@@ -1,2453 +1,274 @@
-import type { MessageDeliveryState, UserWebSessionEventData } from '@kilocode/cloud-agent-sdk';
-import { TRPCClientError } from '@trpc/client';
-import React, { createElement, type ComponentProps } from 'react';
-import { renderToStaticMarkup } from 'react-dom/server';
-import { DropdownMenuItem } from '@/components/ui/dropdown-menu';
-import type * as DropdownMenuComponents from '@/components/ui/dropdown-menu';
-import type * as DropdownMenuPrimitives from '@radix-ui/react-dropdown-menu';
-import { ChatSidebar } from '../ChatSidebar';
-import { SessionPrIndicator } from '../SessionPrIndicator';
-import type { DbSessionV2 } from '../store/db-session-atoms';
 import type { StoredSession } from '../types';
-import { groupWorkspacesByFolder } from '../workspace-folders';
 import {
-  createSidebarQueryReconciler,
-  dbSessionToStoredSession,
-  dbSessionMatchesSearch,
   deriveForegroundSessionStatus,
-  eventRowMatchesSidebarFilters,
-  eventRowToDbSession,
   getRunningSessionSortTime,
-  getDbSessionActivityTime,
-  getSidebarRunOutcomeAfterStatus,
-  getSidebarSessionStatus,
   getSidebarWorktreeActivity,
-  getSidebarWorktreeLabel,
-  getSidebarWorktreePrSession,
-  getSidebarWorktreeRefetchInterval,
-  getStoredSessionActivityTime,
-  groupSidebarSessions,
   groupSidebarSessionsByDate,
-  groupSidebarWorkspaces,
-  mergeWorkspaceRowDetails,
-  workspaceRowToSidebarDetails,
-  type SidebarWorkspaceListRow,
-  mergeWorktreeChatSessions,
-  nextPrLinkVerification,
-  PR_LINK_ATTEMPT_HISTORY_LIMIT,
-  recordPrLinkVerificationAttempt,
-  shouldRetryPrLinkVerification,
-  mergeSidebarFolderSessions,
-  patchSidebarWorktreeSessionStatus,
-  removeSidebarDbSession,
-  sessionCacheKey,
-  SIDEBAR_RECONCILE_DELAY_MS,
   SIDEBAR_RUNNING_BUMP_INTERVAL_MS,
-  upsertSidebarDbSession,
-  type SidebarSortPins,
-  type SidebarWorktreeDetails,
-} from './useSidebarSessions';
+} from './sidebar-session-model';
+import {
+  groupSidebarWorkspaces,
+  latestOpenWorkspaceChat,
+  workspaceSummaryChats,
+} from './sidebar-workspace-model';
+import {
+  getMissingWorkspaceAncestorIds,
+  getWorkspaceSummaryRefetchInterval,
+} from './useWorkspaceSummaries';
+import { mergeWorkspaceChats } from './useWorkspaceChats';
+import { sidebarListInput } from './sidebar-queries';
+import { workspaceSummaryFixture, WORKSPACE_FIXTURE_TIME } from './workspace-summary-test-fixtures';
 
-describe('shouldRetryPrLinkVerification', () => {
-  it.each([
-    'INTERNAL_SERVER_ERROR',
-    'BAD_GATEWAY',
-    'SERVICE_UNAVAILABLE',
-    'GATEWAY_TIMEOUT',
-    'TIMEOUT',
-  ])('retries %s only once', code => {
-    const error = new TRPCClientError('Temporary failure', {
-      result: { error: { code: -32603, message: 'Temporary failure', data: { code } } },
-    });
-    expect(shouldRetryPrLinkVerification(0, error)).toBe(true);
-    expect(shouldRetryPrLinkVerification(1, error)).toBe(false);
-    expect(shouldRetryPrLinkVerification(2, error)).toBe(false);
+const now = Date.parse(WORKSPACE_FIXTURE_TIME);
+
+describe('workspace sidebar summaries', () => {
+  it('renders workspace rows without a recent root-chat list', () => {
+    const summary = workspaceSummaryFixture({ lastActivityAt: '2025-01-01T00:00:00Z' });
+    const groups = groupSidebarWorkspaces([], {}, [summary]);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].summary).toBe(summary);
+    expect(groups[0].latestSession.sessionId).toBe(summary.latestOpenSessionId);
+    expect(groups[0].details?.baseSha).toBe(summary.baseSha);
   });
 
-  it.each([
-    'BAD_REQUEST',
-    'TOO_MANY_REQUESTS',
-    'UNAUTHORIZED',
-    'FORBIDDEN',
-    'NOT_FOUND',
-    'PRECONDITION_FAILED',
-  ])('does not retry %s', code => {
-    const error = new TRPCClientError('Permanent failure', {
-      result: { error: { code: -32000, message: 'Permanent failure', data: { code } } },
-      cause: new TypeError('Failed to fetch'),
-    });
-    expect(shouldRetryPrLinkVerification(0, error)).toBe(false);
+  it('does not reconstruct workspace rows from server search or recent-chat results', () => {
+    const summary = workspaceSummaryFixture();
+    expect(groupSidebarWorkspaces(workspaceSummaryChats(summary))).toEqual([]);
   });
 
-  it('retries a tRPC network failure only once', () => {
-    const error = TRPCClientError.from(new TypeError('Failed to fetch'));
-    expect(shouldRetryPrLinkVerification(0, error)).toBe(true);
-    expect(shouldRetryPrLinkVerification(1, error)).toBe(false);
+  it('keeps pending local chats separate, and yields to server chat summaries', () => {
+    const summary = workspaceSummaryFixture();
+    const [server] = workspaceSummaryChats(summary);
+    const pending = { ...server, sessionId: 'ses_pending', localSync: 'syncing' as const };
+    const staleLocal = { ...server, prompt: 'Local title', localSync: 'syncing' as const };
+    expect(mergeWorkspaceChats(summary.worktreeId, [server], [pending, staleLocal])).toEqual([
+      server,
+      pending,
+    ]);
+    const [group] = groupSidebarWorkspaces([pending], {}, [summary]);
+    expect(group.sessions.map(chat => chat.sessionId)).toEqual(['ses_root', 'ses_pending']);
+    expect(group.summary).toBe(summary);
   });
 
-  it('does not retry unknown or untyped failures', () => {
-    expect(shouldRetryPrLinkVerification(0, new Error('Unknown failure'))).toBe(false);
-    expect(shouldRetryPrLinkVerification(0, new TRPCClientError('Unknown failure'))).toBe(false);
-    expect(shouldRetryPrLinkVerification(0, { data: { code: 'TIMEOUT' } })).toBe(false);
-  });
-});
-
-describe('recordPrLinkVerificationAttempt', () => {
-  it('evicts the oldest attempt at the fixed history limit', () => {
-    const attempted = new Map<string, string>();
-    for (let index = 0; index <= PR_LINK_ATTEMPT_HISTORY_LIMIT; index++) {
-      recordPrLinkVerificationAttempt(attempted, `ses_${index}`, 'link');
-    }
-    expect(attempted.size).toBe(PR_LINK_ATTEMPT_HISTORY_LIMIT);
-    expect(attempted.has('ses_0')).toBe(false);
-    expect(attempted.get('ses_1')).toBe('link');
-    expect(attempted.get(`ses_${PR_LINK_ATTEMPT_HISTORY_LIMIT}`)).toBe('link');
-  });
-
-  it('retains attempts across candidate filter changes', () => {
-    const attempted = new Map<string, string>();
-    const first = { session_id: 'ses_first', prLinkVerificationKey: 'link-1' };
-    const second = { session_id: 'ses_second', prLinkVerificationKey: 'link-2' };
-    recordPrLinkVerificationAttempt(attempted, first.session_id, first.prLinkVerificationKey);
-    expect(nextPrLinkVerification([second], attempted)).toBe(second);
-    recordPrLinkVerificationAttempt(attempted, second.session_id, second.prLinkVerificationKey);
-    expect(nextPrLinkVerification([first], attempted)).toBeUndefined();
-  });
-
-  it('updates changed evidence without growing history and retains it as the newest attempt', () => {
-    const attempted = new Map<string, string>();
-    for (let index = 0; index < PR_LINK_ATTEMPT_HISTORY_LIMIT; index++) {
-      recordPrLinkVerificationAttempt(attempted, `ses_${index}`, 'old-link');
-    }
-    recordPrLinkVerificationAttempt(attempted, 'ses_0', 'new-link');
-    recordPrLinkVerificationAttempt(attempted, 'ses_new', 'link');
-    expect(attempted.size).toBe(PR_LINK_ATTEMPT_HISTORY_LIMIT);
-    expect(attempted.get('ses_0')).toBe('new-link');
-    expect(attempted.has('ses_1')).toBe(false);
-  });
-});
-
-describe('nextPrLinkVerification', () => {
-  it('verifies stored links even when there is no visible PR badge', () => {
-    const session = { session_id: 'ses_unverified', prLinkVerificationKey: 'link-1' };
-    expect(nextPrLinkVerification([session], new Map())).toBe(session);
-  });
-
-  it('skips sessions without a verification candidate', () => {
-    expect(nextPrLinkVerification([{ session_id: 'ses_no_link' }], new Map())).toBeUndefined();
-  });
-
-  it('attempts each session link once and proceeds to the next candidate', () => {
-    const first = { session_id: 'ses_first', prLinkVerificationKey: 'link-1' };
-    const second = { session_id: 'ses_second', prLinkVerificationKey: 'link-1' };
-    const attempted = new Map([[first.session_id, first.prLinkVerificationKey]]);
-    expect(nextPrLinkVerification([first, second], attempted)).toBe(second);
-    attempted.set(second.session_id, second.prLinkVerificationKey);
-    expect(nextPrLinkVerification([first, second], attempted)).toBeUndefined();
-  });
-
-  it('verifies again when the stored link or head evidence changes', () => {
-    const session = { session_id: 'ses_changed', prLinkVerificationKey: 'new-evidence' };
-    expect(nextPrLinkVerification([session], new Map([[session.session_id, 'old-evidence']]))).toBe(
-      session
-    );
-  });
-});
-
-Object.assign(globalThis, { React });
-
-let mockRenderOpenMenus = false;
-
-jest.mock('../hooks/useStackedWorkspaceSource', () => ({
-  useStackedWorkspaceSource: () => ({ source: undefined, isPending: false }),
-}));
-
-jest.mock('next/navigation', () => ({
-  usePathname: () => '/cloud/chat',
-  useRouter: () => ({ push: jest.fn() }),
-}));
-
-jest.mock('@/components/ui/dropdown-menu', () => {
-  const actual = jest.requireActual<typeof DropdownMenuComponents>('@/components/ui/dropdown-menu');
-  const primitives = jest.requireActual<typeof DropdownMenuPrimitives>(
-    '@radix-ui/react-dropdown-menu'
-  );
-  const { createElement } = jest.requireActual<typeof React>('react');
-
-  return {
-    ...actual,
-    DropdownMenu: (props: ComponentProps<typeof actual.DropdownMenu>) =>
-      createElement(actual.DropdownMenu, {
-        ...props,
-        open: mockRenderOpenMenus ? true : props.open,
-      }),
-    DropdownMenuContent: (props: ComponentProps<typeof actual.DropdownMenuContent>) =>
-      createElement(primitives.Content, props),
-    DropdownMenuItem: jest.fn(actual.DropdownMenuItem),
-  };
-});
-
-jest.mock('../SessionPrIndicator', () => {
-  const actual = jest.requireActual<{ SessionPrIndicator: typeof SessionPrIndicator }>(
-    '../SessionPrIndicator'
-  );
-  return { ...actual, SessionPrIndicator: jest.fn(actual.SessionPrIndicator) };
-});
-
-const associatedPr = {
-  url: 'https://github.com/kilo/repo/pull/42',
-  number: 42,
-  state: 'open',
-  title: 'Worktree changes',
-  headSha: 'abc123',
-  lastSyncedAt: '2026-01-01T00:00:00.000Z',
-  reviewDecision: null,
-  reviewDecisionPending: false,
-  observations: null,
-  platform: 'github',
-} satisfies NonNullable<StoredSession['associatedPr']>;
-
-function makeDbSession(sessionId: string, updatedAt: string): DbSessionV2 {
-  return {
-    session_id: sessionId,
-    title: sessionId,
-    cloud_agent_session_id: null,
-    created_on_platform: 'web',
-    organization_id: null,
-    git_url: 'https://github.com/kilo/repo',
-    git_branch: 'main',
-    parent_session_id: null,
-    created_at: new Date('2026-01-01T00:00:00.000Z'),
-    updated_at: new Date(updatedAt),
-    last_activity_at: new Date(updatedAt),
-    version: 2,
-    status: 'idle',
-    status_updated_at: null,
-  };
-}
-
-function makeStoredSession(
-  sessionId: string,
-  updatedAt: string,
-  overrides: Partial<StoredSession> = {}
-): StoredSession {
-  return { ...dbSessionToStoredSession(makeDbSession(sessionId, updatedAt)), ...overrides };
-}
-
-describe('mergeSidebarFolderSessions', () => {
-  it('includes all-time folder workspaces beyond the recent 200-session cap', () => {
-    const recent = Array.from({ length: 200 }, (_, i) =>
-      makeStoredSession(`recent-${i}`, '2026-10-03T00:00:00.000Z', { worktreeId: 'busy' })
-    );
-    const folder = Array.from({ length: 250 }, (_, i) =>
-      makeStoredSession(`old-${i}`, '2026-01-01T00:00:00.000Z', {
-        worktreeId: `worktree_11111111-1111-4111-8111-${i.toString(16).padStart(12, '0')}`,
-        cloudAgentSessionId: 'workspace_22222222-2222-4222-8222-222222222222',
+  it('preserves all server stack layers and their depth', () => {
+    const root = workspaceSummaryFixture();
+    const layers = Array.from({ length: 8 }, (_, index) =>
+      workspaceSummaryFixture({
+        worktreeId: `worktree_layer_${index}`,
+        stackRootId: root.worktreeId,
+        stackDepth: index + 1,
       })
     );
-    const merged = mergeSidebarFolderSessions(recent, folder);
-    expect(merged).toHaveLength(450);
-    expect(groupSidebarSessions(merged)).toHaveLength(251);
-    expect(merged.slice(0, 200).every(session => session.sessionId.startsWith('recent-'))).toBe(
-      true
+    const [group] = groupSidebarWorkspaces([], {}, [root, ...layers]);
+    expect(group.stackLayers?.map(layer => layer.worktreeId)).toEqual(
+      layers.map(layer => layer.worktreeId)
     );
-    const grouped = groupWorkspacesByFolder(groupSidebarSessionsByDate(merged), [
-      {
-        id: '33333333-3333-4333-8333-333333333333',
-        name: 'Saved',
-        color: 'default',
-        kind: 'manual',
-        smartPreset: null,
-        sortMode: 'manual',
-        manualWorktreeOrder: [],
-        worktreeIds: folder.flatMap(session => (session.worktreeId ? [session.worktreeId] : [])),
-      },
+    expect(group.stackLayers?.at(-1)?.stackDepth).toBe(8);
+  });
+
+  it('uses only the server status source chat for immediate foreground or live changes', () => {
+    const summary = workspaceSummaryFixture({
+      sessionStatus: 'busy',
+      status: { ...workspaceSummaryFixture().status, kind: 'running', sessionStatus: 'busy' },
+    });
+    const [group] = groupSidebarWorkspaces([], {}, [summary]);
+    expect(
+      getSidebarWorktreeActivity(group, new Map([['ses_other', 'question']]), {
+        sessionId: 'ses_other',
+        status: 'failed',
+      }).status
+    ).toBe('busy');
+    expect(getSidebarWorktreeActivity(group, new Map([['ses_root', 'question']])).status).toBe(
+      'question'
+    );
+    expect(
+      getSidebarWorktreeActivity(group, new Map([['ses_root', 'busy']]), {
+        sessionId: 'ses_root',
+        status: 'idle',
+      })
+    ).toEqual({ status: null, statusUpdatedAt: null, isLive: false });
+  });
+
+  it('uses summary open-chat order immediately, followed by recently closed chats', () => {
+    const initial = workspaceSummaryFixture();
+    const chat = initial.openChats[0];
+    const summary = workspaceSummaryFixture({
+      openChats: [{ ...chat, sessionId: 'ses_second' }, chat],
+      closedChats: [{ ...chat, sessionId: 'ses_closed' }],
+      latestOpenSessionId: 'ses_root',
+    });
+    expect(workspaceSummaryChats(summary).map(chat => chat.sessionId)).toEqual([
+      'ses_second',
+      'ses_root',
+      'ses_closed',
     ]);
-    expect(grouped.folderGroups[0].worktrees).toHaveLength(250);
-    expect(grouped.ungrouped.flatMap(group => group.items)).toHaveLength(1);
+    expect(groupSidebarWorkspaces([], {}, [summary])[0].latestSession.sessionId).toBe('ses_root');
   });
 
-  it('deduplicates matching recent rows and preserves the newest local updates', () => {
-    const older = makeStoredSession('shared', '2026-01-01T00:00:00.000Z');
-    const newer = makeStoredSession('shared', '2026-10-03T00:00:00.000Z', { prompt: 'Renamed' });
-    expect(mergeSidebarFolderSessions([newer], [older])).toEqual([newer]);
-    expect(mergeSidebarFolderSessions([older], [newer])).toEqual([newer]);
-  });
-
-  it('does not add old ungrouped sessions absent from the folder query', () => {
-    const recent = makeStoredSession('recent', '2026-10-03T00:00:00.000Z');
-    expect(mergeSidebarFolderSessions([recent], [])).toEqual([recent]);
+  it('selects the next open summary chat while a legacy import or local close is pending', () => {
+    const summary = workspaceSummaryFixture();
+    const second = {
+      ...summary.openChats[0],
+      sessionId: 'ses_second',
+      lastActivityAt: '2026-11-09T00:00:00Z',
+    };
+    const workspace = { ...summary, openChats: [...summary.openChats, second] };
+    expect(latestOpenWorkspaceChat(workspace, ['ses_root'])).toBe('ses_second');
+    expect(latestOpenWorkspaceChat(workspace, ['ses_root', 'ses_second'])).toBeNull();
   });
 });
 
-type ForegroundSessionStatusInput = Parameters<typeof deriveForegroundSessionStatus>[0];
+describe('workspace polling', () => {
+  it('does not poll an idle completed workspace with a cloud-agent ID', () => {
+    expect(
+      getWorkspaceSummaryRefetchInterval(
+        workspaceSummaryFixture({ cloudAgentSessionId: 'workspace_synthetic' }),
+        now
+      )
+    ).toBe(false);
+  });
 
-function makeForegroundSessionStatusInput(
-  overrides: Partial<ForegroundSessionStatusInput> = {}
-): ForegroundSessionStatusInput {
-  return {
-    currentSessionId: 'ses_foreground',
+  it('polls only running work, open runs, or pending PR information', () => {
+    expect(
+      getWorkspaceSummaryRefetchInterval(workspaceSummaryFixture({ sessionStatus: 'busy' }), now)
+    ).toBe(30_000);
+    expect(
+      getWorkspaceSummaryRefetchInterval(workspaceSummaryFixture({ hasOpenRun: true }), now)
+    ).toBe(30_000);
+    expect(
+      getWorkspaceSummaryRefetchInterval(
+        workspaceSummaryFixture({ sessionStatus: 'question' }),
+        now
+      )
+    ).toBe(false);
+  });
+
+  it.each(['busy', 'retry'])(
+    'stops stale %s polling after exactly three hours, including an open run',
+    sessionStatus => {
+      const summary = workspaceSummaryFixture();
+      const stale = {
+        ...summary,
+        hasOpenRun: true,
+        openChats: [
+          {
+            ...summary.openChats[0],
+            sessionStatus,
+            updatedAt: new Date(now - 3 * 60 * 60_000).toISOString(),
+          },
+        ],
+      };
+      expect(getWorkspaceSummaryRefetchInterval(stale, now)).toBe(false);
+      expect(getWorkspaceSummaryRefetchInterval(stale, now - 1)).toBe(30_000);
+    }
+  );
+});
+
+describe('stack summary lookup', () => {
+  it('reuses cached ancestors without requesting an unfiltered list', () => {
+    const root = workspaceSummaryFixture();
+    const child = workspaceSummaryFixture({
+      worktreeId: 'worktree_child',
+      parentWorktreeId: root.worktreeId,
+      stackRootId: root.worktreeId,
+    });
+    expect(getMissingWorkspaceAncestorIds([child.worktreeId], [root, child])).toEqual([]);
+    expect(getMissingWorkspaceAncestorIds([child.worktreeId], [child])).toEqual([root.worktreeId]);
+  });
+
+  it('batches the first missing ancestor of each chain and bounds cycles', () => {
+    const left = workspaceSummaryFixture({
+      worktreeId: 'left',
+      parentWorktreeId: 'missing-parent',
+    });
+    const right = workspaceSummaryFixture({
+      worktreeId: 'right',
+      parentWorktreeId: 'missing-parent',
+    });
+    expect(getMissingWorkspaceAncestorIds(['left', 'right', 'unknown'], [left, right])).toEqual([
+      'missing-parent',
+      'unknown',
+    ]);
+    expect(
+      getMissingWorkspaceAncestorIds(
+        ['left'],
+        [
+          { ...left, parentWorktreeId: 'right' },
+          { ...right, parentWorktreeId: 'left' },
+        ]
+      )
+    ).toEqual([]);
+  });
+});
+
+describe('standalone sidebar sessions', () => {
+  it('explicitly excludes workspace chats from the general sidebar list', () => {
+    expect(
+      sidebarListInput({
+        organizationId: null,
+        createdOnPlatform: undefined,
+        gitUrl: undefined,
+        updatedSince: WORKSPACE_FIXTURE_TIME,
+      }).standaloneOnly
+    ).toBe(true);
+  });
+
+  it('preserves the 60-second running sort step', () => {
+    const [session] = workspaceSummaryChats(workspaceSummaryFixture());
+    const moving = { ...session, lastActivityAt: new Date(now + 59_999).toISOString() };
+    expect(getRunningSessionSortTime(moving, true)).toBe(now);
+    expect(
+      getRunningSessionSortTime(
+        { ...moving, lastActivityAt: new Date(now + 60_000).toISOString() },
+        true
+      )
+    ).toBe(now + SIDEBAR_RUNNING_BUMP_INTERVAL_MS);
+  });
+
+  it('groups standalone sessions by activity without workspace dates', () => {
+    const [session] = workspaceSummaryChats(workspaceSummaryFixture());
+    const standalone: StoredSession = { ...session, worktreeId: null };
+    expect(groupSidebarSessionsByDate([standalone], new Date(now))[0]).toMatchObject({
+      label: 'Today',
+      items: [{ type: 'session', session: standalone }],
+    });
+  });
+});
+
+describe('foreground feedback', () => {
+  const foreground = {
+    currentSessionId: 'ses_root',
     organizationId: null,
-    activeSessionType: 'cloud-agent',
-    fetchedSessionData: { kiloSessionId: 'ses_foreground', organizationId: null },
-    activity: { type: 'idle' },
+    activeSessionType: 'cloud-agent' as const,
+    fetchedSessionData: { kiloSessionId: 'ses_root', organizationId: null },
+    activity: { type: 'idle' as const },
     isStreaming: false,
     activeQuestion: null,
     activePermission: null,
     cloudStatus: null,
     pendingMessages: new Map(),
-    ...overrides,
   };
-}
-
-function makeEventRow(overrides?: Partial<UserWebSessionEventData<'session.created'>['session']>) {
-  return {
-    source: 'v2',
-    sessionId: 'ses_root',
-    createdAt: '2026-01-01T00:00:00.000Z',
-    updatedAt: '2026-01-01T00:00:01.000Z',
-    title: 'Root',
-    createdOnPlatform: 'web',
-    organizationId: null,
-    gitUrl: 'https://github.com/kilo/repo',
-    gitBranch: 'main',
-    parentSessionId: null,
-    status: 'idle',
-    statusUpdatedAt: null,
-    ...overrides,
-  } satisfies UserWebSessionEventData<'session.created'>['session'];
-}
-
-describe('useSidebarSessions live update helpers', () => {
-  it.each(['failed', 'system_interrupted'] as const)(
-    'preserves fetched %s outcome through websocket metadata and status patches',
-    failureKind => {
-      const cached: DbSessionV2 = {
-        ...makeDbSession('ses_root', '2026-01-01T00:00:00.000Z'),
-        latest_run_status: failureKind === 'failed' ? 'failed' : 'interrupted',
-        latest_run_failure_kind: failureKind,
-      };
-      for (const status of ['idle', 'busy', 'question']) {
-        const event = eventRowToDbSession(makeEventRow({ status, title: 'Live title' }));
-        const [updated] = upsertSidebarDbSession([cached], event);
-        expect(updated).toMatchObject({
-          title: 'Live title',
-          status,
-          latest_run_status: cached.latest_run_status,
-          latest_run_failure_kind: failureKind,
-        });
-        expect(dbSessionToStoredSession(updated).latestRunFailureKind).toBe(failureKind);
-        expect(cached.title).toBe('ses_root');
-      }
-    }
-  );
-
-  it('keeps a generated title when an out-of-order placeholder event arrives', () => {
-    const cached: DbSessionV2 = {
-      ...makeDbSession('ses_root', '2026-01-01T00:00:00.000Z'),
-      title: 'Fix login form validation',
-    };
-    const event = eventRowToDbSession(
-      makeEventRow({ title: 'New session - 2026-01-01T00:00:02.000Z' })
-    );
-
-    const [updated] = upsertSidebarDbSession([cached], event);
-
-    expect(updated.title).toBe('Fix login form validation');
-  });
-
-  it.each(['completed', 'queued', 'accepted'] as const)(
-    'clears a previous failure when an authoritative %s outcome arrives',
-    latestRunStatus => {
-      const cached: DbSessionV2 = {
-        ...makeDbSession('ses_root', '2026-01-01T00:00:00.000Z'),
-        latest_run_status: 'failed',
-        latest_run_failure_kind: 'failed',
-      };
-      const next: DbSessionV2 = {
-        ...cached,
-        updated_at: new Date('2026-01-01T00:01:00.000Z'),
-        latest_run_status: latestRunStatus,
-        latest_run_failure_kind: null,
-      };
-      const [updated] = upsertSidebarDbSession([cached], next);
-      expect(updated.latest_run_status).toBe(latestRunStatus);
-      expect(updated.latest_run_failure_kind).toBeNull();
-      expect(getSidebarSessionStatus(dbSessionToStoredSession(updated))).toBe('idle');
-      expect(cached.latest_run_failure_kind).toBe('failed');
-    }
-  );
-
-  it.each(['failed', 'system_interrupted', null, undefined] as const)(
-    'converts persisted failure kind %s to a stored sidebar session',
-    latestRunFailureKind => {
-      expect(
-        dbSessionToStoredSession({
-          ...makeDbSession('ses_root', '2026-01-01T00:00:00.000Z'),
-          latest_run_failure_kind: latestRunFailureKind,
-        }).latestRunFailureKind
-      ).toBe(latestRunFailureKind ?? null);
-    }
-  );
-
-  it.each([
-    { latest_run_status: 'failed' },
-    { latest_run_status: 'interrupted' },
-    { latest_run_failure_kind: 'failed' },
-    { latest_run_failure_kind: 'system_interrupted' },
-  ])('invalidates sidebar equality when only the latest outcome changes: %j', outcome => {
-    const base = {
-      session_id: 'ses_root',
-      updated_at: '2026-01-01T00:00:00.000Z',
-      status: 'idle',
-      status_updated_at: null,
-      latest_run_status: null,
-      latest_run_failure_kind: null,
-    };
-    expect(sessionCacheKey(base)).not.toBe(sessionCacheKey({ ...base, ...outcome }));
-  });
-
-  describe('getSidebarSessionStatus', () => {
-    it.each(['busy', 'retry', 'question', 'permission'])(
-      'overrides stale %s after terminal failure',
-      sessionStatus => {
-        const session = {
-          sessionStatus,
-          sessionStatusUpdatedAt: '2026-01-03T12:00:00.000Z',
-          latestRunFailureKind: 'failed' as const,
-          latestRunTerminalAt: '2026-01-03T12:01:00.000Z',
-        };
-        expect(getSidebarSessionStatus(session)).toBe('failed');
-        expect(
-          getSidebarSessionStatus({
-            ...session,
-            sessionStatusUpdatedAt: '2026-01-03T12:02:00.000Z',
-          })
-        ).toBe(sessionStatus);
-      }
-    );
-    it.each(['failed', 'system_interrupted'] as const)(
-      'falls back to %s only when session activity is idle or absent',
-      latestRunFailureKind => {
-        for (const sessionStatus of ['idle', null, undefined]) {
-          expect(getSidebarSessionStatus({ sessionStatus, latestRunFailureKind })).toBe(
-            latestRunFailureKind
-          );
-        }
-        for (const sessionStatus of ['busy', 'retry', 'question', 'permission']) {
-          expect(getSidebarSessionStatus({ sessionStatus, latestRunFailureKind })).toBe(
-            sessionStatus
-          );
-        }
-      }
-    );
-
-    it('leaves idle and missing activity unchanged without a failure', () => {
-      expect(getSidebarSessionStatus({ sessionStatus: 'idle', latestRunFailureKind: null })).toBe(
-        'idle'
-      );
-      expect(getSidebarSessionStatus({ sessionStatus: null })).toBeNull();
-      expect(getSidebarSessionStatus({})).toBeNull();
-    });
-  });
-
-  it.each(['failed', null] as const)(
-    'uses authoritative worktree outcome %s despite equal metadata timestamps',
-    latestRunFailureKind => {
-      const cached = makeStoredSession('ses_root', '2026-01-03T12:00:00.000Z', {
-        latestRunFailureKind: latestRunFailureKind ? null : 'failed',
-      });
-      const authoritative = { ...cached, latestRunFailureKind };
-      expect(getSidebarWorktreeActivity([cached], new Map(), [authoritative]).status).toBe(
-        latestRunFailureKind
-      );
-    }
-  );
-
-  it('shows a terminal failure instead of stale stored and live retry activity', () => {
-    const session = makeStoredSession('ses_root', '2026-01-03T12:00:00.000Z', {
-      sessionStatus: 'retry',
-      sessionStatusUpdatedAt: '2026-01-03T12:00:00.000Z',
-      latestRunFailureKind: 'failed',
-      latestRunTerminalAt: '2026-01-03T12:01:00.000Z',
-    });
-    expect(getSidebarWorktreeActivity([session], new Map([['ses_root', 'retry']])).status).toBe(
-      'failed'
-    );
+  it('does not use foreground status from another session or organization', () => {
     expect(
-      getSidebarWorktreeActivity([session], new Map(), [session], {
-        sessionId: 'ses_root',
-        status: 'busy',
-      }).status
-    ).toBe('busy');
-  });
-
-  it.each(['busy', 'retry'])(
-    'preserves live %s after a terminal run without a failure or stored status',
-    status => {
-      const session = makeStoredSession('ses_root', '2026-01-03T12:00:00.000Z', {
-        sessionStatus: null,
-        latestRunFailureKind: null,
-        latestRunTerminalAt: '2026-01-03T12:01:00.000Z',
-      });
-      expect(getSidebarWorktreeActivity([session], new Map([['ses_root', status]])).status).toBe(
-        status
-      );
-    }
-  );
-
-  it.each(['failed', 'system_interrupted'] as const)(
-    'does not restore obsolete %s after a newer busy run returns to idle',
-    failureKind => {
-      const cached: DbSessionV2 = {
-        ...makeDbSession('ses_root', '2026-01-03T12:00:00.000Z'),
-        latest_run_status: failureKind === 'failed' ? 'failed' : 'interrupted',
-        latest_run_failure_kind: failureKind,
-        latest_run_terminal_at: '2026-01-03T12:01:00.000Z',
-      };
-      const [running] = upsertSidebarDbSession(
-        [cached],
-        eventRowToDbSession(
-          makeEventRow({ status: 'busy', statusUpdatedAt: '2026-01-03T12:02:00.000Z' })
-        )
-      );
-      const [completed] = upsertSidebarDbSession(
-        [running],
-        eventRowToDbSession(
-          makeEventRow({ status: 'idle', statusUpdatedAt: '2026-01-03T12:03:00.000Z' })
-        )
-      );
-      expect(completed.latest_run_failure_kind).toBeNull();
-      expect(getSidebarSessionStatus(dbSessionToStoredSession(completed))).toBe('idle');
-      expect(cached.latest_run_failure_kind).toBe(failureKind);
-    }
-  );
-
-  describe('getSidebarRunOutcomeAfterStatus', () => {
-    const failure = {
-      latest_run_status: 'failed' as const,
-      latest_run_failure_kind: 'failed' as const,
-      latest_run_terminal_at: '2026-01-03T12:01:00.000Z',
-    };
-
-    it.each([
-      ['idle', '2026-01-03T12:02:00.000Z'],
-      ['retry', '2026-01-03T12:02:00.000Z'],
-      ['busy', '2026-01-03T12:00:00.000Z'],
-      ['busy', '2026-01-03T12:01:00.000Z'],
-      ['busy', null],
-      ['busy', 'invalid'],
-    ])('preserves a real failure for %s observed at %s', (status, statusUpdatedAt) => {
-      expect(getSidebarRunOutcomeAfterStatus(failure, status, statusUpdatedAt)).toEqual(failure);
-    });
-
-    it('preserves failure when the terminal timestamp is absent or invalid', () => {
-      for (const latest_run_terminal_at of [null, 'invalid']) {
-        const session = { ...failure, latest_run_terminal_at };
-        expect(
-          getSidebarRunOutcomeAfterStatus(session, 'busy', '2026-01-03T12:02:00.000Z')
-        ).toEqual(session);
-      }
-    });
-
-    it('clears the whole cached outcome only after demonstrably newer busy activity', () => {
-      expect(
-        getSidebarRunOutcomeAfterStatus(failure, 'busy', new Date('2026-01-03T12:02:00.000Z'))
-      ).toEqual({
-        latest_run_status: null,
-        latest_run_failure_kind: null,
-        latest_run_terminal_at: null,
-      });
-    });
-
-    it('does not clear an explicitly supplied authoritative failure', () => {
-      const previous: DbSessionV2 = {
-        ...makeDbSession('ses_root', '2026-01-03T12:00:00.000Z'),
-        ...failure,
-      };
-      const incoming: DbSessionV2 = {
-        ...previous,
-        status: 'busy',
-        status_updated_at: new Date('2026-01-03T12:02:00.000Z'),
-      };
-      expect(upsertSidebarDbSession([previous], incoming)[0]).toMatchObject(failure);
-    });
-  });
-
-  it('preserves updated_at descending order when patching a visible row', () => {
-    const newest = makeDbSession('ses_newest', '2026-01-03T00:00:00.000Z');
-    const middle = makeDbSession('ses_middle', '2026-01-02T00:00:00.000Z');
-    const olderPatch = makeDbSession('ses_older_patch', '2026-01-01T00:00:00.000Z');
-
-    const result = upsertSidebarDbSession([newest, middle], olderPatch);
-
-    expect(result.map(session => session.session_id)).toEqual([
-      'ses_newest',
-      'ses_middle',
-      'ses_older_patch',
-    ]);
-  });
-
-  it('moves a patched row according to updated_at instead of prepending blindly', () => {
-    const newest = makeDbSession('ses_newest', '2026-01-03T00:00:00.000Z');
-    const stale = makeDbSession('ses_stale', '2026-01-01T00:00:00.000Z');
-    const refreshed = makeDbSession('ses_stale', '2026-01-04T00:00:00.000Z');
-
-    const result = upsertSidebarDbSession([newest, stale], refreshed);
-
-    expect(result.map(session => session.session_id)).toEqual(['ses_stale', 'ses_newest']);
-  });
-
-  it('preserves fetched Cloud Agent and PR fields when a live row patches the session', () => {
-    const associatedPr = {
-      url: 'https://github.com/kilo/repo/pull/42',
-      number: 42,
-      state: 'open',
-      title: 'Realtime sidebar',
-      headSha: 'abc123',
-      lastSyncedAt: '2026-01-01T00:00:00.000Z',
-      reviewDecision: 'approved' as const,
-      reviewDecisionPending: false,
-      observations: null,
-      platform: 'github',
-    };
-    const cached = {
-      ...makeDbSession('ses_cached', '2026-01-01T00:00:00.000Z'),
-      cloud_agent_session_id: 'agent_123',
-      associatedPr,
-    };
-    const livePatch = {
-      ...makeDbSession('ses_cached', '2026-01-04T00:00:00.000Z'),
-      title: 'Updated live title',
-      status: 'busy',
-    };
-
-    const result = upsertSidebarDbSession([cached], livePatch);
-
-    expect(result).toHaveLength(1);
-    expect(result[0]).toMatchObject({
-      title: 'Updated live title',
-      status: 'busy',
-      cloud_agent_session_id: 'agent_123',
-      associatedPr,
-    });
-  });
-
-  it('preserves an existing group when an older live event omits its worktree', () => {
-    const cached = {
-      ...makeDbSession('ses_grouped', '2026-01-01T00:00:00.000Z'),
-      cloud_agent_worktree_id: 'worktree_existing',
-    };
-    const olderEvent = eventRowToDbSession(
-      makeEventRow({ sessionId: 'ses_grouped', updatedAt: '2026-01-02T00:00:00.000Z' })
-    );
-
-    expect(upsertSidebarDbSession([cached], olderEvent)[0]).toMatchObject({
-      cloud_agent_worktree_id: 'worktree_existing',
-    });
-  });
-
-  it('adopts a user-wide event worktree and maps it through the stored sidebar session', () => {
-    const cached = makeDbSession('ses_grouped', '2026-01-01T00:00:00.000Z');
-    const groupedEvent = eventRowToDbSession(
-      makeEventRow({
-        sessionId: 'ses_grouped',
-        updatedAt: '2026-01-02T00:00:00.000Z',
-        worktreeId: 'worktree_added_live',
+      deriveForegroundSessionStatus({
+        ...foreground,
+        fetchedSessionData: { kiloSessionId: 'ses_other', organizationId: null },
       })
-    );
-
-    const [updated] = upsertSidebarDbSession([cached], groupedEvent);
-
-    expect(dbSessionToStoredSession(updated).worktreeId).toBe('worktree_added_live');
-  });
-
-  it('invalidates sidebar equality when only the group identity changes', () => {
-    const base = {
-      session_id: 'ses_grouped',
-      updated_at: '2026-01-01T00:00:00.000Z',
-      status: 'idle',
-      status_updated_at: null,
-    };
-
-    expect(sessionCacheKey(base)).not.toBe(
-      sessionCacheKey({ ...base, cloud_agent_worktree_id: 'worktree_added_live' })
-    );
-  });
-
-  it('updates the session cache key when webhook counts change without session activity', () => {
-    const base = {
-      session_id: 'ses_webhook_counts',
-      updated_at: '2026-01-01T00:00:00.000Z',
-      status: 'idle',
-      status_updated_at: null,
-      associatedPr: {
-        state: 'open',
-        lastSyncedAt: '2026-01-01T00:00:00.000Z',
-        reviewDecision: null,
-        reviewDecisionPending: false,
-        observations: {
-          checks: { total: 2, failed: 0 },
-          unresolvedThreads: null,
-          truncated: false,
-        },
-      },
-    };
-    expect(sessionCacheKey(base)).not.toBe(
-      sessionCacheKey({
-        ...base,
-        associatedPr: {
-          ...base.associatedPr,
-          observations: { ...base.associatedPr.observations, checks: { total: 2, failed: 1 } },
-        },
-      })
-    );
-  });
-
-  it('removes deleted rows immediately from the visible list', () => {
-    const result = removeSidebarDbSession(
-      [
-        makeDbSession('ses_keep', '2026-01-02T00:00:00.000Z'),
-        makeDbSession('ses_delete', '2026-01-01T00:00:00.000Z'),
-      ],
-      'ses_delete'
-    );
-
-    expect(result.map(session => session.session_id)).toEqual(['ses_keep']);
-  });
-
-  it('excludes child session rows from root-only sidebar filters', () => {
-    const result = eventRowMatchesSidebarFilters(
-      makeEventRow({ parentSessionId: 'ses_parent' }),
-      {}
-    );
-
-    expect(result).toBe(false);
-  });
-
-  it('treats the platform other filter as unsafe for local-only patching', () => {
-    const result = eventRowMatchesSidebarFilters(makeEventRow(), { createdOnPlatform: 'other' });
-
-    expect(result).toBeNull();
-  });
-
-  it('preserves associated PR data from fetched sidebar rows', () => {
-    const session = {
-      ...makeDbSession('ses_with_pr', '2026-01-01T00:00:00.000Z'),
-      associatedPr: {
-        url: 'https://github.com/kilo/repo/pull/42',
-        number: 42,
-        state: 'open',
-        title: 'Realtime sidebar',
-        headSha: 'abc123',
-        lastSyncedAt: '2026-01-01T00:00:00.000Z',
-        reviewDecision: 'approved' as const,
-        reviewDecisionPending: false,
-        observations: null,
-        platform: 'github',
-      },
-    };
-
-    expect(dbSessionToStoredSession(session).associatedPr).toEqual(session.associatedPr);
-  });
-
-  describe('deriveForegroundSessionStatus', () => {
-    it.each<Partial<ForegroundSessionStatusInput>>([
-      { agentStatus: { type: 'error' } },
-      { cloudStatus: { type: 'error', message: 'Run failed' } },
-    ])('reports failure for an idle foreground error: %j', overrides => {
-      expect(deriveForegroundSessionStatus(makeForegroundSessionStatusInput(overrides))).toBe(
-        'failed'
-      );
-    });
-
-    it('does not warn for a normally interrupted foreground agent', () => {
-      expect(
-        deriveForegroundSessionStatus(
-          makeForegroundSessionStatusInput({
-            agentStatus: { type: 'interrupted' },
-          })
-        )
-      ).toBe('idle');
-    });
-
-    it.each<[Partial<ForegroundSessionStatusInput>, string]>([
-      [{ activePermission: { requestId: 'permission' } }, 'permission'],
-      [{ activeQuestion: { requestId: 'question' } }, 'question'],
-      [{ activity: { type: 'retrying', attempt: 1, message: 'Retrying' } }, 'retry'],
-      [{ activity: { type: 'busy' } }, 'busy'],
-      [{ isStreaming: true }, 'busy'],
-      [{ cloudStatus: { type: 'preparing' } }, 'busy'],
-      [{ cloudStatus: { type: 'finalizing' } }, 'busy'],
-      [
-        {
-          pendingMessages: new Map<string, MessageDeliveryState>([
-            ['message', { status: 'queued' }],
-          ]),
-        },
-        'busy',
-      ],
-    ])('keeps current activity ahead of foreground errors: %j', (overrides, expected) => {
-      expect(
-        deriveForegroundSessionStatus(
-          makeForegroundSessionStatusInput({
-            agentStatus: { type: 'error' },
-            cloudStatus: { type: 'error', message: 'Run failed' },
-            ...overrides,
-          })
-        )
-      ).toBe(expected);
-    });
-
-    it('prioritizes permissions over questions, retries, and running work', () => {
-      const result = deriveForegroundSessionStatus(
-        makeForegroundSessionStatusInput({
-          activePermission: { requestId: 'permission' },
-          activeQuestion: { requestId: 'question' },
-          activity: { type: 'retrying', attempt: 1, message: 'Retrying' },
-          isStreaming: true,
-          cloudStatus: { type: 'preparing' },
-          pendingMessages: new Map<string, MessageDeliveryState>([
-            ['message', { status: 'queued' }],
-          ]),
-        })
-      );
-
-      expect(result).toBe('permission');
-    });
-
-    it('prioritizes questions over retries and running work', () => {
-      const result = deriveForegroundSessionStatus(
-        makeForegroundSessionStatusInput({
-          activeQuestion: { requestId: 'question' },
-          activity: { type: 'retrying', attempt: 1, message: 'Retrying' },
-          isStreaming: true,
-        })
-      );
-
-      expect(result).toBe('question');
-    });
-
-    it('prioritizes retries over streaming, cloud preparation, and queued messages', () => {
-      const result = deriveForegroundSessionStatus(
-        makeForegroundSessionStatusInput({
-          activity: { type: 'retrying', attempt: 1, message: 'Retrying' },
-          isStreaming: true,
-          cloudStatus: { type: 'preparing' },
-          pendingMessages: new Map<string, MessageDeliveryState>([
-            ['message', { status: 'queued' }],
-          ]),
-        })
-      );
-
-      expect(result).toBe('retry');
-    });
-
-    it.each<[string, Partial<ForegroundSessionStatusInput>]>([
-      ['busy activity', { activity: { type: 'busy' } }],
-      ['streaming', { isStreaming: true }],
-      ['cloud preparation', { cloudStatus: { type: 'preparing' } }],
-      ['cloud finalization', { cloudStatus: { type: 'finalizing' } }],
-      [
-        'queued message delivery',
-        {
-          pendingMessages: new Map<string, MessageDeliveryState>([
-            ['message', { status: 'queued' }],
-          ]),
-        },
-      ],
-    ])('reports busy for %s', (_label, overrides) => {
-      expect(deriveForegroundSessionStatus(makeForegroundSessionStatusInput(overrides))).toBe(
-        'busy'
-      );
-    });
-
-    it('returns idle instead of treating failed queued-message history as active', () => {
-      const result = deriveForegroundSessionStatus(
-        makeForegroundSessionStatusInput({
-          pendingMessages: new Map<string, MessageDeliveryState>([
-            [
-              'failed-message',
-              { status: 'failed', error: 'Delivery failed', reason: 'exhausted', attempts: 3 },
-            ],
-          ]),
-        })
-      );
-
-      expect(result).toBe('idle');
-    });
-
-    it('derives foreground status within the exact organization scope', () => {
-      const result = deriveForegroundSessionStatus(
-        makeForegroundSessionStatusInput({
-          organizationId: 'organization-current',
-          fetchedSessionData: {
-            kiloSessionId: 'ses_foreground',
-            organizationId: 'organization-current',
-          },
-          isStreaming: true,
-        })
-      );
-
-      expect(result).toBe('busy');
-    });
-
-    it.each<[string, Partial<ForegroundSessionStatusInput>]>([
-      ['a remote session', { activeSessionType: 'remote' }],
-      ['a missing current session', { currentSessionId: null }],
-      ['missing fetched session data', { fetchedSessionData: null }],
-      [
-        'a different fetched session',
-        { fetchedSessionData: { kiloSessionId: 'ses_different', organizationId: null } },
-      ],
-      [
-        'an organization session on a personal route',
-        {
-          fetchedSessionData: {
-            kiloSessionId: 'ses_foreground',
-            organizationId: 'organization-foreign',
-          },
-        },
-      ],
-      ['a personal session on an organization route', { organizationId: 'organization-current' }],
-      [
-        'a different organization',
-        {
-          organizationId: 'organization-current',
-          fetchedSessionData: {
-            kiloSessionId: 'ses_foreground',
-            organizationId: 'organization-foreign',
-          },
-        },
-      ],
-    ])('does not override status for %s', (_label, overrides) => {
-      expect(
-        deriveForegroundSessionStatus(
-          makeForegroundSessionStatusInput({ ...overrides, isStreaming: true })
-        )
-      ).toBeNull();
-    });
-  });
-
-  describe('mergeWorktreeChatSessions', () => {
-    const worktreeId = 'worktree_shared';
-
-    it('applies newer live titles and statuses while preserving authoritative runtime identity', () => {
-      const authoritative = makeStoredSession('ses_existing', '2026-01-01T00:00:00.000Z', {
-        worktreeId,
-        prompt: 'Original title',
-        cloudAgentSessionId: 'workspace_authoritative',
-        status: 'active',
-        sessionStatus: 'idle',
-      });
-      const live = makeStoredSession('ses_existing', '2026-01-02T00:00:00.000Z', {
-        worktreeId,
-        prompt: 'Live title',
-        cloudAgentSessionId: null,
-        status: 'completed',
-        sessionStatus: 'busy',
-        sessionStatusUpdatedAt: '2026-01-02T00:00:00.000Z',
-      });
-
-      expect(mergeWorktreeChatSessions(worktreeId, [authoritative], [live])).toEqual([
-        expect.objectContaining({
-          sessionId: 'ses_existing',
-          prompt: 'Live title',
-          cloudAgentSessionId: 'workspace_authoritative',
-          status: 'active',
-          sessionStatus: 'busy',
-          sessionStatusUpdatedAt: '2026-01-02T00:00:00.000Z',
-        }),
-      ]);
-    });
-
-    it('keeps authoritative siblings and includes newly cached siblings from the selected worktree', () => {
-      const authoritative = makeStoredSession('ses_authoritative', '2026-01-02T00:00:00.000Z', {
-        worktreeId,
-        createdAt: '2026-01-01T00:00:00.000Z',
-      });
-      const newlyCreated = makeStoredSession('ses_new', '2026-01-03T00:00:00.000Z', {
-        worktreeId,
-        createdAt: '2026-01-03T00:00:00.000Z',
-      });
-      const unrelatedAuthoritative = makeStoredSession(
-        'ses_authoritative_foreign',
-        '2026-01-03T00:00:00.000Z',
-        { worktreeId: 'worktree_foreign' }
-      );
-      const unrelatedCached = makeStoredSession('ses_cached_foreign', '2026-01-03T00:00:00.000Z', {
-        worktreeId: 'worktree_foreign',
-      });
-
-      const result = mergeWorktreeChatSessions(
-        worktreeId,
-        [unrelatedAuthoritative, authoritative],
-        [unrelatedCached, newlyCreated]
-      );
-
-      expect(result.map(session => session.sessionId)).toEqual(['ses_authoritative', 'ses_new']);
-    });
-
-    it('does not replace newer authoritative data with stale cached session data', () => {
-      const authoritative = makeStoredSession('ses_existing', '2026-01-03T00:00:00.000Z', {
-        worktreeId,
-        prompt: 'Authoritative title',
-        sessionStatus: 'idle',
-      });
-      const stale = makeStoredSession('ses_existing', '2026-01-02T00:00:00.000Z', {
-        worktreeId,
-        prompt: 'Stale title',
-        sessionStatus: 'busy',
-      });
-
-      expect(mergeWorktreeChatSessions(worktreeId, [authoritative], [stale])).toEqual([
-        expect.objectContaining({ prompt: 'Authoritative title', sessionStatus: 'idle' }),
-      ]);
-    });
-
-    it('keeps optimistic cached titles when authoritative and cached timestamps match', () => {
-      const authoritative = makeStoredSession('ses_existing', '2026-01-02T00:00:00.000Z', {
-        worktreeId,
-        prompt: 'Previous title',
-      });
-      const renamed = makeStoredSession('ses_existing', '2026-01-02T00:00:00.000Z', {
-        worktreeId,
-        prompt: 'Optimistically renamed',
-      });
-
-      expect(mergeWorktreeChatSessions(worktreeId, [authoritative], [renamed])).toEqual([
-        expect.objectContaining({ prompt: 'Optimistically renamed' }),
-      ]);
-    });
-
-    it('sorts chats by creation time and uses session identity for deterministic ties', () => {
-      const latest = makeStoredSession('ses_latest', '2026-01-01T00:00:00.000Z', {
-        worktreeId,
-        createdAt: '2026-01-03T00:00:00.000Z',
-      });
-      const firstTie = makeStoredSession('ses_a', '2026-01-03T00:00:00.000Z', {
-        worktreeId,
-        createdAt: '2026-01-01T00:00:00.000Z',
-      });
-      const secondTie = makeStoredSession('ses_b', '2026-01-02T00:00:00.000Z', {
-        worktreeId,
-        createdAt: '2026-01-01T00:00:00.000Z',
-      });
-
-      const result = mergeWorktreeChatSessions(worktreeId, [latest, secondTie], [firstTie]);
-
-      expect(result.map(session => session.sessionId)).toEqual(['ses_a', 'ses_b', 'ses_latest']);
-    });
-  });
-
-  describe('sidebar worktree grouping', () => {
-    it.each(['failed', 'system_interrupted'] as const)(
-      'ignores an older hidden persisted %s outcome when the latest session is healthy',
-      latestRunFailureKind => {
-        const visible = makeStoredSession('ses_visible', '2026-01-03T12:00:00.000Z');
-        const hidden = makeStoredSession('ses_hidden', '2025-01-03T12:00:00.000Z', {
-          latestRunFailureKind,
-        });
-        for (const active of [new Map<string, string>(), new Map([['ses_hidden', 'idle']])]) {
-          expect(getSidebarWorktreeActivity([visible], active, [visible, hidden])).toEqual({
-            status: null,
-            statusUpdatedAt: null,
-            isLive: active.size > 0,
-          });
-        }
-        expect(
-          getSidebarWorktreeActivity([visible], new Map(), [visible, hidden], {
-            sessionId: hidden.sessionId,
-            status: 'idle',
-          }).status
-        ).toBeNull();
-        expect(
-          getSidebarWorktreeActivity([visible], new Map([['ses_hidden', 'idle']]), [visible]).status
-        ).toBeNull();
-      }
-    );
-
-    it.each(['failed', 'system_interrupted'] as const)(
-      'includes the latest hidden session persisted %s outcome even with live idle status',
-      latestRunFailureKind => {
-        const visible = makeStoredSession('ses_visible', '2026-01-03T12:00:00.000Z');
-        const hidden = makeStoredSession('ses_hidden', '2026-01-03T13:00:00.000Z', {
-          latestRunFailureKind,
-        });
-        for (const authoritative of [
-          [visible, hidden],
-          [hidden, visible],
-        ]) {
-          for (const active of [new Map<string, string>(), new Map([['ses_hidden', 'idle']])]) {
-            expect(getSidebarWorktreeActivity([visible], active, authoritative)).toEqual({
-              status: latestRunFailureKind,
-              statusUpdatedAt: null,
-              isLive: active.size > 0,
-            });
-          }
-        }
-        expect(
-          getSidebarWorktreeActivity([visible], new Map(), [visible, hidden], {
-            sessionId: hidden.sessionId,
-            status: 'idle',
-          }).status
-        ).toBe(latestRunFailureKind);
-        const latest = { ...hidden, latestRunFailureKind: null };
-        expect(
-          getSidebarWorktreeActivity(
-            [visible],
-            new Map([[latest.sessionId, latestRunFailureKind]]),
-            [visible, latest]
-          ).status
-        ).toBe(latestRunFailureKind);
-        expect(
-          getSidebarWorktreeActivity([visible], new Map(), [visible, latest], {
-            sessionId: latest.sessionId,
-            status: 'failed',
-          }).status
-        ).toBe('failed');
-      }
-    );
-
-    it.each(['failed', 'system_interrupted'] as const)(
-      'ignores an older visible %s session when the latest healthy sibling is hidden',
-      status => {
-        const older = makeStoredSession('ses_older', '2026-01-03T12:00:00.000Z', {
-          sessionStatus: status,
-        });
-        const latest = makeStoredSession('ses_latest', '2026-01-03T13:00:00.000Z');
-        for (const sessions of [[older], [older, latest], [latest, older]]) {
-          expect(
-            getSidebarWorktreeActivity(sessions, new Map(), [older, latest]).status
-          ).toBeNull();
-          expect(
-            getSidebarWorktreeActivity(sessions, new Map([[older.sessionId, status]]), [
-              older,
-              latest,
-            ]).status
-          ).toBeNull();
-          expect(
-            getSidebarWorktreeActivity(sessions, new Map(), [older, latest], {
-              sessionId: older.sessionId,
-              status,
-            }).status
-          ).toBeNull();
-        }
-      }
-    );
-
-    it('uses the sidebar session-ID tie-breaker for equally recent failure warnings', () => {
-      const first = makeStoredSession('ses_a', '2026-01-03T12:00:00.000Z', {
-        latestRunFailureKind: 'failed',
-      });
-      const second = makeStoredSession('ses_b', '2026-01-03T12:00:00.000Z');
-      for (const sessions of [
-        [first, second],
-        [second, first],
-      ]) {
-        expect(getSidebarWorktreeActivity(sessions, new Map()).status).toBeNull();
-        expect(
-          getSidebarWorktreeActivity(
-            sessions.map(session => ({ ...session, latestRunFailureKind: 'failed' })),
-            new Map()
-          ).status
-        ).toBe('failed');
-      }
-    });
-
-    it.each(['question', 'permission', 'busy', 'retry'])(
-      'prioritizes sibling %s over a persisted failure regardless of order',
-      status => {
-        const failed = makeStoredSession('ses_failed', '2026-01-03T12:00:00.000Z', {
-          latestRunFailureKind: 'failed',
-        });
-        const active = makeStoredSession('ses_active', '2026-01-03T12:00:00.000Z', {
-          sessionStatus: status,
-        });
-        for (const sessions of [
-          [failed, active],
-          [active, failed],
-        ]) {
-          expect(
-            getSidebarWorktreeActivity(
-              sessions,
-              new Map(),
-              sessions,
-              null,
-              new Date('2026-01-03T12:01:00.000Z').getTime()
-            ).status
-          ).toBe(status);
-        }
-      }
-    );
-
-    it('groups siblings before date bucketing so a worktree appears only once', () => {
-      const local = (day: number, hour: number) => new Date(2026, 0, day, hour).toISOString();
-      const sessions = [
-        makeStoredSession('ses_today', local(3, 12), { worktreeId: 'worktree_shared' }),
-        makeStoredSession('ses_yesterday', local(2, 12), { worktreeId: 'worktree_shared' }),
-        makeStoredSession('ses_ungrouped', local(2, 11)),
-      ];
-
-      const result = groupSidebarSessionsByDate(sessions, new Date(2026, 0, 3, 18));
-
-      expect(result.map(group => ({ label: group.label, size: group.items.length }))).toEqual([
-        { label: 'Today', size: 1 },
-        { label: 'Yesterday', size: 1 },
-      ]);
-      expect(result[0]?.items[0]).toMatchObject({
-        type: 'worktree',
-        worktreeId: 'worktree_shared',
-        sessions: [{ sessionId: 'ses_today' }, { sessionId: 'ses_yesterday' }],
-      });
-      expect(result[1]?.items[0]).toMatchObject({
-        type: 'session',
-        session: { sessionId: 'ses_ungrouped' },
-      });
-    });
-
-    it('orders groups and their children by the newest sibling activity', () => {
-      const result = groupSidebarSessions([
-        makeStoredSession('ses_older_group', '2026-01-01T10:00:00.000Z', {
-          worktreeId: 'worktree_latest',
-        }),
-        makeStoredSession('ses_ungrouped', '2026-01-02T10:00:00.000Z'),
-        makeStoredSession('ses_newest_group', '2026-01-03T10:00:00.000Z', {
-          worktreeId: 'worktree_latest',
-        }),
-      ]);
-
-      expect(result[0]).toMatchObject({
-        type: 'worktree',
-        latestSession: { sessionId: 'ses_newest_group' },
-        sessions: [{ sessionId: 'ses_newest_group' }, { sessionId: 'ses_older_group' }],
-      });
-      expect(result[1]).toMatchObject({ type: 'session', session: { sessionId: 'ses_ungrouped' } });
-    });
-
-    it('derives stable group labels from repository and branch metadata', () => {
-      const [group] = groupSidebarSessions([
-        makeStoredSession('ses_grouped', '2026-01-03T10:00:00.000Z', {
-          repository: 'kilo/repo',
-          branch: 'feature/shared-chat',
-          worktreeId: 'worktree_shared',
-        }),
-      ]);
-      if (group?.type !== 'worktree') throw new Error('Expected worktree group');
-
-      expect(getSidebarWorktreeLabel(group)).toBe('kilo/repo · feature/shared-chat');
-    });
-
-    it.each([
-      {
-        name: 'Custom worktree name',
-        defaultTitle: 'Authoritative first chat title',
-        expected: 'Custom worktree name',
-      },
-      {
-        name: null,
-        defaultTitle: 'Authoritative first chat title',
-        expected: 'Authoritative first chat title',
-      },
-      { name: null, defaultTitle: null, expected: 'New chat' },
-    ])('keeps $expected independent of visible chat titles and activity', details => {
-      const first = makeStoredSession('ses_first', '2026-01-01T10:00:00.000Z', {
-        worktreeId: 'worktree_shared',
-        prompt: 'Visible older chat title',
-      });
-      const latest = makeStoredSession('ses_latest', '2026-01-03T10:00:00.000Z', {
-        worktreeId: 'worktree_shared',
-        prompt: 'Visible latest chat title',
-      });
-      const worktreeDetails = {
-        worktree_shared: {
-          name: details.name,
-          defaultTitle: details.defaultTitle,
-          prSession: null,
-          sessions: [first, latest],
-        },
-      } satisfies Record<string, SidebarWorktreeDetails>;
-
-      for (const sessions of [[first, latest], [latest], [{ ...first, prompt: 'Renamed chat' }]]) {
-        const [group] = groupSidebarSessions(sessions, worktreeDetails);
-        if (group?.type !== 'worktree') throw new Error('Expected worktree group');
-
-        expect(getSidebarWorktreeLabel(group)).toBe(details.expected);
-        expect(group.details).toBe(worktreeDetails.worktree_shared);
-      }
-    });
-
-    it('carries authoritative metadata through date grouping without adding invisible worktrees', () => {
-      const visible = makeStoredSession('ses_visible', '2026-01-03T10:00:00.000Z', {
-        worktreeId: 'worktree_shared',
-      });
-      const details: SidebarWorktreeDetails = {
-        name: 'Named worktree',
-        defaultTitle: 'First chat outside the filtered list',
-        prSession: null,
-        sessions: [visible],
-      };
-      const result = groupSidebarSessionsByDate([visible], new Date('2026-01-03T18:00:00.000Z'), {
-        worktree_shared: details,
-        worktree_hidden: details,
-      });
-
-      expect(result).toHaveLength(1);
-      expect(result[0]?.items).toHaveLength(1);
-      expect(result[0]?.items[0]).toMatchObject({
-        type: 'worktree',
-        worktreeId: 'worktree_shared',
-        details,
-        latestSession: visible,
-      });
-    });
-
-    it('uses repository and branch instead of a visible chat title while metadata is absent', () => {
-      const [group] = groupSidebarSessions([
-        makeStoredSession('ses_filtered', '2026-01-03T10:00:00.000Z', {
-          worktreeId: 'worktree_shared',
-          prompt: 'This filtered chat must not become the worktree name',
-          repository: '',
-          branch: null,
-        }),
-      ]);
-      if (group?.type !== 'worktree') throw new Error('Expected worktree group');
-
-      expect(getSidebarWorktreeLabel(group)).toBe('Repository');
-    });
-
-    it('uses the most recently active PR-bearing sibling rather than the latest chat', () => {
-      const olderPr = makeStoredSession('ses_older_pr', '2026-01-01T10:00:00.000Z', {
-        worktreeId: 'worktree_shared',
-        associatedPr,
-      });
-      const latestPr = makeStoredSession('ses_latest_pr', '2026-01-02T10:00:00.000Z', {
-        worktreeId: 'worktree_shared',
-        associatedPr: { ...associatedPr, number: 43 },
-      });
-      const latestChat = makeStoredSession('ses_latest_chat', '2026-01-03T10:00:00.000Z', {
-        worktreeId: 'worktree_shared',
-        associatedPr: null,
-      });
-      const pendingChat = makeStoredSession('ses_pending_chat', '2026-01-04T10:00:00.000Z', {
-        worktreeId: 'worktree_shared',
-        associatedPr: undefined,
-      });
-      const [group] = groupSidebarSessions([olderPr, latestChat, latestPr, pendingChat]);
-      if (group?.type !== 'worktree') throw new Error('Expected worktree group');
-
-      expect(group.latestSession).toBe(pendingChat);
-      expect(getSidebarWorktreePrSession(group)).toBe(latestPr);
-    });
-
-    it('uses the existing deterministic sibling order for equally active PR sources', () => {
-      const first = makeStoredSession('ses_a', '2026-01-03T10:00:00.000Z', {
-        worktreeId: 'worktree_shared',
-        associatedPr,
-      });
-      const second = { ...first, sessionId: 'ses_b' };
-
-      for (const sessions of [
-        [first, second],
-        [second, first],
-      ]) {
-        const [group] = groupSidebarSessions(sessions);
-        if (group?.type !== 'worktree') throw new Error('Expected worktree group');
-
-        expect(getSidebarWorktreePrSession(group)).toBe(second);
-      }
-    });
-
-    it('prefers an authoritative PR source outside the visible group and honors confirmed absence', () => {
-      const visible = makeStoredSession('ses_visible', '2026-01-03T10:00:00.000Z', {
-        worktreeId: 'worktree_shared',
-        associatedPr,
-      });
-      const hidden = makeStoredSession('ses_hidden', '2026-01-04T10:00:00.000Z', {
-        worktreeId: 'worktree_shared',
-        associatedPr: { ...associatedPr, number: 43 },
-      });
-
-      for (const prSession of [hidden, { ...hidden, associatedPr: undefined }, null]) {
-        const [group] = groupSidebarSessions([visible], {
-          worktree_shared: {
-            name: null,
-            defaultTitle: null,
-            prSession,
-            sessions: [visible, hidden],
-          },
-        });
-        if (group?.type !== 'worktree') throw new Error('Expected worktree group');
-
-        expect(getSidebarWorktreePrSession(group)).toBe(prSession);
-      }
-    });
-
-    it('preserves a real pending PR source only when a branch can show the loading indicator', () => {
-      const confirmed = makeStoredSession('ses_confirmed', '2026-01-03T10:00:00.000Z', {
-        worktreeId: 'worktree_shared',
-        associatedPr: null,
-      });
-      const pending = makeStoredSession('ses_pending', '2026-01-02T10:00:00.000Z', {
-        worktreeId: 'worktree_shared',
-        associatedPr: undefined,
-      });
-      const withoutBranch = makeStoredSession('ses_unbranched', '2026-01-04T10:00:00.000Z', {
-        worktreeId: 'worktree_shared',
-        branch: null,
-        associatedPr: undefined,
-      });
-      const [group] = groupSidebarSessions([confirmed, pending, withoutBranch]);
-      const [loadedGroup] = groupSidebarSessions([confirmed, withoutBranch]);
-      if (group?.type !== 'worktree' || loadedGroup?.type !== 'worktree') {
-        throw new Error('Expected worktree groups');
-      }
-
-      expect(getSidebarWorktreePrSession(group)).toBe(pending);
-      expect(getSidebarWorktreePrSession(loadedGroup)).toBeNull();
-    });
-
-    it('prioritizes attention from any child over another running sibling', () => {
-      const sessions = [
-        makeStoredSession('ses_running', '2026-01-03T12:00:00.000Z', {
-          sessionStatus: 'busy',
-          sessionStatusUpdatedAt: '2026-01-03T12:00:00.000Z',
-        }),
-        makeStoredSession('ses_waiting', '2026-01-03T11:00:00.000Z', {
-          sessionStatus: 'question',
-          sessionStatusUpdatedAt: '2026-01-03T11:00:00.000Z',
-        }),
-      ];
-
-      expect(getSidebarWorktreeActivity(sessions, new Map())).toEqual({
-        status: 'question',
-        statusUpdatedAt: '2026-01-03T11:00:00.000Z',
-        isLive: false,
-      });
-    });
-
-    it.each(['busy', 'retry'])(
-      'expires stored %s at twenty minutes for visible and hidden sessions',
-      status => {
-        const now = new Date('2026-01-03T12:20:00.000Z').getTime();
-        const stale = makeStoredSession('ses_stale', '2026-01-03T12:00:00.000Z', {
-          sessionStatus: status,
-          sessionStatusUpdatedAt: '2026-01-03T12:19:00.000Z',
-        });
-        expect(getSidebarWorktreeActivity([stale], new Map(), [stale], null, now)).toEqual({
-          status: null,
-          statusUpdatedAt: null,
-          isLive: false,
-        });
-        expect(getSidebarWorktreeActivity([], new Map(), [stale], null, now).status).toBeNull();
-        expect(getSidebarWorktreeActivity([stale], new Map(), [stale], null, now - 1).status).toBe(
-          status
-        );
-        expect(
-          getSidebarWorktreeActivity([], new Map([['ses_stale', status]]), [stale], null, now)
-            .status
-        ).toBe(status);
-        expect(
-          getSidebarWorktreeActivity(
-            [],
-            new Map(),
-            [stale],
-            { sessionId: 'ses_stale', status },
-            now
-          ).status
-        ).toBe(status);
-      }
-    );
-
-    it('keeps recently updated sessions running even when the status timestamp is old', () => {
-      const session = makeStoredSession('ses_running', '2026-01-03T12:19:00.000Z', {
-        sessionStatus: 'busy',
-        sessionStatusUpdatedAt: '2026-01-03T10:00:00.000Z',
-      });
-      expect(
-        getSidebarWorktreeActivity(
-          [session],
-          new Map(),
-          [session],
-          null,
-          new Date('2026-01-03T12:20:00.000Z').getTime()
-        ).status
-      ).toBe('busy');
-    });
-
-    it.each(['question', 'permission'])('preserves stale stored %s attention', status => {
-      const session = makeStoredSession('ses_attention', '2026-01-03T10:00:00.000Z', {
-        sessionStatus: status,
-      });
-      expect(
-        getSidebarWorktreeActivity(
-          [],
-          new Map(),
-          [session],
-          null,
-          new Date('2026-01-03T12:20:00.000Z').getTime()
-        ).status
-      ).toBe(status);
-    });
-
-    it.each([false, true])(
-      'uses the freshest session update when status timestamps match (fresh visible=%s)',
-      freshVisible => {
-        const stale = makeStoredSession('ses_same', '2026-01-03T10:00:00.000Z', {
-          sessionStatus: 'busy',
-          sessionStatusUpdatedAt: '2026-01-03T10:00:00.000Z',
-        });
-        const fresh = { ...stale, updatedAt: '2026-01-03T12:19:00.000Z' };
-        expect(
-          getSidebarWorktreeActivity(
-            [freshVisible ? fresh : stale],
-            new Map(),
-            [freshVisible ? stale : fresh],
-            null,
-            new Date('2026-01-03T12:20:00.000Z').getTime()
-          ).status
-        ).toBe('busy');
-      }
-    );
-
-    it('ignores an expired sibling without hiding another recently running sibling', () => {
-      const stale = makeStoredSession('ses_stale', '2026-01-03T10:00:00.000Z', {
-        sessionStatus: 'busy',
-      });
-      const fresh = makeStoredSession('ses_fresh', '2026-01-03T12:19:00.000Z', {
-        sessionStatus: 'retry',
-      });
-      expect(
-        getSidebarWorktreeActivity(
-          [stale, fresh],
-          new Map(),
-          [stale, fresh],
-          null,
-          new Date('2026-01-03T12:20:00.000Z').getTime()
-        ).status
-      ).toBe('retry');
-    });
-
-    it('reflects live running status even before a stored status update arrives', () => {
-      const sessions = [makeStoredSession('ses_live', '2026-01-03T12:00:00.000Z')];
-
-      expect(getSidebarWorktreeActivity(sessions, new Map([['ses_live', 'retry']]))).toEqual({
-        status: 'retry',
-        statusUpdatedAt: null,
-        isLive: true,
-      });
-    });
-
-    it.each(['question', 'permission', 'busy', 'retry'])(
-      'includes a hidden sibling with %s status outside the displayed slice',
-      status => {
-        const visible = makeStoredSession('ses_visible', '2026-01-03T12:00:00.000Z');
-        const hidden = makeStoredSession('ses_hidden', '2026-01-03T12:00:00.000Z', {
-          sessionStatus: status,
-          sessionStatusUpdatedAt: '2026-01-03T12:00:00.000Z',
-        });
-
-        expect(
-          getSidebarWorktreeActivity(
-            [visible],
-            new Map(),
-            [visible, hidden],
-            null,
-            new Date('2026-01-03T12:01:00.000Z').getTime()
-          )
-        ).toEqual({
-          status,
-          statusUpdatedAt: hidden.sessionStatusUpdatedAt,
-          isLive: false,
-        });
-      }
-    );
-
-    it('matches hidden live sessions only against authorized group membership', () => {
-      const visible = makeStoredSession('ses_visible', '2026-01-03T12:00:00.000Z');
-      const hidden = makeStoredSession('ses_hidden', '2025-01-03T12:00:00.000Z');
-      const active = new Map([
-        ['ses_hidden', 'retry'],
-        ['ses_other_tenant', 'permission'],
-      ]);
-
-      expect(getSidebarWorktreeActivity([visible], active, [visible, hidden])).toEqual({
-        status: 'retry',
-        statusUpdatedAt: null,
-        isLive: true,
-      });
-      expect(getSidebarWorktreeActivity([visible], active, [visible])).toEqual({
-        status: null,
-        statusUpdatedAt: null,
-        isLive: false,
-      });
-    });
-
-    it.each([false, true])(
-      'prefers the newer idle completion over a stale busy snapshot (newer visible=%s)',
-      newerVisible => {
-        const busy = makeStoredSession('ses_same', '2026-01-03T12:00:00.000Z', {
-          sessionStatus: 'busy',
-          sessionStatusUpdatedAt: '2026-01-03T12:00:00.000Z',
-        });
-        const idle = {
-          ...busy,
-          sessionStatus: 'idle',
-          sessionStatusUpdatedAt: '2026-01-03T12:01:00.000Z',
-        };
-
-        expect(
-          getSidebarWorktreeActivity([newerVisible ? idle : busy], new Map(), [
-            newerVisible ? busy : idle,
-          ])
-        ).toEqual({ status: null, statusUpdatedAt: null, isLive: false });
-      }
-    );
-
-    it('lets live idle completion clear stale stored attention instead of taking maximum priority', () => {
-      const waiting = makeStoredSession('ses_waiting', '2026-01-03T12:00:00.000Z', {
-        sessionStatus: 'question',
-      });
-
-      expect(getSidebarWorktreeActivity([], new Map([['ses_waiting', 'idle']]), [waiting])).toEqual(
-        {
-          status: null,
-          statusUpdatedAt: null,
-          isLive: true,
-        }
-      );
-      expect(
-        getSidebarWorktreeActivity([], new Map([['ses_waiting', 'busy']]), [waiting]).status
-      ).toBe('question');
-    });
-
-    it('lets a hidden foreground completion override stale snapshots without idling another sibling', () => {
-      const foreground = makeStoredSession('ses_foreground', '2026-01-03T12:00:00.000Z', {
-        sessionStatus: 'question',
-      });
-      const background = makeStoredSession('ses_background', '2026-01-03T12:00:00.000Z', {
-        sessionStatus: 'busy',
-      });
-      const active = new Map([['ses_foreground', 'busy']]);
-      const completed = { sessionId: 'ses_foreground', status: 'idle' };
-
-      expect(getSidebarWorktreeActivity([], active, [foreground], completed).status).toBeNull();
-      expect(
-        getSidebarWorktreeActivity(
-          [background],
-          active,
-          [foreground, background],
-          completed,
-          new Date('2026-01-03T12:01:00.000Z').getTime()
-        ).status
-      ).toBe('busy');
-      expect(
-        getSidebarWorktreeActivity([], active, [foreground], {
-          sessionId: 'ses_other_tenant',
-          status: 'idle',
-        }).status
-      ).toBe('question');
-    });
-
-    it('prioritizes hidden attention over a foreground session that starts running', () => {
-      const visible = makeStoredSession('ses_visible', '2026-01-03T12:00:00.000Z');
-      const hidden = makeStoredSession('ses_hidden', '2025-01-03T12:00:00.000Z');
-
-      expect(
-        getSidebarWorktreeActivity(
-          [visible],
-          new Map([['ses_hidden', 'permission']]),
-          [visible, hidden],
-          { sessionId: 'ses_visible', status: 'busy' }
-        ).status
-      ).toBe('permission');
-    });
-  });
-
-  describe('running session sort throttling', () => {
-    const runningCreatedAt = '2026-01-03T10:00:00.000Z';
-
-    function makeRunningSession(
-      sessionId: string,
-      updatedAt: string,
-      overrides: Partial<StoredSession> = {}
-    ): StoredSession {
-      return makeStoredSession(sessionId, updatedAt, { createdAt: runningCreatedAt, ...overrides });
-    }
-
-    function pinFor(session: StoredSession): SidebarSortPins {
-      return new Map([[session.sessionId, getRunningSessionSortTime(session, true)]]);
-    }
-
-    it('sorts non-running sessions by raw recency', () => {
-      const session = makeRunningSession('ses_idle', '2026-01-03T12:00:37.000Z');
-
-      expect(getRunningSessionSortTime(session, false)).toBe(
-        new Date('2026-01-03T12:00:37.000Z').getTime()
-      );
-    });
-
-    it('advances a running session at most one bump interval past its start', () => {
-      const startedAt = new Date(runningCreatedAt).getTime();
-      const withinFirstInterval = makeRunningSession('ses_busy', '2026-01-03T10:00:30.000Z');
-      const churnedSameInterval = makeRunningSession('ses_busy', '2026-01-03T10:00:59.000Z');
-      const crossedInterval = makeRunningSession('ses_busy', '2026-01-03T10:01:05.000Z');
-
-      expect(getRunningSessionSortTime(withinFirstInterval, true)).toBe(startedAt);
-      expect(getRunningSessionSortTime(churnedSameInterval, true)).toBe(startedAt);
-      expect(getRunningSessionSortTime(crossedInterval, true)).toBe(
-        startedAt + SIDEBAR_RUNNING_BUMP_INTERVAL_MS
-      );
-    });
-
-    it('holds a running session in place while its updates churn, then lets it advance', () => {
-      const idle = makeStoredSession('ses_idle', '2026-01-03T12:00:10.000Z');
-      const churned = makeRunningSession('ses_running', '2026-01-03T12:00:45.000Z');
-      const advanced = makeRunningSession('ses_running', '2026-01-03T12:01:05.000Z');
-
-      const churnedOrder = groupSidebarSessions([churned, idle], {}, pinFor(churned)).map(item =>
-        item.type === 'session' ? item.session.sessionId : item.worktreeId
-      );
-      expect(churnedOrder).toEqual(['ses_idle', 'ses_running']);
-
-      const advancedOrder = groupSidebarSessions([advanced, idle], {}, pinFor(advanced)).map(item =>
-        item.type === 'session' ? item.session.sessionId : item.worktreeId
-      );
-      expect(advancedOrder).toEqual(['ses_running', 'ses_idle']);
-    });
-
-    it('holds a worktree group in place while its running member churns', () => {
-      const idle = makeStoredSession('ses_idle', '2026-01-03T12:00:10.000Z');
-      const churned = makeRunningSession('ses_running', '2026-01-03T12:00:45.000Z', {
-        worktreeId: 'worktree_shared',
-      });
-
-      const groups = groupSidebarSessions([churned, idle], {}, pinFor(churned));
-      expect(
-        groups.map(item => (item.type === 'session' ? item.session.sessionId : item.worktreeId))
-      ).toEqual(['ses_idle', 'worktree_shared']);
-    });
-
-    it('buckets a running session by its pinned sort time, not its raw update time', () => {
-      // Day buckets follow the viewer's local midnight, so build the instants locally.
-      const running = makeStoredSession(
-        'ses_running',
-        new Date(2026, 0, 4, 0, 0, 10).toISOString(),
-        { createdAt: new Date(2026, 0, 3, 23, 58, 30).toISOString() }
-      );
-      const pins = new Map([[running.sessionId, getRunningSessionSortTime(running, true)]]);
-      const now = new Date(2026, 0, 4, 0, 10);
-
-      const result = groupSidebarSessionsByDate([running], now, {}, pins);
-
-      expect(result.map(group => group.label)).toEqual(['Yesterday']);
-      expect(groupSidebarSessionsByDate([running], now).map(group => group.label)).toEqual([
-        'Today',
-      ]);
-    });
-  });
-
-  describe('patchSidebarWorktreeSessionStatus', () => {
-    const initial = {
-      worktrees: {
-        worktree_shared: {
-          name: 'Named worktree',
-          defaultTitle: null,
-          branch: null,
-          folderId: null,
-          sidebarPosition: null,
-          parentWorktreeId: null,
-          baseBranch: null,
-          baseSha: null,
-          createdAt: '2026-01-03T12:00:00.000Z',
-          prSession: null,
-          sessions: [
-            {
-              sessionId: 'ses_hidden',
-              sessionStatus: 'busy',
-              sessionStatusUpdatedAt: '2026-01-03T12:00:00.000Z',
-              updatedAt: '2026-01-03T12:00:00.000Z',
-              latest_run_status: null,
-              latest_run_failure_kind: null,
-              latest_run_terminal_at: null,
-            },
-          ],
-        },
-      },
-    } satisfies Parameters<typeof patchSidebarWorktreeSessionStatus>[0];
-
-    it('does not revive a hidden chat failure after a newer busy-to-idle transition', () => {
-      const failed = {
-        worktrees: {
-          worktree_shared: {
-            ...initial.worktrees.worktree_shared,
-            sessions: [
-              {
-                ...initial.worktrees.worktree_shared.sessions[0],
-                latest_run_status: 'failed' as const,
-                latest_run_failure_kind: 'failed' as const,
-                latest_run_terminal_at: '2026-01-03T12:01:00.000Z',
-              },
-            ],
-          },
-        },
-      };
-      const running = patchSidebarWorktreeSessionStatus(failed, {
-        sessionId: 'ses_hidden',
-        sessionStatus: 'busy',
-        sessionStatusUpdatedAt: '2026-01-03T12:02:00.000Z',
-      });
-      const completed = patchSidebarWorktreeSessionStatus(running, {
-        sessionId: 'ses_hidden',
-        sessionStatus: 'idle',
-        sessionStatusUpdatedAt: '2026-01-03T12:03:00.000Z',
-      });
-      expect(completed.worktrees.worktree_shared.sessions[0].latest_run_failure_kind).toBeNull();
-      expect(failed.worktrees.worktree_shared.sessions[0].latest_run_failure_kind).toBe('failed');
-    });
-
-    it('adds a created chat to only its owning cached worktree without a refetch', () => {
-      const update = {
-        worktreeId: 'worktree_shared',
-        sessionId: 'ses_created',
-        sessionStatus: 'idle',
-        sessionStatusUpdatedAt: '2026-01-03T12:02:00.000Z',
-        updatedAt: '2026-01-03T12:02:00.000Z',
-      };
-      const patched = patchSidebarWorktreeSessionStatus(initial, update);
-      expect(patched.worktrees.worktree_shared.sessions.map(row => row.sessionId)).toEqual([
-        'ses_hidden',
-        'ses_created',
-      ]);
-      expect(patchSidebarWorktreeSessionStatus(patched, update)).toBe(patched);
-      expect(
-        patchSidebarWorktreeSessionStatus(initial, { ...update, worktreeId: 'elsewhere' })
-      ).toBe(initial);
-    });
-
-    it('does not poll unloaded, empty, or CLI-only worktree batches', () => {
-      expect(getSidebarWorktreeRefetchInterval(undefined)).toBe(false);
-      expect(getSidebarWorktreeRefetchInterval(undefined, true)).toBe(false);
-      expect(getSidebarWorktreeRefetchInterval({ worktrees: {} })).toBe(false);
-      expect(getSidebarWorktreeRefetchInterval(initial)).toBe(false);
-    });
-
-    it('polls a visible Cloud Agent even before its first run telemetry arrives', () => {
-      expect(getSidebarWorktreeRefetchInterval(initial, true)).toBe(SIDEBAR_RECONCILE_DELAY_MS);
-    });
-
-    it('polls hidden chats that have Cloud Agent run telemetry', () => {
-      const data = {
-        worktrees: {
-          worktree_shared: {
-            ...initial.worktrees.worktree_shared,
-            sessions: [
-              {
-                ...initial.worktrees.worktree_shared.sessions[0],
-                latest_run_status: 'completed' as const,
-              },
-            ],
-          },
-        },
-      };
-      expect(getSidebarWorktreeRefetchInterval(data)).toBe(SIDEBAR_RECONCILE_DELAY_MS);
-    });
-
-    it('refreshes activity recency even when the stored status has not changed', () => {
-      const updated = patchSidebarWorktreeSessionStatus(initial, {
-        ...initial.worktrees.worktree_shared.sessions[0],
-        updatedAt: '2026-01-03T12:19:00.000Z',
-      });
-      expect(
-        getSidebarWorktreeActivity(
-          [],
-          new Map(),
-          updated.worktrees.worktree_shared.sessions,
-          null,
-          new Date('2026-01-03T12:20:00.000Z').getTime()
-        ).status
-      ).toBe('busy');
-    });
-
-    it('updates a hidden member through attention and completion without changing membership', () => {
-      const waiting = patchSidebarWorktreeSessionStatus(initial, {
-        sessionId: 'ses_hidden',
-        sessionStatus: 'question',
-        sessionStatusUpdatedAt: '2026-01-03T12:01:00.000Z',
-      });
-      expect(
-        getSidebarWorktreeActivity([], new Map(), waiting.worktrees.worktree_shared.sessions).status
-      ).toBe('question');
-
-      const completed = patchSidebarWorktreeSessionStatus(waiting, {
-        sessionId: 'ses_hidden',
-        sessionStatus: 'idle',
-        sessionStatusUpdatedAt: '2026-01-03T12:02:00.000Z',
-      });
-      expect(completed.worktrees.worktree_shared.sessions).toHaveLength(1);
-      expect(
-        getSidebarWorktreeActivity([], new Map(), completed.worktrees.worktree_shared.sessions)
-          .status
-      ).toBeNull();
-      expect(initial.worktrees.worktree_shared.sessions[0].sessionStatus).toBe('busy');
-      expect(completed.worktrees.worktree_shared.name).toBe(initial.worktrees.worktree_shared.name);
-      expect(
-        patchSidebarWorktreeSessionStatus(completed, waiting.worktrees.worktree_shared.sessions[0])
-      ).toBe(completed);
-    });
-
-    it('ignores unknown or foreign session identities and older or duplicate status updates', () => {
-      expect(
-        patchSidebarWorktreeSessionStatus(initial, {
-          sessionId: 'ses_foreign',
-          sessionStatus: 'permission',
-          sessionStatusUpdatedAt: '2026-01-03T12:02:00.000Z',
-        })
-      ).toBe(initial);
-      expect(
-        patchSidebarWorktreeSessionStatus(initial, {
-          sessionId: 'ses_hidden',
-          sessionStatus: 'idle',
-          sessionStatusUpdatedAt: '2026-01-03T11:59:00.000Z',
-        })
-      ).toBe(initial);
-      expect(
-        patchSidebarWorktreeSessionStatus(initial, initial.worktrees.worktree_shared.sessions[0])
-      ).toBe(initial);
-    });
-  });
-
-  describe('dbSessionMatchesSearch', () => {
-    it('matches by session_id substring', () => {
-      const session = makeDbSession('abc-123-def', '2026-01-01T00:00:00.000Z');
-      expect(dbSessionMatchesSearch(session, '123')).toBe(true);
-    });
-
-    it('matches by title substring (case-insensitive)', () => {
-      const session = makeDbSession('ses-1', '2026-01-01T00:00:00.000Z');
-      const withTitle = { ...session, title: 'Hello World' };
-      expect(dbSessionMatchesSearch(withTitle, 'world')).toBe(true);
-    });
-
-    it('returns false when neither session_id nor title matches', () => {
-      const session = makeDbSession('ses-1', '2026-01-01T00:00:00.000Z');
-      expect(dbSessionMatchesSearch(session, 'zzz')).toBe(false);
-    });
-  });
-
-  describe('createSidebarQueryReconciler', () => {
-    beforeEach(() => {
-      jest.useFakeTimers();
-    });
-
-    afterEach(() => {
-      jest.useRealTimers();
-    });
-
-    it('coalesces status event bursts into one delayed authoritative reconciliation', () => {
-      const reconcile = jest.fn();
-      const reconciler = createSidebarQueryReconciler(reconcile);
-
-      reconciler.schedule();
-      reconciler.schedule();
-      jest.advanceTimersByTime(SIDEBAR_RECONCILE_DELAY_MS - 1);
-      expect(reconcile).not.toHaveBeenCalled();
-
-      jest.advanceTimersByTime(1);
-      expect(reconcile).toHaveBeenCalledTimes(1);
-
-      reconciler.schedule();
-      jest.advanceTimersByTime(SIDEBAR_RECONCILE_DELAY_MS);
-      expect(reconcile).toHaveBeenCalledTimes(2);
-    });
-
-    it('reconciles immediately after reconnect without running a pending delayed refresh', () => {
-      const reconcile = jest.fn();
-      const reconciler = createSidebarQueryReconciler(reconcile);
-
-      reconciler.schedule();
-      reconciler.reconcileNow();
-      expect(reconcile).toHaveBeenCalledTimes(1);
-
-      jest.advanceTimersByTime(SIDEBAR_RECONCILE_DELAY_MS);
-      expect(reconcile).toHaveBeenCalledTimes(1);
-    });
-
-    it('cancels pending reconciliation when its listener owner is disposed', () => {
-      const reconcile = jest.fn();
-      const reconciler = createSidebarQueryReconciler(reconcile);
-
-      reconciler.schedule();
-      reconciler.dispose();
-      jest.advanceTimersByTime(SIDEBAR_RECONCILE_DELAY_MS);
-
-      expect(reconcile).not.toHaveBeenCalled();
-    });
-  });
-});
-
-type ChatSidebarProps = ComponentProps<typeof ChatSidebar>;
-
-function renderChatSidebar(overrides: Partial<ChatSidebarProps> = {}, openMenus = false): string {
-  mockRenderOpenMenus = openMenus;
-  jest.mocked(DropdownMenuItem).mockClear();
-  jest.mocked(SessionPrIndicator).mockClear();
-  return renderToStaticMarkup(
-    createElement(ChatSidebar, {
-      sessions: [
-        makeStoredSession('ses_latest', '2026-01-03T10:00:00.000Z', {
-          worktreeId: 'worktree_shared',
-          associatedPr: null,
-        }),
-      ],
-      ...overrides,
-    })
-  );
-}
-
-function getSidebarMenuItemProps(label: string): ComponentProps<typeof DropdownMenuItem> {
-  const props = jest
-    .mocked(DropdownMenuItem)
-    .mock.calls.find(([props]) => React.Children.toArray(props.children).includes(label))?.[0];
-  if (!props) throw new Error(`Menu item not rendered: ${label}`);
-  return props;
-}
-
-function getSidebarButtonMarkup(html: string, label: string): string {
-  const buttons = html.match(/<button\b[^>]*>[\s\S]*?<\/button>/g) ?? [];
-  const button = buttons.find(markup => markup.includes(`aria-label="${label}"`));
-  if (!button) throw new Error(`Button not rendered: ${label}`);
-  return button;
-}
-
-describe('ChatSidebar worktree controls', () => {
-  it('renders hidden sibling activity from complete worktree details during search', () => {
-    const visible = makeStoredSession('ses_visible', '2026-01-03T12:00:00.000Z', {
-      worktreeId: 'worktree_shared',
-      associatedPr: null,
-    });
-    const hidden = makeStoredSession('ses_hidden', '2025-01-03T12:00:00.000Z', {
-      worktreeId: 'worktree_shared',
-      sessionStatus: 'question',
-    });
-    const props: Partial<ChatSidebarProps> = {
-      sessions: [visible],
-      searchQuery: 'visible',
-      worktreeDetails: {
-        worktree_shared: {
-          name: null,
-          defaultTitle: null,
-          prSession: null,
-          sessions: [visible, hidden],
-        },
-      },
-    };
-
-    expect(renderChatSidebar(props)).toContain('aria-label="Waiting for answer"');
+    ).toBeNull();
     expect(
-      renderChatSidebar({
-        ...props,
-        foregroundSession: { sessionId: hidden.sessionId, status: 'idle' },
-      })
-    ).not.toContain('Waiting for answer');
+      deriveForegroundSessionStatus({ ...foreground, organizationId: 'synthetic-organization' })
+    ).toBeNull();
   });
-
-  it('renders a hidden live sibling on its worktree rather than relying on displayed chats', () => {
-    const visible = makeStoredSession('ses_visible', '2026-01-03T12:00:00.000Z', {
-      worktreeId: 'worktree_shared',
-      associatedPr: null,
-    });
-    const hidden = makeStoredSession('ses_hidden', '2025-01-03T12:00:00.000Z');
-    const html = renderChatSidebar({
-      sessions: [visible],
-      activeSessions: [
-        { id: hidden.sessionId, status: 'retry', title: 'Hidden chat', connectionId: 'cli' },
-      ],
-      worktreeDetails: {
-        worktree_shared: {
-          name: null,
-          defaultTitle: null,
-          prSession: null,
-          sessions: [visible, hidden],
-        },
-      },
-    });
-    const worktreeMarkup = html.slice(html.indexOf('aria-label="Open worktree'));
-
-    expect(worktreeMarkup).toContain('<title>Retrying</title>');
-  });
-
-  it.each([
-    { create: false, rename: false, remove: false },
-    { create: true, rename: false, remove: false },
-    { create: false, rename: true, remove: false },
-    { create: false, rename: false, remove: true },
-    { create: true, rename: true, remove: false },
-    { create: true, rename: false, remove: true },
-    { create: false, rename: true, remove: true },
-    { create: true, rename: true, remove: true },
-  ])('independently gates worktree capabilities: %j', capabilities => {
-    const html = renderChatSidebar(
-      {
-        onCreateWorktreeChat: capabilities.create ? async () => true : undefined,
-        onRenameWorktree: capabilities.rename ? async () => undefined : undefined,
-        onDeleteWorktree: capabilities.remove ? () => undefined : undefined,
-        onRenameSession: async () => undefined,
-        onDeleteSession: () => undefined,
-      },
-      true
-    );
-
-    expect(html).toContain('Worktree actions for');
-    expect(html).toContain('New stacked workspace');
-    expect(html.includes('New chat')).toBe(capabilities.create);
-    expect(html.includes('Rename worktree')).toBe(capabilities.rename);
-    expect(html.includes('Delete worktree')).toBe(capabilities.remove);
-    expect(html).not.toContain('Delete session');
-    expect(html).not.toContain('Session actions for');
-  });
-
-  it.each([
-    { details: undefined, label: 'kilo/repo · main' },
-    {
-      details: { name: 'Release cleanup', defaultTitle: 'Generated title' },
-      label: 'Release cleanup',
-    },
-    { details: { name: null, defaultTitle: 'Generated title' }, label: 'Generated title' },
-    { details: { name: null, defaultTitle: null }, label: 'New chat' },
-  ])('delegates deletion with the worktree ID and display name: $label', ({ details, label }) => {
-    const createdFrom: string[] = [];
-    const deletedWorktrees: { worktreeId: string; name: string }[] = [];
-    const deletedSessions: string[] = [];
-    const openedSessions: string[] = [];
-    renderChatSidebar(
-      {
-        sessions: [
-          makeStoredSession('ses_older', '2026-01-01T10:00:00.000Z', {
-            worktreeId: 'worktree_shared',
-          }),
-          makeStoredSession('ses_latest', '2026-01-03T10:00:00.000Z', {
-            worktreeId: 'worktree_shared',
-          }),
-        ],
-        worktreeDetails: details
-          ? { worktree_shared: { ...details, prSession: null, sessions: [] } }
-          : {},
-        onCreateWorktreeChat: sessionId => {
-          createdFrom.push(sessionId);
-        },
-        onDeleteWorktree: (worktreeId, name) => deletedWorktrees.push({ worktreeId, name }),
-        onDeleteSession: sessionId => deletedSessions.push(sessionId),
-        onOpenSession: sessionId => openedSessions.push(sessionId),
-      },
-      true
-    );
-
-    getSidebarMenuItemProps('New chat').onSelect?.(new Event('select'));
-    getSidebarMenuItemProps('Delete worktree').onSelect?.(new Event('select'));
-
-    expect(createdFrom).toEqual(['ses_latest']);
-    expect(deletedWorktrees).toEqual([{ worktreeId: 'worktree_shared', name: label }]);
-    expect(deletedSessions).toEqual([]);
-    expect(openedSessions).toEqual([]);
-  });
-
-  it.each([null, 'busy'])('shares the session action slot for status=%s', sessionStatus => {
-    const worktreeSession = makeStoredSession('ses_grouped', '2026-01-03T10:00:00.000Z', {
-      worktreeId: 'worktree_shared',
-      associatedPr: null,
-      sessionStatus,
-    });
-    const standalone = { ...worktreeSession, sessionId: 'ses_standalone', worktreeId: null };
-    const html = renderChatSidebar({
-      sessions: [worktreeSession, standalone],
-      onDeleteWorktree: () => undefined,
-      onDeleteSession: () => undefined,
-    });
-    const slots = html.match(/class="group\/session-actions[^"]*"/g) ?? [];
-    const worktreeButton = getSidebarButtonMarkup(html, 'Worktree actions for kilo/repo · main');
-    const sessionButton = getSidebarButtonMarkup(html, `Session actions for ${standalone.prompt}`);
-
-    expect(slots).toHaveLength(2);
-    expect(slots[0]).toBe(slots[1]);
-    expect(worktreeButton.match(/class="([^"]*)"/)?.[1]).toBe(
-      sessionButton.match(/class="([^"]*)"/)?.[1]
-    );
-    expect(html.match(/group-focus-within\/session-actions:invisible/g)).toHaveLength(2);
-    expect(html.match(/focus-within:opacity-100/g)).toHaveLength(2);
-    expect(html.match(/\[@media\(any-pointer:coarse\)\]:opacity-100/g)).toHaveLength(2);
-    expect(html.match(/\[@media\(hover:none\)\]:opacity-100/g)).toHaveLength(2);
-    expect(worktreeButton).not.toContain('tabindex="-1"');
-  });
-
-  it('renders sibling PR information outside the worktree navigation button with a real chat ID', () => {
-    const source = makeStoredSession('ses_pr_source', '2026-01-02T10:00:00.000Z', {
-      worktreeId: 'worktree_shared',
-      associatedPr,
-    });
-    const latest = makeStoredSession('ses_latest', '2026-01-03T10:00:00.000Z', {
-      worktreeId: 'worktree_shared',
-      associatedPr: null,
-    });
-    const html = renderChatSidebar({
-      sessions: [source, latest],
-      onDeleteWorktree: () => undefined,
-    });
-
-    expect(html).toContain('aria-label="open pull request #42"');
-    expect(getSidebarButtonMarkup(html, 'Open worktree kilo/repo · main')).not.toContain(
-      'open pull request'
-    );
-    expect(html).not.toMatch(/<button\b[^>]*>(?:(?!<\/button>)[\s\S])*<button\b/);
-    expect(jest.mocked(SessionPrIndicator).mock.calls.map(([props]) => props.session)).toEqual([
-      source,
-    ]);
-  });
-
-  it('uses parent metadata for a filtered worktree and honors an authoritative missing PR', () => {
-    const source = makeStoredSession('ses_hidden_pr', '2026-01-04T10:00:00.000Z', {
-      worktreeId: 'worktree_shared',
-      associatedPr,
-    });
-    const details: SidebarWorktreeDetails = {
-      name: 'Custom worktree',
-      defaultTitle: 'Authoritative first chat',
-      prSession: source,
-      sessions: [source],
-    };
-    const html = renderChatSidebar({ worktreeDetails: { worktree_shared: details } });
-
-    expect(html).toContain('aria-label="Open worktree Custom worktree"');
-    expect(jest.mocked(SessionPrIndicator).mock.calls.map(([props]) => props.session)).toEqual([
-      source,
-    ]);
-
-    const withoutPr = renderChatSidebar({
-      sessions: [source],
-      worktreeDetails: { worktree_shared: { ...details, prSession: null } },
-    });
-
-    expect(withoutPr).toContain('aria-label="Open worktree Custom worktree"');
-    expect(withoutPr).not.toContain('open pull request');
-    expect(jest.mocked(SessionPrIndicator).mock.calls).toHaveLength(0);
-  });
-
-  it('disables navigation and mutation controls only for the deleting worktree', () => {
-    const deleting = makeStoredSession('ses_deleting', '2026-01-03T10:00:00.000Z', {
-      worktreeId: 'worktree_deleting',
-      branch: 'deleting',
-      associatedPr: null,
-    });
-    const available = {
-      ...deleting,
-      sessionId: 'ses_available',
-      worktreeId: 'worktree_available',
-      branch: 'available',
-    };
-    const html = renderChatSidebar(
-      {
-        sessions: [deleting, available],
-        deletingWorktreeIds: deleting.worktreeId ? [deleting.worktreeId] : undefined,
-        onCreateWorktreeChat: () => undefined,
-        onRenameWorktree: async () => undefined,
-        onDeleteWorktree: () => undefined,
-      },
-      true
-    );
-
-    expect(getSidebarButtonMarkup(html, 'Open worktree kilo/repo · deleting')).toContain(
-      'disabled=""'
-    );
-    expect(html).toContain('aria-label="Deleting worktree"');
-    expect(html).not.toContain('Worktree actions for kilo/repo · deleting');
-    expect(getSidebarButtonMarkup(html, 'Open worktree kilo/repo · available')).not.toContain(
-      'disabled=""'
-    );
+  it('keeps permission, question and streaming feedback immediate', () => {
     expect(
-      getSidebarButtonMarkup(html, 'Worktree actions for kilo/repo · available')
-    ).not.toContain('disabled=""');
-    expect(getSidebarMenuItemProps('New chat').disabled).not.toBe(true);
-    expect(getSidebarMenuItemProps('Rename worktree').disabled).not.toBe(true);
-    expect(getSidebarMenuItemProps('Delete worktree').disabled).not.toBe(true);
-  });
-
-  it('preserves standalone session permissions and deletion callbacks', () => {
-    const standalone = makeStoredSession('ses_standalone', '2026-01-03T10:00:00.000Z', {
-      prompt: 'Standalone chat',
-      associatedPr: null,
-    });
-    const deletedSessions: string[] = [];
-    const worktreeCallbacks: Partial<ChatSidebarProps> = {
-      onCreateWorktreeChat: () => undefined,
-      onRenameWorktree: async () => undefined,
-      onDeleteWorktree: () => undefined,
-    };
-    const readOnlyHtml = renderChatSidebar({ sessions: [standalone], ...worktreeCallbacks }, true);
-
-    expect(readOnlyHtml).not.toContain('Session actions for');
-    expect(readOnlyHtml).not.toContain('Worktree actions for');
-
-    const html = renderChatSidebar(
-      {
-        sessions: [standalone],
-        ...worktreeCallbacks,
-        onRenameSession: async () => undefined,
-        onDeleteSession: sessionId => deletedSessions.push(sessionId),
-      },
-      true
-    );
-    getSidebarMenuItemProps('Delete session').onClick?.({
-      stopPropagation: () => undefined,
-    } as React.MouseEvent<HTMLDivElement>);
-
-    expect(html).toContain('Session actions for Standalone chat');
-    expect(html).toContain('>Rename<');
-    expect(html).not.toContain('Rename worktree');
-    expect(html).not.toContain('Delete worktree');
-    expect(deletedSessions).toEqual([standalone.sessionId]);
-  });
-});
-
-describe('S0 activity fallback', () => {
-  it('falls back to the creation time, not the update time, when activity is absent', () => {
-    const session = makeStoredSession('ses_idle', '2026-01-09T00:00:00.000Z', {
-      createdAt: '2026-01-02T00:00:00.000Z',
-      lastActivityAt: null,
-    });
-    expect(getStoredSessionActivityTime(session)).toBe(
-      new Date('2026-01-02T00:00:00.000Z').getTime()
-    );
-  });
-
-  it('falls back to created_at for database rows', () => {
-    const session = makeDbSession('ses_idle', '2026-01-09T00:00:00.000Z');
-    expect(
-      getDbSessionActivityTime({
-        ...session,
-        created_at: new Date('2026-01-02T00:00:00.000Z'),
-        last_activity_at: null,
+      deriveForegroundSessionStatus({
+        ...foreground,
+        activePermission: { requestId: 'permission' },
       })
-    ).toBe(new Date('2026-01-02T00:00:00.000Z').getTime());
-  });
-});
-
-function makeWorkspaceRow(
-  worktreeId: string,
-  overrides: Record<string, unknown> = {}
-): SidebarWorkspaceListRow {
-  return {
-    worktreeId,
-    name: worktreeId,
-    defaultTitle: null,
-    branch: `branch/${worktreeId}`,
-    createdAt: '2026-01-01T00:00:00.000Z',
-    lastActivityAt: '2026-01-02T00:00:00.000Z',
-    folderId: null,
-    sidebarPosition: null,
-    parentWorktreeId: null,
-    baseBranch: null,
-    pr: null,
-    status: {
-      kind: null,
-      sessionStatus: null,
-      statusUpdatedAt: null,
-      latestRunStatus: null,
-      latestRunFailureKind: null,
-      latestRunTerminalAt: null,
-    },
-    chatCount: 0,
-    latestSessionId: `ses_${worktreeId}`,
-    gitUrl: 'https://github.com/kilo/repo',
-    ...overrides,
-  } as unknown as SidebarWorkspaceListRow;
-}
-
-describe('workspace rows independent of the chat list', () => {
-  it('keeps an old open workspace visible and openable through its latest session', () => {
-    const row = makeWorkspaceRow('worktree_old', { name: 'Old workspace' });
-    const [group] = groupSidebarWorkspaces([], mergeWorkspaceRowDetails({}, [row]), [row]);
-
-    expect(group).toMatchObject({
-      type: 'worktree',
-      worktreeId: 'worktree_old',
-      latestSession: { sessionId: 'ses_worktree_old', repository: 'kilo/repo' },
-      details: { name: 'Old workspace' },
-    });
-  });
-
-  it('does not duplicate a worktree that still has a chat in the list', () => {
-    const row = makeWorkspaceRow('worktree_shared');
-    const session = makeStoredSession('ses_visible', '2026-01-03T00:00:00.000Z', {
-      worktreeId: 'worktree_shared',
-    });
-    const groups = groupSidebarWorkspaces([session], mergeWorkspaceRowDetails({}, [row]), [row]);
-
-    expect(groups).toHaveLength(1);
-    expect(groups[0]).toMatchObject({ worktreeId: 'worktree_shared' });
-    expect(groups[0]?.sessions).toHaveLength(1);
-    expect(groups[0]?.latestSession.sessionId).toBe('ses_visible');
-  });
-
-  it('renders stacked children once under their root', () => {
-    const root = makeWorkspaceRow('worktree_root', { branch: 'feature/base' });
-    const child = makeWorkspaceRow('worktree_child', {
-      branch: 'feature/child',
-      parentWorktreeId: 'worktree_root',
-      baseBranch: 'feature/base',
-    });
-    const details = mergeWorkspaceRowDetails({}, [root, child]);
-    const groups = groupSidebarWorkspaces([], details, [root, child]);
-
-    expect(groups).toHaveLength(1);
-    expect(groups[0]?.worktreeId).toBe('worktree_root');
-    expect(groups[0]?.stackLayers?.map(layer => layer.worktreeId)).toEqual(['worktree_child']);
-  });
-
-  it('merges row metadata without replacing chat-derived sessions', () => {
-    const session = makeStoredSession('ses_visible', '2026-01-03T00:00:00.000Z', {
-      worktreeId: 'worktree_shared',
-    });
-    const merged = mergeWorkspaceRowDetails(
-      {
-        worktree_shared: {
-          name: 'Chat-derived name',
-          defaultTitle: null,
-          prSession: null,
-          sessions: [session],
-        },
-      },
-      [makeWorkspaceRow('worktree_shared', { name: 'Row name', folderId: 'folder-1' })]
-    );
-
-    expect(merged.worktree_shared).toMatchObject({
-      name: 'Chat-derived name',
-      folderId: 'folder-1',
-      sessions: [session],
-    });
-  });
-
-  it('builds a detail row with a PR session for an old workspace', () => {
-    const row = makeWorkspaceRow('worktree_old', {
-      pr: {
-        url: 'https://github.com/kilo/repo/pull/7',
-        number: 7,
-        state: 'open',
-        title: 'Stacked change',
-        headSha: null,
-        baseRef: null,
-        stackNumber: null,
-        stackPosition: null,
-        stackSize: null,
-        lastSyncedAt: '2026-01-02T00:00:00.000Z',
-        reviewDecision: null,
-        reviewDecisionPending: false,
-        platform: 'github',
-      },
-    });
-    const details = workspaceRowToSidebarDetails(row);
-    expect(details.prSession).toMatchObject({
-      sessionId: 'ses_worktree_old',
-      associatedPr: { number: 7, state: 'open' },
-    });
+    ).toBe('permission');
+    expect(
+      deriveForegroundSessionStatus({ ...foreground, activeQuestion: { requestId: 'question' } })
+    ).toBe('question');
+    expect(deriveForegroundSessionStatus({ ...foreground, isStreaming: true })).toBe('busy');
   });
 });

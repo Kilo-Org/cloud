@@ -20,6 +20,8 @@ import {
 } from '@kilocode/web-shared/lib/trpc/init';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
+jest.mock('@/lib/cloud-agent/session-events', () => ({ queueWorkspaceUpdates: jest.fn() }));
+
 const mockGetSession = jest.fn<(sessionId: string, organizationId?: string) => Promise<unknown>>();
 const mockListChildSessions = jest.fn<(input: unknown) => Promise<unknown>>();
 const mockClient = {

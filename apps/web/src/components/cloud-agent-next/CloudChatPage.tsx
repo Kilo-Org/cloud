@@ -234,6 +234,8 @@ export default function CloudChatPage({
     worktreeChats,
     openWorktreeChats,
     closedWorktreeChats,
+    workspaceTabsStatus,
+    retryWorkspaceTabs,
     openSession,
     composerFocusRequest,
     closeSession,
@@ -1791,7 +1793,7 @@ export default function CloudChatPage({
                             currentSessionId={sessionIdFromParams}
                             worktreeId={selectedWorktreeId}
                             onSelectChat={openSession}
-                            onCloseChat={handleCloseChat}
+                            onCloseChat={workspaceTabsStatus === null ? handleCloseChat : undefined}
                             onCreateChat={selectedWorktreeId ? handleCreateWorktreeChat : undefined}
                             canCreateChat={canCreateWorktreeChat}
                             onRenameChat={renameSession}
@@ -1808,6 +1810,16 @@ export default function CloudChatPage({
                             }}
                             selectionSuppressed={changesViewOpen}
                           />
+                        )}
+                        {workspaceTabsStatus === 'loading' && (
+                          <p role="status" className="text-muted-foreground px-2 text-xs">
+                            Loading more chat tabs…
+                          </p>
+                        )}
+                        {workspaceTabsStatus === 'error' && (
+                          <Button variant="ghost" size="sm" onClick={retryWorkspaceTabs}>
+                            Could not load all chat tabs. Retry
+                          </Button>
                         )}
                       </div>
                       <WorktreeReviewDialog

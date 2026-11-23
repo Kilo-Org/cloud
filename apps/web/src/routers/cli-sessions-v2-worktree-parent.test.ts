@@ -58,6 +58,7 @@ jest.mock('next/server', () => {
 
 jest.mock('@/lib/cloud-agent/session-events', () => ({
   notifyCliSessionRenamed: jest.fn(),
+  queueWorkspaceUpdates: jest.fn(),
 }));
 
 jest.mock('@sentry/nextjs', () => {

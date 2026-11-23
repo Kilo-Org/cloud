@@ -12,6 +12,7 @@ import {
   type ActiveSessionWithConnectionData,
 } from '@kilocode/cloud-agent-sdk/schemas';
 import { useUserWebConnection } from '../CloudAgentProvider';
+import { WORKSPACE_STALE_STATUS_MS } from '@/lib/cloud-agent/workspace-activity';
 
 /**
  * A live row as the sidebar needs it: the connection wire shape plus the
@@ -20,6 +21,7 @@ import { useUserWebConnection } from '../CloudAgentProvider';
  * the live-row filters read `createdOnPlatform` and `organizationId`.
  */
 export type ActiveSession = ActiveSessionWithConnectionData & {
+  worktreeId?: string;
   createdOnPlatform?: string;
   organizationId?: string | null;
   createdAt?: string;
@@ -75,6 +77,7 @@ function getCliConnectionPayload(value: unknown): CliConnectionPayload | null {
  * `cli_sessions_v2` and a connection payload never carries.
  */
 const ENRICHED_FIELDS = [
+  'worktreeId',
   'createdOnPlatform',
   'createdAt',
   'updatedAt',
@@ -182,6 +185,19 @@ type ActiveSessionsQueryData = {
   sessions: ActiveSession[];
 };
 
+export function getActiveSessionsRefetchInterval(
+  sessions: readonly Pick<ActiveSession, 'status' | 'updatedAt' | 'statusUpdatedAt'>[],
+  now = Date.now()
+): number | false {
+  return sessions.some(session => {
+    if (session.status !== 'busy' && session.status !== 'retry') return false;
+    const updatedAt = session.updatedAt ?? session.statusUpdatedAt;
+    return !updatedAt || now - Date.parse(updatedAt) < WORKSPACE_STALE_STATUS_MS;
+  })
+    ? 10_000
+    : false;
+}
+
 export function useActiveSessions(): {
   activeSessions: ActiveSession[];
   isLoading: boolean;
@@ -193,7 +209,7 @@ export function useActiveSessions(): {
   const activeSessionsQueryKey = useMemo(() => trpc.activeSessions.list.queryKey(), [trpc]);
   const { data, isLoading, refetch } = useQuery({
     ...activeSessionsQueryOptions,
-    refetchInterval: 10_000,
+    refetchInterval: query => getActiveSessionsRefetchInterval(query.state.data?.sessions ?? []),
     staleTime: 5_000,
   });
   const activeSessions = useMemo(

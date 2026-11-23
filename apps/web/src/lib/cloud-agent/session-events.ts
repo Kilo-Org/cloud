@@ -4,10 +4,60 @@ import { z } from 'zod';
 import { SESSION_INGEST_WORKER_URL } from '@kilocode/web-shared/lib/config.server';
 import { generateBoundedInternalServiceToken } from '@kilocode/web-shared/lib/tokens';
 import { SESSION_INGEST_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import { after } from 'next/server';
+import { captureException } from '@sentry/nextjs';
+import pLimit from 'p-limit';
 
 const RenameNotifyResponseSchema = z.object({
   delivered: z.boolean(),
 });
+
+async function notifyWorkspaceUpdates({
+  userId,
+  organizationId,
+  worktreeIds,
+}: {
+  userId: string;
+  organizationId: string | null;
+  worktreeIds: readonly string[];
+}): Promise<void> {
+  if (!SESSION_INGEST_WORKER_URL) return;
+  const token = generateBoundedInternalServiceToken(userId, {
+    audience: SESSION_INGEST_AUDIENCE,
+    expiresIn: 60,
+  });
+  const response = await fetch(`${SESSION_INGEST_WORKER_URL}/api/workspaces/notify`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ organizationId, worktreeIds }),
+    signal: AbortSignal.timeout(5_000),
+  });
+  if (!response.ok) throw new Error(`Workspace notification failed: ${response.status}`);
+}
+
+export function queueWorkspaceUpdates(
+  scope: { userId: string; organizationId: string | null },
+  worktreeIds: readonly string[]
+): void {
+  after(async () => {
+    const limit = pLimit(4);
+    const ids = [...new Set(worktreeIds)];
+    const batches: string[][] = [];
+    for (let offset = 0; offset < ids.length; offset += 200)
+      batches.push(ids.slice(offset, offset + 200));
+    await Promise.all(
+      batches.map(worktreeIds =>
+        limit(async () => {
+          try {
+            await notifyWorkspaceUpdates({ ...scope, worktreeIds });
+          } catch (error) {
+            captureException(error, { tags: { source: 'workspace-update-notification' } });
+          }
+        })
+      )
+    );
+  });
+}
 
 type NotifyCliSessionRenamedInput = {
   sessionId: string;

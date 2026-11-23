@@ -10,9 +10,12 @@ import {
   getOpenWorktreeChatSessionIds,
   getWorkspaceControlSession,
   isRestoredDocumentNavigation,
+  legacyWorkspaceTabImport,
   parseWorktreeChatTabs,
+  patchWorkspaceChatTabs,
   reduceWorktreeChatTabs,
   requestChatNavigation,
+  workspaceChatTabsState,
   type WorktreeChatTabsAction,
   type WorktreeChatTabsState,
 } from './worktree-chat-tabs';
@@ -82,6 +85,90 @@ const replaceAction = {
   newSessionId: 'new-session',
   openSessionIds,
 } satisfies WorktreeChatTabsAction;
+
+describe('workspace summary tab projection', () => {
+  const chat = (sessionId: string, lastActivityAt = '2026-01-01T00:00:00.000Z') => ({
+    sessionId,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    lastActivityAt,
+  });
+  const workspace = {
+    worktreeId,
+    openChats: [chat('a'), chat('b', '2026-01-02T00:00:00.000Z')],
+    closedChats: [chat('newly-closed'), chat('older-closed')],
+    latestOpenSessionId: 'b',
+  };
+
+  it('adapts newest-first server closures to the existing oldest-first boundary', () => {
+    expect(workspaceChatTabsState([workspace])).toEqual({
+      closedSessionIds: ['older-closed', 'newly-closed'],
+      sessionOrderByWorktree: { [worktreeId]: ['a', 'b'] },
+    });
+  });
+
+  it('moves a newly closed chat to the front and updates the latest-open destination', () => {
+    const patched = patchWorkspaceChatTabs(workspace, { type: 'close', sessionId: 'b' });
+    expect(patched.openChats.map(chat => chat.sessionId)).toEqual(['a']);
+    expect(patched.closedChats.map(chat => chat.sessionId)).toEqual([
+      'b',
+      'newly-closed',
+      'older-closed',
+    ]);
+    expect(patched.latestOpenSessionId).toBe('a');
+    expect(workspace.openChats.map(chat => chat.sessionId)).toEqual(['a', 'b']);
+  });
+
+  it('keeps replacement in place without duplicating metadata', () => {
+    const patched = patchWorkspaceChatTabs(workspace, {
+      type: 'replace',
+      worktreeId,
+      oldSessionId: 'a',
+      newSessionId: 'newly-closed',
+      openSessionIds: ['a', 'b'],
+    });
+    expect(patched.openChats.map(chat => chat.sessionId)).toEqual(['newly-closed', 'b']);
+    expect(patched.closedChats.map(chat => chat.sessionId)).toEqual(['a', 'older-closed']);
+  });
+
+  it('applies a relative move to the current visible order', () => {
+    const patched = patchWorkspaceChatTabs(workspace, {
+      type: 'reorder',
+      worktreeId,
+      sessionId: 'b',
+      beforeSessionId: 'a',
+      openSessionIds: ['a', 'b'],
+    });
+    expect(patched.openChats.map(chat => chat.sessionId)).toEqual(['b', 'a']);
+    expect(patched.closedChats).toEqual(workspace.closedChats);
+  });
+});
+
+describe('legacy workspace tab import', () => {
+  const validWorktree = 'worktree_11111111-1111-4111-8111-111111111111';
+
+  it('drops invalid IDs and worktree keys without rejecting valid preferences', () => {
+    expect(
+      legacyWorkspaceTabImport(
+        JSON.stringify({
+          closedSessionIds: ['', 'a', 'x'.repeat(201), 'b'],
+          sessionOrderByWorktree: { invalid: ['a'], [validWorktree]: ['', 'b', 'a'] },
+        })
+      )
+    ).toEqual({
+      closedSessionIds: ['a', 'b'],
+      sessionOrderByWorktree: { [validWorktree]: ['b', 'a'] },
+    });
+  });
+
+  it('keeps the newest closed preferences and bounds each imported order', () => {
+    const ids = Array.from({ length: 10_010 }, (_, index) => `session-${index}`);
+    const tabs = legacyWorkspaceTabImport(
+      JSON.stringify({ closedSessionIds: ids, sessionOrderByWorktree: { [validWorktree]: ids } })
+    );
+    expect(tabs.closedSessionIds).toEqual(ids.slice(-10_000));
+    expect(tabs.sessionOrderByWorktree[validWorktree]).toHaveLength(2_000);
+  });
+});
 
 function visibleSessionIds(state: WorktreeChatTabsState, sessionIds: readonly string[]) {
   return getOpenWorktreeChatSessionIds(

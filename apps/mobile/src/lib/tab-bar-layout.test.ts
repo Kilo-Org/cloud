@@ -117,21 +117,17 @@ describe('getEffectiveTabBarHeight', () => {
   });
 
   it('matches the rendered bar height at representative scales', () => {
-    // default scale: label-inclusive bar is 84pt on an iPhone-class bottom inset
     expect(getEffectiveTabBarHeight({ bottomInset: 34, platform: 'ios', fontScale: 1 })).toBe(84);
-    // large scale: icon-forward bar collapses back to 84pt (same as default scale)
     expect(getEffectiveTabBarHeight({ bottomInset: 34, platform: 'ios', fontScale: 3 })).toBe(84);
   });
 
   it('applies the same Android bottom padding as the overlay helpers', () => {
-    // Below the icon-forward threshold the label-inclusive overlay height is used.
     expect(getEffectiveTabBarHeight({ bottomInset: 16, platform: 'android', fontScale: 1 })).toBe(
       70
     );
     expect(getEffectiveTabBarHeight({ bottomInset: 16, platform: 'android', fontScale: 1.8 })).toBe(
       82.8
     );
-    // At and above the threshold the bar collapses to the icon-forward height.
     expect(getEffectiveTabBarHeight({ bottomInset: 16, platform: 'android', fontScale: 2 })).toBe(
       70
     );
@@ -234,11 +230,6 @@ describe('tabLabelWidth', () => {
   });
 
   it('counts RTL-script glyphs at the fallback-font advance, not the mono advance', () => {
-    // Arabic and Hebrew render in the system fallback font (`Text` drops the
-    // mono family for RTL-script copy, both scripts included), whose glyphs are
-    // far narrower than JetBrains Mono's 0.6em. Measuring them at the mono
-    // advance over-estimated the width until the width rule dropped every
-    // Arabic label at phone widths.
     expect(tabLabelWidth('الرئيسية')).toBeCloseTo(8 * (0.55 * 11 + 0.2), 5);
     expect(tabLabelWidth('הגדרות')).toBeCloseTo(6 * (0.55 * 11 + 0.2), 5);
     expect(tabLabelWidth('الملف الشخصي')).toBeCloseTo(11 * (0.55 * 11 + 0.2) + (0.6 * 11 + 0.2), 5);
@@ -337,10 +328,6 @@ describe('tabLabelLines', () => {
 });
 
 describe('tab label shrink floor', () => {
-  // A one-line label asks the platform to shrink it and caps the shrink at
-  // TAB_LABEL_MINIMUM_FONT_SCALE on iOS (Android floors at RN's own minimum).
-  // The bar no longer drops the row when the cap cannot save a label: the label
-  // tail-truncates, so the row stays and the tab keeps its visible name.
   it('keeps one line for a word that cannot fit its tab even at the floor', () => {
     // Profile is 47.6dp wide; a 30dp label box would need a 0.63 shrink, below
     // the 0.75 cap, so the label tail-truncates instead of wrapping mid-word.
@@ -420,9 +407,6 @@ describe('shouldHideTabBar', () => {
   });
 
   it('reads the screen a form sheet covers instead of the sheet', () => {
-    // A sheet is not a screen of its own: over a pushed screen the bar keeps
-    // that screen's hidden state, and over a tab root it keeps the bar, so the
-    // covered root also keeps its bottom inset while the sheet is up.
     expect(
       shouldHideTabBar('/organization/invite-member', [
         '(app)',

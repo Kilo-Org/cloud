@@ -294,7 +294,8 @@ export async function hasOrganizationAccess(
  * its live parent organization, then {@link ORGANIZATION_ROLE_PRIORITY} picks
  * the stronger of the two. A caller with no membership yields `null`.
  * {@link activeOrganizationAccessSql} holds the same conditions in predicate
- * form.
+ * form. This role is the role for reads. Runtime delegation accepts only a
+ * direct membership with role owner, admin or member.
  */
 export async function findEffectiveOrganizationMemberRole(
   db: OrganizationMembershipDb,
@@ -328,9 +329,12 @@ export async function findEffectiveOrganizationMemberRole(
 /**
  * True when the user may act for the organization through any membership the
  * read paths honour: a direct membership in the live organization, or a
- * permitted role in its live parent organization. Session reads gate on
- * {@link activeOrganizationAccessSql}, so a user who can read a session in an
- * organization can also create one there.
+ * permitted role in its live parent organization. Read predicates gate on
+ * {@link activeOrganizationAccessSql}. They accept a direct membership of any
+ * role, and an inherited parent role from
+ * {@link ORGANIZATION_PARENT_ACCESS_ROLES}. Runtime delegation and
+ * organization-scoped session creation accept a direct membership only, with
+ * role owner, admin or member.
  */
 export async function hasEffectiveOrganizationAccess(
   db: OrganizationMembershipDb,

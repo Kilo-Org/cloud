@@ -16,6 +16,13 @@ import {
 export { RuntimeAuthorizationSchema };
 export type { RuntimeAuthorization };
 
+/*
+ * The role authority for runtime delegation and organization-scoped session
+ * creation. The restriction is intended: these paths accept a direct
+ * membership only, with role owner, admin or member. The wider read predicate
+ * `activeOrganizationAccessSql` in `./organization-membership.js` accepts any
+ * role, and also honours an inherited parent-organization role.
+ */
 const membershipRole = z.enum(['owner', 'admin', 'member']);
 const principalSchema = z.object({
   id: z.string().min(1),
@@ -148,6 +155,8 @@ async function getMembership(
     return membership === null ? null : membershipSchema.parse(membership);
   }
   const db = getWorkerDb(input.connectionString);
+  // The lookup is deliberately the direct membership row only: an inherited
+  // parent-organization role authorizes reads and not runtime delegation.
   const [row] = await db
     .select({
       id: organization_memberships.id,

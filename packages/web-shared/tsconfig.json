@@ -22,8 +22,6 @@
     "isolatedModules": true,
     "jsx": "react-jsx",
     "types": ["jest", "node"],
-    "experimentalDecorators": true,
-    "emitDecoratorMetadata": true,
     "strictPropertyInitialization": false,
     "noErrorTruncation": true,
     "noImplicitReturns": true,

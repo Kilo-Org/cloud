@@ -53,6 +53,7 @@ import {
   getOpenRouterModelsMetadataFromDatabase,
   getVercelLanguageModelIdsFromDatabase,
   isValidOpenRouterModelId,
+  resolveOpenRouterModelAlias,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 import {
@@ -377,6 +378,7 @@ const mockedUpstreamRequest = jest.mocked(upstreamRequest);
 const mockedGetOpenRouterChatModelIds = jest.mocked(getOpenRouterChatModelIdsFromDatabase);
 const mockedIsValidOpenRouterModelId = jest.mocked(isValidOpenRouterModelId);
 const mockedGetVercelLanguageModelIds = jest.mocked(getVercelLanguageModelIdsFromDatabase);
+const mockedResolveOpenRouterModelAlias = jest.mocked(resolveOpenRouterModelAlias);
 
 /** Like the OpenRouter catalog stub, Vercel's list accepts every model unless a test narrows it. */
 const everyVercelModel = { has: () => true } as unknown as ReadonlySet<string>;
@@ -384,6 +386,7 @@ const everyVercelModel = { has: () => true } as unknown as ReadonlySet<string>;
 beforeEach(() => {
   mockedGetVercelLanguageModelIds.mockResolvedValue(everyVercelModel);
   jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({});
+  mockedResolveOpenRouterModelAlias.mockImplementation(async modelId => modelId);
 });
 const mockedEmitApiMetricsForResponse = jest.mocked(emitApiMetricsForResponse);
 const mockedAccountForMicrodollarUsage = jest.mocked(accountForMicrodollarUsage);
@@ -2651,6 +2654,49 @@ describe('POST /api/v1/chat/completions request handling', () => {
       expect(mockedUpstreamRequest).not.toHaveBeenCalled();
     }
   );
+
+  it('applies free-model rate limiting to a latest alias by the free model it serves', async () => {
+    setAnonymousAuth();
+    mockedResolveOpenRouterModelAlias.mockImplementation(async modelId =>
+      modelId === '~vendor/latest' ? 'test/free-model:free' : modelId
+    );
+    mockedIsFreeModelRateLimited.mockResolvedValue(true);
+
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const response = await handleLlmProxyRequest(makeRequest(makeBody('~vendor/latest')) as never);
+
+    expect(response.status).toBe(429);
+    expect(mockedIsFreeModelRateLimited).toHaveBeenCalledWith(expect.anything(), {
+      kind: 'ip',
+      ipAddress: '127.0.0.1',
+    });
+  });
+
+  it('reads the balance for a latest alias as the free model it serves', async () => {
+    setUserAuth();
+    mockedResolveOpenRouterModelAlias.mockImplementation(async modelId =>
+      modelId === '~vendor/latest' ? 'test/free-model:free' : modelId
+    );
+
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const freeResponse = await handleLlmProxyRequest(
+      makeRequest(makeBody('~vendor/latest')) as never
+    );
+
+    expect(freeResponse.status).toBe(200);
+    expect(mockedGetBalanceAndOrgSettings).toHaveBeenCalledTimes(1);
+    // Free models are not usage-funded, so the read requests no auto top-up.
+    expect(mockedGetBalanceAndOrgSettings.mock.calls[0]?.[3]).toBeUndefined();
+
+    mockedGetBalanceAndOrgSettings.mockClear();
+    mockedResolveOpenRouterModelAlias.mockImplementation(async modelId => modelId);
+    const paidResponse = await handleLlmProxyRequest(
+      makeRequest(makeBody('openai/gpt-4o')) as never
+    );
+
+    expect(paidResponse.status).toBe(200);
+    expect(mockedGetBalanceAndOrgSettings.mock.calls[0]?.[3]).toBe('usage');
+  });
 
   it.each([
     ['a client on its own IP', {}],

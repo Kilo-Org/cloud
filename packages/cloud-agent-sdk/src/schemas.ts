@@ -584,15 +584,26 @@ const REMOTE_DIRECTORY_MAX_STRING_LENGTH = 2_000;
 const remoteDirectoryEntrySchema = z
   .object({
     name: z.string().min(1).max(REMOTE_DIRECTORY_MAX_STRING_LENGTH),
-    path: z.string().min(1).max(REMOTE_DIRECTORY_MAX_STRING_LENGTH),
+    path: z
+      .string()
+      .min(1)
+      .max(REMOTE_DIRECTORY_MAX_STRING_LENGTH)
+      // The CLI emits entry paths relative to its launch directory, so a
+      // leading `/` (filesystem root) or a `..` segment (above the launch
+      // directory) is never a valid entry.
+      .refine(value => !value.startsWith('/') && !value.split('/').includes('..'), {
+        message: 'directory path must be relative to the launch directory',
+      }),
   })
   .strict();
 
 /**
  * Strict `list_directories` success body (protocol v1). The CLI returns the
- * resolved listing path and up to 256 contained directory entries. Anything
- * outside this envelope — extra keys, an over-limit entry array, an empty or
- * over-length entry string, or protocol drift — fails closed as `invalid`.
+ * resolved listing path, relative to its launch directory, and up to 256
+ * contained directory entries whose paths are relative to that same launch
+ * directory. Anything outside this envelope — extra keys, an over-limit entry
+ * array, an empty or over-length entry string, an absolute or parent-climbing
+ * entry path, or protocol drift — fails closed as `invalid`.
  */
 export const listDirectoriesV1Schema = z
   .object({

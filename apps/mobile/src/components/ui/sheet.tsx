@@ -214,6 +214,13 @@ export function Sheet({
   // instead of the sheet's native handler, so a press in that window of the
   // opening animation is answered here. Once the window has focus the sheet
   // receives Back natively and this listener does not run.
+  //
+  // That window starts when the caller flips `visible`, before this sheet has
+  // mounted its content or its dialog, so the listener is armed for this
+  // component's life and decides at press time. Armed with the presentation it
+  // would miss a press during that mount, and the navigator would spend the
+  // press on the screen beneath: one Back would close the sheet and the screen
+  // it was opened from.
   // Still set when the previous self-dismiss call already handed the caller the
   // close and that close has not been superseded: the dismissal the caller then
   // starts forwards to the library's `onClose` as soon as `visible` is false,
@@ -235,17 +242,23 @@ export function Sheet({
     onClose();
   };
   useEffect(() => {
-    if (Platform.OS !== 'android' || !mounted || !visible) {
+    if (Platform.OS !== 'android') {
       return undefined;
     }
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      // Read at press time, not from the render that armed the listener: the
+      // caller owns whether a sheet is open, and it may have asked for one in
+      // the commit this listener already covers.
+      if (!stateRef.current.visible) {
+        return false;
+      }
       requestSelfDismissRef.current();
       return true;
     });
     return () => {
       subscription.remove();
     };
-  }, [mounted, visible]);
+  }, []);
 
   // The caller's two handlers, read through refs: `settleClose` and
   // `settleDismiss` must keep one identity, or every parent render that hands

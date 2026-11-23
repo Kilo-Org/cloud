@@ -1,10 +1,11 @@
-import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
+import { Redirect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { BootstrapLoadingSurface } from '@/components/bootstrap-loading-surface';
 import { QueryError } from '@/components/query-error';
 import { isChatFixtureState, writeChatFixture } from '@/lib/chat/chat-fixture';
 import { useChatPlace } from '@/lib/chat/use-chat';
+import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 
 /**
  * Development-only entry for one chat conversation in a fixed state: it starts
@@ -24,7 +25,10 @@ import { useChatPlace } from '@/lib/chat/use-chat';
  */
 export default function ChatFixtureRoute() {
   const { state } = useLocalSearchParams<{ state?: string }>();
-  const router = useRouter();
+  // The hand-off swaps the fixture for the conversation screen, so it goes
+  // through the push-then-retire hook: a literal `router.replace` swaps both in
+  // one native-stack commit and crashes Android Fabric.
+  const { replace } = useStackSafeReplace();
   const place = useChatPlace();
   const [failed, setFailed] = useState(false);
   // Counts attempts; an attempt owns the route while it is the latest one.
@@ -40,14 +44,14 @@ export default function ChatFixtureRoute() {
     try {
       const sessionId = await writeChatFixture(place, state);
       if (attempt.current === mine) {
-        router.replace({ pathname: '/(app)/(tabs)/(4_chat)/[id]', params: { id: sessionId } });
+        replace({ pathname: '/(app)/(tabs)/(4_chat)/[id]', params: { id: sessionId } });
       }
     } catch {
       if (attempt.current === mine) {
         setFailed(true);
       }
     }
-  }, [place, router, state]);
+  }, [place, replace, state]);
 
   useEffect(() => {
     void open();

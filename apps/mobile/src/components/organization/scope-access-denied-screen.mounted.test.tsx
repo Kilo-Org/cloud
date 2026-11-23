@@ -15,7 +15,13 @@ const replaceMock = vi.hoisted(() => vi.fn());
 const retryMock = vi.hoisted(() => vi.fn());
 
 vi.mock('expo-router', () => ({
-  useRouter: () => ({ replace: replaceMock, push: vi.fn() }),
+  // The screen reaches Profile through the push-then-retire hook, so the router
+  // mock carries no `replace`: a literal one would fail here instead of passing.
+  useRouter: () => ({ push: vi.fn() }),
+}));
+
+vi.mock('@/lib/navigation/stack-safe-replace', () => ({
+  useStackSafeReplace: () => ({ replace: replaceMock }),
 }));
 
 vi.mock('@/components/screen-header', () => ({

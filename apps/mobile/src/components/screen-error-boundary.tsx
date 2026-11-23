@@ -12,6 +12,7 @@ import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { useRefetchBeforeRemount } from '@/lib/hooks/use-refetch-before-remount';
 import { getRouteRecoveryScope } from '@/lib/navigation/route-recovery-scope';
+import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 import { captureTelemetry } from '@/lib/telemetry/error-sink';
 
 /** Where a route with no back stack lands: the authenticated stack's anchor. */
@@ -60,6 +61,7 @@ function fingerprintPart(error: unknown, part: 'name' | 'message'): string {
  */
 export function ScreenErrorBoundary({ error, retry }: ErrorBoundaryProps) {
   const router = useRouter();
+  const stackSafeRouter = useStackSafeReplace();
   const navigation = useNavigation();
   const segments = useSegments();
   const subsystem = routeSubsystem(segments);
@@ -107,8 +109,10 @@ export function ScreenErrorBoundary({ error, retry }: ErrorBoundaryProps) {
       router.back();
       return;
     }
-    router.replace(AUTHENTICATED_ENTRY_HREF);
-  }, [router]);
+    // Swapping the failed route for the entry in one commit crashes Android
+    // Fabric, so it pushes then retires.
+    stackSafeRouter.replace(AUTHENTICATED_ENTRY_HREF);
+  }, [router, stackSafeRouter]);
 
   return (
     <View className="flex-1 bg-background">

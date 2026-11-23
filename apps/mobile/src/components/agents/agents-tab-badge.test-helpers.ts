@@ -19,14 +19,14 @@ const attentionKv = vi.hoisted(() => ({
   getItem: vi.fn<() => Promise<string | null>>().mockResolvedValue(null),
   setItem: vi.fn().mockResolvedValue(undefined),
 }));
-const routerReplace = vi.hoisted(() => vi.fn());
+const routerNavigate = vi.hoisted(() => vi.fn());
 // Mutable so a test can present a different route: the tabs layout reads these
 // segments to decide whether a form sheet covers the tab's screen.
 const segments = vi.hoisted(() => ({
   current: ['(app)', '(tabs)', '(0_home)'] as readonly string[],
 }));
 
-export { attentionKv, fetchSessions, organization, routerReplace, segments };
+export { attentionKv, fetchSessions, organization, routerNavigate, segments };
 
 vi.mock('@/lib/persist/encrypted-kv', () => attentionKv);
 vi.mock('@/lib/trpc', () => {
@@ -54,7 +54,7 @@ vi.mock('expo-router', () => ({
   usePathname: () => '/',
   useSegments: () => segments.current,
   useLocalSearchParams: () => ({}),
-  useRouter: () => ({ replace: routerReplace, setParams: vi.fn() }),
+  useRouter: () => ({ navigate: routerNavigate, setParams: vi.fn() }),
   useNavigation: () => ({ isFocused: () => false }),
   useFocusEffect: () => undefined,
   useScrollToTop: () => undefined,

@@ -89,6 +89,12 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 vi.mock('expo-router', () => ({ useRouter: () => ({ replace: vi.fn<() => void>() }) }));
+// The invalid-route state's Back hands off through the settled-replace hook (a
+// literal `router.replace` crashes Android Fabric); this suite only renders the
+// state's placement.
+vi.mock('@/lib/navigation/settled-replace', () => ({
+  useSettledReplace: () => ({ replace: vi.fn() }),
+}));
 
 // The reduced-motion policy a mounted state reads, and the one `RefreshProgress`
 // reads: both come from one provider on a device, so one mock serves both.

@@ -146,8 +146,7 @@ export function ModelAccessForm({
   // reports a height of zero, so its last measurement would keep reserving
   // room the list has back: the band counts the bar only while it is drawn.
   const footerBand = tab === 'gateways' ? 0 : footerHeight;
-  const bodyBand =
-    frame === null ? null : Math.max(0, frame.height - headerHeight - footerBand);
+  const bodyBand = frame === null ? null : Math.max(0, frame.height - headerHeight - footerBand);
   const keyboardLiftPad = clampLiftPad(
     Math.max(0, keyboardHeight - bottom),
     frame === null || bodyBand === null

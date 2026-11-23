@@ -193,10 +193,11 @@ function loaderMapOf(root) {
  * its data on `globalThis`. A sandbox with no `__addLocaleData` takes the
  * second path, so the file's own code says what the data is rather than a
  * second parser here.
+ *
+ * The sandbox is local to this call: only the category names leave it, so no
+ * context outlives the read that needed it.
  */
 function readPluralDataFile(file) {
-  const sandbox = { Intl: { PluralRules: undefined } };
-  vm.createContext(sandbox);
   let source;
   try {
     source = readFileSync(file, 'utf8');
@@ -205,12 +206,14 @@ function readPluralDataFile(file) {
       `${file} is missing: this audit reads the plural data the app bundle ships, so install the app's dependencies before running it`
     );
   }
+  const sandbox = { Intl: { PluralRules: undefined } };
+  vm.createContext(sandbox);
   vm.runInContext(source, sandbox, { timeout: 2000 });
   const data = sandbox.__FORMATJS_PLURALRULES_DATA__;
   if (!Array.isArray(data) || data.length === 0) {
     throw new Error(`no plural data in ${file}`);
   }
-  return data[0].data.categories.cardinal;
+  return [...data[0].data.categories.cardinal];
 }
 
 /**

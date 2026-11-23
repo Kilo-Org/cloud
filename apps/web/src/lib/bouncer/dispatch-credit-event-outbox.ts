@@ -57,7 +57,7 @@ function isOrganizationCreditEvent(row: BouncerCreditEventOutboxRow): boolean {
 /**
  * The wire fields that describe the attributed account's client (its address, its TLS/HTTP
  * fingerprint, and the card it used), rather than the organization the event is reported against.
- * An organization row reports the organization, so such a body carries organization-level fields.
+ * An organization row publishes them only while its attributed account is active.
  */
 const CLIENT_DERIVED_FIELDS = ['ip', 'ipCountry', 'ja4', 'cardFingerprint', 'cardCountry'] as const;
 
@@ -164,8 +164,9 @@ async function dispatchCreditEvent(
 
   // A row whose subject is a personal account is delivered only while that account is active: the
   // owner is rechecked here and a gone/deleting account's row is dropped. An organization row is
-  // delivered, because the organization is its subject, and its body carries organization-level
-  // fields only. The delete is fenced on this claim, so it never removes a row a newer claim owns.
+  // delivered, because the organization is its subject, and it publishes the client-derived fields
+  // only while its attributed account is active. The delete is fenced on this claim, so it never
+  // removes a row a newer claim owns.
   const organizationEvent = isOrganizationCreditEvent(row);
   const [owner] = await db
     .select({ blockedReason: kilocode_users.blocked_reason })

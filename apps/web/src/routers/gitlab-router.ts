@@ -23,6 +23,7 @@ import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
 import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import {
+  rotationRepositorySelection,
   syncWebhooksForRepositories,
   type ConfiguredWebhook,
 } from '@/lib/integrations/platforms/gitlab/webhook-sync';
@@ -288,33 +289,27 @@ export const gitlabRouter = createTRPCRouter({
     try {
       const accessToken = await getValidGitLabToken(integration, { userId: ctx.user.id });
 
-      // A secret rotation must re-sign the hooks of the repositories the code-review
-      // configuration still selects. The stored webhook map is not the selection: it
-      // also retains a handle whose removal is still pending, and re-signing that one
-      // would keep a hook alive for a project that is no longer selected. The sync
-      // treats anything stored but unselected as a removal, so passing the selection
-      // here retries those removals while every selected project is re-signed.
-      //
-      // The stored selection is authoritative only in `selected` mode. Without a
-      // stored configuration, or in any other mode, rotation re-signs every stored
-      // entry as before: a rotation must never turn into a bulk removal.
+      // A secret rotation re-signs only the stored hooks of the repositories the
+      // code-review configuration still selects. A stored hook whose project is no
+      // longer selected is left to the removal path: the sync treats anything
+      // stored but unselected as a removal, so a rotation retries that pending
+      // removal instead of re-signing it. A rotated secret never creates a hook
+      // (every project keeps its stored handle) and never removes every hook (the
+      // stored map supplies the ids when the configuration selects nothing), so
+      // the shared selection helper is the only place the two cases are derived.
       const storedCodeReviewConfig = await getAgentConfigForOwner(
         owner,
         'code_review',
         PLATFORM.GITLAB
       );
       const storedConfig = storedCodeReviewConfig?.config as CodeReviewAgentConfig | undefined;
-      const selectedRepositoryIds =
+      const storedSelection =
         storedConfig?.repository_selection_mode === 'selected'
-          ? storedConfig.selected_repository_ids
+          ? storedConfig.selected_repository_ids?.filter(
+              (id): id is number => typeof id === 'number' && Number.isFinite(id)
+            )
           : undefined;
-      const configuredRepoIds = Array.isArray(selectedRepositoryIds)
-        ? selectedRepositoryIds.filter(
-            (id): id is number => typeof id === 'number' && Number.isFinite(id)
-          )
-        : Object.keys(configuredWebhooks)
-            .map(id => Number.parseInt(id, 10))
-            .filter(id => Number.isFinite(id));
+      const configuredRepoIds = rotationRepositorySelection(configuredWebhooks, storedSelection);
 
       const syncOutcome = await syncWebhooksForRepositories(
         accessToken,

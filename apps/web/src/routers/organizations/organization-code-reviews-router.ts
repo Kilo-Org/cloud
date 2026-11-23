@@ -45,6 +45,7 @@ import { isCouncilActive } from '@kilocode/worker-utils/code-review-council';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { isPlatformIntegrationHealthy } from '@/lib/integrations/core/health';
 import {
+  rotationRepositorySelection,
   syncWebhooksForRepositories,
   type ConfiguredWebhook,
 } from '@/lib/integrations/platforms/gitlab/webhook-sync';
@@ -1364,12 +1365,15 @@ export const organizationReviewAgentRouter = createTRPCRouter({
    *
    * Admin-gated (owner or billing_manager) — the previous shape leaked the
    * secret to every org member via `getGitLabStatus`. The new secret is
-   * returned ONCE, only to the caller, for manual reconfiguration. When
-   * Kilo-managed webhooks exist they are all UPDATED in place (the
-   * `previous = []` trick makes every currently-configured repo an
-   * "added" repo, which the sync helper handles as an update of the
-   * existing webhook). When no webhooks are configured (manual-only
-   * setup) the sync is skipped and the secret is still returned once.
+   * returned ONCE, only to the caller, for manual reconfiguration. A
+   * rotation re-signs the stored hooks of the repositories the code-review
+   * configuration still selects; a stored hook whose project is no longer
+   * selected is left to the removal path, so a rotation retries that pending
+   * removal instead of re-signing it. A rotated secret never creates a hook
+   * (every project keeps its stored handle) and never removes every hook
+   * (the stored map supplies the ids when the configuration selects
+   * nothing). When no webhooks are configured (manual-only setup) the sync
+   * is skipped and the secret is still returned once.
    *
    * Scope is per-org: only this integration's metadata is touched. See
    * P1-D-32.
@@ -1441,34 +1445,28 @@ export const organizationReviewAgentRouter = createTRPCRouter({
           userId: ctx.user.id,
           organizationId,
         });
-        // A secret rotation must re-sign the hooks of the repositories the
-        // code-review configuration still selects. The stored webhook map is not
-        // the selection: it also retains a handle whose removal is still pending,
-        // and re-signing that one would keep a hook alive for a project that is no
-        // longer selected. The sync treats anything stored but unselected as a
-        // removal, so passing the selection here retries those removals while
-        // every selected project is re-signed.
-        //
-        // The stored selection is authoritative only in `selected` mode. Without a
-        // stored configuration, or in any other mode, rotation re-signs every
-        // stored entry as before: a rotation must never become a bulk removal.
+        // A secret rotation re-signs only the stored hooks of the repositories
+        // the code-review configuration still selects. A stored hook whose
+        // project is no longer selected is left to the removal path: the sync
+        // treats anything stored but unselected as a removal, so a rotation
+        // retries that pending removal instead of re-signing it. A rotated
+        // secret never creates a hook (every project keeps its stored handle)
+        // and never removes every hook (the stored map supplies the ids when
+        // the configuration selects nothing), so the shared selection helper
+        // is the only place the two cases are derived.
         const storedCodeReviewConfig = await getAgentConfig(
           organizationId,
           'code_review',
           PLATFORM.GITLAB
         );
         const storedConfig = storedCodeReviewConfig?.config as CodeReviewAgentConfig | undefined;
-        const selectedRepositoryIds =
+        const storedSelection =
           storedConfig?.repository_selection_mode === 'selected'
-            ? storedConfig.selected_repository_ids
+            ? storedConfig.selected_repository_ids?.filter(
+                (id): id is number => typeof id === 'number' && Number.isFinite(id)
+              )
             : undefined;
-        const configuredRepoIds = Array.isArray(selectedRepositoryIds)
-          ? selectedRepositoryIds.filter(
-              (id): id is number => typeof id === 'number' && Number.isFinite(id)
-            )
-          : Object.keys(configuredWebhooks)
-              .map(id => Number.parseInt(id, 10))
-              .filter(id => Number.isFinite(id));
+        const configuredRepoIds = rotationRepositorySelection(configuredWebhooks, storedSelection);
 
         const syncOutcome = await syncWebhooksForRepositories(
           accessToken,

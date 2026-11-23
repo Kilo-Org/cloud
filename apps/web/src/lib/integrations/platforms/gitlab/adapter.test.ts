@@ -1249,6 +1249,50 @@ describe('deleteProjectWebhook', () => {
     );
   });
 
+  it('throws GitLabAuthenticationError when the credential is rejected', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      text: async () => 'Unauthorized',
+    });
+
+    const refusal = await deleteProjectWebhook('test-token', 123, 456).catch(
+      (error: unknown) => error
+    );
+
+    expect(refusal).toBeInstanceOf(GitLabAuthenticationError);
+    expect(refusal).toMatchObject({ statusCode: 401, projectId: 123 });
+    expect((refusal as Error).message).toContain('Reconnect the GitLab integration');
+  });
+
+  it('throws GitLabWebhookPermissionError when the role is insufficient', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 403,
+      text: async () => 'Forbidden',
+    });
+
+    const refusal = await deleteProjectWebhook('test-token', 123, 456).catch(
+      (error: unknown) => error
+    );
+
+    expect(refusal).toBeInstanceOf(GitLabWebhookPermissionError);
+    expect(refusal).toMatchObject({ statusCode: 403, projectId: 123 });
+    expect((refusal as Error).message).toContain('Requires Maintainer role or higher');
+  });
+
+  it('reports the provider status for other failures', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      text: async () => 'Server error',
+    });
+
+    await expect(deleteProjectWebhook('test-token', 123, 456)).rejects.toThrow(
+      'GitLab delete webhook failed: 500'
+    );
+  });
+
   it('treats an absent hook as already removed', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: false,

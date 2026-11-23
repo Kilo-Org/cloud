@@ -33,6 +33,49 @@ export type ConfiguredWebhook = {
   updated_at?: string;
 };
 
+/**
+ * Turns any provider failure into one actionable message, so a create, an
+ * update and a retry of a kept delete all report the same guidance instead of
+ * a raw provider status line.
+ */
+function describeWebhookSyncError(error: unknown): string {
+  if (error instanceof GitLabAuthenticationError) {
+    return `GitLab rejected the connected credential: reconnect the GitLab integration, then retry. You can still configure the webhook manually in GitLab.`;
+  }
+
+  if (error instanceof GitLabWebhookPermissionError) {
+    return `Permission denied: You need Maintainer role or higher on this project to configure webhooks automatically. You can still configure the webhook manually in GitLab.`;
+  }
+
+  return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * Narrows a secret rotation to the stored webhook handles. A rotation re-signs
+ * only hooks it already stores, so a selected project with no stored handle is
+ * left to the save path and rotation never creates a hook. The stored-id
+ * fallback keeps a rotation from becoming a bulk removal when the stored
+ * selection is absent, unusable or empty.
+ */
+export function rotationRepositorySelection(
+  configuredWebhooks: Record<string, ConfiguredWebhook>,
+  storedSelection: number[] | undefined
+): number[] {
+  const storedIds = Object.keys(configuredWebhooks)
+    .map(key => Number.parseInt(key, 10))
+    .filter(id => Number.isFinite(id));
+
+  if (storedSelection === undefined) {
+    return storedIds;
+  }
+
+  const selectedStoredIds = storedSelection.filter(
+    id => configuredWebhooks[String(id)] !== undefined
+  );
+
+  return selectedStoredIds.length > 0 ? selectedStoredIds : storedIds;
+}
+
 export type WebhookSyncResult = {
   created: Array<{ projectId: number; hookId: number }>;
   updated: Array<{ projectId: number; hookId: number }>;
@@ -142,14 +185,7 @@ export async function syncWebhooksForRepositories(
         });
       }
     } catch (error) {
-      let errorMessage: string;
-      if (error instanceof GitLabAuthenticationError) {
-        errorMessage = `GitLab rejected the connected credential: reconnect the GitLab integration, then retry. You can still configure the webhook manually in GitLab.`;
-      } else if (error instanceof GitLabWebhookPermissionError) {
-        errorMessage = `Permission denied: You need Maintainer role or higher on this project to configure webhooks automatically. You can still configure the webhook manually in GitLab.`;
-      } else {
-        errorMessage = error instanceof Error ? error.message : String(error);
-      }
+      const errorMessage = describeWebhookSyncError(error);
 
       result.errors.push({
         projectId,
@@ -178,7 +214,7 @@ export async function syncWebhooksForRepositories(
         hookId: webhookInfo.hook_id,
       });
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage = describeWebhookSyncError(error);
       result.errors.push({
         projectId,
         error: errorMessage,

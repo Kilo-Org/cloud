@@ -20,9 +20,17 @@ jest.mock('@/lib/code-reviews/dispatch/dispatch-pending-reviews', () => ({
   tryDispatchPendingReviews: (...args: unknown[]) => mockTryDispatchPendingReviews(...args),
 }));
 
-jest.mock('@/lib/integrations/platforms/gitlab/webhook-sync', () => ({
-  syncWebhooksForRepositories: (...args: unknown[]) => mockSyncWebhooksForRepositories(...args),
-}));
+jest.mock('@/lib/integrations/platforms/gitlab/webhook-sync', () => {
+  // The rotation mutations derive their repository selection with the real
+  // helper; only the network-touching sync is replaced.
+  const actual: Record<string, unknown> = jest.requireActual(
+    '@/lib/integrations/platforms/gitlab/webhook-sync'
+  );
+  return {
+    ...actual,
+    syncWebhooksForRepositories: (...args: unknown[]) => mockSyncWebhooksForRepositories(...args),
+  };
+});
 
 jest.mock('@/lib/integrations/platforms/bitbucket/code-review-webhooks', () => {
   class BitbucketCodeReviewWebhookConfigurationError extends Error {
@@ -4478,6 +4486,9 @@ describe('gitlab.regenerateWebhookSecret P1-D-32 (self-only, re-syncs)', () => {
 
   afterEach(async () => {
     await db
+      .delete(agent_configs)
+      .where(inArray(agent_configs.owned_by_user_id, [testUser.id, otherUser.id]));
+    await db
       .delete(platform_integrations)
       .where(eq(platform_integrations.owned_by_user_id, testUser.id));
     await db
@@ -4625,6 +4636,130 @@ describe('gitlab.regenerateWebhookSecret P1-D-32 (self-only, re-syncs)', () => {
     expect(result.webhookSync.errors).toHaveLength(1);
     expect(mockSyncWebhooksForRepositories).not.toHaveBeenCalled();
     expect(await readPersonalWebhookSecret(testUser.id)).toBe(result.webhookSecret);
+  });
+
+  it('re-signs only the stored hooks the saved code-review config still selects', async () => {
+    const configured = {
+      '101': { hook_id: 9001, created_at: '2026-01-01T00:00:00Z' },
+      '202': { hook_id: 9002, created_at: '2026-01-02T00:00:00Z' },
+    };
+    await seedPersonalGitLabIntegration(testUser.id, {
+      gitlab_instance_url: 'https://gitlab.example.com',
+      configured_webhooks: configured,
+    });
+    // 202 is stored with a hook but is no longer selected: its hook must be
+    // treated as a removal, never re-signed with the new secret.
+    await db.insert(agent_configs).values({
+      owned_by_user_id: testUser.id,
+      agent_type: 'code_review',
+      platform: 'gitlab',
+      config: {
+        focus_areas: [],
+        model_slug: 'kilo/fake-deterministic',
+        repository_selection_mode: 'selected',
+        review_style: 'balanced',
+        selected_repository_ids: [101],
+      },
+      created_by: testUser.id,
+    });
+
+    const caller = await createCallerForUser(testUser.id);
+    await caller.gitlab.regenerateWebhookSecret();
+
+    // The sync receives the stored selection, not the stored map's keys, so it
+    // re-signs 101 and falls into the removal path for 202.
+    expect(mockSyncWebhooksForRepositories).toHaveBeenCalledTimes(1);
+    expect(mockSyncWebhooksForRepositories).toHaveBeenCalledWith(
+      'gitlab-access-token',
+      expect.any(String),
+      [101],
+      [],
+      configured,
+      'https://gitlab.example.com'
+    );
+  });
+
+  it('re-signs every stored hook when `selected` mode selects an empty list', async () => {
+    const configured = {
+      '101': { hook_id: 9001, created_at: '2026-01-01T00:00:00Z' },
+      '202': { hook_id: 9002, created_at: '2026-01-02T00:00:00Z' },
+    };
+    await seedPersonalGitLabIntegration(testUser.id, {
+      gitlab_instance_url: 'https://gitlab.example.com',
+      configured_webhooks: configured,
+    });
+    // An empty stored selection carries no narrowing information. Forwarding it
+    // to the sync would treat every stored hook as removed, so a rotation must
+    // fall back to the stored handles.
+    await db.insert(agent_configs).values({
+      owned_by_user_id: testUser.id,
+      agent_type: 'code_review',
+      platform: 'gitlab',
+      config: {
+        focus_areas: [],
+        model_slug: 'kilo/fake-deterministic',
+        repository_selection_mode: 'selected',
+        review_style: 'balanced',
+        selected_repository_ids: [],
+      },
+      created_by: testUser.id,
+    });
+
+    const caller = await createCallerForUser(testUser.id);
+    await caller.gitlab.regenerateWebhookSecret();
+
+    expect(mockSyncWebhooksForRepositories).toHaveBeenCalledTimes(1);
+    expect(mockSyncWebhooksForRepositories).toHaveBeenCalledWith(
+      'gitlab-access-token',
+      expect.any(String),
+      [101, 202],
+      [],
+      configured,
+      'https://gitlab.example.com'
+    );
+  });
+
+  it('never passes a selected id with no stored hook to the sync', async () => {
+    const configured = {
+      '101': { hook_id: 9001, created_at: '2026-01-01T00:00:00Z' },
+      '202': { hook_id: 9002, created_at: '2026-01-02T00:00:00Z' },
+    };
+    await seedPersonalGitLabIntegration(testUser.id, {
+      gitlab_instance_url: 'https://gitlab.example.com',
+      configured_webhooks: configured,
+    });
+    // 999 is selected but was never configured by Kilo. Passing it to the sync
+    // would make the rotation create a hook, which a secret rotation must never
+    // do; only the stored handles are rotated.
+    await db.insert(agent_configs).values({
+      owned_by_user_id: testUser.id,
+      agent_type: 'code_review',
+      platform: 'gitlab',
+      config: {
+        focus_areas: [],
+        model_slug: 'kilo/fake-deterministic',
+        repository_selection_mode: 'selected',
+        review_style: 'balanced',
+        selected_repository_ids: [999],
+      },
+      created_by: testUser.id,
+    });
+
+    const caller = await createCallerForUser(testUser.id);
+    await caller.gitlab.regenerateWebhookSecret();
+
+    expect(mockSyncWebhooksForRepositories).toHaveBeenCalledTimes(1);
+    const syncArgs = mockSyncWebhooksForRepositories.mock.calls[0]!;
+    expect(syncArgs[2]).not.toContain(999);
+    expect(syncArgs[2]).toEqual([101, 202]);
+    expect(mockSyncWebhooksForRepositories).toHaveBeenCalledWith(
+      'gitlab-access-token',
+      expect.any(String),
+      [101, 202],
+      [],
+      configured,
+      'https://gitlab.example.com'
+    );
   });
 });
 

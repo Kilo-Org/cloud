@@ -1155,6 +1155,8 @@ export async function updateProjectWebhook(
  * @param projectId - GitLab project ID or path (URL-encoded)
  * @param hookId - ID of the webhook to delete
  * @param instanceUrl - GitLab instance URL (defaults to gitlab.com)
+ * @throws {GitLabAuthenticationError} When GitLab rejects the credential (HTTP 401)
+ * @throws {GitLabWebhookPermissionError} When user doesn't have Maintainer+ role on the project (HTTP 403)
  */
 export async function deleteProjectWebhook(
   accessToken: string,
@@ -1184,6 +1186,23 @@ export async function deleteProjectWebhook(
       projectId,
       hookId,
     });
+
+    if (response.status === 401) {
+      throw new GitLabAuthenticationError(
+        projectId,
+        401,
+        `GitLab rejected the credential while deleting a webhook for project ${projectId} (HTTP 401). Reconnect the GitLab integration and try again.`
+      );
+    }
+
+    if (response.status === 403) {
+      throw new GitLabWebhookPermissionError(
+        projectId,
+        response.status,
+        `Insufficient permissions to delete webhook for project ${projectId}. Requires Maintainer role or higher.`
+      );
+    }
+
     throw new Error(`GitLab delete webhook failed: ${response.status}`);
   }
 

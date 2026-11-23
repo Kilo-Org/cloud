@@ -2,9 +2,17 @@ const mockSyncWebhooksForRepositories = jest.fn();
 const mockGetValidGitLabToken = jest.fn();
 const mockIsGitLabCredentialConnected = jest.fn();
 
-jest.mock('@/lib/integrations/platforms/gitlab/webhook-sync', () => ({
-  syncWebhooksForRepositories: (...args: unknown[]) => mockSyncWebhooksForRepositories(...args),
-}));
+jest.mock('@/lib/integrations/platforms/gitlab/webhook-sync', () => {
+  // The rotation mutation derives its repository selection with the real
+  // helper; only the network-touching sync is replaced.
+  const actual: Record<string, unknown> = jest.requireActual(
+    '@/lib/integrations/platforms/gitlab/webhook-sync'
+  );
+  return {
+    ...actual,
+    syncWebhooksForRepositories: (...args: unknown[]) => mockSyncWebhooksForRepositories(...args),
+  };
+});
 
 jest.mock('@/lib/integrations/gitlab-service', () => ({
   getValidGitLabToken: (...args: unknown[]) => mockGetValidGitLabToken(...args),
@@ -647,6 +655,95 @@ describe('P1-D-32 GitLab webhook secret (rotation + status)', () => {
         organizationId: organization.id,
       });
 
+      expect(mockSyncWebhooksForRepositories).toHaveBeenCalledWith(
+        'gitlab-access-token',
+        expect.any(String),
+        [101, 202],
+        [],
+        configured,
+        'https://gitlab.example.com'
+      );
+    });
+
+    it('re-signs every stored hook when `selected` mode selects an empty list', async () => {
+      const { owner, organization } = await makeOrgAndOwner();
+      const configured = {
+        '101': { hook_id: 9001, created_at: '2026-01-01T00:00:00Z' },
+        '202': { hook_id: 9002, created_at: '2026-01-02T00:00:00Z' },
+      };
+      await seedGitLabIntegration(organization.id, {
+        gitlab_instance_url: 'https://gitlab.example.com',
+        configured_webhooks: configured,
+      });
+      // `selected` mode with nothing selected carries no narrowing information
+      // yet. Forwarding an empty list to the sync would treat every stored hook
+      // as removed, so a rotation must fall back to the stored handles.
+      await db.insert(agent_configs).values({
+        owned_by_organization_id: organization.id,
+        agent_type: 'code_review',
+        platform: 'gitlab',
+        config: {
+          focus_areas: [],
+          model_slug: 'kilo/fake-deterministic',
+          repository_selection_mode: 'selected',
+          review_style: 'balanced',
+          selected_repository_ids: [],
+        },
+        created_by: owner.id,
+      });
+
+      const caller = await createCallerForUser(owner.id);
+      await caller.organizations.reviewAgent.rotateGitLabWebhookSecret({
+        organizationId: organization.id,
+      });
+
+      expect(mockSyncWebhooksForRepositories).toHaveBeenCalledTimes(1);
+      expect(mockSyncWebhooksForRepositories).toHaveBeenCalledWith(
+        'gitlab-access-token',
+        expect.any(String),
+        [101, 202],
+        [],
+        configured,
+        'https://gitlab.example.com'
+      );
+    });
+
+    it('never passes a selected id with no stored hook to the sync', async () => {
+      const { owner, organization } = await makeOrgAndOwner();
+      const configured = {
+        '101': { hook_id: 9001, created_at: '2026-01-01T00:00:00Z' },
+        '202': { hook_id: 9002, created_at: '2026-01-02T00:00:00Z' },
+      };
+      await seedGitLabIntegration(organization.id, {
+        gitlab_instance_url: 'https://gitlab.example.com',
+        configured_webhooks: configured,
+      });
+      // 999 is selected but was never configured by Kilo. Passing it to the sync
+      // would make the rotation create a hook, which a secret rotation must
+      // never do; only the stored handles are rotated.
+      await db.insert(agent_configs).values({
+        owned_by_organization_id: organization.id,
+        agent_type: 'code_review',
+        platform: 'gitlab',
+        config: {
+          focus_areas: [],
+          model_slug: 'kilo/fake-deterministic',
+          repository_selection_mode: 'selected',
+          review_style: 'balanced',
+          selected_repository_ids: [999],
+        },
+        created_by: owner.id,
+      });
+
+      const caller = await createCallerForUser(owner.id);
+      await caller.organizations.reviewAgent.rotateGitLabWebhookSecret({
+        organizationId: organization.id,
+      });
+
+      expect(mockSyncWebhooksForRepositories).toHaveBeenCalledTimes(1);
+      const syncArgs = mockSyncWebhooksForRepositories.mock.calls[0]!;
+      expect(syncArgs[2]).not.toContain(999);
+      expect(syncArgs[2]).toEqual([101, 202]);
       expect(mockSyncWebhooksForRepositories).toHaveBeenCalledWith(
         'gitlab-access-token',
         expect.any(String),

@@ -1203,7 +1203,7 @@ function reading(sessionId: string, question: Question, runtime: ChatRuntime): E
     }
     return Effect.void;
   }).pipe(
-    Effect.provideService(questionSearches, { used: 0, attempts: 0 }),
+    Effect.provideService(questionSearches, { used: 0, attempts: 0, answered: 0 }),
     Effect.matchCauseEffect({
       onFailure: (cause: Cause.Cause<unknown>) =>
         Effect.promise(async () => {

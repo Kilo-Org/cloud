@@ -22,11 +22,21 @@ export const MAX_SEARCHES_PER_QUESTION = 5;
  */
 export const MAX_ATTEMPTS_PER_QUESTION = 15;
 
+/*
+ * The three counts describe one question's searches from two angles. `used` is
+ * the answered-search cap's view: a slot reserved before the search leaves the
+ * device, given back when Kilo did not answer. `answered` is the settled view,
+ * which the attempt cap's stop text reads, because only a search whose result
+ * came back lets the model's reply read as if the web was searched. A reserved
+ * slot is due in both, so `answered <= used` always holds.
+ */
 export type QuestionSearches = {
-  /** Searches Kilo answered, which draw on the account's allowance. */
+  /** Searches Kilo answered, which draw on the account's allowance, including reserved ones. */
   used: number;
   /** Searches sent, answered or not. */
   attempts: number;
+  /** Searches Kilo answered whose result already came back, which the stop text reads. */
+  answered: number;
 };
 
 /**

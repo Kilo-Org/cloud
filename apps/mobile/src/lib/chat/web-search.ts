@@ -116,7 +116,7 @@ function admit(spent: QuestionSearches | undefined): Admission {
     return { kind: 'refused', reason: OVER_BUDGET };
   }
   if (spent.attempts >= MAX_ATTEMPTS_PER_QUESTION) {
-    return { kind: 'refused', reason: overAttempts(spent.used > 0) };
+    return { kind: 'refused', reason: overAttempts(spent.answered > 0) };
   }
   spent.used += 1;
   spent.attempts += 1;
@@ -125,8 +125,10 @@ function admit(spent: QuestionSearches | undefined): Admission {
 
 /**
  * Gives back the slots the attempt did not use, once per run, and hands its
- * outcome to the model. A search Kilo answered keeps the answered slot; one
- * that never left the device keeps neither slot.
+ * outcome to the model. A search Kilo answered keeps the answered slot and also
+ * counts as settled here, so a stop that reads `answered` cannot claim a search
+ * came back before its result did; one that never left the device keeps neither
+ * slot.
  */
 function settle(
   result: Attempt,
@@ -134,6 +136,9 @@ function settle(
 ): Effect.Effect<string, ToolFailure> {
   if (reserved !== undefined && result.charge !== 'answered') {
     reserved.used -= 1;
+  }
+  if (reserved !== undefined && result.charge === 'answered') {
+    reserved.answered += 1;
   }
   if (reserved !== undefined && result.charge === 'none') {
     reserved.attempts -= 1;

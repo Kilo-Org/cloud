@@ -119,7 +119,7 @@ beforeEach(() => {
  * what was charged. A later round of the same question passes the counter back.
  */
 function askQuestion(calls: number, shared?: QuestionSearches) {
-  const spent = shared ?? { used: 0, attempts: 0 };
+  const spent = shared ?? { used: 0, attempts: 0, answered: 0 };
   const tool = webSearchTool();
   const call = { id: 'c', name: 'web_search', arguments: '{"query":"news"}' };
   const answers = Effect.runPromise(
@@ -135,7 +135,7 @@ function askQuestion(calls: number, shared?: QuestionSearches) {
  * runner does: every call reads the same counter before any of them settles.
  */
 function askQuestionAtOnce(calls: number, shared?: QuestionSearches) {
-  const spent = shared ?? { used: 0, attempts: 0 };
+  const spent = shared ?? { used: 0, attempts: 0, answered: 0 };
   const tool = webSearchTool();
   const call = { id: 'c', name: 'web_search', arguments: '{"query":"news"}' };
   const answers = Effect.runPromise(
@@ -344,6 +344,50 @@ describe('a web search', () => {
     expect(spent.attempts).toBe(15);
   });
 
+  it('tells the model nothing answered when the attempt cap stops a turn that answered nothing', async () => {
+    // Fourteen failures one at a time give their answered slot back each time,
+    // so the question has an answered search of zero and one attempt left.
+    world.transportFailures = 14;
+
+    const failures = askQuestion(14);
+    const failed = await failures.answers;
+
+    expect(failed.every(answer => Result.isFailure(answer))).toBe(true);
+    expect(failures.spent.used).toBe(0);
+    expect(failures.spent.attempts).toBe(14);
+    expect(failures.spent.answered).toBe(0);
+
+    // The next turn issues three searches at once against a proxy that answers:
+    // the first reserves the last attempt, and the other two reach the cap while
+    // that search is still on the wire.
+    world.response = { status: 200, body: '{"results":[]}' };
+    world.transportFailures = 0;
+    world.requests.length = 0;
+
+    const turn = askQuestionAtOnce(3, failures.spent);
+    const outcome = await turn.answers;
+
+    expect(world.requests).toHaveLength(1);
+    expect(turn.spent.used).toBe(1);
+    expect(turn.spent.attempts).toBe(15);
+    expect(turn.spent.answered).toBe(1);
+
+    const reasons = outcome
+      .filter(answer => Result.isFailure(answer))
+      .map(answer => reasonOf(answer));
+
+    expect(reasons).toHaveLength(2);
+    expect(reasons.every(reason => reason.includes('all 15 of its web search attempts'))).toBe(
+      true
+    );
+    // A reserved slot is not an answer: no refused call of this turn may tell
+    // the model to read its reply as if a search had come back.
+    expect(reasons.filter(reason => reason.includes('say the search did not work'))).toHaveLength(
+      2
+    );
+    expect(reasons.some(reason => reason.includes('answer with what you have.'))).toBe(false);
+  });
+
   it('holds the answered-search cap for a parallel burst that never answers', async () => {
     world.transportFailures = 20;
 
@@ -357,6 +401,7 @@ describe('a web search', () => {
     expect(outcome.slice(0, 5).every(answer => Result.isFailure(answer))).toBe(true);
     expect(reasonOf(outcome[5])).toContain('5 web searches, the limit');
     expect(spent.used).toBe(0);
+    expect(spent.answered).toBe(0);
     expect(spent.attempts).toBe(5);
   });
 
@@ -378,6 +423,7 @@ describe('a web search', () => {
     expect(refused.failure).toBeInstanceOf(ToolFailure);
     expect(reasonOf(outcome[5])).toContain('5 web searches, the limit');
     expect(spent.used).toBe(5);
+    expect(spent.answered).toBe(5);
     expect(spent.attempts).toBe(5);
   });
 
@@ -391,6 +437,7 @@ describe('a web search', () => {
     expect(world.requests).toHaveLength(5);
     // Nothing answered, so the searches come back; the five attempts stay spent.
     expect(first.spent.used).toBe(0);
+    expect(first.spent.answered).toBe(0);
     expect(first.spent.attempts).toBe(5);
 
     const next = await askQuestion(1, first.spent).answers;
@@ -400,6 +447,7 @@ describe('a web search', () => {
     expect(world.requests).toHaveLength(6);
     // The same question may still search, and the answered search now counts.
     expect(first.spent.used).toBe(1);
+    expect(first.spent.answered).toBe(1);
     expect(first.spent.attempts).toBe(6);
   });
 
@@ -419,6 +467,7 @@ describe('a web search', () => {
     expect(reasonOf(outcome[5])).toContain('5 web searches, the limit');
     expect(world.requests).toHaveLength(5);
     expect(spent.used).toBe(5);
+    expect(spent.answered).toBe(5);
     expect(spent.attempts).toBe(5);
   });
 

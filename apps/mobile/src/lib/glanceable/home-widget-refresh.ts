@@ -59,6 +59,8 @@ type HomeWidgetRefreshModule = {
    * `configure`, so it is the one writer that can keep the chrome in step.
    */
   setFixtureLocale?(locale: string): Promise<void>;
+  /** iOS only: dev fixture, a stand-in widget push token for the scope fixture. */
+  setFixturePushToken?(token: string | null): Promise<void>;
   // oxlint-disable-next-line anti-slop/no-unknown-returns -- raw native payload, parsed by homeWidgetDataSchema in restoreNativeHomeWidgetData
   getData(): Promise<unknown>;
   /** iOS only: the Android module registers no token getter. */

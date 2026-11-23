@@ -72,6 +72,22 @@ public class HomeWidgetRefreshModule: Module {
     }
     AsyncFunction("setFixtureMode") { (enabled: Bool) in HomeWidgetRefreshStore.fixture(enabled) }
     AsyncFunction("setFixtureLocale") { (locale: String) in HomeWidgetRefreshStore.fixtureLocale(locale) }
+    // Dev fixture: a stand-in widget push token for the scope-replacement
+    // verification. A release build cannot write one.
+    AsyncFunction("setFixturePushToken") { (token: String?) in
+      #if DEBUG
+      HomeWidgetRefreshStore.locked { defaults in
+        if let token {
+          defaults.set(token, forKey: "homeWidgetPushToken")
+        } else {
+          defaults.removeObject(forKey: "homeWidgetPushToken")
+        }
+        defaults.synchronize()
+      }
+      #else
+      throw NSError(domain: HomeWidgetRefreshStore.service, code: 4, userInfo: [NSLocalizedDescriptionKey: "Fixture only"])
+      #endif
+    }
     AsyncFunction("getData") { () -> [String: Any]? in
       HomeWidgetRefreshStore.locked { HomeWidgetRefreshStore.readJSON($0, "homeWidgetData") } ?? nil
     }

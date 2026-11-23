@@ -18,12 +18,11 @@ import {
   world,
 } from './remote-mcp.world.test-helpers';
 
-/** The stored remote MCP servers, discovered for the tools they offer. */
-
 beforeEach(() => {
   resetWorld();
 });
 
+/** The stored remote MCP servers, discovered for the tools they offer. */
 describe('the discovered state', () => {
   it('discovers an enabled server and exposes the tools it offers', async () => {
     const alpha = server({ id: 'alpha' });

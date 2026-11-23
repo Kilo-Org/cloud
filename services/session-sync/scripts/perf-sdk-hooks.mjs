@@ -17,8 +17,8 @@ export function observeSDKSource(file, observe) {
           `globalThis.__sessionSyncPerfStage?.('dequeue', ${dequeue}); const frame = envelopeSchema.parse(JSON.parse(${dequeue}));`,
         ],
         [
-          'visible(applyNativeEvent(state.messages, frame))',
-          "visible((() => { globalThis.__sessionSyncPerfStage?.('projection_start', frame); const result = applyNativeEvent(state.messages, frame); globalThis.__sessionSyncPerfStage?.('projection_end', frame); return result; })())",
+          'projectNativeEvent(state.messages, frame, state.session)',
+          "(() => { globalThis.__sessionSyncPerfStage?.('projection_start', frame); const result = projectNativeEvent(state.messages, frame, state.session); globalThis.__sessionSyncPerfStage?.('projection_end', frame); return result; })()",
         ],
       ];
       for (const [anchor, replacement] of anchors) {

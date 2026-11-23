@@ -1657,6 +1657,18 @@ test('Cloud Agent e2e deploy refuses a runtime source outside main', () => {
       assert.match(`${rejected.stdout}${rejected.stderr}`, /::error::.*40-character/);
       assert.doesNotMatch(rejected.output, /runtime_source_sha=/);
     }
+
+    // A dispatch may paste the SHA in either case: the step accepts both and
+    // writes the lowercase form for the later git calls and the checkout.
+    const uppercase = runAdmission(mainSha.toUpperCase());
+    assert.equal(uppercase.status, 0, uppercase.stderr);
+    assert.equal(uppercase.output, `runtime_source_sha=${mainSha}\n`);
+
+    // A 40-character string that is not hexadecimal still fails the guard.
+    const nonHex = runAdmission('g'.repeat(40));
+    assert.equal(nonHex.status, 1);
+    assert.match(`${nonHex.stdout}${nonHex.stderr}`, /::error::.*40-character/);
+    assert.doesNotMatch(nonHex.output, /runtime_source_sha=/);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

@@ -26,7 +26,7 @@
     "format": "oxfmt",
     "format:check": "oxfmt --list-different .",
     "format:changed": "bash scripts/format-changed.sh",
-    "check:md-table-padding": "tsx script/check-md-table-padding.ts",
+    "check:md-table-padding": "tsx scripts/check-md-table-padding.ts",
     "validate": "node scripts/validate.mjs",
     "drizzle": "pnpm --filter @kilocode/db exec drizzle-kit",
     "drizzle:verify-bootstrap": "bash scripts/verify-drizzle-bootstrap.sh",

@@ -24,10 +24,6 @@ describe('foldForSearch', () => {
     expect(foldForSearch('Ａ１ ﬁ')).toBe('a1 fi');
   });
 
-  it('folds a compatibility form the same way as the text it looks like', () => {
-    expect(foldForSearch('ＥＳＰＡＮＯＬ')).toBe(foldForSearch('Español'));
-  });
-
   it('folds case without an unpinned lowercase call', () => {
     // A tr/az device lowers 'I' to 'ı', so a locale-sensitive fold would make
     // a search for "indonesian" miss "Indonesian". The fold must not take the

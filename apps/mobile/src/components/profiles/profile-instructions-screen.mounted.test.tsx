@@ -470,9 +470,13 @@ describe('ProfileInstructionsScreen read-only row', () => {
   it('leaves the trailing cell to the switch its state belongs to', async () => {
     const { renderer, unmount } = await mountScreen();
 
-    const frames = renderer.root.findAll(node => node.props?.trailing?.kind === 'nodes');
-    expect(frames).toHaveLength(1);
-    expect(frames[0]?.props.trailing.nodes).toHaveLength(1);
+    // The renderer keeps host props untyped; the frame's spec is the screen's own.
+    const trailingCells = renderer.root
+      .findAll(node => node.props.trailing !== undefined)
+      .map(node => node.props.trailing as { kind: string; nodes?: readonly unknown[] });
+    expect(trailingCells).toHaveLength(1);
+    expect(trailingCells[0]?.kind).toBe('nodes');
+    expect(trailingCells[0]?.nodes).toHaveLength(1);
     expect(findAll(renderer.root, 'Switch')).toHaveLength(1);
 
     unmount();

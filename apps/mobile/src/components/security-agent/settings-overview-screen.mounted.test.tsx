@@ -477,6 +477,25 @@ describe.each([
     expect(row?.props.subtitle).toBe('All repositories');
   });
 
+  // The counts' denominators belong to the toggle lists, not the catalog: the
+  // subtitle states the list length, so adding a toggle moves the total with it.
+  it('states each counted subtitle total from its own toggle list', async () => {
+    if (presentation !== 'standalone') {
+      return;
+    }
+    configData.isEnabled = true;
+    configData.autoAnalysisEnabled = true;
+    configData.autoRemediationEnabled = false;
+    configData.autoDismissEnabled = false;
+    configData.newFindingNotificationsEnabled = true;
+    configData.slaNotificationsEnabled = true;
+    const root = await mount('personal');
+    const automated = host(root, 'ConfigureRow').find(node => node.props.title === 'Automation');
+    const notified = host(root, 'ConfigureRow').find(node => node.props.title === 'Notifications');
+    expect(automated?.props.subtitle).toBe('1 of 3 enabled');
+    expect(notified?.props.subtitle).toBe('2 of 2 enabled');
+  });
+
   // The header is not part of the body's loading state: a ⋯ that appeared only
   // once the queries answered changed the header between the two states.
   it('keeps the header action while the settings load', async () => {

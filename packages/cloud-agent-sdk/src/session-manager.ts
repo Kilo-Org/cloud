@@ -1396,7 +1396,14 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     // of an admitted one. Until then the answer is still pending, and the
     // metadata usually lands after this page.
     if (metadata === null) return { kind: 'pending' };
-    return metadata.initialMessageId != null ? { kind: 'unreadable' } : { kind: 'settled' };
+    if (metadata.initialMessageId == null) return { kind: 'settled' };
+    // An admitted turn whose rows have not landed is also what a run that is
+    // streaming its first turn looks like. That is progress, not an unreadable
+    // history, so the surface keeps the skeleton while the run is live. It does
+    // not test preparation: a run whose sandbox never prepared produces no rows
+    // at all, and that state must state itself instead of loading forever.
+    if (get(isStreamingAtom)) return { kind: 'pending' };
+    return { kind: 'unreadable' };
   });
 
   // Bumped whenever the active session or its resolved-delivery record changes,

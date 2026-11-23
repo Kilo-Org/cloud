@@ -11709,6 +11709,32 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
       });
     });
 
+    it('stays pending while an admitted run is streaming its first turn', async () => {
+      // Zero rows with an admitted turn is also what a working run looks like
+      // before its first turn lands. The surface must keep the skeleton rather
+      // than state a failure over a run that is still producing rows.
+      const config = createMockConfig({
+        fetchSnapshotPage: createPageFetchMock(async () =>
+          makePage({ kiloSessionId: 'ses-1', messages: [] })
+        ),
+        fetchSession: jest.fn().mockResolvedValue({
+          ...defaultFetchedSession,
+          initialMessageId: 'msg_0123456789abcdefghijklmnop',
+        }),
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      await settlePage();
+      config.store.set(mgr.atoms.isStreaming, true);
+
+      expect(atomValue<TranscriptHistoryState>(config.store, mgr.atoms.transcriptHistory)).toEqual({
+        kind: 'pending',
+      });
+
+      mgr.destroy();
+    });
+
     it('settles as empty for a session with no admitted turn', async () => {
       const fetchSnapshotPage = createPageFetchMock(async () =>
         makePage({ kiloSessionId: 'ses-1', messages: [] })

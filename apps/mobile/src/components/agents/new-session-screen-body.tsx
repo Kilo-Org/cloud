@@ -1001,8 +1001,10 @@ export function NewSessionScreenBody() {
     promptEditedRef.current = true;
     const previous = promptRef.current;
     promptRef.current = text;
-    // The visible-text walk is the only O(draft length) work on the keystroke
-    // path, and an append cannot change its answer while it is already true.
+    // The visibility answer cannot change on an append while it is already
+    // true, so a keystroke at the end does not re-ask it. The walk it would
+    // start returns at the first visible code point, so this saves that call
+    // rather than a long pass; the pass only happens for a draft of fillers.
     if (
       shouldRescanPromptVisibility({
         previous,

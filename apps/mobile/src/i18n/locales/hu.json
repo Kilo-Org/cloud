@@ -108,7 +108,6 @@
     "agents": "Ügynökök",
     "all": "Összes",
     "allModels": "Összes modell",
-    "balanced": "Kiegyensúlyozott",
     "bitbucketConnected": "Bitbucket csatlakoztatva",
     "branch": "Ág",
     "cameraAccessDisabled": "A kamera használata letiltva",
@@ -1288,7 +1287,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "Kiemelt területek",
       "hint": "Ha mindent ellenőrizni szeretnél, ne jelölj ki egyetlen területet sem."
     },
@@ -1320,10 +1319,18 @@
     },
     "style": {
       "title": "Ellenőrzési stílus",
-      "balanced": "Lényeges találatok, felesleges jelzések nélkül",
-      "lenient": "Csak komoly problémák",
-      "roast": "Kíméletlenül őszinte, mégis szórakoztató",
-      "strict": "Minden probléma jelzése, szigorú elvárások"
+      "labels": {
+        "balanced": "Kiegyensúlyozott",
+        "lenient": "Engedékeny",
+        "roast": "Csípős kritika",
+        "strict": "Szigorú"
+      },
+      "descriptions": {
+        "balanced": "Lényeges találatok, felesleges jelzések nélkül",
+        "lenient": "Csak komoly problémák",
+        "roast": "Kíméletlenül őszinte, mégis szórakoztató",
+        "strict": "Minden probléma jelzése, szigorú elvárások"
+      }
     },
     "reviewDetail": {
       "title": "Kódellenőrzés",
@@ -1528,12 +1535,7 @@
     "status": {
       "interrupted": "Megszakítva"
     },
-    "reviewStyle": {
-      "strict": "Szigorú",
-      "lenient": "Engedékeny",
-      "roast": "Csípős kritika"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "Biztonság",
       "bugs": "Hibák",
       "style": "Stílus",
@@ -1823,7 +1825,7 @@
       "cannotDismissDescription": "Csak a szervezet tulajdonosai, adminisztrátorai és számlázási felelősei vethetnek el találatokat.",
       "alreadyResolvedDescription": "Ezt a találatot már megoldották, ezért nem vethető el."
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "supersededBy": "Újabb találat váltotta fel",
       "supersededByDescription": "Koppints az aktuális bejegyzésre az állapot, az elemzés és a hibajavítás megtekintéséhez.",
       "dismissedOn": "Elvetés dátuma",
@@ -1911,7 +1913,7 @@
       "enableTrackingSubtitle": "A találatok súlyossága alapján határozd meg a hibajavítási határidőket.",
       "deadlinesHeading": "Hibajavítási határidők (nap)"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "title": "Találat",
       "tabAnalysis": "Elemzés",
       "tabRemediation": "Hibajavítás"

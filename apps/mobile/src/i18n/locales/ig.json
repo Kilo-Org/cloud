@@ -108,7 +108,6 @@
     "agents": "Ndị nnọchi anya",
     "all": "Niile",
     "allModels": "Ihe nlereanya niile",
-    "balanced": "Nhatanha",
     "bitbucketConnected": "Ejikọọla Bitbucket",
     "branch": "Alaka",
     "cameraAccessDisabled": "Enweghị ikike iji igwefoto",
@@ -1288,7 +1287,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "Ihe a ga-elekwasị anya",
       "hint": "Ahọrọla nke ọ bụla ma ọ bụrụ na ịchọrọ ka a nyochaa ihe niile."
     },
@@ -1320,10 +1319,18 @@
     },
     "style": {
       "title": "Ụdị nyocha",
-      "balanced": "Ihe achọpụtara bara uru n'enweghị nkọwa na-adịghị mkpa",
-      "lenient": "Naanị nsogbu dị njọ",
-      "roast": "Eziokwu na-enweghị mgbachapụ anya, nke na-atọkwa ọchị",
-      "strict": "Gosi nsogbu niile ma sie ọnwụ n'ụkpụrụ dị elu"
+      "labels": {
+        "balanced": "Nhatanha",
+        "lenient": "Dị nwayọọ",
+        "roast": "Nkatọ na-atọ ọchị",
+        "strict": "Siri ike"
+      },
+      "descriptions": {
+        "balanced": "Ihe achọpụtara bara uru n'enweghị nkọwa na-adịghị mkpa",
+        "lenient": "Naanị nsogbu dị njọ",
+        "roast": "Eziokwu na-enweghị mgbachapụ anya, nke na-atọkwa ọchị",
+        "strict": "Gosi nsogbu niile ma sie ọnwụ n'ụkpụrụ dị elu"
+      }
     },
     "reviewDetail": {
       "title": "Nyocha",
@@ -1528,12 +1535,7 @@
     "status": {
       "interrupted": "A kwụsịrị tupu ọ gwụchaa"
     },
-    "reviewStyle": {
-      "strict": "Siri ike",
-      "lenient": "Dị nwayọọ",
-      "roast": "Nkatọ na-atọ ọchị"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "Nchebe",
       "bugs": "Njehie",
       "style": "Ụdị ide koodu",
@@ -1823,7 +1825,7 @@
       "cannotDismissDescription": "Naanị ndị nwe nzukọ, ndị nchịkwa, na ndị njikwa ịgba ụgwọ nwere ike iwepụ ihe achọpụtara.",
       "alreadyResolvedDescription": "E dozilarị ihe achọpụtara a, ya mere a pụghịzi iwepụ ya."
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "supersededBy": "Ihe achọpụtara ọhụrụ nọchiri ya",
       "supersededByDescription": "Pịa ka ị mepee ndekọ nke ugbu a maka ọnọdụ, nyocha na ndozi.",
       "dismissedOn": "Ụbọchị elegharala anya",
@@ -1911,7 +1913,7 @@
       "enableTrackingSubtitle": "Debe oge njedebe ndozi dabere n'ogo njọ ihe achọpụtara.",
       "deadlinesHeading": "Oge njedebe ndozi (ụbọchị)"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "title": "Ihe achọpụtara",
       "tabAnalysis": "Nyocha",
       "tabRemediation": "Ndozi"

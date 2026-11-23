@@ -112,7 +112,6 @@
     "agents": "Asiantau",
     "all": "Popeth",
     "allModels": "Pob model AI",
-    "balanced": "Cytbwys",
     "bitbucketConnected": "Wedi cysylltu â Bitbucket",
     "branch": "Cangen",
     "cameraAccessDisabled": "Mynediad i'r camera wedi'i analluogi",
@@ -1400,7 +1399,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "Meysydd i ganolbwyntio arnynt",
       "hint": "Gadewch bob un heb ei ddewis i adolygu popeth."
     },
@@ -1432,10 +1431,18 @@
     },
     "style": {
       "title": "Arddull adolygu",
-      "balanced": "Canfyddiadau defnyddiol heb fanylion diangen",
-      "lenient": "Dim ond problemau difrifol",
-      "roast": "Gonest, deifiol a difyr",
-      "strict": "Nodi popeth a mynnu safon uchel"
+      "labels": {
+        "balanced": "Cytbwys",
+        "lenient": "Goddefgar",
+        "roast": "Dychanol",
+        "strict": "Llym"
+      },
+      "descriptions": {
+        "balanced": "Canfyddiadau defnyddiol heb fanylion diangen",
+        "lenient": "Dim ond problemau difrifol",
+        "roast": "Gonest, deifiol a difyr",
+        "strict": "Nodi popeth a mynnu safon uchel"
+      }
     },
     "reviewDetail": {
       "title": "Adolygiad",
@@ -1644,12 +1651,7 @@
     "status": {
       "interrupted": "Wedi'i atal"
     },
-    "reviewStyle": {
-      "strict": "Llym",
-      "lenient": "Goddefgar",
-      "roast": "Dychanol"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "Diogelwch",
       "bugs": "Bygiau",
       "style": "Arddull",
@@ -1987,7 +1989,7 @@
       "cannotDismissDescription": "Dim ond perchnogion, gweinyddwyr a rheolwyr bilio'r sefydliad sy'n gallu diystyru canfyddiadau.",
       "alreadyResolvedDescription": "Mae'r canfyddiad hwn eisoes wedi'i ddatrys, felly ni ellir ei ddiystyru mwyach."
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "supersededBy": "Wedi'i ddisodli gan ganfyddiad cyfredol",
       "supersededByDescription": "Tapiwch i agor y cofnod cyfredol a gweld y statws, y dadansoddiad a'r gwaith cywiro.",
       "dismissedOn": "Wedi'i ddiystyru ar",
@@ -2079,7 +2081,7 @@
       "enableTrackingSubtitle": "Pennir dyddiadau terfyn cywiro yn ôl difrifoldeb y canfyddiad.",
       "deadlinesHeading": "Dyddiadau terfyn cywiro (diwrnodau)"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "title": "Canfyddiad",
       "tabAnalysis": "Dadansoddiad",
       "tabRemediation": "Cywiro"

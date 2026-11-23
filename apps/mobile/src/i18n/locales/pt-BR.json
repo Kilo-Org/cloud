@@ -110,7 +110,6 @@
     "agents": "Agentes",
     "all": "Todos",
     "allModels": "Todos os modelos",
-    "balanced": "Equilibrado",
     "bitbucketConnected": "Bitbucket conectado",
     "branch": "Ramificação",
     "cameraAccessDisabled": "Acesso à câmera desativado",
@@ -697,7 +696,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "Áreas prioritárias",
       "hint": "Para revisar tudo, não selecione nenhuma área."
     },
@@ -729,10 +728,18 @@
     },
     "style": {
       "title": "Estilo de revisão",
-      "balanced": "Ocorrências relevantes, sem distrações",
-      "lenient": "Apenas problemas sérios",
-      "roast": "Sincero sem poupar críticas, mas com humor",
-      "strict": "Apontar tudo e exigir um alto padrão"
+      "labels": {
+        "balanced": "Equilibrado",
+        "lenient": "Tolerante",
+        "roast": "Sem filtro",
+        "strict": "Rigoroso"
+      },
+      "descriptions": {
+        "balanced": "Ocorrências relevantes, sem distrações",
+        "lenient": "Apenas problemas sérios",
+        "roast": "Sincero sem poupar críticas, mas com humor",
+        "strict": "Apontar tudo e exigir um alto padrão"
+      }
     },
     "autoReviews": "Revisões automáticas",
     "bitbucket": {
@@ -939,12 +946,7 @@
     "status": {
       "interrupted": "Interrompida"
     },
-    "reviewStyle": {
-      "strict": "Rigoroso",
-      "lenient": "Tolerante",
-      "roast": "Sem filtro"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "Segurança",
       "bugs": "Erros",
       "style": "Estilo",
@@ -1316,12 +1318,12 @@
       "reasonTolerableRisk": "Risco tolerável",
       "title": "Ignorar problema"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "tabAnalysis": "Análise",
       "tabRemediation": "Correção",
       "title": "Ocorrência"
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "cve": "CVE",
       "detected": "Detectada",
       "dismissedOn": "Ignorado em",

@@ -110,7 +110,6 @@
     "agents": "Agenti",
     "all": "Vše",
     "allModels": "Všechny modely",
-    "balanced": "Vyvážený",
     "bitbucketConnected": "Bitbucket připojen",
     "branch": "Větev",
     "cameraAccessDisabled": "Přístup k fotoaparátu zakázán",
@@ -1344,7 +1343,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "Oblasti zaměření",
       "hint": "Pokud chcete zkontrolovat vše, nevybírejte žádnou oblast."
     },
@@ -1376,10 +1375,18 @@
     },
     "style": {
       "title": "Styl kontroly",
-      "balanced": "Důležité nálezy bez zbytečných připomínek",
-      "lenient": "Pouze vážné problémy",
-      "roast": "Drsně upřímný, ale s humorem",
-      "strict": "Upozornit na vše a vyžadovat vysokou kvalitu"
+      "labels": {
+        "balanced": "Vyvážený",
+        "lenient": "Shovívavý",
+        "roast": "Jízlivý",
+        "strict": "Přísný"
+      },
+      "descriptions": {
+        "balanced": "Důležité nálezy bez zbytečných připomínek",
+        "lenient": "Pouze vážné problémy",
+        "roast": "Drsně upřímný, ale s humorem",
+        "strict": "Upozornit na vše a vyžadovat vysokou kvalitu"
+      }
     },
     "reviewDetail": {
       "title": "Kontrola",
@@ -1586,12 +1593,7 @@
     "status": {
       "interrupted": "Přerušeno"
     },
-    "reviewStyle": {
-      "strict": "Přísný",
-      "lenient": "Shovívavý",
-      "roast": "Jízlivý"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "Bezpečnost",
       "bugs": "Chyby",
       "style": "Styl",
@@ -1905,7 +1907,7 @@
       "cannotDismissDescription": "Nálezy mohou zamítat pouze vlastníci organizace, správci a správci fakturace.",
       "alreadyResolvedDescription": "Tento nález je již vyřešený a nelze ho zamítnout."
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "supersededBy": "Nahrazeno aktuálním nálezem",
       "supersededByDescription": "Klepnutím otevřete aktuální záznam se stavem, analýzou a nápravou.",
       "dismissedOn": "Zamítnuto dne",
@@ -1995,7 +1997,7 @@
       "enableTrackingSubtitle": "Termíny nápravy se stanoví podle závažnosti nálezu.",
       "deadlinesHeading": "Lhůty pro nápravu (dny)"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "title": "Nález",
       "tabAnalysis": "Analýza",
       "tabRemediation": "Náprava"

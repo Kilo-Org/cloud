@@ -108,7 +108,6 @@
     "agents": "Wakilai",
     "all": "Duka",
     "allModels": "Dukkan samfura",
-    "balanced": "Daidaitacce",
     "bitbucketConnected": "An haɗa Bitbucket",
     "branch": "Reshe",
     "cameraAccessDisabled": "An hana amfani da kamara",
@@ -1288,7 +1287,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "Abubuwan da za a fi dubawa",
       "hint": "Kada ka zaɓi ko ɗaya idan kana son a duba komai."
     },
@@ -1320,10 +1319,18 @@
     },
     "style": {
       "title": "Salon bita",
-      "balanced": "Matsaloli masu muhimmanci kawai, ba bayanan da ba su da amfani ba",
-      "lenient": "Matsaloli masu tsanani kawai",
-      "roast": "Faɗin gaskiya ba sassauci, cikin raha",
-      "strict": "Nuna kowace matsala, ka nace kan inganci"
+      "labels": {
+        "balanced": "Daidaitacce",
+        "lenient": "Mai sassauci",
+        "roast": "Suka cikin raha",
+        "strict": "Mai tsauri"
+      },
+      "descriptions": {
+        "balanced": "Matsaloli masu muhimmanci kawai, ba bayanan da ba su da amfani ba",
+        "lenient": "Matsaloli masu tsanani kawai",
+        "roast": "Faɗin gaskiya ba sassauci, cikin raha",
+        "strict": "Nuna kowace matsala, ka nace kan inganci"
+      }
     },
     "reviewDetail": {
       "title": "Bita",
@@ -1528,12 +1535,7 @@
     "status": {
       "interrupted": "An katse"
     },
-    "reviewStyle": {
-      "strict": "Mai tsauri",
-      "lenient": "Mai sassauci",
-      "roast": "Suka cikin raha"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "Tsaro",
       "bugs": "Kurakurai",
       "style": "Salo",
@@ -1823,7 +1825,7 @@
       "cannotDismissDescription": "Masu ƙungiya, masu gudanarwa, da manajannin biyan kuɗi kawai za su iya yin watsi da matsalolin da aka gano.",
       "alreadyResolvedDescription": "An riga an warware wannan matsalar, don haka ba za a iya yin watsi da ita ba."
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "supersededBy": "Wata matsalar da aka gano a yanzu ta maye gurbinta",
       "supersededByDescription": "Danna don buɗe bayanan matsalar ta yanzu ka ga halinta, nazarinta da gyaranta.",
       "dismissedOn": "An yi watsi da shi a ranar",
@@ -1911,7 +1913,7 @@
       "enableTrackingSubtitle": "Saita wa'adin gyara bisa tsananin matsalar da aka gano.",
       "deadlinesHeading": "Wa'adin gyara (kwanaki)"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "title": "Matsalar da aka gano",
       "tabAnalysis": "Nazari",
       "tabRemediation": "Gyara"

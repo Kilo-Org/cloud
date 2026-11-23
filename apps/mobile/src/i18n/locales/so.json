@@ -108,7 +108,6 @@
     "agents": "Wakiillada",
     "all": "Dhammaan",
     "allModels": "Dhammaan moodeellada",
-    "balanced": "Dheellitiran",
     "bitbucketConnected": "Bitbucket waa ku xiran",
     "branch": "Laan",
     "cameraAccessDisabled": "Isticmaalka kamaradda lama oggola",
@@ -1288,7 +1287,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "Qaybaha xoogga la saarayo",
       "hint": "Waxba ha dooran si wax walba dib loogu eego."
     },
@@ -1320,10 +1319,18 @@
     },
     "style": {
       "title": "Qaabka dib-u-eegista",
-      "balanced": "Natiijooyin waxtar leh oo aan faahfaahin aan loo baahnayn lahayn",
-      "lenient": "Kaliya dhibaatooyinka halista ah",
-      "roast": "Run aan la qarin oo kaftan leh",
-      "strict": "Wax walba calaamadee oo dalbo tayo sare"
+      "labels": {
+        "balanced": "Dheellitiran",
+        "lenient": "Dabacsan",
+        "roast": "Kaftan kulul",
+        "strict": "Adag"
+      },
+      "descriptions": {
+        "balanced": "Natiijooyin waxtar leh oo aan faahfaahin aan loo baahnayn lahayn",
+        "lenient": "Kaliya dhibaatooyinka halista ah",
+        "roast": "Run aan la qarin oo kaftan leh",
+        "strict": "Wax walba calaamadee oo dalbo tayo sare"
+      }
     },
     "reviewDetail": {
       "title": "Dib-u-eegis",
@@ -1528,12 +1535,7 @@
     "status": {
       "interrupted": "Waa la hakiyay"
     },
-    "reviewStyle": {
-      "strict": "Adag",
-      "lenient": "Dabacsan",
-      "roast": "Kaftan kulul"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "Amniga",
       "bugs": "Cilladaha",
       "style": "Qaabka",
@@ -1823,7 +1825,7 @@
       "cannotDismissDescription": "Milkiilayaasha ururka, maamulayaasha iyo maareeyayaasha biilasha oo keliya ayaa iska dhaafi kara natiijooyinka.",
       "alreadyResolvedDescription": "Natiijadan hore ayaa loo xalliyay, mar dambena lama iska dhaafi karo."
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "supersededBy": "Waxaa beddelay natiijo hadda jirta",
       "supersededByDescription": "Taabo si aad u furto diiwaanka hadda jira oo aad u aragto xaaladda, falanqaynta iyo hagaajinta.",
       "dismissedOn": "Taariikhda la iska dhaafay",
@@ -1911,7 +1913,7 @@
       "enableTrackingSubtitle": "Deji waqtiyada kama dambaysta ah ee hagaajinta adigoo ku salaynaya heerka halista natiijada.",
       "deadlinesHeading": "Waqtiyada kama dambaysta ah ee hagaajinta (maalmo)"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "title": "Natiijo",
       "tabAnalysis": "Falanqayn",
       "tabRemediation": "Hagaajin"

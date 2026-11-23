@@ -108,7 +108,6 @@
     "agents": "ເອເຈນ",
     "all": "ທັງໝົດ",
     "allModels": "ໂມເດວທັງໝົດ",
-    "balanced": "ສົມດຸນ",
     "bitbucketConnected": "ເຊື່ອມຕໍ່ Bitbucket ແລ້ວ",
     "branch": "ສາຂາໂຄ້ດ",
     "cameraAccessDisabled": "ບໍ່ໄດ້ອະນຸຍາດໃຫ້ໃຊ້ກ້ອງ",
@@ -1288,7 +1287,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "ຫົວຂໍ້ທີ່ເນັ້ນ",
       "hint": "ຖ້າຕ້ອງການກວດທານທຸກຢ່າງ ໃຫ້ປະໄວ້ໂດຍບໍ່ເລືອກລາຍການໃດ."
     },
@@ -1320,10 +1319,18 @@
     },
     "style": {
       "title": "ຮູບແບບການກວດສອບ",
-      "balanced": "ລາຍງານບັນຫາທີ່ສຳຄັນ ໂດຍບໍ່ເພີ່ມລາຍການທີ່ບໍ່ຈຳເປັນ",
-      "lenient": "ບັນຫາຮ້າຍແຮງເທົ່ານັ້ນ",
-      "roast": "ວິຈານກົງໆ ແບບເຈັບໆ ແຕ່ຕະຫຼົກ",
-      "strict": "ລາຍງານທຸກບັນຫາ ຮັກສາມາດຕະຖານສູງ"
+      "labels": {
+        "balanced": "ສົມດຸນ",
+        "lenient": "ຜ່ອນຜັນ",
+        "roast": "ວິຈານແບບແຊວແຮງ",
+        "strict": "ເຄັ່ງຄັດ"
+      },
+      "descriptions": {
+        "balanced": "ລາຍງານບັນຫາທີ່ສຳຄັນ ໂດຍບໍ່ເພີ່ມລາຍການທີ່ບໍ່ຈຳເປັນ",
+        "lenient": "ບັນຫາຮ້າຍແຮງເທົ່ານັ້ນ",
+        "roast": "ວິຈານກົງໆ ແບບເຈັບໆ ແຕ່ຕະຫຼົກ",
+        "strict": "ລາຍງານທຸກບັນຫາ ຮັກສາມາດຕະຖານສູງ"
+      }
     },
     "reviewDetail": {
       "title": "ການກວດສອບ",
@@ -1528,12 +1535,7 @@
     "status": {
       "interrupted": "ຢຸດກາງຄັນ"
     },
-    "reviewStyle": {
-      "strict": "ເຄັ່ງຄັດ",
-      "lenient": "ຜ່ອນຜັນ",
-      "roast": "ວິຈານແບບແຊວແຮງ"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "ຄວາມປອດໄພ",
       "bugs": "ບັກ",
       "style": "ຮູບແບບການຂຽນໂຄ້ດ",
@@ -1823,7 +1825,7 @@
       "cannotDismissDescription": "ມີພຽງເຈົ້າຂອງອົງກອນ, ຜູ້ດູແລລະບົບ ແລະ ຜູ້ຈັດການການຮຽກເກັບເງິນທີ່ປິດບັນຫາທີ່ກວດພົບໄດ້.",
       "alreadyResolvedDescription": "ບັນຫານີ້ໄດ້ຮັບການແກ້ໄຂແລ້ວ ຈຶ່ງບໍ່ສາມາດປິດບັນຫາຊ້ຳໄດ້."
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "supersededBy": "ມີບັນຫາທີ່ກວດພົບລາຍການໃໝ່ແທນແລ້ວ",
       "supersededByDescription": "ແຕະເພື່ອເປີດລາຍການປັດຈຸບັນ ແລະ ເບິ່ງສະຖານະ, ການວິເຄາະ ແລະ ການແກ້ໄຂ.",
       "dismissedOn": "ລະເວັ້ນແລ້ວເມື່ອ",
@@ -1911,7 +1913,7 @@
       "enableTrackingSubtitle": "ຕັ້ງກຳນົດເວລາແກ້ໄຂຕາມລະດັບຄວາມຮ້າຍແຮງຂອງບັນຫາທີ່ກວດພົບ.",
       "deadlinesHeading": "ກຳນົດເວລາແກ້ໄຂ (ມື້)"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "title": "ບັນຫາທີ່ກວດພົບ",
       "tabAnalysis": "ການວິເຄາະ",
       "tabRemediation": "ການແກ້ໄຂ"

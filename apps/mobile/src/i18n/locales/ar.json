@@ -112,7 +112,6 @@
     "agents": "الوكلاء",
     "all": "الكل",
     "allModels": "جميع النماذج",
-    "balanced": "متوازن",
     "bitbucketConnected": "تم ربط Bitbucket",
     "branch": "الفرع",
     "cameraAccessDisabled": "الوصول إلى الكاميرا معطّل",
@@ -734,7 +733,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "مجالات التركيز",
       "hint": "اترك الكل دون تحديد لمراجعة كل شيء."
     },
@@ -766,10 +765,18 @@
     },
     "style": {
       "title": "أسلوب المراجعة",
-      "balanced": "نتائج مهمة دون تفاصيل غير ضرورية",
-      "lenient": "المشكلات الخطيرة فقط",
-      "roast": "صراحة لاذعة بأسلوب ساخر",
-      "strict": "رصد كل المشكلات وفق معايير صارمة"
+      "labels": {
+        "balanced": "متوازن",
+        "lenient": "متساهل",
+        "roast": "ساخر",
+        "strict": "صارم"
+      },
+      "descriptions": {
+        "balanced": "نتائج مهمة دون تفاصيل غير ضرورية",
+        "lenient": "المشكلات الخطيرة فقط",
+        "roast": "صراحة لاذعة بأسلوب ساخر",
+        "strict": "رصد كل المشكلات وفق معايير صارمة"
+      }
     },
     "autoReviews": "مراجعات تلقائية",
     "bitbucket": {
@@ -978,12 +985,7 @@
     "status": {
       "interrupted": "متوقفة"
     },
-    "reviewStyle": {
-      "strict": "صارم",
-      "lenient": "متساهل",
-      "roast": "ساخر"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "الأمان",
       "bugs": "الأخطاء",
       "style": "الأسلوب",
@@ -1383,12 +1385,12 @@
       "reasonTolerableRisk": "الخطر مقبول",
       "title": "استبعاد النتيجة"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "tabAnalysis": "التحليل",
       "tabRemediation": "المعالجة",
       "title": "النتيجة"
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "cve": "CVE",
       "detected": "تاريخ الاكتشاف",
       "dismissedOn": "مستبعدة في",

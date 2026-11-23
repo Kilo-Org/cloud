@@ -318,7 +318,7 @@ describe('FindingDetailScreen view switch', () => {
     // Each view swaps the body below the strip, so a reader hears tabs, and the
     // tab list is named by the screen's own title.
     expect(control.semantics).toBe('tabs');
-    expect(control.accessibilityLabel).toBe('securityAgent.findingDetail.title');
+    expect(control.accessibilityLabel).toBe('securityAgent.findingDetailScreen.title');
   });
 });
 

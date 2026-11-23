@@ -108,7 +108,6 @@
     "agents": "एजेंट",
     "all": "सभी",
     "allModels": "सभी मॉडल",
-    "balanced": "संतुलित",
     "bitbucketConnected": "Bitbucket जुड़ गया",
     "branch": "ब्रांच",
     "cameraAccessDisabled": "कैमरे की अनुमति बंद है",
@@ -726,7 +725,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "ध्यान देने वाले क्षेत्र",
       "hint": "सब कुछ की समीक्षा करने के लिए कोई विकल्प न चुनें।"
     },
@@ -758,10 +757,18 @@
     },
     "style": {
       "title": "समीक्षा की शैली",
-      "balanced": "सिर्फ़ काम की समस्याएँ, बेवजह की टिप्पणियाँ नहीं",
-      "lenient": "केवल गंभीर समस्याएँ",
-      "roast": "बिना नरमी के, मज़ेदार अंदाज़ में खरी-खरी बातें",
-      "strict": "हर समस्या बताएँ, कड़े मानक रखें"
+      "labels": {
+        "balanced": "संतुलित",
+        "lenient": "नरम",
+        "roast": "रोस्ट",
+        "strict": "सख्त"
+      },
+      "descriptions": {
+        "balanced": "सिर्फ़ काम की समस्याएँ, बेवजह की टिप्पणियाँ नहीं",
+        "lenient": "केवल गंभीर समस्याएँ",
+        "roast": "बिना नरमी के, मज़ेदार अंदाज़ में खरी-खरी बातें",
+        "strict": "हर समस्या बताएँ, कड़े मानक रखें"
+      }
     },
     "autoReviews": "स्वचालित समीक्षाएँ",
     "bitbucket": {
@@ -966,12 +973,7 @@
     "status": {
       "interrupted": "बाधित"
     },
-    "reviewStyle": {
-      "strict": "सख्त",
-      "lenient": "नरम",
-      "roast": "रोस्ट"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "सुरक्षा",
       "bugs": "बग",
       "style": "शैली",
@@ -1315,12 +1317,12 @@
       "reasonTolerableRisk": "जोखिम स्वीकार्य है",
       "title": "मिली समस्या खारिज करें"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "tabAnalysis": "विश्लेषण",
       "tabRemediation": "सुधार",
       "title": "समस्या"
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "cve": "CVE",
       "detected": "पता लगाया गया",
       "dismissedOn": "खारिज होने की तारीख",

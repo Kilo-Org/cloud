@@ -108,7 +108,6 @@
     "agents": "Axentes",
     "all": "Todos",
     "allModels": "Todos os modelos",
-    "balanced": "Equilibrado",
     "bitbucketConnected": "Bitbucket conectado",
     "branch": "Rama",
     "cameraAccessDisabled": "Acceso á cámara desactivado",
@@ -1288,7 +1287,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "Áreas prioritarias",
       "hint": "Non selecciones ningunha área para revisalas todas."
     },
@@ -1320,10 +1319,18 @@
     },
     "style": {
       "title": "Estilo de revisión",
-      "balanced": "Achados relevantes sen detalles innecesarios",
-      "lenient": "Só problemas graves",
-      "roast": "Sinceridade sen filtros e con humor",
-      "strict": "Sinalar todos os problemas cun nivel de esixencia alto"
+      "labels": {
+        "balanced": "Equilibrado",
+        "lenient": "Tolerante",
+        "roast": "Crítica mordaz",
+        "strict": "Estrito"
+      },
+      "descriptions": {
+        "balanced": "Achados relevantes sen detalles innecesarios",
+        "lenient": "Só problemas graves",
+        "roast": "Sinceridade sen filtros e con humor",
+        "strict": "Sinalar todos os problemas cun nivel de esixencia alto"
+      }
     },
     "reviewDetail": {
       "title": "Revisión",
@@ -1528,12 +1535,7 @@
     "status": {
       "interrupted": "Interrompida"
     },
-    "reviewStyle": {
-      "strict": "Estrito",
-      "lenient": "Tolerante",
-      "roast": "Crítica mordaz"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "Seguridade",
       "bugs": "Erros",
       "style": "Estilo",
@@ -1823,7 +1825,7 @@
       "cannotDismissDescription": "Só os propietarios da organización, os administradores e os xestores de facturación poden descartar achados.",
       "alreadyResolvedDescription": "Este achado xa está resolto e non se pode descartar."
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "supersededBy": "Substituído por un achado actual",
       "supersededByDescription": "Toca para abrir o rexistro actual e consultar o estado, a análise e a corrección.",
       "dismissedOn": "Descartado o",
@@ -1911,7 +1913,7 @@
       "enableTrackingSubtitle": "Establece prazos de corrección segundo a gravidade do achado.",
       "deadlinesHeading": "Prazos de corrección (días)"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "title": "Achado",
       "tabAnalysis": "Análise",
       "tabRemediation": "Corrección"

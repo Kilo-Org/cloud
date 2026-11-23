@@ -108,7 +108,6 @@
     "agents": "නියෝජිතයන්",
     "all": "සියල්ල",
     "allModels": "සියලුම ආකෘති",
-    "balanced": "සමතුලිත",
     "bitbucketConnected": "Bitbucket සම්බන්ධයි",
     "branch": "ශාඛාව",
     "cameraAccessDisabled": "කැමරා ප්‍රවේශය අක්‍රීයයි",
@@ -1288,7 +1287,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "අවධානය යොමු කරන ක්ෂේත්‍ර",
       "hint": "සියල්ල සමාලෝචනය කිරීමට කිසිවක් තෝරන්න එපා."
     },
@@ -1320,10 +1319,18 @@
     },
     "style": {
       "title": "සමාලෝචන විලාසය",
-      "balanced": "අනවශ්‍ය කරුණු නැති, වැදගත් සොයාගැනීම්",
-      "lenient": "බරපතළ ගැටලු පමණි",
-      "roast": "හාස්‍යය සමඟ නොසඟවා කරන දැඩි විවේචන",
-      "strict": "සෑම ගැටලුවක්ම සලකුණු කර ඉහළ ප්‍රමිතියක් පවත්වා ගන්න"
+      "labels": {
+        "balanced": "සමතුලිත",
+        "lenient": "නම්‍යශීලී",
+        "roast": "හාස්‍යමය විවේචනය",
+        "strict": "දැඩි"
+      },
+      "descriptions": {
+        "balanced": "අනවශ්‍ය කරුණු නැති, වැදගත් සොයාගැනීම්",
+        "lenient": "බරපතළ ගැටලු පමණි",
+        "roast": "හාස්‍යය සමඟ නොසඟවා කරන දැඩි විවේචන",
+        "strict": "සෑම ගැටලුවක්ම සලකුණු කර ඉහළ ප්‍රමිතියක් පවත්වා ගන්න"
+      }
     },
     "reviewDetail": {
       "title": "සමාලෝචනය",
@@ -1528,12 +1535,7 @@
     "status": {
       "interrupted": "බාධා විය"
     },
-    "reviewStyle": {
-      "strict": "දැඩි",
-      "lenient": "නම්‍යශීලී",
-      "roast": "හාස්‍යමය විවේචනය"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "ආරක්ෂාව",
       "bugs": "දෝෂ",
       "style": "කේත ශෛලිය",
@@ -1823,7 +1825,7 @@
       "cannotDismissDescription": "සංවිධාන හිමිකරුවන්ට, පරිපාලකවරුන්ට සහ බිල්පත් කළමනාකරුවන්ට පමණක් සොයාගැනීම් ඉවතලිය හැක.",
       "alreadyResolvedDescription": "මෙම සොයාගැනීම දැනටමත් විසඳා ඇති නිසා තවදුරටත් එය ඉවතලිය නොහැක."
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "supersededBy": "නව සොයාගැනීමකින් ප්‍රතිස්ථාපනය කර ඇත",
       "supersededByDescription": "තත්ත්වය, විශ්ලේෂණය සහ පිළියම් යෙදීම පිළිබඳ විස්තර බැලීමට වත්මන් වාර්තාව තට්ටු කර විවෘත කරන්න.",
       "dismissedOn": "ඉවතලා ඇති දිනය",
@@ -1911,7 +1913,7 @@
       "enableTrackingSubtitle": "සොයාගැනීමේ බරපතළකම අනුව පිළියම් යෙදීමේ කාල සීමා සකසන්න.",
       "deadlinesHeading": "පිළියම් යෙදීමේ කාල සීමා (දින)"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "title": "සොයාගැනීම",
       "tabAnalysis": "විශ්ලේෂණය",
       "tabRemediation": "පිළියම්"

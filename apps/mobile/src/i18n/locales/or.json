@@ -108,7 +108,6 @@
     "agents": "ଏଜେଣ୍ଟ",
     "all": "ସମସ୍ତ",
     "allModels": "ସମସ୍ତ ମଡେଲ୍",
-    "balanced": "ସନ୍ତୁଳିତ",
     "bitbucketConnected": "Bitbucket ସହ ସଂଯୋଗ ହୋଇଛି",
     "branch": "ବ୍ରାଞ୍ଚ୍",
     "cameraAccessDisabled": "କ୍ୟାମେରା ବ୍ୟବହାର ଅନୁମତି ବନ୍ଦ",
@@ -1288,7 +1287,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "ଧ୍ୟାନ ଦେବାର କ୍ଷେତ୍ର",
       "hint": "ସବୁକିଛି ସମୀକ୍ଷା କରିବାକୁ କୌଣସି ବିକଳ୍ପ ବାଛନ୍ତୁ ନାହିଁ।"
     },
@@ -1320,10 +1319,18 @@
     },
     "style": {
       "title": "ସମୀକ୍ଷା ଶୈଳୀ",
-      "balanced": "ଅନାବଶ୍ୟକ କଥା ବିନା ଗୁରୁତ୍ୱପୂର୍ଣ୍ଣ ଚିହ୍ନଟ ସମସ୍ୟା",
-      "lenient": "କେବଳ ଗୁରୁତର ସମସ୍ୟା",
-      "roast": "କଡ଼ା ସତକଥା, ମଜାଳିଆ ଢଙ୍ଗରେ",
-      "strict": "ପ୍ରତ୍ୟେକ ସମସ୍ୟା ଚିହ୍ନଟ କରନ୍ତୁ, ଉଚ୍ଚ ମାନ ବଜାୟ ରଖନ୍ତୁ"
+      "labels": {
+        "balanced": "ସନ୍ତୁଳିତ",
+        "lenient": "ଶିଥିଳ",
+        "roast": "କଟାକ୍ଷ",
+        "strict": "କଠୋର"
+      },
+      "descriptions": {
+        "balanced": "ଅନାବଶ୍ୟକ କଥା ବିନା ଗୁରୁତ୍ୱପୂର୍ଣ୍ଣ ଚିହ୍ନଟ ସମସ୍ୟା",
+        "lenient": "କେବଳ ଗୁରୁତର ସମସ୍ୟା",
+        "roast": "କଡ଼ା ସତକଥା, ମଜାଳିଆ ଢଙ୍ଗରେ",
+        "strict": "ପ୍ରତ୍ୟେକ ସମସ୍ୟା ଚିହ୍ନଟ କରନ୍ତୁ, ଉଚ୍ଚ ମାନ ବଜାୟ ରଖନ୍ତୁ"
+      }
     },
     "reviewDetail": {
       "title": "ସମୀକ୍ଷା",
@@ -1528,12 +1535,7 @@
     "status": {
       "interrupted": "ବ୍ୟାହତ"
     },
-    "reviewStyle": {
-      "strict": "କଠୋର",
-      "lenient": "ଶିଥିଳ",
-      "roast": "କଟାକ୍ଷ"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "ସୁରକ୍ଷା",
       "bugs": "ବଗ୍",
       "style": "ଶୈଳୀ",
@@ -1823,7 +1825,7 @@
       "cannotDismissDescription": "କେବଳ ସଂଗଠନର ମାଲିକ, ପ୍ରଶାସକ ଏବଂ ବିଲିଂ ପରିଚାଳକମାନେ ଚିହ୍ନଟ ସମସ୍ୟା ଖାରଜ କରିପାରିବେ।",
       "alreadyResolvedDescription": "ଏହି ଚିହ୍ନଟ ସମସ୍ୟାର ସମାଧାନ ହୋଇସାରିଛି। ଏହାକୁ ଆଉ ଖାରଜ କରାଯାଇପାରିବ ନାହିଁ।"
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "supersededBy": "ନୂଆ ଚିହ୍ନଟ ସମସ୍ୟା ଏହାର ସ୍ଥାନ ନେଇଛି",
       "supersededByDescription": "ସ୍ଥିତି, ବିଶ୍ଳେଷଣ ଏବଂ ସମାଧାନ ପାଇଁ ବର୍ତ୍ତମାନର ରେକର୍ଡ ଖୋଲିବାକୁ ଟାପ୍ କରନ୍ତୁ।",
       "dismissedOn": "ଖାରଜ କରାଯାଇଥିବା ତାରିଖ",
@@ -1911,7 +1913,7 @@
       "enableTrackingSubtitle": "ଚିହ୍ନଟ ସମସ୍ୟାର ତୀବ୍ରତା ଅନୁସାରେ ସମାଧାନର ସମୟସୀମା ଧାର୍ଯ୍ୟ କରନ୍ତୁ।",
       "deadlinesHeading": "ସମାଧାନର ସମୟସୀମା (ଦିନ)"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "title": "ଚିହ୍ନଟ ସମସ୍ୟା",
       "tabAnalysis": "ବିଶ୍ଳେଷଣ",
       "tabRemediation": "ସମାଧାନ"

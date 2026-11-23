@@ -108,7 +108,6 @@
     "agents": "Агенти",
     "all": "Сите",
     "allModels": "Сите модели",
-    "balanced": "Балансирано",
     "bitbucketConnected": "Bitbucket е поврзан",
     "branch": "Гранка",
     "cameraAccessDisabled": "Пристапот до камерата е оневозможен",
@@ -1288,7 +1287,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "Приоритетни области",
       "hint": "Остави ги сите неизбрани за да се прегледа сè."
     },
@@ -1320,10 +1319,18 @@
     },
     "style": {
       "title": "Стил на преглед",
-      "balanced": "Значајни наоди без непотребни забелешки",
-      "lenient": "Само сериозни проблеми",
-      "roast": "Безмилосно искрен, но забавен",
-      "strict": "Означи сè и барај висок квалитет"
+      "labels": {
+        "balanced": "Балансирано",
+        "lenient": "Попустлив",
+        "roast": "Остра шега",
+        "strict": "Строг"
+      },
+      "descriptions": {
+        "balanced": "Значајни наоди без непотребни забелешки",
+        "lenient": "Само сериозни проблеми",
+        "roast": "Безмилосно искрен, но забавен",
+        "strict": "Означи сè и барај висок квалитет"
+      }
     },
     "reviewDetail": {
       "title": "Преглед",
@@ -1528,12 +1535,7 @@
     "status": {
       "interrupted": "Прекинато"
     },
-    "reviewStyle": {
-      "strict": "Строг",
-      "lenient": "Попустлив",
-      "roast": "Остра шега"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "Безбедност",
       "bugs": "Грешки",
       "style": "Стил",
@@ -1823,7 +1825,7 @@
       "cannotDismissDescription": "Само сопствениците на организацијата, администраторите и одговорните за наплата можат да отфрлаат наоди.",
       "alreadyResolvedDescription": "Овој наод веќе е решен и не може да се отфрли."
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "supersededBy": "Заменет со актуелен наод",
       "supersededByDescription": "Допри за да го отвориш актуелниот запис со статусот, анализата и санирањето.",
       "dismissedOn": "Отфрлено на",
@@ -1911,7 +1913,7 @@
       "enableTrackingSubtitle": "Постави рокови за санирање врз основа на сериозноста на наодот.",
       "deadlinesHeading": "Рокови за санирање (денови)"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "title": "Наод",
       "tabAnalysis": "Анализа",
       "tabRemediation": "Санирање"

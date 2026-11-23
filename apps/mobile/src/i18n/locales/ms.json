@@ -108,7 +108,6 @@
     "agents": "Ejen",
     "all": "Semua",
     "allModels": "Semua model",
-    "balanced": "Seimbang",
     "bitbucketConnected": "Bitbucket disambungkan",
     "branch": "Cabang",
     "cameraAccessDisabled": "Akses kamera dinyahaktifkan",
@@ -1288,7 +1287,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "Bidang fokus",
       "hint": "Jangan pilih mana-mana bidang jika anda mahu semuanya disemak."
     },
@@ -1320,10 +1319,18 @@
     },
     "style": {
       "title": "Gaya semakan",
-      "balanced": "Penemuan penting sahaja, tanpa perkara remeh",
-      "lenient": "Hanya masalah serius",
-      "roast": "Terus terang tanpa berlapik, tetapi menghiburkan",
-      "strict": "Tandakan semua masalah dan tetapkan standard yang tinggi"
+      "labels": {
+        "balanced": "Seimbang",
+        "lenient": "Longgar",
+        "roast": "Sindiran pedas",
+        "strict": "Ketat"
+      },
+      "descriptions": {
+        "balanced": "Penemuan penting sahaja, tanpa perkara remeh",
+        "lenient": "Hanya masalah serius",
+        "roast": "Terus terang tanpa berlapik, tetapi menghiburkan",
+        "strict": "Tandakan semua masalah dan tetapkan standard yang tinggi"
+      }
     },
     "reviewDetail": {
       "title": "Semakan",
@@ -1528,12 +1535,7 @@
     "status": {
       "interrupted": "Terganggu"
     },
-    "reviewStyle": {
-      "strict": "Ketat",
-      "lenient": "Longgar",
-      "roast": "Sindiran pedas"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "Keselamatan",
       "bugs": "Pepijat",
       "style": "Gaya",
@@ -1823,7 +1825,7 @@
       "cannotDismissDescription": "Hanya pemilik organisasi, pentadbir dan pengurus pengebilan boleh mengetepikan penemuan.",
       "alreadyResolvedDescription": "Penemuan ini telah diselesaikan dan tidak boleh diketepikan lagi."
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "supersededBy": "Digantikan oleh penemuan semasa",
       "supersededByDescription": "Ketik untuk membuka rekod semasa dan melihat status, analisis serta pemulihan.",
       "dismissedOn": "Diketepikan pada",
@@ -1911,7 +1913,7 @@
       "enableTrackingSubtitle": "Tetapkan tarikh akhir pemulihan berdasarkan keterukan penemuan.",
       "deadlinesHeading": "Tempoh pemulihan (hari)"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "title": "Penemuan",
       "tabAnalysis": "Analisis",
       "tabRemediation": "Pemulihan"

@@ -108,7 +108,6 @@
     "agents": "Mga ahente",
     "all": "Lahat",
     "allModels": "Lahat ng modelo",
-    "balanced": "Balanse",
     "bitbucketConnected": "Nakakonekta ang Bitbucket",
     "branch": "Sangay",
     "cameraAccessDisabled": "Hindi pinapayagan ang paggamit ng kamera",
@@ -1288,7 +1287,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "Mga pagtutuunan",
       "hint": "Huwag pumili ng anuman para masuri ang lahat."
     },
@@ -1320,10 +1319,18 @@
     },
     "style": {
       "title": "Estilo ng pagsusuri",
-      "balanced": "Makabuluhang natukoy na isyu, walang di-kailangang puna",
-      "lenient": "Mga seryosong problema lamang",
-      "roast": "Prangkang pumuna pero nakaaaliw",
-      "strict": "Tukuyin ang lahat ng isyu at panatilihing mataas ang pamantayan"
+      "labels": {
+        "balanced": "Balanse",
+        "lenient": "Maluwag",
+        "roast": "Mapanuksong puna",
+        "strict": "Mahigpit"
+      },
+      "descriptions": {
+        "balanced": "Makabuluhang natukoy na isyu, walang di-kailangang puna",
+        "lenient": "Mga seryosong problema lamang",
+        "roast": "Prangkang pumuna pero nakaaaliw",
+        "strict": "Tukuyin ang lahat ng isyu at panatilihing mataas ang pamantayan"
+      }
     },
     "reviewDetail": {
       "title": "Pagsusuri",
@@ -1528,12 +1535,7 @@
     "status": {
       "interrupted": "Naputol"
     },
-    "reviewStyle": {
-      "strict": "Mahigpit",
-      "lenient": "Maluwag",
-      "roast": "Mapanuksong puna"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "Seguridad",
       "bugs": "Mga bug",
       "style": "Estilo",
@@ -1823,7 +1825,7 @@
       "cannotDismissDescription": "Mga may-ari ng organisasyon, admin, at tagapamahala ng pagsingil lang ang maaaring magbalewala ng mga natukoy na isyu.",
       "alreadyResolvedDescription": "Nalutas na ang natukoy na isyung ito at hindi na ito maaaring balewalain."
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "supersededBy": "Pinalitan ng mas bagong natukoy na isyu",
       "supersededByDescription": "I-tap para buksan ang kasalukuyang tala ng katayuan, pagsusuri, at pag-aayos.",
       "dismissedOn": "Binalewala noong",
@@ -1911,7 +1913,7 @@
       "enableTrackingSubtitle": "Magtakda ng mga petsa ng pag-aayos batay sa kalubhaan ng natukoy na isyu.",
       "deadlinesHeading": "Mga takdang petsa ng pag-aayos (araw)"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "title": "Natukoy na isyu",
       "tabAnalysis": "Pagsusuri",
       "tabRemediation": "Pag-aayos"

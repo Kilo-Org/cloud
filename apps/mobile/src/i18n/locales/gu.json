@@ -108,7 +108,6 @@
     "agents": "એજન્ટો",
     "all": "બધા",
     "allModels": "બધા મોડેલ",
-    "balanced": "સંતુલિત",
     "bitbucketConnected": "Bitbucket જોડાયું",
     "branch": "બ્રાન્ચ",
     "cameraAccessDisabled": "કૅમેરાનો ઉપયોગ કરવાની મંજૂરી નથી",
@@ -1288,7 +1287,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "ધ્યાન આપવાના મુદ્દા",
       "hint": "બધાની સમીક્ષા કરવા કોઈપણ વિકલ્પ પસંદ ન કરો."
     },
@@ -1320,10 +1319,18 @@
     },
     "style": {
       "title": "સમીક્ષાની શૈલી",
-      "balanced": "બિનજરૂરી વિગતો વિના ઉપયોગી તારણો",
-      "lenient": "માત્ર ગંભીર સમસ્યાઓ",
-      "roast": "રમૂજી છતાં કડવું સત્ય",
-      "strict": "દરેક સમસ્યા દર્શાવો, ઊંચાં ધોરણો રાખો"
+      "labels": {
+        "balanced": "સંતુલિત",
+        "lenient": "હળવું",
+        "roast": "કટાક્ષ",
+        "strict": "કડક"
+      },
+      "descriptions": {
+        "balanced": "બિનજરૂરી વિગતો વિના ઉપયોગી તારણો",
+        "lenient": "માત્ર ગંભીર સમસ્યાઓ",
+        "roast": "રમૂજી છતાં કડવું સત્ય",
+        "strict": "દરેક સમસ્યા દર્શાવો, ઊંચાં ધોરણો રાખો"
+      }
     },
     "reviewDetail": {
       "title": "સમીક્ષા",
@@ -1528,12 +1535,7 @@
     "status": {
       "interrupted": "અધવચ્ચે અટક્યું"
     },
-    "reviewStyle": {
-      "strict": "કડક",
-      "lenient": "હળવું",
-      "roast": "કટાક્ષ"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "સુરક્ષા",
       "bugs": "બગ્સ",
       "style": "શૈલી",
@@ -1823,7 +1825,7 @@
       "cannotDismissDescription": "માત્ર સંસ્થાના માલિકો, એડમિનો અને બિલિંગ મેનેજરો જ તારણો ખારિજ કરી શકે છે.",
       "alreadyResolvedDescription": "આ તારણ પહેલેથી ઉકેલાઈ ગયું છે, તેથી હવે તેને ખારિજ કરી શકાતું નથી."
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "supersededBy": "આની જગ્યાએ નવું તારણ નોંધાયું છે",
       "supersededByDescription": "સ્થિતિ, વિશ્લેષણ અને સુધારણા માટે હાલનો રેકોર્ડ ખોલવા ટેપ કરો.",
       "dismissedOn": "ખારિજ કરવાની તારીખ",
@@ -1911,7 +1913,7 @@
       "enableTrackingSubtitle": "તારણની ગંભીરતા પ્રમાણે સુધારણાની સમયમર્યાદા નક્કી કરો.",
       "deadlinesHeading": "સુધારણાની સમયમર્યાદા (દિવસોમાં)"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "title": "તારણ",
       "tabAnalysis": "વિશ્લેષણ",
       "tabRemediation": "સુધારણા"

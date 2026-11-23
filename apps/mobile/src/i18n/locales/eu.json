@@ -108,7 +108,6 @@
     "agents": "Agenteak",
     "all": "Guztiak",
     "allModels": "Eredu guztiak",
-    "balanced": "Orekatua",
     "bitbucketConnected": "Bitbucket konektatuta",
     "branch": "Adarra",
     "cameraAccessDisabled": "Kamera erabiltzeko baimena desgaituta",
@@ -1288,7 +1287,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "Arreta-eremuak",
       "hint": "Dena berrikusteko, utzi aukera guztiak hautatu gabe."
     },
@@ -1320,10 +1319,18 @@
     },
     "style": {
       "title": "Berrikuspen-estiloa",
-      "balanced": "Aurkikuntza esanguratsuak, garrantzirik gabeko xehetasunik gabe",
-      "lenient": "Arazo larriak soilik",
-      "roast": "Gupidarik gabeko zintzotasuna, umorez",
-      "strict": "Seinalatu arazo guztiak eta izan zorrotza"
+      "labels": {
+        "balanced": "Orekatua",
+        "lenient": "Malgua",
+        "roast": "Zirikagarria",
+        "strict": "Zorrotza"
+      },
+      "descriptions": {
+        "balanced": "Aurkikuntza esanguratsuak, garrantzirik gabeko xehetasunik gabe",
+        "lenient": "Arazo larriak soilik",
+        "roast": "Gupidarik gabeko zintzotasuna, umorez",
+        "strict": "Seinalatu arazo guztiak eta izan zorrotza"
+      }
     },
     "reviewDetail": {
       "title": "Berrikuspena",
@@ -1528,12 +1535,7 @@
     "status": {
       "interrupted": "Etenda"
     },
-    "reviewStyle": {
-      "strict": "Zorrotza",
-      "lenient": "Malgua",
-      "roast": "Zirikagarria"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "Segurtasuna",
       "bugs": "Akatsak",
       "style": "Estiloa",
@@ -1823,7 +1825,7 @@
       "cannotDismissDescription": "Erakundeko jabeek, administratzaileek eta fakturazio-kudeatzaileek soilik bazter ditzakete aurkikuntzak.",
       "alreadyResolvedDescription": "Aurkikuntza hau jada ebatzita dago eta ezin da baztertu."
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "supersededBy": "Uneko aurkikuntza batek ordezkatu du",
       "supersededByDescription": "Sakatu uneko erregistroa irekitzeko eta egoera, azterketa eta konponketa ikusteko.",
       "dismissedOn": "Baztertuta geratu zen data",
@@ -1911,7 +1913,7 @@
       "enableTrackingSubtitle": "Ezarri konponketa-epeak aurkikuntzen larritasunaren arabera.",
       "deadlinesHeading": "Konponketa-epeak (egunak)"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "title": "Aurkikuntza",
       "tabAnalysis": "Azterketa",
       "tabRemediation": "Konponketa"

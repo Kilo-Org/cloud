@@ -275,7 +275,7 @@ describe('FindingDetailsPanel stored dismissal values', () => {
         mocks.kvRows.some(
           row =>
             row.label === 'securityAgent.dismiss.reason' &&
-            row.value === 'securityAgent.findingDetails.reasonAfterReview'
+            row.value === 'securityAgent.findingDetailFields.reasonAfterReview'
         )
       ).toBe(true);
     }
@@ -299,12 +299,12 @@ describe('FindingDetailsPanel dates block', () => {
   // The labels the dates group can render; any other KvRow belongs to another
   // group on the panel.
   const DATE_LABEL_KEYS: Record<string, true> = {
-    'securityAgent.findingDetails.detected': true,
+    'securityAgent.findingDetailFields.detected': true,
     'common.updated': true,
     'securityAgent.filter.fixed': true,
-    'securityAgent.findingDetails.slaDeadline': true,
-    'securityAgent.findingDetails.dismissedOn': true,
-    'securityAgent.findingDetails.supersededOn': true,
+    'securityAgent.findingDetailFields.slaDeadline': true,
+    'securityAgent.findingDetailFields.dismissedOn': true,
+    'securityAgent.findingDetailFields.supersededOn': true,
   };
 
   function dateRows() {
@@ -331,15 +331,17 @@ describe('FindingDetailsPanel dates block', () => {
     );
 
     expect(dateRows().map(row => row.label)).toEqual([
-      'securityAgent.findingDetails.detected',
-      'securityAgent.findingDetails.dismissedOn',
+      'securityAgent.findingDetailFields.detected',
+      'securityAgent.findingDetailFields.dismissedOn',
     ]);
     expect(dateRows()[1]).toMatchObject({ value: '2026-10-30T00:00:00.000Z' });
 
     mocks.kvRows.length = 0;
     mocks.supersedingFindingId = 'finding-2';
     renderPanel(findingFixture({ status: 'ignored' }));
-    expect(dateRows()[1]).toMatchObject({ label: 'securityAgent.findingDetails.supersededOn' });
+    expect(dateRows()[1]).toMatchObject({
+      label: 'securityAgent.findingDetailFields.supersededOn',
+    });
   });
 
   // The reference only counts while the row is still ignored, so a row the
@@ -356,7 +358,7 @@ describe('FindingDetailsPanel dates block', () => {
       })
     );
     expect(dateRows().map(row => row.label)).toEqual([
-      'securityAgent.findingDetails.detected',
+      'securityAgent.findingDetailFields.detected',
       'common.updated',
       'securityAgent.filter.fixed',
     ]);
@@ -373,7 +375,7 @@ describe('FindingDetailsPanel dates block', () => {
     );
 
     expect(dateRows().map(row => row.label)).toEqual([
-      'securityAgent.findingDetails.detected',
+      'securityAgent.findingDetailFields.detected',
       'common.updated',
       'securityAgent.filter.fixed',
     ]);
@@ -387,9 +389,9 @@ describe('FindingDetailsPanel dates block', () => {
     renderPanel(findingFixture({ status: 'open', sla_due_at: '2026-11-02T00:00:00.000Z' }));
 
     expect(dateRows().map(row => row.label)).toEqual([
-      'securityAgent.findingDetails.detected',
+      'securityAgent.findingDetailFields.detected',
       'common.updated',
-      'securityAgent.findingDetails.slaDeadline',
+      'securityAgent.findingDetailFields.slaDeadline',
     ]);
     expect(dateRows()[2]).toMatchObject({
       value: '1970-01-01T00:00:00.000Z',
@@ -401,7 +403,7 @@ describe('FindingDetailsPanel dates block', () => {
     renderPanel(findingFixture({ status: 'open', sla_due_at: null }));
 
     expect(dateRows().map(row => row.label)).toEqual([
-      'securityAgent.findingDetails.detected',
+      'securityAgent.findingDetailFields.detected',
       'common.updated',
     ]);
   });
@@ -429,13 +431,13 @@ describe('FindingDetailsPanel identifier values', () => {
     renderPanel(findingFixture());
 
     for (const label of [
-      'securityAgent.findingDetails.package',
-      'securityAgent.findingDetails.vulnerableVersions',
-      'securityAgent.findingDetails.patchedVersion',
-      'securityAgent.findingDetails.cve',
-      'securityAgent.findingDetails.ghsa',
-      'securityAgent.findingDetails.manifest',
-      'securityAgent.findingDetails.sourceId',
+      'securityAgent.findingDetailFields.package',
+      'securityAgent.findingDetailFields.vulnerableVersions',
+      'securityAgent.findingDetailFields.patchedVersion',
+      'securityAgent.findingDetailFields.cve',
+      'securityAgent.findingDetailFields.ghsa',
+      'securityAgent.findingDetailFields.manifest',
+      'securityAgent.findingDetailFields.sourceId',
     ]) {
       expect(identifierRow(label).valueDirection).toBe('ltr');
     }
@@ -448,8 +450,8 @@ describe('FindingDetailsPanel identifier values', () => {
 
     expect(mocks.kvRows.map(row => row.label)).not.toContain('common.repository');
     for (const label of [
-      'securityAgent.findingDetails.package',
-      'securityAgent.findingDetails.manifest',
+      'securityAgent.findingDetailFields.package',
+      'securityAgent.findingDetailFields.manifest',
     ]) {
       identifierRow(label);
     }
@@ -462,10 +464,10 @@ describe('FindingDetailsPanel identifier values', () => {
     renderPanel(findingFixture({ vulnerable_version_range: null, patched_version: null }));
 
     expect(
-      identifierRow('securityAgent.findingDetails.vulnerableVersions').valueDirection
+      identifierRow('securityAgent.findingDetailFields.vulnerableVersions').valueDirection
     ).toBeUndefined();
     expect(
-      identifierRow('securityAgent.findingDetails.patchedVersion').valueDirection
+      identifierRow('securityAgent.findingDetailFields.patchedVersion').valueDirection
     ).toBeUndefined();
   });
 });
@@ -473,7 +475,7 @@ describe('FindingDetailsPanel identifier values', () => {
 describe('FindingDetailsPanel facts card', () => {
   // The facts live in one `RowGroup`: rows draw no divider of their own, so the
   // group owns the hairlines and whatever row it draws last ends the card.
-  const PACKAGE_LABEL = 'securityAgent.findingDetails.package';
+  const PACKAGE_LABEL = 'securityAgent.findingDetailFields.package';
 
   beforeEach(() => {
     mocks.kvRows.length = 0;
@@ -488,21 +490,25 @@ describe('FindingDetailsPanel facts card', () => {
   }
 
   it.each([
-    { name: 'manifest row', overrides: {}, lastLabel: 'securityAgent.findingDetails.manifest' },
+    {
+      name: 'manifest row',
+      overrides: {},
+      lastLabel: 'securityAgent.findingDetailFields.manifest',
+    },
     {
       name: 'ghsa row',
       overrides: { manifest_path: null },
-      lastLabel: 'securityAgent.findingDetails.ghsa',
+      lastLabel: 'securityAgent.findingDetailFields.ghsa',
     },
     {
       name: 'cve row',
       overrides: { manifest_path: null, ghsa_id: null },
-      lastLabel: 'securityAgent.findingDetails.cve',
+      lastLabel: 'securityAgent.findingDetailFields.cve',
     },
     {
       name: 'patched-version row',
       overrides: { manifest_path: null, ghsa_id: null, cve_id: null },
-      lastLabel: 'securityAgent.findingDetails.patchedVersion',
+      lastLabel: 'securityAgent.findingDetailFields.patchedVersion',
     },
   ])('ends the group on the $name', ({ overrides, lastLabel }) => {
     const labels = factLabels(renderPanel(findingFixture(overrides)));
@@ -520,11 +526,11 @@ describe('FindingDetailsPanel facts card', () => {
     expect(factGroups).toHaveLength(1);
     expect(factLabels(r)).toEqual([
       PACKAGE_LABEL,
-      'securityAgent.findingDetails.vulnerableVersions',
-      'securityAgent.findingDetails.patchedVersion',
-      'securityAgent.findingDetails.cve',
-      'securityAgent.findingDetails.ghsa',
-      'securityAgent.findingDetails.manifest',
+      'securityAgent.findingDetailFields.vulnerableVersions',
+      'securityAgent.findingDetailFields.patchedVersion',
+      'securityAgent.findingDetailFields.cve',
+      'securityAgent.findingDetailFields.ghsa',
+      'securityAgent.findingDetailFields.manifest',
     ]);
   });
 });

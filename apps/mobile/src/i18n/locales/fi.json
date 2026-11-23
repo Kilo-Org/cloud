@@ -108,7 +108,6 @@
     "agents": "Agentit",
     "all": "Kaikki",
     "allModels": "Kaikki mallit",
-    "balanced": "Tasapainoinen",
     "bitbucketConnected": "Bitbucket yhdistetty",
     "branch": "Haara",
     "cameraAccessDisabled": "Kameran käyttö estetty",
@@ -1288,7 +1287,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "Painopisteet",
       "hint": "Jos haluat katselmoida kaiken, jätä kaikki valinnat tyhjiksi."
     },
@@ -1320,10 +1319,18 @@
     },
     "style": {
       "title": "Katselmointityyli",
-      "balanced": "Olennaiset havainnot ilman turhia huomautuksia",
-      "lenient": "Vain vakavat ongelmat",
-      "roast": "Viihdyttävän armoton ja rehellinen",
-      "strict": "Huomauta kaikesta ja vaadi korkeaa laatua"
+      "labels": {
+        "balanced": "Tasapainoinen",
+        "lenient": "Salliva",
+        "roast": "Piikittelevä",
+        "strict": "Tiukka"
+      },
+      "descriptions": {
+        "balanced": "Olennaiset havainnot ilman turhia huomautuksia",
+        "lenient": "Vain vakavat ongelmat",
+        "roast": "Viihdyttävän armoton ja rehellinen",
+        "strict": "Huomauta kaikesta ja vaadi korkeaa laatua"
+      }
     },
     "reviewDetail": {
       "title": "Katselmointi",
@@ -1528,12 +1535,7 @@
     "status": {
       "interrupted": "Keskeytynyt"
     },
-    "reviewStyle": {
-      "strict": "Tiukka",
-      "lenient": "Salliva",
-      "roast": "Piikittelevä"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "Tietoturva",
       "bugs": "Ohjelmavirheet",
       "style": "Tyyli",
@@ -1823,7 +1825,7 @@
       "cannotDismissDescription": "Vain organisaation omistajat, ylläpitäjät ja laskutusvastaavat voivat hylätä havaintoja.",
       "alreadyResolvedDescription": "Havainto on jo ratkaistu, joten sitä ei voi enää hylätä."
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "supersededBy": "Korvattu ajantasaisella havainnolla",
       "supersededByDescription": "Napauta nähdäksesi ajantasaisen havainnon tilan, analyysin ja korjauksen.",
       "dismissedOn": "Sivuuttamispäivä",
@@ -1911,7 +1913,7 @@
       "enableTrackingSubtitle": "Korjausten määräajat asetetaan havaintojen vakavuuden mukaan.",
       "deadlinesHeading": "Korjausten määräajat (päivää)"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "title": "Havainto",
       "tabAnalysis": "Analyysi",
       "tabRemediation": "Korjaus"

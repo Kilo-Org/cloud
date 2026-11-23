@@ -109,7 +109,6 @@
     "agents": "Aģenti",
     "all": "Visi",
     "allModels": "Visi modeļi",
-    "balanced": "Līdzsvarots",
     "bitbucketConnected": "Bitbucket pievienots",
     "branch": "Atzars",
     "cameraAccessDisabled": "Piekļuve kamerai ir atspējota",
@@ -1316,7 +1315,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "Pārskatāmās jomas",
       "hint": "Lai pārskatītu visu, neizvēlies nevienu jomu."
     },
@@ -1348,10 +1347,18 @@
     },
     "style": {
       "title": "Pārskatīšanas stils",
-      "balanced": "Būtiski konstatējumi bez liekām piezīmēm",
-      "lenient": "Tikai nopietnas problēmas",
-      "roast": "Nesaudzīgi atklāts, bet ar humoru",
-      "strict": "Atzīmēt visas problēmas un ievērot augstas prasības"
+      "labels": {
+        "balanced": "Līdzsvarots",
+        "lenient": "Piekāpīgs",
+        "roast": "Dzēlīgs",
+        "strict": "Stingrs"
+      },
+      "descriptions": {
+        "balanced": "Būtiski konstatējumi bez liekām piezīmēm",
+        "lenient": "Tikai nopietnas problēmas",
+        "roast": "Nesaudzīgi atklāts, bet ar humoru",
+        "strict": "Atzīmēt visas problēmas un ievērot augstas prasības"
+      }
     },
     "reviewDetail": {
       "title": "Pārskatīšana",
@@ -1557,12 +1564,7 @@
     "status": {
       "interrupted": "Pārtraukta"
     },
-    "reviewStyle": {
-      "strict": "Stingrs",
-      "lenient": "Piekāpīgs",
-      "roast": "Dzēlīgs"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "Drošība",
       "bugs": "Kļūdas",
       "style": "Stils",
@@ -1864,7 +1866,7 @@
       "cannotDismissDescription": "Tikai organizācijas īpašnieki, administratori un norēķinu pārvaldnieki var noraidīt konstatējumus.",
       "alreadyResolvedDescription": "Šis konstatējums jau ir atrisināts, un to vairs nevar noraidīt."
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "supersededBy": "Aizstāts ar aktuālu konstatējumu",
       "supersededByDescription": "Pieskaries, lai atvērtu aktuālo ierakstu un skatītu statusu, analīzi un labošanas informāciju.",
       "dismissedOn": "Noraidīšanas datums",
@@ -1953,7 +1955,7 @@
       "enableTrackingSubtitle": "Nosaka labošanas termiņus atbilstoši konstatējumu smaguma pakāpei.",
       "deadlinesHeading": "Labošanas termiņi (dienās)"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "title": "Konstatējums",
       "tabAnalysis": "Analīze",
       "tabRemediation": "Labošana"

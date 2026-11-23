@@ -108,7 +108,6 @@
     "agents": "Agjentët",
     "all": "Të gjitha",
     "allModels": "Të gjitha modelet",
-    "balanced": "I ekuilibruar",
     "bitbucketConnected": "Bitbucket u lidh",
     "branch": "Dega",
     "cameraAccessDisabled": "Qasja te kamera është çaktivizuar",
@@ -1288,7 +1287,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "Fushat e përqendrimit",
       "hint": "Lëri të gjitha të pazgjedhura për të shqyrtuar gjithçka."
     },
@@ -1320,10 +1319,18 @@
     },
     "style": {
       "title": "Stili i shqyrtimit",
-      "balanced": "Gjetje të rëndësishme pa hollësi të panevojshme",
-      "lenient": "Vetëm probleme serioze",
-      "roast": "Sinqeritet pa mëshirë, me humor",
-      "strict": "Shëno çdo problem dhe kërko standard të lartë"
+      "labels": {
+        "balanced": "I ekuilibruar",
+        "lenient": "I butë",
+        "roast": "Thumbues",
+        "strict": "I rreptë"
+      },
+      "descriptions": {
+        "balanced": "Gjetje të rëndësishme pa hollësi të panevojshme",
+        "lenient": "Vetëm probleme serioze",
+        "roast": "Sinqeritet pa mëshirë, me humor",
+        "strict": "Shëno çdo problem dhe kërko standard të lartë"
+      }
     },
     "reviewDetail": {
       "title": "Shqyrtimi",
@@ -1528,12 +1535,7 @@
     "status": {
       "interrupted": "I ndërprerë"
     },
-    "reviewStyle": {
-      "strict": "I rreptë",
-      "lenient": "I butë",
-      "roast": "Thumbues"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "Siguria",
       "bugs": "Defektet",
       "style": "Stili",
@@ -1823,7 +1825,7 @@
       "cannotDismissDescription": "Vetëm pronarët e organizatës, administratorët dhe menaxherët e faturimit mund të hedhin poshtë gjetjet.",
       "alreadyResolvedDescription": "Kjo gjetje është zgjidhur tashmë dhe nuk mund të hidhet më poshtë."
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "supersededBy": "E zëvendësuar nga një gjetje aktuale",
       "supersededByDescription": "Prek për të hapur regjistrimin aktual dhe për të parë statusin, analizën dhe korrigjimin.",
       "dismissedOn": "E hedhur poshtë më",
@@ -1911,7 +1913,7 @@
       "enableTrackingSubtitle": "Cakto afatet e korrigjimit sipas nivelit të rrezikut të gjetjes.",
       "deadlinesHeading": "Afatet e korrigjimit (ditë)"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "title": "Gjetja",
       "tabAnalysis": "Analiza",
       "tabRemediation": "Korrigjimi"

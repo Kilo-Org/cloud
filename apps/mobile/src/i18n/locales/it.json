@@ -109,7 +109,6 @@
     "agents": "Agenti",
     "all": "Tutti",
     "allModels": "Tutti i modelli",
-    "balanced": "Bilanciato",
     "bitbucketConnected": "Bitbucket collegato",
     "branch": "Ramo",
     "cameraAccessDisabled": "Accesso alla fotocamera disattivato",
@@ -695,7 +694,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "Aspetti da controllare",
       "hint": "Non selezionare alcuna area per esaminare tutto il codice."
     },
@@ -727,10 +726,18 @@
     },
     "style": {
       "title": "Stile di revisione",
-      "balanced": "Segnalazioni rilevanti, senza dettagli superflui",
-      "lenient": "Solo problemi gravi",
-      "roast": "Spietato ma divertente",
-      "strict": "Segnala ogni problema e applica criteri rigorosi"
+      "labels": {
+        "balanced": "Bilanciato",
+        "lenient": "Indulgente",
+        "roast": "Sarcastico",
+        "strict": "Rigoroso"
+      },
+      "descriptions": {
+        "balanced": "Segnalazioni rilevanti, senza dettagli superflui",
+        "lenient": "Solo problemi gravi",
+        "roast": "Spietato ma divertente",
+        "strict": "Segnala ogni problema e applica criteri rigorosi"
+      }
     },
     "autoReviews": "Revisioni automatiche",
     "bitbucket": {
@@ -936,12 +943,7 @@
     "status": {
       "interrupted": "Interrotta"
     },
-    "reviewStyle": {
-      "strict": "Rigoroso",
-      "lenient": "Indulgente",
-      "roast": "Sarcastico"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "Sicurezza",
       "bugs": "Bug",
       "style": "Stile",
@@ -1299,12 +1301,12 @@
       "reasonTolerableRisk": "Rischio accettabile",
       "title": "Ignora il problema"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "tabAnalysis": "Analisi",
       "tabRemediation": "Correzione",
       "title": "Segnalazione"
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "cve": "CVE",
       "detected": "Rilevata",
       "dismissedOn": "Ignorato il",

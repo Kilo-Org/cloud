@@ -110,7 +110,6 @@
     "agents": "Agentes",
     "all": "Todos",
     "allModels": "Todos os modelos",
-    "balanced": "Equilibrado",
     "bitbucketConnected": "Bitbucket ligado",
     "branch": "Ramo",
     "cameraAccessDisabled": "Acesso à câmara desativado",
@@ -1344,7 +1343,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "Áreas prioritárias",
       "hint": "Para rever todas as áreas, deixa todas as opções por selecionar."
     },
@@ -1376,10 +1375,18 @@
     },
     "style": {
       "title": "Estilo de revisão",
-      "balanced": "Ocorrências relevantes, sem distrações",
-      "lenient": "Apenas problemas graves",
-      "roast": "Brutalmente honesto, de forma divertida",
-      "strict": "Assinalar tudo com o máximo rigor"
+      "labels": {
+        "balanced": "Equilibrado",
+        "lenient": "Tolerante",
+        "roast": "Sarcástico",
+        "strict": "Rigoroso"
+      },
+      "descriptions": {
+        "balanced": "Ocorrências relevantes, sem distrações",
+        "lenient": "Apenas problemas graves",
+        "roast": "Brutalmente honesto, de forma divertida",
+        "strict": "Assinalar tudo com o máximo rigor"
+      }
     },
     "reviewDetail": {
       "title": "Revisão",
@@ -1586,12 +1593,7 @@
     "status": {
       "interrupted": "Interrompida"
     },
-    "reviewStyle": {
-      "strict": "Rigoroso",
-      "lenient": "Tolerante",
-      "roast": "Sarcástico"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "Segurança",
       "bugs": "Erros",
       "style": "Estilo",
@@ -1905,7 +1907,7 @@
       "cannotDismissDescription": "Apenas os proprietários da organização, os administradores e os gestores de faturação podem descartar ocorrências.",
       "alreadyResolvedDescription": "Esta ocorrência já foi resolvida e já não pode ser descartada."
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "supersededBy": "Substituída por uma ocorrência atual",
       "supersededByDescription": "Toca para abrir o registo atual e consultar o estado, a análise e a correção.",
       "dismissedOn": "Ignorada em",
@@ -1995,7 +1997,7 @@
       "enableTrackingSubtitle": "Define prazos de correção com base na gravidade das ocorrências.",
       "deadlinesHeading": "Prazos de correção (dias)"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "title": "Ocorrência",
       "tabAnalysis": "Análise",
       "tabRemediation": "Correção"

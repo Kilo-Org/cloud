@@ -108,7 +108,6 @@
     "agents": "Агенти",
     "all": "Всички",
     "allModels": "Всички модели",
-    "balanced": "Балансиран",
     "bitbucketConnected": "Bitbucket е свързан",
     "branch": "Клон",
     "cameraAccessDisabled": "Няма достъп до камерата",
@@ -1288,7 +1287,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "Акценти",
       "hint": "Не избирай нищо, за да се прегледа всичко."
     },
@@ -1320,10 +1319,18 @@
     },
     "style": {
       "title": "Стил на прегледа",
-      "balanced": "Съществени проблеми без излишни забележки",
-      "lenient": "Само сериозни проблеми",
-      "roast": "Безпощадно откровен, но забавен",
-      "strict": "Отбелязвай всичко и прилагай високи изисквания"
+      "labels": {
+        "balanced": "Балансиран",
+        "lenient": "Снизходителен",
+        "roast": "Хаплив",
+        "strict": "Строг"
+      },
+      "descriptions": {
+        "balanced": "Съществени проблеми без излишни забележки",
+        "lenient": "Само сериозни проблеми",
+        "roast": "Безпощадно откровен, но забавен",
+        "strict": "Отбелязвай всичко и прилагай високи изисквания"
+      }
     },
     "reviewDetail": {
       "title": "Преглед",
@@ -1528,12 +1535,7 @@
     "status": {
       "interrupted": "Прекъснато"
     },
-    "reviewStyle": {
-      "strict": "Строг",
-      "lenient": "Снизходителен",
-      "roast": "Хаплив"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "Сигурност",
       "bugs": "Грешки",
       "style": "Стил",
@@ -1823,7 +1825,7 @@
       "cannotDismissDescription": "Само собствениците на организацията, администраторите и отговорниците за плащанията могат да отхвърлят проблеми.",
       "alreadyResolvedDescription": "Този проблем вече е решен и не може да бъде отхвърлен."
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "supersededBy": "Заменен с актуален проблем",
       "supersededByDescription": "Докосни, за да отвориш актуалния запис със състоянието, анализа и отстраняването на проблема.",
       "dismissedOn": "Отхвърлено на",
@@ -1911,7 +1913,7 @@
       "enableTrackingSubtitle": "Задава крайни срокове за отстраняване според сериозността на проблема.",
       "deadlinesHeading": "Крайни срокове за отстраняване (дни)"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "title": "Проблем",
       "tabAnalysis": "Анализ",
       "tabRemediation": "Отстраняване"

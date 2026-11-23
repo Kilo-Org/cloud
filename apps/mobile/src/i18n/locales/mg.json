@@ -108,7 +108,6 @@
     "agents": "Mpanampy",
     "all": "Rehetra",
     "allModels": "Modely rehetra",
-    "balanced": "Voalanjalanja",
     "bitbucketConnected": "Mifandray ny Bitbucket",
     "branch": "Sampana",
     "cameraAccessDisabled": "Tsy azo ampiasaina ny fakantsary",
@@ -1288,7 +1287,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "Lafiny ifantohana",
       "hint": "Aza mifidy na inona na inona raha hanamarina ny zava-drehetra."
     },
@@ -1320,10 +1319,18 @@
     },
     "style": {
       "title": "Fomba fandinihana",
-      "balanced": "Olana tena ilaina jerena, tsy misy fanamarihana tsy ilaina",
-      "lenient": "Olana lehibe ihany",
-      "roast": "Milaza ny marina tsy misy antra, sady mampihomehy",
-      "strict": "Mariho ny olana rehetra ary mitakia fenitra avo"
+      "labels": {
+        "balanced": "Voalanjalanja",
+        "lenient": "Malefaka",
+        "roast": "Fanakianana maneso",
+        "strict": "Henjana"
+      },
+      "descriptions": {
+        "balanced": "Olana tena ilaina jerena, tsy misy fanamarihana tsy ilaina",
+        "lenient": "Olana lehibe ihany",
+        "roast": "Milaza ny marina tsy misy antra, sady mampihomehy",
+        "strict": "Mariho ny olana rehetra ary mitakia fenitra avo"
+      }
     },
     "reviewDetail": {
       "title": "Fandinihana",
@@ -1528,12 +1535,7 @@
     "status": {
       "interrupted": "Tapaka"
     },
-    "reviewStyle": {
-      "strict": "Henjana",
-      "lenient": "Malefaka",
-      "roast": "Fanakianana maneso"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "Fiarovana",
       "bugs": "Lesoka",
       "style": "Fomba fanoratana",
@@ -1823,7 +1825,7 @@
       "cannotDismissDescription": "Ny tompon'ny fikambanana, ny mpitantana, ary ny mpitantana ny faktiora ihany no afaka manilika olana hita.",
       "alreadyResolvedDescription": "Efa voavaha ity olana hita ity ka tsy azo ailika intsony."
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "supersededBy": "Nosoloina olana hita vaovao",
       "supersededByDescription": "Tsindrio ny firaketana vaovao hijerena ny sata, ny famakafakana ary ny fanarenana.",
       "dismissedOn": "Daty fanesorana",
@@ -1911,7 +1913,7 @@
       "enableTrackingSubtitle": "Farito araka ny hamafin'ny olana hita ny fe-potoana fanarenana.",
       "deadlinesHeading": "Fe-potoana fanarenana (andro)"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "title": "Olana hita",
       "tabAnalysis": "Famakafakana",
       "tabRemediation": "Fanarenana"

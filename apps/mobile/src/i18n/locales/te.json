@@ -108,7 +108,6 @@
     "agents": "ఏజెంట్లు",
     "all": "అన్నీ",
     "allModels": "అన్ని మోడళ్లు",
-    "balanced": "సమతుల్యం",
     "bitbucketConnected": "Bitbucket కనెక్ట్ అయింది",
     "branch": "బ్రాంచ్",
     "cameraAccessDisabled": "కెమెరా వాడేందుకు అనుమతి లేదు",
@@ -1288,7 +1287,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "దృష్టి పెట్టాల్సిన అంశాలు",
       "hint": "అంతా సమీక్షించడానికి ఏవీ ఎంచుకోవద్దు."
     },
@@ -1320,10 +1319,18 @@
     },
     "style": {
       "title": "సమీక్ష శైలి",
-      "balanced": "అనవసర వివరాలు లేకుండా ముఖ్యమైన సమస్యలు",
-      "lenient": "తీవ్రమైన సమస్యలు మాత్రమే",
-      "roast": "మొహమాటం లేని విమర్శ, సరదాగా",
-      "strict": "ప్రతి సమస్యనూ గుర్తించండి, ఉన్నత ప్రమాణాలను పాటించండి"
+      "labels": {
+        "balanced": "సమతుల్యం",
+        "lenient": "సడలింపు",
+        "roast": "వ్యంగ్య విమర్శ",
+        "strict": "కఠినం"
+      },
+      "descriptions": {
+        "balanced": "అనవసర వివరాలు లేకుండా ముఖ్యమైన సమస్యలు",
+        "lenient": "తీవ్రమైన సమస్యలు మాత్రమే",
+        "roast": "మొహమాటం లేని విమర్శ, సరదాగా",
+        "strict": "ప్రతి సమస్యనూ గుర్తించండి, ఉన్నత ప్రమాణాలను పాటించండి"
+      }
     },
     "reviewDetail": {
       "title": "సమీక్ష",
@@ -1528,12 +1535,7 @@
     "status": {
       "interrupted": "అంతరాయం కలిగింది"
     },
-    "reviewStyle": {
-      "strict": "కఠినం",
-      "lenient": "సడలింపు",
-      "roast": "వ్యంగ్య విమర్శ"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "భద్రత",
       "bugs": "బగ్‌లు",
       "style": "శైలి",
@@ -1823,7 +1825,7 @@
       "cannotDismissDescription": "సంస్థ యజమానులు, నిర్వాహకులు మరియు బిల్లింగ్ మేనేజర్లు మాత్రమే సమస్యలను తీసివేయగలరు.",
       "alreadyResolvedDescription": "ఈ సమస్య ఇప్పటికే పరిష్కారమైంది. దీన్ని ఇక తీసివేయలేరు."
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "supersededBy": "ఈ సమస్య స్థానంలో తాజా సమస్య నమోదైంది",
       "supersededByDescription": "స్థితి, విశ్లేషణ, పరిష్కారం వివరాలను చూడటానికి తాజా రికార్డును నొక్కండి.",
       "dismissedOn": "విస్మరణ తేదీ",
@@ -1911,7 +1913,7 @@
       "enableTrackingSubtitle": "సమస్య తీవ్రత ఆధారంగా పరిష్కార గడువులను నిర్ణయించండి.",
       "deadlinesHeading": "పరిష్కార గడువులు (రోజులు)"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "title": "సమస్య",
       "tabAnalysis": "విశ్లేషణ",
       "tabRemediation": "పరిష్కారం"

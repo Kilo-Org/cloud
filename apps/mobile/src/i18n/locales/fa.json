@@ -108,7 +108,6 @@
     "agents": "عامل‌ها",
     "all": "همه",
     "allModels": "همه مدل‌ها",
-    "balanced": "متعادل",
     "bitbucketConnected": "Bitbucket متصل شد",
     "branch": "شاخه",
     "cameraAccessDisabled": "دسترسی به دوربین غیرفعال است",
@@ -1288,7 +1287,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "حوزه‌های تمرکز",
       "hint": "برای بررسی همه موارد، هیچ گزینه‌ای را انتخاب نکنید."
     },
@@ -1320,10 +1319,18 @@
     },
     "style": {
       "title": "سبک بازبینی",
-      "balanced": "یافته‌های مهم، بدون موارد اضافی",
-      "lenient": "فقط مشکلات جدی",
-      "roast": "بی‌پرده و صریح، با لحنی سرگرم‌کننده",
-      "strict": "شناسایی همه ایرادها با معیارهای سخت‌گیرانه"
+      "labels": {
+        "balanced": "متعادل",
+        "lenient": "سهل‌گیرانه",
+        "roast": "نقد طنزآمیز",
+        "strict": "سخت‌گیرانه"
+      },
+      "descriptions": {
+        "balanced": "یافته‌های مهم، بدون موارد اضافی",
+        "lenient": "فقط مشکلات جدی",
+        "roast": "بی‌پرده و صریح، با لحنی سرگرم‌کننده",
+        "strict": "شناسایی همه ایرادها با معیارهای سخت‌گیرانه"
+      }
     },
     "reviewDetail": {
       "title": "بازبینی",
@@ -1528,12 +1535,7 @@
     "status": {
       "interrupted": "قطع شد"
     },
-    "reviewStyle": {
-      "strict": "سخت‌گیرانه",
-      "lenient": "سهل‌گیرانه",
-      "roast": "نقد طنزآمیز"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "امنیت",
       "bugs": "باگ‌ها",
       "style": "سبک کدنویسی",
@@ -1823,7 +1825,7 @@
       "cannotDismissDescription": "فقط مالکان سازمان، مدیران و مدیران صورتحساب می‌توانند یافته‌ها را نادیده بگیرند.",
       "alreadyResolvedDescription": "این یافته قبلاً برطرف شده است و دیگر نمی‌توان آن را نادیده گرفت."
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "supersededBy": "با یافته جدید جایگزین شده",
       "supersededByDescription": "برای دیدن وضعیت، تحلیل و اصلاح، روی این مورد بزنید تا رکورد جدید باز شود.",
       "dismissedOn": "نادیده‌گرفته‌شده در",
@@ -1911,7 +1913,7 @@
       "enableTrackingSubtitle": "مهلت‌های اصلاح را بر اساس شدت یافته‌ها تعیین کنید.",
       "deadlinesHeading": "مهلت‌های اصلاح (روز)"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "title": "یافته",
       "tabAnalysis": "تحلیل",
       "tabRemediation": "اصلاح"

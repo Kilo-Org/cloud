@@ -108,7 +108,6 @@
     "agents": "Agentlar",
     "all": "Barchasi",
     "allModels": "Barcha modellar",
-    "balanced": "Muvozanatli",
     "bitbucketConnected": "Bitbucket ulandi",
     "branch": "Tarmoq",
     "cameraAccessDisabled": "Kameradan foydalanishga ruxsat berilmagan",
@@ -1288,7 +1287,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "Asosiy yo‘nalishlar",
       "hint": "Hammasini ko'rib chiqish uchun hech birini tanlamang."
     },
@@ -1320,10 +1319,18 @@
     },
     "style": {
       "title": "Ko‘rib chiqish uslubi",
-      "balanced": "Ortiqcha izohlarsiz, faqat muhim muammolar",
-      "lenient": "Faqat jiddiy muammolar",
-      "roast": "Ayovsiz, ammo kulgili tanqid",
-      "strict": "Barcha muammolarni aniqlash, yuqori talablar qo'yish"
+      "labels": {
+        "balanced": "Muvozanatli",
+        "lenient": "Yumshoq",
+        "roast": "Hajviy tanqid",
+        "strict": "Talabchan"
+      },
+      "descriptions": {
+        "balanced": "Ortiqcha izohlarsiz, faqat muhim muammolar",
+        "lenient": "Faqat jiddiy muammolar",
+        "roast": "Ayovsiz, ammo kulgili tanqid",
+        "strict": "Barcha muammolarni aniqlash, yuqori talablar qo'yish"
+      }
     },
     "reviewDetail": {
       "title": "Ko‘rib chiqish",
@@ -1528,12 +1535,7 @@
     "status": {
       "interrupted": "Uzildi"
     },
-    "reviewStyle": {
-      "strict": "Talabchan",
-      "lenient": "Yumshoq",
-      "roast": "Hajviy tanqid"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "Xavfsizlik",
       "bugs": "Xatolar",
       "style": "Uslub",
@@ -1823,7 +1825,7 @@
       "cannotDismissDescription": "Faqat tashkilot egalar, administratorlar va to'lov menejerlari muammolarni rad etishi mumkin.",
       "alreadyResolvedDescription": "Bu muammo allaqachon hal qilingan. Endi uni rad etib bo'lmaydi."
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "supersededBy": "O'rniga dolzarb muammo qayd etilgan",
       "supersededByDescription": "Holat, tahlil va tuzatish ma'lumotlarini ko'rish uchun dolzarb yozuvni bosing.",
       "dismissedOn": "E’tiborsiz qoldirilgan sana",
@@ -1911,7 +1913,7 @@
       "enableTrackingSubtitle": "Muammoning xavf darajasiga qarab tuzatish muddatlarini belgilaydi.",
       "deadlinesHeading": "Tuzatish muddatlari (kun)"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "title": "Muammo",
       "tabAnalysis": "Tahlil",
       "tabRemediation": "Tuzatish"

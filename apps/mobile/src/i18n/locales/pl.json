@@ -110,7 +110,6 @@
     "agents": "Agenci",
     "all": "Wszystkie",
     "allModels": "Wszystkie modele",
-    "balanced": "Zrównoważony",
     "bitbucketConnected": "Połączono z serwisem Bitbucket",
     "branch": "Gałąź",
     "cameraAccessDisabled": "Brak dostępu do aparatu",
@@ -730,7 +729,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "Obszary przeglądu",
       "hint": "Nie zaznaczaj żadnego obszaru, aby przegląd objął wszystko."
     },
@@ -762,10 +761,18 @@
     },
     "style": {
       "title": "Styl przeglądu",
-      "balanced": "Istotne problemy bez zbędnych uwag",
-      "lenient": "Tylko poważne problemy",
-      "roast": "Bez ogródek, ale z humorem",
-      "strict": "Wskazuj każdy problem i stawiaj wysokie wymagania"
+      "labels": {
+        "balanced": "Zrównoważony",
+        "lenient": "Pobłażliwy",
+        "roast": "Bez ogródek",
+        "strict": "Rygorystyczny"
+      },
+      "descriptions": {
+        "balanced": "Istotne problemy bez zbędnych uwag",
+        "lenient": "Tylko poważne problemy",
+        "roast": "Bez ogródek, ale z humorem",
+        "strict": "Wskazuj każdy problem i stawiaj wysokie wymagania"
+      }
     },
     "autoReviews": "Automatyczne przeglądy",
     "bitbucket": {
@@ -972,12 +979,7 @@
     "status": {
       "interrupted": "Przerwano"
     },
-    "reviewStyle": {
-      "strict": "Rygorystyczny",
-      "lenient": "Pobłażliwy",
-      "roast": "Bez ogródek"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "Bezpieczeństwo",
       "bugs": "Błędy",
       "style": "Styl",
@@ -1349,12 +1351,12 @@
       "reasonTolerableRisk": "Ryzyko jest akceptowalne",
       "title": "Odrzuć wykryty problem"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "tabAnalysis": "Analiza",
       "tabRemediation": "Naprawa",
       "title": "Problem"
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "cve": "CVE",
       "detected": "Wykryto",
       "dismissedOn": "Data odrzucenia",

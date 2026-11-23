@@ -108,7 +108,6 @@
     "agents": "एजंट",
     "all": "सर्व",
     "allModels": "सर्व मॉडेल",
-    "balanced": "संतुलित",
     "bitbucketConnected": "Bitbucket जोडले",
     "branch": "ब्रँच",
     "cameraAccessDisabled": "कॅमेरा वापरण्याची परवानगी नाही",
@@ -1288,7 +1287,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "लक्ष द्यायचे मुद्दे",
       "hint": "सर्व गोष्टींचे पुनरावलोकन करण्यासाठी कोणताही पर्याय निवडू नका."
     },
@@ -1320,10 +1319,18 @@
     },
     "style": {
       "title": "पुनरावलोकनाची शैली",
-      "balanced": "अनावश्यक तपशील वगळून महत्त्वाचे निष्कर्ष",
-      "lenient": "फक्त गंभीर समस्या",
-      "roast": "थेट, स्पष्ट आणि विनोदी टीका",
-      "strict": "प्रत्येक समस्या दाखवा आणि कडक निकष लावा"
+      "labels": {
+        "balanced": "संतुलित",
+        "lenient": "सौम्य",
+        "roast": "खोचक",
+        "strict": "कठोर"
+      },
+      "descriptions": {
+        "balanced": "अनावश्यक तपशील वगळून महत्त्वाचे निष्कर्ष",
+        "lenient": "फक्त गंभीर समस्या",
+        "roast": "थेट, स्पष्ट आणि विनोदी टीका",
+        "strict": "प्रत्येक समस्या दाखवा आणि कडक निकष लावा"
+      }
     },
     "reviewDetail": {
       "title": "पुनरावलोकन",
@@ -1528,12 +1535,7 @@
     "status": {
       "interrupted": "व्यत्यय आला"
     },
-    "reviewStyle": {
-      "strict": "कठोर",
-      "lenient": "सौम्य",
-      "roast": "खोचक"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "सुरक्षा",
       "bugs": "बग",
       "style": "शैली",
@@ -1823,7 +1825,7 @@
       "cannotDismissDescription": "केवळ संस्थेचे मालक, प्रशासक आणि बिलिंग व्यवस्थापक निष्कर्ष फेटाळू शकतात.",
       "alreadyResolvedDescription": "या निष्कर्षाचे निराकरण आधीच झाले आहे. आता तो फेटाळता येत नाही."
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "supersededBy": "या निष्कर्षाची जागा नवीन निष्कर्षाने घेतली आहे",
       "supersededByDescription": "स्थिती, विश्लेषण आणि निराकरण पाहण्यासाठी सध्याची नोंद उघडण्याकरिता टॅप करा.",
       "dismissedOn": "दुर्लक्षित केल्याचा दिनांक",
@@ -1911,7 +1913,7 @@
       "enableTrackingSubtitle": "निष्कर्षांच्या तीव्रतेनुसार निराकरणाच्या मुदती ठरवा.",
       "deadlinesHeading": "निराकरणाच्या मुदती (दिवस)"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "title": "निष्कर्ष",
       "tabAnalysis": "विश्लेषण",
       "tabRemediation": "निराकरण"

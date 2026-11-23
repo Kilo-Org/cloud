@@ -110,7 +110,6 @@
     "agents": "Agentai",
     "all": "Visi",
     "allModels": "Visi modeliai",
-    "balanced": "Subalansuotas",
     "bitbucketConnected": "Bitbucket prijungtas",
     "branch": "Šaka",
     "cameraAccessDisabled": "Neleidžiama naudoti kameros",
@@ -1344,7 +1343,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "Peržiūros sritys",
       "hint": "Jei nori peržiūrėti viską, nepasirink nė vienos srities."
     },
@@ -1376,10 +1375,18 @@
     },
     "style": {
       "title": "Peržiūros stilius",
-      "balanced": "Reikšmingi radiniai be nereikalingų pastabų",
-      "lenient": "Tik rimtos problemos",
-      "roast": "Negailestingai atviras ir šmaikštus",
-      "strict": "Pažymėti visus trūkumus, taikyti aukštus reikalavimus"
+      "labels": {
+        "balanced": "Subalansuotas",
+        "lenient": "Atlaidus",
+        "roast": "Pašaipus",
+        "strict": "Griežtas"
+      },
+      "descriptions": {
+        "balanced": "Reikšmingi radiniai be nereikalingų pastabų",
+        "lenient": "Tik rimtos problemos",
+        "roast": "Negailestingai atviras ir šmaikštus",
+        "strict": "Pažymėti visus trūkumus, taikyti aukštus reikalavimus"
+      }
     },
     "reviewDetail": {
       "title": "Peržiūra",
@@ -1586,12 +1593,7 @@
     "status": {
       "interrupted": "Nutraukta"
     },
-    "reviewStyle": {
-      "strict": "Griežtas",
-      "lenient": "Atlaidus",
-      "roast": "Pašaipus"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "Sauga",
       "bugs": "Klaidos",
       "style": "Stilius",
@@ -1905,7 +1907,7 @@
       "cannotDismissDescription": "Radinius gali atmesti tik organizacijos savininkai, administratoriai ir atsiskaitymų administratoriai.",
       "alreadyResolvedDescription": "Šis radinys jau išspręstas, todėl jo atmesti nebegalima."
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "supersededBy": "Pakeistas naujesniu radiniu",
       "supersededByDescription": "Bakstelėk, kad atidarytum naujausią įrašą su būsenos, analizės ir taisymo informacija.",
       "dismissedOn": "Atmetimo data",
@@ -1995,7 +1997,7 @@
       "enableTrackingSubtitle": "Nustato taisymo terminus pagal radinio pavojingumą.",
       "deadlinesHeading": "Taisymo terminai (dienomis)"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "title": "Radinys",
       "tabAnalysis": "Analizė",
       "tabRemediation": "Taisymas"

@@ -108,7 +108,6 @@
     "agents": "Àwọn aṣojú",
     "all": "Gbogbo",
     "allModels": "Gbogbo àwọn àwòṣe",
-    "balanced": "Dọ́gba",
     "bitbucketConnected": "Bitbucket ti sopọ̀",
     "branch": "Ẹ̀ka",
     "cameraAccessDisabled": "A kò gba lílo kámẹ́rà láyè",
@@ -1288,7 +1287,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "Àwọn apá ìfọkànsí",
       "hint": "Má ṣe yan èyíkéyìí bí o bá fẹ́ ṣàtúnyẹ̀wò ohun gbogbo."
     },
@@ -1320,10 +1319,18 @@
     },
     "style": {
       "title": "Ọ̀nà àtúnyẹ̀wò",
-      "balanced": "Àwọn àbùkù pàtàkì láìsí àlàyé tí kò wúlò",
-      "lenient": "Àwọn ìṣòro tó le nìkan",
-      "roast": "Òótọ́ láìfi nǹkan pamọ́, pẹ̀lú àwàdà",
-      "strict": "Fi gbogbo àbùkù hàn, má ṣe gba iṣẹ́ tí kò dára"
+      "labels": {
+        "balanced": "Dọ́gba",
+        "lenient": "Ìrọ̀rùn",
+        "roast": "Àwàdà ẹlẹ́yà",
+        "strict": "Mímúná"
+      },
+      "descriptions": {
+        "balanced": "Àwọn àbùkù pàtàkì láìsí àlàyé tí kò wúlò",
+        "lenient": "Àwọn ìṣòro tó le nìkan",
+        "roast": "Òótọ́ láìfi nǹkan pamọ́, pẹ̀lú àwàdà",
+        "strict": "Fi gbogbo àbùkù hàn, má ṣe gba iṣẹ́ tí kò dára"
+      }
     },
     "reviewDetail": {
       "title": "Àtúnyẹ̀wò",
@@ -1528,12 +1535,7 @@
     "status": {
       "interrupted": "Ó dá dúró"
     },
-    "reviewStyle": {
-      "strict": "Mímúná",
-      "lenient": "Ìrọ̀rùn",
-      "roast": "Àwàdà ẹlẹ́yà"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "Ààbò",
       "bugs": "Àwọn àṣìṣe",
       "style": "Àṣà kíkọ kóòdù",
@@ -1823,7 +1825,7 @@
       "cannotDismissDescription": "Àwọn ẹni tó ni àjọ, àwọn alákòóso, àti àwọn olùṣàkóso ìsanwó nìkan ló lè kọ àwọn àbùkù sílẹ̀.",
       "alreadyResolvedDescription": "A ti yanjú àbùkù yìí tẹ́lẹ̀, a kò sì lè kọ̀ ọ́ sílẹ̀ mọ́."
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "supersededBy": "Àbùkù tuntun ti rọ́pò rẹ̀",
       "supersededByDescription": "Tẹ̀ ẹ́ láti ṣí àkọsílẹ̀ tuntun fún ipò, ìtúpalẹ̀ àti àtúnṣe.",
       "dismissedOn": "A ti kọ̀ sílẹ̀ ní",
@@ -1911,7 +1913,7 @@
       "enableTrackingSubtitle": "Ṣètò àwọn ọjọ́ ìparí àtúnṣe gẹ́gẹ́ bí ìwọ̀n ewu àbùkù.",
       "deadlinesHeading": "Ọjọ́ ìparí àtúnṣe (iye ọjọ́)"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "title": "Àbùkù",
       "tabAnalysis": "Ìtúpalẹ̀",
       "tabRemediation": "Àtúnṣe"

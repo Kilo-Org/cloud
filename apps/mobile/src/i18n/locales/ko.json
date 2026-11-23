@@ -108,7 +108,6 @@
     "agents": "에이전트",
     "all": "전체",
     "allModels": "모든 모델",
-    "balanced": "균형형",
     "bitbucketConnected": "Bitbucket 연결됨",
     "branch": "브랜치",
     "cameraAccessDisabled": "카메라 접근 권한 없음",
@@ -726,7 +725,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "중점 리뷰 항목",
       "hint": "전체를 리뷰하려면 아무 항목도 선택하지 마세요."
     },
@@ -758,10 +757,18 @@
     },
     "style": {
       "title": "리뷰 스타일",
-      "balanced": "불필요한 지적 없이 의미 있는 문제만 보고",
-      "lenient": "심각한 문제만",
-      "roast": "재미있고 거침없는 독설",
-      "strict": "높은 기준으로 모든 문제 지적"
+      "labels": {
+        "balanced": "균형형",
+        "lenient": "관대",
+        "roast": "독설",
+        "strict": "엄격"
+      },
+      "descriptions": {
+        "balanced": "불필요한 지적 없이 의미 있는 문제만 보고",
+        "lenient": "심각한 문제만",
+        "roast": "재미있고 거침없는 독설",
+        "strict": "높은 기준으로 모든 문제 지적"
+      }
     },
     "autoReviews": "자동 리뷰",
     "bitbucket": {
@@ -966,12 +973,7 @@
     "status": {
       "interrupted": "중단됨"
     },
-    "reviewStyle": {
-      "strict": "엄격",
-      "lenient": "관대",
-      "roast": "독설"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "보안",
       "bugs": "버그",
       "style": "스타일",
@@ -1315,12 +1317,12 @@
       "reasonTolerableRisk": "위험 감수 가능",
       "title": "진단 결과 무시"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "tabAnalysis": "분석",
       "tabRemediation": "수정",
       "title": "발견된 문제"
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "cve": "CVE",
       "detected": "감지됨",
       "dismissedOn": "무시된 날짜",

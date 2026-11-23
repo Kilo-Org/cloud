@@ -108,7 +108,6 @@
     "agents": "Agente",
     "all": "Alles",
     "allModels": "Alle modelle",
-    "balanced": "Gebalanseerd",
     "bitbucketConnected": "Bitbucket gekoppel",
     "branch": "Tak",
     "cameraAccessDisabled": "Kameratoegang afgeskakel",
@@ -1288,7 +1287,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "Fokusareas",
       "hint": "Laat al die opsies ongekies om alles te hersien."
     },
@@ -1320,10 +1319,18 @@
     },
     "style": {
       "title": "Hersieningstyl",
-      "balanced": "Betekenisvolle bevindings sonder onnodige besonderhede",
-      "lenient": "Slegs ernstige probleme",
-      "roast": "Genadeloos eerlik, op 'n vermaaklike manier",
-      "strict": "Wys elke probleem uit en stel hoë vereistes"
+      "labels": {
+        "balanced": "Gebalanseerd",
+        "lenient": "Toegeeflik",
+        "roast": "Spottend",
+        "strict": "Streng"
+      },
+      "descriptions": {
+        "balanced": "Betekenisvolle bevindings sonder onnodige besonderhede",
+        "lenient": "Slegs ernstige probleme",
+        "roast": "Genadeloos eerlik, op 'n vermaaklike manier",
+        "strict": "Wys elke probleem uit en stel hoë vereistes"
+      }
     },
     "reviewDetail": {
       "title": "Hersiening",
@@ -1528,12 +1535,7 @@
     "status": {
       "interrupted": "Onderbreek"
     },
-    "reviewStyle": {
-      "strict": "Streng",
-      "lenient": "Toegeeflik",
-      "roast": "Spottend"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "Sekuriteit",
       "bugs": "Foute",
       "style": "Styl",
@@ -1823,7 +1825,7 @@
       "cannotDismissDescription": "Slegs organisasie-eienaars, administrateurs en faktureringsbestuurders kan bevindings verwerp.",
       "alreadyResolvedDescription": "Hierdie bevinding is reeds opgelos en kan nie meer verwerp word nie."
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "supersededBy": "Vervang deur 'n huidige bevinding",
       "supersededByDescription": "Tik om die huidige rekord se status, ontleding en regstelling te sien.",
       "dismissedOn": "Verwerp op",
@@ -1911,7 +1913,7 @@
       "enableTrackingSubtitle": "Stel regstellingsperdatums volgens die bevindings se ernsgraad in.",
       "deadlinesHeading": "Regstellingsperdatums (dae)"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "title": "Bevinding",
       "tabAnalysis": "Ontleding",
       "tabRemediation": "Regstelling"

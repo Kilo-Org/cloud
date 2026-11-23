@@ -108,7 +108,6 @@
     "agents": "Agenter",
     "all": "Alle",
     "allModels": "Alle modeller",
-    "balanced": "Balansert",
     "bitbucketConnected": "Bitbucket tilkoblet",
     "branch": "Gren",
     "cameraAccessDisabled": "Ingen tilgang til kameraet",
@@ -1288,7 +1287,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "Fokusområder",
       "hint": "La alle områdene stå uten avkrysning for å gjennomgå alt."
     },
@@ -1320,10 +1319,18 @@
     },
     "style": {
       "title": "Gjennomgangsstil",
-      "balanced": "Relevante funn uten unødvendige merknader",
-      "lenient": "Kun alvorlige problemer",
-      "roast": "Brutalt ærlig på en underholdende måte",
-      "strict": "Påpek alt og still høye krav"
+      "labels": {
+        "balanced": "Balansert",
+        "lenient": "Ettergivende",
+        "roast": "Nådeløs kritikk",
+        "strict": "Streng"
+      },
+      "descriptions": {
+        "balanced": "Relevante funn uten unødvendige merknader",
+        "lenient": "Kun alvorlige problemer",
+        "roast": "Brutalt ærlig på en underholdende måte",
+        "strict": "Påpek alt og still høye krav"
+      }
     },
     "reviewDetail": {
       "title": "Gjennomgang",
@@ -1528,12 +1535,7 @@
     "status": {
       "interrupted": "Avbrutt"
     },
-    "reviewStyle": {
-      "strict": "Streng",
-      "lenient": "Ettergivende",
-      "roast": "Nådeløs kritikk"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "Sikkerhet",
       "bugs": "Feil",
       "style": "Stil",
@@ -1823,7 +1825,7 @@
       "cannotDismissDescription": "Bare organisasjonseiere, administratorer og faktureringsansvarlige kan avvise funn.",
       "alreadyResolvedDescription": "Dette funnet er allerede løst og kan ikke lenger avvises."
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "supersededBy": "Erstattet av et oppdatert funn",
       "supersededByDescription": "Trykk for å se status, analyse og utbedring for det oppdaterte funnet.",
       "dismissedOn": "Avvisningsdato",
@@ -1911,7 +1913,7 @@
       "enableTrackingSubtitle": "Angi utbedringsfrister ut fra funnenes alvorlighetsgrad.",
       "deadlinesHeading": "Utbedringsfrister (dager)"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "title": "Funn",
       "tabAnalysis": "Analyse",
       "tabRemediation": "Utbedring"

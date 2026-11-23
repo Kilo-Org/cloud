@@ -47,8 +47,8 @@ type FindingTab = 'details' | 'analysis' | 'remediation';
 
 const TABS = [
   { key: 'details', labelKey: 'common.details' },
-  { key: 'analysis', labelKey: 'securityAgent.findingDetail.tabAnalysis' },
-  { key: 'remediation', labelKey: 'securityAgent.findingDetail.tabRemediation' },
+  { key: 'analysis', labelKey: 'securityAgent.findingDetailScreen.tabAnalysis' },
+  { key: 'remediation', labelKey: 'securityAgent.findingDetailScreen.tabRemediation' },
 ] as const satisfies readonly { key: FindingTab; labelKey: string }[];
 
 // Server-verified security_agent_ui_interaction enum values (schemas.ts:28-31)
@@ -237,7 +237,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        title={t('securityAgent.findingDetail.title')}
+        title={t('securityAgent.findingDetailScreen.title')}
         subtitle={finding.repo_full_name}
         reserveSubtitle
         showBackButton
@@ -297,7 +297,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
             options={viewOptions}
             value={tab}
             semantics="tabs"
-            accessibilityLabel={t('securityAgent.findingDetail.title')}
+            accessibilityLabel={t('securityAgent.findingDetailScreen.title')}
             onChange={setTab}
           />
         </View>

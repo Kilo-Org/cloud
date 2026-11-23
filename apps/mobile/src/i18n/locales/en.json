@@ -206,7 +206,6 @@
     "agents": "Agents",
     "all": "All",
     "allModels": "All models",
-    "balanced": "Balanced",
     "bitbucketConnected": "Bitbucket connected",
     "branch": "Branch",
     "cameraAccessDisabled": "Camera Access Disabled",
@@ -1386,7 +1385,7 @@
     }
   },
   "codeReviewer": {
-    "focusAreas": {
+    "focusAreaSection": {
       "title": "Focus areas",
       "hint": "Leave all unselected to review everything."
     },
@@ -1418,10 +1417,18 @@
     },
     "style": {
       "title": "Review style",
-      "balanced": "Meaningful findings without noise",
-      "lenient": "Only serious problems",
-      "roast": "Brutally honest, entertainingly so",
-      "strict": "Flag everything, hold a high bar"
+      "labels": {
+        "balanced": "Balanced",
+        "lenient": "Lenient",
+        "roast": "Roast",
+        "strict": "Strict"
+      },
+      "descriptions": {
+        "balanced": "Meaningful findings without noise",
+        "lenient": "Only serious problems",
+        "roast": "Brutally honest, entertainingly so",
+        "strict": "Flag everything, hold a high bar"
+      }
     },
     "reviewDetail": {
       "title": "Review",
@@ -1626,12 +1633,7 @@
     "status": {
       "interrupted": "Interrupted"
     },
-    "reviewStyle": {
-      "strict": "Strict",
-      "lenient": "Lenient",
-      "roast": "Roast"
-    },
-    "focusArea": {
+    "focusAreaOptions": {
       "security": "Security",
       "bugs": "Bugs",
       "style": "Style",
@@ -1921,7 +1923,7 @@
       "cannotDismissDescription": "Only organization owners, admins, and billing managers can dismiss findings.",
       "alreadyResolvedDescription": "This finding has already been resolved and no longer accepts a dismissal."
     },
-    "findingDetails": {
+    "findingDetailFields": {
       "supersededBy": "Superseded by a current finding",
       "supersededByDescription": "Tap to open the current record for status, analysis, and remediation.",
       "dismissedOn": "Dismissed on",
@@ -2009,7 +2011,7 @@
       "enableTrackingSubtitle": "Set remediation deadlines based on finding severity.",
       "deadlinesHeading": "Remediation deadlines (days)"
     },
-    "findingDetail": {
+    "findingDetailScreen": {
       "title": "Finding",
       "tabAnalysis": "Analysis",
       "tabRemediation": "Remediation"

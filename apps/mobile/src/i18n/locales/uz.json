@@ -380,6 +380,7 @@
       "rowSubtitle": "LinkedIn va GitHub havolalari",
       "linkedinLabel": "LinkedIn URL manzili",
       "githubLabel": "GitHub URL manzili",
+      "emptyRemovesLink": "Bo'sh maydonni saqlash ushbu havolani o'chiradi",
       "invalidUrl": "http:// yoki https:// bilan boshlanadigan URL kiriting",
       "saved": "Profil yangilandi"
     },

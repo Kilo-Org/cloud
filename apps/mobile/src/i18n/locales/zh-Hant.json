@@ -379,6 +379,7 @@
       "rowSubtitle": "LinkedIn 與 GitHub 連結",
       "linkedinLabel": "LinkedIn 網址",
       "githubLabel": "GitHub 網址",
+      "emptyRemovesLink": "儲存空白欄位會刪除該連結",
       "invalidUrl": "請輸入以 http:// 或 https:// 開頭的網址",
       "saved": "個人資料已更新"
     },

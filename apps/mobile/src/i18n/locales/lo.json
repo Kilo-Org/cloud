@@ -379,6 +379,7 @@
       "rowSubtitle": "ລິ້ງ LinkedIn ແລະ GitHub",
       "linkedinLabel": "URL ຂອງ LinkedIn",
       "githubLabel": "URL ຂອງ GitHub",
+      "emptyRemovesLink": "ການບັນທຶກຊ່ອງຂໍ້ມູນທີ່ຫວ່າງເປົ່າຈະລຶບລິ້ງນັ້ນອອກ",
       "invalidUrl": "ປ້ອນ URL ທີ່ຂຶ້ນຕົ້ນດ້ວຍ http:// ຫຼື https://",
       "saved": "ອັບເດດໂປຣໄຟລ໌ແລ້ວ"
     },

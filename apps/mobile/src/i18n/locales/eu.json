@@ -380,6 +380,7 @@
       "rowSubtitle": "LinkedIn eta GitHub estekak",
       "linkedinLabel": "LinkedIn URLa",
       "githubLabel": "GitHub URLa",
+      "emptyRemovesLink": "Eremu bat hutsik gordetzean, esteka hori ezabatuko da",
       "invalidUrl": "Idatzi http:// edo https:// hasiera duen URL bat",
       "saved": "Profila eguneratu da"
     },

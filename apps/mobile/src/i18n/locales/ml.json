@@ -380,6 +380,7 @@
       "rowSubtitle": "LinkedIn, GitHub ലിങ്കുകൾ",
       "linkedinLabel": "LinkedIn URL",
       "githubLabel": "GitHub URL",
+      "emptyRemovesLink": "ഒരു ഫീൽഡ് ശൂന്യമായി സംരക്ഷിച്ചാൽ ആ ലിങ്ക് ഇല്ലാതാകും",
       "invalidUrl": "http:// അല്ലെങ്കിൽ https:// എന്നതിൽ ആരംഭിക്കുന്ന ഒരു URL നൽകുക",
       "saved": "പ്രൊഫൈൽ അപ്ഡേറ്റ് ചെയ്തു"
     },

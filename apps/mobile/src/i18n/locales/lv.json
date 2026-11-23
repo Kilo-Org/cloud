@@ -381,6 +381,7 @@
       "rowSubtitle": "LinkedIn un GitHub saites",
       "linkedinLabel": "LinkedIn URL",
       "githubLabel": "GitHub URL",
+      "emptyRemovesLink": "Saglabājot tukšu lauku, šī saite tiek dzēsta",
       "invalidUrl": "Ievadi URL, kas sākas ar http:// vai https://",
       "saved": "Profils atjaunināts"
     },

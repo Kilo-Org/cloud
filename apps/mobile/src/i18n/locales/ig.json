@@ -379,6 +379,7 @@
       "rowSubtitle": "Njikọ LinkedIn na GitHub",
       "linkedinLabel": "URL LinkedIn",
       "githubLabel": "URL GitHub",
+      "emptyRemovesLink": "Ịchekwa ubi tọgbọ chakọọ na-ehichapụ njikọ ahụ",
       "invalidUrl": "Tinye URL na-amalite na http:// ma ọ bụ https://",
       "saved": "Emelitere profaịlụ"
     },

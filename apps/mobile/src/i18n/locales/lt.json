@@ -382,6 +382,7 @@
       "rowSubtitle": "LinkedIn ir GitHub nuorodos",
       "linkedinLabel": "LinkedIn URL",
       "githubLabel": "GitHub URL",
+      "emptyRemovesLink": "Išsaugojus tuščią lauką, ta nuoroda bus ištrinta",
       "invalidUrl": "Įveskite URL, prasidedantį http:// arba https://",
       "saved": "Profilis atnaujintas"
     },

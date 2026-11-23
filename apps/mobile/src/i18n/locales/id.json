@@ -379,6 +379,7 @@
       "rowSubtitle": "Tautan LinkedIn dan GitHub",
       "linkedinLabel": "URL LinkedIn",
       "githubLabel": "URL GitHub",
+      "emptyRemovesLink": "Menyimpan kolom kosong akan menghapus tautan tersebut",
       "invalidUrl": "Masukkan URL yang diawali http:// atau https://",
       "saved": "Profil diperbarui"
     },

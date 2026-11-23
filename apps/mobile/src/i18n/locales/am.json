@@ -380,6 +380,7 @@
       "rowSubtitle": "የLinkedIn እና የGitHub አገናኞች",
       "linkedinLabel": "የLinkedIn URL",
       "githubLabel": "የGitHub URL",
+      "emptyRemovesLink": "ባዶ መስክን ማስቀመጥ ያንን አገናኝ ይሰርዛል",
       "invalidUrl": "በhttp:// ወይም በhttps:// የሚጀምር URL ያስገቡ",
       "saved": "መገለጫው ተዘምኗል"
     },

@@ -380,6 +380,7 @@
       "rowSubtitle": "پیوندهای LinkedIn و GitHub",
       "linkedinLabel": "نشانی LinkedIn",
       "githubLabel": "نشانی GitHub",
+      "emptyRemovesLink": "ذخیرهٔ یک فیلد خالی آن پیوند را حذف می‌کند",
       "invalidUrl": "نشانی‌ای وارد کنید که با http:// یا https:// شروع شود",
       "saved": "نمایه به‌روزرسانی شد"
     },

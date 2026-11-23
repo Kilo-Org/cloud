@@ -380,6 +380,7 @@
       "rowSubtitle": "Izixhumanisi ze-LinkedIn ne-GitHub",
       "linkedinLabel": "I-URL ye-LinkedIn",
       "githubLabel": "I-URL ye-GitHub",
+      "emptyRemovesLink": "Ukugcina inkambu engenalutho kucisha leso sixhumanisi",
       "invalidUrl": "Faka i-URL eqala ngo-http:// noma https://",
       "saved": "Iphrofayela ibuyekeziwe"
     },

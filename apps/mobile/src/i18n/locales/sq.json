@@ -380,6 +380,7 @@
       "rowSubtitle": "Lidhjet e LinkedIn dhe GitHub",
       "linkedinLabel": "URL-ja e LinkedIn",
       "githubLabel": "URL-ja e GitHub",
+      "emptyRemovesLink": "Ruajtja e një fushe bosh fshin atë lidhje",
       "invalidUrl": "Fut një URL që fillon me http:// ose https://",
       "saved": "Profili u përditësua"
     },

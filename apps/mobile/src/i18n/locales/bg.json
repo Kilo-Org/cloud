@@ -380,6 +380,7 @@
       "rowSubtitle": "Връзки към LinkedIn и GitHub",
       "linkedinLabel": "URL адрес в LinkedIn",
       "githubLabel": "URL адрес в GitHub",
+      "emptyRemovesLink": "Запазването на празно поле изтрива тази връзка",
       "invalidUrl": "Въведи URL адрес, който започва с http:// или https://",
       "saved": "Профилът е актуализиран"
     },

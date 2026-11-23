@@ -2,7 +2,9 @@
 import { createElement, type ElementType } from 'react';
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
+import { INPUT_BOX_SHAPE_CLASS } from '@/components/ui/input';
 import '@/i18n';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { resetLeaveSettle } from '@/lib/navigation/leave-settle';
 import { act, type ReactTestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
@@ -20,6 +22,7 @@ type MutationOptions = {
 type ScreenState = {
   invalidate: Mock;
   links: Links;
+  linksPending: boolean;
   error: boolean;
   mutations: MutationOptions[];
   mutate: Mock;
@@ -33,6 +36,7 @@ type ScreenState = {
 
 const state = vi.hoisted((): ScreenState => ({
   links: { linkedinUrl: null, githubUrl: null },
+  linksPending: false,
   error: false,
   mutations: [] as MutationOptions[],
   mutate: vi.fn(),
@@ -82,7 +86,7 @@ vi.mock('@tanstack/react-query', async importOriginal => {
     ...actual,
     useQuery: () => ({
       data: state.links,
-      isPending: false,
+      isPending: state.linksPending,
       isError: state.error,
       isFetching: false,
       refetch: vi.fn(),
@@ -123,6 +127,7 @@ vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
 
 const FIELD = 'FormField' as ElementType;
 const BUTTON = 'Button' as ElementType;
+const TEXT = 'Text' as ElementType;
 
 let renderer: ReactTestRenderer | undefined = undefined;
 
@@ -186,6 +191,7 @@ beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   resetLeaveSettle();
   state.links = { linkedinUrl: null, githubUrl: null };
+  state.linksPending = false;
   state.error = false;
   state.mutations = [];
   state.pending = false;
@@ -335,6 +341,33 @@ describe('ProfileEditScreen', () => {
     );
   });
 
+  it('states that an empty field deletes the link, and holds the error slot from the first render', async () => {
+    const root = await mount();
+
+    // An emptied field submits `null`, which deletes the saved link; the screen
+    // says so before the reader clears anything.
+    const hints = root.findAll(
+      node =>
+        Object.is(node.type, TEXT) &&
+        node.props.children === 'Saving an empty field deletes that link'
+    );
+    expect(hints).toHaveLength(1);
+
+    // The rule can arrive from a Save press with no focus on the field, so both
+    // fields hold their error line from the first render: the Save button below
+    // them never moves between the untouched form and a shown error.
+    for (const label of ['LinkedIn URL', 'GitHub URL']) {
+      const props = field(root, label).props as {
+        alwaysReserve?: boolean;
+        reserveErrorMessages?: string[];
+      };
+      expect(props.alwaysReserve).toBe(true);
+      expect(props.reserveErrorMessages).toEqual([
+        'Enter a URL that starts with http:// or https://',
+      ]);
+    }
+  });
+
   it('clears a link by submitting null', async () => {
     state.links = { linkedinUrl: null, githubUrl: 'https://github.com/ada' };
     const root = await mount();
@@ -378,6 +411,73 @@ describe('ProfileEditScreen', () => {
     const root = await mount();
 
     expect(root.findAll(node => Object.is(node.type, 'QueryError'))).toHaveLength(1);
+  });
+
+  it('hides the empty-field hint when the retry is the whole body', async () => {
+    state.error = true;
+    const root = await mount();
+
+    // The hint explains what an emptied field does; the error body has no
+    // fields, so the rule is not shown beside a screen that cannot edit them.
+    const hints = root.findAll(
+      node =>
+        Object.is(node.type, TEXT) &&
+        node.props.children === 'Saving an empty field deletes that link'
+    );
+    expect(hints).toHaveLength(0);
+    expect(root.findAll(node => Object.is(node.type, 'QueryError'))).toHaveLength(1);
+  });
+
+  it('reserves the message line in each field of the loading placeholder', async () => {
+    state.linksPending = true;
+    const root = await mount();
+
+    // A loaded field holds its label line, its input box and the message line it
+    // reserves from the first render. The placeholder must hold the same three,
+    // or the swap to real content grows the body and moves the Save button.
+    const fieldBlocks = root.findAll(
+      node =>
+        Object.is(node.type, 'View') &&
+        typeof node.props.className === 'string' &&
+        node.props.className === 'gap-1.5' &&
+        node.findAll(child => Object.is(child.type, 'Skeleton')).length === 3
+    );
+    expect(fieldBlocks).toHaveLength(2);
+
+    // The input bar must carry the loaded box's own geometry token, because a
+    // hand-sized bar drifts from it (rem is 14pt, so `h-11` is 38.5pt against the
+    // 44pt box). A block's second Skeleton is that bar: label, input, message.
+    for (const block of fieldBlocks) {
+      const [, inputBar] = block.findAll(child => Object.is(child.type, 'Skeleton'));
+      expect(inputBar).toBeDefined();
+      const tokens = String(inputBar?.props.className).split(' ');
+      expect(tokens).toEqual(expect.arrayContaining(INPUT_BOX_SHAPE_CLASS.split(' ')));
+    }
+
+    // The Save slot is the loaded button's own frame, and no placeholder bar is
+    // hand-sized.
+    const allSkeletonClasses = root
+      .findAll(node => Object.is(node.type, 'Skeleton'))
+      .map(node => String(node.props.className));
+    const actionTokens = STATE_ACTION_CLASS.split(' ');
+    const actionBars = allSkeletonClasses.filter(classes => {
+      const tokens = classes.split(' ');
+      return actionTokens.every(token => tokens.includes(token));
+    });
+    expect(actionBars).toHaveLength(1);
+    const handSized = allSkeletonClasses.filter(classes => classes.split(' ').includes('h-11'));
+    expect(handSized).toHaveLength(0);
+
+    // The bar's height comes from this copy, so wrapping in a long locale cannot
+    // make the loaded form taller than the placeholder.
+    const placeholderCopy = root
+      .findAll(node => Object.is(node.type, TEXT))
+      .map(node => node.props.children);
+    expect(placeholderCopy.filter(copy => copy === 'LinkedIn URL')).toHaveLength(1);
+    expect(placeholderCopy.filter(copy => copy === 'GitHub URL')).toHaveLength(1);
+    expect(
+      placeholderCopy.filter(copy => copy === 'Enter a URL that starts with http:// or https://')
+    ).toHaveLength(2);
   });
 
   it('keeps the fields live and takes one save while a save is pending', async () => {

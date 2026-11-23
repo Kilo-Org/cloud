@@ -380,6 +380,7 @@
       "rowSubtitle": "LinkedIn болон GitHub холбоосууд",
       "linkedinLabel": "LinkedIn URL",
       "githubLabel": "GitHub URL",
+      "emptyRemovesLink": "Хоосон талбарыг хадгалахад тухайн холбоосыг устгана",
       "invalidUrl": "http:// эсвэл https://-ээр эхэлсэн URL оруулна уу",
       "saved": "Профайл шинэчлэгдлээ"
     },

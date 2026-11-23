@@ -380,6 +380,7 @@
       "rowSubtitle": "Hanyoyin LinkedIn da GitHub",
       "linkedinLabel": "URL na LinkedIn",
       "githubLabel": "URL na GitHub",
+      "emptyRemovesLink": "Adana fili mara komai yana share wancan mahaɗin",
       "invalidUrl": "Shigar da URL da ya fara da http:// ko https://",
       "saved": "An sabunta bayanin martaba"
     },

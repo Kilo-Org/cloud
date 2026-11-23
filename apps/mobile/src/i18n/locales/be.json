@@ -382,6 +382,7 @@
       "rowSubtitle": "Спасылкі на LinkedIn і GitHub",
       "linkedinLabel": "URL LinkedIn",
       "githubLabel": "URL GitHub",
+      "emptyRemovesLink": "Захаванне пустога поля выдаляе гэтую спасылку",
       "invalidUrl": "Увядзіце URL, які пачынаецца з http:// або https://",
       "saved": "Профіль абноўлены"
     },

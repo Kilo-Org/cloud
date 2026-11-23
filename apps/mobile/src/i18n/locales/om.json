@@ -380,6 +380,7 @@
       "rowSubtitle": "Liinkii LinkedIn fi GitHub",
       "linkedinLabel": "URL LinkedIn",
       "githubLabel": "URL GitHub",
+      "emptyRemovesLink": "Dirree duwwaa kuusuun liinkii sana ni haqa",
       "invalidUrl": "URL http:// ykn https:// jedhee jalqabu galchi",
       "saved": "Piroofaayiliin haaromfameera"
     },

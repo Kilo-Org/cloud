@@ -380,6 +380,7 @@
       "rowSubtitle": "Länkar till LinkedIn och GitHub",
       "linkedinLabel": "LinkedIn-URL",
       "githubLabel": "GitHub-URL",
+      "emptyRemovesLink": "Om du sparar ett tomt fält tas länken bort",
       "invalidUrl": "Ange en URL som börjar med http:// eller https://",
       "saved": "Profilen har uppdaterats"
     },

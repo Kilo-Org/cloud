@@ -381,6 +381,7 @@
       "rowSubtitle": "Liens LinkedIn et GitHub",
       "linkedinLabel": "URL LinkedIn",
       "githubLabel": "URL GitHub",
+      "emptyRemovesLink": "Enregistrer un champ vide supprime ce lien",
       "invalidUrl": "Saisissez une URL commençant par http:// ou https://",
       "saved": "Profil mis à jour"
     },

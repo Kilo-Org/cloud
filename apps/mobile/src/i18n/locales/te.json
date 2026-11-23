@@ -380,6 +380,7 @@
       "rowSubtitle": "LinkedIn, GitHub లింక్‌లు",
       "linkedinLabel": "LinkedIn URL",
       "githubLabel": "GitHub URL",
+      "emptyRemovesLink": "ఖాళీ ఫీల్డ్‌ను సేవ్ చేస్తే ఆ లింక్ తొలగించబడుతుంది",
       "invalidUrl": "http:// లేదా https://తో ప్రారంభమయ్యే URLను నమోదు చేయండి",
       "saved": "ప్రొఫైల్ అప్‌డేట్ అయింది"
     },

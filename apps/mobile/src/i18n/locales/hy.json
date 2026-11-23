@@ -380,6 +380,7 @@
       "rowSubtitle": "LinkedIn և GitHub հղումներ",
       "linkedinLabel": "LinkedIn URL",
       "githubLabel": "GitHub URL",
+      "emptyRemovesLink": "Դատարկ դաշտը պահպանելը ջնջում է այդ հղումը։",
       "invalidUrl": "Մուտքագրեք http:// կամ https:// նախածանցով սկսվող URL",
       "saved": "Պրոֆիլը թարմացվեց"
     },

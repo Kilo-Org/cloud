@@ -379,6 +379,7 @@
       "rowSubtitle": "ลิงก์ LinkedIn และ GitHub",
       "linkedinLabel": "URL ของ LinkedIn",
       "githubLabel": "URL ของ GitHub",
+      "emptyRemovesLink": "การบันทึกช่องที่ว่างเปล่าจะลบลิงก์นั้นออก",
       "invalidUrl": "ป้อน URL ที่ขึ้นต้นด้วย http:// หรือ https://",
       "saved": "อัปเดตโปรไฟล์แล้ว"
     },

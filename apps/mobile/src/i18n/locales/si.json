@@ -380,6 +380,7 @@
       "rowSubtitle": "LinkedIn සහ GitHub සබැඳි",
       "linkedinLabel": "LinkedIn URL",
       "githubLabel": "GitHub URL",
+      "emptyRemovesLink": "හිස් ක්ෂේත්‍රයක් සුරකින විට එම සබැඳිය මකා දැමේ",
       "invalidUrl": "http:// හෝ https:// වලින් ආරම්භ වන URL එකක් ඇතුළත් කරන්න",
       "saved": "පැතිකඩ යාවත්කාලීන කරන ලදී"
     },

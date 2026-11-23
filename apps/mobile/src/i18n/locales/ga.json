@@ -383,6 +383,7 @@
       "rowSubtitle": "Naisc LinkedIn agus GitHub",
       "linkedinLabel": "URL LinkedIn",
       "githubLabel": "URL GitHub",
+      "emptyRemovesLink": "Má shábháiltear réimse folamh, scriostar an nasc sin",
       "invalidUrl": "Cuir isteach URL a thosaíonn le http:// nó https://",
       "saved": "Nuashonraíodh an phróifíl"
     },

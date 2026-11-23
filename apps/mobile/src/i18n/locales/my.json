@@ -379,6 +379,7 @@
       "rowSubtitle": "LinkedIn နှင့် GitHub လင့်ခ်များ",
       "linkedinLabel": "LinkedIn URL",
       "githubLabel": "GitHub URL",
+      "emptyRemovesLink": "ကွက်လပ်တစ်ခုကို သိမ်းပါက ထို လင့်ခ်ကို ဖျက်ပစ်ပါမည်",
       "invalidUrl": "http:// သို့မဟုတ် https:// ဖြင့် စတင်သော URL ကို ထည့်ပါ",
       "saved": "ပရိုဖိုင်ကို အပ်ဒိတ်လုပ်ပြီးပါပြီ"
     },

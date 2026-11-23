@@ -380,6 +380,7 @@
       "rowSubtitle": "LinkedIn ಮತ್ತು GitHub ಲಿಂಕ್‌ಗಳು",
       "linkedinLabel": "LinkedIn URL",
       "githubLabel": "GitHub URL",
+      "emptyRemovesLink": "ಖಾಲಿ ಫೀಲ್ಡ್ ಸೇವ್ ಮಾಡಿದರೆ ಆ ಲಿಂಕ್ ಅಳಿಸಿಹೋಗುತ್ತದೆ",
       "invalidUrl": "http:// ಅಥವಾ https:// ನಿಂದ ಪ್ರಾರಂಭವಾಗುವ URL ನಮೂದಿಸಿ",
       "saved": "ಪ್ರೊಫೈಲ್ ಅಪ್‌ಡೇಟ್ ಮಾಡಲಾಗಿದೆ"
     },

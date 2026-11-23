@@ -384,6 +384,7 @@
       "rowSubtitle": "Dolenni LinkedIn a GitHub",
       "linkedinLabel": "URL LinkedIn",
       "githubLabel": "URL GitHub",
+      "emptyRemovesLink": "Mae cadw maes gwag yn dileu'r ddolen honno",
       "invalidUrl": "Rhowch URL sy'n dechrau gyda http:// neu https://",
       "saved": "Proffil wedi'i ddiweddaru"
     },

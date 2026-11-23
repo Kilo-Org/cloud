@@ -382,6 +382,7 @@
       "rowSubtitle": "Povezavi za LinkedIn in GitHub",
       "linkedinLabel": "URL za LinkedIn",
       "githubLabel": "URL za GitHub",
+      "emptyRemovesLink": "Če shraniš prazno polje, se ta povezava izbriše",
       "invalidUrl": "Vnesi URL, ki se začne s http:// ali https://",
       "saved": "Profil je posodobljen"
     },

@@ -380,6 +380,7 @@
       "rowSubtitle": "LinkedIn மற்றும் GitHub இணைப்புகள்",
       "linkedinLabel": "LinkedIn URL",
       "githubLabel": "GitHub URL",
+      "emptyRemovesLink": "காலியான புலத்தைச் சேமித்தால் அந்த இணைப்பு நீக்கப்படும்",
       "invalidUrl": "http:// அல்லது https:// எனத் தொடங்கும் URL-ஐ உள்ளிடவும்",
       "saved": "சுயவிவரம் புதுப்பிக்கப்பட்டது"
     },

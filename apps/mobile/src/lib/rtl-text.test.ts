@@ -449,16 +449,21 @@ describe('withoutLeadingDirectionMarks', () => {
     ['  \u200F***', 'an indented starred thematic break'],
     ['\u200F<div>x</div>', 'an HTML block'],
     ['\u200F[ref]: /url', 'a reference definition'],
+    ['  \u200F    code', 'an indented code line'],
   ])('keeps a mark in front of %s (%s)', (value, _shape) => {
     expect(withoutLeadingDirectionMarks(value)).toBe(value);
   });
 
   // Inside a heading's own text no marker can open another block, so the mark
   // there is only an edge and goes: keeping it would leave the heading on the
-  // wrong one, which is the defect this strip exists for.
-  it('strips a mark inside a heading that would not open a block there', () => {
-    expect(withoutLeadingDirectionMarks('# \u200F# Latin')).toBe('# # Latin');
-  });
+  // wrong one, which is the defect this strip exists for. A heading can sit
+  // inside a list item or a quote, so those shapes are read as headings too.
+  it.each(['# \u200F# Latin', '- # \u200FLatin', '> # \u200FLatin'])(
+    'strips a mark inside a heading that would not open a block there (%s)',
+    value => {
+      expect(withoutLeadingDirectionMarks(value)).toBe(value.replace('\u200F', ''));
+    }
+  );
 
   it('returns the same string when there is no mark to strip', () => {
     expect(withoutLeadingDirectionMarks('42 · 7\n\n- Latin bullet')).toBe(

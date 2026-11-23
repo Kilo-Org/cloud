@@ -663,10 +663,12 @@ export function withoutLeadingDirectionMarks(markdown: string): string {
     // Code is copy in its own right: a mark inside it is part of the code.
     const code = inFence || (previousBlank && INDENTED_CODE.test(body));
     // A list item or heading's own marker is line machinery its content follows;
-    // a continuation line has none and keeps its marks.
+    // a continuation line has none and keeps its marks. A heading may sit inside
+    // a list item (`- # x`), so its marker is read after the list marker too.
     const list = LIST_START.exec(body);
-    const heading = list === null ? HEADING_START.exec(body) : null;
-    const marker = (list ?? heading)?.[0].length ?? 0;
+    const afterList = list === null ? body : body.slice(list[0].length);
+    const heading = HEADING_START.exec(afterList);
+    const marker = (list?.[0].length ?? 0) + (heading?.[0].length ?? 0);
     const startsBlock = previousBlank || marker > 0;
     const stripped =
       opensFence || code || blank || !startsBlock

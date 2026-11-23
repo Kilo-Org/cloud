@@ -14,6 +14,11 @@ export const MAX_SEARCHES_PER_QUESTION = 5;
  * searches keep failing would otherwise retry until the chat loop's round
  * ceiling, and every attempt costs a round trip. A failed attempt spends a
  * fraction here but nothing of the answered-search allowance.
+ *
+ * The answered-search slot is reserved together with this one, before the
+ * search leaves the device, so a turn that issues all its calls at once is
+ * bounded by whichever cap it reaches first. One call after another still
+ * reaches this higher bound.
  */
 export const MAX_ATTEMPTS_PER_QUESTION = 15;
 

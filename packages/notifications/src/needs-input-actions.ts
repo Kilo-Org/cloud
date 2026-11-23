@@ -30,7 +30,6 @@ export type NeedsInputKind = (typeof NEEDS_INPUT_KINDS)[number];
 
 const NEEDS_INPUT_CATEGORY_PREFIX = 'kilo-needs-input';
 
-/** The per-raise category id: the prefix, the kind, and the `-pr` suffix when a pull request exists. */
 export type NeedsInputCategoryId =
   `${typeof NEEDS_INPUT_CATEGORY_PREFIX}:${NeedsInputKind}${'' | '-pr'}`;
 

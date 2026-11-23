@@ -127,10 +127,7 @@ function outcomeKind(
  * start and foreground updates) and the notifications service (remote
  * updates) both use this, so the two producers cannot disagree.
  *
- * - `approvalKey` is kept only while the row waits on a permission, and
- *   `awaitingPermission` is true only when that key is present.
  * - `statusSinceFallback` is used when the row has no usable status time.
- * - `scheduledAt` is set only for the scheduled status kind.
  * - One absence policy covers every optional fact: a row that does not carry
  *   a fact omits it, and the card keeps the value it already shows. A tray row
  *   carries no step, plan, diff or outcome, so a local update must not wipe

@@ -2,6 +2,7 @@ import { SignJWT } from 'jose';
 import { z } from 'zod';
 import { ORGANIZATION_ROLES } from '@kilocode/app-shared/organizations';
 import { CloudAgentAuthoritySchema } from './cloud-agent-authority';
+import { KILO_TOKEN_VERSION } from './kilo-token-version';
 import { CloudAgentNextRuntimeAuthorizationClaimSchema } from './runtime-proxy-attestation';
 import { RuntimeAdmissionSchema } from './runtime-authorization-contract';
 import {
@@ -10,7 +11,7 @@ import {
   verifyKiloTokenSignature,
 } from './kilo-token-verification';
 
-export const KILO_TOKEN_VERSION = 3;
+export { KILO_TOKEN_VERSION };
 const organizationRole = z.enum(ORGANIZATION_ROLES);
 
 /**

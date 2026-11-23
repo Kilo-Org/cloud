@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as ReactQuery from '@tanstack/react-query';
 
 import { i18n } from '@/i18n';
+import type * as InfiniteRetentionModule from '@/lib/query/infinite-retention';
 import { ORGANIZATION_TRIAL_EXPIRED_MESSAGE } from '@/lib/server-error-copy';
 import { useOrganizationMutations } from './use-organization-mutations';
 
@@ -24,22 +25,35 @@ const getQueryDataMock = vi.fn();
 const setQueryDataMock = vi.fn();
 const cancelQueriesMock = vi.fn();
 const toastErrorMock = vi.fn();
+const reconcileFirstPageMock = vi.hoisted(() => vi.fn(() => Promise.resolve()));
+
+// One object for every `useQueryClient` call, so an assertion can name the
+// client the hook handed the reconcile.
+const queryClientMock = {
+  invalidateQueries: (...args: unknown[]) => {
+    invalidateQueriesMock(...args);
+  },
+  getQueryData: (...args: unknown[]) => getQueryDataMock(...args),
+  setQueryData: (...args: unknown[]) => setQueryDataMock(...args),
+  cancelQueries: (...args: unknown[]) => cancelQueriesMock(...args),
+};
 
 vi.mock('@tanstack/react-query', () => ({
   useMutation: (opts: MutationOptions) => {
     capturedMutations.push(opts);
     return { mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false, isError: false };
   },
-  useQueryClient: () => ({
-    invalidateQueries: (...args: unknown[]) => {
-      invalidateQueriesMock(...args);
-    },
-    getQueryData: (...args: unknown[]) => getQueryDataMock(...args),
-    setQueryData: (...args: unknown[]) => setQueryDataMock(...args),
-    cancelQueries: (...args: unknown[]) => cancelQueriesMock(...args),
-  }),
+  useQueryClient: () => queryClientMock,
   hashKey: (key: unknown) => JSON.stringify(key),
 }));
+
+// The real module stays loaded (its probe never runs here); only the reconcile
+// is replaced, so it records the call instead of touching a query cache this
+// suite never builds.
+vi.mock('@/lib/query/infinite-retention', async importOriginal => {
+  const actual = await importOriginal<typeof InfiniteRetentionModule>();
+  return { ...actual, reconcileFirstPage: reconcileFirstPageMock };
+});
 
 vi.mock('@/lib/a11y/announcing-toast', () => ({
   announcingToast: {
@@ -104,6 +118,7 @@ describe('useOrganizationMutations (generation guard + scope)', () => {
     setQueryDataMock.mockReset();
     cancelQueriesMock.mockReset();
     toastErrorMock.mockReset();
+    reconcileFirstPageMock.mockReset();
     role.canManageBilling = false;
     role.action = undefined;
   });
@@ -205,6 +220,33 @@ describe('useOrganizationMutations (generation guard + scope)', () => {
     updateMinimumBalanceAlert?.onError?.(new Error('boom'), { enabled: true }, context);
     expect(setQueryDataMock).toHaveBeenCalledTimes(1);
     expect(toastErrorMock).not.toHaveBeenCalled();
+  });
+
+  it('rename reconciles the audit log page one beside the two invalidations', async () => {
+    useOrganizationMutations(ORG_ID);
+    // rename's onSettled is the shared invalidateAll.
+    await capturedMutations[0]?.onSettled?.();
+
+    expect(reconcileFirstPageMock).toHaveBeenCalledWith(queryClientMock, [
+      'organizations.auditLogs.list',
+      ORG_ID,
+    ]);
+    // The two invalidations this hook already made stay exactly as they were.
+    expect(invalidateQueriesMock).toHaveBeenCalledWith({
+      queryKey: ['organizations', 'withMembers', { organizationId: ORG_ID }],
+    });
+    expect(invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: ['organizations', 'list'] });
+  });
+
+  it('a minimum-balance alert save reconciles the same audit log key', async () => {
+    useOrganizationMutations(ORG_ID);
+    // updateMinimumBalanceAlert settles through the same invalidateAll.
+    await capturedMutations[5]?.onSettled?.();
+
+    expect(reconcileFirstPageMock).toHaveBeenCalledWith(queryClientMock, [
+      'organizations.auditLogs.list',
+      ORG_ID,
+    ]);
   });
 
   const trialRefusal = () =>

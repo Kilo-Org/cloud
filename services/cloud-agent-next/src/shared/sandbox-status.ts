@@ -28,6 +28,7 @@ export const SandboxProviderLabelSchema = z.enum([
   'Cloudflare',
   'Cloudflare Containers',
   'Vercel',
+  'AWS',
   'Unknown',
 ]);
 

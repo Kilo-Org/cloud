@@ -1,5 +1,7 @@
 import * as z from 'zod';
 
+import { ORGANIZATION_ROLES, type OrganizationRole } from './roles';
+
 /**
  * The structured payload an organization audit row carries beside its English
  * `message`.
@@ -22,9 +24,15 @@ import * as z from 'zod';
  * action cannot name the event; the id does.
  */
 
-/** A server vocabulary the catalog names, never echoed as English. */
-export const AUDIT_ROLE_TAGS = ['owner', 'admin', 'billing_manager', 'member'] as const;
-export type AuditRoleTag = (typeof AUDIT_ROLE_TAGS)[number];
+/**
+ * A role, as the audit reader names it.
+ *
+ * `roles.ts` holds the single source. This module builds its validator from
+ * `ORGANIZATION_ROLES`, so a role added to the canonical list is accepted here
+ * the day it is added — the alternative, restating the list, would silently
+ * drop a new role's detail back to the event name.
+ */
+export type AuditRoleTag = OrganizationRole;
 
 /**
  * The inference region an organization can pin.
@@ -69,13 +77,23 @@ export const AUDIT_MODE_FIELDS = [
 ] as const;
 export type AuditModeField = (typeof AUDIT_MODE_FIELDS)[number];
 
-const RoleTag = z.enum(AUDIT_ROLE_TAGS);
+/** The object an enforcement setting guards, as a server vocabulary the catalog names. */
+export const AUDIT_GUARDRAIL_TARGET_TAGS = ['mcp', 'skill'] as const;
+export type AuditGuardrailTargetTag = (typeof AUDIT_GUARDRAIL_TARGET_TAGS)[number];
+
+/** The scope a default behaviour applies to, as a server vocabulary the catalog names. */
+export const AUDIT_DEFAULT_BEHAVIOR_TAGS = ['global', 'specific', 'auto'] as const;
+export type AuditDefaultBehaviorTag = (typeof AUDIT_DEFAULT_BEHAVIOR_TAGS)[number];
+
+const RoleTag = z.enum(ORGANIZATION_ROLES);
 const RegionTag = z.enum(AUDIT_REGION_TAGS);
 const PlatformTag = z.enum(AUDIT_PLATFORM_TAGS);
 const DataCollectionTag = z.enum(AUDIT_DATA_COLLECTION_TAGS);
 const BrowserPolicyTag = z.enum(AUDIT_BROWSER_POLICY_TAGS);
 const IntegrationTag = z.enum(AUDIT_INTEGRATION_TAGS);
 const ModeField = z.enum(AUDIT_MODE_FIELDS);
+const GuardrailTargetTag = z.enum(AUDIT_GUARDRAIL_TARGET_TAGS);
+const DefaultBehaviorTag = z.enum(AUDIT_DEFAULT_BEHAVIOR_TAGS);
 
 /** One field a mode update changed; prose fields carry no `previous`/`next`. */
 const ModeFieldChangeSchema = z.strictObject({
@@ -88,6 +106,34 @@ export type AuditModeFieldChange = z.infer<typeof ModeFieldChangeSchema>;
 const ModeIdentitySchema = z.strictObject({
   name: z.string(),
   slug: z.string(),
+});
+
+// Where several events carry the same payload, the payload is written once and
+// each event extends it with its own `id`. A copy of the fields per event drifts
+// as soon as one arm is edited, and the drift is invisible to the compiler
+// because every copy type-checks on its own.
+const IntegrationKeySchema = z.strictObject({
+  integration: IntegrationTag,
+  provider: z.string(),
+});
+
+const NamedPolicySchema = z.strictObject({
+  policyKind: z.string(),
+  policyId: z.string(),
+});
+
+const MemberParentSchema = z.strictObject({
+  email: z.string(),
+  parent: z.string(),
+});
+
+const GroupPolicySchema = z.strictObject({
+  name: z.string(),
+  policyType: z.string(),
+});
+
+const GroupDefaultPolicySchema = z.strictObject({
+  policyType: z.string(),
 });
 
 /**
@@ -111,8 +157,8 @@ const AuditDetailSchema = z.discriminatedUnion('id', [
   }),
   z.strictObject({ id: z.literal('member.added'), email: z.string(), role: RoleTag }),
   z.strictObject({ id: z.literal('member.removed'), email: z.string() }),
-  z.strictObject({ id: z.literal('member.parentAdded'), email: z.string(), parent: z.string() }),
-  z.strictObject({ id: z.literal('member.parentRemoved'), email: z.string(), parent: z.string() }),
+  MemberParentSchema.extend({ id: z.literal('member.parentAdded') }),
+  MemberParentSchema.extend({ id: z.literal('member.parentRemoved') }),
 
   z.strictObject({ id: z.literal('invite.sent'), email: z.string(), role: RoleTag }),
   z.strictObject({ id: z.literal('invite.revoked'), email: z.string() }),
@@ -125,14 +171,10 @@ const AuditDetailSchema = z.discriminatedUnion('id', [
     count: z.number(),
     email: z.string().optional(),
   }),
-  z.strictObject({ id: z.literal('group.policySet'), name: z.string(), policyType: z.string() }),
-  z.strictObject({
-    id: z.literal('group.policyRemoved'),
-    name: z.string(),
-    policyType: z.string(),
-  }),
-  z.strictObject({ id: z.literal('group.defaultPolicySet'), policyType: z.string() }),
-  z.strictObject({ id: z.literal('group.defaultPolicyRemoved'), policyType: z.string() }),
+  GroupPolicySchema.extend({ id: z.literal('group.policySet') }),
+  GroupPolicySchema.extend({ id: z.literal('group.policyRemoved') }),
+  GroupDefaultPolicySchema.extend({ id: z.literal('group.defaultPolicySet') }),
+  GroupDefaultPolicySchema.extend({ id: z.literal('group.defaultPolicyRemoved') }),
 
   z.strictObject({
     id: z.literal('guardrail.identity'),
@@ -152,7 +194,7 @@ const AuditDetailSchema = z.discriminatedUnion('id', [
   }),
   z.strictObject({
     id: z.literal('guardrail.enforcement'),
-    target: z.enum(['mcp', 'skill']),
+    target: GuardrailTargetTag,
     enforcement: z.string().optional(),
     enabled: z.boolean().optional(),
     scanBeforeUse: z.boolean().optional(),
@@ -206,7 +248,7 @@ const AuditDetailSchema = z.discriminatedUnion('id', [
   }),
   z.strictObject({
     id: z.literal('setting.defaultBehavior'),
-    behavior: z.enum(['global', 'specific', 'auto']),
+    behavior: DefaultBehaviorTag,
     model: z.string().optional(),
   }),
   z.strictObject({ id: z.literal('setting.dataCollection'), mode: DataCollectionTag }),
@@ -239,21 +281,9 @@ const AuditDetailSchema = z.discriminatedUnion('id', [
   z.strictObject({ id: z.literal('integration.uninstalled'), integration: IntegrationTag }),
   z.strictObject({ id: z.literal('integration.refreshed'), integration: IntegrationTag }),
   z.strictObject({ id: z.literal('integration.cancelled'), integration: IntegrationTag }),
-  z.strictObject({
-    id: z.literal('integration.keyAdded'),
-    integration: IntegrationTag,
-    provider: z.string(),
-  }),
-  z.strictObject({
-    id: z.literal('integration.keyUpdated'),
-    integration: IntegrationTag,
-    provider: z.string(),
-  }),
-  z.strictObject({
-    id: z.literal('integration.keyDeleted'),
-    integration: IntegrationTag,
-    provider: z.string(),
-  }),
+  IntegrationKeySchema.extend({ id: z.literal('integration.keyAdded') }),
+  IntegrationKeySchema.extend({ id: z.literal('integration.keyUpdated') }),
+  IntegrationKeySchema.extend({ id: z.literal('integration.keyDeleted') }),
   z.strictObject({
     id: z.literal('integration.keyToggled'),
     integration: IntegrationTag,
@@ -268,21 +298,9 @@ const AuditDetailSchema = z.discriminatedUnion('id', [
     removed: z.array(z.string()),
   }),
 
-  z.strictObject({
-    id: z.literal('namedPolicy.created'),
-    policyKind: z.string(),
-    policyId: z.string(),
-  }),
-  z.strictObject({
-    id: z.literal('namedPolicy.updated'),
-    policyKind: z.string(),
-    policyId: z.string(),
-  }),
-  z.strictObject({
-    id: z.literal('namedPolicy.deleted'),
-    policyKind: z.string(),
-    policyId: z.string(),
-  }),
+  NamedPolicySchema.extend({ id: z.literal('namedPolicy.created') }),
+  NamedPolicySchema.extend({ id: z.literal('namedPolicy.updated') }),
+  NamedPolicySchema.extend({ id: z.literal('namedPolicy.deleted') }),
   z.strictObject({
     id: z.literal('namedPolicy.linked'),
     policyKind: z.string(),

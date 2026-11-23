@@ -3274,6 +3274,8 @@ export const CustomLlmDefinitionSchema = z
      * an upstream that does not train on prompts. It never makes a custom LLM eligible
      * for zero data retention (`provider.zdr`), which excludes every custom LLM. */
     may_train_on_prompts: z.boolean().optional(),
+    /** False keeps the row but serves it nowhere, as if it were deleted. Unset means enabled. */
+    is_enabled: z.boolean().optional(),
   })
   .superRefine((definition, ctx) => {
     const clientApiKind = getCustomLlmClientApiKind(definition.opencode_settings?.ai_sdk_provider);

@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { dropPathsSchema, dropTargetSchema } from './browser-agent-checks';
+import {
+  dropPathsSchema,
+  dropTargetSchema,
+  webMcpCallArgumentsSchema,
+} from './browser-agent-checks';
 import { createKiloBrowserToolDefinitions } from './browser-tool-definitions';
+import { publishedBrowserToolInputSchema } from './browser-tool-published-schema';
 import { BROWSER_TOOL_CONTRACT, toKiloBrowserToolName } from './browser-tool-contract';
 import type { BrowserToolContractEntry, BrowserToolInputSchema } from './browser-tool-contract';
 
@@ -43,15 +48,48 @@ const withoutDescriptions = (value: unknown): unknown => {
 /*
  * What a model is told for a contract entry: the vendored schema, except that
  * `browser_drop`'s `paths` entries and `target` are the non-empty strings its
- * handlers accept. Written out here, from the contract, so this spec states the
- * rule instead of importing the producer it checks.
+ * handlers accept, and `browser_webmcp_call` publishes only `name` and `params`
+ * with a `name` description that names the discovery tool. Written out here,
+ * from the contract, so this spec states the rule instead of importing the
+ * producer it checks.
  */
 const jsonObjectSchema = z.record(z.string(), z.unknown());
 
 const propertiesOf = (schema: unknown): Record<string, unknown> =>
   z.object({ properties: jsonObjectSchema }).parse(schema).properties;
 
+const contractEntryNamed = (name: string): BrowserToolContractEntry => {
+  const entry = BROWSER_TOOL_CONTRACT.find(candidate => candidate.name === name);
+
+  if (entry === undefined) {
+    throw new Error(`the vendored contract has no ${name} entry`);
+  }
+
+  return entry;
+};
+
 const publishedSchema = (entry: BrowserToolContractEntry): BrowserToolInputSchema => {
+  if (entry.name === 'browser_webmcp_call') {
+    const params = jsonObjectSchema.parse(entry.inputSchema.properties['params']);
+    const derived = z
+      .object({ properties: jsonObjectSchema })
+      .parse(z.toJSONSchema(webMcpCallArgumentsSchema, { io: 'input' })).properties;
+
+    return {
+      ...entry.inputSchema,
+      properties: {
+        name: {
+          ...jsonObjectSchema.parse(derived['name']),
+          description: 'Name of the WebMCP tool to call, as reported by browser_webmcp_list',
+        },
+        params: {
+          ...jsonObjectSchema.parse(derived['params']),
+          description: params['description'],
+        },
+      },
+    };
+  }
+
   if (entry.name !== 'browser_drop') {
     return entry.inputSchema;
   }
@@ -170,6 +208,34 @@ describe('kilo browser tool definitions', () => {
     expect(publishedTarget).toStrictEqual({ ...vendoredTarget, ...targetRule });
   });
 
+  it('publishes only the arguments the browser_webmcp_call handler parses', () => {
+    const definitions = createKiloBrowserToolDefinitions('dangerous');
+    const call = definitions.find(
+      definition => definition.function.name === 'kilo_browser_webmcp_call'
+    );
+    const published = propertiesOf(call?.function.parameters);
+    const handled = z
+      .object({ properties: jsonObjectSchema })
+      .parse(z.toJSONSchema(webMcpCallArgumentsSchema, { io: 'input' })).properties;
+
+    // The vendored contract's `frame` is advertised to no model: no handler reads it, and the handler refuses one a caller sends anyway.
+    expect(Object.keys(published).toSorted()).toStrictEqual(Object.keys(handled).toSorted());
+    expect(published).not.toHaveProperty('frame');
+    expect(handled).not.toHaveProperty('frame');
+  });
+
+  it('publishes a browser_webmcp_list description that matches its top-level-document discovery', () => {
+    const definitions = createKiloBrowserToolDefinitions('safe');
+    const list = z
+      .object({ function: z.object({ description: z.string() }) })
+      .parse(
+        definitions.find(definition => definition.function.name === 'kilo_browser_webmcp_list')
+      ).function.description;
+
+    expect(list).toContain('top-level document');
+    expect(list).not.toContain('across all frames');
+  });
+
   it('rewrites every bare upstream sibling reference to its exposed kilo_ name', () => {
     const definitions = createKiloBrowserToolDefinitions('dangerous');
     const definitionByName = new Map(
@@ -190,12 +256,34 @@ describe('kilo browser tool definitions', () => {
       'use kilo_browser_snapshot for actions'
     );
 
-    // References inside input-schema property descriptions are rewritten too.
-    expect(JSON.stringify(definitionByName.get('kilo_browser_webmcp_call')?.parameters)).toContain(
-      'kilo_browser_webmcp_list'
-    );
+    // References inside input-schema property descriptions are rewritten too. `browser_webmcp_call` publishes only `name` and `params`, and its `name` description is what names the discovery tool, so that is the sibling reference to check.
     expect(
       JSON.stringify(definitionByName.get('kilo_browser_network_request')?.parameters)
     ).toContain('kilo_browser_network_requests');
+
+    const publishedCallName = z
+      .object({ description: z.string() })
+      .catchall(z.unknown())
+      .parse(propertiesOf(definitionByName.get('kilo_browser_webmcp_call')?.parameters)['name']);
+
+    expect({
+      namesBareSibling: bareToolReference.test(publishedCallName.description),
+      namesPrefixedSibling: publishedCallName.description.includes('kilo_browser_webmcp_list'),
+    }).toStrictEqual({ namesBareSibling: false, namesPrefixedSibling: true });
+  });
+
+  it('publishes a browser_webmcp_call name description that names the bare discovery tool', () => {
+    const published = z
+      .object({ description: z.string() })
+      .catchall(z.unknown())
+      .parse(
+        publishedBrowserToolInputSchema(contractEntryNamed('browser_webmcp_call')).properties[
+          'name'
+        ]
+      );
+
+    // The local-agent path publishes bare names, so the pointer states the bare tool name.
+    expect(published.description).toContain('browser_webmcp_list');
+    expect(published.description).not.toContain('kilo_browser_webmcp_list');
   });
 });

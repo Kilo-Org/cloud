@@ -32,7 +32,11 @@ import {
 type Database = Pick<typeof WebDb, 'select' | 'update'>;
 
 type WorktreeOperationClient = {
-  getSession(cloudAgentSessionId: string): Promise<{
+  getSession(
+    cloudAgentSessionId: string,
+    organizationId?: string,
+    stackOnWorktreeId?: string
+  ): Promise<{
     branchName?: string;
     gitUrl?: string;
     platform?: ProviderBranchPlatform;
@@ -40,11 +44,13 @@ type WorktreeOperationClient = {
   }>;
   syncWorktreeBranch(input: {
     cloudAgentSessionId: string;
+    organizationId?: string;
     baseBranch?: string;
     upstreamSha?: string;
   }): Promise<WorktreeBranchOperationResult>;
   restackWorktreeBranch(input: {
     cloudAgentSessionId: string;
+    organizationId?: string;
     baseBranch?: string;
     upstreamSha?: string;
   }): Promise<WorktreeBranchOperationResult>;
@@ -63,6 +69,7 @@ export type WorktreeBranchOperationParams = {
   organizationId?: string;
   cloudAgentSessionId: string;
   operation: 'sync' | 'restack';
+  scoped?: boolean;
 };
 
 type Refused = Extract<WorktreeBranchOperationResult, { status: 'refused' }>;
@@ -386,7 +393,8 @@ export async function runWorktreeBranchOperation(
     });
   }
 
-  const metadata = await params.client.getSession(params.cloudAgentSessionId);
+  const scopedOrganizationId = params.scoped ? params.organizationId : undefined;
+  const metadata = await params.client.getSession(params.cloudAgentSessionId, scopedOrganizationId);
   const branch = metadata?.branchName ?? session.gitBranch;
   if (!branch) {
     throw new TRPCError({
@@ -510,7 +518,13 @@ export async function runWorktreeBranchOperation(
         .limit(1);
 
       const parentMetadata = parentRoot?.cloudAgentSessionId
-        ? await params.client.getSession(parentRoot.cloudAgentSessionId).catch(() => null)
+        ? await params.client
+            .getSession(
+              parentRoot.cloudAgentSessionId,
+              scopedOrganizationId,
+              params.scoped ? worktree.parentWorktreeId : undefined
+            )
+            .catch(() => null)
         : null;
       const parentGitUrl = parentMetadata?.gitUrl ?? parentRoot?.gitUrl ?? null;
       if (parentGitUrl !== null && normalizeGitUrl(parentGitUrl) !== normalizeGitUrl(gitUrl)) {
@@ -594,6 +608,7 @@ export async function runWorktreeBranchOperation(
     const syncBase = childPr?.prBaseRef ?? worktree.baseBranch ?? undefined;
     result = await params.client.syncWorktreeBranch({
       cloudAgentSessionId: params.cloudAgentSessionId,
+      ...(scopedOrganizationId ? { organizationId: scopedOrganizationId } : {}),
       ...(syncBase ? { baseBranch: syncBase } : {}),
       // The wrapper refuses to regress a still-live recorded boundary, so the
       // current DB fork point is the server-derived upstream for Sync.
@@ -602,6 +617,7 @@ export async function runWorktreeBranchOperation(
   } else {
     result = await params.client.restackWorktreeBranch({
       cloudAgentSessionId: params.cloudAgentSessionId,
+      ...(scopedOrganizationId ? { organizationId: scopedOrganizationId } : {}),
       ...(newBase !== null ? { baseBranch: newBase } : {}),
       ...(upstreamSha !== undefined ? { upstreamSha } : {}),
     });
@@ -636,7 +652,7 @@ export async function runWorktreeBranchOperation(
 
   const effectiveBaseBranch = updates.base_branch ?? worktree.baseBranch;
   const effectiveBaseSha = updates.base_sha ?? worktree.baseSha;
-  if (effectiveBaseBranch !== null && effectiveBaseSha !== null) {
+  if (!params.scoped && effectiveBaseBranch !== null && effectiveBaseSha !== null) {
     await adoptSiblingWorktreeBases({
       db: params.db,
       client: params.client,

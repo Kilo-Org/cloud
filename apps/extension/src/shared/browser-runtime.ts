@@ -98,6 +98,7 @@ import type {
   ChromeDebuggerApi,
   EvalTabResult,
 } from './tab-debugger';
+import { webMcpDispatchHooks } from './web-mcp-tools';
 
 /** The grant pairs and step tokens one CLI agent call carries (SPEC "Protocol v1" `tools.call`). */
 export interface BrowserAgentCallContext {
@@ -1692,6 +1693,8 @@ export const createBrowserRuntime = ({
   tabsApi,
 }: BrowserRuntimeDeps): BrowserRuntime => {
   const tokens = stepTokens ?? createStepTokenStore(now === undefined ? {} : { now });
+  // One WebMCP discovery/execution pair for every caller of this runtime: a CLI agent's call carries no options of its own, and reaches the page the way the panel's does.
+  const runtimeWebMcpHooks = webMcpDispatchHooks(scriptingApi);
   const groups =
     tabGroups ??
     createBrowserTabGroupController({
@@ -3429,6 +3432,7 @@ export const createBrowserRuntime = ({
                 ...(openDialog === undefined
                   ? {}
                   : { readFrames: () => dialogFrameInventory(tabId, openDialog) }),
+                readWebMcpTools: session.discoverWebMcpTools,
                 session,
                 sessionHandle: sessionKey,
                 stepTokens: agentContext.sensitive ?? [],
@@ -4128,6 +4132,10 @@ export const createBrowserRuntime = ({
         // The call returns when the dialog opens; the action finishes on its own once the dialog is answered.
         const dialogWatch = watchForDialog(runSession.watchDialogs);
 
+        // A CLI agent's call carries no options, so the runtime supplies the WebMCP hooks itself; the panel's message supplies its own.
+        const webMcpDiscover = options?.webMcpDiscover ?? runtimeWebMcpHooks.webMcpDiscover;
+        const webMcpExecute = options?.webMcpExecute ?? runtimeWebMcpHooks.webMcpExecute;
+
         try {
           dispatched = true;
 
@@ -4167,12 +4175,8 @@ export const createBrowserRuntime = ({
                   }),
               readFrames,
               ...(options?.now === undefined ? {} : { now: options.now }),
-              ...(options?.webMcpDiscover === undefined
-                ? {}
-                : { webMcpDiscover: options.webMcpDiscover }),
-              ...(options?.webMcpExecute === undefined
-                ? {}
-                : { webMcpExecute: options.webMcpExecute }),
+              ...(webMcpDiscover === undefined ? {} : { webMcpDiscover }),
+              ...(webMcpExecute === undefined ? {} : { webMcpExecute }),
             },
             session: runSession,
             toolName: runToolName,

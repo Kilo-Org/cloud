@@ -3,8 +3,7 @@ import type { OrganizationFeatures } from '@kilocode/web-shared/lib/ai-gateway/g
 import { isOrganizationFeatureEnabled } from '@kilocode/web-shared/lib/ai-gateway/organization-features';
 import type { OrganizationPlan } from '@kilocode/web-shared/lib/organizations/organization-types';
 import type { BYOKResult, Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
-import { OPENAI_CHATGPT_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/provider-id';
-import { CLAUDE_BILLING_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/provider-id';
+import { isDelegatedBillingProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/provider-type-predicates';
 import { getDomain } from 'tldts';
 
 export type ManagedGatewayId = 'openrouter';
@@ -90,8 +89,7 @@ function isUserPaidRoute(
 ): boolean {
   return (
     (!!route.userByok && route.userByok.length > 0) ||
-    route.provider.type === OPENAI_CHATGPT_PROVIDER_ID ||
-    route.provider.type === CLAUDE_BILLING_PROVIDER_ID
+    isDelegatedBillingProvider(route.provider.type)
   );
 }
 

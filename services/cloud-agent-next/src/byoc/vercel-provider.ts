@@ -7,6 +7,7 @@ import type { SessionCredentialGrant } from '../sandbox-control/session-credenti
 import {
   createVercelProviderAdapter,
   type VercelProviderLocator,
+  type VercelRestrictedEgress,
 } from '../sandbox-control/vercel-provider.js';
 import { VercelSandboxRestError } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
 import { vercelSnapshotBaseImage } from './vercel-snapshot-compatibility.js';
@@ -45,6 +46,7 @@ export function createByocVercelProviderAdapter(deps: {
   persistRuntimeLocator?: (locator: VercelProviderLocator) => Promise<void>;
   readContainedGrants: () => Promise<readonly SessionCredentialGrant[]>;
   readAcceptedRuntimeProxyHandles?: () => Promise<ReadonlyMap<string, readonly string[]>>;
+  restrictedEgress?: VercelRestrictedEgress;
 }): ProviderAdapter {
   async function accessAdapter() {
     const config = await resolveByocVercelAccessConfig(deps.env, deps.source);

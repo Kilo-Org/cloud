@@ -5,7 +5,6 @@ import {
   runEnvironmentSetupTool,
 } from './environment-setup-tools';
 import catalogJson from '../catalog.json';
-import { cloudAgentAuthorityProcedures } from '../../../packages/worker-utils/src/cloud-agent-authority';
 import {
   CHILD_SESSION_INSTRUCTIONS,
   CHILD_SESSION_TOOL_NAMES,
@@ -513,8 +512,7 @@ async function runTool(
   if (auth.cloudAgentAuthority && ENVIRONMENT_SETUP_TOOL_NAMES.has(name)) {
     return toolResult(await runEnvironmentSetupTool({ name, args, auth, ...deps }));
   }
-  // Running clients can retain the old tool list until their next MCP connection.
-  if (auth.cloudAgentAuthority && name !== 'search' && name !== 'call') {
+  if (auth.cloudAgentAuthority) {
     return toolResult(await runChildSessionTool({ name, args, auth, ...deps }));
   }
   if (name === 'search') {
@@ -541,12 +539,6 @@ async function runTool(
       // Fail-closed: only a grant that ticked the admin opt-in sees admin or
       // debug rows.
       includeGuarded: auth.adminEnabled === true,
-      ...(auth.cloudAgentAuthority
-        ? {
-            allowedPaths: cloudAgentAuthorityProcedures(auth.cloudAgentAuthority),
-            cloudAgentAuthority: auth.cloudAgentAuthority,
-          }
-        : {}),
     });
     // The query's shape only — never the raw text (it can carry personal data).
     analytics.searchPerformed({

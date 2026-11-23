@@ -38,6 +38,21 @@ export function useCopyCustomLlm() {
   );
 }
 
+export function useSetCustomLlmEnabled() {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+
+  return useMutation(
+    trpc.admin.customLlm.setEnabled.mutationOptions({
+      onSuccess: () => {
+        void queryClient.invalidateQueries({
+          queryKey: trpc.admin.customLlm.list.queryKey(),
+        });
+      },
+    })
+  );
+}
+
 export function useDeleteCustomLlm() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();

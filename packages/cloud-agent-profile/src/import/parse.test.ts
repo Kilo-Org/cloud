@@ -503,7 +503,7 @@ describe('parseLocalConfigArchive', () => {
     ]);
   });
 
-  test('rejects a kilo command model over the runtime cap even though storage accepts it', () => {
+  test('rejects a kilo command model over the contract cap', () => {
     const overLongModel = 'a'.repeat(201);
     expect(
       kiloCommandCreateInputSchema.safeParse({
@@ -511,7 +511,7 @@ describe('parseLocalConfigArchive', () => {
         template: 'Template',
         model: overLongModel,
       }).success
-    ).toBe(true);
+    ).toBe(false);
 
     const preview = parseFiles({
       'kilo.json': JSON.stringify({
@@ -524,8 +524,17 @@ describe('parseLocalConfigArchive', () => {
   });
 
   test('rejects a kilo command agent over the runtime cap', () => {
+    const overLongAgent = 'a'.repeat(51);
+    expect(
+      kiloCommandCreateInputSchema.safeParse({
+        name: 'agent-cap',
+        template: 'Body',
+        agent: overLongAgent,
+      }).success
+    ).toBe(false);
+
     const preview = parseFiles({
-      'command/agent-cap.md': `---\nagent: ${'a'.repeat(51)}\n---\nBody`,
+      'command/agent-cap.md': `---\nagent: ${overLongAgent}\n---\nBody`,
     });
     const issue = preview.issues.find(candidate => candidate.code === 'command-field-invalid');
     expect(issue?.field).toBe('agent');

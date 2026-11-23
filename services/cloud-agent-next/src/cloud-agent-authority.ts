@@ -14,6 +14,8 @@ import {
   type RuntimeAuthorization,
 } from '@kilocode/worker-utils/runtime-authorization-contract';
 import { backendUrlForSandbox } from './kilo/kilo-targets.js';
+import { environmentReferenceSchema } from './environment-build/reference.js';
+import { SessionProfileBundleSchema } from './persistence/schemas.js';
 import {
   isLegacySharedSandboxWorkspace,
   type SessionMetadata,
@@ -73,6 +75,21 @@ export const workspaceEgressSchema = z
   })
   .strict();
 
+const workspaceSpawnConfigurationSchema = z.object({
+  profile: SessionProfileBundleSchema.optional(),
+  environment: environmentReferenceSchema.optional(),
+});
+export type WorkspaceSpawnConfiguration = z.infer<typeof workspaceSpawnConfigurationSchema>;
+
+export const workspaceSpawnContextSchema = z.object({
+  token: z.string(),
+  createdOnPlatform: z.string().optional(),
+  egress: workspaceEgressSchema.optional(),
+  configuration: workspaceSpawnConfigurationSchema.optional(),
+  environmentSetup: environmentSetupClaimSchema.optional(),
+});
+export type WorkspaceSpawnContext = z.infer<typeof workspaceSpawnContextSchema>;
+
 /**
  * The workspace's own Cloud Agent authority. It is bound to the canonical
  * workspace ID, owner and organization, and carries its own runtime
@@ -87,6 +104,7 @@ export const WorkspaceAuthorityRecordSchema = z
     organizationId: z.string().min(1).nullable(),
     createdOnPlatform: z.string().optional(),
     egress: workspaceEgressSchema.optional(),
+    spawnConfiguration: workspaceSpawnConfigurationSchema.optional(),
     environmentSetup: environmentSetupClaimSchema.optional(),
     authorization: RuntimeAuthorizationSchema,
     establishedAt: z.number().int().nonnegative(),
@@ -171,6 +189,9 @@ export function workspaceAuthorityFromAnchor(
     ...(workspaceEgressFromMetadata(metadata) === undefined
       ? {}
       : { egress: workspaceEgressFromMetadata(metadata) }),
+    ...(setup === undefined
+      ? { spawnConfiguration: { profile: metadata.profile, environment: metadata.environment } }
+      : {}),
     ...(setup?.role === 'setup'
       ? { environmentSetup: { runId: setup.runId, environmentId: setup.environmentId } }
       : {}),
@@ -325,7 +346,10 @@ export function deriveWorkspaceRuntimeAuthorization(
 
 const workerPreparationMetadataSchema = z
   .object({
-    platform: z.literal('github').optional(),
+    platform: z.enum(['github', 'gitlab', 'bitbucket']).optional(),
+    gitUrl: z.url({ protocol: /^https$/ }).optional(),
+    bitbucketWorkspaceUuid: z.uuid().optional(),
+    bitbucketRepositoryUuid: z.uuid().optional(),
     createdOnPlatform: z.enum(['cloud-agent', 'cloud-agent-web']).optional(),
     githubAccessPurpose: z.enum(['agent', 'workflow']).optional(),
     clientProvenance: z.enum(['browser', 'mobile']).optional(),
@@ -354,8 +378,25 @@ export function validateScopedWorkerPreparation(authority: CloudAgentAuthority, 
   }
   const input = { ...parsed };
   for (const key of Object.keys(workerPreparationMetadataSchema.shape)) delete input[key];
+  if (parsed.parentWorktreeId !== undefined) delete input.githubRepo;
+  const gitUrl = parsed.gitUrl === undefined ? undefined : new URL(parsed.gitUrl);
+  const repository =
+    parsed.parentWorktreeId !== undefined || gitUrl === undefined
+      ? {}
+      : parsed.platform === 'gitlab'
+        ? { gitlabProject: gitUrl.pathname.slice(1).replace(/\.git$/, '') }
+        : parsed.platform === 'bitbucket'
+          ? {
+              bitbucketRepo: {
+                fullName: gitUrl.pathname.slice(1).replace(/\.git$/, ''),
+                workspaceUuid: parsed.bitbucketWorkspaceUuid,
+                repositoryUuid: parsed.bitbucketRepositoryUuid,
+              },
+            }
+          : { publicRepoUrl: parsed.gitUrl };
   return validateCloudAgentAuthorityRequest(authority, cloudAgentAuthorityProcedure(authority), {
     ...input,
+    ...repository,
     ...(parsed.parentWorktreeId === undefined
       ? {}
       : { stackOnWorktreeId: parsed.parentWorktreeId }),

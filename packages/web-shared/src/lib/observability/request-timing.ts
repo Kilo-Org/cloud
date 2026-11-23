@@ -30,6 +30,14 @@ export type ClientDimensions = {
   requestId: string | null;
 };
 
+/** The dimensions logged when no headers are available or reading them fails. */
+const EMPTY_CLIENT_DIMENSIONS: ClientDimensions = {
+  client: null,
+  platform: null,
+  version: null,
+  requestId: null,
+};
+
 const DEFAULT_SAMPLE_RATE = 0.01;
 
 /**
@@ -112,16 +120,12 @@ export type TimingLine = {
   surface: TimingSurface;
   durationMs: number;
   ok: boolean;
-  client: string | null;
-  platform: string | null;
-  version: string | null;
-  requestId: string | null;
   path?: string;
   route?: string;
   procedureType?: string;
   method?: string;
   userId?: string;
-};
+} & ClientDimensions;
 
 /**
  * Build the object that gets `JSON.stringify`-ed to the structured log line.
@@ -222,7 +226,7 @@ function logRestTiming(
     try {
       dimensions = readClientDimensions(request.headers);
     } catch {
-      dimensions = { client: null, platform: null, version: null, requestId: null };
+      dimensions = EMPTY_CLIENT_DIMENSIONS;
     }
     if (!shouldLogTiming({ client: dimensions.client })) return;
     console.log(

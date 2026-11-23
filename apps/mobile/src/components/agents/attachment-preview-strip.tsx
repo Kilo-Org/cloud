@@ -42,11 +42,8 @@ import { CenteredState } from '@/components/centered-state';
 import { ImageViewer } from '@/components/ui/image-viewer';
 import { SheetHeader } from '@/components/sheet-header';
 import { SelectableText } from '@/components/ui/selectable-text';
-import {
-  getShareRemoteFileReason,
-  shareLocalFile,
-  ShareRemoteFileError,
-} from '@/lib/share-remote-file';
+import { getShareFailureKind, shareLocalFile } from '@/lib/share-remote-file';
+import { assertSurfaceFailureHandled } from '@/lib/surface-feedback';
 import { isMarkdownPath } from '@/components/agents/read-tool-markdown';
 import { MarkdownText } from '@/components/agents/markdown-text';
 import { SessionPageSheet } from '@/components/agents/session-page-sheet';
@@ -372,16 +369,28 @@ const AttachmentChip = memo(function AttachmentChip({
     try {
       await shareLocalFile(attachment.localUri, { mimeType: attachment.mimeType });
     } catch (error: unknown) {
-      const reason = getShareRemoteFileReason(error);
-      if (reason === 'sharing-unavailable') {
-        toast.error(t('agentChat.filePart.sharingUnavailable'));
-        return;
+      const kind = getShareFailureKind(error);
+      switch (kind) {
+        case 'sharing-unavailable': {
+          toast.error(t('agentChat.filePart.sharingUnavailable'));
+          return;
+        }
+        case 'file-unavailable': {
+          toast.error(t('common.fileUnavailable'));
+          return;
+        }
+        case 'retry': {
+          toast.error(t('agentChat.filePart.shareFailedRetry'));
+          return;
+        }
+        case 'general': {
+          toast.error(t('agentChat.filePart.shareFailed'));
+          return;
+        }
+        default: {
+          assertSurfaceFailureHandled(kind);
+        }
       }
-      if (error instanceof ShareRemoteFileError) {
-        toast.error(t('agentChat.filePart.shareFailedRetry'));
-        return;
-      }
-      toast.error(t('agentChat.filePart.shareFailed'));
     }
   }
 

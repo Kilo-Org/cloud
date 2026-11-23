@@ -8,6 +8,8 @@ import {
 } from '@kilocode/db/schema';
 import {
   MAX_PROFILE_KILO_COMMANDS,
+  MAX_KILO_COMMAND_AGENT_LENGTH,
+  MAX_KILO_COMMAND_MODEL_LENGTH,
   kiloCommandNameSchema,
   kiloCommandReorderIdsSchema,
   kiloCommandCreateInputSchema,
@@ -182,6 +184,54 @@ describe('kiloCommandCreateInputSchema', () => {
     });
     expect(result.success).toBe(false);
   });
+
+  test('accepts an agent and model at the limit', () => {
+    const result = kiloCommandCreateInputSchema.safeParse({
+      name: 'deploy',
+      template: 'Deploy',
+      agent: 'x'.repeat(MAX_KILO_COMMAND_AGENT_LENGTH),
+      model: 'x'.repeat(MAX_KILO_COMMAND_MODEL_LENGTH),
+    });
+    expect(result.success).toBe(true);
+  });
+
+  test('rejects an agent one character over the limit', () => {
+    const result = kiloCommandCreateInputSchema.safeParse({
+      name: 'deploy',
+      template: 'Deploy',
+      agent: 'x'.repeat(MAX_KILO_COMMAND_AGENT_LENGTH + 1),
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const issue = result.error.issues.find(candidate => candidate.path[0] === 'agent');
+      expect(issue).toEqual(
+        expect.objectContaining({
+          code: 'too_big',
+          path: ['agent'],
+          maximum: MAX_KILO_COMMAND_AGENT_LENGTH,
+        })
+      );
+    }
+  });
+
+  test('rejects a model one character over the limit', () => {
+    const result = kiloCommandCreateInputSchema.safeParse({
+      name: 'deploy',
+      template: 'Deploy',
+      model: 'x'.repeat(MAX_KILO_COMMAND_MODEL_LENGTH + 1),
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const issue = result.error.issues.find(candidate => candidate.path[0] === 'model');
+      expect(issue).toEqual(
+        expect.objectContaining({
+          code: 'too_big',
+          path: ['model'],
+          maximum: MAX_KILO_COMMAND_MODEL_LENGTH,
+        })
+      );
+    }
+  });
 });
 
 describe('kiloCommandUpdateInputSchema', () => {
@@ -212,6 +262,48 @@ describe('kiloCommandUpdateInputSchema', () => {
       name: 'INVALID',
     });
     expect(result.success).toBe(false);
+  });
+
+  test('accepts an agent and model at the limit', () => {
+    const result = kiloCommandUpdateInputSchema.safeParse({
+      agent: 'x'.repeat(MAX_KILO_COMMAND_AGENT_LENGTH),
+      model: 'x'.repeat(MAX_KILO_COMMAND_MODEL_LENGTH),
+    });
+    expect(result.success).toBe(true);
+  });
+
+  test('rejects an agent one character over the limit', () => {
+    const result = kiloCommandUpdateInputSchema.safeParse({
+      agent: 'x'.repeat(MAX_KILO_COMMAND_AGENT_LENGTH + 1),
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const issue = result.error.issues.find(candidate => candidate.path[0] === 'agent');
+      expect(issue).toEqual(
+        expect.objectContaining({
+          code: 'too_big',
+          path: ['agent'],
+          maximum: MAX_KILO_COMMAND_AGENT_LENGTH,
+        })
+      );
+    }
+  });
+
+  test('rejects a model one character over the limit', () => {
+    const result = kiloCommandUpdateInputSchema.safeParse({
+      model: 'x'.repeat(MAX_KILO_COMMAND_MODEL_LENGTH + 1),
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const issue = result.error.issues.find(candidate => candidate.path[0] === 'model');
+      expect(issue).toEqual(
+        expect.objectContaining({
+          code: 'too_big',
+          path: ['model'],
+          maximum: MAX_KILO_COMMAND_MODEL_LENGTH,
+        })
+      );
+    }
   });
 });
 

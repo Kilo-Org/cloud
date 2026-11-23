@@ -323,7 +323,6 @@ describe('Worker getEgressAudit', () => {
     { sandboxKind: 'isolated-standard' },
     { sandboxRoute: { kind: 'shared', routeKey: sharedSandboxId } },
     { sandboxProvider: 'cloudflare' },
-    { sandboxProvider: 'vercel' },
   ] satisfies Partial<NonNullable<SessionMetadata['workspace']>>[])(
     'rejects unsupported or shared placement %j without a container RPC',
     async workspace => {
@@ -338,6 +337,18 @@ describe('Worker getEgressAudit', () => {
       expect(harness.containers.getByName).not.toHaveBeenCalled();
     }
   );
+
+  it('reads the rows of a Vercel session from the store of its logical sandbox', async () => {
+    const harness = setup();
+    harness.sessionStub.getMetadata.mockResolvedValue({
+      ...harness.metadata,
+      workspace: { ...harness.metadata.workspace, sandboxProvider: 'vercel' },
+    });
+    await expect(
+      harness.caller.getEgressAudit({ cloudAgentSessionId: sessionId })
+    ).resolves.toEqual(audit);
+    expect(harness.containers.getByName).toHaveBeenCalledExactlyOnceWith(sandboxId);
+  });
 
   it('supports persisted isolated session IDs without an explicit sandbox kind', async () => {
     const harness = setup();

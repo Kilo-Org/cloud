@@ -160,9 +160,7 @@ describe('shouldRescanPromptVisibility', () => {
       `${previous}\u00A0`,
       `${previous}\nthe next line`,
     ]) {
-      expect(
-        shouldRescanPromptVisibility({ previous, next, publishedVisible: true })
-      ).toBe(false);
+      expect(shouldRescanPromptVisibility({ previous, next, publishedVisible: true })).toBe(false);
     }
   });
 

@@ -342,26 +342,23 @@ export function NewSessionPrompt({
   // matters because iOS cannot report the content height. The band stays
   // mounted, and its height is 0 where the edge lands on a line boundary. Only
   // iOS renders it.
-  const promptBottomFadeStyle = useAnimatedStyle(
-    () => {
-      // The bottom clip edge in content coordinates: the scroll offset plus the
-      // field's rendered height, where the iOS text view clips at its own bounds.
-      // The first line box starts one inset into the content, so the edge is
-      // measured from that line box.
-      const clipEdge =
-        promptScrollOffset.value +
-        resolvePromptRenderedHeight(closedPromptHeight, promptHeight, keyboardProgress.value);
-      return {
-        height: resolveComposerEdgeFadeHeight({
-          clipEdgeOffset: Math.max(0, clipEdge - PROMPT_INPUT_VERTICAL_INSET),
-          edge: 'bottom',
-          lineHeight: promptLineHeight,
-          ramp: promptEdgeFadeRamp,
-        }),
-      };
-    },
-    [closedPromptHeight, promptHeight, promptLineHeight, promptEdgeFadeRamp]
-  );
+  const promptBottomFadeStyle = useAnimatedStyle(() => {
+    // The bottom clip edge in content coordinates: the scroll offset plus the
+    // field's rendered height, where the iOS text view clips at its own bounds.
+    // The first line box starts one inset into the content, so the edge is
+    // measured from that line box.
+    const clipEdge =
+      promptScrollOffset.value +
+      resolvePromptRenderedHeight(closedPromptHeight, promptHeight, keyboardProgress.value);
+    return {
+      height: resolveComposerEdgeFadeHeight({
+        clipEdgeOffset: Math.max(0, clipEdge - PROMPT_INPUT_VERTICAL_INSET),
+        edge: 'bottom',
+        lineHeight: promptLineHeight,
+        ramp: promptEdgeFadeRamp,
+      }),
+    };
+  }, [closedPromptHeight, promptHeight, promptLineHeight, promptEdgeFadeRamp]);
 
   function handlePromptScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
     const next = Math.max(0, event.nativeEvent.contentOffset.y);

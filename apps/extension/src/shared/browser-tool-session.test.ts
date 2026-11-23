@@ -2015,6 +2015,57 @@ describe('browser tool session scripting backend', () => {
     });
   });
 
+  it('rediscovers WebMCP tools after a navigation instead of serving the previous document’s', async () => {
+    type Updated = (tabId: number, changeInfo: { readonly status?: string }) => void;
+    const listeners: Updated[] = [];
+    const discoveryResult = (documentId: string) => ({
+      documentId,
+      result: [
+        {
+          description: 'Do it',
+          inputSchema: { type: 'object' },
+          name: 'do_thing',
+          origin: 'https://example.com',
+          title: 'Do',
+        },
+      ],
+    });
+    const executeScript = vi
+      .fn<BrowserScriptingApi['executeScript']>()
+      .mockResolvedValueOnce([discoveryResult('doc-1')])
+      .mockResolvedValueOnce([discoveryResult('doc-2')]);
+    const tabsApi: BrowserTabsApi = {
+      ...createTabsApi().api,
+      onUpdated: {
+        addListener: listener => {
+          listeners.push(listener);
+        },
+        removeListener: () => {},
+      },
+    };
+    const session = createBrowserToolSession({
+      scriptingApi: { executeScript },
+      tabId: 7,
+      tabsApi,
+    });
+
+    await expect(session.callTool('kilo_browser_webmcp_list', {})).resolves.toStrictEqual({
+      ok: true,
+      value: '- do_thing: Do — Do it',
+    });
+
+    // The cache belongs to one document: the second list discovers again rather than answering from the old one.
+    for (const listener of listeners) {
+      listener(7, { status: 'loading' });
+    }
+
+    await expect(session.callTool('kilo_browser_webmcp_list', {})).resolves.toStrictEqual({
+      ok: true,
+      value: '- do_thing: Do — Do it',
+    });
+    expect(executeScript).toHaveBeenCalledTimes(2);
+  });
+
   it('refuses a WebMCP call that carries an argument it does not take', async () => {
     const executeScript = vi.fn<BrowserScriptingApi['executeScript']>();
     const tabsApi = createTabsApi();

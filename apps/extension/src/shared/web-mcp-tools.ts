@@ -71,24 +71,24 @@ export const webMcpDispatchHooks = (
 });
 
 /**
- * The WebMCP tools a caller may see. An agent caller sees only the descriptors
- * that name an origin it holds `read` for, and one naming no origin is withheld:
- * the list is page text, shown under the origin the page claims and withheld
- * when that origin cannot be read. A caller without readable origins supplied
- * (`undefined`, a panel) sees every tool, as with a snapshot. Both list paths
- * filter here, so a withheld tool is never reported with its count.
+ * The WebMCP tools a caller may see. A descriptor that names no origin is
+ * withheld from every caller — panel or agent — because every call path refuses
+ * one, so showing it would offer a tool nothing can run. An agent caller
+ * additionally sees only the descriptors whose origin it holds `read` for: the
+ * list is page text, shown under the origin the page claims and withheld when
+ * that origin cannot be read. Both list paths filter here, so a withheld tool is
+ * never reported with its count.
  */
 export const readableWebMcpTools = (
   tools: readonly WebMcpToolDescriptor[],
   readableOrigins: readonly string[] | undefined
 ): readonly WebMcpToolDescriptor[] =>
-  readableOrigins === undefined
-    ? tools
-    : tools.filter(
-        tool =>
-          tool.origin !== '' &&
-          readableOrigins.some(pattern => originPatternMatches(pattern, tool.origin))
-      );
+  tools.filter(
+    tool =>
+      tool.origin !== '' &&
+      (readableOrigins === undefined ||
+        readableOrigins.some(pattern => originPatternMatches(pattern, tool.origin)))
+  );
 
 export interface WebMcpToolRoute {
   readonly tabId: number;

@@ -1767,10 +1767,11 @@ export const createBrowserToolSession = ({
     webMcpDiscovery = undefined;
   };
 
-  // A navigation replaces the document, so the cached root node id and the snapshot refs of the previous document are stale for every caller; drop them instead of querying the old document.
+  // A navigation replaces the document, so the cached root node id, the snapshot refs and the WebMCP discovery of the previous document are stale for every caller; drop them instead of querying, or binding a call to, the old document.
   const invalidateDocument = (): void => {
     documentNodeId = undefined;
     consoleMessagesSinceNavigation = 0;
+    webMcpDiscovery = undefined;
     clearRefs();
   };
 
@@ -3858,7 +3859,7 @@ export const createBrowserToolSession = ({
           return { error: 'WebMCP execution API is unavailable.', ok: false };
         }
 
-        // Discovery and execution both run in the tab's top-level document, so a descriptor that names another origin is refused here too: the handler is the last door, not the first.
+        // This handler refuses a descriptor that names no origin, the last door under the preflight; whether a named origin is the one the call may run in is the preflight's decision, not this handler's.
         const tools = await discoverWebMcpTools();
         const discovery = webMcpDiscovery;
 

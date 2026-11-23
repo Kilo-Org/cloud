@@ -1207,6 +1207,7 @@ describe('browser-tool-page-actions', () => {
         webMcpDiscover: discover,
       });
 
+      // An originless descriptor stays out even for a caller with no scope: no call could run it.
       expect(unscoped).toStrictEqual({
         ok: true,
         value: {
@@ -1218,13 +1219,6 @@ describe('browser-tool-page-actions', () => {
               name: 'hidden_thing',
               origin: 'https://bank.example.com',
               title: 'Hidden thing',
-            },
-            {
-              description: 'Names no origin',
-              inputSchema: { properties: {}, type: 'object' },
-              name: 'originless_thing',
-              origin: '',
-              title: 'Originless thing',
             },
           ],
         },

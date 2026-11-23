@@ -10,6 +10,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
+import type * as TextModule from '@/components/ui/text';
 import CodeReviewerAnalyticsRoute from './analytics';
 
 type Membership = { organizationId: string; organizationName: string };
@@ -164,9 +165,16 @@ vi.mock('@/components/ui/configure-row', () => ({
   ConfigureRow: (props: { title?: string }) => createElement('ConfigureRowMock', props),
 }));
 
-vi.mock('@/components/ui/text', () => ({
-  Text: (props: { children?: ReactNode }) => createElement('TextMock', null, props.children),
-}));
+// The skeleton primitives this route draws read the shared text primitive's
+// line-height contract, so the mock keeps the module's own exports and replaces
+// only the component.
+vi.mock('@/components/ui/text', async importOriginal => {
+  const actual = await importOriginal<typeof TextModule>();
+  return {
+    ...actual,
+    Text: (props: { children?: ReactNode }) => createElement('TextMock', null, props.children),
+  };
+});
 
 vi.mock('@/components/ui/icons', () => ({
   FileText: 'FileText',

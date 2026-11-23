@@ -356,7 +356,28 @@ describe('getCreditBlocks', () => {
     expect(result.deductions[0].planName).toBe('MiniMax Token Plan Plus');
   });
 
-  it('leaves a coding-plan charge whose category names no plan without a reason', () => {
+  it('names the plan a coding-plan renewal renewed from its subscription', () => {
+    const transactions = [
+      makeTransaction('plan-renewal', 0, -20_000_000, {
+        description: 'Coding plan renewal: MiniMax Token Plan Plus',
+        credit_category: 'coding-plan:renewal:sub-1:2026-12-01',
+        created_at: '2024-01-10',
+      }),
+    ];
+
+    const result = getCreditBlocks(
+      transactions,
+      now,
+      makeEntity(20_000_000, 0),
+      ENTITY_ID,
+      new Map([['sub-1', 'MiniMax Token Plan Plus']])
+    );
+
+    expect(result.deductions[0].reason).toBe('coding_plan');
+    expect(result.deductions[0].planName).toBe('MiniMax Token Plan Plus');
+  });
+
+  it('leaves a coding-plan renewal without a resolved plan without a reason', () => {
     const transactions = [
       makeTransaction('plan-renewal', 0, -20_000_000, {
         description: 'Coding plan renewal: MiniMax Token Plan Plus',

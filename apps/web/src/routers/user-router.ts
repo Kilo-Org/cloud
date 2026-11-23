@@ -57,6 +57,7 @@ import {
   agent_configs,
   passkey_credentials,
   cli_sessions_v2,
+  coding_plan_subscriptions,
 } from '@kilocode/db/schema';
 import { eq, and, isNull, inArray, or, sql, gte, gt, desc, isNotNull, ne } from 'drizzle-orm';
 import crypto from 'crypto';
@@ -84,6 +85,7 @@ import {
   CreditGrantReasonSchema,
   CreditDeductionReasonSchema,
 } from '@/lib/getCreditBlocks';
+import { getCodingPlanPrice } from '@/lib/coding-plans/pricing';
 import { resolveStripeReceiptUrl } from '@kilocode/web-shared/lib/credits';
 import { getBalanceForUser } from '@kilocode/web-shared/lib/user/balance';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
@@ -461,6 +463,41 @@ function getTopUpConditions(userId: string, organizationId?: string) {
         eq(credit_transactions.description, 'Organization top-up via stripe')
       )
     : getPersonalTopUpConditions(userId);
+}
+
+/**
+ * Map each coding-plan subscription a renewal charged to the plan it bought, as
+ * "<Provider> <Plan>", so the deduction row can name the plan when its category
+ * names only the subscription. Ids whose plan the catalog does not know are
+ * left out, so their rows keep the stored description.
+ */
+async function getCodingPlanNamesBySubscription(
+  userId: string,
+  transactions: { credit_category: string | null }[]
+): Promise<Map<string, string>> {
+  const subscriptionIds = new Set<string>();
+  for (const transaction of transactions) {
+    const subscriptionId = transaction.credit_category?.match(/^coding-plan:renewal:([^:]+):/)?.[1];
+    if (subscriptionId) subscriptionIds.add(subscriptionId);
+  }
+
+  const namesBySubscription = new Map<string, string>();
+  if (subscriptionIds.size === 0) return namesBySubscription;
+
+  const rows = await db
+    .select({ id: coding_plan_subscriptions.id, plan_id: coding_plan_subscriptions.plan_id })
+    .from(coding_plan_subscriptions)
+    .where(
+      and(
+        eq(coding_plan_subscriptions.user_id, userId),
+        inArray(coding_plan_subscriptions.id, [...subscriptionIds])
+      )
+    );
+  for (const row of rows) {
+    const plan = getCodingPlanPrice(row.plan_id);
+    if (plan) namesBySubscription.set(row.id, `${plan.providerName} ${plan.name}`);
+  }
+  return namesBySubscription;
 }
 
 /**
@@ -997,7 +1034,18 @@ export const userRouter = createTRPCRouter({
         ),
       });
 
-      const result = getCreditBlocks(transactions, now, ctx.user, ctx.user.id);
+      const codingPlanNamesBySubscription = await getCodingPlanNamesBySubscription(
+        ctx.user.id,
+        transactions
+      );
+
+      const result = getCreditBlocks(
+        transactions,
+        now,
+        ctx.user,
+        ctx.user.id,
+        codingPlanNamesBySubscription
+      );
 
       // Enrich KiloClaw deduction descriptions with instance names.
       const enrichedDeductions = await enrichDeductionsWithInstanceNames(

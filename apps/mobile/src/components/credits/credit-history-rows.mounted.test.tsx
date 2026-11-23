@@ -495,14 +495,19 @@ describe('LedgerHistoryRow titles from the catalog', () => {
       deduction({
         reason: 'coding_plan',
         planName: 'MiniMax Token Plan Plus',
-        description: 'Coding plan: MiniMax Token Plan Plus',
+        description: 'Coding plan charge recorded for this period',
         expiry: null,
         purchase: null,
       })
     );
 
     const painted = texts(renderer).map(text => readable(text));
-    expect(painted).toContain('Coding plan: MiniMax Token Plan Plus');
+    // The stored sentence differs from the catalog template, so painting the
+    // template proves the row reads the catalog rather than echoing the ledger.
+    expect(painted).toContain(
+      readable(i18n.t('credits.history.deduction.codingPlan', { plan: 'MiniMax Token Plan Plus' }))
+    );
+    expect(painted).not.toContain('Coding plan charge recorded for this period');
     renderer.unmount();
   });
 

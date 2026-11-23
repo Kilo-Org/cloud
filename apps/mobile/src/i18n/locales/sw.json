@@ -654,7 +654,7 @@
       "diffTooLarge": "Tofauti za msimbo ni nyingi mno kuonyeshwa.",
       "noPreview": "Hakuna onyesho la kukagua kwa faili hii",
       "binaryDiff": "Hakuna tofauti za msimbo za kuonyesha kwa faili hii isiyo ya maandishi",
-      "diffUnavailable": "Mtoa huduma huyu hatumi tofauti za msimbo za faili",
+      "diffUnavailable": "Mtoa huduma hakutuma tofauti za msimbo kwa faili hili.",
       "contentUnchanged": "Hakuna mabadiliko ya maudhui kwenye faili hii",
       "openOnProvider": "Fungua faili hii kwenye {{provider}}",
       "openDiffOnProvider": "Fungua tofauti za msimbo wa faili hii kwenye {{provider}}",

@@ -3091,7 +3091,7 @@
       "markViewed": "{{path}} als angesehen markieren",
       "unmarkViewed": "{{path}} als nicht angesehen markieren",
       "binaryDiff": "Kein Diff für diese Binärdatei verfügbar",
-      "diffUnavailable": "Dieser Anbieter sendet keine Datei-Diffs.",
+      "diffUnavailable": "Dieser Anbieter hat für diese Datei keinen Diff gesendet",
       "contentUnchanged": "Keine Inhaltsänderungen in dieser Datei",
       "openOnProvider": "Diese Datei auf {{provider}} öffnen",
       "openDiffOnProvider": "Den Diff dieser Datei auf {{provider}} öffnen",

@@ -660,7 +660,7 @@
       "diffTooLarge": "Prehľad zmien je príliš veľký na zobrazenie.",
       "noPreview": "Pre tento súbor nie je k dispozícii náhľad",
       "binaryDiff": "Pre tento binárny súbor nie je k dispozícii prehľad zmien",
-      "diffUnavailable": "Tento poskytovateľ neposiela prehľady zmien súborov",
+      "diffUnavailable": "Tento poskytovateľ neposlal prehľad zmien pre tento súbor",
       "contentUnchanged": "V tomto súbore nie sú žiadne zmeny obsahu",
       "openOnProvider": "Otvoriť tento súbor na {{provider}}",
       "openDiffOnProvider": "Otvoriť prehľad zmien tohto súboru na {{provider}}",

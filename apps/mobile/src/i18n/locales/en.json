@@ -751,7 +751,7 @@
       "expandFile": "Expand file",
       "diffTooLarge": "Diff too large to display",
       "binaryDiff": "No diff to show for this binary file",
-      "diffUnavailable": "This provider does not send file diffs",
+      "diffUnavailable": "This provider did not send a diff for this file",
       "contentUnchanged": "No content changes in this file",
       "noPreview": "No preview available for this file",
       "openOnProvider": "Open this file on {{provider}}",

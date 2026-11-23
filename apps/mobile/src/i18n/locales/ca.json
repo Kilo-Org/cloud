@@ -657,7 +657,7 @@
       "diffTooLarge": "Hi ha massa diferències per mostrar-les totes.",
       "noPreview": "No hi ha cap previsualització disponible per a aquest fitxer",
       "binaryDiff": "No hi ha cap diferència per mostrar per a aquest fitxer binari",
-      "diffUnavailable": "Aquest proveïdor no envia diferències de fitxers",
+      "diffUnavailable": "Aquest proveïdor no ha enviat cap diferència per a aquest fitxer",
       "contentUnchanged": "No hi ha canvis de contingut en aquest fitxer",
       "openOnProvider": "Obre aquest fitxer a {{provider}}",
       "openDiffOnProvider": "Obre les diferències d'aquest fitxer a {{provider}}",

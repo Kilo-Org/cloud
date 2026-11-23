@@ -654,7 +654,7 @@
       "diffTooLarge": "Muudatusi on kuvamiseks liiga palju",
       "noPreview": "Selle faili eelvaade pole saadaval",
       "binaryDiff": "Selle binaarfaili jaoks pole muudatusi kuvada",
-      "diffUnavailable": "See teenusepakkuja ei saada faili muudatusi",
+      "diffUnavailable": "See teenusepakkuja ei saatnud selle faili kohta muudatusi",
       "contentUnchanged": "Selles failis pole sisumuudatusi",
       "openOnProvider": "Ava see fail teenuses {{provider}}",
       "openDiffOnProvider": "Ava selle faili muudatuste vaade teenuses {{provider}}",

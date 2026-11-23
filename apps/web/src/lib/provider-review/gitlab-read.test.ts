@@ -592,6 +592,43 @@ describe('listChangedFiles', () => {
     });
   });
 
+  it('keeps a renderable patch even when GitLab flags the file excluded', async () => {
+    // A flag is a claim about the diff GitLab withheld; when the response
+    // carries real hunks there is nothing withheld, so the patch wins. Reading
+    // the flag first discarded those hunks while still counting their lines.
+    const gitlabPatch = '@@ -1 +1 @@\n-a\n+b\n';
+    fetchMock.mockImplementation((url: string) => {
+      const path = new URL(url).pathname;
+      if (path.endsWith('/diffs')) {
+        return Promise.resolve(
+          jsonResponse([
+            {
+              old_path: 'src/flagged.ts',
+              new_path: 'src/flagged.ts',
+              new_file: false,
+              renamed_file: false,
+              deleted_file: false,
+              diff: gitlabPatch,
+              collapsed: true,
+            },
+          ])
+        );
+      }
+      return Promise.resolve(jsonResponse([]));
+    });
+
+    const page = await listChangedFiles(OWNER, PROJECT_PATH, 12);
+
+    expect(page.files[0]).toMatchObject({
+      path: 'src/flagged.ts',
+      additions: 1,
+      deletions: 1,
+      patch: gitlabPatch,
+      patchMissing: false,
+      patchMissingCause: null,
+    });
+  });
+
   it('labels a file whose diff field is absent instead of failing the page', async () => {
     // `requestGitLabJson` casts the response without validating it, so a body
     // that omits `diff` reaches the mapper as undefined; one such file must not

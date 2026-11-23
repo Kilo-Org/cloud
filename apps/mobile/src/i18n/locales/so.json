@@ -654,7 +654,7 @@
       "diffTooLarge": "Kala duwanaanshuhu aad buu u weyn yahay in la muujiyo.",
       "noPreview": "Faylkan horu-eeg looma hayo",
       "binaryDiff": "Ma jiro kala duwanaansho la muujiyo faylkan aan qoraal ahayn",
-      "diffUnavailable": "Bixiyahan ma soo dirto kala duwanaanshaha faylalka",
+      "diffUnavailable": "Bixiyahan ma soo dirin kala duwanaansho ku saabsan faylkan",
       "contentUnchanged": "Ma jiro isbeddel nuxur ah oo ku jira faylkan",
       "openOnProvider": "Ku fur faylkan {{provider}}",
       "openDiffOnProvider": "Ku fur {{provider}} kala duwanaanshaha faylkan",

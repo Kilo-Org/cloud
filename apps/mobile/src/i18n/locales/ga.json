@@ -663,7 +663,7 @@
       "diffTooLarge": "Tá an chomparáid athruithe rómhór le taispeáint.",
       "noPreview": "Níl réamhamharc ar fáil don chomhad seo",
       "binaryDiff": "Níl aon chomparáid athruithe le taispeáint don chomhad dénártha seo",
-      "diffUnavailable": "Ní sheolann an soláthraí seo comparáidí athruithe comhad",
+      "diffUnavailable": "Níor sheol an soláthraí seo comparáid athruithe don chomhad seo",
       "contentUnchanged": "Níl aon athruithe ábhair sa chomhad seo",
       "openOnProvider": "Oscail an comhad seo ar {{provider}}",
       "openDiffOnProvider": "Oscail comparáid athruithe an chomhaid seo ar {{provider}}",

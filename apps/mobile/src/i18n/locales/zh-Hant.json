@@ -3091,7 +3091,7 @@
       "markViewed": "將 {{path}} 標記為已檢視",
       "unmarkViewed": "取消 {{path}} 的已檢視標記",
       "binaryDiff": "此二進位檔案沒有可顯示的差異。",
-      "diffUnavailable": "此提供者不會傳送檔案差異。",
+      "diffUnavailable": "此提供者未傳送此檔案的差異",
       "contentUnchanged": "此檔案沒有內容變更。",
       "openOnProvider": "在 {{provider}} 上開啟此檔案",
       "openDiffOnProvider": "在 {{provider}} 上開啟此檔案的差異",

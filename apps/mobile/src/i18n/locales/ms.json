@@ -654,7 +654,7 @@
       "diffTooLarge": "Perbezaan kod terlalu besar untuk dipaparkan.",
       "noPreview": "Tiada pratonton tersedia untuk fail ini",
       "binaryDiff": "Tiada perbezaan kod untuk ditunjukkan bagi fail binari ini",
-      "diffUnavailable": "Penyedia ini tidak menghantar perbezaan kod fail",
+      "diffUnavailable": "Penyedia ini tidak menghantar perbezaan kod untuk fail ini",
       "contentUnchanged": "Tiada perubahan kandungan dalam fail ini",
       "openOnProvider": "Buka fail ini di {{provider}}",
       "openDiffOnProvider": "Buka perbezaan kod fail ini di {{provider}}",

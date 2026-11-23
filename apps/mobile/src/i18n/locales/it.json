@@ -3138,7 +3138,7 @@
       "markViewed": "Segna {{path}} come visualizzato",
       "unmarkViewed": "Segna {{path}} come non visualizzato",
       "binaryDiff": "Nessun confronto da mostrare per questo file binario",
-      "diffUnavailable": "Questo fornitore non invia i confronti delle modifiche ai file.",
+      "diffUnavailable": "Questo provider non ha inviato un confronto delle modifiche per questo file",
       "contentUnchanged": "Nessuna modifica al contenuto di questo file",
       "openOnProvider": "Apri questo file su {{provider}}",
       "openDiffOnProvider": "Apri il confronto delle modifiche a questo file su {{provider}}",

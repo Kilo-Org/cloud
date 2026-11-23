@@ -3091,7 +3091,7 @@
       "markViewed": "{{path}}を確認済みにする",
       "unmarkViewed": "{{path}}を未確認にする",
       "binaryDiff": "このバイナリファイルには表示できる差分がありません",
-      "diffUnavailable": "このプロバイダーはファイルの差分を送信しません",
+      "diffUnavailable": "このプロバイダーはこのファイルの差分を送信しませんでした",
       "contentUnchanged": "このファイルには内容の変更がありません",
       "openOnProvider": "このファイルを{{provider}}で開く",
       "openDiffOnProvider": "このファイルの差分を{{provider}}で開く",

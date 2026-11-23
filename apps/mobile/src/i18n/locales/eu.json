@@ -654,7 +654,7 @@
       "diffTooLarge": "Diferentziak handiegiak dira bistaratzeko.",
       "noPreview": "Fitxategi honek ez du aurrebistarik",
       "binaryDiff": "Fitxategi bitar honetarako ez dago erakusteko diferentziarik",
-      "diffUnavailable": "Hornitzaile honek ez ditu fitxategi-diferentziak bidaltzen",
+      "diffUnavailable": "Hornitzaile honek ez du fitxategi honetarako diferentziarik bidali",
       "contentUnchanged": "Fitxategi honetan ez dago eduki-aldaketarik",
       "openOnProvider": "Ireki fitxategi hau {{provider}}-en",
       "openDiffOnProvider": "Ireki fitxategi honen diferentziak {{provider}}-en",

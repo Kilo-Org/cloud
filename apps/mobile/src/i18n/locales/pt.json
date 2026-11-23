@@ -660,7 +660,7 @@
       "diffTooLarge": "As diferenças são demasiado extensas para serem apresentadas.",
       "noPreview": "Pré-visualização indisponível para este ficheiro",
       "binaryDiff": "Não há diferenças para mostrar neste ficheiro binário",
-      "diffUnavailable": "Este fornecedor não envia diferenças de ficheiros",
+      "diffUnavailable": "Este provedor não enviou diferenças para este ficheiro",
       "contentUnchanged": "Sem alterações de conteúdo neste ficheiro",
       "openOnProvider": "Abrir este ficheiro no {{provider}}",
       "openDiffOnProvider": "Abrir as diferenças deste ficheiro no {{provider}}",

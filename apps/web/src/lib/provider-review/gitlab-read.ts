@@ -207,19 +207,22 @@ function mapDiffToFile(diff: GitLabDiff): ProviderPrFile {
   // `requestGitLabJson` casts the response without validating it, so `diff` may
   // be absent; the guard keeps one such file from failing the whole page.
   const patch = diff.diff ?? '';
-  // The exclusion flags come first: GitLab withholds a diff it excluded for
-  // size or for collapsing, and an empty diff alone cannot tell that from a
-  // binary file — reading the flags is what keeps an oversized text file from
-  // being labelled binary.
+  // A patch the rows can render wins over every flag: an instance that sends
+  // this file's diff has not withheld it, so a stale or blanket exclusion flag
+  // must not discard the hunks its own line counts were read from. Only a file
+  // with no renderable patch is a candidate for a cause, and there the
+  // exclusion flags come first: an empty diff alone cannot tell a withheld text
+  // file from a binary one, so reading the flags keeps an oversized text file
+  // from being labelled binary.
   const patchMissingCause: ProviderPrFilePatchMissingCause | null =
-    diff.too_large === true
-      ? 'too_large'
-      : diff.collapsed === true
-        ? 'provider_omitted'
-        : isBinaryPlaceholderDiff(patch)
-          ? 'binary'
-          : patch
-            ? null
+    patch !== '' && !isBinaryPlaceholderDiff(patch)
+      ? null
+      : diff.too_large === true
+        ? 'too_large'
+        : diff.collapsed === true
+          ? 'provider_omitted'
+          : isBinaryPlaceholderDiff(patch)
+            ? 'binary'
             : diff.renamed_file && !diff.new_file && !diff.deleted_file
               ? 'content_unchanged'
               : 'binary';

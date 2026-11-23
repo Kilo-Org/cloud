@@ -654,7 +654,7 @@
       "diffTooLarge": "He nui rawa ngā rerekētanga hei whakaatu",
       "noPreview": "Kāore he arokite mō tēnei kōnae",
       "binaryDiff": "Kāore he rerekētanga hei whakaatu mō tēnei kōnae ā-rua",
-      "diffUnavailable": "Kāore tēnei kaiwhakarato e tuku rerekētanga kōnae",
+      "diffUnavailable": "Kāore tēnei kaiwhakarato i tuku rerekētanga mō tēnei kōnae",
       "contentUnchanged": "Kāore he rerekētanga ihirangi i tēnei kōnae",
       "openOnProvider": "Whakatuwheratia tēnei kōnae ki {{provider}}",
       "openDiffOnProvider": "Whakatuwheratia ngā rerekētanga o tēnei kōnae ki {{provider}}",

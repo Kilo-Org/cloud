@@ -654,7 +654,7 @@
       "diffTooLarge": "Umehluko mkhulu kakhulu ukuba uboniswe.",
       "noPreview": "Akukho ukubuka kuqala okutholakalayo kwaleli fayela",
       "binaryDiff": "Akukho mehluko ongaboniswa kuleli fayela lebhinari",
-      "diffUnavailable": "Lo mhlinzeki akayithumeli imehluko yamafayela",
+      "diffUnavailable": "Lo mhlinzeki akathumanga umehluko kuleli fayela",
       "contentUnchanged": "Akukho zinguquko zokuqukethwe kuleli fayela",
       "openOnProvider": "Vula leli fayela ku-{{provider}}",
       "openDiffOnProvider": "Vula umehluko okuleli fayela ku-{{provider}}",

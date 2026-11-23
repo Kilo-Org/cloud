@@ -3091,7 +3091,7 @@
       "markViewed": "Tandai {{path}} sebagai sudah dilihat",
       "unmarkViewed": "Hapus tanda sudah dilihat pada {{path}}",
       "binaryDiff": "Tidak ada perbedaan kode yang dapat ditampilkan untuk file biner ini.",
-      "diffUnavailable": "Penyedia ini tidak mengirim perbedaan kode file.",
+      "diffUnavailable": "Penyedia ini tidak mengirim perbedaan kode untuk file ini.",
       "contentUnchanged": "Tidak ada perubahan konten di file ini.",
       "openOnProvider": "Buka file ini di {{provider}}",
       "openDiffOnProvider": "Buka perbedaan kode file ini di {{provider}}",

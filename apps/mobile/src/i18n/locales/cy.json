@@ -666,7 +666,7 @@
       "diffTooLarge": "Mae gormod o wahaniaethau i'w dangos.",
       "noPreview": "Does dim rhagolwg ar gael ar gyfer y ffeil hon",
       "binaryDiff": "Does dim gwahaniaethau i'w dangos ar gyfer y ffeil ddeuaidd hon",
-      "diffUnavailable": "Nid yw'r darparwr hwn yn anfon gwahaniaethau ffeil",
+      "diffUnavailable": "Ni anfonodd y darparwr hwn wahaniaethau ar gyfer y ffeil hon",
       "contentUnchanged": "Does dim newidiadau cynnwys yn y ffeil hon",
       "openOnProvider": "Agor y ffeil hon ar {{provider}}",
       "openDiffOnProvider": "Agor gwahaniaethau'r ffeil hon ar {{provider}}",

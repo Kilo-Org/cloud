@@ -654,7 +654,7 @@
       "diffTooLarge": "ልዩነቱ በጣም ትልቅ ስለሆነ ማሳየት አይቻልም።",
       "noPreview": "ለዚህ ፋይል ቅድመ እይታ የለም",
       "binaryDiff": "ለዚህ ሁለትዮሽ ፋይል ማሳየት የሚቻል ልዩነት የለም",
-      "diffUnavailable": "ይህ አቅራቢ የፋይል ልዩነቶችን አይልክም",
+      "diffUnavailable": "ይህ አቅራቢ ለዚህ ፋይል ልዩነት አልላከም",
       "contentUnchanged": "በዚህ ፋይል ውስጥ የይዘት ለውጦች የሉም",
       "openOnProvider": "ይህን ፋይል በ{{provider}} ክፈት",
       "openDiffOnProvider": "የዚህን ፋይል ልዩነት በ{{provider}} ክፈት",

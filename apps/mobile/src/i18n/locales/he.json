@@ -3138,7 +3138,7 @@
       "markViewed": "סימון {{path}} כנצפה",
       "unmarkViewed": "ביטול הסימון של {{path}} כנצפה",
       "binaryDiff": "אין השוואת שינויים להצגה בקובץ הבינארי הזה",
-      "diffUnavailable": "הספק הזה לא שולח השוואות שינויים של קבצים",
+      "diffUnavailable": "ספק זה לא שלח השוואת השינויים עבור קובץ זה",
       "contentUnchanged": "אין שינויי תוכן בקובץ הזה",
       "openOnProvider": "פתיחת הקובץ הזה ב-{{provider}}",
       "openDiffOnProvider": "פתיחת השוואת השינויים של הקובץ הזה ב-{{provider}}",

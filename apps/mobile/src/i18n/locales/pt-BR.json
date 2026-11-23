@@ -3185,7 +3185,7 @@
       "markViewed": "Marcar {{path}} como visualizado",
       "unmarkViewed": "Desmarcar {{path}} como visualizado",
       "binaryDiff": "Nenhuma comparação a exibir para este arquivo binário",
-      "diffUnavailable": "Este provedor não envia comparações de arquivos.",
+      "diffUnavailable": "Este provedor não enviou uma comparação para este arquivo",
       "contentUnchanged": "Nenhuma alteração de conteúdo neste arquivo",
       "openOnProvider": "Abrir este arquivo no {{provider}}",
       "openDiffOnProvider": "Abrir a comparação deste arquivo no {{provider}}",

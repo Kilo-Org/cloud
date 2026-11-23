@@ -654,7 +654,7 @@
       "diffTooLarge": "Diferans kòd yo twò gwo pou afiche.",
       "noPreview": "Pa gen apèsi disponib pou fichye sa a",
       "binaryDiff": "Pa gen diferans kòd pou afiche pou fichye binè sa a",
-      "diffUnavailable": "Founisè sa a pa voye diferans kòd fichye yo",
+      "diffUnavailable": "Founisè sa a pa voye yon diferans kòd pou fichye sa a",
       "contentUnchanged": "Pa gen chanjman kontni nan fichye sa a",
       "openOnProvider": "Louvri fichye sa a sou {{provider}}",
       "openDiffOnProvider": "Louvri diferans kòd fichye sa a sou {{provider}}",

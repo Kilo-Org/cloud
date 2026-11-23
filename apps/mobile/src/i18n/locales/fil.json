@@ -654,7 +654,7 @@
       "diffTooLarge": "Masyadong malaki ang pagkakaiba para maipakita.",
       "noPreview": "Walang preview para sa file na ito",
       "binaryDiff": "Walang pagkakaibang maipapakita para sa di-tekstong file na ito",
-      "diffUnavailable": "Hindi nagpapadala ng mga pagkakaiba ng file ang tagapagbigay na ito",
+      "diffUnavailable": "Hindi nagpadala ang provider ng pagkakaiba para sa file na ito.",
       "contentUnchanged": "Walang pagbabago sa nilalaman ng file na ito",
       "openOnProvider": "Buksan ang file na ito sa {{provider}}",
       "openDiffOnProvider": "Buksan sa {{provider}} ang pagkakaiba ng file na ito",

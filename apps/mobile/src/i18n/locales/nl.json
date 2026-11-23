@@ -3091,7 +3091,7 @@
       "markViewed": "{{path}} markeren als bekeken",
       "unmarkViewed": "Markering als bekeken verwijderen voor {{path}}",
       "binaryDiff": "Geen diff om weer te geven voor dit binaire bestand",
-      "diffUnavailable": "Deze provider verstuurt geen bestandsdiffs.",
+      "diffUnavailable": "Deze provider heeft geen diff voor dit bestand gestuurd",
       "contentUnchanged": "Geen inhoudswijzigingen in dit bestand",
       "openOnProvider": "Dit bestand openen op {{provider}}",
       "openDiffOnProvider": "De diff van dit bestand openen op {{provider}}",

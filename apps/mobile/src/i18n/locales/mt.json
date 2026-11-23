@@ -663,7 +663,7 @@
       "diffTooLarge": "Hemm wisq differenzi biex jintwerew.",
       "noPreview": "M'hemmx preview disponibbli għal dan il-fajl",
       "binaryDiff": "M'hemmx differenzi biex jintwerew għal dan il-fajl binarju.",
-      "diffUnavailable": "Dan il-fornitur ma jibgħatx differenzi tal-fajl.",
+      "diffUnavailable": "Dan il-fornitur ma bagħatx differenzi għal dan il-fajl",
       "contentUnchanged": "M'hemmx tibdil fil-kontenut ta' dan il-fajl.",
       "openOnProvider": "Iftaħ dan il-fajl fuq {{provider}}",
       "openDiffOnProvider": "Iftaħ id-differenzi ta' dan il-fajl fuq {{provider}}",

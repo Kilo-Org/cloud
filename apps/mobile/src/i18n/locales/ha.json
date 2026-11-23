@@ -654,7 +654,7 @@
       "diffTooLarge": "Bambancin fayil ya yi yawa don a nuna shi.",
       "noPreview": "Babu samfoti ga wannan fayil",
       "binaryDiff": "Babu bambancin da za a nuna ga wannan fayil ɗin da ba rubutu ba",
-      "diffUnavailable": "Wannan mai samarwa ba ya aika bambancin fayil",
+      "diffUnavailable": "Mai bayarwa bai aiko da bambanci don wannan fayil ba",
       "contentUnchanged": "Babu canjin abun ciki a wannan fayil",
       "openOnProvider": "Buɗe wannan fayil a {{provider}}",
       "openDiffOnProvider": "Buɗe bambancin wannan fayil ɗin a {{provider}}",

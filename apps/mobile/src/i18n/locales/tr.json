@@ -3091,7 +3091,7 @@
       "markViewed": "{{path}} dosyasını görüntülenmiş olarak işaretle",
       "unmarkViewed": "{{path}} dosyasının görüntülenmiş işaretini kaldır",
       "binaryDiff": "Bu ikili dosya için gösterilecek fark yok",
-      "diffUnavailable": "Bu sağlayıcı dosya farklarını göndermiyor",
+      "diffUnavailable": "Bu sağlayıcı bu dosya için fark göndermedi",
       "contentUnchanged": "Bu dosyada içerik değişikliği yok",
       "openOnProvider": "Bu dosyayı {{provider}} üzerinde aç",
       "openDiffOnProvider": "Bu dosyanın farkını {{provider}} üzerinde aç",

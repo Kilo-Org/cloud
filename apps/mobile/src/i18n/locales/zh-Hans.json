@@ -3091,7 +3091,7 @@
       "markViewed": "将 {{path}} 标记为已查看",
       "unmarkViewed": "取消 {{path}} 的已查看标记",
       "binaryDiff": "此二进制文件没有可显示的差异",
-      "diffUnavailable": "此提供商不发送文件差异",
+      "diffUnavailable": "此提供商未为此文件发送差异",
       "contentUnchanged": "此文件没有内容更改",
       "openOnProvider": "在 {{provider}} 上打开此文件",
       "openDiffOnProvider": "在 {{provider}} 上打开此文件的差异",

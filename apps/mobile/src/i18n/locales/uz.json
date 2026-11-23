@@ -654,7 +654,7 @@
       "diffTooLarge": "Farqlar hajmi juda katta, ularni ko'rsatib bo'lmaydi.",
       "noPreview": "Bu fayl uchun oldindan ko'rish mavjud emas",
       "binaryDiff": "Bu ikkilik fayl uchun ko'rsatiladigan farq yo'q",
-      "diffUnavailable": "Bu provayder fayl farqlarini yubormaydi",
+      "diffUnavailable": "Bu provayder ushbu fayl uchun farq yubormadi",
       "contentUnchanged": "Bu faylda mazmun o'zgarishlari yo'q",
       "openOnProvider": "Bu faylni {{provider}}da ochish",
       "openDiffOnProvider": "Bu fayldagi farqlarni {{provider}}da ochish",

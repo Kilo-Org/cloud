@@ -3138,7 +3138,7 @@
       "markViewed": "Marquer {{path}} comme consulté",
       "unmarkViewed": "Marquer {{path}} comme non consulté",
       "binaryDiff": "Aucune différence à afficher pour ce fichier binaire",
-      "diffUnavailable": "Ce fournisseur n'envoie pas de différences de fichiers",
+      "diffUnavailable": "Ce fournisseur n'a pas envoyé de différences pour ce fichier",
       "contentUnchanged": "Aucun changement de contenu dans ce fichier",
       "openOnProvider": "Ouvrir ce fichier sur {{provider}}",
       "openDiffOnProvider": "Ouvrir les différences de ce fichier sur {{provider}}",

@@ -657,7 +657,7 @@
       "diffTooLarge": "Diferențele sunt prea mari pentru a fi afișate.",
       "noPreview": "Nu există previzualizare pentru acest fișier",
       "binaryDiff": "Nu există diferențe de afișat pentru acest fișier binar",
-      "diffUnavailable": "Acest furnizor nu trimite diferențe pentru fișiere",
+      "diffUnavailable": "Acest furnizor nu a trimis diferențe pentru acest fișier",
       "contentUnchanged": "Nicio modificare de conținut în acest fișier",
       "openOnProvider": "Deschide acest fișier pe {{provider}}",
       "openDiffOnProvider": "Deschide comparația acestui fișier pe {{provider}}",

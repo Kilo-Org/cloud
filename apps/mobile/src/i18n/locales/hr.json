@@ -657,7 +657,7 @@
       "diffTooLarge": "Razlike su prevelike za prikaz.",
       "noPreview": "Pregled ove datoteke nije dostupan",
       "binaryDiff": "Za ovu binarnu datoteku nema razlika za prikaz",
-      "diffUnavailable": "Ovaj pružatelj ne šalje razlike datoteka",
+      "diffUnavailable": "Ovaj pružatelj nije poslao razlike za ovu datoteku",
       "contentUnchanged": "Nema promjena sadržaja u ovoj datoteci",
       "openOnProvider": "Otvori ovu datoteku na {{provider}}",
       "openDiffOnProvider": "Otvori prikaz razlika ove datoteke na {{provider}}",

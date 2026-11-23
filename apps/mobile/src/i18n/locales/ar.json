@@ -3279,7 +3279,7 @@
       "markViewed": "تحديد {{path}} كملف تم الاطلاع عليه",
       "unmarkViewed": "إلغاء تحديد {{path}} كملف تم الاطلاع عليه",
       "binaryDiff": "لا توجد فروق لعرضها لهذا الملف الثنائي",
-      "diffUnavailable": "هذا المزوّد لا يرسل فروق الملفات",
+      "diffUnavailable": "لم يرسل هذا المزوّد أي فروق لهذا الملف",
       "contentUnchanged": "لا توجد تغييرات في محتوى هذا الملف",
       "openOnProvider": "فتح هذا الملف على {{provider}}",
       "openDiffOnProvider": "فتح فروق هذا الملف على {{provider}}",

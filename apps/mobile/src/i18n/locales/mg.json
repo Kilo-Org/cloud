@@ -654,7 +654,7 @@
       "diffTooLarge": "Lehibe loatra ny fahasamihafana ka tsy azo aseho.",
       "noPreview": "Tsy misy topimaso azo jerena ho an'ity rakitra ity",
       "binaryDiff": "Tsy misy fahasamihafana azo aseho ho an'ity rakitra tsy lahatsoratra ity",
-      "diffUnavailable": "Tsy mandefa fahasamihafan'ny rakitra ity mpanome ity",
+      "diffUnavailable": "Tsy nandefa fahasamihafana ho an'ity rakitra ity ny mpanome",
       "contentUnchanged": "Tsy misy fiovan'ny votoaty ao amin'ity rakitra ity",
       "openOnProvider": "Sokafy ao amin'ny {{provider}} ity rakitra ity",
       "openDiffOnProvider": "Sokafy ao amin'ny {{provider}} ny fahasamihafan'ity rakitra ity",

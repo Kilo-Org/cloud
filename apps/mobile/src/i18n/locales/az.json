@@ -654,7 +654,7 @@
       "diffTooLarge": "Dəyişikliklərin həcmi göstərilmək üçün çox böyükdür.",
       "noPreview": "Bu fayl üçün önizləmə mövcud deyil",
       "binaryDiff": "Bu ikili fayl üçün göstəriləcək dəyişiklik yoxdur",
-      "diffUnavailable": "Bu provayder fayl dəyişikliklərini göndərmir",
+      "diffUnavailable": "Bu provayder bu fayl üçün dəyişiklik göndərmədi",
       "contentUnchanged": "Bu faylda məzmun dəyişikliyi yoxdur",
       "openOnProvider": "Bu faylı {{provider}}-da aç",
       "openDiffOnProvider": "Bu faylın dəyişikliklərini {{provider}}-da aç",

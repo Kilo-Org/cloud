@@ -11,7 +11,7 @@ import { type ProviderPrFileStatus } from '@kilocode/app-shared/provider-review'
 
 import { i18n } from '@/i18n';
 import { openExternalUrl } from '@/lib/external-link';
-import { FileHeaderRow, MarkViewedToggle, PatchMissingRow } from './pr-diff-file-rows';
+import { FileHeaderRow, PatchMissingRow } from './pr-diff-file-rows';
 import { LTR_ISOLATE_CLOSE, LTR_ISOLATE_OPEN } from '@/lib/bidi';
 
 const i18nManager = vi.hoisted(() => ({ isRTL: false }));
@@ -225,11 +225,6 @@ describe('PatchMissingRow repeats nothing from the file row above', () => {
       .map(node => node.props.children)
       .filter((children): children is string => typeof children === 'string');
     expect(texts.filter(text => text.includes(path))).toEqual([]);
-  });
-
-  it('renders no mark-viewed toggle', () => {
-    mountPatchlessRow('too_large');
-    expect(renderer?.root.findAll(node => Object.is(node.type, MarkViewedToggle))).toHaveLength(0);
   });
 });
 

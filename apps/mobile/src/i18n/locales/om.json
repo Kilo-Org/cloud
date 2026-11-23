@@ -654,7 +654,7 @@
       "diffTooLarge": "Garaagarummaan agarsiisuuf garmalee guddaadha.",
       "noPreview": "Faayilii kanaaf duraaltoon hin jiru",
       "binaryDiff": "Faayilii binaayirii kanaaf garaagarummaa agarsiisuuf hin jiru.",
-      "diffUnavailable": "Dhiyeessaan kun garaagarummaa faayilii hin ergu",
+      "diffUnavailable": "Dhiyeessaan kun faayilii kanaaf garaagarummaa hin ergine",
       "contentUnchanged": "Faayilii kana keessatti jijjiiramni qabiyyee hin jiru",
       "openOnProvider": "Faayilii kana {{provider}} irratti bani",
       "openDiffOnProvider": "Garaagarummaa faayilii kanaa {{provider}} irratti bani",

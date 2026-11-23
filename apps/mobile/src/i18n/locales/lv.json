@@ -657,7 +657,7 @@
       "diffTooLarge": "Izmaiņu salīdzinājums ir pārāk liels, lai to parādītu.",
       "noPreview": "Šim failam priekšskatījums nav pieejams",
       "binaryDiff": "Šim binārajam failam nav izmaiņu salīdzinājuma, ko parādīt",
-      "diffUnavailable": "Šis nodrošinātājs nesūta failu izmaiņu salīdzinājumus",
+      "diffUnavailable": "Šis nodrošinātājs šim failam nav nosūtījis izmaiņu salīdzinājumu",
       "contentUnchanged": "Šim failam nav satura izmaiņu",
       "openOnProvider": "Atvērt šo failu {{provider}}",
       "openDiffOnProvider": "Atvērt šī faila izmaiņu salīdzinājumu {{provider}}",

@@ -3091,7 +3091,7 @@
       "markViewed": "Đánh dấu {{path}} là đã xem",
       "unmarkViewed": "Bỏ dấu đã xem của {{path}}",
       "binaryDiff": "Không có bản so sánh nào để hiển thị cho tệp nhị phân này",
-      "diffUnavailable": "Nhà cung cấp này không gửi bản so sánh tệp",
+      "diffUnavailable": "Nhà cung cấp này không gửi bản so sánh cho tệp này",
       "contentUnchanged": "Không có thay đổi nội dung trong tệp này",
       "openOnProvider": "Mở tệp này trên {{provider}}",
       "openDiffOnProvider": "Mở bản so sánh của tệp này trên {{provider}}",

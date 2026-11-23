@@ -3091,7 +3091,7 @@
       "markViewed": "{{path}} 확인함으로 표시",
       "unmarkViewed": "{{path}} 확인 표시 해제",
       "binaryDiff": "이 바이너리 파일에는 표시할 변경 내용이 없습니다.",
-      "diffUnavailable": "이 제공자는 파일 변경 내용을 전송하지 않습니다.",
+      "diffUnavailable": "이 제공업체는 이 파일의 변경 내용을 보내지 않았습니다",
       "contentUnchanged": "이 파일에는 내용 변경이 없습니다.",
       "openOnProvider": "{{provider}}에서 이 파일 열기",
       "openDiffOnProvider": "{{provider}}에서 이 파일의 변경 내용 열기",

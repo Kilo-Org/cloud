@@ -654,7 +654,7 @@
       "diffTooLarge": "Muutosvertailu on liian suuri näytettäväksi",
       "noPreview": "Tälle tiedostolle ei ole esikatselua",
       "binaryDiff": "Tälle binääritiedostolle ei ole näytettävää muutosvertailua",
-      "diffUnavailable": "Tämä palveluntarjoaja ei lähetä tiedostojen muutosvertailuja",
+      "diffUnavailable": "Tämä palveluntarjoaja ei lähettänyt muutosvertailua tälle tiedostolle",
       "contentUnchanged": "Tässä tiedostossa ei ole sisältömuutoksia",
       "openOnProvider": "Avaa tämä tiedosto {{provider}}issa",
       "openDiffOnProvider": "Avaa tämän tiedoston muutosvertailu {{provider}}issa",

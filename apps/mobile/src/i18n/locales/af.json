@@ -654,7 +654,7 @@
       "diffTooLarge": "Die verskille is te groot om te vertoon.",
       "noPreview": "Geen voorskou beskikbaar vir hierdie lêer nie",
       "binaryDiff": "Geen verskille om vir hierdie binêre lêer te wys nie",
-      "diffUnavailable": "Hierdie verskaffer stuur nie lêerverskille nie",
+      "diffUnavailable": "Hierdie verskaffer het nie verskille vir hierdie lêer gestuur nie",
       "contentUnchanged": "Geen inhoudsveranderinge in hierdie lêer nie",
       "openOnProvider": "Maak hierdie lêer op {{provider}} oop",
       "openDiffOnProvider": "Maak hierdie lêer se verskille op {{provider}} oop",

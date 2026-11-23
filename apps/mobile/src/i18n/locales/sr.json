@@ -657,7 +657,7 @@
       "diffTooLarge": "Ima previše izmena za prikaz.",
       "noPreview": "Pregled ove datoteke nije dostupan",
       "binaryDiff": "Nema prikaza izmena za ovu binarnu datoteku",
-      "diffUnavailable": "Ovaj provajder ne šalje prikaze izmena datoteka",
+      "diffUnavailable": "Ovaj provajder nije poslao prikaz izmena za ovu datoteku",
       "contentUnchanged": "Nema izmena sadržaja u ovoj datoteci",
       "openOnProvider": "Otvori ovu datoteku na {{provider}}",
       "openDiffOnProvider": "Otvori prikaz izmena ove datoteke na {{provider}}",

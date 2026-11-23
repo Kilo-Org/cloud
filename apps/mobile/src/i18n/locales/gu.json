@@ -654,7 +654,7 @@
       "diffTooLarge": "તફાવત એટલો મોટો છે કે તેને બતાવી શકાતો નથી.",
       "noPreview": "આ ફાઇલનું પૂર્વાવલોકન ઉપલબ્ધ નથી",
       "binaryDiff": "આ બાઇનરી ફાઇલ માટે બતાવવા કોઈ તફાવત નથી",
-      "diffUnavailable": "આ પ્રદાતા ફાઇલ તફાવતો મોકલતું નથી",
+      "diffUnavailable": "આ પ્રદાતાએ આ ફાઇલ માટે તફાવત મોકલ્યો નથી",
       "contentUnchanged": "આ ફાઇલમાં સામગ્રીમાં કોઈ ફેરફાર નથી",
       "openOnProvider": "આ ફાઇલ {{provider}} પર ખોલો",
       "openDiffOnProvider": "આ ફાઇલનો તફાવત {{provider}} પર ખોલો",

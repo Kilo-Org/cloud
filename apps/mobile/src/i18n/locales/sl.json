@@ -660,7 +660,7 @@
       "diffTooLarge": "Razlike so preobsežne za prikaz.",
       "noPreview": "Predogled te datoteke ni na voljo",
       "binaryDiff": "Za to binarno datoteko ni razlik za prikaz",
-      "diffUnavailable": "Ta ponudnik ne pošilja datotečnih razlik",
+      "diffUnavailable": "Ta ponudnik ni poslal razlik za to datoteko",
       "contentUnchanged": "V tej datoteki ni sprememb vsebine",
       "openOnProvider": "Odpri to datoteko na {{provider}}",
       "openDiffOnProvider": "Odpri prikaz razlik te datoteke na {{provider}}",

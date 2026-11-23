@@ -3185,7 +3185,7 @@
       "markViewed": "Oznacz {{path}} jako przejrzany",
       "unmarkViewed": "Usuń oznaczenie przejrzenia pliku {{path}}",
       "binaryDiff": "Brak różnic do wyświetlenia dla tego pliku binarnego",
-      "diffUnavailable": "Ten dostawca nie przesyła różnic w plikach",
+      "diffUnavailable": "Ten dostawca nie przesłał różnicy dla tego pliku",
       "contentUnchanged": "Brak zmian zawartości w tym pliku",
       "openOnProvider": "Otwórz ten plik w serwisie {{provider}}",
       "openDiffOnProvider": "Otwórz różnice w tym pliku w serwisie {{provider}}",

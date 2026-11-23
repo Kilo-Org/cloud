@@ -654,7 +654,7 @@
       "diffTooLarge": "Hai demasiadas diferenzas para amosalas.",
       "noPreview": "Non hai vista previa dispoñible para este ficheiro",
       "binaryDiff": "Non hai diferenzas para amosar neste ficheiro binario",
-      "diffUnavailable": "Este proveedor non envía as diferenzas dos ficheiros",
+      "diffUnavailable": "Este provedor non enviou as diferenzas deste ficheiro",
       "contentUnchanged": "Non hai cambios de contido neste ficheiro",
       "openOnProvider": "Abrir este ficheiro en {{provider}}",
       "openDiffOnProvider": "Abrir as diferenzas deste ficheiro en {{provider}}",

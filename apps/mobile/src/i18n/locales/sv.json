@@ -654,7 +654,7 @@
       "diffTooLarge": "Diffen är för stor för att visas",
       "noPreview": "Ingen förhandsvisning tillgänglig för den här filen",
       "binaryDiff": "Ingen diff att visa för den här binära filen",
-      "diffUnavailable": "Den här leverantören skickar inga fildiffar",
+      "diffUnavailable": "Den här leverantören skickade ingen diff för den här filen",
       "contentUnchanged": "Inga innehållsändringar i den här filen",
       "openOnProvider": "Öppna den här filen på {{provider}}",
       "openDiffOnProvider": "Öppna den här filens diff på {{provider}}",

@@ -654,7 +654,7 @@
       "diffTooLarge": "A különbségnézet túl nagy a megjelenítéshez.",
       "noPreview": "Ehhez a fájlhoz nem érhető el előnézet",
       "binaryDiff": "Ehhez a bináris fájlhoz nincs megjeleníthető különbségnézet",
-      "diffUnavailable": "Ez a szolgáltató nem küld fájlkülönbségnézeteket",
+      "diffUnavailable": "Ez a szolgáltató nem küldött különbségnézetet ehhez a fájlhoz",
       "contentUnchanged": "Ebben a fájlban nincsenek tartalmi változások",
       "openOnProvider": "A fájl megnyitása a {{provider}}on",
       "openDiffOnProvider": "A fájl különbségnézetének megnyitása a {{provider}}on",

@@ -654,7 +654,7 @@
       "diffTooLarge": "Breytingarnar eru of umfangsmiklar til að birta.",
       "noPreview": "Engin forskoðun í boði fyrir þessa skrá",
       "binaryDiff": "Enginn breytingasamanburður í boði fyrir þessa tvíundarskrá",
-      "diffUnavailable": "Þessi veitandi sendir ekki breytingasamanburð skráa",
+      "diffUnavailable": "Þessi veitandi sendi ekki breytingasamanburð fyrir þessa skrá",
       "contentUnchanged": "Engar innihaldsbreytingar í þessari skrá",
       "openOnProvider": "Opna þessa skrá á {{provider}}",
       "openDiffOnProvider": "Opna breytingasamanburð þessarar skrár á {{provider}}",

@@ -654,7 +654,7 @@
       "diffTooLarge": "Endringene er for omfattende til å vises.",
       "noPreview": "Ingen forhåndsvisning tilgjengelig for denne filen",
       "binaryDiff": "Ingen endringer å vise for denne binære filen",
-      "diffUnavailable": "Denne leverandøren sender ikke filendringer",
+      "diffUnavailable": "Denne leverandøren sendte ingen endringer for denne filen",
       "contentUnchanged": "Ingen innholdsendringer i denne filen",
       "openOnProvider": "Åpne denne filen på {{provider}}",
       "openDiffOnProvider": "Åpne endringene i denne filen på {{provider}}",

@@ -660,7 +660,7 @@
       "diffTooLarge": "Pakeitimų palyginimas per didelis, kad būtų galima jį parodyti",
       "noPreview": "Šio failo peržiūra negalima",
       "binaryDiff": "Nėra pakeitimų palyginimo, kurį būtų galima parodyti šiam dvejetainiam failui",
-      "diffUnavailable": "Šis teikėjas nesiunčia failų pakeitimų palyginimų",
+      "diffUnavailable": "Šis teikėjas neatsiuntė šio failo pakeitimų palyginimo",
       "contentUnchanged": "Šiame faile nėra turinio pakeitimų",
       "openOnProvider": "Atidaryti šį failą {{provider}} platformoje",
       "openDiffOnProvider": "Atidaryti šio failo pakeitimų palyginimą {{provider}} platformoje",

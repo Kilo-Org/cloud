@@ -654,7 +654,7 @@
       "diffTooLarge": "Ndryshimet janë tepër të mëdha për t'u shfaqur.",
       "noPreview": "Nuk ka parapamje për këtë skedar",
       "binaryDiff": "Nuk ka ndryshime për t'u shfaqur në këtë skedar binar",
-      "diffUnavailable": "Ky ofrues nuk dërgon ndryshime skedarësh",
+      "diffUnavailable": "Ky ofrues nuk dërgoi ndryshimet për këtë skedar.",
       "contentUnchanged": "Nuk ka ndryshime përmbajtjeje në këtë skedar",
       "openOnProvider": "Hap këtë skedar në {{provider}}",
       "openDiffOnProvider": "Hap ndryshimet e këtij skedari në {{provider}}",

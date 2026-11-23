@@ -165,7 +165,7 @@ describe('TriggersListScreen rows', () => {
     const copyControls = root.findAll(
       node =>
         Object.is(node.type, PRESSABLE) &&
-        String(node.props.accessibilityLabel ?? '').includes('https://Inbound.example/trigger-a') &&
+        String(node.props.accessibilityLabel ?? '').includes('Copy link for trigger-a') &&
         typeof node.props.onPress === 'function'
     );
     expect(copyControls).toHaveLength(1);
@@ -253,7 +253,11 @@ describe('TriggersListScreen rows', () => {
     }
 
     // Only the webhook row has a copy control; it names its own trigger too.
-    const copyButtons = root.findAll(node => Object.is(node.type, ICON_BUTTON));
+    const copyButtons = root.findAll(
+      node =>
+        Object.is(node.type, PRESSABLE) &&
+        String(node.props.accessibilityLabel ?? '').startsWith('Copy link for ')
+    );
     expect(copyButtons).toHaveLength(1);
     expect(copyButtons[0]?.props.accessibilityLabel).toBe('Copy link for trigger-a');
 

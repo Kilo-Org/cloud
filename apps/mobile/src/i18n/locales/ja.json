@@ -3776,7 +3776,6 @@
       "usageDetails": "使用状況の詳細",
       "providersAndModels": "プロバイダーとモデル",
       "groups": "グループ",
-      "guardrails": "ガードレール",
       "byok": "独自のキーを使用",
       "ssoAndDomain": "SSOとドメイン",
       "dataCollection": "データ収集",

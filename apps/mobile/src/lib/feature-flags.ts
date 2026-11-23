@@ -3,7 +3,6 @@ import {
   CODE_REVIEW_COUNCIL_FLAG,
   CODE_REVIEW_MD_CONVERSION_FLAG,
   type FeatureFlagKey,
-  MOBILE_CHAT_SESSION_SYNC_FLAG,
   ORGANIZATION_AUTO_MODEL_FLAG,
 } from '@kilocode/app-shared/feature-flags';
 import * as Application from 'expo-application';
@@ -59,11 +58,6 @@ export const FEATURE_FLAG_DEFINITIONS: readonly FeatureFlagDefinition[] = [
   },
   {
     key: CHATGPT_ACCESS_FLAG,
-    minAppVersion: '1.0.16',
-    defaultValue: false,
-  },
-  {
-    key: MOBILE_CHAT_SESSION_SYNC_FLAG,
     minAppVersion: '1.0.16',
     defaultValue: false,
   },

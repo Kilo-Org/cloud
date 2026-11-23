@@ -190,12 +190,7 @@ vi.mock('@/lib/chat/backend-capabilities', () => ({
 }));
 vi.mock('@/lib/chat/layers', () => ({ rememberModelFacts: () => undefined }));
 vi.mock('@/lib/chat/sync/use-chat-sync', () => ({
-  useChatSyncGate: () => ({
-    flagOn: false,
-    setting: { kind: 'off' },
-    enabled: false,
-    decide: async () => undefined,
-  }),
+  useChatSyncGate: () => ({ state: { kind: 'off' }, enabled: false, decide: async () => undefined }),
   useChatSyncUploader: () => undefined,
   useSyncBanner: () => ({ kind: 'none' }),
   useDeletedElsewhere: () => undefined,

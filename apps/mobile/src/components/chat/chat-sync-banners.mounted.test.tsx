@@ -3,7 +3,6 @@ import { createElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ChatSyncBanner } from '@/components/chat/chat-sync-banners';
-import { ChatSyncPromptCard } from '@/components/chat/chat-sync-prompt-card';
 import { i18n } from '@/i18n';
 import { act, TestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
@@ -68,24 +67,5 @@ describe('ChatSyncBanner', () => {
       await Promise.resolve();
     });
     expect(onDiscard).toHaveBeenCalledOnce();
-  });
-});
-
-describe('ChatSyncPromptCard', () => {
-  it('turns both answers into a decision', async () => {
-    const onDecide = vi.fn();
-    view = await renderWithProviders(createElement(ChatSyncPromptCard, { onDecide }));
-    const enable = view.renderer.root
-      .findAllByProps({ accessibilityLabel: i18n.t('modelChat.sync.promptEnable') })
-      .at(0);
-    const dismiss = view.renderer.root
-      .findAllByProps({ accessibilityLabel: i18n.t('modelChat.sync.promptDismiss') })
-      .at(0);
-    await act(async () => {
-      (enable?.props.onPress as () => void)();
-      (dismiss?.props.onPress as () => void)();
-      await Promise.resolve();
-    });
-    expect(onDecide.mock.calls).toEqual([['on'], ['off']]);
   });
 });

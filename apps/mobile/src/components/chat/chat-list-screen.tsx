@@ -50,7 +50,6 @@ import { selectChatListSurface } from './chat-list-surface';
 import { BackendSettingsControl } from './backend-settings-sheet';
 import { LocalResetNoticeCard } from './local-reset-notice';
 import { ChatSyncListControls } from './chat-sync-list-controls';
-import { ChatSyncPromptCard } from './chat-sync-prompt-card';
 
 /**
  * The chats a person has, newest first.
@@ -451,13 +450,6 @@ function ScopedChatListScreen() {
             ordinary empty state, so the explanation outranks what remains. */}
         {localResetNotice.kind === 'present' ? (
           <LocalResetNoticeCard onDismiss={dismissLocalResetNotice} />
-        ) : null}
-        {gate.flagOn && gate.setting.kind === 'undecided' ? (
-          <ChatSyncPromptCard
-            onDecide={choice => {
-              void gate.decide(choice);
-            }}
-          />
         ) : null}
         {gate.enabled ? <ChatSyncListControls filters={filters} onChange={setFilters} /> : null}
         <View className="flex-1">{renderBody()}</View>

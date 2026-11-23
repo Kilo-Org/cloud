@@ -41,6 +41,35 @@ export type SyncClient = {
 
 const clients = new Map<string, SyncClient>();
 
+/**
+ * Runs one SDK call, answering the thrown error instead of raising it. Every
+ * thrown answer — the network, a 5xx, 429, a 404 route, a body that no
+ * longer parses against an older service — becomes retryable.
+ */
+async function pausedOnOutage<T>(call: () => Promise<T>): Promise<T | Error> {
+  try {
+    return await call();
+  } catch (error) {
+    return error instanceof Error ? error : new Error('sync unavailable');
+  }
+}
+
+/**
+ * Maps any service refusal onto the paused state. A refusal here means the
+ * deployment or this session cannot take the write yet (an older service
+ * with no join support, a session another writer created, a route it does
+ * not serve), never that the person's chat is broken: sync parks and the
+ * next attempt tries again.
+ */
+function pausedWhenUnavailable<T extends { readonly type: string }>(
+  result: T | Error
+): T | { readonly type: 'retryable' } {
+  if (result instanceof Error || result.type === 'failed') {
+    return { type: 'retryable' };
+  }
+  return result;
+}
+
 export function syncClientFor(organizationId: string | undefined): SyncClient {
   const epoch = getAuthenticatedOwner().authEpoch;
   const key = `${epoch}:${organizationId ?? 'personal'}`;
@@ -55,35 +84,49 @@ export function syncClientFor(organizationId: string | undefined): SyncClient {
   const writer = new NativeSyncWriter(client, organizationId);
   const transport: SyncTransport = {
     register: async (sessionID, sourceID) => {
-      const result = await writer.register(sessionID, sourceID, 'mobile');
+      const result = await pausedOnOutage(() => writer.register(sessionID, sourceID, 'mobile'));
       return result.type === 'registered'
         ? { type: 'registered', position: result.state.position }
-        : result;
+        : pausedWhenUnavailable(result);
     },
-    putBlob: (sessionID, bytes, mime) => writer.putBlob(sessionID, bytes, mime),
+    putBlob: async (sessionID, bytes, mime) => {
+      const result = await pausedOnOutage(() => writer.putBlob(sessionID, bytes, mime));
+      if (result instanceof Error) {
+        throw result;
+      }
+      return result;
+    },
     commit: async (sessionID, packet) => {
-      const result = await writer.commit(sessionID, packet);
-      return result.type === 'committed'
-        ? {
-            type: 'committed',
-            receipt: {
-              through: result.receipt.through,
-              batchID: result.receipt.batchID,
-              digest: result.receipt.digest,
-            },
-          }
-        : result;
+      const result = await pausedOnOutage(() => writer.commit(sessionID, packet));
+      if (result.type === 'committed') {
+        return {
+          type: 'committed',
+          receipt: {
+            through: result.receipt.through,
+            batchID: result.receipt.batchID,
+            digest: result.receipt.digest,
+          },
+        };
+      }
+      return pausedWhenUnavailable(result);
     },
-    pull: sessionID => writer.pull(sessionID),
+    pull: async sessionID => pausedWhenUnavailable(await pausedOnOutage(() => writer.pull(sessionID))),
   };
   const made: SyncClient = {
     transport,
-    listSessions: params =>
-      client.listSessions({ ...params, limit: 50, organizationID: organizationId }),
-    deleteSession: async sessionID => {
-      const result = await client.deleteSession(sessionID, organizationId);
-      return result.type === 'retryable' ? { type: 'retryable' } : result;
+    listSessions: async params => {
+      const result = await pausedOnOutage(() =>
+        client.listSessions({ ...params, limit: 50, organizationID: organizationId })
+      );
+      if (result instanceof Error) {
+        throw result;
+      }
+      return result;
     },
+    deleteSession: async sessionID =>
+      pausedWhenUnavailable(
+        await pausedOnOutage(() => client.deleteSession(sessionID, organizationId))
+      ),
     probeLive: sessionID =>
       new Promise<boolean>(resolve => {
         const timer = setTimeout(() => {

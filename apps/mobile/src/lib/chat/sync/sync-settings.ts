@@ -4,15 +4,11 @@ import * as encryptedKv from '@/lib/persist/encrypted-kv';
 
 /**
  * The per-account "Sync chats across devices" choice and this install's
- * source id, in the encrypted store beside the chats themselves. The choice
- * defaults to off: `undecided` (never answered) and `off` both keep chats
- * on the device, and only `undecided` shows the one-time prompt.
+ * source id, in the encrypted store beside the chats themselves. Sync is on
+ * until the person turns it off: only a stored `off` keeps a chat local.
  */
 
-export type ChatSyncSetting =
-  | { readonly kind: 'undecided' }
-  | { readonly kind: 'on' }
-  | { readonly kind: 'off' };
+export type ChatSyncSetting = 'on' | 'off';
 
 const SETTING_KEY = 'chat-sync-setting';
 const SOURCE_KEY = 'chat-sync-source-id';
@@ -23,15 +19,10 @@ export function syncSettingsScope(chatScope: string): string {
   return `chat-sync:${userId}`;
 }
 
+/** The answer for this account: on unless this device was told otherwise. */
 export async function readChatSyncSetting(chatScope: string): Promise<ChatSyncSetting> {
   const stored = await encryptedKv.getItem(syncSettingsScope(chatScope), SETTING_KEY);
-  if (stored === 'on') {
-    return { kind: 'on' };
-  }
-  if (stored === 'off') {
-    return { kind: 'off' };
-  }
-  return { kind: 'undecided' };
+  return stored === 'off' ? 'off' : 'on';
 }
 
 export async function writeChatSyncSetting(

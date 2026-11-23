@@ -24,7 +24,6 @@ export const CROSS_APP_FEATURE_FLAG_KEYS = {
   codeReviewCouncil: 'code-review-council',
   organizationAutoModel: 'organization-auto-model-routing',
   chatGptSignIn: 'sign-in-with-chatgpt',
-  mobileChatSessionSync: 'mobile-chat-session-sync',
 } as const satisfies Record<string, string>;
 
 /**
@@ -53,13 +52,6 @@ export const ORGANIZATION_AUTO_MODEL_FLAG = CROSS_APP_FEATURE_FLAG_KEYS.organiza
  * it needs a person. "Continue with ChatGPT" sign-in itself is not gated.
  */
 export const CHATGPT_ACCESS_FLAG = CROSS_APP_FEATURE_FLAG_KEYS.chatGptSignIn;
-
-/**
- * Mobile quick-chat sync to the session-sync service (staged rollout). The
- * per-account opt-in setting still applies on top of this flag; either one
- * off keeps chats on the device.
- */
-export const MOBILE_CHAT_SESSION_SYNC_FLAG = CROSS_APP_FEATURE_FLAG_KEYS.mobileChatSessionSync;
 
 /**
  * Every flag key this repository evaluates in more than one app.

@@ -139,9 +139,9 @@ async function depsFor(place: ChatPlace): Promise<{ deps: SyncDeps; client: Sync
   return { deps, client, db };
 }
 
-/** Whether sync runs for this place: the setting on. The flag is the caller's half. */
+/** Whether sync runs for this place: on unless this device stored an off. */
 export async function syncSettingOn(place: ChatPlace): Promise<boolean> {
-  return (await readChatSyncSetting(place.chatScope)).kind === 'on';
+  return (await readChatSyncSetting(place.chatScope)) === 'on';
 }
 
 function storedTitle(db: ChatDatabase, sessionId: string): string | null {

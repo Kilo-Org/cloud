@@ -1,8 +1,6 @@
-import { MOBILE_CHAT_SESSION_SYNC_FLAG } from '@kilocode/app-shared/feature-flags';
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useSyncExternalStore } from 'react';
 
-import { useFeatureFlag } from '@/lib/analytics/posthog';
 import { encryptedDatabase } from '@/lib/persist/encrypted-kv';
 
 import { organizationIdOf } from '../layers';
@@ -32,21 +30,51 @@ import {
 import { syncedRecordsOfScope } from './sync-store';
 
 /**
- * React's view of chat sync: the gate (flag and per-account setting), the
- * settled-exchange uploader, the merged server list, and the banner a chat
- * screen reads. Screens compose these; nothing here draws.
+ * React's view of chat sync: the per-account setting, the settled-exchange
+ * uploader, the merged server list, and the banner a chat screen reads.
+ * Screens compose these; nothing here draws.
  */
 
+/**
+ * The setting as the app knows it: still being read, unreadable (with
+ * whether asking again can help), on, or off. `enabled` derives from this one
+ * union, so a half-read setting never reads as "off" and quietly drops sync.
+ */
+export type ChatSyncSettingState =
+  | { readonly kind: 'loading' }
+  | { readonly kind: 'failed'; readonly retryable: boolean; readonly retry: () => void }
+  | { readonly kind: 'on' }
+  | { readonly kind: 'off' };
+
 export type ChatSyncGate = {
-  readonly flagOn: boolean;
-  readonly setting: ChatSyncSetting;
-  /** Both halves on: sync runs. */
+  readonly state: ChatSyncSettingState;
+  /** Sync runs unless this device was told to keep chats local. */
   readonly enabled: boolean;
-  readonly decide: (choice: 'on' | 'off') => Promise<void>;
+  readonly decide: (choice: ChatSyncSetting) => Promise<void>;
 };
 
+/** The union one settings read answers with. Pure, so every state is testable. */
+export function selectChatSyncSettingState(input: {
+  readonly hasPlace: boolean;
+  readonly isPending: boolean;
+  readonly isPaused: boolean;
+  readonly isError: boolean;
+  readonly setting: ChatSyncSetting | undefined;
+  readonly retry: () => void;
+}): ChatSyncSettingState {
+  if (!input.hasPlace) {
+    return { kind: 'failed', retryable: false, retry: input.retry };
+  }
+  if (input.setting !== undefined) {
+    return input.setting === 'on' ? { kind: 'on' } : { kind: 'off' };
+  }
+  if (input.isError) {
+    return { kind: 'failed', retryable: input.isPaused, retry: input.retry };
+  }
+  return { kind: 'loading' };
+}
+
 export function useChatSyncGate(place: ChatPlace | null): ChatSyncGate {
-  const flagOn = useFeatureFlag(MOBILE_CHAT_SESSION_SYNC_FLAG, false);
   const client = useQueryClient();
   const scope = place?.chatScope ?? '';
   const query = useQuery({
@@ -54,7 +82,7 @@ export function useChatSyncGate(place: ChatPlace | null): ChatSyncGate {
     enabled: place !== null,
     networkMode: 'always',
     queryFn: async (): Promise<ChatSyncSetting> =>
-      place === null ? { kind: 'undecided' } : readChatSyncSetting(place.chatScope),
+      place === null ? 'on' : readChatSyncSetting(place.chatScope),
   });
   const decide = useCallback(
     async (choice: 'on' | 'off') => {
@@ -66,8 +94,17 @@ export function useChatSyncGate(place: ChatPlace | null): ChatSyncGate {
     },
     [client, place, scope]
   );
-  const setting = query.data ?? { kind: 'undecided' as const };
-  return { flagOn, setting, enabled: flagOn && setting.kind === 'on', decide };
+  const state = selectChatSyncSettingState({
+    hasPlace: place !== null,
+    isPending: query.isPending,
+    isPaused: query.fetchStatus === 'paused',
+    isError: query.isError,
+    setting: query.data,
+    retry: () => {
+      void query.refetch();
+    },
+  });
+  return { state, enabled: state.kind === 'on', decide };
 }
 
 /** Registers the settled-exchange uploader while sync is enabled. */

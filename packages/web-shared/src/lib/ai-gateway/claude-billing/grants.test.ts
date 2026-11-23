@@ -12,6 +12,7 @@ import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   type ClaudeBillingShareError,
   ClaudeBillingLockBusyError,
+  __test__,
   claudeBillingEffectiveConnection,
   claudeBillingOwnerLockKey,
   claudeBillingPayerLockKey,
@@ -789,13 +790,14 @@ describe('Claude billing grants', () => {
     ).resolves.toEqual([expect.objectContaining({ payer_connection_id: payer.id })]);
   }, 20000);
 
-  it('answers a budget spent on restarts with ClaudeBillingLockBusyError, not the restart signal', async () => {
+  it('restarts once per lower payer key it discovers, so a removal that frees several occupants still succeeds', async () => {
     const user = await insertTestUser();
     // Four payers this person owns, each kept by an organization grant, so the
     // removal hands every payer to its organization and frees that organization's
-    // occupant row first. Each occupant id sorts below the key taken so far, so
-    // every restart discovers one more occupant below every held key: the third
-    // attempt meets an occupant below a held key and spends the budget.
+    // occupant row first. Each occupant id sorts below every payer key taken so
+    // far, so each restart discovers one more occupant below the held keys. Every
+    // restart adds that key, so the fourth attempt to meet one still makes
+    // progress and the removal finishes.
     const fixtures = [
       {
         payerId: '44444444-4444-4444-8444-444444444401',
@@ -814,8 +816,10 @@ describe('Claude billing grants', () => {
         occupantId: '00000000-0000-4000-8000-000000000001',
       },
     ];
+    const organizations: string[] = [];
     for (const [index, fixture] of fixtures.entries()) {
       const organization = await createTestOrganization(`Claude busy org ${index}`, user.id, 0);
+      organizations.push(organization.id);
       // A payer row naming both the person and the organization is the shape the
       // retired member scope wrote; the organization grant then outlives the
       // person's own grant and becomes the payer's next owner.
@@ -848,26 +852,65 @@ describe('Claude billing grants', () => {
     }
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
 
-    const removal = removeUserClaudeBillingGrants(user.id, db);
-    const failure = await removal.catch((error: unknown) => error);
+    await expect(removeUserClaudeBillingGrants(user.id, db)).resolves.toBeUndefined();
+    // No restart ran out of progress, so the busy path never ran.
+    expect(warn.mock.calls).toEqual([]);
+    warn.mockRestore();
+
+    for (const [index, fixture] of fixtures.entries()) {
+      const organizationId = organizations[index];
+      if (!organizationId) throw new Error('Missing organization fixture');
+      await expect(
+        db
+          .select()
+          .from(claude_billing_connections)
+          .where(eq(claude_billing_connections.id, fixture.payerId))
+      ).resolves.toEqual([
+        expect.objectContaining({
+          kilo_user_id: null,
+          organization_id: organizationId,
+          status: 'connected',
+        }),
+      ]);
+      await expect(
+        db
+          .select()
+          .from(claude_billing_connections)
+          .where(eq(claude_billing_connections.id, fixture.occupantId))
+      ).resolves.toEqual([expect.objectContaining({ status: 'removed', connection_id: null })]);
+    }
+  }, 30000);
+
+  it('answers a repeated lock key with ClaudeBillingLockBusyError after one warning', async () => {
+    // A repeated key is unreachable through the public API: every caller checks
+    // whether it already holds the key before it asks for a restart, so the store
+    // never retries one it collected. That makes this the smallest honest proof of
+    // the no-progress branch, driven through the retry loop itself.
+    const { withClaudeBillingLockRetry, lockRetrySignal } = __test__;
+    const repeatedKey = 'claude_billing_grant:00000000-0000-4000-8000-0000000000ff';
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const attempts: string[][] = [];
+
+    const failure = await withClaudeBillingLockRetry(async extraLockKeys => {
+      attempts.push([...extraLockKeys]);
+      throw lockRetrySignal(repeatedKey);
+    }).catch((error: unknown) => error);
+
     expect(failure).toBeInstanceOf(ClaudeBillingLockBusyError);
     if (!(failure instanceof ClaudeBillingLockBusyError)) {
-      throw new Error('The removal did not reject with ClaudeBillingLockBusyError');
+      throw new Error('The retry loop did not reject with ClaudeBillingLockBusyError');
     }
-
+    // The key was collected by one restart; the next one cannot change the order.
+    expect(attempts).toEqual([[], [repeatedKey]]);
     expect(warn.mock.calls).toEqual([
-      [
-        '[claude-billing] lock retry exhausted after %d attempts: %s',
-        3,
-        'claude_billing_grant:11111111-1111-4111-8111-111111111101',
-      ],
+      ['[claude-billing] lock retry cannot make progress: %s (after %d restarts)', repeatedKey, 1],
     ]);
     warn.mockRestore();
-    expect(failure.lockKey).toBe('claude_billing_grant:11111111-1111-4111-8111-111111111101');
+    expect(failure.lockKey).toBe(repeatedKey);
     expect(failure.message).toBe('Claude billing locks stayed busy; retry the request');
     // The restart signal stays private: its sentence never reaches a caller.
     expect(failure.message).not.toContain('ascending key order');
-  }, 20000);
+  });
 
   it('takes the claim namespace below the payer namespace, and keeps the profile key outside that order', () => {
     const owner: ClaudeBillingOwner = { kind: 'organization', organizationId: 'scope-order' };

@@ -454,9 +454,10 @@ export class ClaudeBillingShareError extends Error {
 }
 
 /**
- * The locks this operation needs stayed busy for every attempt it was allowed,
- * so the work did not run. `lockKey` is the key it could not take in order.
- * Callers may retry the request; the internal restart signal stays private.
+ * The restart loop could not reach a key order it could hold, so the work did
+ * not run. `lockKey` is the key the loop stopped on: one it already held, or one
+ * it reached at the safety cap. Callers may retry the request; the internal
+ * restart signal stays private.
  */
 export class ClaudeBillingLockBusyError extends Error {
   constructor(readonly lockKey: string) {
@@ -468,8 +469,8 @@ export class ClaudeBillingLockBusyError extends Error {
  * Signals that the transaction would have to wait for a lock key at or below a
  * key it already holds. The transaction aborts, and the caller restarts the
  * operation with that key added to its lock set. `lockKey` is the key the next
- * attempt must take as well. A budget spent on restarts surfaces as
- * `ClaudeBillingLockBusyError`, never as this signal.
+ * attempt must take as well. Only a key the loop already collected, or the
+ * safety cap, surfaces as `ClaudeBillingLockBusyError`, never as this signal.
  */
 class ClaudeBillingLockRetry extends Error {
   constructor(readonly lockKey: string) {
@@ -477,8 +478,17 @@ class ClaudeBillingLockRetry extends Error {
   }
 }
 
-/** How often a transaction restarts after a key left it on the wrong side of the ascending rule. */
-const CLAUDE_BILLING_LOCK_ATTEMPTS = 3;
+/**
+ * A guard against a logic error, not a policy limit: no legitimate operation
+ * reaches it.
+ *
+ * The real bound is the number of distinct lock keys one operation can discover,
+ * which is the claim keys it names plus one payer key per row it touches. Each
+ * restart adds one key it has not taken, and a repeated key is a genuine cycle
+ * that ends the loop, so the loop can only stop early when a caller discovers
+ * more keys than this cap, in which case a bug in the discovery is the cause.
+ */
+const CLAUDE_BILLING_LOCK_ATTEMPT_CAP = 64;
 
 /** The lock key of a payer row: the grants and the owner columns of that row change under it. */
 export function claudeBillingPayerLockKey(payerConnectionId: string): string {
@@ -565,25 +575,36 @@ function isAboveHeldLockKeys(lockKey: string, heldLockKeys: ReadonlySet<string>)
 }
 
 /**
- * Runs `attempt` again, up to the attempt bound, when a transaction asks to
- * retake its locks, and passes the keys every attempt must take as well. The
- * bound spent surfaces as `ClaudeBillingLockBusyError`, so the restart signal
- * never leaves this function.
+ * Runs `attempt` again when a transaction asks to retake its locks, and passes
+ * the keys every attempt must take as well.
+ *
+ * Each restart adds the key the attempt could not take, so each one makes
+ * progress: that key was outside the collected set, and the next attempt takes it
+ * in ascending order with the rest. A restart therefore needs one attempt per
+ * distinct lower key an operation discovers, and only two things end the loop
+ * early. A key that is already in the collected set cannot change the key order,
+ * so the next attempt would fail the same way: that is a genuine cycle. The
+ * safety cap, `CLAUDE_BILLING_LOCK_ATTEMPT_CAP`, exists for the same reason. Both
+ * surface as `ClaudeBillingLockBusyError` after one `console.warn`, so the
+ * restart signal never leaves this function.
  */
 async function withClaudeBillingLockRetry<T>(
   attempt: (extraLockKeys: ReadonlySet<string>) => Promise<T>
 ): Promise<T> {
   const extraLockKeys = new Set<string>();
-  for (let attemptNumber = 1; ; attemptNumber += 1) {
+  for (;;) {
     try {
       return await attempt(extraLockKeys);
     } catch (error) {
       if (!(error instanceof ClaudeBillingLockRetry)) throw error;
-      if (attemptNumber >= CLAUDE_BILLING_LOCK_ATTEMPTS) {
+      if (
+        extraLockKeys.has(error.lockKey) ||
+        extraLockKeys.size >= CLAUDE_BILLING_LOCK_ATTEMPT_CAP
+      ) {
         console.warn(
-          '[claude-billing] lock retry exhausted after %d attempts: %s',
-          CLAUDE_BILLING_LOCK_ATTEMPTS,
-          error.lockKey
+          '[claude-billing] lock retry cannot make progress: %s (after %d restarts)',
+          error.lockKey,
+          extraLockKeys.size
         );
         throw new ClaudeBillingLockBusyError(error.lockKey);
       }
@@ -734,8 +755,9 @@ async function reassignPayerOwnerColumns(
  *
  * A transaction only ever waits for a key above every key it holds, so no two
  * holders can wait for each other. A re-read that resolves another payer restarts
- * the transaction with the wider key set, and a budget spent on those restarts
- * surfaces as `ClaudeBillingLockBusyError`.
+ * the transaction with the wider key set, and that restart makes progress because
+ * the key was outside it. Only a repeated key or the safety cap surfaces as
+ * `ClaudeBillingLockBusyError`.
  *
  * `work` also receives the keys this transaction holds, which it must pass to any
  * owner-column change so the ascending rule keeps holding.
@@ -791,7 +813,8 @@ export async function withClaudeBillingPayerLock<T>(
  * under the locks. Claim keys are never taken after the first batch: a claim key
  * sorts below every payer key, so a later claim would break the order. A re-read
  * that resolves a payer outside the locked union restarts the transaction with the
- * wider union, and a budget spent on those restarts surfaces as
+ * wider union, and that restart makes progress because the payer key was outside
+ * it. Only a repeated key or the safety cap surfaces as
  * `ClaudeBillingLockBusyError`. `work` receives the re-read grants in the order of
  * `owners`; a scope without a row contributes `null`. `work` also receives the one
  * key set of this transaction, and every owner-column change it makes adds its
@@ -1204,8 +1227,9 @@ export async function describeClaudeBillingSharing(
  * covers the whole loop, and every owner-column change adds the keys it takes to
  * it, so a later reassignment sees what an earlier one holds. A reassignment that
  * meets another payer row below a held key restarts the whole attempt: the
- * deletes and the reassignments are idempotent. A budget spent on those restarts
- * surfaces as `ClaudeBillingLockBusyError`.
+ * deletes and the reassignments are idempotent, and each restart adds the key it
+ * could not take, so a person with several such payers still finishes. Only a
+ * repeated key or the safety cap surfaces as `ClaudeBillingLockBusyError`.
  *
  * The account-deletion transaction calls this with its own `tx`. A restart is
  * then a savepoint restart: PostgreSQL releases the keys a savepoint took when it
@@ -1402,3 +1426,13 @@ export async function clearClaudeBillingRefusal(
     onDb
   );
 }
+
+/**
+ * The retry loop and its restart signal, so a test can prove how the loop ends
+ * in cases no public path can build: every caller checks the key it holds first,
+ * so a repeated key and the safety cap are unreachable through the store.
+ */
+export const __test__ = {
+  withClaudeBillingLockRetry,
+  lockRetrySignal: (lockKey: string) => new ClaudeBillingLockRetry(lockKey),
+};

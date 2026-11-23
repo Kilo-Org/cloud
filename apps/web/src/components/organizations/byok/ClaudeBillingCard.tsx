@@ -97,6 +97,8 @@ function outcomeMessage(outcome: string, scope: ClaudeBillingScope, connected: b
       return scope === 'organization'
         ? 'Only a Kilo organization owner or admin can link it.'
         : 'Claude linked billing is not available for this account.';
+    case 'busy':
+      return 'Claude is busy right now. Try again in a moment.';
     default:
       return 'We could not link your Claude organization. Try again.';
   }

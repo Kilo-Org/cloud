@@ -3,33 +3,33 @@ import { useCallback, useEffect, useSyncExternalStore } from 'react';
 
 import { encryptedDatabase } from '@/lib/persist/encrypted-kv';
 
-import { selectChatSyncSettingState, type ChatSyncGate } from './sync-gate';
+import { type ChatSyncGate, selectChatSyncSettingState } from './sync-gate';
 
 import { organizationIdOf } from '../layers';
-import type { ChatPlace } from '../scope';
-import type { ChatSummary } from '../store';
+import  { type ChatPlace } from '../scope';
+import  { type ChatSummary } from '../store';
 import { syncClientFor } from './sync-client';
 import {
+  type ChatListFilters,
   mergeChatRows,
+  type MergedChatRow,
   selectSyncedListSurface,
   serverListParams,
-  type ChatListFilters,
-  type MergedChatRow,
   type SyncedListSurface,
 } from './sync-list';
 import {
   bannerOf,
   onDeletedElsewhere,
   registerSyncUploader,
-  watchBanners,
   type SyncBanner,
+  watchBanners,
 } from './sync-service';
 import {
+  type ChatSyncSetting,
   markSyncNoticeSeen,
   readChatSyncSetting,
   readSyncNoticeSeen,
   writeChatSyncSetting,
-  type ChatSyncSetting,
 } from './sync-settings';
 export { selectChatSyncSettingState, type ChatSyncSettingState } from './sync-gate';
 import { syncedRecordsOfScope } from './sync-store';

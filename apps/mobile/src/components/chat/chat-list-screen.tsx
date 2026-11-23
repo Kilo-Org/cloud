@@ -28,8 +28,8 @@ import { useEffectiveTabBarHeight } from '@/lib/tab-bar-clearance';
 import { useOrganization } from '@/lib/organization-context';
 import { useLocalResetNotice } from '@/lib/persist/use-local-reset-notice';
 import {
-  DEFAULT_CHAT_FILTERS,
   type ChatListFilters,
+  DEFAULT_CHAT_FILTERS,
   type MergedChatRow,
 } from '@/lib/chat/sync/sync-list';
 import {

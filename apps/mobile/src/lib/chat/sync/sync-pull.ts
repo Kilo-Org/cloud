@@ -1,4 +1,4 @@
-import type { Turn } from '@kilocode/harness-sdk';
+import  { type Turn } from '@kilocode/harness-sdk';
 
 import {
   applyPulled,
@@ -29,22 +29,26 @@ export async function pullChat(
     }
     return ready.kind === 'unknown-chat'
       ? { kind: 'unknown-chat' }
-      : ready.kind === 'pending'
+      : (ready.kind === 'pending'
         ? { kind: 'pending' }
-        : { kind: 'failed', code: ready.code };
+        : { kind: 'failed', code: ready.code });
   }
   const pulled = await deps.transport.pull(ready.serverId);
   switch (pulled.type) {
-    case 'deleted':
+    case 'deleted': {
       saveSyncRecord(deps.db, input.sessionId, { phase: 'deleted', outbox: null });
       await deps.forgetLocal(input.sessionId);
       return { kind: 'deleted' };
-    case 'not_found':
+    }
+    case 'not_found': {
       return { kind: 'not-found' };
-    case 'retryable':
+    }
+    case 'retryable': {
       return { kind: 'pending' };
-    case 'failed':
+    }
+    case 'failed': {
       return { kind: 'failed', code: pulled.code };
+    }
     case 'pulled': {
       if (
         pulled.snapshot.position === ready.record.acknowledged &&

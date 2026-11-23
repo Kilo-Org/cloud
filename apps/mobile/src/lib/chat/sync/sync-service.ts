@@ -2,25 +2,25 @@ import { randomUUID } from 'expo-crypto';
 import * as Crypto from 'expo-crypto';
 import { Effect, ManagedRuntime, Option } from 'effect';
 import { SessionStore, type Turn } from '@kilocode/harness-sdk';
-import type { SQLiteDatabase } from 'expo-sqlite';
+import  { type SQLiteDatabase } from 'expo-sqlite';
 
 import { encryptedDatabase } from '@/lib/persist/encrypted-kv';
 
 import { chatLayers, organizationIdOf } from '../layers';
 import { enterChat, releaseChat, SYSTEM } from '../registry';
-import type { ChatPlace } from '../scope';
+import  { type ChatPlace } from '../scope';
 import {
+  type ChatDatabase,
   deleteChat,
   modelOfSession,
   recordOfChat,
   rememberChat,
-  type ChatDatabase,
 } from '../store';
 import { runBackfill } from './sync-backfill';
-import { syncClientFor, type SyncClient } from './sync-client';
+import { type SyncClient, syncClientFor } from './sync-client';
 import {
-  uploadChat,
   type SyncDeps,
+  uploadChat,
   type UploadOutcome,
 } from './sync-engine';
 import { mintServerSessionId } from './sync-ids';
@@ -124,7 +124,7 @@ async function depsFor(place: ChatPlace): Promise<{ deps: SyncDeps; client: Sync
             prompted: Option.isSome(held) ? (held.value.prompted ?? 0) : 0,
           });
           yield* store.flush();
-        }) as Effect.Effect<void, unknown, never>
+        }) as Effect.Effect<void, unknown>
       );
     },
     forgetLocal: async sessionId => {
@@ -279,9 +279,10 @@ export async function prepareSend(
       liveElsewhere: live,
     });
     switch (admission.kind) {
-      case 'local-turn':
+      case 'local-turn': {
         setBanner(sessionId, { kind: 'none' });
         return { kind: 'local' };
+      }
       case 'live-elsewhere': {
         setBanner(sessionId, { kind: 'live' });
         const sent = await client.sendLiveMessage(record.serverSessionId, text);
@@ -291,16 +292,20 @@ export async function prepareSend(
         }
         return { kind: 'blocked', reason: 'unavailable' };
       }
-      case 'busy':
+      case 'busy': {
         setBanner(sessionId, { kind: 'busy' });
         return { kind: 'blocked', reason: 'busy' };
-      case 'diverged':
+      }
+      case 'diverged': {
         setBanner(sessionId, { kind: 'diverged' });
         return { kind: 'blocked', reason: 'diverged' };
-      case 'deleted':
+      }
+      case 'deleted': {
         return { kind: 'blocked', reason: 'deleted' };
-      case 'unavailable':
+      }
+      case 'unavailable': {
         return { kind: 'blocked', reason: 'unavailable' };
+      }
     }
   } catch {
     return { kind: 'blocked', reason: 'unavailable' };
@@ -433,7 +438,7 @@ async function loadTurns(place: ChatPlace, sessionId: string): Promise<readonly 
         const store = yield* SessionStore;
         const held = yield* store.load(sessionId);
         return [...held] as readonly Turn[];
-      }) as Effect.Effect<readonly Turn[], unknown, never>
+      }) as Effect.Effect<readonly Turn[], unknown>
     );
   } catch {
     return [];

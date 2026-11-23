@@ -1,14 +1,14 @@
-import type { ListedSession } from '@kilocode/cloud-agent-sdk';
+import  { type ListedSession } from '@kilocode/cloud-agent-sdk';
 import { describe, expect, it } from 'vitest';
 
-import type { ChatSummary } from '../store';
+import  { type ChatSummary } from '../store';
 import {
   DEFAULT_CHAT_FILTERS,
   mergeChatRows,
   selectSyncedListSurface,
   serverListParams,
 } from './sync-list';
-import type { SyncRecord } from './sync-store';
+import  { type SyncRecord } from './sync-store';
 
 const chat = (over: Partial<ChatSummary> = {}): ChatSummary => ({
   sessionId: 'ses_local1',

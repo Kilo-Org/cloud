@@ -1,4 +1,4 @@
-import type { UploadOutcome } from './sync-engine';
+import  { type UploadOutcome } from './sync-engine';
 
 /**
  * Backfill: the chats that existed before sync was available, uploaded in

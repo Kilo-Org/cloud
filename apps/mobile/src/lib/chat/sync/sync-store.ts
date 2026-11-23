@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import type { ChatDatabase } from '../store';
+import  { type ChatDatabase } from '../store';
 
 /**
  * The sync record one chat carries, in the `chats` row beside the harness
@@ -163,7 +163,7 @@ export function saveSyncRecord(db: ChatDatabase, sessionId: string, patch: SyncR
     }
     sets.push(`${column} = ?`);
     values.push(key === 'messageMap' ? JSON.stringify(value) : (value as string | number));
-    if (values[values.length - 1] === null) {
+    if (values.at(-1) === null) {
       // SQLite binds a JS null through the same parameter slot; the database
       // shim only admits strings and numbers, so null writes ride as SQL.
       values.pop();

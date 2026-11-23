@@ -1,5 +1,5 @@
-import type { PortableMessage, PulledMessage } from '@kilocode/cloud-agent-sdk';
-import type { Turn } from '@kilocode/harness-sdk';
+import  { type PortableMessage, type PulledMessage } from '@kilocode/cloud-agent-sdk';
+import  { type Turn } from '@kilocode/harness-sdk';
 
 import { idleMsgIdForTurn, importedPartId, importedTurnId, msgIdForTurn, ulidTimeMs } from './sync-ids';
 
@@ -156,8 +156,8 @@ export function turnsToPortable(
       time: { created, completed: created },
     });
   }
-  const last = sequenced[sequenced.length - 1];
-  if (options.idleSeq !== null && last !== undefined && last.turn.role === 'assistant') {
+  const last = sequenced.at(-1);
+  if (options.idleSeq !== null && last?.turn.role === 'assistant') {
     messages.push({
       type: 'idle',
       id: idleMsgIdForTurn(last.turn.id),
@@ -242,7 +242,7 @@ export function pulledToTurns(pulled: readonly PulledMessage[], sessionId: strin
     }
     if (results.length > 0) {
       turns.push({
-        id: importedTurnId(created, seq) + 'R',
+        id: `${importedTurnId(created, seq)  }R`,
         sessionId,
         role: 'user',
         parts: results,

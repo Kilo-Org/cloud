@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Text } from '@/components/ui/text';
-import type { SyncBanner } from '@/lib/chat/sync/sync-service';
+import  { type SyncBanner } from '@/lib/chat/sync/sync-service';
 
 /**
  * The strip a synced chat wears while another device owns its next turn:
@@ -26,9 +26,9 @@ export function ChatSyncBanner({
   const copy =
     banner.kind === 'busy'
       ? { title: t('modelChat.sync.busyTitle'), body: t('modelChat.sync.busyBody') }
-      : banner.kind === 'live'
+      : (banner.kind === 'live'
         ? { title: t('modelChat.sync.liveTitle'), body: t('modelChat.sync.liveBody') }
-        : { title: t('modelChat.sync.divergedTitle'), body: t('modelChat.sync.divergedBody') };
+        : { title: t('modelChat.sync.divergedTitle'), body: t('modelChat.sync.divergedBody') });
   return (
     <View
       accessibilityRole="alert"

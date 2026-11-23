@@ -1,7 +1,7 @@
-import type { ListedSession } from '@kilocode/cloud-agent-sdk';
+import  { type ListedSession } from '@kilocode/cloud-agent-sdk';
 
-import type { ChatSummary } from '../store';
-import type { SyncRecord } from './sync-store';
+import  { type ChatSummary } from '../store';
+import  { type SyncRecord } from './sync-store';
 
 /**
  * The merged chat list: local chats and server sessions as one row type.

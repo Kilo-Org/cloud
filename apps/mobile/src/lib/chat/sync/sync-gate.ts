@@ -1,4 +1,4 @@
-import type { ChatSyncSetting } from './sync-settings';
+import  { type ChatSyncSetting } from './sync-settings';
 
 /**
  * The setting as the app knows it: still being read, unreadable (with

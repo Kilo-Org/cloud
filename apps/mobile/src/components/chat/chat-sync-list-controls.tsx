@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { SCREEN_GUTTER_CLASS } from '@/lib/layout';
 import { cn } from '@/lib/utils';
-import type { ChatListFilters } from '@/lib/chat/sync/sync-list';
+import  { type ChatListFilters } from '@/lib/chat/sync/sync-list';
 
 /**
  * The synced list's filters: title search, origin (all, mobile, CLI), and

@@ -1,20 +1,20 @@
 import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 
-import type { NativeSyncPacket, PulledSnapshot } from '@kilocode/cloud-agent-sdk';
-import type { Turn } from '@kilocode/harness-sdk';
+import  { type NativeSyncPacket, type PulledSnapshot } from '@kilocode/cloud-agent-sdk';
+import  { type Turn } from '@kilocode/harness-sdk';
 import { monotonicFactory } from 'ulid';
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { moveChat, rememberChat, type ChatDatabase } from '../store';
+import { type ChatDatabase, moveChat, rememberChat } from '../store';
 import {
   base64ToBytes,
-  uploadChat,
   type SyncCommitResult,
   type SyncDeps,
   type SyncPullResult,
   type SyncRegisterResult,
   type SyncTransport,
+  uploadChat,
 } from './sync-engine';
 import { admitTurn, discardDiverged, pullChat } from './sync-pull';
 import { syncRecordOf } from './sync-store';

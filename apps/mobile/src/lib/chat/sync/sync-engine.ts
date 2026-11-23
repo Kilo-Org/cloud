@@ -2,29 +2,29 @@ import {
   classifyConflict,
   encodeMessageChanges,
   encodeSessionEntity,
-  nextSeq,
   type NativeSyncPacket,
+  nextSeq,
   type PortableSession,
   type PulledSnapshot,
 } from '@kilocode/cloud-agent-sdk';
-import type { Turn } from '@kilocode/harness-sdk';
+import  { type Turn } from '@kilocode/harness-sdk';
 
-import type { ChatDatabase } from '../store';
+import  { type ChatDatabase } from '../store';
 import { importedTurnId, msgIdForTurn } from './sync-ids';
 import {
   imagePartsOf,
-  pulledToTurns,
-  turnsToPortable,
   type PortableModelRef,
+  pulledToTurns,
   type SequencedTurn,
+  turnsToPortable,
   type UploadedBlob,
 } from './sync-mapping';
 import {
   saveSyncRecord,
   stampServerSessionId,
-  syncRecordOf,
   type SyncMessageMap,
   type SyncRecord,
+  syncRecordOf,
 } from './sync-store';
 
 /**
@@ -122,7 +122,7 @@ const BASE64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/
 
 /** Decodes the base64 an image part stores, without a platform global. */
 export function base64ToBytes(base64: string): Uint8Array {
-  const clean = base64.replace(/[^A-Za-z0-9+/=]/g, '');
+  const clean = base64.replaceAll(/[^A-Za-z0-9+/=]/g, '');
   const bytes: number[] = [];
   for (let index = 0; index + 3 < clean.length; index += 4) {
     const a = BASE64.indexOf(clean[index] ?? '');
@@ -134,7 +134,7 @@ export function base64ToBytes(base64: string): Uint8Array {
     }
     bytes.push((a << 2) | (b >> 4));
     if (c !== -1) {
-      bytes.push(((b & 0x0f) << 4) | (c >> 2));
+      bytes.push(((b & 0x0F) << 4) | (c >> 2));
     }
     if (d !== -1) {
       bytes.push(((c & 0x03) << 6) | d);
@@ -237,20 +237,24 @@ export async function ensureRegistered(
   }
   const registered = await deps.transport.register(serverId, sourceId);
   switch (registered.type) {
-    case 'registered':
+    case 'registered': {
       saveSyncRecord(deps.db, sessionId, {
         sourceId,
         phase: record.outbox === null ? 'synced' : 'pending',
         acknowledged: Math.max(record.acknowledged, registered.position),
       });
       return { kind: 'ready', record: syncRecordOf(deps.db, sessionId) ?? record, serverId };
-    case 'deleted':
+    }
+    case 'deleted': {
       saveSyncRecord(deps.db, sessionId, { phase: 'deleted', outbox: null });
       return { kind: 'deleted' };
-    case 'retryable':
+    }
+    case 'retryable': {
       return { kind: 'pending' };
-    case 'failed':
+    }
+    case 'failed': {
       return { kind: 'failed', code: registered.code };
+    }
   }
 }
 
@@ -330,9 +334,9 @@ export async function uploadChat(
     }
     return ready.kind === 'unknown-chat'
       ? { kind: 'unknown-chat' }
-      : ready.kind === 'pending'
+      : (ready.kind === 'pending'
         ? { kind: 'pending' }
-        : { kind: 'failed', code: ready.code };
+        : { kind: 'failed', code: ready.code });
   }
   const { serverId } = ready;
   let record = ready.record;
@@ -370,7 +374,7 @@ export async function uploadChat(
       : { kind: 'synced', position: resentPosition };
   }
   const now = deps.now();
-  const lastAssistant = sequenced[sequenced.length - 1]?.turn.role === 'assistant';
+  const lastAssistant = sequenced.at(-1)?.turn.role === 'assistant';
   const idleSeq = lastAssistant ? nextSeq(maxSeq, maxSeq) : null;
   const finalMaxSeq = idleSeq ?? maxSeq;
 
@@ -417,7 +421,7 @@ async function commitFrozen(
 ): Promise<UploadOutcome> {
   const result = await deps.transport.commit(serverId, frozen.packet);
   switch (result.type) {
-    case 'committed':
+    case 'committed': {
       saveSyncRecord(deps.db, input.sessionId, {
         phase: 'synced',
         outbox: null,
@@ -428,19 +432,24 @@ async function commitFrozen(
         maxSeq: frozen.maxSeq,
       });
       return { kind: 'synced', position: result.receipt.through };
-    case 'deleted':
+    }
+    case 'deleted': {
       saveSyncRecord(deps.db, input.sessionId, { phase: 'deleted', outbox: null });
       await deps.forgetLocal(input.sessionId);
       return { kind: 'deleted' };
-    case 'retryable':
+    }
+    case 'retryable': {
       saveSyncRecord(deps.db, input.sessionId, { phase: 'pending' });
       return { kind: 'pending' };
-    case 'failed':
+    }
+    case 'failed': {
       saveSyncRecord(deps.db, input.sessionId, { phase: 'pending' });
       return { kind: 'failed', code: result.code };
+    }
     case 'superseded':
-    case 'conflict':
+    case 'conflict': {
       return resolveConflict(deps, input, serverId, frozen, mayRebatch);
+    }
   }
 }
 
@@ -454,17 +463,21 @@ async function resolveConflict(
 ): Promise<UploadOutcome> {
   const pulled = await deps.transport.pull(serverId);
   switch (pulled.type) {
-    case 'deleted':
+    case 'deleted': {
       saveSyncRecord(deps.db, input.sessionId, { phase: 'deleted', outbox: null });
       await deps.forgetLocal(input.sessionId);
       return { kind: 'deleted' };
+    }
     case 'not_found':
-    case 'retryable':
+    case 'retryable': {
       return { kind: 'pending' };
-    case 'failed':
+    }
+    case 'failed': {
       return { kind: 'failed', code: pulled.code };
-    case 'pulled':
+    }
+    case 'pulled': {
       break;
+    }
   }
   const snapshot = pulled.snapshot;
   const record = syncRecordOf(deps.db, input.sessionId);

@@ -1,5 +1,5 @@
-import type { PulledMessage } from '@kilocode/cloud-agent-sdk';
-import type { Turn } from '@kilocode/harness-sdk';
+import  { type PulledMessage } from '@kilocode/cloud-agent-sdk';
+import  { type Turn } from '@kilocode/harness-sdk';
 import { monotonicFactory } from 'ulid';
 import { describe, expect, it } from 'vitest';
 
@@ -8,9 +8,9 @@ import {
   imagePartsOf,
   portableModelRef,
   pulledToTurns,
+  type SequencedTurn,
   tailStateOf,
   turnsToPortable,
-  type SequencedTurn,
 } from './sync-mapping';
 
 const nextId = monotonicFactory();

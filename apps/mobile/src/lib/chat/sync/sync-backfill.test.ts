@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { runBackfill } from './sync-backfill';
-import type { UploadOutcome } from './sync-engine';
+import  { type UploadOutcome } from './sync-engine';
 
 /**
  * Backfill under upgrade: existing chats upload in the background, one at a
@@ -61,7 +61,7 @@ describe('runBackfill', () => {
 
   it('stops before the next request once sync is off, leaving the rest local', async () => {
     const run = make({ chats: ['a', 'b', 'c'], outcomes: {} });
-    run.stillOn.mockImplementation(async () => run.requested.length < 1);
+    run.stillOn.mockImplementation(async () => run.requested.length === 0);
     expect(await run.result()).toEqual({ kind: 'stopped', uploaded: 1 });
     expect(run.requested).toEqual(['a']);
   });

@@ -129,18 +129,18 @@ export function ChatRow({
                 accessibilityLabel={t(
                   origin === 'cli'
                     ? 'agentChat.sessionFilter.platformCli'
-                    : origin === 'cloud-agent'
+                    : (origin === 'cloud-agent'
                       ? 'agentChat.sessionFilter.platformCloud'
-                      : 'modelChat.sync.originMobile'
+                      : 'modelChat.sync.originMobile')
                 )}
               >
                 {origin === 'cli' ? (
                   <Terminal size={14} color={colors.mutedForeground} />
-                ) : origin === 'cloud-agent' ? (
+                ) : (origin === 'cloud-agent' ? (
                   <Cloud size={14} color={colors.mutedForeground} />
                 ) : (
                   <Smartphone size={14} color={colors.mutedForeground} />
-                )}
+                ))}
               </View>
             )
           }

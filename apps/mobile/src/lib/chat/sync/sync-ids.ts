@@ -23,7 +23,7 @@ export function isServerSessionId(value: string): boolean {
  * per call; it is injected so tests can pin the suffix.
  */
 export function mintServerSessionId(now: number, random: () => number): string {
-  const descending = (0xffff_ffff_ffffn - BigInt(Math.max(0, Math.floor(now))))
+  const descending = (0xFFFF_FFFF_FFFFn - BigInt(Math.max(0, Math.floor(now))))
     .toString(16)
     .padStart(12, '0')
     .slice(-12);
@@ -36,7 +36,7 @@ export function mintServerSessionId(now: number, random: () => number): string {
 
 /** The stable `msg_` id a harness turn uploads under. */
 export function msgIdForTurn(turnId: string): string {
-  const suffix = turnId.replace(/[^0-9A-Za-z]/g, '').replace(/^trn/i, '');
+  const suffix = turnId.replaceAll(/[^0-9A-Za-z]/g, '').replace(/^trn/i, '');
   return `msg_${suffix === '' ? 'turn' : suffix}`;
 }
 

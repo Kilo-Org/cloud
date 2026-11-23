@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { normalizeShareIntent } from './share-payload';
+import { utf8ByteLength } from './utf8-utils';
 
 vi.mock('expo-crypto', () => {
   let n = 0;
@@ -14,7 +15,10 @@ vi.mock('expo-crypto', () => {
 
 const expoFileSystemMock = vi.hoisted(() => {
   const files = new Map<string, string>();
+  const createdNames: string[] = [];
   const File = vi.fn(function FileMock(_base: unknown, ...rest: unknown[]) {
+    const name = rest.length > 0 ? String(rest[0]) : String(_base);
+    createdNames.push(name);
     const uri =
       rest.length > 0 ? `${(_base as { uri: string }).uri}/${String(rest[0])}` : String(_base);
     return {
@@ -31,10 +35,12 @@ const expoFileSystemMock = vi.hoisted(() => {
       delete() {
         files.delete(uri);
       },
+      copy: () => Promise.resolve(),
     };
   });
   return {
     File,
+    createdNames,
     Paths: { cache: { uri: 'file:///cache' } },
   };
 });
@@ -185,5 +191,43 @@ describe('normalizeShareIntent partial copy failures', () => {
     );
 
     expect(payload).toEqual({ text: '', files: [], failedFiles: ['shared-file'] });
+  });
+});
+
+describe('normalizeShareIntent default cache copy', () => {
+  it('bounds the cache file name of an attachment whose display name is too long', async () => {
+    expoFileSystemMock.createdNames.length = 0;
+    const displayName = `${'写真'.repeat(300)}.pdf`;
+
+    const payload = await normalizeShareIntent({
+      text: '',
+      webUrl: null,
+      meta: null,
+      files: [
+        {
+          fileName: displayName,
+          mimeType: 'application/pdf',
+          path: 'file:///share/long.pdf',
+          size: 3,
+          width: null,
+          height: null,
+          duration: null,
+        },
+      ],
+    });
+
+    expect(payload.failedFiles).toEqual([]);
+    expect(payload.files).toHaveLength(1);
+    // The name the composer shows is the sender's display name, unchanged.
+    expect(payload.files.at(0)?.name).toBe(displayName);
+    expect(payload.files.at(0)?.uri.startsWith('file:///cache/share-')).toBe(true);
+
+    const constructedCacheNames = expoFileSystemMock.createdNames.filter(name =>
+      name.startsWith('share-')
+    );
+    expect(constructedCacheNames).toHaveLength(1);
+    const cacheName = constructedCacheNames.at(-1) ?? '';
+    expect(utf8ByteLength(cacheName)).toBeLessThanOrEqual(255);
+    expect(cacheName.endsWith('.pdf')).toBe(true);
   });
 });

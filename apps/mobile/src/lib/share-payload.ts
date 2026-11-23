@@ -5,9 +5,11 @@ import { File, Paths } from 'expo-file-system';
 import { type ShareIntent } from 'expo-share-intent';
 
 import { type AgentAttachmentCandidate } from '@/lib/agent-attachments/use-agent-attachment-upload';
+import { boundFilenameSegment, MAX_CACHE_FILENAME_BYTES } from '@/lib/cache-filename';
 import type * as DraftsModule from '@/lib/persist/drafts';
 import { captureTelemetry } from '@/lib/telemetry/error-sink';
 import { registerTempFile } from '@/lib/temp-file-registry';
+import { utf8ByteLength } from '@/lib/utf8-utils';
 
 // Durable persistence of the in-memory payload store (DEC-01 drafts). Loaded
 // lazily via dynamic import so unit tests that only touch the in-memory map or
@@ -545,7 +547,15 @@ export function composeShareText(shareIntent: ShareIntentLike): string {
 
 async function defaultCopyToCache(args: { from: string; fileName: string }): Promise<string> {
   const safeName = args.fileName.replaceAll(/[/\\]/g, '_') || 'shared-file';
-  const destination = new File(Paths.cache, `share-${Crypto.randomUUID()}-${safeName}`);
+  const prefix = `share-${Crypto.randomUUID()}-`;
+  // A display name comes from the sharing app and has no length bound: it can
+  // be longer than the filesystem's per-component limit, and a rejected create
+  // drops the attachment instead of copying it.
+  const nameBudget = MAX_CACHE_FILENAME_BYTES - utf8ByteLength(prefix);
+  const destination = new File(
+    Paths.cache,
+    `${prefix}${boundFilenameSegment(safeName, nameBudget)}`
+  );
   await new File(args.from).copy(destination);
   registerTempFile(destination.uri);
   return destination.uri;

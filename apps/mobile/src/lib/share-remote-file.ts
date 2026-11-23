@@ -3,11 +3,10 @@ import { Directory, File, Paths } from 'expo-file-system';
 import { fetch } from 'expo/fetch';
 import * as Sharing from 'expo-sharing';
 
+import { boundFilenameSegment, getExtension, MAX_CACHE_FILENAME_BYTES } from './cache-filename';
 import { registerTempFile } from './temp-file-registry';
 import { isAbortError, isRequestDeadlineError } from './telemetry/abort-classification';
 import { truncateUtf8, utf8ByteLength } from './utf8-utils';
-
-const MAX_CACHE_FILENAME_BYTES = 255;
 
 /**
  * How long a share's transfer may take. A phone on a bad connection still
@@ -325,31 +324,4 @@ function deleteQuietly(file: File): void {
 function safePathSegment(value: string): string {
   const sanitized = value.trim().replaceAll(/[^a-zA-Z0-9._-]/g, '_');
   return sanitized.length > 0 ? sanitized : 'attachment';
-}
-
-function boundFilenameSegment(filename: string, maxBytes: number): string {
-  if (utf8ByteLength(filename) <= maxBytes) {
-    return filename;
-  }
-
-  const extension = getExtension(filename);
-  const extensionBytes = utf8ByteLength(extension);
-  if (extension.length > 0 && extensionBytes < maxBytes) {
-    const stem = filename.slice(0, -extension.length);
-    const truncatedStem = truncateUtf8(stem, maxBytes - extensionBytes);
-    if (truncatedStem.length > 0) {
-      return `${truncatedStem}${extension}`;
-    }
-  }
-
-  return truncateUtf8(filename, maxBytes);
-}
-
-function getExtension(filename: string): string {
-  const extensionStart = filename.lastIndexOf('.');
-  if (extensionStart <= 0 || extensionStart === filename.length - 1) {
-    return '';
-  }
-
-  return filename.slice(extensionStart);
 }

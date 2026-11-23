@@ -113,6 +113,9 @@ function FormField({
   // error known from elsewhere (a rejected submit). Either one marks the field
   // invalid; the field's own rule wins while it has something to say.
   const displayedError = (validate ? validationError : null) ?? error;
+  // `Input` reads the same prop for its box, so the two agree on the shape on
+  // screen.
+  const isMultiline = props.multiline === true;
 
   // Write the default only on attach; later prop changes must not move the caret
   // while the person edits an uncontrolled field.
@@ -150,6 +153,10 @@ function FormField({
           }}
           {...props}
           defaultValue={defaultValue}
+          // The single-line box paints this value from its start while it is
+          // unfocused; a multiline field keeps the real input, whose box already
+          // starts at its top left.
+          restingText={isMultiline ? undefined : (defaultValue ?? '')}
           editable={!disabled}
           // A field's content follows the interface direction, not the script of
           // its own value, so an email address stays on the same side as its

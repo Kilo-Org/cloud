@@ -1,5 +1,7 @@
-import { type StyleProp, TextInput, type TextInputProps, type TextStyle } from 'react-native';
+import { useRef, useState } from 'react';
+import { type StyleProp, TextInput, type TextInputProps, type TextStyle, View } from 'react-native';
 
+import { Text } from '@/components/ui/text';
 import { useSystemFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { resolveFontScaleCap } from '@/lib/font-scale/text-scale-cap';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -52,10 +54,26 @@ function Input({
   lineBreakModeIOS,
   numberOfLines,
   maxFontSizeMultiplier,
+  // The value a single-line field shows while it is not focused. A resting
+  // single-line field keeps the native EditText's scroll offset at its caret
+  // (measured on Android), so a value longer than the box paints its tail with
+  // its first glyph cut at the leading inset; while unfocused the preview paints
+  // that value from its start and clips the end, which is what a field at rest
+  // must show.
+  restingText,
+  onChangeText,
+  onFocus,
+  onBlur,
   ...props
-}: Readonly<TextInputProps & React.RefAttributes<TextInput>>) {
+}: Readonly<TextInputProps & React.RefAttributes<TextInput> & { restingText?: string }>) {
   const colors = useThemeColors();
   const fontScaleCap = resolveFontScaleCap(useSystemFontScale(), maxFontSizeMultiplier);
+  // The live value stays in a ref: this field is uncontrolled, so a keystroke
+  // must not re-render the box. Only focus, and the value the preview returns
+  // with on blur, re-render it.
+  const valueRef = useRef(restingText ?? '');
+  const [focused, setFocused] = useState(false);
+  const [resting, setResting] = useState(restingText ?? '');
   // Fold the explicit `textAlign` prop into the style after the caller's own
   // style, so it lands after the RTL default too: RN flattens `style` after the
   // prop, so the prop alone would lose to `withRtlInputAlignment` in RTL.
@@ -63,7 +81,14 @@ function Input({
   const inputStyle: StyleProp<TextStyle> = multiline
     ? contentStyle
     : [contentStyle, INPUT_BOX_VERTICAL_STYLE];
-  return (
+  // Only a single-line field can rest: a multiline field's own box already
+  // starts at its top left, and a masked field must never paint its value in a
+  // `Text`. An empty field keeps its placeholder visible through the real input.
+  const hostsPreview = restingText !== undefined && multiline !== true;
+  const showsPreview =
+    hostsPreview && props.secureTextEntry !== true && !focused && resting.length > 0;
+
+  const input = (
     <TextInput
       {...props}
       maxFontSizeMultiplier={fontScaleCap ?? maxFontSizeMultiplier}
@@ -81,7 +106,65 @@ function Input({
       // field draws one. A caller's own mode still wins.
       lineBreakModeIOS={multiline ? lineBreakModeIOS : (lineBreakModeIOS ?? 'clip')}
       placeholderTextColor={placeholderTextColor ?? colors.mutedForeground}
+      onChangeText={
+        hostsPreview
+          ? value => {
+              valueRef.current = value;
+              onChangeText?.(value);
+            }
+          : onChangeText
+      }
+      onFocus={
+        hostsPreview
+          ? event => {
+              setFocused(true);
+              onFocus?.(event);
+            }
+          : onFocus
+      }
+      onBlur={
+        hostsPreview
+          ? event => {
+              setFocused(false);
+              setResting(valueRef.current);
+              onBlur?.(event);
+            }
+          : onBlur
+      }
     />
+  );
+  if (!hostsPreview) {
+    return input;
+  }
+  // One wrapper in both states: gaining or losing focus must not remount the
+  // native input, because a remount drops the text of an uncontrolled field.
+  return (
+    <View className="relative">
+      {input}
+      {showsPreview && (
+        <View
+          pointerEvents="none"
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          className={cn(
+            'absolute inset-px justify-center rounded-md bg-background pl-3 pr-3 dark:bg-[#FFFFFF0A]',
+            // The preview paints over the input, so it carries the disabled
+            // dimming the caller put on the input itself; otherwise a disabled
+            // field would look enabled while it rests.
+            props.editable === false && 'opacity-50'
+          )}
+        >
+          <Text
+            numberOfLines={1}
+            className="text-sm font-normal text-foreground"
+            style={withRtlInputAlignment(contentStyle)}
+            maxFontSizeMultiplier={fontScaleCap ?? maxFontSizeMultiplier}
+          >
+            {resting}
+          </Text>
+        </View>
+      )}
+    </View>
   );
 }
 

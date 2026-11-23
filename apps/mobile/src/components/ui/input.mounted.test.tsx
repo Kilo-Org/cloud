@@ -14,12 +14,14 @@ const appearance = vi.hoisted((): { colors: Record<string, string> } => ({ color
 vi.mock('react-native', () => ({
   Platform: { OS: 'android' },
   TextInput: 'TextInput',
+  View: 'View',
   I18nManager: {
     get isRTL() {
       return rtl.isRTL;
     },
   },
 }));
+vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => appearance.colors,
 }));
@@ -36,14 +38,30 @@ afterEach(() => {
   });
 });
 
-function mountInput(props: Readonly<TextInputProps> = {}) {
+/** The box's own props plus the resting preview's value. */
+type InputTestProps = TextInputProps & { restingText?: string };
+
+function mount(props: Readonly<InputTestProps> = {}) {
   act(() => {
     renderer = TestRenderer.create(createElement(Input, props));
   });
   if (!renderer) {
     throw new Error('renderer was not created');
   }
-  return renderer.root.findByType('TextInput');
+  return renderer;
+}
+
+function mountInput(props: Readonly<InputTestProps> = {}) {
+  return mount(props).root.findByType('TextInput');
+}
+
+/** The native field's handlers, typed so a test can drive focus and typing. */
+function fieldHandlers(node: TestRenderer.ReactTestInstance) {
+  return node.props as {
+    onFocus?: (event: unknown) => void;
+    onChangeText?: (value: string) => void;
+    onBlur?: (event: unknown) => void;
+  };
 }
 
 /**
@@ -133,5 +151,81 @@ describe('Input single-line box', () => {
     expect(classes).not.toContain('min-h-[44px]');
     expect(classes).not.toContain('leading-[normal]');
     expect(classes).toEqual(expect.arrayContaining(['pt-2.5', 'pb-2.5', 'pl-3', 'pr-3']));
+  });
+});
+
+describe('Input resting preview', () => {
+  // Longer than the box, so a value that scrolled to its caret would show its
+  // tail instead of the start this preview paints.
+  const longValue = 'kilo-org/cloud-streaming-agent-session-worker-2026';
+
+  it('paints the resting value from its start and keeps the real input', () => {
+    const mounted = mount({ restingText: longValue });
+
+    const previews = mounted.root.findAllByType('Text');
+
+    expect(previews).toHaveLength(1);
+    expect(previews[0].props.children).toBe(longValue);
+    expect(mounted.root.findAllByType('TextInput')).toHaveLength(1);
+  });
+
+  it('paints the resting value with the input’s own weight and size', () => {
+    // `Text` seats `text-base font-medium`; the native value is a normal-weight
+    // `text-sm`, so the preview overrides both or the resting value changes
+    // weight the moment it swaps back to the real input.
+    const classes = String(
+      mount({ restingText: longValue }).root.findByType('Text').props.className
+    ).split(' ');
+
+    expect(classes).toEqual(expect.arrayContaining(['text-sm', 'font-normal']));
+  });
+
+  it('drops the preview on focus and returns with the typed value on blur', () => {
+    const mounted = mount({ restingText: longValue });
+
+    act(() => {
+      fieldHandlers(mounted.root.findByType('TextInput')).onFocus?.({});
+    });
+
+    expect(mounted.root.findAllByType('Text')).toHaveLength(0);
+    // The wrapper stays across the state change: a field that swapped it out
+    // would remount the native input and drop its text.
+    expect(mounted.root.findAllByType('View')).toHaveLength(1);
+
+    act(() => {
+      const handlers = fieldHandlers(mounted.root.findByType('TextInput'));
+      handlers.onChangeText?.('kilo');
+      handlers.onBlur?.({});
+    });
+
+    expect(mounted.root.findByType('Text').props.children).toBe('kilo');
+  });
+
+  it('never paints a masked field’s value', () => {
+    const mounted = mount({ restingText: longValue, secureTextEntry: true });
+
+    expect(mounted.root.findAllByType('Text')).toHaveLength(0);
+  });
+
+  it('leaves a multiline field’s own box alone', () => {
+    const mounted = mount({ restingText: longValue, multiline: true });
+
+    expect(mounted.root.findAllByType('View')).toHaveLength(0);
+    expect(mounted.root.findAllByType('Text')).toHaveLength(0);
+  });
+
+  it('keeps the placeholder of a field that rests without a value', () => {
+    const mounted = mount({ restingText: '' });
+
+    expect(mounted.root.findAllByType('Text')).toHaveLength(0);
+    expect(mounted.root.findAllByType('TextInput')).toHaveLength(1);
+  });
+
+  it('adds no wrapper or preview to a field without a resting value', () => {
+    const mounted = mount({ defaultValue: longValue });
+
+    expect(mounted.root.findAllByType('View')).toHaveLength(0);
+    expect(mounted.root.findAllByType('Text')).toHaveLength(0);
+    expect(mounted.root.findAllByType('TextInput')).toHaveLength(1);
   });
 });

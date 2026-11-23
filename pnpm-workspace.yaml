@@ -201,8 +201,6 @@ overrides:
   '@babel/core': 7.29.7
   mdast-util-to-hast: 13.2.1
   storybook: 10.6.2
-  # Read the catalog pin: web-shared must resolve the same `next` instance as
-  # apps/web, and one literal for three apps and the shared package is the point.
   next: 'catalog:'
   preact: 10.28.4
   adm-zip: 0.6.1

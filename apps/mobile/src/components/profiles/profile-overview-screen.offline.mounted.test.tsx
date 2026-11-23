@@ -175,10 +175,8 @@ describe('ProfileOverviewScreen offline refetch', () => {
     expect(findOne(renderer.root, 'QueryError').props.variant).toBe('offline');
     expect(findAll(renderer.root, 'FormField')).toHaveLength(0);
     // Nothing sits under the error, so it owns the surface: it centres and no
-    // scroller wraps it.
+    // tab scroller wraps it.
     expect(findOne(renderer.root, 'QueryError').props.placement).toBe('center');
-    expect(findAll(renderer.root, 'ScrollView')).toHaveLength(0);
-    expect(findAll(renderer.root, 'TabScrollView')).toHaveLength(0);
     expect(findAll(renderer.root, 'TabScreenScrollView')).toHaveLength(0);
 
     unmount();

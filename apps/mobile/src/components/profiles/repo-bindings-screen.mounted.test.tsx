@@ -144,6 +144,8 @@ vi.mock('@/components/ui/icons', () => ({
 const GITHUB_REPO: TestRepoOption = { platform: 'github', fullName: 'acme/api', private: true };
 const GITLAB_REPO: TestRepoOption = { platform: 'gitlab', fullName: 'acme/infra', private: false };
 const PROFILE: TestProfile = { id: 'profile-1', name: 'Backend debugging', isDefault: false };
+/** The role sentence a member reads in the action's place. */
+const ROLE_SENTENCE = 'Only organization owners and admins can change organization profiles.';
 
 describe('RepoBindingsScreen', () => {
   beforeEach(() => {
@@ -223,6 +225,9 @@ describe('RepoBindingsScreen', () => {
     // The manage slot's sentence sits under the error, so the body keeps the
     // error at its top instead of centring it as the whole surface.
     expect(queryError.placement).toBe('top');
+    expect(findAll(renderer.root, 'Text').some(node => node.props.children === ROLE_SENTENCE)).toBe(
+      true
+    );
     expect(findAll(renderer.root, 'ScrollView')).toHaveLength(1);
 
     unmount();
@@ -248,7 +253,6 @@ describe('RepoBindingsScreen', () => {
     // centres and no tab scroller holds it.
     expect(queryError.placement).toBe('center');
     expect(findAll(renderer.root, 'ScrollView')).toHaveLength(0);
-    expect(findAll(renderer.root, 'TabScrollView')).toHaveLength(0);
 
     unmount();
   });

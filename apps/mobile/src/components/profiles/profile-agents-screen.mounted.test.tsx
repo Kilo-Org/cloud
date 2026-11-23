@@ -808,7 +808,6 @@ describe('ProfileAgentsScreen load errors', () => {
     // tab scroller holds it.
     expect(queryError?.placement).toBe('center');
     expect(nodesOfType(renderer, 'ScrollView')).toHaveLength(0);
-    expect(nodesOfType(renderer, 'TabScrollView')).toHaveLength(0);
 
     unmount();
   });

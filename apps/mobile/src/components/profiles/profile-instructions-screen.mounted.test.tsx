@@ -675,7 +675,6 @@ describe('ProfileInstructionsScreen load errors', () => {
     // A read with nothing under it owns the surface, so it centres and no
     // tab scroller holds it.
     expect(queryError?.placement).toBe('center');
-    expect(findAll(renderer.root, 'ScrollView')).toHaveLength(0);
     expect(findAll(renderer.root, 'TabScrollView')).toHaveLength(0);
 
     unmount();

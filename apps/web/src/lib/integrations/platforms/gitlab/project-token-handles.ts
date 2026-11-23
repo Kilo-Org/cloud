@@ -1,5 +1,5 @@
 import 'server-only';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { db } from '@kilocode/web-shared/lib/drizzle';
@@ -573,7 +573,7 @@ export const PROJECT_TOKEN_WALK_BUDGET_MS = 20_000;
 
 /**
  * Marks the credentials the walk does not reach after the deadline, in one read
- * and one transaction, so every project the walk lists is accounted for.
+ * and one statement, so every project the walk lists is accounted for.
  */
 async function markUnreachedProjectCredentialsUnusable(input: {
   integration: Pick<PlatformIntegration, 'id' | 'metadata'>;
@@ -628,30 +628,32 @@ async function markUnreachedProjectCredentialsUnusable(input: {
   if (pending.length === 0) return failures;
 
   const validatedAt = new Date().toISOString();
-  await db.transaction(async tx => {
-    for (const entry of pending) {
-      try {
-        const updated = await tx
-          .update(platform_access_token_credentials)
-          .set({ provider_metadata: entry.providerMetadata, last_validated_at: validatedAt })
-          .where(
-            and(
-              eq(platform_access_token_credentials.id, entry.credentialId),
-              eq(platform_access_token_credentials.credential_version, entry.credentialVersion)
-            )
-          )
-          .returning({ id: platform_access_token_credentials.id });
-        if (updated.length !== 1) {
-          failures.push({
-            projectId: entry.projectId,
-            error: new ProjectCredentialReplacedError(),
-          });
-        }
-      } catch (error) {
-        failures.push({ projectId: entry.projectId, error });
-      }
+  const updated = await db.execute<{ id: string; credential_version: number }>(sql`
+    UPDATE ${platform_access_token_credentials}
+    SET provider_metadata = marks.provider_metadata,
+        last_validated_at = ${validatedAt},
+        updated_at = now()
+    FROM (VALUES ${sql.join(
+      pending.map(
+        entry =>
+          sql`(${entry.credentialId}::uuid, ${entry.credentialVersion}::integer, ${JSON.stringify(entry.providerMetadata)}::jsonb)`
+      ),
+      sql`, `
+    )}) AS marks(id, credential_version, provider_metadata)
+    WHERE ${platform_access_token_credentials.id} = marks.id
+      AND ${platform_access_token_credentials.credential_version} = marks.credential_version
+    RETURNING ${platform_access_token_credentials.id} AS id,
+      ${platform_access_token_credentials.credential_version} AS credential_version
+  `);
+
+  // A pending entry whose row did not come back lost a version race: its
+  // credential was replaced between the read and this statement.
+  const marked = new Set(updated.rows.map(row => `${row.id}:${row.credential_version}`));
+  for (const entry of pending) {
+    if (!marked.has(`${entry.credentialId}:${entry.credentialVersion}`)) {
+      failures.push({ projectId: entry.projectId, error: new ProjectCredentialReplacedError() });
     }
-  });
+  }
   return failures;
 }
 

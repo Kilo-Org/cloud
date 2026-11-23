@@ -133,7 +133,6 @@ vi.mock('@/components/ui/icons', () => ({
 describe('ProfileSkillsScreen', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.restoreAllMocks();
     resetFormDraftsForTests();
     permissionState.permission = 'allowed';
     h.connectivity = 'online';
@@ -669,9 +668,6 @@ describe('ProfileSkillsScreen', () => {
     // request already left and there is nothing unsaved to discard.
     pressSheetCancel(renderer.root);
     expect(h.confirm).not.toHaveBeenCalled();
-    // The empty-state action is armed by the sheet that just closed, so the
-    // reopen is a deliberate press after that window.
-    vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 10_000);
     pressEmptyAction(renderer);
 
     await act(async () => {
@@ -702,9 +698,6 @@ describe('ProfileSkillsScreen', () => {
     // The save is still in flight, so the guard closes without asking.
     pressSheetCancel(renderer.root);
     expect(h.confirm).not.toHaveBeenCalled();
-    // The empty-state action is armed by the sheet that just closed, so the
-    // reopen is a deliberate press after that window.
-    vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 10_000);
     pressEmptyAction(renderer);
 
     await act(async () => {
@@ -977,7 +970,6 @@ function deleteRequest(): ConfirmRequest {
 describe('ProfileSkillsScreen delete confirmation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.restoreAllMocks();
     resetFormDraftsForTests();
     permissionState.permission = 'allowed';
     h.connectivity = 'online';

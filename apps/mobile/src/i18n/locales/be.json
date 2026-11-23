@@ -4595,7 +4595,7 @@
       "agents_one": "{{count}} агент",
       "agents_few": "{{count}} агенты",
       "agents_many": "{{count}} агентаў",
-      "agents_other": "{{count}} агенты"
+      "agents_other": "{{count}} агентаў"
     },
     "nameLabel": "Імя профілю",
     "namePlaceholder": "напр. Бэкэнд-адладка",

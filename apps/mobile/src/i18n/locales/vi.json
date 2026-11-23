@@ -676,6 +676,7 @@
     "needsInputAction": {
       "approved": "Yêu cầu đã được phê duyệt",
       "replied": "Phản hồi đã được gửi",
+      "empty": "Nhập câu trả lời rồi gửi.",
       "failed": "Không thể trả lời. Nhấn lại để thử lại.",
       "unavailable": "Yêu cầu này không còn chờ đợi nữa."
     }
@@ -817,6 +818,8 @@
     },
     "providerConnect": {
       "description": "Kết nối {{label}} của Kilo để tự động rà soát các yêu cầu hợp nhất.",
+      "notConnectedTitle": "{{platform}} chưa được kết nối",
+      "githubAdminOnlyDescription": "Chỉ chủ sở hữu tổ chức và quản trị viên mới có thể kết nối.",
       "githubApp": "ứng dụng GitHub",
       "githubError": "Không thể mở trang thiết lập GitHub. Vui lòng thử lại.",
       "gitlabAccount": "tài khoản GitLab",
@@ -1689,6 +1692,7 @@
       "couldNotLoadThisSession": "Không thể tải phiên này.",
       "historyTooLarge": "Kết xuất của phiên này quá lớn để tải.",
       "historyUnavailable": "Không thể đọc kết xuất của phiên này.",
+      "historyTemporarilyUnavailable": "Kết xuất của phiên này tạm thời không khả dụng.",
       "cloneFailedRetry": "Không thể sao chép phiên này. Hãy thử lại.",
       "notEnoughCredits": "Số dư không đủ cho yêu cầu này. Hãy nạp tiền và thử lại.",
       "previousTaskFinishing": "Tác vụ trước chưa hoàn tất. Vui lòng chờ một chút.",
@@ -2225,7 +2229,9 @@
       "skip": "Bỏ qua",
       "retrySkip": "Thử lại thao tác bỏ qua",
       "submitting": "Đang gửi…",
-      "sendAnswers": "Gửi câu trả lời"
+      "sendAnswers": "Gửi câu trả lời",
+      "unreadableTitle": "Không hiển thị được câu hỏi này",
+      "unreadableBody": "Tác nhân đang chờ một câu hỏi mà ứng dụng này không thể hiển thị. Hãy trả lời câu hỏi trong CLI để tiếp tục."
     },
     "blockingCard": {
       "questionUnavailable": "Câu hỏi này không còn hiệu lực.",
@@ -2252,6 +2258,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Không thể tải phiên tác nhân phụ.",
+      "historyTooLarge": "Lịch sử của tác nhân phụ này quá lớn để tải.",
+      "historyUnavailable": "Lịch sử của tác nhân phụ này không khả dụng.",
+      "historyTemporarilyUnavailable": "Lịch sử của tác nhân phụ này tạm thời không khả dụng.",
       "failed": "Phiên tác nhân phụ gặp lỗi.",
       "noMessages": "Tác nhân phụ chưa có tin nhắn",
       "noMessagesDescription": "Phiên tác nhân phụ này đã hoàn tất nhưng không có bản ghi.",
@@ -2832,6 +2841,8 @@
     "why": "Mục đích",
     "who": "Bên nhận dữ liệu",
     "installAttributionPromptMessage": "Kilo chỉ dùng quyền theo dõi của Apple để biết bạn tìm đến ứng dụng qua kênh nào. Nội dung yêu cầu và cuộc trò chuyện của bạn không bao giờ được dùng cho mục đích này.",
+    "installAttributionRequestFailedTitle": "Không thể hiển thị lời nhắc theo dõi",
+    "installAttributionRequestFailedMessage": "Kilo không thể hiển thị lời nhắc hệ thống, nên việc xác định nguồn cài đặt vẫn tắt.",
     "installAttributionPromptTitle": "Cho phép xác định nguồn cài đặt?"
   },
   "prReview": {
@@ -3399,7 +3410,7 @@
   "organization": {
     "auditLog": {
       "title": "Nhật ký kiểm tra",
-      "permissionDenied": "Chỉ chủ sở hữu, quản trị viên hoặc người quản lý thanh toán của tổ chức dùng gói Enterprise mới có thể xem nhật ký kiểm tra của tổ chức.",
+      "permissionDenied": "Chỉ chủ sở hữu, quản trị viên hoặc người quản lý thanh toán của tổ chức dùng gói Enterprise mới có thể xem nhật ký kiểm tra của tổ chức. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Không có sự kiện kiểm tra",
       "emptyDescription": "Các hành động được thực hiện trong tổ chức này sẽ hiển thị tại đây.",
       "truncated": "Đang hiển thị các sự kiện gần đây nhất.",
@@ -3589,7 +3600,7 @@
     },
     "billing": {
       "title": "Thanh toán",
-      "permissionDenied": "Chỉ chủ sở hữu, quản trị viên hoặc người quản lý thanh toán của tổ chức mới có thể xem thông tin thanh toán.",
+      "permissionDenied": "Chỉ chủ sở hữu, quản trị viên hoặc người quản lý thanh toán của tổ chức mới có thể xem thông tin thanh toán. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Gói đăng ký",
       "state": "Trạng thái",
       "stateNone": "Không có gói đăng ký",
@@ -3778,7 +3789,7 @@
       "emptyDescription": "Dùng Giờ cũ hơn để xem các yêu cầu trước đó.",
       "emptyBoundDescription": "Nhật ký yêu cầu không lưu xa hơn mốc này.",
       "loadError": "Không thể tải nhật ký yêu cầu.",
-      "permissionDenied": "Chỉ chủ sở hữu, quản trị viên hoặc người quản lý thanh toán của tổ chức mới có thể xem nhật ký yêu cầu của tổ chức.",
+      "permissionDenied": "Chỉ chủ sở hữu, quản trị viên hoặc người quản lý thanh toán của tổ chức mới có thể xem nhật ký yêu cầu của tổ chức. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} vào · {{output}} ra",
       "byok": "BYOK"
     },
@@ -4044,7 +4055,10 @@
     "list": {
       "loadFailed": "Không thể tải lịch sử trò chuyện.",
       "new": "Cuộc trò chuyện mới",
-      "deleteTitle": "Xóa cuộc trò chuyện này?"
+      "deleteTitle": "Xóa cuộc trò chuyện này?",
+      "resetNoticeTitle": "Đã xóa cuộc trò chuyện và bản nháp trên thiết bị",
+      "resetNoticeBody": "Kilo không thể mở các cuộc trò chuyện đã lưu trên thiết bị này. Các phiên trên đám mây của bạn không bị ảnh hưởng.",
+      "resetNoticeDismiss": "Bỏ qua thông báo"
     },
     "rename": {
       "title": "Đổi tên cuộc trò chuyện",
@@ -4876,7 +4890,7 @@
     "defaultModel": "Dùng mô hình mặc định của Kilo",
     "duration": "Giới hạn thời gian (phút)",
     "spendLimit": "Giới hạn chi phí (USD)",
-    "invalidSafeguards": "Nhập giới hạn thời gian và chi phí dương, hữu hạn.",
+    "invalidSafeguards": "Nhập một số dương trong phạm vi cho phép.",
     "estimate": "Ước tính {{estimate}} · tối đa {{maximum}}",
     "estimateUnavailable": "Không có bản tóm tắt trả phí cho các cài đặt này. Hãy đổi mô hình hoặc giới hạn, hoặc thử lại sau.",
     "confirmPaid": "Bật tóm tắt trả phí cho {{context}}?",
@@ -4946,7 +4960,8 @@
     "unavailableTitle": "Mức sử dụng không khả dụng",
     "unavailableDescription": "Mức sử dụng chưa được thiết lập cho vùng làm việc này. Hãy liên hệ bộ phận hỗ trợ nếu bạn nghĩ mức sử dụng lẽ ra phải hiển thị ở đây.",
     "orgSelfNotice": "Bạn đang xem mức sử dụng của chính mình trong tổ chức này.",
-    "viewDetails": "Xem chi tiết mức sử dụng"
+    "viewDetails": "Xem chi tiết mức sử dụng",
+    "orgSelfEntryTitle": "Mức sử dụng của bạn"
   },
   "integrations": {
     "title": "Tích hợp",
@@ -5042,6 +5057,8 @@
       "autoCommit": "Commit thay đổi khi lần chạy kết thúc",
       "condenseOnComplete": "Cô đọng ngữ cảnh khi lần chạy kết thúc",
       "activeTitle": "Trình kích hoạt đang hoạt động",
+      "activeSwitchA11y": "Trình kích hoạt đang hoạt động: {{name}}",
+      "copyLinkA11y": "Sao chép liên kết cho {{name}}",
       "activeDescription": "Webhook bị tạm dừng sẽ trả về 404.",
       "runAsCreator": "Chạy dưới danh nghĩa tôi",
       "runAsCreatorDescription": "Mỗi lần chạy đều dùng tài khoản của bạn, nên bắt buộc phải có tiêu đề bí mật.",

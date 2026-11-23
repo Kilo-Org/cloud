@@ -1266,6 +1266,7 @@
     "needsInputAction": {
       "approved": "Pieprasījums apstiprināts",
       "replied": "Atbilde nosūtīta",
+      "empty": "Ievadiet atbildi un pēc tam to nosūtiet.",
       "failed": "Neizdevās atbildēt. Pieskarieties vēlreiz, lai mēģinātu vēlreiz.",
       "unavailable": "Šis pieprasījums vairs negaida."
     }
@@ -1530,7 +1531,9 @@
       "githubError": "Neizdevās atvērt GitHub iestatīšanu. Lūdzu, mēģini vēlreiz.",
       "gitlabAccount": "GitLab konts",
       "gitlabError": "Neizdevās atvērt GitLab iestatīšanu. Lūdzu, mēģini vēlreiz.",
-      "description": "Pievieno Kilo integrāciju ({{label}}), lai automātiski pārskatītu izmaiņu pieprasījumus."
+      "description": "Pievieno Kilo integrāciju ({{label}}), lai automātiski pārskatītu izmaiņu pieprasījumus.",
+      "notConnectedTitle": "{{platform}} nav pievienots",
+      "githubAdminOnlyDescription": "To var pievienot tikai organizācijas īpašnieki un administratori."
     },
     "overview": {
       "allAreas": "Visas jomas",
@@ -2300,6 +2303,7 @@
       "couldNotLoadThisSession": "Neizdevās ielādēt šo sesiju.",
       "historyTooLarge": "Šīs sesijas ieraksts ir pārāk liels, lai to ielādētu.",
       "historyUnavailable": "Šīs sesijas ierakstu nevar nolasīt.",
+      "historyTemporarilyUnavailable": "Šīs sesijas ieraksts īslaicīgi nav pieejams.",
       "cloneFailedRetry": "Neizdevās klonēt šo sesiju. Mēģini vēlreiz.",
       "notEnoughCredits": "Nepietiek kredītu šim pieprasījumam. Papildini kredītus un mēģini vēlreiz.",
       "previousTaskFinishing": "Iepriekšējā uzdevuma izpilde vēl nav beigusies. Lūdzu, nedaudz uzgaidi.",
@@ -2840,7 +2844,9 @@
       "skip": "Izlaist",
       "retrySkip": "Mēģināt izlaist vēlreiz",
       "submitting": "Nosūta…",
-      "sendAnswers": "Nosūtīt atbildes"
+      "sendAnswers": "Nosūtīt atbildes",
+      "unreadableTitle": "Šo jautājumu nevarēja parādīt",
+      "unreadableBody": "Aģents gaida jautājumu, ko šī lietotne nevar parādīt. Atbildēt uz to CLI, lai turpinātu."
     },
     "blockingCard": {
       "questionUnavailable": "Šis jautājums vairs nav pieejams.",
@@ -2867,6 +2873,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Neizdevās ielādēt apakšaģenta sesiju.",
+      "historyTooLarge": "Šī apakšaģenta vēsture ir pārāk liela, lai to ielādētu.",
+      "historyUnavailable": "Šī apakšaģenta vēsture nav pieejama.",
+      "historyTemporarilyUnavailable": "Šī apakšaģenta vēsture īslaicīgi nav pieejama.",
       "failed": "Apakšaģenta sesija beidzās ar kļūdu.",
       "noMessages": "Nav apakšaģenta ziņojumu",
       "noMessagesDescription": "Šī apakšaģenta sesija beidzās bez sarakstes.",
@@ -3455,6 +3464,8 @@
     "voiceTranscriptionWho": "Jūsu ierīce, Kilo Gateway ar jūsu izvēlēto transkripcijas modeli, vai Apple vai Google tiešsaistes atpazīšanai.",
     "installAttributionPromptTitle": "Atļaut noteikt instalēšanas avotu?",
     "installAttributionPromptMessage": "Kilo izmanto Apple izsekošanas atļauju tikai tam, lai noteiktu, kurā kanālā uzzināji par lietotni. Tavas uzvednes un sarunas šim nolūkam nekad netiek izmantotas.",
+    "installAttributionRequestFailedTitle": "Neizdevās parādīt izsekošanas uzvedni",
+    "installAttributionRequestFailedMessage": "Kilo neizdevās parādīt sistēmas uzvedni, tāpēc instalēšanas avota noteikšana paliek izslēgta.",
     "what": "Kādi dati",
     "why": "Kāpēc",
     "who": "Kas saņem datus"
@@ -3470,7 +3481,7 @@
   "organization": {
     "auditLog": {
       "title": "Audita žurnāls",
-      "permissionDenied": "Organizācijas audita žurnālu var skatīt tikai tās īpašnieks, administrators vai norēķinu pārvaldnieks, ja organizācijai ir Enterprise plāns.",
+      "permissionDenied": "Organizācijas audita žurnālu var skatīt tikai tās īpašnieks, administrators vai norēķinu pārvaldnieks, ja organizācijai ir Enterprise plāns. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Nav audita notikumu",
       "emptyDescription": "Šeit tiek rādītas šajā organizācijā veiktās darbības.",
       "truncated": "Tiek rādīti jaunākie notikumi.",
@@ -3665,7 +3676,7 @@
     },
     "billing": {
       "title": "Norēķini",
-      "permissionDenied": "Organizācijas norēķinus var redzēt tikai tās īpašnieks, administrators vai norēķinu pārvaldnieks.",
+      "permissionDenied": "Organizācijas norēķinus var redzēt tikai tās īpašnieks, administrators vai norēķinu pārvaldnieks. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Abonements",
       "state": "Statuss",
       "stateNone": "Nav abonementa",
@@ -3842,7 +3853,7 @@
       "emptyDescription": "Izmantojiet pogu „Iepriekšējā stunda”, lai apskatītu iepriekšējos pieprasījumus.",
       "emptyBoundDescription": "Pieprasījumu žurnāli tālāk pagātnē nesniedzas.",
       "loadError": "Neizdevās ielādēt pieprasījumu žurnālus.",
-      "permissionDenied": "Organizācijas pieprasījumu žurnālus var skatīt tikai tās īpašnieks, administrators vai norēķinu pārvaldnieks.",
+      "permissionDenied": "Organizācijas pieprasījumu žurnālus var skatīt tikai tās īpašnieks, administrators vai norēķinu pārvaldnieks. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} ievade · {{output}} izvade",
       "byok": "BYOK"
     },
@@ -4122,7 +4133,10 @@
     "list": {
       "loadFailed": "Neizdevās ielādēt tērzēšanas vēsturi.",
       "new": "Jauna tērzēšana",
-      "deleteTitle": "Vai dzēst šo tērzēšanu?"
+      "deleteTitle": "Vai dzēst šo tērzēšanu?",
+      "resetNoticeTitle": "Vietējās tērzēšanas un melnraksti notīrīti",
+      "resetNoticeBody": "Kilo nevarēja atvērt šajā ierīcē saglabātās tērzēšanas. Jūsu sesijas mākonī nav skartas.",
+      "resetNoticeDismiss": "Noraidīt paziņojumu"
     },
     "rename": {
       "title": "Pārdēvēt tērzēšanu",
@@ -4965,7 +4979,7 @@
     "defaultModel": "Izmantot Kilo noklusējuma modeli",
     "duration": "Laika ierobežojums (minūtes)",
     "spendLimit": "Izdevumu ierobežojums (USD)",
-    "invalidSafeguards": "Ievadiet pozitīvus, galīgus laika un izdevumu ierobežojumus.",
+    "invalidSafeguards": "Ievadiet pozitīvu skaitli atļautajā intervālā.",
     "estimate": "Novērtējums {{estimate}} · maksimums {{maximum}}",
     "estimateUnavailable": "Apmaksāts kopsavilkums šiem iestatījumiem nav pieejams. Mainiet modeli vai ierobežojumus, vai arī mēģiniet vēlreiz vēlāk.",
     "confirmPaid": "Iespējot maksas kopsavilkumus kontekstam {{context}}?",
@@ -5040,7 +5054,8 @@
     "unavailableTitle": "Lietojums nav pieejams",
     "unavailableDescription": "Šai darbvietai lietojums nav iestatīts. Ja sagaidāt, ka šeit būs redzams lietojums, sazinieties ar atbalsta dienestu.",
     "orgSelfNotice": "Jūs redzat savu lietojumu šajā organizācijā.",
-    "viewDetails": "Skatīt lietojuma informāciju"
+    "viewDetails": "Skatīt lietojuma informāciju",
+    "orgSelfEntryTitle": "Jūsu lietojums"
   },
   "integrations": {
     "title": "Integrācijas",
@@ -5136,6 +5151,8 @@
       "autoCommit": "Fiksēt izmaiņas, kad palaišana beidzas",
       "condenseOnComplete": "Saspiest kontekstu, kad palaišana beidzas",
       "activeTitle": "Trigeris aktīvs",
+      "activeSwitchA11y": "Trigeris aktīvs: {{name}}",
+      "copyLinkA11y": "Kopēt trigera saiti: {{name}}",
       "activeDescription": "Apturēti tīmekļa āķi atbild ar 404.",
       "runAsCreator": "Palaist manā vārdā",
       "runAsCreatorDescription": "Katra palaišana izmanto jūsu kontu, tāpēc noslēpuma galvene ir obligāta.",

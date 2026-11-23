@@ -327,7 +327,6 @@ function scrubPayload(value: unknown): Record<string, unknown> {
   return result;
 }
 
-/** The string at `key`, or undefined when it is absent or not a string. */
 function stringField(value: Record<string, unknown>, key: string): string | undefined {
   const field = value[key];
   return typeof field === 'string' ? field : undefined;

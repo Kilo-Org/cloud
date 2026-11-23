@@ -645,7 +645,9 @@ jobs:
       # trips the script chain's filter, but that chain names it nowhere, and
       # this list is the only place the suite runs: the `test:mobile-sbom`
       # script that test-scripts reaches must not name it, or one run executes
-      # the file in two jobs.
+      # the file in two jobs. That is why the root `test:mobile-sbom` entry
+      # lists its five files instead of one `scripts/mobile-sbom*.test.mjs`
+      # glob, which would also collect `scripts/mobile-sbom-workflow.test.mjs`.
       - name: Test workflow wiring
         run: >-
           node --test

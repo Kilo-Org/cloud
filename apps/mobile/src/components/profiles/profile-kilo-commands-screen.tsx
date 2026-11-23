@@ -34,6 +34,7 @@ import { MAX_PROFILE_KILO_COMMANDS } from '@/lib/agent-profile-forms';
 import { isolateLtrBidiText } from '@/lib/bidi';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useSheetRowTapGuard } from '@/lib/hooks/use-sheet-row-tap-guard';
+import { useCloseEditorOnDeniedPermission } from '@/lib/hooks/use-close-editor-on-denied-permission';
 import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useProfileFormDraft } from '@/lib/hooks/use-profile-form-draft';
@@ -82,6 +83,8 @@ export function ProfileKiloCommandsScreen({
   const atCommandCap = commands.length >= MAX_PROFILE_KILO_COMMANDS;
   // The open form comes from the sibling screens' draft contract: it survives a
   // remount, and its generation is what proves a settling save still owns it.
+  // The screen offers the sheet only while the permission allows the write, and
+  // a denial closes it and drops that draft, so a remount cannot reopen it.
   const draftScope = `profiles:slash-commands:${profileId}`;
   const form = useProfileFormDraft<KiloCommandSource, null>(draftScope, commands, null);
   // The open form's key; the handlers below pass their own destination instead,
@@ -119,6 +122,8 @@ export function ProfileKiloCommandsScreen({
     markSheetClosed();
     form.close();
   };
+
+  useCloseEditorOnDeniedPermission(permission, handleClose);
 
   const runDelete = async (commandId: string) => {
     try {
@@ -291,7 +296,7 @@ export function ProfileKiloCommandsScreen({
         {content}
       </TabScreenScrollView>
 
-      {form.isOpen ? (
+      {form.isOpen && canManage ? (
         <KiloCommandFormSheet
           draftScope={draftScope}
           command={form.editing}

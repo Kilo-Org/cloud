@@ -39,8 +39,6 @@ export function useScreenInsets() {
           right: Math.max(insets.right, 8),
         }
       : insets;
-  // The surface clears the window's side insets itself, on either platform:
-  // what follows from that is the surface's own gutter, not the window's.
   return use(SurfaceClearsSideInsetsContext)
     ? { ...cornerPadded, left: 0, right: 0 }
     : cornerPadded;

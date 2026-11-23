@@ -29,6 +29,7 @@ import {
   useAgentProfileMcpServers,
   useAgentProfileSectionMutations,
 } from '@/lib/hooks/use-agent-profiles';
+import { useCloseEditorOnDeniedPermission } from '@/lib/hooks/use-close-editor-on-denied-permission';
 import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useProfileFormDraft } from '@/lib/hooks/use-profile-form-draft';
@@ -88,7 +89,10 @@ export function ProfileMcpScreen({
   // row unfiltered, so the loaded length is the count the cap compares.
   const atServerCap = servers.length >= MAX_PROFILE_MCP_SERVERS;
   // The open form, its fields and the refusal the sheet shows are one draft, so
-  // opening or closing the form resets the refusal with everything else.
+  // opening or closing the form resets the refusal with everything else. A
+  // remount reopens it on what was typed. The screen offers the sheet only
+  // while the permission allows the write, and a denial closes it and drops
+  // that draft, so a remount cannot reopen it.
   const draftScope = `profiles:mcp:${profileId}`;
   const form = useProfileFormDraft<McpServerSource, McpSaveFailure | null>(
     draftScope,
@@ -104,6 +108,8 @@ export function ProfileMcpScreen({
     markSheetClosed();
     form.close();
   };
+
+  useCloseEditorOnDeniedPermission(permission, handleClose);
 
   const saveServer = async (target: McpServerSource | null, payload: McpServerPayload) => {
     // The form this save belongs to. A remount keeps it alive; a later open or
@@ -270,7 +276,7 @@ export function ProfileMcpScreen({
         {content}
       </TabScreenScrollView>
 
-      {form.isOpen ? (
+      {form.isOpen && canManage ? (
         <McpFormSheet
           draftScope={draftScope}
           server={form.editing}

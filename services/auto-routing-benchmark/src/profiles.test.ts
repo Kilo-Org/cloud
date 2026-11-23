@@ -647,6 +647,99 @@ describe('classifyProfileAdmission', () => {
     ).toEqual({ kind: 'admit', charged: true });
   });
 
+  it('refuses an owner retry of a permanent failure; only admin re-admission lifts it', () => {
+    const permanent = profileRow({
+      model: 'm',
+      status: 'unavailable',
+      failure_reason: 'Six consecutive runs failed.',
+      failure_class: 'provider_unavailable',
+      failure_attempts: 6,
+    });
+    const expected = {
+      kind: 'report',
+      status: 'failed',
+      failureReason: 'Six consecutive runs failed.',
+      failure: {
+        kind: 'permanent',
+        failureClass: 'provider_unavailable',
+        reason: 'Six consecutive runs failed.',
+        attempts: 6,
+        firstFailedAt: '2026-07-27T00:00:00.000Z',
+        lastFailedAt: '2026-07-27T00:00:00.000Z',
+        cause: 'infrastructure_budget_exhausted',
+      },
+    };
+    expect(classifyProfileAdmission([permanent], current, e, true)).toEqual(expected);
+    expect(classifyProfileAdmission([permanent], current, e, false)).toEqual(expected);
+  });
+
+  it('refuses admission when the same pair is permanent at another repetition count', () => {
+    const permanentSibling = profileRow({
+      model: 'm',
+      status: 'unavailable',
+      repetitions: REPS - 1,
+      failure_reason: 'Six proven runs failed.',
+      failure_class: 'provider_unavailable',
+      failure_attempts: 6,
+    });
+    // The pair, not the row, is permanent for this engine: a new-repetition admission must
+    // not promise eligibility the quote/permit path refuses.
+    expect(classifyProfileAdmission([permanentSibling], current, e, false)).toEqual({
+      kind: 'report',
+      status: 'failed',
+      failureReason: 'Six proven runs failed.',
+      failure: {
+        kind: 'permanent',
+        failureClass: 'provider_unavailable',
+        reason: 'Six proven runs failed.',
+        attempts: 6,
+        firstFailedAt: '2026-07-27T00:00:00.000Z',
+        lastFailedAt: '2026-07-27T00:00:00.000Z',
+        cause: 'infrastructure_budget_exhausted',
+      },
+    });
+    // An explicit owner retry cannot bypass a permanent verdict either.
+    expect(classifyProfileAdmission([permanentSibling], current, e, true)).toEqual({
+      kind: 'report',
+      status: 'failed',
+      failureReason: 'Six proven runs failed.',
+      failure: expect.objectContaining({ kind: 'permanent' }),
+    });
+  });
+
+  it('ignores a permanent row from another engine or router when admitting', () => {
+    expect(
+      classifyProfileAdmission(
+        [
+          profileRow({
+            model: 'm',
+            status: 'unavailable',
+            repetitions: REPS - 1,
+            engine_identity: 'v-old:engine',
+          }),
+        ],
+        current,
+        e,
+        false
+      )
+    ).toEqual({ kind: 'admit', charged: false });
+    expect(
+      classifyProfileAdmission(
+        [
+          profileRow({
+            model: 'm',
+            status: 'unavailable',
+            repetitions: REPS - 1,
+            router: 'frontier',
+          }),
+        ],
+        current,
+        e,
+        false
+      )
+    ).toEqual({ kind: 'admit', charged: false });
+  });
+
   it('charges for a never-seen pair', () => {
     expect(classifyProfileAdmission([], current, e, false)).toEqual({
       kind: 'admit',

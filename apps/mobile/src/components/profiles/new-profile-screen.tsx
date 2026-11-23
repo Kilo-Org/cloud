@@ -26,6 +26,7 @@ import { useAgentProfileMutations } from '@/lib/hooks/use-agent-profiles';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { useProfileNameField } from '@/lib/hooks/use-profile-name-field';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 import {
   getProfileOverviewPath,
   type ProfileManagementStack,
@@ -86,6 +87,10 @@ export function NewProfileScreen({
   organizationId?: string;
 }>) {
   const router = useRouter();
+  // The post-create hand-off swaps this form for the new profile in one
+  // native-stack commit; a literal `router.replace` crashes Android Fabric
+  // there, so it goes through the push-then-retire hook.
+  const stackSafeRouter = useStackSafeReplace();
   const { t } = useTranslation();
   const {
     organizationId: boundaryOrganizationId,
@@ -151,7 +156,7 @@ export function NewProfileScreen({
         router.back();
         return;
       }
-      router.replace(
+      stackSafeRouter.replace(
         getProfileOverviewPath(created.id, { organizationId: ownerOrganizationId, stack })
       );
     } catch (error) {

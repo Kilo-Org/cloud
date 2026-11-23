@@ -1266,6 +1266,7 @@
     "needsInputAction": {
       "approved": "Sol·licitud aprovada",
       "replied": "Resposta enviada",
+      "empty": "Escriu una resposta i després envia-la.",
       "failed": "No s’ha pogut respondre. Torna a tocar-ho per reintentar-ho.",
       "unavailable": "Aquesta sol·licitud ja no està en espera."
     }
@@ -1530,7 +1531,9 @@
       "githubError": "No s'ha pogut obrir la configuració de GitHub. Torna-ho a provar.",
       "gitlabAccount": "el compte de GitLab",
       "gitlabError": "No s'ha pogut obrir la configuració de GitLab. Torna-ho a provar.",
-      "description": "Connecta {{label}} a Kilo per revisar automàticament les sol·licituds d'integració."
+      "description": "Connecta {{label}} a Kilo per revisar automàticament les sol·licituds d'integració.",
+      "notConnectedTitle": "{{platform}} no està connectat",
+      "githubAdminOnlyDescription": "Només els propietaris i els administradors de l'organització poden connectar-lo."
     },
     "overview": {
       "allAreas": "Totes les àrees",
@@ -2300,6 +2303,7 @@
       "couldNotLoadThisSession": "No s'ha pogut carregar aquesta sessió.",
       "historyTooLarge": "La transcripció d'aquesta sessió és massa gran per carregar-la.",
       "historyUnavailable": "No es pot llegir la transcripció d'aquesta sessió.",
+      "historyTemporarilyUnavailable": "La transcripció d'aquesta sessió no està disponible temporalment.",
       "cloneFailedRetry": "No s'ha pogut clonar aquesta sessió. Torna-ho a provar.",
       "notEnoughCredits": "No tens prou crèdits per a aquesta sol·licitud. Afegeix crèdits i torna-ho a provar.",
       "previousTaskFinishing": "La tasca anterior encara no ha acabat. Espera un moment.",
@@ -2840,7 +2844,9 @@
       "skip": "Omet",
       "retrySkip": "Torna a provar d'ometre",
       "submitting": "Enviant…",
-      "sendAnswers": "Envia les respostes"
+      "sendAnswers": "Envia les respostes",
+      "unreadableTitle": "No s'ha pogut mostrar aquesta pregunta",
+      "unreadableBody": "L'agent està esperant una pregunta que aquesta aplicació no pot mostrar. Responeu la pregunta al CLI per continuar."
     },
     "blockingCard": {
       "questionUnavailable": "Aquesta pregunta ja no està disponible.",
@@ -2867,6 +2873,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "No s'ha pogut carregar la sessió de l'agent secundari.",
+      "historyTooLarge": "L'historial d'aquest agent secundari és massa gran per carregar-lo.",
+      "historyUnavailable": "L'historial d'aquest agent secundari no està disponible.",
+      "historyTemporarilyUnavailable": "L'historial d'aquest agent secundari no està disponible temporalment.",
       "failed": "La sessió de l'agent secundari ha fallat.",
       "noMessages": "No hi ha missatges de l'agent secundari",
       "noMessagesDescription": "La sessió de l'agent secundari ha acabat sense generar cap transcripció.",
@@ -3455,6 +3464,8 @@
     "voiceTranscriptionWho": "El teu dispositiu, Kilo Gateway amb el model de transcripció que triïs, o Apple o Google per al reconeixement en línia.",
     "installAttributionPromptTitle": "Vols permetre l'atribució de la instal·lació?",
     "installAttributionPromptMessage": "Kilo només utilitza el permís de seguiment d'Apple per saber per quin canal has arribat aquí. Mai no s'utilitzen els teus missatges ni les teves converses.",
+    "installAttributionRequestFailedTitle": "No s'ha pogut mostrar la sol·licitud de seguiment",
+    "installAttributionRequestFailedMessage": "Kilo no ha pogut mostrar la sol·licitud del sistema, així que l'atribució de la instal·lació queda desactivada.",
     "what": "Què",
     "why": "Per què",
     "who": "Qui"
@@ -3470,7 +3481,7 @@
   "organization": {
     "auditLog": {
       "title": "Registre d'auditoria",
-      "permissionDenied": "Només un propietari, administrador o gestor de facturació d'una organització amb el pla Enterprise pot consultar-ne el registre d'auditoria.",
+      "permissionDenied": "Només un propietari, administrador o gestor de facturació d'una organització amb el pla Enterprise pot consultar-ne el registre d'auditoria. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "No hi ha esdeveniments d'auditoria",
       "emptyDescription": "Aquí apareixen les accions fetes en aquesta organització.",
       "truncated": "Es mostren els esdeveniments més recents.",
@@ -3665,7 +3676,7 @@
     },
     "billing": {
       "title": "Facturació",
-      "permissionDenied": "Només un propietari, administrador o gestor de facturació de l'organització en pot veure la facturació.",
+      "permissionDenied": "Només un propietari, administrador o gestor de facturació de l'organització en pot veure la facturació. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Subscripció",
       "state": "Estat",
       "stateNone": "Sense subscripció",
@@ -3842,7 +3853,7 @@
       "emptyDescription": "Utilitza «Hora anterior» per veure les sol·licituds anteriors.",
       "emptyBoundDescription": "Els registres de sol·licituds no arriben més enrere.",
       "loadError": "No s'han pogut carregar els registres de sol·licituds.",
-      "permissionDenied": "Només un propietari, administrador o gestor de facturació d'una organització pot consultar-ne els registres de sol·licituds.",
+      "permissionDenied": "Només un propietari, administrador o gestor de facturació d'una organització pot consultar-ne els registres de sol·licituds. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} d'entrada · {{output}} de sortida",
       "byok": "BYOK"
     },
@@ -4122,7 +4133,10 @@
     "list": {
       "loadFailed": "No s'ha pogut carregar l'historial del xat.",
       "new": "Xat nou",
-      "deleteTitle": "Vols suprimir aquest xat?"
+      "deleteTitle": "Vols suprimir aquest xat?",
+      "resetNoticeTitle": "Els xats i esborranys locals s'han esborrat",
+      "resetNoticeBody": "Kilo no ha pogut obrir els xats desats en aquest dispositiu. Les teves sessions al núvol no es veuen afectades.",
+      "resetNoticeDismiss": "Descarta l'avís"
     },
     "rename": {
       "title": "Reanomena el xat",
@@ -4965,7 +4979,7 @@
     "defaultModel": "Usa el model per defecte de Kilo",
     "duration": "Límit de temps (minuts)",
     "spendLimit": "Límit de despesa (USD)",
-    "invalidSafeguards": "Introdueix límits de temps i despesa positius i finits.",
+    "invalidSafeguards": "Introdueix un nombre positiu dins del rang permès.",
     "estimate": "Estimació {{estimate}} · màxim {{maximum}}",
     "estimateUnavailable": "No hi ha cap resum de pagament disponible per a aquesta configuració. Canvia el model o els límits, o torna-ho a provar més tard.",
     "confirmPaid": "Vols activar els resums de pagament per a {{context}}?",
@@ -5040,7 +5054,8 @@
     "unavailableTitle": "Ús no disponible",
     "unavailableDescription": "L'ús no està configurat per a aquest espai de treball. Contacta amb el servei d'assistència si esperes veure l'ús aquí.",
     "orgSelfNotice": "Estàs veient el teu propi ús en aquesta organització.",
-    "viewDetails": "Mostra els detalls d'ús"
+    "viewDetails": "Mostra els detalls d'ús",
+    "orgSelfEntryTitle": "El teu ús"
   },
   "integrations": {
     "title": "Integracions",
@@ -5136,6 +5151,8 @@
       "autoCommit": "Confirma els canvis quan acabi l'execució",
       "condenseOnComplete": "Condensa el context quan acabi l'execució",
       "activeTitle": "Disparador actiu",
+      "activeSwitchA11y": "Disparador actiu: {{name}}",
+      "copyLinkA11y": "Copia l'enllaç de {{name}}",
       "activeDescription": "Els ganxos web en pausa responen amb 404.",
       "runAsCreator": "Executa com a mi",
       "runAsCreatorDescription": "Cada execució utilitza el teu compte, així que la capçalera secreta és obligatòria.",

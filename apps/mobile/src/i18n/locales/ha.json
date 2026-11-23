@@ -1238,6 +1238,7 @@
     "needsInputAction": {
       "approved": "An amince da buƙatar",
       "replied": "An tura amsa",
+      "empty": "Rubuta amsa, sannan ka aika.",
       "failed": "Ba a iya amsawa ba. Sake danna don sake gwadawa.",
       "unavailable": "Wannan buƙatar ba ta jira ba."
     }
@@ -1502,7 +1503,9 @@
       "githubError": "An kasa buɗe saitin GitHub. Sake gwadawa.",
       "gitlabAccount": "asusun GitLab",
       "gitlabError": "An kasa buɗe saitin GitLab. Sake gwadawa.",
-      "description": "Haɗa {{label}} na Kilo don yin bitar buƙatun haɗa canje-canje ta atomatik."
+      "description": "Haɗa {{label}} na Kilo don yin bitar buƙatun haɗa canje-canje ta atomatik.",
+      "notConnectedTitle": "Ba a haɗa {{platform}} ba",
+      "githubAdminOnlyDescription": "Masu ƙungiya da masu gudanarwa kawai za su iya haɗa shi."
     },
     "overview": {
       "allAreas": "Duk fannoni",
@@ -2251,6 +2254,7 @@
       "couldNotLoadThisSession": "An kasa loda wannan zaman.",
       "historyTooLarge": "Rubutun wannan zaman ya yi girma don a loda shi.",
       "historyUnavailable": "Ba a iya karantawa rubutun wannan zaman ba.",
+      "historyTemporarilyUnavailable": "Rubutun wannan zaman ba ya samuwa na ɗan lokaci.",
       "cloneFailedRetry": "An kasa yin kwafin wannan zaman. Sake gwadawa.",
       "notEnoughCredits": "Kuɗin amfani ba su isa don wannan buƙata ba. Ƙara kuɗin amfani ka sake gwadawa.",
       "previousTaskFinishing": "Ba a gama aikin da ya gabata ba tukuna. Jira ɗan lokaci.",
@@ -2787,7 +2791,9 @@
       "skip": "Tsallake",
       "retrySkip": "Sake gwada tsallakewa",
       "submitting": "Ana aikawa…",
-      "sendAnswers": "Aika amsoshi"
+      "sendAnswers": "Aika amsoshi",
+      "unreadableTitle": "Ba a iya nuna wannan tambayar ba",
+      "unreadableBody": "Wakilin yana jiran tambayar da wannan manhajar ba za ta iya nunawa ba. Amsa tambayar a cikin CLI domin ci gaba."
     },
     "blockingCard": {
       "questionUnavailable": "An daina samun wannan tambayar.",
@@ -2814,6 +2820,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "An kasa loda zaman ƙaramin wakili.",
+      "historyTooLarge": "Tarihin wannan ƙaramin wakili ya yi girma don a loda shi.",
+      "historyUnavailable": "Tarihin wannan ƙaramin wakili ba ya samuwa.",
+      "historyTemporarilyUnavailable": "Tarihin wannan ƙaramin wakili ba ya samuwa na ɗan lokaci.",
       "failed": "Zaman ƙaramin wakili ya gaza.",
       "noMessages": "Babu saƙonnin ƙaramin wakili",
       "noMessagesDescription": "Wannan zaman ƙaramin wakili ya ƙare ba tare da samar da tarihin tattaunawa ba.",
@@ -3392,6 +3401,8 @@
     "voiceTranscriptionWho": "Na'urar ka, Kilo Gateway tare da samfurin rubutun da ka zaɓa, ko Apple ko Google don ganewa ta kan layi.",
     "installAttributionPromptTitle": "A ba da izinin gano inda aka samo manhaja?",
     "installAttributionPromptMessage": "Kilo yana amfani da izinin bin diddigi na Apple kawai don sanin hanyar da ta kawo ka nan. Ba a taɓa amfani da umarnin aikinka ko tattaunawarka ba.",
+    "installAttributionRequestFailedTitle": "An kasa nuna buƙatar bin diddigi",
+    "installAttributionRequestFailedMessage": "Kilo ya kasa nuna buƙatar izini ta tsarin, don haka gano inda aka samo manhaja ya kasance a kashe.",
     "what": "Me",
     "why": "Me yasa",
     "who": "Wane"
@@ -3407,7 +3418,7 @@
   "organization": {
     "auditLog": {
       "title": "Rajistar bincike",
-      "permissionDenied": "Mai ƙungiya, mai gudanarwa ko manajan biyan kuɗi a tsarin Enterprise ne kaɗai zai iya karanta rajistar binciken ƙungiyar.",
+      "permissionDenied": "Mai ƙungiya, mai gudanarwa ko manajan biyan kuɗi a tsarin Enterprise ne kaɗai zai iya karanta rajistar binciken ƙungiyar. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Babu abubuwan bincike",
       "emptyDescription": "Ayyukan da aka yi a wannan ƙungiya suna bayyana a nan.",
       "truncated": "Ana nuna abubuwan baya-bayan nan.",
@@ -3597,7 +3608,7 @@
     },
     "billing": {
       "title": "Biyan kuɗi",
-      "permissionDenied": "Mai ƙungiya, mai gudanarwa ko manajan biyan kuɗi ne kaɗai zai iya ganin bayanan biyan kuɗinta.",
+      "permissionDenied": "Mai ƙungiya, mai gudanarwa ko manajan biyan kuɗi ne kaɗai zai iya ganin bayanan biyan kuɗinta. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Rajista",
       "state": "Matsayi",
       "stateNone": "Babu rajista",
@@ -3774,7 +3785,7 @@
       "emptyDescription": "Yi amfani da \"Awa ta baya\" don duba buƙatun da suka gabata.",
       "emptyBoundDescription": "Nan ne iyakar tarihin bayanan buƙatu.",
       "loadError": "An kasa loda rajistun buƙatu.",
-      "permissionDenied": "Mai ƙungiya, mai gudanarwa ko manajan biyan kuɗi ne kaɗai zai iya karanta rajistun buƙatun ƙungiyar.",
+      "permissionDenied": "Mai ƙungiya, mai gudanarwa ko manajan biyan kuɗi ne kaɗai zai iya karanta rajistun buƙatun ƙungiyar. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} shigarwa · {{output}} fitarwa",
       "byok": "BYOK"
     },
@@ -4044,7 +4055,10 @@
     "list": {
       "loadFailed": "Ba a iya loda tarihin tattaunawa.",
       "new": "Sabuwar tattaunawa",
-      "deleteTitle": "A share wannan tattaunawar?"
+      "deleteTitle": "A share wannan tattaunawar?",
+      "resetNoticeTitle": "An share tattaunawa da daftari a na'urar",
+      "resetNoticeBody": "Kilo bai iya buɗe tattaunawar da aka adana a wannan na'urar ba. Ba a shafi zaman girgije ba.",
+      "resetNoticeDismiss": "Yi watsi da sanarwa"
     },
     "rename": {
       "title": "Sauya sunan tattaunawa",
@@ -4876,7 +4890,7 @@
     "defaultModel": "Yi amfani da model na asali na Kilo",
     "duration": "Kariyar lokaci (mintuna)",
     "spendLimit": "Kariyar kashe kuɗi (USD)",
-    "invalidSafeguards": "Shigar da iyakokin lokaci da kashe kuɗi da suka fi sifili kuma suke da iyaka.",
+    "invalidSafeguards": "Shigar da lamba fiye da sifili cikin iyakar da aka yarda.",
     "estimate": "Kimanin {{estimate}} · iyaka mafi girma {{maximum}}",
     "estimateUnavailable": "Ba a samun taƙaitawar da ake biya don waɗannan saituna. Canza samfurin ko iyakoki, ko kuma sake gwadawa bayan ɗan lokaci.",
     "confirmPaid": "Kunna taƙaitawa ta biya don {{context}}?",
@@ -4946,7 +4960,8 @@
     "unavailableTitle": "Amfani ba ya samuwa",
     "unavailableDescription": "Ba a saita amfani a wannan sararin aiki ba. Tuntuɓi tallafi idan kuna sa ran ganin amfani a nan.",
     "orgSelfNotice": "Kuna ganin amfaninku na kanku a wannan ƙungiyar.",
-    "viewDetails": "Duba bayanan amfani"
+    "viewDetails": "Duba bayanan amfani",
+    "orgSelfEntryTitle": "Amfanin ku"
   },
   "integrations": {
     "title": "Haɗe-haɗe",
@@ -5042,6 +5057,8 @@
       "autoCommit": "Tabbatar da canje-canje idan gudanarwa ta ƙare",
       "condenseOnComplete": "Taƙaita mahallin idan gudanarwa ta ƙare",
       "activeTitle": "Mai jawowa yana aiki",
+      "activeSwitchA11y": "Mai jawowa mai aiki: {{name}}",
+      "copyLinkA11y": "Kwafa hanyar haɗi don {{name}}",
       "activeDescription": "Kiran yanar gizo da aka dakatar yana amsa da 404.",
       "runAsCreator": "Gudana a matsayina",
       "runAsCreatorDescription": "Kowace gudanarwa tana amfani da asusunka, don haka ana buƙatar kanun sirri.",

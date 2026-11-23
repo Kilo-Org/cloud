@@ -399,7 +399,7 @@
       "title": "Lakilen'ny mpamatsy",
       "rowSubtitle": "Ampiasao ny fandoavam-bola amin'ny mpamatsinao",
       "orgDescription": "Iombonan'ny olona rehetra ao amin'ny fikambanana ireo lakile ireo ary aloa amin'ny kaontin'ny fikambanana ao amin'ny mpamatsy.",
-      "viewOnly": "Ny tompon'ny fikambanana, ny mpitantana na ny mpitantana ny fandoavam-bola ihany no afaka manova ny lakileny.",
+      "viewOnly": "Ny tompon'ny fikambanana, ny mpitantana na ny mpitantana ny faktiora ihany no afaka manova ny lakileny.",
       "description": "Ny fangatahana mampiasa ireo lakile ireo dia aloa amin'ny kaontinao ao amin'ny mpamatsy fa tsy amin'ny ambim-bola Kilo anananao.",
       "managedByPlan": "Tantanin'ny drafitra fandaharana anananao",
       "enableKey": "Alefaso ny lakilen'ny {{provider}}",
@@ -1238,6 +1238,7 @@
     "needsInputAction": {
       "approved": "Nankinina ny fangatahana",
       "replied": "Nalefa ny valiny",
+      "empty": "Soraty ny valiny, dia alefaso.",
       "failed": "Tsy nahavaly. Tsindrio indray mba hanandrama.",
       "unavailable": "Tsy miandry intsony ity fangatahana ity."
     }
@@ -1502,7 +1503,9 @@
       "githubError": "Tsy nety nosokafana ny fametrahana ny GitHub. Andramo indray azafady.",
       "gitlabAccount": "kaonty GitLab",
       "gitlabError": "Tsy nety nosokafana ny fametrahana ny GitLab. Andramo indray azafady.",
-      "description": "Ampifandraiso amin'i Kilo ny {{label}} mba hanamarinana PR ho azy."
+      "description": "Ampifandraiso amin'i Kilo ny {{label}} mba hanamarinana PR ho azy.",
+      "notConnectedTitle": "Tsy mifandray ny {{platform}}",
+      "githubAdminOnlyDescription": "Ny tompon'ny fikambanana sy ny mpitantana ihany no afaka mampifandray azy."
     },
     "overview": {
       "allAreas": "Lafiny rehetra",
@@ -2251,6 +2254,7 @@
       "couldNotLoadThisSession": "Tsy voaray ity fotoam-piasana ity.",
       "historyTooLarge": "Lava loatra ny firaketan'ity fotoam-piasana ity havoaka.",
       "historyUnavailable": "Tsy azo vakiana ny firaketan'ity fotoam-piasana ity.",
+      "historyTemporarilyUnavailable": "Tsy azo jerena vonjimaika ny firaketan'ity fotoam-piasana ity.",
       "cloneFailedRetry": "Tsy nahomby ny famoronana dika mitovy amin'ity fotoam-piasana ity. Andramo indray.",
       "notEnoughCredits": "Tsy ampy ny kireditra ho an'ity fangatahana ity. Ampio kireditra ary andramo indray.",
       "previousTaskFinishing": "Mbola eo am-pamaranana ny asa teo aloha. Andraso kely azafady.",
@@ -2787,7 +2791,9 @@
       "skip": "Dingano",
       "retrySkip": "Andramo dinganina indray",
       "submitting": "Mandefa…",
-      "sendAnswers": "Alefaso ny valiny"
+      "sendAnswers": "Alefaso ny valiny",
+      "unreadableTitle": "Tsy afaka naseho ity fanontaniana ity",
+      "unreadableBody": "Miandry fanontaniana izay tsy afaka asehon'ity rindrankajy ity ny agent. Valio ao amin'ny CLI izy mba hahafahana manohy."
     },
     "blockingCard": {
       "questionUnavailable": "Tsy misy intsony ity fanontaniana ity.",
@@ -2814,6 +2820,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Tsy voaray ny fotoam-piasan'ny mpanampy lefitra.",
+      "historyTooLarge": "Lava loatra ny tantaran'ny mpanampy lefitra ity havoaka.",
+      "historyUnavailable": "Tsy misy ny tantaran'ny mpanampy lefitra ity.",
+      "historyTemporarilyUnavailable": "Tsy azo jerena vonjimaika ny tantaran'ny mpanampy lefitra ity.",
       "failed": "Tsy nahomby ny fotoam-piasan'ny mpanampy lefitra.",
       "noMessages": "Tsy misy hafatra avy amin'ny mpanampy lefitra",
       "noMessagesDescription": "Vita ity fotoam-piasan'ny mpanampy lefitra ity nefa tsy namokatra rakitsoratra.",
@@ -3392,6 +3401,8 @@
     "voiceTranscriptionWho": "Ny fitaovanao, Kilo Gateway miaraka amin'ny maodely fanovana feo ho soratra nofidinao, na Apple na Google ho an'ny fanekena an-tsehatra.",
     "installAttributionPromptTitle": "Havela ve ny famantarana ny loharanon'ny fametrahana?",
     "installAttributionPromptMessage": "Ny hamantarana ny fantsona nahatongavanao teto ihany no ampiasan'ny Kilo ny alalana fanarahana omen'ny Apple. Tsy ampiasaina mihitsy ny toromarikanao sy ny resakao.",
+    "installAttributionRequestFailedTitle": "Tsy voaseho ny fangatahana fanarahana",
+    "installAttributionRequestFailedMessage": "Tsy afaka nasehon'ny Kilo ny fangatahana avy amin'ny rafitra, ka mijanona tsy mandeha ny famantarana ny loharanon'ny fametrahana.",
     "what": "Inona",
     "why": "Nahoana",
     "who": "Iza"
@@ -3407,7 +3418,7 @@
   "organization": {
     "auditLog": {
       "title": "Rakitry ny fanaraha-maso",
-      "permissionDenied": "Ny tompon'ny fikambanana, ny mpitantana na ny mpitantana ny faktiora amin'ny drafitra Enterprise ihany no afaka mamaky ny rakitry ny fanaraha-maso.",
+      "permissionDenied": "Ny tompon'ny fikambanana, ny mpitantana na ny mpitantana ny faktiora amin'ny drafitra Enterprise ihany no afaka mamaky ny rakitry ny fanaraha-maso. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Tsy misy hetsika voarakitra",
       "emptyDescription": "Eto no miseho ireo hetsika natao tao amin'ity fikambanana ity.",
       "truncated": "Ireo hetsika farany indrindra no aseho.",
@@ -3597,7 +3608,7 @@
     },
     "billing": {
       "title": "Faktiora",
-      "permissionDenied": "Ny tompon'ny fikambanana, ny mpitantana na ny mpiandraikitra ny faktiora ihany no afaka mahita ny faktioran'ny fikambanana.",
+      "permissionDenied": "Ny tompon'ny fikambanana, ny mpitantana na ny mpitantana ny faktiora ihany no afaka mahita ny faktioran'ny fikambanana. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Famandrihana",
       "state": "Toe-javatra",
       "stateNone": "Tsy misy famandrihana",
@@ -3774,7 +3785,7 @@
       "emptyDescription": "Ampiasao ny Ora teo aloha hijerena ny fangatahana teo aloha.",
       "emptyBoundDescription": "Hatreto ihany no iverenan'ny firaketana fangatahana.",
       "loadError": "Tsy afaka nampiditra ny rakitry ny fangatahana.",
-      "permissionDenied": "Ny tompon'ny fikambanana, ny mpitantana na ny mpitantana ny faktiora ihany no afaka mamaky ny rakitry ny fangatahana.",
+      "permissionDenied": "Ny tompon'ny fikambanana, ny mpitantana na ny mpitantana ny faktiora ihany no afaka mamaky ny rakitry ny fangatahana. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} miditra · {{output}} mivoaka",
       "byok": "BYOK"
     },
@@ -4044,7 +4055,10 @@
     "list": {
       "loadFailed": "Tsy afaka nampidirina ny tantaran'ny resaka.",
       "new": "Resaka vaovao",
-      "deleteTitle": "Hamafa ity resaka ity?"
+      "deleteTitle": "Hamafa ity resaka ity?",
+      "resetNoticeTitle": "Voafafa ny resaka sy volavola eto amin'ny fitaovana",
+      "resetNoticeBody": "Tsy afaka nanokatra ny resaka voatahiry ao amin'ity fitaovana ity i Kilo. Tsy voakasika ny fotoam-piasanao ao amin'ny rahona.",
+      "resetNoticeDismiss": "Esory ny filazana"
     },
     "rename": {
       "title": "Ovay ny anaran'ny resaka",
@@ -4876,7 +4890,7 @@
     "defaultModel": "Ampiasao ny modely default an'i Kilo",
     "duration": "Fetra fotoana (minitra)",
     "spendLimit": "Fetra fandaniana (USD)",
-    "invalidSafeguards": "Ampidiro fetra fotoana sy fandaniana lehibe noho ny aotra sady voafetra.",
+    "invalidSafeguards": "Ampidiro isa tsara ao anatin'ny fetra ekena.",
     "estimate": "Vinavina {{estimate}} · ambony indrindra {{maximum}}",
     "estimateUnavailable": "Tsy misy famintinana andoavam-bola ho an'ireto fandrindrana ireto. Ovay ny maodely na ny fetra, na andramo indray any aoriana.",
     "confirmPaid": "Alefa ve ny famintinana andoavana ho an'i {{context}}?",
@@ -4946,7 +4960,8 @@
     "unavailableTitle": "Tsy azo ny fampiasana",
     "unavailableDescription": "Tsy voalamina ho an'ity toeram-piasana ity ny fampiasana. Mifandraisa amin'ny ekipa mpanampy raha manantena ny hahita fampiasana eto ianao.",
     "orgSelfNotice": "Ny fampiasanao manokana ato amin'ity fikambanana ity no hitanao.",
-    "viewDetails": "Hijery ny antsipirian'ny fampiasana"
+    "viewDetails": "Hijery ny antsipirian'ny fampiasana",
+    "orgSelfEntryTitle": "Ny fampiasanao"
   },
   "integrations": {
     "title": "Fampifandraisana",
@@ -5042,6 +5057,8 @@
       "autoCommit": "Ataovy voatahiry ny fanovana rehefa vita ny fanatanterahana.",
       "condenseOnComplete": "Ahena ny tontolon-kevitra rehefa vita ny fanatanterahana.",
       "activeTitle": "Mavitrika ny fanentanana",
+      "activeSwitchA11y": "Fanentanana mavitrika: {{name}}",
+      "copyLinkA11y": "Adikao ny rohy ho an'ny {{name}}",
       "activeDescription": "Ny fiantsoana mijanona dia mamaly 404.",
       "runAsCreator": "Hihazakazaka amin'ny anarako",
       "runAsCreatorDescription": "Ny fanatanterahana rehetra dia mampiasa ny kaontinao, noho izany dia ilaina ny lohateny miafina.",

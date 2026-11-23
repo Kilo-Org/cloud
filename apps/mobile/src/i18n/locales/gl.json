@@ -1238,6 +1238,7 @@
     "needsInputAction": {
       "approved": "Solicitude aprobada",
       "replied": "Resposta enviada",
+      "empty": "Escribe unha resposta e despois envíaa.",
       "failed": "Non se puido responder. Toca de novo para tentalo de novo.",
       "unavailable": "Esta solicitude xa non está á espera."
     }
@@ -1502,7 +1503,9 @@
       "githubError": "Non se puido abrir a configuración de GitHub. Téntao de novo.",
       "gitlabAccount": "conta de GitLab",
       "gitlabError": "Non se puido abrir a configuración de GitLab. Téntao de novo.",
-      "description": "Conecta a {{label}} de Kilo para revisar as solicitudes de cambios automaticamente."
+      "description": "Conecta a {{label}} de Kilo para revisar as solicitudes de cambios automaticamente.",
+      "notConnectedTitle": "{{platform}} non está conectado",
+      "githubAdminOnlyDescription": "Só os propietarios da organización e os administradores poden conectalo."
     },
     "overview": {
       "allAreas": "Todas as áreas",
@@ -2251,6 +2254,7 @@
       "couldNotLoadThisSession": "Non se puido cargar esta sesión.",
       "historyTooLarge": "A transcrición desta sesión é demasiado grande para cargala.",
       "historyUnavailable": "Non se pode ler a transcrición desta sesión.",
+      "historyTemporarilyUnavailable": "A transcrición desta sesión non está dispoñible temporalmente.",
       "cloneFailedRetry": "Non se puido clonar esta sesión. Téntao de novo.",
       "notEnoughCredits": "Non tes créditos suficientes para esta solicitude. Engade créditos e téntao de novo.",
       "previousTaskFinishing": "A tarefa anterior aínda está a rematar. Agarda un momento.",
@@ -2787,7 +2791,9 @@
       "skip": "Omitir",
       "retrySkip": "Volver tentar omitir",
       "submitting": "Enviando…",
-      "sendAnswers": "Enviar respostas"
+      "sendAnswers": "Enviar respostas",
+      "unreadableTitle": "Non se puido amosar esta pregunta",
+      "unreadableBody": "O agente está agardando unha pregunta que esta aplicación non pode amosar. Responde á pregunta na CLI para continuar."
     },
     "blockingCard": {
       "questionUnavailable": "Esta pregunta xa non está dispoñible.",
@@ -2814,6 +2820,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Non se puido cargar a sesión do subaxente.",
+      "historyTooLarge": "O historial deste subaxente é demasiado grande para cargalo.",
+      "historyUnavailable": "O historial deste subaxente non está dispoñible.",
+      "historyTemporarilyUnavailable": "O historial deste subaxente non está dispoñible temporalmente.",
       "failed": "Fallou a sesión do subaxente.",
       "noMessages": "Non hai mensaxes do subaxente",
       "noMessagesDescription": "Esta sesión do subaxente rematou sen xerar unha transcrición.",
@@ -3392,6 +3401,8 @@
     "voiceTranscriptionWho": "O teu dispositivo, Kilo Gateway co modelo de transcrición que escollas, ou Apple ou Google para o recoñecemento en liña.",
     "installAttributionPromptTitle": "Permitir a atribución da instalación?",
     "installAttributionPromptMessage": "Kilo usa o permiso de seguimento de Apple só para saber por que canle chegaches á aplicación. As túas instrucións e conversas nunca se usan para isto.",
+    "installAttributionRequestFailedTitle": "Non se puido amosar o aviso de seguimento",
+    "installAttributionRequestFailedMessage": "Kilo non puido amosar o aviso do sistema, polo que a atribución da instalación segue desactivada.",
     "what": "Que se comparte",
     "why": "Para que",
     "who": "Con quen"
@@ -3407,7 +3418,7 @@
   "organization": {
     "auditLog": {
       "title": "Rexistro de auditoría",
-      "permissionDenied": "Só un propietario, administrador ou xestor de facturación dunha organización co plan Enterprise pode ler o seu rexistro de auditoría.",
+      "permissionDenied": "Só un propietario, administrador ou xestor de facturación dunha organización co plan Enterprise pode ler o seu rexistro de auditoría. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Non hai eventos de auditoría",
       "emptyDescription": "Aquí aparecen as accións realizadas nesta organización.",
       "truncated": "Móstranse os eventos máis recentes.",
@@ -3597,7 +3608,7 @@
     },
     "billing": {
       "title": "Facturación",
-      "permissionDenied": "Só o propietario, un administrador ou un xestor de facturación da organización pode ver a súa facturación.",
+      "permissionDenied": "Só o propietario, un administrador ou un xestor de facturación da organización pode ver a súa facturación. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Subscrición",
       "state": "Estado",
       "stateNone": "Sen subscrición",
@@ -3774,7 +3785,7 @@
       "emptyDescription": "Usa Hora anterior para ver solicitudes anteriores.",
       "emptyBoundDescription": "Os rexistros de solicitudes non van máis atrás.",
       "loadError": "Non se puideron cargar os rexistros de solicitudes.",
-      "permissionDenied": "Só un propietario, administrador ou xestor de facturación da organización pode ler os seus rexistros de solicitudes.",
+      "permissionDenied": "Só un propietario, administrador ou xestor de facturación da organización pode ler os seus rexistros de solicitudes. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} de entrada · {{output}} de saída",
       "byok": "BYOK"
     },
@@ -4044,7 +4055,10 @@
     "list": {
       "loadFailed": "Non se puido cargar o historial do chat.",
       "new": "Chat novo",
-      "deleteTitle": "Eliminar este chat?"
+      "deleteTitle": "Eliminar este chat?",
+      "resetNoticeTitle": "Borráronse os chats e os borradores locais",
+      "resetNoticeBody": "Kilo non puido abrir os chats gardados neste dispositivo. As túas sesións na nube non se ven afectadas.",
+      "resetNoticeDismiss": "Descartar o aviso"
     },
     "rename": {
       "title": "Renomear o chat",
@@ -4876,7 +4890,7 @@
     "defaultModel": "Usar o modelo predeterminado de Kilo",
     "duration": "Límite de tempo (minutos)",
     "spendLimit": "Límite de gasto (USD)",
-    "invalidSafeguards": "Introduce límites de tempo e gasto positivos e finitos.",
+    "invalidSafeguards": "Introduce un número positivo dentro do intervalo permitido.",
     "estimate": "Estimación {{estimate}} · máximo {{maximum}}",
     "estimateUnavailable": "Non hai dispoñible un resumo de pago para estes axustes. Cambia o modelo ou os límites, ou proba de novo máis tarde.",
     "confirmPaid": "Activar os resumos de pago para {{context}}?",
@@ -4946,7 +4960,8 @@
     "unavailableTitle": "Uso non dispoñible",
     "unavailableDescription": "O uso non está configurado para este espazo de traballo. Contacta co servizo de asistencia se esperas ver aquí datos de uso.",
     "orgSelfNotice": "Estás a ver o teu propio uso nesta organización.",
-    "viewDetails": "Ver detalles do uso"
+    "viewDetails": "Ver detalles do uso",
+    "orgSelfEntryTitle": "O teu uso"
   },
   "integrations": {
     "title": "Integracións",
@@ -5042,6 +5057,8 @@
       "autoCommit": "Fai commit dos cambios cando remate a execución",
       "condenseOnComplete": "Condensa o contexto cando remate a execución",
       "activeTitle": "Disparador activo",
+      "activeSwitchA11y": "Disparador activo: {{name}}",
+      "copyLinkA11y": "Copiar a ligazón de {{name}}",
       "activeDescription": "Os webhooks en pausa responden cun 404.",
       "runAsCreator": "Executar como eu",
       "runAsCreatorDescription": "Cada execución usa a túa conta, polo que a cabeceira secreta é obrigatoria.",

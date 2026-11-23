@@ -55,9 +55,7 @@ type CreateLiveSyncOptions = {
 
 export class ActiveSessionsLiveSync {
   private readonly now: () => number;
-  // eslint-disable-next-line promise/prefer-await-to-then
   private writeQueue: Promise<void> = Promise.resolve();
-  // eslint-disable-next-line promise/prefer-await-to-then
   private fetchQueue: Promise<void> = Promise.resolve();
   private fetchStartCount = 0;
   private readonly fetchStartWaiters: (() => void)[] = [];
@@ -68,12 +66,7 @@ export class ActiveSessionsLiveSync {
   private isFetchInFlight = false;
   private inFlightFetchCanceled = false;
   private lastEnrichmentAttemptAt: number | null = null;
-  /**
-   * Consecutive attempts this scope's socket writes canceled while it still had
-   * no server outcome. Past the budget a write waits for the in-flight attempt
-   * instead of canceling it, so a list slower than the heartbeat period can
-   * still settle instead of being restarted forever.
-   */
+  /** Consecutive cancels with no server outcome; reset once the scope gains an outcome. */
   private unacceptedCancelCount = 0;
   /**
    * The scope's last attempt failed with a code a retry cannot fix. Such a
@@ -368,10 +361,7 @@ export class ActiveSessionsLiveSync {
         success = !this.readInFlightFetchCanceled() && refresh.hasAcceptedResult();
       }
     } catch (error) {
-      // Cancellation and network failure keep reasons pending for Retry. A code
-      // a retry cannot fix is recorded: its query may leave the cache (a
-      // permission denial drops an unobserved query) and with it the metadata
-      // this owner reads as the outcome.
+      // Cancellation and network failure keep reasons pending for Retry.
       this.terminalFailureSeen = isTerminalTrpcCode(readTrpcErrorField(error, 'code'));
     } finally {
       this.isFetchInFlight = false;
@@ -391,9 +381,6 @@ export class ActiveSessionsLiveSync {
       }
       this.updateEnrichmentReason();
     }
-    // An attempt a socket write canceled left the scope without a server
-    // outcome, so it is replaced even when no other reason is pending;
-    // otherwise the section paints its loading placeholder until the user pulls.
     this.updateReconcileReason();
     const hasNewReasons = [...this.pendingReasons].some(reason => !inFlightReasons.has(reason));
     const wasCanceled = this.readInFlightFetchCanceled();

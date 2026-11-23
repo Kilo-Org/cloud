@@ -126,6 +126,15 @@ vi.mock('expo-router', () => ({
   useNavigation: () => ({ getState: () => ({ index: navigation.history.length - 1 }) }),
   useFocusEffect: focusEffect,
 }));
+// Back with no local history hands off through the push-then-retire hook (a
+// literal `router.replace` crashes Android Fabric). Its own
+// mechanics have their suite; here it stands in for the navigation call so the
+// assertions stay about the resulting route list.
+vi.mock('@/lib/navigation/stack-safe-replace', () => ({
+  useStackSafeReplace: () => ({
+    replace: (href: string) => navigation.history.splice(-1, 1, href),
+  }),
+}));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useMutedDisabledInk: () => '#666',
   useThemeColors: () => ({ foreground: '#000', mutedForeground: '#666' }),

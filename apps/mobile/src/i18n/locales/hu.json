@@ -399,7 +399,7 @@
       "title": "Szolgáltatói kulcsok",
       "rowSubtitle": "Saját szolgáltatói számlázás használata",
       "orgDescription": "Ezek a kulcsok a szervezet minden tagja számára közösek, és a költségek a szervezet szolgáltatói fiókjait terhelik.",
-      "viewOnly": "Csak a szervezet tulajdonosa, adminisztrátora vagy számlázási kezelője módosíthatja a szervezet kulcsait.",
+      "viewOnly": "Csak a szervezet tulajdonosa, adminisztrátora vagy számlázási felelőse módosíthatja a szervezet kulcsait.",
       "description": "Az ezekkel a kulcsokkal küldött kérések a szolgáltatói fiókodat terhelik a Kilo-egyenleged helyett.",
       "managedByPlan": "A kódolási csomagod kezeli",
       "enableKey": "A(z) {{provider}} kulcs engedélyezése",
@@ -1238,6 +1238,7 @@
     "needsInputAction": {
       "approved": "Kérelem jóváhagyva",
       "replied": "Válasz elküldve",
+      "empty": "Írj egy választ, majd küldd el.",
       "failed": "Nem sikerült válaszolni. Koppints újra az újrapróbálkozáshoz.",
       "unavailable": "Ez a kérelem már nem várakozik."
     }
@@ -1502,7 +1503,9 @@
       "githubError": "Nem sikerült megnyitni a GitHub beállítását. Próbáld újra.",
       "gitlabAccount": "GitLab-fiók",
       "gitlabError": "Nem sikerült megnyitni a GitLab beállítását. Próbáld újra.",
-      "description": "A PR-ek automatikus kódellenőrzéséhez hozd létre ezt a kapcsolatot a Kilo szolgáltatással: {{label}}."
+      "description": "A PR-ek automatikus kódellenőrzéséhez hozd létre ezt a kapcsolatot a Kilo szolgáltatással: {{label}}.",
+      "notConnectedTitle": "A {{platform}} nincs csatlakoztatva",
+      "githubAdminOnlyDescription": "Csak a szervezet tulajdonosai és adminisztrátorai csatlakoztathatják."
     },
     "overview": {
       "allAreas": "Minden terület",
@@ -2251,6 +2254,7 @@
       "couldNotLoadThisSession": "Nem sikerült betölteni ezt a munkamenetet.",
       "historyTooLarge": "Ez a munkamenet leirata túl nagy a betöltéshez.",
       "historyUnavailable": "Ez a munkamenet leirata nem olvasható.",
+      "historyTemporarilyUnavailable": "Ez a munkamenet leirata átmenetileg nem érhető el.",
       "cloneFailedRetry": "Nem sikerült klónozni ezt a munkamenetet. Próbáld újra.",
       "notEnoughCredits": "Nincs elég kredit ehhez a kéréshez. Töltsd fel az egyenleged, és próbáld újra.",
       "previousTaskFinishing": "Az előző feladat még nem fejeződött be. Várj egy kicsit.",
@@ -2787,7 +2791,9 @@
       "skip": "Kihagyás",
       "retrySkip": "Kihagyás újrapróbálása",
       "submitting": "Küldés…",
-      "sendAnswers": "Válaszok küldése"
+      "sendAnswers": "Válaszok küldése",
+      "unreadableTitle": "Nem sikerült megjeleníteni a kérdést",
+      "unreadableBody": "Az ügynök egy kérdésre vár, amelyet ez az alkalmazás nem tud megjeleníteni. Válaszoljon rá a CLI-ben a folytatáshoz."
     },
     "blockingCard": {
       "questionUnavailable": "Ez a kérdés már nem érhető el.",
@@ -2814,6 +2820,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Nem sikerült betölteni az alügynök munkamenetét",
+      "historyTooLarge": "Az alügynök előzményei túl nagyok a betöltéshez.",
+      "historyUnavailable": "Az alügynök előzményei nem érhetők el.",
+      "historyTemporarilyUnavailable": "Az alügynök előzményei átmenetileg nem érhetők el.",
       "failed": "Az alügynök munkamenete sikertelenül zárult",
       "noMessages": "Az alügynöknek nincsenek üzenetei",
       "noMessagesDescription": "Az alügynök munkamenete átirat nélkül fejeződött be.",
@@ -3392,6 +3401,8 @@
     "voiceTranscriptionWho": "Az eszközöd, a Kilo Gateway a választott átírási modelleddel, vagy az Apple vagy a Google az online felismeréshez.",
     "installAttributionPromptTitle": "Engedélyezed a telepítés forrásának azonosítását?",
     "installAttributionPromptMessage": "A Kilo az Apple követési engedélyét kizárólag arra használja, hogy megtudja, milyen csatornán jutottál el hozzánk. Az utasításaidat és beszélgetéseidet soha nem használjuk.",
+    "installAttributionRequestFailedTitle": "Nem sikerült megjeleníteni a követési engedélykérést",
+    "installAttributionRequestFailedMessage": "A Kilo nem tudta megjeleníteni a rendszer engedélykérését, ezért a telepítés forrásának azonosítása kikapcsolva marad.",
     "what": "Mit",
     "why": "Miért",
     "who": "Kivel"
@@ -3407,7 +3418,7 @@
   "organization": {
     "auditLog": {
       "title": "Auditnapló",
-      "permissionDenied": "Az auditnaplót csak az Enterprise csomagot használó szervezet tulajdonosa, adminisztrátora vagy számlázási felelőse olvashatja.",
+      "permissionDenied": "Az auditnaplót csak az Enterprise csomagot használó szervezet tulajdonosa, adminisztrátora vagy számlázási felelőse olvashatja. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Nincsenek auditesemények",
       "emptyDescription": "A szervezetben végrehajtott műveletek itt jelennek meg.",
       "truncated": "A legutóbbi események láthatók.",
@@ -3597,7 +3608,7 @@
     },
     "billing": {
       "title": "Számlázás",
-      "permissionDenied": "A számlázási adatokat csak a szervezet tulajdonosa, adminisztrátora vagy számlázási felelőse láthatja.",
+      "permissionDenied": "A számlázási adatokat csak a szervezet tulajdonosa, adminisztrátora vagy számlázási felelőse láthatja. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Előfizetés",
       "state": "Állapot",
       "stateNone": "Nincs előfizetés",
@@ -3774,7 +3785,7 @@
       "emptyDescription": "A Korábbi óra gombbal tekintheti meg a korábbi kéréseket.",
       "emptyBoundDescription": "A kérésnaplók ennél korábbra nem nyúlnak vissza.",
       "loadError": "Nem sikerült betölteni a kérésnaplókat.",
-      "permissionDenied": "A kérésnaplókat csak a szervezet tulajdonosa, adminisztrátora vagy számlázási felelőse olvashatja.",
+      "permissionDenied": "A kérésnaplókat csak a szervezet tulajdonosa, adminisztrátora vagy számlázási felelőse olvashatja. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} be · {{output}} ki",
       "byok": "BYOK"
     },
@@ -4044,7 +4055,10 @@
     "list": {
       "loadFailed": "Nem sikerült betölteni a csevegés előzményeit.",
       "new": "Új csevegés",
-      "deleteTitle": "Törli ezt a csevegést?"
+      "deleteTitle": "Törli ezt a csevegést?",
+      "resetNoticeTitle": "A helyi csevegések és piszkozatok törlődtek",
+      "resetNoticeBody": "A Kilo nem tudta megnyitni az ezen az eszközön tárolt csevegéseket. A felhőben lévő munkameneteidet ez nem érinti.",
+      "resetNoticeDismiss": "Értesítés elvetése"
     },
     "rename": {
       "title": "Csevegés átnevezése",
@@ -4876,7 +4890,7 @@
     "defaultModel": "A Kilo alapértelmezett modelljének használata",
     "duration": "Időkorlát (perc)",
     "spendLimit": "Költési korlát (USD)",
-    "invalidSafeguards": "Adj meg pozitív, véges idő- és költési korlátot.",
+    "invalidSafeguards": "Adj meg egy pozitív számot az engedélyezett tartományban.",
     "estimate": "Becsült {{estimate}} · legfeljebb {{maximum}}",
     "estimateUnavailable": "Fizetett összefoglaló nem elérhető ezekkel a beállításokkal. Változtasd meg a modellt vagy a korlátokat, vagy próbáld újra később.",
     "confirmPaid": "Engedélyezed a fizetős összefoglalókat ehhez: {{context}}?",
@@ -4946,7 +4960,8 @@
     "unavailableTitle": "A használat nem érhető el",
     "unavailableDescription": "Ehhez a munkaterülethez nincs beállítva a használat. Ha itt használati adatokat vár, forduljon az ügyfélszolgálathoz.",
     "orgSelfNotice": "A saját használatodat látod ebben a szervezetben.",
-    "viewDetails": "Használati részletek megtekintése"
+    "viewDetails": "Használati részletek megtekintése",
+    "orgSelfEntryTitle": "Saját használatod"
   },
   "integrations": {
     "title": "Integrációk",
@@ -5042,6 +5057,8 @@
       "autoCommit": "A módosítások véglegesítése a futás befejezésekor",
       "condenseOnComplete": "A kontextus tömörítése a futás befejezésekor",
       "activeTitle": "Trigger aktív",
+      "activeSwitchA11y": "Aktív trigger: {{name}}",
+      "copyLinkA11y": "Hivatkozás másolása: {{name}}",
       "activeDescription": "A szüneteltetett webhookok 404-gyel válaszolnak.",
       "runAsCreator": "Futtatás a saját fiókommal",
       "runAsCreatorDescription": "Minden futás az Ön fiókját használja, ezért a titkos fejléc kötelező.",

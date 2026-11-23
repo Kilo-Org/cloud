@@ -788,9 +788,6 @@ describe('progressive segment rotation', () => {
       engine.stop();
       await settle();
 
-      // Neither segment produced text, and the session still advanced twice:
-      // a stop that waits on this drain measures its silence from here rather
-      // than abandoning a queue that keeps finishing work.
       expect(progress).toHaveLength(2);
     } finally {
       vi.useRealTimers();

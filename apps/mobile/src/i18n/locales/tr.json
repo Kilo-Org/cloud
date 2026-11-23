@@ -676,6 +676,7 @@
     "needsInputAction": {
       "approved": "İstek onaylandı",
       "replied": "Yanıt gönderildi",
+      "empty": "Bir yanıt yazın, ardından gönderin.",
       "failed": "Yanıtlanamadı. Yeniden denemek için tekrar dokunun.",
       "unavailable": "Bu istek artık beklemiyor."
     }
@@ -817,6 +818,8 @@
     },
     "providerConnect": {
       "description": "Çekme isteklerini otomatik olarak incelemek için Kilo bağlantısını kur: {{label}}.",
+      "notConnectedTitle": "{{platform}} bağlı değil",
+      "githubAdminOnlyDescription": "Yalnızca kuruluş sahipleri ve yöneticiler bağlayabilir.",
       "githubApp": "GitHub uygulaması",
       "githubError": "GitHub kurulumu açılamadı. Lütfen tekrar dene.",
       "gitlabAccount": "GitLab hesabı",
@@ -1689,6 +1692,7 @@
       "couldNotLoadThisSession": "Bu oturum yüklenemedi.",
       "historyTooLarge": "Bu oturumun dökümü yüklenemeyecek kadar büyük.",
       "historyUnavailable": "Bu oturumun dökümü okunamıyor.",
+      "historyTemporarilyUnavailable": "Bu oturumun dökümü geçici olarak kullanılamıyor.",
       "cloneFailedRetry": "Bu oturum kopyalanamadı. Tekrar dene.",
       "notEnoughCredits": "Bu istek için yeterli kredi yok. Kredi ekleyip tekrar dene.",
       "previousTaskFinishing": "Önceki görev henüz tamamlanmadı. Biraz bekle.",
@@ -2225,7 +2229,9 @@
       "skip": "Atla",
       "retrySkip": "Atlamayı tekrar dene",
       "submitting": "Gönderiliyor…",
-      "sendAnswers": "Yanıtları gönder"
+      "sendAnswers": "Yanıtları gönder",
+      "unreadableTitle": "Bu soru görüntülenemedi",
+      "unreadableBody": "Aracı, bu uygulamanın gösteremediği bir soruyu bekliyor. Devam etmek için soruyu CLI'de yanıtla."
     },
     "blockingCard": {
       "questionUnavailable": "Bu soru artık kullanılamıyor.",
@@ -2252,6 +2258,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Alt ajan oturumu yüklenemedi.",
+      "historyTooLarge": "Bu alt ajanın geçmişi yüklenemeyecek kadar büyük.",
+      "historyUnavailable": "Bu alt ajanın geçmişi kullanılamıyor.",
+      "historyTemporarilyUnavailable": "Bu alt ajanın geçmişi geçici olarak kullanılamıyor.",
       "failed": "Alt ajan oturumu başarısız oldu.",
       "noMessages": "Alt ajan mesajı yok",
       "noMessagesDescription": "Bu alt ajan oturumu, mesaj dökümü oluşturmadan tamamlandı.",
@@ -2832,6 +2841,8 @@
     "why": "Paylaşım amacı",
     "who": "Verileri alan taraf",
     "installAttributionPromptMessage": "Kilo, Apple'ın takip iznini yalnızca uygulamaya hangi kanaldan ulaştığını öğrenmek için kullanır. İstemlerin ve konuşmaların bunun için asla kullanılmaz.",
+    "installAttributionRequestFailedTitle": "Takip istemi gösterilemedi",
+    "installAttributionRequestFailedMessage": "Kilo sistem istemini gösteremedi, bu yüzden yükleme kaynağı belirleme kapalı kalır.",
     "installAttributionPromptTitle": "Yükleme kaynağının belirlenmesine izin verilsin mi?"
   },
   "prReview": {
@@ -3399,7 +3410,7 @@
   "organization": {
     "auditLog": {
       "title": "Denetim günlüğü",
-      "permissionDenied": "Denetim günlüğünü yalnızca Enterprise planındaki kuruluşun sahibi, yöneticisi veya faturalandırma yöneticisi görüntüleyebilir.",
+      "permissionDenied": "Denetim günlüğünü yalnızca Enterprise planındaki kuruluşun sahibi, yöneticisi veya faturalandırma yöneticisi görüntüleyebilir. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Denetim olayı yok",
       "emptyDescription": "Bu kuruluşta gerçekleştirilen işlemler burada görünür.",
       "truncated": "En son olaylar gösteriliyor.",
@@ -3589,7 +3600,7 @@
     },
     "billing": {
       "title": "Faturalandırma",
-      "permissionDenied": "Faturalandırma bilgilerini yalnızca kuruluşun sahibi, yöneticisi veya faturalandırma yöneticisi görebilir.",
+      "permissionDenied": "Faturalandırma bilgilerini yalnızca kuruluşun sahibi, yöneticisi veya faturalandırma yöneticisi görebilir. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Abonelik",
       "state": "Durum",
       "stateNone": "Abonelik yok",
@@ -3778,7 +3789,7 @@
       "emptyDescription": "Daha önceki istekleri görmek için Önceki saat'i kullanın.",
       "emptyBoundDescription": "İstek kayıtları en fazla buraya kadar geriye gider.",
       "loadError": "İstek günlükleri yüklenemedi.",
-      "permissionDenied": "İstek günlüklerini yalnızca kuruluşun sahibi, yöneticisi veya faturalandırma yöneticisi görüntüleyebilir.",
+      "permissionDenied": "İstek günlüklerini yalnızca kuruluşun sahibi, yöneticisi veya faturalandırma yöneticisi görüntüleyebilir. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} giriş · {{output}} çıkış",
       "byok": "BYOK"
     },
@@ -4044,7 +4055,10 @@
     "list": {
       "loadFailed": "Sohbet geçmişi yüklenemedi.",
       "new": "Yeni sohbet",
-      "deleteTitle": "Bu sohbet silinsin mi?"
+      "deleteTitle": "Bu sohbet silinsin mi?",
+      "resetNoticeTitle": "Yerel sohbetler ve taslaklar temizlendi",
+      "resetNoticeBody": "Kilo bu cihazda kayıtlı sohbetleri açamadı. Bulut oturumlarınız etkilenmedi.",
+      "resetNoticeDismiss": "Bildirimi yok say"
     },
     "rename": {
       "title": "Sohbeti yeniden adlandır",
@@ -4876,7 +4890,7 @@
     "defaultModel": "Kilo’nun varsayılan modelini kullan",
     "duration": "Süre sınırı (dakika)",
     "spendLimit": "Harcama sınırı (USD)",
-    "invalidSafeguards": "Pozitif ve sonlu süre ve harcama sınırları girin.",
+    "invalidSafeguards": "İzin verilen aralıkta pozitif bir sayı girin.",
     "estimate": "Tahmini {{estimate}} · en fazla {{maximum}}",
     "estimateUnavailable": "Bu ayarlar için ücretli özet mevcut değil. Modeli veya sınırları değiştirin ya da daha sonra tekrar deneyin.",
     "confirmPaid": "{{context}} için ücretli özetler etkinleştirilsin mi?",
@@ -4946,7 +4960,8 @@
     "unavailableTitle": "Kullanım kullanılamıyor",
     "unavailableDescription": "Bu çalışma alanı için kullanım ayarlanmamış. Burada kullanım görmeyi bekliyorsanız destek ekibiyle iletişime geçin.",
     "orgSelfNotice": "Bu organizasyondaki kendi kullanımınızı görüyorsunuz.",
-    "viewDetails": "Kullanım ayrıntılarını görüntüle"
+    "viewDetails": "Kullanım ayrıntılarını görüntüle",
+    "orgSelfEntryTitle": "Sizin kullanımınız"
   },
   "integrations": {
     "title": "Entegrasyonlar",
@@ -5042,6 +5057,8 @@
       "autoCommit": "Çalıştırma bittiğinde değişiklikleri işle",
       "condenseOnComplete": "Çalıştırma bittiğinde bağlamı sıkıştır",
       "activeTitle": "Tetikleyici etkin",
+      "activeSwitchA11y": "Tetikleyici etkin: {{name}}",
+      "copyLinkA11y": "{{name}} için bağlantıyı kopyala",
       "activeDescription": "Duraklatılmış web kancaları 404 yanıtı verir.",
       "runAsCreator": "Benim adıma çalıştır",
       "runAsCreatorDescription": "Her çalıştırma hesabınızı kullanır, bu nedenle gizli başlık gerekir.",

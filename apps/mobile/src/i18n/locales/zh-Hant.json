@@ -676,6 +676,7 @@
     "needsInputAction": {
       "approved": "要求已核准",
       "replied": "回覆已傳送",
+      "empty": "請先填寫回答，再傳送。",
       "failed": "無法回答。再次點按即可重試。",
       "unavailable": "此要求已不再等待。"
     }
@@ -817,6 +818,8 @@
     },
     "providerConnect": {
       "description": "連結 Kilo {{label}}，即可自動審查 PR。",
+      "notConnectedTitle": "尚未連結 {{platform}}",
+      "githubAdminOnlyDescription": "只有組織擁有者和管理員可以設定連結。",
       "githubApp": "GitHub App",
       "githubError": "無法開啟 GitHub 設定。請再試一次。",
       "gitlabAccount": "GitLab 帳戶",
@@ -1689,6 +1692,7 @@
       "couldNotLoadThisSession": "無法載入此工作階段。",
       "historyTooLarge": "此工作階段的對話記錄過大，無法載入。",
       "historyUnavailable": "無法讀取此工作階段的對話記錄。",
+      "historyTemporarilyUnavailable": "此工作階段的對話記錄暫時無法取得。",
       "cloneFailedRetry": "無法複製此工作階段。請再試一次。",
       "notEnoughCredits": "點數不足，無法執行此請求。請加值後再試一次。",
       "previousTaskFinishing": "上一個任務仍在收尾。請稍候。",
@@ -2225,7 +2229,9 @@
       "skip": "略過",
       "retrySkip": "再次嘗試略過",
       "submitting": "送出中…",
-      "sendAnswers": "傳送答案"
+      "sendAnswers": "傳送答案",
+      "unreadableTitle": "無法顯示此問題",
+      "unreadableBody": "代理程式正在等待一個此應用程式無法顯示的問題。請在 CLI 中回答該問題以繼續。"
     },
     "blockingCard": {
       "questionUnavailable": "此問題已無法作答。",
@@ -2252,6 +2258,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "無法載入子代理工作階段。",
+      "historyTooLarge": "此子代理的記錄過大，無法載入。",
+      "historyUnavailable": "此子代理的記錄無法取得。",
+      "historyTemporarilyUnavailable": "此子代理的記錄暫時無法取得。",
       "failed": "子代理工作階段執行失敗。",
       "noMessages": "沒有子代理訊息",
       "noMessagesDescription": "此子代理工作階段已完成，但未產生對話記錄。",
@@ -2832,6 +2841,8 @@
     "why": "用途",
     "who": "對象",
     "installAttributionPromptMessage": "Kilo 僅使用 Apple 的追蹤權限，了解你透過哪個管道安裝應用程式。絕不會使用你的提示詞或對話。",
+    "installAttributionRequestFailedTitle": "無法顯示追蹤提示",
+    "installAttributionRequestFailedMessage": "Kilo 無法顯示系統提示，因此安裝來源追蹤保持關閉。",
     "installAttributionPromptTitle": "允許追蹤安裝來源？"
   },
   "prReview": {
@@ -3399,7 +3410,7 @@
   "organization": {
     "auditLog": {
       "title": "稽核記錄",
-      "permissionDenied": "只有 Enterprise 套餐組織的擁有者、管理員或帳務管理員可以查看其稽核記錄。",
+      "permissionDenied": "只有 Enterprise 套餐組織的擁有者、管理員或帳單管理員可以查看其稽核記錄。 $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "沒有稽核事件",
       "emptyDescription": "在此組織中執行的操作會顯示在這裡。",
       "truncated": "僅顯示最近的事件。",
@@ -3589,7 +3600,7 @@
     },
     "billing": {
       "title": "帳單",
-      "permissionDenied": "只有組織擁有者、管理員或帳單管理員可以查看組織帳單。",
+      "permissionDenied": "只有組織擁有者、管理員或帳單管理員可以查看組織帳單。 $t(organization.boundary.accessDeniedDescription)",
       "subscription": "訂閱",
       "state": "狀態",
       "stateNone": "無訂閱",
@@ -3778,7 +3789,7 @@
       "emptyDescription": "使用「較早一小時」查看較早的請求。",
       "emptyBoundDescription": "請求記錄最早只到這裡。",
       "loadError": "無法載入請求記錄。",
-      "permissionDenied": "只有組織的擁有者、管理員或帳務管理員可以查看其請求記錄。",
+      "permissionDenied": "只有組織的擁有者、管理員或帳單管理員可以查看其請求記錄。 $t(organization.boundary.accessDeniedDescription)",
       "tokens": "輸入 {{input}} · 輸出 {{output}}",
       "byok": "BYOK"
     },
@@ -4044,7 +4055,10 @@
     "list": {
       "loadFailed": "無法載入聊天記錄。",
       "new": "新對話",
-      "deleteTitle": "刪除這個對話？"
+      "deleteTitle": "刪除這個對話？",
+      "resetNoticeTitle": "本機對話與草稿已清除",
+      "resetNoticeBody": "Kilo 無法開啟儲存在本裝置上的對話。你的雲端工作階段不受影響。",
+      "resetNoticeDismiss": "忽略通知"
     },
     "rename": {
       "title": "重新命名聊天",
@@ -4876,7 +4890,7 @@
     "defaultModel": "使用 Kilo 的預設模型",
     "duration": "時間上限（分鐘）",
     "spendLimit": "花費上限（USD）",
-    "invalidSafeguards": "請輸入大於零的有限時間與花費上限。",
+    "invalidSafeguards": "請輸入允許範圍內的正數。",
     "estimate": "預估 {{estimate}} · 上限 {{maximum}}",
     "estimateUnavailable": "這些設定無法提供付費摘要。請變更模型或上限，或稍後再試。",
     "confirmPaid": "要為 {{context}} 啟用付費摘要嗎？",
@@ -4946,7 +4960,8 @@
     "unavailableTitle": "用量無法使用",
     "unavailableDescription": "此工作區尚未設定用量。若預期此處應顯示用量，請聯絡支援團隊。",
     "orgSelfNotice": "你看到的是你自己在此組織中的用量。",
-    "viewDetails": "查看用量詳情"
+    "viewDetails": "查看用量詳情",
+    "orgSelfEntryTitle": "你的用量"
   },
   "integrations": {
     "title": "整合",
@@ -5042,6 +5057,8 @@
       "autoCommit": "執行完成時提交變更",
       "condenseOnComplete": "執行完成時精簡內容脈絡",
       "activeTitle": "觸發器已啟用",
+      "activeSwitchA11y": "觸發器已啟用：{{name}}",
+      "copyLinkA11y": "複製 {{name}} 的連結",
       "activeDescription": "暫停的網路鉤子會回應 404。",
       "runAsCreator": "以我的身分執行",
       "runAsCreatorDescription": "每次執行都會使用你的帳戶，因此必須提供密鑰標頭。",

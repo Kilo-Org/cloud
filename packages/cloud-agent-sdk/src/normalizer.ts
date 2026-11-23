@@ -36,6 +36,7 @@ import {
   sessionTurnCloseDataSchema,
   sessionQueueChangedDataSchema,
   questionAskedDataSchema,
+  questionAskedIdentitySchema,
   questionRepliedDataSchema,
   questionRejectedDataSchema,
   permissionAskedDataSchema,
@@ -113,6 +114,16 @@ export type ServiceEvent =
       type: 'question.asked';
       requestId: string;
       questions?: QuestionInfo[] | undefined;
+    }
+  | {
+      /**
+       * A question request is waiting that this app cannot read: its list did
+       * not parse, or it carried no questions at all, so no answer card can be
+       * offered for it. The request is still pending for the CLI, so the user
+       * is told it exists rather than seeing it vanish.
+       */
+      type: 'question.unreadable';
+      requestId: string;
     }
   | { type: 'question.replied'; requestId: string }
   | { type: 'question.rejected'; requestId: string }
@@ -458,13 +469,25 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
     }
 
     case 'question.asked': {
+      // A request with no readable id has nothing to key a card or a notice
+      // to, and no reply that could clear it, so it is dropped.
+      const identity = questionAskedIdentitySchema.safeParse(data);
+      if (!identity.success) return null;
       const r = questionAskedDataSchema.safeParse(data);
-      if (!r.success) return null;
-      return {
-        type: 'question.asked',
-        requestId: r.data.id,
-        questions: r.data.questions,
-      };
+      // An answer card needs a non-empty list: an absent, empty or unreadable
+      // one would render nothing the user could answer.
+      if (r.success && r.data.questions !== undefined && r.data.questions.length > 0) {
+        return {
+          type: 'question.asked',
+          requestId: r.data.id,
+          questions: r.data.questions,
+        };
+      }
+      // A request whose list cannot be read cannot be offered as a card, and a
+      // request with no questions has nothing to ask. Neither is dropped,
+      // because the CLI keeps waiting for an answer the app would otherwise
+      // never mention.
+      return { type: 'question.unreadable', requestId: identity.data.id };
     }
 
     case 'question.replied': {

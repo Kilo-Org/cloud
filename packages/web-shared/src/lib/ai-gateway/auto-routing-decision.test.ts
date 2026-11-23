@@ -20,6 +20,7 @@ import type { EfficientDecisionParams } from './auto-routing-decision';
 import {
   detectRequiredInputModalities,
   estimateRoutingTokens,
+  type CustomRouterDefinition,
 } from '@kilocode/auto-routing-contracts';
 
 const originalFetch = globalThis.fetch;
@@ -69,6 +70,28 @@ const validResponse = {
   classifierResult: null,
 };
 
+const poolDefinition: CustomRouterDefinition = {
+  id: '00000000-0000-4000-8000-000000000001',
+  ownerType: 'org',
+  ownerId: 'org-1',
+  slug: 'team',
+  name: 'Team',
+  baseRouter: 'efficient',
+  mode: 'cost_per_accuracy',
+  entries: [
+    {
+      kind: 'gateway',
+      model: '~anthropic/latest',
+      servingPin: {
+        model: 'anthropic/claude-sonnet-4.6',
+        pinnedAt: '2026-11-20T00:00:00.000Z',
+        source: 'observed',
+      },
+    },
+  ],
+  defaultEntryKey: 'gateway:~anthropic/latest',
+};
+
 describe('fetchEfficientAutoDecision', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -101,6 +124,18 @@ describe('fetchEfficientAutoDecision', () => {
 
     const [, init] = mockedFetch.mock.calls[0];
     expect(JSON.parse(init?.body as string)).not.toHaveProperty('router');
+  });
+
+  it('never carries a pool definition without a custom router reference', async () => {
+    mockedFetch.mockResolvedValueOnce(new Response(JSON.stringify(validResponse), { status: 200 }));
+
+    await fetchEfficientAutoDecision(
+      { ...makeParams(), customRouterDefinition: poolDefinition },
+      options
+    );
+
+    const [, init] = mockedFetch.mock.calls[0];
+    expect(JSON.parse(init?.body as string)).not.toHaveProperty('customRouterDefinition');
   });
 
   it('sends frontier independently with privacy hints and denied models', async () => {
@@ -414,7 +449,49 @@ describe('fetchCustomRouterDecision', () => {
       organizationId: 'org-1',
     });
     expect(sent).not.toHaveProperty('clientEntries');
+    expect(sent).not.toHaveProperty('customRouterDefinition');
     expect(result).toEqual({ kind: 'ok', decision: customDecision, costUsd: 0 });
+  });
+
+  it('forwards the trusted pool definition the gateway derived its policy from', async () => {
+    mockedFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ ...validResponse, cost: 0, decision: customDecision }), {
+        status: 200,
+      })
+    );
+
+    await fetchCustomRouterDecision(
+      { ...customParams(), customRouterDefinition: poolDefinition },
+      options
+    );
+
+    const [, init] = mockedFetch.mock.calls[0];
+    const sent = JSON.parse(init?.body as string);
+    expect(sent.customRouterDefinition).toEqual(poolDefinition);
+  });
+
+  it('never takes the pool definition from the request body', async () => {
+    mockedFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ ...validResponse, cost: 0, decision: customDecision }), {
+        status: 200,
+      })
+    );
+
+    const params = customParams();
+    await fetchCustomRouterDecision(
+      {
+        ...params,
+        body: {
+          ...(params.body as Record<string, unknown>),
+          customRouterDefinition: { ...poolDefinition, slug: 'forged' },
+        },
+      },
+      options
+    );
+
+    const [, init] = mockedFetch.mock.calls[0];
+    const sent = JSON.parse(init?.body as string);
+    expect(sent).not.toHaveProperty('customRouterDefinition');
   });
 
   it.each([

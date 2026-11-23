@@ -399,7 +399,7 @@
       "title": "Furtuuwwan dhiyeessaa",
       "rowSubtitle": "Kaffaltii dhiyeessaa kee fayyadami",
       "orgDescription": "Furtuuwwan kunneen namoota dhaabbata keessa jiran hundaaf qoodamanii herrega dhiyeessaa dhaabbatichaatti kaffalamu.",
-      "viewOnly": "Abbaa dhaabbatichaa, bulchaa ykn hogganaa kaffaltii qofatu furtuuwwan isaa jijjiiruu danda'a.",
+      "viewOnly": "Abbaa dhaabbatichaa, bulchaa ykn bulchaa kaffaltii qofatu furtuuwwan isaa jijjiiruu danda'a.",
       "description": "Gaaffiiwwan furtuuwwan kanaan ergaman haftee Kilo kee irraa osoo hin taane herrega dhiyeessaa keetti kaffalamu.",
       "managedByPlan": "Karoora koodii keetiin bulfama",
       "enableKey": "Furtuu {{provider}} dandeessisi",
@@ -1238,6 +1238,7 @@
     "needsInputAction": {
       "approved": "Gaaffiin mirkanaa’eera",
       "replied": "Deebbiin ergameera",
+      "empty": "Deebii barreessi, sana booda ergi.",
       "failed": "Deebuu kennuu hin dandeenye. Yaaluuf irra deebi’i cuqaasi.",
       "unavailable": "Gaaffiin kun eegamaa hin oolu."
     }
@@ -1502,7 +1503,9 @@
       "githubError": "Qophii GitHub banuun hin danda'amne. Irra deebi'ii yaali.",
       "gitlabAccount": "herrega GitLab",
       "gitlabError": "Qophii GitLab banuun hin danda'amne. Irra deebi'ii yaali.",
-      "description": "Gaaffii makuu ofumaan sakatta'uuf {{label}} kan Kilo walqabsiisi."
+      "description": "Gaaffii makuu ofumaan sakatta'uuf {{label}} kan Kilo walqabsiisi.",
+      "notConnectedTitle": "{{platform}} hin walqabsiifamne",
+      "githubAdminOnlyDescription": "Abbootiin dhaabbataa fi bulchitootaa qofa isa walqabsiisuu danda'u."
     },
     "overview": {
       "allAreas": "Kutaa hunda",
@@ -2251,6 +2254,7 @@
       "couldNotLoadThisSession": "Turtii kana fe'uu hin danda'amne.",
       "historyTooLarge": "Galcheen turtii kanaa fe'uu baay'ee guddaa dha.",
       "historyUnavailable": "Galchi turtii kanaa hin dubbifamu.",
+      "historyTemporarilyUnavailable": "Galchi turtii kanaa yeroodhaaf hin argamu.",
       "cloneFailedRetry": "Turtii kana kopii gochuu hin danda'amne. Deebi'ii yaali.",
       "notEnoughCredits": "Gaaffii kanaaf kiriiditii gahaa hin qabdu. Kiriiditii dabaliitii deebi'ii yaali.",
       "previousTaskFinishing": "Hojiin duraanii amma iyyuu xumuramaa jira. Yeroo muraasa eegi.",
@@ -2787,7 +2791,9 @@
       "skip": "Irra darbi",
       "retrySkip": "Irra darbuuf deebi'ii yaali",
       "submitting": "Ergaa jira…",
-      "sendAnswers": "Deebiiwwan ergi"
+      "sendAnswers": "Deebiiwwan ergi",
+      "unreadableTitle": "Gaaffiin kun agarsiifamuu hin dandeenye",
+      "unreadableBody": "Ajentiin gaaffii appiin kun agarsiisuu hin dandeenye eeggachaa jira. Itti fufuuf, isa CLI keessatti deebisi."
     },
     "blockingCard": {
       "questionUnavailable": "Gaaffiin kun kana booda hin argamu.",
@@ -2814,6 +2820,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Turtii ergamaa gargaaraa fe'uu hin danda'amne.",
+      "historyTooLarge": "Seenaan ergamaa gargaaraa kanaa fe'uu baay'ee guddaa dha.",
+      "historyUnavailable": "Seenaan ergamaa gargaaraa kanaa hin argamu.",
+      "historyTemporarilyUnavailable": "Seenaan ergamaa gargaaraa kanaa yeroodhaaf hin argamu.",
       "failed": "Turtiin ergamaa gargaaraa hin milkoofne.",
       "noMessages": "Ergaan ergamaa gargaaraa hin jiru",
       "noMessagesDescription": "Turtiin ergamaa gargaaraa kun galmee marii osoo hin uumin xumurameera.",
@@ -3392,6 +3401,8 @@
     "voiceTranscriptionWho": "Meeshaa keessan, Kilo Gateway moodeela hiikkaa isin filattaniin, yookaan Apple yookaan Google adda baasuu online.",
     "installAttributionPromptTitle": "Maddi fe'iinsaa akka beekamu hayyamtaa?",
     "installAttributionPromptMessage": "Kilo karaa asitti si fide beekuuf qofa hayyama hordoffii Apple fayyadama. Gaaffiiwwanii fi mariiwwan kee gonkumaa kanaaf hin fayyadamu.",
+    "installAttributionRequestFailedTitle": "Gaaffii hordoffii agarsiisuun hin danda'amne",
+    "installAttributionRequestFailedMessage": "Kilo gaaffii sirnaa agarsiisuu hin dandeenye, kanaaf maddi fe'iinsaa beekamuun cufaa ta'ee hafa.",
     "what": "Maal",
     "why": "Maaliif",
     "who": "Eenyu"
@@ -3407,7 +3418,7 @@
   "organization": {
     "auditLog": {
       "title": "Galmee odiitii",
-      "permissionDenied": "Galmee odiitii dhaabbataa kan dubbisuu danda'an abbaa dhaabbataa, bulchaa ykn hoggantoota kaffaltii karoora Enterprise irra jiran qofa.",
+      "permissionDenied": "Galmee odiitii dhaabbataa kan dubbisuu danda'an abbaa dhaabbataa, bulchaa ykn bulchaa kaffaltii karoora Enterprise irra jiran qofa. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Taateen odiitii hin jiru",
       "emptyDescription": "Tarkaanfiiwwan dhaabbata kana keessatti fudhataman asitti mul'atu.",
       "truncated": "Taateewwan dhihoo kana raawwataman agarsiifamaa jiru.",
@@ -3597,7 +3608,7 @@
     },
     "billing": {
       "title": "Kaffaltii",
-      "permissionDenied": "Kaffaltii dhaabbataa abbaa dhaabbataa, bulchaa ykn hoogganaa kaffaltii qofatu arguu danda'a.",
+      "permissionDenied": "Kaffaltii dhaabbataa abbaa dhaabbataa, bulchaa ykn bulchaa kaffaltii qofatu arguu danda'a. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Galmee tajaajilaa",
       "state": "Haala",
       "stateNone": "Galmeen tajaajilaa hin jiru",
@@ -3774,7 +3785,7 @@
       "emptyDescription": "Sa'aatii darbe fayyadamuun gaaffiiwwan darban ilaali.",
       "emptyBoundDescription": "Galmeewwan gaaffii kana caalaa duubatti hin deeman.",
       "loadError": "Galmeewwan gaaffii fe'uun hin danda'amne.",
-      "permissionDenied": "Galmeewwan gaaffii dhaabbataa kan dubbisuu danda'an abbaa dhaabbataa, bulchaa ykn hogganaa kaffaltii qofa.",
+      "permissionDenied": "Galmeewwan gaaffii dhaabbataa kan dubbisuu danda'an abbaa dhaabbataa, bulchaa ykn bulchaa kaffaltii qofa. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} seene · {{output}} ba'e",
       "byok": "BYOK"
     },
@@ -4044,7 +4055,10 @@
     "list": {
       "loadFailed": "Seenaa chaat fudhachuu hin dandeenye.",
       "new": "Marii haaraa",
-      "deleteTitle": "Marii kana haquuf?"
+      "deleteTitle": "Marii kana haquuf?",
+      "resetNoticeTitle": "Marii fi wixineen meeshaa kanaa haqamaniiru",
+      "resetNoticeBody": "Kilo marii meeshaa kana irratti olkaa'aman banuu hin dandeenye. Turtiiwwan keessan duumessa keessa jiran hin tuqamne.",
+      "resetNoticeDismiss": "Beeksisa dhiisi"
     },
     "rename": {
       "title": "Maqaa marii jijjiiri",
@@ -4876,7 +4890,7 @@
     "defaultModel": "Moodeela durtii Kilo fayyadami",
     "duration": "Eegumsa yeroo (daqiiqaa)",
     "spendLimit": "Eegumsa baasii (USD)",
-    "invalidSafeguards": "Daangaa yeroo fi baasii poozatiivii fi daangeffame galchi.",
+    "invalidSafeguards": "Lakkoofsa poozatiivii hanga hayyamame keessatti galchi.",
     "estimate": "Tilmaama {{estimate}} · daangaa ol'aanaa {{maximum}}",
     "estimateUnavailable": "Cuunfaan kaffaltii qindaa'inoota kanaaf hin argamu. Moodelii ykn daangoota jijjiiri, ykn booda irra deebi'ii yaali.",
     "confirmPaid": "Cuunfaa kaffaltii {{context}}f dandeessisuu?",
@@ -4946,7 +4960,8 @@
     "unavailableTitle": "Itti fayyadama hin argamne",
     "unavailableDescription": "Iddoo hojii kanaaf itti fayyadamni qophaa'ee hin jiru. Itti fayyadama asitti arguu yoo eegde, garee deeggarsaa qunnami.",
     "orgSelfNotice": "Itti fayyadama kee dhaabbata kana keessatti argaa jirta.",
-    "viewDetails": "Bal'ina itti fayyadamaa ilaali"
+    "viewDetails": "Bal'ina itti fayyadamaa ilaali",
+    "orgSelfEntryTitle": "Itti fayyadama kee"
   },
   "integrations": {
     "title": "Walitti hidhamiinsota",
@@ -5042,6 +5057,8 @@
       "autoCommit": "Yeroo hojii xumuramu jijjiiramoota galmeessi",
       "condenseOnComplete": "Yeroo hojii xumuramu konteekstii gabaabsi",
       "activeTitle": "Kakaawwaan hojiirra jira",
+      "activeSwitchA11y": "Kakaawwaan hojiirra jira: {{name}}",
+      "copyLinkA11y": "Geessituu {{name}} garagalchi",
       "activeDescription": "Weebhuukiiwwan dhaabaman 404'n deebii kenna.",
       "runAsCreator": "Akka anaatti hojjedhu",
       "runAsCreatorDescription": "Hojii hundi herrega kee fayyadama, kanaaf sararri iccitii dirqama.",

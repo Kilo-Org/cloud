@@ -1238,6 +1238,7 @@
     "needsInputAction": {
       "approved": "Ìbéèrè náà ti fọwọ́ sí",
       "replied": "Ìfèsì ti ránṣẹ́",
+      "empty": "Kọ ìdáhùn kí o sì ránṣẹ́.",
       "failed": "Kò lè fèsì. Tẹ lẹ́ẹ̀kansi láti gbìyànjú lẹ́ẹ̀kansi.",
       "unavailable": "Ìbéèrè yìí kì í retí mọ́."
     }
@@ -1502,7 +1503,9 @@
       "githubError": "A kò lè ṣí ìṣètò GitHub. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i.",
       "gitlabAccount": "àkọọ́lẹ̀ GitLab",
       "gitlabError": "A kò lè ṣí ìṣètò GitLab. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i.",
-      "description": "So {{label}} ti Kilo pọ̀ láti ṣàtúnyẹ̀wò àwọn ìbéèrè àkópọ̀ láìfọwọ́ṣe."
+      "description": "So {{label}} ti Kilo pọ̀ láti ṣàtúnyẹ̀wò àwọn ìbéèrè àkópọ̀ láìfọwọ́ṣe.",
+      "notConnectedTitle": "A kò tíì so {{platform}} pọ̀",
+      "githubAdminOnlyDescription": "Àwọn ẹni tó ni àjọ àti àwọn alákòóso nìkan ló lè so ó pọ̀."
     },
     "overview": {
       "allAreas": "Gbogbo apá",
@@ -2251,6 +2254,7 @@
       "couldNotLoadThisSession": "A kò lè gbé ìgbà iṣẹ́ yìí wọlé.",
       "historyTooLarge": "Ìgbésílẹ̀ ìgbà iṣẹ́ yìí tóbí jù lọ láti lè gbé wọlé.",
       "historyUnavailable": "Kò sí lè ka ìgbésílẹ̀ ìgbà iṣẹ́ yìí.",
+      "historyTemporarilyUnavailable": "Ìgbésílẹ̀ ìgbà iṣẹ́ yìí kò sí fún ìgbà díẹ̀.",
       "cloneFailedRetry": "A kò lè ṣe àdàkọ ìgbà iṣẹ́ yìí. Gbìyànjú lẹ́ẹ̀kan sí i.",
       "notEnoughCredits": "Kirẹ́dítì kò tó fún ìbéèrè yìí. Fi kirẹ́dítì kún un kí o sì gbìyànjú lẹ́ẹ̀kan sí i.",
       "previousTaskFinishing": "Iṣẹ́ tó ṣáájú kò tíì parí. Jọ̀wọ́ dúró díẹ̀.",
@@ -2787,7 +2791,9 @@
       "skip": "Re kọjá",
       "retrySkip": "Gbìyànjú láti re kọjá lẹ́ẹ̀kan sí i",
       "submitting": "Ń fi ránṣẹ́…",
-      "sendAnswers": "Fi àwọn ìdáhùn ránṣẹ́"
+      "sendAnswers": "Fi àwọn ìdáhùn ránṣẹ́",
+      "unreadableTitle": "A kò lè fi ìbéèrè yìí hàn",
+      "unreadableBody": "Aṣojú náà ń dúró de ìbéèrè tí ápù yìí kò lè fi hàn. Dáhùn ìbéèrè náà nínú CLI kí o lè tẹ̀síwájú."
     },
     "blockingCard": {
       "questionUnavailable": "Ìbéèrè yìí kò sí mọ́.",
@@ -2814,6 +2820,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "A kò lè gbé ìgbà iṣẹ́ aṣojú abẹ́ wọlé.",
+      "historyTooLarge": "Ìtàn aṣojú abẹ́ yìí tóbí jù lọ láti lè gbé wọlé.",
+      "historyUnavailable": "Ìtàn aṣojú abẹ́ yìí kò sí.",
+      "historyTemporarilyUnavailable": "Ìtàn aṣojú abẹ́ yìí kò sí fún ìgbà díẹ̀.",
       "failed": "Ìgbà iṣẹ́ aṣojú abẹ́ kùnà.",
       "noMessages": "Kò sí ìfiránṣẹ́ aṣojú abẹ́",
       "noMessagesDescription": "Ìgbà iṣẹ́ aṣojú abẹ́ yìí parí láìsí àkọsílẹ̀.",
@@ -3392,6 +3401,8 @@
     "voiceTranscriptionWho": "Ẹ̀rọ rẹ, Kilo Gateway pẹ̀lú àwòṣe ìyípadà ọ̀rọ̀ tí o yàn, tàbí Apple tàbí Google fún ìdámọ̀ lórí ayélujára.",
     "installAttributionPromptTitle": "Yọ̀ǹda ìdánimọ̀ orísun fífi ohun èlò sórí ẹ̀rọ?",
     "installAttributionPromptMessage": "Kilo lo ìyọ̀ǹda ìtọpinpin Apple láti mọ ọ̀nà tí o gbà dé síbí nìkan. A kì í lo àwọn ọ̀rọ̀ ìtọ́ni àti ìjíròrò rẹ rárá.",
+    "installAttributionRequestFailedTitle": "A kò lè fi ìtọ́ni ìtọpinpin hàn",
+    "installAttributionRequestFailedMessage": "Kilo kò lè fi ìtọ́ni ètò ẹ̀rọ hàn, nítorí náà ìdánimọ̀ orísun fífi ohun èlò sórí ẹ̀rọ wà ní pípa.",
     "what": "Kí ni",
     "why": "Kí ló dé",
     "who": "Ta ni"
@@ -3407,7 +3418,7 @@
   "organization": {
     "auditLog": {
       "title": "Àkọsílẹ̀ àyẹ̀wò",
-      "permissionDenied": "Olùní àjọ, alábòójútó tàbí olùṣàkóso ìsanwó nínú ètò Enterprise nìkan ló lè ka àkọsílẹ̀ àyẹ̀wò rẹ̀.",
+      "permissionDenied": "Olùní àjọ, alábòójútó tàbí olùṣàkóso ìsanwó nínú ètò Enterprise nìkan ló lè ka àkọsílẹ̀ àyẹ̀wò rẹ̀. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Kò sí ìṣẹ̀lẹ̀ àyẹ̀wò",
       "emptyDescription": "Àwọn ìgbésẹ̀ tí a gbé nínú àjọ yìí yóò hàn níbí.",
       "truncated": "À ń fi àwọn ìṣẹ̀lẹ̀ tuntun jùlọ hàn.",
@@ -3597,7 +3608,7 @@
     },
     "billing": {
       "title": "Ìsanwó",
-      "permissionDenied": "Ẹni tó ni àjọ, alábòójútó tàbí olùṣàkóso ìsanwó nìkan ló lè rí ìsanwó àjọ náà.",
+      "permissionDenied": "Ẹni tó ni àjọ, alábòójútó tàbí olùṣàkóso ìsanwó nìkan ló lè rí ìsanwó àjọ náà. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Ìforúkọsílẹ̀",
       "state": "Ipò",
       "stateNone": "Kò sí ìforúkọsílẹ̀",
@@ -3774,7 +3785,7 @@
       "emptyDescription": "Lo Wákàtí tó ṣáájú láti wo àwọn ìbéèrè tó ṣáájú.",
       "emptyBoundDescription": "Àkọsílẹ̀ àwọn ìbéèrè kò lọ sẹ́yìn ju ibí lọ.",
       "loadError": "A kò lè gbé àwọn àkọsílẹ̀ ìbéèrè wọlé.",
-      "permissionDenied": "Olùní àjọ, alábòójútó tàbí olùṣàkóso ìsanwó nìkan ló lè ka àkọsílẹ̀ ìbéèrè rẹ̀.",
+      "permissionDenied": "Olùní àjọ, alábòójútó tàbí olùṣàkóso ìsanwó nìkan ló lè ka àkọsílẹ̀ ìbéèrè rẹ̀. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} wọlé · {{output}} jáde",
       "byok": "BYOK"
     },
@@ -4044,7 +4055,10 @@
     "list": {
       "loadFailed": "Kò lè ṣagbewọ ìtàn iwiregbe.",
       "new": "Ìjíròrò tuntun",
-      "deleteTitle": "Pa ìjíròrò yìí rẹ́?"
+      "deleteTitle": "Pa ìjíròrò yìí rẹ́?",
+      "resetNoticeTitle": "A ti pa ìjíròrò àti àkọsílẹ̀ àkọ́kọ́ ẹ̀rọ rẹ",
+      "resetNoticeBody": "Kilo kò lè ṣí àwọn ìjíròrò tí a fipamọ́ sórí ẹ̀rọ yìí. A kò yí àwọn ìgbà iṣẹ́ nínú kùrukùru rẹ padà.",
+      "resetNoticeDismiss": "Yọ ìfitónilétí kúrò"
     },
     "rename": {
       "title": "Yí orúkọ ìjíròrò padà",
@@ -4876,7 +4890,7 @@
     "defaultModel": "Lo àwòṣe àìyípadà Kilo",
     "duration": "Ààbò àkókò (ìṣẹ́jú)",
     "spendLimit": "Ààbò ìnáwó (USD)",
-    "invalidSafeguards": "Tẹ òpin àkókò àti ìnáwó tó jẹ́ rere, tó sì ní òpin.",
+    "invalidSafeguards": "Tẹ nọ́mbà rere sínú ààlà tí a gbà.",
     "estimate": "Ìsirò {{estimate}} · ti ó pọ̀jù {{maximum}}",
     "estimateUnavailable": "Àkópọ̀ tí a sanwó fún kò sí fún àwọn ètò yìí. Yí àwòṣe dà tàbí àwọn ààlà dà, tàbí gbìyànjú mọ̀ ní àmọ̀jú.",
     "confirmPaid": "Mú àkópọ̀ olówó ṣiṣẹ́ fún {{context}}?",
@@ -4946,7 +4960,8 @@
     "unavailableTitle": "Ìlò kò ṣeé rí",
     "unavailableDescription": "A kò tíì ṣètò ìlò fún ibi-iṣẹ́ yìí. Kàn sí ẹgbẹ́ àtìlẹ́yìn tí o bá ń retí láti rí ìlò níbí.",
     "orgSelfNotice": "Ìlò tìrẹ nínú àjọ yìí ni ò ń rí.",
-    "viewDetails": "Wo àlàyé ìlò"
+    "viewDetails": "Wo àlàyé ìlò",
+    "orgSelfEntryTitle": "Ìlò tìrẹ"
   },
   "integrations": {
     "title": "Àwọn Ìsopọ̀",
@@ -5042,6 +5057,8 @@
       "autoCommit": "Ṣe àkójọ àwọn àyípadà nígbà tí ìṣiṣẹ́ bá parí",
       "condenseOnComplete": "Ṣe àkópọ̀ àyíká ọ̀rọ̀ nígbà tí ìṣiṣẹ́ bá parí",
       "activeTitle": "Ìmúṣiṣẹ́ ń ṣiṣẹ́",
+      "activeSwitchA11y": "Ìmúṣiṣẹ́ ń ṣiṣẹ́: {{name}}",
+      "copyLinkA11y": "Da ìjápọ̀ kọ fún {{name}}",
       "activeDescription": "Àwọn wẹ́ẹ̀bùhóòkù tí a dá dúró máa ń dáhùn pẹ̀lú 404.",
       "runAsCreator": "Ṣiṣẹ́ gẹ́gẹ́ bí èmi",
       "runAsCreatorDescription": "Ìṣiṣẹ́ kọ̀ọ̀kan máa ń lo àkọọ́lẹ̀ rẹ, nítorí náà àkọlé àṣírí pọn dandan.",

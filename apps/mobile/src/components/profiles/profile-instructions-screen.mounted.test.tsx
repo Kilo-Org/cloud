@@ -1,13 +1,15 @@
 /* eslint-disable max-lines -- one mounted harness drives the screen's list rows, its cap and both empty-state permissions */
 import { type Href } from 'expo-router';
+import { type QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
 import { ProfileInstructionsScreen } from '@/components/profiles/profile-instructions-screen';
 import { isolateLtrBidiText } from '@/lib/bidi';
+import { resetFormDraftsForTests } from '@/lib/form-draft';
 import { MAX_PROFILE_INSTRUCTIONS } from '@/lib/agent-profile-forms';
-import { act, type ReactTestInstance } from '@/test/renderer';
+import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 
 /** The default destination the Profile tab's routes pass: their own Profiles list. */
@@ -106,9 +108,41 @@ vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'TabScrollView'
 vi.mock('@/components/profiles/profile-section-header', () => ({
   ProfileSectionHeader: 'ProfileSectionHeader',
 }));
-vi.mock('@/components/profiles/instruction-form-sheet', () => ({
-  InstructionFormSheet: 'InstructionFormSheet',
-}));
+vi.mock('@/components/profiles/instruction-form-sheet', async () => {
+  // vi.mock factories are hoisted above this module's imports, so the React,
+  // i18n and draft helpers load inside the factory. The stand-in keeps the
+  // screen's props on its host element and renders the two fields whose text the
+  // sheet's own draft holds (`instruction-form-sheet.tsx` writes `name` and
+  // `content`), so a case can type into them and read what a remount restores.
+  const { createElement: create } = await import('react');
+  const { i18n: translate } = await import('@/i18n');
+  const { useFormDraftRef } = await import('@/lib/form-draft');
+  function InstructionFormSheet(props: { draftScope?: string }) {
+    const nameRef = useFormDraftRef(props.draftScope, 'name', '');
+    const contentRef = useFormDraftRef(props.draftScope, 'content', '');
+    return create(
+      'InstructionFormSheet',
+      props,
+      create('FormField', {
+        key: 'name',
+        label: translate.t('profiles.instructionNameLabel'),
+        defaultValue: nameRef.current,
+        onChangeText: (value: string) => {
+          nameRef.current = value;
+        },
+      }),
+      create('FormField', {
+        key: 'content',
+        label: translate.t('profiles.instructionContentLabel'),
+        defaultValue: contentRef.current,
+        onChangeText: (value: string) => {
+          contentRef.current = value;
+        },
+      })
+    );
+  }
+  return { InstructionFormSheet };
+});
 
 /** The name the fixture row holds; the dialog must isolate exactly this run. */
 const INSTRUCTION_NAME = 'zalgo-2026';
@@ -208,6 +242,52 @@ async function confirmRequestAndSettle(request: ConfirmRequest): Promise<void> {
 
 function rowControls(root: ReactTestInstance): string[] {
   return findAll(root, 'Pressable').map(node => String(node.props.accessibilityLabel));
+}
+
+/** Press the add control a loaded list renders in its footer. */
+function pressAdd(root: ReactTestInstance): void {
+  const button = findAll(root, 'Button')[0];
+  const press = button?.props.onPress;
+  if (typeof press !== 'function') {
+    throw new TypeError('the add control was not rendered');
+  }
+  act(() => {
+    (press as () => void)();
+  });
+}
+
+/** The props one sheet field stub carries; the renderer keeps them untyped. */
+type FieldProps = { defaultValue?: string; onChangeText?: (text: string) => void };
+
+/** The sheet field the stub renders under `label`. */
+function findField(root: ReactTestInstance, label: string) {
+  const field = findAll(root, 'FormField').find(node => node.props.label === label);
+  if (!field) {
+    throw new Error(`field ${label} was not rendered`);
+  }
+  return field;
+}
+
+/** Type into one sheet field, which writes the scope's draft as the sheet does. */
+function changeText(root: ReactTestInstance, label: string, value: string): void {
+  const field = findField(root, label).props as FieldProps;
+  act(() => {
+    field.onChangeText?.(value);
+  });
+}
+
+/** Re-render the mounted screen against fresh mock state, keeping the providers. */
+function rerenderScreen(renderer: ReactTestRenderer, queryClient: QueryClient): void {
+  renderer.update(
+    createElement(
+      QueryClientProvider,
+      { client: queryClient },
+      createElement(ProfileInstructionsScreen, {
+        profileId: 'profile-1',
+        backFallback: PROFILES_LIST_HREF,
+      })
+    )
+  );
 }
 
 beforeEach(() => {
@@ -481,6 +561,105 @@ describe('ProfileInstructionsScreen load errors', () => {
       queryError?.onRetry?.();
     });
     expect(h.query.refetch).toHaveBeenCalledTimes(1);
+
+    unmount();
+  });
+});
+
+/** A sheet draft typed while the role allowed the write; the store keeps it past an unmount. */
+async function seedSheetDraft(): Promise<void> {
+  const first = await mountScreen();
+  pressAdd(first.renderer.root);
+  changeText(first.renderer.root, i18n.t('profiles.instructionNameLabel'), 'portal-rules');
+  changeText(first.renderer.root, i18n.t('profiles.instructionContentLabel'), '# Portal rules');
+  first.unmount();
+}
+
+describe('ProfileInstructionsScreen manage permission', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetFormDraftsForTests();
+    permission.value = 'allowed';
+    h.query.data = [testInstruction()];
+    h.query.error = undefined;
+    h.query.isError = false;
+    h.query.isPending = false;
+    h.query.isRefetching = false;
+  });
+
+  it('renders no sheet for a stored draft once the role is read-only, and states the role once', async () => {
+    await seedSheetDraft();
+    permission.value = 'read-only';
+
+    const { renderer, unmount } = await mountScreen();
+
+    expect(findAll(renderer.root, 'InstructionFormSheet')).toHaveLength(0);
+    expect(
+      findAll(renderer.root, 'Text').filter(
+        node => node.props.children === i18n.t('profiles.organizationRoleRequired')
+      )
+    ).toHaveLength(1);
+
+    unmount();
+  });
+
+  it('drops that draft with the denial, so a later allowed render stays closed', async () => {
+    await seedSheetDraft();
+    permission.value = 'read-only';
+
+    const denied = await mountScreen();
+    expect(findAll(denied.renderer.root, 'InstructionFormSheet')).toHaveLength(0);
+    denied.unmount();
+
+    permission.value = 'allowed';
+    const allowed = await mountScreen();
+    expect(findAll(allowed.renderer.root, 'InstructionFormSheet')).toHaveLength(0);
+    allowed.unmount();
+  });
+
+  it('keeps the draft while the role resolves, then reopens on the typed fields', async () => {
+    await seedSheetDraft();
+    permission.value = 'resolving';
+
+    const resolving = await mountScreen();
+    expect(findAll(resolving.renderer.root, 'InstructionFormSheet')).toHaveLength(0);
+
+    permission.value = 'allowed';
+    await act(async () => {
+      rerenderScreen(resolving.renderer, resolving.queryClient);
+      await Promise.resolve();
+    });
+
+    expect(findAll(resolving.renderer.root, 'InstructionFormSheet')).toHaveLength(1);
+    const name = findField(resolving.renderer.root, i18n.t('profiles.instructionNameLabel'))
+      .props as FieldProps;
+    const content = findField(resolving.renderer.root, i18n.t('profiles.instructionContentLabel'))
+      .props as FieldProps;
+    expect(name.defaultValue).toBe('portal-rules');
+    expect(content.defaultValue).toBe('# Portal rules');
+
+    resolving.unmount();
+  });
+
+  it('closes the open sheet when the role is denied and does not reopen it when it returns', async () => {
+    const { renderer, queryClient, unmount } = await mountScreen();
+    pressAdd(renderer.root);
+    expect(findAll(renderer.root, 'InstructionFormSheet')).toHaveLength(1);
+    changeText(renderer.root, i18n.t('profiles.instructionNameLabel'), 'portal-rules');
+
+    permission.value = 'read-only';
+    await act(async () => {
+      rerenderScreen(renderer, queryClient);
+      await Promise.resolve();
+    });
+    expect(findAll(renderer.root, 'InstructionFormSheet')).toHaveLength(0);
+
+    permission.value = 'allowed';
+    await act(async () => {
+      rerenderScreen(renderer, queryClient);
+      await Promise.resolve();
+    });
+    expect(findAll(renderer.root, 'InstructionFormSheet')).toHaveLength(0);
 
     unmount();
   });

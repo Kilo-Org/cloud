@@ -1238,6 +1238,7 @@
     "needsInputAction": {
       "approved": "Anmodning godkendt",
       "replied": "Svar sendt",
+      "empty": "Skriv et svar, og send det.",
       "failed": "Kunne ikke svare. Tryk igen for at prøve igen.",
       "unavailable": "Denne anmodning venter ikke længere."
     }
@@ -1502,7 +1503,9 @@
       "githubError": "Opsætningen af GitHub kunne ikke åbnes. Prøv igen.",
       "gitlabAccount": "GitLab-konto",
       "gitlabError": "Opsætningen af GitLab kunne ikke åbnes. Prøv igen.",
-      "description": "Tilslut Kilos {{label}} for automatisk at gennemgå pull requests."
+      "description": "Tilslut Kilos {{label}} for automatisk at gennemgå pull requests.",
+      "notConnectedTitle": "{{platform}} er ikke tilsluttet",
+      "githubAdminOnlyDescription": "Kun organisationsejere og administratorer kan oprette forbindelsen."
     },
     "overview": {
       "allAreas": "Alle områder",
@@ -2251,6 +2254,7 @@
       "couldNotLoadThisSession": "Kunne ikke indlæse denne session.",
       "historyTooLarge": "Denne sessions transskription er for stor at indlæse.",
       "historyUnavailable": "Denne sessions transskription kan ikke læses.",
+      "historyTemporarilyUnavailable": "Denne sessions transskription er midlertidigt utilgængelig.",
       "cloneFailedRetry": "Kunne ikke klone denne session. Prøv igen.",
       "notEnoughCredits": "Du har ikke nok kreditter til denne anmodning. Tilføj kreditter og prøv igen.",
       "previousTaskFinishing": "Den forrige opgave er ved at blive afsluttet. Vent et øjeblik.",
@@ -2787,7 +2791,9 @@
       "skip": "Spring over",
       "retrySkip": "Prøv at springe over igen",
       "submitting": "Sender…",
-      "sendAnswers": "Send svar"
+      "sendAnswers": "Send svar",
+      "unreadableTitle": "Dette spørgsmål kunne ikke vises",
+      "unreadableBody": "Agenten venter på et spørgsmål, som denne app ikke kan vise. Besvar spørgsmålet i CLI'en for at fortsætte."
     },
     "blockingCard": {
       "questionUnavailable": "Dette spørgsmål er ikke længere tilgængeligt.",
@@ -2814,6 +2820,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Kunne ikke indlæse underagentens session.",
+      "historyTooLarge": "Underagentens historik er for stor at indlæse.",
+      "historyUnavailable": "Underagentens historik er ikke tilgængelig.",
+      "historyTemporarilyUnavailable": "Underagentens historik er midlertidigt utilgængelig.",
       "failed": "Underagentens session mislykkedes.",
       "noMessages": "Ingen beskeder fra underagenten",
       "noMessagesDescription": "Underagentens session blev afsluttet uden en samtalehistorik.",
@@ -3392,6 +3401,8 @@
     "voiceTranscriptionWho": "Din enhed, Kilo Gateway med den transskriptionsmodel, du har valgt, eller Apple eller Google til genkendelse online.",
     "installAttributionPromptTitle": "Tillad sporing af installationskilde?",
     "installAttributionPromptMessage": "Kilo bruger kun Apples sporingstilladelse til at se, hvilken kanal du fandt os gennem. Dine forespørgsler og samtaler bruges aldrig til dette.",
+    "installAttributionRequestFailedTitle": "Sporingsprompten kunne ikke vises",
+    "installAttributionRequestFailedMessage": "Kilo kunne ikke vise systemprompten, så sporing af installationskilde forbliver slået fra.",
     "what": "Hvad",
     "why": "Hvorfor",
     "who": "Hvem"
@@ -3407,7 +3418,7 @@
   "organization": {
     "auditLog": {
       "title": "Revisionslog",
-      "permissionDenied": "Kun en ejer, administrator eller faktureringsansvarlig i en organisation på Enterprise-planen kan se organisationens revisionslog.",
+      "permissionDenied": "Kun en ejer, administrator eller faktureringsansvarlig i en organisation på Enterprise-planen kan se organisationens revisionslog. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Ingen revisionshændelser",
       "emptyDescription": "Handlinger, der udføres i denne organisation, vises her.",
       "truncated": "Viser de seneste hændelser.",
@@ -3597,7 +3608,7 @@
     },
     "billing": {
       "title": "Fakturering",
-      "permissionDenied": "Kun en ejer, administrator eller faktureringsansvarlig i organisationen kan se dens fakturering.",
+      "permissionDenied": "Kun en ejer, administrator eller faktureringsansvarlig i organisationen kan se dens fakturering. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Abonnement",
       "state": "Status",
       "stateNone": "Intet abonnement",
@@ -3774,7 +3785,7 @@
       "emptyDescription": "Brug Forrige time for at se tidligere anmodninger.",
       "emptyBoundDescription": "Anmodningsloggen går ikke længere tilbage.",
       "loadError": "Anmodningslogs kunne ikke indlæses.",
-      "permissionDenied": "Kun en ejer, administrator eller faktureringsansvarlig i organisationen kan se dens anmodningslogs.",
+      "permissionDenied": "Kun en ejer, administrator eller faktureringsansvarlig i organisationen kan se dens anmodningslogs. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} ind · {{output}} ud",
       "byok": "BYOK"
     },
@@ -4044,7 +4055,10 @@
     "list": {
       "loadFailed": "Kunne ikke indlæse chathistorik.",
       "new": "Ny chat",
-      "deleteTitle": "Slet denne chat?"
+      "deleteTitle": "Slet denne chat?",
+      "resetNoticeTitle": "Lokale chats og kladder blev ryddet",
+      "resetNoticeBody": "Kilo kunne ikke åbne de chats, der er gemt på denne enhed. Dine sessioner i skyen er ikke berørte.",
+      "resetNoticeDismiss": "Afvis meddelelse"
     },
     "rename": {
       "title": "Omdøb chat",
@@ -4876,7 +4890,7 @@
     "defaultModel": "Brug Kilos standardmodel",
     "duration": "Tidsgrænse (minutter)",
     "spendLimit": "Forbrugsgrænse (USD)",
-    "invalidSafeguards": "Angiv positive, endelige tids- og forbrugsgrænser.",
+    "invalidSafeguards": "Angiv et positivt tal inden for det tilladte interval.",
     "estimate": "Estimat {{estimate}} · maksimum {{maximum}}",
     "estimateUnavailable": "Et betalt resumé er ikke tilgængeligt med disse indstillinger. Skift model eller grænser, eller prøv igen senere.",
     "estimatePricingUnavailable": "Prissætning for denne model er ikke tilgængelig. Vælg en anden model.",
@@ -4946,7 +4960,8 @@
     "unavailableTitle": "Forbrug er ikke tilgængeligt",
     "unavailableDescription": "Forbrug er ikke sat op for dette arbejdsområde. Kontakt support, hvis du forventer at se forbrug her.",
     "orgSelfNotice": "Du ser dit eget forbrug i denne organisation.",
-    "viewDetails": "Se forbrugsdetaljer"
+    "viewDetails": "Se forbrugsdetaljer",
+    "orgSelfEntryTitle": "Dit forbrug"
   },
   "integrations": {
     "title": "Integrationer",
@@ -5042,6 +5057,8 @@
       "autoCommit": "Registrér ændringerne, når kørslen slutter",
       "condenseOnComplete": "Komprimér konteksten, når kørslen slutter",
       "activeTitle": "Udløser aktiv",
+      "activeSwitchA11y": "Udløser aktiv: {{name}}",
+      "copyLinkA11y": "Kopiér link til {{name}}",
       "activeDescription": "Pausede webhooks svarer med 404.",
       "runAsCreator": "Kør som mig",
       "runAsCreatorDescription": "Hver kørsel bruger din konto, så det hemmelige headerfelt er påkrævet.",

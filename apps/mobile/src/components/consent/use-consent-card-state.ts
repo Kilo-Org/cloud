@@ -8,6 +8,7 @@ import { useConfirmDialog } from '@/components/ui/dialog';
 import { useAuth } from '@/lib/auth/auth-context';
 import { acceptConsent, readConsent, revokeConsent, setOptionalConsent } from '@/lib/consent';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
+import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 
 /** The bound on the stored-consent read before the card gives up on it. */
 const STORED_LOAD_TIMEOUT_MS = 15_000;
@@ -34,6 +35,10 @@ const STORED_LOAD_TIMEOUT_MS = 15_000;
  */
 export function useConsentCardState(mode: ConsentMode) {
   const router = useRouter();
+  // The post-accept hand-off swaps the consent screen for the tabs in one
+  // native-stack commit; a literal `router.replace` crashes Android Fabric
+  // there, so it goes through the push-then-retire hook.
+  const stackSafeRouter = useStackSafeReplace();
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
   const { signOut, token } = useAuth();
@@ -143,7 +148,7 @@ export function useConsentCardState(mode: ConsentMode) {
     setPendingAction('primary');
     try {
       await acceptConsent(userId, optionalToggle);
-      router.replace('/(app)/(tabs)' as Href);
+      stackSafeRouter.replace('/(app)/(tabs)' as Href);
     } catch {
       setError('consent.couldNotSaveConsent');
       setPendingAction(null);

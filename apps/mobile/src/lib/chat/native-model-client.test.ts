@@ -72,7 +72,6 @@ describe('native on-device model client', () => {
       { ...AVAILABLE, status: 'unavailable', reason: 'apple_intelligence_disabled' },
       'modelChat.localModels.reasons.appleIntelligenceDisabled',
     ],
-    // Android's normal restricted answers carry no reason; the status picks the class.
     [
       'downloadable',
       { ...AVAILABLE, status: 'downloadable' },

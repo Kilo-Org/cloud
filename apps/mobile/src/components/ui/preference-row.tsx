@@ -103,8 +103,6 @@ export function PreferenceRow({
   const spokenName = accessibilityLabel ?? title;
   const spokenLabel =
     note === undefined ? spokenName : formatList([spokenName, note], i18n.language);
-  // Renders only when the caller passes a note, so a row gains its one extra
-  // muted line just then.
   const noteNode =
     note === undefined ? null : (
       <Text variant="muted" className="mt-0.5 text-xs">

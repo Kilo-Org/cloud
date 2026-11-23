@@ -1238,6 +1238,7 @@
     "needsInputAction": {
       "approved": "Permintaan diluluskan",
       "replied": "Balasan dihantar",
+      "empty": "Tulis balasan kemudian hantar.",
       "failed": "Tidak dapat menjawab. Ketik semula untuk mencuba lagi.",
       "unavailable": "Permintaan ini tidak lagi menunggu."
     }
@@ -1502,7 +1503,9 @@
       "githubError": "Tidak dapat membuka persediaan GitHub. Sila cuba lagi.",
       "gitlabAccount": "akaun GitLab",
       "gitlabError": "Tidak dapat membuka persediaan GitLab. Sila cuba lagi.",
-      "description": "Sambungkan {{label}} Kilo untuk menyemak permintaan penarikan secara automatik."
+      "description": "Sambungkan {{label}} Kilo untuk menyemak permintaan penarikan secara automatik.",
+      "notConnectedTitle": "{{platform}} tidak disambungkan",
+      "githubAdminOnlyDescription": "Hanya pemilik organisasi dan pentadbir boleh menyambungkannya."
     },
     "overview": {
       "allAreas": "Semua bidang",
@@ -2251,6 +2254,7 @@
       "couldNotLoadThisSession": "Tidak dapat memuatkan sesi ini.",
       "historyTooLarge": "Transkrip sesi ini terlalu besar untuk dimuatkan.",
       "historyUnavailable": "Transkrip sesi ini tidak dapat dibaca.",
+      "historyTemporarilyUnavailable": "Transkrip sesi ini buat sementara waktu tidak tersedia.",
       "cloneFailedRetry": "Tidak dapat mengklon sesi ini. Cuba semula.",
       "notEnoughCredits": "Kredit tidak mencukupi untuk permintaan ini. Tambah kredit dan cuba semula.",
       "previousTaskFinishing": "Tugasan sebelumnya masih dalam proses penyelesaian. Sila tunggu sebentar.",
@@ -2787,7 +2791,9 @@
       "skip": "Langkau",
       "retrySkip": "Cuba langkau semula",
       "submitting": "Menghantar…",
-      "sendAnswers": "Hantar jawapan"
+      "sendAnswers": "Hantar jawapan",
+      "unreadableTitle": "Soalan ini tidak dapat dipaparkan",
+      "unreadableBody": "Ejen sedang menunggu soalan yang tidak dapat ditunjukkan oleh aplikasi ini. Jawab soalan itu dalam CLI untuk meneruskan."
     },
     "blockingCard": {
       "questionUnavailable": "Soalan ini tidak lagi tersedia.",
@@ -2814,6 +2820,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Tidak dapat memuatkan sesi subejen.",
+      "historyTooLarge": "Sejarah subejen ini terlalu besar untuk dimuatkan.",
+      "historyUnavailable": "Sejarah subejen ini tidak tersedia.",
+      "historyTemporarilyUnavailable": "Sejarah subejen ini buat sementara waktu tidak tersedia.",
       "failed": "Sesi subejen gagal.",
       "noMessages": "Tiada mesej subejen",
       "noMessagesDescription": "Sesi subejen ini selesai tanpa menghasilkan transkrip.",
@@ -3392,6 +3401,8 @@
     "voiceTranscriptionWho": "Peranti anda, Kilo Gateway dengan model transkripsi pilihan anda, atau Apple atau Google untuk pengecaman dalam talian.",
     "installAttributionPromptTitle": "Benarkan penjejakan sumber pemasangan?",
     "installAttributionPromptMessage": "Kilo menggunakan kebenaran penjejakan Apple hanya untuk mengetahui saluran mana yang membawa anda ke sini. Gesaan dan perbualan anda tidak pernah digunakan.",
+    "installAttributionRequestFailedTitle": "Gesaan penjejakan tidak dapat dipaparkan",
+    "installAttributionRequestFailedMessage": "Kilo tidak dapat memaparkan gesaan sistem, jadi penjejakan sumber pemasangan kekal tidak aktif.",
     "what": "Apa",
     "why": "Mengapa",
     "who": "Siapa"
@@ -3407,7 +3418,7 @@
   "organization": {
     "auditLog": {
       "title": "Log audit",
-      "permissionDenied": "Hanya pemilik, pentadbir atau pengurus pengebilan organisasi pada pelan Enterprise boleh membaca log auditnya.",
+      "permissionDenied": "Hanya pemilik, pentadbir atau pengurus pengebilan organisasi pada pelan Enterprise boleh membaca log auditnya. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Tiada peristiwa audit",
       "emptyDescription": "Tindakan yang diambil dalam organisasi ini dipaparkan di sini.",
       "truncated": "Memaparkan peristiwa terkini.",
@@ -3597,7 +3608,7 @@
     },
     "billing": {
       "title": "Pengebilan",
-      "permissionDenied": "Hanya pemilik, pentadbir atau pengurus pengebilan organisasi boleh melihat pengebilannya.",
+      "permissionDenied": "Hanya pemilik, pentadbir atau pengurus pengebilan organisasi boleh melihat pengebilannya. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Langganan",
       "state": "Status",
       "stateNone": "Tiada langganan",
@@ -3774,7 +3785,7 @@
       "emptyDescription": "Gunakan Jam sebelumnya untuk melihat permintaan yang lebih awal",
       "emptyBoundDescription": "Log permintaan tidak tersedia lebih awal daripada ini",
       "loadError": "Tidak dapat memuatkan log permintaan.",
-      "permissionDenied": "Hanya pemilik, pentadbir atau pengurus pengebilan organisasi boleh membaca log permintaannya.",
+      "permissionDenied": "Hanya pemilik, pentadbir atau pengurus pengebilan organisasi boleh membaca log permintaannya. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} masuk · {{output}} keluar",
       "byok": "BYOK"
     },
@@ -4044,7 +4055,10 @@
     "list": {
       "loadFailed": "Tidak dapat memuatkan sejarah sembang.",
       "new": "Sembang baharu",
-      "deleteTitle": "Padam sembang ini?"
+      "deleteTitle": "Padam sembang ini?",
+      "resetNoticeTitle": "Sembang dan draf setempat telah dikosongkan",
+      "resetNoticeBody": "Kilo tidak dapat membuka sembang yang disimpan pada peranti ini. Sesi awan anda tidak terjejas.",
+      "resetNoticeDismiss": "Ketepikan notis"
     },
     "rename": {
       "title": "Namakan semula sembang",
@@ -4876,7 +4890,7 @@
     "defaultModel": "Guna model lalai Kilo",
     "duration": "Had masa (minit)",
     "spendLimit": "Had perbelanjaan (USD)",
-    "invalidSafeguards": "Masukkan had masa dan perbelanjaan yang positif dan terhingga.",
+    "invalidSafeguards": "Masukkan nombor positif dalam julat yang dibenarkan.",
     "estimate": "Anggaran {{estimate}} · maksimum {{maximum}}",
     "estimateUnavailable": "Ringkasan berbayar tidak tersedia untuk tetapan ini. Tukar model atau had, atau cuba lagi nanti.",
     "confirmPaid": "Dayakan ringkasan berbayar untuk {{context}}?",
@@ -4946,7 +4960,8 @@
     "unavailableTitle": "Penggunaan tidak tersedia",
     "unavailableDescription": "Penggunaan belum disediakan untuk ruang kerja ini. Hubungi sokongan jika anda menjangkakan penggunaan dipaparkan di sini.",
     "orgSelfNotice": "Anda sedang melihat penggunaan anda sendiri dalam organisasi ini.",
-    "viewDetails": "Lihat butiran penggunaan"
+    "viewDetails": "Lihat butiran penggunaan",
+    "orgSelfEntryTitle": "Penggunaan anda"
   },
   "integrations": {
     "title": "Integrasi",
@@ -5042,6 +5057,8 @@
       "autoCommit": "Komit perubahan apabila larian selesai",
       "condenseOnComplete": "Ringkaskan konteks apabila larian selesai",
       "activeTitle": "Pencetus aktif",
+      "activeSwitchA11y": "Pencetus aktif: {{name}}",
+      "copyLinkA11y": "Salin pautan untuk {{name}}",
       "activeDescription": "Webhook yang dijeda menjawab dengan 404.",
       "runAsCreator": "Jalankan sebagai saya",
       "runAsCreatorDescription": "Setiap larian menggunakan akaun anda, jadi pengepala rahsia diperlukan.",

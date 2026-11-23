@@ -193,10 +193,7 @@ export function recordLastRoute(href: string, userId: string | null): boolean {
   if (userId === null || href.length === 0) {
     return false;
   }
-  // Until the relaunch repair consumed the restored record, a write would
-  // overwrite it with the cold start's first committed route (the base
-  // Intent's destination itself) before the repair can read it. Recording
-  // opens when the repair latched; on a process that started with no persisted
+  // Recording opens when the repair latched; on a process that started with no persisted
   // record, `consumeLastRouteForRepair` latches the same way, so ordinary
   // navigation recording still works there.
   if (!repairEvaluated) {
@@ -205,9 +202,7 @@ export function recordLastRoute(href: string, userId: string | null): boolean {
   epoch += 1;
   record = { href, userId, storedAt: Date.now() };
   notify();
-  // The payload is captured now, at record time; only the write is serialized
-  // behind any earlier mirror operation, so a later record always lands after
-  // an earlier one and no write can jump a sign-out delete.
+  // The payload is captured now, at record time, not when the queued write runs.
   const serialized = JSON.stringify(record);
   chainMirror(async () => {
     await mirrorRecord(serialized);

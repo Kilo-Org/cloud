@@ -1238,6 +1238,7 @@
     "needsInputAction": {
       "approved": "Taotlus kiideti heaks",
       "replied": "Vastus on saadetud",
+      "empty": "Kirjuta vastus, seejärel saada see.",
       "failed": "Vastamine ei õnnestunud. Uuesti proovimiseks puuduta uuesti.",
       "unavailable": "See taotlus ei ole enam ootel."
     }
@@ -1502,7 +1503,9 @@
       "githubError": "GitHubi seadistamist ei õnnestunud avada. Proovi uuesti.",
       "gitlabAccount": "GitLabi konto",
       "gitlabError": "GitLabi seadistamist ei õnnestunud avada. Proovi uuesti.",
-      "description": "Ühenda Kilo {{label}}, et tõmbetaotlusi automaatselt üle vaadata."
+      "description": "Ühenda Kilo {{label}}, et tõmbetaotlusi automaatselt üle vaadata.",
+      "notConnectedTitle": "{{platform}} pole ühendatud",
+      "githubAdminOnlyDescription": "Selle saavad ühendada ainult organisatsiooni omanikud ja administraatorid."
     },
     "overview": {
       "allAreas": "Kõik valdkonnad",
@@ -2251,6 +2254,7 @@
       "couldNotLoadThisSession": "Seda seanssi ei õnnestunud laadida.",
       "historyTooLarge": "Selle seansi üleskirjutus on laadimiseks liiga suur.",
       "historyUnavailable": "Selle seansi üleskirjutust ei saa lugeda.",
+      "historyTemporarilyUnavailable": "Selle seansi üleskirjutus pole ajutiselt saadaval.",
       "cloneFailedRetry": "Seda seanssi ei õnnestunud kloonida. Proovi uuesti.",
       "notEnoughCredits": "Selle päringu jaoks ei jätku krediiti. Lisa krediiti ja proovi uuesti.",
       "previousTaskFinishing": "Eelmine ülesanne pole veel lõppenud. Oota hetk.",
@@ -2787,7 +2791,9 @@
       "skip": "Jäta vahele",
       "retrySkip": "Proovi vahelejätmist uuesti",
       "submitting": "Saatmine…",
-      "sendAnswers": "Saada vastused"
+      "sendAnswers": "Saada vastused",
+      "unreadableTitle": "Seda küsimust ei saanud kuvada",
+      "unreadableBody": "Agent ootab küsimust, mida see rakendus ei saa näidata. Vasta küsimusele CLI-s, et jätkata."
     },
     "blockingCard": {
       "questionUnavailable": "See küsimus pole enam saadaval.",
@@ -2814,6 +2820,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Alamagendi seanssi ei õnnestunud laadida",
+      "historyTooLarge": "Selle alamagendi ajalugu on laadimiseks liiga suur.",
+      "historyUnavailable": "Selle alamagendi ajalugu pole saadaval.",
+      "historyTemporarilyUnavailable": "Selle alamagendi ajalugu pole ajutiselt saadaval.",
       "failed": "Alamagendi seanss ebaõnnestus",
       "noMessages": "Alamagendi sõnumeid pole",
       "noMessagesDescription": "See alamagendi seanss lõppes ilma vestlusajaloota.",
@@ -3392,6 +3401,8 @@
     "voiceTranscriptionWho": "Sinu seade, Kilo Gateway koos sinu valitud transkriptsioonimudeliga või Apple või Google veebipõhiseks tuvastuseks.",
     "installAttributionPromptTitle": "Kas lubada paigaldusallika tuvastamine?",
     "installAttributionPromptMessage": "Kilo kasutab Apple'i jälgimisluba ainult selleks, et teada saada, millisest kanalist sa siia jõudsid. Sinu viipasid ega vestlusi selleks kunagi ei kasutata.",
+    "installAttributionRequestFailedTitle": "Jälgimisküsimust ei õnnestunud kuvada",
+    "installAttributionRequestFailedMessage": "Kilo ei saanud süsteemi küsimust kuvada, seega jääb paigaldusallika tuvastamine välja lülitatuks.",
     "what": "Mis",
     "why": "Miks",
     "who": "Kellele"
@@ -3407,7 +3418,7 @@
   "organization": {
     "auditLog": {
       "title": "Auditilogi",
-      "permissionDenied": "Auditilogi saavad lugeda ainult Enterprise-plaaniga organisatsiooni omanik, administraator või arvelduse haldur.",
+      "permissionDenied": "Auditilogi saavad lugeda ainult Enterprise-plaaniga organisatsiooni omanik, administraator või arvelduse haldur. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Auditisündmusi pole",
       "emptyDescription": "Siin kuvatakse selles organisatsioonis tehtud toimingud.",
       "truncated": "Kuvatakse viimased sündmused.",
@@ -3597,7 +3608,7 @@
     },
     "billing": {
       "title": "Arveldus",
-      "permissionDenied": "Arveldusteavet näevad ainult organisatsiooni omanik, administraator või arvelduse haldur.",
+      "permissionDenied": "Arveldusteavet näevad ainult organisatsiooni omanik, administraator või arvelduse haldur. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Tellimus",
       "state": "Olek",
       "stateNone": "Tellimus puudub",
@@ -3774,7 +3785,7 @@
       "emptyDescription": "Kasuta nuppu „Varasem tund”, et näha varasemaid päringuid.",
       "emptyBoundDescription": "Päringulogid ei ulatu sellest kaugemale tagasi.",
       "loadError": "Päringulogide laadimine ebaõnnestus.",
-      "permissionDenied": "Päringulogisid saavad lugeda ainult organisatsiooni omanik, administraator või arvelduse haldur.",
+      "permissionDenied": "Päringulogisid saavad lugeda ainult organisatsiooni omanik, administraator või arvelduse haldur. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} sisse · {{output}} välja",
       "byok": "BYOK"
     },
@@ -4044,7 +4055,10 @@
     "list": {
       "loadFailed": "Vestluse ajaloo laadimine ei õnnestunud.",
       "new": "Uus vestlus",
-      "deleteTitle": "Kas kustutada see vestlus?"
+      "deleteTitle": "Kas kustutada see vestlus?",
+      "resetNoticeTitle": "Kohalikud vestlused ja mustandid kustutati",
+      "resetNoticeBody": "Kilo ei suutnud avada selles seadmes salvestatud vestlusi. Sinu pilve seansse see ei mõjuta.",
+      "resetNoticeDismiss": "Jäta teade kõrvale"
     },
     "rename": {
       "title": "Nimeta vestlus ümber",
@@ -4876,7 +4890,7 @@
     "defaultModel": "Kasuta Kilo vaikemudelit",
     "duration": "Ajapiirang (minutid)",
     "spendLimit": "Kulupiirang (USD)",
-    "invalidSafeguards": "Sisesta positiivsed ja lõplikud aja- ja kulupiirangud.",
+    "invalidSafeguards": "Sisesta positiivne arv lubatud vahemikus.",
     "estimate": "Hinnang {{estimate}} · maksimaalselt {{maximum}}",
     "estimateUnavailable": "Nende seadetega pole tasuline kokkuvõte saadaval. Muuda mudelit või piiranguid või proovi hiljem uuesti.",
     "estimatePricingUnavailable": "Selle mudeli hinnad pole saadaval. Vali teine mudel.",
@@ -4946,7 +4960,8 @@
     "unavailableTitle": "Kasutus pole saadaval",
     "unavailableDescription": "Selle tööruumi jaoks pole kasutust seadistatud. Kui eeldad siin kasutust näha, võta ühendust toega.",
     "orgSelfNotice": "Näed oma kasutust selles organisatsioonis.",
-    "viewDetails": "Vaata kasutuse üksikasju"
+    "viewDetails": "Vaata kasutuse üksikasju",
+    "orgSelfEntryTitle": "Sinu kasutus"
   },
   "integrations": {
     "title": "Integratsioonid",
@@ -5042,6 +5057,8 @@
       "autoCommit": "Kinnita muudatused, kui käivitus lõpeb",
       "condenseOnComplete": "Tihenda kontekst, kui käivitus lõpeb",
       "activeTitle": "Päästik aktiivne",
+      "activeSwitchA11y": "Päästik aktiivne: {{name}}",
+      "copyLinkA11y": "Kopeeri link: {{name}}",
       "activeDescription": "Peatatud veebihaagid vastavad 404-ga.",
       "runAsCreator": "Käivita minuna",
       "runAsCreatorDescription": "Iga käivitus kasutab sinu kontot, seega on salajane päis nõutav.",

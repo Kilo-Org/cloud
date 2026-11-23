@@ -12830,6 +12830,11 @@ export const auto_routing_custom_routers = pgTable(
       .where(isNotNull(table.owned_by_user_id)),
     index('IDX_auto_routing_custom_routers_org_id').on(table.owned_by_organization_id),
     index('IDX_auto_routing_custom_routers_user_id').on(table.owned_by_user_id),
+    // `jsonb_path_ops` serves the `@>` lookup an alias promotion uses to find every pool that
+    // holds a moved alias, which is the only use.
+    index('IDX_auto_routing_custom_routers_entries')
+      .using('gin', table.entries.op('jsonb_path_ops'))
+      .concurrently(),
     check(
       'auto_routing_custom_routers_owner_check',
       sql`(

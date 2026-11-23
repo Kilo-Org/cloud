@@ -45,7 +45,7 @@
     "defaultModel": "Use Kilo’s default model",
     "duration": "Time safeguard (minutes)",
     "spendLimit": "Spend safeguard (USD)",
-    "invalidSafeguards": "Enter positive, finite time and spend limits.",
+    "invalidSafeguards": "Enter a positive limit within the allowed range.",
     "estimate": "Estimate {{estimate}} · maximum {{maximum}}",
     "estimateUnavailable": "A paid summary is not available for these settings. Change the model or the limits, or try again later.",
     "estimatePricingUnavailable": "Pricing for this model is unavailable. Choose another model.",
@@ -1336,6 +1336,7 @@
     "needsInputAction": {
       "approved": "Request approved",
       "replied": "Reply sent",
+      "empty": "Add an answer, then send.",
       "failed": "Couldn't answer. Tap again to retry.",
       "unavailable": "This request is no longer waiting."
     }
@@ -1600,7 +1601,9 @@
       "githubError": "Could not open GitHub setup. Please try again.",
       "gitlabAccount": "GitLab account",
       "gitlabError": "Could not open GitLab setup. Please try again.",
-      "description": "Connect the Kilo {{label}} to review pull requests automatically."
+      "description": "Connect the Kilo {{label}} to review pull requests automatically.",
+      "notConnectedTitle": "{{platform}} not connected",
+      "githubAdminOnlyDescription": "Only organization owners and admins can connect it."
     },
     "overview": {
       "allAreas": "All areas",
@@ -2349,6 +2352,7 @@
       "couldNotLoadThisSession": "Couldn't load this session",
       "historyTooLarge": "This session's transcript is too large to load.",
       "historyUnavailable": "This session's transcript can't be read.",
+      "historyTemporarilyUnavailable": "This session's transcript is temporarily unavailable.",
       "cloneFailedRetry": "Couldn't clone this session. Try again.",
       "notEnoughCredits": "Not enough credits for this request. Add credits and try again.",
       "previousTaskFinishing": "The previous task is still finishing. Please wait a moment.",
@@ -2904,7 +2908,9 @@
       "skip": "Skip",
       "retrySkip": "Retry skip",
       "submitting": "Submitting…",
-      "sendAnswers": "Send answers"
+      "sendAnswers": "Send answers",
+      "unreadableTitle": "This question could not be displayed",
+      "unreadableBody": "The agent is waiting on a question this app cannot show. Answer it in the CLI to continue."
     },
     "blockingCard": {
       "questionUnavailable": "This question is no longer available.",
@@ -2931,6 +2937,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Could not load subagent session",
+      "historyTooLarge": "This sub-agent's history is too large to load.",
+      "historyUnavailable": "This sub-agent's history isn't available.",
+      "historyTemporarilyUnavailable": "This sub-agent's history is temporarily unavailable.",
       "failed": "Subagent session failed",
       "noMessages": "No subagent messages",
       "noMessagesDescription": "This subagent session completed without producing a transcript.",
@@ -3502,6 +3511,8 @@
     "voiceTranscriptionWho": "Your device, the Kilo gateway with your chosen transcription model, or Apple or Google for online recognition.",
     "installAttributionPromptTitle": "Allow install attribution?",
     "installAttributionPromptMessage": "Kilo uses Apple's tracking permission only to learn which channel brought you here. Your prompts and conversations are never used.",
+    "installAttributionRequestFailedTitle": "Couldn't show the tracking prompt",
+    "installAttributionRequestFailedMessage": "Kilo couldn't show the system prompt, so install attribution stays off.",
     "what": "What",
     "why": "Why",
     "who": "Who"
@@ -3517,7 +3528,7 @@
   "organization": {
     "auditLog": {
       "title": "Audit log",
-      "permissionDenied": "Only an organization owner, admin or billing manager on the Enterprise plan can read its audit log.",
+      "permissionDenied": "Only an organization owner, admin or billing manager on the Enterprise plan can read its audit log. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "No audit events",
       "emptyDescription": "Actions taken in this organization appear here.",
       "truncated": "Showing the most recent events.",
@@ -3707,7 +3718,7 @@
     },
     "billing": {
       "title": "Billing",
-      "permissionDenied": "Only an organization owner, admin or billing manager can see its billing.",
+      "permissionDenied": "Only an organization owner, admin or billing manager can see its billing. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Subscription",
       "state": "State",
       "stateNone": "No subscription",
@@ -3884,7 +3895,7 @@
       "emptyDescription": "Use Older hour to see earlier requests.",
       "emptyBoundDescription": "This is as far back as request logs go.",
       "loadError": "Couldn't load request logs.",
-      "permissionDenied": "Only an organization owner, admin or billing manager can read its request logs.",
+      "permissionDenied": "Only an organization owner, admin or billing manager can read its request logs. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} in · {{output}} out",
       "byok": "BYOK"
     },
@@ -4142,7 +4153,10 @@
     "list": {
       "loadFailed": "Could not load chat history.",
       "new": "New chat",
-      "deleteTitle": "Delete this chat?"
+      "deleteTitle": "Delete this chat?",
+      "resetNoticeTitle": "Local chats and drafts were cleared",
+      "resetNoticeBody": "Kilo could not open the chats saved on this device. Your cloud sessions are not affected.",
+      "resetNoticeDismiss": "Dismiss notice"
     },
     "rename": {
       "title": "Rename chat",
@@ -4946,7 +4960,8 @@
     "unavailableTitle": "Usage is unavailable",
     "unavailableDescription": "Usage isn't set up for this workspace. Contact support if you expect to see usage here.",
     "orgSelfNotice": "You're seeing your own usage in this organization.",
-    "viewDetails": "View usage details"
+    "viewDetails": "View usage details",
+    "orgSelfEntryTitle": "Your usage"
   },
   "integrations": {
     "title": "Integrations",
@@ -5042,6 +5057,8 @@
       "autoCommit": "Commit changes when the run finishes",
       "condenseOnComplete": "Condense the context when the run finishes",
       "activeTitle": "Trigger active",
+      "activeSwitchA11y": "Trigger active: {{name}}",
+      "copyLinkA11y": "Copy link for {{name}}",
       "activeDescription": "Paused webhooks answer with 404.",
       "runAsCreator": "Run as me",
       "runAsCreatorDescription": "Every run uses your account, so the secret header is required.",

@@ -52,7 +52,8 @@ vi.mock('@/lib/hooks/use-theme-colors', async () => {
   };
 });
 
-/** The row's icon prop takes a Lucide component; the test never inspects it. */
+/** The row's icon prop takes a Lucide component; this stub renders nothing, and
+ * the tile assertions read the element's own size and colour. */
 const Icon = (() => null) as unknown as LucideIcon;
 
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
@@ -429,9 +430,6 @@ describe('PreferenceRow', () => {
   });
 
   it('keeps the light off switch at 3:1 against the row it sits on', () => {
-    // Left alone on this light row, the shared switch's `mutedSoft` track sits
-    // at 2.1:1 over the `#F0EEE6` card, and Android's own default before it was
-    // 1.02:1, so the off control read as two barely-visible grey marks.
     schemeState.current = 'light';
     const root = renderRow({ value: false, onValueChange: () => undefined });
     const toggle = root.find(node => Object.is(node.type, 'Switch'));

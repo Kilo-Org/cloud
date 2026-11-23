@@ -65,6 +65,9 @@ const permissionState = vi.hoisted(() => ({
   permission: 'allowed' as 'resolving' | 'allowed' | 'read-only',
 }));
 
+/** The role sentence a member reads in the action's place. */
+const ROLE_SENTENCE = 'Only organization owners and admins can change organization profiles.';
+
 vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
   useOrganizationProfilePermission: () => permissionState.permission,
 }));
@@ -851,6 +854,96 @@ describe('ProfileSkillsScreen', () => {
 
     expect(h.confirm).toHaveBeenCalledTimes(1);
 
+    unmount();
+  });
+
+  it('hides a stored add sheet from a member and names the required role', async () => {
+    h.query.data = testSkills();
+    h.query.isPending = false;
+
+    const first = await mountScreen();
+    pressEmptyAction(first.renderer);
+    changeText(first.renderer.root, 'Skill name', 'portal-skill');
+    changeText(first.renderer.root, 'Skill content', 'Use the portal carefully.');
+    first.unmount();
+
+    permissionState.permission = 'read-only';
+    const second = await mountScreen();
+    expect(findAll(second.renderer.root, 'SheetHeader')).toHaveLength(0);
+    expect(findAll(second.renderer.root, 'FormField')).toHaveLength(0);
+    expect(findAll(second.renderer.root, 'StateAction')).toHaveLength(0);
+    expect(
+      findAll(second.renderer.root, 'Text').filter(node => node.props.children === ROLE_SENTENCE)
+    ).toHaveLength(1);
+    second.unmount();
+  });
+
+  it('does not reopen the stored sheet once the denied read dropped it', async () => {
+    h.query.data = testSkills();
+    h.query.isPending = false;
+
+    const first = await mountScreen();
+    pressEmptyAction(first.renderer);
+    changeText(first.renderer.root, 'Skill name', 'portal-skill');
+    first.unmount();
+
+    permissionState.permission = 'read-only';
+    const second = await mountScreen();
+    expect(findAll(second.renderer.root, 'SheetHeader')).toHaveLength(0);
+
+    permissionState.permission = 'allowed';
+    act(() => {
+      rerenderScreen(second.renderer, second.queryClient);
+    });
+    expect(findAll(second.renderer.root, 'SheetHeader')).toHaveLength(0);
+    second.unmount();
+  });
+
+  it('keeps the stored sheet while the role resolves and reopens it on its text', async () => {
+    h.query.data = testSkills();
+    h.query.isPending = false;
+
+    const first = await mountScreen();
+    pressEmptyAction(first.renderer);
+    changeText(first.renderer.root, 'Skill name', 'portal-skill');
+    changeText(first.renderer.root, 'Skill content', 'Use the portal carefully.');
+    first.unmount();
+
+    permissionState.permission = 'resolving';
+    const second = await mountScreen();
+    expect(findAll(second.renderer.root, 'SheetHeader')).toHaveLength(0);
+
+    permissionState.permission = 'allowed';
+    act(() => {
+      rerenderScreen(second.renderer, second.queryClient);
+    });
+    expect(findOne(second.renderer.root, 'SheetHeader')).toBeTruthy();
+    expect(findField(second.renderer.root, 'Skill name').props.defaultValue).toBe('portal-skill');
+    expect(findField(second.renderer.root, 'Skill content').props.defaultValue).toBe(
+      'Use the portal carefully.'
+    );
+    second.unmount();
+  });
+
+  it('closes the open sheet when the role drops and keeps it closed on return', async () => {
+    h.query.data = testSkills([testSkill()]);
+    h.query.isPending = false;
+
+    const { renderer, queryClient, unmount } = await mountScreen();
+    pressAddButton(renderer.root);
+    changeText(renderer.root, 'Skill name', 'portal-skill');
+
+    permissionState.permission = 'read-only';
+    act(() => {
+      rerenderScreen(renderer, queryClient);
+    });
+    expect(findAll(renderer.root, 'SheetHeader')).toHaveLength(0);
+
+    permissionState.permission = 'allowed';
+    act(() => {
+      rerenderScreen(renderer, queryClient);
+    });
+    expect(findAll(renderer.root, 'SheetHeader')).toHaveLength(0);
     unmount();
   });
 });

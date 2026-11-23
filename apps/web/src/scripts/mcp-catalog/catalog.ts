@@ -77,6 +77,8 @@ const NATIVE_ONLY_PATHS: Record<string, true> = {
   'organizations.settings.updateBrowserControl': true,
   'activeSessions.widgetCredential': true,
   'agentBriefing.updateContextPreferences': true,
+  // Starting a benchmark requires the pool owner's confirmation of the estimate in the app.
+  'customRouterBenchmarks.start': true,
   // Stores a raw GitHub credential as the user's personal identity.
   'githubApps.provideUserToken': true,
   // "Start fresh" irreversibly discards a workspace's changes behind an in-app confirmation.

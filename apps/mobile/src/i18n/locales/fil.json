@@ -399,7 +399,7 @@
       "title": "Mga key ng provider",
       "rowSubtitle": "Gamitin ang sarili mong billing sa provider",
       "orgDescription": "Ibinabahagi ang mga key na ito sa lahat ng nasa organisasyon at sinisingil sa mga akawnt nito sa provider.",
-      "viewOnly": "Ang may-ari, admin, o billing manager lang ng organisasyon ang makakapagpalit ng mga key nito.",
+      "viewOnly": "Ang may-ari, admin, o tagapamahala ng pagsingil lang ng organisasyon ang makakapagpalit ng mga key nito.",
       "description": "Ang mga request na dumadaan sa mga key na ito ay sisingilin sa akawnt mo sa provider sa halip na sa balanse mo sa Kilo.",
       "managedByPlan": "Pinamamahalaan ng iyong coding plan",
       "enableKey": "I-enable ang key ng {{provider}}",
@@ -1238,6 +1238,7 @@
     "needsInputAction": {
       "approved": "Aprubado ang kahilingan",
       "replied": "Naipadala ang sagot",
+      "empty": "Maglagay ng sagot at pagkatapos ay ipadala ito.",
       "failed": "Hindi nasagot. I-tap muli para subukang muli.",
       "unavailable": "Hindi na naghihintay ang kahilingang ito."
     }
@@ -1502,7 +1503,9 @@
       "githubError": "Hindi mabuksan ang setup ng GitHub. Pakisubukang muli.",
       "gitlabAccount": "account sa GitLab",
       "gitlabError": "Hindi mabuksan ang setup ng GitLab. Pakisubukang muli.",
-      "description": "Ikonekta ang Kilo {{label}} para awtomatikong suriin ang mga pull request."
+      "description": "Ikonekta ang Kilo {{label}} para awtomatikong suriin ang mga pull request.",
+      "notConnectedTitle": "Hindi nakakonekta ang {{platform}}",
+      "githubAdminOnlyDescription": "Mga may-ari ng organisasyon at admin lang ang maaaring magkonekta nito."
     },
     "overview": {
       "allAreas": "Lahat ng aspeto",
@@ -2251,6 +2254,7 @@
       "couldNotLoadThisSession": "Hindi ma-load ang sesyong ito.",
       "historyTooLarge": "Sobrang laki ng transkrip ng sesyong ito para i-load.",
       "historyUnavailable": "Hindi mabasa ang transkrip ng sesyong ito.",
+      "historyTemporarilyUnavailable": "Pansamantalang hindi available ang transkrip ng sesyong ito.",
       "cloneFailedRetry": "Hindi makopya ang sesyong ito. Subukang muli.",
       "notEnoughCredits": "Kulang ang kredito para sa kahilingang ito. Magdagdag ng kredito at subukang muli.",
       "previousTaskFinishing": "Tinatapos pa ang naunang gawain. Maghintay sandali.",
@@ -2787,7 +2791,9 @@
       "skip": "Laktawan",
       "retrySkip": "Subukang laktawan muli",
       "submitting": "Isinusumite…",
-      "sendAnswers": "Ipadala ang mga sagot"
+      "sendAnswers": "Ipadala ang mga sagot",
+      "unreadableTitle": "Hindi maipakita ang tanong na ito",
+      "unreadableBody": "Naghihintay ang agent sa isang tanong na hindi maipakita ng app na ito. Sagutin ang tanong sa CLI upang magpatuloy."
     },
     "blockingCard": {
       "questionUnavailable": "Hindi na masasagot ang tanong na ito.",
@@ -2814,6 +2820,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Hindi ma-load ang sesyon ng subahente.",
+      "historyTooLarge": "Sobrang laki ng kasaysayan ng subahenteng ito para i-load.",
+      "historyUnavailable": "Hindi available ang kasaysayan ng subahenteng ito.",
+      "historyTemporarilyUnavailable": "Pansamantalang hindi available ang kasaysayan ng subahenteng ito.",
       "failed": "Nabigo ang sesyon ng subahente.",
       "noMessages": "Walang mensahe mula sa subahente",
       "noMessagesDescription": "Natapos ang sesyong ito ng subahente nang walang nalikhang tala ng pag-uusap.",
@@ -3392,6 +3401,8 @@
     "voiceTranscriptionWho": "Ang device mo, Kilo Gateway kasama ang napili mong transcription model, o Apple o Google para sa online recognition.",
     "installAttributionPromptTitle": "Payagang tukuyin ang pinagmulan ng pag-install?",
     "installAttributionPromptMessage": "Ginagamit ng Kilo ang pahintulot sa pagsubaybay ng Apple para lang malaman kung saan mo nalaman ang app. Hindi kailanman ginagamit ang mga prompt at pag-uusap mo.",
+    "installAttributionRequestFailedTitle": "Hindi naipakita ang prompt sa pagsubaybay",
+    "installAttributionRequestFailedMessage": "Hindi naipakita ng Kilo ang prompt ng sistema, kaya nananatiling naka-off ang pagtukoy sa pinagmulan ng pag-install.",
     "what": "Ano",
     "why": "Bakit",
     "who": "Sino"
@@ -3407,7 +3418,7 @@
   "organization": {
     "auditLog": {
       "title": "Audit log",
-      "permissionDenied": "Ang may-ari, admin o billing manager lang ng organisasyon na nasa Enterprise plan ang puwedeng magbasa ng audit log nito.",
+      "permissionDenied": "Ang may-ari, admin o tagapamahala ng pagsingil lang ng organisasyon na nasa Enterprise plan ang puwedeng magbasa ng audit log nito. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Walang audit event",
       "emptyDescription": "Dito lalabas ang mga aksyong ginawa sa organisasyong ito.",
       "truncated": "Ipinapakita ang mga pinakabagong event.",
@@ -3597,7 +3608,7 @@
     },
     "billing": {
       "title": "Pagsingil",
-      "permissionDenied": "Ang may-ari, admin o billing manager lang ng organisasyon ang makakakita ng pagsingil nito.",
+      "permissionDenied": "Ang may-ari, admin o tagapamahala ng pagsingil lang ng organisasyon ang makakakita ng pagsingil nito. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Subscription",
       "state": "Katayuan",
       "stateNone": "Walang subscription",
@@ -3774,7 +3785,7 @@
       "emptyDescription": "Gamitin ang \"Mas lumang oras\" para makita ang mga naunang request.",
       "emptyBoundDescription": "Hanggang dito na lang ang kasaysayan ng mga request.",
       "loadError": "Hindi ma-load ang mga request log.",
-      "permissionDenied": "Ang may-ari, admin o billing manager lang ng organisasyon ang puwedeng magbasa ng mga request log nito.",
+      "permissionDenied": "Ang may-ari, admin o tagapamahala ng pagsingil lang ng organisasyon ang puwedeng magbasa ng mga request log nito. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} input · {{output}} output",
       "byok": "BYOK"
     },
@@ -4044,7 +4055,10 @@
     "list": {
       "loadFailed": "Hindi ma-load ang kasaysayan ng chat.",
       "new": "Bagong chat",
-      "deleteTitle": "Burahin ang chat na ito?"
+      "deleteTitle": "Burahin ang chat na ito?",
+      "resetNoticeTitle": "Nabura ang mga chat sa device na ito at mga burador",
+      "resetNoticeBody": "Hindi mabuksan ng Kilo ang mga chat sa device na ito. Hindi apektado ang mga sesyon sa cloud.",
+      "resetNoticeDismiss": "Balewalain ang abiso"
     },
     "rename": {
       "title": "Palitan ang pangalan ng chat",
@@ -4876,7 +4890,7 @@
     "defaultModel": "Gamitin ang default na model ng Kilo",
     "duration": "Limitasyon sa oras (minuto)",
     "spendLimit": "Limitasyon sa gastos (USD)",
-    "invalidSafeguards": "Maglagay ng mga positibong limitasyon sa oras at gastos na may hangganang halaga.",
+    "invalidSafeguards": "Maglagay ng positibong numero sa pinapayagang saklaw.",
     "estimate": "Tantiya {{estimate}} · maximum {{maximum}}",
     "estimateUnavailable": "Hindi available ang bayad na buod para sa mga setting na ito. Palitan ang modelo o ang mga limitasyon, o subukan itong muli mamaya.",
     "estimatePricingUnavailable": "Walang available na presyo para sa modelong ito. Pumili ng ibang modelo.",
@@ -4946,7 +4960,8 @@
     "unavailableTitle": "Hindi available ang paggamit",
     "unavailableDescription": "Hindi pa naisasaayos ang paggamit para sa workspace na ito. Makipag-ugnayan sa suporta kung inaasahan mong may makikitang paggamit dito.",
     "orgSelfNotice": "Nakikita mo ang sarili mong paggamit sa organisasyong ito.",
-    "viewDetails": "Tingnan ang detalye ng paggamit"
+    "viewDetails": "Tingnan ang detalye ng paggamit",
+    "orgSelfEntryTitle": "Paggamit mo"
   },
   "integrations": {
     "title": "Mga Integration",
@@ -5042,6 +5057,8 @@
       "autoCommit": "I-commit ang mga pagbabago kapag natapos ang pagtakbo",
       "condenseOnComplete": "Paikliin ang konteksto kapag natapos ang pagtakbo",
       "activeTitle": "Aktibo ang pampapagana",
+      "activeSwitchA11y": "Aktibong pampapagana: {{name}}",
+      "copyLinkA11y": "Kopyahin ang link para sa {{name}}",
       "activeDescription": "Ang mga nakapahingang webhook ay tumutugon ng 404.",
       "runAsCreator": "Patakbuhin bilang ako",
       "runAsCreatorDescription": "Ginagamit ng bawat pagtakbo ang iyong kuwenta, kaya kailangan ang sekretong header.",

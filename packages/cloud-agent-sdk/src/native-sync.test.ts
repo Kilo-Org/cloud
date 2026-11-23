@@ -701,7 +701,12 @@ test('unreadable pending inventory clears controls without blocking later ordere
   expect(state?.pending.permissions.map(item => item.id)).toEqual(['old']);
   socket.frame('remote.state', { incarnation: 'runner', runID: 'run', pending: null }, 2, 'events');
   await flush();
-  expect(state?.pending).toEqual({ permissions: [], questions: [], unreadablePermissions: [] });
+  expect(state?.pending).toEqual({
+    permissions: [],
+    questions: [],
+    unreadableQuestions: [],
+    unreadablePermissions: [],
+  });
   socket.frame(
     'permission.asked',
     { incarnation: 'runner', runID: 'run', data: { data: { id: 'invalid' } } },
@@ -3682,4 +3687,377 @@ test('a caller abort during a stalled exchange stays request_canceled', async ()
   await flush();
   expect(settled.code).toBe('request_canceled');
   await expect(pending).rejects.toMatchObject({ code: 'request_canceled' });
+});
+
+const mediaHash = 'd'.repeat(64);
+const mediaReference = `media:${mediaHash}`;
+const mediaKey = kilo2AssetKey('msg_keep_000000_file_0', mediaReference, 'image/png');
+const attachmentTranscript: NativeSnapshot = {
+  position: 5,
+  revision: 2,
+  session: sessionMetadata,
+  entities: [],
+  assetURLs: { [mediaKey]: 'data:image/png;base64,bWVkaWE=' },
+  messages: [
+    {
+      seq: 1,
+      message: {
+        id: 'msg_keep',
+        type: 'assistant',
+        time: { created: 1, completed: 5 },
+        content: [
+          {
+            type: 'tool',
+            id: 'call',
+            name: 'read',
+            time: { created: 1, ran: 1, completed: 1 },
+            state: {
+              status: 'completed',
+              input: { path: 'image.png' },
+              content: [{ type: 'file', uri: mediaReference, mime: 'image/png' }],
+            },
+          },
+        ],
+      },
+    },
+    {
+      seq: 2,
+      message: {
+        id: 'msg_answer',
+        type: 'assistant',
+        time: { created: 1 },
+        content: [{ type: 'text', text: '' }],
+      },
+    },
+  ],
+};
+
+test('streamed deltas leave an unchanged message with a private attachment as a full recompute does', async () => {
+  snapshot.mockResolvedValue(attachmentTranscript);
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  const socket = connectedSocket();
+  socket.frame('hello', hello(), 1);
+  await flush();
+  expect(state?.assetURLs?.[mediaKey]).toBe('data:image/png;base64,bWVkaWE=');
+  const kept = state?.messages[0];
+  const assets = state?.assetURLs;
+  for (let index = 0; index < 5; index++) {
+    socket.frame(
+      'session.text.delta',
+      {
+        syncPosition: 6,
+        data: { data: { assistantMessageID: 'msg_answer', ordinal: 0, delta: `${index}` } },
+      },
+      2 + index,
+      'events'
+    );
+    await flush();
+  }
+  expect(state?.messages[1]?.message.content).toEqual([{ type: 'text', text: '01234' }]);
+  // The untouched attachment keeps its exact entry and authorization across every delta.
+  expect(state?.messages[0]).toBe(kept);
+  expect(state?.assetURLs).toBe(assets);
+  expect(state?.pendingSnapshotMessageIDs).toBeUndefined();
+  // A frame that needs the whole transcript reaches exactly the same conclusion.
+  socket.frame(
+    'session.inbox.delivered',
+    { syncPosition: 7, data: { data: { inboxID: 'msg_missing' } } },
+    20,
+    'events'
+  );
+  await flush();
+  expect(state?.messages[0]).toBe(kept);
+  expect(state?.assetURLs).toBe(assets);
+  expect(state?.pendingSnapshotMessageIDs).toBeUndefined();
+  expect(state?.error).toBeUndefined();
+  connection.close();
+});
+
+test('a replaced file still drops its asset key after deltas kept the per-id map current', async () => {
+  const uri = 'file:///owned/report.png';
+  const key = kilo2AssetKey('msg_file_000000_file_0', uri, 'image/png');
+  const fileContent = [{ type: 'file', uri, mime: 'image/png' }];
+  snapshot.mockResolvedValue({
+    position: 4,
+    revision: 1,
+    session: sessionMetadata,
+    entities: [],
+    assetURLs: { [key]: 'data:image/png;base64,b2xk' },
+    messages: [
+      {
+        seq: 1,
+        message: {
+          id: 'msg_file',
+          type: 'assistant',
+          time: { created: 1, completed: 4 },
+          content: [
+            {
+              type: 'tool',
+              id: 'call',
+              name: 'read',
+              time: { created: 1, ran: 1, completed: 1 },
+              state: { status: 'completed', input: { path: 'report.png' }, content: fileContent },
+            },
+          ],
+        },
+      },
+      {
+        seq: 2,
+        message: {
+          id: 'msg_answer',
+          type: 'assistant',
+          time: { created: 1 },
+          content: [{ type: 'text', text: '' }],
+        },
+      },
+    ],
+  });
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  const socket = connectedSocket();
+  socket.frame('hello', hello(), 1);
+  await flush();
+  // A fresh authoritative read rebuilds the per-id map from its own transcript.
+  socket.frame('reset_required', { seq: 1 }, 1);
+  await flush();
+  for (let index = 0; index < 3; index++) {
+    socket.frame(
+      'session.text.delta',
+      {
+        syncPosition: 5,
+        data: { data: { assistantMessageID: 'msg_answer', ordinal: 0, delta: 'x' } },
+      },
+      2 + index,
+      'events'
+    );
+    await flush();
+  }
+  expect(state?.assetURLs?.[key]).toBe('data:image/png;base64,b2xk');
+  socket.frame(
+    'session.message.content.updated',
+    {
+      syncPosition: 6,
+      data: {
+        data: {
+          messageID: 'msg_file',
+          content: [
+            {
+              type: 'tool',
+              id: 'call',
+              name: 'read',
+              time: { created: 1, ran: 1, completed: 2 },
+              state: { status: 'completed', input: { path: 'report.png' }, content: fileContent },
+            },
+          ],
+        },
+      },
+    },
+    6,
+    'events'
+  );
+  await flush();
+  expect(state?.assetURLs?.[key]).toBeUndefined();
+  expect(state?.pendingSnapshotMessageIDs).toEqual(['msg_file']);
+  // The same replaced entry reports the same gap through the whole-transcript path.
+  const pendingIDs = state?.pendingSnapshotMessageIDs;
+  socket.frame(
+    'session.inbox.delivered',
+    { syncPosition: 7, data: { data: { inboxID: 'msg_missing' } } },
+    7,
+    'events'
+  );
+  await flush();
+  expect(state?.pendingSnapshotMessageIDs).toEqual(pendingIDs ?? []);
+  expect(state?.assetURLs?.[key]).toBeUndefined();
+  connection.close();
+});
+
+test('a local clear keeps hiding the ids it cleared while later traffic re-creates them', async () => {
+  snapshot.mockResolvedValue({
+    position: 1,
+    revision: 1,
+    session: sessionMetadata,
+    entities: [],
+    messages: [
+      {
+        seq: 1,
+        message: {
+          id: 'msg_old',
+          type: 'assistant',
+          time: { created: 1 },
+          content: [{ type: 'text', text: 'gone' }],
+        },
+      },
+    ],
+  });
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  const socket = connectedSocket();
+  socket.frame('hello', hello(), 1);
+  await flush();
+  expect(state?.messages.map(item => item.message.id)).toEqual(['msg_old']);
+  connection.clear();
+  expect(state?.messages).toEqual([]);
+  socket.frame(
+    'session.inbox.enqueued',
+    {
+      syncPosition: 2,
+      data: {
+        data: {
+          inboxID: 'msg_old',
+          item: { type: 'user', payload: { text: 'again', type: 'user' } },
+        },
+      },
+    },
+    2,
+    'events'
+  );
+  await flush();
+  expect(state?.messages).toEqual([]);
+  socket.frame(
+    'session.step.started',
+    { syncPosition: 3, data: { data: { assistantMessageID: 'msg_old' } } },
+    3,
+    'events'
+  );
+  await flush();
+  expect(state?.messages).toEqual([]);
+  socket.frame(
+    'session.step.started',
+    { syncPosition: 4, data: { data: { assistantMessageID: 'msg_fresh' } } },
+    4,
+    'events'
+  );
+  await flush();
+  expect(state?.messages.map(item => item.message.id)).toEqual(['msg_fresh']);
+  connection.close();
+});
+
+test('the published ring keeps the remote state plus at most 499 live frames and resets on remote state', async () => {
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  const socket = connectedSocket();
+  socket.frame('hello', hello(), 1);
+  await flush();
+  const initial = state?.events;
+  for (let index = 0; index < 520; index++) {
+    socket.frame(
+      'session.text.delta',
+      { data: { data: { assistantMessageID: 'msg_absent', ordinal: 0, delta: 'x' } } },
+      100 + index,
+      'events'
+    );
+    await flush();
+  }
+  expect(state?.events).not.toBe(initial);
+  expect(state?.events).toHaveLength(499);
+  expect(state?.events[0]?.seq).toBe(121);
+  expect(state?.events.at(-1)?.seq).toBe(619);
+  socket.frame(
+    'remote.state',
+    { incarnation: 'runner', runID: 'run', pending: { permissions: [], questions: [] } },
+    700,
+    'events'
+  );
+  await flush();
+  expect(state?.events).toHaveLength(1);
+  expect(state?.events[0]?.type).toBe('remote.state');
+  for (const seq of [701, 702]) {
+    socket.frame(
+      'session.text.delta',
+      { data: { data: { assistantMessageID: 'msg_absent', ordinal: 0, delta: 'y' } } },
+      seq,
+      'events'
+    );
+    await flush();
+  }
+  expect(state?.events.map(event => event.seq)).toEqual([700, 701, 702]);
+  expect(state?.events[0]?.type).toBe('remote.state');
+  connection.close();
+});
+
+test('a delta skips an unresolved snapshot entry exactly as the whole-transcript scan does', async () => {
+  const uri = 'file:///owned/unresolved.png';
+  const key = kilo2AssetKey('msg_pending_000000_file_0', uri, 'image/png');
+  snapshot.mockResolvedValue({
+    position: 4,
+    revision: 1,
+    session: sessionMetadata,
+    entities: [],
+    messages: [
+      {
+        seq: 1,
+        message: {
+          id: 'msg_pending',
+          type: 'assistant',
+          time: { created: 1, completed: 4 },
+          content: [
+            {
+              type: 'tool',
+              id: 'call',
+              name: 'read',
+              time: { created: 1, ran: 1, completed: 1 },
+              state: {
+                status: 'completed',
+                input: { path: 'unresolved.png' },
+                content: [{ type: 'file', uri, mime: 'image/png' }],
+              },
+            },
+          ],
+        },
+      },
+      {
+        seq: 2,
+        message: {
+          id: 'msg_answer',
+          type: 'assistant',
+          time: { created: 1 },
+          content: [{ type: 'text', text: '' }],
+        },
+      },
+    ],
+  });
+  const { client } = fixture();
+  let state: NativeSessionState | undefined;
+  const connection = client.connectSession('ses_a', value => {
+    state = value;
+  });
+  await flush();
+  const socket = connectedSocket();
+  socket.frame('hello', hello(), 1);
+  await flush();
+  expect(state?.assetURLs?.[key]).toBeUndefined();
+  socket.frame(
+    'session.text.delta',
+    {
+      syncPosition: 5,
+      data: { data: { assistantMessageID: 'msg_answer', ordinal: 0, delta: 'x' } },
+    },
+    2,
+    'events'
+  );
+  await flush();
+  expect(state?.messages[1]?.message.content).toEqual([{ type: 'text', text: 'x' }]);
+  // The unresolved entry keeps its identity, so this frame's scan skips it exactly as the
+  // whole-transcript scan does; the attachment stays recovery's job, not this frame's.
+  expect(state?.pendingSnapshotMessageIDs).toBeUndefined();
+  expect(state?.assetURLs?.[key]).toBeUndefined();
+  connection.close();
 });

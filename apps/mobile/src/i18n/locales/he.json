@@ -400,7 +400,7 @@
       "title": "מפתחות ספקים",
       "rowSubtitle": "שימוש בחיוב דרך הספק שלך",
       "orgDescription": "מפתחות אלה משותפים לכל חברי הארגון, והחיוב מתבצע בחשבונות הספקים של הארגון.",
-      "viewOnly": "רק בעלים של הארגון, מנהל או אחראי חיובים יכולים לשנות את המפתחות שלו.",
+      "viewOnly": "רק בעלים של הארגון, אדמין או מנהל חיובים יכולים לשנות את המפתחות שלו.",
       "description": "בקשות שנשלחות באמצעות מפתחות אלה מחויבות בחשבון הספק שלך במקום ביתרת Kilo שלך.",
       "managedByPlan": "מנוהל במסגרת תוכנית הקידוד שלך",
       "enableKey": "הפעלת המפתח של {{provider}}",
@@ -678,6 +678,7 @@
     "needsInputAction": {
       "approved": "הבקשה אושרה",
       "replied": "התשובה נשלחה",
+      "empty": "כתבו תשובה ואז שלחו אותה.",
       "failed": "לא ניתן היה לענות. הקישו שוב כדי לנסות שוב.",
       "unavailable": "הבקשה הזאת כבר לא מחכה."
     }
@@ -819,6 +820,8 @@
     },
     "providerConnect": {
       "description": "חבר את {{label}} של Kilo כדי לסקור בקשות משיכה אוטומטית.",
+      "notConnectedTitle": "{{platform}} לא מחובר",
+      "githubAdminOnlyDescription": "רק בעלי הארגון ומנהלים יכולים לחבר אותו.",
       "githubApp": "אפליקציית GitHub",
       "githubError": "לא ניתן לפתוח את הגדרות GitHub. נסה שוב.",
       "gitlabAccount": "חשבון GitLab",
@@ -1712,6 +1715,7 @@
       "couldNotLoadThisSession": "לא ניתן היה לטעון את הסשן הזה.",
       "historyTooLarge": "ההתעתק של הסשן הזה גדול מדי מכדי לטעון.",
       "historyUnavailable": "לא ניתן לקרוא את ההתעתק של הסשן הזה.",
+      "historyTemporarilyUnavailable": "ההתעתק של הסשן הזה אינו זמין באופן זמני.",
       "cloneFailedRetry": "לא ניתן היה לשכפל את הסשן הזה. נסה שוב.",
       "notEnoughCredits": "אין מספיק קרדיטים לבקשה הזו. הוסף קרדיטים ונסה שוב.",
       "previousTaskFinishing": "המשימה הקודמת עדיין לא הסתיימה. המתן רגע.",
@@ -2252,7 +2256,9 @@
       "skip": "דילוג",
       "retrySkip": "ניסיון דילוג נוסף",
       "submitting": "שולח…",
-      "sendAnswers": "שליחת התשובות"
+      "sendAnswers": "שליחת התשובות",
+      "unreadableTitle": "לא ניתן להציג את השאלה",
+      "unreadableBody": "הסוכן ממתין לשאלה שאין באפשרות האפליקציה הזו להציג. יש להשיב לשאלה ב-CLI כדי להמשיך."
     },
     "blockingCard": {
       "questionUnavailable": "השאלה הזו אינה זמינה עוד.",
@@ -2279,6 +2285,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "לא ניתן היה לטעון את הסשן של תת-הסוכן.",
+      "historyTooLarge": "ההיסטוריה של תת-הסוכן הזה גדולה מדי מכדי לטעון.",
+      "historyUnavailable": "ההיסטוריה של תת-הסוכן הזה אינה זמינה.",
+      "historyTemporarilyUnavailable": "ההיסטוריה של תת-הסוכן הזה אינה זמינה באופן זמני.",
       "failed": "הסשן של תת-הסוכן נכשל.",
       "noMessages": "אין הודעות מתת-הסוכן",
       "noMessagesDescription": "הסשן של תת-הסוכן הסתיים ללא תמליל.",
@@ -2869,6 +2878,8 @@
     "why": "לאיזו מטרה",
     "who": "למי נשלח",
     "installAttributionPromptMessage": "Kilo משתמש בהרשאת המעקב של Apple רק כדי לדעת מאיזה ערוץ הגעת. לעולם לא נעשה שימוש בהנחיות ובשיחות שלך למטרה הזו.",
+    "installAttributionRequestFailedTitle": "לא ניתן היה להציג את בקשת המעקב",
+    "installAttributionRequestFailedMessage": "Kilo לא הצליח להציג את הודעת המערכת, ולכן זיהוי מקור ההתקנה נשאר כבוי.",
     "installAttributionPromptTitle": "לאפשר זיהוי של מקור ההתקנה?"
   },
   "prReview": {
@@ -3462,7 +3473,7 @@
   "organization": {
     "auditLog": {
       "title": "יומן ביקורת",
-      "permissionDenied": "רק בעלים, אדמין או מנהל חיובים של ארגון בתוכנית Enterprise יכולים לצפות ביומן הביקורת שלו.",
+      "permissionDenied": "רק בעלים, אדמין או מנהל חיובים של ארגון בתוכנית Enterprise יכולים לצפות ביומן הביקורת שלו. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "אין אירועי ביקורת",
       "emptyDescription": "פעולות שמתבצעות בארגון הזה יופיעו כאן.",
       "truncated": "מוצגים האירועים האחרונים.",
@@ -3657,7 +3668,7 @@
     },
     "billing": {
       "title": "חיוב",
-      "permissionDenied": "רק בעלים, מנהל או מנהל חיובים של הארגון יכולים לראות את פרטי החיוב שלו.",
+      "permissionDenied": "רק בעלים, מנהל או מנהל חיובים של הארגון יכולים לראות את פרטי החיוב שלו. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "מינוי",
       "state": "סטטוס",
       "stateNone": "אין מינוי",
@@ -3846,7 +3857,7 @@
       "emptyDescription": "השתמשו ב-'שעה קודמת' כדי לראות בקשות קודמות.",
       "emptyBoundDescription": "יומני הבקשות לא מגיעים אחורה יותר מכך.",
       "loadError": "לא ניתן לטעון את יומני הבקשות.",
-      "permissionDenied": "רק בעלים, אדמין או מנהל חיובים של הארגון יכולים לצפות ביומני הבקשות שלו.",
+      "permissionDenied": "רק בעלים, אדמין או מנהל חיובים של הארגון יכולים לצפות ביומני הבקשות שלו. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "קלט {{input}} · פלט {{output}}",
       "byok": "BYOK"
     },
@@ -4122,7 +4133,10 @@
     "list": {
       "loadFailed": "לא ניתן היה לטעון את היסטוריית השיחה.",
       "new": "צ'אט חדש",
-      "deleteTitle": "למחוק את הצ'אט הזה?"
+      "deleteTitle": "למחוק את הצ'אט הזה?",
+      "resetNoticeTitle": "הצ'אטים והטיוטות במכשיר נוקו",
+      "resetNoticeBody": "Kilo לא הצליח לפתוח את הצ'אטים השמורים במכשיר הזה. הסשנים בענן שלך לא נפגעו.",
+      "resetNoticeDismiss": "התעלמות מההודעה"
     },
     "rename": {
       "title": "שינוי שם הצ׳אט",
@@ -4965,7 +4979,7 @@
     "defaultModel": "שימוש במודל ברירת המחדל של Kilo",
     "duration": "מגבלת זמן (דקות)",
     "spendLimit": "מגבלת הוצאה (USD)",
-    "invalidSafeguards": "יש להזין מגבלות זמן והוצאה חיוביות וסופיות.",
+    "invalidSafeguards": "יש להזין מספר חיובי בטווח המותר.",
     "estimate": "הערכת עלות {{estimate}} · מקסימום {{maximum}}",
     "estimateUnavailable": "סיכום בתשלום אינו זמין עבור הגדרות אלה. יש לשנות את המודל או המגבלות, או לנסות שוב מאוחר יותר.",
     "confirmPaid": "להפעיל סיכומים בתשלום עבור {{context}}?",
@@ -5040,7 +5054,8 @@
     "unavailableTitle": "השימוש אינו זמין",
     "unavailableDescription": "השימוש אינו מוגדר עבור סביבת העבודה הזו. פנו לתמיכה אם אתם מצפים לראות כאן נתוני שימוש.",
     "orgSelfNotice": "מוצג השימוש שלך בארגון זה.",
-    "viewDetails": "הצגת פרטי השימוש"
+    "viewDetails": "הצגת פרטי השימוש",
+    "orgSelfEntryTitle": "השימוש שלך"
   },
   "integrations": {
     "title": "אינטגרציות",
@@ -5136,6 +5151,8 @@
       "autoCommit": "בצעו קומיט לשינויים כשההרצה מסתיימת",
       "condenseOnComplete": "כווצו את ההקשר כשההרצה מסתיימת",
       "activeTitle": "הטריגר פעיל",
+      "activeSwitchA11y": "טריגר פעיל: {{name}}",
+      "copyLinkA11y": "העתקת קישור עבור {{name}}",
       "activeDescription": "וובהוקים מושהים מחזירים 404.",
       "runAsCreator": "הרצה בשמי",
       "runAsCreatorDescription": "כל הרצה משתמשת בחשבון שלך, לכן כותרת הסוד נדרשת.",

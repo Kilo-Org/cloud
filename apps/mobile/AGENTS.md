@@ -182,6 +182,7 @@ Keep `pt-5` for the sheet grabber on top of that clearance.
 ## Implementation Rules
 
 - Write the smallest boring implementation. Reuse existing helpers, components, and contracts.
+- A handoff that swaps the focused native-stack screen uses `useStackSafeReplace()` from `@/lib/navigation/stack-safe-replace`, never a literal `router.replace`: one commit removes the old screen and inserts the new one, and React Native's Fabric mount throws `addViewAt … The specified child already has a parent` on Android. A route guard that must land at the same stack position uses `useSettledReplace()` from `@/lib/navigation/settled-replace`, which dispatches once the navigator has settled. `navigation-swap-contract.test.ts` fails a navigator `replace` outside its allowlist, under every binding shape: a `useRouter()`/`useNavigation()` object, a `replace` destructured from either call, and the literal `router.replace(`.
 - Derive mobile types from shared exports or tRPC results. Do not copy shapes.
 - Fetch backend data through tRPC. Zod-parse only genuinely untrusted HTTP input at entry; do not re-parse trusted tRPC or shared-package data in components.
 - Parse backend dates with `parseTimestamp()` from `@/lib/utils`; `new Date()` breaks on PostgreSQL timestamps in Hermes.

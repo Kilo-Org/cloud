@@ -121,7 +121,6 @@ describe('ActiveSessionsLiveSync — enrichment retry policy', () => {
       now,
     });
     sync.attach();
-    // First enrichment attempt.
     const heartbeat1: SystemEvent = {
       event: 'sessions.heartbeat',
       data: {
@@ -270,7 +269,6 @@ describe('ActiveSessionsLiveSync — enrichment retry policy', () => {
     conn.__fireSystem(emptySnapshot);
     await sync.getWriteQueue();
     expect(qc.__getCached()?.sessions).toEqual([]);
-    // Next heartbeat repopulates.
     const heartbeat: SystemEvent = {
       event: 'sessions.heartbeat',
       data: {

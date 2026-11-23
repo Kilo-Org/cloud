@@ -224,13 +224,62 @@ describe('briefing schedule validation', () => {
   it('saves a valid schedule in the active language', () => {
     const renderer = mount();
     press(all(renderer, 'Button').at(-1) as Node);
-    expect(mutate).toHaveBeenCalledWith({
+    expect(mutate.mock.calls[0]?.[0]).toEqual({
       timezone: 'America/Los_Angeles',
       nightStart: '23:00',
       morningStart: '08:00',
       morningEnd: '12:00',
       language: 'de',
     });
+    // The attempt settles on this call's own outcome, so the card learns the
+    // save's result from the per-call callbacks rather than a toast.
+    expect(mutate.mock.calls[0]?.[1]).toMatchObject({
+      onSuccess: expect.any(Function),
+      onError: expect.any(Function),
+    });
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('reports a refused save inline and restores the stored plan on Discard', () => {
+    vi.stubEnv('TZ', 'America/Los_Angeles');
+    const renderer = mount();
+    edit(first(renderer, 'FormField'), 'Europe/Berlin');
+    press(row(renderer, 1));
+    choose(first(renderer, 'NativeDateTimePicker'), new Date(2000, 0, 1, 22, 0));
+    press(all(renderer, 'Button').at(-1) as Node);
+
+    const callbacks = mutate.mock.calls[0]?.[1] as { onError?: () => void } | undefined;
+    const refuse = callbacks?.onError;
+    if (!refuse) {
+      throw new Error('the save did not pass its outcome callbacks');
+    }
+    act(() => {
+      refuse();
+    });
+
+    // The card says the save was refused, and keeps what the person typed:
+    // only Discard may throw that away.
+    expect(renderedTexts(renderer)).toContain('common.couldNotSaveSetting');
+    const edited = first(renderer, 'FormField').props as { defaultValue?: string };
+    expect(edited.defaultValue).toBe('Europe/Berlin');
+    expect(renderedTexts(renderer)).toContain('22:00');
+
+    const discard = all(renderer, 'Button').find(
+      node =>
+        node.findAll(child => (child.type as string) === 'Text')[0]?.props.children ===
+        'common.discard'
+    );
+    if (!discard) {
+      throw new Error('Discard is missing');
+    }
+    press(discard);
+
+    expect(renderedTexts(renderer)).not.toContain('common.couldNotSaveSetting');
+    const restored = first(renderer, 'FormField').props as { defaultValue?: string };
+    expect(restored.defaultValue).toBe('America/Los_Angeles');
+    expect(renderedTexts(renderer)).toContain('23:00');
     act(() => {
       renderer.unmount();
     });

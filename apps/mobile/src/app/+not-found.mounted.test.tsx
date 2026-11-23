@@ -68,6 +68,20 @@ afterEach(() => {
   mounted = undefined;
 });
 
+describe('not-found exits', () => {
+  it('gives the in-app exit the app root, with no plain-router override', () => {
+    router.canGoBack.mockReturnValue(false);
+    const tree = mount();
+
+    // `InvalidRouteState` dispatches one settled replace at this route's own
+    // stack position, so it needs no override here even though the root Slot
+    // emits no transition: its bounded fallback covers that navigator.
+    const state = tree.root.findByType('InvalidRouteState' as never);
+    expect(state.props.backTo).toBe('/');
+    expect(state.props.replace).toBeUndefined();
+  });
+});
+
 describe('not-found hardware back', () => {
   it('replaces the dead route with the app root when there is no history', () => {
     router.canGoBack.mockReturnValue(false);

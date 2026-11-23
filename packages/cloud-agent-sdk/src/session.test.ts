@@ -306,7 +306,7 @@ describe('session pipeline integration', () => {
       expect(serviceState.getStatus()).toEqual({
         type: 'autocommit',
         step: 'completed',
-        message: `${'a'.repeat(40)} fix: bug`,
+        message: `${'a'.repeat(7)} · fix: bug`,
       });
     });
 

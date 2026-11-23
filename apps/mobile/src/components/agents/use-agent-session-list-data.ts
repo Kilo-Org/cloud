@@ -1,7 +1,6 @@
 import { useCallback, useMemo } from 'react';
 
-import { formatGitUrlProject } from '@kilocode/app-shared/git-url-project';
-
+import { mergeProjectOptions } from '@/components/agents/platform-filter-rows';
 import {
   expandPlatformFilter,
   normalisePlatformSelection,
@@ -149,27 +148,15 @@ export function useAgentSessionListData(options: {
       timeZone: groupedIn,
     }));
   }, [dateGroups, effectiveSearchQuery, search.dateGroups, search.timeZone, timeZone]);
-  const projectOptions = useMemo(() => {
-    const byGitUrl = new Map<string, { gitUrl: string; displayName: string }>();
-    // The server already bounds `recentRepositories` (LIMIT 10); offer every row
-    // it returns so older repositories stay filterable. A client-side cap here
-    // silently drops the rows the user needs to narrow the list.
-    for (const project of recentRepositories?.repositories ?? []) {
-      byGitUrl.set(project.gitUrl, {
-        gitUrl: project.gitUrl,
-        displayName: formatGitUrlProject(project.gitUrl),
-      });
-    }
-    for (const selectedGitUrl of projectFilter) {
-      if (!byGitUrl.has(selectedGitUrl)) {
-        byGitUrl.set(selectedGitUrl, {
-          gitUrl: selectedGitUrl,
-          displayName: formatGitUrlProject(selectedGitUrl),
-        });
-      }
-    }
-    return [...byGitUrl.values()];
-  }, [projectFilter, recentRepositories?.repositories]);
+  const projectOptions = useMemo(
+    () =>
+      mergeProjectOptions({
+        recentProjects: recentRepositories?.repositories.map(project => project.gitUrl) ?? [],
+        sessionGitUrls: sections.flatMap(section => section.data.map(row => row.git_url)),
+        selectedProjects: projectFilter,
+      }),
+    [projectFilter, recentRepositories?.repositories, sections]
+  );
 
   return {
     storedSessions,

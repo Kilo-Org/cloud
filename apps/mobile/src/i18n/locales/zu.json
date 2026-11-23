@@ -1238,6 +1238,7 @@
     "needsInputAction": {
       "approved": "Isicelo sigunyaziwe",
       "replied": "Impendulo ithunyelwe",
+      "empty": "Faka impendulo, bese uyithumela.",
       "failed": "Ayikwazanga ukuphendula. Thepha kabusha ukuze uzame kabusha.",
       "unavailable": "Lesi sicelo asisalindile."
     }
@@ -1502,7 +1503,9 @@
       "githubError": "Asikwazanga ukuvula ukusetha i-GitHub. Sicela uzame futhi.",
       "gitlabAccount": "i-akhawunti ye-GitLab",
       "gitlabError": "Asikwazanga ukuvula ukusetha i-GitLab. Sicela uzame futhi.",
-      "description": "Xhuma ne-Kilo usebenzisa {{label}} ukuze kuhlolwe izicelo zokuhlanganisa ikhodi ngokuzenzakalelayo."
+      "description": "Xhuma ne-Kilo usebenzisa {{label}} ukuze kuhlolwe izicelo zokuhlanganisa ikhodi ngokuzenzakalelayo.",
+      "notConnectedTitle": "I-{{platform}} ayixhunyiwe",
+      "githubAdminOnlyDescription": "Abanikazi benhlangano nabalawuli kuphela abangayixhuma."
     },
     "overview": {
       "allAreas": "Zonke izindawo",
@@ -2251,6 +2254,7 @@
       "couldNotLoadThisSession": "Asikwazanga ukulayisha le seshini.",
       "historyTooLarge": "Umyalezo wale seshini mude kakhulu ukuthi ulayishwe.",
       "historyUnavailable": "Iyalelephu wale seshini ayikwazi ukufundwa.",
+      "historyTemporarilyUnavailable": "Umyalezo wale seshini awutholakali okwesikhashana.",
       "cloneFailedRetry": "Asikwazanga ukwenza ikhophi yale seshini. Zama futhi.",
       "notEnoughCredits": "Awekho amakhredithi anele kulesi sicelo. Engeza amakhredithi bese uzama futhi.",
       "previousTaskFinishing": "Umsebenzi wangaphambilini usaphethwa. Sicela ulinde isikhashana.",
@@ -2787,7 +2791,9 @@
       "skip": "Yeqa",
       "retrySkip": "Zama ukweqa futhi",
       "submitting": "Kuyathunyelwa…",
-      "sendAnswers": "Thumela izimpendulo"
+      "sendAnswers": "Thumela izimpendulo",
+      "unreadableTitle": "Umbuzo awukwazile ukuboniswa",
+      "unreadableBody": "I-agent ilinde umbuzo ongakwazi ukuboniswa kule app. Phendula umbuzo ku-CLI ukuze uqhubeke."
     },
     "blockingCard": {
       "questionUnavailable": "Lo mbuzo awusatholakali.",
@@ -2814,6 +2820,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Asikwazanga ukulayisha iseshini yomenzeli ongaphansi.",
+      "historyTooLarge": "Umlando womenzeli ongaphansi ude kakhulu ukuthi ulayishwe.",
+      "historyUnavailable": "Umlando womenzeli ongaphansi awutholakali.",
+      "historyTemporarilyUnavailable": "Umlando womenzeli ongaphansi awutholakali okwesikhashana.",
       "failed": "Iseshini yomenzeli ongaphansi yehlulekile.",
       "noMessages": "Ayikho imilayezo yomenzeli ongaphansi",
       "noMessagesDescription": "Le seshini yomenzeli ongaphansi iphelile ngaphandle kokukhiqiza umbhalo.",
@@ -3392,6 +3401,8 @@
     "voiceTranscriptionWho": "Idivayisi yakho, i-Kilo Gateway enemodeli yokuguqula umbhalo oyikhethile, noma i-Apple noma i-Google ukuze kuqashelwe ku-inthanethi.",
     "installAttributionPromptTitle": "Uyafuna ukuvumela ukuhlonzwa komthombo wokufakwa?",
     "installAttributionPromptMessage": "I-Kilo isebenzisa imvume yokulandelela ka-Apple ukuze ithole kuphela ukuthi iyiphi indlela ekulethile lapha. Izicelo zakho nezingxoxo azisetshenziswa nhlobo.",
+    "installAttributionRequestFailedTitle": "Akukwazekanga ukubonisa isicelo sokulandelela",
+    "installAttributionRequestFailedMessage": "I-Kilo ayikwazanga ukubonisa isicelo sesistimu, ngakho ukuhlonza umthombo wokufakwa kuhlala kucishiwe.",
     "what": "Ini",
     "why": "Kungani",
     "who": "Ubani"
@@ -3407,7 +3418,7 @@
   "organization": {
     "auditLog": {
       "title": "Irekhodi lokucwaninga",
-      "permissionDenied": "Ngumnikazi wenhlangano, umlawuli noma umphathi wokukhokha ohlelweni lwe-Enterprise kuphela ongafunda irekhodi layo lokucwaninga.",
+      "permissionDenied": "Ngumnikazi wenhlangano, umlawuli noma umphathi wokukhokha ohlelweni lwe-Enterprise kuphela ongafunda irekhodi layo lokucwaninga. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Azikho izehlakalo zokucwaninga",
       "emptyDescription": "Izenzo ezenziwa kule nhlangano zivela lapha.",
       "truncated": "Kuboniswa izehlakalo zakamuva kakhulu.",
@@ -3597,7 +3608,7 @@
     },
     "billing": {
       "title": "Ukukhokha",
-      "permissionDenied": "Ngumnikazi wenhlangano, umlawuli noma umphathi wokukhokha kuphela ongabona ukukhokha kwayo.",
+      "permissionDenied": "Ngumnikazi wenhlangano, umlawuli noma umphathi wokukhokha kuphela ongabona ukukhokha kwayo. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Ukubhalisela",
       "state": "Isimo",
       "stateNone": "Akukho ukubhalisela",
@@ -3774,7 +3785,7 @@
       "emptyDescription": "Sebenzisa i-Ihora elidlule ukubona izicelo ezangaphambili.",
       "emptyBoundDescription": "Amarekhodi ezicelo awahambi emuva ukwedlula lapha.",
       "loadError": "Akukwazekanga ukulayisha amarekhodi ezicelo.",
-      "permissionDenied": "Ngumnikazi wenhlangano, umlawuli noma umphathi wokukhokha kuphela ongafunda amarekhodi ayo ezicelo.",
+      "permissionDenied": "Ngumnikazi wenhlangano, umlawuli noma umphathi wokukhokha kuphela ongafunda amarekhodi ayo ezicelo. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} okungenayo · {{output}} okuphumayo",
       "byok": "BYOK"
     },
@@ -4044,7 +4055,10 @@
     "list": {
       "loadFailed": "Asikwazanga ukulayisha umlando wengxoxo.",
       "new": "Ingxoxo entsha",
-      "deleteTitle": "Susa le ngxoxo?"
+      "deleteTitle": "Susa le ngxoxo?",
+      "resetNoticeTitle": "Kususiwe izingxoxo nokusalungiswa kule divayisi",
+      "resetNoticeBody": "I-Kilo ayikwazanga ukuvula izingxoxo ezigcinwe kule divayisi. Amaseshini akho asefini awathintekile.",
+      "resetNoticeDismiss": "Chitha isaziso"
     },
     "rename": {
       "title": "Qamba kabusha ingxoxo",
@@ -4876,7 +4890,7 @@
     "defaultModel": "Sebenzisa imodeli ezenzakalelayo ye-Kilo",
     "duration": "Umkhawulo wesikhathi (amaminithi)",
     "spendLimit": "Umkhawulo wezindleko (USD)",
-    "invalidSafeguards": "Faka imikhawulo yesikhathi neyezindleko engaphezu kukaziro nenqunyiwe.",
+    "invalidSafeguards": "Faka inombolo ephozithivu ngaphakathi kwebanga elivunyelwe.",
     "estimate": "Kulinganiselwe {{estimate}} · okuphezulu kakhulu {{maximum}}",
     "estimateUnavailable": "Isifinyezo esikhokhelwayo asitholakali kulezi zilungiselelo. Shintsha imodeli noma imikhawulo, noma zama futhi emva kwesikhathi.",
     "confirmPaid": "Vula izifinyezo ezikhokhelwayo ze-{{context}}?",
@@ -4946,7 +4960,8 @@
     "unavailableTitle": "Ukusetshenziswa akutholakali",
     "unavailableDescription": "Ukusetshenziswa akukasethwa kule ndawo yokusebenza. Xhumana nosekelo uma ulindele ukubona ukusetshenziswa lapha.",
     "orgSelfNotice": "Ubona ukusetshenziswa kwakho kule nhlangano.",
-    "viewDetails": "Buka imininingwane yokusetshenziswa"
+    "viewDetails": "Buka imininingwane yokusetshenziswa",
+    "orgSelfEntryTitle": "Ukusetshenziswa kwakho"
   },
   "integrations": {
     "title": "Ukuhlanganiswa",
@@ -5042,6 +5057,8 @@
       "autoCommit": "Gcina izinguquko lapho ukusebenza kuphela",
       "condenseOnComplete": "Fingqa umongo lapho ukusebenza kuphela",
       "activeTitle": "Isibangeli siyasebenza",
+      "activeSwitchA11y": "Isibangeli siyasebenza: {{name}}",
+      "copyLinkA11y": "Kopisha isixhumanisi sesibangeli: {{name}}",
       "activeDescription": "Ama-webhook amisiwe aphendula nge-404.",
       "runAsCreator": "Sebenza njengami",
       "runAsCreatorDescription": "Ukusebenza konke kusebenzisa i-akhawunti yakho, ngakho iheda eyimfihlo iyadingeka.",

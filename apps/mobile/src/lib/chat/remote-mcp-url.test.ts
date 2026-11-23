@@ -39,7 +39,6 @@ describe('normalizeRemoteMcpUrl', () => {
   });
 
   it('refuses with the typed error whose message is the problem tag', () => {
-    // The message is the tag, never prose: the toast picks words elsewhere.
     expect(() => normalizeRemoteMcpUrl('ftp://remote.example/mcp')).toThrow(RemoteMcpUrlError);
     expect(() => normalizeRemoteMcpUrl('ftp://remote.example/mcp')).toThrow('insecureEndpoint');
     expect(problemOf('ftp://remote.example/mcp')).toBe('insecureEndpoint');

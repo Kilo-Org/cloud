@@ -258,12 +258,7 @@ describe('settingsService one source of truth', () => {
   });
 });
 
-/**
- * The alert channels and the balance toggle ask the person before the one
- * direction that takes something away. The confirm answer is stubbed per test;
- * the dialog copy itself comes from the real `guardedChangeSummary`. Every case
- * comes from the guarded table, so a name added there is covered here too.
- */
+/** Every case comes from the guarded table, so a name added there is covered here too. */
 describe('guarded settings ask the person first', () => {
   const guarded = (name: string) => {
     const found = guardedChangeFor(name);
@@ -334,11 +329,6 @@ describe('guarded settings ask the person first', () => {
   });
 });
 
-/**
- * The agent's language write has to apply the way the manual picker does: the
- * stored preference alone leaves the running app in its old language, so the
- * write goes through the picker's own apply path and reports what happened.
- */
 describe('the language write applies the change', () => {
   beforeEach(() => {
     applyLanguagePreference.mockReset();

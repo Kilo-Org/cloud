@@ -1,7 +1,8 @@
 // Android Back reaches the app before the native sheet's own window takes
 // focus, so the wrapper answers that press itself. This suite pins that answer:
-// it closes the sheet, it still asks a caller that wants to confirm first, and
-// it never registers on iOS or after the sheet closes.
+// it closes the sheet, it still asks a caller that wants to confirm first, it
+// keeps one listener for the component's life while leaving Back to the
+// navigator whenever the sheet is closed, and it never registers on iOS.
 
 import { QueryClientProvider } from '@tanstack/react-query';
 import { createElement, type ReactElement } from 'react';

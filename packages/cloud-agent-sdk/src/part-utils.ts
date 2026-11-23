@@ -10,12 +10,13 @@ function isToolPart(part: Part): part is ToolPart {
 }
 
 /**
- * A tool part's `state`, validated well enough to read. The wire and the
- * snapshot schemas require a tool part to carry a `state` object with a
- * non-empty string `status`, and check nothing else in it, so the remaining
- * members arrive unvalidated even though the generated `ToolPart` declares a
- * full `ToolState`. Returns `null` when `state` or its `status` is unusable, so
- * callers skip a part they cannot read.
+ * A tool part's `state`, validated well enough to read. The live part-event
+ * and snapshot schemas require a `state` object with a non-empty string
+ * `status`, but a stored-page replay hands parts straight to the sink with no
+ * event schema in front of them, so `state` can be absent, null, a non-object,
+ * or carry a `status` that is not a string even though the generated `ToolPart`
+ * declares a full `ToolState`. Returns `null` for all of those, so callers skip
+ * a part they cannot read.
  *
  * The declared union cannot be recovered by narrowing (`in`/`typeof` give an
  * object with unknown members); it is then trusted only for the members each
@@ -191,10 +192,11 @@ export function normalizeMissingPatchFiles(part: Part): Part {
 /**
  * A tool part's `state` decides how every reader treats the part: the stored
  * lifecycle merge ranks `state.status`, the transcript renders the completed
- * output, and the attachment sink reads `state.attachments[].mime`. The
- * boundary schemas validate only `status` (a non-empty string), leaving every
- * other member unchecked, so a reader must validate each member it uses
- * instead of trusting the declared `ToolState`.
+ * output, and the attachment sink reads `state.attachments[].mime`. The live
+ * event schemas require only a non-empty string `status`, and a stored-page
+ * replay runs no event schema at all, so a part can arrive with no `state`, a
+ * null one, or a `status` that is not a string; a reader must validate each
+ * member it uses instead of trusting the declared `ToolState`.
  *
  * Such a part is DROPPED (returns `null`): nothing renderable is lost, no state
  * is invented for it, and skipping the write leaves any previously stored good

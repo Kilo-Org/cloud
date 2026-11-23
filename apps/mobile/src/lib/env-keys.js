@@ -25,12 +25,16 @@ export const ENV_KEYS = {
   posthogApiKey: 'POSTHOG_API_KEY',
 };
 
-/** Optional config keys — absent values are tolerated (dependent features hide themselves). */
+/** Optional config keys — optional means only that the build-time missing-value
+ *  check does not require the key. Most entries below disable the feature that
+ *  reads them, or fall back to a committed default; playIntegrityProjectNumber
+ *  is the exception, and its absence refuses production native signup (see its
+ *  entry). */
 export const OPTIONAL_ENV_KEYS = {
   // The Kilo MCP server the chat reaches with the signed-in session's own
   // token. An override: a production build resolves the public server in
   // lib/config.ts, and a build that is neither production nor given a value
-  // hides the whole feature, as with every optional key.
+  // hides the whole feature, as with most optional keys.
   kiloMcpUrl: 'KILO_MCP_URL',
   googleWebClientId: 'GOOGLE_WEB_CLIENT_ID',
   googleIosClientId: 'GOOGLE_IOS_CLIENT_ID',

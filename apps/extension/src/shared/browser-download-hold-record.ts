@@ -16,7 +16,7 @@ export const DOWNLOAD_HOLD_STATE_KEY = 'session:kiloDownloadHoldState' as const;
 const stepSchema = z.object({
   argumentHash: z.string(),
   // The origin the gate bound this step's approval under, when it classified a sensitive element: a file approval
-  // issued after a worker restart binds it, so the retry matches the binding the gate recomputes.
+  // Issued after a worker restart binds it, so the retry matches the binding the gate recomputes.
   boundOrigin: z.string().optional(),
   description: z.string(),
   element: z.string().optional(),

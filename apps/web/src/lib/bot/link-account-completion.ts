@@ -4,6 +4,7 @@ import { captureException } from '@sentry/nextjs';
 import type { User } from '@kilocode/db';
 import {
   consumeLinkAccountContext,
+  isLinkAccountContextConsumed,
   linkKiloUser,
   loadLinkAccountContext,
   type LinkAccountContext,
@@ -27,10 +28,18 @@ export type CompleteLinkAccountOutcome =
  *
  * Order matters:
  *  1. load the pending context, so an expired link writes nothing;
- *  2. consume it, so a link completes at most once even under concurrent
- *     submissions;
- *  3. compare-and-set the mapping, so an identity already held by a different
- *     Kilo account is never reassigned.
+ *  2. refuse a link that is already spent, without writing anything;
+ *  3. claim the mapping compare-and-set, so an identity already held by a
+ *     different Kilo account is refused while the pending link is still
+ *     unspent, and so a transient state-store failure leaves the link usable;
+ *  4. consume the pending link, so it completes at most once even under
+ *     concurrent submissions.
+ *
+ * A `conflict` therefore leaves the pending link unspent until its TTL. That is
+ * safe: the link is bound to the submitting Kilo account and to the chat
+ * identity the sign-in proves, a retry for the same pair is refused again, and
+ * the mapping compare-and-set never reassigns an identity, so the link cannot
+ * take over an account it does not belong to.
  *
  * Callers must complete the platform's identity proof before calling this; the
  * `identity` argument is what the proof returned, not what a URL claimed.
@@ -50,12 +59,16 @@ export async function completeLinkAccount({
     return { status: 'context_missing' };
   }
 
-  if (!(await consumeLinkAccountContext(state, contextKey))) {
+  if (await isLinkAccountContextConsumed(state, contextKey)) {
     return { status: 'used' };
   }
 
   if ((await linkKiloUser(state, identity, user.id)) === 'conflict') {
     return { status: 'conflict' };
+  }
+
+  if (!(await consumeLinkAccountContext(state, contextKey))) {
+    return { status: 'used' };
   }
 
   return { status: 'linked', context };

@@ -244,6 +244,18 @@ export async function consumeLinkAccountContext(
 }
 
 /**
+ * Report whether a pending link was already completed, without taking the
+ * single-use claim. A caller uses this to refuse a spent link before it writes
+ * anything, and only then takes the claim itself.
+ */
+export async function isLinkAccountContextConsumed(
+  state: StateAdapter,
+  contextKey: string
+): Promise<boolean> {
+  return (await state.get(`${contextKey}:consumed`)) != null;
+}
+
+/**
  * Read the chat message a pending link was minted for. Returns `null` when the
  * context expired or no longer parses.
  */

@@ -302,6 +302,7 @@ app.get('/v1/sessions/:id/entities', async c => {
     cursor,
     limit: query.data.limit ?? LIMITS.pageDefault,
     revision: query.data.revision,
+    includeSource: query.data.include === 'source',
   };
   const result = await call(
     c,

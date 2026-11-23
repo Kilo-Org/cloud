@@ -8,7 +8,7 @@ import {
   sessionSources,
   sessionStatus,
 } from '../../db/sqlite-schema';
-import { sessionStatusSchema } from '../../protocol';
+import { LIMITS, sessionStatusSchema } from '../../protocol';
 import type {
   ErrorCode,
   Principal,
@@ -214,6 +214,17 @@ export function register(
     }
     // The first source needs no row: `listSources` and `isJoined` read the
     // immutable binding on the session row.
+    if (!isJoined(db, meta, sourceID)) {
+      const joined = db
+        .select({ source_id: sessionSources.source_id })
+        .from(sessionSources)
+        .all();
+      if (joined.length >= LIMITS.sessionSources) {
+        raise('source_limit_exceeded', 'The session holds the maximum number of sources', {
+          sources: LIMITS.sessionSources,
+        });
+      }
+    }
     joinSource(db, sourceID, client, now);
     return { created: false, state: toState(db, meta) };
   }

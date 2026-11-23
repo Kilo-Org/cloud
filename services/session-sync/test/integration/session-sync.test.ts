@@ -46,7 +46,7 @@ async function readAll(api: Client, id: string): Promise<Entity[]> {
   let cursor: string | null = null;
   let revision: number | undefined;
   do {
-    const query: Record<string, string> = {};
+    const query: Record<string, string> = { include: 'source' };
     if (cursor) query.cursor = cursor;
     if (revision !== undefined) query.revision = String(revision);
     const response = await api.entities(id, query);
@@ -766,7 +766,12 @@ describe('entity pages', () => {
       ])
     );
 
-    const firstResponse = await api.entities(id, { limit: '2' });
+    const bare = pageSchema.parse(await (await api.entities(id, { limit: '2' })).json());
+    expect(bare.entities[0]).not.toHaveProperty('sourceID');
+    const tagged = await api.entities(id, { limit: '2', include: 'source' });
+    expect(await tagged.text()).toContain(`"sourceID":"${sourceID}"`);
+
+    const firstResponse = await api.entities(id, { limit: '2', include: 'source' });
     const first = pageSchema.parse(await firstResponse.json());
     expect(first.entities.map(entity => entity.id)).toEqual(['msg_1', 'msg_2']);
     expect(first.next).not.toBeNull();

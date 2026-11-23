@@ -81,6 +81,8 @@ export const listMetadata = sqliteTable('list_metadata', {
   owed: text('owed'),
   pushed: text('pushed'),
   retry_at: integer('retry_at').notNull(),
+  /** Consecutive refusals; drives the bounded exponential backoff. */
+  attempts: integer('attempts').notNull().default(0),
 });
 
 /** Bounded tail of durable batch receipts, keyed by the producer batch ID. */

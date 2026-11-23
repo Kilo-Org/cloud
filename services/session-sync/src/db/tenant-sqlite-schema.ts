@@ -21,6 +21,8 @@ export const createdSessions = sqliteTable(
     session_id: text('session_id').notNull(),
     created_at: integer('created_at').notNull().default(0),
     title: text('title'),
+    /** NFKD-folded, lower-cased title the search compares against. */
+    title_folded: text('title_folded'),
     client: text('client', { enum: ['cli', 'mobile', 'cloud-agent'] })
       .notNull()
       .default('cli'),

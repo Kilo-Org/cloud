@@ -29,6 +29,13 @@
       "when": 1795437699492,
       "tag": "0003_material_senator_kelly",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1795440583603,
+      "tag": "0004_zippy_power_pack",
+      "breakpoints": true
     }
   ]
 }

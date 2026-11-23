@@ -42,6 +42,8 @@ export const LIMITS = {
   pageBytes: 2 * 1024 * 1024,
   /** Characters of an encoded page cursor. */
   cursorChars: 4096,
+  /** Joined sources per session; the creator can register this many devices. */
+  sessionSources: 16,
   /** Retained batch receipts per session. */
   receipts: 256,
   /** Time an upload has to store its object after it starts. */
@@ -342,6 +344,8 @@ export const pageQuerySchema = z.strictObject({
   cursor: z.string().min(1).max(LIMITS.cursorChars).optional(),
   limit: z.coerce.number().int().min(1).max(LIMITS.pageItems).optional(),
   revision: z.coerce.number().int().min(0).max(Number.MAX_SAFE_INTEGER).optional(),
+  /** Opt in to the writer tag; pages stay byte-identical without it. */
+  include: z.literal('source').optional(),
 });
 
 export const receiptSchema = z.strictObject({
@@ -407,14 +411,14 @@ export const entitySchema = z.union([
     kind: kindSchema,
     id: entityIDSchema,
     revision: revisionSchema,
-    sourceID: uuidSchema.nullable(),
+    sourceID: uuidSchema.nullable().optional(),
     value: jsonSchema,
   }),
   z.strictObject({
     kind: kindSchema,
     id: entityIDSchema,
     revision: revisionSchema,
-    sourceID: uuidSchema.nullable(),
+    sourceID: uuidSchema.nullable().optional(),
     blob: blobRefSchema,
   }),
 ]);
@@ -458,6 +462,7 @@ export const ERROR_STATUS = {
   session_not_found: 404,
   blob_not_found: 404,
   source_conflict: 409,
+  source_limit_exceeded: 409,
   batch_conflict: 409,
   batch_superseded: 409,
   position_conflict: 409,

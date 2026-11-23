@@ -7,6 +7,7 @@ import { listMetadata } from '../../src/db/sqlite-schema';
 import { getSessionSyncDOStub, type SessionSyncDO } from '../../src/dos/SessionSyncDO';
 import { getTenantStub } from '../../src/dos/SessionSyncTenantDO';
 import type { Env } from '../../src/env';
+import { LIMITS } from '../../src/protocol';
 import { batch, client, member, newSessionID, personal, testEnv, type Client } from '../helpers';
 
 /** Makes the next `updateCreatedSession` call fail without reaching the tenant. */
@@ -134,23 +135,26 @@ describe('creator session list', () => {
 
   it('orders by the session update time and filters on indexed metadata', async () => {
     const api = client(personal(`usr-${crypto.randomUUID()}`));
+    // Producers send epoch milliseconds; the index never moves backwards, so
+    // the fixture seeds times ahead of its own registration clock.
+    const base = Date.now() + 5_000;
     const parser = await seed(api, {
       client: 'cli',
       title: 'Fix Parser Bug',
       directory: '/repo/a',
-      updated: 3000,
+      updated: base + 2000,
     });
     const mobile = await seed(api, {
       client: 'mobile',
       title: 'Mobile chat about parsers',
       directory: '',
-      updated: 1000,
+      updated: base,
     });
     const release = await seed(api, {
       client: 'cli',
       title: 'Release notes',
       directory: '/repo/a',
-      updated: 2000,
+      updated: base + 1000,
       archived: true,
     });
 
@@ -158,14 +162,14 @@ describe('creator session list', () => {
     expect(all.items.map(item => item.sessionID)).toEqual([parser, release, mobile]);
     expect(all.items[0]).toMatchObject({
       sessionID: parser,
-      updatedAt: 3000,
+      updatedAt: base + 2000,
       title: 'Fix Parser Bug',
       client: 'cli',
       directory: '/repo/a',
       archived: false,
       live: false,
     });
-    expect(all.items[0].createdAt).toBeGreaterThan(3000);
+    expect(all.items[0].createdAt).toBeLessThanOrEqual(base);
     // An empty origin directory indexes as no directory.
     expect(all.items.find(item => item.sessionID === mobile)).toMatchObject({ directory: null });
 
@@ -315,5 +319,35 @@ describe('creator index retries', () => {
     await runInDurableObject(stub, (_instance, state) => {
       expect(drizzle(state.storage).select().from(listMetadata).get()?.owed).toBeNull();
     });
+  });
+});
+
+describe('session list search folding', () => {
+  it('matches an accented title regardless of case or accents', async () => {
+    const api = client(personal(`usr-${crypto.randomUUID()}`));
+    const id = await seed(api, {
+      client: 'cli',
+      title: 'École normale',
+      directory: '/repo/fr',
+      updated: Date.now() - 1000,
+    });
+    for (const term of ['ecole', 'ÉCOLE', 'École']) {
+      expect((await listing(api, `?q=${encodeURIComponent(term)}`)).items.map(i => i.sessionID)).toEqual([id]);
+    }
+    expect((await listing(api, '?q=ecol')).items.map(i => i.sessionID)).toEqual([id]);
+  });
+
+  it('caps the sources one session can join', async () => {
+    const api = client(personal(`usr-${crypto.randomUUID()}`));
+    const id = newSessionID();
+    expect((await api.register(id, crypto.randomUUID(), 'cli')).status).toBe(201);
+    for (let index = 1; index < LIMITS.sessionSources; index++) {
+      expect((await api.register(id, crypto.randomUUID(), 'mobile')).status).toBe(200);
+    }
+    const refused = await api.register(id, crypto.randomUUID(), 'mobile');
+    expect(refused.status).toBe(409);
+    expect(await refused.json()).toMatchObject({ error: { code: 'source_limit_exceeded' } });
+    // A joined source still re-registers as a no-op.
+    expect((await api.register(id, crypto.randomUUID(), 'mobile')).status).toBe(409);
   });
 });

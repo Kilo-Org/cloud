@@ -19,6 +19,7 @@ import {
   type Tenant,
 } from '../protocol';
 import * as erasure from './session-sync/user-erasure';
+import { foldTitle } from './session-sync/notifications';
 
 const inputSchema = z.strictObject({
   tenant: tenantSchema,
@@ -47,20 +48,19 @@ export class SessionSyncTenantDO extends DurableObject<Env> {
     void ctx.blockConcurrencyWhile(async () => {
       await migrate(this.db, migrations);
       this.db.insert(usage).values({ id: 1, sessions: 0, bytes: 0 }).onConflictDoNothing().run();
-      // Rows created before list metadata sort by their creation time.
-      if (
-        this.db
-          .select({ target: createdSessions.target })
-          .from(createdSessions)
-          .where(eq(createdSessions.updated_at, 0))
-          .limit(1)
-          .get()
-      ) {
+      // One-time backfill: rows created before list metadata sort by creation time.
+      if (!(await ctx.storage.get<boolean>('listMetadataBackfilled'))) {
         this.db
           .update(createdSessions)
           .set({ updated_at: sql`${createdSessions.created_at}` })
-          .where(eq(createdSessions.updated_at, 0))
+          .where(
+            and(
+              eq(createdSessions.updated_at, 0),
+              sql`${createdSessions.created_at} > 0`
+            )
+          )
           .run();
+        await ctx.storage.put('listMetadataBackfilled', true);
       }
       await erasure.schedule(this.db, ctx);
     });
@@ -152,9 +152,12 @@ export class SessionSyncTenantDO extends DurableObject<Env> {
     this.db
       .update(createdSessions)
       .set({
-        ...(metadata.title !== undefined ? { title: metadata.title } : {}),
+        ...(metadata.title !== undefined
+          ? { title: metadata.title, title_folded: metadata.title ? foldTitle(metadata.title) : null }
+          : {}),
         ...(metadata.directory !== undefined ? { directory: metadata.directory } : {}),
-        updated_at: metadata.updatedAt,
+        // Producers can clock-skew; the index never moves backwards.
+        updated_at: sql`max(${createdSessions.updated_at}, ${metadata.updatedAt})`,
         ...(metadata.archived !== undefined ? { archived: metadata.archived ? 1 : 0 } : {}),
       })
       .where(eq(createdSessions.target, JSON.stringify([tenant.type, tenant.id, sessionID])))
@@ -183,7 +186,7 @@ export class SessionSyncTenantDO extends DurableObject<Env> {
       return ok({ items: [], next: null });
     }
     const { before, limit, q, client, directory, archived } = parsed.data;
-    const escaped = q?.toLowerCase().replace(/[\\%_]/g, character => `\\${character}`);
+    const escaped = q === undefined ? undefined : foldTitle(q).replace(/[\\%_]/g, character => `\\${character}`);
     const conditions = [
       before
         ? or(
@@ -195,7 +198,7 @@ export class SessionSyncTenantDO extends DurableObject<Env> {
           )
         : undefined,
       escaped !== undefined
-        ? sql`lower(${createdSessions.title}) like ${`%${escaped}%`} escape '\\'`
+        ? sql`${createdSessions.title_folded} like ${`%${escaped}%`} escape '\\'`
         : undefined,
       client !== undefined ? eq(createdSessions.client, client) : undefined,
       directory !== undefined ? eq(createdSessions.directory, directory) : undefined,

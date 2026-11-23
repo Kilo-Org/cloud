@@ -4,8 +4,9 @@ import { listMetadata } from '../../db/sqlite-schema';
 import { sessionListMetadataSchema, type SessionListMetadata } from '../../protocol';
 import { KEY, type Db } from './session';
 
-/** How long a refused index push waits before its next attempt. */
+/** First retry delay after a refused index push; doubles up to the cap. */
 export const LIST_METADATA_RETRY_MS = 5_000;
+export const LIST_METADATA_RETRY_MAX_MS = 10 * 60_000;
 
 type Row = typeof listMetadata.$inferSelect;
 
@@ -25,16 +26,17 @@ function parse(text: string | null): SessionListMetadata | undefined {
 
 function put(
   db: Db,
-  values: { owed: string | null; pushed?: string | null; retry_at: number }
+  values: { owed: string | null; pushed?: string | null; retry_at: number; attempts?: number }
 ): void {
+  const row = {
+    owed: values.owed,
+    pushed: values.pushed ?? null,
+    retry_at: values.retry_at,
+    attempts: values.attempts ?? 0,
+  };
   db.insert(listMetadata)
-    .values({
-      key: KEY,
-      owed: values.owed,
-      pushed: values.pushed ?? null,
-      retry_at: values.retry_at,
-    })
-    .onConflictDoUpdate({ target: listMetadata.key, set: values })
+    .values({ key: KEY, ...row })
+    .onConflictDoUpdate({ target: listMetadata.key, set: row })
     .run();
 }
 
@@ -47,38 +49,66 @@ export function stage(db: Db, metadata: SessionListMetadata, now: number): void 
   const value = JSON.stringify(metadata);
   const row = read(db);
   if (row?.pushed === value) {
-    // The index already shows this record.
-    put(db, { owed: null, retry_at: now });
+    put(db, { owed: null, pushed: row.pushed, retry_at: now, attempts: 0 });
     return;
   }
-  put(db, { owed: value, retry_at: now });
+  put(db, {
+    owed: value,
+    pushed: row?.pushed ?? null,
+    retry_at: now,
+    attempts: row?.attempts ?? 0,
+  });
 }
 
 export function owed(
-  db: Db
+  db: Db,
+  now: number
 ): { value: string; metadata: SessionListMetadata; retryAt: number } | undefined {
   const row = read(db);
   if (!row?.owed) return undefined;
   const metadata = parse(row.owed);
-  if (!metadata) {
-    put(db, { owed: null, pushed: row.pushed, retry_at: row.retry_at });
-    return undefined;
-  }
-  return { value: row.owed, metadata, retryAt: row.retry_at };
+  if (metadata) return { value: row.owed, metadata, retryAt: row.retry_at };
+  // An unreadable debt still describes a session that changed; push the field
+  // that always resolves instead of dropping the entry silently.
+  const value = JSON.stringify({ updatedAt: now });
+  put(db, { owed: value, pushed: row.pushed, retry_at: now, attempts: row.attempts });
+  return { value, metadata: { updatedAt: now }, retryAt: now };
 }
 
-/** The index accepted `value`; it becomes the record later puts compare with. */
+/**
+ * The index accepted `value`; it becomes the record later puts compare with.
+ * A newer value staged meanwhile stays owed, so its own push still happens.
+ */
 export function succeeded(db: Db, value: string): void {
-  put(db, { owed: null, pushed: value, retry_at: 0 });
+  const row = read(db);
+  put(db, {
+    owed: row?.owed === value ? null : (row?.owed ?? null),
+    pushed: value,
+    retry_at: row?.owed === value ? 0 : (row?.retry_at ?? 0),
+    attempts: row?.owed === value ? 0 : (row?.attempts ?? 0),
+  });
 }
 
-export function refused(db: Db, retryAt: number): void {
+/** Defers the owed push: bounded exponential backoff, never sooner than a retry hint. */
+export function refused(db: Db, now: number, hint?: number): number {
   const row = read(db);
-  put(db, { owed: row?.owed ?? null, pushed: row?.pushed ?? null, retry_at: retryAt });
+  const attempts = (row?.attempts ?? 0) + 1;
+  const backoff = Math.min(
+    LIST_METADATA_RETRY_MAX_MS,
+    LIST_METADATA_RETRY_MS * 2 ** Math.min(attempts - 1, 16)
+  );
+  const retryAt = Math.max(now + backoff, hint ?? 0);
+  put(db, {
+    owed: row?.owed ?? null,
+    pushed: row?.pushed ?? null,
+    retry_at: retryAt,
+    attempts,
+  });
+  return retryAt;
 }
 
 /** A tombstone leaves every list, so nothing stays owed. */
 export function clear(db: Db): void {
   const row = read(db);
-  if (row) put(db, { owed: null, pushed: row.pushed, retry_at: 0 });
+  if (row) put(db, { owed: null, pushed: row.pushed, retry_at: 0, attempts: 0 });
 }

@@ -293,7 +293,6 @@ it('streams byte-identical pages for every JSON type, escaping, blobs, and empty
       kind: change.kind,
       id: change.id,
       revision: 1,
-      sourceID: source,
       ...('value' in change
         ? { value: change.value }
         : 'blob' in change

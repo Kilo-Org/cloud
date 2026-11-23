@@ -68,6 +68,7 @@ const pageInput = z.strictObject({
   cursor: cursorSchema.optional(),
   limit: z.number().int().min(1).max(LIMITS.pageItems),
   revision: z.number().int().min(0).optional(),
+  includeSource: z.boolean().optional(),
 });
 const blobInput = z.strictObject({ ...target, blob: blobRefSchema });
 const attemptInput = z.strictObject({ ...target, blob: blobRefSchema, attempt: z.uuid() });
@@ -1016,7 +1017,7 @@ export class SessionSyncDO extends DurableObject<Env> {
    * so a transient tenant failure cannot leave the list stale forever.
    */
   private async flushListMetadata(): Promise<Result<null>> {
-    const owed = listMetadata.owed(this.db);
+    const owed = listMetadata.owed(this.db, Date.now());
     if (!owed) return ok(null);
     if (Date.now() < owed.retryAt) {
       await this.scheduleSweep();
@@ -1039,7 +1040,12 @@ export class SessionSyncDO extends DurableObject<Env> {
     );
     if (!listed.ok) {
       this.tx(() => {
-        listMetadata.refused(this.db, Date.now() + listMetadata.LIST_METADATA_RETRY_MS);
+        const hint = listed.error.details?.retryAt;
+        listMetadata.refused(
+          this.db,
+          Date.now(),
+          typeof hint === 'number' ? hint : undefined
+        );
         return null;
       });
       await this.scheduleSweep();
@@ -1070,7 +1076,7 @@ export class SessionSyncDO extends DurableObject<Env> {
         ? Math.max(Date.now() + 1, this.relayPurgeRetryAt)
         : null;
     const retentionDue = meta && meta.deleted_at === null ? this.retentionDeadline(meta) : null;
-    const owed = listMetadata.owed(this.db);
+    const owed = listMetadata.owed(this.db, Date.now());
     const metadataDue = owed ? Math.max(owed.retryAt, Date.now() + 1) : null;
     const deadlines = [blobDue, leaseDue, retentionDue, relayDue, metadataDue].filter(
       value => value !== null

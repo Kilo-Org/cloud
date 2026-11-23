@@ -66,6 +66,14 @@ export function setStatus(
   };
 }
 
+/** Case- and accent-insensitive form used by the list's title search. */
+export function foldTitle(title: string): string {
+  return title
+    .normalize('NFKD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase();
+}
+
 function cleanTitle(title: string): string {
   return title.slice(0, 1024).replace(/[\uD800-\uDBFF]$/, '');
 }
@@ -101,7 +109,10 @@ export function listMetadata(value: unknown, committedAt: number): SessionListMe
     ...(origin?.directory !== undefined
       ? { directory: origin.directory === '' ? null : origin.directory }
       : {}),
-    updatedAt: time?.updated !== undefined ? Math.trunc(time.updated) : committedAt,
+    updatedAt:
+      time?.updated !== undefined && Number.isSafeInteger(Math.trunc(time.updated))
+        ? Math.trunc(time.updated)
+        : committedAt,
     ...(time !== undefined
       ? { archived: time.archived !== undefined && time.archived !== null }
       : {}),

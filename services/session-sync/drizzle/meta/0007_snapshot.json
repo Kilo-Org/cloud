@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "7025db47-386b-43b0-96ab-31ef04601c46",
+  "id": "5f8c24fb-d515-4457-95e8-ee516248d1e6",
   "prevId": "388235ac-ad7a-4bdd-9577-2a8c81a35592",
   "tables": {
     "blobs": {
@@ -179,6 +179,14 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "attempts": {
+          "name": "attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
         }
       },
       "indexes": {},

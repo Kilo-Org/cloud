@@ -187,6 +187,7 @@
     "legalDocumentEnglishOnly": "Tài liệu này chỉ có sẵn bằng tiếng Anh.",
     "organizationTrialEndedBilling": "Bản dùng thử của tổ chức đã kết thúc và tổ chức không có gói đang hoạt động. Bạn có thể cập nhật thanh toán, sau đó thử lại.",
     "organizationTrialEndedBillingAtKiloAi": "Bản dùng thử của tổ chức đã kết thúc và tổ chức không có gói đang hoạt động. Bạn có thể cập nhật thanh toán tại kilo.ai, sau đó thử lại.",
+    "planRequiredTitle": "Cần gói hoạt động",
     "markdownA11y": {
       "list": {
         "bulletPoint": "Dấu đầu dòng",
@@ -4633,7 +4634,6 @@
       "entryLabel": "Hồ sơ mặc định",
       "add": "Thêm mặc định",
       "empty": "Không có cấu hình mặc định",
-      "planEndedTitle": "Cần gói hoạt động",
       "emptyDescription": "Thêm mặc định để tự động áp dụng cấu hình khi bắt đầu phiên cho kho lưu trữ.",
       "repo": "Chọn kho lưu trữ…",
       "profile": "Chọn hồ sơ",

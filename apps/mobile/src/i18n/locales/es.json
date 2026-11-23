@@ -187,6 +187,7 @@
     "legalDocumentEnglishOnly": "Este documento solo está disponible en inglés.",
     "organizationTrialEndedBilling": "La prueba de la organización ha finalizado y no tiene ningún plan activo. Puedes actualizar la facturación y, después, volver a intentarlo.",
     "organizationTrialEndedBillingAtKiloAi": "La prueba de la organización ha finalizado y no tiene ningún plan activo. Puedes actualizar la facturación en kilo.ai y, después, volver a intentarlo.",
+    "planRequiredTitle": "Se requiere un plan",
     "viewOnGitHub": "Ver PR en GitHub",
     "markdownA11y": {
       "list": {
@@ -4718,7 +4719,6 @@
       "entryLabel": "Perfiles predeterminados",
       "add": "Agregar valor predeterminado",
       "empty": "No hay valores predeterminados configurados",
-      "planEndedTitle": "Se requiere un plan",
       "emptyDescription": "Agregue un valor predeterminado para aplicar automáticamente un perfil al iniciar sesiones para un repositorio.",
       "repo": "Seleccionar repositorio…",
       "profile": "Seleccionar perfil",

@@ -186,6 +186,7 @@
     "legalDocumentEnglishOnly": "Tämä asiakirja on saatavilla vain englanniksi.",
     "organizationTrialEndedBilling": "Organisaation kokeilujakso on päättynyt, eikä sillä ole aktiivista suunnitelmaa. Voit päivittää laskutuksen ja yrittää sitten uudelleen.",
     "organizationTrialEndedBillingAtKiloAi": "Organisaation kokeilujakso on päättynyt, eikä sillä ole aktiivista suunnitelmaa. Voit päivittää laskutuksen osoitteessa kilo.ai ja yrittää sitten uudelleen.",
+    "planRequiredTitle": "Suunnitelma vaaditaan",
     "viewOnGitHub": "Katso PR GitHubissa",
     "markdownA11y": {
       "list": {
@@ -4633,7 +4634,6 @@
       "entryLabel": "Profiilin oletukset",
       "add": "Lisää oletusprofiili",
       "empty": "Ei määritettyjä oletusprofiileja",
-      "planEndedTitle": "Suunnitelma vaaditaan",
       "emptyDescription": "Lisää oletusprofiili, joka ottaa profiilin käyttöön automaattisesti, kun koodivarastolle aloitetaan istuntoja.",
       "repo": "Valitse koodivarasto…",
       "profile": "Valitse profiili",

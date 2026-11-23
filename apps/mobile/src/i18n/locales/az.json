@@ -186,6 +186,7 @@
     "legalDocumentEnglishOnly": "Bu sənəd yalnız ingilis dilində mövcuddur.",
     "organizationTrialEndedBilling": "Təşkilatın sınaq müddəti başa çatıb və aktiv planı yoxdur. Billinqi yeniləyə və sonra yenidən cəhd edə bilərsiniz.",
     "organizationTrialEndedBillingAtKiloAi": "Təşkilatın sınaq müddəti başa çatıb və aktiv planı yoxdur. Billinqi kilo.ai ünvanında yeniləyə və sonra yenidən cəhd edə bilərsiniz.",
+    "planRequiredTitle": "Aktiv plan tələb olunur",
     "viewOnGitHub": "GitHub-da PR-ə bax",
     "markdownA11y": {
       "list": {
@@ -4633,7 +4634,6 @@
       "entryLabel": "Defolt profillər",
       "add": "Defolt əlavə edin",
       "empty": "Defolt konfiqurasiya edilməyib",
-      "planEndedTitle": "Aktiv plan tələb olunur",
       "emptyDescription": "Repo üçün sessiyalara başladıqda profili avtomatik tətbiq etmək üçün defolt əlavə edin.",
       "repo": "Repozitoru seçin…",
       "profile": "Profil seçin",

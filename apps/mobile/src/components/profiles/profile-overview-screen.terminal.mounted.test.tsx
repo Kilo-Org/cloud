@@ -93,6 +93,12 @@ vi.mock('@/components/ui/dialog', () => ({
 }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
+// The manage slot's plan state is asserted by the section suites; here the
+// notice is a host element, so the suite does not load the state surface's
+// native chain.
+vi.mock('@/components/organization/plan-notice', () => ({
+  OrganizationPlanNotice: 'OrganizationPlanNotice',
+}));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'TabScreenScrollView' }));
 vi.mock('@/components/profiles/profile-repo-pins-section', () => ({
   ProfileRepoPinsSection: 'ProfileRepoPinsSection',

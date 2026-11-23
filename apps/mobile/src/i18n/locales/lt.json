@@ -188,6 +188,7 @@
     "legalDocumentEnglishOnly": "Šis dokumentas prieinamas tik anglų kalba.",
     "organizationTrialEndedBilling": "Organizacijos bandomasis laikotarpis baigėsi ir ji neturi aktyvaus plano. Galite atnaujinti atsiskaitymo duomenis, tada bandykite dar kartą.",
     "organizationTrialEndedBillingAtKiloAi": "Organizacijos bandomasis laikotarpis baigėsi ir ji neturi aktyvaus plano. Galite atnaujinti atsiskaitymo duomenis adresu kilo.ai, tada bandykite dar kartą.",
+    "planRequiredTitle": "Reikalingas aktyvus planas",
     "viewOnGitHub": "Peržiūrėti PR GitHub platformoje",
     "markdownA11y": {
       "list": {
@@ -4803,7 +4804,6 @@
       "entryLabel": "Numatytieji profiliai",
       "add": "Pridėti numatytąjį",
       "empty": "Jokių numatytųjų sukonfigūruotų",
-      "planEndedTitle": "Reikalingas aktyvus planas",
       "emptyDescription": "Pridėkite numatytąjį nustatymą, kad profilis būtų automatiškai taikomas pradedant seansus saugyklai.",
       "repo": "Pasirinkite saugyklą…",
       "profile": "Pasirinkite profilį",

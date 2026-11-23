@@ -186,6 +186,7 @@
     "legalDocumentEnglishOnly": "Dokumen ini hanya tersedia dalam bahasa Inggeris.",
     "organizationTrialEndedBilling": "Percubaan organisasi telah tamat dan ia tidak mempunyai pelan aktif. Anda boleh mengemas kini bil, kemudian cuba lagi.",
     "organizationTrialEndedBillingAtKiloAi": "Percubaan organisasi telah tamat dan ia tidak mempunyai pelan aktif. Anda boleh mengemas kini bil di kilo.ai, kemudian cuba lagi.",
+    "planRequiredTitle": "Pelan aktif diperlukan",
     "viewOnGitHub": "Lihat PR di GitHub",
     "markdownA11y": {
       "list": {
@@ -4633,7 +4634,6 @@
       "entryLabel": "Profil lalai",
       "add": "Tambah lalai",
       "empty": "Tiada lalai dikonfigurasikan",
-      "planEndedTitle": "Pelan aktif diperlukan",
       "emptyDescription": "Tambahkan lalai untuk menggunakan profil secara automatik apabila memulakan sesi untuk repo.",
       "repo": "Pilih repositori…",
       "profile": "Pilih profil",

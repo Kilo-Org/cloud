@@ -187,6 +187,7 @@
     "legalDocumentEnglishOnly": "Nyaraka hii inapatikana kwa Kiingereza pekee.",
     "organizationTrialEndedBilling": "Kipindi cha majaribio cha shirika kimeisha na hakina mpango unaotumika. Unaweza kusasisha malipo, kisha ujaribu tena.",
     "organizationTrialEndedBillingAtKiloAi": "Kipindi cha majaribio cha shirika kimeisha na hakina mpango unaotumika. Unaweza kusasisha malipo kwenye kilo.ai, kisha ujaribu tena.",
+    "planRequiredTitle": "Mpango unahitajika",
     "markdownA11y": {
       "list": {
         "bulletPoint": "Nukta ya orodha",
@@ -4633,7 +4634,6 @@
       "entryLabel": "Profaili chaguomsingi",
       "add": "Ongeza chaguomsingi",
       "empty": "Hakuna chaguo-msingi zilizosanidiwa",
-      "planEndedTitle": "Mpango unahitajika",
       "emptyDescription": "Ongeza chaguomsingi ili kutumia wasifu kiotomatiki unapoanzisha vipindi vya repo.",
       "repo": "Chagua hazina…",
       "profile": "Chagua wasifu",

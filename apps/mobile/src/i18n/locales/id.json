@@ -186,6 +186,7 @@
     "legalDocumentEnglishOnly": "Dokumen ini hanya tersedia dalam bahasa Inggris.",
     "organizationTrialEndedBilling": "Masa percobaan organisasi telah berakhir dan tidak memiliki paket aktif. Anda dapat memperbarui penagihan, lalu coba lagi.",
     "organizationTrialEndedBillingAtKiloAi": "Masa percobaan organisasi telah berakhir dan tidak memiliki paket aktif. Anda dapat memperbarui penagihan di kilo.ai, lalu coba lagi.",
+    "planRequiredTitle": "Paket aktif diperlukan",
     "viewOnGitHub": "Lihat PR di GitHub",
     "markdownA11y": {
       "list": {
@@ -4633,7 +4634,6 @@
       "entryLabel": "Profil bawaan",
       "add": "Tambahkan bawaan",
       "empty": "Tidak ada konfigurasi default",
-      "planEndedTitle": "Paket aktif diperlukan",
       "emptyDescription": "Tambahkan default untuk menerapkan profil secara otomatis saat memulai sesi untuk repo.",
       "repo": "Pilih repositori…",
       "profile": "Pilih profil",

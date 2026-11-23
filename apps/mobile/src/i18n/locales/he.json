@@ -187,6 +187,7 @@
     "legalDocumentEnglishOnly": "מסמך זה זמין באנגלית בלבד.",
     "organizationTrialEndedBilling": "הסתיימה תקופת הניסיון של הארגון ואין לו תוכנית פעילה. תוכל לעדכן את החיוב, ואז לנסות שוב.",
     "organizationTrialEndedBillingAtKiloAi": "הסתיימה תקופת הניסיון של הארגון ואין לו תוכנית פעילה. תוכל לעדכן את החיוב ב-kilo.ai, ואז לנסות שוב.",
+    "planRequiredTitle": "נדרשת תוכנית",
     "viewOnGitHub": "הצגת ה-PR ב-GitHub",
     "markdownA11y": {
       "list": {
@@ -4718,7 +4719,6 @@
       "entryLabel": "פרופילים המוגדרים כברירת מחדל",
       "add": "הוסף ברירת מחדל",
       "empty": "לא הוגדרו ברירת מחדל",
-      "planEndedTitle": "נדרשת תוכנית",
       "emptyDescription": "הוסף ברירת מחדל להחלה אוטומטית של פרופיל בעת תחילת הפעלות עבור ריפו.",
       "repo": "בחר מאגר…",
       "profile": "בחר פרופיל",

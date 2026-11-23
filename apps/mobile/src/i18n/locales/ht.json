@@ -186,6 +186,7 @@
     "legalDocumentEnglishOnly": "Dokiman sa a disponib nan lang angle sèlman.",
     "organizationTrialEndedBilling": "Esè òganizasyon an fini epi li pa gen okenn plan aktif. Ou ka mete ajou faktirasyon, epi eseye ankò.",
     "organizationTrialEndedBillingAtKiloAi": "Esè òganizasyon an fini epi li pa gen okenn plan aktif. Ou ka mete ajou faktirasyon sou kilo.ai, epi eseye ankò.",
+    "planRequiredTitle": "Plan aktif obligatwa",
     "viewOnGitHub": "Gade PR a sou GitHub",
     "markdownA11y": {
       "list": {
@@ -4633,7 +4634,6 @@
       "entryLabel": "Pwofil default",
       "add": "Ajoute default",
       "empty": "Pa gen par défaut configuré",
-      "planEndedTitle": "Plan aktif obligatwa",
       "emptyDescription": "Ajoute yon default pou aplike otomatikman yon pwofil lè w kòmanse sesyon yo pou yon repo.",
       "repo": "Chwazi depo…",
       "profile": "Chwazi pwofil",

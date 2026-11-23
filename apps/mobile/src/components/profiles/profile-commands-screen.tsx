@@ -3,7 +3,7 @@ import { type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
-import { EmptyState, StateAction } from '@/components/empty-state';
+import { StateAction } from '@/components/empty-state';
 import {
   addCommand,
   commandRowA11yLabel,
@@ -16,6 +16,7 @@ import {
 } from '@/components/profiles/profile-commands-model';
 import { CommandsSkeleton } from '@/components/profiles/profile-commands-skeleton';
 import { ProfileManageSlot } from '@/components/profiles/profile-manage-slot';
+import { ProfileSectionEmptyState } from '@/components/profiles/profile-section-empty-state';
 import { selectProfileReadErrorView } from '@/components/profiles/profile-read-error-view';
 import { ReorderableItem, ReorderableItemActions } from '@/components/profiles/reorderable-item';
 import { SetupCommandField } from '@/components/profiles/setup-command-field';
@@ -292,16 +293,13 @@ export function ProfileCommandsScreen({
     content = <CommandsSkeleton />;
   } else if (commands.length === 0) {
     content = (
-      <EmptyState
+      <ProfileSectionEmptyState
+        permission={permission}
+        organizationId={organizationId}
         icon={Terminal}
         title={t('profiles.commandsEmpty')}
-        description={null}
         placement="top"
-        action={
-          <ProfileManageSlot permission={permission} organizationId={organizationId}>
-            <StateAction label={t('profiles.addCommand')} icon={Plus} onPress={add} />
-          </ProfileManageSlot>
-        }
+        action={<StateAction label={t('profiles.addCommand')} icon={Plus} onPress={add} />}
       />
     );
   } else {

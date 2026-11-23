@@ -187,6 +187,7 @@
     "legalDocumentEnglishOnly": "Dukumeentigan waxaa laga heli karaa af Ingiriisi oo keliya.",
     "organizationTrialEndedBilling": "Tijaabadii ururku way dhamaatay, mana laha qorshe firfircoon. Waxaad cusboonaysiin kartaa biilasha, ka dibna isku day mar kale.",
     "organizationTrialEndedBillingAtKiloAi": "Tijaabadii ururku way dhamaatay, mana laha qorshe firfircoon. Waxaad cusboonaysiin kartaa biilasha kilo.ai, ka dibna isku day mar kale.",
+    "planRequiredTitle": "Qorshe loo baahan yahay",
     "markdownA11y": {
       "list": {
         "bulletPoint": "Dhibic liis",
@@ -4633,7 +4634,6 @@
       "entryLabel": "Profile-ka ugu tala galay",
       "add": "Kudar default",
       "empty": "Ma jiro wax khalad ah oo la habeeyey",
-      "planEndedTitle": "Qorshe loo baahan yahay",
       "emptyDescription": "Ku dar default si toos ah u codso profile marka la bilaabayo fadhiyada repo.",
       "repo": "Dooro kaydka…",
       "profile": "Dooro astaanta",

@@ -187,6 +187,7 @@
     "legalDocumentEnglishOnly": "本文件僅提供英文版本。",
     "organizationTrialEndedBilling": "組織的試用期已結束，且沒有使用中的方案。您可以更新帳單資訊，然後再試一次。",
     "organizationTrialEndedBillingAtKiloAi": "組織的試用期已結束，且沒有使用中的方案。您可以在 kilo.ai 更新帳單資訊，然後再試一次。",
+    "planRequiredTitle": "需要方案",
     "markdownA11y": {
       "list": {
         "bulletPoint": "項目符號",
@@ -4633,7 +4634,6 @@
       "entryLabel": "預設設定檔",
       "add": "新增預設值",
       "empty": "沒有配置預設值",
-      "planEndedTitle": "需要方案",
       "emptyDescription": "新增預設值以在啟動儲存庫會話時自動套用設定檔。",
       "repo": "選擇存儲庫…",
       "profile": "選擇個人資料",

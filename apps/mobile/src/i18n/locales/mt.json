@@ -189,6 +189,7 @@
     "legalDocumentEnglishOnly": "Dan id-dokument huwa disponibbli bl-Ingliż biss.",
     "organizationTrialEndedBilling": "Il-prova tal-organizzazzjoni ntemmet u m'għandhiex pjan attiv. Tista' taġġorna l-fatturazzjoni, imbagħad terġa' tipprova.",
     "organizationTrialEndedBillingAtKiloAi": "Il-prova tal-organizzazzjoni ntemmet u m'għandhiex pjan attiv. Tista' taġġorna l-fatturazzjoni fuq kilo.ai, imbagħad terġa' tipprova.",
+    "planRequiredTitle": "Pjan attiv meħtieġ",
     "viewOnGitHub": "Ara l-PR fuq GitHub",
     "markdownA11y": {
       "list": {
@@ -4888,7 +4889,6 @@
       "entryLabel": "Profili default",
       "add": "Żid default",
       "empty": "Ebda defaults konfigurati",
-      "planEndedTitle": "Pjan attiv meħtieġ",
       "emptyDescription": "Żid default biex tapplika profil awtomatikament meta tibda sessjonijiet għal repo.",
       "repo": "Agħżel repożitorju…",
       "profile": "Agħżel il-profil",

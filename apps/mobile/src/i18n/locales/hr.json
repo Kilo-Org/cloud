@@ -187,6 +187,7 @@
     "legalDocumentEnglishOnly": "Ovaj je dokument dostupan samo na engleskom jeziku.",
     "organizationTrialEndedBilling": "Probno razdoblje organizacije je završilo i organizacija nema aktivan plan. Možete ažurirati naplatu i zatim pokušati ponovno.",
     "organizationTrialEndedBillingAtKiloAi": "Probno razdoblje organizacije je završilo i organizacija nema aktivan plan. Možete ažurirati naplatu na kilo.ai i zatim pokušati ponovno.",
+    "planRequiredTitle": "Potreban je aktivan plan",
     "viewOnGitHub": "Pogledaj PR na GitHubu",
     "markdownA11y": {
       "list": {
@@ -4718,7 +4719,6 @@
       "entryLabel": "Zadani profili",
       "add": "Dodaj zadano",
       "empty": "Nisu konfigurirane zadane postavke",
-      "planEndedTitle": "Potreban je aktivan plan",
       "emptyDescription": "Dodajte zadanu postavku za automatsku primjenu profila prilikom pokretanja sesija za repo.",
       "repo": "Odaberite spremište…",
       "profile": "Odaberite profil",

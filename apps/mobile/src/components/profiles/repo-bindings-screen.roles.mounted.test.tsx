@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
 import { StateAction } from '@/components/empty-state';
+import { CreditCard, GitBranch } from '@/components/ui/icons';
 import { billingHrefFor } from '@/lib/trial-refusal';
 import { emptyStateProps } from '@/components/profiles/repo-bindings-screen.add-form.test-helpers';
 import {
@@ -140,7 +141,7 @@ const PROFILE: TestProfile = { id: 'profile-1', name: 'Backend debugging', isDef
 const ADD_LABEL = 'Add default';
 const ROLE_SENTENCE = i18n.t('profiles.organizationRoleRequired');
 const EMPTY_TITLE = i18n.t('profiles.repoBindings.empty');
-const PLAN_TITLE = i18n.t('profiles.repoBindings.planEndedTitle');
+const PLAN_TITLE = i18n.t('common.planRequiredTitle');
 // A 'plan-ended' reader holds a role that can change the plan, so the state
 // pairs the step-offering sentence with the billing action under it.
 const PLAN_ENDED_SENTENCE = i18n.t('common.organizationTrialEndedBilling');
@@ -268,6 +269,10 @@ describe('RepoBindingsScreen roles', () => {
     expect(empty.props.title).toBe(PLAN_TITLE);
     expect(empty.props.title).not.toBe(EMPTY_TITLE);
     expect(empty.props.description).toBe(PLAN_ENDED_SENTENCE);
+    // A repository glyph would name the list's subject, not the plan that ends
+    // every write, so the blocked state takes the billing mark.
+    expect(empty.props.icon).toBe(CreditCard);
+    expect(empty.props.icon).not.toBe(GitBranch);
     expect(pressableLabels(renderer.root)).not.toContain(ADD_LABEL);
 
     // `EmptyState` is a host stub here, so its action is read as the element the

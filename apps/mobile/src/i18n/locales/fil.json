@@ -186,6 +186,7 @@
     "legalDocumentEnglishOnly": "Ang dokumentong ito ay makukuha lamang sa Ingles.",
     "organizationTrialEndedBilling": "Natapos na ang trial ng organisasyon at wala itong aktibong plano. Maaaring i-update mo ang billing, pagkatapos ay subukan muli.",
     "organizationTrialEndedBillingAtKiloAi": "Natapos na ang trial ng organisasyon at wala itong aktibong plano. Maaaring i-update mo ang billing sa kilo.ai, pagkatapos ay subukan muli.",
+    "planRequiredTitle": "Kailangan ng plano",
     "viewOnGitHub": "Tingnan ang PR sa GitHub",
     "markdownA11y": {
       "list": {
@@ -4633,7 +4634,6 @@
       "entryLabel": "Mga default na profile",
       "add": "Magdagdag ng default",
       "empty": "Walang mga default na na-configure",
-      "planEndedTitle": "Kailangan ng plano",
       "emptyDescription": "Magdagdag ng default para awtomatikong maglapat ng profile kapag nagsisimula ng mga session para sa isang repo.",
       "repo": "Pumili ng repositoryo…",
       "profile": "Pumili ng profile",

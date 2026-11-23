@@ -187,6 +187,7 @@
     "legalDocumentEnglishOnly": "Ìwé yìí wà ní Èdè Gẹ̀ẹ́sì nìkan.",
     "organizationTrialEndedBilling": "Àkókò ìdánwò àjọ náà ti parí, kò sì ní ètò tó ń ṣiṣẹ́. O lè ṣe àtúnṣe ìsanwó, kí o sì tún gbìyànjú.",
     "organizationTrialEndedBillingAtKiloAi": "Àkókò ìdánwò àjọ náà ti parí, kò sì ní ètò tó ń ṣiṣẹ́. O lè ṣe àtúnṣe ìsanwó ní kilo.ai, kí o sì tún gbìyànjú.",
+    "planRequiredTitle": "Àjọ nílò ètò",
     "markdownA11y": {
       "list": {
         "bulletPoint": "Àmì àkójọ",
@@ -4633,7 +4634,6 @@
       "entryLabel": "Awọn profaili aiyipada",
       "add": "Fi aiyipada kun",
       "empty": "Ko si awọn atunto aiyipada",
-      "planEndedTitle": "Àjọ nílò ètò",
       "emptyDescription": "Ṣafikun aiyipada lati kan profaili laifọwọyi nigbati o bẹrẹ awọn akoko fun atunto kan.",
       "repo": "Yan ibi ipamọ…",
       "profile": "Yan profaili",

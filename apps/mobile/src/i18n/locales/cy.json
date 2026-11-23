@@ -190,6 +190,7 @@
     "legalDocumentEnglishOnly": "Dim ond yn Saesneg y mae'r ddogfen hon ar gael.",
     "organizationTrialEndedBilling": "Mae treial y sefydliad wedi dod i ben ac nid oes ganddo gynllun gweithredol. Gallwch ddiweddaru bilio, ac yna rhoi cynnig arall arni.",
     "organizationTrialEndedBillingAtKiloAi": "Mae treial y sefydliad wedi dod i ben ac nid oes ganddo gynllun gweithredol. Gallwch ddiweddaru bilio ar kilo.ai, ac yna rhoi cynnig arall arni.",
+    "planRequiredTitle": "Angen cynllun",
     "viewOnGitHub": "Gweld y PR ar GitHub",
     "markdownA11y": {
       "list": {
@@ -4973,7 +4974,6 @@
       "entryLabel": "Proffiliau rhagosodedig",
       "add": "Ychwanegu rhagosodiad",
       "empty": "Dim rhagosodiadau wedi'u ffurfweddu",
-      "planEndedTitle": "Angen cynllun",
       "emptyDescription": "Ychwanegu rhagosodiad i gymhwyso proffil yn awtomatig wrth gychwyn sesiynau ar gyfer repo.",
       "repo": "Dewiswch ystorfa…",
       "profile": "Dewiswch broffil",

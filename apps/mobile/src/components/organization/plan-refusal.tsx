@@ -7,6 +7,13 @@ import { UNDER_COPY_ACTION_BOX_CLASS, UNDER_COPY_ACTION_HIT_SLOP } from '@/lib/a
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
+/**
+ * The error-tinted block both plan states paint: the refusal and its titled
+ * form share one surface, so neither can drift into a second treatment.
+ */
+export const PLAN_REFUSAL_SURFACE_CLASS =
+  'rounded-lg border border-danger-tile-border bg-danger-tile-bg px-3 py-2.5';
+
 const ALERT_ICON_SIZE = 16;
 
 type OrganizationPlanRefusalProps = Readonly<{
@@ -45,12 +52,7 @@ export function OrganizationPlanRefusal({
   const colors = useThemeColors();
 
   return (
-    <View
-      className={cn(
-        'flex-row items-start gap-2 rounded-lg border border-danger-tile-border bg-danger-tile-bg px-3 py-2.5',
-        className
-      )}
-    >
+    <View className={cn(PLAN_REFUSAL_SURFACE_CLASS, 'flex-row items-start gap-2', className)}>
       <View className="pt-0.5">
         <AlertCircle size={ALERT_ICON_SIZE} color={colors.destructive} />
       </View>

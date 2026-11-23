@@ -186,6 +186,7 @@
     "legalDocumentEnglishOnly": "E wātea ana tēnei tuhinga i te reo Ingarihi anake.",
     "organizationTrialEndedBilling": "Kua mutu te whakamātautau o te rōpū, ā, kāore ōna mahere kaha. Ka taea e koe te whakahou i te nama, kātahi ka whakamātau anō.",
     "organizationTrialEndedBillingAtKiloAi": "Kua mutu te whakamātautau o te rōpū, ā, kāore ōna mahere kaha. Ka taea e koe te whakahou i te nama i kilo.ai, kātahi ka whakamātau anō.",
+    "planRequiredTitle": "Me whai mahere",
     "viewOnGitHub": "Tirohia te PR i GitHub",
     "markdownA11y": {
       "list": {
@@ -4633,7 +4634,6 @@
       "entryLabel": "Kōtaha taunoa",
       "add": "Tāpiri taunoa",
       "empty": "Karekau he taunoa i whirihora",
-      "planEndedTitle": "Me whai mahere",
       "emptyDescription": "Tāpirihia he taunoa ki te tono aunoa i tētahi kōtaha i te wā e tīmata ana ngā huihuinga mō te repo.",
       "repo": "Tīpakohia te rokiroki…",
       "profile": "Tīpakohia te kōtaha",

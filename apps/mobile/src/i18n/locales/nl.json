@@ -186,6 +186,7 @@
     "legalDocumentEnglishOnly": "Dit document is alleen beschikbaar in het Engels.",
     "organizationTrialEndedBilling": "De proefperiode van de organisatie is afgelopen en er is geen actief abonnement. Je kunt de facturering bijwerken en het daarna opnieuw proberen.",
     "organizationTrialEndedBillingAtKiloAi": "De proefperiode van de organisatie is afgelopen en er is geen actief abonnement. Je kunt de facturering bijwerken op kilo.ai en het daarna opnieuw proberen.",
+    "planRequiredTitle": "Abonnement vereist",
     "viewOnGitHub": "PR op GitHub bekijken",
     "markdownA11y": {
       "list": {
@@ -4633,7 +4634,6 @@
       "entryLabel": "Standaardprofielen",
       "add": "Standaard toevoegen",
       "empty": "Geen standaardinstellingen geconfigureerd",
-      "planEndedTitle": "Abonnement vereist",
       "emptyDescription": "Voeg een standaard toe om automatisch een profiel toe te passen bij het starten van sessies voor een opslagplaats.",
       "repo": "Selecteer opslagplaats…",
       "profile": "Selecteer profiel",

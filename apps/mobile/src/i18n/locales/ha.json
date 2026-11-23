@@ -186,6 +186,7 @@
     "legalDocumentEnglishOnly": "Wannan takarda tana samuwa cikin Turanci kawai.",
     "organizationTrialEndedBilling": "Gwajin ƙungiyar ya ƙare kuma ba ta da wani shiri mai aiki. Za ka iya sabunta lissafin kuɗi, sannan ka sake gwadawa.",
     "organizationTrialEndedBillingAtKiloAi": "Gwajin ƙungiyar ya ƙare kuma ba ta da wani shiri mai aiki. Za ka iya sabunta lissafin kuɗi a kilo.ai, sannan ka sake gwadawa.",
+    "planRequiredTitle": "Ana buƙatar shiri",
     "viewOnGitHub": "Duba PR a GitHub",
     "markdownA11y": {
       "list": {
@@ -4633,7 +4634,6 @@
       "entryLabel": "Tsoffin bayanan martaba",
       "add": "Ƙara tsoho",
       "empty": "Ba a saita abubuwan da suka dace ba",
-      "planEndedTitle": "Ana buƙatar shiri",
       "emptyDescription": "Ƙara tsoho don amfani da bayanin martaba ta atomatik lokacin fara zama don repo.",
       "repo": "Zaɓi wurin ajiya…",
       "profile": "Zaɓi bayanin martaba",

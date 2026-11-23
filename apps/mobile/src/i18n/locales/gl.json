@@ -186,6 +186,7 @@
     "legalDocumentEnglishOnly": "Este documento só está dispoñible en inglés.",
     "organizationTrialEndedBilling": "O período de proba da organización rematou e non ten ningún plan activo. Podes actualizar a facturación e despois tentalo de novo.",
     "organizationTrialEndedBillingAtKiloAi": "O período de proba da organización rematou e non ten ningún plan activo. Podes actualizar a facturación en kilo.ai e despois tentalo de novo.",
+    "planRequiredTitle": "Cómpre un plan activo",
     "viewOnGitHub": "Ver a PR en GitHub",
     "markdownA11y": {
       "list": {
@@ -4633,7 +4634,6 @@
       "entryLabel": "Perfís predeterminados",
       "add": "Engadir predeterminado",
       "empty": "Non se configuraron valores predeterminados",
-      "planEndedTitle": "Cómpre un plan activo",
       "emptyDescription": "Engade un predeterminado para aplicar automaticamente un perfil ao iniciar sesións para un repositorio.",
       "repo": "Seleccionar repositorio…",
       "profile": "Seleccione o perfil",

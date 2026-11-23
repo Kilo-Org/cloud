@@ -7,10 +7,10 @@ import { renderWithProviders } from '@/test/render-with-providers';
 
 vi.mock('react-native', () => ({ View: 'View' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
-// The shared plan-refusal block is asserted through its props, so a host
-// element of the same name stands in for it.
-vi.mock('@/components/organization/plan-refusal', () => ({
-  OrganizationPlanRefusal: 'OrganizationPlanRefusal',
+// The shared plan notice is asserted through its props, so a host element of
+// the same name stands in for it.
+vi.mock('@/components/organization/plan-notice', () => ({
+  OrganizationPlanNotice: 'OrganizationPlanNotice',
 }));
 // The billing step reads the reader's membership list, a module chain the
 // mounted project cannot load (see `vitest.setup.ts`), so the hook answers with
@@ -28,6 +28,8 @@ const SENTENCE = i18n.t('profiles.organizationRoleRequired');
 // A `plan-ended` reader is an owner or an admin, which is always a billing
 // role, and the slot pairs the step-offering sentence with that step.
 const PLAN_ENDED_SENTENCE = i18n.t('common.organizationTrialEndedBilling');
+// The state's own title, shared by every profile surface that states it.
+const PLAN_TITLE = i18n.t('common.planRequiredTitle');
 const OWNER_NAMING_SENTENCE = i18n.t('common.organizationTrialEnded');
 const ORGANIZATION_ID = 'org-1';
 
@@ -49,7 +51,7 @@ describe('ProfileManageSlot', () => {
     expect(actions).toHaveLength(1);
     expect(actions[0]?.props.children).toBe(ACTION);
     expect(texts).not.toContain(SENTENCE);
-    expect(renderer.root.findAll(node => String(node.type) === 'OrganizationPlanRefusal')).toEqual(
+    expect(renderer.root.findAll(node => String(node.type) === 'OrganizationPlanNotice')).toEqual(
       []
     );
 
@@ -71,14 +73,14 @@ describe('ProfileManageSlot', () => {
 
     expect(texts).toEqual([SENTENCE]);
     expect(renderer.root.findAll(node => String(node.type) === 'Action')).toHaveLength(0);
-    expect(renderer.root.findAll(node => String(node.type) === 'OrganizationPlanRefusal')).toEqual(
+    expect(renderer.root.findAll(node => String(node.type) === 'OrganizationPlanNotice')).toEqual(
       []
     );
 
     unmount();
   });
 
-  it('plan-ended: paints the shared refusal with the step-offering copy and the billing step', async () => {
+  it('plan-ended: paints the titled plan notice with the step-offering copy and the billing step', async () => {
     const { renderer, unmount } = await renderWithProviders(
       createElement(
         ProfileManageSlot,
@@ -89,15 +91,16 @@ describe('ProfileManageSlot', () => {
 
     // The plan, not the role, is what stops this manager: an action here would
     // be refused by the server on every press. The reader can change the plan,
-    // so the slot paints the shared block with the sentence that pairs with the
-    // billing step under it, and stretches across an `EmptyState`'s centered
-    // action cell.
-    const refusals = renderer.root.findAll(node => String(node.type) === 'OrganizationPlanRefusal');
-    expect(refusals).toHaveLength(1);
-    expect(refusals[0]?.props.message).toBe(PLAN_ENDED_SENTENCE);
-    expect(refusals[0]?.props.message).not.toBe(OWNER_NAMING_SENTENCE);
-    expect(refusals[0]?.props.className).toContain('self-stretch');
-    expect(refusals[0]?.props.action).toBe(BILLING_ACTION);
+    // so the slot paints the shared titled notice with the sentence that pairs
+    // with the billing step under it, and stretches across an `EmptyState`'s
+    // centered action cell.
+    const notices = renderer.root.findAll(node => String(node.type) === 'OrganizationPlanNotice');
+    expect(notices).toHaveLength(1);
+    expect(notices[0]?.props.title).toBe(PLAN_TITLE);
+    expect(notices[0]?.props.message).toBe(PLAN_ENDED_SENTENCE);
+    expect(notices[0]?.props.message).not.toBe(OWNER_NAMING_SENTENCE);
+    expect(notices[0]?.props.className).toContain('self-stretch');
+    expect(notices[0]?.props.action).toBe(BILLING_ACTION);
     expect(renderer.root.findAll(node => String(node.type) === 'Text')).toHaveLength(0);
     expect(renderer.root.findAll(node => String(node.type) === 'Action')).toHaveLength(0);
 
@@ -118,7 +121,7 @@ describe('ProfileManageSlot', () => {
     expect(renderer.root.findAll(node => String(node.type) === 'Action')).toHaveLength(0);
     expect(renderer.root.findAll(node => String(node.type) === 'Text')).toHaveLength(0);
     expect(renderer.root.findAll(node => String(node.type) === 'View')).toHaveLength(0);
-    expect(renderer.root.findAll(node => String(node.type) === 'OrganizationPlanRefusal')).toEqual(
+    expect(renderer.root.findAll(node => String(node.type) === 'OrganizationPlanNotice')).toEqual(
       []
     );
 

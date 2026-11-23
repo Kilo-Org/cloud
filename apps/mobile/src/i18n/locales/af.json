@@ -186,6 +186,7 @@
     "legalDocumentEnglishOnly": "Hierdie dokument is slegs in Engels beskikbaar.",
     "organizationTrialEndedBilling": "Die organisasie se proeftydperk het geëindig en dit het geen aktiewe plan nie. Jy kan die fakturering opdateer en dan weer probeer.",
     "organizationTrialEndedBillingAtKiloAi": "Die organisasie se proeftydperk het geëindig en dit het geen aktiewe plan nie. Jy kan die fakturering by kilo.ai opdateer en dan weer probeer.",
+    "planRequiredTitle": "Aktiewe plan vereis",
     "viewOnGitHub": "Bekyk PR op GitHub",
     "markdownA11y": {
       "list": {
@@ -4633,7 +4634,6 @@
       "entryLabel": "Verstekprofiele",
       "add": "Voeg verstek by",
       "empty": "Geen verstekke opgestel nie",
-      "planEndedTitle": "Aktiewe plan vereis",
       "emptyDescription": "Voeg 'n verstek by om 'n profiel outomaties toe te pas wanneer sessies vir 'n repo begin.",
       "repo": "Kies bewaarplek …",
       "profile": "Kies profiel",

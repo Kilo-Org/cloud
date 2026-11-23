@@ -284,6 +284,7 @@
     "legalDocumentEnglishOnly": "This document is available in English only.",
     "organizationTrialEndedBilling": "The organization's trial has ended and it has no active plan. You can update billing, then try again.",
     "organizationTrialEndedBillingAtKiloAi": "The organization's trial has ended and it has no active plan. You can update billing at kilo.ai, then try again.",
+    "planRequiredTitle": "Plan required",
     "viewOnGitHub": "View PR on GitHub",
     "markdownA11y": {
       "list": {
@@ -4731,7 +4732,6 @@
       "entryLabel": "Default profiles",
       "add": "Add default",
       "empty": "No defaults configured",
-      "planEndedTitle": "Plan required",
       "emptyDescription": "Add a default to automatically apply a profile when starting sessions for a repo.",
       "repo": "Select repository…",
       "profile": "Select profile",

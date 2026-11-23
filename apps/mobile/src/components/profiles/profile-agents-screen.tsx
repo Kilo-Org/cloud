@@ -4,11 +4,12 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
-import { EmptyState, StateAction } from '@/components/empty-state';
+import { StateAction } from '@/components/empty-state';
 import { AgentFormSheet, type AgentSaveFailure } from '@/components/profiles/agent-form-sheet';
 import { AgentRowView, AgentsSkeleton } from '@/components/profiles/profile-agents-row';
 import { agentRows, type AgentSource } from '@/components/profiles/profile-agents-model';
 import { ProfileManageSlot } from '@/components/profiles/profile-manage-slot';
+import { ProfileSectionEmptyState } from '@/components/profiles/profile-section-empty-state';
 import { selectProfileReadErrorView } from '@/components/profiles/profile-read-error-view';
 import { ProfileSectionHeader } from '@/components/profiles/profile-section-header';
 import { QueryError } from '@/components/query-error';
@@ -164,15 +165,14 @@ export function ProfileAgentsScreen({
     content = <AgentsSkeleton />;
   } else if (rows.length === 0) {
     content = (
-      <EmptyState
+      <ProfileSectionEmptyState
+        permission={permission}
+        organizationId={organizationId}
         icon={Bot}
         title={t('profiles.agents.empty')}
-        description={null}
         placement="top"
         action={
-          <ProfileManageSlot permission={permission} organizationId={organizationId}>
-            <StateAction label={t('profiles.agents.add')} icon={Plus} onPress={handleStartAdd} />
-          </ProfileManageSlot>
+          <StateAction label={t('profiles.agents.add')} icon={Plus} onPress={handleStartAdd} />
         }
       />
     );

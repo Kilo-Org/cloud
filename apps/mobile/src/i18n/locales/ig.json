@@ -186,6 +186,7 @@
     "legalDocumentEnglishOnly": "Akwụkwọ a dị naanị n'asụsụ Bekee.",
     "organizationTrialEndedBilling": "Oge nnwale nke òtù ahụ agwụla na o nweghị atụmatụ na-arụ ọrụ. Ị nwere ike imelite nhazi ụgwọ, wee nwaa ọzọ.",
     "organizationTrialEndedBillingAtKiloAi": "Oge nnwale nke òtù ahụ agwụla na o nweghị atụmatụ na-arụ ọrụ. Ị nwere ike imelite nhazi ụgwọ na kilo.ai, wee nwaa ọzọ.",
+    "planRequiredTitle": "A chọrọ atụmatụ",
     "viewOnGitHub": "Lelee PR na GitHub",
     "markdownA11y": {
       "list": {
@@ -4633,7 +4634,6 @@
       "entryLabel": "Profaịlụ ndabara",
       "add": "Tinye ndabara",
       "empty": "Ọ nweghị ndabara ahaziri",
-      "planEndedTitle": "A chọrọ atụmatụ",
       "emptyDescription": "Tinye ndabara ka itinye profaịlụ na-akpaghị aka mgbe ịmalite nnọkọ maka repo.",
       "repo": "Họrọ ebe nchekwa…",
       "profile": "Họrọ profaịlụ",

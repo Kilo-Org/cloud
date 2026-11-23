@@ -187,6 +187,7 @@
     "legalDocumentEnglishOnly": "本文件仅提供英文版本。",
     "organizationTrialEndedBilling": "组织的试用期已结束，且没有生效的套餐。您可以更新账单信息，然后重试。",
     "organizationTrialEndedBillingAtKiloAi": "组织的试用期已结束，且没有生效的套餐。您可以在 kilo.ai 更新账单信息，然后重试。",
+    "planRequiredTitle": "需要生效套餐",
     "markdownA11y": {
       "list": {
         "bulletPoint": "项目符号",
@@ -4633,7 +4634,6 @@
       "entryLabel": "默认配置",
       "add": "添加默认值",
       "empty": "没有配置默认值",
-      "planEndedTitle": "需要生效套餐",
       "emptyDescription": "添加默认值以在启动仓库会话时自动应用配置文件。",
       "repo": "选择仓库…",
       "profile": "选择配置文件",

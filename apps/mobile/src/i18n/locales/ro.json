@@ -188,6 +188,7 @@
     "legalDocumentEnglishOnly": "Acest document este disponibil doar în engleză.",
     "organizationTrialEndedBilling": "Perioada de probă a organizației s-a încheiat și nu are un plan activ. Poți actualiza facturarea, apoi poți încerca din nou.",
     "organizationTrialEndedBillingAtKiloAi": "Perioada de probă a organizației s-a încheiat și nu are un plan activ. Poți actualiza facturarea pe kilo.ai, apoi poți încerca din nou.",
+    "planRequiredTitle": "Este necesar un plan",
     "markdownA11y": {
       "list": {
         "bulletPoint": "Marcator",
@@ -4718,7 +4719,6 @@
       "entryLabel": "Profiluri implicite",
       "add": "Adăugați implicit",
       "empty": "Nu sunt configurate implicite",
-      "planEndedTitle": "Este necesar un plan",
       "emptyDescription": "Adăugați o valoare prestabilită pentru a aplica automat un profil la pornirea sesiunilor pentru un depozit.",
       "repo": "Selectați depozitul…",
       "profile": "Selectați profilul",

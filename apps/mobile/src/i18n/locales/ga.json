@@ -189,6 +189,7 @@
     "legalDocumentEnglishOnly": "Tá an doiciméad seo ar fáil i mBéarla amháin.",
     "organizationTrialEndedBilling": "Tá tréimhse trialach na heagraíochta thart agus níl aon phlean gníomhach aici. Is féidir leat an billeáil a nuashonrú agus ansin triail a bhaint as arís.",
     "organizationTrialEndedBillingAtKiloAi": "Tá tréimhse trialach na heagraíochta thart agus níl aon phlean gníomhach aici. Is féidir leat an billeáil a nuashonrú ag kilo.ai agus ansin triail a bhaint as arís.",
+    "planRequiredTitle": "Plean gníomhach de dhíth",
     "viewOnGitHub": "Féach ar an PR ar GitHub",
     "markdownA11y": {
       "list": {
@@ -4888,7 +4889,6 @@
       "entryLabel": "Próifílí réamhshocraithe",
       "add": "Cuir réamhshocraithe leis",
       "empty": "Níl aon réamhshocruithe cumraithe",
-      "planEndedTitle": "Plean gníomhach de dhíth",
       "emptyDescription": "Cuir réamhshocrú leis chun próifíl a chur i bhfeidhm go huathoibríoch agus seisiúin á gcur ar bun le haghaidh repo.",
       "repo": "Roghnaigh stór…",
       "profile": "Roghnaigh próifíl",

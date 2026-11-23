@@ -189,6 +189,7 @@
     "legalDocumentEnglishOnly": "Tento dokument je dostupný len v angličtine.",
     "organizationTrialEndedBilling": "Skúšobné obdobie organizácie sa skončilo a organizácia nemá aktívny plán. Môžete aktualizovať fakturáciu a potom to skúsiť znova.",
     "organizationTrialEndedBillingAtKiloAi": "Skúšobné obdobie organizácie sa skončilo a organizácia nemá aktívny plán. Môžete aktualizovať fakturáciu na kilo.ai a potom to skúsiť znova.",
+    "planRequiredTitle": "Vyžaduje sa aktívny plán",
     "markdownA11y": {
       "list": {
         "bulletPoint": "Odrážka",
@@ -4803,7 +4804,6 @@
       "entryLabel": "Predvolené profily",
       "add": "Pridať predvolené",
       "empty": "Nie sú nakonfigurované žiadne predvolené hodnoty",
-      "planEndedTitle": "Vyžaduje sa aktívny plán",
       "emptyDescription": "Pridajte predvolené nastavenie na automatické použitie profilu pri spustení relácií pre repo.",
       "repo": "Vybrať úložisko…",
       "profile": "Vyberte profil",

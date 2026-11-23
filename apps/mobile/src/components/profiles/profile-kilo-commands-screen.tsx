@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
-import { EmptyState, StateAction } from '@/components/empty-state';
+import { StateAction } from '@/components/empty-state';
 import { KiloCommandFormSheet } from '@/components/profiles/kilo-command-form-sheet';
 import { KiloCommandRowView } from '@/components/profiles/kilo-command-row';
 import {
@@ -13,6 +13,7 @@ import {
   type KiloCommandSource,
 } from '@/components/profiles/profile-kilo-commands-model';
 import { ProfileManageSlot } from '@/components/profiles/profile-manage-slot';
+import { ProfileSectionEmptyState } from '@/components/profiles/profile-section-empty-state';
 import { selectProfileReadErrorView } from '@/components/profiles/profile-read-error-view';
 import { ProfileSectionHeader } from '@/components/profiles/profile-section-header';
 import { QueryError } from '@/components/query-error';
@@ -181,15 +182,14 @@ export function ProfileKiloCommandsScreen({
     content = <SlashCommandsSkeleton />;
   } else if (rows.length === 0) {
     content = (
-      <EmptyState
+      <ProfileSectionEmptyState
+        permission={permission}
+        organizationId={organizationId}
         icon={Terminal}
         title={t('profiles.slashCommands.empty')}
-        description={null}
         placement="top"
         action={
-          <ProfileManageSlot permission={permission} organizationId={organizationId}>
-            <StateAction label={t('profiles.slashCommands.add')} icon={Plus} onPress={startAdd} />
-          </ProfileManageSlot>
+          <StateAction label={t('profiles.slashCommands.add')} icon={Plus} onPress={startAdd} />
         }
       />
     );

@@ -186,6 +186,7 @@
     "legalDocumentEnglishOnly": "이 문서는 영어로만 제공됩니다.",
     "organizationTrialEndedBilling": "조직의 체험이 종료되었으며 활성 요금제가 없습니다. 결제 정보를 업데이트한 후 다시 시도할 수 있습니다.",
     "organizationTrialEndedBillingAtKiloAi": "조직의 체험이 종료되었으며 활성 요금제가 없습니다. kilo.ai에서 결제 정보를 업데이트한 후 다시 시도할 수 있습니다.",
+    "planRequiredTitle": "요금제가 필요합니다",
     "viewOnGitHub": "GitHub에서 PR 보기",
     "markdownA11y": {
       "list": {
@@ -4633,7 +4634,6 @@
       "entryLabel": "기본 프로필",
       "add": "기본값 추가",
       "empty": "구성된 기본값이 없습니다.",
-      "planEndedTitle": "요금제가 필요합니다",
       "emptyDescription": "저장소에 대한 세션을 시작할 때 프로필을 자동으로 적용하려면 기본값을 추가하세요.",
       "repo": "저장소 선택…",
       "profile": "프로필 선택",

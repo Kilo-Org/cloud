@@ -187,6 +187,7 @@
     "legalDocumentEnglishOnly": "Ce document est disponible uniquement en anglais.",
     "organizationTrialEndedBilling": "L'essai de l'organisation a pris fin et elle ne dispose d'aucun forfait actif. Vous pouvez mettre à jour la facturation, puis réessayer.",
     "organizationTrialEndedBillingAtKiloAi": "L'essai de l'organisation a pris fin et elle ne dispose d'aucun forfait actif. Vous pouvez mettre à jour la facturation sur kilo.ai, puis réessayer.",
+    "planRequiredTitle": "Forfait actif requis",
     "viewOnGitHub": "Voir la PR sur GitHub",
     "markdownA11y": {
       "list": {
@@ -4718,7 +4719,6 @@
       "entryLabel": "Profils par défaut",
       "add": "Ajouter un profil par défaut",
       "empty": "Aucun profil par défaut configuré",
-      "planEndedTitle": "Forfait actif requis",
       "emptyDescription": "Ajoutez un profil par défaut pour appliquer automatiquement un profil lors du démarrage des sessions pour un dépôt.",
       "repo": "Sélectionnez le dépôt…",
       "profile": "Sélectionnez un profil",

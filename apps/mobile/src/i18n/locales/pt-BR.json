@@ -188,6 +188,7 @@
     "legalDocumentEnglishOnly": "Este documento está disponível apenas em inglês.",
     "organizationTrialEndedBilling": "O período de teste da organização terminou e ela não tem nenhum plano ativo. Você pode atualizar o faturamento e tentar novamente.",
     "organizationTrialEndedBillingAtKiloAi": "O período de teste da organização terminou e ela não tem nenhum plano ativo. Você pode atualizar o faturamento em kilo.ai e tentar novamente.",
+    "planRequiredTitle": "Plano ativo necessário",
     "viewOnGitHub": "Ver PR no GitHub",
     "markdownA11y": {
       "list": {
@@ -4803,7 +4804,6 @@
       "entryLabel": "Perfis padrão",
       "add": "Adicionar padrão",
       "empty": "Nenhum padrão configurado",
-      "planEndedTitle": "Plano ativo necessário",
       "emptyDescription": "Adicione um padrão para aplicar automaticamente um perfil ao iniciar sessões de um repositório.",
       "repo": "Selecione o repositório…",
       "profile": "Selecione o perfil",

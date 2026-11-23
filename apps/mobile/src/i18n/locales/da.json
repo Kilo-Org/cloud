@@ -186,6 +186,7 @@
     "legalDocumentEnglishOnly": "Dette dokument er kun tilgængeligt på engelsk.",
     "organizationTrialEndedBilling": "Organisationens prøveperiode er udløbet, og den har ingen aktiv plan. Du kan opdatere betalingen og derefter prøve igen.",
     "organizationTrialEndedBillingAtKiloAi": "Organisationens prøveperiode er udløbet, og den har ingen aktiv plan. Du kan opdatere betalingen på kilo.ai og derefter prøve igen.",
+    "planRequiredTitle": "Aktiv plan påkrævet",
     "viewOnGitHub": "Vis PR på GitHub",
     "markdownA11y": {
       "list": {
@@ -4633,7 +4634,6 @@
       "entryLabel": "Standardprofiler",
       "add": "Tilføj standard",
       "empty": "Ingen standardindstillinger konfigureret",
-      "planEndedTitle": "Aktiv plan påkrævet",
       "emptyDescription": "Tilføj en standard for automatisk at anvende en profil, når du starter sessioner for en repo.",
       "repo": "Vælg lager…",
       "profile": "Vælg profil",

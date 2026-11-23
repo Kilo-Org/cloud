@@ -5,8 +5,9 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
-import { EmptyState, StateAction } from '@/components/empty-state';
+import { StateAction } from '@/components/empty-state';
 import { ProfileManageSlot } from '@/components/profiles/profile-manage-slot';
+import { ProfileSectionEmptyState } from '@/components/profiles/profile-section-empty-state';
 import { selectProfileReadErrorView } from '@/components/profiles/profile-read-error-view';
 import { ProfileSectionHeader } from '@/components/profiles/profile-section-header';
 import { skillRowSubtitle } from '@/components/profiles/skill-markdown';
@@ -287,16 +288,13 @@ export function ProfileSkillsScreen({
     content = <SkillsSkeleton />;
   } else if (skills.length === 0) {
     content = (
-      <EmptyState
+      <ProfileSectionEmptyState
+        permission={permission}
+        organizationId={organizationId}
         icon={Sparkles}
         title={t('profiles.skillsEmpty')}
-        description={null}
         placement="top"
-        action={
-          <ProfileManageSlot permission={permission} organizationId={organizationId}>
-            <StateAction label={t('profiles.addSkill')} icon={Plus} onPress={handleStartAdd} />
-          </ProfileManageSlot>
-        }
+        action={<StateAction label={t('profiles.addSkill')} icon={Plus} onPress={handleStartAdd} />}
       />
     );
   } else {

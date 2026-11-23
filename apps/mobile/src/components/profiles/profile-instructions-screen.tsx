@@ -5,12 +5,13 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
-import { EmptyState, StateAction } from '@/components/empty-state';
+import { StateAction } from '@/components/empty-state';
 import {
   InstructionFormSheet,
   type InstructionFormSubmission,
 } from '@/components/profiles/instruction-form-sheet';
 import { ProfileManageSlot } from '@/components/profiles/profile-manage-slot';
+import { ProfileSectionEmptyState } from '@/components/profiles/profile-section-empty-state';
 import { selectProfileReadErrorView } from '@/components/profiles/profile-read-error-view';
 import { ProfileSectionHeader } from '@/components/profiles/profile-section-header';
 import { QueryError } from '@/components/query-error';
@@ -277,7 +278,9 @@ export function ProfileInstructionsScreen({
     content = <InstructionsSkeleton />;
   } else if (instructions.length === 0) {
     content = (
-      <EmptyState
+      <ProfileSectionEmptyState
+        permission={permission}
+        organizationId={organizationId}
         icon={FileText}
         title={t('profiles.instructionsEmpty')}
         description={
@@ -287,13 +290,7 @@ export function ProfileInstructionsScreen({
         }
         placement="top"
         action={
-          <ProfileManageSlot permission={permission} organizationId={organizationId}>
-            <StateAction
-              label={t('profiles.addInstruction')}
-              icon={Plus}
-              onPress={handleStartAdd}
-            />
-          </ProfileManageSlot>
+          <StateAction label={t('profiles.addInstruction')} icon={Plus} onPress={handleStartAdd} />
         }
       />
     );

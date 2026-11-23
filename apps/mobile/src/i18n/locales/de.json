@@ -186,6 +186,7 @@
     "legalDocumentEnglishOnly": "Dieses Dokument ist nur auf Englisch verfügbar.",
     "organizationTrialEndedBilling": "Die Testphase der Organisation ist beendet und sie hat keinen aktiven Plan. Sie können die Abrechnung aktualisieren und es dann erneut versuchen.",
     "organizationTrialEndedBillingAtKiloAi": "Die Testphase der Organisation ist beendet und sie hat keinen aktiven Plan. Sie können die Abrechnung unter kilo.ai aktualisieren und es dann erneut versuchen.",
+    "planRequiredTitle": "Aktiver Plan erforderlich",
     "viewOnGitHub": "PR auf GitHub ansehen",
     "markdownA11y": {
       "list": {
@@ -4633,7 +4634,6 @@
       "entryLabel": "Standardprofile",
       "add": "Standard hinzufügen",
       "empty": "Keine Standardeinstellungen konfiguriert",
-      "planEndedTitle": "Aktiver Plan erforderlich",
       "emptyDescription": "Füge einen Standard hinzu, um beim Starten von Sitzungen für ein Repo automatisch ein Profil anzuwenden.",
       "repo": "Repository auswählen…",
       "profile": "Profil auswählen",

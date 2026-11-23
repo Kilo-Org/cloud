@@ -186,6 +186,7 @@
     "legalDocumentEnglishOnly": "Ity antontan-taratasy ity dia tsy misy afa-tsy amin'ny teny anglisy.",
     "organizationTrialEndedBilling": "Lasa ny fe-potoana fanandramana ho an'ny fikambanana ary tsy manana drafitra mavitrika izy. Afaka manavao ny faktiora ianao, ary hanandrana indray.",
     "organizationTrialEndedBillingAtKiloAi": "Lasa ny fe-potoana fanandramana ho an'ny fikambanana ary tsy manana drafitra mavitrika izy. Afaka manavao ny faktiora ao amin'ny kilo.ai ianao, ary hanandrana indray.",
+    "planRequiredTitle": "Ilaina ny drafitra mavitrika",
     "viewOnGitHub": "Jereo ao amin'ny GitHub ny PR",
     "markdownA11y": {
       "list": {
@@ -4633,7 +4634,6 @@
       "entryLabel": "Profil default",
       "add": "Ampio ny default",
       "empty": "Tsy misy default voarindra",
-      "planEndedTitle": "Ilaina ny drafitra mavitrika",
       "emptyDescription": "Manampia default hampihatra ho azy ny mombamomba rehefa manomboka fivoriana ho an'ny repo.",
       "repo": "Safidio ny tahiry…",
       "profile": "Fidio ny mombamomba",

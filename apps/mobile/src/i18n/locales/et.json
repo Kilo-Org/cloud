@@ -186,6 +186,7 @@
     "legalDocumentEnglishOnly": "See dokument on saadaval ainult inglise keeles.",
     "organizationTrialEndedBilling": "Organisatsiooni prooviperiood on lõppenud ja sellel pole aktiivset paketti. Saad arveldust uuendada ja seejärel uuesti proovida.",
     "organizationTrialEndedBillingAtKiloAi": "Organisatsiooni prooviperiood on lõppenud ja sellel pole aktiivset paketti. Saad arveldust kilo.ai keskkonnas uuendada ja seejärel uuesti proovida.",
+    "planRequiredTitle": "Aktiivne pakett on vajalik",
     "viewOnGitHub": "Vaata PR-i GitHubis",
     "markdownA11y": {
       "list": {
@@ -4633,7 +4634,6 @@
       "entryLabel": "Vaikeprofiilid",
       "add": "Lisa vaikeprofiil",
       "empty": "Ühtegi vaikeprofiili pole seadistatud",
-      "planEndedTitle": "Aktiivne pakett on vajalik",
       "emptyDescription": "Lisa vaikeprofiil, mida rakendatakse automaatselt repo seansside alustamisel.",
       "repo": "Vali hoidla…",
       "profile": "Vali profiil",

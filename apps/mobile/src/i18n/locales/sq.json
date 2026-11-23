@@ -187,6 +187,7 @@
     "legalDocumentEnglishOnly": "Ky dokument është në dispozicion vetëm në anglisht.",
     "organizationTrialEndedBilling": "Periudha e provës e organizatës ka përfunduar dhe nuk ka asnjë plan aktiv. Ju mund të përditësoni faturimin dhe më pas të provoni përsëri.",
     "organizationTrialEndedBillingAtKiloAi": "Periudha e provës e organizatës ka përfunduar dhe nuk ka asnjë plan aktiv. Ju mund të përditësoni faturimin në kilo.ai dhe më pas të provoni përsëri.",
+    "planRequiredTitle": "Kërkohet një plan aktiv",
     "markdownA11y": {
       "list": {
         "bulletPoint": "Pikë liste",
@@ -4633,7 +4634,6 @@
       "entryLabel": "Profilet e paravendosura",
       "add": "Shto parazgjedhje",
       "empty": "Asnjë parazgjedhje nuk është konfiguruar",
-      "planEndedTitle": "Kërkohet një plan aktiv",
       "emptyDescription": "Shto një parazgjedhje për të aplikuar automatikisht një profil kur nis seancat për një depo.",
       "repo": "Zgjidhni depo…",
       "profile": "Zgjidhni profilin",

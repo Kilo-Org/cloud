@@ -188,6 +188,7 @@
     "legalDocumentEnglishOnly": "Tento dokument je k dispozici pouze v angličtině.",
     "organizationTrialEndedBilling": "Zkušební období organizace skončilo a organizace nemá žádný aktivní plán. Fakturaci můžete aktualizovat a poté to zkuste znovu.",
     "organizationTrialEndedBillingAtKiloAi": "Zkušební období organizace skončilo a organizace nemá žádný aktivní plán. Fakturaci můžete aktualizovat na kilo.ai a poté to zkuste znovu.",
+    "planRequiredTitle": "Je vyžadován plán",
     "viewOnGitHub": "Zobrazit PR na GitHubu",
     "markdownA11y": {
       "list": {
@@ -4803,7 +4804,6 @@
       "entryLabel": "Výchozí profily",
       "add": "Přidat výchozí",
       "empty": "Nejsou nakonfigurována žádná výchozí nastavení",
-      "planEndedTitle": "Je vyžadován plán",
       "emptyDescription": "Přidejte výchozí nastavení pro automatické použití profilu při zahájení relací pro repo.",
       "repo": "Vyberte úložiště…",
       "profile": "Vyberte profil",

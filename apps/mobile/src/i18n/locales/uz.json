@@ -187,6 +187,7 @@
     "legalDocumentEnglishOnly": "Ushbu hujjat faqat ingliz tilida mavjud.",
     "organizationTrialEndedBilling": "Tashkilotning sinov muddati tugadi va unda faol reja mavjud emas. Siz hisob-kitobni yangilab, so'ng qayta urinib ko'rishingiz mumkin.",
     "organizationTrialEndedBillingAtKiloAi": "Tashkilotning sinov muddati tugadi va unda faol reja mavjud emas. Siz kilo.ai saytida hisob-kitobni yangilab, so'ng qayta urinib ko'rishingiz mumkin.",
+    "planRequiredTitle": "Reja talab qilinadi",
     "markdownA11y": {
       "list": {
         "bulletPoint": "Ro‘yxat belgisi",
@@ -4633,7 +4634,6 @@
       "entryLabel": "Standart profillar",
       "add": "Standart qo‘shish",
       "empty": "Hech qanday standart sozlanmagan",
-      "planEndedTitle": "Reja talab qilinadi",
       "emptyDescription": "Repo uchun seanslarni boshlashda profilni avtomatik ravishda qo'llash uchun standartni qo'shing.",
       "repo": "Repozitoriyni tanlang…",
       "profile": "Profilni tanlang",

@@ -187,6 +187,7 @@
     "legalDocumentEnglishOnly": "Šis dokuments ir pieejams tikai angļu valodā.",
     "organizationTrialEndedBilling": "Organizācijas izmēģinājuma periods ir beidzies, un tai nav aktīva plāna. Jūs varat atjaunināt norēķinu informāciju un pēc tam mēģināt vēlreiz.",
     "organizationTrialEndedBillingAtKiloAi": "Organizācijas izmēģinājuma periods ir beidzies, un tai nav aktīva plāna. Jūs varat atjaunināt norēķinu informāciju vietnē kilo.ai un pēc tam mēģināt vēlreiz.",
+    "planRequiredTitle": "Nepieciešams plāns",
     "viewOnGitHub": "Skatīt PR GitHub",
     "markdownA11y": {
       "list": {
@@ -4718,7 +4719,6 @@
       "entryLabel": "Noklusējuma profili",
       "add": "Pievienot noklusējumu",
       "empty": "Nav konfigurēti noklusējuma iestatījumi",
-      "planEndedTitle": "Nepieciešams plāns",
       "emptyDescription": "Pievienojiet noklusējuma iestatījumu, lai automātiski lietotu profilu, sākot repo sesijas.",
       "repo": "Atlasīt repozitoriju…",
       "profile": "Izvēlieties profilu",

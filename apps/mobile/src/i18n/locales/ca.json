@@ -187,6 +187,7 @@
     "legalDocumentEnglishOnly": "Aquest document només està disponible en anglès.",
     "organizationTrialEndedBilling": "El període de prova de l'organització ha finalitzat i no té cap pla actiu. Pots actualitzar la facturació i tornar-ho a provar.",
     "organizationTrialEndedBillingAtKiloAi": "El període de prova de l'organització ha finalitzat i no té cap pla actiu. Pots actualitzar la facturació a kilo.ai i tornar-ho a provar.",
+    "planRequiredTitle": "Cal un pla",
     "viewOnGitHub": "Mostra la PR a GitHub",
     "markdownA11y": {
       "list": {
@@ -4718,7 +4719,6 @@
       "entryLabel": "Perfils predeterminats",
       "add": "Afegeix per defecte",
       "empty": "No s'ha configurat cap valor predeterminat",
-      "planEndedTitle": "Cal un pla",
       "emptyDescription": "Afegiu un valor predeterminat per aplicar automàticament un perfil quan inicieu sessions per a un repo.",
       "repo": "Seleccioneu el repositori…",
       "profile": "Seleccioneu el perfil",

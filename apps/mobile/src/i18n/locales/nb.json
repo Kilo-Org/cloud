@@ -186,6 +186,7 @@
     "legalDocumentEnglishOnly": "Dette dokumentet er kun tilgjengelig på engelsk.",
     "organizationTrialEndedBilling": "Organisasjonens prøveperiode er over, og den har ingen aktiv plan. Du kan oppdatere faktureringen og deretter prøve igjen.",
     "organizationTrialEndedBillingAtKiloAi": "Organisasjonens prøveperiode er over, og den har ingen aktiv plan. Du kan oppdatere faktureringen på kilo.ai og deretter prøve igjen.",
+    "planRequiredTitle": "Aktiv plan påkrevd",
     "viewOnGitHub": "Vis PR på GitHub",
     "markdownA11y": {
       "list": {
@@ -4633,7 +4634,6 @@
       "entryLabel": "Standardprofiler",
       "add": "Legg til standard",
       "empty": "Ingen standardinnstillinger er konfigurert",
-      "planEndedTitle": "Aktiv plan påkrevd",
       "emptyDescription": "Legg til en standard for automatisk å bruke en profil når du starter økter for en repo.",
       "repo": "Velg depot…",
       "profile": "Velg profil",

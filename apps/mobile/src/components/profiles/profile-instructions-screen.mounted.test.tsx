@@ -37,16 +37,20 @@ const h = vi.hoisted(() => ({
 
 /** The manage permission the mocked profile hook reports; read-only drops every control. */
 const permission = vi.hoisted(() => ({
-  value: 'allowed' as 'allowed' | 'read-only' | 'resolving',
+  value: 'allowed' as 'allowed' | 'read-only' | 'resolving' | 'plan-ended',
 }));
 
 vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
   useOrganizationProfilePermission: () => permission.value,
 }));
-// The plan refusal reads the reader's membership list, a module chain the
-// mounted project cannot load (see `vitest.setup.ts`). The billing step is not
-// under test here, so the slot's hook answers with none.
-vi.mock('@/lib/trial-refusal', () => ({ useBillingAction: () => undefined }));
+// The billing step reads the reader's membership list, a module chain the
+// mounted project cannot load (see `vitest.setup.ts`), so the hook answers with
+// a known step: the plan state's action is that step.
+const BILLING_ACTION = vi.hoisted(() => ({
+  label: 'Manage billing',
+  onPress: vi.fn<() => void>(),
+}));
+vi.mock('@/lib/trial-refusal', () => ({ useBillingAction: () => BILLING_ACTION }));
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfileInstructions: () => h.query,
   useAgentProfileOverview: () => ({ data: { name: 'Team profile' }, isPending: false }),
@@ -82,6 +86,8 @@ vi.mock('@/components/ui/dialog', () => ({
   useConfirmDialog: () => ({ confirm: h.confirm, dialog: null }),
 }));
 vi.mock('@/components/ui/icons', () => ({
+  AlertCircle: 'AlertCircle',
+  CreditCard: 'CreditCard',
   FileText: 'FileText',
   Pencil: 'Pencil',
   Plus: 'Plus',
@@ -456,6 +462,57 @@ describe('ProfileInstructionsScreen empty state', () => {
     expect(texts).toContain(i18n.t('profiles.organizationRoleRequired'));
     expect(findAll(member.renderer.root, 'StateAction')).toHaveLength(0);
     member.unmount();
+  });
+});
+
+describe('ProfileInstructionsScreen plan state', () => {
+  it('with rows: states the plan above the list and withholds every write control', async () => {
+    permission.value = 'plan-ended';
+
+    const { renderer, unmount } = await mountScreen();
+
+    // The plan, not the role, stops this manager, so the section keeps its list
+    // and replaces every control it would have offered with the one step that
+    // ends the state.
+    const texts = findAll(renderer.root, 'Text').map(node => node.props.children);
+    expect(texts).toContain(i18n.t('common.planRequiredTitle'));
+    expect(texts).toContain(i18n.t('common.organizationTrialEndedBilling'));
+    expect(rowControls(renderer.root)).not.toContain(
+      i18n.t('profiles.instructionEdit', { name: INSTRUCTION_NAME })
+    );
+    expect(findAll(renderer.root, 'Button')).toHaveLength(0);
+    expect(findAll(renderer.root, 'StateAction')).toHaveLength(1);
+
+    unmount();
+  });
+
+  it('with no rows: titles the state with the plan and offers the billing step', async () => {
+    permission.value = 'plan-ended';
+    Object.assign(h.query, { data: [], isError: false, isPending: false, isRefetching: false });
+
+    const { renderer, unmount } = await mountScreen();
+
+    const empty = findAll(renderer.root, 'EmptyState')[0];
+    expect(empty?.props.title).toBe(i18n.t('common.planRequiredTitle'));
+    expect(empty?.props.title).not.toBe(i18n.t('profiles.instructionsEmpty'));
+    expect(empty?.props.description).toBe(i18n.t('common.organizationTrialEndedBilling'));
+    // A file glyph would name what the section lists; the blocked state takes
+    // the billing mark, because the plan is what is missing.
+    expect(empty?.props.icon).toBe('CreditCard');
+    const [action] = findAll(renderer.root, 'StateAction');
+    expect(action?.props.label).toBe(BILLING_ACTION.label);
+    const press = action?.props.onPress as (() => void) | undefined;
+    if (typeof press !== 'function') {
+      throw new TypeError('the plan state rendered no action handler');
+    }
+    act(() => {
+      press();
+    });
+    // The action is the billing step itself, so its press is what opens the
+    // organization's billing screen.
+    expect(BILLING_ACTION.onPress).toHaveBeenCalledTimes(1);
+
+    unmount();
   });
 });
 

@@ -189,6 +189,7 @@
     "legalDocumentEnglishOnly": "Ta dokument je na voljo samo v angleščini.",
     "organizationTrialEndedBilling": "Preizkusna doba organizacije se je končala in nima aktivnega načrta. Obračun lahko posodobiš, nato poskusi znova.",
     "organizationTrialEndedBillingAtKiloAi": "Preizkusna doba organizacije se je končala in nima aktivnega načrta. Obračun lahko posodobiš na kilo.ai, nato poskusi znova.",
+    "planRequiredTitle": "Potreben je aktiven načrt",
     "markdownA11y": {
       "list": {
         "bulletPoint": "Alineja",
@@ -4803,7 +4804,6 @@
       "entryLabel": "Privzeti profili",
       "add": "Dodaj privzeto",
       "empty": "Privzete nastavitve niso konfigurirane",
-      "planEndedTitle": "Potreben je aktiven načrt",
       "emptyDescription": "Dodajte privzeto za samodejno uporabo profila ob zagonu sej za repo.",
       "repo": "Izberite repozitorij …",
       "profile": "Izberite profil",

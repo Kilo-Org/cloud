@@ -188,6 +188,7 @@
     "legalDocumentEnglishOnly": "Ten dokument jest dostępny wyłącznie w języku angielskim.",
     "organizationTrialEndedBilling": "Okres próbny organizacji zakończył się i nie ma ona aktywnego planu. Możesz zaktualizować rozliczenia, a następnie spróbować ponownie.",
     "organizationTrialEndedBillingAtKiloAi": "Okres próbny organizacji zakończył się i nie ma ona aktywnego planu. Możesz zaktualizować rozliczenia na kilo.ai, a następnie spróbować ponownie.",
+    "planRequiredTitle": "Wymagany aktywny plan",
     "viewOnGitHub": "Zobacz PR w serwisie GitHub",
     "markdownA11y": {
       "list": {
@@ -4803,7 +4804,6 @@
       "entryLabel": "Profile domyślne",
       "add": "Dodaj domyślne",
       "empty": "Nie skonfigurowano żadnych ustawień domyślnych",
-      "planEndedTitle": "Wymagany aktywny plan",
       "emptyDescription": "Dodaj ustawienie domyślne, aby automatycznie stosować profil podczas rozpoczynania sesji dla repozytorium.",
       "repo": "Wybierz repozytorium…",
       "profile": "Wybierz profil",

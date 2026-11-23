@@ -186,6 +186,7 @@
     "legalDocumentEnglishOnly": "Ez a dokumentum csak angol nyelven érhető el.",
     "organizationTrialEndedBilling": "A szervezet próbaidőszaka lejárt, és nincs aktív csomagja. Frissítheti a számlázást, majd próbálja újra.",
     "organizationTrialEndedBillingAtKiloAi": "A szervezet próbaidőszaka lejárt, és nincs aktív csomagja. Frissítheti a számlázást a kilo.ai oldalon, majd próbálja újra.",
+    "planRequiredTitle": "Aktív csomag szükséges",
     "viewOnGitHub": "PR megtekintése a GitHubon",
     "markdownA11y": {
       "list": {
@@ -4633,7 +4634,6 @@
       "entryLabel": "Alapértelmezett profilok",
       "add": "Alapértelmezés hozzáadása",
       "empty": "Nincsenek beállított alapértelmezett profilok",
-      "planEndedTitle": "Aktív csomag szükséges",
       "emptyDescription": "Adjon hozzá egy alapértelmezett profilt, amely automatikusan alkalmazza a profilt az adattár munkameneteinek indításakor.",
       "repo": "Adattár kiválasztása…",
       "profile": "Profil kiválasztása",

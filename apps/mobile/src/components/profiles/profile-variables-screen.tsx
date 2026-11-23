@@ -4,8 +4,9 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
-import { EmptyState, StateAction } from '@/components/empty-state';
+import { StateAction } from '@/components/empty-state';
 import { ProfileManageSlot } from '@/components/profiles/profile-manage-slot';
+import { ProfileSectionEmptyState } from '@/components/profiles/profile-section-empty-state';
 import { selectProfileReadErrorView } from '@/components/profiles/profile-read-error-view';
 import { ProfileSectionHeader } from '@/components/profiles/profile-section-header';
 import {
@@ -223,16 +224,13 @@ export function ProfileVariablesScreen({
     content = <VariablesSkeleton />;
   } else if (rows.length === 0 && !isAdding) {
     content = (
-      <EmptyState
+      <ProfileSectionEmptyState
+        permission={permission}
+        organizationId={organizationId}
         icon={KeyRound}
         title={t('profiles.variablesEmpty')}
-        description={null}
         placement="top"
-        action={
-          <ProfileManageSlot permission={permission} organizationId={organizationId}>
-            <StateAction label={t('profiles.addVariable')} icon={Plus} onPress={startAdd} />
-          </ProfileManageSlot>
-        }
+        action={<StateAction label={t('profiles.addVariable')} icon={Plus} onPress={startAdd} />}
       />
     );
   } else {

@@ -187,6 +187,7 @@
     "legalDocumentEnglishOnly": "Leli dokhumenti litholakala ngesiNgisi kuphela.",
     "organizationTrialEndedBilling": "Isilingo senhlangano siphelile futhi ayinayo uhlelo olusebenzayo. Ungabuyekeza ukukhokhela, bese uzama futhi.",
     "organizationTrialEndedBillingAtKiloAi": "Isilingo senhlangano siphelile futhi ayinayo uhlelo olusebenzayo. Ungabuyekeza ukukhokhela ku-kilo.ai, bese uzama futhi.",
+    "planRequiredTitle": "Uhlelo olusebenzayo luyadingeka",
     "markdownA11y": {
       "list": {
         "bulletPoint": "Iphuzu lohlu",
@@ -4633,7 +4634,6 @@
       "entryLabel": "Amaphrofayili azenzakalelayo",
       "add": "Engeza okuzenzakalelayo",
       "empty": "Akukho okumisiwe okumisiwe",
-      "planEndedTitle": "Uhlelo olusebenzayo luyadingeka",
       "emptyDescription": "Engeza okuzenzakalelayo ukuze usebenzise ngokuzenzakalelayo iphrofayela lapho uqala izikhathi ze-repo.",
       "repo": "Khetha inqolobane…",
       "profile": "Khetha iphrofayela",

@@ -186,6 +186,7 @@
     "legalDocumentEnglishOnly": "Þetta skjal er aðeins tiltækt á ensku.",
     "organizationTrialEndedBilling": "Próftímabili fyrirtækisins er lokið og það er ekki með virka áætlun. Þú getur uppfært greiðsluupplýsingar og reynir síðan aftur.",
     "organizationTrialEndedBillingAtKiloAi": "Próftímabili fyrirtækisins er lokið og það er ekki með virka áætlun. Þú getur uppfært greiðsluupplýsingar á kilo.ai og reynir síðan aftur.",
+    "planRequiredTitle": "Áætlun nauðsynleg",
     "viewOnGitHub": "Skoða PR á GitHub",
     "markdownA11y": {
       "list": {
@@ -4633,7 +4634,6 @@
       "entryLabel": "Sjálfgefin snið",
       "add": "Bæta við sjálfgefnu",
       "empty": "Engar sjálfgefnar stillingar",
-      "planEndedTitle": "Áætlun nauðsynleg",
       "emptyDescription": "Bættu við sjálfgefnu til að nota prófíl sjálfkrafa þegar þú byrjar lotur fyrir geymslu.",
       "repo": "Veldu geymslu…",
       "profile": "Veldu prófíl",

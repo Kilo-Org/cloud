@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, TestRenderer } from '@/test/renderer';
 
 import { OrganizationPlanRefusal } from './plan-refusal';
+import { OrganizationPlanNotice } from './plan-notice';
 
 vi.mock('react-native', () => ({
   I18nManager: { isRTL: false },
@@ -12,7 +13,10 @@ vi.mock('react-native', () => ({
   View: 'View',
 }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
-vi.mock('@/components/ui/icons', () => ({ AlertCircle: 'AlertCircle' }));
+// The state action is asserted through its props, so a host element of the same
+// name stands in for it.
+vi.mock('@/components/empty-state', () => ({ StateAction: 'StateAction' }));
+vi.mock('@/components/ui/icons', () => ({ AlertCircle: 'AlertCircle', CreditCard: 'CreditCard' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ destructive: '#ff0000' }),
@@ -32,6 +36,29 @@ function renderBlock(props: { action?: { label: string; onPress: () => void } })
   });
   if (!renderer) {
     throw new Error('Missing refusal renderer');
+  }
+  return renderer.root;
+}
+
+function renderNotice(props: {
+  title?: string;
+  message?: string;
+  action?: { label: string; onPress: () => void };
+}) {
+  act(() => {
+    const element = createElement(OrganizationPlanNotice, {
+      title: 'Plan required',
+      message: 'Trial ended.',
+      ...props,
+    });
+    if (renderer) {
+      renderer.update(element);
+    } else {
+      renderer = TestRenderer.create(element);
+    }
+  });
+  if (!renderer) {
+    throw new Error('Missing notice renderer');
   }
   return renderer.root;
 }
@@ -79,6 +106,48 @@ describe('OrganizationPlanRefusal', () => {
 
     act(() => {
       (control.props.onPress as () => void)();
+    });
+    expect(onPress).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('OrganizationPlanNotice', () => {
+  it('titles the state above the explanation, in the warning ink on the title only', () => {
+    const root = renderNotice({});
+
+    const texts = root.findAllByType('Text');
+    const title = texts.find(node => node.props.children === 'Plan required');
+    const message = texts.find(node => node.props.children === 'Trial ended.');
+    if (!title || !message) {
+      throw new Error('the notice did not paint its title and message');
+    }
+    expect(title).not.toBe(message);
+    expect(title.props.className).toContain('text-destructive');
+    // Red belongs to the mark and the title; the explanation keeps the muted
+    // body ink, which is what stays readable on this tint in both schemes.
+    expect(message.props.className).not.toContain('text-destructive');
+    expect(message.props.className).toContain('text-ink2');
+    expect(root.findAllByType('AccessibleStatus')).toHaveLength(0);
+  });
+
+  it('offers the billing step as the state action, and nothing without one', () => {
+    const withoutAction = renderNotice({});
+    expect(withoutAction.findAllByType('StateAction')).toHaveLength(0);
+
+    const onPress = vi.fn<() => void>();
+    const root = renderNotice({ action: { label: 'Manage billing', onPress } });
+
+    const [action] = root.findAllByType('StateAction');
+    if (!action) {
+      throw new Error('the notice rendered no state action');
+    }
+    expect(action.props.label).toBe('Manage billing');
+    expect(action.props.icon).toBe('CreditCard');
+    // The state's only control: the quiet face would understate the one way out.
+    expect(action.props.emphasis).toBe('primary');
+
+    act(() => {
+      (action.props.onPress as () => void)();
     });
     expect(onPress).toHaveBeenCalledTimes(1);
   });

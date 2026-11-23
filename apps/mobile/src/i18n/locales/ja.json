@@ -186,6 +186,7 @@
     "legalDocumentEnglishOnly": "この文書は英語でのみご利用いただけます。",
     "organizationTrialEndedBilling": "組織のトライアルは終了し、有効なプランがありません。請求情報を更新してから、もう一度お試しください。",
     "organizationTrialEndedBillingAtKiloAi": "組織のトライアルは終了し、有効なプランがありません。kilo.ai で請求情報を更新してから、もう一度お試しください。",
+    "planRequiredTitle": "有効なプランが必要です",
     "viewOnGitHub": "GitHubでPRを表示",
     "markdownA11y": {
       "list": {
@@ -4633,7 +4634,6 @@
       "entryLabel": "デフォルトのプロフィール",
       "add": "デフォルトを追加",
       "empty": "デフォルトは設定されていません",
-      "planEndedTitle": "有効なプランが必要です",
       "emptyDescription": "リポジトリのセッションを開始するときにプロフィールを自動的に適用するデフォルトを追加します。",
       "repo": "リポジトリを選択してください…",
       "profile": "プロフィールの選択",

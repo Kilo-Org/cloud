@@ -5,7 +5,7 @@ import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { ProfileManageSlot } from '@/components/profiles/profile-manage-slot';
-import { RepoBindingsEmptyState } from '@/components/profiles/repo-bindings-empty-state';
+import { ProfileSectionEmptyState } from '@/components/profiles/profile-section-empty-state';
 import { type ProfileOwnerChoice } from '@/components/profiles/profile-owner-model';
 import { selectProfileReadErrorView } from '@/components/profiles/profile-read-error-view';
 import { RepoBindingsAddForm } from '@/components/profiles/repo-bindings-add-form';
@@ -25,7 +25,7 @@ import { RepoPickerSheet } from '@/components/profiles/repo-picker-sheet';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
-import { Plus } from '@/components/ui/icons';
+import { GitBranch, Plus } from '@/components/ui/icons';
 import { IconButton } from '@/components/ui/icon-button';
 import { RowGroup } from '@/components/ui/row-group';
 import { useAgentProfileList } from '@/lib/hooks/use-agent-profiles';
@@ -41,7 +41,6 @@ import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { getNewProfilePath, type ProfileManagementStack } from '@/lib/profile-agent-navigation';
 import { connectedServicesHref } from '@/lib/profile-navigation';
 import { type ProfileExternalOpener } from '@/lib/profile-route-stack';
-import { billingHrefFor } from '@/lib/trial-refusal';
 
 /** The mutation hook toasts `error.message`; the screen supplies a fallback otherwise. */
 function hasUsableMessage(error: unknown): boolean {
@@ -200,12 +199,14 @@ export function RepoBindingsScreen({
   // the Add action, and a member's state says why it has none instead of a
   // second sentence under the copy.
   const emptySurface = isEmpty && !isAdding;
-  // A viewer who cannot add is told the rule instead of an action the screen
-  // withholds. The plan ends writes for a manager too, and this empty state is
-  // the whole surface then: the slot that states the plan sits inside the list
-  // branch, so the state carries the refusal here. That reader holds a role that
-  // can change the plan, so the state pairs the `'offered'` sentence with the
-  // billing step under it.
+  // The shared state names a member's rule, the manager's list description, and
+  // an unresolved role (or a personal scope) nothing.
+  let emptyDescription: string | undefined = undefined;
+  if (profilePermission === 'read-only') {
+    emptyDescription = t('profiles.organizationRoleRequired');
+  } else if (profilePermission === 'allowed') {
+    emptyDescription = t('profiles.repoBindings.emptyDescription');
+  }
 
   return (
     <View className="flex-1 bg-background">
@@ -226,11 +227,12 @@ export function RepoBindingsScreen({
         }
       />
       {emptySurface ? (
-        <RepoBindingsEmptyState
+        <ProfileSectionEmptyState
           permission={profilePermission}
-          onBilling={() => {
-            router.push(billingHrefFor(organizationId));
-          }}
+          organizationId={organizationId}
+          icon={GitBranch}
+          title={t('profiles.repoBindings.empty')}
+          description={emptyDescription}
         />
       ) : (
         <TabScreenScrollView

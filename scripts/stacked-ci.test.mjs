@@ -486,8 +486,8 @@ test('the catalog job owns exactly the paths no mobile family selects', () => {
   const install = steps.find(step => step.name === 'Install dependencies');
   assert.equal(
     install?.run,
-    'pnpm --filter kilocode-monorepo install --frozen-lockfile --ignore-scripts',
-    'the catalog job installs only the root project the audit reads'
+    'pnpm --filter kilocode-monorepo --filter kilo-app install --frozen-lockfile --ignore-scripts',
+    'the catalog job installs the app too, because the audit reads the plural data the app bundle ships'
   );
   assert.deepEqual(
     steps.map(step => step.name).filter(Boolean),

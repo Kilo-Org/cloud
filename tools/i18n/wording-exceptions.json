@@ -1115,6 +1115,7 @@
     "commit",
     "deleted",
     "dismissed",
+    "edit",
     "open",
     "open pull request",
     "pr opened",

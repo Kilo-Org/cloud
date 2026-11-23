@@ -509,6 +509,10 @@ describe('GroupForm create at the group cap', () => {
     changeName(renderer.root, 'Workshop');
 
     expect(textWithTestID(renderer.root, 'org-group-limit')).toBe(limitCopy);
+    expect(fieldOf(renderer.root, i18n.t('organization.groups.nameLabel'))?.disabled).toBe(true);
+    expect(fieldOf(renderer.root, i18n.t('organization.groups.descriptionLabel'))?.disabled).toBe(
+      true
+    );
     expect(saveControl(renderer.root).disabled).toBe(true);
 
     unmountOnce();
@@ -521,6 +525,10 @@ describe('GroupForm create at the group cap', () => {
     changeName(renderer.root, 'Workshop');
 
     expect(textWithTestID(renderer.root, 'org-group-limit')).toBeUndefined();
+    expect(fieldOf(renderer.root, i18n.t('organization.groups.nameLabel'))?.disabled).toBeFalsy();
+    expect(
+      fieldOf(renderer.root, i18n.t('organization.groups.descriptionLabel'))?.disabled
+    ).toBeFalsy();
     expect(saveControl(renderer.root).disabled).toBe(false);
 
     unmountOnce();

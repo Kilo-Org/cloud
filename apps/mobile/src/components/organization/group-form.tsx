@@ -405,6 +405,14 @@ function GroupFormBody({ organizationId, canManageBilling, group, draft }: Group
         automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}
       >
+        {/* The intro line under the header: the cap notice, when the manager has
+            already reached it. The fields and Save below are disabled with it,
+            so a create form reads as blocked from the start. */}
+        {atGroupLimit ? (
+          <Text variant="muted" testID="org-group-limit">
+            {t('organization.groups.limitReached', { max: MAX_ORGANIZATION_GROUPS })}
+          </Text>
+        ) : null}
         {/* Keyed by the applied draft: a remount re-reads every `defaultValue`
             from the refs and re-arms the search, which a live uncontrolled
             input would ignore. */}
@@ -415,7 +423,7 @@ function GroupFormBody({ organizationId, canManageBilling, group, draft }: Group
             containerOnLayout={fieldLayout('name')}
             defaultValue={nameRef.current}
             maxLength={ORG_GROUP_NAME_MAX_LENGTH}
-            disabled={busy}
+            disabled={busy || atGroupLimit}
             error={
               nameError === null
                 ? undefined
@@ -440,7 +448,7 @@ function GroupFormBody({ organizationId, canManageBilling, group, draft }: Group
             textAlignVertical="top"
             maxLength={ORG_GROUP_DESCRIPTION_MAX_LENGTH}
             className="min-h-20 leading-[1.25rem]"
-            disabled={busy}
+            disabled={busy || atGroupLimit}
             onChangeText={value => {
               descriptionRef.current = value;
               editValues();
@@ -488,11 +496,6 @@ function GroupFormBody({ organizationId, canManageBilling, group, draft }: Group
           )}
         </Fragment>
 
-        {atGroupLimit ? (
-          <Text variant="muted" testID="org-group-limit">
-            {t('organization.groups.limitReached', { max: MAX_ORGANIZATION_GROUPS })}
-          </Text>
-        ) : null}
         <OrgFormActions
           saving={saving}
           removing={removing}

@@ -1,6 +1,7 @@
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import { readEnvironmentReference, type EnvironmentReference } from '@kilocode/cloud-agent-profile';
+import { ENVIRONMENT_BUILD_LOG_LINES } from '@kilocode/cloud-agent-sdk/limits';
 import { validateBalanceOnly } from '../../balance-validation.js';
 import { getPgDb } from '../../db/pg.js';
 import { environmentActorAccess } from '../../environment-build/access.js';
@@ -120,7 +121,7 @@ export const getEnvironmentBuildLogs = protectedProcedure
     environmentScopeSchema.extend({
       buildId: z.string().uuid(),
       cursor: z.number().int().nonnegative().optional(),
-      limit: z.number().int().min(1).max(1000).default(500),
+      limit: z.number().int().min(1).max(1000).default(ENVIRONMENT_BUILD_LOG_LINES),
     })
   )
   .output(environmentBuildLogsSchema)

@@ -42,6 +42,7 @@ import {
   environmentRepositoryListSchema,
   toEnvironmentRepositoryEntry,
 } from '@/lib/cloud-agent/environment-repository-input';
+import { ENVIRONMENT_BUILD_LOG_LINES } from '@kilocode/cloud-agent-sdk/limits';
 import { getOwner, requireActiveOrganization } from '@/lib/cloud-agent/environment-owner';
 import { environmentBuildClientFor } from '@/lib/cloud-agent-next/environment-build-client';
 import {
@@ -524,7 +525,7 @@ export const cloudEnvironmentsRouter = createTRPCRouter({
         environmentId: input.environmentId,
         buildId: input.buildId,
         cursor: input.cursor,
-        limit: 500,
+        limit: ENVIRONMENT_BUILD_LOG_LINES,
         ...(input.organizationId ? { kilocodeOrganizationId: input.organizationId } : {}),
       });
     }),

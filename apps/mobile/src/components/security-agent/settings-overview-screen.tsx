@@ -170,8 +170,12 @@ export function SettingsOverviewScreen({
     language: i18n.language,
     grantsSettledEmpty: repositoriesSettledEmpty,
   });
-  const { automation: automationEnabledCount, notifications: notificationsEnabledCount } =
-    settingsEnabledCounts(data);
+  const {
+    automation: automationEnabledCount,
+    automationTotal,
+    notifications: notificationsEnabledCount,
+    notificationsTotal,
+  } = settingsEnabledCounts(data);
   const analysisModeLabel = Object.hasOwn(ANALYSIS_MODE_KEYS, data.analysisMode)
     ? t(ANALYSIS_MODE_KEYS[data.analysisMode])
     : data.analysisMode;
@@ -329,6 +333,7 @@ export function SettingsOverviewScreen({
                   : t('securityAgent.settingsOverview.automationCount', {
                       count: automationEnabledCount,
                       displayCount: formatNumber(automationEnabledCount, i18n.language),
+                      total: formatNumber(automationTotal, i18n.language),
                     })
               }
               onPress={() => {
@@ -344,6 +349,7 @@ export function SettingsOverviewScreen({
                   : t('securityAgent.settingsOverview.notificationsCount', {
                       count: notificationsEnabledCount,
                       displayCount: formatNumber(notificationsEnabledCount, i18n.language),
+                      total: formatNumber(notificationsTotal, i18n.language),
                     })
               }
               onPress={() => {

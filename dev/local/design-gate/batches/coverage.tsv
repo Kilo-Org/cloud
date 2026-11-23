@@ -353,6 +353,8 @@ file	screen	source	platform	loading	empty	happy	retryable-error	non-retryable-er
 (auth)/language-picker.tsx	(auth)/language-picker	route	ios	n/a	n/a	none	n/a	n/a	n/a	n/a	none
 (auth)/legal/[document].tsx	(auth)/legal/[document]	route	android	none	n/a	T2-auth01b kiloapp:///(auth)/legal/privacy	none	note: none (legal-document-screen.tsx:100)	n/a	none	B:T2-auth01b
 (auth)/legal/[document].tsx	(auth)/legal/[document]	route	ios	none	n/a	T2-auth01b kiloapp:///(auth)/legal/privacy	none	note: none (legal-document-screen.tsx:100)	n/a	none	B:T2-auth01b
+(auth)/limit-copy-fixture.tsx	(auth)/limit-copy-fixture	dev-fixture	android	none	none	none	none	none	none	none	none
+(auth)/limit-copy-fixture.tsx	(auth)/limit-copy-fixture	dev-fixture	ios	none	none	none	none	none	none	none	none
 (auth)/login-fixture.tsx	(auth)/login-fixture	dev-fixture	android	none	none	none	none	none	none	none	none
 (auth)/login-fixture.tsx	(auth)/login-fixture	dev-fixture	ios	none	none	none	none	none	none	none	none
 (auth)/login.tsx	(auth)/login	route	android	none	n/a	T2-auth01b kiloapp:///(auth)/login	none	none	n/a	none	n/a

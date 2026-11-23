@@ -22,6 +22,13 @@ export const PREPARATION_OUTPUT_MAX_LENGTH = 65_536;
 export const PREPARATION_OUTPUT_TAIL_MAX_BYTES = 65_536;
 
 /**
+ * Most recent retained build-log lines one read returns. The coordinator
+ * serves this page by default and bounds any request at 1,000, so every client
+ * asks for the same page without naming the number itself.
+ */
+export const ENVIRONMENT_BUILD_LOG_LINES = 500;
+
+/**
  * Retained live-transport work a native session keeps while it awaits parsing and replay, in
  * UTF-16 bytes. Model discovery shares the same ceiling so one catalog read cannot exceed the
  * work one live session would retain.

@@ -187,6 +187,10 @@ const TWO_SENSE_COPY = new Map([
     '{{values}}',
     'two format-only sentences a key builds from its parts: the list of advanced-policy changes an audit row scanned, versus the joined pair of counted clauses a review-agent secret rotation reports',
   ],
+  [
+    '{{displaycount}} of {{total}} enabled',
+    "the enabled automation switches, versus the enabled notification opt-ins; a language whose noun for each carries a different gender or number agrees the surrounding words with its own row's noun",
+  ],
 ]);
 
 /**

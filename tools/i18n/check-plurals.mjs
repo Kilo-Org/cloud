@@ -110,11 +110,11 @@ export const NO_AGREEMENT = new Map([
   ],
   [
     'securityAgent.settingsOverview.automationCount',
-    'fixed total: "{{displayCount}} of 3 enabled" reads the same at every count',
+    'fixed total: "{{displayCount}} of {{total}} enabled" reads the same at every count',
   ],
   [
     'securityAgent.settingsOverview.notificationsCount',
-    'fixed total: "{{displayCount}} of 2 enabled" reads the same at every count',
+    'fixed total: "{{displayCount}} of {{total}} enabled" reads the same at every count',
   ],
   [
     'modelChat.mcp.available',

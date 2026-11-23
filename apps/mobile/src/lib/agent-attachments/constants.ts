@@ -2,6 +2,9 @@ export const AGENT_ATTACHMENT_MAX_FILES = 5;
 /** The decimal 20 MB the refusal copy states; stricter than the server's 20 MiB check. */
 export const AGENT_ATTACHMENT_MAX_BYTES = 20_000_000;
 
+/** The same cap as the megabyte figure its refusal copy names. */
+export const AGENT_ATTACHMENT_MAX_MEGABYTES = AGENT_ATTACHMENT_MAX_BYTES / 1_000_000;
+
 /**
  * Longest image edge, in pixels, that the vision model reads. Anything decoded
  * above it only spends native heap and upload bytes the model throws away, so

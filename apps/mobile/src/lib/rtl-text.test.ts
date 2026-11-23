@@ -419,6 +419,12 @@ describe('withoutLeadingDirectionMarks', () => {
     expect(withoutLeadingDirectionMarks(inside)).toBe(inside);
   });
 
+  // Just inside an opening code span nothing can open a block: the span's text
+  // is code, so removing the mark there cannot change how the line parses.
+  it('strips a mark inside an opening code span that would otherwise open a block', () => {
+    expect(withoutLeadingDirectionMarks('`\u200F# x`')).toBe('`# x`');
+  });
+
   it('leaves a continuation line and the rest of the source byte-identical', () => {
     const value = '\u200FFirst\nsecond \u200Fline\n\n- \u200Fitem';
     expect(withoutLeadingDirectionMarks(value)).toBe('First\nsecond \u200Fline\n\n- item');
@@ -481,6 +487,25 @@ describe('withoutLeadingDirectionMarks', () => {
     expect(withoutLeadingDirectionMarks(code)).toBe(code);
     // One tab reaches column 4, which is still the item's own indent.
     expect(withoutLeadingDirectionMarks('-\t# \u200FLatin')).toBe('-\t# Latin');
+  });
+
+  // A quote's prefix moves where the tab stops land, because CommonMark counts
+  // them from the line's first column: behind `> ` the same padding reaches six
+  // columns and leaves an indented code block, whose text keeps every character.
+  // Unquoted the padding is three columns, so the `#` is a heading in the item.
+  it('keeps a mark in a list item whose quoted tab padding makes an indented code block', () => {
+    const code = '>-  \t# \u200FLatin';
+    expect(withoutLeadingDirectionMarks(code)).toBe(code);
+    expect(withoutLeadingDirectionMarks('-  \t# \u200FLatin')).toBe('-  \t# Latin');
+  });
+
+  // A checkbox is structure only at a list item's own content start, where
+  // cutting the mark would turn `[ ]` into the item's task box. A paragraph's
+  // brackets and space are its own text, so the mark there is only an edge.
+  it('keeps a mark in front of a checkbox that would make the item a task', () => {
+    const task = '- \u200F[ ] Latin';
+    expect(withoutLeadingDirectionMarks(task)).toBe(task);
+    expect(withoutLeadingDirectionMarks('\u200F[ ] Latin')).toBe('[ ] Latin');
   });
 
   it('returns the same string when there is no mark to strip', () => {

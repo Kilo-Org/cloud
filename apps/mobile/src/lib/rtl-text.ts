@@ -468,6 +468,9 @@ const CONTENT_INDENT = / {0,3}/y;
 /** A task list item's checkbox and the space after it: `[ ]`, `[x]` or `[X]`. */
 const TASK_CHECKBOX = /\[[ xX]\][ \t]+/y;
 
+/** That checkbox at an offset's line start, matched non-sticky. */
+const TASK_CHECKBOX_START = /^\[[ xX]\][ \t]/;
+
 /** The run of backticks that opens an inline code span. */
 const BACKTICK_RUN = /`+/y;
 
@@ -541,8 +544,12 @@ function withoutRuns(line: string, runs: readonly (readonly [number, number])[])
  * loop already trusts answer it, and the fence case is why it also keeps this
  * function's own fence bookkeeping honest: it reads the raw line, so a line the
  * renderer would draw as code must not be walked as prose here.
+ *
+ * A task checkbox counts only at `atItemStart`, a list item's own content
+ * start: there `[ ] x` turns the item into a task item. In a paragraph's text
+ * the same brackets are its own copy and open nothing.
  */
-function opensBlockAt(line: string, at: number): boolean {
+function opensBlockAt(line: string, at: number, atItemStart: boolean): boolean {
   const rest = line.slice(at);
   return (
     HEADING_START.test(rest) ||
@@ -552,7 +559,8 @@ function opensBlockAt(line: string, at: number): boolean {
     THEMATIC_BREAK_START.test(rest) ||
     HTML_BLOCK_START.test(rest) ||
     REFERENCE_DEFINITION_START.test(rest) ||
-    INDENTED_CODE.test(rest)
+    INDENTED_CODE.test(rest) ||
+    (atItemStart && TASK_CHECKBOX_START.test(rest))
   );
 }
 
@@ -571,6 +579,12 @@ function opensBlockAt(line: string, at: number): boolean {
  * were written for and stay: markup this walk does not know (an HTML tag, say)
  * ends it there for the same reason. A reference link's label is the one shape
  * whose mark survives (`pastLinkOpener`).
+ *
+ * A cut is refused when it would open a block (see `opensBlockAt`), with two
+ * exceptions. A checkbox refuses a cut only at the list item's own content
+ * start, because that is where `[ ]` makes the item a task and nowhere else is
+ * it structure. A cut just inside an opening code span is code and opens no
+ * block, so it needs no check.
  */
 
 function stripLineMarks(
@@ -580,21 +594,27 @@ function stripLineMarks(
 ): string {
   const runs: [number, number][] = [];
   /** Records the mark run at `from` only when cutting it keeps the same blocks. */
-  const cut = (from: number): number => {
+  const cut = (from: number, options?: { atItemStart?: boolean; insideCode?: boolean }): number => {
     const after = pastMatch(DIRECTION_MARK_RUN, line, from);
     // Inside a heading's own text no marker can start a block, so the mark there
     // is only an edge and always goes. Anywhere else a cut that would reparse
     // the line as a different block is refused, and the walk ends: only the
-    // block's first character was the walk's business.
-    if (after === from || (!block.inHeading && opensBlockAt(line, after))) {
+    // block's first character was the walk's business. Inside an opening code
+    // span no marker can open a block either, and a checkbox is structure only
+    // at the item's own content start.
+    const atItemStart = block.listItem && options?.atItemStart === true;
+    if (
+      after === from ||
+      (options?.insideCode !== true && !block.inHeading && opensBlockAt(line, after, atItemStart))
+    ) {
       return from;
     }
     runs.push([from, after]);
     return after;
   };
-  let cursor = cut(at);
+  let cursor = cut(at, { atItemStart: true });
   // The block's machinery is kept exactly as written.
-  cursor = cut(pastMatch(CONTENT_INDENT, line, cursor));
+  cursor = cut(pastMatch(CONTENT_INDENT, line, cursor), { atItemStart: true });
   // A checkbox belongs to a list item's structure; without a list marker the
   // brackets and space are the paragraph's own text.
   const checkbox = block.listItem ? pastMatch(TASK_CHECKBOX, line, cursor) : cursor;
@@ -608,7 +628,7 @@ function stripLineMarks(
   }
   const span = pastMatch(BACKTICK_RUN, line, cursor);
   if (span > cursor) {
-    cut(span);
+    cut(span, { insideCode: true });
   }
   // A mark just inside the opening backticks is still the block's first
   // character and went above; from the span's own text to the end of the line
@@ -675,15 +695,18 @@ export function withoutLeadingDirectionMarks(markdown: string): string {
       // read apart from it. CommonMark expands a tab to the next four-column tab
       // stop before it decides this, so the padding is measured in columns, not
       // in characters: `-\t\t# x` pads seven columns and holds code, where two
-      // characters would look like an item's own indent.
+      // characters would look like an item's own indent. The columns are the
+      // line's own, because that is where the tab stops sit: an offset inside
+      // `body` is a column only once the quote prefix's width is added back.
       const markerEnd = /^ {0,3}(?:[-*+]|\d{1,9}[.)])/.exec(body)?.[0].length ?? 0;
+      const markerColumn = quoted + markerEnd;
       const afterMarker = body.slice(markerEnd);
       const run = /^[ \t]*/.exec(afterMarker)?.[0] ?? '';
-      let column = markerEnd;
+      let column = markerColumn;
       let padding = 0;
       for (const character of run) {
         const next = character === '\t' ? column + 4 - (column % 4) : column + 1;
-        padding = next - markerEnd;
+        padding = next - markerColumn;
         column = next;
       }
       // Five or more columns pad to one, leaving an indented code block: its text

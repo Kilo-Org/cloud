@@ -59,4 +59,32 @@ describe('OrganizationBillingScreen failure states', () => {
     expect(queries.seats.refetch).not.toHaveBeenCalled();
     unmount();
   });
+
+  it('offers Retry when the Kilo Pass usage read fails, and refetches only that read', async () => {
+    queries.subscription.data = subscriptionReadout();
+    // An agreement puts the usage section on the screen; without one it stays
+    // hidden, because the read alone cannot tell "no pass" from "no window".
+    queries.kiloPass.data = {
+      state: 'active',
+      commercialState: 'active',
+      processingCondition: 'ready',
+      agreement: { tier: 'tier_49', paidSeatCount: 2, planVersion: 1, paidThrough: null },
+    };
+    queries.kiloPassUsage.isError = true;
+    const { renderer, unmount } = await mount();
+
+    const copy = texts(renderer);
+    expect(copy).toContain('Something went wrong');
+    expect(copy).toContain('Retry');
+
+    await act(() => {
+      handlerOf(onlyButton(renderer), 'onPress')?.();
+    });
+
+    expect(queries.kiloPassUsage.refetch).toHaveBeenCalledTimes(1);
+    expect(queries.subscription.refetch).not.toHaveBeenCalled();
+    expect(queries.autoTopUp.refetch).not.toHaveBeenCalled();
+    expect(queries.kiloPass.refetch).not.toHaveBeenCalled();
+    unmount();
+  });
 });

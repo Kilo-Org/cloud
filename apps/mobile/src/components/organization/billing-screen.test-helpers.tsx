@@ -35,6 +35,14 @@ const queries = vi.hoisted(() => ({
     data: undefined as unknown,
     refetch: vi.fn(),
   },
+  kiloPassUsage: {
+    isPending: false,
+    isError: false,
+    isFetching: false,
+    error: null as unknown,
+    data: undefined as unknown,
+    refetch: vi.fn(),
+  },
 }));
 
 /** The boundary's own seat numbers, which the seats read corrects once it lands. */
@@ -87,6 +95,7 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
   },
   useOrgParentLink: () => ({ parentLink: null }),
   useOrgKiloPassSummary: () => queries.kiloPass,
+  useOrgKiloPassUsage: () => queries.kiloPassUsage,
 }));
 
 vi.mock('@/lib/hooks/use-org-billing-queries', () => ({

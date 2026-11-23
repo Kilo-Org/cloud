@@ -3994,7 +3994,22 @@
       "paymentPending": "Payment pending",
       "processingBlocked": "Processing blocked",
       "processingNeedsReview": "Processing needs review",
-      "retryHint": "Retries loading Kilo Pass status."
+      "retryHint": "Retries loading Kilo Pass status.",
+      "usage": {
+        "bonusExpired": "Bonus can no longer be earned",
+        "bonusLocked": "{{spent}} of {{target}} spent",
+        "bonusMissed": "Checking your bonus",
+        "bonusUnlocked": "Bonus unlocked",
+        "bonusUpfront": "Bonus already added",
+        "empty": "No monthly Credits have been issued yet. They appear here once the current period is processed.",
+        "noPasses": "No passes assigned for this period",
+        "passLine": "{{passes}} passes · {{credits}} monthly Credits",
+        "passLine_one": "{{passes}} pass · {{credits}} monthly Credits",
+        "passLine_other": "{{passes}} passes · {{credits}} monthly Credits",
+        "proratedNote": "Includes prorated Credits for passes added mid-period. A full month is {{credits}} per pass.",
+        "title": "Kilo Pass usage",
+        "unavailable": "Kilo Pass usage isn't available for this organization."
+      }
     }
   },
   "authErrors": {

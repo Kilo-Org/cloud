@@ -173,6 +173,34 @@ export function useOrgKiloPassSummary(organizationId: string | null, enabled: bo
   );
 }
 
+/**
+ * Parent organization's Kilo Pass for Orgs usage: the current window's Credits
+ * and bonus progress, one entry per allocated organization.
+ *
+ * The API sits behind the same guard as the summary
+ * (`organizationParentBillingProcedure` rejects child orgs and non-billing
+ * roles), so `enabled` must only be true when the user has a billing-capable
+ * role AND no payload reports a parent id. A child organization must never fire
+ * this query.
+ *
+ * A `null` answer means either that the organization has no Kilo Pass or that
+ * its agreement has no issued window yet; the caller separates the two with the
+ * summary's `agreement`.
+ */
+export function useOrgKiloPassUsage(organizationId: string | null, enabled: boolean) {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.organizations.kiloPass.usage.queryOptions(
+      { organizationId: organizationId ?? '' },
+      {
+        enabled: enabled && organizationId != null,
+        // A paused first read leaves the usage rows with no exit.
+        ...SETTLE_WHILE_OFFLINE,
+      }
+    )
+  );
+}
+
 export function useOrgUsageStats(organizationId: string | null) {
   const trpc = useTRPC();
   return useQuery(

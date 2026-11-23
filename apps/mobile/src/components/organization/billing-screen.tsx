@@ -14,6 +14,7 @@ import {
 import { BillingWebSettings } from '@/components/organization/billing-web-settings';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { getOrgKiloPassRowState } from '@/components/organization/org-kilo-pass-row-state';
+import { OrgKiloPassUsage } from '@/components/organization/org-kilo-pass-usage';
 import { OrganizationPlanRefusal } from '@/components/organization/plan-refusal';
 import { PermissionDenied } from '@/components/organization/permission-denied';
 import { ScreenHeader } from '@/components/screen-header';
@@ -164,6 +165,11 @@ export function OrganizationBillingScreen({
           data: kiloPassSummary.data,
           isError: kiloPassSummary.isError,
         });
+
+  // The usage read answers `null` both for an organization with no Kilo Pass and
+  // for one whose agreement has issued no window yet, so only the summary's
+  // agreement says whether the section belongs on the screen at all.
+  const kiloPassUsageAgreement = kiloPassSummary.data?.agreement != null;
 
   const renderSubscriptionState = (): ReactNode => {
     if (subscription.isPending) {
@@ -318,6 +324,12 @@ export function OrganizationBillingScreen({
         <Section label={t('organization.billing.autoTopUp')}>{renderAutoTopUpState()}</Section>
 
         {renderKiloPassState()}
+
+        <OrgKiloPassUsage
+          organizationId={organizationId}
+          hasBillingRole={hasBillingRole}
+          hasAgreement={kiloPassUsageAgreement}
+        />
 
         <BillingWebSettings
           subscriptionsUrl={subscriptionsUrl}

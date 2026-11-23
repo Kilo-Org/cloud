@@ -506,15 +506,15 @@ export function ModelAccessForm({
                   14pt rem — and the status is clamped to those same two lines, so
                   the slot is one fixed height and the action row above it cannot
                   move in any shipped locale: a message that needs a third line
-                  ends in the tail ellipsis instead of raising the pair. Several
-                  messages do need one — the two blocking refusals that name a
-                  catalogue outage or a missing model, and a save the server
-                  refused, which reaches `common.organizationTrialEnded` — so the
-                  clamp is a fixed slot, never a per-sentence size. No message
-                  loses its meaning to it: `useStatusAnnouncement` announces the
-                  whole sentence to assistive technology whatever the rendered
-                  height, and a refused save also shows its full copy in the
-                  mutation's own error toast. */}
+                  ends in the tail ellipsis instead of raising the pair. Two do:
+                  the catalogue-outage refusal, three rows in the German
+                  catalogue, and a save the server refused, which reaches
+                  `common.organizationTrialEnded`. So the clamp is a fixed slot,
+                  never a per-sentence size, and no message loses its meaning to
+                  it: `useStatusAnnouncement` announces the whole sentence to
+                  assistive technology whatever the rendered height, and a refused
+                  save also shows its full copy in the mutation's own error
+                  toast. */}
               <View className="min-h-10 justify-center">
                 <AccessibleStatus
                   message={statusMessage}

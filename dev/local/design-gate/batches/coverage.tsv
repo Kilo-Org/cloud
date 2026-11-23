@@ -199,6 +199,8 @@ file	screen	source	platform	loading	empty	happy	retryable-error	non-retryable-er
 (app)/credits-pack-prices-fixture.tsx	(app)/credits-pack-prices-fixture	dev-fixture	ios	n/a	n/a	T2-G17b kiloapp:///dev/credits-pack-prices-fixture/priced ; T2-G17b kiloapp:///dev/credits-pack-prices-fixture/unresolved ; note: ?state=priced	T2-G17c kiloapp:///dev/credits-pack-prices-fixture/failed ; note: ?state=failed	note: ?state=refused-unresolved	n/a	n/a	n/a
 (app)/credits.tsx	(app)/credits	route	android	T3-L05 force:loading kiloapp:///(app)/credits	n/a: pack rows	T1-G04b kiloapp:///(app)/credits	F:dev/credits-pack-prices-fixture/failed	F:dev/credits-pack-prices-fixture/refused-unresolved	n/a	none	n/a
 (app)/credits.tsx	(app)/credits	route	ios	T3-L05 force:loading kiloapp:///(app)/credits	n/a: pack rows	T1-G04b kiloapp:///(app)/credits	F:dev/credits-pack-prices-fixture/failed	F:dev/credits-pack-prices-fixture/refused-unresolved	n/a	none	n/a
+(app)/details-reset-fixture.tsx	(app)/details-reset-fixture	dev-fixture	android	n/a	n/a: one item, swapped	F:dev/details-reset-fixture	n/a	n/a	n/a	n/a	none
+(app)/details-reset-fixture.tsx	(app)/details-reset-fixture	dev-fixture	ios	n/a	n/a: one item, swapped	F:dev/details-reset-fixture	n/a	n/a	n/a	n/a	none
 (app)/gguf-retry-fixture.tsx	(app)/gguf-retry-fixture	dev-fixture	android	n/a	n/a	F:dev/gguf-retry-fixture	F:dev/gguf-retry-fixture	n/a	n/a	n/a	none
 (app)/gguf-retry-fixture.tsx	(app)/gguf-retry-fixture	dev-fixture	ios	n/a	n/a	F:dev/gguf-retry-fixture	F:dev/gguf-retry-fixture	n/a	n/a	n/a	none
 (app)/header-balance-fixture.tsx	(app)/header-balance-fixture	dev-fixture	android	n/a	n/a	F:dev/header-balance-fixture?variant=cluster	n/a	n/a	n/a	n/a	note: ?variant=no-back

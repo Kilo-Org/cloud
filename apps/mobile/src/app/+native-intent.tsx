@@ -176,6 +176,12 @@ export function redirectSystemPath({
     if (/(?:^|\/)dev\/attachment-chip-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(app)/attachment-chip-fixture';
     }
+    // Dev-only recycled transcript cell (`dev/details-reset-fixture`): one list
+    // item whose message the fixture swaps, so a reused cell shows whether a
+    // `<details>` block resets with the message it belongs to.
+    if (/(?:^|\/)dev\/details-reset-fixture\/?(?:[?#].*)?$/.test(path)) {
+      return '/(app)/details-reset-fixture';
+    }
     // Dev-only header geometry fixture: a centered title against each trailing
     // variant the plan names (`?variant=cluster|back-only|no-back`, default
     // cluster), so the emulator probe can measure all three from one link.

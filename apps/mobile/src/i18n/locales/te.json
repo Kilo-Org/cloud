@@ -2919,7 +2919,7 @@
       "onlyAddingFiles_other": "{{total}} ఫైళ్లలో {{accepted}} మాత్రమే జోడిస్తోంది (గరిష్టం {{max}})"
     },
     "composer": {
-      "addAttachment": "ఫైల్‌ను జోడించండి",
+      "addAttachment": "జోడింపును జోడించండి",
       "removeFailedAttachments": "అప్‌లోడ్ విఫలమైన జోడింపులను తీసివేయండి.",
       "attachmentsWithSlashCommands": "స్లాష్ కమాండ్‌లతో జోడింపులను పంపలేరు.",
       "photoMetadataNotRemoved": "ఒక జోడింపు నుండి ఫోటో మెటాడేటాను తీసివేయలేకపోయాము.",

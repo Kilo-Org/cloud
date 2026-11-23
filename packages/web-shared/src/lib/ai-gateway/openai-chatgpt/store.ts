@@ -394,10 +394,13 @@ export async function clearOpenAiChatGptConnection(owner: OpenAiChatGptOwner): P
  *
  * This read takes the primary, not the replica, for the same reason
  * `getOpenAiChatGptStoredConnectionFromPrimary` does: the status query reports
- * the connection to a person, so a limit a request recorded moments ago must be
- * visible at once rather than after the replica lag. No gateway path reads this
- * value: a gateway request records the limit only after the upstream response,
- * so the gateway's pre-inference replica rule does not apply here.
+ * the connection to a person. It already reads the connection payload on the
+ * primary through `getOpenAiChatGptConnection`, so the payload and the limit
+ * come from one database and one status response stays consistent. It also
+ * means a limit a request recorded moments ago must be visible at once rather
+ * than after the replica lag. No gateway path reads this value: a gateway
+ * request records the limit only after the upstream response, so the gateway's
+ * pre-inference replica rule does not apply here.
  */
 export async function readOpenAiChatGptUsageLimit(
   owner: OpenAiChatGptOwner,

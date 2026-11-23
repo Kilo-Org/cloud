@@ -10,6 +10,7 @@ import { QueryError } from '@/components/query-error';
 import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
 import { ScopeAccessDeniedScreen } from '@/components/organization/scope-access-denied-screen';
 import {
+  AnalyticsCaptions,
   AnalyticsSkeleton,
   MetricCard,
   PERIOD_OPTIONS,
@@ -20,7 +21,6 @@ import { FileText, GitPullRequest, LineChart } from '@/components/ui/icons';
 import { RowGroup } from '@/components/ui/row-group';
 import { Section } from '@/components/ui/section';
 import { SegmentedControl } from '@/components/ui/segmented-control';
-import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
 import { formatNumber } from '@/lib/format';
@@ -218,19 +218,10 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
               value={number(summary.estimatedImpactPoints)}
             />
           </View>
-          <Text variant="muted" className="text-xs">
-            {t('codeReviewer.analytics.trackedReviewsCaption')}
-          </Text>
-          {/* The line always renders, so a period or platform change never
-          moves the list below it; at zero the count names the problem none. */}
-          <Text variant="muted" className="text-xs">
-            {t('codeReviewer.analytics.trackedReviewsUncounted', {
-              count: uncapturedReviews,
-              displayCount: number(uncapturedReviews),
-              total: coverage.enrolledCompletedReviews,
-              displayTotal: number(coverage.enrolledCompletedReviews),
-            })}
-          </Text>
+          <AnalyticsCaptions
+            uncapturedReviews={uncapturedReviews}
+            enrolledCompletedReviews={coverage.enrolledCompletedReviews}
+          />
         </View>
 
         {repositories.length === 0 ? (

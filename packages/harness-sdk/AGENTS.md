@@ -917,13 +917,13 @@ same model varies by a factor of ten between runs — `xiaomi/mimo-v2.5` took
 1419 ms on one run, 20 s on the next, and 2023 ms on the one above.
 
 The ratios move too, and by more than the request does. `tencent/hy3` read
-0.79 of its input from the cache on one run and 0.99 on the next; `minimax/
-minimax-m3` went 0.80 to 0.9987, and `google/gemini-3.7-flash` 0.14 to 0.42, on
-the same prompts through the same code. What the ratio measures is whether the
-upstream provider still held the prefix, which is its decision and not this
-package's. Read one run as weather. The one number that is climate is the top
-of the table: a model whose provider caches at all lands above 0.99, and that
-has held on every run.
+0.79 of its input from the cache on one run and 0.99 on the next;
+`minimax/minimax-m3` went 0.80 to 0.9987, and `google/gemini-3.7-flash` 0.14 to
+0.42, on the same prompts through the same code. What the ratio measures is
+whether the upstream provider still held the prefix, which is its decision and
+not this package's. Read one run as weather. The one number that is climate is
+the top of the table: a model whose provider caches at all lands above 0.99,
+and that has held on every run.
 
 The prompts are identical between runs, so a ratio that fell is the provider
 having dropped a prefix it once held, not a change here. Do not chase one.
@@ -1635,9 +1635,10 @@ instead of the provider would be a change to what the provider sealed.
 
 **The gateway sends the reasoning under different names again.** Measured
 2026-09-04: the responses shape relays Anthropic's thinking as
-`response.reasoning.delta`, not the documented `response.reasoning_summary_text
-.delta`, so both are read. Two providers relayed through the chat shape name it
-`reasoning` and `reasoning_content`, so both are read there.
+`response.reasoning.delta`, not the documented
+`response.reasoning_summary_text.delta`, so both are read. Two providers
+relayed through the chat shape name it `reasoning` and `reasoning_content`, so
+both are read there.
 
 A turn holds as many reasoning parts as the model produced. The words and the
 signature arrive on separate events, so both land on the block still open, and

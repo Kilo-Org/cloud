@@ -6,6 +6,7 @@ import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
+import { useMotionPolicy } from '@/lib/a11y/motion';
 import { textActionTargetClass } from '@/lib/a11y/tap-target';
 import {
   BITBUCKET_TOKEN_MAX_LENGTH,
@@ -32,7 +33,6 @@ export function BitbucketConnectForm({
   integrationId,
   organizationName,
   scrollRef,
-  scrollFrameHeight,
   onConnected,
   onDirtyChange,
 }: Readonly<{
@@ -45,12 +45,6 @@ export function BitbucketConnectForm({
    * viewport.
    */
   scrollRef: RefObject<ScrollViewInstance | null>;
-  /**
-   * The height that scroll view last measured. The keyboard's band can land
-   * after a status line renders, which shortens the viewport again, so a
-   * change here is a second reason to reveal.
-   */
-  scrollFrameHeight: number;
   onConnected: () => void;
   /**
    * Reports whether a dismissal would drop a draft: text in the token field
@@ -124,14 +118,18 @@ export function BitbucketConnectForm({
   };
 
   const failure = feedback.status === 'failed' ? feedback.failure : null;
+  const { scrollAnimated } = useMotionPolicy();
   const revealPrimaryAction = useCallback(() => {
-    scrollRef.current?.scrollToEnd({ animated: true });
-  }, [scrollRef]);
+    // The shared policy turns the reveal into a jump for a person who asked the
+    // system for fewer animations (apps/mobile/AGENTS.md).
+    scrollRef.current?.scrollToEnd({ animated: scrollAnimated });
+  }, [scrollAnimated, scrollRef]);
   // A refused token's sentence grows this body's scroll content while the sheet
   // keeps its detent, so the primary action — the form's last child — can fall
-  // below the viewport. Reveal it in the frame the sentence is laid out in. The
-  // effect reruns on the frame height because the keyboard's band can land after
-  // the sentence, which shortens the viewport that just revealed the action. A
+  // below the viewport. Reveal it in the frame the sentence is laid out in. Once
+  // per failure, not per layout pass: the frame also changes when the token
+  // field takes focus and raises its keyboard, and scrolling to the end there
+  // would carry the caret's field away from the person correcting the token. A
   // submit in flight renders no failure, so nothing moves while it runs.
   useEffect(() => {
     if (failure === null) {
@@ -141,7 +139,7 @@ export function BitbucketConnectForm({
     return () => {
       cancelAnimationFrame(frame);
     };
-  }, [failure, revealPrimaryAction, scrollFrameHeight]);
+  }, [failure, revealPrimaryAction]);
   // A refused token judged the token itself, so submit waits for a different
   // one; only a failure that never judged it (a network or server fault) lets
   // the same token go again. A lost role or a changed connection waits for a

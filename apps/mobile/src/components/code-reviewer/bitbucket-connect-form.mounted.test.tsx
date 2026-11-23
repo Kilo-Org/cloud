@@ -34,6 +34,15 @@ vi.mock('@/lib/hooks/use-bitbucket', () => ({
   useConnectBitbucket: () => ({ mutateAsync: mutations.connect }),
   useReplaceBitbucketToken: () => ({ mutateAsync: mutations.replace }),
 }));
+// The reveal asks the shared policy whether its scroll may animate; the suite
+// flips that answer where the case is about Reduce Motion.
+const motion = vi.hoisted(() => ({ scrollAnimated: true }));
+vi.mock('@/lib/a11y/motion', () => ({
+  useMotionPolicy: () => ({
+    reducedMotion: !motion.scrollAnimated,
+    scrollAnimated: motion.scrollAnimated,
+  }),
+}));
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
@@ -78,9 +87,6 @@ function statusMessage(root: ReactTestRenderer['root']): string | null {
   return status ? (status.props.message as string | null) : null;
 }
 
-/** The scroll frame's height the form is told about, in points. */
-const FRAME_HEIGHT = 420;
-
 /**
  * The frames the form asked for and that no test has run yet. A reveal is
  * scheduled inside a frame, so a test that reads `scrollToEnd` immediately after
@@ -124,8 +130,8 @@ type MountedForm = {
   onConnected: () => void;
   /** What the form drives to reveal its primary action. */
   scrollToEnd: ScrollToEnd;
-  /** Re-renders the form as the sheet would after its frame settled. */
-  rerender: (scrollFrameHeight: number) => Promise<void>;
+  /** Re-renders the form as a later layout pass of the sheet would. */
+  rerender: () => Promise<void>;
 };
 
 async function mount(
@@ -139,7 +145,7 @@ async function mount(
   const scrollRef: RefObject<ScrollViewInstance | null> = {
     current: { scrollToEnd } as unknown as ScrollViewInstance,
   };
-  const element = (scrollFrameHeight: number) =>
+  const element = () =>
     createElement(BitbucketConnectForm, {
       scope: 'org-1',
       integrationId,
@@ -147,21 +153,16 @@ async function mount(
       onConnected,
       onDirtyChange,
       scrollRef,
-      scrollFrameHeight,
     });
-  const view = await renderWithProviders(element(FRAME_HEIGHT));
+  const view = await renderWithProviders(element());
   return {
     root: view.renderer.root,
     onConnected,
     scrollToEnd,
-    rerender: async scrollFrameHeight => {
+    rerender: async () => {
       await act(async () => {
         view.renderer.update(
-          createElement(
-            QueryClientProvider,
-            { client: view.queryClient },
-            element(scrollFrameHeight)
-          )
+          createElement(QueryClientProvider, { client: view.queryClient }, element())
         );
         await Promise.resolve();
       });
@@ -191,6 +192,7 @@ async function submit(root: ReactTestRenderer['root'], token: string): Promise<v
 beforeEach(() => {
   mutations.connect.mockReset();
   mutations.replace.mockReset();
+  motion.scrollAnimated = true;
   // A reveal runs inside a frame, so every test controls when that frame runs.
   pendingFrames.clear();
   nextFrameId = 1;
@@ -495,7 +497,7 @@ describe('BitbucketConnectForm primary-action reveal', () => {
     expect(form.scrollToEnd).toHaveBeenCalledExactlyOnceWith({ animated: true });
   });
 
-  it('reveals again when the scroll frame settles while the failure shows', async () => {
+  it('leaves a later layout pass alone while the failure stays on screen', async () => {
     mutations.connect.mockRejectedValue({
       data: {
         code: 'BAD_REQUEST',
@@ -507,17 +509,29 @@ describe('BitbucketConnectForm primary-action reveal', () => {
     await runFrames();
     form.scrollToEnd.mockClear();
 
-    // A re-render that reports the same frame is not a new band, so it is not a
-    // new reveal.
-    await form.rerender(FRAME_HEIGHT);
+    // The sheet re-renders constantly, and the frame changes when the token
+    // field takes focus and raises its keyboard. Revealing again there would
+    // carry the caret's own field away from the person correcting the token.
+    await form.rerender();
     await runFrames();
-    expect(form.scrollToEnd).not.toHaveBeenCalled();
 
-    // The keyboard's band lands after the sentence: the shorter frame is what
-    // pushes the action below the viewport again.
-    await form.rerender(FRAME_HEIGHT - 120);
+    expect(form.scrollToEnd).not.toHaveBeenCalled();
+  });
+
+  it('jumps instead of animating for a person who asked for less motion', async () => {
+    mutations.connect.mockRejectedValue({
+      data: {
+        code: 'BAD_REQUEST',
+        message: 'The Bitbucket Workspace Access Token format is invalid',
+      },
+    });
+    motion.scrollAnimated = false;
+    const form = await mount(null);
+
+    await submit(form.root, 'workspace-token');
     await runFrames();
-    expect(form.scrollToEnd).toHaveBeenCalledExactlyOnceWith({ animated: true });
+
+    expect(form.scrollToEnd).toHaveBeenCalledExactlyOnceWith({ animated: false });
   });
 
   it('keeps the sheet still while the refused token is still being checked', async () => {

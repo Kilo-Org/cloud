@@ -37,6 +37,8 @@ type ScreenState = {
   role: string | undefined;
   mutateAsync: Mock;
   dismissTo: Mock;
+  /** The guard flag recorded when each dismissal is dispatched. */
+  dismissSawEnabled: boolean[];
 };
 
 type RemovalHandler = (options: { data: { action: { type: string } }; repeat: () => void }) => void;
@@ -51,7 +53,14 @@ const state = vi.hoisted((): ScreenState => ({
   role: 'owner',
   mutateAsync: vi.fn(),
   dismissTo: vi.fn(),
+  dismissSawEnabled: [],
 }));
+
+/**
+ * The dialog the guard hands the screen. A marker rather than `null`, so a
+ * screen that drops `{guard.dialog}` fails the render case below.
+ */
+const DISCARD_DIALOG = vi.hoisted(() => 'DiscardDialog');
 
 /**
  * The leave guard's registration, recorded the way the navigator would read it:
@@ -116,7 +125,7 @@ vi.mock('@/lib/trpc', () => ({
   }),
 }));
 vi.mock('@/components/ui/dialog', () => ({
-  useConfirmDialog: () => ({ confirm: guard.confirm, dialog: null }),
+  useConfirmDialog: () => ({ confirm: guard.confirm, dialog: createElement(DISCARD_DIALOG) }),
 }));
 vi.mock('@/components/account/provider-key-credential-form', () => ({
   ProviderKeyCredentialForm: 'CredentialForm',
@@ -270,6 +279,13 @@ beforeEach(() => {
   state.mutateAsync.mockReset();
   state.mutateAsync.mockResolvedValue(undefined);
   state.dismissTo.mockClear();
+  state.dismissSawEnabled = [];
+  // The flag at dispatch is the property under test: the guard must already be
+  // disarmed in this render, or the native stack replays the removal after the
+  // pop and takes a second scene with it.
+  state.dismissTo.mockImplementation(() => {
+    state.dismissSawEnabled.push(guard.enabled);
+  });
   guard.enabled = false;
   guard.handler = undefined;
   guard.confirm.mockClear();
@@ -766,6 +782,14 @@ describe('ProviderKeyNewScreen', () => {
     expect(root.findAll(node => Object.is(node.type, BUTTON))).toHaveLength(0);
   });
 
+  // The guard returns the discard confirmation as an element the screen must
+  // render: without it a dirty Back stores a request no dialog ever shows.
+  it('renders the guard dialog inside the screen', async () => {
+    const root = await mount();
+
+    expect(root.findAll(node => Object.is(node.type, DISCARD_DIALOG))).toHaveLength(1);
+  });
+
   // The write window is the only thing this guard answers: a Back there must not
   // remove the route, because the save's own `dismissTo` would then be a second
   // removal of the same scene and reboot the Android native stack.
@@ -812,6 +836,9 @@ describe('ProviderKeyNewScreen', () => {
     // suite proves the screen asks for the disarmed leave and nothing else.
     expect(state.dismissTo).toHaveBeenCalledTimes(1);
     expect(state.dismissTo).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)/provider-keys');
+    // The dismissal saw a disarmed guard: a submit that called `dismissTo`
+    // directly would leave it armed and be popped again by the stack.
+    expect(state.dismissSawEnabled).toEqual([false]);
     expect(guard.enabled).toBe(false);
     expect(backRepeat).not.toHaveBeenCalled();
   });

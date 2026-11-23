@@ -272,7 +272,7 @@ describe('NewProfileScreen caller request', () => {
   });
 
   it('leaves on Back when no create is in flight', async () => {
-    await mount({ returnToCaller: true });
+    const { unmount } = await mount({ returnToCaller: true });
 
     expect(guard.enabled).toBe(false);
 
@@ -281,6 +281,8 @@ describe('NewProfileScreen caller request', () => {
     expect(guard.confirm).not.toHaveBeenCalled();
     expect(guard.repeat).toHaveBeenCalledTimes(1);
     expect(guard.repeatSawEnabled).toEqual([false]);
+
+    unmount();
   });
 
   // The hand-back is a leave the guard speaks for: the caller's form is popped

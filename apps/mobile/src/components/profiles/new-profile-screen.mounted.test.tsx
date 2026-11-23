@@ -464,7 +464,7 @@ describe('NewProfileScreen', () => {
   });
 
   it('leaves on Back when no create is in flight', async () => {
-    await mount();
+    const { unmount } = await mount();
 
     expect(guard.enabled).toBe(false);
 
@@ -473,6 +473,8 @@ describe('NewProfileScreen', () => {
     expect(guard.confirm).not.toHaveBeenCalled();
     expect(guard.repeat).toHaveBeenCalledTimes(1);
     expect(guard.repeatSawEnabled).toEqual([false]);
+
+    unmount();
   });
 
   // The overview exit is a leave the guard speaks for: the disarm render lands

@@ -1409,7 +1409,7 @@ describe('ManualReviewScreen leave guard', () => {
   });
 
   it('leaves on Back when no start is in flight', async () => {
-    await renderScreen();
+    const { unmount } = await renderScreen();
 
     expect(guard.enabled).toBe(false);
 
@@ -1418,6 +1418,8 @@ describe('ManualReviewScreen leave guard', () => {
     expect(guard.confirm).not.toHaveBeenCalled();
     expect(guard.repeat).toHaveBeenCalledTimes(1);
     expect(guard.repeatSawEnabled).toEqual([false]);
+
+    unmount();
   });
 
   // The success's own exit is a leave the guard speaks for: the disarm render

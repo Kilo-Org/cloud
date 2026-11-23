@@ -1,4 +1,4 @@
-/* eslint-disable max-lines -- one screen renders four states (organization boundary, permission refusal, provider list pending/error, form) and the leave guard adds the two lines this file cannot spare. */
+/* eslint-disable max-lines -- one screen renders four states (organization boundary, permission refusal, provider list pending/error, form) on top of the leave guard's hook, `pending` derivation and dialog. */
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -360,6 +360,7 @@ export function ProviderKeyNewScreen() {
           <Text>{keyId === undefined ? t('profile.providerKeys.add') : t('common.save')}</Text>
         </Button>
       </TabScreenScrollView>
+      {guard.dialog}
     </View>
   );
 }

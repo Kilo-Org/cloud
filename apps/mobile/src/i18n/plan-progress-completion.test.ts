@@ -56,6 +56,11 @@ const locales: readonly LocaleCase[] = [
   { tag: 'sw', render: (done, total) => `Mpango: hatua zilizokamilika ${done} kati ya ${total}` },
   { tag: 'cy', render: (done, total) => `Cynllun: ${done} o ${total} cam wedi cwblhau` },
   {
+    tag: 'ha',
+    render: (done, total) => `Tsari: an kammala ${done} cikin matakai ${total}`,
+    renderOne: (done, total) => `Tsari: an kammala ${done} cikin mataki ${total}`,
+  },
+  {
     tag: 'lv',
     render: (done, total) => `Plāns: ${done}/${total} soļi pabeigti`,
     renderOne: (done, total) => `Plāns: ${done}/${total} solis pabeigts`,

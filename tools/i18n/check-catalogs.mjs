@@ -1437,6 +1437,25 @@ function holdsLabel(values, run) {
 }
 
 /**
+ * The quoted runs of `value` that spell an English label: each names a control
+ * this reader must see as `$t(key)`, not as the English word.
+ *
+ * The one exemption is an explicit parameter, not a second scan: `ownValues`
+ * holds the locale's own values, and a run one of them holds is that locale's
+ * copy of a name it does not translate, so quoting it is right. English passes
+ * an empty set, because a label English spells is a label English can name.
+ */
+function quotedLabelRuns({ value, englishValues, ownValues }) {
+  const runs = [];
+  for (const run of quotedRuns(value)) {
+    if (englishValues.has(run) && !holdsLabel(ownValues, run)) {
+      runs.push(run);
+    }
+  }
+  return runs;
+}
+
+/**
  * The catalog key a node names as a plain string: unwrapped from its
  * TypeScript-only wrappers, a `Literal` string, and non-empty. Any other node,
  * including a template literal and an empty string, names no key here.
@@ -2208,6 +2227,8 @@ function checkSerializedJson(label, key, value) {
 /** The value rules English itself must pass. */
 function checkEnglishValues({ catalogName, english, englishValues }) {
   const problems = [];
+  // English exempts nothing: a label it spells is a label it can name.
+  const ownValues = new Set();
   for (const [key, value] of english) {
     if (value.trim() === '') {
       problems.push(`${catalogName}/en: "${key}" is empty`);
@@ -2222,12 +2243,10 @@ function checkEnglishValues({ catalogName, english, englishValues }) {
     }
     // English must not spell a label it can name, or every translator copies
     // the English word into a sentence they otherwise translated.
-    for (const run of quotedRuns(value)) {
-      if (englishValues.has(run)) {
-        problems.push(
-          `${catalogName}/en: "${key}" quotes the label "${run}"; name its key with $t()`
-        );
-      }
+    for (const run of quotedLabelRuns({ value, englishValues, ownValues })) {
+      problems.push(
+        `${catalogName}/en: "${key}" quotes the label "${run}"; name its key with $t()`
+      );
     }
   }
   return problems;
@@ -2452,13 +2471,9 @@ function checkTranslatedValue({
  * the message points at a button this user never sees.
  */
 function checkQuotedLabels({ label, key, value, englishValues, ownValues }) {
-  const problems = [];
-  for (const run of quotedRuns(value)) {
-    if (englishValues.has(run) && !holdsLabel(ownValues, run)) {
-      problems.push(`${label}: "${key}" quotes the English label "${run}"; name its key with $t()`);
-    }
-  }
-  return problems;
+  return quotedLabelRuns({ value, englishValues, ownValues }).map(
+    run => `${label}: "${key}" quotes the English label "${run}"; name its key with $t()`
+  );
 }
 
 /**

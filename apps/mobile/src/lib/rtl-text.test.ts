@@ -440,6 +440,9 @@ describe('withoutLeadingDirectionMarks', () => {
     ['a thematic break', '---\n\u200FLatin text'],
     ['a dash underline under paragraph text', 'Title\n---\n\u200FLatin text'],
     ['an equals underline under paragraph text', 'Title\n===\n\u200FLatin text'],
+    ['a one-dash underline under paragraph text', 'Title\n-\n\u200FLatin text'],
+    ['a two-dash underline under paragraph text', 'Title\n--\n\u200FLatin text'],
+    ['an equals underline inside the same quote', '> Title\n>===\n\u200FLatin text'],
     ['a fence that closed', '```js\nconst a = 1;\n```\n\u200FLatin text'],
     ['a reference definition', '[ref]: https://example.com\n\u200FLatin text'],
     ['an indented code line', '    code\n\u200FLatin text'],
@@ -451,6 +454,11 @@ describe('withoutLeadingDirectionMarks', () => {
     ['a script element closed on its line', '<script>a</script>\n\u200FLatin text'],
     ['a style element closed on its line', '<style>a{}</style>\n\u200FLatin text'],
     ['a textarea element closed on its line', '<textarea>a</textarea>\n\u200FLatin text'],
+    ['a comment closed on a later line', '<!-- a\nb\n-->\n\u200FLatin text'],
+    ['a processing instruction closed on a later line', '<?php\n?>\n\u200FLatin text'],
+    ['a CDATA section closed on a later line', '<![CDATA[\nx\n]]>\n\u200FLatin text'],
+    ['a pre element closed on a later line', '<pre>\nx\n</pre>\n\u200FLatin text'],
+    ['a script element closed on a later line', '<script>\nx\n</script>\n\u200FLatin text'],
   ])('strips a mark in the block that follows %s', (_shape, value) => {
     expect(withoutLeadingDirectionMarks(value)).toBe(value.replace('\u200F', ''));
   });
@@ -482,6 +490,34 @@ describe('withoutLeadingDirectionMarks', () => {
       'a tag that closes inline but runs to the next blank line',
       '<div>x</div>\n\u200FLatin text',
       '<div>x</div>\n\u200FLatin text',
+    ],
+    // A definition cannot interrupt a paragraph, so inside one the definition
+    // line is that paragraph’s own text and the line under it continues it.
+    [
+      'a reference definition inside a paragraph',
+      'Text\n[ref]: https://example.com\n\u200FLatin text',
+      'Text\n[ref]: https://example.com\n\u200FLatin text',
+    ],
+    // An HTML block of a terminator kind holds raw text until its own
+    // terminator: a mark inside it is the block’s copy, and a blank line does
+    // not end it.
+    [
+      'a comment that closes on a later line',
+      '<!--\n\u200FLatin text\n-->',
+      '<!--\n\u200FLatin text\n-->',
+    ],
+    [
+      'a pre element across a blank line',
+      '<pre>\n\n\u200FLatin text\n</pre>',
+      '<pre>\n\n\u200FLatin text\n</pre>',
+    ],
+    // The underline belongs to the item’s own container, so a run at column
+    // zero does not close the item’s paragraph: the line under it continues
+    // that paragraph.
+    [
+      'the paragraph after an underline below a list item',
+      '- Title\n===\n\u200FLatin text',
+      '- Title\n===\n\u200FLatin text',
     ],
   ])('keeps a mark in %s', (_shape, value, expected) => {
     expect(withoutLeadingDirectionMarks(value)).toBe(expected);

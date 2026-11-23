@@ -459,23 +459,50 @@ const INDENTED_CODE = /^(?: {4}|\t)/;
 /** A thematic break: three or more of one marker, spaced or not. */
 const THEMATIC_BREAK_START = /^ {0,3}(?:(?:\*[ \t]*){3,}|(?:-[ \t]*){3,}|(?:_[ \t]*){3,})$/;
 
-/** A setext heading's underline: a run of equals, which closes the paragraph
- * above it as a heading. A run of dashes is a thematic break above, whether it
- * underlines the paragraph or breaks after it, so only the equals run needs its
- * own pattern. */
-const SETEXT_UNDERLINE_START = /^ {0,3}=+[ \t]*$/;
+/** A setext heading's underline: a run of equals, or one or two dashes, closing
+ * the paragraph above it as a heading. Three or more of one marker is a
+ * thematic break instead, whether it underlines the paragraph or breaks after
+ * it, so the dash run here stops at two. */
+const SETEXT_UNDERLINE_START = /^ {0,3}(?:=+|-{1,2})[ \t]*$/;
 
 /** An HTML block's opening line: a tag, a comment, a processing instruction or
  * a declaration at the line's start. Inline content after a mark is not that,
  * because the raw line does not begin with the tag. */
 const HTML_BLOCK_START = /^ {0,3}(?:<!--|<\?|<![A-Za-z]|<\/?[A-Za-z][A-Za-z0-9-]*(?:[ \t/>]|$))/;
 
-/** An HTML block that opens and closes on its line: a comment, a processing
- * instruction, a declaration, or a raw-text element whose own end tag follows
- * it. Every other HTML block runs on to the next blank line, so the line under
- * it is still inside the block. */
-const HTML_BLOCK_ON_ONE_LINE =
-  /^ {0,3}(?:<!--.*?-->|<\?.*?\?>|<![A-Za-z].*>|<(script|pre|style|textarea)\b.*<\/\1>)/i;
+/**
+ * The HTML block `body` opens when it is a kind that CommonMark ends on a marker
+ * of its own: `from`, where the raw text after the opener starts, and the
+ * `terminator` that closes it. A comment, a processing instruction, a CDATA
+ * section, a declaration and the raw-text elements (`script`, `pre`, `style`,
+ * `textarea`) are those kinds; every other HTML block — a block tag, or a
+ * complete tag alone — runs on to the next blank line and has no terminator.
+ *
+ * `undefined` for every line that opens none of them, including a line already
+ * inside a raw-text element's own text.
+ */
+function htmlBlockTerminator(body: string): { from: number; terminator: string } | undefined {
+  const indent = /^ {0,3}/.exec(body)?.[0].length ?? 0;
+  const rest = body.slice(indent);
+  const rawText = /^<(script|pre|style|textarea)\b/i.exec(rest);
+  if (rawText !== null) {
+    const name = rawText[1] as string;
+    return { from: indent + rawText[0].length, terminator: `</${name.toLowerCase()}>` };
+  }
+  if (rest.startsWith('<!--')) {
+    return { from: indent + '<!--'.length, terminator: '-->' };
+  }
+  if (rest.startsWith('<?')) {
+    return { from: indent + '<?'.length, terminator: '?>' };
+  }
+  if (rest.startsWith('<![CDATA[')) {
+    return { from: indent + '<![CDATA['.length, terminator: ']]>' };
+  }
+  if (/^<![A-Za-z]/.test(rest)) {
+    return { from: indent + '<!'.length, terminator: '>' };
+  }
+  return undefined;
+}
 
 /** A link reference definition: a label, a colon, and a destination. */
 const REFERENCE_DEFINITION_START = /^ {0,3}\[[^\]\n]+\]:/;
@@ -682,14 +709,25 @@ function stripLineMarks(
  * from the renderer's container.
  *
  * A block starts at the first line, after a blank line, after a line that closed
- * a block of its own — a heading, a thematic break or the setext underline under
- * a paragraph, a fence's closing line, a reference definition, an HTML block
- * that opened and closed on its line, or code — and at a list, blockquote or
- * heading line's own content after its marker. Its content may
+ * a block of its own — a heading, a thematic break or the setext underline
+ * (a run of equals, or of one or two dashes) under a paragraph at the same quote
+ * depth, a fence's closing line, a reference definition that starts a block,
+ * an HTML block whose terminator arrived on its line, or code — and at a list,
+ * blockquote or heading line's own content after its marker. A reference
+ * definition cannot interrupt a paragraph, so a definition line inside one is
+ * that paragraph's text and closes nothing. Its content may
  * open on further machinery and markup — indentation, a task checkbox, emphasis,
  * a link or image label — so the mark is found through all of it, in front of
  * the block's first real character rather than its marker. A continuation line
  * of a paragraph or of a list item keeps its marks.
+ *
+ * An HTML block of a terminator kind — a comment, a processing instruction, a
+ * CDATA section, a declaration, or a raw-text element (`script`, `pre`, `style`,
+ * `textarea`) — is raw text from its opening line to the line holding its
+ * terminator, blank lines included. Those lines keep every mark they hold, and
+ * nothing inside them is read as markdown; the line that holds the terminator
+ * ends the block, so the line under it starts one. An HTML block of the tag
+ * kinds still runs to the next blank line and keeps its marks.
  *
  * Fenced and indented code keep every character they hold. An inline code span
  * is the one place where the two rules meet: a mark as a span's first character
@@ -710,36 +748,63 @@ export function withoutLeadingDirectionMarks(markdown: string): string {
   let previousEndsBlock = false;
   // The quote depth of the paragraph text directly above, when a setext
   // underline at the same depth would close it: how the walk tells a paragraph
-  // that follows a heading-shaped line from one the line above continues.
-  let previousParagraphQuoted: number | undefined = undefined;
+  // that follows a heading-shaped line from one the line above continues. The
+  // depth is the number of `>` markers, not the prefix's width, because `> Title`
+  // and `>===` sit in the same quote though their prefixes differ by a character.
+  let previousParagraphDepth: number | undefined = undefined;
   // Whether the previous line held an indented code block, which the lines under
   // it continue while they keep the indentation.
   let inIndentedCode = false;
   let inFence = false;
+  // The terminator that closes the HTML block now open, when the previous line
+  // opened one of the kinds CommonMark ends on a marker of its own. Every line
+  // until that marker is the block's raw text, blank lines included.
+  let openHtmlBlock: string | undefined = undefined;
   for (const [index, line] of lines.entries()) {
     const quoted = BLOCKQUOTE_START.exec(line)?.[0].length ?? 0;
+    const quotedDepth = (line.slice(0, quoted).match(/>/g) ?? []).length;
     const body = line.slice(quoted);
     const blank = body.trim().length === 0;
-    const opensFence = FENCE_START.test(body);
+    // A line inside an HTML block of a terminator kind is that block's raw text:
+    // it keeps every mark it holds and none of it is read as markdown. A line
+    // outside one may open that kind, and then it is raw text too.
+    const rawHtml: boolean = openHtmlBlock !== undefined;
+    const opensFence = !rawHtml && FENCE_START.test(body);
     // An indented code block starts after a blank line or after a block that has
     // closed, and runs on while the lines keep its indentation; an indented line
     // under paragraph text is that paragraph's own continuation instead. These
     // three predicates feed each other through the walk's state, which the
     // checker cannot infer a type for, so each says it is a boolean.
     const indentedCode: boolean =
+      !rawHtml &&
       !inFence &&
       INDENTED_CODE.test(body) &&
       !blank &&
       (previousBlank || previousEndsBlock || inIndentedCode);
     // Code is copy in its own right: a mark inside it is part of the code.
     const code: boolean = inFence || indentedCode;
+    // A fence's own lines are code, so an HTML block may not start inside one.
+    const html: { from: number; terminator: string } | undefined =
+      rawHtml || code ? undefined : htmlBlockTerminator(body);
+    // The block ends on the line that holds its terminator, or, for a block that
+    // opens and closes on one line, on that line: the line under it opens a
+    // block. A raw-text element's end tag is matched without regard to case,
+    // and the other terminators hold no letters, so one comparison serves all.
+    const closesHtml: boolean =
+      openHtmlBlock !== undefined
+        ? line.toLowerCase().includes(openHtmlBlock)
+        : html !== undefined && line.slice(html.from).toLowerCase().includes(html.terminator);
+    // A line that is an HTML block's raw text — the block's opening line, or a
+    // line inside one — is not read as markdown: a `#` or a run of dashes inside
+    // a `<pre>` is that block's copy, not a heading or an underline.
+    const htmlLine: boolean = html !== undefined || rawHtml;
     // A list item or heading's own marker is line machinery its content follows;
     // a continuation line has none and keeps its marks. A heading may sit inside
     // a list item (`- # x`), so its marker is read after the list marker too —
     // but only within the item's content indent. Under CommonMark a marker
     // followed by five or more spaces pads to one space and the rest is code, so
     // `-     # x` is an indented code block whose text must keep every character.
-    const list = LIST_START.exec(body);
+    const list: RegExpExecArray | null = htmlLine ? null : LIST_START.exec(body);
     let contentStart = 0;
     if (list !== null) {
       // `LIST_START` is greedy over the padding, so the marker's own width is
@@ -765,24 +830,34 @@ export function withoutLeadingDirectionMarks(markdown: string): string {
       // is code and the heading rule must not reach into it.
       contentStart = padding >= 5 ? body.length : markerEnd + run.length;
     }
-    const heading = HEADING_START.exec(body.slice(contentStart));
-    const marker = contentStart + (heading?.[0].length ?? 0);
+    const heading: RegExpExecArray | null = htmlLine
+      ? null
+      : HEADING_START.exec(body.slice(contentStart));
+    const marker: number = contentStart + (heading?.[0].length ?? 0);
+    // Whether this line opens a block: the first line, a line under a blank or
+    // after a line that closed a block, and a list, quote or heading line's own
+    // content after its marker.
+    const startsBlock: boolean = previousBlank || previousEndsBlock || marker > 0;
     // A line that closes a block of its own leaves the line after it opening
     // one: an ATX heading, a thematic break or the setext underline under the
-    // paragraph above, a reference definition, an HTML block that closed on its
-    // line, and code — the fence's last line before the closing fence, the fence
-    // line that closed it, and an indented code line, whose block ends at the
-    // first line not indented far enough for the walk to read it as code.
-    const endsBlock: boolean =
-      code ||
-      heading !== null ||
-      THEMATIC_BREAK_START.test(body) ||
-      (previousParagraphQuoted === quoted && SETEXT_UNDERLINE_START.test(body)) ||
-      REFERENCE_DEFINITION_START.test(body) ||
-      HTML_BLOCK_ON_ONE_LINE.test(body);
-    const startsBlock = previousBlank || previousEndsBlock || marker > 0;
+    // paragraph above, a reference definition that starts a block, an HTML block
+    // whose terminator arrived on its line, and code — the fence's last line
+    // before the closing fence, the fence line that closed it, and an indented
+    // code line, whose block ends at the first line not indented far enough for
+    // the walk to read it as code.
+    //
+    // A definition only ends a block when the line carrying it starts one: it
+    // cannot interrupt a paragraph, so inside one it is the paragraph's own
+    // text and the line under it continues that paragraph.
+    const endsBlock: boolean = htmlLine
+      ? closesHtml
+      : code ||
+        heading !== null ||
+        THEMATIC_BREAK_START.test(body) ||
+        (previousParagraphDepth === quotedDepth && SETEXT_UNDERLINE_START.test(body)) ||
+        (startsBlock && REFERENCE_DEFINITION_START.test(body));
     const stripped =
-      opensFence || code || blank || !startsBlock
+      opensFence || htmlLine || code || blank || !startsBlock
         ? line
         : stripLineMarks(line, quoted + marker, {
             listItem: list !== null,
@@ -791,13 +866,22 @@ export function withoutLeadingDirectionMarks(markdown: string): string {
     if (opensFence) {
       inFence = !inFence;
     }
+    // The block's terminator closes it, and the line that held it leaves the
+    // line after it opening a block; a block still open runs on.
+    if (closesHtml) {
+      openHtmlBlock = undefined;
+    } else if (html !== undefined) {
+      openHtmlBlock = html.terminator;
+    }
     previousBlank = blank;
     previousEndsBlock = endsBlock;
     inIndentedCode = indentedCode;
     // Only paragraph text in this line's own container can be closed by the next
     // line's setext underline: a list item's text sits inside its item, so a
     // markerless line under it is that item's lazy continuation, not an underline.
-    previousParagraphQuoted = blank || code || endsBlock || list !== null ? undefined : quoted;
+    // An HTML line is raw, not paragraph text, so it says nothing to the next.
+    previousParagraphDepth =
+      blank || code || endsBlock || list !== null || htmlLine ? undefined : quotedDepth;
     if (stripped !== line) {
       lines[index] = stripped;
       changed = true;

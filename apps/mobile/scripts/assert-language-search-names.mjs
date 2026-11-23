@@ -14,7 +14,7 @@ import {
 const expectedFiles = new Map(
   LANGUAGES.map(tag => {
     const names = collectLanguageSearchNames(tag);
-    return [fileName(tag), generateLanguageSearchNamesSource(tag, names)];
+    return [fileName(tag), generateLanguageSearchNamesSource(names)];
   })
 );
 

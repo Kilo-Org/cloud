@@ -33,6 +33,7 @@ vi.mock('react-i18next', () => ({
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/agent-briefing-format', () => ({ briefingMoney: () => '$0' }));
 vi.mock('@/lib/agent-briefing-state', () => ({
+  briefingSummaryBodyKey: () => 'agentBriefing.summaryPendingBody',
   briefingSummaryStatusKey: () => 'agentBriefing.summary',
 }));
 vi.mock('@/lib/hooks/use-available-models', () => ({

@@ -1,10 +1,22 @@
 /* eslint-disable max-lines, require-await -- every injected double stands in for an async I/O dep (async by contract, nothing to await), and the outcome branches from nothing-to-approve through every rejection stay together. */
 import { atom, createStore } from 'jotai';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type SessionManager } from '@kilocode/cloud-agent-sdk';
 
 import { type LiveSessionManagerHandle } from '@/components/agents/live-session-manager-registry';
+import { applyGlanceablePushData } from '@/lib/notifications';
+import {
+  __hydrateSessionAttentionForTests,
+  __resetSessionAttentionForTests,
+  getHydrationSnapshot,
+} from '@/lib/session-attention';
+import {
+  gateSessionAttentionKvRead,
+  nextEventLoopTurn,
+  resetSessionAttentionKvFake,
+  seedSessionAttentionKvFake,
+} from '@/test/session-attention-fake';
 
 import {
   approveFrontAgent,
@@ -12,8 +24,20 @@ import {
   type FrontApprovalDeps,
   frontApprovalListInput,
   isManagerStillWaitingForApproval,
+  refreshGlanceableSurfacesFromRows,
 } from './approve-front-agent';
 import { type FrontApprovableRow } from './front-approval';
+
+// The default refresh dep publishes through the notification runtime and
+// restores the persisted snapshot: both are mocked so this pure suite can drive
+// the derive itself.
+vi.mock('@/lib/notifications', () => ({ applyGlanceablePushData: vi.fn(async () => true) }));
+vi.mock('./persist', () => ({ restorePersistedGlanceable: vi.fn(async () => undefined) }));
+// The ack store's hydration read, so a case can hold the store in `loading`.
+vi.mock('@/lib/persist/encrypted-kv', async () => {
+  const { sessionAttentionKvFake } = await import('@/test/session-attention-fake');
+  return sessionAttentionKvFake;
+});
 
 const PERMISSION_ROW: FrontApprovableRow = {
   id: 'session-1',
@@ -400,10 +424,6 @@ describe('approveFrontAgent', () => {
 
 describe('frontApprovalListInput', () => {
   it('reads the same cloud-inclusive tray list the glanceable snapshot is derived from', () => {
-    // The `needsApproval` count that gates the wrist control is built from the
-    // tray list, cloud-agent rows included; the picker must query that same
-    // list or a cloud-agent permission row would offer an Approve the picker
-    // cannot answer.
     expect(frontApprovalListInput('org-1')).toEqual({
       organizationId: 'org-1',
       includeCloudAgentSessions: true,
@@ -483,5 +503,81 @@ describe('isManagerStillWaitingForApproval', () => {
     fake.store.set(fake.agentStatus, { type: 'idle' });
 
     expect(isManagerStillWaitingForApproval(fake.handle)).toBe(false);
+  });
+});
+
+describe('refreshGlanceableSurfacesFromRows', () => {
+  const scope = { organizationId: 'org-1', userId: 'user-1' };
+  const RAISE = '2026-01-01T00:00:00.000Z';
+  const DAY_MS = 24 * 60 * 60 * 1000;
+
+  beforeEach(async () => {
+    vi.mocked(applyGlanceablePushData).mockClear();
+    resetSessionAttentionKvFake();
+    __resetSessionAttentionForTests();
+    // Settle the store first, so the wait below resolves at once unless a case
+    // deliberately holds it, instead of every case paying the deadline.
+    await __hydrateSessionAttentionForTests();
+  });
+
+  afterEach(() => {
+    // Open any read a case gated, so its hydration cannot resolve into a later
+    // case.
+    resetSessionAttentionKvFake();
+  });
+
+  it('waits for the ack store to hydrate before deriving', async () => {
+    // The earlier launch answered this raise and the persisted blob names it; a
+    // derive that beat the hydration read would count it as waiting.
+    seedSessionAttentionKvFake([
+      {
+        sessionId: PERMISSION_ROW.id,
+        raiseId: RAISE,
+        status: 'permission',
+        ackedAt: Date.now(),
+        expiresAt: Date.now() + DAY_MS,
+      },
+    ]);
+    __resetSessionAttentionForTests();
+    const releaseRead = gateSessionAttentionKvRead();
+    void __hydrateSessionAttentionForTests();
+    expect(getHydrationSnapshot()).toBe('loading');
+
+    let settled = false;
+    const derive = (async () => {
+      await refreshGlanceableSurfacesFromRows({ rows: [PERMISSION_ROW], scope, now: 1 });
+      settled = true;
+    })();
+
+    // One event-loop turn settles the restore and every other promise-only dep;
+    // only the held hydration read can keep the derive back.
+    await nextEventLoopTurn();
+    expect(settled).toBe(false);
+    expect(applyGlanceablePushData).not.toHaveBeenCalled();
+
+    releaseRead();
+    await derive;
+    expect(applyGlanceablePushData).toHaveBeenCalledTimes(1);
+    // The restored ack made the raise idle, so the earlier answer was not
+    // published as waiting.
+    expect(applyGlanceablePushData).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'active_agents_glanceable', needsInput: 0 })
+    );
+  });
+
+  it('still derives after the bounded deadline when the ack store never settles', async () => {
+    // `loading` with no read in flight: only the settle deadline can release
+    // the derive, and it must, instead of hanging the wrist control's refresh.
+    __resetSessionAttentionForTests();
+    expect(getHydrationSnapshot()).toBe('loading');
+
+    // Real clock on purpose: this case pins the production deadline itself.
+    await refreshGlanceableSurfacesFromRows({ rows: [PERMISSION_ROW], scope, now: 1 });
+    expect(applyGlanceablePushData).toHaveBeenCalledTimes(1);
+    // The unhydrated store left the raise unanswered, so it still counts as
+    // waiting — the derive ran regardless, which is the fail-open contract.
+    expect(applyGlanceablePushData).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'active_agents_glanceable', needsInput: 1 })
+    );
   });
 });

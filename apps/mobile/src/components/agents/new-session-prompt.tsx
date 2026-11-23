@@ -27,6 +27,7 @@ import { toast } from 'sonner-native';
 import { useTranslation } from 'react-i18next';
 
 import { AttachmentPreviewStrip } from '@/components/agents/attachment-preview-strip';
+import { QueryError } from '@/components/query-error';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { InputFrame } from '@/components/ui/input-frame';
 import { RemainingCharactersCounter } from '@/components/ui/remaining-characters-counter';
@@ -174,6 +175,7 @@ export function NewSessionPrompt({
   model,
   variant,
   modelOptions,
+  modelSelectionFailure = null,
   onChangeText,
   onModeChange,
   onModelSelect,
@@ -512,6 +514,7 @@ export function NewSessionPrompt({
         isLoadingModels={isLoadingModels}
         isCreating={isCreating}
         onRefetchModels={onRefetchModels}
+        modelSelectionFailure={modelSelectionFailure}
       />
     );
   }
@@ -540,6 +543,22 @@ export function NewSessionPrompt({
           onRetryModels={onRefetchModels}
           className="border-b-[0.5px] border-hair-soft bg-neutral-100 dark:bg-neutral-900 px-3 py-3"
         />
+        {/* The organization default was the only input left that could pick the
+            model, so its failed read is stated where the model row sits. The
+            toolbar keeps its tiles: the catalog itself may be fine. */}
+        {modelSelectionFailure ? (
+          <QueryError
+            placement="top"
+            compact
+            variant="server"
+            title={t('common.couldNotLoadModels')}
+            onRetry={() => {
+              modelSelectionFailure.onRetry();
+            }}
+            isRetrying={modelSelectionFailure.isRetrying}
+            className="px-3"
+          />
+        ) : null}
         {sharePrefill.failed ? (
           <SharePrefillFailure
             onRetry={() => {

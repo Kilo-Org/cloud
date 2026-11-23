@@ -319,6 +319,70 @@ export function filterSummariesByProvenance(
 }
 
 /**
+ * Re-establish the order the deployed table published: the `model_summaries`
+ * primary key `(run_id, model, variant, route_key)`, which is the order an
+ * unqualified scan returned. The ranker is stable, so tied candidates keep
+ * whatever row order reaches it; without this a caller's order decides routes.
+ */
+function canonicalSummaryOrder(
+  summaries: readonly BenchmarkModelSummaryWithRun[]
+): BenchmarkModelSummaryWithRun[] {
+  return summaries
+    .map(summary => ({
+      summary,
+      key: `${summary.runId}\u0000${summary.model}\u0000${summary.variant ?? ''}\u0000${summary.routeKey}`,
+    }))
+    .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0))
+    .map(entry => entry.summary);
+}
+
+/**
+ * Order case results as the deployed projection emitted them.
+ *
+ * The deployed assembly handed `buildEffortByComplexity` the case rows in entry-resolution order:
+ * each pool entry contributed its catalog's variant list in declaration order, and the reader
+ * returned one pair per measured row. A tied variant pair therefore resolved to the variant the
+ * catalog declared first, which is not the same as the variant name that sorts first. Sorting by
+ * identity alone would silently change `effortByComplexity` for a pool whose served candidates
+ * never moved, so pairs follow `order` — the caller's resolved pair sequence — and case ids and
+ * repetitions within a pair follow `case_results` primary-key order.
+ *
+ * `order` is a property of the resolved entries, not of the caller's array: a pair it does not
+ * name sorts after the named ones by its own key, so no input ordering can decide a tie.
+ */
+function canonicalCaseOrder(
+  pairs: OfflineSweep['pairs'],
+  order?: readonly BenchmarkPair[]
+): OfflineSweep['pairs'] {
+  const position = new Map<string, number>();
+  for (const pair of order ?? []) {
+    const key = benchmarkPairKey(pair);
+    if (!position.has(key)) position.set(key, position.size);
+  }
+  const last = Number.MAX_SAFE_INTEGER;
+  return pairs
+    .map((pair, index) => {
+      const key = benchmarkPairKey(pair);
+      return { pair, index, key, rank: position.get(key) ?? last };
+    })
+    .sort((a, b) =>
+      a.rank !== b.rank
+        ? a.rank - b.rank
+        : a.key !== b.key
+          ? a.key < b.key
+            ? -1
+            : 1
+          : a.index - b.index
+    )
+    .map(({ pair }) => ({
+      ...pair,
+      results: [...pair.results].sort((a, b) =>
+        a.caseId !== b.caseId ? (a.caseId < b.caseId ? -1 : 1) : a.rep - b.rep
+      ),
+    }));
+}
+
+/**
  * Assemble a SPARSE custom routing table for the requested ready Pool entries
  * only. Uses per-route summaries from each profile's provenance run only —
  * exact (model, variant) AND run_id must match; no cross-run leakage. Omits
@@ -340,6 +404,12 @@ export function buildCustomRoutingTable(params: {
   lowConfidenceThreshold?: number | null;
   prices?: ReadonlyMap<string, CandidatePricing | null>;
   perCaseResults?: OfflineSweep['pairs'];
+  /**
+   * The measured pairs in entry-resolution order, which is what the deployed assembly fed the
+   * effort builder. Ties between variants of one model resolve to the first pair here, so this
+   * sequence — not the case-array order and not variant-name order — decides `effortByComplexity`.
+   */
+  casePairOrder?: readonly BenchmarkPair[];
   complexityLabels?: ComplexityLabels;
   /** Ready profiles with provenance run ids. */
   readyEntries: readonly {
@@ -364,7 +434,7 @@ export function buildCustomRoutingTable(params: {
 
   if (readyEntries.length === 0) return null;
 
-  const filtered = filterSummariesByProvenance(readyEntries, summaries);
+  const filtered = canonicalSummaryOrder(filterSummariesByProvenance(readyEntries, summaries));
   const stalePairs = new Set(readyEntries.filter(r => r.stale).map(r => benchmarkPairKey(r.entry)));
 
   const routes: CustomRoutingTable['routes'] = {};
@@ -402,7 +472,7 @@ export function buildCustomRoutingTable(params: {
     params.perCaseResults && params.complexityLabels
       ? buildEffortByComplexity(
           routes,
-          params.perCaseResults,
+          canonicalCaseOrder(params.perCaseResults, params.casePairOrder),
           params.complexityLabels,
           minAccuracy,
           params.productionTokenProfile ?? null,

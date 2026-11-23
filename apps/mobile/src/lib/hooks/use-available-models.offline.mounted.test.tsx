@@ -65,7 +65,13 @@ type CatalogSnapshot = {
   refetch: () => unknown;
 };
 
-type OrgDefaultSnapshot = { defaultModel: string | undefined; isLoading: boolean };
+type OrgDefaultSnapshot = {
+  defaultModel: string | undefined;
+  isPending: boolean;
+  isError: boolean;
+  isFetching: boolean;
+  refetch: () => unknown;
+};
 
 type PreferencesSnapshot = {
   favorites: string[];
@@ -84,8 +90,8 @@ function CatalogProbe() {
 }
 
 function OrgDefaultProbe() {
-  const { defaultModel, isLoading } = useOrgDefaultModel('org_1');
-  orgDefaultRead.current = { defaultModel, isLoading };
+  const { defaultModel, isPending, isError, isFetching, refetch } = useOrgDefaultModel('org_1');
+  orgDefaultRead.current = { defaultModel, isPending, isError, isFetching, refetch };
   return null;
 }
 
@@ -225,7 +231,33 @@ describe('model catalogue reads while the online manager reports offline', () =>
 
     await waitFor(() => orgDefaultRead.current?.defaultModel === 'org/default');
     expect(matching('/api/organizations/org_1/defaults')).toBe(1);
-    expect(orgDefaultRead.current?.isLoading).toBe(false);
+    expect(orgDefaultRead.current?.isPending).toBe(false);
+    expect(orgDefaultRead.current?.isError).toBe(false);
+    unmount();
+  });
+
+  it('settles a failed org-default read into its error state and lets the retry issue a request', async () => {
+    world.catalog = 'unreachable';
+    const queryClient = newClient();
+    onlineManager.setOnline(false);
+
+    const { unmount } = await renderWithProviders(<OrgDefaultProbe />, { queryClient, wrapper });
+
+    await waitFor(() => orgDefaultRead.current?.isError === true);
+    expect(orgDefaultRead.current?.defaultModel).toBeUndefined();
+    expect(orgDefaultRead.current?.isPending).toBe(false);
+    expect(matching('/api/organizations/org_1/defaults')).toBe(1);
+
+    // The model row's Retry calls this hook's own `refetch`, so a paused read
+    // would never issue a second request.
+    await act(() => {
+      void orgDefaultRead.current?.refetch();
+    });
+    await waitFor(() => matching('/api/organizations/org_1/defaults') === 2);
+    // v5 clears the error and reports `pending` while the no-data retry runs, so
+    // the hook's own flag has to keep the failure visible through it.
+    await waitFor(() => orgDefaultRead.current?.isError === true);
+    expect(orgDefaultRead.current?.defaultModel).toBeUndefined();
     unmount();
   });
 
@@ -267,8 +299,6 @@ describe('model catalogue reads while the online manager reports offline', () =>
     expect(catalogRead.current?.models.map(model => model.id)).toEqual(['c/schematron', 'c/seed']);
     expect(matching('/api/openrouter/models')).toBe(1);
 
-    // `applyLanguagePreference`'s LTR switch calls `i18n.changeLanguage` in
-    // place: no remount, no new catalog read, only the language moves.
     await act(async () => {
       await i18n.changeLanguage('cs');
     });

@@ -19,6 +19,14 @@ const PLATFORM_CONFIG = {
     label: 'codeReviewer.providerConnect.githubApp',
     title: 'common.connectGithub',
     errorMessage: 'codeReviewer.providerConnect.githubError',
+    // The brand name the state titles itself with. `common.github` holds the
+    // Latin product name, so a translated interface still titles the state with
+    // the word the reader sees on the platform itself, and the heading does not
+    // grow a second name for the same product.
+    brand: 'common.github',
+    // The install rule for the GitHub App is narrower than the one for GitLab:
+    // only an owner or admin can install it.
+    adminOnlyDescription: 'codeReviewer.providerConnect.githubAdminOnlyDescription',
   },
   gitlab: {
     icon: GitMerge,
@@ -26,26 +34,34 @@ const PLATFORM_CONFIG = {
     label: 'codeReviewer.providerConnect.gitlabAccount',
     title: 'common.connectGitlab',
     errorMessage: 'codeReviewer.providerConnect.gitlabError',
+    brand: 'common.gitlab',
+    // GitLab's account connect already names the role gate in the PR-review
+    // connect gate's copy, so the overview reuses that wording rather than
+    // adding a second key with the same English string.
+    adminOnlyDescription: 'prReview.connect.adminOnlyConnectDescription',
   },
 } as const;
 
 /**
- * The disconnected provider's one state: the icon circle, the platform's
- * connect heading, what the connection asks for, and the one action that
- * starts it. A reader the install rule refuses gets the sentence naming who
- * may connect in the description and no action, so the screen never offers a
- * press its role cannot finish.
+ * The disconnected provider's one surface, in two faces. A reader the install
+ * rule allows gets the platform's connect heading, what the connection asks
+ * for, and the one action that starts it. A reader the rule refuses
+ * (`refused`) gets a neutral heading naming the platform and the sentence
+ * saying who may connect it, and no action, so the screen never offers a press
+ * its role cannot finish. The two faces share the icon circle and the state
+ * layout, and the refused face's description is the whole copy: it does not
+ * restate what the heading already named.
  */
 export function ProviderConnectState<T>({
   scope,
   platform,
-  notice,
+  refused = false,
   onConnected,
 }: Readonly<{
   scope: string;
   platform: 'github' | 'gitlab';
-  /** Why this reader cannot connect; replaces the action when present. */
-  notice?: string;
+  /** This reader's role cannot connect the provider: no action, neutral title. */
+  refused?: boolean;
   onConnected: () => Promise<T>;
 }>) {
   const { t } = useTranslation();
@@ -56,6 +72,8 @@ export function ProviderConnectState<T>({
     label,
     title,
     errorMessage,
+    brand,
+    adminOnlyDescription,
   } = PLATFORM_CONFIG[platform];
 
   const connect = async () => {
@@ -87,10 +105,18 @@ export function ProviderConnectState<T>({
     <EmptyState
       icon={Icon}
       iconSize={28}
-      title={t(title)}
-      description={notice ?? t('codeReviewer.providerConnect.description', { label: t(label) })}
+      title={
+        refused
+          ? t('codeReviewer.providerConnect.notConnectedTitle', { platform: t(brand) })
+          : t(title)
+      }
+      description={
+        refused
+          ? t(adminOnlyDescription)
+          : t('codeReviewer.providerConnect.description', { label: t(label) })
+      }
       action={
-        notice ? undefined : (
+        refused ? undefined : (
           <StateAction
             label={t('common.connect')}
             icon={ActionIcon}

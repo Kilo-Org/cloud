@@ -47,6 +47,58 @@ function imageCount(root: TestRenderer.ReactTestInstance): number {
     .length;
 }
 
+const HTTP_CHIP_LINE =
+  '\u2068A chart\u2069 · \u2068insecure.com\u2069 · \u2068HTTPS images only\u2069';
+const HTTP_CHIP_LINE_WITHOUT_ALT = '\u2068insecure.com\u2069 · \u2068HTTPS images only\u2069';
+
+async function mountImage(props: {
+  uri: string;
+  alt?: string;
+  accessibilityLabel?: string;
+  onPress?: () => void;
+}): Promise<TestRenderer.ReactTestRenderer> {
+  const rendererRef: { current: TestRenderer.ReactTestRenderer | undefined } = {
+    current: undefined,
+  };
+  await act(async () => {
+    await Promise.resolve();
+    rendererRef.current = TestRenderer.create(createElement(MarkdownImage, { alt: '', ...props }));
+  });
+  const renderer = rendererRef.current;
+  if (!renderer) {
+    throw new Error('renderer was not created');
+  }
+  return renderer;
+}
+
+async function unmount(renderer: TestRenderer.ReactTestRenderer): Promise<void> {
+  await act(async () => {
+    await Promise.resolve();
+    renderer.unmount();
+  });
+}
+
+/** Names of the chips that answer the enclosing link's press. */
+function linkChipLabels(root: TestRenderer.ReactTestInstance): string[] {
+  return root
+    .findAll(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'Pressable' &&
+        node.props.accessibilityRole === 'link'
+    )
+    .map(node => node.props.accessibilityLabel as string);
+}
+
+function textContents(root: TestRenderer.ReactTestInstance): string[] {
+  return root
+    .findAll(node => typeof node.type === 'string' && (node.type as string) === 'Text')
+    .map(node => {
+      const children = node.props.children;
+      return Array.isArray(children) ? children.join('') : String(children ?? '');
+    });
+}
+
 describe('MarkdownImage viewer mounting', () => {
   it('mounts ImageViewer only after the image is confirmed and pressed', async () => {
     const rendererRef: { current: TestRenderer.ReactTestRenderer | undefined } = {
@@ -70,7 +122,7 @@ describe('MarkdownImage viewer mounting', () => {
       node =>
         typeof node.type === 'string' &&
         (node.type as string) === 'Pressable' &&
-        node.props.accessibilityLabel === 'Load x'
+        node.props.accessibilityLabel === 'shot and Load x'
     );
     await act(async () => {
       await Promise.resolve();
@@ -107,5 +159,137 @@ describe('MarkdownImage viewer mounting', () => {
       await Promise.resolve();
       renderer.unmount();
     });
+  });
+});
+
+/**
+ * A blocked chip is the link's control, so its accessible name carries the
+ * link's own name — but only when that name is not already drawn: an untitled
+ * image link is named after its alt text (or, with no alt, after the href
+ * host), which the drawn line already says.
+ */
+describe('BlockedImageChip link naming', () => {
+  it('does not repeat an alt-text link name the chip already draws', async () => {
+    const renderer = await mountImage({
+      uri: 'http://insecure.com/a.png',
+      alt: 'A chart',
+      accessibilityLabel: 'A chart',
+      onPress: () => undefined,
+    });
+
+    expect(linkChipLabels(renderer.root)).toEqual([HTTP_CHIP_LINE]);
+    expect(textContents(renderer.root)).toContain(HTTP_CHIP_LINE);
+
+    await unmount(renderer);
+  });
+
+  it('does not repeat a host link name the chip already draws', async () => {
+    const renderer = await mountImage({
+      uri: 'http://insecure.com/a.png',
+      alt: '',
+      accessibilityLabel: 'insecure.com',
+      onPress: () => undefined,
+    });
+
+    expect(linkChipLabels(renderer.root)).toEqual([HTTP_CHIP_LINE_WITHOUT_ALT]);
+    expect(textContents(renderer.root)).toContain(HTTP_CHIP_LINE_WITHOUT_ALT);
+
+    await unmount(renderer);
+  });
+
+  it('does not repeat a link host written in mixed case', async () => {
+    const renderer = await mountImage({
+      uri: 'http://insecure.com/a.png',
+      alt: '',
+      accessibilityLabel: 'Insecure.com',
+      onPress: () => undefined,
+    });
+
+    expect(linkChipLabels(renderer.root)).toEqual([HTTP_CHIP_LINE_WITHOUT_ALT]);
+
+    await unmount(renderer);
+  });
+
+  it('does not repeat a link host written with the default port', async () => {
+    const renderer = await mountImage({
+      uri: 'http://insecure.com/a.png',
+      alt: '',
+      accessibilityLabel: 'insecure.com:80',
+      onPress: () => undefined,
+    });
+
+    expect(linkChipLabels(renderer.root)).toEqual([HTTP_CHIP_LINE_WITHOUT_ALT]);
+
+    await unmount(renderer);
+  });
+
+  it('merges a link name that only looks like the drawn host', async () => {
+    const renderer = await mountImage({
+      uri: 'http://insecure.com/a.png',
+      alt: '',
+      accessibilityLabel: 'other.example',
+      onPress: () => undefined,
+    });
+
+    expect(linkChipLabels(renderer.root)).toEqual([
+      `${HTTP_CHIP_LINE_WITHOUT_ALT} and other.example`,
+    ]);
+
+    await unmount(renderer);
+  });
+
+  it('merges a link name that the chip does not draw', async () => {
+    const renderer = await mountImage({
+      uri: 'http://insecure.com/a.png',
+      alt: 'A chart',
+      accessibilityLabel: 'Example site',
+      onPress: () => undefined,
+    });
+
+    expect(linkChipLabels(renderer.root)).toEqual([`${HTTP_CHIP_LINE} and Example site`]);
+    expect(textContents(renderer.root)).toContain(HTTP_CHIP_LINE);
+
+    await unmount(renderer);
+  });
+});
+
+/**
+ * The unconfirmed row draws the image's description next to the Load control,
+ * so the row's copy must leave the accessibility tree: the Load control is the
+ * one that names the image, or a reader hears the description twice.
+ */
+describe('UnconfirmedImageChip row naming', () => {
+  it('hides the drawn row copy and names the image on the Load control', async () => {
+    const renderer = await mountImage({ uri: 'https://example.com/a.png', alt: 'A chart' });
+    const drawn = '\u2068A chart\u2069 · \u2068example.com\u2069';
+
+    const rowText = renderer.root.find(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'Text' &&
+        node.props.children === drawn
+    );
+    expect(rowText.props.accessibilityElementsHidden).toBe(true);
+    expect(rowText.props.importantForAccessibility).toBe('no-hide-descendants');
+
+    const row = renderer.root.find(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'Pressable' &&
+        node.props.accessible === false
+    );
+    expect(row.props.accessibilityLabel).toBeUndefined();
+
+    const loadButtons = renderer.root.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'Pressable' &&
+        node.props.accessibilityRole === 'button'
+    );
+    expect(loadButtons.map(node => node.props.accessibilityLabel)).toEqual([
+      'A chart and Load example.com',
+    ]);
+
+    await unmount(renderer);
   });
 });

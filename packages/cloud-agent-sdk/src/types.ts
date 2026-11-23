@@ -190,6 +190,17 @@ export type PermissionState = {
 };
 
 /**
+ * A question request that is still pending for the CLI while this app cannot
+ * read it: its payload did not satisfy the question schema, or it carried no
+ * questions at all. No answer card can stand for it — there is nothing to show
+ * and nothing to answer — so the surfaces show a notice that names the request
+ * and points the user at the CLI.
+ */
+export type UnreadableQuestionState = {
+  requestId: string;
+};
+
+/**
  * A permission request that is still pending for the CLI while this app cannot
  * read its scope. No consent card can be offered for it, so the surfaces show a
  * notice that names the request and points the user at the CLI.
@@ -340,6 +351,8 @@ export type ServiceStateSnapshot = {
   sessionInfo: SessionInfo | null;
   question: QuestionState | null;
   permission: PermissionState | null;
+  /** Pending question requests this app could not read, oldest first. */
+  unreadableQuestions: readonly UnreadableQuestionState[];
   /** Pending permission requests this app could not read, oldest first. */
   unreadablePermissions: readonly UnreadablePermissionState[];
   suggestion: SuggestionState | null;
@@ -393,10 +406,6 @@ export type SessionSnapshotPage = {
   totalCostMicrodollars?: number | null | undefined;
   /** The preparation rows the stream replays first, so the first page can show them. */
   preparationAttempts?: readonly PreparationAttempt[] | undefined;
-  /**
-   * The run's queued and failed turns the socket replays on connect, so a page
-   * opened without a socket still shows the question row and its failure.
-   */
   queuedMessages?: readonly QueuedMessageSnapshot[] | undefined;
   /** The turns the session ever admitted; a positive count with no transcript is a gap. */
   admittedMessages?: number | undefined;
@@ -467,7 +476,6 @@ export type FetchedSessionData = {
   routeReady?: boolean;
   prompt: string | null;
   initialMessageId: string | null;
-  /** Installed custom agents, including picker visibility and model overrides. */
   runtimeAgents?: SessionConfig['runtimeAgents'];
   associatedPr: AssociatedPrData | null;
   totalCostMicrodollars?: number | null;

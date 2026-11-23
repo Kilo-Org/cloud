@@ -1,5 +1,5 @@
 import { type Href, type NativeStackNavigationProp, useNavigation, useRouter } from 'expo-router';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 
 /**
  * The `router.replace` call signature, so helpers that already take a router
@@ -165,5 +165,8 @@ export function useStackSafeReplace(): StackSafeReplaceRouter {
     [navigation, router]
   );
 
-  return { replace };
+  // Call sites hold this object in effect dependency arrays, so it must stay
+  // the same one between renders: a fresh `{ replace }` would rebuild every
+  // callback and re-subscribe every effect that depends on it.
+  return useMemo(() => ({ replace }), [replace]);
 }

@@ -85,7 +85,16 @@ export type AdmissionClass =
 /**
  * Pure classification of one entry against existing registry rows for that
  * exact pair. `retry` is true when the owner listed this entry in retryEntries.
- * An explicit retry re-admits a failed row, permanent or not: it is charged.
+ * An explicit owner retry re-admits a retryable failed row and is charged. A
+ * permanently failed pair is only reported: the owner cannot re-admit it by
+ * paying, because re-admission is an explicit admin action after the catalog
+ * proves the model runnable today. Nothing re-admits a failed row automatically.
+ *
+ * The permanent verdict is scoped exactly like the attempt history and the paid
+ * quote/permit: (router, model, variant, engine identity), across repetition counts. A
+ * permanent row at another repetition count of the same engine therefore blocks this
+ * admission too — otherwise a new-repetition row would be admitted into a pair the
+ * permit path refuses. A row from another engine or router never blocks.
  */
 export function classifyProfileAdmission(
   entryRows: readonly ProfileRow[],
@@ -98,7 +107,7 @@ export function classifyProfileAdmission(
     const state = parseProfileState(currentRow);
     const failure = wireProfileFailure(state);
     if (!failure) return { kind: 'report', status: wireProfileStatus(state) };
-    if (retry) {
+    if (retry && failure.kind === 'retryable') {
       return { kind: 'admit', charged: true };
     }
     return {
@@ -109,7 +118,28 @@ export function classifyProfileAdmission(
     };
   }
 
-  // No current row: stale history (free) or never seen (charged).
+  // No current row, but the pair may be permanently failed at another repetition count of
+  // this engine. Same rule as the quote and the permit: the pair, not the row, is
+  // unavailable until an explicit admin re-admission clears it.
+  const permanentSibling = entryRows.find(
+    row =>
+      (row.router ?? 'efficient') === (current.router ?? 'efficient') &&
+      row.model === entry.model &&
+      row.variant === variantToStorage(entry.variant) &&
+      row.engine_identity === current.engineIdentity &&
+      row.status === 'unavailable'
+  );
+  if (permanentSibling) {
+    const failure = wireProfileFailure(parseProfileState(permanentSibling));
+    return {
+      kind: 'report',
+      status: 'failed',
+      failureReason: permanentSibling.failure_reason,
+      ...(failure ? { failure } : {}),
+    };
+  }
+
+  // No current or permanently failed row: stale history (free) or never seen (charged).
   if (entryRows.length > 0) {
     return { kind: 'admit', charged: false };
   }

@@ -29,7 +29,13 @@ vi.mock('react-native', () => ({
 }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ back: vi.fn(), replace: vi.fn(), push: vi.fn() }),
-  useNavigation: () => ({ dispatch: vi.fn(), goBack: vi.fn() }),
+  useNavigation: () => ({
+    dispatch: vi.fn(),
+    goBack: vi.fn(),
+    // `useSettledReplace` hears the navigator's transition events; this suite's
+    // config is enabled, so the bounce never dispatches.
+    addListener: () => () => undefined,
+  }),
   usePreventRemove: () => undefined,
   // The screen's disabled-config redirect only runs on focus, and the config
   // these cases mount is enabled, so it never redirects here.

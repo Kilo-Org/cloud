@@ -67,13 +67,12 @@ const LOCALES_DIR = join(ROOT, 'apps/mobile/src/i18n/locales');
 const COUNTED_OPTIONS = ['count', 'displayCount', 'itemCount'];
 
 /**
- * Counted messages whose English copy has no word whose form the count
- * changes, so a plural family would be noise. Reviewed one by one: before
- * adding an entry, read the English copy and confirm every word reads the same
- * at 1 and at 5. If a word does change, declare the family instead. The list is
- * checked in both directions: a counted key that is neither a family nor here is
- * a problem, and so is an entry here whose counted call the source no longer
- * has, so a removed call site cannot leave a stale exemption behind.
+ * Reviewed one by one: before adding an entry, read the English copy and
+ * confirm every word reads the same at 1 and at 5. If a word does change,
+ * declare the family instead. The list is checked in both directions: a counted
+ * key that is neither a family nor here is a problem, and so is an entry here
+ * whose counted call the source no longer has, so a removed call site cannot
+ * leave a stale exemption behind.
  */
 export const NO_AGREEMENT = new Map([
   [
@@ -218,7 +217,6 @@ export function auditCountedCalls(rootDir = SOURCE_DIR) {
 
 /**
  * Every static counted key: `t('key', { … count … })` and its quoted variants.
- * It projects a scan the caller made once with `auditCountedCalls`.
  */
 export function collectCountedKeys(scan) {
   const keys = new Set();
@@ -235,7 +233,6 @@ export function collectCountedKeys(scan) {
  * source writes it, whitespace-normalized. A listed expression in
  * `DYNAMIC_COUNTED_KEYS` names the keys it can produce; an unlisted one is an
  * audit problem, because the audit cannot see which messages a count reaches.
- * It projects a scan the caller made once with `auditCountedCalls`.
  */
 export function collectDynamicCountedCalls(scan) {
   const dynamic = new Set();
@@ -251,8 +248,7 @@ export function collectDynamicCountedCalls(scan) {
  * Every problem the tree scan made, as one line each: a file the parser refused
  * or a file the walk could not read. A refused file's tree is empty, so its
  * counted messages are invisible; an unreadable one was never read at all.
- * Saying so keeps either failure from passing as a clean audit. It projects a
- * scan the caller made once with `auditCountedCalls`.
+ * Saying so keeps either failure from passing as a clean audit.
  */
 export function findUnparsedFiles(scan) {
   return scan.problems;
@@ -543,10 +539,10 @@ export function checkDynamicCountedKeySources(rootDir = ROOT, reported = new Set
         }
       }
     }
-    // A file the parser refused has no declaration to read, and its parse
-    // problems already say so; naming every listed key as undeclared would
-    // only bury that line.
-    if (source.entry === null || source.problems.length > 0) {
+    // A module that could not be read or parsed has no declaration to read, and
+    // its own problem line already says so; naming every listed key as
+    // undeclared would only bury that line.
+    if (source.problems.length > 0) {
       continue;
     }
     if (!source.declarations.has(listed.declaration)) {
@@ -610,12 +606,7 @@ export function readAuditedCatalog(tag, localesDir = LOCALES_DIR) {
   }
 }
 
-/**
- * The English catalog, flattened. A caller that cannot read English gets one
- * problem line and skips only the checks that need English: a read the
- * filesystem refuses, or a file JSON.parse rejects, leaves the rest of the
- * audit reporting instead of a stack trace.
- */
+/** The English catalog, flattened: `readAuditedCatalog` for the `en` tag. */
 export function readEnglishCatalog(localesDir = LOCALES_DIR) {
   return readAuditedCatalog('en', localesDir);
 }
@@ -639,8 +630,7 @@ function auditKeys(scan) {
 
 /**
  * The variable-key counted calls that are not in `DYNAMIC_COUNTED_KEYS`. Each
- * one is a call whose possible messages the audit cannot see. It projects a
- * scan the caller made once with `auditCountedCalls`.
+ * one is a call whose possible messages the audit cannot see.
  */
 export function findUnlistedDynamicCalls(scan) {
   return collectDynamicCountedCalls(scan).filter(
@@ -652,10 +642,10 @@ export function findUnlistedDynamicCalls(scan) {
  * The counted keys — literal, or produced by a reviewed dynamic call — that
  * are neither a plural family in English nor a reviewed `NO_AGREEMENT` entry.
  * Empty on a healthy tree; every entry is a message whose count cannot select
- * a form. It projects a scan the caller made once with `auditCountedCalls` and
- * checks it against the `english` catalog the caller read once. Without an
- * English catalog there is no family to judge against, so every key would look
- * countless; the caller's one problem line already names the cause instead.
+ * a form. The rule checks the scan against the `english` catalog the caller read
+ * once. Without an English catalog there is no family to judge against, so every
+ * key would look countless; the caller's one problem line already names the
+ * cause instead.
  */
 export function findCountlessFamilies(scan, english) {
   if (english === null) {
@@ -697,9 +687,6 @@ function run() {
   const englishRead = readEnglishCatalog();
   const english = englishRead.catalog;
   problems.push(...englishRead.problems);
-  // The scan already read every file below the source root, the declaration
-  // modules included, so it owns their parse diagnostics; the declaration check
-  // skips the lines this scan already reported.
   const unparsed = findUnparsedFiles(scan);
   const reported = new Set(unparsed);
 

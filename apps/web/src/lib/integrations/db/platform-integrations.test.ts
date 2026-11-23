@@ -23,7 +23,6 @@ import {
   unsuspendIntegration,
   unsuspendIntegrationForOwner,
   updateIntegrationMetadataForOwner,
-  updateIntegrationRepositories,
   upsertPlatformIntegrationForOwner,
 } from './platform-integrations';
 import type { Owner } from '../core/types';
@@ -37,6 +36,7 @@ import {
 } from '@/lib/code-reviews/db/code-reviews';
 
 const INSTALLATION_ID = `test-github-install-${Date.now()}`;
+const GITLAB_INSTALLATION_ID = `test-gitlab-install-${Date.now()}`;
 
 describe('upsertPlatformIntegrationForOwner', () => {
   const userId = `test-upsert-user-${Date.now()}`;
@@ -102,6 +102,15 @@ describe('upsertPlatformIntegrationForOwner', () => {
     repositories: null,
     installedAt: new Date().toISOString(),
     githubAppType: 'standard' as const,
+  });
+
+  const gitlabData = (overrides: Partial<{ platformAccountLogin: string }> = {}) => ({
+    platform: 'gitlab',
+    integrationType: 'pat',
+    platformInstallationId: GITLAB_INSTALLATION_ID,
+    platformAccountId: '4242',
+    platformAccountLogin: overrides.platformAccountLogin ?? 'kilo-test',
+    repositoryAccess: 'all' as const,
   });
 
   test('inserts a new GitHub installation for a user owner', async () => {
@@ -912,36 +921,6 @@ describe('upsertPlatformIntegrationForOwner', () => {
       ]);
     }
 
-    // The installation-scoped update matches by installation id, so its
-    // app-type predicate only matters when two rows share one installation id.
-    // That arrangement is legal only across owners (one row per app type).
-    async function seedOrgInstallationSiblings() {
-      await db.insert(platform_integrations).values([
-        {
-          owned_by_organization_id: orgId,
-          platform: 'github',
-          integration_type: 'app',
-          platform_installation_id: destructiveInstallId,
-          platform_account_id: '1000',
-          platform_account_login: 'org-a',
-          repository_access: 'all',
-          integration_status: 'active',
-          github_app_type: 'standard',
-        },
-        {
-          owned_by_organization_id: otherOrgId,
-          platform: 'github',
-          integration_type: 'app',
-          platform_installation_id: destructiveInstallId,
-          platform_account_id: '2000',
-          platform_account_login: 'org-b',
-          repository_access: 'all',
-          integration_status: 'active',
-          github_app_type: 'lite',
-        },
-      ]);
-    }
-
     test('deleteIntegration with app type leaves the owner sibling app-type row', async () => {
       await seedOrgSiblings();
 
@@ -1299,26 +1278,6 @@ describe('upsertPlatformIntegrationForOwner', () => {
       expect(lite?.integration_status).toBe('suspended');
     });
 
-    test('updateIntegrationRepositories with app type updates only the matched row', async () => {
-      await seedOrgInstallationSiblings();
-
-      await updateIntegrationRepositories(
-        'github',
-        destructiveInstallId,
-        [{ id: 999, name: 'new-repo', full_name: 'acme/new-repo', private: false }],
-        'standard'
-      );
-
-      const rows = await getRowsByInstallId();
-      expect(rows).toHaveLength(2);
-      const standard = rows.find(row => row.github_app_type === 'standard');
-      const lite = rows.find(row => row.github_app_type === 'lite');
-      expect(standard?.repositories).toEqual([
-        { id: 999, name: 'new-repo', full_name: 'acme/new-repo', private: false },
-      ]);
-      expect(lite?.repositories).toBeNull();
-    });
-
     // Two rows for the same owner, same app type, but different installation
     // ids are legal (the GitHub unique index is keyed per installation id).
     // A mutation scoped only to owner and app type would touch both rows; the
@@ -1486,6 +1445,88 @@ describe('upsertPlatformIntegrationForOwner', () => {
       expect(matched?.integration_status).toBe('active');
       expect(sibling?.integration_status).toBe('suspended');
     });
+  });
+
+  test('a non-GitHub upsert inside a rolled-back caller transaction leaves no row', async () => {
+    await expect(
+      db.transaction(async tx => {
+        const result = await upsertPlatformIntegrationForOwner(
+          { type: 'user', id: userId },
+          gitlabData(),
+          tx
+        );
+        expect(result).toEqual({ ok: true });
+
+        const [inside] = await tx
+          .select()
+          .from(platform_integrations)
+          .where(
+            and(
+              eq(platform_integrations.owned_by_user_id, userId),
+              eq(platform_integrations.platform, 'gitlab')
+            )
+          );
+        expect(inside?.platform_installation_id).toBe(GITLAB_INSTALLATION_ID);
+
+        throw new Error('rollback');
+      })
+    ).rejects.toThrow('rollback');
+
+    const rows = await db
+      .select()
+      .from(platform_integrations)
+      .where(
+        and(
+          eq(platform_integrations.owned_by_user_id, userId),
+          eq(platform_integrations.platform, 'gitlab')
+        )
+      );
+    expect(rows).toHaveLength(0);
+  });
+
+  test('a non-GitHub upsert that refreshes an existing row joins the caller transaction', async () => {
+    const owner: Owner = { type: 'user', id: userId };
+    const first = await upsertPlatformIntegrationForOwner(
+      owner,
+      gitlabData({ platformAccountLogin: 'original' })
+    );
+    expect(first).toEqual({ ok: true });
+
+    await expect(
+      db.transaction(async tx => {
+        const result = await upsertPlatformIntegrationForOwner(
+          owner,
+          gitlabData({ platformAccountLogin: 'rolled-back' }),
+          tx
+        );
+        expect(result).toEqual({ ok: true });
+
+        const [inside] = await tx
+          .select()
+          .from(platform_integrations)
+          .where(
+            and(
+              eq(platform_integrations.owned_by_user_id, userId),
+              eq(platform_integrations.platform, 'gitlab')
+            )
+          );
+        expect(inside?.platform_account_login).toBe('rolled-back');
+
+        throw new Error('rollback');
+      })
+    ).rejects.toThrow('rollback');
+
+    const rows = await db
+      .select()
+      .from(platform_integrations)
+      .where(
+        and(
+          eq(platform_integrations.owned_by_user_id, userId),
+          eq(platform_integrations.platform, 'gitlab')
+        )
+      );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].platform_account_login).toBe('original');
   });
 });
 

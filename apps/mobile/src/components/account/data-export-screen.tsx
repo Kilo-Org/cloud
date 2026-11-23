@@ -5,6 +5,8 @@ import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { ExportRow } from '@/components/account/data-export-row';
+import { CenteredState } from '@/components/centered-state';
+import { useShortCenteredBand } from '@/components/centered-state-band';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
@@ -27,6 +29,25 @@ import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { useTRPC } from '@/lib/trpc';
 
 const SKELETON_ROWS = [0, 1];
+
+/** The stack the unavailable answer paints — the notice's disc, title line and
+ *  two description lines — so that answer lands where the reserve painted. The
+ *  read error keeps the same band but carries its retry action below the copy,
+ *  which this reserve does not hold. A short band drops the disc, as the notice
+ *  it reserves does. */
+function ReleaseCheckSkeleton() {
+  const shortBand = useShortCenteredBand();
+  return (
+    <View className="items-center gap-4" testID="data-export-release-check">
+      {shortBand ? null : <Skeleton className="h-14 w-14 rounded-full" />}
+      <View className="items-center gap-1">
+        <Skeleton className="h-6 w-40 rounded" />
+        <Skeleton className="h-4 w-56 max-w-full rounded" />
+        <Skeleton className="h-4 w-32 max-w-full rounded" />
+      </View>
+    </View>
+  );
+}
 
 /** The emailed-code step: either closed, or open for one export. */
 type ExportChallenge =
@@ -133,19 +154,12 @@ export function DataExportScreen() {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={t('profile.dataExport.title')} backFallback={PROFILE_TAB_HREF} />
-        <View className={SCREEN_BODY_CLASS}>
-          {/* The description line, the request action and the list keep their
-              settled heights, so the page does not move when the release check
-              answers and the real content arrives. */}
-          <RowGroup>
-            {SKELETON_ROWS.map(row => (
-              // The export row's subtitle is the server's own status sentence,
-              // which the row lets run to two lines.
-              <RowSkeleton key={row} tile lines={3} />
-            ))}
-          </RowGroup>
-          <Skeleton className="h-11 rounded-md" />
-        </View>
+        <CenteredState>
+          {/* The two whole-surface answers — the notice and the read error —
+              land in this same centered band; the released answer becomes the
+              content screen below the header instead. */}
+          <ReleaseCheckSkeleton />
+        </CenteredState>
       </View>
     );
   }
@@ -164,6 +178,7 @@ export function DataExportScreen() {
       <View className="flex-1 bg-background">
         <ScreenHeader title={t('profile.dataExport.title')} backFallback={PROFILE_TAB_HREF} />
         <EmptyState
+          placement="center"
           icon={Archive}
           title={t('profile.dataExport.unavailableTitle')}
           description={t('profile.dataExport.unavailableDescription')}

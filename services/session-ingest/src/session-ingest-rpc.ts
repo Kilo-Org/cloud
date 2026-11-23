@@ -158,7 +158,10 @@ function databaseTimestampToMilliseconds(value: string): number {
 }
 
 function organizationMembershipJoin(kiloUserId: string) {
-  return organizationMembershipJoinCondition(kiloUserId, cli_sessions_v2.organization_id);
+  return organizationMembershipJoinCondition({
+    kiloUserId,
+    organizationIdColumn: cli_sessions_v2.organization_id,
+  });
 }
 
 function organizationJoin() {
@@ -170,7 +173,10 @@ function personalOrAccessibleOrganizationCondition() {
 }
 
 function worktreeOrganizationMembershipJoin(kiloUserId: string) {
-  return organizationMembershipJoinCondition(kiloUserId, cloud_agent_worktrees.organization_id);
+  return organizationMembershipJoinCondition({
+    kiloUserId,
+    organizationIdColumn: cloud_agent_worktrees.organization_id,
+  });
 }
 
 function worktreeOrganizationJoin() {

@@ -63,9 +63,9 @@ export type AgentAttachmentCandidate = {
 
 /**
  * How many local images are encoded at once when a message is sent. One decode
- * is already bounded to `MAX_EDGE`, so this is what keeps the peak independent
- * of how many photos the sender attached; two keeps a multi-photo send from
- * paying every encode in series.
+ * is already bounded to `AGENT_ATTACHMENT_IMAGE_MAX_EDGE`, so this is what keeps
+ * the peak independent of how many photos the sender attached; two keeps a
+ * multi-photo send from paying every encode in series.
  */
 const CONCURRENT_LOCAL_READS = 2;
 

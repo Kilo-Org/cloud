@@ -9,6 +9,7 @@ import { Text } from '@/components/ui/text';
 import {
   isAttentionAcked,
   shouldShowNeedsInput,
+  useSessionAttentionHydration,
   useSessionAttentionRevision,
 } from '@/lib/session-attention';
 
@@ -43,17 +44,36 @@ export function SessionPreviewHeaderMeta({
 }: Readonly<SessionPreviewHeaderMetaProps>) {
   const { t } = useTranslation();
   // Re-renders when an ack lands, so a raise the user already answered stops
-  // reading as needs input (the row does the same).
+  // reading as needs input (the row does the same). The hydration phase is read
+  // beside the revision: the ack store answers "not acked" for every raise while
+  // it loads, so the header holds its state label until that settles.
   useSessionAttentionRevision();
+  const hydration = useSessionAttentionHydration();
 
   const raiseId = liveRow ? (liveRow.status_updated_at ?? liveRow.status ?? null) : null;
-  const needsInput = liveRow
-    ? shouldShowNeedsInput({
-        status: liveRow.status,
-        raiseId,
-        isAcked: isAttentionAcked(target.sessionId, { raiseId, status: liveRow.status }),
-      })
-    : target.needsInput;
+  /* Which status this header decides from. A live row is re-read every poll and
+     wins outright, including when it reports no status: a finished row has no
+     raise, so the header must not fall back to the status the target was opened
+     with. A preview that outlives its row carries the row's own status and
+     status time, and re-derives from those: the flag it was opened with may be
+     the `false` a held store reported, which would otherwise keep the state
+     label hidden after the store hydrated. A target that carries no status has
+     nothing to re-derive from and keeps its flag. */
+  const previewStatus = liveRow ? liveRow.status : target.status;
+  // The same raise identity the row uses: its own status time when it has one,
+  // so an ack naming that exact raise is honoured here too.
+  const previewRaiseId = liveRow ? raiseId : (target.statusUpdatedAt ?? target.status ?? null);
+  const needsInput =
+    previewStatus === undefined
+      ? target.needsInput
+      : shouldShowNeedsInput({
+          status: previewStatus,
+          hydration,
+          isAcked: isAttentionAcked(target.sessionId, {
+            raiseId: previewRaiseId,
+            status: previewStatus,
+          }),
+        });
   const liveStatus = liveRow?.status ?? null;
   const rowStatusKind: GlanceableStatusKind | null =
     liveStatus === null ? null : glanceableStatusKind(liveStatus);

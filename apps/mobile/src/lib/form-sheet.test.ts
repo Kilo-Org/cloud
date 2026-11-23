@@ -72,10 +72,6 @@ describe('useFormSheetDetents', () => {
   });
 
   it('takes the inset the startup metrics carry while the provider answers 0', () => {
-    // The provider has not measured yet and answers 0. `StatusBar.currentHeight`
-    // stops at the status bar and leaves out the display cutout, which put the
-    // list settings sheet 13.7 dp inside the top inset; the startup metrics are
-    // the same native read the provider will report.
     mocks.dimensions.height = 914;
     mocks.statusBar.currentHeight = 24;
     mocks.initial.insets.top = 51.8;
@@ -112,9 +108,6 @@ describe('useFormSheetScreenOptions', () => {
     vi.clearAllMocks();
   });
 
-  // Without this the Android sheet is measured against the top-inset-reduced
-  // height and then lifted again by the bottom gesture inset, so its surface
-  // stops above the window bottom and the screen behind it shows through.
   it('overflows the top inset on Android so the detent fills the window bottom', () => {
     mocks.insets.top = 47;
 
@@ -192,8 +185,6 @@ describe('sheetHeaderTopClearance', () => {
         statusBar: 51.81,
       })
     ).toBe(0);
-    // A window with no inset of its own leaves the sheet edge at the window
-    // top, where the header clears the status bar and the landscape corner.
     expect(clearance('bottom-form-sheet', 'android')).toBe(0);
     expect(clearance('bottom-form-sheet', 'android', { screen: 24 })).toBe(24);
   });

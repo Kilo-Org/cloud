@@ -42,8 +42,6 @@ describe('claimHeaderBack', () => {
     const state = freshState();
     claimHeaderBack(state, T0);
 
-    // A wall clock that stepped back must not hold every press out until the
-    // clock catches up with the recorded time.
     expect(claimHeaderBack(state, T0 - 3_600_000)).toBe(true);
     expect(state.lastBackAt).toBe(T0 - 3_600_000);
   });

@@ -62,15 +62,19 @@ function insertRun(sqlite: DatabaseSync, id: string, options: RunOptions = {}) {
     .prepare(`
     INSERT INTO benchmark_runs (
       id, router, kind, purpose, status, started_at,
-      min_accuracy, switch_cost_factor, max_concurrency, repetitions, engine_identity
-    ) VALUES (?, ?, ?, ?, 'running', ?, 0.7, 3, 4, 1, 'scheduler-storage-test')
+      min_accuracy, switch_cost_factor, max_concurrency, repetitions, engine_identity,
+      admission_marker
+    ) VALUES (?, ?, ?, ?, 'running', ?, 0.7, 3, 4, 1, 'scheduler-storage-test', ?)
   `)
     .run(
       id,
       options.router ?? 'efficient',
       options.kind ?? 'decider',
       options.purpose ?? 'platform',
-      options.startedAt ?? new Date(NOW).toISOString()
+      options.startedAt ?? new Date(NOW).toISOString(),
+      // These fixtures are post-cutover work: a real admission marker is what makes a run
+      // claimable at all.
+      crypto.randomUUID()
     );
 }
 
@@ -159,6 +163,9 @@ describe('scheduler (production migrations and real SQLite)', () => {
     filename = join(directory, 'scheduler.sqlite');
     sqlite = new DatabaseSync(filename);
     applyBenchmarkMigrations(sqlite);
+    sqlite
+      .prepare('INSERT INTO benchmark_cutover (id, cutover_at) VALUES (1, ?)')
+      .run('1970-01-01T00:00:00.000Z');
     db = sqliteD1(sqlite);
   });
 

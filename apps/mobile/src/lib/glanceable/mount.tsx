@@ -10,7 +10,11 @@ import {
 import { useAuth } from '@/lib/auth/auth-context';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useOrganization } from '@/lib/organization-context';
-import { useSessionAttentionRevision } from '@/lib/session-attention';
+import {
+  getHydrationSnapshot,
+  useSessionAttentionHydration,
+  useSessionAttentionRevision,
+} from '@/lib/session-attention';
 import { useTRPC } from '@/lib/trpc';
 
 import { resolveAnsweredRaises } from './attention-rows';
@@ -51,8 +55,11 @@ export function GlanceablePublisherMount(): null {
 
   // Answering a raise from the needs-input notification writes an ack that the
   // in-app list reads; the counts below must drop it too, so re-derive on every
-  // ack revision instead of only on tray events.
+  // ack revision instead of only on tray events. The store's hydration phase is
+  // read beside it: while it loads every raise reads as unanswered, so the
+  // ack-derived publish is held until it settles.
   const attentionRevision = useSessionAttentionRevision();
+  const attentionHydration = useSessionAttentionHydration();
 
   const signedIn = token != null;
 
@@ -110,6 +117,13 @@ export function GlanceablePublisherMount(): null {
       // answered raise counts as idle until its status syncs, but the session
       // has not finished.
       syncFollowedSessionCards(sessions, checkedAt);
+      // Hold the ack-derived publish while the store is still loading: it
+      // answers "not acked" for every raise, so a derive now would put back a
+      // badge and a count the person already answered. The effect below
+      // re-derives from the cache when the phase settles.
+      if (getHydrationSnapshot() === 'loading') {
+        return;
+      }
       publisher.handleSessions(resolveAnsweredRaises(sessions), ctx, checkedAt);
     };
 
@@ -160,6 +174,12 @@ export function GlanceablePublisherMount(): null {
   ]);
 
   useEffect(() => {
+    // A held store publishes nothing: it answers "not acked" for every raise,
+    // so this republish would restore a count the person already answered.
+    // Settling re-runs the effect, which is what re-derives after the hold.
+    if (attentionHydration === 'loading') {
+      return;
+    }
     const current = live.current;
     if (current === null) {
       return;
@@ -172,7 +192,7 @@ export function GlanceablePublisherMount(): null {
         queryClient.getQueryState(queryKey)?.dataUpdatedAt ?? 0
       );
     }
-  }, [attentionRevision, queryClient, queryKey]);
+  }, [attentionRevision, attentionHydration, queryClient, queryKey]);
 
   useEffect(() => {
     if (!restored || !isLoaded || authLoading || restoreFailed) {

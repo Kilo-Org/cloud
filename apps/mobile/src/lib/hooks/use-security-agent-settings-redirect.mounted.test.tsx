@@ -20,7 +20,6 @@ const focus = vi.hoisted(() => ({
 }));
 
 vi.mock('expo-router', () => ({
-  useRouter: () => ({ replace }),
   // The redirect is the subject here; the guard half of the module only needs
   // its own imports to resolve.
   useNavigation: () => navigation,
@@ -30,6 +29,14 @@ vi.mock('expo-router', () => ({
     useEffect(effect, [effect]);
   },
 }));
+// The deferred swap has its own suite (`settled-replace.mounted.test.tsx`); this
+// one asserts the bounce's destinations, so it dispatches them directly.
+vi.mock('@/lib/navigation/settled-replace', () => {
+  // One stable object, like the real memoized hook: a fresh one per render would
+  // re-register the focus effect below on every render.
+  const settled = { replace };
+  return { useSettledReplace: () => settled };
+});
 // The guard's confirmation renders through the app dialog, which reaches a
 // React Native native module this project cannot load.
 vi.mock('@/components/ui/dialog', () => ({

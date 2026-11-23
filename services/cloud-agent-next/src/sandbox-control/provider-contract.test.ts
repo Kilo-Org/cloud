@@ -36,6 +36,9 @@ import type { SessionCredentialGrant } from './session-credentials.js';
 import { buildControlNetworkPolicy } from './session-credentials.js';
 import { CONTROL_SUPERVISOR_PATH, CONTROL_WRAPPER_LOG_PATH } from './container-paths.js';
 import { leaseAtLeastMs } from './deadlines.js';
+import { awsProviderFixture } from '../../test/fixtures/aws-provider.js';
+import { encodeAwsProviderRef } from './aws-operation.js';
+import type { CloudAgentRunContainer } from '@kilocode/worker-utils/cloud-agent-queue-report';
 
 /**
  * The shared provider-adapter contract, exercised against the two real
@@ -83,6 +86,8 @@ const vercelConfig: VercelSandboxRuntimeConfig = {
  * implements them over one adapter and its backend's observed state.
  */
 type ContractHarness = {
+  expectedRuntime?: CloudAgentRunContainer;
+  leaseModel?: 'fixed';
   name: AgentSandboxProvider;
   adapter: ProviderAdapter;
   /** Resolve a fresh owned ref through the adapter's own `create`. */
@@ -355,10 +360,45 @@ function vercelHarness(): ContractHarness {
  * below then runs against the new adapter. The retired `cloudflare` provider
  * starts no compute and has no harness.
  */
+function awsHarness(): ContractHarness {
+  const fixture = awsProviderFixture(SANDBOX);
+  const adapter = fixture.adapter();
+  return {
+    name: 'aws',
+    adapter,
+    create: () => requireRef(adapter),
+    foreignRef: () =>
+      encodeAwsProviderRef({
+        provider: 'aws',
+        sandboxId: FOREIGN,
+        intentId: intent.intentId,
+        createdAt: 0,
+      }),
+    setRunning: fixture.setRunning,
+    failObserve: fixture.failObserve,
+    failStop: fixture.failStop,
+    failCreate: () => fixture.failRuntime(new ProviderCreationError('invalid_configuration')),
+    launchedEnv: () => fixture.launchedDocument()?.env,
+    launchSupervisor: () => undefined,
+    launchInvocation: () => fixture.launchedDocument()?.argv,
+    leaseCalls: () => 0,
+    leaseMs: () => [],
+    leaseModel: 'fixed',
+    expectedRuntime: {
+      provider: 'aws',
+      sandboxId: SANDBOX,
+      instanceId: intent.intentId,
+      region: 'us-east-1',
+      instanceType: 'microvm-8g',
+    },
+  };
+}
+
 const harnessFactories: Record<
   Exclude<AgentSandboxProvider, 'cloudflare'>,
   () => ContractHarness
 > = {
+  aws: awsHarness,
   'cloudflare-containers': () => containersHarness(),
   vercel: vercelHarness,
 };
@@ -372,20 +412,22 @@ describe.each(Object.values(harnessFactories).map(factory => [factory().name, fa
       harness.failObserve();
       harness.failCreate();
       const container = harness.adapter.describeRuntime?.(ref);
-      expect(container).toEqual({
-        provider: harness.name,
-        sandboxId: SANDBOX,
-        instanceId: harness.name === 'vercel' ? 'session-1' : intent.intentId,
-        ...(harness.name === 'vercel'
-          ? {
-              region: 'fra1',
-              instanceType: 'small',
-              snapshotId: 'snapshot',
-              runtimeBuildId: 'build',
-              startSource: 'snapshot',
-            }
-          : { instanceType: 'standard-3' }),
-      });
+      expect(container).toEqual(
+        harness.expectedRuntime ?? {
+          provider: harness.name,
+          sandboxId: SANDBOX,
+          instanceId: harness.name === 'vercel' ? 'session-1' : intent.intentId,
+          ...(harness.name === 'vercel'
+            ? {
+                region: 'fra1',
+                instanceType: 'small',
+                snapshotId: 'snapshot',
+                runtimeBuildId: 'build',
+                startSource: 'snapshot',
+              }
+            : { instanceType: 'standard-3' }),
+        }
+      );
       expect(harness.adapter.describeRuntime?.(harness.foreignRef())).toBeUndefined();
       expect(harness.adapter.describeRuntime?.('invalid')).toBeUndefined();
     });
@@ -427,6 +469,7 @@ describe.each(Object.values(harnessFactories).map(factory => [factory().name, fa
     it('observes an owned ref active, then terminal once the backend reports it gone', async () => {
       const harness = factory();
       const ref = await harness.create();
+      await harness.adapter.launch(ref, { command: supervisorStartup(), env: {} });
 
       harness.setRunning(true);
       await expect(harness.adapter.observe(ref, intent)).resolves.toMatchObject({
@@ -442,6 +485,7 @@ describe.each(Object.values(harnessFactories).map(factory => [factory().name, fa
     it('observes a backend failure as unknown, not as a lost sandbox', async () => {
       const harness = factory();
       const ref = await harness.create();
+      await harness.adapter.launch(ref, { command: supervisorStartup(), env: {} });
 
       harness.failObserve();
       await expect(harness.adapter.observe(ref, intent)).resolves.toMatchObject({
@@ -452,6 +496,7 @@ describe.each(Object.values(harnessFactories).map(factory => [factory().name, fa
     it('stops an owned ref as terminal when the backend confirms', async () => {
       const harness = factory();
       const ref = await harness.create();
+      await harness.adapter.launch(ref, { command: supervisorStartup(), env: {} });
 
       await expect(harness.adapter.stop(ref)).resolves.toBe('terminal');
     });
@@ -459,6 +504,7 @@ describe.each(Object.values(harnessFactories).map(factory => [factory().name, fa
     it('reports a retryable stop when the backend has not confirmed', async () => {
       const harness = factory();
       const ref = await harness.create();
+      await harness.adapter.launch(ref, { command: supervisorStartup(), env: {} });
 
       harness.failStop();
       await expect(harness.adapter.stop(ref)).resolves.toBe('retryable');
@@ -481,7 +527,8 @@ describe.each(Object.values(harnessFactories).map(factory => [factory().name, fa
       const ref = await harness.create();
 
       await harness.adapter.ensureLeaseAtLeast(ref, OWNED_LEASE_MS);
-      expect(harness.leaseCalls()).toBeGreaterThan(0);
+      if (harness.leaseModel === 'fixed') expect(harness.leaseCalls()).toBe(0);
+      else expect(harness.leaseCalls()).toBeGreaterThan(0);
     });
 
     it('returns non-empty logs for an owned ref', async () => {

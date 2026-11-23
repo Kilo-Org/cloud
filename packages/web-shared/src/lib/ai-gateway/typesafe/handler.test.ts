@@ -187,6 +187,7 @@ const METERED_LATENCY_MS = 3 * CLOCK_STEP_MS;
 const METERED_COMPLETE_REQUEST_MS = 4 * CLOCK_STEP_MS;
 const OTHER_SYSTEM_ONE_MODEL = 'respan/span-01-lite:free';
 const SYSTEM_ONE_ALIAS = '~typesafe/jev-latest';
+const FREE_SYSTEM_ONE_ALIAS = '~respan/span-latest';
 const pricedSystemOneModels: Record<string, GatewayModelWithEndpoints> = {
   [TYPESAFE_MODEL]: {
     id: TYPESAFE_MODEL,
@@ -396,14 +397,16 @@ describe('handleSystemOneRequest', () => {
     jest.mocked(resolveOrganizationMemberModelDecision).mockResolvedValue(memberDecision);
     jest
       .mocked(getOpenRouterSystemOneModelIdsFromDatabase)
-      .mockResolvedValue(new Set([TYPESAFE_MODEL, OTHER_SYSTEM_ONE_MODEL, SYSTEM_ONE_ALIAS]));
+      .mockResolvedValue(
+        new Set([TYPESAFE_MODEL, OTHER_SYSTEM_ONE_MODEL, SYSTEM_ONE_ALIAS, FREE_SYSTEM_ONE_ALIAS])
+      );
     jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue(pricedSystemOneModels);
     jest.mocked(getCachedVercelInferenceProviderIdsForModel).mockResolvedValue(null);
-    jest
-      .mocked(resolveOpenRouterModelAlias)
-      .mockImplementation(async modelId =>
-        modelId === SYSTEM_ONE_ALIAS ? TYPESAFE_MODEL : modelId
-      );
+    jest.mocked(resolveOpenRouterModelAlias).mockImplementation(async modelId => {
+      if (modelId === SYSTEM_ONE_ALIAS) return TYPESAFE_MODEL;
+      if (modelId === FREE_SYSTEM_ONE_ALIAS) return OTHER_SYSTEM_ONE_MODEL;
+      return modelId;
+    });
     jest.mocked(generateProviderSpecificHash).mockReturnValue('hashed-user');
     jest
       .mocked(resolveEmbeddingOrDecisionRoute)
@@ -824,6 +827,36 @@ describe('handleSystemOneRequest', () => {
     });
     expect(getBalanceAndOrgSettings).not.toHaveBeenCalled();
     expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
+  it('classifies a latest alias by the free System One model it serves', async () => {
+    jest.mocked(isFreeModelRateLimited).mockResolvedValue(true);
+
+    const response = await handleSystemOneRequest(
+      makeRequest({ ...requestBody, model: FREE_SYSTEM_ONE_ALIAS })
+    );
+
+    expect(response.status).toBe(429);
+    await expect(response.json()).resolves.toMatchObject({ error_type: 'rate_limit_exceeded' });
+    expect(isFreeModelRateLimited).toHaveBeenCalledWith(expect.anything(), {
+      kind: 'account',
+      kiloUserId: user.id,
+    });
+  });
+
+  it('records the free class of the model a latest alias serves', async () => {
+    jest.mocked(isFreeModelRateLimited).mockResolvedValue(false);
+
+    const response = await handleSystemOneRequest(
+      makeRequest({ ...requestBody, model: FREE_SYSTEM_ONE_ALIAS })
+    );
+
+    expect(response.status).toBe(200);
+    await runAfter();
+    expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
+      expect.objectContaining({ cost_mUsd: 0 }),
+      expect.objectContaining({ requested_model: FREE_SYSTEM_ONE_ALIAS, is_free: true })
+    );
   });
 
   it.each([

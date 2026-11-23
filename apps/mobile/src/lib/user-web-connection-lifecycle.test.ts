@@ -233,10 +233,6 @@ describe('createNativeUserWebConnectionLifecycleHooks', () => {
       onOnline();
     });
 
-    // NetInfo replays the current state to every new listener. An online replay
-    // is a baseline, not a recovery: firing it re-entered the SDK
-    // metadata-recovery retry in a loop on every failed session open, so the
-    // terminal load error never surfaced (p6).
     native.setConnectivity({ isConnected: true, isInternetReachable: true });
     expect(onOnline).not.toHaveBeenCalled();
 

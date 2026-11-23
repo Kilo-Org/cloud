@@ -7,10 +7,11 @@ import { SelectableText } from '@/components/ui/selectable-text';
 
 import { FixedPartRow } from '../fixed-part-row';
 import { useOpenPartDetail } from '../open-part-detail-context';
-import { getToolDisplay, toolPartHasDetails } from '../tool-card-display';
+import { toolPartHasDetails } from '../tool-card-display';
 import { toolStatusLabel } from '../tool-status-label';
 import { buildResultRowsModel } from '../tool-list-model';
 import { ToolResultRows } from '../tool-result-rows';
+import { useToolDisplay } from '../use-tool-display';
 
 /**
  * Sheet body for a grep tool part: one row per result path with the `Found N`
@@ -40,7 +41,7 @@ export function GrepToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
 export function GrepToolCard({ part }: Readonly<{ part: ToolPart }>) {
   const openPartDetail = useOpenPartDetail();
   const { t } = useTranslation();
-  const display = getToolDisplay(part);
+  const display = useToolDisplay(part);
   const hasDetails = toolPartHasDetails(part);
 
   return (

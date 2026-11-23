@@ -42,6 +42,9 @@ const state = vi.hoisted(() => ({
     isPreferred: boolean;
   }[],
   connectivity: 'online' as BannerState,
+  // The reset notice's own state, and the dismiss control the card calls.
+  resetNotice: 'absent' as 'loading' | 'absent' | 'present',
+  dismissResetNotice: vi.fn<() => void>(),
 }));
 
 vi.mock('@/lib/haptics', () => ({ selectionHaptic: vi.fn() }));
@@ -77,8 +80,9 @@ vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
   useCommittedConnectivityStatus: () => state.connectivity,
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({ primaryForeground: '#fff' }),
+  useThemeColors: () => ({ primaryForeground: '#fff', foreground: '#14130F' }),
 }));
+vi.mock('@/lib/a11y/announce', () => ({ announceForA11y: vi.fn() }));
 vi.mock('@/lib/tab-bar-clearance', () => ({ useEffectiveTabBarHeight: () => 0 }));
 vi.mock('@/lib/tab-bar-layout', () => ({ getEffectiveTabBarHeight: () => 0 }));
 vi.mock('sonner-native', () => ({
@@ -117,6 +121,7 @@ vi.mock('@/components/ui/icons', () => ({
   MessageCirclePlus: 'MessageCirclePlus',
   Plus: 'Plus',
   Server: 'Server',
+  X: 'X',
 }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
@@ -130,6 +135,12 @@ vi.mock('@/lib/chat/gguf-models', () => ({
 }));
 vi.mock('@/components/chat/backend-settings-sheet', () => ({
   BackendSettingsControl: 'BackendSettingsControl',
+}));
+vi.mock('@/lib/persist/use-local-reset-notice', () => ({
+  useLocalResetNotice: () => ({
+    notice: { kind: state.resetNotice },
+    dismiss: state.dismissResetNotice,
+  }),
 }));
 
 let view: Awaited<ReturnType<typeof renderWithProviders>> | undefined = undefined;
@@ -146,6 +157,7 @@ beforeEach(() => {
   state.catalogFailed = false;
   state.models = [{ id: 'm1', name: 'One', isPreferred: true }];
   state.connectivity = 'online';
+  state.resetNotice = 'absent';
   state.newChat.mockResolvedValue('session-1');
 });
 afterEach(() => {
@@ -299,6 +311,58 @@ describe('the list body names what it knows', () => {
     expect(error?.props.variant).toBe('server');
     expect(typeof error?.props.onRetry).toBe('function');
     expect(bodyNodes(tree, 'EmptyState')).toHaveLength(0);
+  });
+});
+
+describe('the local reset notice', () => {
+  it('explains a reset above the empty state, not instead of it', async () => {
+    state.resetNotice = 'present';
+    const tree = await mount();
+
+    const card = tree.root.findAllByProps({ testID: 'chat-reset-notice' });
+    expect(card.length).toBeGreaterThan(0);
+
+    const text = tree.root
+      .findAll(node => (node.type as string) === 'Text')
+      .map(node => node.props.children as string);
+    expect(text).toContain(i18n.t('modelChat.list.resetNoticeTitle'));
+    expect(text).toContain(i18n.t('modelChat.list.resetNoticeBody'));
+    // The emptied list keeps its own answer under the explanation.
+    expect(tree.root.findAll(node => (node.type as string) === 'EmptyState')).toHaveLength(1);
+  });
+
+  it('dismisses once from the card control', async () => {
+    state.resetNotice = 'present';
+    const tree = await mount();
+
+    const dismiss = tree.root.find(
+      node =>
+        (node.type as string) === 'Pressable' &&
+        node.props.accessibilityLabel === i18n.t('modelChat.list.resetNoticeDismiss')
+    );
+    await act(async () => {
+      (dismiss.props.onPress as () => void)();
+      await Promise.resolve();
+    });
+
+    expect(state.dismissResetNotice).toHaveBeenCalledTimes(1);
+  });
+
+  it('draws no card in the empty state when there was no reset', async () => {
+    state.resetNotice = 'absent';
+    const tree = await mount();
+
+    expect(tree.root.findAllByProps({ testID: 'chat-reset-notice' })).toHaveLength(0);
+    expect(tree.root.findAll(node => (node.type as string) === 'EmptyState')).toHaveLength(1);
+  });
+
+  it('draws no card over answered rows when there was no reset', async () => {
+    state.resetNotice = 'absent';
+    state.chats = [{ sessionId: 's1', model: 'm1', title: 'First chat', updatedAt: 1 }];
+    const tree = await mount();
+
+    expect(tree.root.findAllByProps({ testID: 'chat-reset-notice' })).toHaveLength(0);
+    expect(tree.root.findAll(node => (node.type as string) === 'FlashList')).toHaveLength(1);
   });
 });
 

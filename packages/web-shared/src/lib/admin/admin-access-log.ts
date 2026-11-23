@@ -211,7 +211,6 @@ export type AdminAccessEvent =
       target: string | null;
     });
 
-/** The `kind` discriminant of {@link AdminAccessEvent}. */
 export type AdminAccessKind = AdminAccessEvent['kind'];
 
 export type AdminAccessSink = (event: AdminAccessEvent) => void;
@@ -598,11 +597,13 @@ export async function recordKiloAdminElevation(
     // is always correct. `tokenSource` only adds granularity *within* the token
     // case, and null is already one of its documented values.
     await recordKiloAdminElevationForRequest({
+      // The elevation record passes through unchanged, so a field added to it
+      // reaches this sink without being listed again here. The transport
+      // fields follow the spread and always win.
+      ...params,
       user: ctx.user,
       tokenSource: ctx.tokenSource,
       internalApiUse: ctx.internalApiUse,
-      reason: params.reason,
-      target: params.target,
       surface: ctx.auditSurface,
       method: ctx.auditMethod,
       route: ctx.auditRoute,
@@ -611,14 +612,6 @@ export async function recordKiloAdminElevation(
       // read from the ambient store would attribute one event to two requests.
       headersList: ctx.headersList,
       delegatedWorkload: ctx.delegatedWorkload,
-      membershipRole: params.membershipRole,
-      wouldPassWithoutAdmin: params.wouldPassWithoutAdmin,
-      supportDecision: params.supportDecision,
-      supportGrantId: params.supportGrantId,
-      supportActionId: params.supportActionId,
-      inventoryId: params.inventoryId,
-      supportInheritedFromOrganizationId: params.supportInheritedFromOrganizationId,
-      issuanceId: params.issuanceId,
     });
     return;
   }
@@ -658,11 +651,16 @@ export async function elevateViaKiloAdmin<const TGrant>(
   return params.grant;
 }
 
-export type KiloAdminElevationRequestParams = {
+/**
+ * Request params for a route handler or server-component elevation: the
+ * transport-independent {@link ElevationRecord} plus the request's own
+ * attribution. Deriving from the record rather than re-listing its fields keeps
+ * both transports in step: a field added to an elevation is part of these params
+ * by construction, so the headers path cannot silently drop it.
+ */
+export type KiloAdminElevationRequestParams = ElevationRecord & {
   user: AdminAccessUser;
   tokenSource?: string | null;
-  reason: KiloAdminElevationReason;
-  target: string;
   surface?: AdminAccessSurface;
   /** The actual Request method when the caller has one. */
   method?: string;
@@ -672,13 +670,7 @@ export type KiloAdminElevationRequestParams = {
   headersList?: Headers;
   internalApiUse?: boolean;
   delegatedWorkload?: boolean;
-  supportDecision?: SupportDecision | null;
-  supportGrantId?: string | null;
-  supportActionId?: string | null;
-  inventoryId?: string | null;
-  supportInheritedFromOrganizationId?: string | null;
-  issuanceId?: string | null;
-} & ElevationMembershipObservation;
+};
 
 /**
  * {@link recordKiloAdminElevation} for route handlers and server components,

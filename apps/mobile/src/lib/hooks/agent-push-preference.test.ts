@@ -166,7 +166,6 @@ describe('spendAlerts optimistic flip (agreement with the spend view column)', (
       next: false,
       category: 'spendAlerts',
     });
-    // The flip lands on spendAlerts only: the sibling balance row is untouched.
     expect(readAgentPushPreference(qc, key, 'spendAlerts')).toBe(false);
     expect(readAgentPushPreference(qc, key, 'balanceAlerts')).toBe(true);
 

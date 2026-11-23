@@ -20,7 +20,8 @@ import { readCloudAgentErrorCode } from './cloud-agent-error';
 type CreateWorktreeChatOptions = {
   user: User;
   headersList?: Headers;
-  sourceKiloSessionId: string;
+  sourceKiloSessionId?: string;
+  cloudAgentSessionId?: string;
   operationKey: string;
   kiloSessionId?: string;
   organizationId?: string;
@@ -78,10 +79,14 @@ export async function createWorktreeChat({
   user,
   headersList,
   sourceKiloSessionId,
+  cloudAgentSessionId,
   operationKey,
   kiloSessionId,
   organizationId,
 }: CreateWorktreeChatOptions): Promise<CreateWorktreeChatOutput> {
+  if (sourceKiloSessionId === undefined && cloudAgentSessionId === undefined) {
+    throw new TRPCError({ code: 'BAD_REQUEST', message: 'A source session is required' });
+  }
   if (isMobileClient(headersList?.get(APP_CLIENT_HEADER))) {
     throw new TRPCError({
       code: 'FORBIDDEN',
@@ -99,18 +104,27 @@ export async function createWorktreeChat({
 
   const [source] = await db
     .select({
+      kiloSessionId: cli_sessions_v2.session_id,
       cloudAgentSessionId: cli_sessions_v2.cloud_agent_session_id,
       worktreeId: cli_sessions_v2.cloud_agent_worktree_id,
     })
     .from(cli_sessions_v2)
     .leftJoin(
       organization_memberships,
-      organizationMembershipJoinCondition(user.id, cli_sessions_v2.organization_id)
+      organizationMembershipJoinCondition({
+        kiloUserId: user.id,
+        organizationIdColumn: cli_sessions_v2.organization_id,
+      })
     )
     .leftJoin(organizations, activeOrganizationJoinCondition(cli_sessions_v2.organization_id))
     .where(
       and(
-        eq(cli_sessions_v2.session_id, sourceKiloSessionId),
+        sourceKiloSessionId === undefined
+          ? undefined
+          : eq(cli_sessions_v2.session_id, sourceKiloSessionId),
+        cloudAgentSessionId === undefined
+          ? undefined
+          : eq(cli_sessions_v2.cloud_agent_session_id, cloudAgentSessionId),
         eq(cli_sessions_v2.kilo_user_id, user.id),
         organizationCondition
       )
@@ -143,7 +157,7 @@ export async function createWorktreeChat({
   try {
     const client = createCloudAgentNextClient(token);
     const input = {
-      sourceKiloSessionId,
+      sourceKiloSessionId: source.kiloSessionId,
       sourceCloudAgentSessionId: source.cloudAgentSessionId,
       operationKey,
       ...(organizationId ? { kilocodeOrganizationId: organizationId } : {}),

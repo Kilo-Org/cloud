@@ -8,10 +8,10 @@ import { FixedPartRow } from './fixed-part-row';
 import { useOpenPartDetail } from './open-part-detail-context';
 import { useOpenToolRun } from './open-tool-run-context';
 import { buildToolRunCountLabel, buildToolRunLabel, buildToolRunRows } from './session-tool-run';
-import { getToolDisplay } from './tool-card-display';
 import { getToolRowIcon } from './tool-row-icon';
 import { toolStatusLabel } from './tool-status-label';
 import { ToolSummaryTranslationScope } from './tool-summary-translation-scope';
+import { useToolDisplay } from './use-tool-display';
 
 /**
  * One-line rendering of a single tool part: the same `FixedPartRow` chrome the
@@ -25,7 +25,7 @@ export function ToolOneLineRow({
 }: Readonly<{ part: ToolPart; onPress?: () => void }>) {
   const { t } = useTranslation();
   const openPartDetail = useOpenPartDetail();
-  const display = getToolDisplay(part);
+  const display = useToolDisplay(part);
   const label = display.subtitle ?? display.title;
   const defaultPress = openPartDetail
     ? () => {

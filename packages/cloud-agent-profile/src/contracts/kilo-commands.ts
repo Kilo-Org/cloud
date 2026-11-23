@@ -1,10 +1,16 @@
 import * as z from 'zod';
 import { overLimitMessage } from './limit-copy';
+import { MAX_AGENT_SLUG_LENGTH } from './agents';
+import { MAX_BUILTIN_AGENT_MODEL_LENGTH } from '../builtin-agents';
 
 export const MAX_PROFILE_KILO_COMMANDS = 50;
 export const MAX_KILO_COMMAND_NAME_LENGTH = 50;
 export const MAX_KILO_COMMAND_TEMPLATE_LENGTH = 100_000;
 export const MAX_KILO_COMMAND_DESCRIPTION_LENGTH = 2000;
+/** The longest agent identifier a command may name: a profile agent slug or a built-in slug. */
+export const MAX_KILO_COMMAND_AGENT_LENGTH = MAX_AGENT_SLUG_LENGTH;
+/** The longest model identifier a command may name, matching the builtin agent override. */
+export const MAX_KILO_COMMAND_MODEL_LENGTH = MAX_BUILTIN_AGENT_MODEL_LENGTH;
 
 export const BUILTIN_COMMAND_NAMES = new Set([
   'init',
@@ -49,8 +55,20 @@ export const kiloCommandCreateInputSchema = z.object({
       MAX_KILO_COMMAND_TEMPLATE_LENGTH,
       overLimitMessage('Command template', MAX_KILO_COMMAND_TEMPLATE_LENGTH)
     ),
-  agent: z.string().optional(),
-  model: z.string().optional(),
+  agent: z
+    .string()
+    .max(
+      MAX_KILO_COMMAND_AGENT_LENGTH,
+      overLimitMessage('Command agent', MAX_KILO_COMMAND_AGENT_LENGTH)
+    )
+    .optional(),
+  model: z
+    .string()
+    .max(
+      MAX_KILO_COMMAND_MODEL_LENGTH,
+      overLimitMessage('Command model', MAX_KILO_COMMAND_MODEL_LENGTH)
+    )
+    .optional(),
   subtask: z.boolean().optional(),
 });
 
@@ -65,8 +83,22 @@ export const kiloCommandUpdateInputSchema = z.object({
       overLimitMessage('Command template', MAX_KILO_COMMAND_TEMPLATE_LENGTH)
     )
     .optional(),
-  agent: z.string().nullable().optional(),
-  model: z.string().nullable().optional(),
+  agent: z
+    .string()
+    .max(
+      MAX_KILO_COMMAND_AGENT_LENGTH,
+      overLimitMessage('Command agent', MAX_KILO_COMMAND_AGENT_LENGTH)
+    )
+    .nullable()
+    .optional(),
+  model: z
+    .string()
+    .max(
+      MAX_KILO_COMMAND_MODEL_LENGTH,
+      overLimitMessage('Command model', MAX_KILO_COMMAND_MODEL_LENGTH)
+    )
+    .nullable()
+    .optional(),
   subtask: z.boolean().optional(),
 });
 

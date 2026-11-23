@@ -252,6 +252,52 @@ describe('workspace authority checks', () => {
 });
 
 describe('workspace MCP credential', () => {
+  it('signs the setup claim only for the workspace created by the setup session', async () => {
+    const claim = {
+      runId: '22345678-1234-4234-8234-123456789abc',
+      environmentId: '32345678-1234-4234-8234-123456789abc',
+    };
+    const setup = workspaceAuthorityFromAnchor(
+      {
+        metadata: anchorMetadata({ environmentSetup: { ...claim, role: 'setup' } }),
+        authorization: authorization(),
+      },
+      now.getTime()
+    );
+    if (setup === undefined) throw new Error('fixture did not adopt');
+    expect(setup.spawnConfiguration).toBeUndefined();
+
+    const issued = await signWorkspaceMcpGrant({
+      record: setup,
+      pepper: 'current-account-pepper',
+      secret,
+      now: now.getTime(),
+    });
+    const claimedScope = { ...scope, environmentSetup: claim };
+    expect(jwt.verify(issued.token, secret)).toMatchObject({ cloudAgentAuthority: claimedScope });
+    expect(() => assertWorkspaceAuthority(setup, claimedScope, now.getTime())).not.toThrow();
+    expect(() => assertWorkspaceAuthority(setup, scope, now.getTime())).toThrow();
+    expect(() =>
+      assertWorkspaceAuthority(
+        setup,
+        { ...scope, environmentSetup: { ...claim, runId: claim.environmentId } },
+        now.getTime()
+      )
+    ).toThrow();
+    expect(() => assertWorkspaceAuthority(record(), claimedScope, now.getTime())).toThrow();
+
+    const verification = workspaceAuthorityFromAnchor(
+      {
+        metadata: anchorMetadata({ environmentSetup: { ...claim, role: 'verification' } }),
+        authorization: authorization(),
+      },
+      now.getTime()
+    );
+    expect(verification).toBeDefined();
+    expect(verification?.environmentSetup).toBeUndefined();
+    expect(verification?.spawnConfiguration).toBeUndefined();
+  });
+
   it('carries the workspace authority and ends with the workspace delegation', async () => {
     const issued = await signWorkspaceMcpGrant({
       record: record(),
@@ -451,6 +497,7 @@ describe('scoped worker preparation', () => {
       'runtimeAgents',
       'profileId',
       'sandboxAllocation',
+      'environmentSetupRunId',
     ]) {
       expect(() =>
         validateScopedWorkerPreparation(scope, { ...launch, [forbidden]: {} })
@@ -505,7 +552,10 @@ describe('scoped worker preparation', () => {
         operationKey: '33333333-3333-4333-8333-333333333333',
       })
     ).toEqual({
-      ...launch,
+      model: launch.model,
+      mode: launch.mode,
+      prompt: launch.prompt,
+      autoInitiate: true,
       stackOnWorktreeId: parentWorktreeId,
       operationKey: '33333333-3333-4333-8333-333333333333',
     });

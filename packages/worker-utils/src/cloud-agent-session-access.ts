@@ -48,10 +48,10 @@ async function queryAccessibleSession(
   db: SessionAccessDb,
   query: AccessibleSessionQuery
 ): Promise<AccessibleKiloSession | null> {
-  const membershipJoin = organizationMembershipJoinCondition(
-    query.kiloUserId,
-    cli_sessions_v2.organization_id
-  );
+  const membershipJoin = organizationMembershipJoinCondition({
+    kiloUserId: query.kiloUserId,
+    organizationIdColumn: cli_sessions_v2.organization_id,
+  });
   const organizationJoin = activeOrganizationJoinCondition(cli_sessions_v2.organization_id);
   const expectedOrganizationId =
     'expectedOrganizationId' in query ? query.expectedOrganizationId : undefined;

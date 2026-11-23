@@ -83,7 +83,17 @@ export const GLANCEABLE_NEEDS_INPUT_STATUSES = ['question', 'permission', 'retry
 
 export type GlanceableNeedsInputKind = (typeof GLANCEABLE_NEEDS_INPUT_STATUSES)[number];
 
-export const glanceableAgentsSnapshotSchema = z.object({
+/**
+ * The snapshot fields, declared apart from the schema below so the
+ * cross-field refinement can read their types and so a variant can spread the
+ * same fields. The newest-result pairing is enforced once, by
+ * `refineNewestResultPair`.
+ *
+ * A refined object cannot be reshaped: zod refuses `.omit` on it, and
+ * `.extend` silently drops the refinement. A variant that needs a narrower or
+ * wider snapshot spreads this shape and applies the same refiner itself.
+ */
+export const glanceableAgentsSnapshotShape = {
   schemaVersion: z.literal(GLANCEABLE_SNAPSHOT_SCHEMA_VERSION),
   revision: z.number().int().min(1),
   /** Snapshot write time; producers emit the `epochMsToIso` UTC form. */
@@ -150,11 +160,42 @@ export const glanceableAgentsSnapshotSchema = z.object({
   newestResultKind: z.enum(GLANCEABLE_STATUS_KINDS).nullable().default(null),
   /**
    * ISO 8601 timestamp or null: when that newest change happened. Null exactly
-   * when `newestResultKind` is null. Optional on input with a null default for
-   * the same reason as the kind.
+   * when `newestResultKind` is null, a pairing that `refineNewestResultPair`
+   * enforces. Optional on input with a null default for the same reason as the
+   * kind.
    */
   newestResultAt: z.string().nullable().default(null),
-});
+};
+
+/**
+ * The shape's own type, so the refinement below reads the field types from the
+ * shape.
+ */
+const glanceableAgentsSnapshotShapeSchema = z.object(glanceableAgentsSnapshotShape);
+
+/**
+ * `newestResultKind` and `newestResultAt` answer one question: which agent
+ * changed state, and when. A payload that sets one without the other describes
+ * a line the card cannot draw — a kind with no instant to show, or an instant
+ * with no kind to label it. The builder (`buildGlanceableSnapshot`) takes the
+ * pair from one row, so this check never rejects what the repository itself
+ * produces; it rejects a payload assembled anywhere else.
+ */
+export function refineNewestResultPair(
+  data: z.infer<typeof glanceableAgentsSnapshotShapeSchema>,
+  ctx: z.RefinementCtx
+): void {
+  if ((data.newestResultKind === null) !== (data.newestResultAt === null)) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['newestResultAt'],
+      message: 'newestResultAt is present exactly when newestResultKind is not null',
+    });
+  }
+}
+
+export const glanceableAgentsSnapshotSchema =
+  glanceableAgentsSnapshotShapeSchema.superRefine(refineNewestResultPair);
 
 export type GlanceableAgentsSnapshot = z.infer<typeof glanceableAgentsSnapshotSchema>;
 
@@ -167,9 +208,9 @@ export type GlanceableCounts = {
 
 /**
  * The snapshot fields that describe the frame rather than the work in it. A
- * blank-work record must cover every other field of the snapshot, so a work
- * field added to the schema fails to compile here until it is either listed as
- * non-work or blanked by `NO_GLANCEABLE_WORK`.
+ * blank-work record must cover every other field of the snapshot, optional ones
+ * included, so a work field added to the schema fails to compile here until it
+ * is either listed as non-work or blanked by `NO_GLANCEABLE_WORK`.
  */
 type GlanceableFrameField =
   | 'schemaVersion'
@@ -184,12 +225,40 @@ type GlanceableFrameField =
   | 'newestResultAt';
 
 /**
+ * The blank-work record: a value for every work field of the snapshot. The keys
+ * come from an explicit union rather than from `Omit`, and a mapping over an
+ * explicit key union always emits required properties — `Omit` keeps an
+ * optional field's modifier, which is how an optional work fact used to escape
+ * this record. `-?` states that intent.
+ */
+type GlanceableBlankWork<T = GlanceableAgentsSnapshot> = {
+  [K in Exclude<keyof T, GlanceableFrameField>]-?: T[K];
+};
+
+/**
+ * The mapping above is the whole guard, so one assertion pins it: a snapshot
+ * widened with an optional work field must still require that field, so leaving
+ * it out is not a blank-work record. The check is an ambient declaration, so it
+ * compiles away and emits no runtime value.
+ */
+type AssertTrue<T extends true> = T;
+type OptionalWorkSnapshot = GlanceableAgentsSnapshot & { queued?: number };
+declare const _blankWorkRequiresOptionalWorkFields: AssertTrue<
+  Omit<
+    GlanceableBlankWork<OptionalWorkSnapshot>,
+    'queued'
+  > extends GlanceableBlankWork<OptionalWorkSnapshot>
+    ? false
+    : true
+>;
+
+/**
  * The work fields a frame carries when it asserts no work at all: one that has
  * lapsed, and one built for a terminal scope. Both producers spread this one
  * record instead of listing the fields again, so no path can blank a field the
  * other keeps.
  */
-export const NO_GLANCEABLE_WORK: Omit<GlanceableAgentsSnapshot, GlanceableFrameField> = {
+export const NO_GLANCEABLE_WORK: GlanceableBlankWork = {
   running: 0,
   needsInput: 0,
   needsApproval: 0,
@@ -230,12 +299,6 @@ export function glanceableNeedsInputKind(status: string): GlanceableNeedsInputKi
     : null;
 }
 
-/**
- * The snapshot statuses that end the surface: a signed-out or privacy-cleared
- * scope. The one terminal vocabulary: a consumer that maps a terminal status to
- * its own value reads the narrowed status this predicate returns instead of
- * restating the set.
- */
 export const GLANCEABLE_TERMINAL_STATUSES = [
   'signed_out',
   'privacy',
@@ -287,20 +350,12 @@ export function isScheduledSessionRow(session: GlanceableSessionRow): boolean {
 }
 
 /**
- * Map session rows to the glanceable counts. `busy` → running,
- * `question`/`permission`/`retry` → needs-input, `idle` → idle, the literal
- * `scheduled` → scheduled, and any other status (starting, empty, unknown,
- * completed) counts as running: a session is idle only when the agent says
- * so, and no row is dropped from the count its list row shows.
+ * Map session rows to the glanceable counts.
  *
  * `retry` folds into needs-input because it means one thing to the user: the
  * agent is waiting and cannot go on alone. Session-ingest writes it when a CLI
  * disconnects while that session was waiting on an answer, and the CLI writes
  * it while backing off after a provider error.
- *
- * The scheduled count and `isScheduledSessionRow` are the same membership
- * rule, so a row counted as scheduled is one the wake selector and the
- * widget's scheduled list also admit.
  */
 export function countGlanceableSessions(
   sessions: readonly GlanceableSessionRow[]
@@ -324,15 +379,11 @@ export function isApprovableGlanceableStatus(status: string): boolean {
 }
 
 /**
- * The number of session rows whose status is exactly `permission`. A
- * permission wait is the one needs-input kind the user can clear without
- * choosing an option, so the wrist control offers Approve only against this
- * count.
+ * The number of session rows whose status is exactly `permission`, so the
+ * wrist control offers Approve only against this count.
  *
  * Deliberately narrower than `needsInput`: a `question` needs an answer, and a
- * `retry` needs the provider to come back, so neither is approvable. It reads
- * `isApprovableGlanceableStatus`, the same rule the Home widget's approving row
- * reads, so the count and that row cannot drift.
+ * `retry` needs the provider to come back, so neither is approvable.
  */
 export function countGlanceableApprovals(sessions: readonly GlanceableSessionRow[]): number {
   let approvals = 0;
@@ -385,7 +436,6 @@ function extremeTimestampRow(
   extreme: 'earliest' | 'latest'
 ): { at: number; session: GlanceableSessionRow } | null {
   let winner: { at: number; session: GlanceableSessionRow } | null = null;
-  const compare = compareSessionInstant(readTimestamp, extreme);
   for (const session of sessions) {
     if (!qualifies(session)) {
       continue;
@@ -394,7 +444,7 @@ function extremeTimestampRow(
     if (at === null) {
       continue;
     }
-    if (winner !== null && compare(session, winner.session) >= 0) {
+    if (winner !== null && (extreme === 'earliest' ? at >= winner.at : at <= winner.at)) {
       continue;
     }
     winner = { at, session };
@@ -512,8 +562,6 @@ export function buildGlanceableSnapshot(
   input: BuildGlanceableSnapshotInput
 ): GlanceableAgentsSnapshot {
   const counts = countGlanceableSessions(input.sessions);
-  // One normalization: a missing or empty organization id is the personal
-  // scope, so the key and the bound flag cannot read the input differently.
   const organizationId = input.organizationId || null;
   // Idle and scheduled counts: a connected agent doing nothing, or one that
   // will wake later, is still something the user wants on the Lock Screen.

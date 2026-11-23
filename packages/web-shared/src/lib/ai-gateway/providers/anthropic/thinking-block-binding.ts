@@ -4,10 +4,11 @@ import {
   isClaudeModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/claude-model';
 import type { GatewayMessagesRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import { isThinkingContentBlock } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
 import type { TransformRequestContext } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import {
+  createCacheControlCarrier,
   isWhitespaceOnlyMessage,
-  preserveCacheControl,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-whitespace-only-messages';
 
 const THINKING_BINDING_BETA = 'thinking-binding-controls-2026-08-01';
@@ -35,29 +36,28 @@ function stripHistoricalThinkingBlocks(
   messages: GatewayMessagesRequest['messages']
 ): GatewayMessagesRequest['messages'] {
   const cleanedMessages: GatewayMessagesRequest['messages'] = [];
+  const carrier = createCacheControlCarrier();
   for (const message of messages) {
     if (message.role !== 'assistant' || !Array.isArray(message.content)) {
       cleanedMessages.push(message);
+      carrier.keep(message);
       continue;
     }
-    const content = message.content.filter(
-      block => block.type !== 'thinking' && block.type !== 'redacted_thinking'
-    );
+    const content = message.content.filter(block => !isThinkingContentBlock(block));
     if (content.length === message.content.length) {
       cleanedMessages.push(message);
+      carrier.keep(message);
       continue;
     }
     const strippedMessage = { ...message, content };
     if (!isWhitespaceOnlyMessage(strippedMessage)) {
       cleanedMessages.push(strippedMessage);
+      carrier.keep(strippedMessage);
       continue;
     }
-    const previousMessage = cleanedMessages.at(-1);
-    if (previousMessage) {
-      cleanedMessages[cleanedMessages.length - 1] = preserveCacheControl(
-        previousMessage,
-        strippedMessage
-      );
+    const carriedMessage = carrier.drop(strippedMessage);
+    if (carriedMessage) {
+      cleanedMessages[cleanedMessages.length - 1] = carriedMessage;
     }
   }
   return cleanedMessages;

@@ -199,6 +199,7 @@ export type {
   CloudStatus,
   QuestionState,
   PermissionState,
+  UnreadableQuestionState,
   UnreadablePermissionState,
   SlashCommandInfo,
   SlashCommandCatalogStatus,

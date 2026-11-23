@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { type OrgModeConfigInput } from '@/components/organization/org-mode-form-model';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
+import { orgAuditLogQueryKey } from '@/lib/hooks/use-org-billing-queries';
+import { reconcileFirstPage } from '@/lib/query/infinite-retention';
 import { organizationErrorMessage } from '@/lib/server-error-copy';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
@@ -38,6 +40,7 @@ export function useOrgModeMutations(organizationId: string, canManageBilling = f
   };
   const onSuccess = () => {
     void queryClient.invalidateQueries(modesFilter);
+    void reconcileFirstPage(queryClient, orgAuditLogQueryKey(organizationId));
   };
 
   return {

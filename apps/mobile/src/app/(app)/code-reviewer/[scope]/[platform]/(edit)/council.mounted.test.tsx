@@ -113,6 +113,12 @@ vi.mock('expo-router', () => ({
   useNavigation: () => ({ isFocused: () => true }),
   useRouter: () => ({ push: state.routerPush, replace: state.routerReplace }),
 }));
+// The refusal's switch step hands off through the push-then-retire hook (a
+// literal `router.replace` crashes Android Fabric); assert the
+// destination it is given.
+vi.mock('@/lib/navigation/stack-safe-replace', () => ({
+  useStackSafeReplace: () => ({ replace: state.routerReplace }),
+}));
 vi.mock('@/lib/hooks/use-reviewer-route-params', () => ({
   useReviewerRouteParams: () => ({ scope: state.scope, platform: state.platform }),
 }));
@@ -700,11 +706,24 @@ describe('council label gate', () => {
     });
   };
 
-  it('saves a pasted list within the server caps', async () => {
+  it('saves a pasted list with spaces around the commas', async () => {
     const mounted = await renderWithProviders(createElement(CouncilRoute));
     await act(() => undefined);
 
     await commitLabels(mounted, ' council , deep review ');
+
+    expect(state.save.mutate).toHaveBeenCalledTimes(1);
+    expect(state.patches[0]?.council?.required_labels).toEqual(['council', 'deep review']);
+    expect(state.toastErrors).toHaveLength(0);
+
+    mounted.unmount();
+  });
+
+  it('saves a pasted list with spaces only after the commas', async () => {
+    const mounted = await renderWithProviders(createElement(CouncilRoute));
+    await act(() => undefined);
+
+    await commitLabels(mounted, ' council, deep review ');
 
     expect(state.save.mutate).toHaveBeenCalledTimes(1);
     expect(state.patches[0]?.council?.required_labels).toEqual(['council', 'deep review']);

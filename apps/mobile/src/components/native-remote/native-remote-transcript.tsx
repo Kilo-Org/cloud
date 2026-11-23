@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { type TextInput, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { displaySafeText } from '@kilocode/app-shared/display-text';
-import { PermissionUnreadableNotice } from '@/components/agents/permission-unreadable-notice';
+import { UnreadableRequestNotices } from '@/components/agents/unreadable-request-notices';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { renderRowTrailing } from '@/components/ui/row-trailing';
@@ -74,13 +74,17 @@ export function NativeRemoteTranscript({
         (conversation.messages.length > 0 || conversation.incompleteMessageIDs.length === 0) && (
           <NativeRemoteMessages messages={conversation.messages} />
         )}
-      {pending.unreadablePermissions.length > 0 ? (
-        // No consent card for these: the app never read the request's scope, so
-        // offering allow/deny would decide a permission nobody parsed. The
-        // notice points the user at the CLI, which can still answer it. The
-        // screen already pads this column, so the notice drops its own margin.
-        <PermissionUnreadableNotice inset={false} />
-      ) : null}
+      {/* No consent card and no answer card for these: the app never read the
+          request's scope or its questions, so offering allow/deny or a choice
+          would decide something nobody parsed. The notices point the user at
+          the CLI, which can still answer them. One host covers both so the iOS
+          announcement is read once instead of twice. The screen already pads
+          this column, so the notices drop their own margin. */}
+      <UnreadableRequestNotices
+        hasPermissions={pending.unreadablePermissions.length > 0}
+        hasQuestions={pending.unreadableQuestions.length > 0}
+        inset={false}
+      />
       {pending.permissions.map(permission => (
         <View key={permission.id} className="gap-2 rounded-lg border border-border p-3">
           <Text>{isolateLtrBidiText(displaySafeText(permission.action))}</Text>

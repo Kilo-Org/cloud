@@ -30,6 +30,14 @@ export type ClientDimensions = {
   requestId: string | null;
 };
 
+/** The dimensions logged when no headers are available or reading them fails. */
+const EMPTY_CLIENT_DIMENSIONS: ClientDimensions = {
+  client: null,
+  platform: null,
+  version: null,
+  requestId: null,
+};
+
 const DEFAULT_SAMPLE_RATE = 0.01;
 
 /**
@@ -45,7 +53,6 @@ const OTHER = 'other';
  */
 const VERSION_MAX_LENGTH = 32;
 
-/** Accepted request-id shape: 1-64 characters from a bounded character set. */
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9._:-]{1,64}$/;
 
 function readAllowlisted(
@@ -113,16 +120,12 @@ export type TimingLine = {
   surface: TimingSurface;
   durationMs: number;
   ok: boolean;
-  client: string | null;
-  platform: string | null;
-  version: string | null;
-  requestId: string | null;
   path?: string;
   route?: string;
   procedureType?: string;
   method?: string;
   userId?: string;
-};
+} & ClientDimensions;
 
 /**
  * Build the object that gets `JSON.stringify`-ed to the structured log line.
@@ -157,9 +160,7 @@ export function buildTimingLine(input: TimingLineInput): TimingLine {
 export type RestRouteHandler<Ctx> = (request: Request, ctx?: Ctx) => Promise<Response> | Response;
 
 /**
- * The wrapped handler. `ctx` is optional because Next only passes a context to
- * dynamic routes, and existing callers (route tests, helpers) invoke a handler
- * with the request alone. It always returns a promise: the wrapper awaits the
+ * The wrapped handler. It always returns a promise: the wrapper awaits the
  * handler, so callers can chain `.then`/`.catch` as they did before wrapping.
  */
 export type TimedRestRouteHandler<Ctx> = (request: Request, ctx?: Ctx) => Promise<Response>;
@@ -225,7 +226,7 @@ function logRestTiming(
     try {
       dimensions = readClientDimensions(request.headers);
     } catch {
-      dimensions = { client: null, platform: null, version: null, requestId: null };
+      dimensions = EMPTY_CLIENT_DIMENSIONS;
     }
     if (!shouldLogTiming({ client: dimensions.client })) return;
     console.log(

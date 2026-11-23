@@ -18,6 +18,17 @@ type PreferenceRowProps = Readonly<{
   /** The line under the title. Omit it for a one-line switch row. */
   subtitle?: string;
   /**
+   * The line cap for the subtitle, and the one place this row departs from
+   * `ConfigureRow`. That row's subtitle is often a value, an identifier or a
+   * hint that reads best on one line, so it caps the line by default. This
+   * row's subtitle explains the switch beside it, and the reader has to be able
+   * to finish it, so an omitted cap paints every line. A caller that pairs this
+   * copy with a capped sibling passes that sibling's cap so both reserve the
+   * same height, and `'all'` states the same uncapped intent when only the
+   * sibling has a default.
+   */
+  subtitleNumberOfLines?: number | 'all';
+  /**
    * A second muted line under the subtitle (a model's retirement date, say).
    * It renders only when a caller passes it and joins the switch's spoken
    * name through the shared list formatter, so the row keeps one name.
@@ -55,6 +66,7 @@ export function PreferenceRow({
   icon,
   title,
   subtitle,
+  subtitleNumberOfLines,
   note,
   value,
   disabled,
@@ -105,8 +117,6 @@ export function PreferenceRow({
   const spokenName = accessibilityLabel ?? title;
   const spokenLabel =
     note === undefined ? spokenName : formatList([spokenName, note], i18n.language);
-  // Renders only when the caller passes a note, so a row gains its one extra
-  // muted line just then.
   const noteNode =
     note === undefined ? null : (
       <Text variant="muted" className="mt-0.5 text-xs">
@@ -124,11 +134,14 @@ export function PreferenceRow({
   // layout — the idiom in form-field's reserved error area — so swapping them
   // cannot change the row's height in any language, font scale or width,
   // without measuring.
+  // `'all'` names the same uncapped intent the omitted prop has, so a caller
+  // that shares copy with a capped sibling states it without a number.
+  const subtitleLines = subtitleNumberOfLines === 'all' ? undefined : subtitleNumberOfLines;
   let subtitleNode: ReactNode = null;
   if (subtitle !== undefined) {
     subtitleNode =
       inactiveSubtitle === undefined ? (
-        <Text variant="muted" className="mt-0.5 text-xs">
+        <Text variant="muted" className="mt-0.5 text-xs" numberOfLines={subtitleLines}>
           {subtitle}
         </Text>
       ) : (
@@ -139,15 +152,19 @@ export function PreferenceRow({
             accessibilityElementsHidden
             importantForAccessibility="no-hide-descendants"
           >
-            <Text variant="muted" className="w-full shrink-0 text-xs">
+            <Text variant="muted" className="w-full shrink-0 text-xs" numberOfLines={subtitleLines}>
               {subtitle}
             </Text>
-            <Text variant="muted" className="-ms-[100%] w-full shrink-0 text-xs">
+            <Text
+              variant="muted"
+              className="-ms-[100%] w-full shrink-0 text-xs"
+              numberOfLines={subtitleLines}
+            >
               {inactiveSubtitle}
             </Text>
           </View>
           <View className="absolute inset-x-0 top-0">
-            <Text variant="muted" className="text-xs">
+            <Text variant="muted" className="text-xs" numberOfLines={subtitleLines}>
               {subtitle}
             </Text>
           </View>

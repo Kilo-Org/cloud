@@ -244,8 +244,6 @@ function withEnrichmentAndConnectionId(
   const status = effectiveStatus(row.status, current?.status);
   return {
     id: row.id,
-    // Sticky attention: a non-attention WS status must not clear a held
-    // question/permission. "stored" for WS paths is the cached row status.
     status,
     // The tray title is DB-authoritative (the router enriches it from
     // cli_sessions_v2), so once a row has been through a tRPC fetch a heartbeat's

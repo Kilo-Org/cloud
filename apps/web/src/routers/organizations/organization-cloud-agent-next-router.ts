@@ -20,7 +20,7 @@ import {
   organizationMemberMutationProcedure,
 } from '@kilocode/web-shared/routers/organizations/utils';
 import { fetchAllGitHubRepositoriesForOrganization } from '@/lib/cloud-agent/github-integration-helpers';
-import { resolveGitHubIntegrationIdForRepository } from '@/lib/cloud-agent/github-integration-resolution';
+import { resolveGitHubPrepareParams } from '@/lib/cloud-agent-next/github-prepare-params';
 import {
   BitbucketOrganizationRepositoryListResultSchema,
   fetchBitbucketRepositoriesForOrganization,
@@ -442,7 +442,9 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
           ? undefined
           : await resolveStackedWorkspaceSource({
               db,
-              client,
+              client: ctx.cloudAgentAuthority
+                ? { getSession: id => client.getSession(id, organizationId, stackOnWorktreeId) }
+                : client,
               userId: ctx.user.id,
               organizationId,
               worktreeId: stackOnWorktreeId,
@@ -557,30 +559,20 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         gitParams = { gitUrl: publicRepoUrl };
         repository = { platform: 'git', fullName: publicRepoUrl, canonicalUrl: publicRepoUrl };
       } else {
-        // The runtime's repository preflight runs only when the request names
-        // the integration that owns the repository, so resolve it for the
-        // caller's organization here. An explicitly supplied id wins, and an
-        // unresolvable repository stays unqualified (the previous behaviour)
-        // rather than refusing a request the runtime can still serve.
-        const resolvedIntegrationId =
-          githubIntegrationId ??
-          (githubRepo === undefined
-            ? null
-            : await resolveGitHubIntegrationIdForRepository(
-                { type: 'org', id: organizationId },
-                githubRepo
-              ));
-        gitParams = {
+        gitParams = await resolveGitHubPrepareParams({
+          userId: ctx.user.id,
+          organizationId,
           githubRepo,
-          githubIntegrationId: resolvedIntegrationId ?? undefined,
-          platform: PLATFORM.GITHUB,
-        };
+          ...(githubIntegrationId === undefined ? {} : { githubIntegrationId }),
+        });
         if (githubRepo) {
           repository = {
             platform: 'github',
             fullName: githubRepo,
             canonicalUrl: `https://github.com/${githubRepo}`,
-            ...(resolvedIntegrationId ? { githubIntegrationId: resolvedIntegrationId } : {}),
+            ...(gitParams.githubIntegrationId
+              ? { githubIntegrationId: gitParams.githubIntegrationId }
+              : {}),
           };
         }
       }
@@ -645,6 +637,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         user: ctx.user,
         headersList: ctx.headersList,
         sourceKiloSessionId: input.sourceKiloSessionId,
+        cloudAgentSessionId: input.cloudAgentSessionId,
         operationKey: input.operationKey,
         kiloSessionId: input.kiloSessionId,
         organizationId: input.organizationId,
@@ -925,6 +918,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         organizationId: input.organizationId,
         cloudAgentSessionId: input.cloudAgentSessionId,
         operation: 'sync',
+        scoped: Boolean(ctx.cloudAgentAuthority),
       });
     }),
 
@@ -945,6 +939,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         organizationId: input.organizationId,
         cloudAgentSessionId: input.cloudAgentSessionId,
         operation: 'restack',
+        scoped: Boolean(ctx.cloudAgentAuthority),
       });
     }),
 
@@ -963,7 +958,10 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         input.organizationId
       );
       const client = createCloudAgentNextClient(authToken);
-      return await client.listWorkspaceArtifacts(input.cloudAgentSessionId);
+      return await client.listWorkspaceArtifacts(
+        input.cloudAgentSessionId,
+        ctx.cloudAgentAuthority ? input.organizationId : undefined
+      );
     }),
 
   getWorkspaceArtifactDownloadUrl: organizationMemberProcedure
@@ -983,7 +981,8 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       const client = createCloudAgentNextClient(authToken);
       return await client.getWorkspaceArtifactDownloadUrl(
         input.cloudAgentSessionId,
-        input.relativePath
+        input.relativePath,
+        ctx.cloudAgentAuthority ? input.organizationId : undefined
       );
     }),
 
@@ -1319,7 +1318,11 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       );
       const client = createCloudAgentNextClient(authToken);
 
-      return await client.cancelQueuedMessage(input.sessionId, input.messageId);
+      return await client.cancelQueuedMessage(
+        input.sessionId,
+        input.messageId,
+        ctx.cloudAgentAuthority ? input.organizationId : undefined
+      );
     }),
 
   answerQuestion: organizationMemberMutationProcedure
@@ -1341,6 +1344,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         sessionId: input.sessionId,
         questionId: input.questionId,
         answers: input.answers,
+        organizationId: ctx.cloudAgentAuthority ? input.organizationId : undefined,
       });
     }),
 
@@ -1362,6 +1366,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       return await client.rejectQuestion({
         sessionId: input.sessionId,
         questionId: input.questionId,
+        organizationId: ctx.cloudAgentAuthority ? input.organizationId : undefined,
       });
     }),
 
@@ -1409,7 +1414,10 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         input.organizationId
       );
       const client = createCloudAgentNextClient(authToken);
-      return await client.getPendingInteractions(input.cloudAgentSessionId);
+      return await client.getPendingInteractions(
+        input.cloudAgentSessionId,
+        ctx.cloudAgentAuthority ? input.organizationId : undefined
+      );
     }),
 
   /**
@@ -1437,13 +1445,16 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
           clock: ctx,
           message: SESSION_MESSAGES_UNAVAILABLE_MESSAGE,
           read: () =>
-            client.getSessionMessagesPage({
-              sessionId: input.sessionId,
-              kiloSessionId: input.kiloSessionId,
-              cursor: input.cursor,
-              limit: input.limit,
-              toolDisplay: input.toolDisplay,
-            }),
+            client.getSessionMessagesPage(
+              {
+                sessionId: input.sessionId,
+                kiloSessionId: input.kiloSessionId,
+                cursor: input.cursor,
+                limit: input.limit,
+                toolDisplay: input.toolDisplay,
+              },
+              ctx.cloudAgentAuthority ? input.organizationId : undefined
+            ),
         });
       } catch (error) {
         throw (
@@ -1518,13 +1529,16 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         ctx.headersList,
         input.organizationId
       );
-      return createCloudAgentNextClient(authToken).getSessionToolPartDetail({
-        sessionId: input.sessionId,
-        kiloSessionId: input.kiloSessionId,
-        messageId: input.messageId,
-        partId: input.partId,
-        callId: input.callId,
-      });
+      return createCloudAgentNextClient(authToken).getSessionToolPartDetail(
+        {
+          sessionId: input.sessionId,
+          kiloSessionId: input.kiloSessionId,
+          messageId: input.messageId,
+          partId: input.partId,
+          callId: input.callId,
+        },
+        ctx.cloudAgentAuthority ? input.organizationId : undefined
+      );
     }),
 
   getSession: organizationMemberProcedure

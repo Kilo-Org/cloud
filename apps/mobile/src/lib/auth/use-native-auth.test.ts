@@ -227,7 +227,10 @@ describe('use-native-auth error mapping', () => {
   });
 
   it.each([
-    ['INVALID_CODE', "That code is incorrect or expired. Try again or use 'Resend code'."],
+    [
+      'INVALID_CODE',
+      "That code is incorrect or expired. Use 'Resend code' or 'More sign-in options'.",
+    ],
     ['TOO_MANY_ATTEMPTS', 'Too many attempts. Please request a new code.'],
     ['RATE_LIMITED', 'Too many sign-in attempts. Please wait and try again.'],
     ['CODE_IN_PROGRESS', 'Your code is being processed. Wait a moment and try again.'],

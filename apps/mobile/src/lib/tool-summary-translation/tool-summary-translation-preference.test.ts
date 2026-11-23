@@ -170,9 +170,6 @@ describe('cold-start hydration ordering', () => {
     await flushPreferences();
 
     const runtime = await import('./tool-summary-translation-runtime');
-    // The enabled preference has settled, the persisted model has not: the
-    // runtime must stay disabled so no summary is translated on the default
-    // model the user did not choose.
     expect(runtime.getConfig()).toEqual({ enabled: false, model: DEFAULT_MODEL });
 
     modelReadGate.current.resolve(undefined);

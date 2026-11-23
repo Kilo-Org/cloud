@@ -217,7 +217,7 @@ export type KiloCredentialExchangeEligibilityPolicy = {
   legacy: 'deny' | 'five-year-api';
 };
 
-const exchangeSafeClaimNames: ReadonlySet<string> = new Set([
+export const KILO_EXCHANGE_SAFE_CLAIM_NAMES: ReadonlySet<string> = new Set([
   'version',
   'kiloUserId',
   'apiTokenPepper',
@@ -231,12 +231,12 @@ const exchangeSafeClaimNames: ReadonlySet<string> = new Set([
 ] satisfies (keyof KiloTokenPolicyClaims)[]);
 
 const legacyExchangeSafeClaimNames: ReadonlySet<string> = new Set([
-  ...exchangeSafeClaimNames,
+  ...KILO_EXCHANGE_SAFE_CLAIM_NAMES,
   'deviceSessionId',
 ]);
 
 function hasOnlyExchangeSafeClaims(claimNames: readonly string[]): boolean {
-  return claimNames.every(name => exchangeSafeClaimNames.has(name));
+  return claimNames.every(name => KILO_EXCHANGE_SAFE_CLAIM_NAMES.has(name));
 }
 
 function hasSoleKiloApiAudience(audience: unknown): boolean {

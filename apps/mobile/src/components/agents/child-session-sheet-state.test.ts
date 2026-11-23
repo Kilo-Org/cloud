@@ -52,11 +52,15 @@ describe('getChildSessionSheetState', () => {
   });
 
   it('shows an error after failed hydration with no messages', () => {
-    expect(getChildSessionSheetState({ status: 'error', message: 'Failed' }, 0)).toBe('error');
+    expect(getChildSessionSheetState({ status: 'error', kind: null, message: 'Failed' }, 0)).toBe(
+      'error'
+    );
   });
 
   it('keeps live messages visible after first-page hydration fails', () => {
-    expect(getChildSessionSheetState({ status: 'error', message: 'Failed' }, 1)).toBe('content');
+    expect(getChildSessionSheetState({ status: 'error', kind: null, message: 'Failed' }, 1)).toBe(
+      'content'
+    );
   });
 
   it('keeps live messages visible while first-page hydration retries', () => {

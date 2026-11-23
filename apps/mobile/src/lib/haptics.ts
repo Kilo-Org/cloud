@@ -10,7 +10,7 @@ async function attempt(run: () => Promise<void>): Promise<void> {
   try {
     await run();
   } catch {
-    // Decoration only: the tap's own action runs regardless.
+    // Intentionally empty.
   }
 }
 

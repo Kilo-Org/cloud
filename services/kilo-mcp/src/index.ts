@@ -1,5 +1,10 @@
+import {
+  ENVIRONMENT_SETUP_INSTRUCTIONS,
+  ENVIRONMENT_SETUP_TOOL_NAMES,
+  environmentSetupTools,
+  runEnvironmentSetupTool,
+} from './environment-setup-tools';
 import catalogJson from '../catalog.json';
-import { cloudAgentAuthorityProcedures } from '../../../packages/worker-utils/src/cloud-agent-authority';
 import {
   CHILD_SESSION_INSTRUCTIONS,
   CHILD_SESSION_TOOL_NAMES,
@@ -110,6 +115,7 @@ const PUBLISHED_TOOL_NAMES = new Set([
   'call_protected',
   'submit_otp',
   ...CHILD_SESSION_TOOL_NAMES,
+  ...ENVIRONMENT_SETUP_TOOL_NAMES,
 ]);
 
 const CORS_HEADERS: Record<string, string> = {
@@ -500,8 +506,13 @@ async function runTool(
   ) {
     throw new JsonRpcFailure(UNAUTHORIZED, 'Cloud Agent authority has expired');
   }
-  // Running clients can retain the old tool list until their next MCP connection.
-  if (auth.cloudAgentAuthority && name !== 'search' && name !== 'call') {
+  if (auth.cloudAgentAuthority?.environmentSetup && (name === 'call' || name === 'search')) {
+    throw new JsonRpcFailure(INVALID_PARAMS, 'Environment setup requires its dedicated tools');
+  }
+  if (auth.cloudAgentAuthority && ENVIRONMENT_SETUP_TOOL_NAMES.has(name)) {
+    return toolResult(await runEnvironmentSetupTool({ name, args, auth, ...deps }));
+  }
+  if (auth.cloudAgentAuthority) {
     return toolResult(await runChildSessionTool({ name, args, auth, ...deps }));
   }
   if (name === 'search') {
@@ -528,12 +539,6 @@ async function runTool(
       // Fail-closed: only a grant that ticked the admin opt-in sees admin or
       // debug rows.
       includeGuarded: auth.adminEnabled === true,
-      ...(auth.cloudAgentAuthority
-        ? {
-            allowedPaths: cloudAgentAuthorityProcedures(auth.cloudAgentAuthority),
-            cloudAgentAuthority: auth.cloudAgentAuthority,
-          }
-        : {}),
     });
     // The query's shape only — never the raw text (it can carry personal data).
     analytics.searchPerformed({
@@ -782,7 +787,7 @@ async function handleRpcMessage(
           capabilities: { tools: {} },
           serverInfo: SERVER_INFO,
           instructions: auth.cloudAgentAuthority
-            ? `${CHILD_SESSION_INSTRUCTIONS} ${feedback}`
+            ? `${CHILD_SESSION_INSTRUCTIONS} ${auth.cloudAgentAuthority.environmentSetup ? ENVIRONMENT_SETUP_INSTRUCTIONS : ''} ${feedback}`
             : canUseProtectedActions(auth)
               ? `This server exposes the Kilo API through two tools: search (find catalog endpoints) and call (invoke one by path). Search before every call. Each result carries a kind: "query" reads data, "mutation" changes it. Call a mutation path only when the user asked for that change, and if it fails with an ambiguous transport error, check the current state before retrying. This connection may also run admin and debug endpoints: use call_protected to submit one, then submit_otp with the code the user reads from their authenticator app to approve it. The endpoint and payload are fixed once call_protected returns. ${feedback}`
               : `This server exposes the Kilo API through two tools: search (find catalog endpoints) and call (invoke one by path). Search before every call. Each result carries a kind: "query" reads data, "mutation" changes it. Call a mutation path only when the user asked for that change, and if it fails with an ambiguous transport error, check the current state before retrying. ${feedback}`,
@@ -793,7 +798,10 @@ async function handleRpcMessage(
       case 'tools/list':
         return jsonRpcResult(id ?? 0, {
           tools: auth.cloudAgentAuthority
-            ? childSessionTools(auth.cloudAgentAuthority)
+            ? [
+                ...childSessionTools(auth.cloudAgentAuthority),
+                ...environmentSetupTools(auth.cloudAgentAuthority),
+              ]
             : canUseProtectedActions(auth)
               ? [...TOOLS, ...PROTECTED_TOOLS]
               : TOOLS,

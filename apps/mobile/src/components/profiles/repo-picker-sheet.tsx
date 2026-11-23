@@ -22,6 +22,7 @@ import { SearchField } from '@/components/ui/search-field';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
+import { CONTROL_TO_STATE_GAP_CLASS } from '@/lib/layout';
 import { dismissSearchPickerKeyboard, SEARCHABLE_PICKER_LIST_PROPS } from '@/lib/picker-list';
 
 type RepoPickerSheetProps = Readonly<{
@@ -182,6 +183,7 @@ export function RepoPickerSheet({
         placement="top"
         compact
         inset="gutter"
+        className={CONTROL_TO_STATE_GAP_CLASS}
         icon={isSearching ? SearchX : GitBranch}
         title={
           isSearching ? t('common.noRepositoriesFound') : t('agentChat.repoPicker.noRepositories')

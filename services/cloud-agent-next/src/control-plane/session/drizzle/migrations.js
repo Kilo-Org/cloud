@@ -7,6 +7,7 @@ import m0004 from './0004_history_hydration_stage.sql';
 import m0005 from './0005_native_history_scope.sql';
 import m0006 from './0006_confused_shiva.sql';
 import m0007 from './0007_session_cost_totals.sql';
+import m0008 from './0008_message_settlement.sql';
 
 export default {
   journal,
@@ -19,5 +20,6 @@ export default {
     m0005,
     m0006,
     m0007,
+    m0008,
   },
 };

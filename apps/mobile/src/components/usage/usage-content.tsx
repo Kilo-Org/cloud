@@ -9,6 +9,8 @@ import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { LineChart } from '@/components/ui/icons';
+import { joinAccessibleName } from '@/lib/a11y/accessible-name';
+import { HIDDEN_LABEL_PROPS } from '@/lib/a11y/hidden-label';
 import { formatNumber } from '@/lib/format';
 import {
   type UsageMetric,
@@ -54,6 +56,14 @@ const METRIC_OPTIONS = [
  * whether the detail is short or long, and its spare line falls below.
  *
  * A larger font scale grows the tile with its text.
+ *
+ * The tile is one accessibility element: its three lines paint as separate
+ * `Text` nodes, and left on their own iOS reads the grid by position — both
+ * values, then both captions, then the tokens tile's detail after the average
+ * cost caption, which separates the detail from the tile it describes. So the
+ * card names itself caption, value, then detail, and each painted line leaves
+ * the tree (Android maps `accessible={false}` onto focusability alone, hence
+ * `HIDDEN_LABEL_PROPS`).
  */
 function StatTile({
   label,
@@ -65,15 +75,26 @@ function StatTile({
   subtext?: string;
 }>) {
   return (
-    <Card className="flex-1">
-      <Text variant="figure">{value}</Text>
-      <Text variant="caption">{label}</Text>
+    <Card
+      className="flex-1"
+      accessible
+      accessibilityRole="text"
+      accessibilityLabel={joinAccessibleName([label, value, subtext])}
+    >
+      <Text variant="figure" {...HIDDEN_LABEL_PROPS}>
+        {value}
+      </Text>
+      <Text variant="caption" {...HIDDEN_LABEL_PROPS}>
+        {label}
+      </Text>
       {subtext !== undefined && (
         // Two caption lines' floor (28pt on the spacing scale): a one-line
         // detail keeps the caption's gap, and a detail that needs more lines
         // grows the tile instead of clipping the tokens breakdown.
         <View className="min-h-8">
-          <Text variant="caption">{subtext}</Text>
+          <Text variant="caption" {...HIDDEN_LABEL_PROPS}>
+            {subtext}
+          </Text>
         </View>
       )}
     </Card>

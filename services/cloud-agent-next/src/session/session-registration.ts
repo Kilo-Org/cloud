@@ -20,6 +20,7 @@ import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import type { WorkerDb } from '@kilocode/db/client';
 import { cli_sessions_v2, kilocode_users, operation_ledgers } from '@kilocode/db/schema';
+import { ByocAwsProviderError, fetchAwsByocConnection } from '../byoc/aws-credential-resolver.js';
 import {
   isSelectableSandboxAllocation,
   sandboxAllocationSchema,
@@ -56,7 +57,10 @@ import {
 } from '@kilocode/session-ingest-contracts';
 import { normalizeGitUrl } from '@kilocode/worker-utils';
 import { generateBranchSlugFromSeed } from '@kilocode/worker-utils/deployment-slug';
-import type { CloudAgentAuthority } from '@kilocode/worker-utils/cloud-agent-authority';
+import {
+  CLOUD_AGENT_STACK_TARGET_DENIED,
+  type CloudAgentAuthority,
+} from '@kilocode/worker-utils/cloud-agent-authority';
 import {
   createRuntimeAuthorization,
   RuntimeAuthorizationRevokedError,
@@ -141,7 +145,6 @@ import {
   withSavedSandboxAllocation,
 } from './sandbox-allocation-resolution.js';
 import type { SessionCreateRequest, SessionRepositoryRequest } from './session-requests.js';
-import { isInteractiveSessionOrigin } from '../shared/control-plane-permission.js';
 import { egressAllowlistSchema, egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
 import {
   egressRequestSupported,
@@ -155,24 +158,6 @@ import {
 } from '../shared/runtime-profile.js';
 
 export type SessionRegistrationInput = SessionCreateRequest;
-
-/**
- * Whether a create may launch child Cloud Agent sessions. The capability is not
- * caller-controlled: a session gets it when a person created it through an
- * interactive client and it is not itself a spawned child. Every sandbox serves
- * one workspace, so the sandbox never removes the capability.
- */
-export function allowsSubagentSessions(
-  input: Pick<
-    SessionRegistrationInput,
-    'options' | 'parentCloudAgentSessionId' | 'runtime' | 'savedSandboxAllocation'
-  >
-): boolean {
-  return (
-    input.parentCloudAgentSessionId === undefined &&
-    isInteractiveSessionOrigin(input.options?.createdOnPlatform)
-  );
-}
 
 function assertSupportedSandboxAllocation(
   input: SessionRegistrationInput,
@@ -940,12 +925,20 @@ async function issueSessionRuntimeAuthorization(
     const authority = ctx.cloudAgentAuthority;
     const runtimeAuthorization = await withDORetry(
       () => getWorkspaceStub(ctx.env, ctx.userId, authority.parentSessionId),
-      stub => stub.authorizeChild({ authority, childSessionId: cloudAgentSessionId }),
+      stub =>
+        stub.authorizeChild({
+          authority,
+          childSessionId: cloudAgentSessionId,
+          stackOnWorktreeId: input.parentWorktreeId,
+        }),
       'authorizeChild'
-    ).catch(() => {
+    ).catch((error: unknown) => {
       throw new TRPCError({
         code: 'FORBIDDEN',
-        message: 'Cloud Agent parent authorization unavailable',
+        message:
+          error instanceof Error && error.message === CLOUD_AGENT_STACK_TARGET_DENIED
+            ? CLOUD_AGENT_STACK_TARGET_DENIED
+            : 'Cloud Agent parent authorization unavailable',
       });
     });
     await assertKiloModelAvailable({
@@ -1230,6 +1223,29 @@ async function allocateNewSession(
           kind: 'byoc',
           ...byocVercelOwnerFields(enrollment),
           credentialId: enrollment.credentialId,
+        },
+      };
+    } else if (sandboxProvider === 'aws') {
+      let connection: Awaited<ReturnType<typeof fetchAwsByocConnection>>;
+      try {
+        connection = await fetchAwsByocConnection(
+          ctx.env,
+          orgId !== undefined ? { organizationId: orgId } : { userId: ctx.userId }
+        );
+      } catch (error) {
+        if (error instanceof ByocAwsProviderError && error.reason === 'byoc_credential_missing') {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'byoc_aws_not_ready' });
+        }
+        throw error;
+      }
+      if (connection.setupStatus !== 'ready')
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'byoc_aws_not_ready' });
+      sandboxProviderBinding = {
+        kind: 'aws',
+        source: {
+          kind: 'byoc',
+          ...byocVercelOwnerFields(connection),
+          credentialId: connection.credentialId,
         },
       };
     } else {
@@ -1569,10 +1585,7 @@ function buildSessionRegistrationCommand(
 ) {
   return {
     generatedBranch: allocation.generatedBranch,
-    allowSubagentSessions:
-      allowsSubagentSessions(input) &&
-      isPolicyBearingAuthToken(ctx.authToken) &&
-      ctx.botId === undefined,
+    allowSubagentSessions: ctx.botId === undefined && isPolicyBearingAuthToken(ctx.authToken),
     parentCloudAgentSessionId: input.parentCloudAgentSessionId,
     ...(input.parentWorktreeId === undefined ? {} : { parentWorktreeId: input.parentWorktreeId }),
     identity: {
@@ -1625,6 +1638,7 @@ function buildSessionRegistrationCommand(
           requestedEnvironmentRepositories: input.requestedEnvironment?.repositories ?? [],
         }
       : {}),
+    environmentSetup: input.environmentSetup,
     hostedGitHubRepositories: input.hostedGitHubRepositories,
     finalization: input.finalization,
     callback: input.options?.callbackTarget ? { target: input.options.callbackTarget } : undefined,

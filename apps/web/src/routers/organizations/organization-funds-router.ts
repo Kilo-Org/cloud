@@ -207,6 +207,11 @@ export const organizationFundsRouter = createTRPCRouter({
             actor_email: user.google_user_email,
             actor_id: user.id,
             actor_name: user.google_user_name,
+            details: {
+              id: 'funds.received',
+              amount: allocation.amountMicrodollars / 1_000_000,
+              parent: parent.name,
+            },
             message: `Received ${formatMicrodollars(allocation.amountMicrodollars)} from parent organization ${parent.name}`,
             organization_id: child.id,
           });
@@ -218,6 +223,11 @@ export const organizationFundsRouter = createTRPCRouter({
           actor_email: user.google_user_email,
           actor_id: user.id,
           actor_name: user.google_user_name,
+          details: {
+            id: 'funds.distributed',
+            amount: totalToMoveMicrodollars / 1_000_000,
+            count: allocations.length,
+          },
           message: `Distributed ${formatMicrodollars(totalToMoveMicrodollars)} to ${allocations.length} child organization${allocations.length === 1 ? '' : 's'}`,
           organization_id: organizationId,
         });

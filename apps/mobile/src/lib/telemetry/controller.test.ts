@@ -188,8 +188,6 @@ describe('subscribeToTelemetryGeneration', () => {
     expect(listener).toHaveBeenCalledTimes(1);
     listener.mockClear();
 
-    // Same account: only the epoch advances, and the epoch scopes nothing to
-    // an account, so subscribers must not wake.
     setTelemetryDecision('acct-2', true);
     expect(listener).not.toHaveBeenCalled();
     expect(currentEpoch()).toBe(3);

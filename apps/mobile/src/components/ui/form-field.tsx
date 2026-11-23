@@ -98,7 +98,8 @@ type FormFieldProps = Omit<TextInputProps, 'value'> &
  * field with a value rests, no native input is mounted, so the forwarded
  * `TextInput` ref and the mount value write are inert until the person enters
  * the field. A resting value also honours a caller's `editable={false}`: it
- * offers no press and dims. `disabled` remains the switch that stops the field
+ * offers no press, no assistive activation, and reports itself disabled.
+ * `disabled` remains the switch that dims the box and stops the field
  * accepting text in both states, so use it for a field that stays read-only.
  */
 function FormField({
@@ -145,11 +146,11 @@ function FormField({
     isMultiline || props.secureTextEntry === true || props.autoFocus === true || editing;
   // The field accepts no text: its own `disabled`, or a caller's `editable`
   // turned off for a busy state. A resting value honours both — no press, no
-  // assistive activation, and the dimmed box — because a preview that offers to
-  // open an editor the field would refuse misleads. A mounted input keeps the
-  // field's own switch: an `editable={false}` written under a focused Android
-  // input drops the IME mid-edit, so a caller that must stop accepting text for
-  // good passes `disabled`.
+  // assistive activation, and the disabled state it reports — because a preview
+  // that offers to open an editor the field would refuse misleads. A mounted
+  // input keeps the field's own switch: an `editable={false}` written under a
+  // focused Android input drops the IME mid-edit, so a caller that must stop
+  // accepting text for good passes `disabled`.
   const readOnly = disabled === true || props.editable === false;
   // Android keeps a resting one-line EditText scrolled to its caret, so a value
   // longer than the box paints its tail with its first glyph cut; a

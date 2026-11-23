@@ -1,5 +1,5 @@
 import { AlertCircle, RotateCcw, Share, X } from '@/components/ui/icons';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { type LayoutChangeEvent, Platform, Pressable, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -50,6 +50,14 @@ const VIEWER_SURFACE = '#000000';
 const VIEWER_INK = '#FFFFFF';
 
 /**
+ * A retried `Image` that never fires `onLoad` or `onError` — a hung request —
+ * would otherwise leave the action busy and unpressed forever. This expiry
+ * returns the action and never drops the request: the retried image stays
+ * mounted, so a decode that lands later still clears the state.
+ */
+const RETRY_BUSY_LIMIT_MS = 10_000;
+
+/**
  * The schemes a retry can help: a case-insensitive test, because a scheme is
  * ASCII and re-casing display text to compare it is what the case guard bans.
  */
@@ -64,10 +72,11 @@ function isRetryableUri(uri: string): boolean {
 }
 
 /**
- * One attempt's outcome, so the unavailable state can stay in place while a
- * retry is in flight instead of blanking the canvas.
+ * One attempt's outcome. `stalled` is the same attempt after the busy bound
+ * expires: the request may still land, so the retried image stays mounted while
+ * the action becomes pressable again.
  */
-type ViewerImageStatus = 'ready' | 'failed' | 'retrying';
+type ViewerImageStatus = 'ready' | 'failed' | 'retrying' | 'stalled';
 
 type ImageViewerProps = {
   visible: boolean;
@@ -78,6 +87,13 @@ type ImageViewerProps = {
   sharing?: boolean;
   /** Share failure message. Rendered inline — the toast layer sits behind this surface. */
   shareError?: string | null;
+  /**
+   * A caller that owns a renewal path (a re-presign) passes it, and the retry
+   * awaits it before handing the state back to the action. Without it the retry
+   * only remounts the image for the same URI, which is all a local or
+   * already-fresh URL can do.
+   */
+  onRetry?: () => void | Promise<void>;
   onClose: () => void;
 };
 
@@ -87,6 +103,7 @@ export function ImageViewer({
   filename,
   sharing = false,
   shareError = null,
+  onRetry,
   onClose,
   onShare,
 }: ImageViewerProps) {
@@ -106,6 +123,15 @@ export function ImageViewer({
   const sideInsetStyle = useSideInsetStyle();
 
   const [status, setStatus] = useState<ViewerImageStatus>('ready');
+  // The attempt that owns the phase. A press bumps it, so a settle that lands
+  // after a later press — reachable now that `stalled` makes the action
+  // pressable again — can tell it no longer owns the state.
+  const retryAttempt = useRef(0);
+  // The attempt the mounted `Image` belongs to. It keys the image so a press
+  // re-issues the fetch even when the component stays mounted: from `stalled`
+  // the image is still there, and an unchanged `source` would otherwise decode
+  // nothing at all.
+  const [decodeAttempt, setDecodeAttempt] = useState(0);
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const measureViewport = useCallback(({ nativeEvent: { layout } }: LayoutChangeEvent) => {
     setViewport(current =>
@@ -118,10 +144,12 @@ export function ImageViewer({
   // renew writes a NEW signed URL; the reset must land in the same commit so
   // the refreshed image, not the "Image unavailable" row, renders. A failed
   // renew keeps the same URL, so the failure survives and the row stays until
-  // a new URL lands.
+  // a new URL lands. The reset also takes ownership from any in-flight attempt,
+  // so a pending settle publishes nothing on top of the fresh image.
   const [previousUri, setPreviousUri] = useState(uri);
   if (uri !== previousUri) {
     setPreviousUri(uri);
+    retryAttempt.current += 1;
     setStatus('ready');
   }
 
@@ -132,10 +160,50 @@ export function ImageViewer({
 
   // A retry keeps the unavailable state mounted and marks it busy; the new
   // `Image` mounts at once and its `onLoad` clears the state, while its
-  // `onError` returns it to the failed action.
+  // `onError` returns it to the failed action. When the caller owns a renewal
+  // path, the action also stays busy until that path settles. The status says
+  // which phase is rendered; the attempt ref says which press owns it, because
+  // `stalled` makes the action pressable while the first attempt is still in
+  // flight.
   const retryImage = useCallback(() => {
+    const attempt = retryAttempt.current + 1;
+    retryAttempt.current = attempt;
+    setDecodeAttempt(attempt);
     setStatus('retrying');
-  }, []);
+    if (onRetry === undefined) {
+      return;
+    }
+    void (async () => {
+      await onRetry();
+      if (retryAttempt.current !== attempt) {
+        return;
+      }
+      // Fail back to the action unless a decode or a renewed uri took over.
+      setStatus(current => (current === 'retrying' ? 'failed' : current));
+    })();
+  }, [onRetry]);
+
+  // A busy phase that outlives the bound returns the action while the retried
+  // image stays mounted, so a late decode can still take the state back. The
+  // timer pins its own attempt: a `stalled` phase can be re-entered by a new
+  // press, and this timer must not expire that later attempt's phase.
+  useEffect(() => {
+    if (status !== 'retrying') {
+      return undefined;
+    }
+    const attempt = retryAttempt.current;
+    const timer = setTimeout(() => {
+      if (retryAttempt.current !== attempt) {
+        return;
+      }
+      // The request may still land, so the image stays mounted: the expiry only
+      // returns the action, it never drops the fetch.
+      setStatus(current => (current === 'retrying' ? 'stalled' : current));
+    }, RETRY_BUSY_LIMIT_MS);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [status]);
 
   const handleSwipe = useCallback(
     (direction: 'up' | 'down' | 'left' | 'right') => {
@@ -208,12 +276,19 @@ export function ImageViewer({
                 }}
               >
                 <Image
+                  // A press re-issues the fetch: from `stalled` the image is
+                  // still mounted with the same `source`, so only a new key
+                  // makes it decode again.
+                  key={decodeAttempt}
                   source={{ uri }}
                   cachePolicy="memory"
                   // ResumableZoom measures an unconstrained child; percentages collapse it to zero.
                   style={viewport}
                   contentFit="contain"
                   onLoad={() => {
+                    // A landed decode owns the state from any phase, so a retry
+                    // still awaiting its renewal path publishes nothing.
+                    retryAttempt.current += 1;
                     setStatus('ready');
                   }}
                   onError={() => {
@@ -235,7 +310,13 @@ export function ImageViewer({
                       <AlertCircle size={24} color={VIEWER_INK} strokeWidth={1.5} />
                     </View>
                     <AccessibleStatus
-                      message={t('common.imageUnavailable')}
+                      // Reusing `common.loading` avoids a new catalog key; the
+                      // change of message is what makes the return to
+                      // `Image unavailable` a live announcement on Android and
+                      // through `nextAnnouncement` on iOS.
+                      message={
+                        status === 'retrying' ? t('common.loading') : t('common.imageUnavailable')
+                      }
                       className="max-w-sm text-center text-base text-neutral-300"
                     />
                     {isRetryableUri(uri) ? (
@@ -244,6 +325,10 @@ export function ImageViewer({
                         icon={RotateCcw}
                         onPress={retryImage}
                         loading={status === 'retrying'}
+                        // The viewer paints one black surface in every scheme,
+                        // so its action keeps the brand pair that surface was
+                        // designed for.
+                        surface="on-dark"
                       />
                     ) : null}
                   </View>

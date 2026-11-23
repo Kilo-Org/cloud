@@ -24,12 +24,13 @@ import { cn } from '@/lib/utils';
  * is not itself `accessible`: that would shadow the dismiss control inside it.
  *
  * The dismiss control floats on the card's top end with its whole 48dp box, and
- * the title keeps a `pe-14` (49dp) clearance so no title ink can run under it.
- * A 48dp band inside the title row would be that row's tallest item and push the
- * body away from its title; an absolutely positioned child leaves the row at the
- * title's own line box. The control's box is its measured and delivered target,
- * inside an ancestor (the card) far taller than 48dp, so no slop has to reach
- * past a 32dp row and no negative margin shrinks the rect.
+ * the title row keeps an empty cell of the control's own width beside the title,
+ * so no title ink can run under it. A 48dp band inside the title row would be
+ * that row's tallest item and push the body away from its title; an absolutely
+ * positioned child leaves the row at the title's own line box. The control's box
+ * is its measured and delivered target, inside an ancestor (the card) far taller
+ * than 48dp, so no slop has to reach past a short row and no negative margin
+ * shrinks the rect.
  */
 export function LocalResetNoticeCard({ onDismiss }: { readonly onDismiss: () => void }) {
   const { t } = useTranslation();

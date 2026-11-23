@@ -258,7 +258,11 @@ describe('useLocalResetNotice', () => {
     // surfacing outside the test's sight.
     const refused = Promise.withResolvers<undefined>();
     const refusal = new Error('keychain refused the clear');
-    kvMock.clearPersistedResetNotice.mockImplementationOnce(async () => refused.promise);
+    // Not `async`: an `async` wrapper would adopt the rejection into a second
+    // promise that the hook drops, and the runner would see that one rejected
+    // with no handler. Handing the hook `refused.promise` itself keeps the only
+    // rejection the test's own await below.
+    kvMock.clearPersistedResetNotice.mockImplementationOnce(() => refused.promise);
 
     let thrown: unknown = undefined;
     act(() => {

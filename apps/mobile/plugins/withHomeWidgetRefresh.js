@@ -11,7 +11,11 @@ const {
 const TARGET = 'ExpoWidgetsTarget';
 const GROUP = 'group.com.kilocode.kiloapp';
 const KEYCHAIN = '$(AppIdentifierPrefix)com.kilocode.kiloapp.home-widget-refresh';
-const MODULE_FILES = ['HomeWidgetRefreshStore.swift', 'HomeWidgetConfigureScope.swift', 'HomeWidgetAccessibilityLabel.swift'];
+const MODULE_FILES = [
+  'HomeWidgetRefreshStore.swift',
+  'HomeWidgetConfigureScope.swift',
+  'HomeWidgetAccessibilityLabel.swift',
+];
 const PROVIDER_FILE = 'HomeWidgetTimelineProvider.swift';
 
 function integrateProvider(source) {

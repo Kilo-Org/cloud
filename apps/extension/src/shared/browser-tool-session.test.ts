@@ -1938,6 +1938,38 @@ describe('browser tool session scripting backend', () => {
     );
   });
 
+  it('refuses a WebMCP call whose tool names another origin than the tab’s own', async () => {
+    const executeScript = vi.fn<BrowserScriptingApi['executeScript']>().mockResolvedValueOnce([
+      {
+        documentId: 'doc-1',
+        result: [
+          {
+            description: 'Do it',
+            inputSchema: { type: 'object' },
+            name: 'do_thing',
+            origin: 'https://example.com',
+            title: 'Do',
+          },
+        ],
+      },
+    ]);
+    const tabsApi = createTabsApi({ url: 'https://bank.example.com/account' });
+    const session = createBrowserToolSession({
+      scriptingApi: { executeScript },
+      tabId: 7,
+      tabsApi: tabsApi.api,
+    });
+
+    // The page chooses the descriptor's origin, so the tab's own origin is what decides whether the call runs.
+    await expect(
+      session.callTool('kilo_browser_webmcp_call', { name: 'do_thing' })
+    ).resolves.toStrictEqual({
+      error:
+        'WebMCP tool "do_thing" reports origin https://example.com but runs in the tab\'s own document (https://bank.example.com), so the call was refused.',
+      ok: false,
+    });
+  });
+
   it('withholds a WebMCP tool an agent caller cannot read, and one that names no origin', async () => {
     const executeScript = vi.fn<BrowserScriptingApi['executeScript']>().mockResolvedValueOnce([
       {

@@ -6,6 +6,7 @@ import {
   dropPathsSchema,
   dropTargetSchema,
   STALE_REF_ERROR,
+  toBrowserOrigin,
   webMcpCallArgumentError,
   webMcpCallArgumentsSchema,
 } from './browser-agent-checks';
@@ -3879,6 +3880,25 @@ export const createBrowserToolSession = ({
         if (tool.origin === '') {
           return {
             error: `WebMCP tool "${parsed.data.name}" does not name the origin it belongs to, so the call was refused.`,
+            ok: false,
+          };
+        }
+
+        // The descriptor's origin is page-chosen and execution happens in the tab's own document: a call runs only when the tab's readable origin is the one the tool names.
+        const getTab = tabsApi.get?.bind(tabsApi);
+        const tabOrigin =
+          getTab === undefined ? undefined : toBrowserOrigin(await readTabUrl(getTab, tabId));
+
+        if (tabOrigin === undefined) {
+          return {
+            error: `WebMCP tool "${parsed.data.name}" reports origin ${tool.origin}, but the tab's own origin cannot be read, so the call was refused.`,
+            ok: false,
+          };
+        }
+
+        if (tabOrigin !== tool.origin) {
+          return {
+            error: `WebMCP tool "${parsed.data.name}" reports origin ${tool.origin} but runs in the tab's own document (${tabOrigin}), so the call was refused.`,
             ok: false,
           };
         }

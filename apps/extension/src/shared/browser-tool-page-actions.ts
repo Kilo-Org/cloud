@@ -871,6 +871,32 @@ const runWebMcpCall = async (
     );
   }
 
+  // The route came from a listing this call made, so a descriptor registered since is judged here too: the page controls the descriptor, and execution happens in the tab's own document.
+  const getTab = options.tabsApi?.get?.bind(options.tabsApi);
+  let tab: BrowserTabInfo | undefined = undefined;
+
+  if (getTab !== undefined) {
+    try {
+      tab = await getTab(options.tabId);
+    } catch {
+      tab = undefined;
+    }
+  }
+
+  const tabOrigin = toBrowserOrigin(tab?.url);
+
+  if (tabOrigin === undefined) {
+    return fail(
+      `WebMCP tool "${name}" reports origin ${route.origin}, but the tab's own origin cannot be read, so the call was refused.`
+    );
+  }
+
+  if (tabOrigin !== route.origin) {
+    return fail(
+      `WebMCP tool "${name}" reports origin ${route.origin} but runs in the tab's own document (${tabOrigin}), so the call was refused.`
+    );
+  }
+
   const result = await options.webMcpExecute(
     createWebMcpToolCall({
       arguments: parsed.data.params ?? {},

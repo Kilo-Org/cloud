@@ -1131,7 +1131,12 @@ describe('browser-tool-page-actions', () => {
         'kilo_browser_webmcp_call',
         { name: 'do_thing', params: { amount: 2 } },
         undefined,
-        { tabId: 1, webMcpDiscover: discover, webMcpExecute: execute }
+        {
+          tabId: 1,
+          tabsApi: tabsWithOnePage().tabsApi,
+          webMcpDiscover: discover,
+          webMcpExecute: execute,
+        }
       );
 
       expect(execute).toHaveBeenCalledWith(
@@ -1281,6 +1286,58 @@ describe('browser-tool-page-actions', () => {
       expect(result).toStrictEqual({
         error:
           'WebMCP tool "do_thing" does not name the origin it belongs to, so the call was refused.',
+        ok: false,
+      });
+      expect(execute).not.toHaveBeenCalled();
+    });
+
+    it('refuses a WebMCP call whose tool names another origin than the tab’s', async () => {
+      const discover = vi.fn(async () => discovery);
+      const execute = vi.fn(async () => ({ ok: true, value: 'never' }) as EvalTabResult);
+
+      const result = await runPageBrowserTool(
+        'kilo_browser_webmcp_call',
+        { name: 'do_thing' },
+        undefined,
+        {
+          tabId: 2,
+          tabsApi: createFakeTabsApi([
+            inspectableTab(2, 'Bank', 'https://bank.example.com/account'),
+          ]).tabsApi,
+          webMcpDiscover: discover,
+          webMcpExecute: execute,
+        }
+      );
+
+      // The page controls the descriptor and execution happens in the tab's own document, so a mismatch is a tool error naming both origins — never a permission item.
+      expect(result).toStrictEqual({
+        error:
+          'WebMCP tool "do_thing" reports origin https://example.com but runs in the tab\'s own document (https://bank.example.com), so the call was refused.',
+        ok: false,
+      });
+      expect(execute).not.toHaveBeenCalled();
+    });
+
+    it('refuses a WebMCP call when the tab’s own origin cannot be read', async () => {
+      const discover = vi.fn(async () => discovery);
+      const execute = vi.fn(async () => ({ ok: true, value: 'never' }) as EvalTabResult);
+      const tabsApi: BrowserToolPageTabsApi = {
+        get: async () => {
+          throw new Error('tab is gone');
+        },
+        query: async () => [],
+      };
+
+      const result = await runPageBrowserTool(
+        'kilo_browser_webmcp_call',
+        { name: 'do_thing' },
+        undefined,
+        { tabId: 1, tabsApi, webMcpDiscover: discover, webMcpExecute: execute }
+      );
+
+      expect(result).toStrictEqual({
+        error:
+          'WebMCP tool "do_thing" reports origin https://example.com, but the tab\'s own origin cannot be read, so the call was refused.',
         ok: false,
       });
       expect(execute).not.toHaveBeenCalled();

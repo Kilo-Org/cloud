@@ -59,7 +59,11 @@ export function PoolBenchmarkDialog({ router, organizationId, onClose }: Props) 
   const [requestId, setRequestId] = useState<string | undefined>(undefined);
   const [showQuote, setShowQuote] = useState(false);
   const [startFailure, setStartFailure] = useState<BenchmarkFailureCopy | null>(null);
-  const [startNotice, setStartNotice] = useState<BenchmarkFailureCopy | null>(null);
+  /** What a second confirmation replaced: shown while the request it named is still live. */
+  const [startNoticeFor, setStartNoticeFor] = useState<{
+    requestId: string;
+    copy: BenchmarkFailureCopy;
+  } | null>(null);
   const [pauseFailure, setPauseFailure] = useState<BenchmarkFailureCopy | null>(null);
   const [filter, setFilter] = useState<PaidBenchmarkCaseStatus | 'all'>('all');
   const [pagination, setPagination] = useState<CasePageState | null>(null);
@@ -107,17 +111,22 @@ export function PoolBenchmarkDialog({ router, organizationId, onClose }: Props) 
     trpc.customRouterBenchmarks.start.mutationOptions({
       onSuccess: result => {
         const copy = startFailureCopy(result);
-        if (result.status === 'started') {
-          setStartNotice(null);
-          setStartFailure(null);
-        } else if (result.status === 'already_in_progress') {
+        if (result.status === 'started' && result.alreadyInProgress === true) {
           // Another tab, or a quote taken before this request existed: show the request that
-          // is already staging instead of failing. Nothing new was created or charged.
-          setStartNotice(copy);
+          // is already staging instead of failing. Nothing new was created or charged. The
+          // notice is bound to that request and drops as soon as it settles.
+          setStartNoticeFor(
+            copy === null || result.request.status === 'empty'
+              ? null
+              : { requestId: result.request.id, copy }
+          );
+          setStartFailure(null);
+        } else if (result.status === 'started') {
+          setStartNoticeFor(null);
           setStartFailure(null);
         } else {
           setStartFailure(copy);
-          setStartNotice(null);
+          setStartNoticeFor(null);
           return;
         }
         setPauseFailure(null);
@@ -181,6 +190,19 @@ export function PoolBenchmarkDialog({ router, organizationId, onClose }: Props) 
       });
     }
   }, [progress?.status, organizationId, queryClient, slug, trpc]);
+
+  useEffect(() => {
+    // The second-confirmation notice describes one request in flight. Once that request
+    // completes, pauses or fails there is nothing to announce, so it is dropped here rather
+    // than lingering as a stale banner over the settled result.
+    if (startNoticeFor === null) return;
+    if (
+      activeProgress === undefined ||
+      activeProgress.id !== startNoticeFor.requestId ||
+      (activeProgress.status !== 'preparing' && activeProgress.status !== 'active')
+    )
+      setStartNoticeFor(null);
+  }, [activeProgress, startNoticeFor]);
 
   const pageState = casePageState(pagination, progressId);
   const extraCases = pageState.kind === 'first' ? [] : pageState.cases;
@@ -280,30 +302,40 @@ export function PoolBenchmarkDialog({ router, organizationId, onClose }: Props) 
               </Alert>
             ) : null}
             {showProgress && activeProgress !== undefined ? (
-              <BenchmarkProgressPanel
-                progress={activeProgress}
-                cases={cases}
-                filter={filter}
-                onFilterChange={setFilter}
-                hasMore={nextCursor !== null}
-                loadingMore={loadingMore}
-                onLoadMore={() => void loadMore()}
-                pausePending={pauseMutation.isPending}
-                error={pauseFailure ?? loadMoreFailure ?? startNotice}
-                onPause={() => {
-                  if (activeProgress !== undefined) {
-                    pauseMutation.mutate({
-                      slug,
-                      organizationId,
-                      requestId: activeProgress.id,
-                    });
-                  }
-                }}
-                onFreshEstimate={requestFreshEstimate}
-                quotePending={quoteQuery.isFetching}
-                onRefreshProgress={() => void progressQuery.refetch()}
-                refreshPending={progressQuery.isFetching}
-              />
+              <>
+                {startNoticeFor !== null &&
+                (activeProgress.status === 'preparing' || activeProgress.status === 'active') ? (
+                  // Neutral, not an error: the pool's own request is simply already in flight.
+                  <Alert variant="notice">
+                    <AlertTitle>{startNoticeFor.copy.title}</AlertTitle>
+                    <AlertDescription>{startNoticeFor.copy.description}</AlertDescription>
+                  </Alert>
+                ) : null}
+                <BenchmarkProgressPanel
+                  progress={activeProgress}
+                  cases={cases}
+                  filter={filter}
+                  onFilterChange={setFilter}
+                  hasMore={nextCursor !== null}
+                  loadingMore={loadingMore}
+                  onLoadMore={() => void loadMore()}
+                  pausePending={pauseMutation.isPending}
+                  error={pauseFailure ?? loadMoreFailure}
+                  onPause={() => {
+                    if (activeProgress !== undefined) {
+                      pauseMutation.mutate({
+                        slug,
+                        organizationId,
+                        requestId: activeProgress.id,
+                      });
+                    }
+                  }}
+                  onFreshEstimate={requestFreshEstimate}
+                  quotePending={quoteQuery.isFetching}
+                  onRefreshProgress={() => void progressQuery.refetch()}
+                  refreshPending={progressQuery.isFetching}
+                />
+              </>
             ) : progressQuery.isLoading ? (
               <div className="space-y-3" aria-busy="true">
                 <Skeleton className="h-32 w-full" />

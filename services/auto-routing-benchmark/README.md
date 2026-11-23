@@ -1198,12 +1198,15 @@ pool, then forwards its immutable context to `POST /admin/custom-router-benchmar
 | `pause` | Detaches this request's payers, cancels only the case runs it was alone paying, and makes dispatch stop now. |
 
 Staging is paged, and the browser is not required to finish it: while a request is `preparing`,
-the one-minute tick stages a shared budget of 4,800 slots (120 batches of 40) across its live
-requests, which activates the widest observed pool in about 25 minutes with the tab closed, and a
-`progress` read stages 400 more. A request stays alive while its staging keeps adding slots
-(`last_staged_at`) and is closed as "Benchmark request was never activated." — retryably, freeing
-its pool's only live-request slot — once no slot has been staged for an hour. Row age and passes
-that write nothing never extend that window.
+the one-minute tick stages a hard-capped budget of 4,400 slots (50 batches of 88, split as
+`floor(4,400 / preparing requests)` and served stalest-first) across its live requests, which
+activates the widest observed pool in about 28 minutes with the tab closed, and a `progress` read
+stages 400 more. A request stays
+alive while its staging keeps adding slots (`last_staged_at`) and is closed as "Benchmark request
+was never activated." — retryably, freeing its pool's only live-request slot — once it was offered
+budget and staged no slot for an hour. Row age, a tick that never reached it for budget, and passes
+that write nothing never extend that window. `scheduled-tick-budget.test.ts` measures the whole
+tick at about 680 of D1's 1,000 queries per invocation.
 
 The web exposes the same four actions through the pool-owner authorization: an organization needs
 the existing billing authority to start or pause, and any member with pool access may read the

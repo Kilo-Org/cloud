@@ -462,13 +462,17 @@ describe('customRouterBenchmarks', () => {
     await createRouter({ userId: user.id });
     mockedStart.mockResolvedValue({
       ok: true,
-      body: { status: 'already_in_progress', request: progress('preparing') },
+      body: { status: 'started', request: progress('preparing'), alreadyInProgress: true },
     });
 
     const caller = await createCallerForUser(user.id);
     await expect(
       caller.customRouterBenchmarks.start({ slug: 'coding', quoteId: REQUEST_ID })
-    ).resolves.toMatchObject({ status: 'already_in_progress', request: { status: 'preparing' } });
+    ).resolves.toMatchObject({
+      status: 'started',
+      alreadyInProgress: true,
+      request: { status: 'preparing' },
+    });
   });
 
   test('returns a credit refusal as a typed start result instead of an error', async () => {

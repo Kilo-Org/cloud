@@ -2295,11 +2295,14 @@ describe('paid request staging liveness', () => {
       });
       expect(summary.closed).toEqual([]);
       const stagedAfter = requestState(requestId).staged_cases;
-      // Each pass carries the raised budget, not the retired 80-slot slice.
-      expect(stagedAfter - stagedBefore).toBeLessThanOrEqual(ONE_HOUR_OF_OLD_CRON_SLOTS);
+      // Each pass carries the raised budget (4,400), not the retired 80-slot slice.
+      expect(stagedAfter - stagedBefore).toBeLessThanOrEqual(4_400);
       stagedBefore = stagedAfter;
     }
-    expect(passes).toBe(1);
+    // A plan one hour of the old cron could not finish inside the inactivity window (and three
+    // pairs of the measured case set is larger than the new per-tick budget) still activates
+    // from cron passes alone, in two of them.
+    expect(passes).toBe(2);
     expect(requestState(requestId)).toMatchObject({ status: 'active', staged_cases: planCases });
   });
 
@@ -2391,7 +2394,7 @@ describe('paid request staging liveness', () => {
       )
       .run(requestId, ROUTER_ID, ENGINE, quoteId, SLOTS * 68, at, at);
 
-    const ticks = Math.ceil((SLOTS * 68) / 4_800) + 5;
+    const ticks = Math.ceil((SLOTS * 68) / 4_400) + 5;
     let stagedBefore = 0;
     let lastStamp = '';
     let passes = 0;
@@ -2421,31 +2424,159 @@ describe('paid request staging liveness', () => {
     expect(passes).toBeGreaterThan(20);
   }, 120_000);
 
-  it('answers a second start while a request is preparing with its live request, not an error', async () => {
+  it.each([1, 25, 100])(
+    'keeps the tick under budget and every waiting request alive with %i preparing requests',
+    async concurrent => {
+      // Each request is its own pool (its own router id) with the same single-pair plan, which
+      // is the widest shape one pool can hold for a single pair. The point is the count.
+      const plan: PaidBenchmarkPlan = {
+        version: 1,
+        router: 'efficient',
+        engineIdentity: ENGINE,
+        revision: ACTIVE_MEASUREMENT_REVISION,
+        repetitions: REPS,
+        caseIds: CASES.map(benchCase => benchCase.id),
+        pairs: [
+          {
+            model: 'vendor/shared',
+            variant: '',
+            serving: false,
+            missing: btoa(String.fromCharCode(...new Uint8Array(Math.ceil(SLOTS / 8)).fill(0xff))),
+            covered: btoa(String.fromCharCode(...new Uint8Array(Math.ceil(SLOTS / 8)))),
+            cost: CASES.map(() => 1),
+          },
+        ],
+        counts: { reused: 0, covered: 0, shared: 0, exclusive: SLOTS },
+        estimateMicrodollars: SLOTS,
+        maximumMicrodollars: SLOTS,
+        aliases: [],
+        projectId: 'bench-pool-project',
+      };
+      const at = new Date(Date.now() - 60_000).toISOString();
+      const ids: string[] = [];
+      for (let index = 0; index < concurrent; index += 1) {
+        const requestId = crypto.randomUUID();
+        const quoteId = crypto.randomUUID();
+        ids.push(requestId);
+        sqlite
+          .prepare(
+            `INSERT INTO paid_benchmark_quotes
+              (id, owner_type, owner_id, organization_id, router, router_id, pool_version,
+                engine_identity, context, plan, estimate_microdollars, maximum_microdollars,
+                plan_cases, expires_at, started_request_id, created_at, updated_at)
+            VALUES (?, 'user', ?, NULL, 'efficient', ?, 'pool-v1', ?, '{}', ?, 0, 0, ?,
+              '2027-01-01T00:00:00.000Z', ?, ?, ?)`
+          )
+          .run(
+            quoteId,
+            `user-${index}`,
+            crypto.randomUUID(),
+            ENGINE,
+            JSON.stringify(plan),
+            SLOTS,
+            requestId,
+            at,
+            at
+          );
+        sqlite
+          .prepare(
+            `INSERT INTO paid_benchmark_requests
+              (id, owner_type, owner_id, organization_id, router, router_id, pool_version,
+                engine_identity, status, quote_id, estimate_microdollars, maximum_microdollars,
+                charged_microdollars, plan_cases, staged_cases, pause_reason, actor_user_id,
+                context, created_at, updated_at)
+            VALUES (?, 'user', ?, NULL, 'efficient', ?, 'pool-v1', ?, 'preparing', ?, 0, 0, 0,
+              ?, 0, NULL, ?, '{}', ?, ?)`
+          )
+          .run(
+            requestId,
+            `user-${index}`,
+            crypto.randomUUID(),
+            ENGINE,
+            quoteId,
+            SLOTS,
+            `user-${index}`,
+            at,
+            at
+          );
+      }
+
+      // A single tick must never stage more than the shared budget...
+      const first = await reconcilePaidBenchmarkRequests(paidBindings(db), { now: Date.now() });
+      const stagedFirstTick = ids.reduce((sum, id) => sum + requestState(id).staged_cases, 0);
+      expect(stagedFirstTick).toBeLessThanOrEqual(4_400);
+      expect(first.closed).toEqual([]);
+
+      // ...and over several ticks no request is abandoned for waiting, and the served set keeps
+      // advancing. At 100 requests the scan bound (50) means half are served per tick; the
+      // stalest-first order rotates them, so every request advances within two ticks.
+      let moved = ids.map(id => requestState(id).staged_cases > 0);
+      for (let tick = 1; tick <= 4; tick += 1) {
+        await reconcilePaidBenchmarkRequests(paidBindings(db), {
+          now: Date.now() + tick * MINUTE_MS,
+        });
+        for (const id of ids) expect(['preparing', 'active']).toContain(requestState(id).status);
+        moved = moved.map((was, index) => was || requestState(ids[index]!).staged_cases > 0);
+      }
+      // Every request was served at least once across the run, so none was starved.
+      expect(moved.every(Boolean)).toBe(true);
+      // And the tick totals never exceeded the shared budget.
+      expect(ids.reduce((sum, id) => sum + requestState(id).staged_cases, 0)).toBeLessThanOrEqual(
+        4_400 + 4_400 * 4
+      );
+    },
+    180_000
+  );
+
+  it('answers a second start with the live request on its own plan, not the second quote', async () => {
+    // The live request's plan is wider than the second start's: three pairs versus one.
     const { requestId } = await startFor(['vendor/alpha', 'vendor/cheap', 'vendor/third']);
     expect(requestState(requestId).status).toBe('preparing');
     expect(liveRequestCount()).toBe(1);
+    const stagedBefore = requestState(requestId).staged_cases;
 
-    // A second quote and click for the same pool: the quote is read-only, so it succeeds; the
-    // click cannot create a request because the pool already holds its one live slot.
-    const quoted = await quoteFor(poolContext(['vendor/alpha', 'vendor/cheap', 'vendor/third']));
+    // A second quote for a DIFFERENT (narrower) pool on the same router, then a click. The
+    // quote is read-only, so it succeeds; the click cannot create a request because the pool
+    // already holds its one live slot.
+    const quoted = await quoteFor(poolContext(['vendor/cheap']));
     if (quoted.status !== 'ready') throw new Error('quote not ready');
     const response = await post(startRequest(quoted.id));
     expect(response.status).toBe(200);
     const second = await startResult(response);
-    expect(second.status).toBe('already_in_progress');
-    if (second.status !== 'already_in_progress') return;
+    // The old web release validates this body too, so the answer keeps the `started` shape and
+    // marks the join with a field it ignores.
+    expect(second.status).toBe('started');
+    if (second.status !== 'started') return;
+    expect(second.alreadyInProgress).toBe(true);
     // The caller is handed the request that is already live, with its real progress.
     const progress = second.request;
     if (progress.status === 'empty') throw new Error('already-in-progress request was empty');
     expect(progress.status).toBe('preparing');
     expect(progress.id).toBe(requestId);
-    // Nothing new was created, and the refused quote was not consumed.
+    // It kept staging against its OWN frozen three-pair plan: the narrower second quote never
+    // re-scoped it, and the live row's plan count is unchanged.
+    const live = requestState(requestId);
+    expect(live.plan_cases).toBe(3 * SLOTS);
+    expect(live.staged_cases).toBeGreaterThan(stagedBefore);
+    // Nothing new was created, and the second quote was not consumed.
     expect(countRows('SELECT COUNT(*) AS count FROM paid_benchmark_requests')).toBe(1);
     expect(
       sqlite
         .prepare('SELECT started_request_id FROM paid_benchmark_quotes WHERE id = ?')
         .get(quoted.id)
     ).toEqual({ started_request_id: null });
+    // The live request still reaches `active` on its own plan through cron passes only.
+    let passes = 0;
+    while (requestState(requestId).status === 'preparing' && passes < 5) {
+      passes += 1;
+      await reconcilePaidBenchmarkRequests(paidBindings(db), {
+        now: Date.now() + passes * MINUTE_MS,
+      });
+    }
+    expect(requestState(requestId)).toMatchObject({
+      status: 'active',
+      staged_cases: 3 * SLOTS,
+      plan_cases: 3 * SLOTS,
+    });
   });
 });

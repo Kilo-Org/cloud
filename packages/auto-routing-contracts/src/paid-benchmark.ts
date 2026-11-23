@@ -90,11 +90,18 @@ export const PaidBenchmarkProgressSchema = z.discriminatedUnion('status', [
 export type PaidBenchmarkProgress = z.infer<typeof PaidBenchmarkProgressSchema>;
 
 export const PaidBenchmarkStartResultSchema = z.discriminatedUnion('status', [
-  z.object({ status: z.literal('started'), request: PaidBenchmarkProgressSchema }),
-  // A second explicit confirmation while this pool's request is still live (another tab, a
-  // stale quote) joins the request already staging instead of failing: nothing new is
-  // created, priced or charged, and the caller gets that request's progress to show.
-  z.object({ status: z.literal('already_in_progress'), request: PaidBenchmarkProgressSchema }),
+  z.object({
+    status: z.literal('started'),
+    request: PaidBenchmarkProgressSchema,
+    /**
+     * This pool already had a live request, so the click joined it instead of creating one:
+     * nothing new was priced, consumed or charged. It is a field on `started`, not a new
+     * status, so a web release that predates it still validates the body (the object schema
+     * strips unknown keys) and shows the same live progress; `deploy-workers` runs before the
+     * web promotion, so the worker must stay readable by the previous web release.
+     */
+    alreadyInProgress: z.boolean().optional(),
+  }),
   z.object({
     status: z.literal('insufficient_balance'),
     requiredMicrodollars: BenchmarkMicrodollarsSchema.optional(),

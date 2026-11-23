@@ -194,8 +194,9 @@ describe('start failure copy', () => {
 
   it('shows the running request instead of an error when a start finds one live', () => {
     const copy = startFailureCopy({
-      status: 'already_in_progress',
+      status: 'started',
       request: progress('preparing', { queued: 3 }),
+      alreadyInProgress: true,
     });
     expect(copy?.title).toBe('A benchmark is already running for this pool');
     expect(copy?.description).toContain('already in progress');

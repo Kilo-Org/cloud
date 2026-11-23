@@ -202,15 +202,17 @@ export function benchmarkRequestErrorCopy(error: unknown): BenchmarkFailureCopy 
 export function startFailureCopy(result: PaidBenchmarkStartResult): BenchmarkFailureCopy | null {
   switch (result.status) {
     case 'started':
+      // A second confirmation joins the pool's live request instead of creating one. That is
+      // a notice, not a failure: the dialog shows it above the running request and drops it
+      // when that request settles.
+      if (result.alreadyInProgress === true)
+        return {
+          title: 'A benchmark is already running for this pool',
+          description:
+            'Showing the request already in progress. Nothing new was started or charged.',
+          retryable: false,
+        };
       return null;
-    case 'already_in_progress':
-      // Not a failure: the pool's live request is shown instead, and nothing was started or
-      // charged. The dialog renders this as a notice, not an error.
-      return {
-        title: 'A benchmark is already running for this pool',
-        description: 'Showing the request already in progress. Nothing new was started or charged.',
-        retryable: false,
-      };
     case 'insufficient_balance': {
       const required =
         result.requiredMicrodollars === undefined

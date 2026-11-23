@@ -62,19 +62,23 @@ function countingDb(sqlite: DatabaseSync, counts: QueryCounts): D1Database {
 const CATALOG = { data: [{ id: 'vendor/one', pricing: { prompt: 1e-6, completion: 2e-6 } }] };
 
 /** The widest observed real pool (68 concrete pairs), every slot unmeasured. */
-function widestPlan(): PaidBenchmarkPlan {
-  const caseIds = Array.from({ length: CASE_COUNT }, (_, index) => `case-${index}`);
-  const perPair = caseIds.length * REPETITIONS;
+function widestPlan(
+  router: 'efficient' | 'frontier' = 'efficient',
+  repetitions = REPETITIONS,
+  caseCount = CASE_COUNT
+): PaidBenchmarkPlan {
+  const caseIds = Array.from({ length: caseCount }, (_, index) => `case-${index}`);
+  const perPair = caseIds.length * repetitions;
   const bytes = Math.ceil(perPair / 8);
   const filled = btoa(String.fromCharCode(...new Uint8Array(bytes).fill(0xff)));
   const empty = btoa(String.fromCharCode(...new Uint8Array(bytes)));
   const slots = perPair * 68;
   return {
     version: 1,
-    router: 'efficient',
-    engineIdentity: ENGINE,
+    router,
+    engineIdentity: computeEngineIdentity('decider', router),
     revision: 3,
-    repetitions: REPETITIONS,
+    repetitions,
     caseIds,
     pairs: Array.from({ length: 68 }, (_, index) => ({
       model: `vendor/pair-${index}`,
@@ -92,24 +96,25 @@ function widestPlan(): PaidBenchmarkPlan {
   };
 }
 
-/** One `preparing` request for the widest plan, plus a second `active` one to reconcile. */
+/** One `preparing` request per router shape, plus an `active` one to reconcile. */
 function seedPaidRequests(sqlite: DatabaseSync): void {
   const insert = (status: 'preparing' | 'active', plan: PaidBenchmarkPlan) => {
     const requestId = crypto.randomUUID();
     const quoteId = crypto.randomUUID();
+    const engine = plan.engineIdentity;
     sqlite
       .prepare(
         `INSERT INTO paid_benchmark_quotes
           (id, owner_type, owner_id, organization_id, router, router_id, pool_version,
             engine_identity, context, plan, estimate_microdollars, maximum_microdollars,
             plan_cases, expires_at, started_request_id, created_at, updated_at)
-        VALUES (?, 'user', 'user-1', NULL, 'efficient', ?, 'pool-v1', ?, '{}', ?, 0, 0, ?, ?,
-          ?, ?, ?)`
+        VALUES (?, 'user', 'user-1', NULL, ?, ?, 'pool-v1', ?, '{}', ?, 0, 0, ?, ?, ?, ?, ?)`
       )
       .run(
         quoteId,
+        plan.router,
         crypto.randomUUID(),
-        ENGINE,
+        engine,
         JSON.stringify(plan),
         plan.counts.exclusive,
         new Date(NOW + 30 * 60_000).toISOString(),
@@ -124,14 +129,28 @@ function seedPaidRequests(sqlite: DatabaseSync): void {
             engine_identity, status, quote_id, estimate_microdollars, maximum_microdollars,
             charged_microdollars, plan_cases, staged_cases, pause_reason, actor_user_id,
             context, created_at, updated_at)
-        VALUES (?, 'user', 'user-1', NULL, 'efficient', ?, 'pool-v1', ?, ?, ?, 0, 0, 0, ?, 0,
-          NULL, 'user-1', '{}', ?, ?)`
+        VALUES (?, 'user', 'user-1', NULL, ?, ?, 'pool-v1', ?, ?, ?, 0, 0, 0, ?, 0, NULL,
+          'user-1', '{}', ?, ?)`
       )
-      .run(requestId, crypto.randomUUID(), ENGINE, status, quoteId, plan.counts.exclusive, AT, AT);
+      .run(
+        requestId,
+        plan.router,
+        crypto.randomUUID(),
+        engine,
+        status,
+        quoteId,
+        plan.counts.exclusive,
+        AT,
+        AT
+      );
     return requestId;
   };
-  insert('preparing', widestPlan());
-  insert('active', widestPlan());
+  // Both router shapes: efficient binds 100 cases over 3 repetitions, frontier 100 cases over
+  // 1, so a staging slice of 100 slots must stay inside D1's 100-bound-parameter limit for
+  // either.
+  insert('preparing', widestPlan('efficient'));
+  insert('preparing', widestPlan('frontier', 1, 294));
+  insert('active', widestPlan('efficient'));
 }
 
 /** A full claim pass: three running decider runs per router, so the drain may still start one. */
@@ -296,11 +315,24 @@ describe('scheduled tick D1 budget (production migrations, real handler)', () =>
     };
     console.error(JSON.stringify(components));
 
-    // Staging carries the 4,800-slot budget in 120 batches, each with about five reads.
-    expect(components.staging).toBeLessThanOrEqual(640);
+    // Both router shapes staged for real: a frontier slice (1 repetition, 294 cases) binds just
+    // as many parameters as an efficient one, so a silent binding failure on either would show
+    // up here as a zero count.
+    for (const router of ['efficient', 'frontier']) {
+      const row = worstSqlite
+        .prepare(
+          `SELECT COALESCE(SUM(staged_cases), 0) AS staged FROM paid_benchmark_requests
+          WHERE status = 'preparing' AND router = ?`
+        )
+        .get(router) as { staged: number } | undefined;
+      expect(Number(row?.staged ?? 0)).toBeGreaterThan(0);
+    }
+
+    // Staging carries the 4,400-slot budget in 50 batches of 88, each with three slice reads
+    // and a recount; both router shapes (efficient, 3 repetitions; frontier, 1) are preparing.
+    expect(components.staging).toBeLessThanOrEqual(420);
     // The whole tick keeps a wide margin under D1's hard limit of 1,000 queries per
-    // invocation: about 70% is used, leaving roughly 300 queries for anything a future
-    // addition to the tick needs.
+    // invocation: about a third stays free for anything a future addition needs.
     expect(components.worst).toBeLessThanOrEqual(700);
     expect(components.worst).toBeLessThan(1_000);
   }, 60_000);

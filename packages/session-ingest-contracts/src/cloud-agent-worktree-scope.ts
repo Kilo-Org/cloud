@@ -38,10 +38,12 @@ export const cloudAgentSessionScopeV2AssertionSchema = z.object({
     cloudAgentOrganizationIdSchema,
   ]),
   /**
-   * The member roots of the scope. The cap counts distinct roots: trimming and
-   * de-duplication happen only when a header value is parsed. The encoder accepts
-   * a repeated entry in the caller's array and writes it unchanged, so encoding
-   * then parsing returns the distinct list.
+   * The member roots of the scope. The cap counts **entries**, and the two
+   * callers apply it to different lists: the encoder validates the caller's
+   * array as given, while `parseCloudAgentSessionScopeV2Headers` trims and
+   * de-duplicates the header value first. On the wire the cap therefore counts
+   * distinct roots, and a repeated array entry encodes unchanged but parses back
+   * as one root.
    */
   memberRootKiloSessionIds: z
     .array(containedKiloSessionIdSchema)

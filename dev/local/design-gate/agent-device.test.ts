@@ -443,7 +443,7 @@ const HEADER_TITLE_TWIN = JSON.stringify({
         rect: { x: 135, y: 252, width: 755, height: 65 },
       },
       {
-        index: 2,
+        index: 5,
         parentIndex: 0,
         bundleId: APP,
         type: 'android.widget.TextView',
@@ -451,7 +451,7 @@ const HEADER_TITLE_TWIN = JSON.stringify({
         label: 'ASK DANA TO REVIEW THE PRICING COPY',
         hittable: true,
         visibleToUser: true,
-        rect: { x: 135, y: 158, width: 754, height: 58 },
+        rect: { x: 135, y: 158, width: 754.01, height: 58.01 },
       },
       // The twin: a ViewGroup over the title's own line, with the same copy in
       // it, and nothing on screen by the platform's account.

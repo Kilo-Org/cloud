@@ -2770,7 +2770,7 @@
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
-      "maxNestingDepth": "A ti dé òpin iye ìpele ìgbà iṣẹ́ tí a lè ṣẹ̀dá lábẹ́ ara wọn.",
+      "maxNestingDepth": "A ti dé òpin ìjinlẹ̀ ìgbà iṣẹ́ inú.",
       "modelAccessibility": "Àwòṣe: {{modelLabel}}",
       "openHint": "Ṣí ìgbà iṣẹ́ aṣojú abẹ́",
       "subagent": "Aṣojú abẹ́",

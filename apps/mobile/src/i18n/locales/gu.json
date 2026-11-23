@@ -2813,7 +2813,7 @@
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
-      "maxNestingDepth": "સત્રોની અંદર વધુ સત્રો બનાવવાની મહત્તમ મર્યાદા આવી ગઈ છે.",
+      "maxNestingDepth": "નેસ્ટેડ સત્રોની મહત્તમ ઊંડાઈ આવી ગઈ છે.",
       "modelAccessibility": "મોડલ: {{modelLabel}}",
       "openHint": "સબએજન્ટનું સત્ર ખોલો",
       "subagent": "સબએજન્ટ",

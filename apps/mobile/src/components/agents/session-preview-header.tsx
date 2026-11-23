@@ -62,9 +62,7 @@ export function SessionPreviewHeaderMeta({
   const previewStatus = liveRow ? liveRow.status : target.status;
   // The same raise identity the row uses: its own status time when it has one,
   // so an ack naming that exact raise is honoured here too.
-  const previewRaiseId = liveRow
-    ? raiseId
-    : (target.statusUpdatedAt ?? target.status ?? null);
+  const previewRaiseId = liveRow ? raiseId : (target.statusUpdatedAt ?? target.status ?? null);
   const needsInput =
     previewStatus === undefined
       ? target.needsInput

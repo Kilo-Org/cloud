@@ -292,7 +292,11 @@ describe('SessionPreviewOverlay', () => {
   it('does not fall back to the opened status when the live row reports none', () => {
     // A finished live row reports `status: null`. The header must read that as
     // "no raise", not fall back to the status the preview was opened with.
-    previewState.row.data = { status: null, status_updated_at: null, total_cost_microdollars: null };
+    previewState.row.data = {
+      status: null,
+      status_updated_at: null,
+      total_cost_microdollars: null,
+    };
     const renderer = mountOverlay();
     attentionPhase.current = 'ready';
     attentionPhase.acked = false;

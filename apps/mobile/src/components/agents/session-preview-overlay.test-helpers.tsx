@@ -344,6 +344,8 @@ export function openPreview(target: SessionPreviewTarget): void {
 }
 
 export function resetPreviewHolder(): void {
+  attentionPhase.current = 'ready';
+  attentionPhase.acked = false;
   holder.transcript.data = undefined;
   holder.transcript.isLoading = false;
   holder.transcript.isError = false;

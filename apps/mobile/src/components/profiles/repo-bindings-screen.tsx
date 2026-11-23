@@ -199,8 +199,11 @@ export function RepoBindingsScreen({
   // the Add action, and a member's state says why it has none instead of a
   // second sentence under the copy.
   const emptySurface = isEmpty && !isAdding;
-  // The shared state names a member's rule, the manager's list description, and
-  // an unresolved role (or a personal scope) nothing.
+  // The shared state names a member's rule in the description, or the list's
+  // own description for a reader who may add — a personal scope reports
+  // `allowed` too, because the signed-in user always manages their own — and
+  // states nothing while the role is unresolved. A lapsed plan ignores both:
+  // that branch states the plan instead.
   let emptyDescription: string | undefined = undefined;
   if (profilePermission === 'read-only') {
     emptyDescription = t('profiles.organizationRoleRequired');

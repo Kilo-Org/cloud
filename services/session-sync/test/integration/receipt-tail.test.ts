@@ -120,7 +120,7 @@ it('retains the exact accepted tail across retries, rollback, migration and rest
           999
         )
       )
-    ).toThrow('another source');
+    ).toThrow('not registered');
     expect(() =>
       state.storage.transactionSync(() =>
         apply(db, { ...principal, userID: 'other' }, sessionID, latest.packet, 'digest-600', 999)

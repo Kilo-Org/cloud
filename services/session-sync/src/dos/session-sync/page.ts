@@ -15,13 +15,19 @@ function* pageChunks(
   revision: number,
   position: number,
   rows: Row[],
-  next: string | null
+  next: string | null,
+  includeSource: boolean
 ): Generator<string> {
   yield `{"version":1,"sessionID":${JSON.stringify(sessionID)},"revision":${revision},"position":${position},"entities":[`;
   for (let index = 0; index < rows.length; index++) {
     const row = rows[index];
     if (index > 0) yield ',';
-    const header = JSON.stringify({ kind: row.kind, id: row.id, revision: row.revision });
+    const header = JSON.stringify({
+      kind: row.kind,
+      id: row.id,
+      revision: row.revision,
+      ...(includeSource ? { sourceID: row.source_id } : {}),
+    });
     yield header.slice(0, -1);
     if (row.value !== null) {
       yield ',"value":';
@@ -43,7 +49,7 @@ export function read(
   db: Db,
   principal: Principal,
   sessionID: string,
-  input: { cursor?: Cursor; limit: number; revision?: number }
+  input: { cursor?: Cursor; limit: number; revision?: number; includeSource?: boolean }
 ): ReadableStream<Uint8Array> {
   const meta = live(db, principal, sessionID);
   if (input.revision !== undefined && input.revision !== meta.revision) {
@@ -98,7 +104,14 @@ export function read(
     last && selected.length < rows.length
       ? encodeCursor({ kind: kindSchema.parse(last.kind), id: last.id })
       : null;
-  const chunks = pageChunks(sessionID, meta.revision, meta.position, values, next);
+  const chunks = pageChunks(
+    sessionID,
+    meta.revision,
+    meta.position,
+    values,
+    next,
+    input.includeSource === true
+  );
   const encoder = new TextEncoder();
   return new ReadableStream({
     type: 'bytes',

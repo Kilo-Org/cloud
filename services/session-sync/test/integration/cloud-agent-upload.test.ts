@@ -69,7 +69,12 @@ describe('Cloud Agent upload-only access', () => {
     expect(first.status).toBe(200);
     const retry = await f.request('POST', `/v1/sessions/${f.id}/batches`, packet);
     expect(await retry.json()).toEqual(await first.json());
-    expect((await f.request('GET', `/v1/sessions/${f.id}`)).status).toBe(200);
+    const uploaded = await f.request('GET', `/v1/sessions/${f.id}`);
+    expect(uploaded.status).toBe(200);
+    // An upload principal that omits the register client records cloud-agent.
+    expect(await uploaded.json()).toMatchObject({
+      sources: [{ sourceID: f.sourceID, client: 'cloud-agent' }],
+    });
     expect(f.authorizeUpload).toHaveBeenCalledTimes(5);
     const reader = client(personal(f.userID));
     const snapshot = await reader.entities(f.id);

@@ -2,7 +2,16 @@ import { asc, and, eq } from 'drizzle-orm';
 
 import { blobs, entities, receipts } from '../../db/sqlite-schema';
 import { LIMITS, utf8Bytes, type BatchRequest, type Principal, type Receipt } from '../../protocol';
-import { raise, toReceipt, update, writable, type Db, type Meta, type ReceiptRow } from './session';
+import {
+  isJoined,
+  raise,
+  toReceipt,
+  update,
+  writable,
+  type Db,
+  type Meta,
+  type ReceiptRow,
+} from './session';
 type BatchWork = { pruneMs: number; pruneAttempts: number; pruneError?: unknown };
 
 /**
@@ -25,8 +34,8 @@ export function apply(
   work?: BatchWork
 ): { receipt: Receipt; meta?: Meta } {
   const meta = writable(db, principal, sessionID);
-  if (meta.source_id !== batch.sourceID) {
-    raise('source_conflict', 'The session is bound to another source');
+  if (!isJoined(db, meta, batch.sourceID)) {
+    raise('source_conflict', 'The session source is not registered');
   }
 
   const prior = db.select().from(receipts).where(eq(receipts.batch_id, batch.batchID)).get();
@@ -72,7 +81,7 @@ export function apply(
 
     let row: Pick<
       typeof entities.$inferInsert,
-      'value' | 'blob_hash' | 'blob_bytes' | 'inline_bytes'
+      'value' | 'blob_hash' | 'blob_bytes' | 'inline_bytes' | 'source_id'
     >;
     if ('blob' in change) {
       const blob = db.select().from(blobs).where(eq(blobs.hash, change.blob.hash)).get();
@@ -85,11 +94,23 @@ export function apply(
           bytes: blob.bytes,
         });
       }
-      row = { value: null, blob_hash: blob.hash, blob_bytes: blob.bytes, inline_bytes: 0 };
+      row = {
+        value: null,
+        blob_hash: blob.hash,
+        blob_bytes: blob.bytes,
+        inline_bytes: 0,
+        source_id: batch.sourceID,
+      };
       touched.add(blob.hash);
     } else {
       const value = JSON.stringify(change.value);
-      row = { value, blob_hash: null, blob_bytes: null, inline_bytes: utf8Bytes(value) };
+      row = {
+        value,
+        blob_hash: null,
+        blob_bytes: null,
+        inline_bytes: utf8Bytes(value),
+        source_id: batch.sourceID,
+      };
     }
 
     db.insert(entities)
@@ -141,6 +162,7 @@ export function apply(
     revision,
     changes: batch.changes.length,
     committed_at: now,
+    source_id: batch.sourceID,
   };
   db.insert(receipts).values(receipt).run();
   prune(db, meta.batches + 1, work);

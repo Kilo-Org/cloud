@@ -9,6 +9,7 @@ import {
   ok,
   principalSchema,
   sessionIDSchema,
+  sourceClientSchema,
   userIDSchema,
   type Result,
 } from '../../protocol';
@@ -16,7 +17,11 @@ import { getSessionSyncDOStub } from '../SessionSyncDO';
 
 export const ERASURE_PAGE_ITEMS = 16;
 const RETRY_MS = 60_000;
-const trackInput = z.strictObject({ principal: principalSchema, sessionID: sessionIDSchema });
+const trackInput = z.strictObject({
+  principal: principalSchema,
+  sessionID: sessionIDSchema,
+  client: sourceClientSchema.optional(),
+});
 const eraseInput = z.strictObject({ userID: userIDSchema });
 type Db = DrizzleSqliteDODatabase;
 
@@ -25,15 +30,18 @@ export function track(db: Db, input: unknown): Result<null> {
   if (!parsed.success) return fail('invalid_request', 'Invalid creator index entry');
   if (db.select().from(userErasure).get())
     return fail('session_deleted', 'The account was deleted');
-  const { principal, sessionID } = parsed.data;
+  const { principal, sessionID, client } = parsed.data;
   const tenant = principal.tenant;
+  const now = Date.now();
   db.insert(createdSessions)
     .values({
       target: JSON.stringify([tenant.type, tenant.id, sessionID]),
       tenant_type: tenant.type,
       tenant_id: tenant.id,
       session_id: sessionID,
-      created_at: Date.now(),
+      created_at: now,
+      client: client ?? 'cli',
+      updated_at: now,
     })
     .onConflictDoNothing()
     .run();

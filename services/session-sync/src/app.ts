@@ -40,7 +40,10 @@ import { live } from './live/routes';
 import { LiveTicketError } from './live/ticket';
 import { notifications } from './notifications/routes';
 
-type AppContext = { Bindings: Env; Variables: { principal: Principal } };
+type AppContext = {
+  Bindings: Env;
+  Variables: { principal: Principal; principalKind: 'transcript' | 'cloud-agent' | 'grant' };
+};
 type C = Context<AppContext>;
 
 function json(body: unknown, status: number): Response {
@@ -192,12 +195,19 @@ app.route('/v1', live);
 app.route('/v1', notifications);
 
 app.use('/v1/sessions/*', async (c, next) => {
-  const principal =
-    (await authorizeTranscript(c.req.raw, c.env)) ??
-    (await authorizeCloudAgentUpload(c.req.raw, c.env)) ??
-    (await authorize(c.req.raw, c.env));
+  let principal = await authorizeTranscript(c.req.raw, c.env);
+  let principalKind: AppContext['Variables']['principalKind'] = 'transcript';
+  if (principal === undefined) {
+    principal = await authorizeCloudAgentUpload(c.req.raw, c.env);
+    principalKind = 'cloud-agent';
+  }
+  if (principal === undefined) {
+    principal = await authorize(c.req.raw, c.env);
+    principalKind = 'grant';
+  }
   if (principal instanceof Response) return principal;
   c.set('principal', principal);
+  c.set('principalKind', principalKind);
   const metrics = requestMetrics(c.req.raw);
   if (metrics) metrics.tenant = principal.tenant.type;
   // Reads and batches buy request credits in their session object.
@@ -229,7 +239,12 @@ app.put('/v1/sessions/:id', async c => {
   const input = {
     principal: c.get('principal'),
     sessionID: sessionID.value,
-    request: request.data,
+    request: {
+      ...request.data,
+      client:
+        request.data.client ??
+        (c.get('principalKind') === 'cloud-agent' ? ('cloud-agent' as const) : undefined),
+    },
   };
   const result = await call(c, input.sessionID, async s => await s.register(input), 'register');
   if (!result.ok) return failure(result.error);
@@ -287,6 +302,7 @@ app.get('/v1/sessions/:id/entities', async c => {
     cursor,
     limit: query.data.limit ?? LIMITS.pageDefault,
     revision: query.data.revision,
+    includeSource: query.data.include === 'source',
   };
   const result = await call(
     c,

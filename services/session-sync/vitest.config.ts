@@ -31,6 +31,9 @@ function fixPgCjsDependencies() {
   };
 }
 
+/** Loops of tens of sequential requests; they need their own worker and deadline. */
+const SLOW_SUITES = ['lease-granularity.test.ts', 'live-relay.test.ts'];
+
 // Every suite runs in the Workers runtime against real Durable Object and R2 bindings.
 export default defineConfig({
   plugins: [
@@ -43,7 +46,29 @@ export default defineConfig({
   test: {
     globals: true,
     env: { SESSION_SYNC_MEASURE_URL: process.env.SESSION_SYNC_MEASURE_URL ?? '' },
-    include: ['src/**/*.test.ts', 'test/**/*.test.ts'],
-    exclude: [...configDefaults.exclude, 'test/postgres/**'],
+    // Suites that drive long request loops keep their own worker and deadline, so
+    // a growing default suite cannot starve them past the shared timeout.
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: 'default',
+          include: ['src/**/*.test.ts', 'test/**/*.test.ts'],
+          exclude: [
+            ...configDefaults.exclude,
+            'test/postgres/**',
+            ...SLOW_SUITES.map(path => `**/${path}`),
+          ],
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'slow',
+          include: SLOW_SUITES.map(path => `test/integration/${path}`),
+          testTimeout: 20_000,
+        },
+      },
+    ],
   },
 });

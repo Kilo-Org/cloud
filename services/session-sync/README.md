@@ -71,10 +71,11 @@ The CLI retains the typed error and uses its existing jittered backoff.
 | Operation | Route | Meaning |
 |---|---|---|
 | Exchange credential | `POST /v1/auth/exchange` | Verify the Kilo credential and issue a short-lived tenant-scoped sync grant. |
-| Inspect session | `GET /v1/sessions/:id` | Read producer binding, committed source position, revision, and deletion state. |
-| Register session | `PUT /v1/sessions/:id` | Bind a session to its source without replacing an existing owner. |
+| Inspect session | `GET /v1/sessions/:id` | Read joined sources, committed source position, revision, and deletion state. |
+| Register session | `PUT /v1/sessions/:id` | Create a session, or join one more source of the same creator to it. |
+| List sessions | `GET /v1/sessions` | List the creator's sessions with title, origin client, directory, and archive filters. |
 | Apply batch | `POST /v1/sessions/:id/batches` | Atomically apply an incremental batch and return its durable receipt. |
-| Read entities | `GET /v1/sessions/:id/entities` | Read bounded pages of the current portable entities. |
+| Read entities | `GET /v1/sessions/:id/entities` | Read bounded pages of the current portable entities; add `?include=source` for the writer tag. |
 | Upload blob | `PUT /v1/sessions/:id/blobs/:hash` | Verify and durably store private content-addressed bytes. |
 | Read blob | `GET /v1/sessions/:id/blobs/:hash` | Read bytes after tenant and session authorization. |
 | Remove cloud session | `DELETE /v1/sessions/:id` | Tombstone the cloud copy and prevent its automatic recreation. |
@@ -93,14 +94,42 @@ Do not repeat the account-database lookup for every upload packet.
 empty configuration returns `auth_unavailable` (503) and logs a configuration error;
 a credential from another environment is rejected before account SQL.
 
-Registration supplies `{version, sourceID}`.
-The creator identity comes from the grant, not the registration body.
+Registration supplies `{version, sourceID, client?}`, where `client` is `cli`,
+`mobile`, or `cloud-agent`. The creator identity comes from the grant, not the
+registration body. An omitted `client` records `cloud-agent` for a Cloud Agent
+upload principal and `cli` otherwise.
+
+A session can hold several sources of its one creator. Registering a new
+source on a live session joins it (re-registering a joined source is a no-op);
+a deleted session refuses every registration with `session_deleted`. Live
+state keeps `sourceID` as the first source and lists all of them in `sources`
+as `{sourceID, client, joinedAt}`. Batches and status writes must name a
+joined source or fail with `source_conflict`; every joined source writes
+under the same position check, so a stale writer gets `position_conflict`
+with the committed position and never overwrites newer entities. Each entity
+row and batch receipt records its writer. Entity pages stay byte-identical to
+their pre-tag shape by default; pass `?include=source` to add `sourceID`
+(null for rows written before side tags existed) to each item.
 
 A batch supplies `{version, sourceID, batchID, after, through, changes}`.
 `after` is the last acknowledged source position.
 `through` covers the complete captured change range in this batch.
 Source positions can be sparse after local coalescing.
 The service checks that `after` matches the committed source position.
+
+The creator index behind `GET /v1/sessions` carries display metadata the
+session object pushes whenever an accepted batch puts the `session` entity:
+`title`, `directory` (`origin.directory`; an empty string indexes as null),
+`updatedAt` (`time.updated`, or the batch commit time when unusable), and
+`archived` (whether `time.archived` is present). The index also records the
+first source's `client` at registration. List items are `{sessionID, tenant,
+createdAt, updatedAt, title, client, directory, archived, live}`, ordered by
+`updatedAt` descending with an opaque `{updatedAt, target}` cursor (cursors
+minted under the previous creation-time order are rejected). Filters combine:
+`q` is a case-insensitive title substring of 1–200 characters, `client` is one
+of `cli`, `mobile`, or `cloud-agent`, `directory` matches exactly, and
+`archived` is `true` or `false` (omitted lists both). Invalid filter values
+fail with `invalid_request`. Deleting a session removes its index row.
 
 Each change has a kind and an entity ID.
 The portable kinds are `session`, `message`, `message-part`, `inbox`, `instruction-entry`,
@@ -792,7 +821,7 @@ Late runner `command_not_found` replies are informational: routing has expired
 or the controller left; do not retry the reply. Live request/reply needs no fake/control session.
 
 Session discovery pages the user's personal creator index across all tenants,
-newest registration first with stable cursor ties, and merges matching presence
+newest update first with stable cursor ties, and merges matching presence
 into `live`. It may show a creator's session IDs after leaving an organization,
 but opening still requires a current grant and session ACL. The index is discovery,
 never authorization. Deletion removes entries and durably retries relay purge:

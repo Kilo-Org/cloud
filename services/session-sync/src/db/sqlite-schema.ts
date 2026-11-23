@@ -33,6 +33,15 @@ export const sessionRoles = sqliteTable('session_roles', {
   role: text('role', { enum: ['owner', 'viewer', 'editor'] }).notNull(),
 });
 
+/** Sources joined to this session; the first row matches `session.source_id`. */
+export const sessionSources = sqliteTable('session_sources', {
+  source_id: text('source_id').primaryKey(),
+  client: text('client', { enum: ['cli', 'mobile', 'cloud-agent'] })
+    .notNull()
+    .default('cli'),
+  joined_at: integer('joined_at').notNull(),
+});
+
 export const sessionStatus = sqliteTable('session_status', {
   key: integer('key').primaryKey(),
   value: text('value').notNull(),
@@ -51,6 +60,8 @@ export const entities = sqliteTable(
     blob_hash: text('blob_hash'),
     blob_bytes: integer('blob_bytes'),
     inline_bytes: integer('inline_bytes').notNull(),
+    /** Writer of the row's last put; null for rows written before side tags. */
+    source_id: text('source_id'),
   },
   table => [
     primaryKey({ columns: [table.kind, table.id] }),
@@ -59,6 +70,20 @@ export const entities = sqliteTable(
       .where(sql`${table.blob_hash} IS NOT NULL`),
   ]
 );
+
+/**
+ * Creator-index metadata. One row (`key` = 1): `owed` is metadata the index
+ * does not hold yet, `pushed` is what it last accepted, `retry_at` gates the
+ * next attempt after a refusal.
+ */
+export const listMetadata = sqliteTable('list_metadata', {
+  key: integer('key').primaryKey(),
+  owed: text('owed'),
+  pushed: text('pushed'),
+  retry_at: integer('retry_at').notNull(),
+  /** Consecutive refusals; drives the bounded exponential backoff. */
+  attempts: integer('attempts').notNull().default(0),
+});
 
 /** Bounded tail of durable batch receipts, keyed by the producer batch ID. */
 export const receipts = sqliteTable(
@@ -71,6 +96,8 @@ export const receipts = sqliteTable(
     revision: integer('revision').notNull(),
     changes: integer('changes').notNull(),
     committed_at: integer('committed_at').notNull(),
+    /** Writer of this batch; null for receipts written before side tags. */
+    source_id: text('source_id'),
   },
   table => [index('receipts_through_idx').on(table.through)]
 );

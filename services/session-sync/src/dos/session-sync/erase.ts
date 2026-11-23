@@ -5,6 +5,7 @@ import type { SessionNotification } from '../../notifications/protocol';
 import type { Principal, SessionState } from '../../protocol';
 import { toState, update, visible, type Db, type Meta } from './session';
 import { SWEEP_MARGIN_MS } from './blob';
+import { clear as clearListMetadata } from './list-metadata';
 import { snapshot } from './notifications';
 
 /**
@@ -25,6 +26,8 @@ export function tombstone(
   db.delete(entities).where(isNotNull(entities.kind)).run();
   db.delete(receipts).where(isNotNull(receipts.batch_id)).run();
   db.delete(sessionStatus).where(isNotNull(sessionStatus.key)).run();
+  // A tombstone leaves every list, so an owed index push no longer applies.
+  clearListMetadata(db);
   // Preserve every physical key until cleanup completes. A committed upload
   // has finished its PUT, so its object is eligible for immediate cleanup.
   db.update(blobs)

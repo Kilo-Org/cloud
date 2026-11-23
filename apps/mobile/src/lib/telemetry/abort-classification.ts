@@ -63,8 +63,7 @@ function isExpoCanceledError(error: unknown): boolean {
 /**
  * True when the value is an abort: an `AbortError` / `DOMException` or an Expo
  * `FetchRequestCanceledException`. The Expo cancellation is checked on the
- * error itself and one level of `cause`, since the SDK wraps it. Total: an
- * unrecognized value yields `false` and never throws.
+ * error itself and one level of `cause`, since the SDK wraps it.
  */
 export function isAbortError(error: unknown): boolean {
   try {

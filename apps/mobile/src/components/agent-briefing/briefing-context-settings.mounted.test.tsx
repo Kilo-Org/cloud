@@ -7,6 +7,8 @@ import { act, TestRenderer } from '@/test/renderer';
 import { waitFor } from '@/test/render-with-providers';
 
 import { BriefingContextSettings } from './briefing-context-settings';
+import type * as AgentBriefingFormat from '@/lib/agent-briefing-format';
+import type * as Format from '@/lib/format';
 
 const COPY: Readonly<Record<string, string>> = {
   'agentBriefing.scheduledContextEnabled': 'Scheduled briefs',
@@ -32,6 +34,13 @@ const paid = vi.hoisted(() => ({
   read: { offline: false, isError: false, isFetching: false },
   catalog: { isError: false, refetch: vi.fn() },
   appState: { currentState: 'active' },
+  // The locale every formatter was handed, in call order. The card's copy is
+  // written in the tag whose catalog loaded, so the numbers beside it must be
+  // formatted in that tag and not in the requested regional one.
+  formatting: {
+    money: [] as { microdollars: number; locale: string }[],
+    numbers: [] as { locale: string; options: Intl.NumberFormatOptions }[],
+  },
   // The fake cache: `estimate.value` is the fake server's answer, and
   // `answerKey` is the key it settled on. Any other key has no answer of its
   // own, so only a placeholder may stand the settled answer in for it. Without
@@ -46,6 +55,8 @@ beforeEach(() => {
   paid.read = { offline: false, isError: false, isFetching: false };
   paid.catalog = { isError: false, refetch: vi.fn() };
   paid.appState.currentState = 'active';
+  paid.formatting.money.length = 0;
+  paid.formatting.numbers.length = 0;
   paid.refetch.mockResolvedValue({
     data: {
       canGenerate: true,
@@ -75,7 +86,7 @@ vi.mock('react-i18next', () => ({
       const copy = COPY[key] ?? key;
       return params?.context ? copy.replace('{{context}}', params.context) : copy;
     },
-    i18n: { language: 'en', resolvedLanguage: 'en' },
+    i18n: { language: 'en-US', resolvedLanguage: 'en' },
   }),
 }));
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
@@ -124,6 +135,29 @@ vi.mock('@/components/ui/card', () => ({ Card: 'Card' }));
 vi.mock('@/lib/utils', () => ({
   cn: (...classes: unknown[]) => classes.filter(Boolean).join(' '),
 }));
+// The card's copy is written in the tag whose catalog loaded, so the numbers
+// beside it must be formatted in that same tag. Both formatters keep their real
+// output and record the locale they were handed.
+vi.mock('@/lib/agent-briefing-format', async importOriginal => {
+  const actual = await importOriginal<typeof AgentBriefingFormat>();
+  return {
+    ...actual,
+    briefingMoney: (microdollars: number, locale: string) => {
+      paid.formatting.money.push({ microdollars, locale });
+      return actual.briefingMoney(microdollars, locale);
+    },
+  };
+});
+vi.mock('@/lib/format', async importOriginal => {
+  const actual = await importOriginal<typeof Format>();
+  return {
+    ...actual,
+    formatNumber: (value: number, locale: string, options?: Intl.NumberFormatOptions) => {
+      paid.formatting.numbers.push({ locale, options: options ?? {} });
+      return actual.formatNumber(value, locale, options);
+    },
+  };
+});
 
 vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
 // The status component's announcement bridge imports the native accessibility
@@ -340,6 +374,9 @@ it('names the model catalog failure and offers Retry as its own control', () => 
 });
 
 it('requires a fresh cost confirmation before explicitly enabling scheduled capture', async () => {
+  // A cached quote would format its own money before the dialog opens; the
+  // disclosure's arguments are the only ones this run records.
+  paid.estimate.value = undefined;
   const mounted = mount(false);
   const switchNode = mounted.root.find(node => (node.type as string) === 'Switch');
   const { onValueChange } = switchNode.props as { onValueChange: (next: boolean) => void };
@@ -349,6 +386,17 @@ it('requires a fresh cost confirmation before explicitly enabling scheduled capt
   await waitFor(() => paid.alert.mock.calls.length === 1);
   expect(paid.refetch).toHaveBeenCalledTimes(1);
   expect(paid.mutate).not.toHaveBeenCalled();
+  // One sentence, one locale: the estimate, the maximum and the minute limit all
+  // format in the tag whose catalog loaded ('en'), never the requested regional
+  // tag ('en-US') the copy is not written in.
+  expect(paid.formatting.money).toEqual([
+    { microdollars: 1000, locale: 'en' },
+    { microdollars: 2_000_000, locale: 'en' },
+  ]);
+  const disclosureMinutes = paid.formatting.numbers.filter(
+    call => call.options.maximumFractionDigits === 2
+  );
+  expect(disclosureMinutes).toEqual([{ locale: 'en', options: { maximumFractionDigits: 2 } }]);
   const buttons = paid.alert.mock.calls[0]?.[2] as { onPress?: () => void }[];
   act(() => {
     buttons[1]?.onPress?.();

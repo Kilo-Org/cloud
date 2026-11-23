@@ -26,6 +26,7 @@ import { dateTimeFormat } from '@/lib/intl-cache';
 import { assertSurfaceFailureHandled, type SurfaceFeedback } from '@/lib/surface-feedback';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
+import { useBriefingLocale } from './briefing-locale';
 
 /** The save's refusal: the server answered no, and nothing was stored. */
 type BriefingScheduleFailure = { readonly kind: 'refused' };
@@ -71,7 +72,8 @@ const TIME_REFUSAL_KEYS = {
 export function ScheduleSettings({ preferences }: { readonly preferences: StoredSchedule }) {
   const trpc = useTRPC();
   const client = useQueryClient();
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
+  const locale = useBriefingLocale();
   const offline = useOfflineBannerState();
   const draft = useRef({
     timezone: preferences.timezone,
@@ -138,7 +140,7 @@ export function ScheduleSettings({ preferences }: { readonly preferences: Stored
       return;
     }
     update.mutate(
-      { ...next, language: i18n.resolvedLanguage ?? i18n.language },
+      { ...next, language: locale },
       {
         onSuccess: () => {
           attempt.abandon();
@@ -205,7 +207,7 @@ export function ScheduleSettings({ preferences }: { readonly preferences: Stored
         const pickerValue = briefingPickerDate(time);
         // One value for what the button shows and announces, in the locale
         // convention the picker itself uses.
-        const clock = formatClockTime(pickerValue, i18n.resolvedLanguage ?? i18n.language);
+        const clock = formatClockTime(pickerValue, locale);
         return (
           <View key={field.key} className="gap-2">
             {/* The same label the text fields above wear: one relation, one
@@ -230,7 +232,7 @@ export function ScheduleSettings({ preferences }: { readonly preferences: Stored
                   value={pickerValue}
                   mode="time"
                   display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                  locale={i18n.resolvedLanguage ?? i18n.language}
+                  locale={locale}
                   positiveButton={{ label: t('common.done') }}
                   negativeButton={{ label: t('common.cancel') }}
                   onDismiss={() => {

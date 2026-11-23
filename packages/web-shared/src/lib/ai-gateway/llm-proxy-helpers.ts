@@ -165,7 +165,34 @@ export function temporarilyUnavailableResponse() {
   );
 }
 
-export async function usageLimitExceededResponse(user: User, balance?: number) {
+/**
+ * The terminal credits block for a paid request.
+ *
+ * With an `organizationId` the organization pays, so the response names it as the payer and
+ * points at the organization billing page: a personal top-up would not unblock the request.
+ * Without one the caller's own credits pay, and the response is the personal low-credit prompt.
+ */
+export async function usageLimitExceededResponse(
+  user: User,
+  balance?: number,
+  organizationId?: string
+) {
+  if (organizationId) {
+    return NextResponse.json(
+      {
+        error: {
+          title: 'Organization Credits Required',
+          message:
+            'Your organization pays for this request and has no credits left. Ask an organization owner to add credits.',
+          balance,
+          buyCreditsUrl: `${APP_URL}/organizations/${organizationId}`,
+        },
+        error_type: ProxyErrorType.usage_limit_exceeded,
+      },
+      { status: 402 }
+    );
+  }
+
   const payments = await summarizeUserPayments(user.id);
 
   const title = !payments.payments_count ? 'Paid Model - Credits Required' : 'Low Credit Warning!';
@@ -217,6 +244,11 @@ export function topUpInProgressResponse() {
  * transient and reported as retryable; otherwise it is the terminal
  * low-credits response.
  *
+ * The terminal response names the payer the block belongs to: the organization
+ * when an organization funds the request, so the member is sent to the
+ * organization billing page, and the caller themselves when their own balance
+ * (including their per-user allowance) is the binding constraint.
+ *
  * A block caused by an exhausted per-user allowance is never retryable: an
  * organization top-up restores the organization balance, not the member's
  * allowance, so the retry would not resolve.
@@ -233,7 +265,11 @@ export async function creditsBlockedResponse(params: {
   ) {
     return topUpInProgressResponse();
   }
-  return await usageLimitExceededResponse(params.user, params.balance);
+  return await usageLimitExceededResponse(
+    params.user,
+    params.balance,
+    params.balanceLimitedByUserAllowance ? undefined : params.organizationId
+  );
 }
 
 export function dataCollectionRequiredResponse() {

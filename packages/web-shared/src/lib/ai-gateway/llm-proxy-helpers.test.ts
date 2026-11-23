@@ -70,6 +70,26 @@ jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
   errorExceptInTest: (...args: unknown[]) => mockedErrorExceptInTest(...args),
 }));
 
+// The credits block reads the caller's payment history and the auto-top-up lock from the
+// database; neither read belongs in these tests.
+const mockedSummarizeUserPayments = jest.fn();
+jest.mock('@kilocode/web-shared/lib/creditTransactions', () => ({
+  ...(jest.requireActual('@kilocode/web-shared/lib/creditTransactions') as Record<string, unknown>),
+  summarizeUserPayments: (...args: unknown[]) => mockedSummarizeUserPayments(...args),
+}));
+const mockedIsAutoTopUpInFlight = jest.fn();
+jest.mock('@kilocode/web-shared/lib/autoTopUpInFlight', () => ({
+  ...(jest.requireActual('@kilocode/web-shared/lib/autoTopUpInFlight') as Record<string, unknown>),
+  isAutoTopUpInFlight: (...args: unknown[]) => mockedIsAutoTopUpInFlight(...args),
+}));
+
+// The checked-in first-top-up bonus is off, which hides its wording. Turn it on so the prompt a
+// first top-up would receive stays covered.
+jest.mock('@kilocode/web-shared/lib/constants', () => ({
+  ...(jest.requireActual('@kilocode/web-shared/lib/constants') as Record<string, unknown>),
+  FIRST_TOPUP_BONUS_AMOUNT: 10,
+}));
+
 import {
   captureProxyError,
   countAndStoreEditUsage,
@@ -92,9 +112,13 @@ import {
   requestedSamples,
   claudeBillingReconnectResponse,
   claudeBillingUnavailableResponse,
+  creditsBlockedResponse,
+  usageLimitExceededResponse,
 } from './llm-proxy-helpers';
 import { createControlledClock } from '@kilocode/web-shared/tests/helpers/timed-body.helper';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
+import { APP_URL, FIRST_TOPUP_BONUS_AMOUNT } from '@kilocode/web-shared/lib/constants';
+import type { User } from '@kilocode/db/schema';
 
 const clock = createControlledClock();
 
@@ -136,6 +160,122 @@ describe('claudeBillingUnavailableResponse', () => {
     const body = (await response.json()) as { error: string; message: string };
     expect(body.message).toBe('Some retryable reason.');
     expect(body.error).toBe(body.message);
+  });
+});
+
+const creditsBlockUser = { id: 'user-1' } as User;
+
+type CreditsBlockBody = {
+  error: { title: string; message: string; balance?: number; buyCreditsUrl: string };
+  error_type: string;
+};
+
+describe('usageLimitExceededResponse', () => {
+  const organizationId = '00000000-0000-4000-8000-000000000042';
+
+  beforeEach(() => {
+    mockedSummarizeUserPayments.mockReset();
+    mockedIsAutoTopUpInFlight.mockReset();
+  });
+
+  it('names the organization as the payer and links its billing page', async () => {
+    const response = await usageLimitExceededResponse(creditsBlockUser, 0, organizationId);
+
+    expect(response.status).toBe(402);
+    const body = (await response.json()) as CreditsBlockBody;
+    expect(body.error_type).toBe(ProxyErrorType.usage_limit_exceeded);
+    expect(body.error.title).toBe('Organization Credits Required');
+    expect(body.error.message).toBe(
+      'Your organization pays for this request and has no credits left. Ask an organization owner to add credits.'
+    );
+    expect(body.error.balance).toBe(0);
+    expect(body.error.buyCreditsUrl).toBe(`${APP_URL}/organizations/${organizationId}`);
+    expect(mockedSummarizeUserPayments).not.toHaveBeenCalled();
+  });
+
+  it('keeps the first-topup prompt for a personal payer who never paid', async () => {
+    mockedSummarizeUserPayments.mockResolvedValue({
+      payments_count: 0,
+      payments_total_microdollars: 0,
+    });
+
+    const response = await usageLimitExceededResponse(creditsBlockUser, 0.5);
+
+    expect(response.status).toBe(402);
+    const body = (await response.json()) as CreditsBlockBody;
+    expect(body.error_type).toBe(ProxyErrorType.usage_limit_exceeded);
+    expect(body.error.title).toBe('Paid Model - Credits Required');
+    expect(body.error.message).toBe(
+      `This is a paid model. To use paid models, you need to add credits. Get $${FIRST_TOPUP_BONUS_AMOUNT} free on your first topup!`
+    );
+    expect(body.error.balance).toBe(0.5);
+    expect(body.error.buyCreditsUrl).toBe(`${APP_URL}/profile`);
+    expect(mockedSummarizeUserPayments).toHaveBeenCalledWith(creditsBlockUser.id);
+  });
+
+  it('keeps the low-credit warning for a personal payer who already paid', async () => {
+    mockedSummarizeUserPayments.mockResolvedValue({
+      payments_count: 2,
+      payments_total_microdollars: 5_000_000,
+    });
+
+    const response = await usageLimitExceededResponse(creditsBlockUser);
+
+    expect(response.status).toBe(402);
+    const body = (await response.json()) as CreditsBlockBody;
+    expect(body.error.title).toBe('Low Credit Warning!');
+    expect(body.error.message).toBe('Add credits to continue, or switch to a free model');
+    expect(body.error.buyCreditsUrl).toBe(`${APP_URL}/profile`);
+    expect(mockedSummarizeUserPayments).toHaveBeenCalledWith(creditsBlockUser.id);
+  });
+});
+
+describe('creditsBlockedResponse', () => {
+  beforeEach(() => {
+    mockedSummarizeUserPayments.mockReset();
+    mockedIsAutoTopUpInFlight.mockReset();
+  });
+
+  it('names the organization payer when its balance is the block', async () => {
+    mockedIsAutoTopUpInFlight.mockResolvedValue(false);
+
+    const response = await creditsBlockedResponse({
+      user: creditsBlockUser,
+      balance: 0,
+      organizationId: 'org-42',
+    });
+
+    expect(mockedIsAutoTopUpInFlight).toHaveBeenCalledWith({
+      userId: creditsBlockUser.id,
+      organizationId: 'org-42',
+    });
+    expect(mockedSummarizeUserPayments).not.toHaveBeenCalled();
+    expect(response.status).toBe(402);
+    const body = (await response.json()) as CreditsBlockBody;
+    expect(body.error_type).toBe(ProxyErrorType.usage_limit_exceeded);
+    expect(body.error.title).toBe('Organization Credits Required');
+    expect(body.error.buyCreditsUrl).toBe(`${APP_URL}/organizations/org-42`);
+  });
+
+  it("keeps the personal prompt when the member's own allowance is the block", async () => {
+    mockedSummarizeUserPayments.mockResolvedValue({
+      payments_count: 0,
+      payments_total_microdollars: 0,
+    });
+
+    const response = await creditsBlockedResponse({
+      user: creditsBlockUser,
+      balance: 0,
+      organizationId: 'org-42',
+      balanceLimitedByUserAllowance: true,
+    });
+
+    expect(mockedIsAutoTopUpInFlight).not.toHaveBeenCalled();
+    expect(response.status).toBe(402);
+    const body = (await response.json()) as CreditsBlockBody;
+    expect(body.error_type).toBe(ProxyErrorType.usage_limit_exceeded);
+    expect(body.error.title).toBe('Paid Model - Credits Required');
+    expect(body.error.buyCreditsUrl).toBe(`${APP_URL}/profile`);
   });
 });
 

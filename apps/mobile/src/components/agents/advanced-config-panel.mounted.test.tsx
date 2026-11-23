@@ -992,6 +992,80 @@ describe('AdvancedConfigPanel', () => {
     expect(saveSheetMessage(renderer)).toBe(refusal);
   });
 
+  it("resolves a retry against this account's own record", async () => {
+    const mocks = mutations();
+    const refusal = 'A profile with this name already exists';
+    const firstWrite = Promise.withResolvers<{ id: string }>();
+    // Each account keeps its own save record.
+    mocks.create.mutateAsync
+      .mockReturnValueOnce(firstWrite.promise)
+      .mockResolvedValueOnce({ id: 'org2-1' })
+      .mockRejectedValueOnce(
+        Object.assign(new Error(refusal), {
+          name: 'TRPCClientError',
+          data: { code: 'CONFLICT', httpStatus: 409, path: 'agentProfiles.create', zodError: null },
+        })
+      );
+    const created: ProfileSelectorProfile = {
+      id: 'prod-1',
+      name: 'prod',
+      varCount: 1,
+      commandCount: 1,
+      isDefault: false,
+      ownerType: 'organization',
+    };
+    const refetch = vi
+      .fn()
+      .mockResolvedValue({ data: { orgProfiles: [created], personalProfiles: [] } });
+    const onSelectProfile = vi.fn<(id: string | null) => void>();
+    const renderer = mount({
+      mocks,
+      organizationId: 'org-1',
+      list: { personalProfiles: [], refetch },
+      onSelectProfile,
+    });
+    fillManualConfig(renderer);
+    press(buttonByText(renderer, 'Save as profile'));
+    typeInto(renderer, 'Profile name', 'prod');
+    // Start the write without waiting for its answer.
+    act(() => {
+      (renderer.root.findByType('SheetHeader' as never).props.onDone as () => void)();
+    });
+
+    // The panel moves to org-2 while that save is still open.
+    rerenderWithScope(renderer, 'org-2', onSelectProfile);
+
+    // A transport wrapper carries no outcome, so the attempt belongs to the
+    // account the save was made in.
+    await act(async () => {
+      firstWrite.reject(
+        Object.assign(new Error('Network request failed'), { name: 'TRPCClientError' })
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // Org-2 then completes a save of its own.
+    addVariable(renderer, 'SECOND', 'xyz');
+    press(buttonByText(renderer, 'Save as profile'));
+    await submitSave(renderer, 'Second Setup');
+    expect(onSelectProfile).toHaveBeenCalledWith('org2-1');
+
+    // Back in org-1, the retry resolves against org-1's own record.
+    rerenderWithScope(renderer, 'org-1', onSelectProfile);
+    addVariable(renderer, 'API_KEY', 'abc');
+    press(buttonByText(renderer, 'Add command'));
+    typeInto(renderer, 'Command 1', 'pnpm install');
+    press(buttonByText(renderer, 'Save as profile'));
+    await submitSave(renderer, 'prod');
+
+    expect(mocks.create.mutateAsync).toHaveBeenCalledTimes(3);
+    expect(refetch).toHaveBeenCalled();
+    expect(onSelectProfile).toHaveBeenCalledWith('prod-1');
+    expect(toast.success).toHaveBeenCalledTimes(2);
+    expect(renderer.root.findAll(node => node.type === SaveProfileSheet)).toHaveLength(0);
+  });
+
   it('keeps the save sheet open and the typed name when the save fails', async () => {
     const mocks = mutations();
     mocks.create.mutateAsync.mockRejectedValue(new Error('nope'));

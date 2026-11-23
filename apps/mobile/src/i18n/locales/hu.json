@@ -3180,6 +3180,7 @@
     "notFoundDescription": "Lehet, hogy ezt az elemet eltávolították, vagy már nem érhető el.",
     "serverTitle": "Nem sikerült betölteni",
     "serverDescription": "Nálunk hiba történt. Próbáld újra.",
+    "terminalDescription": "Ez az elem nem tölthető be, és az újrapróbálkozás nem segít.",
     "timeoutTitle": "A szerver túl sokáig tart",
     "timeoutDescription": "A kérés túllépte az időkorlátot, mielőtt befejeződött volna. Próbáld újra."
   },

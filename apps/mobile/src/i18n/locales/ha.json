@@ -3180,6 +3180,7 @@
     "notFoundDescription": "Wataƙila an cire wannan abu ko kuma ba a samunsa yanzu.",
     "serverTitle": "An kasa loda bayanai.",
     "serverDescription": "An sami matsala daga ɓangarenmu. Sake gwadawa.",
+    "terminalDescription": "Ba za a iya loda wannan abun ba, kuma sake gwadawa ba zai taimaka ba.",
     "timeoutTitle": "Sabar uwar garka na ɗaukar lokaci mai tsawo",
     "timeoutDescription": "An ƙare lokacin buƙatar kafin ta kammala. Sake gwadawa."
   },

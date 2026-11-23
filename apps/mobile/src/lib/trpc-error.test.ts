@@ -87,7 +87,17 @@ describe('trpcErrorVariant', () => {
     expect(trpcErrorVariant(trpcCode('UNAUTHORIZED'))).toBe('permission');
     expect(trpcErrorVariant(trpcCode('NOT_FOUND'))).toBe('not-found');
     expect(trpcErrorVariant(trpcCode('INTERNAL_SERVER_ERROR'))).toBe('server');
-    expect(trpcErrorVariant(trpcCode('BAD_REQUEST'))).toBe('server');
+  });
+
+  it('names a terminal code no retry can clear as the terminal state', () => {
+    // Each of these is a contract failure: the same request repeats it, so the
+    // screen must not offer a Retry for it.
+    expect(trpcErrorVariant(trpcCode('BAD_REQUEST'))).toBe('terminal');
+    expect(trpcErrorVariant(trpcCode('CONFLICT'))).toBe('terminal');
+    expect(trpcErrorVariant(trpcCode('UNPROCESSABLE_CONTENT'))).toBe('terminal');
+    // A retryable code with no terminal meaning keeps the server state.
+    expect(trpcErrorVariant(trpcCode('TOO_MANY_REQUESTS'))).toBe('server');
+    expect(trpcErrorVariant(trpcCode('PRECONDITION_FAILED'))).toBe('server');
   });
 
   it('falls back to the server state for a failure it cannot explain', () => {

@@ -3180,6 +3180,7 @@
     "notFoundDescription": "Kua tangohia pea tēnei mea, kua kore rānei e wātea.",
     "serverTitle": "Kāore i taea te uta",
     "serverDescription": "I puta he hapa i tō mātou taha. Whakamātau anō.",
+    "terminalDescription": "Kāore e taea tēnei mea te uta, ā, kāore e whai hua te whakamātau anō.",
     "timeoutTitle": "Kua roa rawa te tūmau",
     "timeoutDescription": "Kua pau te wā o te tono i mua i tōna otinga. Whakamātau anō."
   },

@@ -2618,6 +2618,7 @@
     "notFoundDescription": "Dit item is mogelijk verwijderd of is niet meer beschikbaar.",
     "serverTitle": "Het laden is mislukt.",
     "serverDescription": "Er is aan onze kant iets misgegaan. Probeer het opnieuw.",
+    "terminalDescription": "Dit item kan niet worden geladen en opnieuw proberen zal niet helpen.",
     "timeoutTitle": "De server doet er te lang over",
     "timeoutDescription": "Het verzoek duurde te lang. Probeer het opnieuw."
   },

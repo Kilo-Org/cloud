@@ -2586,6 +2586,7 @@
     "notFoundDescription": "這個項目可能已移除，或已無法使用。",
     "serverTitle": "無法載入。",
     "serverDescription": "我們的服務發生錯誤。請再試一次。",
+    "terminalDescription": "無法載入此項目，重試也不會有幫助。",
     "timeoutTitle": "伺服器回應時間過長",
     "timeoutDescription": "請求逾時，未能完成。請再試一次。"
   },

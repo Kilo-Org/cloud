@@ -3180,6 +3180,7 @@
     "notFoundDescription": "See on kas eemaldatud või pole enam saadaval.",
     "serverTitle": "Laadimine ei õnnestunud",
     "serverDescription": "Meie poolel tekkis viga. Proovi uuesti.",
+    "terminalDescription": "Seda üksust ei saa laadida ja uuesti proovimine ei aita.",
     "timeoutTitle": "Server vastab liiga aeglaselt",
     "timeoutDescription": "Päring ei jõudnud õigeaegselt lõpule. Proovi uuesti."
   },

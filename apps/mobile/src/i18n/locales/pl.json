@@ -2688,6 +2688,7 @@
     "notFoundDescription": "Ten element mógł zostać usunięty lub nie jest już dostępny.",
     "serverTitle": "Nie udało się wczytać danych.",
     "serverDescription": "Wystąpił błąd po naszej stronie. Spróbuj ponownie.",
+    "terminalDescription": "Tego elementu nie można wczytać i ponowna próba nie pomoże.",
     "timeoutTitle": "Serwer zbyt długo odpowiada",
     "timeoutDescription": "Serwer nie odpowiada wystarczająco szybko. Spróbuj ponownie."
   },

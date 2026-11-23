@@ -3180,6 +3180,7 @@
     "notFoundDescription": "ይህ ንጥል ተወግዶ ሊሆን ይችላል፣ ወይም ከእንግዲህ አይገኝም።",
     "serverTitle": "መጫን አልተቻለም።",
     "serverDescription": "በእኛ በኩል የሆነ ችግር ተከስቷል። እባክዎ እንደገና ይሞክሩ።",
+    "terminalDescription": "ይህ ንጥል ሊጫን አይችልም፣ እንደገና መሞከርም አይረዳም።",
     "timeoutTitle": "ሰርቨሩ በጣም እየዘገየ ነው",
     "timeoutDescription": "ጥያቄው ከመጠናቀቁ በፊት ጊዜው አልቋል። እባክዎ እንደገና ይሞክሩ።"
   },

@@ -3302,6 +3302,7 @@
     "notFoundDescription": "Este item pode ter sido removido ou já não está disponível.",
     "serverTitle": "Não foi possível carregar os dados.",
     "serverDescription": "Ocorreu um problema do nosso lado. Tenta novamente.",
+    "terminalDescription": "Este item não pode ser carregado, e voltar a tentar não vai ajudar.",
     "timeoutTitle": "O servidor está muito lento",
     "timeoutDescription": "O pedido não terminou a tempo. Tenta novamente."
   },

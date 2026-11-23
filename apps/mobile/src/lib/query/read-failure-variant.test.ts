@@ -221,7 +221,7 @@ describe('classifyReadFailureKind', () => {
     expect(readFailureKindVariant('timeout')).toBe('timeout');
     expect(readFailureKindVariant('permission')).toBe('permission');
     expect(readFailureKindVariant('not-found')).toBe('not-found');
-    expect(readFailureKindVariant('terminal')).toBe('server');
+    expect(readFailureKindVariant('terminal')).toBe('terminal');
     expect(readFailureKindVariant('retryable')).toBe('server');
   });
 });

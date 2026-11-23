@@ -3180,6 +3180,7 @@
     "notFoundDescription": "Ky element mund të jetë hequr ose të mos jetë më i disponueshëm.",
     "serverTitle": "Nuk u krye ngarkimi.",
     "serverDescription": "Ndodhi një gabim nga ana jonë. Provo përsëri.",
+    "terminalDescription": "Ky element nuk mund të ngarkohet dhe një përpjekje tjetër nuk do të ndihmojë.",
     "timeoutTitle": "Serveri po vonon shumë",
     "timeoutDescription": "Kërkesa skadoi përpara se të përfundonte. Provo përsëri."
   },

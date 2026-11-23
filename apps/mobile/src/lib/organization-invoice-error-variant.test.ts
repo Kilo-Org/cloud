@@ -14,6 +14,14 @@ describe('selectInvoiceErrorVariant', () => {
     expect(selectInvoiceErrorVariant(makeTrpcError('UNAUTHORIZED'), 'online')).toBe('permission');
   });
 
+  it('keeps the terminal state ahead of connectivity, because no retry can clear it', () => {
+    expect(selectInvoiceErrorVariant(makeTrpcError('BAD_REQUEST'), 'offline')).toBe('terminal');
+    expect(selectInvoiceErrorVariant(makeTrpcError('CONFLICT'), 'online')).toBe('terminal');
+    expect(selectInvoiceErrorVariant(makeTrpcError('UNPROCESSABLE_CONTENT'), 'unknown')).toBe(
+      'terminal'
+    );
+  });
+
   it('presents a confirmed-offline failure as connectivity', () => {
     expect(selectInvoiceErrorVariant(undefined, 'offline')).toBe('offline');
     expect(selectInvoiceErrorVariant(new Error('network down'), 'offline')).toBe('offline');

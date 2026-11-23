@@ -3180,6 +3180,7 @@
     "notFoundDescription": "Yo ka retire eleman sa a, oswa li pa disponib ankò.",
     "serverTitle": "Nou pa t ka chaje done yo.",
     "serverDescription": "Gen yon pwoblèm bò kote nou. Tanpri eseye ankò.",
+    "terminalDescription": "Eleman sa a pa ka chaje, epi eseye ankò p ap chanje anyen.",
     "timeoutTitle": "Sèvè a pran twò tan",
     "timeoutDescription": "Demann lan te depase delè li. Tanpri eseye ankò."
   },

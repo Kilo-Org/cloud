@@ -339,7 +339,7 @@ describe('OrganizationRequestLogsScreen', () => {
     const { renderer, unmount } = await mount();
 
     const [error] = renderer.root.findAllByType('QueryError');
-    expect(error?.props.variant).toBe('server');
+    expect(error?.props.variant).toBe('terminal');
     expect(error?.props.message).toBe("Couldn't load request logs.");
     expect(error?.props.onRetry).toBeUndefined();
     unmount();

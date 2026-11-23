@@ -2653,6 +2653,7 @@
     "notFoundDescription": "Questo elemento potrebbe essere stato rimosso o non essere più disponibile.",
     "serverTitle": "Impossibile caricare i dati.",
     "serverDescription": "Si è verificato un problema nel nostro sistema. Riprova.",
+    "terminalDescription": "Impossibile caricare questo elemento e riprovare non servirà.",
     "timeoutTitle": "Il server sta impiegando troppo tempo",
     "timeoutDescription": "La richiesta è scaduta prima di essere completata. Riprova."
   },

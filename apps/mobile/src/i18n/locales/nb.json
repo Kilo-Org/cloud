@@ -3180,6 +3180,7 @@
     "notFoundDescription": "Dette elementet kan ha blitt fjernet eller er ikke lenger tilgjengelig.",
     "serverTitle": "Kunne ikke laste inn innholdet.",
     "serverDescription": "Noe gikk galt hos oss. Prøv igjen.",
+    "terminalDescription": "Dette elementet kan ikke lastes inn, og å prøve igjen vil ikke hjelpe.",
     "timeoutTitle": "Serveren bruker for lang tid",
     "timeoutDescription": "Forespørselen tok for lang tid og ble avbrutt. Prøv igjen."
   },

@@ -318,6 +318,21 @@ describe('OrganizationCreditActivityScreen first-page errors', () => {
     expect(queryErrors.errors[0]?.onRetry).toBeUndefined();
   });
 
+  it.each(['BAD_REQUEST', 'CONFLICT', 'UNPROCESSABLE_CONTENT'] as const)(
+    'renders the terminal state with no Retry on %s',
+    async code => {
+      pageQuery.data = { pages: [] };
+      pageQuery.isError = true;
+      pageQuery.error = { data: { code } };
+
+      await renderScreen();
+
+      expect(queryErrors.errors).toHaveLength(1);
+      expect(queryErrors.errors[0]?.variant).toBe('terminal');
+      expect(queryErrors.errors[0]?.onRetry).toBeUndefined();
+    }
+  );
+
   it.each(['FORBIDDEN', 'UNAUTHORIZED'] as const)(
     'renders a permanent permission state with no Retry on %s',
     async code => {

@@ -3241,6 +3241,7 @@
     "notFoundDescription": "Este posibil ca acest element să fi fost eliminat sau să nu mai fie disponibil.",
     "serverTitle": "Nu s-au putut încărca datele.",
     "serverDescription": "A apărut o problemă pe server. Încearcă din nou.",
+    "terminalDescription": "Acest element nu poate fi încărcat, iar o nouă încercare nu va ajuta.",
     "timeoutTitle": "Serverul răspunde prea încet",
     "timeoutDescription": "Cererea a expirat înainte de a se finaliza. Încearcă din nou."
   },

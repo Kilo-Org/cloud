@@ -3180,6 +3180,7 @@
     "notFoundDescription": "Bu element silinmiş ola bilər və ya artıq əlçatan deyil.",
     "serverTitle": "Yükləmək mümkün olmadı.",
     "serverDescription": "Bizim tərəfdə xəta baş verdi. Yenidən cəhd et.",
+    "terminalDescription": "Bu elementi yükləmək mümkün deyil və yenidən cəhd etmək heç nəyi dəyişməyəcək.",
     "timeoutTitle": "Server çox gec cavab verir",
     "timeoutDescription": "Sorğu tamamlanmazdan əvvəl vaxtı bitdi. Yenidən cəhd et."
   },

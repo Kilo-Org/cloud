@@ -3290,6 +3290,7 @@
     "notFoundDescription": "This item may have been removed or is no longer available.",
     "serverTitle": "Could not load",
     "serverDescription": "Something went wrong on our end. Please try again.",
+    "terminalDescription": "This item cannot be loaded, and trying again will not help.",
     "timeoutTitle": "The server is taking too long",
     "timeoutDescription": "The request timed out before it finished. Try again."
   },

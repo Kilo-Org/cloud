@@ -40,24 +40,25 @@ const VARIANT_BY_KIND = {
   timeout: 'timeout',
   permission: 'permission',
   'not-found': 'not-found',
-  // A terminal code the app has no better sentence for keeps the server's
-  // copy: the read was answered, so neither the connection nor a missing item
-  // describes it.
-  terminal: 'server',
+  // A terminal code the app has no better sentence for keeps its own state:
+  // the server answered, so neither the connection nor a missing item describes
+  // it, and the state withholds the Retry no second request could justify.
+  terminal: 'terminal',
   retryable: 'server',
 } as const satisfies Record<
   ReadFailureKind,
-  'offline' | 'timeout' | 'permission' | 'not-found' | 'server'
+  'offline' | 'timeout' | 'permission' | 'not-found' | 'server' | 'terminal'
 >;
 
 /**
  * The `QueryError` variant that carries the kind's copy: the connection's own
- * wording, a deadline's own wording, the refusal, the removed item, or the
- * server's failure. Plain strings so this module stays free of components.
+ * wording, a deadline's own wording, the refusal, the removed item, the
+ * terminal state, or the server's failure. Plain strings so this module stays
+ * free of components.
  */
 export function readFailureKindVariant(
   kind: ReadFailureKind
-): 'offline' | 'timeout' | 'permission' | 'not-found' | 'server' {
+): 'offline' | 'timeout' | 'permission' | 'not-found' | 'server' | 'terminal' {
   return VARIANT_BY_KIND[kind];
 }
 
@@ -126,7 +127,8 @@ export function isReadPausedBeforeData(read: {
  * error is still a refusal. After that, a refusal outranks a terminal code (a
  * `FORBIDDEN` is itself terminal, and the refusal copy is the one that
  * explains it); `NOT_FOUND` is the one terminal code that has its own copy,
- * and every other terminal code keeps the server's.
+ * and every other terminal code is `terminal`, the state that says the read
+ * cannot be served and withholds the retry.
  */
 export function classifyReadFailureKind({
   errors,

@@ -3241,6 +3241,7 @@
     "notFoundDescription": "Ova stavka je možda uklonjena ili više nije dostupna.",
     "serverTitle": "Nije moguće učitati podatke.",
     "serverDescription": "Došlo je do greške na našoj strani. Pokušaj ponovo.",
+    "terminalDescription": "Ova stavka ne može da se učita i ponovni pokušaj neće pomoći.",
     "timeoutTitle": "Server ne odgovara na vreme",
     "timeoutDescription": "Zahtev nije završen na vreme. Pokušaj ponovo."
   },

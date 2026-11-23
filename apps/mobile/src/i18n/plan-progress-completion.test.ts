@@ -54,6 +54,11 @@ const locales: readonly LocaleCase[] = [
   },
   { tag: 'sw', render: (done, total) => `Mpango: hatua zilizokamilika ${done} kati ya ${total}` },
   { tag: 'cy', render: (done, total) => `Cynllun: ${done} o ${total} cam wedi cwblhau` },
+  {
+    tag: 'lv',
+    render: (done, total) => `Plāns: ${done}/${total} soļi pabeigti`,
+    renderOne: (done, total) => `Plāns: ${done}/${total} solis pabeigts`,
+  },
 ];
 
 const previous = i18n.language;

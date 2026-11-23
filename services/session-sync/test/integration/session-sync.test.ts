@@ -108,10 +108,20 @@ describe('registration', () => {
     });
   });
 
-  it('refuses another source without replacing the binding', async () => {
+  it('joins another source of the same creator without replacing the first binding', async () => {
     const { api, id, sourceID } = await setup();
-    await expectError(await api.register(id, crypto.randomUUID()), 409, 'source_conflict');
-    expect(await state(api, id)).toMatchObject({ sourceID });
+    const second = crypto.randomUUID();
+    expect((await api.register(id, second, 'mobile')).status).toBe(200);
+    // Re-registering a joined source is a no-op, even with another client label.
+    expect((await api.register(id, second, 'cli')).status).toBe(200);
+
+    const current = await state(api, id);
+    expect(current).toMatchObject({ sourceID });
+    if (current.deleted) throw new Error('expected a live session');
+    expect(current.sources).toEqual([
+      { sourceID, client: 'cli', joinedAt: expect.any(Number) },
+      { sourceID: second, client: 'mobile', joinedAt: expect.any(Number) },
+    ]);
   });
 
   it('accepts producer-defined session IDs that start with ses', async () => {
@@ -153,8 +163,14 @@ describe('batches', () => {
 
     expect(await state(api, id)).toMatchObject({ position: 7, revision: 1, batches: 1 });
     expect(await readAll(api, id)).toEqual([
-      { kind: 'message', id: 'msg_1', revision: 1, value: { role: 'user', text: 'héllo' } },
-      { kind: 'session', id, revision: 1, value: { title: 'Fix the parser' } },
+      {
+        kind: 'message',
+        id: 'msg_1',
+        revision: 1,
+        sourceID,
+        value: { role: 'user', text: 'héllo' },
+      },
+      { kind: 'session', id, revision: 1, sourceID, value: { title: 'Fix the parser' } },
     ]);
   });
 
@@ -214,7 +230,7 @@ describe('batches', () => {
     const changed = { ...packet, changes: [{ ...packet.changes[0], value: { text: 'two' } }] };
     await expectError(await api.apply(id, changed), 409, 'batch_conflict');
     expect(await readAll(api, id)).toEqual([
-      { kind: 'message', id: 'msg_1', revision: 1, value: { text: 'one' } },
+      { kind: 'message', id: 'msg_1', revision: 1, sourceID, value: { text: 'one' } },
     ]);
   });
 
@@ -251,7 +267,7 @@ describe('batches', () => {
     expect(await state(api, id)).toMatchObject({ position: 0, revision: 0, batches: 0 });
   });
 
-  it('refuses a batch from another source', async () => {
+  it('refuses a batch from a source that never joined', async () => {
     const { api, id } = await setup();
     await expectError(
       await api.apply(id, batch(crypto.randomUUID(), 0, 1, [])),
@@ -308,7 +324,7 @@ describe('batches', () => {
       position: 2,
     });
     expect(await readAll(api, id)).toEqual([
-      { kind: 'message', id: 'msg_1', revision: 2, value: 'new' },
+      { kind: 'message', id: 'msg_1', revision: 2, sourceID, value: 'new' },
     ]);
   });
 
@@ -386,7 +402,7 @@ describe('creator and tenant authority', () => {
     await expectError(await other.putBlob(id, await sha256(bytes), bytes), 403, 'creator_mismatch');
     await expectError(await other.remove(id), 403, 'creator_mismatch');
     expect(await readAll(api, id)).toEqual([
-      { kind: 'message', id: 'msg_1', revision: 1, value: 'mine' },
+      { kind: 'message', id: 'msg_1', revision: 1, sourceID, value: 'mine' },
     ]);
   });
 
@@ -453,7 +469,13 @@ describe('blobs', () => {
     );
     expect(applied.status).toBe(200);
     expect(await readAll(api, id)).toEqual([
-      { kind: 'asset', id: 'asset_1', revision: 1, blob: { hash, bytes: bytes.byteLength } },
+      {
+        kind: 'asset',
+        id: 'asset_1',
+        revision: 1,
+        sourceID,
+        blob: { hash, bytes: bytes.byteLength },
+      },
     ]);
     expect(await state(api, id)).toMatchObject({ usage: { blobBytes: bytes.byteLength } });
 
@@ -645,6 +667,92 @@ async function expireUploads(stub: DurableObjectStub<SessionSyncDO>, hash: strin
       .run();
   });
 }
+
+describe('multiple sources', () => {
+  async function joined() {
+    const fixture = await setup();
+    const second = crypto.randomUUID();
+    expect((await fixture.api.register(fixture.id, second, 'mobile')).status).toBe(200);
+    return { ...fixture, second };
+  }
+
+  it('lets the second source write under the shared position and tags its entities', async () => {
+    const { api, id, sourceID, second } = await joined();
+    expect(
+      (
+        await api.apply(
+          id,
+          batch(sourceID, 0, 1, [{ op: 'put', kind: 'message', id: 'msg_cli', value: 'cli' }])
+        )
+      ).status
+    ).toBe(200);
+    expect(
+      (
+        await api.apply(
+          id,
+          batch(second, 1, 2, [{ op: 'put', kind: 'message', id: 'msg_m', value: 'mobile' }])
+        )
+      ).status
+    ).toBe(200);
+
+    expect(await state(api, id)).toMatchObject({ position: 2, revision: 2, batches: 2 });
+    expect(await readAll(api, id)).toEqual([
+      { kind: 'message', id: 'msg_cli', revision: 1, sourceID, value: 'cli' },
+      { kind: 'message', id: 'msg_m', revision: 2, sourceID: second, value: 'mobile' },
+    ]);
+  });
+
+  it('reports the committed position when a writer races the other source', async () => {
+    const { api, id, sourceID, second } = await joined();
+    expect(
+      (
+        await api.apply(
+          id,
+          batch(second, 0, 4, [{ op: 'put', kind: 'message', id: 'msg_1', value: 'mobile' }])
+        )
+      ).status
+    ).toBe(200);
+
+    const stale = await api.apply(
+      id,
+      batch(sourceID, 0, 5, [{ op: 'put', kind: 'message', id: 'msg_1', value: 'stale' }])
+    );
+    expect(stale.status).toBe(409);
+    expect(errorBodySchema.parse(await stale.json()).error).toMatchObject({
+      code: 'position_conflict',
+      position: 4,
+      details: { position: 4 },
+    });
+    // The stale writer did not overwrite the other source's entity or its tag.
+    expect(await readAll(api, id)).toEqual([
+      { kind: 'message', id: 'msg_1', revision: 1, sourceID: second, value: 'mobile' },
+    ]);
+  });
+
+  it('requires status writes to come from a joined source', async () => {
+    const { api, id, second } = await joined();
+    expect((await api.status(id, second, 0, 'busy')).status).toBe(200);
+    await expectError(await api.status(id, crypto.randomUUID(), 1, 'idle'), 409, 'source_conflict');
+    expect(await state(api, id)).toMatchObject({ status: { value: 'busy', version: 1 } });
+  });
+
+  it('refuses registration and writes from either source after deletion', async () => {
+    const { api, id, sourceID, second } = await joined();
+    expect((await api.remove(id)).status).toBe(200);
+    for (const source of [sourceID, second]) {
+      await expectError(await api.register(id, source), 410, 'session_deleted');
+      await expectError(await api.apply(id, batch(source, 0, 1, [])), 410, 'session_deleted');
+      await expectError(await api.status(id, source, 0, 'idle'), 410, 'session_deleted');
+    }
+  });
+
+  it('records the default client of an omitted registration as cli', async () => {
+    const { api, id, sourceID } = await setup();
+    const current = await state(api, id);
+    if (current.deleted) throw new Error('expected a live session');
+    expect(current.sources).toEqual([{ sourceID, client: 'cli', joinedAt: expect.any(Number) }]);
+  });
+});
 
 describe('entity pages', () => {
   it('pages by key and refuses a page from a changed revision', async () => {

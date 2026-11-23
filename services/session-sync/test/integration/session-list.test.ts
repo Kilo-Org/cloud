@@ -1,20 +1,63 @@
+import { bytesToBase64url } from '@kilocode/worker-utils/base64url';
 import { describe, expect, it } from 'vitest';
 
-import { client, member, newSessionID, personal, type Client } from '../helpers';
+import { batch, client, member, newSessionID, personal, type Client } from '../helpers';
+
+type Item = {
+  sessionID: string;
+  tenant: { type: string; id: string };
+  createdAt: number;
+  updatedAt: number;
+  title: string | null;
+  client: string;
+  directory: string | null;
+  archived: boolean;
+  live: boolean;
+};
 
 async function listing(api: Client, query = '') {
   const response = await api.send('GET', `/v1/sessions${query}`);
   expect(response.status).toBe(200);
-  return response.json<{
-    version: 1;
-    items: {
-      sessionID: string;
-      tenant: { type: string; id: string };
-      createdAt: number;
-      live: boolean;
-    }[];
-    cursor: string | null;
-  }>();
+  return response.json<{ version: 1; items: Item[]; cursor: string | null }>();
+}
+
+/** Registers a session and commits the session entity its list metadata comes from. */
+async function seed(
+  api: Client,
+  options: {
+    client?: 'cli' | 'mobile' | 'cloud-agent';
+    title: string;
+    directory: string;
+    updated: number;
+    archived?: boolean;
+  }
+): Promise<string> {
+  const id = newSessionID();
+  const sourceID = crypto.randomUUID();
+  expect((await api.register(id, sourceID, options.client)).status).toBe(201);
+  const time = {
+    created: options.updated - 10,
+    updated: options.updated,
+    ...(options.archived ? { archived: options.updated } : {}),
+  };
+  const applied = await api.apply(
+    id,
+    batch(sourceID, 0, 1, [
+      {
+        op: 'put',
+        kind: 'session',
+        id,
+        value: {
+          id,
+          title: options.title,
+          origin: { directory: options.directory, client: options.client ?? 'cli' },
+          time,
+        },
+      },
+    ])
+  );
+  expect(applied.status).toBe(200);
+  return id;
 }
 
 describe('creator session list', () => {
@@ -30,10 +73,14 @@ describe('creator session list', () => {
     }
     const all = await listing(mine);
     expect(new Set(all.items.map(item => item.sessionID))).toEqual(new Set(ids.slice(0, 2)));
-    expect(all.items[0].createdAt).toBeGreaterThanOrEqual(all.items[1].createdAt);
+    expect(all.items[0].updatedAt).toBeGreaterThanOrEqual(all.items[1].updatedAt);
     expect(all.items.find(item => item.sessionID === ids[1])).toMatchObject({
       tenant: { type: 'organization', id: org },
       live: false,
+      title: null,
+      client: 'cli',
+      directory: null,
+      archived: false,
     });
     const first = await listing(mine, '?limit=1');
     expect(first.items).toHaveLength(1);
@@ -48,11 +95,123 @@ describe('creator session list', () => {
     expect((await listing(mine)).items.map(item => item.sessionID)).toEqual([ids[1]]);
   });
 
-  it.each(['?limit=0', '?limit=101', '?cursor=bad', '?cursor=e30='])(
-    'rejects invalid pagination %s',
-    async query => {
-      const api = client(personal(`usr-${crypto.randomUUID()}`));
-      expect((await api.send('GET', `/v1/sessions${query}`)).status).toBe(400);
-    }
+  it('orders by the session update time and filters on indexed metadata', async () => {
+    const api = client(personal(`usr-${crypto.randomUUID()}`));
+    const parser = await seed(api, {
+      client: 'cli',
+      title: 'Fix Parser Bug',
+      directory: '/repo/a',
+      updated: 3000,
+    });
+    const mobile = await seed(api, {
+      client: 'mobile',
+      title: 'Mobile chat about parsers',
+      directory: '',
+      updated: 1000,
+    });
+    const release = await seed(api, {
+      client: 'cli',
+      title: 'Release notes',
+      directory: '/repo/a',
+      updated: 2000,
+      archived: true,
+    });
+
+    const all = await listing(api);
+    expect(all.items.map(item => item.sessionID)).toEqual([parser, release, mobile]);
+    expect(all.items[0]).toMatchObject({
+      sessionID: parser,
+      updatedAt: 3000,
+      title: 'Fix Parser Bug',
+      client: 'cli',
+      directory: '/repo/a',
+      archived: false,
+      live: false,
+    });
+    expect(all.items[0].createdAt).toBeGreaterThan(3000);
+    // An empty origin directory indexes as no directory.
+    expect(all.items.find(item => item.sessionID === mobile)).toMatchObject({ directory: null });
+
+    const ids = async (query: string) =>
+      (await listing(api, query)).items.map(item => item.sessionID);
+    expect(await ids('?q=parser')).toEqual([parser, mobile]);
+    expect(await ids('?q=PARSER')).toEqual([parser, mobile]);
+    expect(await ids('?q=absent')).toEqual([]);
+    expect(await ids('?client=mobile')).toEqual([mobile]);
+    expect(await ids('?client=cli')).toEqual([parser, release]);
+    expect(await ids(`?directory=${encodeURIComponent('/repo/a')}`)).toEqual([parser, release]);
+    expect(await ids('?archived=true')).toEqual([release]);
+    expect(await ids('?archived=false')).toEqual([parser, mobile]);
+    expect(await ids('?q=parser&client=cli&archived=false')).toEqual([parser]);
+
+    const page = await listing(api, '?limit=2');
+    expect(page.items.map(item => item.sessionID)).toEqual([parser, release]);
+    const rest = await listing(api, `?limit=2&cursor=${encodeURIComponent(page.cursor ?? '')}`);
+    expect(rest.items.map(item => item.sessionID)).toEqual([mobile]);
+    expect(rest.cursor).toBeNull();
+  });
+
+  it('follows renames and falls back to the commit time without an update time', async () => {
+    const api = client(personal(`usr-${crypto.randomUUID()}`));
+    const id = newSessionID();
+    const sourceID = crypto.randomUUID();
+    expect((await api.register(id, sourceID)).status).toBe(201);
+    expect(
+      (
+        await api.apply(
+          id,
+          batch(sourceID, 0, 1, [
+            {
+              op: 'put',
+              kind: 'session',
+              id,
+              value: {
+                id,
+                title: 'Old name',
+                origin: { directory: '/repo/d', client: 'cli' },
+                time: { created: 900, updated: 1000 },
+              },
+            },
+          ])
+        )
+      ).status
+    ).toBe(200);
+    expect((await listing(api, '?q=old')).items.map(item => item.sessionID)).toEqual([id]);
+
+    const before = Date.now();
+    expect(
+      (
+        await api.apply(
+          id,
+          batch(sourceID, 1, 2, [
+            { op: 'put', kind: 'session', id, value: { id, title: 'New name' } },
+          ])
+        )
+      ).status
+    ).toBe(200);
+
+    expect((await listing(api, '?q=old')).items).toEqual([]);
+    const renamed = (await listing(api, '?q=new')).items;
+    expect(renamed).toHaveLength(1);
+    expect(renamed[0]).toMatchObject({ sessionID: id, title: 'New name', directory: '/repo/d' });
+    expect(renamed[0].updatedAt).toBeGreaterThanOrEqual(before);
+  });
+
+  const oldCursor = bytesToBase64url(
+    new TextEncoder().encode(JSON.stringify({ createdAt: 1, target: 'x' }))
   );
+  it.each([
+    '?limit=0',
+    '?limit=101',
+    '?cursor=bad',
+    '?cursor=e30=',
+    `?cursor=${oldCursor}`,
+    '?q=',
+    `?q=${'x'.repeat(201)}`,
+    '?client=web',
+    '?archived=yes',
+  ])('rejects invalid pagination %s', async query => {
+    const api = client(personal(`usr-${crypto.randomUUID()}`));
+    expect((await api.send('GET', `/v1/sessions${query}`)).status).toBe(400);
+  });
 });

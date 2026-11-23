@@ -450,8 +450,6 @@ export function projectKilo2Message(
   message: Kilo2Message,
   parentID?: string
 ): ProjectedKilo2Message | undefined {
-  // No authorized URL exists for an attachment that can never have one, so this
-  // message can never be displayed.
   if (hasUndisplayableKilo2Assets(message)) return undefined;
   let display: ProjectedKilo2Message | undefined;
   try {

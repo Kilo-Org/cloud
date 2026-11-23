@@ -241,9 +241,6 @@ export function retryableGapCount(
   unresolvedMessageIDs: ReadonlySet<string>,
   projectionFailed: boolean
 ): number {
-  // The same identities the projector would have consumed: when the
-  // projection itself fails, none of them is a recoverable gap — recovery
-  // fills missing transports, not a broken projector.
   if (projectionFailed) {
     return new Set([
       ...messages.filter(item => item.incomplete).map(item => item.message.id),
@@ -300,9 +297,6 @@ export function readNativeConversation(state: NativeSessionState): NativeConvers
           incompleteMessageIDs.push(item.message.id);
     }
   }
-  // Retryable gap count: parts the recovery snapshot can still fill. A
-  // projection failure is a real error below, not more gaps to charge the
-  // banner with.
   const recoveryGaps = retryableGapCount(
     state.messages,
     state.pendingSnapshotMessageIDs,

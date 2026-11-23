@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { type RefObject, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
+import { type ScrollViewInstance, View } from 'react-native';
 
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
@@ -31,12 +31,26 @@ export function BitbucketConnectForm({
   scope,
   integrationId,
   organizationName,
+  scrollRef,
+  scrollFrameHeight,
   onConnected,
   onDirtyChange,
 }: Readonly<{
   scope: string;
   integrationId: string | null;
   organizationName: string;
+  /**
+   * The scroll view this form's body lives in. The form reveals its primary
+   * action through it when a failure grows the content past the sheet's
+   * viewport.
+   */
+  scrollRef: RefObject<ScrollViewInstance | null>;
+  /**
+   * The height that scroll view last measured. The keyboard's band can land
+   * after a status line renders, which shortens the viewport again, so a
+   * change here is a second reason to reveal.
+   */
+  scrollFrameHeight: number;
   onConnected: () => void;
   /**
    * Reports whether a dismissal would drop a draft: text in the token field
@@ -110,6 +124,24 @@ export function BitbucketConnectForm({
   };
 
   const failure = feedback.status === 'failed' ? feedback.failure : null;
+  const revealPrimaryAction = useCallback(() => {
+    scrollRef.current?.scrollToEnd({ animated: true });
+  }, [scrollRef]);
+  // A refused token's sentence grows this body's scroll content while the sheet
+  // keeps its detent, so the primary action — the form's last child — can fall
+  // below the viewport. Reveal it in the frame the sentence is laid out in. The
+  // effect reruns on the frame height because the keyboard's band can land after
+  // the sentence, which shortens the viewport that just revealed the action. A
+  // submit in flight renders no failure, so nothing moves while it runs.
+  useEffect(() => {
+    if (failure === null) {
+      return undefined;
+    }
+    const frame = requestAnimationFrame(revealPrimaryAction);
+    return () => {
+      cancelAnimationFrame(frame);
+    };
+  }, [failure, revealPrimaryAction, scrollFrameHeight]);
   // A refused token judged the token itself, so submit waits for a different
   // one; only a failure that never judged it (a network or server fault) lets
   // the same token go again. A lost role or a changed connection waits for a

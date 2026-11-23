@@ -1,8 +1,8 @@
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { type ReactNode } from 'react';
+import { type ReactNode, useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
+import { type LayoutChangeEvent, type ScrollViewInstance, View } from 'react-native';
 import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations';
 
 import { BitbucketConnectForm } from '@/components/code-reviewer/bitbucket-connect-form';
@@ -111,6 +111,14 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
   // so a deep link never offers a submit the server would refuse.
   const canManage = canManageOrganizationBilling(role);
 
+  // The form's status line grows this body's scroll content while the sheet
+  // keeps its detent, so the form reveals its primary action through this
+  // instance. The measured frame height is what tells the form the band it has
+  // to clear: on Android the IME's occlusion lands in this frame's margin after
+  // the status line has already rendered.
+  const scrollRef = useRef<ScrollViewInstance>(null);
+  const [scrollFrameHeight, setScrollFrameHeight] = useState(0);
+
   const integrationId = readiness.data?.integrationId ?? null;
   const repair = readiness.data === undefined ? null : bitbucketRepair(readiness.data, status.data);
   // A workspace connected through Bitbucket OAuth has no token integration to
@@ -141,6 +149,13 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
       title = t('prReview.connect.reconnectTitleBitbucket');
     }
   }
+
+  // A guarded update: an equal height leaves the state identity untouched, so
+  // the form's reveal effect does not rerun on every unrelated layout pass.
+  const onScrollFrameLayout = useCallback((event: LayoutChangeEvent) => {
+    const { height } = event.nativeEvent.layout;
+    setScrollFrameHeight(current => (current === height ? current : height));
+  }, []);
 
   // One body per state, so the guard's confirmation renders beside all of them:
   // a read that answers while a token is typed can replace the form with an
@@ -295,6 +310,8 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
 
     return (
       <SheetScrollView
+        ref={scrollRef}
+        onLayout={onScrollFrameLayout}
         className="flex-1 bg-background"
         contentContainerClassName={SCREEN_BODY_CLASS}
         automaticallyAdjustKeyboardInsets
@@ -304,6 +321,8 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
           scope={scope}
           integrationId={integrationId}
           organizationName={org.organizationName}
+          scrollRef={scrollRef}
+          scrollFrameHeight={scrollFrameHeight}
           onDirtyChange={guard.handleDirtyChange}
           onConnected={() => {
             notificationHaptic(Haptics.NotificationFeedbackType.Success);

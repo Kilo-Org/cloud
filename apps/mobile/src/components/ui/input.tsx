@@ -32,6 +32,15 @@ const INPUT_BOX_VERTICAL_STYLE: TextStyle = {
   textAlignVertical: 'center',
 };
 
+/**
+ * What the native input's own value is drawn with while the resting preview
+ * paints the field instead. The preview covers the value, and the field fill is
+ * translucent in dark, so the value underneath would otherwise read through as
+ * a doubled line. The placeholder keeps its own colour and is unaffected: an
+ * empty field paints no preview.
+ */
+const INPUT_RESTING_TEXT_STYLE: TextStyle = { color: 'transparent' };
+
 // Android TextInput ignores logical paddingInline: defaults and caller overrides
 // must use physical pl/pr classes, not px classes.
 const INPUT_MULTILINE_INSET_CLASS = 'pl-3 pr-3 pt-2.5 pb-2.5';
@@ -99,7 +108,14 @@ function Input({
         className,
         multiline ? undefined : INPUT_BOX_LINE_HEIGHT_CLASS
       )}
-      style={withRtlInputAlignment(inputStyle)}
+      style={withRtlInputAlignment(
+        // While the preview paints, the input's own value is still drawn at its
+        // resting scroll offset under it. Its fill is translucent in dark, so
+        // that copy would read through the preview as a doubled value; make it
+        // invisible instead of painting a second, invented opaque fill. An empty
+        // field shows no preview, so this never hides a placeholder.
+        showsPreview ? [inputStyle, INPUT_RESTING_TEXT_STYLE] : inputStyle
+      )}
       textAlignVertical={multiline ? textAlignVertical : 'center'}
       // An explicit `textAlign` attaches a paragraph style whose default line
       // break mode wraps an overlong value onto a second line; a single-line
@@ -147,7 +163,10 @@ function Input({
           accessibilityElementsHidden
           importantForAccessibility="no-hide-descendants"
           className={cn(
-            'absolute inset-px justify-center rounded-md bg-background pl-3 pr-3 dark:bg-[#FFFFFF0A]',
+            // No fill of its own: the field's own border and fill still show
+            // through, and the input's value is invisible underneath, so the
+            // preview never paints a second surface over the box.
+            'absolute inset-px justify-center pl-3 pr-3',
             // The preview paints over the input, so it carries the disabled
             // dimming the caller put on the input itself; otherwise a disabled
             // field would look enabled while it rests.

@@ -55,14 +55,26 @@ export function NewSessionModelProvider({
   const [variant, setVariant] = useState('');
   const { models } = useAvailableModels(organizationId);
   const autoSelected = useAutoSelectModel(models, organizationId);
-  const hasAppliedAutoSelection = useRef(false);
+  // The selection is resolved from the account the form shows: the catalog, the
+  // route prefill and the auto-selection all read this one scope, so the model
+  // and variant the form holds belong to the account the session is created in.
+  // `null` is the personal account, so it never shares a key with an
+  // organization.
+  const scope = organizationId ?? null;
+  const resolvedScope = useRef<{ scope: string | null } | null>(null);
+  if (resolvedScope.current?.scope !== scope) {
+    resolvedScope.current = { scope };
+    if (model !== '' || variant !== '') {
+      setModel('');
+      setVariant('');
+    }
+  }
   const initialSelection =
     resolvePrefillModel(models, prefill) ??
     (autoSelected.kind === 'selected'
       ? { model: autoSelected.model, variant: autoSelected.variant }
       : null);
-  if (!hasAppliedAutoSelection.current && initialSelection?.model && !model) {
-    hasAppliedAutoSelection.current = true;
+  if (initialSelection?.model && !model) {
     setModel(initialSelection.model);
     setVariant(initialSelection.variant);
   }

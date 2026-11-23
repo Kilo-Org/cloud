@@ -1,24 +1,12 @@
 import { buildActiveSessionsTrayInput } from '@/lib/active-sessions-live';
-import { whenSessionAttentionHydrationSettled } from '@/lib/session-attention';
 import { trpcClient } from '@/lib/trpc';
 
+import { whenGlanceableAckHydrationSettled } from './ack-hydration';
 import { whenAskBindingSettled } from './ask-binding';
 import { resolveAnsweredRaises } from './attention-rows';
 import { createGlanceablePublisher } from './create-publisher';
 import { type GlanceablePublisherContext } from './publisher';
 import { getGlanceableSinks } from './sink-registry';
-
-/**
- * How long this run waits for the session-attention ack store to hydrate before
- * deriving. The store answers "not acked" for every raise while it loads, so a
- * derive that beats it would republish a raise the person already answered. A
- * fresh background process opens the encrypted KV on this run, so the wait is a
- * cold KV open, not a network read: a couple of seconds covers it while keeping
- * the periodic refresh well inside its OS budget, and a store that never
- * settles still derives — an unhydrated read is the same answer every surface
- * had before this wait existed.
- */
-const ACK_HYDRATION_SETTLE_MS = 2000;
 
 /**
  * Read the tray once and publish it to every registered sink, for the periodic
@@ -45,10 +33,11 @@ export async function publishTrayOnce(ctx: GlanceablePublisherContext): Promise<
   // subscription would outlive the process in the module-level listener set.
   const publisher = createGlanceablePublisher({ context: ctx, redrawOnAskBound: false });
   // The settle wait runs beside the read, so the ack store's KV open costs this
-  // run nothing when it is the slower of the two.
+  // run nothing when it is the slower of the two. It is bounded by
+  // `ACK_HYDRATION_SETTLE_MS`; a store that never settles still derives.
   const [{ sessions }] = await Promise.all([
     trpcClient.activeSessions.list.query(buildActiveSessionsTrayInput(ctx.organizationId)),
-    whenSessionAttentionHydrationSettled(ACK_HYDRATION_SETTLE_MS),
+    whenGlanceableAckHydrationSettled(),
   ]);
   publisher.handleSessions(resolveAnsweredRaises(sessions), ctx);
   // The surface reads the ask's request binding when it draws, and the select

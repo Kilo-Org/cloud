@@ -6,7 +6,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { type GlanceableAgentsSnapshot } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
 import { readStoredValue } from '@/lib/auth/secure-store-value';
-import { __resetSessionAttentionForTests, isAttentionAcked } from '@/lib/session-attention';
+import {
+  __hydrateSessionAttentionForTests,
+  __resetSessionAttentionForTests,
+  getHydrationSnapshot,
+  isAttentionAcked,
+} from '@/lib/session-attention';
+import {
+  gateSessionAttentionKvRead,
+  resetSessionAttentionKvFake,
+  seedSessionAttentionKvFake,
+} from '@/test/session-attention-fake';
 
 import {
   type GlanceableSink,
@@ -66,6 +76,11 @@ function keyFor(sessionId: string, permissionId: string): string {
     .update(JSON.stringify([sessionId, permissionId]))
     .digest('hex');
 }
+
+vi.mock('@/lib/persist/encrypted-kv', async () => {
+  const { sessionAttentionKvFake } = await import('@/test/session-attention-fake');
+  return sessionAttentionKvFake;
+});
 
 vi.mock('./persist', () => ({
   getLastGlanceableSnapshot: () => null,
@@ -199,7 +214,7 @@ describe('resolveWaitingSession', () => {
 });
 
 describe('runWidgetApprove', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     mocks.secure.clear();
     mocks.secure.set(USER_KEY, 'user-1');
     mocks.dismissNeedsInputNotification.mockReset();
@@ -207,13 +222,19 @@ describe('runWidgetApprove', () => {
     mocks.orgLost = false;
     // An approve records the same session-attention ack the other answer paths
     // do, and the store is module-level: drop it so one case's answer cannot
-    // resolve another case's raise.
+    // resolve another case's raise. Then settle it, so the republish's bounded
+    // hydration wait resolves at once instead of paying its deadline.
+    resetSessionAttentionKvFake();
     __resetSessionAttentionForTests();
+    await __hydrateSessionAttentionForTests();
     setSurfaceExtras({ newestSessionTitle: null, actionFeedback: null });
   });
 
   afterEach(() => {
     setSurfaceExtras({ newestSessionTitle: null, actionFeedback: null });
+    // Open any read a case gated, so its hydration cannot resolve into a later
+    // case.
+    resetSessionAttentionKvFake();
   });
 
   it('reports none when the tray holds no waiting session', async () => {
@@ -357,6 +378,73 @@ describe('runWidgetApprove', () => {
     // The answered raise's app-owned notification goes with it: nothing else
     // retires it on this headless path.
     expect(mocks.dismissNeedsInputNotification).toHaveBeenCalledWith('waiting');
+    release();
+  });
+
+  it('holds the republish until the ack store hydrates, so an earlier answer is not counted as waiting', async () => {
+    // The earlier launch answered this raise, and the tray still reports it
+    // until the control plane's status sync. A republish that beats the
+    // hydration read would count it as a second waiting session.
+    const earlierRaise = '2026-09-18T21:00:00.000Z';
+    seedSessionAttentionKvFake([
+      {
+        sessionId: 'ackedEarlier',
+        raiseId: earlierRaise,
+        status: 'permission',
+        ackedAt: Date.now(),
+        expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000,
+      },
+    ]);
+    __resetSessionAttentionForTests();
+    const releaseRead = gateSessionAttentionKvRead();
+    void __hydrateSessionAttentionForTests();
+    expect(getHydrationSnapshot()).toBe('loading');
+
+    const rpc = wireTrpc({
+      sessions: [
+        // The press answers this older raise; `ackedEarlier` only waits in the
+        // tray because its status sync has not landed.
+        { id: 'waiting', status: 'permission', statusUpdatedAt: '2026-09-18T20:00:00.000Z' },
+        { id: 'ackedEarlier', status: 'permission', statusUpdatedAt: earlierRaise },
+      ],
+      cloudAgentSessionId: 'workspace_agent_1',
+      permissions: [{ id: 'perm-1' }],
+    });
+    const { snapshots, release } = collectSink();
+
+    const run = runWidgetApprove(keyFor('waiting', 'perm-1'));
+    // The second list read is the republish's: once it is in flight, an
+    // unwaiting derive publishes before the store can hydrate.
+    await vi.waitFor(() => {
+      expect(rpc.activeSessions.list.query).toHaveBeenCalledTimes(2);
+    });
+    expect(snapshots).toEqual([]);
+
+    releaseRead();
+    await expect(run).resolves.toEqual({ kind: 'approved' });
+    expect(snapshots).toHaveLength(1);
+    expect(snapshots[0]).toMatchObject({ needsInput: 0 });
+    release();
+  });
+
+  it('still republishes after the bounded deadline when the ack store never settles', async () => {
+    // `loading` with no read in flight: only the settle deadline can release
+    // the derive, and it must, instead of leaving the widget press unfinished.
+    __resetSessionAttentionForTests();
+    expect(getHydrationSnapshot()).toBe('loading');
+    wireTrpc({
+      sessions: [{ id: 'waiting', status: 'permission' }],
+      cloudAgentSessionId: 'workspace_agent_1',
+      permissions: [{ id: 'perm-1' }],
+    });
+    const { snapshots, release } = collectSink();
+
+    // Real clock on purpose: this case pins the production deadline itself.
+    await expect(runWidgetApprove(keyFor('waiting', 'perm-1'))).resolves.toEqual({
+      kind: 'approved',
+    });
+    expect(snapshots).toHaveLength(1);
+    expect(snapshots[0]).toMatchObject({ needsInput: 0 });
     release();
   });
 

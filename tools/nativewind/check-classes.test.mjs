@@ -2619,6 +2619,60 @@ test('does not accept a nested sheet header reached inside a local component', (
   );
 });
 
+test('terminates on local components that render each other', () => {
+  // Two local components render each other, so following the sheet's body into
+  // them has no end: the header search has to terminate, and neither component
+  // draws a header, so the sheet is still reported as one without a header.
+  const found = layoutProblems(
+    SCREEN_FILE,
+    "import { Sheet } from '@/components/ui/sheet';\n" +
+      '// A and B render each other; neither draws a header.\n' +
+      'function A() {\n' +
+      '  return <B />;\n' +
+      '}\n' +
+      'function B() {\n' +
+      '  return <A />;\n' +
+      '}\n' +
+      'export function Screen() {\n' +
+      '  return (\n' +
+      '    <Sheet visible onClose={onClose}>\n' +
+      '      <A />\n' +
+      '    </Sheet>\n' +
+      '  );\n' +
+      '}'
+  );
+  assert.equal(found.length, 1);
+  assert.match(found[0], /screen\.tsx:11: \[L11\] "<Sheet>"/);
+  // The positive control: the same cycle, with one component drawing the header
+  // beside the cycle, is the sheet's own header.
+  assert.deepEqual(
+    layoutProblems(
+      SCREEN_FILE,
+      "import { Sheet } from '@/components/ui/sheet';\n" +
+        '// The cycle from A still reaches the header B draws.\n' +
+        'function A() {\n' +
+        '  return <B />;\n' +
+        '}\n' +
+        'function B() {\n' +
+        '  return (\n' +
+        '    <>\n' +
+        '      <A />\n' +
+        '      <SheetHeader title="Advanced" onDone={onClose} />\n' +
+        '    </>\n' +
+        '  );\n' +
+        '}\n' +
+        'export function Screen() {\n' +
+        '  return (\n' +
+        '    <Sheet visible onClose={onClose}>\n' +
+        '      <A />\n' +
+        '    </Sheet>\n' +
+        '  );\n' +
+        '}'
+    ),
+    []
+  );
+});
+
 test('reports a malformed theme seam instead of throwing', async context => {
   // The seam has one shape. A reader that supplies neither the tokens nor a
   // failure used to escape out of the first rule that read it, as a TypeError,
@@ -2630,9 +2684,15 @@ test('reports a malformed theme seam instead of throwing', async context => {
   const { run } = await import(
     pathToFileURL(join(root, 'tools/nativewind/check-classes.mjs')).href
   );
+  const circular = {};
+  circular.self = circular;
   const cases = [
     [() => ({}), /theme read seam is malformed/],
     [() => null, /theme read seam is malformed/],
+    // `JSON.stringify` throws on this pair, so the diagnostic names the type
+    // instead of escaping the run as a TypeError.
+    [() => 1n, /theme read seam is malformed/],
+    [() => circular, /theme read seam is malformed/],
     [() => ({ tokens: [] }), /theme read seam is malformed/],
     [() => ({ tokens: ['primary'], failure: 'boom' }), /boom/],
   ];

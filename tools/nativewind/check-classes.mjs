@@ -359,6 +359,15 @@ function themeSeamFailure(cause) {
   return `check-classes: the theme read seam is malformed (${cause}) — the /opacity modifier rule cannot run without the tokens and was skipped`;
 }
 
+/** One value for a diagnostic: JSON where it encodes, the type where it does not. */
+function describeValue(value) {
+  try {
+    return JSON.stringify(value) ?? 'undefined';
+  } catch {
+    return typeof value;
+  }
+}
+
 /**
  * The theme read as one state: the tokens the `/opacity` rule builds its pattern
  * from, or the reason they are not there. A seam that supplies neither — a
@@ -370,7 +379,7 @@ function themeState(result) {
   if (!isPlainObject(result)) {
     return {
       ok: false,
-      failure: themeSeamFailure(`the theme read returned ${JSON.stringify(result) ?? 'undefined'}`),
+      failure: themeSeamFailure(`the theme read returned ${describeValue(result)}`),
     };
   }
   const { tokens, failure } = result;
@@ -1364,8 +1373,21 @@ function localComponents(program) {
  * `SheetHeader` that belongs to the sheet around it. A header under a nested
  * sheet is that sheet's, so the same nesting rule reads a literal `SheetHeader`
  * and a local component that draws one, and the recursion carries it.
+ *
+ * A component's body gives the same answer on every path that reaches it — the
+ * file's components, text and sheet names do not change — so `state.memo` keeps
+ * that answer per component tag and a diamond of local components walks each
+ * body once. Only the cycle guard depends on the path: `state.active` holds the
+ * components this walk is still reading, and a component it meets there is its
+ * own ancestor, whose header cannot appear through the cycle.
  */
-function drawsOwnHeader(scope, text, components, sheetNames, visited = new Set()) {
+function drawsOwnHeader(
+  scope,
+  text,
+  components,
+  sheetNames,
+  state = { memo: new Map(), active: new Set() }
+) {
   const headers = [];
   const candidates = [];
   const nested = [];
@@ -1388,17 +1410,29 @@ function drawsOwnHeader(scope, text, components, sheetNames, visited = new Set()
   return (
     headers.some(outsideNested) ||
     candidates.some(candidate => {
-      if (!outsideNested(candidate.start) || visited.has(candidate.tag)) {
+      if (!outsideNested(candidate.start)) {
         return false;
       }
-      // A cycle guard: this component, or one reached from it, is being read.
-      return drawsOwnHeader(
+      const seen = state.memo.get(candidate.tag);
+      if (seen !== undefined) {
+        return seen;
+      }
+      // A component already being read is this walk's own ancestor: a header it
+      // does not hold on the way down cannot appear through the cycle.
+      if (state.active.has(candidate.tag)) {
+        return false;
+      }
+      state.active.add(candidate.tag);
+      const found = drawsOwnHeader(
         components.get(candidate.tag),
         text,
         components,
         sheetNames,
-        new Set([...visited, candidate.tag])
+        state
       );
+      state.active.delete(candidate.tag);
+      state.memo.set(candidate.tag, found);
+      return found;
     })
   );
 }
@@ -1421,6 +1455,9 @@ function detectSheetHeader({ relative, imports, program, text, lineOf }) {
   }
   const problems = [];
   const components = localComponents(program);
+  // One memo per file run: every `<Sheet>` in the file reads the same component
+  // bodies, so the answers carry across the sheets too.
+  const state = { memo: new Map(), active: new Set() };
   walk(program, node => {
     if (node.type !== 'JSXElement') {
       return;
@@ -1433,7 +1470,7 @@ function detectSheetHeader({ relative, imports, program, text, lineOf }) {
     // sheet is that sheet's, not this one's. `drawsOwnHeader` holds that nesting
     // rule, so a literal `SheetHeader` and a local component that draws one are
     // read the same way.
-    if (!drawsOwnHeader(node, text, components, sheetNames)) {
+    if (!drawsOwnHeader(node, text, components, sheetNames, state)) {
       problems.push({ line: lineOf(node.start), offending: `<${name}>` });
     }
   });

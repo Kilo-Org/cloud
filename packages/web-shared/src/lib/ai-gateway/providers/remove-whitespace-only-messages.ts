@@ -112,16 +112,6 @@ export function createCacheControlCarrier() {
   };
 }
 
-/** Carries a removed message's breakpoint without mutating the retained history. */
-export function preserveCacheControl(
-  previousMessage: Anthropic.MessageParam,
-  removedMessage: Anthropic.MessageParam
-): Anthropic.MessageParam {
-  const carrier = createCacheControlCarrier();
-  carrier.keep(previousMessage);
-  return carrier.drop(removedMessage) ?? previousMessage;
-}
-
 /**
  * Anthropic rejects a message whose content is only whitespace text with "text content blocks
  * must contain non-whitespace text", while whitespace text next to any other block is accepted.

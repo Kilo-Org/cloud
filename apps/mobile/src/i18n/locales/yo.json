@@ -3782,6 +3782,7 @@
       "emptyDescription": "Ẹgbẹ́ ń kó àwọn ọmọ ẹgbẹ́ jọ kí ìlànà kan lè kan gbogbo wọn.",
       "emptyTitle": "Kò tíì sí àwọn ẹgbẹ́",
       "enterpriseOnly": "Àwọn ẹgbẹ́ wà pẹ̀lú ètò Enterprise.",
+      "limitReached": "Àjọ yìí ti dé ààlà rẹ̀ ti ẹgbẹ́ {{max}}. Parẹ́ ẹgbẹ́ kí o tó ṣẹ̀dá ẹgbẹ́ mìíràn.",
       "memberCount": "{{displayCount}} ọmọ ẹgbẹ́",
       "memberCount_other": "{{displayCount}} ọmọ ẹgbẹ́",
       "memberViewEmpty": "Ìwọ kò sí nínú ẹgbẹ́ kankan nínú àjọ yìí.",

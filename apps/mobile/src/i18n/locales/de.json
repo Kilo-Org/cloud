@@ -3842,6 +3842,7 @@
       "emptyDescription": "Eine Gruppe fasst Mitglieder zusammen, damit eine Richtlinie für alle gilt.",
       "emptyTitle": "Noch keine Gruppen",
       "enterpriseOnly": "Gruppen sind im Enterprise-Tarif verfügbar.",
+      "limitReached": "Diese Organisation hat ihr Limit von {{max}} Gruppen erreicht. Löschen Sie eine Gruppe, bevor Sie eine weitere erstellen.",
       "memberCount": "{{displayCount}} Mitglieder",
       "memberCount_one": "{{displayCount}} Mitglied",
       "memberCount_other": "{{displayCount}} Mitglieder",

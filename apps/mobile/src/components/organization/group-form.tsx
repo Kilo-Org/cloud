@@ -1,4 +1,5 @@
 /* eslint-disable max-lines -- one form: the wrapper that owns the durable draft, the loading shape it gates a create on, and the body that seeds from it */
+import { MAX_ORGANIZATION_GROUPS } from '@kilocode/app-shared/organizations';
 import { type Href, useNavigation, useRouter } from 'expo-router';
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -23,14 +24,21 @@ import { OrgFormActions } from '@/components/organization/org-form-actions';
 import { useMetadataLeaveGuard } from '@/components/profiles/use-metadata-leave-guard';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { FormField } from '@/components/ui/form-field';
 import { FormFieldLabel } from '@/components/ui/form-field-label';
+import { AlertCircle } from '@/components/ui/icons';
 import { SearchField } from '@/components/ui/search-field';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useFormFieldScroll } from '@/lib/hooks/use-form-field-scroll';
-import { type OrgGroup, useOrgGroupMutations } from '@/lib/hooks/use-org-groups-queries';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import {
+  type OrgGroup,
+  useOrgGroupMutations,
+  useOrgGroups,
+} from '@/lib/hooks/use-org-groups-queries';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import {
   type ActiveOrgMember,
@@ -156,8 +164,22 @@ function GroupFormBody({ organizationId, canManageBilling, group, draft }: Group
   const popOnce = usePopOnce();
   const stackSafeReplace = useStackSafeReplace();
   const { t } = useTranslation();
+  const colors = useThemeColors();
   const mutations = useOrgGroupMutations(organizationId, canManageBilling);
   const orgWithMembers = useOrgWithMembers(organizationId);
+  // A create can only be refused by the group count, so only a create reads the
+  // list; the query is off for an edit, which never needs the count.
+  const groupsQuery = useOrgGroups(organizationId, group === undefined);
+  // Only the manager shape carries the organization's whole list, so a member
+  // shape (or no answer yet) is not a count. The body shows the loading
+  // skeleton until the count is known, so the form paints once in its final
+  // shape and nothing moves when the list answers.
+  const limitGroups = groupsQuery.data?.access === 'manager' ? groupsQuery.data.groups : null;
+  const atGroupLimit =
+    group === undefined && limitGroups !== null && limitGroups.length >= MAX_ORGANIZATION_GROUPS;
+  const limitCopy = atGroupLimit
+    ? t('organization.groups.limitReached', { max: MAX_ORGANIZATION_GROUPS })
+    : null;
   const initial =
     group === undefined
       ? null
@@ -334,6 +356,13 @@ function GroupFormBody({ organizationId, canManageBilling, group, draft }: Group
     }
     const payload = { name, description: description.length === 0 ? null : description };
     if (group === undefined) {
+      // At the cap nothing can be created, and the warning block above the
+      // fields already says why. A list that landed under the cap before the
+      // server counted the last group still sends the create, and the refusal
+      // lands as the localized toast.
+      if (atGroupLimit) {
+        return;
+      }
       mutations.create.mutate(payload, {
         onSuccess: created => {
           draft.clear();
@@ -372,6 +401,22 @@ function GroupFormBody({ organizationId, canManageBilling, group, draft }: Group
     });
   };
 
+  // A create paints one shape only: until its count is known the body shows the
+  // same skeleton the wrapper uses for a loading draft, so the form never paints
+  // before its cap state and then shifts the fields as they disable. An errored
+  // read is not pending, so that create paints with no notice and a working
+  // Save, and the server refuses it with the toast that explains why. The
+  // guard's dialog ships with the skeleton, since the guard is already armed by
+  // the mount effect and a held Back press must still show its prompt.
+  if (group === undefined && groupsQuery.isPending) {
+    return (
+      <>
+        <GroupFormSkeleton />
+        {guard.dialog}
+      </>
+    );
+  }
+
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={group === undefined ? t('organization.groups.create') : group.name} />
@@ -383,6 +428,22 @@ function GroupFormBody({ organizationId, canManageBilling, group, draft }: Group
         automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}
       >
+        {/* The cap warning block, once the manager has reached the group limit.
+            The fields and Save below are disabled with it, so the blocked form
+            must not read as an ordinary create form. */}
+        {limitCopy === null ? null : (
+          <View className="flex-row items-start gap-2 rounded-lg border border-warn-tile-border bg-warn-tile-bg px-3 py-2.5">
+            <View className="pt-0.5">
+              <AlertCircle size={16} color={colors.warn} />
+            </View>
+            <AccessibleStatus
+              message={limitCopy}
+              tone="status"
+              className="min-w-0 flex-1 text-sm text-foreground"
+              testID="org-group-limit"
+            />
+          </View>
+        )}
         {/* Keyed by the applied draft: a remount re-reads every `defaultValue`
             from the refs and re-arms the search, which a live uncontrolled
             input would ignore. */}
@@ -393,7 +454,7 @@ function GroupFormBody({ organizationId, canManageBilling, group, draft }: Group
             containerOnLayout={fieldLayout('name')}
             defaultValue={nameRef.current}
             maxLength={ORG_GROUP_NAME_MAX_LENGTH}
-            disabled={busy}
+            disabled={busy || atGroupLimit}
             error={
               nameError === null
                 ? undefined
@@ -418,7 +479,7 @@ function GroupFormBody({ organizationId, canManageBilling, group, draft }: Group
             textAlignVertical="top"
             maxLength={ORG_GROUP_DESCRIPTION_MAX_LENGTH}
             className="min-h-20 leading-[1.25rem]"
-            disabled={busy}
+            disabled={busy || atGroupLimit}
             onChangeText={value => {
               descriptionRef.current = value;
               editValues();
@@ -469,7 +530,7 @@ function GroupFormBody({ organizationId, canManageBilling, group, draft }: Group
         <OrgFormActions
           saving={saving}
           removing={removing}
-          disabled={busy || !dirty}
+          disabled={busy || !dirty || atGroupLimit}
           deleteLabel={group === undefined ? undefined : t('organization.groups.deleteAction')}
           onSave={save}
           onDelete={remove}

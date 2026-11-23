@@ -3838,6 +3838,7 @@
       "emptyDescription": "ગ્રુપ સભ્યોને એકત્ર કરે છે જેથી એક પોલિસી તેમના બધા પર લાગુ થઈ શકે.",
       "emptyTitle": "હજી કોઈ ગ્રુપ નથી",
       "enterpriseOnly": "ગ્રુપ એન્ટરપ્રાઇઝ પ્લાન પર ઉપલબ્ધ છે.",
+      "limitReached": "આ સંસ્થા {{max}} ગ્રુપની તેની મર્યાદા સુધી પહોંચી ગઈ છે. બીજું ગ્રુપ બનાવતા પહેલાં એક ગ્રુપ કાઢી નાખો.",
       "memberCount": "સભ્ય: {{displayCount}}",
       "memberCount_one": "{{displayCount}} સભ્ય",
       "memberCount_other": "{{displayCount}} સભ્યો",

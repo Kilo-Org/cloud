@@ -3783,6 +3783,7 @@
       "emptyDescription": "Grup mengumpulkan anggota agar satu kebijakan dapat berlaku untuk semuanya.",
       "emptyTitle": "Belum ada grup",
       "enterpriseOnly": "Grup tersedia di paket Enterprise.",
+      "limitReached": "Organisasi ini telah mencapai batas {{max}} grup. Hapus grup sebelum membuat grup lain.",
       "memberCount": "{{displayCount}} anggota",
       "memberCount_other": "{{displayCount}} anggota",
       "memberViewEmpty": "Anda tidak berada dalam grup mana pun di organisasi ini.",

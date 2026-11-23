@@ -3838,6 +3838,7 @@
       "emptyDescription": "Pinagsasama ng grupo ang mga miyembro para mailapat ang isang patakaran sa kanilang lahat.",
       "emptyTitle": "Wala pang grupo",
       "enterpriseOnly": "Makukuha ang mga grupo sa Enterprise plan.",
+      "limitReached": "Naabot na ng organisasyong ito ang limitasyon nitong {{max}} grupo. Burahin ang grupo bago gumawa ng isa pa.",
       "memberCount": "{{displayCount}} miyembro",
       "memberCount_one": "{{displayCount}} miyembro",
       "memberCount_other": "{{displayCount}} miyembro",

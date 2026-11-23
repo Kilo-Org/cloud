@@ -3780,6 +3780,7 @@
       "emptyDescription": "ກຸ່ມລວບລວມສະມາຊິກເພື່ອໃຫ້ນະໂຍບາຍດຽວມີຜົນກັບທຸກຄົນ.",
       "emptyTitle": "ຍັງບໍ່ມີກຸ່ມ",
       "enterpriseOnly": "ກຸ່ມມີໃຫ້ໃຊ້ໃນແຜນ Enterprise.",
+      "limitReached": "ອົງກອນນີ້ຮອດຂີດຈຳກັດ {{max}} ກຸ່ມແລ້ວ. ລຶບກຸ່ມກ່ອນສ້າງກຸ່ມໃໝ່.",
       "memberCount": "{{displayCount}} ສະມາຊິກ",
       "memberCount_other": "{{displayCount}} ສະມາຊິກ",
       "memberViewEmpty": "ທ່ານບໍ່ໄດ້ຢູ່ໃນກຸ່ມໃດຂອງອົງກອນນີ້.",

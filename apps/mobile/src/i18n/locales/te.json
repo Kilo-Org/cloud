@@ -3840,6 +3840,7 @@
       "emptyDescription": "ఒకే పాలసీ వారందరికీ వర్తించేలా గ్రూప్ సభ్యులను సేకరిస్తుంది.",
       "emptyTitle": "ఇంకా గ్రూప్‌లు లేవు",
       "enterpriseOnly": "గ్రూప్‌లు ఎంటర్‌ప్రైజ్ ప్లాన్‌లో అందుబాటులో ఉంటాయి.",
+      "limitReached": "ఈ సంస్థ {{max}} గ్రూప్‌ల పరిమితిని చేరుకుంది. మరొక గ్రూప్ సృష్టించే ముందు గ్రూప్ తొలగించండి.",
       "memberCount": "{{displayCount}} సభ్యులు",
       "memberCount_one": "{{displayCount}} సభ్యుడు",
       "memberCount_other": "{{displayCount}} సభ్యులు",

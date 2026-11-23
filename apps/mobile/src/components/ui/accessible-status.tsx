@@ -36,6 +36,8 @@ type AccessibleStatusProps = {
    * without bound under a large accessibility scale.
    */
   maxFontSizeMultiplier?: number;
+  /** Test handle on the rendered `Text`, so the design gate and mounted tests find the status. */
+  testID?: string;
 };
 
 export function AccessibleStatus({
@@ -45,6 +47,7 @@ export function AccessibleStatus({
   numberOfLines,
   ellipsizeMode,
   maxFontSizeMultiplier,
+  testID,
 }: Readonly<AccessibleStatusProps>) {
   useStatusAnnouncement(message);
   if (message == null) {
@@ -56,6 +59,7 @@ export function AccessibleStatus({
       numberOfLines={numberOfLines}
       ellipsizeMode={ellipsizeMode}
       maxFontSizeMultiplier={maxFontSizeMultiplier}
+      testID={testID}
       className={cn(TONE_CLASS[tone], className)}
     >
       {message}

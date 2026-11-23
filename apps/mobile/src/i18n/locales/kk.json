@@ -3838,6 +3838,7 @@
       "emptyDescription": "Топ мүшелерді бір саясат олардың барлығына қолданылуы үшін жинайды.",
       "emptyTitle": "Әзірге топтар жоқ",
       "enterpriseOnly": "Топтар Enterprise жоспарында қолжетімді.",
+      "limitReached": "Бұл ұйым {{max}} топ шегіне жетті. Тағы бір топ құру алдында топты жойыңыз.",
       "memberCount": "{{displayCount}} мүше",
       "memberCount_one": "{{displayCount}} мүше",
       "memberCount_other": "{{displayCount}} мүше",

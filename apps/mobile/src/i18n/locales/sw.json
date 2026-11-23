@@ -3838,6 +3838,7 @@
       "emptyDescription": "Kikundi hukusanya wanachama ili sera moja itumike kwa wote.",
       "emptyTitle": "Bado hakuna vikundi",
       "enterpriseOnly": "Vikundi vinapatikana kwenye mpango wa Enterprise.",
+      "limitReached": "Shirika hili limefikia kikomo chake cha vikundi {{max}}. Futa kikundi kabla ya kuunda kingine.",
       "memberCount": "Wanachama: {{displayCount}}",
       "memberCount_one": "{{displayCount}} mwanachama",
       "memberCount_other": "{{displayCount}} wanachama",

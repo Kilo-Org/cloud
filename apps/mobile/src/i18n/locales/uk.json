@@ -3978,6 +3978,7 @@
       "emptyDescription": "Група об'єднує учасників, щоб одна політика застосовувалася до всіх.",
       "emptyTitle": "Груп ще немає",
       "enterpriseOnly": "Групи доступні на плані Enterprise.",
+      "limitReached": "Ця організація досягла ліміту в {{max}} груп. Видаліть групу, перш ніж створити іншу.",
       "memberCount": "Учасників: {{displayCount}}",
       "memberCount_few": "{{displayCount}} учасники",
       "memberCount_many": "{{displayCount}} учасників",

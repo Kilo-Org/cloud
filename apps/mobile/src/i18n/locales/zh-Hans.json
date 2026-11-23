@@ -3779,6 +3779,7 @@
       "emptyDescription": "群组用于汇集成员，以便对全体成员应用同一策略。",
       "emptyTitle": "还没有群组",
       "enterpriseOnly": "群组仅在企业版套餐中可用。",
+      "limitReached": "此组织已达到 {{max}} 个群组的上限。请先删除一个群组，再创建新的群组。",
       "memberCount": "{{displayCount}} 名成员",
       "memberCount_other": "{{displayCount}} 名成员",
       "memberViewEmpty": "你不在该组织的任何群组中。",

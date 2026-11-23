@@ -3838,6 +3838,7 @@
       "emptyDescription": "Ka whakahuihui te kāhui i ngā mema kia pā ai tētahi kaupapa here ki a rātou katoa.",
       "emptyTitle": "Kāore anō he kāhui",
       "enterpriseOnly": "Ka wātea ngā kāhui i te mahere Enterprise.",
+      "limitReached": "Kua tae tēnei whakahaere ki tōna tepe o te {{max}} kāhui. Mukua he kāhui i mua i te waihanga i tētahi atu.",
       "memberCount": "{{displayCount}} mema",
       "memberCount_one": "{{displayCount}} mema",
       "memberCount_other": "{{displayCount}} mema",

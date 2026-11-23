@@ -3838,6 +3838,7 @@
       "emptyDescription": "Խումբը միավորում է անդամներին, որպեսզի մեկ քաղաքականություն կիրառվի բոլորի նկատմամբ։",
       "emptyTitle": "Դեռ խմբեր չկան",
       "enterpriseOnly": "Խմբերը հասանելի են Enterprise պլանում։",
+      "limitReached": "Այս կազմակերպությունը հասել է {{max}} խմբի սահմանաչափին։ Ջնջել խումբը նախքան նորը ստեղծելը։",
       "memberCount": "{{displayCount}} անդամ",
       "memberCount_one": "{{displayCount}} անդամ",
       "memberCount_other": "{{displayCount}} անդամ",

@@ -3838,6 +3838,7 @@
       "emptyDescription": "Koox waxay ururisaa xubnaha si hal siyaasad loogu dabaqo dhammaantood.",
       "emptyTitle": "Weli ma jiraan kooxo",
       "enterpriseOnly": "Kooxaha waxay diyaar ku yihiin qorshaha Enterprise.",
+      "limitReached": "Ururkan wuxuu gaadhay xaddigiisa {{max}} kooxood. Tirtir kooxda ka hor intaadan mid kale abuurin.",
       "memberCount": "{{displayCount}} xubnood",
       "memberCount_one": "{{displayCount}} xubin",
       "memberCount_other": "{{displayCount}} xubnood",

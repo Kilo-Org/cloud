@@ -4110,6 +4110,7 @@
       "emptyDescription": "Mae grŵp yn casglu aelodau fel y gall un polisi fod yn berthnasol i bawb ohonynt.",
       "emptyTitle": "Dim grwpiau eto",
       "enterpriseOnly": "Mae grwpiau ar gael ar y cynllun Enterprise.",
+      "limitReached": "Mae'r sefydliad hwn wedi cyrraedd ei derfyn o {{max}} grŵp. Dilewch grŵp cyn creu un arall.",
       "memberCount": "{{displayCount}} aelod",
       "memberCount_few": "{{displayCount}} aelod",
       "memberCount_many": "{{displayCount}} aelod",

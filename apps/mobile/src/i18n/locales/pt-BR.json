@@ -3978,6 +3978,7 @@
       "emptyDescription": "Um grupo reúne membros para que uma política possa ser aplicada a todos eles.",
       "emptyTitle": "Ainda não há grupos.",
       "enterpriseOnly": "Os grupos estão disponíveis no plano Enterprise.",
+      "limitReached": "Esta organização atingiu o limite de {{max}} grupos. Exclua um grupo antes de criar outro.",
       "memberCount": "{{displayCount}} membro(s)",
       "memberCount_many": "{{displayCount}} membros",
       "memberCount_one": "{{displayCount}} membro",

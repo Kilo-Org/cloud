@@ -3838,6 +3838,7 @@
       "emptyDescription": "Talde batek kideak biltzen ditu, politika bat guztiei aplika dakien.",
       "emptyTitle": "Oraindik ez dago talderik",
       "enterpriseOnly": "Taldeak Enterprise planean daude erabilgarri.",
+      "limitReached": "Erakunde honek {{max}} taldeko muga lortu du. Ezabatu talde bat beste bat sortu aurretik.",
       "memberCount": "{{displayCount}} kide",
       "memberCount_one": "{{displayCount}} kide",
       "memberCount_other": "{{displayCount}} kide",

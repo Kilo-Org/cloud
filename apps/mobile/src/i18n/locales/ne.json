@@ -3838,6 +3838,7 @@
       "emptyDescription": "समूहले सदस्यहरूलाई एकत्र गर्छ ताकि एउटै नीति सबैमा लागू हुन सकोस्।",
       "emptyTitle": "अझै समूहहरू छैनन्।",
       "enterpriseOnly": "समूहहरू एन्टरप्राइज योजनामा उपलब्ध छन्।",
+      "limitReached": "यो संस्था आफ्नो {{max}} समूहको सीमामा पुगेको छ। अर्को समूह बनाउनु अघि समूह मेट्नुहोस्।",
       "memberCount": "{{displayCount}} सदस्य",
       "memberCount_one": "{{displayCount}} सदस्य",
       "memberCount_other": "{{displayCount}} सदस्यहरू",

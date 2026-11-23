@@ -5,6 +5,10 @@ import {
   SLACK_DISCONNECT_NEEDS_SUPPORT_MESSAGE,
   SLACK_DISCONNECT_UNCONFIRMED_MESSAGE,
 } from '@kilocode/app-shared/integrations-errors';
+import {
+  MAX_ORGANIZATION_GROUPS,
+  ORGANIZATION_GROUP_LIMIT_MESSAGE,
+} from '@kilocode/app-shared/organizations';
 import { i18n } from '@/i18n';
 import {
   isTrialExpiredRefusal,
@@ -39,6 +43,24 @@ describe('knownServerErrorMessage', () => {
     expect(
       knownServerErrorMessage(makeError('CONFLICT', ORGANIZATION_PENDING_INVITATION_MESSAGE))
     ).toBe(i18n.t('organization.inviteMember.pendingInvitation'));
+  });
+
+  // The group create is refused once the organization holds its last group, so
+  // the copy names the cap instead of echoing the server's sentence.
+  it('explains a group create refused at the organization cap', () => {
+    const atCap = makeError('BAD_REQUEST', ORGANIZATION_GROUP_LIMIT_MESSAGE);
+    expect(knownServerErrorCopyKey(atCap)).toBe('organization.groups.limitReached');
+    expect(knownServerErrorMessage(atCap)).toBe(
+      i18n.t('organization.groups.limitReached', { max: MAX_ORGANIZATION_GROUPS })
+    );
+  });
+
+  // The client shows the cap beside the same sentence the server refuses with,
+  // so one number has to build both.
+  it('builds the group cap sentence from the number a client shows', () => {
+    expect(ORGANIZATION_GROUP_LIMIT_MESSAGE).toBe(
+      `An organization can have at most ${MAX_ORGANIZATION_GROUPS} groups.`
+    );
   });
 
   it('explains a refused self role change', () => {
@@ -208,6 +230,14 @@ describe('organizationErrorMessage', () => {
     expect(
       organizationErrorMessage(makeError('CONFLICT', ORGANIZATION_PENDING_INVITATION_MESSAGE))
     ).toBe(i18n.t('organization.inviteMember.pendingInvitation'));
+  });
+
+  // The groups screen creates a group through this path, so the cap has its own
+  // localized line rather than the generic failure.
+  it('names the group cap for a refused group create', () => {
+    expect(
+      organizationErrorMessage(makeError('BAD_REQUEST', ORGANIZATION_GROUP_LIMIT_MESSAGE))
+    ).toBe(i18n.t('organization.groups.limitReached', { max: MAX_ORGANIZATION_GROUPS }));
   });
 
   it('never shows an unexplained server sentence', () => {

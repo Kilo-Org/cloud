@@ -3906,6 +3906,7 @@
       "emptyDescription": "Un grup reunește membri pentru ca o singură politică să se aplice tuturor.",
       "emptyTitle": "Nu există încă grupuri",
       "enterpriseOnly": "Grupurile sunt disponibile în planul Enterprise.",
+      "limitReached": "Această organizație a atins limita de {{max}} de grupuri. Șterge un grup înainte de a crea altul.",
       "memberCount": "Membri: {{displayCount}}",
       "memberCount_few": "{{displayCount}} membri",
       "memberCount_one": "{{displayCount}} membru",

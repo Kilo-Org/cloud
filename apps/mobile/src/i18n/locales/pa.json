@@ -3838,6 +3838,7 @@
       "emptyDescription": "ਇੱਕ ਗਰੁੱਪ ਮੈਂਬਰਾਂ ਨੂੰ ਇਕੱਠਾ ਕਰਦਾ ਹੈ ਤਾਂ ਜੋ ਇੱਕ ਨੀਤੀ ਉਨ੍ਹਾਂ ਸਾਰਿਆਂ 'ਤੇ ਲਾਗੂ ਹੋ ਸਕੇ।",
       "emptyTitle": "ਹਾਲੇ ਕੋਈ ਗਰੁੱਪ ਨਹੀਂ",
       "enterpriseOnly": "ਗਰੁੱਪ ਐਂਟਰਪ੍ਰਾਈਜ਼ ਪਲਾਨ 'ਤੇ ਉਪਲਬਧ ਹਨ।",
+      "limitReached": "ਇਸ ਸੰਸਥਾ ਨੇ {{max}} ਗਰੁੱਪਾਂ ਦੀ ਸੀਮਾ ਪੂਰੀ ਕਰ ਲਈ ਹੈ। ਹੋਰ ਗਰੁੱਪ ਬਣਾਉਣ ਤੋਂ ਪਹਿਲਾਂ ਇੱਕ ਗਰੁੱਪ ਮਿਟਾਓ।",
       "memberCount": "{{displayCount}} ਮੈਂਬਰ",
       "memberCount_one": "{{displayCount}} ਮੈਂਬਰ",
       "memberCount_other": "{{displayCount}} ਮੈਂਬਰ",

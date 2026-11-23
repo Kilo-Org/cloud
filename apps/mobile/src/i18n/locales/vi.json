@@ -3842,6 +3842,7 @@
       "emptyDescription": "Nhóm tập hợp các thành viên để một chính sách có thể áp dụng cho tất cả.",
       "emptyTitle": "Chưa có nhóm nào",
       "enterpriseOnly": "Nhóm có sẵn trên gói Enterprise.",
+      "limitReached": "Tổ chức này đã đạt đến giới hạn {{max}} nhóm. Xóa nhóm trước khi tạo nhóm khác.",
       "memberCount": "{{displayCount}} thành viên",
       "memberCount_one": "{{displayCount}} thành viên",
       "memberCount_other": "{{displayCount}} thành viên",

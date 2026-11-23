@@ -3974,6 +3974,7 @@
       "emptyDescription": "Grupė surenka narius, kad viena taisyklė būtų taikoma visiems.",
       "emptyTitle": "Grupių dar nėra",
       "enterpriseOnly": "Grupės prieinamos „Enterprise“ plane.",
+      "limitReached": "Ši organizacija pasiekė savo {{max}} grupių limitą. Ištrinkite grupę prieš kurdami kitą.",
       "memberCount": "{{displayCount}} narių",
       "memberCount_few": "{{displayCount}} nariai",
       "memberCount_many": "{{displayCount}} narių",

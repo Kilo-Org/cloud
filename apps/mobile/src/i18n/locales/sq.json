@@ -3838,6 +3838,7 @@
       "emptyDescription": "Një grup mbledh anëtarë që një politikë të zbatohet për të gjithë ata.",
       "emptyTitle": "Nuk ka ende grupe",
       "enterpriseOnly": "Grupet janë të disponueshme në planin Enterprise.",
+      "limitReached": "Kjo organizatë ka arritur kufirin e saj prej {{max}} grupesh. Fshi një grup përpara se të krijosh një tjetër.",
       "memberCount": "{{displayCount}} anëtarë",
       "memberCount_one": "{{displayCount}} anëtar",
       "memberCount_other": "{{displayCount}} anëtarë",

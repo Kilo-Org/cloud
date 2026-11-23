@@ -3838,6 +3838,7 @@
       "emptyDescription": "Ryhmä kokoaa jäsenet, jotta yksi käytäntö voidaan kohdistaa kaikkiin.",
       "emptyTitle": "Ei vielä ryhmiä",
       "enterpriseOnly": "Ryhmät ovat saatavilla Enterprise-paketissa.",
+      "limitReached": "Tämä organisaatio on saavuttanut {{max}} ryhmän rajan. Poista ryhmä ennen kuin luot uuden.",
       "memberCount": "Jäseniä: {{displayCount}}",
       "memberCount_one": "{{displayCount}} jäsen",
       "memberCount_other": "{{displayCount}} jäsentä",

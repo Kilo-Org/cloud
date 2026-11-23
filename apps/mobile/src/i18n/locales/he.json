@@ -3910,6 +3910,7 @@
       "emptyDescription": "קבוצה מרכזת חברים כדי שמדיניות אחת תחול על כולם.",
       "emptyTitle": "אין עדיין קבוצות",
       "enterpriseOnly": "קבוצות זמינות בתוכנית Enterprise.",
+      "limitReached": "הארגון הזה הגיע למגבלה של {{max}} קבוצות. יש למחוק קבוצה לפני יצירת קבוצה נוספת.",
       "memberCount": "{{displayCount}} חברים",
       "memberCount_one": "{{displayCount}} חבר",
       "memberCount_other": "{{displayCount}} חברים",

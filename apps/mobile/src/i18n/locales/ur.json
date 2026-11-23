@@ -3838,6 +3838,7 @@
       "emptyDescription": "گروپ اراکین کو جمع کرتا ہے تاکہ ایک پالیسی ان سب پر لاگو ہو سکے۔",
       "emptyTitle": "ابھی کوئی گروپ نہیں",
       "enterpriseOnly": "گروپس انٹرپرائز پلان میں دستیاب ہیں۔",
+      "limitReached": "یہ تنظیم اپنی {{max}} گروپس کی حد تک پہنچ چکی ہے۔ دوسرا گروپ بنانے سے پہلے ایک گروپ حذف کریں۔",
       "memberCount": "{{displayCount}} اراکین",
       "memberCount_one": "{{displayCount}} رکن",
       "memberCount_other": "{{displayCount}} اراکین",

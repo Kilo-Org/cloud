@@ -3838,6 +3838,7 @@
       "emptyDescription": "Rukuni yana tattara membobi domin manufa ɗaya ta shafi dukansu.",
       "emptyTitle": "Babu rukunoni tukuna.",
       "enterpriseOnly": "Rukunoni suna samuwa a shirin Enterprise.",
+      "limitReached": "Wannan ƙungiya ta kai iyakarta ta rukuni {{max}}. Share rukuni kafin ƙirƙirar wani.",
       "memberCount": "Membobi: {{displayCount}}",
       "memberCount_one": "{{displayCount}} memba",
       "memberCount_other": "{{displayCount}} membobi",

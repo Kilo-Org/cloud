@@ -1,6 +1,10 @@
 import 'server-only';
 
 import {
+  MAX_ORGANIZATION_GROUPS,
+  ORGANIZATION_GROUP_LIMIT_MESSAGE,
+} from '@kilocode/app-shared/organizations';
+import {
   kilocode_users,
   organization_group_memberships,
   organization_group_policy_links,
@@ -12,7 +16,6 @@ import {
   type OrganizationGroup,
 } from '@kilocode/db/schema';
 import {
-  MAX_ORGANIZATION_GROUPS,
   OrganizationSettingsSchema,
   type NamedOrganizationPolicyKind,
 } from '@kilocode/db/schema-types';
@@ -636,7 +639,7 @@ export async function createOrganizationGroup(params: {
       if (groupCount >= MAX_ORGANIZATION_GROUPS) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
-          message: `An organization can have at most ${MAX_ORGANIZATION_GROUPS} groups.`,
+          message: ORGANIZATION_GROUP_LIMIT_MESSAGE,
         });
       }
 

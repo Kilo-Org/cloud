@@ -1,4 +1,5 @@
 /* eslint-disable max-lines -- the form's create swap, both leave exits and the delete path share one mock harness. */
+import { MAX_ORGANIZATION_GROUPS } from '@kilocode/app-shared/organizations';
 import { createElement, useState } from 'react';
 import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
@@ -48,17 +49,38 @@ const router = vi.hoisted(() => ({
 }));
 
 const popOnce = vi.hoisted(() => vi.fn());
+// The list the create form reads for the group cap. Its answer is swapped per
+// test: a manager shape counts, a member shape or no answer does not.
+const groupsQuery = vi.hoisted(
+  (): {
+    data: unknown;
+    isPending: boolean;
+    isError: boolean;
+    isFetching: boolean;
+    refetch: () => void;
+  } => ({
+    data: undefined,
+    isPending: false,
+    isError: false,
+    isFetching: false,
+    refetch: vi.fn<() => void>(),
+  })
+);
 const stackSafeReplace = vi.hoisted(() => ({ replace: vi.fn<(href: unknown) => void>() }));
 const guard = vi.hoisted(
   (): {
     leave: (() => void)[];
-    handleDirtyChange: (dirty: boolean) => void;
+    handleDirtyChange: Mock<(dirty: boolean) => void>;
     // The props the form handed the guard, so the suite reads its `onDiscard`.
     props: Record<string, unknown>;
+    // The node the guard renders as its prompt: a test that asserts the form
+    // mounts it while another shape paints sets a marker here.
+    dialog: unknown;
   } => ({
     leave: [],
     handleDirtyChange: vi.fn<(dirty: boolean) => void>(),
     props: {},
+    dialog: null,
   })
 );
 // The durable draft the wrapper reads: its state is swapped per test, and its
@@ -106,7 +128,7 @@ vi.mock('@/components/profiles/use-metadata-leave-guard', () => ({
       leaveWithoutAsking: (leave: () => void) => {
         guard.leave.push(leave);
       },
-      dialog: null,
+      dialog: guard.dialog,
     };
   },
 }));
@@ -115,6 +137,7 @@ vi.mock('@/components/profiles/use-metadata-leave-guard', () => ({
 // group only through the props the form hands on.
 vi.mock('@/lib/hooks/use-org-groups-queries', () => ({
   useOrgGroupMutations: () => mutations,
+  useOrgGroups: () => groupsQuery,
 }));
 vi.mock('@/lib/hooks/use-organization-queries', () => ({
   useOrgWithMembers: () => members,
@@ -154,7 +177,7 @@ vi.mock('@/components/ui/text', async () => {
   const { createContext } = await import('react');
   return { Text: 'Text', TextClassContext: createContext(undefined) };
 });
-vi.mock('@/components/ui/icons', () => ({ Search: 'Search' }));
+vi.mock('@/components/ui/icons', () => ({ AlertCircle: 'AlertCircle', Search: 'Search' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 // The icon barrels reach `react-native-svg`, whose Flow-derived ESM output the
 // Node transform cannot parse; the suite reads icons through host elements.
@@ -295,15 +318,31 @@ function textHandler(value: unknown): (text: string) => void {
   return value as (text: string) => void;
 }
 
-async function pressSave(root: ReactTestInstance): Promise<void> {
+/** The Save control's props: the create form's only button. */
+function saveControl(root: ReactTestInstance): WidgetProps {
   const save = root
     .findAll(node => node.type === PRESSABLE && (node.props as WidgetProps).role === 'button')
     .at(0);
   if (save === undefined) {
     throw new Error('the save button was not rendered');
   }
+  return save.props as WidgetProps;
+}
+
+/** The visible text of the block carrying `testID`, or undefined while it is absent. */
+function textWithTestID(root: ReactTestInstance, testID: string): string | undefined {
+  // A status component forwards the handle to the `Text` it renders, so the
+  // component node matches before that `Text`: read the node that holds the copy.
+  const found = root
+    .findAll(node => (node.props as WidgetProps).testID === testID)
+    .find(node => typeof (node.props as WidgetProps).children === 'string');
+  const children: unknown = found?.props.children;
+  return typeof children === 'string' ? children : undefined;
+}
+
+async function pressSave(root: ReactTestInstance): Promise<void> {
   await act(async () => {
-    pressHandler((save.props as WidgetProps).onPress)();
+    pressHandler(saveControl(root).onPress)();
     await Promise.resolve();
   });
 }
@@ -416,11 +455,16 @@ beforeEach(() => {
   members.isError = false;
   router.canGoBack.mockReturnValue(true);
   nav.isFocused = true;
+  groupsQuery.data = undefined;
+  groupsQuery.isPending = false;
+  groupsQuery.isError = false;
+  groupsQuery.isFetching = false;
   listThenForm({ key: 'form-1', name: 'group-form' });
   // Every case starts with the store answering no draft, so the form renders
   // its fields at once; a case that needs the loading phase sets it first.
   draft.state = { kind: 'ready', value: null, save: draft.save, clear: draft.clear };
   guard.props = {};
+  guard.dialog = null;
 });
 
 describe('GroupForm create path', () => {
@@ -449,6 +493,151 @@ describe('GroupForm create path', () => {
     });
     expect(router.dismissTo).not.toHaveBeenCalled();
     expect(popOnce).not.toHaveBeenCalled();
+
+    unmountOnce();
+  });
+});
+
+describe('GroupForm create at the group cap', () => {
+  /** The manager list shape the create form counts, holding `count` groups. */
+  function managerList(count: number) {
+    return {
+      access: 'manager',
+      groups: Array.from({ length: count }, (_, index) => storedGroup({ id: `group-${index}` })),
+    };
+  }
+
+  const limitCopy = i18n.t('organization.groups.limitReached', {
+    max: MAX_ORGANIZATION_GROUPS,
+  });
+
+  it('disables Save and states the cap', async () => {
+    groupsQuery.data = managerList(MAX_ORGANIZATION_GROUPS);
+    const { renderer, unmountOnce } = await mountForm(undefined);
+
+    changeName(renderer.root, 'Workshop');
+
+    expect(textWithTestID(renderer.root, 'org-group-limit')).toBe(limitCopy);
+    expect(fieldOf(renderer.root, i18n.t('organization.groups.nameLabel'))?.disabled).toBe(true);
+    expect(fieldOf(renderer.root, i18n.t('organization.groups.descriptionLabel'))?.disabled).toBe(
+      true
+    );
+    expect(saveControl(renderer.root).disabled).toBe(true);
+
+    unmountOnce();
+  });
+
+  it('leaves Save enabled below the cap and shows no notice', async () => {
+    groupsQuery.data = managerList(MAX_ORGANIZATION_GROUPS - 1);
+    const { renderer, unmountOnce } = await mountForm(undefined);
+
+    changeName(renderer.root, 'Workshop');
+
+    expect(textWithTestID(renderer.root, 'org-group-limit')).toBeUndefined();
+    expect(fieldOf(renderer.root, i18n.t('organization.groups.nameLabel'))?.disabled).toBeFalsy();
+    expect(
+      fieldOf(renderer.root, i18n.t('organization.groups.descriptionLabel'))?.disabled
+    ).toBeFalsy();
+    expect(saveControl(renderer.root).disabled).toBe(false);
+
+    unmountOnce();
+  });
+
+  it('does not fire the create while the cap stands', async () => {
+    groupsQuery.data = managerList(MAX_ORGANIZATION_GROUPS + 1);
+    const { renderer, unmountOnce } = await mountForm(undefined);
+
+    changeName(renderer.root, 'Workshop');
+    await pressSave(renderer.root);
+
+    expect(mutations.create.mutate).not.toHaveBeenCalled();
+
+    unmountOnce();
+  });
+
+  it('leaves an edit form unaffected by the cap', async () => {
+    // An edit never creates, so the cap must not reach it: the notice stays
+    // absent and Save follows the form's own dirtiness.
+    groupsQuery.data = managerList(MAX_ORGANIZATION_GROUPS);
+    members.data = {
+      members: [{ id: 'user-1', name: 'Amira', email: 'amira@example.com', status: 'active' }],
+    };
+    const { renderer, unmountOnce } = await mountForm(storedGroup());
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    selectMember('user-1');
+
+    expect(textWithTestID(renderer.root, 'org-group-limit')).toBeUndefined();
+    expect(saveControl(renderer.root).disabled).toBe(false);
+
+    unmountOnce();
+  });
+
+  it('paints the create skeleton until the count is known, then the whole form', async () => {
+    // A create paints one shape only: while the count is pending it shows the
+    // same skeleton a loading draft shows, not fields that would shift when the
+    // cap notice lands and disables them.
+    groupsQuery.data = undefined;
+    groupsQuery.isPending = true;
+    const pending = await mountForm(undefined);
+
+    expect(fieldOf(pending.renderer.root, i18n.t('organization.groups.nameLabel'))).toBeUndefined();
+    expect(
+      fieldOf(pending.renderer.root, i18n.t('organization.groups.descriptionLabel'))
+    ).toBeUndefined();
+    expect(
+      pending.renderer.root.findAll(node => String(node.type) === 'Skeleton').length
+    ).toBeGreaterThan(0);
+
+    pending.unmountOnce();
+
+    // An errored read is not pending, so the form paints with no notice and a
+    // Save the server then refuses, which is the create's existing path.
+    groupsQuery.data = undefined;
+    groupsQuery.isPending = false;
+    groupsQuery.isError = true;
+    const errored = await mountForm(undefined);
+
+    expect(fieldOf(errored.renderer.root, i18n.t('organization.groups.nameLabel'))).toBeDefined();
+    expect(
+      fieldOf(errored.renderer.root, i18n.t('organization.groups.descriptionLabel'))
+    ).toBeDefined();
+    expect(textWithTestID(errored.renderer.root, 'org-group-limit')).toBeUndefined();
+
+    changeName(errored.renderer.root, 'Workshop');
+
+    expect(saveControl(errored.renderer.root).disabled).toBe(false);
+
+    errored.unmountOnce();
+  });
+
+  it('ships the leave prompt with the skeleton of a dirty create draft', async () => {
+    // The guard arms from the mount effect, and a restored draft carrying a name
+    // is dirty at once, so a Back press held while the count is pending is
+    // prevented. The prompt must therefore paint with the skeleton, not only
+    // with the fields it replaces.
+    groupsQuery.data = undefined;
+    groupsQuery.isPending = true;
+    guard.dialog = createElement('GuardDialog');
+    guard.handleDirtyChange.mockClear();
+    draft.state = {
+      kind: 'ready',
+      value: restoredDraft({ name: 'Drafted' }),
+      save: draft.save,
+      clear: draft.clear,
+    };
+    const { renderer, unmountOnce } = await mountForm(undefined);
+
+    expect(fieldOf(renderer.root, i18n.t('organization.groups.nameLabel'))).toBeUndefined();
+    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton').length).toBeGreaterThan(
+      0
+    );
+    expect(guard.handleDirtyChange).toHaveBeenCalledWith(true);
+    expect(
+      renderer.root.findAll(node => String(node.type) === 'GuardDialog').length
+    ).toBeGreaterThan(0);
 
     unmountOnce();
   });

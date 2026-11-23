@@ -3838,6 +3838,7 @@
       "emptyDescription": "ډله غړي راغونډوي ترڅو یوه پالیسي پر ټولو پلي شي.",
       "emptyTitle": "تر اوسه ډلې نشته",
       "enterpriseOnly": "ډلې یوازې د Enterprise په پلان کې شته.",
+      "limitReached": "دا سازمان خپل د {{max}} ډلو حد ته رسېدلی دی. د نوې ډلې له جوړولو مخکې یوه ډله ړنګ کړئ.",
       "memberCount": "{{displayCount}} غړي",
       "memberCount_one": "{{displayCount}} غړی",
       "memberCount_other": "{{displayCount}} غړي",

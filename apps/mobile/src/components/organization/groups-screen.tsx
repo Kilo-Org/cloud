@@ -1,4 +1,4 @@
-import { canManageOrganization } from '@kilocode/app-shared/organizations';
+import { canManageOrganization, MAX_ORGANIZATION_GROUPS } from '@kilocode/app-shared/organizations';
 import { useRouter } from 'expo-router';
 import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -42,7 +42,11 @@ function GroupsSkeleton() {
  * are Enterprise-only. A manager — an owner, admin or billing manager — sees every
  * group and opens one to change it, which the server allows an owner or admin; a
  * plain member sees the groups their own policies come from, read-only. Deleting
- * lives in the group's form, so the list carries no per-row actions.
+ * lives in the group's form, so the list carries no per-row actions. Once the
+ * organization holds `MAX_ORGANIZATION_GROUPS` groups, a role that can create —
+ * an owner or admin — sees the cap stated and loses the header's create action,
+ * so the app never offers a create the server would refuse; a billing manager
+ * sees neither, since it can neither create nor delete a group.
  */
 export function OrganizationGroupsScreen() {
   const router = useRouter();
@@ -67,6 +71,10 @@ export function OrganizationGroupsScreen() {
   const data = groupsQuery.data;
   const managerGroups = data?.access === 'manager' ? data.groups : null;
   const memberGroups = data?.access === 'member' ? data.groups : null;
+  // The cap is one derived fact from the manager list: no create action and a
+  // stated cap, for the role that can create, once the organization already
+  // holds its last group.
+  const atGroupLimit = managerGroups !== null && managerGroups.length >= MAX_ORGANIZATION_GROUPS;
   const errorView = groupsQuery.isError ? selectOrgListErrorView(groupsQuery.error) : null;
   // A plan gate, a failed read, or an empty list is the whole surface; a member
   // view, a list, or the loading skeleton keeps the scroller. The skeleton is
@@ -139,28 +147,39 @@ export function OrganizationGroupsScreen() {
       />
     );
   } else {
+    // The list is the only surface that knows the count, so it states the cap
+    // that its own create action would hit, above the rows at the body's
+    // section gap: the reader who can create learns why the header lost its `+`
+    // here, and a reader who cannot gets no notice it could not act on.
     body = (
-      <RowGroup>
-        {managerGroups.map(group => (
-          <OrgRecordRow
-            key={group.id}
-            title={group.name}
-            meta={t('organization.groups.memberCount', {
-              count: group.memberIds.length,
-              displayCount: formatNumber(group.memberIds.length, i18n.language),
-            })}
-            description={group.description ?? undefined}
-            accessibilityLabel={group.name}
-            onPress={
-              canManage
-                ? () => {
-                    openGroupForm(group.id);
-                  }
-                : undefined
-            }
-          />
-        ))}
-      </RowGroup>
+      <View className="gap-3">
+        {atGroupLimit && canManage ? (
+          <Text variant="muted" testID="org-groups-limit">
+            {t('organization.groups.limitReached', { max: MAX_ORGANIZATION_GROUPS })}
+          </Text>
+        ) : null}
+        <RowGroup>
+          {managerGroups.map(group => (
+            <OrgRecordRow
+              key={group.id}
+              title={group.name}
+              meta={t('organization.groups.memberCount', {
+                count: group.memberIds.length,
+                displayCount: formatNumber(group.memberIds.length, i18n.language),
+              })}
+              description={group.description ?? undefined}
+              accessibilityLabel={group.name}
+              onPress={
+                canManage
+                  ? () => {
+                      openGroupForm(group.id);
+                    }
+                  : undefined
+              }
+            />
+          ))}
+        </RowGroup>
+      </View>
     );
   }
 
@@ -169,7 +188,9 @@ export function OrganizationGroupsScreen() {
       <ScreenHeader
         title={t('organization.settingsOnWeb.groups')}
         headerRight={
-          enterprise && canManage ? (
+          // At the cap the header drops its create action rather than offering a
+          // press the server refuses; the list's notice states the cap instead.
+          enterprise && canManage && !atGroupLimit ? (
             <IconButton
               accessibilityLabel={t('organization.groups.create')}
               onPress={() => {

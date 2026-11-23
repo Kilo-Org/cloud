@@ -3781,6 +3781,7 @@
       "emptyDescription": "グループはメンバーをまとめ、1つのポリシーを全員に適用できるようにします。",
       "emptyTitle": "グループはまだありません",
       "enterpriseOnly": "グループは Enterprise プランで利用できます。",
+      "limitReached": "この組織はグループ数が上限の{{max}}件に達しました。別のグループを作成する前にグループを削除してください。",
       "memberCount": "メンバー{{displayCount}}人",
       "memberCount_other": "メンバー{{displayCount}}人",
       "memberViewEmpty": "この組織のどのグループにも所属していません。",

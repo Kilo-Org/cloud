@@ -28,9 +28,9 @@ afterEach(() => {
   view = undefined;
 });
 
-function textOf(tree: TestRenderer.ReactTestRenderer, id: string): string {
-  const node = tree.root.findAllByProps({ testID: id }).at(0);
-  return JSON.stringify(node?.props ?? {});
+/** The body the card hands its status line. */
+function statusOf(tree: TestRenderer.ReactTestRenderer): unknown {
+  return tree.root.findAllByProps({ tone: 'status' }).at(0)?.props.message;
 }
 
 describe('ChatSyncBanner', () => {
@@ -49,9 +49,7 @@ describe('ChatSyncBanner', () => {
     const banner = view.renderer.root.findAllByProps({ testID: 'chat-sync-banner-busy' }).at(0);
     expect(banner).toBeDefined();
     expect(banner?.props.accessibilityRole).toBe('alert');
-    expect(textOf(view.renderer, 'chat-sync-banner-busy')).toContain(
-      i18n.t('modelChat.sync.busyTitle')
-    );
+    expect(statusOf(view.renderer)).toBe(i18n.t('modelChat.sync.busyBody'));
   });
 
   it('offers discard-and-reload on a diverged chat and calls it', async () => {

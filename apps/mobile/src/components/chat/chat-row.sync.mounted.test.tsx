@@ -115,10 +115,12 @@ describe('ChatRow under sync', () => {
     const { tree } = await mount({ origin: 'cli', liveRemote: true });
     const row = tree.root.findAllByProps({ agentLabel: 'Kilo' }).at(0);
     expect(row?.props.live).toBe(true);
-    const icon = tree.root.findAll(node => node.props.accessibilityLabel !== undefined).at(-1);
-    expect(JSON.stringify(icon?.props.accessibilityLabel)).toContain(
-      i18n.t('agentChat.sessionFilter.platformCli')
-    );
+    const icon: unknown = row?.props.platformIcon;
+    const label =
+      typeof icon === 'object' && icon !== null && 'props' in icon
+        ? (icon as { props: { accessibilityLabel?: string } }).props.accessibilityLabel
+        : undefined;
+    expect(label).toBe(i18n.t('agentChat.sessionFilter.platformCli'));
   });
 
   it('keeps a local-only chat out of the badge state', async () => {

@@ -83,8 +83,13 @@ export function mergeChatRows(input: {
     if (server === undefined && !matchesLocal(chat, input.filters)) {
       continue;
     }
-    if (server !== undefined && server.archived && !input.filters.includeArchived) {
-      continue;
+    if (server !== undefined) {
+      if (server.archived && !input.filters.includeArchived) {
+        continue;
+      }
+      if (input.filters.origin !== 'all' && server.client !== input.filters.origin) {
+        continue;
+      }
     }
     rows.push({
       key: chat.sessionId,
@@ -100,8 +105,18 @@ export function mergeChatRows(input: {
       chat,
     });
   }
+  const q = input.filters.q.trim().toLowerCase();
   for (const server of input.listed) {
     if (heldServerIds.has(server.sessionID)) {
+      continue;
+    }
+    if (server.archived && !input.filters.includeArchived) {
+      continue;
+    }
+    if (input.filters.origin !== 'all' && server.client !== input.filters.origin) {
+      continue;
+    }
+    if (q !== '' && !(server.title ?? '').toLowerCase().includes(q)) {
       continue;
     }
     rows.push({

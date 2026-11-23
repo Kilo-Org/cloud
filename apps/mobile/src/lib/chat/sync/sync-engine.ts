@@ -290,7 +290,10 @@ export async function applyPulled(
     ackBatch: snapshot.lastReceipt?.batchID ?? record.ackBatch,
     ackDigest: snapshot.lastReceipt?.digest ?? record.ackDigest,
     maxSeq: Math.max(record.maxSeq, snapshot.maxSeq),
-    ackedSeq: Math.max(record.ackedSeq, snapshot.maxSeq),
+    // `ackedSeq` counts only what THIS device committed: a pulled log raises
+    // the numbering waterline, never this device's acknowledgement, or the
+    // local tail a conflict must park would look already sent.
+    ackedSeq: record.ackedSeq,
     messageMap: map,
     phase: record.phase === 'diverged' ? 'diverged' : 'synced',
   });
@@ -333,6 +336,9 @@ export async function uploadChat(
   }
   const { serverId } = ready;
   let record = ready.record;
+  // A frozen outbox that commits is the outcome, even when it carried the
+  // chat's only pending messages: there is nothing left to send afterwards.
+  let resentPosition: number | null = null;
   if (record.phase === 'diverged') {
     return { kind: 'diverged' };
   }
@@ -346,6 +352,7 @@ export async function uploadChat(
       if (outcome.kind !== 'synced') {
         return outcome;
       }
+      resentPosition = outcome.position;
       record = syncRecordOf(deps.db, input.sessionId) ?? record;
     } else {
       saveSyncRecord(deps.db, input.sessionId, { outbox: null, phase: 'synced' });
@@ -358,7 +365,9 @@ export async function uploadChat(
     if (JSON.stringify(map) !== JSON.stringify(record.messageMap)) {
       saveSyncRecord(deps.db, input.sessionId, { messageMap: map });
     }
-    return { kind: 'nothing-to-upload' };
+    return resentPosition === null
+      ? { kind: 'nothing-to-upload' }
+      : { kind: 'synced', position: resentPosition };
   }
   const now = deps.now();
   const lastAssistant = sequenced[sequenced.length - 1]?.turn.role === 'assistant';

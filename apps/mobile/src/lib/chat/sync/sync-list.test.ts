@@ -44,6 +44,7 @@ const listed = (over: Partial<ListedSession> = {}): ListedSession => ({
   directory: null,
   archived: false,
   live: false,
+  ...over,
 });
 
 describe('mergeChatRows', () => {

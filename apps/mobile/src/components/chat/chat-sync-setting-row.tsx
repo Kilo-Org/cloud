@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 
 import { ConfigureRow } from '@/components/ui/configure-row';
+import { Smartphone } from '@/components/ui/icons';
 import { PreferenceRow } from '@/components/ui/preference-row';
 import { RowGroup } from '@/components/ui/row-group';
 import { Section } from '@/components/ui/section';
@@ -22,6 +23,7 @@ export function ChatSyncSettingRow() {
       <Section>
         <RowGroup>
           <ConfigureRow
+            icon={Smartphone}
             title={t('modelChat.sync.settingTitle')}
             subtitle={t('modelChat.sync.settingUnreadable')}
             subtitleNumberOfLines={2}

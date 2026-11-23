@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { selectChatSyncSettingState } from './use-chat-sync';
+import { selectChatSyncSettingState } from './sync-gate';
 
 /**
  * The setting's own states. Sync runs by default, so only a stored "off"

@@ -200,21 +200,18 @@ describe('uploadChat', () => {
     expect(commits).toHaveLength(1);
   });
 
-  it('removes the local chat on a tombstone at register and at commit', async () => {
-    const atRegister = makeDeps({ register: { type: 'deleted' } });
-    expect((await uploadChat(atRegister, uploadInput([turn('user', 'hi')]))).kind).toBe('deleted');
+  it('removes the local chat when the service answers a tombstone at register', async () => {
+    const deps = makeDeps({ register: { type: 'deleted' } });
+    expect((await uploadChat(deps, uploadInput([turn('user', 'hi')]))).kind).toBe('deleted');
     expect(forgotten).toEqual(['ses_local']);
-    forgotten = [];
-    const atCommit = makeDeps({ commits: [{ type: 'deleted' }] });
-    // Re-register path: the record is already stamped and deleted; a fresh
-    // chat stands in for the commit-time tombstone.
-    rememberChat(db, { sessionId: 'ses_local2', scope: 'user:personal', at: 1000 });
-    const outcome = await uploadChat(atCommit, {
-      ...uploadInput([turn('user', 'hi')]),
-      sessionId: 'ses_local2',
-    });
+    expect(syncRecordOf(db, 'ses_local')?.phase).toBe('deleted');
+  });
+
+  it('removes the local chat when the tombstone lands at commit time', async () => {
+    const deps = makeDeps({ commits: [{ type: 'deleted' }] });
+    const outcome = await uploadChat(deps, uploadInput([turn('user', 'hi')]));
     expect(outcome.kind).toBe('deleted');
-    expect(forgotten).toEqual(['ses_local2']);
+    expect(forgotten).toEqual(['ses_local']);
   });
 
   it('surfaces a non-retryable failure and keeps the outbox pending', async () => {

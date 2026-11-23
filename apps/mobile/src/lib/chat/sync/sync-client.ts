@@ -62,12 +62,9 @@ async function pausedOnOutage<T>(call: () => Promise<T>): Promise<T | Error> {
  * next attempt tries again.
  */
 function pausedWhenUnavailable<T extends { readonly type: string }>(
-  result: T | Error
+  result: T
 ): T | { readonly type: 'retryable' } {
-  if (result instanceof Error || result.type === 'failed') {
-    return { type: 'retryable' };
-  }
-  return result;
+  return result.type === 'failed' ? { type: 'retryable' } : result;
 }
 
 export function syncClientFor(organizationId: string | undefined): SyncClient {
@@ -85,6 +82,9 @@ export function syncClientFor(organizationId: string | undefined): SyncClient {
   const transport: SyncTransport = {
     register: async (sessionID, sourceID) => {
       const result = await pausedOnOutage(() => writer.register(sessionID, sourceID, 'mobile'));
+      if (result instanceof Error) {
+        return { type: 'retryable' };
+      }
       return result.type === 'registered'
         ? { type: 'registered', position: result.state.position }
         : pausedWhenUnavailable(result);
@@ -98,6 +98,9 @@ export function syncClientFor(organizationId: string | undefined): SyncClient {
     },
     commit: async (sessionID, packet) => {
       const result = await pausedOnOutage(() => writer.commit(sessionID, packet));
+      if (result instanceof Error) {
+        return { type: 'retryable' };
+      }
       if (result.type === 'committed') {
         return {
           type: 'committed',
@@ -110,7 +113,10 @@ export function syncClientFor(organizationId: string | undefined): SyncClient {
       }
       return pausedWhenUnavailable(result);
     },
-    pull: async sessionID => pausedWhenUnavailable(await pausedOnOutage(() => writer.pull(sessionID))),
+    pull: async sessionID => {
+      const result = await pausedOnOutage(() => writer.pull(sessionID));
+      return result instanceof Error ? { type: 'retryable' } : pausedWhenUnavailable(result);
+    },
   };
   const made: SyncClient = {
     transport,
@@ -119,14 +125,16 @@ export function syncClientFor(organizationId: string | undefined): SyncClient {
         client.listSessions({ ...params, limit: 50, organizationID: organizationId })
       );
       if (result instanceof Error) {
+        // An older service answers a list shape this build cannot read, or not
+        // at all: the merged list keeps the local chats and asks again later.
         throw result;
       }
       return result;
     },
-    deleteSession: async sessionID =>
-      pausedWhenUnavailable(
-        await pausedOnOutage(() => client.deleteSession(sessionID, organizationId))
-      ),
+    deleteSession: async sessionID => {
+      const result = await pausedOnOutage(() => client.deleteSession(sessionID, organizationId));
+      return result instanceof Error ? { type: 'retryable' } : pausedWhenUnavailable(result);
+    },
     probeLive: sessionID =>
       new Promise<boolean>(resolve => {
         const timer = setTimeout(() => {

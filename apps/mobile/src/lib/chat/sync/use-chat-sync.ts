@@ -3,6 +3,8 @@ import { useCallback, useEffect, useSyncExternalStore } from 'react';
 
 import { encryptedDatabase } from '@/lib/persist/encrypted-kv';
 
+import { selectChatSyncSettingState, type ChatSyncGate } from './sync-gate';
+
 import { organizationIdOf } from '../layers';
 import type { ChatPlace } from '../scope';
 import type { ChatSummary } from '../store';
@@ -29,6 +31,7 @@ import {
   writeChatSyncSetting,
   type ChatSyncSetting,
 } from './sync-settings';
+export { selectChatSyncSettingState, type ChatSyncSettingState } from './sync-gate';
 import { syncedRecordsOfScope } from './sync-store';
 
 /**
@@ -36,45 +39,6 @@ import { syncedRecordsOfScope } from './sync-store';
  * uploader, the merged server list, and the banner a chat screen reads.
  * Screens compose these; nothing here draws.
  */
-
-/**
- * The setting as the app knows it: still being read, unreadable (with
- * whether asking again can help), on, or off. `enabled` derives from this one
- * union, so a half-read setting never reads as "off" and quietly drops sync.
- */
-export type ChatSyncSettingState =
-  | { readonly kind: 'loading' }
-  | { readonly kind: 'failed'; readonly retryable: boolean; readonly retry: () => void }
-  | { readonly kind: 'on' }
-  | { readonly kind: 'off' };
-
-export type ChatSyncGate = {
-  readonly state: ChatSyncSettingState;
-  /** Sync runs unless this device was told to keep chats local. */
-  readonly enabled: boolean;
-  readonly decide: (choice: ChatSyncSetting) => Promise<void>;
-};
-
-/** The union one settings read answers with. Pure, so every state is testable. */
-export function selectChatSyncSettingState(input: {
-  readonly hasPlace: boolean;
-  readonly isPending: boolean;
-  readonly isPaused: boolean;
-  readonly isError: boolean;
-  readonly setting: ChatSyncSetting | undefined;
-  readonly retry: () => void;
-}): ChatSyncSettingState {
-  if (!input.hasPlace) {
-    return { kind: 'failed', retryable: false, retry: input.retry };
-  }
-  if (input.setting !== undefined) {
-    return input.setting === 'on' ? { kind: 'on' } : { kind: 'off' };
-  }
-  if (input.isError) {
-    return { kind: 'failed', retryable: input.isPaused, retry: input.retry };
-  }
-  return { kind: 'loading' };
-}
 
 export function useChatSyncGate(place: ChatPlace | null): ChatSyncGate {
   const client = useQueryClient();

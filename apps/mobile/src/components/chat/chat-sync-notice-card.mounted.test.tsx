@@ -41,8 +41,11 @@ describe('ChatSyncNoticeCard', () => {
     view = await renderWithProviders(
       createElement(ChatSyncNoticeCard, { onDismiss, onOpenSettings })
     );
-    const card = view.renderer.root.findAllByProps({ testID: 'chat-sync-notice' }).at(0);
-    expect(JSON.stringify(card?.props)).toContain(i18n.t('modelChat.sync.noticeBody'));
+    const words = view.renderer.root
+      .findAll(node => (node.type as string) === 'Text')
+      .map(node => node.props.children)
+      .filter((child): child is string => typeof child === 'string');
+    expect(words).toContain(i18n.t('modelChat.sync.noticeBody'));
     await press(view.renderer, i18n.t('modelChat.sync.noticeAction'));
     expect(onOpenSettings).toHaveBeenCalledOnce();
     expect(onDismiss).not.toHaveBeenCalled();

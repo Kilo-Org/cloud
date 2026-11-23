@@ -163,6 +163,20 @@ export const SCHEDULER_MAX_USER_LEASE_RECLAIMS = 3;
  * "Requeue retryable" CTA admits it again.
  */
 export const SCHEDULER_MAX_PLATFORM_ATTEMPTS = 2;
+/**
+ * Rows per page when a changed paid-request plan makes the initializer read the run's
+ * materialized chunks.
+ *
+ * The widest real plan is 68 pairs x 597 cases x 3 reps = 121,788 blocks, one case per chunk.
+ * Measured against the repo's own identifiers — the 75-character longest decider case id, a
+ * 41-character catalog model, variant `high`, a UUID-shaped paid run id, chunk index 121787 —
+ * one serialized `(id, model, variant, rep, case_ids)` row is 292 bytes, so one statement
+ * would return ~35.6 MB (average-width cases: ~31 MB). D1 caps a query result at 50 MB, the
+ * Worker at 128 MB, and the whole request at 30 s, so a single read would sit at 71% of the
+ * result cap with ~121k parsed strings live in the isolate. Keyset paging instead peaks at
+ * 1,000 rows (~292 KB) and ~122 queries, and reads each row exactly once.
+ */
+export const SCHEDULER_MATERIALIZED_PAGE_SIZE = 1_000;
 
 /** True for a chunk of a user pool's run; every other chunk belongs to a platform pool. */
 function chunkIsUserSql(alias: string): string {
@@ -372,16 +386,44 @@ export async function scheduleRunChunks(
   const materialized = new Map<string, Set<string>>();
   const takenIds = new Set<string>();
   if (planChanged) {
-    const materializedRows = await db
-      .prepare('SELECT id, model, variant, rep, case_ids FROM scheduler_chunks WHERE run_id = ?')
-      .bind(run.runId)
-      .all<{ id: string; model: string; variant: string; rep: number; case_ids: string }>();
-    for (const row of materializedRows.results) {
-      takenIds.add(row.id);
-      const laneKey = JSON.stringify([row.model, row.variant, row.rep]);
-      const cases = materialized.get(laneKey) ?? new Set<string>();
-      for (const caseId of JSON.parse(row.case_ids) as string[]) cases.add(caseId);
-      materialized.set(laneKey, cases);
+    // Keyset pages, so the peak stays one page of rows in memory instead of every row the
+    // run has written. Each row is read exactly once: the total stays S for the widest plan
+    // (~121.8k rows), at ~122 queries for 1,000-row pages rather than one 15 MB result.
+    type MaterializedRow = {
+      id: string;
+      model: string;
+      variant: string;
+      rep: number;
+      case_ids: string;
+    };
+    let cursor: string | null = null;
+    for (;;) {
+      const page: D1Result<MaterializedRow> =
+        cursor === null
+          ? await db
+              .prepare(
+                `SELECT id, model, variant, rep, case_ids FROM scheduler_chunks
+                WHERE run_id = ? ORDER BY id LIMIT ${SCHEDULER_MATERIALIZED_PAGE_SIZE}`
+              )
+              .bind(run.runId)
+              .all<MaterializedRow>()
+          : await db
+              .prepare(
+                `SELECT id, model, variant, rep, case_ids FROM scheduler_chunks
+                WHERE run_id = ? AND id > ? ORDER BY id LIMIT ${SCHEDULER_MATERIALIZED_PAGE_SIZE}`
+              )
+              .bind(run.runId, cursor)
+              .all<MaterializedRow>();
+      for (const row of page.results) {
+        takenIds.add(row.id);
+        const laneKey = JSON.stringify([row.model, row.variant, row.rep]);
+        const cases = materialized.get(laneKey) ?? new Set<string>();
+        for (const caseId of JSON.parse(row.case_ids) as string[]) cases.add(caseId);
+        materialized.set(laneKey, cases);
+      }
+      const last: MaterializedRow | undefined = page.results.at(-1);
+      if (page.results.length < SCHEDULER_MATERIALIZED_PAGE_SIZE || last === undefined) break;
+      cursor = last.id;
     }
   }
   const writeBatch = async (final: boolean): Promise<boolean> => {

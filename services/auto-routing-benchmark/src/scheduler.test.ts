@@ -32,6 +32,7 @@ import {
   SCHEDULER_MATERIALIZED_LANES_SQL,
   SCHEDULER_MAX_PLATFORM_ATTEMPTS,
   SCHEDULER_MAX_USER_ATTEMPTS,
+  SCHEDULER_MATERIALIZED_PAGE_SIZE,
   SCHEDULER_MAX_USER_LEASE_RECLAIMS,
   SCHEDULER_QUEUE_LEASE_MS,
   SCHEDULER_PRUNE_CHUNKS_SQL,
@@ -1992,9 +1993,14 @@ describe('platform attempt cap — a block can never be re-chunked with a fresh 
     const counted = {
       ...counting,
       prepare(sqlText: string) {
-        // The guard's read, told apart from the lanes aggregate the resume cursor uses.
-        if (sqlText.includes('SELECT id, model, variant, rep, case_ids FROM scheduler_chunks'))
+        // The guard's pages, told apart from the lanes aggregate the resume cursor uses.
+        if (sqlText.includes('SELECT id, model, variant, rep, case_ids FROM scheduler_chunks')) {
           reads.chunkRows += 1;
+          // Every page carries the keyset bound (except the first) and the page size, so the
+          // read can never become one unbounded result.
+          expect(sqlText).toContain(`LIMIT ${SCHEDULER_MATERIALIZED_PAGE_SIZE}`);
+          expect(sqlText).toContain('ORDER BY id');
+        }
         return counting.prepare(sqlText);
       },
     } as unknown as D1Database;
@@ -2041,7 +2047,10 @@ describe('platform attempt cap — a block can never be re-chunked with a fresh 
       chunkSize: 1,
       laneCaseIds: new Map([[laneKey, [...caseIds, 'case-new']]]),
     });
-    expect(reads.chunkRows).toBe(before + 1);
+    // A re-plan reads the run's rows in keyset pages of SCHEDULER_MATERIALIZED_PAGE_SIZE:
+    // 41 rows fit one page, so the statement count is the ceiling of rows/page, never one
+    // unbounded result.
+    expect(reads.chunkRows).toBe(before + Math.ceil(41 / SCHEDULER_MATERIALIZED_PAGE_SIZE));
     // Only the case the new plan adds is written; the 40 it already had keep their rows.
     expect(storedChunks(sqlite)).toHaveLength(41);
   });

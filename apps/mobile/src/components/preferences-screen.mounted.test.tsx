@@ -10,8 +10,17 @@ vi.hoisted(() => {
   vi.stubGlobal('__DEV__', false);
 });
 const push = vi.hoisted(() => vi.fn());
+vi.mock('@/components/ui/preference-row', () => ({ PreferenceRow: 'PreferenceRow' }));
 vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
+  Pressable: 'Pressable',
+  Switch: 'Switch',
+  Text: 'Text',
   View: 'View',
+  // The sync switch is a real PreferenceRow: a pressable row holding the
+  // shared Switch, both of which read the colour scheme and window scale.
+  useColorScheme: () => 'light',
+  useWindowDimensions: () => ({ fontScale: 1, width: 400, height: 800 }),
 }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push }),
@@ -49,7 +58,9 @@ async function mountPreferences(): Promise<ReactTestRenderer> {
 }
 function hubRows(renderer: ReactTestRenderer): ReactTestInstance[] {
   return renderer.root.findAll(
-    node => typeof node.type === 'string' && (node.type as string) === 'ConfigureRow'
+    node =>
+      typeof node.type === 'string' &&
+      ((node.type as string) === 'ConfigureRow' || (node.type as string) === 'PreferenceRow')
   );
 }
 function row(renderer: ReactTestRenderer, title: string): ReactTestInstance {
@@ -92,7 +103,12 @@ describe('PreferencesScreen hub', () => {
   it('renders one navigation row per settings group with its title and subtitle', async () => {
     const renderer = await mountPreferences();
 
-    expect(hubRows(renderer)).toHaveLength(7);
+    // The seven navigation rows above the account group, plus the sync switch
+    // that now sits before them.
+    expect(hubRows(renderer)).toHaveLength(8);
+    expect(row(renderer, i18n.t('modelChat.sync.settingTitle')).props).toMatchObject({
+      value: true,
+    });
     expect(row(renderer, 'General').props).toMatchObject({ icon: 'SlidersHorizontal' });
     // The Voice input screen explains gateway transcription. A caption under
     // this card sat below the last row, which has its own subtitle, so the hub

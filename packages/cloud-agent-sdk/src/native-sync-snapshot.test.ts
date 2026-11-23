@@ -46,7 +46,7 @@ function state(revision = 4, position = 20) {
 }
 
 function pagePath(revision = 4, cursor?: string) {
-  return `${sessionPath}/entities?revision=${revision}&limit=100${cursor === undefined ? '' : `&cursor=${encodeURIComponent(cursor)}`}`;
+  return `${sessionPath}/entities?revision=${revision}&limit=100&include=source${cursor === undefined ? '' : `&cursor=${encodeURIComponent(cursor)}`}`;
 }
 
 function page(entities: unknown[], next: string | null = null, revision = 4, position = 20) {
@@ -205,7 +205,19 @@ async function until(done: () => boolean): Promise<void> {
 }
 
 describe('fetchNativeSnapshot', () => {
-  it('pins every page to state and reconstructs numeric, sparse ordinals across lexical pages', async () => {
+    it('asks every entity page for the writer source tag', async () => {
+    const { fetch, request } = snapshotFetch([envelope()]);
+    await fetchNativeSnapshot(request, sessionID);
+    const entityPages = (fetch as jest.Mock).mock.calls
+      .map(call => String(call[0]))
+      .filter(path => path.includes('/entities?'));
+    expect(entityPages.length).toBeGreaterThan(0);
+    for (const path of entityPages) {
+      expect(path).toContain('include=source');
+    }
+  });
+
+it('pins every page to state and reconstructs numeric, sparse ordinals across lexical pages', async () => {
     const first = part(2, 10, { type: 'reasoning', text: 'first', native: { nil: null } });
     const last = part(10, 19, { type: 'text', text: 'last' });
     const user = entity('message', 'msg_user', {

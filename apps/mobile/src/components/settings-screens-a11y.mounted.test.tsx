@@ -60,6 +60,10 @@ vi.mock('react-native', () => ({
   Text: 'Text',
   View: 'View',
   useWindowDimensions: () => ({ fontScale: 1 }),
+  // The sync switch is a real PreferenceRow whose row holds the shared Switch;
+  // both read the colour scheme.
+  useColorScheme: () => 'light',
+  Switch: 'Switch',
 }));
 vi.mock('expo-router', () => ({
   useNavigationContainerRef: () => ({ addListener: () => () => undefined }),
@@ -234,7 +238,9 @@ vi.mock('@/lib/chat/use-chat', () => ({
   useChatPlace: () => null,
 }));
 vi.mock('@/lib/chat/sync/use-chat-sync', () => ({
-  useChatSyncGate: () => ({ state: { kind: 'on' }, enabled: true, decide: async () => undefined }),
+  // Sync off: the switch row still draws (unchecked), so the appearance
+  // control stays the scene's only checked option.
+  useChatSyncGate: () => ({ state: { kind: 'off' }, enabled: false, decide: async () => undefined }),
 }));
 describe('settings screens announce every control', () => {
   it('labels the back control and every Account settings row', async () => {

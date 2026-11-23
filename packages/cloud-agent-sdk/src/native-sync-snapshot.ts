@@ -504,7 +504,7 @@ async function readSnapshot(
   const cursors = new Set<string>();
   let cursor: string | null = null;
   do {
-    const query = `revision=${state.revision}&limit=100${cursor === null ? '' : `&cursor=${encodeURIComponent(cursor)}`}`;
+    const query = `revision=${state.revision}&limit=100&include=source${cursor === null ? '' : `&cursor=${encodeURIComponent(cursor)}`}`;
     const page = pageSchema.parse(await request<unknown>(`${path}/entities?${query}`));
     if (page.sessionID !== sessionID)
       throw new Error('Native entity page session identity mismatch');

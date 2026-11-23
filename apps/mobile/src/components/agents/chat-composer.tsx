@@ -167,11 +167,17 @@ export type ChatComposerControl = {
   /**
    * Withdraw a draft this composer restored after a failed send, once the server
    * turns out to have accepted that send: the confirmed message is in the
-   * transcript, so the same text must leave the input. Only the untouched
-   * restore is withdrawn — a draft the reader edited stays, because that is the
-   * next message — and only the attachments that restore put back are removed.
+   * transcript, so the same text must leave the input. The withdrawal names the
+   * message id the settled send carried, so another send with the same words is
+   * never withdrawn. Only the untouched restore is withdrawn — a draft the
+   * reader edited stays, because that is the next message — and only the
+   * attachments that restore put back are removed.
+   *
+   * Returns `true` when it withdrew the restore, and `false` otherwise. An
+   * unmatched withdrawal releases a draft load that already settled, so its
+   * suppression cannot outlive the load it was published for.
    */
-  withdrawRestoredSend: (text: string) => void;
+  withdrawRestoredSend: (text: string, messageId: string) => boolean;
 };
 
 /** The id one send carried, as the host's `onOptimisticSend` reported it. */
@@ -452,14 +458,16 @@ export function ChatComposer({
   // mounts with editable=true from the start. Draft text is restored after
   // remount.
   const [inputEpoch, setInputEpoch] = useState(0);
-  // The draft this composer put back after a failed send, with the chips that
-  // restore added. The server can accept a send whose response was lost, and the
-  // confirmed message then appears in the transcript; that makes the restored
-  // text a duplicate, so the host withdraws exactly this restore. It is dropped
-  // as soon as the reader edits the draft, because then the text is their next
-  // message rather than the failed one.
+  // The restore this composer made after a send failed, with the message id
+  // that send carried. A draft loaded from storage is never armed: the app
+  // cannot tell such a draft from text the reader typed. The server can accept
+  // a send whose response was lost, and the confirmed row then makes this
+  // restore a duplicate, so the host withdraws exactly it. It is dropped as
+  // soon as the reader edits the draft. That text is then their next message,
+  // not the failed one.
   const restoredFailedSendRef = useRef<{
     text: string;
+    messageId: string;
     attachmentIds: readonly string[];
   } | null>(null);
   // Armed by handleStop; the remount effect restores the live text once.
@@ -743,10 +751,8 @@ export function ChatComposer({
       return;
     }
     restoreTextIntoInput(initialDraft);
-    // A stored draft can be the text of a send whose outcome was unknown when
-    // its route closed. The host publishes that send's confirmation later, and
-    // this draft — loaded, not typed — is what it must withdraw.
-    restoredFailedSendRef.current = { text: initialDraft, attachmentIds: [] };
+    // Withdrawal needs the send's message id, so a draft loaded from storage is
+    // not armed here.
   }, [
     initialDraft,
     deliveredDraft,
@@ -834,18 +840,29 @@ export function ChatComposer({
       restoreAttachments: parts => {
         restoreFilePartsRef.current(parts);
       },
-      withdrawRestoredSend: (text: string) => {
+      withdrawRestoredSend: (text: string, messageId: string) => {
+        // A load that already settled has nothing left to suppress, while a load
+        // still pending keeps the suppression for the one load it was published
+        // for.
+        const releaseSettledDraftLoad = (): false => {
+          if (initialDraftAppliedRef.current) {
+            onDeliveredDraftConsumedRef.current();
+          }
+          return false;
+        };
         const restored = restoredFailedSendRef.current;
-        // Both sides compare as the prompt a send carries: a draft kept with
-        // surrounding whitespace restores raw, and the record names the text
-        // that was sent.
-        if (restored === null || composerPromptText(restored.text) !== composerPromptText(text)) {
-          return;
+        if (restored === null || restored.messageId !== messageId) {
+          return releaseSettledDraftLoad();
+        }
+        // Both sides compare as the prompt a send carries: the record names the
+        // text that was sent.
+        if (composerPromptText(restored.text) !== composerPromptText(text)) {
+          return releaseSettledDraftLoad();
         }
         // A draft the reader edited is their next message, not the send that
         // turned out to be delivered.
         if (composerPromptText(textRef.current) !== composerPromptText(restored.text)) {
-          return;
+          return releaseSettledDraftLoad();
         }
         restoredFailedSendRef.current = null;
         for (const id of restored.attachmentIds) {
@@ -855,6 +872,7 @@ export function ChatComposer({
         // The restore this record was published for is spent: the host must not
         // keep holding the same words against a later draft.
         onDeliveredDraftConsumedRef.current();
+        return true;
       },
     }),
     []
@@ -1397,13 +1415,15 @@ export function ChatComposer({
                   applyComposerText(prompt);
                 }
                 upload.restoreChips(optimisticChips);
-                // Remember exactly this restore: the send may have been accepted
-                // after all, and the confirmed row then makes the text a
-                // duplicate the host withdraws.
-                restoredFailedSendRef.current = {
-                  text: prompt,
-                  attachmentIds: optimisticChips.map(chip => chip.id),
-                };
+                // The confirmed row makes this exact restore a duplicate. The
+                // send's own id is what identifies it.
+                if (sentMessageId !== undefined) {
+                  restoredFailedSendRef.current = {
+                    text: prompt,
+                    messageId: sentMessageId,
+                    attachmentIds: optimisticChips.map(chip => chip.id),
+                  };
+                }
               }
               throw error;
             }

@@ -1556,7 +1556,10 @@ export function SessionDetailContent({
       return;
     }
     appliedDeliveredFailedPromptSequence.current = deliveredFailedPrompt.sequence;
-    composerControlRef.current?.withdrawRestoredSend(deliveredFailedPrompt.text);
+    composerControlRef.current?.withdrawRestoredSend(
+      deliveredFailedPrompt.text,
+      deliveredFailedPrompt.messageId
+    );
   }, [deliveredFailedPrompt, setConsumedDeliveredSequence]);
   const consumableDeliveredDraft =
     deliveredFailedPrompt !== null && deliveredFailedPrompt.sequence > consumedDeliveredSequence

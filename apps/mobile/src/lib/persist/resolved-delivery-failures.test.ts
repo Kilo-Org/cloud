@@ -225,6 +225,16 @@ describe('resolved delivery failures', () => {
     await expect(readResolvedDeliveryFailures(USER_ID, SESSION_ID)).resolves.toEqual(incomplete);
   });
 
+  it('answers an empty owner id or session id with a complete, empty record', async () => {
+    // No account can hold a record for an empty id, so this is not a read
+    // failure: the caller must still trust the answer.
+    const empty = { items: [], complete: true };
+
+    await expect(readResolvedDeliveryFailures('', SESSION_ID)).resolves.toEqual(empty);
+    await expect(readResolvedDeliveryFailures(USER_ID, '')).resolves.toEqual(empty);
+    await expect(readResolvedDeliveryFailures('', '')).resolves.toEqual(empty);
+  });
+
   it('is a no-op for an empty owner, session id, or message id', async () => {
     await persistResolvedDeliveryFailure(
       { userId: '', authEpoch: OWNER.authEpoch },
@@ -235,14 +245,6 @@ describe('resolved delivery failures', () => {
     await persistResolvedDeliveryFailure(OWNER, SESSION_ID, '');
 
     expect(kvMock.setItem).not.toHaveBeenCalled();
-    await expect(readResolvedDeliveryFailures('', SESSION_ID)).resolves.toEqual({
-      items: [],
-      complete: false,
-    });
-    await expect(readResolvedDeliveryFailures(USER_ID, '')).resolves.toEqual({
-      items: [],
-      complete: false,
-    });
   });
 
   it('refuses to write while a sign-out is active', async () => {

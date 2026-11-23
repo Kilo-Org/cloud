@@ -9027,6 +9027,17 @@ describe('createSessionManager', () => {
 
       expect(lastSessionConfig()?.isDeliveryFailureResolved?.('m-original')).toBe(true);
 
+      // An id this process minted for a send cannot be a stored-event replay,
+      // so the incomplete record must not hide its failure.
+      const sentIds: string[] = [];
+      mockSession.send.mockResolvedValue(undefined);
+      await mgr.send({
+        payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
+        onOptimisticSend: messageId => sentIds.push(messageId),
+      });
+      expect(sentIds).toHaveLength(1);
+      expect(lastSessionConfig()?.isDeliveryFailureResolved?.(sentIds[0]!)).toBe(false);
+
       // A later read that can vouch for the record restores the normal
       // behaviour for that session.
       complete = true;
@@ -9035,6 +9046,75 @@ describe('createSessionManager', () => {
       await Promise.resolve();
 
       expect(lastSessionConfig()?.isDeliveryFailureResolved?.('m-original')).toBe(false);
+    });
+
+    it('applies a failure for a send this process made in an unverifiable session', async () => {
+      const config = createMockConfig({
+        readResolvedDeliveryFailures: jest.fn(async () => ({ items: [], complete: false })),
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      await Promise.resolve();
+
+      const sentIds: string[] = [];
+      mockSession.send.mockResolvedValue(undefined);
+      await mgr.send({
+        payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
+        onOptimisticSend: messageId => sentIds.push(messageId),
+      });
+      const sentId = sentIds[0]!;
+
+      // The service state applies the failure footer only when the predicate
+      // allows it, so this call mirrors an applied `cloud.message.failed`.
+      expect(lastSessionConfig()?.isDeliveryFailureResolved?.(sentId)).toBe(false);
+      mockSessionCallbacks.onMessageFailed?.(sentId, {
+        status: 'failed',
+        error: 'The message could not be delivered',
+        reason: 'exhausted',
+      });
+
+      expect(
+        atomValue<{ message?: string; code?: string } | null>(
+          config.store,
+          mgr.atoms.statusIndicator
+        )
+      ).toMatchObject({ message: 'Message failed to deliver', code: 'message-delivery-failed' });
+    });
+
+    it('keeps a failure this process sent when the unverifiable read discards applied ones', async () => {
+      const read = deferred<DurableDeliveryRecord<string>>();
+      const config = createMockConfig({
+        readResolvedDeliveryFailures: jest.fn(() => read.promise),
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+
+      const sentIds: string[] = [];
+      mockSession.send.mockResolvedValue(undefined);
+      await mgr.send({
+        payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
+        onOptimisticSend: messageId => sentIds.push(messageId),
+      });
+      const sentId = sentIds[0]!;
+      // The replay applied a stored failure, and this process's own send then
+      // failed, both before the unverifiable read landed.
+      mockSession.state.getPendingMessages.mockReturnValue(
+        new Map([
+          [sentId, { status: 'failed', error: 'x', reason: 'exhausted' }],
+          ['m-replay', { status: 'failed', error: 'y', reason: 'execution' }],
+        ])
+      );
+      mockSession.state.clearFailedMessage.mockReturnValue(true);
+      mockSession.state.clearFailedMessage.mockClear();
+
+      read.resolve({ items: [], complete: false });
+      await read.promise;
+      await Promise.resolve();
+
+      expect(mockSession.state.clearFailedMessage).toHaveBeenCalledWith('m-replay');
+      expect(mockSession.state.clearFailedMessage).not.toHaveBeenCalledWith(sentId);
     });
 
     it('drops a failure the replay applied before the unverifiable read landed', async () => {

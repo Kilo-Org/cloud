@@ -5009,7 +5009,10 @@ describe('session detail composer after a failed turn', () => {
         }
       );
     });
-    expect(control.withdrawRestoredSend).toHaveBeenCalledExactlyOnceWith('Delivered late');
+    expect(control.withdrawRestoredSend).toHaveBeenCalledExactlyOnceWith(
+      'Delivered late',
+      'msg-delivered'
+    );
 
     // A re-render of the same record changes nothing: one delivery, one
     // withdrawal.

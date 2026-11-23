@@ -63,8 +63,9 @@ export const PENDING_SEND_MAX_IDS = 20;
 
 /**
  * At most this many sessions keep a pending send per user. The delivery scope
- * is cleared only on an explicit account purge, so without a cap a long-lived
- * install would accumulate one entry per session that ever failed a send.
+ * survives sign-out and a `SCHEMA_VERSION` bump by design, and nothing on the
+ * device purges it — the same lifetime as the composer drafts under
+ * `draft:<userId>`. The cap bounds a long-lived install.
  */
 export const PENDING_SEND_MAX_SESSIONS = 200;
 
@@ -192,13 +193,16 @@ async function migrateLegacyPendingSend(
  * complete, empty answer; a record this build cannot read is reported as
  * `{ items: [], complete: false }`, so the caller can tell "nothing recorded"
  * from "cannot tell".
+ *
+ * An empty owner id is a complete, empty answer: no account can hold a record
+ * for it. An unreadable stored value is incomplete.
  */
 export async function readPendingSendConfirmations(
   userId: string,
   sessionId: string
 ): Promise<DeliveryRecordRead<PendingSendConfirmation>> {
   if (userId === '' || sessionId === '') {
-    return incompleteDeliveryRecord();
+    return emptyDeliveryRecord();
   }
   const stored = await readStoredPendingSend(userId, sessionId);
   if (stored !== null) {

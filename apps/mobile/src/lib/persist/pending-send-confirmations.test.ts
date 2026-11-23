@@ -270,6 +270,16 @@ describe('pending send confirmations', () => {
     await expect(readPendingSendConfirmations(USER_ID, SESSION_ID)).resolves.toEqual(incomplete);
   });
 
+  it('answers an empty owner id or session id with a complete, empty record', async () => {
+    // No account can hold a record for an empty id, so this is not a read
+    // failure: the caller must still trust the answer.
+    const empty = { items: [], complete: true };
+
+    await expect(readPendingSendConfirmations('', SESSION_ID)).resolves.toEqual(empty);
+    await expect(readPendingSendConfirmations(USER_ID, '')).resolves.toEqual(empty);
+    await expect(readPendingSendConfirmations('', '')).resolves.toEqual(empty);
+  });
+
   it('keeps a warm-start record across sign-out and the same user signing in again', async () => {
     await persist(SESSION_ID, 'msg-1');
     expect(kvMock.scopes.has(readCacheScope(USER_ID))).toBe(false);

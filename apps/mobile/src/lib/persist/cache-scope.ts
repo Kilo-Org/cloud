@@ -19,7 +19,8 @@ export function readCacheScope(userId: string): string {
  * the resolved delivery-failure memory). It deliberately shares nothing with
  * `cache:`: those records guard a composer draft and a replayed failure event,
  * both of which outlive the read cache, so sign-out's `cache:<userId>:` sweep
- * and a `SCHEMA_VERSION` bump must not reach them.
+ * and a `SCHEMA_VERSION` bump must not reach them. Nothing purges the scope
+ * automatically; each family caps itself per user.
  */
 const DELIVERY_SCOPE_PREFIX = 'delivery:';
 

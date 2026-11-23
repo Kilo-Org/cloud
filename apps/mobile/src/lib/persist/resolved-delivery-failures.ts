@@ -54,8 +54,9 @@ export const RESOLVED_DELIVERY_MAX_IDS = 100;
 
 /**
  * At most this many sessions keep a recorded resolution per user. The delivery
- * scope is cleared only on an explicit account purge, so without a cap a
- * long-lived install would accumulate one entry per session the user retried.
+ * scope survives sign-out and a `SCHEMA_VERSION` bump by design, and nothing on
+ * the device purges it — the same lifetime as the composer drafts under
+ * `draft:<userId>`. The cap bounds a long-lived install.
  */
 export const RESOLVED_DELIVERY_MAX_SESSIONS = 200;
 
@@ -178,13 +179,16 @@ async function migrateLegacyResolvedDelivery(
  * Reads the resolved delivery-failure ids for a session. A session with no
  * record anywhere is a complete, empty answer; a record this build cannot read
  * is reported as `{ items: [], complete: false }`.
+ *
+ * An empty owner id is a complete, empty answer: no account can hold a record
+ * for it. An unreadable stored value is incomplete.
  */
 export async function readResolvedDeliveryFailures(
   userId: string,
   sessionId: string
 ): Promise<DeliveryRecordRead<string>> {
   if (userId === '' || sessionId === '') {
-    return incompleteDeliveryRecord();
+    return emptyDeliveryRecord();
   }
   const stored = await readStoredResolvedDelivery(userId, sessionId);
   if (stored !== null) {

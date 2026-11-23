@@ -213,7 +213,14 @@ describe('localized format helpers', () => {
 
   it('reads a twelve-hour clock on a device set to one', () => {
     stubDeviceCalendars(false);
-    expect(formatClockTime(new Date(2026, 0, 1, 13, 45), 'en')).toBe('1:45 PM');
+    // `de` writes 13:45 on its own clock, so only the forced twelve-hour cycle
+    // can print the language's own day period for this instant.
+    expect(formatClockTime(new Date(2026, 0, 1, 13, 45), 'de')).toBe('1:45 PM');
+  });
+
+  it('leaves the language clock in place on a device that reports no setting', () => {
+    stubDeviceCalendars(null);
+    expect(formatClockTime(new Date(2026, 0, 1, 13, 45), 'de')).toBe('13:45');
   });
 
   it('formats a list and preserves one grapheme', () => {

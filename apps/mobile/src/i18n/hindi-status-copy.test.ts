@@ -23,6 +23,8 @@ const CASES: Case[] = [
   },
   { key: 'glanceable.count.needsInput_one', value: '{{displayCount}} को इनपुट चाहिए' },
   { key: 'glanceable.count.needsInput_other', value: '{{displayCount}} को इनपुट चाहिए' },
+  { key: 'glanceable.checked', value: 'जाँच' },
+  { key: 'glanceable.wasDue', value: 'अपेक्षित' },
   { key: 'glanceable.footer.checked', value: 'जाँच · {{time}}' },
   { key: 'glanceable.wake.wasDue', value: '{{time}} को अपेक्षित था' },
   { key: 'glanceable.noActivityFor', value: 'निष्क्रिय समय' },

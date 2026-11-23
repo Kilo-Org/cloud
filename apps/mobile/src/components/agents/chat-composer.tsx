@@ -307,7 +307,9 @@ type ChatComposerProps = {
   /**
    * Whether the host finished attributing the loaded draft. `false` means the
    * answer is still being read, so a withdrawal for an unarmed draft must be
-   * held instead of spending the load's suppression on a guess.
+   * held instead of spending the load's suppression on a guess. Omit it when
+   * the host does not attribute drafts: nothing is pending, so a withdrawal
+   * whose restore it does not name is released rather than held forever.
    */
   restoredSendSettled?: boolean;
   /**
@@ -397,7 +399,7 @@ export function ChatComposer({
   initialDraft,
   deliveredDraft = null,
   restoredSend = null,
-  restoredSendSettled = false,
+  restoredSendSettled,
   isPromptDelivered,
   onDeliveredDraftConsumed,
   sessionId = null,
@@ -492,9 +494,11 @@ export function ChatComposer({
   // attribution settles.
   const pendingWithdrawalRef = useRef<{ text: string; messageId: string } | null>(null);
   // Whether the host's attribution is final, as the latest render published it.
-  // The imperative handle is created once, so it reads this ref.
-  const restoredSendSettledRef = useRef(false);
-  restoredSendSettledRef.current = restoredSendSettled;
+  // The imperative handle is created once, so it reads this ref. A host that
+  // does not report attribution has nothing pending: only an explicit `false`
+  // holds a withdrawal, so an omitted prop can never strand one forever.
+  const restoredSendSettledRef = useRef(true);
+  restoredSendSettledRef.current = restoredSendSettled !== false;
   // Armed by handleStop; the remount effect restores the live text once.
   const pendingDraftRestoreRef = useRef(false);
   const stopRemountPhaseRef = useRef<StopRemountPhase>('idle');
@@ -903,7 +907,7 @@ export function ChatComposer({
       return;
     }
     // With no answer yet, the read may still name the send. Keep holding.
-    if (!restoredSendSettled && restoredSend === null) {
+    if (restoredSendSettled === false && restoredSend === null) {
       return;
     }
     pendingWithdrawalRef.current = null;

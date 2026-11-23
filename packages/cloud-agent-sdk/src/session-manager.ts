@@ -3363,7 +3363,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    * whole — pending entry, terminal error, and the client-materialised row —
    * while a confirmed user row is server history and stays. A failure whose id
    * this process minted for its own send is kept. It cannot be a stored-event
-   * replay, so its footer and terminal error stay.
+   * replay, so its footer and terminal error stay. A failure another client of
+   * this session made is dropped like a replay, because the unreadable record
+   * cannot tell the two apart; see `isDeliveryFailureResolved`.
    */
   function discardAppliedDeliveryFailures(): void {
     const state = currentSession?.state;
@@ -4180,6 +4182,16 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       // An unverifiable durable record hides a failure only when this process
       // did not send it. A failure for an id this manager minted is genuine,
       // not a stored-event replay. It keeps its footer.
+      //
+      // A live failure for a send made by another client of this session (a
+      // second device, or the CLI) is therefore hidden too while the record
+      // cannot be read. The client has no way to tell that failure apart from
+      // a stored-event replay: both carry an id this process never minted, and
+      // the record that could separate them is exactly the one that is
+      // unreadable. Hiding it keeps this record's one promise — a footer the
+      // person already resolved never returns — and the cost is that such a
+      // failure shows no footer and no Retry for as long as the record stays
+      // incomplete.
       isDeliveryFailureResolved: messageId =>
         resolvedFailures.has(messageId) ||
         (resolvedFailuresUncertain.has(kiloSessionId) && !locallySentMessageIds.has(messageId)),

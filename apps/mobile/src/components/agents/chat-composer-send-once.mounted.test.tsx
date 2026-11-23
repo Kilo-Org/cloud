@@ -599,6 +599,33 @@ describe('ChatComposer withdraws a restored send the server delivered', () => {
     renderer.unmount();
   });
 
+  it('releases a withdrawal when the host reports no attribution at all', async () => {
+    const controlRef = createRef<ChatComposerControl>();
+    const onDeliveredDraftConsumed = vi.fn<() => void>();
+    const renderer = await mountComposer(
+      baseProps({
+        controlRef,
+        draftKey: 'agent-composer:sess-1',
+        initialDraft: 'Restored draft text',
+        deliveredDraft: null,
+        onDeliveredDraftConsumed,
+      })
+    );
+    expect(controlRef.current?.hasContent()).toBe(true);
+
+    // A host that reports no attribution has no answer pending. Holding the
+    // request would strand it, and the record it guards would never be spent.
+    let withdrawn: boolean | undefined = undefined;
+    await act(async () => {
+      withdrawn = controlRef.current?.withdrawRestoredSend('Another prompt', 'msg-1');
+    });
+    expect(withdrawn).toBe(false);
+    expect(onDeliveredDraftConsumed).toHaveBeenCalledTimes(1);
+    expect(controlRef.current?.hasContent()).toBe(true);
+
+    renderer.unmount();
+  });
+
   it('keeps a pending draft load when a withdrawal matches nothing', async () => {
     const controlRef = createRef<ChatComposerControl>();
     const onDeliveredDraftConsumed = vi.fn<() => void>();

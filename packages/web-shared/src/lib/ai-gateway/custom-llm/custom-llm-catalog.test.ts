@@ -2,6 +2,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, test } from '@jest/gl
 import { custom_llm2 } from '@kilocode/db/schema';
 import type { CustomLlmDefinition } from '@kilocode/db/schema-types';
 import { captureException } from '@sentry/nextjs';
+import { sql } from 'drizzle-orm';
 import {
   fetchCustomLlmsFromDatabase,
   findCustomLlm,
@@ -123,6 +124,24 @@ describe('custom LLM catalog', () => {
       expect(mockedCaptureException).toHaveBeenCalledTimes(1);
     } finally {
       await deleteCustomLlmForTest('acme/malformed-model');
+    }
+  });
+
+  test('reports a JSON null definition and keeps serving the valid rows', async () => {
+    const errorLog = jest.spyOn(console, 'error').mockImplementation(() => {});
+    await db
+      .insert(custom_llm2)
+      .values({ public_id: 'acme/null-definition', definition: sql`'null'::jsonb` });
+    try {
+      await expect(isCustomLlm('acme/public-model')).resolves.toBe(true);
+      await expect(requireCustomLlmsById()).resolves.toBeDefined();
+      expect(errorLog).toHaveBeenCalledWith(
+        'Failed to parse custom llm definition',
+        'acme/null-definition',
+        expect.anything()
+      );
+    } finally {
+      await deleteCustomLlmForTest('acme/null-definition');
     }
   });
 

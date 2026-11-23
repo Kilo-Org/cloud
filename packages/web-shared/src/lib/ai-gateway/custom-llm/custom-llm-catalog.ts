@@ -55,9 +55,21 @@ function reportUnparseableCustomLlm(publicId: string, error: unknown): void {
 
 /** Disabled rows are skipped before parsing, so a disabled custom LLM behaves as if it were
  * deleted and a disabled malformed row is not reported. */
+function isDisabledCustomLlmRow(row: CustomLlm2): boolean {
+  // The jsonb `$type` is not checked at runtime, and a JSON null must reach the parse
+  // below to be reported instead of throwing and blanking the whole catalog.
+  const definition: unknown = row.definition;
+  return (
+    typeof definition === 'object' &&
+    definition !== null &&
+    'is_enabled' in definition &&
+    definition.is_enabled === false
+  );
+}
+
 function parseAllCustomLlmRows(rows: readonly CustomLlm2[]): CustomLlm[] {
   return rows.flatMap(row => {
-    if (row.definition.is_enabled === false) return [];
+    if (isDisabledCustomLlmRow(row)) return [];
     const parsed = CustomLlmDefinitionSchema.safeParse(row.definition);
     if (!parsed.success) {
       reportUnparseableCustomLlm(row.public_id, parsed.error);

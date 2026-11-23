@@ -89,6 +89,17 @@ export type SessionIngestServiceStatus = {
   port: number;
 };
 
+/** A file part a completed tool call returned in `state.attachments`. */
+export type FixtureToolAttachment = {
+  id: string;
+  sessionID: string;
+  messageID: string;
+  type: 'file';
+  mime: string;
+  filename?: string;
+  url: string;
+};
+
 const ROOT_ASSISTANT_COST = 0.01;
 const ROOT_ASSISTANT_TOKENS: FixtureTokens = {
   total: 1375,
@@ -212,6 +223,8 @@ export function buildToolPartItem(params: {
   metadata: Record<string, unknown>;
   start: number;
   end: number;
+  /** File parts the completed call returned, as `send_file` reports them. */
+  attachments?: FixtureToolAttachment[];
 }): SessionIngestItem {
   return {
     type: 'part',
@@ -246,6 +259,7 @@ export function buildToolPartItem(params: {
                 title: params.title,
                 metadata: params.metadata,
                 time: { start: params.start, end: params.end },
+                ...(params.attachments === undefined ? {} : { attachments: params.attachments }),
               },
     },
   };

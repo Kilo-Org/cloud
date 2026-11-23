@@ -4947,7 +4947,8 @@
     "unavailableTitle": "Itti fayyadama hin argamne",
     "unavailableDescription": "Iddoo hojii kanaaf itti fayyadamni qophaa'ee hin jiru. Itti fayyadama asitti arguu yoo eegde, garee deeggarsaa qunnami.",
     "orgSelfNotice": "Itti fayyadama kee dhaabbata kana keessatti argaa jirta.",
-    "viewDetails": "Bal'ina itti fayyadamaa ilaali"
+    "viewDetails": "Bal'ina itti fayyadamaa ilaali",
+    "orgSelfEntryTitle": "Itti fayyadama kee"
   },
   "integrations": {
     "title": "Walitti hidhamiinsota",

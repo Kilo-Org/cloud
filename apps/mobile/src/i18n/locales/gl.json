@@ -4947,7 +4947,8 @@
     "unavailableTitle": "Uso non dispoñible",
     "unavailableDescription": "O uso non está configurado para este espazo de traballo. Contacta co servizo de asistencia se esperas ver aquí datos de uso.",
     "orgSelfNotice": "Estás a ver o teu propio uso nesta organización.",
-    "viewDetails": "Ver detalles do uso"
+    "viewDetails": "Ver detalles do uso",
+    "orgSelfEntryTitle": "O teu uso"
   },
   "integrations": {
     "title": "Integracións",

@@ -5041,7 +5041,8 @@
     "unavailableTitle": "Uso no disponible",
     "unavailableDescription": "El uso no está configurado para este espacio de trabajo. Contacta con soporte si esperas ver el uso aquí.",
     "orgSelfNotice": "Estás viendo tu propio uso en esta organización.",
-    "viewDetails": "Ver detalles de uso"
+    "viewDetails": "Ver detalles de uso",
+    "orgSelfEntryTitle": "Tu uso"
   },
   "integrations": {
     "title": "Integraciones",

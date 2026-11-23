@@ -5041,7 +5041,8 @@
     "unavailableTitle": "Lietojums nav pieejams",
     "unavailableDescription": "Šai darbvietai lietojums nav iestatīts. Ja sagaidāt, ka šeit būs redzams lietojums, sazinieties ar atbalsta dienestu.",
     "orgSelfNotice": "Jūs redzat savu lietojumu šajā organizācijā.",
-    "viewDetails": "Skatīt lietojuma informāciju"
+    "viewDetails": "Skatīt lietojuma informāciju",
+    "orgSelfEntryTitle": "Jūsu lietojums"
   },
   "integrations": {
     "title": "Integrācijas",

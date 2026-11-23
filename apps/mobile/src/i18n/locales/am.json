@@ -4947,7 +4947,8 @@
     "unavailableTitle": "አጠቃቀም አይገኝም",
     "unavailableDescription": "ለዚህ የሥራ አካባቢ አጠቃቀም አልተዋቀረም። እዚህ አጠቃቀም ለማየት የሚጠብቁ ከሆነ ድጋፍን ያግኙ።",
     "orgSelfNotice": "በዚህ ድርጅት ውስጥ የራስዎን አጠቃቀም እያዩ ነው።",
-    "viewDetails": "የአጠቃቀም ዝርዝሮችን ይመልከቱ"
+    "viewDetails": "የአጠቃቀም ዝርዝሮችን ይመልከቱ",
+    "orgSelfEntryTitle": "የእርስዎ አጠቃቀም"
   },
   "integrations": {
     "title": "ውህደቶች",

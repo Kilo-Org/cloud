@@ -4947,7 +4947,8 @@
     "unavailableTitle": "Gebruik is nie beskikbaar nie",
     "unavailableDescription": "Gebruik is nie vir hierdie werkruimte opgestel nie. Kontak ondersteuning as jy verwag om gebruik hier te sien.",
     "orgSelfNotice": "Jy sien jou eie gebruik in hierdie organisasie.",
-    "viewDetails": "Bekyk gebruiksbesonderhede"
+    "viewDetails": "Bekyk gebruiksbesonderhede",
+    "orgSelfEntryTitle": "Jou gebruik"
   },
   "integrations": {
     "title": "Integrasies",

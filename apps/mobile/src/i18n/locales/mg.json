@@ -4947,7 +4947,8 @@
     "unavailableTitle": "Tsy azo ny fampiasana",
     "unavailableDescription": "Tsy voalamina ho an'ity toeram-piasana ity ny fampiasana. Mifandraisa amin'ny ekipa mpanampy raha manantena ny hahita fampiasana eto ianao.",
     "orgSelfNotice": "Ny fampiasanao manokana ato amin'ity fikambanana ity no hitanao.",
-    "viewDetails": "Hijery ny antsipirian'ny fampiasana"
+    "viewDetails": "Hijery ny antsipirian'ny fampiasana",
+    "orgSelfEntryTitle": "Ny fampiasanao"
   },
   "integrations": {
     "title": "Fampifandraisana",

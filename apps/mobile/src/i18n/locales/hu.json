@@ -4947,7 +4947,8 @@
     "unavailableTitle": "A használat nem érhető el",
     "unavailableDescription": "Ehhez a munkaterülethez nincs beállítva a használat. Ha itt használati adatokat vár, forduljon az ügyfélszolgálathoz.",
     "orgSelfNotice": "A saját használatodat látod ebben a szervezetben.",
-    "viewDetails": "Használati részletek megtekintése"
+    "viewDetails": "Használati részletek megtekintése",
+    "orgSelfEntryTitle": "Saját használatod"
   },
   "integrations": {
     "title": "Integrációk",

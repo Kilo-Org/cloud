@@ -4947,7 +4947,8 @@
     "unavailableTitle": "Usage is unavailable",
     "unavailableDescription": "Usage isn't set up for this workspace. Contact support if you expect to see usage here.",
     "orgSelfNotice": "You're seeing your own usage in this organization.",
-    "viewDetails": "View usage details"
+    "viewDetails": "View usage details",
+    "orgSelfEntryTitle": "Your usage"
   },
   "integrations": {
     "title": "Integrations",

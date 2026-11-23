@@ -5041,7 +5041,8 @@
     "unavailableTitle": "Potrošnja nije dostupna",
     "unavailableDescription": "Potrošnja nije postavljena za ovaj radni prostor. Obratite se podršci ako očekujete da ćete ovdje vidjeti potrošnju.",
     "orgSelfNotice": "Prikazuje se vaša vlastita potrošnja u ovoj organizaciji.",
-    "viewDetails": "Prikaži detalje potrošnje"
+    "viewDetails": "Prikaži detalje potrošnje",
+    "orgSelfEntryTitle": "Vaša potrošnja"
   },
   "integrations": {
     "title": "Integracije",

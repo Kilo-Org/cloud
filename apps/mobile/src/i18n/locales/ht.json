@@ -4947,7 +4947,8 @@
     "unavailableTitle": "Itilizasyon pa disponib",
     "unavailableDescription": "Itilizasyon pa konfigire pou espas travay sa a. Kontakte sipò si ou panse ou ta dwe wè itilizasyon isit la.",
     "orgSelfNotice": "W ap wè pwòp itilizasyon pa w nan òganizasyon sa a.",
-    "viewDetails": "Wè detay itilizasyon"
+    "viewDetails": "Wè detay itilizasyon",
+    "orgSelfEntryTitle": "Itilizasyon ou"
   },
   "integrations": {
     "title": "Entegrasyon",

@@ -4947,7 +4947,8 @@
     "unavailableTitle": "Amfani ba ya samuwa",
     "unavailableDescription": "Ba a saita amfani a wannan sararin aiki ba. Tuntuɓi tallafi idan kuna sa ran ganin amfani a nan.",
     "orgSelfNotice": "Kuna ganin amfaninku na kanku a wannan ƙungiyar.",
-    "viewDetails": "Duba bayanan amfani"
+    "viewDetails": "Duba bayanan amfani",
+    "orgSelfEntryTitle": "Amfanin ku"
   },
   "integrations": {
     "title": "Haɗe-haɗe",

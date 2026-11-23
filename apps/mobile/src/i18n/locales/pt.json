@@ -5135,7 +5135,8 @@
     "unavailableTitle": "Utilização indisponível",
     "unavailableDescription": "A utilização não está configurada para esta área de trabalho. Contacte o suporte se espera ver a utilização aqui.",
     "orgSelfNotice": "Está a ver a sua própria utilização nesta organização.",
-    "viewDetails": "Ver detalhes de utilização"
+    "viewDetails": "Ver detalhes de utilização",
+    "orgSelfEntryTitle": "A sua utilização"
   },
   "integrations": {
     "title": "Integrações",

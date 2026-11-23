@@ -4947,7 +4947,8 @@
     "unavailableTitle": "Matumizi hayapatikani",
     "unavailableDescription": "Matumizi hayajawekwa kwa eneo hili la kazi. Wasiliana na timu ya usaidizi ikiwa unatarajia kuona matumizi hapa.",
     "orgSelfNotice": "Unaona matumizi yako mwenyewe katika shirika hili.",
-    "viewDetails": "Angalia maelezo ya matumizi"
+    "viewDetails": "Angalia maelezo ya matumizi",
+    "orgSelfEntryTitle": "Matumizi yako"
   },
   "integrations": {
     "title": "Miunganisho",

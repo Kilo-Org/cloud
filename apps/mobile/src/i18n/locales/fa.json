@@ -1603,6 +1603,7 @@
     "council": {
       "title": "بازبینی شورایی",
       "subtitle": "چند متخصص هر درخواست ادغام را بازبینی می‌کنند و آرای آن‌ها در یک تصمیم واحد ترکیب می‌شود.",
+      "enable": "فعال‌سازی شورا",
       "unavailablePersonallyTitle": "نیازمند سازمان Enterprise",
       "unavailablePersonally": "بازبینی شورایی بخشی از حساب شخصی نیست.",
       "unavailablePersonallyAction": "ایجاد سازمان",

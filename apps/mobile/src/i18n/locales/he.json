@@ -1045,6 +1045,7 @@
     "council": {
       "title": "סקירת מועצה",
       "subtitle": "כמה מומחים סוקרים כל בקשת משיכה, והקולות שלהם מצטרפים להחלטה אחת.",
+      "enable": "הפעלת המועצה",
       "unavailablePersonallyTitle": "נדרש ארגון Enterprise",
       "unavailablePersonally": "סקירת מועצה אינה חלק מחשבון אישי.",
       "unavailablePersonallyAction": "יצירת ארגון",

@@ -1603,6 +1603,7 @@
     "council": {
       "title": "Panelvurdering",
       "subtitle": "Flere spesialister vurderer hver PR, og stemmene deres kombineres til én avgjørelse.",
+      "enable": "Aktiver panel",
       "unavailablePersonallyTitle": "Trenger en Enterprise-organisasjon",
       "unavailablePersonally": "Panelvurdering er ikke en del av en personlig konto.",
       "unavailablePersonallyAction": "Opprett organisasjon",

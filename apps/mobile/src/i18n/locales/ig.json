@@ -1578,6 +1578,7 @@
     "council": {
       "title": "Nyocha otu ndị nyocha",
       "subtitle": "Ọtụtụ ndị ọkachamara na-enyocha PR ọ bụla, ntuli aka ha na-ejikọta ọnụ wee bụrụ otu mkpebi.",
+      "enable": "Gbanye otu ndị nyocha",
       "unavailablePersonallyTitle": "Ọ chọrọ ọgbakọ Enterprise",
       "unavailablePersonally": "Nyocha otu ndị nyocha abụghị akụkụ nke akaụntụ onwe onye.",
       "unavailablePersonallyAction": "Mepụta nzukọ",

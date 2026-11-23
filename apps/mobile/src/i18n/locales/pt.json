@@ -1663,6 +1663,7 @@
     "council": {
       "title": "Revisão do conselho",
       "subtitle": "Vários especialistas revêm cada pedido de integração e os votos deles combinam-se numa única decisão.",
+      "enable": "Ativar revisão do conselho",
       "unavailablePersonallyTitle": "Precisa de uma organização Enterprise",
       "unavailablePersonally": "A revisão do conselho não faz parte de uma conta pessoal.",
       "unavailablePersonallyAction": "Criar organização",

@@ -1603,6 +1603,7 @@
     "council": {
       "title": "Arotake kaunihera",
       "subtitle": "Ka arotakehia ia tono kume e ētahi mātanga maha, ā, ka whakakotahitia ō rātou pōti hei whakatau kotahi.",
+      "enable": "Whakahohea te kaunihera",
       "unavailablePersonallyTitle": "Me whai whakahaere Enterprise",
       "unavailablePersonally": "Kāore te arotake kaunihera i roto i tētahi pūkete takitahi.",
       "unavailablePersonallyAction": "Waihanga rōpū",

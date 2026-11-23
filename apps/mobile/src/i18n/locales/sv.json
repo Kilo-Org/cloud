@@ -1603,6 +1603,7 @@
     "council": {
       "title": "Rådsgranskning",
       "subtitle": "Flera experter granskar varje pull-begäran och deras röster kombineras till ett beslut.",
+      "enable": "Aktivera rådsgranskning",
       "unavailablePersonallyTitle": "Kräver en Enterprise-organisation",
       "unavailablePersonally": "Rådsgranskning ingår inte i ett personligt konto.",
       "unavailablePersonallyAction": "Skapa organisation",

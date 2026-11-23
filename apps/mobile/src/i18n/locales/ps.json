@@ -1603,6 +1603,7 @@
     "council": {
       "title": "د شورا بیاکتنه",
       "subtitle": "څو متخصصین هر پل ریکویسټ بیاکتنه کوي او د هغوی رایې په یوه پرېکړه کې یوځای کېږي.",
+      "enable": "د شورا بیاکتنه فعاله کړئ",
       "unavailablePersonallyTitle": "یو Enterprise سازمان ته اړتیا ده",
       "unavailablePersonally": "د شورا بیاکتنه د شخصي حساب برخه نه ده.",
       "unavailablePersonallyAction": "سازمان جوړ کړئ",

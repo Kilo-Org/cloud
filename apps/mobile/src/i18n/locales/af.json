@@ -1603,6 +1603,7 @@
     "council": {
       "title": "Raadhersiening",
       "subtitle": "Verskeie spesialiste hersien elke trekversoek, en hul stemme word tot een besluit saamgevoeg.",
+      "enable": "Aktiveer raad",
       "unavailablePersonallyTitle": "Benodig 'n Enterprise-organisasie",
       "unavailablePersonally": "Raadhersiening is nie deel van 'n persoonlike rekening nie.",
       "unavailablePersonallyAction": "Skep organisasie",

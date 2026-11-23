@@ -1603,6 +1603,7 @@
     "council": {
       "title": "Зөвлөлийн шалгалт",
       "subtitle": "Нэгтгэх хүсэлт бүрийг хэд хэдэн мэргэжилтэн шалгаж, тэдний санал нэг шийдвэрт нэгдэнэ.",
+      "enable": "Зөвлөлийг идэвхжүүлэх",
       "unavailablePersonallyTitle": "Enterprise байгууллага шаардлагатай",
       "unavailablePersonally": "Зөвлөлийн шалгалт нь хувийн дансны хэсэг биш юм.",
       "unavailablePersonallyAction": "Байгууллага үүсгэх",

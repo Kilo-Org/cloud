@@ -1041,6 +1041,7 @@
     "council": {
       "title": "Konsey incelemesi",
       "subtitle": "Birkaç uzman her çekme isteğini inceler ve oyları tek bir kararda birleşir.",
+      "enable": "Konsey incelemesini etkinleştir",
       "unavailablePersonallyTitle": "Enterprise kuruluşu gerekli",
       "unavailablePersonally": "Konsey incelemesi kişisel hesabın bir parçası değildir.",
       "unavailablePersonallyAction": "Kuruluş oluştur",

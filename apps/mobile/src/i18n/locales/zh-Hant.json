@@ -1037,6 +1037,7 @@
     "council": {
       "title": "審查小組審查",
       "subtitle": "多位專家分別審查每個提取要求，他們的投票會彙整成一項決定。",
+      "enable": "啟用審查小組審查",
       "unavailablePersonallyTitle": "需要 Enterprise 組織",
       "unavailablePersonally": "審查小組審查不包含在個人帳戶中。",
       "unavailablePersonallyAction": "建立組織",

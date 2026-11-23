@@ -1603,6 +1603,7 @@
     "council": {
       "title": "Ukuhlola komkhandlu",
       "subtitle": "Ochwepheshe abaningi bahlola i-PR ngayinye, futhi amavoti abo ahlangana abe yisinqumo esisodwa.",
+      "enable": "Vula ukuhlola komkhandlu",
       "unavailablePersonallyTitle": "Kudingeka inhlangano ye-Enterprise",
       "unavailablePersonally": "Ukuhlola komkhandlu akuyingxenye ye-akhawunti yomuntu siqu.",
       "unavailablePersonallyAction": "Dala inhlangano",

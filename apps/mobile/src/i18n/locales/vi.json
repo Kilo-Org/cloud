@@ -1041,6 +1041,7 @@
     "council": {
       "title": "Rà soát hội đồng",
       "subtitle": "Nhiều chuyên gia rà soát từng yêu cầu hợp nhất và phiếu của họ được tổng hợp thành một quyết định.",
+      "enable": "Bật rà soát hội đồng",
       "unavailablePersonallyTitle": "Cần một tổ chức Enterprise",
       "unavailablePersonally": "Rà soát hội đồng không thuộc tài khoản cá nhân.",
       "unavailablePersonallyAction": "Tạo tổ chức",

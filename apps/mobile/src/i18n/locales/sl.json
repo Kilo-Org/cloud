@@ -1663,6 +1663,7 @@
     "council": {
       "title": "Kolegijski pregled",
       "subtitle": "Vsak zahtevek za združitev pregleda več strokovnjakov, njihovi glasovi pa se združijo v eno odločitev.",
+      "enable": "Omogoči kolegijski pregled",
       "unavailablePersonallyTitle": "Potrebuje organizacijo Enterprise",
       "unavailablePersonally": "Kolegijski pregled ni del osebnega računa.",
       "unavailablePersonallyAction": "Ustvari organizacijo",

@@ -1603,6 +1603,7 @@
     "council": {
       "title": "Sakatta'a gumii",
       "subtitle": "Ogeessota hedduun PR tokkoon tokkoo sakatta'u, sagaleen isaanii immoo murtee tokko ta'a.",
+      "enable": "Sakatta'a gumii bani",
       "unavailablePersonallyTitle": "Dhaabbata Enterprise barbaachisa",
       "unavailablePersonally": "Sakatta'aan gumii waan hisaabii dhuunirraa ta'e miti.",
       "unavailablePersonallyAction": "Dhaabbata uumi",

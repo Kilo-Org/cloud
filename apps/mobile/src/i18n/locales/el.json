@@ -1603,6 +1603,7 @@
     "council": {
       "title": "Έλεγχος από συμβούλιο",
       "subtitle": "Πολλοί ειδικοί ελέγχουν κάθε pull request και οι ψήφοι τους συνδυάζονται σε μία απόφαση.",
+      "enable": "Ενεργοποίηση συμβουλίου",
       "unavailablePersonallyTitle": "Απαιτείται οργανισμός Enterprise",
       "unavailablePersonally": "Ο έλεγχος από συμβούλιο δεν αποτελεί μέρος ενός προσωπικού λογαριασμού.",
       "unavailablePersonallyAction": "Δημιουργία οργανισμού",

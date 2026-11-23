@@ -1603,6 +1603,7 @@
     "council": {
       "title": "Bitar majalisa",
       "subtitle": "Ƙwararru da dama suna bitar kowace buƙatar haɗawa, kuma ƙuri'unsu suna haɗuwa su zama shawara ɗaya.",
+      "enable": "Kunna majalisa",
       "unavailablePersonallyTitle": "Ana buƙatar ƙungiyar Enterprise",
       "unavailablePersonally": "Bitar majalisa ba wani ɓangare na asusun sirri ba.",
       "unavailablePersonallyAction": "Ƙirƙiri ƙungiya",

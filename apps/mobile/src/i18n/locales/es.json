@@ -1045,6 +1045,7 @@
     "council": {
       "title": "Revisión por consejo",
       "subtitle": "Varios especialistas revisan cada pull request y sus votos se combinan en una única decisión.",
+      "enable": "Activar el consejo",
       "unavailablePersonallyTitle": "Necesita una organización Enterprise",
       "unavailablePersonally": "La revisión por consejo no forma parte de una cuenta personal.",
       "unavailablePersonallyAction": "Crear una organización",

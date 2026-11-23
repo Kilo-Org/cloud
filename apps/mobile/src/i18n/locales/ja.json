@@ -1037,6 +1037,7 @@
     "council": {
       "title": "合議レビュー",
       "subtitle": "複数のスペシャリストが各プルリクエストをレビューし、その投票が1つの判定にまとめられます。",
+      "enable": "合議を有効にする",
       "unavailablePersonallyTitle": "Enterprise 組織が必要です",
       "unavailablePersonally": "合議レビューは個人アカウントには含まれません。",
       "unavailablePersonallyAction": "組織を作成",

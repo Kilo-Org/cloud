@@ -1603,6 +1603,7 @@
     "council": {
       "title": "समीक्षक मण्डल",
       "subtitle": "धेरै विशेषज्ञले प्रत्येक पुल रिक्वेस्टको समीक्षा गर्छन् र उनीहरूका मत एउटै निर्णयमा मिल्छन्.",
+      "enable": "मण्डल चालु गर्नुहोस्",
       "unavailablePersonallyTitle": "Enterprise संस्था चाहिन्छ",
       "unavailablePersonally": "समीक्षक मण्डल व्यक्तिगत खाताको भाग होइन।",
       "unavailablePersonallyAction": "संस्था सिर्जना गर्नुहोस्",

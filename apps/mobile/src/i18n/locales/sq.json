@@ -1603,6 +1603,7 @@
     "council": {
       "title": "Shqyrtimi nga këshilli",
       "subtitle": "Disa ekspertë shqyrtojnë çdo PR dhe votat e tyre bashkohen në një vendim të vetëm.",
+      "enable": "Aktivizo shqyrtimin nga këshilli",
       "unavailablePersonallyTitle": "Kërkon një organizatë Enterprise",
       "unavailablePersonally": "Shqyrtimi nga këshilli nuk është pjesë e një llogarie personale.",
       "unavailablePersonallyAction": "Krijo një organizatë",

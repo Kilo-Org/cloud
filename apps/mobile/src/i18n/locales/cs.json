@@ -1663,6 +1663,7 @@
     "council": {
       "title": "Kontrola radou",
       "subtitle": "Každý pull request zkontroluje několik specialistů a jejich hlasy se spojí do jednoho rozhodnutí.",
+      "enable": "Zapnout radu",
       "unavailablePersonallyTitle": "Vyžaduje organizaci Enterprise",
       "unavailablePersonally": "Kontrola radou není součástí osobního účtu.",
       "unavailablePersonallyAction": "Vytvořit organizaci",

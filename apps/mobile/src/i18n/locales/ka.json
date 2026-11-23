@@ -1603,6 +1603,7 @@
     "council": {
       "title": "საბჭოს შემოწმება",
       "subtitle": "რამდენიმე სპეციალისტი ამოწმებს ყოველ PR-ს და მათი ხმები ერთ გადაწყვეტილებად იკრიბება.",
+      "enable": "საბჭოს ჩართვა",
       "unavailablePersonallyTitle": "საჭიროა Enterprise ორგანიზაცია",
       "unavailablePersonally": "საბჭოს შემოწმება არ არის პირადი ანგარიშის ნაწილი.",
       "unavailablePersonallyAction": "ორგანიზაციის შექმნა",

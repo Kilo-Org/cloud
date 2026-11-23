@@ -273,6 +273,8 @@ const renderedTexts = (renderer: MountedRenderer) =>
 const specialistToggle = (title: string) =>
   state.toggleProps.findLast(props => props.title === title);
 
+const councilSwitch = () => state.toggleProps.findLast(props => props.title === 'Enable council');
+
 type LabelFieldProps = {
   value: string;
   onChangeText: (value: string) => void;
@@ -643,7 +645,7 @@ describe('council unit of write', () => {
     const mounted = await renderWithProviders(createElement(CouncilRoute));
     await act(() => undefined);
 
-    expect(specialistToggle('Council review')?.value).toBe(false);
+    expect(councilSwitch()?.value).toBe(false);
     // A repository opt-in is a multi-select choice row, and one only runs
     // against a stored council, so the row stays closed until the switch
     // stores one.
@@ -659,7 +661,7 @@ describe('council unit of write', () => {
     await act(() => undefined);
 
     await act(() => {
-      specialistToggle('Council review')?.onValueChange?.(true);
+      councilSwitch()?.onValueChange?.(true);
     });
 
     expect(state.save.mutate).toHaveBeenCalledTimes(1);
@@ -684,7 +686,7 @@ describe('council unit of write', () => {
     await act(() => undefined);
 
     await act(() => {
-      specialistToggle('Council review')?.onValueChange?.(false);
+      councilSwitch()?.onValueChange?.(false);
     });
 
     expect(state.save.mutate).toHaveBeenCalledTimes(1);

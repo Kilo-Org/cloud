@@ -1705,6 +1705,7 @@
     "council": {
       "title": "Council review",
       "subtitle": "Several specialists review each pull request, and their votes combine into one decision.",
+      "enable": "Enable council",
       "unavailablePersonallyTitle": "Needs an Enterprise organization",
       "unavailablePersonally": "Council review is not part of a personal account.",
       "unavailablePersonallyAction": "Create an organization",

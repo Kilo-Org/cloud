@@ -1041,6 +1041,7 @@
     "council": {
       "title": "काउंसिल समीक्षा",
       "subtitle": "कई विशेषज्ञ हर पुल रिक्वेस्ट की समीक्षा करते हैं, और उनके वोट मिलकर एक फ़ैसला बनाते हैं।",
+      "enable": "काउंसिल चालू करें",
       "unavailablePersonallyTitle": "Enterprise संगठन आवश्यक है",
       "unavailablePersonally": "काउंसिल समीक्षा व्यक्तिगत खाते का हिस्सा नहीं है।",
       "unavailablePersonallyAction": "संगठन बनाएँ",

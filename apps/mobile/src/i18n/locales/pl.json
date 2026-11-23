@@ -1049,6 +1049,7 @@
     "council": {
       "title": "Przegląd rady",
       "subtitle": "Każdy pull request przegląda kilku specjalistów, a ich głosy łączą się w jedną decyzję.",
+      "enable": "Włącz przegląd rady",
       "unavailablePersonallyTitle": "Wymaga organizacji Enterprise",
       "unavailablePersonally": "Przegląd rady nie jest częścią konta osobistego.",
       "unavailablePersonallyAction": "Utwórz organizację",

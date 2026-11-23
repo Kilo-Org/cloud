@@ -1603,6 +1603,7 @@
     "council": {
       "title": "Dib-u-eegista golaha",
       "subtitle": "Takhasusleyaal badan ayaa dib u eega PR kasta, codadkoodana waxay isu yimaadaan hal go'aan.",
+      "enable": "Shid dib-u-eegista golaha",
       "unavailablePersonallyTitle": "Waxay u baahan tahay hay'ad Enterprise",
       "unavailablePersonally": "Dib-u-eegista golaha qayb ka mid ah maaha akoon shaqsiyeed.",
       "unavailablePersonallyAction": "Samee urur",

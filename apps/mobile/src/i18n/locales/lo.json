@@ -1578,6 +1578,7 @@
     "council": {
       "title": "ການກວດສອບໂດຍຄະນະ",
       "subtitle": "ຜູ້ຊ່ຽວຊານຫຼາຍຄົນກວດສອບແຕ່ລະຄຳຂໍລວມໂຄ້ດ ແລະ ຄະແນນສຽງຂອງພວກເຂົາລວມເປັນການຕັດສິນດຽວ.",
+      "enable": "ເປີດໃຊ້ຄະນະ",
       "unavailablePersonallyTitle": "ຕ້ອງການອົງກອນ Enterprise",
       "unavailablePersonally": "ການກວດສອບໂດຍຄະນະບໍ່ແມ່ນສ່ວນໜຶ່ງຂອງບັນຊີສ່ວນຕົວ.",
       "unavailablePersonallyAction": "ສ້າງອົງກອນ",

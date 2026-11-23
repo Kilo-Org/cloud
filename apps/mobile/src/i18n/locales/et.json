@@ -1603,6 +1603,7 @@
     "council": {
       "title": "Nõukogu ülevaatus",
       "subtitle": "Iga tõmbetaotluse vaatavad üle mitu spetsialisti ja nende hääled liidetakse üheks otsuseks.",
+      "enable": "Luba nõukogu",
       "unavailablePersonallyTitle": "Vajab Enterprise'i organisatsiooni",
       "unavailablePersonally": "Nõukogu ülevaatus ei kuulu isikliku konto juurde.",
       "unavailablePersonallyAction": "Loo organisatsioon",

@@ -1041,6 +1041,7 @@
     "council": {
       "title": "Panelbeoordeling",
       "subtitle": "Meerdere deskundigen beoordelen elke PR en hun stemmen komen samen tot één beslissing.",
+      "enable": "Panelbeoordeling inschakelen",
       "unavailablePersonallyTitle": "Vereist een Enterprise-organisatie",
       "unavailablePersonally": "Panelbeoordeling maakt geen deel uit van een persoonlijk account.",
       "unavailablePersonallyAction": "Organisatie maken",

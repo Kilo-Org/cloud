@@ -1037,6 +1037,7 @@
     "council": {
       "title": "협의체 리뷰",
       "subtitle": "여러 전문가가 각 풀 리퀘스트를 리뷰하고, 그 투표가 하나의 결정으로 합쳐집니다.",
+      "enable": "협의체 활성화",
       "unavailablePersonallyTitle": "Enterprise 조직이 필요합니다",
       "unavailablePersonally": "협의체 리뷰는 개인 계정에 포함되지 않습니다.",
       "unavailablePersonallyAction": "조직 만들기",

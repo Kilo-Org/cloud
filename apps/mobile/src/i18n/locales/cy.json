@@ -1723,6 +1723,7 @@
     "council": {
       "title": "Adolygiad cyngor",
       "subtitle": "Mae sawl arbenigwr yn adolygu pob cais tynnu, ac mae eu pleidleisiau'n cyfuno'n un penderfyniad.",
+      "enable": "Galluogi'r cyngor",
       "unavailablePersonallyTitle": "Angen sefydliad Enterprise",
       "unavailablePersonally": "Nid yw adolygiad cyngor yn rhan o gyfrif personol.",
       "unavailablePersonallyAction": "Creu sefydliad",

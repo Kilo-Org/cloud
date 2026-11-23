@@ -1693,6 +1693,7 @@
     "council": {
       "title": "Reviżjoni tal-kunsill",
       "subtitle": "Diversi speċjalisti jirrevedu kull PR, u l-voti tagħhom jingħaqdu f'deċiżjoni waħda.",
+      "enable": "Attiva l-kunsill",
       "unavailablePersonallyTitle": "Jeħtieġ organizzazzjoni Enterprise",
       "unavailablePersonally": "Ir-reviżjoni tal-kunsill m'hijiex parti minn kont personali.",
       "unavailablePersonallyAction": "Oħloq organizazzjoni",

@@ -2813,7 +2813,7 @@
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
-      "maxNestingDepth": "İç-içə sessiyaların say həddinə çatılıb.",
+      "maxNestingDepth": "İç-içə sessiyaların maksimal dərinliyinə çatılıb.",
       "modelAccessibility": "İstifadə olunan model: {{modelLabel}}",
       "openHint": "Alt agentin sessiyasını aç",
       "subagent": "Alt agent",

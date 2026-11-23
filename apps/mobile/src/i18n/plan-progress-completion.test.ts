@@ -25,8 +25,12 @@ interface LocaleCase {
 }
 
 const locales: readonly LocaleCase[] = [
-  { tag: 'te', render: (done, total) => `ప్లాన్: ${total} దశల్లో ${done} పూర్తి` },
-  { tag: 'hi', render: (done, total) => `प्लान: ${total} में से ${done} पूर्ण` },
+  {
+    tag: 'te',
+    render: (done, total) => `ప్లాన్: ${total} దశల్లో ${done} పూర్తి`,
+    renderOne: (done, total) => `ప్లాన్: ${total} దశలో ${done} పూర్తి`,
+  },
+  { tag: 'hi', render: (done, total) => `प्लान: ${total} में से ${done} स्टेप पूर्ण` },
   { tag: 'pa', render: (done, total) => `ਯੋਜਨਾ: ${total} ਵਿੱਚੋਂ ${done} ਮੁਕੰਮਲ` },
   { tag: 'gu', render: (done, total) => `પ્લાન: ${total}માંથી ${done} પૂર્ણ` },
   { tag: 'mr', render: (done, total) => `योजना: ${total} पैकी ${done} पूर्ण` },

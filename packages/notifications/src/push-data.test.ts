@@ -492,6 +492,30 @@ describe('pushDataSchema active_agents_glanceable snapshot shape', () => {
     expect('organizationBound' in parsed).toBe(true);
     expect('accountEpoch' in parsed).toBe(false);
   });
+
+  it('refuses a contradictory newest-result pair and accepts the corrected one', () => {
+    // The push member applies the shared newest-result refiner, so a body that
+    // names a kind without its instant, or the reverse, is refused here too.
+    const contradictory = [
+      { ...fullSnapshot, newestResultAt: null },
+      { ...fullSnapshot, newestResultKind: null },
+    ];
+    for (const body of contradictory) {
+      const result = pushDataSchema.safeParse({ type: 'active_agents_glanceable', ...body });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues.map(issue => issue.path)).toContainEqual(['newestResultAt']);
+      }
+    }
+
+    // Both fields set, or both absent, describes a line the card can draw.
+    expect(
+      pushDataSchema.safeParse({ type: 'active_agents_glanceable', ...fullSnapshot }).success
+    ).toBe(true);
+    const { newestResultKind: _kind, newestResultAt: _at, ...withoutPair } = fullSnapshot;
+    const omitted = pushDataSchema.safeParse({ type: 'active_agents_glanceable', ...withoutPair });
+    expect(omitted.success).toBe(true);
+  });
 });
 
 describe('pushDataSchema session_live_update approvalKey', () => {

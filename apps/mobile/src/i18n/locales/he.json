@@ -2278,7 +2278,7 @@
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
-      "maxNestingDepth": "לא ניתן לפתוח סשנים נוספים ברמת קינון עמוקה יותר.",
+      "maxNestingDepth": "עומק הקינון המרבי הושג.",
       "modelAccessibility": "מודל: {{modelLabel}}",
       "openHint": "פתיחת הסשן של תת-הסוכן",
       "subagent": "תת-סוכן",

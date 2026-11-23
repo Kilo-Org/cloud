@@ -1,3 +1,12 @@
+import { ECS_TEST_CONFIG } from '../fixtures/aws-ecs.js';
+import { AWS_TEST_CONFIGURATION } from '../fixtures/aws-provider.js';
+import {
+  awsOperationStorage,
+  awsEcsOperationStorage,
+  readAwsEgressOperation,
+} from '../../src/control-plane/sandbox/aws-operation-storage.js';
+import { encodeAwsProviderRef } from '../../src/sandbox-control/aws-operation.js';
+import { encodeAwsEcsProviderRef } from '../../src/sandbox-control/aws-ecs-operation.js';
 import { env, reset, runInDurableObject } from 'cloudflare:test';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-do.js';
@@ -44,6 +53,56 @@ async function admittedSandbox() {
 }
 
 describe('AWS egress RPC transport', () => {
+  it('keeps engine operation checkpoints independent in actual durable storage', async () => {
+    const sandboxId = 'sbx_aws_engine_storage';
+    const stub = namespace.getByName(sandboxId);
+    await runInDurableObject(stub, async (instance, state) => {
+      await instance.getAllocationState();
+      const identity = { sandboxId, intentId: 'same-intent', createdAt: 1 };
+      const microvm = {
+        ref: { ...identity, provider: 'aws' as const },
+        config: AWS_TEST_CONFIGURATION,
+        phase: 'created' as const,
+      };
+      const ecs = {
+        ref: { ...identity, provider: 'aws-ecs' as const },
+        config: ECS_TEST_CONFIG,
+        phase: 'created' as const,
+      };
+      const legacyStorage = awsOperationStorage(state.storage);
+      const ecsStorage = awsEcsOperationStorage(state.storage);
+      await legacyStorage.update(identity.intentId, () => microvm);
+      await ecsStorage.update(identity.intentId, () => ecs);
+      expect(
+        await readAwsEgressOperation({
+          provider: 'aws',
+          providerRef: encodeAwsProviderRef(microvm.ref),
+          sandboxId,
+          storage: state.storage,
+        })
+      ).toEqual(microvm);
+      expect(
+        await readAwsEgressOperation({
+          provider: 'aws-ecs',
+          providerRef: encodeAwsEcsProviderRef(ecs.ref),
+          sandboxId,
+          storage: state.storage,
+        })
+      ).toEqual(ecs);
+      expect((await legacyStorage.list()).size).toBe(1);
+      expect((await ecsStorage.list()).size).toBe(1);
+      await legacyStorage.delete(identity.intentId);
+      expect(await ecsStorage.get(identity.intentId)).toEqual(ecs);
+      expect(
+        await readAwsEgressOperation({
+          provider: 'aws',
+          providerRef: encodeAwsProviderRef(microvm.ref),
+          sandboxId,
+          storage: state.storage,
+        })
+      ).toBeNull();
+    });
+  });
   it('initializes the actual sandbox and refuses absent allocation authority', async () => {
     const stub = namespace.getByName('sbx_aws_egress_absent');
     expect((await stub.getAwsEgressPolicy(invalidProof)).status).toBe(403);

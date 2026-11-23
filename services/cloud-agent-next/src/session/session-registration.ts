@@ -20,7 +20,10 @@ import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import type { WorkerDb } from '@kilocode/db/client';
 import { cli_sessions_v2, kilocode_users, operation_ledgers } from '@kilocode/db/schema';
-import { ByocAwsProviderError, fetchAwsByocConnection } from '../byoc/aws-credential-resolver.js';
+import {
+  ByocAwsProviderError,
+  fetchAwsProviderConnection,
+} from '../byoc/aws-credential-resolver.js';
 import {
   isSelectableSandboxAllocation,
   sandboxAllocationSchema,
@@ -1225,12 +1228,13 @@ async function allocateNewSession(
           credentialId: enrollment.credentialId,
         },
       };
-    } else if (sandboxProvider === 'aws') {
-      let connection: Awaited<ReturnType<typeof fetchAwsByocConnection>>;
+    } else if (sandboxProvider === 'aws' || sandboxProvider === 'aws-ecs') {
+      let connection: Awaited<ReturnType<typeof fetchAwsProviderConnection>>;
       try {
-        connection = await fetchAwsByocConnection(
+        connection = await fetchAwsProviderConnection(
           ctx.env,
-          orgId !== undefined ? { organizationId: orgId } : { userId: ctx.userId }
+          orgId !== undefined ? { organizationId: orgId } : { userId: ctx.userId },
+          sandboxProvider
         );
       } catch (error) {
         if (error instanceof ByocAwsProviderError && error.reason === 'byoc_credential_missing') {
@@ -1241,7 +1245,7 @@ async function allocateNewSession(
       if (connection.setupStatus !== 'ready')
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'byoc_aws_not_ready' });
       sandboxProviderBinding = {
-        kind: 'aws',
+        kind: sandboxProvider,
         source: {
           kind: 'byoc',
           ...byocVercelOwnerFields(connection),

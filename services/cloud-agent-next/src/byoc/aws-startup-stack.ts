@@ -1,13 +1,36 @@
 import { AwsRequestError } from '@kilocode/worker-utils/aws-client';
 import type { AwsStack } from '@kilocode/worker-utils/aws-cloudformation';
+import type { AwsEcsByocConfiguration } from '@kilocode/worker-utils/aws-ecs';
+import { assertAwsEcsAllocationStack } from './aws-ecs-stack-validation.js';
 import type { AwsByocConfiguration } from '@kilocode/worker-utils/aws-byoc';
 import { ByocAwsProviderError } from './aws-credential-resolver.js';
 import { assertAwsAllocationStack, AwsSetupError } from './aws-stack-validation.js';
 
 /** Safe reads may retry. Known version or resource mismatches fail before any compute request. */
-export async function validateAwsStartupStack(input: {
-  configuration: AwsByocConfiguration;
+type StartupStackInput<Config> = {
+  configuration: Config;
   read: (signal: AbortSignal) => Promise<AwsStack>;
+  pause?: (ms: number) => Promise<void>;
+};
+export function validateAwsStartupStack(
+  input: StartupStackInput<AwsByocConfiguration>
+): Promise<void> {
+  return validateStartupStack({
+    ...input,
+    check: stack => assertAwsAllocationStack(stack, input.configuration),
+  });
+}
+export function validateAwsEcsStartupStack(
+  input: StartupStackInput<AwsEcsByocConfiguration>
+): Promise<void> {
+  return validateStartupStack({
+    ...input,
+    check: stack => assertAwsEcsAllocationStack(stack, input.configuration),
+  });
+}
+async function validateStartupStack(input: {
+  read: (signal: AbortSignal) => Promise<AwsStack>;
+  check: (stack: AwsStack) => void;
   pause?: (ms: number) => Promise<void>;
 }): Promise<void> {
   const pause = input.pause ?? (ms => new Promise(resolve => setTimeout(resolve, ms)));
@@ -35,7 +58,7 @@ export async function validateAwsStartupStack(input: {
   }
   if (!stack) throw new ByocAwsProviderError('byoc_aws_not_ready');
   try {
-    assertAwsAllocationStack(stack, input.configuration);
+    input.check(stack);
   } catch (error) {
     if (error instanceof AwsSetupError) {
       if (

@@ -10,12 +10,15 @@ import {
   type ProviderAdapter,
   type ProviderLaunchResult,
   type ProviderStartup,
+  type ProviderDeadline,
 } from './provider.js';
 import { uploadAwsLaunchDocument, type AwsLaunchEnvelope } from './aws-launch-document.js';
 import { logger } from '../logger.js';
 
 /** Replay is bounded; neither engine promises permanent idempotency-token retention. */
 export const AWS_LAUNCH_RECOVERY_MS = 5 * 60_000;
+/** A replay claimed inside the bound finishes within this margin, so later lookups can prove absence. */
+export const AWS_ABSENCE_SETTLE_MS = 60_000;
 export type AwsComputeRef = { sandboxId: string; intentId: string; createdAt: number };
 export type AwsComputeOperation<Config, Ref extends AwsComputeRef, Request> = {
   ref: Ref;
@@ -38,7 +41,7 @@ export type AwsComputeStorage<Record> = {
 };
 export type AwsComputeAdapter = ProviderAdapter & {
   reconcileLaunch(ref: string): Promise<ProviderLaunchResult | undefined>;
-  lifetimeDeadlineAt(ref: string): Promise<number | undefined>;
+  allocationDeadline(ref: string): Promise<ProviderDeadline | undefined>;
   confirmAdmission(ref: string): Promise<void>;
   validateWrapperAdmission(ref: string): Promise<void>;
 };
@@ -55,6 +58,8 @@ export type AwsPrepareSnapshot<Config, Ref> = (input: {
  * wrapper admission rejects until a later inspection is `active`. `stopping` and `terminal` stop.
  */
 export type AwsComputeStatus = 'active' | 'pending' | 'stopping' | 'terminal' | 'unknown';
+/** `absent` is a complete lookup that found no live allocation. Only the lifecycle decides if it is final. */
+export type AwsDiscovery = { status: 'identified'; physicalId: string } | { status: 'absent' };
 
 const PHASE_TRANSITIONS: Record<
   AwsComputeOperation<unknown, AwsComputeRef, unknown>['phase'],
@@ -182,11 +187,13 @@ export function createAwsComputeLifecycle<
       ref: Ref,
       envelope: AwsLaunchEnvelope
     ): Promise<{ request: Request; deadlineAt?: number }>;
-    discover?(value: AwsComputeOperation<Config, Ref, Request>): Promise<string | undefined>;
+    deadline?(value: AwsComputeOperation<Config, Ref, Request>): ProviderDeadline | undefined;
+    discover?(value: AwsComputeOperation<Config, Ref, Request>): Promise<AwsDiscovery | undefined>;
     runner(config: Config): Promise<(request: Request) => Promise<string>>;
     isDefiniteRunRejection(error: unknown): boolean;
     inspect(value: AwsComputeOperation<Config, Ref, Request>): Promise<AwsComputeStatus>;
-    stop(config: Config, physicalId: string): Promise<'terminal' | 'retryable'>;
+    /** `absent` means the engine no longer knows the identity. It is not evidence for a recent launch. */
+    stop(config: Config, physicalId: string): Promise<'terminal' | 'retryable' | 'absent'>;
   };
   describeRuntime?: ProviderAdapter['describeRuntime'];
   now?: () => number;
@@ -236,15 +243,29 @@ export function createAwsComputeLifecycle<
         .warn('AWS launch document cleanup failed after a confirmed stop');
     }
   }
+  const settled = (value: Operation) =>
+    value.requestAt !== undefined &&
+    now() - value.requestAt > AWS_LAUNCH_RECOVERY_MS + AWS_ABSENCE_SETTLE_MS;
   async function recoverExpired(value: Operation): Promise<Operation> {
     if (awsRecoveryStep(value, now()) !== 'blocked') return value;
-    const physicalId = await deps.engine.discover?.(value);
+    const found = await deps.engine.discover?.(value);
     // Recheck storage after discovery. Another caller may already have found or stopped the task.
-    value = await change(value, current =>
-      physicalId
-        ? transitionAwsOperation(current, { type: 'identified', physicalId }, now())
-        : current
-    );
+    value = await change(value, current => {
+      if (found?.status === 'identified')
+        return transitionAwsOperation(
+          current,
+          { type: 'identified', physicalId: found.physicalId },
+          now()
+        );
+      // No replay can start after the bound, so a settled absence means no compute exists.
+      if (
+        found?.status === 'absent' &&
+        awsRecoveryStep(current, now()) === 'blocked' &&
+        settled(current)
+      )
+        return transitionAwsOperation(current, { type: 'terminated' }, now());
+      return current;
+    });
     if (awsRecoveryStep(value, now()) === 'blocked')
       throw new ProviderCreationError('cleanup_required');
     return value;
@@ -254,10 +275,10 @@ export function createAwsComputeLifecycle<
     if (!value.request || value.requestAt === undefined)
       throw new ProviderCreationError('invalid_configuration');
     value = await recoverExpired(value);
-    if (value.physicalId) return value;
+    if (value.physicalId || value.phase === 'terminated') return value;
     const run = await deps.engine.runner(value.config);
     value = await recoverExpired(await operation(codec.encodeRef(value.ref)));
-    if (value.physicalId) return value;
+    if (value.physicalId || value.phase === 'terminated') return value;
     value = await change(value, current =>
       transitionAwsOperation(current, { type: 'claim' }, now())
     );
@@ -293,6 +314,7 @@ export function createAwsComputeLifecycle<
     if (value.phase === 'stopping' || value.phase === 'terminated')
       throw new Error('AWS allocation is stopping');
     value = await recover(value);
+    if (value.phase === 'terminated') throw new ProviderStoppedError();
     const status = await deps.engine.inspect(value);
     if (status === 'terminal' || status === 'stopping') throw new ProviderStoppedError();
     value = await change(value, current =>
@@ -469,11 +491,12 @@ export function createAwsComputeLifecycle<
         );
         if (value.request && value.submission !== 'prepared') {
           value = await recover(value);
-          if (
-            !value.physicalId ||
-            (await deps.engine.stop(value.config, value.physicalId)) !== 'terminal'
-          )
-            return 'retryable';
+          if (value.phase !== 'terminated') {
+            if (!value.physicalId) return 'retryable';
+            const stopped = await deps.engine.stop(value.config, value.physicalId);
+            if (stopped === 'retryable' || (stopped === 'absent' && !settled(value)))
+              return 'retryable';
+          }
         }
         // Persist confirmed termination before fallible object cleanup.
         await change(value, current =>
@@ -492,8 +515,12 @@ export function createAwsComputeLifecycle<
       if (value.deadlineAt !== undefined && now() + ms >= value.deadlineAt)
         throw new Error('AWS allocation lifetime cannot be extended');
     },
-    async lifetimeDeadlineAt(ref) {
-      return (await operation(ref)).deadlineAt;
+    async allocationDeadline(ref) {
+      const value = await operation(ref);
+      if (deps.engine.deadline) return deps.engine.deadline(value);
+      return value.deadlineAt === undefined
+        ? undefined
+        : { at: value.deadlineAt, reason: 'provider_lifetime_exhausted' };
     },
     async validateWrapperAdmission(ref) {
       let value = await operation(ref);

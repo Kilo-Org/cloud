@@ -33,7 +33,9 @@ export type ScmAdmissionDependencies<C extends ScmAdmissionContext = ScmAdmissio
   readContext: () => Promise<C>;
   authenticate: (context: C) => Promise<ScmIdentityVerification>;
 };
-function sessionContext<C extends ScmAdmissionContext>(context: C): SessionContext<C> {
+export function sessionScmAdmissionContext<C extends ScmAdmissionContext>(
+  context: C
+): SessionContext<C> {
   return {
     ...context,
     allocation: {
@@ -44,9 +46,10 @@ function sessionContext<C extends ScmAdmissionContext>(context: C): SessionConte
     grants: context.grants.filter(hasRuntimeCredentialProxy),
   };
 }
-const memberIds = (grant: SessionCredentialGrant) => grant.members.map(member => member.sessionId);
+export const sessionScmMemberIds = (grant: SessionCredentialGrant) =>
+  grant.members.map(member => member.sessionId);
 export function activeScmGrants(context: ScmAdmissionContext, now: number) {
-  return activeScopedScmGrants(sessionContext(context), now, memberIds);
+  return activeScopedScmGrants(sessionScmAdmissionContext(context), now, sessionScmMemberIds);
 }
 /** Provider adapters keep their identity contract. The SCM-only core owns repository rules. */
 export function admitScmRequest<C extends ScmAdmissionContext>(
@@ -55,7 +58,7 @@ export function admitScmRequest<C extends ScmAdmissionContext>(
 ): Promise<ControlPlaneScmForwardAdmissionResult> {
   return admitScopedScmRequest<SessionCredentialGrant, SessionContext<C>>(input, {
     ...deps,
-    memberIds,
-    readContext: async () => sessionContext(await deps.readContext()),
+    memberIds: sessionScmMemberIds,
+    readContext: async () => sessionScmAdmissionContext(await deps.readContext()),
   });
 }

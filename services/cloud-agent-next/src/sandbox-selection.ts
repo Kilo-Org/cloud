@@ -107,6 +107,8 @@ export function sandboxAllocationUnavailableReason(
   if (capabilityReason) return capabilityReason;
   const provider = getSandboxAllocationProvider(allocation);
   switch (provider) {
+    case 'aws-ecs':
+      return 'AWS ECS setup is not available yet';
     case 'aws':
       return enrolledByocOwner(env.BYOC_AWS_IDS, owner) === undefined
         ? 'Configure AWS BYOC in Cloud Agent settings to use AWS compute'

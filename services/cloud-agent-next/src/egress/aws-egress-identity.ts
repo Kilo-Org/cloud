@@ -3,59 +3,82 @@ import { withTimeout } from '@kilocode/worker-utils';
 import {
   AWS_EGRESS_POLICY_REFRESH_MS,
   AWS_EGRESS_POLICY_TTL_MS,
-  type AwsEgressClaims,
 } from '@kilocode/worker-utils/aws-egress';
+import type { AwsEgressClaims } from '@kilocode/worker-utils/aws-egress';
+import type { AwsEcsByocConfiguration } from '@kilocode/worker-utils/aws-ecs';
+import type { AwsEcsOperation } from '../sandbox-control/aws-ecs-operation.js';
+import { encodeAwsEcsProviderRef } from '../sandbox-control/aws-ecs-operation.js';
+import { resolveAwsEcsByocConfiguration } from '../byoc/aws-ecs-credential-resolver.js';
 import type { AwsByocConfiguration } from '@kilocode/worker-utils/aws-byoc';
 import { resolveSecret } from '../auth.js';
 import { resolveAwsByocConfiguration } from '../byoc/aws-credential-resolver.js';
-import { createAwsRuntimeAccessResolver } from '../byoc/aws-runtime-access.js';
-import { readPinnedAwsProxyDeployment, type AwsProxyMetadata } from '../byoc/aws-proxy.js';
+import { createAwsRoleSessionCache } from '../byoc/aws-runtime-access.js';
+import { awsAccountAccess } from '../byoc/aws-account-access.js';
+import { readPinnedAwsProxyDeployment } from '../byoc/aws-proxy.js';
+import type { AwsProxyMetadata } from '../byoc/aws-proxy.js';
 import type { ByocSource } from '../byoc/owner.js';
-import { encodeAwsProviderRef, type AwsOperation } from '../sandbox-control/aws-operation.js';
+import type { AwsOperation } from '../sandbox-control/aws-operation.js';
+import { encodeAwsProviderRef } from '../sandbox-control/aws-operation.js';
 import { sandboxCredentialMatchesHash } from '../sandbox-control/credential.js';
-import type { ScmAdmissionContext, ScmAdmissionDependencies } from '../scm-broker/admission.js';
+import {
+  type ScopedScmGrant,
+  type ScopedScmAdmissionContext,
+  type ScopedScmAdmissionDependencies,
+} from '../scm-broker/scoped-admission.js';
 import type { Env } from '../types.js';
-import { verifyAwsEgressCredential } from './aws-credential.js';
 import { AwsEgressAdmissionError as AdmissionFailure } from './aws-egress-error.js';
 
+export type AwsEgressConfiguration = AwsByocConfiguration | AwsEcsByocConfiguration;
+export type AwsEgressOperation = AwsOperation | (AwsEcsOperation & { deadlineAt?: never });
+
 export type AwsEgressProof = { credential: string; identity: string };
-export type AwsEgressContext = ScmAdmissionContext & {
+export type AwsScopedEgressContext<G extends ScopedScmGrant> = ScopedScmAdmissionContext<G> & {
   byoc?: ByocSource;
-  operation: AwsOperation | null;
+  operation: AwsEgressOperation | null;
   credentialHash?: string;
   allowlist?: readonly string[];
   audit: boolean;
 };
-type IssuedContext = AwsEgressContext & {
+export type AwsEgressIdentityClaims = Pick<
+  AwsEgressClaims,
+  'sandboxId' | 'allocationId' | 'credential' | 'generation' | 'stackId' | 'exp'
+>;
+type IssuedContext<C> = C & {
   byoc: ByocSource;
   credentialHash: string;
-  operation: AwsOperation & {
-    config: AwsByocConfiguration & { proxy: NonNullable<AwsByocConfiguration['proxy']> };
-    deadlineAt: number;
+  operation: AwsEgressOperation & {
+    config: AwsEgressConfiguration & { proxy: NonNullable<AwsByocConfiguration['proxy']> };
+    deadlineAt?: number;
   };
 };
-function issued(context: AwsEgressContext, now: number): context is IssuedContext {
+function encodeOperationRef(ref: AwsEgressOperation['ref']): string {
+  return ref.provider === 'aws' ? encodeAwsProviderRef(ref) : encodeAwsEcsProviderRef(ref);
+}
+function issued<G extends ScopedScmGrant, C extends AwsScopedEgressContext<G>>(
+  context: C,
+  now: number
+): context is IssuedContext<C> {
   const operation = context.operation;
   return Boolean(
     context.available &&
-    context.provider === 'aws' &&
+    context.provider === operation?.ref.provider &&
     context.containmentEnabled &&
     context.ownerId &&
     context.byoc &&
     context.credentialHash &&
     operation?.config.proxy &&
+    operation.ref.sandboxId === context.sandboxId &&
     (context.byoc.userId === undefined || context.byoc.userId === context.ownerId) &&
-    context.allocation.kind !== 'stopped' &&
-    context.allocation.kind !== 'stopping' &&
+    context.allocation.active &&
     context.allocation.allocationId === operation.ref.intentId &&
-    context.allocation.providerRef === encodeAwsProviderRef(operation.ref) &&
+    context.allocation.providerRef === encodeOperationRef(operation.ref) &&
     (operation.phase === 'launching' || operation.phase === 'running') &&
     operation.request &&
-    operation.deadlineAt !== undefined &&
-    operation.deadlineAt > now
+    (operation.ref.provider !== 'aws' ||
+      (operation.deadlineAt !== undefined && operation.deadlineAt > now))
   );
 }
-function binding(context: AwsEgressContext) {
+function binding<G extends ScopedScmGrant>(context: AwsScopedEgressContext<G>) {
   return JSON.stringify([
     context.sandboxId,
     context.ownerId,
@@ -66,27 +89,40 @@ function binding(context: AwsEgressContext) {
     context.byoc,
     context.credentialHash,
     context.operation?.config,
+    context.identityBinding,
   ]);
 }
 
-export type AwsEgressIdentityDeps = {
+/** Owns AWS identity only. Shared SCM admission remains the owner of repository and credential rules. */
+export function createAwsEgressIdentity<
+  G extends ScopedScmGrant,
+  C extends AwsScopedEgressContext<G>,
+>(deps: {
   env: Env;
-  serial: ScmAdmissionDependencies['serial'];
-  readContext: () => Promise<AwsEgressContext>;
-  resolveConfiguration?: (source: ByocSource) => Promise<AwsByocConfiguration>;
-  readMetadata?: (configuration: AwsByocConfiguration) => Promise<AwsProxyMetadata>;
+  serial: ScopedScmAdmissionDependencies<G, C>['serial'];
+  readContext: () => Promise<C>;
+  verifyCredential(
+    token: string,
+    secret: string,
+    context: C,
+    now: number
+  ): AwsEgressIdentityClaims | null;
+  resolveConfiguration?: (
+    source: ByocSource,
+    provider: 'aws' | 'aws-ecs'
+  ) => Promise<AwsEgressConfiguration>;
+  readMetadata?: (configuration: AwsEgressConfiguration) => Promise<AwsProxyMetadata>;
   signingSecret?: () => Promise<string | undefined>;
   now?: () => number;
-};
-
-/** Owns proof verification and current allocation binding for every AWS egress endpoint. */
-export function createAwsEgressIdentity(deps: AwsEgressIdentityDeps) {
+}) {
   const now = deps.now ?? Date.now;
-  const access = createAwsRuntimeAccessResolver(deps.env);
+  const access = createAwsRoleSessionCache((configuration: AwsEgressConfiguration) =>
+    awsAccountAccess(deps.env, configuration)
+  );
   // One admission owner retains at most one deployment cache entry. Current owner
   // authorization is never cached, and failed reads cannot use stale metadata.
   let deployment: { key: string; validUntil: number; value: Promise<AwsProxyMetadata> } | undefined;
-  async function readDeployment(config: AwsByocConfiguration, source: ByocSource) {
+  async function readDeployment(config: AwsEgressConfiguration, source: ByocSource) {
     const key = JSON.stringify([source, config]);
     const startedAt = now();
     if (deployment?.key === key && startedAt < deployment.validUntil) return deployment.value;
@@ -110,7 +146,8 @@ export function createAwsEgressIdentity(deps: AwsEgressIdentityDeps) {
     }
   }
 
-  const readContext = async () => {
+  type BoundContext = C & { organizationId: string | undefined; identityBinding: string };
+  const readContext = async (): Promise<BoundContext> => {
     const context = await deps.readContext();
     return {
       ...context,
@@ -118,7 +155,7 @@ export function createAwsEgressIdentity(deps: AwsEgressIdentityDeps) {
       identityBinding: binding(context),
     };
   };
-  async function authenticate(context: AwsEgressContext, proof: AwsEgressProof) {
+  async function authenticate(context: C, proof: AwsEgressProof) {
     if (!issued(context, now())) throw new AdmissionFailure(403, 'allocation_unavailable');
     if (
       typeof proof?.credential !== 'string' ||
@@ -132,7 +169,7 @@ export function createAwsEgressIdentity(deps: AwsEgressIdentityDeps) {
       1_000,
       'AWS egress signer unavailable'
     );
-    const claims = secret ? verifyAwsEgressCredential(proof.credential, secret, now()) : null;
+    const claims = secret ? deps.verifyCredential(proof.credential, secret, context, now()) : null;
     const config = context.operation.config;
     if (
       !claims ||
@@ -145,8 +182,10 @@ export function createAwsEgressIdentity(deps: AwsEgressIdentityDeps) {
       throw new AdmissionFailure(401, 'invalid_identity');
     // A cached STS session never replaces the current owner/connection authorization read.
     const current = await (deps.resolveConfiguration
-      ? deps.resolveConfiguration(context.byoc)
-      : resolveAwsByocConfiguration(deps.env, context.byoc));
+      ? deps.resolveConfiguration(context.byoc, context.operation.ref.provider)
+      : context.operation.ref.provider === 'aws'
+        ? resolveAwsByocConfiguration(deps.env, context.byoc)
+        : resolveAwsEcsByocConfiguration(deps.env, context.byoc));
     if (JSON.stringify(current) !== JSON.stringify(config))
       throw new AdmissionFailure(403, 'connection_changed');
     const metadata = await readDeployment(config, context.byoc);
@@ -155,13 +194,13 @@ export function createAwsEgressIdentity(deps: AwsEgressIdentityDeps) {
     const expiresAt = Math.min(
       claims.exp * 1000,
       Date.parse(metadata.deployment.expiresAt),
-      context.operation.deadlineAt
+      context.operation.deadlineAt ?? Infinity
     );
     if (expiresAt <= now()) throw new AdmissionFailure(403, 'identity_expired');
     return { claims, expiresAt, initialBinding: binding(context) };
   }
   async function current(identity: {
-    claims: AwsEgressClaims;
+    claims: AwsEgressIdentityClaims;
     expiresAt: number;
     initialBinding: string;
   }) {
@@ -177,7 +216,7 @@ export function createAwsEgressIdentity(deps: AwsEgressIdentityDeps) {
   async function accepted<T>(
     proof: AwsEgressProof,
     operation: (
-      context: IssuedContext,
+      context: IssuedContext<BoundContext>,
       identity: Awaited<ReturnType<typeof authenticate>>
     ) => Promise<T>
   ) {
@@ -187,10 +226,13 @@ export function createAwsEgressIdentity(deps: AwsEgressIdentityDeps) {
   }
   function withCurrent<T>(
     identity: Awaited<ReturnType<typeof authenticate>>,
-    action: (context: IssuedContext) => T | Promise<T>
+    action: (context: IssuedContext<BoundContext>) => T | Promise<T>
   ) {
     return deps.serial(async () => action(await current(identity)));
   }
   return { authenticate, accepted, withCurrent, readContext, serial: deps.serial, now };
 }
-export type AwsEgressIdentity = ReturnType<typeof createAwsEgressIdentity>;
+export type AwsEgressIdentity<
+  G extends ScopedScmGrant,
+  C extends AwsScopedEgressContext<G>,
+> = ReturnType<typeof createAwsEgressIdentity<G, C>>;

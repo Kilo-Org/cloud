@@ -1,8 +1,7 @@
 /** This module owns AWS sandbox egress context assembly. */
 import type { Env } from '../types.js';
 import type { ByocSource } from '../byoc/owner.js';
-import { awsOperationSchema, decodeAwsProviderRef } from '../sandbox-control/aws-operation.js';
-import { awsOperationStorage } from '../control-plane/sandbox/aws-operation-storage.js';
+import { readAwsEgressOperation } from '../control-plane/sandbox/aws-operation-storage.js';
 import type { ScmAdmissionContext, ScmAdmissionDependencies } from '../scm-broker/admission.js';
 import { createAwsEgressAdmission } from './aws-admission.js';
 import { buildNativeEgressAllowlist } from '../sandbox-control/egress-policy.js';
@@ -15,21 +14,21 @@ export function createAwsSandboxEgress(deps: {
   env: Env;
   admission: Pick<ScmAdmissionDependencies, 'serial' | 'resolve' | 'persist'>;
   readContext(): Promise<SandboxContext>;
-  operationStorage: Parameters<typeof awsOperationStorage>[0];
+  operationStorage: Parameters<typeof readAwsEgressOperation>[0]['storage'];
   readCredentialHash(): Promise<string | undefined>;
   readPolicy(): { allowlist?: readonly string[]; audit: boolean };
 }) {
-  const operations = awsOperationStorage(deps.operationStorage);
   return createAwsEgressAdmission({
     env: deps.env,
     ...deps.admission,
     readContext: async () => {
       const context = await deps.readContext();
-      const ref = decodeAwsProviderRef(context.allocation.providerRef);
-      const operation =
-        ref?.sandboxId === context.sandboxId
-          ? (awsOperationSchema.safeParse(await operations.get(ref.intentId)).data ?? null)
-          : null;
+      const operation = await readAwsEgressOperation({
+        provider: context.provider,
+        providerRef: context.allocation.providerRef,
+        sandboxId: context.sandboxId,
+        storage: deps.operationStorage,
+      });
       const policy = deps.readPolicy();
       // The stored request pin stays immutable. Compute-specific routing uses the same allowlist owner.
       const allowlist =
@@ -44,7 +43,7 @@ export function createAwsSandboxEgress(deps: {
             });
       return {
         ...context,
-        available: context.provider === 'aws',
+        available: context.provider === 'aws' || context.provider === 'aws-ecs',
         identityBinding: '',
         operation,
         credentialHash: await deps.readCredentialHash(),

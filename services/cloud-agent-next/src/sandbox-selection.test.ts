@@ -219,6 +219,10 @@ describe('sandbox selection policy', () => {
         await expect(assertSandboxAllocationAvailable(env, owner, preset)).rejects.toThrow(
           'Configure AWS BYOC'
         );
+      else if (preset === 'aws-ecs-8g')
+        await expect(assertSandboxAllocationAvailable(env, owner, preset)).rejects.toThrow(
+          'AWS ECS setup is not available yet'
+        );
       else if (preset === 'cloudflare-shared' || preset === 'isolated-standard')
         await expect(assertSandboxAllocationAvailable(env, owner, preset)).rejects.toThrow(
           'has been retired'

@@ -1,4 +1,13 @@
 'use client';
+import { useAwsComputeAccess } from '@/hooks/useAwsComputeAccess';
+import type { AwsSetupProvider } from '@kilocode/worker-utils/aws-onboarding';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useEffect, useId, useState, type FormEvent } from 'react';
 import { ExternalLink, Loader2 } from 'lucide-react';
 import { useAwsComputeData } from '@/hooks/useAwsComputeData';
@@ -20,15 +29,33 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
 export function AwsComputeSettings({ organizationId }: { organizationId?: string }) {
-  return <AwsComputeForm key={organizationId ?? 'personal'} organizationId={organizationId} />;
+  const [provider, setProvider] = useState<AwsSetupProvider>('aws');
+  const hasAccess = useAwsComputeAccess({ organizationId, enabled: true });
+  if (!hasAccess) return null;
+  return (
+    <AwsComputeForm
+      key={`${organizationId ?? 'personal'}:${provider}`}
+      organizationId={organizationId}
+      provider={provider}
+      onProviderChange={setProvider}
+    />
+  );
 }
-function AwsComputeForm({ organizationId }: { organizationId?: string }) {
+function AwsComputeForm({
+  organizationId,
+  provider,
+  onProviderChange,
+}: {
+  organizationId?: string;
+  provider: AwsSetupProvider;
+  onProviderChange: (provider: AwsSetupProvider) => void;
+}) {
   const id = useId();
   const [accountId, setAccountId] = useState('');
   const [roleArn, setRoleArn] = useState('');
   const [accountTouched, setAccountTouched] = useState(false);
   const [discardOpen, setDiscardOpen] = useState(false);
-  const data = useAwsComputeData(organizationId);
+  const data = useAwsComputeData(provider, organizationId);
   const status = data.status.data;
   const busy =
     data.prepare.isPending ||
@@ -79,7 +106,6 @@ function AwsComputeForm({ organizationId }: { organizationId?: string }) {
     if (value) data.validate.mutate(value);
   }
 
-  if (data.enrollment.isSuccess && !enrolled && data.status.isSuccess && !status) return null;
   return (
     <Card className="min-w-0">
       <CardHeader>
@@ -96,6 +122,29 @@ function AwsComputeForm({ organizationId }: { organizationId?: string }) {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        <div className="space-y-1.5">
+          <Label htmlFor={`${id}-provider`}>AWS provider</Label>
+          <Select
+            value={provider}
+            disabled={busy}
+            onValueChange={value => {
+              if (value === 'aws' || value === 'aws-ecs') onProviderChange(value);
+            }}
+          >
+            <SelectTrigger id={`${id}-provider`} className="min-h-11 w-full sm:min-h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="aws">Lambda MicroVM</SelectItem>
+              <SelectItem value="aws-ecs">EC2 · ECS isolated tasks</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-muted-foreground text-xs">
+            {provider === 'aws'
+              ? 'Sandboxes can run for up to eight hours.'
+              : 'Removes the eight-hour limit. AWS host maintenance and proxy certificate expiry can still stop a sandbox.'}
+          </p>
+        </div>
         {data.status.isPending || data.enrollment.isPending ? (
           <p className="text-muted-foreground text-sm" role="status">
             Loading AWS settings…
@@ -126,7 +175,9 @@ function AwsComputeForm({ organizationId }: { organizationId?: string }) {
             )}
             {!enrolled && (
               <p className="text-muted-foreground text-sm">
-                This connection remains saved. Contact Kilo to enable AWS compute.
+                {status
+                  ? 'This connection remains saved. Contact Kilo to enable AWS compute.'
+                  : 'This AWS provider is not enabled. Select another provider or contact Kilo.'}
               </p>
             )}
             {status?.state === 'ready' ? (

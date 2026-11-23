@@ -1,22 +1,23 @@
 import type { AwsByocConfiguration } from '@kilocode/worker-utils/aws-byoc';
+import type { AwsEcsByocConfiguration } from '@kilocode/worker-utils/aws-ecs';
 import type { Env } from '../types.js';
 import { awsRuntimeAccess } from './aws-credential-resolver.js';
+import { awsEcsRuntimeAccess } from './aws-ecs-credential-resolver.js';
 
-/** Cache role sessions inside one owner. Current connection authorization stays with each caller. */
-export function createAwsRuntimeAccessResolver(env: Env) {
-  let cached: Awaited<ReturnType<typeof awsRuntimeAccess>> | undefined;
-  let pending: Promise<Awaited<ReturnType<typeof awsRuntimeAccess>>> | undefined;
+/** Cache role sessions inside one owner. Each caller still checks current connection authorization. */
+export function createAwsRoleSessionCache<
+  Config,
+  Access extends { config: Config; expiresAt: number },
+>(resolve: (config: Config) => Promise<Access>, now = Date.now) {
+  let cached: Access | undefined;
+  let pending: Promise<Access> | undefined;
   let pendingKey: string | undefined;
-  return async (configuration: AwsByocConfiguration) => {
+  return async (configuration: Config) => {
     const key = JSON.stringify(configuration);
-    if (
-      cached &&
-      JSON.stringify(cached.config) === key &&
-      cached.expiresAt > Date.now() + 15 * 60_000
-    )
+    if (cached && JSON.stringify(cached.config) === key && cached.expiresAt > now() + 15 * 60_000)
       return cached;
     if (pending && pendingKey === key) return pending;
-    const request = awsRuntimeAccess(env, configuration);
+    const request = resolve(configuration);
     pending = request;
     pendingKey = key;
     try {
@@ -30,4 +31,14 @@ export function createAwsRuntimeAccessResolver(env: Env) {
       }
     }
   };
+}
+export function createAwsRuntimeAccessResolver(env: Env) {
+  return createAwsRoleSessionCache((configuration: AwsByocConfiguration) =>
+    awsRuntimeAccess(env, configuration)
+  );
+}
+export function createAwsEcsRuntimeAccessResolver(env: Env) {
+  return createAwsRoleSessionCache((configuration: AwsEcsByocConfiguration) =>
+    awsEcsRuntimeAccess(env, configuration)
+  );
 }

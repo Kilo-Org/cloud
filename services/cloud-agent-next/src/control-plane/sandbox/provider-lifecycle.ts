@@ -4,17 +4,21 @@ import type {
   ControlPlaneFailureReason,
   ControlPlaneWrapperFrame,
 } from '../../shared/control-plane-protocol.js';
-import type { ProviderAdapter, ProviderLaunchResult } from '../../sandbox-control/provider.js';
+import type {
+  ProviderAdapter,
+  ProviderLaunchResult,
+  ProviderDeadline,
+} from '../../sandbox-control/provider.js';
 import type { AllocationState } from './allocation.js';
 
-/** Lifetime comes from durable provider state. A healthy wrapper does not need provider polling. */
-export async function providerLifetimeAt(
+/** Deadlines come from durable provider state. A healthy wrapper does not need provider polling. */
+export async function providerDeadline(
   provider: ProviderAdapter,
   state: AllocationState
-): Promise<number | undefined> {
+): Promise<ProviderDeadline | undefined> {
   if (state.kind === 'stopped' || state.kind === 'stopping' || state.providerRef === null)
     return undefined;
-  return provider.lifetimeDeadlineAt?.(state.providerRef);
+  return provider.allocationDeadline?.(state.providerRef);
 }
 
 /** A hello keeps the authority observed before external provider validation. */

@@ -5,9 +5,7 @@ import { TELEMETRY_DESCRIPTION_KEY } from '@/lib/telemetry/error-sink';
 import {
   SESSION_HISTORY_FAILURES,
   sessionHistoryFailureCopy,
-  sessionHistoryFailureCopyKey,
   SessionHistoryFailureError,
-  type SessionHistoryFailureKind,
 } from './session-history-failures';
 
 function declaredTelemetry(error: Error): unknown {
@@ -63,31 +61,6 @@ describe('SessionHistoryFailureError', () => {
       fingerprint: ['session-history-page', kind],
       tags: { 'error.subsystem': 'session-history', 'error.operation': 'read-page' },
     });
-  });
-
-  it.each([
-    ['too_large', 'agentChat.session.historyTooLarge'],
-    ['invalid_data', 'agentChat.session.historyUnavailable'],
-  ] as const)('maps the %s kind to its own reader copy key', (kind, copyKey) => {
-    expect(sessionHistoryFailureCopyKey(kind)).toBe(copyKey);
-  });
-
-  it('maps one copy key for every declared failure kind', () => {
-    // `SessionHistoryFailureKind` derives from the object, so a new kind
-    // cannot fail to type-check the mapping above; this case fails instead.
-    const expected: Record<string, string> = {
-      retryable_failure: 'agentChat.session.historyUnavailable',
-      too_large: 'agentChat.session.historyTooLarge',
-      invalid_data: 'agentChat.session.historyUnavailable',
-    };
-    expect(
-      Object.fromEntries(
-        Object.keys(SESSION_HISTORY_FAILURES).map(kind => [
-          kind,
-          sessionHistoryFailureCopyKey(kind as SessionHistoryFailureKind),
-        ])
-      )
-    ).toEqual(expected);
   });
 });
 

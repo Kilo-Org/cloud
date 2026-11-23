@@ -36,17 +36,27 @@ export const SESSION_HISTORY_FAILURES = {
 export type SessionHistoryFailureKind = keyof typeof SESSION_HISTORY_FAILURES;
 
 /**
- * The reader copy key for a failure kind, so the terminal state names the
- * failure from its type instead of matching the wire's English message. Only
- * a terminal kind has one; a retryable failure never resolves through it.
- * The English `message` stays the wire identity of the row itself.
+ * The reader copy key for each kind a retry cannot recover, keyed by the kind
+ * so a kind added later fails the type check here instead of borrowing the
+ * unreadable-data line.
  */
-export function sessionHistoryFailureCopyKey(
-  kind: SessionHistoryFailureKind
-): 'agentChat.session.historyTooLarge' | 'agentChat.session.historyUnavailable' {
-  return kind === 'too_large'
-    ? 'agentChat.session.historyTooLarge'
-    : 'agentChat.session.historyUnavailable';
+const TERMINAL_HISTORY_COPY_KEY = {
+  too_large: 'agentChat.session.historyTooLarge',
+  invalid_data: 'agentChat.session.historyUnavailable',
+} as const;
+
+/** A kind a retry cannot recover. */
+type TerminalSessionHistoryFailureKind = keyof typeof TERMINAL_HISTORY_COPY_KEY;
+
+/**
+ * The reader copy key for a failure kind, so the terminal state names the
+ * failure from its type instead of matching the wire's English message. The
+ * English `message` stays the wire identity of the row itself.
+ */
+function sessionHistoryFailureCopyKey(
+  kind: TerminalSessionHistoryFailureKind
+): (typeof TERMINAL_HISTORY_COPY_KEY)[TerminalSessionHistoryFailureKind] {
+  return TERMINAL_HISTORY_COPY_KEY[kind];
 }
 
 /**

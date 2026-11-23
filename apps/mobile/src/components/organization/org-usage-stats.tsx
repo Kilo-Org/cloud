@@ -85,9 +85,12 @@ type OrgUsageStatsProps = {
  * fade that does not run leaves four cards unpainted while their frames and
  * accessibility nodes are already in place.
  *
- * With `onPress` the whole grid opens the usage screen. The section cannot load
- * keeps its own retry row instead of the wrapper: a pressable around a retry
- * button leaves the reader guessing which control a tap reaches.
+ * With `onPress` the grid alone opens the usage screen, inside the section
+ * rather than around it: the eyebrow names the scope on both platforms, and the
+ * grid is one button announced in grid order whose tiles are not elements of
+ * their own. The section cannot load keeps its own retry row instead of the
+ * wrapper: a pressable around a retry button leaves the reader guessing which
+ * control a tap reaches.
  *
  * The two token tiles print the same input and output totals the usage screen
  * prints, so they use its compact notation and the two screens can be compared
@@ -149,30 +152,45 @@ export function OrgUsageStats({ organizationId, onPress }: Readonly<OrgUsageStat
     },
   ] as const;
   // Only the pressable grid needs this name: the informational grid's four
-  // tiles each name themselves. The section's own label leads, because the
-  // enclosing button used to speak it as its first child and it names the scope
-  // (every member, the last 30 days) the four totals are read against.
-  const gridLabel = joinAccessibleName([
-    t('organization.usageStats.orgLast30Days'),
-    ...tiles.flatMap(tile => [tile.label, tile.value]),
-  ]);
+  // tiles each name themselves. The section eyebrow already names the scope
+  // (every member, the last 30 days) beside the grid, so the button names the
+  // totals alone — neither stop repeats the other.
+  const gridLabel = joinAccessibleName(tiles.flatMap(tile => [tile.label, tile.value]));
 
-  const body = (
+  const grid = (
+    <View className="gap-3">
+      {[tiles.slice(0, 2), tiles.slice(2, 4)].map(row => (
+        <View key={row[0]?.label} className="flex-row gap-3">
+          {row.map(tile => (
+            <StatTile
+              key={tile.label}
+              label={tile.label}
+              value={tile.value}
+              asElement={onPress === undefined || unavailable}
+            />
+          ))}
+        </View>
+      ))}
+    </View>
+  );
+
+  return (
     <Section label={t('organization.usageStats.orgLast30Days')}>
-      <View className="gap-3">
-        {[tiles.slice(0, 2), tiles.slice(2, 4)].map(row => (
-          <View key={row[0]?.label} className="flex-row gap-3">
-            {row.map(tile => (
-              <StatTile
-                key={tile.label}
-                label={tile.label}
-                value={tile.value}
-                asElement={onPress === undefined || unavailable}
-              />
-            ))}
-          </View>
-        ))}
-      </View>
+      {onPress === undefined || unavailable ? (
+        grid
+      ) : (
+        // The button wraps the grid, not the section: the eyebrow stays its own
+        // heading stop beside it on both platforms.
+        <Pressable
+          onPress={onPress}
+          accessibilityRole="button"
+          accessibilityLabel={gridLabel}
+          accessibilityHint={t('usage.viewDetails')}
+          className="active:opacity-70"
+        >
+          {grid}
+        </Pressable>
+      )}
       {unavailable && (
         <View className="gap-2">
           <Text accessibilityRole="alert" variant="muted">
@@ -188,21 +206,5 @@ export function OrgUsageStats({ organizationId, onPress }: Readonly<OrgUsageStat
         </View>
       )}
     </Section>
-  );
-
-  if (onPress === undefined || unavailable) {
-    return body;
-  }
-
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={gridLabel}
-      accessibilityHint={t('usage.viewDetails')}
-      className="active:opacity-70"
-    >
-      {body}
-    </Pressable>
   );
 }

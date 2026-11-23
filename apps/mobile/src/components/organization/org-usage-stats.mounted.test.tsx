@@ -255,13 +255,21 @@ describe('Organization usage stats accessibility', () => {
     }
     expect(button.props.accessibilityRole).toBe('button');
     expect(button.props.accessibilityHint).toBe(i18n.t('usage.viewDetails'));
+    // The button names the four totals alone: the section eyebrow names the
+    // scope beside it, so the scope must not lead the button's name.
     expect(button.props.accessibilityLabel).toBe(
-      `${i18n.t('organization.usageStats.orgLast30Days')}, Cost, \u2066$2\u2069, ` +
-        'Requests, 12, Input tokens, compact:34, Output tokens, compact:56'
+      'Cost, \u2066$2\u2069, Requests, 12, Input tokens, compact:34, Output tokens, compact:56'
+    );
+    // That eyebrow is a sibling of the button, not its child: the reader hears
+    // the scope once as a heading, then the button's totals.
+    const scope = i18n.t('organization.usageStats.orgLast30Days');
+    expect(button.findAllByType('Text').some(node => node.props.children === scope)).toBe(false);
+    expect(renderer.root.findAllByType('Text').some(node => node.props.children === scope)).toBe(
+      true
     );
     // The enclosing button speaks the tiles, so no tile is an element itself.
     expect(
-      renderer.root.findAllByType('View').filter(node => node.props.accessible === true)
+      button.findAllByType('View').filter(node => node.props.accessible === true)
     ).toHaveLength(0);
     act(() => {
       (button.props.onPress as () => void)();

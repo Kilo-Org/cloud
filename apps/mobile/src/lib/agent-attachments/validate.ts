@@ -10,6 +10,8 @@ import {
   type AgentAttachmentMime,
 } from './constants';
 import { truncateUtf8, utf8ByteLength } from '../utf8-utils';
+import { stripUnsafeFilenameCharacters } from '../filename-safety';
+
 import { i18n } from '@/i18n';
 
 const IMAGE_EXTENSIONS = new Set<AgentAttachmentExtension>([
@@ -72,8 +74,8 @@ export function mimeForExtension(extension: string): AgentAttachmentMime {
  * cannot create an unsafe path.
  *
  * - Strips leading path components (basename only).
- * - Strips control characters (ASCII 0x00–0x1f, 0x7f).
- * - Strips path separators (`/`, `\`).
+ * - Strips path separators (`/`, `\`), control characters and bidi
+ *   overrides, all through {@link stripUnsafeFilenameCharacters}.
  * - Truncates to {@link AGENT_ATTACHMENT_SAFE_FILENAME_MAX_LENGTH}
  *   UTF-8 bytes without splitting Unicode characters.
  * - When truncation removes name characters, the extension is
@@ -84,22 +86,7 @@ export function mimeForExtension(extension: string): AgentAttachmentMime {
  *   or a bare traversal token (`.` or `..`).
  */
 export function sanitizeAttachmentFilename(raw: string): string {
-  let sanitized = raw.replace(/^.*[/\\]/, '');
-
-  // Strip control characters
-  {
-    let out = '';
-    for (const c of sanitized) {
-      const code = c.codePointAt(0);
-      // eslint-disable-next-line eslint-plugin-unicorn/number-literal-case — oxfmt prefers lowercase hex
-      if (code !== undefined && code > 0x1f && code !== 0x7f) {
-        out += c;
-      }
-    }
-    sanitized = out;
-  }
-
-  sanitized = sanitized.replaceAll('/', '').replaceAll('\\', '');
+  let sanitized = stripUnsafeFilenameCharacters(raw);
 
   // Truncate to the byte budget, preserving the extension when
   // truncation removes characters from the name part.
@@ -166,7 +153,12 @@ export function classifyAttachment(candidate: AttachmentCandidate): ClassifiedAt
   if (candidate.size <= 0) {
     return { ok: false, reason: 'empty' };
   }
-  const extension = normalizeAttachmentExtension(candidate.name);
+  // The deny list judges the name that would be stored, not the raw picker
+  // name: sanitization removes characters (a bidi override, a control) that
+  // can hide the real extension, so `evil.e\u202Exe` sanitizes to `evil.exe`
+  // and must be refused here rather than stored with an extension this list
+  // never saw.
+  const extension = normalizeAttachmentExtension(stripUnsafeFilenameCharacters(candidate.name));
   if (AGENT_ATTACHMENT_DENIED_EXTENSIONS.has(extension)) {
     return { ok: false, reason: 'denied' };
   }

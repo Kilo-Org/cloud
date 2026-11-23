@@ -271,6 +271,14 @@ describe('classifyAttachment', () => {
     }
   });
 
+  it('rejects an executable whose extension is hidden by a removed character', () => {
+    // The stored name is `evil.exe`: the override is stripped before the wire
+    // name is emitted, so the deny list must judge the same name.
+    for (const name of ['evil.e\u202Exe', 'evil.e\u0000xe']) {
+      expect(classifyAttachment({ name, size: 10 })).toEqual({ ok: false, reason: 'denied' });
+    }
+  });
+
   it('rejects a file over the 20 MB cap', () => {
     expect(classifyAttachment({ name: 'big.pdf', size: AGENT_ATTACHMENT_MAX_BYTES + 1 })).toEqual({
       ok: false,

@@ -192,8 +192,71 @@ describe('getSafeCacheFilename', () => {
     expect(cacheFilename.endsWith('.pdf')).toBe(true);
   });
 
-  it('sanitizes unsafe path characters', () => {
-    expect(getSafeCacheFilename({ id: 'inv/1', filename: 'a b.pdf' })).toBe('inv_1-a_b.pdf');
+  it('keeps letters and marks of every script in the name', () => {
+    const id = 'prt_1';
+
+    // A person's own name reaches the share sheet as itself, whichever script
+    // it is written in.
+    for (const filename of ['Rechnung-März.pdf', '報告書.pdf', 'تقرير-مارس.pdf']) {
+      expect(getSafeCacheFilename({ id, filename })).toBe(`${id}-${filename}`);
+    }
+  });
+
+  it('keeps a space in the name', () => {
+    expect(getSafeCacheFilename({ id: 'prt_1', filename: 'Rechnung März.pdf' })).toBe(
+      'prt_1-Rechnung März.pdf'
+    );
+  });
+
+  it('strips separators and keeps only the basename of a path', () => {
+    // Both separators go, and a traversal path collapses to the name the path
+    // ends on — the cache name is never a path.
+    expect(getSafeCacheFilename({ id: 'prt_1', filename: '../../etc/passwd' })).toBe(
+      'prt_1-passwd'
+    );
+    expect(getSafeCacheFilename({ id: 'prt_1', filename: String.raw`..\..\etc\passwd` })).toBe(
+      'prt_1-passwd'
+    );
+  });
+
+  it('strips control characters from the name', () => {
+    expect(getSafeCacheFilename({ id: 'prt_1', filename: 'a\u0000b\nc.pdf' })).toBe(
+      'prt_1-abc.pdf'
+    );
+  });
+
+  it('strips a bidi override from the name', () => {
+    // `report\u202Etxt.exe` displays as `reportexe.txt`; the override never
+    // reaches a name the person reads in the share sheet.
+    expect(getSafeCacheFilename({ id: 'prt_1', filename: 'report\u202Etxt.exe' })).toBe(
+      'prt_1-reporttxt.exe'
+    );
+  });
+
+  it('keeps the opaque id in its strict set', () => {
+    expect(getSafeCacheFilename({ id: 'inv/1', filename: 'a.pdf' })).toBe('inv_1-a.pdf');
+  });
+
+  it('falls back to attachment when the name strips to nothing', () => {
+    expect(getSafeCacheFilename({ id: 'prt_1', filename: '///' })).toBe('prt_1-attachment');
+  });
+
+  it('bounds a long CJK name, keeps the extension, and never exceeds 255 bytes', () => {
+    const id = 'prt_1';
+    const withExtension = getSafeCacheFilename({ id, filename: `${'報'.repeat(200)}.pdf` });
+
+    expect(utf8ByteLength(withExtension)).toBeLessThanOrEqual(255);
+    expect(withExtension.startsWith(`${id}-`)).toBe(true);
+    expect(withExtension.endsWith('.pdf')).toBe(true);
+
+    // The byte budget holds for every name, with or without an extension.
+    for (const filename of [
+      `${'報'.repeat(200)}.pdf`,
+      '報'.repeat(200),
+      `${'Rechnung-März '.repeat(40)}.pdf`,
+    ]) {
+      expect(utf8ByteLength(getSafeCacheFilename({ id, filename }))).toBeLessThanOrEqual(255);
+    }
   });
 });
 
@@ -536,6 +599,16 @@ describe('shareRemoteFile', () => {
     expect(expoSharingMock.shareAsync).not.toHaveBeenCalled();
     expect(survivingAttempts()).toEqual([]);
     expect(survivingRecords()).toEqual([]);
+  });
+
+  it('hands the share sheet the accented name the person was given', async () => {
+    expoFetchMock.mockResolvedValue(okResponse(new Uint8Array([1])));
+
+    await shareRemoteFile({ ...shareInput(), filename: 'Rechnung-März.pdf' });
+
+    const [sharedUri] = expoSharingMock.shareAsync.mock.calls[0] as [string, unknown];
+    expect(sharedUri).toContain('Rechnung-März-');
+    expect(sharedUri.endsWith('.pdf')).toBe(true);
   });
 
   it('bounds the share filename and keeps the extension', async () => {

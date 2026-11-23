@@ -7,6 +7,7 @@ import {
   validatePreviewSessionToken,
   validateStreamTicket,
   validateWrapperDispatchTicket,
+  WRAPPER_DISPATCH_TICKET_AUDIENCE,
   type WrapperDispatchTicketClaims,
 } from './auth.js';
 
@@ -343,14 +344,27 @@ describe('validateWrapperDispatchTicket', () => {
   });
 
   it('rejects a raw Kilo JWT / stream ticket by its type discriminant', async () => {
+    // A stream ticket is fully shaped but declares its own purpose, so it
+    // reaches the purpose check; a raw Kilo JWT carries none of these claims,
+    // so the payload schema refuses it first.
     const streamTicket = jwt.sign(
-      { type: 'stream_ticket', userId: 'user-1', cloudAgentSessionId: 'session-1' },
+      {
+        type: 'stream_ticket',
+        purpose: 'stream',
+        userId: 'user-1',
+        cloudAgentSessionId: 'session-1',
+        kiloSessionId: 'kilo-session-1',
+        wrapperRunId: 'run-1',
+        wrapperGeneration: 2,
+        wrapperConnectionId: 'connection-1',
+      },
       secret,
-      { algorithm: 'HS256', expiresIn: '1 minute' }
+      { algorithm: 'HS256', expiresIn: '1 minute', audience: WRAPPER_DISPATCH_TICKET_AUDIENCE }
     );
     const kiloJwt = jwt.sign({ kiloUserId: 'user-1' }, secret, {
       algorithm: 'HS256',
       expiresIn: '1 minute',
+      audience: WRAPPER_DISPATCH_TICKET_AUDIENCE,
     });
 
     await expect(validateWrapperDispatchTicket(`Bearer ${streamTicket}`, secret)).resolves.toEqual({
@@ -359,7 +373,7 @@ describe('validateWrapperDispatchTicket', () => {
     });
     await expect(validateWrapperDispatchTicket(`Bearer ${kiloJwt}`, secret)).resolves.toEqual({
       success: false,
-      error: 'Invalid ticket type',
+      error: 'Invalid ticket payload',
     });
   });
 
@@ -367,11 +381,12 @@ describe('validateWrapperDispatchTicket', () => {
     const userToken = jwt.sign({ version: 3, kiloUserId: 'user-1' }, secret, {
       algorithm: 'HS256',
       expiresIn: '1 minute',
+      audience: WRAPPER_DISPATCH_TICKET_AUDIENCE,
     });
 
     await expect(validateWrapperDispatchTicket(`Bearer ${userToken}`, secret)).resolves.toEqual({
       success: false,
-      error: 'Invalid ticket type',
+      error: 'Invalid ticket payload',
     });
   });
 
@@ -385,7 +400,7 @@ describe('validateWrapperDispatchTicket', () => {
     ['a malformed empty audience list', []],
     ['a malformed null audience list', [null]],
     ['a malformed audience object', { audience: 'cloud-agent-next' }],
-  ])('rejects a Kilo user JWT with %s', async (_description, aud) => {
+  ])('rejects a Kilo user JWT carrying %s', async (_description, aud) => {
     const token = jwt.sign({ version: 3, kiloUserId: 'user-1', aud }, secret, {
       algorithm: 'HS256',
       expiresIn: '1 minute',
@@ -393,7 +408,7 @@ describe('validateWrapperDispatchTicket', () => {
 
     await expect(validateWrapperDispatchTicket(`Bearer ${token}`, secret)).resolves.toEqual({
       success: false,
-      error: 'Invalid ticket type',
+      error: 'Invalid ticket audience',
     });
   });
 
@@ -429,12 +444,90 @@ describe('validateWrapperDispatchTicket', () => {
     const userToken = jwt.sign(
       { version: 3, kiloUserId: 'user-1', deviceSessionId: 'session-xyz-999' },
       secret,
-      { algorithm: 'HS256', expiresIn: '1 minute' }
+      { algorithm: 'HS256', expiresIn: '1 minute', audience: WRAPPER_DISPATCH_TICKET_AUDIENCE }
     );
 
     await expect(validateWrapperDispatchTicket(`Bearer ${userToken}`, secret)).resolves.toEqual({
       success: false,
+      error: 'Invalid ticket payload',
+    });
+  });
+
+  it('rejects a ticket whose audience is another real audience', async () => {
+    const ticket = jwt.sign(wrapperDispatchTicketClaims, secret, {
+      algorithm: 'HS256',
+      expiresIn: '1 minute',
+      audience: 'cloud-agent-stream',
+    });
+
+    await expect(validateWrapperDispatchTicket(`Bearer ${ticket}`, secret)).resolves.toEqual({
+      success: false,
+      error: 'Invalid ticket audience',
+    });
+  });
+
+  it('rejects a ticket that carries no audience', async () => {
+    const ticket = jwt.sign(wrapperDispatchTicketClaims, secret, {
+      algorithm: 'HS256',
+      expiresIn: '1 minute',
+    });
+
+    await expect(validateWrapperDispatchTicket(`Bearer ${ticket}`, secret)).resolves.toEqual({
+      success: false,
+      error: 'Invalid ticket audience',
+    });
+  });
+
+  it('rejects a ticket with the right audience but no expiry', async () => {
+    const ticket = jwt.sign(wrapperDispatchTicketClaims, secret, {
+      algorithm: 'HS256',
+      noTimestamp: true,
+      audience: WRAPPER_DISPATCH_TICKET_AUDIENCE,
+    });
+
+    await expect(validateWrapperDispatchTicket(`Bearer ${ticket}`, secret)).resolves.toEqual({
+      success: false,
+      error: 'Invalid ticket payload',
+    });
+  });
+
+  it('rejects a ticket for another purpose with the right audience and expiry', async () => {
+    const ticket = jwt.sign(
+      {
+        type: 'stream_ticket',
+        userId: 'user-1',
+        cloudAgentSessionId: 'session-1',
+        kiloSessionId: 'kilo-session-1',
+        wrapperRunId: 'run-1',
+        wrapperGeneration: 2,
+        wrapperConnectionId: 'connection-1',
+      },
+      secret,
+      {
+        algorithm: 'HS256',
+        expiresIn: '1 minute',
+        audience: WRAPPER_DISPATCH_TICKET_AUDIENCE,
+      }
+    );
+
+    await expect(validateWrapperDispatchTicket(`Bearer ${ticket}`, secret)).resolves.toEqual({
+      success: false,
       error: 'Invalid ticket type',
     });
+  });
+
+  it('mints a ticket carrying the wrapper dispatch audience and a four-hour expiry', () => {
+    const ticket = mintWrapperDispatchTicket(wrapperDispatchTicketClaims, secret);
+    const decoded = jwt.decode(ticket);
+    if (typeof decoded !== 'object' || decoded === null) {
+      throw new Error('a minted ticket must decode to an object payload');
+    }
+
+    expect(decoded.aud).toBe(WRAPPER_DISPATCH_TICKET_AUDIENCE);
+    const { exp, iat } = decoded;
+    if (typeof exp !== 'number' || typeof iat !== 'number') {
+      throw new Error('a minted ticket must carry numeric iat and exp');
+    }
+    expect(Math.abs(exp - iat - 4 * 60 * 60)).toBeLessThanOrEqual(5);
   });
 });

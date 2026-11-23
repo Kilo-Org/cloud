@@ -6,7 +6,7 @@ import { readTrpcErrorField } from '@/lib/trpc-error';
 import { parseTimestamp } from '@/lib/utils';
 
 /** The failure-history answer, in the shape the router declares it. */
-type SessionFailureHistory =
+export type SessionFailureHistory =
   inferRouterOutputs<MobileRouter>['cloudAgentNextFailures']['getSessionFailureHistory'];
 export type SessionFailureRun = SessionFailureHistory['runs'][number];
 export type SessionSetupFailure = NonNullable<SessionFailureHistory['setupFailure']>;
@@ -33,11 +33,12 @@ export function isAddressableSessionId(id: string | null): id is string {
  */
 const TERMINAL_ACCESS_CODES = ['FORBIDDEN', 'UNAUTHORIZED', 'NOT_FOUND'] as const;
 
-/** True when the failure is an access refusal that a retry cannot recover. */
-export function isTerminalAccessError(error: unknown): boolean {
-  const code = readTrpcErrorField(error, 'code');
-  return TERMINAL_ACCESS_CODES.some(terminal => terminal === code);
-}
+/**
+ * The statuses that are the same refusal without a code on the envelope: a
+ * proxy or the transport can answer 403 or 404 before tRPC formats a code, and
+ * the web component treats both as the permanent denial for that reason.
+ */
+const TERMINAL_ACCESS_STATUSES = [403, 404] as const;
 
 /*
  * The HTTP status a tRPC answer carried. `readTrpcErrorField` covers the code
@@ -55,6 +56,16 @@ function httpStatusOf(error: unknown): number | undefined {
   }
   const shaped = ShapedStatus.safeParse(error);
   return shaped.success ? shaped.data.shape.data.httpStatus : undefined;
+}
+
+/** True when the failure is an access refusal that a retry cannot recover. */
+export function isTerminalAccessError(error: unknown): boolean {
+  const code = readTrpcErrorField(error, 'code');
+  if (TERMINAL_ACCESS_CODES.some(terminal => terminal === code)) {
+    return true;
+  }
+  const status = httpStatusOf(error);
+  return TERMINAL_ACCESS_STATUSES.some(terminal => terminal === status);
 }
 
 /**

@@ -176,14 +176,16 @@ const buttonLabelClasses = Object.fromEntries(
  * The face a disabled (not busy) primary action paints: `--primary-disabled-fill`,
  * the palette's own step for a disabled filled control. A brand or taupe fill
  * reads as a second colour rather than as an inactive control, so the face takes
- * a faint tint instead. In dark that tint is 1.18:1 off `--secondary`, the
- * surface a `Card` paints, and 1.39:1 off the page, which reads as a plate yet
- * stays quieter than any enabled fill; in light it keeps the value the disabled
+ * a faint tint instead. In dark that tint is 1.27:1 off `--secondary`, the
+ * surface a `Card` paints, and 1.49:1 off the page: it clears the two floors the
+ * palette already holds a faint surface to, so the plate has a shape, and it
+ * stays under both `--secondary-fill` and the floor an enabled control's own
+ * surface must clear, so it recedes. In light it keeps the value the disabled
  * action has always painted.
  *
  * The plate draws no border, so an enabled-to-disabled transition changes no
  * geometry. The label takes `--muted-foreground` in light (4.62:1) and `--ink2`
- * in dark (7.72:1), because `--muted-foreground` measures 3.84:1 on the dark
+ * in dark (7.19:1), because `--muted-foreground` measures 3.57:1 on the dark
  * fill. `--secondary-fill` is the palette's step for an enabled filled neutral
  * action, so the dark face must not take it: an unavailable primary would
  * otherwise look like an available `secondary` action. The label takes the

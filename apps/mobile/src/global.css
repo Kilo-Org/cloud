@@ -207,14 +207,17 @@
      * The fill stays neutral and muted: a tinted fill reads as a second brand
      * colour and competes with the enabled #ffdd00 it replaces. */
     --primary-disabled: #8a8680;
-    /* Dark counterpart of the disabled primary fill: 6% white over the card
-     * surface, 1.18:1 off `--secondary`, 1.39:1 off the page and 1.29:1 off
-     * `--card`. It stays under `--secondary-fill` (1.70:1 off `--secondary`),
-     * which also fills an enabled `secondary` action, so an unavailable primary
-     * recedes as it does in light instead of reading as a tappable neutral
-     * control. `--muted-foreground` measures 3.84:1 on it, under the text floor,
-     * so its label takes `--ink2` (7.72:1). */
-    --primary-disabled-fill: #2c2c31;
+    /* Dark counterpart of the disabled primary fill: 8% white over the card
+     * surface, 1.27:1 off `--secondary`, 1.49:1 off the page and 1.38:1 off
+     * `--card`. It clears the two floors the palette already holds a faint
+     * surface to (`skeleton-fill`: 1.45:1 off the page, 1.25:1 off a card), so
+     * a disabled plate reads as a plate, and it stays under `--secondary-fill`
+     * (1.70:1 off `--secondary`), which also fills an enabled `secondary`
+     * action, and under the 1.6:1 floor an enabled control's own surface must
+     * clear, so an unavailable primary recedes as it does in light.
+     * `--muted-foreground` measures 3.57:1 on it, under the text floor, so its
+     * label takes `--ink2` (7.19:1). */
+    --primary-disabled-fill: #313136;
     --destructive: #f28b7a;
     --destructive-foreground: #1a1a10;
     /* The deep red the light scheme fills with, lifted just enough to stand off

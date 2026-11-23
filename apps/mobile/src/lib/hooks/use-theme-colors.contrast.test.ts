@@ -267,21 +267,17 @@ describe('disabled primary action fill contrast (WCAG AA text)', () => {
     );
   });
 
-  it('dark theme: the disabled plate is a visible but faint step off the surfaces it sits on', () => {
-    // A plate that matched its surface would leave a disabled primary with no
-    // shape at all. The upper bound is the perception floor this file sets for
-    // an enabled control's own surface, so a disabled plate stays quieter than
-    // any enabled fill and can never be promoted to an enabled step. The lower
-    // bound is not a perception threshold: the palette has no floor for a
-    // disabled surface, and the light plate has none either. It pins the
-    // shipped 1.18:1 step against drift back toward the card surface.
-    for (const surface of ['secondary', 'card', 'background'] as const) {
-      const ratio = contrastRatio(darkColors.primaryDisabledFill, darkColors[surface]);
-      expect(ratio, `primaryDisabledFill vs ${surface} (dark)`).toBeGreaterThanOrEqual(1.15);
-      expect(ratio, `primaryDisabledFill vs ${surface} (dark)`).toBeLessThan(
-        MIN_VISIBLE_SURFACE_RATIO
-      );
-    }
+  it('dark theme: the disabled plate clears the palette faint-surface floors', () => {
+    // A plate under these floors has no shape; they are the ones the palette
+    // already holds a faint surface to (`skeleton-fill.test.ts`): 1.45:1 off the
+    // page and 1.25:1 off a card. The plate must also stay under the enabled
+    // control floor above, so it never reads as an enabled step.
+    const page = contrastRatio(darkColors.primaryDisabledFill, darkColors.background);
+    const card = contrastRatio(darkColors.primaryDisabledFill, darkColors.secondary);
+    expect(page, 'primaryDisabledFill vs background (dark)').toBeGreaterThanOrEqual(1.45);
+    expect(card, 'primaryDisabledFill vs secondary (dark)').toBeGreaterThanOrEqual(1.25);
+    expect(page).toBeLessThan(MIN_VISIBLE_SURFACE_RATIO);
+    expect(card).toBeLessThan(MIN_VISIBLE_SURFACE_RATIO);
   });
 
   it('dark theme: the disabled plate is its own step, not the enabled secondary action fill', () => {

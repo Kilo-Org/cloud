@@ -17,8 +17,8 @@ export function useThemeColors(): ThemeColors {
  * fill a disabled (not busy) primary action paints. That fill is the palette's
  * `--primary-disabled-fill`, the pair the Button's disabled plate uses in
  * `components/ui/button.tsx`. In light the mark takes `--muted-foreground`
- * (4.62:1 on the light fill). In dark it takes `--ink2` (7.72:1), because
- * `--muted-foreground` measures 3.84:1 on the dark fill and would leave the
+ * (4.62:1 on the light fill). In dark it takes `--ink2` (7.19:1), because
+ * `--muted-foreground` measures 3.57:1 on the dark fill and would leave the
  * mark unreadable. A mark painted on that fill must use this ink.
  */
 export function useMutedDisabledInk(): string {

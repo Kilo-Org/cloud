@@ -1022,6 +1022,39 @@ describe('local agent browser bridge', () => {
     );
   });
 
+  it('lists browser_drop with the non-empty path rule its handler enforces', async () => {
+    const fake = createFakeRuntime();
+    const bridge = createRuntimeBrowserBridge({ runtime: () => fake.runtime });
+    const listed = z
+      .object({
+        contractSha: z.string(),
+        tools: z.array(z.object({ inputSchema: z.unknown(), name: z.string() })),
+      })
+      .parse(await bridge.listTools());
+    const drop = listed.tools.find(tool => tool.name === 'browser_drop');
+    const publishedPaths = z
+      .object({
+        description: z.string(),
+        items: z.record(z.string(), z.unknown()),
+      })
+      .parse(
+        z.object({ properties: z.record(z.string(), z.unknown()) }).parse(drop?.inputSchema)
+          .properties['paths']
+      );
+
+    // The listing a model reads states the rule the tool applies.
+    expect(publishedPaths.items).toStrictEqual({ minLength: 1, type: 'string' });
+    expect(publishedPaths.description).toContain('empty entry is not allowed');
+    // The contract itself stays verbatim, which is what keeps the handshake SHA valid.
+    expect(
+      z
+        .object({ properties: z.record(z.string(), z.unknown()) })
+        .parse(BROWSER_TOOL_CONTRACT.find(entry => entry.name === 'browser_drop')?.inputSchema)
+        .properties['paths']
+    ).toMatchObject({ items: { type: 'string' } });
+    expect(listed.contractSha).toBe(BROWSER_TOOL_CONTRACT_SHA);
+  });
+
   it('does not offer the one pinned tool no backend here can run', async () => {
     const fake = createFakeRuntime();
     const bridge = createRuntimeBrowserBridge({ runtime: () => fake.runtime });

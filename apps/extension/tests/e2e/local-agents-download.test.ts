@@ -1836,3 +1836,337 @@ test('a drop naming an absent local file is still the upload step, and the page 
     await fixture.close();
   }
 });
+
+/**
+ * The session's own tabs, read from `browser_tabs list`: its one-line-per-tab
+ * answer, `- <index>: (current) [Title](url)`, is the only surface that names
+ * the tab a later `select` addresses. Two tabs of one session can show the same
+ * url, so the index and the `(current)` marker are what tell them apart.
+ */
+const listedTabs = async (
+  session: LocalAgentSession,
+  grants: readonly Record<string, unknown>[]
+): Promise<
+  readonly { readonly current: boolean; readonly index: number; readonly url: string }[]
+> => {
+  const listed = await session.callTool('browser_tabs', { action: 'list' }, grants);
+
+  if (listed.kind !== 'result' || listed.isError) {
+    throw new Error(`browser_tabs list failed: ${JSON.stringify(listed)}`);
+  }
+
+  return listed.text.split('\n').map(line => {
+    const parsed = /^- (\d+): (?:\(current\) )?\[[^\]]*\]\((.*?)\)$/u.exec(line.trim());
+
+    if (parsed?.[1] === undefined) {
+      throw new Error(`no tab in the listed line: ${line}`);
+    }
+
+    return { current: line.includes('(current) '), index: Number(parsed[1]), url: parsed[2] ?? '' };
+  });
+};
+
+/** The tab a `browser_tabs select` (or `new`) answered for: the JSON the tool returns for both actions. */
+const selectedTab = (answer: LocalAgentToolResponse) =>
+  z
+    .object({ selected: z.boolean(), tabId: z.number(), title: z.string(), url: z.string() })
+    .parse(JSON.parse(answer.kind === 'result' ? answer.text : 'null'));
+
+/*
+ * The record of a download approval belongs to the tab that approval was issued for. The identical click approved on a
+ * second tab of the same session is a different step with an approval of its own, and each tab's approval stays
+ * available for that tab's own retry.
+ *
+ * Both tabs show the same fixture page, so the two clicks really are the identical call — same tool, same arguments —
+ * and tab A's step is made ordinary before the retry, the way the page-update spec does it. Nothing about the tab is
+ * asserted from what the run expected: the tabs are read back through the agent's own `browser_tabs`, and the folder is
+ * a directory Chrome wrote into.
+ */
+// eslint-disable-next-line no-empty-pattern -- Playwright requires the fixtures object destructured, and this spec takes no fixture: every page is opened on the launch's own context.
+test('a download approval is redeemed on the tab it was issued for after the same step was approved on another tab', async ({}, testInfo) => {
+  test.setTimeout(240_000);
+  const fixture = await startDownloadFixture();
+  const hub = await startFakeHub();
+  const launch = await launchRealDownloadBrowser();
+  const { context, downloadsPath, extensionId } = launch;
+  await mockKiloApi(context, {});
+  await context.addInitScript({
+    content:
+      "Object.defineProperty(chrome.permissions, 'request', { value: () => Promise.resolve(true) });",
+  });
+
+  try {
+    // The page Playwright holds is tab A: it is the tab the session shares, and where the capture is taken.
+    const sidePanel = await context.newPage();
+    const agentPage = await context.newPage();
+
+    await agentPage.goto(`${fixture.url}${CARD_PAGE_PATH}`);
+
+    const origin = fixture.url;
+    const grants = grant(origin);
+    const session = await openPairedAgentSession({
+      beforeShare: async () => {
+        await activateTab(sidePanel, `${fixture.url}${CARD_PAGE_PATH}`);
+      },
+      context,
+      extensionId,
+      hub,
+      sidePanel,
+      title: 'Two tab approval E2E session',
+    });
+
+    const navigated = await session.callTool(
+      'browser_navigate',
+      { url: `${fixture.url}${CARD_PAGE_PATH}` },
+      grants
+    );
+
+    expect(navigated).toMatchObject({ isError: false, kind: 'result' });
+
+    // 1. Tab A: the submit is a sensitive step, and the file its approval starts is a second one.
+    // The call names the control by selector rather than by a snapshot ref: a ref is numbered per tab, so the identical
+    // Call on the second tab has to name something both documents resolve — and identical arguments are exactly what
+    // Makes tab B's approval a record for the same step the base revision keyed together.
+    const args = { element: 'Get receipt', target: '#receipt' };
+
+    const askedA = await session.callTool('browser_click', args, grants);
+
+    expect(askedA).toMatchObject({ code: -32_010, kind: 'error' });
+    expect(
+      z.array(permissionItemSchema).parse(askedA.kind === 'error' ? askedA.items : [])
+    ).toStrictEqual([
+      { class: 'sensitive', origin, reason: 'submitting a form with payment fields' },
+    ]);
+    const sensitiveTokenA = askedA.kind === 'error' ? (askedA.stepToken ?? '') : '';
+
+    expect(sensitiveTokenA).not.toBe('');
+
+    const guardedA = await session.callTool('browser_click', args, grants, [sensitiveTokenA]);
+
+    expect(guardedA).toMatchObject({ afterAction: true, code: -32_010, kind: 'error' });
+    expect(
+      z.array(permissionItemSchema).parse(guardedA.kind === 'error' ? guardedA.items : [])
+    ).toStrictEqual([{ class: 'sensitive', origin, reason: 'downloading a file' }]);
+    const downloadTokenA = guardedA.kind === 'error' ? (guardedA.stepToken ?? '') : '';
+
+    expect(downloadTokenA).not.toBe('');
+    // The refusal names the file, so the click ran and the guard stopped the file it started.
+    expect(guardedA.kind === 'error' ? guardedA.message : '').toContain(DOWNLOAD_FILENAME);
+    expect(fixture.hits()).toBeGreaterThan(0);
+    await expectNothingSaved(downloadsPath);
+
+    // 2. Tab B: opened and navigated by the session's own `browser_tabs`, so the session owns it. A second tab on the
+    // Same url cannot be activated from a url prefix, so the tab tools — and the index their list reports — do it.
+    const openedB = await session.callTool(
+      'browser_tabs',
+      { action: 'new', url: `${fixture.url}${CARD_PAGE_PATH}` },
+      grants
+    );
+
+    expect(openedB).toMatchObject({ isError: false, kind: 'result' });
+    const tabB = selectedTab(openedB);
+
+    expect(tabB.url).toBe(`${fixture.url}${CARD_PAGE_PATH}`);
+    expect(tabB.tabId).not.toBe(session.tabId);
+
+    // Both tabs are in the session, and the one that is current is still tab A: `new` opens its tab behind the user.
+    const beforeSelect = await listedTabs(session, grants);
+    const tabAIndex = beforeSelect.find(
+      tab => tab.current && tab.url === `${fixture.url}${CARD_PAGE_PATH}`
+    );
+    const tabBIndex = beforeSelect.find(
+      tab => !tab.current && tab.url === `${fixture.url}${CARD_PAGE_PATH}`
+    );
+
+    expect(beforeSelect).toHaveLength(2);
+    expect(tabAIndex).toBeDefined();
+    expect(tabBIndex).toBeDefined();
+
+    // Selecting the listed index makes tab B the tab a call runs on; its answer names the tab it selected.
+    const selectedB = await session.callTool(
+      'browser_tabs',
+      { action: 'select', index: tabBIndex?.index },
+      grants
+    );
+
+    expect(selectedB).toMatchObject({ isError: false, kind: 'result' });
+    expect(selectedTab(selectedB).tabId).toBe(tabB.tabId);
+    const afterSelect = await listedTabs(session, grants);
+
+    expect(afterSelect.find(tab => tab.current)?.index).toBe(tabBIndex?.index);
+
+    // 3. Tab B: the identical click, approved on its own tab, which files that approval under tab B.
+    const askedB = await session.callTool('browser_click', args, grants);
+
+    expect(askedB).toMatchObject({ code: -32_010, kind: 'error' });
+    // Refused before the page ran: the click on tab B never happened yet.
+    expect(askedB.kind === 'error' ? askedB.afterAction : 'not a refusal').toBeUndefined();
+    const sensitiveTokenB = askedB.kind === 'error' ? (askedB.stepToken ?? '') : '';
+
+    expect(sensitiveTokenB).not.toBe('');
+
+    const guardedB = await session.callTool('browser_click', args, grants, [sensitiveTokenB]);
+
+    expect(guardedB).toMatchObject({ afterAction: true, code: -32_010, kind: 'error' });
+    expect(
+      z.array(permissionItemSchema).parse(guardedB.kind === 'error' ? guardedB.items : [])
+    ).toStrictEqual([{ class: 'sensitive', origin, reason: 'downloading a file' }]);
+    const downloadTokenB = guardedB.kind === 'error' ? (guardedB.stepToken ?? '') : '';
+
+    // Two approvals, one step: each was issued for its own tab, so no account of them is the same.
+    expect(downloadTokenB).not.toBe('');
+    expect(downloadTokenB).not.toBe(downloadTokenA);
+    await expectNothingSaved(downloadsPath);
+
+    // 4. Tab A's step stops being sensitive: the form presents the field differently, made through Playwright's own
+    // Page object and read back, as the page-update spec does it.
+    const changed = await agentPage.evaluate(`
+      (() => {
+        const field = document.querySelector('#cc');
+        if (field === null) { throw new Error('#cc is not in the page'); }
+        field.setAttribute('autocomplete', '');
+        field.setAttribute('name', 'line1');
+        return {
+          autocomplete: field.getAttribute('autocomplete'),
+          name: field.getAttribute('name')
+        };
+      })()
+    `);
+
+    expect(changed).toStrictEqual({ autocomplete: '', name: 'line1' });
+
+    // 5. Back to tab A: its own approval is the one the retry presents, and the record must still be tab A's.
+    const selectedA = await session.callTool(
+      'browser_tabs',
+      { action: 'select', index: tabAIndex?.index },
+      grants
+    );
+
+    expect(selectedA).toMatchObject({ isError: false, kind: 'result' });
+    expect(selectedTab(selectedA).tabId).toBe(session.tabId);
+
+    const folderBefore = await downloadFiles(downloadsPath);
+    const redeemed = await session.callTool('browser_click', args, grants, [downloadTokenA]);
+
+    // The approval issued for this tab is the one it is redeemed on: the click runs and its file lands.
+    expect(redeemed).toMatchObject({ isError: false, kind: 'result' });
+    // Chrome renames a second file of the same name (`report (1).txt`) and may swallow one, so the folder is asserted
+    // To have grown rather than to hold an exact name list: a finished file is what the approval bought.
+    await expect
+      .poll(() => downloadFiles(downloadsPath).then(files => files.length), { timeout: 20_000 })
+      .toBeGreaterThan(folderBefore.length);
+    await expect
+      .poll(() => tempDownloadFiles(downloadsPath), { timeout: 20_000 })
+      .toStrictEqual([]);
+
+    const folderAfter = await downloadFiles(downloadsPath);
+
+    await showObservedState(agentPage, [
+      `answer: ${answerText(redeemed)}`,
+      `downloads folder: [${folderAfter.join(', ')}]`,
+      `files before the retry: ${String(folderBefore.length)}`,
+    ]);
+    await agentPage.screenshot({
+      fullPage: true,
+      path: testInfo.outputPath('10-two-tab-approval.png'),
+    });
+  } finally {
+    await launch.close();
+    await hub.close();
+    await fixture.close();
+  }
+});
+
+// eslint-disable-next-line no-empty-pattern -- Playwright requires the fixtures object destructured, and this spec takes no fixture: every page is opened on the launch's own context.
+test('the published browser_drop schema refuses no entry the model was told to send', async ({}, testInfo) => {
+  test.setTimeout(120_000);
+  const fixture = await startDownloadFixture();
+  const hub = await startFakeHub();
+  const launch = await launchRealDownloadBrowser();
+  const { context, extensionId } = launch;
+  await mockKiloApi(context, {});
+  await context.addInitScript({
+    content:
+      "Object.defineProperty(chrome.permissions, 'request', { value: () => Promise.resolve(true) });",
+  });
+
+  try {
+    const sidePanel = await context.newPage();
+    const agentPage = await context.newPage();
+
+    await agentPage.goto(`${fixture.url}${DROP_PAGE_PATH}`);
+
+    const origin = fixture.url;
+    const grants = grant(origin);
+    const session = await openPairedAgentSession({
+      beforeShare: async () => {
+        await activateTab(sidePanel, `${fixture.url}${DROP_PAGE_PATH}`);
+      },
+      context,
+      extensionId,
+      hub,
+      sidePanel,
+      title: 'Published drop schema E2E session',
+    });
+
+    // 1. The listing a model reads, over the paired socket rather than from the build: an id no tool call of this
+    // Session uses, because `tools.list` answers on the same wire `tools.call` does.
+    const listed = await sendAgentRpc(hub, session.controllerId, 9001, 'tools.list', {});
+    const listing = z
+      .object({
+        contractSha: z.string(),
+        tools: z.array(z.object({ inputSchema: z.unknown(), name: z.string() })),
+      })
+      .parse(listed.result);
+    const drop = listing.tools.find(tool => tool.name === 'browser_drop');
+    const publishedPaths = z
+      .object({ items: z.record(z.string(), z.unknown()) })
+      .parse(
+        z.object({ properties: z.record(z.string(), z.unknown()) }).parse(drop?.inputSchema)
+          .properties['paths']
+      );
+
+    // The narrowed item rule is the one the handler applies, and the vendored contract is untouched: its SHA is the
+    // Handshake stamp every CLI compares, so it still names the same pinned upstream listing.
+    expect(publishedPaths.items).toStrictEqual({ minLength: 1, type: 'string' });
+    expect(listing.contractSha).toMatch(/^[\da-f]{64}$/u);
+
+    const navigated = await session.callTool(
+      'browser_navigate',
+      { url: `${fixture.url}${DROP_PAGE_PATH}` },
+      grants
+    );
+
+    expect(navigated).toMatchObject({ isError: false, kind: 'result' });
+
+    await recordDropsOnPage(agentPage);
+    const dropRecord = agentPage.locator('#drop-record');
+
+    await expect(dropRecord).toHaveText('Drop record: nothing received yet');
+
+    // 2. The published rule requires a non-empty entry, and the handler applies the same rule: this entry names no
+    // File, so the tool's own argument check answers before any drag reaches the page.
+    // A model told `minLength: 1` reads the rule the call applies.
+    const refused = await session.callTool(
+      'browser_drop',
+      { element: 'Drop zone', paths: [''], target: '#zone' },
+      grants
+    );
+
+    expect(refused).toMatchObject({ isError: true, kind: 'result' });
+    expect(refused.kind === 'result' ? refused.text : '').toContain(
+      'browser_drop: invalid arguments'
+    );
+    // Refused before the tool ran: the page's own handler never saw a drop, and the fixture recorded none.
+    await expect(dropRecord).toHaveText('Drop record: nothing received yet');
+    await expect.poll(() => fixture.dropReceived(), { timeout: 5000 }).toStrictEqual([]);
+    await agentPage.screenshot({
+      fullPage: true,
+      path: testInfo.outputPath('11-published-drop-schema.png'),
+    });
+  } finally {
+    await launch.close();
+    await hub.close();
+    await fixture.close();
+  }
+});

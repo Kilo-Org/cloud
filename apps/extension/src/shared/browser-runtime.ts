@@ -1803,6 +1803,18 @@ export const createBrowserRuntime = ({
     readonly toolName: string;
   }): string => [binding.session, binding.toolName, binding.argumentHash].join('|');
 
+  /**
+   * A download approval belongs to one step on one tab, so that is what its record is filed under. Each tab's
+   * approval stays available for that tab's own retry.
+   */
+  const stepBindingKey = (binding: {
+    readonly argumentHash: string;
+    readonly session: string;
+    readonly tabId: number;
+    readonly toolName: string;
+  }): string =>
+    [binding.session, binding.toolName, binding.argumentHash, String(binding.tabId)].join('|');
+
   /** Remembers the tab a refused `browser_tabs new` step opened, for the one repeat its token buys. */
   const rememberStepTab = (step: DownloadStep, openedTabId: number): void => {
     if (step.toolName !== 'browser_tabs') {
@@ -1878,9 +1890,10 @@ export const createBrowserRuntime = ({
   };
 
   /**
-   * The binding each download approval was issued under, keyed by the step it belongs to. A refusal's retry is not
-   * re-classified as sensitive — post-action, the gate sees a file it never asked about — so the retry has no
-   * sensitive element of its own: the token still has to match the call it was issued for.
+   * The binding each download approval was issued under, filed under the step it belongs to and the tab that approval
+   * was issued for. A refusal's retry is not re-classified as sensitive — post-action, the gate sees a file it never
+   * asked about — so the retry has no sensitive element of its own: the token still has to match the call it was
+   * issued for.
    */
   const approvedStepBindings = new Map<
     string,
@@ -1915,7 +1928,10 @@ export const createBrowserRuntime = ({
       }
     }
 
-    approvedStepBindings.set(stepTabKey(step), { binding, since: at });
+    approvedStepBindings.set(stepBindingKey({ ...step, tabId: binding.tabId }), {
+      binding,
+      since: at,
+    });
 
     // Bounded the same way the step tabs are: only a token that is about to be redeemed can still read one.
     while (approvedStepBindings.size > STEP_TAB_LIMIT) {
@@ -1929,19 +1945,22 @@ export const createBrowserRuntime = ({
     }
   };
 
-  /** The binding a download approval for this step was issued under, while its entry is live. */
-  const peekApprovedBinding = (step: {
-    readonly argumentHash: string;
-    readonly session: string;
-    readonly toolName: string;
-  }):
+  /** The binding a download approval for this step on this tab was issued under, while its entry is live. */
+  const peekApprovedBinding = (
+    step: {
+      readonly argumentHash: string;
+      readonly session: string;
+      readonly toolName: string;
+    },
+    tabId: number
+  ):
     | {
         readonly element?: string | undefined;
         readonly origin: string;
         readonly tabId: number;
       }
     | undefined => {
-    const entry = approvedStepBindings.get(stepTabKey(step));
+    const entry = approvedStepBindings.get(stepBindingKey({ ...step, tabId }));
 
     return entry === undefined || entry.since + STEP_TAB_TTL_MS < Date.now()
       ? undefined
@@ -3533,11 +3552,14 @@ export const createBrowserRuntime = ({
             toolName: stepToolName,
           };
           const candidates: StepTokenBinding[] = [gateBinding];
-          const rememberedBinding = peekApprovedBinding({
-            argumentHash: stepHash,
-            session: sessionKey,
-            toolName: stepToolName,
-          });
+          const rememberedBinding = peekApprovedBinding(
+            {
+              argumentHash: stepHash,
+              session: sessionKey,
+              toolName: stepToolName,
+            },
+            gateBinding.tabId
+          );
 
           if (rememberedBinding !== undefined) {
             const issued: StepTokenBinding = {
@@ -3551,13 +3573,11 @@ export const createBrowserRuntime = ({
               toolName: stepToolName,
             };
 
-            // The record answers only on the tab the approval was issued for: an identical call on another tab is a
-            // New step that needs its own approval. On that tab it adds the element the gate classified and the
-            // Origin it bound, so it is a second candidate exactly when those differ.
+            // The record names the tab this call runs on, so it adds the element the gate classified and the origin it
+            // Bound: a second candidate exactly when those differ.
             if (
-              rememberedBinding.tabId === gateBinding.tabId &&
-              (issued.origin !== gateBinding.origin ||
-                (issued.element ?? '') !== (gateBinding.element ?? ''))
+              issued.origin !== gateBinding.origin ||
+              (issued.element ?? '') !== (gateBinding.element ?? '')
             ) {
               candidates.push(issued);
             }

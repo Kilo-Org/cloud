@@ -1077,6 +1077,172 @@ describe('agent browser calls', () => {
     expect(expectStepToken(otherTabRepeat)).not.toBe(otherToken);
   });
 
+  it('redeems a download approval on the tab it was issued for', async () => {
+    const downloads = createFakeDownloads();
+    const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
+    const otherTab = TAB_ID + 6;
+
+    // Both tabs are the session's, so the same call and the same arguments may be sent on either.
+    await runtime.shareActiveTab({ sessionHandle: 'session-1', tabId: otherTab });
+
+    /** Whether the pay frame's field is sensitive: the retry is driven with an ordinary field presentation. */
+    let sensitive = true;
+    /** The pay frame's field is sensitive; every node of the tab's own document is an ordinary one. */
+    const passwordProbe = { fields: [{ kind: 'password' }], paymentFormSubmit: false };
+    const plainProbe = { fields: [], paymentFormSubmit: false };
+    // The pay frame's tree gives node 31 an interactive role, so a snapshot surfaces it as the ref `e31`.
+    const payTree = {
+      nodes: [
+        { childIds: ['2'], nodeId: '1', role: { value: 'RootWebArea' } },
+        {
+          backendDOMNodeId: 31,
+          name: { value: 'Card number' },
+          nodeId: '2',
+          role: { value: 'textbox' },
+        },
+      ],
+    };
+    // One isolated world per frame, so the ownership probe can tell which document holds a node.
+    const worlds = new Map<number, string>();
+    let nextWorld = 3;
+    /** The presses that reached the page and the tab each drove: a refused call never runs the tool. */
+    const started: { readonly id: number; readonly tabId: number }[] = [];
+    let nextFileId = 71;
+
+    cdp.setHandlers({
+      'Accessibility.getFullAXTree': params => {
+        const { frameId } = params ?? {};
+
+        return frameId === 'f1' ? payTree : MAIN_TREE;
+      },
+      'DOM.resolveNode': params => {
+        const requested = params?.['backendNodeId'] ?? params?.['nodeId'];
+        const backendNodeId = typeof requested === 'number' ? String(requested) : 'none';
+        const contextId = params?.['executionContextId'];
+        const world = typeof contextId === 'number' ? (worlds.get(contextId) ?? 'main') : 'main';
+
+        return { object: { objectId: `obj-${backendNodeId}-${world}` } };
+      },
+      'Input.dispatchMouseEvent': (params, target) => {
+        // A drag is one press and one release: only the press can start the file. A refused call never ran the tool.
+        if (params?.['type'] === 'mousePressed') {
+          const id = nextFileId;
+          const tabId = target?.tabId ?? TAB_ID;
+
+          nextFileId += 1;
+          started.push({ id, tabId });
+          downloads.emit({ id, tabId, url: `${MAIN_ORIGIN}/report.txt` });
+        }
+
+        return {};
+      },
+      'Page.createIsolatedWorld': params => {
+        const frameId = typeof params?.['frameId'] === 'string' ? params['frameId'] : 'main';
+        const executionContextId = nextWorld;
+
+        nextWorld += 1;
+        worlds.set(executionContextId, frameId);
+
+        return { executionContextId };
+      },
+      'Runtime.callFunctionOn': params => {
+        const declaration = params?.['functionDeclaration'];
+        const objectId = typeof params?.['objectId'] === 'string' ? params['objectId'] : '';
+        const [backendNodeId = 'none', world = 'main'] = objectId.split('-').slice(1);
+        // The gate's ownership probe: node 31 is the pay frame's field, every other node the tab's document.
+        const nodeFrame = backendNodeId === '31' ? 'f1' : 'main';
+
+        return {
+          result: {
+            value:
+              typeof declaration === 'string' && declaration.includes('ownerDocument')
+                ? nodeFrame === world
+                : JSON.stringify(sensitive && backendNodeId === '31' ? passwordProbe : plainProbe),
+          },
+        };
+      },
+    });
+
+    const grants: readonly BrowserGrant[] = [
+      readGrant,
+      actGrant,
+      { class: 'read', origin: FRAME_ORIGIN },
+      { class: 'act', origin: FRAME_ORIGIN },
+    ];
+
+    // A ref belongs to the caller and the tab it was read on, so each tab needs its own snapshot of `e2` and `e31`.
+    for (const tabId of [TAB_ID, otherTab]) {
+      // eslint-disable-next-line no-await-in-loop -- one tab's snapshot per call, in order
+      const snapshot = await runtime.runTool({
+        agent: { authorized: grants },
+        arguments: {},
+        caller: agent(),
+        tabId,
+        toolName: 'browser_snapshot',
+      });
+
+      expect(snapshot.kind).toBe('result');
+    }
+
+    const drag = (tabId: number, presented: readonly string[]) =>
+      runtime.runTool({
+        agent: { authorized: grants, sensitive: [...presented] },
+        arguments: { endTarget: 'e31', startTarget: 'e2' },
+        caller: agent(),
+        tabId,
+        toolName: 'browser_drag',
+      });
+
+    /** One tab's refusal of the step, then of the file its approved repeat starts. */
+    const refuseFile = async (tabId: number): Promise<string> => {
+      // The sensitive element is in the pay frame while the call's first target is in the tab's own document.
+      const refusedStep = await drag(tabId, []);
+
+      expect(refusedStep).toMatchObject({
+        items: [{ class: 'sensitive', origin: FRAME_ORIGIN, reason: SENSITIVE_REASON.password }],
+        kind: 'needs_permission',
+      });
+
+      // The step's approval lets the drag run; the file it starts keeps the ordinary download rule.
+      const refusedFile = await drag(tabId, [expectStepToken(refusedStep)]);
+
+      expect(refusedFile).toMatchObject({
+        afterAction: true,
+        items: [{ class: 'sensitive', origin: MAIN_ORIGIN, reason: SENSITIVE_REASON.download }],
+        kind: 'needs_permission',
+      });
+
+      return expectStepToken(refusedFile);
+    };
+
+    // Each tab's refusal issues an approval of its own.
+    const firstToken = await refuseFile(TAB_ID);
+    const secondToken = await refuseFile(otherTab);
+
+    expect(secondToken).not.toBe(firstToken);
+    expect(started).toStrictEqual([
+      { id: 71, tabId: TAB_ID },
+      { id: 72, tabId: otherTab },
+    ]);
+    expect(downloads.cancelled).toStrictEqual([71, 72]);
+
+    // The pay frame answers as an ordinary field, so this repeat names no element of its own and is answered by the
+    // Record filed for the first tab.
+    sensitive = false;
+
+    const approved = await drag(TAB_ID, [firstToken]);
+
+    // The repeated drag keeps the one file that approval bought, and nothing was stopped again.
+    expect(started).toStrictEqual([
+      { id: 71, tabId: TAB_ID },
+      { id: 72, tabId: otherTab },
+      { id: 73, tabId: TAB_ID },
+    ]);
+    expect(downloads.cancelled).toStrictEqual([71, 72]);
+    expect(downloads.removed).toStrictEqual([]);
+    expect(JSON.stringify(expectResult(approved).result)).toContain('report.txt');
+  });
+
   it('gives the file a step-approved submit starts its own approval', async () => {
     // A granted `downloads` permission and no hold is the legacy tier.
     const downloads = createFakeDownloads();

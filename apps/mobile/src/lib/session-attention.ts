@@ -36,7 +36,10 @@ import { SESSION_ATTENTION_KEY } from '@/lib/storage-keys';
  * consumers stop holding, and it answers exactly as `ready` does: an ack this
  * run recorded still hides its raise, and with no ack the badge derives from
  * the server status. Failing that way can add a badge the person dismissed,
- * but it can never suppress a genuine raise.
+ * but it can never suppress a genuine raise. A commit recorded after a failed
+ * read is kept in memory only and never replaces the stored blob: the read
+ * never merged it, so writing the map would drop the acks the blob still
+ * holds. Those survive to the next launch, which hydrates them normally.
  *
  * No backend or tRPC imports: this is a mobile-local module so the web client
  * can keep its own copy. The one shared import is the pure timestamp reader,
@@ -148,7 +151,9 @@ type PersistedAttentionEntry = {
  * `ready` — the read completed: persisted entries applied, or genuinely empty.
  * `failed` — the KV is unavailable, the read rejected, or the blob does not
  * parse. Settled: never retried, so consumers must not wait on it; they fail
- * open instead.
+ * open instead. A commit recorded after a failed read stays in memory only and
+ * does not replace the stored blob, so the acks this run never merged survive
+ * and the next launch hydrates them.
  */
 export type SessionAttentionHydration = 'loading' | 'ready' | 'failed';
 
@@ -239,10 +244,18 @@ let lastWrite: Promise<void> | null = null;
 
 function persistEntries(): void {
   lastWrite = chainSave(SESSION_ATTENTION_KEY, async () => {
-    // Serialize only after hydration settles. A write that lands during the
-    // hydration window must not overwrite the persisted blob before the
-    // hydrated entries are applied, or it erases other sessions' acks.
-    await hydrationPromise;
+    // Start the read when none ran (a reset), else join the settled one. A
+    // write that lands during the hydration window must not overwrite the
+    // persisted blob before the hydrated entries are applied, or it erases
+    // other sessions' acks.
+    await hydrate();
+    // The blob was never merged this run (no KV, or the read rejected), so the
+    // map is not the whole record: writing it would drop the acks the blob
+    // still holds. The ack stays in memory, which is what the settled `failed`
+    // phase promises, and the next launch hydrates the blob as it stands.
+    if (!blobReadUnderEpoch) {
+      return;
+    }
     const serialized = serializeEntries();
     await writeEntriesSafely(serialized);
   });
@@ -305,6 +318,17 @@ function hydratedEntry(entry: PersistedAttentionEntry, raiseId: string): Attenti
 
 let hydrationPromise: Promise<void> | null = null;
 
+// Set only by a read that returned under the current account boundary. The
+// in-memory map is the whole record only once that happened: before it, the
+// map may be missing rows the stored blob still holds, so a write that
+// replaced the blob would drop them.
+let blobReadUnderEpoch = false;
+
+// Bumped at every account boundary (sign-out, test reset) so a read that
+// started before it neither applies the signed-out account's rows nor
+// persists the emptied map it never saw.
+let hydrationEpoch = 0;
+
 // Dev-only: a bundle-time delay so the loading window is observable on a
 // device (`EXPO_PUBLIC_*` is inlined by Metro, so the value is baked into the
 // bundle and never read at runtime). Default 0 keeps the shipped timing; a
@@ -354,6 +378,7 @@ async function hydrate(): Promise<void> {
   if (hydrationPromise) {
     return hydrationPromise;
   }
+  const epoch = hydrationEpoch;
   hydrationPromise = (async () => {
     if (devHydrationDelayMs > 0) {
       const { promise, resolve } = Promise.withResolvers<undefined>();
@@ -361,17 +386,33 @@ async function hydrate(): Promise<void> {
       await promise;
     }
     const kv = await loadKv();
+    // The account boundary moved while this read was being set up: what it
+    // would apply belongs to the signed-out account, and sign-out already
+    // settled the phase, so touch neither.
+    if (epoch !== hydrationEpoch) {
+      return;
+    }
     if (!kv) {
       // No encrypted KV on this build: settled and empty, and it never retries.
       settleHydration('failed');
       return;
     }
     const read = await readPersistedEntries(kv);
+    // Same boundary, crossed while the read was in flight: drop the result
+    // rather than restore rows into a map the clear just emptied.
+    if (epoch !== hydrationEpoch) {
+      return;
+    }
     if (read.kind === 'error') {
       // Unreadable KV: settled, so consumers fail open on the server status.
+      // The blob was never merged, so it stays not-known-read and no write
+      // replaces it this run.
       settleHydration('failed');
       return;
     }
+    // The read returned, so the map now holds everything the blob does — or
+    // the blob was absent/unreadable as data, which the map may replace.
+    blobReadUnderEpoch = true;
     if (read.raw === null) {
       // No blob is a genuinely empty store, not a failure.
       settleHydration('ready');
@@ -644,6 +685,9 @@ export function reconcileSessionAttention(
  * Best effort: a storage failure is swallowed so it can never abort sign-out.
  */
 export async function clearSessionAttentionForSignOut(): Promise<void> {
+  // A read already in flight belongs to the signed-out account: invalidate it
+  // before the wipe, or its rows land in the map the clear just emptied.
+  hydrationEpoch += 1;
   store.entries.clear();
   // One bump, through the settle helper: the phase moves to `ready` (or, when it
   // already is, the cleared entries are the change). Nothing re-runs hydrate for
@@ -662,8 +706,11 @@ export async function clearSessionAttentionForSignOut(): Promise<void> {
   });
   await lastWrite;
   // Re-arm hydration so the next account does not read the cleared blob
-  // through the settled promise of this run.
+  // through the settled promise of this run, and require its own read before
+  // any write replaces the blob: a write queued across this reset must not
+  // persist the emptied map over the scope the clear just deleted.
   hydrationPromise = null;
+  blobReadUnderEpoch = false;
 }
 
 /**
@@ -799,7 +846,11 @@ export function __resetSessionAttentionForTests(): void {
   store.entries.clear();
   store.revision = 0;
   store.hydration = 'loading';
+  // An abandoned read from an earlier case must not apply or persist into
+  // this one.
+  hydrationEpoch += 1;
   hydrationPromise = null;
+  blobReadUnderEpoch = false;
   lastWrite = null;
   for (const release of settledWaitReleases) {
     release();

@@ -596,6 +596,54 @@ describe('durable persistence', () => {
     ackSessionAttention('s1', 'question', 'R1');
     expect(isAttentionAcked('s1', { raiseId: 'R1' })).toBe(true);
   });
+
+  it('a rejected read followed by an ack keeps the prior stored rows', async () => {
+    const now = Date.now();
+    seedAttentionKv([
+      {
+        sessionId: 's1',
+        raiseId: 'R1',
+        status: 'question',
+        ackedAt: now,
+        expiresAt: now + SESSION_ATTENTION_EXPIRY_MS,
+      },
+    ]);
+    kvMock.getItem.mockRejectedValueOnce(new Error('corrupt'));
+    __resetSessionAttentionForTests();
+    await __hydrateSessionAttentionForTests();
+    expect(getHydrationSnapshot()).toBe('failed');
+
+    ackSessionAttention('s2', 'question', 'R2');
+    await __flushSessionAttentionWritesForTests();
+
+    // The blob was never merged, so the ack must not replace it: s1's stored
+    // ack survives to the next launch, and s2's answer answers in memory for
+    // this run only.
+    const stored = JSON.parse(
+      kvStore.get(storageKey(SESSION_ATTENTION_KEY, ATTENTION_ENTRY_KEY)) ?? '[]'
+    ) as { sessionId: string }[];
+    expect(stored.map(entry => entry.sessionId)).toEqual(['s1']);
+    expect(isAttentionAcked('s2', { raiseId: 'R2' })).toBe(true);
+    expect(kvMock.setItem).not.toHaveBeenCalled();
+  });
+
+  it('an ack after an unparsable blob still persists', async () => {
+    // A blob whose data cannot be read holds no rows to protect, so the map
+    // may replace it.
+    kvStore.set(storageKey(SESSION_ATTENTION_KEY, ATTENTION_ENTRY_KEY), '{not json');
+    __resetSessionAttentionForTests();
+    await __hydrateSessionAttentionForTests();
+    expect(getHydrationSnapshot()).toBe('failed');
+
+    ackSessionAttention('s1', 'question', 'R1');
+    await __flushSessionAttentionWritesForTests();
+
+    const stored = JSON.parse(
+      kvStore.get(storageKey(SESSION_ATTENTION_KEY, ATTENTION_ENTRY_KEY)) ?? '[]'
+    ) as unknown[];
+    expect(stored).toHaveLength(1);
+    expect(stored[0]).toEqual(expect.objectContaining({ sessionId: 's1' }));
+  });
 });
 
 describe('expiry', () => {
@@ -1142,5 +1190,44 @@ describe('sign-out cleanup', () => {
 
     await expect(clearSessionAttentionForSignOut()).resolves.toBeUndefined();
     expect(__peekSessionAttentionForTests('session-a')).toBeUndefined();
+  });
+
+  it('a deferred read resolved after sign-out leaves the store and the KV empty', async () => {
+    const now = Date.now();
+    const readGate = Promise.withResolvers<string | null>();
+    const readIssued = Promise.withResolvers<undefined>();
+    kvMock.getItem.mockImplementationOnce(async () => {
+      // Signalled synchronously when the read is issued, so the clear below
+      // runs with the `getItem` genuinely in flight.
+      readIssued.resolve(undefined);
+      return readGate.promise;
+    });
+
+    __resetSessionAttentionForTests();
+    const hydration = __hydrateSessionAttentionForTests();
+    await readIssued.promise;
+    expect(kvMock.getItem).toHaveBeenCalledTimes(1);
+
+    await clearSessionAttentionForSignOut();
+
+    // The read was issued for the signed-out account: resolving it after the
+    // wipe must neither restore its rows nor rewrite the cleared scope.
+    readGate.resolve(
+      JSON.stringify([
+        {
+          sessionId: 's1',
+          raiseId: 'R1',
+          status: 'question',
+          ackedAt: now,
+          expiresAt: now + SESSION_ATTENTION_EXPIRY_MS,
+        },
+      ])
+    );
+    await hydration;
+    await __flushSessionAttentionWritesForTests();
+
+    expect(__peekSessionAttentionForTests('s1')).toBeUndefined();
+    expect(getHydrationSnapshot()).toBe('ready');
+    expect(kvStore.get(storageKey(SESSION_ATTENTION_KEY, ATTENTION_ENTRY_KEY))).toBeUndefined();
   });
 });

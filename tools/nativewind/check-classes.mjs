@@ -61,9 +61,10 @@ const ROOT = fileURLToPath(new URL('../../', import.meta.url));
  * below scans the source root, the theme tokens come from its `global.css`, and
  * the formatter rule scopes itself by it, so a moved or renamed app root
  * reaches all three together instead of leaving one of them reading a path the
- * walk no longer parses. The layout allowlist and exempt trees are written
- * under the same base, so the prefix the layout rules test and the slice they
- * take are one path, not two spellings of it. The compiler pins resolve
+ * walk no longer parses. Every allowlist, exemption tree and exemption set is
+ * written under the same base, so the prefix a rule tests and the slice it takes
+ * are one path, not two spellings of it, and a renamed app root cannot leave a
+ * set matching nothing. The compiler pins resolve
  * `react-native-css/compiler` from the app's `package.json` under this base too:
  * the compiler is the app's dependency, not the repo root's, so that resolution
  * moves with the rest.
@@ -73,6 +74,23 @@ const require = createRequire(join(ROOT, APP_RELATIVE, 'package.json'));
 const APP_SRC_RELATIVE = `${APP_RELATIVE}/src`;
 const APP_SRC = join(ROOT, APP_SRC_RELATIVE);
 const SOURCE_DIRS = [APP_SRC, join(ROOT, 'packages/app-shared/src')];
+
+/**
+ * The path relative to `APP_RELATIVE` — the spelling every allowlist and
+ * exemption tree below uses — or null when the path is outside the app. One
+ * slice, so a moved app root moves the walk, the layout lists and the
+ * exemption sets together.
+ */
+function appPath(path) {
+  const prefix = `${APP_RELATIVE}/`;
+  return path.startsWith(prefix) ? path.slice(prefix.length) : null;
+}
+
+/** Whether `path` is one of `set`'s entries, which are relative to `APP_RELATIVE`. */
+function appExempt(set, path) {
+  const relativeAppPath = appPath(path);
+  return relativeAppPath !== null && set.has(relativeAppPath);
+}
 
 /**
  * The modules that own the layout scale, relative to `APP_RELATIVE`: the UI
@@ -291,6 +309,7 @@ function firstLine(error) {
   return (error instanceof Error ? error.message : String(error)).split('\n')[0];
 }
 
+/** The theme read as one state, memoised: `{ ok: true, tokens }` or `{ ok: false, failure }`. */
 let themeTokenCache;
 
 /**
@@ -331,9 +350,49 @@ function readThemeTokens() {
   }
 }
 
-/** The memoised read of the theme tokens and its failure, so one read serves the run. */
+/**
+ * The theme seam's own problem, worded like the baseline one: the reader named
+ * the seam, the cause says what it supplied, and the rule it starves is named so
+ * the report says what went unchecked.
+ */
+function themeSeamFailure(cause) {
+  return `check-classes: the theme read seam is malformed (${cause}) — the /opacity modifier rule cannot run without the tokens and was skipped`;
+}
+
+/**
+ * The theme read as one state: the tokens the `/opacity` rule builds its pattern
+ * from, or the reason they are not there. A seam that supplies neither — a
+ * partial result, a missing field, a null — becomes a failure that names the
+ * seam, so it is reported as an instrument problem instead of throwing out of a
+ * rule or silently falling back to the repository's global.css.
+ */
+function themeState(result) {
+  if (!isPlainObject(result)) {
+    return {
+      ok: false,
+      failure: themeSeamFailure(`the theme read returned ${JSON.stringify(result) ?? 'undefined'}`),
+    };
+  }
+  const { tokens, failure } = result;
+  if (typeof failure === 'string') {
+    return { ok: false, failure };
+  }
+  if (
+    !Array.isArray(tokens) ||
+    tokens.length === 0 ||
+    tokens.some(token => typeof token !== 'string' || token === '')
+  ) {
+    return { ok: false, failure: themeSeamFailure('it supplied no tokens') };
+  }
+  if (failure !== null && failure !== undefined) {
+    return { ok: false, failure: themeSeamFailure('it supplied both tokens and a failure') };
+  }
+  return { ok: true, tokens };
+}
+
+/** The memoised read of the theme as one state, so one read serves the run. */
 function themeTokens() {
-  themeTokenCache ??= readThemeTokens();
+  themeTokenCache ??= themeState(readThemeTokens());
   return themeTokenCache;
 }
 
@@ -343,8 +402,8 @@ function themeTokens() {
  * would match nothing while claiming the colours were checked.
  */
 function opacityRules() {
-  const { tokens } = themeTokens();
-  if (tokens === null) {
+  const state = themeTokens();
+  if (!state.ok) {
     return [];
   }
   return [
@@ -360,7 +419,7 @@ function opacityRules() {
       // transparent)`, so they are dropped the same way and one compiler pin
       // covers both.
       pattern: new RegExp(
-        `\\b(?:${COLOR_UTILITIES})-(?:${tokens.join('|')})/(?:\\d+\\b|\\[[^\\]\\s]+\\])`,
+        `\\b(?:${COLOR_UTILITIES})-(?:${state.tokens.join('|')})/(?:\\d+\\b|\\[[^\\]\\s]+\\])`,
         'g'
       ),
       advice:
@@ -681,30 +740,30 @@ export function checkScrollPadding(relative, elements, chunks, text, lineOf) {
  * reported where its binding is used as `.Text`, whether by a member access or
  * by destructuring `Text` out of the binding.
  */
-const RAW_TEXT_EXEMPT = new Set([
+export const RAW_TEXT_EXEMPT = new Set([
   // The shared component itself: it is the replacement the rule names, and it
   // renders the platform Text under the base classes the rule protects.
-  'apps/mobile/src/components/ui/text.tsx',
+  'src/components/ui/text.tsx',
   // A hidden node measured for height. It must not inherit the shared
   // component's base font classes, or the measurement stops matching the
   // input it mirrors.
-  'apps/mobile/src/components/agents/use-text-height.tsx',
+  'src/components/agents/use-text-height.tsx',
   // These two build the agent's markdown HTML surface with their own computed
   // styles, and a `mobile-pure` test reaches them — importing the shared
   // component would pull @rn-primitives/slot's untransformed JSX into a node
   // environment. Both apply `withRtlWritingDirection` from the same source.
-  'apps/mobile/src/components/agents/markdown-html.tsx',
-  'apps/mobile/src/components/agents/markdown-html-details.tsx',
+  'src/components/agents/markdown-html.tsx',
+  'src/components/agents/markdown-html-details.tsx',
   // The code surfaces — both diff rows, the highlighted runs inside them and
   // the fenced code block — name their own LTR base direction, because code
   // reads left to right in every interface language, and they nest a raw
   // `Text` run under the line's own `Text` so the run inherits the mono font.
   // The shared component's base font classes would override that font on every
   // run and its paragraph direction would flip the code in an RTL locale.
-  'apps/mobile/src/components/agents/code-block.tsx',
-  'apps/mobile/src/components/pr-review/diff/diff-line.tsx',
-  'apps/mobile/src/components/pr-review/diff/highlight-runs.tsx',
-  'apps/mobile/src/components/pr-review/diff/pr-diff-side-by-side-row.tsx',
+  'src/components/agents/code-block.tsx',
+  'src/components/pr-review/diff/diff-line.tsx',
+  'src/components/pr-review/diff/highlight-runs.tsx',
+  'src/components/pr-review/diff/pr-diff-side-by-side-row.tsx',
 ]);
 
 /** The module the raw `Text` rule reads: the platform one, not the shared component. */
@@ -739,7 +798,7 @@ function* valueImportSpecifiers(declaration, modules) {
 
 export function checkRawText(relative, imports, memberUses, lineOf) {
   const problems = [];
-  if (RAW_TEXT_EXEMPT.has(relative)) {
+  if (appExempt(RAW_TEXT_EXEMPT, relative)) {
     return problems;
   }
   // The bindings a `.Text` use names. A namespace or default import is only
@@ -808,10 +867,10 @@ const INTL_CONSTRUCTORS = new Set([
 const TO_LOCALE_STRING = /^toLocale(?:Date|Time)?String$/;
 // These layouts are stringified and run in the iOS widget extension, which
 // cannot import @/lib/intl-cache; they normalise the locale tag themselves.
-const WIDGET_PROCESS_LAYOUTS = new Set([
-  'apps/mobile/src/glanceable-ios/active-agents-widget.tsx',
-  'apps/mobile/src/glanceable-ios/active-agents-live-activity.tsx',
-  'apps/mobile/src/glanceable-ios/session-live-activity.tsx',
+export const WIDGET_PROCESS_LAYOUTS = new Set([
+  'src/glanceable-ios/active-agents-widget.tsx',
+  'src/glanceable-ios/active-agents-live-activity.tsx',
+  'src/glanceable-ios/session-live-activity.tsx',
 ]);
 
 /** `object.name` from a member expression read as a plain dotted name. */
@@ -839,7 +898,7 @@ export function checkDirectIntl(relative, absolute, calls, lineOf) {
   if (
     !absolute.startsWith(APP_SRC) ||
     relative.endsWith('lib/intl-cache.ts') ||
-    WIDGET_PROCESS_LAYOUTS.has(relative)
+    appExempt(WIDGET_PROCESS_LAYOUTS, relative)
   ) {
     return problems;
   }
@@ -1236,14 +1295,14 @@ function detectRowChevrons({ imports, lineOf }) {
  * title line is not a plain string keep it; everything else passes a `title`
  * and, for a badge beside it, `titleAccessory`.
  */
-const TITLE_CONTENT_ALLOWLIST = new Set([
-  'apps/mobile/src/components/chat/chat-screen.tsx',
-  'apps/mobile/src/components/home/home-screen.tsx',
-  'apps/mobile/src/components/profiles/profile-overview-screen.tsx',
+export const TITLE_CONTENT_ALLOWLIST = new Set([
+  'src/components/chat/chat-screen.tsx',
+  'src/components/home/home-screen.tsx',
+  'src/components/profiles/profile-overview-screen.tsx',
 ]);
 
 function detectTitleContent({ relative, program, lineOf }) {
-  if (TITLE_CONTENT_ALLOWLIST.has(relative)) {
+  if (appExempt(TITLE_CONTENT_ALLOWLIST, relative)) {
     return [];
   }
   const problems = [];
@@ -1266,15 +1325,15 @@ function detectTitleContent({ relative, program, lineOf }) {
  * the sheet's JSX stays, because that reads elements, not imports.
  */
 const SHEET_MODULES = new Set(['@/components/ui/sheet']);
-const SHEET_ALLOWLIST = new Set([
+export const SHEET_ALLOWLIST = new Set([
   // A confirmation dialog with its own title and message, not a titled sheet.
-  'apps/mobile/src/components/destructive-confirm-dialog.tsx',
+  'src/components/destructive-confirm-dialog.tsx',
   // The generic sheet shell: the caller supplies the child surface and its header.
-  'apps/mobile/src/components/agents/session-page-sheet.tsx',
+  'src/components/agents/session-page-sheet.tsx',
   // These three draw the todo sheets' title with `SheetTitleRow`.
-  'apps/mobile/src/components/todos/save-draft-as-todo-sheet.tsx',
-  'apps/mobile/src/components/todos/session-todo-link.tsx',
-  'apps/mobile/src/components/todos/todo-link-session-sheet.tsx',
+  'src/components/todos/save-draft-as-todo-sheet.tsx',
+  'src/components/todos/session-todo-link.tsx',
+  'src/components/todos/todo-link-session-sheet.tsx',
 ]);
 
 /**
@@ -1300,33 +1359,52 @@ function localComponents(program) {
   return components;
 }
 
-/** Whether one local component — or a local component it renders — draws a header. */
-function localComponentDrawsHeader(name, text, components, visited) {
-  const body = components.get(name);
-  if (body === undefined || visited.has(name)) {
-    return false;
-  }
-  visited.add(name);
-  let header = false;
-  const children = [];
-  walk(body, node => {
-    if (node.type !== 'JSXOpeningElement') {
+/**
+ * Whether `scope` — a sheet element or a local component's body — draws a
+ * `SheetHeader` that belongs to the sheet around it. A header under a nested
+ * sheet is that sheet's, so the same nesting rule reads a literal `SheetHeader`
+ * and a local component that draws one, and the recursion carries it.
+ */
+function drawsOwnHeader(scope, text, components, sheetNames, visited = new Set()) {
+  const headers = [];
+  const candidates = [];
+  const nested = [];
+  walk(scope, node => {
+    if (node === scope) {
       return;
     }
-    const tag = tagName(node, text);
-    if (tag === 'SheetHeader') {
-      header = true;
-    } else if (components.has(tag)) {
-      children.push(tag);
+    if (node.type === 'JSXElement' && sheetNames.has(tagName(node.openingElement, text))) {
+      nested.push(node);
+    } else if (node.type === 'JSXOpeningElement') {
+      const tag = tagName(node, text);
+      if (tag === 'SheetHeader') {
+        headers.push(node.start);
+      } else if (components.has(tag)) {
+        candidates.push({ tag, start: node.start });
+      }
     }
   });
+  const outsideNested = start => !nested.some(child => start > child.start && start < child.end);
   return (
-    header || children.some(child => localComponentDrawsHeader(child, text, components, visited))
+    headers.some(outsideNested) ||
+    candidates.some(candidate => {
+      if (!outsideNested(candidate.start) || visited.has(candidate.tag)) {
+        return false;
+      }
+      // A cycle guard: this component, or one reached from it, is being read.
+      return drawsOwnHeader(
+        components.get(candidate.tag),
+        text,
+        components,
+        sheetNames,
+        new Set([...visited, candidate.tag])
+      );
+    })
   );
 }
 
 function detectSheetHeader({ relative, imports, program, text, lineOf }) {
-  if (SHEET_ALLOWLIST.has(relative)) {
+  if (appExempt(SHEET_ALLOWLIST, relative)) {
     return [];
   }
   const sheetNames = new Set();
@@ -1352,40 +1430,10 @@ function detectSheetHeader({ relative, imports, program, text, lineOf }) {
       return;
     }
     // The header belongs to this sheet's own subtree: a header inside a nested
-    // sheet is that sheet's, not this one's, and the same nesting rule serves
-    // both a literal SheetHeader and a local component that draws one.
-    const headers = [];
-    const candidates = [];
-    const nested = [];
-    walk(node, descendant => {
-      if (descendant === node) {
-        return;
-      }
-      if (
-        descendant.type === 'JSXElement' &&
-        sheetNames.has(tagName(descendant.openingElement, text))
-      ) {
-        nested.push(descendant);
-      } else if (descendant.type === 'JSXOpeningElement') {
-        const tag = tagName(descendant, text);
-        if (tag === 'SheetHeader') {
-          headers.push(descendant.start);
-        } else if (components.has(tag)) {
-          candidates.push({ tag, start: descendant.start });
-        }
-      }
-    });
-    const outsideNested = start => !nested.some(child => start > child.start && start < child.end);
-    const header =
-      headers.some(outsideNested) ||
-      // A sheet whose body is a local component (`<SessionFilterContent />`)
-      // can draw its header there; follow the component it renders.
-      candidates.some(
-        candidate =>
-          outsideNested(candidate.start) &&
-          localComponentDrawsHeader(candidate.tag, text, components, new Set())
-      );
-    if (!header) {
+    // sheet is that sheet's, not this one's. `drawsOwnHeader` holds that nesting
+    // rule, so a literal `SheetHeader` and a local component that draws one are
+    // read the same way.
+    if (!drawsOwnHeader(node, text, components, sheetNames)) {
       problems.push({ line: lineOf(node.start), offending: `<${name}>` });
     }
   });
@@ -1441,13 +1489,13 @@ function layoutExempt(path) {
   if (!path.startsWith(`${APP_SRC_RELATIVE}/`)) {
     return true;
   }
-  // The allowlist is written relative to `APP_RELATIVE`, so it reads `src/…`.
-  const appPath = path.slice(APP_RELATIVE.length + 1);
-  if (LAYOUT_EXEMPT_TREES.some(tree => appPath.startsWith(tree))) {
+  // Not null: the prefix tested above is under `APP_RELATIVE`.
+  const appRelative = appPath(path);
+  if (LAYOUT_EXEMPT_TREES.some(tree => appRelative.startsWith(tree))) {
     return true;
   }
   return LAYOUT_ALLOWLIST.some(
-    entry => appPath === entry || (entry.endsWith('/') && appPath.startsWith(entry))
+    entry => appRelative === entry || (entry.endsWith('/') && appRelative.startsWith(entry))
   );
 }
 
@@ -1987,7 +2035,10 @@ function compareLayoutBaseline(findings, baseline) {
  * - `readBaseline` supplies both the checked-in baseline for the comparison and
  *   the failure that skips it, so a run never compares against a file it could
  *   not read.
- * - `readTheme` supplies the `@theme inline` tokens and their failure.
+ * - `readTheme` fills the same shape `readThemeTokens` returns — the
+ *   `@theme inline` tokens and their failure — and `run` normalises it into the
+ *   one theme state, so a result that supplies neither is reported instead of
+ *   escaping a rule.
  *
  * The theme read and the ban list are scoped to the run: the memos are seeded
  * from this run's reader, and the caches the module held before it are
@@ -1996,7 +2047,7 @@ function compareLayoutBaseline(findings, baseline) {
 export function run({ readTheme = readThemeTokens, ...options } = {}) {
   const previousTheme = themeTokenCache;
   const previousRules = ruleCache;
-  themeTokenCache = readTheme();
+  themeTokenCache = themeState(readTheme());
   ruleCache = undefined;
   try {
     return auditRun(options);
@@ -2052,10 +2103,10 @@ function auditRun({
   // summary.
   // The theme was already read during the walk, by the opacity rule, so this is
   // the memo and not a second read.
-  const { failure: themeFailure } = themeTokens();
+  const theme = themeTokens();
   const { baseline, failure: baselineFailure } = readBaseline();
-  if (themeFailure !== null) {
-    problems.push(themeFailure);
+  if (!theme.ok) {
+    problems.push(theme.failure);
   }
   if (baselineFailure !== null) {
     problems.push(baselineFailure);

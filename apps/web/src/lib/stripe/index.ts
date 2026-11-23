@@ -1308,18 +1308,19 @@ async function handlePaymentMethodEvent(
 type AutoTopUpOwner = { type: 'user'; id: string } | { type: 'organization'; id: string };
 type DisputeChargeWithInvoice = Stripe.Charge & { invoice?: string | Stripe.Invoice | null };
 
+// charge_refused_at records a current refusal, so a settled charge clears it.
 async function releaseAutoTopUpAttemptLock(owner: AutoTopUpOwner): Promise<void> {
   if (owner.type === 'user') {
     await db
       .update(auto_top_up_configs)
-      .set({ attempt_started_at: null })
+      .set({ attempt_started_at: null, charge_refused_at: null })
       .where(eq(auto_top_up_configs.owned_by_user_id, owner.id));
     return;
   }
 
   await db
     .update(auto_top_up_configs)
-    .set({ attempt_started_at: null })
+    .set({ attempt_started_at: null, charge_refused_at: null })
     .where(eq(auto_top_up_configs.owned_by_organization_id, owner.id));
 }
 
@@ -1327,14 +1328,22 @@ async function markAutoTopUpCompleted(owner: AutoTopUpOwner): Promise<void> {
   if (owner.type === 'user') {
     await db
       .update(auto_top_up_configs)
-      .set({ last_auto_top_up_at: sql`NOW()`, attempt_started_at: null })
+      .set({
+        last_auto_top_up_at: sql`NOW()`,
+        attempt_started_at: null,
+        charge_refused_at: null,
+      })
       .where(eq(auto_top_up_configs.owned_by_user_id, owner.id));
     return;
   }
 
   await db
     .update(auto_top_up_configs)
-    .set({ last_auto_top_up_at: sql`NOW()`, attempt_started_at: null })
+    .set({
+      last_auto_top_up_at: sql`NOW()`,
+      attempt_started_at: null,
+      charge_refused_at: null,
+    })
     .where(eq(auto_top_up_configs.owned_by_organization_id, owner.id));
 }
 

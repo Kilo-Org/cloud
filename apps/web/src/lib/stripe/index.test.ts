@@ -2980,6 +2980,7 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
         stripe_payment_method_id: `pm_${chargeId}`,
         amount_cents: principal,
         attempt_started_at: startedAt,
+        charge_refused_at: new Date().toISOString(),
       });
       await db.insert(credit_transactions).values({
         kilo_user_id: user.id,
@@ -3072,6 +3073,7 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
             : eq(auto_top_up_configs.owned_by_user_id, user.id),
         });
         expect(config?.attempt_started_at).toBeNull();
+        expect(config?.charge_refused_at).toBeNull();
         expect(config?.last_auto_top_up_at).not.toBeNull();
       } finally {
         invoicePayments.mockRestore();
@@ -3593,6 +3595,7 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
       stripe_payment_method_id: `pm_lock_user_${Math.random()}`,
       amount_cents: 2000,
       attempt_started_at: new Date().toISOString(),
+      charge_refused_at: new Date().toISOString(),
     });
 
     const processTopUpMock = processTopUp as jest.MockedFunction<typeof processTopUp>;
@@ -3628,6 +3631,7 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
         where: eq(auto_top_up_configs.owned_by_user_id, user.id),
       });
       expect(userConfig?.attempt_started_at).toBeNull();
+      expect(userConfig?.charge_refused_at).toBeNull();
     } finally {
       processTopUpMock.mockRestore();
     }

@@ -9,6 +9,7 @@ import { SELF_CLEANUP_PROCEDURES } from '@kilocode/app-shared/auth';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   agent_configs,
+  auto_top_up_configs,
   cli_sessions_v2,
   credit_transactions,
   device_sessions,
@@ -2954,6 +2955,47 @@ describe('user router - hasGatewayUsage', () => {
       await db.delete(microdollar_usage).where(eq(microdollar_usage.kilo_user_id, isolatedUser.id));
       await db.delete(kilocode_users).where(eq(kilocode_users.id, isolatedUser.id));
     }
+  });
+});
+
+describe('user router - toggleAutoTopUp', () => {
+  let enableUser: User;
+
+  beforeAll(async () => {
+    enableUser = await insertTestUser({
+      google_user_email: `toggle-auto-top-up-${crypto.randomUUID()}@example.com`,
+    });
+  });
+
+  afterAll(async () => {
+    await db
+      .delete(auto_top_up_configs)
+      .where(eq(auto_top_up_configs.owned_by_user_id, enableUser.id));
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, enableUser.id));
+  });
+
+  it('clears a recorded charge refusal when enabling with a saved payment method', async () => {
+    await db.insert(auto_top_up_configs).values({
+      owned_by_user_id: enableUser.id,
+      stripe_payment_method_id: `pm_toggle_${crypto.randomUUID()}`,
+      amount_cents: 5000,
+      charge_refused_at: new Date().toISOString(),
+    });
+
+    const caller = await createCallerForUser(enableUser.id);
+    await expect(caller.user.toggleAutoTopUp({ currentEnabled: false })).resolves.toEqual({
+      enabled: true,
+    });
+
+    const config = await db.query.auto_top_up_configs.findFirst({
+      where: eq(auto_top_up_configs.owned_by_user_id, enableUser.id),
+    });
+    expect(config?.charge_refused_at).toBeNull();
+
+    const user = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.id, enableUser.id),
+    });
+    expect(user?.auto_top_up_enabled).toBe(true);
   });
 });
 

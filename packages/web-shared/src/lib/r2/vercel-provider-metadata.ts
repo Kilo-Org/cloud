@@ -7,6 +7,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 export function createVercelProviderMetadataCollector() {
   let metadata: Record<string, unknown> | undefined;
   let terminal = false;
+  let kind: GatewayChatApiKind | undefined;
   const { promise: completed, resolve: complete } = Promise.withResolvers<void>();
 
   const captureNode = (value: unknown) => {
@@ -15,9 +16,25 @@ export function createVercelProviderMetadataCollector() {
     if (isRecord(candidate)) metadata = candidate;
   };
 
+  const resolveKind = (
+    value: Record<string, unknown>,
+    apiKind?: GatewayChatApiKind
+  ): GatewayChatApiKind | undefined => {
+    if (apiKind !== undefined) {
+      kind = apiKind;
+      return apiKind;
+    }
+    if (kind === undefined) {
+      if (value.type === 'message_start') kind = 'messages';
+      else if (isRecord(value.response)) kind = 'responses';
+      else if (Array.isArray(value.choices)) kind = 'chat_completions';
+    }
+    return kind;
+  };
+
   return {
     completed,
-    capture(value: unknown, apiKind?: GatewayChatApiKind) {
+    capture(value: unknown, suppliedApiKind?: GatewayChatApiKind) {
       if (terminal) return;
       if (value === '[DONE]') {
         terminal = true;
@@ -26,10 +43,12 @@ export function createVercelProviderMetadataCollector() {
       }
       if (!isRecord(value)) return;
 
-      if (apiKind === 'messages' || (apiKind === undefined && value.type === 'message_start')) {
+      const apiKind = resolveKind(value, suppliedApiKind);
+
+      if (apiKind === 'messages') {
         if (value.type === 'message_start') captureNode(value.message);
         captureNode(value);
-      } else if (apiKind === 'responses' || (apiKind === undefined && isRecord(value.response))) {
+      } else if (apiKind === 'responses') {
         captureNode(value.response);
         captureNode(value);
       } else {

@@ -5,7 +5,7 @@ import {
   EnkryptScanKindSchema,
   EnkryptScanPartSchema,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/report';
-import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
+import { getEnvVariable, requireEnv } from '@kilocode/web-shared/lib/dotenvx';
 import { createR2Client } from '@kilocode/web-shared/lib/r2/create-client';
 
 const enkryptRequestLogSchema = z.object({
@@ -50,24 +50,25 @@ type ApiRequestLogStorage = { client: S3Client; bucket: string };
 
 let storage: ApiRequestLogStorage | undefined;
 
-function requireEnvVariable(name: string): string {
-  const value = getEnvVariable(name);
-  if (!value) {
-    throw new Error(`${name} environment variable is required`);
-  }
-  return value;
-}
-
 /**
  * Resolved on first use rather than at import, so missing configuration only
  * affects request logging instead of every module importing the gateway.
  */
 function getStorage(): ApiRequestLogStorage {
   storage ??= {
-    bucket: requireEnvVariable('R2_API_REQUEST_LOG_BUCKET_NAME'),
+    bucket: requireEnv(
+      'R2_API_REQUEST_LOG_BUCKET_NAME',
+      getEnvVariable('R2_API_REQUEST_LOG_BUCKET_NAME')
+    ),
     client: createR2Client({
-      accessKeyId: requireEnvVariable('R2_API_REQUEST_LOG_ACCESS_KEY_ID'),
-      secretAccessKey: requireEnvVariable('R2_API_REQUEST_LOG_SECRET_ACCESS_KEY'),
+      accessKeyId: requireEnv(
+        'R2_API_REQUEST_LOG_ACCESS_KEY_ID',
+        getEnvVariable('R2_API_REQUEST_LOG_ACCESS_KEY_ID')
+      ),
+      secretAccessKey: requireEnv(
+        'R2_API_REQUEST_LOG_SECRET_ACCESS_KEY',
+        getEnvVariable('R2_API_REQUEST_LOG_SECRET_ACCESS_KEY')
+      ),
     }),
   };
   return storage;

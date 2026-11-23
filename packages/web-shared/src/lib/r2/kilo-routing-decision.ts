@@ -18,14 +18,39 @@ import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 const LOG_SOURCE = 'kilo-routing-decision';
 
 export type AiProviderMetadataCapture = {
+  /**
+   * Keeps the first decision for the usage id and schedules the archive.
+   * A repeat call is ignored. Run this before `captureVercelMetadata` so the
+   * archive carries the request's api_kind.
+   */
   captureRoutingDecision: (decision: ProviderRoutingDecision) => void;
+  /**
+   * Called per response chunk, including the terminal one. The api_kind comes
+   * from the recorded decision. A call before `captureRoutingDecision` loses
+   * it silently and leaves the collector to infer the protocol from the chunk.
+   */
   captureVercelMetadata: (value: unknown) => void;
-  /** Called at upload time, after the response. */
+  /**
+   * Stores the report reader. It is invoked at upload time, after the response.
+   */
   captureEnkryptReport: (report: () => Promise<EnkryptGuardrailReport | null>) => void;
-  /** Called at upload time, after the response. */
+  /**
+   * Stores the output report reader. It is invoked at upload time, after the
+   * response.
+   */
   captureEnkryptOutputReport: (report: () => Promise<EnkryptOutputGuardrailReport>) => void;
-  /** Awaited at upload time, after the response. */
+  /**
+   * Stores the attempts promise. It is awaited at upload time, after the
+   * response.
+   */
   captureByokFailoverAttempts: (attempts: Promise<readonly ByokFailoverAttempt[]>) => void;
+  /**
+   * Registers the promise that the archive body races against
+   * `vercel.completed`. Call it before the archive body runs. It holds one
+   * promise only, so a later call replaces the earlier one. It swallows the
+   * rejection on purpose, so a failed parse is archived without its partial
+   * data instead of failing the upload.
+   */
   waitFor: (promise: Promise<unknown>) => void;
 };
 

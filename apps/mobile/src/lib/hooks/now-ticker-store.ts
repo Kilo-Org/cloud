@@ -43,8 +43,6 @@ function createRegistration(intervalMs: number): TickerRegistration {
     stop,
     hasSubscribers: () => listeners.size > 0,
     createdAt: now,
-    // Arrow properties keep both method references stable and `this`-free,
-    // which is what `useSyncExternalStore` requires.
     ticker: {
       subscribe: listener => {
         listeners.add(listener);

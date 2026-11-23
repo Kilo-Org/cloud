@@ -99,19 +99,18 @@ export type CreditHistoryItem =
       readonly key: string;
       readonly entry: CreditPurchaseEntry;
       readonly sortDate: string;
+      /**
+       * The loaded ledger row that closed this grant, painted as its status
+       * line inside the purchase row's own block. The purchase row names the
+       * grant, so that line carries the status alone.
+       */
+      readonly status: CreditDeduction | null;
     }
   | {
       readonly kind: 'ledger';
       readonly key: string;
       readonly deduction: CreditDeduction;
       readonly sortDate: string;
-      /**
-       * True when the paid grant this row belongs to is already on screen as
-       * its own purchase row. The row then paints that purchase's status line
-       * (an expiry or a voidance) instead of the grant a second time, and sorts
-       * directly under the purchase at the same instant.
-       */
-      readonly grantListed: boolean;
     }
   | {
       readonly kind: 'grant';
@@ -141,12 +140,12 @@ function sortTimeOf(value: string): number {
  *
  * Purchases arrive paged and the ledger does not, so a ledger row that is newer
  * than the oldest loaded purchase still sorts above it; the two sources cannot
- * disagree on a timestamp because both are stored on the same credit row. A
- * ledger row whose grant already has its purchase row is flagged so the row
- * paints that purchase's status line, at the same instant and directly under
- * it, while the purchase stays one row. A grant whose expiry row already prints
- * it is likewise left out here, so every existing purchase and deduction row
- * keeps its rendering.
+ * disagree on a timestamp because both are stored on the same credit row. The
+ * ledger row of a grant whose purchase row is loaded is folded into that
+ * purchase row's `status`, so the start and the end of one grant read as one
+ * block at the block's own gap instead of as two rows. A grant whose expiry row
+ * already prints it is likewise left out here, so every existing purchase and
+ * deduction row keeps its rendering.
  */
 export function buildCreditHistoryItems(
   purchases: readonly CreditPurchaseEntry[],
@@ -155,19 +154,33 @@ export function buildCreditHistoryItems(
 ): CreditHistoryItem[] {
   // The two reads overlap: an expiry row names the grant it closed, and a paid
   // grant is also a purchase row with its receipt. Only the purchase pages the
-  // screen holds can be duplicated, so the loaded ids decide.
+  // screen holds can be folded, so the loaded ids decide.
   const listedPurchaseIds = new Set(purchases.map(entry => entry.id));
   // The same overlap for a free grant: its expiry row prints the grant itself,
   // so listing the grant again would read as two grants.
   const printedGrantIds = new Set(
     deductions.flatMap(deduction => (deduction.purchase ? [deduction.purchase.id] : []))
   );
+  // In the ledger's own order, the first row that closes a loaded grant is that
+  // purchase row's status line; every other row stays a row of its own, so a
+  // second close of the same grant is never dropped.
+  const statusByGrantId = new Map<string, CreditDeduction>();
+  const ledgerRows: CreditDeduction[] = [];
+  for (const deduction of deductions) {
+    const grantId = deduction.purchase?.id;
+    if (grantId != null && listedPurchaseIds.has(grantId) && !statusByGrantId.has(grantId)) {
+      statusByGrantId.set(grantId, deduction);
+    } else {
+      ledgerRows.push(deduction);
+    }
+  }
   const items: CreditHistoryItem[] = [
     ...purchases.map((entry): CreditHistoryItem => ({
       kind: 'purchase',
       key: `purchase:${entry.id}`,
       entry,
       sortDate: entry.date,
+      status: statusByGrantId.get(entry.id) ?? null,
     })),
     ...grants
       .filter(grant => !printedGrantIds.has(grant.id))
@@ -177,16 +190,12 @@ export function buildCreditHistoryItems(
         grant,
         sortDate: grant.date,
       })),
-    ...deductions.map((deduction): CreditHistoryItem => {
-      const grant = deduction.purchase;
-      return {
-        kind: 'ledger',
-        key: `ledger:${deduction.id}`,
-        deduction,
-        sortDate: grant?.date ?? deduction.date,
-        grantListed: grant != null && listedPurchaseIds.has(grant.id),
-      };
-    }),
+    ...ledgerRows.map((deduction): CreditHistoryItem => ({
+      kind: 'ledger',
+      key: `ledger:${deduction.id}`,
+      deduction,
+      sortDate: deduction.purchase?.date ?? deduction.date,
+    })),
   ];
 
   return items.sort((a, b) => {
@@ -194,15 +203,6 @@ export function buildCreditHistoryItems(
     const atB = sortTimeOf(b.sortDate);
     if (atA !== atB) {
       return atB - atA;
-    }
-    // A listed grant's ledger row is that purchase row's status line, so it
-    // has to read directly under the purchase and never above it: the two
-    // share an instant, and the ledger's key would otherwise sort first. Every
-    // other row keeps rank 0, so no other pair on one timestamp changes order.
-    const rankA = a.kind === 'ledger' && a.grantListed ? 1 : 0;
-    const rankB = b.kind === 'ledger' && b.grantListed ? 1 : 0;
-    if (rankA !== rankB) {
-      return rankA - rankB;
     }
     // A deterministic order for two rows that share a timestamp (or whose time
     // does not parse), so a refetch cannot reshuffle them under the reader.

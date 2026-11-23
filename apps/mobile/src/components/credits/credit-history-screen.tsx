@@ -97,6 +97,7 @@ export function PersonalCreditHistoryScreen() {
         return (
           <PurchaseHistoryRow
             entry={item.entry}
+            status={item.status}
             isOpeningReceipt={openingReceiptId === item.entry.id}
             onOpenReceipt={openReceipt}
             last={last}
@@ -106,9 +107,7 @@ export function PersonalCreditHistoryScreen() {
       if (item.kind === 'grant') {
         return <GrantHistoryRow grant={item.grant} last={last} />;
       }
-      return (
-        <LedgerHistoryRow deduction={item.deduction} grantListed={item.grantListed} last={last} />
-      );
+      return <LedgerHistoryRow deduction={item.deduction} last={last} />;
     },
     [openReceipt, openingReceiptId, items.length]
   );

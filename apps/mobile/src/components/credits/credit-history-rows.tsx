@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the three rows of one module share the same ledger line, catalog lookups and block padding contract */
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { ExternalLink } from '@/components/ui/icons';
 import { type TFunction } from 'i18next';
@@ -130,15 +131,18 @@ function grantTitle(t: TFunction, reason: CreditGrantReason): string {
   return t(lookup(GRANT_TITLE_KEYS, reason) ?? 'credits.history.kind.grant');
 }
 
-/**
- * The status alone, for the muted line that names what happened to the grant
- * the row above paints: that row carries the grant's own title, so repeating
- * the name would read as a second grant.
- */
+/** The status alone: the block above the line already names the grant. */
 const EXPIRY_STATUS_KEYS = {
   expired: 'credits.history.expiredStatus',
   voided: 'credits.history.voidedStatus',
 } satisfies Record<NonNullable<CreditDeduction['expiry']>, string>;
+
+/** The status alone, or null when the ledger row records no expiry or voidance. */
+function expiryStatusLabel(t: TFunction, deduction: CreditDeduction): string | null {
+  return deduction.expiry == null
+    ? null
+    : t(lookup(EXPIRY_STATUS_KEYS, deduction.expiry) ?? 'credits.history.expiredStatus');
+}
 
 /** A signed credit amount, kept in its own left-to-right run. */
 function creditAmountLabel(amountMicrodollars: number): string {
@@ -149,6 +153,12 @@ function creditAmountLabel(amountMicrodollars: number): string {
 
 type PurchaseHistoryRowProps = Readonly<{
   entry: CreditPurchaseEntry;
+  /**
+   * The ledger row that closed this purchase, painted under its caption as the
+   * muted status line; null while the grant still runs or the ledger has not
+   * loaded it.
+   */
+  status: CreditDeduction | null;
   isOpeningReceipt: boolean;
   onOpenReceipt: (transactionId: string) => void;
   /** The final row of the list draws no divider under it. */
@@ -169,9 +179,14 @@ const RECEIPT_HIT_SLOP = { top: 9, bottom: 9, left: 9, right: 9 } as const;
  * A card purchase keeps its Stripe receipt behind the trailing action; a pack
  * the App Store or Play sold has no Stripe invoice, so its row names the store
  * that holds the receipt instead.
+ *
+ * When the ledger holds the row that closed this grant, the block paints it
+ * too: the muted status line sits under the caption at the block's own 7 dp
+ * gap, so the grant's start and end read as one event, not two list rows.
  */
 export const PurchaseHistoryRow = memo(function PurchaseHistoryRow({
   entry,
+  status,
   isOpeningReceipt,
   onOpenReceipt,
   last,
@@ -195,51 +210,54 @@ export const PurchaseHistoryRow = memo(function PurchaseHistoryRow({
     : null;
 
   return (
-    <View className={cn('gap-1.5 px-4 py-3', !last && 'border-b-[0.5px] border-hair-soft')}>
-      <View className="flex-row items-center justify-between gap-3">
-        <Text variant="small" className="min-w-0 flex-1" numberOfLines={1}>
-          {title}
-        </Text>
-        <Text variant="small" className="text-good">
-          {creditAmountLabel(entry.amount_mUsd)}
-        </Text>
-        {channel === 'card' && (
-          <Pressable
-            // The audit reads the pressable's own rect, and the glyph is 14 dp,
-            // so the box carries the floor itself through the shared inline
-            // link box (28 dp, with the negative margin cancelling it back to
-            // one line so the row keeps its height). The slop then carries the
-            // reach to 44 dp without overlapping the amount beside it.
-            className={cn(INLINE_LINK_BOX_CLASS, 'active:opacity-70')}
-            hitSlop={RECEIPT_HIT_SLOP}
-            disabled={isOpeningReceipt}
-            accessibilityRole="button"
-            accessibilityState={{ busy: isOpeningReceipt }}
-            accessibilityLabel={t('credits.history.receiptA11y', {
-              description: title,
-              amount: creditAmountLabel(entry.amount_mUsd),
-              date: dateLabel,
-            })}
-            onPress={() => {
-              onOpenReceipt(entry.id);
-            }}
-          >
-            {isOpeningReceipt ? (
-              <ActivityIndicator size="small" color={colors.mutedForeground} />
-            ) : (
-              <ExternalLink size={14} color={colors.mutedForeground} />
-            )}
-          </Pressable>
-        )}
+    <View className={cn('gap-2 px-4 py-3', !last && 'border-b-[0.5px] border-hair-soft')}>
+      <View className="gap-1.5">
+        <View className="flex-row items-center justify-between gap-3">
+          <Text variant="small" className="min-w-0 flex-1" numberOfLines={1}>
+            {title}
+          </Text>
+          <Text variant="small" className="text-good">
+            {creditAmountLabel(entry.amount_mUsd)}
+          </Text>
+          {channel === 'card' && (
+            <Pressable
+              // The audit reads the pressable's own rect, and the glyph is 14
+              // dp, so the shared inline link box carries the 28 dp floor
+              // itself (its negative margin cancelling back to one line, so the
+              // row keeps its height). The slop then reaches 44 dp without
+              // overlapping the amount beside it.
+              className={cn(INLINE_LINK_BOX_CLASS, 'active:opacity-70')}
+              hitSlop={RECEIPT_HIT_SLOP}
+              disabled={isOpeningReceipt}
+              accessibilityRole="button"
+              accessibilityState={{ busy: isOpeningReceipt }}
+              accessibilityLabel={t('credits.history.receiptA11y', {
+                description: title,
+                amount: creditAmountLabel(entry.amount_mUsd),
+                date: dateLabel,
+              })}
+              onPress={() => {
+                onOpenReceipt(entry.id);
+              }}
+            >
+              {isOpeningReceipt ? (
+                <ActivityIndicator size="small" color={colors.mutedForeground} />
+              ) : (
+                <ExternalLink size={14} color={colors.mutedForeground} />
+              )}
+            </Pressable>
+          )}
+        </View>
+        <View className="flex-row flex-wrap items-center justify-between gap-x-3 gap-y-1">
+          <Text variant="caption">{dateLabel}</Text>
+          {/* Both lines, not either: a pack Play sold still expires a year
+              after purchase, so its row keeps the expiry beside the store that
+              holds the receipt. */}
+          {expiryLabel != null && <Text variant="caption">{expiryLabel}</Text>}
+          {storeReceiptNote != null && <Text variant="caption">{storeReceiptNote}</Text>}
+        </View>
       </View>
-      <View className="flex-row flex-wrap items-center justify-between gap-x-3 gap-y-1">
-        <Text variant="caption">{dateLabel}</Text>
-        {/* Both lines, not either: a pack Play sold still expires a year after
-            purchase, so its row keeps the expiry beside the store that holds
-            the receipt. */}
-        {expiryLabel != null && <Text variant="caption">{expiryLabel}</Text>}
-        {storeReceiptNote != null && <Text variant="caption">{storeReceiptNote}</Text>}
-      </View>
+      {status != null && <GrantStatusLine deduction={status} />}
     </View>
   );
 });
@@ -297,16 +315,35 @@ function LedgerLine({
 }
 
 /**
- * One ledger event, in one of three shapes.
- *
- * A grant whose paid purchase row is already on screen paints that row's
- * status line alone: an indented, muted line carrying `Expired` or `Voided`,
- * the amount it took back, and the type caption. The purchase row above names
- * the grant, so this row never repeats it, and it sorts directly under it.
+ * The muted line a purchase row paints under its caption: what closed the
+ * grant, the amount it took back, and its type. Nothing paints when the ledger
+ * row records no expiry or voidance.
+ */
+function GrantStatusLine({ deduction }: Readonly<{ deduction: CreditDeduction }>) {
+  const { t } = useTranslation();
+  const status = expiryStatusLabel(t, deduction);
+  if (status == null) {
+    return null;
+  }
+  return (
+    <LedgerLine
+      title={status}
+      typeLabel={deductionTypeLabel(t, deduction.kind)}
+      amountMicrodollars={deduction.amount_mUsd}
+      date={null}
+      muted
+    />
+  );
+}
+
+/**
+ * One ledger event, in one of two shapes.
  *
  * A grant the screen does not list as a purchase is one row of its own: the
  * grant's title on the main line, and the muted status line under it when the
- * deduction names an expiry or a voidance.
+ * deduction names an expiry or a voidance. The status line a listed grant paints
+ * now belongs to its purchase row, which keeps the start and the end of one
+ * grant at the block's own gap.
  *
  * Every other ledger row — a usage charge, an adjustment, a balance-neutral
  * settlement, or an expiry whose grant is not loaded — is a plain row titled
@@ -314,22 +351,21 @@ function LedgerLine({
  */
 export const LedgerHistoryRow = memo(function LedgerHistoryRow({
   deduction,
-  grantListed,
   last,
-}: Readonly<{ deduction: CreditDeduction; grantListed: boolean; last: boolean }>) {
+}: Readonly<{ deduction: CreditDeduction; last: boolean }>) {
   const { t } = useTranslation();
   // The purchase row carries the grant, its receipt, and its expiry date, so a
   // grant printed again here would read as a second purchase.
-  const grant = deduction.purchase;
+  const purchase = deduction.purchase;
   // The grant's own name: a free grant is titled from the reason the server
   // recorded, so the row reads in the reader's language, while a paid grant
   // keeps the description its receipts record. An empty stored description
   // still names the row, the way the purchase list already falls back.
   let grantName: string | null = null;
-  if (grant != null) {
-    grantName = grant.is_free
-      ? grantTitle(t, grant.kind)
-      : firstNonEmpty(grant.description, t('credits.history.purchaseFallback'));
+  if (purchase != null) {
+    grantName = purchase.is_free
+      ? grantTitle(t, purchase.kind)
+      : firstNonEmpty(purchase.description, t('credits.history.purchaseFallback'));
   }
   const storedDescription = firstNonEmpty(
     deduction.description,
@@ -337,30 +373,20 @@ export const LedgerHistoryRow = memo(function LedgerHistoryRow({
   );
   // The muted line sits under the grant's own title, so it carries the status
   // alone: repeating the name there would paint the same grant twice.
-  const expiryStatus =
-    deduction.expiry == null
-      ? null
-      : t(lookup(EXPIRY_STATUS_KEYS, deduction.expiry) ?? 'credits.history.expiredStatus');
+  const expiryStatus = expiryStatusLabel(t, deduction);
   const rowClassName = cn('gap-2 px-4 py-3', !last && 'border-b-[0.5px] border-hair-soft');
 
-  // A listed grant's row is its purchase row's status line: the purchase above
-  // already names the grant, the receipt and the purchase date, so this paints
-  // only what happened to it. Without an expiry there is no status to paint, so
-  // that case keeps the single main line below instead of an empty row.
-  const statusTitle = grantListed && expiryStatus != null ? expiryStatus : null;
   // A grant this screen does not list as a purchase is the row's own subject,
   // so its title stays on the main line and the muted line follows it.
-  const purchase = grantListed ? null : grant;
   const rowTitle = firstNonEmpty(grantName, deductionTitle(t, deduction), storedDescription);
 
   return (
     <View className={rowClassName}>
       <LedgerLine
-        title={statusTitle ?? rowTitle}
+        title={rowTitle}
         typeLabel={purchase ? grantTypeLabel(t, purchase) : deductionTypeLabel(t, deduction.kind)}
         amountMicrodollars={purchase ? purchase.amount_mUsd : deduction.amount_mUsd}
-        date={statusTitle != null ? null : (purchase?.date ?? deduction.date)}
-        muted={statusTitle != null}
+        date={purchase?.date ?? deduction.date}
       />
       {purchase != null && (
         <LedgerLine

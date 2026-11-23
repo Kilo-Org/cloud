@@ -49,7 +49,7 @@ export function BlockedImageChip({
   const body = (
     <>
       <AlertCircle size={14} color={colors.mutedForeground} />
-      <Text className="shrink text-xs text-muted-foreground" numberOfLines={2}>
+      <Text className="min-w-0 flex-1 text-xs text-muted-foreground" numberOfLines={2}>
         {label}
       </Text>
     </>

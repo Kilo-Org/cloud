@@ -492,7 +492,7 @@
       "download": "ファイルをダウンロード",
       "downloadFailed": "エクスポートをダウンロードできませんでした。接続を確認して、もう一度お試しください。",
       "unavailableTitle": "データのエクスポートはまだ利用できません",
-      "unavailableDescription": "データのエクスポートは段階的に提供中です。しばらくしてから再度ご確認ください。"
+      "unavailableDescription": "段階的に提供中です。しばらくしてから再度ご確認ください。"
     },
     "blockedPeople": {
       "title": "ブロック・ミュートしたユーザー",
@@ -4883,6 +4883,7 @@
   },
   "usage": {
     "title": "使用状況",
+    "personalTitle": "個人の使用状況",
     "orgTitle": "組織の使用状況",
     "entrySubtitle": "コスト、リクエスト、トークン",
     "rangePicker": "期間",

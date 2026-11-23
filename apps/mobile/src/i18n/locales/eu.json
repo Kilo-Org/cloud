@@ -493,7 +493,7 @@
       "download": "Deskargatu fitxategia",
       "downloadFailed": "Ezin izan da esportazioa deskargatu. Egiaztatu konexioa eta saiatu berriro.",
       "unavailableTitle": "Datuen esportazioa ez dago oraindik erabilgarri",
-      "unavailableDescription": "Datuen esportazioa pixkanaka zabaltzen ari da. Itzuli laster."
+      "unavailableDescription": "Funtzioa pixkanaka zabaltzen ari da. Itzuli laster."
     },
     "blockedPeople": {
       "title": "Blokeatutako eta isilarazitako pertsonak",
@@ -4970,6 +4970,7 @@
   },
   "usage": {
     "title": "Erabilera",
+    "personalTitle": "Kontu pertsonalaren erabilera",
     "orgTitle": "Erakundearen erabilera",
     "entrySubtitle": "Gastua, eskaerak eta tokenak",
     "rangePicker": "Denbora-tartea",

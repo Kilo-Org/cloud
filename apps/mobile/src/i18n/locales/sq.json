@@ -493,7 +493,7 @@
       "download": "Shkarko skedarin",
       "downloadFailed": "Eksportimi nuk u shkarkua. Kontrollo lidhjen dhe provo përsëri.",
       "unavailableTitle": "Eksportimi i të dhënave nuk është ende i disponueshëm",
-      "unavailableDescription": "Eksportimi i të dhënave po vihet në dispozicion gradualisht. Kontrollo përsëri së shpejti."
+      "unavailableDescription": "Veçoria po vihet në dispozicion gradualisht. Kontrollo përsëri së shpejti."
     },
     "blockedPeople": {
       "title": "Personat e bllokuar dhe të heshtur",
@@ -4970,6 +4970,7 @@
   },
   "usage": {
     "title": "Përdorimi",
+    "personalTitle": "Përdorimi i llogarisë personale",
     "orgTitle": "Përdorimi i organizatës",
     "entrySubtitle": "Shpenzimet, kërkesat dhe tokenët",
     "rangePicker": "Periudha kohore",

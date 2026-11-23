@@ -493,7 +493,7 @@
       "download": "Ampidino ny rakitra",
       "downloadFailed": "Tsy voadidina ny fanondranana. Hamarino ny fifandraisanao ary andramo indray.",
       "unavailableTitle": "Mbola tsy misy ny fanondranana angona",
-      "unavailableDescription": "Miandalana ny fametrahana ny fanondranana angona. Miverena tsy ho ela."
+      "unavailableDescription": "Miandalana ny famoahana ny endri-javatra. Miverena tsy ho ela."
     },
     "blockedPeople": {
       "title": "Olona voasakana sy nampanginina",
@@ -4970,6 +4970,7 @@
   },
   "usage": {
     "title": "Fampiasana",
+    "personalTitle": "Fampiasana ny kaonty manokana",
     "orgTitle": "Fampiasana ny fikambanana",
     "entrySubtitle": "Fandaniana, fangatahana ary sombin-tsoratra",
     "rangePicker": "Elanelam-potoana",

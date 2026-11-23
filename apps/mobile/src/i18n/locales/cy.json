@@ -497,7 +497,7 @@
       "download": "Lawrlwytho ffeil",
       "downloadFailed": "Methu lawrlwytho'r allforiad. Gwiriwch eich cysylltiad a rhowch gynnig arall arni.",
       "unavailableTitle": "Nid yw allforio data ar gael eto",
-      "unavailableDescription": "Mae allforio data yn cael ei gyflwyno'n raddol. Dewch yn ôl cyn bo hir."
+      "unavailableDescription": "Mae'r nodwedd yn cael ei chyflwyno'n raddol. Dewch yn ôl cyn bo hir."
     },
     "blockedPeople": {
       "title": "Pobl sydd wedi'u rhwystro a'u tewi",
@@ -5346,6 +5346,7 @@
   },
   "usage": {
     "title": "Defnydd",
+    "personalTitle": "Defnydd y cyfrif personol",
     "orgTitle": "Defnydd y sefydliad",
     "entrySubtitle": "Gwariant, ceisiadau a thocynnau",
     "rangePicker": "Cyfnod amser",

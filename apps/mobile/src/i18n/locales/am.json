@@ -493,7 +493,7 @@
       "download": "ፋይል አውርድ",
       "downloadFailed": "ወደ ውጭ የተላከውን ውሂብ ማውረድ አልተቻለም። ግንኙነትዎን ያረጋግጡና እንደገና ይሞክሩ።",
       "unavailableTitle": "ውሂብን ወደ ውጭ መላክ ገና አልተዘጋጀም",
-      "unavailableDescription": "ውሂብን ወደ ውጭ የመላክ አገልግሎት ቀስ በቀስ እየተለቀቀ ነው። በቅርቡ ተመልሰው ይመልከቱ።"
+      "unavailableDescription": "ባህሪው ቀስ በቀስ እየተለቀቀ ነው። በቅርቡ ተመልሰው ይመልከቱ።"
     },
     "blockedPeople": {
       "title": "የታገዱና ድምጸ-ከል የተደረጉ ሰዎች",
@@ -4970,6 +4970,7 @@
   },
   "usage": {
     "title": "አጠቃቀም",
+    "personalTitle": "የግል አጠቃቀም",
     "orgTitle": "የድርጅት አጠቃቀም",
     "entrySubtitle": "ወጪ፣ ጥያቄዎች እና ቶከኖች",
     "rangePicker": "የጊዜ ክልል",

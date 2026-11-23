@@ -105,7 +105,10 @@ export async function createWorktreeChat({
     .from(cli_sessions_v2)
     .leftJoin(
       organization_memberships,
-      organizationMembershipJoinCondition(user.id, cli_sessions_v2.organization_id)
+      organizationMembershipJoinCondition({
+        kiloUserId: user.id,
+        organizationIdColumn: cli_sessions_v2.organization_id,
+      })
     )
     .leftJoin(organizations, activeOrganizationJoinCondition(cli_sessions_v2.organization_id))
     .where(

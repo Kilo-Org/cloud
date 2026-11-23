@@ -493,7 +493,7 @@
       "download": "Dosyayı indir",
       "downloadFailed": "Dışa aktarılan veriler indirilemedi. Bağlantını kontrol edip tekrar dene.",
       "unavailableTitle": "Veri dışa aktarma henüz hazır değil",
-      "unavailableDescription": "Veri dışa aktarma özelliği kademeli olarak kullanıma sunuluyor. Yakında tekrar göz at."
+      "unavailableDescription": "Özellik kademeli olarak kullanıma sunuluyor. Yakında tekrar göz at."
     },
     "blockedPeople": {
       "title": "Engellenen ve sessize alınan kişiler",
@@ -4970,6 +4970,7 @@
   },
   "usage": {
     "title": "Kullanım",
+    "personalTitle": "Kişisel hesap kullanımı",
     "orgTitle": "Organizasyon kullanımı",
     "entrySubtitle": "Harcama, istekler ve tokenlar",
     "rangePicker": "Zaman aralığı",

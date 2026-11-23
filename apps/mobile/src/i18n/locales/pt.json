@@ -495,7 +495,7 @@
       "download": "Transferir ficheiro",
       "downloadFailed": "Não foi possível transferir a exportação. Verifica a ligação e tenta novamente.",
       "unavailableTitle": "A exportação de dados ainda não está disponível",
-      "unavailableDescription": "A exportação de dados está a ser disponibilizada gradualmente. Volta a verificar em breve."
+      "unavailableDescription": "A funcionalidade está a ser disponibilizada gradualmente. Volta a verificar em breve."
     },
     "blockedPeople": {
       "title": "Pessoas bloqueadas e silenciadas",
@@ -5158,6 +5158,7 @@
   },
   "usage": {
     "title": "Utilização",
+    "personalTitle": "Utilização pessoal",
     "orgTitle": "Utilização da organização",
     "entrySubtitle": "Gastos, pedidos e tokens",
     "rangePicker": "Período",

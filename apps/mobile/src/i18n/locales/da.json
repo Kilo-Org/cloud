@@ -493,7 +493,7 @@
       "download": "Download fil",
       "downloadFailed": "Kunne ikke downloade eksporten. Tjek din forbindelse, og prøv igen.",
       "unavailableTitle": "Dataeksport er ikke tilgængelig endnu",
-      "unavailableDescription": "Dataeksport udrulles gradvist. Kig forbi igen snart."
+      "unavailableDescription": "Funktionen udrulles gradvist. Kig forbi igen snart."
     },
     "blockedPeople": {
       "title": "Blokerede og ignorerede personer",
@@ -4970,6 +4970,7 @@
   },
   "usage": {
     "title": "Forbrug",
+    "personalTitle": "Personligt forbrug",
     "orgTitle": "Organisationens forbrug",
     "entrySubtitle": "Udgifter, anmodninger og tokens",
     "rangePicker": "Tidsperiode",

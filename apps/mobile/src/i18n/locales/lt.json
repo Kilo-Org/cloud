@@ -495,7 +495,7 @@
       "download": "Atsisiųsti failą",
       "downloadFailed": "Nepavyko atsisiųsti eksporto. Patikrinkite ryšį ir bandykite dar kartą.",
       "unavailableTitle": "Duomenų eksportas dar nepasiekiamas",
-      "unavailableDescription": "Duomenų eksportas diegiamas palaipsniui. Netrukus užsukite dar kartą."
+      "unavailableDescription": "Funkcija diegiama palaipsniui. Netrukus užsukite dar kartą."
     },
     "blockedPeople": {
       "title": "Užblokuoti ir nutildyti žmonės",
@@ -5158,6 +5158,7 @@
   },
   "usage": {
     "title": "Naudojimas",
+    "personalTitle": "Asmeninės paskyros naudojimas",
     "orgTitle": "Organizacijos naudojimas",
     "entrySubtitle": "Išlaidos, užklausos ir žetonai",
     "rangePicker": "Laikotarpis",

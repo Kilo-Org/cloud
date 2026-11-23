@@ -494,7 +494,7 @@
       "download": "Descarcă fișierul",
       "downloadFailed": "Exportul nu a putut fi descărcat. Verifică-ți conexiunea și încearcă din nou.",
       "unavailableTitle": "Exportul datelor nu este încă disponibil",
-      "unavailableDescription": "Exportul datelor este lansat treptat. Revino în curând."
+      "unavailableDescription": "Funcția este lansată treptat. Revino în curând."
     },
     "blockedPeople": {
       "title": "Persoane blocate și ignorate",
@@ -5064,6 +5064,7 @@
   },
   "usage": {
     "title": "Utilizare",
+    "personalTitle": "Utilizarea contului personal",
     "orgTitle": "Utilizarea organizației",
     "entrySubtitle": "Cheltuieli, cereri și tokenuri",
     "rangePicker": "Interval de timp",

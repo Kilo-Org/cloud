@@ -11,6 +11,8 @@ import tailwindcss from '@tailwindcss/postcss';
 import postcss from 'postcss';
 import type * as NativeCSSCompiler from 'react-native-css/compiler';
 
+import { compiledLengthDp } from '@/test/native-dimensions';
+
 import {
   BALANCE_RETRY_CANCEL_DP,
   BALANCE_RETRY_TARGET_CLASS,
@@ -35,6 +37,7 @@ import {
   DENSE_ROW_HIT_SLOP,
   DENSE_ROW_HIT_SLOP_DP,
   FIELD_CLEAR_BOX_CLASS,
+  FLOOR_BOX_MEASURED_DP,
   HEADER_TITLE_TARGET_CLASS,
   ICON_TARGET_BOX_CLASS,
   ICON_TARGET_DP,
@@ -45,6 +48,8 @@ import {
   INLINE_LINK_FACING_VERTICAL_HIT_SLOP_DP,
   INLINE_LINK_LINE_GAP_CLASS,
   INLINE_LINK_LINE_GAP_DP,
+  INLINE_LINK_NEIGHBOUR_RESERVE_CLASS,
+  INLINE_LINK_NEIGHBOUR_RESERVE_DP,
   INLINE_LINK_OUTER_HIT_SLOP_DP,
   INLINE_LINK_OUTER_VERTICAL_HIT_SLOP_DP,
   INLINE_LINK_ROW_CLASS,
@@ -384,17 +389,37 @@ describe('shared tap-target geometry', () => {
   it('carries an inline link from the audit floor to the design target with its slop', () => {
     expect(INLINE_LINK_BOX_CLASS).toContain('min-h-[28px]');
     expect(INLINE_LINK_BOX_CLASS).toContain('min-w-[28px]');
-    // The vertical reach is symmetric: 28 + 2 * 8 = 44.
-    expect(tapTargetReachDp(MIN_TAP_TARGET_DP, INLINE_LINK_VERTICAL_HIT_SLOP_DP)).toBe(
+    // The declared reach from the 28dp floor is symmetric past the target:
+    // 28 + 2 * 9 = 46.
+    expect(tapTargetReachDp(MIN_TAP_TARGET_DP, INLINE_LINK_VERTICAL_HIT_SLOP_DP)).toBeGreaterThan(
       TOUCH_TARGET_DP
     );
+    // The regression this guards, measured the way `LINE_ACTION_HIT_SLOP`'s
+    // test measures it: a `min-h-[28px]` box lays out at
+    // FLOOR_BOX_MEASURED_DP. 27.8 + 2 * 9 = 45.8dp holds, while 8dp a side
+    // landed at 43.8dp.
+    expect(FLOOR_BOX_MEASURED_DP).toBe(27.8);
+    expect(
+      tapTargetReachDp(FLOOR_BOX_MEASURED_DP, INLINE_LINK_VERTICAL_HIT_SLOP_DP)
+    ).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+    expect(tapTargetReachDp(FLOOR_BOX_MEASURED_DP, 8)).toBeLessThan(TOUCH_TARGET_DP);
     // A link with an inline neighbour splits the same vertical reach by side:
     // the facing side gives up its half, the far side carries all of it, and the
-    // height is still 28 + 16 = 44.
+    // two still sum to the symmetric reach (0 + 18 = 2 * 9).
     expect(INLINE_LINK_FACING_VERTICAL_HIT_SLOP_DP + INLINE_LINK_OUTER_VERTICAL_HIT_SLOP_DP).toBe(
       2 * INLINE_LINK_VERTICAL_HIT_SLOP_DP
     );
-    expect(MIN_TAP_TARGET_DP + INLINE_LINK_OUTER_VERTICAL_HIT_SLOP_DP).toBe(TOUCH_TARGET_DP);
+    // The far side alone has to clear the target from the measured box: 27.8 +
+    // 18 = 45.8dp holds, while the 16dp it replaced landed at 43.8dp. The
+    // declared 28 + 18 = 46dp clears it too, but the measurement is the one
+    // that has to.
+    expect(FLOOR_BOX_MEASURED_DP + INLINE_LINK_OUTER_VERTICAL_HIT_SLOP_DP).toBeGreaterThanOrEqual(
+      TOUCH_TARGET_DP
+    );
+    expect(FLOOR_BOX_MEASURED_DP + 16).toBeLessThan(TOUCH_TARGET_DP);
+    expect(MIN_TAP_TARGET_DP + INLINE_LINK_OUTER_VERTICAL_HIT_SLOP_DP).toBeGreaterThan(
+      TOUCH_TARGET_DP
+    );
     // The horizontal reach is asymmetric (4dp toward the neighbour, 12dp away),
     // so it is box + facing + outer rather than tapTargetReachDp's 2 * slop.
     expect(MIN_TAP_TARGET_DP + INLINE_LINK_FACING_HIT_SLOP_DP + INLINE_LINK_OUTER_HIT_SLOP_DP).toBe(
@@ -429,6 +454,42 @@ describe('shared tap-target geometry', () => {
     expect(INLINE_LINK_ROW_CLASS).toContain(`my-[${INLINE_LINK_ROW_MARGIN_DP}px]`);
     // The compiled row gap is what the layout applies, not the constant.
     expect(await compiledDp(INLINE_LINK_ROW_CLASS, 'rowGap')).toBe(INLINE_LINK_LINE_GAP_DP);
+  });
+
+  it('keeps a neighbouring control out of the consent sentence downward band', async () => {
+    // The consent review card's sentence is the last thing in the footer's
+    // `gap-3` block, so the only thing under it is the action button. The box
+    // overflows its own line by (28 - 17.5) / 2 = 5.25dp below, so the button's
+    // top edge sat 10.5 - 5.25 = 5.25dp under the box (measured 5.7dp), and a
+    // control owns every pixel from its top edge up: the link's downward slop
+    // never reached the button. The compiled margin is what the layout applies;
+    // a scale step compiles to `calc(var(--spacing) * 1.5)`, which the static
+    // reader above cannot follow, so the shared dp resolver reads it.
+    expect(await compiledLengthDp(INLINE_LINK_NEIGHBOUR_RESERVE_CLASS, 'marginBottom')).toBe(
+      INLINE_LINK_NEIGHBOUR_RESERVE_DP
+    );
+  });
+
+  it('delivers the whole downward inline-link band under the consent sentence', () => {
+    // The consent review card again: the footer's gutter to the action button is
+    // `gap-3` (10.5dp), the row's box overflows its line by half the 28 - 17.5
+    // difference, and the reserve sits below that. What is left under the box is
+    // the space the downward slop has to fit inside, because the button claims
+    // everything from its own top edge up.
+    const footerGutterDp = 10.5;
+    const boxBottomGapDp =
+      footerGutterDp -
+      (MIN_TAP_TARGET_DP - INLINE_LINK_SENTENCE_LINE_DP) / 2 +
+      INLINE_LINK_NEIGHBOUR_RESERVE_DP;
+    expect(boxBottomGapDp).toBeGreaterThanOrEqual(INLINE_LINK_VERTICAL_HIT_SLOP_DP);
+    // And the band the link then delivers on its measured Android box clears
+    // `DESIGN.md:364`'s target: 27.8 + 9 + 9 = 45.8dp. The 3.5dp reserve the
+    // scale step below is not enough: 3.5dp under the measured 5.7dp gap leaves
+    // 0.19px once Android rounds 9dp to 24px.
+    expect(FLOOR_BOX_MEASURED_DP + 2 * INLINE_LINK_VERTICAL_HIT_SLOP_DP).toBeGreaterThanOrEqual(
+      TOUCH_TARGET_DP
+    );
+    expect(footerGutterDp - 5.7 + 3.5).toBeLessThan(INLINE_LINK_VERTICAL_HIT_SLOP_DP);
   });
 
   it('reserves both facing inline-link reaches on the connector between the links', async () => {
@@ -578,9 +639,9 @@ describe('code-reviewer line-action geometry', () => {
       -(MIN_TAP_TARGET_DP - textLineDp) / 2
     );
     // A `min-h-[28px]` box measures 27.8dp on Android: 27.8 + 2 * 9 = 45.8dp
-    // holds, while the inline link's 8dp a side would land at 43.8dp.
+    // holds, while 8dp a side would land at 43.8dp.
     expect(
-      tapTargetReachDp(MIN_TAP_TARGET_DP - 0.2, LINE_ACTION_HIT_SLOP.top)
+      tapTargetReachDp(FLOOR_BOX_MEASURED_DP, LINE_ACTION_HIT_SLOP.top)
     ).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
     // A short label's 36dp width floor at the call site measures 35.81dp on
     // Android, so the horizontal reach is checked at that width too:

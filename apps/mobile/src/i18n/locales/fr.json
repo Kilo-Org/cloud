@@ -494,7 +494,7 @@
       "download": "Télécharger le fichier",
       "downloadFailed": "Impossible de télécharger l'exportation. Vérifiez votre connexion et réessayez.",
       "unavailableTitle": "L'exportation des données n'est pas encore disponible",
-      "unavailableDescription": "L'exportation des données est déployée progressivement. Revenez bientôt."
+      "unavailableDescription": "La fonctionnalité est déployée progressivement. Revenez bientôt."
     },
     "blockedPeople": {
       "title": "Personnes bloquées et masquées",
@@ -5064,6 +5064,7 @@
   },
   "usage": {
     "title": "Utilisation",
+    "personalTitle": "Utilisation du compte personnel",
     "orgTitle": "Utilisation de l'organisation",
     "entrySubtitle": "Dépenses, requêtes et jetons",
     "rangePicker": "Période",

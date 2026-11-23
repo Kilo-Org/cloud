@@ -493,7 +493,7 @@
       "download": "Faylni yuklab olish",
       "downloadFailed": "Eksportni yuklab bo'lmadi. Internet aloqasini tekshirib, qayta urinib ko'ring.",
       "unavailableTitle": "Ma'lumotlarni eksport qilish hali tayyor emas",
-      "unavailableDescription": "Ma'lumotlarni eksport qilish bosqichma-bosqich joriy qilinmoqda. Tez orada qayta tekshiring."
+      "unavailableDescription": "Funksiya bosqichma-bosqich joriy qilinmoqda. Tez orada qayta tekshiring."
     },
     "blockedPeople": {
       "title": "Bloklangan va ovozsiz qilingan foydalanuvchilar",
@@ -4970,6 +4970,7 @@
   },
   "usage": {
     "title": "Foydalanish",
+    "personalTitle": "Shaxsiy hisob foydalanishi",
     "orgTitle": "Tashkilot foydalanishi",
     "entrySubtitle": "Xarajat, so'rovlar va tokenlar",
     "rangePicker": "Vaqt oralig'i",

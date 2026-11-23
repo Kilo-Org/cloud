@@ -493,7 +493,7 @@
       "download": "Datei herunterladen",
       "downloadFailed": "Der Export konnte nicht heruntergeladen werden. Prüfe deine Verbindung und versuche es erneut.",
       "unavailableTitle": "Der Datenexport ist noch nicht verfügbar",
-      "unavailableDescription": "Der Datenexport wird schrittweise eingeführt. Schau bald wieder vorbei."
+      "unavailableDescription": "Die Funktion wird schrittweise eingeführt. Schau bald wieder vorbei."
     },
     "blockedPeople": {
       "title": "Blockierte und stummgeschaltete Personen",
@@ -4970,6 +4970,7 @@
   },
   "usage": {
     "title": "Nutzung",
+    "personalTitle": "Persönliche Nutzung",
     "orgTitle": "Organisationsnutzung",
     "entrySubtitle": "Kosten, Anfragen und Tokens",
     "rangePicker": "Zeitraum",

@@ -492,7 +492,7 @@
       "download": "Muat turun fail",
       "downloadFailed": "Tidak dapat memuat turun eksport. Semak sambungan anda dan cuba lagi.",
       "unavailableTitle": "Eksport data belum tersedia",
-      "unavailableDescription": "Eksport data sedang dilancarkan secara berperingkat. Sila semak semula tidak lama lagi."
+      "unavailableDescription": "Ciri ini sedang dilancarkan secara berperingkat. Sila semak semula tidak lama lagi."
     },
     "blockedPeople": {
       "title": "Orang yang disekat dan disenyapkan",
@@ -4884,6 +4884,7 @@
   },
   "usage": {
     "title": "Penggunaan",
+    "personalTitle": "Penggunaan peribadi",
     "orgTitle": "Penggunaan organisasi",
     "entrySubtitle": "Perbelanjaan, permintaan dan token",
     "rangePicker": "Julat masa",

@@ -493,7 +493,7 @@
       "download": "Descargar ficheiro",
       "downloadFailed": "Non se puido descargar a exportación. Comproba a conexión e téntao de novo.",
       "unavailableTitle": "A exportación de datos aínda non está dispoñible",
-      "unavailableDescription": "A exportación de datos estase activando gradualmente. Volve consultalo pronto."
+      "unavailableDescription": "A función estase activando gradualmente. Volve consultalo pronto."
     },
     "blockedPeople": {
       "title": "Persoas bloqueadas e silenciadas",
@@ -4970,6 +4970,7 @@
   },
   "usage": {
     "title": "Uso",
+    "personalTitle": "Uso da conta persoal",
     "orgTitle": "Uso da organización",
     "entrySubtitle": "Gasto, solicitudes e tokens",
     "rangePicker": "Intervalo de tempo",

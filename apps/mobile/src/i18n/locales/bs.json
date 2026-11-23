@@ -494,7 +494,7 @@
       "download": "Preuzmi datoteku",
       "downloadFailed": "Preuzimanje izvoza nije uspjelo. Provjeri vezu i pokušaj ponovo.",
       "unavailableTitle": "Izvoz podataka još nije dostupan",
-      "unavailableDescription": "Izvoz podataka uvodi se postepeno. Provjeri ponovo uskoro."
+      "unavailableDescription": "Funkcija se uvodi postepeno. Provjeri ponovo uskoro."
     },
     "blockedPeople": {
       "title": "Blokirane i utišane osobe",
@@ -5064,6 +5064,7 @@
   },
   "usage": {
     "title": "Potrošnja",
+    "personalTitle": "Potrošnja ličnog računa",
     "orgTitle": "Potrošnja organizacije",
     "entrySubtitle": "Troškovi, zahtjevi i tokeni",
     "rangePicker": "Vremenski period",

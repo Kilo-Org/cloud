@@ -66,6 +66,48 @@
       { "tool": "external_directory", "resource": "/other", "decision": "inherit" }
     ]
   },
+  "layered_bash_action_and_profile": {
+    "schema_version": 1,
+    "organization_id": "9d278969-5453-4ae3-a51f-a8d2274a7b56",
+    "managed": true,
+    "revision": 13,
+    "max_age_seconds": 300,
+    "policy": {
+      "agent_permissions": {
+        "layers": [
+          {
+            "schema_version": 1,
+            "tools": { "bash": "allow" },
+            "shell": {
+              "bash": {
+                "fallback": "ask",
+                "rules": [
+                  { "pattern": "git status *", "action": "allow" },
+                  { "pattern": "git push *", "action": "deny" }
+                ]
+              }
+            }
+          },
+          {
+            "schema_version": 1,
+            "tools": { "bash": "ask" },
+            "shell": {
+              "bash": { "fallback": "deny", "rules": [{ "pattern": "ls *", "action": "allow" }] }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "layered_bash_action_and_profile_expectations": {
+    "shell": [
+      { "kind": "bash", "command": "git status --short", "decision": "deny" },
+      { "kind": "bash", "command": "git push origin main", "decision": "deny" },
+      { "kind": "bash", "command": "ls -la", "decision": "ask" },
+      { "kind": "bash", "command": "make release", "decision": "deny" },
+      { "kind": "powershell", "command": "Get-Location -Verbose", "decision": "deny" }
+    ]
+  },
   "enabled_empty": {
     "schema_version": 1,
     "organization_id": "9d278969-5453-4ae3-a51f-a8d2274a7b56",

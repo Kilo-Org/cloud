@@ -493,7 +493,7 @@
       "download": "Bestand downloaden",
       "downloadFailed": "De export kon niet worden gedownload. Controleer je verbinding en probeer het opnieuw.",
       "unavailableTitle": "Gegevensexport is nog niet beschikbaar",
-      "unavailableDescription": "Gegevensexport wordt geleidelijk uitgerold. Kom binnenkort terug."
+      "unavailableDescription": "De functie wordt geleidelijk uitgerold. Kom binnenkort terug."
     },
     "blockedPeople": {
       "title": "Geblokkeerde en gedempte personen",
@@ -4970,6 +4970,7 @@
   },
   "usage": {
     "title": "Gebruik",
+    "personalTitle": "Persoonlijk gebruik",
     "orgTitle": "Organisatiegebruik",
     "entrySubtitle": "Kosten, verzoeken en tokens",
     "rangePicker": "Periode",

@@ -493,7 +493,7 @@
       "download": "Soo deji faylka",
       "downloadFailed": "Xogta la dhoofiyay lama soo dejin karin. Hubi xiriirkaaga oo mar kale isku day.",
       "unavailableTitle": "Dhoofinta xogta weli lama heli karo",
-      "unavailableDescription": "Dhoofinta xogta si tartiib-tartiib ah ayaa loo soo bandhigayaa. Dib u soo eeg dhawaan."
+      "unavailableDescription": "Sifada si tartiib-tartiib ah ayaa loo soo bandhigayaa. Dib u soo eeg dhawaan."
     },
     "blockedPeople": {
       "title": "Dadka la xannibay iyo kuwa la aamusiiyay",
@@ -4970,6 +4970,7 @@
   },
   "usage": {
     "title": "Isticmaalka",
+    "personalTitle": "Isticmaalka akoonka qofka",
     "orgTitle": "Isticmaalka ururka",
     "entrySubtitle": "Kharashka, codsiyada iyo halbeegyada",
     "rangePicker": "Muddada waqtiga",

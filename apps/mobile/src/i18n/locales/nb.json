@@ -493,7 +493,7 @@
       "download": "Last ned fil",
       "downloadFailed": "Kunne ikke laste ned eksporten. Sjekk tilkoblingen og prøv igjen.",
       "unavailableTitle": "Dataeksport er ikke tilgjengelig ennå",
-      "unavailableDescription": "Dataeksport rulles ut gradvis. Sjekk igjen snart."
+      "unavailableDescription": "Funksjonen rulles ut gradvis. Sjekk igjen snart."
     },
     "blockedPeople": {
       "title": "Blokkerte og dempede personer",
@@ -4970,6 +4970,7 @@
   },
   "usage": {
     "title": "Forbruk",
+    "personalTitle": "Personlig forbruk",
     "orgTitle": "Organisasjonens forbruk",
     "entrySubtitle": "Kostnader, forespørsler og tokener",
     "rangePicker": "Tidsperiode",

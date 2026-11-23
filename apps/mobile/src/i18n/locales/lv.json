@@ -494,7 +494,7 @@
       "download": "Lejupielādēt failu",
       "downloadFailed": "Neizdevās lejupielādēt eksportu. Pārbaudi savienojumu un mēģini vēlreiz.",
       "unavailableTitle": "Datu eksports vēl nav pieejams",
-      "unavailableDescription": "Datu eksports tiek ieviests pakāpeniski. Drīzumā ieskaties vēlreiz."
+      "unavailableDescription": "Funkcija tiek ieviesta pakāpeniski. Drīzumā ieskaties vēlreiz."
     },
     "blockedPeople": {
       "title": "Bloķētie un apklusinātie cilvēki",
@@ -5064,6 +5064,7 @@
   },
   "usage": {
     "title": "Lietojums",
+    "personalTitle": "Personīgā konta lietojums",
     "orgTitle": "Organizācijas lietojums",
     "entrySubtitle": "Tēriņi, pieprasījumi un tokeni",
     "rangePicker": "Laika periods",

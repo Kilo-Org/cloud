@@ -493,7 +493,7 @@
       "download": "I-download ang file",
       "downloadFailed": "Hindi ma-download ang export. Suriin ang iyong koneksyon at subukang muli.",
       "unavailableTitle": "Hindi pa available ang pag-export ng data",
-      "unavailableDescription": "Unti-unting inilalabas ang pag-export ng data. Bumalik muli sa lalong madaling panahon."
+      "unavailableDescription": "Unti-unting inilalabas ang tampok. Bumalik muli sa lalong madaling panahon."
     },
     "blockedPeople": {
       "title": "Mga naka-block at naka-mute na tao",
@@ -4970,6 +4970,7 @@
   },
   "usage": {
     "title": "Paggamit",
+    "personalTitle": "Paggamit ng personal na account",
     "orgTitle": "Paggamit ng organisasyon",
     "entrySubtitle": "Gastos, mga kahilingan, at mga token",
     "rangePicker": "Saklaw ng panahon",

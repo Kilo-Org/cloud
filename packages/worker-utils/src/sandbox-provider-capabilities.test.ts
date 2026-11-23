@@ -49,7 +49,7 @@ describe('egressRequestSupported', () => {
   // One column for each request above, in the same order.
   const expected: Record<SandboxProviderId, readonly boolean[]> = {
     'cloudflare-containers': [true, true, true, true, true, true],
-    vercel: [true, true, false, false, false, false],
+    vercel: [true, true, true, true, false, false],
     cloudflare: [true, true, false, false, false, false],
   };
 

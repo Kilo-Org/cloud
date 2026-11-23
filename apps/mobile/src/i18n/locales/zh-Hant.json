@@ -492,7 +492,7 @@
       "download": "下載檔案",
       "downloadFailed": "無法下載匯出檔案。請檢查網路連線後再試一次。",
       "unavailableTitle": "資料匯出尚未準備好",
-      "unavailableDescription": "資料匯出功能正逐步推出，請稍後再回來查看。"
+      "unavailableDescription": "此功能正逐步推出。請稍後再回來查看。"
     },
     "blockedPeople": {
       "title": "已封鎖和已靜音的使用者",
@@ -4883,6 +4883,7 @@
   },
   "usage": {
     "title": "用量",
+    "personalTitle": "個人用量",
     "orgTitle": "組織用量",
     "entrySubtitle": "費用、請求與詞元",
     "rangePicker": "時間範圍",

@@ -493,7 +493,7 @@
       "download": "Faylı endir",
       "downloadFailed": "İxracı endirmək mümkün olmadı. Bağlantını yoxla və yenidən cəhd et.",
       "unavailableTitle": "Məlumat ixracı hələ əlçatan deyil",
-      "unavailableDescription": "Məlumat ixracı mərhələli şəkildə istifadəyə verilir. Tezliklə yenidən yoxla."
+      "unavailableDescription": "Funksiya mərhələli şəkildə istifadəyə verilir. Tezliklə yenidən yoxla."
     },
     "blockedPeople": {
       "title": "Bloklanmış və səssizə alınmış şəxslər",
@@ -4970,6 +4970,7 @@
   },
   "usage": {
     "title": "İstifadə",
+    "personalTitle": "Şəxsi hesabın istifadəsi",
     "orgTitle": "Təşkilatın istifadəsi",
     "entrySubtitle": "Xərc, sorğular və tokenlər",
     "rangePicker": "Zaman aralığı",

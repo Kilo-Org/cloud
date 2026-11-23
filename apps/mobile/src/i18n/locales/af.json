@@ -493,7 +493,7 @@
       "download": "Laai lêer af",
       "downloadFailed": "Kon nie die uitvoer aflaai nie. Gaan jou verbinding na en probeer weer.",
       "unavailableTitle": "Data-uitvoer is nog nie beskikbaar nie",
-      "unavailableDescription": "Data-uitvoer word geleidelik uitgerol. Kom kyk binnekort weer."
+      "unavailableDescription": "Die funksie word geleidelik uitgerol. Kom kyk binnekort weer."
     },
     "blockedPeople": {
       "title": "Geblokkeerde en gedempte mense",
@@ -4970,6 +4970,7 @@
   },
   "usage": {
     "title": "Gebruik",
+    "personalTitle": "Persoonlike gebruik",
     "orgTitle": "Organisasiegebruik",
     "entrySubtitle": "Besteding, versoeke en tekens",
     "rangePicker": "Tydperk",

@@ -492,7 +492,7 @@
       "download": "Unduh file",
       "downloadFailed": "Tidak dapat mengunduh ekspor. Periksa koneksimu dan coba lagi.",
       "unavailableTitle": "Ekspor data belum tersedia",
-      "unavailableDescription": "Ekspor data sedang diluncurkan secara bertahap. Periksa lagi nanti."
+      "unavailableDescription": "Fitur ini sedang diluncurkan secara bertahap. Periksa lagi nanti."
     },
     "blockedPeople": {
       "title": "Orang yang diblokir dan dibisukan",
@@ -4886,6 +4886,7 @@
   },
   "usage": {
     "title": "Penggunaan",
+    "personalTitle": "Penggunaan pribadi",
     "orgTitle": "Penggunaan organisasi",
     "entrySubtitle": "Pengeluaran, permintaan, dan token",
     "rangePicker": "Rentang waktu",

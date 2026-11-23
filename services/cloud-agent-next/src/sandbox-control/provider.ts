@@ -55,6 +55,19 @@ export class ProviderCreationError extends AgentSandboxUnavailableError {
   }
 }
 
+/**
+ * A sandbox egress allowlist cannot be applied: the provider policy cannot be
+ * built from the list, so no sandbox is created and no update is sent.
+ */
+export class SandboxNetworkPolicyError extends Error {
+  readonly reason = 'network_policy_failed';
+
+  constructor() {
+    super('The sandbox network allowlist could not be applied');
+    this.name = 'SandboxNetworkPolicyError';
+  }
+}
+
 export const sandboxProviderConfigurationSchema = z.discriminatedUnion('provider', [
   z.object({ provider: z.literal('cloudflare') }).strict(),
   z

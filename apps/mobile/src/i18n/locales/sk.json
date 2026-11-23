@@ -495,7 +495,7 @@
       "download": "Stiahnuť súbor",
       "downloadFailed": "Export sa nepodarilo stiahnuť. Skontroluj pripojenie a skús to znova.",
       "unavailableTitle": "Export údajov zatiaľ nie je dostupný",
-      "unavailableDescription": "Export údajov sa sprístupňuje postupne. Skús to čoskoro znova."
+      "unavailableDescription": "Funkcia sa sprístupňuje postupne. Skús to čoskoro znova."
     },
     "blockedPeople": {
       "title": "Zablokovaní a stlmení ľudia",
@@ -5158,6 +5158,7 @@
   },
   "usage": {
     "title": "Využitie",
+    "personalTitle": "Využitie osobného účtu",
     "orgTitle": "Využitie organizácie",
     "entrySubtitle": "Výdavky, požiadavky a tokeny",
     "rangePicker": "Časové obdobie",

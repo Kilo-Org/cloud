@@ -2690,7 +2690,9 @@ describe('POST /api/v1/chat/completions request handling', () => {
 
     mockedGetBalanceAndOrgSettings.mockClear();
     mockedResolveOpenRouterModelAlias.mockImplementation(async modelId => modelId);
-    const paidResponse = await handleLlmProxyRequest(makeRequest(makeBody('openai/gpt-4o')) as never);
+    const paidResponse = await handleLlmProxyRequest(
+      makeRequest(makeBody('openai/gpt-4o')) as never
+    );
 
     expect(paidResponse.status).toBe(200);
     expect(mockedGetBalanceAndOrgSettings.mock.calls[0]?.[3]).toBe('usage');

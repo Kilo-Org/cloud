@@ -20,9 +20,10 @@ type PreferenceRowProps = Readonly<{
   /**
    * The line cap for the subtitle. Omit it and the subtitle paints every line;
    * a caller that shares this row's copy with another row passes its cap so
-   * both reserve the same height.
+   * both reserve the same height. `'all'` states the same uncapped intent when
+   * the sibling row's own default is capped.
    */
-  subtitleNumberOfLines?: number;
+  subtitleNumberOfLines?: number | 'all';
   /**
    * A second muted line under the subtitle (a model's retirement date, say).
    * It renders only when a caller passes it and joins the switch's spoken
@@ -131,11 +132,14 @@ export function PreferenceRow({
   // layout — the idiom in form-field's reserved error area — so swapping them
   // cannot change the row's height in any language, font scale or width,
   // without measuring.
+  // `'all'` names the same uncapped intent the omitted prop has, so a caller
+  // that shares copy with a capped sibling states it without a number.
+  const subtitleLines = subtitleNumberOfLines === 'all' ? undefined : subtitleNumberOfLines;
   let subtitleNode: ReactNode = null;
   if (subtitle !== undefined) {
     subtitleNode =
       inactiveSubtitle === undefined ? (
-        <Text variant="muted" className="mt-0.5 text-xs" numberOfLines={subtitleNumberOfLines}>
+        <Text variant="muted" className="mt-0.5 text-xs" numberOfLines={subtitleLines}>
           {subtitle}
         </Text>
       ) : (
@@ -149,20 +153,20 @@ export function PreferenceRow({
             <Text
               variant="muted"
               className="w-full shrink-0 text-xs"
-              numberOfLines={subtitleNumberOfLines}
+              numberOfLines={subtitleLines}
             >
               {subtitle}
             </Text>
             <Text
               variant="muted"
               className="-ms-[100%] w-full shrink-0 text-xs"
-              numberOfLines={subtitleNumberOfLines}
+              numberOfLines={subtitleLines}
             >
               {inactiveSubtitle}
             </Text>
           </View>
           <View className="absolute inset-x-0 top-0">
-            <Text variant="muted" className="text-xs" numberOfLines={subtitleNumberOfLines}>
+            <Text variant="muted" className="text-xs" numberOfLines={subtitleLines}>
               {subtitle}
             </Text>
           </View>

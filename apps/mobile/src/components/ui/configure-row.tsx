@@ -31,9 +31,11 @@ type ConfigureRowProps = {
    * token (an email address, a host name) cannot wrap on Android and is
    * hard-clipped at the row edge with no ellipsis, while a long sentence grows
    * the row past its neighbours. Pass `2` from a caller whose subtitle is a
-   * sentence the reader must finish.
+   * sentence the reader must finish, or `'all'` from a caller whose copy a
+   * reader must be able to finish and whose length no fixed line count can
+   * bound.
    */
-  subtitleNumberOfLines?: number;
+  subtitleNumberOfLines?: number | 'all';
   /**
    * Node rendered in the subtitle's place while the value that fills it loads.
    * The row's subtitle is one line of `text-xs`, so a placeholder of that
@@ -189,7 +191,10 @@ export function ConfigureRow({
       subtitle={
         subtitle === undefined
           ? undefined
-          : { text: subtitle, numberOfLines: subtitleNumberOfLines }
+          : {
+              text: subtitle,
+              numberOfLines: subtitleNumberOfLines === 'all' ? undefined : subtitleNumberOfLines,
+            }
       }
       subtitlePlaceholder={subtitlePlaceholder}
       trailing={rowTrailing}

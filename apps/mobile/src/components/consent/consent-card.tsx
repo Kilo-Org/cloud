@@ -64,10 +64,12 @@ export const CONSENT_DISCLOSURE_MAX_FONT_SCALE = 1.4;
  * Line cap shared by the optional disclosure's two rows.
  *
  * The pending placeholder and the settled row paint the same copy, so the row
- * must reserve the same height in both: both branches pass this one cap. The
- * optional disclosure needs the third line at the app's text column.
+ * must reserve the same height in both: both branches pass this one cap. No
+ * count bounds this copy: the English disclosure already fills three lines at
+ * the compact text column, and the longer catalogs need more, so a reader must
+ * be able to finish the sentence in every language.
  */
-const CONSENT_OPTIONAL_SUBTITLE_LINES = 3;
+const CONSENT_OPTIONAL_SUBTITLE_LINES = 'all';
 
 /**
  * Whether the optional switch holds the same-size placeholder.

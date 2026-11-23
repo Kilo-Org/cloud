@@ -517,6 +517,41 @@ describe('ConsentCard', () => {
     expect(singleSwitch(renderer.root).props.value).toBe(true);
   });
 
+  it('gives the placeholder and the settled row one uncapped disclosure', async () => {
+    // The two branches paint the same copy, so the row cannot change height
+    // when the stored answer lands. No line count bounds that copy: a count
+    // that fits English clips the longer catalogs mid-sentence.
+    const deferred = Promise.withResolvers<{ mandatory: boolean; optional: boolean }>();
+    mockedReadConsent.mockReturnValue(deferred.promise);
+    const renderer = mountCard('review');
+    await act(async () => {
+      await Promise.resolve();
+    });
+    const placeholder = renderer.root.findAll(
+      n =>
+        typeof n.type === 'string' &&
+        (n.type as string) === 'ConfigureRow' &&
+        n.props.title === 'Help improve Kilo'
+    );
+    expect(placeholder).toHaveLength(1);
+    expect(placeholder[0]?.props.subtitleNumberOfLines).toBe('all');
+
+    await act(() => {
+      deferred.resolve({ mandatory: true, optional: true });
+    });
+    await act(flush);
+    // The settled row paints the same copy with no cap, so the two branches
+    // reserve the same height in every language.
+    const settled = renderer.root.findAll(
+      n =>
+        typeof n.type === 'string' &&
+        (n.type as string) === 'Text' &&
+        n.props.children === i18n.t('consent.helpImproveDescription')
+    );
+    expect(settled.length).toBeGreaterThan(0);
+    for (const node of settled) expect(node.props.numberOfLines).toBeUndefined();
+  });
+
   it('derives the pending phase from the account and the load phase together', () => {
     // `optionalIsPending` gates the switch placeholder: the b911 vr5 pre-load
     // state read as a completed revoke, so any render that has an account but

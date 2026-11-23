@@ -3692,7 +3692,7 @@
       "noSeatsAvailable": "Бүх суудал ашиглагдаж байна. Нэмэлт гишүүн урихаасаа өмнө байгууллагын эзэмшигчээс суудал нэмэхийг хүснэ үү."
     },
     "invoices": {
-      "downloadA11y": "{{number}} нэхэмжлэхийг татах",
+      "downloadA11y": "{{number}} нэхэмжлэхийг татах, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Төлбөрийн мөчлөг бүрт нэхэмжлэх автоматаар үүснэ. Байгууллагад тань төлбөр нэхэмжилсний дараа энд харагдана.",
       "emptyTitle": "Нэхэмжлэх алга",
       "invoiceFallback": "Нэхэмжлэх",
@@ -4700,6 +4700,15 @@
     "history": {
       "activityUnavailable": "Кредитийн гүйлгээг ачаалж чадсангүй.",
       "appStoreReceipt": "App Store-ын баримт",
+      "deduction": {
+        "adminCancel": "Админы хаасан үлдэгдэл",
+        "adminDebit": "Админы хасан кредит",
+        "codingPlan": "Кодлох багц: {{plan}}",
+        "correction": "Үлдэгдлийн залруулга",
+        "dispute": "Төлбөрийн маргаан",
+        "refundAppStore": "App Store-оос кредит багцын буцаан олголт",
+        "refundGooglePlay": "Google Play-оос кредит багцын буцаан олголт"
+      },
       "deductionFallback": "Кредитийн хасалт",
       "emptyDescription": "Кредитийн худалдан авалт, баримт, хэрэглээ энд харагдана.",
       "emptyTitle": "Кредитийн түүх алга",

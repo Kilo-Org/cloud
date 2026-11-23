@@ -3692,7 +3692,7 @@
       "noSeatsAvailable": "Efa ampiasaina avokoa ny toerana rehetra. Angataho amin'ny tompon'ny fikambanana iray ny hanampy toerana alohan'ny hanasanao mpikambana fanampiny."
     },
     "invoices": {
-      "downloadA11y": "Alao ny faktiora {{number}}",
+      "downloadA11y": "Alao ny faktiora {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Foronina ho azy isaky ny fe-potoana fandoavana ny faktiora. Hiseho eto izany rehefa ampandoavina ny fikambananao.",
       "emptyTitle": "Tsy misy faktiora",
       "invoiceFallback": "Faktiora",
@@ -4700,6 +4700,15 @@
     "history": {
       "activityUnavailable": "Tsy afaka nampidirina ny hetsika momba ny trosa.",
       "appStoreReceipt": "Rosia avy amin'ny App Store",
+      "deduction": {
+        "adminCancel": "Fanakatonana ambim-bola nataon'ny mpitantana",
+        "adminDebit": "Fanesorana kredita nataon'ny mpitantana",
+        "codingPlan": "Drafitra fandaharana: {{plan}}",
+        "correction": "Fanitsiana ambim-bola",
+        "dispute": "Fifandirana momba ny fandoavana",
+        "refundAppStore": "Famerenam-bola ho an'ny fonosana kredita avy amin'ny App Store",
+        "refundGooglePlay": "Famerenam-bola ho an'ny fonosana kredita avy amin'ny Google Play"
+      },
       "deductionFallback": "Fanalana kredita",
       "emptyDescription": "Hiseho eto ny fividianana kredita, ny rosia ary ny fampiasana.",
       "emptyTitle": "Tsy misy tantaran'ny kredita",

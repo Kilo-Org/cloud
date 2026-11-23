@@ -57,6 +57,7 @@ import {
   agent_configs,
   passkey_credentials,
   cli_sessions_v2,
+  coding_plan_subscriptions,
 } from '@kilocode/db/schema';
 import { eq, and, isNull, inArray, or, sql, gte, gt, desc, isNotNull, ne } from 'drizzle-orm';
 import crypto from 'crypto';
@@ -82,7 +83,9 @@ import {
   getCreditBlocks,
   creditGrantReasonOf,
   CreditGrantReasonSchema,
+  CreditDeductionReasonSchema,
 } from '@/lib/getCreditBlocks';
+import { getCodingPlanPrice } from '@/lib/coding-plans/pricing';
 import { resolveStripeReceiptUrl } from '@kilocode/web-shared/lib/credits';
 import { getBalanceForUser } from '@kilocode/web-shared/lib/user/balance';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
@@ -250,6 +253,10 @@ const CreditDeductionSchema = z.object({
       kind: CreditGrantReasonSchema,
     })
     .nullable(),
+  /** Why the row drew credit, from its own category: a usage charge, a coding plan, a store refund, a dispute, an administrator action or a balance correction. Null when the row's category carries no reason the app can name, so a client keeps the stored description. */
+  reason: CreditDeductionReasonSchema.nullable(),
+  /** The coding plan this row charged, verbatim from the plan catalog, so the client can name it inside its own template. Null for every other reason. */
+  planName: z.string().nullable(),
 });
 
 const CreditGrantSchema = z.object({
@@ -340,6 +347,8 @@ type RawDeduction = {
   credit_category: string | null;
   amount_mUsd: number;
   expiry: 'expired' | 'voided' | null;
+  reason: z.infer<typeof CreditDeductionReasonSchema> | null;
+  planName: string | null;
   purchase: {
     id: string;
     date: string;
@@ -457,6 +466,41 @@ function getTopUpConditions(userId: string, organizationId?: string) {
 }
 
 /**
+ * Map each coding-plan subscription a renewal charged to the plan it bought, as
+ * "<Provider> <Plan>", so the deduction row can name the plan when its category
+ * names only the subscription. Ids whose plan the catalog does not know are
+ * left out, so their rows keep the stored description.
+ */
+async function getCodingPlanNamesBySubscription(
+  userId: string,
+  transactions: { credit_category: string | null }[]
+): Promise<Map<string, string>> {
+  const subscriptionIds = new Set<string>();
+  for (const transaction of transactions) {
+    const subscriptionId = transaction.credit_category?.match(/^coding-plan:renewal:([^:]+):/)?.[1];
+    if (subscriptionId) subscriptionIds.add(subscriptionId);
+  }
+
+  const namesBySubscription = new Map<string, string>();
+  if (subscriptionIds.size === 0) return namesBySubscription;
+
+  const rows = await db
+    .select({ id: coding_plan_subscriptions.id, plan_id: coding_plan_subscriptions.plan_id })
+    .from(coding_plan_subscriptions)
+    .where(
+      and(
+        eq(coding_plan_subscriptions.user_id, userId),
+        inArray(coding_plan_subscriptions.id, [...subscriptionIds])
+      )
+    );
+  for (const row of rows) {
+    const plan = getCodingPlanPrice(row.plan_id);
+    if (plan) namesBySubscription.set(row.id, `${plan.providerName} ${plan.name}`);
+  }
+  return namesBySubscription;
+}
+
+/**
  * Enrich KiloClaw deduction descriptions with instance names so users
  * can distinguish charges across multiple instances.
  */
@@ -471,6 +515,8 @@ async function enrichDeductionsWithInstanceNames(
     amount_mUsd: number;
     kind: z.infer<typeof CreditDeductionKindSchema>;
     expiry: RawDeduction['expiry'];
+    reason: RawDeduction['reason'];
+    planName: RawDeduction['planName'];
     purchase: RawDeduction['purchase'];
   }[]
 > {
@@ -563,6 +609,8 @@ async function enrichDeductionsWithInstanceNames(
       amount_mUsd: d.amount_mUsd,
       kind: getDeductionKind(d.credit_category),
       expiry: d.expiry,
+      reason: d.reason,
+      planName: d.planName,
       purchase: d.purchase,
     };
   });
@@ -986,7 +1034,18 @@ export const userRouter = createTRPCRouter({
         ),
       });
 
-      const result = getCreditBlocks(transactions, now, ctx.user, ctx.user.id);
+      const codingPlanNamesBySubscription = await getCodingPlanNamesBySubscription(
+        ctx.user.id,
+        transactions
+      );
+
+      const result = getCreditBlocks(
+        transactions,
+        now,
+        ctx.user,
+        ctx.user.id,
+        codingPlanNamesBySubscription
+      );
 
       // Enrich KiloClaw deduction descriptions with instance names.
       const enrichedDeductions = await enrichDeductionsWithInstanceNames(

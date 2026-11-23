@@ -3692,7 +3692,7 @@
       "noSeatsAvailable": "Barcha o'rinlar band. Ko'proq a'zo taklif qilishdan oldin tashkilot egasidan o'rinlar qo'shishni so'rang."
     },
     "invoices": {
-      "downloadA11y": "{{number}} raqamli hisob-fakturani yuklab olish",
+      "downloadA11y": "{{number}} raqamli hisob-fakturani yuklab olish, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Hisob-fakturalar har bir hisob-kitob davrida avtomatik yaratiladi. Tashkilotingizga to'lov hisobi chiqarilgach, ular shu yerda ko'rinadi.",
       "emptyTitle": "Hisob-fakturalar yo'q",
       "invoiceFallback": "Hisob-faktura",
@@ -4700,6 +4700,15 @@
     "history": {
       "activityUnavailable": "Kredit harakatini yuklab bo‘lmadi.",
       "appStoreReceipt": "Chek App Store’da",
+      "deduction": {
+        "adminCancel": "Balans administrator tomonidan yopilgan",
+        "adminDebit": "Kreditlar administrator tomonidan olib tashlangan",
+        "codingPlan": "Kodlash tarifi: {{plan}}",
+        "correction": "Balansni tuzatish",
+        "dispute": "To‘lov bo‘yicha nizo",
+        "refundAppStore": "App Store’dan kredit paketi qaytarilishi",
+        "refundGooglePlay": "Google Play’dan kredit paketi qaytarilishi"
+      },
       "deductionFallback": "Kredit yechilishi",
       "emptyDescription": "Kredit xaridlari, cheklar va sarflar shu yerda ko‘rinadi.",
       "emptyTitle": "Kreditlar tarixi yo‘q",

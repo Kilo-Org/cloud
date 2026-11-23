@@ -3692,7 +3692,7 @@
       "noSeatsAvailable": "બધી બેઠકો ઉપયોગમાં છે. વધુ સભ્યોને આમંત્રિત કરતાં પહેલાં સંસ્થાના માલિકને બેઠકો ઉમેરવા માટે કહો."
     },
     "invoices": {
-      "downloadA11y": "ઇનવોઇસ {{number}} ડાઉનલોડ કરો",
+      "downloadA11y": "ઇનવોઇસ {{number}}, {{amount}}, {{date}}, {{status}} ડાઉનલોડ કરો",
       "emptyDescription": "દરેક બિલિંગ ચક્રમાં ઇનવોઇસ આપમેળે બને છે. તમારી સંસ્થાનું બિલ બન્યા પછી તે અહીં દેખાશે.",
       "emptyTitle": "કોઈ ઇનવોઇસ નથી",
       "invoiceFallback": "ઇનવોઇસ",
@@ -4700,6 +4700,15 @@
     "history": {
       "activityUnavailable": "ક્રેડિટ પ્રવૃત્તિ લોડ થઈ શકી નથી.",
       "appStoreReceipt": "App Storeની રસીદ",
+      "deduction": {
+        "adminCancel": "એડમિન દ્વારા બેલેન્સ બંધ કરવામાં આવ્યું",
+        "adminDebit": "એડમિન દ્વારા ક્રેડિટ દૂર કરવામાં આવી",
+        "codingPlan": "કોડિંગ પ્લાન: {{plan}}",
+        "correction": "બેલેન્સ સુધારો",
+        "dispute": "ચુકવણી વિવાદ",
+        "refundAppStore": "App Store તરફથી ક્રેડિટ પેકનું રિફંડ",
+        "refundGooglePlay": "Google Play તરફથી ક્રેડિટ પેકનું રિફંડ"
+      },
       "deductionFallback": "ક્રેડિટ કપાત",
       "emptyDescription": "ક્રેડિટ ખરીદીઓ, રસીદો અને વપરાશ અહીં દેખાશે.",
       "emptyTitle": "કોઈ ક્રેડિટ ઇતિહાસ નથી",

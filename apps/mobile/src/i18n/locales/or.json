@@ -3692,7 +3692,7 @@
       "noSeatsAvailable": "ସମସ୍ତ ସିଟ୍ ବ୍ୟବହାରରେ ଅଛି। ଅଧିକ ସଦସ୍ୟଙ୍କୁ ନିମନ୍ତ୍ରଣ କରିବା ପୂର୍ବରୁ ସିଟ୍ ଯୋଡ଼ିବା ପାଇଁ ଜଣେ ସଂଗଠନ ମାଲିକଙ୍କୁ କୁହନ୍ତୁ।"
     },
     "invoices": {
-      "downloadA11y": "ଇନଭଏସ୍ {{number}} ଡାଉନଲୋଡ୍ କରନ୍ତୁ",
+      "downloadA11y": "ଇନଭଏସ୍ {{number}}, {{amount}}, {{date}}, {{status}} ଡାଉନଲୋଡ୍ କରନ୍ତୁ",
       "emptyDescription": "ପ୍ରତ୍ୟେକ ବିଲିଂ ଚକ୍ରରେ ଇନଭଏସ୍ ଆପେ ତିଆରି ହୁଏ। ଆପଣଙ୍କ ସଂଗଠନ ପାଇଁ ବିଲ୍ ତିଆରି ହେଲେ ଇନଭଏସ୍ ଏଠାରେ ଦେଖାଯିବ।",
       "emptyTitle": "କୌଣସି ଇନଭଏସ୍ ନାହିଁ",
       "invoiceFallback": "ଇନଭଏସ୍",
@@ -4700,6 +4700,15 @@
     "history": {
       "activityUnavailable": "କ୍ରେଡିଟ୍ କାର୍ଯ୍ୟକଳାପ ଲୋଡ୍ କରାଯାଇପାରିଲା ନାହିଁ।",
       "appStoreReceipt": "App Storeରୁ ରସିଦ",
+      "deduction": {
+        "adminCancel": "ପ୍ରଶାସକ ଦ୍ୱାରା ବନ୍ଦ ହୋଇଥିବା ବ୍ୟାଲାନ୍ସ",
+        "adminDebit": "ପ୍ରଶାସକ ଦ୍ୱାରା ହଟାଯାଇଥିବା କ୍ରେଡିଟ୍",
+        "codingPlan": "କୋଡିଂ ପ୍ଲାନ୍: {{plan}}",
+        "correction": "ବ୍ୟାଲାନ୍ସ ସମାୟୋଜନ",
+        "dispute": "ଦେୟ ବିବାଦ",
+        "refundAppStore": "App Storeରୁ କ୍ରେଡିଟ୍ ପ୍ୟାକ୍ ଫେରସ୍ତ",
+        "refundGooglePlay": "Google Playରୁ କ୍ରେଡିଟ୍ ପ୍ୟାକ୍ ଫେରସ୍ତ"
+      },
       "deductionFallback": "କ୍ରେଡିଟ୍ କଟାଣ",
       "emptyDescription": "କ୍ରେଡିଟ୍ କ୍ରୟ, ରସିଦ ଏବଂ ବ୍ୟବହାର ଏଠାରେ ଦେଖାଯିବ।",
       "emptyTitle": "କୌଣସି କ୍ରେଡିଟ୍ ଇତିହାସ ନାହିଁ",

@@ -3692,7 +3692,7 @@
       "noSeatsAvailable": "Alle plasser er i bruk. Be en organisasjonseier om å legge til plasser før du inviterer flere medlemmer."
     },
     "invoices": {
-      "downloadA11y": "Last ned faktura {{number}}",
+      "downloadA11y": "Last ned faktura {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Fakturaer opprettes automatisk for hver faktureringsperiode. De vises her når organisasjonen din faktureres.",
       "emptyTitle": "Ingen fakturaer",
       "invoiceFallback": "Faktura",
@@ -4700,6 +4700,15 @@
     "history": {
       "activityUnavailable": "Kunne ikke laste inn kredittaktivitet.",
       "appStoreReceipt": "Kvittering fra App Store",
+      "deduction": {
+        "adminCancel": "Saldo lukket av en administrator",
+        "adminDebit": "Kreditter fjernet av en administrator",
+        "codingPlan": "Kodeabonnement: {{plan}}",
+        "correction": "Justering av saldo",
+        "dispute": "Tvist om betaling",
+        "refundAppStore": "Refusjon av kredittpakke fra App Store",
+        "refundGooglePlay": "Refusjon av kredittpakke fra Google Play"
+      },
       "deductionFallback": "Kredittrekk",
       "emptyDescription": "Kjøp av kreditter, kvitteringer og forbruk vises her.",
       "emptyTitle": "Ingen kreditthistorikk",

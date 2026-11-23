@@ -3692,7 +3692,7 @@
       "noSeatsAvailable": "ሁሉም መቀመጫዎች በጥቅም ላይ ናቸው። ተጨማሪ አባላትን ከመጋበዝዎ በፊት የድርጅት ባለቤት መቀመጫዎችን እንዲጨምር ይጠይቁ።"
     },
     "invoices": {
-      "downloadA11y": "ደረሰኝ {{number}}ን ያውርዱ",
+      "downloadA11y": "ደረሰኝ {{number}}ን፣ {{amount}}፣ {{date}}፣ {{status}} ያውርዱ",
       "emptyDescription": "ደረሰኞች በእያንዳንዱ የክፍያ ዑደት በራስ ሰር ይዘጋጃሉ። ድርጅትዎ ክፍያ እንዲፈጽም ሲጠየቅ እዚህ ይታያሉ።",
       "emptyTitle": "ምንም ደረሰኞች የሉም",
       "invoiceFallback": "ደረሰኝ",
@@ -4700,6 +4700,15 @@
     "history": {
       "activityUnavailable": "የክሬዲት እንቅስቃሴ ማምጣት አልተቻለም።",
       "appStoreReceipt": "ደረሰኝ ከApp Store",
+      "deduction": {
+        "adminCancel": "ቀሪ ሂሳቡ በአስተዳዳሪ ተዘግቷል",
+        "adminDebit": "ክሬዲቶች በአስተዳዳሪ ተወግደዋል",
+        "codingPlan": "የኮድ እቅድ፦ {{plan}}",
+        "correction": "የቀሪ ሂሳብ ማስተካከያ",
+        "dispute": "የክፍያ ክርክር",
+        "refundAppStore": "የክሬዲት ጥቅል ተመላሽ ከApp Store",
+        "refundGooglePlay": "የክሬዲት ጥቅል ተመላሽ ከGoogle Play"
+      },
       "deductionFallback": "የክሬዲት ቅነሳ",
       "emptyDescription": "የክሬዲት ግዢዎች፣ ደረሰኞች እና አጠቃቀም እዚህ ይታያሉ።",
       "emptyTitle": "የክሬዲት ታሪክ የለም",

@@ -3696,7 +3696,7 @@
       "noSeatsAvailable": "Semua kursi sudah terpakai. Minta pemilik organisasi untuk menambah kursi sebelum mengundang lebih banyak anggota."
     },
     "invoices": {
-      "downloadA11y": "Unduh faktur {{number}}",
+      "downloadA11y": "Unduh faktur {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Faktur dibuat secara otomatis setiap siklus penagihan dan akan muncul di sini setelah organisasimu ditagih.",
       "emptyTitle": "Belum ada faktur",
       "invoiceFallback": "Faktur",
@@ -4700,6 +4700,15 @@
     "history": {
       "activityUnavailable": "Aktivitas kredit gagal dimuat.",
       "appStoreReceipt": "Tanda terima dari App Store",
+      "deduction": {
+        "adminCancel": "Saldo ditutup oleh admin",
+        "adminDebit": "Kredit dihapus oleh admin",
+        "codingPlan": "Paket coding: {{plan}}",
+        "correction": "Koreksi saldo",
+        "dispute": "Sengketa pembayaran",
+        "refundAppStore": "Pengembalian dana paket kredit dari App Store",
+        "refundGooglePlay": "Pengembalian dana paket kredit dari Google Play"
+      },
       "deductionFallback": "Pengurangan kredit",
       "emptyDescription": "Pembelian kredit, tanda terima, dan penggunaan akan muncul di sini.",
       "emptyTitle": "Tidak ada riwayat kredit",

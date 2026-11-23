@@ -3692,7 +3692,7 @@
       "noSeatsAvailable": "ที่นั่งทั้งหมดถูกใช้งานแล้ว โปรดขอให้เจ้าของขององค์กรเพิ่มที่นั่งก่อนเชิญสมาชิกเพิ่มเติม"
     },
     "invoices": {
-      "downloadA11y": "ดาวน์โหลดใบแจ้งหนี้ {{number}}",
+      "downloadA11y": "ดาวน์โหลดใบแจ้งหนี้ {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "ระบบจะสร้างใบแจ้งหนี้โดยอัตโนมัติทุกรอบบิล และแสดงที่นี่เมื่อมีการเรียกเก็บเงินจากองค์กรของคุณ",
       "emptyTitle": "ไม่มีใบแจ้งหนี้",
       "invoiceFallback": "ใบแจ้งหนี้",
@@ -4700,6 +4700,15 @@
     "history": {
       "activityUnavailable": "ไม่สามารถโหลดกิจกรรมเครดิตได้",
       "appStoreReceipt": "ใบเสร็จจาก App Store",
+      "deduction": {
+        "adminCancel": "ยอดคงเหลือถูกปิดโดยผู้ดูแลระบบ",
+        "adminDebit": "เครดิตถูกนำออกโดยผู้ดูแลระบบ",
+        "codingPlan": "แผนการเขียนโค้ด: {{plan}}",
+        "correction": "การปรับปรุงยอดคงเหลือ",
+        "dispute": "ข้อพิพาทการชำระเงิน",
+        "refundAppStore": "การคืนเงินค่าแพ็กเกจเครดิตจาก App Store",
+        "refundGooglePlay": "การคืนเงินค่าแพ็กเกจเครดิตจาก Google Play"
+      },
       "deductionFallback": "การหักเครดิต",
       "emptyDescription": "การซื้อเครดิต ใบเสร็จ และการใช้งานจะแสดงที่นี่",
       "emptyTitle": "ไม่มีประวัติเครดิต",

@@ -3692,7 +3692,7 @@
       "noSeatsAvailable": "Öll sæti eru í notkun. Biddu eiganda fyrirtækisins að bæta við sætum áður en þú býður fleiri meðlimum."
     },
     "invoices": {
-      "downloadA11y": "Sækja reikning {{number}}",
+      "downloadA11y": "Sækja reikning {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Reikningar eru búnir til sjálfkrafa á hverju innheimtutímabili og birtast hér þegar félaginu þínu er sendur reikningur.",
       "emptyTitle": "Engir reikningar",
       "invoiceFallback": "Reikningur",
@@ -4700,6 +4700,15 @@
     "history": {
       "activityUnavailable": "Gat ekki hlaðið inneignarferli.",
       "appStoreReceipt": "Kvittun frá App Store",
+      "deduction": {
+        "adminCancel": "Stjórnandi lokaði stöðunni",
+        "adminDebit": "Stjórnandi fjarlægði inneign",
+        "codingPlan": "Forritunaráskrift: {{plan}}",
+        "correction": "Leiðrétting á stöðu",
+        "dispute": "Ágreiningur um greiðslu",
+        "refundAppStore": "Endurgreiðsla inneignarpakka frá App Store",
+        "refundGooglePlay": "Endurgreiðsla inneignarpakka frá Google Play"
+      },
       "deductionFallback": "Frádráttur inneignar",
       "emptyDescription": "Kaup á inneign, kvittanir og notkun birtast hér.",
       "emptyTitle": "Enginn inneignarferill",

@@ -3696,7 +3696,7 @@
       "noSeatsAvailable": "Alle plaatsen zijn in gebruik. Vraag een organisatie-eigenaar om plaatsen toe te voegen voordat je meer leden uitnodigt."
     },
     "invoices": {
-      "downloadA11y": "Factuur {{number}} downloaden",
+      "downloadA11y": "Factuur {{number}}, {{amount}}, {{date}}, {{status}} downloaden",
       "emptyDescription": "Facturen worden elke factureringsperiode automatisch aangemaakt. Ze verschijnen hier zodra je organisatie een factuur ontvangt.",
       "emptyTitle": "Geen facturen",
       "invoiceFallback": "Factuur",
@@ -4700,6 +4700,15 @@
     "history": {
       "activityUnavailable": "Kan tegoedactiviteit niet laden.",
       "appStoreReceipt": "Bon in de App Store",
+      "deduction": {
+        "adminCancel": "Saldo gesloten door een beheerder",
+        "adminDebit": "Tegoed verwijderd door een beheerder",
+        "codingPlan": "Codeerabonnement: {{plan}}",
+        "correction": "Saldocorrectie",
+        "dispute": "Geschil over betaling",
+        "refundAppStore": "Terugbetaling van tegoedpakket uit de App Store",
+        "refundGooglePlay": "Terugbetaling van tegoedpakket uit Google Play"
+      },
       "deductionFallback": "Tegoedafschrijving",
       "emptyDescription": "Tegoedaankopen, bonnen en verbruik verschijnen hier.",
       "emptyTitle": "Geen tegoedgeschiedenis",

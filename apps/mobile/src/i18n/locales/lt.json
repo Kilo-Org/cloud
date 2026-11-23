@@ -3828,7 +3828,7 @@
       "noSeatsAvailable": "Visos vietos užimtos. Paprašykite organizacijos savininko pridėti vietų, prieš kviesdami daugiau narių."
     },
     "invoices": {
-      "downloadA11y": "Atsisiųsti sąskaitą {{number}}",
+      "downloadA11y": "Atsisiųsti sąskaitą {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Sąskaitos automatiškai parengiamos kiekvieną atsiskaitymo laikotarpį. Kai jūsų organizacijai bus išrašyta sąskaita, ji bus rodoma čia.",
       "emptyTitle": "Nėra sąskaitų",
       "invoiceFallback": "Sąskaita",
@@ -4870,6 +4870,15 @@
     "history": {
       "activityUnavailable": "Nepavyko įkelti kredito aktyvumo.",
       "appStoreReceipt": "Kvitas iš App Store",
+      "deduction": {
+        "adminCancel": "Administratoriaus uždarytas balansas",
+        "adminDebit": "Administratoriaus pašalinti kreditai",
+        "codingPlan": "Programavimo planas: {{plan}}",
+        "correction": "Balanso korekcija",
+        "dispute": "Mokėjimo ginčas",
+        "refundAppStore": "Kreditų paketo grąžinimas iš App Store",
+        "refundGooglePlay": "Kreditų paketo grąžinimas iš Google Play"
+      },
       "deductionFallback": "Kreditų nurašymas",
       "emptyDescription": "Čia bus rodomi kreditų pirkimai, kvitai ir naudojimas.",
       "emptyTitle": "Kreditų istorijos nėra",

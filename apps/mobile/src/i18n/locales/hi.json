@@ -3696,7 +3696,7 @@
       "noSeatsAvailable": "सभी सीटें उपयोग में हैं। और सदस्यों को आमंत्रित करने से पहले किसी संगठन मालिक से सीटें जोड़ने के लिए कहें।"
     },
     "invoices": {
-      "downloadA11y": "इनवॉइस {{number}} डाउनलोड करें",
+      "downloadA11y": "इनवॉइस {{number}}, {{amount}}, {{date}}, {{status}} डाउनलोड करें",
       "emptyDescription": "हर बिलिंग चक्र में इनवॉइस अपने आप बनते हैं। आपके संगठन का बिल बनने पर वे यहाँ दिखाई देंगे।",
       "emptyTitle": "कोई इनवॉइस नहीं",
       "invoiceFallback": "इनवॉइस",
@@ -4700,6 +4700,15 @@
     "history": {
       "activityUnavailable": "क्रेडिट गतिविधि लोड नहीं हो सकी।",
       "appStoreReceipt": "App Store की रसीद",
+      "deduction": {
+        "adminCancel": "बैलेंस एडमिन द्वारा बंद किया गया",
+        "adminDebit": "एडमिन द्वारा क्रेडिट हटाए गए",
+        "codingPlan": "कोडिंग प्लान: {{plan}}",
+        "correction": "बैलेंस सुधार",
+        "dispute": "भुगतान विवाद",
+        "refundAppStore": "App Store से क्रेडिट पैक की वापसी",
+        "refundGooglePlay": "Google Play से क्रेडिट पैक की वापसी"
+      },
       "deductionFallback": "क्रेडिट कटौती",
       "emptyDescription": "क्रेडिट की खरीदारी, रसीदें और इस्तेमाल यहाँ दिखेंगे।",
       "emptyTitle": "कोई क्रेडिट इतिहास नहीं",

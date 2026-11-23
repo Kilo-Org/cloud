@@ -3760,7 +3760,7 @@
       "noSeatsAvailable": "Sva mjesta su zauzeta. Zamoli vlasnika organizacije da doda mjesta prije nego što pozoveš još članova."
     },
     "invoices": {
-      "downloadA11y": "Preuzmi fakturu {{number}}",
+      "downloadA11y": "Preuzmi fakturu {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Fakture se automatski generišu u svakom obračunskom periodu i prikazuju ovdje nakon naplate tvojoj organizaciji.",
       "emptyTitle": "Nema faktura",
       "invoiceFallback": "Faktura",
@@ -4785,6 +4785,15 @@
     "history": {
       "activityUnavailable": "Nije moguće učitati aktivnost kredita.",
       "appStoreReceipt": "Potvrda iz trgovine App Store",
+      "deduction": {
+        "adminCancel": "Stanje zatvorio administrator",
+        "adminDebit": "Kredite uklonio administrator",
+        "codingPlan": "Plan kodiranja: {{plan}}",
+        "correction": "Korekcija stanja",
+        "dispute": "Spor oko plaćanja",
+        "refundAppStore": "Povrat paketa kredita iz trgovine App Store",
+        "refundGooglePlay": "Povrat paketa kredita iz trgovine Google Play"
+      },
       "deductionFallback": "Odbitak kredita",
       "emptyDescription": "Kupovine kredita, potvrde i potrošnja pojavit će se ovdje.",
       "emptyTitle": "Nema historije kredita",

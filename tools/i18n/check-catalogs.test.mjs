@@ -3307,6 +3307,39 @@ test('rejects an added plural form that quotes the English label', () => {
   );
 });
 
+// English exempts nothing: a label it spells is a label it can name, so its own
+// catalog cannot quote another of its labels either.
+test('rejects an English label that quotes another English label', () => {
+  const found = run({
+    english: {
+      agents: { title: 'Agents', mention: 'Ask the "Agents" list' },
+    },
+    translated: {
+      agents: { title: 'Агенты', mention: 'Спросите у списка' },
+    },
+    source: "t('agents.title');\nt('agents.mention');",
+  });
+  assert.deepEqual(found, [
+    'mobile/en: "agents.mention" quotes the label "Agents"; name its key with $t()',
+  ]);
+});
+
+// A product name the locale keeps in its own catalog sits in a value barely
+// longer than the name, so a translated sentence that quotes it names no
+// control the user misses.
+test('accepts a locale that quotes a product name its own catalog keeps', () => {
+  const found = run({
+    english: {
+      agents: { brand: 'Kilo', hint: 'Open the Kilo console' },
+    },
+    translated: {
+      agents: { brand: 'Kilo Pass', hint: 'Откройте "Kilo" здесь' },
+    },
+    source: "t('agents.brand');\nt('agents.hint');",
+  });
+  assert.deepEqual(found, []);
+});
+
 // A zero category words its own answer — "none" beside a noun reads badly — so
 // it may drop the family's visible count without a review entry.
 test('accepts a zero added form that drops the visible count', () => {

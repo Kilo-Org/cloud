@@ -141,11 +141,6 @@ export function parseSourceEntry(dir, root, file, text) {
  * it could not read rather than drop it, and one refusal must not discard the
  * findings the walk already collected.
  *
- * The walk reads through `read`, which defaults to `readFileSync`, so a caller
- * can supply the read itself and a test can fail one file without the
- * filesystem's help. A throw from it is reported exactly like a throw from the
- * filesystem, so the contract has one name whichever reader refused.
- *
  * `dir` is the subtree walked and `root` the base every entry's `path` is named
  * from; they differ when an audit reads a fixture tree outside the repository,
  * and a file outside `root` is then named from `dir`. A relative `dir` or

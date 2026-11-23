@@ -3692,7 +3692,7 @@
       "noSeatsAvailable": "ټولې څوکۍ کارول شوې دي. نورو غړو ته د بلنې ورکولو مخکې، د سازمان له یوه مالک څخه وغواړئ چې څوکۍ زیاتې کړي."
     },
     "invoices": {
-      "downloadA11y": "د {{number}} بل ښکته کړئ",
+      "downloadA11y": "د {{number}} بل ښکته کړئ، {{amount}}، {{date}}، {{status}}",
       "emptyDescription": "بلونه د تادیې په هره دوره کې په اوتومات ډول جوړېږي. کله چې ستاسو سازمان ته بل صادر شي، دلته به ښکاره شي.",
       "emptyTitle": "هېڅ بل نشته",
       "invoiceFallback": "بل",
@@ -4700,6 +4700,15 @@
     "history": {
       "activityUnavailable": "د کریډیټ فعالیت پورته نه شو.",
       "appStoreReceipt": "له App Store څخه رسید",
+      "deduction": {
+        "adminCancel": "د مدیر له خوا بند شوی بیلانس",
+        "adminDebit": "د مدیر له خوا لرې شوي کریډیټ",
+        "codingPlan": "کوډینګ پلان: {{plan}}",
+        "correction": "د بیلانس سمون",
+        "dispute": "د تادیې شخړه",
+        "refundAppStore": "له App Store څخه د کریډیټ بستې بیرته ورکول",
+        "refundGooglePlay": "له Google Play څخه د کریډیټ بستې بیرته ورکول"
+      },
       "deductionFallback": "د کریډیټ کسر",
       "emptyDescription": "د کریډیټ پېرودنې، رسیدونه، او کارونه به دلته ښکاره شي.",
       "emptyTitle": "د کریډیټ تاریخچه نشته",

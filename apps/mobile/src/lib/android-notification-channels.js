@@ -4,10 +4,9 @@
  *  Both exported lists below derive from this table, so the silent set is a
  *  subset of the created set by construction and each id is written once.
  *  Android never changes a channel's sound after creation, so a channel that
- *  moves in or out of silence needs a new channel id instead. Plain .js because
- *  scripts/assert-expo-config.mjs runs under plain Node, which cannot load
- *  workspace TS (same reason env-keys.js exists). Checked by the mobile
- *  typecheck through tsconfig include — keep the entry.
+ *  moves in or out of silence needs a new channel id instead. Plain .js for
+ *  the reason env-keys.js states. Checked by the mobile typecheck through
+ *  tsconfig include — keep the entry.
  *  @type {ReadonlyArray<{ id: import('@kilocode/notifications').AndroidNotificationChannelId, silent: boolean }>} */
 const ANDROID_NOTIFICATION_CHANNELS_CREATED = Object.freeze([
   { id: 'needs-input', silent: false },

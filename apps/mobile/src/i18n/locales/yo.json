@@ -3692,7 +3692,7 @@
       "noSeatsAvailable": "Gbogbo ìjókòó ni wọ́n ti ń lò. Béèrè lọ́wọ́ olùní àjọ kan láti ṣàfikún ìjókòó kí o tó pe àwọn ọmọ ẹgbẹ́ míì."
     },
     "invoices": {
-      "downloadA11y": "Ṣe ìgbàsílẹ̀ ìwé ìbéèrè owó {{number}}",
+      "downloadA11y": "Ṣe ìgbàsílẹ̀ ìwé ìbéèrè owó {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "A máa ń ṣẹ̀dá àwọn ìwé ìbéèrè owó láìfọwọ́yí ní gbogbo àkókò ìsanwó. Wọ́n yóò hàn níbí nígbà tí a bá béèrè owó lọ́wọ́ àjọ rẹ.",
       "emptyTitle": "Kò sí ìwé ìbéèrè owó",
       "invoiceFallback": "Ìwé ìbéèrè owó",
@@ -4700,6 +4700,15 @@
     "history": {
       "activityUnavailable": "Kò lè gbé ìgbòkègbodò kírẹ́dítì wọ̀.",
       "appStoreReceipt": "Ìwé ẹ̀rí ìsanwó láti App Store",
+      "deduction": {
+        "adminCancel": "Alákòóso ti tì owó tó kù",
+        "adminDebit": "Alákòóso ti yọ kírẹ́dítì kúrò",
+        "codingPlan": "Ètò kóòdù: {{plan}}",
+        "correction": "Àtúnṣe owó tó kù",
+        "dispute": "Àríyànjiyàn ìsanwó",
+        "refundAppStore": "Ìdápadà owó àpò kírẹ́dítì láti App Store",
+        "refundGooglePlay": "Ìdápadà owó àpò kírẹ́dítì láti Google Play"
+      },
       "deductionFallback": "Ìyọkúrò kírẹ́dítì",
       "emptyDescription": "Àwọn ìrajà kírẹ́dítì, ìwé ẹ̀rí ìsanwó, àti ìlò yóò hàn níbí.",
       "emptyTitle": "Kò sí ìtàn kírẹ́dítì",

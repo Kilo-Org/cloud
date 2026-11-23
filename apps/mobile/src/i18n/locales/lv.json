@@ -3760,7 +3760,7 @@
       "noSeatsAvailable": "Visas vietas ir aizņemtas. Palūdz organizācijas īpašniekam pievienot vietas, pirms uzaicini vairāk dalībnieku."
     },
     "invoices": {
-      "downloadA11y": "Lejupielādēt rēķinu {{number}}",
+      "downloadA11y": "Lejupielādēt rēķinu {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Rēķini tiek izveidoti automātiski katrā norēķinu periodā. Tie būs redzami šeit, kad tavai organizācijai būs izrakstīts rēķins.",
       "emptyTitle": "Nav rēķinu",
       "invoiceFallback": "Rēķins",
@@ -4785,6 +4785,15 @@
     "history": {
       "activityUnavailable": "Neizdevās ielādēt kredīta aktivitāti.",
       "appStoreReceipt": "Kvīts veikalā App Store",
+      "deduction": {
+        "adminCancel": "Administratora slēgta bilance",
+        "adminDebit": "Administratora noņemti kredīti",
+        "codingPlan": "Kodēšanas plāns: {{plan}}",
+        "correction": "Bilances korekcija",
+        "dispute": "Maksājuma strīds",
+        "refundAppStore": "Kredītu paketes atmaksa no App Store",
+        "refundGooglePlay": "Kredītu paketes atmaksa no Google Play"
+      },
       "deductionFallback": "Kredītu norakstīšana",
       "emptyDescription": "Šeit būs redzami kredītu pirkumi, kvītis un lietojums.",
       "emptyTitle": "Nav kredītu vēstures",

@@ -3692,7 +3692,7 @@
       "noSeatsAvailable": "Dhammaan kuraasta waa la wada isticmaalayaa. Ka codso milkiilaha ururka inuu kuraas ku daro ka hor intaadan casuumin xubno kale."
     },
     "invoices": {
-      "downloadA11y": "Soo deji qaansheegta {{number}}",
+      "downloadA11y": "Soo deji qaansheegta {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Qaansheegyada si toos ah ayaa loo sameeyaa xilli kasta oo biil bixin ah. Halkan ayay ka soo muuqan doonaan marka ururkaaga biil loo soo saaro.",
       "emptyTitle": "Ma jiraan qaansheegyo",
       "invoiceFallback": "Qaansheeg",
@@ -4700,6 +4700,15 @@
     "history": {
       "activityUnavailable": "Dhaqdhaqaaqa kireditka lama rari karin.",
       "appStoreReceipt": "Rasiid ka yimid App Store",
+      "deduction": {
+        "adminCancel": "Hadhaaga waxaa xidhay maamule",
+        "adminDebit": "Kiredit waxaa ka saaray maamule",
+        "codingPlan": "Qorshaha codeynta: {{plan}}",
+        "correction": "Hagaajinta haraaga",
+        "dispute": "Muranka lacag-bixinta",
+        "refundAppStore": "Lacag celin xirmo kiredit oo ka timid App Store",
+        "refundGooglePlay": "Lacag celin xirmo kiredit oo ka timid Google Play"
+      },
       "deductionFallback": "Ka-goynta kiredit-ka",
       "emptyDescription": "Iibsiyada kiredit-ka, rasiidhada, iyo isticmaalka halkan ayay ka muuqan doonaan.",
       "emptyTitle": "Ma jirto taariikh kiredit",

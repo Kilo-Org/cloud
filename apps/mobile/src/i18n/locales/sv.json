@@ -3692,7 +3692,7 @@
       "noSeatsAvailable": "Alla platser används. Be en organisationsägare att lägga till platser innan du bjuder in fler medlemmar."
     },
     "invoices": {
-      "downloadA11y": "Ladda ner faktura {{number}}",
+      "downloadA11y": "Ladda ner faktura {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Fakturor skapas automatiskt för varje faktureringsperiod och visas här när din organisation har fakturerats.",
       "emptyTitle": "Inga fakturor",
       "invoiceFallback": "Faktura",
@@ -4700,6 +4700,15 @@
     "history": {
       "activityUnavailable": "Det gick inte att läsa in kreditaktivitet.",
       "appStoreReceipt": "Kvitto från App Store",
+      "deduction": {
+        "adminCancel": "Saldot stängdes av en administratör",
+        "adminDebit": "Krediter togs bort av en administratör",
+        "codingPlan": "Kodningsplan: {{plan}}",
+        "correction": "Saldokorrigering",
+        "dispute": "Tvist om betalning",
+        "refundAppStore": "Återbetalning för kreditpaket från App Store",
+        "refundGooglePlay": "Återbetalning för kreditpaket från Google Play"
+      },
       "deductionFallback": "Kreditavdrag",
       "emptyDescription": "Kreditköp, kvitton och användning visas här.",
       "emptyTitle": "Ingen kredithistorik",

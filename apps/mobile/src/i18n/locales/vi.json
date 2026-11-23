@@ -3696,7 +3696,7 @@
       "noSeatsAvailable": "Tất cả chỗ đã được sử dụng. Hãy yêu cầu chủ sở hữu tổ chức thêm chỗ trước khi mời thêm thành viên."
     },
     "invoices": {
-      "downloadA11y": "Tải xuống hóa đơn {{number}}",
+      "downloadA11y": "Tải xuống hóa đơn {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Hóa đơn được tạo tự động theo từng chu kỳ thanh toán và xuất hiện tại đây khi có khoản phí tính cho tổ chức.",
       "emptyTitle": "Chưa có hóa đơn",
       "invoiceFallback": "Hóa đơn",
@@ -4700,6 +4700,15 @@
     "history": {
       "activityUnavailable": "Không thể tải hoạt động tín dụng.",
       "appStoreReceipt": "Biên lai từ App Store",
+      "deduction": {
+        "adminCancel": "Số dư bị quản trị viên đóng",
+        "adminDebit": "Tín dụng bị quản trị viên gỡ bỏ",
+        "codingPlan": "Gói lập trình: {{plan}}",
+        "correction": "Điều chỉnh số dư",
+        "dispute": "Tranh chấp thanh toán",
+        "refundAppStore": "Hoàn tiền gói tín dụng từ App Store",
+        "refundGooglePlay": "Hoàn tiền gói tín dụng từ Google Play"
+      },
       "deductionFallback": "Khấu trừ tín dụng",
       "emptyDescription": "Các giao dịch mua tín dụng, biên lai và mức sử dụng sẽ hiển thị tại đây.",
       "emptyTitle": "Chưa có lịch sử tín dụng",

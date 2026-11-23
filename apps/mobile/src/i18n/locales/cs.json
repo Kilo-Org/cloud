@@ -3828,7 +3828,7 @@
       "noSeatsAvailable": "Všechna místa jsou obsazena. Než pozvete další členy, požádejte vlastníka organizace o přidání míst."
     },
     "invoices": {
-      "downloadA11y": "Stáhnout fakturu {{number}}",
+      "downloadA11y": "Stáhnout fakturu {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Faktury se vystavují automaticky za každé fakturační období. Zobrazí se zde po vyúčtování vaší organizaci.",
       "emptyTitle": "Žádné faktury",
       "invoiceFallback": "Faktura",
@@ -4870,6 +4870,15 @@
     "history": {
       "activityUnavailable": "Aktivitu kreditů se nepodařilo načíst.",
       "appStoreReceipt": "Účtenka z App Store",
+      "deduction": {
+        "adminCancel": "Zůstatek uzavřen správcem",
+        "adminDebit": "Kredity odebrány správcem",
+        "codingPlan": "Plán programování: {{plan}}",
+        "correction": "Oprava zůstatku",
+        "dispute": "Spor o platbu",
+        "refundAppStore": "Vrácení balíčku kreditů z App Store",
+        "refundGooglePlay": "Vrácení balíčku kreditů z Google Play"
+      },
       "deductionFallback": "Odečtení kreditů",
       "emptyDescription": "Zde se zobrazí nákupy kreditů, účtenky a využití.",
       "emptyTitle": "Žádná historie kreditů",

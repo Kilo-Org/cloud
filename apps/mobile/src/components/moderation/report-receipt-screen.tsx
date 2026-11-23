@@ -184,7 +184,7 @@ export function ReportReceiptScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Section>
-          <Text variant="caption">{t('profile.reportReceipt.description')}</Text>
+          <Text variant="muted">{t('profile.reportReceipt.description')}</Text>
           <RowGroup>
             <KvRow
               label={t('profile.reportReceipt.receiptLabel')}

@@ -3696,7 +3696,7 @@
       "noSeatsAvailable": "所有席位皆已使用。請先請組織擁有者增加席位，再邀請更多成員。"
     },
     "invoices": {
-      "downloadA11y": "下載發票 {{number}}",
+      "downloadA11y": "下載發票 {{number}}，{{amount}}，{{date}}，{{status}}",
       "emptyDescription": "每個帳單週期都會自動產生發票，並在組織完成計費後顯示在這裡。",
       "emptyTitle": "尚無發票",
       "invoiceFallback": "發票",
@@ -4700,6 +4700,15 @@
     "history": {
       "activityUnavailable": "無法載入點數活動。",
       "appStoreReceipt": "App Store 收據",
+      "deduction": {
+        "adminCancel": "管理員已關閉餘額",
+        "adminDebit": "管理員已移除點數",
+        "codingPlan": "程式設計方案：{{plan}}",
+        "correction": "餘額調整",
+        "dispute": "付款爭議",
+        "refundAppStore": "App Store 點數包退款",
+        "refundGooglePlay": "Google Play 點數包退款"
+      },
       "deductionFallback": "點數扣除",
       "emptyDescription": "點數購買、收據與使用情況會顯示在這裡。",
       "emptyTitle": "尚無點數紀錄",

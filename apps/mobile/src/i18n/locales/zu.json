@@ -3692,7 +3692,7 @@
       "noSeatsAvailable": "Zonke izihlalo ziyasetshenziswa. Cela umnikazi wenhlangano ukuthi engeze izihlalo ngaphambi kokumema amanye amalungu."
     },
     "invoices": {
-      "downloadA11y": "Landa i-invoyisi {{number}}",
+      "downloadA11y": "Landa i-invoyisi {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Ama-invoyisi akhiqizwa ngokuzenzakalelayo ngomjikelezo ngamunye wokukhokha futhi azovela lapha uma inhlangano yakho isikhokhiswa.",
       "emptyTitle": "Awekho ama-invoyisi",
       "invoiceFallback": "I-invoyisi",
@@ -4700,6 +4700,15 @@
     "history": {
       "activityUnavailable": "Ayikwazanga ukulayisha umsebenzi wamakhredithi.",
       "appStoreReceipt": "Irisidi evela ku-App Store",
+      "deduction": {
+        "adminCancel": "Ibhalansi ivalwe umlawuli",
+        "adminDebit": "Amakhredithi asuswe umlawuli",
+        "codingPlan": "Uhlelo lokukhoda: {{plan}}",
+        "correction": "Ulungiso lwebhalansi",
+        "dispute": "Ingxabano yokukhokha",
+        "refundAppStore": "Ukubuyiselwa kwemali kwephakethe lamakhredithi ku-App Store",
+        "refundGooglePlay": "Ukubuyiselwa kwemali kwephakethe lamakhredithi ku-Google Play"
+      },
       "deductionFallback": "Ukudonswa kwamakhredithi",
       "emptyDescription": "Ukuthengwa kwamakhredithi, amarisidi, nokusetshenziswa kuzovela lapha.",
       "emptyTitle": "Awukho umlando wamakhredithi",

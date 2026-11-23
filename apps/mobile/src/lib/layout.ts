@@ -37,3 +37,16 @@ export const SCREEN_BODY_CLASS = 'gap-6 px-4 pt-3';
  * the Run on and Repository sections keep.
  */
 export const NESTED_SECTION_GAP_CLASS = 'mt-4';
+
+/**
+ * The separation a compact `top` state keeps from the control above it in a
+ * list: the search field's own `my-3` lands its 10.5pt under the field, and this
+ * constant lands the second 10.5pt, so the pair is the contract's 21pt section
+ * gap (`SCREEN_SECTION_GAP_CLASS`) instead of the 10.5pt a state with no spacing
+ * of its own leaves. A state that has a section header below it adds its own
+ * bottom gap on top of this one: the model picker spells that form out as
+ * `"mt-3 mb-6"` because its file already spends the whole 300 code lines the
+ * lint config admits. A state that is the last thing in its scroller adds
+ * nothing, because the scroller already pads the end.
+ */
+export const CONTROL_TO_STATE_GAP_CLASS = 'mt-3';

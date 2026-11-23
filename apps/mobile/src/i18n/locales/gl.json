@@ -3692,7 +3692,7 @@
       "noSeatsAvailable": "Todas as prazas están en uso. Pídelle a un propietario da organización que engada prazas antes de convidar máis membros."
     },
     "invoices": {
-      "downloadA11y": "Descargar factura {{number}}",
+      "downloadA11y": "Descargar factura {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "As facturas xéranse automaticamente en cada ciclo de facturación. Aparecerán aquí cando se lle facture á túa organización.",
       "emptyTitle": "Non hai facturas",
       "invoiceFallback": "Factura",
@@ -4700,6 +4700,15 @@
     "history": {
       "activityUnavailable": "Non se puido cargar a actividade de crédito.",
       "appStoreReceipt": "Recibo da App Store",
+      "deduction": {
+        "adminCancel": "Saldo pechado por un administrador",
+        "adminDebit": "Créditos eliminados por un administrador",
+        "codingPlan": "Plan de programación: {{plan}}",
+        "correction": "Corrección do saldo",
+        "dispute": "Disputa de pagamento",
+        "refundAppStore": "Reembolso dun paquete de créditos da App Store",
+        "refundGooglePlay": "Reembolso dun paquete de créditos de Google Play"
+      },
       "deductionFallback": "Dedución de créditos",
       "emptyDescription": "As compras de créditos, os recibos e o uso aparecerán aquí.",
       "emptyTitle": "Sen historial de créditos",

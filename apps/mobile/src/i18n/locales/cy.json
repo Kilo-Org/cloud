@@ -3964,7 +3964,7 @@
       "noSeatsAvailable": "Mae'r holl seddi'n cael eu defnyddio. Gofynnwch i berchennog sefydliad ychwanegu seddi cyn gwahodd rhagor o aelodau."
     },
     "invoices": {
-      "downloadA11y": "Lawrlwytho anfoneb {{number}}",
+      "downloadA11y": "Lawrlwytho anfoneb {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Cynhyrchir anfonebau'n awtomatig bob cylch bilio a byddant yn ymddangos yma unwaith y bydd eich sefydliad yn cael ei filio.",
       "emptyTitle": "Dim anfonebau",
       "invoiceFallback": "Anfoneb",
@@ -5040,6 +5040,15 @@
     "history": {
       "activityUnavailable": "Methwyd llwytho gweithgarwch credyd.",
       "appStoreReceipt": "Derbynneb gan yr App Store",
+      "deduction": {
+        "adminCancel": "Balans wedi'i gau gan weinyddwr",
+        "adminDebit": "Credydau wedi'u tynnu gan weinyddwr",
+        "codingPlan": "Cynllun codio: {{plan}}",
+        "correction": "Cywiriad balans",
+        "dispute": "Anghydfod talu",
+        "refundAppStore": "Ad-daliad pecyn credyd o'r App Store",
+        "refundGooglePlay": "Ad-daliad pecyn credyd o Google Play"
+      },
       "deductionFallback": "Didyniad credyd",
       "emptyDescription": "Bydd pryniannau credyd, derbynebau a defnydd yn ymddangos yma.",
       "emptyTitle": "Dim hanes credydau",

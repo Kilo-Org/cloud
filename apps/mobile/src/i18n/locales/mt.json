@@ -3896,7 +3896,7 @@
       "noSeatsAvailable": "Il-postijiet kollha qed jintużaw. Staqsi lil sid tal-organizzazzjoni biex iżid postijiet qabel ma tistieden aktar membri."
     },
     "invoices": {
-      "downloadA11y": "Niżżel l-fattura {{number}}",
+      "downloadA11y": "Niżżel l-fattura {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Il-fatturi jinħolqu awtomatikament f'kull ċiklu tal-kontijiet u jidhru hawn meta tinħareġ fattura għall-organizzazzjoni tiegħek.",
       "emptyTitle": "L-ebda fattura",
       "invoiceFallback": "Fattura",
@@ -4955,6 +4955,15 @@
     "history": {
       "activityUnavailable": "Ma stajniex nitgħabbu l-attività tal-kreditu.",
       "appStoreReceipt": "Irċevuta mill-App Store",
+      "deduction": {
+        "adminCancel": "Bilanċ magħluq minn amministratur",
+        "adminDebit": "Krediti mneħħija minn amministratur",
+        "codingPlan": "Pjan tal-ikkowdjar: {{plan}}",
+        "correction": "Aġġustament tal-bilanċ",
+        "dispute": "Tilwima dwar il-ħlas",
+        "refundAppStore": "Rifużjoni ta' pakkett ta' krediti mill-App Store",
+        "refundGooglePlay": "Rifużjoni ta' pakkett ta' krediti minn Google Play"
+      },
       "deductionFallback": "Tnaqqis tal-krediti",
       "emptyDescription": "Ix-xiri, l-irċevuti u l-użu tal-krediti se jidhru hawn.",
       "emptyTitle": "L-ebda storja tal-krediti",

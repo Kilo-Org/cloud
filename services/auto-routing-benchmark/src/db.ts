@@ -300,7 +300,10 @@ const QueueRunOccupancySchema = z.object({
 });
 export type QueueRunOccupancy = z.infer<typeof QueueRunOccupancySchema>;
 
-export type RunAdmission = { admitted: true } | { admitted: false; occupancy: QueueRunOccupancy };
+export type RunAdmission =
+  | { admitted: true }
+  | { admitted: false; occupancy: QueueRunOccupancy }
+  | { admitted: false; operatorHold: true };
 
 /**
  * Running decider runs of one (router ?1, queue ?2), and the oldest of them that
@@ -315,17 +318,25 @@ const QUEUE_RUN_OCCUPANCY_SQL = `
 `;
 
 /**
+ * Admission predicate for a *live operator pause* on the dispatch lock row (id 1,
+ * `operator-pause-*`, `lease_until` in the future). The hold exists to freeze the queues: the
+ * lease stops chunk claims, but nothing before the claim, so without this predicate a start
+ * under the hold still writes a `running` run and claims work no dispatch can start. Only that
+ * token prefix is a hold — an ordinary dispatch pass or the deploy intent on another row keeps
+ * admitting platform work, and an expired operator token blocks nothing.
+ *
+ * Each admitting statement closes the `NOT EXISTS (` with its own admission-instant bind.
+ */
+const OPERATOR_HOLD_CLEAR_PREDICATE_SQL = `
+    SELECT 1 FROM scheduler_dispatch_lock AS held
+    WHERE held.id = 1
+      AND held.token LIKE 'operator-pause-%'
+      AND held.lease_until > `;
+
+/**
  * Inserts a decider run only while its (router ?2, queue ?15) has no starting run
  * and fewer than ?17 active runs, so the check and the insert are one statement.
  * The run records the measurement revision it was started under (?16).
- *
- * ?19 is the admission instant, compared against a *live operator pause* on the dispatch lock
- * row (id 1, `operator-pause-*`, `lease_until` in the future). The hold exists to freeze the
- * queues: the lease stops chunk claims, but nothing before the claim, so without this predicate
- * a drain under the hold still writes a `running` run, consumes one of ?17 admission slots and
- * claims registry profiles that no dispatch can start. Only that token prefix is a hold — an
- * ordinary dispatch pass or the deploy intent on another row keeps admitting platform work,
- * and an expired operator token blocks nothing.
  */
 const ADMIT_DECIDER_RUN_SQL = `
   INSERT INTO benchmark_runs (id, router, accuracy_noise_band, frontier_min_accuracy_delta,
@@ -345,12 +356,26 @@ const ADMIT_DECIDER_RUN_SQL = `
     WHERE active.router = ?2 AND active.kind = 'decider' AND active.purpose = ?15
       AND active.status = 'running'
   ) < ?17
-  AND NOT EXISTS (
-    SELECT 1 FROM scheduler_dispatch_lock AS held
-    WHERE held.id = 1
-      AND held.token LIKE 'operator-pause-%'
-      AND held.lease_until > ?19
-  )
+  AND NOT EXISTS (${OPERATOR_HOLD_CLEAR_PREDICATE_SQL}?19)
+`;
+
+/**
+ * Inserts a classifier run only while no operator pause holds the dispatch lock (?17). The
+ * classifier path keeps no occupancy or starting-run predicate: the admin start picks the one
+ * run, and the unique partial index is its backstop. Like the decider insert, it stamps the
+ * post-cutover admission marker (?18) so the row is never mistaken for legacy work: the
+ * kind-agnostic `--legacy-residue` inspection reports any unmarked running row, and
+ * `retireLegacyRuns` retires only deciders, so nothing would ever clear an unmarked classifier.
+ */
+const ADMIT_CLASSIFIER_RUN_SQL = `
+  INSERT INTO benchmark_runs (id, router, accuracy_noise_band, frontier_min_accuracy_delta,
+    kind, status, started_at, min_accuracy, switch_cost_factor, best_accuracy_switch_threshold,
+    max_concurrency, benchmark_user_id, benchmark_org_id, repetitions,
+    classifier_max_p95_latency_ms, engine_identity, purpose, measurement_revision,
+    admission_marker)
+  SELECT ?1, ?2, ?3, ?4, 'classifier', 'running', ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14,
+    ?15, ?16, ?18
+  WHERE NOT EXISTS (${OPERATOR_HOLD_CLEAR_PREDICATE_SQL}?17)
 `;
 
 export async function getQueueRunOccupancy(
@@ -367,7 +392,10 @@ export async function getQueueRunOccupancy(
  * Writes a run with its model rows and carried summaries in one batch. A decider
  * run is admitted by the same statement that inserts it: only while no run of its
  * (router, queue) is still starting and fewer than MAX_RUNNING_RUNS_PER_QUEUE are
- * active, so overlapping drains cannot both start one. A refused run leaves no rows.
+ * active, so overlapping drains cannot both start one. A classifier run is admitted
+ * by its own insert only while no operator pause holds the dispatch lock. A refused
+ * run leaves no rows. Both kinds stamp the post-cutover admission marker, so no run
+ * this function writes can be mistaken for legacy work.
  */
 export async function insertRun(
   db: D1Database,
@@ -413,6 +441,11 @@ export async function insertRun(
     engine_identity: run.engine_identity,
     measurement_revision: run.measurement_revision ?? ACTIVE_MEASUREMENT_REVISION,
     purpose: run.purpose ?? 'platform',
+    // Post-cutover admission provenance: only a Worker that owns the flow writes it, so a
+    // run admitted by an older image during the deploy overlap stays NULL and is never
+    // claimable, initializable or dispatchable — and is exactly what `--legacy-residue`
+    // reports. A classifier run needs it too: nothing retires an unmarked classifier row.
+    admission_marker: crypto.randomUUID(),
   } satisfies typeof benchmarkRuns.$inferInsert;
 
   const dependents = [];
@@ -449,19 +482,54 @@ export async function insertRun(
     );
   }
 
-  // CLASSIFIER IS NOT COVERED BY THE OPERATOR-HOLD ADMISSION GUARD. This branch is a plain
-  // insert with no occupancy and no hold predicate, and it is reached only by the explicit admin
-  // start (`admin.ts`), never by the cron drain. Until a classifier hold is designed and tested,
-  // it must not be run while the `operator-pause-*` lease is live; that is a rollout prohibition,
-  // not a verified property. Do not widen this branch by hand: a half-applied guard here would
-  // admit a classifier run under a hold that everyone reads as a freeze.
-  if (row.kind === 'classifier') {
-    await orm.batch([orm.insert(benchmarkRuns).values(row), ...dependents]);
-    return { admitted: true };
-  }
-
+  const dependentStatements = dependents.map(query => {
+    const built = query.toSQL();
+    return db.prepare(built.sql).bind(...built.params);
+  });
   // D1 runs a batch as one transaction: a refused run's model and summary rows are
   // written under its id and deleted again before the batch commits.
+  const refusedRunCleanup =
+    dependents.length > 0
+      ? ['run_models', 'model_summaries'].map(table =>
+          db
+            .prepare(
+              `DELETE FROM ${table} WHERE run_id = ?1
+                AND NOT EXISTS (SELECT 1 FROM benchmark_runs WHERE id = ?1)`
+            )
+            .bind(row.id)
+        )
+      : [];
+
+  if (row.kind === 'classifier') {
+    const [inserted] = await db.batch([
+      db.prepare(ADMIT_CLASSIFIER_RUN_SQL).bind(
+        row.id,
+        row.router,
+        row.accuracy_noise_band,
+        row.frontier_min_accuracy_delta,
+        row.started_at,
+        row.min_accuracy,
+        row.switch_cost_factor,
+        row.best_accuracy_switch_threshold,
+        row.max_concurrency,
+        row.benchmark_user_id,
+        row.benchmark_org_id,
+        row.repetitions,
+        row.classifier_max_p95_latency_ms,
+        row.engine_identity,
+        row.purpose,
+        row.measurement_revision,
+        // The admission instant the operator-hold predicate compares the lease against.
+        Date.now(),
+        row.admission_marker
+      ),
+      ...dependentStatements,
+      ...refusedRunCleanup,
+    ]);
+    if ((inserted.meta.changes ?? 0) > 0) return { admitted: true };
+    return { admitted: false, operatorHold: true };
+  }
+
   const [inserted, occupancy] = await db.batch([
     db.prepare(ADMIT_DECIDER_RUN_SQL).bind(
       row.id,
@@ -481,28 +549,14 @@ export async function insertRun(
       row.purpose,
       row.measurement_revision,
       MAX_RUNNING_RUNS_PER_QUEUE,
-      // Post-cutover admission provenance: only a Worker that owns the paid flow writes
-      // it, so a run admitted by an older image during the deploy overlap stays NULL and
-      // is never claimable, initializable or dispatchable.
-      crypto.randomUUID(),
+      // The same post-cutover admission marker the classifier insert stamps.
+      row.admission_marker,
       // The admission instant the operator-hold predicate compares the lease against.
       Date.now()
     ),
     db.prepare(QUEUE_RUN_OCCUPANCY_SQL).bind(row.router, row.purpose),
-    ...dependents.map(query => {
-      const built = query.toSQL();
-      return db.prepare(built.sql).bind(...built.params);
-    }),
-    ...(dependents.length > 0
-      ? ['run_models', 'model_summaries'].map(table =>
-          db
-            .prepare(
-              `DELETE FROM ${table} WHERE run_id = ?1
-                AND NOT EXISTS (SELECT 1 FROM benchmark_runs WHERE id = ?1)`
-            )
-            .bind(row.id)
-        )
-      : []),
+    ...dependentStatements,
+    ...refusedRunCleanup,
   ]);
   if ((inserted.meta.changes ?? 0) > 0) return { admitted: true };
   return {

@@ -126,12 +126,20 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
     !status.isPending &&
     !(readiness.isError && readiness.data == null) &&
     !(status.isError && status.data == null);
-  let title = t('agentChat.repoPicker.platformBitbucket');
+  // A title that names a connect or reconnect action is offered only to a role
+  // that can finish it. A refused member reads the connection state when the
+  // workspace has no integration, and the platform name when one exists,
+  // because the body refuses that reconnect.
+  const platformTitle = t('agentChat.repoPicker.platformBitbucket');
+  let title = platformTitle;
   if (readsSettled && !managesExisting) {
-    title =
-      integrationId === null
+    if (integrationId === null) {
+      title = canManage
         ? t('common.connectBitbucket')
-        : t('prReview.connect.reconnectTitleBitbucket');
+        : t('prReview.connect.bitbucketNotConnectedTitle');
+    } else if (canManage) {
+      title = t('prReview.connect.reconnectTitleBitbucket');
+    }
   }
 
   // One body per state, so the guard's confirmation renders beside all of them:

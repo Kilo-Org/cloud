@@ -206,7 +206,7 @@ test('a lost claim reports the link as this account without a second replay', as
   await expect(resolveKiloUserId(state as never, identity)).resolves.toBe(KILO_USER_ID);
 });
 
-test('a failing claim keeps the link and reports it as this account', async () => {
+test('a failing claim still hands back the message to replay', async () => {
   const contextKey = await seedPendingLink();
 
   const setIfNotExists = state.setIfNotExists;
@@ -215,7 +215,10 @@ test('a failing claim keeps the link and reports it as this account', async () =
     return await setIfNotExists(key, value, ttl);
   };
 
-  await expect(complete(contextKey)).resolves.toEqual({ status: 'linked_elsewhere' });
+  await expect(complete(contextKey)).resolves.toEqual({
+    status: 'linked',
+    context: { thread, message },
+  });
   await expect(resolveKiloUserId(state as never, identity)).resolves.toBe(KILO_USER_ID);
   expect(state.values.has(`${contextKey}:consumed`)).toBe(false);
 });

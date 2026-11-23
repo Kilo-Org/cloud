@@ -47,7 +47,9 @@ export type CompleteLinkAccountOutcome =
  * account, so the link belongs to this account from that point on. Whoever
  * takes the single-use claim in step 4 — this submission or a concurrent one —
  * owns replaying the stored message; the others report `linked_elsewhere`
- * without a context, so exactly one caller hands the message back.
+ * without a context, so exactly one caller hands the message back. A claim
+ * write that fails without taking the marker leaves this submission the owner,
+ * so it returns `linked` with its context and the message is still replayed.
  *
  * A `conflict` therefore leaves the pending link unspent until its TTL. That is
  * safe: the link is bound to the submitting Kilo account and to the chat
@@ -85,17 +87,19 @@ export async function completeLinkAccount({
   try {
     claimed = await consumeLinkAccountContext(state, contextKey);
   } catch (error) {
-    // The mapping is committed; report the link as this account's instead of a
-    // failure, and leave the pending link unspent so a retry can take the claim.
+    // The claim write did not land, so this submission is the only one that can
+    // own the replay: a later submission sees the marker only if the write did
+    // apply, and then reports the link as used without replaying.
     captureException(error, { tags: { component: 'kilo-bot', op: 'link-account-claim' } });
+    return { status: 'linked', context };
   }
 
   if (claimed) {
     return { status: 'linked', context };
   }
 
-  // A concurrent submission, or the claim above failing, leaves the message
-  // replay to whichever submission holds the claim.
+  // A concurrent submission of the same pending link holds the claim and owns
+  // the replay.
   return (await resolveKiloUserId(state, identity)) === user.id
     ? { status: 'linked_elsewhere' }
     : { status: 'used' };

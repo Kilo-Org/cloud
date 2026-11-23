@@ -209,6 +209,38 @@ describe('removeWhitespaceOnlyMessages', () => {
     ]);
   });
 
+  it('keeps one carried breakpoint across many removals after a long reasoning tail', () => {
+    jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const messages: Anthropic.MessageParam[] = [
+      { role: 'assistant', content: [toolUse, ...Array.from({ length: 64 }, () => thinking)] },
+      ...Array.from({ length: 64 }, (): Anthropic.MessageParam => ({
+        role: 'assistant',
+        content: [{ type: 'text', text: '\n', cache_control: { type: 'ephemeral' } }],
+      })),
+      { role: 'user', content: 'Continue.' },
+    ];
+    const before = structuredClone(messages);
+    const body = makeBody(messages);
+
+    removeWhitespaceOnlyMessages(body);
+
+    expect(body.messages).toEqual([
+      {
+        role: 'assistant',
+        content: [
+          { ...toolUse, cache_control: { type: 'ephemeral' } },
+          ...Array.from({ length: 64 }, () => thinking),
+        ],
+      },
+      { role: 'user', content: 'Continue.' },
+    ]);
+    expect(body.messages[0]).not.toBe(messages[0]);
+    const carriedContent = body.messages[0].content;
+    const carriedBlocks = Array.isArray(carriedContent) ? carriedContent : [];
+    expect(carriedBlocks.filter(block => 'cache_control' in block)).toHaveLength(1);
+    expect(messages).toEqual(before);
+  });
+
   it('moves the cache breakpoint of a removed message to the last cacheable block before it', () => {
     jest.spyOn(console, 'warn').mockImplementation(() => undefined);
     const body = makeBody([

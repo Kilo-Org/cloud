@@ -343,6 +343,18 @@ describe('validateWrapperDispatchTicket', () => {
     });
   });
 
+  it('returns exactly the declared claims for a minted ticket', async () => {
+    const ticket = mintWrapperDispatchTicket(wrapperDispatchTicketClaims, secret);
+    const result = await validateWrapperDispatchTicket(`Bearer ${ticket}`, secret);
+    if (!result.success) {
+      throw new Error('a minted ticket must validate');
+    }
+
+    expect(Object.keys(result.claims).sort()).toEqual(
+      Object.keys(wrapperDispatchTicketClaims).sort()
+    );
+  });
+
   it('rejects a raw Kilo JWT / stream ticket by its type discriminant', async () => {
     // A stream ticket is fully shaped but declares its own purpose, so it
     // reaches the purpose check; a raw Kilo JWT carries none of these claims,
@@ -470,6 +482,19 @@ describe('validateWrapperDispatchTicket', () => {
     const ticket = jwt.sign(wrapperDispatchTicketClaims, secret, {
       algorithm: 'HS256',
       expiresIn: '1 minute',
+    });
+
+    await expect(validateWrapperDispatchTicket(`Bearer ${ticket}`, secret)).resolves.toEqual({
+      success: false,
+      error: 'Invalid ticket audience',
+    });
+  });
+
+  it('accepts the dispatch audience only as a single value', async () => {
+    const ticket = jwt.sign(wrapperDispatchTicketClaims, secret, {
+      algorithm: 'HS256',
+      expiresIn: '1 minute',
+      audience: ['other-service', WRAPPER_DISPATCH_TICKET_AUDIENCE],
     });
 
     await expect(validateWrapperDispatchTicket(`Bearer ${ticket}`, secret)).resolves.toEqual({

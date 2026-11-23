@@ -90,6 +90,9 @@ const wrapperDispatchTicketClaimsSchema = z.object({
   wrapperConnectionId: z.string(),
 });
 
+/** The audience is read on its own, before the payload schema, so it is reported first. */
+const wrapperDispatchTicketAudienceSchema = z.object({ aud: z.string().optional() });
+
 /** A payload expiry is required: the parser rejects a body without `exp`. */
 const wrapperDispatchTicketPayloadSchema = z.intersection(
   wrapperDispatchTicketClaimsSchema,
@@ -264,26 +267,20 @@ export async function validateWrapperDispatchTicket(
 
   let payload: string | jwt.JwtPayload;
   try {
-    payload = jwt.verify(ticket, secret, {
-      algorithms: ['HS256'],
-      audience: WRAPPER_DISPATCH_TICKET_AUDIENCE,
-    });
+    payload = jwt.verify(ticket, secret, { algorithms: ['HS256'] });
   } catch (error) {
     if (error instanceof jwt.TokenExpiredError) {
       return { success: false, error: 'Ticket expired' };
-    }
-    if (
-      error instanceof jwt.JsonWebTokenError &&
-      // `jsonwebtoken` reports an audience mismatch as a plain
-      // `JsonWebTokenError`, so this branch names it for the caller.
-      error.message.startsWith('jwt audience invalid')
-    ) {
-      return { success: false, error: 'Invalid ticket audience' };
     }
     if (error instanceof jwt.JsonWebTokenError) {
       return { success: false, error: 'Invalid ticket signature' };
     }
     return { success: false, error: 'Ticket validation failed' };
+  }
+
+  const audience = wrapperDispatchTicketAudienceSchema.safeParse(payload);
+  if (!audience.success || audience.data.aud !== WRAPPER_DISPATCH_TICKET_AUDIENCE) {
+    return { success: false, error: 'Invalid ticket audience' };
   }
 
   const parsed = wrapperDispatchTicketPayloadSchema.safeParse(payload);

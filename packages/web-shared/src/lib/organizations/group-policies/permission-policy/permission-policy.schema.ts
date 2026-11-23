@@ -26,8 +26,9 @@ const rules = z
   )
   .max(MAX_RULES);
 // A tool's rule is either a string action, which is that tool's default action for
-// every call, or an object holding patterns (last matching pattern wins) and a
-// default for the calls no pattern matches.
+// every call, or an object holding patterns (last matching pattern wins) and an
+// optional default for the calls no pattern matches; an object without a default
+// states no decision of its own for those calls.
 const toolRule = z.union([action, z.strictObject({ rules, fallback: action.optional() })]);
 // A shell profile holds the command rules for one shell kind plus that profile's
 // own default for commands no rule matches. The default stops short of `allow`, so
@@ -59,7 +60,8 @@ export const AgentPermissionFields = {
     // layers. Neither form overrides the other, so a permissive `tools.bash`
     // cannot lift a shell rule or shell default, and a restrictive `tools.bash`
     // narrows an allowing shell profile. A layer whose `shell` block names no
-    // profile for the shell that runs the command denies that command.
+    // profile for the shell that runs the command denies that command, and so does
+    // a command that the layer's shell block cannot classify at all.
     .refine(
       tools => tools.bash === undefined || typeof tools.bash === 'string',
       'Use shell profiles for Bash command rules'

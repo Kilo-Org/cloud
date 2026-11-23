@@ -52,16 +52,17 @@ export async function organizationBouncerAccountId(
 }
 
 /**
- * Enqueues one credit event into the durable outbox. The soft-delete check locks the user row
- * `FOR UPDATE`, so it must run inside a transaction (the callers pass `db.transaction` or an open
- * transaction) for the lock to hold; the `BouncerCreditEventOutboxTransaction` parameter makes a
- * bare client a compile error, so the lock cannot be reduced to a single statement by accident.
- * That serializes the enqueue insert against a concurrent `softDeleteUser` (which updates the same
- * row) at the database boundary, so an in-flight late webhook cannot insert after the deletion
- * commits; it does not undo a delivery that already happened, and the drainer rechecks the owner
- * before sending. Passing the caller's transaction also makes the insert atomic with the primary
- * write. A DB error propagates, so the caller can let the payment or webhook provider retry instead
- * of losing the report. The insert is idempotent on `(eventId, event_type)`.
+ * Enqueues one credit event into the durable outbox. For a personal event, the soft-delete check
+ * locks the user row `FOR UPDATE`, so it must run inside a transaction (the callers pass
+ * `db.transaction` or an open transaction) for the lock to hold; the
+ * `BouncerCreditEventOutboxTransaction` parameter makes a bare client a compile error, so the lock
+ * cannot be reduced to a single statement by accident. That serializes the enqueue insert against a
+ * concurrent `softDeleteUser` (which updates the same row) at the database boundary, so an in-flight
+ * late webhook cannot insert after the deletion commits; it does not undo a delivery that already
+ * happened, and the drainer rechecks the owner before sending a personal event. Passing the caller's
+ * transaction also makes the insert atomic with the primary write. A DB error propagates, so the
+ * caller can let the payment or webhook provider retry instead of losing the report. The insert is
+ * idempotent on `(eventId, event_type)`.
  *
  * The row keeps the raw `userId` (so a soft delete can find it by the real user id). `event_id` is
  * `bouncerWireEventId(event.eventId)` — the exact id when within bouncer's 128-character limit,

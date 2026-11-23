@@ -144,23 +144,27 @@ function wholeMarkdownTarget(text: string): string | null {
   return target;
 }
 
-/** Whether a sentence may punctuate this text: it ends in a digit, or in a
- * wrapper whose own inside ends in a digit (`(…/pull/42)` and `<…/pull/42>`). */
+/**
+ * Whether a sentence may punctuate this text: peel every wrapper the text is
+ * closed in — `(…/pull/42)`, `<…/pull/42>` and a stack of them, which the
+ * wrapper peel already accepts — and require what is left to end in a digit.
+ * `(see <url>)` peels once and then ends in `>`, so it keeps its point.
+ */
 function endsWherePunctuationStops(text: string): boolean {
-  if (DIGIT_END.test(text)) {
-    return true;
+  let inner = text;
+  for (;;) {
+    const closer = inner.at(-1);
+    let opener: string | null = null;
+    if (closer === ')') {
+      opener = '(';
+    } else if (closer === '>') {
+      opener = '<';
+    }
+    if (opener === null || inner.length < 2 || !inner.startsWith(opener)) {
+      return DIGIT_END.test(inner);
+    }
+    inner = inner.slice(1, -1);
   }
-  const closer = text.at(-1);
-  let opener: string | null = null;
-  if (closer === ')') {
-    opener = '(';
-  } else if (closer === '>') {
-    opener = '<';
-  }
-  if (opener === null || !text.startsWith(opener)) {
-    return false;
-  }
-  return DIGIT_END.test(text.slice(1, -1));
 }
 
 /** Trim the edges, then strip a trailing punctuation run that follows a digit

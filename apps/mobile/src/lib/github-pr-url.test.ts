@@ -202,6 +202,21 @@ describe('parseGitHubPrUrl', () => {
     });
   });
 
+  it('parses a wrapped stack followed by a period', () => {
+    // Every wrapper the peel accepts can sit under sentence punctuation, so a
+    // paren-wrapped autolink is punctuated like a bare one.
+    expect(parseGitHubPrUrl('(<https://github.com/octocat/hello-world/pull/42>).')).toEqual({
+      owner: 'octocat',
+      repo: 'hello-world',
+      number: 42,
+    });
+    expect(parseGitHubPrUrl('((https://github.com/octocat/hello-world/pull/42)).')).toEqual({
+      owner: 'octocat',
+      repo: 'hello-world',
+      number: 42,
+    });
+  });
+
   it('keeps a wrapper holding more than the URL intact', () => {
     // The paren layer needs the inside to start with a scheme, so a sentence
     // wrapped around an autolink is not a bare URL.

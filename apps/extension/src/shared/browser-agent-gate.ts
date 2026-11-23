@@ -7,8 +7,8 @@ import {
   hashBrowserToolArguments,
   isOAuthConsentUrl,
   isOriginGranted,
-  isScriptTool,
   isUploadCall,
+  runsPageCode,
   SENSITIVE_REASON,
   toBrowserOrigin,
   toolGrantClass,
@@ -480,8 +480,10 @@ export const tabsNewDestinationCheck = (
  * Classifies one act call as a sensitive step: a call that hands a local file's
  * contents to the page (an upload, or a drop of local paths), an OAuth consent
  * page, typing into or submitting a password/one-time-code/payment field, or a
- * script call on a page whose script can reach such a field. A download that the
- * call starts is classified after it ran, by the runtime.
+ * call that runs page code — model-authored code or a page-registered tool — on
+ * a page whose script can reach such a field. A call that runs page code probes
+ * the tab's own origin plus every frame with a `read` grant, one probe per frame.
+ * A download that the call starts is classified after it ran, by the runtime.
  */
 const sensitiveStepFor = async (input: {
   readonly args: Record<string, unknown>;
@@ -507,8 +509,8 @@ const sensitiveStepFor = async (input: {
     return { origin: input.origin, reason: SENSITIVE_REASON.frameUnverified };
   }
 
-  if (isScriptTool(input.toolName)) {
-    // Model-authored code reaches every field a page script can reach: the tab's own origin, and any frame the extension may read. One probe per such frame.
+  if (runsPageCode(input.toolName)) {
+    // Model-authored code and page-registered code reach every field a page script can reach: the tab's own origin, and every frame with a `read` grant. One probe per such frame.
     const mainOrigin = mainFrameOf(input.frames)?.origin;
     const reachable = input.frames.filter(
       frame =>

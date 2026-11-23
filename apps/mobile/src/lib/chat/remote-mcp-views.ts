@@ -41,6 +41,16 @@ export type RemoteMcpViewDocument =
   | { readonly kind: 'unavailable' };
 
 /**
+ * The document's size in the unit the cap names. `String.length` counts UTF-16
+ * code units, so a document of three-byte characters measures a third of the
+ * bytes it hands the page; a code unit is never less than one byte, so the
+ * length test in `readViewDocument` is a free refusal for a document far too big.
+ */
+function utf8ByteLength(text: string): number {
+  return new TextEncoder().encode(text).byteLength;
+}
+
+/**
  * The document the view is drawn from, held to the policy the resource
  * declared. It is read off the same server the tool came from, on the view-read
  * deadline rather than one call's, and a read that fails is not reported the
@@ -73,6 +83,9 @@ export async function readViewDocument(
       return { kind: 'empty' };
     }
     if (html.length > MAX_VIEW_BYTES) {
+      return { kind: 'tooLarge' };
+    }
+    if (utf8ByteLength(html) > MAX_VIEW_BYTES) {
       return { kind: 'tooLarge' };
     }
     return {

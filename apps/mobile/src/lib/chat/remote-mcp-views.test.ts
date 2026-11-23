@@ -252,6 +252,22 @@ describe('the document a view is drawn from', () => {
     expect(await readRemoteMcpView(view)).toEqual({ kind: 'tooLarge' });
   });
 
+  it('is too large when non-ASCII text passes the code-unit cap', async () => {
+    // 400,000 code units of three-byte characters: 1.2 MB, over a 1 MB cap.
+    answering('あ'.repeat(400_000), undefined);
+    const view = await discoveredWithChart();
+
+    expect(await readRemoteMcpView(view)).toEqual({ kind: 'tooLarge' });
+  });
+
+  it('is drawn when non-ASCII text stays under the byte cap', async () => {
+    answering('あ'.repeat(200_000), undefined);
+    const view = await discoveredWithChart();
+
+    const read = await readRemoteMcpView(view);
+    expect(read.kind).toBe('ready');
+  });
+
   it('is drawn when the document is exactly at the cap', async () => {
     answering('x'.repeat(MAX_VIEW_BYTES), undefined);
     const view = await discoveredWithChart();

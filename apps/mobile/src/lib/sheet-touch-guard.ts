@@ -6,11 +6,20 @@ import { useLayoutEffect } from 'react';
  *
  * Measured on the Android emulator: a tap ~320 ms after the open request still
  * reached the tab bar behind the sheet, one at ~500 ms reached the sheet. The
- * bound is that handover plus a margin for a slower device; until it ends the
- * sheet is still sliding in, so keeping it short also keeps the sheet's own
- * controls from being unreachable for long after they are visible.
+ * window is that handover, with no added margin.
+ *
+ * It used to carry a margin, and the margin cost the reader the sheet's own
+ * controls: the sheet paints its buttons at ~450–550 ms, and the gate went on
+ * claiming their presses until 800 ms, so a reader who pressed Cancel as it
+ * appeared got nothing and had to press again. Measured with the window at this
+ * value on the emulator, a press on a destructive confirm's Cancel 200–650 ms
+ * after it opened ran Cancel in every clean trial, while a press on the screen
+ * behind the sheet stayed claimed. A window long enough to cover the slowest
+ * device would bring the dead window back, so this one is the handover itself
+ * and a slow device may still drop a press made in the first frame or two of
+ * the animation.
  */
-export const SHEET_TOUCH_HOLD_MS = 800;
+export const SHEET_TOUCH_HOLD_MS = 500;
 
 /**
  * How long the gate stays shut after the native sheet reports its dismissal

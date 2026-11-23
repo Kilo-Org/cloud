@@ -51,4 +51,16 @@ describe('sheet touch hold', () => {
     next();
     expect(isSheetTouchHeld()).toBe(false);
   });
+
+  // The window is what keeps a press made while a sheet opens off the screen
+  // behind it, and it is also what makes the sheet's own controls dead: its
+  // content is part of the same tree, so a press on a confirm's Cancel is
+  // claimed for as long as the window runs. Measured on the Android emulator
+  // (the readings are in `@/lib/sheet-touch-guard`): touch reaches a presented
+  // sheet at ~500 ms and its buttons are painted before that. A window longer
+  // than the handover keeps Cancel and Close inert after the reader can see and
+  // aim at them, which is the defect this pins.
+  it('lets the sheet take its own presses once touch has handed over', () => {
+    expect(SHEET_TOUCH_HOLD_MS).toBeLessThanOrEqual(500);
+  });
 });

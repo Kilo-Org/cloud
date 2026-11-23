@@ -20,6 +20,11 @@ type AgentNode = {
   bundleId?: string;
   systemBar?: string | null;
   hittable?: boolean | null;
+  /**
+   * Whether the platform says a person can see this view. The Android helper
+   * reports it on every node; the iOS snapshot does not report it at all.
+   */
+  visibleToUser?: boolean | null;
   rect: AgentRect;
 };
 
@@ -177,6 +182,7 @@ const IOS_TAGS: Record<string, string> = {
   TextView: 'TextInput',
   Other: 'View',
 };
+
 const IOS_PRESSABLE_KINDS = new Set(['button', 'link', 'text-field', 'text-view']);
 /**
  * A React Native `Switch` is two views on iOS: the host, whose frame is the touch
@@ -185,6 +191,53 @@ const IOS_PRESSABLE_KINDS = new Set(['button', 'link', 'text-field', 'text-view'
  * its own tag so the row rule measures what is painted.
  */
 const IOS_SWITCH_HOST = 'RCTSwitchComponentView';
+
+/**
+ * The app views a person can see in an Android snapshot. The helper reports
+ * `visibleToUser` per node, and a subtree the platform calls invisible paints
+ * nothing: React Native renders a measuring twin of a header title with
+ * `opacity: 0`, `pointerEvents="none"` and `accessibilityElementsHidden` (see
+ * `titleNaturalCopy` in `apps/mobile/src/components/screen-header.tsx`), and the
+ * snapshot still reports its frame. Measured on the to-do detail screen: the
+ * twin's box `[14.1, 59.81, 255.62, 24.76]` dp sits across the visible title's
+ * line, so `overlap` read a transparent measuring copy as a sibling that paints
+ * there and reported a collision with no ink behind it. A native view hierarchy
+ * has no style to read here, so the platform's own answer is the paint: a node
+ * it calls invisible, with no visible descendant, is dropped exactly as
+ * `normalize()` drops an `opacity: 0` subtree of a probe dump.
+ *
+ * A node the snapshot does not describe is kept, because the iOS snapshot
+ * reports no such field and silence is not an answer.
+ */
+function visibleAppNodes(nodes: readonly AgentNode[]): AgentNode[] {
+  const childIndexes = new Map<number, number[]>();
+  for (const node of nodes) {
+    const parent = node.parentIndex;
+    if (parent === undefined || parent === null) continue;
+    const siblings = childIndexes.get(parent);
+    if (siblings === undefined) childIndexes.set(parent, [node.index]);
+    else siblings.push(node.index);
+  }
+  const byIndex = new Map(nodes.map(node => [node.index, node]));
+  const visible = new Map<number, boolean>();
+  const subtreeVisible = (node: AgentNode): boolean => {
+    const known = visible.get(node.index);
+    if (known !== undefined) return known;
+    // A cycle cannot exist in a view tree, but a malformed snapshot must not
+    // recurse for ever: the node counts as visible until its children answer.
+    visible.set(node.index, true);
+    const children = childIndexes.get(node.index) ?? [];
+    const answer =
+      node.visibleToUser !== false ||
+      children.some(index => {
+        const child = byIndex.get(index);
+        return child !== undefined && subtreeVisible(child);
+      });
+    visible.set(node.index, answer);
+    return answer;
+  };
+  return nodes.filter(node => subtreeVisible(node));
+}
 
 /** Where one snapshot's frames live, and how its nodes read. */
 type Conversion = {
@@ -303,7 +356,7 @@ export function agentDeviceToProbeDump(json: string): ProbeDump {
   }
   return convert(
     all,
-    all.filter(node => node.bundleId === APP_ID && !node.systemBar),
+    visibleAppNodes(all.filter(node => node.bundleId === APP_ID && !node.systemBar)),
     {
       platform: 'android',
       window: { width: round(width / density), height: round(height / density) },

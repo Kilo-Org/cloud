@@ -4,7 +4,7 @@ import test from 'node:test';
 import { agentDeviceArgs, agentDeviceToProbeDump, withScreenshotScale } from './agent-device';
 import { InfraError } from './capture';
 import { normalize } from './rules';
-import { checkTouchOverlap, checkTouchTargets } from './rules/screen';
+import { checkOverlap, checkTouchOverlap, checkTouchTargets } from './rules/screen';
 import type { ProbeNode } from './tree';
 
 const APP = 'com.kilocode.kiloapp';
@@ -399,4 +399,107 @@ test('agent-device snapshot marks a scrolled box as one that clips what it draws
 test('a clipped text run leaves one tap owner on the message row', () => {
   const findings = checkTouchOverlap(normalize(agentDeviceToProbeDump(SCROLLED_TRANSCRIPT)));
   assert.deepEqual(findings, []);
+});
+
+/**
+ * The to-do detail header on an Android emulator (1080x2400, density 2.625),
+ * as the agent-device helper reports it: the visible title inside its pressable
+ * button, and the header's measuring twin of that title at the same place, which
+ * React Native paints with `opacity: 0` and hides from accessibility. A probe
+ * dump answers both questions with style; this snapshot answers only
+ * `visibleToUser`, so that is what the conversion has to read.
+ */
+const HEADER_TITLE_TWIN = JSON.stringify({
+  data: {
+    androidSnapshot: { pixelDensity: 2.625 },
+    viewport: { width: 1080, height: 2400 },
+    nodes: [
+      {
+        index: 0,
+        bundleId: APP,
+        type: 'android.view.ViewGroup',
+        visibleToUser: true,
+        rect: { x: 0, y: 0, width: 1080, height: 2400 },
+      },
+      {
+        index: 1,
+        parentIndex: 0,
+        bundleId: APP,
+        type: 'android.widget.Button',
+        kind: 'button',
+        label: 'Ask Dana to review the pricing copy, Rename task',
+        hittable: true,
+        visibleToUser: true,
+        rect: { x: 135, y: 221, width: 755, height: 126 },
+      },
+      {
+        index: 2,
+        parentIndex: 1,
+        bundleId: APP,
+        type: 'android.widget.TextView',
+        kind: 'text',
+        label: 'Ask Dana to review the pricing copy',
+        visibleToUser: true,
+        rect: { x: 135, y: 252, width: 755, height: 65 },
+      },
+      {
+        index: 2,
+        parentIndex: 0,
+        bundleId: APP,
+        type: 'android.widget.TextView',
+        kind: 'text',
+        label: 'ASK DANA TO REVIEW THE PRICING COPY',
+        hittable: true,
+        visibleToUser: true,
+        rect: { x: 135, y: 158, width: 754, height: 58 },
+      },
+      // The twin: a ViewGroup over the title's own line, with the same copy in
+      // it, and nothing on screen by the platform's account.
+      {
+        index: 3,
+        parentIndex: 0,
+        bundleId: APP,
+        type: 'android.view.ViewGroup',
+        visibleToUser: false,
+        rect: { x: 37, y: 157, width: 671, height: 65 },
+      },
+      {
+        index: 4,
+        parentIndex: 3,
+        bundleId: APP,
+        type: 'android.widget.TextView',
+        kind: 'text',
+        label: 'Ask Dana to review the pricing copy',
+        visibleToUser: false,
+        rect: { x: 37, y: 157, width: 671, height: 65 },
+      },
+    ],
+  },
+});
+
+test('an invisible measuring twin is not a colliding sibling', () => {
+  const dump = agentDeviceToProbeDump(HEADER_TITLE_TWIN);
+  // The platform's invisible subtree is gone, exactly as `normalize()` drops an
+  // `opacity: 0` subtree of a probe dump, and the visible title stays.
+  assert.deepEqual(
+    dump.nodes.map(entry => [entry.parent, entry.tag]),
+    [
+      [-1, 'View'],
+      // The app's own visible root stays; only the twin's subtree is gone.
+      [0, 'ViewGroup'],
+      [1, 'Button'],
+      [2, 'Paragraph'],
+      [1, 'Paragraph'],
+    ]
+  );
+  assert.deepEqual(checkOverlap(normalize(dump)), []);
+});
+
+test('an overlap between two visible siblings is still reported', () => {
+  const visibleTwin = HEADER_TITLE_TWIN.replace(/visibleToUser":false/g, 'visibleToUser":true');
+  const findings = checkOverlap(normalize(agentDeviceToProbeDump(visibleTwin)));
+  assert.deepEqual(
+    findings.map(finding => [finding.rule, finding.element.tag, finding.measured]),
+    [['overlap', 'ViewGroup', 22.1]]
+  );
 });

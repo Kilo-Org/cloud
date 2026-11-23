@@ -163,6 +163,24 @@ describe('active deployed egress pins', () => {
       matchesActiveEgressPolicy({ stored: tokenStored, selected, request, env, kiloToken })
     ).toBe(false);
   });
+  it('accepts an MCP-enabled old baseline only with delegation on', () => {
+    const mcpEnv = { ...env, CLOUD_AGENT_MCP_URL_OVERRIDE: 'https://mcp.example.com/mcp' };
+    const mcpSelected = {
+      egressAllowlist: buildNativeEgressAllowlist({
+        allowlist: request.egressAllowlist,
+        env: mcpEnv,
+        cloudAgentMcp: true,
+      }),
+      egressAudit: true,
+    };
+    const mcpStored = {
+      ...stored,
+      egressAllowlist: [...stored.egressAllowlist, 'mcp.example.com'].sort(),
+    };
+    const input = { stored: mcpStored, selected: mcpSelected, request, env: mcpEnv };
+    expect(matchesActiveEgressPolicy({ ...input, cloudAgentMcp: true })).toBe(true);
+    expect(matchesActiveEgressPolicy({ ...input, cloudAgentMcp: false })).toBe(false);
+  });
   it('rejects an old baseline after a Worker upstream URL changes', () => {
     const changedEnv = { ...env, KILOCODE_BACKEND_BASE_URL: 'https://backend.example.com' };
     expect(matchesActiveEgressPolicy({ stored, selected, request, env: changedEnv })).toBe(false);

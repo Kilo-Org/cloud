@@ -983,7 +983,7 @@ describe('AgentSessionListContent next-page footer', () => {
     );
     expect(hosts(renderer, 'ActivityIndicator')).toHaveLength(0);
     expect(hosts(renderer, 'Text').map(node => node.props.children)).toContain(
-      i18n.t('common.couldnTLoadMore')
+      i18n.t('common.couldNotLoadMore')
     );
   });
 
@@ -996,7 +996,7 @@ describe('AgentSessionListContent next-page footer', () => {
     );
     expect(hosts(renderer, 'ActivityIndicator')).toHaveLength(1);
     expect(hosts(renderer, 'Text').map(node => node.props.children)).not.toContain(
-      i18n.t('common.couldnTLoadMore')
+      i18n.t('common.couldNotLoadMore')
     );
   });
 
@@ -1009,7 +1009,7 @@ describe('AgentSessionListContent next-page footer', () => {
       })
     );
     expect(hosts(renderer, 'Text').map(node => node.props.children)).toContain(
-      i18n.t('common.couldnTLoadMore')
+      i18n.t('common.couldNotLoadMore')
     );
     act(() => {
       renderer.update(
@@ -1019,7 +1019,7 @@ describe('AgentSessionListContent next-page footer', () => {
       );
     });
     expect(hosts(renderer, 'Text').map(node => node.props.children)).not.toContain(
-      i18n.t('common.couldnTLoadMore')
+      i18n.t('common.couldNotLoadMore')
     );
     expect(hosts(renderer, 'ActivityIndicator')).toHaveLength(0);
   });
@@ -1051,7 +1051,7 @@ describe('AgentSessionListContent next-page footer', () => {
       })
     );
     const texts = hosts(renderer, 'Text').map(node => node.props.children);
-    expect(texts).toContain(i18n.t('common.couldnTLoadMore'));
+    expect(texts).toContain(i18n.t('common.couldNotLoadMore'));
     expect(texts).not.toContain(i18n.t('agents.sessionList.retentionLimit'));
   });
 

@@ -263,7 +263,9 @@ const IN_APP_TITLE_KEYS = {
   auditLogs: 'organization.settingsOnWeb.auditLogs',
   requestLogs: 'organization.settingsOnWeb.requestLogs',
   providersAndModels: 'organization.settingsOnWeb.providersAndModels',
-  guardrails: 'organization.settingsOnWeb.guardrails',
+  // Guardrails opens the app's own AI Guardrails screen, so this row reads
+  // that screen's title: the hub and the screen one tap away name it alike.
+  guardrails: 'organizationGuardrails.title',
   byok: 'organization.settingsOnWeb.byok',
 } satisfies Record<OrgInAppSettingsArea, string>;
 

@@ -938,4 +938,82 @@ describe('verifyPlayIntegrity access token cache', () => {
       })
     );
   });
+
+  test('a rotated credential string takes effect on the next verification', async () => {
+    const originalKey = mockConfig.GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY;
+    const rotatedEmail = 'rotated@example.iam.gserviceaccount.com';
+    try {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: 'token-one', expires_in: 3600 }),
+      });
+      const hash1 = createHash('sha256').update('challenge-1', 'utf8').digest('base64');
+      mockFetch.mockResolvedValueOnce(validVerdict(hash1));
+
+      const first = await verifyPlayIntegrity('integrity-1', 'challenge-1');
+      expect(first).toEqual({ ok: true, packageName: 'com.kilocode.kiloapp' });
+
+      const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+      mockConfig.GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY = JSON.stringify({
+        client_email: rotatedEmail,
+        private_key: privateKey.export({ type: 'pkcs8', format: 'pem' }),
+        token_uri: 'https://oauth2.googleapis.com/token',
+      });
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: 'token-two', expires_in: 3600 }),
+      });
+      const hash2 = createHash('sha256').update('challenge-2', 'utf8').digest('base64');
+      mockFetch.mockResolvedValueOnce(validVerdict(hash2));
+
+      const second = await verifyPlayIntegrity('integrity-2', 'challenge-2');
+      expect(second).toEqual({ ok: true, packageName: 'com.kilocode.kiloapp' });
+
+      const tokenCalls = mockFetch.mock.calls.filter(
+        ([url]) => url === 'https://oauth2.googleapis.com/token'
+      );
+      expect(tokenCalls).toHaveLength(2);
+      // The new raw string is a cache miss, so the second token request is the
+      // rotated identity's, not a replay of the first document's.
+      const body = tokenCalls[1][1].body as URLSearchParams;
+      const assertion = String(body.get('assertion'));
+      const claimSet = JSON.parse(Buffer.from(assertion.split('.')[1], 'base64url').toString()) as {
+        iss?: string;
+      };
+      expect(claimSet.iss).toBe(rotatedEmail);
+    } finally {
+      mockConfig.GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY = originalKey;
+    }
+  });
+
+  test('a malformed credential is not cached, so a later valid credential works', async () => {
+    const originalKey = mockConfig.GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY;
+    try {
+      mockConfig.GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY = '{not json';
+      mockCaptureMessage.mockClear();
+
+      await expect(verifyPlayIntegrity('integrity-1', 'challenge-1')).rejects.toThrow(
+        'Failed to obtain Play Integrity access token'
+      );
+      expect(mockCaptureMessage).toHaveBeenCalledWith('google_play_integrity_auth_failure');
+
+      await expect(verifyPlayIntegrity('integrity-1', 'challenge-1')).rejects.toThrow(
+        'Failed to obtain Play Integrity access token'
+      );
+
+      mockConfig.GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY = originalKey;
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: 'token-after-malformed', expires_in: 3600 }),
+      });
+      const hash = createHash('sha256').update('challenge-1', 'utf8').digest('base64');
+      mockFetch.mockResolvedValueOnce(validVerdict(hash));
+
+      const result = await verifyPlayIntegrity('integrity-1', 'challenge-1');
+      expect(result).toEqual({ ok: true, packageName: 'com.kilocode.kiloapp' });
+    } finally {
+      mockConfig.GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY = originalKey;
+    }
+  });
 });

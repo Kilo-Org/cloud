@@ -239,7 +239,7 @@ function LoadMoreRetry({ onRetry }: Readonly<{ onRetry: () => void }>) {
   return (
     <View className="items-center gap-2">
       <Text variant="muted" className="text-center text-xs">
-        {t('common.couldnTLoadMore')}
+        {t('common.couldNotLoadMore')}
       </Text>
       <Button
         size="sm"

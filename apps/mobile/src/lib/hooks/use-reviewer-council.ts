@@ -119,7 +119,16 @@ export function useCouncilGate(scope: string): CouncilGate {
   };
 }
 
-/** Boolean view of the same gate, for surfaces that only show or hide an entry. */
-export function useCouncilUiEnabled(scope: string): boolean {
-  return useCouncilGate(scope).allowed;
+/**
+ * Whether this build can offer the council entry on this scope at all: the
+ * rollout flag the build applies, on an organization. The overview row is
+ * offered before the plan check answers, because the council route's refusal
+ * screen is the only place that explains a refusal; reading the entitlement
+ * here would hide the row from an organization the reader could be told how to
+ * upgrade, and would run that read twice once the route mounts. The entitlement
+ * stays with `useCouncilGate`, which the route owns.
+ */
+export function useCouncilEntryAvailable(scope: string): boolean {
+  const flagEnabled = useFeatureFlag(CODE_REVIEW_COUNCIL_FLAG);
+  return flagEnabled && !isPersonal(scope);
 }

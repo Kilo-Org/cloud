@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "b3f1c0de-5a52-4c40-9a1e-2f3d4b5c6a71",
+  "id": "9f77d4f9-c3b7-44d4-8bb5-5c4604701435",
   "prevId": "599f90db-daa8-40ac-a08d-71ade59264c1",
   "tables": {
     "benchmark_case_payers": {
@@ -2407,6 +2407,13 @@
           "autoincrement": false,
           "default": 0
         },
+        "last_staged_at": {
+          "name": "last_staged_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "pause_reason": {
           "name": "pause_reason",
           "type": "text",
@@ -4041,14 +4048,6 @@
         },
         "catalog_deferrals": {
           "name": "catalog_deferrals",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "lease_reclaims": {
-          "name": "lease_reclaims",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,

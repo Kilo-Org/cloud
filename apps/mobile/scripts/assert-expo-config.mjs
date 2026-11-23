@@ -430,8 +430,11 @@ check(
 // the evaluated config is the only place that shows the entry the plugin
 // composed.
 const appExtensions = config.extra?.eas?.build?.experimental?.ios?.appExtensions ?? [];
+const fileProviderExtension = appExtensions.find(
+  extension => extension.targetName === 'ArtifactsFileProvider'
+);
 check(
-  appExtensions.some(extension => extension.targetName === 'ArtifactsFileProvider'),
+  fileProviderExtension !== undefined,
   'extra.eas.build.experimental.ios.appExtensions must carry the ArtifactsFileProvider target'
 );
 // Dev-only capability, asserted where it would break a release: Apple rejects
@@ -441,9 +444,6 @@ check(
 // would fail here before Apple sees it.
 if (profile === 'production') {
   const FILE_PROVIDER_TESTING_MODE = 'com.apple.developer.fileprovider.testing-mode';
-  const fileProviderExtension = appExtensions.find(
-    extension => extension.targetName === 'ArtifactsFileProvider'
-  );
   check(
     !(FILE_PROVIDER_TESTING_MODE in (config.ios?.entitlements ?? {})),
     `a production build must not carry the ${FILE_PROVIDER_TESTING_MODE} app entitlement`

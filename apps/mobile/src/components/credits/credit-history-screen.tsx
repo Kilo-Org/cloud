@@ -207,7 +207,7 @@ export function PersonalCreditHistoryScreen() {
         {isLaterPageError && (
           <View className="items-center gap-3 px-4 py-4">
             <Text variant="caption" className="text-center">
-              {t('common.couldnTLoadMore')}
+              {t('common.couldNotLoadMore')}
             </Text>
             <Button
               variant="outline"

@@ -19,6 +19,7 @@ import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { resolveOpenRouterModelAlias } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import {
   findCustomLlm,
   isPublicCustomLlm,
@@ -218,9 +219,14 @@ export async function handleLlmProxyRequest(
     settings: undefined,
     plan: undefined,
   };
-  const balanceAndSettingsPromise = callerPromise.then(caller =>
+  // The free class belongs to the model that is served and billed, which a `~` alias names by its
+  // target. Started here so the funding read overlaps authentication.
+  const balanceModel = resolveOpenRouterModelAlias(requestedModelLowerCased);
+  // Some early returns never await it, so keep those paths from surfacing a lookup failure.
+  void balanceModel.catch(() => {});
+  const balanceAndSettingsPromise = callerPromise.then(async caller =>
     caller.kind === 'signed-in'
-      ? readGatewayBalance(caller.user, caller.organizationId, requestedModelLowerCased, {
+      ? readGatewayBalance(caller.user, caller.organizationId, await balanceModel, {
           // A benchmark case never initiates a purchase for its payer, and it reads the
           // primary: the same payer may have just been debited by an earlier case request.
           noAutoTopUp: Boolean(benchmark),
@@ -350,8 +356,12 @@ export async function handleLlmProxyRequest(
     });
   const customLlm = await findCustomLlm(effectiveModelIdLowerCased);
   const isPrivateCustomLlm = customLlm !== null && !isPublicCustomLlm(customLlm.definition);
+  // The free class belongs to the model that is served and billed, which a `~` alias names by its target.
+  const servedModelLowerCased = (
+    await resolveOpenRouterModelAlias(effectiveModelIdLowerCased)
+  ).toLowerCase();
   // Anonymous callers cannot use private custom LLMs, so those are never publicly free.
-  const isPubliclyFreeModel = !isPrivateCustomLlm && isFreeModel(effectiveModelIdLowerCased);
+  const isPubliclyFreeModel = !isPrivateCustomLlm && isFreeModel(servedModelLowerCased);
 
   // Bouncer takes a bare IP literal. Normalize once here and reuse the value for
   // the report-only decide call and the usage event, which share this request.
@@ -363,7 +373,7 @@ export async function handleLlmProxyRequest(
     const rateLimited = await freeModelRateLimitRejection({
       request,
       caller: freeModelCaller,
-      model: effectiveModelIdLowerCased,
+      model: servedModelLowerCased,
       feature,
     });
     if (rateLimited) return rateLimited;

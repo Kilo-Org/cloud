@@ -6,6 +6,7 @@ import {
   GOOGLE_PLAY_INTEGRITY_CERT_DIGESTS,
   GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY,
 } from '@kilocode/web-shared/lib/config.server';
+import { z } from 'zod';
 import { countAdmissionCondition } from './native-admission-counters';
 
 /**
@@ -35,9 +36,41 @@ const accessTokenCache = new Map<
   { token: string; refreshAt: number; inflight?: Promise<string> }
 >();
 
+/**
+ * Parsed Play Integrity service-account document, memoized per raw credential
+ * string. The document is a process constant until the configured string
+ * changes, and re-parsing it only to read `client_email` makes every
+ * cached-token admission pay a full-document parse.
+ */
+const serviceAccountKeySchema = z.object({
+  client_email: z.string(),
+  private_key: z.string(),
+  token_uri: z.string().nullish(),
+});
+
+type ServiceAccountKey = z.infer<typeof serviceAccountKeySchema>;
+
+let serviceAccountKeyCache: { raw: string; parsed: ServiceAccountKey } | null = null;
+
+/**
+ * Parse the credential document once per raw string. A failed parse is not
+ * memoized, so a malformed document throws on every call exactly as an
+ * unmemoized parse would.
+ */
+function parseServiceAccountKey(raw: string): ServiceAccountKey {
+  if (serviceAccountKeyCache?.raw === raw) {
+    return serviceAccountKeyCache.parsed;
+  }
+
+  const parsed = serviceAccountKeySchema.parse(JSON.parse(raw));
+  serviceAccountKeyCache = { raw, parsed };
+  return parsed;
+}
+
 /** Exported for tests: clear the cache so each test exercises a cold start. */
 export function resetAccessTokenCacheForTests(): void {
   accessTokenCache.clear();
+  serviceAccountKeyCache = null;
 }
 
 // Required integrity labels per the plan
@@ -293,7 +326,7 @@ export async function verifyPlayIntegrity(
   let accessToken: string;
   let clientEmail: string;
   try {
-    const saKey = JSON.parse(config.serviceAccountKey);
+    const saKey = parseServiceAccountKey(config.serviceAccountKey);
     clientEmail = saKey.client_email;
     accessToken = await getAccessToken(
       clientEmail,

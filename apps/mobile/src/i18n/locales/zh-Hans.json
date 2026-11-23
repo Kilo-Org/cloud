@@ -20,7 +20,6 @@
     "commandStatus": "命令送达状态：{{status}}",
     "delivered": "已送达",
     "expired": "已过期",
-    "recoveryGaps_one": "此对话记录缺少 {{displayCount}} 个部分。",
     "recoveryGaps_other": "此对话记录缺少 {{displayCount}} 个部分。"
   },
   "common": {
@@ -123,10 +122,10 @@
     "connectProvider": "连接代码托管平台",
     "contentTruncated": "内容已截断",
     "copyLink": "复制链接",
+    "couldNotLoad": "无法加载",
+    "couldNotLoadMore": "无法加载更多内容",
     "couldNotLoadOrganizations": "无法加载组织",
     "couldNotLoadSessions": "无法加载会话",
-    "couldnTLoad": "无法加载",
-    "couldnTLoadMore": "无法加载更多内容",
     "deviceSessions": "登录设备",
     "disabled": "已禁用",
     "email": "邮箱",
@@ -665,7 +664,6 @@
       "emptyTitle": "暂无通知",
       "emptyCategoryTitle": "此类别中暂无通知",
       "emptyBody": "此账户收到的通知会显示在这里。通知会保留 {{days}} 天。",
-      "emptyBody_one": "此账户收到的通知会显示在这里。通知会保留 {{days}} 天。",
       "emptyBody_other": "此账户收到的通知会显示在这里。通知会保留 {{days}} 天。",
       "capped": "仅显示最近的通知。",
       "loadError": "无法加载通知历史。",
@@ -955,7 +953,6 @@
     "overview": {
       "allAreas": "所有方面",
       "nSelected": "已选 {{displayCount}} 项",
-      "nSelected_one": "已选 {{displayCount}} 项",
       "nSelected_other": "已选 {{displayCount}} 项",
       "proposedReviewMdGuidance": "REVIEW.md 审查准则建议",
       "set": "已设置",
@@ -1034,7 +1031,6 @@
       "couldNotLoad": "无法加载分析数据",
       "trackedReviewsCaption": "本时间段内启用分析后完成的审查。运行中和失败的审查永不计入。",
       "trackedReviewsUncounted": "未计入：组织已有 {{displayTotal}} 个已完成的审查，其中 {{displayCount}} 个未捕获结果。",
-      "trackedReviewsUncounted_one": "未计入：组织已有 {{displayTotal}} 个已完成的审查，其中 {{displayCount}} 个未捕获结果。",
       "trackedReviewsUncounted_other": "未计入：组织已有 {{displayTotal}} 个已完成的审查，其中 {{displayCount}} 个未捕获结果。"
     },
     "council": {
@@ -1126,7 +1122,6 @@
       "triageReasoning": "初步评估依据",
       "watchInCloudAgent": "在云端智能体中查看",
       "whereFound": "发现位置（{{displayCount}}）",
-      "whereFound_one": "发现位置（{{displayCount}}）",
       "whereFound_other": "发现位置（{{displayCount}}）",
       "yes": "是",
       "action": {
@@ -1155,7 +1150,6 @@
       "eventReason": "原因：{{reason}}",
       "eventSeverityChange": "$t(securityAgent.filter.severity)：{{previous}} → {{next}}",
       "eventStatusChange": "$t(common.status)：{{previous}} → {{next}}",
-      "eventsCount_one": "{{displayCount}} 个事件",
       "eventsCount_other": "{{displayCount}} 个事件",
       "generated": "已于 {{generatedAt}} 生成",
       "noActivity": "暂无活动记录",
@@ -1164,7 +1158,6 @@
       "repositoryNotRecorded": "未记录仓库",
       "reasonUnknown": "未识别的原因",
       "severityCount": "{{displayCount}} {{label}}",
-      "severityCount_one": "{{displayCount}} {{label}}",
       "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "报告摘要",
       "title": "审计报告",
@@ -1215,14 +1208,14 @@
       "minimumSeverity": "最低严重程度",
       "queued": "{{displayCount}} 个现有安全问题已加入分析队列。",
       "queued_other": "{{displayCount}} 个现有安全问题已加入分析队列。",
-      "queued_one": "已将 {{displayCount}} 个现有安全问题加入分析队列。",
       "requireApproval": "自动修复前需要批准",
       "requireApprovalSubtitle": "自动修复需获得你的批准后才会创建 PR。",
       "severityAll": "所有严重级别",
       "severityCriticalOnly": "仅严重级",
       "severityHighAndAbove": "高危及以上",
       "severityMediumAndAbove": "中危及以上",
-      "title": "自动化"
+      "title": "自动化",
+      "queued_one": "已将 {{displayCount}} 个现有安全问题加入分析队列。"
     },
     "dashboard": {
       "actFirst": "优先处理",
@@ -1250,13 +1243,10 @@
       "refreshFailed": "刷新失败，当前显示的是上次同步的数据。",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",
       "repoSummaryOpen": "{{displayCount}} 个未解决",
-      "repoSummaryOpen_one": "{{displayCount}} 个未解决",
       "repoSummaryOpen_other": "{{displayCount}} 个未解决",
       "repoSummaryCritical": "{{displayCount}} 个严重级",
-      "repoSummaryCritical_one": "{{displayCount}} 个严重级",
       "repoSummaryCritical_other": "{{displayCount}} 个严重级",
       "repoSummaryHigh": "{{displayCount}} 个高危",
-      "repoSummaryHigh_one": "{{displayCount}} 个高危",
       "repoSummaryHigh_other": "{{displayCount}} 个高危",
       "repositoryActionPlan": "仓库处理计划",
       "settings": "设置",
@@ -1264,9 +1254,7 @@
       "syncNow": "立即同步",
       "syncQueued": "同步任务已加入队列",
       "syncStatusUnavailable": "无法获取同步状态",
-      "daysOverdue_one": "逾期 {{displayCount}} 天",
       "daysOverdue_other": "逾期 {{displayCount}} 天",
-      "findingsCount_one": "{{displayCount}} 个安全问题",
       "findingsCount_other": "{{displayCount}} 个安全问题"
     },
     "dashboardMetrics": {
@@ -1281,17 +1269,13 @@
       "deadlinePassedDetail": "{{critical}}，{{high}}",
       "deadlinePassedDetailWithMediumLow": "{{critical}}，{{high}}，{{mediumLow}}",
       "breakdownCritical": "严重：{{displayCount}} 个",
-      "breakdownCritical_one": "严重：{{displayCount}} 个",
       "breakdownCritical_other": "严重：{{displayCount}} 个",
       "breakdownHigh": "高危：{{displayCount}} 个",
-      "breakdownHigh_one": "高危：{{displayCount}} 个",
       "breakdownHigh_other": "高危：{{displayCount}} 个",
       "breakdownMediumLow": "中低危：{{displayCount}} 个",
-      "breakdownMediumLow_one": "中低危：{{displayCount}} 个",
       "breakdownMediumLow_other": "中低危：{{displayCount}} 个",
       "dueThisWeek": "本周到期",
       "dueThisWeekDetail": "其中 {{exploitable}} 个已确认可利用",
-      "dueThisWeekDetail_one": "其中 {{exploitable}} 个已确认可利用",
       "dueThisWeekDetail_other": "其中 {{exploitable}} 个已确认可利用",
       "noDeadline": "无截止时间",
       "reviewSlaAssignment": "检查 SLA 设置",
@@ -1433,8 +1417,7 @@
       "notificationsCount": "已启用 {{displayCount}}/2 项",
       "on": "已开启",
       "repositoriesCount": "已选择 {{displayCount}} 个仓库",
-      "repositoriesCount_other": "已选择 {{displayCount}} 个仓库",
-      "repositoriesCount_one": "已选择 {{displayCount}} 个仓库"
+      "repositoriesCount_other": "已选择 {{displayCount}} 个仓库"
     },
     "settingsSave": {
       "saveChanges": "保存更改",
@@ -1530,9 +1513,7 @@
       "dueTomorrow": "明天到期",
       "dueInDays_other": "{{count}} 天后到期",
       "overdue": "逾期 {{count}} 天",
-      "overdue_one": "逾期 {{count}} 天",
-      "dueInDays": "{{count}} 天后到期",
-      "dueInDays_one": "{{count}} 天后到期"
+      "dueInDays": "{{count}} 天后到期"
     },
     "remediationStatus": {
       "notStarted": "未开始",
@@ -1614,7 +1595,6 @@
       "completedWillAppear": "已完成的会话将显示在这里。",
       "noPastSessions": "暂无历史会话",
       "pastSessions": "历史会话",
-      "sectionAccessibility_one": "{{title}}：{{displayCount}} 个会话",
       "sectionAccessibility_other": "{{title}}：{{displayCount}} 个会话",
       "sectionAccessibility": "{{title}}：{{displayCount}} 个会话",
       "live": "实时",
@@ -1634,10 +1614,8 @@
       "sessionDeleted": "会话已删除",
       "needsInput": "等待输入",
       "fromPlatform": "来自 {{platform}}",
-      "cent_one": "美分",
       "cent": "美分",
       "cent_other": "美分",
-      "dollar_one": "美元",
       "dollar": "美元",
       "dollar_other": "美元",
       "costSpoken": "费用 {{cost}}",
@@ -1927,7 +1905,6 @@
       "snapshotCaptured": "工作区快照捕获于 {{when}}"
     },
     "partRenderer": {
-      "updatedFileCount_one": "已更新 {{displayCount}} 个文件。",
       "updatedFileCount": "已更新 {{displayCount}} 个文件。",
       "updatedFileCount_other": "已更新 {{displayCount}} 个文件。"
     },
@@ -1966,11 +1943,8 @@
       "linesBadge": "{{displayCount}} 行",
       "filesBadge": "{{displayCount}} 个文件",
       "matchesBadge": "{{displayCount}} 项匹配",
-      "filesBadge_one": "{{displayCount}} 个文件",
       "filesBadge_other": "{{displayCount}} 个文件",
-      "linesBadge_one": "{{displayCount}} 行",
       "linesBadge_other": "{{displayCount}} 行",
-      "matchesBadge_one": "{{displayCount}} 项匹配",
       "matchesBadge_other": "{{displayCount}} 项匹配",
       "noOutput": "没有输出。",
       "translationFailed": "翻译失败"
@@ -2286,12 +2260,12 @@
     "olderMessages": {
       "arrived": "已加载较早的消息",
       "retryHint": "重新加载此会话的较早消息。",
-      "omitted_one": "无法显示此会话中的部分较早内容。",
       "omitted": "无法显示此会话中的 {{displayCount}} 项较早内容。",
       "omitted_other": "无法显示此会话中的 {{displayCount}} 项较早内容。",
       "couldNotLoad": "无法加载较早的消息。",
       "unavailable": "无法查看较早的消息。",
-      "tooLarge": "较早的消息数据量过大，无法加载。"
+      "tooLarge": "较早的消息数据量过大，无法加载。",
+      "omitted_one": "无法显示此会话中的部分较早内容。"
     },
     "sessionFilter": {
       "title": "筛选会话",
@@ -2349,9 +2323,7 @@
       "couldNotOpenPhotoPicker": "无法打开照片选择器。请重启 Kilo 后重试。",
       "maxFilesAllowed": "最多可添加 {{displayCount}} 个文件。",
       "onlyAddingFiles": "仅添加 {{accepted}} 个文件（共 {{total}} 个，最多 {{max}} 个）",
-      "maxFilesAllowed_one": "最多可添加 {{displayCount}} 个文件。",
       "maxFilesAllowed_other": "最多可添加 {{displayCount}} 个文件。",
-      "onlyAddingFiles_one": "仅添加 {{accepted}} 个文件（共 {{total}} 个，最多 {{max}} 个）",
       "onlyAddingFiles_other": "仅添加 {{accepted}} 个文件（共 {{total}} 个，最多 {{max}} 个）"
     },
     "composer": {
@@ -2376,7 +2348,6 @@
       "discardAttachmentsTitle": "丢弃附件？",
       "charactersRemaining": "还可输入 {{count}} 个字符",
       "insertNewline": "插入换行",
-      "charactersRemaining_one": "还可输入 {{count}} 个字符",
       "charactersRemaining_other": "还可输入 {{count}} 个字符"
     },
     "chatLink": {
@@ -2452,13 +2423,10 @@
       "ofWindowTokens": "／ {{window}} 个词元",
       "tokens": "词元",
       "tokens_other": "词元",
-      "tokens_one": "词元",
       "tokensWithPercentage": "个词元（{{percentage}}）",
-      "stepsCount_one": "{{steps}} 步",
       "stepsCount": "{{steps}} 步",
       "stepsCount_other": "{{steps}} 步",
       "modelAccessibilityLabel": "{{name}}，{{provider}}，{{steps}}，{{cost}}",
-      "modelsCount_one": "模型（{{displayCount}}）",
       "modelsCount_other": "模型（{{displayCount}}）"
     },
     "sessionChanges": {
@@ -2532,7 +2500,6 @@
     "toolRun": {
       "sheetTitle": "工具调用",
       "condensedLabel": "{{itemCount}} 项; {{last}}",
-      "condensedLabel_one": "{{itemCount}} 项; {{last}}",
       "condensedLabel_other": "{{itemCount}} 项; {{last}}"
     }
   },
@@ -2671,7 +2638,6 @@
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
     "searchPlaceholder": "搜索最近的会话",
     "connectedCli": "已连接的 CLI",
-    "connectedCliAccessibility_one": "{{title}}：{{displayCount}} 个实例",
     "connectedCliAccessibility_other": "{{title}}：{{displayCount}} 个实例",
     "connectedCliAccessibility": "{{title}}：{{displayCount}} 个实例",
     "newSessionOn": "在 {{name}} 上新建会话",
@@ -2687,7 +2653,6 @@
     "cliCantReceiveFilesMessage": "运行此会话的 Kilo CLI 无法接收文件。请更新该设备上的 CLI，或改为分享到新会话。",
     "contentlessMessage": "没有可分享的内容，未包含文本或文件。",
     "couldNotReadContent": "无法读取分享的内容。",
-    "onlyFirstFilesAttached_one": "仅附加前 {{displayCount}} 个文件。",
     "onlyFirstFilesAttached_other": "仅附加前 {{displayCount}} 个文件。"
   },
   "kiloPass": {
@@ -2852,23 +2817,19 @@
     "checkConnection": "检查连接",
     "checks": {
       "checksCount": "{{displayCount}} 项检查",
-      "checksCount_one": "{{displayCount}} 项检查",
       "checksCount_other": "{{displayCount}} 项检查",
       "couldNotLoad": "无法加载检查结果。",
       "failed": "{{displayCount}} 项失败",
-      "failed_one": "{{displayCount}} 项失败",
       "failed_other": "{{displayCount}} 项失败",
       "noAccess": "你无权查看此仓库的检查结果。",
       "noChecksReported": "暂无检查结果",
       "notAvailable": "暂时无法查看检查结果。可能是最新提交尚未处理，或源仓库尚未安装 Kilo GitHub 应用。",
       "openDetails": "查看 {{name}} 的详情",
       "passed": "{{displayCount}} 项通过",
-      "passed_one": "{{displayCount}} 项通过",
       "passed_other": "{{displayCount}} 项通过",
       "pending": "{{displayCount}} 项待处理",
       "retryChecks": "重新加载检查结果",
       "skipped": "{{displayCount}} 项已跳过",
-      "skipped_one": "{{displayCount}} 项已跳过",
       "skipped_other": "{{displayCount}} 项已跳过",
       "title": "检查",
       "checkDetails": "检查详情"
@@ -2936,7 +2897,6 @@
       "couldNotLoadMore": "无法加载更多评论。",
       "loadMoreComments": "加载更多评论",
       "conversationTruncated": "仅显示前 {{displayCount}} 条评论。",
-      "conversationTruncated_one": "仅显示前 {{displayCount}} 条评论。",
       "conversationTruncated_other": "仅显示前 {{displayCount}} 条评论。",
       "loading": "正在加载讨论",
       "moderation": {
@@ -2962,13 +2922,11 @@
       "mutedUser": "已静音 {{login}}",
       "noDiscussion": "暂无讨论",
       "noDiscussionDescription": "此拉取请求暂无审查讨论串或评论。",
-      "comment_one": "1 条评论",
       "outdated": "已过时",
       "quotedDiffSnippet": "引用的差异片段",
       "reactionPill": "{{emoji}} 表情回应，{{displayCount}} {{countLabel}}",
       "reaction": "个表情回应",
       "reaction_other": "个表情回应",
-      "reaction_one": "个表情回应",
       "replyBadRequest": "无法发布此回复。讨论串可能已发生变化。",
       "replyBody": "回复正文",
       "replyForbidden": "你无权回复此拉取请求。",
@@ -3027,7 +2985,6 @@
       },
       "deletedUser": "已删除的用户",
       "replyForbiddenTerm": "你无权回复此{{term}}。",
-      "moreLinesAbove_one": "上方还有 {{displayCount}} 行",
       "moreLinesAbove_other": "上方还有 {{displayCount}} 行",
       "deleteComment": "删除评论",
       "deleteCommentTitle": "删除评论？",
@@ -3035,7 +2992,8 @@
       "commentEditFailed": "无法保存你的评论。请检查网络连接后重试。",
       "commentEditUnavailable": "无法编辑此评论。它可能已被删除。",
       "commentDeleteFailed": "无法删除你的评论。请检查网络连接后重试。",
-      "commentDeleteUnavailable": "无法删除此评论。"
+      "commentDeleteUnavailable": "无法删除此评论。",
+      "comment_one": "1 条评论"
     },
     "entry": {
       "noRecentPrs": "暂无最近审查",
@@ -3079,10 +3037,8 @@
       "retryLoadingMoreFiles": "重新加载更多文件",
       "title": "文件",
       "viewedCount": "已查看 {{viewed}}/{{total}}",
-      "viewedCount_one": "已查看 {{viewed}}/{{total}}",
       "viewedCount_other": "已查看 {{viewed}}/{{total}}",
       "viewedOfListed": "所列文件：已查看 {{viewed}}/{{total}}",
-      "viewedOfListed_one": "所列文件：已查看 {{viewed}}/{{total}}",
       "viewedOfListed_other": "所列文件：已查看 {{viewed}}/{{total}}"
     },
     "fileRows": {
@@ -3115,8 +3071,6 @@
       "expandMoreLines": "再展开 {{displayCount}} 行（{{start}}–{{end}}）",
       "failedToLoadContext": "上下文加载失败，点按重试",
       "failedToLoadMoreFiles": "更多文件加载失败，点按重试",
-      "fileLoadedCount_one": "已加载 {{displayCount}} 个文件",
-      "fileLoadedOfTotalCount_one": "已加载 {{displayCount}}/{{total}} 个文件",
       "fileLoadedCount": "已加载 {{displayCount}} 个文件",
       "fileLoadedCount_other": "已加载 {{displayCount}} 个文件",
       "fileLoadedOfTotalCount": "已加载 {{displayCount}}/{{total}} 个文件",
@@ -3135,15 +3089,10 @@
       "loadingMoreFiles": "正在加载更多文件…",
       "retryLoadingContext": "重新加载上下文",
       "retryLoadingNextPage": "重新加载下一页",
-      "expandAllLines_one": "展开全部 {{displayCount}} 行",
       "expandAllLines_other": "展开全部 {{displayCount}} 行",
-      "expandLines_one": "展开 {{displayCount}} 行（{{start}}–{{end}}）",
       "expandLines_other": "展开 {{displayCount}} 行（{{start}}–{{end}}）",
-      "expandLinesOfContext_one": "展开 {{displayCount}} 行上下文",
       "expandLinesOfContext_other": "展开 {{displayCount}} 行上下文",
-      "expandMoreLines_one": "再展开 {{displayCount}} 行（{{start}}–{{end}}）",
       "expandMoreLines_other": "再展开 {{displayCount}} 行（{{start}}–{{end}}）",
-      "loadedOfTotalFiles_one": "已加载 {{loaded}}/{{total}} 个文件",
       "loadedOfTotalFiles_other": "已加载 {{loaded}}/{{total}} 个文件"
     },
     "inbox": {
@@ -3227,7 +3176,6 @@
       },
       "restrictions": {
         "title": "合并限制",
-        "approvalsRequired_one": "需要 {{displayCount}} 个批准",
         "approvalsRequired_other": "需要 {{displayCount}} 个批准",
         "pipelineMustSucceed": "合并前流水线必须成功。"
       },
@@ -3254,10 +3202,8 @@
     "overview": {
       "commit": "提交",
       "commit_other": "提交",
-      "commit_one": "提交",
       "file": "文件",
       "file_other": "文件",
-      "file_one": "文件",
       "stateMerged": "已合并",
       "stateOpen": "开放中",
       "stateOpenApproved": "开放中 · 已批准",
@@ -3320,20 +3266,17 @@
       "loadFailedTitle": "无法加载审查提交页面",
       "pendingComment": "条待提交评论",
       "pendingComment_other": "条待提交评论",
-      "pendingComment_one": "条待提交的评论",
       "summaryOptional": "总结（可选）",
       "partialPostedFresh": "已发布 {{displayFreshCount}} 条评论。",
-      "partialPostedFresh_one": "已发布 {{displayFreshCount}} 条评论。",
       "partialPostedFresh_other": "已发布 {{displayFreshCount}} 条评论。",
       "partialPostedStale": "另有 {{displayStaleCount}} 条评论针对旧提交，仍保留在你的队列中。",
-      "partialPostedStale_one": "另有 {{displayStaleCount}} 条评论针对旧提交，仍保留在你的队列中。",
       "partialPostedStale_other": "另有 {{displayStaleCount}} 条评论针对旧提交，仍保留在你的队列中。",
       "submitCountOfTotal": "提交 {{displayTotalCount}} 条评论中的 {{displayFreshCount}} 条",
-      "submitCountOfTotal_one": "提交 {{displayTotalCount}} 条评论中的 {{displayFreshCount}} 条",
       "submitCountOfTotal_other": "提交 {{displayTotalCount}} 条评论中的 {{displayFreshCount}} 条",
       "submitReview": "提交审查意见",
       "blockedRequestChanges": "请填写总结或添加至少一条评论，才能要求更改。",
-      "blockedComment": "请填写总结或添加至少一条评论，才能提交评论类型的审查。"
+      "blockedComment": "请填写总结或添加至少一条评论，才能提交评论类型的审查。",
+      "pendingComment_one": "条待提交的评论"
     },
     "fileStatus": {
       "changed": "已更改",
@@ -3345,9 +3288,9 @@
       "discussion": "讨论",
       "discussionAccessibility": "{{title}}：{{displayCount}} 条评论",
       "discussionAccessibility_other": "{{title}}：{{displayCount}} 条评论",
-      "discussionAccessibility_one": "{{title}}：1 条评论",
       "files": "文件",
-      "overview": "概览"
+      "overview": "概览",
+      "discussionAccessibility_one": "{{title}}：1 条评论"
     },
     "diff": {
       "selectedTapToChange": "已选择 {{label}}，点按更改选择",
@@ -3357,7 +3300,6 @@
       "lineLabel": "第 {{line}} 行，{{status}}：{{text}}",
       "lineLabelNoNumber": "{{status}}：{{text}}",
       "emptyLine": "（空）",
-      "truncationBanner_one": "受 GitHub API 限制，仅显示 {{total}} 个变更文件中的前 {{limit}} 个",
       "truncationBanner_other": "受 GitHub API 限制，仅显示 {{total}} 个变更文件中的前 {{limit}} 个"
     },
     "linkPasteClipboardEmpty": "剪贴板为空",
@@ -3495,10 +3437,8 @@
         "groupIdentity": "群组“{{name}}”",
         "groupMembers": "群组“{{name}}”：{{members}}",
         "groupMemberGroups": "{{displayCount}} 个群组",
-        "groupMemberGroups_one": "{{displayCount}} 个群组",
         "groupMemberGroups_other": "{{displayCount}} 个群组",
         "groupMemberGroupsOf": "{{email}}：{{displayCount}} 个群组",
-        "groupMemberGroupsOf_one": "{{email}}：{{displayCount}} 个群组",
         "groupMemberGroupsOf_other": "{{email}}：{{displayCount}} 个群组",
         "groupPolicySet": "群组“{{name}}”：已设置 {{policy}} 策略",
         "groupPolicyRemoved": "群组“{{name}}”：已移除 {{policy}} 策略",
@@ -3520,17 +3460,14 @@
         "fundsPurchased": "{{amount}}，通过 {{method}}",
         "fundsGranted": "{{amount}}",
         "fundsDistributed": "{{amount}} 至 {{displayCount}} 个子组织",
-        "fundsDistributed_one": "{{amount}} 至 {{displayCount}} 个子组织",
         "fundsDistributed_other": "{{amount}} 至 {{displayCount}} 个子组织",
         "fundsReceived": "来自 {{parent}} 的 {{amount}}",
         "reviewAgentPlatform": "{{platform}}",
         "reviewAgentConfig": "{{platform}} 配置",
         "reviewAgentConfigStyle": "{{platform}}：风格 {{style}}",
         "reviewAgentSecretsUpdated": "{{displayCount}} 个已更新",
-        "reviewAgentSecretsUpdated_one": "{{displayCount}} 个已更新",
         "reviewAgentSecretsUpdated_other": "{{displayCount}} 个已更新",
         "reviewAgentSecretsFailed": "{{displayCount}} 个错误",
-        "reviewAgentSecretsFailed_one": "{{displayCount}} 个错误",
         "reviewAgentSecretsFailed_other": "{{displayCount}} 个错误",
         "reviewAgentSecretRotated": "{{values}}",
         "settingAdvancedPolicies": "{{values}}",
@@ -3696,7 +3633,7 @@
       "noSeatsAvailable": "所有席位均已占用。请先联系组织所有者增加席位，再邀请更多成员。"
     },
     "invoices": {
-      "downloadA11y": "下载发票 {{number}}",
+      "downloadA11y": "下载发票 {{number}}，{{amount}}，{{date}}，{{status}}",
       "emptyDescription": "每个账单周期都会自动生成发票，组织完成计费后即可在此查看。",
       "emptyTitle": "暂无发票",
       "invoiceFallback": "发票",
@@ -3776,7 +3713,6 @@
       "usageDetails": "用量详情",
       "providersAndModels": "提供商和模型",
       "groups": "群组",
-      "guardrails": "防护规则",
       "byok": "自带密钥",
       "ssoAndDomain": "SSO 和域名",
       "dataCollection": "数据收集",
@@ -3843,7 +3779,6 @@
       "emptyTitle": "还没有群组",
       "enterpriseOnly": "群组仅在企业版套餐中可用。",
       "memberCount": "{{displayCount}} 名成员",
-      "memberCount_one": "{{displayCount}} 名成员",
       "memberCount_other": "{{displayCount}} 名成员",
       "memberViewEmpty": "你不在该组织的任何群组中。",
       "memberViewTitle": "你的群组",
@@ -3865,14 +3800,14 @@
       "ended": "已结束",
       "notSubscribed": "未订阅",
       "overallocated": "Kilo Pass 分配数量超出已付费席位数",
-      "paidSeat_one": "{{displayCount}} 个已付费席位",
       "paidSeat": "{{displayCount}} 个付费席位",
       "paidSeat_other": "{{displayCount}} 个付费席位",
       "paymentNeedsAttention": "付款需要处理",
       "paymentPending": "付款待处理",
       "processingBlocked": "处理受阻",
       "processingNeedsReview": "处理情况需要审核",
-      "retryHint": "重新加载 Kilo Pass 状态。"
+      "retryHint": "重新加载 Kilo Pass 状态。",
+      "paidSeat_one": "{{displayCount}} 个已付费席位"
     }
   },
   "feedback": {
@@ -3974,23 +3909,15 @@
     "answerNeeded": "等待回答",
     "waitingToRetry": "等待重试",
     "countNoun": {
-      "needsInput_one": "等待输入",
       "needsInput_other": "等待输入",
-      "running_one": "处理中",
       "running_other": "处理中",
-      "scheduled_one": "已计划",
       "scheduled_other": "已计划",
-      "idle_one": "空闲",
       "idle_other": "空闲"
     },
     "count": {
-      "needsInput_one": "{{displayCount}} 等待输入",
       "needsInput_other": "{{displayCount}} 等待输入",
-      "running_one": "{{displayCount}} 处理中",
       "running_other": "{{displayCount}} 处理中",
-      "scheduled_one": "{{displayCount}} 已计划",
       "scheduled_other": "{{displayCount}} 已计划",
-      "idle_one": "{{displayCount}} 空闲",
       "idle_other": "{{displayCount}} 空闲"
     },
     "footer": {
@@ -4131,7 +4058,6 @@
       "settingsToolsOn": "开启 — 设置工具会发送给模型",
       "settingsToolsOff": "关闭 — 不会向模型发送任何设置工具",
       "serverChecking": "正在检查此服务器…",
-      "serverToolCount_one": "{{count}} 个工具",
       "serverToolCount_other": "{{count}} 个工具",
       "serverUnreachable": "无法连接此服务器",
       "serverOff": "此服务器已关闭",
@@ -4417,16 +4343,11 @@
     "emptyDescription": "创建配置文件以跨会话重复使用环境变量、设置命令和技能。",
     "loadFailed": "无法加载配置文件",
     "counts": {
-      "vars_one": "{{count}} 个变量",
       "vars_other": "{{count}} 个变量",
       "mcp": "{{count}} MCP",
-      "skills_one": "{{count}} 个技能",
       "skills_other": "{{count}} 个技能",
-      "commands_one": "{{count}} 个命令",
       "commands_other": "{{count}} 个命令",
-      "setupCommands_one": "{{count}} 个设置命令",
       "setupCommands_other": "{{count}} 个设置命令",
-      "agents_one": "{{count}} 个代理",
       "agents_other": "{{count}} 个代理"
     },
     "nameLabel": "配置文件名称",
@@ -4544,7 +4465,6 @@
       "environment": "环境（JSON）",
       "headers": "标头（JSON）",
       "timeout": "超时",
-      "secretCount_one": "{{count}} 个密钥",
       "secretCount_other": "{{count}} 个密钥",
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
@@ -4700,6 +4620,15 @@
     "history": {
       "activityUnavailable": "无法加载积分活动。",
       "appStoreReceipt": "收据位于 App Store",
+      "deduction": {
+        "adminCancel": "管理员关闭了余额",
+        "adminDebit": "管理员移除了积分",
+        "codingPlan": "编程套餐：{{plan}}",
+        "correction": "余额调整",
+        "dispute": "支付争议",
+        "refundAppStore": "来自 App Store 的积分包退款",
+        "refundGooglePlay": "来自 Google Play 的积分包退款"
+      },
       "deductionFallback": "积分扣除",
       "emptyDescription": "积分购买、收据和使用情况将显示在这里。",
       "emptyTitle": "暂无积分记录",
@@ -4776,9 +4705,7 @@
       "couldNotLoad": "无法加载列表",
       "noRepository": "无仓库",
       "rowA11y": "{{name}}，{{openCount}}",
-      "openCount_one": "{{count}} 个未完成",
       "openCount_other": "{{count}} 个未完成",
-      "archived_one": "已归档 ({{count}})",
       "archived_other": "已归档 ({{count}})",
       "archive": "归档",
       "unarchive": "取消归档",
@@ -4801,7 +4728,6 @@
       "addFailed": "无法添加待办事项。请检查网络连接后重试。",
       "empty": "暂无待办事项",
       "setDefaults": "设置仓库、模式和模型",
-      "completed_one": "已完成 ({{count}})",
       "completed_other": "已完成 ({{count}})"
     },
     "item": {
@@ -4810,7 +4736,6 @@
       "markDonePrompt": "标记为已完成？",
       "deleted": "待办事项已删除",
       "undo": "撤销删除",
-      "runCount_one": "{{count}} 次运行",
       "runCount_other": "{{count}} 次运行",
       "startNow": "无需审查直接开始",
       "startNowHint": "长按可无需审查直接开始",
@@ -4908,7 +4833,6 @@
     "estimate": "预估 {{estimate}} · 最高 {{maximum}}",
     "estimateUnavailable": "这些设置下无法获取付费摘要。请更换模型或调整限制，或稍后重试。",
     "confirmPaid": "为 {{context}} 启用付费摘要？",
-    "paidDisclosure_one": "预计 {{estimate}}，最多 {{maximum}}，时间上限 {{minutes}} 分钟。即使生成失败也会收费。",
     "paidDisclosure": "预计 {{estimate}}，最多 {{maximum}}，时间上限 {{minutes}} 分钟。即使生成失败也会收费。",
     "paidDisclosure_other": "预计 {{estimate}}，最多 {{maximum}}，时间上限 {{minutes}} 分钟。即使生成失败也会收费。",
     "enable": "启用付费摘要",
@@ -4921,8 +4845,8 @@
     "estimateSpendLimitTooLow": "请提高消费保护限额以允许此摘要。",
     "saved": "简报设置已保存",
     "selectedSessions": "所选会话",
-    "snapshotPullRequests": "所选会话中的 PRs",
-    "snapshotBlockers": "所选会话中的阻塞项",
+    "snapshotPullRequests": "PRs",
+    "snapshotBlockers": "阻塞项",
     "capturedAt": "采集于 {{time}}",
     "snapshotHint": "在预定的早晨时间尽力采集的快照，记录当时可获取的最新会话状态。计数仅涵盖所选会话，并非整夜的全部活动。",
     "snapshotTruncated": "为限制快照规模，部分会话或证据未纳入。",
@@ -4950,11 +4874,7 @@
     "metadataFailureProvider": "提供商错误",
     "metadataFailureTool": "工具错误",
     "metadataStopped": "上一轮已停止",
-    "metadataFailureOther": "未指定错误",
-    "metadataPlan_one": "计划：已完成 {{displayDone}}/{{displayTotal}} 步",
-    "metadataFiles_one": "{{displayCount}} 个文件已更改",
-    "metadataLinesAdded_one": "新增 {{displayCount}} 行",
-    "metadataLinesRemoved_one": "删除 {{displayCount}} 行"
+    "metadataFailureOther": "未指定错误"
   },
   "systemSearch": {
     "couldNotOpenResult": "无法打开此搜索结果"

@@ -717,7 +717,6 @@ export const webhookTriggersRouter = createTRPCRouter({
         actorRole = await resolveTriggerViewerRole(ctx, input.organizationId);
       }
 
-      // Query PostgreSQL with ownership + optional target type filter
       const ownerFilter = input.organizationId
         ? eq(cloud_agent_webhook_triggers.organization_id, input.organizationId)
         : and(
@@ -823,7 +822,6 @@ export const webhookTriggersRouter = createTRPCRouter({
       // Verify ownership via PostgreSQL
       await assertTriggerOwnership(userId, input.triggerId, input.organizationId);
 
-      // Fetch authoritative config from worker
       const workerResult = await getWorkerTrigger(
         input.organizationId ? undefined : userId,
         input.organizationId,
@@ -851,7 +849,6 @@ export const webhookTriggersRouter = createTRPCRouter({
         });
       }
 
-      // Build inbound URL
       const inboundUrl = buildInboundUrl(
         input.organizationId ? undefined : userId,
         input.organizationId,
@@ -1075,7 +1072,6 @@ export const webhookTriggersRouter = createTRPCRouter({
       });
     }
 
-    // Build inbound URL
     const inboundUrl = buildInboundUrl(
       input.organizationId ? undefined : userId,
       input.organizationId,
@@ -1187,7 +1183,6 @@ export const webhookTriggersRouter = createTRPCRouter({
       });
     }
 
-    // Validate profile ownership if profileId provided
     if (input.profileId) {
       await assertProfileOwnership(
         executionUserId ?? userId,
@@ -1218,7 +1213,6 @@ export const webhookTriggersRouter = createTRPCRouter({
       });
     }
 
-    // Build update payload
     // Use null to explicitly clear fields, undefined to leave unchanged
     // Cron fields only apply to scheduled triggers — ignore for webhook triggers
     const isScheduledTrigger = dbTrigger.activation_mode === 'scheduled';
@@ -1239,7 +1233,6 @@ export const webhookTriggersRouter = createTRPCRouter({
       cronTimezone: isScheduledTrigger ? input.cronTimezone : undefined,
     };
 
-    // Update in worker
     const workerResult = await updateWorkerTrigger(
       input.organizationId ? undefined : userId,
       input.organizationId,
@@ -1262,7 +1255,6 @@ export const webhookTriggersRouter = createTRPCRouter({
       });
     }
 
-    // Update PostgreSQL (isActive/profileId/updatedAt)
     await db
       .update(cloud_agent_webhook_triggers)
       .set({
@@ -1290,7 +1282,6 @@ export const webhookTriggersRouter = createTRPCRouter({
       });
     }
 
-    // Build inbound URL
     const inboundUrl = buildInboundUrl(
       input.organizationId ? undefined : userId,
       input.organizationId,
@@ -1371,7 +1362,6 @@ export const webhookTriggersRouter = createTRPCRouter({
       // Verify ownership via PostgreSQL
       const dbTrigger = await assertTriggerOwnership(userId, input.triggerId, input.organizationId);
 
-      // Delete from worker
       const workerResult = await deleteWorkerTrigger(
         input.organizationId ? undefined : userId,
         input.organizationId,
@@ -1385,7 +1375,6 @@ export const webhookTriggersRouter = createTRPCRouter({
         });
       }
 
-      // Delete from PostgreSQL
       await db
         .delete(cloud_agent_webhook_triggers)
         .where(eq(cloud_agent_webhook_triggers.id, dbTrigger.id));
@@ -1436,7 +1425,6 @@ export const webhookTriggersRouter = createTRPCRouter({
       // Verify ownership via PostgreSQL
       await assertTriggerOwnership(userId, input.triggerId, input.organizationId);
 
-      // Fetch from worker
       const result = await listWorkerRequests(
         input.organizationId ? undefined : userId,
         input.organizationId,

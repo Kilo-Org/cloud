@@ -35,7 +35,7 @@ export const cloudAgentSessionScopeV2AssertionSchema = z.object({
   worktreeId: cloudAgentWorktreeIdSchema,
   expectedOrganization: z.union([
     z.literal(CLOUD_AGENT_SESSION_SCOPE_PERSONAL_ORGANIZATION),
-    z.uuid(),
+    cloudAgentOrganizationIdSchema,
   ]),
   /**
    * The member roots of the scope. The cap counts distinct roots: trimming and
@@ -162,19 +162,18 @@ export function parseCloudAgentSessionScopeV2Headers(
   });
   if (!parsed.success) return { kind: 'invalid' };
 
-  // The assertion union already admits only a UUID here, so this cannot fail; it
-  // is a checked narrowing so the returned value carries the domain brand.
-  const organizationId =
-    parsed.data.expectedOrganization === CLOUD_AGENT_SESSION_SCOPE_PERSONAL_ORGANIZATION
-      ? null
-      : cloudAgentOrganizationIdSchema.safeParse(parsed.data.expectedOrganization);
-  if (organizationId !== null && !organizationId.success) return { kind: 'invalid' };
+  // The assertion union already resolved this arm to the branded domain id, so
+  // the sentinel check is the only narrowing left.
+  const parsedOrganization = parsed.data.expectedOrganization;
 
   return {
     kind: 'ok',
     scope: {
       worktreeId: parsed.data.worktreeId,
-      organizationId: organizationId === null ? null : organizationId.data,
+      organizationId:
+        parsedOrganization === CLOUD_AGENT_SESSION_SCOPE_PERSONAL_ORGANIZATION
+          ? null
+          : parsedOrganization,
       memberRootKiloSessionIds: parsed.data.memberRootKiloSessionIds,
     },
   };

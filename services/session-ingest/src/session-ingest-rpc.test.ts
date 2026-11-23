@@ -1839,6 +1839,77 @@ describe('createSessionForCloudAgent clone path', () => {
     expect(sourceStub.exportCloneBatch).not.toHaveBeenCalled();
   });
 
+  it('clones a stored native display part, admitting both part-id families', async () => {
+    const nativePartItem: CloneItem = {
+      itemId: 'part/msg_user_01/msg_user_01_000001',
+      itemType: 'part',
+      itemData: JSON.stringify({
+        id: 'msg_user_01_000001',
+        messageID: 'msg_user_01',
+        sessionID: sourceSessionId,
+        type: 'text',
+        text: 'Native display part',
+      }),
+      itemDataR2Key: null,
+      ingestedAt: 3,
+    };
+    const sourceItems = [sourceSessionItem(), sourceMessageItem(), nativePartItem];
+    const sourceStub = makePagedSourceStub(sourceItems, sourceItems.length);
+    const dest = makeDestinationStub();
+    const r2 = { get: vi.fn(async () => null), put: vi.fn(async () => {}) };
+    const { db } = makeCloneDb({
+      sourceRows: [{ sessionId: sourceSessionId, organizationId }],
+      created: createdRow,
+    });
+    const rpc = makeCloneRpc({ db, sourceStub, destStub: dest.stub, r2 });
+
+    await expect(rpc.createSessionForCloudAgent(cloneParams())).resolves.toEqual({
+      status: 'ready',
+      clone: { sessionId: destinationSessionId, copiedItemCount: 3 },
+    });
+
+    const stagedPart = dest.state.stagedRows.find(
+      row => row.itemId === 'part/msg_user_01/msg_user_01_000001'
+    );
+    expect(JSON.parse(stagedPart!.itemData)).toMatchObject({
+      id: 'msg_user_01_000001',
+      messageID: 'msg_user_01',
+      sessionID: destinationSessionId,
+    });
+    expect(dest.stub.resetCloneStage).not.toHaveBeenCalled();
+  });
+
+  it('rejects a native display part whose id names another message', async () => {
+    const mismatchedPartItem: CloneItem = {
+      itemId: 'part/msg_user_01/msg_other_000001',
+      itemType: 'part',
+      itemData: JSON.stringify({
+        id: 'msg_other_000001',
+        messageID: 'msg_user_01',
+        sessionID: sourceSessionId,
+        type: 'text',
+        text: 'Native display part filed under the wrong message',
+      }),
+      itemDataR2Key: null,
+      ingestedAt: 3,
+    };
+    const sourceItems = [sourceSessionItem(), sourceMessageItem(), mismatchedPartItem];
+    const sourceStub = makePagedSourceStub(sourceItems, sourceItems.length);
+    const dest = makeDestinationStub();
+    const r2 = { get: vi.fn(async () => null), put: vi.fn(async () => {}) };
+    const { db, values } = makeCloneDb({
+      sourceRows: [{ sessionId: sourceSessionId, organizationId }],
+    });
+    const rpc = makeCloneRpc({ db, sourceStub, destStub: dest.stub, r2 });
+
+    await expect(rpc.createSessionForCloudAgent(cloneParams())).resolves.toEqual({
+      status: 'rejected',
+      code: 'malformed_source_data',
+    });
+    expect(values).not.toHaveBeenCalled();
+    expect(dest.stub.resetCloneStage).toHaveBeenCalled();
+  });
+
   it('rejects with organization_mismatch when source and destination organizations differ', async () => {
     const sourceStub = makePagedSourceStub([], 100);
     const dest = makeDestinationStub();

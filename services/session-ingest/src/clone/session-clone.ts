@@ -2,7 +2,8 @@ import { withDORetry } from '@kilocode/worker-utils';
 import {
   kiloSdkSessionInfoSchema,
   messageIdSchema,
-  partIdSchema,
+  sdkPartIdMatchesMessage,
+  sdkPartIdSchema,
   type SessionCloneRejectionCode,
 } from '@kilocode/session-ingest-contracts';
 
@@ -133,11 +134,20 @@ function parseMessageItemId(itemId: string): string | null {
   return messageIdSchema.safeParse(id).success ? id : null;
 }
 
+/**
+ * A clone copies stored part rows verbatim, so it must admit exactly the part
+ * ids the stored-history reader serves: the SDK's `prt` id and the native
+ * display id the v2 projection retains. `sdkPartIdSchema` is that admitted set,
+ * and a native id must still name the message it is filed under, so a
+ * mismatched identity stays corrupt data here as it does in the Durable Object.
+ */
 function parsePartItemId(itemId: string): { messageId: string; partId: string } | null {
   const identity = parsePartItemIdentity(itemId);
   if (identity === null) return null;
   if (!messageIdSchema.safeParse(identity.messageId).success) return null;
-  if (!partIdSchema.safeParse(identity.partId).success) return null;
+  const partId = sdkPartIdSchema.safeParse(identity.partId);
+  if (!partId.success) return null;
+  if (!sdkPartIdMatchesMessage({ id: partId.data, messageID: identity.messageId })) return null;
   return identity;
 }
 

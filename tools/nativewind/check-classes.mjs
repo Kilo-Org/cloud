@@ -38,9 +38,11 @@
  * may never exceed its baseline count, and an entry the file is now below is
  * reported with the line to lower or delete, so the baseline only shrinks and
  * at the end of the migration it is empty. Regenerate it with
- * `--write-layout-baseline` only after the violations themselves are gone, and
- * the rewrite refuses a run that could not read the theme or could not read or
- * parse a walked file: those counts are short by what the run never saw.
+ * `--write-layout-baseline` only after the violations themselves are gone. The
+ * rewrite refuses a run that could not read or parse a walked file, because
+ * those counts are short by what the run never saw; a theme read failure does
+ * not withhold the rewrite, because the theme tokens feed only the `/opacity`
+ * ban rule, and an ordinary run reports it.
  *
  * Usage: node tools/nativewind/check-classes.mjs [--write-layout-baseline]
  */
@@ -350,7 +352,15 @@ function opacityRules() {
       // cannot decompose the variable, so the runtime drops the declaration and
       // the element paints nothing, with no build error. The `*-tile-bg` /
       // `*-tile-border` pairs pre-bake the alpha instead.
-      pattern: new RegExp(`\\b(?:${COLOR_UTILITIES})-(?:${tokens.join('|')})/\\d+\\b`, 'g'),
+      //
+      // The bare number (`/60`) and the arbitrary spelling (`/[0.6]`, `/[60%]`)
+      // compile to byte-identical `color-mix(in oklab, var(--color-…) n%,
+      // transparent)`, so they are dropped the same way and one compiler pin
+      // covers both.
+      pattern: new RegExp(
+        `\\b(?:${COLOR_UTILITIES})-(?:${tokens.join('|')})/(?:\\d+\\b|\\[[^\\]\\s]+\\])`,
+        'g'
+      ),
       advice:
         'the /opacity modifier is dropped on CSS-variable theme colours; use the paired *-tile-bg / *-tile-border token or a concrete colour',
     },
@@ -379,7 +389,15 @@ function rules() {
       // multiplier of the font size. `leading-9` on a 30px title paints a 945pt
       // line box, which pushes everything below it off the screen. An explicit
       // length is resolved as a length.
-      pattern: /(?<![\w-])leading-\d+(?:\.5)?(?![\w[.-])/g,
+      //
+      // The same unitless multiplier can be written inside an arbitrary value:
+      // the compiler turns `leading-[9]` and `leading-[.5]` into the same
+      // deferred `em` multiplier the bare form produces, so every spelling is
+      // one rule. An explicit length (`leading-[1.25rem]`, `leading-[20px]`,
+      // `leading-[1.5em]`) is folded to a length and keeps passing, and
+      // `leading-[normal]` / `leading-[150%]` emit no line height at all, so
+      // they keep passing too.
+      pattern: /(?<![\w-])(?:leading-\d+(?:\.5)?(?![\w[.-])|leading-\[(?:\.\d+|\d+(?:\.\d+)?)\])/g,
       advice:
         'a numeric leading-N is multiplied by the font size at runtime; use an explicit length, e.g. leading-[1.25rem]',
     },
@@ -657,7 +675,9 @@ export function checkScrollPadding(relative, elements, chunks, text, lineOf) {
  * Hebrew while everything beside it mirrors. The type alone is safe — callers
  * annotate refs with `import type { Text }` or `type Text as RNText` — but a
  * runtime import renders the raw component under whatever name it takes, so an
- * alias is reported like a bare import.
+ * alias is reported like a bare import, and a namespace or default import is
+ * reported where its binding is used as `.Text`, whether by a member access or
+ * by destructuring `Text` out of the binding.
  */
 const RAW_TEXT_EXEMPT = new Set([
   // The shared component itself: it is the replacement the rule names, and it
@@ -715,21 +735,44 @@ function* valueImportSpecifiers(declaration, modules) {
   }
 }
 
-export function checkRawText(relative, imports, lineOf) {
+export function checkRawText(relative, imports, memberUses, lineOf) {
   const problems = [];
   if (RAW_TEXT_EXEMPT.has(relative)) {
     return problems;
   }
+  // The bindings a `.Text` use names. A namespace or default import is only
+  // reported through one of these, so the set is built once for the file.
+  const memberNames = new Set(memberUses);
   for (const node of imports) {
+    if (node.importKind === 'type' || !RAW_TEXT_MODULES.has(node.source.value)) {
+      continue;
+    }
+    const line = lineOf(node.start);
     // One diagnostic per declaration, as before: the rule names the import, and
     // one declaration cannot be fixed twice.
     const runtime = [...valueImportSpecifiers(node, RAW_TEXT_MODULES)].some(
       specifier => importedName(specifier.imported) === 'Text'
     );
     if (runtime) {
-      const line = lineOf(node.start);
       problems.push(
         `${relative}:${line}: imports Text from 'react-native'; use @/components/ui/text so the copy follows the RTL paragraph direction`
+      );
+      continue;
+    }
+    // `import * as RN` / `import RN` bring in the same platform component, and
+    // render it only where the local binding is used as `<RN>.Text`. A binding
+    // used as `RN.View` alone renders no copy, so it is not reported.
+    const local = node.specifiers.find(
+      specifier =>
+        (specifier.type === 'ImportNamespaceSpecifier' ||
+          specifier.type === 'ImportDefaultSpecifier') &&
+        specifier.importKind !== 'type' &&
+        typeof specifier.local?.name === 'string' &&
+        memberNames.has(specifier.local.name)
+    );
+    if (local !== undefined) {
+      problems.push(
+        `${relative}:${line}: imports Text from 'react-native' as ${local.local.name}.Text; use @/components/ui/text so the copy follows the RTL paragraph direction`
       );
     }
   }
@@ -1635,6 +1678,22 @@ export function checkCompilerStillDropsThese() {
         rule: 'numeric leading',
       })
     );
+
+    // A unitless line height — what both `leading-9` and `leading-[9]` compile
+    // to — reaches the runtime as a deferred `em` descriptor, and the line-height
+    // resolver multiplies it by the font size. When the compiler folds it to a
+    // length the ban can go.
+    pin(
+      'the unitless line-height fixture',
+      declarationPin({
+        subject: 'a unitless line height',
+        css: '.x { line-height: 9; }',
+        options: { inlineVariables: false },
+        property: 'lineHeight',
+        call: 'em',
+        rule: 'numeric leading',
+      })
+    );
   }
 
   return problems;
@@ -1653,6 +1712,7 @@ function fileFacts(program, text) {
   const elements = [];
   const imports = [];
   const calls = [];
+  const memberUses = [];
   walk(program, node => {
     const chunk = chunkOf(node, text);
     if (chunk !== null) {
@@ -1663,9 +1723,59 @@ function fileFacts(program, text) {
       imports.push(node);
     } else if (node.type === 'NewExpression' || node.type === 'CallExpression') {
       calls.push(node);
+    } else if (node.type === 'JSXMemberExpression' || node.type === 'MemberExpression') {
+      const name = textMemberUse(node.object, node.property, node.computed);
+      if (name !== null) {
+        memberUses.push(name);
+      }
+    } else if (node.type === 'VariableDeclarator') {
+      const name = destructuredTextSource(node.id, node.init);
+      if (name !== null) {
+        memberUses.push(name);
+      }
     }
   });
-  return { chunks, elements, imports, calls };
+  return { chunks, elements, imports, calls, memberUses };
+}
+
+/**
+ * The binding name of one `<object>.Text` use — the only way a namespace or
+ * default `react-native` import renders the platform component — or null when
+ * the member is not `Text` or its object is not a plain identifier
+ * (`a.RN.Text` and a call result name no local binding).
+ */
+function textMemberUse(object, property, computed = false) {
+  if (computed) {
+    return null;
+  }
+  const name =
+    property.type === 'Identifier' || property.type === 'JSXIdentifier' ? property.name : null;
+  if (name !== 'Text') {
+    return null;
+  }
+  return object.type === 'Identifier' || object.type === 'JSXIdentifier' ? object.name : null;
+}
+
+/**
+ * The binding name one `const { Text } = <binding>` takes `Text` out of, or
+ * null when the pattern has no `Text` key or the source is not a plain
+ * identifier. Taking `Text` out of the namespace binding reaches the same
+ * member, so it is one more way that binding renders the platform component.
+ */
+function destructuredTextSource(pattern, init) {
+  if (pattern?.type !== 'ObjectPattern' || init?.type !== 'Identifier') {
+    return null;
+  }
+  const takesText = pattern.properties.some(property => {
+    if (property.type !== 'Property') {
+      return false;
+    }
+    const { key } = property;
+    const named = key.type === 'Identifier' && key.name === 'Text';
+    const literal = key.type === 'Literal' && key.value === 'Text';
+    return property.computed ? literal : named || literal;
+  });
+  return takesText ? init.name : null;
 }
 
 /**
@@ -1688,12 +1798,12 @@ function fileFacts(program, text) {
  * same collection.
  */
 export function checkParsedFile({ file, path, text, program, lineOf, problems }) {
-  const { chunks, elements, imports, calls } = fileFacts(program, text);
+  const { chunks, elements, imports, calls, memberUses } = fileFacts(program, text);
   return {
     problems: [
       ...problems,
       ...checkScrollPadding(path, elements, chunks, text, lineOf),
-      ...checkRawText(path, imports, lineOf),
+      ...checkRawText(path, imports, memberUses, lineOf),
       ...checkDirectIntl(path, file, calls, lineOf),
       ...checkRules(path, chunks, lineOf),
     ],
@@ -1823,16 +1933,20 @@ function writeLayoutBaseline(findings) {
  * the baseline shrinking instead of outliving the migration.
  */
 function compareLayoutBaseline(findings, baseline) {
-  const exceeded = new Set();
-  const stale = [];
+  const reported = [];
+  const overCount = [];
   for (const [path, byRule] of findings) {
     for (const [id, problems] of byRule) {
       const admitted = baseline[path]?.[id] ?? 0;
       if (problems.length > admitted) {
-        exceeded.add(`${path} ${id}`);
+        reported.push(...problems.map(layoutFindingText));
+        overCount.push(
+          `${path}: ${id} now has ${problems.length} violation(s) and the baseline admits ${admitted}; remove the new one(s)`
+        );
       }
     }
   }
+  const stale = [];
   for (const [path, rules] of Object.entries(baseline)) {
     for (const [id, admitted] of Object.entries(rules)) {
       const actual = findings.get(path)?.get(id)?.length ?? 0;
@@ -1842,19 +1956,6 @@ function compareLayoutBaseline(findings, baseline) {
       if (actual < admitted) {
         stale.push(
           `${LAYOUT_BASELINE_PATH}: ${path} ${id} baseline is ${admitted} but the file now has ${actual}; ${actual === 0 ? 'delete the entry' : `lower it to ${actual}`}`
-        );
-      }
-    }
-  }
-
-  const reported = [];
-  const overCount = [];
-  for (const [path, byRule] of findings) {
-    for (const [id, problems] of byRule) {
-      if (exceeded.has(`${path} ${id}`)) {
-        reported.push(...problems.map(layoutFindingText));
-        overCount.push(
-          `${path}: ${id} now has ${problems.length} violation(s) and the baseline admits ${baseline[path]?.[id] ?? 0}; remove the new one(s)`
         );
       }
     }
@@ -1904,7 +2005,6 @@ function auditRun({
   // from the rules' findings: no rule can report what it never read, so a run
   // holding one of these has not audited the tree it walked.
   const unaudited = [];
-  const { failure: themeFailure } = themeTokens();
   for (const dir of SOURCE_DIRS) {
     for (const entry of parseSourceTree(dir, ROOT, isTestArtifact, read)) {
       unaudited.push(...entry.problems);
@@ -1916,19 +2016,17 @@ function auditRun({
   const findings = layoutFindings(layout);
 
   if (writeBaseline) {
-    // A run that could not read the theme, or a walked file it could not read
-    // or parse, has not audited the tree: rewriting the baseline from it would
-    // record counts short by every file the run never saw, and the migration's
-    // floor would rise instead of shrink.
-    if (themeFailure !== null || unaudited.length > 0) {
-      if (themeFailure !== null) {
-        console.error(themeFailure);
-      }
+    // Only a walked file the run could not read or parse leaves the tree
+    // unaudited and makes the counts short: rewriting the baseline from such a
+    // run would record every file it never saw as clean, and the migration's
+    // floor would rise instead of shrink. A theme read failure is an instrument
+    // problem of the ban rule and changes no layout count, so it neither aborts
+    // nor shortens the rewrite.
+    if (unaudited.length > 0) {
       for (const problem of unaudited) {
         console.error(problem);
       }
-      const count = unaudited.length + (themeFailure === null ? 0 : 1);
-      console.error(`\ncheck-classes: ${count} problem(s)`);
+      console.error(`\ncheck-classes: ${unaudited.length} problem(s)`);
       process.exitCode = 1;
       return;
     }
@@ -1939,6 +2037,9 @@ function auditRun({
   // The theme and baseline problems belong with the instrument problems: the
   // file problems print first, then what the audit could not check, then the
   // summary.
+  // The theme was already read during the walk, by the opacity rule, so this is
+  // the memo and not a second read.
+  const { failure: themeFailure } = themeTokens();
   const { baseline, failure: baselineFailure } = readBaseline();
   if (themeFailure !== null) {
     problems.push(themeFailure);

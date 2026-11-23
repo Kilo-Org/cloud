@@ -23,7 +23,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, relative as relativePath, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { isTranslateCallee, propertyName, unwrap, walk } from '../lib/ast.mjs';
+import { isTranslateCallee, propertyName, stringLiteralValue, unwrap, walk } from '../lib/ast.mjs';
 import {
   catalogEntryNames,
   catalogTags,
@@ -32,6 +32,8 @@ import {
   missingPluralCategories,
   pluralFamilyBases,
   pluralParts,
+  selectablePluralCategories,
+  unselectablePluralCategories,
 } from '../lib/catalogs.mjs';
 import { runIfMain } from '../lib/entry-point.mjs';
 import { isTestArtifact, parseSourceEntry, parseSourceTree } from '../lib/source-files.mjs';
@@ -62,6 +64,9 @@ function catalogsOf(root) {
       dir: join(root, 'apps/mobile/src/i18n/locales'),
       sourceRoots: [join(root, 'apps/mobile/src')],
       baseKeyOf: pluralBaseKey,
+      // The app renders on Hermes, which has no `Intl.PluralRules`, so the
+      // FormatJS polyfill data the bundle ships decides the suffix.
+      selectableCategoriesOf: tag => selectablePluralCategories(root, tag),
       englishCopyRules: [
         checkEnglishCopies,
         checkMobileEnglishIdentical,
@@ -78,6 +83,10 @@ function catalogsOf(root) {
       localeRegistry: join(root, 'packages/notifications/src/i18n.ts'),
       sourceRoots: [join(root, 'packages/notifications/src'), join(root, 'services')],
       baseKeyOf: pushBaseKey,
+      // Push copy renders on a Worker, whose runtime brings its own
+      // `Intl.PluralRules` and ships no polyfill data.
+      selectableCategoriesOf: tag =>
+        new Set([...new Intl.PluralRules(tag).resolvedOptions().pluralCategories, 'zero']),
       englishCopyRules: [checkEnglishCopies, checkPushEnglishCopy],
       calledKeyOf: pushCalledKeyOf,
       keyPrefixOf: pushKeyPrefix,
@@ -1463,13 +1472,13 @@ function quotedLabelRuns({ value, englishValues, ownValues }) {
 /**
  * The catalog key a node names as a plain string: unwrapped from its
  * TypeScript-only wrappers, a `Literal` string, and non-empty. Any other node,
- * including a template literal and an empty string, names no key here.
+ * including a template literal and an empty string, names no key here. The read
+ * itself is the shared one, so a key rule cannot see a literal shape the others
+ * do not; the non-empty requirement is this layer's own.
  */
 function staticStringKey(node) {
-  const value = unwrap(node);
-  return value.type === 'Literal' && typeof value.value === 'string' && value.value !== ''
-    ? value.value
-    : null;
+  const value = stringLiteralValue(node);
+  return value !== null && value !== '' ? value : null;
 }
 
 /** The catalog key a property's value translates, when it is `t('literal')`. */
@@ -2271,6 +2280,8 @@ function checkEnglishCatalog({ catalogName, english, englishValues }) {
 /** The keys a locale owes English, then the keys English does not name. */
 function checkKeyParity({
   label,
+  tag,
+  selectableCategories,
   english,
   translated,
   englishFamilies,
@@ -2278,11 +2289,18 @@ function checkKeyParity({
   localeFamilies,
 }) {
   const problems = [];
+  const selectable = selectableCategories(tag);
   for (const key of english.keys()) {
     if (translated.has(key)) {
       continue;
     }
     const parts = pluralParts(key);
+    if (parts && !selectable.has(parts.category)) {
+      // The locale can never select this category, so it owes no such form:
+      // the key would be copy no reader of this language sees. A `_zero`
+      // member stays owed, because i18next looks that suffix up itself.
+      continue;
+    }
     if (
       parts &&
       englishFamilies.has(parts.base) &&
@@ -2309,12 +2327,63 @@ function checkKeyParity({
   return problems;
 }
 
-/** The categories a locale's plural families lack. */
-function checkPluralCategories({ label, tag, english, translated }) {
+/**
+ * The categories a locale's plural families lack, judged by the categories its
+ * catalog's runtime can both require and render.
+ *
+ * This rule demands a form and the unreachable-form rule rejects one, so the two
+ * must read one truth source or they can contradict each other: a category the
+ * host requires but the runtime cannot select would be demanded by one rule and
+ * rejected by the other, leaving the audit unsatisfiable. The required list is
+ * therefore the intersection of the host's categories and the catalog's own
+ * selectable set, and it keeps `zero` wherever the host list carries it: a
+ * language that selects that category itself (Arabic, Welsh, Latvian) still owes
+ * its `_zero` form.
+ *
+ * The demand therefore never includes a form the runtime cannot render. It also
+ * cannot demand a category only the shipped data selects, so a family a locale
+ * declares under a flat counted English key is not asked for that form; a
+ * family English declares is still covered by the key-parity rule.
+ */
+function checkPluralCategories({ label, tag, english, translated, selectableCategories }) {
   const problems = [];
-  for (const [family, absent] of missingPluralCategories(english, translated, tag)) {
+  const host = new Intl.PluralRules(tag).resolvedOptions().pluralCategories;
+  const selectable = selectableCategories(tag);
+  // The intersection, with no separate `zero` rule: `zero` is in the host list
+  // only for a language that really selects it (Arabic, Welsh, Latvian), so a
+  // family of one of those still owes its `_zero` form. For every other
+  // language the host list has no `zero` to carry through.
+  const required = host.filter(category => selectable.has(category));
+  for (const [family, absent] of missingPluralCategories(english, translated, tag, required)) {
     for (const category of absent) {
       problems.push(`${label}: plural family "${family}" lacks the ${category} category of ${tag}`);
+    }
+  }
+  return problems;
+}
+
+/**
+ * The plural forms no reader of this language can see: a form whose category
+ * the runtime never selects for this tag, and whose copy is identical to its
+ * family's `other` copy.
+ *
+ * Both conditions are needed before the rule names a line. The first says the
+ * runtime does not pick this form; the second says that even a runtime which
+ * does pick it renders exactly the same text, so the entry is a duplicate of
+ * copy its family already carries. A form with text of its own is left alone,
+ * because a runtime the audit does not measure may select it. `zero` is never
+ * reported: i18next consults it directly at a zero count.
+ */
+function checkUnselectablePluralCategories({ label, tag, translated, selectableCategories }) {
+  const problems = [];
+  for (const [family, categories] of unselectablePluralCategories(
+    translated,
+    selectableCategories(tag)
+  )) {
+    for (const category of categories) {
+      problems.push(
+        `${label}: plural family "${family}" declares a ${category} form that ${tag} never selects`
+      );
     }
   }
   return problems;
@@ -2718,6 +2787,7 @@ function checkSharedWordings({ label, tag, translated, sharedWordings, wordingEx
  */
 function checkCatalogLocales({
   catalog,
+  selectableCategories,
   present,
   supported,
   english,
@@ -2764,21 +2834,30 @@ function checkCatalogLocales({
     problems.push(...checkChangelogAreaLabels(tag, translated, label));
 
     // The families this locale declares itself, through a member key with a
-    // category suffix. The English `_one`/`_other` siblings of a family
-    // English declares stay mandatory in the missing-key rule below, except
-    // where the locale carries the flat base key instead.
+    // category suffix. The English siblings of a family English declares stay
+    // mandatory in the missing-key rule below, except where the locale carries
+    // the flat base key instead, and except a category this tag can never
+    // select: a Japanese catalog owes no `_one` form, because i18next never
+    // asks for one there.
     const localeFamilies = pluralFamilyBases(translated);
     problems.push(
       ...checkKeyParity({
         label,
+        tag,
         english,
         translated,
         englishFamilies,
         englishCountedBases,
         localeFamilies,
+        selectableCategories,
       })
     );
-    problems.push(...checkPluralCategories({ label, tag, english, translated }));
+    problems.push(
+      ...checkPluralCategories({ label, tag, english, translated, selectableCategories })
+    );
+    problems.push(
+      ...checkUnselectablePluralCategories({ label, tag, translated, selectableCategories })
+    );
     problems.push(
       ...checkTranslatedValues({
         label,
@@ -3225,6 +3304,7 @@ export function checkCatalogs(root = ROOT) {
 
     const locales = checkCatalogLocales({
       catalog,
+      selectableCategories: catalog.selectableCategoriesOf,
       present,
       supported,
       english,

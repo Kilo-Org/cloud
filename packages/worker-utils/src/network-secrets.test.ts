@@ -6,6 +6,22 @@ import {
   assertNetworkSecretDestinations,
 } from './network-secrets';
 
+const excludedUrls = ['https://gitlab.example.com/team/repo.git'];
+
+function snapshotFor(allowedHosts: string[]) {
+  return networkSecretsSchema.parse({
+    KEY: {
+      allowedHosts,
+      envelope: {
+        algorithm: 'rsa-aes-256-gcm',
+        version: 1,
+        encryptedData: 'synthetic',
+        encryptedDEK: 'synthetic',
+      },
+    },
+  });
+}
+
 describe('network secret destinations', () => {
   it.each(['sentry.io', 'api.axiom.co', 'npm.pkg.github.com'])('accepts %s', host => {
     expect(networkSecretHostSchema.parse(host)).toBe(host);
@@ -44,19 +60,21 @@ describe('network secret destinations', () => {
     ).toBe(false);
   });
   it('rejects configured platform or SCM destinations', () => {
-    const snapshot = networkSecretsSchema.parse({
-      KEY: {
-        allowedHosts: ['gitlab.example.com'],
-        envelope: {
-          algorithm: 'rsa-aes-256-gcm',
-          version: 1,
-          encryptedData: 'synthetic',
-          encryptedDEK: 'synthetic',
-        },
-      },
-    });
     expect(() =>
-      assertNetworkSecretDestinations(snapshot, ['https://gitlab.example.com/team/repo.git'])
+      assertNetworkSecretDestinations(snapshotFor(['gitlab.example.com']), excludedUrls)
     ).toThrow('cannot target');
+  });
+  it.each([['GITLAB.Example.COM'], ['gitlab.example.com.']])(
+    'rejects managed SCM destinations after host normalization (%#)',
+    host => {
+      expect(() => assertNetworkSecretDestinations(snapshotFor([host]), excludedUrls)).toThrow(
+        'cannot target'
+      );
+    }
+  );
+  it('accepts public destinations', () => {
+    expect(() =>
+      assertNetworkSecretDestinations(snapshotFor(['api.example.com']), excludedUrls)
+    ).not.toThrow();
   });
 });

@@ -81,6 +81,34 @@ describe('listDirectoriesOnConnection', () => {
     });
   });
 
+  it('classifies an absolute entry path as invalid', async () => {
+    const connection = makeFakeConnection();
+    connection.sendCommandToConnection.mockResolvedValue({
+      protocolVersion: 1,
+      path: '',
+      directories: [{ name: 'apps', path: '/workspace/x/apps' }],
+    });
+
+    await expect(listDirectoriesOnConnection(connection, 'cli-owner-1')).resolves.toEqual({
+      ok: false,
+      reason: 'invalid',
+    });
+  });
+
+  it('classifies a parent-climbing entry path as invalid', async () => {
+    const connection = makeFakeConnection();
+    connection.sendCommandToConnection.mockResolvedValue({
+      protocolVersion: 1,
+      path: '',
+      directories: [{ name: 'apps', path: '../apps' }],
+    });
+
+    await expect(listDirectoriesOnConnection(connection, 'cli-owner-1')).resolves.toEqual({
+      ok: false,
+      reason: 'invalid',
+    });
+  });
+
   it('classifies an old-CLI unknown command as unsupported', async () => {
     const connection = makeFakeConnection();
     connection.sendCommandToConnection.mockRejectedValue(

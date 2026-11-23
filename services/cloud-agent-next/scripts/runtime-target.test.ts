@@ -140,13 +140,13 @@ it('renders the published Kilo v2 release for its organization scope', () => {
     })
   ).toThrow('configuration drift');
 });
-it('enables Kilo v2 for all web accounts and every origin for the Kilo organization', () => {
+it('enables Kilo v2 for all accounts and session origins', () => {
   const catalog = JSON.parse(
     readFileSync(new URL('../runtime-targets.json', import.meta.url), 'utf8')
   );
   const kilo2 = {
     orgIds: '*',
-    allSessionOrgIds: ['9d278969-5453-4ae3-a51f-a8d2274a7b56'],
+    allSessionOrgIds: '*',
   };
   expect(selectRuntimeTarget(catalog, 'dev').kilo2).toEqual(kilo2);
   for (const environment of ['production', 'isolated']) {
@@ -162,7 +162,7 @@ it('enables Kilo v2 for all web accounts and every origin for the Kilo organizat
     expect(target).toMatchObject({
       vars: {
         RUNTIME_KILO2_ORG_IDS: '*',
-        RUNTIME_KILO2_ALL_SESSION_ORG_IDS: kilo2.allSessionOrgIds.join(','),
+        RUNTIME_KILO2_ALL_SESSION_ORG_IDS: '*',
         RUNTIME_RELEASE_DESCRIPTOR_KILO2: 'f'.repeat(64),
       },
     });

@@ -20,7 +20,6 @@
     "commandStatus": "การส่งคำสั่ง: {{status}}",
     "delivered": "ส่งถึงแล้ว",
     "expired": "หมดอายุแล้ว",
-    "recoveryGaps_one": "ส่วน {{displayCount}} ของบันทึกนี้หายไป",
     "recoveryGaps_other": "ส่วน {{displayCount}} ของบันทึกนี้หายไป"
   },
   "common": {
@@ -123,10 +122,10 @@
     "connectProvider": "เชื่อมต่อผู้ให้บริการ",
     "contentTruncated": "เนื้อหาถูกตัดทอน",
     "copyLink": "คัดลอกลิงก์",
+    "couldNotLoad": "ไม่สามารถโหลดได้",
+    "couldNotLoadMore": "ไม่สามารถโหลดเพิ่มได้",
     "couldNotLoadOrganizations": "ไม่สามารถโหลดรายชื่อองค์กรได้",
     "couldNotLoadSessions": "ไม่สามารถโหลดเซสชันได้",
-    "couldnTLoad": "ไม่สามารถโหลดได้",
-    "couldnTLoadMore": "ไม่สามารถโหลดเพิ่มได้",
     "deviceSessions": "เซสชันบนอุปกรณ์",
     "disabled": "ปิดใช้งานแล้ว",
     "email": "อีเมล",
@@ -628,10 +627,8 @@
       "retryLoadingFiles": "ลองโหลดไฟล์อีกครั้ง",
       "filterPlaceholder": "กรองตามพาธไฟล์",
       "viewedCount": "ดูแล้ว {{viewed}} จาก {{total}} ไฟล์",
-      "viewedCount_one": "ดูแล้ว {{viewed}} จาก {{total}} ไฟล์",
       "viewedCount_other": "ดูแล้ว {{viewed}} จาก {{total}} ไฟล์",
       "viewedOfListed": "ดูแล้ว {{viewed}} จาก {{total}} ไฟล์ในรายการ",
-      "viewedOfListed_one": "ดูแล้ว {{viewed}} จาก {{total}} ไฟล์ในรายการ",
       "viewedOfListed_other": "ดูแล้ว {{viewed}} จาก {{total}} ไฟล์ในรายการ",
       "loadingFiles": "กำลังโหลด {{loaded}} จาก {{total}} ไฟล์…",
       "failedToLoadAllFiles": "โหลดไฟล์ไม่ครบทั้งหมด",
@@ -684,25 +681,19 @@
       "loadedOfTotalFiles": "โหลดแล้ว {{loaded}} จาก {{total}} ไฟล์",
       "loadAllFiles": "โหลดไฟล์ทั้งหมด",
       "loadAll": "โหลดทั้งหมด",
-      "fileLoadedCount_one": "โหลดแล้ว {{displayCount}} ไฟล์",
       "fileLoadedCount": "โหลด {{displayCount}} ไฟล์แล้ว",
       "fileLoadedCount_other": "โหลด {{displayCount}} ไฟล์แล้ว",
-      "fileLoadedOfTotalCount_one": "โหลดแล้ว {{displayCount}} จาก {{total}} ไฟล์",
       "fileLoadedOfTotalCount": "โหลดแล้ว {{displayCount}} จาก {{total}} ไฟล์",
       "fileLoadedOfTotalCount_other": "โหลดแล้ว {{displayCount}} จาก {{total}} ไฟล์",
       "filesStillLoading": "ยังโหลดไฟล์ไม่เสร็จ ดึงลงเพื่อรีเฟรช",
       "goToOverview": "ไปที่ภาพรวม",
       "goToOverviewTab": "ไปที่แท็บภาพรวม",
-      "expandAllLines_one": "ขยายทั้ง {{displayCount}} บรรทัด",
       "expandAllLines_other": "ขยายทั้ง {{displayCount}} บรรทัด",
-      "expandLines_one": "ขยาย {{displayCount}} บรรทัด ({{start}}–{{end}})",
       "expandLines_other": "ขยาย {{displayCount}} บรรทัด ({{start}}–{{end}})",
-      "expandLinesOfContext_one": "ขยายบรรทัดแวดล้อม {{displayCount}} บรรทัด",
       "expandLinesOfContext_other": "ขยายบรรทัดแวดล้อม {{displayCount}} บรรทัด",
-      "expandMoreLines_one": "ขยายเพิ่มอีก {{displayCount}} บรรทัด ({{start}}–{{end}})",
       "expandMoreLines_other": "ขยายเพิ่มอีก {{displayCount}} บรรทัด ({{start}}–{{end}})",
-      "loadedOfTotalFiles_one": "โหลดแล้ว {{loaded}} จาก {{total}} ไฟล์",
-      "loadedOfTotalFiles_other": "โหลดแล้ว {{loaded}} จาก {{total}} ไฟล์"
+      "loadedOfTotalFiles_other": "โหลดแล้ว {{loaded}} จาก {{total}} ไฟล์",
+      "fileLoadedCount_one": "โหลดแล้ว {{displayCount}} ไฟล์"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ ไม่มีอักขระขึ้นบรรทัดใหม่ท้ายไฟล์",
@@ -781,7 +772,6 @@
       },
       "restrictions": {
         "title": "ข้อจำกัดการรวม",
-        "approvalsRequired_one": "ต้องมีการอนุมัติ {{displayCount}} ครั้ง",
         "approvalsRequired_other": "ต้องมีการอนุมัติ {{displayCount}} ครั้ง",
         "pipelineMustSucceed": "ไปป์ไลน์ต้องสำเร็จก่อนการรวม"
       },
@@ -809,7 +799,6 @@
       "unresolveThread": "ทำเครื่องหมายเธรดว่ายังไม่แก้ไข",
       "resolved": "แก้ไขแล้ว",
       "outdated": "ล้าสมัย",
-      "comment_one": "ความคิดเห็น 1 รายการ",
       "comment": "ความคิดเห็น {{displayCount}} รายการ",
       "comment_other": "ความคิดเห็น {{displayCount}} รายการ",
       "startedRelative": " · เริ่มเมื่อ {{relative}}",
@@ -817,11 +806,9 @@
       "retryLoadingMore": "ลองโหลดความคิดเห็นเพิ่มอีกครั้ง",
       "loadMoreComments": "โหลดความคิดเห็นเพิ่ม",
       "conversationTruncated": "กำลังแสดง {{displayCount}} ความคิดเห็นแรกเท่านั้น",
-      "conversationTruncated_one": "กำลังแสดง {{displayCount}} ความคิดเห็นแรกเท่านั้น",
       "conversationTruncated_other": "กำลังแสดง {{displayCount}} ความคิดเห็นแรกเท่านั้น",
       "addReaction": "แสดงความรู้สึก",
       "reactionPill": "การแสดงความรู้สึก {{emoji}}: {{displayCount}} {{countLabel}}",
-      "reaction_one": "การแสดงความรู้สึก",
       "reaction": "การแสดงความรู้สึก",
       "reaction_other": "การแสดงความรู้สึก",
       "commentActions": "ตัวเลือกความคิดเห็น",
@@ -907,7 +894,6 @@
       },
       "deletedUser": "ผู้ใช้ที่ถูกลบ",
       "replyForbiddenTerm": "คุณไม่มีสิทธิ์ตอบกลับใน {{term}} นี้",
-      "moreLinesAbove_one": "… ยังมีอีก {{displayCount}} บรรทัดด้านบน",
       "moreLinesAbove_other": "… ยังมีอีก {{displayCount}} บรรทัดด้านบน",
       "deleteComment": "ลบความคิดเห็น",
       "deleteCommentTitle": "ลบความคิดเห็นหรือไม่?",
@@ -915,7 +901,8 @@
       "commentEditFailed": "ไม่สามารถบันทึกความคิดเห็นของคุณได้ ตรวจสอบการเชื่อมต่อของคุณแล้วลองอีกครั้ง",
       "commentEditUnavailable": "ไม่สามารถแก้ไขความคิดเห็นนี้ได้ อาจถูกลบไปแล้ว",
       "commentDeleteFailed": "ไม่สามารถลบความคิดเห็นของคุณได้ ตรวจสอบการเชื่อมต่อของคุณแล้วลองอีกครั้ง",
-      "commentDeleteUnavailable": "ไม่สามารถลบความคิดเห็นนี้ได้"
+      "commentDeleteUnavailable": "ไม่สามารถลบความคิดเห็นนี้ได้",
+      "comment_one": "ความคิดเห็น 1 รายการ"
     },
     "couldNotOpenGitHubAppSettings": "ไม่สามารถเปิดการตั้งค่าแอป GitHub ได้",
     "installKiloGitHubApp": "ติดตั้ง Kilo GitHub App",
@@ -950,17 +937,13 @@
       "retryChecks": "ลองตรวจสอบอีกครั้ง",
       "noChecksReported": "ยังไม่มีรายงานผลการตรวจสอบ",
       "passed": "ผ่าน {{displayCount}} รายการ",
-      "passed_one": "ผ่าน {{displayCount}} รายการ",
       "passed_other": "ผ่าน {{displayCount}} รายการ",
       "failed": "ไม่ผ่าน {{displayCount}} รายการ",
-      "failed_one": "ไม่ผ่าน {{displayCount}} รายการ",
       "failed_other": "ไม่ผ่าน {{displayCount}} รายการ",
       "pending": "รอดำเนินการ {{displayCount}} รายการ",
       "skipped": "ข้าม {{displayCount}} รายการ",
-      "skipped_one": "ข้าม {{displayCount}} รายการ",
       "skipped_other": "ข้าม {{displayCount}} รายการ",
       "checksCount": "การตรวจสอบ {{displayCount}} รายการ",
-      "checksCount_one": "การตรวจสอบ {{displayCount}} รายการ",
       "checksCount_other": "การตรวจสอบ {{displayCount}} รายการ",
       "checkDetails": "รายละเอียดการตรวจสอบ"
     },
@@ -1028,18 +1011,14 @@
       "deletePendingTitle": "ลบความคิดเห็นที่รอส่งหรือไม่?",
       "deletePendingMessage": "ความคิดเห็นนี้จะถูกลบออกจากรายการที่รอส่งรีวิว",
       "summaryOptional": "สรุปรีวิว (ไม่บังคับ)",
-      "pendingComment_one": "ความคิดเห็นที่รอส่ง",
       "pendingComment": "ความคิดเห็นที่รอส่ง",
       "pendingComment_other": "ความคิดเห็นที่รอส่ง",
       "submitCountOfTotal": "ส่งความคิดเห็น {{displayFreshCount}} จาก {{displayTotalCount}} รายการ",
-      "submitCountOfTotal_one": "ส่งความคิดเห็น {{displayFreshCount}} จาก {{displayTotalCount}} รายการ",
       "submitCountOfTotal_other": "ส่งความคิดเห็น {{displayFreshCount}} จาก {{displayTotalCount}} รายการ",
       "submitReview": "ส่งรีวิว",
       "partialPostedFresh": "โพสต์ความคิดเห็นแล้ว {{displayFreshCount}} รายการ ",
-      "partialPostedFresh_one": "โพสต์ความคิดเห็นแล้ว {{displayFreshCount}} รายการ ",
       "partialPostedFresh_other": "โพสต์ความคิดเห็นแล้ว {{displayFreshCount}} รายการ ",
       "partialPostedStale": "อีก {{displayStaleCount}} รายการอ้างอิงคอมมิตเก่า จึงยังอยู่ในรายการที่รอส่ง",
-      "partialPostedStale_one": "อีก {{displayStaleCount}} รายการอ้างอิงคอมมิตเก่า จึงยังอยู่ในรายการที่รอส่ง",
       "partialPostedStale_other": "อีก {{displayStaleCount}} รายการอ้างอิงคอมมิตเก่า จึงยังอยู่ในรายการที่รอส่ง",
       "blockedRequestChanges": "เพิ่มสรุปรีวิวหรือความคิดเห็นอย่างน้อยหนึ่งรายการเพื่อขอให้แก้ไข",
       "blockedComment": "เพิ่มสรุปรีวิวหรือความคิดเห็นอย่างน้อยหนึ่งรายการเพื่อส่งรีวิวแบบแสดงความคิดเห็น"
@@ -1062,10 +1041,8 @@
       "stateOpenReviewRequired": "เปิด · ต้องรีวิว",
       "stateOpen": "เปิด",
       "unknownAuthor": "ไม่ทราบผู้เขียน",
-      "commit_one": "คอมมิต",
       "commit": "คอมมิต",
       "commit_other": "คอมมิต",
-      "file_one": "ไฟล์",
       "file": "ไฟล์",
       "file_other": "ไฟล์",
       "openedAgo": "เปิดเมื่อ {{time}}",
@@ -1099,9 +1076,9 @@
       "overview": "ภาพรวม",
       "files": "ไฟล์",
       "discussion": "การสนทนา",
-      "discussionAccessibility_one": "{{title}}: ความคิดเห็น 1 รายการ",
       "discussionAccessibility": "{{title}}: ความคิดเห็น {{displayCount}} รายการ",
-      "discussionAccessibility_other": "{{title}}: ความคิดเห็น {{displayCount}} รายการ"
+      "discussionAccessibility_other": "{{title}}: ความคิดเห็น {{displayCount}} รายการ",
+      "discussionAccessibility_one": "{{title}}: ความคิดเห็น 1 รายการ"
     },
     "fileStatus": {
       "modified": "แก้ไขแล้ว",
@@ -1117,7 +1094,6 @@
       "lineLabel": "บรรทัด {{line}} ({{status}}): {{text}}",
       "lineLabelNoNumber": "สถานะ {{status}}: {{text}}",
       "emptyLine": "(ว่าง)",
-      "truncationBanner_one": "กำลังแสดง {{limit}} ไฟล์แรกจากทั้งหมด {{total}} ไฟล์ที่เปลี่ยนแปลง — ขีดจำกัด API ของ GitHub",
       "truncationBanner_other": "กำลังแสดง {{limit}} ไฟล์แรกจากทั้งหมด {{total}} ไฟล์ที่เปลี่ยนแปลง — ขีดจำกัด API ของ GitHub"
     },
     "linkPasteClipboardEmpty": "คลิปบอร์ดว่างเปล่า",
@@ -1227,7 +1203,6 @@
       "emptyTitle": "ยังไม่มีการแจ้งเตือน",
       "emptyCategoryTitle": "ยังไม่มีการแจ้งเตือนในหมวดหมู่นี้",
       "emptyBody": "การแจ้งเตือนที่บัญชีนี้ได้รับจะแสดงที่นี่ โดยจะเก็บไว้เป็นเวลา {{days}} วัน",
-      "emptyBody_one": "การแจ้งเตือนที่บัญชีนี้ได้รับจะแสดงที่นี่ โดยจะเก็บไว้เป็นเวลา {{days}} วัน",
       "emptyBody_other": "การแจ้งเตือนที่บัญชีนี้ได้รับจะแสดงที่นี่ โดยจะเก็บไว้เป็นเวลา {{days}} วัน",
       "capped": "กำลังแสดงการแจ้งเตือนล่าสุด",
       "loadError": "ไม่สามารถโหลดประวัติการแจ้งเตือนได้",
@@ -1513,7 +1488,6 @@
       "set": "ตั้งค่าแล้ว",
       "notSet": "ยังไม่ได้ตั้งค่า",
       "nSelected": "เลือกแล้ว {{displayCount}} รายการ",
-      "nSelected_one": "เลือกแล้ว {{displayCount}} รายการ",
       "nSelected_other": "เลือกแล้ว {{displayCount}} รายการ",
       "proposedReviewMdGuidance": "คำแนะนำที่เสนอสำหรับ REVIEW.md"
     },
@@ -1596,7 +1570,6 @@
       "couldNotLoad": "ไม่สามารถโหลดข้อมูลการวิเคราะห์ได้",
       "trackedReviewsCaption": "การตรวจสอบที่เสร็จสิ้นในช่วงเวลานี้ในขณะที่เปิดใช้การวิเคราะห์ โดยการตรวจสอบที่กำลังดำเนินการหรือล้มเหลวจะไม่ถูกนับเลย",
       "trackedReviewsUncounted": "ไม่ถูกนับ: การตรวจสอบที่เสร็จสิ้นทั้งหมด {{displayTotal}} รายการขององค์กร มี {{displayCount}} รายการที่ไม่ได้บันทึกผลลัพธ์",
-      "trackedReviewsUncounted_one": "ไม่ถูกนับ: การตรวจสอบที่เสร็จสิ้นทั้งหมด {{displayTotal}} รายการขององค์กร มี {{displayCount}} รายการที่ไม่ได้บันทึกผลลัพธ์",
       "trackedReviewsUncounted_other": "ไม่ถูกนับ: การตรวจสอบที่เสร็จสิ้นทั้งหมด {{displayTotal}} รายการขององค์กร มี {{displayCount}} รายการที่ไม่ได้บันทึกผลลัพธ์"
     },
     "council": {
@@ -1685,7 +1658,6 @@
       "enableAutoRemediationConfirmTitle": "เปิดการแก้ไขอัตโนมัติหรือไม่?",
       "enableAutoRemediationConfirmMessage": "เอเจนต์ความปลอดภัยจะเปิด PR เพื่อแก้ไขโดยอัตโนมัติสำหรับข้อค้นพบที่ผู้โจมตีนำไปใช้ได้และตรงตามเงื่อนไข",
       "enable": "เปิด",
-      "queued_one": "จัดคิวข้อค้นพบที่มีอยู่ {{displayCount}} รายการเพื่อวิเคราะห์แล้ว",
       "queued": "เพิ่มข้อค้นพบที่มีอยู่ {{displayCount}} รายการเข้าคิววิเคราะห์แล้ว",
       "queued_other": "เพิ่มข้อค้นพบที่มีอยู่ {{displayCount}} รายการเข้าคิววิเคราะห์แล้ว",
       "severityCriticalOnly": "เฉพาะวิกฤต",
@@ -1694,7 +1666,8 @@
       "severityAll": "ทุกระดับ",
       "confidenceHighOnly": "เฉพาะความมั่นใจสูง",
       "confidenceMediumOrHigher": "ปานกลางขึ้นไป",
-      "confidenceAny": "ทุกระดับความมั่นใจ"
+      "confidenceAny": "ทุกระดับความมั่นใจ",
+      "queued_one": "จัดคิวข้อค้นพบที่มีอยู่ {{displayCount}} รายการเพื่อวิเคราะห์แล้ว"
     },
     "analysis": {
       "couldNotLoad": "ไม่สามารถโหลดการวิเคราะห์ได้",
@@ -1719,7 +1692,6 @@
       "exploitabilityReasoning": "เหตุผลในการประเมินความสามารถในการใช้โจมตี",
       "suggestedFix": "วิธีแก้ไขที่แนะนำ",
       "whereFound": "ตำแหน่งที่พบ ({{displayCount}})",
-      "whereFound_one": "ตำแหน่งที่พบ ({{displayCount}})",
       "whereFound_other": "ตำแหน่งที่พบ ({{displayCount}})",
       "fullReport": "รายงานฉบับเต็มที่สร้างขึ้น",
       "yes": "ใช่",
@@ -1752,13 +1724,10 @@
       "noRepositoryDataDescription": "ลำดับความสำคัญของคลังโค้ดจะแสดงหลังซิงค์ข้อค้นพบแล้ว",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",
       "repoSummaryOpen": "เปิดอยู่ {{displayCount}}",
-      "repoSummaryOpen_one": "เปิดอยู่ {{displayCount}}",
       "repoSummaryOpen_other": "เปิดอยู่ {{displayCount}}",
       "repoSummaryCritical": "วิกฤต {{displayCount}}",
-      "repoSummaryCritical_one": "วิกฤต {{displayCount}}",
       "repoSummaryCritical_other": "วิกฤต {{displayCount}}",
       "repoSummaryHigh": "สูง {{displayCount}}",
-      "repoSummaryHigh_one": "สูง {{displayCount}}",
       "repoSummaryHigh_other": "สูง {{displayCount}}",
       "couldNotLoad": "ไม่สามารถโหลดข้อมูลแดชบอร์ดได้",
       "filterByRepository": "กรองตามคลังโค้ด",
@@ -1772,9 +1741,7 @@
       "syncNow": "ซิงค์ตอนนี้",
       "syncQueued": "จัดคิวการซิงค์แล้ว",
       "syncStatusUnavailable": "ไม่สามารถดูสถานะการซิงค์ได้",
-      "daysOverdue_one": "เกินกำหนด {{displayCount}} วัน",
       "daysOverdue_other": "เกินกำหนด {{displayCount}} วัน",
-      "findingsCount_one": "ข้อค้นพบ {{displayCount}} รายการ",
       "findingsCount_other": "ข้อค้นพบ {{displayCount}} รายการ"
     },
     "dashboardMetrics": {
@@ -1789,17 +1756,13 @@
       "deadlinePassedDetail": "{{critical}} {{high}}",
       "deadlinePassedDetailWithMediumLow": "{{critical}} {{high}} {{mediumLow}}",
       "breakdownCritical": "ระดับวิกฤต {{displayCount}} รายการ",
-      "breakdownCritical_one": "ระดับวิกฤต {{displayCount}} รายการ",
       "breakdownCritical_other": "ระดับวิกฤต {{displayCount}} รายการ",
       "breakdownHigh": "ระดับสูง {{displayCount}} รายการ",
-      "breakdownHigh_one": "ระดับสูง {{displayCount}} รายการ",
       "breakdownHigh_other": "ระดับสูง {{displayCount}} รายการ",
       "breakdownMediumLow": "ระดับปานกลางและต่ำ {{displayCount}} รายการ",
-      "breakdownMediumLow_one": "ระดับปานกลางและต่ำ {{displayCount}} รายการ",
       "breakdownMediumLow_other": "ระดับปานกลางและต่ำ {{displayCount}} รายการ",
       "dueThisWeek": "ถึงกำหนดสัปดาห์นี้",
       "dueThisWeekDetail": "จากจำนวนนี้ยืนยันว่าผู้โจมตีนำไปใช้ได้ {{exploitable}} รายการ",
-      "dueThisWeekDetail_one": "จากจำนวนนี้ยืนยันว่าผู้โจมตีนำไปใช้ได้ {{exploitable}} รายการ",
       "dueThisWeekDetail_other": "จากจำนวนนี้ยืนยันว่าผู้โจมตีนำไปใช้ได้ {{exploitable}} รายการ",
       "noDeadline": "ไม่มีกำหนดเวลา",
       "reviewSlaAssignment": "ตรวจสอบการกำหนด SLA",
@@ -1850,7 +1813,6 @@
       "couldNotLoadSettings": "ไม่สามารถโหลดการตั้งค่าเอเจนต์ความปลอดภัยได้",
       "couldNotLoadPermissions": "ไม่สามารถโหลดสิทธิ์ได้",
       "on": "เปิด",
-      "repositoriesCount_one": "เลือกคลังโค้ดแล้ว {{displayCount}} แห่ง",
       "repositoriesCount": "เลือกคลังโค้ดแล้ว {{displayCount}} รายการ",
       "repositoriesCount_other": "เลือกคลังโค้ดแล้ว {{displayCount}} รายการ",
       "analysisModeSubtitle": "การวิเคราะห์แบบ {{mode}}",
@@ -1859,7 +1821,8 @@
       "notificationsCount": "เปิดอยู่ {{displayCount}} จาก 2 รายการ",
       "disabledNoManage": "เอเจนต์ความปลอดภัยปิดอยู่ เฉพาะเจ้าขององค์กร ผู้ดูแลระบบ และผู้ดูแลการเรียกเก็บเงินเท่านั้นที่สามารถเปิดได้",
       "disabledNoRepo": "เลือกคลังโค้ดอย่างน้อยหนึ่งแห่งก่อนเปิดเอเจนต์ความปลอดภัย",
-      "disabledPrompt": "เปิดเอเจนต์ความปลอดภัยเพื่อซิงค์การแจ้งเตือน Dependabot เลือกคลังโค้ด และตั้งค่าระบบอัตโนมัติ"
+      "disabledPrompt": "เปิดเอเจนต์ความปลอดภัยเพื่อซิงค์การแจ้งเตือน Dependabot เลือกคลังโค้ด และตั้งค่าระบบอัตโนมัติ",
+      "repositoriesCount_one": "เลือกคลังโค้ดแล้ว {{displayCount}} แห่ง"
     },
     "remediation": {
       "cancellationRequested": "ส่งคำขอยกเลิกแล้ว",
@@ -1959,7 +1922,6 @@
       "eventReason": "เหตุผล: {{reason}}",
       "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
       "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
-      "eventsCount_one": "{{displayCount}} เหตุการณ์",
       "eventsCount_other": "{{displayCount}} เหตุการณ์",
       "generated": "สร้างเมื่อ {{generatedAt}}",
       "noActivity": "ยังไม่มีกิจกรรมที่บันทึกไว้",
@@ -1967,7 +1929,6 @@
       "repositoryNotRecorded": "ไม่ได้บันทึกคลังโค้ดไว้",
       "reasonUnknown": "ไม่รู้จักเหตุผล",
       "severityCount": "{{displayCount}} {{label}}",
-      "severityCount_one": "{{displayCount}} {{label}}",
       "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "สรุปรายงาน",
       "title": "รายงานการตรวจสอบ",
@@ -2092,9 +2053,7 @@
       "dueTomorrow": "ครบกำหนดพรุ่งนี้",
       "dueInDays_other": "ครบกำหนดใน {{count}} วัน",
       "overdue": "เกินกำหนด {{count}} วัน",
-      "overdue_one": "เกินกำหนด {{count}} วัน",
-      "dueInDays": "ครบกำหนดใน {{count}} วัน",
-      "dueInDays_one": "ครบกำหนดใน {{count}} วัน"
+      "dueInDays": "ครบกำหนดใน {{count}} วัน"
     },
     "remediationStatus": {
       "notStarted": "ยังไม่เริ่ม",
@@ -2176,7 +2135,6 @@
       "completedWillAppear": "เซสชันที่เสร็จแล้วจะแสดงที่นี่",
       "noPastSessions": "ยังไม่มีเซสชันที่ผ่านมา",
       "pastSessions": "เซสชันที่ผ่านมา",
-      "sectionAccessibility_one": "{{title}}: {{displayCount}} เซสชัน",
       "sectionAccessibility_other": "{{title}}: {{displayCount}} เซสชัน",
       "sectionAccessibility": "{{title}}: {{displayCount}} เซสชัน",
       "live": "สด",
@@ -2196,10 +2154,8 @@
       "sessionDeleted": "ลบเซสชันแล้ว",
       "needsInput": "รอข้อมูลจากคุณ",
       "fromPlatform": "จาก {{platform}}",
-      "cent_one": "เซนต์",
       "cent": "เซนต์",
       "cent_other": "เซนต์",
-      "dollar_one": "ดอลลาร์",
       "dollar": "ดอลลาร์",
       "dollar_other": "ดอลลาร์",
       "costSpoken": "ค่าใช้จ่าย {{cost}}",
@@ -2489,7 +2445,6 @@
       "snapshotCaptured": "บันทึกสแนปช็อตเวิร์กสเปซเมื่อ {{when}}"
     },
     "partRenderer": {
-      "updatedFileCount_one": "อัปเดตไฟล์แล้ว {{displayCount}} ไฟล์",
       "updatedFileCount": "อัปเดตไฟล์แล้ว {{displayCount}} ไฟล์",
       "updatedFileCount_other": "อัปเดตไฟล์แล้ว {{displayCount}} ไฟล์"
     },
@@ -2528,11 +2483,8 @@
       "linesBadge": "{{displayCount}} บรรทัด",
       "filesBadge": "{{displayCount}} ไฟล์",
       "matchesBadge": "พบ {{displayCount}} รายการ",
-      "filesBadge_one": "{{displayCount}} ไฟล์",
       "filesBadge_other": "{{displayCount}} ไฟล์",
-      "linesBadge_one": "{{displayCount}} บรรทัด",
       "linesBadge_other": "{{displayCount}} บรรทัด",
-      "matchesBadge_one": "พบ {{displayCount}} รายการ",
       "matchesBadge_other": "พบ {{displayCount}} รายการ",
       "noOutput": "ไม่มีเอาต์พุต",
       "translationFailed": "การแปลล้มเหลว"
@@ -2848,12 +2800,12 @@
     "olderMessages": {
       "arrived": "โหลดข้อความก่อนหน้าแล้ว",
       "retryHint": "ลองโหลดข้อความเก่าของเซสชันนี้อีกครั้ง",
-      "omitted_one": "ไม่สามารถแสดงบางรายการก่อนหน้าของเซสชันนี้ได้",
       "omitted": "ไม่สามารถแสดงรายการก่อนหน้า {{displayCount}} รายการของเซสชันนี้ได้",
       "omitted_other": "ไม่สามารถแสดงรายการก่อนหน้า {{displayCount}} รายการของเซสชันนี้ได้",
       "couldNotLoad": "โหลดข้อความก่อนหน้าไม่สำเร็จ",
       "unavailable": "ข้อความก่อนหน้าไม่พร้อมใช้งาน",
-      "tooLarge": "ข้อความก่อนหน้ามีขนาดใหญ่เกินไปที่จะโหลด"
+      "tooLarge": "ข้อความก่อนหน้ามีขนาดใหญ่เกินไปที่จะโหลด",
+      "omitted_one": "ไม่สามารถแสดงบางรายการก่อนหน้าของเซสชันนี้ได้"
     },
     "sessionFilter": {
       "title": "กรองเซสชัน",
@@ -2911,9 +2863,7 @@
       "couldNotOpenPhotoPicker": "เปิดหน้าต่างเลือกรูปภาพไม่สำเร็จ ปิดแล้วเปิด Kilo ใหม่ จากนั้นลองอีกครั้ง",
       "maxFilesAllowed": "แนบไฟล์ได้สูงสุด {{displayCount}} ไฟล์",
       "onlyAddingFiles": "เพิ่มเพียง {{accepted}} ไฟล์จากทั้งหมด {{total}} ไฟล์ (สูงสุด {{max}} ไฟล์)",
-      "maxFilesAllowed_one": "แนบไฟล์ได้สูงสุด {{displayCount}} ไฟล์",
       "maxFilesAllowed_other": "แนบไฟล์ได้สูงสุด {{displayCount}} ไฟล์",
-      "onlyAddingFiles_one": "เพิ่มเพียง {{accepted}} ไฟล์จากทั้งหมด {{total}} ไฟล์ (สูงสุด {{max}} ไฟล์)",
       "onlyAddingFiles_other": "เพิ่มเพียง {{accepted}} ไฟล์จากทั้งหมด {{total}} ไฟล์ (สูงสุด {{max}} ไฟล์)"
     },
     "composer": {
@@ -2938,7 +2888,6 @@
       "discardAttachmentsTitle": "ทิ้งไฟล์แนบหรือไม่?",
       "charactersRemaining": "เหลือ {{count}} อักขระ",
       "insertNewline": "แทรกบรรทัดใหม่",
-      "charactersRemaining_one": "เหลือ {{count}} อักขระ",
       "charactersRemaining_other": "เหลือ {{count}} อักขระ"
     },
     "chatLink": {
@@ -3014,14 +2963,12 @@
       "ofWindowTokens": "จาก {{window}} โทเคน",
       "tokens": "โทเคน",
       "tokens_other": "โทเคน",
-      "tokens_one": "โทเค็น",
       "tokensWithPercentage": "โทเคน ({{percentage}})",
-      "stepsCount_one": "{{steps}} ขั้นตอน",
       "stepsCount": "{{steps}} ขั้นตอน",
       "stepsCount_other": "{{steps}} ขั้นตอน",
       "modelAccessibilityLabel": "{{name}} จาก {{provider}} · {{steps}} · {{cost}}",
-      "modelsCount_one": "โมเดล ({{displayCount}})",
-      "modelsCount_other": "โมเดล ({{displayCount}})"
+      "modelsCount_other": "โมเดล ({{displayCount}})",
+      "tokens_one": "โทเค็น"
     },
     "sessionChanges": {
       "viewChanges": "ดูการเปลี่ยนแปลง",
@@ -3094,7 +3041,6 @@
     "toolRun": {
       "sheetTitle": "การเรียกเครื่องมือ",
       "condensedLabel": "{{itemCount}} รายการ; {{last}}",
-      "condensedLabel_one": "{{itemCount}} รายการ; {{last}}",
       "condensedLabel_other": "{{itemCount}} รายการ; {{last}}"
     }
   },
@@ -3233,7 +3179,6 @@
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
     "searchPlaceholder": "ค้นหาเซสชันล่าสุด",
     "connectedCli": "บน CLI ที่เชื่อมต่ออยู่",
-    "connectedCliAccessibility_one": "{{title}}: {{displayCount}} อินสแตนซ์",
     "connectedCliAccessibility_other": "{{title}}: {{displayCount}} อินสแตนซ์",
     "connectedCliAccessibility": "{{title}}: {{displayCount}} อินสแตนซ์",
     "newSessionOn": "เซสชันใหม่บน {{name}}",
@@ -3249,7 +3194,6 @@
     "cliCantReceiveFilesMessage": "Kilo CLI ที่รันเซสชันนี้ไม่สามารถรับไฟล์ได้ อัปเดต CLI บนเครื่องนั้น หรือแชร์ไปยังเซสชันใหม่แทน",
     "contentlessMessage": "ไม่มีเนื้อหาให้แชร์ เพราะไม่มีข้อความหรือไฟล์แนบมา",
     "couldNotReadContent": "อ่านเนื้อหาที่แชร์ไม่สำเร็จ",
-    "onlyFirstFilesAttached_one": "จะแนบเฉพาะ {{displayCount}} ไฟล์แรกเท่านั้น",
     "onlyFirstFilesAttached_other": "จะแนบเฉพาะ {{displayCount}} ไฟล์แรกเท่านั้น"
   },
   "kiloPass": {
@@ -3503,10 +3447,8 @@
         "groupIdentity": "กลุ่ม \"{{name}}\"",
         "groupMembers": "กลุ่ม \"{{name}}\": {{members}}",
         "groupMemberGroups": "{{displayCount}} กลุ่ม",
-        "groupMemberGroups_one": "{{displayCount}} กลุ่ม",
         "groupMemberGroups_other": "{{displayCount}} กลุ่ม",
         "groupMemberGroupsOf": "{{email}}: {{displayCount}} กลุ่ม",
-        "groupMemberGroupsOf_one": "{{email}}: {{displayCount}} กลุ่ม",
         "groupMemberGroupsOf_other": "{{email}}: {{displayCount}} กลุ่ม",
         "groupPolicySet": "กลุ่ม \"{{name}}\": กำหนดนโยบาย {{policy}}",
         "groupPolicyRemoved": "กลุ่ม \"{{name}}\": ลบนโยบาย {{policy}}",
@@ -3528,17 +3470,14 @@
         "fundsPurchased": "{{amount}} ด้วย {{method}}",
         "fundsGranted": "{{amount}}",
         "fundsDistributed": "{{amount}} ให้ {{displayCount}} องค์กรลูก",
-        "fundsDistributed_one": "{{amount}} ให้ {{displayCount}} องค์กรลูก",
         "fundsDistributed_other": "{{amount}} ให้ {{displayCount}} องค์กรลูก",
         "fundsReceived": "{{amount}} จาก {{parent}}",
         "reviewAgentPlatform": "{{platform}}",
         "reviewAgentConfig": "การกำหนดค่า {{platform}}",
         "reviewAgentConfigStyle": "{{platform}}: รูปแบบ {{style}}",
         "reviewAgentSecretsUpdated": "อัปเดตแล้ว {{displayCount}}",
-        "reviewAgentSecretsUpdated_one": "อัปเดตแล้ว {{displayCount}}",
         "reviewAgentSecretsUpdated_other": "อัปเดตแล้ว {{displayCount}}",
         "reviewAgentSecretsFailed": "ข้อผิดพลาด {{displayCount}}",
-        "reviewAgentSecretsFailed_one": "ข้อผิดพลาด {{displayCount}}",
         "reviewAgentSecretsFailed_other": "ข้อผิดพลาด {{displayCount}}",
         "reviewAgentSecretRotated": "{{values}}",
         "settingAdvancedPolicies": "{{values}}",
@@ -3772,7 +3711,6 @@
       "usageDetails": "รายละเอียดการใช้งาน",
       "providersAndModels": "ผู้ให้บริการและโมเดล",
       "groups": "กลุ่ม",
-      "guardrails": "Guardrails",
       "byok": "ใช้คีย์ของคุณเอง",
       "ssoAndDomain": "SSO และโดเมน",
       "dataCollection": "การเก็บรวบรวมข้อมูล",
@@ -3839,7 +3777,6 @@
       "emptyTitle": "ยังไม่มีกลุ่ม",
       "enterpriseOnly": "กลุ่มพร้อมใช้งานในแพ็กเกจ Enterprise",
       "memberCount": "{{displayCount}} สมาชิก",
-      "memberCount_one": "{{displayCount}} สมาชิก",
       "memberCount_other": "{{displayCount}} สมาชิก",
       "memberViewEmpty": "คุณไม่ได้อยู่ในกลุ่มใดขององค์กรนี้",
       "memberViewTitle": "กลุ่มของคุณ",
@@ -3873,14 +3810,14 @@
       "ended": "สิ้นสุดแล้ว",
       "notSubscribed": "ยังไม่ได้สมัครสมาชิก",
       "overallocated": "จำนวนผู้ได้รับ Pass เกินจำนวนสิทธิ์ใช้งานที่ชำระเงินแล้ว",
-      "paidSeat_one": "สิทธิ์ใช้งานที่ชำระเงินแล้ว {{displayCount}} สิทธิ์",
       "paidSeat": "สิทธิ์ใช้งานแบบชำระเงิน {{displayCount}} สิทธิ์",
       "paidSeat_other": "สิทธิ์ใช้งานแบบชำระเงิน {{displayCount}} สิทธิ์",
       "paymentNeedsAttention": "ต้องตรวจสอบการชำระเงิน",
       "paymentPending": "รอการชำระเงิน",
       "processingBlocked": "การประมวลผลถูกบล็อก",
       "processingNeedsReview": "ต้องตรวจสอบการประมวลผล",
-      "retryHint": "ลองโหลดสถานะ Kilo Pass อีกครั้ง"
+      "retryHint": "ลองโหลดสถานะ Kilo Pass อีกครั้ง",
+      "paidSeat_one": "สิทธิ์ใช้งานที่ชำระเงินแล้ว {{displayCount}} สิทธิ์"
     }
   },
   "authErrors": {
@@ -3974,23 +3911,15 @@
     "answerNeeded": "รอคำตอบ",
     "waitingToRetry": "รอลองใหม่",
     "countNoun": {
-      "needsInput_one": "รอข้อมูลจากคุณ",
       "needsInput_other": "รอข้อมูลจากคุณ",
-      "running_one": "กำลังทำงาน",
       "running_other": "กำลังทำงาน",
-      "scheduled_one": "กำหนดเวลาไว้",
       "scheduled_other": "กำหนดเวลาไว้",
-      "idle_one": "รอทำงาน",
       "idle_other": "รอทำงาน"
     },
     "count": {
-      "needsInput_one": "{{displayCount}} รอข้อมูลจากคุณ",
       "needsInput_other": "{{displayCount}} รอข้อมูลจากคุณ",
-      "running_one": "{{displayCount}} กำลังทำงาน",
       "running_other": "{{displayCount}} กำลังทำงาน",
-      "scheduled_one": "{{displayCount}} กำหนดเวลาไว้",
       "scheduled_other": "{{displayCount}} กำหนดเวลาไว้",
-      "idle_one": "{{displayCount}} รอทำงาน",
       "idle_other": "{{displayCount}} รอทำงาน"
     },
     "footer": {
@@ -4131,7 +4060,6 @@
       "settingsToolsOn": "เปิด — เครื่องมือการตั้งค่าถูกส่งไปยังโมเดล",
       "settingsToolsOff": "ปิด — ไม่มีเครื่องมือการตั้งค่าถูกส่งไปยังโมเดล",
       "serverChecking": "กำลังตรวจสอบเซิร์ฟเวอร์นี้…",
-      "serverToolCount_one": "{{count}} เครื่องมือ",
       "serverToolCount_other": "{{count}} เครื่องมือ",
       "serverUnreachable": "ไม่สามารถเข้าถึงเซิร์ฟเวอร์นี้ได้",
       "serverOff": "เซิร์ฟเวอร์นี้ปิดอยู่",
@@ -4417,16 +4345,11 @@
     "emptyDescription": "สร้างโปรไฟล์เพื่อนำตัวแปรสภาพแวดล้อม คำสั่งการตั้งค่า และทักษะมาใช้ซ้ำในเซสชันต่างๆ",
     "loadFailed": "ไม่สามารถโหลดโปรไฟล์ได้",
     "counts": {
-      "vars_one": "{{count}} ตัวแปร",
       "vars_other": "{{count}} ตัวแปร",
       "mcp": "{{count}} MCP",
-      "skills_one": "{{count}} ทักษะ",
       "skills_other": "{{count}} ทักษะ",
-      "commands_one": "{{count}} คำสั่ง",
       "commands_other": "{{count}} คำสั่ง",
-      "setupCommands_one": "{{count}} คำสั่งการตั้งค่า",
       "setupCommands_other": "{{count}} คำสั่งการตั้งค่า",
-      "agents_one": "{{count}} เอเจนต์",
       "agents_other": "{{count}} เอเจนต์"
     },
     "nameLabel": "ชื่อโปรไฟล์",
@@ -4544,7 +4467,6 @@
       "environment": "ตัวแปรสภาพแวดล้อม (JSON)",
       "headers": "ส่วนหัว (JSON)",
       "timeout": "การหมดเวลา",
-      "secretCount_one": "{{count}} ความลับ",
       "secretCount_other": "{{count}} ความลับ",
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
@@ -4785,9 +4707,7 @@
       "couldNotLoad": "ไม่สามารถโหลดรายการได้",
       "noRepository": "ไม่มีคลังโค้ด",
       "rowA11y": "{{name}} {{openCount}}",
-      "openCount_one": "เปิดอยู่ {{count}}",
       "openCount_other": "เปิดอยู่ {{count}}",
-      "archived_one": "เก็บถาวรแล้ว ({{count}})",
       "archived_other": "เก็บถาวรแล้ว ({{count}})",
       "archive": "เก็บถาวร",
       "unarchive": "นำออกจากที่เก็บถาวร",
@@ -4810,7 +4730,6 @@
       "addFailed": "เพิ่มงานไม่สำเร็จ โปรดตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง",
       "empty": "ยังไม่มีงาน",
       "setDefaults": "ตั้งค่าคลังโค้ด โหมด และโมเดล",
-      "completed_one": "เสร็จสิ้น ({{count}})",
       "completed_other": "เสร็จสิ้น ({{count}})"
     },
     "item": {
@@ -4819,7 +4738,6 @@
       "markDonePrompt": "ทำเครื่องหมายว่าเสร็จหรือไม่?",
       "deleted": "ลบงานแล้ว",
       "undo": "เลิกทำ",
-      "runCount_one": "รัน {{count}} ครั้ง",
       "runCount_other": "รัน {{count}} ครั้ง",
       "startNow": "เริ่มโดยไม่ต้องตรวจสอบ",
       "startNowHint": "กดค้างเพื่อเริ่มโดยไม่ต้องตรวจสอบ",
@@ -4917,7 +4835,6 @@
     "estimate": "ประมาณการ {{estimate}} · สูงสุด {{maximum}}",
     "estimateUnavailable": "ไม่มีสรุปแบบเสียเงินสำหรับการตั้งค่าเหล่านี้ เปลี่ยนโมเดลหรือขีดจำกัด หรือลองใหม่ภายหลัง",
     "confirmPaid": "เปิดใช้สรุปแบบชำระเงินสำหรับ {{context}} ไหม",
-    "paidDisclosure_one": "ประมาณ {{estimate}} สูงสุด {{maximum}} จำกัดเวลา {{minutes}} นาที มีค่าบริการแม้การสร้างจะไม่สำเร็จ",
     "paidDisclosure": "ประมาณ {{estimate}} สูงสุด {{maximum}} จำกัดเวลา {{minutes}} นาที มีค่าบริการแม้การสร้างจะไม่สำเร็จ",
     "paidDisclosure_other": "ประมาณ {{estimate}} สูงสุด {{maximum}} จำกัดเวลา {{minutes}} นาที มีค่าบริการแม้การสร้างจะไม่สำเร็จ",
     "enable": "เปิดใช้สรุปแบบชำระเงิน",
@@ -4959,11 +4876,7 @@
     "metadataFailureProvider": "ข้อผิดพลาดผู้ให้บริการ",
     "metadataFailureTool": "ข้อผิดพลาดเครื่องมือ",
     "metadataStopped": "รอบล่าสุดถูกหยุด",
-    "metadataFailureOther": "ข้อผิดพลาดที่ไม่ระบุ",
-    "metadataPlan_one": "แผน: เสร็จแล้ว {{displayDone}} จาก {{displayTotal}} ขั้นตอน",
-    "metadataFiles_one": "{{displayCount}} ไฟล์ที่เปลี่ยนแปลง",
-    "metadataLinesAdded_one": "เพิ่ม {{displayCount}} บรรทัด",
-    "metadataLinesRemoved_one": "ลบ {{displayCount}} บรรทัด"
+    "metadataFailureOther": "ข้อผิดพลาดที่ไม่ระบุ"
   },
   "systemSearch": {
     "couldNotOpenResult": "ไม่สามารถเปิดผลการค้นหานี้ได้"

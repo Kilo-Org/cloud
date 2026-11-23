@@ -17,12 +17,12 @@ import { formatNumber } from '@/lib/format';
  * multi-step plan, a finished plan, and a single-step plan.
  */
 
-interface LocaleCase {
+type LocaleCase = {
   readonly tag: string;
   readonly render: (done: string, total: string) => string;
   /** A plan with a single step names that step in the singular in some locales. */
   readonly renderOne?: (done: string, total: string) => string;
-}
+};
 
 const locales: readonly LocaleCase[] = [
   {

@@ -4799,7 +4799,6 @@
       "deductionFallback": "ניכוי קרדיטים",
       "emptyDescription": "רכישות קרדיטים, קבלות ושימוש יופיעו כאן.",
       "emptyTitle": "אין היסטוריית קרדיטים",
-      "expiredGrant": "פג התוקף: {{description}}",
       "expiredStatus": "פג התוקף",
       "googlePlayReceipt": "קבלה מ-Google Play",
       "kind": {
@@ -4827,7 +4826,6 @@
       "receiptA11y": "פתיחת הקבלה עבור {{description}}, {{amount}}, מתאריך {{date}}",
       "receiptUnavailable": "אין קבלה זמינה עבור רכישה זו.",
       "retentionLimit": "מוצגת היסטוריית הקרדיטים העדכנית ביותר.",
-      "voidedGrant": "בוטל: {{description}}",
       "voidedStatus": "בוטל"
     },
     "title": "קניית קרדיטים",

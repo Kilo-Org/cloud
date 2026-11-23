@@ -4714,7 +4714,6 @@
       "deductionFallback": "Ka-goynta kiredit-ka",
       "emptyDescription": "Iibsiyada kiredit-ka, rasiidhada, iyo isticmaalka halkan ayay ka muuqan doonaan.",
       "emptyTitle": "Ma jirto taariikh kiredit",
-      "expiredGrant": "Waqtigiisu dhacay: {{description}}",
       "expiredStatus": "Waqtigiisu dhacay",
       "googlePlayReceipt": "Rasiid ka yimid Google Play",
       "kind": {
@@ -4742,7 +4741,6 @@
       "receiptA11y": "Fur rasiidka {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Iibsashadan rasiid looma hayo.",
       "retentionLimit": "Waxaa la muujinayaa taariikhda kireditka ugu dambeysa.",
-      "voidedGrant": "La buriyay: {{description}}",
       "voidedStatus": "La buriyay"
     },
     "title": "Iibso lacag adeeg",

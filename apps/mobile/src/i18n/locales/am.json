@@ -4714,7 +4714,6 @@
       "deductionFallback": "የክሬዲት ቅነሳ",
       "emptyDescription": "የክሬዲት ግዢዎች፣ ደረሰኞች እና አጠቃቀም እዚህ ይታያሉ።",
       "emptyTitle": "የክሬዲት ታሪክ የለም",
-      "expiredGrant": "ጊዜው አልፏል፦ {{description}}",
       "expiredStatus": "ጊዜው አልፏል",
       "googlePlayReceipt": "ደረሰኝ ከGoogle Play",
       "kind": {
@@ -4742,7 +4741,6 @@
       "receiptA11y": "የ{{description}}፣ {{amount}}፣ ከ{{date}} ደረሰኝን ክፈት",
       "receiptUnavailable": "ለዚህ ግዢ ደረሰኝ አይገኝም።",
       "retentionLimit": "የቅርብ ጊዜ የክሬዲት ታሪክን በማሳየት ላይ።",
-      "voidedGrant": "ተሰርዟል፦ {{description}}",
       "voidedStatus": "ተሰርዟል"
     },
     "title": "ክሬዲት ይግዙ",

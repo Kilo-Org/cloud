@@ -27,9 +27,10 @@ export const usage = '<email>';
  *   with a body that runs past three lines.
  * - provider keys: an Anthropic key and an OpenAI key, both wrapped by the
  *   local `byok-kms` service with a placeholder secret upstream rejects.
- * - credit history: two paid purchases, an expiring grant with its expiry row,
- *   a welcome grant that still expires and an open-ended referral grant, and
- *   one usage deduction, so the purchase list and the ledger both have rows.
+ * - credit history: two paid purchases, a paid top-up that already expired with
+ *   the expiry row that closed it, an expiring grant with its expiry row, a
+ *   welcome grant that still expires and an open-ended referral grant, and one
+ *   usage deduction, so the purchase list and the ledger both have rows.
  *
  * Two screens need no seed for their empty state, and two cannot be seeded: a
  * fresh account already shows the empty blocked-people list and the empty
@@ -43,13 +44,16 @@ export const usage = '<email>';
  * negative rows (`buildCreditHistoryItems` merges the three sources). An expired
  * grant appears through the expiry row that closes it: that grant is seeded with
  * a past expiry date and an expiry row that names it, which is the shape
- * `computeExpiration` writes. The welcome grant carries a live expiry date, as
- * the category's own 30-day term writes it, so its row prints when it runs out;
- * the referral grant has no term, so its row prints the date alone. Neither
- * unspent grant has an expiry row closing it, so both are rows of their own. The
- * ledger-cache reconciliation row is seeded too, with the shape
- * `recompute-balances` writes, so the list shows the one positive free row the
- * history labels as an adjustment instead of a grant.
+ * `computeExpiration` writes. A paid top-up that has already run out pairs the
+ * same way, and its ledger row reads as that purchase row's status line: an
+ * indented, muted line naming only the status, the amount, and the type. The
+ * welcome grant carries a live expiry date, as the category's own 30-day term
+ * writes it, so its row prints when it runs out; the referral grant has no
+ * term, so its row prints the date alone. Neither unspent grant has an expiry
+ * row closing it, so both are rows of their own. The ledger-cache
+ * reconciliation row is seeded too, with the shape `recompute-balances` writes,
+ * so the list shows the one positive free row the history labels as an
+ * adjustment instead of a grant.
  *
  * The passkey rows carry generated credential ids and a placeholder COSE key:
  * they render in the list, and the device cannot sign in with them, because
@@ -65,7 +69,7 @@ export const usage = '<email>';
  *
  * A rerun deletes the rows this topic owns — the two derived passkey credential
  * ids, the four moderation logins, the five idempotency keys, the two derived
- * provider ids and the eight credit transaction ids — then inserts them again.
+ * provider ids and the fourteen credit transaction ids — then inserts them again.
  */
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
@@ -96,6 +100,8 @@ const CREDIT_KEYS = [
   'program-grant-expiry',
   'voided-grant',
   'voided-grant-row',
+  'expired-purchase',
+  'expired-purchase-expiry',
 ] as const;
 
 /** Stable UUID for one account's fixture key: a rerun replaces the same rows. */
@@ -371,6 +377,12 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   // a legacy usage deduction has no source.
   const firstPurchaseAt = iso(-40 * DAY_MS);
   const secondPurchaseAt = iso(-12 * DAY_MS);
+  // A top-up bought eight days ago and left unspent reads as the expired paid
+  // pair the design gate must show. The fixture compresses the one-year paid
+  // term so the purchase row and its status line fit one screen: the list
+  // sorts the pair by the grant's own date, so both land near the top.
+  const expiredPurchaseAt = iso(-8 * DAY_MS);
+  const expiredPurchaseExpiryAt = iso(-1 * DAY_MS);
   await db.insert(credit_transactions).values([
     {
       id: creditIds[0],
@@ -504,13 +516,43 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       credit_source: 'promotion',
       created_at: iso(-30 * DAY_MS),
     },
+    // A paid top-up that has already run out: the purchase list still lists it
+    // (a Stripe description, a payment id, not free), and the expiry row that
+    // closed it points back through `original_transaction_id` and carries the
+    // grant's own expiry date as its `created_at`, the shape
+    // `computeExpiration` writes. The client paints that row as the purchase
+    // row's status line, directly under it.
+    {
+      id: creditIds[12],
+      kilo_user_id: userId,
+      amount_microdollars: 8_000_000,
+      is_free: false,
+      description: 'Top-up via stripe',
+      credit_source: 'stripe',
+      stripe_payment_id: seedPaymentId(userId, 'expired-purchase'),
+      paid_credit_policy: 'one_year',
+      expiry_date: expiredPurchaseExpiryAt,
+      created_at: expiredPurchaseAt,
+    },
+    {
+      id: creditIds[13],
+      kilo_user_id: userId,
+      amount_microdollars: -3_000_000,
+      is_free: false,
+      description: 'Expired: Top-up via stripe',
+      credit_category: 'credits_expired',
+      original_transaction_id: creditIds[12],
+      credit_source: 'stripe',
+      created_at: expiredPurchaseExpiryAt,
+    },
   ]);
 
   console.log('This fixture represents:');
   console.log('  Passkeys, blocked and muted people, recorded notifications, two provider keys');
-  console.log('  and a credit ledger with purchases, an expired campaign grant, a program');
-  console.log('  grant with its own expiry, a voided program grant, an unspent grant that');
-  console.log('  still expires, and a deduction.');
+  console.log('  and a credit ledger with purchases, an expired paid top-up and its');
+  console.log('  closure row, an expired campaign grant, a program grant with its own');
+  console.log('  expiry, a voided program grant, an unspent grant that still expires, and');
+  console.log('  a deduction.');
   console.log('  The passkey rows list but cannot sign in: no device holds their private key.');
   console.log('The empty states of the blocked-people and passkey lists need no seed: a fresh');
   console.log('account already shows them. Data export needs the cloud-data-export-ui release');

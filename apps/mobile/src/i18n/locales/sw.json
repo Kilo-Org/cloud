@@ -4714,7 +4714,6 @@
       "deductionFallback": "Makato ya salio",
       "emptyDescription": "Ununuzi wa salio, risiti na matumizi vitaonekana hapa.",
       "emptyTitle": "Hakuna historia ya salio",
-      "expiredGrant": "Muda wake umeisha: {{description}}",
       "expiredStatus": "Muda wake umeisha",
       "googlePlayReceipt": "Risiti kutoka Google Play",
       "kind": {
@@ -4742,7 +4741,6 @@
       "receiptA11y": "Fungua risiti ya {{description}}, {{amount}}, kutoka {{date}}",
       "receiptUnavailable": "Hakuna risiti ya ununuzi huu.",
       "retentionLimit": "Inaonyesha historia ya salio ya hivi karibuni.",
-      "voidedGrant": "Imebatilishwa: {{description}}",
       "voidedStatus": "Imebatilishwa"
     },
     "title": "Nunua salio",

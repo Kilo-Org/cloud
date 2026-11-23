@@ -4799,7 +4799,6 @@
       "deductionFallback": "Oduzimanje kredita",
       "emptyDescription": "Ovdje će se prikazivati kupnje kredita, računi i potrošnja.",
       "emptyTitle": "Nema povijesti kredita",
-      "expiredGrant": "Isteklo: {{description}}",
       "expiredStatus": "Isteklo",
       "googlePlayReceipt": "Račun iz trgovine Google Play",
       "kind": {
@@ -4827,7 +4826,6 @@
       "receiptA11y": "Otvori račun za {{description}}, {{amount}}, od {{date}}",
       "receiptUnavailable": "Račun za ovu kupnju nije dostupan.",
       "retentionLimit": "Prikazuje se najnovija povijest kredita.",
-      "voidedGrant": "Poništeno: {{description}}",
       "voidedStatus": "Poništeno"
     },
     "title": "Kupi kredite",

@@ -4969,7 +4969,6 @@
       "deductionFallback": "Asbhaint chreidmheasa",
       "emptyDescription": "Taispeánfar ceannacháin chreidmheasa, admhálacha agus úsáid anseo.",
       "emptyTitle": "Gan stair chreidmheasa",
-      "expiredGrant": "Imithe in éag: {{description}}",
       "expiredStatus": "Imithe in éag",
       "googlePlayReceipt": "Admháil ó Google Play",
       "kind": {
@@ -4997,7 +4996,6 @@
       "receiptA11y": "Oscail an admháil do {{description}}, {{amount}}, ó {{date}}",
       "receiptUnavailable": "Níl admháil ar fáil don cheannach seo.",
       "retentionLimit": "Taispeántar an stair chreidmheasa is déanaí.",
-      "voidedGrant": "Cealaithe: {{description}}",
       "voidedStatus": "Cealaithe"
     },
     "title": "Ceannaigh creidmheasanna",

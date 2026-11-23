@@ -4799,7 +4799,6 @@
       "deductionFallback": "Déduction de crédits",
       "emptyDescription": "Vos achats de crédits, reçus et consommations apparaîtront ici.",
       "emptyTitle": "Aucun historique de crédits",
-      "expiredGrant": "Expiré : {{description}}",
       "expiredStatus": "Expiré",
       "googlePlayReceipt": "Reçu disponible sur Google Play",
       "kind": {
@@ -4827,7 +4826,6 @@
       "receiptA11y": "Ouvrir le reçu pour {{description}}, {{amount}}, du {{date}}",
       "receiptUnavailable": "Aucun reçu n'est disponible pour cet achat.",
       "retentionLimit": "Affichage de l'historique de crédits le plus récent.",
-      "voidedGrant": "Annulé : {{description}}",
       "voidedStatus": "Annulé"
     },
     "title": "Acheter des crédits",

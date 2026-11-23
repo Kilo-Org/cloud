@@ -131,19 +131,9 @@ function grantTitle(t: TFunction, reason: CreditGrantReason): string {
 }
 
 /**
- * The line that names an expiry as the whole event. Only a grant that already
- * has its own purchase row above reaches it, and that row carries the grant's
- * title, so the line has to name what ran out itself.
- */
-const EXPIRY_TITLE_KEYS = {
-  expired: 'credits.history.expiredGrant',
-  voided: 'credits.history.voidedGrant',
-} satisfies Record<NonNullable<CreditDeduction['expiry']>, string>;
-
-/**
- * The status alone, for the muted line under the grant it closed: the grant's
- * own title sits directly above, so repeating the name would read as a second
- * grant.
+ * The status alone, for the muted line that names what happened to the grant
+ * the row above paints: that row carries the grant's own title, so repeating
+ * the name would read as a second grant.
  */
 const EXPIRY_STATUS_KEYS = {
   expired: 'credits.history.expiredStatus',
@@ -307,11 +297,20 @@ function LedgerLine({
 }
 
 /**
- * One ledger event: a grant (a purchase, a bonus, a Kilo Pass month), a
- * deduction, an adjustment, or a balance-neutral settlement. A grant whose
- * expiry closed it reads as one event, with the expiry as its second line —
- * unless the grant already has its own purchase row above, in which case this
- * row reads as the expiry alone.
+ * One ledger event, in one of three shapes.
+ *
+ * A grant whose paid purchase row is already on screen paints that row's
+ * status line alone: an indented, muted line carrying `Expired` or `Voided`,
+ * the amount it took back, and the type caption. The purchase row above names
+ * the grant, so this row never repeats it, and it sorts directly under it.
+ *
+ * A grant the screen does not list as a purchase is one row of its own: the
+ * grant's title on the main line, and the muted status line under it when the
+ * deduction names an expiry or a voidance.
+ *
+ * Every other ledger row — a usage charge, an adjustment, a balance-neutral
+ * settlement, or an expiry whose grant is not loaded — is a plain row titled
+ * from the catalog entry its reason names, falling back to the ledger's text.
  */
 export const LedgerHistoryRow = memo(function LedgerHistoryRow({
   deduction,
@@ -322,7 +321,6 @@ export const LedgerHistoryRow = memo(function LedgerHistoryRow({
   // The purchase row carries the grant, its receipt, and its expiry date, so a
   // grant printed again here would read as a second purchase.
   const grant = deduction.purchase;
-  const purchase = grantListed ? null : grant;
   // The grant's own name: a free grant is titled from the reason the server
   // recorded, so the row reads in the reader's language, while a paid grant
   // keeps the description its receipts record. An empty stored description
@@ -337,37 +335,32 @@ export const LedgerHistoryRow = memo(function LedgerHistoryRow({
     deduction.description,
     t('credits.history.deductionFallback')
   );
-  // Only a row whose own category is an expiry or a voidance, and whose grant
-  // is loaded, gets the framed line: anything else keeps the ledger's own
-  // description, which already names what happened. A voided grant was
-  // cancelled rather than left to run out, so it never reads as expired. This
-  // full form is the main title below, where no grant title sits beside it.
-  const expiryTitle =
-    deduction.expiry == null || grant == null
-      ? null
-      : t(lookup(EXPIRY_TITLE_KEYS, deduction.expiry) ?? 'credits.history.expiredGrant', {
-          description: firstNonEmpty(grantName, storedDescription),
-        });
   // The muted line sits under the grant's own title, so it carries the status
   // alone: repeating the name there would paint the same grant twice.
   const expiryStatus =
     deduction.expiry == null
       ? null
       : t(lookup(EXPIRY_STATUS_KEYS, deduction.expiry) ?? 'credits.history.expiredStatus');
-  // A paid grant keeps the description its receipt records, but an empty one
-  // still names the row.
+  const rowClassName = cn('gap-2 px-4 py-3', !last && 'border-b-[0.5px] border-hair-soft');
+
+  // A listed grant's row is its purchase row's status line: the purchase above
+  // already names the grant, the receipt and the purchase date, so this paints
+  // only what happened to it. Without an expiry there is no status to paint, so
+  // that case keeps the single main line below instead of an empty row.
+  const statusTitle = grantListed && expiryStatus != null ? expiryStatus : null;
+  // A grant this screen does not list as a purchase is the row's own subject,
+  // so its title stays on the main line and the muted line follows it.
+  const purchase = grantListed ? null : grant;
   const rowTitle = firstNonEmpty(grantName, deductionTitle(t, deduction), storedDescription);
-  // Alone, the expiry line is the whole event: the grant it ended already has
-  // its own purchase row above.
-  const mainTitle = purchase != null ? rowTitle : (expiryTitle ?? rowTitle);
 
   return (
-    <View className={cn('gap-2 px-4 py-3', !last && 'border-b-[0.5px] border-hair-soft')}>
+    <View className={rowClassName}>
       <LedgerLine
-        title={mainTitle}
+        title={statusTitle ?? rowTitle}
         typeLabel={purchase ? grantTypeLabel(t, purchase) : deductionTypeLabel(t, deduction.kind)}
         amountMicrodollars={purchase ? purchase.amount_mUsd : deduction.amount_mUsd}
-        date={purchase?.date ?? deduction.date}
+        date={statusTitle != null ? null : (purchase?.date ?? deduction.date)}
+        muted={statusTitle != null}
       />
       {purchase != null && (
         <LedgerLine

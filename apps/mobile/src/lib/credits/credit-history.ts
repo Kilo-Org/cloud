@@ -107,8 +107,9 @@ export type CreditHistoryItem =
       readonly sortDate: string;
       /**
        * True when the paid grant this row belongs to is already on screen as
-       * its own purchase row. The row then prints only the event it records
-       * (an expiry) instead of that grant a second time.
+       * its own purchase row. The row then paints that purchase's status line
+       * (an expiry or a voidance) instead of the grant a second time, and sorts
+       * directly under the purchase at the same instant.
        */
       readonly grantListed: boolean;
     }
@@ -142,9 +143,10 @@ function sortTimeOf(value: string): number {
  * than the oldest loaded purchase still sorts above it; the two sources cannot
  * disagree on a timestamp because both are stored on the same credit row. A
  * ledger row whose grant already has its purchase row is flagged so the row
- * prints the expiry alone, and the purchase stays one row. A grant whose expiry
- * row already prints it is likewise left out here, so every existing purchase
- * and deduction row keeps its rendering.
+ * paints that purchase's status line, at the same instant and directly under
+ * it, while the purchase stays one row. A grant whose expiry row already prints
+ * it is likewise left out here, so every existing purchase and deduction row
+ * keeps its rendering.
  */
 export function buildCreditHistoryItems(
   purchases: readonly CreditPurchaseEntry[],
@@ -192,6 +194,15 @@ export function buildCreditHistoryItems(
     const atB = sortTimeOf(b.sortDate);
     if (atA !== atB) {
       return atB - atA;
+    }
+    // A listed grant's ledger row is that purchase row's status line, so it
+    // has to read directly under the purchase and never above it: the two
+    // share an instant, and the ledger's key would otherwise sort first. Every
+    // other row keeps rank 0, so no other pair on one timestamp changes order.
+    const rankA = a.kind === 'ledger' && a.grantListed ? 1 : 0;
+    const rankB = b.kind === 'ledger' && b.grantListed ? 1 : 0;
+    if (rankA !== rankB) {
+      return rankA - rankB;
     }
     // A deterministic order for two rows that share a timestamp (or whose time
     // does not parse), so a refetch cannot reshuffle them under the reader.

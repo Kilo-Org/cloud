@@ -4799,7 +4799,6 @@
       "deductionFallback": "Odbitak kredita",
       "emptyDescription": "Kupovine kredita, potvrde i potrošnja pojavit će se ovdje.",
       "emptyTitle": "Nema historije kredita",
-      "expiredGrant": "Isteklo: {{description}}",
       "expiredStatus": "Isteklo",
       "googlePlayReceipt": "Potvrda iz trgovine Google Play",
       "kind": {
@@ -4827,7 +4826,6 @@
       "receiptA11y": "Otvori potvrdu za {{description}}, {{amount}}, od {{date}}",
       "receiptUnavailable": "Potvrda nije dostupna za ovu kupovinu.",
       "retentionLimit": "Prikazuje se najnovija historija kredita.",
-      "voidedGrant": "Poništeno: {{description}}",
       "voidedStatus": "Poništeno"
     },
     "title": "Kupi kredite",

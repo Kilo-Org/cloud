@@ -4634,7 +4634,6 @@
       "deductionFallback": "크레딧 차감",
       "emptyDescription": "크레딧 구매, 영수증 및 사용 내역이 여기에 표시됩니다.",
       "emptyTitle": "크레딧 내역 없음",
-      "expiredGrant": "만료됨: {{description}}",
       "expiredStatus": "만료됨",
       "googlePlayReceipt": "Google Play 영수증",
       "kind": {
@@ -4662,7 +4661,6 @@
       "receiptA11y": "{{description}}, {{amount}}, {{date}} 영수증 열기",
       "receiptUnavailable": "이 구매에 대한 영수증이 없습니다.",
       "retentionLimit": "최근 크레딧 기록을 표시합니다.",
-      "voidedGrant": "무효 처리됨: {{description}}",
       "voidedStatus": "무효 처리됨"
     },
     "title": "크레딧 구매",

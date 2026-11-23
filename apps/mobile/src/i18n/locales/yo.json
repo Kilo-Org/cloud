@@ -4642,7 +4642,6 @@
       "deductionFallback": "Ìyọkúrò kírẹ́dítì",
       "emptyDescription": "Àwọn ìrajà kírẹ́dítì, ìwé ẹ̀rí ìsanwó, àti ìlò yóò hàn níbí.",
       "emptyTitle": "Kò sí ìtàn kírẹ́dítì",
-      "expiredGrant": "Àkókò ti kọjá: {{description}}",
       "expiredStatus": "Àkókò ti kọjá",
       "googlePlayReceipt": "Ìwé ẹ̀rí ìsanwó láti Google Play",
       "kind": {
@@ -4670,7 +4669,6 @@
       "receiptA11y": "Ṣí ìwé ẹ̀rí ìsanwó fún {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Kò sí ìwé ẹ̀rí ìsanwó fún ìrajà yìí.",
       "retentionLimit": "Ń ṣàfihàn ìtàn kírẹ́dítì tuntun jùlọ.",
-      "voidedGrant": "A ti fagilé: {{description}}",
       "voidedStatus": "A ti fagilé"
     },
     "title": "Ra kírẹ́dítì",

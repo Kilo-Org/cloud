@@ -4714,7 +4714,6 @@
       "deductionFallback": "Dedución de créditos",
       "emptyDescription": "As compras de créditos, os recibos e o uso aparecerán aquí.",
       "emptyTitle": "Sen historial de créditos",
-      "expiredGrant": "Caducado: {{description}}",
       "expiredStatus": "Caducado",
       "googlePlayReceipt": "Recibo de Google Play",
       "kind": {
@@ -4742,7 +4741,6 @@
       "receiptA11y": "Abrir o recibo de {{description}}, {{amount}}, do {{date}}",
       "receiptUnavailable": "Non hai ningún recibo dispoñible para esta compra.",
       "retentionLimit": "Mostrando o historial de créditos máis recente.",
-      "voidedGrant": "Anulado: {{description}}",
       "voidedStatus": "Anulado"
     },
     "title": "Mercar créditos",

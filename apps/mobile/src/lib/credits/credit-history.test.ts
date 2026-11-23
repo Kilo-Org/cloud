@@ -122,6 +122,61 @@ describe('buildCreditHistoryItems', () => {
     expect(items.map(item => item.key)).toEqual(['ledger:a', 'purchase:b']);
   });
 
+  it('sorts a listed grant status line directly under its purchase row', () => {
+    // Both rows carry the grant's own instant, and the ledger key sorts before
+    // the purchase key; the row that paints the purchase's status has to follow
+    // it anyway, so the pair reads as one event.
+    const items = buildCreditHistoryItems(
+      [purchase({ id: 'p1', date: '2026-01-01T00:00:00.000Z' })],
+      [
+        deduction({
+          id: 'expiry',
+          date: '2026-06-01T00:00:00.000Z',
+          kind: 'adjustment',
+          purchase: {
+            id: 'p1',
+            date: '2026-01-01T00:00:00.000Z',
+            description: 'Top-up via stripe',
+            amount_mUsd: 20_000_000,
+            is_free: false,
+            credit_source: 'stripe',
+            kind: 'promotional',
+          },
+        }),
+      ],
+      []
+    );
+
+    expect(items.map(item => item.key)).toEqual(['purchase:p1', 'ledger:expiry']);
+  });
+
+  it('keeps the key order for an expiry whose grant is not listed', () => {
+    // Only a listed grant's status line moves: an unlisted expiry, whose row
+    // prints the grant itself, keeps the key order it always had.
+    const items = buildCreditHistoryItems(
+      [purchase({ id: 'b', date: '2026-01-01T00:00:00.000Z' })],
+      [
+        deduction({
+          id: 'a',
+          date: '2026-01-01T00:00:00.000Z',
+          kind: 'adjustment',
+          purchase: {
+            id: 'free-grant',
+            date: '2026-01-01T00:00:00.000Z',
+            description: 'Welcome credits',
+            amount_mUsd: 5_000_000,
+            is_free: true,
+            credit_source: null,
+            kind: 'welcome',
+          },
+        }),
+      ],
+      []
+    );
+
+    expect(items.map(item => item.key)).toEqual(['ledger:a', 'purchase:b']);
+  });
+
   it('returns nothing for an account with no history', () => {
     expect(buildCreditHistoryItems([], [], [])).toEqual([]);
   });

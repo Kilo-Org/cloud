@@ -4816,7 +4816,6 @@
       "deductionFallback": "Credit deduction",
       "emptyDescription": "Credit purchases, receipts, and usage will appear here.",
       "emptyTitle": "No credit history",
-      "expiredGrant": "Expired: {{description}}",
       "expiredStatus": "Expired",
       "googlePlayReceipt": "Receipt from Google Play",
       "kind": {
@@ -4844,7 +4843,6 @@
       "receiptA11y": "Open the receipt for {{description}}, {{amount}}, from {{date}}",
       "receiptUnavailable": "A receipt is not available for this purchase.",
       "retentionLimit": "Showing the most recent credit history.",
-      "voidedGrant": "Voided: {{description}}",
       "voidedStatus": "Voided"
     },
     "title": "Buy credits",

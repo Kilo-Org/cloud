@@ -4884,7 +4884,6 @@
       "deductionFallback": "Списання кредитів",
       "emptyDescription": "Тут з’являтимуться покупки кредитів, квитанції та використання.",
       "emptyTitle": "Історії кредитів немає",
-      "expiredGrant": "Термін дії минув: {{description}}",
       "expiredStatus": "Термін дії минув",
       "googlePlayReceipt": "Квитанція в Google Play",
       "kind": {
@@ -4912,7 +4911,6 @@
       "receiptA11y": "Відкрити квитанцію для {{description}}, {{amount}}, від {{date}}",
       "receiptUnavailable": "Квитанція для цієї покупки недоступна.",
       "retentionLimit": "Показано найновішу історію кредитів.",
-      "voidedGrant": "Анульовано: {{description}}",
       "voidedStatus": "Анульовано"
     },
     "title": "Купити кредити",

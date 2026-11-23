@@ -4714,7 +4714,6 @@
       "deductionFallback": "கிரெடிட் கழிவு",
       "emptyDescription": "கிரெடிட் வாங்குதல்கள், ரசீதுகள் மற்றும் பயன்பாடு இங்கே தோன்றும்.",
       "emptyTitle": "கிரெடிட் வரலாறு இல்லை",
-      "expiredGrant": "காலாவதியானது: {{description}}",
       "expiredStatus": "காலாவதியானது",
       "googlePlayReceipt": "Google Play-இலிருந்து ரசீது",
       "kind": {
@@ -4742,7 +4741,6 @@
       "receiptA11y": "{{description}}, {{amount}}, {{date}}-க்கான ரசீதைத் திற",
       "receiptUnavailable": "இந்த வாங்குதலுக்கு ரசீது கிடைக்கவில்லை.",
       "retentionLimit": "மிகச் சமீபத்திய கிரெடிட் வரலாறு காட்டப்படுகிறது.",
-      "voidedGrant": "ரத்து செய்யப்பட்டது: {{description}}",
       "voidedStatus": "ரத்து செய்யப்பட்டது"
     },
     "title": "கிரெடிட்களை வாங்கவும்",

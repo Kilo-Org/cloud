@@ -4714,7 +4714,6 @@
       "deductionFallback": "لێبڕینی کرێدیت",
       "emptyDescription": "کڕین، پسوولە و بەکارهێنانی کرێدیت لێرە دەردەکەون.",
       "emptyTitle": "هیچ مێژوویەکی کرێدیت نییە",
-      "expiredGrant": "بەسەرچوو: {{description}}",
       "expiredStatus": "بەسەرچوو",
       "googlePlayReceipt": "پسوولە لە Google Play",
       "kind": {
@@ -4742,7 +4741,6 @@
       "receiptA11y": "کردنەوەی پسوولەی {{description}}، {{amount}}، لە {{date}}",
       "receiptUnavailable": "هیچ پسوولەیەک بۆ ئەم کڕینە بەردەست نییە.",
       "retentionLimit": "نوێترین مێژووی کرێدیت پیشان دەدرێت.",
-      "voidedGrant": "پووچەڵ کراوە: {{description}}",
       "voidedStatus": "پووچەڵ کراوە"
     },
     "title": "کرێدیت بکڕە",

@@ -4639,7 +4639,6 @@
       "deductionFallback": "Pengurangan kredit",
       "emptyDescription": "Pembelian kredit, tanda terima, dan penggunaan akan muncul di sini.",
       "emptyTitle": "Tidak ada riwayat kredit",
-      "expiredGrant": "Kedaluwarsa: {{description}}",
       "expiredStatus": "Kedaluwarsa",
       "googlePlayReceipt": "Tanda terima dari Google Play",
       "kind": {
@@ -4667,7 +4666,6 @@
       "receiptA11y": "Buka tanda terima untuk {{description}}, {{amount}}, dari {{date}}",
       "receiptUnavailable": "Tanda terima tidak tersedia untuk pembelian ini.",
       "retentionLimit": "Menampilkan riwayat kredit terbaru.",
-      "voidedGrant": "Dibatalkan: {{description}}",
       "voidedStatus": "Dibatalkan"
     },
     "title": "Beli kredit",

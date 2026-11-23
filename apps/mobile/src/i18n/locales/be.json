@@ -4884,7 +4884,6 @@
       "deductionFallback": "Спісанне крэдытаў",
       "emptyDescription": "Тут будуць адлюстроўвацца пакупкі крэдытаў, чэкі і выкарыстанне.",
       "emptyTitle": "Гісторыі крэдытаў няма",
-      "expiredGrant": "Тэрмін дзеяння скончыўся: {{description}}",
       "expiredStatus": "Тэрмін дзеяння скончыўся",
       "googlePlayReceipt": "Чэк у Google Play",
       "kind": {
@@ -4912,7 +4911,6 @@
       "receiptA11y": "Адкрыць чэк: {{description}}, {{amount}}, ад {{date}}",
       "receiptUnavailable": "Чэк для гэтай пакупкі недаступны.",
       "retentionLimit": "Паказваецца самая апошняя гісторыя крэдытаў.",
-      "voidedGrant": "Ануляваны: {{description}}",
       "voidedStatus": "Ануляваны"
     },
     "title": "Купіць крэдыты",

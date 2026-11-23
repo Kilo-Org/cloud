@@ -4636,7 +4636,6 @@
       "deductionFallback": "ការកាត់ក្រេឌីត",
       "emptyDescription": "ការទិញក្រេឌីត បង្កាន់ដៃ និងការប្រើប្រាស់នឹងបង្ហាញនៅទីនេះ។",
       "emptyTitle": "គ្មានប្រវត្តិក្រេឌីត",
-      "expiredGrant": "បានផុតកំណត់៖ {{description}}",
       "expiredStatus": "បានផុតកំណត់",
       "googlePlayReceipt": "បង្កាន់ដៃពី Google Play",
       "kind": {
@@ -4664,7 +4663,6 @@
       "receiptA11y": "បើកបង្កាន់ដៃសម្រាប់ {{description}}, {{amount}}, ពី {{date}}",
       "receiptUnavailable": "មិនមានបង្កាន់ដៃសម្រាប់ការទិញនេះទេ។",
       "retentionLimit": "បង្ហាញប្រវត្តិឥណទានថ្មីៗបំផុត។",
-      "voidedGrant": "បានលុបចោល៖ {{description}}",
       "voidedStatus": "បានលុបចោល"
     },
     "title": "ទិញឥណទាន",

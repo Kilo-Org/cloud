@@ -4714,7 +4714,6 @@
       "deductionFallback": "क्रेडिट कटौती",
       "emptyDescription": "क्रेडिट खरिद, रसिद र प्रयोग यहाँ देखिनेछन्।",
       "emptyTitle": "कुनै क्रेडिट इतिहास छैन",
-      "expiredGrant": "म्याद सकियो: {{description}}",
       "expiredStatus": "म्याद सकियो",
       "googlePlayReceipt": "Google Play बाट रसिद",
       "kind": {
@@ -4742,7 +4741,6 @@
       "receiptA11y": "{{description}}, {{amount}}, {{date}} को रसिद खोल्नुहोस्",
       "receiptUnavailable": "यो खरिदको रसिद उपलब्ध छैन।",
       "retentionLimit": "सबैभन्दा पछिल्लो क्रेडिट इतिहास देखाइँदै छ।",
-      "voidedGrant": "रद्द गरिएको: {{description}}",
       "voidedStatus": "रद्द गरिएको"
     },
     "title": "क्रेडिट किन्नुहोस्",

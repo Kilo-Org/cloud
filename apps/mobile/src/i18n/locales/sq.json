@@ -4714,7 +4714,6 @@
       "deductionFallback": "Zbritje kredish",
       "emptyDescription": "Blerjet e kredive, dëftesat dhe përdorimi do të shfaqen këtu.",
       "emptyTitle": "Nuk ka historik kredish",
-      "expiredGrant": "Skaduar: {{description}}",
       "expiredStatus": "Skaduar",
       "googlePlayReceipt": "Dëftesë nga Google Play",
       "kind": {
@@ -4742,7 +4741,6 @@
       "receiptA11y": "Hap dëftesën për {{description}}, {{amount}}, nga {{date}}",
       "receiptUnavailable": "Nuk ka dëftesë për këtë blerje.",
       "retentionLimit": "Po shfaqet historiku i kredive më i fundit.",
-      "voidedGrant": "Anuluar: {{description}}",
       "voidedStatus": "Anuluar"
     },
     "title": "Bli kredite",

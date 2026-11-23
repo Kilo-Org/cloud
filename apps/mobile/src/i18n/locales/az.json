@@ -3401,6 +3401,8 @@
     "voiceTranscriptionWho": "Cihazınız, seçdiyiniz transkripsiya modeli ilə Kilo Gateway və ya onlayn tanıma üçün Apple və ya Google.",
     "installAttributionPromptTitle": "Quraşdırma mənbəyini müəyyən etməyə icazə verilsin?",
     "installAttributionPromptMessage": "Kilo Apple-ın izləmə icazəsindən yalnız tətbiqi hansı kanal vasitəsilə tapdığını öyrənmək üçün istifadə edir. Sorğuların və söhbətlərin bunun üçün heç vaxt istifadə olunmur.",
+    "installAttributionRequestFailedTitle": "İzləmə tələbi göstərilə bilmədi",
+    "installAttributionRequestFailedMessage": "Kilo sistem tələbini göstərə bilmədi, buna görə quraşdırma mənbəyinin müəyyən edilməsi deaktiv qalır.",
     "what": "Nə",
     "why": "Niyə",
     "who": "Kim"

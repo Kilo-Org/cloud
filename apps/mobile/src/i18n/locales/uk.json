@@ -2915,6 +2915,8 @@
     "why": "Навіщо",
     "who": "Хто отримує дані",
     "installAttributionPromptMessage": "Kilo використовує дозвіл Apple на відстеження лише для того, щоб дізнатися, звідки ви прийшли. Ваші запити та розмови для цього ніколи не використовуються.",
+    "installAttributionRequestFailedTitle": "Не вдалося показати запит на відстеження",
+    "installAttributionRequestFailedMessage": "Kilo не вдалося показати системний запит, тому визначення джерела встановлення залишається вимкненим.",
     "installAttributionPromptTitle": "Дозволити визначення джерела встановлення?"
   },
   "prReview": {

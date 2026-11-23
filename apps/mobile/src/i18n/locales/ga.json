@@ -3590,6 +3590,8 @@
     "voiceTranscriptionWho": "Do ghléas, Kilo Gateway leis an tsamhail tras-scríofa a roghnaigh tú, nó Apple nó Google le haghaidh aithinte ar líne.",
     "installAttributionPromptTitle": "An gceadaíonn tú foinse na suiteála a aithint?",
     "installAttributionPromptMessage": "Ní úsáideann Kilo cead rianaithe Apple ach le foghlaim cén bealach a thug anseo thú. Ní úsáidtear do leideanna ná do chomhráite riamh.",
+    "installAttributionRequestFailedTitle": "Níorbh fhéidir an leid rianaithe a thaispeáint",
+    "installAttributionRequestFailedMessage": "Níorbh fhéidir le Kilo an leid chórais a thaispeáint, mar sin fanann aithint fhoinse na suiteála múchta.",
     "what": "Cad é",
     "why": "Cén fáth",
     "who": "Cé"

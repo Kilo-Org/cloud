@@ -3527,6 +3527,8 @@
     "voiceTranscriptionWho": "Jūsų įrenginys, Kilo Gateway su pasirinktu transkripcijos modeliu arba Apple ar Google atpažinimui internete.",
     "installAttributionPromptTitle": "Leisti nustatyti įdiegimo šaltinį?",
     "installAttributionPromptMessage": "Kilo naudoja Apple sekimo leidimą tik tam, kad sužinotų, per kurį kanalą radote programėlę. Jūsų užklausos ir pokalbiai tam niekada nenaudojami.",
+    "installAttributionRequestFailedTitle": "Nepavyko parodyti sekimo užklausos",
+    "installAttributionRequestFailedMessage": "Kilo nepavyko parodyti sistemos užklausos, todėl įdiegimo šaltinio nustatymas lieka išjungtas.",
     "what": "Kokie duomenys",
     "why": "Kam naudojami",
     "who": "Kas gauna"

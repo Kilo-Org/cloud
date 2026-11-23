@@ -1,4 +1,5 @@
 /* eslint-disable import/first -- mocks must be defined before the module under test is imported */
+/* eslint-disable max-lines -- one suite covers the pre-prompt, the request path, its retry and its cancellation against the same native and SecureStore harness */
 import { createElement, type FC } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -77,6 +78,21 @@ function getAlertButtons(): [AlertButton, AlertButton] {
   const buttons = call[2] as AlertButton[];
   expect(buttons).toHaveLength(2);
   return buttons as [AlertButton, AlertButton];
+}
+
+// Reads the failure alert that follows a rejected system-prompt request.
+function getFailureAlertButtons(): [AlertButton, AlertButton] {
+  expect(alertMock).toHaveBeenCalledTimes(2);
+  const call = alertMock.mock.calls[1] as unknown[];
+  expect(call[0]).toBe("Couldn't show the tracking prompt");
+  expect(call[1]).toBe("Kilo couldn't show the system prompt, so install attribution stays off.");
+  const buttons = call[2] as AlertButton[];
+  expect(buttons).toHaveLength(2);
+  const [cancelButton, retryButton] = buttons as [AlertButton, AlertButton];
+  expect(cancelButton.text).toBe('Cancel');
+  expect(cancelButton.style).toBe('cancel');
+  expect(retryButton.text).toBe('Retry');
+  return [cancelButton, retryButton];
 }
 
 // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
@@ -257,7 +273,8 @@ describe('useTrackingPermissionPrompt', () => {
     (renderer as unknown as TestRenderer.ReactTestRenderer).unmount();
   });
 
-  // Request failure: Sentry receives error; no rethrow or retry.
+  // Request failure: Sentry receives error; no rethrow, and the person gets a
+  // retry alert.
   it('reports errors to Sentry and does not rethrow when requestTrackingPermissionsAsync fails', async () => {
     getTrackingPermissionsAsync.mockResolvedValue({
       status: 'undetermined',
@@ -288,7 +305,113 @@ describe('useTrackingPermissionPrompt', () => {
         'error.operation': 'request_permission',
       },
     });
+    getFailureAlertButtons();
     renderer.unmount();
+  });
+
+  // Retry: the failure alert's Retry button runs the same request path again.
+  it('requests tracking permission again when Retry is pressed on the failure alert', async () => {
+    getTrackingPermissionsAsync.mockResolvedValue({
+      status: 'undetermined',
+    });
+    requestTrackingPermissionsAsync
+      .mockRejectedValueOnce(new Error('ATT request failed'))
+      .mockResolvedValueOnce({ status: 'granted' });
+
+    const renderer = mountHarness(true);
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const [, continueButton] = getAlertButtons();
+    await act(async () => {
+      continueButton.onPress?.();
+      await Promise.resolve();
+    });
+    expect(requestTrackingPermissionsAsync).toHaveBeenCalledOnce();
+
+    const [, retryButton] = getFailureAlertButtons();
+    await act(async () => {
+      retryButton.onPress?.();
+      await Promise.resolve();
+    });
+
+    expect(requestTrackingPermissionsAsync).toHaveBeenCalledTimes(2);
+    // A successful retry adds no alert of its own.
+    expect(alertMock).toHaveBeenCalledTimes(2);
+    renderer.unmount();
+  });
+
+  // The failure and cancel path remembers nothing: only Not now dismisses.
+  it('writes no dismissal preference when the request fails and Cancel is pressed', async () => {
+    getTrackingPermissionsAsync.mockResolvedValue({
+      status: 'undetermined',
+    });
+    requestTrackingPermissionsAsync.mockRejectedValue(new Error('ATT request failed'));
+
+    const renderer = mountHarness(true);
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const [, continueButton] = getAlertButtons();
+    await act(async () => {
+      continueButton.onPress?.();
+      await Promise.resolve();
+    });
+
+    const [cancelButton] = getFailureAlertButtons();
+    await act(async () => {
+      cancelButton.onPress?.();
+      await flushMicrotasks();
+    });
+
+    expect(setItemAsync).not.toHaveBeenCalledWith('tracking-prompt-dismissed', 'true');
+    expect(setItemAsync).not.toHaveBeenCalledWith('tracking-prompt-dismissed', 'false');
+    renderer.unmount();
+
+    // A fresh mount still shows the pre-prompt.
+    const remounted = mountHarness(true);
+    await act(async () => {
+      await flushMicrotasks();
+    });
+    expect(alertMock).toHaveBeenCalledTimes(3);
+    const freshCall = alertMock.mock.calls[2] as unknown[];
+    expect(freshCall[0]).toBe('Allow install attribution?');
+    remounted.unmount();
+  });
+
+  // Cancellation: a request that rejects after unmount shows no failure alert.
+  it('shows no failure alert when the request rejects after the harness unmounts', async () => {
+    getTrackingPermissionsAsync.mockResolvedValue({
+      status: 'undetermined',
+    });
+    const { promise: requestPromise, reject } = Promise.withResolvers<{ status: string }>();
+    requestTrackingPermissionsAsync.mockReturnValue(requestPromise);
+
+    const renderer = mountHarness(true);
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const [, continueButton] = getAlertButtons();
+    act(() => {
+      continueButton.onPress?.();
+    });
+    expect(requestTrackingPermissionsAsync).toHaveBeenCalledOnce();
+
+    act(() => {
+      renderer.unmount();
+    });
+
+    await act(async () => {
+      reject(new Error('ATT request failed'));
+      await flushMicrotasks();
+    });
+
+    expect(captureException).toHaveBeenCalledOnce();
+    // Only the pre-prompt alert was shown.
+    expect(alertMock).toHaveBeenCalledOnce();
   });
 
   // getTrackingPermissionsAsync failure: error reported to Sentry, no alert shown.

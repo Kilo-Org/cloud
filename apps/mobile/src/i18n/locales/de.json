@@ -2841,6 +2841,8 @@
     "why": "Warum",
     "who": "Wer",
     "installAttributionPromptMessage": "Kilo nutzt Apples Tracking-Berechtigung nur, um zu erfahren, über welchen Kanal du zur App gefunden hast. Deine Prompts und Unterhaltungen werden dafür niemals verwendet.",
+    "installAttributionRequestFailedTitle": "Tracking-Abfrage konnte nicht angezeigt werden",
+    "installAttributionRequestFailedMessage": "Kilo konnte die Systemabfrage nicht anzeigen, deshalb bleibt die Installationszuordnung ausgeschaltet.",
     "installAttributionPromptTitle": "Installationszuordnung erlauben?"
   },
   "prReview": {

@@ -3401,6 +3401,8 @@
     "voiceTranscriptionWho": "Zure gailua, Kilo Gateway aukeratutako transkripzio-ereduarekin, edo Apple edo Google lineako ezagutzarako.",
     "installAttributionPromptTitle": "Baimendu instalazioaren jatorria identifikatzea?",
     "installAttributionPromptMessage": "Kilo-k Apple-ren jarraipen-baimena hona zein kanalen bidez iritsi zaren jakiteko soilik erabiltzen du. Zure eskaerak eta elkarrizketak ez dira inoiz erabiltzen.",
+    "installAttributionRequestFailedTitle": "Ezin izan da jarraipen-eskaera erakutsi",
+    "installAttributionRequestFailedMessage": "Kilok ezin izan du sistemaren eskaera erakutsi, beraz instalazioaren jatorriaren identifikazioa itzalita geratzen da.",
     "what": "Zer",
     "why": "Zergatik",
     "who": "Nor"

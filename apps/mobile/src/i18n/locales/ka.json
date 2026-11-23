@@ -3401,6 +3401,8 @@
     "voiceTranscriptionWho": "თქვენი მოწყობილობა, Kilo Gateway თქვენ მიერ არჩეული ტრანსკრიფციის მოდელით, ან Apple ან Google ონლაინ ამოცნობისთვის.",
     "installAttributionPromptTitle": "დაშვებული იყოს ინსტალაციის წყაროს დადგენა?",
     "installAttributionPromptMessage": "Kilo Apple-ის თვალთვალის ნებართვას მხოლოდ იმის დასადგენად იყენებს, თუ რომელი არხიდან მოხვდით აქ. თქვენი მოთხოვნები და საუბრები ამ მიზნით არასდროს გამოიყენება.",
+    "installAttributionRequestFailedTitle": "თვალთვალის მოთხოვნის ჩვენება ვერ მოხერხდა",
+    "installAttributionRequestFailedMessage": "Kilo-მ სისტემური მოთხოვნის ჩვენება ვერ შეძლო, ამიტომ ინსტალაციის წყაროს დადგენა გამორთული რჩება.",
     "what": "რა",
     "why": "რატომ",
     "who": "ვინ"

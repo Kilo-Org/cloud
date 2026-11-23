@@ -2915,6 +2915,8 @@
     "why": "W jakim celu",
     "who": "Komu",
     "installAttributionPromptMessage": "Kilo korzysta ze zgody na śledzenie w systemie Apple wyłącznie do ustalenia źródła instalacji aplikacji. Nigdy nie wykorzystuje do tego twoich poleceń ani rozmów.",
+    "installAttributionRequestFailedTitle": "Nie udało się wyświetlić monitu o śledzenie",
+    "installAttributionRequestFailedMessage": "Kilo nie mogło wyświetlić monitu systemowego, więc ustalanie źródła instalacji pozostaje wyłączone.",
     "installAttributionPromptTitle": "Zezwolić na ustalenie źródła instalacji?"
   },
   "prReview": {

@@ -3401,6 +3401,8 @@
     "voiceTranscriptionWho": "آپ کی ڈیوائس، آپ کے منتخب کردہ ٹرانسکرپشن ماڈل کے ساتھ Kilo Gateway، یا آن لائن شناخت کے لیے Apple یا Google۔",
     "installAttributionPromptTitle": "انسٹالیشن کے ذریعے کی شناخت کی اجازت دیں؟",
     "installAttributionPromptMessage": "Kilo صرف یہ جاننے کے لیے Apple کی ٹریکنگ کی اجازت استعمال کرتا ہے کہ آپ کس ذریعے سے یہاں آئے۔ اس مقصد کے لیے آپ کے پرامپٹس اور گفتگو کبھی استعمال نہیں ہوتے۔",
+    "installAttributionRequestFailedTitle": "ٹریکنگ پرامپٹ نہیں دکھایا جا سکا",
+    "installAttributionRequestFailedMessage": "Kilo سسٹم پرامپٹ نہیں دکھا سکا، اس لیے انسٹالیشن کے ذریعے کی شناخت بند ہی رہتی ہے۔",
     "what": "کیا",
     "why": "کیوں",
     "who": "کون"

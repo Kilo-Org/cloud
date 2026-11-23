@@ -3401,6 +3401,8 @@
     "voiceTranscriptionWho": "Sinu seade, Kilo Gateway koos sinu valitud transkriptsioonimudeliga või Apple või Google veebipõhiseks tuvastuseks.",
     "installAttributionPromptTitle": "Kas lubada paigaldusallika tuvastamine?",
     "installAttributionPromptMessage": "Kilo kasutab Apple'i jälgimisluba ainult selleks, et teada saada, millisest kanalist sa siia jõudsid. Sinu viipasid ega vestlusi selleks kunagi ei kasutata.",
+    "installAttributionRequestFailedTitle": "Jälgimisküsimust ei õnnestunud kuvada",
+    "installAttributionRequestFailedMessage": "Kilo ei saanud süsteemi küsimust kuvada, seega jääb paigaldusallika tuvastamine välja lülitatuks.",
     "what": "Mis",
     "why": "Miks",
     "who": "Kellele"

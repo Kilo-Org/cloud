@@ -3401,6 +3401,8 @@
     "voiceTranscriptionWho": "ستاسو وسیله، Kilo Gateway د هغه د متن د بدلون ماډل سره چې تاسو ټاکلی، یا Apple یا Google د آنلاین پېژندنې لپاره.",
     "installAttributionPromptTitle": "د نصب د سرچینې پېژندلو ته اجازه ورکړم؟",
     "installAttributionPromptMessage": "Kilo د Apple د تعقیب اجازه یوازې د دې معلومولو لپاره کاروي چې تاسو له کومې لارې دلته راغلي یاست. ستاسو پرامپټونه او خبرې اترې هېڅکله نه کارول کېږي.",
+    "installAttributionRequestFailedTitle": "د تعقیب پرامپټ ښودل نه شو",
+    "installAttributionRequestFailedMessage": "Kilo ونه شو کړای د سیسټم پرامپټ وښيي، نو د نصب د سرچینې پېژندنه بنده پاتې کېږي.",
     "what": "څه",
     "why": "ولې",
     "who": "څوک"

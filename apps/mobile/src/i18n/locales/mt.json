@@ -3590,6 +3590,8 @@
     "voiceTranscriptionWho": "L-apparat tiegħek, Kilo Gateway bil-mudell tat-traskrizzjoni li tagħżel, jew Apple jew Google għar-rikonoxximent online.",
     "installAttributionPromptTitle": "Tippermetti l-attribuzzjoni tal-installazzjoni?",
     "installAttributionPromptMessage": "Kilo juża l-permess tat-traċċar ta' Apple biss biex ikun jaf liema kanal ġabek hawn. L-istruzzjonijiet u l-konversazzjonijiet tiegħek qatt ma jintużaw.",
+    "installAttributionRequestFailedTitle": "Il-prompt tat-traċċar ma setax jintwera",
+    "installAttributionRequestFailedMessage": "Kilo ma setax juri l-prompt tas-sistema, għalhekk l-attribuzzjoni tal-installazzjoni tibqa' mitfija.",
     "what": "Xiex",
     "why": "Għaliex",
     "who": "Min"

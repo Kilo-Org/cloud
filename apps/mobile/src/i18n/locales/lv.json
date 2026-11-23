@@ -3464,6 +3464,8 @@
     "voiceTranscriptionWho": "Jūsu ierīce, Kilo Gateway ar jūsu izvēlēto transkripcijas modeli, vai Apple vai Google tiešsaistes atpazīšanai.",
     "installAttributionPromptTitle": "Atļaut noteikt instalēšanas avotu?",
     "installAttributionPromptMessage": "Kilo izmanto Apple izsekošanas atļauju tikai tam, lai noteiktu, kurā kanālā uzzināji par lietotni. Tavas uzvednes un sarunas šim nolūkam nekad netiek izmantotas.",
+    "installAttributionRequestFailedTitle": "Neizdevās parādīt izsekošanas uzvedni",
+    "installAttributionRequestFailedMessage": "Kilo neizdevās parādīt sistēmas uzvedni, tāpēc instalēšanas avota noteikšana paliek izslēgta.",
     "what": "Kādi dati",
     "why": "Kāpēc",
     "who": "Kas saņem datus"

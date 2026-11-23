@@ -3401,6 +3401,8 @@
     "voiceTranscriptionWho": "Ang device mo, Kilo Gateway kasama ang napili mong transcription model, o Apple o Google para sa online recognition.",
     "installAttributionPromptTitle": "Payagang tukuyin ang pinagmulan ng pag-install?",
     "installAttributionPromptMessage": "Ginagamit ng Kilo ang pahintulot sa pagsubaybay ng Apple para lang malaman kung saan mo nalaman ang app. Hindi kailanman ginagamit ang mga prompt at pag-uusap mo.",
+    "installAttributionRequestFailedTitle": "Hindi naipakita ang prompt sa pagsubaybay",
+    "installAttributionRequestFailedMessage": "Hindi naipakita ng Kilo ang prompt ng sistema, kaya nananatiling naka-off ang pagtukoy sa pinagmulan ng pag-install.",
     "what": "Ano",
     "why": "Bakit",
     "who": "Sino"

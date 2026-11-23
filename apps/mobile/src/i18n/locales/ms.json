@@ -3401,6 +3401,8 @@
     "voiceTranscriptionWho": "Peranti anda, Kilo Gateway dengan model transkripsi pilihan anda, atau Apple atau Google untuk pengecaman dalam talian.",
     "installAttributionPromptTitle": "Benarkan penjejakan sumber pemasangan?",
     "installAttributionPromptMessage": "Kilo menggunakan kebenaran penjejakan Apple hanya untuk mengetahui saluran mana yang membawa anda ke sini. Gesaan dan perbualan anda tidak pernah digunakan.",
+    "installAttributionRequestFailedTitle": "Gesaan penjejakan tidak dapat dipaparkan",
+    "installAttributionRequestFailedMessage": "Kilo tidak dapat memaparkan gesaan sistem, jadi penjejakan sumber pemasangan kekal tidak aktif.",
     "what": "Apa",
     "why": "Mengapa",
     "who": "Siapa"

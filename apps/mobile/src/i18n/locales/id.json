@@ -2841,6 +2841,8 @@
     "why": "Tujuan",
     "who": "Penerima",
     "installAttributionPromptMessage": "Kilo menggunakan izin pelacakan Apple hanya untuk mengetahui saluran yang memperkenalkan Kilo kepadamu. Instruksi dan percakapanmu tidak pernah digunakan.",
+    "installAttributionRequestFailedTitle": "Tidak dapat menampilkan permintaan pelacakan",
+    "installAttributionRequestFailedMessage": "Kilo tidak dapat menampilkan permintaan sistem, jadi pelacakan sumber pemasangan tetap nonaktif.",
     "installAttributionPromptTitle": "Izinkan pelacakan sumber pemasangan?"
   },
   "prReview": {

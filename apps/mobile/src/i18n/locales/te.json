@@ -3403,6 +3403,8 @@
     "voiceTranscriptionWho": "మీ పరికరం, మీరు ఎంచుకున్న ట్రాన్స్క్రిప్షన్ మోడల్‌తో Kilo Gateway, లేదా ఆన్‌లైన్ గుర్తింపు కోసం Apple లేదా Google.",
     "installAttributionPromptTitle": "ఇన్‌స్టాల్ మూలాన్ని గుర్తించడానికి అనుమతించాలా?",
     "installAttributionPromptMessage": "మీరు ఏ మార్గం ద్వారా వచ్చారో తెలుసుకోవడానికి మాత్రమే Kilo, Apple ట్రాకింగ్ అనుమతిని ఉపయోగిస్తుంది. మీ ప్రాంప్ట్‌లను, సంభాషణలను ఎప్పుడూ ఉపయోగించదు.",
+    "installAttributionRequestFailedTitle": "ట్రాకింగ్ ప్రాంప్ట్‌ను చూపించలేకపోయింది",
+    "installAttributionRequestFailedMessage": "Kilo సిస్టమ్ ప్రాంప్ట్‌ను చూపించలేకపోయింది, కాబట్టి ఇన్‌స్టాల్ మూల గుర్తింపు ఆఫ్‌లోనే ఉంటుంది.",
     "what": "ఏమి",
     "why": "ఎందుకు",
     "who": "ఎవరు"

@@ -2841,6 +2841,8 @@
     "why": "Mục đích",
     "who": "Bên nhận dữ liệu",
     "installAttributionPromptMessage": "Kilo chỉ dùng quyền theo dõi của Apple để biết bạn tìm đến ứng dụng qua kênh nào. Nội dung yêu cầu và cuộc trò chuyện của bạn không bao giờ được dùng cho mục đích này.",
+    "installAttributionRequestFailedTitle": "Không thể hiển thị lời nhắc theo dõi",
+    "installAttributionRequestFailedMessage": "Kilo không thể hiển thị lời nhắc hệ thống, nên việc xác định nguồn cài đặt vẫn tắt.",
     "installAttributionPromptTitle": "Cho phép xác định nguồn cài đặt?"
   },
   "prReview": {

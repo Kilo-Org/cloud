@@ -3401,6 +3401,8 @@
     "voiceTranscriptionWho": "የእርስዎ መሣሪያ፣ Kilo Gateway ከመረጡት የጽሑፍ ቅየራ ሞዴል ጋር፣ ወይም Apple ወይም Google ለመስመር ላይ መለያ።",
     "installAttributionPromptTitle": "የመተግበሪያውን ምንጭ ለመለየት ይፈቅዳሉ?",
     "installAttributionPromptMessage": "Kilo የApple መከታተያ ፈቃድን የሚጠቀመው እዚህ በምን መንገድ እንደደረሱ ለማወቅ ብቻ ነው። ጥያቄዎችዎና ውይይቶችዎ በፍጹም ጥቅም ላይ አይውሉም።",
+    "installAttributionRequestFailedTitle": "የመከታተያ ጥያቄውን ማሳየት አልተቻለም",
+    "installAttributionRequestFailedMessage": "Kilo የስርዓቱን ጥያቄ ማሳየት አልቻለም፣ ስለዚህ የመተግበሪያውን ምንጭ መለየት ተዘግቷል።",
     "what": "ምን",
     "why": "ለምን",
     "who": "ማን"

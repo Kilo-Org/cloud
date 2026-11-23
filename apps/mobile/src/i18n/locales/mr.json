@@ -3401,6 +3401,8 @@
     "voiceTranscriptionWho": "तुमचे डिव्हाइस, तुम्ही निवडलेल्या प्रतिलेखन मॉडेलसह Kilo Gateway, किंवा ऑनलाइन ओळखीसाठी Apple किंवा Google.",
     "installAttributionPromptTitle": "इंस्टॉलचा स्रोत ओळखण्यास परवानगी द्यायची?",
     "installAttributionPromptMessage": "तुम्ही कोणत्या माध्यमातून येथे आलात हे जाणून घेण्यासाठीच Kilo Apple ची ट्रॅकिंग परवानगी वापरते. यासाठी तुमचे प्रॉम्प्ट आणि संभाषणे कधीही वापरली जात नाहीत.",
+    "installAttributionRequestFailedTitle": "ट्रॅकिंग प्रॉम्प्ट दाखवता आला नाही",
+    "installAttributionRequestFailedMessage": "Kilo ला सिस्टम प्रॉम्प्ट दाखवता आला नाही, म्हणून इंस्टॉलचा स्रोत ओळखणे बंद राहते.",
     "what": "काय",
     "why": "का",
     "who": "कोण"

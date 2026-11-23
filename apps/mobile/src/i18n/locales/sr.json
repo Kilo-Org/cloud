@@ -3464,6 +3464,8 @@
     "voiceTranscriptionWho": "Tvoj uređaj, Kilo Gateway sa izabranim modelom transkripcije ili Apple ili Google za prepoznavanje na mreži.",
     "installAttributionPromptTitle": "Dozvoliti praćenje izvora instalacije?",
     "installAttributionPromptMessage": "Kilo koristi dozvolu kompanije Apple za praćenje samo da sazna preko kog kanala dolaziš. Tvoji upiti i razgovori se nikada ne koriste za to.",
+    "installAttributionRequestFailedTitle": "Nije moguće prikazati zahtev za praćenje",
+    "installAttributionRequestFailedMessage": "Kilo nije mogao da prikaže sistemski zahtev, pa praćenje izvora instalacije ostaje isključeno.",
     "what": "Šta",
     "why": "Zašto",
     "who": "Ko"

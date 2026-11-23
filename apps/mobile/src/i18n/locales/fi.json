@@ -3401,6 +3401,8 @@
     "voiceTranscriptionWho": "Laitteesi, Kilo Gateway valitsemallasi puheentunnistusmallilla tai Apple tai Google verkkotunnistusta varten.",
     "installAttributionPromptTitle": "Sallitaanko asennuslähteen tunnistus?",
     "installAttributionPromptMessage": "Kilo käyttää Applen seurantalupaa vain selvittääkseen, mistä kanavasta löysit sovelluksen. Kehotteitasi ja keskustelujasi ei koskaan käytetä tähän.",
+    "installAttributionRequestFailedTitle": "Seurantakehotetta ei voitu näyttää",
+    "installAttributionRequestFailedMessage": "Kilo ei voinut näyttää järjestelmäkehotetta, joten asennuslähteen tunnistus pysyy poissa päältä.",
     "what": "Mitä",
     "why": "Miksi",
     "who": "Kenelle"

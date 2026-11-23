@@ -2841,6 +2841,8 @@
     "why": "用途",
     "who": "接收方",
     "installAttributionPromptMessage": "Kilo 仅使用 Apple 的跟踪权限来了解你通过哪个渠道安装了应用，绝不会使用你的提示词和对话。",
+    "installAttributionRequestFailedTitle": "无法显示跟踪提示",
+    "installAttributionRequestFailedMessage": "Kilo 无法显示系统提示，因此安装归因保持关闭。",
     "installAttributionPromptTitle": "允许安装归因？"
   },
   "prReview": {

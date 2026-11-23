@@ -3401,6 +3401,8 @@
     "voiceTranscriptionWho": "دستگاه شما، Kilo Gateway با مدل تبدیل گفتار به متن انتخابی شما، یا Apple یا Google برای بازشناسی برخط.",
     "installAttributionPromptTitle": "اجازهٔ شناسایی منبع نصب را می‌دهید؟",
     "installAttributionPromptMessage": "Kilo از مجوز ردیابی Apple فقط برای شناسایی مسیر آشنایی شما با برنامه استفاده می‌کند. پیام‌ها و گفت‌وگوهای شما هرگز برای این کار استفاده نمی‌شوند.",
+    "installAttributionRequestFailedTitle": "درخواست ردیابی نمایش داده نشد",
+    "installAttributionRequestFailedMessage": "Kilo نتوانست درخواست سیستم را نمایش دهد، بنابراین شناسایی منبع نصب غیرفعال می‌ماند.",
     "what": "چه داده‌هایی",
     "why": "با چه هدفی",
     "who": "دریافت‌کننده"

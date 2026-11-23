@@ -121,8 +121,7 @@ describe('assert-expo-config', () => {
 
   it('fails a renamed File Provider extension target under production', () => {
     const path = writeVariant(config => {
-      config.extra.eas.build.experimental.ios.appExtensions[0].targetName =
-        'ArtifactsFileProviderRenamed';
+      fileProviderExtension(config).targetName = 'ArtifactsFileProviderRenamed';
     });
     const { status, output } = run(['--config', path, '--profile', 'production']);
     expect(status).toBe(1);

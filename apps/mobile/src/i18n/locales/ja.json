@@ -4332,7 +4332,7 @@
     "instructionsEmptyDescriptionReadOnly": "ここに追加されたルールファイルは、このプロファイルを使用するすべてのセッションに適用されます。",
     "instructionNameRequired": "ファイル名を入力してください",
     "instructionNameTooLong": "ファイル名は{{max}}文字以内にしてください",
-    "instructionNameInvalid": "英小文字または数字で始め、英小文字・数字・ハイフンのみ使用できます",
+    "instructionNameInvalid": "ASCII 小文字または数字で始め、ASCII 小文字・数字・ハイフンのみ使用できます",
     "instructionNameReserved": "そのファイル名は予約されています。別の名前を選んでください。",
     "instructionContentRequired": "ルールのマークダウンを入力してください",
     "instructionNamePreview": "{{name}}として保存されます",

@@ -9341,6 +9341,45 @@ describe('createSessionManager', () => {
       }
     });
 
+    it('deletes the ghost row a complete record prunes after the replay applied it', async () => {
+      // The other order of the same race: a COMPLETE record whose read lands
+      // after the replay already applied the failure. The predicate answered
+      // false for an id the read had not seeded yet, so the failure and its
+      // row are on screen; the prune then drops the footer, and the row must
+      // not survive it as an ordinary sent bubble.
+      const realState = replayUnacceptedQueuedFailure();
+      expect(realState.getPendingMessages().get('m-ghost')?.status).toBe('failed');
+
+      const read = deferred<DurableDeliveryRecord<string>>();
+      const config = createMockConfig({
+        readResolvedDeliveryFailures: jest.fn(() => read.promise),
+      });
+      const mgr = createSessionManager(config);
+      const originalState = mockSession.state;
+      mockSession.state = realState as unknown as MockSession['state'];
+      try {
+        await mgr.switchSession(kiloId('ses-1'));
+        const storage = mockSession.storage;
+        if (!storage) throw new Error('expected session storage');
+        storage.upsertMessage(
+          stubUserMessage({ id: 'm-ghost', sessionID: 'ses-1', synthetic: true })
+        );
+        const deleteMessage = jest.spyOn(storage, 'deleteMessage');
+
+        // Complete, and it names the id: the resolved-set path, not the
+        // uncertain one that `discardAppliedDeliveryFailures` serves.
+        read.resolve({ items: ['m-ghost'], complete: true });
+        await read.promise;
+        await Promise.resolve();
+
+        expect(deleteMessage).toHaveBeenCalledWith('m-ghost');
+        expect(realState.getPendingMessages().has('m-ghost')).toBe(false);
+        expect(storage.getMessageInfo('m-ghost')).toBeUndefined();
+      } finally {
+        mockSession.state = originalState;
+      }
+    });
+
     it('projects the seeded durable ids on the resolvedDeliveryFailures atom', async () => {
       // A relaunch: the row a retry superseded is server history and comes back
       // with the snapshot, so the transcript filter needs the durable record.

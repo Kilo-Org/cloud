@@ -3308,6 +3308,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           );
         }
         for (const id of ids) {
+          // A failure the replay applied before this read landed still has its
+          // client-materialised row, so it goes whole here too.
+          dropMaterialisedRow(id);
           // `clearFailedMessage` reports when the pruned entry was also the
           // failure that set the terminal error and has undone it. That
           // error reached `errorAtom` through `config.onError`, which the
@@ -3336,6 +3339,23 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   }
 
   /**
+   * A failure this client hid goes whole: the replayed `cloud.message.queued`
+   * materialised its user row locally, and without the footer that row renders
+   * as an ordinary sent bubble for a prompt that was never delivered. A
+   * confirmed row (`synthetic` undefined) is server history and stays.
+   *
+   * The delete is deliberately not gated on `clearFailedMessage`, which returns
+   * true only for the entry that owned the terminal error, and a prompt that
+   * was never delivered replays as queued and unaccepted, which never owns one.
+   */
+  function dropMaterialisedRow(messageId: string): void {
+    const info = currentSession?.storage.getMessageInfo(messageId);
+    if (info?.role === 'user' && info.synthetic === true) {
+      currentSession?.storage.deleteMessage(messageId);
+    }
+  }
+
+  /**
    * A record the reader cannot vouch for may name a failure the user already
    * resolved. The DO's stored-event replay usually applies those footers before
    * the durable read lands, so hiding later failures is not enough: the ones
@@ -3351,17 +3371,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     for (const [messageId, delivery] of state.getPendingMessages()) {
       if (delivery.status !== 'failed') continue;
       if (locallySentMessageIds.has(messageId)) continue;
-      // The replayed `cloud.message.queued` materialised this row locally.
-      // Without the footer it would render as an ordinary sent bubble for a
-      // prompt that was never delivered, so the row goes with the failure. A
-      // confirmed row (`synthetic` undefined) is server history and stays.
-      // This is not gated on `clearFailedMessage`: that returns true only for
-      // the entry that owned the terminal error, and a prompt that was never
-      // delivered replays as queued and unaccepted, which never owns one.
-      const info = currentSession?.storage.getMessageInfo(messageId);
-      if (info?.role === 'user' && info.synthetic === true) {
-        currentSession?.storage.deleteMessage(messageId);
-      }
+      dropMaterialisedRow(messageId);
       if (state.clearFailedMessage(messageId)) {
         store.set(errorAtom, null);
         store.set(failedHistoryKindAtom, null);

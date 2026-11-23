@@ -105,8 +105,14 @@ export function NewProfileScreen({
     refetch,
   } = useOrgBoundary(organizationId);
   // The stored selection publishes an organization only once it settles, so a
-  // Personal id before that is the absence of an answer rather than one.
-  const { isLoaded: selectionSettled } = useOrganization();
+  // Personal id before that is the absence of an answer rather than one. Its
+  // own read can fail, and it then stays unsettled, so the failure and its
+  // retry reach the row this screen already renders for a failed read.
+  const {
+    isLoaded: selectionSettled,
+    error: selectionError,
+    retry: retrySelection,
+  } = useOrganization();
   // No organization context on the hook: the owner choice below decides which
   // `organizationId` each create carries, so a personal create is never
   // rewritten to the selected organization.
@@ -139,9 +145,12 @@ export function NewProfileScreen({
   const owner: ProfileOwnerChoice = canOwnOrganization
     ? (pickedOwner ?? initialOwner ?? 'personal')
     : 'personal';
-  // Only a first read that failed leaves no answer and no retry of its own, and
-  // the row is for the reads a create depends on.
-  const boundaryUnread = roleDecidesOwner && isError && orgs === undefined;
+  // Only a read that failed leaves no answer and no retry of its own, and the
+  // row is for the reads a create depends on: the membership list, or the
+  // stored selection it is resolved against.
+  const selectionUnread = selectionError === 'restore';
+  const boundaryUnread = roleDecidesOwner && (selectionUnread || (isError && orgs === undefined));
+  const retryBoundary = selectionUnread ? retrySelection : refetch;
   const selectOwner = (next: ProfileOwnerChoice) => {
     setOwnerSelection({ organizationId: boundaryOrganizationId ?? null, owner: next });
   };
@@ -212,7 +221,7 @@ export function NewProfileScreen({
             placement="top"
             inset="none"
             compact
-            onRetry={() => void refetch()}
+            onRetry={() => void retryBoundary()}
             isRetrying={isFetching}
           />
         ) : null}

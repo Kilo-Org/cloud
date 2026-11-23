@@ -12,6 +12,7 @@ const toastSuccess = vi.hoisted(() => vi.fn());
 const toastError = vi.hoisted(() => vi.fn());
 const routerReplace = vi.hoisted(() => vi.fn());
 const boundaryRefetch = vi.hoisted(() => vi.fn());
+const selectionRetry = vi.hoisted(() => vi.fn());
 type BoundaryOrgRow = { organizationId: string; role: string };
 const boundaryState = vi.hoisted(() => {
   const state: {
@@ -22,6 +23,7 @@ const boundaryState = vi.hoisted(() => {
     isError: boolean;
     isFetching: boolean;
     selectionSettled: boolean;
+    selectionError: 'restore' | 'save' | null;
     orgs: BoundaryOrgRow[] | undefined;
     refetch: typeof boundaryRefetch;
   } = {
@@ -32,6 +34,7 @@ const boundaryState = vi.hoisted(() => {
     isError: false,
     isFetching: false,
     selectionSettled: true,
+    selectionError: null,
     orgs: [{ organizationId: 'org-1', role: 'owner' }],
     refetch: boundaryRefetch,
   };
@@ -69,7 +72,11 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
 // `isLoaded` stands in, so a test can mount the screen before the selection
 // names anything.
 vi.mock('@/lib/organization-context', () => ({
-  useOrganization: () => ({ isLoaded: boundaryState.selectionSettled }),
+  useOrganization: () => ({
+    isLoaded: boundaryState.selectionSettled,
+    error: boundaryState.selectionError,
+    retry: selectionRetry,
+  }),
 }));
 
 vi.mock('@/lib/profile-agent-navigation', () => ({
@@ -102,7 +109,15 @@ vi.mock('@/components/query-error', () => ({
 
 // `vi.hoisted` results cannot be exported at their declaration (vitest hoists
 // them above the export), so they are exported after the declaration instead.
-export { boundaryRefetch, boundaryState, createMutate, routerReplace, toastError, toastSuccess };
+export {
+  boundaryRefetch,
+  boundaryState,
+  createMutate,
+  routerReplace,
+  selectionRetry,
+  toastError,
+  toastSuccess,
+};
 
 export function findAll(root: ReactTestInstance, type: string): ReactTestInstance[] {
   return root.findAll(node => typeof node.type === 'string' && node.type === type);
@@ -182,6 +197,7 @@ export function resetNewProfileState(): void {
   toastError.mockReset();
   routerReplace.mockReset();
   boundaryRefetch.mockReset();
+  selectionRetry.mockReset();
   createMutate.mockResolvedValue({ id: 'profile-1' });
   boundaryState.organizationId = 'org-1';
   boundaryState.role = 'owner';
@@ -190,6 +206,7 @@ export function resetNewProfileState(): void {
   boundaryState.isError = false;
   boundaryState.isFetching = false;
   boundaryState.selectionSettled = true;
+  boundaryState.selectionError = null;
   boundaryState.orgs = [{ organizationId: 'org-1', role: 'owner' }];
   mutationState.create.isPending = false;
 }

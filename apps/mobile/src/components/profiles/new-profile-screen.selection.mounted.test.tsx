@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import {
+  boundaryRefetch,
   boundaryState,
   createMutate,
   findCreateButton,
@@ -8,9 +9,11 @@ import {
   mount,
   pressCreate,
   resetNewProfileState,
+  selectionRetry,
   typeName,
 } from '@/components/profiles/new-profile-screen.mounted.test-helpers';
 import { waitFor } from '@/test/render-with-providers';
+import { act } from '@/test/renderer';
 
 /**
  * The stored organization selection publishes an organization only once it
@@ -66,6 +69,31 @@ describe('NewProfileScreen stored selection', () => {
 
     await waitFor(() => createMutate.mock.calls.length > 0);
     expect(createMutate.mock.calls[0]?.[0]).toEqual({ name: 'Backend debugging' });
+
+    unmount();
+  });
+
+  it('offers the retry row when the stored selection could not be read', async () => {
+    boundaryState.organizationId = null;
+    boundaryState.role = undefined;
+    boundaryState.org = undefined;
+    boundaryState.orgs = undefined;
+    boundaryState.isResolving = true;
+    boundaryState.selectionSettled = false;
+    boundaryState.selectionError = 'restore';
+    const { renderer, unmount } = await mount();
+
+    expect(findCreateButton(renderer.root).props.disabled).toBe(true);
+
+    const retryRow = findRetryRow(renderer.root);
+    if (!retryRow) {
+      throw new Error('selection retry row was not rendered');
+    }
+    act(() => {
+      (retryRow.props as { onRetry: () => void }).onRetry();
+    });
+    expect(selectionRetry).toHaveBeenCalledOnce();
+    expect(boundaryRefetch).not.toHaveBeenCalled();
 
     unmount();
   });

@@ -386,6 +386,46 @@ describe('ImageViewer mounted', () => {
     renderer.unmount();
   });
 
+  it('keeps the busy phase through a decode error from the URL the press is renewing', async () => {
+    const renewal = Promise.withResolvers<undefined>();
+    const onRetry = vi.fn(() => renewal.promise);
+    const renderer = await mountViewer({ uri: REMOTE_URI, onRetry });
+
+    await fireDecode(renderer, 'onError');
+    await pressRetry(renderer, 'retry action');
+
+    // The press remounted the decode at the URL it is renewing, and the action
+    // is awaiting that renewal.
+    expect(announcedMessage(renderer.root)).toBe('Loading…');
+    expect(first(retryActions(renderer.root), 'busy retry action').props.loading).toBe(true);
+
+    // That URL is the expired one, so its decode errors before the renewal
+    // lands; the error belongs to the pending attempt, so the action stays busy
+    // and the decode stays mounted.
+    await fireDecode(renderer, 'onError');
+    expect(announcedMessage(renderer.root)).toBe('Loading…');
+    expect(first(retryActions(renderer.root), 'waiting retry action').props.loading).toBe(true);
+    expect(findByType(renderer.root, 'Image')).toHaveLength(1);
+
+    await flush(() => {
+      renewal.resolve(undefined);
+    });
+
+    // The renewal settled without a renewed uri, so the action takes the busy
+    // phase back and the decode stays mounted, because it may still paint.
+    expect(announcedMessage(renderer.root)).toBe('Image unavailable');
+    expect(first(retryActions(renderer.root), 'settled retry action').props.loading).toBe(false);
+    expect(findByType(renderer.root, 'Image')).toHaveLength(1);
+
+    // No renewal is pending now, so a decode error publishes the failure and
+    // unmounts the image.
+    await fireDecode(renderer, 'onError');
+    expect(findByType(renderer.root, 'Image')).toHaveLength(0);
+    expect(unavailableText(renderer.root)).toHaveLength(1);
+
+    renderer.unmount();
+  });
+
   it('publishes nothing from a renewal that lands after a renewed uri took the state', async () => {
     const renewal = Promise.withResolvers<undefined>();
     const onRetry = vi.fn(() => renewal.promise);

@@ -132,6 +132,12 @@ export function ImageViewer({
   // after a later press — reachable now that `stalled` makes the action
   // pressable again — can tell it no longer owns the state.
   const retryAttempt = useRef(0);
+  // The attempt that is awaiting the caller's renewal path. The press remounts
+  // the decode with the URL it is about to renew, so a presigned URL that has
+  // already expired errors before that renewal lands. That error belongs to the
+  // pending attempt: publishing it would return the action, and unmount the
+  // decode, ahead of the renewed URL that is still on its way.
+  const renewalAttempt = useRef<number | null>(null);
   // The attempt the mounted `Image` belongs to. It keys the image so a press
   // re-issues the fetch even when the component stays mounted: from `stalled`
   // the image is still there, and an unchanged `source` would otherwise decode
@@ -158,14 +164,19 @@ export function ImageViewer({
 
   // A renewed URL takes ownership away from any in-flight attempt, so a pending
   // settle publishes nothing on top of the fresh image. The bump lives in an
-  // effect because render must stay side-effect free.
+  // effect because render must stay side-effect free. The pending renewal
+  // clears with it: the URL it was waiting on has landed, so a decode error on
+  // the fresh image is a real one again.
   useEffect(() => {
     retryAttempt.current += 1;
+    renewalAttempt.current = null;
   }, [uri]);
 
-  // A new image (or a reopen) retries the decode from a clean slate.
+  // A new image (or a reopen) retries the decode from a clean slate, so neither
+  // a prior phase nor a renewal the closed viewer was awaiting can publish.
   useEffect(() => {
     setStatus('ready');
+    renewalAttempt.current = null;
   }, [visible]);
 
   // A retry keeps the unavailable state mounted and marks it busy; the new
@@ -175,7 +186,8 @@ export function ImageViewer({
   // returns the action without unmounting the decode. The status says which
   // phase is rendered; the attempt ref says which press owns it, because
   // `stalled` makes the action pressable while the first attempt is still in
-  // flight.
+  // flight; the renewal ref says which press is still awaiting `onRetry`, so
+  // an error from the URL that press remounted publishes nothing.
   const retryImage = useCallback(() => {
     const attempt = retryAttempt.current + 1;
     retryAttempt.current = attempt;
@@ -184,12 +196,18 @@ export function ImageViewer({
     if (onRetry === undefined) {
       return;
     }
+    renewalAttempt.current = attempt;
     void (async () => {
       try {
         await onRetry();
       } catch {
         // A renewal that throws has the same outcome as one that returns a
         // stale url: return the action, never the pending decode.
+      }
+      // A landed uri, a later press or a decode outcome may already have taken
+      // this renewal's place, so only its own attempt may clear the ref.
+      if (renewalAttempt.current === attempt) {
+        renewalAttempt.current = null;
       }
       if (retryAttempt.current !== attempt) {
         return;
@@ -305,11 +323,21 @@ export function ImageViewer({
                   contentFit="contain"
                   onLoad={() => {
                     // A landed decode owns the state from any phase, so a retry
-                    // still awaiting its renewal path publishes nothing.
+                    // still awaiting its renewal path publishes nothing — and
+                    // the renewal it was awaiting no longer owns anything.
                     retryAttempt.current += 1;
+                    renewalAttempt.current = null;
                     setStatus('ready');
                   }}
                   onError={() => {
+                    // The press remounted this decode with the URL it is
+                    // renewing, so an already-expired URL errors before that
+                    // renewal lands. The error belongs to the pending attempt:
+                    // it must keep the action busy and the decode mounted until
+                    // the renewed URL arrives.
+                    if (renewalAttempt.current !== null) {
+                      return;
+                    }
                     setStatus('failed');
                   }}
                 />

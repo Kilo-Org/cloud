@@ -4055,7 +4055,7 @@
       "new": "Nova conversa",
       "deleteTitle": "Excluir esta conversa?",
       "resetNoticeTitle": "Conversas locais e rascunhos foram excluídos",
-      "resetNoticeBody": "O Kilo não conseguiu abrir as conversas salvas neste dispositivo e, por isso, as removeu junto com os rascunhos. Suas sessões na nuvem não foram afetadas.",
+      "resetNoticeBody": "O Kilo não conseguiu abrir as conversas salvas neste dispositivo. Suas sessões na nuvem não foram afetadas.",
       "resetNoticeDismiss": "Ignorar aviso"
     },
     "rename": {

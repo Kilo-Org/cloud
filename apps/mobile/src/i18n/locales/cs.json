@@ -4055,7 +4055,7 @@
       "new": "Nový chat",
       "deleteTitle": "Smazat tento chat?",
       "resetNoticeTitle": "Místní chaty a koncepty byly vymazány",
-      "resetNoticeBody": "Kilo nemohlo otevřít chaty uložené v tomto zařízení, proto je odstranilo i s jejich koncepty. Vaše relace v cloudu nejsou dotčeny.",
+      "resetNoticeBody": "Kilo nemohlo otevřít chaty uložené v tomto zařízení. Vaše relace v cloudu nejsou dotčeny.",
       "resetNoticeDismiss": "Skrýt oznámení"
     },
     "rename": {

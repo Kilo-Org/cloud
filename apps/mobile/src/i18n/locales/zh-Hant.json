@@ -3909,7 +3909,7 @@
       "new": "新對話",
       "deleteTitle": "刪除這個對話？",
       "resetNoticeTitle": "本機對話與草稿已清除",
-      "resetNoticeBody": "Kilo 無法開啟儲存在本裝置上的對話，因此將這些對話與其草稿一併刪除。你的雲端工作階段不受影響。",
+      "resetNoticeBody": "Kilo 無法開啟儲存在本裝置上的對話。你的雲端工作階段不受影響。",
       "resetNoticeDismiss": "忽略通知"
     },
     "rename": {

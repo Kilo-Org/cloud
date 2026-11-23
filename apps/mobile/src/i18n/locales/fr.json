@@ -3982,7 +3982,7 @@
       "new": "Nouvelle discussion",
       "deleteTitle": "Supprimer cette discussion ?",
       "resetNoticeTitle": "Discussions et brouillons locaux effacés",
-      "resetNoticeBody": "Kilo n'a pas pu ouvrir les discussions enregistrées sur cet appareil et les a supprimées avec leurs brouillons. Vos sessions dans le nuage ne sont pas affectées.",
+      "resetNoticeBody": "Kilo n'a pas pu ouvrir les discussions enregistrées sur cet appareil. Vos sessions dans le nuage ne sont pas affectées.",
       "resetNoticeDismiss": "Ignorer la notification"
     },
     "rename": {

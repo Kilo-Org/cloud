@@ -4055,7 +4055,7 @@
       "new": "Naujas pokalbis",
       "deleteTitle": "Ištrinti šį pokalbį?",
       "resetNoticeTitle": "Vietiniai pokalbiai ir juodraščiai išvalyti",
-      "resetNoticeBody": "Kilo negalėjo atidaryti šiame įrenginyje išsaugotų pokalbių, todėl pašalino juos ir jų juodraščius. Jūsų sesijos debesyje nebuvo paveiktos.",
+      "resetNoticeBody": "Kilo negalėjo atidaryti šiame įrenginyje išsaugotų pokalbių. Jūsų sesijos debesyje nebuvo paveiktos.",
       "resetNoticeDismiss": "Atmesti pranešimą"
     },
     "rename": {

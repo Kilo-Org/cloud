@@ -3909,7 +3909,7 @@
       "new": "Ny chatt",
       "deleteTitle": "Ta bort den här chatten?",
       "resetNoticeTitle": "Lokala chattar och utkast rensades",
-      "resetNoticeBody": "Kilo kunde inte öppna chattarna som sparats på den här enheten, så appen tog bort dem och deras utkast. Dina sessioner i molnet påverkas inte.",
+      "resetNoticeBody": "Kilo kunde inte öppna chattarna som sparats på den här enheten. Dina sessioner i molnet påverkas inte.",
       "resetNoticeDismiss": "Avskriv avisering"
     },
     "rename": {

@@ -3909,7 +3909,7 @@
       "new": "Bagong chat",
       "deleteTitle": "Burahin ang chat na ito?",
       "resetNoticeTitle": "Nabura ang mga chat sa device na ito at mga burador",
-      "resetNoticeBody": "Hindi mabuksan ng Kilo ang mga chat sa device na ito, kaya binura nito ang mga ito at ang mga burador. Hindi apektado ang mga sesyon sa cloud.",
+      "resetNoticeBody": "Hindi mabuksan ng Kilo ang mga chat sa device na ito. Hindi apektado ang mga sesyon sa cloud.",
       "resetNoticeDismiss": "Balewalain ang abiso"
     },
     "rename": {

@@ -38,6 +38,7 @@ import {
   HEADER_TITLE_TARGET_CLASS,
   ICON_TARGET_BOX_CLASS,
   ICON_TARGET_DP,
+  ICON_TARGET_WIDTH_CLASS,
   INLINE_LINK_BOX_CLASS,
   INLINE_LINK_CONNECTOR_CLASS,
   INLINE_LINK_FACING_HIT_SLOP_DP,
@@ -179,6 +180,17 @@ describe('shared tap-target geometry', () => {
     expect(width).toBeGreaterThanOrEqual(ICON_TARGET_DP);
     expect(ICON_TARGET_BOX_CLASS).toContain('items-center');
     expect(ICON_TARGET_BOX_CLASS).toContain('justify-center');
+  });
+
+  it('keeps the reserved-width class in step with the icon target box', async () => {
+    // The regression this guards: a title row reserved the dismiss control's
+    // width with a literal `w-14` (49pt), which cleared the 48dp box only by
+    // accident and drifted from it as soon as the box changed. The width class
+    // is the box's own width, so a row that reserves it can never under-run
+    // the control.
+    expect(ICON_TARGET_WIDTH_CLASS).toBe(`w-[${ICON_TARGET_DP}px]`);
+    expect(ICON_TARGET_BOX_CLASS).toContain(ICON_TARGET_WIDTH_CLASS);
+    expect(await compiledDp(ICON_TARGET_WIDTH_CLASS, 'width')).toBe(ICON_TARGET_DP);
   });
 
   it('renders a text-only action frame at the platform minimum on both axes', async () => {

@@ -4201,7 +4201,7 @@
       "new": "Sgwrs newydd",
       "deleteTitle": "Dileu'r sgwrs hon?",
       "resetNoticeTitle": "Cliriwyd y sgyrsiau a'r drafftiau lleol",
-      "resetNoticeBody": "Ni allai Kilo agor y sgyrsiau a gadwyd ar y ddyfais hon, felly fe'u dileodd a'u drafftiau. Nid oes effaith ar eich sesiynau yn y cwmwl.",
+      "resetNoticeBody": "Ni allai Kilo agor y sgyrsiau a gadwyd ar y ddyfais hon. Nid oes effaith ar eich sesiynau yn y cwmwl.",
       "resetNoticeDismiss": "Diystyru'r hysbysiad"
     },
     "rename": {

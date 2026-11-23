@@ -3982,7 +3982,7 @@
       "new": "Chat nou",
       "deleteTitle": "Ștergi acest chat?",
       "resetNoticeTitle": "Chat-urile și ciornele locale au fost șterse",
-      "resetNoticeBody": "Kilo nu a putut deschide chat-urile salvate pe acest dispozitiv, așa că le-a șters împreună cu ciornele lor. Sesiunile din cloud nu sunt afectate.",
+      "resetNoticeBody": "Kilo nu a putut deschide chat-urile salvate pe acest dispozitiv. Sesiunile din cloud nu sunt afectate.",
       "resetNoticeDismiss": "Ignoră notificarea"
     },
     "rename": {

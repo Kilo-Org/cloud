@@ -3909,7 +3909,7 @@
       "new": "Ny chat",
       "deleteTitle": "Slette denne chatten?",
       "resetNoticeTitle": "Lokale chatter og utkast ble slettet",
-      "resetNoticeBody": "Kilo kunne ikke åpne chattene som er lagret på denne enheten, så de ble slettet sammen med utkastene sine. Øktene dine i skyen er ikke påvirket.",
+      "resetNoticeBody": "Kilo kunne ikke åpne chattene som er lagret på denne enheten. Øktene dine i skyen er ikke påvirket.",
       "resetNoticeDismiss": "Avvis varsel"
     },
     "rename": {

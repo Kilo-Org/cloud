@@ -4055,7 +4055,7 @@
       "new": "Nov klepet",
       "deleteTitle": "Izbrišem ta klepet?",
       "resetNoticeTitle": "Lokalni klepeti in osnutki počiščeni",
-      "resetNoticeBody": "Kilo ni mogel odpreti klepetov, shranjenih na tej napravi, zato jih je izbrisal skupaj z osnutki. Vaše seje v oblaku niso prizadete.",
+      "resetNoticeBody": "Kilo ni mogel odpreti klepetov, shranjenih na tej napravi. Vaše seje v oblaku niso prizadete.",
       "resetNoticeDismiss": "Zavrzi obvestilo"
     },
     "rename": {

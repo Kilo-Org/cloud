@@ -4,7 +4,7 @@ import { Pressable, View } from 'react-native';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { X } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
-import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { ICON_TARGET_BOX_CLASS, ICON_TARGET_WIDTH_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
@@ -47,10 +47,10 @@ export function LocalResetNoticeCard({ onDismiss }: { readonly onDismiss: () => 
         <Text className="min-w-0 flex-1 text-base font-medium text-warn">
           {t('modelChat.list.resetNoticeTitle')}
         </Text>
-        {/* The empty cell beside the title covers the floating control's width,
-            so the title wraps before it instead of running under it. It carries
-            no height, so the title still sets the row's line. */}
-        <View className="w-14" />
+        {/* The empty cell beside the title covers the floating control's own
+            width, so the title wraps before it instead of running under it. It
+            carries no height, so the title still sets the row's line. */}
+        <View className={ICON_TARGET_WIDTH_CLASS} />
       </View>
       {/* The live region sits on the body `Text`, which is the node that
           changes: the announcement hook covers a platform without live

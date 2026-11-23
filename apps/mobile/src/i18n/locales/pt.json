@@ -4055,7 +4055,7 @@
       "new": "Nova conversa",
       "deleteTitle": "Eliminar esta conversa?",
       "resetNoticeTitle": "Conversas e rascunhos locais eliminados",
-      "resetNoticeBody": "O Kilo não conseguiu carregar o histórico do chat guardado neste dispositivo e eliminou as conversas e os rascunhos. As sessões na cloud não foram afetadas.",
+      "resetNoticeBody": "O Kilo não conseguiu carregar o histórico do chat guardado neste dispositivo. As sessões na cloud não foram afetadas.",
       "resetNoticeDismiss": "Ignorar aviso"
     },
     "rename": {

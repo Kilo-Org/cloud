@@ -3909,7 +3909,7 @@
       "new": "新聊天",
       "deleteTitle": "删除这个聊天？",
       "resetNoticeTitle": "本地聊天和草稿已清除",
-      "resetNoticeBody": "Kilo 无法打开保存在此设备上的聊天，因此已将聊天及其草稿删除。你的云端会话不受影响。",
+      "resetNoticeBody": "Kilo 无法打开保存在此设备上的聊天。你的云端会话不受影响。",
       "resetNoticeDismiss": "忽略通知"
     },
     "rename": {

@@ -3909,7 +3909,7 @@
       "new": "Új csevegés",
       "deleteTitle": "Törli ezt a csevegést?",
       "resetNoticeTitle": "A helyi csevegések és piszkozatok törlődtek",
-      "resetNoticeBody": "A Kilo nem tudta megnyitni az ezen az eszközön tárolt csevegéseket, ezért törölte őket és a piszkozataikat. A felhőben lévő munkameneteidet ez nem érinti.",
+      "resetNoticeBody": "A Kilo nem tudta megnyitni az ezen az eszközön tárolt csevegéseket. A felhőben lévő munkameneteidet ez nem érinti.",
       "resetNoticeDismiss": "Értesítés elvetése"
     },
     "rename": {

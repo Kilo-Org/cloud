@@ -3909,7 +3909,7 @@
       "new": "Txat berria",
       "deleteTitle": "Txat hau ezabatu?",
       "resetNoticeTitle": "Tokiko txatak eta zirriborroak ezabatu dira",
-      "resetNoticeBody": "Kilok ezin izan zituen gailu honetan gordetako txatak ireki, beraz, horiek eta beren zirriborroak ezabatu zituen. Zure hodeiko saioei ez die eragin.",
+      "resetNoticeBody": "Kilok ezin izan zituen gailu honetan gordetako txatak ireki. Zure hodeiko saioei ez die eragin.",
       "resetNoticeDismiss": "Baztertu oharra"
     },
     "rename": {

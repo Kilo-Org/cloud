@@ -3982,7 +3982,7 @@
       "new": "Novi razgovor",
       "deleteTitle": "Izbrisati ovaj razgovor?",
       "resetNoticeTitle": "Lokalni razgovori i nacrti su izbrisani",
-      "resetNoticeBody": "Kilo nije mogao otvoriti razgovore spremljene na ovom uređaju pa ih je uklonio s njihovim nacrtima. Vaše sesije u oblaku nisu pogođene.",
+      "resetNoticeBody": "Kilo nije mogao otvoriti razgovore spremljene na ovom uređaju. Vaše sesije u oblaku nisu pogođene.",
       "resetNoticeDismiss": "Odbaci obavijest"
     },
     "rename": {

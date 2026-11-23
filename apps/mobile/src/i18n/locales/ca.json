@@ -3982,7 +3982,7 @@
       "new": "Xat nou",
       "deleteTitle": "Vols suprimir aquest xat?",
       "resetNoticeTitle": "Els xats i esborranys locals s'han esborrat",
-      "resetNoticeBody": "Kilo no ha pogut obrir els xats desats en aquest dispositiu, així que els ha esborrat amb els seus esborranys. Les teves sessions al núvol no es veuen afectades.",
+      "resetNoticeBody": "Kilo no ha pogut obrir els xats desats en aquest dispositiu. Les teves sessions al núvol no es veuen afectades.",
       "resetNoticeDismiss": "Descarta l'avís"
     },
     "rename": {

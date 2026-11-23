@@ -3909,7 +3909,7 @@
       "new": "Nieuwe chat",
       "deleteTitle": "Deze chat verwijderen?",
       "resetNoticeTitle": "Lokale chats en concepten gewist",
-      "resetNoticeBody": "Kilo kon de chatgeschiedenis op dit apparaat niet laden en heeft de chats met de concepten verwijderd. Je sessies in de cloud zijn niet aangetast.",
+      "resetNoticeBody": "Kilo kon de chatgeschiedenis op dit apparaat niet laden. Je sessies in de cloud zijn niet aangetast.",
       "resetNoticeDismiss": "Melding negeren"
     },
     "rename": {

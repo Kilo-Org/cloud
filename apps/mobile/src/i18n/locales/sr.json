@@ -3982,7 +3982,7 @@
       "new": "Novo ćaskanje",
       "deleteTitle": "Izbrisati ovo ćaskanje?",
       "resetNoticeTitle": "Lokalna ćaskanja i nacrti su izbrisani",
-      "resetNoticeBody": "Kilo nije mogao da otvori ćaskanja sačuvana na ovom uređaju, pa ih je izbrisao i njihove nacrte. Vaše sesije u oblaku nisu pogođene.",
+      "resetNoticeBody": "Kilo nije mogao da otvori ćaskanja sačuvana na ovom uređaju. Vaše sesije u oblaku nisu pogođene.",
       "resetNoticeDismiss": "Odbaci obaveštenje"
     },
     "rename": {

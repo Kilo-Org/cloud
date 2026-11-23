@@ -3909,7 +3909,7 @@
       "new": "Nuwe klets",
       "deleteTitle": "Skrap hierdie klets?",
       "resetNoticeTitle": "Plaaslike klets en konsepte is verwyder",
-      "resetNoticeBody": "Kilo kon nie die klets wat op hierdie toestel gestoor is oopmaak nie, en het dit en die konsepte daarvan verwyder. Jou sessies in die wolk word nie geraak nie.",
+      "resetNoticeBody": "Kilo kon nie die klets wat op hierdie toestel gestoor is oopmaak nie. Jou sessies in die wolk word nie geraak nie.",
       "resetNoticeDismiss": "Verwerp kennisgewing"
     },
     "rename": {

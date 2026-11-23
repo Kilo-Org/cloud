@@ -3909,7 +3909,7 @@
       "new": "Nýtt spjall",
       "deleteTitle": "Eyða þessu spjalli?",
       "resetNoticeTitle": "Staðbundin spjöll og drög hreinsuð",
-      "resetNoticeBody": "Kilo gat ekki opnað spjöllin sem vistuð eru í þessu tæki og fjarlægði þau ásamt drögunum. Lotur þínar í skýinu eru ekki fyrir áhrifum.",
+      "resetNoticeBody": "Kilo gat ekki opnað spjöllin sem vistuð eru í þessu tæki. Lotur þínar í skýinu eru ekki fyrir áhrifum.",
       "resetNoticeDismiss": "Vísa tilkynningu frá"
     },
     "rename": {

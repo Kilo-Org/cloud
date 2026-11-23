@@ -4001,7 +4001,7 @@
       "new": "New chat",
       "deleteTitle": "Delete this chat?",
       "resetNoticeTitle": "Local chats and drafts were cleared",
-      "resetNoticeBody": "Kilo could not open the chats saved on this device, so it removed them and their drafts. Your cloud sessions are not affected.",
+      "resetNoticeBody": "Kilo could not open the chats saved on this device. Your cloud sessions are not affected.",
       "resetNoticeDismiss": "Dismiss notice"
     },
     "rename": {

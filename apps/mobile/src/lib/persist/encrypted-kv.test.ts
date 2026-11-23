@@ -58,6 +58,10 @@ let failClose = false;
 // Fails the next `deleteDatabaseAsync` the way a refused file delete does, so
 // the recovery's delete branch and its marker rollback can be proven.
 let failNextDelete = false;
+// Keys whose `setItemAsync` the fake keychain refuses, the way a closed
+// keychain refuses a write. A refusal must never reach the database key, so the
+// fake rejects only the keys listed here.
+const failSetKeys = new Set<string>();
 // Simulates a native build without SQLCipher: `PRAGMA cipher_version` returns
 // no row, exactly as plain SQLite does for an unrecognized pragma.
 let hasSQLCipher = true;
@@ -262,6 +266,9 @@ function createFakeDatabase(): FakeDatabase {
 vi.mock('expo-secure-store', () => ({
   getItemAsync: vi.fn(async (key: string) => store.get(key) ?? null),
   setItemAsync: vi.fn(async (key: string, value: string) => {
+    if (failSetKeys.has(key)) {
+      throw new Error('keychain refused the write');
+    }
     store.set(key, value);
   }),
   deleteItemAsync: vi.fn(async (key: string) => {
@@ -310,6 +317,7 @@ import {
   PERSIST_RESET_NOTICE_KEY,
 } from '@/lib/storage-keys';
 import { ProtectedDataUnavailableError, setProtectedDataAvailable } from '@/lib/protected-data';
+import { setTelemetrySink, type TelemetryEvent } from '@/lib/telemetry/error-sink';
 import {
   clearPersistedResetNotice,
   clearScope,
@@ -348,6 +356,7 @@ beforeEach(() => {
   failJournalMode = false;
   failClose = false;
   failNextDelete = false;
+  failSetKeys.clear();
   hasSQLCipher = true;
   cipherProbedAtSqlCount = -1;
   closeCallCount = 0;
@@ -881,6 +890,53 @@ describe('reset notice marker', () => {
       level: 'error',
       tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'reset' },
     });
+  });
+
+  it('a refused marker write still recreates the store and reports the refusal', async () => {
+    // The keychain refuses the marker while protected data reads as available,
+    // so `writeStoredValueSafe` answers `false` on its own. The delete already
+    // removed the data, so a silent refusal would leave the person with neither
+    // the notice nor any record of the loss.
+    failSetKeys.add(PERSIST_RESET_NOTICE_KEY);
+    const events: TelemetryEvent[] = [];
+    setTelemetrySink(event => {
+      events.push(event);
+    });
+    try {
+      failNextProbe = true;
+
+      // The recovery completes: a refused marker is reported, not fatal.
+      await expect(setItem('s', 'a', 'x')).resolves.toBeUndefined();
+    } finally {
+      setTelemetrySink(null);
+    }
+
+    // The data was removed and the store was recreated under a fresh key.
+    expect(SQLite.deleteDatabaseAsync).toHaveBeenCalledWith('kilo-persist.db');
+    expect(store.get(PERSIST_DB_KEY)).toMatch(/^02[0-9a-f]{62}$/);
+    await expect(getItem('s', 'a')).resolves.toBe('x');
+    // The marker did not land, which is exactly what the report has to say.
+    expect(store.get(PERSIST_RESET_NOTICE_KEY)).toBeUndefined();
+    expect(SecureStore.setItemAsync).toHaveBeenCalledWith(PERSIST_RESET_NOTICE_KEY, '1');
+
+    // The secure-store helper still reports its own failed write.
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        level: 'warning',
+        tags: { 'error.subsystem': 'secure_store', 'error.operation': 'write' },
+      })
+    );
+    // The reset is still reported under its own operation, and the marker
+    // refusal carries its own tag so the two never merge into one issue.
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      level: 'warning',
+      tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'reset' },
+    });
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      level: 'warning',
+      tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'reset-notice-marker' },
+    });
+    expect(Sentry.captureException).toHaveBeenCalledTimes(2);
   });
 });
 

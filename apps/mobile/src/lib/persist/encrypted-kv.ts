@@ -449,6 +449,26 @@ async function keepDatabaseAndRethrow(db: KVDatabase | undefined, cause: unknown
   throw cause;
 }
 
+/**
+ * Writes the marker the chat list reads as the reset notice.
+ *
+ * The marker follows the delete: only a file that was actually removed may be
+ * reported, so this runs after `deleteDatabaseAsync` resolves. A marker that
+ * did not land leaves the data deleted with no explanation and no record, so
+ * the refusal is reported here. `writeStoredValueSafe` reports a rejected
+ * write itself, but answers `false` silently while the keychain is closed, and
+ * the delete above can land in exactly that window.
+ */
+async function markResetNotice(): Promise<void> {
+  if (await writeStoredValueSafe(PERSIST_RESET_NOTICE_KEY, '1')) {
+    return;
+  }
+  Sentry.captureException(new Error('reset notice marker not written'), {
+    level: 'warning',
+    tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'reset-notice-marker' },
+  });
+}
+
 async function openEncryptedDatabase(): Promise<KVDatabase> {
   const key = await readOrCreateKey();
   let db: KVDatabase | undefined = undefined;
@@ -553,9 +573,11 @@ async function openEncryptedDatabase(): Promise<KVDatabase> {
       // claiming a loss that did not happen. The window this leaves is the
       // opposite one — a crash between the delete and the write reports
       // nothing — which loses an explanation in a rare process death instead of
-      // inventing one the person never suffered.
+      // inventing one the person never suffered. A marker that the keychain
+      // refuses is reported by {@link markResetNotice}: the data is already
+      // gone, so a silent refusal would leave a loss with no record.
       await SQLite.deleteDatabaseAsync(DATABASE_NAME);
-      await writeStoredValueSafe(PERSIST_RESET_NOTICE_KEY, '1');
+      await markResetNotice();
       const freshKey = await generateAndStoreKey();
       reopened = await openWithKey(freshKey);
       probeSchema(reopened);

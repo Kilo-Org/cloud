@@ -3909,7 +3909,7 @@
       "new": "Chat novo",
       "deleteTitle": "Eliminar este chat?",
       "resetNoticeTitle": "Borráronse os chats e os borradores locais",
-      "resetNoticeBody": "Kilo non puido abrir os chats gardados neste dispositivo, polo que os eliminou xunto cos seus borradores. As túas sesións na nube non se ven afectadas.",
+      "resetNoticeBody": "Kilo non puido abrir os chats gardados neste dispositivo. As túas sesións na nube non se ven afectadas.",
       "resetNoticeDismiss": "Descartar o aviso"
     },
     "rename": {

@@ -3909,7 +3909,7 @@
       "new": "Yeni sohbet",
       "deleteTitle": "Bu sohbet silinsin mi?",
       "resetNoticeTitle": "Yerel sohbetler ve taslaklar temizlendi",
-      "resetNoticeBody": "Kilo bu cihazda kayıtlı sohbetleri açamadı, bu yüzden onları ve taslaklarını kaldırdı. Bulut oturumlarınız etkilenmedi.",
+      "resetNoticeBody": "Kilo bu cihazda kayıtlı sohbetleri açamadı. Bulut oturumlarınız etkilenmedi.",
       "resetNoticeDismiss": "Bildirimi yok say"
     },
     "rename": {

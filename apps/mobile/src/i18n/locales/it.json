@@ -3982,7 +3982,7 @@
       "new": "Nuova chat",
       "deleteTitle": "Eliminare questa chat?",
       "resetNoticeTitle": "Chat e bozze locali cancellate",
-      "resetNoticeBody": "Kilo non è riuscito ad aprire le chat salvate su questo dispositivo, quindi le ha rimosse insieme alle bozze. Le sessioni nel cloud non sono interessate.",
+      "resetNoticeBody": "Kilo non è riuscito ad aprire le chat salvate su questo dispositivo. Le sessioni nel cloud non sono interessate.",
       "resetNoticeDismiss": "Ignora l'avviso"
     },
     "rename": {

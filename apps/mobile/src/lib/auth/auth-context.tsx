@@ -31,6 +31,7 @@ import {
 } from '@/lib/deep-link-launch';
 import { resolveIncomingUrl } from '@kilocode/app-shared/universal-links';
 import { writeSignedOutSnapshotAndEnd } from '@/lib/glanceable/cleanup';
+import { clearHomeWidgetRefresh } from '@/lib/glanceable/home-widget-refresh';
 import { deleteAccountMetadata } from '@/lib/auth/account-metadata-write';
 import { runLogoutCleanup, unregisterActivityTokensAndTombstone } from '@/lib/auth/logout-cleanup';
 import { queryClient } from '@/lib/query-client';
@@ -73,7 +74,7 @@ import { clearReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
 import { clearHideThinkingPreference } from '@/lib/hooks/use-hide-thinking-preference';
 import {
   clearSessionScopedState,
-  clearSystemSearchIndexOnSignedOutLaunch,
+  clearDeviceWideStateOnSignedOutLaunch,
 } from '@/lib/auth/session-scoped-state';
 import { retireLoginAttempt } from '@/lib/login-draft';
 import { takeAccountIndependentLaunchUrl } from '@/lib/native-launcher-surfaces';
@@ -314,16 +315,17 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           setToken(stored);
           setCurrentDeepLinkUserId(readUserIdFromToken(stored));
         } else if (isCurrentAuthEpoch(epoch) && !isSignOutActive()) {
-          // A launch that positively restored no session owns the index: the
-          // sign-out teardown's clear is fire-and-forget and the process can
-          // be killed before it lands, so a failure there would leave the
-          // previous account's titles searchable for the whole signed-out
-          // window with nothing to retry it. Re-run the idempotent clear; the
-          // index sync is gated off while signed out, and the next sign-in
-          // re-indexes its own account from its own cache. A sign-out or
-          // sign-in in flight owns the index instead and fires its own clear,
-          // so the epoch and sign-out fences hold here as for every other
-          // publish in this bootstrap.
+          // A launch that positively restored no session owns the device-wide
+          // surfaces: the sign-out teardown's clears are fire-and-forget and
+          // the process can be killed before they land, so a failure there
+          // would leave the previous account's titles searchable — and its Home
+          // widget still refreshing with its own credential — for the whole
+          // signed-out window, with nothing to retry it. Re-run the idempotent
+          // clears; the index sync is gated off while signed out, and the next
+          // sign-in re-indexes its own account from its own cache. A sign-out or
+          // sign-in in flight owns those surfaces instead and fires its own
+          // clear, so the epoch and sign-out fences hold here as for every
+          // other publish in this bootstrap.
           // The clear of the launcher surfaces also drops the Quick Action URL
           // a cold start parks natively, and the sign-in path is that URL's
           // only staging reader. Take the destination that names no account
@@ -336,7 +338,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           if (parkedLaunchHref !== null && getPendingDeepLinkSnapshot() === null) {
             setPendingDeepLink(parkedLaunchHref, 'universal-link');
           }
-          clearSystemSearchIndexOnSignedOutLaunch();
+          clearDeviceWideStateOnSignedOutLaunch();
           // The account is now known to be none: a system-search destination
           // captured before this point is not this process's to open, so the
           // settle drops it instead of holding it for whoever signs in next.

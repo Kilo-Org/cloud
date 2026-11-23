@@ -92,32 +92,30 @@ const LAYOUT_ALLOWLIST = [
 const LAYOUT_EXEMPT_TREES = ['src/glanceable-ios/', 'src/glanceable-android/'];
 
 /**
- * Every utility that can write a page inset, with both facts a rule reads off
- * it: the `side` it moves and the `property` it writes, a padding or a margin.
- * One table so the two inset rules below cannot drift on which sides exist, and
- * so no caller probes the utility name to work out what it insets; each rule
- * still states its own policy on top of it.
+ * Every utility that can write a page inset, with the `property` it writes: a
+ * padding or a margin. One table so the two inset rules below cannot drift on
+ * which utilities exist, and so no caller probes the utility name to work out
+ * what it insets; each rule still states its own policy on top of it.
  *
  * The family is horizontal only: a page inset is the column a screen's content
  * sits in, so `mt-6` or `py-6` moves an element's own box and is not one. The
- * all-side `p`/`m` entries are here for the same reason as every other side:
- * both inset rules read this one table and each applies its own policy on top
- * of it — L2 the gutter on a surface that owns one, L12 anything wider than
- * the gutter.
+ * all-side `p`/`m` entries are here because both inset rules read this one
+ * table and each applies its own policy on top of it — L2 the gutter on a
+ * surface that owns one, L12 anything wider than the gutter.
  */
 const INSET_UTILITIES = new Map([
-  ['p', { side: 'all', property: 'padding' }],
-  ['px', { side: 'x', property: 'padding' }],
-  ['ps', { side: 's', property: 'padding' }],
-  ['pe', { side: 'e', property: 'padding' }],
-  ['pl', { side: 'l', property: 'padding' }],
-  ['pr', { side: 'r', property: 'padding' }],
-  ['m', { side: 'all', property: 'margin' }],
-  ['mx', { side: 'x', property: 'margin' }],
-  ['ms', { side: 's', property: 'margin' }],
-  ['me', { side: 'e', property: 'margin' }],
-  ['ml', { side: 'l', property: 'margin' }],
-  ['mr', { side: 'r', property: 'margin' }],
+  ['p', 'padding'],
+  ['px', 'padding'],
+  ['ps', 'padding'],
+  ['pe', 'padding'],
+  ['pl', 'padding'],
+  ['pr', 'padding'],
+  ['m', 'margin'],
+  ['mx', 'margin'],
+  ['ms', 'margin'],
+  ['me', 'margin'],
+  ['ml', 'margin'],
+  ['mr', 'margin'],
 ]);
 
 /**
@@ -233,7 +231,7 @@ export const LAYOUT_RULES = [
     // content on a column the rest of the app does not share — the 21pt
     // sheet-header label and 28pt empty-state paragraph the design gate read
     // as double insets both started as a class wider than the gutter. The
-    // detector reads `INSET_UTILITIES` through `parseInset`, so a side added
+    // detector reads `INSET_UTILITIES` through `parseInset`, so a utility added
     // to that table is judged here without this rule being edited.
     detectSurface: detectPageInsets,
     advice:
@@ -917,14 +915,13 @@ function utilityOf(token) {
 /**
  * One class token read as a page inset, or null when it is not one.
  *
- * `property` is what the utility insets — a padding or a margin — and `side`
- * is the side it moves; both come from the token's entry in `INSET_UTILITIES`,
- * so a rule states only the policy it owns on top of the same parse. A negative
- * token (`-mt-2`) parses the same way: the sign only decides which direction
- * the inset moves.
+ * `property` is what the utility insets — a padding or a margin — and comes
+ * from the token's entry in `INSET_UTILITIES`, so a rule states only the policy
+ * it owns on top of the same parse. A negative token (`-mt-2`) parses the same
+ * way: the sign only decides which direction the inset moves.
  *
  * The two inset rules read this one parse with different policies:
- * - L12 judges any page inset wider than the gutter, whatever its side or
+ * - L12 judges any page inset wider than the gutter, whatever its utility or
  *   step: `px-6`, `p-6`, `m-10` and `px-4.5` are one decision against
  *   `PAGE_GUTTER_STEPS`.
  * - L2 judges the page inset on a scroll content container, a `CenteredState`
@@ -938,11 +935,11 @@ function parseInset(token) {
     return null;
   }
   const [, utility, value] = match;
-  const entry = INSET_UTILITIES.get(utility);
-  if (entry === undefined) {
+  const property = INSET_UTILITIES.get(utility);
+  if (property === undefined) {
     return null;
   }
-  return { ...entry, utility, value };
+  return { property, utility, value };
 }
 
 /** True when one class token writes a page inset other than the `px-4`/`p-4` gutter. */
@@ -1754,6 +1751,15 @@ function layoutBaselineFailure(baseline) {
 }
 
 /**
+ * The line both kinds of unusable baseline report: an unparseable file and a
+ * malformed shape say the same thing, so the wording and the skipped-comparison
+ * promise have one edit site.
+ */
+function baselineReadFailure(cause) {
+  return `check-classes: cannot read the layout baseline from ${LAYOUT_BASELINE_PATH} (${cause}) — the layout baseline comparison cannot run without it and was skipped`;
+}
+
+/**
  * The baseline as written, with the reason it could not be used when it is
  * malformed. An absent file is an empty baseline, not a failure: the migration
  * may not have written one yet. A read error that is neither that nor a parse
@@ -1775,19 +1781,13 @@ function readLayoutBaseline() {
       return { baseline: {}, failure: null };
     }
     if (error instanceof SyntaxError) {
-      return {
-        baseline: {},
-        failure: `check-classes: cannot read the layout baseline from ${LAYOUT_BASELINE_PATH} (${firstLine(error)}) — the layout baseline comparison cannot run without it and was skipped`,
-      };
+      return { baseline: {}, failure: baselineReadFailure(firstLine(error)) };
     }
     throw error;
   }
   const failure = layoutBaselineFailure(parsed);
   if (failure !== null) {
-    return {
-      baseline: {},
-      failure: `check-classes: cannot read the layout baseline from ${LAYOUT_BASELINE_PATH} (${failure}) — the layout baseline comparison cannot run without it and was skipped`,
-    };
+    return { baseline: {}, failure: baselineReadFailure(failure) };
   }
   return { baseline: parsed, failure: null };
 }

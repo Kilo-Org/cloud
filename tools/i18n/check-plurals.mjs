@@ -539,10 +539,10 @@ export function checkDynamicCountedKeySources(rootDir = ROOT, reported = new Set
         }
       }
     }
-    // A file the parser refused has no declaration to read, and its parse
-    // problems already say so; naming every listed key as undeclared would
-    // only bury that line.
-    if (source.entry === null || source.problems.length > 0) {
+    // A module that could not be read or parsed has no declaration to read, and
+    // its own problem line already says so; naming every listed key as
+    // undeclared would only bury that line.
+    if (source.problems.length > 0) {
       continue;
     }
     if (!source.declarations.has(listed.declaration)) {

@@ -4516,7 +4516,7 @@
     "instructionsEmptyDescriptionReadOnly": "ئەو فایلە ڕێسایانەی کە لێرە زیادکراون، بۆ هەموو دانیشتنێک کە ئەم پرۆفایلە بەکاردەهێنێت جێبەجێ دەکرێن.",
     "instructionNameRequired": "ناوی فایلێک بنووسە",
     "instructionNameTooLong": "ناوی فایل دەبێت {{max}} پیت یان کەمتر بێت",
-    "instructionNameInvalid": "بە پیت یان ژمارەیەک دەست پێ بکە و تەنها پیتی بچووک، ژمارە و داش بەکاربهێنە",
+    "instructionNameInvalid": "بە پیتێکی بچووکی ASCII یان ژمارەیەک دەست پێ بکە و تەنها پیتی بچووکی ASCII، ژمارە و داش بەکاربهێنە",
     "instructionNameReserved": "ئەم ناوی فایلە پارێزراوە. یەکێکی تر هەڵبژێرە.",
     "instructionContentRequired": "ڕێنماییەکانی markdown بنووسە",
     "instructionNamePreview": "وەک {{name}} پاشەکەوت دەکرێت",

@@ -4516,7 +4516,7 @@
     "instructionsEmptyDescriptionReadOnly": "Ny rakitra fitsipika ampidirina eto dia ampiharina isaky ny mampiasa ity profil ity.",
     "instructionNameRequired": "Ampidiro ny anaran'ny rakitra",
     "instructionNameTooLong": "Tsy tokony hihoatra {{max}} tarehintsoratra ny anaran'ny rakitra",
-    "instructionNameInvalid": "Atombohy amin'ny litera na isa ary ampiasao litera kely, isa ary tsipika fotsiny",
+    "instructionNameInvalid": "Atombohy amin'ny litera ASCII na isa ary ampiasao litera kely ASCII, isa ary tsipika fotsiny",
     "instructionNameReserved": "Voatokana io anaran'ny rakitra io. Safidio ny hafa.",
     "instructionContentRequired": "Ampidiro ny markdown fitsipika",
     "instructionNamePreview": "Hotehirizina ho {{name}}",

@@ -24,17 +24,39 @@ export function instructionErrorKey(error: InstructionInputError): string {
 }
 
 /**
- * The name a save will store, when it differs from what was typed; `null` when
- * the typed name saves unchanged or the field is blank. The sheet renders this
- * under the name field, so a normalization is never silent.
+ * What the sheet states under the name field, as one state per outcome:
+ *
+ * - `none`: nothing to say, because the field is blank or the name saves as typed.
+ * - `preview`: a save will store `slug`, so a normalization is never silent.
+ * - `rule`: the fold leaves no ASCII name at all, so a save would refuse this
+ *   input as `bad-name`. The rule is stated before Save, not only after it.
  */
-export function instructionNamePreview(typed: string): string | null {
+export type InstructionNameHint =
+  | { readonly kind: 'none' }
+  | { readonly kind: 'rule' }
+  | { readonly kind: 'preview'; readonly slug: string };
+
+/** The hint the sheet shows for the name as typed. */
+export function instructionNameHint(typed: string): InstructionNameHint {
   const trimmed = typed.trim();
   if (trimmed.length === 0) {
-    return null;
+    return { kind: 'none' };
   }
   const saved = cleanInstructionName(trimmed);
-  return saved === trimmed || saved.length === 0 ? null : saved;
+  if (saved.length === 0) {
+    return { kind: 'rule' };
+  }
+  return saved === trimmed ? { kind: 'none' } : { kind: 'preview', slug: saved };
+}
+
+/**
+ * One value per hint, so a keystroke that leaves the hint the same keeps the
+ * previous object. The sheet stores the hint to render it, and a fresh object
+ * on every character would re-render the whole form on typing that changes
+ * nothing, which `lib/form-draft` forbids.
+ */
+export function instructionNameHintKey(hint: InstructionNameHint): string {
+  return hint.kind === 'preview' ? `preview:${hint.slug}` : hint.kind;
 }
 
 /**

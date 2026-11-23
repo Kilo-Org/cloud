@@ -4516,7 +4516,7 @@
     "instructionsEmptyDescriptionReadOnly": "Добавените тук файлове с правила се прилагат към всяка сесия, която използва този профил.",
     "instructionNameRequired": "Въведете име на файл",
     "instructionNameTooLong": "Името на файла трябва да е до {{max}} знака",
-    "instructionNameInvalid": "Започнете с буква или цифра и използвайте само малки букви, цифри и тирета",
+    "instructionNameInvalid": "Започнете с ASCII буква или цифра и използвайте само ASCII малки букви, цифри и тирета",
     "instructionNameReserved": "Това име на файл е запазено. Изберете друго.",
     "instructionContentRequired": "Въведете правилата в markdown",
     "instructionNamePreview": "Ще се запази като {{name}}",

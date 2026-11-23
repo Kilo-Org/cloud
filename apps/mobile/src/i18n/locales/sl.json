@@ -4684,7 +4684,7 @@
     "instructionsEmptyDescriptionReadOnly": "Datoteke s pravili, dodane tukaj, veljajo za vsako sejo, ki uporablja ta profil.",
     "instructionNameRequired": "Vnesite ime datoteke",
     "instructionNameTooLong": "Ime datoteke lahko ima največ {{max}} znakov",
-    "instructionNameInvalid": "Začnite s črko ali številko in uporabite le male črke, številke in pomišljaje",
+    "instructionNameInvalid": "Začnite z malo ASCII črko ali številko in uporabite le male ASCII črke, številke in pomišljaje",
     "instructionNameReserved": "To ime datoteke je rezervirano. Izberite drugo.",
     "instructionContentRequired": "Vnesite pravila v markdownu",
     "instructionNamePreview": "Shrani se kot {{name}}",

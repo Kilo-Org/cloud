@@ -4516,7 +4516,7 @@
     "instructionsEmptyDescriptionReadOnly": "Skedarët e rregullave të shtuar këtu zbatohen për çdo sesion që përdor këtë profil.",
     "instructionNameRequired": "Jep një emër skedari",
     "instructionNameTooLong": "Emri i skedarit duhet të ketë {{max}} karaktere ose më pak",
-    "instructionNameInvalid": "Fillo me një shkronjë ose shifër dhe përdor vetëm shkronja të vogla, shifra dhe viza",
+    "instructionNameInvalid": "Fillo me një shkronjë të vogël ASCII ose shifër dhe përdor vetëm shkronja të vogla ASCII, shifra dhe viza",
     "instructionNameReserved": "Ky emër skedari është i rezervuar. Zgjidh një tjetër.",
     "instructionContentRequired": "Jep rregullat markdown",
     "instructionNamePreview": "Ruhet si {{name}}",

@@ -4852,7 +4852,7 @@
     "instructionsEmptyDescriptionReadOnly": "Mae ffeiliau rheolau a ychwanegir yma yn cael eu cymhwyso i bob sesiwn sy'n defnyddio'r proffil hwn.",
     "instructionNameRequired": "Rhowch enw ffeil",
     "instructionNameTooLong": "Rhaid i enw'r ffeil fod yn {{max}} nod neu lai",
-    "instructionNameInvalid": "Dechreuwch gyda llythyren neu rif a defnyddiwch lythrennau bach, rhifau a llinellau tosturiol yn unig",
+    "instructionNameInvalid": "Dechreuwch gyda llythyren ASCII neu rif a defnyddiwch lythrennau bach ASCII, rhifau a llinellau tosturiol yn unig",
     "instructionNameReserved": "Mae'r enw ffeil hwnnw wedi'i gadw. Dewiswch un arall.",
     "instructionContentRequired": "Rhowch y rheolau markdown",
     "instructionNamePreview": "Yn cael ei gadw fel {{name}}",

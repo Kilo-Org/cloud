@@ -4516,7 +4516,7 @@
     "instructionsEmptyDescriptionReadOnly": "ଏଠାରେ ଯୋଡ଼ା ଯାଇଥିବା ନିୟମ ଫାଇଲଗୁଡ଼ିକ ଏହି ପ୍ରୋଫାଇଲ୍ ବ୍ୟବହାର କରୁଥିବା ପ୍ରତ୍ୟେକ ସେସନ୍ ଉପରେ ଲାଗୁ ହୁଏ।",
     "instructionNameRequired": "ଏକ ଫାଇଲ ନାମ ଦିଅନ୍ତୁ",
     "instructionNameTooLong": "ଫାଇଲ ନାମ {{max}} ଅକ୍ଷର କିମ୍ବା ତାହାଠାରୁ କମ ହେବା ଉଚିତ",
-    "instructionNameInvalid": "ଏକ ଅକ୍ଷର କିମ୍ବା ସଂଖ୍ୟାରେ ଆରମ୍ଭ କରନ୍ତୁ ଏବଂ କେବଳ ଛୋଟ ଅକ୍ଷର, ସଂଖ୍ୟା ଓ ଡ୍ୟାସ ବ୍ୟବହାର କରନ୍ତୁ",
+    "instructionNameInvalid": "ଏକ ASCII ଲୋୟର କେସ୍ ଅକ୍ଷର କିମ୍ବା ସଂଖ୍ୟାରେ ଆରମ୍ଭ କରନ୍ତୁ ଏବଂ କେବଳ ASCII ଲୋୟର କେସ୍ ଅକ୍ଷର, ସଂଖ୍ୟା ଓ ଡ୍ୟାସ ବ୍ୟବହାର କରନ୍ତୁ",
     "instructionNameReserved": "ସେହି ଫାଇଲ ନାମ ସଂରକ୍ଷିତ। ଅନ୍ୟଟି ବାଛନ୍ତୁ।",
     "instructionContentRequired": "ନିୟମ ମାର୍କଡାଉନ ଦିଅନ୍ତୁ",
     "instructionNamePreview": "{{name}} ଭାବରେ ସେଭ ହେବ",

@@ -4600,7 +4600,7 @@
     "instructionsEmptyDescriptionReadOnly": "Šeit pievienotie noteikumu faili tiek piemēroti visām sesijām, kurās tiek izmantots šis profils.",
     "instructionNameRequired": "Ievadiet faila nosaukumu",
     "instructionNameTooLong": "Faila nosaukumā drīkst būt ne vairāk kā {{max}} rakstzīmes",
-    "instructionNameInvalid": "Sāciet ar burtu vai ciparu un izmantojiet tikai mazos burtus, ciparus un domuzīmes",
+    "instructionNameInvalid": "Sāciet ar ASCII burtu vai ciparu un izmantojiet tikai mazos ASCII burtus, ciparus un domuzīmes",
     "instructionNameReserved": "Šis faila nosaukums ir rezervēts. Izvēlieties citu.",
     "instructionContentRequired": "Ievadiet noteikumu markdown",
     "instructionNamePreview": "Saglabās kā {{name}}",

@@ -4516,7 +4516,7 @@
     "instructionsEmptyDescriptionReadOnly": "येथे जोडलेल्या नियम फाइल्स या प्रोफाइलचा वापर करणाऱ्या प्रत्येक सत्रावर लागू होतात.",
     "instructionNameRequired": "फाइलचे नाव टाका",
     "instructionNameTooLong": "फाइलचे नाव {{max}} अक्षरांपेक्षा जास्त नसावे",
-    "instructionNameInvalid": "अक्षर किंवा अंकाने सुरू करा आणि फक्त लहान अक्षरे, अंक व डॅश वापरा",
+    "instructionNameInvalid": "ASCII लोअरकेस अक्षर किंवा अंकाने सुरू करा आणि फक्त ASCII लोअरकेस अक्षरे, अंक व डॅश वापरा",
     "instructionNameReserved": "हे फाइल नाव राखीव आहे. दुसरे निवडा.",
     "instructionContentRequired": "नियम मार्कडाउन टाका",
     "instructionNamePreview": "{{name}} म्हणून सेव्ह होईल",

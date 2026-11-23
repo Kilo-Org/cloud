@@ -4684,7 +4684,7 @@
     "instructionsEmptyDescriptionReadOnly": "Os arquivos de regras adicionados aqui são aplicados a todas as sessões que usam este perfil.",
     "instructionNameRequired": "Informe um nome de arquivo",
     "instructionNameTooLong": "O nome do arquivo deve ter no máximo {{max}} caracteres",
-    "instructionNameInvalid": "Comece com letra ou número e use apenas letras minúsculas, números e hífens",
+    "instructionNameInvalid": "Comece com uma letra ASCII minúscula ou número e use apenas letras ASCII minúsculas, números e hífens",
     "instructionNameReserved": "Esse nome de arquivo é reservado. Escolha outro.",
     "instructionContentRequired": "Informe as regras em markdown",
     "instructionNamePreview": "Salvo como {{name}}",

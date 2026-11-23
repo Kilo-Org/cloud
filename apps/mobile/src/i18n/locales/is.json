@@ -4516,7 +4516,7 @@
     "instructionsEmptyDescriptionReadOnly": "Regluskrár sem bætt er við hér gilda fyrir hverja lotu sem notar þennan prófíl.",
     "instructionNameRequired": "Sláðu inn skráarnafn",
     "instructionNameTooLong": "Skráarnafn má vera að hámarki {{max}} stafir",
-    "instructionNameInvalid": "Byrjaðu á bókstaf eða tölustaf og notaðu aðeins lágstafi, tölustafi og bandstrik",
+    "instructionNameInvalid": "Byrjaðu á lágstaf (ASCII) eða tölustaf og notaðu aðeins lágstafi (ASCII), tölustafi og bandstrik",
     "instructionNameReserved": "Þetta skráarnafn er frátekið. Veldu annað.",
     "instructionContentRequired": "Sláðu inn reglurnar í markdown",
     "instructionNamePreview": "Vistast sem {{name}}",

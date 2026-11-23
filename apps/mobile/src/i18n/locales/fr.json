@@ -4600,7 +4600,7 @@
     "instructionsEmptyDescriptionReadOnly": "Les fichiers de règles ajoutés ici s'appliquent à chaque session qui utilise ce profil.",
     "instructionNameRequired": "Saisissez un nom de fichier",
     "instructionNameTooLong": "Le nom doit faire {{max}} caractères ou moins",
-    "instructionNameInvalid": "Commencez par une lettre ou un chiffre, puis uniquement des minuscules, chiffres et tirets",
+    "instructionNameInvalid": "Commencez par une lettre ASCII minuscule ou un chiffre, puis uniquement des minuscules ASCII, chiffres et tirets",
     "instructionNameReserved": "Ce nom de fichier est réservé. Choisissez-en un autre.",
     "instructionContentRequired": "Saisissez le markdown des règles",
     "instructionNamePreview": "Enregistré sous {{name}}",

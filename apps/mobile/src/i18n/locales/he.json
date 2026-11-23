@@ -4600,7 +4600,7 @@
     "instructionsEmptyDescriptionReadOnly": "קובצי כללים שנוספים כאן חלים על כל סשן שמשתמש בפרופיל הזה.",
     "instructionNameRequired": "הזינו שם קובץ",
     "instructionNameTooLong": "שם הקובץ חייב להכיל {{max}} תווים לכל היותר",
-    "instructionNameInvalid": "התחילו באות או בספרה והשתמשו רק באותיות לטיניות קטנות, ספרות ומקפים",
+    "instructionNameInvalid": "התחילו באות קטנה באנגלית (ASCII) או בספרה והשתמשו רק באותיות לטיניות קטנות, ספרות ומקפים",
     "instructionNameReserved": "שם הקובץ הזה שמור. בחרו שם אחר.",
     "instructionContentRequired": "הזינו את חוקי ה-Markdown",
     "instructionNamePreview": "יישמר בשם {{name}}",

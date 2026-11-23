@@ -4516,7 +4516,7 @@
     "instructionsEmptyDescriptionReadOnly": "Энд нэмсэн дүрмийн файлууд энэ профайлыг ашигладаг бүх сешнд хэрэгжинэ.",
     "instructionNameRequired": "Файлын нэр оруулна уу",
     "instructionNameTooLong": "Файлын нэр {{max}} тэмдэгтээс ихгүй байх ёстой",
-    "instructionNameInvalid": "Үсэг эсвэл тоогоор эхэлж, зөвхөн жижиг үсэг, тоо, зураас ашиглана уу",
+    "instructionNameInvalid": "ASCII жижиг үсэг эсвэл тоогоор эхэлж, зөвхөн ASCII жижиг үсэг, тоо, зураас ашиглана уу",
     "instructionNameReserved": "Энэ файлын нэр нөөцлөгдсөн. Өөр нэр сонгоно уу.",
     "instructionContentRequired": "Дүрмийн markdown оруулна уу",
     "instructionNamePreview": "{{name}} нэрээр хадгална",

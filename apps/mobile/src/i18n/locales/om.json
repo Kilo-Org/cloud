@@ -4516,7 +4516,7 @@
     "instructionsEmptyDescriptionReadOnly": "Faayiloonni seeraa asitti dabalaman seshinii hunda kan profaayilii kana fayyadamu irratti hojiirra oolamu.",
     "instructionNameRequired": "Maqaa faayilii galchi",
     "instructionNameTooLong": "Maqaan faayilii qubee {{max}} gadi ykn walqixa ta'uu qaba",
-    "instructionNameInvalid": "Qubee ykn lakkoofsaan jalqabi; qubee xixiqqaa, lakkoofsaa fi '-' qofa fayyadami",
+    "instructionNameInvalid": "Qubee xixiqqaa ASCII ykn lakkoofsaan jalqabi; qubee xixiqqaa ASCII, lakkoofsaa fi '-' qofa fayyadami",
     "instructionNameReserved": "Maqaan faayilii sun qorateeffameera. Kan biraa filadhu.",
     "instructionContentRequired": "Seera markdown galchi",
     "instructionNamePreview": "Akka {{name}}tti olkaa'ama",

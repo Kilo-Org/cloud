@@ -4516,7 +4516,7 @@
     "instructionsEmptyDescriptionReadOnly": "فایل‌های قواعدی که اینجا اضافه می‌شوند برای هر نشستی که از این پروفایل استفاده می‌کند اعمال می‌شوند.",
     "instructionNameRequired": "یک نام فایل وارد کنید",
     "instructionNameTooLong": "نام فایل باید {{max}} نویسه یا کمتر باشد",
-    "instructionNameInvalid": "با حرف یا رقم شروع کنید و فقط از حروف کوچک، ارقام و خط تیره استفاده کنید",
+    "instructionNameInvalid": "با حرف کوچک ASCII یا رقم شروع کنید و فقط از حروف کوچک ASCII، ارقام و خط تیره استفاده کنید",
     "instructionNameReserved": "این نام فایل رزرو شده است. نام دیگری انتخاب کنید.",
     "instructionContentRequired": "مارک‌داون قواعد را وارد کنید",
     "instructionNamePreview": "با نام {{name}} ذخیره می‌شود",

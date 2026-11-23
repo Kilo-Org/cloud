@@ -4444,7 +4444,7 @@
     "instructionsEmptyDescriptionReadOnly": "ဤနေရာတွင် ထည့်သွင်းထားသော စည်းမျဉ်းဖိုင်များကို ဤပရိုဖိုင်ကို အသုံးပြုသော ဆက်ရှင်တိုင်းတွင် အသုံးချပါသည်။",
     "instructionNameRequired": "ဖိုင်အမည် ထည့်ပါ",
     "instructionNameTooLong": "ဖိုင်အမည်သည် စာလုံး {{max}} လုံးထက် မကျော်ရပါ",
-    "instructionNameInvalid": "စာလုံး သို့မဟုတ် ဂဏန်းဖြင့် စတင်ပြီး အင်္ဂလိပ်စာလုံးအသေး၊ ဂဏန်းနှင့် မျဉ်းတိုသာ သုံးပါ",
+    "instructionNameInvalid": "ASCII စာလုံးသေး သို့မဟုတ် ဂဏန်းဖြင့် စတင်ပြီး အင်္ဂလိပ်စာလုံးအသေး၊ ဂဏန်းနှင့် မျဉ်းတိုသာ သုံးပါ",
     "instructionNameReserved": "ဤဖိုင်အမည်ကို သီးသန့်သိမ်းထားသည်။ အခြားတစ်ခု ရွေးပါ။",
     "instructionContentRequired": "စည်းမျဉ်း markdown ထည့်ပါ",
     "instructionNamePreview": "{{name}} အမည်ဖြင့် သိမ်းမည်",

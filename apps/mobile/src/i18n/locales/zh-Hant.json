@@ -4439,7 +4439,7 @@
     "instructionsEmptyDescriptionReadOnly": "在此新增的規則檔案會套用至使用此設定檔的每個工作階段。",
     "instructionNameRequired": "請輸入檔案名稱",
     "instructionNameTooLong": "檔案名稱必須為 {{max}} 個字元以內",
-    "instructionNameInvalid": "請以字母或數字開頭，且只能使用小寫字母、數字與連字號",
+    "instructionNameInvalid": "請以 ASCII 小寫字母或數字開頭，且只能使用 ASCII 小寫字母、數字與連字號",
     "instructionNameReserved": "該檔案名稱為保留名稱，請選擇其他名稱。",
     "instructionContentRequired": "請輸入規則 Markdown",
     "instructionNamePreview": "儲存為 {{name}}",

@@ -4684,7 +4684,7 @@
     "instructionsEmptyDescriptionReadOnly": "Os ficheiros de regras adicionados aqui são aplicados a todas as sessões que utilizam este perfil.",
     "instructionNameRequired": "Introduza um nome de ficheiro",
     "instructionNameTooLong": "O nome do ficheiro deve ter {{max}} caracteres ou menos",
-    "instructionNameInvalid": "Comece com uma letra ou dígito e use apenas letras minúsculas, dígitos e hífenes",
+    "instructionNameInvalid": "Comece com uma letra minúscula ASCII ou dígito e use apenas letras minúsculas ASCII, dígitos e hífenes",
     "instructionNameReserved": "Esse nome de ficheiro está reservado. Escolha outro.",
     "instructionContentRequired": "Introduza o markdown das regras",
     "instructionNamePreview": "É guardado como {{name}}",

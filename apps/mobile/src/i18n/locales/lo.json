@@ -4443,7 +4443,7 @@
     "instructionsEmptyDescriptionReadOnly": "ໄຟລ໌ກົດລະບຽບທີ່ເພີ່ມຢູ່ນີ້ຈະຖືກນຳໃຊ້ກັບທຸກເຊສຊັນທີ່ໃຊ້ໂປຣໄຟລ໌ນີ້.",
     "instructionNameRequired": "ປ້ອນຊື່ໄຟລ໌",
     "instructionNameTooLong": "ຊື່ໄຟລ໌ຕ້ອງມີບໍ່ເກີນ {{max}} ໂຕອັກສອນ",
-    "instructionNameInvalid": "ເລີ່ມດ້ວຍຕົວອັກສອນ ຫຼື ຕົວເລກ ແລະ ໃຊ້ພຽງຕົວອັກສອນນ້ອຍ, ຕົວເລກ ແລະ ເສັ້ນຂີດ",
+    "instructionNameInvalid": "ເລີ່ມດ້ວຍຕົວອັກສອນພິມນ້ອຍ ASCII ຫຼື ຕົວເລກ ແລະ ໃຊ້ພຽງຕົວອັກສອນພິມນ້ອຍ ASCII, ຕົວເລກ ແລະ ເສັ້ນຂີດ",
     "instructionNameReserved": "ຊື່ໄຟລ໌ນີ້ຖືກສະຫງວນໄວ້. ເລືອກຊື່ອື່ນ.",
     "instructionContentRequired": "ປ້ອນກົດເກນ markdown",
     "instructionNamePreview": "ຈະບັນທຶກເປັນ {{name}}",

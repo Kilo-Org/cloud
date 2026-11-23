@@ -4600,7 +4600,7 @@
     "instructionsEmptyDescriptionReadOnly": "Fișierele de reguli adăugate aici se aplică fiecărei sesiuni care utilizează acest profil.",
     "instructionNameRequired": "Introdu un nume de fișier",
     "instructionNameTooLong": "Numele fișierului trebuie să aibă cel mult {{max}} caractere",
-    "instructionNameInvalid": "Începe cu o literă sau cifră și folosește doar litere mici, cifre și cratime",
+    "instructionNameInvalid": "Începe cu o literă mică ASCII sau cifră și folosește doar litere mici ASCII, cifre și cratime",
     "instructionNameReserved": "Acest nume de fișier este rezervat. Alege altul.",
     "instructionContentRequired": "Introdu regulile markdown",
     "instructionNamePreview": "Se salvează ca {{name}}",

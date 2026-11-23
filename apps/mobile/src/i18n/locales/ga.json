@@ -4768,7 +4768,7 @@
     "instructionsEmptyDescriptionReadOnly": "Cuirtear na comhaid rialacha a chuirtear leis anseo i bhfeidhm ar gach seisiún a úsáideann an próifíl seo.",
     "instructionNameRequired": "Iontráil ainm comhaid",
     "instructionNameTooLong": "Caithfidh ainm an chomhaid a bheith {{max}} carachtar nó níos lú",
-    "instructionNameInvalid": "Tosaigh le litir nó le digit agus ná húsáid ach litreacha beaga, digití agus fleiscíní",
+    "instructionNameInvalid": "Tosaigh le litir bheag ASCII nó le digit agus ná húsáid ach litreacha beaga ASCII, digití agus fleiscíní",
     "instructionNameReserved": "Tá an t-ainm comhaid sin curtha in áirithe. Roghnaigh ceann eile.",
     "instructionContentRequired": "Iontráil na rialacha markdown",
     "instructionNamePreview": "Sábhálfar mar {{name}}",

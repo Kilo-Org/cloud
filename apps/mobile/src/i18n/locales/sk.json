@@ -4684,7 +4684,7 @@
     "instructionsEmptyDescriptionReadOnly": "Súbory pravidiel pridané sem sa uplatňujú na každú reláciu, ktorá používa tento profil.",
     "instructionNameRequired": "Zadajte názov súboru",
     "instructionNameTooLong": "Názov súboru môže mať najviac {{max}} znakov",
-    "instructionNameInvalid": "Začnite písmenom alebo číslicou a používajte len malé písmená, číslice a pomlčky",
+    "instructionNameInvalid": "Začnite malým písmenom ASCII alebo číslicou a používajte len malé písmená ASCII, číslice a pomlčky",
     "instructionNameReserved": "Tento názov súboru je vyhradený. Vyberte iný.",
     "instructionContentRequired": "Zadajte pravidlá v markdowne",
     "instructionNamePreview": "Uloží sa ako {{name}}",

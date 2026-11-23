@@ -4516,7 +4516,7 @@
     "instructionsEmptyDescriptionReadOnly": "Датотеките со правила додадени овде се применуваат на секоја сесија што го користи овој профил.",
     "instructionNameRequired": "Внесете име на датотека",
     "instructionNameTooLong": "Името на датотеката мора да има {{max}} знаци или помалку",
-    "instructionNameInvalid": "Започнете со буква или број и користете само мали букви, бројки и цртички",
+    "instructionNameInvalid": "Започнете со мала ASCII буква или број и користете само ASCII мали букви, бројки и цртички",
     "instructionNameReserved": "Тоа име на датотека е резервирано. Изберете друго.",
     "instructionContentRequired": "Внесете ги правилата во Markdown",
     "instructionNamePreview": "Се зачувува како {{name}}",

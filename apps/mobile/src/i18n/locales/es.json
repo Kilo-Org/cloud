@@ -4600,7 +4600,7 @@
     "instructionsEmptyDescriptionReadOnly": "Los archivos de reglas que se añaden aquí se aplican a todas las sesiones que utilizan este perfil.",
     "instructionNameRequired": "Introduce un nombre de archivo",
     "instructionNameTooLong": "El nombre debe tener {{max}} caracteres o menos",
-    "instructionNameInvalid": "Empieza con una letra o número y usa solo minúsculas, números y guiones",
+    "instructionNameInvalid": "Empieza con una letra ASCII o número y usa solo letras ASCII minúsculas, números y guiones",
     "instructionNameReserved": "Ese nombre de archivo está reservado. Elige otro.",
     "instructionContentRequired": "Introduce las reglas en markdown",
     "instructionNamePreview": "Se guarda como {{name}}",

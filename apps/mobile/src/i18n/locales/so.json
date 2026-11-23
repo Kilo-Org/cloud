@@ -4516,7 +4516,7 @@
     "instructionsEmptyDescriptionReadOnly": "Faylalka xeerarka ee halkan lagu daro waxay khuseeyaan fadhi kasta oo isticmaala borofaylkan.",
     "instructionNameRequired": "Geli magaca faylka",
     "instructionNameTooLong": "Magaca faylku waa inuu ka badnaan {{max}} xaraf",
-    "instructionNameInvalid": "Ku bilow xaraf ama lambar, oo isticmaal oo kaliya xarfaha yaryar, lambarrada, iyo xariijimo",
+    "instructionNameInvalid": "Ku bilow xaraf ASCII yar ama lambar, oo isticmaal oo kaliya xarfaha ASCII yaryar, lambarrada, iyo xariijimo",
     "instructionNameReserved": "Magaca faylkaas waa la horey u qaatay. Dooro mid kale.",
     "instructionContentRequired": "Geli xeerarka markdown",
     "instructionNamePreview": "Waxaa lagu kaydinayaa {{name}}",

@@ -4516,7 +4516,7 @@
     "instructionsEmptyDescriptionReadOnly": "Ang mga rules file na idinagdag dito ay inilalapat sa bawat session na gumagamit ng profile na ito.",
     "instructionNameRequired": "Maglagay ng pangalan ng file",
     "instructionNameTooLong": "Ang pangalan ng file ay dapat {{max}} character o mas kaunti",
-    "instructionNameInvalid": "Magsimula sa titik o digit at gumamit lamang ng maliliit na titik, digit, at gitling",
+    "instructionNameInvalid": "Magsimula sa maliit na ASCII na titik o digit at gumamit lamang ng maliliit na ASCII na titik, digit, at gitling",
     "instructionNameReserved": "Nakareserba ang pangalan ng file na iyon. Pumili ng iba.",
     "instructionContentRequired": "Ilagay ang markdown ng mga patakaran",
     "instructionNamePreview": "Mase-save bilang {{name}}",

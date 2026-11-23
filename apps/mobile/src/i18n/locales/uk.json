@@ -4684,7 +4684,7 @@
     "instructionsEmptyDescriptionReadOnly": "Файли правил, додані тут, застосовуються до кожного сеансу, що використовує цей профіль.",
     "instructionNameRequired": "Введіть ім'я файлу",
     "instructionNameTooLong": "Ім'я файлу має містити не більше {{max}} символів",
-    "instructionNameInvalid": "Почніть з літери чи цифри й використовуйте лише малі літери, цифри та дефіси",
+    "instructionNameInvalid": "Почніть з малої літери ASCII чи цифри й використовуйте лише малі літери ASCII, цифри та дефіси",
     "instructionNameReserved": "Це ім'я файлу зарезервоване. Виберіть інше.",
     "instructionContentRequired": "Введіть правила у форматі markdown",
     "instructionNamePreview": "Збережеться як {{name}}",

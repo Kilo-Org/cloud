@@ -1,6 +1,7 @@
 /* eslint-disable max-lines -- the crawl reads the session tree, bounds and materializes bytes, and assembles the mirror entries as one cohesive module */
 import { type File } from 'expo-file-system';
 import { fetch } from 'expo/fetch';
+import { z } from 'zod';
 
 import { parseCloudAgentAttachmentUrl } from '@/components/agents/file-part-preview';
 import { stripDataUrlBase64Prefix } from '@/components/agents/tool-card-image-cache';
@@ -627,11 +628,22 @@ async function downloadAllowedArtifact(url: string, target: File): Promise<File>
 // `messages` comes off tRPC as a trusted-shaped but statically unknown payload,
 // so the walk checks each level before it reads it. A top-level part's
 // guaranteed fields are declared here and a genuinely optional one (filename,
-// state, attachments) stays optional, but an attachment entry is checked before
-// use the way the live sink checks it (`isToolAttachment` in
+// state, attachments) stays optional, but an attachment entry is parsed against
+// the live sink's own checks (`isToolAttachment` in
 // `packages/cloud-agent-sdk/src/part-utils.ts`), because a stored page carries
 // no event schema in front of its parts.
 type LooseAttachment = { filename?: string; mime: string; url: string };
+
+/**
+ * One stored tool attachment entry, as the walk may read it: `mime` and `url`
+ * are strings. Parsed rather than asserted, because the entry is unknown input
+ * whose shape a stored page can get wrong.
+ */
+const storedAttachmentSchema = z.object({
+  filename: z.string().optional(),
+  mime: z.string(),
+  url: z.string(),
+});
 type LooseToolState = { attachments?: unknown[]; status: string };
 type LoosePart = {
   filename?: string;
@@ -862,41 +874,38 @@ function collectPartArtifacts(part: LoosePart, artifacts: CrawledArtifact[]): vo
   }
 
   for (let index = 0; index < attachments.length; index += 1) {
-    const attachment = attachments[index];
     // The stored position names the artifact, so it stays the index even when
     // an earlier entry is skipped and two attachments share one tool part.
-    if (!isReadableAttachment(attachment) || !keepsAttachment(part, attachment)) {
-      continue;
+    const attachment = readableAttachment(attachments[index]);
+    if (attachment !== null && keepsAttachment(part, attachment)) {
+      artifacts.push({
+        id: index === 0 ? part.id : `${part.id}-${index}`,
+        mime: attachment.mime,
+        ...(attachment.filename ? { filename: attachment.filename } : {}),
+        url: attachment.url,
+      });
     }
-    artifacts.push({
-      id: index === 0 ? part.id : `${part.id}-${index}`,
-      mime: attachment.mime,
-      ...(attachment.filename ? { filename: attachment.filename } : {}),
-      url: attachment.url,
-    });
   }
 }
 
 /**
- * Read one tool attachment entry: an object, not an array, whose `mime` and
- * `url` are strings, with a `url` that names something to fetch. The live sink
- * applies the same two checks — `isToolAttachment` (`part-utils.ts`) for the
- * types, then its own `url === ''` skip — so an entry the sink would not read
- * is skipped here rather than throwing inside the walk. An empty `mime` stays
- * readable, as it does for the sink: it names no image, and a `send_file`
- * attachment still shows the file the chat shows.
+ * One stored tool attachment entry the walk can read, or `null`.
+ *
+ * `messages` arrives as a statically unknown payload, so the entry is parsed
+ * rather than asserted: an object whose `mime` and `url` are strings, with a
+ * `url` that names something to fetch. The live sink applies the same two
+ * checks — `isToolAttachment` (`part-utils.ts`) for the types, then its own
+ * `url === ''` skip — so an entry the sink would not read is skipped here
+ * instead of throwing inside the walk. An empty `mime` stays readable, as it
+ * does for the sink: it names no image, and a `send_file` attachment still
+ * shows the file the chat shows.
  */
-function isReadableAttachment(attachment: unknown): attachment is LooseAttachment {
-  if (typeof attachment !== 'object' || attachment === null || Array.isArray(attachment)) {
-    return false;
+function readableAttachment(value: unknown): LooseAttachment | null {
+  const parsed = storedAttachmentSchema.safeParse(value);
+  if (!parsed.success || parsed.data.url === '') {
+    return null;
   }
-  if (!('mime' in attachment) || typeof attachment.mime !== 'string') {
-    return false;
-  }
-  if (!('url' in attachment) || typeof attachment.url !== 'string' || attachment.url === '') {
-    return false;
-  }
-  return true;
+  return parsed.data;
 }
 
 function keepsAttachment(part: LoosePart, attachment: LooseAttachment): boolean {

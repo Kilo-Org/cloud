@@ -992,6 +992,19 @@ describe('ScreenHeader mounted', () => {
       reportOverhang(oneLine);
       expect(oneLine.root.findAll(isStackedActionsRow)).toHaveLength(1);
     });
+
+    // The count arrives after the frame paints, so the first press of this row
+    // must not wait for it: a title that wraps overruns its box by far more
+    // than a physical pixel, and the measured pair alone already says so.
+    it('moves the cluster on the measured pair before any line count arrives', () => {
+      const renderer = renderHeader(session);
+      expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(0);
+      const first = fitTargets(renderer);
+      reportWidth(first.box, 158.86);
+      reportWidth(first.copy, 210.67);
+      reportWidth(fitTargets(renderer).box, 158.86);
+      expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(1);
+    });
   });
 
   it('lets a pinned picker give way before the title it sits beside', () => {

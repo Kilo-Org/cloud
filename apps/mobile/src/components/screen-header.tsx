@@ -692,10 +692,13 @@ export function ScreenHeader({
   // cluster is still settling, and stacking on that frame would keep the
   // cluster on its own row for the rest of the layout.
   //
-  // A title capped at several lines is decided by the line count it reports
-  // instead: a prose title that wraps reports more than one line, while a
-  // single-line title is cut. A line that did not wrap can overrun its box by
-  // one physical pixel, and that must not move the cluster.
+  // A title capped at several lines keeps that pre-paint decision: the pair is
+  // already measured on the layout's first pass, so the cluster moves before
+  // the frame paints, and the line count the title reports only confirms it (a
+  // title that wrapped where the box still held its own width). Its tolerance
+  // is a physical pixel and a half rather than half a pixel, because a line
+  // that did not wrap can overrun its box by up to one physical pixel — that is
+  // no wrap, and it must not move the cluster.
   //
   // One cap for the Text and the reserved box: a title capped deeper than the
   // reserve would shift the body the moment it reached the extra line. A large
@@ -707,12 +710,15 @@ export function ScreenHeader({
   const [titleWrap, setTitleWrap] = useState<TitleWrap>(UNMEASURED_TITLE_WRAP);
   const titleNaturalRef = useRef<TextInstance>(null);
   const titleBoxRef = useRef<ViewInstance>(null);
-  // The count is kept per layout, like the widths, so a report from the
-  // previous layout never decides this one.
+  // Both readings are kept per layout, like the widths, so a pair or a count
+  // from the previous layout never decides this one.
+  const titleTooWide =
+    titleFit.naturalKey === titleFitKey &&
+    titleFit.boxKey === titleFitKey &&
+    titleFit.naturalWidth - titleFit.boxWidth > 1.5 / PixelRatio.get();
   const titleWraps = titleWrap.key === titleFitKey && titleWrap.count > 1;
   const titleOverflows =
-    measuresTitleFit &&
-    (titleLines === 1 ? titleFit.cutKey === titleFitKey : titleWraps);
+    measuresTitleFit && (titleLines === 1 ? titleFit.cutKey === titleFitKey : titleTooWide || titleWraps);
   // The probe's extra pass remounts the hidden copy through this key, which
   // leaves `titleFitKey` free to keep its one-meaning-per-layout role.
   const titleProbeKey = `${titleFitKey}#${titleFit.probePass}`;

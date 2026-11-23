@@ -167,6 +167,10 @@ export async function downloadRemoteFile({
     // exist and neither platform truncates on open, so a fresh empty file is
     // the only way the stream starts without a leftover tail.
     attempt.create({ intermediates: true, overwrite: true });
+    // Registered as soon as it exists: the reaper is the only cleanup left for
+    // an attempt this attempt's own delete cannot remove (a deadline reject
+    // while the writable stream still holds the file, or a filesystem error).
+    registerTempFile(attempt.uri);
   } catch (error) {
     deleteQuietly(attempt);
     throw new ShareRemoteFileError('download-failed', { cause: error });
@@ -245,12 +249,14 @@ export async function shareRemoteFile({
   cacheDirectoryName,
   cacheKey,
   filename,
+  deadlineMs,
   signal,
 }: {
   url: string;
   cacheDirectoryName: string;
   cacheKey: string;
   filename: string;
+  deadlineMs?: number;
   signal?: AbortSignal;
 }): Promise<void> {
   // Every attempt keeps its own name: a second share of the same key must not
@@ -264,6 +270,7 @@ export async function shareRemoteFile({
     url,
     cacheDirectoryName,
     cacheFilename,
+    deadlineMs,
     signal,
   });
   await shareMaterializedRemoteFile(materialized);
@@ -310,7 +317,8 @@ function deleteQuietly(file: File): void {
       file.delete();
     }
   } catch {
-    // The TTL reap removes an attempt that could not be deleted here.
+    // The attempt is registered before its transfer, so the temp-file reap is
+    // the cleanup that remains when this delete cannot run.
   }
 }
 

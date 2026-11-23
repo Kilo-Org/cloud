@@ -140,4 +140,10 @@ describe('getInvoicePdfFilename', () => {
     ).toBe('Seat invoice.pdf');
     expect(getInvoicePdfFilename({ id: 'in_1', number: null, description: null })).toBe('in_1.pdf');
   });
+
+  it('does not double-append .pdf', () => {
+    expect(getInvoicePdfFilename({ id: 'in_1', number: 'report.pdf', description: null })).toBe(
+      'report.pdf'
+    );
+  });
 });

@@ -4,6 +4,13 @@ import { assertSurfaceFailureHandled } from '@/lib/surface-feedback';
 
 const DATA_EXPORT_CACHE_DIRECTORY = 'data-exports';
 
+/**
+ * The export archive is the whole account's data and has no server-side size
+ * cap, so a slow but progressing transfer must not be cut at the interactive
+ * share budget.
+ */
+const DATA_EXPORT_DEADLINE_MS = 5 * 60_000;
+
 /** The name the export worker gives the artifact it serves. */
 const DATA_EXPORT_FILENAME = 'kilo-data-export.jsonl.gz';
 
@@ -50,5 +57,6 @@ export async function shareDataExport({
     cacheDirectoryName: DATA_EXPORT_CACHE_DIRECTORY,
     cacheKey: exportId,
     filename: DATA_EXPORT_FILENAME,
+    deadlineMs: DATA_EXPORT_DEADLINE_MS,
   });
 }

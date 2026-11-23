@@ -2,6 +2,7 @@ import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { Text } from '@/components/ui/text';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 
 /**
  * The one-time notice after upgrade: chats now sync unless the person turns
@@ -23,7 +24,7 @@ export function ChatSyncNoticeCard({
       <Pressable
         accessibilityRole="link"
         accessibilityLabel={t('modelChat.sync.noticeAction')}
-        className="mt-2 self-start active:opacity-70"
+        className={`mt-2 self-start justify-center active:opacity-70 ${ROW_TARGET_CLASS}`}
         onPress={onOpenSettings}
       >
         <Text variant="muted">{t('modelChat.sync.noticeAction')}</Text>
@@ -31,7 +32,7 @@ export function ChatSyncNoticeCard({
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={t('modelChat.list.resetNoticeDismiss')}
-        className="mt-2 self-start rounded-md px-2 py-1 active:opacity-70"
+        className={`mt-2 self-start justify-center rounded-md px-2 active:opacity-70 ${ROW_TARGET_CLASS}`}
         onPress={onDismiss}
       >
         <Text className="text-sm font-medium">{t('modelChat.list.resetNoticeDismiss')}</Text>

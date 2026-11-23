@@ -1,6 +1,8 @@
 import { type PulledSnapshot } from '@kilocode/cloud-agent-sdk';
 
-import { pulledToTurns } from './sync-mapping';
+import { captureTelemetry } from '@/lib/telemetry/error-sink';
+
+import { pulledToTurns, targetOfPortableModel } from './sync-mapping';
 import { importedTurnId } from './sync-ids';
 import { type SyncDeps } from './sync-protocol';
 import { type MutableMessageMap, saveSyncRecord, syncRecordOf } from './sync-store';
@@ -26,6 +28,27 @@ export async function applyPulled(input: {
   const known = new Set(Object.values(record.messageMap).map(entry => entry.msgId));
   const fresh = snapshot.messages.filter(one => !known.has(one.message.id));
   const turns = pulledToTurns(fresh, sessionId);
+  // The harness session freezes its model, so an import must write one the
+  // app can route: the model the person chose here, else the session's own
+  // model when this app wrote it, else the person's default (passed in). An
+  // empty one opens as "Not selected" and every answer fails.
+  const sessionModel = snapshot.session?.model;
+  let resolvedModel = model;
+  if (resolvedModel === '' && sessionModel !== undefined) {
+    resolvedModel = targetOfPortableModel(sessionModel) ?? '';
+  }
+  if (resolvedModel === '') {
+    // Nothing this app can route: writing the session anyway would show "Not
+    // selected" and fail every answer. Leave it unimported so the caller can
+    // retry with a model chosen here.
+    captureTelemetry({
+      level: 'warning',
+      message: 'sync import had no routable model',
+      fingerprint: ['chat-sync-import'],
+      tags: { reason: 'no-model' },
+    });
+    return 0;
+  }
   // Even an empty log materializes the harness session: the chat opens on the
   // row this writes, and a listed chat with no session behind it can only
   // fail with the retry surface.
@@ -34,7 +57,7 @@ export async function applyPulled(input: {
     serverSessionId: serverId,
     turns,
     title: snapshot.session?.title ?? null,
-    model,
+    model: resolvedModel,
   });
   const map: MutableMessageMap = { ...record.messageMap };
   for (const one of fresh) {

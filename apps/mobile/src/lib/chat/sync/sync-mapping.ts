@@ -50,6 +50,31 @@ export function portableModelRef(target: string): PortableModelRef {
   return { providerID: 'kilo', id: target };
 }
 
+/**
+ * The mobile target an imported assistant message names. The three providers
+ * this app writes map straight back; anything else is a model only the other
+ * side can route, so the chat keeps its own default instead.
+ */
+export function targetOfPortableModel(ref: {
+  readonly providerID: string;
+  readonly id: string;
+}): string | null {
+  if (ref.id === '') {
+    return null;
+  }
+  if (ref.providerID === 'kilo') {
+    return ref.id;
+  }
+  if (
+    ref.providerID === 'kilo-mobile-local' ||
+    ref.providerID === 'kilo-mobile-custom' ||
+    ref.providerID.startsWith('kilo-mobile-')
+  ) {
+    return ref.id;
+  }
+  return null;
+}
+
 /** Every image part in these turns, which the engine uploads before mapping. */
 export function imagePartsOf(
   turns: readonly Turn[]

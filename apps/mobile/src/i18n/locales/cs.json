@@ -3551,7 +3551,7 @@
         "promoCreditGranted": "Propagační kredity přiděleny",
         "memberRemove": "Odebrání člena",
         "memberChangeRole": "Změna role člena",
-        "memberAdminAdd": "Přidání administrátora",
+        "memberAdminAdd": "Přidání správce",
         "memberAutoJoin": "Automatické připojení člena",
         "ssoAutoProvision": "Zřízení uživatele přes SSO",
         "ssoSetDomain": "Přidání domény SSO",

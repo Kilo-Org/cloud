@@ -3669,7 +3669,7 @@
         "promoCreditGranted": "منح الرصيد الترويجي",
         "memberRemove": "تمت إزالة العضو",
         "memberChangeRole": "تم تغيير دور العضو",
-        "memberAdminAdd": "تمت إضافة مسؤول",
+        "memberAdminAdd": "تمت إضافة مشرف",
         "memberAutoJoin": "انضم العضو تلقائيًا",
         "ssoAutoProvision": "تمت تهيئة المستخدم عبر SSO",
         "ssoSetDomain": "تمت إضافة نطاق SSO",

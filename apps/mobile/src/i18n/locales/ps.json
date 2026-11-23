@@ -3425,7 +3425,7 @@
         "promoCreditGranted": "پروموشنل کریډیټ ورکړل شول",
         "memberRemove": "غړی لرې شو",
         "memberChangeRole": "د غړي رول بدل شو",
-        "memberAdminAdd": "اډمین اضافه شو",
+        "memberAdminAdd": "مدیر اضافه شو",
         "memberAutoJoin": "غړی په اتومات ډول شامل شو",
         "ssoAutoProvision": "د SSO لخوا کارن چمتو شو",
         "ssoSetDomain": "SSO ډومېن اضافه شو",

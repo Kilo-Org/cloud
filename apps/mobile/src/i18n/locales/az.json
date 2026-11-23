@@ -3425,7 +3425,7 @@
         "promoCreditGranted": "Promosyon kreditlər verildi",
         "memberRemove": "Üzv çıxarıldı",
         "memberChangeRole": "Üzv rolu dəyişdirildi",
-        "memberAdminAdd": "Administrator əlavə edildi",
+        "memberAdminAdd": "İnzibatçı əlavə edildi",
         "memberAutoJoin": "Üzv avtomatik qoşuldu",
         "ssoAutoProvision": "İstifadəçi SSO tərəfindən təmin edildi",
         "ssoSetDomain": "SSO domeni əlavə edildi",

@@ -459,10 +459,23 @@ const INDENTED_CODE = /^(?: {4}|\t)/;
 /** A thematic break: three or more of one marker, spaced or not. */
 const THEMATIC_BREAK_START = /^ {0,3}(?:(?:\*[ \t]*){3,}|(?:-[ \t]*){3,}|(?:_[ \t]*){3,})$/;
 
+/** A setext heading's underline: a run of equals, which closes the paragraph
+ * above it as a heading. A run of dashes is a thematic break above, whether it
+ * underlines the paragraph or breaks after it, so only the equals run needs its
+ * own pattern. */
+const SETEXT_UNDERLINE_START = /^ {0,3}=+[ \t]*$/;
+
 /** An HTML block's opening line: a tag, a comment, a processing instruction or
  * a declaration at the line's start. Inline content after a mark is not that,
  * because the raw line does not begin with the tag. */
 const HTML_BLOCK_START = /^ {0,3}(?:<!--|<\?|<![A-Za-z]|<\/?[A-Za-z][A-Za-z0-9-]*(?:[ \t/>]|$))/;
+
+/** An HTML block that opens and closes on its line: a comment, a processing
+ * instruction, a declaration, or a raw-text element whose own end tag follows
+ * it. Every other HTML block runs on to the next blank line, so the line under
+ * it is still inside the block. */
+const HTML_BLOCK_ON_ONE_LINE =
+  /^ {0,3}(?:<!--.*?-->|<\?.*?\?>|<![A-Za-z].*>|<(script|pre|style|textarea)\b.*<\/\1>)/i;
 
 /** A link reference definition: a label, a colon, and a destination. */
 const REFERENCE_DEFINITION_START = /^ {0,3}\[[^\]\n]+\]:/;
@@ -668,8 +681,11 @@ function stripLineMarks(
  * Nothing is added: a block with no letter at all takes the message's direction
  * from the renderer's container.
  *
- * A block starts at the first line, after a blank line, and at a list,
- * blockquote or heading line's own content after its marker. Its content may
+ * A block starts at the first line, after a blank line, after a line that closed
+ * a block of its own — a heading, a thematic break or the setext underline under
+ * a paragraph, a fence's closing line, a reference definition, an HTML block
+ * that opened and closed on its line, or code — and at a list, blockquote or
+ * heading line's own content after its marker. Its content may
  * open on further machinery and markup — indentation, a task checkbox, emphasis,
  * a link or image label — so the mark is found through all of it, in front of
  * the block's first real character rather than its marker. A continuation line
@@ -689,14 +705,34 @@ export function withoutLeadingDirectionMarks(markdown: string): string {
   const lines = markdown.split('\n');
   let changed = false;
   let previousBlank = true;
+  // Whether the previous line closed a block of its own, so that this line opens
+  // one and its content's mark is that block's edge.
+  let previousEndsBlock = false;
+  // The quote depth of the paragraph text directly above, when a setext
+  // underline at the same depth would close it: how the walk tells a paragraph
+  // that follows a heading-shaped line from one the line above continues.
+  let previousParagraphQuoted: number | undefined = undefined;
+  // Whether the previous line held an indented code block, which the lines under
+  // it continue while they keep the indentation.
+  let inIndentedCode = false;
   let inFence = false;
   for (const [index, line] of lines.entries()) {
     const quoted = BLOCKQUOTE_START.exec(line)?.[0].length ?? 0;
     const body = line.slice(quoted);
     const blank = body.trim().length === 0;
     const opensFence = FENCE_START.test(body);
+    // An indented code block starts after a blank line or after a block that has
+    // closed, and runs on while the lines keep its indentation; an indented line
+    // under paragraph text is that paragraph's own continuation instead. These
+    // three predicates feed each other through the walk's state, which the
+    // checker cannot infer a type for, so each says it is a boolean.
+    const indentedCode: boolean =
+      !inFence &&
+      INDENTED_CODE.test(body) &&
+      !blank &&
+      (previousBlank || previousEndsBlock || inIndentedCode);
     // Code is copy in its own right: a mark inside it is part of the code.
-    const code = inFence || (previousBlank && INDENTED_CODE.test(body));
+    const code: boolean = inFence || indentedCode;
     // A list item or heading's own marker is line machinery its content follows;
     // a continuation line has none and keeps its marks. A heading may sit inside
     // a list item (`- # x`), so its marker is read after the list marker too —
@@ -731,7 +767,20 @@ export function withoutLeadingDirectionMarks(markdown: string): string {
     }
     const heading = HEADING_START.exec(body.slice(contentStart));
     const marker = contentStart + (heading?.[0].length ?? 0);
-    const startsBlock = previousBlank || marker > 0;
+    // A line that closes a block of its own leaves the line after it opening
+    // one: an ATX heading, a thematic break or the setext underline under the
+    // paragraph above, a reference definition, an HTML block that closed on its
+    // line, and code — the fence's last line before the closing fence, the fence
+    // line that closed it, and an indented code line, whose block ends at the
+    // first line not indented far enough for the walk to read it as code.
+    const endsBlock: boolean =
+      code ||
+      heading !== null ||
+      THEMATIC_BREAK_START.test(body) ||
+      (previousParagraphQuoted === quoted && SETEXT_UNDERLINE_START.test(body)) ||
+      REFERENCE_DEFINITION_START.test(body) ||
+      HTML_BLOCK_ON_ONE_LINE.test(body);
+    const startsBlock = previousBlank || previousEndsBlock || marker > 0;
     const stripped =
       opensFence || code || blank || !startsBlock
         ? line
@@ -743,6 +792,12 @@ export function withoutLeadingDirectionMarks(markdown: string): string {
       inFence = !inFence;
     }
     previousBlank = blank;
+    previousEndsBlock = endsBlock;
+    inIndentedCode = indentedCode;
+    // Only paragraph text in this line's own container can be closed by the next
+    // line's setext underline: a list item's text sits inside its item, so a
+    // markerless line under it is that item's lazy continuation, not an underline.
+    previousParagraphQuoted = blank || code || endsBlock || list !== null ? undefined : quoted;
     if (stripped !== line) {
       lines[index] = stripped;
       changed = true;

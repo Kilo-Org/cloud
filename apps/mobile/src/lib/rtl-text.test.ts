@@ -428,6 +428,72 @@ describe('withoutLeadingDirectionMarks', () => {
     expect(withoutLeadingDirectionMarks(indented)).toBe('Intro\n\n    const \u200Fa = 1;');
   });
 
+  // A paragraph that directly follows a line which ended its own block starts a
+  // block of its own, so the mark in front of it names that block’s edge exactly
+  // as it would after a blank line. Before this rule a marked Latin paragraph
+  // under a heading kept the mark and laid out right to left, while the same
+  // paragraph one blank line lower down did not.
+  it.each([
+    ['a heading', '# Heading\n\u200FLatin text'],
+    ['a heading in a quote', '> # Heading\n\u200FLatin text'],
+    ['a heading in a list item', '- # Heading\n\u200FLatin text'],
+    ['a thematic break', '---\n\u200FLatin text'],
+    ['a dash underline under paragraph text', 'Title\n---\n\u200FLatin text'],
+    ['an equals underline under paragraph text', 'Title\n===\n\u200FLatin text'],
+    ['a fence that closed', '```js\nconst a = 1;\n```\n\u200FLatin text'],
+    ['a reference definition', '[ref]: https://example.com\n\u200FLatin text'],
+    ['an indented code line', '    code\n\u200FLatin text'],
+    ['a code block of several indented lines', '    first\n    second\n\u200FLatin text'],
+    ['a comment closed on its line', '<!-- c -->\n\u200FLatin text'],
+    ['a processing instruction', '<?php echo 1; ?>\n\u200FLatin text'],
+    ['a declaration', '<!DOCTYPE html>\n\u200FLatin text'],
+    ['a pre element closed on its line', '<pre>a</pre>\n\u200FLatin text'],
+    ['a script element closed on its line', '<script>a</script>\n\u200FLatin text'],
+    ['a style element closed on its line', '<style>a{}</style>\n\u200FLatin text'],
+    ['a textarea element closed on its line', '<textarea>a</textarea>\n\u200FLatin text'],
+  ])('strips a mark in the block that follows %s', (_shape, value) => {
+    expect(withoutLeadingDirectionMarks(value)).toBe(value.replace('\u200F', ''));
+  });
+
+  // A line that ends nothing holds the block above it open: the line after it is
+  // that block’s own continuation, whose mark orders the run it was written for.
+  // An HTML block of the tag kinds runs to the next blank line, so the line under
+  // it is still inside the block even though it starts with a tag.
+  it.each([
+    ['a paragraph continuation line', '\u200FFirst\n\u200Fsecond line', 'First\n\u200Fsecond line'],
+    [
+      'an indented paragraph continuation line',
+      '\u200FFirst\n    \u200Fsecond line',
+      'First\n    \u200Fsecond line',
+    ],
+    ['a list item continued lazily', '- item\n\u200FLatin text', '- item\n\u200FLatin text'],
+    ['a quote continued lazily', '> quote\n\u200FLatin text', '> quote\n\u200FLatin text'],
+    [
+      'a block tag that runs to the next blank line',
+      '<div>\n\u200FLatin text',
+      '<div>\n\u200FLatin text',
+    ],
+    [
+      'a complete tag that runs to the next blank line',
+      '<a href="/x">\n\u200FLatin text',
+      '<a href="/x">\n\u200FLatin text',
+    ],
+    [
+      'a tag that closes inline but runs to the next blank line',
+      '<div>x</div>\n\u200FLatin text',
+      '<div>x</div>\n\u200FLatin text',
+    ],
+  ])('keeps a mark in %s', (_shape, value, expected) => {
+    expect(withoutLeadingDirectionMarks(value)).toBe(expected);
+  });
+
+  // A setext underline closes the paragraph above it; a run of equals that starts
+  // a block is that block’s own text, and the line under it continues it.
+  it('keeps a mark under an equals run that has no paragraph above it', () => {
+    const value = '===\n\u200FLatin text';
+    expect(withoutLeadingDirectionMarks(value)).toBe(value);
+  });
+
   // A mark can stand where a block marker would otherwise be: the line is a
   // paragraph only because the mark interrupts it, so removing that mark would
   // turn the paragraph into a heading, a list item, a quote or a fence. The

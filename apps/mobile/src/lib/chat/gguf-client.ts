@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the teardown chain, the answer's ownership of it, and the release cause that stops an answer are one closure: the one-context invariant cannot be read across two files */
 import {
   type ModelClientService,
   ModelError,
@@ -98,13 +99,25 @@ async function waitForTeardown(teardown: Promise<void>): Promise<'settled' | 'st
   }
 }
 
+/**
+ * Why a release ran. The app leaving the foreground is not the model failing, so
+ * the answer it stops carries this cause instead of the generic failure copy.
+ */
+export type GgufReleaseCause = 'background';
+
 export type GgufModelClient = {
   readonly client: ModelClientService;
   /**
    * Stops any answer and frees the loaded context. With a file id, only when
    * that file is the one loaded, so deleting another model keeps this one.
+   *
+   * A cause names what the answer in flight is being stopped for: an answer
+   * stopped by the background ends as that, not as a model failure. It is
+   * consumed once, by the answer running when the release starts, and a release
+   * with no cause - a delete, a model switch - says nothing about an answer that
+   * is not interrupted by it.
    */
-  readonly release: (fileId?: string) => Promise<void>;
+  readonly release: (fileId?: string, cause?: GgufReleaseCause) => Promise<void>;
 };
 
 /**
@@ -146,6 +159,14 @@ export function ggufModelClient({
    * busy for the rest of the session.
    */
   let abandon: (() => void) | undefined = undefined;
+  /**
+   * Why the release under way ran, for the answer it is stopping. It belongs to
+   * the turn it interrupts: the answer that reads it clears it, so a later
+   * answer is never ended with a cause meant for an earlier one. A release that
+   * runs with no answer in flight names nothing here, since no answer can be
+   * stopped by it.
+   */
+  let noteRelease: ((cause: GgufReleaseCause) => void) | undefined = undefined;
 
   const free = async (
     previous: Promise<void>,
@@ -191,7 +212,13 @@ export function ggufModelClient({
     }
   };
 
-  const release = (fileId?: string): Promise<void> => {
+  const release = (fileId?: string, cause?: GgufReleaseCause): Promise<void> => {
+    // The cause belongs to the answer this release stops, so it is handed over
+    // before the teardown below can settle that answer. A release that finds no
+    // answer in flight has nothing to label.
+    if (cause !== undefined) {
+      noteRelease?.(cause);
+    }
     const current = loaded;
     if (current === undefined || (fileId !== undefined && current.fileId !== fileId)) {
       // Nothing of this model is loaded, but a release the background listener
@@ -322,6 +349,20 @@ export function ggufModelClient({
           await attempt(() => context.stopCompletion());
         }
       };
+      /**
+       * Why a release is stopping this answer, when it named one. It is read once,
+       * so the answer that follows a release never inherits its cause: only the
+       * answer in flight can be interrupted by that release.
+       */
+      let cause: GgufReleaseCause | undefined = undefined;
+      const noteCause = (next: GgufReleaseCause) => {
+        cause = next;
+      };
+      const stoppedProblem = (): LocalModelProblem => {
+        const taken = cause;
+        cause = undefined;
+        return taken ?? 'failed';
+      };
       const run = async () => {
         /**
          * Gives up this answer's ownership of the client, once. A release that
@@ -337,11 +378,15 @@ export function ggufModelClient({
           }
           released = true;
           if (running()) {
-            stop('failed', streamed !== '');
+            stop(stoppedProblem(), streamed !== '');
           }
           if (abandon === giveUp) {
             abandon = undefined;
           }
+          if (noteRelease === noteCause) {
+            noteRelease = undefined;
+          }
+          cause = undefined;
           busy = false;
           inflight = undefined;
         };
@@ -361,6 +406,8 @@ export function ggufModelClient({
           const completion = opened.value.completion(paramsOf(request, file), onToken);
           inflight = completion;
           abandon = giveUp;
+          // Only now can a release interrupt this answer rather than the load.
+          noteRelease = noteCause;
           const finished = await settled(completion);
           if (!finished.ok) {
             stop('failed', streamed !== '');
@@ -372,8 +419,10 @@ export function ggufModelClient({
             return;
           }
           if (result.value.interrupted) {
-            // Stopped by a release: the app went to the background or the model was deleted.
-            stop('failed', streamed !== '');
+            // Stopped by a release: the app went to the background, the model was
+            // deleted, or another model was loaded. Only the release that named a
+            // cause makes this something other than a model failure.
+            stop(stoppedProblem(), streamed !== '');
             return;
           }
           finish(result.value);

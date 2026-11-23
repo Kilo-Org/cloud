@@ -1,12 +1,14 @@
 /* oxlint-disable max-lines -- cohesive HTML segmentation, sanitization, and image/link wiring share one renderer */
-import { useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { marked, type Token } from 'marked';
 import {
   type AccessibilityActionEvent,
   type GestureResponderEvent,
+  type LayoutChangeEvent,
   Platform,
   Text,
   useWindowDimensions,
+  View,
 } from 'react-native';
 import RenderHTML, {
   type CustomBlockRenderer,
@@ -301,19 +303,33 @@ export type MarkdownHtmlIncrementalInput =
     ));
 
 /**
+ * Where a publish's conversion stops being final for the next publish, and that
+ * region's conversion: `converted` is the conversion of `rawValue.slice(start)`,
+ * and `start` is 0 when nothing is final.
+ */
+export type MarkdownHtmlConversionTail = { start: number; converted: string };
+
+/**
  * What the previous publish turned into segments, kept so the next publish can
- * reuse it: `tail` is that publish's snapshot, and `convert` folds raw source
- * into the markdown the splitter segments, joining the previous converted
- * source it is given: `(suffix, previous) => previous + converted(suffix)`. A
- * publish that extends the previous raw value passes the appended region, so
- * `convert` returns the previous converted source joined with the appended
- * region's conversion; a publish the gate declines passes the whole converted
- * value and `convert` returns it alone.
+ * reuse it: `tail` is that publish's snapshot, `conversion` the tail its own
+ * publish carried, and `convert` folds raw source into the markdown the
+ * splitter segments, joining the previous converted source it is given:
+ * `(suffix, previous) => previous + converted(suffix)`. A publish that extends
+ * the previous raw value passes the appended region, so `convert` returns the
+ * previous converted source joined with the appended region's conversion; a
+ * publish the gate declines passes the whole converted value and `convert`
+ * returns it alone.
  */
 export type MarkdownHtmlIncrementalConverted = {
   tail: MarkdownHtmlSnapshot;
   /** The raw source the previous publish saw, for the extends-previous guard. */
   rawValue?: string;
+  /**
+   * Where the previous publish's conversion stops being final, with that
+   * region's conversion: the next publish proves its composition against it
+   * instead of converting the region a second time.
+   */
+  conversion?: MarkdownHtmlConversionTail;
   convert: (suffix: string, previous: string) => string;
 };
 
@@ -614,7 +630,21 @@ export function MarkdownHtml({
   onLongPressLink,
   onPressLink,
 }: Readonly<MarkdownHtmlProps>) {
-  const { width } = useWindowDimensions();
+  const { width: windowWidth } = useWindowDimensions();
+  // The engine sizes the blocks it lays out from one number, and the app
+  // overrides every renderer that reads it today. Hosts still insets this
+  // renderer — a chat bubble keeps 82 % of the row and pads its content, a card
+  // pads its body — so the window is the wrong box to report: measuring the
+  // container gives the engine the width it actually lays out in, on every
+  // host, without each one passing its own inset. The window width answers for
+  // the first frame, before any layout has been reported.
+  const [measuredWidth, setMeasuredWidth] = useState<number | null>(null);
+  const handleLayout = useCallback((event: LayoutChangeEvent) => {
+    const next = event.nativeEvent.layout.width;
+    setMeasuredWidth(previous =>
+      previous !== null && Math.abs(previous - next) < 0.5 ? previous : next
+    );
+  }, []);
   const source = useMemo(() => ({ html }), [html]);
   const baseStyle = useMemo(
     () => ({
@@ -743,18 +773,20 @@ export function MarkdownHtml({
   }, [baseStyle, documentDirection, onLongPressLink, onPressLink, selectable]);
 
   return (
-    <RenderHTML
-      baseStyle={baseStyle}
-      contentWidth={width}
-      customHTMLElementModels={HTML_ELEMENT_MODELS}
-      defaultTextProps={{ selectable }}
-      domVisitors={HTML_DOM_VISITORS}
-      enableCSSInlineProcessing={false}
-      ignoredDomTags={IGNORED_HTML_TAGS}
-      renderers={renderers}
-      renderersProps={renderersProps}
-      source={source}
-      tagsStyles={tagsStyles}
-    />
+    <View onLayout={handleLayout}>
+      <RenderHTML
+        baseStyle={baseStyle}
+        contentWidth={measuredWidth ?? windowWidth}
+        customHTMLElementModels={HTML_ELEMENT_MODELS}
+        defaultTextProps={{ selectable }}
+        domVisitors={HTML_DOM_VISITORS}
+        enableCSSInlineProcessing={false}
+        ignoredDomTags={IGNORED_HTML_TAGS}
+        renderers={renderers}
+        renderersProps={renderersProps}
+        source={source}
+        tagsStyles={tagsStyles}
+      />
+    </View>
   );
 }

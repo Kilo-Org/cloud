@@ -88,6 +88,7 @@ jest.mock('@kilocode/web-shared/lib/admin/admin-access-log', () => ({
 }));
 jest.mock('@kilocode/web-shared/lib/web-session-revocation', () => ({
   isWebSessionCurrent: () => true,
+  readWebSessionPepper: async () => null,
 }));
 jest.mock('@sentry/nextjs', () => ({
   setTag: jest.fn(),

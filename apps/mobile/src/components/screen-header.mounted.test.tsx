@@ -419,14 +419,6 @@ describe('ScreenHeader mounted', () => {
   it('pulls the leading controls with a logical start margin the RTL swap cannot mirror', async () => {
     const renderer = renderHeader({ title: 'Sessions', headerRight: slotView() });
 
-    // The pull is on the START edge, so it must compile to the logical
-    // `marginInlineStart`. A hand-picked `-mr-4` under RTL compiles to
-    // `marginRight`, which Fabric rewrites to Yoga End for an RTL tree, landing
-    // the pull on the side that faces the title: the heading then started 12
-    // points under the 44-point back target and the title's box covered 0.27 of
-    // it — the "two controls cover each other" finding (the scan reports above
-    // 0.25). `-ms-4` keeps a real 4-point `gap-1` between the two controls in
-    // both writing directions. It rides on the frame, which is the row's child.
     const frame = findBackFrame(renderer.root);
     expect(frame.props.className).toContain('-ms-4');
     expect(await compiledMarginProperties(frame.props.className as string)).toEqual([
@@ -552,6 +544,46 @@ describe('ScreenHeader mounted', () => {
           /(^|\s)ms-3(\s|$)/.test(String(node.props.className ?? ''))
       )
     ).toHaveLength(0);
+  });
+
+  it('reflows on the row the side insets leave, not on the raw window width', () => {
+    // A landscape cutout pads the inner wrapper, so the row is narrower than
+    // the window. At 340dp the 130dp cluster leaves the title 155.5dp
+    // (340 - 44 - 10.5 - 130), above its 120dp minimum: one row. With the
+    // window's 47 + 59 side insets the same header has 49.5dp for the title
+    // (340 - 47 - 59 - 44 - 10.5 - 130), so the slots take rows of their own.
+    Object.assign(layout, { width: 340, fontScale: 1 });
+    Object.assign(safeArea, { left: 47, right: 59 });
+
+    const stackedCluster = renderHeader({
+      title: 'Sessions',
+      headerRight: slotView(),
+      headerRightWidth: 130,
+    });
+    expect(stackedCluster.root.findAll(isStackedActionsRow)).toHaveLength(1);
+
+    const stackedInline = renderHeader({
+      title: 'Agents',
+      inlineActions: slotView(),
+      inlineActionsWidth: 130,
+    });
+    expect(stackedInline.root.findAll(isStackedActionsRow)).toHaveLength(1);
+
+    // Without the side insets the row is the window, and both keep one row.
+    Object.assign(safeArea, { left: 0, right: 0 });
+    const singleCluster = renderHeader({
+      title: 'Sessions',
+      headerRight: slotView(),
+      headerRightWidth: 130,
+    });
+    expect(singleCluster.root.findAll(isStackedActionsRow)).toHaveLength(0);
+
+    const singleInline = renderHeader({
+      title: 'Agents',
+      inlineActions: slotView(),
+      inlineActionsWidth: 130,
+    });
+    expect(singleInline.root.findAll(isStackedActionsRow)).toHaveLength(0);
   });
 
   it("keeps a mark-only heading's inlineActions on the row when the caller forbids a reflow", () => {
@@ -849,10 +881,6 @@ describe('ScreenHeader mounted', () => {
   });
 
   it('keeps the title touch area out of the row gap beside it', () => {
-    // The heading's free side is the gap to the trailing slot, and a trailing
-    // control can carry a slop that reaches into that gap. A title slop there
-    // made the same strip two tap targets: measured on the session screen at
-    // 10.33 dp across, in every state and every gate cell.
     const renderer = renderHeader({ title: 'Sessions', onTitlePress: () => undefined });
 
     const title = findTitlePressable(renderer.root);
@@ -860,8 +888,6 @@ describe('ScreenHeader mounted', () => {
   });
 
   it('keeps the title touch area identical in both directions', () => {
-    // RN does not mirror hitSlop under RTL. With no side slop there is nothing
-    // to mirror, so Back and the trailing cluster keep their own taps alike.
     i18nManager.isRTL = true;
     const renderer = renderHeader({ title: 'Sessions', onTitlePress: () => undefined });
 
@@ -968,11 +994,16 @@ describe('ScreenHeader mounted', () => {
     }
   );
 
-  it('labels the title with its own text and hints at the action', () => {
+  it('announces the title once and its action once', () => {
+    // The action copy names only the action: Android speaks it after the title
+    // in one utterance, so any title inside the copy is heard twice. iOS reads
+    // the action from the hint beside the name; Android's hint is only a
+    // tooltip (`ConfigureRow` documents the same rule), so its name carries the
+    // action after the title.
     const renderer = renderHeader({ title: 'Sessions', onTitlePress: () => undefined });
     const title = findTitlePressable(renderer.root);
     expect(title.props.accessibilityLabel).toBe('Sessions');
-    expect(title.props.accessibilityHint).toBe('Open menu for Sessions');
+    expect(title.props.accessibilityHint).toBe('Open menu');
 
     const customRenderer = renderHeader({
       title: 'Sessions',
@@ -982,6 +1013,21 @@ describe('ScreenHeader mounted', () => {
     const custom = findTitlePressable(customRenderer.root);
     expect(custom.props.accessibilityLabel).toBe('Sessions');
     expect(custom.props.accessibilityHint).toBe('Rename session');
+
+    platform.OS = 'android';
+    const android = renderHeader({ title: 'Sessions', onTitlePress: () => undefined });
+    const androidTitle = findTitlePressable(android.root);
+    expect(androidTitle.props.accessibilityLabel).toBe('Sessions, Open menu');
+    expect(androidTitle.props.accessibilityHint).toBe('Open menu');
+
+    const androidCustom = renderHeader({
+      title: 'Sessions',
+      onTitlePress: () => undefined,
+      onTitlePressAccessibilityHint: 'Rename session',
+    });
+    const androidCustomTitle = findTitlePressable(androidCustom.root);
+    expect(androidCustomTitle.props.accessibilityLabel).toBe('Sessions, Rename session');
+    expect(androidCustomTitle.props.accessibilityHint).toBe('Rename session');
   });
 
   it('renders the close icon and label for backIcon="close"', () => {
@@ -1141,10 +1187,6 @@ describe('ScreenHeader mounted', () => {
     renderer.unmount();
   });
 
-  // The reserve cannot know the arriving label, so it holds a no-ink no-break
-  // space: the eyebrow variant's line box is the same for every script
-  // (`EYEBROW_LINE_HEIGHT_DP`), so the space reserves exactly the height the
-  // label takes, in either interface direction.
   it.each([false, true])(
     'reserves a blank filler when the arriving label is unknown (RTL=%s)',
     isRTL => {
@@ -1904,9 +1946,8 @@ describe('centered title balance', () => {
   it('refines the filler from the measured slot width after mount', () => {
     // No declared width: the first frame balances on the 0 seed (no mirror),
     // then onLayout reports the slot's real 140dp — the same filler this test
-    // then reads back. The row's layout event lands the 358dp row width the
-    // seed already used, so the filler only moves when the slot
-    // reports.
+    // then reads back. The seed row is 390 - 44 = 346dp, so the 140dp slot
+    // report is what moves the filler.
     const renderer = renderHeader({
       title: 'Kilo Pass',
       modal: true,

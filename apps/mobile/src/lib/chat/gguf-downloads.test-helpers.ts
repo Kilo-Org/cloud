@@ -41,6 +41,8 @@ export function harness(
     readonly checksums?: Readonly<Record<string, string>>;
     /** A file the native hash cannot read. */
     readonly unreadable?: string;
+    /** A file whose first hash the device refuses and whose next one works. */
+    readonly unreadableOnce?: string;
     /** A task that refuses pause the way expo-file-system does once it is cancelled. */
     readonly refusePause?: boolean;
     /** A task whose cancel loses to a pause already under way: it reports itself paused. */
@@ -55,6 +57,7 @@ export function harness(
   const files = new Map<string, number>();
   const index: { text: string | null; fails?: boolean; writeFails?: boolean } = { text: null };
   const hashed: string[] = [];
+  const refusedOnce = new Set<string>();
   const tasks: Task[] = [];
   const inspected: string[] = [];
   const released: string[] = [];
@@ -74,6 +77,10 @@ export function harness(
     sha256: async name => {
       hashed.push(name);
       if (name === options.unreadable) {
+        throw new Error('read failed');
+      }
+      if (name === options.unreadableOnce && !refusedOnce.has(name)) {
+        refusedOnce.add(name);
         throw new Error('read failed');
       }
       return options.checksums?.[name] ?? (name.includes('.mmproj.') ? 'b' : 'a').repeat(64);

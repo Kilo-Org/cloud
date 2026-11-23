@@ -143,6 +143,7 @@ describe('native on-device model client', () => {
     ['device_not_eligible', 'modelChat.localModels.reasons.deviceNotEligible'],
     ['battery_quota_exceeded', 'modelChat.localModels.reasons.batteryQuota'],
     ['check_failed', 'modelChat.localModels.reasons.checkFailed'],
+    ['models_unreadable', 'modelChat.localModels.reasons.checkFailed'],
     ['background_use_blocked', 'modelChat.localModels.background'],
     ['busy', 'modelChat.localModels.busy'],
     ['context_exceeded', 'modelChat.localModels.failed'],

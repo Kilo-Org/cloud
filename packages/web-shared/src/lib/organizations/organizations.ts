@@ -1224,6 +1224,7 @@ export async function acceptOrganizationInvite(
         actor_email: invitation.email,
         actor_id: userId,
         actor_name: null,
+        details: { id: 'invite.accepted', email: invitation.email },
         message: `${invitation.email} accepted an invitation`,
         organization_id: organization.id,
         tx,

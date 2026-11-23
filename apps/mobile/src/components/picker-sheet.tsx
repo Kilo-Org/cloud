@@ -47,7 +47,9 @@ export function PickerSheet({
   /**
    * Set when the caller's data source (picker bridge) is gone — renders the
    * standard "Options expired" empty state instead of children. An expired
-   * shell that has a Cancel disables Done: there is nothing left to commit.
+   * shell that has a Cancel disables Done, because there is nothing left to
+   * commit, so the leading Cancel is its one way out; a shell with no Cancel
+   * keeps Done as its only exit.
    */
   expired?: boolean;
   /**
@@ -169,9 +171,6 @@ export function PickerSheet({
           doneLabel={doneLabel}
           cancelLabel={cancelLabel}
           disabled={disabled}
-          // An expired shell holds nothing to commit: Done would promise a
-          // selection that cannot exist, so the leading Cancel becomes the one
-          // way out. A shell with no Cancel keeps Done as its only exit.
           doneDisabled={doneDisabled || (expired && onCancel !== undefined)}
           topInset={topInset}
         />

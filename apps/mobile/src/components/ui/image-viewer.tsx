@@ -13,7 +13,6 @@ import { StateSurface } from '@/components/centered-state-surface';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Image } from '@/components/ui/image';
 import { Sheet } from '@/components/ui/sheet';
-import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 /**
@@ -183,7 +182,10 @@ export function ImageViewer({
               <CenteredState className="w-full">
                 <View className="flex-row items-center justify-center gap-2 px-6">
                   <AlertCircle size={14} color="#ffffff" />
-                  <Text className="text-xs text-white">{t('common.imageUnavailable')}</Text>
+                  <AccessibleStatus
+                    message={t('common.imageUnavailable')}
+                    className="text-xs text-white"
+                  />
                 </View>
               </CenteredState>
             ) : null}

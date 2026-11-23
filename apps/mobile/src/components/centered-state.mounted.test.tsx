@@ -350,8 +350,6 @@ describe('CenteredState measurements', () => {
   });
 
   it('keeps a horizontal inset on the content box, not the scroller', async () => {
-    // The scroller's own padding does not narrow the scroll content, so an inset
-    // set through `className` leaves the end side flush in a right-to-left layout.
     const mounted = await mount({
       className: 'bg-background',
       contentContainerClassName: 'px-6',
@@ -408,10 +406,6 @@ describe('CenteredState measurements', () => {
   ] as const)(
     'holds a state out of %s until its scroller measures',
     async (_name, band, bandHeight) => {
-      // The estimate centers in the scroller and carries the bottom reserve, which
-      // is the band placement only when the band starts at the scroller's top. A
-      // moved band gets the scroller's own frame first, so no frame paints a
-      // position the measurement then corrects.
       band();
       const mounted = await mount();
       expect(mounted.renderer.root.findAllByProps({ testID: 'state-content' })).toHaveLength(0);
@@ -544,9 +538,6 @@ describe('CenteredState measurements', () => {
     act(() => {
       ref(null);
     });
-    // The host view re-attaches on a screen's return, and the band it had is
-    // the band it still has: the placement must survive the gap rather than
-    // re-center and jump back.
     expectPainted(mounted);
     expect(mounted.scroll().contentContainerStyle).toEqual(placed);
     act(() => {
@@ -665,13 +656,6 @@ describe('CenteredState first-frame paint', () => {
   });
 
   it('holds the state until a pending native surface reports, then paints it placed', async () => {
-    // A pushed stack screen paints its surface insets 0/0 while the native
-    // geometry probe is still arriving; the probe's safe-area bottom then
-    // raises the band bottom and a state painted from the estimate jumped up
-    // half the band change after it first appeared (explorer:android
-    // layout-jump, Recent Reviews). A pending native surface is a band the
-    // estimate cannot place, so the state waits for the surface's frame — and
-    // its first painted placement already carries the reported insets.
     native.surface.frame = null;
     native.surface.bounds = null;
     native.surface.source = 'pending';

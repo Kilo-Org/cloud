@@ -5402,6 +5402,9 @@ describe('User', () => {
 
     it('should anonymize organization audit logs', async () => {
       const user = await insertTestUser();
+      // A second member, so the suite can prove a row about someone else keeps
+      // that person's address when the author's account is deleted.
+      const otherUser = await insertTestUser();
       const orgId = randomUUID();
       await db.insert(organizations).values({
         id: orgId,
@@ -5417,6 +5420,56 @@ describe('User', () => {
         actor_email: user.google_user_email,
         actor_name: user.google_user_name,
         message: 'User joined org',
+        // A row whose structured detail names a member's address. The address
+        // must not survive the deletion, and the row's English message does.
+        details: { id: 'invite.accepted', email: user.google_user_email },
+      });
+
+      await db.insert(organization_audit_logs).values({
+        organization_id: orgId,
+        action: 'organization.user.send_invite',
+        actor_id: user.id,
+        actor_email: user.google_user_email,
+        actor_name: user.google_user_name,
+        message: `Invited ${otherUser.google_user_email} as member`,
+        details: { id: 'invite.sent', email: otherUser.google_user_email, role: 'member' },
+      });
+
+      // A detail whose address sits in an array rather than a scalar field: the
+      // minimum-balance alert stores its recipients as `emails`. The deleted
+      // member's entry goes; the other member's stays.
+      await db.insert(organization_audit_logs).values({
+        organization_id: orgId,
+        action: 'organization.settings.change',
+        actor_id: otherUser.id,
+        actor_email: otherUser.google_user_email,
+        actor_name: otherUser.google_user_name,
+        message: 'Minimum balance alert enabled',
+        details: {
+          id: 'setting.minimumBalanceAlert',
+          enabled: true,
+          threshold: 10,
+          emails: [user.google_user_email, otherUser.google_user_email],
+        },
+      });
+
+      // A second alert row names the deleted address alone, so scrubbing it
+      // empties the list. The key is dropped there rather than written as `[]`,
+      // because the row's sentence names the recipients and an empty list would
+      // leave it dangling.
+      await db.insert(organization_audit_logs).values({
+        organization_id: orgId,
+        action: 'organization.settings.change',
+        actor_id: otherUser.id,
+        actor_email: otherUser.google_user_email,
+        actor_name: otherUser.google_user_name,
+        message: 'Minimum balance alert enabled for one recipient',
+        details: {
+          id: 'setting.minimumBalanceAlert',
+          enabled: true,
+          threshold: 25,
+          emails: [user.google_user_email],
+        },
       });
 
       await softDeleteUser(user.id);
@@ -5424,12 +5477,45 @@ describe('User', () => {
       const logs = await db
         .select()
         .from(organization_audit_logs)
-        .where(eq(organization_audit_logs.actor_id, user.id));
-      expect(logs).toHaveLength(1);
-      expect(logs[0].actor_email).toBeNull();
-      expect(logs[0].actor_name).toBeNull();
-      expect(logs[0].actor_id).toBe(user.id); // actor_id preserved for reference
-      expect(logs[0].message).toBe('User joined org'); // message preserved
+        .where(eq(organization_audit_logs.organization_id, orgId));
+      expect(logs).toHaveLength(4);
+      for (const log of logs.filter(entry => entry.actor_id === user.id)) {
+        expect(log.actor_email).toBeNull();
+        expect(log.actor_name).toBeNull();
+        expect(log.actor_id).toBe(user.id); // actor_id preserved for reference
+      }
+      const own = logs.find(log => log.action === 'organization.user.accept_invite');
+      expect(own?.message).toBe('User joined org'); // message preserved
+      // The structured detail keeps its event, and no longer carries the address.
+      expect(own?.details).toEqual({ id: 'invite.accepted' });
+      // A row about another member keeps that member's address: redaction is by
+      // the address a detail names, not by who authored the row.
+      const [otherSubject] = logs.filter(log => log.action === 'organization.user.send_invite');
+      expect(otherSubject.details).toEqual({
+        id: 'invite.sent',
+        email: otherUser.google_user_email,
+        role: 'member',
+      });
+      // The array field is scrubbed too, and every other detail key survives.
+      // `toEqual` is exact, so the second row's missing `emails` key is what
+      // proves the emptied list was dropped rather than written as `[]`.
+      const alerts = logs.filter(log => log.action === 'organization.settings.change');
+      expect(alerts).toHaveLength(2);
+      expect(alerts.map(entry => entry.details)).toEqual(
+        expect.arrayContaining([
+          {
+            id: 'setting.minimumBalanceAlert',
+            enabled: true,
+            threshold: 10,
+            emails: [otherUser.google_user_email],
+          },
+          {
+            id: 'setting.minimumBalanceAlert',
+            enabled: true,
+            threshold: 25,
+          },
+        ])
+      );
     });
 
     it('should clear organization group attribution fields', async () => {

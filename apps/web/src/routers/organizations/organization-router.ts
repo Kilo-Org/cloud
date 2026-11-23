@@ -246,6 +246,9 @@ export const organizationsRouter = createTRPCRouter({
       actor_name: user.google_user_name,
       actor_email: user.google_user_email,
       actor_id: user.id,
+      // No `details`: the row's event name already says the organization was
+      // created, and every row of this log belongs to this organization, so a
+      // detail line here would only restate it.
       message: `Organization ${org.name} created`,
     });
 
@@ -506,6 +509,11 @@ export const organizationsRouter = createTRPCRouter({
             actor_email: opts.ctx.user.google_user_email,
             actor_id: opts.ctx.user.id,
             actor_name: opts.ctx.user.google_user_name,
+            details: {
+              id: 'setting.name',
+              previous: oldName,
+              next: opts.input.name,
+            },
             message: `Renamed organization from "${oldName}" to "${opts.input.name}"`,
             tx,
           });

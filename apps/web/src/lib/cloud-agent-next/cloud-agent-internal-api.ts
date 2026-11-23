@@ -6,7 +6,7 @@
 import 'server-only';
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
-import { fetchWithinBudget } from '@/lib/bounded-service-fetch';
+import { fetchWithinBudget, readJsonWithinBudget } from '@/lib/bounded-service-fetch';
 import { approvalKeySchema } from '@kilocode/app-shared/approval-key';
 import * as z from 'zod';
 
@@ -41,6 +41,7 @@ export async function closeCloudAgentOrgStreams(
 
 // Optional enrichment that runs after the active-session read inside the native
 // widget route's ten-second deadline: a slow identity read drops only the key.
+// The fetch and the body read share this budget.
 const WIDGET_APPROVAL_KEY_BUDGET_MS = 1_500;
 
 const widgetApprovalKeyResponseSchema = z.object({
@@ -71,6 +72,7 @@ export async function readCloudAgentWidgetApprovalKey(
   signal?: AbortSignal
 ): Promise<CloudAgentWidgetApproval> {
   const budget = AbortSignal.timeout(WIDGET_APPROVAL_KEY_BUDGET_MS);
+  const readDeadlineAt = Date.now() + WIDGET_APPROVAL_KEY_BUDGET_MS;
   const response = await fetchWithinBudget(
     `${CLOUD_AGENT_NEXT_API_URL}/internal/widgets/approval-key`,
     {
@@ -85,9 +87,17 @@ export async function readCloudAgentWidgetApprovalKey(
     }
   );
   if (!response.ok) {
+    await response.body?.cancel().catch(() => undefined);
     throw new Error(`Cloud Agent widget approval key failed: ${response.status}`);
   }
-  const parsed = widgetApprovalKeyResponseSchema.parse(await response.json());
+  const parsed = widgetApprovalKeyResponseSchema.parse(
+    await readJsonWithinBudget(
+      response,
+      readDeadlineAt - Date.now(),
+      WIDGET_APPROVAL_KEY_BUDGET_MS,
+      signal
+    )
+  );
   return { approvalKey: parsed.approvalKey, command: parsed.command ?? null };
 }
 

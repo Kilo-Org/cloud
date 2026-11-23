@@ -237,6 +237,42 @@ export function firstGrapheme(value: string, locale: string): string {
   );
 }
 
+const ELLIPSIS = '…';
+
+/**
+ * `text` as a single line of at most `maxGraphemes` user-perceived characters:
+ * whitespace runs (line breaks included) collapse to single spaces, the ends
+ * are trimmed, and a line longer than the cap is cut short at the cap with a
+ * trailing ellipsis. A line that fits keeps its characters: the ellipsis means
+ * a cut happened, never that the cap was counted in a different unit.
+ *
+ * A string no longer than the cap in code units holds no more characters than
+ * that, so the common short case never reaches the segmenter. A real cut must
+ * not split a character the reader sees as one: counted in code units it could
+ * end on half a surrogate pair, and counted in code points it would still split
+ * a family emoji or a Devanagari syllable with its vowel sign. The segmenter is
+ * iterated only as far as the cap, so a long text costs the cap rather than its
+ * own length.
+ */
+export function boundedOneLineExcerpt(text: string, maxGraphemes: number, locale: string): string {
+  const oneLine = text.replaceAll(/\s+/gu, ' ').trim();
+  if (oneLine.length <= maxGraphemes) {
+    return oneLine;
+  }
+  let cut = '';
+  let seen = 0;
+  for (const { segment } of segmenter(locale, { granularity: 'grapheme' }).segment(oneLine)) {
+    if (seen === maxGraphemes) {
+      return `${cut.trimEnd()}${ELLIPSIS}`;
+    }
+    if (seen < maxGraphemes - 1) {
+      cut += segment;
+    }
+    seen += 1;
+  }
+  return oneLine;
+}
+
 /** Characters with no bearing on a number's value but present in locale output. */
 const BIDI_MARK = /[\u061C\u200E\u200F]/g;
 /** The space characters a locale or a keyboard may use for a space-sized group separator. */

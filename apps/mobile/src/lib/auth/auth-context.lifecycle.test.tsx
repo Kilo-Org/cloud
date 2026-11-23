@@ -1106,6 +1106,9 @@ describe('sign-out teardown ordering', () => {
 
   it('keeps a parked account-independent launch destination on sign-in', async () => {
     const { ctx, unmount } = await mountAndGetContext();
+    // The signed-out launch of the mount cleared once already; this case counts
+    // the account boundary's own clear.
+    nativeLauncherSurfacesMock.clearLauncherSurfaces.mockClear();
     nativeLauncherSurfacesMock.takeAccountIndependentLaunchUrl.mockReturnValueOnce(
       'kiloapp:///cloud/sessions/new'
     );
@@ -1130,6 +1133,9 @@ describe('sign-out teardown ordering', () => {
 
   it('keeps the destination already in the pending slot over the parked one', async () => {
     const { ctx, unmount } = await mountAndGetContext();
+    // The signed-out launch of the mount cleared once already; this case counts
+    // the account boundary's own clear.
+    nativeLauncherSurfacesMock.clearLauncherSurfaces.mockClear();
     nativeLauncherSurfacesMock.takeAccountIndependentLaunchUrl.mockReturnValueOnce(
       'kiloapp:///cloud/sessions/new'
     );
@@ -1187,6 +1193,11 @@ describe('sign-out teardown ordering', () => {
 
   it('clears the last-opened session and the launcher surfaces on sign-out', async () => {
     const { ctx } = await mountAndGetContext();
+    // The signed-out launch of the mount cleared once already; this case counts
+    // the sign-out body's own clear.
+    nativeLauncherSurfacesMock.clearLauncherSurfaces.mockClear();
+    lastOpenedSessionMock.clearLastOpenedSession.mockClear();
+    lastRouteMock.clearLastRoute.mockClear();
 
     await act(async () => {
       await ctx.signOut();
@@ -2135,6 +2146,72 @@ describe('bootstrap and foreground race fencing', () => {
 
     const search = await import('@/lib/native-system-search');
     expect(vi.mocked(search.clearSystemSearchIndex)).toHaveBeenCalledTimes(1);
+
+    unmount();
+  });
+
+  it('regression: a signed-out launch clears the OS launcher surfaces the teardown may not have reached', async () => {
+    // The beforeEach leaves every read null: the launch positively restored no
+    // session, so this is the retry for a sign-out killed during its awaited
+    // teardown, before the account-boundary clear ran. The launcher shortcuts and
+    // Quick Actions label themselves from the departing account's sessions, so
+    // the launch must drop them too, not only the search index.
+    nativeLauncherSurfacesMock.clearLauncherSurfaces.mockClear();
+    const { getCtx, unmount } = await mountProvider();
+    expect(getCtx().isLoading).toBe(false);
+    expect(getCtx().token).toBeUndefined();
+    expect(getCtx().restoreFailed).toBe(false);
+
+    expect(nativeLauncherSurfacesMock.clearLauncherSurfaces).toHaveBeenCalledTimes(1);
+
+    unmount();
+  });
+
+  it('a restore-failure bootstrap leaves the launcher surfaces alone', async () => {
+    useFakeBackoffClock();
+    // Every credential read rejects: the account may still own the surfaces, so
+    // only a positively signed-out launch may drop them.
+    hoisted.secureStore.getItemAsync.mockRejectedValue(new Error('keychain unavailable'));
+    nativeLauncherSurfacesMock.clearLauncherSurfaces.mockClear();
+
+    const { getCtx, unmount } = await mountProvider();
+    await settleBootstrap(getCtx);
+    expect(getCtx().restoreFailed).toBe(true);
+
+    expect(nativeLauncherSurfacesMock.clearLauncherSurfaces).not.toHaveBeenCalled();
+
+    unmount();
+  }, 60_000);
+
+  it('regression: a signed-out launch stages the parked New agent tap before it clears the launcher surfaces', async () => {
+    // The launcher clear also drops the Quick Action URL a cold start parks
+    // natively, and the sign-in path is that URL's only staging reader. A
+    // launch that restored no session must stage the account-independent
+    // destination first, or the tap is lost before the sign-in that follows.
+    nativeLauncherSurfacesMock.takeAccountIndependentLaunchUrl.mockReturnValueOnce(
+      'kiloapp:///cloud/sessions/new'
+    );
+    // The earlier cases in this file leave a destination in the pending slot;
+    // this case starts with an empty slot so the parked tap is what is staged.
+    hoisted.deepLinkLaunch.getPendingDeepLinkSnapshot.mockReturnValue(null);
+    hoisted.deepLinkLaunch.setPendingDeepLink.mockClear();
+    // The staged destination must land before the clear drops the parked URL.
+    let stagedBeforeClear: boolean | null = null;
+    nativeLauncherSurfacesMock.clearLauncherSurfaces.mockImplementationOnce(() => {
+      stagedBeforeClear = hoisted.deepLinkLaunch.setPendingDeepLink.mock.calls.length > 0;
+    });
+
+    const { getCtx, unmount } = await mountProvider();
+    expect(getCtx().token).toBeUndefined();
+
+    expect(hoisted.deepLinkLaunch.setPendingDeepLink).toHaveBeenCalledWith(
+      expect.stringContaining('/agent-chat/new'),
+      'universal-link'
+    );
+    expect(stagedBeforeClear).toBe(true);
+    // The take drops the parked value, so the clear afterwards has nothing left
+    // to lose.
+    expect(nativeLauncherSurfacesMock.takeAccountIndependentLaunchUrl).toHaveBeenCalled();
 
     unmount();
   });

@@ -1,6 +1,14 @@
 export const AGENT_ATTACHMENT_MAX_FILES = 5;
 /** The decimal 20 MB the refusal copy states; stricter than the server's 20 MiB check. */
 export const AGENT_ATTACHMENT_MAX_BYTES = 20_000_000;
+
+/**
+ * Longest image edge, in pixels, that the vision model reads. Anything decoded
+ * above it only spends native heap and upload bytes the model throws away, so
+ * both the selection-time metadata strip and the local delivery read bound the
+ * decoder to this edge.
+ */
+export const AGENT_ATTACHMENT_IMAGE_MAX_EDGE = 1568;
 /** Maximum UTF-8 byte count for a sanitized filename emitted by sanitizeAttachmentFilename. */
 export const AGENT_ATTACHMENT_SAFE_FILENAME_MAX_LENGTH = 255;
 

@@ -4,6 +4,7 @@ import {
   buildOpaqueScopeKey,
 } from '../../../../packages/app-shared/src/glanceable-agents-snapshot';
 import { getWorkerDb } from '@kilocode/db/client';
+import { MAX_GIT_BRANCH_LENGTH } from '@kilocode/session-ingest-contracts';
 import { drizzle } from 'drizzle-orm/pg-proxy';
 import { NotificationChannelDO, NotificationsService } from '../../../notifications/src/index';
 import {
@@ -5864,6 +5865,22 @@ describe('UserConnectionDO', () => {
       }
     });
 
+    it('accepts a 40-character instance branch and keeps it in the attachment and the instance list', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const gitBranch = 'feature/'.padEnd(40, 'b');
+      sendHeartbeat(doInstance, cliWs, [], {
+        instance: { name: 'laptop-1', projectName: 'kilo', gitBranch },
+      });
+      await flushAsync();
+
+      expect(allSent(cliWs)).toContainEqual({ type: 'heartbeat_ack' });
+      expect(cliWs.deserializeAttachment()).toMatchObject({ instance: { gitBranch } });
+      expect(doInstance.getConnectedInstances().instances).toEqual([
+        { connectionId: 'cli-1', name: 'laptop-1', projectName: 'kilo', gitBranch },
+      ]);
+    });
+
     it('drops `instance` from the attachment on a subsequent heartbeat that omits it', async () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
@@ -6205,9 +6222,10 @@ describe('UserConnectionDO', () => {
     // These are JSON fixture guards, not proof of native attachment capacity.
     // The Workers regression calibrates the actual production heartbeat write.
     const LEGACY_JSON_BUDGET = 2048;
-    // 184 bounded UTF-16 units can each need six JSON bytes, plus 30 bytes for
-    // kind/timestamp and 81 bytes of framing: at most 1215, below 1280.
-    const INSTANCE_HEADROOM = 1280;
+    // 416 bounded UTF-16 units (64 name, 64 project name, 32 version, 256
+    // branch) can each need six JSON bytes, plus 30 bytes for kind/timestamp
+    // and 81 bytes of framing: 2607 measured, below 2700.
+    const INSTANCE_HEADROOM = 2700;
 
     it('keeps maximally escaped instance metadata within its JSON bound', () => {
       const instance: Instance = {
@@ -6216,7 +6234,7 @@ describe('UserConnectionDO', () => {
         version: '\u0000'.repeat(32),
         kind: 'remote',
         startedAt: '2026-08-28T12:34:56.789Z',
-        gitBranch: '\u0000'.repeat(24),
+        gitBranch: '\u0000'.repeat(MAX_GIT_BRANCH_LENGTH),
       };
       expect(new TextEncoder().encode(JSON.stringify(instance)).byteLength).toBeLessThan(
         INSTANCE_HEADROOM

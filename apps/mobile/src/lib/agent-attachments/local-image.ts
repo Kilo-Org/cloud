@@ -1,13 +1,10 @@
 import * as ImageManipulator from 'expo-image-manipulator';
 
+import { AGENT_ATTACHMENT_IMAGE_MAX_EDGE } from './constants';
+
 /** An image that stays on the device: its bytes, base64, and their media type. */
 export type LocalImage = { readonly media: string; readonly data: string };
 
-/**
- * The longest edge sent. Larger images cost more tokens and gain nothing: the
- * major vision models scale an image down to about this size before they read it.
- */
-const MAX_EDGE = 1568;
 const QUALITY = 0.8;
 /**
  * The largest encoded image sent. Providers refuse a base64 image over 5 MB,
@@ -28,7 +25,8 @@ export class LocalImageError extends Error {
 
 /**
  * Reads a picked or pasted image as a bounded JPEG. The image is scaled so its
- * longest edge is at most `MAX_EDGE`, and the re-encode drops its metadata.
+ * longest edge is at most `AGENT_ATTACHMENT_IMAGE_MAX_EDGE`, and the re-encode
+ * drops its metadata.
  */
 export async function encodeLocalImage(uri: string): Promise<LocalImage> {
   let data: string | undefined = undefined;
@@ -40,15 +38,15 @@ export async function encodeLocalImage(uri: string): Promise<LocalImage> {
     // photo are never materialized: a 12-megapixel camera image otherwise costs
     // tens of megabytes of native heap before anything is scaled down.
     live = await ImageManipulator.ImageManipulator.manipulate(uri, {
-      maxWidth: MAX_EDGE,
-      maxHeight: MAX_EDGE,
+      maxWidth: AGENT_ATTACHMENT_IMAGE_MAX_EDGE,
+      maxHeight: AGENT_ATTACHMENT_IMAGE_MAX_EDGE,
     }).renderAsync();
     const { width, height } = live;
     // A loader that ignores the bounds would still hand back a full-resolution
     // image, so the size is enforced again here. The resize takes the rendered
     // image, not the URI: the pixels are already decoded, and reading the file
     // a second time would put a second full-resolution copy in memory.
-    const scale = Math.min(1, MAX_EDGE / Math.max(width, height));
+    const scale = Math.min(1, AGENT_ATTACHMENT_IMAGE_MAX_EDGE / Math.max(width, height));
     if (scale < 1) {
       const source = live;
       live = await ImageManipulator.ImageManipulator.manipulate(source)

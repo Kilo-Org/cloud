@@ -25,7 +25,6 @@ export function renderRow(
     acceptsVariant: boolean;
     isFavorite: boolean;
     showProvider: boolean;
-    suppressUnavailableCheck: boolean;
   }> = {}
 ): TestRenderer.ReactTestRenderer {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
@@ -38,7 +37,6 @@ export function renderRow(
         acceptsVariant: overrides.acceptsVariant ?? true,
         isFavorite: overrides.isFavorite ?? false,
         showProvider: overrides.showProvider ?? true,
-        suppressUnavailableCheck: overrides.suppressUnavailableCheck ?? false,
         onSelectModel: vi.fn<(option: SessionModelOption) => void>(),
         onSelectVariant: vi.fn<(variant: string) => void>(),
         onToggleFavorite: vi.fn<(option: SessionModelOption) => void>(),
@@ -57,6 +55,7 @@ export function renderSelector(
     isLoading: boolean;
     disabled: boolean;
     lockLabel: string;
+    onRetryModels: () => void;
   }> = {}
 ): TestRenderer.ReactTestRenderer {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
@@ -71,6 +70,7 @@ export function renderSelector(
         disabled: overrides.disabled ?? false,
         lockLabel: overrides.lockLabel,
         onSelect: vi.fn<(modelId: string, variant: string) => void>(),
+        onRetryModels: overrides.onRetryModels,
       })
     );
   });

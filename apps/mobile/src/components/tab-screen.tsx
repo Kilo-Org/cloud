@@ -199,11 +199,10 @@ export function TabScreenScrollView({
   // submit button receives the tap while the keyboard is open instead of the
   // first tap only dismissing it.
   //
-  // With the keyboard down the margin is the tab bar's band. With it up the
-  // tab bar hides, so the band is replaced by the IME occlusion. The IME is
-  // always reserved in the frame (never left to the native inset): the native
-  // inset does not clamp programmatic scrolls to the keyboard top, leaving
-  // focused content under the IME with no scroll range to drag it clear.
+  // The IME is always reserved in the frame (never left to the native inset):
+  // the native inset does not clamp programmatic scrolls to the keyboard top,
+  // leaving focused content under the IME with no scroll range to drag it
+  // clear.
   // `useTabScreenFrame` owns the band and its short-window clamp.
   // The scroll view's own focused-field reveal runs on focus only. Two
   // re-layouts leave the focused row (and whatever sits under it) parked behind

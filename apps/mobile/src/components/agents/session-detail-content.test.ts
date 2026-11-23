@@ -5453,6 +5453,77 @@ describe('session detail composer attribution across a session switch', () => {
     expect(withdrawn).toBe(true);
     expect(handle.hasContent()).toBe(false);
   });
+
+  it('does not publish the previous session answer that arrives after the switch', async () => {
+    // A late answer must not publish over the newer state, and the session it
+    // was read for is the other half of that: both fences are required here,
+    // because the read for the session being left resolves after the screen
+    // already reads for the one on screen.
+    const realComposer = await vi.importActual<{ ChatComposer: ElementType }>(
+      '@/components/agents/chat-composer'
+    );
+    composerProbe.real = realComposer.ChatComposer;
+    composerProbe.useReal = true;
+
+    goalMountOptions = { resolvedType: 'remote' };
+    draftLoadState.value = 'Delivered late';
+    // Both sessions restore the same words, so the old answer would attribute a
+    // send in the new session if either fence let it through.
+    pendingSendRead.hold = true;
+    const view = await mountDetails(undefined, { keepInstanceOnSwitch: true });
+    const rootAnswer = await heldReadFor(ROOT_ID);
+
+    // The manager's open for the next session stays in flight, so the screen
+    // keeps its composer mounted through the switch and starts the next read.
+    vi.spyOn(view.manager, 'switchSession').mockImplementation(
+      () =>
+        new Promise<void>(() => {
+          // Never settles: the switch stays in flight for this case.
+        })
+    );
+    await view.switchRoot(NEXT_ROOT_ID);
+    const nextAnswer = await heldReadFor(NEXT_ROOT_ID);
+
+    // The previous session's record answers only now, after the screen left it.
+    await act(async () => {
+      rootAnswer.resolve({
+        items: [{ messageId: 'msg-old', text: 'Delivered late' }],
+        complete: true,
+      });
+      await Promise.resolve();
+    });
+    // Nothing is attributed: the answer belongs to the session being left, so
+    // the composer stays unarmed and the withdrawal is still held.
+    const afterRoot = view.renderer.root.find(node =>
+      Object.is(node.type, realComposer.ChatComposer)
+    );
+    expect(afterRoot.props.restoredSend).toBeNull();
+    expect(afterRoot.props.restoredSendSettled).toBe(false);
+
+    // Only the session on screen may publish, and it publishes its own send.
+    await act(async () => {
+      nextAnswer.resolve({
+        items: [{ messageId: 'msg-next', text: 'Delivered late' }],
+        complete: true,
+      });
+      await Promise.resolve();
+    });
+    await waitFor(() => publishedRestoredSend(view, realComposer)?.messageId === 'msg-next');
+    const composer = view.renderer.root.find(node =>
+      Object.is(node.type, realComposer.ChatComposer)
+    );
+    expect(composer.props.restoredSend).toEqual({ text: 'Delivered late', messageId: 'msg-next' });
+    const control = composer.props.controlRef as {
+      current: {
+        withdrawRestoredSend: (text: string, messageId: string) => boolean;
+      } | null;
+    };
+    const handle = control.current;
+    if (!handle) {
+      throw new Error('the real composer did not publish its control');
+    }
+    expect(handle.withdrawRestoredSend('Delivered late', 'msg-next')).toBe(true);
+  });
 });
 
 describe('session detail composer cannot-send reason', () => {

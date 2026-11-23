@@ -36,6 +36,11 @@ const PRIVATE_REPO_LABEL = 'acme/api, private repository';
 const h = vi.hoisted(() => ({
   success: vi.fn(),
   error: vi.fn(),
+  push: vi.fn(),
+  // The router's focus effect, captured so a case can replay the focus a return
+  // from a pushed child screen produces. `now` pins the clock the guard reads.
+  focusEffects: [] as (() => void)[],
+  now: 1_700_000_000_000,
   connectivity: 'online' as string,
   bindingsQuery: {
     bindings: [] as TestBinding[],
@@ -74,7 +79,12 @@ vi.mock('@/lib/hooks/use-repo-bindings', () => ({
   useRepoBindingMutations: () => h.mutations,
   useRepoOptions: () => h.repoOptions,
 }));
-vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn<(href: string) => void>() }) }));
+vi.mock('expo-router', () => ({
+  useRouter: () => ({ push: h.push }),
+  useFocusEffect: (effect: () => void) => {
+    h.focusEffects.push(effect);
+  },
+}));
 vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
   useOrganizationProfilePermission: () => 'allowed',
 }));
@@ -146,6 +156,9 @@ const PROFILE: TestProfile = { id: 'profile-1', name: 'Backend debugging', isDef
 describe('RepoBindingsScreen', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.restoreAllMocks();
+    h.focusEffects = [];
+    h.now = 1_700_000_000_000;
     h.connectivity = 'online';
     Object.assign(h.bindingsQuery, {
       bindings: [],
@@ -457,6 +470,51 @@ describe('RepoBindingsScreen', () => {
       await Promise.resolve();
     });
     expect(findAll(renderer.root, 'Text').map(node => node.props.children)).toContain('acme/api');
+
+    unmount();
+  });
+
+  it('drops the row press of the burst that closed a pushed child screen', async () => {
+    Object.assign(h.bindingsQuery, { bindings: [testBinding()], isLoading: false });
+    h.mutations.unbind.mutateAsync.mockResolvedValue({ success: true });
+    vi.spyOn(Date, 'now').mockImplementation(() => h.now);
+
+    const { renderer, unmount } = await mountScreen();
+    const pressUnbind = (): void => pressPressable(renderer.root, 'Unbind acme/api');
+
+    // The router focuses a fresh screen once on mount, and that first focus
+    // must not deaden the row's action.
+    await act(async () => {
+      for (const effect of h.focusEffects) {
+        effect();
+      }
+      await Promise.resolve();
+    });
+
+    pressUnbind();
+    await waitFor(() => h.mutations.unbind.mutateAsync.mock.calls.length > 0);
+    expect(h.mutations.unbind.mutateAsync).toHaveBeenCalledTimes(1);
+    h.mutations.unbind.mutateAsync.mockClear();
+
+    // The child screen closes itself and the router focuses this one again.
+    await act(async () => {
+      for (const effect of h.focusEffects) {
+        effect();
+      }
+      await Promise.resolve();
+    });
+
+    pressUnbind();
+    pressUnbind();
+    expect(h.mutations.unbind.mutateAsync).not.toHaveBeenCalled();
+
+    h.now += 1000;
+    pressUnbind();
+    await waitFor(() => h.mutations.unbind.mutateAsync.mock.calls.length > 0);
+    expect(h.mutations.unbind.mutateAsync).toHaveBeenCalledExactlyOnceWith({
+      repoFullName: 'acme/api',
+      platform: 'github',
+    });
 
     unmount();
   });

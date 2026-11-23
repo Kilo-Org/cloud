@@ -36,6 +36,10 @@ const state = vi.hoisted(() => ({
   mutations: [] as MutationOptions[],
   mutate: vi.fn(),
   push: vi.fn(),
+  // The router's focus effect, captured so a case can replay the focus a return
+  // from a pushed child screen produces. `now` pins the clock the guard reads.
+  focusEffects: [] as (() => void)[],
+  now: 1_700_000_000_000,
   client: {
     invalidateQueries: vi.fn(),
     cancelQueries: vi.fn(),
@@ -45,7 +49,12 @@ const state = vi.hoisted(() => ({
 }));
 
 vi.mock('react-native', () => ({ View: 'View', useColorScheme: () => 'light' }));
-vi.mock('expo-router', () => ({ useRouter: () => ({ push: state.push }) }));
+vi.mock('expo-router', () => ({
+  useRouter: () => ({ push: state.push }),
+  useFocusEffect: (effect: () => void) => {
+    state.focusEffects.push(effect);
+  },
+}));
 vi.mock('@tanstack/react-query', async importOriginal => {
   // The provider and client stay real so renderWithProviders works; only the
   // hooks the screen calls are replaced.
@@ -194,6 +203,19 @@ function testMutation() {
   return found;
 }
 
+/**
+ * Run every focus effect the router registered: once on mount, which is the
+ * focus a fresh screen receives, and again when a pushed child closes.
+ */
+async function runFocusEffects(): Promise<void> {
+  await act(async () => {
+    for (const effect of state.focusEffects) {
+      effect();
+    }
+    await Promise.resolve();
+  });
+}
+
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   state.keys = [
@@ -221,6 +243,8 @@ beforeEach(() => {
   state.mutate.mockClear();
   state.confirm.mockClear();
   state.push.mockClear();
+  state.focusEffects = [];
+  state.now = 1_700_000_000_000;
   vi.mocked(announcingToast.success).mockClear();
   vi.mocked(announcingToast.error).mockClear();
 });
@@ -228,6 +252,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => renderer?.unmount());
   renderer = undefined;
+  vi.restoreAllMocks();
 });
 
 describe('ProviderKeysScreen', () => {
@@ -480,5 +505,39 @@ describe('ProviderKeysScreen', () => {
     }
     expect(queryError.props.variant).toBe('permission');
     expect(queryError.props.onRetry).toBeUndefined();
+  });
+
+  it('drops the press of the burst that closed a pushed child screen', async () => {
+    vi.spyOn(Date, 'now').mockImplementation(() => state.now);
+    const root = await mount();
+    // The router focuses a fresh screen once on mount, and that first focus
+    // must not deaden the header action.
+    await runFocusEffects();
+
+    act(() => {
+      (button(root, 'Add key').props.onPress as () => void)();
+    });
+    expect(state.push).toHaveBeenCalledExactlyOnceWith(
+      '/(app)/(tabs)/(3_profile)/provider-key-add'
+    );
+    state.push.mockClear();
+
+    // The child screen closes itself and the router focuses this one again.
+    await runFocusEffects();
+
+    act(() => {
+      const press = button(root, 'Add key').props.onPress as () => void;
+      press();
+      press();
+    });
+    expect(state.push).not.toHaveBeenCalled();
+
+    state.now += 1000;
+    act(() => {
+      (button(root, 'Add key').props.onPress as () => void)();
+    });
+    expect(state.push).toHaveBeenCalledExactlyOnceWith(
+      '/(app)/(tabs)/(3_profile)/provider-key-add'
+    );
   });
 });

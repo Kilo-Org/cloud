@@ -27,6 +27,7 @@ import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Section } from '@/components/ui/section';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
+import { useSheetRowTapGuard } from '@/lib/hooks/use-sheet-row-tap-guard';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { formatProfileCountItems, profileCountItems } from '@/lib/profile-count-labels';
 import { type AgentProfileListItem, useAgentProfileList } from '@/lib/hooks/use-agent-profiles';
@@ -71,6 +72,9 @@ export function ProfilesListScreen({
   backFallback?: Href;
 }>) {
   const router = useRouter();
+  // Every row here opens a pushed child, so the press that closed one must not
+  // open the row or header action that lands under the second tap of the burst.
+  const { guard } = useSheetRowTapGuard();
   const { t } = useTranslation();
   const ownerLabel = useProfileOwnerLabel();
   const colors = useThemeColors();
@@ -133,7 +137,7 @@ export function ProfilesListScreen({
         title={t('profiles.title')}
         backFallback={backFallback}
         headerRight={
-          <IconButton onPress={openNewProfile} accessibilityLabel={t('profiles.newProfile')}>
+          <IconButton onPress={guard(openNewProfile)} accessibilityLabel={t('profiles.newProfile')}>
             <Plus size={22} color={colors.foreground} />
           </IconButton>
         }
@@ -175,7 +179,11 @@ export function ProfilesListScreen({
             description={t('profiles.emptyDescription')}
             placement="top"
             action={
-              <StateAction label={t('profiles.newProfile')} icon={Plus} onPress={openNewProfile} />
+              <StateAction
+                label={t('profiles.newProfile')}
+                icon={Plus}
+                onPress={guard(openNewProfile)}
+              />
             }
           />
         )}
@@ -221,9 +229,9 @@ export function ProfilesListScreen({
                         }
                         subtitle={subtitle || undefined}
                         accessibilityLabel={accessibilityLabel}
-                        onPress={() => {
+                        onPress={guard(() => {
                           openProfile(profile);
-                        }}
+                        })}
                       />
                     );
                   })}
@@ -254,7 +262,7 @@ export function ProfilesListScreen({
                 // The visible label is shortened under the section header, so
                 // the row's own name carries the full destination instead.
                 accessibilityLabel={t('profiles.repoBindings.title')}
-                onPress={openRepoBindings}
+                onPress={guard(openRepoBindings)}
               />
             </RowGroup>
           </Section>

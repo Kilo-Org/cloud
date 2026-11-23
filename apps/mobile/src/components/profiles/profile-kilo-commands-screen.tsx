@@ -188,7 +188,11 @@ export function ProfileKiloCommandsScreen({
         placement="top"
         action={
           <ProfileManageSlot permission={permission}>
-            <StateAction label={t('profiles.slashCommands.add')} icon={Plus} onPress={startAdd} />
+            <StateAction
+              label={t('profiles.slashCommands.add')}
+              icon={Plus}
+              onPress={guardRowPress(startAdd)}
+            />
           </ProfileManageSlot>
         }
       />

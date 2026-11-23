@@ -31,6 +31,7 @@ import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { attemptPushRegistrationReconciliation } from '@/lib/auth/push-registration-reconciliation';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { getResolvedLanguage, useLanguagePreference } from '@/lib/hooks/use-language-preference';
+import { useSheetRowTapGuard } from '@/lib/hooks/use-sheet-row-tap-guard';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useTrustedHosts } from '@/lib/hooks/use-trusted-hosts';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
@@ -58,6 +59,9 @@ const SKELETON_ROWS = [0, 1, 2, 3, 4, 5, 6, 7];
 export function AccountSettingsScreen({ settingsTarget }: Readonly<{ settingsTarget?: string }>) {
   const router = useRouter();
   const pushOnce = useSinglePushRoute();
+  // A pushed child screen returns focus here, so the press that closed it must
+  // not open the row that lands under the second tap of the burst.
+  const { guard } = useSheetRowTapGuard();
   const { t } = useTranslation();
   const trpc = useTRPC();
   const { confirm, dialog } = useConfirmDialog();
@@ -98,9 +102,9 @@ export function AccountSettingsScreen({ settingsTarget }: Readonly<{ settingsTar
             icon={UserRound}
             title={t(ACCOUNT_SETTINGS.profile.label)}
             subtitle={t('profile.editProfile.rowSubtitle')}
-            onPress={() => {
+            onPress={guard(() => {
               router.push('/(app)/(tabs)/(3_profile)/profile-edit' as Href);
-            }}
+            })}
           />
         </SettingsTarget>
         <SettingsTarget item={ACCOUNT_SETTINGS.signInMethods}>
@@ -108,9 +112,9 @@ export function AccountSettingsScreen({ settingsTarget }: Readonly<{ settingsTar
             icon={Lock}
             title={t(ACCOUNT_SETTINGS.signInMethods.label)}
             subtitle={t('profile.linkedAccounts')}
-            onPress={() => {
+            onPress={guard(() => {
               router.push('/(app)/(tabs)/(3_profile)/login-methods' as Href);
-            }}
+            })}
           />
         </SettingsTarget>
         <SettingsTarget item={ACCOUNT_SETTINGS.language}>
@@ -118,7 +122,7 @@ export function AccountSettingsScreen({ settingsTarget }: Readonly<{ settingsTar
             icon={Globe}
             title={t(ACCOUNT_SETTINGS.language.label)}
             subtitle={languageSubtitle}
-            onPress={() => {
+            onPress={guard(() => {
               setLanguagePickerBridge({
                 onApplied: () => {
                   if (userId) {
@@ -127,7 +131,7 @@ export function AccountSettingsScreen({ settingsTarget }: Readonly<{ settingsTar
                 },
               });
               pushOnce('/(app)/language-picker' as Href);
-            }}
+            })}
           />
         </SettingsTarget>
         <SettingsTarget item={ACCOUNT_SETTINGS.trustedHosts}>
@@ -136,9 +140,9 @@ export function AccountSettingsScreen({ settingsTarget }: Readonly<{ settingsTar
             title={t(ACCOUNT_SETTINGS.trustedHosts.label)}
             subtitle={t('trustedHosts.subtitle')}
             disabled={!trustedHostsLoaded}
-            onPress={() => {
+            onPress={guard(() => {
               router.push('/(app)/(tabs)/(3_profile)/trusted-hosts' as Href);
-            }}
+            })}
           />
         </SettingsTarget>
         <SettingsTarget item={ACCOUNT_SETTINGS.passkeys}>
@@ -146,9 +150,9 @@ export function AccountSettingsScreen({ settingsTarget }: Readonly<{ settingsTar
             icon={KeyRound}
             title={t(ACCOUNT_SETTINGS.passkeys.label)}
             subtitle={t('profile.passkeysSubtitle')}
-            onPress={() => {
+            onPress={guard(() => {
               router.push('/(app)/(tabs)/(3_profile)/passkeys' as Href);
-            }}
+            })}
           />
         </SettingsTarget>
         <SettingsTarget item={ACCOUNT_SETTINGS.providerKeys}>
@@ -156,9 +160,9 @@ export function AccountSettingsScreen({ settingsTarget }: Readonly<{ settingsTar
             icon={Cpu}
             title={t(ACCOUNT_SETTINGS.providerKeys.label)}
             subtitle={t('profile.providerKeys.rowSubtitle')}
-            onPress={() => {
+            onPress={guard(() => {
               router.push('/(app)/(tabs)/(3_profile)/provider-keys' as Href);
-            }}
+            })}
           />
         </SettingsTarget>
         <SettingsTarget item={ACCOUNT_SETTINGS.dataExport}>
@@ -166,9 +170,9 @@ export function AccountSettingsScreen({ settingsTarget }: Readonly<{ settingsTar
             icon={FileText}
             title={t(ACCOUNT_SETTINGS.dataExport.label)}
             subtitle={t('profile.dataExport.rowSubtitle')}
-            onPress={() => {
+            onPress={guard(() => {
               router.push('/(app)/(tabs)/(3_profile)/data-export' as Href);
-            }}
+            })}
           />
         </SettingsTarget>
         <SettingsTarget item={ACCOUNT_SETTINGS.blockedPeople}>
@@ -176,9 +180,9 @@ export function AccountSettingsScreen({ settingsTarget }: Readonly<{ settingsTar
             icon={Ban}
             title={t(ACCOUNT_SETTINGS.blockedPeople.label)}
             subtitle={t('profile.blockedPeople.rowSubtitle')}
-            onPress={() => {
+            onPress={guard(() => {
               router.push('/(app)/(tabs)/(3_profile)/blocked-people' as Href);
-            }}
+            })}
           />
         </SettingsTarget>
         <SettingsTarget item={ACCOUNT_SETTINGS.reportReceipts}>
@@ -186,9 +190,9 @@ export function AccountSettingsScreen({ settingsTarget }: Readonly<{ settingsTar
             icon={Flag}
             title={t(ACCOUNT_SETTINGS.reportReceipts.label)}
             subtitle={t('profile.reportReceipts.rowSubtitle')}
-            onPress={() => {
+            onPress={guard(() => {
               router.push('/(app)/(tabs)/(3_profile)/report-receipts' as Href);
-            }}
+            })}
           />
         </SettingsTarget>
         <SettingsTarget item={ACCOUNT_SETTINGS.deviceSessions}>
@@ -196,9 +200,9 @@ export function AccountSettingsScreen({ settingsTarget }: Readonly<{ settingsTar
             icon={Smartphone}
             title={t(ACCOUNT_SETTINGS.deviceSessions.label)}
             subtitle={t('profile.deviceSessionsSubtitle')}
-            onPress={() => {
+            onPress={guard(() => {
               router.push('/(app)/(tabs)/(3_profile)/device-sessions' as Href);
-            }}
+            })}
           />
         </SettingsTarget>
         <SettingsTarget item={ACCOUNT_SETTINGS.browserSignOut}>
@@ -208,7 +212,7 @@ export function AccountSettingsScreen({ settingsTarget }: Readonly<{ settingsTar
             subtitle={t('profile.signOutWeb.rowSubtitle')}
             tone="danger"
             accessibilityLabel={t(ACCOUNT_SETTINGS.browserSignOut.label)}
-            onPress={() => {
+            onPress={guard(() => {
               confirm({
                 title: t('profile.signOutWeb.confirmTitle'),
                 message: t('profile.signOutWeb.confirmMessage'),
@@ -217,7 +221,7 @@ export function AccountSettingsScreen({ settingsTarget }: Readonly<{ settingsTar
                   signOutWeb.mutate(undefined);
                 },
               });
-            }}
+            })}
           />
         </SettingsTarget>
       </RowGroup>

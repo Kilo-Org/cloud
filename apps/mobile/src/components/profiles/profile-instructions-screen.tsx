@@ -323,7 +323,7 @@ export function ProfileInstructionsScreen({
             <StateAction
               label={t('profiles.addInstruction')}
               icon={Plus}
-              onPress={handleStartAdd}
+              onPress={guardRowPress(handleStartAdd)}
             />
           </ProfileManageSlot>
         }

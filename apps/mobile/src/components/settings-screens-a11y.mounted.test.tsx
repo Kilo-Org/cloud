@@ -64,6 +64,9 @@ vi.mock('react-native', () => ({
 vi.mock('expo-router', () => ({
   useNavigationContainerRef: () => ({ addListener: () => () => undefined }),
   useRouter: () => ({ push, back, replace, canGoBack }),
+  // The account screen's tap guard reads the route's focus; this suite reads
+  // accessible names, so the effect stays unregistered.
+  useFocusEffect: () => undefined,
 }));
 // The picker rows push through the guarded hook; this file asserts control labels,
 // not navigation, so the hook only has to exist.

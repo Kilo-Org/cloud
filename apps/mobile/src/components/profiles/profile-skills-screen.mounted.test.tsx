@@ -72,6 +72,9 @@ vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
   useOrganizationProfilePermission: () => permissionState.permission,
 }));
 
+// The screen's tap guard reads the route's focus. This suite drives the sheet's
+// own guard, not a return from a pushed child, so the effect stays inert.
+vi.mock('expo-router', () => ({ useFocusEffect: () => undefined }));
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfileSkills: () => h.query,
   useAgentProfileOverview: () => ({ data: { name: 'Team profile' } }),
@@ -130,6 +133,7 @@ vi.mock('@/components/ui/icons', () => ({
 describe('ProfileSkillsScreen', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.restoreAllMocks();
     resetFormDraftsForTests();
     permissionState.permission = 'allowed';
     h.connectivity = 'online';
@@ -665,6 +669,9 @@ describe('ProfileSkillsScreen', () => {
     // request already left and there is nothing unsaved to discard.
     pressSheetCancel(renderer.root);
     expect(h.confirm).not.toHaveBeenCalled();
+    // The empty-state action is armed by the sheet that just closed, so the
+    // reopen is a deliberate press after that window.
+    vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 10_000);
     pressEmptyAction(renderer);
 
     await act(async () => {
@@ -695,6 +702,9 @@ describe('ProfileSkillsScreen', () => {
     // The save is still in flight, so the guard closes without asking.
     pressSheetCancel(renderer.root);
     expect(h.confirm).not.toHaveBeenCalled();
+    // The empty-state action is armed by the sheet that just closed, so the
+    // reopen is a deliberate press after that window.
+    vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 10_000);
     pressEmptyAction(renderer);
 
     await act(async () => {
@@ -967,6 +977,7 @@ function deleteRequest(): ConfirmRequest {
 describe('ProfileSkillsScreen delete confirmation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.restoreAllMocks();
     resetFormDraftsForTests();
     permissionState.permission = 'allowed';
     h.connectivity = 'online';

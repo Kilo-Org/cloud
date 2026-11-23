@@ -1,5 +1,5 @@
 import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
 import { AccountSettingsScreen } from '@/components/account-settings-screen';
@@ -8,6 +8,9 @@ import { renderWithProviders } from '@/test/render-with-providers';
 import type * as ReactQuery from '@tanstack/react-query';
 
 const push = vi.hoisted(() => vi.fn());
+// The router's focus effect, captured so a case can replay the focus a return
+// from a pushed child screen produces. `now` pins the clock the guard reads.
+const focusState = vi.hoisted(() => ({ effects: [] as (() => void)[], now: 1_700_000_000_000 }));
 const setLanguagePickerBridge = vi.hoisted(() => vi.fn());
 const confirm = vi.hoisted(() => vi.fn());
 const signOutWeb = vi.hoisted(() => vi.fn());
@@ -24,6 +27,9 @@ vi.mock('react-native', () => ({
 }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push }),
+  useFocusEffect: (effect: () => void) => {
+    focusState.effects.push(effect);
+  },
 }));
 // The picker rows push through the guarded hook; the plain rows keep `useRouter`,
 // so both resolve to the same spy and the assertions observe one call each.
@@ -115,6 +121,19 @@ function findConfigureRow(renderer: ReactTestRenderer, title: string) {
 function findStateNodes(renderer: ReactTestRenderer, type: 'QueryError' | 'RowSkeleton') {
   return renderer.root.findAll(node => String(node.type) === type);
 }
+
+/**
+ * Run every focus effect the router registered: once on mount, which is the
+ * focus a fresh screen receives, and again when a pushed child closes.
+ */
+async function runFocusEffects(): Promise<void> {
+  await act(async () => {
+    for (const effect of focusState.effects) {
+      effect();
+    }
+    await Promise.resolve();
+  });
+}
 function settingsTargetAncestors(node: ReactTestInstance): ReactTestInstance[] {
   const ancestors: ReactTestInstance[] = [];
   for (let parent = node.parent; parent !== null; parent = parent.parent) {
@@ -134,6 +153,14 @@ beforeEach(() => {
   vi.resetAllMocks();
   currentUser.isLoading = false;
   currentUser.isFetchError = false;
+  focusState.effects = [];
+  focusState.now = 1_700_000_000_000;
+});
+
+afterEach(() => {
+  act(() => view?.unmount());
+  view = undefined;
+  vi.restoreAllMocks();
 });
 
 describe('AccountSettingsScreen', () => {
@@ -328,5 +355,35 @@ describe('AccountSettingsScreen', () => {
     const targetProps = target?.props as SettingsTargetProps | undefined;
     expect(targetProps?.item.id).toBe('account.browser-sign-out');
     expect(target?.props.onPress).toBeUndefined();
+  });
+
+  it('drops the row press of the burst that closed a pushed child screen', async () => {
+    vi.spyOn(Date, 'now').mockImplementation(() => focusState.now);
+    const renderer = await mountAccount();
+    // The router focuses a fresh screen once on mount, and that first focus
+    // must not deaden the rows behind it.
+    await runFocusEffects();
+
+    act(() => {
+      (findConfigureRow(renderer, 'Trusted hosts').props.onPress as () => void)();
+    });
+    expect(push).toHaveBeenCalledExactlyOnceWith('/(app)/(tabs)/(3_profile)/trusted-hosts');
+    push.mockClear();
+
+    // The child screen closes itself and the router focuses this one again.
+    await runFocusEffects();
+
+    act(() => {
+      const press = findConfigureRow(renderer, 'Trusted hosts').props.onPress as () => void;
+      press();
+      press();
+    });
+    expect(push).not.toHaveBeenCalled();
+
+    focusState.now += 1000;
+    act(() => {
+      (findConfigureRow(renderer, 'Trusted hosts').props.onPress as () => void)();
+    });
+    expect(push).toHaveBeenCalledExactlyOnceWith('/(app)/(tabs)/(3_profile)/trusted-hosts');
   });
 });

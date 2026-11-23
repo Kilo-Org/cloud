@@ -171,7 +171,11 @@ export function ProfileAgentsScreen({
         placement="top"
         action={
           <ProfileManageSlot permission={permission}>
-            <StateAction label={t('profiles.agents.add')} icon={Plus} onPress={handleStartAdd} />
+            <StateAction
+              label={t('profiles.agents.add')}
+              icon={Plus}
+              onPress={guardRowPress(handleStartAdd)}
+            />
           </ProfileManageSlot>
         }
       />

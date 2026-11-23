@@ -37,6 +37,7 @@ import {
   useRepoOptions,
 } from '@/lib/hooks/use-repo-bindings';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useSheetRowTapGuard } from '@/lib/hooks/use-sheet-row-tap-guard';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { getNewProfilePath, type ProfileManagementStack } from '@/lib/profile-agent-navigation';
 import { connectedServicesHref } from '@/lib/profile-navigation';
@@ -73,6 +74,9 @@ export function RepoBindingsScreen({
   backFallback?: Href;
 }>) {
   const router = useRouter();
+  // The profile creator is a pushed child that returns here by itself, so the
+  // press that closed it must not remove a binding or open the Add form.
+  const { guard } = useSheetRowTapGuard();
   const { t } = useTranslation();
   const colors = useThemeColors();
   const bindingsQuery = useRepoBindings(organizationId);
@@ -212,9 +216,9 @@ export function RepoBindingsScreen({
           canManage && !readErrorTerminal ? (
             <IconButton
               accessibilityLabel={t('profiles.repoBindings.add')}
-              onPress={() => {
+              onPress={guard(() => {
                 setIsAdding(true);
-              }}
+              })}
             >
               <Plus size={22} color={colors.foreground} />
             </IconButton>
@@ -265,11 +269,13 @@ export function RepoBindingsScreen({
                   isRemoving={unbind.isPending}
                   {...(canManage
                     ? {
-                        onRemove: () =>
-                          void handleUnbind(
-                            binding.repoFullName,
-                            binding.platform as RepoBindingPlatform
-                          ),
+                        onRemove: guard(
+                          () =>
+                            void handleUnbind(
+                              binding.repoFullName,
+                              binding.platform as RepoBindingPlatform
+                            )
+                        ),
                       }
                     : {})}
                 />

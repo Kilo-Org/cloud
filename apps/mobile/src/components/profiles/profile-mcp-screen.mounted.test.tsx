@@ -54,6 +54,9 @@ vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
   useOrganizationProfilePermission: () => permissionState.permission,
 }));
 
+// The screen's tap guard reads the route's focus. This suite drives the sheet's
+// own guard, not a return from a pushed child, so the effect stays inert.
+vi.mock('expo-router', () => ({ useFocusEffect: () => undefined }));
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfileMcpServers: () => h.query,
   useAgentProfileOverview: () => ({ data: { name: 'Team profile' } }),
@@ -116,6 +119,7 @@ type RenderedQueryError = { variant?: string; title?: string; onRetry?: () => vo
 describe('ProfileMcpScreen', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.restoreAllMocks();
     resetFormDraftsForTests();
     permissionState.permission = 'allowed';
     h.connectivity = 'online';
@@ -720,6 +724,9 @@ describe('ProfileMcpScreen', () => {
     // under the second.
     pressSheetCancel(renderer.root);
     expect(h.confirm).not.toHaveBeenCalled();
+    // The empty-state action is armed by the sheet that just closed, so the
+    // reopen is a deliberate press after that window.
+    vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 10_000);
     pressEmptyAction(renderer);
 
     await act(async () => {
@@ -782,6 +789,7 @@ function deleteRequest(): ConfirmRequest {
 describe('ProfileMcpScreen delete confirmation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.restoreAllMocks();
     resetFormDraftsForTests();
     permissionState.permission = 'allowed';
     h.query.data = testProfile([testServer({ name: SERVER_NAME })]);
@@ -870,6 +878,7 @@ function serversAt(length: number) {
 describe('ProfileMcpScreen server cap', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.restoreAllMocks();
     resetFormDraftsForTests();
     permissionState.permission = 'allowed';
     Object.assign(h.query, { isError: false, isPending: false, isRefetching: false });
@@ -978,6 +987,7 @@ async function seedSheetDraft(): Promise<void> {
 describe('ProfileMcpScreen manage permission', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.restoreAllMocks();
     resetFormDraftsForTests();
     permissionState.permission = 'allowed';
     Object.assign(h.query, {

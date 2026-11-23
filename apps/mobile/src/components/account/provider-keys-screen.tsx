@@ -29,6 +29,7 @@ import { announceTestOutcome } from '@/lib/byok/key-test-outcome';
 import { providerKeyName } from '@/lib/byok/provider-key-name';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
+import { useSheetRowTapGuard } from '@/lib/hooks/use-sheet-row-tap-guard';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { isRetryableTrpcError, trpcErrorVariant } from '@/lib/trpc-error';
@@ -60,6 +61,9 @@ export function ProviderKeysScreen({ organizationId }: Readonly<{ organizationId
   const { t } = useTranslation();
   const trpc = useTRPC();
   const router = useRouter();
+  // The add and edit screens are pushed children of this list, so the press
+  // that closed one must not reach the row underneath it.
+  const { guard } = useSheetRowTapGuard();
   const queryClient = useQueryClient();
   const colors = useThemeColors();
   const { confirm, dialog } = useConfirmDialog();
@@ -195,19 +199,19 @@ export function ProviderKeysScreen({ organizationId }: Readonly<{ organizationId
             toggling={setEnabled.isPending && setEnabled.variables.id === providerKey.id}
             deleting={deletingId === providerKey.id}
             canEdit={permissions.canEdit}
-            onTest={() => {
+            onTest={guard(() => {
               setTestingId(providerKey.id);
               test.mutate({ ...scopeInput, id: providerKey.id });
-            }}
-            onToggle={enabled => {
+            })}
+            onToggle={guard((enabled: boolean) => {
               setEnabled.mutate({ ...scopeInput, id: providerKey.id, is_enabled: enabled });
-            }}
-            onEdit={() => {
+            })}
+            onEdit={guard(() => {
               router.push(providerKeyNewHref(scope, providerKey.provider_id, providerKey.id));
-            }}
-            onDelete={() => {
+            })}
+            onDelete={guard(() => {
               confirmRemove(providerKey);
-            }}
+            })}
           />
         ))}
       </>
@@ -223,9 +227,9 @@ export function ProviderKeysScreen({ organizationId }: Readonly<{ organizationId
           permissions.canEdit ? (
             <IconButton
               accessibilityLabel={t('profile.providerKeys.add')}
-              onPress={() => {
+              onPress={guard(() => {
                 router.push(providerKeyAddHref(scope));
-              }}
+              })}
             >
               <Plus size={20} color={colors.foreground} />
             </IconButton>

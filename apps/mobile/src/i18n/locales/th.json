@@ -589,6 +589,7 @@
     "appearanceDark": "มืด",
     "account": "บัญชี",
     "accountSubtitle": "ภาษา โฮสต์ที่เชื่อถือ และเซสชันบนอุปกรณ์",
+    "accountNotifications": "บัญชีและการแจ้งเตือน",
     "prReviewAttribution": "ระบุแอปที่ใช้ในการตรวจสอบ PR",
     "prReviewAttributionSubtitle": "เพิ่มข้อความท้ายการตรวจสอบว่าตรวจสอบผ่าน Kilo เมื่อคุณส่งผลการตรวจสอบ",
     "returnSendsMessage": "ปุ่มขึ้นบรรทัดใหม่ใช้ส่งข้อความ",

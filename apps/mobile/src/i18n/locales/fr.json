@@ -2491,6 +2491,7 @@
     "appearanceDark": "Sombre",
     "account": "Compte",
     "accountSubtitle": "Langue, sites de confiance et sessions sur les appareils",
+    "accountNotifications": "Compte et notifications",
     "prReviewAttribution": "Mentionner l'application dans les revues de PR",
     "prReviewAttributionSubtitle": "Ajouter la mention « Revue via Kilo » au bas de chaque revue envoyée.",
     "returnSendsMessage": "La touche Entrée envoie le message",

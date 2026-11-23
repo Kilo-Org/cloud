@@ -592,6 +592,7 @@
     "appearanceDark": "Escuro",
     "account": "Conta",
     "accountSubtitle": "Idioma, servidores de confiança e sessões nos dispositivos",
+    "accountNotifications": "Conta e notificações",
     "prReviewAttribution": "Identificar a aplicação nas revisões de PR",
     "prReviewAttributionSubtitle": "Adicionar um rodapé que indica que a revisão foi feita através do Kilo quando a enviar.",
     "returnSendsMessage": "A tecla de retorno envia a mensagem",

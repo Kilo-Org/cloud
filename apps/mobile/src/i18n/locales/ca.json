@@ -591,6 +591,7 @@
     "appearanceDark": "Fosc",
     "account": "Compte",
     "accountSubtitle": "Idioma, servidors de confiança i sessions als dispositius",
+    "accountNotifications": "Compte i notificacions",
     "prReviewAttribution": "Afegeix l'atribució de l'aplicació a les revisions de PR",
     "prReviewAttributionSubtitle": "Afegeix un peu amb el text «Revisat amb Kilo» quan enviïs una revisió.",
     "returnSendsMessage": "La tecla de retorn envia el missatge",

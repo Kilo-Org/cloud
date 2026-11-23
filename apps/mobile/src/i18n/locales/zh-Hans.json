@@ -589,6 +589,7 @@
     "appearanceDark": "深色",
     "account": "账户",
     "accountSubtitle": "语言、受信任的主机和设备会话",
+    "accountNotifications": "账户和通知",
     "prReviewAttribution": "在 PR 审查中添加应用署名",
     "prReviewAttributionSubtitle": "提交审查时，在末尾添加“通过 Kilo 审查”的署名。",
     "returnSendsMessage": "回车键发送消息",

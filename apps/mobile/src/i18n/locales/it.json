@@ -2563,6 +2563,7 @@
     "appearanceDark": "Scuro",
     "account": "Il tuo account",
     "accountSubtitle": "Lingua, siti attendibili e sessioni sui dispositivi",
+    "accountNotifications": "Account e notifiche",
     "prReviewAttribution": "Indica l'app usata nelle revisioni delle PR",
     "prReviewAttributionSubtitle": "Aggiungi la dicitura «Revisione effettuata tramite Kilo» in fondo a ogni revisione che invii.",
     "returnSendsMessage": "Il tasto Invio invia il messaggio",

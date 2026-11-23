@@ -590,6 +590,7 @@
     "appearanceDark": "Donker",
     "account": "Gebruikersaccount",
     "accountSubtitle": "Taal, vertrouwde hosts en apparaatsessies",
+    "accountNotifications": "Gebruikersaccount en meldingen",
     "prReviewAttribution": "De app vermelden bij PR-beoordelingen",
     "prReviewAttributionSubtitle": "Voeg bij het indienen van een beoordeling een voettekst toe die vermeldt dat je de beoordeling via Kilo hebt gedaan.",
     "returnSendsMessage": "Return-toets verzendt bericht",

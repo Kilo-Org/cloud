@@ -591,6 +591,7 @@
     "appearanceDark": "Oscuro",
     "account": "Cuenta",
     "accountSubtitle": "Idioma, dominios de confianza y sesiones en dispositivos",
+    "accountNotifications": "Cuenta y notificaciones",
     "prReviewAttribution": "Mencionar la aplicación en las revisiones de PR",
     "prReviewAttributionSubtitle": "Añadir una nota al final de cada revisión para indicar que se ha realizado con Kilo.",
     "returnSendsMessage": "La tecla Intro envía el mensaje",

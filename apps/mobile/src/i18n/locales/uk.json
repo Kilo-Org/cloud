@@ -592,6 +592,7 @@
     "appearanceDark": "Темна",
     "account": "Обліковий запис",
     "accountSubtitle": "Мова, довірені хости та сеанси на пристроях",
+    "accountNotifications": "Обліковий запис та сповіщення",
     "prReviewAttribution": "Додавати згадку про застосунок до перевірок PR",
     "prReviewAttributionSubtitle": "Додавати підпис «Перевірено через Kilo» в кінці перевірки під час надсилання.",
     "returnSendsMessage": "Клавіша вводу надсилає повідомлення",

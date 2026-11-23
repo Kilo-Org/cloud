@@ -590,6 +590,7 @@
     "appearanceDark": "Tumma",
     "account": "Tili",
     "accountSubtitle": "Kieli, luotetut verkkotunnukset ja laiteistunnot",
+    "accountNotifications": "Tili ja ilmoitukset",
     "prReviewAttribution": "Lisää maininta sovelluksesta PR-katselmointeihin",
     "prReviewAttributionSubtitle": "Lisää lähetettävän katselmoinnin loppuun maininta, että katselmointi tehtiin Kilolla.",
     "returnSendsMessage": "Enter-näppäin lähettää viestin",

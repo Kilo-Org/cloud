@@ -589,6 +589,7 @@
     "appearanceDark": "다크",
     "account": "계정",
     "accountSubtitle": "언어, 신뢰하는 호스트, 기기 세션",
+    "accountNotifications": "계정 및 알림",
     "prReviewAttribution": "PR 리뷰에 사용 앱 표시",
     "prReviewAttributionSubtitle": "리뷰를 제출할 때 Kilo로 리뷰했다는 문구를 하단에 추가합니다.",
     "returnSendsMessage": "리턴 키로 메시지 보내기",

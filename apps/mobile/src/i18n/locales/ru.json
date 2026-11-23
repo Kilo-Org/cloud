@@ -592,6 +592,7 @@
     "appearanceDark": "Тёмная",
     "account": "Аккаунт",
     "accountSubtitle": "Язык, доверенные сайты и сеансы на устройствах",
+    "accountNotifications": "Аккаунт и уведомления",
     "prReviewAttribution": "Указывать приложение в проверках PR",
     "prReviewAttributionSubtitle": "Добавлять подпись «Проверено с помощью Kilo» в конце проверки при её отправке.",
     "returnSendsMessage": "Отправлять сообщение клавишей ввода",

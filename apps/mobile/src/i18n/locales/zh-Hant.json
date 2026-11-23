@@ -589,6 +589,7 @@
     "appearanceDark": "深色",
     "account": "帳戶",
     "accountSubtitle": "語言、信任的主機和裝置工作階段",
+    "accountNotifications": "帳戶與通知",
     "prReviewAttribution": "在 PR 審查中註明使用的應用程式",
     "prReviewAttributionSubtitle": "送出審查時，在結尾註明透過 Kilo 審查。",
     "returnSendsMessage": "按換行鍵傳送訊息",

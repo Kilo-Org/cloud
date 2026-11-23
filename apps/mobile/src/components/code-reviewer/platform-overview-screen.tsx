@@ -43,7 +43,7 @@ import {
   useSaveReviewConfig,
   useToggleReviewer,
 } from '@/lib/hooks/use-code-reviewer';
-import { useCouncilUiEnabled } from '@/lib/hooks/use-reviewer-council';
+import { useCouncilEntryAvailable } from '@/lib/hooks/use-reviewer-council';
 import { useReviewerModels } from '@/lib/hooks/use-reviewer-models';
 import { useReviewerScopeTitle } from '@/lib/hooks/use-reviewer-scope-title';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -66,7 +66,7 @@ export function PlatformOverviewScreen({
   const canEdit = permission.status === 'ready' && permission.canEdit;
   const { hasWebhookSyncWarning } = useGitLabWebhookWarning(scope, platform);
   const { models, isLoading: modelsLoading } = useReviewerModels(scope);
-  const councilUiEnabled = useCouncilUiEnabled(scope);
+  const councilEntryAvailable = useCouncilEntryAvailable(scope);
   const { reducedMotion } = useMotionPolicy();
   // The body of the config read has exactly one surface: rows from cache, an
   // error with retry, or a loading state. Bitbucket renders its own overview,
@@ -216,7 +216,7 @@ export function PlatformOverviewScreen({
                 }
               : undefined,
           onOpenCouncil:
-            capabilities.council && councilUiEnabled
+            capabilities.council && councilEntryAvailable
               ? () => {
                   pushField('council');
                 }

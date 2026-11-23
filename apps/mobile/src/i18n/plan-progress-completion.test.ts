@@ -34,8 +34,8 @@ const locales: readonly LocaleCase[] = [
   { tag: 'ur', render: (done, total) => `منصوبہ: ${total} میں سے ${done} مکمل` },
   {
     tag: 'am',
-    render: (done, total) => `እቅድ: ከ${total} ደረጃዎች ውስጥ ${done} ተጠናቋል`,
-    renderOne: (done, total) => `እቅድ: ከ${total} ደረጃ ውስጥ ${done} ተጠናቋል`,
+    render: (done, total) => `እቅድ: ከ${total} ደረጃዎች ውስጥ ${done} የተጠናቀቁ`,
+    renderOne: (done, total) => `እቅድ: ከ${total} ደረጃ ውስጥ ${done} የተጠናቀቀ`,
   },
   { tag: 'ckb', render: (done, total) => `پلان: ${done} لە ${total} هەنگاو تەواوکراو` },
   {
@@ -45,10 +45,10 @@ const locales: readonly LocaleCase[] = [
   },
   {
     tag: 'om',
-    render: (done, total) => `Karoora: tarkaanfiiwwan ${total} keessaa ${done} xumurame`,
+    render: (done, total) => `Karoora: tarkaanfiiwwan ${total} keessaa ${done} xumuraman`,
     renderOne: (done, total) => `Karoora: tarkaanfii ${total} keessaa ${done} xumurame`,
   },
-  { tag: 'sw', render: (done, total) => `Mpango: hatua ${done} kati ya ${total} imekamilika` },
+  { tag: 'sw', render: (done, total) => `Mpango: hatua zilizokamilika ${done} kati ya ${total}` },
   { tag: 'cy', render: (done, total) => `Cynllun: ${done} o ${total} cam wedi cwblhau` },
 ];
 

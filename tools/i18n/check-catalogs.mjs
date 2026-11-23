@@ -119,6 +119,7 @@ const TWO_SENSE_COPY = new Map([
     'receipt',
     'the confirmation a moderation report produces, versus the proof of payment for a credit purchase',
   ],
+  ['expired', 'the state of a native-remote command delivery, versus the state of a credit grant'],
   ['block', 'the verb, block a discussion participant, versus the reviewer decision to block'],
   ['merge', 'the verb in the merge section header, versus the name of the merge method on a badge'],
   ['review', 'the noun, a review, versus the verb in the onboarding step'],
@@ -1192,6 +1193,72 @@ function checkBorrowedDanda(values, label) {
   return problems;
 }
 
+/** The mark an Urdu catalog declares as its sentence terminator. */
+const URDU_SENTENCE_TERMINATOR = '\u06D4';
+/** What continues a token after a dot rather than starting a sentence. */
+const LATIN_OR_NUMBER_AFTER_DOT = /[A-Za-z0-9/%-]/;
+
+/** Whether the character is a letter of the Arabic script, as Urdu words are. */
+function isArabicLetter(char) {
+  return char !== undefined && /\p{Script=Arabic}/u.test(char) && /\p{L}/u.test(char);
+}
+
+/**
+ * The Urdu full stop `۔` (U+06D4) closes a sentence written in the Arabic
+ * script, and a catalog that declares it in `common.sentenceJoiner` has stated
+ * that this mark ends its sentences. An ASCII `.` left at a boundary then puts
+ * two conventions on one screen. The rule reads that declared joiner instead of
+ * a tag list for the same reason `checkBorrowedDanda` does: the joiner is the
+ * catalog's own statement of which mark closes its sentences, so a catalog that
+ * declares another mark keeps its ASCII periods and none is named here. Only a
+ * mark that closes a sentence is read: an ellipsis, a host or file name and a
+ * decimal keep theirs. A period followed by whitespace and a word closes one
+ * sentence and opens the next whatever precedes it, so the sentence it joins is
+ * reported after a `{{token}}` or a closing bracket too; a value-final period
+ * is read only after an Urdu word, which leaves a Latin product name alone.
+ */
+function checkUrduSentenceTerminator(values, label) {
+  const problems = [];
+  const joiner = values.get('common.sentenceJoiner');
+  if (typeof joiner !== 'string' || !joiner.startsWith(URDU_SENTENCE_TERMINATOR)) {
+    return problems;
+  }
+  for (const [key, value] of values) {
+    for (let index = 0; index < value.length; index += 1) {
+      if (value[index] !== '.') {
+        continue;
+      }
+      // A run of dots is an ellipsis, a wait state rather than a sentence end.
+      if (value[index - 1] === '.' || value[index + 1] === '.') {
+        continue;
+      }
+      // A host, file name or decimal continues with its own characters.
+      if (LATIN_OR_NUMBER_AFTER_DOT.test(value[index + 1] ?? '')) {
+        continue;
+      }
+      // A word after the dot means a second sentence follows it, whatever the
+      // dot follows: `{{status}}. ہدف` joins two sentences as surely as a dot
+      // after an Urdu word does.
+      if (/^\s+\p{L}/u.test(value.slice(index + 1))) {
+        problems.push(`${label}: "${key}" joins two sentences with the ASCII "."; Urdu writes «۔»`);
+        continue;
+      }
+      // A dot that ends the value, or runs straight into the next word with no
+      // space, closes a sentence only after an Urdu word: `Sentry.` names a
+      // product and `{{status}}.` a value, not a sentence.
+      if (!isArabicLetter(value[index - 1])) {
+        continue;
+      }
+      if (/\p{L}/u.test(value.slice(index + 1))) {
+        problems.push(`${label}: "${key}" joins two sentences with the ASCII "."; Urdu writes «۔»`);
+        continue;
+      }
+      problems.push(`${label}: "${key}" ends a sentence with the ASCII "."; Urdu writes «۔»`);
+    }
+  }
+  return problems;
+}
+
 /** The `{{token}}` list of one string, in the order it writes them. */
 function placeholderTokens(value) {
   return [...value.matchAll(/\{\{\s*([^}\s]+)\s*\}\}/g)].map(match => match[1]);
@@ -1676,16 +1743,9 @@ function destructiveConfirmKeys(source, english) {
 
 /**
  * Reject a destructive button whose label reads as this catalog's Cancel word.
- *
- * An exact match is always a defect: the reader sees Cancel on the red button
- * too, so it is rejected for every key. The substring test applies only to a
- * key whose English copy is a bare destructive verb such as "Revoke": a red
- * button reading "Revoke link" when Cancel sits beneath it is ambiguous, while
- * "Cancel subscription" beside "Cancel" is deliberate English and its
- * translation may keep the locale's Cancel word. `rejectContainingCancel`
- * carries that per-key decision: a true flag rejects a label that CONTAINS this
- * catalog's Cancel word, so a key whose English names Cancel never reaches the
- * substring test.
+ * It folds both labels, rejects an exact match for every key, and rejects a
+ * match that only contains the Cancel word when `rejectContainingCancel` is
+ * true; `destructiveConfirmKeys` computes that flag.
  */
 function checkDestructiveConfirmLabel(label, key, value, cancelValue, rejectContainingCancel) {
   const problems = [];
@@ -2074,10 +2134,6 @@ function checkCatalogMembership({ catalogName, tags, present, dir }) {
 
 function checkEnglishCopies({ catalogName, english }) {
   const problems = [];
-  // One key per piece of copy. Two keys holding the same English string cannot
-  // be translated apart without the catalogs drifting, so the copy belongs to
-  // one key and every call site points at it.
-  //
   // Every plural key is exempt, not only the members of one family. So two
   // plural families holding the same copy pass here. That is deliberate: the
   // one-wording rule below groups plural keys too, so the catalogs still cannot
@@ -2094,8 +2150,6 @@ function checkEnglishCopies({ catalogName, english }) {
     }
     byCopy.get(value).push(key);
   }
-  // The per-line bucket phrases are registered once in PER_LINE_BUCKET_PHRASES,
-  // which checkSharedWordings also reads.
   for (const [value, keys] of byCopy) {
     if (keys.length < 2 || keys.every(key => PER_LINE_BUCKET_PHRASES.has(pluralBaseKey(key)))) {
       continue;
@@ -2234,8 +2288,6 @@ function checkKeyParity({
 /** The categories a locale's plural families lack. */
 function checkPluralCategories({ label, tag, english, translated }) {
   const problems = [];
-  // The families this locale must complete, and the categories it lacks,
-  // come from the rule both audits share.
   for (const [family, absent] of missingPluralCategories(english, translated, tag)) {
     for (const category of absent) {
       problems.push(`${label}: plural family "${family}" lacks the ${category} category of ${tag}`);
@@ -2375,8 +2427,6 @@ function checkTranslatedValue({
       ...checkDestructiveConfirmLabel(label, key, value, cancelValue, rejectContainingCancel)
     );
   }
-  // A catalog may not leave a listed key in English; MUST_TRANSLATE_KEYS
-  // records which keys, per catalog, and why.
   if (mustTranslateKeys.has(key) && value === englishValue) {
     problems.push(`${label}: "${key}" must be translated`);
   }
@@ -2388,8 +2438,6 @@ function checkTranslatedValue({
       key,
       value,
       englishValue,
-      // Only a reviewed (key, category, locale) entry may say its number as a
-      // word; every other form keeps its language's exact placeholder set.
       countsMayBeWorded: Boolean(
         parts && WORDED_COUNTS.has(`${parts.base}:${parts.category}:${tag}`)
       ),
@@ -2548,10 +2596,6 @@ function checkLoginSeparators({ label, tag, translated }) {
 /** The sentence separator of the composed review message. */
 function checkSentenceSeparator({ label, tag, translated }) {
   const problems = [];
-  // The composed message appends the stale clause to the fresh one verbatim,
-  // so the separator is one choice per catalog: every form of the family
-  // agrees on it, and only a catalog that writes no space after its
-  // terminator leaves the clause bare.
   const freshForms = [...translated].filter(
     ([key]) => pluralBaseKey(key) === SENTENCE_SEPARATED_FAMILY
   );
@@ -2696,6 +2740,7 @@ function checkCatalogLocales({
     problems.push(...checkAgentEditorCopy(translated, english, label));
     problems.push(...checkPullRequestTerm(translated, label));
     problems.push(...checkArmenianSentenceTerminator(tag, translated, label));
+    problems.push(...checkUrduSentenceTerminator(translated, label));
     problems.push(...checkBorrowedDanda(translated, label));
     problems.push(...checkChangelogAreaLabels(tag, translated, label));
 

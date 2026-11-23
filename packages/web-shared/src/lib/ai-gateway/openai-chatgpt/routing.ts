@@ -591,8 +591,6 @@ export async function checkOpenAiChatGptByok(
 
     const outcome = await resolveOpenAiChatGptAccessToken(owner);
 
-    // A terminally dead credential must fail readably instead of falling back
-    // to the next connection or another billing path.
     if (outcome.kind === 'terminal') {
       return { kind: 'reconnect', message: OPENAI_CHATGPT_RECONNECT_MESSAGE };
     }

@@ -93,6 +93,7 @@
     "draft": "Juodraštis",
     "enabled": "Įjungta",
     "github": "GitHub",
+    "image": "Paveikslėlis",
     "imageUnavailable": "Paveikslėlis nepasiekiamas",
     "loading": "Įkeliama…",
     "loadMore": "Įkelti daugiau",
@@ -1305,6 +1306,7 @@
     "needsInputAction": {
       "approved": "Užklausa patvirtinta",
       "replied": "Atsakymas išsiųstas",
+      "empty": "Įrašykite atsakymą, tada jį siųskite.",
       "failed": "Nepavyko atsakyti. Bakstelėkite dar kartą, kad pabandytumėte.",
       "unavailable": "Šios užklausos nebelaukiama."
     }
@@ -1659,7 +1661,7 @@
       "empty": "Dar nėra peržiūrų su analitika",
       "emptyDescription": "Analitika fiksuoja užbaigtas peržiūras, kol ji įjungta organizacijai.",
       "offTitle": "Analitika išjungta platformai {{platform}}",
-      "offDescription": "Analitiką gali įjungti organizacijos atsiskaitymo vaidmenys – savininkai, administratoriai ir atsiskaitymo tvarkytojai – organizacijos nustatymuose žiniatinklyje, kad būtų fiksuojamos užbaigtos peržiūros.",
+      "offDescription": "Analitiką gali įjungti organizacijos atsiskaitymo vaidmenys – savininkai, administratoriai ir atsiskaitymų administratoriai – organizacijos nustatymuose žiniatinklyje, kad būtų fiksuojamos užbaigtos peržiūros.",
       "couldNotLoad": "Nepavyko įkelti analitikos",
       "trackedReviewsCaption": "Užbaigtos peržiūros, kurios baigėsi šiame laikotarpyje su įjungta analitika. Vykstančios ir nepavykusios peržiūros niekada neskaičiuojamos.",
       "trackedReviewsUncounted": "Neįskaičiuota: {{displayCount}} iš {{displayTotal}} organizacijos užbaigtų peržiūrų, kurių rezultatas nebuvo užfiksuotas.",
@@ -2776,6 +2778,7 @@
     "filePart": {
       "loadingImage": "Įkeliamas paveikslėlis",
       "imageUnavailableRetry": "Paveikslėlis nepasiekiamas, bandyti įkelti iš naujo",
+      "imageUnavailableRetryWithAlt": "Paveikslėlis nepasiekiamas, {{alt}}, bandyti įkelti iš naujo",
       "imagePreviewUnavailableInSession": "Paveikslėlio peržiūra šioje sesijoje nepasiekiama.",
       "viewImage": "Peržiūrėti paveikslėlį",
       "viewImageWithAlt": "Peržiūrėti paveikslėlį „{{alt}}“",
@@ -3537,6 +3540,8 @@
     "voiceTranscriptionWho": "Jūsų įrenginys, Kilo Gateway su pasirinktu transkripcijos modeliu arba Apple ar Google atpažinimui internete.",
     "installAttributionPromptTitle": "Leisti nustatyti įdiegimo šaltinį?",
     "installAttributionPromptMessage": "Kilo naudoja Apple sekimo leidimą tik tam, kad sužinotų, per kurį kanalą radote programėlę. Jūsų užklausos ir pokalbiai tam niekada nenaudojami.",
+    "installAttributionRequestFailedTitle": "Nepavyko parodyti sekimo užklausos",
+    "installAttributionRequestFailedMessage": "Kilo nepavyko parodyti sistemos užklausos, todėl įdiegimo šaltinio nustatymas lieka išjungtas.",
     "what": "Kokie duomenys",
     "why": "Kam naudojami",
     "who": "Kas gauna"
@@ -3830,7 +3835,7 @@
       "pendingInvitation": "Šiam el. pašto adresui jau išsiųstas laukiantis kvietimas.",
       "alreadyMember": "Šis asmuo jau yra šios organizacijos narys.",
       "seatsFull": "Visos vietos užimtos ({{used}}/{{total}}). Paprašykite organizacijos savininko pridėti vietų, prieš kviesdami daugiau narių.",
-      "seatsFullCanInviteBilling": "Visos vietos užimtos ({{used}}/{{total}}). Vis tiek galite kviesti atsiskaitymų tvarkytojus, nes jie neužima vietos.",
+      "seatsFullCanInviteBilling": "Visos vietos užimtos ({{used}}/{{total}}). Vis tiek galite kviesti atsiskaitymų administratorius, nes jie neužima vietos.",
       "noSeatsAvailable": "Visos vietos užimtos. Paprašykite organizacijos savininko pridėti vietų, prieš kviesdami daugiau narių."
     },
     "invoices": {
@@ -4038,7 +4043,7 @@
     "signupStepUpApple": "Kad užbaigtum paskyros kūrimą, pasirink „$t(login.signInWithApple)“.",
     "signupStepUpGoogle": "Kad užbaigtum paskyros kūrimą, pasirink „$t(login.signInWithGoogle)“.",
     "signupStepUpBack": "Kad užbaigtum paskyros kūrimą, grįžk atgal ir pasirink „$t(login.moreSignInOptions)“.",
-    "invalidCode": "Kodas neteisingas arba nebegalioja. Bandyk dar kartą arba pasirink „$t(login.resendCode)“.",
+    "invalidCode": "Kodas neteisingas arba nebegalioja. Naudok „$t(login.resendCode)“ arba „$t(login.moreSignInOptions)“.",
     "codeInProgress": "Tavo kodas apdorojamas. Palauk akimirką ir bandyk dar kartą.",
     "tooManyAttempts": "Per daug bandymų. Paprašyk naujo kodo.",
     "invalidToken": "Nepavyko prisijungti. Bandyk dar kartą.",
@@ -4370,6 +4375,8 @@
       "discoveryNoModels": "Prieigos taškas nepateikė nė vieno modelio. Įveskite modelius rankiniu būdu.",
       "connectionIncomplete": "Modelis atsakė, bet nebaigė. Bandykite dar kartą arba patikrinkite modelio ID ir protokolą.",
       "invalidInput": "Įveskite serverio pavadinimą, galiojančias antraštes ir bent vieną modelį su unikaliu ID ir pavadinimu. Žetonų skaičiaus ribos turi būti teigiami sveikieji skaičiai.",
+      "invalidApiKey": "API rakte yra simbolis, kurio negalima išsiųsti. Naudokite tik raides, skaitmenis ir standartinius simbolius, be jokių eilutės lūžio ženklų.",
+      "invalidHeaders": "Pasirinktinės antraštės išsiųsti negalima. Patikrinkite jos pavadinimą ir naudokite tik raides, skaitmenis ir standartinius simbolius, be jokių eilutės lūžio ženklų.",
       "invalidUrl": "Įveskite bazinį HTTP arba HTTPS API URL be prisijungimo duomenų, užklausos parametrų ar fragmento.",
       "publicHttp": "Viešieji HTTP prieigos taškai neleidžiami. Naudokite HTTPS arba privatų vietinį prieigos tašką.",
       "httpApprovalRequired": "Prieš išsaugodami ar prisijungdami patvirtinkite šį vietinį HTTP prieigos tašką.",
@@ -4504,7 +4511,15 @@
       "download": "Atsisiųsti įrenginio modelį",
       "downloading": "Atsisiunčiama…",
       "downloadProgress": "Atsisiunčiama… {{percent}}%",
-      "downloadFailed": "Atsisiuntimas nebaigtas. Patikrinkite ryšį ir laisvą vietą saugykloje, tada bandykite dar kartą."
+      "downloadFailed": "Atsisiuntimas nebaigtas. Patikrinkite ryšį ir laisvą vietą saugykloje, tada bandykite dar kartą.",
+      "cannotUse": "Nepavyksta paleisti: {{items}}.",
+      "cannotUseOptions": "Nepavyksta užpildyti: kai kurios įrankio parinktys.",
+      "limitations": "Apribojimai",
+      "tools": {
+        "time": "Laikas",
+        "settingsList": "Rodyti nustatymus",
+        "settingsSet": "Keisti nustatymus"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Šis modelis palaiko mąstymo intensyvumą"
@@ -4693,6 +4708,7 @@
     "instructionSaveFailed": "Nepavyko išsaugoti instrukcijos",
     "instructionDeleteFailed": "Nepavyko ištrinti instrukcijos",
     "instructionToggleFailed": "Nepavyko atnaujinti instrukcijos",
+    "instructionViewTitle": "Instrukcijos failas",
     "instructionLimitReached": "Profilis gali turėti iki {{max}} instrukcijų. Ištrinkite vieną, kad galėtumėte pridėti kitą.",
     "mcp": {
       "title": "MCP serveriai",
@@ -4869,6 +4885,7 @@
       "emptyDescription": "Čia bus rodomi kreditų pirkimai, kvitai ir naudojimas.",
       "emptyTitle": "Kreditų istorijos nėra",
       "expiredGrant": "Galiojimas baigėsi: {{description}}",
+      "expiredStatus": "Galiojimas baigėsi",
       "googlePlayReceipt": "Kvitas iš Google Play",
       "kind": {
         "adjustment": "Koregavimas",
@@ -4895,7 +4912,8 @@
       "receiptA11y": "Atidaryti kvitą: {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Šiam pirkimui kvito nėra.",
       "retentionLimit": "Rodoma naujausia kreditų istorija.",
-      "voidedGrant": "Anuliuota: {{description}}"
+      "voidedGrant": "Anuliuota: {{description}}",
+      "voidedStatus": "Anuliuota"
     },
     "title": "Pirkti kreditus",
     "description": "Kreditai yra vienkartinis pirkinys, pridedamas prie jūsų Kilo balanso AI kodavimo sesijoms Kilo programoje vykdyti. Parduotuvė nuskaito lėšas iš jūsų paskyros, o kreditai pridedami po to, kai parduotuvė patvirtina mokėjimą.",

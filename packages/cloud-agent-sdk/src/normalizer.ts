@@ -334,7 +334,7 @@ const connectedServiceDataSchema = connectedDataSchema.extend({
   activeMessageId: z.string().nullable().optional().catch(undefined),
 });
 
-// `cloud.message.canceled` mirrors the queued payload minus the content field.
+// `cloud.message.canceled` mirrors the queued payload minus its `content` and `delivery` fields.
 const cloudMessageCanceledDataSchema = z
   .object({
     messageId: z.string(),
@@ -514,10 +514,6 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
           always: r.data.always,
         };
       }
-      // A request whose scope does not parse cannot be offered as a decision:
-      // forwarding an empty scope would describe settings the app never read.
-      // It is not dropped either, because the CLI keeps waiting for an answer
-      // the app would otherwise never mention.
       const identity = permissionAskedIdentitySchema.safeParse(data);
       if (!identity.success) return null;
       return { type: 'permission.unreadable', requestId: identity.data.id };

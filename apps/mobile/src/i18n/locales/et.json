@@ -91,6 +91,7 @@
     "draft": "Mustand",
     "enabled": "Sisse lülitatud",
     "github": "GitHub",
+    "image": "Pilt",
     "imageUnavailable": "Pilt pole saadaval.",
     "loading": "Laadimine…",
     "loadMore": "Laadi veel",
@@ -399,7 +400,7 @@
       "title": "Teenusepakkuja võtmed",
       "rowSubtitle": "Kasuta oma teenusepakkuja arveldust",
       "orgDescription": "Neid võtmeid jagatakse kõigi organisatsiooni liikmetega ja kulud arveldatakse organisatsiooni teenusepakkuja kontodelt.",
-      "viewOnly": "Organisatsiooni võtmeid saavad muuta ainult selle omanik, administraator või arvelduse haldur.",
+      "viewOnly": "Organisatsiooni võtmeid saavad muuta ainult selle omanik, administraator või arveldushaldur.",
       "description": "Nende võtmetega tehtud päringud arveldatakse sinu teenusepakkuja kontolt, mitte Kilo saldolt.",
       "managedByPlan": "Haldab sinu kodeerimispakett",
       "enableKey": "Luba teenusepakkuja {{provider}} võti",
@@ -1249,6 +1250,7 @@
     "needsInputAction": {
       "approved": "Taotlus kiideti heaks",
       "replied": "Vastus on saadetud",
+      "empty": "Kirjuta vastus, seejärel saada see.",
       "failed": "Vastamine ei õnnestunud. Uuesti proovimiseks puuduta uuesti.",
       "unavailable": "See taotlus ei ole enam ootel."
     }
@@ -2670,6 +2672,7 @@
     "filePart": {
       "loadingImage": "Pildi laadimine",
       "imageUnavailableRetry": "Pilt pole saadaval, proovi laadimist uuesti",
+      "imageUnavailableRetryWithAlt": "Pilt pole saadaval, {{alt}}, proovi laadimist uuesti",
       "imagePreviewUnavailableInSession": "Pildi eelvaade pole selles seansis saadaval.",
       "viewImage": "Vaata pilti",
       "viewImageWithAlt": "Vaata pilti {{alt}}",
@@ -3411,6 +3414,8 @@
     "voiceTranscriptionWho": "Sinu seade, Kilo Gateway koos sinu valitud transkriptsioonimudeliga või Apple või Google veebipõhiseks tuvastuseks.",
     "installAttributionPromptTitle": "Kas lubada paigaldusallika tuvastamine?",
     "installAttributionPromptMessage": "Kilo kasutab Apple'i jälgimisluba ainult selleks, et teada saada, millisest kanalist sa siia jõudsid. Sinu viipasid ega vestlusi selleks kunagi ei kasutata.",
+    "installAttributionRequestFailedTitle": "Jälgimisküsimust ei õnnestunud kuvada",
+    "installAttributionRequestFailedMessage": "Kilo ei saanud süsteemi küsimust kuvada, seega jääb paigaldusallika tuvastamine välja lülitatuks.",
     "what": "Mis",
     "why": "Miks",
     "who": "Kellele"
@@ -3426,7 +3431,7 @@
   "organization": {
     "auditLog": {
       "title": "Auditilogi",
-      "permissionDenied": "Auditilogi saavad lugeda ainult Enterprise-plaaniga organisatsiooni omanik, administraator või arvelduse haldur. $t(organization.boundary.accessDeniedDescription)",
+      "permissionDenied": "Auditilogi saavad lugeda ainult Enterprise-plaaniga organisatsiooni omanik, administraator või arveldushaldur. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Auditisündmusi pole",
       "emptyDescription": "Siin kuvatakse selles organisatsioonis tehtud toimingud.",
       "truncated": "Kuvatakse viimased sündmused.",
@@ -3616,7 +3621,7 @@
     },
     "billing": {
       "title": "Arveldus",
-      "permissionDenied": "Arveldusteavet näevad ainult organisatsiooni omanik, administraator või arvelduse haldur. $t(organization.boundary.accessDeniedDescription)",
+      "permissionDenied": "Arveldusteavet näevad ainult organisatsiooni omanik, administraator või arveldushaldur. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Tellimus",
       "state": "Olek",
       "stateNone": "Tellimus puudub",
@@ -3793,7 +3798,7 @@
       "emptyDescription": "Kasuta nuppu „Varasem tund”, et näha varasemaid päringuid.",
       "emptyBoundDescription": "Päringulogid ei ulatu sellest kaugemale tagasi.",
       "loadError": "Päringulogide laadimine ebaõnnestus.",
-      "permissionDenied": "Päringulogisid saavad lugeda ainult organisatsiooni omanik, administraator või arvelduse haldur. $t(organization.boundary.accessDeniedDescription)",
+      "permissionDenied": "Päringulogisid saavad lugeda ainult organisatsiooni omanik, administraator või arveldushaldur. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} sisse · {{output}} välja",
       "byok": "BYOK"
     },
@@ -3898,7 +3903,7 @@
     "signupStepUpApple": "Konto loomise lõpetamiseks kasuta valikut „$t(login.signInWithApple)“.",
     "signupStepUpGoogle": "Konto loomise lõpetamiseks kasuta valikut „$t(login.signInWithGoogle)“.",
     "signupStepUpBack": "Konto loomise lõpetamiseks mine tagasi ja kasuta valikut „$t(login.moreSignInOptions)“.",
-    "invalidCode": "See kood on vale või aegunud. Proovi uuesti või kasuta valikut „$t(login.resendCode)“.",
+    "invalidCode": "See kood on vale või aegunud. Kasuta valikut „$t(login.resendCode)“ või „$t(login.moreSignInOptions)“.",
     "codeInProgress": "Sinu koodi töödeldakse. Oota hetk ja proovi uuesti.",
     "tooManyAttempts": "Liiga palju katseid. Küsi uus kood.",
     "invalidToken": "Sisselogimine ebaõnnestus. Proovi uuesti.",
@@ -4212,6 +4217,8 @@
       "discoveryNoModels": "Lõpp-punkt ei loetlenud ühtki mudelit. Sisesta mudelid käsitsi.",
       "connectionIncomplete": "Mudel vastas, kuid ei lõpetanud. Proovi uuesti või kontrolli mudeli ID-d ja protokolli.",
       "invalidInput": "Sisesta taustsüsteemi nimi, kehtivad päised ja vähemalt üks kordumatu ID ja nimega mudel. Tokenite piirangud peavad olema positiivsed täisarvud.",
+      "invalidApiKey": "API võti sisaldab märki, mida ei saa saata. Kasuta ainult tähti, numbreid ja standardseid sümboleid, ilma reavahetusteta.",
+      "invalidHeaders": "Kohandatud päist ei saa saata. Kontrolli selle nime ja kasuta ainult tähti, numbreid ja standardseid sümboleid, ilma reavahetusteta.",
       "invalidUrl": "Sisesta HTTP või HTTPS API juur-URL ilma autentimisandmete, päringustringi ja fragmendita.",
       "publicHttp": "Avalikud HTTP lõpp-punktid pole lubatud. Kasuta HTTPS-i või privaatset kohalikku lõpp-punkti.",
       "httpApprovalRequired": "Enne salvestamist või ühenduse loomist kiida see kohalik HTTP lõpp-punkt heaks.",
@@ -4346,7 +4353,15 @@
       "download": "Laadi seadmesisene mudel alla",
       "downloading": "Allalaadimine…",
       "downloadProgress": "Allalaadimine… {{percent}}%",
-      "downloadFailed": "Allalaadimine ei lõppenud. Kontrolli ühendust ja vaba salvestusruumi ning proovi uuesti."
+      "downloadFailed": "Allalaadimine ei lõppenud. Kontrolli ühendust ja vaba salvestusruumi ning proovi uuesti.",
+      "cannotUse": "Ei saa käivitada: {{items}}.",
+      "cannotUseOptions": "Ei saa täita: mõned tööriista valikud.",
+      "limitations": "Piirangud",
+      "tools": {
+        "time": "Aeg",
+        "settingsList": "Näita seadeid",
+        "settingsSet": "Muuda seadeid"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "See mudel toetab mõtlemise põhjalikkust"
@@ -4525,6 +4540,7 @@
     "instructionSaveFailed": "Juhise salvestamine ebaõnnestus",
     "instructionDeleteFailed": "Juhise kustutamine ebaõnnestus",
     "instructionToggleFailed": "Juhise uuendamine ebaõnnestus",
+    "instructionViewTitle": "Juhise fail",
     "instructionLimitReached": "Profiil mahutab kuni {{max}} juhist. Kustuta üks, et lisada veel.",
     "mcp": {
       "title": "MCP-serverid",
@@ -4699,6 +4715,7 @@
       "emptyDescription": "Krediidiostud, kviitungid ja kasutus kuvatakse siin.",
       "emptyTitle": "Krediitide ajalugu puudub",
       "expiredGrant": "Aegunud: {{description}}",
+      "expiredStatus": "Aegunud",
       "googlePlayReceipt": "Kviitung Google Playst",
       "kind": {
         "adjustment": "Korrigeerimine",
@@ -4725,7 +4742,8 @@
       "receiptA11y": "Ava kviitung: {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Selle ostu kohta kviitung puudub.",
       "retentionLimit": "Kuvatakse kõige hiljutisem krediitide ajalugu.",
-      "voidedGrant": "Tühistatud: {{description}}"
+      "voidedGrant": "Tühistatud: {{description}}",
+      "voidedStatus": "Tühistatud"
     },
     "title": "Osta krediiti",
     "description": "Krediit on ühekordne ost, mis lisatakse sinu Kilo saldole AI kodeerimisseansside käitamiseks Kilo Appis. Pood võtab tasu sinu kontolt ja krediit lisatakse pärast seda, kui pood makse kinnitab.",

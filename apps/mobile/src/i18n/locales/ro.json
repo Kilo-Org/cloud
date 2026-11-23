@@ -92,6 +92,7 @@
     "draft": "Ciornă",
     "enabled": "Activat",
     "github": "GitHub",
+    "image": "Imagine",
     "imageUnavailable": "Imaginea nu este disponibilă.",
     "loading": "Se încarcă…",
     "loadMore": "Încarcă mai multe",
@@ -1277,6 +1278,7 @@
     "needsInputAction": {
       "approved": "Cerere aprobată",
       "replied": "Răspuns trimis",
+      "empty": "Scrieți un răspuns, apoi trimiteți-l.",
       "failed": "Nu s-a putut răspunde. Atingeți din nou pentru a reîncerca.",
       "unavailable": "Această cerere nu mai așteaptă."
     }
@@ -2723,6 +2725,7 @@
     "filePart": {
       "loadingImage": "Se încarcă imaginea",
       "imageUnavailableRetry": "Imagine indisponibilă, reîncearcă încărcarea",
+      "imageUnavailableRetryWithAlt": "Imagine indisponibilă, {{alt}}, reîncearcă încărcarea",
       "imagePreviewUnavailableInSession": "Previzualizarea imaginii nu este disponibilă în această sesiune.",
       "viewImage": "Vezi imaginea",
       "viewImageWithAlt": "Vezi imaginea {{alt}}",
@@ -3474,6 +3477,8 @@
     "voiceTranscriptionWho": "Dispozitivul tău, Kilo Gateway cu modelul de transcriere ales, sau Apple ori Google pentru recunoaștere online.",
     "installAttributionPromptTitle": "Permiți identificarea sursei instalării?",
     "installAttributionPromptMessage": "Kilo folosește permisiunea de urmărire de la Apple doar pentru a afla prin ce canal ai ajuns aici. Instrucțiunile și conversațiile tale nu sunt niciodată folosite în acest scop.",
+    "installAttributionRequestFailedTitle": "Nu s-a putut afișa promptul de urmărire",
+    "installAttributionRequestFailedMessage": "Kilo nu a putut afișa promptul de sistem, așa că identificarea sursei instalării rămâne dezactivată.",
     "what": "Ce",
     "why": "De ce",
     "who": "Cine"
@@ -3762,7 +3767,7 @@
       "pendingInvitation": "Acest e-mail are deja o invitație în așteptare.",
       "alreadyMember": "Această persoană este deja membru al acestei organizații.",
       "seatsFull": "Toate locurile sunt ocupate ({{used}}/{{total}}). Cere unui proprietar al organizației să adauge locuri înainte de a invita mai mulți membri.",
-      "seatsFullCanInviteBilling": "Toate locurile sunt ocupate ({{used}}/{{total}}). Poți invita în continuare administratori de facturare, care nu ocupă un loc.",
+      "seatsFullCanInviteBilling": "Toate locurile sunt ocupate ({{used}}/{{total}}). Poți invita în continuare manageri de facturare, care nu ocupă un loc.",
       "noSeatsAvailable": "Toate locurile sunt ocupate. Cere unui proprietar al organizației să adauge locuri înainte de a invita mai mulți membri."
     },
     "invoices": {
@@ -3968,7 +3973,7 @@
     "signupStepUpApple": "Pentru a finaliza crearea contului, folosește „$t(login.signInWithApple)”.",
     "signupStepUpGoogle": "Pentru a finaliza crearea contului, folosește „$t(login.signInWithGoogle)”.",
     "signupStepUpBack": "Pentru a finaliza crearea contului, revino la ecranul anterior și folosește „$t(login.moreSignInOptions)”.",
-    "invalidCode": "Codul este incorect sau a expirat. Încearcă din nou sau folosește „$t(login.resendCode)”.",
+    "invalidCode": "Codul este incorect sau a expirat. Folosește „$t(login.resendCode)” sau „$t(login.moreSignInOptions)”.",
     "codeInProgress": "Codul tău este procesat. Așteaptă puțin și încearcă din nou.",
     "tooManyAttempts": "Prea multe încercări. Solicită un cod nou.",
     "invalidToken": "Autentificarea a eșuat. Încearcă din nou.",
@@ -4291,6 +4296,8 @@
       "discoveryNoModels": "Endpointul nu a listat niciun model. Introdu modelele manual.",
       "connectionIncomplete": "Modelul a răspuns, dar nu a terminat. Încearcă din nou sau verifică ID-ul modelului și protocolul.",
       "invalidInput": "Introdu un nume de backend, antete valide și cel puțin un model cu ID și nume unice. Limitele de tokenuri trebuie să fie numere întregi pozitive.",
+      "invalidApiKey": "Cheia API conține un caracter care nu poate fi trimis. Folosește doar litere, cifre și simboluri standard, fără întreruperi de linie.",
+      "invalidHeaders": "Un antet personalizat nu poate fi trimis. Verifică-i numele și folosește doar litere, cifre și simboluri standard, fără întreruperi de linie.",
       "invalidUrl": "Introdu o rădăcină API HTTP sau HTTPS fără credențiale, interogare sau fragment.",
       "publicHttp": "Endpointurile HTTP publice nu sunt permise. Folosește HTTPS sau un endpoint local privat.",
       "httpApprovalRequired": "Aprobă acest endpoint HTTP local înainte de a salva sau de a te conecta.",
@@ -4425,7 +4432,15 @@
       "download": "Descarcă modelul pe dispozitiv",
       "downloading": "Se descarcă…",
       "downloadProgress": "Se descarcă… {{percent}}%",
-      "downloadFailed": "Descărcarea nu s-a finalizat. Verifică-ți conexiunea și spațiul de stocare liber, apoi încearcă din nou."
+      "downloadFailed": "Descărcarea nu s-a finalizat. Verifică-ți conexiunea și spațiul de stocare liber, apoi încearcă din nou.",
+      "cannotUse": "Nu se poate rula: {{items}}.",
+      "cannotUseOptions": "Nu se pot completa: unele opțiuni ale instrumentului.",
+      "limitations": "Limitări",
+      "tools": {
+        "time": "Timp",
+        "settingsList": "Arată setările",
+        "settingsSet": "Modifică setările"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Acest model acceptă efort de raționament"
@@ -4609,6 +4624,7 @@
     "instructionSaveFailed": "Instrucțiunea nu a putut fi salvată",
     "instructionDeleteFailed": "Instrucțiunea nu a putut fi ștearsă",
     "instructionToggleFailed": "Instrucțiunea nu a putut fi actualizată",
+    "instructionViewTitle": "Fișier de instrucțiuni",
     "instructionLimitReached": "Un profil poate avea până la {{max}} instrucțiuni. Șterge una pentru a adăuga alta.",
     "mcp": {
       "title": "servere MCP",
@@ -4784,6 +4800,7 @@
       "emptyDescription": "Achizițiile de credite, chitanțele și utilizarea vor apărea aici.",
       "emptyTitle": "Niciun istoric de credite",
       "expiredGrant": "Expirat: {{description}}",
+      "expiredStatus": "Expirat",
       "googlePlayReceipt": "Chitanță din Google Play",
       "kind": {
         "adjustment": "Ajustare",
@@ -4810,7 +4827,8 @@
       "receiptA11y": "Deschide chitanța pentru {{description}}, {{amount}}, din {{date}}",
       "receiptUnavailable": "Nu există o chitanță disponibilă pentru această achiziție.",
       "retentionLimit": "Se afișează cel mai recent istoric de credite.",
-      "voidedGrant": "Anulat: {{description}}"
+      "voidedGrant": "Anulat: {{description}}",
+      "voidedStatus": "Anulat"
     },
     "title": "Cumpără credite",
     "description": "Creditele sunt o achiziție unică adăugată la soldul tău Kilo pentru rularea sesiunilor de codare AI în Kilo App. Magazinul îți debitează contul, iar creditele sunt adăugate după ce magazinul confirmă plata.",

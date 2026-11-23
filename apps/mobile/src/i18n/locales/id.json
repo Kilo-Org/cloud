@@ -91,6 +91,7 @@
     "draft": "Draf",
     "enabled": "Aktif",
     "github": "GitHub",
+    "image": "Gambar",
     "imageUnavailable": "Gambar tidak tersedia.",
     "loading": "Memuat…",
     "loadMore": "Muat lebih banyak",
@@ -676,6 +677,7 @@
     "needsInputAction": {
       "approved": "Permintaan disetujui",
       "replied": "Balasan terkirim",
+      "empty": "Tulis balasan lalu kirim.",
       "failed": "Tidak dapat menjawab. Ketuk lagi untuk mencoba lagi.",
       "unavailable": "Permintaan ini tidak lagi menunggu."
     }
@@ -1028,7 +1030,7 @@
       "empty": "Belum ada tinjauan dengan analitik",
       "emptyDescription": "Analitik mencatat tinjauan yang selesai selama fitur ini aktif untuk organisasi.",
       "offTitle": "Analitik nonaktif untuk {{platform}}",
-      "offDescription": "Peran penagihan organisasi (pemilik, admin, dan pengelola penagihan) dapat mengaktifkan analitik di pengaturan organisasi di web untuk mencatat tinjauan yang selesai.",
+      "offDescription": "Peran penagihan organisasi (pemilik, admin, dan manajer penagihan) dapat mengaktifkan analitik di pengaturan organisasi di web untuk mencatat tinjauan yang selesai.",
       "couldNotLoad": "Tidak dapat memuat analitik",
       "trackedReviewsCaption": "Tinjauan yang selesai selama periode ini dengan analitik aktif. Tinjauan yang sedang berjalan dan gagal tidak pernah dihitung.",
       "trackedReviewsUncounted": "Tidak dihitung: {{displayCount}} dari {{displayTotal}} tinjauan yang selesai milik organisasi, hasilnya tidak terekam.",
@@ -2097,6 +2099,7 @@
     "filePart": {
       "loadingImage": "Memuat gambar",
       "imageUnavailableRetry": "Gambar tidak tersedia, coba muat ulang",
+      "imageUnavailableRetryWithAlt": "Gambar tidak tersedia, {{alt}}, coba muat ulang",
       "imagePreviewUnavailableInSession": "Pratinjau gambar tidak tersedia di sesi ini.",
       "viewImage": "Lihat gambar",
       "viewImageWithAlt": "Lihat gambar {{alt}}",
@@ -2840,6 +2843,8 @@
     "why": "Tujuan",
     "who": "Penerima",
     "installAttributionPromptMessage": "Kilo menggunakan izin pelacakan Apple hanya untuk mengetahui saluran yang memperkenalkan Kilo kepadamu. Instruksi dan percakapanmu tidak pernah digunakan.",
+    "installAttributionRequestFailedTitle": "Tidak dapat menampilkan permintaan pelacakan",
+    "installAttributionRequestFailedMessage": "Kilo tidak dapat menampilkan permintaan sistem, jadi pelacakan sumber pemasangan tetap nonaktif.",
     "installAttributionPromptTitle": "Izinkan pelacakan sumber pemasangan?"
   },
   "prReview": {
@@ -3434,7 +3439,7 @@
         "promoCreditGranted": "Kredit promosi diberikan",
         "memberRemove": "Anggota dihapus",
         "memberChangeRole": "Peran anggota diubah",
-        "memberAdminAdd": "Administrator ditambahkan",
+        "memberAdminAdd": "Admin ditambahkan",
         "memberAutoJoin": "Anggota bergabung otomatis",
         "ssoAutoProvision": "Pengguna disediakan oleh SSO",
         "ssoSetDomain": "Domain SSO ditambahkan",
@@ -3698,7 +3703,7 @@
       "pendingInvitation": "Email ini sudah memiliki undangan yang tertunda.",
       "alreadyMember": "Orang ini sudah menjadi anggota organisasi ini.",
       "seatsFull": "Semua kursi sudah terpakai ({{used}}/{{total}}). Minta pemilik organisasi untuk menambah kursi sebelum mengundang lebih banyak anggota.",
-      "seatsFullCanInviteBilling": "Semua kursi sudah terpakai ({{used}}/{{total}}). Kamu masih dapat mengundang pengelola penagihan, yang tidak menggunakan kursi.",
+      "seatsFullCanInviteBilling": "Semua kursi sudah terpakai ({{used}}/{{total}}). Kamu masih dapat mengundang manajer penagihan, yang tidak menggunakan kursi.",
       "noSeatsAvailable": "Semua kursi sudah terpakai. Minta pemilik organisasi untuk menambah kursi sebelum mengundang lebih banyak anggota."
     },
     "invoices": {
@@ -3898,7 +3903,7 @@
     "signupStepUpApple": "Untuk menyelesaikan pembuatan akunmu, gunakan '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Untuk menyelesaikan pembuatan akunmu, gunakan '$t(login.signInWithGoogle)'.",
     "signupStepUpBack": "Untuk menyelesaikan pembuatan akunmu, kembali lalu gunakan '$t(login.moreSignInOptions)'.",
-    "invalidCode": "Kode tersebut salah atau sudah kedaluwarsa. Coba lagi atau gunakan '$t(login.resendCode)'.",
+    "invalidCode": "Kode tersebut salah atau sudah kedaluwarsa. Gunakan '$t(login.resendCode)' atau '$t(login.moreSignInOptions)'.",
     "codeInProgress": "Kodemu sedang diproses. Tunggu sebentar dan coba lagi.",
     "tooManyAttempts": "Terlalu banyak percobaan. Silakan minta kode baru.",
     "invalidToken": "Gagal masuk. Coba lagi.",
@@ -4212,6 +4217,8 @@
       "discoveryNoModels": "Titik akhir tidak mencantumkan model apa pun. Masukkan model secara manual.",
       "connectionIncomplete": "Model menjawab tetapi tidak menyelesaikan permintaan. Coba lagi, atau periksa ID model dan protokol.",
       "invalidInput": "Masukkan nama layanan, tajuk yang valid, dan setidaknya satu model dengan ID dan nama yang unik. Batas token harus berupa bilangan bulat positif.",
+      "invalidApiKey": "Kunci API berisi karakter yang tidak dapat dikirim. Gunakan hanya huruf, angka, dan simbol standar, tanpa jeda baris.",
+      "invalidHeaders": "Tajuk kustom tidak dapat dikirim. Periksa namanya dan gunakan hanya huruf, angka, dan simbol standar, tanpa jeda baris.",
       "invalidUrl": "Masukkan URL dasar API HTTP atau HTTPS tanpa kredensial, kueri, atau fragmen.",
       "publicHttp": "Titik akhir HTTP publik tidak diizinkan. Gunakan HTTPS atau titik akhir lokal privat.",
       "httpApprovalRequired": "Setujui titik akhir HTTP lokal ini sebelum menyimpan atau menghubungkannya.",
@@ -4346,7 +4353,15 @@
       "download": "Unduh model di perangkat",
       "downloading": "Mengunduh…",
       "downloadProgress": "Mengunduh… {{percent}}%",
-      "downloadFailed": "Unduhan tidak selesai. Periksa koneksi dan ruang penyimpanan Anda, lalu coba lagi."
+      "downloadFailed": "Unduhan tidak selesai. Periksa koneksi dan ruang penyimpanan Anda, lalu coba lagi.",
+      "cannotUse": "Tidak dapat dijalankan: {{items}}.",
+      "cannotUseOptions": "Tidak dapat diisi: beberapa opsi alat.",
+      "limitations": "Batasan",
+      "tools": {
+        "time": "Waktu",
+        "settingsList": "Tampilkan pengaturan",
+        "settingsSet": "Ubah pengaturan"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Model ini mendukung tingkat penalaran"
@@ -4525,6 +4540,7 @@
     "instructionSaveFailed": "Gagal menyimpan instruksi",
     "instructionDeleteFailed": "Gagal menghapus instruksi",
     "instructionToggleFailed": "Gagal memperbarui instruksi",
+    "instructionViewTitle": "File instruksi",
     "instructionLimitReached": "Satu profil dapat memuat hingga {{max}} instruksi. Hapus satu untuk menambah lagi.",
     "mcp": {
       "title": "server MCP",
@@ -4699,6 +4715,7 @@
       "emptyDescription": "Pembelian kredit, tanda terima, dan penggunaan akan muncul di sini.",
       "emptyTitle": "Tidak ada riwayat kredit",
       "expiredGrant": "Kedaluwarsa: {{description}}",
+      "expiredStatus": "Kedaluwarsa",
       "googlePlayReceipt": "Tanda terima dari Google Play",
       "kind": {
         "adjustment": "Penyesuaian",
@@ -4725,7 +4742,8 @@
       "receiptA11y": "Buka tanda terima untuk {{description}}, {{amount}}, dari {{date}}",
       "receiptUnavailable": "Tanda terima tidak tersedia untuk pembelian ini.",
       "retentionLimit": "Menampilkan riwayat kredit terbaru.",
-      "voidedGrant": "Dibatalkan: {{description}}"
+      "voidedGrant": "Dibatalkan: {{description}}",
+      "voidedStatus": "Dibatalkan"
     },
     "title": "Beli kredit",
     "description": "Kredit adalah pembelian satu kali yang ditambahkan ke saldo Kilo Anda untuk menjalankan sesi coding AI di Kilo App. Toko menagih akun Anda dan kredit ditambahkan setelah toko mengonfirmasi pembayaran.",
@@ -5142,7 +5160,7 @@
   },
   "organizationGuardrails": {
     "title": "Pagar Pengaman Kecerdasan Artifisial",
-    "permissionDenied": "Hanya pemilik dan administrator organisasi yang dapat mengelola Pagar Pengaman Kecerdasan Artifisial. $t(organization.boundary.accessDeniedDescription)",
+    "permissionDenied": "Hanya pemilik dan admin organisasi yang dapat mengelola Pagar Pengaman Kecerdasan Artifisial. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Pagar Pengaman Kecerdasan Artifisial tidak diaktifkan",
     "unavailable": "Kilo mengaktifkan Pagar Pengaman Kecerdasan Artifisial untuk sebuah organisasi atas permintaan. Hubungi {{supportEmail}}, dan tim Kilo mengaktifkannya untuk organisasi Anda.",
     "contactSupport": "Hubungi tim dukungan",
@@ -5284,7 +5302,7 @@
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Fitur perusahaan",
     "enterpriseOnly": "Penyedia dan model tersedia di paket Enterprise.",
-    "readOnly": "Hanya pemilik dan administrator organisasi yang dapat mengubah pengaturan ini.",
+    "readOnly": "Hanya pemilik dan admin organisasi yang dapat mengubah pengaturan ini.",
     "loadError": "Penyedia dan model tidak dapat dimuat",
     "tabModels": "Model",
     "tabProviders": "Penyedia",

@@ -217,10 +217,12 @@ export function PatchMissingRow({
     // The file row above paints `bg-card`, which in dark is what `secondary`
     // also paints, so the notice would merge with the rows: it takes the raised
     // neutral step there. Light keeps `secondary`, where `secondary-fill` is the
-    // same colour.
+    // same colour. The leading glyph and the link below it take `ink2`, the one
+    // quiet ink that clears 3:1 on both notice surfaces; the muted foreground
+    // reads 2.67:1 on the raised dark step.
     <View className="border-b-[0.5px] border-hair-soft bg-secondary px-4 py-3 dark:bg-secondary-fill">
       <View className="flex-row items-center gap-2">
-        <Info size={14} color={colors.mutedForeground} />
+        <Info size={14} color={colors.ink2} />
         <Text className="flex-1 text-sm text-foreground">{causeCopy}</Text>
       </View>
       {link === null ? null : <ProviderDiffLink link={link} />}

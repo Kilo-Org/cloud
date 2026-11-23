@@ -91,6 +91,7 @@
     "draft": "Paraprake",
     "enabled": "Aktivizuar",
     "github": "GitHub",
+    "image": "Imazh",
     "imageUnavailable": "Imazhi nuk është i disponueshëm.",
     "loading": "Duke u ngarkuar…",
     "loadMore": "Ngarko më shumë",
@@ -1249,6 +1250,7 @@
     "needsInputAction": {
       "approved": "Kërkesa u miratua",
       "replied": "Përgjigja u dërgua",
+      "empty": "Shkruani një përgjigje dhe më pas dërgojeni.",
       "failed": "Nuk mundi të përgjigjej. Prekni përsëri për të provuar përsëri.",
       "unavailable": "Kjo kërkesë nuk pret më."
     }
@@ -2670,6 +2672,7 @@
     "filePart": {
       "loadingImage": "Duke u ngarkuar imazhi",
       "imageUnavailableRetry": "Imazhi nuk është i disponueshëm, provo ta ngarkosh përsëri",
+      "imageUnavailableRetryWithAlt": "Imazhi nuk është i disponueshëm, {{alt}}, provo ta ngarkosh përsëri",
       "imagePreviewUnavailableInSession": "Parapamja e imazhit nuk është e disponueshme në këtë seancë.",
       "viewImage": "Shiko imazhin",
       "viewImageWithAlt": "Shiko imazhin {{alt}}",
@@ -3411,6 +3414,8 @@
     "voiceTranscriptionWho": "Pajisja jote, Kilo Gateway me modelin e transkriptimit që zgjidhni, ose Apple ose Google për njohje në internet.",
     "installAttributionPromptTitle": "Të lejohet identifikimi i burimit të instalimit?",
     "installAttributionPromptMessage": "Kilo përdor lejen e gjurmimit të Apple vetëm për të mësuar se cili kanal të solli këtu. Kërkesat dhe bisedat e tua nuk përdoren kurrë.",
+    "installAttributionRequestFailedTitle": "Nuk u shfaq dot kërkesa e gjurmimit",
+    "installAttributionRequestFailedMessage": "Kilo nuk mundi të shfaqë kërkesën e sistemit, prandaj identifikimi i burimit të instalimit mbetet i fikur.",
     "what": "Çfarë",
     "why": "Pse",
     "who": "Kush"
@@ -3898,7 +3903,7 @@
     "signupStepUpApple": "Për të përfunduar krijimin e llogarisë, përdor '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Për të përfunduar krijimin e llogarisë, përdor '$t(login.signInWithGoogle)'.",
     "signupStepUpBack": "Për të përfunduar krijimin e llogarisë, kthehu prapa dhe përdor '$t(login.moreSignInOptions)'.",
-    "invalidCode": "Kodi është i pasaktë ose ka skaduar. Provo përsëri ose përdor '$t(login.resendCode)'.",
+    "invalidCode": "Kodi është i pasaktë ose ka skaduar. Përdor '$t(login.resendCode)' ose '$t(login.moreSignInOptions)'.",
     "codeInProgress": "Kodi yt po përpunohet. Prit pak dhe provo përsëri.",
     "tooManyAttempts": "Ke bërë shumë përpjekje. Kërko një kod të ri.",
     "invalidToken": "Hyrja dështoi. Provo përsëri.",
@@ -4212,6 +4217,8 @@
       "discoveryNoModels": "Pika fundore nuk renditi asnjë model. Fut modelet manualisht.",
       "connectionIncomplete": "Modeli u përgjigj, por nuk përfundoi. Provo sërish, ose kontrollo ID-në e modelit dhe protokollin.",
       "invalidInput": "Fut një emër për shërbimin mbështetës, kryefusha të vlefshme dhe të paktën një model me ID dhe emër unik. Kufijtë e tokenëve duhet të jenë numra të plotë pozitivë.",
+      "invalidApiKey": "Çelësi API përmban një karakter që nuk mund të dërgohet. Përdor vetëm shkronja, shifra dhe simbole standarde, pa ndarje rreshtash.",
+      "invalidHeaders": "Një kryefushë e personalizuar nuk mund të dërgohet. Kontrollo emrin e saj dhe përdor vetëm shkronja, shifra dhe simbole standarde, pa ndarje rreshtash.",
       "invalidUrl": "Fut një URL bazë API me HTTP ose HTTPS, pa të dhëna hyrjeje, parametra kërkimi ose fragment.",
       "publicHttp": "Pikat fundore publike HTTP nuk lejohen. Përdor HTTPS ose një pikë fundore lokale private.",
       "httpApprovalRequired": "Mirato këtë pikë fundore lokale HTTP përpara se ta ruash ose të lidhesh me të.",
@@ -4346,7 +4353,15 @@
       "download": "Shkarko modelin në pajisje",
       "downloading": "Po shkarkohet…",
       "downloadProgress": "Po shkarkohet… {{percent}}%",
-      "downloadFailed": "Shkarkimi nuk përfundoi. Kontrollo lidhjen dhe hapësirën e lirë, pastaj provo përsëri."
+      "downloadFailed": "Shkarkimi nuk përfundoi. Kontrollo lidhjen dhe hapësirën e lirë, pastaj provo përsëri.",
+      "cannotUse": "Nuk mund të ekzekutohet: {{items}}.",
+      "cannotUseOptions": "Nuk mund të plotësohen: disa opsione mjeti.",
+      "limitations": "Kufizimet",
+      "tools": {
+        "time": "Koha",
+        "settingsList": "Shfaq cilësimet",
+        "settingsSet": "Ndrysho cilësimet"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Ky model mbështet nivelin e arsyetimit"
@@ -4525,6 +4540,7 @@
     "instructionSaveFailed": "Udhëzimi nuk u ruajt",
     "instructionDeleteFailed": "Udhëzimi nuk u fshi",
     "instructionToggleFailed": "Udhëzimi nuk u përditësua",
+    "instructionViewTitle": "Skedari i udhëzimit",
     "instructionLimitReached": "Një profil mund të mbajë deri në {{max}} udhëzime. Fshi një për të shtuar një tjetër.",
     "mcp": {
       "title": "serverët MCP",
@@ -4699,6 +4715,7 @@
       "emptyDescription": "Blerjet e kredive, dëftesat dhe përdorimi do të shfaqen këtu.",
       "emptyTitle": "Nuk ka historik kredish",
       "expiredGrant": "Skaduar: {{description}}",
+      "expiredStatus": "Skaduar",
       "googlePlayReceipt": "Dëftesë nga Google Play",
       "kind": {
         "adjustment": "Rregullim",
@@ -4725,7 +4742,8 @@
       "receiptA11y": "Hap dëftesën për {{description}}, {{amount}}, nga {{date}}",
       "receiptUnavailable": "Nuk ka dëftesë për këtë blerje.",
       "retentionLimit": "Po shfaqet historiku i kredive më i fundit.",
-      "voidedGrant": "Anuluar: {{description}}"
+      "voidedGrant": "Anuluar: {{description}}",
+      "voidedStatus": "Anuluar"
     },
     "title": "Bli kredite",
     "description": "Kreditet janë një blerje e njëhershme që shtohet në bilancin tuaj Kilo për të drejtuar seanca kodimi me AI në Kilo App. Dyqani të faturova llogarinë dhe kreditet shtohen pasi dyqani konfirmon pagesën.",

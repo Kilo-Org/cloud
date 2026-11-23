@@ -165,14 +165,10 @@ describe('draft scope and entity keys', () => {
   it('isMergeDraft accepts any subset of the authored fields and rejects other shapes', () => {
     expect(isMergeDraft({ title: 'T', message: 'M' })).toBe(true);
     expect(isMergeDraft({ title: '', message: '' })).toBe(true);
-    // Every field is optional: the sheet persists only what the person authored,
-    // so a method-only tap stores `{ method }` and a text-only edit stores none.
     expect(isMergeDraft({})).toBe(true);
     expect(isMergeDraft({ title: 'T' })).toBe(true);
     expect(isMergeDraft({ message: 'M' })).toBe(true);
     expect(isMergeDraft({ method: 'squash' })).toBe(true);
-    // The method is an open string, narrowed against the pull request's allowed
-    // methods at restore, so another build's record still loads its text.
     expect(isMergeDraft({ title: 'T', message: 'M', method: 'octopus' })).toBe(true);
     expect(isMergeDraft({ title: 'T', message: 'M', method: 1 })).toBe(false);
     expect(isMergeDraft({ title: 1, message: 'M' })).toBe(false);
@@ -191,10 +187,6 @@ describe('draft scope and entity keys', () => {
     expect(resolvePrefillOverDraft('', '')).toBeUndefined();
   });
 
-  // b911 spot check p7-nav.png: a draft that holds only whitespace survives
-  // sign-out, restores as the uncontrolled input's defaultValue, and hides the
-  // placeholder while showing nothing — the prompt reads as blank. A draft
-  // with no visible content must never seed the input.
   it('resolvePrefillOverDraft never seeds a whitespace-only stored draft', () => {
     expect(resolvePrefillOverDraft(null, ' ')).toBeUndefined();
     expect(resolvePrefillOverDraft(undefined, '   ')).toBeUndefined();
@@ -438,8 +430,6 @@ describe('flushAllDrafts', () => {
     saveDraft('u1', 'A', 'va');
     saveDraft('u1', 'B', 'vb');
 
-    // Discard robs the pending entry of its timer, so the flush must not find
-    // it and resurrect the text the person dropped.
     await clearDraft('u1', 'A');
     await flushAllDrafts();
 

@@ -91,6 +91,7 @@
     "draft": "草稿",
     "enabled": "已啟用",
     "github": "GitHub",
+    "image": "圖片",
     "imageUnavailable": "無法顯示圖片。",
     "loading": "載入中…",
     "loadMore": "載入更多",
@@ -676,6 +677,7 @@
     "needsInputAction": {
       "approved": "要求已核准",
       "replied": "回覆已傳送",
+      "empty": "請先填寫回答，再傳送。",
       "failed": "無法回答。再次點按即可重試。",
       "unavailable": "此要求已不再等待。"
     }
@@ -1028,7 +1030,7 @@
       "empty": "尚無含有分析資料的審查",
       "emptyDescription": "在組織啟用分析期間，系統會記錄已完成的審查。",
       "offTitle": "已關閉 {{platform}} 的分析",
-      "offDescription": "組織的帳務角色（擁有者、管理員與帳務管理員）可在網頁版的組織設定中啟用分析，以記錄已完成的審查。",
+      "offDescription": "組織的帳單角色（擁有者、管理員與帳單管理員）可在網頁版的組織設定中啟用分析，以記錄已完成的審查。",
       "couldNotLoad": "無法載入分析資料",
       "trackedReviewsCaption": "此期間內在啟用分析的狀態下完成的審查。執行中與失敗的審查一律不計入。",
       "trackedReviewsUncounted": "未計入：組織共有 {{displayTotal}} 筆已完成的審查，其中 {{displayCount}} 筆未擷取結果。",
@@ -2097,6 +2099,7 @@
     "filePart": {
       "loadingImage": "載入圖片中",
       "imageUnavailableRetry": "無法顯示圖片，重新載入",
+      "imageUnavailableRetryWithAlt": "無法顯示圖片，{{alt}}，重新載入",
       "imagePreviewUnavailableInSession": "此工作階段中無法預覽圖片。",
       "viewImage": "檢視圖片",
       "viewImageWithAlt": "檢視圖片：{{alt}}",
@@ -2840,6 +2843,8 @@
     "why": "用途",
     "who": "對象",
     "installAttributionPromptMessage": "Kilo 僅使用 Apple 的追蹤權限，了解你透過哪個管道安裝應用程式。絕不會使用你的提示詞或對話。",
+    "installAttributionRequestFailedTitle": "無法顯示追蹤提示",
+    "installAttributionRequestFailedMessage": "Kilo 無法顯示系統提示，因此安裝來源追蹤保持關閉。",
     "installAttributionPromptTitle": "允許追蹤安裝來源？"
   },
   "prReview": {
@@ -3698,7 +3703,7 @@
       "pendingInvitation": "這個電子郵件地址已有待處理的邀請。",
       "alreadyMember": "這個人已經是此組織的成員。",
       "seatsFull": "所有席位皆已使用（{{used}}/{{total}}）。請先請組織擁有者增加席位，再邀請更多成員。",
-      "seatsFullCanInviteBilling": "所有席位皆已使用（{{used}}/{{total}}）。你仍可邀請帳務管理員，他們不會佔用席位。",
+      "seatsFullCanInviteBilling": "所有席位皆已使用（{{used}}/{{total}}）。你仍可邀請帳單管理員，他們不會佔用席位。",
       "noSeatsAvailable": "所有席位皆已使用。請先請組織擁有者增加席位，再邀請更多成員。"
     },
     "invoices": {
@@ -3898,7 +3903,7 @@
     "signupStepUpApple": "如要完成帳戶建立，請選擇「$t(login.signInWithApple)」。",
     "signupStepUpGoogle": "如要完成帳戶建立，請選擇「$t(login.signInWithGoogle)」。",
     "signupStepUpBack": "如要完成帳戶建立，請返回上一步並選擇「$t(login.moreSignInOptions)」。",
-    "invalidCode": "該驗證碼不正確或已過期。請再試一次，或使用「$t(login.resendCode)」。",
+    "invalidCode": "該驗證碼不正確或已過期。使用「$t(login.resendCode)」或「$t(login.moreSignInOptions)」。",
     "codeInProgress": "正在處理你的驗證碼。請稍候再試一次。",
     "tooManyAttempts": "嘗試次數過多。請重新索取驗證碼。",
     "invalidToken": "登入失敗。請再試一次。",
@@ -4212,6 +4217,8 @@
       "discoveryNoModels": "端點未列出任何模型。請手動輸入模型。",
       "connectionIncomplete": "模型已回應但未完成。請再試一次，或檢查模型 ID 與協定。",
       "invalidInput": "請輸入後端名稱、有效的標頭，以及至少一個具有唯一 ID 和名稱的模型。詞元上限必須為正整數。",
+      "invalidApiKey": "API 金鑰含有無法傳送的字元。請僅使用字母、數字與標準符號，且不得包含換行。",
+      "invalidHeaders": "無法傳送自訂標頭。請檢查其名稱，並僅使用字母、數字與標準符號，且不得包含換行。",
       "invalidUrl": "請輸入 HTTP 或 HTTPS API 根 URL，且不得包含驗證憑證、查詢參數或片段識別碼。",
       "publicHttp": "不允許使用公開的 HTTP 端點。請使用 HTTPS 或私有的本機端點。",
       "httpApprovalRequired": "儲存或連線前，請先核准此本機 HTTP 端點。",
@@ -4346,7 +4353,15 @@
       "download": "下載裝置端模型",
       "downloading": "下載中…",
       "downloadProgress": "下載中… {{percent}}%",
-      "downloadFailed": "下載未完成。請檢查網路連線和可用儲存空間，然後再試一次。"
+      "downloadFailed": "下載未完成。請檢查網路連線和可用儲存空間，然後再試一次。",
+      "cannotUse": "無法執行：{{items}}。",
+      "cannotUseOptions": "無法填寫：部分工具選項。",
+      "limitations": "限制",
+      "tools": {
+        "time": "時間",
+        "settingsList": "顯示設定",
+        "settingsSet": "變更設定"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "此模型支援思考程度"
@@ -4525,6 +4540,7 @@
     "instructionSaveFailed": "無法儲存指示",
     "instructionDeleteFailed": "無法刪除指示",
     "instructionToggleFailed": "無法更新指示",
+    "instructionViewTitle": "指示檔案",
     "instructionLimitReached": "每個設定檔最多可有 {{max}} 個指示。請刪除一個以新增其他指示。",
     "mcp": {
       "title": "MCP伺服器",
@@ -4699,6 +4715,7 @@
       "emptyDescription": "點數購買、收據與使用情況會顯示在這裡。",
       "emptyTitle": "尚無點數紀錄",
       "expiredGrant": "已過期：{{description}}",
+      "expiredStatus": "已過期",
       "googlePlayReceipt": "Google Play 收據",
       "kind": {
         "adjustment": "調整",
@@ -4725,7 +4742,8 @@
       "receiptA11y": "開啟「{{description}}」，{{amount}}，{{date}} 的收據",
       "receiptUnavailable": "此筆購買沒有可用的收據。",
       "retentionLimit": "顯示最近的點數紀錄。",
-      "voidedGrant": "已作廢：{{description}}"
+      "voidedGrant": "已作廢：{{description}}",
+      "voidedStatus": "已作廢"
     },
     "title": "購買點數",
     "description": "點數是一次性購買，會加入你的 Kilo 餘額，用於在 Kilo App 中執行 AI 程式設計工作階段。商店會向你的帳戶收費，商店確認付款後點數才會入帳。",

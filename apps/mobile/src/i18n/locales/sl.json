@@ -93,6 +93,7 @@
     "draft": "Osnutek",
     "enabled": "Omogočeno",
     "github": "GitHub",
+    "image": "Slika",
     "imageUnavailable": "Slika ni na voljo.",
     "loading": "Nalaganje…",
     "loadMore": "Naloži več",
@@ -1305,6 +1306,7 @@
     "needsInputAction": {
       "approved": "Zahteva odobrena",
       "replied": "Odgovor poslan",
+      "empty": "Vnesite odgovor in ga nato pošljite.",
       "failed": "Odgovoriti ni uspelo. Znova se dotaknite, da poskusite znova.",
       "unavailable": "Ta zahteva ne čaka več."
     }
@@ -1659,7 +1661,7 @@
       "empty": "Še ni pregledov z analitiko",
       "emptyDescription": "Analitika beleži dokončane preglede, dokler je omogočena za organizacijo.",
       "offTitle": "Analitika je za {{platform}} izklopljena",
-      "offDescription": "Lastniki, skrbniki in upravitelji obračunavanja v organizaciji lahko vklopijo analitiko v nastavitvah organizacije na spletu, da se beležijo dokončani pregledi.",
+      "offDescription": "Lastniki, skrbniki in skrbniki obračunavanja v organizaciji lahko vklopijo analitiko v nastavitvah organizacije na spletu, da se beležijo dokončani pregledi.",
       "couldNotLoad": "Analitike ni bilo mogoče naložiti",
       "trackedReviewsCaption": "Dokončani pregledi, ki so se zaključili v tem obdobju z vklopljeno analitiko. Pregledi v teku in neuspešni pregledi se nikoli ne štejejo.",
       "trackedReviewsUncounted": "Ni preštetih: {{displayCount}} od {{displayTotal}} dokončanih pregledov organizacije, njihov rezultat ni bil zajet.",
@@ -2776,6 +2778,7 @@
     "filePart": {
       "loadingImage": "Nalaganje slike",
       "imageUnavailableRetry": "Slika ni na voljo, poskusi jo znova naložiti",
+      "imageUnavailableRetryWithAlt": "Slika ni na voljo, {{alt}}, poskusi jo znova naložiti",
       "imagePreviewUnavailableInSession": "Predogled slike v tej seji ni na voljo.",
       "viewImage": "Prikaži sliko",
       "viewImageWithAlt": "Prikaži sliko {{alt}}",
@@ -3537,6 +3540,8 @@
     "voiceTranscriptionWho": "Tvoja naprava, Kilo Gateway z izbranim modelom prepisovanja ali Apple ali Google za prepoznavanje v spletu.",
     "installAttributionPromptTitle": "Želiš dovoliti ugotavljanje vira namestitve?",
     "installAttributionPromptMessage": "Kilo uporablja dovoljenje za sledenje podjetja Apple le za ugotavljanje, prek katerega kanala si prišel do aplikacije. Tvojih pozivov in pogovorov za to nikoli ne uporabimo.",
+    "installAttributionRequestFailedTitle": "Poziva za sledenje ni bilo mogoče prikazati",
+    "installAttributionRequestFailedMessage": "Kilo ni mogel prikazati sistemskega poziva, zato ugotavljanje vira namestitve ostaja izklopljeno.",
     "what": "Kaj",
     "why": "Zakaj",
     "who": "Kdo"
@@ -3830,7 +3835,7 @@
       "pendingInvitation": "Ta e-poštni naslov že ima čakajoče povabilo.",
       "alreadyMember": "Ta oseba je že član te organizacije.",
       "seatsFull": "Vsa mesta so zasedena ({{used}}/{{total}}). Prosi lastnika organizacije, naj doda mesta, preden povabiš več članov.",
-      "seatsFullCanInviteBilling": "Vsa mesta so zasedena ({{used}}/{{total}}). Še vedno lahko povabiš upravitelje obračunavanja, ki ne zasedajo mesta.",
+      "seatsFullCanInviteBilling": "Vsa mesta so zasedena ({{used}}/{{total}}). Še vedno lahko povabiš skrbnike obračunavanja, ki ne zasedajo mesta.",
       "noSeatsAvailable": "Vsa mesta so zasedena. Prosi lastnika organizacije, naj doda mesta, preden povabiš več članov."
     },
     "invoices": {
@@ -4038,7 +4043,7 @@
     "signupStepUpApple": "Za dokončanje ustvarjanja računa izberi »$t(login.signInWithApple)«.",
     "signupStepUpGoogle": "Za dokončanje ustvarjanja računa izberi »$t(login.signInWithGoogle)«.",
     "signupStepUpBack": "Za dokončanje ustvarjanja računa se vrni nazaj in izberi »$t(login.moreSignInOptions)«.",
-    "invalidCode": "Ta koda ni pravilna ali je potekla. Poskusi znova ali uporabi »$t(login.resendCode)«.",
+    "invalidCode": "Ta koda ni pravilna ali je potekla. Uporabi »$t(login.resendCode)« ali »$t(login.moreSignInOptions)«.",
     "codeInProgress": "Tvoja koda se obdeluje. Počakaj trenutek in poskusi znova.",
     "tooManyAttempts": "Preveč poskusov. Zahtevaj novo kodo.",
     "invalidToken": "Prijava ni uspela. Poskusi znova.",
@@ -4370,6 +4375,8 @@
       "discoveryNoModels": "Končna točka ni navedla nobenega modela. Modele vnesi ročno.",
       "connectionIncomplete": "Model je odgovoril, vendar ni dokončal. Poskusi znova ali preveri ID modela in protokol.",
       "invalidInput": "Vnesi ime zaledja, veljavne glave in vsaj en model z edinstvenim ID in imenom. Omejitve števila žetonov morajo biti pozitivna cela števila.",
+      "invalidApiKey": "Ključ API vsebuje znak, ki ga ni mogoče poslati. Uporabi le črke, števke in standardne simbole, brez prelomov vrstic.",
+      "invalidHeaders": "Glave po meri ni mogoče poslati. Preveri njeno ime in uporabi le črke, števke in standardne simbole, brez prelomov vrstic.",
       "invalidUrl": "Vnesi osnovni URL API s protokolom HTTP ali HTTPS brez poverilnic, poizvedbe ali fragmenta.",
       "publicHttp": "Javne končne točke HTTP niso dovoljene. Uporabi HTTPS ali zasebno lokalno končno točko.",
       "httpApprovalRequired": "Pred shranjevanjem ali povezovanjem odobri to lokalno končno točko HTTP.",
@@ -4504,7 +4511,15 @@
       "download": "Prenesi model v napravo",
       "downloading": "Prenašanje …",
       "downloadProgress": "Prenašanje … {{percent}} %",
-      "downloadFailed": "Prenos se ni dokončal. Preverite povezavo in prosti prostor za shranjevanje ter poskusite znova."
+      "downloadFailed": "Prenos se ni dokončal. Preverite povezavo in prosti prostor za shranjevanje ter poskusite znova.",
+      "cannotUse": "Ni mogoče zagnati: {{items}}.",
+      "cannotUseOptions": "Ni mogoče izpolniti: nekatere možnosti orodja.",
+      "limitations": "Omejitve",
+      "tools": {
+        "time": "Čas",
+        "settingsList": "Prikaži nastavitve",
+        "settingsSet": "Spremeni nastavitve"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Ta model podpira stopnjo razmišljanja"
@@ -4693,6 +4708,7 @@
     "instructionSaveFailed": "Navodila ni bilo mogoče shraniti",
     "instructionDeleteFailed": "Navodila ni bilo mogoče izbrisati",
     "instructionToggleFailed": "Navodila ni bilo mogoče posodobiti",
+    "instructionViewTitle": "Datoteka z navodili",
     "instructionLimitReached": "Profil lahko vsebuje največ {{max}} navodil. Izbrišite eno, da dodate drugo.",
     "mcp": {
       "title": "MCP strežniki",
@@ -4869,6 +4885,7 @@
       "emptyDescription": "Tukaj bodo prikazani nakupi kreditov, potrdila in poraba.",
       "emptyTitle": "Ni zgodovine kreditov",
       "expiredGrant": "Poteklo: {{description}}",
+      "expiredStatus": "Poteklo",
       "googlePlayReceipt": "Potrdilo iz trgovine Google Play",
       "kind": {
         "adjustment": "Prilagoditev",
@@ -4895,7 +4912,8 @@
       "receiptA11y": "Odpri potrdilo za {{description}}, {{amount}}, z dne {{date}}",
       "receiptUnavailable": "Potrdilo za ta nakup ni na voljo.",
       "retentionLimit": "Prikazana je najnovejša zgodovina kreditov.",
-      "voidedGrant": "Razveljavljeno: {{description}}"
+      "voidedGrant": "Razveljavljeno: {{description}}",
+      "voidedStatus": "Razveljavljeno"
     },
     "title": "Kupi kredite",
     "description": "Krediti so enkraten nakup, ki se doda tvojemu Kilo stanju za izvajanje sej kodiranja z umetno inteligenco v aplikaciji Kilo. Trgovina obremeni tvoj račun in krediti se dodajo, ko trgovina potrdi plačilo.",

@@ -92,6 +92,7 @@
     "draft": "Bozza",
     "enabled": "Attivo",
     "github": "GitHub",
+    "image": "Immagine",
     "imageUnavailable": "L'immagine non è disponibile.",
     "loading": "Caricamento…",
     "loadMore": "Carica altro",
@@ -645,6 +646,7 @@
     "needsInputAction": {
       "approved": "Richiesta approvata",
       "replied": "Risposta inviata",
+      "empty": "Scrivi una risposta e poi inviala.",
       "failed": "Impossibile rispondere. Tocca di nuovo per riprovare.",
       "unavailable": "Questa richiesta non è più in attesa."
     }
@@ -998,7 +1000,7 @@
       "empty": "Nessuna revisione con statistiche",
       "emptyDescription": "Le statistiche registrano le revisioni completate mentre sono attive per l'organizzazione.",
       "offTitle": "Le statistiche sono disattivate per {{platform}}",
-      "offDescription": "I ruoli di fatturazione dell'organizzazione (proprietari, amministratori e gestori della fatturazione) possono attivare le statistiche nelle impostazioni dell'organizzazione sul web per registrare le revisioni completate.",
+      "offDescription": "I ruoli di fatturazione dell'organizzazione (proprietari, amministratori e responsabili della fatturazione) possono attivare le statistiche nelle impostazioni dell'organizzazione sul web per registrare le revisioni completate.",
       "couldNotLoad": "Impossibile caricare le statistiche",
       "trackedReviewsCaption": "Revisioni completate che si sono concluse in questo periodo con le statistiche attive. Le revisioni in corso e non riuscite non vengono mai conteggiate.",
       "trackedReviewsUncounted": "Senza conteggio: {{displayCount}} delle {{displayTotal}} revisioni terminate dell’organizzazione con risultato non registrato.",
@@ -2091,6 +2093,7 @@
     "filePart": {
       "loadingImage": "Caricamento dell'immagine",
       "imageUnavailableRetry": "Immagine non disponibile, riprova a caricarla",
+      "imageUnavailableRetryWithAlt": "Immagine non disponibile, {{alt}}, riprova a caricarla",
       "imagePreviewUnavailableInSession": "L'anteprima dell'immagine non è disponibile in questa sessione.",
       "viewImage": "Visualizza l'immagine",
       "viewImageWithAlt": "Visualizza l'immagine {{alt}}",
@@ -2877,6 +2880,8 @@
     "why": "Perché",
     "who": "Chi",
     "installAttributionPromptMessage": "Kilo usa l'autorizzazione al tracciamento di Apple solo per capire quale canale ti ha portato qui. I tuoi prompt e le tue conversazioni non vengono mai usati.",
+    "installAttributionRequestFailedTitle": "Impossibile mostrare la richiesta di tracciamento",
+    "installAttributionRequestFailedMessage": "Kilo non è riuscito a mostrare la richiesta di sistema, quindi l'attribuzione dell'installazione resta disattivata.",
     "installAttributionPromptTitle": "Consentire l'attribuzione dell'installazione?"
   },
   "prReview": {
@@ -3968,7 +3973,7 @@
     "signupStepUpApple": "Per completare la creazione del tuo account, usa \"$t(login.signInWithApple)\".",
     "signupStepUpGoogle": "Per completare la creazione del tuo account, usa \"$t(login.signInWithGoogle)\".",
     "signupStepUpBack": "Per completare la creazione del tuo account, torna indietro e usa \"$t(login.moreSignInOptions)\".",
-    "invalidCode": "Il codice non è corretto o è scaduto. Riprova o usa \"$t(login.resendCode)\".",
+    "invalidCode": "Il codice non è corretto o è scaduto. Usa \"$t(login.resendCode)\" o \"$t(login.moreSignInOptions)\".",
     "codeInProgress": "Il tuo codice è in fase di elaborazione. Attendi un momento e riprova.",
     "tooManyAttempts": "Troppi tentativi. Richiedi un nuovo codice.",
     "invalidToken": "Accesso non riuscito. Riprova.",
@@ -4291,6 +4296,8 @@
       "discoveryNoModels": "L'indirizzo di accesso non ha elencato alcun modello. Inserisci i modelli manualmente.",
       "connectionIncomplete": "Il modello ha risposto ma non ha completato la richiesta. Riprova, oppure controlla l'ID del modello e il protocollo.",
       "invalidInput": "Inserisci un nome per il servizio, intestazioni valide e almeno un modello con ID e nome univoci. I limiti dei token devono essere numeri interi positivi.",
+      "invalidApiKey": "La chiave API contiene un carattere che non può essere inviato. Usa solo lettere, cifre e simboli standard, senza interruzioni di riga.",
+      "invalidHeaders": "Non è possibile inviare un'intestazione personalizzata. Controlla il suo nome e usa solo lettere, cifre e simboli standard, senza interruzioni di riga.",
       "invalidUrl": "Inserisci un URL di base dell'API HTTP o HTTPS senza credenziali, parametri di ricerca o un frammento.",
       "publicHttp": "Gli indirizzi di accesso HTTP pubblici non sono consentiti. Usa HTTPS o un indirizzo di accesso locale privato.",
       "httpApprovalRequired": "Approva questo indirizzo di accesso HTTP locale prima di salvare o connetterti.",
@@ -4425,7 +4432,15 @@
       "download": "Scarica il modello sul dispositivo",
       "downloading": "Download in corso…",
       "downloadProgress": "Download in corso… {{percent}}%",
-      "downloadFailed": "Il download non è stato completato. Controlla la connessione e lo spazio libero, poi riprova."
+      "downloadFailed": "Il download non è stato completato. Controlla la connessione e lo spazio libero, poi riprova.",
+      "cannotUse": "Impossibile eseguire: {{items}}.",
+      "cannotUseOptions": "Impossibile compilare: alcune opzioni dello strumento.",
+      "limitations": "Limitazioni",
+      "tools": {
+        "time": "Ora",
+        "settingsList": "Mostra impostazioni",
+        "settingsSet": "Modifica impostazioni"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Questo modello supporta il livello di ragionamento"
@@ -4609,6 +4624,7 @@
     "instructionSaveFailed": "Impossibile salvare l'istruzione",
     "instructionDeleteFailed": "Impossibile eliminare l'istruzione",
     "instructionToggleFailed": "Impossibile aggiornare l'istruzione",
+    "instructionViewTitle": "File dell'istruzione",
     "instructionLimitReached": "Un profilo può contenere fino a {{max}} istruzioni. Eliminane una per aggiungerne un'altra.",
     "mcp": {
       "title": "server MCP",
@@ -4784,6 +4800,7 @@
       "emptyDescription": "Qui appariranno acquisti, ricevute e utilizzo dei crediti.",
       "emptyTitle": "Nessuna cronologia crediti",
       "expiredGrant": "Scaduto: {{description}}",
+      "expiredStatus": "Scaduto",
       "googlePlayReceipt": "Ricevuta da Google Play",
       "kind": {
         "adjustment": "Rettifica",
@@ -4810,7 +4827,8 @@
       "receiptA11y": "Apri la ricevuta di {{description}}, {{amount}}, del {{date}}",
       "receiptUnavailable": "Nessuna ricevuta disponibile per questo acquisto.",
       "retentionLimit": "Viene mostrata la cronologia crediti più recente.",
-      "voidedGrant": "Annullato: {{description}}"
+      "voidedGrant": "Annullato: {{description}}",
+      "voidedStatus": "Annullato"
     },
     "title": "Acquista crediti",
     "description": "I crediti sono un acquisto una tantum che viene aggiunto al tuo saldo Kilo per eseguire sessioni di coding AI in Kilo App. Lo store addebita il tuo account e i crediti vengono aggiunti dopo che lo store conferma il pagamento.",

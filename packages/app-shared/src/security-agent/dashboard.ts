@@ -1,5 +1,4 @@
-// The four severities the tRPC output reports. Every open finding carries one of
-// them, so a breakdown that skips a severity does not add up.
+// The four severities the tRPC output reports.
 type Severity = 'critical' | 'high' | 'medium' | 'low';
 
 // Structural shape of the `securityAgent.getDashboardStats` tRPC output —

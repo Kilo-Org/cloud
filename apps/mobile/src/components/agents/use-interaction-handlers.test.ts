@@ -125,7 +125,7 @@ describe('useInteractionHandlers attention ack', () => {
     expect(
       shouldShowNeedsInput({
         status: 'question',
-        raiseId: 'question',
+        hydration: 'ready',
         isAcked: isAttentionAcked('kilo-session-1', { raiseId: 'question' }),
       })
     ).toBe(false);
@@ -381,7 +381,7 @@ describe('useInteractionHandlers attention ack', () => {
     expect(
       shouldShowNeedsInput({
         status: 'question',
-        raiseId: 'question',
+        hydration: 'ready',
         isAcked: isAttentionAcked('kilo-session-1', { raiseId: 'question' }),
       })
     ).toBe(true);

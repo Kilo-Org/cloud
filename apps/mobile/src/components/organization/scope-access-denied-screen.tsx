@@ -1,4 +1,4 @@
-import { type Href, useRouter } from 'expo-router';
+import { type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
@@ -6,6 +6,7 @@ import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { StateAction } from '@/components/empty-state';
 import { DirectionalArrowLeft } from '@/components/ui/directional-icons';
 import { RotateCcw } from '@/components/ui/icons';
+import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 import { type OrganizationScopeAccess } from '@/lib/organization-scope-access';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 
@@ -40,7 +41,10 @@ export function ScopeAccessDeniedScreen({
   /** Where the header's Back lands when this state has no history to pop. */
   backFallback?: Href;
 }>) {
-  const router = useRouter();
+  // Leaving for Profile swaps this denied state's route out, so it goes through
+  // the push-then-retire hook: a literal `router.replace` swaps both in one
+  // native-stack commit and crashes Android Fabric.
+  const { replace } = useStackSafeReplace();
   const { t } = useTranslation();
   const notFound = kind === 'not-found';
   const backToProfile = (
@@ -48,7 +52,7 @@ export function ScopeAccessDeniedScreen({
       label={t('organization.boundary.backToProfile')}
       icon={DirectionalArrowLeft}
       onPress={() => {
-        router.replace(PROFILE_TAB_HREF);
+        replace(PROFILE_TAB_HREF);
       }}
     />
   );

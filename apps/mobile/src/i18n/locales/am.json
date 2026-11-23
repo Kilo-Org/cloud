@@ -91,6 +91,7 @@
     "draft": "ረቂቅ",
     "enabled": "ነቅቷል",
     "github": "GitHub",
+    "image": "ምስል",
     "imageUnavailable": "ምስሉ አይገኝም።",
     "loading": "በመጫን ላይ…",
     "loadMore": "ተጨማሪ ጫን",
@@ -1249,6 +1250,7 @@
     "needsInputAction": {
       "approved": "ጥያቄው ጸድቋል",
       "replied": "መልስ ተልኳል",
+      "empty": "መልስ ይጻፉ፣ ከዚያ ይላኩ።",
       "failed": "መልስ መስጠት አልተቻለም። እንደገና ለመሞከር እንደገና ይንኩ።",
       "unavailable": "ይህ ጥያቄ ከእንግዲህ አይጠብቅም።"
     }
@@ -2670,6 +2672,7 @@
     "filePart": {
       "loadingImage": "ምስሉን በመጫን ላይ",
       "imageUnavailableRetry": "ምስሉ አይገኝም፣ ለመጫን እንደገና ይሞክሩ",
+      "imageUnavailableRetryWithAlt": "ምስሉ አይገኝም፣ ለመጫን እንደገና ይሞክሩ {{alt}}",
       "imagePreviewUnavailableInSession": "በዚህ ክፍለ ጊዜ ውስጥ የምስል ቅድመ እይታ አይገኝም።",
       "viewImage": "ምስሉን ይመልከቱ",
       "viewImageWithAlt": "{{alt}} የሚለውን ምስል ይመልከቱ",
@@ -3411,6 +3414,8 @@
     "voiceTranscriptionWho": "የእርስዎ መሣሪያ፣ Kilo Gateway ከመረጡት የጽሑፍ ቅየራ ሞዴል ጋር፣ ወይም Apple ወይም Google ለመስመር ላይ መለያ።",
     "installAttributionPromptTitle": "የመተግበሪያውን ምንጭ ለመለየት ይፈቅዳሉ?",
     "installAttributionPromptMessage": "Kilo የApple መከታተያ ፈቃድን የሚጠቀመው እዚህ በምን መንገድ እንደደረሱ ለማወቅ ብቻ ነው። ጥያቄዎችዎና ውይይቶችዎ በፍጹም ጥቅም ላይ አይውሉም።",
+    "installAttributionRequestFailedTitle": "የመከታተያ ጥያቄውን ማሳየት አልተቻለም",
+    "installAttributionRequestFailedMessage": "Kilo የስርዓቱን ጥያቄ ማሳየት አልቻለም፣ ስለዚህ የመተግበሪያውን ምንጭ መለየት ተዘግቷል።",
     "what": "ምን",
     "why": "ለምን",
     "who": "ማን"
@@ -3694,7 +3699,7 @@
       "pendingInvitation": "ይህ ኢሜይል አስቀድሞ በመጠባበቅ ላይ ያለ ግብዣ አለው።",
       "alreadyMember": "ይህ ሰው አስቀድሞ የዚህ ድርጅት አባል ነው።",
       "seatsFull": "ሁሉም መቀመጫዎች በጥቅም ላይ ናቸው ({{used}}/{{total}})። ተጨማሪ አባላትን ከመጋበዝዎ በፊት የድርጅት ባለቤት መቀመጫዎችን እንዲጨምር ይጠይቁ።",
-      "seatsFullCanInviteBilling": "ሁሉም መቀመጫዎች በጥቅም ላይ ናቸው ({{used}}/{{total}})። መቀመጫ የማይይዙ የሂሳብ አከፋፈል አስተዳዳሪዎችን አሁንም መጋበዝ ይችላሉ።",
+      "seatsFullCanInviteBilling": "ሁሉም መቀመጫዎች በጥቅም ላይ ናቸው ({{used}}/{{total}})። መቀመጫ የማይይዙ የክፍያ አስተዳዳሪዎችን አሁንም መጋበዝ ይችላሉ።",
       "noSeatsAvailable": "ሁሉም መቀመጫዎች በጥቅም ላይ ናቸው። ተጨማሪ አባላትን ከመጋበዝዎ በፊት የድርጅት ባለቤት መቀመጫዎችን እንዲጨምር ይጠይቁ።"
     },
     "invoices": {
@@ -3898,7 +3903,7 @@
     "signupStepUpApple": "መለያህን መፍጠር ለመጨረስ '$t(login.signInWithApple)'ን ተጠቀም።",
     "signupStepUpGoogle": "መለያህን መፍጠር ለመጨረስ '$t(login.signInWithGoogle)'ን ተጠቀም።",
     "signupStepUpBack": "መለያህን መፍጠር ለመጨረስ ወደ ኋላ ተመለስና '$t(login.moreSignInOptions)'ን ተጠቀም።",
-    "invalidCode": "ያ ኮድ ትክክል አይደለም ወይም ጊዜው አልፎበታል። እንደገና ሞክር ወይም '$t(login.resendCode)'ን ተጠቀም።",
+    "invalidCode": "ያ ኮድ ትክክል አይደለም ወይም ጊዜው አልፎበታል። '$t(login.resendCode)'ን ወይም '$t(login.moreSignInOptions)'ን ተጠቀም።",
     "codeInProgress": "ኮድህ እየተሠራበት ነው። ትንሽ ጠብቅና እንደገና ሞክር።",
     "tooManyAttempts": "በጣም ብዙ ሙከራዎች ተደርገዋል። አዲስ ኮድ ጠይቅ።",
     "invalidToken": "መግባት አልተሳካም። እባክህ እንደገና ሞክር።",
@@ -4212,6 +4217,8 @@
       "discoveryNoModels": "የግንኙነት ነጥቡ ምንም ሞዴል አልዘረዘረም። ሞዴሎችን በእጅ ያስገቡ።",
       "connectionIncomplete": "ሞዴሉ ምላሽ ሰጠ ነገር ግን አልጨረሰም። እንደገና ይሞክሩ፣ ወይም የሞዴሉን መለያ እና ፕሮቶኮሉን ያረጋግጡ።",
       "invalidInput": "የጀርባ አገልግሎት ስም፣ ትክክለኛ ራስጌዎች እና ቢያንስ አንድ ልዩ መለያ እና ስም ያለው ሞዴል ያስገቡ። የቶከን ገደቦች ከዜሮ በላይ የሆኑ ሙሉ ቁጥሮች መሆን አለባቸው።",
+      "invalidApiKey": "የAPI ቁልፉ ሊላክ የማይችል ቁምፊ ይዟል። ፊደላትን፣ አሃዞችን እና መደበኛ ምልክቶችን ብቻ ይጠቀሙ፣ የመስመር መስበር የለም።",
+      "invalidHeaders": "ብጁ ራስጌ ሊላክ አይችልም። ስሙን ያረጋግጡ እና ፊደላትን፣ አሃዞችን እና መደበኛ ምልክቶችን ብቻ ይጠቀሙ፣ የመስመር መስበር የለም።",
       "invalidUrl": "የመግቢያ መረጃ፣ የመጠይቅ ክፍል ወይም የቁራጭ ክፍል የሌለው የHTTP ወይም የHTTPS የAPI ሥር አድራሻ ያስገቡ።",
       "publicHttp": "ይፋዊ የHTTP የግንኙነት ነጥቦች አይፈቀዱም። HTTPS ወይም የግል አካባቢያዊ የግንኙነት ነጥብ ይጠቀሙ።",
       "httpApprovalRequired": "ከማስቀመጥዎ ወይም ከመገናኘትዎ በፊት ይህን አካባቢያዊ የHTTP የግንኙነት ነጥብ ይፍቀዱ።",
@@ -4346,7 +4353,15 @@
       "download": "በመሣሪያ ላይ የሚሠራውን ሞዴል ያውርዱ",
       "downloading": "በመውረድ ላይ…",
       "downloadProgress": "በመውረድ ላይ… {{percent}}%",
-      "downloadFailed": "ማውረዱ አልተጠናቀቀም። ግንኙነትዎን እና ነፃ የማከማቻ ቦታዎን ያረጋግጡ፣ ከዚያ እንደገና ይሞክሩ።"
+      "downloadFailed": "ማውረዱ አልተጠናቀቀም። ግንኙነትዎን እና ነፃ የማከማቻ ቦታዎን ያረጋግጡ፣ ከዚያ እንደገና ይሞክሩ።",
+      "cannotUse": "ማስኬድ አይችልም፦ {{items}}።",
+      "cannotUseOptions": "መሙላት አይችልም፦ አንዳንድ የመሣሪያ አማራጮች።",
+      "limitations": "ገደቦች",
+      "tools": {
+        "time": "ጊዜ",
+        "settingsList": "ቅንብሮችን አሳይ",
+        "settingsSet": "ቅንብሮችን ቀይር"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "ይህ ሞዴል የማሰብ ጥረትን ይደግፋል"
@@ -4525,6 +4540,7 @@
     "instructionSaveFailed": "መመሪያውን ማስቀመጥ አልተቻለም",
     "instructionDeleteFailed": "መመሪያውን መሰረዝ አልተቻለም",
     "instructionToggleFailed": "መመሪያውን ማዘመን አልተቻለም",
+    "instructionViewTitle": "የመመሪያ ፋይል",
     "instructionLimitReached": "አንድ መገለጫ እስከ {{max}} መመሪያዎች ሊይዝ ይችላል። ሌላ ለማከል አንዱን ይሰርዙ።",
     "mcp": {
       "title": "MCP አገልጋዮች",
@@ -4699,6 +4715,7 @@
       "emptyDescription": "የክሬዲት ግዢዎች፣ ደረሰኞች እና አጠቃቀም እዚህ ይታያሉ።",
       "emptyTitle": "የክሬዲት ታሪክ የለም",
       "expiredGrant": "ጊዜው አልፏል፦ {{description}}",
+      "expiredStatus": "ጊዜው አልፏል",
       "googlePlayReceipt": "ደረሰኝ ከGoogle Play",
       "kind": {
         "adjustment": "ማስተካከያ",
@@ -4725,7 +4742,8 @@
       "receiptA11y": "የ{{description}}፣ {{amount}}፣ ከ{{date}} ደረሰኝን ክፈት",
       "receiptUnavailable": "ለዚህ ግዢ ደረሰኝ አይገኝም።",
       "retentionLimit": "የቅርብ ጊዜ የክሬዲት ታሪክን በማሳየት ላይ።",
-      "voidedGrant": "ተሰርዟል፦ {{description}}"
+      "voidedGrant": "ተሰርዟል፦ {{description}}",
+      "voidedStatus": "ተሰርዟል"
     },
     "title": "ክሬዲት ይግዙ",
     "description": "ክሬዲት በKilo App ውስጥ የAI ኮዲንግ ክፍለ-ጊዜዎችን ለማስኬድ ወደ Kilo ቀሪ ሂሳብዎ የሚጨመር የአንድ ጊዜ ግዢ ነው። መደብሩ ሂሳብዎን ይከፍላል፣ እና መደብሩ ክፍያውን ካረጋገጠ በኋላ ክሬዲት ይጨመራል።",

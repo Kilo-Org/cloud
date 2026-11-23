@@ -423,9 +423,7 @@ export async function rotateRefreshToken(
     return { ok: false, error: 'USER_BLOCKED' };
   }
 
-  // Steps 4-7: Consume the old token and issue the replacement pair in one
-  // transaction. If issuing the replacement fails, the transaction rolls back
-  // and the old token remains usable, so the client can retry with it.
+  // Steps 4-7:
   const outcome = await db.transaction(async tx => {
     // Step 4: Lock the parent session row and recheck revoked_at INSIDE the
     // transaction, before consuming. The pre-transaction session check above

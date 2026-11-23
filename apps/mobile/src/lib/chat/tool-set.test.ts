@@ -50,14 +50,6 @@ const namesOf = (tools: readonly { readonly definition: { readonly name: string 
 /** A tool of that name: the suite reads the names, not the answers. */
 const toolNamed = (name: string) => ({ definition: { name } }) as unknown as Tool;
 
-/**
- * The names a chat is opened with.
- *
- * A session is opened with a frozen list, so the list has to be exactly what
- * the switches say and in the same order every time: a name the registry cannot
- * resolve would fail the open, and a list that reorders would throw the cached
- * prefix away for a chat that changed nothing.
- */
 describe('the names a chat is opened with', () => {
   it('is the clock and the settings tools while the group switch is on', () => {
     expect(toolNamesFor(input())).toEqual(['time', ...SETTINGS_TOOL_NAMES]);

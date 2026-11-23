@@ -42,6 +42,11 @@ const listState = vi.hoisted(() => ({
   // settles (isFetching false, isPending true).
   storedIsPending: false,
   storedIsFetching: false,
+  storedIsPaused: false,
+  // The search read's own flags: a paused search is offline with no cached
+  // page, so it is neither loading nor errored and never settles on its own.
+  searchIsPending: false,
+  searchIsPaused: false,
   storedFetchedSinceMount: true,
   storedLoadedPageCount: 1,
   hasNextPage: false,
@@ -166,6 +171,9 @@ const focusCallbacks = vi.hoisted(() => ({
   current: new Set<() => void>(),
 }));
 const handleRefetchSpy = vi.hoisted(() => vi.fn());
+// The search read's own refetch: a paused search must be re-issued through it,
+// and counting it here keeps the shared stored refetch out of the tally.
+const searchRefetchSpy = vi.hoisted(() => vi.fn());
 const readFilterRecord = vi.hoisted(() => vi.fn<(storageKey: string) => Promise<string | null>>());
 
 vi.mock('react-native', async () => {
@@ -286,6 +294,7 @@ vi.mock('@/lib/hooks/use-agent-sessions', async () => {
         activeIsError: false,
         storedIsError: listState.isError,
         storedIsPending: listState.storedIsPending,
+        storedIsPaused: listState.storedIsPaused,
         storedIsFetching: listState.storedIsFetching,
         storedFetchedSinceMount: listState.storedFetchedSinceMount,
         storedLoadedPageCount: listState.storedLoadedPageCount,
@@ -302,13 +311,14 @@ vi.mock('@/lib/hooks/use-agent-sessions', async () => {
         dateGroups: [],
         isError: listState.isError,
         isFetching: false,
-        isPending: false,
+        isPending: listState.searchIsPending,
+        isPaused: listState.searchIsPaused,
         hasNextPage: listState.hasNextPage,
         isFetchingNextPage: listState.isFetchingNextPage,
         isFetchNextPageError: listState.isFetchNextPageError,
         isPlaceholderData: false,
         fetchNextPage: listState.fetchNextPage,
-        refetch: handleRefetchSpy,
+        refetch: searchRefetchSpy,
       };
     },
     useRecentAgentRepositories: (options: Parameters<typeof useRecentAgentRepositories>[0]) => {
@@ -463,6 +473,11 @@ describe('SessionHistoryScreen', () => {
     listState.isError = false;
     listState.storedIsPending = false;
     listState.storedIsFetching = false;
+    listState.storedIsPaused = false;
+    listState.searchIsPending = false;
+    listState.searchIsPaused = false;
+    searchRefetchSpy.mockClear();
+    searchRefetchSpy.mockResolvedValue(undefined);
     listState.storedFetchedSinceMount = true;
     listState.storedLoadedPageCount = 1;
     listState.hasNextPage = false;
@@ -991,6 +1006,50 @@ describe('SessionHistoryScreen', () => {
     const content = findNodeByType(renderer, 'AgentSessionListContent');
     expect(content.props.isLoading).toBe(false);
     expect(findNodeByType(renderer, 'AgentSessionListContent').props.sections).toHaveLength(1);
+  });
+
+  // Regression: an offline search that has no page of its own cached is paused,
+  // not loading. The body must hand the surface to the offline card with its
+  // own Retry — never skeletons that never land, and never the unfiltered
+  // stored list painting under a search that is still waiting on the network.
+  it('keeps the offline surface over a paused search and retries it', async () => {
+    listState.storedSessions = sessions;
+    listState.isSearching = true;
+    listState.searchIsPending = true;
+    listState.searchIsPaused = true;
+
+    const renderer = await renderScreen();
+
+    const content = findNodeByType(renderer, 'AgentSessionListContent');
+    expect(content.props.isPaused).toBe(true);
+    expect(content.props.isLoading).toBe(false);
+    // The paused search has no page of its own, so the stored groups are still
+    // handed down (an earlier answer keeps rendering); the offline surface is
+    // what owns the body above them.
+    expect((content.props.sections as unknown[]).length).toBeGreaterThan(0);
+
+    act(() => {
+      (content.props.onRetryPaused as () => void)();
+    });
+    expect(searchRefetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  // Regression: a paused read only owns the body when it has no page of its own
+  // to show. A settled empty history whose refetch is paused already answered —
+  // "nothing here" — so it keeps its empty body and New session action, and the
+  // app-wide offline banner speaks for the connection.
+  it('keeps a settled empty history when its refetch is paused', async () => {
+    listState.storedSessions = [];
+    listState.storedIsPending = false;
+    listState.storedIsPaused = true;
+    listState.storedLoadedPageCount = 1;
+
+    const renderer = await renderScreen();
+
+    const content = findNodeByType(renderer, 'AgentSessionListContent');
+    expect(content.props.isPaused).toBe(false);
+    expect(content.props.isLoading).toBe(false);
+    expect(content.props.hasAnySessions).toBe(false);
   });
 
   it('shows the settled empty state once the request completes with no rows', async () => {

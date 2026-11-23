@@ -105,6 +105,7 @@ export function BriefingNotificationToggle() {
           icon={Bell}
           title={t('common.notifications')}
           subtitle={t('agentBriefing.notificationPermission')}
+          subtitleNumberOfLines={2}
           onPress={() => {
             router.push('/(app)/notifications' as Href);
           }}
@@ -145,6 +146,7 @@ export function BriefingNotificationCategoryRow({ disabled }: Readonly<{ disable
         icon={Newspaper}
         title={t('agentBriefing.title')}
         subtitle={t('agentBriefing.notificationsHint')}
+        subtitleNumberOfLines={2}
         variant="action"
         onPress={() => {
           void preferences.refetch();

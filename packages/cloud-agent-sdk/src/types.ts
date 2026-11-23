@@ -406,10 +406,6 @@ export type SessionSnapshotPage = {
   totalCostMicrodollars?: number | null | undefined;
   /** The preparation rows the stream replays first, so the first page can show them. */
   preparationAttempts?: readonly PreparationAttempt[] | undefined;
-  /**
-   * The run's queued and failed turns the socket replays on connect, so a page
-   * opened without a socket still shows the question row and its failure.
-   */
   queuedMessages?: readonly QueuedMessageSnapshot[] | undefined;
 };
 
@@ -478,7 +474,6 @@ export type FetchedSessionData = {
   routeReady?: boolean;
   prompt: string | null;
   initialMessageId: string | null;
-  /** Installed custom agents, including picker visibility and model overrides. */
   runtimeAgents?: SessionConfig['runtimeAgents'];
   associatedPr: AssociatedPrData | null;
   totalCostMicrodollars?: number | null;

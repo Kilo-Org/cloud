@@ -23,9 +23,6 @@ describe('buildStoredSessionsQueryOptions', () => {
     const infiniteQueryOptions = vi.fn((_input: unknown, options: object) => options);
     const result = buildStoredSessionsQueryOptions(createTrpcStub(infiniteQueryOptions), {});
 
-    // The hook registers its own `useAppLifecycle` foreground edge and
-    // reconciles page one; React Query's native window-focus refetch would
-    // instead re-request every retained page.
     expect(infiniteQueryOptions).toHaveBeenCalledWith(
       expect.objectContaining({ limit: 30 }),
       expect.objectContaining({ refetchOnWindowFocus: false })
@@ -39,8 +36,6 @@ describe('buildStoredSessionsQueryOptions', () => {
       refetchOnWindowFocus: false,
     });
 
-    // The Agents list drives foreground through its own callback, so the
-    // native fan-out stays off there too.
     expect(infiniteQueryOptions).toHaveBeenCalledWith(
       expect.objectContaining({ limit: 30 }),
       expect.objectContaining({ refetchOnWindowFocus: false })
@@ -61,11 +56,7 @@ describe('buildStoredSessionsQueryOptions', () => {
     const infiniteQueryOptions = vi.fn((_input: unknown, options: object) => options);
     const result = buildStoredSessionsQueryOptions(createTrpcStub(infiniteQueryOptions), {});
 
-    // The history browser pages forward and scrolls back over everything it
-    // loaded. The shared 5-page bound front-evicts the oldest page on every
-    // later fetch (`addToEnd` slices index 0), so past five pages the top of
-    // the history disappears and the list cannot scroll back to it. The
-    // signed-in e2e history needs 8 pages of 30 sessions.
+    // The signed-in e2e history needs 8 pages of 30 sessions.
     expect(result.maxPages).toBeGreaterThan(INFINITE_QUERY_MAX_PAGES);
     expect(result.maxPages).toBeGreaterThanOrEqual(8);
   });
@@ -74,11 +65,6 @@ describe('buildStoredSessionsQueryOptions', () => {
     const infiniteQueryOptions = vi.fn((_input: unknown, options: object) => options);
     const result = buildStoredSessionsQueryOptions(createTrpcStub(infiniteQueryOptions), {});
 
-    // React Query re-requests every page retained in the cache on `refetch()`
-    // (see the fan-out test in `infinite-retention.test.ts`), and the history
-    // list refetches on focus return and app foreground. `maxPages` is
-    // therefore also the refetch fan-out, so it stays near the browsable
-    // requirement instead of letting one refetch issue 100 page requests.
     expect(result.maxPages).toBeLessThanOrEqual(20);
   });
 });
@@ -199,8 +185,6 @@ describe('newest-first session paging at the retention bound', () => {
       page => page.cliSessions
     );
 
-    // The newest page (`ses-0`) is still at the front, the walk stopped at the
-    // bound, and the list reports no next page so the footer cannot page on.
     expect(ids[0]).toBe('ses-0');
     expect(ids).toHaveLength(SESSION_HISTORY_MAX_PAGES);
     expect(fetched).toBe(SESSION_HISTORY_MAX_PAGES);
@@ -217,10 +201,6 @@ describe('newest-first session paging at the retention bound', () => {
       page => page.results
     );
 
-    // Search results are newest-first like the stored list, so `ses-0` must
-    // still be at the front of the retained pages: the guarded cursor ends the
-    // chain at the bound instead of letting the trim drop page one, the walk
-    // fetched exactly the bound, and the list reports no next page.
     expect(ids[0]).toBe('ses-0');
     expect(ids).toHaveLength(SESSION_HISTORY_MAX_PAGES);
     expect(fetched).toBe(SESSION_HISTORY_MAX_PAGES);

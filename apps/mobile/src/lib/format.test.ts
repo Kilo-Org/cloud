@@ -165,16 +165,31 @@ describe('localized format helpers', () => {
 
   it('formats a list and preserves one grapheme', () => {
     expect(formatList(['A', 'B'], 'de')).toBe('A und B');
-    expect(formatFileSize(1024, 'de')).toContain('1 kB');
+    expect(formatFileSize(1024, 'de')).toBe('1,02 kB');
     expect(firstGrapheme('👨‍👩‍👧‍👦 family', 'en')).toBe('👨‍👩‍👧‍👦');
   });
 
   it('pluralizes a whole-byte size in the active language', () => {
     expect(formatFileSize(1, 'en')).toBe('1 byte');
     expect(formatFileSize(564, 'en')).toBe('564 bytes');
-    expect(formatFileSize(1023, 'en')).toBe('1,023 bytes');
-    // A count that reaches the kilobyte unit keeps the abbreviated form.
-    expect(formatFileSize(1024, 'en')).toBe('1 kB');
+    expect(formatFileSize(999, 'en')).toBe('999 bytes');
+    // A count of 1000 bytes or more reaches the kilobyte unit, which keeps the
+    // abbreviated form.
+    expect(formatFileSize(1000, 'en')).toBe('1 kB');
+    expect(formatFileSize(1024, 'en')).toBe('1.02 kB');
+    expect(formatFileSize(1_048_576, 'en')).toBe('1.05 MB');
+    expect(formatFileSize(1_073_741_824, 'en')).toBe('1.07 GB');
+    // A count that rounds up to the next step takes the next unit's name, so a
+    // figure the unit cannot hold is never printed.
+    expect(formatFileSize(999_500, 'en')).toBe('999.5 kB');
+    expect(formatFileSize(999_999, 'en')).toBe('1 MB');
+    expect(formatFileSize(999_999_999, 'en')).toBe('1 GB');
+    // The promotion rounds at the digits the unit shows, so a fractional byte
+    // count just under the step promotes instead of printing "1,000 bytes", and
+    // the top step is the last one, holding any larger count.
+    expect(formatFileSize(999.5, 'en')).toBe('1 kB');
+    expect(formatFileSize(1_000_000_000_000, 'en')).toBe('1 TB');
+    expect(formatFileSize(1_000_000_000_000_000, 'en')).toBe('1,000 TB');
   });
 
   it('parses localized numbers and rejects other input', () => {
@@ -316,7 +331,6 @@ describe('parseLocalizedNumber with the device keypad separator', () => {
   });
 
   it('rejects input the two readings disagree on', () => {
-    // A thousand in German, or 1.234 from a dot keypad: the text does not say.
     expect(parseLocalizedNumber('1.234', 'de-DE', '.')).toBeNull();
     expect(parseLocalizedNumber('12.345', 'de-DE', '.')).toBeNull();
     expect(parseLocalizedNumber('1,234', 'en-US', ',')).toBeNull();

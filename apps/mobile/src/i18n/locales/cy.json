@@ -95,6 +95,7 @@
     "draft": "Drafft",
     "enabled": "Wedi'i alluogi",
     "github": "GitHub",
+    "image": "Delwedd",
     "imageUnavailable": "Nid yw'r ddelwedd ar gael.",
     "loading": "Yn llwytho…",
     "loadMore": "Llwytho mwy",
@@ -1361,6 +1362,7 @@
     "needsInputAction": {
       "approved": "Cais wedi’i gymeradwyo",
       "replied": "Anfonwyd yr ymateb",
+      "empty": "Ysgrifennwch ateb ac yna ei anfon.",
       "failed": "Methwyd ag ateb. Tapwch eto i roi cynnig arall.",
       "unavailable": "Nid yw’r cais hwn yn aros mwyach."
     }
@@ -2882,6 +2884,7 @@
     "filePart": {
       "loadingImage": "Yn llwytho delwedd",
       "imageUnavailableRetry": "Nid yw'r ddelwedd ar gael, ceisio ei llwytho eto",
+      "imageUnavailableRetryWithAlt": "Nid yw'r ddelwedd ar gael, {{alt}}, ceisio ei llwytho eto",
       "imagePreviewUnavailableInSession": "Nid yw rhagolwg y ddelwedd ar gael yn y sesiwn hon.",
       "viewImage": "Gweld delwedd",
       "viewImageWithAlt": "Gweld delwedd {{alt}}",
@@ -3663,6 +3666,8 @@
     "voiceTranscriptionWho": "Eich dyfais, Kilo Gateway gyda'r model trawsgrifio a ddewiswch, neu Apple neu Google ar gyfer adnabyddiaeth ar-lein.",
     "installAttributionPromptTitle": "Caniatáu priodoli'r gosodiad?",
     "installAttributionPromptMessage": "Mae Kilo yn defnyddio caniatâd olrhain Apple dim ond i weld pa sianel ddaeth â chi yma. Ni ddefnyddir eich anogiadau na'ch sgyrsiau byth.",
+    "installAttributionRequestFailedTitle": "Methu dangos anogiad olrhain",
+    "installAttributionRequestFailedMessage": "Ni allai Kilo ddangos anogiad y system, felly mae priodoli'r gosodiad yn parhau wedi'i ddiffodd.",
     "what": "Beth",
     "why": "Pam",
     "who": "Pwy"
@@ -4178,7 +4183,7 @@
     "signupStepUpApple": "I orffen creu'ch cyfrif, defnyddiwch '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "I orffen creu'ch cyfrif, defnyddiwch '$t(login.signInWithGoogle)'.",
     "signupStepUpBack": "I orffen creu'ch cyfrif, ewch yn ôl a defnyddiwch '$t(login.moreSignInOptions)'.",
-    "invalidCode": "Mae'r cod hwnnw'n anghywir neu wedi dod i ben. Rhowch gynnig eto neu ddefnyddiwch '$t(login.resendCode)'.",
+    "invalidCode": "Mae'r cod hwnnw'n anghywir neu wedi dod i ben. Defnyddiwch '$t(login.resendCode)' neu ddefnyddiwch '$t(login.moreSignInOptions)'.",
     "codeInProgress": "Mae'ch cod yn cael ei brosesu. Arhoswch ychydig a rhowch gynnig eto.",
     "tooManyAttempts": "Rydych wedi rhoi cynnig gormod o weithiau. Gofynnwch am god newydd.",
     "invalidToken": "Methodd y mewngofnodi. Rho gynnig arall arni.",
@@ -4528,6 +4533,8 @@
       "discoveryNoModels": "Ni restrir unrhyw fodelau gan y pwynt terfyn. Rhowch fodelau i mewn â llaw.",
       "connectionIncomplete": "Atebodd y model ond ni orffennodd. Rhowch gynnig arall arni, neu gwiriwch ID y model a'r protocol.",
       "invalidInput": "Rhowch enw ôl-ben, penawdau dilys ac o leiaf un model ag ID ac enw unigryw. Rhaid i derfynau tocynnau fod yn gyfanrifau positif.",
+      "invalidApiKey": "Mae'r allwedd API yn cynnwys cymeriad na ellir ei anfon. Defnyddiwch lythrennau, digidau a symbolau safonol yn unig, heb doriadau llinell.",
+      "invalidHeaders": "Ni ellir anfon pennawd personol. Gwiriwch ei enw a defnyddiwch lythrennau, digidau a symbolau safonol yn unig, heb doriadau llinell.",
       "invalidUrl": "Rhowch wraidd API HTTP neu HTTPS heb fanylion adnabod, ymholiad na darn.",
       "publicHttp": "Ni chaniateir pwyntiau terfyn HTTP cyhoeddus. Defnyddiwch HTTPS neu bwynt terfyn lleol preifat.",
       "httpApprovalRequired": "Cymeradwywch y pwynt terfyn HTTP lleol hwn cyn cadw neu gysylltu.",
@@ -4662,7 +4669,15 @@
       "download": "Llwytho'r model ar y ddyfais i lawr",
       "downloading": "Wrthi'n llwytho i lawr…",
       "downloadProgress": "Wrthi'n llwytho i lawr… {{percent}}%",
-      "downloadFailed": "Ni orffennodd y llwytho i lawr. Gwiriwch eich cysylltiad a'ch lle storio, yna rhowch gynnig arall arni."
+      "downloadFailed": "Ni orffennodd y llwytho i lawr. Gwiriwch eich cysylltiad a'ch lle storio, yna rhowch gynnig arall arni.",
+      "cannotUse": "Methu rhedeg: {{items}}.",
+      "cannotUseOptions": "Methu llenwi: rhai opsiynau offeryn.",
+      "limitations": "Cyfyngiadau",
+      "tools": {
+        "time": "Amser",
+        "settingsList": "Dangos gosodiadau",
+        "settingsSet": "Newid gosodiadau"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Mae'r model hwn yn cefnogi ymdrech feddwl"
@@ -4861,6 +4876,7 @@
     "instructionSaveFailed": "Methu cadw'r cyfarwyddyd",
     "instructionDeleteFailed": "Methu dileu'r cyfarwyddyd",
     "instructionToggleFailed": "Methu diweddaru'r cyfarwyddyd",
+    "instructionViewTitle": "Ffeil cyfarwyddyd",
     "instructionLimitReached": "Gall proffil gynnwys hyd at {{max}} cyfarwyddyd. Dilëwch un i ychwanegu un arall.",
     "mcp": {
       "title": "gweinyddwyr MCP",
@@ -5039,6 +5055,7 @@
       "emptyDescription": "Bydd pryniannau credyd, derbynebau a defnydd yn ymddangos yma.",
       "emptyTitle": "Dim hanes credydau",
       "expiredGrant": "Wedi dod i ben: {{description}}",
+      "expiredStatus": "Wedi dod i ben",
       "googlePlayReceipt": "Derbynneb gan Google Play",
       "kind": {
         "adjustment": "Addasiad",
@@ -5065,7 +5082,8 @@
       "receiptA11y": "Agor y dderbynneb ar gyfer {{description}}, {{amount}}, o {{date}}",
       "receiptUnavailable": "Nid oes derbynneb ar gael ar gyfer y pryniant hwn.",
       "retentionLimit": "Yn dangos yr hanes credydau diweddaraf.",
-      "voidedGrant": "Wedi'i ddirymu: {{description}}"
+      "voidedGrant": "Wedi'i ddirymu: {{description}}",
+      "voidedStatus": "Wedi'i ddirymu"
     },
     "title": "Prynu credydau",
     "description": "Mae credydau yn bryniant un-tro sy'n cael ei ychwanegu at eich balans Kilo ar gyfer rhedeg sesiynau codio AI yn Kilo App. Mae'r siop yn codi eich cyfrif ac mae credydau'n cael eu hychwanegu ar ôl i'r siop gadarnhau'r taliad.",

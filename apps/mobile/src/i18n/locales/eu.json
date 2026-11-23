@@ -91,6 +91,7 @@
     "draft": "Zirriborroa",
     "enabled": "Gaituta",
     "github": "GitHub",
+    "image": "Irudi",
     "imageUnavailable": "Irudia ez dago eskuragarri.",
     "loading": "Kargatzen…",
     "loadMore": "Kargatu gehiago",
@@ -1249,6 +1250,7 @@
     "needsInputAction": {
       "approved": "Eskaera onartu da",
       "replied": "Erantzuna bidali da",
+      "empty": "Idatzi erantzun bat eta gero bidali.",
       "failed": "Ezin izan da erantzun. Ukitu berriro saiatzeko.",
       "unavailable": "Eskaera honek jada ez du itxaroten."
     }
@@ -2670,6 +2672,7 @@
     "filePart": {
       "loadingImage": "Irudia kargatzen",
       "imageUnavailableRetry": "Irudia ez dago erabilgarri, saiatu berriro kargatzen",
+      "imageUnavailableRetryWithAlt": "Irudia ez dago erabilgarri, {{alt}}, saiatu berriro kargatzen",
       "imagePreviewUnavailableInSession": "Irudiaren aurrebista ez dago erabilgarri saio honetan.",
       "viewImage": "Ikusi irudia",
       "viewImageWithAlt": "Ikusi irudia: {{alt}}",
@@ -3411,6 +3414,8 @@
     "voiceTranscriptionWho": "Zure gailua, Kilo Gateway aukeratutako transkripzio-ereduarekin, edo Apple edo Google lineako ezagutzarako.",
     "installAttributionPromptTitle": "Baimendu instalazioaren jatorria identifikatzea?",
     "installAttributionPromptMessage": "Kilo-k Apple-ren jarraipen-baimena hona zein kanalen bidez iritsi zaren jakiteko soilik erabiltzen du. Zure eskaerak eta elkarrizketak ez dira inoiz erabiltzen.",
+    "installAttributionRequestFailedTitle": "Ezin izan da jarraipen-eskaera erakutsi",
+    "installAttributionRequestFailedMessage": "Kilok ezin izan du sistemaren eskaera erakutsi, beraz instalazioaren jatorriaren identifikazioa itzalita geratzen da.",
     "what": "Zer",
     "why": "Zergatik",
     "who": "Nor"
@@ -3898,7 +3903,7 @@
     "signupStepUpApple": "Kontua sortzen amaitzeko, erabili '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Kontua sortzen amaitzeko, erabili '$t(login.signInWithGoogle)'.",
     "signupStepUpBack": "Kontua sortzen amaitzeko, itzuli atzera eta erabili '$t(login.moreSignInOptions)'.",
-    "invalidCode": "Kode hori okerra da edo iraungita dago. Saiatu berriro edo erabili '$t(login.resendCode)'.",
+    "invalidCode": "Kode hori okerra da edo iraungita dago. Erabili '$t(login.resendCode)' edo '$t(login.moreSignInOptions)'.",
     "codeInProgress": "Zure kodea prozesatzen ari da. Itxaron une bat eta saiatu berriro.",
     "tooManyAttempts": "Saiakera gehiegi. Eskatu kode berri bat.",
     "invalidToken": "Saioa hasteak huts egin du. Saiatu berriro.",
@@ -4212,6 +4217,8 @@
       "discoveryNoModels": "Amaiera-puntuak ez du modelorik zerrendatu. Sartu modeloak eskuz.",
       "connectionIncomplete": "Modeloak erantzun du, baina ez du amaitu. Saiatu berriro, edo egiaztatu modeloaren IDa eta protokoloa.",
       "invalidInput": "Sartu atzeko zerbitzuaren izena, baliozko goiburuak eta gutxienez ID eta izen bakarrak dituen modelo bat. Tokenen mugek zenbaki oso positiboak izan behar dute.",
+      "invalidApiKey": "API gakoak bidali ezin den karaktere bat dauka. Erabili letrak, digituak eta sinbolo estandarrak soilik, lerro-jauzirik gabe.",
+      "invalidHeaders": "Ezin da goiburu pertsonalizatu bat bidali. Egiaztatu bere izena eta erabili letrak, digituak eta sinbolo estandarrak soilik, lerro-jauzirik gabe.",
       "invalidUrl": "Sartu HTTP edo HTTPS APIaren erro bat, kredentzialik, kontsultarik edo zatirik gabe.",
       "publicHttp": "Ez dira onartzen HTTP amaierako puntu publikoak. Erabili HTTPS edo tokiko amaierako puntu pribatu bat.",
       "httpApprovalRequired": "Onartu tokiko HTTP amaierako puntu hau gorde edo konektatu aurretik.",
@@ -4346,7 +4353,15 @@
       "download": "Deskargatu gailuko modeloa",
       "downloading": "Deskargatzen…",
       "downloadProgress": "Deskargatzen… %{{percent}}",
-      "downloadFailed": "Deskarga ez da amaitu. Egiaztatu konexioa eta biltegiratze-toki librea, eta saiatu berriro."
+      "downloadFailed": "Deskarga ez da amaitu. Egiaztatu konexioa eta biltegiratze-toki librea, eta saiatu berriro.",
+      "cannotUse": "Ezin da exekutatu: {{items}}.",
+      "cannotUseOptions": "Ezin dira bete: tresna baten aukera batzuk.",
+      "limitations": "Mugak",
+      "tools": {
+        "time": "Ordua",
+        "settingsList": "Erakutsi ezarpenak",
+        "settingsSet": "Aldatu ezarpenak"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Modelo honek arrazoiketa-ahalegina onartzen du"
@@ -4525,6 +4540,7 @@
     "instructionSaveFailed": "Ezin izan da jarraibidea gorde",
     "instructionDeleteFailed": "Ezin izan da jarraibidea ezabatu",
     "instructionToggleFailed": "Ezin izan da jarraibidea eguneratu",
+    "instructionViewTitle": "Jarraibide fitxategia",
     "instructionLimitReached": "Profil batek {{max}} jarraibide izan ditzake gehienez. Ezabatu bat beste bat gehitzeko.",
     "mcp": {
       "title": "MCP zerbitzariak",
@@ -4699,6 +4715,7 @@
       "emptyDescription": "Kreditu-erosketak, ordainagiriak eta erabilera hemen agertuko dira.",
       "emptyTitle": "Ez dago kredituen historiarik",
       "expiredGrant": "Iraungita: {{description}}",
+      "expiredStatus": "Iraungita",
       "googlePlayReceipt": "Google Play-ko ordainagiria",
       "kind": {
         "adjustment": "Doikuntza",
@@ -4725,7 +4742,8 @@
       "receiptA11y": "Ireki honen ordainagiria: {{description}}, {{amount}}, {{date}}tik",
       "receiptUnavailable": "Ez dago ordainagiririk erosketa honetarako.",
       "retentionLimit": "Azken kreditu-historia erakusten da.",
-      "voidedGrant": "Baliogabetua: {{description}}"
+      "voidedGrant": "Baliogabetua: {{description}}",
+      "voidedStatus": "Baliogabetua"
     },
     "title": "Erosi kredituak",
     "description": "Kredituak Kilo App-en AI kodetze-saioak exekutatzeko zure Kilo saldoari gehitzen zaion behin betiko erosketa bat dira. Dendak zure kontuari kobratzen dio eta kredituak dendak ordainketa baieztatu ondoren gehitzen dira.",

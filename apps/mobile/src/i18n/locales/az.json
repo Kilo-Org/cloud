@@ -91,6 +91,7 @@
     "draft": "Qaralama",
     "enabled": "Aktiv",
     "github": "GitHub",
+    "image": "Şəkil",
     "imageUnavailable": "Şəkil əlçatan deyil.",
     "loading": "Yüklənir…",
     "loadMore": "Daha çox yüklə",
@@ -399,7 +400,7 @@
       "title": "Provayder açarları",
       "rowSubtitle": "Öz provayder ödənişindən istifadə et",
       "orgDescription": "Bu açarlar təşkilatdakı hər kəslə paylaşılır və haqqı təşkilatın provayder hesablarından tutulur.",
-      "viewOnly": "Açarları yalnız təşkilatın sahibi, administratoru və ya ödəniş meneceri dəyişə bilər.",
+      "viewOnly": "Açarları yalnız təşkilatın sahibi, inzibatçısı və ya ödəniş meneceri dəyişə bilər.",
       "description": "Bu açarlarla göndərilən sorğuların haqqı Kilo balansından deyil, provayder hesabından tutulur.",
       "managedByPlan": "Kodlaşdırma planın tərəfindən idarə olunur",
       "enableKey": "{{provider}} açarını aktivləşdir",
@@ -1249,6 +1250,7 @@
     "needsInputAction": {
       "approved": "Sorğu təsdiqləndi",
       "replied": "Cavab göndərildi",
+      "empty": "Cavab yazın, sonra göndərin.",
       "failed": "Cavab vermək olmadı. Yenidən cəhd etmək üçün yenidən toxunun.",
       "unavailable": "Bu sorğu artıq gözləmir."
     }
@@ -2670,6 +2672,7 @@
     "filePart": {
       "loadingImage": "Şəkil yüklənir",
       "imageUnavailableRetry": "Şəkil əlçatan deyil, yenidən yüklə",
+      "imageUnavailableRetryWithAlt": "Şəkil əlçatan deyil, {{alt}}, yenidən yüklə",
       "imagePreviewUnavailableInSession": "Bu sessiyada şəklə önbaxış mümkün deyil.",
       "viewImage": "Şəkilə bax",
       "viewImageWithAlt": "Şəkilə bax: {{alt}}",
@@ -3411,6 +3414,8 @@
     "voiceTranscriptionWho": "Cihazınız, seçdiyiniz transkripsiya modeli ilə Kilo Gateway və ya onlayn tanıma üçün Apple və ya Google.",
     "installAttributionPromptTitle": "Quraşdırma mənbəyini müəyyən etməyə icazə verilsin?",
     "installAttributionPromptMessage": "Kilo Apple-ın izləmə icazəsindən yalnız tətbiqi hansı kanal vasitəsilə tapdığını öyrənmək üçün istifadə edir. Sorğuların və söhbətlərin bunun üçün heç vaxt istifadə olunmur.",
+    "installAttributionRequestFailedTitle": "İzləmə tələbi göstərilə bilmədi",
+    "installAttributionRequestFailedMessage": "Kilo sistem tələbini göstərə bilmədi, buna görə quraşdırma mənbəyinin müəyyən edilməsi deaktiv qalır.",
     "what": "Nə",
     "why": "Niyə",
     "who": "Kim"
@@ -3426,7 +3431,7 @@
   "organization": {
     "auditLog": {
       "title": "Audit jurnalı",
-      "permissionDenied": "Audit jurnalını yalnız Enterprise planındakı təşkilatın sahibi, administratoru və ya ödəniş meneceri oxuya bilər. $t(organization.boundary.accessDeniedDescription)",
+      "permissionDenied": "Audit jurnalını yalnız Enterprise planındakı təşkilatın sahibi, inzibatçısı və ya ödəniş meneceri oxuya bilər. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Audit hadisəsi yoxdur",
       "emptyDescription": "Bu təşkilatda edilən əməliyyatlar burada görünür.",
       "truncated": "Ən son hadisələr göstərilir.",
@@ -3442,7 +3447,7 @@
         "promoCreditGranted": "Promosyon kreditlər verildi",
         "memberRemove": "Üzv çıxarıldı",
         "memberChangeRole": "Üzv rolu dəyişdirildi",
-        "memberAdminAdd": "Administrator əlavə edildi",
+        "memberAdminAdd": "İnzibatçı əlavə edildi",
         "memberAutoJoin": "Üzv avtomatik qoşuldu",
         "ssoAutoProvision": "İstifadəçi SSO tərəfindən təmin edildi",
         "ssoSetDomain": "SSO domeni əlavə edildi",
@@ -3616,7 +3621,7 @@
     },
     "billing": {
       "title": "Ödənişlər",
-      "permissionDenied": "Təşkilatın ödəniş məlumatlarını yalnız sahibi, administratoru və ya ödəniş meneceri görə bilər. $t(organization.boundary.accessDeniedDescription)",
+      "permissionDenied": "Təşkilatın ödəniş məlumatlarını yalnız sahibi, inzibatçısı və ya ödəniş meneceri görə bilər. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Abunəlik",
       "state": "Vəziyyət",
       "stateNone": "Abunəlik yoxdur",
@@ -3732,7 +3737,7 @@
       "limitLabel": "Gündəlik limit (USD)",
       "memberNotFound": "Üzv tapılmadı.",
       "noLimitPlaceholder": "Limit yoxdur",
-      "permissionDenied": "Yalnız təşkilat sahibi və ya administratoru istifadə limitlərini idarə edə bilər.",
+      "permissionDenied": "Yalnız təşkilat sahibi və ya inzibatçısı istifadə limitlərini idarə edə bilər.",
       "removeLimit": "Limiti götür",
       "title": "Gündəlik istifadə limiti",
       "blankError": "Məbləğ daxil et və ya aşağıdakı «Limiti götür» düyməsindən istifadə et.",
@@ -3793,7 +3798,7 @@
       "emptyDescription": "Əvvəlki sorğuları görmək üçün «Əvvəlki saat» düyməsindən istifadə edin.",
       "emptyBoundDescription": "Bundan əvvəlki sorğu jurnalları mövcud deyil.",
       "loadError": "Sorğu jurnallarını yükləmək mümkün olmadı.",
-      "permissionDenied": "Sorğu jurnallarını yalnız təşkilatın sahibi, administratoru və ya ödəniş meneceri oxuya bilər. $t(organization.boundary.accessDeniedDescription)",
+      "permissionDenied": "Sorğu jurnallarını yalnız təşkilatın sahibi, inzibatçısı və ya ödəniş meneceri oxuya bilər. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} giriş · {{output}} çıxış",
       "byok": "BYOK"
     },
@@ -3898,7 +3903,7 @@
     "signupStepUpApple": "Hesabının yaradılmasını tamamlamaq üçün “$t(login.signInWithApple)” seçimini aç.",
     "signupStepUpGoogle": "Hesabının yaradılmasını tamamlamaq üçün “$t(login.signInWithGoogle)” seçimini aç.",
     "signupStepUpBack": "Hesabının yaradılmasını tamamlamaq üçün geri qayıt və “$t(login.moreSignInOptions)” seçimini aç.",
-    "invalidCode": "Bu kod yanlışdır və ya müddəti bitib. Yenidən cəhd et və ya “$t(login.resendCode)” düyməsindən istifadə et.",
+    "invalidCode": "Bu kod yanlışdır və ya müddəti bitib. “$t(login.resendCode)” və ya “$t(login.moreSignInOptions)” düyməsindən istifadə et.",
     "codeInProgress": "Kodun emal edilir. Bir az gözlə və yenidən cəhd et.",
     "tooManyAttempts": "Həddindən çox cəhd edilib. Yeni kod istə.",
     "invalidToken": "Hesaba daxil olmaq mümkün olmadı. Yenidən cəhd et.",
@@ -4212,6 +4217,8 @@
       "discoveryNoModels": "Son nöqtə heç bir model siyahılamadı. Modelləri əl ilə daxil edin.",
       "connectionIncomplete": "Model cavab verdi, lakin tamamlamadı. Yenidən cəhd edin və ya model ID-sini və protokolu yoxlayın.",
       "invalidInput": "Arxa xidmətin adını, etibarlı başlıqları və unikal ID-si və adı olan ən azı bir modeli daxil edin. Token limitləri müsbət tam ədədlər olmalıdır.",
+      "invalidApiKey": "API açarında göndərilə bilməyən simvol var. Yalnız hərflər, rəqəmlər və standart simvollardan istifadə edin, sətir keçidi olmasın.",
+      "invalidHeaders": "Xüsusi başlıq göndərilə bilməz. Onun adını yoxlayın və yalnız hərflər, rəqəmlər və standart simvollardan istifadə edin, sətir keçidi olmasın.",
       "invalidUrl": "Giriş məlumatları, sorğu parametrləri və ya fraqment olmadan HTTP və ya HTTPS API kök ünvanını daxil edin.",
       "publicHttp": "İctimai HTTP son nöqtələrinə icazə verilmir. HTTPS və ya özəl yerli son nöqtədən istifadə edin.",
       "httpApprovalRequired": "Saxlamadan və ya qoşulmadan əvvəl bu yerli HTTP son nöqtəsini təsdiqləyin.",
@@ -4346,7 +4353,15 @@
       "download": "Cihazdakı modeli endir",
       "downloading": "Endirilir…",
       "downloadProgress": "Endirilir… {{percent}}%",
-      "downloadFailed": "Endirmə tamamlanmadı. İnternet bağlantınızı və boş yaddaşı yoxlayın, sonra yenidən cəhd edin."
+      "downloadFailed": "Endirmə tamamlanmadı. İnternet bağlantınızı və boş yaddaşı yoxlayın, sonra yenidən cəhd edin.",
+      "cannotUse": "İcra edilə bilməz: {{items}}.",
+      "cannotUseOptions": "Doldurula bilməz: bəzi alət seçimləri.",
+      "limitations": "Məhdudiyyətlər",
+      "tools": {
+        "time": "Vaxt",
+        "settingsList": "Tənzimləmələri göstər",
+        "settingsSet": "Tənzimləmələri dəyişdir"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Bu model düşünmə səviyyəsini dəstəkləyir"
@@ -4525,6 +4540,7 @@
     "instructionSaveFailed": "Təlimat saxlanıla bilmədi",
     "instructionDeleteFailed": "Təlimat silinə bilmədi",
     "instructionToggleFailed": "Təlimat yenilənə bilmədi",
+    "instructionViewTitle": "Təlimat faylı",
     "instructionLimitReached": "Profildə ən çoxu {{max}} təlimat ola bilər. Yenisini əlavə etmək üçün birini silin.",
     "mcp": {
       "title": "MCP serverləri",
@@ -4699,6 +4715,7 @@
       "emptyDescription": "Kredit alışları, qəbzlər və istifadə burada görünəcək.",
       "emptyTitle": "Kredit tarixçəsi yoxdur",
       "expiredGrant": "Müddəti bitib: {{description}}",
+      "expiredStatus": "Müddəti bitib",
       "googlePlayReceipt": "Google Play qəbzi",
       "kind": {
         "adjustment": "Düzəliş",
@@ -4725,7 +4742,8 @@
       "receiptA11y": "{{description}} üçün {{amount}}, {{date}} tarixli qəbzi açın",
       "receiptUnavailable": "Bu alış üçün qəbz mövcud deyil.",
       "retentionLimit": "Ən son kredit tarixçəsi göstərilir.",
-      "voidedGrant": "Ləğv edilib: {{description}}"
+      "voidedGrant": "Ləğv edilib: {{description}}",
+      "voidedStatus": "Ləğv edilib"
     },
     "title": "Kredit al",
     "description": "Kredit Kilo App-də AI kodlaşdırma sessiyalarını işə salmaq üçün Kilo balansına əlavə olunan birdəfəlik alışdır. Mağaza hesabından ödəniş alır və mağaza ödənişi təsdiqlədikdən sonra kredit əlavə olunur.",
@@ -5142,7 +5160,7 @@
   },
   "organizationGuardrails": {
     "title": "Süni intellekt qoruyucu qaydaları",
-    "permissionDenied": "Süni intellekt qoruyucu qaydalarını yalnız təşkilat sahibləri və adminlər idarə edə bilər. $t(organization.boundary.accessDeniedDescription)",
+    "permissionDenied": "Süni intellekt qoruyucu qaydalarını yalnız təşkilat sahibləri və inzibatçılar idarə edə bilər. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Süni intellekt qoruyucu qaydaları aktivləşdirilməyib",
     "unavailable": "Kilo təşkilat üçün Süni intellekt qoruyucu qaydalarını sorğu əsasında aktivləşdirir. {{supportEmail}} ilə əlaqə saxlayın və Kilo komandası onu təşkilatınız üçün aktivləşdirir.",
     "contactSupport": "Dəstək xidməti ilə əlaqə saxla",
@@ -5284,7 +5302,7 @@
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Enterprise funksiyası",
     "enterpriseOnly": "Provayderlər və modellər Enterprise planında əlçatandır.",
-    "readOnly": "Bu ayarları yalnız təşkilat sahibləri və adminlər dəyişə bilər.",
+    "readOnly": "Bu ayarları yalnız təşkilat sahibləri və inzibatçılar dəyişə bilər.",
     "loadError": "Provayderlər və modellər yüklənmədi",
     "tabModels": "Modellər",
     "tabProviders": "Provayderlər",

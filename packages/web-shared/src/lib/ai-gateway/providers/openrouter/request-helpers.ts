@@ -197,6 +197,17 @@ function setCacheControlOnMessagesSystem(
 }
 
 /**
+ * The two Messages content block types that carry reasoning output: `thinking` and
+ * `redacted_thinking`. One predicate owns that set, so every reader agrees on which blocks
+ * are reasoning.
+ */
+export function isThinkingContentBlock(
+  item: Anthropic.ContentBlockParam
+): item is Anthropic.ThinkingBlockParam | Anthropic.RedactedThinkingBlockParam {
+  return item.type === 'thinking' || item.type === 'redacted_thinking';
+}
+
+/**
  * A Messages content block may carry a cache breakpoint, except a `thinking`
  * or `redacted_thinking` block: those are reasoning output, and a breakpoint
  * belongs on content the model was asked to read.
@@ -207,7 +218,7 @@ export function isCacheableMessagesContentBlock(
   Anthropic.ContentBlockParam,
   Anthropic.ThinkingBlockParam | Anthropic.RedactedThinkingBlockParam
 > {
-  return item.type !== 'thinking' && item.type !== 'redacted_thinking';
+  return !isThinkingContentBlock(item);
 }
 
 function hasCacheableMessagesContent(message: Anthropic.MessageParam) {

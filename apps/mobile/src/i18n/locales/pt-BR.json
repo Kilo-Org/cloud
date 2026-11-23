@@ -93,6 +93,7 @@
     "draft": "Rascunho",
     "enabled": "Ativado",
     "github": "GitHub",
+    "image": "Imagem",
     "imageUnavailable": "A imagem não está disponível.",
     "loading": "Carregando…",
     "loadMore": "Carregar mais",
@@ -647,6 +648,7 @@
     "needsInputAction": {
       "approved": "Solicitação aprovada",
       "replied": "Resposta enviada",
+      "empty": "Escreva uma resposta e depois envie.",
       "failed": "Não foi possível responder. Toque novamente para tentar de novo.",
       "unavailable": "Esta solicitação não está mais aguardando."
     }
@@ -1001,7 +1003,7 @@
       "empty": "Nenhuma revisão com estatísticas ainda",
       "emptyDescription": "As estatísticas registram revisões concluídas enquanto estão ativadas para a organização.",
       "offTitle": "As estatísticas estão desativadas para {{platform}}",
-      "offDescription": "As funções de faturamento da organização (proprietários, administradores e gerentes de faturamento) podem ativar as estatísticas nas configurações da organização na web para registrar revisões concluídas.",
+      "offDescription": "As funções de faturamento da organização (proprietários, administradores e gerentes de cobrança) podem ativar as estatísticas nas configurações da organização na web para registrar revisões concluídas.",
       "couldNotLoad": "Não foi possível carregar as estatísticas",
       "trackedReviewsCaption": "Revisões concluídas neste período com as estatísticas ativadas. Revisões em andamento e com falha nunca são contadas.",
       "trackedReviewsUncounted": "Não contadas: {{displayCount}} das {{displayTotal}} revisões concluídas que a organização tem sem resultado capturado.",
@@ -2118,6 +2120,7 @@
     "filePart": {
       "loadingImage": "Carregando imagem",
       "imageUnavailableRetry": "Imagem indisponível, tentar carregar novamente",
+      "imageUnavailableRetryWithAlt": "Imagem indisponível, {{alt}}, tentar carregar novamente",
       "imagePreviewUnavailableInSession": "A prévia da imagem não está disponível nesta sessão.",
       "viewImage": "Ver imagem",
       "viewImageWithAlt": "Ver imagem {{alt}}",
@@ -2914,6 +2917,8 @@
     "why": "Finalidade",
     "who": "Destinatários",
     "installAttributionPromptMessage": "O Kilo usa a permissão de rastreamento da Apple apenas para saber qual canal trouxe você até aqui. Seus prompts e conversas nunca são usados.",
+    "installAttributionRequestFailedTitle": "Não foi possível mostrar o prompt de rastreamento",
+    "installAttributionRequestFailedMessage": "O Kilo não conseguiu mostrar o prompt do sistema, então a atribuição de instalação continua desativada.",
     "installAttributionPromptTitle": "Permitir atribuição de instalação?"
   },
   "prReview": {
@@ -3834,7 +3839,7 @@
       "pendingInvitation": "Este e-mail já tem um convite pendente.",
       "alreadyMember": "Esta pessoa já é membro desta organização.",
       "seatsFull": "Todos os assentos estão em uso ({{used}}/{{total}}). Peça a um proprietário da organização que adicione assentos antes de convidar mais membros.",
-      "seatsFullCanInviteBilling": "Todos os assentos estão em uso ({{used}}/{{total}}). Você ainda pode convidar gerentes de faturamento, que não ocupam um assento.",
+      "seatsFullCanInviteBilling": "Todos os assentos estão em uso ({{used}}/{{total}}). Você ainda pode convidar gerentes de cobrança, que não ocupam um assento.",
       "noSeatsAvailable": "Todos os assentos estão em uso. Peça a um proprietário da organização que adicione assentos antes de convidar mais membros."
     },
     "invoices": {
@@ -4038,7 +4043,7 @@
     "signupStepUpApple": "Para concluir a criação da sua conta, use '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Para concluir a criação da sua conta, use '$t(login.signInWithGoogle)'.",
     "signupStepUpBack": "Para concluir a criação da sua conta, volte e use '$t(login.moreSignInOptions)'.",
-    "invalidCode": "Esse código está incorreto ou expirou. Tente novamente ou use '$t(login.resendCode)'.",
+    "invalidCode": "Esse código está incorreto ou expirou. Use '$t(login.resendCode)' ou '$t(login.moreSignInOptions)'.",
     "codeInProgress": "Seu código está sendo processado. Aguarde um momento e tente novamente.",
     "tooManyAttempts": "Muitas tentativas. Solicite um novo código.",
     "invalidToken": "Não foi possível entrar. Tente novamente.",
@@ -4370,6 +4375,8 @@
       "discoveryNoModels": "O endereço de acesso não listou nenhum modelo. Insira modelos manualmente.",
       "connectionIncomplete": "O modelo respondeu, mas não concluiu. Tente novamente ou verifique o ID do modelo e o protocolo.",
       "invalidInput": "Insira um nome de servidor, cabeçalhos válidos e pelo menos um modelo com ID e nome exclusivos. Os limites de tokens devem ser números inteiros positivos.",
+      "invalidApiKey": "A chave de API contém um caractere que não pode ser enviado. Use apenas letras, dígitos e símbolos padrão, sem quebras de linha.",
+      "invalidHeaders": "Um cabeçalho personalizado não pode ser enviado. Verifique o nome dele e use apenas letras, dígitos e símbolos padrão, sem quebras de linha.",
       "invalidUrl": "Insira uma URL raiz de API HTTP ou HTTPS sem credenciais, parâmetros de consulta ou fragmento.",
       "publicHttp": "Endereços de acesso HTTP públicos não são permitidos. Use HTTPS ou um endereço de acesso local privado.",
       "httpApprovalRequired": "Autorize este endereço de acesso HTTP local antes de salvar ou conectar.",
@@ -4504,7 +4511,15 @@
       "download": "Baixar modelo no dispositivo",
       "downloading": "Baixando…",
       "downloadProgress": "Baixando… {{percent}}%",
-      "downloadFailed": "O download não foi concluído. Verifique sua conexão e o espaço livre e tente novamente."
+      "downloadFailed": "O download não foi concluído. Verifique sua conexão e o espaço livre e tente novamente.",
+      "cannotUse": "Não é possível executar: {{items}}.",
+      "cannotUseOptions": "Não é possível preencher: algumas opções de ferramenta.",
+      "limitations": "Limitações",
+      "tools": {
+        "time": "Hora",
+        "settingsList": "Mostrar configurações",
+        "settingsSet": "Alterar configurações"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Este modelo aceita esforço de raciocínio"
@@ -4693,6 +4708,7 @@
     "instructionSaveFailed": "Não foi possível salvar a instrução",
     "instructionDeleteFailed": "Não foi possível excluir a instrução",
     "instructionToggleFailed": "Não foi possível atualizar a instrução",
+    "instructionViewTitle": "Arquivo de instrução",
     "instructionLimitReached": "Um perfil pode ter até {{max}} instruções. Exclua uma para adicionar outra.",
     "mcp": {
       "title": "Servidores MCP",
@@ -4869,6 +4885,7 @@
       "emptyDescription": "Compras de créditos, recibos e uso aparecerão aqui.",
       "emptyTitle": "Nenhum histórico de créditos",
       "expiredGrant": "Expirado: {{description}}",
+      "expiredStatus": "Expirado",
       "googlePlayReceipt": "Recibo no Google Play",
       "kind": {
         "adjustment": "Ajuste",
@@ -4895,7 +4912,8 @@
       "receiptA11y": "Abrir o recibo de {{description}}, {{amount}}, de {{date}}",
       "receiptUnavailable": "Não há recibo disponível para esta compra.",
       "retentionLimit": "Mostrando o histórico de créditos mais recente.",
-      "voidedGrant": "Cancelado: {{description}}"
+      "voidedGrant": "Cancelado: {{description}}",
+      "voidedStatus": "Cancelado"
     },
     "title": "Comprar créditos",
     "description": "Os créditos são uma compra única adicionada ao seu saldo Kilo para executar sessões de codificação com IA no Kilo App. A loja cobra na sua conta e os créditos são adicionados depois que a loja confirma o pagamento.",

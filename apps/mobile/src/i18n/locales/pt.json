@@ -93,6 +93,7 @@
     "draft": "Rascunho",
     "enabled": "Ativado",
     "github": "GitHub",
+    "image": "Imagem",
     "imageUnavailable": "A imagem não está disponível.",
     "loading": "A carregar…",
     "loadMore": "Carregar mais",
@@ -1305,6 +1306,7 @@
     "needsInputAction": {
       "approved": "Pedido aprovado",
       "replied": "Resposta enviada",
+      "empty": "Escreva uma resposta e envie-a de seguida.",
       "failed": "Não foi possível responder. Toque novamente para tentar de novo.",
       "unavailable": "Este pedido já não está à espera."
     }
@@ -2776,6 +2778,7 @@
     "filePart": {
       "loadingImage": "A carregar a imagem",
       "imageUnavailableRetry": "Imagem indisponível, tentar carregar novamente",
+      "imageUnavailableRetryWithAlt": "Imagem indisponível, {{alt}}, tentar carregar novamente",
       "imagePreviewUnavailableInSession": "A pré-visualização da imagem não está disponível nesta sessão.",
       "viewImage": "Ver imagem",
       "viewImageWithAlt": "Ver imagem {{alt}}",
@@ -3537,6 +3540,8 @@
     "voiceTranscriptionWho": "O teu dispositivo, Kilo Gateway com o modelo de transcrição que escolheres, ou a Apple ou a Google para reconhecimento online.",
     "installAttributionPromptTitle": "Permitir identificar a origem da instalação?",
     "installAttributionPromptMessage": "O Kilo usa a permissão de seguimento da Apple apenas para identificar o canal através do qual conheceu a aplicação. Os seus pedidos e conversas nunca são usados para este fim.",
+    "installAttributionRequestFailedTitle": "Não foi possível mostrar o prompt de seguimento",
+    "installAttributionRequestFailedMessage": "O Kilo não conseguiu mostrar a instrução do sistema, por isso a origem da instalação continua desativada.",
     "what": "O quê",
     "why": "Porquê",
     "who": "Quem"
@@ -4038,7 +4043,7 @@
     "signupStepUpApple": "Para concluir a criação da tua conta, usa '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Para concluir a criação da tua conta, usa '$t(login.signInWithGoogle)'.",
     "signupStepUpBack": "Para concluir a criação da tua conta, volta atrás e usa '$t(login.moreSignInOptions)'.",
-    "invalidCode": "Esse código está incorreto ou expirou. Tenta novamente ou usa '$t(login.resendCode)'.",
+    "invalidCode": "Esse código está incorreto ou expirou. Usa '$t(login.resendCode)' ou '$t(login.moreSignInOptions)'.",
     "codeInProgress": "O teu código está a ser processado. Aguarda um momento e tenta novamente.",
     "tooManyAttempts": "Demasiadas tentativas. Pede um novo código.",
     "invalidToken": "O início de sessão falhou. Tenta novamente.",
@@ -4370,6 +4375,8 @@
       "discoveryNoModels": "O ponto de acesso não listou nenhum modelo. Introduz os modelos manualmente.",
       "connectionIncomplete": "O modelo respondeu mas não terminou. Tenta novamente ou verifica o ID do modelo e o protocolo.",
       "invalidInput": "Introduz um nome de serviço, cabeçalhos válidos e pelo menos um modelo com ID e nome únicos. Os limites de tokens têm de ser números inteiros positivos.",
+      "invalidApiKey": "A chave da API contém um caractere que não pode ser enviado. Utiliza apenas letras, dígitos e símbolos padrão, sem quebras de linha.",
+      "invalidHeaders": "Um cabeçalho personalizado não pode ser enviado. Verifica o nome dele e utiliza apenas letras, dígitos e símbolos padrão, sem quebras de linha.",
       "invalidUrl": "Introduz um URL base da API com HTTP ou HTTPS, sem credenciais, parâmetros de consulta ou fragmentos.",
       "publicHttp": "Não são permitidos pontos de acesso HTTP públicos. Usa HTTPS ou um ponto de acesso local privado.",
       "httpApprovalRequired": "Autoriza este ponto de acesso HTTP local antes de guardar ou estabelecer ligação.",
@@ -4504,7 +4511,15 @@
       "download": "Descarregar modelo no dispositivo",
       "downloading": "A descarregar…",
       "downloadProgress": "A descarregar… {{percent}}%",
-      "downloadFailed": "A transferência não foi concluída. Verifique a ligação e o armazenamento livre e tente novamente."
+      "downloadFailed": "A transferência não foi concluída. Verifique a ligação e o armazenamento livre e tente novamente.",
+      "cannotUse": "Não é possível executar: {{items}}.",
+      "cannotUseOptions": "Não é possível preencher: algumas opções da ferramenta.",
+      "limitations": "Limitações",
+      "tools": {
+        "time": "Hora",
+        "settingsList": "Mostrar configurações",
+        "settingsSet": "Alterar configurações"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Este modelo suporta esforço de raciocínio"
@@ -4693,6 +4708,7 @@
     "instructionSaveFailed": "Não foi possível guardar a instrução",
     "instructionDeleteFailed": "Não foi possível eliminar a instrução",
     "instructionToggleFailed": "Não foi possível atualizar a instrução",
+    "instructionViewTitle": "Ficheiro de instrução",
     "instructionLimitReached": "Um perfil pode ter até {{max}} instruções. Elimine uma para adicionar outra.",
     "mcp": {
       "title": "Servidores MCP",
@@ -4869,6 +4885,7 @@
       "emptyDescription": "Compras, recibos e uso de créditos aparecerão aqui.",
       "emptyTitle": "Nenhum histórico de créditos",
       "expiredGrant": "Expirado: {{description}}",
+      "expiredStatus": "Expirado",
       "googlePlayReceipt": "Recibo do Google Play",
       "kind": {
         "adjustment": "Ajuste",
@@ -4895,7 +4912,8 @@
       "receiptA11y": "Abrir o recibo de {{description}}, {{amount}}, de {{date}}",
       "receiptUnavailable": "Não há recibo disponível para esta compra.",
       "retentionLimit": "A mostrar o histórico de créditos mais recente.",
-      "voidedGrant": "Anulado: {{description}}"
+      "voidedGrant": "Anulado: {{description}}",
+      "voidedStatus": "Anulado"
     },
     "title": "Comprar créditos",
     "description": "Os créditos são uma compra única adicionada ao seu saldo Kilo para executar sessões de programação com IA na aplicação Kilo. A loja cobra na sua conta e os créditos são adicionados depois de a loja confirmar o pagamento.",

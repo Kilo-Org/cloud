@@ -315,6 +315,15 @@ describe('PatchMissingRow repeats nothing from the file row above', () => {
     expect(hasHostNode('Info')).toBe(true);
     expect(hasHostNode('File')).toBe(false);
   });
+
+  it('paints the info glyph in the ink its dark surface can carry', () => {
+    mountPatchlessRow('binary');
+
+    // The notice's raised dark surface drops the muted foreground under the 3:1
+    // a meaningful mark needs, so the glyph takes the same ink as the link.
+    const glyph = renderer?.root.find(node => Object.is(node.type, 'Info'));
+    expect(glyph?.props.color).toBe(themeColors.ink2);
+  });
 });
 
 describe('PatchMissingRow provider link', () => {

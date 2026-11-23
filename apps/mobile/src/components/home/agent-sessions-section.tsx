@@ -69,6 +69,10 @@ export function LiveSessionFeedback({
   compact?: boolean;
 }) {
   const { t } = useTranslation();
+  // The recovery hand-off switches tabs: the profile route belongs to the Tabs
+  // navigator above this screen's own stack, so the action resolves there and
+  // this stack neither grows nor swaps a screen. A navigate is the whole move —
+  // there is no source route to retire, and no native-stack commit to break.
   const router = useRouter();
   const internet = useCommittedConnectivityStatus();
   const { isConnected, reconnectExhausted } = useUserWebConnectionHealth();
@@ -177,7 +181,7 @@ export function LiveSessionFeedback({
             label={t('organization.boundary.backToProfile')}
             icon={DirectionalArrowLeft}
             onPress={() => {
-              router.replace('/(app)/(tabs)/(3_profile)' as Href);
+              router.navigate('/(app)/(tabs)/(3_profile)' as Href);
             }}
           />
         }

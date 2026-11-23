@@ -91,6 +91,7 @@
     "draft": "下書き",
     "enabled": "有効",
     "github": "GitHub",
+    "image": "画像",
     "imageUnavailable": "画像を表示できません。",
     "loading": "読み込み中…",
     "loadMore": "さらに読み込む",
@@ -676,6 +677,7 @@
     "needsInputAction": {
       "approved": "リクエストを承認しました",
       "replied": "返信を送信しました",
+      "empty": "回答を入力してから送信してください。",
       "failed": "回答できませんでした。もう一度タップして再試行してください。",
       "unavailable": "このリクエストは待機中ではなくなりました。"
     }
@@ -1028,7 +1030,7 @@
       "empty": "分析データのあるレビューはまだありません",
       "emptyDescription": "分析機能は、組織で有効になっている間に完了したレビューを記録します。",
       "offTitle": "{{platform}}の分析がオフになっています",
-      "offDescription": "分析をオンにできるのは、組織のオーナー、管理者、請求マネージャーといった請求ロールです。Web 上の組織設定からオンにすると、完了したレビューが記録されます。",
+      "offDescription": "分析をオンにできるのは、組織のオーナー、管理者、請求管理者といった請求ロールです。Web 上の組織設定からオンにすると、完了したレビューが記録されます。",
       "couldNotLoad": "分析を読み込めませんでした",
       "trackedReviewsCaption": "分析が有効な状態でこの期間内に完了したレビューです。実行中のレビューと失敗したレビューは決してカウントされません。",
       "trackedReviewsUncounted": "カウント対象外：この組織の終了済みレビュー {{displayTotal}} 件のうち {{displayCount}} 件は、結果が記録されていません。",
@@ -2097,6 +2099,7 @@
     "filePart": {
       "loadingImage": "画像を読み込み中",
       "imageUnavailableRetry": "画像を表示できません。読み込みを再試行",
+      "imageUnavailableRetryWithAlt": "画像を表示できません。{{alt}}。読み込みを再試行",
       "imagePreviewUnavailableInSession": "このセッションでは画像のプレビューを表示できません。",
       "viewImage": "画像を表示",
       "viewImageWithAlt": "画像「{{alt}}」を表示",
@@ -2840,6 +2843,8 @@
     "why": "利用目的",
     "who": "共有先",
     "installAttributionPromptMessage": "Kiloは、アプリのインストール元を把握するためにのみ、Appleのトラッキング権限を使用します。この目的でプロンプトや会話を使用することはありません。",
+    "installAttributionRequestFailedTitle": "トラッキングの確認を表示できませんでした",
+    "installAttributionRequestFailedMessage": "Kiloはシステムの確認画面を表示できなかったため、インストール元の特定はオフのままです。",
     "installAttributionPromptTitle": "インストール元の特定を許可しますか？"
   },
   "prReview": {
@@ -3898,7 +3903,7 @@
     "signupStepUpApple": "アカウントの作成を完了するには、「$t(login.signInWithApple)」を選択してください。",
     "signupStepUpGoogle": "アカウントの作成を完了するには、「$t(login.signInWithGoogle)」を選択してください。",
     "signupStepUpBack": "アカウントの作成を完了するには、前の画面に戻って「$t(login.moreSignInOptions)」を選択してください。",
-    "invalidCode": "そのコードは正しくないか、有効期限が切れています。もう一度お試しいただくか、「$t(login.resendCode)」を選択してください。",
+    "invalidCode": "そのコードは正しくないか、有効期限が切れています。「$t(login.resendCode)」または「$t(login.moreSignInOptions)」を選択してください。",
     "codeInProgress": "コードを処理中です。しばらく待ってからもう一度お試しください。",
     "tooManyAttempts": "試行回数が多すぎます。新しいコードをリクエストしてください。",
     "invalidToken": "サインインに失敗しました。もう一度お試しください。",
@@ -4212,6 +4217,8 @@
       "discoveryNoModels": "エンドポイントにモデルが一覧にありませんでした。モデルを手動で入力してください。",
       "connectionIncomplete": "モデルは応答しましたが、完了しませんでした。もう一度お試しいただくか、モデルIDとプロトコルを確認してください。",
       "invalidInput": "バックエンド名、有効なヘッダー、および一意のIDと名前を持つモデルを少なくとも1つ入力してください。トークン数の上限には正の整数を指定してください。",
+      "invalidApiKey": "APIキーに送信できない文字が含まれています。英字、数字、標準的な記号のみを使用し、改行を含めないでください。",
+      "invalidHeaders": "カスタムヘッダーを送信できません。名前を確認し、英字、数字、標準的な記号のみを使用して、改行を含めないでください。",
       "invalidUrl": "認証情報、クエリ、フラグメントを含まないHTTPまたはHTTPSのAPIルートURLを入力してください。",
       "publicHttp": "公開HTTPエンドポイントは許可されません。HTTPSまたは非公開のローカルエンドポイントを使用してください。",
       "httpApprovalRequired": "保存または接続する前に、このローカルHTTPエンドポイントを承認してください。",
@@ -4346,7 +4353,15 @@
       "download": "オンデバイスモデルをダウンロード",
       "downloading": "ダウンロード中…",
       "downloadProgress": "ダウンロード中… {{percent}}%",
-      "downloadFailed": "ダウンロードが完了しませんでした。接続と空き容量を確認してから、もう一度お試しください。"
+      "downloadFailed": "ダウンロードが完了しませんでした。接続と空き容量を確認してから、もう一度お試しください。",
+      "cannotUse": "実行できません：{{items}}。",
+      "cannotUseOptions": "入力できません：一部のツールオプション。",
+      "limitations": "制限",
+      "tools": {
+        "time": "時刻",
+        "settingsList": "設定を表示",
+        "settingsSet": "設定を変更"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "このモデルは思考量の指定に対応しています"
@@ -4525,6 +4540,7 @@
     "instructionSaveFailed": "指示を保存できませんでした",
     "instructionDeleteFailed": "指示を削除できませんでした",
     "instructionToggleFailed": "指示を更新できませんでした",
+    "instructionViewTitle": "指示ファイル",
     "instructionLimitReached": "プロファイルには最大{{max}}件の指示を保存できます。追加するには1件削除してください。",
     "mcp": {
       "title": "MCPサーバー",
@@ -4699,6 +4715,7 @@
       "emptyDescription": "クレジットの購入、領収書、使用状況がここに表示されます。",
       "emptyTitle": "クレジット履歴はありません",
       "expiredGrant": "期限切れ: {{description}}",
+      "expiredStatus": "期限切れ",
       "googlePlayReceipt": "領収書は Google Play にあります",
       "kind": {
         "adjustment": "調整",
@@ -4725,7 +4742,8 @@
       "receiptA11y": "{{description}}、{{amount}}、{{date}}の領収書を開く",
       "receiptUnavailable": "この購入の領収書はありません。",
       "retentionLimit": "最新のクレジット履歴を表示しています。",
-      "voidedGrant": "無効化済み: {{description}}"
+      "voidedGrant": "無効化済み: {{description}}",
+      "voidedStatus": "無効化済み"
     },
     "title": "クレジットを購入",
     "description": "クレジットは、Kilo AppでAIコーディングセッションを実行するためにKilo残高に追加される買い切りの購入です。ストアがアカウントに請求し、ストアが支払いを確認した後にクレジットが追加されます。",

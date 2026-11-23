@@ -433,8 +433,6 @@ function addDefaultEntryIssue(
 
 const CustomRouterNameSchema = z.string().trim().min(1).max(MAX_CUSTOM_ROUTER_NAME_LENGTH);
 const EntryKeySchema = z.string().min(1);
-// Write requests carry the entry budget; stored definitions and responses keep parsing rows that
-// predate it, so the read schemas stay permissive.
 const WriteEntryKeySchema = EntryKeySchema.max(MAX_CUSTOM_ROUTER_ENTRY_KEY_LENGTH);
 
 export const CustomRouterDefinitionSchema = z

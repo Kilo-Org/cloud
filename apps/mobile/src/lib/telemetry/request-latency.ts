@@ -4,9 +4,9 @@
  * Pure and total: no React Native or Expo import, so the node vitest project
  * can import it — the same discipline as `network-errors.ts`. The app measures
  * `ttfbMs` (time to response headers) and `totalMs` (the caller's body read)
- * for every tRPC HTTP call, buffers the samples, and hands them to a `send`
- * callback in batches. The sample shape mirrors the `latency-ingest` worker's
- * schema.
+ * for every tRPC response whose body the caller reads, buffers the samples, and
+ * hands them to a `send` callback in batches. The sample shape mirrors the
+ * `latency-ingest` worker's schema.
  *
  * The ingest endpoint is optional at the config boundary: a missing
  * `LATENCY_INGEST_URL` never fails a build — `lib/config.ts` resolves the
@@ -65,12 +65,6 @@ export type LatencyFetchOptions = {
   newId: () => string;
 };
 
-/**
- * Split `<procs>` from a `/api/trpc/<procs>` URL into a procedure list.
- * Returns `[]` for a URL without the tRPC path. Both telemetry producers read
- * the procedure text through `trpcProcedureText`, so neither reports the query
- * string, the fragment or the authority's userinfo.
- */
 export function trpcProceduresFromUrl(url: string): string[] {
   return (trpcProcedureText(url) ?? '').split(',').filter(procedure => procedure.length > 0);
 }
@@ -183,7 +177,6 @@ function headersWithRequestId(
   return headers;
 }
 
-/** Everything a latency sample carries except the two measurements. */
 type LatencyTarget = Omit<LatencySample, 'ttfbMs' | 'totalMs'>;
 
 /**

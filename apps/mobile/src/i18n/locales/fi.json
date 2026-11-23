@@ -91,6 +91,7 @@
     "draft": "Luonnos",
     "enabled": "Käytössä",
     "github": "GitHub",
+    "image": "Kuva",
     "imageUnavailable": "Kuva ei ole saatavilla",
     "loading": "Ladataan…",
     "loadMore": "Lataa lisää",
@@ -1249,6 +1250,7 @@
     "needsInputAction": {
       "approved": "Pyyntö hyväksytty",
       "replied": "Vastaus lähetetty",
+      "empty": "Kirjoita vastaus ja lähetä se.",
       "failed": "Vastaaminen ei onnistunut. Yritä uudelleen napauttamalla.",
       "unavailable": "Tämä pyyntö ei ole enää odottamassa."
     }
@@ -2670,6 +2672,7 @@
     "filePart": {
       "loadingImage": "Ladataan kuvaa",
       "imageUnavailableRetry": "Kuva ei ole käytettävissä. Yritä ladata se uudelleen",
+      "imageUnavailableRetryWithAlt": "Kuva ei ole käytettävissä. {{alt}}. Yritä ladata se uudelleen",
       "imagePreviewUnavailableInSession": "Kuvan esikatselu ei ole käytettävissä tässä istunnossa.",
       "viewImage": "Näytä kuva",
       "viewImageWithAlt": "Näytä kuva {{alt}}",
@@ -3411,6 +3414,8 @@
     "voiceTranscriptionWho": "Laitteesi, Kilo Gateway valitsemallasi puheentunnistusmallilla tai Apple tai Google verkkotunnistusta varten.",
     "installAttributionPromptTitle": "Sallitaanko asennuslähteen tunnistus?",
     "installAttributionPromptMessage": "Kilo käyttää Applen seurantalupaa vain selvittääkseen, mistä kanavasta löysit sovelluksen. Kehotteitasi ja keskustelujasi ei koskaan käytetä tähän.",
+    "installAttributionRequestFailedTitle": "Seurantakehotetta ei voitu näyttää",
+    "installAttributionRequestFailedMessage": "Kilo ei voinut näyttää järjestelmäkehotetta, joten asennuslähteen tunnistus pysyy poissa päältä.",
     "what": "Mitä",
     "why": "Miksi",
     "who": "Kenelle"
@@ -3694,7 +3699,7 @@
       "pendingInvitation": "Tällä sähköpostiosoitteella on jo odottava kutsu.",
       "alreadyMember": "Tämä henkilö on jo tämän organisaation jäsen.",
       "seatsFull": "Kaikki paikat ovat käytössä ({{used}}/{{total}}). Pyydä organisaation omistajaa lisäämään paikkoja ennen kuin kutsut lisää jäseniä.",
-      "seatsFullCanInviteBilling": "Kaikki paikat ovat käytössä ({{used}}/{{total}}). Voit edelleen kutsua laskutuksen hallinnoijia, sillä he eivät vie paikkaa.",
+      "seatsFullCanInviteBilling": "Kaikki paikat ovat käytössä ({{used}}/{{total}}). Voit edelleen kutsua laskutusvastaavia, sillä he eivät vie paikkaa.",
       "noSeatsAvailable": "Kaikki paikat ovat käytössä. Pyydä organisaation omistajaa lisäämään paikkoja ennen kuin kutsut lisää jäseniä."
     },
     "invoices": {
@@ -3898,7 +3903,7 @@
     "signupStepUpApple": "Viimeistele tilin luominen valitsemalla ”$t(login.signInWithApple)”.",
     "signupStepUpGoogle": "Viimeistele tilin luominen valitsemalla ”$t(login.signInWithGoogle)”.",
     "signupStepUpBack": "Palaa takaisin ja viimeistele tilin luominen valitsemalla ”$t(login.moreSignInOptions)”.",
-    "invalidCode": "Koodi on virheellinen tai vanhentunut. Yritä uudelleen tai valitse ”$t(login.resendCode)”.",
+    "invalidCode": "Koodi on virheellinen tai vanhentunut. Käytä ”$t(login.resendCode)” tai valitse ”$t(login.moreSignInOptions)”.",
     "codeInProgress": "Koodiasi käsitellään. Odota hetki ja yritä uudelleen.",
     "tooManyAttempts": "Liian monta yritystä. Pyydä uusi koodi.",
     "invalidToken": "Kirjautuminen epäonnistui. Yritä uudelleen.",
@@ -4212,6 +4217,8 @@
       "discoveryNoModels": "Päätepiste ei luetellut malleja. Lisää mallit käsin.",
       "connectionIncomplete": "Malli vastasi mutta ei suorittanut pyyntöä loppuun. Yritä uudelleen tai tarkista mallin tunniste ja protokolla.",
       "invalidInput": "Anna taustapalvelun nimi, kelvolliset otsakkeet ja vähintään yksi malli, jolla on yksilöllinen tunniste ja nimi. Tokenrajojen on oltava positiivisia kokonaislukuja.",
+      "invalidApiKey": "API-avain sisältää merkin, jota ei voi lähettää. Käytä vain kirjaimia, numeroita ja tavallisia symboleja ilman rivinvaihtoja.",
+      "invalidHeaders": "Mukautettua otsaketta ei voi lähettää. Tarkista sen nimi ja käytä vain kirjaimia, numeroita ja tavallisia symboleja ilman rivinvaihtoja.",
       "invalidUrl": "Anna API:n HTTP- tai HTTPS-juuriosoite ilman tunnistetietoja, kyselyä tai fragmenttia.",
       "publicHttp": "Julkisia HTTP-päätepisteitä ei sallita. Käytä HTTPS-yhteyttä tai yksityistä paikallista päätepistettä.",
       "httpApprovalRequired": "Hyväksy tämä paikallinen HTTP-päätepiste ennen tallentamista tai yhteyden muodostamista.",
@@ -4346,7 +4353,15 @@
       "download": "Lataa laitteessa toimiva malli",
       "downloading": "Ladataan…",
       "downloadProgress": "Ladataan… {{percent}} %",
-      "downloadFailed": "Lataus ei valmistunut. Tarkista verkkoyhteys ja vapaa tallennustila ja yritä sitten uudelleen."
+      "downloadFailed": "Lataus ei valmistunut. Tarkista verkkoyhteys ja vapaa tallennustila ja yritä sitten uudelleen.",
+      "cannotUse": "Ei voi suorittaa: {{items}}.",
+      "cannotUseOptions": "Ei voi täyttää: joitakin työkalun valintoja.",
+      "limitations": "Rajoitukset",
+      "tools": {
+        "time": "Aika",
+        "settingsList": "Näytä asetukset",
+        "settingsSet": "Muuta asetuksia"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Tämä malli tukee päättelyn tasoa"
@@ -4525,6 +4540,7 @@
     "instructionSaveFailed": "Ohjeen tallennus epäonnistui",
     "instructionDeleteFailed": "Ohjeen poisto epäonnistui",
     "instructionToggleFailed": "Ohjetta ei voitu päivittää",
+    "instructionViewTitle": "Ohjetiedosto",
     "instructionLimitReached": "Profiiliin mahtuu enintään {{max}} ohjetta. Poista yksi lisätäksesi toisen.",
     "mcp": {
       "title": "MCP-palvelimet",
@@ -4699,6 +4715,7 @@
       "emptyDescription": "Krediittien ostot, kuitit ja käyttö näkyvät täällä.",
       "emptyTitle": "Ei krediittihistoriaa",
       "expiredGrant": "Vanhentunut: {{description}}",
+      "expiredStatus": "Vanhentunut",
       "googlePlayReceipt": "Kuitti Google Playssa",
       "kind": {
         "adjustment": "Oikaisu",
@@ -4725,7 +4742,8 @@
       "receiptA11y": "Avaa kuitti: {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Tälle ostolle ei ole saatavilla kuittia.",
       "retentionLimit": "Näytetään uusin krediittihistoria.",
-      "voidedGrant": "Mitätöity: {{description}}"
+      "voidedGrant": "Mitätöity: {{description}}",
+      "voidedStatus": "Mitätöity"
     },
     "title": "Osta krediittejä",
     "description": "Krediitit ovat kertaostos, joka lisätään Kilo-saldoosi AI-koodausistuntojen ajamista varten Kilo-sovelluksessa. Kauppa veloittaa tiliäsi ja krediitit lisätään, kun kauppa vahvistaa maksun.",

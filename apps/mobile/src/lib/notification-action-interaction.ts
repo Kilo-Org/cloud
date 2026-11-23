@@ -26,12 +26,14 @@
  *   the notification offered was approved; the ack stops it showing as
  *   waiting).
  * - `retryable` — a transport / tRPC failure, or nothing was sent because the
- *   raise had not reached the atoms yet (blank reply text, a pending raise of
- *   the other kind, a reply whose still-raised session holds no question, a
- *   wait budget that expired before a live transport opened, a session that
- *   resolved read-only, or an outcome-time status read that failed): the raise
- *   may still be live, so the caller keeps the actions and the user can tap
- *   again.
+ *   raise had not reached the atoms yet (a pending raise of the other kind, a
+ *   reply whose still-raised session holds no question, a wait budget that
+ *   expired before a live transport opened, a session that resolved read-only,
+ *   or an outcome-time status read that failed): the raise may still be live,
+ *   so the caller keeps the actions and the user can tap again.
+ * - `empty` — nothing was sent because the reply carried no visible
+ *   characters. The raise is untouched, so the caller keeps the actions
+ *   without restoring the break-through: a non-answer must not interrupt.
  * - `unavailable` — the session read returned `NOT_FOUND`; the session does
  *   not wait on the raise the notification presented; or a live transport opened,
  *   replayed its snapshot, and reported no raise of either kind while the
@@ -72,7 +74,7 @@ import { createNativeUserWebConnectionLifecycleHooks } from '@/lib/user-web-conn
 
 export type NeedsInputAction = 'approve' | 'reply';
 
-export type NeedsInputActionOutcome = 'ok' | 'retryable' | 'unavailable';
+export type NeedsInputActionOutcome = 'ok' | 'retryable' | 'unavailable' | 'empty';
 
 /** The id-bearing shape both standalone pending-request atoms hold. */
 type PendingRequest = { requestId: string };
@@ -190,11 +192,10 @@ export async function runNeedsInputInteraction({
   const replyText = text ?? '';
   // A reply with no answer text has nothing to send. Nothing is created and
   // the raise is untouched: the notification keeps its actions so the user can
-  // tap Reply again with text, so the outcome is retryable, not gone. The same
-  // predicate the composer sends on decides this, so a reply of only invisible
-  // characters is no answer here either.
+  // tap Reply again with text. The same predicate the composer sends on decides
+  // this, so a reply of only invisible characters is no answer here either.
   if (action === 'reply' && !hasVisibleComposerText(replyText)) {
-    return 'retryable';
+    return 'empty';
   }
 
   const now = deps?.now ?? Date.now;
@@ -259,13 +260,6 @@ export async function runNeedsInputInteraction({
         pollIntervalMs,
       });
       if (requestId === null) {
-        // No raise of this kind reached the atoms inside the budget and
-        // nothing was sent. The budget alone is not proof the raise is gone:
-        // with the app closed, a cold headless start (ticket mint, connect,
-        // snapshot replay) can exceed it while the raise is still live. Only a
-        // proven live snapshot (see `liveSnapshotLanded`) makes the empty
-        // atoms authoritative — then the raise's outcome is decided by the
-        // session's own raise state (see `resolveMissingRequestId`).
         const resolution = await resolveMissingRequestId({
           store,
           manager,
@@ -293,9 +287,6 @@ export async function runNeedsInputInteraction({
           return 'retryable';
         }
       }
-      // The wait can span a raise: re-read the row immediately before sending,
-      // so the request is answered only while the session waits on the raise
-      // the notification presents.
       const gate = await presentedRaiseGate({ getSession, kiloSessionId, action, raiseId, ack });
       if (gate !== 'answer') {
         return gate;
@@ -491,7 +482,7 @@ async function resolveMissingRequestId(args: {
   return { kind: 'ended', outcome: 'unavailable' };
 }
 
-/* eslint-disable @typescript-eslint/promise-function-async, require-await -- thin trpc / stored-value / timer passthroughs */
+/* eslint-disable require-await -- thin trpc / stored-value / timer passthroughs */
 async function defaultGetSession(kiloSessionId: string): Promise<SessionRow> {
   return trpcClient.cliSessionsV2.get.query({ session_id: kiloSessionId });
 }
@@ -513,7 +504,7 @@ async function defaultSleep(ms: number): Promise<void> {
     setTimeout(resolve, ms);
   });
 }
-/* eslint-enable @typescript-eslint/promise-function-async, require-await */
+/* eslint-enable require-await */
 
 /**
  * The real manager: the same construction `session-provider.tsx` performs,

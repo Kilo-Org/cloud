@@ -4,6 +4,7 @@ import {
   isClaudeModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/claude-model';
 import type { GatewayMessagesRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import { isThinkingContentBlock } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
 import type { TransformRequestContext } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import {
   isWhitespaceOnlyMessage,
@@ -40,9 +41,7 @@ function stripHistoricalThinkingBlocks(
       cleanedMessages.push(message);
       continue;
     }
-    const content = message.content.filter(
-      block => block.type !== 'thinking' && block.type !== 'redacted_thinking'
-    );
+    const content = message.content.filter(block => !isThinkingContentBlock(block));
     if (content.length === message.content.length) {
       cleanedMessages.push(message);
       continue;

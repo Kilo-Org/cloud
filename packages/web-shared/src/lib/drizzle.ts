@@ -380,11 +380,7 @@ export function createReadDb(dbs: DrizzleDatabase[]): DrizzleDatabase {
 }
 
 /**
- * Default database instance - connects to the primary database.
- * Use this for writes and for reads that need strong consistency.
- *
- * For read-heavy operations that can tolerate replication lag,
- * consider using `readDb` instead for better performance in US regions.
+ * Alias of `primaryDb`; use `readDb` for lag-tolerant read-heavy queries.
  */
 export const db = primaryDb;
 

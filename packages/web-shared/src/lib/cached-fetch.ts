@@ -108,12 +108,6 @@ export function createCachedFetch<T>(
         cached = { value, state: 'fresh', at: now() };
         return value;
       } catch (error) {
-        // Concurrent callers share this promise, so the refresh never rejects.
-        // The attempt runs at most once per backoff window, so reporting here
-        // reports each failure window once. The stored entry is a failure
-        // state, not a fresh one, so the freshness check cannot mask the
-        // backoff window with a still-fresh last-known-good value, whatever
-        // origin the clock has.
         // A failure keeps serving what the entry already served: a value a
         // successful fetch stored is the last-known-good one, and a previous
         // failure's fallback is still whatever it served, so a repeated failure

@@ -45,7 +45,6 @@ const OTHER = 'other';
  */
 const VERSION_MAX_LENGTH = 32;
 
-/** Accepted request-id shape: 1-64 characters from a bounded character set. */
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9._:-]{1,64}$/;
 
 function readAllowlisted(
@@ -157,9 +156,7 @@ export function buildTimingLine(input: TimingLineInput): TimingLine {
 export type RestRouteHandler<Ctx> = (request: Request, ctx?: Ctx) => Promise<Response> | Response;
 
 /**
- * The wrapped handler. `ctx` is optional because Next only passes a context to
- * dynamic routes, and existing callers (route tests, helpers) invoke a handler
- * with the request alone. It always returns a promise: the wrapper awaits the
+ * The wrapped handler. It always returns a promise: the wrapper awaits the
  * handler, so callers can chain `.then`/`.catch` as they did before wrapping.
  */
 export type TimedRestRouteHandler<Ctx> = (request: Request, ctx?: Ctx) => Promise<Response>;

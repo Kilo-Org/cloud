@@ -475,7 +475,9 @@ describe('ImageViewer mounted', () => {
         false
       );
       expect(announcedMessage(renderer.root)).toBe('Image unavailable');
-      expect(first(findByType(renderer.root, 'Image'), 'second settled Image')).toBe(repressedImage);
+      expect(first(findByType(renderer.root, 'Image'), 'second settled Image')).toBe(
+        repressedImage
+      );
 
       renderer.unmount();
     } finally {

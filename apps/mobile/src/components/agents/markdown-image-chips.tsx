@@ -1,4 +1,4 @@
-import { Pressable } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { AlertCircle, Download } from '@/components/ui/icons';
@@ -46,30 +46,41 @@ export function BlockedImageChip({
   const host = kind === 'http' ? formatTrustedImageHost(uri) : null;
   const description = alt.trim();
   const label = chipLine([description, host, t('agentChat.markdownImage.httpsOnly')]);
+  const body = (
+    <>
+      <AlertCircle size={14} color={colors.mutedForeground} />
+      <Text className="shrink text-xs text-muted-foreground" numberOfLines={2}>
+        {label}
+      </Text>
+    </>
+  );
+  const chrome =
+    'flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 dark:bg-neutral-900';
+  const linkActions = onShowLinkActions ? getLinkAccessibilityActions(true) : undefined;
+  // A chip with no gesture is plain content: no pressable host, so it neither
+  // flashes nor grows to a touch target nobody can use.
+  if (!onPress && !onShowLinkActions) {
+    return (
+      <View className={chrome} accessibilityRole="text" accessibilityLabel={label}>
+        {body}
+      </View>
+    );
+  }
   return (
     <Pressable
       onPress={onPress}
       onLongPress={onShowLinkActions}
-      className={cn(
-        // A chip with no gesture keeps the compact footprint it has always had;
-        // one that answers a tap or a long press is a full-size target.
-        (onPress ?? onShowLinkActions) && TOUCH_TARGET_CLASS,
-        'flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 dark:bg-neutral-900',
-        onPress && 'active:opacity-80'
-      )}
+      className={cn(TOUCH_TARGET_CLASS, chrome, onPress && 'active:opacity-80')}
       accessibilityRole={onPress ? 'link' : 'text'}
       accessibilityLabel={label}
-      accessibilityActions={onShowLinkActions ? getLinkAccessibilityActions(true) : undefined}
+      accessibilityActions={linkActions}
       onAccessibilityAction={event => {
         if (event.nativeEvent.actionName === 'showLinkActions') {
           onShowLinkActions?.();
         }
       }}
     >
-      <AlertCircle size={14} color={colors.mutedForeground} />
-      <Text className="shrink text-xs text-muted-foreground" numberOfLines={2}>
-        {label}
-      </Text>
+      {body}
     </Pressable>
   );
 }

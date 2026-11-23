@@ -235,8 +235,8 @@ describe('MarkdownImage inert-until-load', () => {
   it('renders http and data URIs as static chips without fetching', async () => {
     const httpRenderer = await mount('http://insecure.com/a.png');
     expect(ofType(httpRenderer.root, 'Image')).toHaveLength(0);
-    // The chip itself is the one long-pressable element; it never loads.
-    expect(ofType(httpRenderer.root, 'Pressable')).toHaveLength(1);
+    // Nothing to press without a link: the chip is plain content, never a button.
+    expect(ofType(httpRenderer.root, 'Pressable')).toHaveLength(0);
     expect(texts(httpRenderer.root)).toContain(
       '\u2068insecure.com\u2069 · \u2068HTTPS images only\u2069'
     );
@@ -245,7 +245,7 @@ describe('MarkdownImage inert-until-load', () => {
 
     const dataRenderer = await mount('data:image/png;base64,abc');
     expect(ofType(dataRenderer.root, 'Image')).toHaveLength(0);
-    expect(ofType(dataRenderer.root, 'Pressable')).toHaveLength(1);
+    expect(ofType(dataRenderer.root, 'Pressable')).toHaveLength(0);
     expect(texts(dataRenderer.root)).toContain('\u2068HTTPS images only\u2069');
     expect(slotCount(dataRenderer.root, 4 / 3)).toBe(0);
     await unmount(dataRenderer);
@@ -682,12 +682,12 @@ describe('MarkdownImage trusted-host policy', () => {
     trustImageHost('insecure.com');
     const httpRenderer = await mount('http://insecure.com/a.png');
     expect(ofType(httpRenderer.root, 'Image')).toHaveLength(0);
-    expect(ofType(httpRenderer.root, 'Pressable')).toHaveLength(1);
+    expect(ofType(httpRenderer.root, 'Pressable')).toHaveLength(0);
     await unmount(httpRenderer);
 
     const dataRenderer = await mount('data:image/png;base64,abc');
     expect(ofType(dataRenderer.root, 'Image')).toHaveLength(0);
-    expect(ofType(dataRenderer.root, 'Pressable')).toHaveLength(1);
+    expect(ofType(dataRenderer.root, 'Pressable')).toHaveLength(0);
     await unmount(dataRenderer);
   });
 });
@@ -703,7 +703,7 @@ describe('MarkdownImage chip descriptions and long press', () => {
     expect(texts(renderer.root)).toContain(
       '\u2068A chart\u2069 · \u2068insecure.com\u2069 · \u2068HTTPS images only\u2069'
     );
-    const chip = ofType(renderer.root, 'Pressable')[0];
+    const chip = ofType(renderer.root, 'View')[0];
     if (!chip) {
       throw new Error('blocked chip not found');
     }
@@ -719,7 +719,7 @@ describe('MarkdownImage chip descriptions and long press', () => {
   it('puts the alt text in front of a data URI chip reason', async () => {
     const renderer = await mount('data:image/png;base64,abc', 'A chart');
     expect(texts(renderer.root)).toContain('\u2068A chart\u2069 · \u2068HTTPS images only\u2069');
-    expect(ofType(renderer.root, 'Pressable')[0]?.props.accessibilityLabel).toBe(
+    expect(ofType(renderer.root, 'View')[0]?.props.accessibilityLabel).toBe(
       '\u2068A chart\u2069 · \u2068HTTPS images only\u2069'
     );
     expect(ofType(renderer.root, 'Image')).toHaveLength(0);
@@ -749,17 +749,17 @@ describe('MarkdownImage chip descriptions and long press', () => {
     await unmount(renderer);
   });
 
-  it('keeps the blocked chip inert and unflashed without a link press', async () => {
+  it('keeps the blocked chip inert without a link or link actions', async () => {
     const renderer = await mount('http://insecure.com/a.png', 'A chart');
-    const chip = ofType(renderer.root, 'Pressable')[0];
+    // Nothing to press, nothing to grow: no pressable host at all.
+    expect(ofType(renderer.root, 'Pressable')).toHaveLength(0);
+    const chip = ofType(renderer.root, 'View')[0];
     if (!chip) {
       throw new Error('blocked chip not found');
     }
-    expect(chip.props.onPress).toBeUndefined();
     expect(chip.props.accessibilityRole).toBe('text');
-    expect(String(chip.props.className)).not.toContain('active:opacity-80');
-    // No gesture, no growth: the chip keeps the compact height it always had.
     expect(String(chip.props.className)).not.toContain(TOUCH_TARGET_CLASS);
+    expect(String(chip.props.className)).not.toContain('active:opacity-80');
 
     await unmount(renderer);
   });

@@ -32,6 +32,7 @@ async function fixture() {
   let descriptor: RootfsArchiveDescriptor | undefined;
   let stored: Buffer | undefined;
   let requests = 0;
+  let prepares = 0;
   let verified = false;
   let grantHost = 'customer-artifacts.s3.us-east-1.amazonaws.com';
   let failVerification = false;
@@ -45,8 +46,9 @@ async function fixture() {
     client: {
       async prepareArchiveUpload(value) {
         descriptor = value;
+        prepares++;
         return {
-          url: `https://${grantHost}/${awsArchiveObjectKey(identity)}?synthetic-signature=fixture`,
+          url: `https://${grantHost}/${awsArchiveObjectKey(identity)}?synthetic-signature=${prepares}`,
           headers: {
             'content-type': 'application/x-tar',
             'if-none-match': '*',
@@ -69,6 +71,9 @@ async function fixture() {
       const request = new Request(url, init);
       expect(request.headers.get('if-none-match')).toBe('*');
       expect(request.redirect).toBe('error');
+      // Only the latest capability is still valid; storage rejects an expired signature.
+      if (url.searchParams.get('synthetic-signature') !== String(prepares))
+        return new Response(null, { status: 403 });
       if (stored) return new Response(null, { status: 412 });
       stored = Buffer.from(await request.arrayBuffer());
       // Storage committed the object, but the reply did not reach the builder.
@@ -83,6 +88,7 @@ async function fixture() {
   return {
     archive,
     requests: () => requests,
+    prepares: () => prepares,
     verified: () => verified,
     stored: () => stored,
     descriptor: () => descriptor,
@@ -121,6 +127,8 @@ describe.skipIf(process.platform !== 'linux')('AWS builder archive upload', () =
     try {
       await f.archive.captureAndUpload();
       expect(f.requests()).toBe(2);
+      // The retry signs a fresh capability, so a PUT that outlived the first one still lands.
+      expect(f.prepares()).toBe(2);
       expect(f.verified()).toBe(true);
       expect(f.descriptor()?.fileCount).toBeGreaterThan(0);
       expect(f.stored()?.includes(Buffer.from('prepared-tool'))).toBe(true);

@@ -38,38 +38,45 @@ export async function createAwsFilesystemBuildArchive(input: {
     baselinePath: path.join(scratch, 'baseline.json'),
     archivePath: path.join(scratch, 'environment.tar'),
   };
+  const objectHost = `${base.bucket}.s3.${base.region}.amazonaws.com`;
+  const objectPath = '/' + awsArchiveObjectKey(input.identity);
+  /** A capability expires within ten minutes, so every PUT attempt uses a fresh one. */
+  async function signUpload(descriptor: RootfsArchiveDescriptor) {
+    const grant = await input.client.prepareArchiveUpload(descriptor, input.signal);
+    input.signal.throwIfAborted();
+    // A parse error can repeat the signed URL, so it never reaches the log.
+    const url = URL.canParse(grant.url) ? new URL(grant.url) : null;
+    if (
+      !url ||
+      url.protocol !== 'https:' ||
+      url.host !== objectHost ||
+      url.username ||
+      url.password ||
+      url.hash ||
+      url.pathname !== objectPath ||
+      grant.headers['x-amz-checksum-sha256'] !==
+        Buffer.from(descriptor.sha256, 'hex').toString('base64')
+    )
+      throw new Error('Invalid archive upload capability');
+    return { url, headers: grant.headers };
+  }
   return {
     baseline: () => baselineRootFilesystem(location),
     async captureAndUpload() {
       try {
         const descriptor = await captureRootFilesystem(location);
-        const grant = await input.client.prepareArchiveUpload(descriptor, input.signal);
-        input.signal.throwIfAborted();
-        // A parse error can repeat the signed URL, so it never reaches the log.
-        const url = URL.canParse(grant.url) ? new URL(grant.url) : null;
-        const checksum = Buffer.from(descriptor.sha256, 'hex').toString('base64');
-        if (
-          !url ||
-          url.protocol !== 'https:' ||
-          url.host !== `${base.bucket}.s3.${base.region}.amazonaws.com` ||
-          url.username ||
-          url.password ||
-          url.hash ||
-          url.pathname !== '/' + awsArchiveObjectKey(input.identity) ||
-          grant.headers['x-amz-checksum-sha256'] !== checksum
-        )
-          throw new Error('Invalid archive upload capability');
         const file = Bun.file(location.archivePath);
         if (file.size !== descriptor.size) throw new Error('Environment archive changed');
         let accepted = false;
         // A lost PUT reply is safe to retry: the same checksum/key is reserved and every PUT requires absence.
         for (let attempt = 0; attempt < 3; attempt++) {
           input.signal.throwIfAborted();
+          const upload = await signUpload(descriptor);
           let response: Response;
           try {
-            response = await send(url, {
+            response = await send(upload.url, {
               method: 'PUT',
-              headers: grant.headers,
+              headers: upload.headers,
               body: file,
               redirect: 'error',
               signal: input.signal,

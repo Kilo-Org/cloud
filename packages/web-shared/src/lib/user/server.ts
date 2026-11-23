@@ -73,6 +73,7 @@ import {
 } from '@kilocode/worker-utils/cloud-agent-authority';
 import { KILO_API_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import {
+  KILO_EXCHANGE_SAFE_CLAIM_NAMES,
   isKiloCredentialExchangeEligible,
   verifyKiloTokenForPolicy,
   type KiloCredentialExchangeEligibilityPolicy,
@@ -519,21 +520,18 @@ export async function getUserFromBearerForCredentialExchange(
   return result;
 }
 
-const accountBearerClaimNames: ReadonlySet<string> = new Set([
-  'version',
-  'kiloUserId',
-  'apiTokenPepper',
-  'env',
-  'iat',
-  'exp',
-  'aud',
-  'tokenPurpose',
-  'credentialExchange',
-  'deviceAuthRequestCode',
+// Spreading the shared `ReadonlySet<string>` widens the literal array to `string[]`, so the
+// `satisfies` that used to type-check the whole allow-list sits on the account-only claims.
+const accountOnlyClaimNames = [
   'deviceSessionId',
   'organizationId',
   'organizationRole',
-] satisfies (keyof KiloTokenPolicyClaims)[]);
+] satisfies (keyof KiloTokenPolicyClaims)[];
+
+export const accountBearerClaimNames: ReadonlySet<string> = new Set([
+  ...KILO_EXCHANGE_SAFE_CLAIM_NAMES,
+  ...accountOnlyClaimNames,
+]);
 
 export async function getUserFromAccountBearer(requestHeaders: Headers): Promise<GetAuthResponse> {
   const auth = await verifyKiloApiBearer(requestHeaders);

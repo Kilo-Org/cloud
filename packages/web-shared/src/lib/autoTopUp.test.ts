@@ -39,6 +39,7 @@ import crypto from 'node:crypto';
 import Stripe from 'stripe';
 import { getPaidCreditTerms } from '@kilocode/web-shared/lib/paidCreditPolicy.server';
 import { chargeDecide } from '@kilocode/web-shared/lib/bouncer/client';
+import { captureMessage } from '@sentry/nextjs';
 
 // Convert dollars to microdollars
 const toMicrodollars = (dollars: number) => dollars * 1_000_000;
@@ -48,6 +49,12 @@ const ORG_AUTO_TOP_UP_THRESHOLD_DOLLARS = DEFAULT_ORG_AUTO_TOP_UP_THRESHOLD_CENT
 jest.mock('@kilocode/web-shared/lib/email', () => ({
   sendAutoTopUpFailedEmail: jest.fn().mockResolvedValue({ sent: true }),
 }));
+
+// A refusal stays a log line; the test asserts no Sentry event is captured.
+jest.mock('@sentry/nextjs', () => {
+  const actual = jest.requireActual('@sentry/nextjs');
+  return { __esModule: true, ...actual, captureException: jest.fn(), captureMessage: jest.fn() };
+});
 
 // The automatic top-up asks bouncer for a verdict. A test sets the answer it needs.
 jest.mock('@kilocode/web-shared/lib/bouncer/client', () => {
@@ -1287,6 +1294,7 @@ describe('automatic top-up charge standing', () => {
     });
     expect(savedUser?.auto_top_up_enabled).toBe(true);
     expect(sendAutoTopUpFailedEmail).not.toHaveBeenCalled();
+    expect(captureMessage).not.toHaveBeenCalled();
 
     expect(mockChargeDecide).toHaveBeenCalledTimes(1);
     const request = mockChargeDecide.mock.calls[0]?.[0];

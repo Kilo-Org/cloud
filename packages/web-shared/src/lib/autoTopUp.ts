@@ -258,6 +258,15 @@ async function maybePerformAutoTopUpForEntity(entity: AutoTopUpEntity): Promise<
     return;
   }
 
+  if (!result.success && result.error === 'charge_refused') {
+    logExceptInTest(`Auto-top-up charge refused for ${entityLabel}`, {
+      traceId,
+      entity_type: entity.type,
+      entity_id: entityId,
+    });
+    return;
+  }
+
   if (result.success) {
     logExceptInTest(`Auto-top-up successful for ${entityLabel}`, {
       traceId,
@@ -360,11 +369,6 @@ async function performAutoTopUpForEntity(
       requestId: `auto_topup:${config.id}:${traceId}`,
     });
     if (chargeVerdict?.enforced) {
-      logExceptInTest(`Auto-top-up charge refused for ${entityLabel}`, {
-        traceId,
-        entity_type: entity.type,
-        entity_id: ownerId,
-      });
       return failureResult('charge_refused');
     }
 

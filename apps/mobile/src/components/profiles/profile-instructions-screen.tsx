@@ -10,7 +10,10 @@ import {
   InstructionFormSheet,
   type InstructionFormSubmission,
 } from '@/components/profiles/instruction-form-sheet';
-import { InstructionViewSheet } from '@/components/profiles/instruction-view-sheet';
+import {
+  type InstructionView,
+  InstructionViewSheet,
+} from '@/components/profiles/instruction-view-sheet';
 import { ProfileManageSlot } from '@/components/profiles/profile-manage-slot';
 import { selectProfileReadErrorView } from '@/components/profiles/profile-read-error-view';
 import { ProfileSectionHeader } from '@/components/profiles/profile-section-header';
@@ -88,7 +91,11 @@ function hasUsableMessage(error: unknown): boolean {
  *
  * The read-only row keeps the switch it cannot flip, because whether a rule
  * file is applied is what the member came to read, and it takes no disclosure
- * mark: the title needs every point the trailing cell does not take.
+ * mark: the title needs every point the trailing cell does not take. That
+ * state also rides the row's spoken value: the row's single accessible press
+ * hides the switch from a reader on iOS, so the value is what keeps an enabled
+ * file from reading the same as a disabled one. The editable row leaves the
+ * value unset, because there the switch stays its own stop with its own state.
  */
 function InstructionRow({
   instruction,
@@ -143,6 +150,11 @@ function InstructionRow({
       onPress={contentIsPress ? onEdit : onView}
       contentAccessibilityLabel={contentAccessibilityLabel}
       accessibilityLabel={rowAccessibilityLabel}
+      accessibilityValue={
+        contentIsPress
+          ? undefined
+          : { text: instruction.enabled ? t('common.enabled') : t('common.disabled') }
+      }
       trailing={{ kind: 'nodes', nodes: trailing }}
     >
       <Text variant="mono" numberOfLines={nameLines} ellipsizeMode="middle" {...HIDDEN_LABEL_PROPS}>
@@ -175,9 +187,7 @@ export function ProfileInstructionsScreen({
   // The row the read-only detail sheet shows the whole file name of. A row that
   // can be edited opens the form instead, so this holds one only in the
   // read-only arm.
-  const [preview, setPreview] = useState<{ id: string; name: string; content: string } | null>(
-    null
-  );
+  const [preview, setPreview] = useState<InstructionView | null>(null);
   const readError = selectProfileReadErrorView({
     error: profileQuery.error,
     connectivity: committedConnectivity,

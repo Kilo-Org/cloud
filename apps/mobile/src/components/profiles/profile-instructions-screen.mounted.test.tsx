@@ -56,9 +56,7 @@ vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
 }));
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
-  // The font-scale module falls back to the window's scale outside its
-  // provider, and the row's chevron reads the interface direction.
-  I18nManager: { isRTL: false },
+  // The font-scale module falls back to the window's scale outside its provider.
   useWindowDimensions: () => ({ fontScale: 1 }),
   View: 'View',
   Pressable: 'Pressable',
@@ -82,10 +80,7 @@ vi.mock('@/components/ui/dialog', () => ({
   useConfirmDialog: () => ({ confirm: h.confirm, dialog: null }),
 }));
 vi.mock('@/components/ui/icons', () => ({
-  ChevronLeft: 'ChevronLeft',
-  ChevronRight: 'ChevronRight',
   FileText: 'FileText',
-  Pencil: 'Pencil',
   Plus: 'Plus',
   Trash2: 'Trash2',
 }));
@@ -505,6 +500,18 @@ describe('ProfileInstructionsScreen row controls', () => {
     expect(nameLine?.props.ellipsizeMode).toBe('middle');
     expect(nameLine?.props.children).toBe(INSTRUCTION_NAME);
 
+    // The editable row's switch stays its own accessible stop with its own
+    // checked state, so its content press carries no value of its own.
+    expect(
+      findRowControl(
+        renderer.root,
+        [
+          i18n.t('profiles.instructionEdit', { name: INSTRUCTION_NAME }),
+          `.kilocode/rules/${INSTRUCTION_NAME}.md`,
+        ].join(', ')
+      ).props.accessibilityValue
+    ).toBeUndefined();
+
     unmount();
   });
 });
@@ -543,6 +550,25 @@ describe('ProfileInstructionsScreen read-only row', () => {
     expect(findAll(renderer.root, 'Switch')[0]?.props.accessibilityLabel).toBe(INSTRUCTION_NAME);
 
     unmount();
+  });
+
+  // The row's one accessible press swallows the switch on iOS, so the state the
+  // switch carries has to ride the row's spoken value or a reader loses it.
+  it('speaks the row state in its value, on the press that hides the switch', async () => {
+    const rowLabel = [INSTRUCTION_NAME, `.kilocode/rules/${INSTRUCTION_NAME}.md`].join(', ');
+
+    const enabled = await mountScreen();
+    expect(findRowControl(enabled.renderer.root, rowLabel).props.accessibilityValue).toEqual({
+      text: i18n.t('common.enabled'),
+    });
+    enabled.unmount();
+
+    h.query.data = [testInstruction({ enabled: false })];
+    const disabled = await mountScreen();
+    expect(findRowControl(disabled.renderer.root, rowLabel).props.accessibilityValue).toEqual({
+      text: i18n.t('common.disabled'),
+    });
+    disabled.unmount();
   });
 
   // A disclosure mark beside the switch used to take the width the title

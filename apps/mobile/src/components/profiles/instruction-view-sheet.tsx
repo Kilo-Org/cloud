@@ -8,12 +8,16 @@ import { FormFieldLabel } from '@/components/ui/form-field-label';
 import { SelectableText } from '@/components/ui/selectable-text';
 import { Text } from '@/components/ui/text';
 import { isolateLtrBidiText } from '@/lib/bidi';
+import { type AgentProfileInstructionRow } from '@/lib/hooks/agent-profile-types';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { codeFieldTextStyle } from '@/lib/rtl-text';
 
+/** What the sheet reads from the row it opens: the shared row type owns these fields. */
+export type InstructionView = Pick<AgentProfileInstructionRow, 'name' | 'content'>;
+
 type InstructionViewSheetProps = Readonly<{
   /** The instruction to read, or `null` while the sheet is closed. */
-  instruction: { name: string; content: string } | null;
+  instruction: InstructionView | null;
   onClose: () => void;
 }>;
 

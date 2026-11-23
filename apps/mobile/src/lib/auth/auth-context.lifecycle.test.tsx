@@ -543,12 +543,12 @@ type AuthContextValue = {
   signOut: (ended?: boolean, cause?: AuthSignOutCause) => Promise<void>;
 };
 
-/** Build a Kilo JWT whose payload carries `kiloUserId` (same shape as
- *  `generateApiToken` in packages/web-shared/src/lib/tokens.ts). */
 function base64url(input: string): string {
   return btoa(input).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
 }
 
+/** Build a Kilo JWT whose payload carries `kiloUserId` (same shape as
+ *  `generateApiToken` in packages/web-shared/src/lib/tokens.ts). */
 function makeToken(payload: Record<string, unknown>): string {
   return `${base64url('{"alg":"none"}')}.${base64url(JSON.stringify(payload))}.signature`;
 }
@@ -764,10 +764,8 @@ describe('sign-out teardown ordering', () => {
     expect(hoisted.posthog.discardPostHog).toHaveBeenCalled();
     expect(hoisted.posthogStorage.purgePostHogPersistence).toHaveBeenCalled();
 
-    // SDK teardown calls must appear before any SecureStore delete.
-    // The first 7 calls must be in this exact order (logout capture and flush
-    // precede the teardown steps; remote cleanup is awaited between them but
-    // pushes no callOrder entry).
+    // Remote cleanup is awaited between these steps but pushes no callOrder
+    // entry, so the pinned prefix is seven calls long.
     const expectedPreamble = hoisted.callOrder.slice(0, 7);
     expect(expectedPreamble).toEqual([
       'captureEvent',
@@ -1118,9 +1116,6 @@ describe('sign-out teardown ordering', () => {
       await ctx.signIn(makeToken({ kiloUserId: 'user-2' }));
     });
 
-    // The launcher clear that runs at this boundary takes the parked URL with
-    // it, so the destination that names no account is staged for this account
-    // and the signed-in mount still opens where the Quick Action points.
     expect(nativeLauncherSurfacesMock.takeAccountIndependentLaunchUrl).toHaveBeenCalled();
     expect(hoisted.deepLinkLaunch.setPendingDeepLink).toHaveBeenCalledWith(
       expect.stringContaining('/agent-chat/new'),
@@ -1148,8 +1143,6 @@ describe('sign-out teardown ordering', () => {
       await ctx.signIn(makeToken({ kiloUserId: 'user-2' }));
     });
 
-    // The parked URL has no deadline and the captured link is live, so the
-    // occupied slot keeps the destination the person opened.
     expect(hoisted.deepLinkLaunch.setPendingDeepLink).not.toHaveBeenCalled();
     expect(nativeLauncherSurfacesMock.clearLauncherSurfaces).toHaveBeenCalledTimes(1);
 
@@ -2009,8 +2002,6 @@ describe('bootstrap and foreground race fencing', () => {
   it('regression: a refused refresh from a superseded epoch does not sign out the newer session', async () => {
     const { getCtx, unmount } = await mountProvider();
 
-    // A session with a refresh token and an expiry inside the refresh margin,
-    // so a foreground event initiates a proactive refresh.
     await act(async () => {
       await getCtx().signIn('active-token', 'active-refresh', 3600);
     });
@@ -2078,8 +2069,6 @@ describe('bootstrap and foreground race fencing', () => {
   it('regression: the refusal-triggered sign-out cleanup still authenticates with the owner token', async () => {
     const { getCtx, unmount } = await mountProvider();
 
-    // A session with a refresh token and an expiry inside the refresh margin,
-    // so a foreground event initiates a proactive refresh.
     await act(async () => {
       await getCtx().signIn('active-token', 'active-refresh', 3600);
     });

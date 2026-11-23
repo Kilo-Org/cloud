@@ -66,41 +66,50 @@ type InstructionNameHintRowProps = Readonly<{
  * The helper row under the name field: the slug a save will store, or the rule
  * a name must follow, in one reserved slot.
  *
- * The row is mounted in every state, and the rule sits in it twice: once as an
- * invisible copy in native layout, which is what gives the row exactly the
- * rule's wrapped height in every state, and once as the visible line in an
- * absolute overlay that takes no space of its own. So the preview (one line,
- * cut in the middle) and the rule (a sentence that wraps) paint in the same
- * place, in the same caption size, and switching between them never moves the
- * content field below. The preview carries the only new information, so it
+ * The row is mounted in every state and is always the rule's own wrapped
+ * height: while the rule shows, it is the rule painted in flow; in every other
+ * state an invisible copy of that same sentence holds the slot in native
+ * layout, with the preview in an absolute overlay that takes no space of its
+ * own. So the preview (one line, cut in the middle) and the rule (a sentence
+ * that wraps) paint in the same place, in the same caption size and the same
+ * top gap, and switching between them changes only the colour and never moves
+ * the content field below. The preview carries the only new information, so it
  * stays one line and its ellipsis sits in the middle, the app's treatment for an
  * identifier: both ends of the stored file name stay readable, including in the
- * catalogs that put the slug last. The rule is the same sentence the field's
- * own error states on a refused save, painted here in the field's slot so the
- * name `FormField` does not paint it a second time.
+ * catalogs that put the slug last. The rule is the same sentence a refused save
+ * states, painted here in the field's slot so the name `FormField` does not
+ * paint it a second time, and announced once by `AccessibleStatus`.
  */
 function InstructionNameHintRow({ hint, rule }: InstructionNameHintRowProps) {
   const { t } = useTranslation();
   return (
     <View className="-mt-2">
-      {/* The reservation: in native layout, hidden from the a11y tree, so the
-          row is the rule's natural wrapped height in every state. */}
-      <Text
-        className="text-xs opacity-0"
-        accessibilityElementsHidden
-        importantForAccessibility="no-hide-descendants"
-        pointerEvents="none"
-      >
-        {rule}
-      </Text>
-      <View className="absolute inset-x-0 top-0">
-        {hint.kind === 'preview' ? (
-          <Text variant="muted" className="text-xs" numberOfLines={1} ellipsizeMode="middle">
-            {t('profiles.instructionNamePreview', { name: hint.slug })}
+      {hint.kind === 'rule' ? (
+        // The rule itself holds the slot here: it is the row's content and its
+        // height at once, so the state paints one sentence, not two.
+        <AccessibleStatus message={rule} className="text-xs" />
+      ) : (
+        <>
+          {/* The reservation: in native layout and hidden from the a11y tree,
+              so the row keeps the rule's wrapped height while it shows nothing
+              or a one-line preview. */}
+          <Text
+            className="text-xs opacity-0"
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            pointerEvents="none"
+          >
+            {rule}
           </Text>
-        ) : null}
-        {hint.kind === 'rule' ? <AccessibleStatus message={rule} className="text-xs" /> : null}
-      </View>
+          {hint.kind === 'preview' ? (
+            <View className="absolute inset-x-0 top-0">
+              <Text variant="muted" className="text-xs" numberOfLines={1} ellipsizeMode="middle">
+                {t('profiles.instructionNamePreview', { name: hint.slug })}
+              </Text>
+            </View>
+          ) : null}
+        </>
+      )}
     </View>
   );
 }

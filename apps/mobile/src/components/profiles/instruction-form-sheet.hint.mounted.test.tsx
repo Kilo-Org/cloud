@@ -197,8 +197,8 @@ describe('InstructionFormSheet file-name row', () => {
     // late, so the content label never sits where the row was about to appear.
     expect(rowCopies(hintRow(renderer.root), rule).hidden).toHaveLength(1);
 
-    // Only a name a save would rewrite paints the preview; the reservation
-    // holds the row's height in every one of these states.
+    // Only a name a save would rewrite paints the preview; the row holds its
+    // height in every one of these states.
     const states: readonly (readonly [typed: string, slug: string | null])[] = [
       ['', null],
       ['release-notes', null],
@@ -209,18 +209,26 @@ describe('InstructionFormSheet file-name row', () => {
       typeName(renderer.root, typed);
 
       const row = hintRow(renderer.root);
-      // The reservation: the rule's own copy, in native layout, in every state.
-      const reserved = rowCopies(row, rule).hidden;
-      expect(reserved).toHaveLength(1);
-      expect(reserved[0]?.props.accessibilityElementsHidden).toBe(true);
-      expect(reserved[0]?.props.importantForAccessibility).toBe('no-hide-descendants');
+      const ruleIsShown = typed === 'पुणे कार्यालय नियम';
+      // The rule's own copy is in the row in every state, and it is the row's
+      // visible content exactly while the rule shows: the sentence holds the
+      // slot then, so it is never painted twice in place.
+      const copies = rowCopies(row, rule);
+      expect(copies.hidden.length + copies.visible.length).toBeGreaterThanOrEqual(1);
+      if (ruleIsShown) {
+        expect(copies.hidden).toHaveLength(0);
+        expect(copies.visible).toHaveLength(1);
+      } else {
+        expect(copies.hidden).toHaveLength(1);
+        expect(copies.visible).toHaveLength(0);
+        expect(copies.hidden[0]?.props.accessibilityElementsHidden).toBe(true);
+        expect(copies.hidden[0]?.props.importantForAccessibility).toBe('no-hide-descendants');
+      }
 
-      // The visible line: the preview for a name a save would rewrite, and the
-      // rule only where the field states it too.
+      // The visible line: the preview for a name a save would rewrite, and none
+      // in the other states.
       const previews = findAll(row, 'Text').filter(node => node.props.ellipsizeMode === 'middle');
       if (slug === null) {
-        // No preview line, so nothing is cut: the reservation is the row's only
-        // text in these states.
         expect(previews).toHaveLength(0);
       } else {
         expect(previews).toHaveLength(1);
@@ -229,7 +237,6 @@ describe('InstructionFormSheet file-name row', () => {
           i18n.t('profiles.instructionNamePreview', { name: slug })
         );
       }
-      expect(rowCopies(row, rule).visible).toHaveLength(typed === 'पुणे कार्यालय नियम' ? 1 : 0);
     }
 
     unmount();
@@ -264,11 +271,12 @@ describe('InstructionFormSheet file-name row', () => {
     pressDone(renderer.root);
 
     const rule = i18n.t('profiles.instructionNameInvalid');
-    // One visible copy: the row's. The field paints nothing for `bad-name`,
-    // because the same sentence is already on the row.
+    // One painted copy in the whole sheet: the row's. The field paints nothing
+    // for `bad-name`, because the same sentence is already on the row, and the
+    // row's reservation is not a second copy while the rule itself shows.
     const copies = rowCopies(renderer.root, rule);
     expect(copies.visible).toHaveLength(1);
-    expect(copies.hidden).toHaveLength(1);
+    expect(copies.hidden).toHaveLength(0);
     expect(nameField(renderer.root).props.error).toBeUndefined();
     expect(nameField(renderer.root).props.outsideError).toBe(rule);
     expect(doneDisabled(renderer.root)).toBe(true);

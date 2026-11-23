@@ -349,10 +349,20 @@ export function QuestionCard({
                           reads as supporting text.
                         */}
                         <View className="flex-1 flex-col items-start gap-0.5">
+                          {/* A selected option keeps the brand fill while the
+                              card is submitting or unavailable, so its label
+                              must re-apply the brand ink for each scheme. The
+                              shared disabled face puts `dark:text-ink2` on a
+                              label, and Tailwind emits that after the base ink;
+                              without `dark:text-primary-foreground` here the
+                              dark label would paint on the brand fill at about
+                              1.3:1. */}
                           <Text
                             className={cn(
                               'text-sm',
-                              isSelected ? 'text-primary-foreground' : 'text-foreground'
+                              isSelected
+                                ? 'text-primary-foreground dark:text-primary-foreground'
+                                : 'text-foreground'
                             )}
                             style={OPTION_TEXT_ALIGN}
                           >
@@ -363,7 +373,7 @@ export function QuestionCard({
                               className={cn(
                                 'text-xs',
                                 isSelected
-                                  ? 'text-primary-foreground opacity-70'
+                                  ? 'text-primary-foreground opacity-70 dark:text-primary-foreground'
                                   : 'text-muted-foreground'
                               )}
                               style={OPTION_TEXT_ALIGN}

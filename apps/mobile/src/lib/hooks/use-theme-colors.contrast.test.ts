@@ -269,9 +269,12 @@ describe('disabled primary action fill contrast (WCAG AA text)', () => {
 
   it('dark theme: the disabled plate is a visible but faint step off the surfaces it sits on', () => {
     // A plate that matched its surface would leave a disabled primary with no
-    // shape at all. The lower bound is what a disabled plate needs to read as a
-    // plate; the upper bound is why it stays quieter than any enabled fill, so a
-    // disabled plate can never be promoted to an enabled step.
+    // shape at all. The upper bound is the perception floor this file sets for
+    // an enabled control's own surface, so a disabled plate stays quieter than
+    // any enabled fill and can never be promoted to an enabled step. The lower
+    // bound is not a perception threshold: the palette has no floor for a
+    // disabled surface, and the light plate has none either. It pins the
+    // shipped 1.18:1 step against drift back toward the card surface.
     for (const surface of ['secondary', 'card', 'background'] as const) {
       const ratio = contrastRatio(darkColors.primaryDisabledFill, darkColors[surface]);
       expect(ratio, `primaryDisabledFill vs ${surface} (dark)`).toBeGreaterThanOrEqual(1.15);

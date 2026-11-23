@@ -506,11 +506,13 @@ export function ModelAccessForm({
                   14pt rem — and the status is clamped to those same two lines, so
                   the slot is one fixed height and the action row above it cannot
                   move in any shipped locale: a longer localised sentence ends in
-                  the tail ellipsis instead of raising the pair. Nothing is lost to
-                  the clamp: the live region announces the whole sentence through
-                  `useStatusAnnouncement`, and the one sentence long enough to
-                  truncate (`organizationModelAccess.providersNeedCatalog`) is
-                  also rendered in full as the Providers tab's body caption. */}
+                  the tail ellipsis instead of raising the pair. Only
+                  `organizationModelAccess.providersNeedCatalog` is long enough to
+                  truncate, and it is never the only copy of its reason: that state
+                  also raises the screen's catalog notice above the tabs, which
+                  wraps in full and carries the Retry, and the live region still
+                  announces the whole status sentence through
+                  `useStatusAnnouncement`. */}
               <View className="min-h-10 justify-center">
                 <AccessibleStatus
                   message={statusMessage}

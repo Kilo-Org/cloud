@@ -3928,6 +3928,28 @@
     ],
     "searchBlob": "appReportedMessages.createReport Report a problematic app or extension message for review, such as an unparsed or unstyled message from a CLI session. Submit the message content, mode, model, and report type to store it for investigation. appreportedmessages createreport message cli_session_id mode model report_type message cli_session_id mode model report_type"
   },
+  "awsCompute.getEnrollment": {
+    "path": "awsCompute.getEnrollment",
+    "kind": "query",
+    "summary": "Check whether the current user is enrolled or eligible for AWS BYOC compute, returning their enrollment details. Use to see if an AWS account must be connected first.",
+    "inputSchema": {},
+    "tags": [
+      "awscompute",
+      "getenrollment"
+    ],
+    "searchBlob": "awsCompute.getEnrollment Check whether the current user is enrolled or eligible for AWS BYOC compute, returning their enrollment details. Use to see if an AWS account must be connected first. awscompute getenrollment"
+  },
+  "awsCompute.getStatus": {
+    "path": "awsCompute.getStatus",
+    "kind": "query",
+    "summary": "Get the current AWS BYOC compute connection status for the user, such as pending setup or ready, with the linked account and last verification time. Returns null when no connection exists.",
+    "inputSchema": {},
+    "tags": [
+      "awscompute",
+      "getstatus"
+    ],
+    "searchBlob": "awsCompute.getStatus Get the current AWS BYOC compute connection status for the user, such as pending setup or ready, with the linked account and last verification time. Returns null when no connection exists. awscompute getstatus"
+  },
   "byok.create": {
     "path": "byok.create",
     "kind": "mutation",
@@ -19099,6 +19121,58 @@
       "thresholdcents"
     ],
     "searchBlob": "organizations.autoTopUp.updateThreshold Set the balance threshold that triggers automatic top-up for an organization, so credit is refilled when it falls below the configured amount. Use to change when auto-recharge kicks in for a team or organization account. organizations autotopup updatethreshold organizationid thresholdcents organizationId thresholdCents"
+  },
+  "organizations.awsCompute.getEnrollment": {
+    "path": "organizations.awsCompute.getEnrollment",
+    "kind": "query",
+    "summary": "Check whether the organization is enrolled and eligible for AWS compute onboarding (bring your own AWS account). Use it before starting AWS setup to see if the feature is available.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "organizationId"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "awscompute",
+      "getenrollment",
+      "organizationid"
+    ],
+    "searchBlob": "organizations.awsCompute.getEnrollment Check whether the organization is enrolled and eligible for AWS compute onboarding (bring your own AWS account). Use it before starting AWS setup to see if the feature is available. organizations awscompute getenrollment organizationid organizationId"
+  },
+  "organizations.awsCompute.getStatus": {
+    "path": "organizations.awsCompute.getStatus",
+    "kind": "query",
+    "summary": "Get the current AWS compute connection status: whether no setup exists, a setup draft is pending, or the AWS account role is ready, including account and verification details.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "organizationId"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "awscompute",
+      "getstatus",
+      "organizationid"
+    ],
+    "searchBlob": "organizations.awsCompute.getStatus Get the current AWS compute connection status: whether no setup exists, a setup draft is pending, or the AWS account role is ready, including account and verification details. organizations awscompute getstatus organizationid organizationId"
   },
   "organizations.bitbucket.connect": {
     "path": "organizations.bitbucket.connect",

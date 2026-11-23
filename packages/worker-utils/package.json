@@ -66,6 +66,8 @@
     "./scheduled-job-observability": "./src/scheduled-job-observability.ts",
     "./r2-client": "./src/r2-client.ts",
     "./aws-client": "./src/aws-client.ts",
+    "./aws-cloudformation": "./src/aws-cloudformation.ts",
+    "./aws-onboarding": "./src/aws-onboarding.ts",
     "./aws-byoc": "./src/aws-byoc.ts",
     "./aws-egress": "./src/aws-egress.ts",
     "./aws-egress-store": "./src/aws-egress-store.ts",
@@ -85,7 +87,8 @@
     "./organization-usage": "./src/organization-usage.ts",
     "./organization-consumption": "./src/organization-consumption.ts",
     "./runtime-model-diagnostics": "./src/runtime-model-diagnostics.ts",
-    "./environment-setup-authority": "./src/environment-setup-authority.ts"
+    "./environment-setup-authority": "./src/environment-setup-authority.ts",
+    "./aws-onboarding-api": "./src/aws-onboarding-api.ts"
   },
   "scripts": {
     "test": "vitest run",

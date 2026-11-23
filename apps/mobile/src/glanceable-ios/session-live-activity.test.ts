@@ -1,4 +1,8 @@
 /* eslint-disable max-lines -- one cohesive layout suite for one stringified widget function */
+/* eslint-disable eslint-plugin-import/no-nodejs-modules, eslint-plugin-unicorn/prefer-module -- this test reads the layout source from disk, which is the only place the literal is observable */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type LiveActivityEnvironment } from 'expo-widgets';
@@ -759,5 +763,34 @@ describe('session card layout: surfaces', () => {
     const buttons = collect(banner).filter(item => item.kind === 'Button');
     expect(buttons.map(button => button.props.target)).toEqual(['approve']);
     expect(collect(banner).some(item => item.kind === 'Link')).toBe(true);
+  });
+});
+
+const LAYOUT = 'session-live-activity.tsx';
+
+const read = (file: string) => readFileSync(join(__dirname, file), 'utf8');
+
+/**
+ * The quiet window the stringified layout carries as a literal, because the
+ * widget process cannot import it. Returns null for any shape this reader does
+ * not understand, so the assertion fails instead of passing on a guess.
+ */
+function quietWindowMs(source: string): number | null {
+  const expression = /const QUIET_AFTER_MS: number = ([^;]+);/.exec(source)?.[1];
+  if (expression === undefined) {
+    return null;
+  }
+  const factors = expression.split('*').map(part => Number(part.trim().replaceAll('_', '')));
+  if (!factors.every(factor => Number.isFinite(factor))) {
+    return null;
+  }
+  return factors.reduce((total, factor) => total * factor, 1);
+}
+
+describe('session card layout: quiet window', () => {
+  it('carries the window the notifications package defines', () => {
+    // The layout cannot import the constant, so it repeats the number; this
+    // holds the copy to the shared export so the two cannot drift apart.
+    expect(quietWindowMs(read(LAYOUT))).toBe(SESSION_CARD_QUIET_AFTER_MS);
   });
 });

@@ -478,6 +478,30 @@ describe('buildSessionLiveActivityContentState', () => {
       parse.mockRestore();
     }
   });
+
+  it('reads the title only from the row and never from the previous build', () => {
+    // The card keeps the facts a tray row omits, but never the title: a row
+    // without one draws the generic label instead of the remembered name.
+    const previous = { title: 'Previous title' };
+    expect(
+      buildSessionLiveActivityContentState(
+        { id: 'ses_title', status: 'busy' },
+        { ...options, previous }
+      ).title
+    ).toBeNull();
+    expect(
+      buildSessionLiveActivityContentState(
+        { id: 'ses_title', status: 'busy', title: 'New session - 2026-03-01T00:00:00.000Z' },
+        { ...options, previous }
+      ).title
+    ).toBeNull();
+    expect(
+      buildSessionLiveActivityContentState(
+        { id: 'ses_title', status: 'busy', title: 'Fix the flaky test' },
+        { ...options, previous }
+      ).title
+    ).toBe('Fix the flaky test');
+  });
 });
 
 describe('sessionLiveActivityRelevance', () => {

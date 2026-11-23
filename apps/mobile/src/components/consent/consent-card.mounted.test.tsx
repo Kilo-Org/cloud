@@ -188,6 +188,22 @@ function rowTitles(root: I): string[] {
     .map(n => n.props.title as string);
 }
 
+/**
+ * The subtitles the shared row primitives render. Like the titles, a pending
+ * row's subtitle lives in the row's props; a settled row paints it as a Text
+ * child as well.
+ */
+function rowSubtitles(root: I): string[] {
+  return root
+    .findAll(
+      n =>
+        typeof n.type === 'string' &&
+        ((n.type as string) === 'ConfigureRow' || (n.type as string) === 'PreferenceRow') &&
+        typeof n.props.subtitle === 'string'
+    )
+    .map(n => n.props.subtitle as string);
+}
+
 function disclosureTexts(root: I): I[] {
   return root.findAll(
     n =>
@@ -320,8 +336,22 @@ describe('ConsentCard', () => {
     const revoke = findButton(renderer.root, 'Revoke consent');
     expect(revoke.props.variant).toBe('outline-destructive');
 
-    // The guidance names the surface the entry and the header name, so a
-    // reader who returns later knows where to change the choice.
+    // The header above already names the surface, so the row's subtitle states
+    // what is shared and stops there instead of repeating the header as a
+    // location path on a third line.
+    const subtitle = rowSubtitles(renderer.root).find(text =>
+      text.startsWith(i18n.t('consent.helpImproveReviewDescription'))
+    );
+    expect(subtitle).toBe(i18n.t('consent.helpImproveReviewDescription'));
+    expect(subtitle).not.toContain(i18n.t('common.profile'));
+    expect(subtitle).not.toContain(i18n.t('profile.privacyChoices'));
+  });
+
+  it('names where the choice is changed on first run, before any tab visit', () => {
+    const renderer = mountCard('onboarding');
+    // Onboarding has no header and comes before the Profile tab exists for the
+    // reader, so its guidance carries the path.
+    expect(rowSubtitles(renderer.root)).toContain(i18n.t('consent.helpImproveDescription'));
     expect(i18n.t('consent.helpImproveDescription')).toContain(i18n.t('common.profile'));
     expect(i18n.t('consent.helpImproveDescription')).toContain(i18n.t('profile.privacyChoices'));
   });
@@ -559,7 +589,7 @@ describe('ConsentCard', () => {
       n =>
         typeof n.type === 'string' &&
         (n.type as string) === 'Text' &&
-        n.props.children === i18n.t('consent.helpImproveDescription')
+        n.props.children === i18n.t('consent.helpImproveReviewDescription')
     );
     expect(settled.length).toBeGreaterThan(0);
     for (const node of settled) {

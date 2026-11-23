@@ -3285,6 +3285,7 @@
     "featureFlagsWho": "PostHog, ບໍລິການເປີດປິດຟີເຈີ.",
     "helpImprove": "ຊ່ວຍປັບປຸງ Kilo",
     "helpImproveDescription": "ແບ່ງປັນຂໍ້ມູນວິເຄາະການໃຊ້ແອັບແບບບໍ່ລະບຸຕົວຕົນ ແລະ ແຫຼ່ງທີ່ມາຂອງການຕິດຕັ້ງ. ທ່ານສາມາດປ່ຽນຕົວເລືອກນີ້ໄດ້ທຸກເວລາພາຍໃຕ້ແຖວ $t(common.profile) · $t(profile.privacyChoices).",
+    "helpImproveReviewDescription": "ແບ່ງປັນຂໍ້ມູນວິເຄາະການໃຊ້ແອັບແບບບໍ່ລະບຸຕົວຕົນ ແລະ ແຫຼ່ງທີ່ມາຂອງການຕິດຕັ້ງ.",
     "seeFullDetails": "ເບິ່ງລາຍລະອຽດທັງໝົດ",
     "privacyPolicyPrefix": "ຂໍ້ມູນຂອງທ່ານຖືກຈັດການຕາມ",
     "privacyPolicy": "ນະໂຍບາຍຄວາມເປັນສ່ວນຕົວຂອງ Kilo",

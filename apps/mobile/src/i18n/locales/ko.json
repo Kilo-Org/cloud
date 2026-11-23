@@ -2741,6 +2741,7 @@
     "featureFlagsWho": "PostHog, 기능 플래그 서비스.",
     "helpImprove": "Kilo 개선 돕기",
     "helpImproveDescription": "익명 사용 분석 데이터와 설치 경로를 공유합니다. 언제든지 $t(common.profile) · $t(profile.privacyChoices)에서 변경할 수 있습니다.",
+    "helpImproveReviewDescription": "익명 사용 분석 데이터와 설치 경로를 공유합니다.",
     "seeFullDetails": "자세히 보기",
     "privacyPolicyPrefix": "데이터 처리에 적용되는 방침:",
     "privacyPolicy": "Kilo 개인정보 처리방침",

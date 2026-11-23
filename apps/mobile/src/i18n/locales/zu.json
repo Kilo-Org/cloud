@@ -3338,6 +3338,7 @@
     "featureFlagsWho": "I-PostHog, isevisi yamafulegi ezici.",
     "helpImprove": "Siza ukuthuthukisa i-Kilo",
     "helpImproveDescription": "Yabelana ngedatha yokusetshenziswa komkhiqizo engakuvezi ukuthi ungubani kanye nomthombo owufake kuwo. Ungakushintsha lokhu noma nini ngaphansi komugqa othi $t(common.profile) · $t(profile.privacyChoices).",
+    "helpImproveReviewDescription": "Yabelana ngedatha yokusetshenziswa komkhiqizo engakuvezi ukuthi ungubani kanye nomthombo owufake kuwo.",
     "seeFullDetails": "Bona yonke imininingwane",
     "privacyPolicyPrefix": "Idatha yakho iphathwa ngokulandela",
     "privacyPolicy": "Inqubomgomo yobumfihlo ye-Kilo",

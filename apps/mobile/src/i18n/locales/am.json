@@ -3338,6 +3338,7 @@
     "featureFlagsWho": "PostHog፣ ተግባሮችን የሚያበራና የሚያጠፋ አገልግሎት።",
     "helpImprove": "Kiloን ለማሻሻል ይርዱ",
     "helpImproveDescription": "ማንነትዎን የማይገልጽ የአጠቃቀም ትንታኔ ውሂብ እና መተግበሪያውን ያገኙበትን ምንጭ ያጋሩ። ይህን በማንኛውም ጊዜ በ$t(common.profile) · $t(profile.privacyChoices) ስር መቀየር ይችላሉ።",
+    "helpImproveReviewDescription": "ማንነትዎን የማይገልጽ የአጠቃቀም ትንታኔ ውሂብ እና መተግበሪያውን ያገኙበትን ምንጭ ያጋሩ።",
     "seeFullDetails": "ሙሉ ዝርዝሮችን ይመልከቱ",
     "privacyPolicyPrefix": "ውሂብዎን ለመያዝ የምንከተለው ፖሊሲ፦",
     "privacyPolicy": "የKilo የግላዊነት ፖሊሲ",

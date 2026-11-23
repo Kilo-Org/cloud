@@ -2741,6 +2741,7 @@
     "featureFlagsWho": "機能フラグサービスのPostHog。",
     "helpImprove": "Kiloの改善に協力",
     "helpImproveDescription": "匿名の利用状況データとインストール元の情報を共有します。この設定はいつでも$t(common.profile) · $t(profile.privacyChoices)から変更できます。",
+    "helpImproveReviewDescription": "匿名の利用状況データとインストール元の情報を共有します。",
     "seeFullDetails": "詳細を表示",
     "privacyPolicyPrefix": "データの取り扱いは、次の方針に従います：",
     "privacyPolicy": "Kiloのプライバシーポリシー",

@@ -3452,6 +3452,7 @@
     "featureFlagsWho": "PostHog, the feature-flag service.",
     "helpImprove": "Help improve Kilo",
     "helpImproveDescription": "Share anonymous product analytics and install source. You can change this any time under $t(common.profile) · $t(profile.privacyChoices).",
+    "helpImproveReviewDescription": "Share anonymous product analytics and install source.",
     "seeFullDetails": "See full details",
     "privacyPolicyPrefix": "Your data is handled per the",
     "privacyPolicy": "Kilo privacy policy",

@@ -3338,6 +3338,7 @@
     "featureFlagsWho": "PostHog, die funksievlag-diens.",
     "helpImprove": "Help om Kilo te verbeter",
     "helpImproveDescription": "Deel anonieme gebruiksontledings en jou installasiebron. Jy kan dit enige tyd onder $t(common.profile) · $t(profile.privacyChoices) verander.",
+    "helpImproveReviewDescription": "Deel anonieme gebruiksontledings en jou installasiebron.",
     "seeFullDetails": "Bekyk volledige besonderhede",
     "privacyPolicyPrefix": "Jou data word hanteer volgens die",
     "privacyPolicy": "Kilo-privaatheidsbeleid",

@@ -3338,6 +3338,7 @@
     "featureFlagsWho": "PostHog، د ځانګړنو د بیرغونو خدمت.",
     "helpImprove": "د Kilo په ښه کولو کې مرسته وکړئ",
     "helpImproveDescription": "د محصول د کارونې بې‌نومه احصایې او د نصب سرچینه شریک کړئ. دا ټاکنه هر وخت د $t(common.profile) · $t(profile.privacyChoices) لاندې بدلولی شئ.",
+    "helpImproveReviewDescription": "د محصول د کارونې بې‌نومه احصایې او د نصب سرچینه شریک کړئ.",
     "seeFullDetails": "بشپړ جزیات وګورئ",
     "privacyPolicyPrefix": "ستاسو معلومات د دې تګلارې له مخې اداره کېږي:",
     "privacyPolicy": "د Kilo د محرمیت تګلاره",

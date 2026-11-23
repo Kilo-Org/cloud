@@ -3464,6 +3464,7 @@
     "featureFlagsWho": "PostHog, funkcijų vėliavėlių paslauga.",
     "helpImprove": "Padėti tobulinti Kilo",
     "helpImproveDescription": "Bendrinkite anoniminius naudojimo duomenis ir įdiegimo šaltinį. Šią parinktį bet kada galite pakeisti profilio skirtuke, eilutėje „$t(common.profile) · $t(profile.privacyChoices)“.",
+    "helpImproveReviewDescription": "Bendrinkite anoniminius naudojimo duomenis ir įdiegimo šaltinį.",
     "seeFullDetails": "Peržiūrėti visą informaciją",
     "privacyPolicyPrefix": "Jūsų duomenys tvarkomi kaip aprašyta",
     "privacyPolicy": "Kilo privatumo politikoje",

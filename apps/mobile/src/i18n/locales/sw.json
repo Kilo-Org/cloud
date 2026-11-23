@@ -3338,6 +3338,7 @@
     "featureFlagsWho": "PostHog, huduma ya kuwasha na kuzima vipengele.",
     "helpImprove": "Saidia kuboresha Kilo",
     "helpImproveDescription": "Shiriki takwimu za matumizi zisizokutambulisha na chanzo cha usakinishaji. Unaweza kubadilisha hili wakati wowote chini ya $t(common.profile) · $t(profile.privacyChoices).",
+    "helpImproveReviewDescription": "Shiriki takwimu za matumizi zisizokutambulisha na chanzo cha usakinishaji.",
     "seeFullDetails": "Tazama maelezo kamili",
     "privacyPolicyPrefix": "Data yako inashughulikiwa kwa mujibu wa",
     "privacyPolicy": "Sera ya faragha ya Kilo",

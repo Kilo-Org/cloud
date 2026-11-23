@@ -3338,6 +3338,7 @@
     "featureFlagsWho": "PostHog, அம்சக் கொடிகளை நிர்வகிக்கும் சேவை.",
     "helpImprove": "Kilo-வை மேம்படுத்த உதவவும்",
     "helpImproveDescription": "அடையாளம் தெரியாத பயன்பாட்டுப் பகுப்பாய்வுத் தரவையும் நிறுவல் மூலத்தையும் பகிரவும். இதை எப்போது வேண்டுமானாலும் $t(common.profile) · $t(profile.privacyChoices) என்னும் வரிசையில் மாற்றலாம்.",
+    "helpImproveReviewDescription": "அடையாளம் தெரியாத பயன்பாட்டுப் பகுப்பாய்வுத் தரவையும் நிறுவல் மூலத்தையும் பகிரவும்.",
     "seeFullDetails": "முழு விவரங்களைப் பார்க்கவும்",
     "privacyPolicyPrefix": "உங்கள் தரவு",
     "privacyPolicy": "Kilo தனியுரிமைக் கொள்கையின்",

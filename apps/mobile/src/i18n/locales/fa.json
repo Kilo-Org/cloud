@@ -3338,6 +3338,7 @@
     "featureFlagsWho": "PostHog، سرویس پرچم‌های قابلیت.",
     "helpImprove": "کمک به بهبود Kilo",
     "helpImproveDescription": "داده‌های آماری ناشناس دربارهٔ استفاده از برنامه و منبع نصب را به اشتراک بگذارید. می‌توانید هر زمان این گزینه را در $t(common.profile) · $t(profile.privacyChoices) تغییر دهید.",
+    "helpImproveReviewDescription": "داده‌های آماری ناشناس دربارهٔ استفاده از برنامه و منبع نصب را به اشتراک بگذارید.",
     "seeFullDetails": "مشاهده جزئیات کامل",
     "privacyPolicyPrefix": "داده‌های شما طبق این خط‌مشی پردازش می‌شوند:",
     "privacyPolicy": "خط‌مشی حریم خصوصی Kilo",

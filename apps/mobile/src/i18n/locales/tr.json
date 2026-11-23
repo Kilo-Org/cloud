@@ -2776,6 +2776,7 @@
     "featureFlagsWho": "PostHog, özellik bayrağı hizmeti.",
     "helpImprove": "Kilo'yu iyileştirmeye yardımcı ol",
     "helpImproveDescription": "Anonim ürün analizi verilerini ve uygulamayı yüklediğin kaynağı paylaş. Bu tercihi $t(common.profile) · $t(profile.privacyChoices) satırından istediğin zaman değiştirebilirsin.",
+    "helpImproveReviewDescription": "Anonim ürün analizi verilerini ve uygulamayı yüklediğin kaynağı paylaş.",
     "seeFullDetails": "Tüm ayrıntıları gör",
     "privacyPolicyPrefix": "Verilerinin işlenmesinde esas alınan belge:",
     "privacyPolicy": "Kilo gizlilik politikası",

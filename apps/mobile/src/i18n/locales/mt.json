@@ -3527,6 +3527,7 @@
     "featureFlagsWho": "PostHog, is-servizz tal-bnadar tal-funzjonijiet.",
     "helpImprove": "Għin biex jitjieb Kilo",
     "helpImproveDescription": "Aqsam dejta anonima għall-analiżi tal-prodott u s-sors tal-installazzjoni. Tista' tbiddel din l-għażla meta trid taħt ir-ringiela $t(common.profile) · $t(profile.privacyChoices).",
+    "helpImproveReviewDescription": "Aqsam dejta anonima għall-analiżi tal-prodott u s-sors tal-installazzjoni.",
     "seeFullDetails": "Ara d-dettalji sħaħ",
     "privacyPolicyPrefix": "Id-dejta tiegħek tiġi mmaniġġjata skont il-",
     "privacyPolicy": "Politika tal-privatezza ta' Kilo",

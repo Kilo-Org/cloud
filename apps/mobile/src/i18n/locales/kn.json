@@ -3338,6 +3338,7 @@
     "featureFlagsWho": "PostHog, ವೈಶಿಷ್ಟ್ಯ ಫ್ಲ್ಯಾಗ್ ಸೇವೆ.",
     "helpImprove": "Kilo ಸುಧಾರಿಸಲು ಸಹಾಯ ಮಾಡಿ",
     "helpImproveDescription": "ನಿಮ್ಮ ಗುರುತು ತಿಳಿಸದೆ ಉತ್ಪನ್ನ ಬಳಕೆಯ ವಿಶ್ಲೇಷಣಾ ಮಾಹಿತಿ ಮತ್ತು ಸ್ಥಾಪನೆಯ ಮೂಲವನ್ನು ಹಂಚಿಕೊಳ್ಳಿ. ನೀವು ಇದನ್ನು ಯಾವಾಗ ಬೇಕಾದರೂ $t(common.profile) · $t(profile.privacyChoices) ಅಡಿಯಲ್ಲಿನ ಸಾಲಿನಲ್ಲಿ ಬದಲಾಯಿಸಬಹುದು.",
+    "helpImproveReviewDescription": "ನಿಮ್ಮ ಗುರುತು ತಿಳಿಸದೆ ಉತ್ಪನ್ನ ಬಳಕೆಯ ವಿಶ್ಲೇಷಣಾ ಮಾಹಿತಿ ಮತ್ತು ಸ್ಥಾಪನೆಯ ಮೂಲವನ್ನು ಹಂಚಿಕೊಳ್ಳಿ.",
     "seeFullDetails": "ಪೂರ್ಣ ವಿವರಗಳನ್ನು ನೋಡಿ",
     "privacyPolicyPrefix": "ನಿಮ್ಮ ಡೇಟಾವನ್ನು ನಿರ್ವಹಿಸಲು ಅನುಸರಿಸುವ ನೀತಿ:",
     "privacyPolicy": "Kilo ಗೌಪ್ಯತೆ ನೀತಿ",

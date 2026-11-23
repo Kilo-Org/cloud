@@ -3338,6 +3338,7 @@
     "featureFlagsWho": "PostHog, tajaajila mallattoo amalootaa (feature flag).",
     "helpImprove": "Kilo fooyyessuuf gargaari",
     "helpImproveDescription": "Xiinxala fayyadama oomishaa eenyummaa kee hin mul'isnee fi madda fe'iinsaa qoodi. Kana yeroo kamiyyuu jalatti jijjiiruu dandeessa: $t(common.profile) · $t(profile.privacyChoices).",
+    "helpImproveReviewDescription": "Xiinxala fayyadama oomishaa eenyummaa kee hin mul'isnee fi madda fe'iinsaa qoodi.",
     "seeFullDetails": "Odeeffannoo guutuu ilaali",
     "privacyPolicyPrefix": "Odeeffannoon kee imaammata kanaan bulfama:",
     "privacyPolicy": "Imaammata iccitii Kilo",

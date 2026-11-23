@@ -3338,6 +3338,7 @@
     "featureFlagsWho": "PostHog, funktsioonilippude teenus.",
     "helpImprove": "Aita Kilot paremaks muuta",
     "helpImproveDescription": "Jaga anonüümseid tooteanalüütika andmeid ja paigaldusallikat. Saad seda igal ajal muuta vahekaardil $t(common.profile) · $t(profile.privacyChoices).",
+    "helpImproveReviewDescription": "Jaga anonüümseid tooteanalüütika andmeid ja paigaldusallikat.",
     "seeFullDetails": "Vaata kogu teavet",
     "privacyPolicyPrefix": "Sinu andmeid töödeldakse nii, nagu on kirjeldatud",
     "privacyPolicy": "Kilo privaatsuspoliitikas",

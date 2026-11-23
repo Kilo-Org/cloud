@@ -3284,6 +3284,7 @@
     "featureFlagsWho": "PostHog, ọrụ na-achịkwa njirimara.",
     "helpImprove": "Nyere aka melite Kilo",
     "helpImproveDescription": "Kekọrịta data nyocha ojiji ngwa na-enweghị njirimara gị, yana ebe ị si nweta ngwa ahụ. Ị nwere ike ịgbanwe nke a oge ọ bụla n'okpuru $t(common.profile) · $t(profile.privacyChoices).",
+    "helpImproveReviewDescription": "Kekọrịta data nyocha ojiji ngwa na-enweghị njirimara gị, yana ebe ị si nweta ngwa ahụ.",
     "seeFullDetails": "Hụ nkọwa zuru ezu",
     "privacyPolicyPrefix": "A na-ejikwa data gị dịka",
     "privacyPolicy": "Amụma nzuzo Kilo",

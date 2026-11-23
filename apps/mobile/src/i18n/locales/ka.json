@@ -3338,6 +3338,7 @@
     "featureFlagsWho": "PostHog, ფუნქციების ჩართვა-გამორთვის სერვისი.",
     "helpImprove": "Kilo-ს გაუმჯობესებაში დახმარება",
     "helpImproveDescription": "გააზიარეთ აპის გამოყენების ანონიმური მონაცემები და ინსტალაციის წყარო. ამ არჩევანის შეცვლა ნებისმიერ დროს შეგიძლიათ აქ: $t(common.profile) · $t(profile.privacyChoices).",
+    "helpImproveReviewDescription": "გააზიარეთ აპის გამოყენების ანონიმური მონაცემები და ინსტალაციის წყარო.",
     "seeFullDetails": "სრული დეტალების ნახვა",
     "privacyPolicyPrefix": "თქვენი მონაცემების დამუშავების წესებს ადგენს",
     "privacyPolicy": "Kilo-ს კონფიდენციალურობის პოლიტიკა",

@@ -3527,6 +3527,7 @@
     "featureFlagsWho": "PostHog, an tseirbhís bratach gné.",
     "helpImprove": "Cuidigh le Kilo a fheabhsú",
     "helpImproveDescription": "Roinn sonraí anailísíochta gan ainm faoin táirge agus foinse na suiteála. Is féidir leat é seo a athrú am ar bith faoin ró ar an gcluaisín $t(common.profile) · $t(profile.privacyChoices).",
+    "helpImproveReviewDescription": "Roinn sonraí anailísíochta gan ainm faoin táirge agus foinse na suiteála.",
     "seeFullDetails": "Féach ar na sonraí iomlána",
     "privacyPolicyPrefix": "Láimhseáiltear do shonraí de réir an pholasaí seo:",
     "privacyPolicy": "Polasaí príobháideachta Kilo",

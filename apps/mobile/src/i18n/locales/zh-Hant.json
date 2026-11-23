@@ -2742,6 +2742,7 @@
     "featureFlagsWho": "PostHog，功能旗標服務。",
     "helpImprove": "協助改善 Kilo",
     "helpImproveDescription": "分享匿名的產品分析資料與安裝來源。你隨時可以在「$t(common.profile) · $t(profile.privacyChoices)」這一列中變更此選項。",
+    "helpImproveReviewDescription": "分享匿名的產品分析資料與安裝來源。",
     "seeFullDetails": "查看完整說明",
     "privacyPolicyPrefix": "你的資料處理方式依據",
     "privacyPolicy": "Kilo 隱私權政策",

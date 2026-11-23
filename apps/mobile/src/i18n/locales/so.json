@@ -3338,6 +3338,7 @@
     "featureFlagsWho": "PostHog, adeegga calaamadaha sifooyinka.",
     "helpImprove": "Ka caawi horumarinta Kilo",
     "helpImproveDescription": "Wadaag xogta falanqaynta isticmaalka ee aan aqoonsigaaga muujin iyo halka rakibaaddu ka timid. Tan waad beddeli kartaa wakhti kasta adigoo raacaya $t(common.profile) · $t(profile.privacyChoices).",
+    "helpImproveReviewDescription": "Wadaag xogta falanqaynta isticmaalka ee aan aqoonsigaaga muujin iyo halka rakibaaddu ka timid.",
     "seeFullDetails": "Eeg faahfaahinta buuxda",
     "privacyPolicyPrefix": "Xogtaada waxaa lagu maamulaa sida ku xusan",
     "privacyPolicy": "Siyaasadda asturnaanta ee Kilo",

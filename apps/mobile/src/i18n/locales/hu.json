@@ -3338,6 +3338,7 @@
     "featureFlagsWho": "PostHog, a funkciókapcsoló-szolgáltatás.",
     "helpImprove": "Segíts a Kilo fejlesztésében",
     "helpImproveDescription": "Oszd meg névtelenül az alkalmazás használati adatait és a telepítés forrását. Ezt bármikor módosíthatod a $t(common.profile) · $t(profile.privacyChoices) alatt.",
+    "helpImproveReviewDescription": "Oszd meg névtelenül az alkalmazás használati adatait és a telepítés forrását.",
     "seeFullDetails": "Részletek megtekintése",
     "privacyPolicyPrefix": "Az adataid kezelésének alapja:",
     "privacyPolicy": "Kilo adatvédelmi szabályzata",

@@ -3338,6 +3338,7 @@
     "featureFlagsWho": "PostHog, ominaisuuslippupalvelu.",
     "helpImprove": "Auta parantamaan Kiloa",
     "helpImproveDescription": "Jaa anonyymejä tietoja sovelluksen käytöstä ja asennuksen lähteestä. Voit muuttaa asetusta milloin tahansa kohdassa $t(common.profile) · $t(profile.privacyChoices).",
+    "helpImproveReviewDescription": "Jaa anonyymejä tietoja sovelluksen käytöstä ja asennuksen lähteestä.",
     "seeFullDetails": "Näytä täydet tiedot",
     "privacyPolicyPrefix": "Tietojesi käsittelyä ohjaa",
     "privacyPolicy": "Kilon tietosuojakäytäntö",

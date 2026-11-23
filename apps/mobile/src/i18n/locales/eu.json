@@ -3338,6 +3338,7 @@
     "featureFlagsWho": "PostHog, funtzio-banderen zerbitzua.",
     "helpImprove": "Lagundu Kilo hobetzen",
     "helpImproveDescription": "Partekatu erabilerari buruzko datu anonimoak eta instalazioaren jatorria. Aukera hau edonoiz alda dezakezu $t(common.profile) · $t(profile.privacyChoices) errenkadan.",
+    "helpImproveReviewDescription": "Partekatu erabilerari buruzko datu anonimoak eta instalazioaren jatorria.",
     "seeFullDetails": "Ikusi xehetasun osoak",
     "privacyPolicyPrefix": "Zure datuak politika honen arabera kudeatzen dira:",
     "privacyPolicy": "Kilo-ren pribatutasun-politika",

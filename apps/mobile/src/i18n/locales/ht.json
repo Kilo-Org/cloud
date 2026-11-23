@@ -3338,6 +3338,7 @@
     "featureFlagsWho": "PostHog, sèvis drapo fonksyon yo.",
     "helpImprove": "Ede amelyore Kilo",
     "helpImproveDescription": "Pataje done anonim sou itilizasyon aplikasyon an ak sous enstalasyon an. Ou ka chanje sa nenpòt lè anba liy $t(common.profile) · $t(profile.privacyChoices).",
+    "helpImproveReviewDescription": "Pataje done anonim sou itilizasyon aplikasyon an ak sous enstalasyon an.",
     "seeFullDetails": "Gade tout detay yo",
     "privacyPolicyPrefix": "Yo jere done ou yo dapre",
     "privacyPolicy": "Politik konfidansyalite Kilo",

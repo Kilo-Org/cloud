@@ -3282,6 +3282,7 @@
     "featureFlagsWho": "PostHog ដែលជាសេវាគ្រប់គ្រងការបើកបិទមុខងារ។",
     "helpImprove": "ជួយកែលម្អ Kilo",
     "helpImproveDescription": "ចែករំលែកទិន្នន័យវិភាគការប្រើប្រាស់ផលិតផល និងប្រភពដំឡើងដោយមិនបង្ហាញអត្តសញ្ញាណ។ អ្នកអាចផ្លាស់ប្តូរជម្រើសនេះបានគ្រប់ពេលនៅក្រោម $t(common.profile) · $t(profile.privacyChoices)។",
+    "helpImproveReviewDescription": "ចែករំលែកទិន្នន័យវិភាគការប្រើប្រាស់ផលិតផល និងប្រភពដំឡើងដោយមិនបង្ហាញអត្តសញ្ញាណ។",
     "seeFullDetails": "មើលព័ត៌មានលម្អិតពេញលេញ",
     "privacyPolicyPrefix": "ទិន្នន័យរបស់អ្នកត្រូវបានគ្រប់គ្រងដោយអនុលោមតាម",
     "privacyPolicy": "គោលការណ៍ឯកជនភាព Kilo",

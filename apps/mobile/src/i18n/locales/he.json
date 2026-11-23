@@ -2813,6 +2813,7 @@
     "featureFlagsWho": "PostHog, שירות לניהול דגלי תכונות.",
     "helpImprove": "עזרה בשיפור Kilo",
     "helpImproveDescription": "שתף נתוני שימוש אנונימיים ואת מקור ההתקנה. אפשר לשנות את הבחירה בכל עת תחת $t(common.profile) · $t(profile.privacyChoices).",
+    "helpImproveReviewDescription": "שתף נתוני שימוש אנונימיים ואת מקור ההתקנה.",
     "seeFullDetails": "לפרטים המלאים",
     "privacyPolicyPrefix": "הנתונים שלך מטופלים לפי",
     "privacyPolicy": "מדיניות הפרטיות של Kilo",

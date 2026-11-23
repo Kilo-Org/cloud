@@ -2743,6 +2743,7 @@
     "featureFlagsWho": "PostHog, layanan feature flag.",
     "helpImprove": "Bantu tingkatkan Kilo",
     "helpImproveDescription": "Bagikan data analitik produk anonim dan sumber pemasangan aplikasi. Kamu dapat mengubahnya kapan saja di baris $t(common.profile) · $t(profile.privacyChoices).",
+    "helpImproveReviewDescription": "Bagikan data analitik produk anonim dan sumber pemasangan aplikasi.",
     "seeFullDetails": "Lihat detail lengkap",
     "privacyPolicyPrefix": "Datamu dikelola sesuai dengan",
     "privacyPolicy": "Kebijakan privasi Kilo",

@@ -3401,6 +3401,7 @@
     "featureFlagsWho": "PostHog, serviciul de feature flags.",
     "helpImprove": "Ajută la îmbunătățirea Kilo",
     "helpImproveDescription": "Partajează date anonime despre utilizarea aplicației și sursa instalării. Poți modifica oricând această opțiune din fila $t(common.profile) · $t(profile.privacyChoices).",
+    "helpImproveReviewDescription": "Partajează date anonime despre utilizarea aplicației și sursa instalării.",
     "seeFullDetails": "Vezi toate detaliile",
     "privacyPolicyPrefix": "Datele tale sunt gestionate conform",
     "privacyPolicy": "Politicii de confidențialitate Kilo",

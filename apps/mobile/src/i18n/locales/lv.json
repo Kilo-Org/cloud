@@ -3401,6 +3401,7 @@
     "featureFlagsWho": "PostHog, funkciju karogu pakalpojums.",
     "helpImprove": "Palīdzēt uzlabot Kilo",
     "helpImproveDescription": "Kopīgo anonīmus datus par lietotnes lietošanu un instalēšanas avotu. To vari jebkurā laikā mainīt sadaļā $t(common.profile) · $t(profile.privacyChoices).",
+    "helpImproveReviewDescription": "Kopīgo anonīmus datus par lietotnes lietošanu un instalēšanas avotu.",
     "seeFullDetails": "Skatīt visu informāciju",
     "privacyPolicyPrefix": "Tavi dati tiek apstrādāti saskaņā ar",
     "privacyPolicy": "Kilo privātuma politiku",

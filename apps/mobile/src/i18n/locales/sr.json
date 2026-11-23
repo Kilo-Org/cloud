@@ -3401,6 +3401,7 @@
     "featureFlagsWho": "PostHog, servis za zastavice funkcija.",
     "helpImprove": "Pomozi da poboljšamo Kilo",
     "helpImproveDescription": "Deli anonimne podatke o korišćenju aplikacije i izvoru instalacije. Ovu opciju možeš da promeniš u bilo kom trenutku pod stavkom $t(common.profile) · $t(profile.privacyChoices).",
+    "helpImproveReviewDescription": "Deli anonimne podatke o korišćenju aplikacije i izvoru instalacije.",
     "seeFullDetails": "Vidi sve detalje",
     "privacyPolicyPrefix": "Tvoji podaci se obrađuju prema",
     "privacyPolicy": "Kilo politici privatnosti",

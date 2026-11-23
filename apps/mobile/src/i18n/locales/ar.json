@@ -2924,6 +2924,7 @@
     "featureFlagsWho": "PostHog، خدمة علامات الميزات.",
     "helpImprove": "المساعدة في تحسين Kilo",
     "helpImproveDescription": "شارك بيانات تحليل استخدام المنتج دون الكشف عن هويتك، ومصدر تثبيت التطبيق. يمكنك تغيير هذا الخيار في أي وقت ضمن $t(common.profile) · $t(profile.privacyChoices).",
+    "helpImproveReviewDescription": "شارك بيانات تحليل استخدام المنتج دون الكشف عن هويتك، ومصدر تثبيت التطبيق.",
     "seeFullDetails": "عرض التفاصيل الكاملة",
     "privacyPolicyPrefix": "نعالج بياناتك وفق",
     "privacyPolicy": "سياسة خصوصية Kilo",

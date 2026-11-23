@@ -3338,6 +3338,7 @@
     "featureFlagsWho": "PostHog, o servizo de indicadores de funcións.",
     "helpImprove": "Axudar a mellorar Kilo",
     "helpImproveDescription": "Comparte estatísticas de uso anónimas e a orixe da instalación. Podes cambiar esta opción en calquera momento en $t(common.profile) · $t(profile.privacyChoices).",
+    "helpImproveReviewDescription": "Comparte estatísticas de uso anónimas e a orixe da instalación.",
     "seeFullDetails": "Ver todos os detalles",
     "privacyPolicyPrefix": "Os teus datos trátanse segundo a",
     "privacyPolicy": "Política de privacidade de Kilo",

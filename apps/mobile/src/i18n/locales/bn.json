@@ -3338,6 +3338,7 @@
     "featureFlagsWho": "PostHog, ফিচার-ফ্ল্যাগ পরিষেবা।",
     "helpImprove": "Kilo উন্নত করতে সাহায্য করুন",
     "helpImproveDescription": "আপনার পরিচয় ছাড়া অ্যাপ ব্যবহারের পরিসংখ্যান ও ইনস্টলের উৎস শেয়ার করুন। যেকোনো সময় $t(common.profile) · $t(profile.privacyChoices) এর অধীনে এই পছন্দ বদলাতে পারবেন।",
+    "helpImproveReviewDescription": "আপনার পরিচয় ছাড়া অ্যাপ ব্যবহারের পরিসংখ্যান ও ইনস্টলের উৎস শেয়ার করুন।",
     "seeFullDetails": "পুরো বিস্তারিত দেখুন",
     "privacyPolicyPrefix": "আপনার ডেটা ব্যবহারে আমরা মেনে চলি",
     "privacyPolicy": "Kilo-এর গোপনীয়তা নীতি",

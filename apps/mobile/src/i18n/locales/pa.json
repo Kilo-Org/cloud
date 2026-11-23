@@ -3338,6 +3338,7 @@
     "featureFlagsWho": "PostHog, ਫੀਚਰ-ਫਲੈਗ ਸੇਵਾ।",
     "helpImprove": "Kilo ਨੂੰ ਸੁਧਾਰਨ ਵਿੱਚ ਮਦਦ ਕਰੋ",
     "helpImproveDescription": "ਆਪਣੀ ਪਛਾਣ ਦੱਸੇ ਬਿਨਾਂ ਐਪ ਦੀ ਵਰਤੋਂ ਦੇ ਅੰਕੜੇ ਅਤੇ ਇੰਸਟਾਲ ਕਰਨ ਦੇ ਸਰੋਤ ਦੀ ਜਾਣਕਾਰੀ ਸਾਂਝੀ ਕਰੋ। ਤੁਸੀਂ ਇਹ ਚੋਣ ਕਿਸੇ ਵੀ ਸਮੇਂ $t(common.profile) · $t(profile.privacyChoices) ਦੀ ਕਤਾਰ ਵਿੱਚ ਬਦਲ ਸਕਦੇ ਹੋ।",
+    "helpImproveReviewDescription": "ਆਪਣੀ ਪਛਾਣ ਦੱਸੇ ਬਿਨਾਂ ਐਪ ਦੀ ਵਰਤੋਂ ਦੇ ਅੰਕੜੇ ਅਤੇ ਇੰਸਟਾਲ ਕਰਨ ਦੇ ਸਰੋਤ ਦੀ ਜਾਣਕਾਰੀ ਸਾਂਝੀ ਕਰੋ।",
     "seeFullDetails": "ਪੂਰੇ ਵੇਰਵੇ ਵੇਖੋ",
     "privacyPolicyPrefix": "ਤੁਹਾਡਾ ਡੇਟਾ ਇਸ ਨੀਤੀ ਅਨੁਸਾਰ ਸੰਭਾਲਿਆ ਜਾਂਦਾ ਹੈ:",
     "privacyPolicy": "Kilo ਦੀ ਗੋਪਨੀਯਤਾ ਨੀਤੀ",

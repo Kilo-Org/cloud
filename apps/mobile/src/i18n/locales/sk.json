@@ -3464,6 +3464,7 @@
     "featureFlagsWho": "PostHog, služba pre príznaky funkcií.",
     "helpImprove": "Pomôcť vylepšiť Kilo",
     "helpImproveDescription": "Zdieľaj anonymné údaje o používaní aplikácie a zdroj inštalácie. Túto voľbu môžeš kedykoľvek zmeniť pod položkou $t(common.profile) · $t(profile.privacyChoices).",
+    "helpImproveReviewDescription": "Zdieľaj anonymné údaje o používaní aplikácie a zdroj inštalácie.",
     "seeFullDetails": "Zobraziť všetky podrobnosti",
     "privacyPolicyPrefix": "Tvoje údaje spracúvame podľa",
     "privacyPolicy": "Zásad ochrany súkromia Kilo",

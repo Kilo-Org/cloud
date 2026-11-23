@@ -3282,6 +3282,7 @@
     "featureFlagsWho": "PostHog, perkhidmatan bendera ciri.",
     "helpImprove": "Bantu menambah baik Kilo",
     "helpImproveDescription": "Kongsi analitik produk tanpa nama dan sumber pemasangan. Anda boleh mengubahnya pada bila-bila masa di bawah $t(common.profile) · $t(profile.privacyChoices).",
+    "helpImproveReviewDescription": "Kongsi analitik produk tanpa nama dan sumber pemasangan.",
     "seeFullDetails": "Lihat butiran penuh",
     "privacyPolicyPrefix": "Data anda dikendalikan mengikut",
     "privacyPolicy": "Dasar privasi Kilo",

@@ -3338,6 +3338,7 @@
     "featureFlagsWho": "PostHog, þjónusta fyrir eiginleikaflögg.",
     "helpImprove": "Hjálpa til við að bæta Kilo",
     "helpImproveDescription": "Deildu nafnlausum notkunargögnum og upplýsingum um hvaðan uppsetningin kom. Þú getur breytt þessu hvenær sem er í flipanum $t(common.profile) · $t(profile.privacyChoices).",
+    "helpImproveReviewDescription": "Deildu nafnlausum notkunargögnum og upplýsingum um hvaðan uppsetningin kom.",
     "seeFullDetails": "Sjá allar upplýsingar",
     "privacyPolicyPrefix": "Farið er með gögnin þín samkvæmt",
     "privacyPolicy": "Persónuverndarstefnu Kilo",

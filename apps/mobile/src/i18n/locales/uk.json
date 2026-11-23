@@ -2850,6 +2850,7 @@
     "featureFlagsWho": "PostHog, сервіс прапорців функцій.",
     "helpImprove": "Допомагати покращувати Kilo",
     "helpImproveDescription": "Надсилайте анонімні дані про використання застосунку та джерело його встановлення. Цей вибір можна будь-коли змінити в розділі $t(common.profile) · $t(profile.privacyChoices).",
+    "helpImproveReviewDescription": "Надсилайте анонімні дані про використання застосунку та джерело його встановлення.",
     "seeFullDetails": "Переглянути повні відомості",
     "privacyPolicyPrefix": "Ваші дані обробляються відповідно до",
     "privacyPolicy": "Політики конфіденційності Kilo",

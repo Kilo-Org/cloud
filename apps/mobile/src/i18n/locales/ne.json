@@ -3338,6 +3338,7 @@
     "featureFlagsWho": "PostHog, फिचर-फ्ल्याग सेवा।",
     "helpImprove": "Kilo सुधार्न मद्दत गर्नुहोस्",
     "helpImproveDescription": "आफ्नो पहिचान नखुल्ने गरी एपको प्रयोगसम्बन्धी डेटा र स्थापनाको स्रोत साझा गर्नुहोस्। तपाईं यसलाई कुनै पनि बेलामा $t(common.profile) · $t(profile.privacyChoices) अन्तर्गत परिवर्तन गर्न सक्नुहुन्छ।",
+    "helpImproveReviewDescription": "आफ्नो पहिचान नखुल्ने गरी एपको प्रयोगसम्बन्धी डेटा र स्थापनाको स्रोत साझा गर्नुहोस्।",
     "seeFullDetails": "पूर्ण विवरण हेर्नुहोस्",
     "privacyPolicyPrefix": "तपाईंको डेटा व्यवस्थापनमा लागू हुने नीति:",
     "privacyPolicy": "Kilo को गोपनीयता नीति",

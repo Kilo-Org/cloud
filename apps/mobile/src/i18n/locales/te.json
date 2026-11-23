@@ -3340,6 +3340,7 @@
     "featureFlagsWho": "PostHog, ఫీచర్ ఫ్లాగ్ సేవ.",
     "helpImprove": "Kiloను మెరుగుపరచడానికి సహాయం చేయండి",
     "helpImproveDescription": "మీ గుర్తింపును వెల్లడించని ఉత్పత్తి విశ్లేషణల డేటాను, ఇన్‌స్టాల్ మూలాన్ని పంచుకోండి. దీన్ని ఎప్పుడైనా $t(common.profile) · $t(profile.privacyChoices) వరుసలో మార్చుకోవచ్చు.",
+    "helpImproveReviewDescription": "మీ గుర్తింపును వెల్లడించని ఉత్పత్తి విశ్లేషణల డేటాను, ఇన్‌స్టాల్ మూలాన్ని పంచుకోండి.",
     "seeFullDetails": "పూర్తి వివరాలను చూడండి",
     "privacyPolicyPrefix": "మీ డేటా ఎలా నిర్వహించబడుతుందో తెలిసేది",
     "privacyPolicy": "Kilo గోప్యతా విధానం",

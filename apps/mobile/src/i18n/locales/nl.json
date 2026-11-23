@@ -2776,6 +2776,7 @@
     "featureFlagsWho": "PostHog, de dienst voor feature flags.",
     "helpImprove": "Kilo helpen verbeteren",
     "helpImproveDescription": "Deel anonieme gebruiksstatistieken en de installatiebron. Je kunt dit op elk moment wijzigen onder $t(common.profile) · $t(profile.privacyChoices).",
+    "helpImproveReviewDescription": "Deel anonieme gebruiksstatistieken en de installatiebron.",
     "seeFullDetails": "Volledige details bekijken",
     "privacyPolicyPrefix": "Je gegevens worden verwerkt volgens het",
     "privacyPolicy": "Privacybeleid van Kilo",

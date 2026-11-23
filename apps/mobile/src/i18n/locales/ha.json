@@ -3338,6 +3338,7 @@
     "featureFlagsWho": "PostHog, sabis ɗin tutocin fasaloli.",
     "helpImprove": "Taimaka wajen inganta Kilo",
     "helpImproveDescription": "Raba bayanan amfani da manhaja da ba sa bayyana ko kai wane ne, da inda ka samo manhajar. Za ka iya canza wannan a kowane lokaci ƙarƙashin layin $t(common.profile) · $t(profile.privacyChoices).",
+    "helpImproveReviewDescription": "Raba bayanan amfani da manhaja da ba sa bayyana ko kai wane ne, da inda ka samo manhajar.",
     "seeFullDetails": "Duba cikakkun bayanai",
     "privacyPolicyPrefix": "Ana sarrafa bayananka bisa ga",
     "privacyPolicy": "Manufar sirrin Kilo",

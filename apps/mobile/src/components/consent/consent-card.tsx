@@ -125,6 +125,13 @@ export function ConsentCard({ mode = 'onboarding', settingsTarget }: ConsentCard
   // `optionalIsPending` owns the rule (its doc carries the reasoning and the
   // cases).
   const optionalControlPending = optionalIsPending(userId !== undefined, storedLoad);
+  // The guidance names where the choice is changed only where that is news.
+  // Onboarding runs before the first tab visit, so it names the path; the
+  // review screen sits under a header that already says it, so it stops at the
+  // sentence that says what is shared.
+  const optionalSubtitle = t(
+    mode === 'review' ? 'consent.helpImproveReviewDescription' : 'consent.helpImproveDescription'
+  );
   // The search target wraps whichever row the load state renders, under one
   // definition: a reveal therefore points at the control that appears once the
   // stored choice settles instead of pinning the placeholder that stood in for
@@ -133,7 +140,7 @@ export function ConsentCard({ mode = 'onboarding', settingsTarget }: ConsentCard
     <ConfigureRow
       icon={LineChart}
       title={t('consent.helpImprove')}
-      subtitle={t('consent.helpImproveDescription')}
+      subtitle={optionalSubtitle}
       subtitleNumberOfLines={CONSENT_OPTIONAL_SUBTITLE_LINES}
       trailing={<Skeleton className="h-8 w-14 rounded-full" />}
     />
@@ -141,7 +148,7 @@ export function ConsentCard({ mode = 'onboarding', settingsTarget }: ConsentCard
     <PreferenceRow
       icon={LineChart}
       title={t('consent.helpImprove')}
-      subtitle={t('consent.helpImproveDescription')}
+      subtitle={optionalSubtitle}
       subtitleNumberOfLines={CONSENT_OPTIONAL_SUBTITLE_LINES}
       value={optionalToggle}
       disabled={mode === 'review' && savingOptional}

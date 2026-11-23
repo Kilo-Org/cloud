@@ -3338,6 +3338,7 @@
     "featureFlagsWho": "PostHog, ang serbisyo para sa feature flag.",
     "helpImprove": "Tumulong na mapabuti ang Kilo",
     "helpImproveDescription": "Ibahagi ang datos sa paggamit ng produkto na walang pagkakakilanlan mo, pati ang pinagmulan ng pag-install. Maaari mo itong baguhin anumang oras sa ilalim ng $t(common.profile) · $t(profile.privacyChoices).",
+    "helpImproveReviewDescription": "Ibahagi ang datos sa paggamit ng produkto na walang pagkakakilanlan mo, pati ang pinagmulan ng pag-install.",
     "seeFullDetails": "Tingnan ang lahat ng detalye",
     "privacyPolicyPrefix": "Pinangangasiwaan ang iyong datos ayon sa",
     "privacyPolicy": "Patakaran sa pagkapribado ng Kilo",

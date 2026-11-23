@@ -3282,6 +3282,7 @@
     "featureFlagsWho": "PostHog บริการจัดการฟีเจอร์แฟล็ก",
     "helpImprove": "ช่วยปรับปรุง Kilo",
     "helpImproveDescription": "แชร์ข้อมูลวิเคราะห์การใช้งานแบบไม่ระบุตัวตนและแหล่งที่มาของการติดตั้ง คุณเปลี่ยนตัวเลือกนี้ได้ทุกเมื่อใต้แถว $t(common.profile) · $t(profile.privacyChoices)",
+    "helpImproveReviewDescription": "แชร์ข้อมูลวิเคราะห์การใช้งานแบบไม่ระบุตัวตนและแหล่งที่มาของการติดตั้ง",
     "seeFullDetails": "ดูรายละเอียดทั้งหมด",
     "privacyPolicyPrefix": "ข้อมูลของคุณได้รับการจัดการตาม",
     "privacyPolicy": "นโยบายความเป็นส่วนตัวของ Kilo",

@@ -2776,6 +2776,7 @@
     "featureFlagsWho": "PostHog, फ़ीचर-फ़्लैग सेवा।",
     "helpImprove": "Kilo को बेहतर बनाने में मदद करें",
     "helpImproveDescription": "अपनी पहचान बताए बिना उत्पाद के उपयोग का डेटा और इंस्टॉल का स्रोत साझा करें। इसे आप कभी भी $t(common.profile) · $t(profile.privacyChoices) पर जाकर बदल सकते हैं।",
+    "helpImproveReviewDescription": "अपनी पहचान बताए बिना उत्पाद के उपयोग का डेटा और इंस्टॉल का स्रोत साझा करें।",
     "seeFullDetails": "पूरा विवरण देखें",
     "privacyPolicyPrefix": "आपका डेटा जिस नीति के अनुसार संभाला जाता है:",
     "privacyPolicy": "Kilo की गोपनीयता नीति",

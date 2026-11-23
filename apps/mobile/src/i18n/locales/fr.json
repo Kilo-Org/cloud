@@ -2737,6 +2737,7 @@
     "featureFlagsWho": "PostHog, le service de feature flags.",
     "helpImprove": "Aider à améliorer Kilo",
     "helpImproveDescription": "Partager des données d'utilisation anonymes et l'origine de l'installation. Vous pouvez modifier ce choix à tout moment sous la rubrique $t(common.profile) · $t(profile.privacyChoices).",
+    "helpImproveReviewDescription": "Partager des données d'utilisation anonymes et l'origine de l'installation.",
     "seeFullDetails": "Voir tous les détails",
     "privacyPolicyPrefix": "Vos données sont traitées conformément à la",
     "privacyPolicy": "Politique de confidentialité de Kilo",

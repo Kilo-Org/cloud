@@ -3338,6 +3338,7 @@
     "featureFlagsWho": "PostHog, funksiya bayroqlari xizmati.",
     "helpImprove": "Kiloni yaxshilashga yordam bering",
     "helpImproveDescription": "Ilovadan foydalanish haqidagi anonim ma'lumotlar va o'rnatish manbasini ulashing. Buni istalgan vaqtda $t(common.profile) · $t(profile.privacyChoices) qatorida o'zgartirishingiz mumkin.",
+    "helpImproveReviewDescription": "Ilovadan foydalanish haqidagi anonim ma'lumotlar va o'rnatish manbasini ulashing.",
     "seeFullDetails": "To'liq tafsilotlarni ko'rish",
     "privacyPolicyPrefix": "Ma'lumotlaringizni qayta ishlash qoidalari:",
     "privacyPolicy": "Kilo maxfiylik siyosati",

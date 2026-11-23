@@ -3338,6 +3338,7 @@
     "featureFlagsWho": "PostHog، فیچر فلیگ سروس۔",
     "helpImprove": "Kilo کو بہتر بنانے میں مدد کریں",
     "helpImproveDescription": "ایپ کے استعمال کے گمنام اعداد و شمار اور انسٹالیشن کا ذریعہ شیئر کریں۔ آپ یہ انتخاب کسی بھی وقت $t(common.profile) · $t(profile.privacyChoices) کے تحت تبدیل کر سکتے ہیں۔",
+    "helpImproveReviewDescription": "ایپ کے استعمال کے گمنام اعداد و شمار اور انسٹالیشن کا ذریعہ شیئر کریں۔",
     "seeFullDetails": "مکمل تفصیلات دیکھیں",
     "privacyPolicyPrefix": "آپ کا ڈیٹا اس پالیسی کے مطابق سنبھالا جاتا ہے:",
     "privacyPolicy": "Kilo کی رازداری کی پالیسی",

@@ -3338,6 +3338,7 @@
     "featureFlagsWho": "PostHog, tjenesten for funksjonsflagg.",
     "helpImprove": "Hjelp til å forbedre Kilo",
     "helpImproveDescription": "Del anonyme bruksdata og informasjon om installasjonskilden. Du kan endre dette når som helst under $t(common.profile) · $t(profile.privacyChoices).",
+    "helpImproveReviewDescription": "Del anonyme bruksdata og informasjon om installasjonskilden.",
     "seeFullDetails": "Se alle detaljer",
     "privacyPolicyPrefix": "Dataene dine behandles i samsvar med",
     "privacyPolicy": "Kilos personvernerklæring",

@@ -3338,6 +3338,7 @@
     "featureFlagsWho": "PostHog, услугата за флагове на функции.",
     "helpImprove": "Помогни за подобряването на Kilo",
     "helpImproveDescription": "Споделяй анонимни данни за използването на приложението и източника на инсталацията. Можеш да промениш избора си по всяко време от $t(common.profile) · $t(profile.privacyChoices).",
+    "helpImproveReviewDescription": "Споделяй анонимни данни за използването на приложението и източника на инсталацията.",
     "seeFullDetails": "Виж всички подробности",
     "privacyPolicyPrefix": "Данните ти се обработват съгласно",
     "privacyPolicy": "Политиката за поверителност на Kilo",

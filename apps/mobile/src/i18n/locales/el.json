@@ -3338,6 +3338,7 @@
     "featureFlagsWho": "PostHog, η υπηρεσία feature flags.",
     "helpImprove": "Συμβολή στη βελτίωση του Kilo",
     "helpImproveDescription": "Κοινοποίησε ανώνυμα στατιστικά χρήσης και την πηγή εγκατάστασης. Μπορείς να αλλάξεις αυτή την επιλογή ανά πάσα στιγμή στη γραμμή $t(common.profile) · $t(profile.privacyChoices).",
+    "helpImproveReviewDescription": "Κοινοποίησε ανώνυμα στατιστικά χρήσης και την πηγή εγκατάστασης.",
     "seeFullDetails": "Προβολή πλήρων λεπτομερειών",
     "privacyPolicyPrefix": "Η διαχείριση των δεδομένων σου γίνεται σύμφωνα με την",
     "privacyPolicy": "Πολιτική απορρήτου του Kilo",

@@ -3464,6 +3464,7 @@
     "featureFlagsWho": "PostHog, сэрвіс сцягоў функцый.",
     "helpImprove": "Дапамагчы палепшыць Kilo",
     "helpImproveDescription": "Дазвольце перадаваць ананімныя даныя аб выкарыстанні праграмы і крыніцы яе ўсталявання. Вы можаце змяніць гэта ў любы час у радку $t(common.profile) · $t(profile.privacyChoices).",
+    "helpImproveReviewDescription": "Дазвольце перадаваць ананімныя даныя аб выкарыстанні праграмы і крыніцы яе ўсталявання.",
     "seeFullDetails": "Паказаць усе падрабязнасці",
     "privacyPolicyPrefix": "Вашы даныя апрацоўваюцца адпаведна",
     "privacyPolicy": "Палітыцы прыватнасці Kilo",

@@ -3338,6 +3338,7 @@
     "featureFlagsWho": "PostHog, ilay tolotra fitantanana endri-javatra.",
     "helpImprove": "Ampio hanatsara ny Kilo",
     "helpImproveDescription": "Zarao ny antontanisa fampiasana tsy ahafantarana anao sy ny loharanon'ny fametrahana. Azonao ovaina amin'ny fotoana rehetra ao amin'ny andalana $t(common.profile) · $t(profile.privacyChoices).",
+    "helpImproveReviewDescription": "Zarao ny antontanisa fampiasana tsy ahafantarana anao sy ny loharanon'ny fametrahana.",
     "seeFullDetails": "Jereo ny antsipiriany feno",
     "privacyPolicyPrefix": "Ny angonao dia karakaraina araka ny",
     "privacyPolicy": "Politikan'ny Kilo momba ny fiainana manokana",

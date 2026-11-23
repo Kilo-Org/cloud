@@ -2741,6 +2741,7 @@
     "featureFlagsWho": "PostHog，功能开关服务。",
     "helpImprove": "帮助改进 Kilo",
     "helpImproveDescription": "共享匿名的产品分析数据和安装来源。你可以随时在“$t(common.profile) · $t(profile.privacyChoices)”中更改此选项。",
+    "helpImproveReviewDescription": "共享匿名的产品分析数据和安装来源。",
     "seeFullDetails": "查看完整详情",
     "privacyPolicyPrefix": "处理你的数据所依据的政策为",
     "privacyPolicy": "Kilo 隐私政策",

@@ -3287,6 +3287,7 @@
     "featureFlagsWho": "PostHog, iṣẹ́ tí ń ṣàkóso àsíá àwọn iṣẹ́ ohun èlò.",
     "helpImprove": "Ṣèrànwọ́ láti mú Kilo dára sí i",
     "helpImproveDescription": "Pín ìṣirò lílo tí kò fi ìdánimọ̀ rẹ hàn àti orísun fífi ohun èlò sórí ẹ̀rọ. O lè yí èyí padà nígbàkigbà lábẹ́ $t(common.profile) · $t(profile.privacyChoices).",
+    "helpImproveReviewDescription": "Pín ìṣirò lílo tí kò fi ìdánimọ̀ rẹ hàn àti orísun fífi ohun èlò sórí ẹ̀rọ.",
     "seeFullDetails": "Wo àlàyé kíkún",
     "privacyPolicyPrefix": "A ń bójú tó dátà rẹ ní ìbámu pẹ̀lú",
     "privacyPolicy": "Ìlànà àṣírí Kilo",

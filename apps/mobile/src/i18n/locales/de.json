@@ -2776,6 +2776,7 @@
     "featureFlagsWho": "PostHog, der Feature-Flag-Dienst.",
     "helpImprove": "Zur Verbesserung von Kilo beitragen",
     "helpImproveDescription": "Teile anonyme Daten zur Produktnutzung und zur Installationsquelle. Du kannst das jederzeit unter $t(common.profile) · $t(profile.privacyChoices) ändern.",
+    "helpImproveReviewDescription": "Teile anonyme Daten zur Produktnutzung und zur Installationsquelle.",
     "seeFullDetails": "Vollständige Details ansehen",
     "privacyPolicyPrefix": "Für die Verarbeitung deiner Daten gilt die",
     "privacyPolicy": "Kilo-Datenschutzrichtlinie",

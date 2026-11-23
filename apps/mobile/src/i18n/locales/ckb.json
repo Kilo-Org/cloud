@@ -3338,6 +3338,7 @@
     "featureFlagsWho": "PostHog، خزمەتگوزاریی ئاڵای تایبەتمەندییەکان.",
     "helpImprove": "یارمەتیدان بۆ باشترکردنی Kilo",
     "helpImproveDescription": "زانیارییە بێناسنامەکانی شیکاریی بەکارهێنانی بەرهەم و سەرچاوەی دامەزراندن هاوبەش بکە. دەتوانیت هەر کاتێک لە ژێر ڕیزی $t(common.profile) · $t(profile.privacyChoices) بیگۆڕیت.",
+    "helpImproveReviewDescription": "زانیارییە بێناسنامەکانی شیکاریی بەکارهێنانی بەرهەم و سەرچاوەی دامەزراندن هاوبەش بکە.",
     "seeFullDetails": "بینینی هەموو وردەکارییەکان",
     "privacyPolicyPrefix": "بۆ مامەڵەکردن لەگەڵ زانیارییەکانت، پابەندین بە",
     "privacyPolicy": "سیاسەتی پاراستنی تایبەتیی Kilo",

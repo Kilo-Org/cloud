@@ -443,10 +443,9 @@ describe('withoutLeadingDirectionMarks', () => {
     ['a one-dash underline under paragraph text', 'Title\n-\n\u200FLatin text'],
     ['a two-dash underline under paragraph text', 'Title\n--\n\u200FLatin text'],
     ['an equals underline inside the same quote', '> Title\n>===\n\u200FLatin text'],
-    // An underline under a list item's paragraph closes that paragraph and the
-    // line after it is an item paragraph of its own, at the item's content
-    // indent or at column zero alike.
-    ['an underline under a list item’s paragraph', '- Title\n===\n\u200FLatin text'],
+    // An underline under a list item's paragraph closes that paragraph only at
+    // the item's own content indent: there `===` is inside the item and the line
+    // under the heading starts a block of its own.
     ['an indented underline under a list item’s paragraph', '- Title\n  ===\n\u200FLatin text'],
     ['a fence that closed', '```js\nconst a = 1;\n```\n\u200FLatin text'],
     ['a reference definition', '[ref]: https://example.com\n\u200FLatin text'],
@@ -496,6 +495,14 @@ describe('withoutLeadingDirectionMarks', () => {
       '<div>x</div>\n\u200FLatin text',
       '<div>x</div>\n\u200FLatin text',
     ],
+    // A setext underline cannot be a lazy continuation line of a list item, so
+    // `===` at column zero under `- Title` is a paragraph line of its own and
+    // the line under it is that paragraph's lazy continuation.
+    [
+      'an underline at column zero under a list item’s paragraph',
+      '- Title\n===\n\u200FLatin text',
+      '- Title\n===\n\u200FLatin text',
+    ],
     // A definition cannot interrupt a paragraph, so inside one the definition
     // line is that paragraph’s own text and the line under it continues it.
     [
@@ -518,6 +525,52 @@ describe('withoutLeadingDirectionMarks', () => {
     ],
   ])('keeps a mark in %s', (_shape, value, expected) => {
     expect(withoutLeadingDirectionMarks(value)).toBe(expected);
+  });
+
+  // CommonMark's raw-text start condition is the tag name followed by
+  // whitespace, `>`, or the end of the line, so a tag that merely begins with
+  // one of those names opens no block. Read with a word boundary it did, and
+  // since its `</script>` never arrives the block stayed open for the rest of
+  // the message and every later block kept its mark.
+  it('does not open a raw-text block on a tag name that only starts with one', () => {
+    const value = 'Text\n<script-src x>\n# Heading\n\u200FLatin text';
+    expect(withoutLeadingDirectionMarks(value)).toBe('Text\n<script-src x>\n# Heading\nLatin text');
+  });
+
+  // A CDATA section opens an HTML block of a terminator kind, so a mark in
+  // front of its opener is refused like one in front of any other block:
+  // stripped, it turns the paragraph into a raw block that renders nothing.
+  it('keeps a mark in front of a CDATA section', () => {
+    const value = '\u200F<![CDATA[x]]>';
+    expect(withoutLeadingDirectionMarks(value)).toBe(value);
+  });
+
+  // A tag-kind HTML block — a known block tag, or one complete tag alone on its
+  // line — has no terminator and runs to the next blank line. A `#` or a run of
+  // dashes inside it is that block's copy, so the line under it is still raw
+  // text and keeps its mark; only the line under the blank line opens a block.
+  it('keeps a mark inside a tag-kind HTML block that holds markdown-shaped lines', () => {
+    const heading = '<div>\n# not a heading\n\u200FLatin text';
+    expect(withoutLeadingDirectionMarks(heading)).toBe(heading);
+    const underline = '<div>\n===\n\u200FLatin text';
+    expect(withoutLeadingDirectionMarks(underline)).toBe(underline);
+    expect(withoutLeadingDirectionMarks('<div>\n\n\u200FLatin text')).toBe('<div>\n\nLatin text');
+  });
+
+  // Only a known block tag, or one complete tag alone on its line, opens a
+  // tag-kind block: an inline tag line is the paragraph's own text, a complete
+  // tag cannot interrupt a paragraph, and a raw-text element's name belongs to
+  // its terminator kind, whose start needs whitespace, `>` or the line's end.
+  it('does not read an inline tag or a tag inside a paragraph as an HTML block', () => {
+    expect(withoutLeadingDirectionMarks('<span>text\n# Heading\n\u200FLatin text')).toBe(
+      '<span>text\n# Heading\nLatin text'
+    );
+    expect(withoutLeadingDirectionMarks('Text\n<a href="/x">\n# Heading\n\u200FLatin text')).toBe(
+      'Text\n<a href="/x">\n# Heading\nLatin text'
+    );
+    expect(withoutLeadingDirectionMarks('<script/>\n# Heading\n\u200FLatin text')).toBe(
+      '<script/>\n# Heading\nLatin text'
+    );
   });
 
   // A setext underline closes the paragraph above it; a run of equals that starts

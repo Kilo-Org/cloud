@@ -465,10 +465,120 @@ const THEMATIC_BREAK_START = /^ {0,3}(?:(?:\*[ \t]*){3,}|(?:-[ \t]*){3,}|(?:_[ \
  * it, so the dash run here stops at two. */
 const SETEXT_UNDERLINE_START = /^ {0,3}(?:=+|-{1,2})[ \t]*$/;
 
-/** An HTML block's opening line: a tag, a comment, a processing instruction or
- * a declaration at the line's start. Inline content after a mark is not that,
- * because the raw line does not begin with the tag. */
-const HTML_BLOCK_START = /^ {0,3}(?:<!--|<\?|<![A-Za-z]|<\/?[A-Za-z][A-Za-z0-9-]*(?:[ \t/>]|$))/;
+/** The quote depth and content indent of the paragraph text directly above.
+ * The depth is the number of `>` markers and the indent is measured from the
+ * end of the quote prefix: `> Title` and `>===` sit in the same quote though
+ * their prefixes differ by a character. */
+type ParagraphContainer = { depth: number; indent: number };
+
+/**
+ * Whether `body` is the setext underline of `paragraph`, the paragraph text
+ * directly above it.
+ *
+ * Under CommonMark a setext underline cannot be a lazy continuation line: it
+ * closes the paragraph only from inside that paragraph's own container. So the
+ * line must sit at the paragraph's quote depth and be indented from the
+ * paragraph's content indent up to three spaces past it — the most a line may be
+ * indented and still be that paragraph's text. Under a list item's paragraph,
+ * `===` at column zero is outside the item and is a paragraph line of its own,
+ * where `  ===` at the item's content indent underlines the item's paragraph.
+ */
+function underlinesParagraph(
+  paragraph: ParagraphContainer | undefined,
+  depth: number,
+  body: string
+): boolean {
+  if (paragraph === undefined || paragraph.depth !== depth || !SETEXT_UNDERLINE_START.test(body)) {
+    return false;
+  }
+  const indent = /^ */.exec(body)?.[0].length ?? 0;
+  return indent >= paragraph.indent && indent <= paragraph.indent + 3;
+}
+
+/** An HTML block's opening line: a tag, a comment, a processing instruction, a
+ * CDATA section or a declaration at the line's start. Inline content after a
+ * mark is not that, because the raw line does not begin with the tag. A CDATA
+ * section opens one of the terminator kinds, so its opener is listed apart from
+ * the declaration's `<![`: a mark in front of it is refused like any other. */
+const HTML_BLOCK_START =
+  /^ {0,3}(?:<!--|<\?|<!\[CDATA\[|<![A-Za-z]|<\/?[A-Za-z][A-Za-z0-9-]*(?:[ \t/>]|$))/;
+
+/** The block tag names of a CommonMark type 6 HTML block. */
+const HTML_BLOCK_TAG_NAMES = [
+  'address',
+  'article',
+  'aside',
+  'base',
+  'basefont',
+  'blockquote',
+  'body',
+  'caption',
+  'center',
+  'col',
+  'colgroup',
+  'dd',
+  'details',
+  'dialog',
+  'dir',
+  'div',
+  'dl',
+  'dt',
+  'fieldset',
+  'figcaption',
+  'figure',
+  'footer',
+  'form',
+  'frame',
+  'frameset',
+  'h[1-6]',
+  'head',
+  'header',
+  'hr',
+  'html',
+  'iframe',
+  'legend',
+  'li',
+  'link',
+  'main',
+  'menu',
+  'menuitem',
+  'nav',
+  'noframes',
+  'ol',
+  'optgroup',
+  'option',
+  'p',
+  'param',
+  'section',
+  'source',
+  'summary',
+  'table',
+  'tbody',
+  'td',
+  'tfoot',
+  'th',
+  'thead',
+  'title',
+  'tr',
+  'track',
+  'ul',
+].join('|');
+
+/** A known block tag at the line's start, followed by whitespace, the line's
+ * end, `>` or `/>`: a CommonMark type 6 HTML block, which runs to the next blank
+ * line. Unlike the tag-alone kind it may interrupt a paragraph. */
+const HTML_BLOCK_TAG_START = new RegExp(
+  String.raw`^ {0,3}<\/?(?:${HTML_BLOCK_TAG_NAMES})(?:[ \t]|\/?>|$)`,
+  'i'
+);
+
+/** One complete tag and nothing else but whitespace — an open tag with its
+ * attributes, or a closing tag — on a line of its own: a CommonMark type 7 HTML
+ * block, which runs to the next blank line. It cannot interrupt a paragraph, and
+ * its open tag may not be a raw-text element's name, whose own kind has a
+ * terminator instead. */
+const COMPLETE_TAG_LINE =
+  /^ {0,3}(?:<(?!script[ \t/>]|style[ \t/>]|pre[ \t/>]|textarea[ \t/>])[A-Za-z][A-Za-z0-9-]*(?:[ \t]+[A-Za-z_:][A-Za-z0-9_.:-]*(?:[ \t]*=[ \t]*(?:[^ \t"'=<>`]+|'[^']*'|"[^"]*"))?)*[ \t]*\/?>|<\/[A-Za-z][A-Za-z0-9-]*[ \t]*>)[ \t]*$/;
 
 /**
  * The HTML block `body` opens when it is a kind that CommonMark ends on a marker
@@ -484,7 +594,11 @@ const HTML_BLOCK_START = /^ {0,3}(?:<!--|<\?|<![A-Za-z]|<\/?[A-Za-z][A-Za-z0-9-]
 function htmlBlockTerminator(body: string): { from: number; terminator: string } | undefined {
   const indent = /^ {0,3}/.exec(body)?.[0].length ?? 0;
   const rest = body.slice(indent);
-  const rawText = /^<(script|pre|style|textarea)\b/i.exec(rest);
+  // CommonMark's type 1 start condition is the tag name followed by whitespace,
+  // `>` or the end of the line — not a word boundary. `<script-src x>` is a
+  // paragraph's own text, and reading it as a raw-text element would leave this
+  // block open past its `</script>`, which never arrives.
+  const rawText = /^<(script|pre|style|textarea)(?=[ \t>]|$)/i.exec(rest);
   if (rawText !== null) {
     return { from: indent + rawText[0].length, terminator: `</${rawText[1] as string}>` };
   }
@@ -720,10 +834,14 @@ function stripLineMarks(
  *
  * A block starts at the first line, after a blank line, after a line that closed
  * a block of its own — a heading, a thematic break or the setext underline
- * (a run of equals, or of one or two dashes) under a paragraph at the same quote
- * depth, a fence's closing line, a reference definition that starts a block,
+ * (a run of equals, or of one or two dashes) under a paragraph in its own
+ * container, a fence's closing line, a reference definition that starts a block,
  * an HTML block whose terminator arrived on its line, or code — and at a list,
- * blockquote or heading line's own content after its marker. A reference
+ * blockquote or heading line's own content after its marker. A setext underline
+ * cannot be a lazy continuation line, so it closes a paragraph only at that
+ * paragraph's own quote depth and content indent: under a list item's paragraph,
+ * `===` at column zero is a paragraph line of its own, and the line under it is
+ * that paragraph's lazy continuation. A reference
  * definition cannot interrupt a paragraph, so a definition line inside one is
  * that paragraph's text and closes nothing. Its content may
  * open on further machinery and markup — indentation, a task checkbox, emphasis,
@@ -737,7 +855,10 @@ function stripLineMarks(
  * terminator, blank lines included. Those lines keep every mark they hold, and
  * nothing inside them is read as markdown; the line that holds the terminator
  * ends the block, so the line under it starts one. An HTML block of the tag
- * kinds still runs to the next blank line and keeps its marks.
+ * kinds — a known block tag, or one complete tag alone on its line — has no
+ * terminator and runs to the next blank line instead, and those lines are raw
+ * too: a `#`, a run of dashes or an underline inside one is that block's copy,
+ * so the line under the blank line, not the block's own text, opens a block.
  *
  * Fenced and indented code keep every character they hold. An inline code span
  * is the one place where the two rules meet: a mark as a span's first character
@@ -756,12 +877,11 @@ export function withoutLeadingDirectionMarks(markdown: string): string {
   // Whether the previous line closed a block of its own, so that this line opens
   // one and its content's mark is that block's edge.
   let previousEndsBlock = false;
-  // The quote depth of the paragraph text directly above, when a setext
-  // underline at the same depth would close it: how the walk tells a paragraph
-  // that follows a heading-shaped line from one the line above continues. The
-  // depth is the number of `>` markers, not the prefix's width, because `> Title`
-  // and `>===` sit in the same quote though their prefixes differ by a character.
-  let previousParagraphDepth: number | undefined = undefined;
+  // The paragraph text directly above, when a setext underline in its own
+  // container would close it: how the walk tells a paragraph that follows a
+  // heading-shaped line from one the line above continues, and an underline that
+  // closes the paragraph from one that stands outside its container.
+  let previousParagraph: ParagraphContainer | undefined = undefined;
   // Whether the previous line held an indented code block, which the lines under
   // it continue while they keep the indentation.
   let inIndentedCode = false;
@@ -770,15 +890,19 @@ export function withoutLeadingDirectionMarks(markdown: string): string {
   // opened one of the kinds CommonMark ends on a marker of its own. Every line
   // until that marker is the block's raw text, blank lines included.
   let openHtmlBlock: string | undefined = undefined;
+  // Whether a tag-kind HTML block is open: a known block tag, or one complete tag
+  // alone on its line. It has no terminator and runs to the next blank line, and
+  // its lines are raw text like the terminator kinds'.
+  let openTagHtmlBlock = false;
   for (const [index, line] of lines.entries()) {
     const quoted = BLOCKQUOTE_START.exec(line)?.[0].length ?? 0;
     const quotedDepth = (line.slice(0, quoted).match(/>/g) ?? []).length;
     const body = line.slice(quoted);
     const blank = body.trim().length === 0;
-    // A line inside an HTML block of a terminator kind is that block's raw text:
-    // it keeps every mark it holds and none of it is read as markdown. A line
-    // outside one may open that kind, and then it is raw text too.
-    const rawHtml: boolean = openHtmlBlock !== undefined;
+    // A line inside an HTML block is that block's raw text: it keeps every mark
+    // it holds and none of it is read as markdown. A line outside one may open a
+    // block of either family, and then it is raw text too.
+    const rawHtml: boolean = openHtmlBlock !== undefined || openTagHtmlBlock;
     const opensFence = !rawHtml && FENCE_START.test(body);
     // An indented code block starts after a blank line or after a block that has
     // closed, and runs on while the lines keep its indentation; an indented line
@@ -804,10 +928,20 @@ export function withoutLeadingDirectionMarks(markdown: string): string {
       openHtmlBlock !== undefined
         ? holdsHtmlTerminator(line, openHtmlBlock)
         : html !== undefined && holdsHtmlTerminator(line.slice(html.from), html.terminator);
+    // A tag-kind HTML block has no terminator, so the walk tracks it instead: a
+    // known block tag may interrupt a paragraph and opens one wherever it stands,
+    // while one complete tag alone on its line opens one only off a blank line or
+    // under a block that closed.
+    const opensTagHtmlBlock: boolean =
+      !rawHtml &&
+      !code &&
+      html === undefined &&
+      (HTML_BLOCK_TAG_START.test(body) ||
+        ((previousBlank || previousEndsBlock) && COMPLETE_TAG_LINE.test(body)));
     // A line that is an HTML block's raw text — the block's opening line, or a
     // line inside one — is not read as markdown: a `#` or a run of dashes inside
-    // a `<pre>` is that block's copy, not a heading or an underline.
-    const htmlLine: boolean = html !== undefined || rawHtml;
+    // a `<pre>` or a `<div>` is that block's copy, not a heading or an underline.
+    const htmlLine: boolean = html !== undefined || opensTagHtmlBlock || rawHtml;
     // A list item or heading's own marker is line machinery its content follows;
     // a continuation line has none and keeps its marks. A heading may sit inside
     // a list item (`- # x`), so its marker is read after the list marker too —
@@ -864,7 +998,7 @@ export function withoutLeadingDirectionMarks(markdown: string): string {
       : code ||
         heading !== null ||
         THEMATIC_BREAK_START.test(body) ||
-        (previousParagraphDepth === quotedDepth && SETEXT_UNDERLINE_START.test(body)) ||
+        underlinesParagraph(previousParagraph, quotedDepth, body) ||
         (startsBlock && REFERENCE_DEFINITION_START.test(body));
     const stripped =
       opensFence || htmlLine || code || blank || !startsBlock
@@ -883,18 +1017,33 @@ export function withoutLeadingDirectionMarks(markdown: string): string {
     } else if (html !== undefined) {
       openHtmlBlock = html.terminator;
     }
+    // A tag-kind block has no terminator: it ends at the next blank line, which
+    // is not part of it.
+    openTagHtmlBlock = !blank && (openTagHtmlBlock || opensTagHtmlBlock);
     previousBlank = blank;
     previousEndsBlock = endsBlock;
     inIndentedCode = indentedCode;
     // Only paragraph text in this line's own container can be closed by the next
     // line's setext underline, and a list item's opening text is such paragraph
-    // text: the underline closes it and the line under the underline is an item
-    // paragraph of its own. Without the underline that line is the item's lazy
-    // continuation instead, which the depth comparison alone cannot tell apart —
-    // so a markerless line under an item keeps its mark through the setext rule,
-    // not through this one. An HTML line is raw, not paragraph text, so it says
-    // nothing to the next.
-    previousParagraphDepth = blank || code || endsBlock || htmlLine ? undefined : quotedDepth;
+    // text in the item's container: the underline must then sit at the item's
+    // content indent, or the line under it is a paragraph outside the item and
+    // keeps its mark. A continuation line has no container of its own, so it
+    // keeps the record of the line that opened the paragraph. An HTML line is
+    // raw, not paragraph text, so it says nothing to the next.
+    if (blank || code || endsBlock || htmlLine) {
+      previousParagraph = undefined;
+    } else if (startsBlock) {
+      // The content column of this line's own container, counted from the end of
+      // its quote markers: a plain paragraph carries no container machinery, so
+      // its content starts at the indent's end, while a list item's content
+      // starts after its marker and padding. A setext underline in the same
+      // container sits at that same indent; one at column zero under a list item
+      // is outside the item and is a paragraph line of its own.
+      previousParagraph = {
+        depth: quotedDepth,
+        indent: columnAt(line, quoted + contentStart) - columnAt(line, quoted),
+      };
+    }
     if (stripped !== line) {
       lines[index] = stripped;
       changed = true;

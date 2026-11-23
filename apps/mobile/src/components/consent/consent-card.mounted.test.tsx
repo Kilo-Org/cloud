@@ -323,9 +323,7 @@ describe('ConsentCard', () => {
     // The guidance names the surface the entry and the header name, so a
     // reader who returns later knows where to change the choice.
     expect(i18n.t('consent.helpImproveDescription')).toContain(i18n.t('common.profile'));
-    expect(i18n.t('consent.helpImproveDescription')).toContain(
-      i18n.t('profile.privacyChoices')
-    );
+    expect(i18n.t('consent.helpImproveDescription')).toContain(i18n.t('profile.privacyChoices'));
   });
 
   it('defaults the optional switch to on', async () => {

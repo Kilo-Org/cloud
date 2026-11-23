@@ -10,6 +10,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
+import { INPUT_BOX_SHAPE_CLASS } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
@@ -18,6 +19,7 @@ import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { usePopOnce } from '@/lib/navigation/pop-once';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { useTRPC } from '@/lib/trpc';
+import { cn } from '@/lib/utils';
 
 type ProfileUrlError = (value: string) => string | null;
 
@@ -222,27 +224,27 @@ export function ProfileEditScreen() {
 
   let body: ReactNode = null;
   if (links.isPending) {
-    // Each block holds the loaded field's geometry: the label line, the 44pt
-    // input box, and the message line the form now reserves from its first
-    // render. A placeholder without that line would let the swap to real
-    // content move the Save button, which is the shift this screen removes.
+    // Each block holds the loaded field's geometry: the label line, the field's
+    // own 44pt box (`INPUT_BOX_SHAPE_CLASS`) and the reserved message line; the
+    // Save slot holds the button's own 48pt action frame (`STATE_ACTION_CLASS`).
+    // A hand-sized bar would drift from those boxes and move the body on swap.
     body = (
       <>
         <View className="gap-1.5">
           <View className="gap-1.5">
             <Skeleton className="h-5 w-24" />
-            <Skeleton className="h-11 rounded-md" />
+            <Skeleton className={cn(INPUT_BOX_SHAPE_CLASS, 'w-full')} />
           </View>
           <Skeleton className="h-5 w-40" />
         </View>
         <View className="gap-1.5">
           <View className="gap-1.5">
             <Skeleton className="h-5 w-24" />
-            <Skeleton className="h-11 rounded-md" />
+            <Skeleton className={cn(INPUT_BOX_SHAPE_CLASS, 'w-full')} />
           </View>
           <Skeleton className="h-5 w-40" />
         </View>
-        <Skeleton className="h-11 rounded-md" />
+        <Skeleton className={cn(STATE_ACTION_CLASS, 'rounded-md')} />
       </>
     );
   } else if (links.isError) {

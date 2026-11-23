@@ -2,7 +2,9 @@
 import { createElement, type ElementType } from 'react';
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
+import { INPUT_BOX_SHAPE_CLASS } from '@/components/ui/input';
 import '@/i18n';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { resetLeaveSettle } from '@/lib/navigation/leave-settle';
 import { act, type ReactTestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
@@ -426,6 +428,30 @@ describe('ProfileEditScreen', () => {
         node.findAll(child => Object.is(child.type, 'Skeleton')).length === 3
     );
     expect(fieldBlocks).toHaveLength(2);
+
+    // The input bar must carry the loaded box's own geometry token, because a
+    // hand-sized bar drifts from it (rem is 14pt, so `h-11` is 38.5pt against the
+    // 44pt box). A block's second Skeleton is that bar: label, input, message.
+    for (const block of fieldBlocks) {
+      const [, inputBar] = block.findAll(child => Object.is(child.type, 'Skeleton'));
+      expect(inputBar).toBeDefined();
+      const tokens = String(inputBar?.props.className).split(' ');
+      expect(tokens).toEqual(expect.arrayContaining(INPUT_BOX_SHAPE_CLASS.split(' ')));
+    }
+
+    // The Save slot is the loaded button's own frame, and no placeholder bar is
+    // hand-sized.
+    const allSkeletonClasses = root
+      .findAll(node => Object.is(node.type, 'Skeleton'))
+      .map(node => String(node.props.className));
+    const actionTokens = STATE_ACTION_CLASS.split(' ');
+    const actionBars = allSkeletonClasses.filter(classes => {
+      const tokens = classes.split(' ');
+      return actionTokens.every(token => tokens.includes(token));
+    });
+    expect(actionBars).toHaveLength(1);
+    const handSized = allSkeletonClasses.filter(classes => classes.split(' ').includes('h-11'));
+    expect(handSized).toHaveLength(0);
   });
 
   it('keeps the fields live and takes one save while a save is pending', async () => {

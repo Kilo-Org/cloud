@@ -28,13 +28,19 @@ const deliveryMock = vi.hoisted(() => ({
   unregisterTokens: vi.fn(),
 }));
 
+// A `vi.fn` so a test can make the lookup itself throw; the default returns the
+// shared delivery.
+const getGlanceableDeliveryMock = vi.hoisted(() => vi.fn());
+
 vi.mock('@/lib/trpc', () => ({
   trpcClient: { user: trpcMock },
 }));
 
 vi.mock('@/lib/glanceable/sink-registry', () => ({
-  getGlanceableDelivery: () => deliveryMock,
+  getGlanceableDelivery: getGlanceableDeliveryMock,
 }));
+
+getGlanceableDeliveryMock.mockImplementation(() => deliveryMock);
 
 vi.mock('@/lib/notifications', () => ({
   emitNotificationTokenUpdated: vi.fn(),
@@ -358,6 +364,70 @@ describe('runLogoutCleanup', () => {
       pushTokens: [],
       needsActivityUnregister: true,
       activityTokens: ['activity-token-1', 'activity-token-2'],
+    });
+  });
+
+  it('treats a throwing activity unregister as a recorded failure and still retires the device', async () => {
+    pushOutcome('token');
+    const calls: string[] = [];
+    deliveryMock.unregisterTokens.mockRejectedValue(new Error('network down'));
+    trpcMock.unregisterPushToken.mutate.mockImplementation(async () => {
+      await Promise.resolve();
+      calls.push('push');
+      throw new Error('server 500');
+    });
+    trpcMock.revokeCurrentDeviceSession.mutate.mockImplementation(async () => {
+      await Promise.resolve();
+      calls.push('revoke');
+      return { outcome: 'revoked' };
+    });
+
+    await expect(runLogoutCleanup()).resolves.toBeUndefined();
+
+    // The throw is contained: the push unregister then the revoke still run,
+    // in the order the pair requires.
+    expect(deliveryMock.unregisterTokens).toHaveBeenCalledTimes(1);
+    expect(calls).toEqual(['push', 'revoke']);
+    expect(await storedRecordFor('u1')).toMatchObject({
+      userId: 'u1',
+      pushTokens: ['push-1'],
+      needsActivityUnregister: true,
+      activityTokens: [],
+    });
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: { 'error.subsystem': 'auth', 'error.operation': 'logout_activity_unregister' },
+    });
+  });
+
+  it('treats a throwing delivery lookup as a recorded failure and still retires the device', async () => {
+    pushOutcome('token');
+    const calls: string[] = [];
+    getGlanceableDeliveryMock.mockImplementationOnce(() => {
+      throw new Error('delivery unavailable');
+    });
+    trpcMock.unregisterPushToken.mutate.mockImplementation(async () => {
+      await Promise.resolve();
+      calls.push('push');
+      return { success: true };
+    });
+    trpcMock.revokeCurrentDeviceSession.mutate.mockImplementation(async () => {
+      await Promise.resolve();
+      calls.push('revoke');
+      return { outcome: 'revoked' };
+    });
+
+    await expect(runLogoutCleanup()).resolves.toBeUndefined();
+
+    // The lookup throw is contained: the push unregister then the revoke still
+    // run, and the activity obligation is recorded with no known tokens.
+    expect(calls).toEqual(['push', 'revoke']);
+    expect(await storedRecordFor('u1')).toMatchObject({
+      userId: 'u1',
+      needsActivityUnregister: true,
+      activityTokens: [],
+    });
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: { 'error.subsystem': 'auth', 'error.operation': 'logout_activity_unregister' },
     });
   });
 

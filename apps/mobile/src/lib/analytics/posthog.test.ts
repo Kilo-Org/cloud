@@ -459,6 +459,46 @@ describe('discardPostHog', () => {
     unsubscribe();
   });
 
+  it('still drops the client, notifies and opts out when a queue clear throws', async () => {
+    const { initPostHog, discardPostHog, subscribeToPostHogReady, isPostHogReady } =
+      await loadModule();
+    initPostHog();
+    const listener = vi.fn<() => void>();
+    const unsubscribe = subscribeToPostHogReady(listener);
+    hoisted.client.setPersistedProperty.mockImplementationOnce(() => {
+      throw new Error('storage lost');
+    });
+
+    await expect(discardPostHog()).resolves.toBeUndefined();
+
+    expect(isPostHogReady()).toBe(false);
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(hoisted.client.optOut).toHaveBeenCalledTimes(1);
+    unsubscribe();
+  });
+
+  it('does not reject init or discard when a ready listener throws, and keeps later listeners', async () => {
+    const { initPostHog, discardPostHog, subscribeToPostHogReady } = await loadModule();
+    const throwing = vi.fn<() => void>(() => {
+      throw new Error('subscriber bug');
+    });
+    const later = vi.fn<() => void>();
+    const unsubscribeFirst = subscribeToPostHogReady(throwing);
+    const unsubscribeSecond = subscribeToPostHogReady(later);
+
+    expect(() => {
+      initPostHog();
+    }).not.toThrow();
+    // The throwing listener must not skip the listener registered after it.
+    expect(later).toHaveBeenCalledTimes(1);
+
+    await expect(discardPostHog()).resolves.toBeUndefined();
+    expect(later).toHaveBeenCalledTimes(2);
+
+    unsubscribeFirst();
+    unsubscribeSecond();
+  });
+
   it('allows concurrent re-init to create a fresh client', async () => {
     const { initPostHog, discardPostHog } = await loadModule();
     initPostHog();
@@ -771,6 +811,47 @@ describe('discard serialization', () => {
     // Clean up: resolve the second discard.
     optOut.resolve(undefined);
     await secondDiscard;
+  });
+
+  it('resumePostHog still purges and unseals after a discard step threw, and a later discard plus init work', async () => {
+    const { initPostHog, discardPostHog, resumePostHog, isPostHogReady } = await loadModule();
+    initPostHog();
+
+    // A throwing step inside the completion must not reject the chain tail.
+    hoisted.client.setPersistedProperty.mockImplementationOnce(() => {
+      throw new Error('storage lost');
+    });
+
+    await expect(discardPostHog()).resolves.toBeUndefined();
+
+    const resumePromise = resumePostHog();
+    await vi.advanceTimersByTimeAsync(110);
+    await expect(resumePromise).resolves.toBeUndefined();
+    expect(hoisted.storage.purgePostHogPersistence).toHaveBeenCalledTimes(1);
+    expect(hoisted.storage.unsealPostHogStorage).toHaveBeenCalledTimes(1);
+
+    // The chain tail settled, so a later off-on cycle still works.
+    initPostHog();
+    expect(isPostHogReady()).toBe(true);
+    await expect(discardPostHog()).resolves.toBeUndefined();
+    expect(isPostHogReady()).toBe(false);
+    initPostHog();
+    expect(isPostHogReady()).toBe(true);
+  });
+
+  it('unseals storage and resolves even when the purge throws', async () => {
+    const { resumePostHog } = await loadModule();
+    hoisted.storage.purgePostHogPersistence.mockImplementationOnce(() => {
+      throw new Error('purge failed');
+    });
+
+    const resumePromise = resumePostHog();
+    await vi.advanceTimersByTimeAsync(110);
+
+    // The only caller awaits from a void call, so a rejected resume would be an
+    // unhandled rejection and would skip the init that follows.
+    await expect(resumePromise).resolves.toBeUndefined();
+    expect(hoisted.storage.unsealPostHogStorage).toHaveBeenCalledTimes(1);
   });
 
   it('rapid off-then-on creates a working non-opted-out client', async () => {

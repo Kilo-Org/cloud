@@ -16,6 +16,13 @@ import { CONTROL_PLANE_DEADLINE_MS, withDeadline } from '@kilocode/event-service
  */
 type ExchangeOutcome = { ok: true; body: unknown } | { ok: false; refusedBody: unknown };
 
+/** What the deadline callback produced: no attestation capability, a superseded
+ *  sign-in session, or an actual exchange outcome. */
+type ExchangeAttempt =
+  | { readonly status: 'no-admission' }
+  | { readonly status: 'superseded' }
+  | { readonly status: 'exchange'; readonly outcome: ExchangeOutcome };
+
 export async function exchangeLegacyToken(): Promise<{
   token: string;
   refreshToken: string;
@@ -50,27 +57,29 @@ export async function exchangeLegacyToken(): Promise<{
     // The exchange issues device credentials, so it needs the same attestation
     // the sign-in exchange does. Fetch the proof after the epoch check so a
     // superseded sign-in never spends a challenge.
-    const admission = await getAdmission().catch(() => null);
-    if (!admission) {
-      // This device cannot attest, so the exchange cannot succeed. It costs
-      // nothing to retry next launch — no challenge is requested for a device
-      // without capability — so do not write a permanent marker that would
-      // outlive a build-configuration fix.
-      return null;
-    }
-
-    if (!isCurrentAuthEpoch(epoch)) {
-      return null;
-    }
-
-    // Bound the exchange at the control-plane deadline: it runs inside the
-    // cold-start bootstrap, whose loading state only clears in a `finally`, so a
-    // request that never settles would hold the app behind the spinner forever.
-    // Both bodies are read inside that deadline: a body that stalls after its
-    // headers would otherwise leave this promise pending the same way.
-    const outcome = await withDeadline(
+    //
+    // Bound the whole exchange — attestation included — at the control-plane
+    // deadline: it runs inside the cold-start bootstrap, whose loading state
+    // only clears in a `finally`, so a request or attestation that never
+    // settles would hold the app behind the spinner forever. Both bodies are
+    // read inside that deadline: a body that stalls after its headers would
+    // otherwise leave this promise pending the same way.
+    const attempt = await withDeadline(
       CONTROL_PLANE_DEADLINE_MS,
-      async (signal): Promise<ExchangeOutcome> => {
+      async (signal): Promise<ExchangeAttempt> => {
+        const admission = await getAdmission().catch(() => null);
+        if (!admission) {
+          // This device cannot attest, so the exchange cannot succeed. It costs
+          // nothing to retry next launch — no challenge is requested for a
+          // device without capability — so do not write a permanent marker that
+          // would outlive a build-configuration fix.
+          return { status: 'no-admission' };
+        }
+        // The session moved while the read or attestation was in flight: the
+        // token may belong to a signed-out account. Discard before sending it.
+        if (!isCurrentAuthEpoch(epoch)) {
+          return { status: 'superseded' };
+        }
         const res = await fetch(`${API_BASE_URL}/api/auth/native/exchange`, {
           method: 'POST',
           headers: {
@@ -84,12 +93,22 @@ export async function exchangeLegacyToken(): Promise<{
           signal,
         });
         if (!res.ok) {
-          return { ok: false, refusedBody: await res.json().catch(() => undefined) };
+          return {
+            status: 'exchange',
+            outcome: { ok: false, refusedBody: await res.json().catch(() => undefined) },
+          };
         }
         const body: unknown = await res.json();
-        return { ok: true, body };
+        return { status: 'exchange', outcome: { ok: true, body } };
       }
     );
+
+    // Neither early end may touch the attest key: no exchange was attempted.
+    if (attempt.status !== 'exchange') {
+      return null;
+    }
+
+    const outcome = attempt.outcome;
 
     if (!outcome.ok) {
       // A refusal can name a key the server does not know, for example when a

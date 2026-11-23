@@ -125,7 +125,7 @@ import {
   TOKEN_EXPIRES_AT_KEY,
 } from '@/lib/storage-keys';
 import { clearActiveToken, getActiveToken, setSignOutTeardownActive } from '@/lib/auth/token-owner';
-import { clearAttestKeyOnRefusal } from '@/lib/auth/admission';
+import { clearAttestKeyOnRefusal, getAdmission } from '@/lib/auth/admission';
 import * as SecureStore from 'expo-secure-store';
 import { CONTROL_PLANE_DEADLINE_MS } from '@kilocode/event-service';
 /* eslint-enable import/first */
@@ -877,6 +877,65 @@ describe('exchangeLegacyToken', () => {
     } finally {
       process.off('unhandledRejection', swallowUnhandledRejection);
       vi.useRealTimers();
+      fetchSpy.mockRestore();
+    }
+  });
+
+  it('settles as retry-next-launch when the attestation never settles', async () => {
+    store.set(AUTH_TOKEN_KEY, 'old-token');
+    // Never settles: only the deadline, which now covers the attestation
+    // too, can end this exchange.
+    const reachedAdmission = Promise.withResolvers<boolean>();
+    vi.mocked(getAdmission).mockImplementationOnce(() => {
+      reachedAdmission.resolve(true);
+      return new Promise<never>(() => undefined);
+    });
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValue(new Error('fetch must not be called'));
+    process.on('unhandledRejection', swallowUnhandledRejection);
+    vi.useFakeTimers();
+    try {
+      const exchange = exchangeLegacyToken();
+      const settled = expect(exchange).resolves.toBeNull();
+      // The deadline is armed before the attestation runs, so reaching it
+      // leaves only the deadline between here and the result.
+      await reachedAdmission.promise;
+      await vi.advanceTimersByTimeAsync(CONTROL_PLANE_DEADLINE_MS + 1);
+      await settled;
+
+      // No token was sent and nothing was persisted: retry next launch.
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(store.get(AUTH_TOKEN_KEY)).toBe('old-token');
+      expect(store.get(LEGACY_EXCHANGE_DONE_KEY)).toBeUndefined();
+    } finally {
+      process.off('unhandledRejection', swallowUnhandledRejection);
+      vi.useRealTimers();
+      fetchSpy.mockRestore();
+      vi.mocked(getAdmission).mockResolvedValue({
+        platform: 'android',
+        kind: 'assertion',
+        challenge: 'challenge',
+        payload: 'integrity-token',
+      });
+    }
+  });
+
+  it('returns null and never sends the token when the device cannot attest', async () => {
+    store.set(AUTH_TOKEN_KEY, 'old-token');
+    vi.mocked(getAdmission).mockResolvedValueOnce(undefined);
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValue(new Error('fetch must not be called'));
+    try {
+      const result = await exchangeLegacyToken();
+
+      expect(result).toBeNull();
+      expect(fetchSpy).not.toHaveBeenCalled();
+      // This costs nothing to retry: keep the old token and set no marker.
+      expect(store.get(AUTH_TOKEN_KEY)).toBe('old-token');
+      expect(store.get(LEGACY_EXCHANGE_DONE_KEY)).toBeUndefined();
+    } finally {
       fetchSpy.mockRestore();
     }
   });

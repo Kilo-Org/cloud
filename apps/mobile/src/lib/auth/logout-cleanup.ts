@@ -9,6 +9,7 @@ import * as z from 'zod';
 
 import { emitNotificationTokenUpdated, getDevicePushTokenOutcome } from '@/lib/notifications';
 import { type ActivityTokenLifetime, getGlanceableDelivery } from '@/lib/glanceable/sink-registry';
+import { unregisterActivityTokensBestEffort } from '@/lib/auth/logout-activity-unregister';
 import { chainSave } from '@/lib/hooks/save-chain';
 import { readCachedUserId } from '@/lib/persist/read-cache';
 import { queryClient } from '@/lib/query-client';
@@ -332,7 +333,10 @@ export async function runLogoutCleanup(): Promise<void> {
     // device session revoke: the revoke ends this token's auth, so a later
     // delete can only answer 401. A failed unregister is recorded and retried
     // at the next authenticated opportunity against the recorded tokens only.
-    const activityResult = await getGlanceableDelivery().unregisterTokens();
+    // A throw — from the delivery lookup or from the unregister promise —
+    // counts as a failed unregister with no known tokens, so the rest of the
+    // gather phase still runs.
+    const activityResult = await unregisterActivityTokensBestEffort();
     const needsActivityUnregister = !activityResult.ok;
 
     // The device push token goes before the revoke, and the pair shares ONE

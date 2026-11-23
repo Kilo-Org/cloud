@@ -130,20 +130,31 @@ export function subscribeToPostHogReady(listener: () => void): () => void {
 
 function notifyPostHogReady(): void {
   for (const listener of readyListeners) {
-    listener();
+    // A throwing subscriber must not skip the rest, and this runs inside
+    // init/discard completion where escaping would reject the caller.
+    try {
+      listener();
+    } catch {
+      // Best-effort: one broken subscriber cannot break the others.
+    }
   }
 }
 
 /** Serialize a discard after the chain tail.  Always continues the chain
  *  even when the prior step rejects, so one failed optOut cannot break
- *  later discards or recovery. */
+ *  later discards or recovery.  The direct caller still awaits `next` and
+ *  sees its own failure; only this chain tail stays settled. */
 async function chainDiscard(prev: Promise<void>, next: Promise<void>): Promise<void> {
   try {
     await prev;
   } catch {
     // previous discard failed — continue the chain.
   }
-  await next;
+  try {
+    await next;
+  } catch {
+    // A step that rejects must not poison the tail every resume awaits.
+  }
 }
 
 // App version + build for PostHog. Both are strings; `app_build` is a monotonic
@@ -405,13 +416,15 @@ export function wrapPostHogFetchForTests(wrap: (fetch: PostHogFetch) => PostHogF
  *    timer that fires after this step has nothing to send.
  * 3. Drop the module-level `client` reference so concurrent code cannot
  *    capture through the stale instance, and a concurrent `initPostHog()`
- *    can create a fresh client.
+ *    can create a fresh client. This step always runs, even when a queue
+ *    clear or a ready listener threw.
  * 4. Flag listeners persist — like ready listeners, they must survive the
  *    discard so mounted `useFeatureFlag` subscribers receive updates when
  *    a later `initPostHog` re-creates the client.
  * 5. `optOut` so a relaunch does not resume capture on the stored anonymous
  *    id. The completion is appended to `discardChain` so `resumePostHog()`
- *    can await every prior discard before unsealing storage.
+ *    can await every prior discard before unsealing storage. Every step is
+ *    best-effort, so the completion never rejects.
  *
 
  * EV-01: An HTTP request already in flight when discard begins cannot be
@@ -435,9 +448,16 @@ export async function discardPostHog(): Promise<void> {
       return;
     }
 
-    c.setPersistedProperty(PostHogPersistedProperty.Queue, null);
-    c.setPersistedProperty(PostHogPersistedProperty.LogsQueue, null);
-    c.setPersistedProperty(PostHogPersistedProperty.AiQueue, null);
+    // Every step below is best-effort: a throwing queue clear, listener, or
+    // optOut must never leave the client reference live or reject this
+    // completion, which callers do not catch.
+    try {
+      c.setPersistedProperty(PostHogPersistedProperty.Queue, null);
+      c.setPersistedProperty(PostHogPersistedProperty.LogsQueue, null);
+      c.setPersistedProperty(PostHogPersistedProperty.AiQueue, null);
+    } catch {
+      // A failed queue clear still drops the client below.
+    }
 
     // Ready listeners persist — they must observe both the false transition
     // now and a true transition from a later initPostHog.
@@ -479,7 +499,12 @@ export async function resumePostHog(): Promise<void> {
   await new Promise<void>(resolve => {
     setTimeout(resolve, 110);
   });
-  purgePostHogPersistence();
+  try {
+    purgePostHogPersistence();
+  } catch {
+    // A failed purge leaves the stale queue for the next purge; the new client
+    // must still be able to write through the sink.
+  }
   unsealPostHogStorage();
 }
 

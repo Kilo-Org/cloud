@@ -140,6 +140,13 @@ export type GlanceableActivity = Pick<LiveActivity, 'getPushToken' | 'addPushTok
  */
 export type ActivityTokenLifetime = 'scope' | 'activity' | 'session';
 
+/**
+ * What one activity-token unregister reported. `ok` is true when every token
+ * was retired; `tokens` names only the ones that failed, so logout can
+ * tombstone exactly those and retry them later.
+ */
+export type ActivityUnregisterResult = { ok: boolean; tokens: string[] };
+
 export type GlanceableDelivery = {
   registerScopeTokens(organizationId: string | null, userId: string | null): void;
   registerTokens(
@@ -157,7 +164,7 @@ export type GlanceableDelivery = {
   unregisterTokens(
     lifetime?: ActivityTokenLifetime,
     activityToken?: Promise<string | null>
-  ): Promise<{ ok: boolean; tokens: string[] }>;
+  ): Promise<ActivityUnregisterResult>;
 };
 
 const noopDelivery: GlanceableDelivery = {

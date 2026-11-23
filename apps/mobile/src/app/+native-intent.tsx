@@ -9,6 +9,7 @@ import { applyForceStatePath } from '@/lib/force-state-fixture';
 import { handleGlanceableFixturePath } from '@/lib/glanceable/fixture-harness';
 import { handleHomeFixturePath } from '@/lib/home-fixture';
 import { instancePickerFixtureRoute } from '@/lib/instance-picker-fixture';
+import { handleLegacyExchangeFixturePath } from '@/lib/legacy-exchange-fixture';
 import { handleLockedKeychainFixturePath } from '@/lib/locked-keychain-fixture';
 import { loginFixtureRoute } from '@/lib/login-fixture';
 import { modelPickerFixtureRoute } from '@/lib/model-picker-fixture';
@@ -66,6 +67,12 @@ export function redirectSystemPath({
   }
   // Dev-only locked-keychain links (`kiloapp:///dev/locked-keychain/<name>`).
   if (__DEV__ && handleLockedKeychainFixturePath(path)) {
+    return null;
+  }
+  // Dev-only legacy session for the cold-start token exchange
+  // (`kiloapp:///dev/legacy-exchange-fixture/<seed|clear>?token=<credential>`):
+  // the handler writes the keychain and returns falsy, so nothing navigates.
+  if (__DEV__ && handleLegacyExchangeFixturePath(path)) {
     return null;
   }
   if (__DEV__) {

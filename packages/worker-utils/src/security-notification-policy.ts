@@ -1,12 +1,13 @@
 import { SecuritySeverity } from '@kilocode/db/schema-types';
 import * as z from 'zod';
+import {
+  SECURITY_SEVERITIES,
+  SECURITY_SEVERITY_RANKS,
+  getSecuritySeverityRank,
+  type SecuritySeverityRank,
+} from './security-severity.js';
 
-export const SECURITY_NOTIFICATION_SEVERITIES = [
-  SecuritySeverity.CRITICAL,
-  SecuritySeverity.HIGH,
-  SecuritySeverity.MEDIUM,
-  SecuritySeverity.LOW,
-] as const;
+export const SECURITY_NOTIFICATION_SEVERITIES = SECURITY_SEVERITIES;
 
 export const SecurityNotificationSeveritySchema = z.enum(SECURITY_NOTIFICATION_SEVERITIES);
 export type SecurityNotificationSeverity = z.infer<typeof SecurityNotificationSeveritySchema>;
@@ -67,33 +68,19 @@ export type SlaNotificationEligibilityParams = {
   isSuperseded?: boolean;
 };
 
-type SecuritySeverityRank = 0 | 1 | 2 | 3;
-
-const SEVERITY_RANKS = {
-  [SecuritySeverity.CRITICAL]: 0,
-  [SecuritySeverity.HIGH]: 1,
-  [SecuritySeverity.MEDIUM]: 2,
-  [SecuritySeverity.LOW]: 3,
-} as const satisfies Record<SecurityNotificationSeverity, SecuritySeverityRank>;
-
-function isNotificationSeverity(value: string): value is SecurityNotificationSeverity {
-  return SECURITY_NOTIFICATION_SEVERITIES.includes(value as SecurityNotificationSeverity);
-}
-
 export function getSecurityNotificationSeverityRank(
   severity: string | null
 ): SecuritySeverityRank | null {
-  if (!severity || !isNotificationSeverity(severity)) return null;
-  return SEVERITY_RANKS[severity];
+  return getSecuritySeverityRank(severity);
 }
 
 export function meetsSecurityNotificationSeverityMinimum(
   severity: string | null,
   minimumSeverity: SecurityNotificationSeverity
 ): boolean {
-  const severityRank = getSecurityNotificationSeverityRank(severity);
+  const severityRank = getSecuritySeverityRank(severity);
   if (severityRank === null) return false;
-  return severityRank <= SEVERITY_RANKS[minimumSeverity];
+  return severityRank <= SECURITY_SEVERITY_RANKS[minimumSeverity];
 }
 
 export function calculateSlaWarningBoundary(slaDueAt: string | Date, warningDays: number): Date {

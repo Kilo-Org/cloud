@@ -16,6 +16,7 @@
     "format:changed:check": "bash ../../scripts/format-changed.sh --check",
     "test": "NODE_ENV=test jest",
     "typecheck": "GOMEMLIMIT=2GiB tsgo --noEmit --checkers 1 --tsBuildInfoFile .tsbuildinfo/tsgo.tsbuildinfo",
+    "typecheck:watch": "GOMEMLIMIT=2GiB tsgo --noEmit --watch --checkers 1 --tsBuildInfoFile .tsbuildinfo/tsgo.tsbuildinfo",
     "dependency-cycle-check": "depcruise --config .dependency-cruiser.circular.js --output-type err src",
     "validate": "pnpm run typecheck && pnpm run lint && pnpm run format:changed:check && pnpm run test && pnpm run dependency-cycle-check",
     "node": "node",

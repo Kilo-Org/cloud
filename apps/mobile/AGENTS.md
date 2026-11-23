@@ -121,9 +121,9 @@ Omit empty-state descriptions that repeat the title or tell the user to use a di
 
 Keyboard avoidance is `react-native-keyboard-controller`, wrapped in one `KeyboardProvider` at the app root.
 `KeyboardAvoidingView` clears the IME on the session, quick-chat, session-detail, conversation and
-manual-review surfaces. The new-session form and the PR-discussion comment bar render
-`@/components/keyboard-lift-view` instead, which pads by a height the screen computes from the keyboard state
-and animates it with the keyboard's own motion progress. The Agents list and the stored history render
+manual-review surfaces. The new-session form, the PR-discussion comment bar and the providers-and-models form
+render `@/components/keyboard-lift-view` instead, which pads by a height the screen computes from the keyboard
+state and animates it with the keyboard's own motion progress. The Agents list and the stored history render
 `@/components/agents/owned-keyboard-lift` instead, which pads by the keyboard their own search field raised and
 writes that pad on every render (the library container drops its animated style when `enabled` turns false, and
 the property it last applied stays on the native view). The pad never takes more room than the body can spare:

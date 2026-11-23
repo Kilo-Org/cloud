@@ -303,26 +303,34 @@ function buttonWithLabel(root: ReactTestInstance, label: string) {
 /** A host view's layout reporter, as the form's measuring views take one. */
 type LayoutHandler = (event: { nativeEvent: { layout: { height: number } } }) => void;
 
-/** The one host view the form measures its own frame from. */
+/** The form's frame view: the `View` that directly wraps the keyboard lift, so
+ *  no class string or second laid-out view can retarget the lookup. */
 function frameLayout(root: ReactTestInstance) {
-  const node = root
-    .findAllByType('View' as never)
-    .find(candidate => candidate.props.className === 'flex-1' && 'onLayout' in candidate.props);
-  if (node === undefined) {
-    throw new Error('the form renders no frame layout handler');
+  const node = root.findByType(KeyboardLiftView as never).parent;
+  if (node === null || String(node.type) !== 'View' || !('onLayout' in node.props)) {
+    throw new Error('the frame view that wraps the keyboard lift carries no onLayout');
   }
   return node.props.onLayout as LayoutHandler;
 }
 
-/** The header block above the list, which the form measures itself: the inset
- *  wrapper around the padded header content. */
+/** The form's header block, which it measures itself: the one laid-out view
+ *  between the tab control and the keyboard lift, the inset wrapper around the
+ *  padded header. */
 function headerLayout(root: ReactTestInstance) {
-  const padded = root
-    .findAllByType('View' as never)
-    .find(candidate => candidate.props.className === 'gap-3 px-4 pt-3');
-  const wrapper = padded?.parent ?? null;
-  if (wrapper === null || !('onLayout' in wrapper.props)) {
-    throw new Error('the form renders no header wrapper');
+  const chain: ReactTestInstance[] = [];
+  for (
+    let node: ReactTestInstance | null = root.findByType('SegmentedControl' as never);
+    node !== null && node.type !== KeyboardLiftView;
+    node = node.parent
+  ) {
+    chain.push(node);
+  }
+  const reporters = chain.filter(node => 'onLayout' in node.props);
+  const [wrapper] = reporters;
+  if (reporters.length !== 1 || wrapper === undefined) {
+    throw new Error(
+      `the header inside the keyboard lift needs one onLayout, found ${reporters.length}`
+    );
   }
   return wrapper.props.onLayout as LayoutHandler;
 }

@@ -469,16 +469,6 @@ export function ModelAccessForm({
         {tab === 'gateways' ? null : (
           <ScreenFooter keyboard="host" className="mt-auto" onLayout={handleFooterLayout}>
             <View className="gap-3">
-              {/* The status line keeps its place while the draft is clean, so a
-                  save that settles never moves the bar: the reservation sits
-                  here rather than on the line's own content. */}
-              <View className="min-h-5 justify-center">
-                <AccessibleStatus
-                  message={statusMessage}
-                  tone={feedback.status === 'failed' ? 'error' : 'status'}
-                  className="text-sm"
-                />
-              </View>
               <View className="flex-row gap-2">
                 <Button
                   variant="outline"
@@ -505,6 +495,19 @@ export function ModelAccessForm({
                 >
                   <Text>{t('common.save')}</Text>
                 </Button>
+              </View>
+              {/* The status line keeps its place while the draft is clean, so a
+                  save that settles never moves the actions: the reservation sits
+                  here rather than on the line's own content. It follows the
+                  actions, as the consent footer's does, because a reserve above
+                  them leaves a band of empty page under the list's last row, and
+                  the row card then reads as clipped short of the bar. */}
+              <View className="min-h-5 justify-center">
+                <AccessibleStatus
+                  message={statusMessage}
+                  tone={feedback.status === 'failed' ? 'error' : 'status'}
+                  className="text-sm"
+                />
               </View>
             </View>
           </ScreenFooter>

@@ -2618,6 +2618,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Təfərrüatlar əlçatan deyil.",
+      "detailsUnavailableDescription": "Bu element artıq sessiyada yoxdur.",
       "textDisplay": "Mətn görünüşü",
       "thinking": "Düşünür",
       "thought": "Düşüncə",

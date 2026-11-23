@@ -2618,6 +2618,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Detaljene er ikke tilgjengelige.",
+      "detailsUnavailableDescription": "Dette elementet er ikke lenger i økten.",
       "textDisplay": "Tekstvisning",
       "thinking": "Tenker",
       "thought": "Resonnement",

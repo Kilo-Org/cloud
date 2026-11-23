@@ -2618,6 +2618,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "အသေးစိတ်ကို ရယူ၍မရပါ။",
+      "detailsUnavailableDescription": "ဤအရာသည် ဆက်ရှင်တွင် မရှိတော့ပါ။",
       "textDisplay": "စာသားပြသမှု",
       "thinking": "တွေးနေသည်",
       "thought": "စဉ်းစားချက်",

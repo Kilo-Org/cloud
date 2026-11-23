@@ -2724,6 +2724,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Podrobnosti nie sú dostupné.",
+      "detailsUnavailableDescription": "Táto položka už nie je v relácii.",
       "textDisplay": "Zobrazenie textu",
       "thinking": "Uvažuje",
       "thought": "Uvažovanie",

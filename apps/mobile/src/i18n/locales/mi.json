@@ -2618,6 +2618,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Kāore e wātea ana ngā taipitopito",
+      "detailsUnavailableDescription": "Kua kore tēnei tuemi i roto i te wātū",
       "textDisplay": "Te whakaaturanga kuputuhi",
       "thinking": "Kei te whakaaro",
       "thought": "Te whakaaro",

@@ -2083,6 +2083,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Los detalles no están disponibles.",
+      "detailsUnavailableDescription": "Este elemento ya no está en la sesión.",
       "textDisplay": "Visualización de texto",
       "thinking": "Razonando",
       "thought": "Razonamiento",

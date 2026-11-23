@@ -2724,6 +2724,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Podrobnosti niso na voljo.",
+      "detailsUnavailableDescription": "Ta element ni več v seji.",
       "textDisplay": "Prikaz besedila",
       "thinking": "Razmišljanje",
       "thought": "Misel",

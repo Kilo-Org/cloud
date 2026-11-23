@@ -2056,6 +2056,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "詳細を表示できません。",
+      "detailsUnavailableDescription": "この項目はセッションに含まれなくなりました。",
       "textDisplay": "テキスト表示",
       "thinking": "思考中",
       "thought": "思考",

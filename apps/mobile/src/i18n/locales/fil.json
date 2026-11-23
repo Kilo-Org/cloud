@@ -2618,6 +2618,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Hindi makuha ang mga detalye.",
+      "detailsUnavailableDescription": "Wala na ang item na ito sa sesyon.",
       "textDisplay": "Pagpapakita ng teksto",
       "thinking": "Nag-iisip",
       "thought": "Naisip",

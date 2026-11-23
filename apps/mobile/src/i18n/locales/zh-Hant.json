@@ -2056,6 +2056,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "無法取得詳細資料。",
+      "detailsUnavailableDescription": "此項目已不在工作階段中。",
       "textDisplay": "文字顯示",
       "thinking": "思考中",
       "thought": "思考內容",

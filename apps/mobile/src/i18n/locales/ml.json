@@ -2618,6 +2618,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "വിശദാംശങ്ങൾ ലഭ്യമല്ല.",
+      "detailsUnavailableDescription": "ഈ ഇനം ഇപ്പോൾ സെഷനിൽ ഇല്ല.",
       "textDisplay": "ടെക്സ്റ്റ് പ്രദർശനം",
       "thinking": "ചിന്തിക്കുന്നു",
       "thought": "ചിന്ത",

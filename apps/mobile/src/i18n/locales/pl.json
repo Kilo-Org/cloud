@@ -2110,6 +2110,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Szczegóły są niedostępne.",
+      "detailsUnavailableDescription": "Tego elementu nie ma już w sesji.",
       "textDisplay": "Widok tekstu",
       "thinking": "Rozumowanie",
       "thought": "Tok rozumowania",

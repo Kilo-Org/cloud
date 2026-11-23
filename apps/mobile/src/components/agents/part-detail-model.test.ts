@@ -184,8 +184,7 @@ const errorState: Extract<ToolPart['state'], { status: 'error' }> = {
 };
 
 describe('shouldCenterPartDetail', () => {
-  it('centers missing details, but not reasoning', () => {
-    expect(shouldCenterPartDetail(null, false)).toBe(true);
+  it('never centers a reasoning part', () => {
     expect(shouldCenterPartDetail(makeReasoningPart(''), false)).toBe(false);
   });
 

@@ -2618,6 +2618,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Ba a samun cikakkun bayanai.",
+      "detailsUnavailableDescription": "Wannan abu ba ya cikin zaman kuma.",
       "textDisplay": "Nunin rubutu",
       "thinking": "Ana tunani",
       "thought": "Tunani",

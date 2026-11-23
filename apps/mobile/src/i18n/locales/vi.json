@@ -2056,6 +2056,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Không thể xem thông tin chi tiết.",
+      "detailsUnavailableDescription": "Mục này không còn trong phiên nữa.",
       "textDisplay": "Vùng hiển thị văn bản",
       "thinking": "Đang suy luận",
       "thought": "Suy luận",

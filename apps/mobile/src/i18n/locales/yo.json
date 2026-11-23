@@ -2618,6 +2618,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Àwọn àlàyé kò sí lárọ̀ọ́wọ́tó.",
+      "detailsUnavailableDescription": "Ohun yìí kò sí nínú ìgbà iṣẹ́ mọ́.",
       "textDisplay": "Ìfihàn ọ̀rọ̀",
       "thinking": "Ń ronú",
       "thought": "Ìrònú",

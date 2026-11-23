@@ -2620,6 +2620,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "వివరాలు అందుబాటులో లేవు.",
+      "detailsUnavailableDescription": "ఈ అంశం ఇకపై సెషన్‌లో లేదు.",
       "textDisplay": "వచన ప్రదర్శన",
       "thinking": "ఆలోచిస్తోంది",
       "thought": "ఆలోచన",

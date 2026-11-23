@@ -2618,6 +2618,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "ບໍ່ສາມາດສະແດງລາຍລະອຽດໄດ້.",
+      "detailsUnavailableDescription": "ລາຍການນີ້ບໍ່ຢູ່ໃນເຊສຊັນອີກແລ້ວ.",
       "textDisplay": "ການສະແດງຂໍ້ຄວາມ",
       "thinking": "ກຳລັງຄິດ",
       "thought": "ຄວາມຄິດ",

@@ -2618,6 +2618,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Дэлгэрэнгүй мэдээлэл алга.",
+      "detailsUnavailableDescription": "Энэ зүйл сессэд байхгүй болсон.",
       "textDisplay": "Текст харах хэсэг",
       "thinking": "Бодож байна",
       "thought": "Бодол",

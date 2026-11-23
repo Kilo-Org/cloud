@@ -2083,6 +2083,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "הפרטים אינם זמינים.",
+      "detailsUnavailableDescription": "הפריט הזה כבר לא מופיע בסשן.",
       "textDisplay": "תצוגת טקסט",
       "thinking": "חושב",
       "thought": "מחשבה",

@@ -2110,6 +2110,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Сведения недоступны.",
+      "detailsUnavailableDescription": "Этого элемента больше нет в сеансе.",
       "textDisplay": "Отображение текста",
       "thinking": "Обдумывание",
       "thought": "Рассуждения",

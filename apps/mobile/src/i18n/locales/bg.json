@@ -2618,6 +2618,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Подробностите са недостъпни.",
+      "detailsUnavailableDescription": "Този елемент вече не е в сесията.",
       "textDisplay": "Преглед на текста",
       "thinking": "Разсъждава",
       "thought": "Разсъждения",

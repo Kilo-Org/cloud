@@ -2830,6 +2830,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Nid yw'r manylion ar gael.",
+      "detailsUnavailableDescription": "Nid yw'r eitem hon bellach yn y sesiwn.",
       "textDisplay": "Ardal destun",
       "thinking": "Yn meddwl",
       "thought": "Syniad",

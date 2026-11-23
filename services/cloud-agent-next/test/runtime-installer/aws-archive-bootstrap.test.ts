@@ -46,6 +46,7 @@ function command(
     configuration: AWS_TEST_CONFIGURATION,
     downloadUrl: `https://${host}/${awsArchiveObjectKey(identity)}?synthetic-signature=fixture`,
     reportUrl: `https://${host}/startup-failure`,
+    workerUrl: `https://${host}`,
     allocationId: identity.allocationId,
     deadlineAt,
     filesystemRoot: root,

@@ -130,7 +130,9 @@ export function renderAwsArchiveRestore(input: {
   connectionId: string;
   configuration: AwsByocConfiguration;
   downloadUrl: string;
+  /** The launch credential goes to this URL. It must be on the trusted Worker origin. */
   reportUrl: string;
+  workerUrl: string;
   allocationId: string;
   deadlineAt: number;
   command: ProviderStartupCommand;
@@ -152,6 +154,7 @@ export function renderAwsArchiveRestore(input: {
     source.hash ||
     source.pathname !== '/' + awsArchiveObjectKey(snapshot) ||
     report.protocol !== 'https:' ||
+    report.origin !== new URL(input.workerUrl).origin ||
     report.username ||
     report.password ||
     report.search ||

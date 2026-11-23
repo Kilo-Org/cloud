@@ -862,6 +862,7 @@ describe('AWS archive launch size and target admission', () => {
       configuration: AWS_TEST_CONFIGURATION,
       downloadUrl: `https://customer-artifacts.s3.us-east-1.amazonaws.com/${awsArchiveObjectKey(snapshot)}?synthetic-signature=fixture`,
       reportUrl,
+      workerUrl: 'https://worker.example.com',
       allocationId,
       deadlineAt,
       filesystemRoot: '/',
@@ -893,14 +894,23 @@ describe('AWS archive launch size and target admission', () => {
       true
     );
   });
-  it.each(['foreign-host', 'foreign-path', 'foreign-base'])('rejects %s before startup', change => {
-    const value = input();
-    if (change === 'foreign-host')
-      value.downloadUrl = value.downloadUrl.replace('customer-artifacts.', 'foreign-artifacts.');
-    if (change === 'foreign-path')
-      value.downloadUrl = value.downloadUrl.replace('/kilo/archives/', '/kilo/proxy/');
-    if (change === 'foreign-base')
-      value.configuration = { ...value.configuration, imageVersion: '99.0' };
-    expect(() => renderAwsArchiveRestore(value)).toThrow();
-  });
+  it.each(['foreign-host', 'foreign-path', 'foreign-base', 'foreign-report'])(
+    'rejects %s before startup',
+    change => {
+      const value = input();
+      if (change === 'foreign-host')
+        value.downloadUrl = value.downloadUrl.replace('customer-artifacts.', 'foreign-artifacts.');
+      if (change === 'foreign-path')
+        value.downloadUrl = value.downloadUrl.replace('/kilo/archives/', '/kilo/proxy/');
+      if (change === 'foreign-base')
+        value.configuration = { ...value.configuration, imageVersion: '99.0' };
+      if (change === 'foreign-report')
+        value.reportUrl = 'https://attacker.example.com/sandbox-control/sbx-test/startup-failure';
+      expect(() => renderAwsArchiveRestore(value)).toThrow(
+        change === 'foreign-base'
+          ? 'AWS archive base is incompatible'
+          : 'Invalid AWS archive startup'
+      );
+    }
+  );
 });

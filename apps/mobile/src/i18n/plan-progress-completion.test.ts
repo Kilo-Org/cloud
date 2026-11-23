@@ -74,8 +74,16 @@ describe.each(locales)('$tag briefing plan progress', ({ tag, render, renderOne 
       displayTotal: formatNumber(total, tag),
     });
 
+  it('states no finished step yet with the same clause', () => {
+    expect(plan(3, 0, 3)).toBe(render(formatNumber(0, tag), formatNumber(3, tag)));
+  });
+
   it('states a single finished step of a multi-step plan neutrally', () => {
     expect(plan(3, 1, 3)).toBe(render(formatNumber(1, tag), formatNumber(3, tag)));
+  });
+
+  it('states two finished steps with the same clause', () => {
+    expect(plan(3, 2, 3)).toBe(render(formatNumber(2, tag), formatNumber(3, tag)));
   });
 
   it('states a finished plan neutrally', () => {

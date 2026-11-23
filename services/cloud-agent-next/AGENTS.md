@@ -8,7 +8,7 @@ Cloudflare Worker that powers Kilocode Cloud Agents. It exposes tRPC APIs for cr
 
 Every session is a `workspace_*` control-plane session. The Session DO (`SandboxSessionV2`, exported as `SandboxSession`) owns message, route and event state. The Sandbox DO (`SandboxControlV2`, exported as `SandboxControl`) owns allocations, provider lifecycle and wrapper connections. The wrapper in `wrapper/src/control-plane/` runs inside the sandbox and supervises Kilo. The retired `agent_*` plane has no code path and old session IDs are rejected.
 
-The Durable Objects are durable coordinators: they queue messages when a sandbox or wrapper is not ready, persist metadata and event replay state, schedule alarms, prepare or restore sandboxes, and deliver work to the wrapper. Most product behavior after the sandbox is available belongs on the wrapper/Kilo side. Keep the DOs focused on coordination, not feature logic.
+The Durable Objects are durable coordinators: they queue messages when a sandbox or wrapper is not ready, persist metadata and event replay state, schedule alarms, prepare or restore sandboxes, fence wrapper connections, and deliver work to the wrapper. Most product behavior after the sandbox is available belongs on the wrapper/Kilo side. Keep the DOs focused on coordination, not feature logic; a helper with no durable coordination belongs in a small helper module.
 
 Git tokens (GitHub App installation tokens, managed GitLab tokens) are resolved via the shared `git-token-service` Worker. The wrapper connects to the Sandbox DO, forwards Kilo events through it to the Session DO, and owns the job lifecycle inside the sandbox. In the sandbox, git authenticates through the platform's read-only credential helper (`scripts/kilo-git-credential`, pinned by `SYSTEM_GIT_CONFIG_ENV`) and the per-session credential record in the runtime home. HTTP(S) worktree remotes use canonical URLs; SSH remotes retain their login.
 
@@ -48,8 +48,8 @@ Git tokens (GitHub App installation tokens, managed GitLab tokens) are resolved 
 ### Code Quality
 
 - `pnpm run lint` - oxlint
-- `pnpm run format` - oxfmt write (src only)
-- `pnpm run format:check` - oxfmt check (src only)
+- `pnpm run format` - oxfmt write (src, scripts, test/postgres)
+- `pnpm run format:check` - oxfmt check (src, scripts, test/postgres)
 - `pnpm run typecheck:wrapper` - TypeScript (tsgo) + wrapper typecheck
 - `pnpm run test:checkers` - Duplication checker fixtures
 - `pnpm run check:duplication` - Production duplicate-code ratchet
@@ -147,9 +147,7 @@ This pattern blocks API endpoints from running for external contributors who don
 - Wrapper production code may import Worker code only through `src/shared`; Worker production code must not import `wrapper`.
 - Public `start` must authorize any supplied `kilocodeOrganizationId` against `organization_memberships` before resolving profile layers or creating session ownership state. Balance validation is billing-only and `x-skip-balance-check` must never bypass organization authorization.
 - A control-plane session must remain recoverable after the physical sandbox dies: a new message in the same `workspace_*` session prepares a new sandbox (`docs/control-plane.md`).
-- The DOs should remain durable coordinators: queue messages, persist metadata/events, fence wrapper connections, schedule alarms, and prepare/restore sandbox state.
 - Put Kilo/job behavior in `wrapper/` or Kilo SDK integration code when it does not require durable DO coordination.
-- Avoid growing the control-plane DOs with product behavior that can live in the wrapper, Kilo SDK layer, or a small helper module.
 
 ### Runtime Guidelines
 

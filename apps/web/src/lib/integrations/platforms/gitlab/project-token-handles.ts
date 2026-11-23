@@ -663,8 +663,9 @@ async function markUnreachedProjectCredentialsUnusable(input: {
  *
  * A project keeps a handle that still belongs to the connected account, unless
  * its metadata entry names an older token id that only a revocation can settle.
- * The walk marks a project it does not reach as unusable, together with every
- * other project it left, so the connect that replaced the account still
+ * A stored credential that already carries the unusable marker is kept as it
+ * is. The walk marks a project it does not reach as unusable, together with
+ * every other project it left, so the connect that replaced the account still
  * completes.
  */
 export async function retireProjectCredentialsForReplacedAccount(input: {

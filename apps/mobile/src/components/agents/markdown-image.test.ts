@@ -4,6 +4,7 @@ import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { TOUCH_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import {
   clearTrustedImageHosts,
   revokeImageHost,
@@ -757,6 +758,22 @@ describe('MarkdownImage chip descriptions and long press', () => {
     expect(chip.props.onPress).toBeUndefined();
     expect(chip.props.accessibilityRole).toBe('text');
     expect(String(chip.props.className)).not.toContain('active:opacity-80');
+    // No gesture, no growth: the chip keeps the compact height it always had.
+    expect(String(chip.props.className)).not.toContain(TOUCH_TARGET_CLASS);
+
+    await unmount(renderer);
+  });
+
+  it('sizes the blocked chip as a touch target once it answers a press', async () => {
+    const renderer = await mount('http://insecure.com/a.png', 'A chart', {
+      onShowLinkActions: () => undefined,
+    });
+    const chip = ofType(renderer.root, 'Pressable')[0];
+    if (!chip) {
+      throw new Error('blocked chip not found');
+    }
+    expect(chip.props.onLongPress).toBeTypeOf('function');
+    expect(String(chip.props.className)).toContain(TOUCH_TARGET_CLASS);
 
     await unmount(renderer);
   });

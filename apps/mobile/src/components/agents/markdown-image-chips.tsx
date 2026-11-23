@@ -51,7 +51,9 @@ export function BlockedImageChip({
       onPress={onPress}
       onLongPress={onShowLinkActions}
       className={cn(
-        TOUCH_TARGET_CLASS,
+        // A chip with no gesture keeps the compact footprint it has always had;
+        // one that answers a tap or a long press is a full-size target.
+        (onPress ?? onShowLinkActions) && TOUCH_TARGET_CLASS,
         'flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 dark:bg-neutral-900',
         onPress && 'active:opacity-80'
       )}

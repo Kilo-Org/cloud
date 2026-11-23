@@ -463,6 +463,16 @@ describe('withoutLeadingDirectionMarks', () => {
     ['a CDATA section closed on a later line', '<![CDATA[\nx\n]]>\n\u200FLatin text'],
     ['a pre element closed on a later line', '<pre>\nx\n</pre>\n\u200FLatin text'],
     ['a script element closed on a later line', '<script>\nx\n</script>\n\u200FLatin text'],
+    // An HTML block's state belongs to the container it opened in: a blockquote
+    // that ends under a block tag holds no more raw text, so the line below it is
+    // a paragraph at top level and its mark names that paragraph's edge. The
+    // renderer reads both shapes as a quote followed by a paragraph.
+    ['a block tag whose quote ended', '> <div>\n> text\n\u200FLatin after'],
+    ['a comment whose quote ended', '> <!-- c\n> more\n\u200FLatin after'],
+    // A setext underline sits at its paragraph's container indent, which inside a
+    // nested list item is four columns in: the underline closes the item's
+    // paragraph there, and the line below it is the item's next block.
+    ['an underline under a nested item’s paragraph', '- a\n  - Title\n    ===\n    \u200FLatin'],
   ])('strips a mark in the block that follows %s', (_shape, value) => {
     expect(withoutLeadingDirectionMarks(value)).toBe(value.replace('\u200F', ''));
   });

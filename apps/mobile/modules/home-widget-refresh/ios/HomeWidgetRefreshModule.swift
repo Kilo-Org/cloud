@@ -65,11 +65,11 @@ public class HomeWidgetRefreshModule: Module {
       var failure: Error?
       do {
         applied = try self.performOperation(epoch) {
-          retired = try HomeWidgetRefreshStore.configure(config)
+          try HomeWidgetRefreshStore.configure(config, retired: &retired)
         }
       } catch {
-        // Retirement is independent of the store: a replaced scope is retired
-        // whether or not storing the new one succeeds.
+        // The replaced scope is reported before the local credential is
+        // destroyed, so it is retired whether or not the store succeeds.
         failure = error
       }
       // A registration belongs to the scope that created it. When this
@@ -78,7 +78,12 @@ public class HomeWidgetRefreshModule: Module {
       if let retired {
         await HomeWidgetRefreshStore.unregisterPushToken(retired.token, config: retired.config)
       }
-      if applied { await HomeWidgetRefreshStore.registerStoredPushToken() }
+      // Only the newest operation may publish a registration: a clear or a newer
+      // configure that arrived while the retirement was in flight owns the state
+      // now, and registering here would revive the scope it just removed.
+      if applied, self.currentOperationEpoch() == epoch {
+        await HomeWidgetRefreshStore.registerStoredPushToken()
+      }
       if let failure { throw failure }
     }
     AsyncFunction("clear") { (epoch: Int) in

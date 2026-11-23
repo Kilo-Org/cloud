@@ -73,11 +73,12 @@ enum HomeWidgetRefreshStore {
     return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
   }
 
-  /// Stores the incoming scope and returns the scope it replaced — that scope's
-  /// credential and widget push token — so the caller can unregister the
-  /// registration the replaced scope owns.
-  static func configure(_ config: [String: Any]) throws -> HomeWidgetRetiredScope? {
-    var retired: HomeWidgetRetiredScope?
+  /// Stores the incoming scope and reports the scope it replaced — that scope's
+  /// credential and widget push token — through `retired`, so the caller can
+  /// unregister the registration the replaced scope owns. The replaced scope is
+  /// reported before the local credential is destroyed, so a failed store still
+  /// leaves the caller able to retire it.
+  static func configure(_ config: [String: Any], retired: inout HomeWidgetRetiredScope?) throws {
     let stored: Void? = try locked { defaults in
       switch homeWidgetConfigureScope(
         previous: context(),
@@ -86,8 +87,8 @@ enum HomeWidgetRefreshStore {
       ) {
       case .keep:
         break
-      case .replace(let retire):
-        retired = retire
+      case .replace(let replace):
+        retired = replace
         clearLocked(defaults)
       }
       let data = try JSONSerialization.data(withJSONObject: config)
@@ -111,7 +112,6 @@ enum HomeWidgetRefreshStore {
       throw NSError(domain: service, code: 3, userInfo: [NSLocalizedDescriptionKey: "Widget storage unavailable"])
     }
     WidgetCenter.shared.reloadTimelines(ofKind: widgetName)
-    return retired
   }
 
   static func clearLocked(_ defaults: UserDefaults) {

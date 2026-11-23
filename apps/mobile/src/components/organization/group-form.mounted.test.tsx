@@ -566,21 +566,42 @@ describe('GroupForm create at the group cap', () => {
     unmountOnce();
   });
 
-  it('paints a create form while the list is still pending', async () => {
-    // A pending list must not hold the form back: the fields paint at once and
-    // the Save settles to its cap state when the list answers.
+  it('paints the create skeleton until the count is known, then the whole form', async () => {
+    // A create paints one shape only: while the count is pending it shows the
+    // same skeleton a loading draft shows, not fields that would shift when the
+    // cap notice lands and disables them.
     groupsQuery.data = undefined;
     groupsQuery.isPending = true;
-    const { renderer, unmountOnce } = await mountForm(undefined);
+    const pending = await mountForm(undefined);
 
-    expect(fieldOf(renderer.root, i18n.t('organization.groups.nameLabel'))).toBeDefined();
+    expect(fieldOf(pending.renderer.root, i18n.t('organization.groups.nameLabel'))).toBeUndefined();
+    expect(
+      fieldOf(pending.renderer.root, i18n.t('organization.groups.descriptionLabel'))
+    ).toBeUndefined();
+    expect(
+      pending.renderer.root.findAll(node => String(node.type) === 'Skeleton').length
+    ).toBeGreaterThan(0);
 
-    changeName(renderer.root, 'Workshop');
+    pending.unmountOnce();
 
-    expect(textWithTestID(renderer.root, 'org-group-limit')).toBeUndefined();
-    expect(saveControl(renderer.root).disabled).toBe(false);
+    // An errored read is not pending, so the form paints with no notice and a
+    // Save the server then refuses, which is the create's existing path.
+    groupsQuery.data = undefined;
+    groupsQuery.isPending = false;
+    groupsQuery.isError = true;
+    const errored = await mountForm(undefined);
 
-    unmountOnce();
+    expect(fieldOf(errored.renderer.root, i18n.t('organization.groups.nameLabel'))).toBeDefined();
+    expect(
+      fieldOf(errored.renderer.root, i18n.t('organization.groups.descriptionLabel'))
+    ).toBeDefined();
+    expect(textWithTestID(errored.renderer.root, 'org-group-limit')).toBeUndefined();
+
+    changeName(errored.renderer.root, 'Workshop');
+
+    expect(saveControl(errored.renderer.root).disabled).toBe(false);
+
+    errored.unmountOnce();
   });
 });
 

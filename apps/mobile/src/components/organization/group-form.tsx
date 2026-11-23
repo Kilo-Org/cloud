@@ -168,8 +168,9 @@ function GroupFormBody({ organizationId, canManageBilling, group, draft }: Group
   // list; the query is off for an edit, which never needs the count.
   const groupsQuery = useOrgGroups(organizationId, group === undefined);
   // Only the manager shape carries the organization's whole list, so a member
-  // shape (or no answer yet) is not a count. The form keeps painting while the
-  // read is pending and settles to a disabled Save once it lands.
+  // shape (or no answer yet) is not a count. The body shows the loading
+  // skeleton until the count is known, so the form paints once in its final
+  // shape and nothing moves when the list answers.
   const limitGroups = groupsQuery.data?.access === 'manager' ? groupsQuery.data.groups : null;
   const atGroupLimit =
     group === undefined && limitGroups !== null && limitGroups.length >= MAX_ORGANIZATION_GROUPS;
@@ -393,6 +394,15 @@ function GroupFormBody({ organizationId, canManageBilling, group, draft }: Group
       },
     });
   };
+
+  // A create paints one shape only: until its count is known the body shows the
+  // same skeleton the wrapper uses for a loading draft, so the form never paints
+  // before its cap state and then shifts the fields as they disable. An errored
+  // read is not pending, so that create paints with no notice and a working
+  // Save, and the server refuses it with the toast that explains why.
+  if (group === undefined && groupsQuery.isPending) {
+    return <GroupFormSkeleton />;
+  }
 
   return (
     <View className="flex-1 bg-background">

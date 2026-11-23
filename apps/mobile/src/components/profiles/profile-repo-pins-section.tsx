@@ -84,16 +84,19 @@ export function ProfileRepoPinsSection({
 
   const pinned = bindingsForProfile(bindingsQuery.bindings, profileId);
 
-  // A terminal read failure means the section is not showing this profile's
-  // pins at all, so its action and the sheet it opens are withheld. The sheet's
-  // own state closes with the read that offered it: leaving it set would
-  // reopen it without a tap if the same key later answered successfully.
+  // The Pin flow lasts only as long as the manage permission and a read that
+  // was not answered terminally: the server refuses an organization bind without
+  // the manage role (`ensureOrganizationManageAccess`), and a terminal read
+  // failure means the section is not showing this profile's pins at all. The
+  // sheet is a native sheet over this route, so nothing else closes it, and
+  // leaving the state set would reopen it without a tap.
   const readErrorTerminal = bindingsQuery.isError && !readError.showRetry;
   useEffect(() => {
-    if (readErrorTerminal) {
-      setPickerOpen(false);
+    if (canManage && !readErrorTerminal) {
+      return;
     }
-  }, [readErrorTerminal]);
+    setPickerOpen(false);
+  }, [canManage, readErrorTerminal]);
 
   const handlePin = async (repo: RepoOption) => {
     setPickerOpen(false);
@@ -213,7 +216,7 @@ export function ProfileRepoPinsSection({
     >
       <Text variant="caption">{t('profiles.repoBindings.pinnedDescription')}</Text>
       {body}
-      {pickerOpen && !readErrorTerminal ? (
+      {pickerOpen && canManage && !readErrorTerminal ? (
         <RepoPickerSheet
           repositories={repoOptions.repositories}
           isLoading={repoOptions.isLoading}

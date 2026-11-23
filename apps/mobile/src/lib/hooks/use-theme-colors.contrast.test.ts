@@ -14,7 +14,8 @@ vi.mock('expo-router', () => ({ DarkTheme: {}, DefaultTheme: {} }));
 
 // The color maps come from `src/lib/hooks/theme-colors.generated.ts`, which is
 // generated from `src/global.css` and checked by `scripts/assert-theme-colors.mjs`.
-// The contrast assertions below fail if a shipped pair regresses below 4.5:1.
+// The text-pair contrast assertions below fail if a shipped pair regresses
+// below 4.5:1.
 
 const MIN_TEXT_RATIO = 4.5;
 const MIN_NON_TEXT_RATIO = 3;
@@ -351,14 +352,10 @@ describe('row palette contrast (WCAG 1.4.11 non-text)', () => {
 });
 
 describe('idle composer control and ring track contrast (non-text)', () => {
-  // Two surfaces that needed their own step: the composer's send circle while
-  // there is nothing to send (dark only — the light theme keeps its neutral),
-  // and the track under the context-usage ring's arc (both themes: the light
-  // hairline tint sat within 1.2:1 of its pill and left the ring invisible just
-  // as the dark one did). The floors below are perception floors, not a WCAG
-  // bar: the fill and the track must read as objects on their surfaces, and the
-  // ring track must stay under the neutral arc so a part-filled arc still reads
-  // as a fraction.
+  // The composer's send circle while there is nothing to send needed its own
+  // step (dark only — the light theme keeps its neutral). The floors below are
+  // perception floors, not a WCAG bar: the fill must read as an object on its
+  // surface.
   const MIN_VISIBLE_SURFACE_RATIO = 1.6;
   const themes = [
     ['light', lightColors],
@@ -384,8 +381,9 @@ describe('idle composer control and ring track contrast (non-text)', () => {
   // message-details sheets (`background`), so the track is measured over both
   // rather than over the page alone. It must clear the perception floor on each
   // and stay under the neutral arc so a part-filled arc still reads as a
-  // fraction. Light once shipped the hairline tint here (1.11:1 on the pill),
-  // which left the ring as a lone arc with no circle under it.
+  // fraction. Both themes once shipped a hairline tint here, which left the
+  // ring as a lone arc with no circle under it; dark replaced it first, and
+  // light kept it at 1.11:1 on the pill.
   it('every theme: the ring track reads on its surfaces and stays under the neutral arc', () => {
     for (const [themeName, colors] of themes) {
       const arcRatio = contrastRatio(colors.mutedForeground, colors.secondary);

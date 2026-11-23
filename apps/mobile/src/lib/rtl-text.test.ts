@@ -431,6 +431,22 @@ describe('withoutLeadingDirectionMarks', () => {
     expect(withoutLeadingDirectionMarks(indented)).toBe('Intro\n\n    const \u200Fa = 1;');
   });
 
+  // A mark can stand where a block marker would otherwise be: the line is a
+  // paragraph only because the mark interrupts it, so removing that mark would
+  // turn the paragraph into a heading, a list item, a quote or a fence. The
+  // strip keeps the document's blocks, so such a mark stays.
+  it.each([
+    ['  \u200F# Latin', 'an indented heading'],
+    ['\u200F# Latin', 'a heading at the content start'],
+    ['  \u200F- Latin', 'an indented bullet'],
+    ['  \u200F1. Latin', 'an indented ordered item'],
+    ['  \u200F+ Latin', 'an indented plus bullet'],
+    ['  \u200F> Latin', 'an indented quote'],
+    ['  \u200F```js', 'an indented fence'],
+  ])('keeps a mark in front of %s (%s)', (value, _shape) => {
+    expect(withoutLeadingDirectionMarks(value)).toBe(value);
+  });
+
   it('returns the same string when there is no mark to strip', () => {
     expect(withoutLeadingDirectionMarks('42 · 7\n\n- Latin bullet')).toBe(
       '42 · 7\n\n- Latin bullet'

@@ -506,17 +506,6 @@ function pastLinkOpener(text: string, at: number): number {
   return close !== -1 && text[close + 1] === '(' && !/[[\n]/.test(label) ? labelStart : at;
 }
 
-/** Records the direction marks that start at `at`, when any do, and returns the
- * offset past them: they sit in front of content that has not started yet, so
- * they name the block's edge and nothing else. */
-function takeMarkRun(line: string, at: number, runs: [number, number][]): number {
-  const after = pastMatch(DIRECTION_MARK_RUN, line, at);
-  if (after > at) {
-    runs.push([at, after]);
-  }
-  return after;
-}
-
 /** `line` without the `[start, end)` ranges in `runs`, which do not overlap and
  * are in ascending order. */
 function withoutRuns(line: string, runs: readonly (readonly [number, number])[]): string {
@@ -527,6 +516,29 @@ function withoutRuns(line: string, runs: readonly (readonly [number, number])[])
     from = end;
   }
   return kept + line.slice(from);
+}
+
+/**
+ * Whether `at` in `line` would open a block marker once the text before it is
+ * removed, so that the line would parse as a different block than it does now.
+ *
+ * A mark can stand where a block marker would otherwise be: `  ‏# x` is a
+ * paragraph because the mark interrupts the indentation, and removing the mark
+ * would turn it into a heading, `- x` after it into a list item, `> x` into a
+ * quote, or ```js into a fence. The strip must leave the document's blocks
+ * alone, so a cut that would do that is refused. The same patterns the block
+ * loop already trusts answer it, and the fence case is why it also keeps this
+ * function's own fence bookkeeping honest: it reads the raw line, so a line the
+ * renderer would draw as code must not be walked as prose here.
+ */
+function opensBlockAt(line: string, at: number): boolean {
+  const rest = line.slice(at);
+  return (
+    HEADING_START.test(rest) ||
+    LIST_START.test(rest) ||
+    BLOCKQUOTE_START.test(rest) ||
+    FENCE_START.test(rest)
+  );
 }
 
 /**
@@ -545,25 +557,35 @@ function withoutRuns(line: string, runs: readonly (readonly [number, number])[])
  * ends it there for the same reason. A reference link's label is the one shape
  * whose mark survives (`pastLinkOpener`).
  */
+
 function stripLineMarks(line: string, at: number, listItem: boolean): string {
   const runs: [number, number][] = [];
-  let cursor = takeMarkRun(line, at, runs);
+  /** Records the mark run at `from` only when cutting it keeps the same blocks. */
+  const cut = (from: number): number => {
+    const after = pastMatch(DIRECTION_MARK_RUN, line, from);
+    if (after === from || opensBlockAt(line, after)) {
+      return from;
+    }
+    runs.push([from, after]);
+    return after;
+  };
+  let cursor = cut(at);
   // The block's machinery is kept exactly as written.
-  cursor = takeMarkRun(line, pastMatch(CONTENT_INDENT, line, cursor), runs);
+  cursor = cut(pastMatch(CONTENT_INDENT, line, cursor));
   // A checkbox belongs to a list item's structure; without a list marker the
   // brackets and space are the paragraph's own text.
   const checkbox = listItem ? pastMatch(TASK_CHECKBOX, line, cursor) : cursor;
   if (checkbox > cursor) {
-    cursor = takeMarkRun(line, checkbox, runs);
+    cursor = cut(checkbox);
   }
   let opener = pastOpener(line, cursor);
   while (opener > cursor) {
-    cursor = takeMarkRun(line, opener, runs);
+    cursor = cut(opener);
     opener = pastOpener(line, cursor);
   }
   const span = pastMatch(BACKTICK_RUN, line, cursor);
   if (span > cursor) {
-    takeMarkRun(line, span, runs);
+    cut(span);
   }
   // A mark just inside the opening backticks is still the block's first
   // character and went above; from the span's own text to the end of the line

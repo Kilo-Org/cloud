@@ -1,5 +1,5 @@
 import './pr-merge-sheet.test-mocks';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { type ProviderPrMergeState } from '@kilocode/app-shared/provider-review';
 import { type ProviderPrRef, providerPrRefKey } from '@/lib/pr-review/provider-pr-ref';
 import {
@@ -148,15 +148,38 @@ describe('PrMergeSheet provider behavior', () => {
   });
 
   it('withholds the merge form when a provider arm carries no merge state', async () => {
-    const renderer = await mount({ prRef: gitlab });
+    const onRetryMergeState = vi.fn<() => void>();
+    const renderer = await mount({
+      prRef: gitlab,
+      mergeState: null,
+      onRetryMergeState,
+    });
     expect(hosts(renderer, 'TextInput')).toHaveLength(0);
     expect(hosts(renderer, 'Button').map(node => node.props.accessibilityLabel)).toEqual([
+      'Retry',
       'Discard',
     ]);
-    expect(visibleText(renderer)).toContain("Couldn't determine mergeability.");
+    const text = visibleText(renderer);
+    expect(text).toContain("Couldn't determine mergeability.");
+    expect(hosts(renderer, 'AccessibleStatus').map(node => node.props.message)).toContain(
+      'Try refreshing the overview in a moment.'
+    );
+    await press(renderer, 'Retry');
+    expect(onRetryMergeState).toHaveBeenCalledOnce();
     await press(renderer, 'Discard');
     expect(baseProps.onDismiss).toHaveBeenCalledOnce();
     expect(state.merge.mutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('renders no retry control for an allowed provider merge state', async () => {
+    const renderer = await mount({ prRef: gitlab, mergeState: allowed });
+    expect(input(renderer, 'Commit title')).toBeDefined();
+    expect(visibleText(renderer)).not.toContain("Couldn't determine mergeability.");
+    expect(
+      hosts(renderer, 'Button')
+        .map(node => node.props.accessibilityLabel)
+        .filter(label => label === 'Retry')
+    ).toHaveLength(0);
   });
 
   it('withholds the auto-merge action when a provider arm carries no merge state', async () => {
@@ -166,6 +189,7 @@ describe('PrMergeSheet provider behavior', () => {
       autoMergeCapability: { supported: true, reason: '' },
     });
     expect(hosts(renderer, 'Button').map(node => node.props.accessibilityLabel)).toEqual([
+      'Retry',
       'Discard',
     ]);
     expect(visibleText(renderer)).toContain("Couldn't determine mergeability.");

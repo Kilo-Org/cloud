@@ -10,6 +10,7 @@ import {
 
 import { PrFormSheetFooter } from '@/components/pr-review/pr-form-sheet-chrome';
 import { PrReviewCapabilityBanner } from '@/components/pr-review/pr-review-capability-banner';
+import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Text } from '@/components/ui/text';
@@ -132,12 +133,13 @@ function ProviderAutoMergeBody({
 /**
  * The provider arm's sheet body. The screen (`pr-review-merge-screen.tsx`)
  * mounts the sheet only after the provider merge-state read returns, so an
- * `unknown` gate is the contract-violation terminal: it renders the reason and
- * a Discard, never a confirm control. Only an established allowed verdict or
- * the GitHub arm reaches the child form. The restrictions list stays advisory:
- * the merge write (`providerReview.mergePullRequest`) re-fetches the review,
- * fences the expected head SHA and lets the provider refuse a merge its policy
- * blocks, so the list is never the authorization.
+ * `unknown` gate is the contract-violation terminal: it renders the failure
+ * with a merge-state retry and a Discard, never a confirm control. Only an
+ * established allowed verdict or the GitHub arm reaches the child form. The
+ * restrictions list stays advisory: the merge write
+ * (`providerReview.mergePullRequest`) re-fetches the review, fences the
+ * expected head SHA and lets the provider refuse a merge its policy blocks, so
+ * the list is never the authorization.
  */
 export function PrMergeProviderBody({
   gate,
@@ -145,6 +147,7 @@ export function PrMergeProviderBody({
   isMutating,
   onConfirm,
   onCancel,
+  onRetryMergeState,
   children,
 }: Readonly<{
   gate: PrMergeGate;
@@ -152,6 +155,8 @@ export function PrMergeProviderBody({
   isMutating: boolean;
   onConfirm: () => void;
   onCancel: () => void;
+  /** Re-reads the merge state the `unknown` gate could not produce. */
+  onRetryMergeState: () => void;
   children: ReactNode;
 }>) {
   const { t } = useTranslation();
@@ -172,16 +177,15 @@ export function PrMergeProviderBody({
   if (gate.kind === 'unknown') {
     return (
       <>
-        <View style={sideInsetStyle}>
-          <View className={SCREEN_BODY_CLASS}>
-            <Card>
-              <Text className="text-sm text-muted-foreground">
-                {t('prReview.merge.couldNotDetermine')}
-              </Text>
-            </Card>
-          </View>
+        <View className="flex-1 justify-center" style={sideInsetStyle}>
+          <QueryError
+            placement="static"
+            variant="neutral"
+            title={t('prReview.merge.couldNotDetermine')}
+            message={t('prReview.merge.blocked.unknownStateDetail')}
+            onRetry={onRetryMergeState}
+          />
         </View>
-        <View className="flex-1" />
         <PrFormSheetFooter>{cancelButton()}</PrFormSheetFooter>
       </>
     );

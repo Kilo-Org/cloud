@@ -136,10 +136,16 @@ vi.mock('@/components/ui/radio-group', () => ({
   }),
 }));
 vi.mock('@/components/ui/icons', () => ({
+  AlertCircle: 'AlertCircle',
   AlertTriangle: 'AlertTriangle',
   GitBranch: 'GitBranch',
   GitPullRequest: 'GitPullRequest',
+  Lock: 'Lock',
+  RotateCcw: 'RotateCcw',
+  SearchX: 'SearchX',
+  ServerCrash: 'ServerCrash',
   ShieldAlert: 'ShieldAlert',
+  WifiOff: 'WifiOff',
   XCircle: 'XCircle',
 }));
 vi.mock('@/components/pr-review/pr-form-sheet-chrome', () => ({
@@ -150,8 +156,17 @@ vi.mock('@/components/pr-review/pr-form-sheet-chrome', () => ({
 vi.mock('@/components/pr-review/pr-review-reconnect-notice', () => ({
   PrReviewReconnectNotice: 'PrReviewReconnectNotice',
 }));
+// The shared error state (`QueryError` → `EmptyState`) and its action read
+// these tokens; the suite does not assert their values.
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({ mutedForeground: '#000000' }),
+  useThemeColors: () => ({
+    destructive: '#B0483A',
+    foreground: '#000000',
+    ink2: '#3C382F',
+    mutedForeground: '#000000',
+    primaryForeground: '#FFFFFF',
+  }),
+  useMutedDisabledInk: () => '#6F6A61',
 }));
 // The delete-branch row is a PreferenceRow, whose pending state draws the
 // shared ActivityIndicator; that reads the reduced-motion policy, which loads

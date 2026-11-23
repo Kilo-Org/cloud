@@ -175,6 +175,9 @@ export function PrReviewMergeScreen() {
         autoMergeCapability={
           needsAutoMergeCapability && capabilitiesData ? capabilitiesData.autoMerge : undefined
         }
+        onRetryMergeState={() => {
+          void mergeStateQuery.refetch();
+        }}
         onRefetch={async () => {
           await pr.refetch();
         }}

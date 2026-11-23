@@ -85,6 +85,11 @@ type PrMergeSheetProps = Readonly<{
    */
   mergeState?: ProviderPrMergeState | null;
   autoMergeCapability?: ProviderReviewCapability;
+  /**
+   * The provider arm's merge-state refetch. Omitted, it falls back to the
+   * sheet's own refetch.
+   */
+  onRetryMergeState?: () => void;
   onRefetch: () => Promise<void>;
   onDismiss: () => void;
 }>;
@@ -107,6 +112,7 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
     prRef,
     mergeState,
     autoMergeCapability,
+    onRetryMergeState,
     onRefetch,
     onDismiss,
   } = props;
@@ -223,6 +229,12 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
             isMutating={isMutating}
             onConfirm={handleConfirmPress}
             onCancel={handleCancel}
+            onRetryMergeState={
+              onRetryMergeState ??
+              (() => {
+                void onRefetch();
+              })
+            }
           >
             <MergeSheetFormBody
               noMethodsAllowed={noMethodsAllowed}

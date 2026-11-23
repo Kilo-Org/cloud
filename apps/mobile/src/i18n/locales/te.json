@@ -2500,7 +2500,7 @@
       "accessibilityLabel": "{{name}} టూల్, {{status}}",
       "noTasks": "పనులు లేవు.",
       "toolRead": "చదవడం",
-      "toolEdit": "సవరించండి",
+      "toolEdit": "సవరించడం",
       "toolWrite": "రాయడం",
       "toolBash": "bash",
       "toolGlob": "ఫైల్ శోధన",

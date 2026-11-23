@@ -1379,7 +1379,13 @@ function localComponents(program) {
  * that answer per component tag and a diamond of local components walks each
  * body once. Only the cycle guard depends on the path: `state.active` holds the
  * components this walk is still reading, and a component it meets there is its
- * own ancestor, whose header cannot appear through the cycle.
+ * own ancestor, so that one edge is dropped and the walk continues elsewhere.
+ *
+ * A `true` is a header the walk saw, so it holds on every path and is always
+ * memoised. A `false` reached through a dropped edge is only that path's answer —
+ * the ancestor it met may hold a header on another route — so the cut, and every
+ * body whose walk contained it, is marked `tainted` and not memoised. Storing it
+ * would let a later `<Sheet>` read a `false` that only its sibling's path earned.
  */
 function drawsOwnHeader(
   scope,
@@ -1407,7 +1413,8 @@ function drawsOwnHeader(
     }
   });
   const outsideNested = start => !nested.some(child => start > child.start && start < child.end);
-  return (
+  let tainted = false;
+  const found =
     headers.some(outsideNested) ||
     candidates.some(candidate => {
       if (!outsideNested(candidate.start)) {
@@ -1417,13 +1424,12 @@ function drawsOwnHeader(
       if (seen !== undefined) {
         return seen;
       }
-      // A component already being read is this walk's own ancestor: a header it
-      // does not hold on the way down cannot appear through the cycle.
       if (state.active.has(candidate.tag)) {
+        tainted = true;
         return false;
       }
       state.active.add(candidate.tag);
-      const found = drawsOwnHeader(
+      const inner = drawsOwnHeader(
         components.get(candidate.tag),
         text,
         components,
@@ -1431,10 +1437,17 @@ function drawsOwnHeader(
         state
       );
       state.active.delete(candidate.tag);
-      state.memo.set(candidate.tag, found);
-      return found;
-    })
-  );
+      if (inner.tainted) {
+        tainted = true;
+      }
+      // A `true` holds on every path, so it is memoised even from a tainted walk;
+      // only the `false` such a walk produced is path-bound.
+      if (inner.found || !inner.tainted) {
+        state.memo.set(candidate.tag, inner.found);
+      }
+      return inner.found;
+    });
+  return { found, tainted };
 }
 
 function detectSheetHeader({ relative, imports, program, text, lineOf }) {
@@ -1470,7 +1483,7 @@ function detectSheetHeader({ relative, imports, program, text, lineOf }) {
     // sheet is that sheet's, not this one's. `drawsOwnHeader` holds that nesting
     // rule, so a literal `SheetHeader` and a local component that draws one are
     // read the same way.
-    if (!drawsOwnHeader(node, text, components, sheetNames, state)) {
+    if (!drawsOwnHeader(node, text, components, sheetNames, state).found) {
       problems.push({ line: lineOf(node.start), offending: `<${name}>` });
     }
   });

@@ -2673,6 +2673,46 @@ test('terminates on local components that render each other', () => {
   );
 });
 
+test('does not reuse a header answer earned through a dropped cycle edge', () => {
+  // A reads B, then C, and C draws the header; B reads A, so the walk from B is
+  // cut at A. That cut made B's own walk stop short, and the second sheet reads
+  // B: a memo entry for B written from the cut walk would report that sheet as
+  // headerless, even though B reaches C's header through A.
+  assert.deepEqual(
+    layoutProblems(
+      SCREEN_FILE,
+      "import { Sheet } from '@/components/ui/sheet';\n" +
+        'function A() {\n' +
+        '  return (\n' +
+        '    <>\n' +
+        '      <B />\n' +
+        '      <C />\n' +
+        '    </>\n' +
+        '  );\n' +
+        '}\n' +
+        'function B() {\n' +
+        '  return <A />;\n' +
+        '}\n' +
+        'function C() {\n' +
+        '  return <SheetHeader title="Advanced" onDone={onClose} />;\n' +
+        '}\n' +
+        'export function Screen() {\n' +
+        '  return (\n' +
+        '    <>\n' +
+        '      <Sheet visible onClose={onClose}>\n' +
+        '        <A />\n' +
+        '      </Sheet>\n' +
+        '      <Sheet visible onClose={onClose}>\n' +
+        '        <B />\n' +
+        '      </Sheet>\n' +
+        '    </>\n' +
+        '  );\n' +
+        '}'
+    ),
+    []
+  );
+});
+
 test('reports a malformed theme seam instead of throwing', async context => {
   // The seam has one shape. A reader that supplies neither the tokens nor a
   // failure used to escape out of the first rule that read it, as a TypeError,

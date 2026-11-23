@@ -56,13 +56,13 @@ export async function pullChat(
       ) {
         return { kind: 'current' };
       }
-      const count = await applyPulled(
+      const count = await applyPulled({
         deps,
-        input.sessionId,
-        ready.serverId,
-        pulled.snapshot,
-        input.modelId
-      );
+        sessionId: input.sessionId,
+        serverId: ready.serverId,
+        snapshot: pulled.snapshot,
+        model: input.modelId,
+      });
       return count === 0 ? { kind: 'current' } : { kind: 'imported', count };
     }
   }

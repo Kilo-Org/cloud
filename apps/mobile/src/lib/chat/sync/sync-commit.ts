@@ -10,13 +10,14 @@ import { saveSyncRecord, syncRecordOf } from './sync-store';
  * is lost (H4/H5). Split from the upload builder so each half is one story.
  */
 
-export async function commitFrozen(
-  deps: SyncDeps,
-  input: UploadChatInput,
-  serverId: string,
-  frozen: FrozenPacket,
-  mayRebatch: boolean
-): Promise<UploadOutcome> {
+export async function commitFrozen(args: {
+  readonly deps: SyncDeps;
+  readonly input: UploadChatInput;
+  readonly serverId: string;
+  readonly frozen: FrozenPacket;
+  readonly mayRebatch: boolean;
+}): Promise<UploadOutcome> {
+  const { deps, input, serverId, frozen, mayRebatch } = args;
   const result = await deps.transport.commit(serverId, frozen.packet);
   switch (result.type) {
     case 'committed': {
@@ -46,19 +47,20 @@ export async function commitFrozen(
     }
     case 'superseded':
     case 'conflict': {
-      return resolveConflict(deps, input, serverId, frozen, mayRebatch);
+      return resolveConflict({ deps, input, serverId, frozen, mayRebatch });
     }
   }
 }
 
 /** H5: pull, import, then fast-forward above the pulled max seq or park diverged. */
-async function resolveConflict(
-  deps: SyncDeps,
-  input: UploadChatInput,
-  serverId: string,
-  frozen: FrozenPacket,
-  mayRebatch: boolean
-): Promise<UploadOutcome> {
+async function resolveConflict(args: {
+  readonly deps: SyncDeps;
+  readonly input: UploadChatInput;
+  readonly serverId: string;
+  readonly frozen: FrozenPacket;
+  readonly mayRebatch: boolean;
+}): Promise<UploadOutcome> {
+  const { deps, input, serverId, frozen, mayRebatch } = args;
   const pulled = await deps.transport.pull(serverId);
   switch (pulled.type) {
     case 'deleted': {
@@ -86,7 +88,13 @@ async function resolveConflict(
     .filter(entry => entry.seq > record.ackedSeq && entry.seq > 0)
     .map(entry => ({ seq: entry.seq }));
   const verdict = classifyConflict(unacked, snapshot.maxSeq);
-  await applyPulled(deps, input.sessionId, serverId, snapshot, input.modelId);
+  await applyPulled({
+    deps,
+    sessionId: input.sessionId,
+    serverId,
+    snapshot,
+    model: input.modelId,
+  });
   if (verdict === 'diverged' || !mayRebatch) {
     saveSyncRecord(deps.db, input.sessionId, {
       phase: verdict === 'diverged' ? 'diverged' : 'pending',
@@ -106,6 +114,12 @@ async function resolveConflict(
     phase: 'pending',
     outbox: freeze(rebatched, frozen.maxSeq),
   });
-  return commitFrozen(deps, input, serverId, { packet: rebatched, maxSeq: frozen.maxSeq }, false);
+  return commitFrozen({
+    deps,
+    input,
+    serverId,
+    frozen: { packet: rebatched, maxSeq: frozen.maxSeq },
+    mayRebatch: false,
+  });
 }
 

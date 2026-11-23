@@ -18,6 +18,9 @@ const messageMapSchema = z.record(
   z.object({ msgId: z.string(), seq: z.number().int().nonnegative() })
 );
 
+/** A map under construction, before it is written as {@link SyncMessageMap}. */
+export type MutableMessageMap = Record<string, { msgId: string; seq: number }>;
+
 /** Turn id to the portable message it uploads (or was imported) as. */
 export type SyncMessageMap = Readonly<Record<string, { readonly msgId: string; readonly seq: number }>>;
 
@@ -181,12 +184,13 @@ export function saveSyncRecord(db: ChatDatabase, sessionId: string, patch: SyncR
  * id) when the chat already carries a different one: a server id never
  * changes hands.
  */
-export function stampServerSessionId(
-  db: ChatDatabase,
-  sessionId: string,
-  serverSessionId: string,
-  sourceId: string
-): string {
+export function stampServerSessionId(input: {
+  readonly db: ChatDatabase;
+  readonly sessionId: string;
+  readonly serverSessionId: string;
+  readonly sourceId: string;
+}): string {
+  const { db, sessionId, serverSessionId, sourceId } = input;
   const held = syncRecordOf(db, sessionId)?.serverSessionId;
   if (held !== null && held !== undefined) {
     return held;

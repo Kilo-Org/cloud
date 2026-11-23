@@ -4,6 +4,7 @@ import { pulledToTurns } from './sync-mapping';
 import { saveSyncRecord, syncRecordOf } from './sync-store';
 import { importedTurnId } from './sync-ids';
 import type { SyncDeps } from './sync-protocol';
+import type { MutableMessageMap } from './sync-store';
 
 /**
  * Importing a pulled log: the messages this device has not seen become
@@ -11,13 +12,14 @@ import type { SyncDeps } from './sync-protocol';
  */
 
 /** Applies a pulled snapshot locally: imports new messages and re-seeds the acknowledgement. */
-export async function applyPulled(
-  deps: SyncDeps,
-  sessionId: string,
-  serverId: string,
-  snapshot: PulledSnapshot,
-  model: string
-): Promise<number> {
+export async function applyPulled(input: {
+  readonly deps: SyncDeps;
+  readonly sessionId: string;
+  readonly serverId: string;
+  readonly snapshot: PulledSnapshot;
+  readonly model: string;
+}): Promise<number> {
+  const { deps, sessionId, serverId, snapshot, model } = input;
   const record = syncRecordOf(deps.db, sessionId);
   if (record === null) {
     return 0;
@@ -34,7 +36,7 @@ export async function applyPulled(
       model,
     });
   }
-  const map: Record<string, { msgId: string; seq: number }> = { ...record.messageMap };
+  const map: MutableMessageMap = { ...record.messageMap };
   for (const one of fresh) {
     map[importedTurnId(one.message.time.created, one.seq)] = {
       msgId: one.message.id,

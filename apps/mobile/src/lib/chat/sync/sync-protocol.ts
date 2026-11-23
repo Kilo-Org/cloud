@@ -8,7 +8,7 @@ import type { Turn } from '@kilocode/harness-sdk';
 
 import { msgIdForTurn } from './sync-ids';
 import { type PortableModelRef, type SequencedTurn } from './sync-mapping';
-import { type SyncMessageMap, type SyncRecord } from './sync-store';
+import { type MutableMessageMap, type SyncMessageMap, type SyncRecord } from './sync-store';
 
 /**
  * The wire contract the engine speaks: what each transport call answers, what
@@ -150,14 +150,15 @@ export function thaw(raw: string): FrozenPacket | null {
   }
 }
 
-export function sessionOf(
-  record: SyncRecord,
-  serverId: string,
-  title: string | null,
-  model: PortableModelRef,
-  created: number,
-  now: number
-): PortableSession {
+export function sessionOf(input: {
+  readonly record: SyncRecord;
+  readonly serverId: string;
+  readonly title: string | null;
+  readonly model: PortableModelRef;
+  readonly created: number;
+  readonly now: number;
+}): PortableSession {
+  const { record, serverId, title, model, created, now } = input;
   return {
     id: serverId,
     ...(title === null || title === '' ? {} : { title }),
@@ -175,7 +176,7 @@ export type SequencedTurns = {
 
 /** Assigns seqs to the turns the map has never seen, above everything known (H2). */
 export function sequenceNewTurns(record: SyncRecord, turns: readonly Turn[]): SequencedTurns {
-  const map: Record<string, { msgId: string; seq: number }> = { ...record.messageMap };
+  const map: MutableMessageMap = { ...record.messageMap };
   const sequenced: SequencedTurn[] = [];
   let maxSeq = record.maxSeq;
   for (const turn of turns) {

@@ -48,7 +48,12 @@ export async function ensureRegistered(
   }
   const serverId =
     record.serverSessionId ??
-    stampServerSessionId(deps.db, sessionId, deps.newServerSessionId(), sourceId);
+    stampServerSessionId({
+      db: deps.db,
+      sessionId,
+      serverSessionId: deps.newServerSessionId(),
+      sourceId,
+    });
   if (record.serverSessionId !== null && record.phase !== 'local') {
     return { kind: 'ready', record, serverId };
   }
@@ -109,7 +114,7 @@ export async function uploadChat(
   if (record.outbox !== null) {
     const frozen = thaw(record.outbox);
     if (frozen !== null) {
-      const outcome = await commitFrozen(deps, input, serverId, frozen, false);
+      const outcome = await commitFrozen({ deps, input, serverId, frozen, mayRebatch: false });
       if (outcome.kind !== 'synced') {
         return outcome;
       }
@@ -139,7 +144,14 @@ export async function uploadChat(
   for (const image of imagePartsOf(sequenced.map(one => one.turn))) {
     blobs.set(image.partId, await deps.transport.putBlob(serverId, base64ToBytes(image.base64), image.media));
   }
-  const session = sessionOf(record, serverId, input.title, input.model, input.createdAt, now);
+  const session = sessionOf({
+    record,
+    serverId,
+    title: input.title,
+    model: input.model,
+    created: input.createdAt,
+    now,
+  });
   const messages = turnsToPortable(sequenced, {
     model: input.model,
     agent: input.agent,
@@ -166,7 +178,7 @@ export async function uploadChat(
     messageMap: map,
     maxSeq: finalMaxSeq,
   });
-  return commitFrozen(deps, input, serverId, { packet, maxSeq: finalMaxSeq }, true);
+  return commitFrozen({ deps, input, serverId, frozen: { packet, maxSeq: finalMaxSeq }, mayRebatch: true });
 }
 
 

@@ -200,7 +200,7 @@ export async function importServerSession(
   const sessionId = serverSessionId;
   rememberChat(db, { sessionId, scope: place.chatScope, at: Date.now() });
   const sourceId = await chatSyncSourceId(place.chatScope);
-  stampServerSessionId(db, sessionId, serverSessionId, sourceId);
+  stampServerSessionId({ db, sessionId, serverSessionId, sourceId });
   const outcome = await pullChat(deps, { sessionId, sourceId, modelId });
   if (outcome.kind === 'deleted' || outcome.kind === 'not-found' || outcome.kind === 'unknown-chat') {
     return null;

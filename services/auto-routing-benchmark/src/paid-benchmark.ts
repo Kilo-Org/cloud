@@ -1314,44 +1314,43 @@ export async function reconcilePaidBenchmarkRequests(
   const staging = preparingRows.results.filter(row => row.staged_cases < row.plan_cases).length;
   const offered = Math.floor(CRON_STAGE_BUDGET_SLOTS / Math.max(1, staging));
   let remainingStageBudget = CRON_STAGE_BUDGET_SLOTS;
-  const live = [...preparingRows.results, ...activeRows.results];
-  // The frozen plan of every request this tick serves, in one read: a per-request quote read
-  // is the tick's largest fixed cost once many requests stage at once.
-  const plans = new Map<string, PaidBenchmarkPlan | null>();
-  if (live.length > 0) {
-    const quotes = await db
-      .prepare(
-        `SELECT id, plan FROM paid_benchmark_quotes
-        WHERE id IN (SELECT value FROM json_each(?))`
-      )
-      .bind(JSON.stringify([...new Set(live.map(request => request.quote_id))]))
-      .all<{ id: string; plan: string }>();
-    for (const quote of quotes.results) plans.set(quote.id, decodePlan(quote.plan));
-  }
-  for (const request of live) {
-    // One request's failure must never abort the tick for the others: a read fault, an
-    // unexpected throw or a bad quote is that request's problem, logged and left for the next
-    // tick, while every other live request still stages, activates and settles.
-    try {
-      await reconcileOnePaidRequest(env, request, {
-        now,
-        summary,
-        plan: plans.get(request.quote_id) ?? null,
-        offeredSlots: request.status === 'preparing' ? offered : 0,
-        takeStageBudget: (wanted: number) => {
-          const granted = Math.min(wanted, Math.max(0, remainingStageBudget));
-          remainingStageBudget -= granted;
-          return granted;
-        },
-      });
-    } catch (error) {
-      console.error(
-        JSON.stringify({
-          event: 'benchmark_paid_request_reconcile_failed',
-          requestId: request.id,
-          error: error instanceof Error ? error.message : String(error),
-        })
-      );
+  // The frozen plans are read in byte-bounded chunks rather than all at once: a wide pool's
+  // plan is hundreds of KB of JSON, and 100 of them in one query would be tens of MB against
+  // D1's result limit and the Worker's memory. A chunk is decoded and processed one request at
+  // a time, then dropped.
+  for (const chunk of planReadChunks(
+    [...preparingRows.results, ...activeRows.results],
+    await readPlanSizes(
+      db,
+      [...preparingRows.results, ...activeRows.results].map(request => request.quote_id)
+    )
+  )) {
+    const plans = await readPlans(db, chunk);
+    for (const request of chunk) {
+      // One request's failure must never abort the tick for the others: a read fault, an
+      // unexpected throw or an unreadable plan is that request's problem, logged and left for
+      // the next tick, while every other live request still stages, activates and settles.
+      try {
+        await reconcileOnePaidRequest(env, request, {
+          now,
+          summary,
+          plan: decodePlan(plans.get(request.quote_id) ?? ''),
+          offeredSlots: request.status === 'preparing' ? offered : 0,
+          takeStageBudget: (wanted: number) => {
+            const granted = Math.min(wanted, Math.max(0, remainingStageBudget));
+            remainingStageBudget -= granted;
+            return granted;
+          },
+        });
+      } catch (error) {
+        console.error(
+          JSON.stringify({
+            event: 'benchmark_paid_request_reconcile_failed',
+            requestId: request.id,
+            error: error instanceof Error ? error.message : String(error),
+          })
+        );
+      }
     }
   }
   // A crash between completion and the pin callback leaves the notification on the outbox;
@@ -1361,6 +1360,76 @@ export async function reconcilePaidBenchmarkRequests(
   // sees it; anything still absent stays disclosed as pending.
   await reconcilePaidUsageReceipts(env, { limit: 50, fetchImpl: options.fetchImpl });
   return summary;
+}
+
+/**
+ * Bytes of plan JSON one query may return. A wide pool's plan is about 250 KB and a typical one
+ * about 18 KB, so this holds several wide plans or every served request in one read, while
+ * bounding a single result far below D1's 50 MB result limit and the Worker's memory.
+ */
+const PLAN_READ_BYTE_BUDGET = 2 * 1024 * 1024;
+
+/** The stored byte length of each quote's plan, so the read can be sized before it runs. */
+async function readPlanSizes(
+  db: D1Database,
+  quoteIds: readonly string[]
+): Promise<Map<string, number>> {
+  const sizes = new Map<string, number>();
+  if (quoteIds.length === 0) return sizes;
+  const rows = await db
+    .prepare(
+      `SELECT id, length(plan) AS bytes FROM paid_benchmark_quotes
+      WHERE id IN (SELECT value FROM json_each(?))`
+    )
+    .bind(JSON.stringify([...new Set(quoteIds)]))
+    .all<{ id: string; bytes: number }>();
+  for (const row of rows.results) sizes.set(row.id, Number(row.bytes));
+  return sizes;
+}
+
+/**
+ * Split the served requests into consecutive chunks whose plans fit `PLAN_READ_BYTE_BUDGET`.
+ *
+ * A single plan larger than the budget still gets its own chunk, so a pathological quote can
+ * never make a request unreachable; it is just read alone.
+ */
+export function planReadChunks<T extends { quote_id: string }>(
+  requests: readonly T[],
+  bytes: ReadonlyMap<string, number>
+): T[][] {
+  const chunks: T[][] = [];
+  let current: T[] = [];
+  let currentBytes = 0;
+  for (const request of requests) {
+    const size = bytes.get(request.quote_id) ?? 0;
+    if (current.length > 0 && currentBytes + size > PLAN_READ_BYTE_BUDGET) {
+      chunks.push(current);
+      current = [];
+      currentBytes = 0;
+    }
+    current.push(request);
+    currentBytes += size;
+  }
+  if (current.length > 0) chunks.push(current);
+  return chunks;
+}
+
+/** The plan JSON for one chunk of requests (one query). */
+async function readPlans(
+  db: D1Database,
+  requests: readonly { quote_id: string }[]
+): Promise<Map<string, string>> {
+  const plans = new Map<string, string>();
+  if (requests.length === 0) return plans;
+  const rows = await db
+    .prepare(
+      `SELECT id, plan FROM paid_benchmark_quotes
+      WHERE id IN (SELECT value FROM json_each(?))`
+    )
+    .bind(JSON.stringify([...new Set(requests.map(request => request.quote_id))]))
+    .all<{ id: string; plan: string }>();
+  for (const row of rows.results) plans.set(row.id, row.plan);
+  return plans;
 }
 
 /**
@@ -1439,9 +1508,11 @@ async function reconcileOnePaidRequest(
       }
       current = await activateIfFullyStaged(env, current, plan, now);
     } else {
-      // The abandoned check runs BEFORE budget is taken: a stalled request is the stalest, so
-      // it is served first, and charging its share before closing it would starve the healthy
-      // requests behind it for that tick (or, with many stalled ones, for several).
+      // The abandonment check runs before budget is taken, for clarity rather than to change
+      // any grant: `offered = floor(budget / staging)` is computed over exactly the rows that
+      // can reach this call, so a stalled request's share is always its own and every staging
+      // request receives `offered` under either order. Taking nothing for a request that is
+      // being closed simply keeps the shared counter honest.
       if (now - lastProgress > STAGE_ABANDON_MS) {
         await db.batch(
           failPaidBenchmarkRequestStatements(db, {

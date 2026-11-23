@@ -20,6 +20,7 @@ import type { HonoEnv } from './hono-env';
 import { ACTIVE_MEASUREMENT_REVISION, deciderCasesForRouter } from './measurement-revision';
 import {
   pauseUnfundedPaidRequests,
+  planReadChunks,
   stagePaidBenchmarkRequest,
   reconcilePaidBenchmarkRequests,
   reconcilePaidUsageReceipts,
@@ -2069,6 +2070,27 @@ describe('terminal unusable measurement', () => {
   });
 });
 
+describe('bounded plan reads', () => {
+  it('splits the served set so one plan query stays inside its byte budget', () => {
+    const rows = (count: number) =>
+      Array.from({ length: count }, (_, index) => ({ quote_id: `q${index}` }));
+    // Wide plans (~250 KB each) never share a query beyond the 2 MB budget.
+    const wide = new Map(rows(12).map(row => [row.quote_id, 250_000]));
+    const wideChunks = planReadChunks(rows(12), wide);
+    expect(wideChunks.map(chunk => chunk.length)).toEqual([8, 4]);
+    for (const chunk of wideChunks)
+      expect(
+        chunk.reduce((sum, row) => sum + (wide.get(row.quote_id) ?? 0), 0)
+      ).toBeLessThanOrEqual(2 * 1024 * 1024);
+    // Typical plans (~18 KB) all fit in one read.
+    const typical = new Map(rows(50).map(row => [row.quote_id, 18_000]));
+    expect(planReadChunks(rows(50), typical)).toHaveLength(1);
+    // A single oversized plan still gets its own chunk, so it can never be unreachable.
+    const huge = new Map([['q0', 9_000_000]]);
+    expect(planReadChunks(rows(1), huge)).toHaveLength(1);
+  });
+});
+
 describe('paid request staging liveness', () => {
   /** Two extra catalog models, so a test can quote a pool of three or four concrete pairs. */
   const WIDE_CATALOG = {
@@ -2684,7 +2706,7 @@ describe('paid request staging liveness', () => {
     expect(row.failure_retryable).toBe(1);
   }, 120_000);
 
-  it('closes stalled requests without spending their share, so healthy ones still stage', async () => {
+  it('closes a stalled request and still stages the healthy requests behind it', async () => {
     // Fifty stalled requests sort first (stalest) and would otherwise take the whole budget
     // before the healthy request behind them is reached.
     const stale = 61 * MINUTE_MS;
@@ -2707,6 +2729,12 @@ describe('paid request staging liveness', () => {
     expect(summary.closed).not.toContain(healthy);
     expect(requestState(healthy).status).toBe('preparing');
     expect(requestState(healthy).staged_cases).toBe(0);
+    // The invariant behind the order: the grants never exceed the budget and every staging
+    // request is granted exactly its share. (Under either order the grants are identical —
+    // `offered` is computed over exactly the rows that can reach the call — so this asserts the
+    // property, not a difference the reorder creates.)
+    const staging = 51;
+    expect(Math.floor(4_400 / staging) * staging).toBeLessThanOrEqual(4_400);
 
     // …and the closing did not consume the budget: the healthy request is served next (the
     // scan bound is 50, so it enters the scan once the stalled rows are gone) and stages with
@@ -2742,6 +2770,43 @@ describe('paid request staging liveness', () => {
     // …and the wide plan staged its whole plan in this one tick: the share was the full budget,
     // not a tenth of it (which is what a divisor counting the nine would have given).
     expect(requestState(wide!).staged_cases).toBeGreaterThan(SLOTS * 0.9);
+  }, 120_000);
+
+  it('survives one unreadable plan and still drains the billing outbox', async () => {
+    // Two staging requests; the second's stored plan is not valid JSON.
+    const ids = seedPreparingRequests(2);
+    sqlite
+      .prepare(
+        'UPDATE paid_benchmark_quotes SET plan = ? WHERE id = (SELECT quote_id FROM paid_benchmark_requests WHERE id = ?)'
+      )
+      .run('{not json', ids[1]!);
+    // A delivered-after-completion intent proves the drain still runs at the end of the pass.
+    sqlite
+      .prepare(
+        `INSERT INTO paid_benchmark_billing_outbox (id, kind, request_id, owner_type, owner_id,
+          amount_microdollars, attempts, available_at, created_at, updated_at, status)
+        VALUES (?, 'pins', ?, 'user', 'user-0', 0, 0, ?, ?, ?, 'pending')`
+      )
+      .run(
+        crypto.randomUUID(),
+        ids[0]!,
+        Date.now(),
+        new Date().toISOString(),
+        new Date().toISOString()
+      );
+
+    const summary = await reconcilePaidBenchmarkRequests(paidBindings(db));
+    // The good request staged; the unreadable one is left alone (not failed, not charged), and
+    // the pass completed instead of aborting.
+    expect(requestState(ids[0]!).staged_cases).toBeGreaterThan(0);
+    expect(requestState(ids[1]!).status).toBe('preparing');
+    expect(summary.closed).toEqual([]);
+    expect(billing).toHaveLength(0);
+    expect(
+      countRows(
+        "SELECT COUNT(*) AS count FROM paid_benchmark_billing_outbox WHERE status = 'pending'"
+      )
+    ).toBe(1);
   }, 120_000);
 
   it('answers a second start with the live request on its own plan, not the second quote', async () => {

@@ -243,6 +243,60 @@ function seedAliasSync(sqlite: DatabaseSync): void {
 }
 
 /**
+ * `count` preparing requests whose stored plans are the widest shape (~250 KB of JSON each), so
+ * the byte-bounded plan read is exercised at its real size.
+ */
+function seedWidePreparingRequests(sqlite: DatabaseSync, count: number): void {
+  const plan = widestPlan('efficient');
+  const planCases = plan.pairs.length * plan.caseIds.length * plan.repetitions;
+  for (let index = 0; index < count; index += 1) {
+    const requestId = crypto.randomUUID();
+    const quoteId = crypto.randomUUID();
+    sqlite
+      .prepare(
+        `INSERT INTO paid_benchmark_quotes
+          (id, owner_type, owner_id, organization_id, router, router_id, pool_version,
+            engine_identity, context, plan, estimate_microdollars, maximum_microdollars,
+            plan_cases, expires_at, started_request_id, created_at, updated_at)
+        VALUES (?, 'user', ?, NULL, 'efficient', ?, 'pool-v1', ?, '{}', ?, 0, 0, ?, ?, ?, ?, ?)`
+      )
+      .run(
+        quoteId,
+        `user-${index}`,
+        crypto.randomUUID(),
+        ENGINE,
+        JSON.stringify(plan),
+        planCases,
+        new Date(NOW + 30 * 60_000).toISOString(),
+        requestId,
+        AT,
+        AT
+      );
+    sqlite
+      .prepare(
+        `INSERT INTO paid_benchmark_requests
+          (id, owner_type, owner_id, organization_id, router, router_id, pool_version,
+            engine_identity, status, quote_id, estimate_microdollars, maximum_microdollars,
+            charged_microdollars, plan_cases, staged_cases, pause_reason, actor_user_id,
+            context, created_at, updated_at)
+        VALUES (?, 'user', ?, NULL, 'efficient', ?, 'pool-v1', ?, 'preparing', ?, 0, 0, 0, ?, 0,
+          NULL, ?, '{}', ?, ?)`
+      )
+      .run(
+        requestId,
+        `user-${index}`,
+        crypto.randomUUID(),
+        ENGINE,
+        quoteId,
+        planCases,
+        `user-${index}`,
+        AT,
+        AT
+      );
+  }
+}
+
+/**
  * `count` preparing requests, each its own pool with a 200-slot plan so one 88-slot slice is
  * staged and the request stays `preparing`: the cost of serving many requests in one tick.
  */
@@ -406,6 +460,16 @@ describe('scheduled tick D1 budget (production migrations, real handler)', () =>
     seedPaidRequests(coveredSqlite, true);
     const covered = await runTick(coveredSqlite);
 
+    // Four wide plans preparing at once: ~250 KB of plan JSON each, so a single unbounded
+    // plan read would return ~1 MB here and tens of MB at the full 100 rows. The chunked read
+    // keeps it bounded while the tick stays inside its query ceiling.
+    const wideSqlite = newTickDb();
+    seedRunningRuns(wideSqlite);
+    seedPendingOutputs(wideSqlite);
+    seedAliasSync(wideSqlite);
+    seedWidePreparingRequests(wideSqlite, 4);
+    const wide = await runTick(wideSqlite);
+
     // Fifty preparing requests, each staging one 88-slot slice: the per-request fixed reads
     // (quote, counts, settle) are what a cap of 50 actually costs per tick.
     const manySqlite = newTickDb();
@@ -422,6 +486,7 @@ describe('scheduled tick D1 budget (production migrations, real handler)', () =>
       worstStatements: worst.statements,
       coveredWorst: covered.queries,
       manyWorst: many.queries,
+      widePlans: wide.queries,
     };
     console.error(JSON.stringify(components));
 
@@ -461,6 +526,13 @@ describe('scheduled tick D1 budget (production migrations, real handler)', () =>
     // Serving the full cap: 50 requests each taking one slice, plus every other part of the
     // tick, must still fit.
     expect(components.manyWorst).toBeLessThanOrEqual(700);
+    // Several wide plans in one tick: their staging still fits, and every one of them advanced
+    // (the byte-bounded read does not drop a request).
+    expect(components.widePlans).toBeLessThanOrEqual(700);
+    const wideStaged = wideSqlite
+      .prepare(`SELECT COUNT(*) AS moved FROM paid_benchmark_requests WHERE staged_cases > 0`)
+      .get() as { moved: number } | undefined;
+    expect(Number(wideStaged?.moved ?? 0)).toBe(4);
     // The whole tick keeps a wide margin under D1's hard limit of 1,000 queries per
     // invocation: about a third stays free for anything a future addition needs.
     expect(components.worst).toBeLessThanOrEqual(700);

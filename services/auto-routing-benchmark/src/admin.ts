@@ -103,6 +103,7 @@ import {
   publishPlatformRoutingTable,
   resolveRunIdentity,
   RunAlreadyActiveError,
+  RunOperatorHoldError,
   startRun,
   syncPlatformRegistry,
   type DrainSkipReason,
@@ -676,6 +677,9 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
       try {
         return c.json({ ...(await startRun(c.env, kind, { force, router })), startedRuns: [] });
       } catch (error) {
+        if (error instanceof RunOperatorHoldError) {
+          return c.json({ error: 'operator_hold_active' }, 409);
+        }
         // One active run per kind: surface the conflict as 409 so automated
         // callers don't treat it as a transient 5xx and retry.
         if (error instanceof RunAlreadyActiveError) {

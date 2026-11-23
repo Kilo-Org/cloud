@@ -1576,6 +1576,45 @@ describe('POST /admin/runs', () => {
     expect(queueSendBatch).not.toHaveBeenCalled();
   });
 
+  it('refuses a classifier run while the operator hold is live, then admits it after release', async () => {
+    const actual = await vi.importActual<typeof DbModule>('./db');
+    vi.mocked(insertRun).mockImplementation(actual.insertRun);
+    vi.mocked(getConfigRows).mockResolvedValue(TEST_CONFIG_ROWS);
+    env.BENCH_DB = sqliteD1(sqlite);
+    const rows = (table: string) =>
+      sqlite.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get() as { n: number };
+
+    sqlite
+      .prepare('UPDATE scheduler_dispatch_lock SET token = ?, lease_until = ? WHERE id = 1')
+      .run('operator-pause-userpay', Date.now() + 3_600_000);
+
+    const refused = await authedPost('/admin/runs', { kind: 'classifier' });
+
+    expect(refused.status).toBe(409);
+    await expect(refused.json()).resolves.toEqual({ error: 'operator_hold_active' });
+    expect(insertRun).toHaveBeenCalledOnce();
+    expect(rows('benchmark_runs')).toEqual({ n: 0 });
+    expect(rows('run_models')).toEqual({ n: 0 });
+    expect(queueSendBatch).not.toHaveBeenCalled();
+    expect(queueSend).not.toHaveBeenCalled();
+
+    sqlite
+      .prepare('UPDATE scheduler_dispatch_lock SET token = NULL, lease_until = 0 WHERE id = 1')
+      .run();
+
+    const admitted = await authedPost('/admin/runs', { kind: 'classifier' });
+
+    expect(admitted.status).toBe(200);
+    const body = (await admitted.json()) as { runId: string; enqueuedModels: number };
+    expect(body.runId).toMatch(/^classifier-/);
+    expect(body.enqueuedModels).toBe(TEST_CONFIG.classifierModels.length);
+    expect(
+      sqlite.prepare('SELECT status FROM benchmark_runs WHERE id = ?').get(body.runId)
+    ).toEqual({ status: 'running' });
+    expect(rows('benchmark_runs')).toEqual({ n: 1 });
+    expect(queueSendBatch).toHaveBeenCalled();
+  });
+
   it('returns 400 when no config has been saved', async () => {
     // getConfigRows already returns null config by default
     const res = await authedPost('/admin/runs', { kind: 'classifier' });

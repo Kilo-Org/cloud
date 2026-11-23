@@ -18,6 +18,7 @@ import { KeyRound, Plus } from '@/components/ui/icons';
 import { RowGroup } from '@/components/ui/row-group';
 import { renderRowTrailing } from '@/components/ui/row-trailing';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
+import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
 import { joinAccessibleName } from '@/lib/a11y/accessible-name';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
@@ -210,7 +211,7 @@ export function LoginMethodsScreen() {
     );
   } else {
     body = (
-      <>
+      <Section>
         <RowGroup leadingTile>
           {providers.data.providers.map(provider => (
             <ProviderRow
@@ -228,7 +229,7 @@ export function LoginMethodsScreen() {
         {methodCount < 2 ? (
           <Text variant="caption">{t('profile.signInMethods.lastMethod')}</Text>
         ) : null}
-      </>
+      </Section>
     );
   }
 

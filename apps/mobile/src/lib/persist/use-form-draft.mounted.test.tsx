@@ -58,10 +58,7 @@ vi.mock('@/lib/persist/drafts', () => ({
   saveDraft: store.saveDraft,
   clearDraft: store.clearDraft,
   flushDraft: vi.fn(() => Promise.resolve(undefined)),
-  loadDraftEntry: vi.fn(async (userId: string, entityKey: string) => {
-    const value: unknown = await store.loadDraft(userId, entityKey);
-    return value === null ? null : { value, updatedAt: 1 };
-  }),
+  loadDraft: store.loadDraft,
   isStringDraft: (value: unknown): value is string => typeof value === 'string',
 }));
 

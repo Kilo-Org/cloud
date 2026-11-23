@@ -11,9 +11,6 @@ let nextUpdatedAt = 1;
 
 const kvMock = vi.hoisted(() => ({
   getItem: vi.fn(async (_scope: string, _k: string): Promise<string | null> => null),
-  getItemWithUpdatedAt: vi.fn(
-    async (_scope: string, _k: string): Promise<{ v: string; updatedAt: number } | null> => null
-  ),
   setItem: vi.fn(async (_scope: string, _k: string, _v: string): Promise<void> => undefined),
   removeItem: vi.fn(async (_scope: string, _k: string): Promise<void> => undefined),
   listEntries: vi.fn(async (_scope: string): Promise<{ k: string; updatedAt: number }[]> => []),
@@ -40,7 +37,6 @@ import {
   flushDraft,
   isStringDraft,
   loadDraft,
-  loadDraftEntry,
   NEW_SESSION_DRAFT_KEY,
   newSessionRepositoryDraftKey,
   prCommentDraftKey,
@@ -108,10 +104,6 @@ beforeEach(() => {
   kvMock.getItem.mockImplementation(
     async (scope, k) => kvStore.get(storageKey(scope, k))?.v ?? null
   );
-  kvMock.getItemWithUpdatedAt.mockImplementation(async (scope, k) => {
-    const entry = kvStore.get(storageKey(scope, k));
-    return entry === undefined ? null : { v: entry.v, updatedAt: entry.updatedAt };
-  });
   kvMock.setItem.mockImplementation(async (scope, k, v) => {
     kvStore.set(storageKey(scope, k), { scope, k, v, updatedAt: nextUpdatedAt });
     nextUpdatedAt += 1;
@@ -236,33 +228,6 @@ describe('round trip and absent load', () => {
   it('loads null for an absent key without reporting Sentry', async () => {
     await expect(loadDraft('u1', 'missing', isStringDraft)).resolves.toBeNull();
     expect(Sentry.captureException).not.toHaveBeenCalled();
-  });
-
-  it('loads the value with the timestamp of the write that stored it', async () => {
-    saveDraft('u1', agentComposerDraftKey('sess-1'), 'hello');
-    await flushDraft('u1', agentComposerDraftKey('sess-1'));
-
-    const entry = await loadDraftEntry('u1', agentComposerDraftKey('sess-1'), isStringDraft);
-
-    expect(entry).toEqual({ value: 'hello', updatedAt: expect.any(Number) });
-  });
-
-  it('loads a null entry for an absent key, without reporting Sentry', async () => {
-    await expect(loadDraftEntry('u1', 'missing', isStringDraft)).resolves.toBeNull();
-    expect(Sentry.captureException).not.toHaveBeenCalled();
-  });
-
-  it('dates the value a later write replaced, not the earlier one', async () => {
-    saveDraft('u1', 'k', 'first');
-    await flushDraft('u1', 'k');
-    const first = await loadDraftEntry('u1', 'k', isStringDraft);
-
-    saveDraft('u1', 'k', 'second');
-    await flushDraft('u1', 'k');
-    const second = await loadDraftEntry('u1', 'k', isStringDraft);
-
-    expect(second?.value).toBe('second');
-    expect(second?.updatedAt).toBeGreaterThan(first?.updatedAt ?? 0);
   });
 
   it('keeps scopes separate per user', async () => {
@@ -722,10 +687,11 @@ describe('unloadable entry handling', () => {
   });
 
   it('keeps a draft written after the failed read', async () => {
-    // The load read a corrupt value; by the time the conditional removal reads
-    // the key, a newer value has been stored, which the removal must not touch.
-    kvMock.getItemWithUpdatedAt.mockResolvedValueOnce({ v: 'not-json{{{', updatedAt: 1 });
-    kvMock.getItem.mockResolvedValueOnce('"newer"');
+    let reads = 0;
+    kvMock.getItem.mockImplementation(async () => {
+      reads += 1;
+      return reads === 1 ? 'not-json{{{' : '"newer"';
+    });
 
     await expect(loadDraft('u1', 'k', isStringDraft)).resolves.toBeNull();
 

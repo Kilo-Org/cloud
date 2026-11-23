@@ -5,8 +5,6 @@ import { readCacheScope } from '@/lib/persist/cache-scope';
 const auth = vi.hoisted(() => ({ epoch: 1, signingOut: false }));
 const storage = vi.hoisted(() => ({
   getItem: vi.fn<(scope: string, key: string) => Promise<string | null>>(),
-  getItemWithUpdatedAt:
-    vi.fn<(scope: string, key: string) => Promise<{ v: string; updatedAt: number } | null>>(),
   removeItem: vi.fn<(scope: string, key: string) => Promise<void>>(),
 }));
 vi.mock('@/lib/auth/auth-epoch', () => ({
@@ -27,13 +25,8 @@ describe('briefing dismissal read boundary', () => {
     auth.epoch = 1;
     auth.signingOut = false;
     storage.getItem.mockReset();
-    storage.getItemWithUpdatedAt.mockReset();
     storage.removeItem.mockReset();
     storage.getItem.mockResolvedValue(JSON.stringify([dismissal]));
-    storage.getItemWithUpdatedAt.mockResolvedValue({
-      v: JSON.stringify([dismissal]),
-      updatedAt: 0,
-    });
     storage.removeItem.mockResolvedValue(undefined);
   });
 

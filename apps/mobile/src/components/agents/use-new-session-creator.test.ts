@@ -11,7 +11,7 @@ import {
   setSelectedBranchOverride,
 } from './new-session-repository-state';
 import { useNewSessionCreator } from './use-new-session-creator';
-import { clearDraft, flushDraft, loadDraftEntry } from '@/lib/persist/drafts';
+import { clearDraft, flushDraft, loadDraft } from '@/lib/persist/drafts';
 import { useFencedDraftLoad, useRemoteSpawnDraftCleanup } from '@/lib/persist/use-draft-load';
 
 const prepareSessionMutate = vi.hoisted(() => vi.fn());
@@ -81,12 +81,8 @@ vi.mock('@kilocode/cloud-agent-sdk/message-id', () => ({
 
 vi.mock('@/lib/persist/drafts', () => ({
   isStringDraft: vi.fn(),
-  loadDraftEntry: vi.fn(
-    async (
-      _userId: string,
-      _entityKey: string,
-      _isValid: unknown
-    ): Promise<{ value: string; updatedAt: number } | null> => null
+  loadDraft: vi.fn(
+    async (_userId: string, _entityKey: string, _isValid: unknown): Promise<string | null> => null
   ),
   NEW_SESSION_DRAFT_KEY: 'agent-composer:new',
   saveDraft: vi.fn(),
@@ -1432,7 +1428,7 @@ describe('restored new-session submit', () => {
   });
 });
 
-type DraftLoadState = { settled: boolean; value: string | null; storedAt: number | null };
+type DraftLoadState = { settled: boolean; value: string | null };
 
 function FencedDraftHarness({
   userId,
@@ -1476,15 +1472,9 @@ describe('useFencedDraftLoad generation fencing', () => {
     async ({ first, second, staleText, freshText }) => {
       const firstLoad = deferred<string | null>();
       const secondLoad = deferred<string | null>();
-      vi.mocked(loadDraftEntry)
-        .mockImplementationOnce(async () => {
-          const value = await firstLoad.promise;
-          return value === null ? null : { value, updatedAt: 1 };
-        })
-        .mockImplementationOnce(async () => {
-          const value = await secondLoad.promise;
-          return value === null ? null : { value, updatedAt: 2 };
-        });
+      vi.mocked(loadDraft)
+        .mockImplementationOnce(async () => firstLoad.promise)
+        .mockImplementationOnce(async () => secondLoad.promise);
 
       const renders: DraftLoadState[] = [];
       let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
@@ -1519,15 +1509,15 @@ describe('useFencedDraftLoad generation fencing', () => {
         firstLoad.resolve(staleText);
       });
       await flushMicrotasks();
-      expect(renders.at(-1)).toEqual({ settled: false, value: null, storedAt: null });
+      expect(renders.at(-1)).toEqual({ settled: false, value: null });
 
       // The current generation's load resolves: it publishes.
       await act(async () => {
         secondLoad.resolve(freshText);
       });
       await flushMicrotasks();
-      expect(renders.at(-1)).toEqual({ settled: true, value: freshText, storedAt: 2 });
-      expect(vi.mocked(loadDraftEntry)).toHaveBeenCalledWith(
+      expect(renders.at(-1)).toEqual({ settled: true, value: freshText });
+      expect(vi.mocked(loadDraft)).toHaveBeenCalledWith(
         second.userId,
         second.entityKey,
         expect.anything()
@@ -1537,10 +1527,7 @@ describe('useFencedDraftLoad generation fencing', () => {
 
   it('never publishes a load that resolves after unmount', async () => {
     const gate = deferred<string | null>();
-    vi.mocked(loadDraftEntry).mockImplementationOnce(async () => {
-      const value = await gate.promise;
-      return value === null ? null : { value, updatedAt: 1 };
-    });
+    vi.mocked(loadDraft).mockImplementationOnce(async () => gate.promise);
 
     const renders: DraftLoadState[] = [];
     let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
@@ -1564,7 +1551,7 @@ describe('useFencedDraftLoad generation fencing', () => {
       gate.resolve('late draft');
     });
     await flushMicrotasks();
-    expect(renders.at(-1)).toEqual({ settled: false, value: null, storedAt: null });
+    expect(renders.at(-1)).toEqual({ settled: false, value: null });
   });
 });
 

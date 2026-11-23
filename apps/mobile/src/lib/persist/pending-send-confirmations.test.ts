@@ -13,10 +13,6 @@ const kvMock = vi.hoisted(() => {
     getItem: vi.fn<(scope: string, k: string) => Promise<string | null>>(
       async (scope, k) => scopes.get(scope)?.get(k)?.v ?? null
     ),
-    getItemWithUpdatedAt: vi.fn(
-      async (scope: string, k: string): Promise<{ v: string; updatedAt: number } | null> =>
-        scopes.get(scope)?.get(k) ?? null
-    ),
     setItem: vi.fn(async (scope: string, k: string, v: string) => {
       clock += 1;
       let bucket = scopes.get(scope);
@@ -39,7 +35,6 @@ const kvMock = vi.hoisted(() => {
 
 vi.mock('@/lib/persist/encrypted-kv', () => ({
   getItem: kvMock.getItem,
-  getItemWithUpdatedAt: kvMock.getItemWithUpdatedAt,
   setItem: kvMock.setItem,
   removeItem: kvMock.removeItem,
   listEntryValues: kvMock.listEntryValues,
@@ -171,18 +166,14 @@ describe('pending send confirmations', () => {
     expect(record.items.map(entry => entry.messageId)).not.toContain('msg-1');
   });
 
-  it('records an attachment-only send, whose text is empty', async () => {
+  it('keeps the other entries readable when a send carried only attachments', async () => {
     await persist(SESSION_ID, 'msg-text', 'hello');
-    // The composer restores the chips of an attachment-only send exactly like a
-    // text restore, so it must be recorded too — with the empty text the item
-    // schema admits — or nothing would retract that restore on a reopen.
+    // An attachment-only send carries no text; it is not recorded, and it must
+    // not make the stored list unreadable either.
     await persist(SESSION_ID, 'msg-files', '');
 
     await expect(readPendingSendConfirmations(USER_ID, SESSION_ID)).resolves.toEqual({
-      items: [
-        { messageId: 'msg-text', text: 'hello' },
-        { messageId: 'msg-files', text: '' },
-      ],
+      items: [{ messageId: 'msg-text', text: 'hello' }],
       complete: true,
     });
   });

@@ -1,7 +1,5 @@
 import { type MessageDeliveryState, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 
-import { composerPromptText } from '@/lib/composer-text';
-
 import { type MessageFailure, selectMessageFailure } from './message-failure-state';
 import { firstHumanText } from './part-types';
 import { type SessionTranscriptItem, transcriptRendersMessage } from './session-transcript';
@@ -258,73 +256,6 @@ export function unansweredPromptMessageId(
   return lastItem?.type === 'message' && lastItem.message.info.id === lastMessage.info.id
     ? lastMessage.info.id
     : null;
-}
-
-/**
- * When the transcript's newest confirmed user row carries `text` and ends the
- * transcript — i.e. when the confirmation that just landed is this draft's own
- * send — answers that row's creation time; null when it is not that send.
- *
- * The composer restores the text of a send whose outcome the transport could
- * not confirm, and the manager withdraws that restore when the server confirms
- * the row. The durable record of those sends can be truncated by its caps or
- * unreadable, and then nothing withdraws: the text is both delivered and sitting
- * in the composer, one Send away from being posted twice. This is how the
- * composer asks the transcript instead.
- *
- * Only the newest confirmed user row can answer: that is the delivery which
- * just arrived, while an older row with the same words is a different turn the
- * reader may well be repeating on purpose ("continue", "yes"). The text alone
- * still cannot settle it, because a repeated prompt makes an earlier row carry
- * the same words: the withdrawal requires nothing after that row, since a
- * delivered send the agent has not answered yet is the only shape it exists
- * for, and taking the draft for an answered turn would erase text nobody sent.
- * A `synthetic` row is a client-materialised submission the server has not
- * confirmed, so it is the same unknown-outcome send rather than evidence of
- * delivery, and it neither qualifies as the row nor answers it. Both sides
- * compare as the prompt the composer sends, so a draft kept with surrounding
- * whitespace still matches what the server stored.
- *
- * The row's time is what lets the caller separate this send from a message of
- * the same words that predates it: the restore is what writes the draft, so a
- * draft stored AFTER the row is that delivery's restored duplicate, while a
- * draft stored before it is a message of its own.
- */
-export function newestConfirmedPromptSentAt(
-  messages: readonly StoredMessage[],
-  text: string
-): number | null {
-  const prompt = composerPromptText(text);
-  if (prompt === '') {
-    return null;
-  }
-  const index = newestConfirmedUserRowIndex(messages);
-  const newestConfirmedUserRow = messages[index];
-  if (
-    newestConfirmedUserRow === undefined ||
-    composerPromptText(firstHumanText(newestConfirmedUserRow.parts)) !== prompt
-  ) {
-    return null;
-  }
-  for (let i = index + 1; i < messages.length; i += 1) {
-    const row = messages[i];
-    if (row !== undefined && !(row.info.role === 'user' && row.info.synthetic === true)) {
-      return null;
-    }
-  }
-  return newestConfirmedUserRow.info.time.created;
-}
-
-/**
- * The index of the newest user row the server confirmed, or `-1` when there is
- * none. A `synthetic` row is a client-materialised submission the server has
- * not confirmed, so it is the unknown-outcome send itself rather than evidence
- * of delivery and is skipped.
- */
-function newestConfirmedUserRowIndex(messages: readonly StoredMessage[]): number {
-  return messages.findLastIndex(
-    message => message.info.role === 'user' && message.info.synthetic !== true
-  );
 }
 
 /**

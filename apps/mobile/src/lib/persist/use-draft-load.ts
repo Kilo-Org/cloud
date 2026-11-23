@@ -5,7 +5,7 @@ import {
   type DraftShapeValidator,
   flushDraft,
   isStringDraft,
-  loadDraftEntry,
+  loadDraft,
   NEW_SESSION_DRAFT_KEY,
 } from '@/lib/persist/drafts';
 
@@ -36,22 +36,14 @@ type UseFencedDraftLoadGuardInput<T> = UseFencedDraftLoadBaseInput & {
  * the absence of one) has loaded. The draft shape is the caller's contract:
  * omitting `validate` loads a string, and a non-string `T` requires the guard
  * that validates it.
- *
- * `storedAt` is the timestamp of the write that stored the settled value, or
- * null when there is no value — absent, unreadable, or not yet settled. It
- * dates the draft against something else that happened (the row confirming a
- * send of the same words), so it resets with `value` on an identity or entity
- * change and only the winning generation may publish it.
  */
 export function useFencedDraftLoad(input: UseFencedDraftLoadStringInput): {
   settled: boolean;
   value: string | null;
-  storedAt: number | null;
 };
 export function useFencedDraftLoad<T>(input: UseFencedDraftLoadGuardInput<T>): {
   settled: boolean;
   value: T | null;
-  storedAt: number | null;
 };
 export function useFencedDraftLoad<T = string>({
   userId,
@@ -61,7 +53,6 @@ export function useFencedDraftLoad<T = string>({
 }: UseFencedDraftLoadBaseInput & { validate?: DraftShapeValidator<T> }): {
   settled: boolean;
   value: T | string | null;
-  storedAt: number | null;
 } {
   // The fallback is only reachable from the string overload, so the loaded
   // value is either the caller's guarded `T` or a plain string.
@@ -74,11 +65,9 @@ export function useFencedDraftLoad<T = string>({
   const [draftState, setDraftState] = useState<{
     settled: boolean;
     value: T | string | null;
-    storedAt: number | null;
   }>({
     settled: false,
     value: null,
-    storedAt: null,
   });
   // Reset the settled draft state when the identity or entity changes, so the
   // prompt stays hidden while the new generation's draft loads and never
@@ -100,7 +89,7 @@ export function useFencedDraftLoad<T = string>({
   const draftLoadGenerationRef = useRef(0);
   if (identityChanged) {
     setPrevDraftIdentity(draftIdentity);
-    setDraftState({ settled: false, value: null, storedAt: null });
+    setDraftState({ settled: false, value: null });
     draftLoadGenerationRef.current += 1;
   }
   useEffect(() => {
@@ -108,25 +97,21 @@ export function useFencedDraftLoad<T = string>({
     const generation = draftLoadGenerationRef.current;
     if (!userId) {
       if (!isIdentityLoading) {
-        setDraftState({ settled: true, value: null, storedAt: null });
+        setDraftState({ settled: true, value: null });
       }
       return undefined;
     }
     void (async () => {
-      const entry = await loadDraftEntry(userId, entityKey, resolvedValidateRef.current);
+      const value = await loadDraft(userId, entityKey, resolvedValidateRef.current);
       if (draftLoadGenerationRef.current === generation) {
-        setDraftState(
-          entry === null
-            ? { settled: true, value: null, storedAt: null }
-            : { settled: true, value: entry.value, storedAt: entry.updatedAt }
-        );
+        setDraftState({ settled: true, value: value ?? null });
       }
     })();
     return () => {
       draftLoadGenerationRef.current += 1;
     };
   }, [userId, isIdentityLoading, entityKey]);
-  return identityChanged ? { settled: false, value: null, storedAt: null } : draftState;
+  return identityChanged ? { settled: false, value: null } : draftState;
 }
 
 type UseRemoteSpawnDraftCleanupInput = {

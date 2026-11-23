@@ -282,24 +282,20 @@ function reportDraftFailure(
 }
 
 /**
- * Loads one draft with the timestamp of the write that stored it. Returns the
- * parsed JSON value and its `updatedAt`, or null when the key is absent, the
- * value is corrupt/unreadable, the value exceeds the 64 KB cap, or the parsed
- * value fails the caller's shape validator. The corrupt and oversize cases
- * report once and remove the entry so the next mount reads nothing; the
- * shape-mismatch case keeps the entry (another build may read it) and reports
- * at most once per process per key.
- *
- * The timestamp answers a question the value alone cannot: whether a stored
- * value is the app's own restore of a send that later turns out to have been
- * delivered, or text that predates the row carrying the same words. A caller
- * that cannot date the draft must keep it.
+ * Loads one draft. Returns the parsed JSON value, or null when the key is
+ * absent, the value is corrupt/unreadable, the value exceeds the 64 KB cap,
+ * or the parsed value fails the caller's shape validator. The corrupt and
+ * oversize cases report once and remove the entry so the next mount reads
+ * nothing; the shape-mismatch case keeps the entry (another build may read it)
+ * and reports at most once per process per key. The value shape is the
+ * caller's contract: composer text stores a JSON string, and pending-review
+ * stores a JSON `PendingReviewItem[]`.
  */
-export async function loadDraftEntry<T>(
+export async function loadDraft<T>(
   userId: string,
   entityKey: string,
   isValid: DraftShapeValidator<T>
-): Promise<{ value: T; updatedAt: number } | null> {
+): Promise<T | null> {
   if (!userId) {
     return null;
   }
@@ -307,11 +303,10 @@ export async function loadDraftEntry<T>(
   // it could not load; a failed read leaves nothing to drop.
   let raw: string | null = null;
   try {
-    const entry = await encryptedKv.getItemWithUpdatedAt(draftScope(userId), entityKey);
-    if (entry === null) {
+    raw = await encryptedKv.getItem(draftScope(userId), entityKey);
+    if (raw === null) {
       return null;
     }
-    raw = entry.v;
     if (utf8ByteLength(raw) > DRAFT_MAX_BYTES) {
       reportDraftFailure(
         new Error('stored draft exceeds the 64 KB cap'),
@@ -326,7 +321,7 @@ export async function loadDraftEntry<T>(
       reportShapeMismatch(draftScope(userId), entityKey);
       return null;
     }
-    return { value: parsed, updatedAt: entry.updatedAt };
+    return parsed;
   } catch (error) {
     reportDraftFailure(error, 'read');
     if (raw !== null) {
@@ -334,26 +329,6 @@ export async function loadDraftEntry<T>(
     }
     return null;
   }
-}
-
-/**
- * Loads one draft. Returns the parsed JSON value, or null when the key is
- * absent, the value is corrupt/unreadable, the value exceeds the 64 KB cap,
- * or the parsed value fails the caller's shape validator. The corrupt and
- * oversize cases report once and remove the entry so the next mount reads
- * nothing; the shape-mismatch case keeps the entry (another build may read it)
- * and reports at most once per process per key. The value shape is the
- * caller's contract: composer text stores a JSON string, and pending-review
- * stores a JSON `PendingReviewItem[]`. {@link loadDraftEntry} is the same read
- * with the stored timestamp, for a caller that has to date the value.
- */
-export async function loadDraft<T>(
-  userId: string,
-  entityKey: string,
-  isValid: DraftShapeValidator<T>
-): Promise<T | null> {
-  const entry = await loadDraftEntry(userId, entityKey, isValid);
-  return entry === null ? null : entry.value;
 }
 
 async function writeDraft({ epoch, userId, entityKey, value }: DraftWritePayload): Promise<void> {

@@ -23,13 +23,6 @@ const storage = vi.hoisted(() => {
       await Promise.resolve();
       return values.get(`${scope}/${key}`) ?? null;
     }),
-    // The fake stores values only, so the timestamped read answers the same
-    // value under one fixed time.
-    getItemWithUpdatedAt: vi.fn(async (scope: string, key: string) => {
-      await Promise.resolve();
-      const v = values.get(`${scope}/${key}`) ?? null;
-      return v === null ? null : { v, updatedAt: 0 };
-    }),
     setItem: vi.fn(async (scope: string, key: string, value: string) => {
       values.set(`${scope}/${key}`, value);
       await Promise.resolve();

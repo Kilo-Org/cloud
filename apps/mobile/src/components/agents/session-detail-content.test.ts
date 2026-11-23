@@ -106,27 +106,9 @@ import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 
 const managerSlot = vi.hoisted(() => ({ current: null as SessionManager | null }));
 // The durable composer draft the screen loads. `null` is the ordinary
-// no-draft session; the pending-send guard cases put a restored draft here.
-const draftLoadState = vi.hoisted(() => ({
-  settled: true,
-  value: null as string | null,
-  storedAt: null as number | null,
-}));
+// no-draft session; a case that needs a restored draft sets it here.
+const draftLoadState = vi.hoisted(() => ({ settled: true, value: null as string | null }));
 
-/** What `readPendingSendConfirmations` answers: the ids, and whether the record is whole. */
-type PendingSendRecord = {
-  items: { messageId: string; text: string }[];
-  complete: boolean;
-};
-
-// The durable record of unknown-outcome sends. It defaults to a complete, empty
-// record — the ordinary session that never failed a send — and the guard cases
-// swap the implementation so the answer lands after the mount.
-const readPendingSendConfirmations = vi.hoisted(() =>
-  vi.fn<(userId: string, sessionId: string) => Promise<PendingSendRecord>>(() =>
-    Promise.resolve({ items: [], complete: true })
-  )
-);
 // The open gate's verdict the list mock publishes. `true` is the settled open
 // these cases describe; a test that needs the still-measuring window sets it to
 // `false`, and `null` models a list that never reports.
@@ -754,11 +736,7 @@ vi.mock('@/lib/persist/use-draft-load', () => ({
   useFencedDraftLoad: () => ({
     settled: draftLoadState.settled,
     value: draftLoadState.value,
-    storedAt: draftLoadState.storedAt,
   }),
-}));
-vi.mock('@/lib/persist/pending-send-confirmations', () => ({
-  readPendingSendConfirmations,
 }));
 const organizations = vi.hoisted(() => [
   { organizationId: 'org-a', organizationName: 'Session organization' },
@@ -1069,9 +1047,6 @@ beforeEach(() => {
   pendingSend = null;
   draftLoadState.settled = true;
   draftLoadState.value = null;
-  draftLoadState.storedAt = null;
-  readPendingSendConfirmations.mockReset();
-  readPendingSendConfirmations.mockResolvedValue({ items: [], complete: true });
   condensePreference.value = false;
   currentUserId.value = 'test-user';
   sessionConfigSync.currentModel = '';
@@ -5081,24 +5056,18 @@ describe('session detail composer after a failed turn', () => {
     expect(ask('Another prompt', 'msg-delivered')).toBe(false);
   });
 
-  /**
-   * A restored draft is the text of a send whose outcome the transport could
-   * not confirm. The durable record of those sends retires it when the server
-   * confirms the row; when that record is truncated or unreadable nothing
-   * retires it, and the confirmed transcript has to answer instead — by
-   * comparing when the draft was stored against when that row was created.
-   */
-  const CONFIRMED_ROW_CREATED = 1_761_000_000_000;
-
-  function confirmedUserRow(text: string, options: { synthetic?: boolean } = {}): StoredMessage {
+  it('keeps a restored draft the confirmed transcript already carries', async () => {
+    goalMountOptions = { resolvedType: 'remote' };
+    const text = 'Already delivered';
+    // The durable record of unknown-outcome sends is the only thing that can
+    // retire a restored draft: it names the message id the send carried. The
+    // confirmed row only carries words, which cannot separate a delivered send
+    // from text the reader typed again, so the draft stays and the reader can
+    // clear it.
+    draftLoadState.value = text;
     const message = userMessage('msg-confirmed-prompt');
-    return {
-      info: {
-        ...message.info,
-        sessionID: ROOT_ID,
-        time: { created: CONFIRMED_ROW_CREATED },
-        ...(options.synthetic ? { synthetic: true } : {}),
-      },
+    const confirmed: StoredMessage = {
+      info: { ...message.info, sessionID: ROOT_ID },
       parts: [
         stubTextPart({
           id: 'text-confirmed-prompt',
@@ -5108,38 +5077,7 @@ describe('session detail composer after a failed turn', () => {
         }),
       ],
     };
-  }
-
-  /**
-   * Mount with the pending-send record's answer held until the test resolves
-   * it, so an incomplete record lands after the draft and the transcript rows
-   * are in place.
-   */
-  async function mountWithHeldPendingSendRead(rootMessages: StoredMessage[]): Promise<{
-    view: Awaited<ReturnType<typeof mountDetails>>;
-    resolveRecord: (complete: boolean) => Promise<void>;
-  }> {
-    const record = Promise.withResolvers<PendingSendRecord>();
-    readPendingSendConfirmations.mockImplementation(() => record.promise);
-    const view = await mountDetails(rootMessages);
-    // The withdrawal reads the atom, not the page: let the seeded rows land
-    // before the record's answer decides anything.
-    await waitFor(
-      () => view.store.get(view.manager.atoms.messagesList).length >= rootMessages.length
-    );
-    return {
-      view,
-      resolveRecord: async complete => {
-        await act(async () => {
-          record.resolve({ items: [], complete });
-          await Promise.resolve();
-        });
-      },
-    };
-  }
-
-  /** The control object the neighbouring delivery test hands the composer. */
-  function composerControlStub(view: Awaited<ReturnType<typeof mountDetails>>) {
+    const view = await mountDetails([confirmed]);
     const composer = view.renderer.root.find(candidate =>
       Object.is(candidate.type, 'ChatComposer')
     );
@@ -5152,127 +5090,17 @@ describe('session detail composer after a failed turn', () => {
     act(() => {
       (composer.props.controlRef as { current: typeof control | null }).current = control;
     });
-    return control;
-  }
-
-  it('withdraws a restored draft written after the confirmed row that duplicates it', async () => {
-    goalMountOptions = { resolvedType: 'remote' };
-    const text = 'Already delivered';
-    // The restore is what wrote this draft: the row landed at T0 and the
-    // transport failure restored the text afterwards, so a draft stored AFTER
-    // the row is that delivery's duplicate and must be withdrawn.
-    draftLoadState.value = text;
-    draftLoadState.storedAt = CONFIRMED_ROW_CREATED + 1_000;
-    const { view, resolveRecord } = await mountWithHeldPendingSendRead([confirmedUserRow(text)]);
-    const control = composerControlStub(view);
-
-    await resolveRecord(false);
-
-    expect(control.withdrawRestoredSend).toHaveBeenCalledExactlyOnceWith(text);
-  });
-
-  it('keeps a restored draft written before the confirmed row that carries the same words', async () => {
-    goalMountOptions = { resolvedType: 'remote' };
-    const text = 'Already delivered';
-    // The same words, but this draft predates the row: it is a message of its
-    // own (typed, or an older draft another client's identical row landed
-    // over), and withdrawing it would erase text nobody sent.
-    draftLoadState.value = text;
-    draftLoadState.storedAt = CONFIRMED_ROW_CREATED - 1_000;
-    const { view, resolveRecord } = await mountWithHeldPendingSendRead([confirmedUserRow(text)]);
-    const control = composerControlStub(view);
-
-    await resolveRecord(false);
+    // Let the seeded row land before the assertions.
+    await waitFor(() => view.store.get(view.manager.atoms.messagesList).length > 0);
+    await act(async () => {
+      await Promise.resolve();
+    });
 
     expect(control.withdrawRestoredSend).not.toHaveBeenCalled();
-  });
-
-  it('keeps a restored draft it cannot date against the confirmed row', async () => {
-    goalMountOptions = { resolvedType: 'remote' };
-    const text = 'Already delivered';
-    // No stored timestamp: the two sides cannot be ordered, and text that may
-    // be unsent must never be erased.
-    draftLoadState.value = text;
-    draftLoadState.storedAt = null;
-    const { view, resolveRecord } = await mountWithHeldPendingSendRead([confirmedUserRow(text)]);
-    const control = composerControlStub(view);
-
-    await resolveRecord(false);
-
-    expect(control.withdrawRestoredSend).not.toHaveBeenCalled();
-  });
-
-  it('keeps a restored draft the transcript cannot confirm when the pending-send record is incomplete', async () => {
-    goalMountOptions = { resolvedType: 'remote' };
-    const text = 'Already delivered';
-    // The only row carrying that text is the client's own unconfirmed
-    // submission, so the transcript has no evidence the server took the send.
-    draftLoadState.value = text;
-    draftLoadState.storedAt = CONFIRMED_ROW_CREATED + 1_000;
-    const { view, resolveRecord } = await mountWithHeldPendingSendRead([
-      confirmedUserRow(text, { synthetic: true }),
-    ]);
-    const control = composerControlStub(view);
-
-    await resolveRecord(false);
-
-    expect(control.withdrawRestoredSend).not.toHaveBeenCalled();
-  });
-
-  it('keeps a restored draft when the confirmed row that carries it has an answer', async () => {
-    goalMountOptions = { resolvedType: 'remote' };
-    const text = 'continue';
-    // A repeated short prompt: the confirmed row with these words is an earlier
-    // turn the agent already answered, so the restored draft is unsent text the
-    // reader is about to send, not that delivery.
-    draftLoadState.value = text;
-    draftLoadState.storedAt = CONFIRMED_ROW_CREATED + 1_000;
-    const prompt = confirmedUserRow(text);
-    const base = assistantMessage('msg-answered').info as Extract<
-      StoredMessage['info'],
-      { role: 'assistant' }
-    >;
-    const answered: StoredMessage = {
-      info: {
-        ...base,
-        sessionID: ROOT_ID,
-        parentID: prompt.info.id,
-        // The answer's own turn anchors on a later server time, as the worker's
-        // history read orders it.
-        time: { created: prompt.info.time.created + 1_000 },
-      },
-      parts: [
-        stubTextPart({
-          id: 'text-msg-answered',
-          sessionID: ROOT_ID,
-          messageID: 'msg-answered',
-          text: 'Answered the earlier turn',
-        }),
-      ],
-    };
-    const { view, resolveRecord } = await mountWithHeldPendingSendRead([prompt, answered]);
-    const control = composerControlStub(view);
-
-    await resolveRecord(false);
-
-    expect(control.withdrawRestoredSend).not.toHaveBeenCalled();
-  });
-
-  it('leaves the restored draft alone when the pending-send record is complete', async () => {
-    goalMountOptions = { resolvedType: 'remote' };
-    const text = 'Already delivered';
-    // A complete record is the ordinary session: nothing was left unconfirmed,
-    // so the drafted text is the reader's own next message, not a lost send.
-    // The draft is dated after the row on purpose, so only the complete record
-    // keeps it here.
-    draftLoadState.value = text;
-    draftLoadState.storedAt = CONFIRMED_ROW_CREATED + 1_000;
-    const { view, resolveRecord } = await mountWithHeldPendingSendRead([confirmedUserRow(text)]);
-    const control = composerControlStub(view);
-
-    await resolveRecord(true);
-
-    expect(control.withdrawRestoredSend).not.toHaveBeenCalled();
+    const settledComposer = view.renderer.root.find(candidate =>
+      Object.is(candidate.type, 'ChatComposer')
+    );
+    expect(settledComposer.props.initialDraft).toBe(text);
   });
 
   it('keeps the composer sendable after a non-retryable turn failure', async () => {

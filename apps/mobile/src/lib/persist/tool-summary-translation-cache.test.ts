@@ -12,10 +12,6 @@ const kvMock = vi.hoisted(() => {
     getItem: vi.fn<(scope: string, k: string) => Promise<string | null>>(
       async (scope, k) => scopes.get(scope)?.get(k)?.v ?? null
     ),
-    getItemWithUpdatedAt: vi.fn(
-      async (scope: string, k: string): Promise<{ v: string; updatedAt: number } | null> =>
-        scopes.get(scope)?.get(k) ?? null
-    ),
     setItem: vi.fn(async (scope: string, k: string, v: string) => {
       clock += 1;
       let bucket = scopes.get(scope);
@@ -54,7 +50,6 @@ const kvMock = vi.hoisted(() => {
 
 vi.mock('@/lib/persist/encrypted-kv', () => ({
   getItem: kvMock.getItem,
-  getItemWithUpdatedAt: kvMock.getItemWithUpdatedAt,
   setItem: kvMock.setItem,
   removeItem: kvMock.removeItem,
   removeItemIfValue: kvMock.removeItemIfValue,

@@ -25,14 +25,6 @@ const kvMock = vi.hoisted(() => {
     getItem: vi.fn<(scope: string, k: string) => Promise<string | null>>(
       async (scope, k) => scopes.get(scope)?.get(k) ?? null
     ),
-    // The fake stores values only, so the timestamped read answers the same
-    // value under one fixed time.
-    getItemWithUpdatedAt: vi.fn(
-      async (scope: string, k: string): Promise<{ v: string; updatedAt: number } | null> => {
-        const v = scopes.get(scope)?.get(k) ?? null;
-        return v === null ? null : { v, updatedAt: 0 };
-      }
-    ),
     setItem: vi.fn(async (scope: string, k: string, v: string) => {
       let bucket = scopes.get(scope);
       if (!bucket) {
@@ -59,7 +51,6 @@ const kvMock = vi.hoisted(() => {
 
 vi.mock('@/lib/persist/encrypted-kv', () => ({
   getItem: kvMock.getItem,
-  getItemWithUpdatedAt: kvMock.getItemWithUpdatedAt,
   setItem: kvMock.setItem,
   removeItem: kvMock.removeItem,
   clearScope: kvMock.clearScope,

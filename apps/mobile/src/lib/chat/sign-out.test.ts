@@ -85,12 +85,6 @@ vi.mock('@/lib/persist/encrypted-kv', () => ({
   encryptedDatabase: () => Promise.resolve({}),
   getItem: (scope: string, key: string) =>
     Promise.resolve(encryptedKv.get(`${scope}:${key}`) ?? null),
-  // The in-test disk holds values only: the read answers the same value and
-  // stamps it with one fixed time, since nothing here dates a write.
-  getItemWithUpdatedAt: (scope: string, key: string) => {
-    const v = encryptedKv.get(`${scope}:${key}`) ?? null;
-    return Promise.resolve(v === null ? null : { v, updatedAt: 0 });
-  },
   setItem: (scope: string, key: string, value: string) => {
     encryptedKv.set(`${scope}:${key}`, value);
     return Promise.resolve();

@@ -80,12 +80,6 @@ vi.mock('@sentry/react-native', () => ({ captureException: vi.fn() }));
 vi.mock('@/lib/hooks/use-current-user-id', () => ({ useCurrentUserId: () => state.identity }));
 vi.mock('@/lib/persist/encrypted-kv', () => ({
   getItem: state.getItem,
-  // The draft restore reads the value and its write time together, so it goes
-  // through the suite's one disk: a held `state.getItem` still gates the load.
-  getItemWithUpdatedAt: async (scope: string, key: string) => {
-    const v = await state.getItem(scope, key);
-    return v === null ? null : { v, updatedAt: 0 };
-  },
   setItem: (scope: string, key: string, value: string) => {
     state.rows.set(`${scope}\u0000${key}`, value);
     return Promise.resolve();

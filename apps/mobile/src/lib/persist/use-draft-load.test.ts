@@ -11,9 +11,6 @@ let nextUpdatedAt = 1;
 
 const kvMock = vi.hoisted(() => ({
   getItem: vi.fn(async (_scope: string, _k: string): Promise<string | null> => null),
-  getItemWithUpdatedAt: vi.fn(
-    async (_scope: string, _k: string): Promise<{ v: string; updatedAt: number } | null> => null
-  ),
   setItem: vi.fn(async (_scope: string, _k: string, _v: string): Promise<void> => undefined),
   removeItem: vi.fn(async (_scope: string, _k: string): Promise<void> => undefined),
   listEntries: vi.fn(async (_scope: string): Promise<{ k: string; updatedAt: number }[]> => []),
@@ -47,10 +44,6 @@ beforeEach(() => {
   kvMock.getItem.mockImplementation(
     async (scope, k) => kvStore.get(storageKey(scope, k))?.v ?? null
   );
-  kvMock.getItemWithUpdatedAt.mockImplementation(async (scope, k) => {
-    const entry = kvStore.get(storageKey(scope, k));
-    return entry === undefined ? null : { v: entry.v, updatedAt: entry.updatedAt };
-  });
   kvMock.setItem.mockImplementation(async (scope, k, v) => {
     kvStore.set(storageKey(scope, k), { scope, k, v, updatedAt: nextUpdatedAt });
     nextUpdatedAt += 1;
@@ -157,11 +150,7 @@ describe('useFencedDraftLoad generic draft shape', () => {
       );
     });
     await flushMicrotasks();
-    expect(renders.at(-1)).toEqual({
-      settled: true,
-      value: { title: 'T', message: 'M' },
-      storedAt: 1,
-    });
+    expect(renders.at(-1)).toEqual({ settled: true, value: { title: 'T', message: 'M' } });
   });
 
   it('loads a string draft with no validate argument', async () => {
@@ -179,7 +168,7 @@ describe('useFencedDraftLoad generic draft shape', () => {
       );
     });
     await flushMicrotasks();
-    expect(renders.at(-1)).toEqual({ settled: true, value: 'hello', storedAt: 1 });
+    expect(renders.at(-1)).toEqual({ settled: true, value: 'hello' });
   });
 
   it('loads null when a stored value fails the validate guard', async () => {
@@ -198,7 +187,7 @@ describe('useFencedDraftLoad generic draft shape', () => {
       );
     });
     await flushMicrotasks();
-    expect(renders.at(-1)).toEqual({ settled: true, value: null, storedAt: null });
+    expect(renders.at(-1)).toEqual({ settled: true, value: null });
   });
 
   it('returns the not-settled state on the entity-change render, never the stale settled value', async () => {
@@ -209,11 +198,7 @@ describe('useFencedDraftLoad generic draft shape', () => {
     const renderer = mountMergeHarness('u1', keyA, renders);
     await flushMicrotasks();
     // The first generation settled with the stored value.
-    expect(renders.at(-1)).toEqual({
-      settled: true,
-      value: { title: 'T', message: 'M' },
-      storedAt: 1,
-    });
+    expect(renders.at(-1)).toEqual({ settled: true, value: { title: 'T', message: 'M' } });
     renders.length = 0;
 
     // Move to a new entity: the very next render must be not-settled, not the
@@ -229,7 +214,7 @@ describe('useFencedDraftLoad generic draft shape', () => {
         })
       );
     });
-    expect(renders[0]).toEqual({ settled: false, value: null, storedAt: null });
+    expect(renders[0]).toEqual({ settled: false, value: null });
   });
 
   it('returns the not-settled state on the identity-change render, never the stale settled value', async () => {
@@ -238,11 +223,7 @@ describe('useFencedDraftLoad generic draft shape', () => {
     const renders: { settled: boolean; value: MergeDraft | null }[] = [];
     const renderer = mountMergeHarness('u1', key, renders);
     await flushMicrotasks();
-    expect(renders.at(-1)).toEqual({
-      settled: true,
-      value: { title: 'T', message: 'M' },
-      storedAt: 1,
-    });
+    expect(renders.at(-1)).toEqual({ settled: true, value: { title: 'T', message: 'M' } });
     renders.length = 0;
 
     act(() => {
@@ -256,7 +237,7 @@ describe('useFencedDraftLoad generic draft shape', () => {
         })
       );
     });
-    expect(renders[0]).toEqual({ settled: false, value: null, storedAt: null });
+    expect(renders[0]).toEqual({ settled: false, value: null });
   });
 
   it('does not publish a stale in-flight load after the identity changes', async () => {
@@ -265,20 +246,20 @@ describe('useFencedDraftLoad generic draft shape', () => {
 
     // Hold identity A's read open so its load is still in flight when the
     // identity switches to B.
-    const readGate = Promise.withResolvers<string | null>();
-    kvMock.getItemWithUpdatedAt.mockImplementationOnce(async () => ({
-      v: (await readGate.promise) ?? '',
-      updatedAt: 1,
-    }));
+    const readGate: { release: ((v: string | null) => void) | null } = { release: null };
+    const readHeld = new Promise<string | null>(resolve => {
+      readGate.release = resolve;
+    });
+    kvMock.getItem.mockImplementationOnce(async () => readHeld);
 
     const renders: { settled: boolean; value: MergeDraft | null }[] = [];
     const renderer = mountMergeHarness('u1', key, renders);
     // A's load is pending on the deferred read.
-    expect(renders.at(-1)).toEqual({ settled: false, value: null, storedAt: null });
+    expect(renders.at(-1)).toEqual({ settled: false, value: null });
 
     // A's read resolves, then the identity switches before the load's
     // generation check runs. The stale load must not publish A's value.
-    readGate.resolve('{"title":"T","message":"M"}');
+    readGate.release?.('{"title":"T","message":"M"}');
 
     act(() => {
       renderer.update(
@@ -295,6 +276,6 @@ describe('useFencedDraftLoad generic draft shape', () => {
     await flushMicrotasks();
 
     // B has no stored value. The stale A load must never publish A's value.
-    expect(renders.at(-1)).toEqual({ settled: true, value: null, storedAt: null });
+    expect(renders.at(-1)).toEqual({ settled: true, value: null });
   });
 });

@@ -32,7 +32,6 @@ vi.mock('@/lib/persist/encrypted-kv', () => ({
   clearScope: vi.fn(),
   clearScopePrefix: vi.fn(),
   getItem: vi.fn(),
-  getItemWithUpdatedAt: vi.fn(),
   listEntries: vi.fn(),
   removeItem: vi.fn(),
   setItem: vi.fn(),

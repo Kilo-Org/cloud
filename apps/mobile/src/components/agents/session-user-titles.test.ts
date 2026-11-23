@@ -7,9 +7,6 @@ const kvStore = new Map<string, string>();
 
 const kvMock = vi.hoisted(() => ({
   getItem: vi.fn(async (_scope: string, _k: string): Promise<string | null> => null),
-  getItemWithUpdatedAt: vi.fn(
-    async (_scope: string, _k: string): Promise<{ v: string; updatedAt: number } | null> => null
-  ),
   setItem: vi.fn(async (_scope: string, _k: string, _v: string): Promise<void> => undefined),
   clearScope: vi.fn(async (_scope: string): Promise<void> => undefined),
 }));
@@ -66,10 +63,6 @@ beforeEach(() => {
   kvStore.clear();
   __resetUserSessionTitlesForTests();
   kvMock.getItem.mockImplementation(async (scope, k) => kvStore.get(storageKey(scope, k)) ?? null);
-  kvMock.getItemWithUpdatedAt.mockImplementation(async (scope, k) => {
-    const v = kvStore.get(storageKey(scope, k)) ?? null;
-    return v === null ? null : { v, updatedAt: 0 };
-  });
   kvMock.setItem.mockImplementation(async (scope, k, v) => {
     kvStore.set(storageKey(scope, k), v);
   });

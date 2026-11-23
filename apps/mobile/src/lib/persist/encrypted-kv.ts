@@ -721,27 +721,6 @@ export async function getItem(scope: string, k: string): Promise<string | null> 
   return row?.v ?? null;
 }
 
-/** One stored value with the `Date.now()` its last write recorded. */
-export type KVValue = { v: string; updatedAt: number };
-
-/**
- * Reads one value together with its stored `updated_at`, in one statement;
- * returns null when the key is absent. The timestamp is what a caller needs to
- * compare a stored value against something dated elsewhere (a restored draft
- * against the confirmed row that may be its own send), so it must come from the
- * same row read as the value, never from a second query.
- */
-export async function getItemWithUpdatedAt(scope: string, k: string): Promise<KVValue | null> {
-  validateItemKey(scope, k);
-  const db = await openDatabase();
-  const row = db
-    .select({ v: kv.v, updatedAt: kv.updatedAt })
-    .from(kv)
-    .where(and(eq(kv.scope, scope), eq(kv.k, k)))
-    .get();
-  return row === undefined ? null : { v: row.v, updatedAt: row.updatedAt };
-}
-
 type KvWrite = { readonly value: string; readonly signal?: AbortSignal };
 
 /** Writes or overwrites one value, recording `Date.now()`. */

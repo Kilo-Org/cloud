@@ -128,14 +128,30 @@ export function subscribeToPostHogReady(listener: () => void): () => void {
   };
 }
 
+/**
+ * Name a failed teardown step in development. The steps below are best-effort so
+ * a broken one cannot stop the rest, and a step that fails silently is then
+ * invisible; `__DEV__` keeps the report out of release builds, where a teardown
+ * failure is not actionable and the SDK is being dropped anyway.
+ */
+function reportDiscardStepFailure(step: string, error: unknown): void {
+  if (!__DEV__) {
+    return;
+  }
+  const detail = error instanceof Error ? error.message : String(error);
+  // eslint-disable-next-line no-console -- dev-only visibility for a swallowed step
+  console.warn(`Analytics teardown: ${step} failed — ${detail}`);
+}
+
 function notifyPostHogReady(): void {
   for (const listener of readyListeners) {
     // A throwing subscriber must not skip the rest, and this runs inside
     // init/discard completion where escaping would reject the caller.
     try {
       listener();
-    } catch {
+    } catch (error) {
       // Best-effort: one broken subscriber cannot break the others.
+      reportDiscardStepFailure('ready listener', error);
     }
   }
 }
@@ -455,8 +471,9 @@ export async function discardPostHog(): Promise<void> {
       c.setPersistedProperty(PostHogPersistedProperty.Queue, null);
       c.setPersistedProperty(PostHogPersistedProperty.LogsQueue, null);
       c.setPersistedProperty(PostHogPersistedProperty.AiQueue, null);
-    } catch {
+    } catch (error) {
       // A failed queue clear still drops the client below.
+      reportDiscardStepFailure('queue clear', error);
     }
 
     // Ready listeners persist — they must observe both the false transition
@@ -501,9 +518,10 @@ export async function resumePostHog(): Promise<void> {
   });
   try {
     purgePostHogPersistence();
-  } catch {
+  } catch (error) {
     // A failed purge leaves the stale queue for the next purge; the new client
     // must still be able to write through the sink.
+    reportDiscardStepFailure('purge', error);
   }
   unsealPostHogStorage();
 }

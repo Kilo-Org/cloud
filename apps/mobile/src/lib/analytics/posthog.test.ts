@@ -854,6 +854,27 @@ describe('discard serialization', () => {
     expect(hoisted.storage.unsealPostHogStorage).toHaveBeenCalledTimes(1);
   });
 
+  it('names a failed teardown step in development instead of swallowing it', async () => {
+    vi.stubGlobal('__DEV__', true);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      const { resumePostHog } = await loadModule();
+      hoisted.storage.purgePostHogPersistence.mockImplementationOnce(() => {
+        throw new Error('purge failed');
+      });
+
+      const resumePromise = resumePostHog();
+      await vi.advanceTimersByTimeAsync(110);
+      await expect(resumePromise).resolves.toBeUndefined();
+
+      // Best-effort is not silent: the swallowed step is named in development.
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('purge failed — purge failed'));
+    } finally {
+      warn.mockRestore();
+      vi.stubGlobal('__DEV__', false);
+    }
+  });
+
   it('rapid off-then-on creates a working non-opted-out client', async () => {
     const { initPostHog, discardPostHog, resumePostHog, captureEvent } = await loadModule();
     initPostHog();

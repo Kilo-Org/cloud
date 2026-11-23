@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
+import { once } from 'node:events';
 import {
   chmodSync,
   cpSync,
@@ -12,6 +13,7 @@ import {
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
+import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -71,7 +73,19 @@ function fixture(t, overrides = {}) {
   const bin = join(directory, 'bin');
   mkdirSync(bin);
   const wrangler = join(bin, 'wrangler');
-  writeFileSync(wrangler, `#!${process.execPath}\nimport ${JSON.stringify(fixtureUrl)};\n`);
+  writeFileSync(
+    wrangler,
+    `#!${process.execPath}
+import ${JSON.stringify(fixtureUrl)};
+import { connect } from 'node:net';
+import { once } from 'node:events';
+if (process.env.BENCHMARK_DEPLOY_FIXTURE_INTENT_GATE && process.argv.some(arg => arg.includes('VALUES (3,'))) {
+  const socket = connect(Number(process.env.BENCHMARK_DEPLOY_FIXTURE_INTENT_GATE), '127.0.0.1');
+  await once(socket, 'end');
+  socket.destroy();
+}
+`
+  );
   chmodSync(wrangler, 0o755);
   const path = join(directory, 'fixture.sqlite');
   const db = new DatabaseSync(path);
@@ -408,21 +422,46 @@ test(
   'bounds the deploy intent by the lock wait so a dead deploy cannot hold dispatch',
   { timeout: 15_000 },
   async t => {
-    const state = fixture(t, { BENCHMARK_DEPLOY_LOCK_TIMEOUT_MS: '2000' });
-    state.db
-      .prepare(
-        "UPDATE scheduler_dispatch_lock SET token = 'replacement-owner', lease_until = ? WHERE id = 1"
-      )
-      .run(Date.now() + 60_000);
-    const startedAt = Date.now();
-    const result = state.start();
-    await until(() => state.count('intent') === 1);
-    state.kill('SIGKILL');
-    assert.equal((await result).signal, 'SIGKILL');
-    const intent = intentRow(state);
-    assert.match(intent.token, /^deploy-intent-/);
-    assert.ok(intent.lease_until <= Date.now() + 2000);
-    assert.ok(intent.lease_until >= startedAt);
+    const gate = createServer();
+    gate.listen(0, '127.0.0.1');
+    await once(gate, 'listening');
+    const address = gate.address();
+    assert.ok(address && typeof address !== 'string');
+    const connected = once(gate, 'connection');
+    const state = fixture(t, {
+      BENCHMARK_DEPLOY_LOCK_TIMEOUT_MS: '2000',
+      BENCHMARK_DEPLOY_FIXTURE_INTENT_GATE: String(address.port),
+    });
+    try {
+      state.db
+        .prepare(
+          "UPDATE scheduler_dispatch_lock SET token = 'replacement-owner', lease_until = ? WHERE id = 1"
+        )
+        .run(Date.now() + 60_000);
+      const startedAt = Date.now();
+      const result = state.start();
+      const [socket] = await Promise.race([
+        connected,
+        result.then(() => {
+          throw new Error('Deploy exited before the intent fixture reached its gate');
+        }),
+      ]);
+      try {
+        state.kill('SIGKILL');
+        assert.equal((await result).signal, 'SIGKILL');
+      } finally {
+        socket.end();
+        await once(socket, 'close');
+      }
+      const intent = intentRow(state);
+      assert.match(intent.token, /^deploy-intent-/);
+      assert.ok(intent.lease_until <= Date.now() + 2000);
+      assert.ok(intent.lease_until >= startedAt);
+    } finally {
+      await new Promise((resolve, reject) =>
+        gate.close(error => (error ? reject(error) : resolve()))
+      );
+    }
   }
 );
 

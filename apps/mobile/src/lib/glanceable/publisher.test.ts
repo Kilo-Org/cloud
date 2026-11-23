@@ -219,9 +219,6 @@ describe('GlanceablePublisher', () => {
   });
 
   it('emits an approval transition immediately instead of on the coalesce window', () => {
-    // `question` and `permission` both count as needs-input, so `needsInput`
-    // stays constant while `needsApproval` (the Approve control gate) changes.
-    // The approval transition must not wait for the coalesce window.
     vi.useFakeTimers();
     const { sink, calls } = makeSink();
     const publisher = new GlanceablePublisher({ sinks: [sink], now: () => NOW, coalesceMs: 1000 });
@@ -259,11 +256,6 @@ describe('GlanceablePublisher', () => {
   });
 
   it('renews the deadline on an unchanged heartbeat only once the stale window approaches', () => {
-    // Identical heartbeats must still renew before the published deadline
-    // lapses: `updatedAt`/`expiresAt`, the widget stale frame, and the Live
-    // Activity stale date all key off the write, so never renewing falsely
-    // flags confirmed-current data as stale. Renewing on every heartbeat would
-    // rewrite the native surface every few seconds, so it waits for the margin.
     vi.useFakeTimers();
     let now = NOW;
     const { sink, calls } = makeSink();
@@ -287,18 +279,12 @@ describe('GlanceablePublisher', () => {
     expect(Date.parse(renewed.updatedAt)).toBeLessThan(
       Date.parse(first.updatedAt) + GLANCEABLE_STALE_MS
     );
-    // The renewal still carries a start/update so a failed or deferred Live
-    // Activity start is retried while the counts stay stable; it happens at the
-    // renewal margin, never on every heartbeat.
     expect(count(calls, 'startOrUpdate')).toBe(2);
     expect(lastSnapshot(calls, 'startOrUpdate').running).toBe(1);
     publisher.dispose();
   });
 
   it('retries the Live Activity start on an unchanged heartbeat past the renewal margin', () => {
-    // A start the sink could not raise (transient ActivityKit failure, or a
-    // start deferred behind a dismissal) must not be stranded: the renewal
-    // re-emits it while the visible counts are unchanged.
     vi.useFakeTimers();
     let now = NOW;
     const { sink, calls } = makeSink();
@@ -1068,9 +1054,6 @@ describe('GlanceablePublisher ask redraw', () => {
       listener();
     }
 
-    // The sinks read the recorded ask when they draw, so the same content is
-    // enough for Approve to appear without waiting for the next heartbeat; the
-    // revision moves so the surfaces accept the frame.
     expect(count(calls, 'startOrUpdate')).toBe(2);
     expect(lastSnapshot(calls, 'startOrUpdate')).toEqual({
       ...frame,

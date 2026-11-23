@@ -82,8 +82,6 @@ describe('newestSessionTitle', () => {
   });
 
   it('returns null when the newest row still carries the backend placeholder', () => {
-    // The backend seeds a fresh session with `New session - ${ISO}`; the
-    // widget shows nothing rather than the machine string.
     const rows = [
       { title: 'Named row', status: 'busy', updatedAt: '2026-01-01T00:00:00.000Z' },
       {

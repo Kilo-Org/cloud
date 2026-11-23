@@ -55,8 +55,6 @@ import { propertyName, stringLiteralValue, unwrap, walk } from '../lib/ast.mjs';
 import { runIfMain } from '../lib/entry-point.mjs';
 import { isTestArtifact, parseSourceTree } from '../lib/source-files.mjs';
 
-// Resolve from the app: react-native-css is the app's dependency, not the repo root's.
-const require = createRequire(new URL('../../apps/mobile/package.json', import.meta.url));
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 /**
  * The app's base, repo-relative, and its source root built from it. The walk
@@ -65,9 +63,13 @@ const ROOT = fileURLToPath(new URL('../../', import.meta.url));
  * reaches all three together instead of leaving one of them reading a path the
  * walk no longer parses. The layout allowlist and exempt trees are written
  * under the same base, so the prefix the layout rules test and the slice they
- * take are one path, not two spellings of it.
+ * take are one path, not two spellings of it. The compiler pins resolve
+ * `react-native-css/compiler` from the app's `package.json` under this base too,
+ * so that resolution moves with the rest.
  */
 const APP_RELATIVE = 'apps/mobile';
+// Resolve from the app: react-native-css is the app's dependency, not the repo root's.
+const require = createRequire(join(ROOT, APP_RELATIVE, 'package.json'));
 const APP_SRC_RELATIVE = `${APP_RELATIVE}/src`;
 const APP_SRC = join(ROOT, APP_SRC_RELATIVE);
 const SOURCE_DIRS = [APP_SRC, join(ROOT, 'packages/app-shared/src')];
@@ -1208,21 +1210,23 @@ function detectInlineStyles({ program, text, lineOf }) {
 /**
  * A chevron placed straight from the icon modules instead of through
  * `RowChevron`, which is what mirrors it in RTL and keeps it to the row's
- * trailing size. The row primitives and `RowChevron` own that placement.
+ * trailing size. The row primitives and `RowChevron` own that placement. The
+ * declarations are the ones `fileFacts` already collected, in its source-order
+ * walk, so the rule reads them instead of walking the tree again.
  */
 const ROW_CHEVRON_MODULES = new Set(['@/components/ui/directional-icons', '@/components/ui/icons']);
 const ROW_CHEVRON_NAMES = new Set(['ChevronRight', 'DirectionalChevronRight']);
 
-function detectRowChevrons({ program, lineOf }) {
+function detectRowChevrons({ imports, lineOf }) {
   const problems = [];
-  walk(program, node => {
-    for (const specifier of valueImportSpecifiers(node, ROW_CHEVRON_MODULES)) {
+  for (const declaration of imports) {
+    for (const specifier of valueImportSpecifiers(declaration, ROW_CHEVRON_MODULES)) {
       const name = importedName(specifier.imported);
       if (ROW_CHEVRON_NAMES.has(name)) {
         problems.push({ line: lineOf(specifier.start), offending: name });
       }
     }
-  });
+  }
   return problems;
 }
 
@@ -1256,7 +1260,10 @@ function detectTitleContent({ relative, program, lineOf }) {
  * A sheet opened imperatively renders its own body, so nothing outside it adds
  * the title row: without `SheetHeader` it starts under the drag handle with no
  * title and no close control. The files below are the ones that own their first
- * row instead. `SHEET_MODULES` is the module set the sheet rule reads.
+ * row instead. `SHEET_MODULES` is the module set the sheet rule reads, and the
+ * declarations it reads are the ones `fileFacts` already collected, so the rule
+ * does not walk the tree to find the sheet's local name; the walk that finds
+ * the sheet's JSX stays, because that reads elements, not imports.
  */
 const SHEET_MODULES = new Set(['@/components/ui/sheet']);
 const SHEET_ALLOWLIST = new Set([
@@ -1318,19 +1325,19 @@ function localComponentDrawsHeader(name, text, components, visited) {
   );
 }
 
-function detectSheetHeader({ relative, program, text, lineOf }) {
+function detectSheetHeader({ relative, imports, program, text, lineOf }) {
   if (SHEET_ALLOWLIST.has(relative)) {
     return [];
   }
   const sheetNames = new Set();
-  walk(program, node => {
-    for (const specifier of valueImportSpecifiers(node, SHEET_MODULES)) {
+  for (const declaration of imports) {
+    for (const specifier of valueImportSpecifiers(declaration, SHEET_MODULES)) {
       if (importedName(specifier.imported) !== 'Sheet') {
         continue;
       }
       sheetNames.add(specifier.local?.name ?? importedName(specifier.imported));
     }
-  });
+  }
   if (sheetNames.size === 0) {
     return [];
   }
@@ -1447,8 +1454,10 @@ function layoutExempt(path) {
 /**
  * Every layout finding one file has, from the table's rules, as records. The
  * printable line is built from a record only where the report is printed.
+ * `imports` is the collection `fileFacts` gathered, handed to the rules that
+ * read import declarations so they do not walk the tree for them again.
  */
-export function checkLayout(relative, program, chunks, text, lineOf) {
+export function checkLayout(relative, program, chunks, imports, text, lineOf) {
   if (layoutExempt(relative)) {
     return [];
   }
@@ -1474,14 +1483,18 @@ export function checkLayout(relative, program, chunks, text, lineOf) {
       if (rule.detectSurface === undefined) {
         continue;
       }
-      problems.push(...records(rule, rule.detectSurface({ relative, text, lineOf, group })));
+      problems.push(
+        ...records(rule, rule.detectSurface({ relative, imports, text, lineOf, group }))
+      );
     }
   }
   for (const rule of LAYOUT_RULES) {
     if (rule.detect === undefined) {
       continue;
     }
-    problems.push(...records(rule, rule.detect({ relative, program, chunks, text, lineOf })));
+    problems.push(
+      ...records(rule, rule.detect({ relative, program, chunks, imports, text, lineOf }))
+    );
   }
   return problems;
 }
@@ -1793,9 +1806,9 @@ function destructuredTextSource(pattern, init) {
  * for lines once. A file the parser refused is reported here, once: its tree is
  * empty, so leaving it out would report the file as clean.
  *
- * The four syntax rules read the facts one traversal gathered; the layout rules
- * walk the tree for their surfaces and select each surface's chunks from that
- * same collection.
+ * The four syntax rules read the facts one traversal gathered, and so do the two
+ * layout rules that read imports; the other layout rules walk the tree for their
+ * surfaces and select each surface's chunks from that same collection.
  */
 export function checkParsedFile({ file, path, text, program, lineOf, problems }) {
   const { chunks, elements, imports, calls, memberUses } = fileFacts(program, text);
@@ -1807,7 +1820,7 @@ export function checkParsedFile({ file, path, text, program, lineOf, problems })
       ...checkDirectIntl(path, file, calls, lineOf),
       ...checkRules(path, chunks, lineOf),
     ],
-    layout: checkLayout(path, program, chunks, text, lineOf),
+    layout: checkLayout(path, program, chunks, imports, text, lineOf),
   };
 }
 

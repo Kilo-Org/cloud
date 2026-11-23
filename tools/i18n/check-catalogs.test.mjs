@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import {
+  chmodSync,
   copyFileSync,
   mkdirSync,
   mkdtempSync,
@@ -103,6 +104,7 @@ function run({
   pushSource = '',
   wordingExceptions = WORDING_EXCEPTIONS,
   extraFiles = {},
+  afterWrite = null,
 } = {}) {
   const root = fixture({
     'apps/mobile/src/i18n/languages.ts': `export const SUPPORTED_LANGUAGES = ['en', '${language}'];`,
@@ -124,7 +126,16 @@ function run({
       : { 'tools/i18n/wording-exceptions.json': wordingExceptions }),
     ...extraFiles,
   });
-  return checkCatalogs(root).problems;
+  // A case that needs a mode the tree cannot hold — a file the filesystem
+  // refuses to read — changes it here, after the write and before the audit.
+  // A hook that returns a function gets it called after the audit, so the case
+  // can put the mode back before the fixture cleanup deletes the tree.
+  const restore = afterWrite === null ? null : afterWrite(root);
+  try {
+    return checkCatalogs(root).problems;
+  } finally {
+    restore?.();
+  }
 }
 
 /**
@@ -152,6 +163,10 @@ function standardFiles({ english = ENGLISH, translated = TRANSLATED, source = SO
   return {
     'apps/mobile/src/i18n/languages.ts': `export const SUPPORTED_LANGUAGES = ['en', 'ru'];`,
     'apps/mobile/src/example.ts': source,
+    // The push catalog's second source root. A command tree's root IS the
+    // repository root inside the copied checker, so a root absent here is the
+    // strict case: the audit has to have every declared source tree.
+    'services/example.ts': "export const pushExample = 'Example';",
     'apps/mobile/src/i18n/locales/en.json': JSON.stringify(english),
     'apps/mobile/src/i18n/locales/ru.json': JSON.stringify(translated),
     'packages/notifications/src/locales/en.json': '{}',
@@ -436,6 +451,43 @@ test('still rejects a template-literal key', () => {
     found.join('\n'),
     /t\(\) called with a template literal; the key check cannot see it/
   );
+});
+
+test('does not call a key unused when a source file could not be read', () => {
+  // A refused read leaves that file's keys out of the scan, so the dead-key rule
+  // would name every key it never saw. The unreadable file here is the one that
+  // used `agents.retired`: calling it dead would ask someone to delete copy a
+  // screen still renders. The read failure is reported instead, and the key the
+  // readable source calls but English does not define is still named.
+  const file = 'apps/mobile/src/unreadable.ts';
+  const found = run({
+    english: { agents: { title: 'Agents', retired: 'Retired agents' } },
+    translated: { agents: { title: 'Localized agents', retired: 'Localized retirees' } },
+    source: "t('agents.title');\nt('agents.missing');",
+    extraFiles: { [file]: "t('agents.retired');" },
+    afterWrite: root => {
+      const path = join(root, file);
+      chmodSync(path, 0o000);
+      return () => chmodSync(path, 0o644);
+    },
+  });
+  const text = found.join('\n');
+  assert.match(text, /apps\/mobile\/src\/unreadable\.ts: cannot read: /);
+  assert.doesNotMatch(text, /which no source file uses/);
+  assert.match(text, /mobile: source uses "agents\.missing", which en\.json does not define/);
+});
+
+test('reports a missing source tree instead of naming every key unused', () => {
+  // Inside the copied checker the fixture tree IS the repository root, so every
+  // declared source tree must be there. Without `services` the push catalog's
+  // keys would all read as dead; the run names the missing tree once and names
+  // no key, because the fixture's English keys are all called by SOURCE.
+  const root = cliFixture(standardFiles());
+  rmSync(join(root, 'services'), { recursive: true, force: true });
+  const result = cli(root);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /^notifications: no source tree at services$/m);
+  assert.doesNotMatch(result.stderr, /which no source file uses/);
 });
 
 test('reports an unparsed file by its path below the tree it was read from', () => {

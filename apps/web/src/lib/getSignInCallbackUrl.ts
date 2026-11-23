@@ -1,3 +1,4 @@
+import { PLATFORM } from '@/lib/integrations/core/constants';
 import { STANDARD_OAUTH_PLATFORMS } from '@/lib/integrations/oauth/paths';
 
 const CALLBACK_PATH_REGEX = /^\/(users\/)?[-a-zA-Z0-9]+\/?(\?.*)?(#.*)?$/;
@@ -37,8 +38,9 @@ export function isValidCallbackPath(path: string): boolean {
   ) {
     return true;
   }
-  // Integration OAuth round trips resume at the platform's `connect` or
-  // `callback` API route, the latter carrying the provider's `code`/`state`.
+  // Integration OAuth round trips resume at the platform's `connect` API
+  // route, or at its `callback` route for the chat account-link resume, which
+  // carries the provider's `code`/`state`.
   if (isValidIntegrationOAuthPath(path)) {
     return true;
   }
@@ -66,13 +68,18 @@ function isValidIntegrationOAuthPath(path: string): boolean {
   }
 
   const [, api, integrations, platform, action, ...rest] = url.pathname.split('/');
-  return (
-    api === 'api' &&
-    integrations === 'integrations' &&
-    (action === 'connect' || action === 'callback') &&
-    rest.length === 0 &&
-    STANDARD_OAUTH_PLATFORM_SET.has(platform)
-  );
+  if (
+    api !== 'api' ||
+    integrations !== 'integrations' ||
+    rest.length !== 0 ||
+    !STANDARD_OAUTH_PLATFORM_SET.has(platform)
+  ) {
+    return false;
+  }
+  // Every standard platform resumes at its `connect` route. Only the chat
+  // account-link resume returns through a platform `callback` route today,
+  // carrying the provider's `code`/`state`.
+  return action === 'connect' || (platform === PLATFORM.SLACK && action === 'callback');
 }
 
 export default function getSignInCallbackUrl(searchParams?: NextAppSearchParams): string {

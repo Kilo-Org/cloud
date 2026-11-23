@@ -32,9 +32,22 @@ describe('slack bot-link state', () => {
     try {
       Date.now = () => 1_000_000_000_000;
       const state = createSlackBotLinkState(params);
-      Date.now = () => 1_000_000_000_000 + 11 * 60 * 1000;
+      Date.now = () => 1_000_000_000_000 + 31 * 60 * 1000;
 
       expect(verifySlackBotLinkState(state)).toBeNull();
+    } finally {
+      Date.now = realNow;
+    }
+  });
+
+  test('accepts a state older than ten minutes while the pending link is valid', () => {
+    const realNow = Date.now;
+    try {
+      Date.now = () => 1_000_000_000_000;
+      const state = createSlackBotLinkState(params);
+      Date.now = () => 1_000_000_000_000 + 11 * 60 * 1000;
+
+      expect(verifySlackBotLinkState(state)).toEqual(params);
     } finally {
       Date.now = realNow;
     }
@@ -81,7 +94,7 @@ describe('isSlackBotLinkState', () => {
     try {
       Date.now = () => 1_000_000_000_000;
       state = createSlackBotLinkState(params);
-      Date.now = () => 1_000_000_000_000 + 11 * 60 * 1000;
+      Date.now = () => 1_000_000_000_000 + 31 * 60 * 1000;
 
       expect(verifySlackBotLinkState(state)).toBeNull();
       expect(isSlackBotLinkState(state)).toBe(true);

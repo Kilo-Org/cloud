@@ -98,6 +98,8 @@ describe('getSignInCallbackUrl', () => {
 
       test('accepts standard OAuth connect API paths', () => {
         expect(isValidCallbackPath('/api/integrations/slack/connect')).toBe(true);
+        expect(isValidCallbackPath('/api/integrations/linear/connect')).toBe(true);
+        expect(isValidCallbackPath('/api/integrations/gitlab/connect')).toBe(true);
         expect(isValidCallbackPath('/api/integrations/linear/connect?organizationId=org-123')).toBe(
           true
         );
@@ -108,11 +110,11 @@ describe('getSignInCallbackUrl', () => {
         ).toBe(true);
       });
 
-      test('accepts standard OAuth callback API paths', () => {
+      test('accepts the Slack callback API path resumed by the chat account link', () => {
         expect(isValidCallbackPath('/api/integrations/slack/callback?code=abc&state=def')).toBe(
           true
         );
-        expect(isValidCallbackPath('/api/integrations/linear/callback')).toBe(true);
+        expect(isValidCallbackPath('/api/integrations/slack/callback')).toBe(true);
       });
 
       test('accepts Kilo Pass referral paths', () => {
@@ -172,6 +174,13 @@ describe('getSignInCallbackUrl', () => {
           false
         );
         expect(isValidCallbackPath('/api/v1/users')).toBe(false);
+      });
+
+      test('rejects callback API paths for platforms without a chat account-link resume', () => {
+        expect(isValidCallbackPath('/api/integrations/linear/callback?code=abc')).toBe(false);
+        expect(isValidCallbackPath('/api/integrations/gitlab/callback?code=abc')).toBe(false);
+        expect(isValidCallbackPath('/api/integrations/linear/callback')).toBe(false);
+        expect(isValidCallbackPath('/api/integrations/gitlab/callback')).toBe(false);
       });
 
       test('rejects paths with spaces', () => {

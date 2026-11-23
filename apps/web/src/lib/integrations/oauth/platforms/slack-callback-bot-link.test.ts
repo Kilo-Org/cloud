@@ -402,7 +402,7 @@ describe('handleSlackOAuthCallback Slack bot-link', () => {
     try {
       now.mockReturnValue(1_000_000_000_000);
       expiredState = botLinkState(contextKey);
-      now.mockReturnValue(1_000_000_000_000 + 11 * 60 * 1000);
+      now.mockReturnValue(1_000_000_000_000 + 31 * 60 * 1000);
 
       const response = await callCallback({ state: expiredState });
 

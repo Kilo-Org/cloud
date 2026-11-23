@@ -129,8 +129,8 @@ async function handleSlackBotLinkCallback({
     } finally {
       await revokeSlackOidcToken(accessToken);
     }
-  } catch (error) {
-    captureException(error, {
+  } catch (proofError) {
+    captureException(proofError, {
       tags: { component: 'kilo-bot', op: 'slack-bot-link-identity-proof' },
       extra: { stateUserId: state.userId },
     });
@@ -168,9 +168,9 @@ async function handleSlackBotLinkCallback({
       contextKey: state.contextKey,
       user,
     });
-  } catch (error) {
+  } catch (completionError) {
     // Finishing a link reports its outcome on the link flow's own pages.
-    captureException(error, {
+    captureException(completionError, {
       tags: { component: 'kilo-bot', op: 'slack-bot-link-completion' },
       extra: { stateUserId: state.userId },
     });

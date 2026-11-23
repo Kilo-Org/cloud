@@ -225,18 +225,23 @@ function FormField({
             )}
           >
             <Text
+              // One line, ending in a tail ellipsis: the value is longer than the
+              // box often enough that the broken-off end must say so instead of
+              // stopping at the last whole word.
               numberOfLines={1}
+              ellipsizeMode="tail"
               className={cn('text-sm font-normal text-foreground', INPUT_BOX_LINE_HEIGHT_CLASS)}
               // The line height belongs on the painted line: this control is a
               // `View`, which ignores it, and the native input draws its value at
               // the same height, so the resting line keeps the box it stands in.
               //
-              // `selectable` runs selection on Android, where a resting value can
-              // be selected and copied as it could inside the native input. On
-              // iOS it presents an empty edit menu instead, so no iOS selection
-              // is claimed or relied on there: one press enters the field, whose
-              // real input is selectable on both platforms.
-              selectable
+              // No `selectable`: Android drops the tail ellipsis on a selectable
+              // text node and stops the line short of its own edge with nothing
+              // telling the reader that more of the value exists (measured on the
+              // emulator: 27 dp short, no ellipsis, against 1.5 dp and a tail
+              // ellipsis without it). Selecting and copying stay one press away —
+              // the press enters the field, whose real input is selectable and
+              // scrolled to the whole value on both platforms.
               // A `Text` resolves the interface direction itself (the shared
               // `Text` sets the paragraph's base direction), so the preview only
               // carries the caller's own style and an explicit `textAlign`, the

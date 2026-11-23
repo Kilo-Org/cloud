@@ -439,7 +439,7 @@ describe('FormField resting value preview', () => {
     expect(box.disabled).toBe(true);
   });
 
-  it('carries no role of its own and lets the value be selected', () => {
+  it('carries no role of its own and ends a long value in a tail ellipsis', () => {
     const mounted = mountField({ defaultValue: longValue });
     const box = mounted.root.findByType('Pressable');
     const text = box.findByType('Text');
@@ -448,12 +448,14 @@ describe('FormField resting value preview', () => {
     // string it shows, so the resting box adds no role or hint of its own.
     expect(box.props.accessibilityRole).toBeUndefined();
     expect(box.props.accessibilityHint).toBeUndefined();
-    // Android runs selection on a plain text node, so a resting value can be
-    // selected and copied there, as it could inside the native input. iOS shows
-    // an empty edit menu for that, so the preview does not rely on it: entering
-    // the field with one press gives the real input, where the value is
-    // selectable on both platforms.
-    expect(text.props.selectable).toBe(true);
+    // One line that ends in a tail ellipsis, so a value wider than the box does
+    // not stop short of the border with nothing saying more of it exists.
+    expect(text.props.numberOfLines).toBe(1);
+    expect(text.props.ellipsizeMode).toBe('tail');
+    // Android drops that ellipsis on a selectable text node (measured on the
+    // emulator), so the preview stays a plain node and selecting or copying is
+    // one press away, in the real input that press swaps in.
+    expect(text.props.selectable).toBeUndefined();
     // The line height lands on the painted line, not on the `View` around it.
     expect(box.props.className).not.toContain('leading-[normal]');
     expect(String(text.props.className)).toContain('leading-[normal]');

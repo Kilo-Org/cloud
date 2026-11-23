@@ -5,7 +5,7 @@ import {
   type ProviderPrFilePatchMissingCause,
   type ProviderPrPlatform,
 } from '@kilocode/app-shared/provider-review';
-import { ChevronDown, ChevronUp, Eye, EyeOff, File, Link2 } from '@/components/ui/icons';
+import { ChevronDown, ChevronUp, Eye, EyeOff, Info, Link2 } from '@/components/ui/icons';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
@@ -26,11 +26,8 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type PrReviewFile } from '@/lib/pr-review/diff/pr-review-file-types';
 import { cn } from '@/lib/utils';
 
-function ExpandChevron({ hasDiff, expanded }: { hasDiff: boolean; expanded: boolean }) {
+function ExpandChevron({ expanded }: { expanded: boolean }) {
   const colors = useThemeColors();
-  if (!hasDiff) {
-    return <View className="h-3 w-3" />;
-  }
   // A disclosure caret, not a navigation chevron: it names the state of the
   // patch under the row, so it stays on the vertical pair every other
   // disclosure row uses instead of the row-trailing `RowChevron`.
@@ -111,51 +108,64 @@ export function FileHeaderRow({
   const isRename = Boolean(file.previousPath) && file.previousPath !== file.path;
   const pathLine = isRename ? `${file.previousPath} → ${file.path}` : file.path;
 
+  const rowContent = (
+    <>
+      <StatusIcon size={14} color={colors.mutedForeground} />
+      <View className="flex-1">
+        <Text className="font-mono-medium text-sm text-foreground" numberOfLines={2}>
+          {isolateLtrBidiText(pathLine)}
+        </Text>
+        {/* Each count is its own run, and a sign is a neutral: an RTL
+            paragraph would take it and paint `+1` as `1+`. The isolate
+            pins the count's order; the row itself still mirrors. */}
+        <View className="mt-0.5 flex-row items-center gap-2">
+          <Text variant="muted" className="text-xs">
+            {fileStatusLabel(file.status)}
+          </Text>
+          <Text variant="muted" className="text-xs">
+            {isolateLtrBidiText(`+${file.additions}`)}
+          </Text>
+          <Text variant="muted" className="text-xs">
+            {isolateLtrBidiText(`-${file.deletions}`)}
+          </Text>
+        </View>
+      </View>
+    </>
+  );
+
   return (
     // The row's padding sits on the inner row, the parent both controls touch
     // in: Android delivers a touch only inside the parent view, so the expand
-    // control's cancelled padding and the toggle's slop stay reachable.
+    // control's cancelled padding and the toggle's slop stay reachable. A row
+    // whose file has no patch renders no expand control at all.
     <View className="border-b-[0.5px] border-hair-soft bg-card">
       <View className="flex-row items-center gap-2 px-4 py-3">
-        <Pressable
-          onPress={hasDiff ? onToggleExpand : undefined}
-          disabled={!hasDiff}
-          accessibilityRole="button"
-          accessibilityLabel={
-            expanded ? t('prReview.fileRows.collapseFile') : t('prReview.fileRows.expandFile')
-          }
-          accessibilityState={{ expanded, disabled: !hasDiff }}
-          // The control spans the row's vertical padding, so its own node is
-          // the whole row height (the path lines alone measured 33.1 dp).
-          className={cn(
-            ROW_FRAME_CONTENT_PRESS_CLASS,
-            'min-h-9 flex-1 flex-row items-center gap-2 active:opacity-70'
-          )}
-        >
-          <View className="h-7 w-7 items-center justify-center">
-            <ExpandChevron hasDiff={hasDiff} expanded={expanded} />
-          </View>
-          <StatusIcon size={14} color={colors.mutedForeground} />
-          <View className="flex-1">
-            <Text className="font-mono-medium text-sm text-foreground" numberOfLines={2}>
-              {isolateLtrBidiText(pathLine)}
-            </Text>
-            {/* Each count is its own run, and a sign is a neutral: an RTL
-                paragraph would take it and paint `+1` as `1+`. The isolate
-                pins the count's order; the row itself still mirrors. */}
-            <View className="mt-0.5 flex-row items-center gap-2">
-              <Text variant="muted" className="text-xs">
-                {fileStatusLabel(file.status)}
-              </Text>
-              <Text variant="muted" className="text-xs">
-                {isolateLtrBidiText(`+${file.additions}`)}
-              </Text>
-              <Text variant="muted" className="text-xs">
-                {isolateLtrBidiText(`-${file.deletions}`)}
-              </Text>
+        {hasDiff ? (
+          <Pressable
+            onPress={onToggleExpand}
+            accessibilityRole="button"
+            accessibilityLabel={
+              expanded ? t('prReview.fileRows.collapseFile') : t('prReview.fileRows.expandFile')
+            }
+            accessibilityState={{ expanded, disabled: false }}
+            // The control spans the row's vertical padding, so its own node is
+            // the whole row height (the path lines alone measured 33.1 dp).
+            className={cn(
+              ROW_FRAME_CONTENT_PRESS_CLASS,
+              'min-h-9 flex-1 flex-row items-center gap-2 active:opacity-70'
+            )}
+          >
+            <View className="h-7 w-7 items-center justify-center">
+              <ExpandChevron expanded={expanded} />
             </View>
-          </View>
-        </Pressable>
+            {rowContent}
+          </Pressable>
+        ) : (
+          // A file with no patch always shows its notice and cannot collapse,
+          // so this row carries no control at all: no caret slot, no button.
+          // The status icon starts at the row's own padding instead.
+          <View className="min-h-9 flex-1 flex-row items-center gap-2">{rowContent}</View>
+        )}
         {viewedToggle ? (
           <MarkViewedToggle
             path={file.path}
@@ -207,7 +217,7 @@ export function PatchMissingRow({
   return (
     <View className="border-b-[0.5px] border-hair-soft bg-secondary px-4 py-3">
       <View className="flex-row items-center gap-2">
-        <File size={14} color={colors.mutedForeground} />
+        <Info size={14} color={colors.mutedForeground} />
         <Text className="flex-1 text-sm text-foreground">{causeCopy}</Text>
       </View>
       {link === null || provider === null ? null : (

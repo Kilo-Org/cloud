@@ -3273,7 +3273,7 @@
     },
     "fileRows": {
       "collapseFile": "طي الملف",
-      "diffTooLarge": "لا يمكن عرض الفروق لكبر حجمها.",
+      "diffTooLarge": "لا يمكن عرض الفروق لكبر حجمها",
       "noPreview": "لا تتوفر معاينة لهذا الملف",
       "expandFile": "توسيع الملف",
       "markViewed": "تحديد {{path}} كملف تم الاطلاع عليه",

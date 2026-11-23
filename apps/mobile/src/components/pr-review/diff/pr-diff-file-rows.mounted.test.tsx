@@ -11,7 +11,7 @@ import { type ProviderPrFileStatus } from '@kilocode/app-shared/provider-review'
 
 import { i18n } from '@/i18n';
 import { openExternalUrl } from '@/lib/external-link';
-import { FileHeaderRow, PatchMissingRow } from './pr-diff-file-rows';
+import { FileHeaderRow, type FileViewedToggle, PatchMissingRow } from './pr-diff-file-rows';
 import { LTR_ISOLATE_CLOSE, LTR_ISOLATE_OPEN } from '@/lib/bidi';
 
 const i18nManager = vi.hoisted(() => ({ isRTL: false }));
@@ -40,6 +40,7 @@ vi.mock('@/components/ui/icons', () => ({
   File: 'File',
   FileMinus: 'FileMinus',
   FilePlus: 'FilePlus',
+  Info: 'Info',
   Link2: 'Link2',
 }));
 vi.mock('@/lib/a11y/selectable-row', () => ({
@@ -70,6 +71,19 @@ function hostTexts(): TestRenderer.ReactTestInstance[] {
   }
   return renderer.root.findAll(
     node => Object.is(node.type, 'Text') && typeof node.props.children === 'string'
+  );
+}
+
+/** The host icon nodes, plus every host node carrying an accessibility role. */
+function hasHostNode(type: string): boolean {
+  return (renderer?.root.findAll(node => Object.is(node.type, type)) ?? []).length > 0;
+}
+
+function roleHosts(): TestRenderer.ReactTestInstance[] {
+  return (
+    renderer?.root.findAll(
+      node => typeof node.type === 'string' && node.props.accessibilityRole !== undefined
+    ) ?? []
   );
 }
 
@@ -163,6 +177,66 @@ describe('FileHeaderRow status label in Lithuanian', () => {
   });
 });
 
+/**
+ * A file whose patch is absent always shows its notice and cannot collapse, so
+ * an expand control there would be a dead button beside an empty caret slot.
+ */
+describe('FileHeaderRow expand control', () => {
+  function mountHeader(hasDiff: boolean, viewedToggle: FileViewedToggle): void {
+    act(() => {
+      renderer = TestRenderer.create(
+        createElement(FileHeaderRow, {
+          file: {
+            path: 'src/greeting.ts',
+            previousPath: null,
+            status: 'modified',
+            additions: 3,
+            deletions: 1,
+            patch: null,
+            patchMissingCause: 'binary',
+          },
+          expanded: false,
+          hasDiff,
+          viewedToggle,
+          onToggleExpand: () => undefined,
+        })
+      );
+    });
+  }
+
+  it('renders no expand control at all when the file has no patch', () => {
+    mountHeader(false, null);
+
+    expect(hasHostNode('ChevronDown')).toBe(false);
+    expect(hasHostNode('ChevronUp')).toBe(false);
+    // No role anywhere: the dead button is gone, not merely disabled.
+    expect(roleHosts()).toHaveLength(0);
+    // The path still paints once — removing the slot must not drop the label.
+    const paths = hostTexts()
+      .map(node => node.props.children as string)
+      .filter(text => text.includes('src/greeting.ts'));
+    expect(paths).toHaveLength(1);
+  });
+
+  it('keeps only the mark-viewed toggle pressable on a patch-less row', () => {
+    mountHeader(false, { viewed: false, handleToggle: () => undefined });
+
+    const roles = roleHosts();
+    expect(roles).toHaveLength(1);
+    expect(roles[0]?.props.accessibilityRole).toBe('button');
+  });
+
+  it('keeps a collapsible row expandable through its Pressable', () => {
+    mountHeader(true, null);
+
+    const expand = renderer?.root.find(
+      node => Object.is(node.type, 'Pressable') && node.props.accessibilityRole === 'button'
+    );
+    expect(expand?.props.accessibilityState).toEqual({ expanded: false, disabled: false });
+    expect(renderer?.root.findAll(node => Object.is(node.type, 'ChevronDown')).length).toBe(1);
+  });
+});
+
 type PatchMissingFile = Parameters<typeof PatchMissingRow>[0]['file'];
 
 function patchlessFile(patchMissingCause: PatchMissingFile['patchMissingCause']): PatchMissingFile {
@@ -225,6 +299,13 @@ describe('PatchMissingRow repeats nothing from the file row above', () => {
       .map(node => node.props.children)
       .filter((children): children is string => typeof children === 'string');
     expect(texts.filter(text => text.includes(path))).toEqual([]);
+  });
+
+  it('carries an info icon, not a second file icon', () => {
+    mountPatchlessRow('binary');
+
+    expect(hasHostNode('Info')).toBe(true);
+    expect(hasHostNode('File')).toBe(false);
   });
 });
 

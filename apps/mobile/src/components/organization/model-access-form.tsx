@@ -505,14 +505,16 @@ export function ModelAccessForm({
                   `min-h-10` is exactly two `text-sm` lines — 2.5 rem at the app's
                   14pt rem — and the status is clamped to those same two lines, so
                   the slot is one fixed height and the action row above it cannot
-                  move in any shipped locale: a longer localised sentence ends in
-                  the tail ellipsis instead of raising the pair. Only
-                  `organizationModelAccess.providersNeedCatalog` is long enough to
-                  truncate, and it is never the only copy of its reason: that state
-                  also raises the screen's catalog notice above the tabs, which
-                  wraps in full and carries the Retry, and the live region still
-                  announces the whole status sentence through
-                  `useStatusAnnouncement`. */}
+                  move in any shipped locale: a message that needs a third line
+                  ends in the tail ellipsis instead of raising the pair. Several
+                  messages do need one — the two blocking refusals that name a
+                  catalogue outage or a missing model, and a save the server
+                  refused, which reaches `common.organizationTrialEnded` — so the
+                  clamp is a fixed slot, never a per-sentence size. No message
+                  loses its meaning to it: `useStatusAnnouncement` announces the
+                  whole sentence to assistive technology whatever the rendered
+                  height, and a refused save also shows its full copy in the
+                  mutation's own error toast. */}
               <View className="min-h-10 justify-center">
                 <AccessibleStatus
                   message={statusMessage}

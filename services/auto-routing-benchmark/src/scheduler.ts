@@ -1441,9 +1441,17 @@ export async function refundUnspentRetryAttempt(
 
 /**
  * Puts the canonical case-run start back to the first attempt's, for a retry that never
- * reached the model. It carries the same guard shape as `restartPaidCaseRunStatement` — this
- * claim's running generation, plus the ledger row it shares with — so a stale claim cannot
- * move a row another executor owns.
+ * reached the model.
+ *
+ * Its guard is the ledger revert's, term for term, because both run in the same batch and
+ * must apply together or not at all: this claim's ledger row (`scheduler_executions`, same
+ * run, model, variant, rep, case and token), an active unexpired lease on the claimed chunk,
+ * a run still `running`, and no recorded lane failure for that lane. A canonical revert that
+ * could apply while the ledger one refuses would put the two starts back out of step, which
+ * is exactly what RunnerCancel's live check compares.
+ *
+ * Bind order: the revert's timestamp twice, the case key's five columns, the executor run id
+ * and token, then the lease clock (`input.startedAt`, the instant the retry wrote).
  */
 export function revertRetryCanonicalStartStatement(
   db: D1Database,
@@ -1454,7 +1462,29 @@ export function revertRetryCanonicalStartStatement(
     .prepare(
       `UPDATE benchmark_case_runs SET started_at = ?, updated_at = ?
       WHERE engine_identity = ? AND model = ? AND variant = ? AND rep = ? AND case_id = ?
-        AND executor_run_id = ? AND executor_token = ? AND status = 'running'`
+        AND executor_run_id = ? AND executor_token = ? AND status = 'running'
+        AND EXISTS (
+          SELECT 1 FROM scheduler_executions AS ledger
+          WHERE ledger.run_id = benchmark_case_runs.executor_run_id
+            AND ledger.model = benchmark_case_runs.model
+            AND ledger.variant = benchmark_case_runs.variant
+            AND ledger.rep = benchmark_case_runs.rep
+            AND ledger.case_id = benchmark_case_runs.case_id
+            AND ledger.token = benchmark_case_runs.executor_token
+            AND EXISTS (
+              SELECT 1 FROM scheduler_chunks AS chunk
+              WHERE chunk.run_id = ledger.run_id AND chunk.model = ledger.model
+                AND chunk.variant = ledger.variant AND chunk.rep = ledger.rep
+                AND chunk.token = ledger.token
+                AND chunk.status = 'active' AND chunk.lease_until > ?
+            )
+            AND EXISTS (SELECT 1 FROM benchmark_runs WHERE id = ledger.run_id AND status = 'running')
+            AND NOT EXISTS (
+              SELECT 1 FROM run_lane_failures AS failure
+              WHERE failure.run_id = ledger.run_id AND failure.model = ledger.model
+                AND failure.variant = ledger.variant AND failure.rep = ledger.rep
+            )
+        )`
     )
     .bind(
       startedAt,
@@ -1465,7 +1495,8 @@ export function revertRetryCanonicalStartStatement(
       input.execution.rep,
       input.execution.caseId,
       input.execution.runId,
-      input.claim.token
+      input.claim.token,
+      input.startedAt
     );
 }
 

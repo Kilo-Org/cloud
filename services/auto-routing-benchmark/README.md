@@ -156,9 +156,12 @@ limit, and a resume keeps the running lease. The one-minute tick recovers abando
 completion refills slots immediately without waiting for a tick. A block's automatic attempts
 are bounded by its run's purpose — two for a platform block, one billed attempt for a user
 block — at 15–300 second backoff. A wait that made no model call is bounded separately
-(`SCHEDULER_MAX_NO_MODEL_REATTEMPTS`), so a lost claim, a lease loss, an attached generation,
-an unreachable gateway or a refused launch cannot re-queue a block forever; at the bound the
-block fails with its lane. Capacity and unbilled provider-throttle waits do not create
+(`SCHEDULER_MAX_NO_MODEL_REATTEMPTS`), so a lost claim, a lease loss, an unreachable gateway
+or a refused launch cannot re-queue a block forever; at the bound the block fails with its
+lane. An attached generation is not one of those: it is another executor's work, so the block
+keeps its claim, rechecks every 30 seconds, waits until that generation's own output deadline
+(`PAID_OUTPUT_WAIT_MS` from its start) and only then fails its lane as
+`ambiguous_execution`. It never spends or refunds an attempt. Capacity and unbilled provider-throttle waits do not create
 model-failure rows. A provider throttle refunds its claim and counts against a separate budget
 of 16 throttle deferrals (about an hour of backoff), so a briefly rate-limited model is paced
 instead of losing its lanes; after that budget the failure takes an ordinary attempt, so a
@@ -259,10 +262,13 @@ A user block gets exactly one *billed* attempt. An errored billed attempt — th
 and its generation settled without a usable result, or a failure left it ambiguous — fails the
 block into the same path, so only the manual requeue admits it again. An *unfinished* block is
 retried automatically instead, because no billed call completed: a wait that made no model call
-(a lost claim, another executor's generation, a launch-fence refusal, an unreachable gateway)
-returns its attempt, an unbilled throttle or catalog-load failure is re-admitted on its own
-budget, and an expired lease or a crash returns the block to the queue under a separate bound
-(`SCHEDULER_MAX_NO_MODEL_REATTEMPTS`). The paid ledger fence — `getPaidCaseStartedAt` raising
+(a lost claim, a launch-fence refusal, an unreachable gateway) returns its attempt, an unbilled
+throttle or catalog-load failure is re-admitted on its own budget, and an expired lease or a
+crash returns the block to the queue under a separate bound
+(`SCHEDULER_MAX_NO_MODEL_REATTEMPTS`). A generation another executor owns is not a wait of that
+kind: the block keeps its claim, rechecks every 30 seconds, waits until that generation's own
+output deadline (`PAID_OUTPUT_WAIT_MS` from its start) and only then fails its lane as
+`ambiguous_execution`, never spending or refunding an attempt. The paid ledger fence — `getPaidCaseStartedAt` raising
 `AmbiguousBenchmarkExecutionError` — is what keeps those re-attempts from becoming a second
 billed call: it fires whenever a generation may have been admitted, and the ledger row is only
 cleared for a generation proven unspent. The attempt budget is a property of the block

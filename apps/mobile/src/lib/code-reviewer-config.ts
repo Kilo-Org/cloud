@@ -7,6 +7,7 @@ import {
 
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 
+import { parseOrganizationScope } from '@/lib/cloud-agent-scope';
 import { parseParam } from '@/lib/route-params';
 
 export {
@@ -99,7 +100,10 @@ export type ReviewerScopePlatform =
  * value — so a malformed deep link (e.g. a personal-scope route to
  * Bitbucket, which is org-only per PLATFORM_CAPABILITIES) could end up
  * reading/mutating a different platform's config than the URL claimed.
- * Returns `null` for an unknown platform or an unsupported combination.
+ * Returns `null` for an unknown platform or an unsupported combination. Any
+ * scope shape other than `personal` or an organization UUID is a hand-built
+ * link the server would answer `BAD_REQUEST` to, so it reads as an invalid
+ * route instead.
  */
 export function parseReviewerPlatform(
   scope: string,
@@ -115,7 +119,8 @@ export function parseReviewerPlatform(
     }
     return { kind: 'personal', platform };
   }
-  return { kind: 'org', organizationId: scope, platform };
+  const organizationId = parseOrganizationScope(scope);
+  return organizationId === undefined ? null : { kind: 'org', organizationId, platform };
 }
 
 /**

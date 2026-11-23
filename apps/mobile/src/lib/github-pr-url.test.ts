@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseGitHubPrUrl } from './github-pr-url';
+import { parseGitHubPrUrl, tidyReviewLinkCandidate } from './github-pr-url';
 
 describe('parseGitHubPrUrl', () => {
   it('parses a canonical PR URL', () => {
@@ -168,6 +168,54 @@ describe('parseGitHubPrUrl', () => {
       repo: 'hello-world',
       number: 42,
     });
+  });
+
+  it('parses a paren-wrapped PR URL followed by a period', () => {
+    expect(parseGitHubPrUrl('(https://github.com/octocat/hello-world/pull/42).')).toEqual({
+      owner: 'octocat',
+      repo: 'hello-world',
+      number: 42,
+    });
+  });
+
+  it('parses an angle-wrapped PR URL followed by a period', () => {
+    expect(parseGitHubPrUrl('<https://github.com/octocat/hello-world/pull/42>.')).toEqual({
+      owner: 'octocat',
+      repo: 'hello-world',
+      number: 42,
+    });
+  });
+
+  it('parses a PR URL followed by an ellipsis', () => {
+    expect(parseGitHubPrUrl('https://github.com/octocat/hello-world/pull/42...')).toEqual({
+      owner: 'octocat',
+      repo: 'hello-world',
+      number: 42,
+    });
+  });
+
+  it('parses a paren-wrapped PR URL followed by an ellipsis', () => {
+    expect(parseGitHubPrUrl('(https://github.com/octocat/hello-world/pull/42)...')).toEqual({
+      owner: 'octocat',
+      repo: 'hello-world',
+      number: 42,
+    });
+  });
+
+  it('keeps a wrapper holding more than the URL intact', () => {
+    // The paren layer needs the inside to start with a scheme, so a sentence
+    // wrapped around an autolink is not a bare URL.
+    expect(parseGitHubPrUrl('(see <https://github.com/octocat/hello-world/pull/42>)')).toBeNull();
+  });
+
+  it('keeps a punctuated plain-text paren intact', () => {
+    expect(parseGitHubPrUrl('(text).')).toBeNull();
+  });
+
+  it('keeps the dot of a wrapped blob path', () => {
+    const blobUrl = 'https://github.com/octocat/hello-world/blob/main/README.md';
+    expect(parseGitHubPrUrl(blobUrl)).toBeNull();
+    expect(tidyReviewLinkCandidate(blobUrl)).toBe(blobUrl);
   });
 
   it('keeps rejecting a wrapped non-PR GitHub URL', () => {

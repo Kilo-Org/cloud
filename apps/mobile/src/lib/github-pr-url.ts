@@ -17,8 +17,8 @@ const SCHEME_PREFIX = /^https?:\/\//i;
 // Quote glyphs platforms borrow as link delimiters, peeled at string edges.
 const EDGE_QUOTES =
   /^["'\u00AB\u00BB\u201A\u201E\u2019\u2018\u201C\u201D`]+|["'\u00AB\u00BB\u201A\u201E\u2019\u2018\u201C\u201D`]+$/g;
-// Sentence punctuation stripped only while a digit still ends the string.
-const TRAILING_SENTENCE_PUNCT = /[.,;:!?\u2026\u3002\uFF0C\uFF01\uFF1F]$/;
+// A whole trailing punctuation run, so an ellipsis is decoration too.
+const TRAILING_PUNCT_RUN = /[.,;:!?\u2026\u3002\uFF0C\uFF01\uFF1F]+$/;
 const DIGIT_END = /\d$/;
 
 /**
@@ -144,18 +144,40 @@ function wholeMarkdownTarget(text: string): string | null {
   return target;
 }
 
-/** Trim the edges, then strip trailing sentence punctuation as before. */
+/** Whether a sentence may punctuate this text: it ends in a digit, or in a
+ * wrapper whose own inside ends in a digit (`(…/pull/42)` and `<…/pull/42>`). */
+function endsWherePunctuationStops(text: string): boolean {
+  if (DIGIT_END.test(text)) {
+    return true;
+  }
+  const closer = text.at(-1);
+  let opener: string | null = null;
+  if (closer === ')') {
+    opener = '(';
+  } else if (closer === '>') {
+    opener = '<';
+  }
+  if (opener === null || !text.startsWith(opener)) {
+    return false;
+  }
+  return DIGIT_END.test(text.slice(1, -1));
+}
+
+/** Trim the edges, then strip a trailing punctuation run that follows a digit
+ * (or a wrapper around one), so `…/pull/42...` and `(…/pull/42).` settle on
+ * the URL while `/path.md` keeps its dot. */
 function stripDecoration(text: string): string {
   let candidate = text.trim().replace(EDGE_QUOTES, '');
   for (;;) {
-    // Strip the trailing punct only while WHAT REMAINS after it still ends in
-    // a digit: `/pull/42.` → `/pull/42`, but `/path.md` keeps its dot.
-    const endsInPunct = TRAILING_SENTENCE_PUNCT.test(candidate);
-    const remainderEndsInDigit = DIGIT_END.test(candidate.slice(0, -1));
-    if (!endsInPunct || !remainderEndsInDigit) {
+    const run = TRAILING_PUNCT_RUN.exec(candidate);
+    if (run === null) {
       break;
     }
-    candidate = candidate.slice(0, -1);
+    const remainder = candidate.slice(0, run.index);
+    if (!endsWherePunctuationStops(remainder)) {
+      break;
+    }
+    candidate = remainder;
   }
   return candidate;
 }
@@ -188,8 +210,10 @@ function settle(innermost: string, layers: string[]): string {
  *   1. A wrapper the inner layer leaves intact: `(...)`, `<...>` — only when
  *      the inside starts with a scheme — and markdown `[title](url)`.
  *   2. Whitespace and edge quote glyphs (" ' « » „ " ' ' `).
- *   3. Trailing sentence punctuation, but only while the remainder still ends
- *      in a digit, so `/path.md` survives and `/pull/42.` stops at the 2.
+ *   3. A trailing punctuation run, stripped when the remainder ends in a digit
+ *      or in a wrapper around one, so `/path.md` survives while `/pull/42.`
+ *      and `(…/pull/42).` stop at the URL. The strip runs before each wrapper
+ *      peel, so a wrapper followed by sentence punctuation still unwraps.
  *
  * The walk is iterative and stops after `MAX_PEEL_STEPS` layers, so deeply
  * nested input costs a bounded amount of work. An exhausted walk returns the
@@ -200,6 +224,7 @@ export function tidyReviewLinkCandidate(href: string): string {
   // Enclosing wrapper strings, innermost last; unwound once the inside settles.
   const layers: string[] = [];
   for (let step = 0; step <= MAX_PEEL_STEPS; step += 1) {
+    candidate = stripDecoration(candidate);
     // A markdown link inside prose ("see [PR 42](url).") never matches the
     // anchored whole-string form, so the finder's retry loses the URL. A
     // matching embedded link whose target carries a scheme wins; otherwise a

@@ -187,11 +187,7 @@ export function ProfileMcpScreen({
         placement="top"
         action={
           <ProfileManageSlot permission={permission}>
-            <StateAction
-              label={t('profiles.mcp.add')}
-              icon={Plus}
-              onPress={guardRowPress(handleStartAdd)}
-            />
+            <StateAction label={t('profiles.mcp.add')} icon={Plus} onPress={handleStartAdd} />
           </ProfileManageSlot>
         }
       />

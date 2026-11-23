@@ -20,19 +20,25 @@ type SheetRowTapGuard = {
 };
 
 /**
- * Per-screen instance of the tap-burst guard for a list that a sheet or a
- * pushed child screen hands the reader back to.
+ * Per-screen instance of the tap-burst guard for a list whose row actions sit
+ * underneath something that closes itself.
  *
- * Two hand-backs arm it: the screen's own sheet closing (through `markClosed`)
- * and the screen regaining focus from a child it pushed (through the focus
- * effect below, which skips the first focus so a fresh mount does not deaden
- * its own rows).
+ * The screen's own sheet closing arms it through `markClosed`. A screen that
+ * also pushes a child which closes itself after its save asks for the second
+ * arm with `{ onReturn: true }`: from then on, regaining focus from that child
+ * arms the same window through the focus effect below, which skips the first
+ * focus so a fresh mount does not deaden its own rows. A screen whose children
+ * stay open keeps `onReturn` off, so returning from a sheet it opened never
+ * costs the reader the first press.
  *
  * The clock is read at the press, so the window needs no timer and no render.
  * Each screen keeps its own instance through the hook's ref.
  */
-export function useSheetRowTapGuard(): SheetRowTapGuard {
+export function useSheetRowTapGuard(
+  options: Readonly<{ onReturn?: boolean }> = {}
+): SheetRowTapGuard {
   const state = useRef(createSheetRowTapGuardState());
+  const onReturn = options.onReturn === true;
   // A screen that has focused once has already been returned to the reader
   // once; only a later focus means a child closed.
   const hasFocused = useRef(false);
@@ -43,8 +49,10 @@ export function useSheetRowTapGuard(): SheetRowTapGuard {
         hasFocused.current = true;
         return;
       }
-      markScreenReturned(state.current, Date.now());
-    }, [])
+      if (onReturn) {
+        markScreenReturned(state.current, Date.now());
+      }
+    }, [onReturn])
   );
 
   return {

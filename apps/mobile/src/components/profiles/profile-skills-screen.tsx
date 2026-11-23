@@ -294,11 +294,7 @@ export function ProfileSkillsScreen({
         placement="top"
         action={
           <ProfileManageSlot permission={permission}>
-            <StateAction
-              label={t('profiles.addSkill')}
-              icon={Plus}
-              onPress={guardRowPress(handleStartAdd)}
-            />
+            <StateAction label={t('profiles.addSkill')} icon={Plus} onPress={handleStartAdd} />
           </ProfileManageSlot>
         }
       />

@@ -74,7 +74,7 @@ export function ProfilesListScreen({
   const router = useRouter();
   // Every row here opens a pushed child, so the press that closed one must not
   // open the row or header action that lands under the second tap of the burst.
-  const { guard } = useSheetRowTapGuard();
+  const { guard } = useSheetRowTapGuard({ onReturn: true });
   const { t } = useTranslation();
   const ownerLabel = useProfileOwnerLabel();
   const colors = useThemeColors();

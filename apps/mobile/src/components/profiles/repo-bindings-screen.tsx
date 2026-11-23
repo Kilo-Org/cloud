@@ -76,7 +76,7 @@ export function RepoBindingsScreen({
   const router = useRouter();
   // The profile creator is a pushed child that returns here by itself, so the
   // press that closed it must not remove a binding or open the Add form.
-  const { guard } = useSheetRowTapGuard();
+  const { guard } = useSheetRowTapGuard({ onReturn: true });
   const { t } = useTranslation();
   const colors = useThemeColors();
   const bindingsQuery = useRepoBindings(organizationId);

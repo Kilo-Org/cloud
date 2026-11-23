@@ -63,7 +63,7 @@ export function ProviderKeysScreen({ organizationId }: Readonly<{ organizationId
   const router = useRouter();
   // The add and edit screens are pushed children of this list, so the press
   // that closed one must not reach the row underneath it.
-  const { guard } = useSheetRowTapGuard();
+  const { guard } = useSheetRowTapGuard({ onReturn: true });
   const queryClient = useQueryClient();
   const colors = useThemeColors();
   const { confirm, dialog } = useConfirmDialog();

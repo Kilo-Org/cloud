@@ -61,7 +61,7 @@ export function AccountSettingsScreen({ settingsTarget }: Readonly<{ settingsTar
   const pushOnce = useSinglePushRoute();
   // A pushed child screen returns focus here, so the press that closed it must
   // not open the row that lands under the second tap of the burst.
-  const { guard } = useSheetRowTapGuard();
+  const { guard } = useSheetRowTapGuard({ onReturn: true });
   const { t } = useTranslation();
   const trpc = useTRPC();
   const { confirm, dialog } = useConfirmDialog();

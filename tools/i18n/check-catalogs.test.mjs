@@ -53,6 +53,25 @@ const TRANSLATED = {
 };
 const SOURCE = "t('agents.title');\nt('agents.liveCount', { count: 2 });";
 
+// Hindi selects only `one` and `other`, so a fixture catalog for it declares
+// those two forms and nothing else: a form Hindi cannot select is now a
+// reported problem of its own.
+const HINDI_TRANSLATED = {
+  agents: {
+    title: 'स्थानीयकृत एजेंट',
+    liveCount_one: '{{count}} स्थानीयकृत सत्र',
+    liveCount_other: '{{count}} स्थानीयकृत सत्र',
+  },
+};
+
+// Thai selects only `other`, so its fixture catalog carries that one form.
+const THAI_TRANSLATED = {
+  agents: {
+    title: 'เอเจนต์ที่แปลแล้ว',
+    liveCount_other: '{{count}} เซสชันที่แปลแล้ว',
+  },
+};
+
 // One parent directory for the whole file: each case writes its files into a
 // directory of its own, so a case never sees another case's catalogs.
 const FIXTURES = mkdtempSync(join(tmpdir(), 'check-catalogs-'));
@@ -238,6 +257,124 @@ test('rejects a missing required locale plural category', () => {
     found.join('\n'),
     /mobile\/ru: plural family "agents\.liveCount" lacks the few category of ru/
   );
+});
+
+test('still requires a zero form in a language that selects zero', () => {
+  // Arabic selects the zero category itself, so its families owe a `_zero`
+  // form. The required list must not drop that category on the way to matching
+  // the runtime's own categories: i18next's count-zero lookup is an override
+  // for the languages that do not select zero, not a reason to stop asking.
+  const found = run({
+    language: 'ar',
+    translated: {
+      agents: {
+        title: 'وكلاء محليون',
+        liveCount_one: '{{count}} جلسة محلية',
+        liveCount_two: 'جلستان محليتان',
+        liveCount_few: '{{count}} جلسات محلية',
+        liveCount_many: '{{count}} جلسة محلية',
+        liveCount_other: '{{count}} جلسة محلية',
+      },
+    },
+  });
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(
+    found.join('\n'),
+    /mobile\/ar: plural family "agents\.liveCount" lacks the zero category of ar/
+  );
+});
+
+test('rejects a plural category the locale can never select', () => {
+  // Japanese selects only `other`, so i18next never asks it for `_one`. This
+  // form repeats its family's `other` text, so removing it cannot change what
+  // a reader sees, and the rule reports it.
+  const found = run({
+    language: 'ja',
+    translated: {
+      agents: {
+        title: 'エージェント',
+        liveCount_one: '{{count}}件のセッション',
+        liveCount_other: '{{count}}件のセッション',
+      },
+    },
+  });
+  assert.match(
+    found.join('\n'),
+    /mobile\/ja: plural family "agents\.liveCount" declares a one form that ja never selects/
+  );
+});
+
+test('keeps a form the locale cannot select when its copy is its own', () => {
+  // The form has text its `other` sibling does not share. A runtime that
+  // selects it would render different copy, so the rule must leave it alone:
+  // only a form that repeats its family's `other` text is provably safe to
+  // remove from the catalogs alone.
+  const found = run({
+    language: 'ja',
+    translated: {
+      agents: {
+        title: 'エージェント',
+        liveCount_one: '{{count}}件だけです',
+        liveCount_other: '{{count}}件のセッション',
+      },
+    },
+  });
+  assert.deepEqual(found, []);
+});
+
+test('admits a zero form the plural rule cannot select', () => {
+  // i18next looks `_zero` up by itself at count 0, so Japanese may carry one
+  // even though its plural rule never selects that category.
+  const found = run({
+    language: 'ja',
+    translated: {
+      agents: {
+        title: 'エージェント',
+        liveCount_zero: '{{count}}件のセッション',
+        liveCount_other: '{{count}}件のセッション',
+      },
+    },
+  });
+  assert.deepEqual(found, []);
+});
+
+test('admits a form the shipped plural data selects', () => {
+  // Vietnamese is the case that makes the truth source matter: the app bundles
+  // FormatJS plural data that selects `one` at a count of one, while a host on
+  // a newer CLDR reports `other` only. Judging by the host's ICU would call the
+  // Vietnamese singular dead and delete live copy, so the catalog keeps it.
+  //
+  // The tree links the repository's own loader map and polyfill data, because
+  // those are exactly what the rule reads: a fixture without them falls back to
+  // the host's rules and cannot test this case.
+  const root = fixture({
+    'apps/mobile/src/i18n/languages.ts': "export const SUPPORTED_LANGUAGES = ['en', 'vi'];",
+    'apps/mobile/src/example.ts': SOURCE,
+    'apps/mobile/src/i18n/locales/en.json': JSON.stringify(ENGLISH),
+    'apps/mobile/src/i18n/locales/vi.json': JSON.stringify({
+      agents: {
+        title: 'Tác nhân bản địa hoá',
+        liveCount_one: '{{count}} phiên bản địa hoá',
+        liveCount_other: '{{count}} phiên bản địa hoá',
+      },
+    }),
+    'packages/notifications/src/locales/en.json': '{}',
+    'packages/notifications/src/locales/vi.json': '{}',
+    'packages/notifications/src/i18n.ts': [
+      `import en from './locales/en.json';`,
+      `import vi from './locales/vi.json';`,
+      `const pushCatalogs = { 'en': en, 'vi': vi };`,
+    ].join('\n'),
+    'tools/i18n/wording-exceptions.json': WORDING_EXCEPTIONS,
+  });
+  symlinkSync(join(REPO, 'apps/mobile/src/lib'), join(root, 'apps/mobile/src/lib'), 'dir');
+  symlinkSync(
+    join(REPO, 'apps/mobile/node_modules'),
+    join(root, 'apps/mobile/node_modules'),
+    'dir'
+  );
+  const found = checkCatalogs(root).problems;
+  assert.deepEqual(found, []);
 });
 
 test('rejects an unused English exact key', () => {
@@ -547,6 +684,7 @@ test('rejects a borrowed Devanagari danda in a catalog that writes no sentence m
   // sentence mark at all and a danda there belongs to no script of its own.
   const found = run({
     language: 'hi',
+    translated: { agents: HINDI_TRANSLATED.agents },
     pushEnglish: {
       generic: { title: 'Kilo', body: { chatMessage: 'You have a new message' } },
     },
@@ -627,7 +765,7 @@ test('accepts a bare-space sentence joiner in the markless Thai catalog', () => 
   const found = run({
     language: 'th',
     english: { common: { sentenceJoiner: '. ' }, agents: ENGLISH.agents },
-    translated: { common: { sentenceJoiner: ' ' }, agents: TRANSLATED.agents },
+    translated: { common: { sentenceJoiner: ' ' }, agents: THAI_TRANSLATED.agents },
     source: `${SOURCE}\nt('common.sentenceJoiner');`,
   });
   assert.deepEqual(found, []);

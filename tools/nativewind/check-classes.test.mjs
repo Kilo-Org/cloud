@@ -2276,10 +2276,17 @@ test('names the missing global.css and keeps the other findings', context => {
   assert.doesNotMatch(result.stderr, /Error:/);
 });
 
-test('--write-layout-baseline reports a theme failure instead of rewriting the baseline', context => {
+test('--write-layout-baseline writes the layout counts when the theme cannot be read', context => {
+  // The theme tokens feed only the `/opacity` ban rule, so an unreadable theme
+  // cannot make a layout count short: the rewrite records what the walk saw and
+  // the ordinary run is where the missing theme is reported.
   const root = makeFixture(
     context,
-    { 'apps/mobile/src/screen.tsx': THEME_SOURCE },
+    {
+      'apps/mobile/src/screen.tsx': screen(
+        '<View className="mt-[6px] uppercase bg-secondary rounded-lg" />'
+      ),
+    },
     ':root { --x: 1; }\n'
   );
   const result = spawnSync(
@@ -2288,17 +2295,14 @@ test('--write-layout-baseline reports a theme failure instead of rewriting the b
     { cwd: root, encoding: 'utf8', timeout: 30_000 }
   );
   assert.ifError(result.error);
-  assert.equal(result.status, 1, result.stdout);
-  assert.match(
-    result.stderr,
-    /check-classes: cannot read the @theme inline tokens from apps\/mobile\/src\/global\.css \(no @theme inline block\)/
-  );
-  assert.match(result.stderr, /check-classes: 1 problem\(s\)/);
-  assert.doesNotMatch(result.stdout, /wrote/);
-  // A baseline written here would record a tree the audit never checked.
-  assert.throws(
-    () => readFileSync(join(root, 'tools/nativewind/layout-baseline.json'), 'utf8'),
-    /ENOENT/
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /wrote 1 file\(s\)/);
+  assert.doesNotMatch(result.stderr, /cannot read the @theme inline tokens/);
+  assert.deepEqual(
+    JSON.parse(readFileSync(join(root, 'tools/nativewind/layout-baseline.json'), 'utf8')),
+    {
+      'apps/mobile/src/screen.tsx': { L1: 1, L3: 1, L4: 1 },
+    }
   );
 });
 

@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import { type RefObject, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
+import { type ScrollViewInstance, View } from 'react-native';
 
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
+import { useMotionPolicy } from '@/lib/a11y/motion';
 import { textActionTargetClass } from '@/lib/a11y/tap-target';
 import {
   BITBUCKET_TOKEN_MAX_LENGTH,
@@ -31,12 +32,19 @@ export function BitbucketConnectForm({
   scope,
   integrationId,
   organizationName,
+  scrollRef,
   onConnected,
   onDirtyChange,
 }: Readonly<{
   scope: string;
   integrationId: string | null;
   organizationName: string;
+  /**
+   * The scroll view this form's body lives in. The form reveals its primary
+   * action through it when a failure grows the content past the sheet's
+   * viewport.
+   */
+  scrollRef: RefObject<ScrollViewInstance | null>;
   onConnected: () => void;
   /**
    * Reports whether a dismissal would drop a draft: text in the token field
@@ -110,6 +118,34 @@ export function BitbucketConnectForm({
   };
 
   const failure = feedback.status === 'failed' ? feedback.failure : null;
+  const { scrollAnimated } = useMotionPolicy();
+  // The policy can flip while one failure stays on screen: Reduce Motion turns
+  // on, or the battery drops. The reveal reads it at the moment it runs, so that
+  // a flip re-renders the form without re-running the effect below and scrolling
+  // a second time.
+  const scrollAnimatedRef = useRef(scrollAnimated);
+  scrollAnimatedRef.current = scrollAnimated;
+  const revealPrimaryAction = useCallback(() => {
+    // The shared policy turns the reveal into a jump for a person who asked the
+    // system for fewer animations (apps/mobile/AGENTS.md).
+    scrollRef.current?.scrollToEnd({ animated: scrollAnimatedRef.current });
+  }, [scrollRef]);
+  // A refused token's sentence grows this body's scroll content while the sheet
+  // keeps its detent, so the primary action — the form's last child — can fall
+  // below the viewport. Reveal it in the frame the sentence is laid out in. Once
+  // per failure, not per layout pass: the frame also changes when the token
+  // field takes focus and raises its keyboard, and scrolling to the end there
+  // would carry the caret's field away from the person correcting the token. A
+  // submit in flight renders no failure, so nothing moves while it runs.
+  useEffect(() => {
+    if (failure === null) {
+      return undefined;
+    }
+    const frame = requestAnimationFrame(revealPrimaryAction);
+    return () => {
+      cancelAnimationFrame(frame);
+    };
+  }, [failure, revealPrimaryAction]);
   // A refused token judged the token itself, so submit waits for a different
   // one; only a failure that never judged it (a network or server fault) lets
   // the same token go again. A lost role or a changed connection waits for a

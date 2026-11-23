@@ -2,10 +2,13 @@
 // sheet it sits in, and a failed connect leaves a sentence beside a submit whose
 // state says whether another press can help. A refused token is judged, so only
 // a different one unblocks submit; a transport fault is not, so the same token
-// may go again. Everything else the form renders is static copy.
+// may go again. The reveal suite shares this harness and the same mounted tree.
+/* eslint-disable max-lines -- one mounted suite for the form's contract: the outcome copy, the submit's block, the draft the sheet guards and the primary-action reveal share one harness */
 
-import { createElement, type ElementType } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createElement, type ElementType, type RefObject } from 'react';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
+import { type ScrollViewInstance } from 'react-native';
 
 import { i18n } from '@/i18n';
 import { textActionTargetClass, textActionTargetDp } from '@/lib/a11y/tap-target';
@@ -30,6 +33,15 @@ vi.mock('react-native', () => ({
 vi.mock('@/lib/hooks/use-bitbucket', () => ({
   useConnectBitbucket: () => ({ mutateAsync: mutations.connect }),
   useReplaceBitbucketToken: () => ({ mutateAsync: mutations.replace }),
+}));
+// The reveal asks the shared policy whether its scroll may animate; the suite
+// flips that answer where the case is about Reduce Motion.
+const motion = vi.hoisted(() => ({ scrollAnimated: true }));
+vi.mock('@/lib/a11y/motion', () => ({
+  useMotionPolicy: () => ({
+    reducedMotion: !motion.scrollAnimated,
+    scrollAnimated: motion.scrollAnimated,
+  }),
 }));
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
@@ -75,21 +87,87 @@ function statusMessage(root: ReactTestRenderer['root']): string | null {
   return status ? (status.props.message as string | null) : null;
 }
 
+/**
+ * The frames the form asked for and that no test has run yet. A reveal is
+ * scheduled inside a frame, so a test that reads `scrollToEnd` immediately after
+ * the render it follows sees the call only once it runs these.
+ */
+const pendingFrames = new Map<number, FrameRequestCallback>();
+let nextFrameId = 1;
+
+function installFrames(): void {
+  vi.stubGlobal('requestAnimationFrame', (onFrame: FrameRequestCallback) => {
+    const id = nextFrameId;
+    nextFrameId += 1;
+    pendingFrames.set(id, onFrame);
+    return id;
+  });
+  vi.stubGlobal('cancelAnimationFrame', (id: number) => {
+    pendingFrames.delete(id);
+  });
+}
+
+/** Runs every frame the tree scheduled, including the ones those schedule. */
+async function runFrames(): Promise<void> {
+  await act(async () => {
+    // Bounded, so a component that schedules a frame from a frame fails its
+    // assertion instead of hanging the suite.
+    for (let pass = 0; pass < 8 && pendingFrames.size > 0; pass += 1) {
+      const scheduled = [...pendingFrames.values()];
+      pendingFrames.clear();
+      for (const onFrame of scheduled) {
+        onFrame(0);
+      }
+    }
+    await Promise.resolve();
+  });
+}
+
+type ScrollToEnd = Mock<(options?: { animated?: boolean }) => void>;
+
+type MountedForm = {
+  root: ReactTestRenderer['root'];
+  onConnected: () => void;
+  /** What the form drives to reveal its primary action. */
+  scrollToEnd: ScrollToEnd;
+  /** Re-renders the form as a later layout pass of the sheet would. */
+  rerender: () => Promise<void>;
+};
+
 async function mount(
   integrationId: string | null,
   onConnected: () => void = vi.fn(),
   onDirtyChange?: (dirty: boolean) => void
-) {
-  const view = await renderWithProviders(
+): Promise<MountedForm> {
+  // The scroll view's own instance never exists in a test-renderer tree; the
+  // form reaches it only through `scrollToEnd`.
+  const scrollToEnd: ScrollToEnd = vi.fn<(options?: { animated?: boolean }) => void>();
+  const scrollRef: RefObject<ScrollViewInstance | null> = {
+    current: { scrollToEnd } as unknown as ScrollViewInstance,
+  };
+  const element = () =>
     createElement(BitbucketConnectForm, {
       scope: 'org-1',
       integrationId,
       organizationName: 'Acme',
       onConnected,
       onDirtyChange,
-    })
-  );
-  return { root: view.renderer.root, onConnected };
+      scrollRef,
+    });
+  const view = await renderWithProviders(element());
+  return {
+    root: view.renderer.root,
+    onConnected,
+    scrollToEnd,
+    rerender: async () => {
+      await act(async () => {
+        view.renderer.update(
+          createElement(QueryClientProvider, { client: view.queryClient }, element())
+        );
+        await Promise.resolve();
+      });
+    },
+  };
 }
 
 async function edit(root: ReactTestRenderer['root'], token: string): Promise<void> {
@@ -114,6 +192,15 @@ async function submit(root: ReactTestRenderer['root'], token: string): Promise<v
 beforeEach(() => {
   mutations.connect.mockReset();
   mutations.replace.mockReset();
+  motion.scrollAnimated = true;
+  // A reveal runs inside a frame, so every test controls when that frame runs.
+  pendingFrames.clear();
+  nextFrameId = 1;
+  installFrames();
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
 });
 
 describe('BitbucketConnectForm', () => {
@@ -379,5 +466,128 @@ describe('BitbucketConnectForm', () => {
       landing.resolve({ integrationId: 'bitbucket-1' });
       await Promise.resolve();
     });
+  });
+});
+
+// A refusal puts a sentence above the primary action, which grows the sheet's
+// scroll content while the sheet keeps its detent, so the action can fall below
+// the viewport. The form reveals it, and does nothing at all otherwise.
+describe('BitbucketConnectForm primary-action reveal', () => {
+  it('reveals the action once a refused token puts its sentence on screen', async () => {
+    mutations.connect.mockRejectedValue({
+      data: {
+        code: 'BAD_REQUEST',
+        message: 'The Bitbucket Workspace Access Token format is invalid',
+      },
+    });
+    const form = await mount(null);
+
+    // A form with nothing on screen leaves the sheet where the person put it.
+    await runFrames();
+    expect(form.scrollToEnd).not.toHaveBeenCalled();
+
+    await submit(form.root, 'workspace-token');
+
+    // The reveal waits for the frame the sentence is laid out in.
+    expect(statusMessage(form.root)).toBe(i18n.t('codeReviewer.bitbucketConnect.tokenRefused'));
+    expect(form.scrollToEnd).not.toHaveBeenCalled();
+
+    await runFrames();
+
+    expect(form.scrollToEnd).toHaveBeenCalledExactlyOnceWith({ animated: true });
+  });
+
+  it('leaves a later layout pass alone while the failure stays on screen', async () => {
+    mutations.connect.mockRejectedValue({
+      data: {
+        code: 'BAD_REQUEST',
+        message: 'The Bitbucket Workspace Access Token format is invalid',
+      },
+    });
+    const form = await mount(null);
+    await submit(form.root, 'workspace-token');
+    await runFrames();
+    form.scrollToEnd.mockClear();
+
+    // The sheet re-renders constantly, and the frame changes when the token
+    // field takes focus and raises its keyboard. Revealing again there would
+    // carry the caret's own field away from the person correcting the token.
+    await form.rerender();
+    await runFrames();
+
+    expect(form.scrollToEnd).not.toHaveBeenCalled();
+  });
+
+  it('leaves the same failure alone when the motion policy flips under it', async () => {
+    mutations.connect.mockRejectedValue({
+      data: {
+        code: 'BAD_REQUEST',
+        message: 'The Bitbucket Workspace Access Token format is invalid',
+      },
+    });
+    const form = await mount(null);
+    await submit(form.root, 'workspace-token');
+    await runFrames();
+    form.scrollToEnd.mockClear();
+
+    // Reduce Motion turning on, or the battery dropping, recomputes the policy
+    // while this failure stays on screen. That is not a second failure, so the
+    // sheet must not scroll again and pull the token field out from under the
+    // person correcting it.
+    motion.scrollAnimated = false;
+    await form.rerender();
+    await runFrames();
+
+    expect(form.scrollToEnd).not.toHaveBeenCalled();
+  });
+
+  it('jumps instead of animating for a person who asked for less motion', async () => {
+    mutations.connect.mockRejectedValue({
+      data: {
+        code: 'BAD_REQUEST',
+        message: 'The Bitbucket Workspace Access Token format is invalid',
+      },
+    });
+    motion.scrollAnimated = false;
+    const form = await mount(null);
+
+    await submit(form.root, 'workspace-token');
+    await runFrames();
+
+    expect(form.scrollToEnd).toHaveBeenCalledExactlyOnceWith({ animated: false });
+  });
+
+  it('keeps the sheet still while the refused token is still being checked', async () => {
+    const landing = Promise.withResolvers<unknown>();
+    mutations.connect.mockImplementation(() => landing.promise);
+    const form = await mount(null);
+
+    await submit(form.root, 'workspace-token');
+    await runFrames();
+    expect(form.scrollToEnd).not.toHaveBeenCalled();
+
+    await act(async () => {
+      landing.reject({
+        data: {
+          code: 'BAD_REQUEST',
+          message: 'The Bitbucket Workspace Access Token format is invalid',
+        },
+      });
+      await Promise.resolve();
+    });
+    await runFrames();
+
+    expect(form.scrollToEnd).toHaveBeenCalledExactlyOnceWith({ animated: true });
+  });
+
+  it('never moves the sheet after a connect lands', async () => {
+    mutations.connect.mockResolvedValue({ integrationId: 'bitbucket-1' });
+    const form = await mount(null);
+
+    await submit(form.root, 'workspace-token');
+    await runFrames();
+
+    expect(form.onConnected).toHaveBeenCalledTimes(1);
+    expect(form.scrollToEnd).not.toHaveBeenCalled();
   });
 });

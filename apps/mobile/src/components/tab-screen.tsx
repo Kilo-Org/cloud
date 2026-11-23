@@ -105,7 +105,13 @@ function useClampedFrameMargin(reservedBand: number) {
  * underlying tab bar; it owns its safe-area and keyboard insets, so no extra
  * frame margin is reserved.
  */
-export function SheetScrollView({ children, style, onLayout, ...props }: ScrollViewProps) {
+export function SheetScrollView({
+  children,
+  style,
+  onLayout,
+  ref,
+  ...props
+}: ScrollViewProps & { ref?: Ref<ScrollViewInstance> }) {
   const tabBarHeight = useTabBarHeight();
   const keyboardOcclusion = useKeyboardState(state => state.height);
   const sideInsetMarginStyle = useSideInsetMarginStyle();
@@ -120,6 +126,9 @@ export function SheetScrollView({ children, style, onLayout, ...props }: ScrollV
   return (
     <ScrollView
       {...props}
+      // Forwarded rather than absorbed: a sheet body whose content grows under
+      // a fixed detent reveals the row it pushed out through this instance.
+      ref={ref}
       onLayout={event => {
         clamped.measureFrame(event);
         onLayout?.(event);

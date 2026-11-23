@@ -1,8 +1,8 @@
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { type ReactNode } from 'react';
+import { type ReactNode, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
+import { type ScrollViewInstance, View } from 'react-native';
 import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations';
 
 import { BitbucketConnectForm } from '@/components/code-reviewer/bitbucket-connect-form';
@@ -110,6 +110,11 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
   // The contract the connect mutations enforce (`organizationBillingProcedure`),
   // so a deep link never offers a submit the server would refuse.
   const canManage = canManageOrganizationBilling(role);
+
+  // The form's status line grows this body's scroll content while the sheet
+  // keeps its detent, so the form reveals its primary action through this
+  // instance.
+  const scrollRef = useRef<ScrollViewInstance>(null);
 
   const integrationId = readiness.data?.integrationId ?? null;
   const repair = readiness.data === undefined ? null : bitbucketRepair(readiness.data, status.data);
@@ -295,6 +300,7 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
 
     return (
       <SheetScrollView
+        ref={scrollRef}
         className="flex-1 bg-background"
         contentContainerClassName={SCREEN_BODY_CLASS}
         automaticallyAdjustKeyboardInsets
@@ -304,6 +310,7 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
           scope={scope}
           integrationId={integrationId}
           organizationName={org.organizationName}
+          scrollRef={scrollRef}
           onDirtyChange={guard.handleDirtyChange}
           onConnected={() => {
             notificationHaptic(Haptics.NotificationFeedbackType.Success);

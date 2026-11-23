@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -34,6 +34,7 @@ import { configImportArchiveFromText } from '@/lib/config-import-archive';
 import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
 import { useCloseEditorOnDeniedPermission } from '@/lib/hooks/use-close-editor-on-denied-permission';
 import { useConfigImportMutations } from '@/lib/hooks/use-config-import-mutations';
+import { useIsMounted } from '@/lib/hooks/use-is-mounted';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 
@@ -85,13 +86,7 @@ export function ProfileConfigImportSheet({
   permissionRef.current = permission;
   // Whether this sheet can still show a note. Every close path unmounts it, so
   // a request that settles afterwards has only the toast left.
-  const mountedRef = useRef(true);
-  useEffect(
-    () => () => {
-      mountedRef.current = false;
-    },
-    []
-  );
+  const mountedRef = useIsMounted();
 
   const textRef = useRef('');
   const archiveRef = useRef<string | null>(null);

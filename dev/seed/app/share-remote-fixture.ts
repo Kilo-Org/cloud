@@ -150,8 +150,8 @@ function printUsage(): void {
   console.log('');
   console.log('Five sessions, one attachment each. Every attachment URL is a');
   console.log(`  http://localhost:${DEFAULT_FIXTURE_PORT}<path>`);
-  console.log('address: two answer 200, one answers 404, and one never answers.');
-  console.log('The two success cases cover the name a share carries: an accented');
+  console.log('address: three answer 200, one answers 404, and one never answers.');
+  console.log('The two name cases cover what a share carries: an accented');
   console.log('filename (`Rechnung-März.pdf`) and a filename that arrived as a');
   console.log('relative path (`../../Rechnung März.pdf`), which keeps only its');
   console.log('basename.');
@@ -433,9 +433,9 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   console.log('');
   console.log('This fixture represents: five sessions, one attachment each, every');
   console.log(`attachment URL a http://localhost:${port} address on this VM.`);
-  console.log('Two answer 200, one answers 404, and one never answers, so the app');
+  console.log('Three answer 200, one answers 404, and one never answers, so the app');
   console.log('runs the share download success path and both of its failure paths.');
-  console.log('The two success cases differ in the name they carry: an accented one');
+  console.log('The two name cases differ in the name they carry: an accented one');
   console.log('(`Rechnung-März.pdf`) and one that arrived as a relative path');
   console.log('(`../../Rechnung März.pdf`, which keeps only its basename).');
   console.log('');

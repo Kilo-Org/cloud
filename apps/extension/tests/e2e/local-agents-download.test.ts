@@ -1404,6 +1404,131 @@ test('a payment-form submit receives its own approval, and so does the file it s
 });
 
 // eslint-disable-next-line no-empty-pattern -- Playwright requires the fixtures object destructured, and this spec takes no fixture: every page is opened on the launch's own context.
+test('a file approval covers its step after the page updates', async ({}, testInfo) => {
+  test.setTimeout(180_000);
+  const fixture = await startDownloadFixture();
+  const hub = await startFakeHub();
+  const launch = await launchRealDownloadBrowser();
+  const { context, downloadsPath, extensionId } = launch;
+  await mockKiloApi(context, {});
+  await context.addInitScript({
+    content:
+      "Object.defineProperty(chrome.permissions, 'request', { value: () => Promise.resolve(true) });",
+  });
+
+  try {
+    const sidePanel = await context.newPage();
+    const agentPage = await context.newPage();
+
+    await agentPage.goto(`${fixture.url}${CARD_PAGE_PATH}`);
+
+    const origin = fixture.url;
+    const grants = grant(origin);
+    const session = await openPairedAgentSession({
+      beforeShare: async () => {
+        await activateTab(sidePanel, `${fixture.url}${CARD_PAGE_PATH}`);
+      },
+      context,
+      extensionId,
+      hub,
+      sidePanel,
+      title: 'Card page change E2E session',
+    });
+
+    const navigated = await session.callTool(
+      'browser_navigate',
+      { url: `${fixture.url}${CARD_PAGE_PATH}` },
+      grants
+    );
+
+    expect(navigated).toMatchObject({ isError: false, kind: 'result' });
+
+    const target = await controlRef(session, grants, /button "Get receipt" \[ref=(e\d+)\]/u);
+    const args = { element: 'Get receipt', target };
+
+    // 1. The submit is a sensitive step: the call is refused before the page runs, with no `afterAction`.
+    const asked = await session.callTool('browser_click', args, grants);
+
+    expect(asked).toMatchObject({ code: -32_010, kind: 'error' });
+    expect(asked.kind === 'error' ? asked.afterAction : 'not a refusal').toBeUndefined();
+    const askedItems = z
+      .array(permissionItemSchema)
+      .parse(asked.kind === 'error' ? asked.items : []);
+
+    expect(askedItems).toStrictEqual([
+      { class: 'sensitive', origin, reason: 'submitting a form with payment fields' },
+    ]);
+    const sensitiveToken = asked.kind === 'error' ? (asked.stepToken ?? '') : '';
+
+    expect(sensitiveToken).not.toBe('');
+    await expectNothingSaved(downloadsPath);
+
+    // 2. The submit runs on the form's approval; the file it starts takes an approval of its own.
+    const guarded = await session.callTool('browser_click', args, grants, [sensitiveToken]);
+
+    expect(guarded).toMatchObject({ afterAction: true, code: -32_010, kind: 'error' });
+    const guardedItems = z
+      .array(permissionItemSchema)
+      .parse(guarded.kind === 'error' ? guarded.items : []);
+
+    expect(guardedItems).toStrictEqual([
+      { class: 'sensitive', origin, reason: 'downloading a file' },
+    ]);
+    const downloadToken = guarded.kind === 'error' ? (guarded.stepToken ?? '') : '';
+
+    expect(downloadToken).not.toBe('');
+    // The refusal names the file, and the attachment route served it: the click ran.
+    expect(guarded.kind === 'error' ? guarded.message : '').toContain(DOWNLOAD_FILENAME);
+    expect(fixture.hits()).toBeGreaterThan(0);
+    await expectNothingSaved(downloadsPath);
+
+    // 3. The page updates between the two calls: the form presents the field differently, so the retry is an
+    // Ordinary click. The change is made through Playwright's own page object, never through the extension, and
+    // Read back to prove the page holds it.
+    const changed = await agentPage.evaluate(`
+      (() => {
+        const field = document.querySelector('#cc');
+        if (field === null) { throw new Error('#cc is not in the page'); }
+        field.setAttribute('autocomplete', '');
+        field.setAttribute('name', 'line1');
+        return {
+          autocomplete: field.getAttribute('autocomplete'),
+          name: field.getAttribute('name')
+        };
+      })()
+    `);
+
+    expect(changed).toStrictEqual({ autocomplete: '', name: 'line1' });
+
+    // 4. The approval the human already gave covers the file: the identical call runs, the file it starts lands
+    // Under its own name, and the human is not asked again.
+    const approved = await session.callTool('browser_click', args, grants, [downloadToken]);
+
+    expect(approved).toMatchObject({ isError: false, kind: 'result' });
+    await expectOnlyFinishedFile(downloadsPath, DOWNLOAD_FILENAME);
+    const approvedBody = await readDownloadedFile(downloadsPath, DOWNLOAD_FILENAME);
+
+    expect(approvedBody).toBe(DOWNLOAD_BODY);
+
+    const approvedFolder = await downloadFiles(downloadsPath);
+
+    await showObservedState(agentPage, [
+      `answer: ${answerText(approved)}`,
+      `downloads folder: [${approvedFolder.join(', ')}]`,
+      `body: ${JSON.stringify(approvedBody)}`,
+    ]);
+    await agentPage.screenshot({
+      fullPage: true,
+      path: testInfo.outputPath('09-redeemed-after-page-change.png'),
+    });
+  } finally {
+    await launch.close();
+    await hub.close();
+    await fixture.close();
+  }
+});
+
+// eslint-disable-next-line no-empty-pattern -- Playwright requires the fixtures object destructured, and this spec takes no fixture: every page is opened on the launch's own context.
 test('a drop that carries local file paths needs the upload approval', async ({}, testInfo) => {
   test.setTimeout(180_000);
   const fixture = await startDownloadFixture();

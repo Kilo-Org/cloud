@@ -362,15 +362,19 @@ const ADMIT_DECIDER_RUN_SQL = `
 /**
  * Inserts a classifier run only while no operator pause holds the dispatch lock (?17). The
  * classifier path keeps no occupancy or starting-run predicate: the admin start picks the one
- * run, and the unique partial index is its backstop.
+ * run, and the unique partial index is its backstop. Like the decider insert, it stamps the
+ * post-cutover admission marker (?18) so the row is never mistaken for legacy work: the
+ * `--legacy-residue` inspection and `retireLegacyRuns` both treat an unmarked running row as
+ * work the paid flow does not own, and neither filters classifiers out.
  */
 const ADMIT_CLASSIFIER_RUN_SQL = `
   INSERT INTO benchmark_runs (id, router, accuracy_noise_band, frontier_min_accuracy_delta,
     kind, status, started_at, min_accuracy, switch_cost_factor, best_accuracy_switch_threshold,
     max_concurrency, benchmark_user_id, benchmark_org_id, repetitions,
-    classifier_max_p95_latency_ms, engine_identity, purpose, measurement_revision)
+    classifier_max_p95_latency_ms, engine_identity, purpose, measurement_revision,
+    admission_marker)
   SELECT ?1, ?2, ?3, ?4, 'classifier', 'running', ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14,
-    ?15, ?16
+    ?15, ?16, ?18
   WHERE NOT EXISTS (${OPERATOR_HOLD_CLEAR_PREDICATE_SQL}?17)
 `;
 
@@ -390,7 +394,8 @@ export async function getQueueRunOccupancy(
  * (router, queue) is still starting and fewer than MAX_RUNNING_RUNS_PER_QUEUE are
  * active, so overlapping drains cannot both start one. A classifier run is admitted
  * by its own insert only while no operator pause holds the dispatch lock. A refused
- * run leaves no rows.
+ * run leaves no rows. Both kinds stamp the post-cutover admission marker, so no run
+ * this function writes can be mistaken for legacy work.
  */
 export async function insertRun(
   db: D1Database,
@@ -436,6 +441,11 @@ export async function insertRun(
     engine_identity: run.engine_identity,
     measurement_revision: run.measurement_revision ?? ACTIVE_MEASUREMENT_REVISION,
     purpose: run.purpose ?? 'platform',
+    // Post-cutover admission provenance: only a Worker that owns the flow writes it, so a
+    // run admitted by an older image during the deploy overlap stays NULL and is never
+    // claimable, initializable or dispatchable — and is exactly what `--legacy-residue`
+    // reports. A classifier run needs it too: nothing retires an unmarked classifier row.
+    admission_marker: crypto.randomUUID(),
   } satisfies typeof benchmarkRuns.$inferInsert;
 
   const dependents = [];
@@ -492,27 +502,27 @@ export async function insertRun(
 
   if (row.kind === 'classifier') {
     const [inserted] = await db.batch([
-      db
-        .prepare(ADMIT_CLASSIFIER_RUN_SQL)
-        .bind(
-          row.id,
-          row.router,
-          row.accuracy_noise_band,
-          row.frontier_min_accuracy_delta,
-          row.started_at,
-          row.min_accuracy,
-          row.switch_cost_factor,
-          row.best_accuracy_switch_threshold,
-          row.max_concurrency,
-          row.benchmark_user_id,
-          row.benchmark_org_id,
-          row.repetitions,
-          row.classifier_max_p95_latency_ms,
-          row.engine_identity,
-          row.purpose,
-          row.measurement_revision,
-          Date.now()
-        ),
+      db.prepare(ADMIT_CLASSIFIER_RUN_SQL).bind(
+        row.id,
+        row.router,
+        row.accuracy_noise_band,
+        row.frontier_min_accuracy_delta,
+        row.started_at,
+        row.min_accuracy,
+        row.switch_cost_factor,
+        row.best_accuracy_switch_threshold,
+        row.max_concurrency,
+        row.benchmark_user_id,
+        row.benchmark_org_id,
+        row.repetitions,
+        row.classifier_max_p95_latency_ms,
+        row.engine_identity,
+        row.purpose,
+        row.measurement_revision,
+        // The admission instant the operator-hold predicate compares the lease against.
+        Date.now(),
+        row.admission_marker
+      ),
       ...dependentStatements,
       ...refusedRunCleanup,
     ]);
@@ -539,10 +549,8 @@ export async function insertRun(
       row.purpose,
       row.measurement_revision,
       MAX_RUNNING_RUNS_PER_QUEUE,
-      // Post-cutover admission provenance: only a Worker that owns the paid flow writes
-      // it, so a run admitted by an older image during the deploy overlap stays NULL and
-      // is never claimable, initializable or dispatchable.
-      crypto.randomUUID(),
+      // The same post-cutover admission marker the classifier insert stamps.
+      row.admission_marker,
       // The admission instant the operator-hold predicate compares the lease against.
       Date.now()
     ),

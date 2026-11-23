@@ -1608,9 +1608,17 @@ describe('POST /admin/runs', () => {
     const body = (await admitted.json()) as { runId: string; enqueuedModels: number };
     expect(body.runId).toMatch(/^classifier-/);
     expect(body.enqueuedModels).toBe(TEST_CONFIG.classifierModels.length);
-    expect(
-      sqlite.prepare('SELECT status FROM benchmark_runs WHERE id = ?').get(body.runId)
-    ).toEqual({ status: 'running' });
+    // The classifier row carries the post-cutover admission marker the decider write stamps,
+    // so `--legacy-residue` (which has no kind filter) never reports it as legacy work.
+    const admittedRow = sqlite
+      .prepare('SELECT status, admission_marker FROM benchmark_runs WHERE id = ?')
+      .get(body.runId);
+    expect(admittedRow).toEqual({
+      status: 'running',
+      admission_marker: expect.stringMatching(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+      ),
+    });
     expect(rows('benchmark_runs')).toEqual({ n: 1 });
     expect(queueSendBatch).toHaveBeenCalled();
   });

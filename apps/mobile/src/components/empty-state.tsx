@@ -40,7 +40,9 @@ type EmptyStateProps = {
    * section label and above or below start-aligned rows: it then lines up with
    * the label and the rows it belongs to, and its copy reads ragged-right at the
    * start edge instead of being centred between them. The vertical rhythm, the
-   * reading cap and the disc are the same in both.
+   * reading cap and the disc are the same in both, except that a `top`-placed
+   * start state takes no top pin: its section already spaces it from the label
+   * above, so a call site never cancels that air with its own class.
    */
   align?: 'center' | 'start';
   /** Where a state sits, by what shares its surface: `center` (the default) when
@@ -154,7 +156,11 @@ function EmptyStateBody({
       className={cn(
         stacked,
         inset === 'gutter' && STATE_GUTTER_CLASS,
-        placement === 'top' && !compact && 'pt-16',
+        // The top pin is the space a `top` state takes from the surface above
+        // it. A start-aligned state is a block inside a section that already
+        // spaces it from the label, so it takes none: the section's gap is the
+        // only air, and the call site never cancels it with its own class.
+        placement === 'top' && !compact && align === 'center' && 'pt-16',
         className
       )}
     >

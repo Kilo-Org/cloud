@@ -39,16 +39,23 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 
 const TITLE = 'No sessions match';
 
-const alignmentState = (align?: 'start') =>
+const alignmentState = (align?: 'start', placement?: 'top') =>
   renderWithProviders(
     <EmptyState
       align={align}
+      placement={placement}
       icon={SearchX}
       title={TITLE}
       description="Try a different search term."
       action={createElement('Action')}
     />
   );
+
+/** The body's root: the view that carries the placement's own air. */
+const body = (mounted: Mounted) =>
+  mounted.renderer.root
+    .findAll(node => typeof node.type === 'string' && (node.type as string) === 'View')
+    .at(0);
 
 /** The body's own stack: the view that carries the form's gap. */
 const stack = (mounted: Mounted) =>
@@ -98,5 +105,18 @@ describe('EmptyState horizontal alignment', () => {
     expect(String(stack(mounted)?.props.className)).toContain('items-center');
     expect(title(mounted)?.props.className).toContain('text-center');
     expect(texts(mounted)).toContain(TITLE);
+  });
+
+  // The top pin is the air a `top` state takes from the surface above it. A
+  // state inside a section already has that spacing from the section gap, so
+  // the start form takes none and the call site passes no cancelling class.
+  it('takes no top pin in the start form', async () => {
+    const start = await alignmentState('start', 'top');
+    expect(String(body(start)?.props.className)).not.toContain('pt-16');
+    start.unmount();
+    mounted = undefined;
+
+    mounted = await alignmentState(undefined, 'top');
+    expect(String(body(mounted)?.props.className)).toContain('pt-16');
   });
 });

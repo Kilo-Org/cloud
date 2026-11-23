@@ -68,6 +68,8 @@ export type ChargeCheckoutGateParams = {
  * Asks bouncer whether this checkout may proceed. Resolves to `null` when bouncer does not answer,
  * which the caller treats as allowed. A route handler that cannot throw a tRPC error maps the
  * verdict to its own response instead of using `assertChargeAllowed`.
+ *
+ * The automatic top-up calls this before it creates its Stripe invoice.
  */
 export async function decideCheckoutCharge(
   params: ChargeCheckoutGateParams

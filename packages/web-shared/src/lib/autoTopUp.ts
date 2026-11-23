@@ -21,6 +21,7 @@ import {
 } from '@kilocode/web-shared/lib/organizations/organizations';
 import { randomUUID } from 'crypto';
 import { reportChargeAttempted } from '@kilocode/web-shared/lib/bouncer/credit-events';
+import { decideCheckoutCharge } from '@kilocode/web-shared/lib/bouncer/charge-gate';
 import { sendAutoTopUpFailedEmail } from '@kilocode/web-shared/lib/email';
 import { getKiloPassStateForUser } from '@kilocode/web-shared/lib/kilo-pass/state';
 import { isStripeSubscriptionEnded } from '@kilocode/web-shared/lib/kilo-pass/stripe-subscription-status';
@@ -351,6 +352,21 @@ async function performAutoTopUpForEntity(
         ? entity.user.id
         : (config.created_by_user_id ?? SYSTEM_AUTO_TOP_UP_USER_ID);
     const bouncerOrgId = entity.type === 'organization' ? entity.organization.id : undefined;
+
+    const chargeVerdict = await decideCheckoutCharge({
+      userId: bouncerUserId,
+      organizationId: bouncerOrgId,
+      flow: 'auto_topup',
+      requestId: `auto_topup:${config.id}:${traceId}`,
+    });
+    if (chargeVerdict?.enforced) {
+      logExceptInTest(`Auto-top-up charge refused for ${entityLabel}`, {
+        traceId,
+        entity_type: entity.type,
+        entity_id: ownerId,
+      });
+      return failureResult('charge_refused');
+    }
 
     try {
       // Create a proper invoice (with PDF) and pay it off-session.

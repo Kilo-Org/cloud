@@ -147,6 +147,31 @@ describe('PrMergeSheet provider behavior', () => {
     expect(baseProps.onDismiss).toHaveBeenCalledOnce();
   });
 
+  it('withholds the merge form when a provider arm carries no merge state', async () => {
+    const renderer = await mount({ prRef: gitlab });
+    expect(hosts(renderer, 'TextInput')).toHaveLength(0);
+    expect(hosts(renderer, 'Button').map(node => node.props.accessibilityLabel)).toEqual([
+      'Discard',
+    ]);
+    expect(visibleText(renderer)).toContain("Couldn't determine mergeability.");
+    await press(renderer, 'Discard');
+    expect(baseProps.onDismiss).toHaveBeenCalledOnce();
+    expect(state.merge.mutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('withholds the auto-merge action when a provider arm carries no merge state', async () => {
+    const renderer = await mount({
+      prRef: gitlab,
+      mode: 'enable-auto-merge',
+      autoMergeCapability: { supported: true, reason: '' },
+    });
+    expect(hosts(renderer, 'Button').map(node => node.props.accessibilityLabel)).toEqual([
+      'Discard',
+    ]);
+    expect(visibleText(renderer)).toContain("Couldn't determine mergeability.");
+    expect(state.autoMerge.mutateAsync).not.toHaveBeenCalled();
+  });
+
   it('explains unsupported Bitbucket auto-merge without a submission action', async () => {
     const reason = 'Bitbucket Cloud does not expose auto-merge in its API';
     const renderer = await mount({

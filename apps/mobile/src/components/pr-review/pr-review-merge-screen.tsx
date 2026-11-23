@@ -147,9 +147,11 @@ export function PrReviewMergeScreen() {
   // (getCapabilities). Data presence, not `isSuccess`: a foreground refresh
   // whose refetch fails RETAINS the last good read, and gating on success
   // would unmount an open sheet — dropping the commit message the user typed
-  // — over data the sheet still has.
+  // — over data the sheet still has. The sheet refuses the confirm control
+  // for a provider arm that reaches it without a state.
   const isProviderArm = scope.ref.platform !== 'github';
-  const mergeStateReady = !isProviderArm || mergeStateQuery.data !== undefined;
+  const providerMergeState = isProviderArm ? mergeStateQuery.data : undefined;
+  const mergeStateReady = !isProviderArm || providerMergeState !== undefined;
   const capabilitiesReady = !needsAutoMergeCapability || capabilitiesQuery.data !== undefined;
 
   if (pr.data && mergeStateReady && capabilitiesReady) {
@@ -169,7 +171,7 @@ export function PrReviewMergeScreen() {
         sheetTitle={sheetTitle}
         eyebrow={eyebrow}
         prRef={providerRef && providerRef.platform !== 'github' ? providerRef : undefined}
-        mergeState={isProviderArm ? (mergeStateQuery.data ?? null) : undefined}
+        mergeState={providerMergeState}
         autoMergeCapability={
           needsAutoMergeCapability && capabilitiesData ? capabilitiesData.autoMerge : undefined
         }

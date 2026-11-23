@@ -27,7 +27,10 @@ import {
   MergeSheetFormBody,
   MergeSheetFormSkeleton,
 } from '@/components/pr-review/merge/pr-merge-sheet-parts';
-import { PrMergeProviderBody } from '@/components/pr-review/merge/pr-merge-provider-body';
+import {
+  type PrMergeGate,
+  PrMergeProviderBody,
+} from '@/components/pr-review/merge/pr-merge-provider-body';
 import { usePrMergeDraft } from '@/components/pr-review/merge/use-pr-merge-draft';
 import { usePrMergeSubmit } from '@/components/pr-review/merge/use-pr-merge-submit';
 import { providerPrNounKey } from '@/components/pr-review/pr-review-provider-noun';
@@ -37,6 +40,19 @@ import { type ProviderPrRef } from '@/lib/pr-review/provider-pr-ref';
 // flexGrow makes the ScrollView's content container at least the viewport
 // tall, so a short arm's spacer can push its footer to the sheet's bottom.
 const SHEET_SCROLL_CONTENT_STYLE = { flexGrow: 1, paddingBottom: 4 };
+
+function mergeGateFor(
+  prRef: ProviderPrRef | undefined,
+  mergeState: ProviderPrMergeState | null | undefined
+): PrMergeGate {
+  if (!prRef) {
+    return { kind: 'github' };
+  }
+  if (mergeState) {
+    return { kind: 'state', mergeState };
+  }
+  return { kind: 'unknown' };
+}
 
 type PrMergeSheetProps = Readonly<{
   owner: string;
@@ -54,6 +70,10 @@ type PrMergeSheetProps = Readonly<{
   /** The reference under the title; absent when the route names no request. */
   eyebrow?: string;
   prRef?: ProviderPrRef;
+  /**
+   * A provider arm normally carries the merge-state read; a missing value
+   * renders the body's unknown terminal, never a confirm control.
+   */
   mergeState?: ProviderPrMergeState | null;
   autoMergeCapability?: ProviderReviewCapability;
   onRefetch: () => Promise<void>;
@@ -93,6 +113,7 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
       })
     : null;
   const methodOptions = providerMethodOptions ?? mergeMethodOptionsFor(repoSettings);
+  const gate = mergeGateFor(prRef, mergeState);
   const fallbackMethod: AllowedMergeMethod =
     methodOptions.find(o => o.value === initialMethod)?.value ??
     (providerMethodOptions
@@ -190,7 +211,7 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
           <PrMergeProviderBody
             providerAutoMerge={Boolean(prRef) && mode === 'enable-auto-merge'}
             autoMergeCapability={autoMergeCapability}
-            mergeState={mergeState}
+            gate={gate}
             term={prRef ? t(providerPrNounKey(prRef.platform)) : ''}
             isMutating={isMutating}
             onConfirm={handleConfirmPress}

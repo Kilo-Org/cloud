@@ -18,6 +18,16 @@ import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useSideInsetStyle } from '@/lib/screen-insets';
 import { i18n } from '@/i18n';
 
+/**
+ * The merge gate the sheet body renders from: `github` is the arm with no
+ * provider merge read at all, `unknown` is a provider arm whose merge-state
+ * read produced no value yet, and `state` is the provider's own verdict.
+ */
+export type PrMergeGate =
+  | Readonly<{ kind: 'github' }>
+  | Readonly<{ kind: 'unknown' }>
+  | Readonly<{ kind: 'state'; mergeState: ProviderPrMergeState }>;
+
 function providerBlockedReasonText(
   reason: ProviderPrMergeBlockedReason,
   term: string,
@@ -98,7 +108,7 @@ function MergeRestrictionsList({
 function ProviderAutoMergeBody({
   mergeState,
   term,
-}: Readonly<{ mergeState: ProviderPrMergeState | null | undefined; term: string }>) {
+}: Readonly<{ mergeState: ProviderPrMergeState | null; term: string }>) {
   const { t } = useTranslation();
   const sideInsetStyle = useSideInsetStyle();
   return (
@@ -113,10 +123,20 @@ function ProviderAutoMergeBody({
   );
 }
 
+/**
+ * The provider arm's sheet body. The screen (`pr-review-merge-screen.tsx`)
+ * mounts the sheet only after the provider merge-state read returns, so an
+ * `unknown` gate is the contract-violation terminal: it renders the reason and
+ * a Discard, never a confirm control. Only an established allowed verdict or
+ * the GitHub arm reaches the child form. The restrictions list stays advisory:
+ * the merge write (`providerReview.mergePullRequest`) re-fetches the review,
+ * fences the expected head SHA and lets the provider refuse a merge its policy
+ * blocks, so the list is never the authorization.
+ */
 export function PrMergeProviderBody({
   providerAutoMerge,
   autoMergeCapability,
-  mergeState,
+  gate,
   term,
   isMutating,
   onConfirm,
@@ -125,7 +145,7 @@ export function PrMergeProviderBody({
 }: Readonly<{
   providerAutoMerge: boolean;
   autoMergeCapability?: ProviderReviewCapability;
-  mergeState?: ProviderPrMergeState | null;
+  gate: PrMergeGate;
   term: string;
   isMutating: boolean;
   onConfirm: () => void;
@@ -147,6 +167,7 @@ export function PrMergeProviderBody({
       </Button>
     );
   }
+  const mergeState = gate.kind === 'state' ? gate.mergeState : null;
 
   if (providerAutoMerge && autoMergeCapability?.supported === false) {
     return (
@@ -154,6 +175,23 @@ export function PrMergeProviderBody({
         <View style={sideInsetStyle}>
           <View className="px-4 pt-3">
             <PrReviewCapabilityBanner capability={autoMergeCapability} />
+          </View>
+        </View>
+        <View className="flex-1" />
+        <PrFormSheetFooter>{cancelButton()}</PrFormSheetFooter>
+      </>
+    );
+  }
+  if (gate.kind === 'unknown') {
+    return (
+      <>
+        <View style={sideInsetStyle}>
+          <View className={SCREEN_BODY_CLASS}>
+            <Card>
+              <Text className="text-sm text-muted-foreground">
+                {t('prReview.merge.couldNotDetermine')}
+              </Text>
+            </Card>
           </View>
         </View>
         <View className="flex-1" />

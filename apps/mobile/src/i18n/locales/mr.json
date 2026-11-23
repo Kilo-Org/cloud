@@ -1238,6 +1238,7 @@
     "needsInputAction": {
       "approved": "विनंती मंजूर झाली",
       "replied": "उत्तर पाठवले",
+      "empty": "उत्तर लिहा, नंतर पाठवा.",
       "failed": "उत्तर देता आले नाही. पुन्हा प्रयत्न करण्यासाठी पुन्हा टॅप करा.",
       "unavailable": "ही विनंती आता प्रतीक्षा करत नाही."
     }
@@ -1502,7 +1503,9 @@
       "githubError": "GitHub सेटअप उघडता आला नाही. कृपया पुन्हा प्रयत्न करा.",
       "gitlabAccount": "GitLab खाते",
       "gitlabError": "GitLab सेटअप उघडता आला नाही. कृपया पुन्हा प्रयत्न करा.",
-      "description": "पुल रिक्वेस्टचे आपोआप पुनरावलोकन करण्यासाठी Kilo {{label}} जोडा."
+      "description": "पुल रिक्वेस्टचे आपोआप पुनरावलोकन करण्यासाठी Kilo {{label}} जोडा.",
+      "notConnectedTitle": "{{platform}} जोडलेले नाही",
+      "githubAdminOnlyDescription": "केवळ संस्थेचे मालक आणि प्रशासक ते जोडू शकतात."
     },
     "overview": {
       "allAreas": "सर्व क्षेत्रे",
@@ -2251,6 +2254,7 @@
       "couldNotLoadThisSession": "हे सत्र लोड करता आले नाही.",
       "historyTooLarge": "या सत्राची ट्रान्सक्रिप्ट लोड करण्यासाठी खूप मोठी आहे.",
       "historyUnavailable": "या सत्राची ट्रान्सक्रिप्ट वाचता येत नाही.",
+      "historyTemporarilyUnavailable": "या सत्राची ट्रान्सक्रिप्ट तात्पुरती उपलब्ध नाही.",
       "cloneFailedRetry": "या सत्राची प्रत तयार करता आली नाही. पुन्हा प्रयत्न करा.",
       "notEnoughCredits": "या विनंतीसाठी पुरेसे क्रेडिट नाहीत. क्रेडिट जोडून पुन्हा प्रयत्न करा.",
       "previousTaskFinishing": "मागील काम अजून पूर्ण झालेले नाही. कृपया थोडा वेळ थांबा.",
@@ -2787,7 +2791,9 @@
       "skip": "वगळा",
       "retrySkip": "वगळण्याचा पुन्हा प्रयत्न करा",
       "submitting": "उत्तरे पाठवत आहे…",
-      "sendAnswers": "उत्तरे पाठवा"
+      "sendAnswers": "उत्तरे पाठवा",
+      "unreadableTitle": "हा प्रश्न दाखवता आला नाही",
+      "unreadableBody": "एजंट एका प्रश्नाची वाट पाहत आहे जो हे अॅप दाखवू शकत नाही. पुढे जाण्यासाठी CLI मध्येच त्याचे उत्तर द्या."
     },
     "blockingCard": {
       "questionUnavailable": "हा प्रश्न यापुढे उपलब्ध नाही.",
@@ -2814,6 +2820,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "उपएजंटचे सत्र लोड करता आले नाही.",
+      "historyTooLarge": "या उपएजंटचा इतिहास लोड करण्यासाठी खूप मोठा आहे.",
+      "historyUnavailable": "या उपएजंटचा इतिहास उपलब्ध नाही.",
+      "historyTemporarilyUnavailable": "या उपएजंटचा इतिहास तात्पुरती उपलब्ध नाही.",
       "failed": "उपएजंटचे सत्र अयशस्वी झाले.",
       "noMessages": "उपएजंटचे संदेश नाहीत",
       "noMessagesDescription": "उपएजंटचे हे सत्र संभाषणाची नोंद तयार न करताच पूर्ण झाले.",
@@ -3392,6 +3401,8 @@
     "voiceTranscriptionWho": "तुमचे डिव्हाइस, तुम्ही निवडलेल्या प्रतिलेखन मॉडेलसह Kilo Gateway, किंवा ऑनलाइन ओळखीसाठी Apple किंवा Google.",
     "installAttributionPromptTitle": "इंस्टॉलचा स्रोत ओळखण्यास परवानगी द्यायची?",
     "installAttributionPromptMessage": "तुम्ही कोणत्या माध्यमातून येथे आलात हे जाणून घेण्यासाठीच Kilo Apple ची ट्रॅकिंग परवानगी वापरते. यासाठी तुमचे प्रॉम्प्ट आणि संभाषणे कधीही वापरली जात नाहीत.",
+    "installAttributionRequestFailedTitle": "ट्रॅकिंग प्रॉम्प्ट दाखवता आला नाही",
+    "installAttributionRequestFailedMessage": "Kilo ला सिस्टम प्रॉम्प्ट दाखवता आला नाही, म्हणून इंस्टॉलचा स्रोत ओळखणे बंद राहते.",
     "what": "काय",
     "why": "का",
     "who": "कोण"
@@ -3407,7 +3418,7 @@
   "organization": {
     "auditLog": {
       "title": "ऑडिट लॉग",
-      "permissionDenied": "Enterprise प्लॅनवरील संस्थेचा मालक, अ‍ॅडमिन किंवा बिलिंग व्यवस्थापकच तिचा ऑडिट लॉग पाहू शकतो.",
+      "permissionDenied": "Enterprise प्लॅनवरील संस्थेचा मालक, प्रशासक किंवा बिलिंग व्यवस्थापकच तिचा ऑडिट लॉग पाहू शकतो. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "कोणत्याही ऑडिट घटना नाहीत",
       "emptyDescription": "या संस्थेत केलेल्या कृती येथे दिसतात.",
       "truncated": "सर्वात अलीकडील घटना दाखवत आहे.",
@@ -3457,11 +3468,147 @@
         "guardrailUpdate": "गार्डरेल अद्यतनित केले",
         "guardrailRemove": "गार्डरेल हटवले",
         "unknown": "ऑडिट घटना"
+      },
+      "detail": {
+        "fieldChange": "{{field}}: {{change}}",
+        "modeIdentity": "मोड \"{{name}}\" (ओळखकर्ता: {{slug}})",
+        "modeUpdate": "मोड \"{{name}}\": {{changes}}",
+        "field": {
+          "name": "$t(organization.modes.nameLabel)",
+          "slug": "$t(organization.modes.identifierLabel)",
+          "roleDefinition": "$t(organization.modes.roleLabel)",
+          "whenToUse": "$t(organization.modes.whenToUseLabel)",
+          "description": "$t(organization.modes.descriptionLabel)",
+          "customInstructions": "$t(codeReviewer.instructions.title)",
+          "groups": "$t(profiles.agents.tools)",
+          "autoRoute": "आपोआप राउटिंग",
+          "defaultModel": "डीफॉल्ट मॉडेल"
+        },
+        "role": {
+          "owner": "$t(organization.members.roles.owner)",
+          "admin": "$t(organization.members.roles.admin)",
+          "billing_manager": "$t(organization.members.roles.billingManager)",
+          "member": "$t(organization.members.roles.member)"
+        },
+        "memberRole": "{{email}}: {{change}}",
+        "memberAdded": "{{email}} ला {{role}} म्हणून जोडले",
+        "memberRemoved": "{{email}} काढले",
+        "memberParentAdded": "मूळ संस्था {{parent}} मधून {{email}} जोडले",
+        "memberParentRemoved": "मूळ संस्था {{parent}} मधून {{email}} काढले",
+        "inviteSent": "{{email}} {{role}} म्हणून",
+        "inviteRevoked": "{{email}} साठीचे आमंत्रण रद्द केले",
+        "inviteAccepted": "{{email}} स्वीकारले",
+        "groupIdentity": "गट \"{{name}}\"",
+        "groupMembers": "गट \"{{name}}\": {{members}}",
+        "groupMemberGroups": "{{displayCount}} गट",
+        "groupMemberGroups_one": "{{displayCount}} गट",
+        "groupMemberGroups_other": "{{displayCount}} गट",
+        "groupMemberGroupsOf": "{{email}}: {{displayCount}} गट",
+        "groupMemberGroupsOf_one": "{{email}}: {{displayCount}} गट",
+        "groupMemberGroupsOf_other": "{{email}}: {{displayCount}} गट",
+        "groupPolicySet": "गट \"{{name}}\": {{policy}} धोरण सेट केले",
+        "groupPolicyRemoved": "गट \"{{name}}\": {{policy}} धोरण हटवले",
+        "groupDefaultPolicySet": "डीफॉल्ट {{policy}} धोरण सेट केले",
+        "groupDefaultPolicyRemoved": "डीफॉल्ट {{policy}} धोरण हटवले",
+        "guardrailIdentity": "{{type}} \"{{name}}\"",
+        "guardrailStatus": "{{type}} \"{{name}}\" {{state}}",
+        "guardrailConfig": "कृत्रिम बुद्धिमत्ता गार्डरेल्स {{state}}",
+        "guardrailConfigGroup": "गट \"{{group}}\" साठी {{state}}",
+        "guardrailEnforcement": "{{target}}: {{value}}",
+        "guardrailSkill": "{{target}}: {{values}}",
+        "guardrailTarget": {
+          "mcp": "$t(profiles.mcp.title)",
+          "skill": "$t(profiles.skillsTitle)"
+        },
+        "ssoDomainSet": "SSO डोमेन {{domain}}",
+        "ssoDomainChanged": "{{domain}} (पूर्वी {{previous}})",
+        "ssoDomainRemoved": "SSO डोमेन {{domain}} साफ केला",
+        "fundsPurchased": "{{method}} द्वारे {{amount}}",
+        "fundsGranted": "{{amount}}",
+        "fundsDistributed": "{{displayCount}} उप संस्थांना {{amount}}",
+        "fundsDistributed_one": "{{displayCount}} उप संस्थेला {{amount}}",
+        "fundsDistributed_other": "{{displayCount}} उप संस्थांना {{amount}}",
+        "fundsReceived": "{{parent}} कडून {{amount}}",
+        "reviewAgentPlatform": "{{platform}}",
+        "reviewAgentConfig": "{{platform}} कॉन्फिगरेशन",
+        "reviewAgentConfigStyle": "{{platform}}: शैली {{style}}",
+        "reviewAgentSecretsUpdated": "{{displayCount}} अद्यतनित",
+        "reviewAgentSecretsUpdated_one": "{{displayCount}} अद्यतनित",
+        "reviewAgentSecretsUpdated_other": "{{displayCount}} अद्यतनित",
+        "reviewAgentSecretsFailed": "{{displayCount}} त्रुटी",
+        "reviewAgentSecretsFailed_one": "{{displayCount}} त्रुटी",
+        "reviewAgentSecretsFailed_other": "{{displayCount}} त्रुटी",
+        "reviewAgentSecretRotated": "{{values}}",
+        "settingAdvancedPolicies": "{{values}}",
+        "settingAdvancedPoliciesOpenRouter": "OpenRouter {{state}}",
+        "settingAdvancedPoliciesRegion": "इन्फरन्स प्रदेश: {{region}}",
+        "settingDefaultModelSet": "{{next}}",
+        "settingDefaultModelRemoved": "{{previous}}",
+        "settingAutoRoute": "मोड \"{{mode}}\": {{change}}",
+        "settingDefaultBehavior": {
+          "global": "ग्लोबल डीफॉल्ट",
+          "specific": "{{model}}",
+          "auto": "$t(models.auto.organization)"
+        },
+        "settingDataCollection": "{{mode}}",
+        "dataCollection": {
+          "allowed": "अनुमत",
+          "denied": "नाकारले",
+          "followSetting": "एक्स्टेंशन सेटिंगचे अनुसरण करते"
+        },
+        "region": {
+          "us": "$t(organizationModelAccess.region.us)",
+          "eu": "$t(organizationModelAccess.region.eu)",
+          "au": "$t(organizationModelAccess.region.au)",
+          "jp": "$t(organizationModelAccess.region.jp)"
+        },
+        "settingProjectsUi": "प्रकल्प UI {{state}}",
+        "settingMinimumBalanceOn": "{{threshold}} ते {{emails}}",
+        "settingMinimumBalanceThreshold": "{{threshold}}",
+        "settingRecommendationsDigest": "शिफारसी डायजेस्ट {{state}}",
+        "settingBrowserControl": "{{policy}}",
+        "settingBrowserControlOrigins": "{{policy}}: {{origins}}",
+        "settingBrowserControlOriginsCleared": "{{policy}}: कोणतेही अनुमत ओरिजिन नाहीत",
+        "settingName": "{{previous}} वरून {{next}} असे नाव बदलले",
+        "enabled": "$t(common.enabled)",
+        "scanBeforeUseOn": "वापरण्यापूर्वी स्कॅन सुरू",
+        "scanBeforeUseOff": "वापरण्यापूर्वी स्कॅन बंद",
+        "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingRemoved": "काढले: {{models}}",
+        "browserPolicyOff": "ब्राउझर वापरास अडथळा आला",
+        "browserPolicyAllow": "केवळ अनुमत ओरिजिन",
+        "browserPolicyPlaywrightOnly": "केवळ ब्राउझर वापर",
+        "disabled": "$t(common.disabled)",
+        "autoRouting": "मॉडेल बदलले: {{values}}",
+        "integrationConnected": "{{integration}} जोडले",
+        "integrationDisconnected": "{{integration}} डिस्कनेक्ट केले",
+        "integrationRefreshed": "{{integration}} रिफ्रेश केले",
+        "integrationCancelled": "{{integration}} रद्द",
+        "integrationModelUpdated": "{{integration}}: मॉडेल {{model}}",
+        "integrationKeyAdded": "{{provider}} साठी की जोडली",
+        "integrationKeyUpdated": "{{provider}} साठी की अद्यतनित केली",
+        "integrationKeyDeleted": "{{provider}} साठी की काढली",
+        "integrationKeyToggled": "{{provider}} साठी की: {{state}}",
+        "namedPolicyCreated": "{{kind}} धोरण {{id}} तयार केले",
+        "namedPolicyUpdated": "{{kind}} धोरण {{id}} अद्यतनित केले",
+        "namedPolicyDeleted": "{{kind}} धोरण {{id}} हटवले",
+        "namedPolicyLinked": "{{kind}} धोरण {{next}} जोडले",
+        "webhookTriggerUpdated": "ट्रिगर {{trigger}}",
+        "organizationRenamed": "संस्थेचे नाव {{previous}} वरून {{next}} असे बदलले",
+        "brand": {
+          "github": "$t(common.github)",
+          "gitlab": "$t(common.gitlab)",
+          "bitbucket": "$t(agentChat.repoPicker.platformBitbucket)",
+          "discord": "$t(profile.providerDiscord)",
+          "slack": "$t(agentChat.sessionFilter.platformSlack)",
+          "linear": "$t(agentChat.sessionFilter.platformLinear)",
+          "byok": "तुमची स्वतःची API की"
+        }
       }
     },
     "billing": {
       "title": "बिलिंग",
-      "permissionDenied": "संस्थेचे बिलिंग फक्त तिचे मालक, अ‍ॅडमिन किंवा बिलिंग व्यवस्थापकच पाहू शकतात.",
+      "permissionDenied": "संस्थेचे बिलिंग फक्त तिचे मालक, प्रशासक किंवा बिलिंग व्यवस्थापकच पाहू शकतात. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "सदस्यता",
       "state": "स्थिती",
       "stateNone": "सदस्यता नाही",
@@ -3577,7 +3724,7 @@
       "limitLabel": "मर्यादा (प्रतिदिन USD)",
       "memberNotFound": "सदस्य सापडला नाही.",
       "noLimitPlaceholder": "मर्यादा नाही",
-      "permissionDenied": "फक्त संस्थेचा मालक किंवा अ‍ॅडमिन वापराच्या मर्यादा व्यवस्थापित करू शकतात.",
+      "permissionDenied": "फक्त संस्थेचा मालक किंवा प्रशासक वापराच्या मर्यादा व्यवस्थापित करू शकतात.",
       "removeLimit": "मर्यादा काढा",
       "title": "दररोजच्या वापराची मर्यादा",
       "blankError": "रक्कम द्या किंवा खालील मर्यादा काढा हे बटण वापरा.",
@@ -3638,7 +3785,7 @@
       "emptyDescription": "आधीच्या विनंत्या पाहण्यासाठी 'मागील तास' वापरा.",
       "emptyBoundDescription": "विनंत्यांच्या नोंदी इथपर्यंतच मागे उपलब्ध आहेत.",
       "loadError": "विनंती लॉग लोड करता आले नाहीत.",
-      "permissionDenied": "संस्थेचा मालक, अ‍ॅडमिन किंवा बिलिंग व्यवस्थापकच तिचे विनंती लॉग पाहू शकतो.",
+      "permissionDenied": "संस्थेचा मालक, प्रशासक किंवा बिलिंग व्यवस्थापकच तिचे विनंती लॉग पाहू शकतो. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} इनपुट · {{output}} आउटपुट",
       "byok": "BYOK"
     },
@@ -3908,7 +4055,10 @@
     "list": {
       "loadFailed": "चॅट इतिहास लोड करता आला नाही.",
       "new": "नवीन चॅट",
-      "deleteTitle": "ही चॅट हटवायची?"
+      "deleteTitle": "ही चॅट हटवायची?",
+      "resetNoticeTitle": "स्थानिक चॅट आणि मसुदे साफ केले",
+      "resetNoticeBody": "Kilo या डिव्हाइसवर जतन केलेला चॅट इतिहास उघडू शकले नाही. तुमच्या क्लाउड सत्रांना याचा परिणाम होत नाही.",
+      "resetNoticeDismiss": "सूचनेकडे दुर्लक्ष करा"
     },
     "rename": {
       "title": "चॅटचे नाव बदला",
@@ -3958,6 +4108,9 @@
       "fieldName": "दर्शवलेले नाव",
       "fieldUrl": "सर्व्हर URL",
       "fieldUrlInvalid": "वैध सर्व्हर URL प्रविष्ट करा.",
+      "fieldUrlCredentials": "URL मधून वापरकर्तानाव आणि पासवर्ड काढून टाका.",
+      "fieldUrlFragment": "URL मधील # भाग काढून टाका.",
+      "fieldUrlInsecure": "https URL प्रविष्ट करा, किंवा केवळ localhost साठी http वापरा.",
       "duplicateUrl": "हा सर्व्हर URL आधीच जतन केलेला आहे.",
       "serverNotFound": "हा सर्व्हर आता जतन केलेला नाही.",
       "enableServer": "हा सर्व्हर सक्षम करा: {{name}}",
@@ -3983,6 +4136,7 @@
       "app": {
         "label": "साधन इंटरफेस",
         "failed": "या साधनाचा इंटरफेस लोड करता आला नाही.",
+        "tooLarge": "या साधनाचा इंटरफेस {{size}} मर्यादेपेक्षा मोठा आहे.",
         "empty": "या साधनाच्या इंटरफेसमध्ये दाखवण्यासाठी काहीही नाही."
       }
     },
@@ -4735,7 +4889,7 @@
     "defaultModel": "Kilo चे डीफॉल्ट मॉडेल वापरा",
     "duration": "वेळ मर्यादा (मिनिटे)",
     "spendLimit": "खर्च मर्यादा (USD)",
-    "invalidSafeguards": "धनात्मक, मर्यादित वेळ आणि खर्च मर्यादा प्रविष्ट करा.",
+    "invalidSafeguards": "अनुमत श्रेणीत धन संख्या प्रविष्ट करा.",
     "estimate": "अंदाज {{estimate}} · कमाल {{maximum}}",
     "estimateUnavailable": "या सेटिंग्ससाठी सशुल्क सारांश उपलब्ध नाही. मॉडेल किंवा मर्यादा बदला, किंवा नंतर पुन्हा प्रयत्न करा.",
     "confirmPaid": "{{context}} साठी सशुल्क सारांश सुरू करायचे?",
@@ -4805,7 +4959,8 @@
     "unavailableTitle": "वापर उपलब्ध नाही",
     "unavailableDescription": "या वर्कस्पेससाठी वापराची नोंद सुरू केलेली नाही. येथे वापर दिसणे अपेक्षित असल्यास सहाय्य विभागाशी संपर्क साधा.",
     "orgSelfNotice": "तुम्ही या संस्थेतील तुमचा स्वतःचा वापर पाहत आहात.",
-    "viewDetails": "वापराचे तपशील पहा"
+    "viewDetails": "वापराचे तपशील पहा",
+    "orgSelfEntryTitle": "तुमचा वापर"
   },
   "integrations": {
     "title": "इंटिग्रेशन्स",
@@ -4901,6 +5056,8 @@
       "autoCommit": "रन पूर्ण झाल्यावर बदल कमिट करा",
       "condenseOnComplete": "रन पूर्ण झाल्यावर संदर्भ संक्षिप्त करा",
       "activeTitle": "ट्रिगर सक्रिय",
+      "activeSwitchA11y": "ट्रिगर सक्रिय: {{name}}",
+      "copyLinkA11y": "{{name}} साठी लिंक कॉपी करा",
       "activeDescription": "थांबवलेले वेबहूक 404 ने उत्तर देतात.",
       "runAsCreator": "माझ्या रूपात चालवा",
       "runAsCreatorDescription": "प्रत्येक रन तुमचे खाते वापरते, त्यामुळे सीक्रेट हेडर आवश्यक आहे.",

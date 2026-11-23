@@ -20,9 +20,17 @@ const query = vi.hoisted(() => ({
   isPending: false,
   isError: false,
   isFetching: false,
+  fetchStatus: 'idle' as 'fetching' | 'paused' | 'idle',
   error: null as unknown,
   refetch: vi.fn(),
 }));
+
+/** The options the screen handed `useQuery`, one entry per render. */
+const queryOptions = vi.hoisted(() => ({ seen: [] as unknown[] }));
+
+// The read settles offline (`SETTLE_WHILE_OFFLINE`), so the failure's wording
+// reads the committed connectivity state; this harness carries it.
+const connectivity = vi.hoisted(() => ({ value: 'unknown' as 'online' | 'offline' | 'unknown' }));
 
 type HeaderProps = {
   eyebrow?: string;
@@ -65,8 +73,14 @@ vi.mock('@/lib/trpc', () => ({
     },
   }),
 }));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => connectivity.value,
+}));
 vi.mock('@tanstack/react-query', () => ({
-  useQuery: () => query,
+  useQuery: (options: unknown) => {
+    queryOptions.seen.push(options);
+    return query;
+  },
 }));
 
 const CREATED_AT = '2026-11-17T15:52:00.000Z';
@@ -110,6 +124,11 @@ function startedAtLabel(createdAt: string): string {
   });
 }
 
+/** The read's failure face; the stub keeps the props the screen passed it. */
+function queryErrors(renderer: TestRenderer.ReactTestRenderer) {
+  return renderer.root.findAll(node => Object.is(node.type, 'QueryError'));
+}
+
 // The date the subtitle prints for the same payload timestamp, in the language
 // the screen formats with.
 function subtitleDateLabel(createdAt: string): string {
@@ -121,8 +140,11 @@ beforeEach(() => {
   query.isPending = false;
   query.isError = false;
   query.isFetching = false;
+  query.fetchStatus = 'idle';
   query.error = null;
   query.refetch.mockClear();
+  queryOptions.seen = [];
+  connectivity.value = 'unknown';
   headers.rendered = [];
 });
 
@@ -199,6 +221,57 @@ describe('shared session header eyebrow', () => {
     expect(headers.rendered[0]?.eyebrow).toBeUndefined();
     expect(headers.rendered[0]?.reserveEyebrow).toBe(true);
     expect(headers.rendered[0]?.eyebrowPlaceholder).toBeUndefined();
+    renderer.unmount();
+  });
+});
+
+describe('shared session read failure', () => {
+  it('asks the read to settle while offline with one retry', () => {
+    const renderer = renderScreen();
+
+    // `SETTLE_WHILE_OFFLINE` is what keeps a paused first read from leaving the
+    // skeleton on screen with no retry; `retry: 1` absorbs one gateway failure.
+    expect(queryOptions.seen[0]).toMatchObject({
+      networkMode: 'always',
+      refetchOnReconnect: true,
+      retry: 1,
+    });
+    renderer.unmount();
+  });
+
+  it('names the connection for a transport failure while offline, with a retry', () => {
+    query.isError = true;
+    query.error = { message: 'Network request failed' };
+    connectivity.value = 'offline';
+    const renderer = renderScreen();
+
+    const [failure] = queryErrors(renderer);
+    expect(failure?.props.variant).toBe('offline');
+    expect(failure?.props.onRetry).toBeTypeOf('function');
+    renderer.unmount();
+  });
+
+  it('keeps the dead-link state for a share the server no longer holds', () => {
+    query.isError = true;
+    query.error = { data: { code: 'NOT_FOUND' } };
+    connectivity.value = 'online';
+    const renderer = renderScreen();
+
+    const [failure] = queryErrors(renderer);
+    expect(failure?.props.variant).toBe('not-found');
+    expect(failure?.props.onRetry).toBeUndefined();
+    renderer.unmount();
+  });
+
+  it('keeps the server copy and the retry for an answered failure', () => {
+    query.isError = true;
+    query.error = { data: { code: 'INTERNAL_SERVER_ERROR' } };
+    connectivity.value = 'online';
+    const renderer = renderScreen();
+
+    const [failure] = queryErrors(renderer);
+    expect(failure?.props.variant).toBe('server');
+    expect(failure?.props.onRetry).toBeTypeOf('function');
     renderer.unmount();
   });
 });

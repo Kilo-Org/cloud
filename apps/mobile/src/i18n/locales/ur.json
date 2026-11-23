@@ -7,7 +7,7 @@
     "directory": "ورکنگ ڈائریکٹری",
     "createSession": "نیٹو سیشن بنائیں",
     "queueIfOffline": "ہوسٹ آف لائن ہو تو پرامپٹ قطار میں رکھیں",
-    "prompt": "پرامپٹ یا \u2066/command\u2069",
+    "prompt": "پرامپٹ یا ⁦/command⁩",
     "localClear": "مقامی منظر صاف کریں",
     "abort": "ٹرن منسوخ کریں",
     "failed": "نیٹو ریموٹ کارروائی ناکام ہو گئی",
@@ -399,7 +399,7 @@
       "title": "فراہم کنندہ کی کلیدیں",
       "rowSubtitle": "اپنے فراہم کنندہ کی بلنگ استعمال کریں",
       "orgDescription": "یہ کلیدیں تنظیم کے ہر فرد کے ساتھ شیئر کی جاتی ہیں اور ان کا بل تنظیم کے فراہم کنندہ اکاؤنٹس پر آتا ہے۔",
-      "viewOnly": "صرف تنظیم کا مالک، ایڈمن یا بلنگ مینیجر اس کی کلیدیں تبدیل کر سکتا ہے۔",
+      "viewOnly": "صرف تنظیم کا مالک، منتظم یا بلنگ مینیجر اس کی کلیدیں تبدیل کر سکتا ہے۔",
       "description": "ان کلیدوں کے ذریعے کی گئی درخواستوں کا بل آپ کے Kilo بیلنس کے بجائے آپ کے فراہم کنندہ اکاؤنٹ پر آتا ہے۔",
       "managedByPlan": "آپ کے کوڈنگ پلان کے زیر انتظام",
       "enableKey": "{{provider}} کلید فعال کریں",
@@ -1238,6 +1238,7 @@
     "needsInputAction": {
       "approved": "درخواست منظور ہو گئی",
       "replied": "جواب بھیج دیا گیا",
+      "empty": "جواب لکھیں، پھر بھیجیں۔",
       "failed": "جواب دینا ممکن نہیں ہو سکا۔ دوبارہ کوشش کے لیے دوبارہ ٹیپ کریں۔",
       "unavailable": "یہ درخواست اب انتظار نہیں کر رہی۔"
     }
@@ -1502,7 +1503,9 @@
       "githubError": "GitHub سیٹ اپ نہیں کھولا جا سکا۔ براہ کرم دوبارہ کوشش کریں۔",
       "gitlabAccount": "GitLab اکاؤنٹ",
       "gitlabError": "GitLab سیٹ اپ نہیں کھولا جا سکا۔ براہ کرم دوبارہ کوشش کریں۔",
-      "description": "پل ریکویسٹس کا خودکار جائزہ لینے کے لیے Kilo {{label}} منسلک کریں۔"
+      "description": "پل ریکویسٹس کا خودکار جائزہ لینے کے لیے Kilo {{label}} منسلک کریں۔",
+      "notConnectedTitle": "{{platform}} منسلک نہیں ہے",
+      "githubAdminOnlyDescription": "صرف تنظیم کے مالک اور منتظم اسے منسلک کر سکتے ہیں۔"
     },
     "overview": {
       "allAreas": "تمام شعبے",
@@ -2251,6 +2254,7 @@
       "couldNotLoadThisSession": "یہ سیشن لوڈ نہیں ہو سکا۔",
       "historyTooLarge": "اس سیشن کی نقل لوڈ کرنے کے لیے بہت بڑی ہے۔",
       "historyUnavailable": "اس سیشن کی نقل نہیں پڑھی جا سکتی۔",
+      "historyTemporarilyUnavailable": "اس سیشن کی نقل عارضی طور پر دستیاب نہیں ہے۔",
       "cloneFailedRetry": "اس سیشن کی نقل نہیں بن سکی۔ دوبارہ کوشش کریں۔",
       "notEnoughCredits": "اس درخواست کے لیے کافی کریڈٹس نہیں ہیں۔ کریڈٹس شامل کریں اور دوبارہ کوشش کریں۔",
       "previousTaskFinishing": "پچھلا کام ابھی مکمل ہو رہا ہے۔ براہ کرم ایک لمحہ انتظار کریں۔",
@@ -2787,7 +2791,9 @@
       "skip": "چھوڑیں",
       "retrySkip": "سوال چھوڑنے کی دوبارہ کوشش کریں",
       "submitting": "جوابات بھیجے جا رہے ہیں…",
-      "sendAnswers": "جوابات بھیجیں"
+      "sendAnswers": "جوابات بھیجیں",
+      "unreadableTitle": "یہ سوال دکھایا نہیں جا سکا",
+      "unreadableBody": "ایجنٹ ایک سوال کا انتظار کر رہا ہے جو یہ ایپ دکھا نہیں سکتی۔ جاری رکھنے کے لیے CLI میں سوال کا جواب دیں۔"
     },
     "blockingCard": {
       "questionUnavailable": "یہ سوال اب دستیاب نہیں۔",
@@ -2814,6 +2820,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "ذیلی ایجنٹ کا سیشن لوڈ نہیں ہو سکا۔",
+      "historyTooLarge": "اس ذیلی ایجنٹ کا ریکارڈ لوڈ کرنے کے لیے بہت بڑا ہے۔",
+      "historyUnavailable": "اس ذیلی ایجنٹ کا ریکارڈ دستیاب نہیں ہے۔",
+      "historyTemporarilyUnavailable": "اس ذیلی ایجنٹ کا ریکارڈ عارضی طور پر دستیاب نہیں ہے۔",
       "failed": "ذیلی ایجنٹ کا سیشن ناکام ہو گیا۔",
       "noMessages": "ذیلی ایجنٹ کا کوئی پیغام نہیں",
       "noMessagesDescription": "ذیلی ایجنٹ کا یہ سیشن گفتگو کا متن بنائے بغیر مکمل ہو گیا۔",
@@ -3392,6 +3401,8 @@
     "voiceTranscriptionWho": "آپ کی ڈیوائس، آپ کے منتخب کردہ ٹرانسکرپشن ماڈل کے ساتھ Kilo Gateway، یا آن لائن شناخت کے لیے Apple یا Google۔",
     "installAttributionPromptTitle": "انسٹالیشن کے ذریعے کی شناخت کی اجازت دیں؟",
     "installAttributionPromptMessage": "Kilo صرف یہ جاننے کے لیے Apple کی ٹریکنگ کی اجازت استعمال کرتا ہے کہ آپ کس ذریعے سے یہاں آئے۔ اس مقصد کے لیے آپ کے پرامپٹس اور گفتگو کبھی استعمال نہیں ہوتے۔",
+    "installAttributionRequestFailedTitle": "ٹریکنگ پرامپٹ نہیں دکھایا جا سکا",
+    "installAttributionRequestFailedMessage": "Kilo سسٹم پرامپٹ نہیں دکھا سکا، اس لیے انسٹالیشن کے ذریعے کی شناخت بند ہی رہتی ہے۔",
     "what": "کیا",
     "why": "کیوں",
     "who": "کون"
@@ -3407,7 +3418,7 @@
   "organization": {
     "auditLog": {
       "title": "آڈٹ لاگ",
-      "permissionDenied": "انٹرپرائز پلان پر صرف تنظیم کا مالک، ایڈمن یا بلنگ مینیجر ہی اس کا آڈٹ لاگ دیکھ سکتا ہے۔",
+      "permissionDenied": "انٹرپرائز پلان پر صرف تنظیم کا مالک، منتظم یا بلنگ مینیجر ہی اس کا آڈٹ لاگ دیکھ سکتا ہے۔ $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "کوئی آڈٹ ایونٹ نہیں",
       "emptyDescription": "اس تنظیم میں کیے گئے اقدامات یہاں ظاہر ہوتے ہیں۔",
       "truncated": "حالیہ ترین ایونٹس دکھائے جا رہے ہیں۔",
@@ -3457,11 +3468,147 @@
         "guardrailUpdate": "گارڈ ریل اپ ڈیٹ کی گئی",
         "guardrailRemove": "گارڈ ریل ہٹائی گئی",
         "unknown": "آڈٹ ایونٹ"
+      },
+      "detail": {
+        "fieldChange": "{{field}}: {{change}}",
+        "modeIdentity": "موڈ “{{name}}” (شناخت کنندہ: {{slug}})",
+        "modeUpdate": "موڈ “{{name}}”: {{changes}}",
+        "field": {
+          "name": "$t(organization.modes.nameLabel)",
+          "slug": "$t(organization.modes.identifierLabel)",
+          "roleDefinition": "$t(organization.modes.roleLabel)",
+          "whenToUse": "$t(organization.modes.whenToUseLabel)",
+          "description": "$t(organization.modes.descriptionLabel)",
+          "customInstructions": "$t(codeReviewer.instructions.title)",
+          "groups": "$t(profiles.agents.tools)",
+          "autoRoute": "خودکار روٹنگ",
+          "defaultModel": "ڈیفالٹ ماڈل"
+        },
+        "role": {
+          "owner": "$t(organization.members.roles.owner)",
+          "admin": "$t(organization.members.roles.admin)",
+          "billing_manager": "$t(organization.members.roles.billingManager)",
+          "member": "$t(organization.members.roles.member)"
+        },
+        "memberRole": "{{email}}: {{change}}",
+        "memberAdded": "{{email}} کو {{role}} کے طور پر شامل کیا گیا",
+        "memberRemoved": "{{email}} کو ہٹایا گیا",
+        "memberParentAdded": "{{email}} کو بنیادی تنظیم {{parent}} سے شامل کیا گیا",
+        "memberParentRemoved": "{{email}} کو بنیادی تنظیم {{parent}} سے ہٹایا گیا",
+        "inviteSent": "{{email}} بطور {{role}}",
+        "inviteRevoked": "{{email}} کی دعوت منسوخ کی گئی",
+        "inviteAccepted": "{{email}} کی دعوت قبول ہوئی",
+        "groupIdentity": "گروپ “{{name}}”",
+        "groupMembers": "گروپ “{{name}}”: {{members}}",
+        "groupMemberGroups": "{{displayCount}} گروپس",
+        "groupMemberGroups_one": "{{displayCount}} گروپ",
+        "groupMemberGroups_other": "{{displayCount}} گروپس",
+        "groupMemberGroupsOf": "{{email}}: {{displayCount}} گروپس",
+        "groupMemberGroupsOf_one": "{{email}}: {{displayCount}} گروپ",
+        "groupMemberGroupsOf_other": "{{email}}: {{displayCount}} گروپس",
+        "groupPolicySet": "گروپ “{{name}}”: {{policy}} پالیسی مقرر کی گئی",
+        "groupPolicyRemoved": "گروپ “{{name}}”: {{policy}} پالیسی ہٹائی گئی",
+        "groupDefaultPolicySet": "ڈیفالٹ {{policy}} پالیسی مقرر کی گئی",
+        "groupDefaultPolicyRemoved": "ڈیفالٹ {{policy}} پالیسی ہٹائی گئی",
+        "guardrailIdentity": "{{type}} \"{{name}}\"",
+        "guardrailStatus": "{{type}} \"{{name}}\" {{state}}",
+        "guardrailConfig": "مصنوعی ذہانت گارڈ ریلز {{state}}",
+        "guardrailConfigGroup": "گروپ “{{group}}” کے لیے {{state}}",
+        "guardrailEnforcement": "{{target}}: {{value}}",
+        "guardrailSkill": "{{target}}: {{values}}",
+        "guardrailTarget": {
+          "mcp": "$t(profiles.mcp.title)",
+          "skill": "$t(profiles.skillsTitle)"
+        },
+        "ssoDomainSet": "SSO ڈومین {{domain}}",
+        "ssoDomainChanged": "{{domain}} (پہلے {{previous}} تھا)",
+        "ssoDomainRemoved": "SSO ڈومین {{domain}} ہٹایا گیا",
+        "fundsPurchased": "{{amount}} بذریعہ {{method}}",
+        "fundsGranted": "{{amount}}",
+        "fundsDistributed": "{{displayCount}} ذیلی تنظیموں کو {{amount}}",
+        "fundsDistributed_one": "{{displayCount}} ذیلی تنظیم کو {{amount}}",
+        "fundsDistributed_other": "{{displayCount}} ذیلی تنظیموں کو {{amount}}",
+        "fundsReceived": "{{parent}} سے {{amount}}",
+        "reviewAgentPlatform": "{{platform}}",
+        "reviewAgentConfig": "{{platform}} کنفیگریشن",
+        "reviewAgentConfigStyle": "{{platform}}: جائزے کا انداز {{style}}",
+        "reviewAgentSecretsUpdated": "{{displayCount}} اپ ڈیٹ شدہ",
+        "reviewAgentSecretsUpdated_one": "{{displayCount}} اپ ڈیٹ شدہ",
+        "reviewAgentSecretsUpdated_other": "{{displayCount}} اپ ڈیٹ شدہ",
+        "reviewAgentSecretsFailed": "{{displayCount}} غلطیاں",
+        "reviewAgentSecretsFailed_one": "{{displayCount}} غلطی",
+        "reviewAgentSecretsFailed_other": "{{displayCount}} غلطیاں",
+        "reviewAgentSecretRotated": "{{values}}",
+        "settingAdvancedPolicies": "{{values}}",
+        "settingAdvancedPoliciesOpenRouter": "OpenRouter {{state}}",
+        "settingAdvancedPoliciesRegion": "انفرنس کا خطہ: {{region}}",
+        "settingDefaultModelSet": "{{next}}",
+        "settingDefaultModelRemoved": "{{previous}}",
+        "settingAutoRoute": "موڈ “{{mode}}”: {{change}}",
+        "settingDefaultBehavior": {
+          "global": "عالمی ڈیفالٹ",
+          "specific": "{{model}}",
+          "auto": "$t(models.auto.organization)"
+        },
+        "settingDataCollection": "{{mode}}",
+        "dataCollection": {
+          "allowed": "اجازت شدہ",
+          "denied": "انکار شدہ",
+          "followSetting": "ایکسٹینشن کی ترتیب کی پیروی کرتا ہے"
+        },
+        "region": {
+          "us": "$t(organizationModelAccess.region.us)",
+          "eu": "$t(organizationModelAccess.region.eu)",
+          "au": "$t(organizationModelAccess.region.au)",
+          "jp": "$t(organizationModelAccess.region.jp)"
+        },
+        "settingProjectsUi": "پروجیکٹ UI {{state}}",
+        "settingMinimumBalanceOn": "{{threshold}} برائے {{emails}}",
+        "settingMinimumBalanceThreshold": "{{threshold}}",
+        "settingRecommendationsDigest": "سفارشات کا ڈائجسٹ {{state}}",
+        "settingBrowserControl": "{{policy}}",
+        "settingBrowserControlOrigins": "{{policy}}: {{origins}}",
+        "settingBrowserControlOriginsCleared": "{{policy}}: کوئی اجازت شدہ اوریجن نہیں",
+        "settingName": "{{previous}} سے {{next}} میں نام تبدیل کیا گیا",
+        "enabled": "$t(common.enabled)",
+        "scanBeforeUseOn": "استعمال سے پہلے اسکین فعال",
+        "scanBeforeUseOff": "استعمال سے پہلے اسکین غیر فعال",
+        "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingRemoved": "ہٹائے گئے: {{models}}",
+        "browserPolicyOff": "براؤزر کا استعمال مسدود",
+        "browserPolicyAllow": "صرف اجازت شدہ اوریجنز",
+        "browserPolicyPlaywrightOnly": "صرف براؤزر کا استعمال",
+        "disabled": "$t(common.disabled)",
+        "autoRouting": "ماڈل تبدیل ہوئے: {{values}}",
+        "integrationConnected": "{{integration}} منسلک",
+        "integrationDisconnected": "{{integration}} منقطع",
+        "integrationRefreshed": "{{integration}} تازہ شدہ",
+        "integrationCancelled": "{{integration}} منسوخ",
+        "integrationModelUpdated": "{{integration}}: ماڈل {{model}}",
+        "integrationKeyAdded": "{{provider}} کے لیے API کلید شامل کی گئی",
+        "integrationKeyUpdated": "{{provider}} کے لیے API کلید اپ ڈیٹ کی گئی",
+        "integrationKeyDeleted": "{{provider}} کے لیے API کلید ہٹائی گئی",
+        "integrationKeyToggled": "{{provider}} کے لیے API کلید: {{state}}",
+        "namedPolicyCreated": "{{kind}} پالیسی {{id}} بنائی گئی",
+        "namedPolicyUpdated": "{{kind}} پالیسی {{id}} اپ ڈیٹ کی گئی",
+        "namedPolicyDeleted": "{{kind}} پالیسی {{id}} ہٹائی گئی",
+        "namedPolicyLinked": "{{kind}} پالیسی {{next}} سے منسلک کی گئی",
+        "webhookTriggerUpdated": "ٹرگر {{trigger}}",
+        "organizationRenamed": "تنظیم کا نام {{previous}} سے {{next}} میں تبدیل کیا گیا",
+        "brand": {
+          "github": "$t(common.github)",
+          "gitlab": "$t(common.gitlab)",
+          "bitbucket": "$t(agentChat.repoPicker.platformBitbucket)",
+          "discord": "$t(profile.providerDiscord)",
+          "slack": "$t(agentChat.sessionFilter.platformSlack)",
+          "linear": "$t(agentChat.sessionFilter.platformLinear)",
+          "byok": "اپنی API کلید"
+        }
       }
     },
     "billing": {
       "title": "بلنگ",
-      "permissionDenied": "صرف تنظیم کا مالک، ایڈمن یا بلنگ مینیجر ہی اس کی بلنگ دیکھ سکتا ہے۔",
+      "permissionDenied": "صرف تنظیم کا مالک، منتظم یا بلنگ مینیجر ہی اس کی بلنگ دیکھ سکتا ہے۔ $t(organization.boundary.accessDeniedDescription)",
       "subscription": "سبسکرپشن",
       "state": "حالت",
       "stateNone": "کوئی سبسکرپشن نہیں",
@@ -3577,7 +3724,7 @@
       "limitLabel": "حد (USD فی دن)",
       "memberNotFound": "رکن نہیں ملا۔",
       "noLimitPlaceholder": "کوئی حد نہیں",
-      "permissionDenied": "صرف تنظیم کا مالک یا ایڈمن استعمال کی حدوں کا انتظام کر سکتا ہے۔",
+      "permissionDenied": "صرف تنظیم کا مالک یا منتظم استعمال کی حدوں کا انتظام کر سکتا ہے۔",
       "removeLimit": "حد ہٹائیں",
       "title": "روزانہ استعمال کی حد",
       "blankError": "رقم درج کریں یا نیچے «حد ہٹائیں» پر ٹیپ کریں۔",
@@ -3638,7 +3785,7 @@
       "emptyDescription": "پہلے کی درخواستیں دیکھنے کے لیے پچھلا گھنٹہ استعمال کریں۔",
       "emptyBoundDescription": "درخواستوں کا ریکارڈ بس یہیں تک دستیاب ہے۔",
       "loadError": "درخواست لاگز لوڈ نہیں ہو سکے۔",
-      "permissionDenied": "صرف تنظیم کا مالک، ایڈمن یا بلنگ مینیجر ہی اس کے درخواست لاگز دیکھ سکتا ہے۔",
+      "permissionDenied": "صرف تنظیم کا مالک، منتظم یا بلنگ مینیجر ہی اس کے درخواست لاگز دیکھ سکتا ہے۔ $t(organization.boundary.accessDeniedDescription)",
       "tokens": "ان پٹ {{input}} · آؤٹ پٹ {{output}}",
       "byok": "BYOK"
     },
@@ -3908,7 +4055,10 @@
     "list": {
       "loadFailed": "چیٹ کی سرگزشت لوڈ نہیں ہو سکی۔",
       "new": "نئی چیٹ",
-      "deleteTitle": "یہ چیٹ حذف کریں؟"
+      "deleteTitle": "یہ چیٹ حذف کریں؟",
+      "resetNoticeTitle": "مقامی چیٹس اور مسودے صاف کر دیے گئے",
+      "resetNoticeBody": "Kilo اس ڈیوائس پر محفوظ چیٹ کی سرگزشت کو نہیں کھول سکا۔ آپ کے کلاؤڈ سیشنز متاثر نہیں ہوئے۔",
+      "resetNoticeDismiss": "اطلاع نظر انداز کریں"
     },
     "rename": {
       "title": "چیٹ کا نام تبدیل کریں",
@@ -3958,6 +4108,9 @@
       "fieldName": "دکھایا جانے والا نام",
       "fieldUrl": "سرور URL",
       "fieldUrlInvalid": "درست سرور URL درج کریں۔",
+      "fieldUrlCredentials": "URL سے صارف نام اور پاس ورڈ ہٹا دیں۔",
+      "fieldUrlFragment": "URL کا # والا حصہ ہٹا دیں۔",
+      "fieldUrlInsecure": "https URL درج کریں، یا صرف localhost کے لیے http درج کریں۔",
       "duplicateUrl": "یہ URL پہلے ہی محفوظ ہے۔",
       "serverNotFound": "یہ سرور اب مزید محفوظ نہیں ہے۔",
       "enableServer": "اس سرور کو فعال کریں: {{name}}",
@@ -3983,6 +4136,7 @@
       "app": {
         "label": "ٹول کا انٹرفیس",
         "failed": "اس ٹول کا انٹرفیس لوڈ نہیں ہو سکا۔",
+        "tooLarge": "اس ٹول کا انٹرفیس {{size}} کی حد سے بڑا ہے۔",
         "empty": "اس ٹول کے انٹرفیس میں دکھانے کے لیے کچھ نہیں ہے۔"
       }
     },
@@ -4735,7 +4889,7 @@
     "defaultModel": "Kilo کا ڈیفالٹ ماڈل استعمال کریں",
     "duration": "وقت کی حد (منٹ)",
     "spendLimit": "خرچ کی حد (USD)",
-    "invalidSafeguards": "مثبت اور محدود وقت اور خرچ کی حدیں درج کریں۔",
+    "invalidSafeguards": "اجازت شدہ حد کے اندر مثبت عدد درج کریں۔",
     "estimate": "تخمینہ {{estimate}} · زیادہ سے زیادہ {{maximum}}",
     "estimateUnavailable": "ان ترتیبات کے لیے ادائیگی والا خلاصہ دستیاب نہیں ہے۔ ماڈل یا حدود تبدیل کریں، یا بعد میں دوبارہ کوشش کریں۔",
     "confirmPaid": "{{context}} کے لیے ادائیگی والے خلاصے فعال کریں؟",
@@ -4805,7 +4959,8 @@
     "unavailableTitle": "استعمال دستیاب نہیں",
     "unavailableDescription": "اس ورک اسپیس کے لیے استعمال ترتیب نہیں دیا گیا۔ اگر آپ کو یہاں استعمال نظر آنے کی توقع ہے تو معاونت سے رابطہ کریں۔",
     "orgSelfNotice": "آپ اس تنظیم میں اپنا استعمال دیکھ رہے ہیں۔",
-    "viewDetails": "استعمال کی تفصیلات دیکھیں"
+    "viewDetails": "استعمال کی تفصیلات دیکھیں",
+    "orgSelfEntryTitle": "آپ کا استعمال"
   },
   "integrations": {
     "title": "انٹیگریشنز",
@@ -4901,6 +5056,8 @@
       "autoCommit": "رن مکمل ہونے پر تبدیلیاں کمٹ کریں",
       "condenseOnComplete": "رن مکمل ہونے پر سیاق و سباق مختصر کریں",
       "activeTitle": "ٹرگر فعال ہے",
+      "activeSwitchA11y": "فعال ٹرگر: {{name}}",
+      "copyLinkA11y": "{{name}} کے لیے لنک کاپی کریں",
       "activeDescription": "موقوف ویب ہکس 404 کے ساتھ جواب دیتے ہیں۔",
       "runAsCreator": "میرے طور پر چلائیں",
       "runAsCreatorDescription": "ہر رن آپ کے اکاؤنٹ سے ہوتا ہے، اس لیے سیکرٹ ہیڈر لازمی ہے۔",

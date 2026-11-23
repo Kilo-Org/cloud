@@ -469,6 +469,18 @@ const DISALLOWED_AUDIT_JSON_KEY_PHRASES = [
   'credential',
   'headers',
   'raw_error',
+  'passphrase',
+  'api_key',
+  'api_keys',
+  'private_key',
+  'private_keys',
+  'access_key',
+  'access_keys',
+  'signing_key',
+  'signing_keys',
+  'encryption_key',
+  'encryption_keys',
+  'pat',
 ] as const;
 
 const DISALLOWED_AUDIT_JSON_KEY_PATTERN = new RegExp(
@@ -481,6 +493,10 @@ for (const phrase of DISALLOWED_AUDIT_JSON_KEY_PHRASES) {
   DISALLOWED_AUDIT_JSON_KEY_TOKEN_PAIRS[phrase.replace(/_/g, '')] = true;
 }
 
+// A key built only from these tokens carries no qualifier. A qualified name
+// such as `dedupeKey` states what the key identifies and stays accepted.
+const BARE_AUDIT_JSON_KEY_TOKENS: Record<string, true> = { key: true, keys: true };
+
 function auditJsonKeyTokens(key: string): string[] {
   return key
     .replace(
@@ -492,10 +508,16 @@ function auditJsonKeyTokens(key: string): string[] {
     .map(token => token.toLowerCase());
 }
 
-function isDisallowedAuditJsonKey(key: string): boolean {
+export function isDisallowedAuditJsonKey(key: string): boolean {
   if (DISALLOWED_AUDIT_JSON_KEY_PATTERN.test(key)) return true;
 
-  const tokens = auditJsonKeyTokens(key);
+  // A digit run is not a qualifier: `key2` stays a bare name, and `api2Key`
+  // still states the same thing as `apiKey`. Strip digit runs once, then read
+  // both rules from the remaining words.
+  const tokens = auditJsonKeyTokens(key).filter(token => !/^[0-9]+$/.test(token));
+  if (tokens.length > 0 && tokens.every(token => BARE_AUDIT_JSON_KEY_TOKENS[token] === true)) {
+    return true;
+  }
   for (let index = 0; index < tokens.length; index += 1) {
     const single = DISALLOWED_AUDIT_JSON_KEY_TOKEN_PAIRS[tokens[index]] === true;
     const pair =

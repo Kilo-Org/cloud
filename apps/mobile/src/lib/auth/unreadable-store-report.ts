@@ -33,11 +33,6 @@ export function forgetUnreadableStoreReports(): void {
   reportedStatuses.clear();
 }
 
-/**
- * Report one stored payload this build cannot interpret, at most once per
- * process: the first read of a state claims its report and every later read of
- * the same state is silent.
- */
 export function reportUnreadableStore(status: UnreadableStoreStatus): void {
   if (reportedStatuses.has(status)) {
     return;

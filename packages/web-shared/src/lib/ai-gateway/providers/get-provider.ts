@@ -532,6 +532,13 @@ export type GetProviderInput = {
   organizationId: string | undefined;
   /** The platform caller for a service run; see `OpenAiChatGptRoutingInput`. */
   botId?: string | undefined;
+  /**
+   * Serve only the route Kilo pays for: no stored key, no ChatGPT connection, no Claude
+   * billing connection, no partner route. A measurement run needs one identical transport for
+   * every payer, and a payer's own key would both change what is measured and bill a
+   * different account. Organization model and provider policy still apply.
+   */
+  managedRoutesOnly?: boolean;
   /** The provider routing settings, from the organization or group policy and otherwise the
    * request's own `provider`. Decides whether the Vercel AI Gateway key serves and which gateway
    * Kilo's route uses. Direct BYOK and custom LLM routes do not use it. */
@@ -597,6 +604,28 @@ type ByokSkippedKey = { providerId: UserByokProviderId; reason: ByokCandidateSki
  * key metadata; only the key that takes the request is decrypted, and the ChatGPT connection is
  * read only when routing reaches it.
  */
+/**
+ * Kilo's own route for a managed-only call. It keeps the gateway choice the organization's
+ * settings imply and never reaches a partner route, so every payer of a case is measured on the
+ * same transport with the same effort.
+ */
+async function kiloRouteFor(
+  input: GetProviderInput,
+  requestedModel: string
+): Promise<GetProviderResult> {
+  const { kiloIgnoredProviders = [], boundedSpending = false, openRouterDisabled = false } = input;
+  const routesToVercel = await shouldRouteToVercel(
+    { requestedModel, boundedSpending, openRouterDisabled },
+    async () => withIgnoredProviders(await input.getRoutingProviderConfig(), kiloIgnoredProviders)
+  );
+  return servedBy({
+    provider: routesToVercel ? VERCEL_AI_GATEWAY : OPENROUTER,
+    userByok: null,
+    isFree: isFreeModel(requestedModel),
+    bypassAccessCheck: false,
+  });
+}
+
 async function selectProvider(
   input: GetProviderInput,
   decision: RoutingDecisionRecorder
@@ -627,6 +656,12 @@ async function selectProvider(
     );
   }
   decision.step({ step: 'custom-llm', outcome: 'skipped', reason: 'no-match' });
+  if (input.managedRoutesOnly) {
+    // A measurement run must use one identical transport for every payer: no stored key, no
+    // ChatGPT connection, no Claude billing connection, no partner route. Straight to Kilo's
+    // own route, whose organization policy still applies.
+    return kiloRouteFor(input, requestedModel);
+  }
   if (model.kind === 'direct-byok-model') {
     const result = await resolveDirectByokModel(model.provider, model.model, input, decision);
     if (result) return result;

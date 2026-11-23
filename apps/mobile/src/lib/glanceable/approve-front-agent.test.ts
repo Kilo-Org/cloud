@@ -400,10 +400,6 @@ describe('approveFrontAgent', () => {
 
 describe('frontApprovalListInput', () => {
   it('reads the same cloud-inclusive tray list the glanceable snapshot is derived from', () => {
-    // The `needsApproval` count that gates the wrist control is built from the
-    // tray list, cloud-agent rows included; the picker must query that same
-    // list or a cloud-agent permission row would offer an Approve the picker
-    // cannot answer.
     expect(frontApprovalListInput('org-1')).toEqual({
       organizationId: 'org-1',
       includeCloudAgentSessions: true,

@@ -55,6 +55,11 @@ export const EnkryptUsageWriteSchema = z.strictObject({
   kiloUserId: z.string().min(1),
   sessionId: z.string().nullable(),
   microdollarUsageId: z.uuid().optional(),
+  /**
+   * The call belongs to an authenticated benchmark case. Optional so a gateway or web app
+   * deployed before the field stays compatible.
+   */
+  benchmarkCase: z.boolean().optional(),
   apiKind: EnkryptApiKindSchema,
   decision: z.enum(['allowed', 'blocked', 'error']),
   creditsCost: z.number().nonnegative().max(MAX_ENKRYPT_CREDITS_PER_CALL).nullable(),

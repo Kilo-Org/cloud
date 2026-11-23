@@ -201,11 +201,6 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
   // Reactive snapshot of the module auth epoch, advanced synchronously at the
   // start of sign-in and sign-out so a subscriber can resubscribe on the bump.
   const [authEpoch, setAuthEpoch] = useState(() => currentAuthEpoch());
-  // Reactive view of the one sign-out flag the cache write fence also reads.
-  // `setSignOutActive` flips it synchronously at the start of sign-out (same
-  // render as the epoch bump) so the read-cache mount cannot resubscribe while
-  // the old user id is still cached; it is cleared only after a sign-in's
-  // credential publication succeeds.
   const isSigningOut = useSyncExternalStore(subscribeSignOutActive, isSignOutActive);
   const isSignedOutReference = useRef(false);
 
@@ -329,6 +324,18 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           // sign-in in flight owns the index instead and fires its own clear,
           // so the epoch and sign-out fences hold here as for every other
           // publish in this bootstrap.
+          // The clear of the launcher surfaces also drops the Quick Action URL
+          // a cold start parks natively, and the sign-in path is that URL's
+          // only staging reader. Take the destination that names no account
+          // first and stage it for the sign-in that follows, so a tap on the
+          // New agent action while signed out still lands where it points; the
+          // same take drops an account-bound URL the clear would have dropped.
+          const parkedLaunchUrl = takeAccountIndependentLaunchUrl();
+          const parkedLaunchHref =
+            parkedLaunchUrl === null ? null : resolveIncomingUrl(parkedLaunchUrl);
+          if (parkedLaunchHref !== null && getPendingDeepLinkSnapshot() === null) {
+            setPendingDeepLink(parkedLaunchHref, 'universal-link');
+          }
           clearSystemSearchIndexOnSignedOutLaunch();
           // The account is now known to be none: a system-search destination
           // captured before this point is not this process's to open, so the

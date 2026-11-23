@@ -5,8 +5,10 @@
 // whole queue is retained.
 //
 // Disable lifetime: bad-request clears on event/summary change; forbidden
-// stays for the rest of the sheet session. Toasts paint behind formSheets
-// on iOS, so the mutation hook toasts onError AND the sheet shows inline.
+// stays for the rest of the sheet session; reconnect clears when the reconnect
+// notice's connection check confirms the provider can serve this request.
+// Toasts paint behind formSheets on iOS, so the mutation hook toasts onError
+// AND the sheet shows inline.
 
 import * as Haptics from 'expo-haptics';
 import { notificationHaptic, selectionHaptic } from '@/lib/haptics';
@@ -25,6 +27,7 @@ import {
 
 import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
 import { useFeedbackPromptRequest } from '@/components/use-feedback-prompt';
+import { useLatestRef } from '@/components/agents/use-latest-ref';
 import { cn } from '@/lib/utils';
 
 import {
@@ -208,6 +211,10 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
   // Same union the display helper returns, so a new display kind can never
   // silently drift from this surface's state.
   const [inlineErrorKind, setInlineErrorKind] = useState<MutationErrorDisplayKind | null>(null);
+  // The connection check settles after the render that started it, so clearing
+  // the latch reads the live kind through this ref rather than the closure the
+  // notice captured when it was pressed.
+  const inlineErrorKindRef = useLatestRef(inlineErrorKind);
   const [partialResult, setPartialResult] = useState<string | null>(null);
 
   const bodyRef = useRef<string>('');
@@ -297,6 +304,17 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
       setInlineError(null);
       setInlineErrorKind(null);
     }
+  }
+
+  function clearReconnectError() {
+    // Only a connection check clears this latch, and only while it is still
+    // what the sheet is showing: a check that settles after a newer attempt
+    // failed for another reason must not wipe that newer failure.
+    if (inlineErrorKindRef.current !== 'reconnect') {
+      return;
+    }
+    setInlineError(null);
+    setInlineErrorKind(null);
   }
 
   async function handleSubmit() {
@@ -534,7 +552,7 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
                   announcement on both platforms. The notice below keeps the
                   Check connection retry CTA. */}
               <AccessibleStatus message={inlineError} tone="status" className="text-xs" />
-              <PrReviewReconnectNotice />
+              <PrReviewReconnectNotice onConnectionRestored={clearReconnectError} />
             </>
           ) : null}
         </View>

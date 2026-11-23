@@ -1,10 +1,14 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { Provider, atom, createStore } from 'jotai';
+import type { UnreadableQuestionState } from '@kilocode/cloud-agent-sdk';
 import type { ToolPart } from './types';
 import { QuestionToolStatus } from './QuestionToolStatus';
 
+const mockManagerHolder: { current: unknown } = { current: null };
+
 jest.mock('./CloudAgentProvider', () => ({
-  useOptionalManager: () => null,
+  useOptionalManager: () => mockManagerHolder.current,
 }));
 jest.mock('./ToolCardShell', () => ({
   ToolCardShell: ({ title, subtitle }: { title: string; subtitle?: React.ReactNode }) =>
@@ -154,4 +158,55 @@ it('uses owner activity changes with an unchanged running question and no mutati
     expect(html).not.toContain('<button');
     expect(html).not.toContain('<input');
   }
+});
+
+describe('QuestionToolStatus with a live manager', () => {
+  beforeEach(() => {
+    mockManagerHolder.current = null;
+  });
+
+  afterEach(() => {
+    mockManagerHolder.current = null;
+  });
+
+  function renderWithManager(unreadableQuestions: UnreadableQuestionState[]): string {
+    const store = createStore();
+    const activeQuestionAtom = atom(null);
+    const isStreamingAtom = atom(false);
+    const unreadableQuestionsAtom = atom<UnreadableQuestionState[]>(unreadableQuestions);
+    store.set(activeQuestionAtom, null);
+    store.set(isStreamingAtom, false);
+    store.set(unreadableQuestionsAtom, unreadableQuestions);
+    mockManagerHolder.current = {
+      atoms: {
+        activeQuestion: activeQuestionAtom,
+        isStreaming: isStreamingAtom,
+        unreadableQuestions: unreadableQuestionsAtom,
+      },
+    };
+    return renderToStaticMarkup(
+      React.createElement(
+        Provider,
+        { store },
+        React.createElement(QuestionToolStatus, {
+          toolPart: makeQuestionPart('pending'),
+          presentation: 'live',
+        })
+      )
+    );
+  }
+
+  it('waits instead of reporting an interruption for an unreadable question request', () => {
+    const html = renderWithManager([{ requestId: 'que-1' }]);
+
+    expect(html).toContain('Waiting for answer');
+    expect(html).not.toContain('Question interrupted');
+  });
+
+  it('still reports an interruption when no unreadable request is pending', () => {
+    const html = renderWithManager([]);
+
+    expect(html).toContain('Question interrupted');
+    expect(html).not.toContain('Waiting for answer');
+  });
 });

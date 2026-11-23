@@ -400,7 +400,7 @@
       "title": "Ključevi pružalaca",
       "rowSubtitle": "Koristi naplatu vlastitog pružaoca",
       "orgDescription": "Ovi ključevi se dijele sa svima u organizaciji i naplaćuju se na njene naloge kod pružalaca.",
-      "viewOnly": "Samo vlasnik organizacije, administrator ili menadžer naplate može mijenjati njene ključeve.",
+      "viewOnly": "Samo vlasnik organizacije, administrator ili menadžer za naplatu može mijenjati njene ključeve.",
       "description": "Zahtjevi putem ovih ključeva naplaćuju se na tvoj nalog kod pružaoca umjesto s tvog Kilo salda.",
       "managedByPlan": "Upravlja tvoj plan za kodiranje",
       "enableKey": "Omogući ključ za {{provider}}",
@@ -1266,6 +1266,7 @@
     "needsInputAction": {
       "approved": "Zahtjev je odobren",
       "replied": "Odgovor je poslan",
+      "empty": "Napišite odgovor, a zatim ga pošaljite.",
       "failed": "Nije uspjelo odgovoriti. Dodirnite ponovo da pokušate.",
       "unavailable": "Ovaj zahtjev više ne čeka."
     }
@@ -1530,7 +1531,9 @@
       "githubError": "Nije moguće otvoriti podešavanje GitHuba. Pokušaj ponovo.",
       "gitlabAccount": "GitLab račun",
       "gitlabError": "Nije moguće otvoriti podešavanje GitLaba. Pokušaj ponovo.",
-      "description": "Poveži Kilo {{label}} za automatski pregled zahtjeva za spajanje."
+      "description": "Poveži Kilo {{label}} za automatski pregled zahtjeva za spajanje.",
+      "notConnectedTitle": "{{platform}} nije povezan",
+      "githubAdminOnlyDescription": "Samo vlasnici organizacije i administratori mogu je povezati."
     },
     "overview": {
       "allAreas": "Sva područja",
@@ -2300,6 +2303,7 @@
       "couldNotLoadThisSession": "Nije moguće učitati ovu sesiju.",
       "historyTooLarge": "Prijepis ove sesije je prevelik za učitavanje.",
       "historyUnavailable": "Prijepis ove sesije se ne može pročitati.",
+      "historyTemporarilyUnavailable": "Prijepis ove sesije je privremeno nedostupan.",
       "cloneFailedRetry": "Nije moguće klonirati ovu sesiju. Pokušaj ponovo.",
       "notEnoughCredits": "Nema dovoljno kredita za ovaj zahtjev. Dodaj kredite i pokušaj ponovo.",
       "previousTaskFinishing": "Prethodni zadatak se još završava. Sačekaj trenutak.",
@@ -2840,7 +2844,9 @@
       "skip": "Preskoči",
       "retrySkip": "Pokušaj ponovo preskočiti",
       "submitting": "Slanje…",
-      "sendAnswers": "Pošalji odgovore"
+      "sendAnswers": "Pošalji odgovore",
+      "unreadableTitle": "Ovo pitanje nije moguće prikazati",
+      "unreadableBody": "Agent čeka na pitanje koje ova aplikacija ne može prikazati. Odgovorite na pitanje u CLI-ju da biste nastavili."
     },
     "blockingCard": {
       "questionUnavailable": "Ovo pitanje više nije dostupno.",
@@ -2867,6 +2873,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Nije moguće učitati sesiju podagenta.",
+      "historyTooLarge": "Historija ovog podagenta je prevelika za učitavanje.",
+      "historyUnavailable": "Historija ovog podagenta nije dostupna.",
+      "historyTemporarilyUnavailable": "Historija ovog podagenta je privremeno nedostupna.",
       "failed": "Sesija podagenta nije uspjela.",
       "noMessages": "Nema poruka podagenta",
       "noMessagesDescription": "Ova sesija podagenta je završena bez transkripta.",
@@ -3455,6 +3464,8 @@
     "voiceTranscriptionWho": "Tvoj uređaj, Kilo Gateway s modelom za transkripciju koji odabereš ili Apple ili Google za prepoznavanje na mreži.",
     "installAttributionPromptTitle": "Dozvoliti praćenje izvora instalacije?",
     "installAttributionPromptMessage": "Kilo koristi dozvolu kompanije Apple za praćenje samo da sazna kojim kanalom dolaziš. Tvoji upiti i razgovori nikada se ne koriste u tu svrhu.",
+    "installAttributionRequestFailedTitle": "Nije moguće prikazati zahtjev za praćenje",
+    "installAttributionRequestFailedMessage": "Kilo nije mogao prikazati sistemski zahtjev, pa praćenje izvora instalacije ostaje isključeno.",
     "what": "Šta",
     "why": "Zašto",
     "who": "Ko"
@@ -3470,7 +3481,7 @@
   "organization": {
     "auditLog": {
       "title": "Revizijski zapisnik",
-      "permissionDenied": "Revizijski zapisnik organizacije na planu Enterprise mogu čitati samo njen vlasnik, administrator ili menadžer naplate.",
+      "permissionDenied": "Revizijski zapisnik organizacije na planu Enterprise mogu čitati samo njen vlasnik, administrator ili menadžer za naplatu. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Nema revizijskih događaja",
       "emptyDescription": "Ovdje se prikazuju radnje izvršene u ovoj organizaciji.",
       "truncated": "Prikazuju se najnoviji događaji.",
@@ -3520,11 +3531,152 @@
         "guardrailUpdate": "Zaštitno ograničenje ažurirano",
         "guardrailRemove": "Zaštitno ograničenje uklonjeno",
         "unknown": "Revizijski događaj"
+      },
+      "detail": {
+        "fieldChange": "{{field}}: {{change}}",
+        "modeIdentity": "Način rada \"{{name}}\" (identifikator: {{slug}})",
+        "modeUpdate": "Način rada \"{{name}}\": {{changes}}",
+        "field": {
+          "name": "$t(organization.modes.nameLabel)",
+          "slug": "$t(organization.modes.identifierLabel)",
+          "roleDefinition": "$t(organization.modes.roleLabel)",
+          "whenToUse": "$t(organization.modes.whenToUseLabel)",
+          "description": "$t(organization.modes.descriptionLabel)",
+          "customInstructions": "$t(codeReviewer.instructions.title)",
+          "groups": "$t(profiles.agents.tools)",
+          "autoRoute": "Automatsko usmjeravanje",
+          "defaultModel": "Zadani model"
+        },
+        "role": {
+          "owner": "$t(organization.members.roles.owner)",
+          "admin": "$t(organization.members.roles.admin)",
+          "billing_manager": "$t(organization.members.roles.billingManager)",
+          "member": "$t(organization.members.roles.member)"
+        },
+        "memberRole": "{{email}}: {{change}}",
+        "memberAdded": "Dodan {{email}} kao {{role}}",
+        "memberRemoved": "Uklonjen {{email}}",
+        "memberParentAdded": "Dodan {{email}} iz matične organizacije {{parent}}",
+        "memberParentRemoved": "Uklonjen {{email}} iz matične organizacije {{parent}}",
+        "inviteSent": "{{email}} kao {{role}}",
+        "inviteRevoked": "Pozivnica povučena za {{email}}",
+        "inviteAccepted": "Prihvaćen {{email}}",
+        "groupIdentity": "Grupa \"{{name}}\"",
+        "groupMembers": "Grupa \"{{name}}\": {{members}}",
+        "groupMemberGroups": "{{displayCount}} grupe",
+        "groupMemberGroups_few": "{{displayCount}} grupe",
+        "groupMemberGroups_one": "{{displayCount}} grupa",
+        "groupMemberGroups_other": "{{displayCount}} grupe",
+        "groupMemberGroupsOf": "{{email}}: {{displayCount}} grupe",
+        "groupMemberGroupsOf_few": "{{email}}: {{displayCount}} grupe",
+        "groupMemberGroupsOf_one": "{{email}}: {{displayCount}} grupa",
+        "groupMemberGroupsOf_other": "{{email}}: {{displayCount}} grupe",
+        "groupPolicySet": "Grupa \"{{name}}\": postavljena politika {{policy}}",
+        "groupPolicyRemoved": "Grupa \"{{name}}\": uklonjena politika {{policy}}",
+        "groupDefaultPolicySet": "Postavljena zadana politika {{policy}}",
+        "groupDefaultPolicyRemoved": "Uklonjena zadana politika {{policy}}",
+        "guardrailIdentity": "{{type}} \"{{name}}\"",
+        "guardrailStatus": "{{type}} \"{{name}}\" {{state}}",
+        "guardrailConfig": "AI zaštitna ograničenja {{state}}",
+        "guardrailConfigGroup": "{{state}} za grupu \"{{group}}\"",
+        "guardrailEnforcement": "{{target}}: {{value}}",
+        "guardrailSkill": "{{target}}: {{values}}",
+        "guardrailTarget": {
+          "mcp": "$t(profiles.mcp.title)",
+          "skill": "$t(profiles.skillsTitle)"
+        },
+        "ssoDomainSet": "SSO domena {{domain}}",
+        "ssoDomainChanged": "{{domain}} (bila {{previous}})",
+        "ssoDomainRemoved": "Uklonjena SSO domena {{domain}}",
+        "fundsPurchased": "{{amount}} putem {{method}}",
+        "fundsGranted": "{{amount}}",
+        "fundsDistributed": "{{amount}} na {{displayCount}} podorganizacije",
+        "fundsDistributed_few": "{{amount}} na {{displayCount}} podorganizacije",
+        "fundsDistributed_one": "{{amount}} na {{displayCount}} podorganizaciju",
+        "fundsDistributed_other": "{{amount}} na {{displayCount}} podorganizacije",
+        "fundsReceived": "{{amount}} od {{parent}}",
+        "reviewAgentPlatform": "{{platform}}",
+        "reviewAgentConfig": "{{platform}} konfiguracija",
+        "reviewAgentConfigStyle": "{{platform}}: stil {{style}}",
+        "reviewAgentSecretsUpdated": "{{displayCount}} ažurirano",
+        "reviewAgentSecretsUpdated_few": "{{displayCount}} ažurirano",
+        "reviewAgentSecretsUpdated_one": "{{displayCount}} ažurirano",
+        "reviewAgentSecretsUpdated_other": "{{displayCount}} ažurirano",
+        "reviewAgentSecretsFailed": "{{displayCount}} grešaka",
+        "reviewAgentSecretsFailed_few": "{{displayCount}} greške",
+        "reviewAgentSecretsFailed_one": "{{displayCount}} greška",
+        "reviewAgentSecretsFailed_other": "{{displayCount}} grešaka",
+        "reviewAgentSecretRotated": "{{values}}",
+        "settingAdvancedPolicies": "{{values}}",
+        "settingAdvancedPoliciesOpenRouter": "OpenRouter {{state}}",
+        "settingAdvancedPoliciesRegion": "Regija inferencije: {{region}}",
+        "settingDefaultModelSet": "{{next}}",
+        "settingDefaultModelRemoved": "{{previous}}",
+        "settingAutoRoute": "Način rada \"{{mode}}\": {{change}}",
+        "settingDefaultBehavior": {
+          "global": "Globalno zadano",
+          "specific": "{{model}}",
+          "auto": "$t(models.auto.organization)"
+        },
+        "settingDataCollection": "{{mode}}",
+        "dataCollection": {
+          "allowed": "Dozvoljeno",
+          "denied": "Zabranjeno",
+          "followSetting": "Prati postavku ekstenzije"
+        },
+        "region": {
+          "us": "$t(organizationModelAccess.region.us)",
+          "eu": "$t(organizationModelAccess.region.eu)",
+          "au": "$t(organizationModelAccess.region.au)",
+          "jp": "$t(organizationModelAccess.region.jp)"
+        },
+        "settingProjectsUi": "Projects UI {{state}}",
+        "settingMinimumBalanceOn": "{{threshold}} na {{emails}}",
+        "settingMinimumBalanceThreshold": "{{threshold}}",
+        "settingRecommendationsDigest": "Sažetak preporuka {{state}}",
+        "settingBrowserControl": "{{policy}}",
+        "settingBrowserControlOrigins": "{{policy}}: {{origins}}",
+        "settingBrowserControlOriginsCleared": "{{policy}}: nema dozvoljenih izvora",
+        "settingName": "Preimenovano iz {{previous}} u {{next}}",
+        "enabled": "$t(common.enabled)",
+        "scanBeforeUseOn": "Skeniranje prije upotrebe omogućeno",
+        "scanBeforeUseOff": "Skeniranje prije upotrebe onemogućeno",
+        "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingRemoved": "Uklonjeno: {{models}}",
+        "browserPolicyOff": "Korištenje preglednika blokirano",
+        "browserPolicyAllow": "Samo dozvoljeni izvori",
+        "browserPolicyPlaywrightOnly": "Samo korištenje preglednika",
+        "disabled": "$t(common.disabled)",
+        "autoRouting": "Modeli promijenjeni: {{values}}",
+        "integrationConnected": "{{integration}} povezan",
+        "integrationDisconnected": "{{integration}} odspojen",
+        "integrationRefreshed": "{{integration}} osvježen",
+        "integrationCancelled": "{{integration}} otkazan",
+        "integrationModelUpdated": "{{integration}}: AI model {{model}}",
+        "integrationKeyAdded": "Dodan ključ za {{provider}}",
+        "integrationKeyUpdated": "Ažuriran ključ za {{provider}}",
+        "integrationKeyDeleted": "Uklonjen ključ za {{provider}}",
+        "integrationKeyToggled": "Ključ za {{provider}}: {{state}}",
+        "namedPolicyCreated": "Kreirana {{kind}} politika {{id}}",
+        "namedPolicyUpdated": "Ažurirana {{kind}} politika {{id}}",
+        "namedPolicyDeleted": "Uklonjena {{kind}} politika {{id}}",
+        "namedPolicyLinked": "Povezana {{kind}} politika {{next}}",
+        "webhookTriggerUpdated": "Okidač {{trigger}}",
+        "organizationRenamed": "Organizacija preimenovana iz {{previous}} u {{next}}",
+        "brand": {
+          "github": "$t(common.github)",
+          "gitlab": "$t(common.gitlab)",
+          "bitbucket": "$t(agentChat.repoPicker.platformBitbucket)",
+          "discord": "$t(profile.providerDiscord)",
+          "slack": "$t(agentChat.sessionFilter.platformSlack)",
+          "linear": "$t(agentChat.sessionFilter.platformLinear)",
+          "byok": "Vlastiti API ključ"
+        }
       }
     },
     "billing": {
       "title": "Naplata",
-      "permissionDenied": "Naplatu mogu vidjeti samo vlasnik, administrator ili menadžer naplate organizacije.",
+      "permissionDenied": "Naplatu mogu vidjeti samo vlasnik, administrator ili menadžer za naplatu organizacije. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Pretplata",
       "state": "Status",
       "stateNone": "Nema pretplate",
@@ -3701,7 +3853,7 @@
       "emptyDescription": "Odaberite Raniji sat da biste vidjeli ranije zahtjeve.",
       "emptyBoundDescription": "Zapisi zahtjeva ne sežu dalje u prošlost.",
       "loadError": "Učitavanje zapisnika zahtjeva nije uspjelo.",
-      "permissionDenied": "Zapisnike zahtjeva organizacije mogu čitati samo njen vlasnik, administrator ili menadžer naplate.",
+      "permissionDenied": "Zapisnike zahtjeva organizacije mogu čitati samo njen vlasnik, administrator ili menadžer za naplatu. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "Ulaz: {{input}} · Izlaz: {{output}}",
       "byok": "BYOK"
     },
@@ -3981,7 +4133,10 @@
     "list": {
       "loadFailed": "Nije moguće učitati istoriju razgovora.",
       "new": "Novi razgovor",
-      "deleteTitle": "Izbrisati ovaj razgovor?"
+      "deleteTitle": "Izbrisati ovaj razgovor?",
+      "resetNoticeTitle": "Lokalni razgovori i nacrti su izbrisani",
+      "resetNoticeBody": "Kilo nije mogao otvoriti razgovore sačuvane na ovom uređaju. Vaše sesije u oblaku nisu pogođene.",
+      "resetNoticeDismiss": "Odbaci obavještenje"
     },
     "rename": {
       "title": "Preimenuj razgovor",
@@ -4031,6 +4186,9 @@
       "fieldName": "Prikazano ime",
       "fieldUrl": "URL servera",
       "fieldUrlInvalid": "Unesite važeći URL servera.",
+      "fieldUrlCredentials": "Uklonite korisničko ime i lozinku iz URL-a.",
+      "fieldUrlFragment": "Uklonite dio URL-a sa znakom #.",
+      "fieldUrlInsecure": "Unesite https URL, ili http samo za localhost.",
       "duplicateUrl": "Taj URL je već sačuvan.",
       "serverNotFound": "Ovaj server više nije sačuvan.",
       "enableServer": "Omogući ovaj server: {{name}}",
@@ -4057,6 +4215,7 @@
       "app": {
         "label": "Sučelje alata",
         "failed": "Sučelje ovog alata nije se moglo učitati.",
+        "tooLarge": "Sučelje ovog alata veće je od ograničenja od {{size}}.",
         "empty": "Sučelje ovog alata nema ništa za prikaz."
       }
     },
@@ -4819,7 +4978,7 @@
     "defaultModel": "Koristi zadani Kilo model",
     "duration": "Vremensko ograničenje (minute)",
     "spendLimit": "Ograničenje potrošnje (USD)",
-    "invalidSafeguards": "Unesite pozitivna, konačna ograničenja vremena i potrošnje.",
+    "invalidSafeguards": "Unesite pozitivan broj u dozvoljenom opsegu.",
     "estimate": "Procjena {{estimate}} · maksimalno {{maximum}}",
     "estimateUnavailable": "Plaćeni sažetak nije dostupan za ove postavke. Promijenite model ili ograničenja, ili pokušajte kasnije.",
     "confirmPaid": "Omogućiti plaćene sažetke za {{context}}?",
@@ -4894,7 +5053,8 @@
     "unavailableTitle": "Potrošnja nije dostupna",
     "unavailableDescription": "Potrošnja nije podešena za ovaj radni prostor. Obratite se podršci ako očekujete da ovdje vidite potrošnju.",
     "orgSelfNotice": "Vidite vlastitu potrošnju u ovoj organizaciji.",
-    "viewDetails": "Prikaži detalje potrošnje"
+    "viewDetails": "Prikaži detalje potrošnje",
+    "orgSelfEntryTitle": "Vaša potrošnja"
   },
   "integrations": {
     "title": "Integracije",
@@ -4990,6 +5150,8 @@
       "autoCommit": "Commitaj promjene kada se pokretanje završi",
       "condenseOnComplete": "Sažmi kontekst kada se pokretanje završi",
       "activeTitle": "Okidač aktivan",
+      "activeSwitchA11y": "Aktivni okidač: {{name}}",
+      "copyLinkA11y": "Kopiraj vezu za {{name}}",
       "activeDescription": "Pauzirani webhookovi vraćaju 404.",
       "runAsCreator": "Pokreni u moje ime",
       "runAsCreatorDescription": "Svako pokretanje koristi vaš račun, pa je zaglavlje s tajnom obavezno.",

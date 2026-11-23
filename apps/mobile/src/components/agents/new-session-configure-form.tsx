@@ -99,6 +99,7 @@ export function NewSessionConfigureForm({
   model,
   variant,
   modelOptions,
+  modelSelectionFailure = null,
   onChangeText,
   onModeChange,
   onModelSelect,
@@ -280,6 +281,7 @@ export function NewSessionConfigureForm({
           model={model}
           variant={variant}
           modelOptions={modelOptions}
+          modelSelectionFailure={modelSelectionFailure}
           onChangeText={onChangeText}
           onModeChange={onModeChange}
           onModelSelect={onModelSelect}

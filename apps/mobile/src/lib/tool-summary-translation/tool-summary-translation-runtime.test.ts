@@ -370,15 +370,6 @@ describe('tool summary translation runtime', () => {
     expect(requestMock).not.toHaveBeenCalled();
   });
 
-  /**
-   * Every unresolved row owns a retry timer, and each tick asks the runtime for
-   * its summary again. A summary parked behind the batch window or the in-flight
-   * cap is neither cached nor in flight, so a dedupe that knew only those two
-   * states would stack another copy of it on every tick: the queue would grow
-   * with the outage, and the copies would replay as extra store writes once a
-   * slot freed. The queue must hold one entry per summary however often a row
-   * asks.
-   */
   it('keeps one queue entry per summary however often a waiting row retries', async () => {
     const mod = await loadRuntime();
     mod.setConfig({ enabled: true, model: MODEL });
@@ -540,10 +531,6 @@ describe('tool summary translation hydration', () => {
   });
 
   it('does not seed the cache from a store read that settles after an account reset', async () => {
-    // Sign-out (or a direct account switch) can reset the memory while the
-    // store read is still in flight. The entries that read returns belong to
-    // the account the reset just dropped, so seeding them would repopulate the
-    // cache the reset cleared.
     const gate = Promise.withResolvers<StoreEntry[]>();
     readMock.mockImplementation(
       // eslint-disable-next-line typescript-eslint/promise-function-async -- the mock hands back a promise the test resolves later
@@ -671,8 +658,6 @@ describe('tool summary translation hydration', () => {
         translation: 'de:Alpha',
         storedAt: expect.any(Number),
       }),
-      // The auth epoch captured at dispatch, so a late write can remove itself
-      // after a sign-out or direct-switch scope clear.
       expect.any(Number)
     );
     expect(writeMock).toHaveBeenCalledWith(
@@ -1300,7 +1285,6 @@ describe('translation failure exhaustion', () => {
       language: 'de',
       model: MODEL,
     });
-    // eslint-disable-next-line no-await-in-loop -- each batch depends on the previous round's outcome.
     await flushBatch();
     expect(mod.isTranslationFailed('part-1', 'hello', 'de', MODEL.id)).toBe(false);
 
@@ -1346,7 +1330,6 @@ describe('translation failure exhaustion', () => {
     // The stale attempt settles unresolved: the remount's fresh budget must
     // not be charged, so it still holds three full failures.
     resolvers[0]?.([]);
-    // eslint-disable-next-line no-await-in-loop -- each batch depends on the previous round's outcome.
     await flushBatch();
     expect(mod.isTranslationFailed('part-1', 'hello', 'de', MODEL.id)).toBe(false);
 
@@ -1390,7 +1373,6 @@ describe('translation failure exhaustion', () => {
     // not a reset. Only a resolution clears the failure state.
     requestMock.mockRejectedValueOnce(new Error('gateway down'));
     mod.retryUnresolvedTranslations();
-    // eslint-disable-next-line no-await-in-loop -- each batch depends on the previous round's outcome.
     await flushBatch();
     expect(mod.isTranslationFailed('part-1', 'hello', 'de', MODEL.id)).toBe(true);
 
@@ -1414,7 +1396,6 @@ describe('translation failure exhaustion', () => {
     // so settling it unresolved must not spend the new generation's budget.
     mod.setConfig({ enabled: true, model: OTHER_MODEL });
     resolvers[0]?.([null]);
-    // eslint-disable-next-line no-await-in-loop -- each batch depends on the previous round's outcome.
     await flushBatch();
     expect(mod.isTranslationFailed('part-1', 'hello', 'de', OTHER_MODEL.id)).toBe(false);
 

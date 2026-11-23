@@ -852,6 +852,30 @@ describe('internal session-rows export route', () => {
     expect(res.status).toBe(200);
     expect(getWorkerDb).not.toHaveBeenCalled();
     expect(stub.exportSessionRowsStream).toHaveBeenCalledOnce();
+    expect(stub.exportSessionRowsStream).toHaveBeenCalledWith({ deleteIfEmpty: false });
+  });
+
+  it('passes the opt-in empty cleanup to the Durable Object', async () => {
+    const stub = {
+      exportSessionRowsStream: vi.fn(
+        async () => new Response('{"t":"end","rows":0,"empty_cleanup_scheduled":true}\n').body!
+      ),
+    };
+    vi.mocked(getSessionIngestDO).mockReturnValue(stub as never);
+
+    const res = await app.request(
+      route,
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ ...body, requireSessionRow: false, deleteIfEmpty: true }),
+      },
+      defaultEnv
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe('{"t":"end","rows":0,"empty_cleanup_scheduled":true}\n');
+    expect(stub.exportSessionRowsStream).toHaveBeenCalledWith({ deleteIfEmpty: true });
   });
 
   it('does not let the export token authenticate other internal routes', async () => {

@@ -125,9 +125,6 @@ function useNeedsInputLocalNotifications(): void {
   const preferencesQueryHash = useMemo(() => hashKey(preferencesQueryKey), [preferencesQueryKey]);
   const enabled = Boolean(token) && !isLoading && !isSigningOut && isLoaded;
 
-  // Subscribe/prefetch the preferences row at app start. The plan reads the
-  // cache and the query-cache subscription below re-plans when the value lands,
-  // so a cold start gates on the server row instead of an empty cache.
   useQuery({
     ...trpc.user.getNotificationPreferences.queryOptions(),
     enabled,

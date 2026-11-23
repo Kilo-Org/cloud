@@ -1,6 +1,7 @@
 import { createStore } from 'jotai';
 import { assistantMsg, createEventHelpers, textPart, toolPart } from './__fixtures__/helpers';
 import { createSessionManager } from './session-manager';
+import { sessionSnapshotFailureMessage } from './snapshot-page';
 import { createCloudAgentSession, REMOTE_SESSION_CREATION_NOT_SUPPORTED } from './session';
 import type { CloudAgentSession } from './session';
 import type { CloudAgentApi } from './transport';
@@ -1244,7 +1245,11 @@ describe('queued message cancellation replay', () => {
     });
     deliver('kilocode', {
       type: 'question.asked',
-      properties: { id: 'current-question', sessionID: kiloSessionId, questions: [] },
+      properties: {
+        id: 'current-question',
+        sessionID: kiloSessionId,
+        questions: [{ question: 'Continue?', header: 'Approval', options: [] }],
+      },
     });
     expect(notifications).not.toHaveBeenCalled();
     expect(session.storage.getMessageIds()).toEqual([]);
@@ -1485,7 +1490,7 @@ describe('workspace DO-only session transport', () => {
       async (
         _id: CloudAgentSessionId,
         _options: { cursor?: string; limit?: number; kiloSessionId?: string }
-      ): Promise<CloudSessionSnapshotPage | null> => page()
+      ): Promise<unknown> => page()
     );
     const resolveSession = jest.fn(async (id: KiloSessionId): Promise<ResolvedSession> => ({
       type: 'cloud-agent',
@@ -2368,12 +2373,71 @@ describe('workspace DO-only session transport', () => {
       await fixture.manager.hydrateChildSession(childId);
       expect(fixture.store.get(fixture.manager.atoms.childSessionHydrationState)(childId)).toEqual({
         status: 'error',
+        kind: 'invalid_data',
         message: 'Session history is unavailable',
       });
       expect(fixture.store.get(fixture.manager.atoms.childMessages)(childId)).toEqual([]);
       expect(fixture.resolveSession).toHaveBeenCalledTimes(1);
       expect(fixture.fetchSnapshot).not.toHaveBeenCalled();
       expect(fixture.fetchSnapshotPage).not.toHaveBeenCalled();
+    } finally {
+      fixture.manager.destroy();
+    }
+  });
+
+  it.each([
+    ['too_large', 'Session history too large to load'],
+    ['invalid_data', 'Session history is unavailable'],
+  ] as const)(
+    'stores the %s kind when the child hook reports that typed failure itself',
+    async (kind, message) => {
+      const fixture = workspaceManager();
+      const childId = kiloId('ses_bbbbbbbbbbbbbbbbbbbbbbbbbb');
+      fixture.fetchCloudSnapshotPage.mockImplementation(async (_id, options) =>
+        options.kiloSessionId === childId ? { kind, message } : page()
+      );
+      try {
+        await fixture.manager.switchSession(routeId);
+        await jest.advanceTimersByTimeAsync(0);
+        await fixture.manager.hydrateChildSession(childId);
+        // The hook's own typed failure is terminal history, not a shape error
+        // and not a reconnection: its kind and canonical copy reach the state.
+        expect(
+          fixture.store.get(fixture.manager.atoms.childSessionHydrationState)(childId)
+        ).toEqual({
+          status: 'error',
+          kind,
+          message: sessionSnapshotFailureMessage(kind).message,
+        });
+        expect(fixture.store.get(fixture.manager.atoms.childMessages)(childId)).toEqual([]);
+        // A terminal first-page failure ends the read: no retry chain follows.
+        expect(
+          fixture.fetchCloudSnapshotPage.mock.calls.filter(
+            ([, options]) => options.kiloSessionId === childId
+          )
+        ).toHaveLength(1);
+      } finally {
+        fixture.manager.destroy();
+      }
+    }
+  );
+
+  it('classifies a typed failure the root page hook returns as terminal history', async () => {
+    const fixture = workspaceManager();
+    fixture.fetchCloudSnapshotPage.mockResolvedValue({ kind: 'too_large', message: 'hook copy' });
+    try {
+      await fixture.manager.switchSession(routeId);
+      await jest.advanceTimersByTimeAsync(0);
+      // The kind the hook reported reaches the manager, and the canonical copy
+      // replaces the hook's own text.
+      expect(fixture.store.get(fixture.manager.atoms.failedHistoryKind)).toEqual({
+        kind: 'too_large',
+      });
+      expect(fixture.store.get(fixture.manager.atoms.error)).toBe(
+        'Session history too large to load'
+      );
+      // Terminal: the root read is not retried.
+      expect(fixture.fetchCloudSnapshotPage).toHaveBeenCalledTimes(1);
     } finally {
       fixture.manager.destroy();
     }

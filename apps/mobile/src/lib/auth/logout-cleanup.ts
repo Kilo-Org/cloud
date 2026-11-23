@@ -51,9 +51,7 @@ import { retireDeviceRemoteState } from '@/lib/auth/device-retire';
 const logoutCleanupRecordSchema = z.object({
   /** Account identity at logout, or null when it was unknown. */
   userId: z.string().nullable(),
-  /** Push token values still awaiting unregister. */
   pushTokens: z.array(z.string()),
-  /** The device push token could not be read at logout; re-read it later. */
   pushLookupPending: z.boolean(),
   /** Activity-token unregister (Live Activity / push-to-start) outstanding. */
   needsActivityUnregister: z.boolean(),
@@ -456,10 +454,8 @@ async function runActivityCleanup(
     await chainSave(LOGOUT_CLEANUP_TOMBSTONE_KEY, async () => {
       const read = await readLogoutCleanupStore();
       if (read.status === 'unreadable' || read.status === 'unsupported') {
-        // Nothing safe to modify: keep the payload for the build that wrote it.
         return;
       }
-      // A corrupt payload has nothing recoverable, so this write repairs it.
       const records = read.status === 'records' ? read.records : [];
       const pending = logoutCleanupRecordFor(records, userId);
       await writeLogoutCleanupRecords(

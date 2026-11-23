@@ -88,6 +88,13 @@ function refineSessionLiveUpdate(
 }
 
 /**
+ * Longest answer a result notification may carry for a reply that could not be
+ * delivered. The field is read back only by this app, so the cap is a
+ * payload-size bound, not a display rule.
+ */
+export const ANSWER_DRAFT_MAX_LENGTH = 2000;
+
+/**
  * Schema for the `data` blob attached to Expo push notifications.
  * This crosses the OS boundary as untyped JSON, so it MUST be
  * Zod-parsed by the mobile notification handler before use.
@@ -111,6 +118,13 @@ export const pushDataSchema = z.discriminatedUnion('type', [
     // the session belongs to. Optional so a push from an older producer in a
     // rolling deploy still validates; absent means Personal.
     organizationId: nonEmptyStringSchema.optional(),
+    // The answer text someone typed into the notification's inline Reply when
+    // that reply could not be delivered. Only an app-posted result
+    // notification sets it; no server producer does, so its presence never
+    // changes what the push means. The bound lives here, where the payload is
+    // validated, so a longer answer is refused rather than silently carried
+    // into a notification the OS may truncate.
+    answerDraft: nonEmptyStringSchema.max(ANSWER_DRAFT_MAX_LENGTH).optional(),
   }),
   z.object({
     type: z.literal('agent_briefing'),

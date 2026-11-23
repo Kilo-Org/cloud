@@ -21,7 +21,10 @@ const kept = new Map<
 >();
 let keptChars = 0;
 
-/** The length a result counts as, or one when it cannot be measured. */
+/**
+ * An answer that cannot be measured is still kept and counted as one character,
+ * so it is bounded by the answer count rather than evicted as oversized.
+ */
 function charsOf(answered: RemoteMcpCallAnswered): number {
   try {
     return JSON.stringify(answered).length;

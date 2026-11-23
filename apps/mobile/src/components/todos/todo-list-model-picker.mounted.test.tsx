@@ -32,6 +32,13 @@ vi.mock('expo-router', async () => {
     useFocusEffect: boundary.useTestFocusEffect,
   };
 });
+// The post-create hand-off goes through the push-then-retire hook that keeps
+// Android Fabric alive; its own mechanics have their own suite, so
+// here it ends in this suite's own stack model.
+vi.mock('@/lib/navigation/stack-safe-replace', async () => {
+  const boundary = await import('./todo-list-model-picker.mounted.test-helpers');
+  return { useStackSafeReplace: boundary.useTestStackSafeReplace };
+});
 vi.mock('react-native', async () => {
   const { NativeTextInput } = await import('./todo-list-model-picker.mounted.test-helpers');
   return {

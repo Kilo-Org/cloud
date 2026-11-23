@@ -213,7 +213,6 @@ async function restore(): Promise<void> {
     }
     const parsed = parseStoredRecord(raw);
     if (parsed === null || parsed.userId !== userId) {
-      // A corrupt record, or one written for another account, reads as absent.
       return;
     }
     // The names already in memory were painted this run, so they are fresher
@@ -270,8 +269,6 @@ export function rememberScopeName(scopeId: string, name: string): void {
     if (!isCurrentAuthEpoch(epoch)) {
       return;
     }
-    // The account is known only once the restart read settles, so a name
-    // remembered before it lands is written under the account that read names.
     await hydrateScopeNames();
     if (!isCurrentAuthEpoch(epoch) || recordUserId === null) {
       return;
@@ -312,8 +309,6 @@ export function subscribeScopeNames(listener: () => void): () => void {
  */
 export function clearScopeNames(): void {
   const hadNames = names.size > 0 || recordUserId !== null;
-  // Bumped before the state moves, so a restart read already holding this
-  // account cannot commit its names or its id after this clear.
   generation += 1;
   names.clear();
   recordUserId = null;

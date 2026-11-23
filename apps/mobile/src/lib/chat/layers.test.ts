@@ -44,17 +44,6 @@ vi.mock('./kilo-mcp', () => ({
   kiloMcpToolNames: () => mcp.tools.map(tool => tool.definition.name),
 }));
 
-/**
- * What the app tells a session a gateway model can speak.
- *
- * The gateway resolves a model's shapes from the serving provider and refuses a
- * request on a shape that provider does not speak. The app cannot know them per
- * model, so the shape it asserts has to be the one every provider accepts —
- * otherwise a model served over `chat_completions` alone is refused with
- * "This model does not support the messages API" and the question fails to
- * deliver.
- */
-
 describe('the shape a gateway model is asked over', () => {
   it('is chat_completions, which every provider the gateway relays speaks', () => {
     expect(modelFactsFor({ id: 'fake-deterministic' }).apiKinds).toEqual(['chat_completions']);
@@ -85,13 +74,6 @@ const openRegistry = (): Promise<() => readonly string[]> =>
     }).pipe(Effect.provide(layerToolsFor()))
   );
 
-/**
- * The tools the registry holds.
- *
- * A session resolves the names it was opened with against this at open, so a
- * tool discovered after the runtime was built has to be in it — otherwise a
- * chat would need a new runtime every time the server's list arrived.
- */
 describe('the tools the registry holds', () => {
   it('is a live view, so a tool discovered after the runtime was built is in it', async () => {
     mcp.tools.length = 0;

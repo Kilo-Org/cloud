@@ -14,12 +14,6 @@ import { reportSecureStoreFailure } from '@/lib/telemetry/secure-store-events';
  * their credentials are still on the device. Only a rejection is retried by
  * `readStoredValueWithRetry`; a `null` resolution is a real answer (nothing
  * stored) and returns immediately.
- *
- * A `null` is not always a real answer: a `WHEN_UNLOCKED_THIS_DEVICE_ONLY`
- * item answers `null` while the device is not yet unlocked, which is
- * indistinguishable from "nothing stored". `readStoredValueRetryingNull`
- * retries a `null` on the same schedule, for the callers that treat a member
- * of the credential set as unreadable rather than absent.
  */
 const RETRY_DELAYS_MS = [250, 500, 1000] as const;
 
@@ -49,9 +43,7 @@ async function readOnce(
 ): Promise<string | null> {
   if (isFaultWindowOpen()) {
     // No key in the message: the exhausted-read report attaches this error, and
-    // the report must carry no key material, like the real store's error. The
-    // error is an `E2eInjectedFaultError` so the Sentry `beforeSend` gate drops
-    // a harness fault instead of filing it as a product issue.
+    // the report must carry no key material, like the real store's error.
     throw new E2eInjectedFaultError('E2E secure-store fault window is open: read rejected');
   }
   const value = await (firstAttempt ?? readStoredValue(key, options));

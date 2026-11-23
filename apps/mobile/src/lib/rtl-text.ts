@@ -85,11 +85,17 @@ export function keepsLatinDisplay(isRtlScriptCopy: boolean): boolean {
 }
 
 /**
- * JetBrains Mono ships no Arabic or Hebrew glyphs, so a fallback renders the
- * word one character at a time (`ا س ت ك ش ف`); the system font the app draws
- * its other copy with keeps the joins. The font ships the glyphs of neither
- * script, so the rule is the script and not the interface direction. Drop the
- * `font-mono*` utility, keeping the size, color and weight classes around it.
+ * JetBrains Mono draws neither the right-to-left blocks the app ships
+ * (`RTL_SCRIPT`: Hebrew, and Arabic with its supplement, extended and
+ * presentation blocks) nor any of the joined scripts `JOINED_SCRIPT` lists
+ * (the Brahmic blocks, Thai, Lao, Myanmar, Khmer). Every character of that copy
+ * falls to a fallback font, which lays each glyph out on its own: an Arabic word
+ * loses its joins (`ا س ت ك ش ف`) and a Brahmic, Thai, Lao, Myanmar or Khmer
+ * cluster comes apart between the base letter and its vowel signs. The system
+ * font the app draws its other copy with keeps both shapes, so the rule is the
+ * script and not the interface direction: whichever set holds the copy, drop
+ * the `font-mono*` utility and keep the size, color and weight classes around
+ * it.
  */
 export function withoutMonoFamily(className: string): string {
   return className

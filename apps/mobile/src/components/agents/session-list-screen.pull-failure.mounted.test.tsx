@@ -144,7 +144,7 @@ vi.mock('expo-router', () => ({
   useRouter: () => ({
     canGoBack: () => false,
     push: () => undefined,
-    replace: () => undefined,
+    navigate: () => undefined,
     setParams: () => undefined,
   }),
   useScrollToTop: () => undefined,

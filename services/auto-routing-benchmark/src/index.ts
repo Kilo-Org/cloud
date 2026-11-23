@@ -24,6 +24,12 @@ import {
   type BenchmarkJobMessage,
 } from './run';
 import { continueDailyReconcile, dailyReconcileSubscriptions } from './subscriptions';
+import { registerCaseInferenceRoutes } from './case-inference';
+import {
+  reconcilePaidBenchmarkRequests,
+  reconcilePaidUsageReceipts,
+  registerPaidBenchmarkRoutes,
+} from './paid-benchmark';
 
 // Queue name of the dead-letter queue, matched against batch.queue.
 const DLQ_NAME = 'auto-routing-benchmark-dlq';
@@ -138,11 +144,15 @@ app.post('/container/case-result', async c => {
   const accepted = await acceptContainerCaseResult(c.env, await c.req.json().catch(() => null));
   return c.body(null, accepted ? 204 : 404);
 });
+// The same is true of inference: the case capability (an HMAC over the exact paid
+// generation) is its credential, so these routes also precede the backend-secret middleware.
+registerCaseInferenceRoutes(app);
 app.use('*', authMiddleware);
 app.get('/health', c => c.json({ status: 'ok', service: 'auto-routing-benchmark' }));
 
 registerAdminRoutes(app);
 registerClientEvalRoutes(app);
+registerPaidBenchmarkRoutes(app);
 
 app.notFound(createNotFoundHandler());
 app.onError(createErrorHandler());
@@ -153,6 +163,35 @@ export default {
     const errors: unknown[] = [];
     const production =
       controller.cron === PLATFORM_SYNC_CRON ? await fetchProductionAutoMetrics(env) : null;
+    // Paid benchmarks: stage the next bounded slices, activate fully staged requests, settle
+    // finished ones, and deliver the durable pin notifications. Never starts a request.
+    try {
+      const reconciled = await reconcilePaidBenchmarkRequests(env);
+      const receipts = await reconcilePaidUsageReceipts(env);
+      if (
+        receipts.recorded > 0 ||
+        reconciled.completed.length > 0 ||
+        reconciled.failed.length > 0 ||
+        reconciled.closed.length > 0
+      )
+        console.log(
+          JSON.stringify({
+            event: 'benchmark_paid_tick_completed',
+            cron: controller.cron,
+            reconciled,
+            receipts,
+          })
+        );
+    } catch (error) {
+      errors.push(error);
+      console.error(
+        JSON.stringify({
+          event: 'benchmark_paid_tick_failed',
+          cron: controller.cron,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      );
+    }
     for (const router of AUTO_ROUTERS) {
       try {
         if (controller.cron !== PLATFORM_SYNC_CRON) {

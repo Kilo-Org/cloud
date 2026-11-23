@@ -678,6 +678,7 @@
     "needsInputAction": {
       "approved": "Solicitud aprobada",
       "replied": "Respuesta enviada",
+      "empty": "Escribe una respuesta y luego envíala.",
       "failed": "No se pudo responder. Toca de nuevo para reintentarlo.",
       "unavailable": "Esta solicitud ya no está en espera."
     }
@@ -819,6 +820,8 @@
     },
     "providerConnect": {
       "description": "Conecta la {{label}} de Kilo para revisar PR automáticamente.",
+      "notConnectedTitle": "{{platform}} no está conectado",
+      "githubAdminOnlyDescription": "Solo los propietarios de la organización y los administradores pueden conectarlo.",
       "githubApp": "aplicación de GitHub",
       "githubError": "No se pudo abrir la configuración de GitHub. Inténtalo de nuevo.",
       "gitlabAccount": "cuenta de GitLab",
@@ -1712,6 +1715,7 @@
       "couldNotLoadThisSession": "No se pudo cargar esta sesión.",
       "historyTooLarge": "La transcripción de esta sesión es demasiado grande para cargarla.",
       "historyUnavailable": "No se puede leer la transcripción de esta sesión.",
+      "historyTemporarilyUnavailable": "La transcripción de esta sesión no está disponible temporalmente.",
       "cloneFailedRetry": "No se pudo clonar esta sesión. Inténtalo de nuevo.",
       "notEnoughCredits": "No hay suficientes créditos para esta solicitud. Añade créditos e inténtalo de nuevo.",
       "previousTaskFinishing": "La tarea anterior aún no ha terminado. Espera un momento.",
@@ -2252,7 +2256,9 @@
       "skip": "Omitir",
       "retrySkip": "Volver a intentar omitir",
       "submitting": "Enviando…",
-      "sendAnswers": "Enviar respuestas"
+      "sendAnswers": "Enviar respuestas",
+      "unreadableTitle": "No se pudo mostrar esta pregunta",
+      "unreadableBody": "El agente está esperando una pregunta que esta aplicación no puede mostrar. Responde a la pregunta en la CLI para continuar."
     },
     "blockingCard": {
       "questionUnavailable": "Esta pregunta ya no está disponible.",
@@ -2279,6 +2285,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "No se pudo cargar la sesión del subagente.",
+      "historyTooLarge": "El historial de este subagente es demasiado grande para cargarlo.",
+      "historyUnavailable": "El historial de este subagente no está disponible.",
+      "historyTemporarilyUnavailable": "El historial de este subagente no está disponible temporalmente.",
       "failed": "La sesión del subagente ha fallado.",
       "noMessages": "No hay mensajes del subagente",
       "noMessagesDescription": "Esta sesión del subagente terminó sin generar una transcripción.",
@@ -2869,6 +2878,8 @@
     "why": "Para qué",
     "who": "Con quién",
     "installAttributionPromptMessage": "Kilo usa el permiso de seguimiento de Apple solo para saber cómo has llegado a la aplicación. Nunca usa tus instrucciones ni tus conversaciones para este fin.",
+    "installAttributionRequestFailedTitle": "No se pudo mostrar la solicitud de seguimiento",
+    "installAttributionRequestFailedMessage": "Kilo no pudo mostrar la solicitud del sistema, así que la identificación del origen de la instalación sigue desactivada.",
     "installAttributionPromptTitle": "¿Permitir que se identifique el origen de la instalación?"
   },
   "prReview": {
@@ -3462,7 +3473,7 @@
   "organization": {
     "auditLog": {
       "title": "Registro de auditoría",
-      "permissionDenied": "Solo un propietario, administrador o responsable de facturación de una organización con el plan Enterprise puede ver su registro de auditoría.",
+      "permissionDenied": "Solo un propietario, administrador o gestor de facturación de una organización con el plan Enterprise puede ver su registro de auditoría. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "No hay eventos de auditoría",
       "emptyDescription": "Aquí aparecen las acciones realizadas en esta organización.",
       "truncated": "Se muestran los eventos más recientes.",
@@ -3512,11 +3523,152 @@
         "guardrailUpdate": "Barrera de seguridad actualizada",
         "guardrailRemove": "Barrera de seguridad eliminada",
         "unknown": "Evento de auditoría"
+      },
+      "detail": {
+        "fieldChange": "{{field}}: {{change}}",
+        "modeIdentity": "Modo \"{{name}}\" (identificador: {{slug}})",
+        "modeUpdate": "Modo \"{{name}}\": {{changes}}",
+        "field": {
+          "name": "$t(organization.modes.nameLabel)",
+          "slug": "$t(organization.modes.identifierLabel)",
+          "roleDefinition": "$t(organization.modes.roleLabel)",
+          "whenToUse": "$t(organization.modes.whenToUseLabel)",
+          "description": "$t(organization.modes.descriptionLabel)",
+          "customInstructions": "$t(codeReviewer.instructions.title)",
+          "groups": "$t(profiles.agents.tools)",
+          "autoRoute": "Enrutamiento automático",
+          "defaultModel": "Modelo predeterminado"
+        },
+        "role": {
+          "owner": "$t(organization.members.roles.owner)",
+          "admin": "$t(organization.members.roles.admin)",
+          "billing_manager": "$t(organization.members.roles.billingManager)",
+          "member": "$t(organization.members.roles.member)"
+        },
+        "memberRole": "{{email}}: {{change}}",
+        "memberAdded": "{{email}} agregado como {{role}}",
+        "memberRemoved": "{{email}} eliminado",
+        "memberParentAdded": "{{email}} agregado desde la organización principal {{parent}}",
+        "memberParentRemoved": "{{email}} eliminado de la organización principal {{parent}}",
+        "inviteSent": "{{email}} como {{role}}",
+        "inviteRevoked": "Invitación de {{email}} revocada",
+        "inviteAccepted": "Invitación aceptada por {{email}}",
+        "groupIdentity": "Grupo \"{{name}}\"",
+        "groupMembers": "Grupo \"{{name}}\": {{members}}",
+        "groupMemberGroups": "{{displayCount}} grupos",
+        "groupMemberGroups_many": "{{displayCount}} de grupos",
+        "groupMemberGroups_one": "{{displayCount}} grupo",
+        "groupMemberGroups_other": "{{displayCount}} grupos",
+        "groupMemberGroupsOf": "{{email}}: {{displayCount}} grupos",
+        "groupMemberGroupsOf_many": "{{email}}: {{displayCount}} de grupos",
+        "groupMemberGroupsOf_one": "{{email}}: {{displayCount}} grupo",
+        "groupMemberGroupsOf_other": "{{email}}: {{displayCount}} grupos",
+        "groupPolicySet": "Grupo \"{{name}}\": política de {{policy}} establecida",
+        "groupPolicyRemoved": "Grupo \"{{name}}\": política de {{policy}} eliminada",
+        "groupDefaultPolicySet": "Política de {{policy}} predeterminada establecida",
+        "groupDefaultPolicyRemoved": "Política de {{policy}} predeterminada eliminada",
+        "guardrailIdentity": "{{type}} \"{{name}}\"",
+        "guardrailStatus": "{{type}} \"{{name}}\" {{state}}",
+        "guardrailConfig": "Barreras de seguridad de IA {{state}}",
+        "guardrailConfigGroup": "{{state}} para el grupo \"{{group}}\"",
+        "guardrailEnforcement": "{{target}}: {{value}}",
+        "guardrailSkill": "{{target}}: {{values}}",
+        "guardrailTarget": {
+          "mcp": "$t(profiles.mcp.title)",
+          "skill": "$t(profiles.skillsTitle)"
+        },
+        "ssoDomainSet": "Dominio SSO {{domain}}",
+        "ssoDomainChanged": "{{domain}} (antes {{previous}})",
+        "ssoDomainRemoved": "Dominio SSO {{domain}} eliminado",
+        "fundsPurchased": "{{amount}} con {{method}}",
+        "fundsGranted": "{{amount}}",
+        "fundsDistributed": "{{amount}} a {{displayCount}} organizaciones secundarias",
+        "fundsDistributed_many": "{{amount}} a {{displayCount}} de organizaciones secundarias",
+        "fundsDistributed_one": "{{amount}} a {{displayCount}} organización secundaria",
+        "fundsDistributed_other": "{{amount}} a {{displayCount}} organizaciones secundarias",
+        "fundsReceived": "{{amount}} de {{parent}}",
+        "reviewAgentPlatform": "{{platform}}",
+        "reviewAgentConfig": "Configuración de {{platform}}",
+        "reviewAgentConfigStyle": "{{platform}}: estilo {{style}}",
+        "reviewAgentSecretsUpdated": "{{displayCount}} actualizados",
+        "reviewAgentSecretsUpdated_many": "{{displayCount}} de actualizados",
+        "reviewAgentSecretsUpdated_one": "{{displayCount}} actualizado",
+        "reviewAgentSecretsUpdated_other": "{{displayCount}} actualizados",
+        "reviewAgentSecretsFailed": "{{displayCount}} errores",
+        "reviewAgentSecretsFailed_many": "{{displayCount}} de errores",
+        "reviewAgentSecretsFailed_one": "{{displayCount}} error",
+        "reviewAgentSecretsFailed_other": "{{displayCount}} errores",
+        "reviewAgentSecretRotated": "{{values}}",
+        "settingAdvancedPolicies": "{{values}}",
+        "settingAdvancedPoliciesOpenRouter": "OpenRouter {{state}}",
+        "settingAdvancedPoliciesRegion": "Región de inferencia: {{region}}",
+        "settingDefaultModelSet": "{{next}}",
+        "settingDefaultModelRemoved": "{{previous}}",
+        "settingAutoRoute": "Modo \"{{mode}}\": {{change}}",
+        "settingDefaultBehavior": {
+          "global": "Predeterminado global",
+          "specific": "{{model}}",
+          "auto": "$t(models.auto.organization)"
+        },
+        "settingDataCollection": "{{mode}}",
+        "dataCollection": {
+          "allowed": "Permitida",
+          "denied": "Denegada",
+          "followSetting": "Sigue el ajuste de la extensión"
+        },
+        "region": {
+          "us": "$t(organizationModelAccess.region.us)",
+          "eu": "$t(organizationModelAccess.region.eu)",
+          "au": "$t(organizationModelAccess.region.au)",
+          "jp": "$t(organizationModelAccess.region.jp)"
+        },
+        "settingProjectsUi": "Interfaz de Projects {{state}}",
+        "settingMinimumBalanceOn": "{{threshold}} a {{emails}}",
+        "settingMinimumBalanceThreshold": "{{threshold}}",
+        "settingRecommendationsDigest": "Resumen de recomendaciones {{state}}",
+        "settingBrowserControl": "{{policy}}",
+        "settingBrowserControlOrigins": "{{policy}}: {{origins}}",
+        "settingBrowserControlOriginsCleared": "{{policy}}: ningún origen permitido",
+        "settingName": "Renombrado de {{previous}} a {{next}}",
+        "enabled": "$t(common.enabled)",
+        "scanBeforeUseOn": "Escaneo antes del uso activado",
+        "scanBeforeUseOff": "Escaneo antes del uso desactivado",
+        "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingRemoved": "Eliminados: {{models}}",
+        "browserPolicyOff": "Uso del navegador bloqueado",
+        "browserPolicyAllow": "Solo orígenes permitidos",
+        "browserPolicyPlaywrightOnly": "Solo el navegador integrado",
+        "disabled": "$t(common.disabled)",
+        "autoRouting": "Modelos cambiados: {{values}}",
+        "integrationConnected": "{{integration}} conectado",
+        "integrationDisconnected": "{{integration}} desconectado",
+        "integrationRefreshed": "{{integration}} actualizado",
+        "integrationCancelled": "{{integration}} cancelado",
+        "integrationModelUpdated": "{{integration}}: modelo {{model}}",
+        "integrationKeyAdded": "Clave agregada para {{provider}}",
+        "integrationKeyUpdated": "Clave actualizada para {{provider}}",
+        "integrationKeyDeleted": "Clave eliminada para {{provider}}",
+        "integrationKeyToggled": "Clave para {{provider}}: {{state}}",
+        "namedPolicyCreated": "Política {{kind}} {{id}} creada",
+        "namedPolicyUpdated": "Política {{kind}} {{id}} actualizada",
+        "namedPolicyDeleted": "Política {{kind}} {{id}} eliminada",
+        "namedPolicyLinked": "Política {{kind}} {{next}} vinculada",
+        "webhookTriggerUpdated": "Disparador {{trigger}}",
+        "organizationRenamed": "Organización renombrada de {{previous}} a {{next}}",
+        "brand": {
+          "github": "$t(common.github)",
+          "gitlab": "$t(common.gitlab)",
+          "bitbucket": "$t(agentChat.repoPicker.platformBitbucket)",
+          "discord": "$t(profile.providerDiscord)",
+          "slack": "$t(agentChat.sessionFilter.platformSlack)",
+          "linear": "$t(agentChat.sessionFilter.platformLinear)",
+          "byok": "Tu propia clave de API"
+        }
       }
     },
     "billing": {
       "title": "Facturación",
-      "permissionDenied": "Solo el propietario, un administrador o un responsable de facturación de la organización puede ver su facturación.",
+      "permissionDenied": "Solo el propietario, un administrador o un gestor de facturación de la organización puede ver su facturación. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Suscripción",
       "state": "Estado",
       "stateNone": "Sin suscripción",
@@ -3705,7 +3857,7 @@
       "emptyDescription": "Usa Hora anterior para ver solicitudes anteriores.",
       "emptyBoundDescription": "Los registros de solicitudes no llegan más atrás.",
       "loadError": "No se pudieron cargar los registros de solicitudes.",
-      "permissionDenied": "Solo un propietario, administrador o responsable de facturación de la organización puede ver sus registros de solicitudes.",
+      "permissionDenied": "Solo un propietario, administrador o gestor de facturación de la organización puede ver sus registros de solicitudes. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} entrada · {{output}} salida",
       "byok": "BYOK"
     },
@@ -3981,7 +4133,10 @@
     "list": {
       "loadFailed": "No se pudo cargar el historial del chat.",
       "new": "Chat nuevo",
-      "deleteTitle": "¿Eliminar este chat?"
+      "deleteTitle": "¿Eliminar este chat?",
+      "resetNoticeTitle": "Chats locales y borradores eliminados",
+      "resetNoticeBody": "Kilo no pudo abrir los chats guardados en este dispositivo. Tus sesiones en la nube no se ven afectadas.",
+      "resetNoticeDismiss": "Descartar aviso"
     },
     "rename": {
       "title": "Cambiar nombre del chat",
@@ -4031,6 +4186,9 @@
       "fieldName": "Nombre mostrado",
       "fieldUrl": "URL del servidor",
       "fieldUrlInvalid": "Introduce una URL de servidor válida.",
+      "fieldUrlCredentials": "Elimina el nombre de usuario y la contraseña de la URL.",
+      "fieldUrlFragment": "Elimina la parte # de la URL.",
+      "fieldUrlInsecure": "Introduce una URL https o http solo para localhost.",
       "duplicateUrl": "Esa URL ya está guardada.",
       "serverNotFound": "Este servidor ya no está guardado.",
       "enableServer": "Activar este servidor: {{name}}",
@@ -4057,6 +4215,7 @@
       "app": {
         "label": "Interfaz de la herramienta",
         "failed": "No se pudo cargar la interfaz de esta herramienta.",
+        "tooLarge": "La interfaz de esta herramienta es más grande que el límite de {{size}}.",
         "empty": "La interfaz de esta herramienta no tiene nada que mostrar."
       }
     },
@@ -4819,7 +4978,7 @@
     "defaultModel": "Usar el modelo predeterminado de Kilo",
     "duration": "Límite de tiempo (minutos)",
     "spendLimit": "Límite de gasto (USD)",
-    "invalidSafeguards": "Introduce límites de tiempo y gasto positivos y finitos.",
+    "invalidSafeguards": "Introduce un número positivo dentro del rango permitido.",
     "estimate": "Estimado {{estimate}} · máximo {{maximum}}",
     "estimateUnavailable": "No hay resumen de pago disponible con estos ajustes. Cambia el modelo o los límites, o inténtalo de nuevo más tarde.",
     "estimatePricingUnavailable": "No hay precios disponibles para este modelo. Elige otro modelo.",
@@ -4894,7 +5053,8 @@
     "unavailableTitle": "Uso no disponible",
     "unavailableDescription": "El uso no está configurado para este espacio de trabajo. Contacta con soporte si esperas ver el uso aquí.",
     "orgSelfNotice": "Estás viendo tu propio uso en esta organización.",
-    "viewDetails": "Ver detalles de uso"
+    "viewDetails": "Ver detalles de uso",
+    "orgSelfEntryTitle": "Tu uso"
   },
   "integrations": {
     "title": "Integraciones",
@@ -4990,6 +5150,8 @@
       "autoCommit": "Confirmar los cambios al finalizar la ejecución",
       "condenseOnComplete": "Condensar el contexto al finalizar la ejecución",
       "activeTitle": "Disparador activo",
+      "activeSwitchA11y": "Disparador activo: {{name}}",
+      "copyLinkA11y": "Copiar enlace de {{name}}",
       "activeDescription": "Los webhooks en pausa responden con 404.",
       "runAsCreator": "Ejecutar como yo",
       "runAsCreatorDescription": "Cada ejecución usa tu cuenta, así que la cabecera secreta es obligatoria.",

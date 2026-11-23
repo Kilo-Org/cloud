@@ -676,6 +676,7 @@
     "needsInputAction": {
       "approved": "İstek onaylandı",
       "replied": "Yanıt gönderildi",
+      "empty": "Bir yanıt yazın, ardından gönderin.",
       "failed": "Yanıtlanamadı. Yeniden denemek için tekrar dokunun.",
       "unavailable": "Bu istek artık beklemiyor."
     }
@@ -817,6 +818,8 @@
     },
     "providerConnect": {
       "description": "Çekme isteklerini otomatik olarak incelemek için Kilo bağlantısını kur: {{label}}.",
+      "notConnectedTitle": "{{platform}} bağlı değil",
+      "githubAdminOnlyDescription": "Yalnızca kuruluş sahipleri ve yöneticiler bağlayabilir.",
       "githubApp": "GitHub uygulaması",
       "githubError": "GitHub kurulumu açılamadı. Lütfen tekrar dene.",
       "gitlabAccount": "GitLab hesabı",
@@ -1026,7 +1029,7 @@
       "empty": "Henüz istatistiği olan inceleme yok",
       "emptyDescription": "İstatistikler, kuruluş için etkin olduğu sürece tamamlanan incelemeleri kaydeder.",
       "offTitle": "{{platform}} için istatistikler kapalı",
-      "offDescription": "Kuruluşun faturalama rollerine sahip kişiler (sahipler, yöneticiler ve faturalama yöneticileri), tamamlanan incelemeleri kaydetmek için istatistikleri web'deki kuruluş ayarlarından açabilir.",
+      "offDescription": "Kuruluşun faturalandırma rollerine sahip kişiler (sahipler, yöneticiler ve faturalandırma yöneticileri), tamamlanan incelemeleri kaydetmek için istatistikleri web'deki kuruluş ayarlarından açabilir.",
       "couldNotLoad": "İstatistikler yüklenemedi",
       "trackedReviewsCaption": "Bu dönemde istatistikler açıkken tamamlanan incelemeler. Devam eden ve başarısız olan incelemeler hiçbir zaman sayılmaz.",
       "trackedReviewsUncounted": "Sayılmadı: kuruluşun tamamlanan {{displayTotal}} incelemesinden {{displayCount}} tanesinin sonucu kaydedilmedi.",
@@ -1689,6 +1692,7 @@
       "couldNotLoadThisSession": "Bu oturum yüklenemedi.",
       "historyTooLarge": "Bu oturumun dökümü yüklenemeyecek kadar büyük.",
       "historyUnavailable": "Bu oturumun dökümü okunamıyor.",
+      "historyTemporarilyUnavailable": "Bu oturumun dökümü geçici olarak kullanılamıyor.",
       "cloneFailedRetry": "Bu oturum kopyalanamadı. Tekrar dene.",
       "notEnoughCredits": "Bu istek için yeterli kredi yok. Kredi ekleyip tekrar dene.",
       "previousTaskFinishing": "Önceki görev henüz tamamlanmadı. Biraz bekle.",
@@ -2225,7 +2229,9 @@
       "skip": "Atla",
       "retrySkip": "Atlamayı tekrar dene",
       "submitting": "Gönderiliyor…",
-      "sendAnswers": "Yanıtları gönder"
+      "sendAnswers": "Yanıtları gönder",
+      "unreadableTitle": "Bu soru görüntülenemedi",
+      "unreadableBody": "Aracı, bu uygulamanın gösteremediği bir soruyu bekliyor. Devam etmek için soruyu CLI'de yanıtla."
     },
     "blockingCard": {
       "questionUnavailable": "Bu soru artık kullanılamıyor.",
@@ -2252,6 +2258,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Alt ajan oturumu yüklenemedi.",
+      "historyTooLarge": "Bu alt ajanın geçmişi yüklenemeyecek kadar büyük.",
+      "historyUnavailable": "Bu alt ajanın geçmişi kullanılamıyor.",
+      "historyTemporarilyUnavailable": "Bu alt ajanın geçmişi geçici olarak kullanılamıyor.",
       "failed": "Alt ajan oturumu başarısız oldu.",
       "noMessages": "Alt ajan mesajı yok",
       "noMessagesDescription": "Bu alt ajan oturumu, mesaj dökümü oluşturmadan tamamlandı.",
@@ -2832,6 +2841,8 @@
     "why": "Paylaşım amacı",
     "who": "Verileri alan taraf",
     "installAttributionPromptMessage": "Kilo, Apple'ın takip iznini yalnızca uygulamaya hangi kanaldan ulaştığını öğrenmek için kullanır. İstemlerin ve konuşmaların bunun için asla kullanılmaz.",
+    "installAttributionRequestFailedTitle": "Takip istemi gösterilemedi",
+    "installAttributionRequestFailedMessage": "Kilo sistem istemini gösteremedi, bu yüzden yükleme kaynağı belirleme kapalı kalır.",
     "installAttributionPromptTitle": "Yükleme kaynağının belirlenmesine izin verilsin mi?"
   },
   "prReview": {
@@ -3399,7 +3410,7 @@
   "organization": {
     "auditLog": {
       "title": "Denetim günlüğü",
-      "permissionDenied": "Denetim günlüğünü yalnızca Enterprise planındaki kuruluşun sahibi, yöneticisi veya faturalandırma yöneticisi görüntüleyebilir.",
+      "permissionDenied": "Denetim günlüğünü yalnızca Enterprise planındaki kuruluşun sahibi, yöneticisi veya faturalandırma yöneticisi görüntüleyebilir. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Denetim olayı yok",
       "emptyDescription": "Bu kuruluşta gerçekleştirilen işlemler burada görünür.",
       "truncated": "En son olaylar gösteriliyor.",
@@ -3449,11 +3460,147 @@
         "guardrailUpdate": "Koruma kuralı güncellendi",
         "guardrailRemove": "Koruma kuralı kaldırıldı",
         "unknown": "Denetim olayı"
+      },
+      "detail": {
+        "fieldChange": "{{field}}: {{change}}",
+        "modeIdentity": "Mod \"{{name}}\" (tanımlayıcı: {{slug}})",
+        "modeUpdate": "Mod \"{{name}}\": {{changes}}",
+        "field": {
+          "name": "$t(organization.modes.nameLabel)",
+          "slug": "$t(organization.modes.identifierLabel)",
+          "roleDefinition": "$t(organization.modes.roleLabel)",
+          "whenToUse": "$t(organization.modes.whenToUseLabel)",
+          "description": "$t(organization.modes.descriptionLabel)",
+          "customInstructions": "$t(codeReviewer.instructions.title)",
+          "groups": "$t(profiles.agents.tools)",
+          "autoRoute": "Otomatik yönlendirme",
+          "defaultModel": "Varsayılan model"
+        },
+        "role": {
+          "owner": "$t(organization.members.roles.owner)",
+          "admin": "$t(organization.members.roles.admin)",
+          "billing_manager": "$t(organization.members.roles.billingManager)",
+          "member": "$t(organization.members.roles.member)"
+        },
+        "memberRole": "{{email}}: {{change}}",
+        "memberAdded": "{{email}}, {{role}} olarak eklendi",
+        "memberRemoved": "{{email}} kaldırıldı",
+        "memberParentAdded": "{{email}}, {{parent}} üst kuruluşundan eklendi",
+        "memberParentRemoved": "{{email}}, {{parent}} üst kuruluşundan kaldırıldı",
+        "inviteSent": "{{email}}, {{role}} olarak",
+        "inviteRevoked": "{{email}} için davet iptal edildi",
+        "inviteAccepted": "{{email}} kabul edildi",
+        "groupIdentity": "Grup \"{{name}}\"",
+        "groupMembers": "Grup \"{{name}}\": {{members}}",
+        "groupMemberGroups": "{{displayCount}} grup",
+        "groupMemberGroups_one": "{{displayCount}} grup",
+        "groupMemberGroups_other": "{{displayCount}} grup",
+        "groupMemberGroupsOf": "{{email}}: {{displayCount}} grup",
+        "groupMemberGroupsOf_one": "{{email}}: {{displayCount}} grup",
+        "groupMemberGroupsOf_other": "{{email}}: {{displayCount}} grup",
+        "groupPolicySet": "Grup \"{{name}}\": {{policy}} politikası ayarlandı",
+        "groupPolicyRemoved": "Grup \"{{name}}\": {{policy}} politikası kaldırıldı",
+        "groupDefaultPolicySet": "Varsayılan {{policy}} politikası ayarlandı",
+        "groupDefaultPolicyRemoved": "Varsayılan {{policy}} politikası kaldırıldı",
+        "guardrailIdentity": "{{type}} \"{{name}}\"",
+        "guardrailStatus": "{{type}} \"{{name}}\" {{state}}",
+        "guardrailConfig": "Yapay Zeka Korkulukları {{state}}",
+        "guardrailConfigGroup": "\"{{group}}\" grubu için {{state}}",
+        "guardrailEnforcement": "{{target}}: {{value}}",
+        "guardrailSkill": "{{target}}: {{values}}",
+        "guardrailTarget": {
+          "mcp": "$t(profiles.mcp.title)",
+          "skill": "$t(profiles.skillsTitle)"
+        },
+        "ssoDomainSet": "SSO alan adı {{domain}}",
+        "ssoDomainChanged": "{{domain}} (önceki: {{previous}})",
+        "ssoDomainRemoved": "SSO alan adı {{domain}} kaldırıldı",
+        "fundsPurchased": "{{amount}} {{method}} ile",
+        "fundsGranted": "{{amount}}",
+        "fundsDistributed": "{{displayCount}} alt kuruluşa {{amount}}",
+        "fundsDistributed_one": "{{displayCount}} alt kuruluşa {{amount}}",
+        "fundsDistributed_other": "{{displayCount}} alt kuruluşa {{amount}}",
+        "fundsReceived": "{{parent}} kuruluşundan {{amount}}",
+        "reviewAgentPlatform": "{{platform}}",
+        "reviewAgentConfig": "{{platform}} yapılandırması",
+        "reviewAgentConfigStyle": "{{platform}}: {{style}} stili",
+        "reviewAgentSecretsUpdated": "{{displayCount}} güncellendi",
+        "reviewAgentSecretsUpdated_one": "{{displayCount}} güncellendi",
+        "reviewAgentSecretsUpdated_other": "{{displayCount}} güncellendi",
+        "reviewAgentSecretsFailed": "{{displayCount}} hata",
+        "reviewAgentSecretsFailed_one": "{{displayCount}} hata",
+        "reviewAgentSecretsFailed_other": "{{displayCount}} hata",
+        "reviewAgentSecretRotated": "{{values}}",
+        "settingAdvancedPolicies": "{{values}}",
+        "settingAdvancedPoliciesOpenRouter": "OpenRouter {{state}}",
+        "settingAdvancedPoliciesRegion": "Çıkarım bölgesi: {{region}}",
+        "settingDefaultModelSet": "{{next}}",
+        "settingDefaultModelRemoved": "{{previous}}",
+        "settingAutoRoute": "Mod \"{{mode}}\": {{change}}",
+        "settingDefaultBehavior": {
+          "global": "Genel varsayılan",
+          "specific": "{{model}}",
+          "auto": "$t(models.auto.organization)"
+        },
+        "settingDataCollection": "{{mode}}",
+        "dataCollection": {
+          "allowed": "İzin verildi",
+          "denied": "Reddedildi",
+          "followSetting": "Eklenti ayarını izler"
+        },
+        "region": {
+          "us": "$t(organizationModelAccess.region.us)",
+          "eu": "$t(organizationModelAccess.region.eu)",
+          "au": "$t(organizationModelAccess.region.au)",
+          "jp": "$t(organizationModelAccess.region.jp)"
+        },
+        "settingProjectsUi": "Proje UI {{state}}",
+        "settingMinimumBalanceOn": "{{threshold}} için {{emails}}",
+        "settingMinimumBalanceThreshold": "{{threshold}}",
+        "settingRecommendationsDigest": "Öneri özeti {{state}}",
+        "settingBrowserControl": "{{policy}}",
+        "settingBrowserControlOrigins": "{{policy}}: {{origins}}",
+        "settingBrowserControlOriginsCleared": "{{policy}}: izin verilen kaynak yok",
+        "settingName": "{{previous}} adından {{next}} adına yeniden adlandırıldı",
+        "enabled": "$t(common.enabled)",
+        "scanBeforeUseOn": "Kullanımdan önce tarama açık",
+        "scanBeforeUseOff": "Kullanımdan önce tarama kapalı",
+        "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingRemoved": "Kaldırıldı: {{models}}",
+        "browserPolicyOff": "Tarayıcı kullanımı engellendi",
+        "browserPolicyAllow": "Yalnızca izin verilen kaynaklar",
+        "browserPolicyPlaywrightOnly": "Yalnızca tarayıcı kullanımı",
+        "disabled": "$t(common.disabled)",
+        "autoRouting": "Değişen yapay zekâ modelleri: {{values}}",
+        "integrationConnected": "{{integration}} bağlandı",
+        "integrationDisconnected": "{{integration}} bağlantısı kesildi",
+        "integrationRefreshed": "{{integration}} yenilendi",
+        "integrationCancelled": "{{integration}} iptal edildi",
+        "integrationModelUpdated": "{{integration}}: yapay zekâ modeli {{model}}",
+        "integrationKeyAdded": "{{provider}} için anahtar eklendi",
+        "integrationKeyUpdated": "{{provider}} için anahtar güncellendi",
+        "integrationKeyDeleted": "{{provider}} için anahtar kaldırıldı",
+        "integrationKeyToggled": "{{provider}} anahtarı: {{state}}",
+        "namedPolicyCreated": "{{id}} adlı {{kind}} politikası oluşturuldu",
+        "namedPolicyUpdated": "{{id}} adlı {{kind}} politikası güncellendi",
+        "namedPolicyDeleted": "{{id}} adlı {{kind}} politikası kaldırıldı",
+        "namedPolicyLinked": "{{kind}} politikası {{next}} kapsamına bağlandı",
+        "webhookTriggerUpdated": "Tetikleyici {{trigger}}",
+        "organizationRenamed": "Kuruluş {{previous}} adından {{next}} adına yeniden adlandırıldı",
+        "brand": {
+          "github": "$t(common.github)",
+          "gitlab": "$t(common.gitlab)",
+          "bitbucket": "$t(agentChat.repoPicker.platformBitbucket)",
+          "discord": "$t(profile.providerDiscord)",
+          "slack": "$t(agentChat.sessionFilter.platformSlack)",
+          "linear": "$t(agentChat.sessionFilter.platformLinear)",
+          "byok": "Kendi API anahtarınız"
+        }
       }
     },
     "billing": {
       "title": "Faturalandırma",
-      "permissionDenied": "Faturalandırma bilgilerini yalnızca kuruluşun sahibi, yöneticisi veya faturalandırma yöneticisi görebilir.",
+      "permissionDenied": "Faturalandırma bilgilerini yalnızca kuruluşun sahibi, yöneticisi veya faturalandırma yöneticisi görebilir. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Abonelik",
       "state": "Durum",
       "stateNone": "Abonelik yok",
@@ -3617,7 +3764,7 @@
       "shareInviteLink": "Davet bağlantısını paylaş",
       "resendInviteError": "Davet yeniden gönderilemedi.",
       "inviteNotResendable": "Bu davet artık yeniden gönderilemez.",
-      "ownerAuthority": "Yalnızca bir organizasyon sahibi sahipleri yönetebilir.",
+      "ownerAuthority": "Yalnızca bir kuruluş sahibi sahipleri yönetebilir.",
       "ownRoleChange": "Kendi rolünüzü değiştiremezsiniz.",
       "inviteExpired": "Bu davetin süresi dolmuş.",
       "inviteAccepted": "Bu davet zaten kabul edilmiş."
@@ -3642,7 +3789,7 @@
       "emptyDescription": "Daha önceki istekleri görmek için Önceki saat'i kullanın.",
       "emptyBoundDescription": "İstek kayıtları en fazla buraya kadar geriye gider.",
       "loadError": "İstek günlükleri yüklenemedi.",
-      "permissionDenied": "İstek günlüklerini yalnızca kuruluşun sahibi, yöneticisi veya faturalandırma yöneticisi görüntüleyebilir.",
+      "permissionDenied": "İstek günlüklerini yalnızca kuruluşun sahibi, yöneticisi veya faturalandırma yöneticisi görüntüleyebilir. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} giriş · {{output}} çıkış",
       "byok": "BYOK"
     },
@@ -3908,7 +4055,10 @@
     "list": {
       "loadFailed": "Sohbet geçmişi yüklenemedi.",
       "new": "Yeni sohbet",
-      "deleteTitle": "Bu sohbet silinsin mi?"
+      "deleteTitle": "Bu sohbet silinsin mi?",
+      "resetNoticeTitle": "Yerel sohbetler ve taslaklar temizlendi",
+      "resetNoticeBody": "Kilo bu cihazda kayıtlı sohbetleri açamadı. Bulut oturumlarınız etkilenmedi.",
+      "resetNoticeDismiss": "Bildirimi yok say"
     },
     "rename": {
       "title": "Sohbeti yeniden adlandır",
@@ -3958,6 +4108,9 @@
       "fieldName": "Görünen ad",
       "fieldUrl": "Sunucu URL'si",
       "fieldUrlInvalid": "Geçerli bir sunucu URL'si girin.",
+      "fieldUrlCredentials": "Kullanıcı adını ve parolayı URL'den kaldırın.",
+      "fieldUrlFragment": "URL'deki # bölümünü kaldırın.",
+      "fieldUrlInsecure": "https adresi girin, http'yi yalnızca localhost için kullanın.",
       "duplicateUrl": "Bu URL zaten kayıtlı.",
       "serverNotFound": "Bu sunucu artık kayıtlı değil.",
       "enableServer": "Bu sunucuyu etkinleştir: {{name}}",
@@ -3983,6 +4136,7 @@
       "app": {
         "label": "Araç arayüzü",
         "failed": "Bu aracın arayüzü yüklenemedi.",
+        "tooLarge": "Bu aracın arayüzü {{size}} sınırından daha büyük.",
         "empty": "Bu aracın arayüzünde gösterilecek bir şey yok."
       }
     },
@@ -4735,7 +4889,7 @@
     "defaultModel": "Kilo’nun varsayılan modelini kullan",
     "duration": "Süre sınırı (dakika)",
     "spendLimit": "Harcama sınırı (USD)",
-    "invalidSafeguards": "Pozitif ve sonlu süre ve harcama sınırları girin.",
+    "invalidSafeguards": "İzin verilen aralıkta pozitif bir sayı girin.",
     "estimate": "Tahmini {{estimate}} · en fazla {{maximum}}",
     "estimateUnavailable": "Bu ayarlar için ücretli özet mevcut değil. Modeli veya sınırları değiştirin ya da daha sonra tekrar deneyin.",
     "confirmPaid": "{{context}} için ücretli özetler etkinleştirilsin mi?",
@@ -4805,7 +4959,8 @@
     "unavailableTitle": "Kullanım kullanılamıyor",
     "unavailableDescription": "Bu çalışma alanı için kullanım ayarlanmamış. Burada kullanım görmeyi bekliyorsanız destek ekibiyle iletişime geçin.",
     "orgSelfNotice": "Bu organizasyondaki kendi kullanımınızı görüyorsunuz.",
-    "viewDetails": "Kullanım ayrıntılarını görüntüle"
+    "viewDetails": "Kullanım ayrıntılarını görüntüle",
+    "orgSelfEntryTitle": "Sizin kullanımınız"
   },
   "integrations": {
     "title": "Entegrasyonlar",
@@ -4901,6 +5056,8 @@
       "autoCommit": "Çalıştırma bittiğinde değişiklikleri işle",
       "condenseOnComplete": "Çalıştırma bittiğinde bağlamı sıkıştır",
       "activeTitle": "Tetikleyici etkin",
+      "activeSwitchA11y": "Tetikleyici etkin: {{name}}",
+      "copyLinkA11y": "{{name}} için bağlantıyı kopyala",
       "activeDescription": "Duraklatılmış web kancaları 404 yanıtı verir.",
       "runAsCreator": "Benim adıma çalıştır",
       "runAsCreatorDescription": "Her çalıştırma hesabınızı kullanır, bu nedenle gizli başlık gerekir.",

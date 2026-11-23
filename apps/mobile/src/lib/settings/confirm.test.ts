@@ -124,14 +124,8 @@ describe('confirmSettingChange', () => {
 
     await Effect.runPromise(Fiber.interrupt(fiber));
 
-    // Withdrawn, not removed: the request keeps its place in the queue until
-    // the host has drawn out the sheet it presented and reports it.
     expect(getSettingsConfirmRequest()).toMatchObject({ id, withdrawn: true });
 
-    // A delivered answer for the withdrawn request removes it from the queue:
-    // the answer a pre-withdrawal press still reports through the dialog
-    // settles nothing, but no sheet is left to dismiss the entry again, so it
-    // must not pin the queue behind itself.
     answerSettingsConfirm(id, true);
     expect(getSettingsConfirmRequest()).toBeUndefined();
 
@@ -140,11 +134,6 @@ describe('confirmSettingChange', () => {
     expect(getSettingsConfirmRequest()).toBeUndefined();
   });
 
-  // The host draws only the queue head, so a withdrawn request that is not the
-  // head was never on screen: keeping it would present a phantom sheet on
-  // mount just to dismiss it, briefly blocking the requests behind it. It
-  // leaves the queue on withdrawal; only the head — the sheet already
-  // presented — stays until its dismissal report.
   it('removes a withdrawn request that is not the head from the queue outright', async () => {
     setSettingsConfirmHostMounted(true);
     const firstId = requestSettingsConfirmChange(SUMMARY, () => undefined);
@@ -165,9 +154,6 @@ describe('confirmSettingChange', () => {
       unsubscribe();
     }
 
-    // Interrupting the second call withdraws it behind the head: never drawn,
-    // so it leaves the queue outright instead of waiting for a dismissal
-    // report, and the head the sheet is presented on is untouched.
     await Effect.runPromise(Fiber.interrupt(secondFiber));
     expect(getSettingsConfirmRequest()).toMatchObject({ id: firstId, withdrawn: false });
 
@@ -177,9 +163,6 @@ describe('confirmSettingChange', () => {
     expect(getSettingsConfirmRequest()).toBeUndefined();
   });
 
-  // The listener answers while the store is mid-publish. The resolver must
-  // already be registered when the listeners hear about the request, so a
-  // settle from inside the publish still reaches the waiting tool call.
   it('resolves false when the request is settled inside the notify window', async () => {
     // The listener answers every request once, the way a native answer layer
     // would: `settleAllSettingsConfirms` re-notifies its emptying, so the

@@ -18,11 +18,13 @@ import type { CloudAgentEvent } from './cloud-conversation-schemas';
 import type { CloudSessionSnapshotPage } from './types';
 import type { ServiceEvent } from './normalizer';
 import {
+  isSessionSnapshotFailure,
   replaySnapshotPage,
   replayStoredMessages,
   SESSION_HISTORY_UNAVAILABLE_MESSAGE,
   sessionSnapshotFailureMessage,
   type SessionSnapshotFailure,
+  type SessionSnapshotFailureKind,
   snapshotPageFromSnapshot,
 } from './snapshot-page';
 import {
@@ -121,7 +123,7 @@ type CloudAgentTransportConfig = {
 /** One settled snapshot read. Reads never reject; a failure is a value. */
 type SnapshotRead =
   | { kind: 'page'; page: SessionSnapshotPage }
-  | { kind: 'typed'; outcome: { kind: 'retryable_failure' | 'invalid_data' | 'too_large' } }
+  | { kind: 'typed'; outcome: { kind: SessionSnapshotFailureKind } }
   | { kind: 'missing' }
   | { kind: 'rejected'; error: unknown };
 
@@ -135,6 +137,9 @@ async function readCloudSnapshotPage(
   } catch (error) {
     return { kind: 'rejected', error };
   }
+  // A hook can report the typed failure itself instead of a page. Carry that
+  // machine kind through, so a retryable or terminal read keeps its class.
+  if (isSessionSnapshotFailure(payload)) return { kind: 'typed', outcome: payload };
   // A page that fails the schema is terminal: a retry replays the same
   // persisted page, and its validation text is not a user-facing message.
   // The schema's transform can also throw (a session-identity mismatch), and
@@ -143,9 +148,11 @@ async function readCloudSnapshotPage(
   try {
     parsed = cloudSessionMessagesPageSchema.safeParse(payload);
   } catch {
-    return { kind: 'typed', outcome: { kind: 'invalid_data' } };
+    return { kind: 'typed', outcome: sessionSnapshotFailureMessage('invalid_data') };
   }
-  if (!parsed.success) return { kind: 'typed', outcome: { kind: 'invalid_data' } };
+  if (!parsed.success) {
+    return { kind: 'typed', outcome: sessionSnapshotFailureMessage('invalid_data') };
+  }
   return parsed.data === null ? { kind: 'missing' } : { kind: 'page', page: parsed.data };
 }
 
@@ -303,6 +310,7 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
       if (
         awaitingConnectedSnapshot &&
         (event.type === 'question.asked' ||
+          event.type === 'question.unreadable' ||
           event.type === 'question.replied' ||
           event.type === 'question.rejected' ||
           event.type === 'permission.asked' ||

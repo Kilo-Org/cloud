@@ -1266,6 +1266,7 @@
     "needsInputAction": {
       "approved": "Sol·licitud aprovada",
       "replied": "Resposta enviada",
+      "empty": "Escriu una resposta i després envia-la.",
       "failed": "No s’ha pogut respondre. Torna a tocar-ho per reintentar-ho.",
       "unavailable": "Aquesta sol·licitud ja no està en espera."
     }
@@ -1530,7 +1531,9 @@
       "githubError": "No s'ha pogut obrir la configuració de GitHub. Torna-ho a provar.",
       "gitlabAccount": "el compte de GitLab",
       "gitlabError": "No s'ha pogut obrir la configuració de GitLab. Torna-ho a provar.",
-      "description": "Connecta {{label}} a Kilo per revisar automàticament les sol·licituds d'integració."
+      "description": "Connecta {{label}} a Kilo per revisar automàticament les sol·licituds d'integració.",
+      "notConnectedTitle": "{{platform}} no està connectat",
+      "githubAdminOnlyDescription": "Només els propietaris i els administradors de l'organització poden connectar-lo."
     },
     "overview": {
       "allAreas": "Totes les àrees",
@@ -2300,6 +2303,7 @@
       "couldNotLoadThisSession": "No s'ha pogut carregar aquesta sessió.",
       "historyTooLarge": "La transcripció d'aquesta sessió és massa gran per carregar-la.",
       "historyUnavailable": "No es pot llegir la transcripció d'aquesta sessió.",
+      "historyTemporarilyUnavailable": "La transcripció d'aquesta sessió no està disponible temporalment.",
       "cloneFailedRetry": "No s'ha pogut clonar aquesta sessió. Torna-ho a provar.",
       "notEnoughCredits": "No tens prou crèdits per a aquesta sol·licitud. Afegeix crèdits i torna-ho a provar.",
       "previousTaskFinishing": "La tasca anterior encara no ha acabat. Espera un moment.",
@@ -2840,7 +2844,9 @@
       "skip": "Omet",
       "retrySkip": "Torna a provar d'ometre",
       "submitting": "Enviant…",
-      "sendAnswers": "Envia les respostes"
+      "sendAnswers": "Envia les respostes",
+      "unreadableTitle": "No s'ha pogut mostrar aquesta pregunta",
+      "unreadableBody": "L'agent està esperant una pregunta que aquesta aplicació no pot mostrar. Responeu la pregunta al CLI per continuar."
     },
     "blockingCard": {
       "questionUnavailable": "Aquesta pregunta ja no està disponible.",
@@ -2867,6 +2873,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "No s'ha pogut carregar la sessió de l'agent secundari.",
+      "historyTooLarge": "L'historial d'aquest agent secundari és massa gran per carregar-lo.",
+      "historyUnavailable": "L'historial d'aquest agent secundari no està disponible.",
+      "historyTemporarilyUnavailable": "L'historial d'aquest agent secundari no està disponible temporalment.",
       "failed": "La sessió de l'agent secundari ha fallat.",
       "noMessages": "No hi ha missatges de l'agent secundari",
       "noMessagesDescription": "La sessió de l'agent secundari ha acabat sense generar cap transcripció.",
@@ -3455,6 +3464,8 @@
     "voiceTranscriptionWho": "El teu dispositiu, Kilo Gateway amb el model de transcripció que triïs, o Apple o Google per al reconeixement en línia.",
     "installAttributionPromptTitle": "Vols permetre l'atribució de la instal·lació?",
     "installAttributionPromptMessage": "Kilo només utilitza el permís de seguiment d'Apple per saber per quin canal has arribat aquí. Mai no s'utilitzen els teus missatges ni les teves converses.",
+    "installAttributionRequestFailedTitle": "No s'ha pogut mostrar la sol·licitud de seguiment",
+    "installAttributionRequestFailedMessage": "Kilo no ha pogut mostrar la sol·licitud del sistema, així que l'atribució de la instal·lació queda desactivada.",
     "what": "Què",
     "why": "Per què",
     "who": "Qui"
@@ -3470,7 +3481,7 @@
   "organization": {
     "auditLog": {
       "title": "Registre d'auditoria",
-      "permissionDenied": "Només un propietari, administrador o gestor de facturació d'una organització amb el pla Enterprise pot consultar-ne el registre d'auditoria.",
+      "permissionDenied": "Només un propietari, administrador o gestor de facturació d'una organització amb el pla Enterprise pot consultar-ne el registre d'auditoria. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "No hi ha esdeveniments d'auditoria",
       "emptyDescription": "Aquí apareixen les accions fetes en aquesta organització.",
       "truncated": "Es mostren els esdeveniments més recents.",
@@ -3520,11 +3531,152 @@
         "guardrailUpdate": "Salvaguarda actualitzada",
         "guardrailRemove": "Salvaguarda eliminada",
         "unknown": "Esdeveniment d'auditoria"
+      },
+      "detail": {
+        "fieldChange": "{{field}}: {{change}}",
+        "modeIdentity": "Mode \"{{name}}\" (identificador: {{slug}})",
+        "modeUpdate": "Mode \"{{name}}\": {{changes}}",
+        "field": {
+          "name": "$t(organization.modes.nameLabel)",
+          "slug": "$t(organization.modes.identifierLabel)",
+          "roleDefinition": "$t(organization.modes.roleLabel)",
+          "whenToUse": "$t(organization.modes.whenToUseLabel)",
+          "description": "$t(organization.modes.descriptionLabel)",
+          "customInstructions": "$t(codeReviewer.instructions.title)",
+          "groups": "$t(profiles.agents.tools)",
+          "autoRoute": "Enrutament automàtic",
+          "defaultModel": "Model per defecte"
+        },
+        "role": {
+          "owner": "$t(organization.members.roles.owner)",
+          "admin": "$t(organization.members.roles.admin)",
+          "billing_manager": "$t(organization.members.roles.billingManager)",
+          "member": "$t(organization.members.roles.member)"
+        },
+        "memberRole": "{{email}}: {{change}}",
+        "memberAdded": "Afegit {{email}} com a {{role}}",
+        "memberRemoved": "Eliminat {{email}}",
+        "memberParentAdded": "Afegit {{email}} de l'organització principal {{parent}}",
+        "memberParentRemoved": "Eliminat {{email}} de l'organització principal {{parent}}",
+        "inviteSent": "{{email}} com a {{role}}",
+        "inviteRevoked": "Invitació revocada per a {{email}}",
+        "inviteAccepted": "Invitació acceptada per {{email}}",
+        "groupIdentity": "Grup \"{{name}}\"",
+        "groupMembers": "Grup \"{{name}}\": {{members}}",
+        "groupMemberGroups": "{{displayCount}} grups",
+        "groupMemberGroups_many": "{{displayCount}} de grups",
+        "groupMemberGroups_one": "{{displayCount}} grup",
+        "groupMemberGroups_other": "{{displayCount}} grups",
+        "groupMemberGroupsOf": "{{email}}: {{displayCount}} grups",
+        "groupMemberGroupsOf_many": "{{email}}: {{displayCount}} de grups",
+        "groupMemberGroupsOf_one": "{{email}}: {{displayCount}} grup",
+        "groupMemberGroupsOf_other": "{{email}}: {{displayCount}} grups",
+        "groupPolicySet": "Grup \"{{name}}\": política {{policy}} establerta",
+        "groupPolicyRemoved": "Grup \"{{name}}\": política {{policy}} eliminada",
+        "groupDefaultPolicySet": "Política {{policy}} per defecte establerta",
+        "groupDefaultPolicyRemoved": "Política {{policy}} per defecte eliminada",
+        "guardrailIdentity": "{{type}} \"{{name}}\"",
+        "guardrailStatus": "{{type}} \"{{name}}\" {{state}}",
+        "guardrailConfig": "Salvaguardes d'IA {{state}}",
+        "guardrailConfigGroup": "{{state}} per al grup \"{{group}}\"",
+        "guardrailEnforcement": "{{target}}: {{value}}",
+        "guardrailSkill": "{{target}}: {{values}}",
+        "guardrailTarget": {
+          "mcp": "$t(profiles.mcp.title)",
+          "skill": "$t(profiles.skillsTitle)"
+        },
+        "ssoDomainSet": "Domini SSO {{domain}}",
+        "ssoDomainChanged": "{{domain}} (abans {{previous}})",
+        "ssoDomainRemoved": "Domini SSO {{domain}} esborrat",
+        "fundsPurchased": "{{amount}} per {{method}}",
+        "fundsGranted": "{{amount}}",
+        "fundsDistributed": "{{amount}} a {{displayCount}} organitzacions filles",
+        "fundsDistributed_many": "{{amount}} a {{displayCount}} d’organitzacions filles",
+        "fundsDistributed_one": "{{amount}} a {{displayCount}} organització filla",
+        "fundsDistributed_other": "{{amount}} a {{displayCount}} organitzacions filles",
+        "fundsReceived": "{{amount}} de {{parent}}",
+        "reviewAgentPlatform": "{{platform}}",
+        "reviewAgentConfig": "Configuració de {{platform}}",
+        "reviewAgentConfigStyle": "{{platform}}: estil {{style}}",
+        "reviewAgentSecretsUpdated": "{{displayCount}} actualitzats",
+        "reviewAgentSecretsUpdated_many": "{{displayCount}} d’actualitzats",
+        "reviewAgentSecretsUpdated_one": "{{displayCount}} actualitzat",
+        "reviewAgentSecretsUpdated_other": "{{displayCount}} actualitzats",
+        "reviewAgentSecretsFailed": "{{displayCount}} errors",
+        "reviewAgentSecretsFailed_many": "{{displayCount}} d’errors",
+        "reviewAgentSecretsFailed_one": "{{displayCount}} error",
+        "reviewAgentSecretsFailed_other": "{{displayCount}} errors",
+        "reviewAgentSecretRotated": "{{values}}",
+        "settingAdvancedPolicies": "{{values}}",
+        "settingAdvancedPoliciesOpenRouter": "OpenRouter {{state}}",
+        "settingAdvancedPoliciesRegion": "Regió d'inferència: {{region}}",
+        "settingDefaultModelSet": "{{next}}",
+        "settingDefaultModelRemoved": "{{previous}}",
+        "settingAutoRoute": "Mode \"{{mode}}\": {{change}}",
+        "settingDefaultBehavior": {
+          "global": "Predeterminat global",
+          "specific": "{{model}}",
+          "auto": "$t(models.auto.organization)"
+        },
+        "settingDataCollection": "{{mode}}",
+        "dataCollection": {
+          "allowed": "Permesa",
+          "denied": "Denegada",
+          "followSetting": "Segueix la configuració de l'extensió"
+        },
+        "region": {
+          "us": "$t(organizationModelAccess.region.us)",
+          "eu": "$t(organizationModelAccess.region.eu)",
+          "au": "$t(organizationModelAccess.region.au)",
+          "jp": "$t(organizationModelAccess.region.jp)"
+        },
+        "settingProjectsUi": "IU de Projects {{state}}",
+        "settingMinimumBalanceOn": "{{threshold}} a {{emails}}",
+        "settingMinimumBalanceThreshold": "{{threshold}}",
+        "settingRecommendationsDigest": "Resum de recomanacions {{state}}",
+        "settingBrowserControl": "{{policy}}",
+        "settingBrowserControlOrigins": "{{policy}}: {{origins}}",
+        "settingBrowserControlOriginsCleared": "{{policy}}: cap origen permès",
+        "settingName": "Reanomenat de {{previous}} a {{next}}",
+        "enabled": "$t(common.enabled)",
+        "scanBeforeUseOn": "Escaneig abans d'usar activat",
+        "scanBeforeUseOff": "Escaneig abans d'usar desactivat",
+        "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingRemoved": "Eliminats: {{models}}",
+        "browserPolicyOff": "Ús del navegador bloquejat",
+        "browserPolicyAllow": "Només orígens permesos",
+        "browserPolicyPlaywrightOnly": "Només el navegador integrat",
+        "disabled": "$t(common.disabled)",
+        "autoRouting": "Models canviats: {{values}}",
+        "integrationConnected": "S'ha connectat {{integration}}",
+        "integrationDisconnected": "S'ha desconnectat {{integration}}",
+        "integrationRefreshed": "S'ha actualitzat {{integration}}",
+        "integrationCancelled": "S'ha cancel·lat {{integration}}",
+        "integrationModelUpdated": "{{integration}}: model d'IA {{model}}",
+        "integrationKeyAdded": "Clau afegida per a {{provider}}",
+        "integrationKeyUpdated": "Clau actualitzada per a {{provider}}",
+        "integrationKeyDeleted": "Clau eliminada per a {{provider}}",
+        "integrationKeyToggled": "Clau per a {{provider}}: {{state}}",
+        "namedPolicyCreated": "Política {{kind}} creada {{id}}",
+        "namedPolicyUpdated": "Política {{kind}} actualitzada {{id}}",
+        "namedPolicyDeleted": "Política {{kind}} eliminada {{id}}",
+        "namedPolicyLinked": "Política {{kind}} vinculada {{next}}",
+        "webhookTriggerUpdated": "Disparador {{trigger}}",
+        "organizationRenamed": "Organització reanomenada de {{previous}} a {{next}}",
+        "brand": {
+          "github": "$t(common.github)",
+          "gitlab": "$t(common.gitlab)",
+          "bitbucket": "$t(agentChat.repoPicker.platformBitbucket)",
+          "discord": "$t(profile.providerDiscord)",
+          "slack": "$t(agentChat.sessionFilter.platformSlack)",
+          "linear": "$t(agentChat.sessionFilter.platformLinear)",
+          "byok": "La teva pròpia clau d'API"
+        }
       }
     },
     "billing": {
       "title": "Facturació",
-      "permissionDenied": "Només un propietari, administrador o gestor de facturació de l'organització en pot veure la facturació.",
+      "permissionDenied": "Només un propietari, administrador o gestor de facturació de l'organització en pot veure la facturació. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Subscripció",
       "state": "Estat",
       "stateNone": "Sense subscripció",
@@ -3701,7 +3853,7 @@
       "emptyDescription": "Utilitza «Hora anterior» per veure les sol·licituds anteriors.",
       "emptyBoundDescription": "Els registres de sol·licituds no arriben més enrere.",
       "loadError": "No s'han pogut carregar els registres de sol·licituds.",
-      "permissionDenied": "Només un propietari, administrador o gestor de facturació d'una organització pot consultar-ne els registres de sol·licituds.",
+      "permissionDenied": "Només un propietari, administrador o gestor de facturació d'una organització pot consultar-ne els registres de sol·licituds. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} d'entrada · {{output}} de sortida",
       "byok": "BYOK"
     },
@@ -3981,7 +4133,10 @@
     "list": {
       "loadFailed": "No s'ha pogut carregar l'historial del xat.",
       "new": "Xat nou",
-      "deleteTitle": "Vols suprimir aquest xat?"
+      "deleteTitle": "Vols suprimir aquest xat?",
+      "resetNoticeTitle": "Els xats i esborranys locals s'han esborrat",
+      "resetNoticeBody": "Kilo no ha pogut obrir els xats desats en aquest dispositiu. Les teves sessions al núvol no es veuen afectades.",
+      "resetNoticeDismiss": "Descarta l'avís"
     },
     "rename": {
       "title": "Reanomena el xat",
@@ -4031,6 +4186,9 @@
       "fieldName": "Nom que es mostra",
       "fieldUrl": "URL del servidor",
       "fieldUrlInvalid": "Introdueix una URL de servidor vàlida.",
+      "fieldUrlCredentials": "Elimina el nom d'usuari i la contrasenya de la URL.",
+      "fieldUrlFragment": "Elimina la part # de la URL.",
+      "fieldUrlInsecure": "Introdueix una URL https, o http només per a localhost.",
       "duplicateUrl": "Aquesta URL ja està desada.",
       "serverNotFound": "Aquest servidor ja no està desat.",
       "enableServer": "Activa aquest servidor: {{name}}",
@@ -4057,6 +4215,7 @@
       "app": {
         "label": "Interfície de l'eina",
         "failed": "No s'ha pogut carregar la interfície d'aquesta eina.",
+        "tooLarge": "La interfície d'aquesta eina és més gran que el límit de {{size}}.",
         "empty": "La interfície d'aquesta eina no té res a mostrar."
       }
     },
@@ -4819,7 +4978,7 @@
     "defaultModel": "Usa el model per defecte de Kilo",
     "duration": "Límit de temps (minuts)",
     "spendLimit": "Límit de despesa (USD)",
-    "invalidSafeguards": "Introdueix límits de temps i despesa positius i finits.",
+    "invalidSafeguards": "Introdueix un nombre positiu dins del rang permès.",
     "estimate": "Estimació {{estimate}} · màxim {{maximum}}",
     "estimateUnavailable": "No hi ha cap resum de pagament disponible per a aquesta configuració. Canvia el model o els límits, o torna-ho a provar més tard.",
     "confirmPaid": "Vols activar els resums de pagament per a {{context}}?",
@@ -4894,7 +5053,8 @@
     "unavailableTitle": "Ús no disponible",
     "unavailableDescription": "L'ús no està configurat per a aquest espai de treball. Contacta amb el servei d'assistència si esperes veure l'ús aquí.",
     "orgSelfNotice": "Estàs veient el teu propi ús en aquesta organització.",
-    "viewDetails": "Mostra els detalls d'ús"
+    "viewDetails": "Mostra els detalls d'ús",
+    "orgSelfEntryTitle": "El teu ús"
   },
   "integrations": {
     "title": "Integracions",
@@ -4990,6 +5150,8 @@
       "autoCommit": "Confirma els canvis quan acabi l'execució",
       "condenseOnComplete": "Condensa el context quan acabi l'execució",
       "activeTitle": "Disparador actiu",
+      "activeSwitchA11y": "Disparador actiu: {{name}}",
+      "copyLinkA11y": "Copia l'enllaç de {{name}}",
       "activeDescription": "Els ganxos web en pausa responen amb 404.",
       "runAsCreator": "Executa com a mi",
       "runAsCreatorDescription": "Cada execució utilitza el teu compte, així que la capçalera secreta és obligatòria.",

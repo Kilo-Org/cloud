@@ -1,5 +1,6 @@
 import { type Href } from 'expo-router';
 /* eslint-disable max-lines -- one mounted harness pins the mode badge, draft restore, save ownership, row layout, manage slot, and delete confirmation */
+import { type QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createElement, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -76,7 +77,41 @@ vi.mock('@/components/ui/icons', () => ({
   Trash2: 'Trash2',
   Plus: 'Plus',
 }));
-vi.mock('@/components/profiles/agent-form-sheet', () => ({ AgentFormSheet: 'AgentFormSheet' }));
+vi.mock('@/components/profiles/agent-form-sheet', async () => {
+  // vi.mock factories are hoisted above this module's imports, so the React,
+  // i18n and draft helpers load inside the factory. The stand-in keeps the
+  // screen's props on its host element and renders the two fields whose text the
+  // sheet's own draft holds (`agent-form-sheet.tsx` writes `slug` and `name`),
+  // so a case can type into them and read what a remount restores.
+  const { createElement: create } = await import('react');
+  const { i18n: translate } = await import('@/i18n');
+  const { useFormDraftRef } = await import('@/lib/form-draft');
+  function AgentFormSheet(props: { draftScope?: string }) {
+    const slugRef = useFormDraftRef(props.draftScope, 'slug', '');
+    const nameRef = useFormDraftRef(props.draftScope, 'name', '');
+    return create(
+      'AgentFormSheet',
+      props,
+      create('FormField', {
+        key: 'slug',
+        label: translate.t('profiles.agents.slug'),
+        defaultValue: slugRef.current,
+        onChangeText: (value: string) => {
+          slugRef.current = value;
+        },
+      }),
+      create('FormField', {
+        key: 'name',
+        label: translate.t('profiles.agents.name'),
+        defaultValue: nameRef.current,
+        onChangeText: (value: string) => {
+          nameRef.current = value;
+        },
+      })
+    );
+  }
+  return { AgentFormSheet };
+});
 
 function agent(id: string, mode: AgentSource['config']['mode']): AgentSource {
   return { id, slug: id, name: id, config: mode === undefined ? {} : { mode } };
@@ -278,6 +313,40 @@ function pressAdd(renderer: MountedRenderer): void {
   act(() => {
     (button.props as { onPress: () => void }).onPress();
   });
+}
+
+/** The props one sheet field stub carries; the renderer keeps them untyped. */
+type FieldProps = { defaultValue?: string; onChangeText?: (text: string) => void };
+
+/** The sheet field the stub renders under `label`. */
+function findField(renderer: MountedRenderer, label: string) {
+  const field = nodesOfType(renderer, 'FormField').find(node => node.props.label === label);
+  if (!field) {
+    throw new Error(`field ${label} was not rendered`);
+  }
+  return field;
+}
+
+/** Type into one sheet field, which writes the scope's draft as the sheet does. */
+function changeText(renderer: MountedRenderer, label: string, value: string): void {
+  const field = findField(renderer, label).props as FieldProps;
+  act(() => {
+    field.onChangeText?.(value);
+  });
+}
+
+/** Re-render the mounted screen against fresh mock state, keeping the providers. */
+function rerenderScreen(renderer: MountedRenderer, queryClient: QueryClient): void {
+  renderer.update(
+    createElement(
+      QueryClientProvider,
+      { client: queryClient },
+      createElement(ProfileAgentsScreen, {
+        profileId: 'profile-1',
+        backFallback: PROFILES_LIST_HREF,
+      })
+    )
+  );
 }
 
 describe('ProfileAgentsScreen save ownership', () => {
@@ -592,6 +661,103 @@ describe('ProfileAgentsScreen agent cap', () => {
     });
 
     expect(openSheet(renderer).props.saveFailure).toEqual({ kind: 'refused' });
+
+    unmount();
+  });
+});
+
+/** A sheet draft typed while the role allowed the write; the store keeps it past an unmount. */
+async function seedSheetDraft(): Promise<void> {
+  const first = await mountScreen();
+  pressAdd(first.renderer);
+  changeText(first.renderer, i18n.t('profiles.agents.slug'), 'portal-agent');
+  changeText(first.renderer, i18n.t('profiles.agents.name'), 'Portal agent');
+  first.unmount();
+}
+
+describe('ProfileAgentsScreen manage permission', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetFormDraftsForTests();
+    h.permission = 'allowed';
+    h.query.data = [agent('alpha', 'primary')];
+    h.query.isError = false;
+    h.query.isPending = false;
+    h.query.isRefetching = false;
+    for (const mutation of Object.values(h.mutations)) {
+      Object.assign(mutation, { isPending: false });
+    }
+  });
+
+  it('renders no sheet for a stored draft once the role is read-only, and states the role once', async () => {
+    await seedSheetDraft();
+    h.permission = 'read-only';
+
+    const { renderer, unmount } = await mountScreen();
+
+    expect(nodesOfType(renderer, 'AgentFormSheet')).toHaveLength(0);
+    expect(
+      screenTexts(renderer).filter(text => text === i18n.t('profiles.organizationRoleRequired'))
+    ).toHaveLength(1);
+
+    unmount();
+  });
+
+  it('drops that draft with the denial, so a later allowed render stays closed', async () => {
+    await seedSheetDraft();
+    h.permission = 'read-only';
+
+    const denied = await mountScreen();
+    expect(nodesOfType(denied.renderer, 'AgentFormSheet')).toHaveLength(0);
+    denied.unmount();
+
+    h.permission = 'allowed';
+    const allowed = await mountScreen();
+    expect(nodesOfType(allowed.renderer, 'AgentFormSheet')).toHaveLength(0);
+    allowed.unmount();
+  });
+
+  it('keeps the draft while the role resolves, then reopens on the typed fields', async () => {
+    await seedSheetDraft();
+    h.permission = 'resolving';
+
+    const resolving = await mountScreen();
+    expect(nodesOfType(resolving.renderer, 'AgentFormSheet')).toHaveLength(0);
+
+    h.permission = 'allowed';
+    await act(async () => {
+      rerenderScreen(resolving.renderer, resolving.queryClient);
+      await Promise.resolve();
+    });
+
+    expect(nodesOfType(resolving.renderer, 'AgentFormSheet')).toHaveLength(1);
+    const slug = findField(resolving.renderer, i18n.t('profiles.agents.slug')).props as FieldProps;
+    const name = findField(resolving.renderer, i18n.t('profiles.agents.name')).props as FieldProps;
+    expect(slug.defaultValue).toBe('portal-agent');
+    expect(name.defaultValue).toBe('Portal agent');
+
+    resolving.unmount();
+  });
+
+  it('closes the open sheet when the role is denied and does not reopen it when it returns', async () => {
+    const { renderer, queryClient, unmount } = await mountScreen();
+    pressAdd(renderer);
+    expect(nodesOfType(renderer, 'AgentFormSheet')).toHaveLength(1);
+    changeText(renderer, i18n.t('profiles.agents.slug'), 'portal-agent');
+
+    h.permission = 'read-only';
+    await act(async () => {
+      rerenderScreen(renderer, queryClient);
+      await Promise.resolve();
+    });
+    expect(nodesOfType(renderer, 'AgentFormSheet')).toHaveLength(0);
+
+    h.permission = 'allowed';
+    await act(async () => {
+      rerenderScreen(renderer, queryClient);
+      await Promise.resolve();
+    });
+    expect(nodesOfType(renderer, 'AgentFormSheet')).toHaveLength(0);
 
     unmount();
   });

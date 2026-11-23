@@ -38,6 +38,9 @@ describe('scheduler initialization across dispatch ticks (production migrations 
     );
     sqlite = new DatabaseSync(':memory:');
     applyBenchmarkMigrations(sqlite);
+    sqlite
+      .prepare('INSERT INTO benchmark_cutover (id, cutover_at) VALUES (1, ?)')
+      .run('1970-01-01T00:00:00.000Z');
     setupDb = sqliteD1(sqlite);
     sent = [];
     tickStartedAt = null;
@@ -75,11 +78,11 @@ describe('scheduler initialization across dispatch ticks (production migrations 
       INSERT INTO benchmark_runs (
         id, router, kind, purpose, status, started_at,
         min_accuracy, switch_cost_factor, max_concurrency, repetitions, engine_identity,
-        benchmark_user_id, benchmark_org_id
+        benchmark_user_id, benchmark_org_id, admission_marker
       ) VALUES (?, 'efficient', 'decider', ?, 'running', ?, 0.7, 3, 0, ?, 'scheduler-init-test',
-        'scheduler-user', 'scheduler-org')
+        'scheduler-user', 'scheduler-org', ?)
     `)
-      .run(id, purpose, new Date(NOW).toISOString(), repetitions);
+      .run(id, purpose, new Date(NOW).toISOString(), repetitions, crypto.randomUUID());
     const model = sqlite.prepare(
       "INSERT INTO run_models (run_id, model, variant, enqueued) VALUES (?, ?, '', 1)"
     );
@@ -137,7 +140,7 @@ describe('scheduler initialization across dispatch ticks (production migrations 
   }
 
   it('settles failed-lane tails without completing a run that still has runnable work', async () => {
-    insertRun('settled', 'user', 2, 1);
+    insertRun('settled', 'platform', 2, 1);
     insertRun('busy', 'platform', 1, 1);
     for (const id of ['settled', 'busy']) {
       await scheduleRunChunks(setupDb, {
@@ -207,7 +210,7 @@ describe('scheduler initialization across dispatch ticks (production migrations 
     'fails a run without %s and releases its profiles without blocking a sibling',
     async column => {
       insertRun('invalid', 'platform', 1, 1);
-      insertRun('healthy', 'user', 1, 1);
+      insertRun('healthy', 'platform', 1, 1);
       sqlite.prepare(`UPDATE benchmark_runs SET ${column} = NULL WHERE id = 'invalid'`).run();
       sqlite
         .prepare(`INSERT INTO benchmark_profiles (
@@ -239,12 +242,12 @@ describe('scheduler initialization across dispatch ticks (production migrations 
       INSERT INTO benchmark_runs (
         id, router, kind, purpose, status, started_at,
         min_accuracy, switch_cost_factor, max_concurrency, repetitions, engine_identity,
-        benchmark_user_id, benchmark_org_id
+        benchmark_user_id, benchmark_org_id, admission_marker
       ) VALUES (?, 'efficient', 'decider', 'platform', ?, ?, 0.7, 3, 0, 1, 'scheduler-init-test',
-        'scheduler-user', 'scheduler-org')
+        'scheduler-user', 'scheduler-org', ?)
     `);
-    run.run('prior', 'completed', new Date(NOW - 86400_000).toISOString());
-    run.run('fresh', 'running', new Date(NOW).toISOString());
+    run.run('prior', 'completed', new Date(NOW - 86400_000).toISOString(), crypto.randomUUID());
+    run.run('fresh', 'running', new Date(NOW).toISOString(), crypto.randomUUID());
     const runModel = sqlite.prepare(
       "INSERT INTO run_models (run_id, model, variant, enqueued) VALUES ('fresh', ?, '', 1)"
     );
@@ -321,7 +324,7 @@ describe('scheduler initialization across dispatch ticks (production migrations 
     const maxTicks = 60;
     const minNewChunksPerTick = 1_500;
     await insertInitializedRun('steady');
-    insertRun('large', 'user', entries, repetitions);
+    insertRun('large', 'platform', entries, repetitions);
 
     let previous = 0;
     let ticks = 0;
@@ -371,7 +374,7 @@ describe('scheduler initialization across dispatch ticks (production migrations 
 
   it('claims while another pass holds the initialization lease and initializes after it expires', async () => {
     await insertInitializedRun('steady');
-    insertRun('waiting', 'user', 1, 1);
+    insertRun('waiting', 'platform', 1, 1);
     expect(await acquireInitializationLease(setupDb, 'other-pass', Date.now())).toBe(true);
 
     const held = await tick();
@@ -386,7 +389,7 @@ describe('scheduler initialization across dispatch ticks (production migrations 
   });
 
   it('stops materializing a run that stops running mid-pass and in later ticks', async () => {
-    insertRun('abandoned', 'user', 8, 1);
+    insertRun('abandoned', 'platform', 8, 1);
     const stopAfter = 500;
     onD1Call = () => {
       if (chunkCount('abandoned') >= stopAfter) {
@@ -455,8 +458,8 @@ describe('scheduler initialization across dispatch ticks (production migrations 
       { length: MAX_RUNNING_RUNS_PER_QUEUE * 4 },
       (_, index) => `settled-${String(index).padStart(2, '0')}`
     );
-    for (const [index, runId] of runIds.entries()) {
-      insertRun(runId, index % 2 === 0 ? 'platform' : 'user', 1, 1);
+    for (const runId of runIds) {
+      insertRun(runId, 'platform', 1, 1);
       await scheduleRunChunks(setupDb, {
         runId,
         entries: [{ model: `${runId}/model-0`, variant: null }],

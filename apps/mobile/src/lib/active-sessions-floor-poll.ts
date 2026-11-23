@@ -286,9 +286,6 @@ export function useActiveSessionsFloorPoll({
         }
       }
     };
-    // One leading tick on the gate's false->true edge, then the unchanged
-    // interval. `tick` owns every guard, so a backgrounded, hidden-cache or
-    // already-in-flight arm leads to no request.
     const shouldLeadTick = !armed.current;
     armed.current = true;
     if (shouldLeadTick) {

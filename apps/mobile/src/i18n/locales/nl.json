@@ -399,7 +399,7 @@
       "title": "Providersleutels",
       "rowSubtitle": "Facturering via je eigen provider",
       "orgDescription": "Deze sleutels worden gedeeld met iedereen in de organisatie en gefactureerd aan de provideraccounts van de organisatie.",
-      "viewOnly": "Alleen een eigenaar, beheerder of factureringsbeheerder van de organisatie kan de sleutels wijzigen.",
+      "viewOnly": "Alleen een eigenaar, beheerder of factuurbeheerder van de organisatie kan de sleutels wijzigen.",
       "description": "Verzoeken via deze sleutels worden gefactureerd aan je provideraccount in plaats van afgeschreven van je Kilo-saldo.",
       "managedByPlan": "Beheerd door je codeerabonnement",
       "enableKey": "Sleutel van {{provider}} inschakelen",
@@ -676,6 +676,7 @@
     "needsInputAction": {
       "approved": "Verzoek goedgekeurd",
       "replied": "Antwoord verzonden",
+      "empty": "Typ een antwoord en verstuur het daarna.",
       "failed": "Kon niet antwoorden. Tik nogmaals om het opnieuw te proberen.",
       "unavailable": "Dit verzoek wacht niet langer."
     }
@@ -817,6 +818,8 @@
     },
     "providerConnect": {
       "description": "Koppel de Kilo {{label}} om PR's automatisch te laten beoordelen.",
+      "notConnectedTitle": "{{platform}} is niet gekoppeld",
+      "githubAdminOnlyDescription": "Alleen organisatie-eigenaren en beheerders kunnen de koppeling instellen.",
       "githubApp": "GitHub-app",
       "githubError": "Het instellen van GitHub kon niet worden geopend. Probeer het opnieuw.",
       "gitlabAccount": "GitLab-account",
@@ -1026,7 +1029,7 @@
       "empty": "Nog geen reviews met statistieken",
       "emptyDescription": "Statistieken leggen afgeronde reviews vast zolang ze voor de organisatie zijn ingeschakeld.",
       "offTitle": "Statistieken staan uit voor {{platform}}",
-      "offDescription": "De facturatierollen van de organisatie (eigenaren, beheerders en facturatiemanagers) kunnen statistieken inschakelen in de organisatie-instellingen op het web om afgeronde reviews vast te leggen.",
+      "offDescription": "De facturatierollen van de organisatie (eigenaren, beheerders en factuurbeheerders) kunnen statistieken inschakelen in de organisatie-instellingen op het web om afgeronde reviews vast te leggen.",
       "couldNotLoad": "Kan statistieken niet laden",
       "trackedReviewsCaption": "Reviews die in deze periode zijn afgerond terwijl statistieken waren ingeschakeld. Lopende en mislukte reviews worden nooit meegeteld.",
       "trackedReviewsUncounted": "Niet meegeteld: {{displayCount}} van de {{displayTotal}} afgeronde reviews van de organisatie, zonder vastgelegd resultaat.",
@@ -1689,6 +1692,7 @@
       "couldNotLoadThisSession": "Deze sessie kon niet worden geladen.",
       "historyTooLarge": "Het transcript van deze sessie is te groot om te laden.",
       "historyUnavailable": "Het transcript van deze sessie kan niet worden gelezen.",
+      "historyTemporarilyUnavailable": "Het transcript van deze sessie is tijdelijk niet beschikbaar.",
       "cloneFailedRetry": "Deze sessie kon niet worden gekloond. Probeer het opnieuw.",
       "notEnoughCredits": "Je hebt onvoldoende tegoed voor dit verzoek. Vul je tegoed aan en probeer het opnieuw.",
       "previousTaskFinishing": "De vorige taak wordt nog afgerond. Wacht even.",
@@ -2225,7 +2229,9 @@
       "skip": "Overslaan",
       "retrySkip": "Opnieuw overslaan",
       "submitting": "Verzenden…",
-      "sendAnswers": "Antwoorden verzenden"
+      "sendAnswers": "Antwoorden verzenden",
+      "unreadableTitle": "Deze vraag kon niet worden weergegeven",
+      "unreadableBody": "De agent wacht op een vraag die deze app niet kan tonen. Beantwoord hem in de CLI om door te gaan."
     },
     "blockingCard": {
       "questionUnavailable": "Deze vraag is niet meer beschikbaar.",
@@ -2252,6 +2258,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "De sessie van de hulpagent kon niet worden geladen.",
+      "historyTooLarge": "De geschiedenis van deze hulpagent is te groot om te laden.",
+      "historyUnavailable": "De geschiedenis van deze hulpagent is niet beschikbaar.",
+      "historyTemporarilyUnavailable": "De geschiedenis van deze hulpagent is tijdelijk niet beschikbaar.",
       "failed": "De sessie van de hulpagent is mislukt.",
       "noMessages": "Geen berichten van de hulpagent",
       "noMessagesDescription": "De sessie van deze hulpagent is voltooid zonder gespreksverloop vast te leggen.",
@@ -2832,6 +2841,8 @@
     "why": "Waarom",
     "who": "Wie",
     "installAttributionPromptMessage": "Kilo gebruikt de trackingtoestemming van Apple alleen om te bepalen via welk kanaal je de app hebt gevonden. Je prompts en gesprekken worden hiervoor nooit gebruikt.",
+    "installAttributionRequestFailedTitle": "Trackingprompt kon niet worden getoond",
+    "installAttributionRequestFailedMessage": "Kilo kon de systeemprompt niet tonen, dus installatiebron bijhouden blijft uit.",
     "installAttributionPromptTitle": "Bijhouden van de installatiebron toestaan?"
   },
   "prReview": {
@@ -3399,7 +3410,7 @@
   "organization": {
     "auditLog": {
       "title": "Auditlogboek",
-      "permissionDenied": "Alleen een eigenaar, beheerder of factureringsbeheerder van een organisatie met het Enterprise-plan kan het auditlogboek bekijken.",
+      "permissionDenied": "Alleen een eigenaar, beheerder of factuurbeheerder van een organisatie met het Enterprise-plan kan het auditlogboek bekijken. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Geen auditgebeurtenissen",
       "emptyDescription": "Acties die in deze organisatie worden uitgevoerd, verschijnen hier.",
       "truncated": "De meest recente gebeurtenissen worden weergegeven.",
@@ -3449,11 +3460,147 @@
         "guardrailUpdate": "Guardrail bijgewerkt",
         "guardrailRemove": "Guardrail verwijderd",
         "unknown": "Auditgebeurtenis"
+      },
+      "detail": {
+        "fieldChange": "{{field}}: {{change}}",
+        "modeIdentity": "Modus \"{{name}}\" (identificatie: {{slug}})",
+        "modeUpdate": "Modus \"{{name}}\": {{changes}}",
+        "field": {
+          "name": "$t(organization.modes.nameLabel)",
+          "slug": "$t(organization.modes.identifierLabel)",
+          "roleDefinition": "$t(organization.modes.roleLabel)",
+          "whenToUse": "$t(organization.modes.whenToUseLabel)",
+          "description": "$t(organization.modes.descriptionLabel)",
+          "customInstructions": "$t(codeReviewer.instructions.title)",
+          "groups": "$t(profiles.agents.tools)",
+          "autoRoute": "Automatische routering",
+          "defaultModel": "Standaardmodel"
+        },
+        "role": {
+          "owner": "$t(organization.members.roles.owner)",
+          "admin": "$t(organization.members.roles.admin)",
+          "billing_manager": "$t(organization.members.roles.billingManager)",
+          "member": "$t(organization.members.roles.member)"
+        },
+        "memberRole": "{{email}}: {{change}}",
+        "memberAdded": "{{email}} toegevoegd als {{role}}",
+        "memberRemoved": "{{email}} verwijderd",
+        "memberParentAdded": "{{email}} toegevoegd vanuit bovenliggende organisatie {{parent}}",
+        "memberParentRemoved": "{{email}} verwijderd uit bovenliggende organisatie {{parent}}",
+        "inviteSent": "{{email}} als {{role}}",
+        "inviteRevoked": "Uitnodiging voor {{email}} ingetrokken",
+        "inviteAccepted": "{{email}} geaccepteerd",
+        "groupIdentity": "Groep \"{{name}}\"",
+        "groupMembers": "Groep \"{{name}}\": {{members}}",
+        "groupMemberGroups": "{{displayCount}} groepen",
+        "groupMemberGroups_one": "{{displayCount}} groep",
+        "groupMemberGroups_other": "{{displayCount}} groepen",
+        "groupMemberGroupsOf": "{{email}}: {{displayCount}} groepen",
+        "groupMemberGroupsOf_one": "{{email}}: {{displayCount}} groep",
+        "groupMemberGroupsOf_other": "{{email}}: {{displayCount}} groepen",
+        "groupPolicySet": "Groep \"{{name}}\": beleid voor {{policy}} ingesteld",
+        "groupPolicyRemoved": "Groep \"{{name}}\": beleid voor {{policy}} verwijderd",
+        "groupDefaultPolicySet": "Standaardbeleid voor {{policy}} ingesteld",
+        "groupDefaultPolicyRemoved": "Standaardbeleid voor {{policy}} verwijderd",
+        "guardrailIdentity": "{{type}} \"{{name}}\"",
+        "guardrailStatus": "{{type}} \"{{name}}\" {{state}}",
+        "guardrailConfig": "AI-beveiligingsmaatregelen {{state}}",
+        "guardrailConfigGroup": "{{state}} voor groep \"{{group}}\"",
+        "guardrailEnforcement": "{{target}}: {{value}}",
+        "guardrailSkill": "{{target}}: {{values}}",
+        "guardrailTarget": {
+          "mcp": "$t(profiles.mcp.title)",
+          "skill": "$t(profiles.skillsTitle)"
+        },
+        "ssoDomainSet": "SSO-domein {{domain}}",
+        "ssoDomainChanged": "{{domain}} (voorheen {{previous}})",
+        "ssoDomainRemoved": "SSO-domein {{domain}} gewist",
+        "fundsPurchased": "{{amount}} via {{method}}",
+        "fundsGranted": "{{amount}}",
+        "fundsDistributed": "{{amount}} naar {{displayCount}} dochterorganisaties",
+        "fundsDistributed_one": "{{amount}} naar {{displayCount}} dochterorganisatie",
+        "fundsDistributed_other": "{{amount}} naar {{displayCount}} dochterorganisaties",
+        "fundsReceived": "{{amount}} van {{parent}}",
+        "reviewAgentPlatform": "{{platform}}",
+        "reviewAgentConfig": "{{platform}}-configuratie",
+        "reviewAgentConfigStyle": "{{platform}}: stijl {{style}}",
+        "reviewAgentSecretsUpdated": "{{displayCount}} bijgewerkt",
+        "reviewAgentSecretsUpdated_one": "{{displayCount}} bijgewerkt",
+        "reviewAgentSecretsUpdated_other": "{{displayCount}} bijgewerkt",
+        "reviewAgentSecretsFailed": "{{displayCount}} fouten",
+        "reviewAgentSecretsFailed_one": "{{displayCount}} fout",
+        "reviewAgentSecretsFailed_other": "{{displayCount}} fouten",
+        "reviewAgentSecretRotated": "{{values}}",
+        "settingAdvancedPolicies": "{{values}}",
+        "settingAdvancedPoliciesOpenRouter": "OpenRouter {{state}}",
+        "settingAdvancedPoliciesRegion": "Inferentieregio: {{region}}",
+        "settingDefaultModelSet": "{{next}}",
+        "settingDefaultModelRemoved": "{{previous}}",
+        "settingAutoRoute": "Modus \"{{mode}}\": {{change}}",
+        "settingDefaultBehavior": {
+          "global": "Globale standaard",
+          "specific": "{{model}}",
+          "auto": "$t(models.auto.organization)"
+        },
+        "settingDataCollection": "{{mode}}",
+        "dataCollection": {
+          "allowed": "Toegestaan",
+          "denied": "Geweigerd",
+          "followSetting": "Volgt de instelling van de extensie"
+        },
+        "region": {
+          "us": "$t(organizationModelAccess.region.us)",
+          "eu": "$t(organizationModelAccess.region.eu)",
+          "au": "$t(organizationModelAccess.region.au)",
+          "jp": "$t(organizationModelAccess.region.jp)"
+        },
+        "settingProjectsUi": "Projecten UI {{state}}",
+        "settingMinimumBalanceOn": "{{threshold}} naar {{emails}}",
+        "settingMinimumBalanceThreshold": "{{threshold}}",
+        "settingRecommendationsDigest": "Aanbevelingenoverzicht {{state}}",
+        "settingBrowserControl": "{{policy}}",
+        "settingBrowserControlOrigins": "{{policy}}: {{origins}}",
+        "settingBrowserControlOriginsCleared": "{{policy}}: geen toegestane origins",
+        "settingName": "Hernoemd van {{previous}} naar {{next}}",
+        "enabled": "$t(common.enabled)",
+        "scanBeforeUseOn": "Scannen voor gebruik aan",
+        "scanBeforeUseOff": "Scannen voor gebruik uit",
+        "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingRemoved": "Verwijderd: {{models}}",
+        "browserPolicyOff": "Browsergebruik geblokkeerd",
+        "browserPolicyAllow": "Alleen toegestane origins",
+        "browserPolicyPlaywrightOnly": "Alleen browsergebruik",
+        "disabled": "$t(common.disabled)",
+        "autoRouting": "AI-modellen gewijzigd: {{values}}",
+        "integrationConnected": "{{integration}} gekoppeld",
+        "integrationDisconnected": "{{integration}} losgekoppeld",
+        "integrationRefreshed": "{{integration}} vernieuwd",
+        "integrationCancelled": "{{integration}} geannuleerd",
+        "integrationModelUpdated": "{{integration}}: AI-model {{model}}",
+        "integrationKeyAdded": "API-sleutel toegevoegd voor {{provider}}",
+        "integrationKeyUpdated": "API-sleutel bijgewerkt voor {{provider}}",
+        "integrationKeyDeleted": "API-sleutel verwijderd voor {{provider}}",
+        "integrationKeyToggled": "API-sleutel voor {{provider}}: {{state}}",
+        "namedPolicyCreated": "Beleid {{id}} van type {{kind}} aangemaakt",
+        "namedPolicyUpdated": "Beleid {{id}} van type {{kind}} bijgewerkt",
+        "namedPolicyDeleted": "Beleid {{id}} van type {{kind}} verwijderd",
+        "namedPolicyLinked": "Beleid van type {{kind}} gekoppeld aan {{next}}",
+        "webhookTriggerUpdated": "Aanleiding {{trigger}}",
+        "organizationRenamed": "Organisatie hernoemd van {{previous}} naar {{next}}",
+        "brand": {
+          "github": "$t(common.github)",
+          "gitlab": "$t(common.gitlab)",
+          "bitbucket": "$t(agentChat.repoPicker.platformBitbucket)",
+          "discord": "$t(profile.providerDiscord)",
+          "slack": "$t(agentChat.sessionFilter.platformSlack)",
+          "linear": "$t(agentChat.sessionFilter.platformLinear)",
+          "byok": "Je eigen API-sleutel"
+        }
       }
     },
     "billing": {
       "title": "Facturering",
-      "permissionDenied": "Alleen een eigenaar, beheerder of factuurbeheerder van de organisatie kan de facturering bekijken.",
+      "permissionDenied": "Alleen een eigenaar, beheerder of factuurbeheerder van de organisatie kan de facturering bekijken. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Abonnement",
       "state": "Status",
       "stateNone": "Geen abonnement",
@@ -3642,7 +3789,7 @@
       "emptyDescription": "Gebruik Eerder uur om eerdere verzoeken te bekijken.",
       "emptyBoundDescription": "Verder terug gaan de verzoeklogboeken niet.",
       "loadError": "Kan verzoeklogboeken niet laden.",
-      "permissionDenied": "Alleen een eigenaar, beheerder of factureringsbeheerder van de organisatie kan de verzoeklogboeken bekijken.",
+      "permissionDenied": "Alleen een eigenaar, beheerder of factuurbeheerder van de organisatie kan de verzoeklogboeken bekijken. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} in · {{output}} uit",
       "byok": "BYOK"
     },
@@ -3908,7 +4055,10 @@
     "list": {
       "loadFailed": "Kon de chatgeschiedenis niet laden.",
       "new": "Nieuwe chat",
-      "deleteTitle": "Deze chat verwijderen?"
+      "deleteTitle": "Deze chat verwijderen?",
+      "resetNoticeTitle": "Lokale chats en concepten gewist",
+      "resetNoticeBody": "Kilo kon de chatgeschiedenis op dit apparaat niet laden. Je sessies in de cloud zijn niet aangetast.",
+      "resetNoticeDismiss": "Melding negeren"
     },
     "rename": {
       "title": "Chat hernoemen",
@@ -3958,6 +4108,9 @@
       "fieldName": "Weergavenaam",
       "fieldUrl": "Server-URL",
       "fieldUrlInvalid": "Voer een geldige server-URL in.",
+      "fieldUrlCredentials": "Verwijder de gebruikersnaam en het wachtwoord uit de URL.",
+      "fieldUrlFragment": "Verwijder het #-gedeelte uit de URL.",
+      "fieldUrlInsecure": "Voer een https-URL in, of http alleen voor localhost.",
       "duplicateUrl": "Die URL is al opgeslagen.",
       "serverNotFound": "Deze server is niet meer opgeslagen.",
       "enableServer": "Deze server inschakelen: {{name}}",
@@ -3983,6 +4136,7 @@
       "app": {
         "label": "Interface van de tool",
         "failed": "De interface van deze tool kon niet worden geladen.",
+        "tooLarge": "De interface van deze tool is groter dan de limiet van {{size}}.",
         "empty": "De interface van deze tool heeft niets te tonen."
       }
     },
@@ -4735,7 +4889,7 @@
     "defaultModel": "Standaardmodel van Kilo gebruiken",
     "duration": "Tijdslimiet (minuten)",
     "spendLimit": "Uitgavenlimiet (USD)",
-    "invalidSafeguards": "Voer positieve, eindige tijd- en uitgavenlimieten in.",
+    "invalidSafeguards": "Voer een positief getal binnen het toegestane bereik in.",
     "estimate": "Schatting {{estimate}} · maximaal {{maximum}}",
     "estimateUnavailable": "Er is geen betaalde samenvatting beschikbaar voor deze instellingen. Pas het model of de limieten aan, of probeer het later opnieuw.",
     "confirmPaid": "Betaalde samenvattingen inschakelen voor {{context}}?",
@@ -4805,7 +4959,8 @@
     "unavailableTitle": "Gebruik niet beschikbaar",
     "unavailableDescription": "Gebruik is niet ingesteld voor deze workspace. Neem contact op met de ondersteuning als je hier gebruik verwacht te zien.",
     "orgSelfNotice": "Je ziet je eigen gebruik in deze organisatie.",
-    "viewDetails": "Gebruiksdetails bekijken"
+    "viewDetails": "Gebruiksdetails bekijken",
+    "orgSelfEntryTitle": "Jouw gebruik"
   },
   "integrations": {
     "title": "Integraties",
@@ -4901,6 +5056,8 @@
       "autoCommit": "Wijzigingen committen wanneer de uitvoering eindigt",
       "condenseOnComplete": "De context inkorten wanneer de uitvoering eindigt",
       "activeTitle": "Trigger actief",
+      "activeSwitchA11y": "Trigger actief: {{name}}",
+      "copyLinkA11y": "Link kopiëren voor {{name}}",
       "activeDescription": "Gepauzeerde webhooks reageren met 404.",
       "runAsCreator": "Uitvoeren als mij",
       "runAsCreatorDescription": "Elke uitvoering gebruikt je account, dus de geheime header is vereist.",

@@ -120,7 +120,6 @@ function systemModelProvider(
     facts: () => systemFacts(known.get(provider)),
     // The module says whether it runs the tool loop. Until it answers, no tools are sent.
     supportsTools: () => known.get(provider)?.tools === true,
-    // They get images only when the last availability answer says the device's model reads them.
     supportsImages: () => known.get(provider)?.images === true,
   };
 }

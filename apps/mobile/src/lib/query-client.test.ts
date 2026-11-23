@@ -229,8 +229,6 @@ describe('query retry policy', () => {
     }
   );
 
-  // A bare top-level `code` also appears on filesystem, transport and domain
-  // errors, so it is not a server verdict and keeps the transient retries.
   it('retries a non-tRPC error that carries only a top-level code', async () => {
     const queryClient = createKiloAppQueryClient();
     const error = Object.assign(new Error('native refusal'), { code: 'UNAUTHORIZED' });
@@ -284,7 +282,6 @@ describe('permission-denied query removal', () => {
 
     expect(queryClient.getQueryData(org1Key)).toBeUndefined();
     expect(queryClient.getQueryData(org2Key)).toEqual({ members: ['b'] });
-    // Permission loss never signs the user out.
     expect(signOut).not.toHaveBeenCalled();
     clear();
   });
@@ -390,16 +387,12 @@ describe('permission-denied query removal', () => {
     const unsubscribe = observer.subscribe(() => undefined);
     await observer.refetch().catch(() => undefined);
 
-    // The org prefix covers the variant no screen observes: it leaves the
-    // cache, so a later mount cannot paint its rows.
     expect(queryClient.getQueryData(idleSiblingKey)).toBeUndefined();
     expect(
       queryClient.getQueryCache().find({ queryKey: idleSiblingKey, exact: true })
     ).toBeUndefined();
-    // The observed variant keeps its slot and loses only the denied rows.
     expect(queryClient.getQueryData(observedKey)).toBeUndefined();
     expect(queryClient.getQueryCache().find({ queryKey: observedKey, exact: true })).toBeDefined();
-    // Another organization is another prefix.
     expect(queryClient.getQueryData(otherOrgKey)).toEqual({ members: ['b'] });
     expect(signOut).not.toHaveBeenCalled();
     unsubscribe();
@@ -461,7 +454,6 @@ describe('permission-denied query removal', () => {
       })
     ).rejects.toBe(error);
 
-    // A non-permission failure must not drop the cached data.
     expect(queryClient.getQueryData(key)).toEqual({ members: ['a'] });
     expect(signOut).not.toHaveBeenCalled();
     clear();

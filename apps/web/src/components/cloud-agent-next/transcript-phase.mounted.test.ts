@@ -409,6 +409,7 @@ describe('CloudChatPage route-aware transcript phase', () => {
       supersededInFlightMessageIds: new Set(),
       preparationAttempts: [],
       commits: [],
+      unreadableQuestions: [],
       unreadablePermissions: [],
       chatUI: { shouldAutoScroll: true },
       isLoading: true,

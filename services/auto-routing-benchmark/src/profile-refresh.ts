@@ -6,6 +6,7 @@ import type {
 import type { z } from 'zod';
 import { isExactModelUnavailableResult } from './cli-runner';
 import { benchmarkPairUnavailability, type BenchmarkModelCatalogSchema } from './platform-models';
+import { profileAdmissionResetStatement } from './profile-failure-history';
 import { variantFromStorage, variantToStorage } from './reasoning-effort';
 
 type RefreshInput = {
@@ -138,8 +139,28 @@ export async function refreshCurrentProfiles(
       WHERE ${selectedSql} AND NOT (${availableSql}) AND ${failedSql}`)
     .bind(...selectionBindings)
     .all<RefreshedRow>();
-  const updated = await db
-    .prepare(`UPDATE benchmark_profiles SET
+  const repairableKeys = new Set(repairable.map(row => JSON.stringify([row.model, row.variant])));
+  const readmitted = entries.filter(
+    entry =>
+      entry.available &&
+      (input.mode === 'refresh' || repairableKeys.has(JSON.stringify([entry.model, entry.variant])))
+  );
+  // A reset marker must commit with the re-admission: the UPDATE's streak read uses the
+  // row's pre-update first_failed_at, which this update clears to NULL.
+  const resetStatements = readmitted.map(entry =>
+    profileAdmissionResetStatement(db, {
+      router: input.router,
+      model: entry.model,
+      variant: entry.variant,
+      engineIdentity: input.engineIdentity,
+      repetitions: input.repetitions,
+      admittedAt: nowIso,
+      requestId: `${entry.model}:${entry.variant}`,
+    })
+  );
+  const [updatedResult] = await db.batch([
+    db
+      .prepare(`UPDATE benchmark_profiles SET
       status = CASE WHEN (${availableSql}) THEN 'pending' ELSE 'unavailable' END,
       failure_reason = CASE WHEN (${availableSql}) THEN NULL ELSE (${requestedSql('failureReason')}) END,
       failure_class = CASE WHEN (${availableSql}) THEN NULL ELSE (${requestedSql('failureClass')}) END,
@@ -149,11 +170,50 @@ export async function refreshCurrentProfiles(
       retry_after = NULL,
       run_id = NULL,
       completed_at = CASE WHEN (${availableSql}) THEN NULL ELSE ?7 END,
-      requested_at = ?7, updated_at = ?7, invalidated_at = ?7
+      requested_at = ?7, updated_at = ?7,
+      invalidated_at = CASE WHEN ?5 = 'refresh'
+        AND status NOT IN ('failed', 'unavailable') THEN ?7 ELSE invalidated_at END
     WHERE ${selectedSql} AND ((${availableSql}) OR NOT ${failedSql})
     RETURNING model, variant, status`)
-    .bind(...selectionBindings, nowIso)
-    .all<RefreshedRow>();
+      .bind(...selectionBindings, nowIso),
+    // The failure streak is scope (router, model, effort, engine) across repetition
+    // counts, so a re-admission must clear the pair's PERMANENT verdict at every
+    // repetition count of this engine. Otherwise a stale permanent verdict on a row the
+    // current config no longer selects returns as a veto if the repetition count changes
+    // back. Retryable rows are left alone: their window and history still mean what they
+    // said, and nothing uses them as a veto. Only available pairs are cleared (a catalog
+    // refusal is not a re-admission), and no invalidation stamp is written, so compatible
+    // results stay reusable.
+    db
+      .prepare(`UPDATE benchmark_profiles SET
+      status = 'pending', failure_reason = NULL, failure_class = NULL,
+      failure_attempts = 0, model_failure_attempts = 0, first_failed_at = NULL,
+      retry_after = NULL, run_id = NULL, completed_at = NULL,
+      requested_at = ?5, updated_at = ?5
+    WHERE router = ?1 AND engine_identity = ?2 AND repetitions <> ?3
+      AND status = 'unavailable'
+      AND EXISTS (
+        SELECT 1 FROM json_each(?4) AS requested
+        WHERE json_extract(requested.value, '$.model') = benchmark_profiles.model
+          AND json_extract(requested.value, '$.variant') = benchmark_profiles.variant
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM scheduler_chunks AS chunk
+        WHERE chunk.run_id = benchmark_profiles.run_id
+          AND chunk.model = benchmark_profiles.model
+          AND chunk.variant = benchmark_profiles.variant
+          AND chunk.status IN ('queued', 'active')
+      )`)
+      .bind(
+        input.router,
+        input.engineIdentity,
+        input.repetitions,
+        JSON.stringify(readmitted),
+        nowIso
+      ),
+    ...resetStatements,
+  ]);
+  const updated = { results: (updatedResult?.results ?? []) as RefreshedRow[] };
   const result = { results: [...updated.results, ...refused.results] };
   if (
     result.results.length === 0 &&

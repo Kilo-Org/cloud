@@ -345,7 +345,7 @@ beforeEach(() => {
 describe('CloudAgentTransport event routing', () => {
   it('completes bootstrap after a failed first socket and keeps live interactions and disconnects working', async () => {
     jest.useFakeTimers();
-    const { transport, state, stateNotifications, questionAsked, replayComplete } =
+    const { transport, state, serviceEvents, stateNotifications, questionAsked, replayComplete } =
       createTransportWithSinks();
     const flushMicrotasks = async () => {
       for (let i = 0; i < 10; i++) await Promise.resolve();
@@ -360,7 +360,11 @@ describe('CloudAgentTransport event routing', () => {
       stateNotifications.mockClear();
       sendRaw(createEvent('connected', { bootstrapPending: true, cloudStatus: { type: 'ready' } }));
       sendRaw(
-        kilocode('question.asked', { id: 'restored-question', sessionID: 'ses-1', questions: [] })
+        kilocode('question.asked', {
+          id: 'restored-question',
+          sessionID: 'ses-1',
+          questions: [{ question: 'Continue?', header: 'Approval', options: [] }],
+        })
       );
       expect(stateNotifications).not.toHaveBeenCalled();
       expect(questionAsked).not.toHaveBeenCalled();
@@ -368,11 +372,18 @@ describe('CloudAgentTransport event routing', () => {
       expect(replayComplete).toHaveBeenCalledTimes(1);
       expect(stateNotifications).toHaveBeenCalledTimes(1);
       expect(state.getStatus()).toEqual({ type: 'idle' });
-      expect(questionAsked).toHaveBeenCalledWith('restored-question', []);
+      expect(questionAsked).toHaveBeenCalledWith('restored-question', [
+        { question: 'Continue?', header: 'Approval', options: [] },
+      ]);
       sendRaw(
         kilocode('question.asked', { id: 'live-question', sessionID: 'ses-1', questions: [] })
       );
-      expect(questionAsked).toHaveBeenCalledWith('live-question', []);
+      expect(serviceEvents).toContainEqual({
+        type: 'question.unreadable',
+        requestId: 'live-question',
+      });
+      expect(questionAsked).toHaveBeenCalledTimes(1);
+      expect(state.getUnreadableQuestions()).toEqual([{ requestId: 'live-question' }]);
       mockWs.onclose?.({ code: 1006, reason: '', wasClean: false } as CloseEvent);
       // A drop the transport retries reads as reconnecting, not as a loss.
       expect(state.getStatus()).toEqual({ type: 'disconnected', reconnecting: true });
@@ -518,11 +529,10 @@ describe('CloudAgentTransport event routing', () => {
     transport.connect();
     await flushPromises();
     stateNotifications.mockClear();
-    sendRaw(kilocode('question.asked', { id: 'old-question', sessionID: 'ses-1', questions: [] }));
+    const questions = [{ question: 'Continue?', header: 'Approval', options: [] }];
+    sendRaw(kilocode('question.asked', { id: 'old-question', sessionID: 'ses-1', questions }));
     sendRaw(createEvent('connected', { bootstrapPending: true }));
-    sendRaw(
-      kilocode('question.asked', { id: 'current-question', sessionID: 'ses-1', questions: [] })
-    );
+    sendRaw(kilocode('question.asked', { id: 'current-question', sessionID: 'ses-1', questions }));
     sendRaw(
       kilocode('permission.asked', {
         id: 'current-permission',
@@ -700,17 +710,26 @@ describe('CloudAgentTransport event routing', () => {
   });
 
   it.each([
-    ['question.asked', { id: 'request-1' }],
-    ['question.replied', { requestID: 'request-1' }],
-    ['question.rejected', { requestID: 'request-1' }],
+    ['question.asked', { id: 'request-1' }, 'question.unreadable'],
+    [
+      'question.asked',
+      {
+        id: 'request-1',
+        questions: [{ question: 'Continue?', header: 'Approval', options: [] }],
+      },
+      'question.asked',
+    ],
+    ['question.replied', { requestID: 'request-1' }, 'question.replied'],
+    ['question.rejected', { requestID: 'request-1' }, 'question.rejected'],
     [
       'permission.asked',
       { id: 'request-1', permission: 'bash', patterns: [], metadata: {}, always: [] },
+      'permission.asked',
     ],
-    ['permission.replied', { requestID: 'request-1' }],
+    ['permission.replied', { requestID: 'request-1' }, 'permission.replied'],
   ])(
     'suppresses historical %s until connected, then delivers current interactions',
-    async (type, properties) => {
+    async (type, properties, emittedType) => {
       const { transport, serviceEvents } = createTransportWithSinks();
       transport.connect();
       await flushPromises();
@@ -722,7 +741,7 @@ describe('CloudAgentTransport event routing', () => {
       sendRaw(createEvent('connected', {}));
       sendRaw(kilocode(type, properties));
       expect(serviceEvents.at(-1)).toEqual(
-        expect.objectContaining({ type, requestId: 'request-1' })
+        expect.objectContaining({ type: emittedType, requestId: 'request-1' })
       );
       transport.destroy();
     }
@@ -1432,16 +1451,18 @@ describe('CloudAgentTransport snapshot refetch on reconnect', () => {
   it('does not resurrect answered questions during reconnect replay', async () => {
     jest.useFakeTimers();
     const { transport, serviceEvents } = createTransportWithSinks();
+    const answeredQuestion = {
+      id: 'answered-question',
+      questions: [{ question: 'Continue?', header: 'Approval', options: [] }],
+    };
     try {
       transport.connect();
       await flushMicrotasks();
       sendRaw(createEvent('connected', {}));
-      sendRaw(kilocode('question.asked', { id: 'answered-question' }));
+      sendRaw(kilocode('question.asked', answeredQuestion));
       sendRaw(kilocode('question.replied', { requestID: 'answered-question' }));
 
-      const reconnectedWs = await simulateReconnect(
-        kilocode('question.asked', { id: 'answered-question' })
-      );
+      const reconnectedWs = await simulateReconnect(kilocode('question.asked', answeredQuestion));
       expect(serviceEvents.filter(event => event.type === 'question.asked')).toHaveLength(1);
       sendRawOn(reconnectedWs, kilocode('question.replied', { requestID: 'answered-question' }));
       expect(serviceEvents.filter(event => event.type === 'question.replied')).toHaveLength(1);
@@ -1449,9 +1470,8 @@ describe('CloudAgentTransport snapshot refetch on reconnect', () => {
       sendRawOn(reconnectedWs, createEvent('connected', {}));
       sendRawOn(reconnectedWs, kilocode('question.asked', { id: 'pending-question' }));
       expect(serviceEvents.at(-1)).toEqual({
-        type: 'question.asked',
+        type: 'question.unreadable',
         requestId: 'pending-question',
-        questions: undefined,
       });
     } finally {
       transport.destroy();

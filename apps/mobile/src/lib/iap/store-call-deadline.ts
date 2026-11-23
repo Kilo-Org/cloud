@@ -15,6 +15,7 @@ const STORE_CALL_DEADLINE_MS = 15_000;
  * answered with a failure: a hung SDK stays hung for every further call, so a
  * caller must not follow a deadline with more calls to the same store (the
  * credit-product loader would otherwise spend another deadline per product id).
+ * A deadline is a bounded, expected outcome the screen reports its own way.
  * Carries only the label; the message never reaches the screen.
  */
 class StoreDeadlineError extends Error {
@@ -26,9 +27,7 @@ class StoreDeadlineError extends Error {
 
 /**
  * True when the caught value is the deadline itself, not a store that answered
- * with a failure. Callers keep the two apart: a deadline is a bounded, expected
- * outcome the screen reports its own way, and it must not be followed by more
- * calls to the same store.
+ * with a failure.
  */
 export function isStoreDeadlineError(error: unknown): error is StoreDeadlineError {
   return error instanceof StoreDeadlineError;

@@ -399,7 +399,7 @@
       "title": "Palveluntarjoajien avaimet",
       "rowSubtitle": "Käytä palveluntarjoajasi omaa laskutusta",
       "orgDescription": "Nämä avaimet jaetaan kaikille organisaation jäsenille, ja käyttö laskutetaan organisaation palveluntarjoajatileiltä.",
-      "viewOnly": "Vain organisaation omistaja, ylläpitäjä tai laskutuksen hallinnoija voi muuttaa sen avaimia.",
+      "viewOnly": "Vain organisaation omistaja, ylläpitäjä tai laskutusvastaava voi muuttaa sen avaimia.",
       "description": "Näiden avainten kautta tehdyt pyynnöt laskutetaan palveluntarjoajasi tililtä Kilo-saldon sijaan.",
       "managedByPlan": "Hallitaan koodaustilauksesi kautta",
       "enableKey": "Ota palvelun {{provider}} avain käyttöön",
@@ -1238,6 +1238,7 @@
     "needsInputAction": {
       "approved": "Pyyntö hyväksytty",
       "replied": "Vastaus lähetetty",
+      "empty": "Kirjoita vastaus ja lähetä se.",
       "failed": "Vastaaminen ei onnistunut. Yritä uudelleen napauttamalla.",
       "unavailable": "Tämä pyyntö ei ole enää odottamassa."
     }
@@ -1502,7 +1503,9 @@
       "githubError": "GitHubin käyttöönottoa ei voitu avata. Yritä uudelleen.",
       "gitlabAccount": "GitLab-tili",
       "gitlabError": "GitLabin käyttöönottoa ei voitu avata. Yritä uudelleen.",
-      "description": "Yhdistä {{label}} Kiloon, niin muutospyynnöt katselmoidaan automaattisesti."
+      "description": "Yhdistä {{label}} Kiloon, niin muutospyynnöt katselmoidaan automaattisesti.",
+      "notConnectedTitle": "{{platform}}ia ei ole yhdistetty",
+      "githubAdminOnlyDescription": "Vain organisaation omistajat ja ylläpitäjät voivat yhdistää sen."
     },
     "overview": {
       "allAreas": "Kaikki osa-alueet",
@@ -2251,6 +2254,7 @@
       "couldNotLoadThisSession": "Tätä istuntoa ei voitu ladata",
       "historyTooLarge": "Tämän istunnon keskustelutallenne on liian suuri ladattavaksi.",
       "historyUnavailable": "Tämän istunnon keskustelutallennetta ei voi lukea.",
+      "historyTemporarilyUnavailable": "Tämän istunnon keskustelutallenne ei ole tilapäisesti saatavilla.",
       "cloneFailedRetry": "Tätä istuntoa ei voitu kloonata. Yritä uudelleen.",
       "notEnoughCredits": "Krediitit eivät riitä tähän pyyntöön. Lisää krediittejä ja yritä uudelleen.",
       "previousTaskFinishing": "Edellistä tehtävää viimeistellään vielä. Odota hetki.",
@@ -2787,7 +2791,9 @@
       "skip": "Ohita",
       "retrySkip": "Yritä ohittaa uudelleen",
       "submitting": "Lähetetään…",
-      "sendAnswers": "Lähetä vastaukset"
+      "sendAnswers": "Lähetä vastaukset",
+      "unreadableTitle": "Kysymystä ei voitu näyttää",
+      "unreadableBody": "Agentti odottaa kysymystä, jota tämä sovellus ei voi näyttää. Vastaa kysymykseen CLI:ssä jatkaaksesi."
     },
     "blockingCard": {
       "questionUnavailable": "Tämä kysymys ei ole enää käytettävissä.",
@@ -2814,6 +2820,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Aliagentin istuntoa ei voitu ladata",
+      "historyTooLarge": "Tämän aliagentin historia on liian suuri ladattavaksi.",
+      "historyUnavailable": "Tämän aliagentin historia ei ole saatavilla.",
+      "historyTemporarilyUnavailable": "Tämän aliagentin historia ei ole tilapäisesti saatavilla.",
       "failed": "Aliagentin istunto epäonnistui",
       "noMessages": "Ei aliagentin viestejä",
       "noMessagesDescription": "Tämä aliagentin istunto päättyi ilman viestihistoriaa.",
@@ -3392,6 +3401,8 @@
     "voiceTranscriptionWho": "Laitteesi, Kilo Gateway valitsemallasi puheentunnistusmallilla tai Apple tai Google verkkotunnistusta varten.",
     "installAttributionPromptTitle": "Sallitaanko asennuslähteen tunnistus?",
     "installAttributionPromptMessage": "Kilo käyttää Applen seurantalupaa vain selvittääkseen, mistä kanavasta löysit sovelluksen. Kehotteitasi ja keskustelujasi ei koskaan käytetä tähän.",
+    "installAttributionRequestFailedTitle": "Seurantakehotetta ei voitu näyttää",
+    "installAttributionRequestFailedMessage": "Kilo ei voinut näyttää järjestelmäkehotetta, joten asennuslähteen tunnistus pysyy poissa päältä.",
     "what": "Mitä",
     "why": "Miksi",
     "who": "Kenelle"
@@ -3407,7 +3418,7 @@
   "organization": {
     "auditLog": {
       "title": "Tarkastusloki",
-      "permissionDenied": "Vain Enterprise-paketin organisaation omistaja, ylläpitäjä tai laskutusvastaava voi lukea organisaation tarkastuslokia.",
+      "permissionDenied": "Vain Enterprise-paketin organisaation omistaja, ylläpitäjä tai laskutusvastaava voi lukea organisaation tarkastuslokia. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Ei tarkastustapahtumia",
       "emptyDescription": "Tässä organisaatiossa tehdyt toiminnot näkyvät täällä.",
       "truncated": "Näytetään viimeisimmät tapahtumat.",
@@ -3457,11 +3468,147 @@
         "guardrailUpdate": "Suojakaide päivitetty",
         "guardrailRemove": "Suojakaide poistettu",
         "unknown": "Tarkastustapahtuma"
+      },
+      "detail": {
+        "fieldChange": "{{field}}: {{change}}",
+        "modeIdentity": "Tila \"{{name}}\" (tunniste: {{slug}})",
+        "modeUpdate": "Tila \"{{name}}\": {{changes}}",
+        "field": {
+          "name": "$t(organization.modes.nameLabel)",
+          "slug": "$t(organization.modes.identifierLabel)",
+          "roleDefinition": "$t(organization.modes.roleLabel)",
+          "whenToUse": "$t(organization.modes.whenToUseLabel)",
+          "description": "$t(organization.modes.descriptionLabel)",
+          "customInstructions": "$t(codeReviewer.instructions.title)",
+          "groups": "$t(profiles.agents.tools)",
+          "autoRoute": "Automaattinen reititys",
+          "defaultModel": "Oletusmalli"
+        },
+        "role": {
+          "owner": "$t(organization.members.roles.owner)",
+          "admin": "$t(organization.members.roles.admin)",
+          "billing_manager": "$t(organization.members.roles.billingManager)",
+          "member": "$t(organization.members.roles.member)"
+        },
+        "memberRole": "{{email}}: {{change}}",
+        "memberAdded": "Lisätty {{email}} roolilla {{role}}",
+        "memberRemoved": "Poistettu {{email}}",
+        "memberParentAdded": "Lisätty {{email}} emo-organisaatiosta {{parent}}",
+        "memberParentRemoved": "Poistettu {{email}} emo-organisaatiosta {{parent}}",
+        "inviteSent": "{{email}} roolilla {{role}}",
+        "inviteRevoked": "Peruutettu kutsu: {{email}}",
+        "inviteAccepted": "Hyväksytty kutsu: {{email}}",
+        "groupIdentity": "Ryhmä \"{{name}}\"",
+        "groupMembers": "Ryhmä \"{{name}}\": {{members}}",
+        "groupMemberGroups": "{{displayCount}} ryhmää",
+        "groupMemberGroups_one": "{{displayCount}} ryhmä",
+        "groupMemberGroups_other": "{{displayCount}} ryhmää",
+        "groupMemberGroupsOf": "{{email}}: {{displayCount}} ryhmää",
+        "groupMemberGroupsOf_one": "{{email}}: {{displayCount}} ryhmä",
+        "groupMemberGroupsOf_other": "{{email}}: {{displayCount}} ryhmää",
+        "groupPolicySet": "Ryhmä \"{{name}}\": {{policy}}-käytäntö asetettu",
+        "groupPolicyRemoved": "Ryhmä \"{{name}}\": {{policy}}-käytäntö poistettu",
+        "groupDefaultPolicySet": "{{policy}}-oletuskäytäntö asetettu",
+        "groupDefaultPolicyRemoved": "{{policy}}-oletuskäytäntö poistettu",
+        "guardrailIdentity": "{{type}} \"{{name}}\"",
+        "guardrailStatus": "{{type}} \"{{name}}\" {{state}}",
+        "guardrailConfig": "AI-suojakaiteet {{state}}",
+        "guardrailConfigGroup": "{{state}} ryhmälle \"{{group}}\"",
+        "guardrailEnforcement": "{{target}}: {{value}}",
+        "guardrailSkill": "{{target}}: {{values}}",
+        "guardrailTarget": {
+          "mcp": "$t(profiles.mcp.title)",
+          "skill": "$t(profiles.skillsTitle)"
+        },
+        "ssoDomainSet": "SSO-verkkotunnus {{domain}}",
+        "ssoDomainChanged": "{{domain}} (aiemmin {{previous}})",
+        "ssoDomainRemoved": "SSO-verkkotunnus {{domain}} tyhjennetty",
+        "fundsPurchased": "{{amount}} maksutavalla {{method}}",
+        "fundsGranted": "{{amount}}",
+        "fundsDistributed": "{{amount}} {{displayCount}} aliorganisaatiolle",
+        "fundsDistributed_one": "{{amount}} {{displayCount}} aliorganisaatiolle",
+        "fundsDistributed_other": "{{amount}} {{displayCount}} aliorganisaatiolle",
+        "fundsReceived": "{{amount}} emo-organisaatiolta {{parent}}",
+        "reviewAgentPlatform": "{{platform}}",
+        "reviewAgentConfig": "{{platform}}-konfiguraatio",
+        "reviewAgentConfigStyle": "{{platform}}: tyyli {{style}}",
+        "reviewAgentSecretsUpdated": "{{displayCount}} päivitetty",
+        "reviewAgentSecretsUpdated_one": "{{displayCount}} päivitetty",
+        "reviewAgentSecretsUpdated_other": "{{displayCount}} päivitetty",
+        "reviewAgentSecretsFailed": "{{displayCount}} virhettä",
+        "reviewAgentSecretsFailed_one": "{{displayCount}} virhettä",
+        "reviewAgentSecretsFailed_other": "{{displayCount}} virhettä",
+        "reviewAgentSecretRotated": "{{values}}",
+        "settingAdvancedPolicies": "{{values}}",
+        "settingAdvancedPoliciesOpenRouter": "OpenRouter {{state}}",
+        "settingAdvancedPoliciesRegion": "Päättelyalue: {{region}}",
+        "settingDefaultModelSet": "{{next}}",
+        "settingDefaultModelRemoved": "{{previous}}",
+        "settingAutoRoute": "Tila \"{{mode}}\": {{change}}",
+        "settingDefaultBehavior": {
+          "global": "Yleinen oletus",
+          "specific": "{{model}}",
+          "auto": "$t(models.auto.organization)"
+        },
+        "settingDataCollection": "{{mode}}",
+        "dataCollection": {
+          "allowed": "Sallittu",
+          "denied": "Kielletty",
+          "followSetting": "Noudattaa laajennuksen asetusta"
+        },
+        "region": {
+          "us": "$t(organizationModelAccess.region.us)",
+          "eu": "$t(organizationModelAccess.region.eu)",
+          "au": "$t(organizationModelAccess.region.au)",
+          "jp": "$t(organizationModelAccess.region.jp)"
+        },
+        "settingProjectsUi": "Projects-käyttöliittymä {{state}}",
+        "settingMinimumBalanceOn": "{{threshold}} vastaanottajille {{emails}}",
+        "settingMinimumBalanceThreshold": "{{threshold}}",
+        "settingRecommendationsDigest": "Suositusten yhteenveto {{state}}",
+        "settingBrowserControl": "{{policy}}",
+        "settingBrowserControlOrigins": "{{policy}}: {{origins}}",
+        "settingBrowserControlOriginsCleared": "{{policy}}: ei sallittuja alkuperejä",
+        "settingName": "Nimetty uudelleen: {{previous}} → {{next}}",
+        "enabled": "$t(common.enabled)",
+        "scanBeforeUseOn": "Skannaus ennen käyttöä päällä",
+        "scanBeforeUseOff": "Skannaus ennen käyttöä pois päältä",
+        "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingRemoved": "Poistettu: {{models}}",
+        "browserPolicyOff": "Selaimen käyttö estetty",
+        "browserPolicyAllow": "Vain sallitut alkuperät",
+        "browserPolicyPlaywrightOnly": "Vain sisäänrakennettu selain",
+        "disabled": "$t(common.disabled)",
+        "autoRouting": "Mallit muutettu: {{values}}",
+        "integrationConnected": "{{integration}} yhdistetty",
+        "integrationDisconnected": "{{integration}} katkaistu",
+        "integrationRefreshed": "{{integration}} päivitetty",
+        "integrationCancelled": "{{integration}} peruttu",
+        "integrationModelUpdated": "{{integration}}: malli {{model}}",
+        "integrationKeyAdded": "Avain lisätty palveluntarjoajalle {{provider}}",
+        "integrationKeyUpdated": "Avain päivitetty palveluntarjoajalle {{provider}}",
+        "integrationKeyDeleted": "Avain poistettu palveluntarjoajalta {{provider}}",
+        "integrationKeyToggled": "Palveluntarjoajan {{provider}} avain: {{state}}",
+        "namedPolicyCreated": "Luotu {{kind}}-käytäntö {{id}}",
+        "namedPolicyUpdated": "Päivitetty {{kind}}-käytäntö {{id}}",
+        "namedPolicyDeleted": "Poistettu {{kind}}-käytäntö {{id}}",
+        "namedPolicyLinked": "Linkitetty {{kind}}-käytäntö {{next}}",
+        "webhookTriggerUpdated": "Laukaisin {{trigger}}",
+        "organizationRenamed": "Organisaatio nimetty uudelleen: {{previous}} → {{next}}",
+        "brand": {
+          "github": "$t(common.github)",
+          "gitlab": "$t(common.gitlab)",
+          "bitbucket": "$t(agentChat.repoPicker.platformBitbucket)",
+          "discord": "$t(profile.providerDiscord)",
+          "slack": "$t(agentChat.sessionFilter.platformSlack)",
+          "linear": "$t(agentChat.sessionFilter.platformLinear)",
+          "byok": "Oma API-avain"
+        }
       }
     },
     "billing": {
       "title": "Laskutus",
-      "permissionDenied": "Vain organisaation omistaja, ylläpitäjä tai laskutusvastaava voi nähdä organisaation laskutuksen.",
+      "permissionDenied": "Vain organisaation omistaja, ylläpitäjä tai laskutusvastaava voi nähdä organisaation laskutuksen. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Tilaus",
       "state": "Tila",
       "stateNone": "Ei tilausta",
@@ -3539,7 +3686,7 @@
       "pendingInvitation": "Tällä sähköpostiosoitteella on jo odottava kutsu.",
       "alreadyMember": "Tämä henkilö on jo tämän organisaation jäsen.",
       "seatsFull": "Kaikki paikat ovat käytössä ({{used}}/{{total}}). Pyydä organisaation omistajaa lisäämään paikkoja ennen kuin kutsut lisää jäseniä.",
-      "seatsFullCanInviteBilling": "Kaikki paikat ovat käytössä ({{used}}/{{total}}). Voit edelleen kutsua laskutuksen hallinnoijia, sillä he eivät vie paikkaa.",
+      "seatsFullCanInviteBilling": "Kaikki paikat ovat käytössä ({{used}}/{{total}}). Voit edelleen kutsua laskutusvastaavia, sillä he eivät vie paikkaa.",
       "noSeatsAvailable": "Kaikki paikat ovat käytössä. Pyydä organisaation omistajaa lisäämään paikkoja ennen kuin kutsut lisää jäseniä."
     },
     "invoices": {
@@ -3638,7 +3785,7 @@
       "emptyDescription": "Näytä aiemmat pyynnöt painamalla Edellinen tunti.",
       "emptyBoundDescription": "Pyyntölokit eivät ulotu tätä pidemmälle taaksepäin.",
       "loadError": "Pyyntölokien lataaminen epäonnistui.",
-      "permissionDenied": "Vain organisaation omistaja, ylläpitäjä tai laskutusvastaava voi lukea organisaation pyyntölokeja.",
+      "permissionDenied": "Vain organisaation omistaja, ylläpitäjä tai laskutusvastaava voi lukea organisaation pyyntölokeja. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} sisään · {{output}} ulos",
       "byok": "BYOK"
     },
@@ -3908,7 +4055,10 @@
     "list": {
       "loadFailed": "Keskusteluhistoriaa ei voitu ladata.",
       "new": "Uusi keskustelu",
-      "deleteTitle": "Poistetaanko tämä keskustelu?"
+      "deleteTitle": "Poistetaanko tämä keskustelu?",
+      "resetNoticeTitle": "Laitteen keskustelut ja luonnokset poistettu",
+      "resetNoticeBody": "Kilo ei voinut avata tähän laitteeseen tallennettuja keskusteluja. Pilvessä olevat istuntosi ovat tallessa.",
+      "resetNoticeDismiss": "Sivuuta ilmoitus"
     },
     "rename": {
       "title": "Nimeä keskustelu uudelleen",
@@ -3958,6 +4108,9 @@
       "fieldName": "Näyttönimi",
       "fieldUrl": "Palvelimen URL",
       "fieldUrlInvalid": "Anna kelvollinen palvelimen URL.",
+      "fieldUrlCredentials": "Poista käyttäjätunnus ja salasana URL:stä.",
+      "fieldUrlFragment": "Poista #-osa URL:stä.",
+      "fieldUrlInsecure": "Anna https-URL tai http vain localhostille.",
       "duplicateUrl": "Tämä URL on jo tallennettu.",
       "serverNotFound": "Tätä palvelinta ei ole enää tallennettu.",
       "enableServer": "Ota tämä palvelin käyttöön: {{name}}",
@@ -3983,6 +4136,7 @@
       "app": {
         "label": "Työkalun käyttöliittymä",
         "failed": "Tämän työkalun käyttöliittymää ei voitu ladata.",
+        "tooLarge": "Tämän työkalun käyttöliittymä on suurempi kuin {{size}}:n raja.",
         "empty": "Tämän työkalun käyttöliittymässä ei ole näytettävää."
       }
     },
@@ -4735,7 +4889,7 @@
     "defaultModel": "Käytä Kilon oletusmallia",
     "duration": "Aikaraja (minuuttia)",
     "spendLimit": "Kuluraja (USD)",
-    "invalidSafeguards": "Anna positiiviset, äärelliset aika- ja kulurajat.",
+    "invalidSafeguards": "Anna positiivinen luku sallitulla alueella.",
     "estimate": "Arvio {{estimate}} · enintään {{maximum}}",
     "estimateUnavailable": "Maksullinen yhteenveto ei ole saatavilla näillä asetuksilla. Muuta mallia tai rajoja, tai yritä myöhemmin uudelleen.",
     "estimatePricingUnavailable": "Tämän mallin hinnoittelu ei ole käytettävissä. Valitse toinen malli.",
@@ -4805,7 +4959,8 @@
     "unavailableTitle": "Käyttö ei ole saatavilla",
     "unavailableDescription": "Käyttöä ei ole määritetty tälle työtilalle. Ota yhteyttä tukeen, jos käytön pitäisi näkyä tässä.",
     "orgSelfNotice": "Näet oman käyttösi tässä organisaatiossa.",
-    "viewDetails": "Näytä käytön tiedot"
+    "viewDetails": "Näytä käytön tiedot",
+    "orgSelfEntryTitle": "Sinun käyttösi"
   },
   "integrations": {
     "title": "Integraatiot",
@@ -4901,6 +5056,8 @@
       "autoCommit": "Vahvista muutokset, kun ajo päättyy",
       "condenseOnComplete": "Tiivistä konteksti, kun ajo päättyy",
       "activeTitle": "Liipaisin aktiivinen",
+      "activeSwitchA11y": "Liipaisin aktiivinen: {{name}}",
+      "copyLinkA11y": "Kopioi linkki: {{name}}",
       "activeDescription": "Keskeytetyt verkkokoukut vastaavat 404:llä.",
       "runAsCreator": "Suorita minuna",
       "runAsCreatorDescription": "Jokainen ajo käyttää tiliäsi, joten salainen otsake vaaditaan.",

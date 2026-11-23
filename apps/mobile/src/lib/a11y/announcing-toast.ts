@@ -18,9 +18,6 @@ import { announceForA11y } from './announce';
 
 type ToastOptions = NonNullable<Parameters<typeof toast.success>[1]>;
 
-// `announceForA11y` trims, drops empty messages, and swallows a native
-// accessibility failure, so the visual toast always renders.
-
 function success(title: string, options?: ToastOptions): string | number {
   announceForA11y(title);
   return toast.success(title, options);

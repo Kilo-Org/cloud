@@ -10,8 +10,9 @@ import { codeFieldTextStyle } from '@/lib/rtl-text';
 import { FixedPartRow } from '../fixed-part-row';
 import { MonoScrollBlock } from '../mono-scroll-block';
 import { useOpenPartDetail } from '../open-part-detail-context';
-import { getToolDisplay, toolPartHasDetails } from '../tool-card-display';
+import { toolPartHasDetails } from '../tool-card-display';
 import { toolStatusLabel } from '../tool-status-label';
+import { useToolDisplay } from '../use-tool-display';
 import { TOOL_VALUE_SURFACE_CLASS } from './value-surface';
 
 const bashToolInputSchema = z.object({ command: z.string() });
@@ -54,7 +55,7 @@ export function BashToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
 export function BashToolCard({ part }: Readonly<{ part: ToolPart }>) {
   const openPartDetail = useOpenPartDetail();
   const { t } = useTranslation();
-  const display = getToolDisplay(part);
+  const display = useToolDisplay(part);
   const hasDetails = toolPartHasDetails(part);
 
   return (

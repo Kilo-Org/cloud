@@ -141,7 +141,6 @@ function isSelectionSettled(selection: OrganizationSelection): boolean {
 export type OrganizationContextValue = {
   /** The phase the selection is in. Consumers that tell a pending selection from a settled one read this. */
   selection: OrganizationSelection;
-  /** null = personal, string = org UUID */
   organizationId: string | null;
   isLoaded: boolean;
   isSaving: boolean;
@@ -652,8 +651,6 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
     return {
       selection,
       organizationId: publishedOrganizationId(selection),
-      // Only a settled selection is loaded. A restored organization the list has
-      // not confirmed is pending, so no consumer loads it or reports its failure.
       isLoaded: isSelectionSettled(selection),
       isSaving: ownPhase && state.isSaving,
       error: ownPhase ? state.error : null,

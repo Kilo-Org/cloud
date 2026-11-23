@@ -5,6 +5,7 @@ import { ClassifierSubtaskTypeSchema, ClassifierTaskTypeSchema } from './taxonom
 import { VariantSchema } from './reasoning';
 import { addDuplicateKeyIssues } from './duplicate-keys';
 import { KILO_AUTO_MODEL_NAMESPACE_PREFIX, isVirtualAutoModelId } from './virtual-auto-model';
+import { BenchmarkProfileFailureClassSchema, BenchmarkProfileFailureSchema } from './benchmark';
 
 // ADR 0005: docs/adr/0005-custom-auto-routers.md
 
@@ -94,8 +95,28 @@ const GatewayCustomRouterEntryRefSchema = z.object({
   model: GatewayModelIdSchema,
 });
 
+/**
+ * A concrete target kept by a pool after an alias moves (ADR 0005). The server records an
+ * observed target at promotion or a confirmed target after the owner clicks. Clients cannot
+ * write either. A confirmation takes precedence over an observation and orders later callbacks.
+ * Pins without a confirmation time are older than every confirmation.
+ */
+export const CustomRouterServingPinSchema = z.object({
+  model: z
+    .string()
+    .trim()
+    .min(1)
+    .refine(model => !isVirtualAutoModelId(model), 'servingPin must name a concrete model'),
+  pinnedAt: z.iso.datetime(),
+  requestId: z.uuid().optional(),
+  confirmedAt: z.iso.datetime().optional(),
+  source: z.literal('observed').optional(),
+});
+export type CustomRouterServingPin = z.infer<typeof CustomRouterServingPinSchema>;
+
 export const GatewayCustomRouterEntrySchema = GatewayCustomRouterEntryRefSchema.extend({
   measuredAs: MeasuredAsModelIdSchema.optional(),
+  servingPin: CustomRouterServingPinSchema.optional(),
 });
 export type GatewayCustomRouterEntry = z.infer<typeof GatewayCustomRouterEntrySchema>;
 
@@ -170,17 +191,32 @@ export function customRouterCandidateModel(entry: CustomRouterEntryRef): string 
 }
 
 /**
- * A decision's `model` must name the candidate its `entry` resolves to.
+ * A decision's `model` must name the candidate its `entry` resolves to — or, for a gateway entry
+ * that carries a serving pin, the pinned concrete target the entry dispatches. Both serving paths
+ * re-check that pin against the saved pool, so a decision can never name a target the entry does
+ * not pin.
  *
  * Both decision schemas call this function, so a change to the condition, the
  * issue path, or the message cannot leave one schema behind. `entry` is optional
  * because the gateway decision schema still accepts a decision without one.
  */
 export function refineEntryModelMatch(
-  decision: { model: string; entry?: CustomRouterEntryRef },
+  decision: { model: string; entry?: CustomRouterEntryRef; servingPin?: CustomRouterServingPin },
   ctx: z.RefinementCtx
 ): void {
   if (decision.entry == null) return;
+  if (decision.servingPin) {
+    if (decision.entry.kind !== 'gateway') {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['servingPin'],
+        message: 'servingPin needs a gateway entry',
+      });
+    } else if (decision.model !== decision.servingPin.model) {
+      ctx.addIssue({ code: 'custom', path: ['model'], message: 'model must match servingPin' });
+    }
+    return;
+  }
   if (decision.model !== customRouterCandidateModel(decision.entry)) {
     ctx.addIssue({ code: 'custom', path: ['model'], message: 'model must match entry' });
   }
@@ -305,11 +341,77 @@ function validateEntryBudget(
   }
 }
 
-export const CustomRouterWriteEntriesSchema = CustomRouterEntriesSchema.superRefine(
-  (entries, ctx) => {
-    entries.forEach((entry, index) => validateEntryBudget(entry, ctx, [index]));
-  }
-);
+/** `servingPin` is written only by the benchmark settlement; a client copy is ignored. */
+function stripServingPin(entry: CustomRouterEntry): CustomRouterEntry {
+  if (entry.kind !== 'gateway' || entry.servingPin === undefined) return entry;
+  const { servingPin: _ignored, ...rest } = entry;
+  return rest;
+}
+
+/**
+ * An alias is a `~` model id whose target moves. A stored target is concrete: it is neither
+ * another alias nor a reserved `kilo-auto/` model. `storedAliasTarget` in the gateway and the
+ * benchmark's catalog resolution apply the same rule, so both sides of a dispatch agree on when a
+ * target is unproven.
+ */
+export const ALIAS_MODEL_PREFIX = '~';
+
+export function isConcreteAliasTarget(target: string): boolean {
+  return (
+    !target.startsWith(ALIAS_MODEL_PREFIX) &&
+    !target.startsWith(CLIENT_CANDIDATE_PREFIX) &&
+    !isVirtualAutoModelId(target)
+  );
+}
+
+/**
+ * The alias-to-concrete-target map a pool needs to rank the target it would actually dispatch.
+ * Server-to-server only, and it can never widen a pool: `poolAliasTargets` keeps only keys that
+ * are gateway alias entries of the definition it is given, and every target must be a concrete id.
+ */
+export const CustomRouterAliasTargetsSchema = z
+  .record(GatewayModelIdSchema, GatewayModelIdSchema)
+  .superRefine((targets, ctx) => {
+    if (Object.keys(targets).length > MAX_CUSTOM_ROUTER_ENTRIES) {
+      addIssue(ctx, [], `Too big: expected at most ${MAX_CUSTOM_ROUTER_ENTRIES} alias targets`);
+    }
+    for (const [alias, target] of Object.entries(targets)) {
+      if (!alias.startsWith(ALIAS_MODEL_PREFIX)) {
+        addIssue(ctx, [alias], 'Alias targets are keyed by a ~ alias');
+      }
+      if (!isConcreteAliasTarget(target)) {
+        addIssue(ctx, [alias], `Alias ${alias} target must name a concrete model`);
+      }
+    }
+  });
+export type CustomRouterAliasTargets = z.infer<typeof CustomRouterAliasTargetsSchema>;
+
+/**
+ * The alias targets of one saved pool that a caller may rely on, restricted to that pool's own
+ * gateway alias entries. A definition is required: without it an unrestrained map could name a
+ * target no entry of this request can dispatch.
+ */
+export function poolAliasTargets(
+  router: Pick<CustomRouterDefinition, 'entries'>,
+  aliasTargets: ReadonlyMap<string, string>
+): Map<string, string> {
+  const aliases = new Set(
+    router.entries.flatMap(entry =>
+      entry.kind === 'gateway' && entry.model.startsWith(ALIAS_MODEL_PREFIX) ? [entry.model] : []
+    )
+  );
+  return new Map(
+    [...aliasTargets].filter(
+      ([alias, target]) => aliases.has(alias) && isConcreteAliasTarget(target)
+    )
+  );
+}
+
+export const CustomRouterWriteEntriesSchema = CustomRouterEntriesSchema.transform(entries =>
+  entries.map(stripServingPin)
+).superRefine((entries, ctx) => {
+  entries.forEach((entry, index) => validateEntryBudget(entry, ctx, [index]));
+});
 
 const ClientCustomRouterWriteEntrySchema = ClientCustomRouterEntrySchema.superRefine((entry, ctx) =>
   validateEntryBudget(entry, ctx)
@@ -416,11 +518,16 @@ export const CustomRouterDecisionSchema = z
   .object({
     entry: CustomRouterEntryRefSchema,
     model: z.string().min(1),
+    // Present when the decision dispatches a pinned target instead of the entry's pool model.
+    servingPin: CustomRouterServingPinSchema.optional(),
     variant: VariantSchema,
     stale: z.boolean(),
     // True when no routing decision named a servable entry, so the default or first servable
     // entry was used. taskType and subtaskType still report the classification, if any.
     fallback: z.boolean(),
+    // True only when a pinned alias entry had to serve its live alias target because the pinned
+    // concrete target left the catalog. Optional so a not-yet-redeployed worker still parses.
+    servingFallback: z.literal(true).optional(),
     sticky: z.boolean(),
     taskType: ClassifierTaskTypeSchema.nullable(),
     subtaskType: ClassifierSubtaskTypeSchema.nullable(),
@@ -445,15 +552,50 @@ export const AUTO_DECISION_TTL_MS = 5 * 60 * 1000;
 const AUTO_DECISION_CLOCK_SKEW_MS = 30 * 1000;
 const AUTO_DECISION_TOKEN_VERSION = 'v1';
 
-export const AutoDecisionPayloadSchema = z.object({
-  userId: z.string().min(1),
-  organizationId: z.string().min(1).nullable(),
-  routerModelId: z.string().min(1),
-  model: z.string().min(1),
-  variant: z.string().min(1).nullable(),
-  // Epoch milliseconds.
-  expiresAt: z.number().int().nonnegative(),
-});
+export const AutoDecisionPayloadSchema = z
+  .object({
+    userId: z.string().min(1),
+    organizationId: z.string().min(1).nullable(),
+    routerModelId: z.string().min(1),
+    model: z.string().min(1),
+    variant: z.string().min(1).nullable(),
+    // The saved gateway entry this decision's pool picked, so the gateway re-checks that pool
+    // instead of trusting the token's model alone.
+    entryModel: z.string().min(1).optional(),
+    // Signed only when the entry's pinned target left the catalog and its live alias target
+    // served instead; without it a bare alias under a saved pin is stale, not a fallback.
+    servingFallback: z.literal(true).optional(),
+    // The saved pin the fallback was proven against, so it cannot authorize another entry.
+    servingPinModel: z.string().min(1).optional(),
+    // The concrete target the alias's stored target proved at signing. A move after signing would
+    // serve a different model than the worker ranked, so the target is signed and re-checked.
+    servingFallbackTarget: z.string().min(1).optional(),
+    // Epoch milliseconds.
+    expiresAt: z.number().int().nonnegative(),
+  })
+  .superRefine((payload, ctx) => {
+    if (payload.servingFallback === undefined) {
+      for (const field of ['servingPinModel', 'servingFallbackTarget'] as const) {
+        if (payload[field] !== undefined) {
+          ctx.addIssue({
+            code: 'custom',
+            path: [field],
+            message: `${field} needs servingFallback`,
+          });
+        }
+      }
+      return;
+    }
+    for (const field of ['entryModel', 'servingPinModel', 'servingFallbackTarget'] as const) {
+      if (payload[field] === undefined) {
+        ctx.addIssue({
+          code: 'custom',
+          path: [field],
+          message: `servingFallback needs ${field}`,
+        });
+      }
+    }
+  });
 export type AutoDecisionPayload = z.infer<typeof AutoDecisionPayloadSchema>;
 
 export type AutoDecisionVerification =
@@ -642,12 +784,80 @@ export const CustomRouterEntryStatusSchema = z.enum([
 ]);
 export type CustomRouterEntryStatus = z.infer<typeof CustomRouterEntryStatusSchema>;
 
+/**
+ * What a pool entry's model can do in this pool right now, independent of any owner's billing
+ * state. The web layer folds an owner's paid request into `paused` with a reason; a ready
+ * measurement from any payer always wins over a paused or unbenchmarked request for the same
+ * concrete model.
+ */
+export const CustomRouterAvailabilitySchema = z.enum([
+  // A current-identity ready measurement serves this variant now.
+  'ready',
+  // An older engine identity still serves it.
+  'stale',
+  // No measurement at all, and no request is working on it.
+  'unbenchmarked',
+  // A measurement is pending or running.
+  'benchmarking',
+  // A confirmed request that cannot continue until the owner acts or funds it.
+  'paused',
+  // The resolved pair is permanently unavailable.
+  'permanent_failure',
+  // The alias moved: the pinned target still serves, and the owner may re-benchmark when ready.
+  'alias_rebenchmark_needed',
+]);
+export type CustomRouterAvailability = z.infer<typeof CustomRouterAvailabilitySchema>;
+
+/** The owner's paid request state the UI may fold into availability; never a measurement fact. */
+export type CustomRouterRequestAvailability =
+  | { status: 'preparing' | 'active' }
+  | { status: 'paused'; reason: 'owner' | 'no_funds' }
+  | { status: 'completed' | 'failed' };
+
+/**
+ * Folds one owner's paid request into the measurement availability. Readiness is global: a ready
+ * or stale measurement — from any payer — stays `ready`/`stale`, so a paused or failed request
+ * never hides a model that can serve. Permanent failure also wins over request state. Otherwise a
+ * running request is `benchmarking` and a stopped one is `paused` (the UI shows `reason`); the
+ * server never invents a separate payment state.
+ */
+export function customRouterAvailabilityWithRequest(
+  availability: CustomRouterAvailability,
+  request: CustomRouterRequestAvailability | null
+): CustomRouterAvailability {
+  if (
+    availability === 'ready' ||
+    availability === 'stale' ||
+    availability === 'permanent_failure' ||
+    availability === 'alias_rebenchmark_needed' ||
+    request === null
+  ) {
+    return availability;
+  }
+  if (request.status === 'preparing' || request.status === 'active') return 'benchmarking';
+  if (request.status === 'paused') return 'paused';
+  return availability;
+}
+
 export const CustomRouterVariantStatusSchema = z.object({
   variant: VariantSchema,
   status: CustomRouterEntryStatusSchema,
   failureReason: z.string().nullable(),
   // True when the variant reuses the platform measurement of the entry's `measuredAs` model.
   linked: z.boolean().default(false),
+  // The registry failure behind `status: 'failed'`, with its permanent/retryable kind. Optional so
+  // a web release still parses status answers from a worker that predates the field.
+  failure: BenchmarkProfileFailureSchema.nullable().optional(),
+  // The concrete model this variant dispatches: the entry's serving pin when one applies, else the
+  // entry's own model (or its live alias target for a gateway alias).
+  servingModel: z.string().nullable().optional(),
+  // The exact concrete gateway pair this status row reports (the pinned or current alias target),
+  // so a failure names the model that actually failed.
+  resolvedModel: z.string().nullable().optional(),
+  // True when the pinned target is gone from the catalog, so the live alias target serves instead.
+  servingFallback: z.boolean().optional(),
+  // Measurement-side availability. Optional for deploy overlap; a missing value is `status`-derived.
+  availability: CustomRouterAvailabilitySchema.optional(),
 });
 export type CustomRouterVariantStatus = z.infer<typeof CustomRouterVariantStatusSchema>;
 
@@ -690,12 +900,30 @@ export function suggestMeasuredAs(
   return byName.length === 1 ? (byName[0] ?? null) : null;
 }
 
+/**
+ * A pool entry whose measured pair is permanently unavailable. New pools cannot add it; existing
+ * pools keep the row and show why (ADR 0005). `model`/`variant` name the exact resolved gateway
+ * pair, which is not always the entry's own model (an alias resolves to its target).
+ */
+export const CustomRouterEntryBlockerSchema = z.object({
+  kind: z.literal('permanent'),
+  model: z.string().trim().min(1),
+  variant: VariantSchema,
+  failureClass: BenchmarkProfileFailureClassSchema,
+  reason: z.string().nullable(),
+});
+export type CustomRouterEntryBlocker = z.infer<typeof CustomRouterEntryBlockerSchema>;
+
 export const CustomRouterListEntrySchema = z.object({
   key: EntryKeySchema,
   entry: CustomRouterEntrySchema,
   // True when the owner's CLI must run this entry's evals: the platform key cannot serve it.
   needsClientEval: z.boolean(),
   variants: z.array(CustomRouterVariantStatusSchema),
+  // The saved serving pin, echoed for the editor; the same value is on `entry.servingPin`.
+  servingPin: CustomRouterServingPinSchema.nullable().optional(),
+  // The first permanently failed pair of this entry, when one exists.
+  blocker: CustomRouterEntryBlockerSchema.nullable().optional(),
 });
 export type CustomRouterListEntry = z.infer<typeof CustomRouterListEntrySchema>;
 
@@ -780,8 +1008,62 @@ export type RegisterClientEntryRequest = z.infer<typeof RegisterClientEntryReque
 
 export const CUSTOM_ROUTER_TABLE_PATH = '/admin/custom-router-table';
 export const CUSTOM_ROUTER_STATUS_PATH = '/admin/custom-router-status';
+// POST with a CustomRouterBenchmarkContext; answers a cheap readiness fingerprint. It reads one
+// indexed profile read per entry, never builds a table, and lets the serving Worker notice a newly
+// ready measurement without waiting for the table cache to expire. It is not the table's own
+// `version` (that hash also covers prices and summaries): it changes exactly when the set of ready
+// contributors a pool ranks changes.
+export const CUSTOM_ROUTER_TABLE_VERSION_PATH = '/admin/custom-router-table-version';
+
+export const CustomRouterTableVersionResponseSchema = z.object({
+  readinessVersion: z.string().min(1),
+});
+export type CustomRouterTableVersionResponse = z.infer<
+  typeof CustomRouterTableVersionResponseSchema
+>;
+// POST with `{ router: AutoRouter }`; answers that router's monotonic readiness epoch. Every
+// committed change to a profile row's status, provenance, or measurement identity bumps it in the
+// same D1 transaction, so a serving Worker that sees the same epoch may serve its cached table and
+// a different one must re-check the pool. One exact-key read: no catalogue or registry scan.
+export const CUSTOM_ROUTER_EPOCH_PATH = '/admin/custom-router-epoch';
+
+export const CustomRouterEpochRequestSchema = z.object({ router: AutoRouterSchema });
+export type CustomRouterEpochRequest = z.infer<typeof CustomRouterEpochRequestSchema>;
+
+export const CustomRouterEpochResponseSchema = z.object({
+  epoch: z.number().int().nonnegative(),
+});
+export type CustomRouterEpochResponse = z.infer<typeof CustomRouterEpochResponseSchema>;
+
 // GET ?router=<base router>; answers with PlatformMeasurementsResponseSchema.
 export const PLATFORM_MEASUREMENTS_PATH = '/admin/platform-measurements';
+// POST; read-only registry lookup for the pool editor's add validation. Resolves each asked model
+// (an alias included) to its exact gateway pairs at the live base router and reports the pairs
+// whose registry row is permanently unavailable. Never writes and never admits a benchmark.
+export const CUSTOM_ROUTER_BLOCKED_MODELS_PATH = '/admin/custom-router-blocked-models';
+
+export const CustomRouterBlockedModelsRequestSchema = z.object({
+  router: AutoRouterSchema,
+  models: z.array(ModelIdSchema).min(1).max(MAX_CUSTOM_ROUTER_ENTRIES),
+});
+export type CustomRouterBlockedModelsRequest = z.infer<
+  typeof CustomRouterBlockedModelsRequestSchema
+>;
+
+export const CustomRouterBlockedModelsResponseSchema = z.object({
+  router: AutoRouterSchema,
+  blocked: z.array(
+    z.object({
+      /** The pool model the caller asked about, so an alias reports its own id. */
+      model: ModelIdSchema,
+      pair: z.object({ model: ModelIdSchema, variant: VariantSchema }),
+      failure: BenchmarkProfileFailureSchema,
+    })
+  ),
+});
+export type CustomRouterBlockedModelsResponse = z.infer<
+  typeof CustomRouterBlockedModelsResponseSchema
+>;
 
 const customRouterBenchmarkContextShape = {
   ...OwnerIdentityShape,
@@ -837,6 +1119,17 @@ export const CustomRouterStatusResponseSchema = z.object({
     z.object({
       key: EntryKeySchema,
       variants: z.array(CustomRouterVariantStatusSchema),
+      /**
+       * Informational only. The concrete target the owner's pre-feature serving data
+       * (`benchmark_subscriptions`) recorded for this alias. It is never adopted as a pin: that
+       * snapshot is keyed by owner and base router rather than by pool, is overwritten by the last
+       * registration batch, and records what the alias resolved to, not what was measured — so it
+       * cannot prove which target a given pool served. Presented so an owner can see what the old
+       * queue looked at; only an explicit paid confirmation pins a target.
+       */
+      legacyServingTarget: z.string().nullable().optional(),
+      /** True when that legacy data named more than one concrete target, so nothing can be inferred. */
+      legacyServingAmbiguous: z.boolean().optional(),
     })
   ),
 });
@@ -877,10 +1170,93 @@ export type InternalClientEvalResultRequest = z.infer<typeof InternalClientEvalR
 
 export const AUTO_ROUTING_DENIED_MODELS_PATH = '/api/v1/internal/auto-routing/denied-models';
 
+/**
+ * What one pool entry dispatches: its pinned concrete target when the benchmark worker still
+ * serves that pin, else the entry's own model. Both serving paths call it, so the worker and the
+ * gateway cannot disagree about which model a pick names. Client entries are never pinned and are
+ * never denied by a gateway model policy.
+ */
+export function customRouterEntryDispatch(
+  entry: CustomRouterEntry,
+  options: {
+    deniedModelIds?: ReadonlySet<string>;
+    /** Entry key -> concrete target the benchmark worker currently serves for that pin. */
+    usablePins?: ReadonlyMap<string, string>;
+  } = {}
+): { model: string; pinned: boolean } | null {
+  if (entry.kind === 'client') return { model: customRouterCandidateModel(entry), pinned: false };
+  const denied = options.deniedModelIds;
+  if (denied?.has(entry.model)) return null;
+  const pinnedModel = options.usablePins?.get(customRouterEntryKey(entry));
+  if (pinnedModel && pinnedModel !== entry.model) {
+    return denied?.has(pinnedModel) ? null : { model: pinnedModel, pinned: true };
+  }
+  return { model: entry.model, pinned: false };
+}
+
+// Server-only: the benchmark worker reports the aliases whose confirmed target now has a usable
+// measurement, and the web pins each one on the saved pool. Clients never call it.
+export const CUSTOM_ROUTER_POOL_PINS_PATH = '/api/internal/auto-routing/pool-pins';
+
+export const CustomRouterPoolPinsRequestSchema = z.object({
+  routerId: z.uuid(),
+  ...OwnerIdentityShape,
+  /** The pool state the settlement was authorized for; a mismatch pins nothing. */
+  poolVersion: z.string().trim().min(1),
+  /** The paid benchmark request that was confirmed; replays of it are idempotent. */
+  requestId: z.uuid(),
+  /** When that request was confirmed. Pins order by this, never by completion time. */
+  confirmedAt: z.iso.datetime(),
+  aliases: z
+    .array(
+      z.object({
+        model: z.string().trim().min(1),
+        /** The concrete gateway model the confirmed measurement names. */
+        target: z
+          .string()
+          .trim()
+          .min(1)
+          .refine(
+            target => !isVirtualAutoModelId(target),
+            'target must name a concrete gateway model'
+          ),
+      })
+    )
+    .max(MAX_CUSTOM_ROUTER_ENTRIES),
+});
+export type CustomRouterPoolPinsRequest = z.infer<typeof CustomRouterPoolPinsRequestSchema>;
+
+export const CustomRouterPoolPinsSkippedReasonSchema = z.enum([
+  'pool_changed',
+  'entry_missing',
+  'not_a_gateway_entry',
+  'link_applies',
+  'unchanged',
+  'superseded',
+]);
+export type CustomRouterPoolPinsSkippedReason = z.infer<
+  typeof CustomRouterPoolPinsSkippedReasonSchema
+>;
+
+export const CustomRouterPoolPinsResponseSchema = z.object({
+  routerId: z.uuid(),
+  /** False when the saved pool changed since the confirmation: nothing was pinned. */
+  poolUnchanged: z.boolean(),
+  applied: z.array(z.object({ model: z.string(), target: z.string(), pinnedAt: z.iso.datetime() })),
+  skipped: z.array(
+    z.object({ model: z.string(), reason: CustomRouterPoolPinsSkippedReasonSchema })
+  ),
+});
+export type CustomRouterPoolPinsResponse = z.infer<typeof CustomRouterPoolPinsResponseSchema>;
+
+// A custom router is checked with both its pool model and its serving pin for every gateway
+// entry, so the candidate list can be twice a maximal pool.
+export const MAX_DENIED_MODEL_CANDIDATES = MAX_CUSTOM_ROUTER_ENTRIES * 2;
+
 export const AutoRoutingDeniedModelsRequestSchema = z.object({
   userId: z.string().trim().min(1),
   organizationId: z.uuid(),
-  modelIds: z.array(ModelIdSchema).max(MAX_CUSTOM_ROUTER_ENTRIES),
+  modelIds: z.array(ModelIdSchema).max(MAX_DENIED_MODEL_CANDIDATES),
 });
 export type AutoRoutingDeniedModelsRequest = z.infer<typeof AutoRoutingDeniedModelsRequestSchema>;
 

@@ -9,12 +9,6 @@ import {
 } from './remote-mcp-state';
 import { server, stateOf, tool, viewTool } from './remote-mcp.test-helpers';
 
-/**
- * The join between the stored list and the discovery, proven directly: an
- * enabled server merges its tools, a disabled one does not, and a failed or
- * empty discovery offers nothing but a Retry.
- */
-
 describe('the pure helpers', () => {
   it('merges an enabled server’s tools, named for the server', () => {
     const alpha = server({ id: 'alpha' });

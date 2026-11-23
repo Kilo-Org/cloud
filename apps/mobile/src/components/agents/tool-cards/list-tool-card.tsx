@@ -7,10 +7,11 @@ import { SelectableText } from '@/components/ui/selectable-text';
 
 import { FixedPartRow } from '../fixed-part-row';
 import { useOpenPartDetail } from '../open-part-detail-context';
-import { getToolDisplay, toolPartHasDetails } from '../tool-card-display';
+import { toolPartHasDetails } from '../tool-card-display';
 import { toolStatusLabel } from '../tool-status-label';
 import { buildResultRowsModel } from '../tool-list-model';
 import { ToolResultRows } from '../tool-result-rows';
+import { useToolDisplay } from '../use-tool-display';
 
 /**
  * Sheet body for a list tool part: one plain row per output line, plus the
@@ -39,7 +40,7 @@ export function ListToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
 export function ListToolCard({ part }: Readonly<{ part: ToolPart }>) {
   const openPartDetail = useOpenPartDetail();
   const { t } = useTranslation();
-  const display = getToolDisplay(part);
+  const display = useToolDisplay(part);
   const hasDetails = toolPartHasDetails(part);
 
   return (

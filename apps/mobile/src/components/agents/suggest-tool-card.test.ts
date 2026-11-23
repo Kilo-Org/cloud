@@ -24,6 +24,16 @@ const { state, manager, openPartDetail } = vi.hoisted(() => ({
 }));
 
 vi.mock('react-native', () => ({ View: 'View' }));
+vi.mock('react', async importOriginal => {
+  const actual = await importOriginal<typeof React>();
+  return {
+    default: actual,
+    ...actual,
+    // The card is invoked directly, outside a React render, so `useMemo` would
+    // throw on the null dispatcher; it computes the same value uncached here.
+    useMemo: <T>(fn: () => T): T => fn(),
+  };
+});
 vi.mock('react-i18next', async importOriginal => ({
   ...(await importOriginal<typeof ReactI18next>()),
   useTranslation: () => ({ t: (key: string) => key }),

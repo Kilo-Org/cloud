@@ -361,6 +361,50 @@ describe('markdownMessageDirection', () => {
   it('closes a fence only on its own marker', () => {
     expect(markdownMessageDirection('~~~\n```\nمرحبا\n~~~')).toBeUndefined();
   });
+
+  // An indented block starts after a blank line or after a block that closed,
+  // and every kind CommonMark closes counts: an ATX heading, a thematic break,
+  // the setext underline under the paragraph above, an HTML block whose
+  // terminator arrived, and a reference definition that starts a block. Only a
+  // fence and an indented code line closed a block here before, so the Arabic
+  // line under each of these was read as prose and the message named a
+  // direction it has no prose letter for. The paragraph above the underline
+  // holds no letter, so the underline closes a block and nothing else.
+  it.each([
+    ['an ATX heading', '# 42\n    مرحبا'],
+    ['a thematic break', '---\n    مرحبا'],
+    ['a setext underline', '42\n===\n    مرحبا'],
+    ['a comment closed on its line', '<!-- c -->\n    مرحبا'],
+    ['a comment closed on a later line', '<!--\n-->\n    مرحبا'],
+    ['a reference definition', '[ref]: https://example.com\n    مرحبا'],
+  ])('reads an indented line under %s as code', (_shape, message) => {
+    expect(markdownMessageDirection(message)).toBeUndefined();
+  });
+
+  // The same block ends leave the line under them opening a block, so a Latin
+  // paragraph there names the message exactly as it does under a blank line.
+  it('reads a Latin paragraph under a closed block', () => {
+    expect(markdownMessageDirection('---\n    مرحبا\nLatin paragraph')).toBe('ltr');
+  });
+
+  // An indented block is measured past its container's content column, the way
+  // the strip's walk measures it: five columns under a bullet whose content
+  // starts at column two are three columns past the item's content, so the line
+  // is that item's paragraph and its Arabic names the message. Counted from the
+  // line's start instead, four columns looked like code and the paragraph's own
+  // letters were dropped.
+  it('measures an indented line past its list item’s content column', () => {
+    expect(markdownMessageDirection('- 42\n\n     مرحبا')).toBe('rtl');
+    expect(markdownMessageDirection('- 42\n\n     Latin text')).toBe('ltr');
+  });
+
+  // Neither shape ends a block where CommonMark says it does not: a definition
+  // inside a paragraph is that paragraph's own text, and a `---` inside a
+  // `<div>` is the tag block's copy, so the lines under them are not code.
+  it('keeps the line under a definition in a paragraph and a tag block', () => {
+    expect(markdownMessageDirection('Text\n[ref]: https://example.com\n    مرحبا')).toBe('ltr');
+    expect(markdownMessageDirection('<div>\n---\n    مرحبا')).toBe('rtl');
+  });
 });
 
 describe('withoutLeadingDirectionMarks', () => {

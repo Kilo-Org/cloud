@@ -3,7 +3,7 @@ on:
   pull_request:
     paths:
       - '**/*.md'
-      - 'scripts/check-md-table-padding.ts'
+      - 'script/check-md-table-padding.ts'
       - '.github/workflows/check-md-table-padding.yml'
   workflow_dispatch:
 
@@ -30,4 +30,4 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
       - name: Run check
-        run: bun run scripts/check-md-table-padding.ts
+        run: bun run script/check-md-table-padding.ts

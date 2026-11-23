@@ -1,0 +1,22 @@
+label=base-instrumented chunk=500 chunks=10
+field_len=221 wall=10.259 per_char_ms=20.52 dump=2.31
+field_len=486 wall=10.140 per_char_ms=20.28 dump=2.34
+field_len=737 wall=10.261 per_char_ms=20.52 dump=2.47
+field_len=737 wall=10.252 per_char_ms=20.50 dump=0.35
+field_len=1235 wall=10.118 per_char_ms=20.24 dump=3.11
+field_len=1368 wall=10.514 per_char_ms=21.03 dump=3.38
+field_len=1496 wall=10.440 per_char_ms=20.88 dump=3.11
+field_len=1619 wall=10.553 per_char_ms=21.11 dump=3.33
+field_len=1745 wall=10.670 per_char_ms=21.34 dump=3.29
+field_len=1867 wall=10.639 per_char_ms=21.28 dump=3.39
+Total frames rendered: 1758
+Janky frames: 1694 (96.36%)
+Janky frames (legacy): 1746 (99.32%)
+50th percentile: 85ms
+90th percentile: 150ms
+95th percentile: 150ms
+99th percentile: 150ms
+Number Slow UI thread: 1487
+Number Slow issue draw commands: 1694
+Number Frame deadline missed: 1694
+Number Frame deadline missed (legacy): 1689

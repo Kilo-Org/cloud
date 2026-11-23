@@ -1,0 +1,17 @@
+label=probe-6k chunk=500 chunks=4 before=2900 after=3837
+chunk=1 device_ms=1650 per_char_ms=3.30
+chunk=2 device_ms=1656 per_char_ms=3.31
+chunk=3 device_ms=1565 per_char_ms=3.13
+chunk=4 device_ms=1621 per_char_ms=3.24
+host_seconds=40.9
+Total frames rendered: 866
+Janky frames: 818 (94.46%)
+Janky frames (legacy): 864 (99.77%)
+50th percentile: 65ms
+90th percentile: 81ms
+95th percentile: 85ms
+99th percentile: 101ms
+Number Slow UI thread: 728
+Number Slow issue draw commands: 818
+Number Frame deadline missed: 818
+Number Frame deadline missed (legacy): 821

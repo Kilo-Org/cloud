@@ -109,7 +109,7 @@ function ruleAction(rules: readonly Rule[], input: string, fallback?: Action) {
   return matched?.action ?? fallback;
 }
 
-type ShellKind = keyof NonNullable<Layer['shell']>;
+type ShellKind = keyof NonNullable<Layer['shell']> | 'unsupported';
 
 /**
  * The decision the schema comment at the `tools.bash` guard describes for one shell
@@ -122,7 +122,7 @@ function decideShell(layers: readonly Layer[], kind: ShellKind, command: string)
   for (const layer of layers) {
     const tool = layer.tools?.bash;
     if (typeof tool === 'string') decision = restrict(decision, tool);
-    const profile = layer.shell?.[kind];
+    const profile = kind === 'unsupported' ? undefined : layer.shell?.[kind];
     if (layer.shell) {
       if (!profile) return 'deny' as const;
       decision = restrict(decision, ruleAction(profile.rules, command, profile.fallback));
@@ -209,6 +209,13 @@ test('keeps a layer Bash default and its shell profile both in force', () => {
     },
   ];
   expect(decideShell(profileForAnotherShell, 'bash', 'ls -la')).toBe('deny');
+
+  // A layer with no shell block leaves Bash to its tools entry; a layer that has
+  // one denies a command whose shell cannot be parsed.
+  const toolOnlyLayer: Layer[] = [{ schema_version: 1, tools: { bash: 'allow' } }];
+  expect(decideShell(toolOnlyLayer, 'bash', 'ls -la')).toBe('allow');
+  expect(decideShell(toolOnlyLayer, 'unsupported', 'ls -la')).toBe('allow');
+  expect(decideShell(layers.slice(0, 1), 'unsupported', 'ls -la')).toBe('deny');
 
   // The shell rules still decide the commands they describe.
   expect(decideShell(layers.slice(0, 1), 'bash', 'git status --short')).toBe('allow');

@@ -134,7 +134,6 @@ jobs:
       - name: Switch to the run SHA
         if: steps.runtime_source.outputs.runtime_source_sha != github.sha
         env:
-          RUNTIME_SOURCE_SHA: ${{ steps.runtime_source.outputs.runtime_source_sha }}
           RUN_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail

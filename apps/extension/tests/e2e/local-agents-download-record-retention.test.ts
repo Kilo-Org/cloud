@@ -306,9 +306,7 @@ const downloadItems = async (page: Page): Promise<z.infer<typeof downloadItemSch
  * leave. The guarded navigate of step 2 left an earlier item for the same file behind, and this
  * step drove the one that matters, so the newest match is the one read.
  */
-const settledItem = async (
-  page: Page
-): Promise<z.infer<typeof downloadItemSchema> | undefined> => {
+const settledItem = async (page: Page): Promise<z.infer<typeof downloadItemSchema> | undefined> => {
   let found: z.infer<typeof downloadItemSchema> | undefined = undefined;
 
   await expect
@@ -403,11 +401,15 @@ test('the download-hold record stays as written across a worker restart that get
       title: 'Record retention session',
     });
 
-    const guarded = await session.callTool('browser_navigate', { url: `${fixture.url}${DOWNLOAD_PATH}` }, [
-      { class: 'act', origin: fixture.url },
-      { class: 'navigate', origin: fixture.url },
-      { class: 'read', origin: fixture.url },
-    ]);
+    const guarded = await session.callTool(
+      'browser_navigate',
+      { url: `${fixture.url}${DOWNLOAD_PATH}` },
+      [
+        { class: 'act', origin: fixture.url },
+        { class: 'navigate', origin: fixture.url },
+        { class: 'read', origin: fixture.url },
+      ]
+    );
 
     expect(guarded).toMatchObject({
       afterAction: true,
@@ -430,7 +432,9 @@ test('the download-hold record stays as written across a worker restart that get
       waitForDebuggerOnStart: true,
     });
 
-    const targets = (await browserCdp.send('Target.getTargets')) as { targetInfos: CdpTargetInfo[] };
+    const targets = (await browserCdp.send('Target.getTargets')) as {
+      targetInfos: CdpTargetInfo[];
+    };
     const workerTarget = targets.targetInfos.find(
       target => target.type === 'service_worker' && target.url.includes(extensionId)
     );
@@ -443,7 +447,11 @@ test('the download-hold record stays as written across a worker restart that get
 
     // The auto-attach above would hold every new page target for the debugger; nothing else needs it.
     await browserCdp
-      .send('Target.setAutoAttach', { autoAttach: false, flatten: true, waitForDebuggerOnStart: false })
+      .send('Target.setAutoAttach', {
+        autoAttach: false,
+        flatten: true,
+        waitForDebuggerOnStart: false,
+      })
       .catch(() => null);
     await browserCdp.detach().catch(() => null);
 
@@ -481,22 +489,24 @@ test('the download-hold record stays as written across a worker restart that get
     // 7. That download stored nothing either: the record is still the seeded one.
     const afterDownload = await settledRecord(sidePanel);
 
-    test.info().annotations.push(
-      { description: JSON.stringify(seeded), type: 'seeded-record' },
-      { description: JSON.stringify(written), type: 'record-after-write' },
-      { description: JSON.stringify(beforeRestart), type: 'record-before-restart' },
-      { description: JSON.stringify(first.state), type: 'first-generation' },
-      { description: JSON.stringify(second.state), type: 'second-generation' },
-      { description: JSON.stringify(closed), type: 'worker-close' },
-      { description: JSON.stringify(wake), type: 'wake' },
-      { description: JSON.stringify(workerRead), type: 'worker-read' },
-      { description: JSON.stringify(afterRestart), type: 'record-after-restart' },
-      { description: JSON.stringify(item ?? null), type: 'post-restart-download' },
-      { description: JSON.stringify(items), type: 'download-items' },
-      { description: JSON.stringify({ hits: fixture.hits() }), type: 'guarded-navigate' },
-      { description: JSON.stringify(folder), type: 'post-restart-folder' },
-      { description: JSON.stringify(afterDownload), type: 'record-after-download' }
-    );
+    test
+      .info()
+      .annotations.push(
+        { description: JSON.stringify(seeded), type: 'seeded-record' },
+        { description: JSON.stringify(written), type: 'record-after-write' },
+        { description: JSON.stringify(beforeRestart), type: 'record-before-restart' },
+        { description: JSON.stringify(first.state), type: 'first-generation' },
+        { description: JSON.stringify(second.state), type: 'second-generation' },
+        { description: JSON.stringify(closed), type: 'worker-close' },
+        { description: JSON.stringify(wake), type: 'wake' },
+        { description: JSON.stringify(workerRead), type: 'worker-read' },
+        { description: JSON.stringify(afterRestart), type: 'record-after-restart' },
+        { description: JSON.stringify(item ?? null), type: 'post-restart-download' },
+        { description: JSON.stringify(items), type: 'download-items' },
+        { description: JSON.stringify({ hits: fixture.hits() }), type: 'guarded-navigate' },
+        { description: JSON.stringify(folder), type: 'post-restart-folder' },
+        { description: JSON.stringify(afterDownload), type: 'record-after-download' }
+      );
 
     expect(recordSchema.parse(afterRestart)).toStrictEqual(seeded);
     expect(recordSchema.parse(afterDownload)).toStrictEqual(seeded);

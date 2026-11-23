@@ -1120,7 +1120,10 @@ export async function acceptOrganizationInvite(
           acceptingUserDomain !== ssoPolicy.domain ||
           invitation.sso_source_organization_id !== ssoPolicy.sourceOrganizationId
         ) {
-          return failureResult('Invitation requires authentication through organization SSO');
+          // The policy in force no longer matches this invitation, so acceptance
+          // retires it and leaves the address free for a new invitation.
+          await expireOrganizationInvitation(tx, invitation);
+          return failureResult('Invitation is no longer valid');
         }
         if (
           authentication.provider !== 'workos' ||
@@ -1140,7 +1143,7 @@ export async function acceptOrganizationInvite(
       }
 
       const existingMembership = await tx
-        .select()
+        .select({ role: organization_memberships.role })
         .from(organization_memberships)
         .where(
           and(
@@ -1162,7 +1165,8 @@ export async function acceptOrganizationInvite(
         return successResult({
           invitation: updatedInvitation,
           organizationId: invitation.organization_id,
-          role: invitation.role,
+          // An existing membership keeps its own role, so report that role.
+          role: existingMembership[0].role,
           membershipInserted: false,
         });
       }

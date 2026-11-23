@@ -1,5 +1,9 @@
 import type { CreditTransactionForBlocks } from '@kilocode/web-shared/lib/creditExpiration';
-import { getCreditBlocks, creditGrantReasonOf } from './getCreditBlocks';
+import {
+  getCreditBlocks,
+  creditGrantReasonOf,
+  type CreditDeductionReason,
+} from './getCreditBlocks';
 
 const makeTransaction = (
   id: string,
@@ -321,6 +325,97 @@ describe('getCreditBlocks', () => {
         kind: 'adjustment',
       },
     });
+  });
+
+  it('reports a negative row that records no category as usage', () => {
+    const transactions = [
+      makeTransaction('spend', 0, -1_000_000, {
+        description: 'Deducting credits',
+        created_at: '2024-01-10',
+      }),
+    ];
+
+    const result = getCreditBlocks(transactions, now, makeEntity(1_000_000, 0), ENTITY_ID);
+
+    expect(result.deductions[0].reason).toBe('usage');
+    expect(result.deductions[0].planName).toBeNull();
+  });
+
+  it('names the coding plan a charge came from', () => {
+    const transactions = [
+      makeTransaction('plan-charge', 0, -20_000_000, {
+        description: 'Coding plan: MiniMax Token Plan Plus',
+        credit_category: 'coding-plan:minimax-token-plan-plus:req-1',
+        created_at: '2024-01-10',
+      }),
+    ];
+
+    const result = getCreditBlocks(transactions, now, makeEntity(20_000_000, 0), ENTITY_ID);
+
+    expect(result.deductions[0].reason).toBe('coding_plan');
+    expect(result.deductions[0].planName).toBe('MiniMax Token Plan Plus');
+  });
+
+  it('names the plan a coding-plan renewal renewed from its subscription', () => {
+    const transactions = [
+      makeTransaction('plan-renewal', 0, -20_000_000, {
+        description: 'Coding plan renewal: MiniMax Token Plan Plus',
+        credit_category: 'coding-plan:renewal:sub-1:2026-12-01',
+        created_at: '2024-01-10',
+      }),
+    ];
+
+    const result = getCreditBlocks(
+      transactions,
+      now,
+      makeEntity(20_000_000, 0),
+      ENTITY_ID,
+      new Map([['sub-1', 'MiniMax Token Plan Plus']])
+    );
+
+    expect(result.deductions[0].reason).toBe('coding_plan');
+    expect(result.deductions[0].planName).toBe('MiniMax Token Plan Plus');
+  });
+
+  it('leaves a coding-plan renewal without a resolved plan without a reason', () => {
+    const transactions = [
+      makeTransaction('plan-renewal', 0, -20_000_000, {
+        description: 'Coding plan renewal: MiniMax Token Plan Plus',
+        credit_category: 'coding-plan:renewal:sub-1:2026-12-01',
+        created_at: '2024-01-10',
+      }),
+    ];
+
+    const result = getCreditBlocks(transactions, now, makeEntity(20_000_000, 0), ENTITY_ID);
+
+    expect(result.deductions[0].reason).toBeNull();
+    expect(result.deductions[0].planName).toBeNull();
+  });
+
+  it('reports the reason each deduction category carries', () => {
+    const cases: { creditCategory: string; reason: CreditDeductionReason | null }[] = [
+      { creditCategory: 'store-credit-refund:app_store:txn-1', reason: 'refund_app_store' },
+      { creditCategory: 'store-credit-refund:google_play:txn-2', reason: 'refund_google_play' },
+      { creditCategory: 'store-credit-refund:stripe:txn-3', reason: null },
+      { creditCategory: 'stripe-dispute-enforcement', reason: 'dispute' },
+      { creditCategory: 'admin-cancel-kilo-pass-no-refund', reason: 'admin_cancel' },
+      { creditCategory: 'manual_decrement', reason: 'admin_debit' },
+      { creditCategory: 'orb_manual_decrement', reason: 'admin_debit' },
+      { creditCategory: 'accounting_adjustment', reason: 'correction' },
+      { creditCategory: 'orb_migration_accounting_adjustment', reason: 'correction' },
+      { creditCategory: 'credits_expired', reason: null },
+    ];
+
+    for (const { creditCategory, reason } of cases) {
+      const transactions = [
+        makeTransaction('row', 0, -1_000_000, { credit_category: creditCategory }),
+      ];
+
+      const result = getCreditBlocks(transactions, now, makeEntity(1_000_000, 0), ENTITY_ID);
+
+      expect(result.deductions[0].reason).toBe(reason);
+      expect(result.deductions[0].planName).toBeNull();
+    }
   });
 });
 

@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   CountSurfaces,
-  routerReplace,
+  routerNavigate,
   segments,
 } from '@/components/agents/agents-tab-badge.test-helpers';
 import { i18n } from '@/i18n';
@@ -33,7 +33,7 @@ function screenOptions(renderer: Mount['renderer']) {
 describe('Tabs layout with the keyboard raised', () => {
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-    routerReplace.mockClear();
+    routerNavigate.mockClear();
   });
 
   afterEach(() => {
@@ -110,7 +110,7 @@ describe('Tabs layout with the keyboard raised', () => {
         total: 4,
       })
     );
-    expect(routerReplace).not.toHaveBeenCalled();
+    expect(routerNavigate).not.toHaveBeenCalled();
     expect(
       result.renderer.root.findAll(tab => isHostType(tab, 'TabScreen')).map(tab => tab.props.name)
     ).toEqual(['(0_home)', '(2_agents)', '(4_chat)', '(3_profile)']);

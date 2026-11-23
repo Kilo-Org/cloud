@@ -94,7 +94,9 @@ describe('the GGUF store bootstrap', () => {
 
     await expect(ggufModelProvider.availability()).resolves.toMatchObject({
       status: 'unavailable',
-      reason: 'model_unavailable',
+      // The saved list could not be read, so an empty `models` is not an empty
+      // library and the reason does not claim a model is missing.
+      reason: 'models_unreadable',
     });
     expect(fsMock.readIndexAttempts).toBe(1);
     expect(appState.addEventListener).not.toHaveBeenCalled();

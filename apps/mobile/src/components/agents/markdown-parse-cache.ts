@@ -1,7 +1,7 @@
 import { marked, type TokensList } from 'marked';
 
 import { CharacterBoundedCache } from './character-bounded-cache';
-import { type MarkdownHtmlSplit } from './markdown-html';
+import { type MarkdownHtmlConversionTail, type MarkdownHtmlSplit } from './markdown-html';
 
 // Two megabytes of source text per artifact kind. A 200-message transcript of
 // ordinary sizes fits entirely; a transcript of huge messages keeps only the
@@ -9,7 +9,19 @@ import { type MarkdownHtmlSplit } from './markdown-html';
 const MARKDOWN_PARSE_CACHE_CHARACTERS = 2_000_000;
 
 const markdownTokenCache = new CharacterBoundedCache<TokensList>(MARKDOWN_PARSE_CACHE_CHARACTERS);
-export const markdownHtmlSplitCache = new CharacterBoundedCache<MarkdownHtmlSplit>(
+
+/**
+ * A cached split plus the tail the publish that produced it carried: `conversion`
+ * says where that publish's conversion stops being final and carries that
+ * region's conversion. A remounted row starts without a record, so both travel
+ * with the split; without them the first publish after the remount would have
+ * to convert the whole value to learn where its conversion stays final.
+ */
+export type CachedMarkdownHtmlSplit = MarkdownHtmlSplit & {
+  conversion: MarkdownHtmlConversionTail;
+};
+
+export const markdownHtmlSplitCache = new CharacterBoundedCache<CachedMarkdownHtmlSplit>(
   MARKDOWN_PARSE_CACHE_CHARACTERS
 );
 

@@ -1,10 +1,21 @@
 import * as z from 'zod';
 import {
   AUTO_ROUTERS,
+  BENCHMARK_ALIAS_PROMOTION_PATH,
+  AliasPromotionRequestSchema,
+  AliasPromotionAcquireResponseSchema,
+  AliasPromotionReleaseResponseSchema,
   AutoRouterSchema,
+  CUSTOM_ROUTER_BLOCKED_MODELS_PATH,
+  CUSTOM_ROUTER_EPOCH_PATH,
   CUSTOM_ROUTER_STATUS_PATH,
   CUSTOM_ROUTER_TABLE_PATH,
+  CUSTOM_ROUTER_TABLE_VERSION_PATH,
   CustomRouterBenchmarkContextSchema,
+  CustomRouterBlockedModelsRequestSchema,
+  CustomRouterEpochRequestSchema,
+  CustomRouterEpochResponseSchema,
+  CustomRouterTableVersionResponseSchema,
   PLATFORM_MEASUREMENTS_PATH,
   PlatformMeasurementsResponseSchema,
   type AutoRouter,
@@ -17,7 +28,17 @@ import {
   BenchmarkKindSchema,
   BenchmarkProfileStatusesRequestSchema,
   BenchmarkRunPurposeSchema,
+  BenchmarkRunCancelResponseSchema,
   CustomRoutingTableRequestSchema,
+  PAID_BENCHMARK_ADMIN_PATH,
+  PAID_BENCHMARK_ADMIN_PAUSE_PATH,
+  PAID_BENCHMARK_ADMIN_PROGRESS_PATH,
+  PAID_BENCHMARK_ADMIN_ROUTING_TABLE_PATH,
+  PaidBenchmarkAdminPauseRequestSchema,
+  PaidBenchmarkAdminPauseResponseSchema,
+  PaidBenchmarkAdminRequestStatusSchema,
+  PaidBenchmarkAdminRoutingTableRequestSchema,
+  PaidBenchmarkIdSchema,
   RegisterBenchmarkProfilesRequestSchema,
   RequeueBenchmarkRegistryRequestSchema,
   SyncBenchmarkSubscriptionsRequestSchema,
@@ -27,6 +48,7 @@ import {
   type BenchmarkConfigSaveWarning,
   type BenchmarkRegistryQueue,
   type BenchmarkIdentity,
+  POLICY_SETTINGS,
   resolveBenchmarkIdentity,
   resolvePolicySettings,
   resolveEffectivePolicy,
@@ -44,10 +66,26 @@ import {
 import { formatError, zodJsonValidator } from '@kilocode/worker-utils';
 import type { Context, Hono } from 'hono';
 import { getBenchmarkConfig, saveBenchmarkConfig } from './config';
+import {
+  listPaidBenchmarkAdminRequests,
+  pausePaidBenchmarkAdminRequest,
+  readPaidBenchmarkAdminContext,
+  readPaidBenchmarkAdminProgress,
+} from './paid-benchmark-admin';
+import {
+  acquireAliasPromotionLease,
+  releaseAliasPromotionLease,
+  type AliasPromotionProfileIdentity,
+} from './alias-promotion';
 import { registerProfileRefreshRoute } from './admin-profile-refresh';
 import { debugRunCli } from './cli-runner';
 import { assembleCustomRoutingTable } from './custom-routing-table';
-import { assembleCustomRouterTable, lookupCustomRouterStatuses } from './custom-routers';
+import {
+  assembleCustomRouterTable,
+  computeCustomRouterReadinessVersion,
+  lookupCustomRouterBlockers,
+  lookupCustomRouterStatuses,
+} from './custom-routers';
 import {
   lookupProfileStatuses,
   listReadyPlatformMeasurements,
@@ -58,12 +96,14 @@ import {
 } from './profiles';
 import {
   BenchmarkRunConfigError,
+  cancelPlatformBenchmarkRun,
   computeEngineIdentity,
   drainQueues,
   PLATFORM_SYNC_SCHEDULE,
   publishPlatformRoutingTable,
   resolveRunIdentity,
   RunAlreadyActiveError,
+  RunOperatorHoldError,
   startRun,
   syncPlatformRegistry,
   type DrainSkipReason,
@@ -77,6 +117,8 @@ import {
   listRunModelIds,
   listRunningRunIds,
   listRuns,
+  readBenchmarkCutover,
+  readBenchmarkReadinessEpoch,
   requeueRetryableCurrentProfiles,
 } from './db';
 import { loadRunProgress } from './run-progress';
@@ -192,13 +234,69 @@ function withLegacyAdminRunFields(run: BenchmarkRun): BenchmarkRunAdminResponseR
 const RETRY_AFTER_SAVE = `The scheduled platform sync (${PLATFORM_SYNC_SCHEDULE}) retries it; save again to retry now.`;
 
 /**
+ * The table inputs a saved config can change. The publish gate treats a policy edit as a
+ * reason to rebuild even when pool membership is unchanged, so the comparison must cover
+ * every knob the persisted artifact carries — not the four the gate can read cheaply.
+ * Repetition and classifier knobs are deliberately absent: they change which cases run,
+ * not the table's content.
+ */
+type RoutingPolicyProjection = {
+  minAccuracy: number;
+  accuracyNoiseBand: number;
+  switchCostFactor: number;
+  bestAccuracySwitchThreshold: number;
+  productionTokenProfile: string;
+  switchHorizonTurns: number | null;
+  lowConfidenceThreshold: number | null;
+};
+
+function routingPolicyProjection(
+  config: BenchmarkConfig,
+  router: AutoRouter
+): RoutingPolicyProjection {
+  const policy = resolveEffectivePolicy(config);
+  return {
+    // The table stores the router-adjusted threshold, so compare what is stored.
+    minAccuracy: Math.min(
+      1,
+      policy.minAccuracy + (router === 'frontier' ? policy.frontierMinAccuracyDelta : 0)
+    ),
+    accuracyNoiseBand: policy.accuracyNoiseBand,
+    switchCostFactor: policy.switchCostFactor,
+    bestAccuracySwitchThreshold: policy.bestAccuracySwitchThreshold,
+    productionTokenProfile: JSON.stringify(policy.productionTokenProfile ?? null),
+    switchHorizonTurns: policy.switchHorizonTurns,
+    lowConfidenceThreshold: policy.lowConfidenceThreshold,
+  };
+}
+
+/**
+ * Whether this save changed a knob the routing table is built from. Compared before and
+ * after in the same request, against the complete projection above, so a save that only
+ * rewrites an unrelated field reports `false` and stays cache-only.
+ */
+function configSaveChangedRoutingPolicy(
+  before: BenchmarkConfig | null,
+  after: BenchmarkConfig,
+  router: AutoRouter
+): boolean {
+  if (before === null) return false;
+  const previous = routingPolicyProjection(before, router);
+  const next = routingPolicyProjection(after, router);
+  return (Object.keys(previous) as (keyof RoutingPolicyProjection)[]).some(
+    key => previous[key] !== next[key]
+  );
+}
+
+/**
  * Registry sync, then routing-table publish, for a config that is already
  * saved. A failed step does not undo the save; it comes back as a warning so
  * the admin learns what did not happen. A failed sync skips the publish.
  */
 async function syncRegistryAfterConfigSave(
   env: Env,
-  router: AutoRouter
+  router: AutoRouter,
+  policyChanged: boolean
 ): Promise<BenchmarkConfigSaveWarning[]> {
   try {
     await syncPlatformRegistry(env, fetch, router);
@@ -221,7 +319,12 @@ async function syncRegistryAfterConfigSave(
   try {
     // A save also flushes an unchanged table: an earlier save may have written
     // it but failed the flush, and the version check would otherwise skip it.
-    await publishPlatformRoutingTable(env, fetch, router, { flushUnchangedTable: true });
+    // `policyChanged` is the one signal that lets this admin publish rebuild an
+    // unchanged pool: only a save that observed its own policy edit sets it.
+    await publishPlatformRoutingTable(env, fetch, router, {
+      flushUnchangedTable: true,
+      policyChanged,
+    });
   } catch (error) {
     console.warn(
       JSON.stringify({
@@ -337,6 +440,14 @@ async function drainPlatformAfterConfigSave(
   }
 }
 
+/** Console list query. Statuses arrive comma-separated; an unknown value is a 400. */
+const PaidBenchmarkAdminListQuerySchema = z.object({
+  router: AutoRouterSchema.default(DEFAULT_AUTO_ROUTER),
+  status: z.string().optional(),
+  cursor: z.string().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+});
+
 export function registerAdminRoutes(app: Hono<HonoEnv>): void {
   // Every /admin/* route below requires the worker-wide authMiddleware
   // (./auth), which src/index.ts mounts with app.use('*', ...) before it calls
@@ -385,12 +496,16 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
       const deciderModels = hasSelectedPool
         ? body.deciderModels
         : [{ id: DEFAULT_BENCHMARK_DECIDER_MODEL_IDS[router] }];
+      // Read the previous policy before writing: the publish gate needs the save's own
+      // before/after, and reading it after the write would compare the row to itself.
+      const previousConfig = await getBenchmarkConfig(c.env.BENCH_DB, router);
       const saved = await saveBenchmarkConfig(
         c.env.BENCH_DB,
         { ...body, router, deciderModels },
         updatedBy
       );
-      const warnings = await syncRegistryAfterConfigSave(c.env, router);
+      const policyChanged = configSaveChangedRoutingPolicy(previousConfig, saved, router);
+      const warnings = await syncRegistryAfterConfigSave(c.env, router, policyChanged);
       // Only a save whose registry sync and publish both landed has new pending
       // rows to start; a failed sync has no rows and a failed publish is already
       // reported, so the cron owns that case.
@@ -562,6 +677,9 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
       try {
         return c.json({ ...(await startRun(c.env, kind, { force, router })), startedRuns: [] });
       } catch (error) {
+        if (error instanceof RunOperatorHoldError) {
+          return c.json({ error: 'operator_hold_active' }, 409);
+        }
         // One active run per kind: surface the conflict as 409 so automated
         // callers don't treat it as a transient 5xx and retry.
         if (error instanceof RunAlreadyActiveError) {
@@ -588,10 +706,12 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
       engineIdentity: computeEngineIdentity('decider', router),
       repetitions: resolveEffectivePolicy(config).deciderRepetitions,
     };
+    // Fences pending rows out of both counters; a missing marker fails closed in the readers.
+    const cutoverAt = await readBenchmarkCutover(c.env.BENCH_DB);
     const [platform, user, platformEntries, failedEntries] = await Promise.all([
-      countCurrentProfilesByStatus(c.env.BENCH_DB, current, 'platform'),
-      countCurrentProfilesByStatus(c.env.BENCH_DB, current, 'user'),
-      listCurrentPlatformProfileStatuses(c.env.BENCH_DB, current),
+      countCurrentProfilesByStatus(c.env.BENCH_DB, current, 'platform', cutoverAt),
+      countCurrentProfilesByStatus(c.env.BENCH_DB, current, 'user', cutoverAt),
+      listCurrentPlatformProfileStatuses(c.env.BENCH_DB, current, cutoverAt),
       listCurrentFailedProfiles(c.env.BENCH_DB, current),
     ]);
     const toQueue = (rows: Awaited<ReturnType<typeof countCurrentProfilesByStatus>>) => {
@@ -914,6 +1034,210 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
       }
       return c.json(
         await lookupCustomRouterStatuses(c.env.BENCH_DB, config, context, { catalogEnv: c.env })
+      );
+    }
+  );
+
+  // Read-only add-time validation for the pool editor: the exact resolved gateway pair and the
+  // permanent failure behind it. It reads the registry and never writes or admits a benchmark, so
+  // a save can never start spend through this path.
+  app.post(
+    CUSTOM_ROUTER_BLOCKED_MODELS_PATH,
+    zodJsonValidator(CustomRouterBlockedModelsRequestSchema, {
+      errorMessage: 'Invalid blocked models request',
+    }),
+    async c => {
+      const request = c.req.valid('json');
+      const config = await getBenchmarkConfig(c.env.BENCH_DB, request.router);
+      if (!config) return c.json({ router: request.router, blocked: [] });
+      return c.json(
+        await lookupCustomRouterBlockers(c.env.BENCH_DB, config, request, { catalogEnv: c.env })
+      );
+    }
+  );
+
+  // Operator stop for one platform run. Platform benchmarking is automatic, so this is
+  // the only admin stop control; it never touches a paid user request.
+  app.post('/admin/runs/:runId/cancel', async c => {
+    const router = AutoRouterSchema.safeParse(c.req.query('router') ?? DEFAULT_AUTO_ROUTER);
+    if (!router.success) return c.json({ error: 'Invalid router' }, 400);
+    const runId = c.req.param('runId');
+    if (runId.length === 0) return c.json({ error: 'Invalid run id' }, 400);
+    const outcome = await cancelPlatformBenchmarkRun(c.env, router.data, runId);
+    return c.json(
+      BenchmarkRunCancelResponseSchema.parse({
+        status: outcome === 'not_active' ? 'already_finished' : outcome,
+      })
+    );
+  });
+
+  // Cheap canonical version for a pool's table: one indexed profile read, no table build, no
+  // writes. The serving Worker polls it to notice a newly ready measurement — from any payer —
+  // instead of waiting out its cache TTL.
+  app.post(
+    CUSTOM_ROUTER_TABLE_VERSION_PATH,
+    zodJsonValidator(CustomRouterBenchmarkContextSchema, {
+      errorMessage: 'Invalid custom router table version request',
+    }),
+    async c => {
+      const context = c.req.valid('json');
+      const config = await getBenchmarkConfig(c.env.BENCH_DB, context.baseRouter);
+      if (!config) return c.json({ error: 'Benchmark config is not configured.' }, 400);
+      const version = await computeCustomRouterReadinessVersion(c.env.BENCH_DB, config, context, {
+        catalogEnv: c.env,
+      });
+      return c.json(CustomRouterTableVersionResponseSchema.parse({ readinessVersion: version }));
+    }
+  );
+
+  // One exact-key read of the router's readiness epoch. The serving Worker calls this through the
+  // benchmark service binding before it trusts a cached custom routing table: the epoch advances
+  // inside the same D1 transaction as every readiness/provenance change, so a match proves the
+  // cache was assembled from the current registry state. It reads no catalogue and scans nothing.
+  app.post(
+    CUSTOM_ROUTER_EPOCH_PATH,
+    zodJsonValidator(CustomRouterEpochRequestSchema, {
+      errorMessage: 'Invalid custom router epoch request',
+    }),
+    async c => {
+      const { router } = c.req.valid('json');
+      try {
+        const epoch = await readBenchmarkReadinessEpoch(c.env.BENCH_DB, router);
+        return c.json(CustomRouterEpochResponseSchema.parse({ epoch }));
+      } catch (error) {
+        console.warn(
+          JSON.stringify({
+            event: 'custom_router_epoch_unavailable',
+            router,
+            ...formatError(error),
+          })
+        );
+        // Unprovable state is never "unchanged": the caller must re-read the actual table.
+        return c.json({ error: 'Readiness epoch is unavailable' }, 503);
+      }
+    }
+  );
+
+  // Short global readiness fence for an alias move. The catalog writer holds it while it saves the
+  // observed concrete targets it read here, so no ready publication can land between that read and
+  // the save. It reads the registry alone and never starts, dispatches or grades a benchmark.
+  app.post(
+    BENCHMARK_ALIAS_PROMOTION_PATH,
+    zodJsonValidator(AliasPromotionRequestSchema, {
+      errorMessage: 'Invalid alias promotion request',
+    }),
+    async c => {
+      const request = c.req.valid('json');
+      if (request.action === 'release') {
+        await releaseAliasPromotionLease(c.env.BENCH_DB, request.token);
+        return c.json(AliasPromotionReleaseResponseSchema.parse({ status: 'released' }));
+      }
+      const currentIdentities: AliasPromotionProfileIdentity[] = AUTO_ROUTERS.map(router => ({
+        router,
+        engine_identity: computeEngineIdentity('decider', router),
+        repetitions: POLICY_SETTINGS.deciderRepetitions.fixedByRouter[router],
+      }));
+      const acquired = await acquireAliasPromotionLease(
+        c.env.BENCH_DB,
+        request.token,
+        request.models,
+        currentIdentities
+      );
+      return c.json(AliasPromotionAcquireResponseSchema.parse(acquired));
+    }
+  );
+
+  // The admin console manages both benchmark queues: platform work stays automatic, and
+  // these routes read the user-paid requests and expose the one control it needs — a
+  // pause that stops that request's spend immediately.
+  app.get(PAID_BENCHMARK_ADMIN_PATH, async c => {
+    const query = PaidBenchmarkAdminListQuerySchema.safeParse({
+      router: c.req.query('router') ?? undefined,
+      status: c.req.query('status') ?? undefined,
+      cursor: c.req.query('cursor') ?? undefined,
+      limit: c.req.query('limit') ?? undefined,
+    });
+    if (!query.success) return c.json({ error: 'Invalid paid request query' }, 400);
+    const statuses = (query.data.status ?? '')
+      .split(',')
+      .map(value => value.trim())
+      .filter(value => value.length > 0);
+    const parsedStatuses = z.array(PaidBenchmarkAdminRequestStatusSchema).safeParse(statuses);
+    if (!parsedStatuses.success) return c.json({ error: 'Unknown paid request status' }, 400);
+    try {
+      return c.json(
+        await listPaidBenchmarkAdminRequests(c.env.BENCH_DB, {
+          router: query.data.router,
+          statuses: parsedStatuses.data,
+          cursor: query.data.cursor,
+          limit: query.data.limit,
+        })
+      );
+    } catch (error) {
+      // A malformed keyset cursor is a client error, not a worker fault.
+      if (error instanceof Error && error.message.includes('cursor')) {
+        return c.json({ error: 'Invalid paid request cursor' }, 400);
+      }
+      throw error;
+    }
+  });
+
+  app.get(PAID_BENCHMARK_ADMIN_PROGRESS_PATH, async c => {
+    const requestId = PaidBenchmarkIdSchema.safeParse(c.req.query('requestId'));
+    if (!requestId.success) return c.json({ error: 'Invalid paid request id' }, 400);
+    const limit = z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(100)
+      .optional()
+      .safeParse(c.req.query('limit') ?? undefined);
+    if (!limit.success) return c.json({ error: 'Invalid case limit' }, 400);
+    const progress = await readPaidBenchmarkAdminProgress(c.env.BENCH_DB, {
+      requestId: requestId.data,
+      cursor: c.req.query('cursor') ?? undefined,
+      limit: limit.data,
+    });
+    return c.json(progress, progress.status === 'empty' ? 404 : 200);
+  });
+
+  app.post(
+    PAID_BENCHMARK_ADMIN_PAUSE_PATH,
+    zodJsonValidator(PaidBenchmarkAdminPauseRequestSchema, {
+      errorMessage: 'Invalid paid request pause',
+    }),
+    async c => {
+      const { requestId } = c.req.valid('json');
+      const status = await pausePaidBenchmarkAdminRequest(c.env, requestId);
+      return c.json(PaidBenchmarkAdminPauseResponseSchema.parse({ status }));
+    }
+  );
+
+  // The pool routing result the request's quote was bound to: same ranking as the pool's
+  // own routing table, read from the stored context.
+  app.post(
+    PAID_BENCHMARK_ADMIN_ROUTING_TABLE_PATH,
+    zodJsonValidator(PaidBenchmarkAdminRoutingTableRequestSchema, {
+      errorMessage: 'Invalid paid request routing table request',
+    }),
+    async c => {
+      const { requestId } = c.req.valid('json');
+      const stored = await readPaidBenchmarkAdminContext(c.env.BENCH_DB, requestId);
+      if (stored === null) return c.json({ error: 'Paid benchmark request not found' }, 404);
+      let rawContext: unknown;
+      try {
+        rawContext = JSON.parse(stored);
+      } catch {
+        return c.json({ error: 'Stored pool context is not JSON' }, 400);
+      }
+      const context = CustomRouterBenchmarkContextSchema.safeParse(rawContext);
+      if (!context.success) return c.json({ error: 'Stored pool context is invalid' }, 400);
+      const config = await getBenchmarkConfig(c.env.BENCH_DB, context.data.baseRouter);
+      if (!config) return c.json({ table: null });
+      return c.json(
+        await assembleCustomRouterTable(c.env.BENCH_DB, config, context.data, {
+          catalogEnv: c.env,
+        })
       );
     }
   );

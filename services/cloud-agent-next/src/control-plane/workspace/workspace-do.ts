@@ -168,6 +168,7 @@ export class CloudAgentWorkspaceDO extends DurableObject<Env> {
       createdOnPlatform: live.record.createdOnPlatform,
       egress: live.record.egress,
       configuration: live.record.spawnConfiguration,
+      environmentSetup: live.record.environmentSetup,
     };
   }
 

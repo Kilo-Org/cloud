@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { i18n } from '@/i18n';
 import { getEffectiveTabBarHeight } from '@/lib/tab-bar-layout';
 import { type StoredSession } from '@/lib/hooks/use-agent-sessions';
+import { QueryError } from '@/components/query-error';
 import { AgentSessionListContent } from './session-list-content';
 import { RowsRefreshControl } from './rows-refresh-control';
 import { type SessionListRow } from './session-list-rows';
@@ -204,6 +205,8 @@ function contentProps(overrides: Partial<ContentProps> = {}): ContentProps {
     hasActiveFilters: false,
     isSearching: false,
     isRetrying: false,
+    isPaused: false,
+    onRetryPaused: () => undefined,
     searchQuery: '',
     onClearAction: () => undefined,
     onCreateSession: () => undefined,
@@ -545,6 +548,30 @@ describe('AgentSessionListContent liveness', () => {
       )
     ).toBe(true);
   });
+  it('shows the offline card with Retry instead of skeletons while the read is paused', () => {
+    // Offline with nothing of its own cached: the read will not settle until
+    // the network returns, so skeletons here would never land. The surface is
+    // the app's offline card, and its Retry re-issues the read.
+    const onRetryPaused = vi.fn<() => void>();
+    const renderer = mount(contentProps({ isPaused: true, isLoading: true, onRetryPaused }));
+    const cards = renderer.root.findAllByType(QueryError);
+    expect(cards).toHaveLength(1);
+    const card = cards[0];
+    if (!card) {
+      throw new Error('the paused read rendered no offline card');
+    }
+    expect(card.props.variant).toBe('offline');
+    expect(typeof card.props.onRetry).toBe('function');
+    expect(skeletonRows(renderer)).toHaveLength(0);
+    expect(hosts(renderer, 'Skeleton')).toHaveLength(0);
+    expect(hosts(renderer, 'FlashList')).toHaveLength(0);
+
+    act(() => {
+      (card.props.onRetry as () => void)();
+    });
+    expect(onRetryPaused).toHaveBeenCalledOnce();
+  });
+
   it('keeps stale history behind pull recovery feedback and its timeout', async () => {
     const { promise, resolve } = Promise.withResolvers<undefined>();
     vi.useFakeTimers();
@@ -956,7 +983,7 @@ describe('AgentSessionListContent next-page footer', () => {
     );
     expect(hosts(renderer, 'ActivityIndicator')).toHaveLength(0);
     expect(hosts(renderer, 'Text').map(node => node.props.children)).toContain(
-      i18n.t('common.couldnTLoadMore')
+      i18n.t('common.couldNotLoadMore')
     );
   });
 
@@ -969,7 +996,7 @@ describe('AgentSessionListContent next-page footer', () => {
     );
     expect(hosts(renderer, 'ActivityIndicator')).toHaveLength(1);
     expect(hosts(renderer, 'Text').map(node => node.props.children)).not.toContain(
-      i18n.t('common.couldnTLoadMore')
+      i18n.t('common.couldNotLoadMore')
     );
   });
 
@@ -982,7 +1009,7 @@ describe('AgentSessionListContent next-page footer', () => {
       })
     );
     expect(hosts(renderer, 'Text').map(node => node.props.children)).toContain(
-      i18n.t('common.couldnTLoadMore')
+      i18n.t('common.couldNotLoadMore')
     );
     act(() => {
       renderer.update(
@@ -992,7 +1019,7 @@ describe('AgentSessionListContent next-page footer', () => {
       );
     });
     expect(hosts(renderer, 'Text').map(node => node.props.children)).not.toContain(
-      i18n.t('common.couldnTLoadMore')
+      i18n.t('common.couldNotLoadMore')
     );
     expect(hosts(renderer, 'ActivityIndicator')).toHaveLength(0);
   });
@@ -1024,7 +1051,7 @@ describe('AgentSessionListContent next-page footer', () => {
       })
     );
     const texts = hosts(renderer, 'Text').map(node => node.props.children);
-    expect(texts).toContain(i18n.t('common.couldnTLoadMore'));
+    expect(texts).toContain(i18n.t('common.couldNotLoadMore'));
     expect(texts).not.toContain(i18n.t('agents.sessionList.retentionLimit'));
   });
 

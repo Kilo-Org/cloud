@@ -104,11 +104,9 @@ export function useModelPreferences(
     // replace that reconcile.
     onSettled: undefined,
     mutationFn: (selection: LastSelectedSelection) =>
-      // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
       chainSave(LAST_SELECTED_CHAIN_KEY, () =>
         trpcClient.modelPreferences.setLastSelected.mutate(selection)
       ),
-    // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     onMutate: async (selection: LastSelectedSelection): Promise<LastSelectedContext> => {
       const queryKey = trpc.modelPreferences.get.queryKey(input);
       const hash = hashKey(queryKey);
@@ -155,9 +153,7 @@ export function useModelPreferences(
   // the caller renders the error inline (no toast).
   const addFavorite = useMutation({
     mutationFn: (vars: { model: string }) =>
-      // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
       chainSave(FAVORITES_CHAIN_KEY, () => trpcClient.modelPreferences.addFavorite.mutate(vars)),
-    // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     onMutate: ({ model }) => {
       setFavoritesError(null);
       return applyOptimisticFavorites(favorites =>
@@ -171,12 +167,8 @@ export function useModelPreferences(
   });
 
   const removeFavorite = useMutation({
-    // onError policy: roll back the onMutate snapshot (latest generation only);
-    // the caller renders the error inline (no toast).
     mutationFn: (vars: { model: string }) =>
-      // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
       chainSave(FAVORITES_CHAIN_KEY, () => trpcClient.modelPreferences.removeFavorite.mutate(vars)),
-    // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     onMutate: ({ model }) => {
       setFavoritesError(null);
       return applyOptimisticFavorites(favorites => favorites.filter(id => id !== model));

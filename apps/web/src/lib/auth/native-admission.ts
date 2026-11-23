@@ -221,8 +221,6 @@ export function validateAdmissionPayload(raw: unknown): AdmissionPayload | undef
 export function requireAdmissionPayload(
   body: Record<string, unknown>
 ): AdmissionPayload | undefined {
-  // Roll the telemetry window on any native auth request, so the final window
-  // of a sparse traffic pattern still flushes.
   rollAdmissionWindowIfNeeded(Date.now());
 
   const result = classifyAdmissionPayload(body['admission']);
@@ -331,21 +329,6 @@ export type AdmissionRefusal = {
   detail: AdmissionRefusalDetail;
 };
 
-/**
- * Perform full async admission verification BEFORE user settlement.
- *
- * Must be called before createOrUpdateUser in the token route so that:
- * - Failed admission never leaves a settled user.
- * - Keys are written after the user id exists (via the token route after
- *   successful settlement).
- *
- * Atomically consumes the challenge, so a caller that retries a refusal must
- * fetch a fresh challenge. On provider infrastructure errors, throws so the
- * caller can surface a 5xx.
- *
- * Returns the key data to persist after settlement, or a refusal carrying the
- * recovery hint when the client may produce a new proof.
- */
 export type VerifyAdmissionOk = {
   ok: true;
   /** Platform that verified */
@@ -366,6 +349,21 @@ export type VerifyAdmissionOk = {
   existingKeyUserId?: string;
 };
 
+/**
+ * Perform full async admission verification BEFORE user settlement.
+ *
+ * Must be called before createOrUpdateUser in the token route so that:
+ * - Failed admission never leaves a settled user.
+ * - Keys are written after the user id exists (via the token route after
+ *   successful settlement).
+ *
+ * Atomically consumes the challenge, so a caller that retries a refusal must
+ * fetch a fresh challenge. On provider infrastructure errors, throws so the
+ * caller can surface a 5xx.
+ *
+ * Returns the key data to persist after settlement, or a refusal carrying the
+ * recovery hint when the client may produce a new proof.
+ */
 export async function verifyAdmissionAsync(
   admission: AdmissionPayload
 ): Promise<VerifyAdmissionOk | AdmissionRefusal> {
@@ -559,7 +557,6 @@ async function verifyAppleAdmission(
     .returning({ key_id: native_attested_keys.key_id });
 
   if (!updatedKey) {
-    // The update matched zero rows, so the assertion is stale or replayed.
     countAdmissionCondition('apple_assertion_stale_or_replayed');
     return {
       ok: false,
@@ -661,7 +658,6 @@ export async function persistAttestedKey(
   verification: VerifyAdmissionOk,
   executor: typeof db | DrizzleTransaction = db
 ): Promise<void> {
-  // Android has no persistent key tracking — skip.
   if (verification.platform === 'android') return;
 
   // A result without a key id has nothing to persist. Every verifier that

@@ -100,11 +100,9 @@ describe('handleTrpcQueryError single-flight', () => {
     const handler = vi.fn().mockReturnValue(handlerPromise);
     const unset = setTrpcUnauthorizedHandler(handler);
 
-    // Start two concurrent unauthorized errors.
     const p1 = handleTrpcQueryError({ data: { authRequired: true, httpStatus: 401 } });
     const p2 = handleTrpcQueryError({ data: { authRequired: true, httpStatus: 401 } });
 
-    // The handler must be invoked exactly once.
     expect(handler).toHaveBeenCalledTimes(1);
 
     resolveRef.current?.();

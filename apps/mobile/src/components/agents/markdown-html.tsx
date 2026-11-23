@@ -303,19 +303,33 @@ export type MarkdownHtmlIncrementalInput =
     ));
 
 /**
+ * Where a publish's conversion stops being final for the next publish, and that
+ * region's conversion: `converted` is the conversion of `rawValue.slice(start)`,
+ * and `start` is 0 when nothing is final.
+ */
+export type MarkdownHtmlConversionTail = { start: number; converted: string };
+
+/**
  * What the previous publish turned into segments, kept so the next publish can
- * reuse it: `tail` is that publish's snapshot, and `convert` folds raw source
- * into the markdown the splitter segments, joining the previous converted
- * source it is given: `(suffix, previous) => previous + converted(suffix)`. A
- * publish that extends the previous raw value passes the appended region, so
- * `convert` returns the previous converted source joined with the appended
- * region's conversion; a publish the gate declines passes the whole converted
- * value and `convert` returns it alone.
+ * reuse it: `tail` is that publish's snapshot, `conversion` the tail its own
+ * publish carried, and `convert` folds raw source into the markdown the
+ * splitter segments, joining the previous converted source it is given:
+ * `(suffix, previous) => previous + converted(suffix)`. A publish that extends
+ * the previous raw value passes the appended region, so `convert` returns the
+ * previous converted source joined with the appended region's conversion; a
+ * publish the gate declines passes the whole converted value and `convert`
+ * returns it alone.
  */
 export type MarkdownHtmlIncrementalConverted = {
   tail: MarkdownHtmlSnapshot;
   /** The raw source the previous publish saw, for the extends-previous guard. */
   rawValue?: string;
+  /**
+   * Where the previous publish's conversion stops being final, with that
+   * region's conversion: the next publish proves its composition against it
+   * instead of converting the region a second time.
+   */
+  conversion?: MarkdownHtmlConversionTail;
   convert: (suffix: string, previous: string) => string;
 };
 

@@ -357,18 +357,15 @@ describe('remembered scope names', () => {
     const listener = vi.fn<() => void>();
 
     const unsubscribe = subscribeScopeNames(listener);
-    // Registering is not a read: nothing of the record is loaded yet.
     expect(secureStoreMock.getItemAsync).not.toHaveBeenCalled();
     expect(readScopeName('org-labs')).toBeUndefined();
 
     rememberScopeName('org-labs', 'Drain Labs');
     rememberScopeName('org-more', 'More Labs');
 
-    // Nothing re-renders while the caller that changed the store is running.
     expect(listener).not.toHaveBeenCalled();
 
     await flushNotifications();
-    // One flush covers both changes in the same turn.
     expect(listener).toHaveBeenCalledTimes(1);
     unsubscribe();
   });

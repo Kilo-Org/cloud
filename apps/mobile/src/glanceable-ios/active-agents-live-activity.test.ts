@@ -187,6 +187,24 @@ describe('Live Activity Lock Screen card (round 7)', () => {
     expect(tint('light')).toEqual({ $type: 'activityBackgroundTint', args: '#FBFAF5' });
     expect(tint('dark')).toEqual({ $type: 'activityBackgroundTint', args: '#17171A' });
   });
+
+  it('paints the idle dot with the muted ink in both schemes', () => {
+    const idle: State = {
+      ...PERMISSION,
+      needsInput: 0,
+      needsApproval: 0,
+      running: 0,
+      scheduled: 0,
+      idle: 1,
+    };
+    const firstDot = (node: unknown) => collect(node).find(item => item.kind === 'Circle') ?? null;
+    expect(modifierArgs(firstDot(render(idle).banner), 'foregroundStyle')).toBe('#6F6A61');
+    expect(
+      modifierArgs(firstDot(render(idle, { colorScheme: 'dark' }).banner), 'foregroundStyle')
+    ).toBe('#8A8680');
+    // The Dynamic Island is always black, so it takes the dark muted ink too.
+    expect(modifierArgs(firstDot(render(idle).minimal), 'foregroundStyle')).toBe('#8A8680');
+  });
 });
 
 type Modifier = { $type: string; args?: unknown };

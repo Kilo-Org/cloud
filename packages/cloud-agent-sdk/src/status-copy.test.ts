@@ -121,6 +121,7 @@ const mockSession = {
     getQuestion: jest.fn(() => null),
     getSessionInfo: jest.fn(() => null),
     getPermission: jest.fn(() => null),
+    getUnreadableQuestions: jest.fn(() => []),
     getUnreadablePermissions: jest.fn(() => []),
     getSuggestion: jest.fn(() => null),
     getPendingMessages: jest.fn((): ReadonlyMap<string, MessageDeliveryState> => new Map()),
@@ -263,7 +264,7 @@ describe('service state copy codes', () => {
     });
     const dataStatus = withData.getStatus();
     if (dataStatus.type !== 'autocommit') throw new Error('expected autocommit status');
-    expect(dataStatus.message).toBe('abc123 feat: add feature');
+    expect(dataStatus.message).toBe('abc123 · feat: add feature');
     expect(dataStatus.code).toBeUndefined();
   });
 

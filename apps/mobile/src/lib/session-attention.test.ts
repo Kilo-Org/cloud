@@ -24,13 +24,16 @@ import {
   __resetSessionAttentionForTests,
   ackSessionAttention,
   clearSessionAttentionForSignOut,
+  getHydrationSnapshot,
   getRevisionSnapshot,
   isAttentionAcked,
+  needsInputVisibility,
   reconcileSessionAttention,
   SESSION_ATTENTION_EXPIRY_MS,
   sessionNeedsInput,
   shouldShowNeedsInput,
   subscribe,
+  whenSessionAttentionHydrationSettled,
 } from './session-attention';
 /* eslint-enable import/first */
 
@@ -105,23 +108,29 @@ describe('sessionNeedsInput', () => {
 
 describe('shouldShowNeedsInput', () => {
   it('shows when status is attention and not acked', () => {
-    expect(shouldShowNeedsInput({ status: 'question', raiseId: 'R1', isAcked: false })).toBe(true);
+    expect(shouldShowNeedsInput({ status: 'question', hydration: 'ready', isAcked: false })).toBe(
+      true
+    );
   });
 
   it('hides when status is attention and acked', () => {
-    expect(shouldShowNeedsInput({ status: 'question', raiseId: 'R1', isAcked: true })).toBe(false);
+    expect(shouldShowNeedsInput({ status: 'question', hydration: 'ready', isAcked: true })).toBe(
+      false
+    );
   });
 
   it('hides when status is non-attention even if not acked', () => {
-    expect(shouldShowNeedsInput({ status: 'busy', raiseId: null, isAcked: false })).toBe(false);
+    expect(shouldShowNeedsInput({ status: 'busy', hydration: 'ready', isAcked: false })).toBe(
+      false
+    );
   });
 
   it('hides when status is non-attention even if acked', () => {
-    expect(shouldShowNeedsInput({ status: 'idle', raiseId: null, isAcked: true })).toBe(false);
+    expect(shouldShowNeedsInput({ status: 'idle', hydration: 'ready', isAcked: true })).toBe(false);
   });
 
   it('hides when status is null', () => {
-    expect(shouldShowNeedsInput({ status: null, raiseId: null, isAcked: false })).toBe(false);
+    expect(shouldShowNeedsInput({ status: null, hydration: 'ready', isAcked: false })).toBe(false);
   });
 });
 
@@ -153,7 +162,7 @@ describe('ack store state machine', () => {
     expect(
       shouldShowNeedsInput({
         status: 'permission',
-        raiseId: 'R2',
+        hydration: 'ready',
         isAcked: isAttentionAcked('s1', { raiseId: 'R2' }),
       })
     ).toBe(true);
@@ -231,7 +240,7 @@ describe('ack store state machine', () => {
     expect(
       shouldShowNeedsInput({
         status: 'permission',
-        raiseId: later,
+        hydration: 'ready',
         isAcked: isAttentionAcked('s1', { raiseId: later, status: 'permission' }),
       })
     ).toBe(true);
@@ -250,7 +259,7 @@ describe('ack store state machine', () => {
     expect(
       shouldShowNeedsInput({
         status: 'question',
-        raiseId: '2026-10-12T09:59:30.000Z',
+        hydration: 'ready',
         isAcked: isAttentionAcked('s1', {
           raiseId: '2026-10-12T09:59:30.000Z',
           status: 'question',
@@ -319,7 +328,7 @@ describe('ack store state machine', () => {
     expect(
       shouldShowNeedsInput({
         status: 'question',
-        raiseId: 'R1',
+        hydration: 'ready',
         isAcked: isAttentionAcked('s1', { raiseId: 'R1' }),
       })
     ).toBe(true);
@@ -332,7 +341,7 @@ describe('ack store state machine', () => {
     expect(
       shouldShowNeedsInput({
         status: 'question',
-        raiseId: 'R1',
+        hydration: 'ready',
         isAcked: isAttentionAcked('s2', { raiseId: 'R1' }),
       })
     ).toBe(true);
@@ -633,7 +642,7 @@ describe('expiry', () => {
 });
 
 describe('hydration gating', () => {
-  it('renders badges from server status until hydration completes', async () => {
+  it('holds the badge until hydration settles, then applies the restored ack', async () => {
     const now = Date.now();
     seedAttentionKv([
       {
@@ -647,25 +656,27 @@ describe('hydration gating', () => {
     __resetSessionAttentionForTests();
     const hydration = __hydrateSessionAttentionForTests();
 
-    // Hydration is in flight: the store is still empty, so the badge derives
-    // from server status (no stale ack suppression).
+    // Hydration is in flight: the store answers "not acked" for every raise, so
+    // the phase — not that answer — decides the affordance.
+    expect(getHydrationSnapshot()).toBe('loading');
     expect(isAttentionAcked('s1', { raiseId: 'R1' })).toBe(false);
     expect(
       shouldShowNeedsInput({
         status: 'question',
-        raiseId: 'R1',
+        hydration: getHydrationSnapshot(),
         isAcked: isAttentionAcked('s1', { raiseId: 'R1' }),
       })
-    ).toBe(true);
+    ).toBe(false);
 
     await hydration;
 
     // After hydration the restored ack suppresses its raise.
+    expect(getHydrationSnapshot()).toBe('ready');
     expect(isAttentionAcked('s1', { raiseId: 'R1' })).toBe(true);
     expect(
       shouldShowNeedsInput({
         status: 'question',
-        raiseId: 'R1',
+        hydration: getHydrationSnapshot(),
         isAcked: isAttentionAcked('s1', { raiseId: 'R1' }),
       })
     ).toBe(false);
@@ -701,6 +712,221 @@ describe('hydration gating', () => {
     // The fresh ack survives: still its own raise, not the persisted entry.
     expect(__peekSessionAttentionForTests('s1')).toEqual({ raiseId: 'question' });
     expect(isAttentionAcked('s1', { raiseId: 'question' })).toBe(true);
+  });
+
+  it('holds the affordance while the read is gated, then settles to ready', async () => {
+    const readGate = Promise.withResolvers<string | null>();
+    kvMock.getItem.mockReturnValueOnce(readGate.promise);
+
+    __resetSessionAttentionForTests();
+    const hydration = __hydrateSessionAttentionForTests();
+
+    // The store has not read anything yet, so it cannot answer for an ack: the
+    // phase says so instead of letting the empty map draw a badge.
+    expect(getHydrationSnapshot()).toBe('loading');
+    expect(needsInputVisibility({ status: 'question', hydration: 'loading', isAcked: false })).toBe(
+      'hold'
+    );
+    expect(shouldShowNeedsInput({ status: 'question', hydration: 'loading', isAcked: false })).toBe(
+      false
+    );
+
+    readGate.resolve(null);
+    await hydration;
+
+    expect(getHydrationSnapshot()).toBe('ready');
+  });
+
+  it('settles ready and hides only the acked raise after a successful hydration', async () => {
+    const now = Date.now();
+    seedAttentionKv([
+      {
+        sessionId: 's1',
+        raiseId: 'R1',
+        status: 'question',
+        ackedAt: now,
+        expiresAt: now + SESSION_ATTENTION_EXPIRY_MS,
+      },
+    ]);
+
+    __resetSessionAttentionForTests();
+    await __hydrateSessionAttentionForTests();
+
+    const hydration = getHydrationSnapshot();
+    expect(hydration).toBe('ready');
+    expect(isAttentionAcked('s1', { raiseId: 'R1' })).toBe(true);
+    expect(
+      needsInputVisibility({
+        status: 'question',
+        hydration,
+        isAcked: isAttentionAcked('s1', { raiseId: 'R1' }),
+      })
+    ).toBe('hide');
+    expect(
+      needsInputVisibility({
+        status: 'question',
+        hydration,
+        isAcked: isAttentionAcked('s1', { raiseId: 'R2' }),
+      })
+    ).toBe('show');
+  });
+
+  it('settles failed, not hanging, when the KV read rejects and fails open', async () => {
+    kvMock.getItem.mockRejectedValueOnce(new Error('corrupt'));
+    __resetSessionAttentionForTests();
+
+    await expect(__hydrateSessionAttentionForTests()).resolves.toBeUndefined();
+
+    const hydration = getHydrationSnapshot();
+    expect(hydration).toBe('failed');
+    // No ack: the badge derives from the server status alone, for an ack the
+    // failed read lost as much as for one it never held.
+    for (const status of ['question', 'permission'] as const) {
+      expect(needsInputVisibility({ status, hydration, isAcked: false })).toBe('show');
+    }
+    for (const status of ['busy', null] as const) {
+      expect(needsInputVisibility({ status, hydration, isAcked: false })).toBe('hide');
+    }
+    // An ack this run recorded still hides its raise: the entry map is
+    // authoritative for what the process has learned, and the phase never
+    // leaves `failed`, so ignoring it would keep the badge for the whole launch.
+    expect(needsInputVisibility({ status: 'question', hydration, isAcked: true })).toBe('hide');
+    expect(needsInputVisibility({ status: 'permission', hydration, isAcked: true })).toBe('hide');
+  });
+
+  it('hides a raise acked after a failed hydration, for the rest of the launch', async () => {
+    kvMock.getItem.mockRejectedValueOnce(new Error('corrupt'));
+    __resetSessionAttentionForTests();
+    await __hydrateSessionAttentionForTests();
+    expect(getHydrationSnapshot()).toBe('failed');
+
+    ackSessionAttention('s1', 'question', 'R1');
+
+    // The phase is settled and never retried, so the in-memory ack is the only
+    // answer available; it must suppress the raise exactly as it does at ready.
+    expect(getHydrationSnapshot()).toBe('failed');
+    expect(isAttentionAcked('s1', { raiseId: 'R1' })).toBe(true);
+    expect(
+      needsInputVisibility({
+        status: 'question',
+        hydration: getHydrationSnapshot(),
+        isAcked: isAttentionAcked('s1', { raiseId: 'R1' }),
+      })
+    ).toBe('hide');
+  });
+
+  it.each([
+    // Neither JSON at all, nor the entry list this build reads.
+    ['not JSON', '{not json'],
+    ['not the entry list', JSON.stringify({ SessionId: 's1' })],
+  ])('settles failed when the stored blob is %s', async (_case, blob) => {
+    kvStore.set(storageKey(SESSION_ATTENTION_KEY, ATTENTION_ENTRY_KEY), blob);
+    __resetSessionAttentionForTests();
+
+    await expect(__hydrateSessionAttentionForTests()).resolves.toBeUndefined();
+
+    const hydration = getHydrationSnapshot();
+    expect(hydration).toBe('failed');
+    expect(needsInputVisibility({ status: 'question', hydration, isAcked: false })).toBe('show');
+    // A raise acked this run stays hidden even though the restored blob was
+    // unreadable: the in-memory entry is the only ack answer this launch has.
+    expect(needsInputVisibility({ status: 'question', hydration, isAcked: true })).toBe('hide');
+    expect(needsInputVisibility({ status: 'busy', hydration, isAcked: false })).toBe('hide');
+  });
+
+  it('notifies subscribers exactly once when hydration settles with restored acks', async () => {
+    const now = Date.now();
+    const persisted = JSON.stringify([
+      {
+        sessionId: 's1',
+        raiseId: 'R1',
+        status: 'question',
+        ackedAt: now,
+        expiresAt: now + SESSION_ATTENTION_EXPIRY_MS,
+      },
+    ]);
+    const readGate = Promise.withResolvers<string | null>();
+    kvMock.getItem.mockReturnValueOnce(readGate.promise);
+
+    __resetSessionAttentionForTests();
+    const hydration = __hydrateSessionAttentionForTests();
+    const listener = vi.fn<() => void>();
+    const unsubscribe = subscribe(listener);
+    const before = getRevisionSnapshot();
+
+    readGate.resolve(persisted);
+    await hydration;
+    unsubscribe();
+
+    // Applying the entries and settling to `ready` is one transition: one bump.
+    expect(getRevisionSnapshot()).toBe(before + 1);
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(getHydrationSnapshot()).toBe('ready');
+  });
+
+  it('leaves hydration ready and the entries empty after sign-out', async () => {
+    ackSessionAttention('session-a', 'question', 'R1');
+    await __flushSessionAttentionWritesForTests();
+    __resetSessionAttentionForTests();
+    await __hydrateSessionAttentionForTests();
+    expect(getHydrationSnapshot()).toBe('ready');
+    expect(isAttentionAcked('session-a', { raiseId: 'R1' })).toBe(true);
+
+    await clearSessionAttentionForSignOut();
+
+    // Authoritatively empty for the next account, and settled: nothing re-runs
+    // hydrate, so returning to `loading` would hold every badge forever.
+    expect(getHydrationSnapshot()).toBe('ready');
+    expect(__peekSessionAttentionForTests('session-a')).toBeUndefined();
+    expect(
+      needsInputVisibility({
+        status: 'question',
+        hydration: getHydrationSnapshot(),
+        isAcked: false,
+      })
+    ).toBe('show');
+  });
+
+  it('a settle wait ends at its deadline while the read is gated, and at once afterwards', async () => {
+    const readGate = Promise.withResolvers<string | null>();
+    kvMock.getItem.mockReturnValueOnce(readGate.promise);
+
+    __resetSessionAttentionForTests();
+    const hydration = __hydrateSessionAttentionForTests();
+
+    await whenSessionAttentionHydrationSettled(20);
+
+    // The deadline ended the wait; the wait itself never changes the phase.
+    expect(getHydrationSnapshot()).toBe('loading');
+
+    readGate.resolve(null);
+    await hydration;
+
+    // Settled, so the next caller does not wait at all: a 60 s deadline would
+    // outlive this test's timeout if the wait ignored the settled phase.
+    await whenSessionAttentionHydrationSettled(60_000);
+    expect(getHydrationSnapshot()).toBe('ready');
+  });
+
+  it('a test reset ends a settle wait an earlier case armed', async () => {
+    const readGate = Promise.withResolvers<string | null>();
+    kvMock.getItem.mockReturnValueOnce(readGate.promise);
+
+    __resetSessionAttentionForTests();
+    const abandoned = __hydrateSessionAttentionForTests();
+
+    // A deadline far past this case's own timeout: the wait can only end
+    // because the reset releases it.
+    const wait = whenSessionAttentionHydrationSettled(60_000);
+    __resetSessionAttentionForTests();
+    await expect(wait).resolves.toBeUndefined();
+
+    // The abandoned read still settles, and the reset it follows owns the store
+    // again, so the next case starts pre-hydration.
+    readGate.resolve(null);
+    await abandoned;
+    __resetSessionAttentionForTests();
+    expect(getHydrationSnapshot()).toBe('loading');
   });
 });
 
@@ -878,7 +1104,11 @@ describe('sign-out cleanup', () => {
     expect(__peekSessionAttentionForTests('session-shared')).toBeUndefined();
     expect(isAttentionAcked('session-shared', { raiseId: '2026-08-24T10:00:00Z' })).toBe(false);
     expect(
-      shouldShowNeedsInput({ status: 'question', raiseId: '2026-08-24T10:00:00Z', isAcked: false })
+      shouldShowNeedsInput({
+        status: 'question',
+        hydration: getHydrationSnapshot(),
+        isAcked: false,
+      })
     ).toBe(true);
   });
 

@@ -6,6 +6,7 @@ import {
   validateCloudAgentAuthorityRequest,
   type CloudAgentAuthority,
 } from '@kilocode/worker-utils/cloud-agent-authority';
+import { environmentSetupClaimSchema } from '@kilocode/worker-utils/environment-setup-authority';
 import { egressModeSchema } from '@kilocode/worker-utils/egress-allowlist';
 import { signModernKiloToken } from '@kilocode/worker-utils/kilo-token-policy';
 import {
@@ -85,6 +86,7 @@ export const workspaceSpawnContextSchema = z.object({
   createdOnPlatform: z.string().optional(),
   egress: workspaceEgressSchema.optional(),
   configuration: workspaceSpawnConfigurationSchema.optional(),
+  environmentSetup: environmentSetupClaimSchema.optional(),
 });
 export type WorkspaceSpawnContext = z.infer<typeof workspaceSpawnContextSchema>;
 
@@ -103,6 +105,7 @@ export const WorkspaceAuthorityRecordSchema = z
     createdOnPlatform: z.string().optional(),
     egress: workspaceEgressSchema.optional(),
     spawnConfiguration: workspaceSpawnConfigurationSchema.optional(),
+    environmentSetup: environmentSetupClaimSchema.optional(),
     authorization: RuntimeAuthorizationSchema,
     establishedAt: z.number().int().nonnegative(),
   })
@@ -173,6 +176,7 @@ export function workspaceAuthorityFromAnchor(
   }
   const authorization = RuntimeAuthorizationSchema.safeParse(seed.authorization);
   if (!authorization.success) return undefined;
+  const setup = metadata.environmentSetup;
   const record = WorkspaceAuthorityRecordSchema.safeParse({
     version: 1,
     workspaceSessionId: metadata.identity.sessionId,
@@ -185,7 +189,12 @@ export function workspaceAuthorityFromAnchor(
     ...(workspaceEgressFromMetadata(metadata) === undefined
       ? {}
       : { egress: workspaceEgressFromMetadata(metadata) }),
-    spawnConfiguration: { profile: metadata.profile, environment: metadata.environment },
+    ...(setup === undefined
+      ? { spawnConfiguration: { profile: metadata.profile, environment: metadata.environment } }
+      : {}),
+    ...(setup?.role === 'setup'
+      ? { environmentSetup: { runId: setup.runId, environmentId: setup.environmentId } }
+      : {}),
     authorization: authorization.data,
     establishedAt: now,
   });
@@ -214,6 +223,7 @@ export function workspaceAuthorityScope(record: WorkspaceAuthorityRecord): Cloud
     organizationId: record.organizationId,
     authorizationId: record.authorization.id,
     expiresAt: Math.floor(Date.parse(record.authorization.delegationExpiresAt) / 1000),
+    ...(record.environmentSetup === undefined ? {} : { environmentSetup: record.environmentSetup }),
   };
 }
 
@@ -226,6 +236,8 @@ function hasWorkspaceAuthorityMismatch(
     scope.ownerId !== record.ownerId ||
     scope.organizationId !== record.organizationId ||
     scope.authorizationId !== record.authorization.id ||
+    scope.environmentSetup?.runId !== record.environmentSetup?.runId ||
+    scope.environmentSetup?.environmentId !== record.environmentSetup?.environmentId ||
     scope.expiresAt * 1000 > Date.parse(record.authorization.delegationExpiresAt)
   );
 }

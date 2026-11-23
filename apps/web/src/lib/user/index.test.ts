@@ -93,6 +93,8 @@ import {
   agent_environment_profile_skills,
   cloud_agent_sandbox_allocation_settings,
   cloud_agent_environments,
+  cloud_agent_environment_setup_runs,
+  environmentSetupRunDataSchema,
   deleted_user_email_tombstones,
   impact_attribution_touches,
   impact_advocate_participants,
@@ -375,6 +377,7 @@ describe('User', () => {
     await db.delete(agent_environment_profile_skills);
     await db.delete(agent_environment_profile_mcp_servers);
     await db.delete(cloud_agent_webhook_triggers);
+    await db.delete(cloud_agent_environment_setup_runs);
     await db.delete(cloud_agent_environments);
     await db.delete(agent_environment_profiles);
     await db.delete(github_branch_pull_requests);
@@ -5402,6 +5405,9 @@ describe('User', () => {
 
     it('should anonymize organization audit logs', async () => {
       const user = await insertTestUser();
+      // A second member, so the suite can prove a row about someone else keeps
+      // that person's address when the author's account is deleted.
+      const otherUser = await insertTestUser();
       const orgId = randomUUID();
       await db.insert(organizations).values({
         id: orgId,
@@ -5417,6 +5423,56 @@ describe('User', () => {
         actor_email: user.google_user_email,
         actor_name: user.google_user_name,
         message: 'User joined org',
+        // A row whose structured detail names a member's address. The address
+        // must not survive the deletion, and the row's English message does.
+        details: { id: 'invite.accepted', email: user.google_user_email },
+      });
+
+      await db.insert(organization_audit_logs).values({
+        organization_id: orgId,
+        action: 'organization.user.send_invite',
+        actor_id: user.id,
+        actor_email: user.google_user_email,
+        actor_name: user.google_user_name,
+        message: `Invited ${otherUser.google_user_email} as member`,
+        details: { id: 'invite.sent', email: otherUser.google_user_email, role: 'member' },
+      });
+
+      // A detail whose address sits in an array rather than a scalar field: the
+      // minimum-balance alert stores its recipients as `emails`. The deleted
+      // member's entry goes; the other member's stays.
+      await db.insert(organization_audit_logs).values({
+        organization_id: orgId,
+        action: 'organization.settings.change',
+        actor_id: otherUser.id,
+        actor_email: otherUser.google_user_email,
+        actor_name: otherUser.google_user_name,
+        message: 'Minimum balance alert enabled',
+        details: {
+          id: 'setting.minimumBalanceAlert',
+          enabled: true,
+          threshold: 10,
+          emails: [user.google_user_email, otherUser.google_user_email],
+        },
+      });
+
+      // A second alert row names the deleted address alone, so scrubbing it
+      // empties the list. The key is dropped there rather than written as `[]`,
+      // because the row's sentence names the recipients and an empty list would
+      // leave it dangling.
+      await db.insert(organization_audit_logs).values({
+        organization_id: orgId,
+        action: 'organization.settings.change',
+        actor_id: otherUser.id,
+        actor_email: otherUser.google_user_email,
+        actor_name: otherUser.google_user_name,
+        message: 'Minimum balance alert enabled for one recipient',
+        details: {
+          id: 'setting.minimumBalanceAlert',
+          enabled: true,
+          threshold: 25,
+          emails: [user.google_user_email],
+        },
       });
 
       await softDeleteUser(user.id);
@@ -5424,12 +5480,45 @@ describe('User', () => {
       const logs = await db
         .select()
         .from(organization_audit_logs)
-        .where(eq(organization_audit_logs.actor_id, user.id));
-      expect(logs).toHaveLength(1);
-      expect(logs[0].actor_email).toBeNull();
-      expect(logs[0].actor_name).toBeNull();
-      expect(logs[0].actor_id).toBe(user.id); // actor_id preserved for reference
-      expect(logs[0].message).toBe('User joined org'); // message preserved
+        .where(eq(organization_audit_logs.organization_id, orgId));
+      expect(logs).toHaveLength(4);
+      for (const log of logs.filter(entry => entry.actor_id === user.id)) {
+        expect(log.actor_email).toBeNull();
+        expect(log.actor_name).toBeNull();
+        expect(log.actor_id).toBe(user.id); // actor_id preserved for reference
+      }
+      const own = logs.find(log => log.action === 'organization.user.accept_invite');
+      expect(own?.message).toBe('User joined org'); // message preserved
+      // The structured detail keeps its event, and no longer carries the address.
+      expect(own?.details).toEqual({ id: 'invite.accepted' });
+      // A row about another member keeps that member's address: redaction is by
+      // the address a detail names, not by who authored the row.
+      const [otherSubject] = logs.filter(log => log.action === 'organization.user.send_invite');
+      expect(otherSubject.details).toEqual({
+        id: 'invite.sent',
+        email: otherUser.google_user_email,
+        role: 'member',
+      });
+      // The array field is scrubbed too, and every other detail key survives.
+      // `toEqual` is exact, so the second row's missing `emails` key is what
+      // proves the emptied list was dropped rather than written as `[]`.
+      const alerts = logs.filter(log => log.action === 'organization.settings.change');
+      expect(alerts).toHaveLength(2);
+      expect(alerts.map(entry => entry.details)).toEqual(
+        expect.arrayContaining([
+          {
+            id: 'setting.minimumBalanceAlert',
+            enabled: true,
+            threshold: 10,
+            emails: [otherUser.google_user_email],
+          },
+          {
+            id: 'setting.minimumBalanceAlert',
+            enabled: true,
+            threshold: 25,
+          },
+        ])
+      );
     });
 
     it('should clear organization group attribution fields', async () => {
@@ -6532,6 +6621,69 @@ describe('User', () => {
         .from(cloud_agent_environments)
         .where(eq(cloud_agent_environments.owned_by_user_id, user.id));
       expect(deletedUserEnvironments).toHaveLength(0);
+    });
+
+    it('deletes user-owned setup runs and clears requirements on organization runs the user created', async () => {
+      const user = await insertTestUser();
+      const otherUser = await insertTestUser();
+      const [organization] = await db
+        .insert(organizations)
+        .values({ name: `Setup runs org ${randomUUID()}` })
+        .returning({ id: organizations.id });
+
+      const runValues = {
+        data: environmentSetupRunDataSchema.parse({
+          requirements: 'Set up the local dev stack.',
+          model: 'anthropic/claude-sonnet-4',
+          launch_repo_full_name: 'acme/widgets',
+        }),
+      };
+      await db.insert(cloud_agent_environment_setup_runs).values([
+        {
+          ...runValues,
+          owned_by_user_id: user.id,
+          created_by_user_id: user.id,
+        },
+        {
+          ...runValues,
+          owned_by_organization_id: organization.id,
+          created_by_user_id: user.id,
+          data: environmentSetupRunDataSchema.parse({
+            ...runValues.data,
+            requirements: 'Organization setup requirements.',
+          }),
+        },
+        {
+          ...runValues,
+          owned_by_user_id: otherUser.id,
+          created_by_user_id: otherUser.id,
+          data: environmentSetupRunDataSchema.parse({
+            ...runValues.data,
+            requirements: 'Other user requirements.',
+          }),
+        },
+      ]);
+
+      await softDeleteUser(user.id);
+
+      const deletedUserRuns = await db
+        .select()
+        .from(cloud_agent_environment_setup_runs)
+        .where(eq(cloud_agent_environment_setup_runs.owned_by_user_id, user.id));
+      expect(deletedUserRuns).toHaveLength(0);
+
+      const [organizationRun] = await db
+        .select()
+        .from(cloud_agent_environment_setup_runs)
+        .where(eq(cloud_agent_environment_setup_runs.owned_by_organization_id, organization.id));
+      expect(organizationRun.data.requirements).toBe('');
+      expect(organizationRun.created_by_user_id).toBe(user.id);
+
+      const [otherUserRun] = await db
+        .select()
+        .from(cloud_agent_environment_setup_runs)
+        .where(eq(cloud_agent_environment_setup_runs.owned_by_user_id, otherUser.id));
+      expect(otherUserRun.data.requirements).toBe('Other user requirements.');
     });
 
     it('should nullify user_feedback FK', async () => {

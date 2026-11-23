@@ -40,9 +40,6 @@ describe('live activity switch', () => {
   });
 
   it('refuses the push-to-start token while the permission is still unknown', () => {
-    // A fresh process has the switch on and no permission answer yet, and an
-    // unknown answer counts as ungranted: the subscription would raise the
-    // Live Activity prompt before the user asked for notifications.
     expect(getLiveActivityEnabled()).toBe(true);
     expect(canRegisterActivityTokenKind('ios_push_to_start')).toBe(false);
   });

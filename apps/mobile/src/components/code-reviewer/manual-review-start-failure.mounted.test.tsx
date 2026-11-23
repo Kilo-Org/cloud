@@ -73,6 +73,11 @@ vi.mock('expo-router', () => ({
   useRouter: () => ({ replace: vi.fn(), push: status.push }),
   useFocusEffect: () => undefined,
 }));
+// The success hand-off uses the push-then-retire hook; this suite drives
+// failures only, so the hook's replace is a plain double.
+vi.mock('@/lib/navigation/stack-safe-replace', () => ({
+  useStackSafeReplace: () => ({ replace: vi.fn() }),
+}));
 // The screen reads the reader's organization role for a trial refusal, so the
 // membership list it resolves through is driven per test.
 vi.mock('@/lib/organization-context', () => ({

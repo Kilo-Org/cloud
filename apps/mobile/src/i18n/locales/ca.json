@@ -92,6 +92,7 @@
     "draft": "Esborrany",
     "enabled": "Activat",
     "github": "GitHub",
+    "image": "Imatge",
     "imageUnavailable": "La imatge no està disponible.",
     "loading": "S'està carregant…",
     "loadMore": "Carrega'n més",
@@ -123,10 +124,10 @@
     "connectProvider": "Connecta un proveïdor",
     "contentTruncated": "Contingut truncat",
     "copyLink": "Copia l'enllaç",
+    "couldNotLoad": "No s'ha pogut carregar.",
+    "couldNotLoadMore": "No se n'han pogut carregar més.",
     "couldNotLoadOrganizations": "No s'han pogut carregar les organitzacions.",
     "couldNotLoadSessions": "No s'han pogut carregar les sessions.",
-    "couldnTLoad": "No s'ha pogut carregar.",
-    "couldnTLoadMore": "No se n'han pogut carregar més.",
     "deviceSessions": "Sessions als dispositius",
     "disabled": "Desactivat",
     "email": "Correu electrònic",
@@ -1266,6 +1267,7 @@
     "needsInputAction": {
       "approved": "Sol·licitud aprovada",
       "replied": "Resposta enviada",
+      "empty": "Escriu una resposta i després envia-la.",
       "failed": "No s’ha pogut respondre. Torna a tocar-ho per reintentar-ho.",
       "unavailable": "Aquesta sol·licitud ja no està en espera."
     }
@@ -1530,7 +1532,9 @@
       "githubError": "No s'ha pogut obrir la configuració de GitHub. Torna-ho a provar.",
       "gitlabAccount": "el compte de GitLab",
       "gitlabError": "No s'ha pogut obrir la configuració de GitLab. Torna-ho a provar.",
-      "description": "Connecta {{label}} a Kilo per revisar automàticament les sol·licituds d'integració."
+      "description": "Connecta {{label}} a Kilo per revisar automàticament les sol·licituds d'integració.",
+      "notConnectedTitle": "{{platform}} no està connectat",
+      "githubAdminOnlyDescription": "Només els propietaris i els administradors de l'organització poden connectar-lo."
     },
     "overview": {
       "allAreas": "Totes les àrees",
@@ -2300,6 +2304,7 @@
       "couldNotLoadThisSession": "No s'ha pogut carregar aquesta sessió.",
       "historyTooLarge": "La transcripció d'aquesta sessió és massa gran per carregar-la.",
       "historyUnavailable": "No es pot llegir la transcripció d'aquesta sessió.",
+      "historyTemporarilyUnavailable": "La transcripció d'aquesta sessió no està disponible temporalment.",
       "cloneFailedRetry": "No s'ha pogut clonar aquesta sessió. Torna-ho a provar.",
       "notEnoughCredits": "No tens prou crèdits per a aquesta sol·licitud. Afegeix crèdits i torna-ho a provar.",
       "previousTaskFinishing": "La tasca anterior encara no ha acabat. Espera un moment.",
@@ -2709,6 +2714,7 @@
     "filePart": {
       "loadingImage": "Carregant la imatge",
       "imageUnavailableRetry": "La imatge no està disponible. Torna a provar de carregar-la",
+      "imageUnavailableRetryWithAlt": "La imatge no està disponible. {{alt}}. Torna a provar de carregar-la",
       "imagePreviewUnavailableInSession": "La previsualització de la imatge no està disponible en aquesta sessió.",
       "viewImage": "Mostra la imatge",
       "viewImageWithAlt": "Mostra la imatge {{alt}}",
@@ -2840,7 +2846,9 @@
       "skip": "Omet",
       "retrySkip": "Torna a provar d'ometre",
       "submitting": "Enviant…",
-      "sendAnswers": "Envia les respostes"
+      "sendAnswers": "Envia les respostes",
+      "unreadableTitle": "No s'ha pogut mostrar aquesta pregunta",
+      "unreadableBody": "L'agent està esperant una pregunta que aquesta aplicació no pot mostrar. Responeu la pregunta al CLI per continuar."
     },
     "blockingCard": {
       "questionUnavailable": "Aquesta pregunta ja no està disponible.",
@@ -2867,6 +2875,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "No s'ha pogut carregar la sessió de l'agent secundari.",
+      "historyTooLarge": "L'historial d'aquest agent secundari és massa gran per carregar-lo.",
+      "historyUnavailable": "L'historial d'aquest agent secundari no està disponible.",
+      "historyTemporarilyUnavailable": "L'historial d'aquest agent secundari no està disponible temporalment.",
       "failed": "La sessió de l'agent secundari ha fallat.",
       "noMessages": "No hi ha missatges de l'agent secundari",
       "noMessagesDescription": "La sessió de l'agent secundari ha acabat sense generar cap transcripció.",
@@ -3455,6 +3466,8 @@
     "voiceTranscriptionWho": "El teu dispositiu, Kilo Gateway amb el model de transcripció que triïs, o Apple o Google per al reconeixement en línia.",
     "installAttributionPromptTitle": "Vols permetre l'atribució de la instal·lació?",
     "installAttributionPromptMessage": "Kilo només utilitza el permís de seguiment d'Apple per saber per quin canal has arribat aquí. Mai no s'utilitzen els teus missatges ni les teves converses.",
+    "installAttributionRequestFailedTitle": "No s'ha pogut mostrar la sol·licitud de seguiment",
+    "installAttributionRequestFailedMessage": "Kilo no ha pogut mostrar la sol·licitud del sistema, així que l'atribució de la instal·lació queda desactivada.",
     "what": "Què",
     "why": "Per què",
     "who": "Qui"
@@ -3470,7 +3483,7 @@
   "organization": {
     "auditLog": {
       "title": "Registre d'auditoria",
-      "permissionDenied": "Només un propietari, administrador o gestor de facturació d'una organització amb el pla Enterprise pot consultar-ne el registre d'auditoria.",
+      "permissionDenied": "Només un propietari, administrador o gestor de facturació d'una organització amb el pla Enterprise pot consultar-ne el registre d'auditoria. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "No hi ha esdeveniments d'auditoria",
       "emptyDescription": "Aquí apareixen les accions fetes en aquesta organització.",
       "truncated": "Es mostren els esdeveniments més recents.",
@@ -3520,11 +3533,152 @@
         "guardrailUpdate": "Salvaguarda actualitzada",
         "guardrailRemove": "Salvaguarda eliminada",
         "unknown": "Esdeveniment d'auditoria"
+      },
+      "detail": {
+        "fieldChange": "{{field}}: {{change}}",
+        "modeIdentity": "Mode \"{{name}}\" (identificador: {{slug}})",
+        "modeUpdate": "Mode \"{{name}}\": {{changes}}",
+        "field": {
+          "name": "$t(organization.modes.nameLabel)",
+          "slug": "$t(organization.modes.identifierLabel)",
+          "roleDefinition": "$t(organization.modes.roleLabel)",
+          "whenToUse": "$t(organization.modes.whenToUseLabel)",
+          "description": "$t(organization.modes.descriptionLabel)",
+          "customInstructions": "$t(codeReviewer.instructions.title)",
+          "groups": "$t(profiles.agents.tools)",
+          "autoRoute": "Enrutament automàtic",
+          "defaultModel": "Model per defecte"
+        },
+        "role": {
+          "owner": "$t(organization.members.roles.owner)",
+          "admin": "$t(organization.members.roles.admin)",
+          "billing_manager": "$t(organization.members.roles.billingManager)",
+          "member": "$t(organization.members.roles.member)"
+        },
+        "memberRole": "{{email}}: {{change}}",
+        "memberAdded": "Afegit {{email}} com a {{role}}",
+        "memberRemoved": "Eliminat {{email}}",
+        "memberParentAdded": "Afegit {{email}} de l'organització principal {{parent}}",
+        "memberParentRemoved": "Eliminat {{email}} de l'organització principal {{parent}}",
+        "inviteSent": "{{email}} com a {{role}}",
+        "inviteRevoked": "Invitació revocada per a {{email}}",
+        "inviteAccepted": "Invitació acceptada per {{email}}",
+        "groupIdentity": "Grup \"{{name}}\"",
+        "groupMembers": "Grup \"{{name}}\": {{members}}",
+        "groupMemberGroups": "{{displayCount}} grups",
+        "groupMemberGroups_many": "{{displayCount}} de grups",
+        "groupMemberGroups_one": "{{displayCount}} grup",
+        "groupMemberGroups_other": "{{displayCount}} grups",
+        "groupMemberGroupsOf": "{{email}}: {{displayCount}} grups",
+        "groupMemberGroupsOf_many": "{{email}}: {{displayCount}} de grups",
+        "groupMemberGroupsOf_one": "{{email}}: {{displayCount}} grup",
+        "groupMemberGroupsOf_other": "{{email}}: {{displayCount}} grups",
+        "groupPolicySet": "Grup \"{{name}}\": política {{policy}} establerta",
+        "groupPolicyRemoved": "Grup \"{{name}}\": política {{policy}} eliminada",
+        "groupDefaultPolicySet": "Política {{policy}} per defecte establerta",
+        "groupDefaultPolicyRemoved": "Política {{policy}} per defecte eliminada",
+        "guardrailIdentity": "{{type}} \"{{name}}\"",
+        "guardrailStatus": "{{type}} \"{{name}}\" {{state}}",
+        "guardrailConfig": "Salvaguardes d'IA {{state}}",
+        "guardrailConfigGroup": "{{state}} per al grup \"{{group}}\"",
+        "guardrailEnforcement": "{{target}}: {{value}}",
+        "guardrailSkill": "{{target}}: {{values}}",
+        "guardrailTarget": {
+          "mcp": "$t(profiles.mcp.title)",
+          "skill": "$t(profiles.skillsTitle)"
+        },
+        "ssoDomainSet": "Domini SSO {{domain}}",
+        "ssoDomainChanged": "{{domain}} (abans {{previous}})",
+        "ssoDomainRemoved": "Domini SSO {{domain}} esborrat",
+        "fundsPurchased": "{{amount}} per {{method}}",
+        "fundsGranted": "{{amount}}",
+        "fundsDistributed": "{{amount}} a {{displayCount}} organitzacions filles",
+        "fundsDistributed_many": "{{amount}} a {{displayCount}} d’organitzacions filles",
+        "fundsDistributed_one": "{{amount}} a {{displayCount}} organització filla",
+        "fundsDistributed_other": "{{amount}} a {{displayCount}} organitzacions filles",
+        "fundsReceived": "{{amount}} de {{parent}}",
+        "reviewAgentPlatform": "{{platform}}",
+        "reviewAgentConfig": "Configuració de {{platform}}",
+        "reviewAgentConfigStyle": "{{platform}}: estil {{style}}",
+        "reviewAgentSecretsUpdated": "{{displayCount}} actualitzats",
+        "reviewAgentSecretsUpdated_many": "{{displayCount}} d’actualitzats",
+        "reviewAgentSecretsUpdated_one": "{{displayCount}} actualitzat",
+        "reviewAgentSecretsUpdated_other": "{{displayCount}} actualitzats",
+        "reviewAgentSecretsFailed": "{{displayCount}} errors",
+        "reviewAgentSecretsFailed_many": "{{displayCount}} d’errors",
+        "reviewAgentSecretsFailed_one": "{{displayCount}} error",
+        "reviewAgentSecretsFailed_other": "{{displayCount}} errors",
+        "reviewAgentSecretRotated": "{{values}}",
+        "settingAdvancedPolicies": "{{values}}",
+        "settingAdvancedPoliciesOpenRouter": "OpenRouter {{state}}",
+        "settingAdvancedPoliciesRegion": "Regió d'inferència: {{region}}",
+        "settingDefaultModelSet": "{{next}}",
+        "settingDefaultModelRemoved": "{{previous}}",
+        "settingAutoRoute": "Mode \"{{mode}}\": {{change}}",
+        "settingDefaultBehavior": {
+          "global": "Predeterminat global",
+          "specific": "{{model}}",
+          "auto": "$t(models.auto.organization)"
+        },
+        "settingDataCollection": "{{mode}}",
+        "dataCollection": {
+          "allowed": "Permesa",
+          "denied": "Denegada",
+          "followSetting": "Segueix la configuració de l'extensió"
+        },
+        "region": {
+          "us": "$t(organizationModelAccess.region.us)",
+          "eu": "$t(organizationModelAccess.region.eu)",
+          "au": "$t(organizationModelAccess.region.au)",
+          "jp": "$t(organizationModelAccess.region.jp)"
+        },
+        "settingProjectsUi": "IU de Projects {{state}}",
+        "settingMinimumBalanceOn": "{{threshold}} a {{emails}}",
+        "settingMinimumBalanceThreshold": "{{threshold}}",
+        "settingRecommendationsDigest": "Resum de recomanacions {{state}}",
+        "settingBrowserControl": "{{policy}}",
+        "settingBrowserControlOrigins": "{{policy}}: {{origins}}",
+        "settingBrowserControlOriginsCleared": "{{policy}}: cap origen permès",
+        "settingName": "Reanomenat de {{previous}} a {{next}}",
+        "enabled": "$t(common.enabled)",
+        "scanBeforeUseOn": "Escaneig abans d'usar activat",
+        "scanBeforeUseOff": "Escaneig abans d'usar desactivat",
+        "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingRemoved": "Eliminats: {{models}}",
+        "browserPolicyOff": "Ús del navegador bloquejat",
+        "browserPolicyAllow": "Només orígens permesos",
+        "browserPolicyPlaywrightOnly": "Només el navegador integrat",
+        "disabled": "$t(common.disabled)",
+        "autoRouting": "Models canviats: {{values}}",
+        "integrationConnected": "S'ha connectat {{integration}}",
+        "integrationDisconnected": "S'ha desconnectat {{integration}}",
+        "integrationRefreshed": "S'ha actualitzat {{integration}}",
+        "integrationCancelled": "S'ha cancel·lat {{integration}}",
+        "integrationModelUpdated": "{{integration}}: model d'IA {{model}}",
+        "integrationKeyAdded": "Clau afegida per a {{provider}}",
+        "integrationKeyUpdated": "Clau actualitzada per a {{provider}}",
+        "integrationKeyDeleted": "Clau eliminada per a {{provider}}",
+        "integrationKeyToggled": "Clau per a {{provider}}: {{state}}",
+        "namedPolicyCreated": "Política {{kind}} creada {{id}}",
+        "namedPolicyUpdated": "Política {{kind}} actualitzada {{id}}",
+        "namedPolicyDeleted": "Política {{kind}} eliminada {{id}}",
+        "namedPolicyLinked": "Política {{kind}} vinculada {{next}}",
+        "webhookTriggerUpdated": "Disparador {{trigger}}",
+        "organizationRenamed": "Organització reanomenada de {{previous}} a {{next}}",
+        "brand": {
+          "github": "$t(common.github)",
+          "gitlab": "$t(common.gitlab)",
+          "bitbucket": "$t(agentChat.repoPicker.platformBitbucket)",
+          "discord": "$t(profile.providerDiscord)",
+          "slack": "$t(agentChat.sessionFilter.platformSlack)",
+          "linear": "$t(agentChat.sessionFilter.platformLinear)",
+          "byok": "La teva pròpia clau d'API"
+        }
       }
     },
     "billing": {
       "title": "Facturació",
-      "permissionDenied": "Només un propietari, administrador o gestor de facturació de l'organització en pot veure la facturació.",
+      "permissionDenied": "Només un propietari, administrador o gestor de facturació de l'organització en pot veure la facturació. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Subscripció",
       "state": "Estat",
       "stateNone": "Sense subscripció",
@@ -3606,7 +3760,7 @@
       "noSeatsAvailable": "Totes les places estan en ús. Demana a un propietari de l'organització que afegeixi places abans de convidar més membres."
     },
     "invoices": {
-      "downloadA11y": "Baixa la factura {{number}}",
+      "downloadA11y": "Baixa la factura {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Les factures es generen automàticament cada cicle de facturació i apareixeran aquí quan es facturi a l'organització.",
       "emptyTitle": "No hi ha factures",
       "invoiceFallback": "Factura",
@@ -3686,7 +3840,6 @@
       "usageDetails": "Detalls d'ús",
       "providersAndModels": "Proveïdors i models",
       "groups": "Grups",
-      "guardrails": "Salvaguardes",
       "byok": "Utilitza la teva pròpia clau",
       "ssoAndDomain": "SSO i domini",
       "dataCollection": "Recollida de dades",
@@ -3701,7 +3854,7 @@
       "emptyDescription": "Utilitza «Hora anterior» per veure les sol·licituds anteriors.",
       "emptyBoundDescription": "Els registres de sol·licituds no arriben més enrere.",
       "loadError": "No s'han pogut carregar els registres de sol·licituds.",
-      "permissionDenied": "Només un propietari, administrador o gestor de facturació d'una organització pot consultar-ne els registres de sol·licituds.",
+      "permissionDenied": "Només un propietari, administrador o gestor de facturació d'una organització pot consultar-ne els registres de sol·licituds. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} d'entrada · {{output}} de sortida",
       "byok": "BYOK"
     },
@@ -3808,7 +3961,7 @@
     "signupStepUpApple": "Per acabar de crear el teu compte, utilitza «$t(login.signInWithApple)».",
     "signupStepUpGoogle": "Per acabar de crear el teu compte, utilitza «$t(login.signInWithGoogle)».",
     "signupStepUpBack": "Per acabar de crear el teu compte, torna enrere i utilitza «$t(login.moreSignInOptions)».",
-    "invalidCode": "Aquest codi és incorrecte o ha caducat. Torna-ho a provar o utilitza «$t(login.resendCode)».",
+    "invalidCode": "Aquest codi és incorrecte o ha caducat. Utilitza «$t(login.resendCode)» o «$t(login.moreSignInOptions)».",
     "codeInProgress": "S'està processant el teu codi. Espera un moment i torna-ho a provar.",
     "tooManyAttempts": "Has fet massa intents. Sol·licita un codi nou.",
     "invalidToken": "L'inici de sessió ha fallat. Torna-ho a provar.",
@@ -3981,7 +4134,10 @@
     "list": {
       "loadFailed": "No s'ha pogut carregar l'historial del xat.",
       "new": "Xat nou",
-      "deleteTitle": "Vols suprimir aquest xat?"
+      "deleteTitle": "Vols suprimir aquest xat?",
+      "resetNoticeTitle": "Els xats i esborranys locals s'han esborrat",
+      "resetNoticeBody": "Kilo no ha pogut obrir els xats desats en aquest dispositiu. Les teves sessions al núvol no es veuen afectades.",
+      "resetNoticeDismiss": "Descarta l'avís"
     },
     "rename": {
       "title": "Reanomena el xat",
@@ -4031,6 +4187,9 @@
       "fieldName": "Nom que es mostra",
       "fieldUrl": "URL del servidor",
       "fieldUrlInvalid": "Introdueix una URL de servidor vàlida.",
+      "fieldUrlCredentials": "Elimina el nom d'usuari i la contrasenya de la URL.",
+      "fieldUrlFragment": "Elimina la part # de la URL.",
+      "fieldUrlInsecure": "Introdueix una URL https, o http només per a localhost.",
       "duplicateUrl": "Aquesta URL ja està desada.",
       "serverNotFound": "Aquest servidor ja no està desat.",
       "enableServer": "Activa aquest servidor: {{name}}",
@@ -4057,6 +4216,7 @@
       "app": {
         "label": "Interfície de l'eina",
         "failed": "No s'ha pogut carregar la interfície d'aquesta eina.",
+        "tooLarge": "La interfície d'aquesta eina és més gran que el límit de {{size}}.",
         "empty": "La interfície d'aquesta eina no té res a mostrar."
       }
     },
@@ -4124,6 +4284,8 @@
       "discoveryNoModels": "El punt de connexió no ha llistat cap model. Introdueix els models manualment.",
       "connectionIncomplete": "El model ha respost però no ha acabat. Torna-ho a provar o comprova l'ID del model i el protocol.",
       "invalidInput": "Introdueix un nom de servidor, capçaleres vàlides i almenys un model amb un ID i un nom únics. Els límits de tòkens han de ser nombres enters positius.",
+      "invalidApiKey": "La clau de l'API conté un caràcter que no es pot enviar. Utilitza només lletres, dígits i símbols estàndard, sense salts de línia.",
+      "invalidHeaders": "No es pot enviar una capçalera personalitzada. Comprova'n el nom i utilitza només lletres, dígits i símbols estàndard, sense salts de línia.",
       "invalidUrl": "Introdueix una arrel d'API HTTP o HTTPS sense credencials, consulta ni fragment.",
       "publicHttp": "No es permeten punts de connexió HTTP públics. Utilitza HTTPS o un punt de connexió local privat.",
       "httpApprovalRequired": "Autoritza aquest punt de connexió HTTP local abans de desar-lo o connectar-t'hi.",
@@ -4172,6 +4334,7 @@
         "network": "La descàrrega no s'ha acabat. Comprova la connexió i torna-ho a provar.",
         "invalidFile": "El fitxer descarregat no és un model que aquesta aplicació pugui executar, així que s'ha eliminat.",
         "checksum": "El fitxer descarregat no coincideix amb la suma de verificació publicada, així que s'ha eliminat. Torna a provar la descàrrega.",
+        "unreadable": "Aquest dispositiu no ha pogut comprovar el fitxer descarregat, així que s'ha eliminat. Torna a provar la descàrrega.",
         "writeFailed": "Aquest dispositiu no ha pogut desar el model. Torna a provar la descàrrega."
       }
     },
@@ -4257,7 +4420,15 @@
       "download": "Baixa el model al dispositiu",
       "downloading": "S'està baixant…",
       "downloadProgress": "S'està baixant… {{percent}}%",
-      "downloadFailed": "La baixada no s'ha completat. Comprova la connexió i l'espai lliure i torna-ho a provar."
+      "downloadFailed": "La baixada no s'ha completat. Comprova la connexió i l'espai lliure i torna-ho a provar.",
+      "cannotUse": "No es pot executar: {{items}}.",
+      "cannotUseOptions": "No es poden emplenar: algunes opcions d'eina.",
+      "limitations": "Limitacions",
+      "tools": {
+        "time": "Hora",
+        "settingsList": "Mostra la configuració",
+        "settingsSet": "Canvia la configuració"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Aquest model admet l'esforç de raonament"
@@ -4441,6 +4612,7 @@
     "instructionSaveFailed": "No s'ha pogut desar la instrucció",
     "instructionDeleteFailed": "No s'ha pogut eliminar la instrucció",
     "instructionToggleFailed": "No s'ha pogut actualitzar la instrucció",
+    "instructionViewTitle": "Fitxer d'instrucció",
     "instructionLimitReached": "Un perfil pot tenir fins a {{max}} instruccions. Elimina'n una per afegir-ne una altra.",
     "mcp": {
       "title": "Servidors MCP",
@@ -4612,10 +4784,20 @@
     "history": {
       "activityUnavailable": "No s'ha pogut carregar l'activitat de crèdit.",
       "appStoreReceipt": "Rebut de l'App Store",
+      "deduction": {
+        "adminCancel": "Saldo tancat per un administrador",
+        "adminDebit": "Crèdits eliminats per un administrador",
+        "codingPlan": "Pla de programació: {{plan}}",
+        "correction": "Correcció del saldo",
+        "dispute": "Disputa de pagament",
+        "refundAppStore": "Reemborsament del paquet de crèdits de l'App Store",
+        "refundGooglePlay": "Reemborsament del paquet de crèdits de Google Play"
+      },
       "deductionFallback": "Deducció de crèdits",
       "emptyDescription": "Les compres de crèdits, els rebuts i l'ús apareixeran aquí.",
       "emptyTitle": "No hi ha historial de crèdits",
       "expiredGrant": "Caducat: {{description}}",
+      "expiredStatus": "Caducat",
       "googlePlayReceipt": "Rebut de Google Play",
       "kind": {
         "adjustment": "Ajust",
@@ -4642,7 +4824,8 @@
       "receiptA11y": "Obre el rebut de {{description}}, {{amount}}, del {{date}}",
       "receiptUnavailable": "No hi ha cap rebut disponible per a aquesta compra.",
       "retentionLimit": "Es mostra l'historial de crèdits més recent.",
-      "voidedGrant": "Anul·lat: {{description}}"
+      "voidedGrant": "Anul·lat: {{description}}",
+      "voidedStatus": "Anul·lat"
     },
     "title": "Compra crèdits",
     "description": "Els crèdits són una compra única que s'afegeix al teu saldo de Kilo per executar sessions de programació amb IA a l'aplicació Kilo. La botiga cobra al teu compte i els crèdits s'afegeixen quan la botiga confirma el pagament.",
@@ -4810,15 +4993,21 @@
     "morningEnd": "Informe disponible fins a les",
     "timeHint": "La targeta d'Inici torna a l'estat en directe quan acaba la finestra de l'informe, fins i tot sense connexió.",
     "invalidSchedule": "Tria una zona horària vàlida i una finestra de l'informe no buida.",
+    "scheduleEmptyNight": "La finestra de l'informe és buida. Tria una hora de preparació posterior a l'inici de la finestra.",
+    "scheduleEmptyMorning": "L'hora de preparació i l'hora de fi de disponibilitat coincideixen. Tria quant de temps es manté disponible l'informe.",
+    "scheduleFullDay": "Les dues finestres cobreixen un dia complet. Deixa part del dia fora de l'informe.",
     "notificationsHint": "Una notificació genèrica per cada informe programat. Independent dels resums d'IA de pagament.",
     "notificationPermission": "Activa les notificacions push per rebre l'informe.",
     "defaultModel": "Usa el model per defecte de Kilo",
     "duration": "Límit de temps (minuts)",
     "spendLimit": "Límit de despesa (USD)",
-    "invalidSafeguards": "Introdueix límits de temps i despesa positius i finits.",
+    "invalidSafeguards": "Introdueix un nombre positiu dins del rang permès.",
     "estimate": "Estimació {{estimate}} · màxim {{maximum}}",
     "estimateUnavailable": "No hi ha cap resum de pagament disponible per a aquesta configuració. Canvia el model o els límits, o torna-ho a provar més tard.",
     "confirmPaid": "Vols activar els resums de pagament per a {{context}}?",
+    "paidDisclosure_one": "{{estimate}} estimat, fins a {{maximum}}, amb un límit de {{minutes}} min. Els càrrecs s'apliquen encara que la generació falli.",
+    "paidDisclosure_many": "{{estimate}} estimat, fins a {{maximum}}, amb un límit de {{minutes}} min. Els càrrecs s'apliquen encara que la generació falli.",
+    "paidDisclosure_other": "{{estimate}} estimat, fins a {{maximum}}, amb un límit de {{minutes}} min. Els càrrecs s'apliquen encara que la generació falli.",
     "paidDisclosure": "{{estimate}} estimat, fins a {{maximum}}, amb un límit de {{minutes}} min. Els càrrecs s'apliquen encara que la generació falli.",
     "enable": "Activa els resums de pagament",
     "allContexts": "Els informes personals i d'organització es mantenen separats.",
@@ -4830,8 +5019,8 @@
     "estimateSpendLimitTooLow": "Augmenta la salvaguarda de despesa per permetre aquest resum.",
     "saved": "S'ha desat la configuració de l'informe",
     "selectedSessions": "Sessions seleccionades",
-    "snapshotPullRequests": "PRs a les sessions seleccionades",
-    "snapshotBlockers": "Bloquejos a les sessions seleccionades",
+    "snapshotPullRequests": "PRs",
+    "snapshotBlockers": "Bloquejos",
     "capturedAt": "Capturada {{time}}",
     "snapshotHint": "Instantània de l'últim estat disponible de les sessions, capturada al matí a l'hora programada. Pot ser incompleta. Els recomptes descriuen les sessions seleccionades, no tota l'activitat nocturna.",
     "snapshotTruncated": "S'han omès algunes sessions o proves per limitar la mida d'aquesta instantània.",
@@ -4866,7 +5055,7 @@
     "sourceActivity": "Activitat sense títol",
     "metadataFailureProvider": "error del proveïdor",
     "metadataFailureTool": "error d'eina",
-    "metadataFailureCancelled": "Cancel·lada",
+    "metadataStopped": "L'últim torn s'ha aturat",
     "metadataFailureOther": "error no especificat"
   },
   "systemSearch": {
@@ -4887,7 +5076,8 @@
     "unavailableTitle": "Ús no disponible",
     "unavailableDescription": "L'ús no està configurat per a aquest espai de treball. Contacta amb el servei d'assistència si esperes veure l'ús aquí.",
     "orgSelfNotice": "Estàs veient el teu propi ús en aquesta organització.",
-    "viewDetails": "Mostra els detalls d'ús"
+    "viewDetails": "Mostra els detalls d'ús",
+    "orgSelfEntryTitle": "El teu ús"
   },
   "integrations": {
     "title": "Integracions",
@@ -4983,6 +5173,8 @@
       "autoCommit": "Confirma els canvis quan acabi l'execució",
       "condenseOnComplete": "Condensa el context quan acabi l'execució",
       "activeTitle": "Disparador actiu",
+      "activeSwitchA11y": "Disparador actiu: {{name}}",
+      "copyLinkA11y": "Copia l'enllaç de {{name}}",
       "activeDescription": "Els ganxos web en pausa responen amb 404.",
       "runAsCreator": "Executa com a mi",
       "runAsCreatorDescription": "Cada execució utilitza el teu compte, així que la capçalera secreta és obligatòria.",

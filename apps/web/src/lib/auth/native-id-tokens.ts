@@ -130,12 +130,6 @@ function appleTokenRecordKey(idToken: string): string {
   return `auth:apple-signin-token:${createHash('sha256').update(idToken).digest('hex')}`;
 }
 
-/**
- * Consume a verified Apple identity token so it signs in exactly once. The
- * record lives as long as the token it binds, and a store write that cannot
- * complete refuses the sign-in with the retryable error, so the acceptance rule
- * never depends on the store being reachable.
- */
 async function recordSingleUseAppleToken(idToken: string, exp: number | undefined): Promise<void> {
   await recordSingleUseToken({
     recordKey: appleTokenRecordKey(idToken),
@@ -238,12 +232,6 @@ const GOOGLE_ISSUERS = ['accounts.google.com', 'https://accounts.google.com'];
 // Upper bound for the single-use record: the longest Google ID-token lifetime.
 const GOOGLE_TOKEN_TTL_CAP_SECONDS = 60 * 60;
 
-/**
- * Consume a verified Google ID token so it signs in exactly once. The record
- * lives as long as the token it binds (bounded by the longest Google ID-token
- * lifetime), and a store write that cannot complete refuses the sign-in, so
- * the acceptance rule never depends on the store being reachable.
- */
 async function recordSingleUseGoogleToken(
   idToken: string,
   expiresAt: number | undefined
@@ -373,10 +361,6 @@ export async function exchangeNativeGoogleAuthCode(
     throw new NativeIdTokenError('Google token response missing id_token');
   }
 
-  // Verify the returned ID token against the web client audience through the
-  // shared helper, so both Google paths apply the same payload checks, reusing
-  // the certificate set fetched before the exchange. Cert/network failures
-  // already surfaced above as 5xx; invalid tokens surface as 401.
   return verifyGoogleIdTokenWith(
     client,
     idToken,

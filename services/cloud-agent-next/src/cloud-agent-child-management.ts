@@ -21,6 +21,7 @@ const MANAGEMENT_PROCEDURES = {
   listChildSessions: { base: 'listChildSessions', kind: 'query' },
   getSession: { base: 'getSession', kind: 'query' },
   getMessageResult: { base: 'getMessageResult', kind: 'query' },
+  getEgressAudit: { base: 'getEgressAudit', kind: 'query' },
   interruptSession: { base: 'interruptSession', kind: 'mutation' },
   sendMessageV2: { base: 'sendMessage', kind: 'mutation' },
   getSessionMessagesPage: { base: 'getSessionMessagesPage', kind: 'query' },
@@ -250,6 +251,14 @@ export async function assertCloudAgentManagementRequest(input: {
   if (target === undefined) {
     if (input.path === 'listChildSessions') return;
     throw forbidden('Cloud Agent management target is invalid');
+  }
+  // Workspace authority validation above checks the stored setup claim.
+  if (
+    input.path === 'getEgressAudit' &&
+    input.authority.environmentSetup !== undefined &&
+    target.childSessionId === input.authority.parentSessionId
+  ) {
+    return;
   }
   await assertCloudAgentChildTarget({
     env: input.env,

@@ -445,8 +445,6 @@ describe('performRefresh', () => {
           });
         })
     );
-    // Suppress Node.js 24 unhandledRejection from AbortController.abort()
-    // with a non-DOMException reason during fake-timer tests.
     process.on('unhandledRejection', swallowUnhandledRejection);
     vi.useFakeTimers();
     try {
@@ -783,8 +781,6 @@ describe('exchangeLegacyToken', () => {
       reachedFetch.resolve(true);
       return neverSettles.promise;
     });
-    // Suppress Node.js 24 unhandledRejection from AbortController.abort()
-    // with a non-DOMException reason during fake-timer tests.
     process.on('unhandledRejection', swallowUnhandledRejection);
     vi.useFakeTimers();
     try {

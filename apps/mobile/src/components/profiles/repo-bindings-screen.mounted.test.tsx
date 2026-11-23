@@ -26,6 +26,7 @@ type RenderedQueryError = {
   variant?: string;
   title?: string;
   message?: string;
+  placement?: string;
   onRetry?: () => void;
 };
 
@@ -37,6 +38,7 @@ const h = vi.hoisted(() => ({
   success: vi.fn(),
   error: vi.fn(),
   connectivity: 'online' as string,
+  permission: 'allowed' as 'resolving' | 'allowed' | 'read-only',
   bindingsQuery: {
     bindings: [] as TestBinding[],
     error: undefined as unknown,
@@ -76,7 +78,7 @@ vi.mock('@/lib/hooks/use-repo-bindings', () => ({
 }));
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn<(href: string) => void>() }) }));
 vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
-  useOrganizationProfilePermission: () => 'allowed',
+  useOrganizationProfilePermission: () => h.permission,
 }));
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfileList: () => h.profileList,
@@ -142,11 +144,14 @@ vi.mock('@/components/ui/icons', () => ({
 const GITHUB_REPO: TestRepoOption = { platform: 'github', fullName: 'acme/api', private: true };
 const GITLAB_REPO: TestRepoOption = { platform: 'gitlab', fullName: 'acme/infra', private: false };
 const PROFILE: TestProfile = { id: 'profile-1', name: 'Backend debugging', isDefault: false };
+/** The role sentence a member reads in the action's place. */
+const ROLE_SENTENCE = 'Only organization owners and admins can change organization profiles.';
 
 describe('RepoBindingsScreen', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     h.connectivity = 'online';
+    h.permission = 'allowed';
     Object.assign(h.bindingsQuery, {
       bindings: [],
       error: undefined,
@@ -206,6 +211,28 @@ describe('RepoBindingsScreen', () => {
     unmount();
   });
 
+  it("retryable on a member's read: the error stays a banner above the manage sentence", async () => {
+    h.permission = 'read-only';
+    Object.assign(h.bindingsQuery, {
+      isError: true,
+      isLoading: false,
+      error: { data: { code: 'INTERNAL_SERVER_ERROR' } },
+    });
+
+    const { renderer, unmount } = await mountScreen();
+
+    const queryError = findOne(renderer.root, 'QueryError').props as RenderedQueryError;
+    // The manage slot's sentence sits under the error, so the body keeps the
+    // error at its top instead of centring it as the whole surface.
+    expect(queryError.placement).toBe('top');
+    expect(findAll(renderer.root, 'Text').some(node => node.props.children === ROLE_SENTENCE)).toBe(
+      true
+    );
+    expect(findAll(renderer.root, 'ScrollView')).toHaveLength(1);
+
+    unmount();
+  });
+
   it('forbidden: names the permission state and offers no Retry', async () => {
     Object.assign(h.bindingsQuery, {
       isError: true,
@@ -222,6 +249,10 @@ describe('RepoBindingsScreen', () => {
     // names who can grant it instead of repeating the title.
     expect(queryError.message).toBe('Ask an organization owner or admin to grant you access.');
     expect(queryError.onRetry).toBeUndefined();
+    // A terminal read hides the manage slot, so the error owns the surface: it
+    // centres and no tab scroller holds it.
+    expect(queryError.placement).toBe('center');
+    expect(findAll(renderer.root, 'ScrollView')).toHaveLength(0);
 
     unmount();
   });

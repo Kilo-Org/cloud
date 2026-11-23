@@ -7,7 +7,10 @@ import {
   ParentCallbackTargetSchema,
   requestedEnvironmentSchema,
 } from '@kilocode/worker-utils/cloud-agent-authority';
-import { CloudAgentSafeFailureSchema } from '@kilocode/worker-utils/cloud-agent-failure';
+import {
+  CLOUD_AGENT_SAFE_FAILURE_MESSAGE_MAX_LENGTH,
+  CloudAgentSafeFailureSchema,
+} from '@kilocode/worker-utils/cloud-agent-failure';
 import {
   cloudSessionMetadataSchema,
   cloudSessionMessagesPageInputSchema,
@@ -755,6 +758,14 @@ export const baseGetMessageResultNextOutputSchema = z.object({
   completionSource: sessionMessageCompletionSourceNextSchema.optional(),
   failure: CloudAgentSafeFailureSchema.extend({ retryable: z.boolean() }).optional(),
   gateResult: z.enum(['pass', 'fail']).optional(),
+  branch: z.string().optional(),
+  preparation: z
+    .object({
+      status: z.enum(['running', 'completed', 'failed']),
+      failedStepLabel: z.string().optional(),
+      reason: z.string().max(CLOUD_AGENT_SAFE_FAILURE_MESSAGE_MAX_LENGTH).optional(),
+    })
+    .optional(),
   assistant: z
     .object({
       messageId: z.string(),
@@ -1029,6 +1040,28 @@ export const baseGetSessionNextOutputSchema = z.object({
 
   // Execution status (grouped for cleaner API)
   execution: executionStatusNextSchema,
+
+  // Setup authority facts read back from a session. Mirrors
+  // cloud-agent-next/router/schemas.ts.
+  environment: z
+    .object({ environmentId: z.string(), configurationRevision: z.number().int() })
+    .optional(),
+  latestPreparation: z
+    .object({
+      status: z.enum(['running', 'completed', 'failed']),
+      startedAt: z.number(),
+      completedAt: z.number().optional(),
+      setupDurationMs: z.number().int().nonnegative().optional(),
+      safeError: z.string().optional(),
+    })
+    .optional(),
+  egress: z
+    .object({
+      mode: z.enum(['unrestricted', 'allowlist']),
+      allowlist: z.array(z.string()).optional(),
+      audit: z.boolean(),
+    })
+    .optional(),
 
   // Lifecycle timestamps
   preparedAt: z.number().optional(),

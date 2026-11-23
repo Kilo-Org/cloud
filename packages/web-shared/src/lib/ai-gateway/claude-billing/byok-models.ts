@@ -21,8 +21,8 @@ export async function tagClaudeBillingByokModels<
   // Deliberate: this runs on the hot models-list path and the badge is recomputed
   // on later page loads, so a lagging replica only delays the badge. payer-state.ts
   // reads the primary because a stale absent row there would switch payer.
-  const connection = await getGrantedClaudeBillingConnection(owner, readDb);
-  if (connection?.status !== ClaudeBillingConnectionStatus.Connected) return models;
+  const granted = await getGrantedClaudeBillingConnection(owner, readDb);
+  if (granted?.connection.status !== ClaudeBillingConnectionStatus.Connected) return models;
 
   return await Promise.all(
     models.map(async model => {

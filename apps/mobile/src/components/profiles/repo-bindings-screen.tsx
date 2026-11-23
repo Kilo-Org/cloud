@@ -203,6 +203,23 @@ export function RepoBindingsScreen({
   const readOnlyDescription =
     profilePermission === 'read-only' ? t('profiles.organizationRoleRequired') : undefined;
 
+  // A read-only member's retryable failure keeps the manage sentence under the
+  // error, so that case stays a banner in the body; a terminal read hides that
+  // slot and the manager's own read has none, so the error owns the surface.
+  // The add form lives in the body too, so an open one keeps it.
+  const readErrorOwnsSurface =
+    bindingsQuery.isError && (readErrorTerminal || profilePermission !== 'read-only') && !isAdding;
+  const errorState = (
+    <QueryError
+      variant={readError.variant}
+      placement={readErrorOwnsSurface ? 'center' : 'top'}
+      title={readError.titleKey ? t(readError.titleKey) : undefined}
+      message={readError.descriptionKey ? t(readError.descriptionKey) : undefined}
+      onRetry={readError.showRetry ? () => void bindingsQuery.refetch() : undefined}
+      isRetrying={bindingsQuery.isRefetching}
+    />
+  );
+
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
@@ -231,7 +248,11 @@ export function RepoBindingsScreen({
             canManage ? t('profiles.repoBindings.emptyDescription') : readOnlyDescription
           }
         />
-      ) : (
+      ) : null}
+      {/* Nothing sits under a read that owns the surface, so it centres in the
+          band the header and the bottom band leave. */}
+      {readErrorOwnsSurface ? errorState : null}
+      {emptySurface || readErrorOwnsSurface ? null : (
         <TabScreenScrollView
           className="flex-1"
           contentContainerClassName={SCREEN_BODY_CLASS}
@@ -239,16 +260,7 @@ export function RepoBindingsScreen({
           automaticallyAdjustKeyboardInsets
           showsVerticalScrollIndicator={false}
         >
-          {bindingsQuery.isError ? (
-            <QueryError
-              variant={readError.variant}
-              placement="top"
-              title={readError.titleKey ? t(readError.titleKey) : undefined}
-              message={readError.descriptionKey ? t(readError.descriptionKey) : undefined}
-              onRetry={readError.showRetry ? () => void bindingsQuery.refetch() : undefined}
-              isRetrying={bindingsQuery.isRefetching}
-            />
-          ) : null}
+          {bindingsQuery.isError ? errorState : null}
 
           {!bindingsQuery.isError && bindingsQuery.isLoading ? <RepoBindingsSkeleton /> : null}
 

@@ -8,6 +8,7 @@ import {
 } from '@kilocode/auto-routing-contracts';
 import { countProbeCaseResults } from '../db';
 import { PROBE_CASES } from '../datasets/probe-cases';
+import { variantToStorage } from '../reasoning-effort';
 import type { OfflineSweep } from '../scoreboard/schema';
 
 /** The agentic routes a probe measures: the subtasks of the probe transcripts. */
@@ -22,7 +23,11 @@ export async function pairsMissingProbeResults(
 ): Promise<Set<string>> {
   const complete = new Set<string>();
   const rows = await countProbeCaseResults(db, {
-    runIds: [...new Set(params.entries.map(entry => entry.runId))],
+    pairs: params.entries.map(({ entry, runId }) => ({
+      runId,
+      model: entry.model,
+      variant: variantToStorage(entry.variant),
+    })),
     caseIds: PROBE_CASES.map(probeCase => probeCase.id),
     revision: params.revision,
   });
@@ -32,7 +37,7 @@ export async function pairsMissingProbeResults(
   }
   const missing = new Set<string>();
   for (const { entry, runId } of params.entries) {
-    if (!complete.has(JSON.stringify([runId, entry.model, entry.variant ?? '']))) {
+    if (!complete.has(JSON.stringify([runId, entry.model, variantToStorage(entry.variant)]))) {
       missing.add(benchmarkPairKey(entry));
     }
   }

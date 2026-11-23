@@ -12,6 +12,11 @@ import { randomUUID } from 'node:crypto';
 import WebSocket from 'ws';
 import { z } from 'zod';
 import {
+  CloudAgentFailureCodeSchema,
+  CloudAgentFailureStageSchema,
+  CloudAgentSafeFailureSchema,
+} from '@kilocode/worker-utils/cloud-agent-failure';
+import {
   getSandboxAllocationRequest,
   type SandboxAllocation,
 } from '@kilocode/worker-utils/sandbox-allocation';
@@ -891,6 +896,21 @@ const messageResultSchema = z.object({
   cloudAgentSessionId: z.string(),
   messageId: z.string(),
   status: z.enum(['queued', 'running', 'completed', 'failed', 'interrupted']),
+  failure: CloudAgentSafeFailureSchema.safeExtend({
+    stage: CloudAgentFailureStageSchema,
+    code: CloudAgentFailureCodeSchema,
+    retryable: z.boolean(),
+  }).optional(),
+  assistant: z.object({ messageId: z.string().min(1), text: z.string().optional() }).optional(),
+  gateResult: z.enum(['pass', 'fail']).optional(),
+  branch: z.string().optional(),
+  preparation: z
+    .object({
+      status: z.enum(['running', 'completed', 'failed']),
+      failedStepLabel: z.string().optional(),
+      reason: z.string().optional(),
+    })
+    .optional(),
 });
 
 export async function getMessageResult(

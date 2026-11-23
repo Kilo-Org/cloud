@@ -13,10 +13,11 @@ import {
 vi.mock('react-native', () => ({ useColorScheme: () => 'light' }));
 vi.mock('expo-router', () => ({ DarkTheme: {}, DefaultTheme: {} }));
 
-// The WCAG contrast assertions for the tinted diff tiles live in
-// `src/lib/hooks/use-theme-colors.contrast.test.ts`, next to the palette they
-// are painted on. The assertions here cover the markdown code cards, whose
-// scheme is derived from the card surface rather than the app color scheme.
+// The markdown code cards derive their scheme from the card surface rather
+// than the app color scheme. Alongside those, this file asserts the dark token
+// rows against the composited good/danger diff tiles the renderer paints them
+// on; the light half of that contrast check lives next to the palette, in
+// `src/lib/hooks/use-theme-colors.contrast.test.ts`.
 
 const MIN_TEXT_RATIO = 4.5;
 

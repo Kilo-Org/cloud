@@ -1,7 +1,17 @@
 import { z } from 'zod';
 
+import { readStoredValueWithRetry } from '@/lib/auth/secure-store-read';
+import {
+  deleteStoredValueSafe,
+  readStoredValue,
+  writeStoredValueSafe,
+} from '@/lib/auth/secure-store-value';
+import {
+  isProtectedDataAvailable,
+  ProtectedDataUnavailableError,
+  subscribeToProtectedDataAvailable,
+} from '@/lib/protected-data';
 import { LAST_OPENED_SESSION_KEY } from '@/lib/storage-keys';
-import { reportSecureStoreFailure } from '@/lib/telemetry/secure-store-events';
 
 /**
  * The durable "Open last session" record behind the launcher shortcut and the
@@ -10,6 +20,11 @@ import { reportSecureStoreFailure } from '@/lib/telemetry/secure-store-events';
  * restart. `userId` scopes the record to its account, so one account is never
  * offered another account's session; a record for a different account reads as
  * null and needs no sign-out wiring.
+ *
+ * The mirror is read and written through `lib/auth/secure-store*`, the one
+ * guarded keychain entry point. The first read spends that module's bounded
+ * retry budget, so a transient refusal is retried and a real failure files one
+ * report; this file never duplicates either.
  */
 
 export type LastOpenedSessionRecord = {
@@ -24,26 +39,39 @@ const lastOpenedSessionSchema = z.object({
   storedAt: z.number(),
 });
 
-type SecureStoreLike = {
-  setItemAsync: (key: string, value: string) => Promise<void>;
-  getItemAsync: (key: string) => Promise<string | null>;
-  deleteItemAsync: (key: string) => Promise<void>;
-};
-
-// Injection seam so the pure suites do not load expo-secure-store
-// (→ expo-modules-core → RN). Mirrors the glanceable persist pattern.
-let secureStoreForTests: SecureStoreLike | null = null;
-
-function getSecureStore(): SecureStoreLike {
-  if (secureStoreForTests) {
-    return secureStoreForTests;
-  }
-  // eslint-disable-next-line typescript-eslint/no-require-imports, typescript-eslint/no-var-requires, unicorn/prefer-module -- lazy native load
-  return require('expo-secure-store') as SecureStoreLike;
-}
-
 let record: LastOpenedSessionRecord | null = null;
-let hydration: Promise<void> | null = null;
+/**
+ * Where the restart read stands. `answered` is the only settled state that
+ * stays for the run: a read that answered — a record or no record — is the
+ * answer, and asking the keychain again would return the same bytes. `failed`
+ * means the read never answered, so a later reader tries again instead of
+ * inheriting an absence the keychain never stated.
+ */
+type Hydration =
+  | { readonly status: 'idle' }
+  | { readonly status: 'pending'; readonly promise: Promise<void> }
+  | { readonly status: 'answered' }
+  | {
+      readonly status: 'failed';
+      /**
+       * How the next attempt reads. The first read, and every read after a
+       * locked refusal, spends the full retry budget in
+       * `lib/auth/secure-store-read`, which reports a failure once. A later
+       * attempt after a real refusal reads once and silently: the mirror is
+       * best effort, this record is not a credential, and a reader on a broken
+       * keychain runs on every render — a reported budget each time would turn
+       * one failure into a stream of events.
+       */
+      readonly nextAttempt: 'budget' | 'single';
+    };
+let hydration: Hydration = { status: 'idle' };
+/**
+ * The re-read armed at the next unlock after a locked refusal. One per module:
+ * a read that finds the keychain locked again must not stack a second
+ * subscription, and an unlock that lands after the read gave up is still
+ * observed.
+ */
+let unlockRetry: (() => void) | null = null;
 // Monotonic epoch bumped on every in-memory write, so a record written while
 // the restart read is pending can never be clobbered by the stale persisted
 // record.
@@ -68,25 +96,17 @@ function parseStoredRecord(raw: string): LastOpenedSessionRecord | null {
 
 /** Best-effort SecureStore write; the in-memory record is the source of truth. */
 async function mirrorRecord(serialized: string): Promise<void> {
-  try {
-    await getSecureStore().setItemAsync(LAST_OPENED_SESSION_KEY, serialized);
-  } catch (error) {
-    // An absent or older development client has no secure store, and a failed
-    // mirror leaves the in-memory record authoritative. Reported at warning
-    // level so a keychain failure is visible.
-    reportSecureStoreFailure('write', error);
-  }
+  // An absent or older development client has no secure store, and a failed
+  // mirror leaves the in-memory record authoritative. The helper reports a real
+  // failure at warning level and skips the call while the device is locked.
+  await writeStoredValueSafe(LAST_OPENED_SESSION_KEY, serialized);
 }
 
 /** Best-effort SecureStore delete; an absent store has nothing to delete. */
 async function dropMirroredRecord(): Promise<void> {
-  try {
-    await getSecureStore().deleteItemAsync(LAST_OPENED_SESSION_KEY);
-  } catch (error) {
-    // An absent or older development client has no secure store, and a failed
-    // delete leaves the record to be discarded on the next write.
-    reportSecureStoreFailure('delete', error);
-  }
+  // A failed delete leaves the record to be discarded on the next write; the
+  // helper reports it and skips the call while the device is locked.
+  await deleteStoredValueSafe(LAST_OPENED_SESSION_KEY);
 }
 
 // The SecureStore mirror is serialized through this chain: each operation runs
@@ -112,15 +132,67 @@ async function runAfterMirror(
 }
 
 /**
- * Restore the in-memory record after a JS restart. Best effort: a failed or
- * malformed read leaves the in-memory record null. A write that lands during
- * the read owns the state and skips the stale persisted record.
+ * Arm one re-read for the next unlock: while the device is locked every
+ * keychain read is refused without reaching the store, so the answer becomes
+ * readable at the unlock and the mount must not wait for an unrelated
+ * re-render to ask again.
  */
-async function restore(): Promise<void> {
+function armUnlockRetry(): void {
+  if (unlockRetry !== null) {
+    return;
+  }
+  const release = subscribeToProtectedDataAvailable(() => {
+    disarmUnlockRetry();
+    if (hydration.status !== 'failed') {
+      // A read answered, or a newer one owns the attempt: this unlock has
+      // nothing left to re-read.
+      return;
+    }
+    hydration = { status: 'idle' };
+    void hydrate();
+  });
+  unlockRetry = () => {
+    release();
+    unlockRetry = null;
+  };
+}
+
+function disarmUnlockRetry(): void {
+  unlockRetry?.();
+}
+
+/**
+ * Restore the in-memory record after a JS restart. The read is the guarded,
+ * bounded-retry read, so a transient refusal is retried there and a spent
+ * budget reports once. A write that lands during the read owns the state and
+ * skips the stale persisted record.
+ */
+async function restore(nextAttempt: 'budget' | 'single'): Promise<void> {
   const startEpoch = epoch;
   try {
-    const raw = await getSecureStore().getItemAsync(LAST_OPENED_SESSION_KEY);
-    if (raw === null || epoch !== startEpoch || record !== null) {
+    // A single attempt is the later read after a real refusal: it stays silent
+    // so a keychain that keeps refusing cannot file one event per render. A
+    // locked device never reaches the store either way — the guard in
+    // `readStoredValue` refuses before the call — so the lock costs no read and
+    // files nothing, whatever kind of attempt it is.
+    const raw =
+      nextAttempt === 'budget'
+        ? await readStoredValueWithRetry(LAST_OPENED_SESSION_KEY)
+        : await readStoredValue(LAST_OPENED_SESSION_KEY);
+    // A write or a clear that landed while this read was in flight owns the
+    // state, and its answer is newer than these bytes. The state settles here
+    // rather than staying `pending`, because no later reader needs a read: the
+    // in-memory record is authoritative.
+    if (epoch !== startEpoch) {
+      disarmUnlockRetry();
+      hydration = { status: 'answered' };
+      return;
+    }
+    // The read answered: a record, or nothing stored. Either way this is the
+    // answer for the run, so no reader asks the keychain again.
+    disarmUnlockRetry();
+    hydration = { status: 'answered' };
+    if (raw === null || record !== null) {
       return;
     }
     const parsed = parseStoredRecord(raw);
@@ -129,14 +201,46 @@ async function restore(): Promise<void> {
       notify();
     }
   } catch (error) {
-    // A mirror that cannot be read is treated as absent; the next write fills it.
-    reportSecureStoreFailure('read', error);
+    // A write or a clear that landed during the read owns the state, so a
+    // refusal it did not cause must not reopen the hydration and let a later
+    // reader restore what the caller just established is gone. Settle it for
+    // the same reason as the success path: the in-memory record is
+    // authoritative and no later reader needs a read.
+    if (epoch !== startEpoch) {
+      disarmUnlockRetry();
+      hydration = { status: 'answered' };
+      return;
+    }
+    // The read never answered, so this run must not serve its absence for the
+    // rest of the process. The next reader tries again: with the full reported
+    // budget while the device is locked, because an unlock can make the record
+    // readable and nothing has been spent on the store yet; once and silently
+    // after a real refusal, which was already reported. A reader that never
+    // reached the store threw the guard's own error; one whose call the device
+    // refused reports the lock in the protected-data state.
+    if (!isProtectedDataAvailable() || error instanceof ProtectedDataUnavailableError) {
+      hydration = { status: 'failed', nextAttempt: 'budget' };
+      armUnlockRetry();
+      return;
+    }
+    hydration = { status: 'failed', nextAttempt: 'single' };
   }
 }
 
 async function hydrate(): Promise<void> {
-  hydration ??= restore();
-  await hydration;
+  const current = hydration;
+  // An `answered` read is the run's answer, and an attempt already in flight is
+  // shared by every reader that arrives meanwhile.
+  if (current.status === 'answered') {
+    return;
+  }
+  if (current.status === 'pending') {
+    await current.promise;
+    return;
+  }
+  const promise = restore(current.status === 'failed' ? current.nextAttempt : 'budget');
+  hydration = { status: 'pending', promise };
+  await promise;
 }
 
 /** Remember the session an account opened last. A null account records nothing. */
@@ -147,9 +251,7 @@ export function recordLastOpenedSession(sessionId: string, userId: string | null
   epoch += 1;
   record = { sessionId, userId, storedAt: Date.now() };
   notify();
-  // The payload is captured now, at record time; only the write is serialized
-  // behind any earlier mirror operation, so a later record always lands after
-  // an earlier one and no write can jump a sign-out delete.
+  // The payload is captured now, at record time.
   const serialized = JSON.stringify(record);
   chainMirror(async () => {
     await mirrorRecord(serialized);
@@ -171,7 +273,7 @@ export function getLastOpenedSession(userId: string | null): string | null {
 /**
  * Subscribe to record changes — the `useSyncExternalStore` contract. The
  * subscription starts the restart read, so a restored record re-renders the
- * subscriber.
+ * subscriber, including a record a retry recovers after a refused first read.
  */
 export function subscribeLastOpenedSession(listener: () => void): () => void {
   listeners.add(listener);
@@ -197,21 +299,22 @@ export function clearLastOpenedSession(): void {
   // record after the caller dropped it.
   epoch += 1;
   record = null;
+  // The caller has just established that there is no record, so this is the
+  // answer for the run: a later reader must not ask the mirror again and restore
+  // the record the clear removed. That matters because the delete below is
+  // queued behind the mirror chain and is skipped outright while the device is
+  // locked, so a read that ran before it landed would bring the record back.
+  disarmUnlockRetry();
+  hydration = { status: 'answered' };
   if (hadRecord) {
     notify();
   }
-  // Serialized behind any earlier mirror operation, so an in-flight write can
-  // never land after this delete. The in-memory clear is already visible.
   chainMirror(async () => {
     await dropMirroredRecord();
   });
 }
 
 // ── Injection seams used by the pure suites ────────────────────────────────
-
-export function _setSecureStoreForTests(store: SecureStoreLike | null): void {
-  secureStoreForTests = store;
-}
 
 export function _setLastOpenedSessionForTests(next: LastOpenedSessionRecord | null): void {
   epoch += 1;
@@ -220,15 +323,15 @@ export function _setLastOpenedSessionForTests(next: LastOpenedSessionRecord | nu
 
 /** Re-run the restart read from the current mirror (a simulated restart). */
 export async function _hydrateLastOpenedSessionForTests(): Promise<void> {
-  hydration = null;
+  hydration = { status: 'idle' };
   await hydrate();
 }
 
 export function _resetLastOpenedSessionForTests(): void {
   record = null;
   epoch = 0;
-  hydration = null;
+  hydration = { status: 'idle' };
   mirrorTail = null;
   listeners.clear();
-  secureStoreForTests = null;
+  disarmUnlockRetry();
 }

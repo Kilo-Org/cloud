@@ -45,10 +45,7 @@ const isLowercase = (email: string): boolean => email === email.toLowerCase();
 const hasAllowedPlus = (email: string): boolean => !email.includes('+') || isKilocodeDomain(email);
 
 /**
- * Validates that an email is suitable for magic link signup:
- * - Must be a syntactically valid address
- * - Must be lowercase
- * - Must not contain a + character (except for @kilocode.ai emails)
+ * Validates that an email is suitable for magic link signup.
  *
  * This is NOT enforced during sign-in to existing accounts.
  * Returns error codes that can be displayed via AuthErrorNotification.

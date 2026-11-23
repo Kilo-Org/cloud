@@ -29,10 +29,15 @@ export type RemoteMcpViewSource = {
   readonly tools: readonly string[];
 };
 
-/** What a view's document is, once read: it, or why there is none. */
+/**
+ * What a view's document is, once read: it, or why there is none. A document
+ * over the cap is its own state rather than a failure, because its size is a
+ * fixed property of the resource — asking again reads the same document.
+ */
 export type RemoteMcpViewDocument =
   | { readonly kind: 'ready'; readonly html: string }
   | { readonly kind: 'empty' }
+  | { readonly kind: 'tooLarge' }
   | { readonly kind: 'unavailable' };
 
 /**
@@ -40,6 +45,10 @@ export type RemoteMcpViewDocument =
  * declared. It is read off the same server the tool came from, on the view-read
  * deadline rather than one call's, and a read that fails is not reported the
  * way a refused call is: the row's own Retry is where a failed read surfaces.
+ *
+ * A document over the cap is terminal: its size is a fixed property of the
+ * resource, so reading it again cannot change the answer, and the row says so
+ * instead of offering a Retry.
  */
 export async function readViewDocument(
   source: RemoteMcpViewSource,
@@ -64,7 +73,7 @@ export async function readViewDocument(
       return { kind: 'empty' };
     }
     if (html.length > MAX_VIEW_BYTES) {
-      return { kind: 'unavailable' };
+      return { kind: 'tooLarge' };
     }
     return {
       kind: 'ready',

@@ -159,30 +159,29 @@ async function enforceLiveAppSessionLimit(
   executor: typeof db | DrizzleTransaction,
   userId: string
 ): Promise<string[]> {
-  const stale = await executor
-    .select({ id: device_sessions.id })
-    .from(device_sessions)
-    .where(
-      and(
-        eq(device_sessions.kilo_user_id, userId),
-        isNull(device_sessions.revoked_at),
-        isNull(device_sessions.device_auth_request_id)
-      )
-    )
-    .orderBy(desc(device_sessions.last_seen_at), desc(device_sessions.created_at))
-    .offset(MAX_LIVE_APP_SESSIONS);
-
-  if (stale.length === 0) {
-    return [];
-  }
-
-  const staleSessionIds = stale.map(session => session.id);
-  await executor
+  const evicted = await executor
     .update(device_sessions)
     .set({ revoked_at: new Date().toISOString(), revoked_reason: 'session_limit' })
-    .where(inArray(device_sessions.id, staleSessionIds));
+    .where(
+      inArray(
+        device_sessions.id,
+        executor
+          .select({ id: device_sessions.id })
+          .from(device_sessions)
+          .where(
+            and(
+              eq(device_sessions.kilo_user_id, userId),
+              isNull(device_sessions.revoked_at),
+              isNull(device_sessions.device_auth_request_id)
+            )
+          )
+          .orderBy(desc(device_sessions.last_seen_at), desc(device_sessions.created_at))
+          .offset(MAX_LIVE_APP_SESSIONS)
+      )
+    )
+    .returning({ id: device_sessions.id });
 
-  return staleSessionIds;
+  return evicted.map(row => row.id);
 }
 
 /**
@@ -423,9 +422,7 @@ export async function rotateRefreshToken(
     return { ok: false, error: 'USER_BLOCKED' };
   }
 
-  // Steps 4-7: Consume the old token and issue the replacement pair in one
-  // transaction. If issuing the replacement fails, the transaction rolls back
-  // and the old token remains usable, so the client can retry with it.
+  // Steps 4-7:
   const outcome = await db.transaction(async tx => {
     // Step 4: Lock the parent session row and recheck revoked_at INSIDE the
     // transaction, before consuming. The pre-transaction session check above

@@ -63,8 +63,16 @@ export const SNAPSHOT_READ_MAX_RETRIES = 3;
 export const SNAPSHOT_READ_BASE_DELAY_MS = 500;
 
 /**
- * Longest a `reauth_required` ticket mint may take before the socket retires and
- * reconnects. A mint is a single small POST, so a read this old is not
- * progressing and must not hold the queued transcript frames.
+ * Longest one native sync HTTP exchange may take, covering both the response and its body.
+ * Matches the per-request deadline the native snapshot reader applies, so a stalled store
+ * fails the same way on every path.
+ */
+export const NATIVE_SYNC_REQUEST_DEADLINE_MS = 15_000;
+
+/**
+ * Longest any one ticket mint may take end to end, covering the credential lookup and the grant
+ * exchange before the ticket POST rather than only the POST itself. Each hop has its own request
+ * deadline, yet three slow hops would still sum to a connect that outlives any of them; one total
+ * bound makes the first failure reach the reconnect backoff in a single hop's time.
  */
 export const NATIVE_SYNC_TICKET_MINT_DEADLINE_MS = 15_000;

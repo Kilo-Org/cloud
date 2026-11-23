@@ -24,6 +24,7 @@ import {
   useAgentProfileAgents,
   useAgentProfileSectionMutations,
 } from '@/lib/hooks/use-agent-profiles';
+import { useCloseEditorOnDeniedPermission } from '@/lib/hooks/use-close-editor-on-denied-permission';
 import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useProfileFormDraft } from '@/lib/hooks/use-profile-form-draft';
@@ -69,7 +70,9 @@ export function ProfileAgentsScreen({
   const atAgentCap = agents.length >= MAX_PROFILE_AGENTS;
   // `null` = closed, the add form, or the agent being edited. The form and the
   // fields it holds are a draft (`lib/form-draft`), so a remount reopens it on
-  // what was typed instead of dropping it.
+  // what was typed instead of dropping it. The screen offers the sheet only
+  // while the permission allows the write, and a denial closes it and drops
+  // that draft, so a remount cannot reopen it.
   const draftScope = `profiles:agents:${profileId}`;
   // A save the server refused leaves one note the sheet renders: a slug the
   // profile already uses shows under the slug field, a create past the cap
@@ -85,6 +88,8 @@ export function ProfileAgentsScreen({
     markSheetClosed();
     form.close();
   };
+
+  useCloseEditorOnDeniedPermission(permission, handleClose);
 
   const saveAgent = async (
     target: AgentSource | null,
@@ -144,18 +149,7 @@ export function ProfileAgentsScreen({
   };
 
   let content: ReactNode = null;
-  if (profileQuery.isError) {
-    content = (
-      <QueryError
-        variant={readError.variant}
-        placement="top"
-        title={readError.titleKey ? t(readError.titleKey) : undefined}
-        message={readError.descriptionKey ? t(readError.descriptionKey) : undefined}
-        onRetry={readError.showRetry ? () => void profileQuery.refetch() : undefined}
-        isRetrying={profileQuery.isRefetching}
-      />
-    );
-  } else if (profileQuery.isPending) {
+  if (profileQuery.isPending) {
     content = <AgentsSkeleton />;
   } else if (rows.length === 0) {
     content = (
@@ -229,17 +223,30 @@ export function ProfileAgentsScreen({
         title={t('profiles.agents.title')}
         backFallback={backFallback}
       />
-      <TabScreenScrollView
-        className="flex-1"
-        contentContainerClassName={SCREEN_BODY_CLASS}
-        keyboardShouldPersistTaps="handled"
-        automaticallyAdjustKeyboardInsets
-        showsVerticalScrollIndicator={false}
-      >
-        {content}
-      </TabScreenScrollView>
+      {profileQuery.isError ? (
+        // The read owns the surface, so it centres in the band the header and
+        // the bottom band leave instead of scrolling as a banner.
+        <QueryError
+          variant={readError.variant}
+          placement="center"
+          title={readError.titleKey ? t(readError.titleKey) : undefined}
+          message={readError.descriptionKey ? t(readError.descriptionKey) : undefined}
+          onRetry={readError.showRetry ? () => void profileQuery.refetch() : undefined}
+          isRetrying={profileQuery.isRefetching}
+        />
+      ) : (
+        <TabScreenScrollView
+          className="flex-1"
+          contentContainerClassName={SCREEN_BODY_CLASS}
+          keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets
+          showsVerticalScrollIndicator={false}
+        >
+          {content}
+        </TabScreenScrollView>
+      )}
 
-      {form.isOpen ? (
+      {form.isOpen && canManage ? (
         <AgentFormSheet
           draftScope={draftScope}
           agent={form.editing}

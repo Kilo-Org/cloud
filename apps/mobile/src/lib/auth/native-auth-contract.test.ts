@@ -106,7 +106,6 @@ describe('parseTokenPair', () => {
   });
 
   it('returns null when expiresIn is zero', () => {
-    // expiresIn must be positive; zero is rejected by the schema
     expect(parseTokenPair({ token: 'abc', refreshToken: 'ref', expiresIn: 0 })).toBeNull();
   });
 

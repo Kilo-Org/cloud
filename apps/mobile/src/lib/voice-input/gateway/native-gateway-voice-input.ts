@@ -100,8 +100,6 @@ export const gatewayVoiceInputNative = createGatewayVoiceInputEngine({
       get uri(): string | null {
         return recorder.uri;
       },
-      // The shimmed `prepareToRecordAsync` flattens the nested preset into the
-      // active platform's native options shape before the native call.
       prepareToRecordAsync: async () => {
         await recorder.prepareToRecordAsync(HIGH_QUALITY);
       },

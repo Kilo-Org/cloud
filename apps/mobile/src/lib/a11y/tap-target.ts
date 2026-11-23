@@ -42,6 +42,14 @@ export const ICON_TARGET_DP = 48;
 export const ICON_TARGET_BOX_CLASS = 'h-[48px] w-[48px] items-center justify-center';
 
 /**
+ * The width half of {@link ICON_TARGET_BOX_CLASS}, for a row that reserves the
+ * control's own width beside its text without taking the box's height. A 48dp
+ * band inside such a row would be that row's tallest item and push its content
+ * apart, so the row keeps an empty cell of exactly this width instead.
+ */
+export const ICON_TARGET_WIDTH_CLASS = 'w-[48px]';
+
+/**
  * The minimum an action's own node renders inside a state surface — an empty
  * or error state's way out. Android's `<Button>` rule is 48dp, and a
  * control-size audit reads the pressed node's view rect, so the shared

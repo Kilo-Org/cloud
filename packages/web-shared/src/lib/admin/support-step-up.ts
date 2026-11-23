@@ -105,8 +105,6 @@ export async function requireSupportWriteUseStepUp(params: {
     return false;
   }
 
-  // A fresh upstream state counts only when the middleware measured this
-  // support write against this organization.
   const upstreamCoversUse =
     params.upstreamStepUpState?.status === 'fresh' &&
     stepUpDecisionCovers(params.upstreamStepUpDecision, 'support_write', {

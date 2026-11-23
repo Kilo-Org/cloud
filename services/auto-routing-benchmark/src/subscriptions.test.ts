@@ -137,6 +137,11 @@ beforeEach(() => {
     CREATE TABLE benchmark_daily_alias_sync (router TEXT PRIMARY KEY, day TEXT, attempts INTEGER, platform_status TEXT, platform_error TEXT, owner_cursor_type TEXT, owner_cursor_id TEXT, owner_pages INTEGER, owner_done INTEGER, updated_at TEXT);
     CREATE TABLE config_decider_models (router TEXT, model TEXT);
     CREATE TABLE benchmark_profiles (router TEXT, model TEXT, variant TEXT, engine_identity TEXT, repetitions INTEGER, status TEXT, run_id TEXT, requested_at TEXT, updated_at TEXT, platform_requested INTEGER, user_requested INTEGER, PRIMARY KEY(router, model, variant, engine_identity, repetitions));
+    CREATE TABLE benchmark_case_runs (engine_identity TEXT, model TEXT, variant TEXT, rep INTEGER, case_id TEXT, status TEXT, generation INTEGER, executor_run_id TEXT, executor_token TEXT, platform_covered INTEGER DEFAULT 0, result_usable INTEGER DEFAULT 0, cost_microdollars INTEGER, settlement_id TEXT, failure_reason TEXT, created_at TEXT, updated_at TEXT, started_at TEXT, settled_at TEXT, PRIMARY KEY(engine_identity, model, variant, rep, case_id));
+    CREATE TABLE benchmark_case_payers (engine_identity TEXT, model TEXT, variant TEXT, rep INTEGER, case_id TEXT, payer_kind TEXT, payer_id TEXT, owner_type TEXT, owner_id TEXT, status TEXT, charged_microdollars INTEGER DEFAULT 0, settlement_id TEXT, release_id TEXT, created_at TEXT, updated_at TEXT, generation INTEGER DEFAULT 0, PRIMARY KEY(engine_identity, model, variant, rep, case_id, payer_kind, payer_id));
+    CREATE TABLE paid_benchmark_request_cases (request_id TEXT, engine_identity TEXT, model TEXT, variant TEXT, rep INTEGER, case_id TEXT, status TEXT, covered_by_kilo INTEGER, reserved_microdollars INTEGER, charged_microdollars INTEGER, reason TEXT, updated_at TEXT, PRIMARY KEY(request_id, engine_identity, model, variant, rep, case_id));
+    CREATE TABLE paid_benchmark_requests (id TEXT PRIMARY KEY, status TEXT, owner_type TEXT, owner_id TEXT);
+    CREATE TABLE paid_benchmark_billing_outbox (seq INTEGER PRIMARY KEY, id TEXT, kind TEXT, request_id TEXT, amount_microdollars INTEGER, status TEXT);
   `);
   env = { BENCH_DB: d1(sqlite) } as Env;
   vi.mocked(getBenchmarkConfig).mockResolvedValue(config);

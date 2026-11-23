@@ -257,7 +257,7 @@ describe('counted expand rows', () => {
     ['ne', MORE_ABOVE, '… माथि थप N पङ्क्ति छ।'],
     ['pa', MORE_ABOVE, '… ਉੱਪਰ N ਹੋਰ ਲਾਈਨ ਹੈ।'],
     ['ta', MORE_ABOVE, '… மேலே மேலும் N வரி உள்ளது.'],
-    ['te', MORE_ABOVE, '… పైన మరో N పంక్తి ఉంది.'],
+    ['te', MORE_ABOVE, '… పైన మరో N పంక్తి ఉంది'],
     ['ur', MORE_ABOVE, 'اوپر مزید N سطر ہے…'],
     ['sq', MORE_ABOVE, '… N rresht tjetër më sipër'],
     ['am', 'agentChat.composer.charactersRemaining', '1 ቁምፊ ቀርቷል'],

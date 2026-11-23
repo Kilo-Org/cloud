@@ -52,7 +52,8 @@ vi.mock('@/lib/hooks/use-theme-colors', async () => {
   };
 });
 
-/** The row's icon prop takes a Lucide component; the test never inspects it. */
+/** The row's icon prop takes a Lucide component; this stub renders nothing, and
+ * the tile assertions read the element's own size and colour. */
 const Icon = (() => null) as unknown as LucideIcon;
 
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
@@ -65,6 +66,7 @@ function renderRow(props: {
   resolveValue?: () => boolean;
   title?: string;
   subtitle?: string;
+  subtitleNumberOfLines?: number | 'all';
   note?: string;
   accessibilityLabel?: string;
   inactiveSubtitle?: string;
@@ -290,6 +292,42 @@ describe('PreferenceRow', () => {
     expect(copies[1]?.props.className).toContain('-ms-[100%]');
   });
 
+  it('pins one line cap on every subtitle copy, capped or uncapped', () => {
+    // The reserved pair and the visible overlay must carry the same cap: a
+    // mismatched pair changes the row's height the moment the state flips.
+    const subtitleCaps = (props: { subtitleNumberOfLines?: number | 'all' }) => {
+      const root = renderRow({
+        value: false,
+        subtitle: 'Applies now',
+        inactiveSubtitle: 'Has no effect right now',
+        onValueChange: () => undefined,
+        ...props,
+      });
+      // The title is `text-sm`; the subtitle copies are the `text-xs` ones.
+      const subtitles = root.findAll(
+        node => Object.is(node.type, 'Text') && String(node.props.className).includes('text-xs')
+      );
+
+      // Three subtitle copies plus the title, so a dropped branch fails here.
+      expect(root.findAll(node => Object.is(node.type, 'Text'))).toHaveLength(4);
+      expect(subtitles).toHaveLength(3);
+      return subtitles.map(node => node.props.numberOfLines);
+    };
+
+    // An omitted cap paints every line.
+    expect(subtitleCaps({})).toEqual([undefined, undefined, undefined]);
+
+    // A number clamps the reserved and the visible copy alike.
+    expect(subtitleCaps({ subtitleNumberOfLines: 2 })).toEqual([2, 2, 2]);
+
+    // `'all'` states the same uncapped intent as the omitted prop.
+    expect(subtitleCaps({ subtitleNumberOfLines: 'all' })).toEqual([
+      undefined,
+      undefined,
+      undefined,
+    ]);
+  });
+
   it('paints the note as a third, smaller muted line under the subtitle', () => {
     // A retiring model's date belongs to the model id, not to the subtitle's
     // sentence: it reads model, what the switch controls, then when it goes, and
@@ -408,9 +446,6 @@ describe('PreferenceRow', () => {
   });
 
   it('keeps the light off switch at 3:1 against the row it sits on', () => {
-    // Left alone on this light row, the shared switch's `mutedSoft` track sits
-    // at 2.1:1 over the `#F0EEE6` card, and Android's own default before it was
-    // 1.02:1, so the off control read as two barely-visible grey marks.
     schemeState.current = 'light';
     const root = renderRow({ value: false, onValueChange: () => undefined });
     const toggle = root.find(node => Object.is(node.type, 'Switch'));

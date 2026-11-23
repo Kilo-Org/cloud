@@ -263,7 +263,6 @@ describe('readClipboardImageFile', () => {
     const result = await readClipboardImageFile(7);
 
     expect(result).toBe('too-large');
-    // No directory is created and no bytes reach disk.
     expect(expoFileSystemMock.Directory).not.toHaveBeenCalled();
     expect(fileInstances).toHaveLength(0);
   });

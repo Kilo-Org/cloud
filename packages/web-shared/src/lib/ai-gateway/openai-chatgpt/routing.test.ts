@@ -1158,6 +1158,72 @@ describe('delegated request normalization', () => {
     expect((await normalize({ input, tools: [namespace('files')] })).input).toEqual(original);
   });
 
+  it('leaves items unchanged for a large tool tree with unmatched calls', async () => {
+    const tools = Array.from({ length: 200 }, (_unused, namespaceIndex) => ({
+      type: 'namespace',
+      name: `namespace_${namespaceIndex}`,
+      tools: Array.from({ length: 20 }, (_other, toolIndex) => ({
+        type: toolIndex % 2 === 0 ? 'function' : 'custom',
+        name: `tool_${namespaceIndex}_${toolIndex}`,
+        parameters: {},
+        strict: false,
+      })),
+    }));
+    const input = [
+      ...Array.from({ length: 500 }, (_unused, index) => ({
+        type: 'function_call',
+        name: `missing_function_${index}`,
+        call_id: `call_function_${index}`,
+        arguments: '{}',
+      })),
+      ...Array.from({ length: 500 }, (_unused, index) => ({
+        type: 'custom_tool_call',
+        name: `missing_custom_${index}`,
+        call_id: `call_custom_${index}`,
+        input: '{}',
+      })),
+    ];
+    const original = structuredClone(input);
+
+    expect((await normalize({ input, tools })).input).toEqual(original);
+  });
+
+  it('does not add a namespace when two entries share the name and the nested tool', async () => {
+    const input = [{ type: 'function_call', name: 'read', call_id: 'short' }];
+    const original = structuredClone(input);
+    const tools = [namespace('files'), namespace('files')];
+
+    expect((await normalize({ input, tools })).input).toEqual(original);
+  });
+
+  it('adds the namespace when one entry repeats the nested tool name', async () => {
+    const body = await normalize({
+      input: [{ type: 'function_call', name: 'read', call_id: 'short' }],
+      tools: [
+        {
+          type: 'namespace',
+          name: 'files',
+          tools: [
+            { type: 'function', name: 'read', parameters: {}, strict: false },
+            { type: 'function', name: 'read', parameters: {}, strict: false },
+          ],
+        },
+      ],
+    });
+
+    expect(body.input).toEqual([
+      { type: 'function_call', name: 'read', call_id: 'short', namespace: 'files' },
+    ]);
+  });
+
+  it('does not add a namespace when a same-named tool of another top-level type exists', async () => {
+    const input = [{ type: 'function_call', name: 'read', call_id: 'short' }];
+    const original = structuredClone(input);
+    const tools = [namespace('files'), { type: 'web_search', name: 'read' }];
+
+    expect((await normalize({ input, tools })).input).toEqual(original);
+  });
+
   it('is deterministic and leaves a normalized body unchanged on its second pass', async () => {
     const fields = {
       model: 'openai/gpt-6.1-sol',

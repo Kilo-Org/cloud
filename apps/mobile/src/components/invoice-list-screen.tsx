@@ -224,7 +224,7 @@ export function InvoiceListScreen({
         {isLaterPageError && (
           <View className="items-center gap-3 px-4 py-4">
             <Text variant="muted" className="text-center text-xs">
-              {t('common.couldnTLoadMore')}
+              {t('common.couldNotLoadMore')}
             </Text>
             <Button
               variant="outline"

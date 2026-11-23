@@ -18,9 +18,6 @@ export function classifyOrganizationEntitlement({
     now
   );
   const trialStatus = getOrgTrialStatusFromDays(daysRemaining);
-  // The stored status is the provider's open set, so it is narrowed exactly once
-  // here: every read below sees the closed union, and a status the union does not
-  // name becomes the non-paying `unrecognized` member.
   const latestSeatPurchaseStatus =
     storedSeatPurchaseStatus === null
       ? null

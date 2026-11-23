@@ -30,10 +30,6 @@ describe('canAutoApprovePermissions', () => {
     );
   });
 
-  // The toggle is a client-side per-session preference: the transport resolves
-  // only after the metadata and transcript, so the settings must stay usable
-  // while the session is still opening (or has failed to open). Only a session
-  // known to be read-only is excluded.
   it('allows an unresolved transport so the session settings stay reachable', () => {
     expect(canAutoApprovePermissions({ activeSessionType: null, isReadOnly: false })).toBe(true);
   });
@@ -58,9 +54,6 @@ describe('canAutoApproveReply', () => {
     expect(canAutoApproveReply({ activeSessionType: 'cloud-agent', isReadOnly: false })).toBe(true);
   });
 
-  // The settings row stays reachable while the transport is unresolved, but an
-  // unresolved transport cannot deliver a permission ask, so it must not make
-  // an auto-reply eligible.
   it('rejects an unresolved transport even though its settings stay reachable', () => {
     expect(canAutoApprovePermissions({ activeSessionType: null, isReadOnly: false })).toBe(true);
     expect(canAutoApproveReply({ activeSessionType: null, isReadOnly: false })).toBe(false);
@@ -212,7 +205,6 @@ describe('rememberRequestId', () => {
     }
 
     expect(remembered.size).toBe(MAX_REMEMBERED_REQUEST_IDS);
-    // The oldest id is evicted first; the newest stays.
     expect(remembered.has('req-0')).toBe(false);
     expect(remembered.has(`req-${MAX_REMEMBERED_REQUEST_IDS}`)).toBe(true);
   });

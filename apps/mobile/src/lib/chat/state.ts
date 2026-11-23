@@ -242,13 +242,7 @@ export function change(sessionId: string, into: Partial<ChatState>): void {
   }
 }
 
-/**
- * Points a chat that moved at the one it became, and drops the state it left.
- *
- * The state is not kept as a second copy under the old id: a screen reading it
- * resolves to the chat that carried on, so the transcript is never cleared, and
- * one conversation never becomes one copy per model switch.
- */
+/** Points a chat that moved at the one it became, and drops the state it left. */
 export function moveState(from: string, to: string): void {
   movedTo.set(from, to);
   states.delete(from);

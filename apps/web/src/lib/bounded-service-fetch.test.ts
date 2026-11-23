@@ -248,6 +248,69 @@ describe('readJsonWithinBudget', () => {
     expect(await outcome).toBeInstanceOf(ServiceFetchTimeoutError);
     expect(cancel).not.toHaveBeenCalled();
   });
+
+  test('a caller abort mid-body rejects with the caller reason and cancels the reader', async () => {
+    const cancel = jest.fn(async () => undefined);
+    let bursts = 0;
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        bursts += 1;
+        if (bursts === 1) {
+          controller.enqueue(encoder.encode('{"sessions":'));
+        }
+      },
+      cancel,
+    });
+    const response = new Response(stream, { status: 200 });
+
+    const caller = new AbortController();
+    const callerReason = new Error('caller cancelled');
+    const outcome = readJsonWithinBudget(response, 1_000, 1_000, caller.signal).catch(
+      (error: unknown) => error
+    );
+
+    let settledEarly = false;
+    void outcome.then(() => {
+      settledEarly = true;
+    });
+
+    await jest.advanceTimersByTimeAsync(250);
+    expect(settledEarly).toBe(false);
+    expect(cancel).not.toHaveBeenCalled();
+
+    caller.abort(callerReason);
+
+    const error = await outcome;
+    expect(error).toBe(callerReason);
+    expect(error).not.toBeInstanceOf(ServiceFetchTimeoutError);
+    expect(cancel).toHaveBeenCalledTimes(1);
+    // The budget timer is disarmed, so waiting past it cannot turn the caller's
+    // reason into a timeout.
+    expect(jest.getTimerCount()).toBe(0);
+    await jest.advanceTimersByTimeAsync(2_000);
+    expect(settledEarly).toBe(true);
+  });
+
+  test('an already aborted caller signal rejects without reading the body', async () => {
+    const json = jest.fn(async () => ({ approvalKey: null }));
+    const cancel = jest.fn(async () => undefined);
+    const response = {
+      json,
+      body: { locked: true, cancel },
+    } as unknown as Response;
+
+    const caller = new AbortController();
+    const callerReason = new Error('caller cancelled');
+    caller.abort(callerReason);
+
+    await expect(readJsonWithinBudget(response, 1_000, 1_000, caller.signal)).rejects.toBe(
+      callerReason
+    );
+    expect(json).not.toHaveBeenCalled();
+    expect(cancel).not.toHaveBeenCalled();
+    expect(jest.getTimerCount()).toBe(0);
+  });
 });
 
 describe('readTextWithinBudget', () => {
@@ -336,5 +399,55 @@ describe('readTextWithinBudget', () => {
     } as unknown as Response;
 
     await expect(readTextWithinBudget(response, 1_000, 1_000, 200)).resolves.toBe('y'.repeat(200));
+  });
+
+  test('a caller abort mid-body rejects with the caller reason and cancels the reader', async () => {
+    const cancel = jest.fn(async () => undefined);
+    let bursts = 0;
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        bursts += 1;
+        if (bursts === 1) {
+          controller.enqueue(encoder.encode('<html>upstream'));
+        }
+      },
+      cancel,
+    });
+    const response = new Response(stream, { status: 502 });
+
+    const caller = new AbortController();
+    const callerReason = new Error('caller cancelled');
+    const outcome = readTextWithinBudget(response, 1_000, 1_000, undefined, caller.signal).catch(
+      (error: unknown) => error
+    );
+
+    await jest.advanceTimersByTimeAsync(250);
+    expect(cancel).not.toHaveBeenCalled();
+
+    caller.abort(callerReason);
+
+    const error = await outcome;
+    expect(error).toBe(callerReason);
+    expect(error).not.toBeInstanceOf(ServiceFetchTimeoutError);
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  test('an already aborted caller signal rejects without reading the body', async () => {
+    const text = jest.fn(async () => 'upstream failed');
+    const cancel = jest.fn(async () => undefined);
+    const response = { text, body: { locked: true, cancel } } as unknown as Response;
+
+    const caller = new AbortController();
+    const callerReason = new Error('caller cancelled');
+    caller.abort(callerReason);
+
+    await expect(
+      readTextWithinBudget(response, 1_000, 1_000, undefined, caller.signal)
+    ).rejects.toBe(callerReason);
+    expect(text).not.toHaveBeenCalled();
+    expect(cancel).not.toHaveBeenCalled();
+    expect(jest.getTimerCount()).toBe(0);
   });
 });

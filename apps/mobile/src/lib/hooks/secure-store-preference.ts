@@ -187,8 +187,8 @@ export function createSecureStorePreference<T>(options: {
     if (epoch !== writeEpoch) {
       return;
     }
-    /* Only the read settles `hasLoaded`: a write landing says what the disk now
-       holds, not that the list it was merged into has been read. */
+    /* A queued write landing does not settle `hasLoaded`: it says what the disk
+       now holds, not that the list it was merged into has been read. */
     value = next;
     emit();
   };

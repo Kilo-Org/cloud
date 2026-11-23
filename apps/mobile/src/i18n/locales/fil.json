@@ -91,6 +91,7 @@
     "draft": "Burador",
     "enabled": "Naka-enable",
     "github": "GitHub",
+    "image": "Larawan",
     "imageUnavailable": "Hindi maipakita ang larawan.",
     "loading": "Naglo-load…",
     "loadMore": "Magpakita pa",
@@ -122,10 +123,10 @@
     "connectProvider": "Ikonekta ang isang provider",
     "contentTruncated": "Pinaikli ang nilalaman",
     "copyLink": "Kopyahin ang link",
+    "couldNotLoad": "Hindi ma-load.",
+    "couldNotLoadMore": "Hindi ma-load ang iba pa.",
     "couldNotLoadOrganizations": "Hindi ma-load ang mga organisasyon.",
     "couldNotLoadSessions": "Hindi ma-load ang mga sesyon.",
-    "couldnTLoad": "Hindi ma-load.",
-    "couldnTLoadMore": "Hindi ma-load ang iba pa.",
     "deviceSessions": "Mga sesyon sa aparato",
     "disabled": "Naka-disable",
     "email": "Adres ng email",
@@ -399,7 +400,7 @@
       "title": "Mga key ng provider",
       "rowSubtitle": "Gamitin ang sarili mong billing sa provider",
       "orgDescription": "Ibinabahagi ang mga key na ito sa lahat ng nasa organisasyon at sinisingil sa mga akawnt nito sa provider.",
-      "viewOnly": "Ang may-ari, admin, o billing manager lang ng organisasyon ang makakapagpalit ng mga key nito.",
+      "viewOnly": "Ang may-ari, admin, o tagapamahala ng pagsingil lang ng organisasyon ang makakapagpalit ng mga key nito.",
       "description": "Ang mga request na dumadaan sa mga key na ito ay sisingilin sa akawnt mo sa provider sa halip na sa balanse mo sa Kilo.",
       "managedByPlan": "Pinamamahalaan ng iyong coding plan",
       "enableKey": "I-enable ang key ng {{provider}}",
@@ -1238,6 +1239,7 @@
     "needsInputAction": {
       "approved": "Aprubado ang kahilingan",
       "replied": "Naipadala ang sagot",
+      "empty": "Maglagay ng sagot at pagkatapos ay ipadala ito.",
       "failed": "Hindi nasagot. I-tap muli para subukang muli.",
       "unavailable": "Hindi na naghihintay ang kahilingang ito."
     }
@@ -1502,7 +1504,9 @@
       "githubError": "Hindi mabuksan ang setup ng GitHub. Pakisubukang muli.",
       "gitlabAccount": "account sa GitLab",
       "gitlabError": "Hindi mabuksan ang setup ng GitLab. Pakisubukang muli.",
-      "description": "Ikonekta ang Kilo {{label}} para awtomatikong suriin ang mga pull request."
+      "description": "Ikonekta ang Kilo {{label}} para awtomatikong suriin ang mga pull request.",
+      "notConnectedTitle": "Hindi nakakonekta ang {{platform}}",
+      "githubAdminOnlyDescription": "Mga may-ari ng organisasyon at admin lang ang maaaring magkonekta nito."
     },
     "overview": {
       "allAreas": "Lahat ng aspeto",
@@ -1588,7 +1592,7 @@
       "empty": "Wala pang pagsusuring may analitika",
       "emptyDescription": "Itinatala ng analitika ang mga natapos na pagsusuri habang pinagana ito para sa organisasyon.",
       "offTitle": "Naka-off ang analitika para sa {{platform}}",
-      "offDescription": "Maaaring paganahin ng mga role sa pagbabayad ng organisasyon ang analitika sa mga setting ng organisasyon sa web para itala ang mga natapos na pagsusuri.",
+      "offDescription": "Maaaring paganahin ng mga role sa pagsingil ng organisasyon ang analitika sa mga setting ng organisasyon sa web para itala ang mga natapos na pagsusuri.",
       "couldNotLoad": "Hindi ma-load ang analitika",
       "trackedReviewsCaption": "Mga natapos na pagsusuri sa panahong ito habang naka-on ang analitika. Hindi kailanman binibilang ang mga pagsusuring tumatakbo o nabigo.",
       "trackedReviewsUncounted": "Hindi binibilang: {{displayCount}} sa {{displayTotal}} natapos na pagsusuri ng organisasyon na walang naitalang resulta.",
@@ -2251,6 +2255,7 @@
       "couldNotLoadThisSession": "Hindi ma-load ang sesyong ito.",
       "historyTooLarge": "Sobrang laki ng transkrip ng sesyong ito para i-load.",
       "historyUnavailable": "Hindi mabasa ang transkrip ng sesyong ito.",
+      "historyTemporarilyUnavailable": "Pansamantalang hindi available ang transkrip ng sesyong ito.",
       "cloneFailedRetry": "Hindi makopya ang sesyong ito. Subukang muli.",
       "notEnoughCredits": "Kulang ang kredito para sa kahilingang ito. Magdagdag ng kredito at subukang muli.",
       "previousTaskFinishing": "Tinatapos pa ang naunang gawain. Maghintay sandali.",
@@ -2656,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Naglo-load ng larawan",
       "imageUnavailableRetry": "Hindi maipakita ang larawan, subukang i-load muli",
+      "imageUnavailableRetryWithAlt": "Hindi maipakita ang larawan, {{alt}}, subukang i-load muli",
       "imagePreviewUnavailableInSession": "Hindi maipakita ang paunang tingin sa larawan sa sesyong ito.",
       "viewImage": "Tingnan ang larawan",
       "viewImageWithAlt": "Tingnan ang larawan: {{alt}}",
@@ -2787,7 +2793,9 @@
       "skip": "Laktawan",
       "retrySkip": "Subukang laktawan muli",
       "submitting": "Isinusumite…",
-      "sendAnswers": "Ipadala ang mga sagot"
+      "sendAnswers": "Ipadala ang mga sagot",
+      "unreadableTitle": "Hindi maipakita ang tanong na ito",
+      "unreadableBody": "Naghihintay ang agent sa isang tanong na hindi maipakita ng app na ito. Sagutin ang tanong sa CLI upang magpatuloy."
     },
     "blockingCard": {
       "questionUnavailable": "Hindi na masasagot ang tanong na ito.",
@@ -2814,6 +2822,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Hindi ma-load ang sesyon ng subahente.",
+      "historyTooLarge": "Sobrang laki ng kasaysayan ng subahenteng ito para i-load.",
+      "historyUnavailable": "Hindi available ang kasaysayan ng subahenteng ito.",
+      "historyTemporarilyUnavailable": "Pansamantalang hindi available ang kasaysayan ng subahenteng ito.",
       "failed": "Nabigo ang sesyon ng subahente.",
       "noMessages": "Walang mensahe mula sa subahente",
       "noMessagesDescription": "Natapos ang sesyong ito ng subahente nang walang nalikhang tala ng pag-uusap.",
@@ -3392,6 +3403,8 @@
     "voiceTranscriptionWho": "Ang device mo, Kilo Gateway kasama ang napili mong transcription model, o Apple o Google para sa online recognition.",
     "installAttributionPromptTitle": "Payagang tukuyin ang pinagmulan ng pag-install?",
     "installAttributionPromptMessage": "Ginagamit ng Kilo ang pahintulot sa pagsubaybay ng Apple para lang malaman kung saan mo nalaman ang app. Hindi kailanman ginagamit ang mga prompt at pag-uusap mo.",
+    "installAttributionRequestFailedTitle": "Hindi naipakita ang prompt sa pagsubaybay",
+    "installAttributionRequestFailedMessage": "Hindi naipakita ng Kilo ang prompt ng sistema, kaya nananatiling naka-off ang pagtukoy sa pinagmulan ng pag-install.",
     "what": "Ano",
     "why": "Bakit",
     "who": "Sino"
@@ -3407,7 +3420,7 @@
   "organization": {
     "auditLog": {
       "title": "Audit log",
-      "permissionDenied": "Ang may-ari, admin o billing manager lang ng organisasyon na nasa Enterprise plan ang puwedeng magbasa ng audit log nito.",
+      "permissionDenied": "Ang may-ari, admin o tagapamahala ng pagsingil lang ng organisasyon na nasa Enterprise plan ang puwedeng magbasa ng audit log nito. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Walang audit event",
       "emptyDescription": "Dito lalabas ang mga aksyong ginawa sa organisasyong ito.",
       "truncated": "Ipinapakita ang mga pinakabagong event.",
@@ -3457,11 +3470,147 @@
         "guardrailUpdate": "Na-update ang guardrail",
         "guardrailRemove": "Inalis ang guardrail",
         "unknown": "Kaganapan sa audit"
+      },
+      "detail": {
+        "fieldChange": "{{field}}: {{change}}",
+        "modeIdentity": "Modo \"{{name}}\" (identifier: {{slug}})",
+        "modeUpdate": "Modo \"{{name}}\": {{changes}}",
+        "field": {
+          "name": "$t(organization.modes.nameLabel)",
+          "slug": "$t(organization.modes.identifierLabel)",
+          "roleDefinition": "$t(organization.modes.roleLabel)",
+          "whenToUse": "$t(organization.modes.whenToUseLabel)",
+          "description": "$t(organization.modes.descriptionLabel)",
+          "customInstructions": "$t(codeReviewer.instructions.title)",
+          "groups": "$t(profiles.agents.tools)",
+          "autoRoute": "Awtomatikong routing",
+          "defaultModel": "Default na modelo"
+        },
+        "role": {
+          "owner": "$t(organization.members.roles.owner)",
+          "admin": "$t(organization.members.roles.admin)",
+          "billing_manager": "$t(organization.members.roles.billingManager)",
+          "member": "$t(organization.members.roles.member)"
+        },
+        "memberRole": "{{email}}: {{change}}",
+        "memberAdded": "Idinagdag si {{email}} bilang {{role}}",
+        "memberRemoved": "Inalis si {{email}}",
+        "memberParentAdded": "Idinagdag si {{email}} mula sa pangunahing organisasyon {{parent}}",
+        "memberParentRemoved": "Inalis si {{email}} mula sa pangunahing organisasyon {{parent}}",
+        "inviteSent": "{{email}} bilang {{role}}",
+        "inviteRevoked": "Binawi ang imbitasyon para kay {{email}}",
+        "inviteAccepted": "Tinanggap ni {{email}}",
+        "groupIdentity": "Grupo \"{{name}}\"",
+        "groupMembers": "Grupo \"{{name}}\": {{members}}",
+        "groupMemberGroups": "{{displayCount}} grupo",
+        "groupMemberGroups_one": "{{displayCount}} grupo",
+        "groupMemberGroups_other": "{{displayCount}} grupo",
+        "groupMemberGroupsOf": "{{email}}: {{displayCount}} grupo",
+        "groupMemberGroupsOf_one": "{{email}}: {{displayCount}} grupo",
+        "groupMemberGroupsOf_other": "{{email}}: {{displayCount}} grupo",
+        "groupPolicySet": "Grupo \"{{name}}\": itinakda ang patakarang {{policy}}",
+        "groupPolicyRemoved": "Grupo \"{{name}}\": inalis ang patakarang {{policy}}",
+        "groupDefaultPolicySet": "Itinakda ang default na patakarang {{policy}}",
+        "groupDefaultPolicyRemoved": "Inalis ang default na patakarang {{policy}}",
+        "guardrailIdentity": "{{type}} \"{{name}}\"",
+        "guardrailStatus": "{{type}} \"{{name}}\" {{state}}",
+        "guardrailConfig": "Mga AI guardrail {{state}}",
+        "guardrailConfigGroup": "{{state}} para sa grupo \"{{group}}\"",
+        "guardrailEnforcement": "{{target}}: {{value}}",
+        "guardrailSkill": "{{target}}: {{values}}",
+        "guardrailTarget": {
+          "mcp": "$t(profiles.mcp.title)",
+          "skill": "$t(profiles.skillsTitle)"
+        },
+        "ssoDomainSet": "Domain ng SSO: {{domain}}",
+        "ssoDomainChanged": "{{domain}} (dating {{previous}})",
+        "ssoDomainRemoved": "Inalis ang SSO domain {{domain}}",
+        "fundsPurchased": "{{amount}} gamit ang {{method}}",
+        "fundsGranted": "{{amount}}",
+        "fundsDistributed": "{{amount}} sa {{displayCount}} sub-organisasyon",
+        "fundsDistributed_one": "{{amount}} sa {{displayCount}} sub-organisasyon",
+        "fundsDistributed_other": "{{amount}} sa {{displayCount}} sub-organisasyon",
+        "fundsReceived": "{{amount}} mula sa {{parent}}",
+        "reviewAgentPlatform": "{{platform}}",
+        "reviewAgentConfig": "Konpigurasyon ng {{platform}}",
+        "reviewAgentConfigStyle": "{{platform}}: istilo {{style}}",
+        "reviewAgentSecretsUpdated": "{{displayCount}} na-update",
+        "reviewAgentSecretsUpdated_one": "{{displayCount}} na-update",
+        "reviewAgentSecretsUpdated_other": "{{displayCount}} na-update",
+        "reviewAgentSecretsFailed": "{{displayCount}} na error",
+        "reviewAgentSecretsFailed_one": "{{displayCount}} na error",
+        "reviewAgentSecretsFailed_other": "{{displayCount}} na error",
+        "reviewAgentSecretRotated": "{{values}}",
+        "settingAdvancedPolicies": "{{values}}",
+        "settingAdvancedPoliciesOpenRouter": "OpenRouter {{state}}",
+        "settingAdvancedPoliciesRegion": "Rehiyon ng inference: {{region}}",
+        "settingDefaultModelSet": "{{next}}",
+        "settingDefaultModelRemoved": "{{previous}}",
+        "settingAutoRoute": "Modo \"{{mode}}\": {{change}}",
+        "settingDefaultBehavior": {
+          "global": "Global na default",
+          "specific": "{{model}}",
+          "auto": "$t(models.auto.organization)"
+        },
+        "settingDataCollection": "{{mode}}",
+        "dataCollection": {
+          "allowed": "Pinapayagan",
+          "denied": "Hindi pinapayagan",
+          "followSetting": "Sumusunod sa setting ng extension"
+        },
+        "region": {
+          "us": "$t(organizationModelAccess.region.us)",
+          "eu": "$t(organizationModelAccess.region.eu)",
+          "au": "$t(organizationModelAccess.region.au)",
+          "jp": "$t(organizationModelAccess.region.jp)"
+        },
+        "settingProjectsUi": "Projects UI {{state}}",
+        "settingMinimumBalanceOn": "{{threshold}} sa {{emails}}",
+        "settingMinimumBalanceThreshold": "{{threshold}}",
+        "settingRecommendationsDigest": "Digest ng mga rekomendasyon {{state}}",
+        "settingBrowserControl": "{{policy}}",
+        "settingBrowserControlOrigins": "{{policy}}: {{origins}}",
+        "settingBrowserControlOriginsCleared": "{{policy}}: walang pinapayagang origin",
+        "settingName": "Pinalitan ang pangalan mula {{previous}} sa {{next}}",
+        "enabled": "$t(common.enabled)",
+        "scanBeforeUseOn": "Scan bago gamitin: Naka-on",
+        "scanBeforeUseOff": "Scan bago gamitin: Naka-off",
+        "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingRemoved": "Inalis: {{models}}",
+        "browserPolicyOff": "Naka-block ang paggamit ng browser",
+        "browserPolicyAllow": "Mga pinapayagang origin lang",
+        "browserPolicyPlaywrightOnly": "Paggamit ng browser lang",
+        "disabled": "$t(common.disabled)",
+        "autoRouting": "Nagbago ang mga modelo: {{values}}",
+        "integrationConnected": "{{integration}} konektado",
+        "integrationDisconnected": "{{integration}} nadiskonekta",
+        "integrationRefreshed": "{{integration}} na-refresh",
+        "integrationCancelled": "{{integration}} nakansela",
+        "integrationModelUpdated": "{{integration}}: modelo {{model}}",
+        "integrationKeyAdded": "Idinagdag ang key para sa {{provider}}",
+        "integrationKeyUpdated": "Na-update ang key para sa {{provider}}",
+        "integrationKeyDeleted": "Inalis ang key para sa {{provider}}",
+        "integrationKeyToggled": "Key para sa {{provider}}: {{state}}",
+        "namedPolicyCreated": "Nilikha ang {{kind}} na patakaran {{id}}",
+        "namedPolicyUpdated": "Na-update ang {{kind}} na patakaran {{id}}",
+        "namedPolicyDeleted": "Inalis ang {{kind}} na patakaran {{id}}",
+        "namedPolicyLinked": "Ini-link ang {{kind}} na patakaran {{next}}",
+        "webhookTriggerUpdated": "Trigger {{trigger}}",
+        "organizationRenamed": "Pinalitan ng pangalan ang organisasyon mula {{previous}} tungo sa {{next}}",
+        "brand": {
+          "github": "$t(common.github)",
+          "gitlab": "$t(common.gitlab)",
+          "bitbucket": "$t(agentChat.repoPicker.platformBitbucket)",
+          "discord": "$t(profile.providerDiscord)",
+          "slack": "$t(agentChat.sessionFilter.platformSlack)",
+          "linear": "$t(agentChat.sessionFilter.platformLinear)",
+          "byok": "Sarili mong API key"
+        }
       }
     },
     "billing": {
       "title": "Pagsingil",
-      "permissionDenied": "Ang may-ari, admin o billing manager lang ng organisasyon ang makakakita ng pagsingil nito.",
+      "permissionDenied": "Ang may-ari, admin o tagapamahala ng pagsingil lang ng organisasyon ang makakakita ng pagsingil nito. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Subscription",
       "state": "Katayuan",
       "stateNone": "Walang subscription",
@@ -3539,11 +3688,11 @@
       "pendingInvitation": "May nakabinbing imbitasyon na ang email na ito.",
       "alreadyMember": "Miembro na ng organisasyong ito ang taong ito.",
       "seatsFull": "Ginagamit na ang lahat ng seat ({{used}}/{{total}}). Hilingin sa isang may-ari ng organisasyon na magdagdag ng mga seat bago mag-imbita ng mas maraming miyembro.",
-      "seatsFullCanInviteBilling": "Ginagamit na ang lahat ng seat ({{used}}/{{total}}). Maaari ka pa ring mag-imbita ng mga billing manager, na hindi gumagamit ng seat.",
+      "seatsFullCanInviteBilling": "Ginagamit na ang lahat ng seat ({{used}}/{{total}}). Maaari ka pa ring mag-imbita ng mga tagapamahala ng pagsingil, na hindi gumagamit ng seat.",
       "noSeatsAvailable": "Ginagamit na ang lahat ng seat. Hilingin sa isang may-ari ng organisasyon na magdagdag ng mga seat bago mag-imbita ng mas maraming miyembro."
     },
     "invoices": {
-      "downloadA11y": "I-download ang talaan ng singil {{number}}",
+      "downloadA11y": "I-download ang talaan ng singil {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Awtomatikong ginagawa ang mga talaan ng singil sa bawat siklo ng pagsingil. Lalabas ang mga ito rito kapag nasingil na ang iyong organisasyon.",
       "emptyTitle": "Walang talaan ng singil",
       "invoiceFallback": "Talaan ng singil",
@@ -3623,7 +3772,6 @@
       "usageDetails": "Mga detalye ng paggamit",
       "providersAndModels": "Mga provider at model",
       "groups": "Mga grupo",
-      "guardrails": "Mga guardrail",
       "byok": "Gamitin ang sarili mong key",
       "ssoAndDomain": "SSO at domain",
       "dataCollection": "Pangongolekta ng data",
@@ -3638,7 +3786,7 @@
       "emptyDescription": "Gamitin ang \"Mas lumang oras\" para makita ang mga naunang request.",
       "emptyBoundDescription": "Hanggang dito na lang ang kasaysayan ng mga request.",
       "loadError": "Hindi ma-load ang mga request log.",
-      "permissionDenied": "Ang may-ari, admin o billing manager lang ng organisasyon ang puwedeng magbasa ng mga request log nito.",
+      "permissionDenied": "Ang may-ari, admin o tagapamahala ng pagsingil lang ng organisasyon ang puwedeng magbasa ng mga request log nito. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} input · {{output}} output",
       "byok": "BYOK"
     },
@@ -3743,7 +3891,7 @@
     "signupStepUpApple": "Para matapos ang paggawa ng iyong account, gamitin ang '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Para matapos ang paggawa ng iyong account, gamitin ang '$t(login.signInWithGoogle)'.",
     "signupStepUpBack": "Para matapos ang paggawa ng iyong account, bumalik at gamitin ang '$t(login.moreSignInOptions)'.",
-    "invalidCode": "Mali o expired na ang code na iyon. Pakisubukan muli o gamitin ang '$t(login.resendCode)'.",
+    "invalidCode": "Mali o expired na ang code na iyon. Gamitin ang '$t(login.resendCode)' o ang '$t(login.moreSignInOptions)'.",
     "codeInProgress": "Pinoproseso ang iyong code. Maghintay ng sandali at subukan muli.",
     "tooManyAttempts": "Masyado nang maraming pagsubok. Humiling ng bagong code.",
     "invalidToken": "Hindi makapag-sign in. Pakisubukan muli.",
@@ -3908,7 +4056,10 @@
     "list": {
       "loadFailed": "Hindi ma-load ang kasaysayan ng chat.",
       "new": "Bagong chat",
-      "deleteTitle": "Burahin ang chat na ito?"
+      "deleteTitle": "Burahin ang chat na ito?",
+      "resetNoticeTitle": "Nabura ang mga chat sa device na ito at mga burador",
+      "resetNoticeBody": "Hindi mabuksan ng Kilo ang mga chat sa device na ito. Hindi apektado ang mga sesyon sa cloud.",
+      "resetNoticeDismiss": "Balewalain ang abiso"
     },
     "rename": {
       "title": "Palitan ang pangalan ng chat",
@@ -3958,6 +4109,9 @@
       "fieldName": "Pangalang ipinapakita",
       "fieldUrl": "URL ng server",
       "fieldUrlInvalid": "Maglagay ng valid na URL ng server.",
+      "fieldUrlCredentials": "Alisin ang user name at password mula sa URL.",
+      "fieldUrlFragment": "Alisin ang # na bahagi ng URL.",
+      "fieldUrlInsecure": "Maglagay ng https na URL, o http lamang para sa localhost.",
       "duplicateUrl": "Naka-save na ang URL na iyon.",
       "serverNotFound": "Hindi na naka-save ang server na ito.",
       "enableServer": "Paganahin ang server na ito: {{name}}",
@@ -3983,6 +4137,7 @@
       "app": {
         "label": "Interface ng tool",
         "failed": "Hindi na-load ang interface ng tool na ito.",
+        "tooLarge": "Mas malaki ang interface ng tool na ito kaysa sa limit na {{size}}.",
         "empty": "Walang maipapakita ang interface ng tool na ito."
       }
     },
@@ -4050,6 +4205,8 @@
       "discoveryNoModels": "Walang nakalista na modelo ang endpoint. Maglagay ng mga modelo nang manu-mano.",
       "connectionIncomplete": "Sumagot ang modelo ngunit hindi natapos. Subukang muli, o suriin ang ID ng modelo at protocol.",
       "invalidInput": "Maglagay ng pangalan ng sistema, mga wastong header, at kahit isang modelo na may natatanging ID at pangalan. Ang mga limitasyon sa token ay dapat mga positibong buong bilang.",
+      "invalidApiKey": "Ang susi ng API ay naglalaman ng karakter na hindi maipapadala. Gumamit lamang ng mga titik, digit, at karaniwang simbolo, nang walang mga putol ng linya.",
+      "invalidHeaders": "Hindi maipadala ang isang pasadyang header. Suriin ang pangalan nito at gumamit lamang ng mga titik, digit, at karaniwang simbolo, nang walang mga putol ng linya.",
       "invalidUrl": "Maglagay ng pangunahing URL ng API na gumagamit ng HTTP o HTTPS at walang mga kredensyal, mga parameter ng query, o fragment.",
       "publicHttp": "Hindi pinapayagan ang mga pampublikong HTTP endpoint. Gumamit ng HTTPS o isang pribadong lokal na endpoint.",
       "httpApprovalRequired": "Aprubahan ang lokal na HTTP endpoint na ito bago mag-save o kumonekta.",
@@ -4098,6 +4255,7 @@
         "network": "Hindi natapos ang pag-download. Suriin ang iyong koneksyon at subukan muli.",
         "invalidFile": "Ang na-download na file ay hindi modelong kayang patakbuhin ng app na ito, kaya inalis ito.",
         "checksum": "Ang na-download na file ay hindi tumutugma sa nakalathalang checksum nito, kaya inalis ito. Subukang i-download itong muli.",
+        "unreadable": "Hindi masuri ng device na ito ang na-download na file, kaya inalis ito. Subukang i-download itong muli.",
         "writeFailed": "Hindi na-save ng device na ito ang modelo. Subukang i-download itong muli."
       }
     },
@@ -4183,7 +4341,15 @@
       "download": "I-download ang modelong nasa device",
       "downloading": "Nagda-download…",
       "downloadProgress": "Nagda-download… {{percent}}%",
-      "downloadFailed": "Hindi natapos ang pag-download. Tingnan ang iyong koneksyon at bakanteng storage, pagkatapos ay subukang muli."
+      "downloadFailed": "Hindi natapos ang pag-download. Tingnan ang iyong koneksyon at bakanteng storage, pagkatapos ay subukang muli.",
+      "cannotUse": "Hindi mapatakbo: {{items}}.",
+      "cannotUseOptions": "Hindi mapupunan: ilang opsyon ng tool.",
+      "limitations": "Mga limitasyon",
+      "tools": {
+        "time": "Oras",
+        "settingsList": "Ipakita ang mga setting",
+        "settingsSet": "Baguhin ang mga setting"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Sinusuportahan ng modelong ito ang antas ng pag-iisip"
@@ -4362,6 +4528,7 @@
     "instructionSaveFailed": "Hindi na-save ang tagubilin",
     "instructionDeleteFailed": "Hindi nabura ang tagubilin",
     "instructionToggleFailed": "Hindi na-update ang tagubilin",
+    "instructionViewTitle": "File ng tagubilin",
     "instructionLimitReached": "Hanggang {{max}} tagubilin lamang ang maaaring taglayin ng isang profile. Burahin ang isa para magdagdag ng panibago.",
     "mcp": {
       "title": "Mga MCP server",
@@ -4532,10 +4699,20 @@
     "history": {
       "activityUnavailable": "Hindi ma-load ang aktibidad ng credit.",
       "appStoreReceipt": "Resibo mula sa App Store",
+      "deduction": {
+        "adminCancel": "Isinara ng admin ang balanse",
+        "adminDebit": "Inalis ng admin ang mga credit",
+        "codingPlan": "Plano sa coding: {{plan}}",
+        "correction": "Pagwawasto ng balanse",
+        "dispute": "Pagtatalo sa pagbabayad",
+        "refundAppStore": "Refund ng credit pack mula sa App Store",
+        "refundGooglePlay": "Refund ng credit pack mula sa Google Play"
+      },
       "deductionFallback": "Bawas sa credit",
       "emptyDescription": "Lalabas dito ang mga pagbili, resibo, at paggamit ng credit.",
       "emptyTitle": "Walang kasaysayan ng credit",
       "expiredGrant": "Nag-expire: {{description}}",
+      "expiredStatus": "Nag-expire",
       "googlePlayReceipt": "Resibo mula sa Google Play",
       "kind": {
         "adjustment": "Adjustment",
@@ -4562,7 +4739,8 @@
       "receiptA11y": "Buksan ang resibo para sa {{description}}, {{amount}}, mula noong {{date}}",
       "receiptUnavailable": "Walang available na resibo para sa pagbiling ito.",
       "retentionLimit": "Ipinapakita ang pinakabagong kasaysayan ng credit.",
-      "voidedGrant": "Kinansela: {{description}}"
+      "voidedGrant": "Kinansela: {{description}}",
+      "voidedStatus": "Kinansela"
     },
     "title": "Bumili ng kredito",
     "description": "Ang kredito ay isang besesang pagbili na idinaragdag sa iyong Kilo balance para sa pagpapatakbo ng mga AI coding session sa Kilo App. Sinisingil ng store ang iyong account at idinaragdag ang kredito pagkatapos kumpirmahin ng store ang bayad.",
@@ -4726,12 +4904,15 @@
     "morningEnd": "Available ang briefing hanggang",
     "timeHint": "Ibinabalik ng Home card ang live na status kapag natapos ang window ng briefing, kahit offline.",
     "invalidSchedule": "Pumili ng wastong time zone at ng isang hindi walang laman na window ng briefing.",
+    "scheduleEmptyNight": "Walang laman ang window ng briefing. Pumili ng ready time na mas huli kaysa sa simula ng window.",
+    "scheduleEmptyMorning": "Nagtutugma ang ready time at ang available until time. Pumili kung gaano katagal mananatiling available ang briefing.",
+    "scheduleFullDay": "Sinasaklaw ng dalawang window ang isang buong araw. Mag-iwan ng bahagi ng araw sa labas ng briefing.",
     "notificationsHint": "Isang pangkalahatang abiso bawat naka-iskedyul na briefing. Hiwalay sa mga bayad na buod ng AI.",
     "notificationPermission": "I-on ang mga push notification para matanggap ang iyong briefing.",
     "defaultModel": "Gamitin ang default na model ng Kilo",
     "duration": "Limitasyon sa oras (minuto)",
     "spendLimit": "Limitasyon sa gastos (USD)",
-    "invalidSafeguards": "Maglagay ng mga positibong limitasyon sa oras at gastos na may hangganang halaga.",
+    "invalidSafeguards": "Maglagay ng positibong numero sa pinapayagang saklaw.",
     "estimate": "Tantiya {{estimate}} · maximum {{maximum}}",
     "estimateUnavailable": "Hindi available ang bayad na buod para sa mga setting na ito. Palitan ang modelo o ang mga limitasyon, o subukan itong muli mamaya.",
     "estimatePricingUnavailable": "Walang available na presyo para sa modelong ito. Pumili ng ibang modelo.",
@@ -4739,6 +4920,8 @@
     "estimateModelNotAllowed": "Hindi pinapayagan ang modelong ito sa kontekstong ito. Pumili ng ibang modelo.",
     "estimateSpendLimitTooLow": "Itaas ang spend safeguard para payagan ang buod na ito.",
     "confirmPaid": "I-enable ang mga bayad na buod para sa {{context}}?",
+    "paidDisclosure_one": "Tinatayang {{estimate}}, hanggang {{maximum}}, na may limitasyong {{minutes}} minuto. May singil kahit mabigo ang paggawa.",
+    "paidDisclosure_other": "Tinatayang {{estimate}}, hanggang {{maximum}}, na may limitasyong {{minutes}} minuto. May singil kahit mabigo ang paggawa.",
     "paidDisclosure": "Tinatayang {{estimate}}, hanggang {{maximum}}, na may limitasyong {{minutes}} minuto. May singil kahit mabigo ang paggawa.",
     "enable": "I-enable ang mga bayad na buod",
     "allContexts": "Magkahiwalay ang mga personal at pang-organisasyong briefing.",
@@ -4746,8 +4929,8 @@
     "estimatePermissionUnavailable": "Wala kang pahintulot na gamitin ang balanse ng kontekstong ito. Humingi sa may-ari ng organisasyon na i-enable ito.",
     "saved": "Na-save na ang mga setting ng briefing",
     "selectedSessions": "Mga napiling session",
-    "snapshotPullRequests": "Mga PR sa mga napiling session",
-    "snapshotBlockers": "Mga blocker sa mga napiling session",
+    "snapshotPullRequests": "Mga PR",
+    "snapshotBlockers": "Mga blocker",
     "capturedAt": "Naitala {{time}}",
     "snapshotHint": "Snapshot ng pinakabagong available na kalagayan ng session na naitala sa naka-iskedyul na umaga; maaaring hindi kumpleto. Ang mga bilang ay para sa mga napiling session, hindi sa lahat ng aktibidad sa magdamag.",
     "snapshotTruncated": "May mga session o ebidensyang hindi isinama para manatili sa limitasyon ang snapshot na ito.",
@@ -4778,7 +4961,7 @@
     "sourceActivity": "Aktibidad na walang pamagat",
     "metadataFailureProvider": "error ng provider",
     "metadataFailureTool": "error ng tool",
-    "metadataFailureCancelled": "Kinansela",
+    "metadataStopped": "Inihinto ang huling turn",
     "metadataFailureOther": "hindi tinukoy na error"
   },
   "systemSearch": {
@@ -4799,7 +4982,8 @@
     "unavailableTitle": "Hindi available ang paggamit",
     "unavailableDescription": "Hindi pa naisasaayos ang paggamit para sa workspace na ito. Makipag-ugnayan sa suporta kung inaasahan mong may makikitang paggamit dito.",
     "orgSelfNotice": "Nakikita mo ang sarili mong paggamit sa organisasyong ito.",
-    "viewDetails": "Tingnan ang detalye ng paggamit"
+    "viewDetails": "Tingnan ang detalye ng paggamit",
+    "orgSelfEntryTitle": "Paggamit mo"
   },
   "integrations": {
     "title": "Mga Integration",
@@ -4895,6 +5079,8 @@
       "autoCommit": "I-commit ang mga pagbabago kapag natapos ang pagtakbo",
       "condenseOnComplete": "Paikliin ang konteksto kapag natapos ang pagtakbo",
       "activeTitle": "Aktibo ang pampapagana",
+      "activeSwitchA11y": "Aktibong pampapagana: {{name}}",
+      "copyLinkA11y": "Kopyahin ang link para sa {{name}}",
       "activeDescription": "Ang mga nakapahingang webhook ay tumutugon ng 404.",
       "runAsCreator": "Patakbuhin bilang ako",
       "runAsCreatorDescription": "Ginagamit ng bawat pagtakbo ang iyong kuwenta, kaya kailangan ang sekretong header.",
@@ -4971,7 +5157,7 @@
   },
   "organizationGuardrails": {
     "title": "Mga AI Guardrail",
-    "permissionDenied": "Ang mga owner at admin lang ng organisasyon ang puwedeng mamahala ng Mga AI Guardrail. $t(organization.boundary.accessDeniedDescription)",
+    "permissionDenied": "Ang mga may-ari at admin lang ng organisasyon ang puwedeng mamahala ng Mga AI Guardrail. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Hindi naka-enable ang Mga AI Guardrail",
     "unavailable": "Ini-enable ng Kilo ang Mga AI Guardrail para sa isang organisasyon kapag hiniling. Makipag-ugnayan sa {{supportEmail}}, at i-on ito ng Kilo team para sa iyong organisasyon.",
     "contactSupport": "Makipag-ugnayan sa suporta",
@@ -5113,7 +5299,7 @@
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Feature ng Enterprise",
     "enterpriseOnly": "Makukuha ang mga provider at modelo sa Enterprise plan.",
-    "readOnly": "Ang mga owner at admin lang ng organisasyon ang puwedeng magbago ng mga setting na ito.",
+    "readOnly": "Ang mga may-ari at admin lang ng organisasyon ang puwedeng magbago ng mga setting na ito.",
     "loadError": "Hindi ma-load ang mga provider at modelo",
     "tabModels": "Mga modelo",
     "tabProviders": "Mga provider",

@@ -34,12 +34,10 @@ export function needsInputSessionOfIdentifier(identifier: string): string | null
     : null;
 }
 
-// The sessions whose app-owned needs-input notification was posted. Only a fast
-// path: the OS is the authority on whether it is still on screen, because a swipe
-// never reaches the app. In-memory like the mount's notified set: a fresh process
-// posts nothing until the cached rows raise again, so a restart can only
-// under-report (a duplicate server push may show once), never suppress a raise
-// that has no notification.
+// The sessions whose app-owned needs-input notification was posted. In-memory
+// like the mount's notified set: a fresh process posts nothing until the cached
+// rows raise again, so a restart can only under-report (a duplicate server push
+// may show once), never suppress a raise that has no notification.
 const postedSessions = new Set<string>();
 
 /** Record that the app's own notification for this session reached the OS. */

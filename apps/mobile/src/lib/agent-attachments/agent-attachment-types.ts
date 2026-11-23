@@ -106,8 +106,8 @@ export function classifyUploadFailure(error: unknown) {
       return { retryable: true, reason: i18n.t('chat.attachment.uploadFailed') };
     }
     if (/status \d{3}/.test(error.message)) {
-      // Any other HTTP error (4xx other than the terminal codes above,
-      // 5xx, etc.) is retryable.
+      // Only statuses outside 408, 429 and 5xx reach this branch, so these are
+      // the remaining 3-digit statuses, which the classifier treats as retryable.
       return { retryable: true, reason: i18n.t('chat.attachment.uploadFailed') };
     }
     return { retryable: true, reason: i18n.t('chat.attachment.uploadFailed') };

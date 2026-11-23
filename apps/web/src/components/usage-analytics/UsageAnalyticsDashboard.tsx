@@ -40,6 +40,7 @@ import {
   granularityOptionsForPeriod,
   periodToDateRange,
   useResolveOrgUsers,
+  useBenchmarkCharges,
   useUsageBreakdown,
   useUsageSummary,
   useUsageTable,
@@ -69,6 +70,8 @@ import { RecommendationsView } from './RecommendationsView';
 import { UsageViewNavigation } from './UsageViewNavigation';
 import { SpendAlertsPanel } from '@/components/spend-alerts/SpendAlertsPanel';
 import { ComputeUsageSection } from './ComputeUsageSection';
+import { BenchmarkChargesCard } from './BenchmarkChargesCard';
+import { projectDisplayLabel } from './project-labels';
 
 /**
  * Personal usage never targets a single organization, so org-only props
@@ -109,12 +112,11 @@ type UsageAnalyticsDashboardProps =
       notice?: ReactNode;
     };
 
-/** Sentinel written by DBT rollups for rows with NULL project_id. */
-const PROJECT_SENTINEL_NONE = '';
+/** Label for the sentinel DBT writes for rows with NULL project_id. */
 const PROJECT_UNATTRIBUTED_LABEL = 'Unattributed';
 
 function labelForProjectValue(value: string): string {
-  return value === PROJECT_SENTINEL_NONE ? PROJECT_UNATTRIBUTED_LABEL : value;
+  return projectDisplayLabel(value, PROJECT_UNATTRIBUTED_LABEL);
 }
 
 type ActiveFilter = {
@@ -445,6 +447,16 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
     enabled: isOrgWideView && showDetailedUsage,
   });
 
+  const {
+    data: benchmarkCharges,
+    isLoading: benchmarkChargesLoading,
+    isError: benchmarkChargesError,
+    refetch: refetchBenchmarkCharges,
+  } = useBenchmarkCharges({
+    ...commonArgs,
+    enabled: showDetailedUsage,
+  });
+
   const tableGroupBy = useMemo<Dimension[]>(() => (groupBy === 'none' ? [] : [groupBy]), [groupBy]);
 
   const {
@@ -580,6 +592,7 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
     void refetchFeatureBreakdown();
     void refetchModelBreakdown();
     void refetchProjectBreakdown();
+    void refetchBenchmarkCharges();
     void refetchTable();
     if (isOrgWideView) void refetchUserBreakdown();
   }, [
@@ -587,6 +600,7 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
     refetchFeatureBreakdown,
     refetchModelBreakdown,
     refetchProjectBreakdown,
+    refetchBenchmarkCharges,
     refetchSummary,
     refetchTable,
     refetchTimeseries,
@@ -918,6 +932,17 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
                       metric="cost"
                       labelFor={projectLabelFor}
                     />
+                    {/* Shown only when there is benchmark spend to report (or a
+                        failure to surface): most usage pages have none, and the
+                        reserved project still appears under Top Projects. */}
+                    {(benchmarkCharges?.status === 'ok' || benchmarkChargesError) && (
+                      <BenchmarkChargesCard
+                        data={benchmarkCharges}
+                        loading={benchmarkChargesLoading}
+                        isError={benchmarkChargesError}
+                        onRetry={() => void refetchBenchmarkCharges()}
+                      />
+                    )}
                     {isOrgWideView && (
                       <BreakdownBarChart
                         title="Users"

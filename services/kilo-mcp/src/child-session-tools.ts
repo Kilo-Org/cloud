@@ -251,6 +251,7 @@ export function childSessionTools(authority: CloudAgentAuthority) {
       delete properties.upstreamSha;
       if (tool.procedure !== 'prepareSession') delete properties.stackOnWorktreeId;
       if (authority.organizationId === null) delete properties.bitbucketRepo;
+      delete properties.verificationOf;
       for (const [key, property] of Object.entries(properties)) {
         properties[key] = {
           ...property,
@@ -258,7 +259,9 @@ export function childSessionTools(authority: CloudAgentAuthority) {
         };
       }
       const required = Array.isArray(schema.required)
-        ? schema.required.filter(key => key !== 'organizationId' && key !== 'autoInitiate')
+        ? schema.required.filter(
+            key => key !== 'organizationId' && key !== 'autoInitiate' && key !== 'verificationOf'
+          )
         : [];
       if (tool.procedure === 'prepareSession') required.push('operationKey');
       const readOnly = cloudAgentAuthorityProcedureKind(path) === 'query';

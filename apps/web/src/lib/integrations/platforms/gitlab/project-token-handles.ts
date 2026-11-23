@@ -569,10 +569,11 @@ export async function removeStoredProjectAccessToken(
 }
 
 /**
- * Budget for one project-token walk inside one request. The settlement walk and
- * the retirement walk each create their own deadline at this value, so a request
- * that runs both can spend up to twice this, and each credential replacement a
- * request performs gets its own budget.
+ * Budget for one project-token walk inside one request. The settlement walk, the
+ * retirement walk, and each single-credential retirement create their own
+ * deadline at this value, so each bounds only its own provider work. One connect
+ * runs at most one of the two walks: settlement requires the stored account to
+ * match the caller, and retirement requires it to differ.
  */
 export const PROJECT_TOKEN_WALK_BUDGET_MS = 20_000;
 

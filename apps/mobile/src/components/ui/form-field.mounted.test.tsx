@@ -439,6 +439,22 @@ describe('FormField resting value preview', () => {
     expect(box.disabled).toBe(true);
   });
 
+  it('treats a caller’s read-only field as one that cannot be entered', () => {
+    // `editable={false}` is how a caller stops accepting text while it saves;
+    // a resting value must not offer an editor the field would refuse, and must
+    // dim like any other read-only field.
+    const mounted = mountField({ defaultValue: longValue, editable: false });
+    const box = preview(mounted);
+
+    expect(box.disabled).toBe(true);
+    expect(mounted.root.findByType('Pressable').props.accessibilityState.disabled).toBe(true);
+    // A press and an assistive activation both leave the field resting.
+    act(() => {
+      preview(mounted).onPress();
+    });
+    expect(mounted.root.findAllByType('TextInput')).toHaveLength(0);
+  });
+
   it('carries no role of its own and ends a long value in a tail ellipsis', () => {
     const mounted = mountField({ defaultValue: longValue });
     const box = mounted.root.findByType('Pressable');

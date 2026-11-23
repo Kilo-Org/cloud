@@ -97,7 +97,9 @@ type FormFieldProps = Omit<TextInputProps, 'value'> &
  * them at call sites to expose system autofill metadata. While a single-line
  * field with a value rests, no native input is mounted, so the forwarded
  * `TextInput` ref and the mount value write are inert until the person enters
- * the field.
+ * the field. A resting value also honours a caller's `editable={false}`: it
+ * offers no press and dims. `disabled` remains the switch that stops the field
+ * accepting text in both states, so use it for a field that stays read-only.
  */
 function FormField({
   label,
@@ -141,6 +143,14 @@ function FormField({
   // and once the person pressed the preview. Everything else is at rest.
   const isEditing =
     isMultiline || props.secureTextEntry === true || props.autoFocus === true || editing;
+  // The field accepts no text: its own `disabled`, or a caller's `editable`
+  // turned off for a busy state. A resting value honours both — no press, no
+  // assistive activation, and the dimmed box — because a preview that offers to
+  // open an editor the field would refuse misleads. A mounted input keeps the
+  // field's own switch: an `editable={false}` written under a focused Android
+  // input drops the IME mid-edit, so a caller that must stop accepting text for
+  // good passes `disabled`.
+  const readOnly = disabled === true || props.editable === false;
   // Android keeps a resting one-line EditText scrolled to its caret, so a value
   // longer than the box paints its tail with its first glyph cut; a
   // programmatic selection does not scroll it back (measured on the emulator).
@@ -195,14 +205,14 @@ function FormField({
           <Pressable
             accessibilityLabel={formFieldA11y({ label, required, error: displayedError })}
             accessibilityValue={{ text: valueRef.current }}
-            accessibilityState={{ disabled }}
+            accessibilityState={{ disabled: readOnly }}
             // The box keeps the field's own name and value and carries no role
             // or hint of its own: the app localizes all of its copy, so the
             // control introduces no English sentence. An assistive activation
             // opens the editor, the same as a press.
             accessibilityActions={ACTIVATION_ACTIONS}
             onAccessibilityAction={event => {
-              if (!disabled && event.nativeEvent.actionName === 'activate') {
+              if (!readOnly && event.nativeEvent.actionName === 'activate') {
                 setEditing(true);
               }
             }}
@@ -210,11 +220,13 @@ function FormField({
             // field rests that control is this preview: a harness that looks the
             // field up by its handle must find it in both states.
             testID={props.testID}
-            // A disabled field has nothing to enter: the press must not open an
-            // editor the field itself would not accept text into.
-            disabled={disabled}
+            // A field that accepts no text has nothing to enter: the press must
+            // not open an editor the field itself would not accept text into.
+            disabled={readOnly}
             onPress={() => {
-              setEditing(true);
+              if (!readOnly) {
+                setEditing(true);
+              }
             }}
             className={cn(
               INPUT_BOX_SHAPE_CLASS,

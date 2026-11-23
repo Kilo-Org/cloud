@@ -1,7 +1,11 @@
 import { translatePush } from './i18n';
 import en from './locales/en.json';
 import { type PushData } from './push-data';
-import { GENERIC_PUSH_TITLE_KEY, SECURITY_LIFECYCLE_BODY_LEAF } from './push-i18n-keys';
+import {
+  GENERIC_PUSH_TITLE_KEY,
+  SECURITY_LIFECYCLE_BODY_LEAF,
+  genericBodyCatalogKey,
+} from './push-i18n-keys';
 
 type GenericBodyLeaf = keyof typeof en.generic.body;
 
@@ -66,6 +70,6 @@ export function genericPushContentForPushData(
   const leaf = GENERIC_BODY_LEAF_BY_TYPE[data.type];
   return {
     title: genericPushTitle(locale),
-    body: translatePush(locale, `generic.body.${leaf}`, undefined, en.generic.body[leaf]),
+    body: translatePush(locale, genericBodyCatalogKey(leaf), undefined, en.generic.body[leaf]),
   };
 }

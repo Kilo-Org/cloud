@@ -243,9 +243,10 @@ function basename(value: unknown): string | null {
   return sessionLiveText(base, SESSION_LIVE_TARGET_LIMIT);
 }
 
-function firstString(input: Record<string, unknown>, keys: readonly string[]): unknown {
+function firstString(input: Record<string, unknown>, keys: readonly string[]): string | null {
   for (const key of keys) {
-    if (typeof input[key] === 'string') return input[key];
+    const value = input[key];
+    if (typeof value === 'string') return value;
   }
   return null;
 }

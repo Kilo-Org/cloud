@@ -1577,8 +1577,12 @@ function scanSource(catalog, root, requiresSourceRoots) {
   const referenced = new Set();
   const keyPrefixes = new Set();
   const destructiveKeys = new Set();
+  // The names a translate call passes a key builder, resolved after the scan so
+  // a builder declared in a file parsed later is still known.
+  const builderNames = new Set();
   let complete = true;
   const { calledKeyOf, keyPrefixOf, collectsDestructiveKeys } = catalog;
+  const builders = new Map();
   for (const sourceRoot of catalog.sourceRoots) {
     if (!existsSync(sourceRoot)) {
       if (requiresSourceRoots) {
@@ -1592,6 +1596,14 @@ function scanSource(catalog, root, requiresSourceRoots) {
       root,
       isTestArtifact
     )) {
+      // A key builder is a function that returns a dotted-head template
+      // literal, such as `` genericBodyCatalogKey `` returning
+      // `` `generic.body.${leaf}` ``. Its head is recorded before the call that
+      // uses it is resolved, so a caller that names the leaf alone still
+      // contributes every key under that head.
+      if (keyPrefixOf !== null) {
+        collectKeyBuilders(program, builders);
+      }
       // A file the parser refused has an empty tree, so its keys would leave
       // both sets without a word. `check:i18n` runs oxlint first, so this
       // normally reports nothing. A read the filesystem refused arrives the
@@ -1627,10 +1639,18 @@ function scanSource(catalog, root, requiresSourceRoots) {
           called.add(found.key);
         }
         const prefix = keyPrefixOf === null ? null : keyPrefixOf(node);
-        if (prefix !== null) {
+        if (typeof prefix === 'string') {
           keyPrefixes.add(prefix);
+        } else if (prefix !== null) {
+          builderNames.add(prefix.builder);
         }
       });
+    }
+  }
+  for (const name of builderNames) {
+    const head = builders.get(name);
+    if (head !== undefined) {
+      keyPrefixes.add(head);
     }
   }
   // A key the source builds from the catalog has no literal of its own, so the
@@ -1713,17 +1733,26 @@ function pushCalledKey(call) {
 }
 
 /**
- * The static head of a `translatePush(locale, key, …)` key built as a template
- * literal, when that head names the dotted parent of the key:
- * `` `generic.body.${leaf}` `` reads `generic.body.`. A table of leaves builds
- * its key this way, so the leaf literals beside it name every key under the
- * head. Any other template literal — `` `${i18nKey}.title` ``, whose head is
- * empty — names no parent and returns null.
+ * The static head of a `translatePush(locale, key, …)` key that names a dotted
+ * parent: `` `generic.body.${leaf}` `` reads `generic.body.`. A table of leaves
+ * builds its key this way, so the leaf literals beside it name every key under
+ * the head. Any other template literal — `` `${i18nKey}.title` ``, whose head
+ * is empty — names no parent and returns null.
+ *
+ * A key the source builds through one small function instead of at the call
+ * site (`genericBodyCatalogKey(leaf)` returning `` `generic.body.${leaf}` ``)
+ * names that builder here, because the caller is scanned before every builder in
+ * the tree is known. `scanSource` resolves the name once the scan finishes, so
+ * the key stays visible to this audit after the derivation moves behind a
+ * function.
  */
 function pushKeyPrefix(call) {
   const value = translatePushKey(call);
   if (value === null) {
     return null;
+  }
+  if (value.type === 'CallExpression') {
+    return value.callee.type === 'Identifier' ? { builder: value.callee.name } : null;
   }
   if (value.type !== 'TemplateLiteral' || value.expressions.length === 0) {
     return null;
@@ -1731,6 +1760,65 @@ function pushKeyPrefix(call) {
   const head = value.quasis[0].value.cooked;
   return typeof head === 'string' && head.endsWith('.') ? head : null;
 }
+
+/**
+ * Record every function in one file that returns a dotted-head template
+ * literal, by the name it is declared under. A declaration, a const arrow and
+ * an expression-bodied arrow all map to the head they prefix:
+ * `function genericBodyCatalogKey(leaf) { return `generic.body.${leaf}`; }`,
+ * `const key = leaf => `generic.body.${leaf}``. A caller's leaf literals then
+ * name every key beneath that head.
+ */
+function collectKeyBuilders(program, builders) {
+  walk(program, node => {
+    if (node.type !== 'FunctionDeclaration' && node.type !== 'VariableDeclarator') {
+      return;
+    }
+    const name = node.type === 'FunctionDeclaration' ? node.id?.name : expressionName(node.id);
+    const fn =
+      node.type === 'FunctionDeclaration'
+        ? node
+        : node.init === null || node.init === undefined
+          ? undefined
+          : unwrap(node.init);
+    if (name === undefined || fn === undefined || !isFunctionNode(fn)) {
+      return;
+    }
+    // An expression body returns its expression; a block body returns from a
+    // statement, so both shapes read the same way here.
+    const expressions =
+      fn.body.type === 'BlockStatement'
+        ? fn.body.body
+            .filter(statement => statement.type === 'ReturnStatement')
+            .map(statement => statement.argument)
+        : [fn.body];
+    for (const expression of expressions) {
+      if (expression === null || expression === undefined) {
+        continue;
+      }
+      const returned = unwrap(expression);
+      if (returned.type !== 'TemplateLiteral' || returned.expressions.length === 0) {
+        continue;
+      }
+      const head = returned.quasis[0].value.cooked;
+      if (typeof head === 'string' && head.endsWith('.')) {
+        builders.set(name, head);
+      }
+    }
+  });
+}
+
+/** The name a declaration binds, when the binding is a plain identifier. */
+function expressionName(node) {
+  const value = node === undefined || node === null ? undefined : unwrap(node);
+  return value?.type === 'Identifier' ? value.name : undefined;
+}
+
+/** Whether a node is a function whose body this scan can read. */
+const isFunctionNode = node =>
+  node.type === 'FunctionDeclaration' ||
+  node.type === 'ArrowFunctionExpression' ||
+  node.type === 'FunctionExpression';
 
 /**
  * Fold a value for the destructive-label comparison: NFC, lower case, one

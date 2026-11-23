@@ -2355,6 +2355,123 @@ test('accepts a leaf table whose built key the source names at runtime', () => {
   assert.deepEqual(found, []);
 });
 
+test('accepts a push key a composer function builds from its leaf', () => {
+  // One small function returns the head, and both the constant and the translate
+  // call take their key from it. The leaf literals are the only place the key is
+  // named, so the dead-key rule must follow the builder too.
+  const found = run({
+    pushEnglish: {
+      generic: {
+        title: 'Kilo',
+        body: {
+          chatMessage: 'You have a new message',
+          scheduledAction: 'A scheduled action has an update',
+        },
+      },
+    },
+    pushTranslated: {
+      generic: {
+        title: 'Kilo',
+        body: {
+          chatMessage: 'Tienes un mensaje nuevo',
+          scheduledAction: 'Una acción programada tiene una actualización',
+        },
+      },
+    },
+    pushSource: [
+      "translatePush(locale, 'generic.title', undefined, 'Kilo');",
+      'function genericBodyCatalogKey(leaf) {',
+      '  return `generic.body.${leaf}`;',
+      '}',
+      "const SECURITY_LEAF = 'scheduledAction';",
+      'const SECURITY_KEY = genericBodyCatalogKey(SECURITY_LEAF);',
+      "const LEAF_BY_TYPE = { 'chat.message': 'chatMessage' };",
+      'const leaf = LEAF_BY_TYPE[type];',
+      'translatePush(locale, genericBodyCatalogKey(leaf), undefined, en.generic.body[leaf]);',
+    ].join('\n'),
+  });
+  assert.deepEqual(found, []);
+});
+
+test('accepts a push key an expression-bodied arrow builds from its leaf', () => {
+  // The same builder as a block-bodied declaration, written as an arrow with an
+  // expression body, must contribute its head too.
+  const found = run({
+    pushEnglish: {
+      generic: {
+        title: 'Kilo',
+        body: {
+          chatMessage: 'You have a new message',
+          scheduledAction: 'A scheduled action has an update',
+        },
+      },
+    },
+    pushTranslated: {
+      generic: {
+        title: 'Kilo',
+        body: {
+          chatMessage: 'Tienes un mensaje nuevo',
+          scheduledAction: 'Una acción programada tiene una actualización',
+        },
+      },
+    },
+    pushSource: [
+      "translatePush(locale, 'generic.title', undefined, 'Kilo');",
+      'const genericBodyCatalogKey = leaf => `generic.body.${leaf}`;',
+      "const SECURITY_LEAF = 'scheduledAction';",
+      'const SECURITY_KEY = genericBodyCatalogKey(SECURITY_LEAF);',
+      "const LEAF_BY_TYPE = { 'chat.message': 'chatMessage' };",
+      'const leaf = LEAF_BY_TYPE[type];',
+      'translatePush(locale, genericBodyCatalogKey(leaf), undefined, en.generic.body[leaf]);',
+    ].join('\n'),
+  });
+  assert.deepEqual(found, []);
+});
+
+test('accepts a builder declared in a file the scan reaches after its caller', () => {
+  // The composer lives in the module that owns the key namespace, and the caller
+  // is another module. The deferred resolution exists for exactly this: the call
+  // is read before the builder's file is parsed.
+  const found = run({
+    pushEnglish: {
+      generic: {
+        title: 'Kilo',
+        body: {
+          chatMessage: 'You have a new message',
+          scheduledAction: 'A scheduled action has an update',
+        },
+      },
+    },
+    pushTranslated: {
+      generic: {
+        title: 'Kilo',
+        body: {
+          chatMessage: 'Tienes un mensaje nuevo',
+          scheduledAction: 'Una acción programada tiene una actualización',
+        },
+      },
+    },
+    pushSource: [
+      "translatePush(locale, 'generic.title', undefined, 'Kilo');",
+      "const SECURITY_LEAF = 'scheduledAction';",
+      'const SECURITY_KEY = genericBodyCatalogKey(SECURITY_LEAF);',
+      "const LEAF_BY_TYPE = { 'chat.message': 'chatMessage' };",
+      'const leaf = LEAF_BY_TYPE[type];',
+      'translatePush(locale, genericBodyCatalogKey(leaf), undefined, en.generic.body[leaf]);',
+    ].join('\n'),
+    extraFiles: {
+      // `zz-` sorts after `push-copy.ts` in the source listing, so the caller is
+      // scanned first.
+      'packages/notifications/src/zz-push-keys.ts': [
+        'export function genericBodyCatalogKey(leaf) {',
+        '  return `generic.body.${leaf}`;',
+        '}',
+      ].join('\n'),
+    },
+  });
+  assert.deepEqual(found, []);
+});
+
 test('rejects a push key under a built head that no leaf names', () => {
   const found = run({
     pushEnglish: {

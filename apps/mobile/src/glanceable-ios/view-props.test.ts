@@ -222,6 +222,7 @@ describe('Home-only presentation and timeline', () => {
       snapshot: snapshotFor([PERMISSION_ROW]),
       details: {
         approvalKey: 'a'.repeat(64),
+        primaryKind: 'needsInput',
         primaryTitle: 'Private title',
         waitingAgents: [{ title: 'Private title', kind: 'permission' }],
         scheduledAgents: [],

@@ -428,7 +428,7 @@ describe('Home-only widget policy', () => {
     const olderDetails: Record<string, unknown> = { ...data.details };
     delete olderDetails.primaryKind;
     const parsed = homeWidgetDataSchema.parse({ snapshot: data.snapshot, details: olderDetails });
-    expect(parsed.details.primaryKind).toBeUndefined();
+    expect(parsed.details.primaryKind).toBeNull();
     expect(parsed.details.primaryTitle).toBe('Approve');
     expect(buildHomeWidgetPresentation(parsed, now).primaryTitle).toBe('Approve');
     // A payload that carries an explicit null kind is the same unknown kind.

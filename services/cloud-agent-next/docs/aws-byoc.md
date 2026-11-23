@@ -82,7 +82,8 @@ public egress, an execution role and another image. Cross-account verification r
 The trusted adapter always selects the configured VPC connector and `NO_INGRESS`, with no execution role or idle policy.
 It verifies the networking and role fields returned by AWS before accepting an allocation.
 
-Launch objects expire after one day. Prepared archives expire 30 days after upload.
+Launch objects expire after one day. A stack created or updated from the current template expires prepared archives
+30 days after upload. An older stack keeps them until you update the stack.
 Kilo stops selecting an archive 29 days after capture, so rebuild the prepared environment before then.
 The launch and archive client cannot read proxy-private prefixes. Launch PUT uses `If-None-Match: *`. Admission deletes the launch object; expiration is a backstop.
 Signed URLs cannot outlive the assumed role credentials. AWS responses and transport errors never enter logs verbatim.

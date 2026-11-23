@@ -4186,7 +4186,7 @@
       "downloadProgress": "Downloaden… {{percent}}%",
       "downloadFailed": "Het downloaden is niet voltooid. Controleer je verbinding en vrije opslagruimte en probeer het opnieuw.",
       "cannotUse": "Dit model kan het volgende niet gebruiken: {{items}}.",
-      "cannotUseOptions": "Dit model kan het volgende niet invullen: {{items}}.",
+      "cannotUseOptions": "Dit model kan sommige opties die een hulpmiddel vraagt niet invullen.",
       "tools": {
         "time": "Tijd",
         "settingsList": "Toon instellingen",

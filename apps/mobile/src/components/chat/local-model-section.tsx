@@ -4,7 +4,7 @@ import { View } from 'react-native';
 import { Text } from '@/components/ui/text';
 import { type NativeAvailability } from '@/lib/chat/native-model-client';
 import { type LocalModelStatus, useLocalModels } from '@/lib/chat/local-models';
-import { toolArgumentDisplayName, toolDisplayName } from '@/lib/chat/tool-display-name';
+import { toolDisplayName } from '@/lib/chat/tool-display-name';
 import { useOfferedTools } from '@/lib/chat/use-offered-tools';
 import { useOrganization } from '@/lib/organization-context';
 
@@ -79,27 +79,21 @@ function LocalModelRow({
       {reasonKey !== undefined && (
         <Text className="text-sm text-muted-foreground">{t(reasonKey)}</Text>
       )}
-      {toolUse.kind === 'some' && toolUse.tools.length > 0 && (
-        <Text
-          testID={`local-model-unusable-${status.provider}`}
-          className="text-sm text-muted-foreground"
-        >
-          {t('modelChat.localModels.cannotUse', {
-            items: toolUse.tools.map(toolDisplayName).join(t('common.listJoiner')),
-          })}
-        </Text>
-      )}
-      {toolUse.kind === 'some' && toolUse.arguments.length > 0 && (
-        <Text
-          testID={`local-model-unusable-arguments-${status.provider}`}
-          className="text-sm text-muted-foreground"
-        >
-          {t('modelChat.localModels.cannotUseOptions', {
-            items: toolUse.arguments
-              .map(one => toolArgumentDisplayName(one.tool, one.argument))
-              .join(t('common.listJoiner')),
-          })}
-        </Text>
+      {toolUse.kind === 'some' && (toolUse.tools.length > 0 || toolUse.option) && (
+        <View className="mt-1 gap-1 border-t-[0.5px] border-hair-soft pt-3">
+          {toolUse.tools.length > 0 && (
+            <Text testID={`local-model-unusable-${status.provider}`} variant="caption">
+              {t('modelChat.localModels.cannotUse', {
+                items: toolUse.tools.map(toolDisplayName).join(t('common.listJoiner')),
+              })}
+            </Text>
+          )}
+          {toolUse.option && (
+            <Text testID={`local-model-unusable-options-${status.provider}`} variant="caption">
+              {t('modelChat.localModels.cannotUseOptions')}
+            </Text>
+          )}
+        </View>
       )}
       <ModelDownloadControl status={status} />
     </View>

@@ -11,11 +11,11 @@ import { type LocalModelStatus } from '@/lib/chat/local-models';
  * The row that says what the selected on-device model cannot run.
  *
  * A model that runs no tool loop runs none of the enabled tools, and a model
- * that runs the loop names exactly what the schema converter leaves out, split
- * in two: whole tools the model never sees, and optional arguments dropped from
- * tools that still reach it. The notes are non-blocking copy: the row keeps its
- * choice, its status and its download control, and adds one muted line per
- * non-empty list.
+ * that runs the loop says exactly what the schema converter leaves out: whole
+ * tools the model never sees, and whether a tool it still receives is missing
+ * an optional argument. The notes are non-blocking copy: the row keeps its
+ * choice, its status and its download control, and adds its lines in one
+ * caption group under a hairline divider.
  */
 
 vi.mock('react-native', () => ({
@@ -27,9 +27,15 @@ vi.mock('react-native', () => ({
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     // A distinctive joiner, so the expectation proves the row joins with the
-    // catalog's separator rather than a literal comma.
-    t: (key: string, values?: { items?: string }) =>
-      key === 'common.listJoiner' ? ' + ' : [key, values?.items ?? ''],
+    // catalog's separator rather than a literal comma. A key asked for without
+    // values stays one string, so a line that passes no payload has a single
+    // string child.
+    t: (key: string, values?: { items?: string }) => {
+      if (key === 'common.listJoiner') {
+        return ' + ';
+      }
+      return values === undefined ? key : [key, values.items ?? ''];
+    },
   }),
 }));
 vi.mock('@/i18n', () => ({ i18n: { t: (key: string) => key, language: 'en' } }));
@@ -47,7 +53,7 @@ vi.mock('@/lib/chat/android-model-download', () => ({ useAndroidModelDownload: (
 
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 
-function rows(statuses: Parameters<typeof LocalModelSection>[0]['statuses']) {
+function mount(statuses: Parameters<typeof LocalModelSection>[0]['statuses']) {
   act(() => {
     renderer = TestRenderer.create(
       createElement(LocalModelSection, { statuses, selectedModel: undefined })
@@ -56,7 +62,28 @@ function rows(statuses: Parameters<typeof LocalModelSection>[0]['statuses']) {
   if (!renderer) {
     throw new Error('Missing renderer');
   }
-  return renderer.root.findAll(node => String(node.props.testID ?? '').startsWith('local-model-'));
+  return renderer.root;
+}
+
+const NOTE_LINE_TEST_ID = 'local-model-unusable-';
+
+/** The caption group each row draws its notes in, under the hairline divider. */
+function noteGroups(root: TestRenderer.ReactTestInstance) {
+  return root.findAll(
+    node =>
+      Object.is(node.type, 'View') && String(node.props.className).includes('border-hair-soft')
+  );
+}
+
+/** The note lines in render order, each as its testID and its child. */
+function noteLines(root: TestRenderer.ReactTestInstance) {
+  return root
+    .findAll(
+      node =>
+        Object.is(node.type, 'Text') &&
+        String(node.props.testID ?? '').startsWith(NOTE_LINE_TEST_ID)
+    )
+    .map(node => [node.props.testID, node.props.children]);
 }
 
 const appleStatus = (toolUse: LocalModelStatus['toolUse']): LocalModelStatus => ({
@@ -84,15 +111,11 @@ afterEach(() => {
 });
 
 describe('the on-device model row', () => {
-  it('names the tools and the arguments the model cannot run, on their own lines', () => {
-    const notes = rows([
-      appleStatus({
-        kind: 'some',
-        tools: ['settings_set'],
-        arguments: [{ tool: 'lookup', argument: 'filter' }],
-      }),
-    ]);
-    expect(notes.map(node => [node.props.testID, node.props.children])).toEqual([
+  it('draws the tools line and the options line in one caption group', () => {
+    const root = mount([appleStatus({ kind: 'some', tools: ['settings_set'], option: true })]);
+    const groups = noteGroups(root);
+    expect(groups).toHaveLength(1);
+    expect(noteLines(root)).toEqual([
       [
         'local-model-unusable-apple',
         [
@@ -102,52 +125,47 @@ describe('the on-device model row', () => {
           isolateBidiText('modelChat.localModels.tools.settingsSet'),
         ],
       ],
+      // The options line carries no payload, so it is one string, not a list.
+      ['local-model-unusable-options-apple', 'modelChat.localModels.cannotUseOptions'],
+    ]);
+    // Both lines belong to the one group, so the divider cannot split them.
+    const lines = noteGroups(root)[0]?.findAll(
+      node =>
+        typeof node.props.testID === 'string' && node.props.testID.startsWith(NOTE_LINE_TEST_ID)
+    );
+    expect(lines?.map(node => node.props.testID)).toEqual([
+      'local-model-unusable-apple',
+      'local-model-unusable-options-apple',
+    ]);
+    expect(lines?.map(node => node.props.variant)).toEqual(['caption', 'caption']);
+  });
+
+  it('joins the tools with the catalog separator, never a literal comma', () => {
+    // Two tools: `join` inserts nothing for one, so a single-item list would
+    // pass whatever separator the row used. The mock's joiner is ` + `, which a
+    // literal comma cannot produce.
+    const root = mount([
+      appleStatus({ kind: 'some', tools: ['time', 'settings_set'], option: true }),
+    ]);
+    expect(noteLines(root)).toEqual([
       [
-        'local-model-unusable-arguments-apple',
+        'local-model-unusable-apple',
         [
-          'modelChat.localModels.cannotUseOptions',
-          // An unknown id stays raw, isolated; the argument rides beside it.
-          isolateBidiText('lookup (filter)'),
+          'modelChat.localModels.cannotUse',
+          [
+            isolateBidiText('modelChat.localModels.tools.time'),
+            isolateBidiText('modelChat.localModels.tools.settingsSet'),
+          ].join(' + '),
         ],
       ],
+      ['local-model-unusable-options-apple', 'modelChat.localModels.cannotUseOptions'],
     ]);
   });
 
-  it('joins each list with the catalog separator, never a literal comma', () => {
-    // Two items on each line: `join` inserts nothing for one, so a single-item
-    // list would pass whatever separator the row used. The mock's joiner is
-    // ` + `, which a literal comma cannot produce.
-    const notes = rows([
-      appleStatus({
-        kind: 'some',
-        tools: ['time', 'settings_set'],
-        arguments: [
-          { tool: 'lookup', argument: 'filter' },
-          { tool: 'mcp_kilo_read-file', argument: 'where.lat' },
-        ],
-      }),
-    ]);
-    expect(notes.map(node => node.props.children)).toEqual([
-      [
-        'modelChat.localModels.cannotUse',
-        [
-          isolateBidiText('modelChat.localModels.tools.time'),
-          isolateBidiText('modelChat.localModels.tools.settingsSet'),
-        ].join(' + '),
-      ],
-      [
-        'modelChat.localModels.cannotUseOptions',
-        [
-          isolateBidiText('lookup (filter)'),
-          isolateBidiText('mcp_kilo_read-file (where.lat)'),
-        ].join(' + '),
-      ],
-    ]);
-  });
-
-  it('draws only the tool line when the model takes every argument', () => {
-    const notes = rows([appleStatus({ kind: 'some', tools: ['settings_list'], arguments: [] })]);
-    expect(notes.map(node => [node.props.testID, node.props.children])).toEqual([
+  it('draws only the tools line when the model can fill in every option', () => {
+    const root = mount([appleStatus({ kind: 'some', tools: ['settings_list'], option: false })]);
+    expect(noteGroups(root)).toHaveLength(1);
+    expect(noteLines(root)).toEqual([
       [
         'local-model-unusable-apple',
         [
@@ -156,25 +174,29 @@ describe('the on-device model row', () => {
         ],
       ],
     ]);
+    expect(
+      root.findAll(node => node.props.testID === 'local-model-unusable-options-apple')
+    ).toEqual([]);
   });
 
-  it('draws only the argument line when every tool still reaches the model', () => {
-    const notes = rows([
-      appleStatus({ kind: 'some', tools: [], arguments: [{ tool: 'lookup', argument: 'filter' }] }),
+  it('draws only the options line when every tool still reaches the model', () => {
+    const root = mount([appleStatus({ kind: 'some', tools: [], option: true })]);
+    expect(noteGroups(root)).toHaveLength(1);
+    expect(noteLines(root)).toEqual([
+      ['local-model-unusable-options-apple', 'modelChat.localModels.cannotUseOptions'],
     ]);
-    expect(notes.map(node => [node.props.testID, node.props.children])).toEqual([
-      [
-        'local-model-unusable-arguments-apple',
-        ['modelChat.localModels.cannotUseOptions', isolateBidiText('lookup (filter)')],
-      ],
-    ]);
+    expect(root.findAll(node => node.props.testID === 'local-model-unusable-apple')).toEqual([]);
   });
 
-  it('draws no note when the model takes every offered tool', () => {
-    expect(rows([appleStatus({ kind: 'none' })])).toEqual([]);
+  it('draws no group when the model takes every offered tool', () => {
+    const root = mount([appleStatus({ kind: 'none' })]);
+    expect(noteGroups(root)).toEqual([]);
+    expect(noteLines(root)).toEqual([]);
   });
 
-  it('draws no note before the model has answered', () => {
-    expect(rows([appleStatus({ kind: 'unknown' })])).toEqual([]);
+  it('draws no group before the model has answered', () => {
+    const root = mount([appleStatus({ kind: 'unknown' })]);
+    expect(noteGroups(root)).toEqual([]);
+    expect(noteLines(root)).toEqual([]);
   });
 });

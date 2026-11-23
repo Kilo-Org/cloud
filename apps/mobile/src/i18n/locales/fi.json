@@ -4186,7 +4186,7 @@
       "downloadProgress": "Ladataan… {{percent}} %",
       "downloadFailed": "Lataus ei valmistunut. Tarkista verkkoyhteys ja vapaa tallennustila ja yritä sitten uudelleen.",
       "cannotUse": "Tämä malli ei voi käyttää: {{items}}.",
-      "cannotUseOptions": "Tämä malli ei voi täyttää: {{items}}.",
+      "cannotUseOptions": "Tämä malli ei voi täyttää joitakin työkalun pyytämiä valintoja.",
       "tools": {
         "time": "Aika",
         "settingsList": "Näytä asetukset",

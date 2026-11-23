@@ -4186,7 +4186,7 @@
       "downloadProgress": "Allalaadimine… {{percent}}%",
       "downloadFailed": "Allalaadimine ei lõppenud. Kontrolli ühendust ja vaba salvestusruumi ning proovi uuesti.",
       "cannotUse": "See mudel ei toeta: {{items}}.",
-      "cannotUseOptions": "See mudel ei toeta täitmist: {{items}}.",
+      "cannotUseOptions": "See mudel ei toeta mõnede tööriista poolt küsitud valikute täitmist.",
       "tools": {
         "time": "Aeg",
         "settingsList": "Näita seadeid",

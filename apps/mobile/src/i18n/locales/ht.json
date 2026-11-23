@@ -4186,7 +4186,7 @@
       "downloadProgress": "Ap telechaje… {{percent}}%",
       "downloadFailed": "Telechajman an pa t fini. Verifye koneksyon w ak espas ki lib sou aparèy la, epi eseye ankò.",
       "cannotUse": "Modèl sa a pa ka itilize: {{items}}.",
-      "cannotUseOptions": "Modèl sa a pa ka ranpli: {{items}}.",
+      "cannotUseOptions": "Modèl sa a pa ka ranpli kèk opsyon yon zouti mande.",
       "tools": {
         "time": "Lè",
         "settingsList": "Montre paramèt",

@@ -4186,7 +4186,7 @@
       "downloadProgress": "Kei te tikiake… {{percent}}%",
       "downloadFailed": "Kāore i oti te tikiake. Tirohia tō hononga me te wāhi rokiroki wātea, kātahi ka ngana anō.",
       "cannotUse": "Kāore e taea e tēnei tauira te whakamahi: {{items}}.",
-      "cannotUseOptions": "Kāore e taea e tēnei tauira te whakakī: {{items}}.",
+      "cannotUseOptions": "Kāore e taea e tēnei tauira te whakakī i ētahi kōwhiringa e tonoa ana e tētahi taputapu.",
       "tools": {
         "time": "Wā",
         "settingsList": "Whakaatu tautuhinga",

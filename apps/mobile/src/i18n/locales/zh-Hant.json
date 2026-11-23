@@ -4186,7 +4186,7 @@
       "downloadProgress": "下載中… {{percent}}%",
       "downloadFailed": "下載未完成。請檢查網路連線和可用儲存空間，然後再試一次。",
       "cannotUse": "此模型無法使用：{{items}}。",
-      "cannotUseOptions": "此模型無法填寫：{{items}}。",
+      "cannotUseOptions": "此模型無法填寫工具要求的某些選項。",
       "tools": {
         "time": "時間",
         "settingsList": "顯示設定",

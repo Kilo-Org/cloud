@@ -4186,7 +4186,7 @@
       "downloadProgress": "Deskargatzen… %{{percent}}",
       "downloadFailed": "Deskarga ez da amaitu. Egiaztatu konexioa eta biltegiratze-toki librea, eta saiatu berriro.",
       "cannotUse": "Eredu honek ezin ditu hauek erabili: {{items}}.",
-      "cannotUseOptions": "Eredu honek ezin ditu hauek bete: {{items}}.",
+      "cannotUseOptions": "Eredu honek ezin ditu tresna batek eskatzen dituen aukera batzuk bete.",
       "tools": {
         "time": "Ordua",
         "settingsList": "Erakutsi ezarpenak",

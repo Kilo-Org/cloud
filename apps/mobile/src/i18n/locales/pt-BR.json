@@ -4334,7 +4334,7 @@
       "downloadProgress": "Baixando… {{percent}}%",
       "downloadFailed": "O download não foi concluído. Verifique sua conexão e o espaço livre e tente novamente.",
       "cannotUse": "Este modelo não pode usar: {{items}}.",
-      "cannotUseOptions": "Este modelo não pode preencher: {{items}}.",
+      "cannotUseOptions": "Este modelo não pode preencher algumas opções que uma ferramenta solicita.",
       "tools": {
         "time": "Hora",
         "settingsList": "Mostrar configurações",

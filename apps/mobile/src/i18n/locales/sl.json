@@ -4334,7 +4334,7 @@
       "downloadProgress": "Prenašanje … {{percent}} %",
       "downloadFailed": "Prenos se ni dokončal. Preverite povezavo in prosti prostor za shranjevanje ter poskusite znova.",
       "cannotUse": "Ta model ne podpira: {{items}}.",
-      "cannotUseOptions": "Ta model ne more izpolniti: {{items}}.",
+      "cannotUseOptions": "Ta model ne more izpolniti nekaterih možnosti, ki jih zahteva orodje.",
       "tools": {
         "time": "Čas",
         "settingsList": "Prikaži nastavitve",

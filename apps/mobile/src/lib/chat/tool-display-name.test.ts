@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { i18n } from '@/i18n';
 import { LTR_ISOLATE_CLOSE } from '@/lib/bidi';
 
-import { toolArgumentDisplayName, toolDisplayName } from './tool-display-name';
+import { toolDisplayName } from './tool-display-name';
 
 afterEach(async () => {
   await i18n.changeLanguage('en');
@@ -55,19 +55,5 @@ describe('toolDisplayName', () => {
     expect(arabic).toBe(`${FSI}${i18n.t('modelChat.webSearch.title')}${LTR_ISOLATE_CLOSE}`);
     expect(arabic.startsWith(FSI)).toBe(true);
     expect(arabic.endsWith(LTR_ISOLATE_CLOSE)).toBe(true);
-  });
-});
-
-describe('toolArgumentDisplayName', () => {
-  it('names the argument beside its tool as one isolated run', async () => {
-    await i18n.changeLanguage('en');
-    expect(toolArgumentDisplayName('time', 'zone')).toBe(`${FSI}Time (zone)${LTR_ISOLATE_CLOSE}`);
-  });
-
-  it('keeps an unknown tool raw inside the pair', async () => {
-    await i18n.changeLanguage('en');
-    expect(toolArgumentDisplayName('mcp_kilo_read-file', 'where.lat')).toBe(
-      `${FSI}mcp_kilo_read-file (where.lat)${LTR_ISOLATE_CLOSE}`
-    );
   });
 });

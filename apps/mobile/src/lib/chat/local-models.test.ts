@@ -15,12 +15,12 @@ vi.mock('./gguf-models', () => ({ ggufModelProvider: undefined }));
 /**
  * What the model can do with the enabled tools.
  *
- * The two lists are the ones the row shows apart: a model that runs no tool
+ * The two facts are the ones the row shows apart: a model that runs no tool
  * loop runs none of the offered tools, and a model that runs the loop names
  * exactly what the schema converter leaves out — the tools it never sees, and
- * the optional arguments of the tools that still reach it. The settings tools
- * are the real case: their `value` argument is a type list, so `settings_set`
- * never reaches a native model.
+ * whether a tool it still receives is missing an optional argument. The
+ * settings tools are the real case: their `value` argument is a type list, so
+ * `settings_set` never reaches a native model.
  */
 const available = (tools: boolean): NativeAvailability => ({
   status: 'available',
@@ -65,7 +65,7 @@ describe('tool use of an on-device model', () => {
     expect(toolUseOf({ ...available(true), tools: undefined }, settings())).toEqual({
       kind: 'some',
       tools: ['settings_list', 'settings_set'],
-      arguments: [],
+      option: false,
     });
   });
 
@@ -74,7 +74,7 @@ describe('tool use of an on-device model', () => {
       toolUseOf({ ...available(false), status: 'unavailable', reason: 'model_not_ready' }, [
         timeTool().definition,
       ])
-    ).toEqual({ kind: 'some', tools: ['time'], arguments: [] });
+    ).toEqual({ kind: 'some', tools: ['time'], option: false });
   });
 
   it('names a name once when two offered tools share it', () => {
@@ -83,41 +83,38 @@ describe('tool use of an on-device model', () => {
         timeTool().definition,
         timeTool().definition,
       ])
-    ).toEqual({ kind: 'some', tools: ['time'], arguments: [] });
+    ).toEqual({ kind: 'some', tools: ['time'], option: false });
   });
 
   it('names only the tool the converter leaves out', () => {
     expect(toolUseOf(available(true), [...settings(), timeTool().definition])).toEqual({
       kind: 'some',
       tools: ['settings_set'],
-      arguments: [],
+      option: false,
     });
   });
 
-  it('names a dropped optional argument by its tool and argument, not as a dead tool', () => {
+  it('says an option is missing without naming a dead tool', () => {
     expect(toolUseOf(available(true), [lookupTool()])).toEqual({
       kind: 'some',
       tools: [],
-      arguments: [{ tool: 'lookup', argument: 'filter' }],
+      option: true,
     });
   });
 
-  it('keeps a dropped tool and a dropped argument in their own lists', () => {
+  it('keeps a dropped tool and a dropped option in their own facts', () => {
     expect(toolUseOf(available(true), [...settings(), lookupTool()])).toEqual({
       kind: 'some',
       tools: ['settings_set'],
-      arguments: [{ tool: 'lookup', argument: 'filter' }],
+      option: true,
     });
   });
 
-  it('names one argument path once when two tools drop it', () => {
+  it('says an option is missing once when two tools each drop one', () => {
     expect(toolUseOf(available(true), [lookupTool('lookup'), lookupTool('other_lookup')])).toEqual({
       kind: 'some',
       tools: [],
-      arguments: [
-        { tool: 'lookup', argument: 'filter' },
-        { tool: 'other_lookup', argument: 'filter' },
-      ],
+      option: true,
     });
   });
 

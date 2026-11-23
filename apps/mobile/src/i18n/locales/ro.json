@@ -4260,7 +4260,7 @@
       "downloadProgress": "Se descarcă… {{percent}}%",
       "downloadFailed": "Descărcarea nu s-a finalizat. Verifică-ți conexiunea și spațiul de stocare liber, apoi încearcă din nou.",
       "cannotUse": "Acest model nu poate rula: {{items}}.",
-      "cannotUseOptions": "Acest model nu poate completa: {{items}}.",
+      "cannotUseOptions": "Acest model nu poate completa unele opțiuni pe care le solicită un instrument.",
       "tools": {
         "time": "Timp",
         "settingsList": "Arată setările",

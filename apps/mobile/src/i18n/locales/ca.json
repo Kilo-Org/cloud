@@ -4260,7 +4260,7 @@
       "downloadProgress": "S'està baixant… {{percent}}%",
       "downloadFailed": "La baixada no s'ha completat. Comprova la connexió i l'espai lliure i torna-ho a provar.",
       "cannotUse": "Aquest model no pot utilitzar: {{items}}.",
-      "cannotUseOptions": "Aquest model no pot emplenar: {{items}}.",
+      "cannotUseOptions": "Aquest model no pot emplenar algunes opcions que demana una eina.",
       "tools": {
         "time": "Hora",
         "settingsList": "Mostra la configuració",

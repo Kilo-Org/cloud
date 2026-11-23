@@ -4186,7 +4186,7 @@
       "downloadProgress": "ښکته کېږي… {{percent}}%",
       "downloadFailed": "ښکته کول بشپړ نه شو. خپل اتصال او خالي ځای وګورئ، بیا هڅه وکړئ.",
       "cannotUse": "دا ماډل دا نشي کارولای: {{items}}.",
-      "cannotUseOptions": "دا ماډل دا نشي ډکولای: {{items}}۔",
+      "cannotUseOptions": "دا ماډل هغه ځینې اختیارونه چې یوه وسیله یې غواړي نشي ډکولای.",
       "tools": {
         "time": "وخت",
         "settingsList": "امستنې ښودل",

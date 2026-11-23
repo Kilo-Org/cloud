@@ -4260,7 +4260,7 @@
       "downloadProgress": "Download in corso… {{percent}}%",
       "downloadFailed": "Il download non è stato completato. Controlla la connessione e lo spazio libero, poi riprova.",
       "cannotUse": "Questo modello non può usare: {{items}}.",
-      "cannotUseOptions": "Questo modello non può compilare: {{items}}.",
+      "cannotUseOptions": "Questo modello non può compilare alcune opzioni richieste da uno strumento.",
       "tools": {
         "time": "Ora",
         "settingsList": "Mostra impostazioni",

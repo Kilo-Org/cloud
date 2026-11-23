@@ -33,7 +33,7 @@ export function toolDisplayName(tool: string): string {
   return isolateBidiText(toolName(tool));
 }
 
-/** The same name without its isolate, for a caller that isolates a longer run. */
+/** The catalog name of a tool, or its raw id when no catalog here names it. */
 function toolName(tool: string): string {
   // Object.hasOwn (not a bare index) so an id that names an inherited member
   // ('constructor', '__proto__') falls through to the raw id instead of handing
@@ -42,13 +42,4 @@ function toolName(tool: string): string {
     ? TOOL_NAME_KEYS[tool as keyof typeof TOOL_NAME_KEYS]
     : undefined;
   return key === undefined ? tool : i18n.t(key);
-}
-
-/**
- * One optional argument of a tool, named as `tool (argument)` and isolated as
- * one run, so the pair reads as a single item in a list and its bracket keeps
- * its place in a right-to-left sentence.
- */
-export function toolArgumentDisplayName(tool: string, argument: string): string {
-  return isolateBidiText(`${toolName(tool)} (${argument})`);
 }

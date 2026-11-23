@@ -4186,7 +4186,7 @@
       "downloadProgress": "Inapakua… {{percent}}%",
       "downloadFailed": "Upakuaji haukukamilika. Angalia muunganisho wako na nafasi ya hifadhi, kisha ujaribu tena.",
       "cannotUse": "Modeli hii haiwezi kutumia: {{items}}.",
-      "cannotUseOptions": "Modeli hii haiwezi kujaza: {{items}}.",
+      "cannotUseOptions": "Modeli hii haiwezi kujaza baadhi ya chaguo zinazoombwa na kifaa.",
       "tools": {
         "time": "Muda",
         "settingsList": "Onyesha mipangilio",

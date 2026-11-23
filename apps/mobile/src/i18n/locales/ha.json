@@ -4186,7 +4186,7 @@
       "downloadProgress": "Ana saukewa… {{percent}}%",
       "downloadFailed": "Saukewar ba ta kammala ba. Duba haɗin intanet ɗinka da sararin ajiya, sannan ka sake gwadawa.",
       "cannotUse": "Wannan samfurin ba zai iya amfani da: {{items}} ba.",
-      "cannotUseOptions": "Wannan samfurin ba zai iya cika: {{items}} ba.",
+      "cannotUseOptions": "Wannan samfurin ba zai iya cika wasu zaɓuɓɓukan da kayan aiki ke nema ba.",
       "tools": {
         "time": "Lokaci",
         "settingsList": "Nuna saituna",

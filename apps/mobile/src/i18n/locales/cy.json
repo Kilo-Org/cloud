@@ -4482,7 +4482,7 @@
       "downloadProgress": "Wrthi'n llwytho i lawr… {{percent}}%",
       "downloadFailed": "Ni orffennodd y llwytho i lawr. Gwiriwch eich cysylltiad a'ch lle storio, yna rhowch gynnig arall arni.",
       "cannotUse": "Ni all y model hwn ddefnyddio: {{items}}.",
-      "cannotUseOptions": "Ni all y model hwn lenwi: {{items}}.",
+      "cannotUseOptions": "Ni all y model hwn lenwi rhai opsiynau y mae offeryn yn gofyn amdanynt.",
       "tools": {
         "time": "Amser",
         "settingsList": "Dangos gosodiadau",

@@ -4186,7 +4186,7 @@
       "downloadProgress": "Iyadawuniloda… {{percent}}%",
       "downloadFailed": "Ukudawuniloda akuqedanga. Hlola uxhumano lwakho nendawo yokugcina ekhululekile, bese uzama futhi.",
       "cannotUse": "Le modeli ayikwazi ukusebenzisa: {{items}}.",
-      "cannotUseOptions": "Le modeli ayikwazi ukugcwalisa: {{items}}.",
+      "cannotUseOptions": "Le modeli ayikwazi ukugcwalisa ezinye izinketho ezicelwa ithuluzi.",
       "tools": {
         "time": "Isikhathi",
         "settingsList": "Bonisa izilungiselelo",

@@ -4186,7 +4186,7 @@
       "downloadProgress": "Memuat turun… {{percent}}%",
       "downloadFailed": "Muat turun tidak selesai. Semak sambungan dan ruang storan kosong anda, kemudian cuba lagi.",
       "cannotUse": "Model ini tidak boleh menggunakan: {{items}}.",
-      "cannotUseOptions": "Model ini tidak boleh mengisi: {{items}}.",
+      "cannotUseOptions": "Model ini tidak boleh mengisi sesetengah pilihan yang diminta oleh alat.",
       "tools": {
         "time": "Masa",
         "settingsList": "Tunjuk tetapan",

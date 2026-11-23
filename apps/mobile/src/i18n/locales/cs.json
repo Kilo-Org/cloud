@@ -4334,7 +4334,7 @@
       "downloadProgress": "Stahování… {{percent}} %",
       "downloadFailed": "Stahování se nedokončilo. Zkontrolujte připojení a volné místo v úložišti a zkuste to znovu.",
       "cannotUse": "Tento model nemůže použít: {{items}}.",
-      "cannotUseOptions": "Tento model nemůže vyplnit: {{items}}.",
+      "cannotUseOptions": "Tento model nemůže vyplnit některé možnosti, které nástroj požaduje.",
       "tools": {
         "time": "Čas",
         "settingsList": "Zobrazit nastavení",

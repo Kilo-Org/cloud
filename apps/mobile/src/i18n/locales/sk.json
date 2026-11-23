@@ -4334,7 +4334,7 @@
       "downloadProgress": "Sťahuje sa… {{percent}} %",
       "downloadFailed": "Sťahovanie sa nedokončilo. Skontrolujte pripojenie a voľné miesto v úložisku a skúste to znova.",
       "cannotUse": "Tento model nemôže používať: {{items}}.",
-      "cannotUseOptions": "Tento model nemôže vyplniť: {{items}}.",
+      "cannotUseOptions": "Tento model nemôže vyplniť niektoré možnosti, ktoré nástroj vyžaduje.",
       "tools": {
         "time": "Čas",
         "settingsList": "Zobraziť nastavenia",

@@ -4186,7 +4186,7 @@
       "downloadProgress": "İndiriliyor… %{{percent}}",
       "downloadFailed": "İndirme tamamlanamadı. Bağlantınızı ve boş depolama alanınızı kontrol edip yeniden deneyin.",
       "cannotUse": "Bu model şunları kullanamaz: {{items}}.",
-      "cannotUseOptions": "Bu model şunları dolduramaz: {{items}}.",
+      "cannotUseOptions": "Bu model bir aracın istediği bazı seçenekleri dolduramaz.",
       "tools": {
         "time": "Saat",
         "settingsList": "Ayarları göster",

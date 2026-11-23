@@ -4186,7 +4186,7 @@
       "downloadProgress": "Yuklab olinmoqda… {{percent}}%",
       "downloadFailed": "Yuklab olish tugallanmadi. Internet aloqasi va bo‘sh xotirani tekshirib, qayta urining.",
       "cannotUse": "Ushbu model quyidagilardan foydalana olmaydi: {{items}}.",
-      "cannotUseOptions": "Ushbu model quyidagilarni to‘ldira olmaydi: {{items}}.",
+      "cannotUseOptions": "Ushbu model asbob so‘raydigan ba’zi variantlarni to‘ldira olmaydi.",
       "tools": {
         "time": "Vaqt",
         "settingsList": "Sozlamalarni ko‘rsatish",

@@ -4186,7 +4186,7 @@
       "downloadProgress": "Na-ebudata… {{percent}}%",
       "downloadFailed": "Nbudata ahụ emezughị. Lelee njikọ gị na ebe nchekwa tọgbọrọ chakoo, wee nwaa ọzọ.",
       "cannotUse": "Ihe nlereanya a enweghị ike iji: {{items}}.",
-      "cannotUseOptions": "Ihe nlereanya a enweghị ike ịdejupụta: {{items}}.",
+      "cannotUseOptions": "Ihe nlereanya a enweghị ike ịdejupụta ụfọdụ nhọrọ nke ngwá ọrụ na-arịọ.",
       "tools": {
         "time": "Oge",
         "settingsList": "Gosi ntọala",

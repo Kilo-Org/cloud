@@ -4186,7 +4186,7 @@
       "downloadProgress": "Ó ń gbà sílẹ̀… {{percent}}%",
       "downloadFailed": "Ìgbàsílẹ̀ náà kò parí. Ṣàyẹ̀wò ìsopọ̀ rẹ àti àyè ìpamọ́ tó ṣófo, lẹ́yìn náà gbìyànjú lẹ́ẹ̀kan sí i.",
       "cannotUse": "Awoṣe yìí kò lè lo: {{items}}.",
-      "cannotUseOptions": "Awoṣe yìí kò lè kún: {{items}}.",
+      "cannotUseOptions": "Awoṣe yìí kò lè kún àwọn àṣàyàn kan tí irinṣẹ́ kan béèrè.",
       "tools": {
         "time": "Àkókò",
         "settingsList": "Fi ètò hàn",

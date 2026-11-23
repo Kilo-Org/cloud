@@ -4260,7 +4260,7 @@
       "downloadProgress": "Preuzimanje… {{percent}}%",
       "downloadFailed": "Preuzimanje nije završeno. Proverite vezu i slobodan prostor, pa pokušajte ponovo.",
       "cannotUse": "Ovaj model ne može da koristi: {{items}}.",
-      "cannotUseOptions": "Ovaj model ne može da popuni: {{items}}.",
+      "cannotUseOptions": "Ovaj model ne može da popuni neke opcije koje alat zahteva.",
       "tools": {
         "time": "Vreme",
         "settingsList": "Prikaži podešavanja",

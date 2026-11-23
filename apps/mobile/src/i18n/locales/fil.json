@@ -4186,7 +4186,7 @@
       "downloadProgress": "Nagda-download… {{percent}}%",
       "downloadFailed": "Hindi natapos ang pag-download. Tingnan ang iyong koneksyon at bakanteng storage, pagkatapos ay subukang muli.",
       "cannotUse": "Hindi magagamit ng modelong ito ang: {{items}}.",
-      "cannotUseOptions": "Hindi mapupunan ng modelong ito ang: {{items}}.",
+      "cannotUseOptions": "Hindi mapupunan ng modelong ito ang ilang opsyon na hinihiling ng isang tool.",
       "tools": {
         "time": "Oras",
         "settingsList": "Ipakita ang mga setting",

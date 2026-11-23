@@ -4186,7 +4186,7 @@
       "downloadProgress": "በመውረድ ላይ… {{percent}}%",
       "downloadFailed": "ማውረዱ አልተጠናቀቀም። ግንኙነትዎን እና ነፃ የማከማቻ ቦታዎን ያረጋግጡ፣ ከዚያ እንደገና ይሞክሩ።",
       "cannotUse": "ይህ ሞዴል የሚከተሉትን መጠቀም አይችልም፦ {{items}}።",
-      "cannotUseOptions": "ይህ ሞዴል የሚከተሉትን መሙላት አይችልም፦ {{items}}።",
+      "cannotUseOptions": "ይህ ሞዴል አንድ መሣሪያ የሚጠይቃቸውን አንዳንድ አማራጮች መሙላት አይችልም።",
       "tools": {
         "time": "ጊዜ",
         "settingsList": "ቅንብሮችን አሳይ",

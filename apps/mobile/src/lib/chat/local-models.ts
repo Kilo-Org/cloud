@@ -39,24 +39,20 @@ type SystemProvider = Exclude<LocalProvider, 'gguf'>;
  * What one model can do with the tools the person enabled.
  *
  * `unknown` is the store's own answer before anyone has handed it the offered
- * tools; `none` is a model that takes every tool it is offered; `some` names
- * what this model cannot run. The two lists stay apart because they say
- * different things: a tool in `tools` never reaches the model, while an
- * argument in `arguments` is one optional field dropped from a tool the model
- * still receives.
+ * tools; `none` is a model that takes every tool it is offered; `some` says
+ * what this model cannot run. The two facts stay apart because they say
+ * different things: a name in `tools` is a whole tool the model never sees,
+ * while `option` says a tool it does receive is missing an optional argument.
  */
 export type LocalModelToolUse =
   | { readonly kind: 'unknown' }
   | { readonly kind: 'none' }
   | {
       readonly kind: 'some';
-      /** Whole tools the model never sees. */
+      /** Whole tools the model never sees. Empty when only an option is affected. */
       readonly tools: readonly string[];
-      /** One optional argument dropped from a tool that still reaches the model. */
-      readonly arguments: readonly {
-        readonly tool: string;
-        readonly argument: string;
-      }[];
+      /** One optional argument of a tool the model still receives cannot be set. */
+      readonly option: boolean;
     };
 
 /** What the settings sheet and the model picker show for one system provider. */
@@ -208,12 +204,11 @@ function statusesOf(): readonly LocalModelStatus[] {
  * Only a check that has not answered is `unknown`: before the answer there is
  * nothing to say. Every settled answer is one of two facts. A model that runs
  * no tool loop runs none of the offered tools, whatever their schemas look
- * like, so every tool it is offered is left out and no argument is. A model
- * that runs the loop names only what the converter leaves out, split into the
- * tools it never sees and the optional arguments it sees a tool without.
+ * like, so every tool it is offered is left out and no option is. A model that
+ * runs the loop names only what the converter leaves out: the tools it never
+ * sees, and whether it sees any tool without one of its optional arguments.
  *
- * A name appears once in each list, in the order the offered tools put it: two
- * tools can leave out the same argument path, and the copy names it once.
+ * A tool name appears once, in the order the offered tools put it.
  */
 export function toolUseOf(
   availability: NativeAvailability | undefined,
@@ -228,13 +223,12 @@ export function toolUseOf(
       : {
           kind: 'some',
           tools: [...new Set(offered.map(tool => tool.name))],
-          arguments: [],
+          option: false,
         };
   }
   const tools: string[] = [];
   const toolNames = new Set<string>();
-  const dropped: { tool: string; argument: string }[] = [];
-  const argumentPaths = new Set<string>();
+  let option = false;
   for (const omission of omittedTools(offeredTools(offered))) {
     if (omission.kind === 'tool') {
       if (!toolNames.has(omission.tool)) {
@@ -242,17 +236,10 @@ export function toolUseOf(
         tools.push(omission.tool);
       }
     } else {
-      // The argument belongs to its tool, so two tools may drop the same path.
-      const path = `${omission.tool}\u0000${omission.argument}`;
-      if (!argumentPaths.has(path)) {
-        argumentPaths.add(path);
-        dropped.push({ tool: omission.tool, argument: omission.argument });
-      }
+      option = true;
     }
   }
-  return tools.length === 0 && dropped.length === 0
-    ? { kind: 'none' }
-    : { kind: 'some', tools, arguments: dropped };
+  return tools.length === 0 && !option ? { kind: 'none' } : { kind: 'some', tools, option };
 }
 
 statuses = statusesOf();

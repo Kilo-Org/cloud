@@ -4186,7 +4186,7 @@
       "downloadProgress": "Waa la soo dejinayaa… {{percent}}%",
       "downloadFailed": "Soo dejintu ma dhammaan. Hubi xiriirkaaga iyo meesha bannaan ee kaydka, kadibna isku day mar kale.",
       "cannotUse": "Moodeelkan ma isticmaali karo: {{items}}.",
-      "cannotUseOptions": "Moodeelkan ma buuxin karo: {{items}}.",
+      "cannotUseOptions": "Moodeelkan ma buuxin karo qaar ka mid ah xulashooyinka ay qalabku codsado.",
       "tools": {
         "time": "Waqti",
         "settingsList": "Muuji dejinta",

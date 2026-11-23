@@ -4334,7 +4334,7 @@
       "downloadProgress": "Pobieranie… {{percent}}%",
       "downloadFailed": "Pobieranie nie zostało ukończone. Sprawdź połączenie i wolne miejsce w pamięci, a potem spróbuj ponownie.",
       "cannotUse": "Ten model nie obsługuje: {{items}}.",
-      "cannotUseOptions": "Ten model nie może wypełnić: {{items}}.",
+      "cannotUseOptions": "Ten model nie może wypełnić niektórych opcji, o które prosi narzędzie.",
       "tools": {
         "time": "Czas",
         "settingsList": "Pokaż ustawienia",

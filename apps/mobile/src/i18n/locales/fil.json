@@ -4702,6 +4702,7 @@
       "emptyDescription": "Lalabas dito ang mga pagbili, resibo, at paggamit ng credit.",
       "emptyTitle": "Walang kasaysayan ng credit",
       "expiredGrant": "Nag-expire: {{description}}",
+      "expiredStatus": "Nag-expire",
       "googlePlayReceipt": "Resibo mula sa Google Play",
       "kind": {
         "adjustment": "Adjustment",
@@ -4728,7 +4729,8 @@
       "receiptA11y": "Buksan ang resibo para sa {{description}}, {{amount}}, mula noong {{date}}",
       "receiptUnavailable": "Walang available na resibo para sa pagbiling ito.",
       "retentionLimit": "Ipinapakita ang pinakabagong kasaysayan ng credit.",
-      "voidedGrant": "Kinansela: {{description}}"
+      "voidedGrant": "Kinansela: {{description}}",
+      "voidedStatus": "Kinansela"
     },
     "title": "Bumili ng kredito",
     "description": "Ang kredito ay isang besesang pagbili na idinaragdag sa iyong Kilo balance para sa pagpapatakbo ng mga AI coding session sa Kilo App. Sinisingil ng store ang iyong account at idinaragdag ang kredito pagkatapos kumpirmahin ng store ang bayad.",

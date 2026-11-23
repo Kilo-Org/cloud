@@ -4702,6 +4702,7 @@
       "emptyDescription": "Kjøp av kreditter, kvitteringer og forbruk vises her.",
       "emptyTitle": "Ingen kreditthistorikk",
       "expiredGrant": "Utløpt: {{description}}",
+      "expiredStatus": "Utløpt",
       "googlePlayReceipt": "Kvittering fra Google Play",
       "kind": {
         "adjustment": "Justering",
@@ -4728,7 +4729,8 @@
       "receiptA11y": "Åpne kvitteringen for {{description}}, {{amount}}, fra {{date}}",
       "receiptUnavailable": "Det finnes ingen kvittering for dette kjøpet.",
       "retentionLimit": "Viser den nyeste kreditthistorikken.",
-      "voidedGrant": "Annullert: {{description}}"
+      "voidedGrant": "Annullert: {{description}}",
+      "voidedStatus": "Annullert"
     },
     "title": "Kjøp kreditter",
     "description": "Kreditter er et engangskjøp som legges til Kilo-saldoen din for å kjøre AI-kodeøkter i Kilo App. Butikken belaster kontoen din, og kredittene legges til etter at butikken bekrefter betalingen.",

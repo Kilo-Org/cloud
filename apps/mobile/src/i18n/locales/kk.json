@@ -4702,6 +4702,7 @@
       "emptyDescription": "Кредит сатып алулары, түбіртектер және пайдалану осында көрсетіледі.",
       "emptyTitle": "Кредиттер тарихы жоқ",
       "expiredGrant": "Мерзімі өтті: {{description}}",
+      "expiredStatus": "Мерзімі өтті",
       "googlePlayReceipt": "Google Play түбіртегі",
       "kind": {
         "adjustment": "Түзету",
@@ -4728,7 +4729,8 @@
       "receiptA11y": "Түбіртекті ашу: {{description}}, {{amount}}, {{date}} күні",
       "receiptUnavailable": "Бұл сатып алу үшін түбіртек қолжетімді емес.",
       "retentionLimit": "Кредиттердің ең соңғы тарихы көрсетілуде.",
-      "voidedGrant": "Күші жойылды: {{description}}"
+      "voidedGrant": "Күші жойылды: {{description}}",
+      "voidedStatus": "Күші жойылды"
     },
     "title": "Кредит сатып алу",
     "description": "Кредиттер — Kilo App-те AI бағдарламалау сессияларын жүргізу үшін Kilo балансына қосылатын бір реттік сатып алу. Дүкен шотыңыздан ақша алады және дүкен төлемді растағаннан кейін кредиттер қосылады.",

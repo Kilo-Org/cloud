@@ -4702,6 +4702,7 @@
       "emptyDescription": "क्रेडिट खरेदी, पावत्या आणि वापर येथे दिसतील.",
       "emptyTitle": "क्रेडिट इतिहास नाही",
       "expiredGrant": "कालबाह्य: {{description}}",
+      "expiredStatus": "कालबाह्य",
       "googlePlayReceipt": "Google Play कडून पावती",
       "kind": {
         "adjustment": "समायोजन",
@@ -4728,7 +4729,8 @@
       "receiptA11y": "{{description}}, {{amount}}, {{date}} ची पावती उघडा",
       "receiptUnavailable": "या खरेदीसाठी पावती उपलब्ध नाही.",
       "retentionLimit": "सर्वात अलीकडचा क्रेडिट इतिहास दाखवला जात आहे.",
-      "voidedGrant": "रद्द केले: {{description}}"
+      "voidedGrant": "रद्द केले: {{description}}",
+      "voidedStatus": "रद्द केले"
     },
     "title": "क्रेडिट्स खरेदी करा",
     "description": "क्रेडिट्स ही Kilo App मध्ये AI कोडिंग सत्रे चालवण्यासाठी तुमच्या Kilo शिल्लकीत जोडली जाणारी एक-वेळची खरेदी आहे. स्टोअर तुमच्या खात्यातून शुल्क घेते आणि स्टोअर पेमेंटची पुष्टी केल्यानंतर क्रेडिट्स जोडली जातात.",

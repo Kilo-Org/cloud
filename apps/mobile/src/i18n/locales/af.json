@@ -4702,6 +4702,7 @@
       "emptyDescription": "Kredietaankope, kwitansies en gebruik sal hier verskyn.",
       "emptyTitle": "Geen kredietgeskiedenis nie",
       "expiredGrant": "Verval: {{description}}",
+      "expiredStatus": "Verval",
       "googlePlayReceipt": "Kwitansie van Google Play",
       "kind": {
         "adjustment": "Aanpassing",
@@ -4728,7 +4729,8 @@
       "receiptA11y": "Maak die kwitansie vir {{description}}, {{amount}}, vanaf {{date}} oop",
       "receiptUnavailable": "Geen kwitansie is vir hierdie aankoop beskikbaar nie.",
       "retentionLimit": "Die mees onlangse kredietgeskiedenis word gewys.",
-      "voidedGrant": "Nietig gemaak: {{description}}"
+      "voidedGrant": "Nietig gemaak: {{description}}",
+      "voidedStatus": "Nietig gemaak"
     },
     "title": "Koop krediete",
     "description": "Krediete is 'n eenmalige aankoop wat by jou Kilo-saldo gevoeg word om AI-koderingsessies in Kilo App te laat loop. Die winkel hef jou rekening en krediete word bygevoeg nadat die winkel betaling bevestig.",

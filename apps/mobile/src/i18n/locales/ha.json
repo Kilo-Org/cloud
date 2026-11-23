@@ -4702,6 +4702,7 @@
       "emptyDescription": "Sayayyar kiredit, rasitai, da amfani za su bayyana a nan.",
       "emptyTitle": "Babu tarihin kiredit",
       "expiredGrant": "Lokaci ya ƙare: {{description}}",
+      "expiredStatus": "Lokaci ya ƙare",
       "googlePlayReceipt": "Rasiti daga Google Play",
       "kind": {
         "adjustment": "Gyara",
@@ -4728,7 +4729,8 @@
       "receiptA11y": "Buɗe rasitin {{description}}, {{amount}}, daga {{date}}",
       "receiptUnavailable": "Babu rasiti don wannan sayayya.",
       "retentionLimit": "Ana nuna tarihin kiredit na baya-bayan nan.",
-      "voidedGrant": "An soke: {{description}}"
+      "voidedGrant": "An soke: {{description}}",
+      "voidedStatus": "An soke"
     },
     "title": "Sayi kuɗin amfani",
     "description": "Kuɗin amfani saye ne na lokaci ɗaya da ake ƙarawa a ma'aunin Kilo naka don gudanar da zaman shirye-shiryen AI a cikin Kilo App. Shagon yana cajin asusunka kuma ana ƙara kuɗin amfani bayan shagon ya tabbatar da biyan kuɗi.",

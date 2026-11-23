@@ -4702,6 +4702,7 @@
       "emptyDescription": "Acha kredi, resi, ak itilizasyon ap parèt isit la.",
       "emptyTitle": "Pa gen istorik kredi",
       "expiredGrant": "Ekspire: {{description}}",
+      "expiredStatus": "Ekspire",
       "googlePlayReceipt": "Resi ki nan Google Play",
       "kind": {
         "adjustment": "Ajisteman",
@@ -4728,7 +4729,8 @@
       "receiptA11y": "Louvri resi pou {{description}}, {{amount}}, soti {{date}}",
       "receiptUnavailable": "Pa gen resi disponib pou acha sa a.",
       "retentionLimit": "Sa yo se istorik kredi ki pi resan an.",
-      "voidedGrant": "Anile: {{description}}"
+      "voidedGrant": "Anile: {{description}}",
+      "voidedStatus": "Anile"
     },
     "title": "Achte kredi",
     "description": "Kredi se yon acha yon sèl fwa ki ajoute nan balans Kilo ou pou kouri sesyon kodaj AI nan Kilo App. Magazen an chaje kont ou epi kredi yo ajoute apre magazen an konfime peman an.",

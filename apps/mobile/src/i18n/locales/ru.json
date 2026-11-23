@@ -4872,6 +4872,7 @@
       "emptyDescription": "Здесь появятся покупки кредитов, чеки и расход.",
       "emptyTitle": "Истории кредитов нет",
       "expiredGrant": "Срок истёк: {{description}}",
+      "expiredStatus": "Срок истёк",
       "googlePlayReceipt": "Чек в Google Play",
       "kind": {
         "adjustment": "Корректировка",
@@ -4898,7 +4899,8 @@
       "receiptA11y": "Открыть чек: {{description}}, {{amount}}, от {{date}}",
       "receiptUnavailable": "Чек для этой покупки недоступен.",
       "retentionLimit": "Показана последняя история кредитов.",
-      "voidedGrant": "Аннулирован: {{description}}"
+      "voidedGrant": "Аннулирован: {{description}}",
+      "voidedStatus": "Аннулирован"
     },
     "title": "Купить кредиты",
     "description": "Кредиты — это разовая покупка, которая добавляется на ваш баланс Kilo для проведения ИИ-сессий кодинга в Kilo App. Магазин списывает средства с вашего аккаунта, и кредиты начисляются после подтверждения оплаты магазином.",

@@ -4702,6 +4702,7 @@
       "emptyDescription": "ක්‍රෙඩිට් මිලදී ගැනීම්, රිසිට්පත් සහ භාවිතය මෙහි දිස් වේ.",
       "emptyTitle": "ක්‍රෙඩිට් ඉතිහාසයක් නැත",
       "expiredGrant": "කල් ඉකුත් වී ඇත: {{description}}",
+      "expiredStatus": "කල් ඉකුත් වී ඇත",
       "googlePlayReceipt": "Google Play වෙතින් ලැබුණු රිසිට්පත",
       "kind": {
         "adjustment": "ගැලපීම",
@@ -4728,7 +4729,8 @@
       "receiptA11y": "{{description}}, {{amount}}, {{date}} සඳහා රිසිට්පත විවෘත කරන්න",
       "receiptUnavailable": "මෙම මිලදී ගැනීම සඳහා රිසිට්පතක් නොමැත.",
       "retentionLimit": "නවතම ක්‍රෙඩිට් ඉතිහාසය පෙන්වයි.",
-      "voidedGrant": "අවලංගු කර ඇත: {{description}}"
+      "voidedGrant": "අවලංගු කර ඇත: {{description}}",
+      "voidedStatus": "අවලංගු කර ඇත"
     },
     "title": "ක්‍රෙඩිට් මිලදී ගන්න",
     "description": "ක්‍රෙඩිට් යනු Kilo App හි AI කේතීකරණ සැසි ක්‍රියාත්මක කිරීම සඳහා ඔබේ Kilo ශේෂයට එක් කරන එක්-වරක් මිලදී ගැනීමකි. ගබඩාව ඔබේ ගිණුමෙන් අය කරන අතර ගබඩාව ගෙවීම තහවුරු කිරීමෙන් පසු ක්‍රෙඩිට් එක් කෙරේ.",

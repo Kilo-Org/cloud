@@ -4872,6 +4872,7 @@
       "emptyDescription": "Tukaj bodo prikazani nakupi kreditov, potrdila in poraba.",
       "emptyTitle": "Ni zgodovine kreditov",
       "expiredGrant": "Poteklo: {{description}}",
+      "expiredStatus": "Poteklo",
       "googlePlayReceipt": "Potrdilo iz trgovine Google Play",
       "kind": {
         "adjustment": "Prilagoditev",
@@ -4898,7 +4899,8 @@
       "receiptA11y": "Odpri potrdilo za {{description}}, {{amount}}, z dne {{date}}",
       "receiptUnavailable": "Potrdilo za ta nakup ni na voljo.",
       "retentionLimit": "Prikazana je najnovejša zgodovina kreditov.",
-      "voidedGrant": "Razveljavljeno: {{description}}"
+      "voidedGrant": "Razveljavljeno: {{description}}",
+      "voidedStatus": "Razveljavljeno"
     },
     "title": "Kupi kredite",
     "description": "Krediti so enkraten nakup, ki se doda tvojemu Kilo stanju za izvajanje sej kodiranja z umetno inteligenco v aplikaciji Kilo. Trgovina obremeni tvoj račun in krediti se dodajo, ko trgovina potrdi plačilo.",

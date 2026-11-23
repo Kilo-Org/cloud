@@ -4702,6 +4702,7 @@
       "emptyDescription": "کڕین، پسوولە و بەکارهێنانی کرێدیت لێرە دەردەکەون.",
       "emptyTitle": "هیچ مێژوویەکی کرێدیت نییە",
       "expiredGrant": "بەسەرچوو: {{description}}",
+      "expiredStatus": "بەسەرچوو",
       "googlePlayReceipt": "پسوولە لە Google Play",
       "kind": {
         "adjustment": "ڕێکخستنەوە",
@@ -4728,7 +4729,8 @@
       "receiptA11y": "کردنەوەی پسوولەی {{description}}، {{amount}}، لە {{date}}",
       "receiptUnavailable": "هیچ پسوولەیەک بۆ ئەم کڕینە بەردەست نییە.",
       "retentionLimit": "نوێترین مێژووی کرێدیت پیشان دەدرێت.",
-      "voidedGrant": "پووچەڵ کراوە: {{description}}"
+      "voidedGrant": "پووچەڵ کراوە: {{description}}",
+      "voidedStatus": "پووچەڵ کراوە"
     },
     "title": "کرێدیت بکڕە",
     "description": "کرێدیت کڕینێکی یەکجارە کە بۆ تەوازنی Kiloت زیاد دەکرێت بۆ بەڕێوەبردنی دانیشتنەکانی کۆدکردنی AI لە ئەپی Kilo. فرۆشگا پارە لە هەژمارەکەت وەردەگرێت و کرێدیت دوای پشتڕاستکردنەوەی پارەدان لەلایەن فرۆشگاوە زیاد دەکرێت.",

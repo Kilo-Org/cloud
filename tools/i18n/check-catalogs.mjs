@@ -119,6 +119,7 @@ const TWO_SENSE_COPY = new Map([
     'receipt',
     'the confirmation a moderation report produces, versus the proof of payment for a credit purchase',
   ],
+  ['expired', 'the state of a native-remote command delivery, versus the state of a credit grant'],
   ['block', 'the verb, block a discussion participant, versus the reviewer decision to block'],
   ['merge', 'the verb in the merge section header, versus the name of the merge method on a badge'],
   ['review', 'the noun, a review, versus the verb in the onboarding step'],

@@ -4872,6 +4872,7 @@
       "emptyDescription": "Тут з’являтимуться покупки кредитів, квитанції та використання.",
       "emptyTitle": "Історії кредитів немає",
       "expiredGrant": "Термін дії минув: {{description}}",
+      "expiredStatus": "Термін дії минув",
       "googlePlayReceipt": "Квитанція в Google Play",
       "kind": {
         "adjustment": "Коригування",
@@ -4898,7 +4899,8 @@
       "receiptA11y": "Відкрити квитанцію для {{description}}, {{amount}}, від {{date}}",
       "receiptUnavailable": "Квитанція для цієї покупки недоступна.",
       "retentionLimit": "Показано найновішу історію кредитів.",
-      "voidedGrant": "Анульовано: {{description}}"
+      "voidedGrant": "Анульовано: {{description}}",
+      "voidedStatus": "Анульовано"
     },
     "title": "Купити кредити",
     "description": "Кредити — це разова покупка, яка додається на ваш баланс Kilo для запуску AI-сесій кодування в Kilo App. Магазин списує кошти з вашого акаунта, і кредити нараховуються після підтвердження оплати магазином.",

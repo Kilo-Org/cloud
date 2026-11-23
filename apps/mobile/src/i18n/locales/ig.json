@@ -4702,6 +4702,7 @@
       "emptyDescription": "Ịzụ kredit, rịsịt, na ojiji ga-apụta ebe a.",
       "emptyTitle": "Enweghị akụkọ kredit",
       "expiredGrant": "Oge agwụla: {{description}}",
+      "expiredStatus": "Oge agwụla",
       "googlePlayReceipt": "Rịsịt sitere na Google Play",
       "kind": {
         "adjustment": "Mmezi",
@@ -4728,7 +4729,8 @@
       "receiptA11y": "Mepee rịsịt maka {{description}}, {{amount}}, site na {{date}}",
       "receiptUnavailable": "Enweghị rịsịt maka ihe a zụrụ a.",
       "retentionLimit": "Na-egosi akụkọ kredit kachasị ọhụrụ.",
-      "voidedGrant": "E kagbuola: {{description}}"
+      "voidedGrant": "E kagbuola: {{description}}",
+      "voidedStatus": "E kagbuola"
     },
     "title": "Zụta ego ojiji",
     "description": "Ego ojiji bụ azụmahịa otu oge nke a na-agbakwunye na nguzozi Kilo gị maka ịgba nnọkọ ịde koodu AI na Kilo App. Ụlọ ahịa na-akwụ ụgwọ na akaụntụ gị, a na-agbakwunye ego ojiji mgbe ụlọ ahịa kwadoro ịkwụ ụgwọ ahụ.",

@@ -4787,6 +4787,7 @@
       "emptyDescription": "Ovdje će se prikazivati kupnje kredita, računi i potrošnja.",
       "emptyTitle": "Nema povijesti kredita",
       "expiredGrant": "Isteklo: {{description}}",
+      "expiredStatus": "Isteklo",
       "googlePlayReceipt": "Račun iz trgovine Google Play",
       "kind": {
         "adjustment": "Prilagodba",
@@ -4813,7 +4814,8 @@
       "receiptA11y": "Otvori račun za {{description}}, {{amount}}, od {{date}}",
       "receiptUnavailable": "Račun za ovu kupnju nije dostupan.",
       "retentionLimit": "Prikazuje se najnovija povijest kredita.",
-      "voidedGrant": "Poništeno: {{description}}"
+      "voidedGrant": "Poništeno: {{description}}",
+      "voidedStatus": "Poništeno"
     },
     "title": "Kupi kredite",
     "description": "Krediti su jednokratna kupnja koja se dodaje tvom Kilo saldu za pokretanje AI sesija kodiranja u aplikaciji Kilo. Trgovina naplaćuje tvoj račun, a krediti se dodaju nakon što trgovina potvrdi plaćanje.",

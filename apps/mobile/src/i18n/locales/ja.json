@@ -4702,6 +4702,7 @@
       "emptyDescription": "クレジットの購入、領収書、使用状況がここに表示されます。",
       "emptyTitle": "クレジット履歴はありません",
       "expiredGrant": "期限切れ: {{description}}",
+      "expiredStatus": "期限切れ",
       "googlePlayReceipt": "領収書は Google Play にあります",
       "kind": {
         "adjustment": "調整",
@@ -4728,7 +4729,8 @@
       "receiptA11y": "{{description}}、{{amount}}、{{date}}の領収書を開く",
       "receiptUnavailable": "この購入の領収書はありません。",
       "retentionLimit": "最新のクレジット履歴を表示しています。",
-      "voidedGrant": "無効化済み: {{description}}"
+      "voidedGrant": "無効化済み: {{description}}",
+      "voidedStatus": "無効化済み"
     },
     "title": "クレジットを購入",
     "description": "クレジットは、Kilo AppでAIコーディングセッションを実行するためにKilo残高に追加される買い切りの購入です。ストアがアカウントに請求し、ストアが支払いを確認した後にクレジットが追加されます。",

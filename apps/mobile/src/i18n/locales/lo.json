@@ -4702,6 +4702,7 @@
       "emptyDescription": "ການຊື້ເຄຣດິດ, ໃບຮັບເງິນ ແລະ ການນຳໃຊ້ຈະສະແດງຢູ່ບ່ອນນີ້.",
       "emptyTitle": "ບໍ່ມີປະຫວັດເຄຣດິດ",
       "expiredGrant": "ໝົດອາຍຸແລ້ວ: {{description}}",
+      "expiredStatus": "ໝົດອາຍຸແລ້ວ",
       "googlePlayReceipt": "ໃບຮັບເງິນຈາກ Google Play",
       "kind": {
         "adjustment": "ການປັບປຸງ",
@@ -4728,7 +4729,8 @@
       "receiptA11y": "ເປີດໃບຮັບເງິນສຳລັບ {{description}}, {{amount}}, ຈາກ {{date}}",
       "receiptUnavailable": "ບໍ່ມີໃບຮັບເງິນສຳລັບການຊື້ນີ້.",
       "retentionLimit": "ກຳລັງສະແດງບັນທຶກເຄຣດິດຫຼ້າສຸດ.",
-      "voidedGrant": "ຍົກເລີກແລ້ວ: {{description}}"
+      "voidedGrant": "ຍົກເລີກແລ້ວ: {{description}}",
+      "voidedStatus": "ຍົກເລີກແລ້ວ"
     },
     "title": "ຊື້ເຄຣດິດ",
     "description": "ເຄຣດິດເປັນການຊື້ຄັ້ງດຽວທີ່ເພີ່ມໃສ່ຍອດ Kilo ຂອງທ່ານສຳລັບການແລ່ນເຊດຊັນການຂຽນໂຄ້ດ AI ໃນ Kilo App. ຮ້ານຄ້າຄິດຄ່າຈາກບັນຊີຂອງທ່ານ ແລະ ເຄຣດິດຈະຖືກເພີ່ມຫຼັງຈາກຮ້ານຄ້າຢືນຢັນການຊຳລະ.",

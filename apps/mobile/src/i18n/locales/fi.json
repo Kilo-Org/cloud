@@ -4702,6 +4702,7 @@
       "emptyDescription": "Krediittien ostot, kuitit ja käyttö näkyvät täällä.",
       "emptyTitle": "Ei krediittihistoriaa",
       "expiredGrant": "Vanhentunut: {{description}}",
+      "expiredStatus": "Vanhentunut",
       "googlePlayReceipt": "Kuitti Google Playssa",
       "kind": {
         "adjustment": "Oikaisu",
@@ -4728,7 +4729,8 @@
       "receiptA11y": "Avaa kuitti: {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Tälle ostolle ei ole saatavilla kuittia.",
       "retentionLimit": "Näytetään uusin krediittihistoria.",
-      "voidedGrant": "Mitätöity: {{description}}"
+      "voidedGrant": "Mitätöity: {{description}}",
+      "voidedStatus": "Mitätöity"
     },
     "title": "Osta krediittejä",
     "description": "Krediitit ovat kertaostos, joka lisätään Kilo-saldoosi AI-koodausistuntojen ajamista varten Kilo-sovelluksessa. Kauppa veloittaa tiliäsi ja krediitit lisätään, kun kauppa vahvistaa maksun.",

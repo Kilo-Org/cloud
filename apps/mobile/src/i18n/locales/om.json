@@ -4702,6 +4702,7 @@
       "emptyDescription": "Bittaan kireeditii, nagaheewwanii fi itti fayyadamni asitti mul'atu.",
       "emptyTitle": "Seenaan kireeditii hin jiru",
       "expiredGrant": "Yeroon isaa darbeera: {{description}}",
+      "expiredStatus": "Yeroon isaa darbeera",
       "googlePlayReceipt": "Nagahee Google Play irraa",
       "kind": {
         "adjustment": "Sirreeffama",
@@ -4728,7 +4729,8 @@
       "receiptA11y": "Nagahee {{description}}, {{amount}}, {{date}} bani",
       "receiptUnavailable": "Bittaa kanaaf nagaheen hin jiru.",
       "retentionLimit": "Seenaan kireeditii haaraan agarsiifamaa jira.",
-      "voidedGrant": "Haqameera: {{description}}"
+      "voidedGrant": "Haqameera: {{description}}",
+      "voidedStatus": "Haqameera"
     },
     "title": "Kireedita bituu",
     "description": "Kireeditiin bittaa yeroo tokkoo kan baalansii Kilo kee irratti dabalame ta'ee, shumarra code AI Kilo App keessatti hojjechuuf oola. Suuqii ammaataa kee irraa kaffaltii fudhata, suuqiin kaffaltii erga mirkaneesse booda kireeditiin dabalama.",

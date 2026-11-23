@@ -239,8 +239,6 @@ type AttemptContext = {
   readonly organizationId: string | undefined;
   /** Aborted when the search times out, so a request nobody waits for is dropped. */
   readonly signal: AbortSignal;
-  /** The slots this call took. The attempt never reads them; its caller settles them. */
-  readonly reserved: QuestionSearches | undefined;
 };
 
 /**
@@ -323,7 +321,7 @@ export function webSearchTool(organizationId?: string): Tool {
              that reached Kilo, so only the attempt slot is spent. */
           const attempted: Effect.Effect<Attempt> = Effect.promise(async signal => {
             try {
-              return await attempt(args.query, { organizationId, signal, reserved });
+              return await attempt(args.query, { organizationId, signal });
             } catch (error) {
               return { ok: false, charge: 'sent', reason: `Web search failed: ${String(error)}` };
             }
@@ -331,6 +329,9 @@ export function webSearchTool(organizationId?: string): Tool {
           return attempted.pipe(
             Effect.timeoutOrElse({
               duration: SEARCH_TIMEOUT,
+              /* A timeout settles as 'sent': the attempt is spent, but the
+                 answered slot is not. See the note on the timeout in
+                 web-search-budget.ts. */
               orElse: () =>
                 Effect.succeed<Attempt>({ ok: false, charge: 'sent', reason: TIMED_OUT }),
             }),

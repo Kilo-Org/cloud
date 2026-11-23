@@ -6,6 +6,12 @@ import { Context } from 'effect';
  * as the extension's tool stops it. An attempt that produced no answer, because
  * the device was offline, the person was signed out, the proxy was unreachable,
  * the proxy refused, or the attempt timed out, costs nothing.
+ *
+ * A timed-out attempt stays uncharged on purpose. The app cannot tell whether
+ * Kilo ran the search before the 15-second deadline, and its account-side charge
+ * is settled by the proxy either way. Charging the timeout here would bring back
+ * the exhausted-budget stop for a transient stall. When every search stalls, the
+ * attempt cap bounds the question instead.
  */
 export const MAX_SEARCHES_PER_QUESTION = 5;
 

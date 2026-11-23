@@ -165,14 +165,20 @@ async function search(argumentsText: string, context: SearchContext): Promise<Se
   if (!onlineManager.isOnline()) {
     return failed(OFFLINE);
   }
-  const token = await getAuthTokenForRequest();
-  if (token === null) {
-    return failed(SIGNED_OUT);
-  }
   /* An attempt that reaches the proxy counts even when it fails or the timeout
-     stops it; the answered-search charge below is separate. */
+     stops it; the answered-search charge below is separate. It is reserved
+     before the token await: a turn runs its calls at once, so charging after an
+     await lets every call read the same count and overshoot the cap by one per
+     call. A signed-out call never reaches the proxy, so it gives it back. */
   if (spent !== undefined) {
     spent.attempts += 1;
+  }
+  const token = await getAuthTokenForRequest();
+  if (token === null) {
+    if (spent !== undefined) {
+      spent.attempts -= 1;
+    }
+    return failed(SIGNED_OUT);
   }
   const response = await postSearch({ query: args.query, token, organizationId, signal });
   if (response === undefined) {

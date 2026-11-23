@@ -21,7 +21,9 @@ import { i18n } from '@/i18n';
  *
  * The skill and question labels take the verbal-noun form because
  * `permission-tool-label.ts` interpolates the same values into the permission
- * card sentence. This branch changes catalog values only: no key, placeholder,
+ * card sentence. The spoken loading cost keeps the English entry's 'so far'
+ * qualifier, because the context pill announces it while the session is still
+ * resolving. This branch changes catalog values only: no key, placeholder,
  * or plural category moves.
  */
 

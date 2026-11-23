@@ -1829,6 +1829,12 @@ test('the model enumeration reads every scoped table through run_id within D1 li
         compoundTermCount(sql) <= D1_MAX_COMPOUND_TERMS,
         `part ${part} has ${compoundTermCount(sql)} compound terms`
       );
+      // Each part is itself capped, so one run cannot stream an unbounded model set.
+      assert.match(
+        sql,
+        /GROUP BY model ORDER BY[\s\S]*LIMIT \d+/,
+        `part ${part} must cap its rows`
+      );
       for (const table of tables) {
         if (new RegExp(`FROM ${table} AS `).test(sql)) seen.add(table);
       }
@@ -1838,6 +1844,142 @@ test('the model enumeration reads every scoped table through run_id within D1 li
     }
     assert.deepEqual([...seen].sort(), [...tables].sort(), 'every table must be enumerated');
     assert.equal(seeks, 6, 'six keyed seeks across the two parts');
+    inner.close();
+  } finally {
+    f.close();
+  }
+});
+
+test('more than 64 models refuse, and no part transfers more than 65 distinct models', async () => {
+  const f = fixture();
+  try {
+    seed(f.sqlite);
+    const {
+      createLocalExecutor,
+      scopeRunModelsSql,
+      LEAN_MAX_MODEL_GROUPS,
+      LEAN_MAX_SCOPED_ROWS,
+      LEAN_MAX_SPLIT_ROWS,
+    } = await import('./legacy-cancel.mjs');
+    const inner = createLocalExecutor(f.path);
+    // The run must really NEED a split (over the per-batch envelope) before the model count is
+    // consulted, so it carries enough rows to exceed `LEAN_MAX_SCOPED_ROWS` while staying under
+    // the enumeration ceiling. Models are spread across BOTH parts, and two appear in both.
+    const shared = ['vendor/shared-a', 'vendor/shared-b'];
+    const part0Only = Array.from({ length: 40 }, (_, i) => `vendor/p0-${i}`);
+    const part1Only = Array.from({ length: 40 }, (_, i) => `vendor/p1-${i}`);
+    const all = [...shared, ...part0Only, ...part1Only];
+    assert.ok(all.length > LEAN_MAX_MODEL_GROUPS, 'the fixture must exceed the model cap');
+    const reps = 700;
+    // Both parts must saturate at the cap, so every model appears in a part-0 table AND a part-1
+    // table; otherwise the part that returned fewer rows would prove nothing about its limit.
+    const total = all.length * reps * 2;
+    assert.ok(all.length * reps > LEAN_MAX_SCOPED_ROWS, 'the fixture must need a split');
+    assert.ok(total < LEAN_MAX_SPLIT_ROWS, 'the fixture must stay under the enumeration ceiling');
+
+    const caseInsert = f.sqlite.prepare(
+      `INSERT INTO case_results (run_id, model, variant, case_id, route_key, score, latency_ms,
+         cost_usd, error, rep, timed_out, prompt_revision)
+       VALUES ('run-live-a', ?, 'high', ?, 'route/a', 1, 10, 0, NULL, 0, 0, 3)`
+    );
+    const execInsert = f.sqlite.prepare(
+      `INSERT INTO scheduler_executions (run_id, model, variant, rep, case_id, token)
+       VALUES ('run-live-a', ?, 'high', 0, ?, 'exec-token')`
+    );
+    f.sqlite.exec('BEGIN');
+    all.forEach((model, i) => {
+      // part 0 table: `case_results`. part 1 table: `scheduler_executions`.
+      for (let rep = 0; rep < reps; rep += 1) {
+        caseInsert.run(model, `c-${i}-${rep}`);
+        execInsert.run(model, `e-${i}-${rep}`);
+      }
+    });
+    f.sqlite.exec('COMMIT');
+
+    // Each part is capped independently: at most cap+1 DISTINCT models per statement.
+    for (const part of [0, 1]) {
+      const rows = inner.read(scopeRunModelsSql('run-live-a', part));
+      assert.equal(
+        rows.length,
+        LEAN_MAX_MODEL_GROUPS + 1,
+        `part ${part} must stop at the ${LEAN_MAX_MODEL_GROUPS + 1}-row cap, got ${rows.length}`
+      );
+      // The cap is on distinct models, so a capped part cannot hide duplicates behind it.
+      assert.equal(new Set(rows.map(row => String(row.model))).size, rows.length);
+    }
+
+    // The merged count still refuses: shared models must not collapse the total below 65.
+    const caseCount = f.sqlite
+      .prepare("SELECT COUNT(*) n FROM case_results WHERE run_id='run-live-a'")
+      .get().n;
+    const result = await leanRun(f.path, leanArgs('--apply', f.path));
+    assert.equal(result.code, EXIT.verifyFailed, JSON.stringify(result.events));
+    assert.match(
+      result.last('verify_failed').reason,
+      /more than 64 model groups; refusing to split it further/
+    );
+    assert.equal(
+      f.sqlite.prepare("SELECT COUNT(*) n FROM case_results WHERE run_id='run-live-a'").get().n,
+      caseCount,
+      'a refused enumeration must not write'
+    );
+    assert.equal(
+      f.sqlite.prepare("SELECT COUNT(*) n FROM benchmark_runs WHERE status='running'").get().n,
+      2,
+      'no run may be cancelled by a refused enumeration'
+    );
+
+    inner.close();
+  } finally {
+    f.close();
+  }
+});
+
+test('a model in both parts cannot hide the 65th, so the merge still refuses', async () => {
+  const f = fixture();
+  try {
+    seed(f.sqlite);
+    const { createLocalExecutor, scopeRunModelsSql, LEAN_MAX_MODEL_GROUPS, LEAN_MAX_SCOPED_ROWS } =
+      await import('./legacy-cancel.mjs');
+    const inner = createLocalExecutor(f.path);
+    // Exactly cap+1 distinct models, ALL of them present in BOTH parts, and enough rows to need a
+    // split. A merge that counted rows would double the total; one that deduplicated to the part
+    // cap could see only 64. Either way the boundary must still refuse.
+    const models = Array.from({ length: LEAN_MAX_MODEL_GROUPS + 1 }, (_, i) => `vendor/both-${i}`);
+    const reps = 800;
+    assert.ok(models.length * reps > LEAN_MAX_SCOPED_ROWS, 'the fixture must need a split');
+
+    const caseInsert = f.sqlite.prepare(
+      `INSERT INTO case_results (run_id, model, variant, case_id, route_key, score, latency_ms,
+         cost_usd, error, rep, timed_out, prompt_revision)
+       VALUES ('run-live-a', ?, 'high', ?, 'route/a', 1, 10, 0, NULL, 0, 0, 3)`
+    );
+    const execInsert = f.sqlite.prepare(
+      `INSERT INTO scheduler_executions (run_id, model, variant, rep, case_id, token)
+       VALUES ('run-live-a', ?, 'high', 0, ?, 'exec-token')`
+    );
+    f.sqlite.exec('BEGIN');
+    models.forEach((model, i) => {
+      for (let rep = 0; rep < reps; rep += 1) {
+        caseInsert.run(model, `c-${i}-${rep}`);
+        execInsert.run(model, `e-${i}-${rep}`);
+      }
+    });
+    f.sqlite.exec('COMMIT');
+
+    const partRows = [0, 1].map(part => inner.read(scopeRunModelsSql('run-live-a', part)));
+    // Both parts saturate at cap+1, so the union is provably at least cap+1 distinct models: a
+    // part returning the full cap cannot be hiding extra models behind a duplicate.
+    for (const rows of partRows) {
+      assert.equal(rows.length, LEAN_MAX_MODEL_GROUPS + 1, 'a part exceeded its own cap');
+      assert.equal(new Set(rows.map(row => String(row.model))).size, rows.length);
+    }
+    const union = new Set(partRows.flatMap(rows => rows.map(row => String(row.model))));
+    assert.equal(union.size, LEAN_MAX_MODEL_GROUPS + 1);
+
+    const result = await leanRun(f.path, leanArgs('--apply', f.path));
+    assert.equal(result.code, EXIT.verifyFailed, JSON.stringify(result.events));
+    assert.match(result.last('verify_failed').reason, /more than 64 model groups/);
     inner.close();
   } finally {
     f.close();

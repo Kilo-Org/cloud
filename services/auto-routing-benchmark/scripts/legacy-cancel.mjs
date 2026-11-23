@@ -964,8 +964,14 @@ const SERVED_SIZE_FIELDS = ['served_case_results', 'served_summaries', 'served_c
  * `UNION ALL`: this is split into two statements of three branches each, run in order and merged.
  * Every branch is its own `run_id` seek with its own GROUP BY, so SQLite materializes them instead
  * of flattening the compound and reading a table by another key.
+ *
+ * Each part is wrapped in `GROUP BY model ... LIMIT cap+1`, so a part transfers at most
+ * `LEAN_MAX_MODEL_GROUPS + 1` DISTINCT models and a run with thousands of them cannot stream the
+ * whole set before the caller refuses. Because each part deduplicates before its own limit, a
+ * model that appears in both parts cannot hide another: a part that returns the full `cap+1` rows
+ * has at least `cap+1` distinct models on its own, so the merged count is never an undercount.
  */
-export function scopeRunModelsSql(runId, part = 0) {
+export function scopeRunModelsSql(runId, part = 0, cap = LEAN_MAX_MODEL_GROUPS) {
   const key = sqlString(runId);
   const branch = (from, alias) =>
     `SELECT ${alias}.model AS model, COUNT(*) AS n FROM ${from} AS ${alias}
@@ -980,7 +986,10 @@ export function scopeRunModelsSql(runId, part = 0) {
   ];
   if (part < 0 || part > 1) throw new UsageError('the model enumeration has two parts');
   const slice = tables.slice(part * 3, part * 3 + 3);
-  return slice.map(([from, alias]) => branch(from, alias)).join('\n    UNION ALL ');
+  const union = slice.map(([from, alias]) => branch(from, alias)).join('\n    UNION ALL ');
+  return `SELECT model, SUM(n) AS n FROM (
+    ${union}
+  ) GROUP BY model ORDER BY n DESC, model ASC LIMIT ${cap + 1}`;
 }
 
 /** Merge the two enumeration parts into `{ model, n }`, largest first. */

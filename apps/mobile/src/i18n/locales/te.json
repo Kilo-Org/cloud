@@ -624,7 +624,7 @@
       "filesList": "ఫైళ్ల జాబితా"
     },
     "fileNavigator": {
-      "couldNotLoadFiles": "ఫైళ్లను లోడ్ చేయలేకపోయాము.",
+      "couldNotLoadFiles": "ఫైళ్లను లోడ్ చేయలేకపోయాము",
       "retryLoadingFiles": "ఫైళ్లను లోడ్ చేయడానికి మళ్లీ ప్రయత్నించండి",
       "filterPlaceholder": "ఫైల్ పాత్‌తో వడపోత",
       "viewedCount": "{{total}}లో {{viewed}} చూశారు",
@@ -634,11 +634,11 @@
       "viewedOfListed_one": "జాబితాలోని {{total}} ఫైల్లో {{viewed}} చూశారు",
       "viewedOfListed_other": "జాబితాలోని {{total}} ఫైళ్లలో {{viewed}} చూశారు",
       "loadingFiles": "{{total}}లో {{loaded}} లోడ్ చేస్తోంది…",
-      "failedToLoadAllFiles": "అన్ని ఫైళ్లను లోడ్ చేయలేకపోయాము.",
-      "couldNotLoadMoreFiles": "మరిన్ని ఫైళ్లను లోడ్ చేయలేకపోయాము.",
+      "failedToLoadAllFiles": "అన్ని ఫైళ్లను లోడ్ చేయలేకపోయాము",
+      "couldNotLoadMoreFiles": "మరిన్ని ఫైళ్లను లోడ్ చేయలేకపోయాము",
       "retryLoadingAllFiles": "అన్ని ఫైళ్లను లోడ్ చేయడానికి మళ్లీ ప్రయత్నించండి",
       "retryLoadingMoreFiles": "మరిన్ని ఫైళ్లను లోడ్ చేయడానికి మళ్లీ ప్రయత్నించండి",
-      "noMatches": "\"{{query}}\"కు సరిపోలే ఫైళ్లు లేవు.",
+      "noMatches": "\"{{query}}\"కు సరిపోలే ఫైళ్లు లేవు",
       "diffTooLarge": "మార్పుల పరిమాణం చాలా ఎక్కువ",
       "openFile": "{{path}} తెరవండి",
       "openFileViewed": "{{path}} తెరవండి (చూశారు)",
@@ -649,7 +649,7 @@
       "unmarkViewed": "{{path}}ను చూసినట్లు పెట్టిన గుర్తును తీసివేయండి",
       "collapseFile": "ఫైల్‌ను కుదించండి",
       "expandFile": "ఫైల్‌ను విస్తరించండి",
-      "diffTooLarge": "మార్పుల పరిమాణం చాలా ఎక్కువగా ఉన్నందున వాటిని చూపలేము.",
+      "diffTooLarge": "చూపించడానికి మార్పుల పరిమాణం చాలా ఎక్కువ",
       "noPreview": "ఈ ఫైల్‌కు ప్రివ్యూ అందుబాటులో లేదు",
       "openOnGitHub": "GitHubలో తెరవండి",
       "openDiffOnGitHub": "ఈ ఫైల్‌లోని మార్పులను GitHubలో తెరవండి",
@@ -664,7 +664,7 @@
     },
     "hunkRows": {
       "hunkHeader": "మార్పుల భాగం శీర్షిక {{header}}",
-      "contextUnavailable": "ఈ రెఫరెన్స్‌లో చుట్టుపక్కల కోడ్ అందుబాటులో లేదు.",
+      "contextUnavailable": "ఈ రెఫరెన్స్‌లో చుట్టుపక్కల కోడ్ అందుబాటులో లేదు",
       "retryLoadingContext": "చుట్టుపక్కల కోడ్‌ను లోడ్ చేయడానికి మళ్లీ ప్రయత్నించండి",
       "failedToLoadContext": "చుట్టుపక్కల కోడ్‌ను లోడ్ చేయలేకపోయాము — మళ్లీ ప్రయత్నించడానికి నొక్కండి",
       "loadingContext": "చుట్టుపక్కల కోడ్‌ను లోడ్ చేస్తోంది…",
@@ -757,10 +757,10 @@
         "closedMergeRequest": "ఈ మెర్జ్ రిక్వెస్ట్ మూసివేయబడింది"
       },
       "partialSuccessBanner": {
-        "body": "బ్రాంచ్‌ను తొలగించలేకపోయాము: {{reason}}.",
+        "body": "బ్రాంచ్‌ను తొలగించలేకపోయాము: {{reason}}",
         "accessibility": "మెర్జ్ అయింది. బ్రాంచ్‌ను తొలగించలేకపోయాము: {{reason}}"
       },
-      "loadFailedTitle": "మెర్జ్ ఎంపికలను లోడ్ చేయలేకపోయాము.",
+      "loadFailedTitle": "మెర్జ్ ఎంపికలను లోడ్ చేయలేకపోయాము",
       "blocked": {
         "unknownStateTitle": "మెర్జ్ చేయవచ్చో లేదో GitHub ఇంకా తెలియజేయలేదు",
         "unknownStateDetail": "కాసేపటి తర్వాత అవలోకనాన్ని రిఫ్రెష్ చేయండి.",
@@ -864,15 +864,15 @@
         }
       },
       "accessDeniedMessage": "ఈ PR చర్చను చూడటానికి మీకు అనుమతి లేదు.",
-      "unavailable": "చర్చ అందుబాటులో లేదు.",
+      "unavailable": "చర్చ అందుబాటులో లేదు",
       "unavailableMessage": "ఈ పుల్ రిక్వెస్ట్ తీసివేయబడి ఉండవచ్చు.",
-      "couldNotLoad": "చర్చను లోడ్ చేయలేకపోయాము.",
+      "couldNotLoad": "చర్చను లోడ్ చేయలేకపోయాము",
       "loading": "చర్చను లోడ్ చేస్తోంది",
       "noDiscussion": "ఇంకా చర్చ లేదు",
       "noDiscussionDescription": "ఈ పుల్ రిక్వెస్ట్‌పై సమీక్ష చర్చలు లేదా సంభాషణలో వ్యాఖ్యలు లేవు.",
       "reviewFiles": "ఫైళ్లను సమీక్షించండి",
       "quotedDiffSnippet": "ఉటంకించిన మార్పుల భాగం",
-      "moreLinesAbove": "… పైన మరో {{displayCount}} పంక్తులు ఉన్నాయి.",
+      "moreLinesAbove": "… పైన మరో {{displayCount}} పంక్తులు ఉన్నాయి",
       "termsAcceptRequired": "పోస్ట్ చేయడానికి మీరు సేవా నిబంధనలను అంగీకరించాలి.",
       "termsOutdatedCopy": "సేవా నిబంధనలు మారాయి. తాజా నిబంధనలను అంగీకరించడానికి ఈ స్క్రీన్‌ను మళ్లీ తెరవండి.",
       "termsCheckRetryCopy": "సేవా నిబంధనలను తనిఖీ చేయలేకపోయాము. మీ కనెక్షన్‌ను తనిఖీ చేసి మళ్లీ ప్రయత్నించండి.",
@@ -907,8 +907,8 @@
       },
       "deletedUser": "తొలగించబడిన వినియోగదారు",
       "replyForbiddenTerm": "ఈ {{term}}‌కు ప్రత్యుత్తరం ఇవ్వడానికి మీకు అనుమతి లేదు.",
-      "moreLinesAbove_one": "… పైన మరో {{displayCount}} పంక్తి ఉంది.",
-      "moreLinesAbove_other": "… పైన మరో {{displayCount}} పంక్తులు ఉన్నాయి.",
+      "moreLinesAbove_one": "… పైన మరో {{displayCount}} పంక్తి ఉంది",
+      "moreLinesAbove_other": "… పైన మరో {{displayCount}} పంక్తులు ఉన్నాయి",
       "deleteComment": "వ్యాఖ్యను తొలగించండి",
       "deleteCommentTitle": "వ్యాఖ్యను తొలగించాలా?",
       "deleteCommentMessage": "ఈ వ్యాఖ్య పుల్ రిక్వెస్ట్ నుండి తొలగించబడుతుంది.",
@@ -917,10 +917,10 @@
       "commentDeleteFailed": "మీ వ్యాఖ్యను తొలగించలేకపోయాము. మీ కనెక్షన్‌ను తనిఖీ చేసి మళ్లీ ప్రయత్నించండి.",
       "commentDeleteUnavailable": "ఈ వ్యాఖ్యను తొలగించలేము."
     },
-    "couldNotOpenGitHubAppSettings": "GitHub యాప్ సెట్టింగ్‌లను తెరవలేకపోయాం.",
+    "couldNotOpenGitHubAppSettings": "GitHub యాప్ సెట్టింగ్‌లను తెరవలేకపోయాం",
     "installKiloGitHubApp": "Kilo GitHub యాప్‌ను ఇన్‌స్టాల్ చేయండి",
     "checkConnection": "కనెక్షన్‌ను తనిఖీ చేయండి",
-    "couldNotLoadPullRequest": "పుల్ రిక్వెస్ట్‌ను లోడ్ చేయలేకపోయాము.",
+    "couldNotLoadPullRequest": "పుల్ రిక్వెస్ట్‌ను లోడ్ చేయలేకపోయాము",
     "reviewServiceUnavailable": "సమీక్ష సేవ అందుబాటులో లేదు",
     "reviewServiceUnavailableDescription": "సమీక్ష సేవ తాత్కాలికంగా అందుబాటులో లేదు. కొంతకాలం తర్వాత మళ్లీ ప్రయత్నించండి.",
     "description": "వివరణ",
@@ -969,7 +969,7 @@
       "loading": "ఇన్‌బాక్స్‌ను లోడ్ చేస్తోంది",
       "noReviewRequests": "సమీక్ష అభ్యర్థనలు లేవు",
       "noReviewRequestsDescription": "మీ సమీక్ష కోసం వేచి ఉన్న పుల్ రిక్వెస్ట్‌లు ఇక్కడ కనిపిస్తాయి.",
-      "couldNotLoad": "ఇన్‌బాక్స్‌ను లోడ్ చేయలేకపోయాము.",
+      "couldNotLoad": "ఇన్‌బాక్స్‌ను లోడ్ చేయలేకపోయాము",
       "accessLostTitle": "ఈ సంస్థను యాక్సెస్ చేయలేరు",
       "accessLostDescription": "మీరు ఇక ఈ సంస్థలో సభ్యులు కాకపోవడంతో, దాని సమీక్ష అభ్యర్థనలను లోడ్ చేయలేం. సమీక్షను కొనసాగించడానికి మీ వ్యక్తిగత ఖాతాలో కొనసాగించండి.",
       "organizationUnavailableTitle": "ఈ సంస్థ ఇక లేదు",
@@ -986,7 +986,7 @@
       "unavailableTitle": "వ్యాఖ్య అందుబాటులో లేదు",
       "unavailableMessage": "సమర్పణ కోసం వేచి ఉన్న ఈ వ్యాఖ్యను ఇప్పటికే తొలగించారు లేదా సమర్పించారు.",
       "ok": "సరే",
-      "loadFailedTitle": "వ్యాఖ్య రాసే స్క్రీన్‌ను లోడ్ చేయలేకపోయాము.",
+      "loadFailedTitle": "వ్యాఖ్య రాసే స్క్రీన్‌ను లోడ్ చేయలేకపోయాము",
       "discardTitle": "వ్యాఖ్యను వదిలేయాలా?",
       "discardMessage": "మీ చిత్తుప్రతి పోతుంది.",
       "comment": "వ్యాఖ్య",
@@ -997,10 +997,10 @@
       "tapDiffLineToSuggest": "సూచనలు ఇవ్వడానికి మార్పుల పోలికలో ఒక పంక్తిని నొక్కండి."
     },
     "connect": {
-      "checkFailedTitle": "GitHub కనెక్షన్‌ను తనిఖీ చేయలేకపోయాము.",
+      "checkFailedTitle": "GitHub కనెక్షన్‌ను తనిఖీ చేయలేకపోయాము",
       "checkFailedMessage": "GitHub‌ను చేరుకోలేకపోయాము. మీ కనెక్షన్‌ను తనిఖీ చేసి మళ్లీ ప్రయత్నించండి.",
-      "checkFailedTitleGitLab": "GitLab కనెక్షన్‌ను తనిఖీ చేయలేకపోయాము.",
-      "checkFailedTitleBitbucket": "Bitbucket కనెక్షన్‌ను తనిఖీ చేయలేకపోయాము.",
+      "checkFailedTitleGitLab": "GitLab కనెక్షన్‌ను తనిఖీ చేయలేకపోయాము",
+      "checkFailedTitleBitbucket": "Bitbucket కనెక్షన్‌ను తనిఖీ చేయలేకపోయాము",
       "providerCheckFailedMessage": "ప్రొవైడర్‌ను చేరుకోలేకపోయాము. మీ కనెక్షన్‌ను తనిఖీ చేసి మళ్లీ ప్రయత్నించండి.",
       "reconnectTitle": "GitHubను మళ్లీ కనెక్ట్ చేయండి",
       "reconnectTitleGitLab": "GitLabను మళ్లీ కనెక్ట్ చేయండి",
@@ -1120,7 +1120,7 @@
       "truncationBanner_one": "GitHub API పరిమితి కారణంగా మారిన {{total}} ఫైల్లో మొదటి {{limit}} ఫైళ్లను మాత్రమే చూపిస్తున్నాము.",
       "truncationBanner_other": "GitHub API పరిమితి కారణంగా మారిన {{total}} ఫైళ్లలో మొదటి {{limit}} ఫైళ్లను మాత్రమే చూపిస్తున్నాము."
     },
-    "linkPasteClipboardEmpty": "క్లిప్‌బోర్డ్ ఖాళీగా ఉంది.",
+    "linkPasteClipboardEmpty": "క్లిప్‌బోర్డ్ ఖాళీగా ఉంది",
     "linkPasteDenied": "పేస్ట్ చేసే యాక్సెస్ తిరస్కరించబడింది. పేస్ట్‌ను అనుమతించి మళ్లీ ప్రయత్నించండి.",
     "linkPasteNotAPullRequest": "ఇది పుల్ రిక్వెస్ట్ లేదా మెర్జ్ రిక్వెస్ట్ లింక్ కాదు",
     "announce": {
@@ -1145,7 +1145,7 @@
       "mergeResultDefaultError": "GitHub మెర్జ్‌ను పూర్తి చేయలేదు.",
       "mergeResultNotCompleted": "{{term}} మెర్జ్ కాలేదు. దాని స్థితిని తనిఖీ చేసి మళ్లీ ప్రయత్నించండి.",
       "ambiguous": "నిర్ధారించలేకపోయాము — మళ్లీ ప్రయత్నించే ముందు PRని తనిఖీ చేయండి.",
-      "forbidden": "ఈ చర్యకు అనుమతి లేదు."
+      "forbidden": "అనుమతి లేదు"
     },
     "capabilities": {
       "banner": {

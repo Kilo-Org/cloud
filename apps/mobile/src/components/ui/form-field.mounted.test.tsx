@@ -352,7 +352,15 @@ describe('FormField resting value preview', () => {
     return mounted.root.findByType('Pressable').props as {
       onPress: () => void;
       disabled?: boolean;
+      className?: string;
       accessibilityState: { disabled?: boolean };
+    };
+  }
+
+  /** The preview's assistive-action handler, typed so a test can activate it. */
+  function activationHandler(mounted: TestRenderer.ReactTestRenderer) {
+    return mounted.root.findByType('Pressable').props as {
+      onAccessibilityAction: (event: { nativeEvent: { actionName: string } }) => void;
     };
   }
 
@@ -448,9 +456,16 @@ describe('FormField resting value preview', () => {
 
     expect(box.disabled).toBe(true);
     expect(box.accessibilityState.disabled).toBe(true);
+    // A read-only field looks read-only in the state a person sees.
+    expect(String(box.className)).toContain('opacity-50');
     // A press and an assistive activation both leave the field resting.
     act(() => {
       preview(mounted).onPress();
+    });
+    act(() => {
+      activationHandler(mounted).onAccessibilityAction({
+        nativeEvent: { actionName: 'activate' },
+      });
     });
     expect(mounted.root.findAllByType('TextInput')).toHaveLength(0);
   });

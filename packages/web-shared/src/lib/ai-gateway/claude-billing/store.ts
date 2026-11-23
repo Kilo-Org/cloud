@@ -163,10 +163,6 @@ async function selectNextActiveGrant(
   return grant ?? null;
 }
 
-/**
- * The owner-to-columns projection for inserts: a personal row stores the user
- * id, an organization row the organization id; neither stores both.
- */
 function ownerColumns(owner: ClaudeBillingOwner): ClaudeBillingOwnerColumns {
   return {
     kilo_user_id: owner.kind === 'organization' ? null : owner.kiloUserId,

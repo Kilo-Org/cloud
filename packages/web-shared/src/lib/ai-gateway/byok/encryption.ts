@@ -19,7 +19,6 @@ function decodeEncryptionKey(keyBase64: string): Buffer {
  * Encrypts a string using AES-256-GCM with the provided key
  *
  * @param keyBase64 - Base64-encoded 32-byte encryption key
- * @returns EncryptedData object containing IV, encrypted data, and auth tag
  */
 export function encryptApiKey(plaintext: string, keyBase64: string): EncryptedData {
   const key = decodeEncryptionKey(keyBase64);

@@ -3696,7 +3696,7 @@
       "noSeatsAvailable": "Tất cả chỗ đã được sử dụng. Hãy yêu cầu chủ sở hữu tổ chức thêm chỗ trước khi mời thêm thành viên."
     },
     "invoices": {
-      "downloadA11y": "Tải xuống hóa đơn {{number}}",
+      "downloadA11y": "Tải xuống hóa đơn {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Hóa đơn được tạo tự động theo từng chu kỳ thanh toán và xuất hiện tại đây khi có khoản phí tính cho tổ chức.",
       "emptyTitle": "Chưa có hóa đơn",
       "invoiceFallback": "Hóa đơn",

@@ -3692,7 +3692,7 @@
       "noSeatsAvailable": "Öll sæti eru í notkun. Biddu eiganda fyrirtækisins að bæta við sætum áður en þú býður fleiri meðlimum."
     },
     "invoices": {
-      "downloadA11y": "Sækja reikning {{number}}",
+      "downloadA11y": "Sækja reikning {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Reikningar eru búnir til sjálfkrafa á hverju innheimtutímabili og birtast hér þegar félaginu þínu er sendur reikningur.",
       "emptyTitle": "Engir reikningar",
       "invoiceFallback": "Reikningur",

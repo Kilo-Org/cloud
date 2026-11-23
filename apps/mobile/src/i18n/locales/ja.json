@@ -3696,7 +3696,7 @@
       "noSeatsAvailable": "すべてのシートが使用中です。さらにメンバーを招待する前に、組織のオーナーにシートの追加を依頼してください。"
     },
     "invoices": {
-      "downloadA11y": "請求書{{number}}をダウンロード",
+      "downloadA11y": "請求書{{number}}をダウンロード、{{amount}}、{{date}}、{{status}}",
       "emptyDescription": "請求書は請求サイクルごとに自動発行されます。組織への請求が発生すると、ここに表示されます。",
       "emptyTitle": "請求書はありません",
       "invoiceFallback": "請求書",

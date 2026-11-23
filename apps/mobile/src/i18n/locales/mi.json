@@ -3692,7 +3692,7 @@
       "noSeatsAvailable": "Kei te whakamahia ngā tūru katoa. Tonoa tētahi rangatira o te rōpū kia tāpiri tūru anō i mua i te pōwhiri i ētahi atu mema."
     },
     "invoices": {
-      "downloadA11y": "Tīkina ake te nama {{number}}",
+      "downloadA11y": "Tīkina ake te nama {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Ka hangaia aunoa ngā nama i ia huringa nama. Ka puta ki konei ina tukuna he nama ki tō rōpū.",
       "emptyTitle": "Kāore he nama",
       "invoiceFallback": "Nama",

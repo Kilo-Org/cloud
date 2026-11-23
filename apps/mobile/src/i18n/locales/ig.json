@@ -3692,7 +3692,7 @@
       "noSeatsAvailable": "A na-eji oche niile ugbu a. Rịọ onye nwe òtù ka ọ tinyekwuo oche tupu ị kpọọ ndị otu ọzọ òkù."
     },
     "invoices": {
-      "downloadA11y": "Budata akwụkwọ ịgba ụgwọ {{number}}",
+      "downloadA11y": "Budata akwụkwọ ịgba ụgwọ {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "A na-emepụta akwụkwọ ịgba ụgwọ na-akpaghị aka n'oge ịgba ụgwọ ọ bụla. Ha ga-apụta ebe a mgbe a gbara ụlọ ọrụ gị ụgwọ.",
       "emptyTitle": "Enweghị akwụkwọ ịgba ụgwọ",
       "invoiceFallback": "Akwụkwọ ịgba ụgwọ",

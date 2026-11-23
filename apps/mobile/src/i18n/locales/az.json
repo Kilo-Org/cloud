@@ -3692,7 +3692,7 @@
       "noSeatsAvailable": "Bütün yerlər istifadədədir. Daha çox üzv dəvət etməzdən əvvəl təşkilat sahibindən yer əlavə etməsini xahiş et."
     },
     "invoices": {
-      "downloadA11y": "{{number}} nömrəli hesab-fakturanı endir",
+      "downloadA11y": "{{number}} nömrəli hesab-fakturanı endir, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Hər ödəniş dövründə avtomatik hesab-faktura yaradılır. Təşkilatına ödəniş hesablandıqdan sonra hesab-faktura burada görünəcək.",
       "emptyTitle": "Hesab-faktura yoxdur",
       "invoiceFallback": "Hesab-faktura",

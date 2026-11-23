@@ -3692,7 +3692,7 @@
       "noSeatsAvailable": "Efa ampiasaina avokoa ny toerana rehetra. Angataho amin'ny tompon'ny fikambanana iray ny hanampy toerana alohan'ny hanasanao mpikambana fanampiny."
     },
     "invoices": {
-      "downloadA11y": "Alao ny faktiora {{number}}",
+      "downloadA11y": "Alao ny faktiora {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Foronina ho azy isaky ny fe-potoana fandoavana ny faktiora. Hiseho eto izany rehefa ampandoavina ny fikambananao.",
       "emptyTitle": "Tsy misy faktiora",
       "invoiceFallback": "Faktiora",

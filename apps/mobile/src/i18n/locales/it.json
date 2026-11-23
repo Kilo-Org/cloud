@@ -3764,7 +3764,7 @@
       "noSeatsAvailable": "Tutti i posti sono in uso. Chiedi a un proprietario dell'organizzazione di aggiungere posti prima di invitare altri membri."
     },
     "invoices": {
-      "downloadA11y": "Scarica la fattura {{number}}",
+      "downloadA11y": "Scarica la fattura {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Le fatture vengono generate automaticamente a ogni ciclo di fatturazione. Appariranno qui dopo l'addebito all'organizzazione.",
       "emptyTitle": "Nessuna fattura",
       "invoiceFallback": "Fattura",

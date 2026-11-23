@@ -3692,7 +3692,7 @@
       "noSeatsAvailable": "Tout plas yo okipe. Mande yon pwopriyetè òganizasyon pou li ajoute plas anvan ou envite plis manm."
     },
     "invoices": {
-      "downloadA11y": "Telechaje fakti {{number}}",
+      "downloadA11y": "Telechaje fakti {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Fakti yo kreye otomatikman nan chak sik faktirasyon. Yo ap parèt isit la lè òganizasyon ou a resevwa yon fakti.",
       "emptyTitle": "Pa gen fakti",
       "invoiceFallback": "Fakti",

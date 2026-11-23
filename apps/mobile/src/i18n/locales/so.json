@@ -3692,7 +3692,7 @@
       "noSeatsAvailable": "Dhammaan kuraasta waa la wada isticmaalayaa. Ka codso milkiilaha ururka inuu kuraas ku daro ka hor intaadan casuumin xubno kale."
     },
     "invoices": {
-      "downloadA11y": "Soo deji qaansheegta {{number}}",
+      "downloadA11y": "Soo deji qaansheegta {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Qaansheegyada si toos ah ayaa loo sameeyaa xilli kasta oo biil bixin ah. Halkan ayay ka soo muuqan doonaan marka ururkaaga biil loo soo saaro.",
       "emptyTitle": "Ma jiraan qaansheegyo",
       "invoiceFallback": "Qaansheeg",

@@ -3760,7 +3760,7 @@
       "noSeatsAvailable": "Toate locurile sunt ocupate. Cere unui proprietar al organizației să adauge locuri înainte de a invita mai mulți membri."
     },
     "invoices": {
-      "downloadA11y": "Descarcă factura {{number}}",
+      "downloadA11y": "Descarcă factura {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Facturile se generează automat la fiecare ciclu de facturare și vor apărea aici după emiterea lor pentru organizația ta.",
       "emptyTitle": "Nicio factură",
       "invoiceFallback": "Factură",

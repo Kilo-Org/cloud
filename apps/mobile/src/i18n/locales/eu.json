@@ -3692,7 +3692,7 @@
       "noSeatsAvailable": "Eserleku guztiak erabiltzen ari dira. Eskatu erakundearen jabe bati eserlekuak gehitzeko kide gehiago gonbidatu aurretik."
     },
     "invoices": {
-      "downloadA11y": "Deskargatu {{number}} faktura",
+      "downloadA11y": "Deskargatu {{number}} faktura, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Fakturak automatikoki sortzen dira fakturazio-ziklo bakoitzean, eta hemen agertuko dira zure erakundeari faktura egin ondoren.",
       "emptyTitle": "Ez dago fakturarik",
       "invoiceFallback": "Faktura",

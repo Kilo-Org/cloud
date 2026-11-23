@@ -3760,7 +3760,7 @@
       "noSeatsAvailable": "Visas vietas ir aizņemtas. Palūdz organizācijas īpašniekam pievienot vietas, pirms uzaicini vairāk dalībnieku."
     },
     "invoices": {
-      "downloadA11y": "Lejupielādēt rēķinu {{number}}",
+      "downloadA11y": "Lejupielādēt rēķinu {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Rēķini tiek izveidoti automātiski katrā norēķinu periodā. Tie būs redzami šeit, kad tavai organizācijai būs izrakstīts rēķins.",
       "emptyTitle": "Nav rēķinu",
       "invoiceFallback": "Rēķins",

@@ -3692,7 +3692,7 @@
       "noSeatsAvailable": "Alle plekke is in gebruik. Vra 'n organisasie-eienaar om plekke by te voeg voordat jy meer lede nooi."
     },
     "invoices": {
-      "downloadA11y": "Laai faktuur {{number}} af",
+      "downloadA11y": "Laai faktuur {{number}} af, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Fakture word elke faktureringsiklus outomaties geskep en sal hier verskyn sodra jou organisasie gefaktureer word.",
       "emptyTitle": "Geen fakture nie",
       "invoiceFallback": "Faktuur",

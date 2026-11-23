@@ -3692,7 +3692,7 @@
       "noSeatsAvailable": "Todas as prazas están en uso. Pídelle a un propietario da organización que engada prazas antes de convidar máis membros."
     },
     "invoices": {
-      "downloadA11y": "Descargar factura {{number}}",
+      "downloadA11y": "Descargar factura {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "As facturas xéranse automaticamente en cada ciclo de facturación. Aparecerán aquí cando se lle facture á túa organización.",
       "emptyTitle": "Non hai facturas",
       "invoiceFallback": "Factura",

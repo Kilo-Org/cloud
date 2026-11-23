@@ -3828,7 +3828,7 @@
       "noSeatsAvailable": "Všetky miesta sú obsadené. Pred pozvaním ďalších členov požiadaj vlastníka organizácie o pridanie miest."
     },
     "invoices": {
-      "downloadA11y": "Stiahnuť faktúru {{number}}",
+      "downloadA11y": "Stiahnuť faktúru {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Faktúry sa vytvárajú automaticky za každé fakturačné obdobie. Zobrazia sa tu po vyúčtovaní služieb tvojej organizácii.",
       "emptyTitle": "Žiadne faktúry",
       "invoiceFallback": "Faktúra",

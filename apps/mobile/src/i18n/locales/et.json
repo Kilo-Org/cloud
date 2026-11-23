@@ -3692,7 +3692,7 @@
       "noSeatsAvailable": "Kõik kohad on kasutusel. Palu organisatsiooni omanikul enne uute liikmete kutsumist kohti juurde lisada."
     },
     "invoices": {
-      "downloadA11y": "Laadi alla arve {{number}}",
+      "downloadA11y": "Laadi alla arve {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Arved koostatakse automaatselt igal arveldusperioodil ja kuvatakse siin pärast sinu organisatsioonile arve esitamist.",
       "emptyTitle": "Arveid pole",
       "invoiceFallback": "Arve",

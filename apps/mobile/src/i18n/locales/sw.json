@@ -3692,7 +3692,7 @@
       "noSeatsAvailable": "Nafasi zote zinatumika. Muombe mmiliki wa shirika aongeze nafasi kabla ya kualika wanachama zaidi."
     },
     "invoices": {
-      "downloadA11y": "Pakua ankara {{number}}",
+      "downloadA11y": "Pakua ankara {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Ankara hutengenezwa kiotomatiki kila mzunguko wa bili na zitaonekana hapa shirika lako likishatozwa.",
       "emptyTitle": "Hakuna ankara",
       "invoiceFallback": "Ankara",

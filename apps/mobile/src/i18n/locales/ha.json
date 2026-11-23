@@ -3692,7 +3692,7 @@
       "noSeatsAvailable": "Ana amfani da dukkan gurabe. Ka nemi mai ƙungiya ya ƙara gurabe kafin ka gayyaci ƙarin membobi."
     },
     "invoices": {
-      "downloadA11y": "Sauke takardar biyan kuɗi {{number}}",
+      "downloadA11y": "Sauke takardar biyan kuɗi {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Ana samar da takardun biyan kuɗi kai tsaye a kowane zagayen biyan kuɗi. Za su bayyana a nan da zarar an nemi ƙungiyarka ta biya kuɗi.",
       "emptyTitle": "Babu takardun biyan kuɗi",
       "invoiceFallback": "Takardar biyan kuɗi",

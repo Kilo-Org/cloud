@@ -3696,7 +3696,7 @@
       "noSeatsAvailable": "Semua kursi sudah terpakai. Minta pemilik organisasi untuk menambah kursi sebelum mengundang lebih banyak anggota."
     },
     "invoices": {
-      "downloadA11y": "Unduh faktur {{number}}",
+      "downloadA11y": "Unduh faktur {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Faktur dibuat secara otomatis setiap siklus penagihan dan akan muncul di sini setelah organisasimu ditagih.",
       "emptyTitle": "Belum ada faktur",
       "invoiceFallback": "Faktur",

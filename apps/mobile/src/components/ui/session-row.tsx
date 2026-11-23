@@ -126,7 +126,7 @@ export function SessionRow({
       <View className="flex-row items-center gap-1.5">
         <SessionStatusIcon kind="needsInput" />
         <Text variant="mono" className="shrink text-xs text-warn">
-          {t('sessionRow.needsInput')}
+          {t('agents.sessionRow.needsInputBadge')}
         </Text>
       </View>
     );
@@ -140,10 +140,10 @@ export function SessionRow({
           numberOfLines={1}
           ellipsizeMode="tail"
         >
-          {/* i18n-dup-ok: 'sessionRow.scheduled' is the full-caps mono row badge; 'common.scheduled' is the sentence-case connection label and the spoken a11y word, and each locale cases the badge form itself — the same split as sessionRow.needsInput beside glanceable.needsInput. */}
+          {/* i18n-dup-ok: 'agents.sessionRow.scheduledBadge' is the full-caps mono row badge; 'common.scheduled' is the sentence-case connection label and the spoken a11y word, and each locale cases the badge form itself — the same split as agents.sessionRow.needsInputBadge beside glanceable.needsInput. */}
           {scheduledWake
-            ? `${t('sessionRow.scheduled')} · ${scheduledWake}`
-            : t('sessionRow.scheduled')}
+            ? `${t('agents.sessionRow.scheduledBadge')} · ${scheduledWake}`
+            : t('agents.sessionRow.scheduledBadge')}
         </Text>
       </View>
     );

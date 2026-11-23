@@ -412,7 +412,7 @@ export function PrDiffFileNavigator({
                 <View className="flex-row items-center gap-1.5">
                   <ActivityIndicator size="small" color={colors.mutedForeground} />
                   <Text variant="muted" className="text-xs">
-                    {t('prReview.fileNavigator.loadingFiles', {
+                    {t('prReview.fileNavigator.loadingFilesProgress', {
                       loaded: formatNumber(fetchAll.loadedFiles, i18n.language),
                       total: formatNumber(changedFiles, i18n.language),
                     })}

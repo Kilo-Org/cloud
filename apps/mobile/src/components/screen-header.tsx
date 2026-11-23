@@ -739,8 +739,6 @@ export function ScreenHeader({
   const reserveOfflineBanner = safeAreaTop && isOfflineBannerVisible && !modal;
   const paddingTop = baseTopPadding + offlineHeaderReservation(reserveOfflineBanner);
 
-  // `paddingTop` stays conditional on `safeAreaTop`: a form sheet owns its
-  // vertical padding through `className`.
   const safeAreaStyle = safeAreaTop ? { paddingTop } : undefined;
 
   // The shared inset hook keeps the chrome and body clear of side status areas
@@ -771,9 +769,6 @@ export function ScreenHeader({
   // touch area is the same box in both directions.
   const titleHitSlop = { top: 13, bottom: 13 };
 
-  // What pressing the title does. The copy names the action only, never the
-  // title: on Android it is spoken after the title in the same utterance, so a
-  // title in the copy would be announced twice.
   const titlePressHint = onTitlePressAccessibilityHint ?? t('screenHeader.openMenu');
 
   // The announced name of the pressable title. The title stays first so a
@@ -859,8 +854,6 @@ export function ScreenHeader({
     eyebrow || reserveEyebrow ? (
       <View className={cn('mb-0.5', centerTitle && 'items-center')}>
         {eyebrow === undefined && eyebrowPlaceholder ? (
-          // The reserved text below still holds the line's height, so the
-          // placeholder is painted over it rather than sizing the slot.
           <View
             className={cn(
               'absolute inset-0 justify-center',
@@ -896,11 +889,6 @@ export function ScreenHeader({
         centerTitle && 'text-center',
         !subtitle && 'opacity-0'
       )}
-      // One line: the subtitle is context for the title, so it truncates at its
-      // tail instead of taking a second line and moving the body. The reserved
-      // copy is a no-break space in the same style, so the height it holds is
-      // the height the name will take. At a large font scale the name takes up
-      // to two lines instead of losing its tail.
       numberOfLines={largeFont ? 2 : 1}
       ellipsizeMode="tail"
       accessible={Boolean(subtitle)}
@@ -914,8 +902,6 @@ export function ScreenHeader({
     subtitle || reserveSubtitle || subtitlePlaceholder ? (
       <View className={cn('mt-0.5', centerTitle && 'items-center')}>
         {subtitle === undefined && subtitlePlaceholder ? (
-          // The reserved text below still holds the line's height, so the
-          // placeholder is painted over it rather than sizing the slot.
           <View
             className={cn(
               'absolute inset-0 justify-center',

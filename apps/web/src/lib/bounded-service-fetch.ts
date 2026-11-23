@@ -162,18 +162,25 @@ export async function fetchWithinBudget(
  * A body this function cannot take over — one without a stream, or one a
  * reader already holds — is read with `response.json()`, which is what the
  * callers of a JSON reader hand in.
+ *
+ * `signal` is the caller's own: when it aborts, the read rejects with the
+ * caller's `reason` instead of the budget error and the reader this function
+ * owns is cancelled.
  */
 export async function readJsonWithinBudget<T = unknown>(
   response: Response,
   remainingBudgetMs: number,
-  totalBudgetMs: number = remainingBudgetMs
+  totalBudgetMs: number = remainingBudgetMs,
+  signal?: AbortSignal
 ): Promise<T> {
   return readBodyWithinBudget(
     response,
     remainingBudgetMs,
     totalBudgetMs,
     body => body.json() as Promise<T>,
-    text => JSON.parse(text) as T
+    text => JSON.parse(text) as T,
+    undefined,
+    signal
   );
 }
 
@@ -205,12 +212,17 @@ export async function readJsonWithinBudget<T = unknown>(
  * upstream error page is neither buffered to its end nor kept streaming after
  * the caller has all it will use; a body that cannot be taken over is read in
  * full and sliced. Without it the whole body is returned, exactly as before.
+ *
+ * `signal` is the caller's own: when it aborts, the read rejects with the
+ * caller's `reason` instead of the budget error and the reader this function
+ * owns is cancelled.
  */
 export async function readTextWithinBudget(
   response: Response,
   remainingBudgetMs: number,
   totalBudgetMs: number = remainingBudgetMs,
-  maxChars?: number
+  maxChars?: number,
+  signal?: AbortSignal
 ): Promise<string> {
   return readBodyWithinBudget(
     response,
@@ -223,7 +235,8 @@ export async function readTextWithinBudget(
       return maxChars !== undefined && text.length > maxChars ? text.slice(0, maxChars) : text;
     },
     text => text,
-    maxChars
+    maxChars,
+    signal
   );
 }
 
@@ -247,6 +260,10 @@ export async function readTextWithinBudget(
  *
  * `maxChars` is forwarded to {@link readAllText} so an owned reader stops
  * collecting at the cap instead of buffering a body the caller will slice away.
+ *
+ * `signal` is the caller's abort: it settles the wait with the caller's
+ * `reason` and cancels the reader this function owns, so a caller that gives up
+ * is neither held to the budget nor left transferring.
  */
 async function readBodyWithinBudget<T>(
   response: Response,
@@ -254,10 +271,15 @@ async function readBodyWithinBudget<T>(
   totalBudgetMs: number,
   readFallback: (response: Response) => Promise<T>,
   parseText: (text: string) => T,
-  maxChars?: number
+  maxChars?: number,
+  signal?: AbortSignal
 ): Promise<T> {
   const budgetError = new ServiceFetchTimeoutError(remainingBudgetMs, totalBudgetMs);
   const expired = Promise.withResolvers<never>();
+  // A caller can abort when no read is in flight to race the rejection, so it
+  // is handled here instead of being left to whoever races it.
+  const callerAbort = signal ? Promise.withResolvers<never>() : undefined;
+  void callerAbort?.promise.catch(() => undefined);
   // A body another reader already holds cannot be taken over; the wait is
   // still bounded, only the cancellation is out of reach.
   const body = response.body;
@@ -272,13 +294,33 @@ async function readBodyWithinBudget<T>(
     Math.max(0, remainingBudgetMs)
   );
 
-  try {
-    if (!reader) {
-      return await Promise.race([readFallback(response), expired.promise]);
+  if (signal?.aborted) {
+    clearTimeout(timer);
+    if (reader) {
+      void reader.cancel().catch(() => undefined);
     }
-    return parseText(await Promise.race([readAllText(reader, maxChars), expired.promise]));
+    throw signal.reason;
+  }
+
+  const cancelForCaller = () => {
+    if (reader) {
+      void reader.cancel().catch(() => undefined);
+    }
+    callerAbort?.reject(signal?.reason);
+  };
+  signal?.addEventListener('abort', cancelForCaller);
+
+  try {
+    const callerAbortRace = callerAbort ? [callerAbort.promise] : [];
+    if (!reader) {
+      return await Promise.race([readFallback(response), expired.promise, ...callerAbortRace]);
+    }
+    return parseText(
+      await Promise.race([readAllText(reader, maxChars), expired.promise, ...callerAbortRace])
+    );
   } finally {
     clearTimeout(timer);
+    signal?.removeEventListener('abort', cancelForCaller);
   }
 }
 

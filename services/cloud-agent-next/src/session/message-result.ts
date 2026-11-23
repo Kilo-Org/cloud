@@ -1,5 +1,21 @@
-import { type SessionMessageCompletionSource } from './session-message-state.js';
-import { type SafeFailureProjection } from './safe-failure-projection.js';
+import type {
+  SessionMessageCompletionSource,
+  SessionMessageFailureCode,
+  SessionMessageFailureStage,
+} from './session-message-state.js';
+import type { SafeFailureProjection } from './safe-failure-projection.js';
+
+export type SafeMessageResultFailure = SafeFailureProjection & {
+  stage: SessionMessageFailureStage;
+  code: SessionMessageFailureCode;
+  retryable: boolean;
+};
+
+export type SafeMessageResultPreparation = {
+  status: 'running' | 'completed' | 'failed';
+  failedStepLabel?: string;
+  reason?: string;
+};
 
 export type SafeMessageResult = {
   messageId: string;
@@ -9,8 +25,10 @@ export type SafeMessageResult = {
   acceptedAt?: number;
   terminalAt?: number;
   completionSource?: SessionMessageCompletionSource;
-  failure?: SafeFailureProjection & { retryable: boolean };
+  failure?: SafeMessageResultFailure;
   gateResult?: 'pass' | 'fail';
+  branch?: string;
+  preparation?: SafeMessageResultPreparation;
 };
 
 export type SafeMessageResultResponse = SafeMessageResult & {

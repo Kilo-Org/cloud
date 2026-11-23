@@ -90,6 +90,12 @@ describe('formatGitUrlProject (one project-path pipeline)', () => {
     expect(formatGitUrlProject('git@github.com:owner/repo/-/tree/main')).toBe('owner/repo');
   });
 
+  it('returns a path with fewer than two parts unchanged in both spellings', () => {
+    expect(formatGitUrlProject('git@github.com:repo.git')).toBe('git@github.com:repo.git');
+    expect(formatGitUrlProject('git@github.com:/')).toBe('git@github.com:/');
+    expect(formatGitUrlProject('https://github.com/repo.git')).toBe('https://github.com/repo.git');
+  });
+
   it('formats the https and ssh spelling of a repository identically', () => {
     for (const path of ['owner/repo.git.git', 'owner/repo/', 'owner/repo/-/tree/main']) {
       expect(formatGitUrlProject(`https://github.com/${path}`)).toBe(

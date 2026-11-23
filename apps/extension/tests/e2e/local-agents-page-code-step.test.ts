@@ -75,6 +75,15 @@ const permissionItemSchema = z.object({
   reason: z.string().optional(),
 });
 
+/** Whether the browser exposes the page-side API; a build without it cannot register a tool, so the spec skips. */
+const hasPageToolApi = async (page: Page): Promise<boolean> => {
+  const value = await page.evaluate(
+    "typeof document.modelContext === 'object' && document.modelContext !== null && typeof document.modelContext.registerTool === 'function'"
+  );
+
+  return z.boolean().parse(value);
+};
+
 /** The tool names the page's own `document.modelContext` reports, read from the page rather than from the extension. */
 const registeredToolNames = async (page: Page): Promise<readonly string[]> => {
   const value = await page.evaluate(`(async () => {
@@ -125,6 +134,9 @@ test('a page tool call on a page holding a protected field asks for its own appr
     const plainUrl = `${fixture.url}${PLAIN_PATH}`;
 
     await agentPage.goto(protectedUrl);
+    // The same guard the other page-tool spec uses: a browser without the API registers nothing, so there is no page tool
+    // To call and the run says so instead of failing.
+    test.skip(!(await hasPageToolApi(agentPage)), 'WebMCP API is not available in this browser');
 
     const origin = fixture.url;
     const grants = grant(origin);
@@ -142,7 +154,7 @@ test('a page tool call on a page holding a protected field asks for its own appr
     const navigated = await session.callTool('browser_navigate', { url: protectedUrl }, grants);
 
     expect(navigated).toMatchObject({ isError: false, kind: 'result' });
-    // A browser build without the page-side API cannot run this spec: the page would register nothing.
+    // The page really holds the tool the call names, so a later refusal is this page's answer and not an unknown tool.
     await expect.poll(() => registeredToolNames(agentPage)).toStrictEqual([TOOL_NAME]);
 
     expect(await toolRuns(agentPage)).toBe(0);

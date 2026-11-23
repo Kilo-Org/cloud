@@ -496,6 +496,15 @@ function pastMatch(pattern: RegExp, text: string, at: number): number {
   return pattern.exec(text) === null ? at : pattern.lastIndex;
 }
 
+/** The column reached at character `at` of `line`, each tab advancing to the next four-column stop. */
+function columnAt(line: string, at: number): number {
+  let column = 0;
+  for (const character of line.slice(0, at)) {
+    column = character === '\t' ? column + 4 - (column % 4) : column + 1;
+  }
+  return column;
+}
+
 /** The offset past the inline opener at `at`, or `at` when no opener is there. */
 function pastOpener(text: string, at: number): number {
   const opener = INLINE_OPENERS.find(spelling => text.startsWith(spelling, at));
@@ -702,10 +711,11 @@ export function withoutLeadingDirectionMarks(markdown: string): string {
       // stop before it decides this, so the padding is measured in columns, not
       // in characters: `-\t\t# x` pads seven columns and holds code, where two
       // characters would look like an item's own indent. The columns are the
-      // line's own, because that is where the tab stops sit: an offset inside
-      // `body` is a column only once the quote prefix's width is added back.
+      // line's own, because that is where the tab stops sit: the marker's column
+      // is read from the line with tabs expanded, since a tab in the quote
+      // prefix does not advance one column per character.
       const markerEnd = /^ {0,3}(?:[-*+]|\d{1,9}[.)])/.exec(body)?.[0].length ?? 0;
-      const markerColumn = quoted + markerEnd;
+      const markerColumn = columnAt(line, quoted + markerEnd);
       const afterMarker = body.slice(markerEnd);
       const run = /^[ \t]*/.exec(afterMarker)?.[0] ?? '';
       let column = markerColumn;

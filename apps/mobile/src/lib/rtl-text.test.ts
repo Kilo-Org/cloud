@@ -224,7 +224,6 @@ describe('contentTextDirection', () => {
   const LTR = { direction: 'ltr', writingDirection: 'ltr' };
   const RTL = { direction: 'rtl', writingDirection: 'rtl' };
 
-
   it.each([false, true])('names English content left to right (isRTL=%s)', isRTL => {
     i18nManager.isRTL = isRTL;
     expect(contentTextDirection('1. Prototype pollution: لا')).toEqual(LTR);
@@ -489,6 +488,14 @@ describe('withoutLeadingDirectionMarks', () => {
     const code = '>-  \t# \u200FLatin';
     expect(withoutLeadingDirectionMarks(code)).toBe(code);
     expect(withoutLeadingDirectionMarks('-  \t# \u200FLatin')).toBe('-  \t# Latin');
+  });
+
+  // A tab inside the quote prefix moves the marker to a later column, so the
+  // item's padding is narrower than its character count makes it look.
+  it('counts a tab in the quote prefix as columns when placing the marker', () => {
+    expect(withoutLeadingDirectionMarks('>\t-  \t# \u200FLatin')).toBe('>\t-  \t# Latin');
+    const code = '>-  \t# \u200FLatin';
+    expect(withoutLeadingDirectionMarks(code)).toBe(code);
   });
 
   // A checkbox is structure only at a list item's own content start, where

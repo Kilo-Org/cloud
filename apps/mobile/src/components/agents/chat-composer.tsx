@@ -282,6 +282,13 @@ type ChatComposerProps = {
    */
   deliveredDraft?: string | null;
   /**
+   * Whether the host already knows this prompt's send was delivered, asked
+   * before a failed send is restored. The manager can classify a lost answer as
+   * delivered when the confirmed row arrives first; restoring then would put
+   * the same text beside the delivered message, one Send away from a duplicate.
+   */
+  isPromptDelivered?: (text: string) => boolean;
+  /**
    * Called once the composer has consumed `deliveredDraft`. The host clears the
    * record with it, so the suppression cannot outlive the load it was published
    * for and take a later draft with the same words.
@@ -357,6 +364,7 @@ export function ChatComposer({
   draftKey,
   initialDraft,
   deliveredDraft = null,
+  isPromptDelivered,
   onDeliveredDraftConsumed,
   sessionId = null,
   suggestion = null,
@@ -1354,9 +1362,13 @@ export function ChatComposer({
               // path and submission messageUuid for the next message.
               upload.commitSent();
             } catch (error) {
+              // The row may already be confirmed: the host answers that before
+              // anything is put back, so a delivered prompt never reappears in
+              // the composer beside its own message.
+              const delivered = isPromptDelivered?.(prompt) === true;
               // Transport failure: restore only when the composer is still
               // empty, so a newer draft is never overwritten.
-              if (!hasContentRef.current()) {
+              if (!delivered && !hasContentRef.current()) {
                 if (prompt !== '') {
                   applyComposerText(prompt);
                 }

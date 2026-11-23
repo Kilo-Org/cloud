@@ -42,8 +42,13 @@ export type SaveContent = Readonly<{
   description: string | undefined;
 }>;
 
-/** The last attempt whose response never arrived: what it submitted, and the ids that scope held just before it. */
+/**
+ * The last attempt whose response never arrived: the account it was made in,
+ * what it submitted, and the ids that account held just before it.
+ */
 export type UnknownSaveAttempt = Readonly<{
+  /** The account the attempt wrote into; `null` is Personal. */
+  scope: string | null;
   name: string;
   knownIds: ReadonlySet<string>;
   content: SaveContent;
@@ -140,6 +145,12 @@ export type LostSaveQuery = Readonly<{
  * The profile a lost attempt created, or null when the collision belongs to
  * somebody else.
  *
+ * The attempt counts only in the account it was made in. `knownIds` is that
+ * account's own list before the write, so the record describes that account and
+ * nothing else: `recoverLostSave` compares it with the same account's rows, and
+ * returns nothing when the account differs. The account is therefore checked
+ * before anything else.
+ *
  * The id diff is what separates the two: a row with the submitted name that the
  * panel did not know before the attempt can only be there because a write landed
  * in between, so exactly one such row is that attempt's own commit. A row the
@@ -165,6 +176,9 @@ export function lostSaveProfile({
   attempt,
   retried,
 }: LostSaveQuery): ProfileSelectorProfile | null {
+  if (attempt.scope !== (organizationId ?? null)) {
+    return null;
+  }
   if (!sameSaveContent(attempt.content, retried)) {
     return null;
   }

@@ -198,6 +198,21 @@ function mount(
 }
 
 /**
+ * Re-render the mounted harness under another account: the tree stays mounted,
+ * so the harness keeps its own draft and selection and only the scope prop
+ * moves.
+ */
+function rerenderWithScope(
+  renderer: TestRenderer.ReactTestRenderer,
+  organizationId?: string,
+  onSelectProfile?: (id: string | null) => void
+) {
+  act(() => {
+    renderer.update(createElement(ControlledPanel, { organizationId, onSelectProfile }));
+  });
+}
+
+/**
  * A captured callback prop. Renderer props are untyped, so the value enters as
  * `unknown` and is narrowed once before the test calls through it.
  */
@@ -672,6 +687,385 @@ describe('AdvancedConfigPanel', () => {
     expect(texts(renderer)).toContain('1 var · 1 setup cmd');
   });
 
+  it('offers a saved profile only under the account that saved it', async () => {
+    const mocks = mutations();
+    const onSelectProfile = vi.fn<(id: string | null) => void>();
+    const renderer = mount({ mocks, organizationId: 'org-1', onSelectProfile });
+    fillManualConfig(renderer);
+    press(buttonByText(renderer, 'Save as profile'));
+    await submitSave(renderer, 'My Setup');
+
+    // The row shows in the account it was saved in, before the invalidated
+    // refetch lands, and the save picks it for this session.
+    expect(onSelectProfile).toHaveBeenCalledWith('new-1');
+    expect(texts(renderer)).toContain('1 var · 1 setup cmd');
+
+    // The panel stays mounted while the account moves to another organization,
+    // whose list holds no profile at all.
+    listMock.useAgentProfileList.mockImplementation((scope?: string) =>
+      listState(scope === 'org-1' ? {} : { personalProfiles: [] })
+    );
+    rerenderWithScope(renderer, 'org-2', onSelectProfile);
+
+    // Org-2 counts only its own rows.
+    expect(texts(renderer)).not.toContain('1 var · 1 setup cmd');
+  });
+
+  it('finishes a save only in the account it started in', async () => {
+    const mocks = mutations();
+    const write = Promise.withResolvers<{ id: string }>();
+    mocks.create.mutateAsync.mockReturnValue(write.promise);
+    const onSelectProfile = vi.fn<(id: string | null) => void>();
+    const renderer = mount({ mocks, organizationId: 'org-1', onSelectProfile });
+    fillManualConfig(renderer);
+    press(buttonByText(renderer, 'Save as profile'));
+    typeInto(renderer, 'Profile name', 'My Setup');
+    // Start the write without waiting for its answer.
+    act(() => {
+      (renderer.root.findByType('SheetHeader' as never).props.onDone as () => void)();
+    });
+
+    listMock.useAgentProfileList.mockImplementation(() => listState({ personalProfiles: [] }));
+    rerenderWithScope(renderer, 'org-2', onSelectProfile);
+    await act(async () => {
+      write.resolve({ id: 'new-1' });
+      await Promise.resolve();
+    });
+
+    // The profile belongs to org-1, so the account on screen neither offers nor
+    // picks it.
+    expect(onSelectProfile).not.toHaveBeenCalled();
+    // The form keeps the configuration it holds.
+    expect(texts(renderer)).toContain('API_KEY');
+    // The draft's counts and the saved row's counts are the same pair, so
+    // dropping the draft's command makes the two distinguishable: the account
+    // on screen counts only what its draft holds, while a row published into it
+    // would add its own var and its saved command on top.
+    typeInto(renderer, 'Command 1', '');
+    expect(texts(renderer)).toContain('1 var');
+    expect(texts(renderer)).not.toContain('2 vars');
+    // The save did complete, so the person still sees the confirmation.
+    expect(toast.success).toHaveBeenCalledTimes(1);
+  });
+
+  it('re-offers no saved row after returning to the account it was saved in', async () => {
+    const mocks = mutations();
+    const onSelectProfile = vi.fn<(id: string | null) => void>();
+    // Neither account's list holds a row, so the only thing an account could
+    // offer here is the record this panel wrote there.
+    const renderer = mount({
+      mocks,
+      organizationId: 'org-1',
+      list: { personalProfiles: [] },
+      onSelectProfile,
+    });
+    fillManualConfig(renderer);
+    press(buttonByText(renderer, 'Save as profile'));
+    await submitSave(renderer, 'My Setup');
+
+    // The saved row publishes in the account that saved it.
+    expect(onSelectProfile).toHaveBeenCalledWith('new-1');
+    expect(texts(renderer)).toContain('1 var · 1 setup cmd');
+
+    rerenderWithScope(renderer, 'org-2', onSelectProfile);
+    expect(texts(renderer)).not.toContain('1 var · 1 setup cmd');
+
+    rerenderWithScope(renderer, 'org-1', onSelectProfile);
+
+    // The record described that visit only: the profile may have been deleted
+    // since, so a return to the account starts from the account's own list.
+    expect(texts(renderer)).not.toContain('1 var · 1 setup cmd');
+    expect(onSelectProfile).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the account on screen's own saved row when a later settlement belongs to another account", async () => {
+    const mocks = mutations();
+    const firstWrite = Promise.withResolvers<{ id: string }>();
+    mocks.create.mutateAsync
+      .mockReturnValueOnce(firstWrite.promise)
+      .mockResolvedValue({ id: 'org2-1' });
+    const onSelectProfile = vi.fn<(id: string | null) => void>();
+    const renderer = mount({
+      mocks,
+      organizationId: 'org-1',
+      list: { personalProfiles: [] },
+      onSelectProfile,
+    });
+    fillManualConfig(renderer);
+    press(buttonByText(renderer, 'Save as profile'));
+    typeInto(renderer, 'Profile name', 'My Setup');
+    // Start the write without waiting for its answer.
+    act(() => {
+      (renderer.root.findByType('SheetHeader' as never).props.onDone as () => void)();
+    });
+
+    // The account moves while the write is still unanswered.
+    rerenderWithScope(renderer, 'org-2', onSelectProfile);
+    // Org-2 saves a profile of its own, with a draft that counts differently so
+    // the two rows are distinguishable: its save settles first.
+    addVariable(renderer, 'SECOND', 'xyz');
+    press(buttonByText(renderer, 'Save as profile'));
+    await submitSave(renderer, 'Second Setup');
+
+    expect(onSelectProfile).toHaveBeenCalledWith('org2-1');
+    expect(texts(renderer)).toContain('2 vars · 1 setup cmd');
+
+    // Org-1's write settles now, into an account the panel has left: it
+    // publishes nothing here, so org-2's row and counts stay on screen.
+    await act(async () => {
+      firstWrite.resolve({ id: 'new-1' });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(texts(renderer)).toContain('2 vars · 1 setup cmd');
+    expect(texts(renderer)).not.toContain('1 var · 1 setup cmd');
+    expect(onSelectProfile).not.toHaveBeenCalledWith('new-1');
+    expect(onSelectProfile).toHaveBeenCalledTimes(1);
+    // The write did complete in the account that received it, so both saves are
+    // reported.
+    expect(toast.success).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps the account on screen's saved row when a later lost attempt belongs to another account", async () => {
+    const mocks = mutations();
+    const firstWrite = Promise.withResolvers<{ id: string }>();
+    mocks.create.mutateAsync
+      .mockReturnValueOnce(firstWrite.promise)
+      .mockResolvedValue({ id: 'org2-1' });
+    const onSelectProfile = vi.fn<(id: string | null) => void>();
+    const renderer = mount({
+      mocks,
+      organizationId: 'org-1',
+      list: { personalProfiles: [] },
+      onSelectProfile,
+    });
+    fillManualConfig(renderer);
+    press(buttonByText(renderer, 'Save as profile'));
+    typeInto(renderer, 'Profile name', 'My Setup');
+    // Start the write without waiting for its answer.
+    act(() => {
+      (renderer.root.findByType('SheetHeader' as never).props.onDone as () => void)();
+    });
+
+    // The account moves while the write is still unanswered, and org-2 saves a
+    // profile of its own from a draft that counts differently, so the two rows
+    // can be told apart.
+    rerenderWithScope(renderer, 'org-2', onSelectProfile);
+    addVariable(renderer, 'SECOND', 'xyz');
+    press(buttonByText(renderer, 'Save as profile'));
+    await submitSave(renderer, 'Second Setup');
+
+    expect(onSelectProfile).toHaveBeenCalledWith('org2-1');
+    expect(texts(renderer)).toContain('2 vars · 1 setup cmd');
+
+    // Org-1's write now fails with a transport wrapper and no server sentence,
+    // so its outcome is unknown: the attempt is recorded against org-1, the
+    // account it was made in, and not against the account on screen.
+    await act(async () => {
+      firstWrite.reject(
+        Object.assign(new Error('Network request failed'), { name: 'TRPCClientError' })
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // Org-2's row and counts are still the ones on screen, and org-1's row never
+    // appears in it.
+    expect(texts(renderer)).toContain('2 vars · 1 setup cmd');
+    expect(texts(renderer)).not.toContain('1 var · 1 setup cmd');
+    expect(onSelectProfile).toHaveBeenCalledTimes(1);
+    // Only org-2's save completed, so only it is confirmed.
+    expect(toast.success).toHaveBeenCalledTimes(1);
+  });
+
+  it('recovers an unanswered attempt after visiting another account and returning', async () => {
+    const mocks = mutations();
+    const refusal = 'A profile with this name already exists';
+    // The first attempt's response never arrives: a transport wrapper named like
+    // a client error, carrying no envelope, so the outcome is unknown. The retry
+    // collides on the name the unanswered write had already stored.
+    mocks.create.mutateAsync
+      .mockRejectedValueOnce(
+        Object.assign(new Error('Network request failed'), { name: 'TRPCClientError' })
+      )
+      .mockRejectedValueOnce(
+        Object.assign(new Error(refusal), {
+          name: 'TRPCClientError',
+          data: { code: 'CONFLICT', httpStatus: 409, path: 'agentProfiles.create', zodError: null },
+        })
+      );
+    const created: ProfileSelectorProfile = {
+      id: 'prod-1',
+      name: 'prod',
+      varCount: 1,
+      commandCount: 1,
+      isDefault: false,
+      ownerType: 'organization',
+    };
+    // Org-1's combined read holds the row the unanswered write stored.
+    const refetch = vi
+      .fn()
+      .mockResolvedValue({ data: { orgProfiles: [created], personalProfiles: [] } });
+    const onSelectProfile = vi.fn<(id: string | null) => void>();
+    const renderer = mount({ mocks, organizationId: 'org-1', list: { refetch }, onSelectProfile });
+    fillManualConfig(renderer);
+    press(buttonByText(renderer, 'Save as profile'));
+
+    // The write is left unanswered, then the panel visits another account and
+    // comes back before the person retries.
+    await submitSave(renderer, 'prod');
+    rerenderWithScope(renderer, 'org-2', onSelectProfile);
+    rerenderWithScope(renderer, 'org-1', onSelectProfile);
+
+    await act(async () => {
+      (renderer.root.findByType('SheetHeader' as never).props.onDone as () => void)();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mocks.create.mutateAsync).toHaveBeenCalledTimes(2);
+    // The attempt was made in org-1, so returning to org-1 keeps it, and the row
+    // absent from that account's list before the attempt is its own commit.
+    expect(refetch).toHaveBeenCalled();
+    expect(onSelectProfile).toHaveBeenCalledWith('prod-1');
+    expect(toast.success).toHaveBeenCalledTimes(1);
+    // The save completed on the recovered row: the sheet closed, the draft it
+    // carried cleared and the duplicate sentence never reached the person.
+    expect(renderer.root.findAll(node => node.type === SaveProfileSheet)).toHaveLength(0);
+    expect(texts(renderer)).not.toContain('API_KEY');
+    expect(texts(renderer)).not.toContain(refusal);
+    expect(buttonByText(renderer, 'Save as profile')).toBeUndefined();
+  });
+
+  it('reports a name that is taken once the unanswered write has completed', async () => {
+    const mocks = mutations();
+    const refusal = 'A profile with this name already exists';
+    const created: ProfileSelectorProfile = {
+      id: 'prod-1',
+      name: 'prod',
+      varCount: 1,
+      commandCount: 1,
+      isDefault: false,
+      ownerType: 'user',
+    };
+    // The first attempt's response never arrives; the retry collides on the row
+    // that write stored, and the third attempt collides on the same row after
+    // the save has already completed.
+    mocks.create.mutateAsync
+      .mockRejectedValueOnce(
+        Object.assign(new Error('Network request failed'), { name: 'TRPCClientError' })
+      )
+      .mockRejectedValue(
+        Object.assign(new Error(refusal), {
+          name: 'TRPCClientError',
+          data: { code: 'CONFLICT', httpStatus: 409, path: 'agentProfiles.create', zodError: null },
+        })
+      );
+    const refetch = vi.fn().mockResolvedValue({ data: [BACKEND, created] });
+    const onSelectProfile = vi.fn<(id: string | null) => void>();
+    const renderer = mount({ mocks, list: { refetch }, onSelectProfile });
+    fillManualConfig(renderer);
+    press(buttonByText(renderer, 'Save as profile'));
+    await submitSave(renderer, 'prod');
+    await act(async () => {
+      (renderer.root.findByType('SheetHeader' as never).props.onDone as () => void)();
+      await Promise.resolve();
+    });
+
+    // The retry converged on the row the unanswered write stored.
+    expect(onSelectProfile).toHaveBeenCalledWith('prod-1');
+    expect(toast.success).toHaveBeenCalledTimes(1);
+
+    // The completed save retires the record of that write, so a later collision
+    // on the same name is a name that is taken, not another completion. The
+    // panel is already expanded, so the draft is filled directly.
+    addVariable(renderer, 'API_KEY', 'abc');
+    press(buttonByText(renderer, 'Add command'));
+    typeInto(renderer, 'Command 1', 'pnpm install');
+    press(buttonByText(renderer, 'Save as profile'));
+    await submitSave(renderer, 'prod');
+
+    expect(mocks.create.mutateAsync).toHaveBeenCalledTimes(3);
+    expect(onSelectProfile).toHaveBeenCalledTimes(1);
+    expect(toast.success).toHaveBeenCalledTimes(1);
+    expect(saveSheetMessage(renderer)).toBe(refusal);
+  });
+
+  it("resolves a retry against this account's own record", async () => {
+    const mocks = mutations();
+    const refusal = 'A profile with this name already exists';
+    const firstWrite = Promise.withResolvers<{ id: string }>();
+    // Each account keeps its own save record.
+    mocks.create.mutateAsync
+      .mockReturnValueOnce(firstWrite.promise)
+      .mockResolvedValueOnce({ id: 'org2-1' })
+      .mockRejectedValueOnce(
+        Object.assign(new Error(refusal), {
+          name: 'TRPCClientError',
+          data: { code: 'CONFLICT', httpStatus: 409, path: 'agentProfiles.create', zodError: null },
+        })
+      );
+    const created: ProfileSelectorProfile = {
+      id: 'prod-1',
+      name: 'prod',
+      varCount: 1,
+      commandCount: 1,
+      isDefault: false,
+      ownerType: 'organization',
+    };
+    const refetch = vi
+      .fn()
+      .mockResolvedValue({ data: { orgProfiles: [created], personalProfiles: [] } });
+    const onSelectProfile = vi.fn<(id: string | null) => void>();
+    const renderer = mount({
+      mocks,
+      organizationId: 'org-1',
+      list: { personalProfiles: [], refetch },
+      onSelectProfile,
+    });
+    fillManualConfig(renderer);
+    press(buttonByText(renderer, 'Save as profile'));
+    typeInto(renderer, 'Profile name', 'prod');
+    // Start the write without waiting for its answer.
+    act(() => {
+      (renderer.root.findByType('SheetHeader' as never).props.onDone as () => void)();
+    });
+
+    // The panel moves to org-2 while that save is still open.
+    rerenderWithScope(renderer, 'org-2', onSelectProfile);
+
+    // A transport wrapper carries no outcome, so the attempt belongs to the
+    // account the save was made in.
+    await act(async () => {
+      firstWrite.reject(
+        Object.assign(new Error('Network request failed'), { name: 'TRPCClientError' })
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // Org-2 then completes a save of its own.
+    addVariable(renderer, 'SECOND', 'xyz');
+    press(buttonByText(renderer, 'Save as profile'));
+    await submitSave(renderer, 'Second Setup');
+    expect(onSelectProfile).toHaveBeenCalledWith('org2-1');
+
+    // Back in org-1, the retry resolves against org-1's own record.
+    rerenderWithScope(renderer, 'org-1', onSelectProfile);
+    addVariable(renderer, 'API_KEY', 'abc');
+    press(buttonByText(renderer, 'Add command'));
+    typeInto(renderer, 'Command 1', 'pnpm install');
+    press(buttonByText(renderer, 'Save as profile'));
+    await submitSave(renderer, 'prod');
+
+    expect(mocks.create.mutateAsync).toHaveBeenCalledTimes(3);
+    expect(refetch).toHaveBeenCalled();
+    expect(onSelectProfile).toHaveBeenCalledWith('prod-1');
+    expect(toast.success).toHaveBeenCalledTimes(2);
+    expect(renderer.root.findAll(node => node.type === SaveProfileSheet)).toHaveLength(0);
+  });
+
   it('keeps the save sheet open and the typed name when the save fails', async () => {
     const mocks = mutations();
     mocks.create.mutateAsync.mockRejectedValue(new Error('nope'));
@@ -860,6 +1254,59 @@ describe('AdvancedConfigPanel', () => {
     // retry cannot create a second profile holding only part of the config.
     expect(mocks.create.mutateAsync.mock.calls[0]).toEqual([MANUAL_PAYLOAD]);
     expect(mocks.create.mutateAsync.mock.calls[1]).toEqual(mocks.create.mutateAsync.mock.calls[0]);
+  });
+
+  it('reads a recorded save only in the account that recorded it', async () => {
+    const mocks = mutations();
+    const refusal = 'A profile with this name already exists';
+    const lost = Promise.withResolvers<never>();
+    // The first attempt never answers; its rejection arrives after the move.
+    mocks.create.mutateAsync.mockReturnValueOnce(lost.promise).mockRejectedValueOnce(
+      Object.assign(new Error(refusal), {
+        name: 'TRPCClientError',
+        data: { code: 'CONFLICT', httpStatus: 409, path: 'agentProfiles.create', zodError: null },
+      })
+    );
+    const other: ProfileSelectorProfile = {
+      id: 'org2-1',
+      name: 'prod',
+      varCount: 1,
+      commandCount: 1,
+      isDefault: false,
+      ownerType: 'organization',
+    };
+    // Org-2's list holds a row of that name.
+    const refetch = vi
+      .fn()
+      .mockResolvedValue({ data: { orgProfiles: [other], personalProfiles: [] } });
+    const onSelectProfile = vi.fn<(id: string | null) => void>();
+    const renderer = mount({ mocks, organizationId: 'org-1', list: { refetch }, onSelectProfile });
+    fillManualConfig(renderer);
+    press(buttonByText(renderer, 'Save as profile'));
+    typeInto(renderer, 'Profile name', 'prod');
+    act(() => {
+      (renderer.root.findByType('SheetHeader' as never).props.onDone as () => void)();
+    });
+
+    // The account moves while the write is still unanswered.
+    rerenderWithScope(renderer, 'org-2', onSelectProfile);
+    await act(async () => {
+      lost.reject(Object.assign(new Error('Network request failed'), { name: 'TRPCClientError' }));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // The retry in org-2 collides on the name.
+    await act(async () => {
+      (renderer.root.findByType('SheetHeader' as never).props.onDone as () => void)();
+      await Promise.resolve();
+    });
+
+    expect(mocks.create.mutateAsync).toHaveBeenCalledTimes(2);
+    // The record belongs to org-1, so org-2's rows complete no save here.
+    expect(onSelectProfile).not.toHaveBeenCalled();
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(saveSheetMessage(renderer)).toBe(refusal);
   });
 
   it('converges a retry that collides on the name onto the lost attempt that created it', async () => {

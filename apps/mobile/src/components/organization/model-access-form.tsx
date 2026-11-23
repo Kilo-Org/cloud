@@ -501,8 +501,11 @@ export function ModelAccessForm({
                   here rather than on the line's own content. It follows the
                   actions, as the consent footer's does, because a reserve above
                   them leaves a band of empty page under the list's last row, and
-                  the row card then reads as clipped short of the bar. */}
-              <View className="min-h-5 justify-center">
+                  the row card then reads as clipped short of the bar.
+                  The reserve is two lines: the refusal sentences this form shows
+                  wrap at this width, and a one-line reserve would raise the pair
+                  when one appears instead of holding it still. */}
+              <View className="min-h-[35px] justify-center">
                 <AccessibleStatus
                   message={statusMessage}
                   tone={feedback.status === 'failed' ? 'error' : 'status'}

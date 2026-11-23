@@ -55,6 +55,30 @@ function findEnvironmentDetailsCacheTargetIndex(
   return environmentDetailsIndex > 0 ? environmentDetailsIndex - 1 : undefined;
 }
 
+/**
+ * The content index a cache breakpoint should land on for a message in `role`:
+ * the block just before the user's `<environment_details>` text. Undefined when
+ * the role has no such target.
+ */
+function environmentDetailsCacheTargetIndex(
+  content: ReadonlyArray<{ type: string; text?: string }>,
+  role: string
+): number | undefined {
+  return role === 'user' ? findEnvironmentDetailsCacheTargetIndex(content) : undefined;
+}
+
+function findCacheTargetBlock<T extends { type: string; text?: string }>(
+  content: ReadonlyArray<T>,
+  role: string
+) {
+  const cacheTargetIndex = environmentDetailsCacheTargetIndex(content, role);
+  if (cacheTargetIndex !== undefined) {
+    return content[cacheTargetIndex];
+  }
+  const lastBlock = content.at(-1);
+  return lastBlock;
+}
+
 function setCacheControlOnChatCompletionsMessage(message: OpenAI.ChatCompletionMessageParam) {
   if (typeof message.content === 'string') {
     message.content = [
@@ -66,10 +90,10 @@ function setCacheControlOnChatCompletionsMessage(message: OpenAI.ChatCompletionM
       },
     ];
   } else if (Array.isArray(message.content)) {
-    const cacheTargetIndex =
-      message.role === 'user' ? findEnvironmentDetailsCacheTargetIndex(message.content) : undefined;
-    const cacheTarget =
-      cacheTargetIndex === undefined ? message.content.at(-1) : message.content[cacheTargetIndex];
+    const content: Array<
+      OpenAI.ChatCompletionContentPart | OpenAI.ChatCompletionContentPartRefusal
+    > = message.content;
+    const cacheTarget = findCacheTargetBlock(content, message.role);
     if (cacheTarget) {
       // @ts-expect-error non-standard extension
       cacheTarget.cache_control = { type: 'ephemeral' };
@@ -102,12 +126,7 @@ function setPromptCacheBreakpointOnResponsesMessage(message: OpenAI.Responses.Re
         },
       ];
     } else if (Array.isArray(message.content)) {
-      const cacheTargetIndex =
-        message.role === 'user'
-          ? findEnvironmentDetailsCacheTargetIndex(message.content)
-          : undefined;
-      const cacheTarget =
-        cacheTargetIndex === undefined ? message.content.at(-1) : message.content[cacheTargetIndex];
+      const cacheTarget = findCacheTargetBlock(message.content, message.role);
       if (cacheTarget) {
         cacheTarget.prompt_cache_breakpoint = RESPONSES_PROMPT_CACHE_BREAKPOINT;
       }
@@ -143,17 +162,20 @@ function setCacheControlOnMessagesMessage(
       },
     ];
   } else {
-    const environmentDetailsCacheTargetIndex =
-      message.role === 'user' ? findEnvironmentDetailsCacheTargetIndex(message.content) : undefined;
+    const content: Anthropic.ContentBlockParam[] = message.content;
+    const environmentDetailsTargetIndex = environmentDetailsCacheTargetIndex(content, message.role);
     const environmentDetailsCacheTarget =
-      environmentDetailsCacheTargetIndex === undefined
+      environmentDetailsTargetIndex === undefined
         ? undefined
-        : message.content[environmentDetailsCacheTargetIndex];
+        : content[environmentDetailsTargetIndex];
+    // The environment-details block is preferred, but a `thinking` or `redacted_thinking`
+    // block cannot hold it: a Messages breakpoint must not land on reasoning output.
+    const lastCacheableBlock = content.findLast(isCacheableMessagesContentBlock);
     const cacheTarget =
       environmentDetailsCacheTarget &&
       isCacheableMessagesContentBlock(environmentDetailsCacheTarget)
         ? environmentDetailsCacheTarget
-        : message.content.findLast(isCacheableMessagesContentBlock);
+        : lastCacheableBlock;
     if (cacheTarget) {
       cacheTarget.cache_control = cacheControl;
     }
@@ -175,6 +197,17 @@ function setCacheControlOnMessagesSystem(
 }
 
 /**
+ * The two Messages content block types that carry reasoning output: `thinking` and
+ * `redacted_thinking`. One predicate owns that set, so every reader agrees on which blocks
+ * are reasoning.
+ */
+export function isThinkingContentBlock(
+  item: Anthropic.ContentBlockParam
+): item is Anthropic.ThinkingBlockParam | Anthropic.RedactedThinkingBlockParam {
+  return item.type === 'thinking' || item.type === 'redacted_thinking';
+}
+
+/**
  * A Messages content block may carry a cache breakpoint, except a `thinking`
  * or `redacted_thinking` block: those are reasoning output, and a breakpoint
  * belongs on content the model was asked to read.
@@ -185,7 +218,7 @@ export function isCacheableMessagesContentBlock(
   Anthropic.ContentBlockParam,
   Anthropic.ThinkingBlockParam | Anthropic.RedactedThinkingBlockParam
 > {
-  return item.type !== 'thinking' && item.type !== 'redacted_thinking';
+  return !isThinkingContentBlock(item);
 }
 
 function hasCacheableMessagesContent(message: Anthropic.MessageParam) {
@@ -194,15 +227,13 @@ function hasCacheableMessagesContent(message: Anthropic.MessageParam) {
     : message.content.some(isCacheableMessagesContentBlock);
 }
 
-const CACHE_CONTROL_NODE_BUDGET = 100_000;
+/** Bounds the cache-control traversal of a client-supplied request payload. */
+export const CACHE_CONTROL_NODE_BUDGET = 100_000;
 
 function containsCacheControl(value: unknown): boolean {
   const pending: unknown[] = [value];
   let visited = 0;
   while (pending.length > 0) {
-    if (visited >= CACHE_CONTROL_NODE_BUDGET) {
-      return true;
-    }
     const current = pending.pop();
     visited += 1;
     let children: readonly unknown[];
@@ -219,6 +250,8 @@ function containsCacheControl(value: unknown): boolean {
     } else {
       continue;
     }
+    // Bounds the queued frontier and, through it, the total visited work. An over-budget payload
+    // returns `true` so the caller skips the transformation.
     if (visited + pending.length + children.length > CACHE_CONTROL_NODE_BUDGET) {
       return true;
     }
@@ -314,22 +347,6 @@ export function fixResponsesRequest(request: GatewayResponsesRequest) {
   }
 }
 
-export function removeChatCompletionsToolNames(request: OpenRouterChatCompletionRequest) {
-  for (const message of request.messages) {
-    if (message.role === 'tool' && 'name' in message) {
-      delete message.name;
-    }
-  }
-}
-
-export function removeChatCompletionsMessageNames(request: OpenRouterChatCompletionRequest) {
-  for (const message of request.messages) {
-    if ('name' in message) {
-      delete message.name;
-    }
-  }
-}
-
 function mapReasoningDetailsToReasoningString(
   request: OpenRouterChatCompletionRequest,
   field: 'reasoning_content' | 'reasoning'
@@ -396,61 +413,6 @@ export function scrubOpenCodeSpecificProperties(request: OpenRouterChatCompletio
   delete body.description;
   delete body.usage;
   delete body.reasoningEffort;
-}
-
-export function isReasoningExplicitlyDisabled(request: GatewayRequest) {
-  if (request.kind === 'messages') {
-    return request.body.thinking?.type === 'disabled';
-  }
-  if (request.kind === 'responses') {
-    return request.body.reasoning?.effort === 'none';
-  }
-  if (request.body.reasoning?.enabled === true) {
-    return false;
-  }
-  return (
-    (request.body.reasoning?.effort ?? request.body.reasoning_effort) === 'none' ||
-    request.body.enable_thinking === false || // Alibaba
-    request.body.thinking?.type === 'disabled' // Bytedance
-  );
-}
-
-/**
- * Strict OpenAI-compatible upstreams reject OpenRouter's top-level `reasoning`
- * object as an unknown parameter, so its effort is carried over as the
- * standard `reasoning_effort` instead. `reasoning: { enabled: false }` maps to
- * `reasoning_effort: 'none'` only for upstreams that accept that value; others,
- * such as Chutes, reject it.
- */
-export function replaceReasoningObjectWithReasoningEffort(
-  request: GatewayRequest,
-  { disableWithNoneEffort = false }: { disableWithNoneEffort?: boolean } = {}
-) {
-  if (request.kind !== 'chat_completions') {
-    return;
-  }
-  const reasoning = request.body.reasoning;
-  const reasoningEffort =
-    reasoning?.effort ??
-    (disableWithNoneEffort && reasoning?.enabled === false ? 'none' : undefined);
-  if (reasoningEffort) {
-    request.body.reasoning_effort ??= reasoningEffort;
-  }
-  delete request.body.reasoning;
-}
-
-/**
- * For Chat Completions upstreams that gate reasoning with a `thinking: { type }`
- * toggle and reject OpenRouter's top-level `reasoning` object: BytePlus, Z.ai,
- * and Kimi Code. The toggle mirrors an explicit client disable, and the
- * reasoning object is replaced because its `effort` has to reach those
- * upstreams as the standard `reasoning_effort` instead.
- */
-export function applyThinkingToggleAndReasoningEffort(request: GatewayRequest) {
-  request.body.thinking = {
-    type: isReasoningExplicitlyDisabled(request) ? 'disabled' : 'enabled',
-  };
-  replaceReasoningObjectWithReasoningEffort(request);
 }
 
 export function enableReasoningSummaries(request: GatewayRequest) {

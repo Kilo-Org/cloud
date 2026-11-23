@@ -22,6 +22,7 @@ export type ConnectionConfig = {
   onDisconnected: () => void;
   onUnexpectedDisconnect?: (() => void) | undefined;
   onReconnected?: (() => void) | undefined;
+  onReconnectExhaustionChange?: ((exhausted: boolean) => void) | undefined;
   onError?: ((error: StreamError) => void) | undefined;
   onRefreshTicket?: (() => Promise<CloudAgentStreamTicketResult>) | undefined;
   heartbeatTimeoutMs?: number | undefined;
@@ -66,18 +67,16 @@ function parseMessage(data: unknown): ParsedMessage | null {
 }
 
 const AUTH_FAILURE_CLOSE_CODES = [1008, 4001] as const;
-const AUTH_FAILURE_KEYWORDS = ['unauthorized', '401', 'auth', 'ticket'] as const;
-
-function isAuthFailureCode(code: number): boolean {
-  return AUTH_FAILURE_CLOSE_CODES.some(authFailureCode => authFailureCode === code);
-}
+// A bad ticket is rejected with HTTP 401/403 before the upgrade, so the browser
+// reports 1006: free-text reasons only count as auth when they name an explicit
+// rejection. A bare mention of auth or a ticket describes a transient fault.
+const AUTH_FAILURE_REASON = /\b(?:unauthorized|401)\b/;
 
 function isAuthFailureClose(event: CloseEvent): boolean {
-  if (isAuthFailureCode(event.code)) {
+  if (AUTH_FAILURE_CLOSE_CODES.some(authFailureCode => authFailureCode === event.code)) {
     return true;
   }
-  const reason = event.reason?.toLowerCase() ?? '';
-  return AUTH_FAILURE_KEYWORDS.some(keyword => reason.includes(keyword));
+  return AUTH_FAILURE_REASON.test(event.reason?.toLowerCase() ?? '');
 }
 
 export function createConnection(config: ConnectionConfig): Connection {
@@ -108,6 +107,7 @@ export function createConnection(config: ConnectionConfig): Connection {
     onDisconnected: config.onDisconnected,
     onUnexpectedDisconnect: config.onUnexpectedDisconnect,
     onReconnected: config.onReconnected,
+    onReconnectExhaustionChange: config.onReconnectExhaustionChange,
     onError: config.onError
       ? message =>
           config.onError?.({

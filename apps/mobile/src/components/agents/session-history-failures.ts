@@ -36,14 +36,43 @@ export const SESSION_HISTORY_FAILURES = {
 export type SessionHistoryFailureKind = keyof typeof SESSION_HISTORY_FAILURES;
 
 /**
- * The failures a retry cannot recover: the stored page is oversize or
- * unreadable, so the same read answers the same way every time. A retryable
- * failure is absent by design — offering Retry for it is correct.
+ * The reader copy key for each kind a retry cannot recover, keyed by the kind
+ * so a kind added later fails the type check here instead of borrowing the
+ * unreadable-data line.
  */
-export const TERMINAL_SESSION_HISTORY_FAILURE_MESSAGES: readonly string[] = [
-  SESSION_HISTORY_FAILURES.too_large.message,
-  SESSION_HISTORY_FAILURES.invalid_data.message,
-];
+const TERMINAL_HISTORY_COPY_KEY = {
+  too_large: 'agentChat.session.historyTooLarge',
+  invalid_data: 'agentChat.session.historyUnavailable',
+} as const;
+
+/** A kind a retry cannot recover. */
+type TerminalSessionHistoryFailureKind = keyof typeof TERMINAL_HISTORY_COPY_KEY;
+
+/**
+ * The reader copy key for a failure kind, so the terminal state names the
+ * failure from its type instead of matching the wire's English message. The
+ * English `message` stays the wire identity of the row itself.
+ */
+function sessionHistoryFailureCopyKey(
+  kind: TerminalSessionHistoryFailureKind
+): (typeof TERMINAL_HISTORY_COPY_KEY)[TerminalSessionHistoryFailureKind] {
+  return TERMINAL_HISTORY_COPY_KEY[kind];
+}
+
+/**
+ * The reader's copy and retryability for a typed transcript-read failure. The
+ * retryable kind names this app's own temporary outage and keeps its Retry;
+ * a terminal kind names a stored page a retry re-reads unchanged. The raw
+ * string stays in `detail` for Copy.
+ */
+export function sessionHistoryFailureCopy(kind: SessionHistoryFailureKind): {
+  copyKey: string;
+  retryable: boolean;
+} {
+  return kind === 'retryable_failure'
+    ? { copyKey: 'agentChat.session.historyTemporarilyUnavailable', retryable: true }
+    : { copyKey: sessionHistoryFailureCopyKey(kind), retryable: false };
+}
 
 /**
  * A typed worker failure, carrying the `code` the query error readers classify

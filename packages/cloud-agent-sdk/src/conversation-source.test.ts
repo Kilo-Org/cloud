@@ -3,6 +3,7 @@ import { cloudSessionMessagesPageSchema, cloudSessionMessagesPageWireSchema } fr
 import type { CloudAgentEvent } from './cloud-conversation-schemas';
 import type { MessageInfo } from './types';
 import {
+  hasIncompleteKilo2Assets,
   hasUnresolvedKilo2Assets,
   isCompactionSummaryPart,
   kilo2AssetKey,
@@ -1017,9 +1018,8 @@ describe('unresolved native attachments degrade at message granularity', () => {
   });
 
   it('omits a message whose user file is storage-free and keeps its siblings', () => {
-    // A user file with neither bytes nor a uri cannot project: kilo2MessageSchema
-    // rejects the message before the guards, so every call site degrades it the
-    // same way as an unresolved attachment.
+    // kilo2MessageSchema rejects a file with neither bytes nor a uri, so the
+    // schema-guarded call sites degrade this message like an unresolved attachment.
     const storageFree = {
       id: 'msg_storage_free_file',
       type: 'user',
@@ -1027,11 +1027,11 @@ describe('unresolved native attachments degrade at message granularity', () => {
       text: 'attached',
       files: [{ mime: 'image/png', source: { type: 'inline' } }],
     };
-    // readKilo2Messages keeps its throwing contract for the raw message; the
-    // guarded call sites never see it because the per-event schema rejects it.
-    expect(() => readKilo2Messages(session, [storageFree as never])).toThrow(
-      'Native attachment msg_storage_free_file_000001 requires authorized asset resolution'
-    );
+    // Raw projection needs no schema: it keeps the text and emits no file part
+    // rather than a zero-byte one.
+    expect(readKilo2Messages(session, [storageFree as never])[0]?.parts).toMatchObject([
+      { id: kilo2PartId(storageFree.id, 0), type: 'text', text: 'attached' },
+    ]);
     expect(hasUnresolvedKilo2Assets(storageFree as never)).toBe(false);
 
     const display = cloudSessionMessagesPageSchema.parse({
@@ -1070,5 +1070,105 @@ describe('unresolved native attachments degrade at message granularity', () => {
       })
     ).events;
     expect(second[0]).toMatchObject({ type: 'message.updated', info: { id: followup.id } });
+  });
+});
+
+describe('absolute remote native attachments display without their file part', () => {
+  const remoteFileTool = kilo2MessageSchema.parse({
+    id: 'msg_remote_file',
+    type: 'assistant',
+    time: { created: 2, completed: 3 },
+    content: [
+      { type: 'text', text: 'kept text' },
+      {
+        type: 'tool',
+        id: 'call_remote',
+        name: 'read',
+        state: {
+          status: 'completed',
+          input: { path: '/workspace/app' },
+          content: [{ type: 'file', uri: 'https://example.test/x.png', mime: 'image/png' }],
+        },
+      },
+    ],
+  });
+
+  it('carries the message without its file part in history and in live events', () => {
+    // An absolute remote reference is never fetched on purpose, so its file part is
+    // withheld while the rest of the message displays. It is neither a recovery gap nor
+    // an incomplete transcript: content storage was never expected to provide it.
+    expect(hasIncompleteKilo2Assets(remoteFileTool)).toBe(false);
+    expect(hasUnresolvedKilo2Assets(remoteFileTool)).toBe(false);
+
+    const display = cloudSessionMessagesPageSchema.parse({
+      ...page,
+      messages: [{ message: user }, { message: remoteFileTool, parentID: user.id }],
+    });
+    expect(display?.messages.map(message => message.info.id)).toEqual([user.id, remoteFileTool.id]);
+    // The tool call is still shown; only the file it returned is withheld.
+    expect(display?.messages[1]?.parts.map(part => part.type)).toEqual(['text', 'tool']);
+    expect(display?.omittedItemCount).toBe(0);
+
+    const reader = createConversationSourceReader();
+    const events = reader.read(
+      wire('conversation.message.updated', {
+        sessionID: session.id,
+        source,
+        message: remoteFileTool,
+      })
+    ).events;
+    expect(events[0]).toMatchObject({
+      type: 'message.updated',
+      info: { id: remoteFileTool.id },
+    });
+    expect(events.filter(event => event.type === 'message.part.updated')).toHaveLength(2);
+    expect(
+      events.some(event => event.type === 'message.part.updated' && event.part.type === 'file')
+    ).toBe(false);
+    expect(JSON.stringify(events)).not.toContain('https://example.test/x.png');
+
+    const followup = {
+      id: 'msg_after_remote_file',
+      type: 'assistant',
+      time: { created: 4 },
+      content: [{ type: 'text', text: 'next turn' }],
+    };
+    const next = reader.read(
+      wire('conversation.message.updated', {
+        sessionID: session.id,
+        source,
+        message: followup,
+        parentID: user.id,
+      })
+    ).events;
+    expect(next[0]).toMatchObject({
+      type: 'message.updated',
+      info: { id: followup.id, parentID: user.id },
+    });
+    expect(next).toHaveLength(2);
+  });
+
+  it('reports an unmapped media reference as incomplete now and still recoverable', () => {
+    // Every recoverable reference is also reported incomplete: a snapshot can still
+    // authorize this one, so the message waits on recovery with no display yet.
+    const unmappedMediaTool = kilo2MessageSchema.parse({
+      id: 'msg_unmapped_media',
+      type: 'assistant',
+      time: { created: 2, completed: 3 },
+      content: [
+        {
+          type: 'tool',
+          id: 'call_media',
+          name: 'read',
+          state: {
+            status: 'completed',
+            input: {},
+            content: [{ type: 'file', uri: `media:${'f'.repeat(64)}`, mime: 'image/png' }],
+          },
+        },
+      ],
+    });
+    expect(hasIncompleteKilo2Assets(unmappedMediaTool)).toBe(true);
+    expect(hasUnresolvedKilo2Assets(unmappedMediaTool)).toBe(true);
   });
 });

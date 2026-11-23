@@ -325,15 +325,9 @@ describe('GET /api/cron/check-enkrypt-health', () => {
   });
 
   it('leaves monitoring external while preserving daily 04:00 UTC ingestion and six-hour catalog sync', () => {
-    expect(vercelConfig.crons.filter(cron => cron.path.includes('enkrypt'))).toEqual([
-      { path: '/api/cron/sync-enkrypt', schedule: '0 4 * * *' },
-    ]);
     expect(
       Object.values(vercelConfig.schedules).filter(schedule => schedule.path.includes('enkrypt'))
-    ).toEqual([]);
-    expect(vercelConfig.crons.filter(cron => cron.path === '/api/cron/sync-model-stats')).toEqual(
-      []
-    );
+    ).toEqual([{ schedule: '0 4 * * *', path: '/api/cron/sync-enkrypt', requestMethod: 'GET' }]);
     expect(vercelConfig.schedules['sync-model-stats']).toEqual({
       schedule: '0 */6 * * *',
       path: '/api/cron/sync-model-stats',

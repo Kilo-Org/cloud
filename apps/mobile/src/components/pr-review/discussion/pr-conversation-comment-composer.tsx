@@ -22,16 +22,22 @@ import {
   View,
 } from 'react-native';
 import { ComposerInlineError } from '@/components/pr-review/composer-inline-error';
-import { PrFormSheetFooter, PrFormSheetHeader } from '@/components/pr-review/pr-form-sheet-chrome';
+import {
+  PrFormSheetFooter,
+  PrFormSheetHeader,
+  useFormSheetKeyboardVisible,
+} from '@/components/pr-review/pr-form-sheet-chrome';
 import { CommentBodyField } from '@/components/pr-review/pr-review-comment-composer-parts';
 import { ensureTermsAcceptedOutcome } from '@/components/pr-review/discussion/reply-input';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Text } from '@/components/ui/text';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { connectionRefusesWrites } from '@/lib/hooks/use-offline-banner-state';
 import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { type SurfaceAttempt } from '@/lib/surface-feedback';
+import { cn } from '@/lib/utils';
 import { clearDraft, prConversationCommentDraftKey, saveDraft } from '@/lib/persist/drafts';
 import { useDraftFlushOnBackground } from '@/lib/persist/use-draft-flush';
 import { useFencedDraftLoad } from '@/lib/persist/use-draft-load';
@@ -81,6 +87,7 @@ export function PrConversationCommentComposer({
   onDismiss,
 }: PrConversationCommentComposerProps) {
   const { t } = useTranslation();
+  const keyboardVisible = useFormSheetKeyboardVisible();
   const { confirm, dialog } = useConfirmDialog();
   const addComment = useAddPrCommentMutation(prRef);
 
@@ -111,7 +118,7 @@ export function PrConversationCommentComposer({
   const { feedback, failure, begin, clearWhere } = useSurfaceFeedback<PrInlineFailure>();
 
   const isSubmitting = feedback.status === 'pending';
-  // Cancel must stay live while only the pre-submit Terms gate is in flight.
+  // Close must stay live while only the pre-submit Terms gate is in flight.
   const [awaitingGate, setAwaitingGate] = useState(false);
   const dismissalLocked = isSubmitting && !awaitingGate;
   // The attempt admitted for a submit whose Terms gate is still running.
@@ -161,7 +168,7 @@ export function PrConversationCommentComposer({
     }
     // Confirmed offline: fail the submit at once with the retryable copy
     // instead of starting a request that hangs on the UI deadline behind a
-    // spinner with a disabled Cancel (uxs3 spot check, e6-offline-hang). The
+    // spinner with a locked Close (uxs3 spot check, e6-offline-hang). The
     // draft stays intact, nothing is pending, and the same tap retries once
     // the banner clears. This is a local rejection with no toast owner, so it
     // announces through AccessibleStatus.
@@ -244,7 +251,7 @@ export function PrConversationCommentComposer({
             // stay on the composer with the text intact (the drafts.ts
             // contract for the returned boolean): dismissing anyway would
             // resurface the draft on the next open as if the discard never
-            // happened. The Cancel/back gate is the retry CTA, so the
+            // happened. The Close/back gate is the retry CTA, so the
             // inline error is retryable.
             if (userId) {
               const cleared = await clearDraft(userId, commentDraftKey);
@@ -278,8 +285,8 @@ export function PrConversationCommentComposer({
   const handleCancelRef = useRef(handleCancel);
   handleCancelRef.current = handleCancel;
 
-  // The hardware back press runs the same gate as the header close and the
-  // footer Cancel: text present asks before discarding. Without the
+  // The hardware back press runs the same gate as the header close: text
+  // present asks before discarding. Without the
   // interception the back press pops the sheet directly and the discard
   // dialog never appears. `true` consumes the event — handleCancel owns the
   // pop (onDismiss → router.back), so the router must not pop it a second
@@ -308,8 +315,8 @@ export function PrConversationCommentComposer({
   // PickerSheet invariant: [header, ScrollView] as direct children (no
   // wrapper View, no sticky-footer sibling). Footer is trailing scroll
   // content so keyboard insets keep CTAs tappable without overpainting the
-  // pinned header. The header close runs the SAME discard gate as the
-  // footer Cancel: text present asks before discarding (Android hardware
+  // pinned header. The header close runs the discard gate: text present
+  // asks before discarding (Android hardware
   // back is intercepted into the same gate). Only a confirmed discard (or a
   // successful post) clears the draft; a dismissal that keeps the text —
   // keep editing, drag-down — relies on the durable draft, so the unmount
@@ -329,7 +336,7 @@ export function PrConversationCommentComposer({
         automaticallyAdjustKeyboardInsets
         keyboardDismissMode="interactive"
       >
-        <View className="gap-4 px-6 pt-4">
+        <View className={SCREEN_BODY_CLASS}>
           {draft.settled ? (
             <CommentBodyField
               inputRef={bodyInputRef}
@@ -337,7 +344,19 @@ export function PrConversationCommentComposer({
               defaultValue={bodyRef.current}
               onChangeText={handleBodyChange}
             />
-          ) : null}
+          ) : (
+            // Keep the field's own box while the durable draft loads: the
+            // sheet then opens on the same geometry it keeps, the footer does
+            // not jump when the field mounts, and the first ink of the scroll
+            // body stays at its top (a body with no first block would leave
+            // the footer label as the first thing the screen shows).
+            <View
+              className={cn(
+                'rounded-md border border-transparent',
+                keyboardVisible ? 'min-h-12' : 'min-h-14'
+              )}
+            />
+          )}
           <ComposerInlineError feedback={feedback} />
         </View>
 
@@ -351,15 +370,6 @@ export function PrConversationCommentComposer({
             accessibilityLabel={t('prReview.composer.comment')}
           >
             <Text>{t('prReview.composer.comment')}</Text>
-          </Button>
-          <Button
-            variant="ghost"
-            onPress={handleCancel}
-            disabled={dismissalLocked}
-            className="mt-2"
-            accessibilityLabel={t('common.cancel')}
-          >
-            <Text>{t('common.cancel')}</Text>
           </Button>
         </PrFormSheetFooter>
       </ScrollView>

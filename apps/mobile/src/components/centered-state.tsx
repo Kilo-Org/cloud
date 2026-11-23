@@ -19,7 +19,11 @@ import {
 
 import { ShortCenteredBandProvider } from '@/components/centered-state-band';
 import { useStateSurface } from '@/components/centered-state-surface';
-import { RefreshProgress } from '@/components/ui/refresh-progress';
+import {
+  REFRESH_PROGRESS_REDUCED_MOTION_HEIGHT,
+  RefreshProgress,
+} from '@/components/ui/refresh-progress';
+import { useProvidedMotionPolicy } from '@/lib/a11y/motion-context';
 import {
   getCenteredStateBandStyle,
   getCenteredStateLayout,
@@ -68,15 +72,19 @@ type MeasuredViewport = { frame: StateFrame; surface: StateFrame };
  * the content back until the scroller reports its own frame. A surface whose
  * native geometry is still arriving is such a band too, for the same reason: any
  * placement built before the probe reports moves when the safe-area answer
- * lands, so the content waits one commit for the frame. The measurement answers
- * inside the commit that mounts the scroller, so the state paints placed rather
- * than at a position the measurement then corrects. It also paints at the
- * estimate whenever a measurement cannot place it at all, because a state that
- * never appears is worse than one placed by the estimate — except on a surface
- * whose native geometry never reports at all, where the content stays back
- * rather than paint a position the probe would contradict the moment it
- * answers; the probe failing is reported and visible, a silently misplaced
- * state is not.
+ * lands, so the content waits one commit for the frame. The scroller's own
+ * layout event starts the one measurement of that layout — one request per
+ * layout, not one from the ref callback beside one from a mount effect, which
+ * the token guard could only discard. On a band that can be estimated, the
+ * state paints at the estimate and takes the measured placement as soon as the
+ * native answer arrives, and the two placements are the same position. On a
+ * band that cannot be estimated, that same answer is what first places it. It
+ * also paints at the estimate whenever a measurement cannot place it at all,
+ * because a state that doesn't appear is worse than one placed by the estimate
+ * — except on a surface whose native geometry never reports at all, where the
+ * content stays back rather than paint a position the probe would contradict
+ * the moment it answers; the probe failing is reported and visible, a silently
+ * misplaced state is not.
  */
 export function CenteredState({
   children,
@@ -88,6 +96,11 @@ export function CenteredState({
   const surface = useStateSurface();
   const windowSize = useWindowDimensions();
   const shortBand = isShortViewport(windowSize.width, windowSize.height);
+  const reducedMotion = useProvidedMotionPolicy()?.reducedMotion ?? false;
+  // The box `RefreshProgress` reserves above the caller's children under reduced
+  // motion — exactly the decoration the placement must look past, so the visible
+  // stack centres in the band rather than the box that carries it.
+  const topReserve = refreshControl && reducedMotion ? REFRESH_PROGRESS_REDUCED_MOTION_HEIGHT : 0;
   // The clip the band lives in: the window, in the same window coordinates the
   // scroller reports through `measureInWindow`. Measured bands carry sub-pixel
   // noise — a re-measure of the same layout can report a different fraction of
@@ -179,20 +192,25 @@ export function CenteredState({
     setContentHeight(PixelRatio.roundToNearestPixel(event.nativeEvent.layout.height));
   }, []);
 
-  const capture = useCallback(
-    (node: ScrollViewInstance | null) => {
-      scrollRef.current = node;
-      measure();
+  // Record the node and nothing else. A measurement started here would race the
+  // scroller's own layout event, which the same mount fires: both requests are
+  // started before either native answer arrives, so the token guard would
+  // discard one of them on every mount. The callback depends on nothing, so a
+  // window-height change cannot re-create it, detach the node and mark the
+  // state unplaceable on the way back.
+  const capture = useCallback((node: ScrollViewInstance | null) => {
+    scrollRef.current = node;
+  }, []);
+
+  // The change of band invalidates a measurement still in flight, and so does
+  // the unmount: a result that describes the previous band, or a component that
+  // is gone, must not publish over newer state.
+  useLayoutEffect(
+    () => () => {
+      requestRef.current += 1;
     },
     [measure]
   );
-
-  useLayoutEffect(() => {
-    measure();
-    return () => {
-      requestRef.current += 1;
-    };
-  }, [measure]);
 
   // The stored viewport carries the band it was measured against, and the window
   // frame is a fresh object on every dimension change, so compare the band
@@ -223,6 +241,7 @@ export function CenteredState({
       bottomInset,
       nativeViewportFillsSurface,
       nativeViewportBottom: boundsBottom,
+      topReserve,
     };
     if (contentHeight === null) {
       return getCenteredStateBandStyle(band);
@@ -240,6 +259,7 @@ export function CenteredState({
     measuredViewport,
     nativeViewportFillsSurface,
     topInset,
+    topReserve,
   ]);
   // The pending placement centers in the scroller and carries the caller's
   // bottom reserve, so the band the surface reserved (the fixed tab bar) stays
@@ -276,8 +296,10 @@ export function CenteredState({
     if (layout && !holdForSurface) {
       return layout;
     }
-    return estimateFits || unplaceable ? getPendingCenteredStateStyle(bottomInset) : null;
-  }, [bottomInset, estimateFits, holdForSurface, layout, unplaceable]);
+    return estimateFits || unplaceable
+      ? getPendingCenteredStateStyle(bottomInset, topReserve)
+      : null;
+  }, [bottomInset, estimateFits, holdForSurface, layout, topReserve, unplaceable]);
   useEffect(() => {
     if (placement !== null && !hasPainted) {
       setHasPainted(true);

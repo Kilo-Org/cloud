@@ -61,8 +61,6 @@ describe('now-ticker-store', () => {
     vi.setSystemTime(BASE_TIME + 250);
     vi.setSystemTime(BASE_TIME + 750);
 
-    // An inline `Date.now()` here would hand `useSyncExternalStore` a new value
-    // on every render and re-render forever.
     expect(ticker.getSnapshot()).toBe(before);
   });
 
@@ -136,8 +134,6 @@ describe('now-ticker-store', () => {
   });
 
   it('keeps a registration younger than one interval that nobody subscribed to yet', () => {
-    // Every component of one commit reads the registry during the same render
-    // pass, before any of them subscribes. They must all get one ticker.
     const first = getNowTicker(60_000);
     vi.setSystemTime(BASE_TIME + 30_000);
 
@@ -145,9 +141,6 @@ describe('now-ticker-store', () => {
   });
 
   it('replaces a registration a discarded render left behind', () => {
-    // A render React discarded before commit read the clock and left a
-    // registration with no listener. Reusing it would serve that old instant
-    // until the first tick, so the next mount starts from a fresh one.
     const abandoned = getNowTicker(60_000);
     expect(abandoned.getSnapshot()).toBe(BASE_TIME);
 

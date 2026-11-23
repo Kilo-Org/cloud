@@ -7,12 +7,13 @@ import {
   type ReasoningOption,
 } from '@kilocode/db/schema-types';
 
-type VariantEffort = [name: string, effort: ReasoningEffort];
+type VariantEffort = { key: string; effort: ReasoningEffort; isEffort: boolean };
 
-const ALWAYS_ON_VARIANTS: VariantEffort[] = [['thinking', 'high']];
+const THINKING_VARIANT: VariantEffort = { key: 'thinking', effort: 'high', isEffort: false };
+const ALWAYS_ON_VARIANTS: VariantEffort[] = [THINKING_VARIANT];
 const TOGGLE_VARIANTS: VariantEffort[] = [
-  ['instant', 'none'],
-  ['thinking', 'high'],
+  { key: 'instant', effort: 'none', isEffort: false },
+  THINKING_VARIANT,
 ];
 
 function variantEfforts(options: readonly ReasoningOption[]): VariantEffort[] {
@@ -35,7 +36,23 @@ function variantEfforts(options: readonly ReasoningOption[]): VariantEffort[] {
   if (toggle && !efforts.includes('none')) {
     efforts.unshift('none');
   }
-  return efforts.map(effort => [effort, effort]);
+  return efforts.map(effort => ({ key: effort, effort, isEffort: true }));
+}
+
+/**
+ * The efforts a client can select from the options, the same set the legacy variants offer: a
+ * toggle stands for `none` and, without effort values, `high`. Undefined when the options do not
+ * say, which is the case for `[]` (reasoning that is always on) and for effort options without
+ * concrete values.
+ */
+export function getSupportedReasoningEfforts(
+  options: readonly ReasoningOption[] | undefined
+): ReadonlySet<ReasoningEffort> | undefined {
+  if (!options?.length) {
+    return undefined;
+  }
+  const efforts = variantEfforts(options).map(({ effort }) => effort);
+  return efforts.length > 0 ? new Set(efforts) : undefined;
 }
 
 function legacyVariant(effort: ReasoningEffort, includeVerbosity: boolean): OpenCodeVariant {
@@ -58,9 +75,9 @@ export function toLegacyVariants(
     return undefined;
   }
   return Object.fromEntries(
-    efforts.map(([name, effort]) => [
-      name,
-      legacyVariant(effort, aiSdkProvider === 'anthropic' && name === effort),
+    efforts.map(({ key, effort, isEffort }) => [
+      key,
+      legacyVariant(effort, aiSdkProvider === 'anthropic' && isEffort),
     ])
   );
 }

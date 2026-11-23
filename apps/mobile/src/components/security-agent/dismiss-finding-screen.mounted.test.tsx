@@ -9,7 +9,7 @@
 
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type * as OrganizationsModule from '@kilocode/app-shared/organizations';
 
@@ -74,15 +74,23 @@ const capability = vi.hoisted(() => ({
   isLoading: false,
   isFetching: false,
   isError: false,
+  isPending: false,
+  fetchStatus: 'idle' as 'fetching' | 'paused' | 'idle',
   refetch: vi.fn(),
 }));
 const finding = vi.hoisted(() => ({
   isLoading: false,
   isFetching: false,
   isError: false,
+  isPending: false,
+  fetchStatus: 'idle' as 'fetching' | 'paused' | 'idle',
   error: null as unknown,
   data: undefined as MockedFinding | undefined,
   refetch: vi.fn(),
+}));
+const findingRetry = vi.hoisted(() => ({
+  retry: vi.fn(),
+  isRetrying: false,
 }));
 const pillGroup = vi.hoisted(() => ({
   onChange: (() => undefined) as (value: string) => void,
@@ -93,6 +101,11 @@ const dismissDraft = vi.hoisted(() => ({
   persist: vi.fn(),
   clear: vi.fn(),
 }));
+// The sheet's commit is its header's Done control, so the harness records the
+// header props the screen passes instead of looking for an inline button.
+const sheetHeader = vi.hoisted((): { props: Record<string, unknown> } => ({ props: {} }));
+const sideInsets = vi.hoisted(() => ({ left: 0, right: 0 }));
+const keyboard = vi.hoisted(() => ({ height: 0 }));
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
@@ -104,7 +117,17 @@ vi.mock('react-native', () => ({
   // for its live region.
   Pressable: 'Pressable',
   Platform: { OS: 'android' },
+  I18nManager: { isRTL: false },
 }));
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: sideInsets.left, right: sideInsets.right }),
+}));
+vi.mock('react-native-keyboard-controller', () => ({
+  useKeyboardState: (select: (state: { height: number }) => number) =>
+    select({ height: keyboard.height }),
+}));
+vi.mock('@/lib/tab-bar-clearance', () => ({ useEffectiveTabBarHeight: () => 0 }));
+vi.mock('@/lib/haptics', () => ({ selectionHaptic: () => undefined }));
 vi.mock('@/components/ui/icons', () => ({ ShieldOff: 'ShieldOff' }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ back: routerBack }),
@@ -130,17 +153,40 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 vi.mock('@/lib/hooks/use-security-agent', () => ({
   useSecurityAgentCapability: () => capability,
 }));
+const connectivity = vi.hoisted(() => ({
+  committed: 'online' as 'online' | 'offline' | 'unknown',
+}));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => connectivity.committed,
+}));
 vi.mock('@/lib/hooks/use-security-findings', () => ({
   useSecurityFinding: () => finding,
+  useRetrySecurityFinding: () => findingRetry,
   useDismissSecurityFinding: () => dismiss,
 }));
 vi.mock('@/lib/hooks/use-security-dismiss-draft', () => ({
   useSecurityDismissDraft: () => dismissDraft,
   securityDismissFailureCopy: (draft: { lastError: string }) => draft.lastError,
 }));
-vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
-vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
+vi.mock('@/components/sheet-header', () => ({
+  SheetHeader: (props: Record<string, unknown>) => {
+    sheetHeader.props = props;
+    return null;
+  },
+}));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
+vi.mock('@/components/query-error', () => ({
+  QueryError: (_props: {
+    variant?: string;
+    message?: string;
+    onRetry?: () => void;
+    isRetrying?: boolean;
+    placement?: string;
+  }) => 'QueryError',
+}));
 vi.mock('@/components/security-agent/settings-recovery-status', () => ({
   SettingsRecoveryStatus: 'SettingsRecoveryStatus',
 }));
@@ -152,7 +198,7 @@ vi.mock('@/components/security-agent/settings-pill-group', () => ({
   },
 }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
-vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/text', () => ({ Text: 'Text', EYEBROW_LINE_HEIGHT_DP: 22 }));
 
 type R = TestRenderer.ReactTestRenderer;
 type I = TestRenderer.ReactTestInstance;
@@ -186,20 +232,21 @@ function selectReason(): void {
   });
 }
 
-function findDismissButton(root: I): I {
-  const nodes = root.findAll(n => typeof n.type === 'string' && (n.type as string) === 'Button');
-  if (nodes.length !== 1) {
-    throw new Error(`expected 1 dismissal Button, got ${nodes.length}`);
-  }
-  const n = nodes[0];
-  if (!n) {
-    throw new Error('dismissal Button not found');
-  }
-  return n;
+/** The commit control's disabled state, as the sheet header received it. */
+function doneDisabled(): boolean | undefined {
+  return sheetHeader.props.doneDisabled as boolean | undefined;
 }
 
-function buttonDisabled(root: I): boolean | undefined {
-  return findDismissButton(root).props.disabled as boolean | undefined;
+/** The commit control's in-flight state, as the sheet header received it. */
+function doneBusy(): boolean | undefined {
+  return sheetHeader.props.doneBusy as boolean | undefined;
+}
+
+/** Presses the sheet header's Done control, the sheet's only commit. */
+function submit(): void {
+  act(() => {
+    (sheetHeader.props.onDone as () => void)();
+  });
 }
 
 function renderedTexts(root: I): string[] {
@@ -232,6 +279,20 @@ function billingSteps(root: I): I[] {
   );
 }
 
+/** Every failure-body node the screen rendered, its props along. */
+function findAllFailures(root: I): I[] {
+  return root.findAll(n => n.type === QueryError);
+}
+
+/** The one load-failure surface the screen must show. */
+function renderFailure(tree: R): I {
+  const nodes = findAllFailures(tree.root);
+  if (nodes.length !== 1) {
+    throw new Error(`expected 1 load-failure surface, got ${nodes.length}`);
+  }
+  return nodes[0] as I;
+}
+
 describe('DismissFindingScreen dismissal CTA states', () => {
   beforeEach(() => {
     trialRole.role = undefined;
@@ -244,17 +305,29 @@ describe('DismissFindingScreen dismissal CTA states', () => {
     capability.isLoading = false;
     capability.isFetching = false;
     capability.isError = false;
+    capability.isPending = false;
+    capability.fetchStatus = 'idle';
     capability.refetch.mockReset();
     finding.isLoading = false;
     finding.isFetching = false;
     finding.isError = false;
+    finding.isPending = false;
+    finding.fetchStatus = 'idle';
     finding.error = null;
+    connectivity.committed = 'online';
     finding.data = { status: 'open', ...FINDING_IDENTITY };
     finding.refetch.mockReset();
+    findingRetry.retry.mockClear();
+    findingRetry.isRetrying = false;
     dismissDraft.draft = null;
     dismissDraft.hydrated = true;
     dismissDraft.persist.mockClear();
     dismissDraft.clear.mockClear();
+  });
+
+  afterEach(() => {
+    sideInsets.left = 0;
+    sideInsets.right = 0;
   });
 
   it('names the finding it dismisses above the reason group', () => {
@@ -265,6 +338,46 @@ describe('DismissFindingScreen dismissal CTA states', () => {
     expect(texts).toContain(
       `${FINDING_IDENTITY.package_name} (${FINDING_IDENTITY.package_ecosystem})`
     );
+  });
+
+  // The loaded form's scroller clears the landscape cutout, so the loading
+  // body must sit inside the same insets or it jumps sideways when the finding
+  // arrives.
+  it('keeps the loading body inside the side insets the loaded form clears', () => {
+    sideInsets.left = 47;
+    sideInsets.right = 59;
+    finding.isLoading = true;
+    finding.data = undefined;
+    const loading = renderScreen();
+    const insetWrappers = loading.root.findAll(
+      n =>
+        typeof n.type === 'string' &&
+        (n.type as string) === 'View' &&
+        JSON.stringify(n.props.style) === JSON.stringify({ paddingLeft: 47, paddingRight: 59 })
+    );
+    expect(insetWrappers).toHaveLength(1);
+
+    finding.isLoading = false;
+    finding.data = { status: 'open', ...FINDING_IDENTITY };
+    const loaded = renderScreen();
+    expect(loaded.root.findByType(ScrollView).props.style).toEqual([
+      undefined,
+      { marginBottom: 0, marginLeft: 47, marginRight: 59 },
+    ]);
+  });
+
+  it('ends the Android scroll frame at the keyboard top so the comment field can clear it', () => {
+    finding.data = { status: 'open', ...FINDING_IDENTITY };
+    keyboard.height = 883;
+    try {
+      const tree = renderScreen();
+      expect(tree.root.findByType(ScrollView).props.style).toEqual([
+        undefined,
+        { marginBottom: 883 },
+      ]);
+    } finally {
+      keyboard.height = 0;
+    }
   });
 
   it.each(['finding', 'permissions'] as const)(
@@ -305,8 +418,8 @@ describe('DismissFindingScreen dismissal CTA states', () => {
       expect(tree.root.findByType(ScrollView)).toBe(scroll);
       expect(findCommentInput(tree.root)).toBe(input);
       expect(tree.root.findAllByType(SettingsRecoveryStatus)).toHaveLength(0);
-      expect(buttonDisabled(tree.root)).toBe(false);
-      act(findDismissButton(tree.root).props.onPress as () => void);
+      expect(doneDisabled()).toBe(false);
+      submit();
       expect(dismiss.mutate).toHaveBeenCalledWith(
         { findingId: 'finding-1', reason: 'not_used', comment: 'Keep this comment' },
         expect.any(Object)
@@ -321,18 +434,119 @@ describe('DismissFindingScreen dismissal CTA states', () => {
       query.isError = true;
       if (source === 'finding') {
         finding.data = undefined;
+        finding.error = { data: { code: 'INTERNAL_SERVER_ERROR' } };
       } else {
         capability.status = 'error';
       }
       const tree = renderScreen();
       expect(tree.root.findAllByType(ScrollView)).toHaveLength(0);
       expect(tree.root.findAllByType(SettingsRecoveryStatus)).toHaveLength(0);
-      const error = tree.root.findByType(QueryError);
-      expect(error.props.placement).not.toBe('top');
+      const error = renderFailure(tree);
+      // Both failures name a server answer in this setup: the sheet's own
+      // title differs, the classified cause does not.
+      expect(error.props.variant).toBe('server');
+      if (source === 'finding') {
+        // The sheet's own failure keeps its screen title, and the description
+        // comes from the classified variant rather than a repeated message.
+        expect(error.props.title).toBe(i18n.t('securityAgent.dismiss.couldNotLoad'));
+        expect(error.props.message).toBeUndefined();
+      }
       act(error.props.onRetry as () => void);
       expect(query.refetch).toHaveBeenCalledOnce();
     }
   );
+
+  it('names the connection and offers Retry for a paused finding read', () => {
+    // The finding read is the only read the form waits on that can pause: the
+    // capability read comes through the hook that owns the shared organizations
+    // options, which settle offline.
+    finding.data = undefined;
+    finding.isPending = true;
+    finding.fetchStatus = 'paused';
+    connectivity.committed = 'offline';
+    const tree = renderScreen();
+
+    expect(tree.root.findAllByType(ScrollView)).toHaveLength(0);
+    const error = renderFailure(tree);
+    expect(error.props.variant).toBe('offline');
+    expect(error.props.message).toBe(i18n.t('securityAgent.dismiss.couldNotLoad'));
+    // The paused branch offers the deliberate paused-read retry, not the plain
+    // query refetch.
+    expect(error.props.isRetrying).toBe(false);
+    act(error.props.onRetry as () => void);
+    expect(findingRetry.retry).toHaveBeenCalledOnce();
+    expect(capability.refetch).not.toHaveBeenCalled();
+    expect(finding.refetch).not.toHaveBeenCalled();
+  });
+
+  it('treats a paused capability read as the settled failure it can only be', () => {
+    // The capability read settles offline, so it never reaches the paused
+    // branch above: a failed role read names its own failure instead of the
+    // connection, and Retry re-reads that read.
+    finding.data = { status: 'open', ...FINDING_IDENTITY };
+    finding.isPending = false;
+    finding.fetchStatus = 'idle';
+    capability.status = 'error';
+    capability.isError = true;
+    capability.isPending = true;
+    capability.fetchStatus = 'paused';
+    connectivity.committed = 'offline';
+    const tree = renderScreen();
+
+    const error = renderFailure(tree);
+    // Confirmed offline with no server answer: the failure names the
+    // connection rather than the default server wording.
+    expect(error.props.variant).toBe('offline');
+    expect(error.props.message).toBe(i18n.t('securityAgent.dismiss.couldNotCheckPermissions'));
+    act(error.props.onRetry as () => void);
+    expect(capability.refetch).toHaveBeenCalledOnce();
+    expect(findingRetry.retry).not.toHaveBeenCalled();
+  });
+
+  it('keeps the skeleton when the capability read has not resolved with the finding loaded', () => {
+    // The form's own read settled, then the capability read is still in flight
+    // with no data: not a failure yet, and no data can close it.
+    // `capability.isLoading` is `isPending && isFetching`, so the pre-fix gate
+    // fell through to the cannot-dismiss empty state; `status === 'loading'`
+    // is the state the hook reports for a read without data and holds the
+    // skeleton.
+    finding.data = { status: 'open', ...FINDING_IDENTITY };
+    finding.isPending = false;
+    finding.fetchStatus = 'idle';
+    capability.status = 'loading';
+    capability.isPending = true;
+    capability.isFetching = true;
+    capability.fetchStatus = 'fetching';
+    capability.canManage = false;
+    connectivity.committed = 'unknown';
+    const tree = renderScreen();
+
+    expect(findAllFailures(tree.root)).toHaveLength(0);
+    expect(
+      tree.root.findAllByProps({ title: i18n.t('securityAgent.dismiss.cannotDismissTitle') })
+    ).toHaveLength(0);
+  });
+
+  it('keeps the skeleton for a pause while connectivity is unsettled', () => {
+    // The online manager also pauses on an unsettled NetInfo report, which is
+    // the normal cold-launch window: that is not a connection failure yet.
+    finding.data = undefined;
+    finding.isPending = true;
+    finding.fetchStatus = 'paused';
+    connectivity.committed = 'unknown';
+    const tree = renderScreen();
+
+    expect(findAllFailures(tree.root)).toHaveLength(0);
+  });
+
+  it('keeps the skeleton for a first finding read still in flight', () => {
+    finding.data = undefined;
+    finding.isLoading = true;
+    finding.fetchStatus = 'fetching';
+    const tree = renderScreen();
+
+    expect(findAllFailures(tree.root)).toHaveLength(0);
+  });
 
   it.each([
     ['denied', 'open'],
@@ -360,16 +574,18 @@ describe('DismissFindingScreen dismissal CTA states', () => {
     finding.error = { data: { code } };
     const tree = renderScreen();
     expect(tree.root.findAllByType(ScrollView)).toHaveLength(0);
-    const empty = tree.root.findAllByType(EmptyState);
-    expect(empty).toHaveLength(1);
-    expect(empty[0]?.props.placement).not.toBe('top');
+    const notFound = tree.root.findAllByType(QueryError);
+    expect(notFound).toHaveLength(1);
+    expect(notFound[0]?.props.variant).toBe('not-found');
+    expect(notFound[0]?.props.placement).not.toBe('top');
+    expect(notFound[0]?.props.onRetry).toBeUndefined();
   });
 
   it('keeps the dismissal CTA enabled once a reason is chosen', () => {
-    const root = renderScreen();
+    renderScreen();
     selectReason();
 
-    expect(buttonDisabled(root.root)).toBe(false);
+    expect(doneDisabled()).toBe(false);
   });
 
   it('keeps the dismissal CTA enabled after a retryable failure and shows its copy', () => {
@@ -378,7 +594,7 @@ describe('DismissFindingScreen dismissal CTA states', () => {
     const root = renderScreen();
     selectReason();
 
-    expect(buttonDisabled(root.root)).toBe(false);
+    expect(doneDisabled()).toBe(false);
     expect(renderedTexts(root.root)).toContain(IN_PROGRESS_COPY);
   });
 
@@ -390,7 +606,7 @@ describe('DismissFindingScreen dismissal CTA states', () => {
 
     // The key was rotated, so a resubmit is a fresh intent; leaving the CTA
     // down would give the reader "try again later" with no way to try.
-    expect(buttonDisabled(root.root)).toBe(false);
+    expect(doneDisabled()).toBe(false);
     expect(renderedTexts(root.root)).toContain(PERSISTENCE_FAILED_MESSAGE);
   });
 
@@ -406,7 +622,7 @@ describe('DismissFindingScreen dismissal CTA states', () => {
     const root = renderScreen();
     selectReason();
 
-    expect(buttonDisabled(root.root)).toBe(false);
+    expect(doneDisabled()).toBe(false);
     expect(renderedTexts(root.root)).toContain(PERSISTENCE_FAILED_MESSAGE);
   });
 
@@ -416,7 +632,7 @@ describe('DismissFindingScreen dismissal CTA states', () => {
     const root = renderScreen();
     selectReason();
 
-    expect(buttonDisabled(root.root)).toBe(true);
+    expect(doneDisabled()).toBe(true);
     expect(renderedTexts(root.root)).toContain(CONFIGURATION_COPY);
     // The raw server message is replaced by the state-specific copy.
     expect(renderedTexts(root.root)).not.toContain(CONFIGURATION_ERROR_MESSAGE);
@@ -428,7 +644,7 @@ describe('DismissFindingScreen dismissal CTA states', () => {
     const root = renderScreen();
     selectReason();
 
-    expect(buttonDisabled(root.root)).toBe(false);
+    expect(doneDisabled()).toBe(false);
     expect(renderedTexts(root.root)).toContain(SERVICE_UNAVAILABLE_COPY);
     // The old ambiguous sentence must not be what the reader is told.
     expect(renderedTexts(root.root)).not.toContain(
@@ -444,7 +660,7 @@ describe('DismissFindingScreen dismissal CTA states', () => {
     selectReason();
 
     // The plan is the fix, so the CTA stays down while the step out is offered.
-    expect(buttonDisabled(root.root)).toBe(true);
+    expect(doneDisabled()).toBe(true);
     expect(renderedTexts(root.root)).toContain(TRIAL_BILLING_COPY);
     expect(renderedTexts(root.root)).not.toContain(TRIAL_MEMBER_COPY);
     expect(billingSteps(root.root)).toHaveLength(1);
@@ -457,7 +673,7 @@ describe('DismissFindingScreen dismissal CTA states', () => {
     const root = renderScreen();
     selectReason();
 
-    expect(buttonDisabled(root.root)).toBe(true);
+    expect(doneDisabled()).toBe(true);
     expect(renderedTexts(root.root)).toContain(TRIAL_MEMBER_COPY);
     expect(billingSteps(root.root)).toHaveLength(0);
   });
@@ -471,7 +687,7 @@ describe('DismissFindingScreen dismissal CTA states', () => {
     const root = renderScreen();
     selectReason();
 
-    expect(buttonDisabled(root.root)).toBe(true);
+    expect(doneDisabled()).toBe(true);
     expect(renderedTexts(root.root)).toContain(TRIAL_BILLING_COPY);
     expect(renderedTexts(root.root)).not.toContain(TRIAL_MEMBER_COPY);
     expect(billingSteps(root.root)).toHaveLength(1);
@@ -485,26 +701,24 @@ describe('DismissFindingScreen dismissal CTA states', () => {
     const root = renderScreen();
     selectReason();
 
-    expect(buttonDisabled(root.root)).toBe(true);
+    expect(doneDisabled()).toBe(true);
     expect(renderedTexts(root.root)).toContain(TRIAL_MEMBER_COPY);
     expect(billingSteps(root.root)).toHaveLength(0);
   });
 
-  it('disables the dismissal CTA while the dismissal is pending', () => {
+  it('marks the dismissal CTA busy while the dismissal is pending', () => {
     dismiss.isPending = true;
-    const root = renderScreen();
+    renderScreen();
     selectReason();
 
-    expect(buttonDisabled(root.root)).toBe(true);
+    expect(doneBusy()).toBe(true);
   });
 
   it('submits the dismissal and pops the screen only on success', () => {
-    const root = renderScreen();
+    renderScreen();
     selectReason();
 
-    act(() => {
-      (findDismissButton(root.root).props.onPress as () => void)();
-    });
+    submit();
 
     expect(dismiss.mutate).toHaveBeenCalledWith(
       expect.objectContaining({ findingId: 'finding-1', reason: 'not_used' }),
@@ -513,12 +727,10 @@ describe('DismissFindingScreen dismissal CTA states', () => {
   });
 
   it('records the intent as a draft before submitting', () => {
-    const root = renderScreen();
+    renderScreen();
     selectReason();
 
-    act(() => {
-      (findDismissButton(root.root).props.onPress as () => void)();
-    });
+    submit();
 
     expect(dismissDraft.persist).toHaveBeenCalledWith({
       reason: 'not_used',
@@ -530,12 +742,10 @@ describe('DismissFindingScreen dismissal CTA states', () => {
   });
 
   it('clears the draft and pops on authoritative accept', () => {
-    const root = renderScreen();
+    renderScreen();
     selectReason();
 
-    act(() => {
-      (findDismissButton(root.root).props.onPress as () => void)();
-    });
+    submit();
 
     const options = dismiss.mutate.mock.calls[0]?.[1] as {
       onSuccess?: () => void;
@@ -549,12 +759,10 @@ describe('DismissFindingScreen dismissal CTA states', () => {
   });
 
   it('persists lastError and retryable on a retryable failure', () => {
-    const root = renderScreen();
+    renderScreen();
     selectReason();
 
-    act(() => {
-      (findDismissButton(root.root).props.onPress as () => void)();
-    });
+    submit();
 
     const options = dismiss.mutate.mock.calls[0]?.[1] as {
       onError?: (error: Error) => void;
@@ -573,12 +781,10 @@ describe('DismissFindingScreen dismissal CTA states', () => {
   });
 
   it('persists retry copy and a retryable draft when the Worker was unreachable', () => {
-    const root = renderScreen();
+    renderScreen();
     selectReason();
 
-    act(() => {
-      (findDismissButton(root.root).props.onPress as () => void)();
-    });
+    submit();
 
     const options = dismiss.mutate.mock.calls[0]?.[1] as {
       onError?: (error: Error) => void;
@@ -597,12 +803,10 @@ describe('DismissFindingScreen dismissal CTA states', () => {
   });
 
   it('persists the configuration copy and non-retryable on a missing-configuration failure', () => {
-    const root = renderScreen();
+    renderScreen();
     selectReason();
 
-    act(() => {
-      (findDismissButton(root.root).props.onPress as () => void)();
-    });
+    submit();
 
     const options = dismiss.mutate.mock.calls[0]?.[1] as {
       onError?: (error: Error) => void;
@@ -634,12 +838,12 @@ describe('DismissFindingScreen dismissal CTA states', () => {
     const root = renderScreen();
 
     expect(renderedTexts(root.root)).toContain(CONFIGURATION_COPY);
-    expect(buttonDisabled(root.root)).toBe(true);
+    expect(doneDisabled()).toBe(true);
 
     // Choosing a reason is a new intent but not a new request: resubmitting the
     // same unrecoverable dismissal cannot succeed, so the CTA stays down.
     selectReason();
-    expect(buttonDisabled(root.root)).toBe(true);
+    expect(doneDisabled()).toBe(true);
   });
 });
 

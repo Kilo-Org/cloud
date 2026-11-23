@@ -20,12 +20,14 @@ import {
   useFormSheetKeyboardVisible,
 } from '@/components/pr-review/pr-form-sheet-chrome';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Text } from '@/components/ui/text';
 import { isolateLtrBidiText } from '@/lib/bidi';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type DiffSelection } from '@/lib/pr-review/diff-selection-bridge';
 import { resolveAlphaColor } from '@/lib/theme-color';
 import { cn } from '@/lib/utils';
+import { REWRITTEN_INPUT_AUTO_CORRECT } from '@/lib/input-suggestions';
 
 // Body field geometry (line box, whole-line caps) lives in
 // comment-body-geometry.ts, kept separate so it stays testable without the
@@ -74,6 +76,11 @@ export function CommentBodyField({
         ref={inputRef}
         defaultValue={defaultValue}
         editable={!isDisabled}
+        // The composer rewrites this field's text programmatically (the
+        // Insert-suggestion write), so Android keeps the framework
+        // suggestion popup off — it crashes against rewritten text (see
+        // REWRITTEN_INPUT_AUTO_CORRECT).
+        autoCorrect={REWRITTEN_INPUT_AUTO_CORRECT}
         placeholder={t('prReview.composer.commentBodyPlaceholder')}
         placeholderTextColor={colors.mutedForeground}
         accessibilityLabel={t('prReview.composer.commentBody')}
@@ -131,7 +138,7 @@ export function ComposerFooter({
 }: {
   isEdit: boolean;
   isSubmitting: boolean;
-  /** Only the in-flight write locks Cancel; the pre-submit Terms gate does not. */
+  /** Only the in-flight write locks Discard; the pre-submit Terms gate does not. */
   dismissalLocked: boolean;
   primaryDisabled: boolean;
   onSave: () => void;
@@ -142,8 +149,9 @@ export function ComposerFooter({
   const { t } = useTranslation();
   return (
     // Lives inside the formSheet ScrollView (not a sticky sibling).
-    // Half detent stays a drag-down; keep Cancel above the closed-sheet
-    // limit (~874) without scrolling.
+    // Half detent stays a drag-down; keep Discard above the closed-sheet
+    // limit (~874) without scrolling. The header close keeps the durable
+    // draft; Discard is the explicit way to clear it.
     <PrFormSheetFooter>
       {isEdit ? (
         <Button onPress={onSave} disabled={primaryDisabled} accessibilityLabel={t('common.save')}>
@@ -175,9 +183,9 @@ export function ComposerFooter({
         onPress={onCancel}
         disabled={dismissalLocked}
         className="mt-2"
-        accessibilityLabel={t('common.cancel')}
+        accessibilityLabel={t('common.discard')}
       >
-        <Text>{t('common.cancel')}</Text>
+        <Text>{t('common.discard')}</Text>
       </Button>
     </PrFormSheetFooter>
   );
@@ -201,21 +209,20 @@ export function ContextPreview({
       ? fallbackLineLabel
       : composerRangeLabel(selection.line, selection.startLine);
   const previewText = preferFallback ? '' : (selection?.selectedText ?? '');
-  // Single-line context keeps half-detent + keyboard-open room for CTAs.
+  // Single-line context keeps half-detent + keyboard-open room for CTAs; the
+  // two lines sit tighter than a card's default stack because they are one
+  // read (the selection and where it came from).
   return (
-    <View className="gap-0.5 rounded-lg border border-hair-soft bg-secondary px-4 py-2">
-      <Text className="font-mono-medium text-[11px] text-muted-foreground" numberOfLines={1}>
+    <Card className="gap-0.5">
+      <Text className="font-mono-medium text-xs text-muted-foreground" numberOfLines={1}>
         {`${isolateLtrBidiText(path)} ${lineLabel}`}
       </Text>
       {previewText.length > 0 ? (
-        <Text
-          className="font-mono-medium text-[12px] leading-[1rem] text-foreground"
-          numberOfLines={1}
-        >
+        <Text className="font-mono-medium text-sm text-foreground" numberOfLines={1}>
           {previewText}
         </Text>
       ) : null}
-    </View>
+    </Card>
   );
 }
 

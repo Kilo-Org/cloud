@@ -29,14 +29,21 @@ vi.mock('react-i18next', async importOriginal => {
   };
 });
 vi.mock('expo-router', () => ({ useRouter: () => router }));
-vi.mock('@/components/ui/icons', () => ({ SearchX: 'SearchX' }));
-vi.mock('@/components/empty-state', () => ({
-  EmptyState: (props: { action?: React.ReactNode }) =>
-    React.createElement('EmptyState', props, props.action),
+// The Back hand-off goes through the settled-replace hook: it dispatches one
+// replace once the navigator settles, at this route's own stack position (a
+// literal `router.replace` during a transition crashes Android Fabric); the
+// assertions below pin the destination it is handed.
+vi.mock('@/lib/navigation/settled-replace', () => ({
+  useSettledReplace: () => ({ replace: router.replace }),
 }));
-vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
-vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
-vi.mock('@/lib/a11y/tap-target', () => ({ STATE_ACTION_CLASS: 'min-h-[48px]' }));
+vi.mock('@/components/ui/directional-icons', () => ({
+  DirectionalArrowLeft: 'DirectionalArrowLeft',
+}));
+vi.mock('@/components/empty-state', () => ({ StateAction: 'StateAction' }));
+vi.mock('@/components/query-error', () => ({
+  QueryError: (props: { action?: React.ReactNode }) =>
+    React.createElement('QueryError', props, props.action),
+}));
 
 let mounted: TestRenderer.ReactTestRenderer | undefined = undefined;
 
@@ -56,7 +63,7 @@ function mount() {
 
 function pressBack(renderer: TestRenderer.ReactTestRenderer) {
   act(() => {
-    (renderer.root.findByType('Button').props.onPress as () => void)();
+    (renderer.root.findByType('StateAction').props.onPress as () => void)();
   });
 }
 
@@ -84,5 +91,14 @@ describe('InvalidRouteState Back', () => {
 
     expect(router.replace).toHaveBeenCalledExactlyOnceWith('/(app)/pr-review');
     expect(router.back).not.toHaveBeenCalled();
+  });
+
+  it('draws the shared not-found state with one mirrored way out', () => {
+    const renderer = mount();
+
+    expect(renderer.root.findByType('QueryError').props.variant).toBe('not-found');
+    const actions = renderer.root.findAllByType('StateAction');
+    expect(actions).toHaveLength(1);
+    expect(actions[0]?.props.icon).toBe('DirectionalArrowLeft');
   });
 });

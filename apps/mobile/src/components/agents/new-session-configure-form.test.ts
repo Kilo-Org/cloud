@@ -9,11 +9,12 @@ import {
   type RepositoryGroup,
 } from '@/components/agents/new-session-repository-state';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
-import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import { FIELD_TRIGGER_FRAME_CLASS } from '@/lib/a11y/tap-target';
 import { resolveNewSessionStartBlockedReason } from '@/lib/new-session-submit';
 import { remoteSpawnInstanceDisconnectedNote } from '@/lib/remote-submit-outcome';
 
 import { OrganizationPlanRefusal } from '@/components/organization/plan-refusal';
+import { FormFieldLabel } from '@/components/ui/form-field-label';
 import { NewSessionProfileRow } from './new-session-environment-row';
 
 import { i18n as appI18n } from '@/i18n';
@@ -268,6 +269,19 @@ function findElementByComponent(node: Node, component: unknown): Record<string, 
   return null;
 }
 
+/** Every element of this component type (by reference) in the tree, in render order. */
+function collectElementsByComponent(node: Node, component: unknown): Record<string, unknown>[] {
+  if (node === null || typeof node !== 'object') {
+    return [];
+  }
+  const found = 'type' in node && node.type === component ? [node.props ?? {}] : [];
+  const children = node.props?.children;
+  for (const child of Array.isArray(children) ? children : [children]) {
+    found.push(...collectElementsByComponent(child as Node, component));
+  }
+  return found;
+}
+
 type ElementNode = { type?: unknown; props?: Record<string, unknown> } | null;
 
 /** The first node of `typeName`, so a test can inspect its position in the tree. */
@@ -505,7 +519,7 @@ describe('NewSessionConfigureForm', () => {
         isRemoteTargetSelected: false,
         isSubmitting: false,
         model: 'claude-opus-4-7',
-        isProfileLoading: false,
+        profileGate: { kind: 'ready' },
       },
     });
     expect(reason).toBe('attachment-uploading');
@@ -1001,9 +1015,9 @@ describe('NewSessionConfigureForm', () => {
   it('renders the loading environment row as its title line', () => {
     const element = renderRow({ isProfileLoading: true });
 
-    // No blank line is reserved while the query runs: the loading copy is the
-    // row's one line, so the card is as tall as what it shows.
-    expect(findTextContent(element, t => t === 'Environment')).toBe(true);
+    // The label stays mounted as the shared field label, and no blank line is
+    // reserved while the query runs: the loading copy is the row's one line.
+    expect(findElementByComponent(element, FormFieldLabel)?.label).toBe('Environment');
     expect(findTextContent(element, t => t === '\u00A0\n\u00A0')).toBe(false);
     expect(findElementByType(element, 'Skeleton')).toBeNull();
     expect(findTextContent(element, t => t === 'Default environment')).toBe(false);
@@ -1032,22 +1046,26 @@ describe('NewSessionConfigureForm', () => {
     expect(slots).toHaveLength(0);
   });
 
-  it('renders every Environment row state inside the same card', () => {
-    const chrome = `${ROW_TARGET_CLASS} flex-row items-center gap-3 rounded-lg border border-border bg-card`;
-
+  it('renders every Environment row state with the same field frame and label', () => {
     for (const row of [
       renderRow({ isProfileLoading: true }),
       renderRow({ isProfileError: true }),
       renderRow({ profile: PROFILE }),
       renderRow(),
     ]) {
-      const cards = [
+      // The label and the trigger frame are the row's fixed anatomy: every
+      // state paints on the same frame, so the state swap cannot move the rows
+      // below it.
+      expect(findElementByComponent(row, FormFieldLabel)?.label).toBe('Environment');
+      const frames = [
         ...collectElementsByType(row, 'View'),
         ...collectElementsByType(row, 'Pressable'),
-      ]
-        .map(element => element.className)
-        .filter(className => typeof className === 'string' && className.includes(chrome));
-      expect(cards).toEqual([expect.stringContaining(chrome)]);
+      ].filter(
+        element =>
+          typeof element.className === 'string' &&
+          element.className.includes(FIELD_TRIGGER_FRAME_CLASS)
+      );
+      expect(frames).toHaveLength(1);
     }
   });
 
@@ -1078,7 +1096,7 @@ describe('NewSessionConfigureForm', () => {
     const row = findElementByComponent(element, NewSessionProfileRow);
     expect(row?.isProfileLoading).toBe(true);
     const loadingRow = renderRow({ isProfileLoading: true });
-    expect(findTextContent(loadingRow, t => t === 'Environment')).toBe(true);
+    expect(findElementByComponent(loadingRow, FormFieldLabel)?.label).toBe('Environment');
     expect(findTextContent(loadingRow, t => t === 'Loading…')).toBe(true);
     expect(findTextContent(loadingRow, t => t === 'Default environment')).toBe(false);
     expect(findTextContent(loadingRow, t => t === '\u00A0\n\u00A0')).toBe(false);
@@ -1173,7 +1191,9 @@ describe('NewSessionConfigureForm', () => {
     expect(control).not.toBeNull();
     // eslint-disable-next-line typescript-eslint/no-non-null-assertion -- guarded by expect above
     expect(control!.value).toBe('leave');
-    expect(findTextContent(element, t => t === 'Changes')).toBe(true);
+    expect(collectElementsByComponent(element, FormFieldLabel).map(({ label }) => label)).toContain(
+      'Changes'
+    );
   });
 
   it('renders the commit control as Commit and push when autoCommit is true', async () => {
@@ -1202,7 +1222,9 @@ describe('NewSessionConfigureForm', () => {
     }) as Node;
 
     expect(findElementByType(element, 'SegmentedControl')).toBeNull();
-    expect(findTextContent(element, t => t === 'Changes')).toBe(false);
+    expect(
+      collectElementsByComponent(element, FormFieldLabel).map(({ label }) => label)
+    ).not.toContain('Changes');
   });
 
   it('holds the rows below the repository section until its final height is known', async () => {
@@ -1215,7 +1237,9 @@ describe('NewSessionConfigureForm', () => {
       repositoryRegionSettled: false,
     }) as Node;
 
-    expect(findTextContent(unsettled, t => t === 'Changes')).toBe(false);
+    expect(
+      collectElementsByComponent(unsettled, FormFieldLabel).map(({ label }) => label)
+    ).not.toContain('Changes');
     expect(containsComponent(unsettled, NewSessionProfileRow)).toBe(false);
     expect(findElementByType(unsettled, 'AdvancedConfigPanel')).toBeNull();
 
@@ -1226,7 +1250,9 @@ describe('NewSessionConfigureForm', () => {
       repositoryRegionSettled: true,
     }) as Node;
 
-    expect(findTextContent(settled, t => t === 'Changes')).toBe(true);
+    expect(collectElementsByComponent(settled, FormFieldLabel).map(({ label }) => label)).toContain(
+      'Changes'
+    );
     expect(containsComponent(settled, NewSessionProfileRow)).toBe(true);
     expect(findElementByType(settled, 'AdvancedConfigPanel')).not.toBeNull();
   });

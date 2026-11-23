@@ -1,11 +1,10 @@
 import { captureException } from '@sentry/nextjs';
-import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import {
   ORGANIZATION_MODEL_AUDIENCES,
   type OrganizationModelAudience,
 } from '@kilocode/app-shared/organizations';
-import type { OpenRouterModelsResponse } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type { OpenRouterModelsResponse } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import { getAvailableModelsForOrganization } from '@kilocode/web-shared/lib/organizations/organization-models';
 import { addCustomRouterModels } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-models';
 import { listUsableCustomRouters } from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
@@ -48,12 +47,6 @@ export async function loadAvailableModelsForOrganization(params: {
       fromDb,
     }
   );
-  if (!result) {
-    throw new TRPCError({
-      code: 'NOT_FOUND',
-      message: 'Organization not found',
-    });
-  }
   const routers = await listUsableCustomRouters({
     userId,
     organizationId,

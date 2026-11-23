@@ -1,5 +1,7 @@
 import './pr-merge-sheet.test-mocks';
 import { describe, expect, it } from 'vitest';
+import { type ProviderPrMergeState } from '@kilocode/app-shared/provider-review';
+import { act } from '@/test/renderer';
 import { i18n } from '@/i18n';
 import {
   PR_OPERATION_PERSISTENCE_FAILED_MESSAGE,
@@ -9,6 +11,7 @@ import { type ProviderPrRef } from '@/lib/pr-review/provider-pr-ref';
 import {
   baseProps,
   button,
+  edit,
   hosts,
   mount,
   state,
@@ -28,6 +31,14 @@ function errorWithCode(message: string, code: string) {
   return Object.assign(new Error(message), { data: { code } });
 }
 
+const allowed: ProviderPrMergeState = {
+  canMerge: true,
+  approvalsRequired: 0,
+  pipelineMustSucceed: false,
+  conflicts: false,
+  blockedReasons: [],
+};
+
 describe('PrMergeSheet mounted errors', () => {
   it.each([
     { prRef: undefined, noun: 'pull request' },
@@ -35,10 +46,10 @@ describe('PrMergeSheet mounted errors', () => {
   ])('blocks another merge after a forbidden $noun response', async ({ prRef, noun }) => {
     const error = errorWithCode('403 Forbidden', 'FORBIDDEN');
     state.merge.mutateAsync.mockRejectedValue(error);
-    const renderer = await mount({ prRef });
+    const renderer = await mount({ prRef, mergeState: prRef ? allowed : undefined });
     await submit(renderer);
     state.merge.error = error;
-    await update(renderer, { prRef });
+    await update(renderer, { prRef, mergeState: prRef ? allowed : undefined });
     expect(visibleText(renderer)).toContain(`You don't have permission to merge this ${noun}.`);
     expect(button(renderer, 'Merge').props.disabled).toBe(true);
     expect(baseProps.onDismiss).not.toHaveBeenCalled();
@@ -51,19 +62,51 @@ describe('PrMergeSheet mounted errors', () => {
     { prRef: bitbucket, message: 'Bitbucket connection expired' },
   ])('shows the reconnect notice for $message', async ({ prRef, message }) => {
     state.merge.error = errorWithCode('revoked', 'PRECONDITION_FAILED');
-    const renderer = await mount({ prRef });
+    const renderer = await mount({ prRef, mergeState: prRef ? allowed : undefined });
     expect(hosts(renderer, 'AccessibleStatus').map(node => node.props.message)).toContain(message);
     expect(hosts(renderer, 'PrReviewReconnectNotice')).toHaveLength(1);
     expect(button(renderer, 'Merge').props.disabled).toBe(true);
     expect(state.merge.mutateAsync).not.toHaveBeenCalled();
   });
 
+  it.each([{ prRef: undefined }, { prRef: gitlab }])(
+    're-enables merge on the kept draft once the notice confirms the connection',
+    async ({ prRef }) => {
+      state.merge.error = errorWithCode('revoked', 'PRECONDITION_FAILED');
+      const renderer = await mount({ prRef, mergeState: prRef ? allowed : undefined });
+      await edit(renderer, 'Commit title', 'Kept title');
+      expect(button(renderer, 'Merge').props.disabled).toBe(true);
+
+      const notice = hosts(renderer, 'PrReviewReconnectNotice')[0];
+      if (!notice) {
+        throw new Error('Reconnect notice missing');
+      }
+      const onConnectionRestored = notice.props.onConnectionRestored as (() => void) | undefined;
+      if (typeof onConnectionRestored !== 'function') {
+        throw new TypeError('Reconnect notice has no onConnectionRestored prop');
+      }
+      await act(() => {
+        onConnectionRestored();
+      });
+
+      // The confirmed check clears the latch and nothing else: the CTA comes
+      // back and the draft the person wrote still rides the merge input.
+      expect(button(renderer, 'Merge').props.disabled).toBe(false);
+      expect(baseProps.onDismiss).not.toHaveBeenCalled();
+      await submit(renderer);
+      expect(state.merge.mutateAsync).toHaveBeenCalledOnce();
+      expect(state.merge.mutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({ commitTitle: 'Kept title' })
+      );
+    }
+  );
+
   it.each([
     'The merge request changed since it was loaded. Reload the merge request and try again.',
     'The merge request was closed without merging.',
   ])('shows the stale-head reason and prevents resubmission: %s', async message => {
     state.merge.error = errorWithCode(message, 'CONFLICT');
-    const renderer = await mount({ prRef: gitlab });
+    const renderer = await mount({ prRef: gitlab, mergeState: allowed });
     expect(visibleText(renderer)).toContain(message);
     expect(button(renderer, 'Merge').props.disabled).toBe(true);
     expect(baseProps.onDismiss).not.toHaveBeenCalled();
@@ -71,7 +114,7 @@ describe('PrMergeSheet mounted errors', () => {
 
   it('keeps a generic conflict retryable rather than misclassifying it as a stale head', async () => {
     state.merge.error = errorWithCode('A merge is already running', 'CONFLICT');
-    const renderer = await mount({ prRef: gitlab });
+    const renderer = await mount({ prRef: gitlab, mergeState: allowed });
     expect(visibleText(renderer)).toContain('A merge is already running');
     expect(button(renderer, 'Merge').props.disabled).toBe(false);
     await submit(renderer);

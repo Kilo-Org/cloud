@@ -19,6 +19,7 @@ describe.each([
         buildAgentMessageBubbleAccessibilityProps({ isUser, canCopy, canOpenDetails })
       ).toEqual({
         accessible: false,
+        focusable: false,
         accessibilityRole: 'text',
         accessibilityLabel: label,
         accessibilityHint: canOpenDetails ? 'Long press for message details' : '',

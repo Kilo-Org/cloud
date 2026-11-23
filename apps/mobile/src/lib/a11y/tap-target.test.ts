@@ -3,14 +3,25 @@ import { describe, expect, it, vi } from 'vitest';
 
 // eslint-disable-next-line import/no-nodejs-modules -- Use the compiler's compatible CommonJS export.
 import { createRequire } from 'node:module';
+// eslint-disable-next-line import/no-nodejs-modules -- vitest-only parity check, runs in node, never bundled into the app
+import { readFileSync } from 'node:fs';
+// eslint-disable-next-line import/no-nodejs-modules -- vitest-only parity check, runs in node, never bundled into the app
+import { fileURLToPath } from 'node:url';
 import tailwindcss from '@tailwindcss/postcss';
 import postcss from 'postcss';
 import type * as NativeCSSCompiler from 'react-native-css/compiler';
 
+import { compiledLengthDp } from '@/test/native-dimensions';
+
 import {
+  BALANCE_RETRY_CANCEL_DP,
+  BALANCE_RETRY_TARGET_CLASS,
+  BALANCE_RETRY_TARGET_DP,
+  CAPTION_ACTION_BOX_CLASS,
   CHIP_FRAME_DP,
   CHIP_HIT_SLOP,
   CHIP_HIT_SLOP_DP,
+  COMMAND_ROW_FIELD_GAP_CLASS,
   COMPACT_BUTTON_HIT_SLOP,
   COMPACT_CONTROL_BOX_CLASS,
   COMPACT_CONTROL_HIT_SLOP_DP,
@@ -26,15 +37,19 @@ import {
   DENSE_ROW_HIT_SLOP,
   DENSE_ROW_HIT_SLOP_DP,
   FIELD_CLEAR_BOX_CLASS,
+  FLOOR_BOX_MEASURED_DP,
   HEADER_TITLE_TARGET_CLASS,
   ICON_TARGET_BOX_CLASS,
   ICON_TARGET_DP,
+  ICON_TARGET_WIDTH_CLASS,
   INLINE_LINK_BOX_CLASS,
   INLINE_LINK_CONNECTOR_CLASS,
   INLINE_LINK_FACING_HIT_SLOP_DP,
   INLINE_LINK_FACING_VERTICAL_HIT_SLOP_DP,
   INLINE_LINK_LINE_GAP_CLASS,
   INLINE_LINK_LINE_GAP_DP,
+  INLINE_LINK_NEIGHBOUR_RESERVE_CLASS,
+  INLINE_LINK_NEIGHBOUR_RESERVE_DP,
   INLINE_LINK_OUTER_HIT_SLOP_DP,
   INLINE_LINK_OUTER_VERTICAL_HIT_SLOP_DP,
   INLINE_LINK_ROW_CLASS,
@@ -47,13 +62,26 @@ import {
   LEGAL_LINK_ROW_CLASS,
   LINE_ACTION_BOX_CLASS,
   LINE_ACTION_HIT_SLOP,
+  LINE_ACTION_OVERLAY_CLASS,
+  LINE_ACTION_REACH_DP,
   MIN_TAP_TARGET_DP,
   ROW_TARGET_CLASS,
+  SECTION_ACTION_BOX_CLASS,
+  SECTION_ACTION_FRAME_DP,
+  SECTION_ACTION_HIT_SLOP_DP,
+  SECTION_ACTION_LABEL_LINE_DP,
+  SETTINGS_HEADING_LINE_DP,
+  SETTINGS_SWITCH_ROW_CLASS,
+  SETTINGS_SWITCH_ROW_PULL_DP,
   STATE_ACTION_CLASS,
   STATE_ACTION_TARGET_DP,
+  SWITCH_HOST_CLASS,
   tapTargetReachDp,
+  textActionRowOverhangDp,
   textActionTargetClass,
+  textActionTargetDp,
   TOUCH_TARGET_DP,
+  TOUCH_TARGET_OVERHANG_DP,
   UNDER_COPY_ACTION_BOX_CLASS,
   UNDER_COPY_ACTION_HIT_SLOP,
 } from './tap-target';
@@ -69,6 +97,12 @@ vi.mock('react-native', () => ({ I18nManager: rtl, Platform: platform }));
 const { compile } = createRequire(import.meta.url)(
   'react-native-css/compiler'
 ) as typeof NativeCSSCompiler;
+
+/** The `Text` primitive's source: the eyebrow's line is declared there. */
+const TEXT_SOURCE = readFileSync(
+  fileURLToPath(new URL('../../components/ui/text.tsx', import.meta.url)),
+  'utf8'
+);
 
 /** The value a compiled style declaration holds for one property. */
 function declarationValue(declaration: unknown, property: string): unknown {
@@ -117,15 +151,8 @@ describe('shared tap-target geometry', () => {
   });
 
   it('renders the field clear target on its own node instead of a slop into the field', async () => {
-    // The in-field clear control sits inside the field's content box beside its
-    // `TextInput`, so the frame an audit reads is the control's own: `hitSlop`
-    // never widens that frame, and a reach toward the input would take taps the
-    // field should get. The box is the icon target rather than the 44pt design
-    // target, because whole-pixel layout on Android lands a 44pt box under it.
-    // Placement (the call site's logical trailing margin) stays out of this box.
     expect(await compiledDp(FIELD_CLEAR_BOX_CLASS, 'height')).toBe(ICON_TARGET_DP);
     expect(await compiledDp(FIELD_CLEAR_BOX_CLASS, 'width')).toBe(ICON_TARGET_DP);
-    // Centring has no dp value to compile, so it stays a class check.
     expect(FIELD_CLEAR_BOX_CLASS).toContain('items-center');
     expect(FIELD_CLEAR_BOX_CLASS).toContain('justify-center');
     // The box is taller than the shared input's 44pt floor, so it cancels the
@@ -153,12 +180,18 @@ describe('shared tap-target geometry', () => {
     expect(ICON_TARGET_BOX_CLASS).toContain('justify-center');
   });
 
+  it('keeps the reserved-width class in step with the icon target box', async () => {
+    // The regression this guards: a title row reserved the dismiss control's
+    // width with a literal `w-14` (49pt), which cleared the 48dp box only by
+    // accident and drifted from it as soon as the box changed. The width class
+    // is the box's own width, so a row that reserves it can never under-run
+    // the control.
+    expect(ICON_TARGET_WIDTH_CLASS).toBe(`w-[${ICON_TARGET_DP}px]`);
+    expect(ICON_TARGET_BOX_CLASS).toContain(ICON_TARGET_WIDTH_CLASS);
+    expect(await compiledDp(ICON_TARGET_WIDTH_CLASS, 'width')).toBe(ICON_TARGET_DP);
+  });
+
   it('renders a text-only action frame at the platform minimum on both axes', async () => {
-    // The regression this guards: a text link whose only child is one label
-    // line reports that line's height as its own rect, and `hitSlop` never
-    // lifts the rect an audit reads. `min-h-11` would be 38.5pt on device. The
-    // width floor is needed because the caller drops its hit slop: a short
-    // label is only a couple of glyphs wide.
     platform.OS = 'ios';
     const ios = textActionTargetClass();
     expect(ios).toContain('min-h-[44px]');
@@ -174,12 +207,27 @@ describe('shared tap-target geometry', () => {
     platform.OS = 'ios';
   });
 
+  it('cancels a row text action down to the row content band on both platforms', () => {
+    const band = TOUCH_TARGET_DP - 2 * TOUCH_TARGET_OVERHANG_DP;
+
+    platform.OS = 'ios';
+    expect(textActionTargetDp()).toBe(TOUCH_TARGET_DP);
+    expect(textActionRowOverhangDp()).toBe(TOUCH_TARGET_OVERHANG_DP);
+    expect(textActionTargetDp() - 2 * textActionRowOverhangDp()).toBe(band);
+
+    platform.OS = 'android';
+    expect(textActionTargetDp()).toBe(ICON_TARGET_DP);
+    // Android's target is the taller pair, so its cancel is deeper: exactly the
+    // row's own `py-3` (10.5dp at the app's 14pt rem), which leaves the node
+    // inside the row's bounds — the platform delivers a touch only inside a
+    // parent view — while the row still sees the same 27dp band.
+    expect(textActionRowOverhangDp()).toBe(10.5);
+    expect(textActionTargetDp() - 2 * textActionRowOverhangDp()).toBe(band);
+
+    platform.OS = 'ios';
+  });
+
   it('cancels the action box slack under the copy it sits below', async () => {
-    // The regression this guards: the box centres one label line, so a tile
-    // that pads its edges evenly showed a wider gap under its action than above
-    // its copy. The margin removes that slack from the layout, so the tile pads
-    // the same on both edges while the box stays above the audit floor and
-    // never reaches the message above it.
     const height = await compiledDp(UNDER_COPY_ACTION_BOX_CLASS, 'minHeight');
     expect(height).toBe(32);
     expect(height).toBeGreaterThanOrEqual(MIN_TAP_TARGET_DP);
@@ -198,9 +246,6 @@ describe('shared tap-target geometry', () => {
   });
 
   it('renders a state surface action on the Android 48dp minimum', async () => {
-    // Android's `<Button>` rule is 48dp on the pressed node's own rect, and the
-    // shared `Button` default frame is `min-h-[44px]`. `hitSlop` would widen
-    // the touch region without moving that rect, so the floor is the class.
     expect(STATE_ACTION_TARGET_DP).toBe(48);
     expect(STATE_ACTION_TARGET_DP).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
     expect(STATE_ACTION_CLASS).toContain('min-h-[48px]');
@@ -209,15 +254,54 @@ describe('shared tap-target geometry', () => {
   });
 
   it('renders an interactive row frame tall enough for both platforms', async () => {
-    // The regression this guards: a selection or menu row whose only child is
-    // one label line reports that line's height plus its padding as its own
-    // rect, and a row sized that way landed under the target on device.
-    // `min-h-11` is under the floor here; `hitSlop` would widen the touch region
-    // without moving the rect an audit reads, so the floor has to be the row's
-    // own class.
     const height = await compiledDp(ROW_TARGET_CLASS, 'minHeight');
     expect(height).toBe(ICON_TARGET_DP);
     expect(height).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+  });
+
+  it('holds a switch in a host as tall as the control and keeps the row band', async () => {
+    // The regression this guards: the slash command row gave its switch a
+    // zero-padding wrapper, so the wrapper laid out to the switch's cancelled
+    // height (27dp) and that wrapper was the parent a touch had to land in.
+    // Android delivers a touch only inside the parent view, and the audit reads
+    // the control's own node, so the control's 44dp target was cut to 27dp.
+    const height = await compiledDp(SWITCH_HOST_CLASS, 'height');
+    const margin = await compiledDp(SWITCH_HOST_CLASS, 'marginBlock');
+    expect(height).toBe(TOUCH_TARGET_DP);
+    expect(height).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+    // The host cancels the same overhang as the switch, so the row still sees
+    // the content band instead of the box.
+    expect(height + 2 * margin).toBe(TOUCH_TARGET_DP - 2 * TOUCH_TARGET_OVERHANG_DP);
+    expect(margin).toBe(-TOUCH_TARGET_OVERHANG_DP);
+    // A single child sits on the host's centre line, so the node fills the box.
+    expect(SWITCH_HOST_CLASS).toContain('justify-center');
+    expect(SWITCH_HOST_CLASS).toContain('items-center');
+  });
+
+  it('keeps a settings header switch row on the control-size floor', async () => {
+    // The regression this guards, in both directions: a header row sized by the
+    // switch pushed the description half a box further from the title than a
+    // section without a switch, and a row shrunk to the heading line clipped the
+    // switch's own box — the row is the switch's parent, and a touch is
+    // delivered only inside each ancestor's bounds.
+    const height = await compiledDp(SETTINGS_SWITCH_ROW_CLASS, 'minHeight');
+    const marginBottom = await compiledDp(SETTINGS_SWITCH_ROW_CLASS, 'marginBottom');
+    expect(height).toBe(MIN_TAP_TARGET_DP);
+    expect(marginBottom).toBe(-3.5);
+    expect(marginBottom).toBe(-SETTINGS_SWITCH_ROW_PULL_DP);
+    expect(SETTINGS_SWITCH_ROW_PULL_DP).toBe((MIN_TAP_TARGET_DP - SETTINGS_HEADING_LINE_DP) / 2);
+    // The pull is the row's only vertical margin, and it is below the row: a
+    // negative top margin would start the row above the header group's top,
+    // where the group clips it. A class with no top margin compiles to no
+    // declaration, which React Native lays out as 0.
+    const marginTop = await compiledDp(SETTINGS_SWITCH_ROW_CLASS, 'marginTop').catch(() => 0);
+    expect(marginTop).toBe(0);
+    expect(
+      SETTINGS_SWITCH_ROW_CLASS.split(/\s+/).filter(token => /^-?m(?:[btxyse])?-/.test(token))
+    ).toEqual(['-mb-[3.5px]']);
+    // The band plus the pull is the heading line plus twice the half line the
+    // switch's centred box adds, so the row's band is the whole difference.
+    expect(SETTINGS_HEADING_LINE_DP + 2 * SETTINGS_SWITCH_ROW_PULL_DP).toBe(MIN_TAP_TARGET_DP);
   });
 
   it('renders a screen header title control on its own 48dp node', async () => {
@@ -245,8 +329,6 @@ describe('shared tap-target geometry', () => {
   });
 
   it('carries the compact button frame past the design target with its slop', () => {
-    // The regression this guards: the 36dp `sm` frame renders 35.81dp at
-    // density 420, so 4 per side measured 43.81dp — under `DESIGN.md`'s 44pt.
     expect(COMPACT_BUTTON_HIT_SLOP.top).toBe(5);
     expect(COMPACT_BUTTON_HIT_SLOP.top).toBe(COMPACT_BUTTON_HIT_SLOP.bottom);
     expect(COMPACT_BUTTON_HIT_SLOP.left).toBe(COMPACT_BUTTON_HIT_SLOP.top);
@@ -307,17 +389,37 @@ describe('shared tap-target geometry', () => {
   it('carries an inline link from the audit floor to the design target with its slop', () => {
     expect(INLINE_LINK_BOX_CLASS).toContain('min-h-[28px]');
     expect(INLINE_LINK_BOX_CLASS).toContain('min-w-[28px]');
-    // The vertical reach is symmetric: 28 + 2 * 8 = 44.
-    expect(tapTargetReachDp(MIN_TAP_TARGET_DP, INLINE_LINK_VERTICAL_HIT_SLOP_DP)).toBe(
+    // The declared reach from the 28dp floor is symmetric past the target:
+    // 28 + 2 * 9 = 46.
+    expect(tapTargetReachDp(MIN_TAP_TARGET_DP, INLINE_LINK_VERTICAL_HIT_SLOP_DP)).toBeGreaterThan(
       TOUCH_TARGET_DP
     );
+    // The regression this guards, measured the way `LINE_ACTION_HIT_SLOP`'s
+    // test measures it: a `min-h-[28px]` box lays out at
+    // FLOOR_BOX_MEASURED_DP. 27.8 + 2 * 9 = 45.8dp holds, while 8dp a side
+    // landed at 43.8dp.
+    expect(FLOOR_BOX_MEASURED_DP).toBe(27.8);
+    expect(
+      tapTargetReachDp(FLOOR_BOX_MEASURED_DP, INLINE_LINK_VERTICAL_HIT_SLOP_DP)
+    ).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+    expect(tapTargetReachDp(FLOOR_BOX_MEASURED_DP, 8)).toBeLessThan(TOUCH_TARGET_DP);
     // A link with an inline neighbour splits the same vertical reach by side:
     // the facing side gives up its half, the far side carries all of it, and the
-    // height is still 28 + 16 = 44.
+    // two still sum to the symmetric reach (0 + 18 = 2 * 9).
     expect(INLINE_LINK_FACING_VERTICAL_HIT_SLOP_DP + INLINE_LINK_OUTER_VERTICAL_HIT_SLOP_DP).toBe(
       2 * INLINE_LINK_VERTICAL_HIT_SLOP_DP
     );
-    expect(MIN_TAP_TARGET_DP + INLINE_LINK_OUTER_VERTICAL_HIT_SLOP_DP).toBe(TOUCH_TARGET_DP);
+    // The far side alone has to clear the target from the measured box: 27.8 +
+    // 18 = 45.8dp holds, while the 16dp it replaced landed at 43.8dp. The
+    // declared 28 + 18 = 46dp clears it too, but the measurement is the one
+    // that has to.
+    expect(FLOOR_BOX_MEASURED_DP + INLINE_LINK_OUTER_VERTICAL_HIT_SLOP_DP).toBeGreaterThanOrEqual(
+      TOUCH_TARGET_DP
+    );
+    expect(FLOOR_BOX_MEASURED_DP + 16).toBeLessThan(TOUCH_TARGET_DP);
+    expect(MIN_TAP_TARGET_DP + INLINE_LINK_OUTER_VERTICAL_HIT_SLOP_DP).toBeGreaterThan(
+      TOUCH_TARGET_DP
+    );
     // The horizontal reach is asymmetric (4dp toward the neighbour, 12dp away),
     // so it is box + facing + outer rather than tapTargetReachDp's 2 * slop.
     expect(MIN_TAP_TARGET_DP + INLINE_LINK_FACING_HIT_SLOP_DP + INLINE_LINK_OUTER_HIT_SLOP_DP).toBe(
@@ -352,6 +454,42 @@ describe('shared tap-target geometry', () => {
     expect(INLINE_LINK_ROW_CLASS).toContain(`my-[${INLINE_LINK_ROW_MARGIN_DP}px]`);
     // The compiled row gap is what the layout applies, not the constant.
     expect(await compiledDp(INLINE_LINK_ROW_CLASS, 'rowGap')).toBe(INLINE_LINK_LINE_GAP_DP);
+  });
+
+  it('keeps a neighbouring control out of the consent sentence downward band', async () => {
+    // The consent review card's sentence is the last thing in the footer's
+    // `gap-3` block, so the only thing under it is the action button. The box
+    // overflows its own line by (28 - 17.5) / 2 = 5.25dp below, so the button's
+    // top edge sat 10.5 - 5.25 = 5.25dp under the box (measured 5.7dp), and a
+    // control owns every pixel from its top edge up: the link's downward slop
+    // never reached the button. The compiled margin is what the layout applies;
+    // a scale step compiles to `calc(var(--spacing) * 1.5)`, which the static
+    // reader above cannot follow, so the shared dp resolver reads it.
+    expect(await compiledLengthDp(INLINE_LINK_NEIGHBOUR_RESERVE_CLASS, 'marginBottom')).toBe(
+      INLINE_LINK_NEIGHBOUR_RESERVE_DP
+    );
+  });
+
+  it('delivers the whole downward inline-link band under the consent sentence', () => {
+    // The consent review card again: the footer's gutter to the action button is
+    // `gap-3` (10.5dp), the row's box overflows its line by half the 28 - 17.5
+    // difference, and the reserve sits below that. What is left under the box is
+    // the space the downward slop has to fit inside, because the button claims
+    // everything from its own top edge up.
+    const footerGutterDp = 10.5;
+    const boxBottomGapDp =
+      footerGutterDp -
+      (MIN_TAP_TARGET_DP - INLINE_LINK_SENTENCE_LINE_DP) / 2 +
+      INLINE_LINK_NEIGHBOUR_RESERVE_DP;
+    expect(boxBottomGapDp).toBeGreaterThanOrEqual(INLINE_LINK_VERTICAL_HIT_SLOP_DP);
+    // And the band the link then delivers on its measured Android box clears
+    // `DESIGN.md:364`'s target: 27.8 + 9 + 9 = 45.8dp. The 3.5dp reserve the
+    // scale step below is not enough: 3.5dp under the measured 5.7dp gap leaves
+    // 0.19px once Android rounds 9dp to 24px.
+    expect(FLOOR_BOX_MEASURED_DP + 2 * INLINE_LINK_VERTICAL_HIT_SLOP_DP).toBeGreaterThanOrEqual(
+      TOUCH_TARGET_DP
+    );
+    expect(footerGutterDp - 5.7 + 3.5).toBeLessThan(INLINE_LINK_VERTICAL_HIT_SLOP_DP);
   });
 
   it('reserves both facing inline-link reaches on the connector between the links', async () => {
@@ -413,6 +551,52 @@ describe('shared tap-target geometry', () => {
   });
 });
 
+describe('section header action geometry', () => {
+  it('cancels the action box against the eyebrow line it sits on', async () => {
+    // The regression this guards: the cancel was calibrated to a 12dp glyph
+    // line while the eyebrow lays its label out on `EYEBROW_LINE_HEIGHT_DP`
+    // (22dp). The action then sat 5dp low and its box reached past the row's
+    // padding. The box's margin box is the label's line, so it centres on it.
+    const frame = await compiledDp(SECTION_ACTION_BOX_CLASS, 'minHeight');
+    expect(frame).toBe(SECTION_ACTION_FRAME_DP);
+    expect(frame).toBeGreaterThanOrEqual(MIN_TAP_TARGET_DP);
+    const margin = await compiledDp(SECTION_ACTION_BOX_CLASS, 'marginBlock');
+    expect(margin).toBe(-(SECTION_ACTION_FRAME_DP - SECTION_ACTION_LABEL_LINE_DP) / 2);
+    expect(frame + 2 * margin).toBe(SECTION_ACTION_LABEL_LINE_DP);
+    // The overhang a side stays inside the header row's `py-2` (7pt a side at
+    // the app's 14pt rem), so the box never paints or receives a touch past the
+    // row. Android delivers a touch only inside a parent view, so the row is
+    // the whole delivered area of this control.
+    expect(Math.abs(margin)).toBeLessThan(7);
+    expect(tapTargetReachDp(frame, SECTION_ACTION_HIT_SLOP_DP)).toBeGreaterThanOrEqual(
+      TOUCH_TARGET_DP
+    );
+  });
+
+  it('keeps its line in step with the eyebrow variant', () => {
+    // The line is the eyebrow's, not the glyph's: a second, drifting copy in
+    // this module would move the action the moment `Text` retunes the variant.
+    expect(TEXT_SOURCE).toContain(
+      `export const EYEBROW_LINE_HEIGHT_DP = ${SECTION_ACTION_LABEL_LINE_DP};`
+    );
+  });
+
+  it('cancels a caption-line action to that line, not the eyebrow line', async () => {
+    // The code fence's copy control sits beside a `caption` label, whose line
+    // is 14dp at `text-xs`. Cancelling the eyebrow line instead would add the
+    // difference to the fence header, growing a row to a control's box.
+    const frame = await compiledDp(CAPTION_ACTION_BOX_CLASS, 'minHeight');
+    const margin = await compiledDp(CAPTION_ACTION_BOX_CLASS, 'marginBlock');
+    expect(frame).toBe(SECTION_ACTION_FRAME_DP);
+    expect(margin).toBe(-7);
+    expect(frame + 2 * margin).toBe(14);
+    expect(frame + 2 * margin).toBeLessThan(SECTION_ACTION_LABEL_LINE_DP);
+    expect(await compiledDp(CAPTION_ACTION_BOX_CLASS, 'minWidth')).toBeGreaterThanOrEqual(
+      TOUCH_TARGET_DP
+    );
+  });
+});
+
 describe('standalone legal link geometry', () => {
   it('renders the 48dp box from whole dp', async () => {
     // The regression this guards: the store legal links rendered as bare
@@ -420,8 +604,6 @@ describe('standalone legal link geometry', () => {
     expect(LEGAL_LINK_MIN_DP).toBe(48);
     expect(await compiledDp(LEGAL_LINK_BOX_CLASS, 'minHeight')).toBe(LEGAL_LINK_MIN_DP);
     expect(await compiledDp(LEGAL_LINK_BOX_CLASS, 'minWidth')).toBe(LEGAL_LINK_MIN_DP);
-    // The utilities are literal in the source so the class compiler can see
-    // them; these hold the literals to the dp constants beside them.
     expect(LEGAL_LINK_BOX_CLASS).toContain(`min-h-[${LEGAL_LINK_MIN_DP}px]`);
     expect(LEGAL_LINK_BOX_CLASS).toContain(`min-w-[${LEGAL_LINK_MIN_DP}px]`);
   });
@@ -457,9 +639,9 @@ describe('code-reviewer line-action geometry', () => {
       -(MIN_TAP_TARGET_DP - textLineDp) / 2
     );
     // A `min-h-[28px]` box measures 27.8dp on Android: 27.8 + 2 * 9 = 45.8dp
-    // holds, while the inline link's 8dp a side would land at 43.8dp.
+    // holds, while 8dp a side would land at 43.8dp.
     expect(
-      tapTargetReachDp(MIN_TAP_TARGET_DP - 0.2, LINE_ACTION_HIT_SLOP.top)
+      tapTargetReachDp(FLOOR_BOX_MEASURED_DP, LINE_ACTION_HIT_SLOP.top)
     ).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
     // A short label's 36dp width floor at the call site measures 35.81dp on
     // Android, so the horizontal reach is checked at that width too:
@@ -470,6 +652,53 @@ describe('code-reviewer line-action geometry', () => {
     // The box floats over one line, so neither axis has a shorter side.
     expect(LINE_ACTION_HIT_SLOP.top).toBe(LINE_ACTION_HIT_SLOP.bottom);
     expect(LINE_ACTION_HIT_SLOP.left).toBe(LINE_ACTION_HIT_SLOP.right);
+  });
+
+  it('lays the command-card band out at the full slop reach', async () => {
+    // The band is the controls' parent, and each control's box is the whole
+    // touch target on its own node: `h-[46px]` past the 44pt target, with no
+    // `hitSlop` whose outer side a row's end cannot dispatch (measured: the
+    // vertical slop band reorders, a tap past the outer edge does nothing).
+    expect(LINE_ACTION_OVERLAY_CLASS).toContain(`h-[${LINE_ACTION_REACH_DP}px]`);
+    expect(await compiledDp(LINE_ACTION_OVERLAY_CLASS, 'height')).toBe(LINE_ACTION_REACH_DP);
+    // The band pins the boxes' outer edge to the card's content edge
+    // (`p-4` = 14dp), so the delete control's whole 46dp width is tappable.
+    expect(LINE_ACTION_OVERLAY_CLASS).toContain('end-[14px]');
+    // The field gap clears the band's bottom edge: 14dp card padding + 17.5dp
+    // label line + 16dp gap = 47.5dp, more than a dp below the band's 46dp.
+    expect(COMMAND_ROW_FIELD_GAP_CLASS).toBe('gap-y-[16px]');
+    expect(await compiledDp(COMMAND_ROW_FIELD_GAP_CLASS, 'rowGap')).toBe(16);
+    expect(14 + 17.5 + 16 - LINE_ACTION_REACH_DP).toBeGreaterThanOrEqual(1);
+    // The band covers the label's tail, so it is touch-transparent itself:
+    // only the control boxes take taps.
+    expect(LINE_ACTION_OVERLAY_CLASS).toContain('absolute');
+    expect(LINE_ACTION_OVERLAY_CLASS).toContain('flex-row');
+    expect(LINE_ACTION_OVERLAY_CLASS).toContain('gap-3');
+    // The box's own compiled width and height carry the reach past 44dp.
+    expect(await compiledDp('w-[46px]', 'width')).toBe(LINE_ACTION_REACH_DP);
+    expect(await compiledDp('h-[46px]', 'height')).toBe(LINE_ACTION_REACH_DP);
+  });
+});
+
+describe('credits balance retry geometry', () => {
+  it('carries the whole touch target on the retry box and keeps the amount line in flow', async () => {
+    // The regression this guards: the retry rendered a 28dp frame and leaned on
+    // a vertical `hitSlop` for the rest of its target, so the slop — not the
+    // control's own node — carried the floor. The box now carries the target
+    // itself, and its negative margin is the half a 28dp line box overflows,
+    // not a slop value.
+    expect(BALANCE_RETRY_TARGET_DP).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+    expect(BALANCE_RETRY_TARGET_CLASS).toContain('min-h-[46px]');
+    expect(BALANCE_RETRY_TARGET_CLASS).toContain('-my-[9px]');
+    // The class compiler only sees the literal, so the compiled box is held to
+    // the constant beside it.
+    expect(await compiledDp(BALANCE_RETRY_TARGET_CLASS, 'minHeight')).toBe(BALANCE_RETRY_TARGET_DP);
+    expect(await compiledDp(BALANCE_RETRY_TARGET_CLASS, 'marginBlock')).toBe(
+      -BALANCE_RETRY_CANCEL_DP
+    );
+    // The margin cancels the overflow on both sides, so the box keeps the
+    // amount's own 28dp line box in flow and the card paints one height.
+    expect(BALANCE_RETRY_TARGET_DP - 2 * BALANCE_RETRY_CANCEL_DP).toBe(MIN_TAP_TARGET_DP);
   });
 });
 

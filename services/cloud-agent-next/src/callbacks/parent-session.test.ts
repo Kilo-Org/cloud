@@ -7,10 +7,14 @@ import { deliverWorkspaceSessionCallback, parentSessionCallbackPrompt } from './
 import { createCallbackQueueConsumer } from './queue-consumer.js';
 import type { CallbackJob } from './types.js';
 
-const { getMetadata, assertAccess, queuePrompt } = vi.hoisted(() => ({
+const { getMetadata, assertAccess, queuePrompt, describeWorkspace } = vi.hoisted(() => ({
   getMetadata: vi.fn(),
   assertAccess: vi.fn(),
   queuePrompt: vi.fn(),
+  describeWorkspace: vi.fn(),
+}));
+vi.mock('../control-plane/workspace/workspace-stub.js', () => ({
+  getWorkspaceStub: () => ({ describe: describeWorkspace }),
 }));
 vi.mock('../session/metadata.js', () => ({ fetchSessionMetadata: getMetadata }));
 vi.mock('../session-access.js', () => ({ requireCurrentSessionAccess: assertAccess }));
@@ -107,6 +111,67 @@ describe('workspace session callback delivery', () => {
         : null
     );
     job.target = { url: `workspace:${targetId}` };
+    describeWorkspace.mockReset().mockResolvedValue({
+      state: 'active',
+      authorizationId: '32345678-1234-4234-8234-123456789abc',
+      worktreeId,
+      organizationId: null,
+    });
+  });
+
+  it('delivers after the chat that created the workspace was deleted', async () => {
+    const target = {
+      ...parent,
+      identity: { userId, sessionId: targetId },
+      parentCloudAgentSessionId: undefined,
+    };
+    getMetadata.mockImplementation(async (_env, owner, sessionId) =>
+      owner !== userId
+        ? null
+        : sessionId === childId
+          ? child
+          : sessionId === targetId
+            ? target
+            : null
+    );
+    expect(await deliverWorkspaceSessionCallback(env, job, 1)).toEqual({ type: 'success' });
+    expect(queuePrompt).toHaveBeenCalledWith(
+      expect.objectContaining({ cloudAgentSessionId: targetId }),
+      expect.anything(),
+      'workspace_session_callback'
+    );
+  });
+
+  it('delivers to an existing chat while the workspace authority is expired', async () => {
+    describeWorkspace.mockResolvedValue({
+      state: 'expired',
+      authorizationId: '32345678-1234-4234-8234-123456789abc',
+      worktreeId,
+      organizationId: null,
+    });
+    expect(await deliverWorkspaceSessionCallback(env, job, 1)).toEqual({ type: 'success' });
+  });
+
+  it.each(['revoked', 'deleted', 'unestablished'] as const)(
+    'does not deliver into a %s workspace',
+    async state => {
+      describeWorkspace.mockResolvedValue({
+        state,
+        authorizationId: null,
+        worktreeId: state === 'revoked' ? worktreeId : null,
+        organizationId: null,
+      });
+      expect(await deliverWorkspaceSessionCallback(env, job, 1)).toMatchObject({ type: 'failed' });
+      expect(queuePrompt).not.toHaveBeenCalled();
+    }
+  );
+
+  it('does not redirect a callback whose target chat was deleted', async () => {
+    getMetadata.mockImplementation(async (_env, owner, sessionId) =>
+      owner === userId && sessionId === childId ? child : null
+    );
+    expect(await deliverWorkspaceSessionCallback(env, job, 1)).toMatchObject({ type: 'failed' });
+    expect(queuePrompt).not.toHaveBeenCalled();
   });
 
   it('preserves gate and structured failure results in the queued parent prompt', async () => {
@@ -153,29 +218,46 @@ describe('workspace session callback delivery', () => {
     );
   });
 
-  it.each(['child target', 'other workspace', 'other owner'])(
-    'rejects a callback to %s',
-    async condition => {
-      getMetadata.mockImplementation(async (_env, owner, sessionId) => {
-        if (owner !== userId) return null;
-        if (sessionId === childId) return child;
-        if (sessionId === rootId) return parent;
-        if (sessionId !== targetId) return null;
-        if (condition === 'other owner')
-          return { ...parent, identity: { userId: 'other', sessionId: targetId } };
-        return {
-          ...parent,
-          identity: { userId, sessionId: targetId },
-          parentCloudAgentSessionId: condition === 'child target' ? rootId : undefined,
-          workspace: {
-            worktreeId: condition === 'other workspace' ? 'worktree_other' : worktreeId,
-          },
-        };
-      });
-      expect(await deliverWorkspaceSessionCallback(env, job, 1)).toMatchObject({ type: 'failed' });
-      expect(queuePrompt).not.toHaveBeenCalled();
-    }
-  );
+  it.each(['other workspace', 'other owner'])('rejects a callback to %s', async condition => {
+    getMetadata.mockImplementation(async (_env, owner, sessionId) => {
+      if (owner !== userId) return null;
+      if (sessionId === childId) return child;
+      if (sessionId === rootId) return parent;
+      if (sessionId !== targetId) return null;
+      if (condition === 'other owner')
+        return { ...parent, identity: { userId: 'other', sessionId: targetId } };
+      return {
+        ...parent,
+        identity: { userId, sessionId: targetId },
+        workspace: {
+          worktreeId: condition === 'other workspace' ? 'worktree_other' : worktreeId,
+        },
+      };
+    });
+    expect(await deliverWorkspaceSessionCallback(env, job, 1)).toMatchObject({ type: 'failed' });
+    expect(queuePrompt).not.toHaveBeenCalled();
+  });
+
+  it('delivers a grandchild callback to the child chat that launched it', async () => {
+    getMetadata.mockImplementation(async (_env, owner, sessionId) => {
+      if (owner !== userId) return null;
+      if (sessionId === childId) return child;
+      if (sessionId === rootId) return parent;
+      return sessionId === targetId
+        ? {
+            ...parent,
+            identity: { userId, sessionId: targetId },
+            parentCloudAgentSessionId: 'workspace_33333333-3333-4333-8333-333333333333',
+          }
+        : null;
+    });
+    expect(await deliverWorkspaceSessionCallback(env, job, 1)).toMatchObject({ type: 'success' });
+    expect(queuePrompt).toHaveBeenCalledWith(
+      expect.objectContaining({ cloudAgentSessionId: targetId }),
+      expect.anything(),
+      'workspace_session_callback'
+    );
+  });
 });
 
 describe('callback fallbacks', () => {

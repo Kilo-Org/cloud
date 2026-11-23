@@ -40,7 +40,7 @@ import {
   getConfiguredAutoFreeModels,
   isAutoFreeEligibleModelId,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config';
-import { getOpenRouterModelsFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import { getOpenRouterChatModelIdsFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import {
   isVercelModel,
   isVercelRoutingEnabledForModel,
@@ -51,8 +51,10 @@ import {
   getOrganizationAutoRoute,
   isOrganizationAutoTargetModel,
   validateOrganizationAutoTarget,
+  type OrganizationAutoTargetValidationResult,
 } from '@kilocode/web-shared/lib/organizations/organization-auto-model';
 import { getModelVariants } from '@kilocode/web-shared/lib/ai-gateway/providers/model-settings';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import type { OpenCodeVariant } from '@kilocode/db/schema-types';
 
 type ResolveAutoModelParams = {
@@ -90,7 +92,7 @@ async function getEligibleAutoFreeModels(
   if (!configuredModels) return [AUTO_FREE_FALLBACK_MODEL];
 
   const [openRouterModels, customLlmsById] = await Promise.all([
-    getOpenRouterModelsFromDatabase(),
+    getOpenRouterChatModelIdsFromDatabase(),
     getCustomLlmsById(),
   ]);
   const isEligible = async (model: string) => {
@@ -194,8 +196,10 @@ async function resolveOrganizationAutoModel(
     };
   }
 
-  let validation: Awaited<ReturnType<typeof validateOrganizationAutoTarget>>;
+  let validation: OrganizationAutoTargetValidationResult;
   try {
+    // The gateway runs in `sfo1`, so validation reads the US replica; web routers validate inside
+    // their transaction and keep the primary they just wrote to.
     validation = await validateOrganizationAutoTarget(
       {
         id: organizationContext.organizationId,
@@ -203,7 +207,7 @@ async function resolveOrganizationAutoModel(
         settings: organizationContext.settings,
       },
       targetModelId,
-      { apiKind: params.apiKind ?? undefined }
+      { apiKind: params.apiKind ?? undefined, read: { fromDb: readDb } }
     );
   } catch {
     return {

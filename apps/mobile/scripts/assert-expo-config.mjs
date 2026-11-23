@@ -1,16 +1,29 @@
 import { execFileSync } from 'node:child_process';
-import { dirname, join } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { createContractFailures } from './contract-failures.mjs';
+
 import { ENV_KEYS } from '../src/lib/env-keys.js';
-import { SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS } from '../src/lib/android-notification-channels.js';
+import {
+  CREATED_ANDROID_NOTIFICATION_CHANNEL_IDS,
+  SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS,
+} from '../src/lib/android-notification-channels.js';
+import {
+  SPLASH_BACKGROUND_COLOR,
+  SPLASH_LOGO_IMAGE,
+  SPLASH_LOGO_SIZE,
+} from '../src/lib/splash-branding.js';
 
 // Contract values mirrored from app.config.ts (bundle id, package, scheme,
 // orientation, associated domain, blocked and requested permissions, and
-// Sentry plugin). ENV_KEYS is imported live from src/lib/env-keys.js, and
-// the silent channel list from src/lib/android-notification-channels.js. The
-// script runs the full evaluated config, so these must match the resolved
-// build-time output, not the raw app.config.ts source.
+// Sentry plugin). ENV_KEYS is imported live from src/lib/env-keys.js, the
+// silent and created channel lists from
+// src/lib/android-notification-channels.js, and the splash branding from
+// src/lib/splash-branding.js. The script runs the full evaluated config, so
+// these must match the resolved build-time output, not the raw app.config.ts
+// source.
 const BUNDLE_IDENTIFIER = 'com.kilocode.kiloapp';
 const ANDROID_PACKAGE = 'com.kilocode.kiloapp';
 const SCHEME = 'kiloapp';
@@ -50,9 +63,11 @@ const BUILD_PROPERTIES_PLUGIN = 'expo-build-properties';
 const NOTIFICATIONS_PLUGIN = 'expo-notifications';
 // The Android channel Firebase falls back to when an FCM message omits
 // `channel_id`, mirrored from app.config.ts. It must be a channel the app
-// creates (src/lib/notifications.ts), or Android drops the fallback push, and
-// it must be created with sound: the fallback carries needs-input/chat alerts,
-// so the silent progress channel must never be named here.
+// creates — CREATED_ANDROID_NOTIFICATION_CHANNEL_IDS in
+// src/lib/android-notification-channels.js, which src/lib/notifications.ts
+// builds its writer from — or Android drops the fallback push, and it must be
+// created with sound: the fallback carries needs-input/chat alerts for an
+// unversioned token, so the silent progress channel must never be named here.
 const ANDROID_DEFAULT_NOTIFICATION_CHANNEL = 'needs-input';
 // expo-task-manager instantiates its headless app loader by name from
 // AndroidManifest metadata. R8 does not keep it (its `@DoNotStrip` is on the
@@ -131,33 +146,116 @@ const PERMISSION_PROMPT_PLIST_KEYS = [
 
 const mobileDir = join(dirname(fileURLToPath(import.meta.url)), '..');
 
+// The contract set has to be reproducible from the command line alone, so the
+// flags are parsed strictly and any deviation is refused: an ignored
+// `--profile production` would run the development-only set and still print OK.
+// Two exit codes keep the two failures apart for the caller — 2 means the config
+// could not be evaluated or read, so no contract was checked; 1 means the checks
+// ran and found drift.
+const USAGE = 'usage: assert-expo-config.mjs [--config <path>] [--profile <name>]';
+const args = {};
+const argv = process.argv.slice(2);
+for (let index = 0; index < argv.length; index += 2) {
+  const flag = argv[index];
+  const value = argv[index + 1];
+  if (flag !== '--config' && flag !== '--profile') {
+    console.error(`${USAGE}\nunexpected argument: ${flag}`);
+    process.exit(2);
+  }
+  if (value === undefined || value === '' || value.startsWith('--')) {
+    console.error(`${USAGE}\n${flag} needs a value`);
+    process.exit(2);
+  }
+  const name = flag.slice(2);
+  if (Object.hasOwn(args, name)) {
+    console.error(`${USAGE}\n${flag} was given more than once`);
+    process.exit(2);
+  }
+  args[name] = value;
+}
+
+// `--profile` selects the contract set; the environment is only the fallback,
+// so a release preflight that exports EAS_BUILD_PROFILE keeps its checks while a
+// local run can name the set without changing what the config evaluates to.
+const profile = args.profile ?? (process.env.EAS_BUILD_PROFILE || null);
+
+// A misspelled profile (`productionn`, `prod`) would select the development set
+// and still print OK, which is the failure a strict parse exists to prevent. EAS
+// resolves every build profile from eas.json, so that file is the list a name
+// has to come from.
+if (profile !== null) {
+  let buildProfiles;
+  try {
+    buildProfiles = Object.keys(
+      JSON.parse(readFileSync(join(mobileDir, 'eas.json'), 'utf8')).build ?? {}
+    );
+  } catch (error) {
+    console.error(`Failed to read eas.json in ${mobileDir}: ${error.message}`);
+    process.exit(2);
+  }
+  if (!buildProfiles.includes(profile)) {
+    console.error(`Unknown profile "${profile}": eas.json defines ${buildProfiles.join(', ')}`);
+    process.exit(2);
+  }
+}
+
+let configPath;
 let raw;
-try {
-  raw = execFileSync('npx', ['expo', 'config', '--json'], {
-    cwd: mobileDir,
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'inherit'],
-  });
-} catch (error) {
-  console.error(`Failed to run "npx expo config --json" from ${mobileDir}: ${error.message}`);
-  process.exit(1);
+if (args.config !== undefined) {
+  configPath = resolve(mobileDir, args.config);
+  try {
+    raw = readFileSync(configPath, 'utf8');
+  } catch (error) {
+    console.error(`Failed to read Expo config ${configPath}: ${error.message}`);
+    process.exit(2);
+  }
+} else {
+  try {
+    raw = execFileSync('npx', ['expo', 'config', '--json'], {
+      cwd: mobileDir,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'inherit'],
+    });
+  } catch (error) {
+    console.error(`Failed to run "npx expo config --json" from ${mobileDir}: ${error.message}`);
+    process.exit(2);
+  }
 }
 
 let config;
 try {
   config = JSON.parse(raw);
 } catch (error) {
-  console.error(`"npx expo config --json" returned invalid JSON: ${error.message}`);
-  process.exit(1);
+  console.error(
+    configPath === undefined
+      ? `"npx expo config --json" returned invalid JSON: ${error.message}`
+      : `Expo config ${configPath} is not valid JSON: ${error.message}`
+  );
+  process.exit(2);
+}
+// JSON.parse accepts `null`, a number or an array, and the first contract read
+// would then throw a TypeError that Node reports as exit 1 — the drift code. A
+// document that is not a config object never reached the checks, so it belongs
+// with the other exit-2 inputs.
+if (typeof config !== 'object' || config === null || Array.isArray(config)) {
+  console.error(
+    configPath === undefined
+      ? '"npx expo config --json" returned no config object'
+      : `Expo config ${configPath} holds no config object`
+  );
+  process.exit(2);
 }
 
-const failures = [];
+const { check, report } = createContractFailures();
 
-function check(condition, message) {
-  if (!condition) {
-    failures.push(message);
-  }
-}
+// A document with a malformed nested member (a string or a number where the
+// checks read a list) throws while the checks run. It never produced a verdict,
+// so it belongs with the exit-2 inputs; Node's default would report it as exit
+// 1, the code that means contract drift.
+process.on('uncaughtException', error => {
+  console.error(`The Expo config could not be checked: ${error.message}`);
+  process.exit(2);
+});
 
 /** True when `actual` holds exactly the members of `expected`, in any order. */
 const sameMembers = (actual, expected) =>
@@ -295,8 +393,12 @@ const pluginEntries = (config.plugins ?? []).map(plugin =>
     : { name: plugin, options: undefined }
 );
 const pluginNames = pluginEntries.map(entry => entry.name);
-/** The first entry for a plugin name, with the options it was configured with. */
-const pluginEntry = name => pluginEntries.find(entry => entry.name === name);
+/** The sole entry for a plugin name; a duplicate registration is a failure. */
+const pluginEntry = name => {
+  const entries = pluginEntries.filter(entry => entry.name === name);
+  check(entries.length === 1, `plugins must include exactly one "${name}"`);
+  return entries.length === 1 ? entries[0] : undefined;
+};
 for (const { name, reason } of REQUIRED_PLUGINS) {
   check(pluginNames.includes(name), `plugins must include "${name}": ${reason}`);
 }
@@ -307,19 +409,17 @@ check(
   sentryPlugin?.options?.experimental_android?.enableAndroidGradlePlugin === true,
   `"${SENTRY_PLUGIN}" must set experimental_android.enableAndroidGradlePlugin`
 );
-const splashEntries = pluginEntries.filter(entry => entry.name === BRANDED_SPLASH_PLUGIN);
-check(splashEntries.length === 1, `plugins must include exactly one "${BRANDED_SPLASH_PLUGIN}"`);
+const splashOptions = pluginEntry(BRANDED_SPLASH_PLUGIN)?.options;
 check(
   !pluginNames.includes('expo-splash-screen') &&
     !pluginNames.includes('./plugins/withAndroidSplashWindowBackground'),
   'the shared branded splash must own native splash registration and mod ordering'
 );
-const splashOptions = splashEntries[0]?.options;
 check(
-  splashOptions?.image === './assets/images/logo-mark.png' &&
-    splashOptions.backgroundColor === '#FFDD00' &&
-    splashOptions.imageWidth === 100,
-  'the shared native splash must match AnimatedSplashOverlay: yellow with the 100dp Kilo mark'
+  splashOptions?.image === SPLASH_LOGO_IMAGE &&
+    splashOptions.backgroundColor === SPLASH_BACKGROUND_COLOR &&
+    splashOptions.imageWidth === SPLASH_LOGO_SIZE,
+  'the native splash and AnimatedSplashOverlay must read the same mark, colour and size from src/lib/splash-branding.js'
 );
 check(
   splashOptions?.ios === undefined && splashOptions?.android === undefined,
@@ -330,8 +430,11 @@ check(
 // the evaluated config is the only place that shows the entry the plugin
 // composed.
 const appExtensions = config.extra?.eas?.build?.experimental?.ios?.appExtensions ?? [];
+const fileProviderExtension = appExtensions.find(
+  extension => extension.targetName === 'ArtifactsFileProvider'
+);
 check(
-  appExtensions.some(extension => extension.targetName === 'ArtifactsFileProvider'),
+  fileProviderExtension !== undefined,
   'extra.eas.build.experimental.ios.appExtensions must carry the ArtifactsFileProvider target'
 );
 // Dev-only capability, asserted where it would break a release: Apple rejects
@@ -339,11 +442,8 @@ check(
 // and App Store review rejects the entitlement itself. The release build and
 // this assertion share one evaluation, so a production config that carried it
 // would fail here before Apple sees it.
-if (process.env.EAS_BUILD_PROFILE === 'production') {
+if (profile === 'production') {
   const FILE_PROVIDER_TESTING_MODE = 'com.apple.developer.fileprovider.testing-mode';
-  const fileProviderExtension = appExtensions.find(
-    extension => extension.targetName === 'ArtifactsFileProvider'
-  );
   check(
     !(FILE_PROVIDER_TESTING_MODE in (config.ios?.entitlements ?? {})),
     `a production build must not carry the ${FILE_PROVIDER_TESTING_MODE} app entitlement`
@@ -358,10 +458,6 @@ if (process.env.EAS_BUILD_PROFILE === 'production') {
   );
 }
 
-// Asserted on the EVALUATED config, not on app.config.ts's source: options that
-// never reach the plugin still evaluate to the dev-menu defaults (auto-show on,
-// onboarding on), and the menu then sits over the product screen carrying the
-// raw SF Symbol names a scene dump reads aloud.
 const devClientPlugin = pluginEntry(DEV_CLIENT_PLUGIN);
 for (const [option, expected] of Object.entries(DEV_CLIENT_PLUGIN_OPTIONS)) {
   check(
@@ -388,12 +484,13 @@ check(
   notificationsPlugin?.options?.defaultChannel === ANDROID_DEFAULT_NOTIFICATION_CHANNEL,
   `plugins "${NOTIFICATIONS_PLUGIN}" must set defaultChannel: "${ANDROID_DEFAULT_NOTIFICATION_CHANNEL}"`
 );
-// The fallback carries needs-input/chat alerts for an unversioned token, so it
-// must not name a channel the app creates silent. The list is the same one
-// src/lib/notifications.ts writes its channels from.
 check(
   !SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS.includes(ANDROID_DEFAULT_NOTIFICATION_CHANNEL),
   `the FCM default channel must not be silent (${SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS.join(', ')})`
+);
+check(
+  CREATED_ANDROID_NOTIFICATION_CHANNEL_IDS.includes(ANDROID_DEFAULT_NOTIFICATION_CHANNEL),
+  `the FCM default channel must be a channel the app creates (${CREATED_ANDROID_NOTIFICATION_CHANNEL_IDS.join(', ')})`
 );
 
 const extra = config.extra ?? {};
@@ -408,7 +505,7 @@ for (const key of Object.keys(ENV_KEYS)) {
 // Admission contract: the server issues native credentials only to an attested
 // device, and Play Integrity is the Android proof. An optional key would
 // otherwise bake an empty value into a release that then cannot sign in.
-if (process.env.EAS_BUILD_PROFILE === 'production') {
+if (profile === 'production') {
   check(
     typeof extra.playIntegrityProjectNumber === 'string' &&
       extra.playIntegrityProjectNumber.length > 0,
@@ -416,12 +513,7 @@ if (process.env.EAS_BUILD_PROFILE === 'production') {
   );
 }
 
-if (failures.length > 0) {
-  console.error('Expo config contract violations:');
-  for (const failure of failures) {
-    console.error(`  - ${failure}`);
-  }
-  process.exit(1);
-}
+const exitCode = report('Expo config contract violations');
+if (exitCode !== 0) process.exit(exitCode);
 
-console.log('Expo config contract OK');
+console.log(`Expo config contract OK (profile: ${profile ?? 'none'})`);

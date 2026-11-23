@@ -101,7 +101,7 @@ vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }
 vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
 vi.mock('@/components/ui/preference-row', () => ({ PreferenceRow: 'PreferenceRow' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/text', () => ({ Text: 'Text', EYEBROW_LINE_HEIGHT_DP: 22 }));
 vi.mock('@/components/ui/icons', () => ({
   Bot: 'Bot',
   CornerDownLeft: 'CornerDownLeft',
@@ -156,6 +156,10 @@ describe('ProfileOverviewScreen terminal error states', () => {
     // A cached profile must not stay editable once the server refuses it.
     expect(findAll(renderer.root, 'FormField')).toHaveLength(0);
     expect(findAll(renderer.root, 'Button')).toHaveLength(0);
+    // With nothing to show under it, the error owns the surface: it centres and
+    // no tab scroller holds it.
+    expect(props.placement).toBe('center');
+    expect(findAll(renderer.root, 'TabScreenScrollView')).toHaveLength(0);
     // Without history the header back lands on the Profiles list.
     expect(findOne(renderer.root, 'ScreenHeader').props.backFallback).toBe(
       '/(app)/(tabs)/(3_profile)/profiles'
@@ -219,6 +223,9 @@ describe('ProfileOverviewScreen terminal error states', () => {
     expect(props.title).toBe("Couldn't load profiles");
     expect(props.onRetry).toBeDefined();
     expect(findAll(renderer.root, 'FormField').length).toBeGreaterThan(0);
+    // The cached editor sits under the error, so it stays a banner in the body.
+    expect(props.placement).toBe('top');
+    expect(findAll(renderer.root, 'TabScreenScrollView')).toHaveLength(1);
 
     unmount();
   });

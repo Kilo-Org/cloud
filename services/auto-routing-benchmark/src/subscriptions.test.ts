@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { BenchmarkConfig } from '@kilocode/auto-routing-contracts';
 import { BenchmarkModelCatalogSchema } from './platform-models';
 import {
+  continueDailyReconcile,
   dailyReconcileSubscriptions,
   loadSubscriptionSnapshot,
   mapSubscriptionStatuses,
@@ -44,14 +45,15 @@ let afterOwnerEnumeration: (() => Promise<void>) | undefined;
 let afterOwnerSnapshotWrite: (() => Promise<void>) | undefined;
 let beforeOwnerSnapshotWrite: (() => Promise<void>) | undefined;
 let afterOwnerRowRead: (() => Promise<void>) | undefined;
-let failOwnerRead: string | undefined;
+let failOwnerReads: Set<string>;
 let writes: { sql: string; changes: number }[];
 function d1(db: DatabaseSync): D1Database {
   return {
     prepare(sql: string) {
       const bound = (params: unknown[]) => ({
         async first() {
-          if (params.includes(failOwnerRead)) throw new Error('D1 owner read failed');
+          if (params.some(param => failOwnerReads.has(String(param))))
+            throw new Error('D1 owner read failed');
           const row = db.prepare(sql).get(...(params as never[])) ?? null;
           if (
             sql.includes('snapshot FROM benchmark_subscriptions') &&
@@ -127,13 +129,19 @@ beforeEach(() => {
   afterOwnerSnapshotWrite = undefined;
   beforeOwnerSnapshotWrite = undefined;
   afterOwnerRowRead = undefined;
-  failOwnerRead = undefined;
+  failOwnerReads = new Set();
   writes = [];
   sqlite = new DatabaseSync(':memory:');
   sqlite.exec(`
     CREATE TABLE benchmark_subscriptions (router TEXT, owner_type TEXT, owner_id TEXT, revision TEXT, snapshot TEXT, updated_at TEXT, PRIMARY KEY(router, owner_type, owner_id));
+    CREATE TABLE benchmark_daily_alias_sync (router TEXT PRIMARY KEY, day TEXT, attempts INTEGER, platform_status TEXT, platform_error TEXT, owner_cursor_type TEXT, owner_cursor_id TEXT, owner_pages INTEGER, owner_done INTEGER, updated_at TEXT);
     CREATE TABLE config_decider_models (router TEXT, model TEXT);
     CREATE TABLE benchmark_profiles (router TEXT, model TEXT, variant TEXT, engine_identity TEXT, repetitions INTEGER, status TEXT, run_id TEXT, requested_at TEXT, updated_at TEXT, platform_requested INTEGER, user_requested INTEGER, PRIMARY KEY(router, model, variant, engine_identity, repetitions));
+    CREATE TABLE benchmark_case_runs (engine_identity TEXT, model TEXT, variant TEXT, rep INTEGER, case_id TEXT, status TEXT, generation INTEGER, executor_run_id TEXT, executor_token TEXT, platform_covered INTEGER DEFAULT 0, result_usable INTEGER DEFAULT 0, cost_microdollars INTEGER, settlement_id TEXT, failure_reason TEXT, created_at TEXT, updated_at TEXT, started_at TEXT, settled_at TEXT, PRIMARY KEY(engine_identity, model, variant, rep, case_id));
+    CREATE TABLE benchmark_case_payers (engine_identity TEXT, model TEXT, variant TEXT, rep INTEGER, case_id TEXT, payer_kind TEXT, payer_id TEXT, owner_type TEXT, owner_id TEXT, status TEXT, charged_microdollars INTEGER DEFAULT 0, settlement_id TEXT, release_id TEXT, created_at TEXT, updated_at TEXT, generation INTEGER DEFAULT 0, PRIMARY KEY(engine_identity, model, variant, rep, case_id, payer_kind, payer_id));
+    CREATE TABLE paid_benchmark_request_cases (request_id TEXT, engine_identity TEXT, model TEXT, variant TEXT, rep INTEGER, case_id TEXT, status TEXT, covered_by_kilo INTEGER, reserved_microdollars INTEGER, charged_microdollars INTEGER, reason TEXT, updated_at TEXT, PRIMARY KEY(request_id, engine_identity, model, variant, rep, case_id));
+    CREATE TABLE paid_benchmark_requests (id TEXT PRIMARY KEY, status TEXT, owner_type TEXT, owner_id TEXT);
+    CREATE TABLE paid_benchmark_billing_outbox (seq INTEGER PRIMARY KEY, id TEXT, kind TEXT, request_id TEXT, amount_microdollars INTEGER, status TEXT);
   `);
   env = { BENCH_DB: d1(sqlite) } as Env;
   vi.mocked(getBenchmarkConfig).mockResolvedValue(config);
@@ -357,7 +365,7 @@ describe('saved daily benchmark subscriptions', () => {
           .prepare('UPDATE benchmark_subscriptions SET snapshot = ? WHERE owner_id = ?')
           .run('{"entries":"invalid"}', owner.ownerId);
       } else {
-        failOwnerRead = owner.ownerId;
+        failOwnerReads = new Set([owner.ownerId]);
       }
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
       vi.mocked(fetchExecutableBenchmarkModelCatalog).mockResolvedValue(catalog('vendor/N'));
@@ -476,19 +484,217 @@ describe('saved daily benchmark subscriptions', () => {
     ]);
   });
 
-  it('leaves all saved targets intact when the daily catalog lookup fails', async () => {
+  it('retries a failed daily resolution on a later tick the same day', async () => {
     await initialReady();
     const previous = await loadSubscriptionSnapshot(env.BENCH_DB, 'efficient', owner);
-    vi.mocked(fetchExecutableBenchmarkModelCatalog).mockRejectedValue(
-      new Error('Catalog unavailable')
-    );
-    await expect(dailyReconcileSubscriptions(env, 'efficient')).rejects.toThrow(
-      'Catalog unavailable'
-    );
+    vi.mocked(fetchExecutableBenchmarkModelCatalog)
+      .mockRejectedValueOnce(new Error('Catalog unavailable'))
+      .mockResolvedValue(catalog('vendor/N'));
+    const failed = await dailyReconcileSubscriptions(env, 'efficient');
+    expect(failed.platform).toEqual({
+      status: 'pending',
+      attempts: 1,
+      error: 'Catalog unavailable',
+    });
+    expect(failed.owners.status).toBe('pending');
     expect(await loadSubscriptionSnapshot(env.BENCH_DB, 'efficient', owner)).toEqual(previous);
     expect(
       snapshotPairs(await servingSubscriptionSnapshot(env.BENCH_DB, config, owner), true)
     ).toEqual([{ model: 'vendor/M', variant: null }]);
+
+    const retried = await continueDailyReconcile(env, 'efficient');
+    expect(retried?.platform.status).toBe('ok');
+    expect(retried?.owners.status).toBe('ok');
+    expect(snapshotPairs(await loadSubscriptionSnapshot(env.BENCH_DB, 'efficient', owner))).toEqual(
+      [{ model: 'vendor/N', variant: null }]
+    );
+  });
+
+  it('stops retrying a daily resolution that failed all day', async () => {
+    await initialReady();
+    vi.mocked(fetchExecutableBenchmarkModelCatalog).mockRejectedValue(
+      new Error('Catalog unavailable')
+    );
+    const now = new Date('2026-11-20T05:00:00.000Z');
+    let result = await dailyReconcileSubscriptions(env, 'efficient', { now });
+    for (let tick = 0; tick < 40 && result.platform.status === 'pending'; tick++) {
+      const next = await continueDailyReconcile(env, 'efficient', { now });
+      if (!next) break;
+      result = next;
+    }
+    expect(result.platform.status).toBe('failed');
+    expect(sqlite.prepare('SELECT attempts FROM benchmark_daily_alias_sync').get()).toEqual({
+      attempts: 30,
+    });
+    // Platform resolution stops for the day; the owner pass does not, so a tick still
+    // runs and the platform attempts stay spent instead of incrementing.
+    const next = await continueDailyReconcile(env, 'efficient', { now });
+    expect(next?.platform.status).toBe('failed');
+    expect(next?.owners.status).toBe('pending');
+    expect(sqlite.prepare('SELECT attempts FROM benchmark_daily_alias_sync').get()).toEqual({
+      attempts: 30,
+    });
+  });
+
+  it('does not reconcile a new day before its daily run', async () => {
+    await initialReady();
+    await dailyReconcileSubscriptions(env, 'efficient', {
+      now: new Date('2026-11-19T05:00:00.000Z'),
+    });
+    expect(
+      await continueDailyReconcile(env, 'efficient', { now: new Date('2026-11-20T00:10:00.000Z') })
+    ).toBeNull();
+  });
+
+  it('re-resolves frontier owners as well as efficient ones', async () => {
+    const frontierConfig = { ...config, router: 'frontier' as const };
+    vi.mocked(getBenchmarkConfig).mockImplementation(async (_db, router) =>
+      router === 'frontier' ? frontierConfig : config
+    );
+    await syncSubscriptionSnapshot(env, frontierConfig, owner, pool);
+    vi.mocked(fetchExecutableBenchmarkModelCatalog).mockResolvedValue(catalog('vendor/N'));
+    const result = await dailyReconcileSubscriptions(env, 'frontier');
+    expect(result.owners.status).toBe('ok');
+    expect(snapshotPairs(await loadSubscriptionSnapshot(env.BENCH_DB, 'frontier', owner))).toEqual([
+      { model: 'vendor/N', variant: null },
+    ]);
+  });
+
+  it('reconciles every owner across bounded pages when most of them fail', async () => {
+    const broken = Array.from({ length: 150 }, (_, index) => `broken-${index}`);
+    const healthy = Array.from({ length: 50 }, (_, index) => `healthy-${index}`);
+    for (const ownerId of [...broken, ...healthy])
+      await syncSubscriptionSnapshot(env, config, { ownerType: 'user', ownerId }, pool);
+    failOwnerReads = new Set(broken);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.mocked(fetchExecutableBenchmarkModelCatalog).mockResolvedValue(catalog('vendor/N'));
+
+    const first = await dailyReconcileSubscriptions(env, 'efficient');
+    expect(first.owners.status).toBe('pending');
+    expect(first.owners.pages).toBe(2);
+    const second = await continueDailyReconcile(env, 'efficient');
+    expect(second?.owners.status).toBe('ok');
+    failOwnerReads = new Set();
+    for (const ownerId of healthy)
+      expect(
+        snapshotPairs(
+          await loadSubscriptionSnapshot(env.BENCH_DB, 'efficient', { ownerType: 'user', ownerId })
+        )
+      ).toEqual([{ model: 'vendor/N', variant: null }]);
+    expect(
+      snapshotPairs(
+        await loadSubscriptionSnapshot(env.BENCH_DB, 'efficient', {
+          ownerType: 'user',
+          ownerId: broken[0],
+        })
+      )
+    ).toEqual([{ model: 'vendor/M', variant: null }]);
+    expect(
+      warn.mock.calls.filter(([message]) => String(message).includes('"category":"owner_sync"'))
+    ).toHaveLength(150);
+    warn.mockRestore();
+  });
+
+  it('does not spend the platform attempt budget on ticks that already resolved it', async () => {
+    await initialReady();
+    for (let index = 0; index < 250; index++)
+      await syncSubscriptionSnapshot(
+        env,
+        config,
+        { ownerType: 'user', ownerId: `user-${String(index).padStart(3, '0')}` },
+        pool
+      );
+    vi.mocked(fetchExecutableBenchmarkModelCatalog).mockResolvedValue(catalog('vendor/N'));
+    const now = new Date('2026-11-20T05:00:00.000Z');
+    const first = await dailyReconcileSubscriptions(env, 'efficient', { now });
+    expect(first.platform.status).toBe('ok');
+    expect(first.owners.status).toBe('pending');
+    expect(first.owners.pages).toBe(2);
+    expect(sqlite.prepare('SELECT attempts FROM benchmark_daily_alias_sync').get()).toEqual({
+      attempts: 0,
+    });
+
+    const later = await continueDailyReconcile(env, 'efficient', { now });
+    expect(later?.owners.status).toBe('ok');
+    expect(sqlite.prepare('SELECT attempts FROM benchmark_daily_alias_sync').get()).toEqual({
+      attempts: 0,
+    });
+    expect(
+      snapshotPairs(
+        await loadSubscriptionSnapshot(env.BENCH_DB, 'efficient', {
+          ownerType: 'user',
+          ownerId: 'user-000',
+        })
+      )
+    ).toEqual([{ model: 'vendor/N', variant: null }]);
+
+    // A pool past the page budget ends the day without a platform attempt.
+    sqlite.prepare('UPDATE benchmark_daily_alias_sync SET owner_pages = 100, owner_done = 0').run();
+    expect(await continueDailyReconcile(env, 'efficient', { now })).toBeNull();
+  });
+
+  it('finishes the owner pages on the same day after the catalog recovers', async () => {
+    await initialReady();
+    for (let index = 0; index < 250; index++)
+      await syncSubscriptionSnapshot(
+        env,
+        config,
+        { ownerType: 'user', ownerId: `user-${String(index).padStart(3, '0')}` },
+        pool
+      );
+    const now = new Date('2026-11-20T05:00:00.000Z');
+    vi.mocked(fetchExecutableBenchmarkModelCatalog).mockRejectedValue(
+      new Error('Catalog unavailable')
+    );
+    let result = await dailyReconcileSubscriptions(env, 'efficient', { now });
+    for (let tick = 0; tick < 40 && result.platform.status === 'pending'; tick++) {
+      const next = await continueDailyReconcile(env, 'efficient', { now });
+      if (!next) break;
+      result = next;
+    }
+    expect(result.platform.status).toBe('failed');
+    expect(result.owners.status).toBe('pending');
+    expect(
+      sqlite.prepare('SELECT attempts, owner_pages FROM benchmark_daily_alias_sync').get()
+    ).toEqual({ attempts: 30, owner_pages: 0 });
+
+    // The catalog recovers: the platform budget is spent, the owner pages are not.
+    vi.mocked(fetchExecutableBenchmarkModelCatalog).mockResolvedValue(catalog('vendor/N'));
+    let owners = await continueDailyReconcile(env, 'efficient', { now });
+    expect(owners?.platform.status).toBe('failed');
+    expect(owners?.owners.pages).toBe(2);
+    for (let tick = 0; tick < 10 && owners?.owners.status === 'pending'; tick++)
+      owners = await continueDailyReconcile(env, 'efficient', { now });
+    expect(owners?.owners.status).toBe('ok');
+    expect(
+      snapshotPairs(
+        await loadSubscriptionSnapshot(env.BENCH_DB, 'efficient', {
+          ownerType: 'user',
+          ownerId: 'user-249',
+        })
+      )
+    ).toEqual([{ model: 'vendor/N', variant: null }]);
+    expect(sqlite.prepare('SELECT attempts FROM benchmark_daily_alias_sync').get()).toEqual({
+      attempts: 30,
+    });
+    expect(await continueDailyReconcile(env, 'efficient', { now })).toBeNull();
+  });
+
+  it('keeps serving a target that lost readiness instead of dropping the alias', async () => {
+    await initialReady();
+    sqlite
+      .prepare(
+        "UPDATE benchmark_profiles SET status = 'failed', run_id = NULL WHERE model = 'vendor/M'"
+      )
+      .run();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(
+      snapshotPairs(await servingSubscriptionSnapshot(env.BENCH_DB, config, owner), true)
+    ).toEqual([{ model: 'vendor/M', variant: null }]);
+    expect(warn.mock.calls.map(([message]) => JSON.parse(String(message)).event)).toContain(
+      'benchmark_alias_serving_held'
+    );
+    warn.mockRestore();
   });
 
   it.each(['vendor/M', 'vendor/N'])(

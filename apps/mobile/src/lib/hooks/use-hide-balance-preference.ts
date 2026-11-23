@@ -3,7 +3,6 @@ import { useSyncExternalStore } from 'react';
 import { createSecureStorePreference } from '@/lib/hooks/secure-store-preference';
 import { HIDE_BALANCE_KEY } from '@/lib/storage-keys';
 
-/** Hidden only when the stored string is exactly `true`. Missing or other values stay visible. */
 function parseHideBalance(raw: string | null): boolean {
   return raw === 'true';
 }
@@ -14,10 +13,6 @@ const store = createSecureStorePreference<boolean>({
   parse: parseHideBalance,
   serialize: value => (value ? 'true' : 'false'),
 });
-
-export function preloadHideBalancePreference(): void {
-  store.preload();
-}
 
 export function setHideBalance(value: boolean) {
   store.set(value);

@@ -1,5 +1,6 @@
 import type { SessionId } from './types/ids.js';
 import type { EnvironmentBuild } from './environment-build/environment-build-do.js';
+import type { PreviewTunnel } from './preview-tunnel/preview-tunnel-do.js';
 import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import type { CloudAgentAuthority } from '@kilocode/worker-utils/cloud-agent-authority';
 import type {
@@ -11,13 +12,14 @@ import type { AccessibleCloudAgentSession } from '@kilocode/worker-utils/cloud-a
 import type { UserKiloFacade } from './kilo-facade/user-kilo-facade.js';
 import type { SandboxControlV2 as SandboxControl } from './control-plane/sandbox/sandbox-do.js';
 import type { SandboxSessionV2 as SandboxSession } from './control-plane/session/session-do.js';
+import type { CloudAgentWorkspaceDO } from './control-plane/workspace/workspace-do.js';
 import type { VercelSnapshotBuild } from './persistence/VercelSnapshotBuild.js';
 import type { SandboxContainers } from './sandbox-containers/SandboxContainers.js';
 import type { StreamTicketNonceDO } from './persistence/StreamTicketNonceDO.js';
 // Type-only exception to "no reverse import from production code": erased at
 // build time, so it cannot make the e2e sink reachable or ship e2e code.
 import type { E2eCallbackSink } from './persistence/E2eCallbackSink.js';
-import type { CallbackJob } from './callbacks/index.js';
+import type { CallbackQueueJob } from './callbacks/types.js';
 import { AGENT_SANDBOX_PROVIDERS, type AgentSandboxProvider } from './shared/sandbox-provider.js';
 import type { NotificationsBinding } from './notifications-binding.js';
 import type { SessionIngestBinding } from './session-ingest-binding.js';
@@ -29,10 +31,7 @@ import type { SecretBinding } from './auth.js';
 import * as z from 'zod';
 import { Limits } from './schema.js';
 import { SESSION_ID_RE } from './shared/protocol.js';
-import {
-  CONTROL_RUNTIME_RESERVED_ENV_VARS,
-  PNPM_STORE_ENV_VAR,
-} from './shared/runtime-environment.js';
+import { findReservedEnvVarName, RESERVED_ENV_VARS_MESSAGE } from './shared/runtime-environment.js';
 
 export const sessionIdSchema = z.string().regex(SESSION_ID_RE, 'Invalid session ID format');
 
@@ -104,14 +103,6 @@ export function parseManagedBitbucketCloneUrl(
   return parseBitbucketCloudCloneUrl(repositoryUrl, true);
 }
 
-export const RESERVED_ENV_VARS = [
-  'HOME',
-  'SESSION_ID',
-  'SESSION_HOME',
-  PNPM_STORE_ENV_VAR,
-  ...CONTROL_RUNTIME_RESERVED_ENV_VARS,
-] as const;
-
 export const envVarsSchema = z
   .record(
     z.string().max(Limits.MAX_ENV_VAR_KEY_LENGTH),
@@ -120,15 +111,9 @@ export const envVarsSchema = z
   .refine(obj => Object.keys(obj).length <= Limits.MAX_ENV_VARS, {
     message: `Maximum ${Limits.MAX_ENV_VARS} environment variables allowed`,
   })
-  .refine(
-    obj => {
-      const keys = Object.keys(obj);
-      return !keys.some(key => (RESERVED_ENV_VARS as readonly string[]).includes(key));
-    },
-    {
-      message: `Cannot set reserved environment variables: ${RESERVED_ENV_VARS.join(', ')}. These are managed by the system.`,
-    }
-  );
+  .refine(obj => findReservedEnvVarName(Object.keys(obj)) === undefined, {
+    message: RESERVED_ENV_VARS_MESSAGE,
+  });
 
 /** Unique identifier for a sandbox (container). Covers hash-based prefixes, per-session IDs, and legacy `__`-delimited formats. */
 export type SandboxId =
@@ -398,7 +383,46 @@ type RedeemBitbucketSessionCapabilityResult =
         | 'source_unavailable';
     };
 
+type HostedGitHubRepositoryScope = {
+  userId: string;
+  organizationId: string;
+  integrationId: string;
+  primaryRepo: string;
+};
+
+type HostedGitHubRepositoryIdentity = { id: number; fullName: string };
+
+type HostedGitHubRepositoryFailure = {
+  success: false;
+  reason: HostedGitHubRepositoryFailureReason;
+};
+
+export type HostedGitHubRepositoryFailureReason =
+  | 'access_denied'
+  | 'repository_unavailable'
+  | 'temporarily_unavailable';
+
 export type GitTokenService = {
+  listHostedWorkspaceGitHubRepositories?(
+    params: HostedGitHubRepositoryScope & { page: number }
+  ): Promise<
+    | {
+        success: true;
+        repositories: (HostedGitHubRepositoryIdentity & { private: boolean })[];
+        nextPage?: number;
+      }
+    | HostedGitHubRepositoryFailure
+  >;
+  resolveHostedWorkspaceGitHubRepositories?(
+    params: HostedGitHubRepositoryScope & { additionalRepositoryIds: number[] }
+  ): Promise<
+    | {
+        success: true;
+        primary: HostedGitHubRepositoryIdentity;
+        additional: HostedGitHubRepositoryIdentity[];
+      }
+    | HostedGitHubRepositoryFailure
+  >;
   authorizeCloudAgentGitHubRepo?(
     params: Omit<ManagedGitHubAuthParams, 'allowUserAuthorization'>
   ): Promise<GitHubRepositoryAuthorizationResult>;
@@ -486,10 +510,14 @@ export type Env = {
   VERCEL_SNAPSHOT_BUILD?: DurableObjectNamespace<VercelSnapshotBuild>;
   /** Durable Object namespace for control-plane sessions */
   SANDBOX_SESSION: DurableObjectNamespace<SandboxSession>;
+  /** One Cloud Agent authority and child registry per workspace (`ownerId:workspace_<uuid>`). */
+  CLOUD_AGENT_WORKSPACE: DurableObjectNamespace<CloudAgentWorkspaceDO>;
   /** Durable Object namespace for DO-managed Cloudflare containers (control-plane only) */
   SANDBOX_CONTAINERS: DurableObjectNamespace<SandboxContainers>;
   /** One environment build coordinator per repository environment id. */
   ENVIRONMENT_BUILD: DurableObjectNamespace<EnvironmentBuild>;
+  /** One preview tunnel per sandbox allocation, named `<sandboxId>:<allocationId>`. */
+  PREVIEW_TUNNEL: DurableObjectNamespace<PreviewTunnel>;
   /** Durable Object namespace for per-user Kilo SDK facade coordination */
   USER_KILO_FACADE: DurableObjectNamespace<UserKiloFacade>;
   /** Durable Object namespace for one-time stream/terminal ticket nonce consumption */
@@ -523,7 +551,7 @@ export type Env = {
   /** The v2 release for `RUNTIME_KILO2_ORG_IDS`, in the same form as `RUNTIME_RELEASE_DESCRIPTOR`. */
   RUNTIME_RELEASE_DESCRIPTOR_KILO2?: string;
   /** Queue for callback messages (optional - supports incremental rollout) */
-  CALLBACK_QUEUE?: Queue<CallbackJob>;
+  CALLBACK_QUEUE?: Queue<CallbackQueueJob>;
   /** Dedicated best-effort Cloud Agent reporting queue. */
   CLOUD_AGENT_REPORT_QUEUE: Queue<CloudAgentQueueReport>;
   /** Service binding for centralized git token generation */
@@ -573,6 +601,11 @@ export type Env = {
   CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED?: string;
   /** User or organization IDs enrolled in customer-paid Vercel compute. */
   BYOC_VERCEL_IDS?: string;
+  /** User or organization IDs enrolled in the AWS BYOC MVP. */
+  BYOC_AWS_IDS?: string;
+  /** Bootstrap principal credentials. Its only permission is assuming the fixed Kilo role. */
+  AWS_BYOC_CREDENTIALS?: string;
+  AWS_BYOC_KILO_ROLE_ARN?: string;
   /** Comma-separated user or org IDs allowed to pick a sandbox destination. `*` includes personal. */
   SANDBOX_SELECTION_IDS?: string;
   /**

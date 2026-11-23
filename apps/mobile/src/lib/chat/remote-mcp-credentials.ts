@@ -17,7 +17,6 @@ import { sameRemoteMcpEndpoint } from './remote-mcp-url';
  * saved for another endpoint is never handed to this one.
  */
 
-/** The server as the SDK knows it: an id, a name, a URL and how it wants a credential. */
 export function serverValue(server: StoredRemoteMcpServer): RemoteMcpServer {
   return {
     id: server.id,
@@ -46,10 +45,6 @@ function tokenOf(serverId: string, url: string): Effect.Effect<string, RemoteMcp
   return Effect.succeed(token);
 }
 
-/**
- * A token accessor for a bearer server, the stored OAuth state for an OAuth
- * one, and neither for a server that wants none.
- */
 export function credentialDeps(
   server: StoredRemoteMcpServer
 ): Pick<RemoteMcpClientDeps, 'token' | 'authProvider'> {

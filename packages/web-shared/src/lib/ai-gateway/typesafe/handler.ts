@@ -63,7 +63,7 @@ import { getEffectiveProviderPrivacy } from '../provider-privacy';
 import { getProviderSlugsForModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import {
   getOpenRouterModelsMetadataFromDatabase,
-  getOpenRouterSystemOneModelsFromDatabase,
+  getOpenRouterSystemOneModelIdsFromDatabase,
   resolveOpenRouterModelAlias,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { systemOneRequestCostBound } from '@kilocode/web-shared/lib/ai-gateway/request-cost-limit';
@@ -138,7 +138,7 @@ function errorResponse(message: string, error_type: ProxyErrorType, status: numb
 }
 
 async function isSystemOneModel(modelId: string) {
-  const systemOneModelIds = await getOpenRouterSystemOneModelsFromDatabase();
+  const systemOneModelIds = await getOpenRouterSystemOneModelIdsFromDatabase();
   if (systemOneModelIds.size === 0) {
     // OpenRouter's System One endpoint still rejects models it cannot serve.
     warnExceptInTest('[isSystemOneModel] no System One model metadata, assuming id is valid');
@@ -175,7 +175,6 @@ export async function handleSystemOneRequest(request: NextRequest) {
     return errorResponse(z.prettifyError(parsed.error), 'invalid_request', 400);
   }
   const { model: requestedModel } = parsed.data;
-  const isFree = isFreeModel(requestedModel);
   if (!(await isSystemOneModel(requestedModel))) {
     return errorResponse(
       `The requested model '${requestedModel}' is not a System One model`,
@@ -183,17 +182,19 @@ export async function handleSystemOneRequest(request: NextRequest) {
       404
     );
   }
+  // The free class belongs to the model that is served and billed, which a `~` alias names by its target.
+  const resolvedModel = await resolveOpenRouterModelAlias(requestedModel);
+  const isFree = isFreeModel(resolvedModel);
   const feature = validateFeatureHeader(request.headers.get(FEATURE_HEADER) || '');
   if (isFree) {
     const rateLimited = await freeModelRateLimitRejection({
       request,
       caller,
-      model: requestedModel,
+      model: resolvedModel,
       feature,
     });
     if (rateLimited) return rateLimited;
   }
-  const resolvedModel = await resolveOpenRouterModelAlias(requestedModel);
 
   // Unlike `readGatewayBalance`, System One funds free models from usage and
   // blocks them at a zero balance too.

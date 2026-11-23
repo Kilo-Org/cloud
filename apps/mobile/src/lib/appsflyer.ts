@@ -194,8 +194,7 @@ const defaultLogEvent: AppsFlyerLogEvent = async (eventName, eventValues) => {
 };
 let logEventImpl: AppsFlyerLogEvent = defaultLogEvent;
 
-/** Test-only wrap hook (slice P3-AH-16a). Replaces the logEvent implementation
- *  with wrap(defaultLogEvent). */
+/** Test-only wrap hook (slice P3-AH-16a). */
 export function wrapAppsFlyerLogEventForTests(
   wrap: (logEvent: AppsFlyerLogEvent) => AppsFlyerLogEvent
 ): void {

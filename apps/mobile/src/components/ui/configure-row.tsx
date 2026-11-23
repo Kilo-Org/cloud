@@ -1,11 +1,9 @@
-import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
-import { type LucideIcon } from '@/components/ui/icons';
-import { DirectionalChevronRight } from '@/components/ui/directional-icons';
-import { IconTile } from '@/components/ui/icon-tile';
-import { type ReactNode } from 'react';
-import { Pressable, useWindowDimensions, View } from 'react-native';
+import { type ComponentType, type ReactNode } from 'react';
+import { useWindowDimensions } from 'react-native';
 
-import { Text } from '@/components/ui/text';
+import { type LucideProps } from '@/components/ui/icons';
+import { RowFrame } from '@/components/ui/row-frame';
+import { type RowTrailingSpec } from '@/components/ui/row-trailing';
 import {
   NEUTRAL_TINT,
   type RowHue,
@@ -14,34 +12,35 @@ import {
   toneColor,
   type ToneKey,
 } from '@/lib/agent-color';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { LARGE_FONT_SCALE, useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { isNarrowLayout } from '@/lib/narrow-layout';
-import { cn } from '@/lib/utils';
-
-/**
- * At/above this Dynamic Type scale, ConfigureRow stacks the icon above the
- * title block so long labels never clip against the chevron in a side row.
- * Matches the tab-label wrap threshold used elsewhere in the shell. A window
- * narrower than `NARROW_LAYOUT_WIDTH` squeezes the same text block and takes
- * the same presentation.
- */
-const CONFIGURE_ROW_STACK_FONT_SCALE = 1.8;
 
 type ConfigureRowProps = {
-  icon: LucideIcon;
+  icon: ComponentType<LucideProps>;
   title: string;
+  /**
+   * A pill or glyph beside the title, on the title's own line — the "this
+   * device" mark and the default profile's star. It never takes the width the
+   * subtitle needs.
+   */
+  titleBadge?: ReactNode;
   subtitle?: string;
   /**
-   * Line cap for the subtitle. A subtitle that is one unbreakable token (an
-   * email address, a host name) cannot wrap on Android and is hard-clipped at
-   * the row edge with no ellipsis; `1` makes it ellipsize cleanly instead.
+   * Line cap for the subtitle, one line by default. The row's subtitle is one
+   * line of `text-xs`, and without the cap a subtitle that is one unbreakable
+   * token (an email address, a host name) cannot wrap on Android and is
+   * hard-clipped at the row edge with no ellipsis, while a long sentence grows
+   * the row past its neighbours. Pass `2` from a caller whose subtitle is a
+   * sentence the reader must finish, or `'all'` from a caller whose copy a
+   * reader must be able to finish and whose length no fixed line count can
+   * bound.
    */
-  subtitleNumberOfLines?: number;
+  subtitleNumberOfLines?: number | 'all';
   /**
    * Node rendered in the subtitle's place while the value that fills it loads.
    * The row's subtitle is one line of `text-xs`, so a placeholder of that
    * height keeps the row's settled size: the rows below never move, and the
-   * card does not print loading copy. The caller builds it, because the width
+   * group does not print loading copy. The caller builds it, because the width
    * that stands in for the settled text is the caller's.
    */
   subtitlePlaceholder?: ReactNode;
@@ -57,6 +56,13 @@ type ConfigureRowProps = {
    * never derived from the title. A semantic tone outranks it.
    */
   hue?: RowHue;
+  /**
+   * `navigation` is a destination row and ends in a chevron; `action` runs a
+   * command in place, so it keeps the foreground title and no chevron.
+   */
+  variant?: 'navigation' | 'action';
+  /** The action destroys something: a danger tile and a destructive title. */
+  destructive?: boolean;
   onPress?: () => void;
   disabled?: boolean;
   /**
@@ -68,131 +74,138 @@ type ConfigureRowProps = {
    * visible text.
    */
   accessibilityLabel?: string;
+  /**
+   * Where the press lives. A row whose trailing node is a control of its own (a
+   * switch) passes `content`, so the trailing control owns its own touch and
+   * its own accessible node. The content press then needs
+   * `contentAccessibilityLabel` to stay reachable, because `RowFrame` hides a
+   * `content` press from assistive technology without it.
+   */
+  pressTarget?: 'row' | 'content';
+  /**
+   * The content press's spoken name. A `content` press is hidden from assistive
+   * technology without one, so a row that hands the press to its content names
+   * the surface that press opens.
+   */
+  contentAccessibilityLabel?: string;
+  contentAccessibilityHint?: string;
   trailing?: ReactNode;
-  /** Suppress bottom divider on the last row of a group. */
-  last?: boolean;
+  /**
+   * The trailing cell must be delivered at the platform touch target in a
+   * stacked row: either a control that reaches it — through its own box or
+   * through a compact `hitSlop` — or the placeholder that reserves the same
+   * line so the row does not move when the real cell lands. A stacked frame
+   * must host it (see `rowTargetHostClass`), because a touch is delivered only
+   * inside an ancestor view; the flat frame needs nothing.
+   */
+  trailingIsTarget?: boolean;
   className?: string;
+  /** Test handle for the row's own control, for native E2E scripts. */
+  testID?: string;
 };
 
-/** Neutral (or `tone`-tinted) icon tile + title + subtitle + trailing chevron row. */
+/** Tile + title + subtitle + trailing mark row. */
 export function ConfigureRow({
-  icon: Icon,
+  icon,
   title,
+  titleBadge,
   subtitle,
-  subtitleNumberOfLines,
+  subtitleNumberOfLines = 1,
   subtitlePlaceholder,
   tone,
   hue,
+  variant = 'navigation',
+  destructive = false,
   onPress,
   disabled,
   accessibilityLabel,
+  pressTarget,
+  contentAccessibilityLabel,
+  contentAccessibilityHint,
   trailing,
-  last,
+  trailingIsTarget,
   className,
+  testID,
 }: Readonly<ConfigureRowProps>) {
-  const colors = useThemeColors();
   const { width } = useWindowDimensions();
   const fontScale = useLiveFontScale();
-  // A narrow window squeezes the flexible text block between the fixed icon
-  // tile and the chevron exactly as a large font scale does, until a whole word
-  // no longer fits and Android breaks it mid-word ("Gene ral", 160 dp, e1,
-  // 2026-09-21). Both cases get the stacked presentation, which hands the
-  // title the row's full width.
-  const stack = fontScale >= CONFIGURE_ROW_STACK_FONT_SCALE || isNarrowLayout(width);
-  // A semantic tone outranks the curated destination hue, and a row carrying
-  // neither keeps the shared neutral tile. A settings list is not a list of
-  // agents: hashing each title into the agent hue ramp gave one list (Language
-  // / Trusted hosts / Device sessions) three different accents, and a title
-  // never picks a hue here.
+  // At a large font scale the row stacks the icon above the title block so a
+  // long label never clips against the chevron in a side row. A narrow window
+  // squeezes the flexible text block between the fixed icon tile and the
+  // chevron exactly as a large font scale does, until a whole word no longer
+  // fits and Android breaks it mid-word ("Gene ral", 160 dp, e1, 2026-09-21).
+  // Both cases get the stacked presentation, which hands the title the row's
+  // full width.
+  const stack = fontScale >= LARGE_FONT_SCALE || isNarrowLayout(width);
+  // A settings list is not a list of agents: hashing each title into the agent
+  // hue ramp gave one list (Language / Trusted hosts / Device sessions) three
+  // different accents, and a title never picks a hue here.
   let tint: Tint = NEUTRAL_TINT;
-  if (tone) {
+  if (destructive) {
+    tint = toneColor('danger');
+  } else if (tone) {
     tint = toneColor(tone);
   } else if (hue) {
     tint = rowTint(hue);
   }
   // Inert rows (no onPress) and disabled rows are not tappable — hide the
   // chevron so they don't look tappable, and never render pressed feedback.
-  const showChevron = Boolean(onPress) && !disabled;
-  const trailingNode =
-    trailing ??
-    (showChevron ? <DirectionalChevronRight size={14} color={colors.mutedForeground} /> : null);
+  const showChevron = variant === 'navigation' && Boolean(onPress) && !disabled;
+  let rowTrailing: RowTrailingSpec | undefined = undefined;
+  if (trailing !== undefined) {
+    rowTrailing = {
+      kind: 'node',
+      node: trailing,
+      ...(trailingIsTarget === true ? { target: true } : {}),
+    };
+  } else if (showChevron) {
+    rowTrailing = { kind: 'chevron' };
+  }
 
   // A disabled row dims by token, once, and never by row opacity: halving the
   // row lands the already-muted subtitle at 2.15:1 on the dark `bg-secondary`
-  // card and 1.95:1 on the light one, so the last line of an unavailable row
+  // group and 1.95:1 on the light one, so the last line of an unavailable row
   // out of reach of a user who cannot act on it. The muted ink keeps 4.53:1
   // dark and 4.62:1 light, and the icon leaves the tint's hue for the same
   // ink (4.05:1 on the tile). The tile's own low-alpha fill and border stay,
   // and the chevron, the pressed feedback and the row Pressable's
-  // `accessibilityState` are what still say "unavailable". The inner layout
-  // View owns no role, so it declares no interactive state of its own: a
-  // state on it would announce disablement from a node a reader never reaches.
+  // `accessibilityState` are what still say "unavailable".
   const iconTint: Tint = disabled ? { ...tint, hueThemeKey: 'mutedForeground' } : tint;
 
-  const iconTile = <IconTile icon={Icon} tint={iconTint} />;
-
-  let subtitleNode: ReactNode = subtitlePlaceholder ?? null;
-  if (subtitle) {
-    subtitleNode = (
-      <Text numberOfLines={subtitleNumberOfLines} className="mt-0.5 text-xs text-muted-foreground">
-        {subtitle}
-      </Text>
-    );
+  let titleClassName = 'text-foreground';
+  if (disabled) {
+    titleClassName = 'text-muted-foreground';
+  } else if (destructive) {
+    titleClassName = 'text-destructive';
   }
 
-  const textBlock = (
-    <View className={cn('min-w-0', stack ? 'w-full' : 'flex-1')}>
-      <Text
-        className={cn(
-          'text-sm font-medium',
-          disabled ? 'text-muted-foreground' : 'text-foreground'
-        )}
-      >
-        {title}
-      </Text>
-      {subtitleNode}
-    </View>
+  return (
+    <RowFrame
+      icon={icon}
+      iconTint={iconTint}
+      title={title}
+      titleBadge={titleBadge}
+      titleClassName={titleClassName}
+      subtitle={
+        subtitle === undefined
+          ? undefined
+          : {
+              text: subtitle,
+              numberOfLines: subtitleNumberOfLines === 'all' ? undefined : subtitleNumberOfLines,
+            }
+      }
+      subtitlePlaceholder={subtitlePlaceholder}
+      trailing={rowTrailing}
+      stack={stack}
+      onPress={onPress}
+      pressTarget={pressTarget}
+      contentAccessibilityLabel={contentAccessibilityLabel}
+      contentAccessibilityHint={contentAccessibilityHint}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      disabled={disabled}
+      testID={testID}
+      className={className}
+    />
   );
-
-  const inner = (
-    <View
-      className={cn(
-        stack ? 'gap-2 py-3' : 'flex-row items-center gap-3 py-3',
-        !last && 'border-b-[0.5px] border-hair-soft',
-        className
-      )}
-    >
-      {stack ? (
-        <>
-          <View className="w-full flex-row items-center justify-between gap-3">
-            {iconTile}
-            {trailingNode ? <View className="shrink-0">{trailingNode}</View> : null}
-          </View>
-          {textBlock}
-        </>
-      ) : (
-        <>
-          {iconTile}
-          {textBlock}
-          {trailingNode}
-        </>
-      )}
-    </View>
-  );
-
-  if (onPress) {
-    return (
-      <Pressable
-        onPress={onPress}
-        disabled={disabled}
-        accessibilityRole="button"
-        accessibilityLabel={accessibilityLabel}
-        accessibilityState={{ disabled: Boolean(disabled) }}
-        className={cn(!disabled && 'active:opacity-70')}
-      >
-        {inner}
-      </Pressable>
-    );
-  }
-  return inner;
 }

@@ -22,8 +22,10 @@ import {
   isAttentionAcked,
   reconcileSessionAttention,
   shouldShowNeedsInput,
+  useSessionAttentionHydration,
   useSessionAttentionRevision,
 } from '@/lib/session-attention';
+import { sessionBranchLabel } from '@/lib/session-branch-label';
 import { useTRPC } from '@/lib/trpc';
 import { exitRemoteSessionFromList } from './exit-remote-session-from-list';
 import { useRemoteSessionExitConfirmation } from './remote-session-exit-alert';
@@ -128,6 +130,7 @@ export const RemoteSessionRow = memo(function RemoteSessionRow({
   const canManage = interactive;
 
   const revision = useSessionAttentionRevision();
+  const hydration = useSessionAttentionHydration();
   // A live row's timestamp is minute-bucketed, so the clock is sampled at
   // least twice per bucket. The tick re-renders this row from the inside:
   // `memo` keeps the row out of a parent poll that changes no prop, so an
@@ -143,12 +146,12 @@ export const RemoteSessionRow = memo(function RemoteSessionRow({
       const raiseId = session.statusUpdatedAt ?? session.status;
       return shouldShowNeedsInput({
         status: session.status,
-        raiseId,
+        hydration,
         isAcked: isAttentionAcked(session.id, { raiseId, status: session.status }),
       });
     },
-    // eslint-disable-next-line react/exhaustive-deps -- the revision is a real input: `isAttentionAcked` reads the ack store, so the flag must re-derive when that store ticks.
-    [session, revision]
+    // eslint-disable-next-line react/exhaustive-deps -- the revision and the hydration phase are real inputs: `isAttentionAcked` reads the ack store, and the flag is held until that store's phase settles, so it must re-derive when either changes.
+    [session, revision, hydration]
   );
   useEffect(() => {
     reconcileSessionAttention(session.id, session.status, null);
@@ -156,7 +159,18 @@ export const RemoteSessionRow = memo(function RemoteSessionRow({
 
   const canExit = canExitSessionFromList(session);
   const statusKind = glanceableStatusKind(session.status);
-  const { title, agentLabel, agentState, subtitle, spokenPrNumber, scheduledWake, spokenMeta } =
+  // Provenance subtitle: list rows show "branch · #N", card rows keep the
+  // branch-only subtitle. The branch decodes once, and the spoken label names
+  // the same decoded text.
+  const branchLabel = sessionBranchLabel(session.gitBranch);
+  const subtitle =
+    variant === 'card'
+      ? branchLabel
+      : composeSessionProvenanceSubtitle({
+          branchLabel,
+          prNumber: session.associatedPr?.number,
+        });
+  const { title, agentLabel, agentState, spokenPrNumber, scheduledWake, spokenMeta } =
     useMemo(() => {
       const isScheduled = session.status === 'scheduled';
       const scheduledWakeValue =
@@ -169,16 +183,6 @@ export const RemoteSessionRow = memo(function RemoteSessionRow({
         // Tint by what the eyebrow names, never by its string: the state word is
         // catalog copy, so its text hashes to a different hue per locale.
         agentState: remoteSessionEyebrowState(session),
-        // Provenance subtitle: list rows show "branch · #N", card rows keep the
-        // branch-only subtitle. The spoken label mirrors this, with the PR phrase
-        // only on the list variant.
-        subtitle:
-          variant === 'card'
-            ? (session.gitBranch ?? null)
-            : composeSessionProvenanceSubtitle({
-                branch: session.gitBranch,
-                prNumber: session.associatedPr?.number,
-              }),
         spokenPrNumber: variant === 'card' ? null : (session.associatedPr?.number ?? null),
         scheduledWake: scheduledWakeValue,
         spokenMeta: selectRemoteRowSpokenMeta({
@@ -271,6 +275,8 @@ export const RemoteSessionRow = memo(function RemoteSessionRow({
       live: true,
       statusKind: glanceableStatusKind(session.status),
       needsInput,
+      status: session.status,
+      statusUpdatedAt: session.statusUpdatedAt,
       totalCostMicrodollars: session.totalCostMicrodollars ?? null,
       onCopySessionId: () => {
         // Load the clipboard/action module at press time: the mounted row test
@@ -321,7 +327,7 @@ export const RemoteSessionRow = memo(function RemoteSessionRow({
         statusKind,
         badge: agentLabel,
         meta: spokenMeta,
-        subtitle: session.gitBranch ?? null,
+        subtitle: branchLabel,
         prNumber: spokenPrNumber,
         platform: spokenPlatform,
       })}
@@ -346,9 +352,7 @@ export const RemoteSessionRow = memo(function RemoteSessionRow({
         needsInput={needsInput}
         metaWhileLive
         platformIcon={platformIcon}
-        stripMode={variant === 'card' ? 'edge' : 'inline'}
         last={variant === 'card' ? true : undefined}
-        className={variant === 'card' ? undefined : 'pl-[22px] pr-[22px]'}
       />
       {exitDialog}
     </Pressable>

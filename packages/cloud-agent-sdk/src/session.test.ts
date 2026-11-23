@@ -306,7 +306,7 @@ describe('session pipeline integration', () => {
       expect(serviceState.getStatus()).toEqual({
         type: 'autocommit',
         step: 'completed',
-        message: `${'a'.repeat(40)} fix: bug`,
+        message: `${'a'.repeat(7)} · fix: bug`,
       });
     });
 
@@ -431,13 +431,14 @@ describe('remote session transport state', () => {
   it('publishes owner-scoped model state and dynamic send capability', async () => {
     let systemListener: ((event: UserWebSystemEvent) => void) | undefined;
     const onRemoteModelStateChange = jest.fn<void, [RemoteModelState]>();
-    const onTransportCapabilityChange = jest.fn();
+    const onComposerCapabilityChange = jest.fn();
     const userWebConnection = {
       retain: jest.fn(() => jest.fn()),
       connect: jest.fn(),
       disconnect: jest.fn(),
       destroy: jest.fn(),
       isConnected: jest.fn(() => false),
+      socketPhase: jest.fn(() => 'absent' as const),
       onConnectionChange: jest.fn(() => jest.fn()),
       isReconnectExhausted: jest.fn(() => false),
       onReconnectExhaustionChange: jest.fn(() => jest.fn()),
@@ -468,7 +469,7 @@ describe('remote session transport state', () => {
       resolveSession: () => Promise.resolve({ type: 'remote', kiloSessionId }),
       transport: { userWebConnection },
       onRemoteModelStateChange,
-      onTransportCapabilityChange,
+      onComposerCapabilityChange,
     });
 
     session.connect();
@@ -492,7 +493,7 @@ describe('remote session transport state', () => {
     await Promise.resolve();
 
     expect(session.canSend).toBe(true);
-    expect(onTransportCapabilityChange).toHaveBeenCalled();
+    expect(onComposerCapabilityChange).toHaveBeenCalled();
     // An empty catalog is not a successful load: the transport self-heals it
     // (error refresh) instead of publishing an empty `idle` catalog.
     expect(onRemoteModelStateChange).toHaveBeenLastCalledWith({
@@ -516,6 +517,7 @@ describe('remote session create and retry commands', () => {
       disconnect: jest.fn(),
       destroy: jest.fn(),
       isConnected: jest.fn(() => false),
+      socketPhase: jest.fn(() => 'absent' as const),
       onConnectionChange: jest.fn(() => jest.fn()),
       isReconnectExhausted: jest.fn(() => false),
       onReconnectExhaustionChange: jest.fn(() => jest.fn()),

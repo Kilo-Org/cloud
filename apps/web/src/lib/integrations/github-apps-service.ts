@@ -28,8 +28,16 @@ import {
   isGitHubRateLimitError,
   toGitHubRateLimitError,
 } from '@/lib/integrations/platforms/github/adapter';
+import {
+  GITHUB_LISTING_BUDGET_MESSAGE,
+  GitHubListingBudgetExceededError,
+} from '@/lib/integrations/platforms/github/listing-budget';
 import { isOrganizationModelUpdateAllowed } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import {
+  forgeFixtureInstallationIds,
+  GitHubAppInstallationProtectedError,
+} from '@/lib/integrations/platforms/github/protected-installation';
 
 /**
  * List all integrations for an owner
@@ -57,10 +65,14 @@ export async function listIntegrations(owner: Owner) {
 export async function listNativelyUninstallableIds(
   integrations: readonly PlatformIntegration[]
 ): Promise<Set<string>> {
+  // A forge fixture installation takes the whole local fixture app offline when
+  // deleted, so it is never offered as natively uninstallable.
+  const protectedInstallationIds = forgeFixtureInstallationIds();
   const candidates = integrations.filter(
     integration =>
       integration.github_connection_role === 'workflow' &&
-      integration.platform_installation_id != null
+      integration.platform_installation_id != null &&
+      !protectedInstallationIds.includes(integration.platform_installation_id)
   );
   const installationIds = [
     ...new Set(candidates.map(integration => integration.platform_installation_id as string)),
@@ -205,6 +217,9 @@ export async function uninstallApp(
       },
     });
   } catch (error) {
+    if (error instanceof GitHubAppInstallationProtectedError) {
+      throw new TRPCError({ code: 'CONFLICT', message: error.message, cause: error });
+    }
     if (error instanceof Error && error.message.includes('disconnected locally')) {
       throw new TRPCError({
         code: 'CONFLICT',
@@ -227,6 +242,27 @@ export async function uninstallApp(
   }
 
   return { success: true };
+}
+
+/**
+ * Runs one provider listing read, answering a listing that passed the
+ * adapter's pagination budget as `PAYLOAD_TOO_LARGE`: it is oversized rather
+ * than unavailable, so the caller cannot retry its way out. Every other error
+ * is rethrown unchanged.
+ */
+async function readListingWithinBudget<T>(read: () => Promise<T>): Promise<T> {
+  try {
+    return await read();
+  } catch (error) {
+    if (error instanceof GitHubListingBudgetExceededError) {
+      throw new TRPCError({
+        code: 'PAYLOAD_TOO_LARGE',
+        message: GITHUB_LISTING_BUDGET_MESSAGE,
+        cause: error,
+      });
+    }
+    throw error;
+  }
 }
 
 /**
@@ -280,11 +316,9 @@ export async function listRepositories(
     })
   ) {
     const appType = integration.github_app_type || 'standard';
-    const repos = await fetchGitHubRepositories(
-      integration.platform_installation_id,
-      appType,
-      integration.id,
-      'management'
+    const installationId = integration.platform_installation_id;
+    const repos = await readListingWithinBudget(() =>
+      fetchGitHubRepositories(installationId, appType, integration.id, 'management')
     );
     await updateRepositoriesForIntegration(integrationId, repos);
     return {
@@ -377,12 +411,9 @@ export async function listBranches(
   }
 
   const appType = integration.github_app_type || 'standard';
-  const branches = await fetchGitHubBranches(
-    integration.platform_installation_id,
-    repositoryFullName,
-    appType,
-    integration.id,
-    purpose
+  const installationId = integration.platform_installation_id;
+  const branches = await readListingWithinBudget(() =>
+    fetchGitHubBranches(installationId, repositoryFullName, appType, integration.id, purpose)
   );
 
   return { branches };

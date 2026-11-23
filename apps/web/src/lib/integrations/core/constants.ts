@@ -168,15 +168,15 @@ export const REPOSITORY_SELECTION = {
  * Used for repository operations, cloud sessions, code reviews, etc.
  */
 export const GIT_PLATFORM = {
-  GITHUB: 'github',
-  GITLAB: 'gitlab',
+  GITHUB: PLATFORM.GITHUB,
+  GITLAB: PLATFORM.GITLAB,
 } as const;
 
 /**
  * Type guard to check if a string is a valid git platform
  */
 export function isGitPlatform(platform: string): platform is GitPlatform {
-  return platform === GIT_PLATFORM.GITHUB || platform === GIT_PLATFORM.GITLAB;
+  return Object.values(GIT_PLATFORM).some(gitPlatform => gitPlatform === platform);
 }
 
 // Type exports for use throughout the codebase

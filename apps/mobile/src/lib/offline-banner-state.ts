@@ -1,6 +1,12 @@
 import { type ConnectivityState, connectivityStatus } from '@/lib/connectivity-online';
 
-/** Wait out transient NetInfo reports before confirming offline with a probe. */
+/**
+ * Wait out transient NetInfo reports before confirming offline with a probe. A
+ * definite disconnect read before any state was committed (a cold start without
+ * a network) skips the wait: no painted state exists for a flap to disturb, and
+ * a banner that lands seconds after the first screen painted pushes every pinned
+ * header down by its height.
+ */
 const OFFLINE_BANNER_SHOW_DELAY_MS = 5000;
 
 /**
@@ -38,6 +44,13 @@ export type OfflineBannerStore = {
   state: () => BannerState;
   /** The phase behind the painted state, for the write gates. */
   phase: () => ConnectivityPhase;
+  /**
+   * Commit offline now, without the confirmation window: for a caller that
+   * already knows the network is gone. A pending confirmation or an in-flight
+   * probe is dropped so it cannot publish over it; the next source report
+   * decides again as usual.
+   */
+  confirmOffline: () => void;
   destroy: () => void;
 };
 
@@ -45,12 +58,14 @@ export type OfflineBannerStore = {
 export type BannerState = 'online' | 'offline' | 'unknown';
 
 /**
- * What the app knows about connectivity. `confirming-offline` is the window in which a
- * disconnect report is being checked by the app's own probe; it is not evidence of a
- * working transport, so a write is refused in it exactly as when confirmed offline, and
- * it keeps painting the state it replaced.
+ * What the app knows about connectivity. `starting` is the boot window before any report
+ * committed a state. `confirming-offline` is the window in which a disconnect report is
+ * being checked by the app's own probe; it is not evidence of a working transport, so a
+ * write is refused in it exactly as when confirmed offline, and it keeps painting the
+ * state it replaced.
  */
 export type ConnectivityPhase =
+  | { readonly kind: 'starting' }
   | { readonly kind: 'unknown' }
   | { readonly kind: 'online' }
   | { readonly kind: 'offline' }
@@ -58,6 +73,9 @@ export type ConnectivityPhase =
 
 /** The banner state a phase shows. */
 export function projectBannerState(phase: ConnectivityPhase): BannerState {
+  if (phase.kind === 'starting') {
+    return 'unknown';
+  }
   return phase.kind === 'confirming-offline' ? phase.previous : phase.kind;
 }
 
@@ -73,8 +91,8 @@ export function createOfflineBannerStore(options: {
 }): OfflineBannerStore {
   const { source, timer, probe } = options;
 
-  // Start unknown: neither NetInfo nor a probe has confirmed connectivity yet.
-  let phase: ConnectivityPhase = { kind: 'unknown' };
+  // Start before any report: neither NetInfo nor a probe has confirmed connectivity yet.
+  let phase: ConnectivityPhase = { kind: 'starting' };
   let pending: { cancel(): void } | null = null;
   let generation = 0;
   let destroyed = false;
@@ -114,13 +132,21 @@ export function createOfflineBannerStore(options: {
   }
 
   function handleSourceState(sourceState: ConnectivityState): void {
+    const status = connectivityStatus(sourceState);
+    // A repeated disconnect report is the same evidence the confirmation window
+    // was opened for: the timer, or the probe that replaced it, owns the
+    // decision, so the deadline stays the one the first report set. Restarting
+    // it let a flapping source postpone the probe for as long as reports kept
+    // arriving.
+    if (status === 'offline' && phase.kind === 'confirming-offline') {
+      return;
+    }
     generation += 1;
     const attempt = generation;
     cancelPending();
     if (destroyed) {
       return;
     }
-    const status = connectivityStatus(sourceState);
     if (status === 'unknown') {
       // A disconnect report that was still being confirmed is not evidence either
       // way: the state it replaced stands, and a later report decides again.
@@ -141,6 +167,12 @@ export function createOfflineBannerStore(options: {
     }
     if (status === 'online') {
       commit({ kind: 'online' });
+      return;
+    }
+    // A cold start with the radio surely down: nothing is painted yet, so the
+    // banner commits with the first screen instead of after the flap delay.
+    if (phase.kind === 'starting' && sourceState.isConnected === false) {
+      commit({ kind: 'offline' });
       return;
     }
     // The report is not evidence yet, but a write dispatched in the window would
@@ -172,6 +204,15 @@ export function createOfflineBannerStore(options: {
 
   const getPhase = (): ConnectivityPhase => phase;
 
+  const confirmOffline = (): void => {
+    if (destroyed) {
+      return;
+    }
+    generation += 1;
+    cancelPending();
+    commit({ kind: 'offline' });
+  };
+
   const destroy = (): void => {
     destroyed = true;
     generation += 1;
@@ -180,5 +221,5 @@ export function createOfflineBannerStore(options: {
     listeners.clear();
   };
 
-  return { subscribe, isOffline, state: getState, phase: getPhase, destroy };
+  return { subscribe, isOffline, state: getState, phase: getPhase, confirmOffline, destroy };
 }

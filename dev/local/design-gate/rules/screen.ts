@@ -5,6 +5,7 @@ import {
   contains,
   contentBox,
   insidePresentedSurface,
+  IOS_SWITCH_TRACK_TAG,
   intersection,
   layoutRect,
   right,
@@ -67,7 +68,14 @@ export function checkClipped(tree: LayoutTree): Finding[] {
       }
     }
     if (!node.absolute && node.paints) {
-      const amount = overflowBeyond(box, contentBox(parent, tree.env.isRTL, layoutRect(parent)), {
+      // A parent that does not clip still paints a child in its padding: the
+      // child leaves the container only past the parent's border box. An iOS tab
+      // label's line box overruns its button's padding by 2 pt, and its ink stays
+      // inside the button.
+      const parentBox = parent.clips
+        ? contentBox(parent, tree.env.isRTL, layoutRect(parent))
+        : layoutRect(parent);
+      const amount = overflowBeyond(box, parentBox, {
         x: !parent.scroll.x,
         y: !parent.scroll.y,
       });
@@ -88,7 +96,7 @@ export function checkClipped(tree: LayoutTree): Finding[] {
         measured,
         expected: `≤ ${TOLERANCE_DP} dp`,
         unit: 'dp',
-        message: `${node.path} extends ${fmt(measured)} beyond the content box of its ${clippedBy} ${against.path}; constrain its size or let the container grow.`,
+        message: `${node.path} extends ${fmt(measured)} beyond the ${against === parent && !parent.clips ? 'border box' : 'content box'} of its ${clippedBy} ${against.path}; constrain its size or let the container grow.`,
       })
     );
   }
@@ -179,9 +187,15 @@ export function checkTouchOverlap(tree: LayoutTree): Finding[] {
 
 export function checkOverlap(tree: LayoutTree): Finding[] {
   const findings: Finding[] = [];
+  // A box the platform says the user cannot see collides with nothing: an
+  // accessibility snapshot carries no style, so a copy the app hides from sight
+  // arrives here as an ordinary sibling and reads as a collision over the
+  // visible box beside it. The probe marks the same node `opacity: 0` or
+  // `position: absolute` and never pairs it.
+  const unseen = (node: LayoutNode) => node.probe.invisible === true;
   for (const node of tree.nodes) {
     const siblings = node.children.filter(
-      child => !child.absolute && (child.hasText || child.pressable)
+      child => !child.absolute && !unseen(child) && (child.hasText || child.pressable)
     );
     for (let i = 0; i < siblings.length; i++) {
       for (let j = i + 1; j < siblings.length; j++) {
@@ -228,33 +242,80 @@ function isMultiLine(node: LayoutNode): boolean {
   );
 }
 
+/** The UISwitch iOS 26 draws, and the one earlier releases draw. */
+const IOS_SWITCH_HEIGHT_PT = 28;
+const IOS_LEGACY_SWITCH_HEIGHT_PT = 31;
+
+/**
+ * The box a row child paints. A UISwitch draws at its fixed size from the top of
+ * whatever frame React Native gives it, so an iOS `Switch` taller than that paints
+ * at the frame's top and the frame's center is not where the track is. Android's
+ * switch centers its track in its frame.
+ *
+ * An accessibility snapshot reports the drawn track as the switch's child, and
+ * that measured box wins. The probe reports the host only, so the track's size
+ * comes from the iOS release the probe names.
+ */
+function paintedRect(node: LayoutNode, env: LayoutTree['env']): Rect {
+  if (env.platform !== 'ios' || node.tag !== 'Switch') return node.rect;
+  const track = node.children.find(child => child.tag === IOS_SWITCH_TRACK_TAG);
+  if (track) return track.rect;
+  const drawn =
+    Number.parseInt(env.osVersion, 10) < 26 ? IOS_LEGACY_SWITCH_HEIGHT_PT : IOS_SWITCH_HEIGHT_PT;
+  return [node.rect[0], node.rect[1], node.rect[2], Math.min(node.rect[3], drawn)];
+}
+
 export function checkRowAlignment(tree: LayoutTree): Finding[] {
   const findings: Finding[] = [];
+  const center = (child: LayoutNode) => {
+    const rect = paintedRect(child, tree.env);
+    return rect[1] + rect[3] / 2;
+  };
   for (const node of tree.nodes) {
     const style = node.probe.style;
     if (style?.flexDirection !== 'row' && style?.flexDirection !== 'row-reverse') continue;
     if (style.alignItems === 'baseline' || node.rect[3] > ROW_MAX_HEIGHT_DP) continue;
     if (style.flexWrap === 'wrap' || style.flexWrap === 'wrap-reverse') continue;
-    const items = node.children.filter(
-      child => !child.absolute && child.rect[3] <= ROW_CHILD_MAX_HEIGHT_DP && !isMultiLine(child)
+    const children = node.children.filter(child => !child.absolute);
+    const items = children.filter(
+      child => child.rect[3] <= ROW_CHILD_MAX_HEIGHT_DP && !isMultiLine(child)
     );
-    if (items.length < 2) continue;
-    const center = (child: LayoutNode) => child.rect[1] + child.rect[3] / 2;
-    const sorted = [...items].sort((a, b) => center(a) - center(b));
-    const low = sorted[0];
-    const high = sorted[sorted.length - 1];
-    const measured = center(high) - center(low);
+    let measured = 0;
+    let related: LayoutNode[] = [];
+    let message = '';
+    if (items.length >= 2) {
+      const sorted = [...items].sort((a, b) => center(a) - center(b));
+      const low = sorted[0];
+      const high = sorted[sorted.length - 1];
+      measured = center(high) - center(low);
+      related = [low, high];
+      message = `Children of row ${node.path} are ${fmt(measured)} apart vertically (${low.path} vs ${high.path}); center them with items-center.`;
+    }
+    // A tall or two-line sibling leaves a switch nothing single-line to line up
+    // with. A row that centers its items puts the switch on its own center, so the
+    // switch is measured against that.
+    if (style.alignItems === 'center' && items.length < children.length) {
+      const box = contentBox(node, tree.env.isRTL);
+      const rowCenter = box[1] + box[3] / 2;
+      for (const control of items.filter(child => child.tag === 'Switch')) {
+        const offset = Math.abs(center(control) - rowCenter);
+        if (offset <= measured) continue;
+        measured = offset;
+        related = [control];
+        message = `${control.path} paints ${fmt(offset)} off the center of row ${node.path}, which centers its items; center the control itself.`;
+      }
+    }
     if (measured <= TOLERANCE_DP) continue;
     findings.push(
       finding({
         rule: 'row-misaligned',
         severity: 'error',
         element: node.ref,
-        related: [low.ref, high.ref],
+        related: related.map(child => child.ref),
         measured,
         expected: `vertical centers within ${TOLERANCE_DP} dp`,
         unit: 'dp',
-        message: `Children of row ${node.path} are ${fmt(measured)} apart vertically (${low.path} vs ${high.path}); center them with items-center.`,
+        message,
       })
     );
   }
@@ -333,6 +394,11 @@ export function checkSafeArea(tree: LayoutTree): Finding[] {
   const { safeArea, window } = tree.env;
   for (const node of tree.nodes) {
     if (!node.isText && !node.isTextInput && !node.pressable) continue;
+    // A box the platform says the user cannot see is painted nowhere, so it can
+    // reach into no inset. An accessibility snapshot carries no style, so a
+    // measurement copy an app mounts — hidden, or laid out against another
+    // window's origin — arrives here as ordinary text at the window's top edge.
+    if (node.probe.invisible === true) continue;
     // A node inside a native dialog or sheet is measured against that surface's
     // origin, which the platform placed inside the window: its frame says nothing
     // about the window's insets, and the surface's presenter owns them.

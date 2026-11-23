@@ -27,7 +27,12 @@ describe('resolveCloudAgentSessionIds', () => {
     expect(result).toEqual(new Map());
   });
 
-  it('resolves all IDs from v1 without querying v2', async () => {
+  it('returns empty map when IDs are not found in v2', async () => {
+    const result = await resolveCloudAgentSessionIds([crypto.randomUUID(), crypto.randomUUID()]);
+    expect(result.size).toBe(0);
+  });
+
+  it('leaves v1-only rows unresolved by default and resolves them with includeLegacyV1', async () => {
     const cloudId1 = crypto.randomUUID();
     const cloudId2 = crypto.randomUUID();
 
@@ -51,14 +56,18 @@ describe('resolveCloudAgentSessionIds', () => {
 
     v1SessionIds.push(s1.session_id, s2.session_id);
 
-    const result = await resolveCloudAgentSessionIds([cloudId1, cloudId2]);
+    const defaultResult = await resolveCloudAgentSessionIds([cloudId1, cloudId2]);
+    expect(defaultResult.size).toBe(0);
 
-    expect(result.size).toBe(2);
-    expect(result.get(cloudId1)).toBe(s1.session_id);
-    expect(result.get(cloudId2)).toBe(s2.session_id);
+    const legacyResult = await resolveCloudAgentSessionIds([cloudId1, cloudId2], {
+      includeLegacyV1: true,
+    });
+    expect(legacyResult.size).toBe(2);
+    expect(legacyResult.get(cloudId1)).toBe(s1.session_id);
+    expect(legacyResult.get(cloudId2)).toBe(s2.session_id);
   });
 
-  it('resolves some IDs from v1 and remainder from v2', async () => {
+  it('resolves only the v2 id by default and both ids with includeLegacyV1', async () => {
     const cloudIdV1 = crypto.randomUUID();
     const cloudIdV2 = crypto.randomUUID();
 
@@ -80,19 +89,20 @@ describe('resolveCloudAgentSessionIds', () => {
     });
     v2SessionIds.push(v2SessionId);
 
-    const result = await resolveCloudAgentSessionIds([cloudIdV1, cloudIdV2]);
+    const defaultResult = await resolveCloudAgentSessionIds([cloudIdV1, cloudIdV2]);
+    expect(defaultResult.size).toBe(1);
+    expect(defaultResult.has(cloudIdV1)).toBe(false);
+    expect(defaultResult.get(cloudIdV2)).toBe(v2SessionId);
 
-    expect(result.size).toBe(2);
-    expect(result.get(cloudIdV1)).toBe(s1.session_id);
-    expect(result.get(cloudIdV2)).toBe(v2SessionId);
+    const legacyResult = await resolveCloudAgentSessionIds([cloudIdV1, cloudIdV2], {
+      includeLegacyV1: true,
+    });
+    expect(legacyResult.size).toBe(2);
+    expect(legacyResult.get(cloudIdV1)).toBe(s1.session_id);
+    expect(legacyResult.get(cloudIdV2)).toBe(v2SessionId);
   });
 
-  it('returns empty map when IDs are not found in either table', async () => {
-    const result = await resolveCloudAgentSessionIds([crypto.randomUUID(), crypto.randomUUID()]);
-    expect(result.size).toBe(0);
-  });
-
-  it('returns the v1 session_id when same cloud_agent_session_id exists in both tables', async () => {
+  it('prefers the v1 session_id over the v2 row only with includeLegacyV1', async () => {
     const sharedCloudId = crypto.randomUUID();
 
     const [v1Session] = await db
@@ -113,9 +123,14 @@ describe('resolveCloudAgentSessionIds', () => {
     });
     v2SessionIds.push(v2SessionId);
 
-    const result = await resolveCloudAgentSessionIds([sharedCloudId]);
+    const defaultResult = await resolveCloudAgentSessionIds([sharedCloudId]);
+    expect(defaultResult.size).toBe(1);
+    expect(defaultResult.get(sharedCloudId)).toBe(v2SessionId);
 
-    expect(result.size).toBe(1);
-    expect(result.get(sharedCloudId)).toBe(v1Session.session_id);
+    const legacyResult = await resolveCloudAgentSessionIds([sharedCloudId], {
+      includeLegacyV1: true,
+    });
+    expect(legacyResult.size).toBe(1);
+    expect(legacyResult.get(sharedCloudId)).toBe(v1Session.session_id);
   });
 });

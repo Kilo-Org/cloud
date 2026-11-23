@@ -11,8 +11,16 @@ Each environment also binds its old global pair as the
 [stall hedge](README.md#stall-hedge-to-the-global-queue) target
 (`usage-ingest-processing` / `usage-ingest-processing-dlq` in production,
 `usage-ingest-processing-staging` / `usage-ingest-processing-dlq-staging` in staging),
-consumed by the same Worker at cap 25 (50 more writer calls). Hedged copies are stored
+consumed by the same Worker at cap 25 with batch 1 (25 more writer calls). Hedged copies are stored
 outside the EU jurisdiction; EU was a latency experiment, not a residency requirement.
+
+Each environment also has a dedicated EU tagged pair for Enkrypt and Exa fallback usage
+(`usage-ingest-enkrypt-eu` / `usage-ingest-enkrypt-dlq-eu` in production,
+`usage-ingest-enkrypt-staging-eu` / `usage-ingest-enkrypt-dlq-staging-eu` in staging),
+consumed by the same Worker at batch1 with cap 50 in production and 10 in staging (at most 50
+or 10 more writer calls). Tagged producers use it only when the cutover switch is on; the
+consumer and preparation are always in place. See
+[Enkrypt usage queue](README.md#enkrypt-usage-queue).
 
 Production uses batch6/parallelism2/cap225; staging policy is unchanged at
 batch2/parallelism2/cap200. The production cap `225` is a bounded single-knob
@@ -70,10 +78,33 @@ a missing global source without a jurisdiction, reads each back, raises the glob
 DLQ's retention like the EU DLQ's, and detaches nothing. A foreign consumer on the
 hedge queue stops deployment. Cloudflare requires a DLQ to share its source queue's
 jurisdiction, so the hedge cannot use the EU DLQ. Any other hedge shape fails the
-config check before API access. The legacy two-producer, one-consumer shape below
-keeps its behaviour, so historical source revisions still deploy. That compatibility
+config check before API access. A config without the hedge (the legacy shared shape,
+now with the tagged pair below) keeps the legacy detach behaviour. That compatibility
 is not a safe rollback once the hedge has been on: a legacy-shaped deployment detaches
 the global consumer without checking the hedge queue's backlog (see removal below).
+
+When the config declares the dedicated tagged pair (`USAGE_INGEST_ENKRYPT_QUEUE` and
+`USAGE_INGEST_ENKRYPT_DLQ` producers on that environment's exact Enkrypt names, plus one
+consumer on the source that dead-letters into that DLQ), preparation also inspects both
+before any write, requires `jurisdiction: "eu"`, verifies consumer ownership of an
+existing source, and stops if the DLQ has any consumer, the source cannot be confirmed
+to keep at least the default four-day retention, or its `delivery_paused` value is explicitly
+`true` or malformed. Preparation accepts an omitted `delivery_paused` response or explicit
+`false`; omission is API-shape compatibility, not proof of active delivery. Operator verification
+of attachment and the production source stall alert still gates merging the switch-on change. Preparation changes none of these settings. After the other pairs it creates a missing
+DLQ (maximum retention) and
+then a missing source, each in EU and read back, raises the DLQ's retention like the
+others, and never detaches the tagged consumer. Any other tagged-pair shape fails the config
+check before API access. Because this revision's tagged ingress publishes to the pair whenever
+the cutover switch is on, and its consumer must keep draining after the switch is turned off,
+this helper requires it in every supported topology and rejects a config without it before
+API access. Earlier revisions deploy with their own copy of the helper, which does not know the
+pair and leaves it untouched. The pair is accepted beside either the EU or the global shared
+pair, so the routing rollback below keeps it and its consumer.
+
+The config check compares the declared producer bindings and source/DLQ consumer pairs with the
+exact set the declared topology requires, in any order. A missing, extra, duplicated, malformed
+or mismatched entry, or a hedge with a global shared pair, fails before API access.
 
 Without the hedge, preparation verifies the selected source's consumer ownership before detaching
 only the obsolete source attachment owned by the selected Worker. All supplied
@@ -129,8 +160,11 @@ only the four source/DLQ references for that environment:
 - Staging: `usage-ingest-processing-staging` / `usage-ingest-processing-dlq-staging`.
 
 Redeploy with that environment paused/drained. Preparation requires the original
-global pair to exist, detaches the EU consumer, then Wrangler reconnects global.
-No EU queues are deleted; global routing restores native provisioning. Rerun an
+global pair to exist, detaches the EU consumer, then Wrangler reconnects global. Keep the
+dedicated tagged pair, its bindings and consumer unchanged; it stays EU and attached.
+No EU queues are deleted. Because the dedicated EU binding remains, CI still runs the
+preparation helper and deploys with Wrangler's auto-provisioning disabled
+(`--experimental-provision=false`). Rerun an
 interrupted deployment after resolving its error, retaining the same gate.
 A full PR revert or older source without production-capable reconciliation does
 **not** automate EU detachment. Restore queue selection only, preserving current

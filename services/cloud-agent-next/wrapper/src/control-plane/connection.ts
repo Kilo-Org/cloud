@@ -22,6 +22,7 @@ import type {
   NativeConnectionPhase,
 } from '../../../src/shared/control-diagnostics.js';
 import type { ControlPlaneTimers } from '../../../src/shared/control-plane-timers.js';
+import { redactSecrets } from '../redact-output.js';
 
 /** Spec §7 Connection: the bounded outbound buffer holds at most this many frames. */
 export const CONTROL_PLANE_OUTBOX_MAX_FRAMES = 1_000;
@@ -66,7 +67,7 @@ function outboxKindOf(frame: ControlPlaneWrapperFrame): OutboxKind {
 
 type WebSocketWithHeadersCtor = new (
   url: string,
-  options?: { headers?: Record<string, string> }
+  options?: { headers?: Record<string, string>; proxy?: string }
 ) => WebSocket;
 
 export type ControlPlaneHeartbeat = { active: boolean; degraded: boolean; workspaceBusy?: boolean };
@@ -83,6 +84,7 @@ export type ControlPlaneConnectionSnapshot = {
 export type ControlPlaneConnectionOptions = {
   url: string;
   credential: string;
+  proxyUrl?: string;
   allocationId: string;
   timers: ControlPlaneTimers;
   wrapperId?: string;
@@ -437,6 +439,7 @@ export function createControlPlaneConnection(
     let target: WebSocket;
     try {
       target = new WebSocketWithHeaders(options.url, {
+        proxy: options.proxyUrl,
         headers: {
           Authorization: `Bearer ${options.credential}`,
           [WORKTREE_RUNTIME_HEADER]: WORKTREE_RUNTIME_VERSION,
@@ -453,7 +456,8 @@ export function createControlPlaneConnection(
         },
       });
     } catch (error) {
-      log(`control-plane connection failed: ${messageOf(error)}`);
+      // The reason can embed the proxy URL, so strip its credentials first.
+      log(`control-plane connection failed: ${redactSecrets(messageOf(error))}`);
       reportDisconnectEpisode('connect_attempt');
       phase = 'idle';
       scheduleReconnect();
@@ -487,6 +491,7 @@ export function createControlPlaneConnection(
           startCommands: true,
           worktreeGit: true,
           transferGrants: true,
+          previewTunnel: true,
         })
       )
         return;

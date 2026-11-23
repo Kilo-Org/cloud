@@ -784,6 +784,66 @@ test('one database gate per deployment checks out, installs and migrates once', 
   assert.match(staging.jobs['record-deployment'].if, /needs\.db-gate\.result == 'success'/);
 });
 
+test('every Worker deploy job retries a failed dependency install at most three times', () => {
+  // A registry download that fails on the runner leaves a lifecycle script (the
+  // workerd postinstall) failed, and a plain rerun repeats that script. A flake
+  // then passes on a later attempt, while a real failure still ends the job.
+  const dir = mkdtempSync(join(tmpdir(), 'install-retry-'));
+  try {
+    const bin = join(dir, 'bin');
+    mkdirSync(bin);
+    writeFileSync(
+      join(bin, 'pnpm'),
+      '#!/usr/bin/env bash\nprintf x >> "$CALLS"\n[ "$(wc -c < "$CALLS")" -gt "$FAILURES" ]\n',
+      { mode: 0o755 }
+    );
+    writeFileSync(join(bin, 'sleep'), '#!/usr/bin/env bash\necho "$1" >> "$SLEEPS"\n', {
+      mode: 0o755,
+    });
+    const installRuns = [];
+    for (const job of [
+      'deploy-manual',
+      'deploy-changed',
+      'deploy-session-ingest',
+      'deploy-cloud-agent-after-session-ingest',
+    ]) {
+      installRuns.push(
+        ...workers.jobs[job].steps.filter(step => (step.run ?? '').includes('pnpm install'))
+      );
+    }
+    assert.equal(installRuns.length, 4);
+
+    for (const { run } of installRuns) {
+      for (const [failures, status, calls, sleeps] of [
+        [0, 0, 1, ''],
+        [2, 0, 3, '20\n40\n'],
+        [3, 1, 3, '20\n40\n'],
+      ]) {
+        const callsFile = join(dir, 'calls');
+        const sleepsFile = join(dir, 'sleeps');
+        writeFileSync(callsFile, '');
+        writeFileSync(sleepsFile, '');
+        const result = spawnSync('bash', ['-e', '-c', run], {
+          cwd: dir,
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            PATH: `${bin}:${process.env.PATH}`,
+            CALLS: callsFile,
+            SLEEPS: sleepsFile,
+            FAILURES: String(failures),
+          },
+        });
+        assert.equal(result.status, status, `${failures} failures: ${result.stderr}`);
+        assert.equal(readFileSync(callsFile, 'utf8').length, calls, `${failures} failures`);
+        assert.equal(readFileSync(sleepsFile, 'utf8'), sleeps, `${failures} failures`);
+      }
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('every Worker deploy job installs only the Worker closure and the root project', () => {
   // A recursive workspace install from inside a Worker links every unrelated
   // project and runs its lifecycle scripts once per deploy job. The closure
@@ -1471,4 +1531,166 @@ test('a Pages pin move deploys the output shell beside Pages', t => {
   git('checkout', '-q', '-b', 'docs', base);
   commit({ 'services/pages/README.md': 'Pages, again' }, 'docs');
   assert.deepEqual(detected('docs'), ['services/pages'], 'another Pages change leaves the shell');
+});
+
+test('Vercel deployment steps pass the deployment URL as one argument', () => {
+  // The promote step reads the caller URL from its env. The stage step accepts
+  // the single https line that `vercel deploy` prints and writes it as the
+  // deployment_url output. Both steps run here under bash -e with a stub
+  // vercel, so the assertions read the arguments the CLI receives and the
+  // output the stage step writes.
+  const VERCEL_STUB = [
+    '#!/usr/bin/env bash',
+    'for argument in "$@"; do',
+    '  printf \'%s\\n\' "$argument" >> "$ARGV_LOG"',
+    'done',
+    'if [ "$1" = deploy ]; then',
+    '  printf \'%s\\n\' "$DEPLOY_OUTPUT"',
+    'fi',
+    'exit 0',
+    '',
+  ].join('\n');
+
+  // Reads one step of a loaded workflow by its name.
+  const namedStep = (document, name) => {
+    const steps = Object.values(document.jobs).flatMap(job => job.steps ?? []);
+    const step = steps.find(candidate => candidate.name === name);
+    assert.ok(step, `the workflow must define a step named ${name}`);
+    return { env: step.env ?? {}, run: step.run };
+  };
+
+  // Applies the runner expression substitution with the supplied values.
+  const substituteExpressions = (text, values) =>
+    text.replace(/\$\{\{\s*([^{}]*?)\s*\}\}/g, (_, expression) => {
+      assert.ok(expression in values, `the test supplies no value for ${expression}`);
+      return values[expression];
+    });
+
+  // Runs a step the way the runner does: bash -e, a stub vercel first on PATH,
+  // the substituted env, and a temporary GITHUB_OUTPUT.
+  const runStep = ({ document, name, values, deployOutput }) => {
+    const step = namedStep(document, name);
+    const directory = mkdtempSync(join(tmpdir(), 'vercel-step-'));
+    try {
+      const bin = join(directory, 'bin');
+      const runnerTemp = join(directory, 'runner-temp');
+      const argvLog = join(directory, 'argv');
+      const githubOutput = join(directory, 'github-output');
+      mkdirSync(bin);
+      mkdirSync(runnerTemp);
+      writeFileSync(argvLog, '');
+      writeFileSync(githubOutput, '');
+      writeFileSync(join(bin, 'vercel'), VERCEL_STUB, { mode: 0o755 });
+      const substitutions = {
+        'runner.temp': runnerTemp,
+        'steps.vercel-cli-cache.outputs.cache-hit': 'false',
+        ...values,
+      };
+      const env = {
+        ...process.env,
+        PATH: `${bin}:${process.env.PATH}`,
+        ARGV_LOG: argvLog,
+        DEPLOY_OUTPUT: deployOutput ?? '',
+        GITHUB_OUTPUT: githubOutput,
+        RUNNER_TEMP: runnerTemp,
+      };
+      for (const [key, value] of Object.entries(step.env)) {
+        env[key] = substituteExpressions(value, substitutions);
+      }
+      const result = spawnSync(
+        'bash',
+        ['-e', '-c', substituteExpressions(step.run, substitutions)],
+        {
+          cwd: directory,
+          encoding: 'utf8',
+          env,
+        }
+      );
+      return {
+        status: result.status,
+        stderr: result.stderr,
+        argv: readFileSync(argvLog, 'utf8').split('\n').filter(Boolean),
+        output: readFileSync(githubOutput, 'utf8'),
+      };
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  };
+
+  const markerExists = path => {
+    try {
+      readFileSync(path);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const markerDirectory = mkdtempSync(join(tmpdir(), 'vercel-marker-'));
+  try {
+    const marker = join(markerDirectory, 'marker');
+
+    const promote = workflow('promote-vercel-deployment');
+    const probeUrl = `https://probe.vercel.app"; touch ${marker}; echo "`;
+    const promoted = runStep({
+      document: promote,
+      name: 'Promote Vercel deployment',
+      values: {
+        'inputs.deployment_url': probeUrl,
+        'secrets.VERCEL_TOKEN': 'probe-token',
+      },
+    });
+    assert.equal(promoted.status, 0, promoted.stderr);
+    assert.equal(markerExists(marker), false, 'the step passes the URL verbatim');
+    const promoteIndex = promoted.argv.indexOf('promote');
+    assert.ok(promoteIndex >= 0, `the stub must run promote: ${promoted.argv.join(' | ')}`);
+    assert.equal(
+      promoted.argv[promoteIndex + 1],
+      probeUrl,
+      'the deployment URL arrives as one argv element'
+    );
+    assert.ok(
+      promoted.argv.includes('--token=probe-token'),
+      'the token arrives as its own argv element'
+    );
+    assert.ok(promoted.argv.includes('--scope=kilocode'), 'the scope stays on the command');
+
+    const stage = workflow('stage-vercel-deployment');
+    const stageValues = { 'secrets.VERCEL_PROJECT_TOKEN': 'probe-token' };
+
+    const staged = runStep({
+      document: stage,
+      name: 'Stage Vercel deployment',
+      values: stageValues,
+      deployOutput: 'Vercel CLI 59.5.0\nhttps://probe-deployment.vercel.app',
+    });
+    assert.equal(staged.status, 0, staged.stderr);
+    assert.equal(staged.output, 'deployment_url=https://probe-deployment.vercel.app\n');
+
+    const rejected = runStep({
+      document: stage,
+      name: 'Stage Vercel deployment',
+      values: stageValues,
+      deployOutput: `https://probe.vercel.app; touch ${marker}`,
+    });
+    assert.notEqual(rejected.status, 0, 'the stage step accepts only a single https host');
+    assert.equal(
+      markerExists(marker),
+      false,
+      'the stage step runs the URL as one command argument'
+    );
+    assert.doesNotMatch(rejected.output, /deployment_url/);
+    assert.match(rejected.stderr, /did not print a deployment URL/);
+
+    const substituted = runStep({
+      document: stage,
+      name: 'Stage Vercel deployment',
+      values: stageValues,
+      deployOutput: 'https://probe.vercel.app$(id)',
+    });
+    assert.notEqual(substituted.status, 0, 'the stage step accepts only a single https host');
+    assert.equal(substituted.output, '');
+  } finally {
+    rmSync(markerDirectory, { recursive: true, force: true });
+  }
 });

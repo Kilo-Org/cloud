@@ -24,6 +24,8 @@ function fixture() {
     rejectQuestion: vi.fn<NativeSessionConnection['rejectQuestion']>(),
     sendCommand: vi.fn<NativeSessionConnection['sendCommand']>(),
     getCommandStatus: vi.fn<NativeSessionConnection['getCommandStatus']>(),
+    requestRecovery: vi.fn<NativeSessionConnection['requestRecovery']>(),
+    refresh: vi.fn(),
   };
   const client: NativeRemoteClient = {
     listSessions: vi.fn<NativeRemoteClient['listSessions']>(),
@@ -49,6 +51,7 @@ const connected: NativeSessionState = {
   pending: {
     permissions: [{ id: 'old-permission', action: 'shell', resources: [] }],
     questions: [],
+    unreadableQuestions: [],
     unreadablePermissions: [],
   },
   events: [],
@@ -127,6 +130,7 @@ describe('native session ownership', () => {
         expect(committed.pending).toEqual({
           permissions: [],
           questions: [],
+          unreadableQuestions: [],
           unreadablePermissions: [],
         });
       }

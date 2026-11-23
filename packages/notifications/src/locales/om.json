@@ -2,11 +2,12 @@
   "generic": {
     "title": "Kilo",
     "body": {
-      "cloudAgentSession": "Shumarra agent kee keessa bakka jijjiiramni jira",
-      "lowBalance": "Baalansii kee xiyyeeffannaa barbaada",
+      "cloudAgentSession": "Shumarra eejentii kee keessa bakka jijjiiramni jira",
+      "lowBalance": "Hafteen kee xiyyeeffannaa barbaada",
       "spendAlert": "Baasiin kee xiyyeeffannaa barbaada",
       "securityFinding": "Arganni nagaa xiyyeeffannaa barbaada",
       "securityUpdate": "Sakatta'a nagaa keessa bakka jijjiiramni jira",
+      "agentBriefing": "Gabaasi agenteessaa kee qophaa'aa jira",
       "activeAgentsGlanceable": "Eejentoonni hojii irra jiran odeeffannoo haaraa qabu"
     }
   },
@@ -17,8 +18,8 @@
   },
   "internal": {
     "lowBalance": {
-      "title": "Akeekkachiisa baalansii xiqqaa",
-      "body": "Baalansiin {{organizationName}} gadii ${{minimumBalanceUsd}} bu'eera"
+      "title": "Akeekkachiisa haftee xiqqaa",
+      "body": "Hafteen {{organizationName}} gadii ${{minimumBalanceUsd}} bu'eera"
     },
     "spendAlert": {
       "title": "Akeekkachiisa baasii",
@@ -29,6 +30,12 @@
     },
     "securityFindingNew": {
       "title": "Arganni nagaa haaraa ({{severity}})"
+    },
+    "securityFindingSeverity": {
+      "critical": "Baay'ee hamaa",
+      "high": "Olaanaa",
+      "medium": "Giddu galeessa",
+      "low": "Gadi aanaa"
     },
     "securityFindingSlaWarning": {
       "title": "Akeekkachiisa SLA"

@@ -1,3 +1,8 @@
+import {
+  canManageOrganizationBilling,
+  type OrganizationRole,
+} from '@kilocode/app-shared/organizations';
+
 import { type RepositoryPlatform } from './new-session-repository-state';
 
 /**
@@ -23,10 +28,12 @@ export const PROVIDER_COPY = {
   bitbucket: {
     connectTitle: 'common.connectBitbucket',
     // Bitbucket's connect card explains itself through the restriction note
-    // below (`connectNoteKey`): a workspace access token is pasted in the
-    // app's own sheet, so there is no browser step left to announce.
+    // (`connectCardOffer`): a workspace access token is pasted in the app's own
+    // sheet, so there is no browser step left to announce.
     connectDescription: null,
-    openLabel: 'common.connectBitbucket',
+    // The card's title already names Bitbucket, so the action repeats only
+    // the verb instead of the whole "Connect Bitbucket" phrase.
+    openLabel: 'common.connect',
     connectedTitle: 'common.bitbucketConnected',
     errorTitle: 'agentChat.newSession.couldNotLoadBitbucketRepositories',
     emptyDescription: 'agentChat.newSession.noRepositoriesVisibleBitbucket',
@@ -44,15 +51,98 @@ export const PROVIDER_COPY = {
   }
 >;
 
+/** What one provider's connect card offers the member looking at it. */
+export type ConnectCardOffer = {
+  /** Whether the card renders its connect action. */
+  offersAction: boolean;
+  /** The restriction the card states outright, or `undefined` for none. */
+  noteKey: string | undefined;
+  /**
+   * The same restriction for the compact row after a repository is selected.
+   * That row has no title, so a note whose sentence names no provider states
+   * the name in `compactContextKey` above it instead of leaning on a header.
+   */
+  compactNoteKey: string | undefined;
+  /**
+   * A subject line the compact row states above `compactNoteKey` when that
+   * note's only subject is a pronoun. The reconnect and role sentences are
+   * provider neutral (the sheet shows them above a title that names the
+   * provider), so the headerless row supplies that name itself instead of
+   * leaving "it" unbound.
+   */
+  compactContextKey: string | undefined;
+};
+
 /**
- * The restriction a provider's connect card must state outright. Bitbucket
- * connects for an organization, never for a personal account, so "connect it"
- * can never read as a promise that a personal session will get Bitbucket
- * repositories — or their branches.
+ * The connect action and restriction note for one provider.
+ *
+ * Bitbucket connects for an organization, never for a personal account, and
+ * every one of its connect mutations takes organization billing authority, so
+ * the card offers the action only where the server would accept it. The
+ * Bitbucket group itself exists only in an organization session
+ * (`resolveRepositoryGroups`), so this decides among organization members.
+ *
+ * `role` is `undefined` until the membership list answers. That state keeps the
+ * action on purpose: the card never blocks on a verdict it does not have, and
+ * refusing one a member may hold would read worse than the delay. The list is
+ * the same one the new-session shell already reads, so this is a retry path and
+ * not the first frame; when it does answer late, the card's note and action
+ * settle in one change instead of the card appearing inert first.
+ *
+ * `needsReconnect` is the Bitbucket answer naming a connected workspace that
+ * still needs a selection or fresh credentials, which `bitbucketRowsUnlisted`
+ * reports. Those states map to the same `connect` status as "not connected",
+ * but the step left is a reconnect, not a first connect, so the note asks for
+ * the former instead of claiming the provider was never connected. The sheet
+ * the card opens says the same thing.
  */
-export function connectNoteKey(platform: RepositoryPlatform): string | undefined {
-  return platform === 'bitbucket' ? 'agentChat.newSession.bitbucketOrganizationsOnly' : undefined;
+export function connectCardOffer(
+  platform: RepositoryPlatform,
+  role: OrganizationRole | undefined,
+  needsReconnect = false
+): ConnectCardOffer {
+  if (platform !== 'bitbucket') {
+    return {
+      offersAction: true,
+      noteKey: undefined,
+      compactNoteKey: undefined,
+      compactContextKey: undefined,
+    };
+  }
+  if (role !== undefined && !canManageOrganizationBilling(role)) {
+    // The member cannot connect it, so the note names the roles that can and the
+    // step left to them instead of an action that can only end in a refusal.
+    if (needsReconnect) {
+      // The workspace is connected but cannot list: the step is a fresh
+      // selection or credentials, so the reconnect sentence applies. Both notes
+      // carry the one provider-neutral reconnect sentence the GitLab surfaces
+      // share, so the two providers cannot drift apart. The sentence names no
+      // provider, so the expanded card's reconnect title supplies the name and
+      // the headerless compact row states it itself above the note.
+      return {
+        offersAction: false,
+        noteKey: 'prReview.connect.reconnectAdminOnlyDescription',
+        compactNoteKey: 'prReview.connect.reconnectAdminOnlyDescription',
+        compactContextKey: 'prReview.connect.reconnectTitleBitbucket',
+      };
+    }
+    return {
+      offersAction: false,
+      noteKey: 'prReview.connect.bitbucketAdminOnlyDescription',
+      // The compact row carries no header, so the subject line above the note
+      // states Bitbucket and the note stays the provider-neutral role sentence.
+      compactNoteKey: 'prReview.connect.bitbucketAdminOnlyDescription',
+      compactContextKey: 'prReview.connect.bitbucketNotConnectedTitle',
+    };
+  }
+  return {
+    offersAction: true,
+    noteKey: 'agentChat.newSession.bitbucketOrganizationsOnly',
+    compactNoteKey: 'agentChat.newSession.bitbucketOrganizationsOnly',
+    compactContextKey: undefined,
+  };
 }
+
 /**
  * Copy for a provider whose stored installation exists but cannot list
  * repositories. Only a provider API that reports the reason answers here:

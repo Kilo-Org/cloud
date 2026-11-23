@@ -1,15 +1,19 @@
 /* eslint-disable max-lines -- one preflight case per grant, sensitive-step and redirect branch */
 /* eslint-disable require-await -- a fake CDP channel is async by contract */
+import { JSDOM } from 'jsdom';
 import { describe, expect, it } from 'vitest';
 import {
   createStepTokenStore,
   hashBrowserToolArguments,
   SENSITIVE_REASON,
+  STALE_REF_ERROR,
 } from './browser-agent-checks';
 import type { BrowserGrant, StepTokenStore } from './browser-agent-checks';
 import { postAgentNavigate, preflightAgentCall } from './browser-agent-gate';
 import type { AgentPreflight } from './browser-agent-gate';
+import type { AgentFrameInventory } from './browser-agent-frames';
 import type { BrowserToolResolvedTarget } from './browser-tool-session';
+import type { WebMcpToolDescriptor } from './tab-debugger';
 
 type CdpHandler = (
   params: Record<string, unknown> | undefined
@@ -20,6 +24,15 @@ const failureOf = (result: AgentPreflight) => (result.ok ? undefined : result.fa
 const sensitiveOf = (result: AgentPreflight) => (result.ok ? undefined : result.sensitive);
 
 const sensitiveReasonOf = (result: AgentPreflight) => sensitiveOf(result)?.reason;
+
+/** The allowed preflight, so a spec body never branches on the outcome's own kind. */
+const allowedOf = (result: AgentPreflight): Extract<AgentPreflight, { readonly ok: true }> => {
+  if (!result.ok) {
+    throw new Error(`expected an allowed call, got ${JSON.stringify(result.failure)}`);
+  }
+
+  return result;
+};
 
 /** Node 12 is the pay frame's field; every other node lives in the main frame. */
 const frameIdForTestNode = (backendNodeId: number): string =>
@@ -53,11 +66,15 @@ const frameTree = (mainUrl: string): Record<string, unknown> => ({
   },
 });
 
+/** No descriptor at all: the page cannot report its WebMCP tools. */
+const NO_WEB_MCP_TOOLS: readonly WebMcpToolDescriptor[] | undefined = undefined;
+
 const createSession = (
   options: {
     readonly describeNodeFails?: boolean;
     readonly focusedNodeName?: string;
     readonly forbidQuerySelectorAll?: boolean;
+    readonly fieldProbeFailureFrames?: readonly string[];
     readonly frameOwnerFailsFor?: readonly string[];
     readonly nestedPathBackendIds?: readonly number[];
     readonly nestedFrames?: readonly {
@@ -69,14 +86,25 @@ const createSession = (
     }[];
     readonly frameIdForBackendNode?: (backendNodeId: number) => string;
     readonly mainUrl?: string;
+    readonly presentFieldFrames?: readonly string[];
     readonly probe?: Record<string, unknown>;
     readonly probeByObject?: Record<string, Record<string, unknown>>;
+    /** Elements of a real DOM the probe function itself runs against, by object id. */
+    readonly probeElements?: Record<string, Element>;
     readonly ambiguousSelectors?: Record<string, number>;
-    readonly selectors?: Record<string, { readonly frameId: string; readonly nodeId: number }>;
-    readonly targetFrameId?: string;
+    readonly selectors?: Record<string, { readonly nodeId: number }>;
+    /** Refs no snapshot registered: `resolveTarget` finds nothing for them. */
+    readonly unknownRefs?: readonly string[];
+    /** The node name `DOM.describeNode` reports for a ref target (e.g. `IFRAME`). */
+    readonly targetNodeName?: string;
   } = {}
 ): FakeGateSession => {
   let describeObjectCalls = 0;
+  // One isolated world per frame, so the field-presence probe can tell the frames apart.
+  const worlds = new Map<number, string>();
+  // The world each object handle was resolved into, so the ownership probe sees which document it asked.
+  const objectWorlds = new Map<string, string>();
+  let nextContextId = 9;
 
   const handlers: Record<string, CdpHandler> = {
     'DOM.describeNode': params => {
@@ -85,12 +113,7 @@ const createSession = (
       }
 
       if (params?.['nodeId'] !== undefined) {
-        const { nodeId } = params;
-        const selector = Object.values(options.selectors ?? {}).find(
-          entry => entry.nodeId === nodeId
-        );
-
-        return { node: { backendNodeId: 40, frameId: selector?.frameId ?? 'main' } };
+        return { node: { backendNodeId: 40 } };
       }
 
       if (params?.['objectId'] !== undefined) {
@@ -100,13 +123,10 @@ const createSession = (
         return { node: { backendNodeId, nodeName: options.focusedNodeName ?? 'INPUT' } };
       }
 
-      const backendNodeId = params?.['backendNodeId'];
-      const frameId =
-        typeof backendNodeId === 'number'
-          ? (options.frameIdForBackendNode?.(backendNodeId) ?? options.targetFrameId ?? 'main')
-          : (options.targetFrameId ?? 'main');
-
-      return { node: { frameId } };
+      // Chrome names a frame only for a frame-owner element: an ordinary node reports no frame at all.
+      return {
+        node: options.targetNodeName === undefined ? {} : { nodeName: options.targetNodeName },
+      };
     },
     'DOM.getDocument': () => ({ root: { nodeId: 1 } }),
     'DOM.getFrameOwner': params => {
@@ -131,10 +151,25 @@ const createSession = (
     },
     'DOM.resolveNode': params => {
       const id = params?.['backendNodeId'] ?? params?.['nodeId'];
+      const objectId = `obj-${String(id)}`;
+      const contextId = params?.['executionContextId'];
+      // Chrome resolves a node into the requested world's handle even when the node lives in another document; the fake remembers which world that was so the ownership probe can tell them apart.
+      objectWorlds.set(
+        objectId,
+        typeof contextId === 'number' ? (worlds.get(contextId) ?? 'main') : 'main'
+      );
 
-      return { object: { objectId: `obj-${String(id)}` } };
+      return { object: { objectId } };
     },
-    'Page.createIsolatedWorld': () => ({ executionContextId: 9 }),
+    'Page.createIsolatedWorld': params => {
+      const frameId = typeof params?.['frameId'] === 'string' ? params['frameId'] : 'main';
+      const executionContextId = nextContextId;
+
+      nextContextId += 1;
+      worlds.set(executionContextId, frameId);
+
+      return { executionContextId };
+    },
     'Page.getFrameTree': () => {
       const nested = options.nestedFrames;
 
@@ -170,6 +205,31 @@ const createSession = (
     },
     'Runtime.callFunctionOn': params => {
       const objectId = params?.['objectId'];
+      const functionDeclaration = params?.['functionDeclaration'];
+
+      // The gate's ownership probe: the node matches the frame whose isolated world holds its document.
+      if (
+        typeof functionDeclaration === 'string' &&
+        functionDeclaration.includes('ownerDocument')
+      ) {
+        const backendNodeId = Number(String(objectId).replace('obj-', ''));
+        const nodeFrame = options.frameIdForBackendNode?.(backendNodeId) ?? 'main';
+
+        return { result: { value: nodeFrame === objectWorlds.get(String(objectId)) } };
+      }
+
+      const probeElement =
+        typeof objectId === 'string' ? options.probeElements?.[objectId] : undefined;
+
+      if (probeElement !== undefined && typeof functionDeclaration === 'string') {
+        // eslint-disable-next-line eslint/no-new-func, typescript-eslint/no-implied-eval, typescript-eslint/no-unsafe-type-assertion -- runs the page-side probe source against a real DOM element
+        const declare = new Function(`return (${functionDeclaration});`) as () => (
+          this: Element
+        ) => unknown;
+
+        return { result: { value: declare().call(probeElement) } };
+      }
+
       const probeForObject =
         typeof objectId === 'string' ? options.probeByObject?.[objectId] : undefined;
 
@@ -181,7 +241,29 @@ const createSession = (
         },
       };
     },
-    'Runtime.evaluate': () => ({ result: { objectId: 'obj-focused' } }),
+    'Runtime.evaluate': params => {
+      const expression = typeof params?.['expression'] === 'string' ? params['expression'] : '';
+
+      if (!expression.includes('present')) {
+        return { result: { objectId: 'obj-focused' } };
+      }
+
+      const contextId = params?.['contextId'];
+      const frameId = typeof contextId === 'number' ? (worlds.get(contextId) ?? 'main') : 'main';
+
+      if (options.fieldProbeFailureFrames?.includes(frameId) === true) {
+        // No value: the probe could not run in this frame.
+        return { result: {} };
+      }
+
+      return {
+        result: {
+          value: JSON.stringify({
+            present: options.presentFieldFrames?.includes(frameId) === true,
+          }),
+        },
+      };
+    },
   };
 
   return {
@@ -198,7 +280,12 @@ const createSession = (
         return { kind: 'selector', nodeId: selector.nodeId, selector: target };
       }
 
-      return target.startsWith('e') && Number.isInteger(Number(target.slice(1)))
+      const knownRef =
+        target.startsWith('e') &&
+        Number.isInteger(Number(target.slice(1))) &&
+        options.unknownRefs?.includes(target) !== true;
+
+      return knownRef
         ? { backendNodeId: Number(target.slice(1)), kind: 'ref', ref: target }
         : undefined;
     },
@@ -227,6 +314,8 @@ const run = (
     readonly args?: Record<string, unknown>;
     readonly authorized?: readonly BrowserGrant[];
     readonly probe?: Record<string, unknown>;
+    readonly readFrames?: () => Promise<AgentFrameInventory>;
+    readonly readWebMcpTools?: () => Promise<readonly WebMcpToolDescriptor[] | undefined>;
     readonly session?: FakeGateSession;
     readonly stepTokens?: readonly string[];
     readonly toolName: string;
@@ -239,13 +328,28 @@ const run = (
   preflightAgentCall({
     args: input.args ?? {},
     authorized: input.authorized ?? grants,
-    consumeStepToken: (token, binding) => tokens.consume(token, binding),
+    consumeStepToken: (token, binding) => tokens.take(token, [binding]),
+    ...(input.readFrames === undefined ? {} : { readFrames: input.readFrames }),
+    // No WebMCP descriptor unless a spec supplies one, so only those specs read the page's tool list.
+    readWebMcpTools: input.readWebMcpTools ?? (() => Promise.resolve(NO_WEB_MCP_TOOLS)),
     session:
       input.session ?? createSession(input.probe === undefined ? {} : { probe: input.probe }),
+    sessionHandle: 'session-1',
     stepTokens: input.stepTokens ?? [],
     tabId: 7,
     toolName: input.toolName,
   });
+
+/** One element of a real DOM, for the page-side probe source to classify. */
+const fixtureElement = (html: string, id: string): Element => {
+  const element = new JSDOM(html).window.document.querySelector(`#${id}`);
+
+  if (element === null) {
+    throw new Error(`no fixture element #${id}`);
+  }
+
+  return element;
+};
 
 describe('origin grants', () => {
   it('refuses a read on an origin the CLI did not approve', async () => {
@@ -276,7 +380,7 @@ describe('origin grants', () => {
     const result = await run({
       args: { target: 'e12' },
       authorized: grants.filter(grant => grant.origin === 'https://app.example.com'),
-      session: createSession({ targetFrameId: 'f1' }),
+      session: createSession({ frameIdForBackendNode: () => 'f1' }),
       toolName: 'browser_click',
     });
 
@@ -286,10 +390,203 @@ describe('origin grants', () => {
     });
   });
 
+  it('asks for the read grant of the frame a targeted iframe ref hosts', async () => {
+    const result = await run({
+      args: { target: 'e12' },
+      authorized: [{ class: 'read', origin: 'https://app.example.com' }],
+      session: createSession({
+        nestedFrames: [
+          {
+            frameId: 'f1',
+            ownerBackendNodeId: 12,
+            securityOrigin: 'https://pay.example.com',
+            url: FRAME_URL,
+          },
+        ],
+        targetNodeName: 'IFRAME',
+      }),
+      toolName: 'browser_snapshot',
+    });
+
+    expect(failureOf(result)).toStrictEqual({
+      items: [{ class: 'read', frame: true, origin: 'https://pay.example.com' }],
+      kind: 'needs_permission',
+    });
+  });
+
+  it('still requires act on the hosted frame for an action on its iframe ref', async () => {
+    const result = await run({
+      args: { target: 'e12' },
+      authorized: [{ class: 'act', origin: 'https://app.example.com' }],
+      session: createSession({
+        nestedFrames: [
+          {
+            frameId: 'f1',
+            ownerBackendNodeId: 12,
+            securityOrigin: 'https://pay.example.com',
+            url: FRAME_URL,
+          },
+        ],
+        targetNodeName: 'IFRAME',
+      }),
+      toolName: 'browser_click',
+    });
+
+    expect(failureOf(result)).toStrictEqual({
+      items: [{ class: 'act', frame: true, origin: 'https://pay.example.com' }],
+      kind: 'needs_permission',
+    });
+  });
+
+  describe('a call on an iframe element', () => {
+    const iframeSession = () =>
+      createSession({
+        nestedFrames: [
+          {
+            frameId: 'f1',
+            ownerBackendNodeId: 12,
+            securityOrigin: 'https://pay.example.com',
+            url: FRAME_URL,
+          },
+        ],
+        targetNodeName: 'IFRAME',
+      });
+
+    it('needs act on the owner document for an evaluate granted only on the hosted frame', async () => {
+      const result = await run({
+        args: { function: '() => document.cookie', target: 'e12' },
+        authorized: [{ class: 'act', origin: 'https://pay.example.com' }],
+        session: iframeSession(),
+        toolName: 'browser_evaluate',
+      });
+
+      expect(failureOf(result)).toStrictEqual({
+        items: [{ class: 'act', origin: 'https://app.example.com' }],
+        kind: 'needs_permission',
+      });
+    });
+
+    it('allows an evaluate granted on both the owner document and the hosted frame', async () => {
+      const result = await run({
+        args: { function: '() => 1', target: 'e12' },
+        authorized: [
+          { class: 'act', origin: 'https://app.example.com' },
+          { class: 'act', origin: 'https://pay.example.com' },
+        ],
+        session: iframeSession(),
+        toolName: 'browser_evaluate',
+      });
+
+      expect(result).toMatchObject({ class: 'act', ok: true, origin: 'https://pay.example.com' });
+    });
+
+    it('needs read on the owner document for a screenshot granted only on the hosted frame', async () => {
+      const result = await run({
+        args: { target: 'e12' },
+        authorized: [{ class: 'read', origin: 'https://pay.example.com' }],
+        session: iframeSession(),
+        toolName: 'browser_take_screenshot',
+      });
+
+      expect(failureOf(result)).toStrictEqual({
+        items: [{ class: 'read', origin: 'https://app.example.com' }],
+        kind: 'needs_permission',
+      });
+    });
+
+    it('leaves a plain element of the main document needing only the main grant', async () => {
+      const result = await run({
+        args: { function: '() => 1', target: 'e5' },
+        authorized: [{ class: 'act', origin: 'https://app.example.com' }],
+        session: createSession(),
+        toolName: 'browser_evaluate',
+      });
+
+      expect(result).toMatchObject({ class: 'act', ok: true, origin: 'https://app.example.com' });
+    });
+
+    // The <iframe> e12 sits in frame f1 (shop) and hosts frame f2 (pay).
+    const nestedOwnerSession = () =>
+      createSession({
+        frameIdForBackendNode: backendNodeId => (backendNodeId === 12 ? 'f1' : 'main'),
+        nestedFrames: [
+          {
+            frameId: 'f1',
+            ownerBackendNodeId: 30,
+            securityOrigin: 'https://shop.example.com',
+            url: 'https://shop.example.com/cart',
+          },
+          {
+            frameId: 'f2',
+            ownerBackendNodeId: 12,
+            parentId: 'f1',
+            securityOrigin: 'https://pay.example.com',
+            url: FRAME_URL,
+          },
+        ],
+        targetNodeName: 'IFRAME',
+      });
+
+    it('needs the grants of a nested owner frame and its hosted frame, both labelled frames', async () => {
+      const result = await run({
+        args: { function: '() => 1', target: 'e12' },
+        authorized: [],
+        session: nestedOwnerSession(),
+        toolName: 'browser_evaluate',
+      });
+
+      expect(failureOf(result)).toStrictEqual({
+        items: [
+          { class: 'act', frame: true, origin: 'https://shop.example.com' },
+          { class: 'act', frame: true, origin: 'https://pay.example.com' },
+        ],
+        kind: 'needs_permission',
+      });
+    });
+
+    it('allows an element in a nested owner frame granted on both frames', async () => {
+      const result = await run({
+        args: { function: '() => 1', target: 'e12' },
+        authorized: [
+          { class: 'act', origin: 'https://shop.example.com' },
+          { class: 'act', origin: 'https://pay.example.com' },
+        ],
+        session: nestedOwnerSession(),
+        toolName: 'browser_evaluate',
+      });
+
+      expect(result).toMatchObject({ class: 'act', ok: true, origin: 'https://pay.example.com' });
+    });
+
+    it('asks once, as the top-level page, for a same-site iframe whose owner shares its origin', async () => {
+      const result = await run({
+        args: { function: '() => 1', target: 'e12' },
+        authorized: [],
+        session: createSession({
+          nestedFrames: [
+            {
+              frameId: 'f1',
+              ownerBackendNodeId: 12,
+              securityOrigin: 'https://app.example.com',
+              url: 'https://app.example.com/embedded',
+            },
+          ],
+          targetNodeName: 'IFRAME',
+        }),
+        toolName: 'browser_evaluate',
+      });
+
+      expect(failureOf(result)).toStrictEqual({
+        items: [{ class: 'act', origin: 'https://app.example.com' }],
+        kind: 'needs_permission',
+      });
+    });
+  });
+
   it('allows an act inside a granted frame and marks it as a frame target', async () => {
     const result = await run({
       args: { target: 'e12' },
-      session: createSession({ targetFrameId: 'f1' }),
+      session: createSession({ frameIdForBackendNode: () => 'f1' }),
       toolName: 'browser_click',
     });
 
@@ -323,10 +620,25 @@ describe('origin grants', () => {
     });
   });
 
-  it('refuses a target whose frame cannot be read', async () => {
+  it('allows a click on a main-frame ref, which no frame id names', async () => {
+    const result = await run({
+      args: { target: 'e5' },
+      toolName: 'browser_click',
+    });
+
+    // Chrome reports no frame for an ordinary element; the node still belongs to the tab's own document.
+    expect(result).toMatchObject({
+      class: 'act',
+      ok: true,
+      origin: 'https://app.example.com',
+      targetOriginFrame: false,
+    });
+  });
+
+  it('refuses a target whose frame cannot be attributed', async () => {
     const result = await run({
       args: { target: 'e12' },
-      session: createSession({ describeNodeFails: true }),
+      session: createSession({ frameIdForBackendNode: () => 'gone' }),
       toolName: 'browser_click',
     });
 
@@ -372,6 +684,29 @@ describe('origin grants', () => {
     expect(result).toMatchObject({ ok: true });
   });
 
+  it('refuses a tabs new destination no grant can name', async () => {
+    const failure = failureOf(
+      await run({
+        args: { action: 'new', url: 'data:text/html,<h1>off-grant</h1>' },
+        toolName: 'browser_tabs',
+      })
+    );
+
+    expect(failure).toMatchObject({
+      error: expect.stringContaining('is blocked') as unknown,
+      kind: 'blocked',
+    });
+  });
+
+  it('refuses a navigate destination no grant can name', async () => {
+    const result = await run({
+      args: { url: 'chrome://settings' },
+      toolName: 'browser_navigate',
+    });
+
+    expect(failureOf(result)).toMatchObject({ kind: 'blocked' });
+  });
+
   it('gates a navigate on the destination origin, not the current one', async () => {
     const refused = await run({
       args: { url: 'https://evil.example.net/login' },
@@ -393,20 +728,111 @@ describe('origin grants', () => {
   });
 });
 
-describe('origin changed after redirects', () => {
-  it('reports the origin a navigation landed on', async () => {
-    const approved = 'https://other.example.com';
+describe('webmcp call origin', () => {
+  const tool = (origin: string): WebMcpToolDescriptor => ({
+    description: 'Does a thing',
+    inputSchema: { properties: {}, type: 'object' },
+    name: 'do_thing',
+    origin,
+    title: 'Do thing',
+  });
+  const discover = (origin: string) => () => Promise.resolve([tool(origin)]);
 
+  it('refuses a tool that names another origin, without asking for a permission it cannot grant', async () => {
+    const result = await run({
+      args: { name: 'do_thing' },
+      authorized: [],
+      readWebMcpTools: discover('https://elsewhere.example.net'),
+      toolName: 'browser_webmcp_call',
+    });
+
+    const failure = failureOf(result);
+
+    // A page-controlled origin is never a permission target: the refusal is blocked, and it names both origins.
+    expect(failure).toMatchObject({
+      error: expect.stringContaining('https://elsewhere.example.net') as unknown,
+      kind: 'blocked',
+    });
+  });
+
+  it('refuses a tool that names no origin', async () => {
+    const result = await run({
+      args: { name: 'do_thing' },
+      readWebMcpTools: discover(''),
+      toolName: 'browser_webmcp_call',
+    });
+
+    expect(failureOf(result)).toStrictEqual({
+      error:
+        'WebMCP tool "do_thing" does not name the origin it belongs to, so the call was refused.',
+      kind: 'blocked',
+    });
+  });
+
+  it('leaves the top-origin act decision untouched for a tool that names the tab’s own origin', async () => {
+    const missing = await run({
+      args: { name: 'do_thing' },
+      authorized: [],
+      readWebMcpTools: discover('https://app.example.com'),
+      toolName: 'browser_webmcp_call',
+    });
+
+    expect(failureOf(missing)).toStrictEqual({
+      items: [{ class: 'act', origin: 'https://app.example.com' }],
+      kind: 'needs_permission',
+    });
+
+    const allowed = await run({
+      args: { name: 'do_thing' },
+      readWebMcpTools: discover('https://app.example.com'),
+      toolName: 'browser_webmcp_call',
+    });
+
+    expect(allowed).toMatchObject({ class: 'act', ok: true, origin: 'https://app.example.com' });
+  });
+
+  it('passes a call the page cannot describe to the handler’s own error', async () => {
+    const result = await run({
+      args: { name: 'do_thing' },
+      readWebMcpTools: () => Promise.resolve(NO_WEB_MCP_TOOLS),
+      toolName: 'browser_webmcp_call',
+    });
+
+    expect(result).toMatchObject({ class: 'act', ok: true });
+  });
+});
+
+describe('origin changed after redirects', () => {
+  const approved = 'https://other.example.com';
+  const landed = 'https://accounts.example.org';
+  const redirected = () => createSession({ mainUrl: `${landed}/login` });
+
+  it('reports the origin a navigation landed on', async () => {
     await expect(
-      postAgentNavigate(createSession({ mainUrl: approved }), approved)
+      postAgentNavigate(createSession({ mainUrl: approved }), approved, [])
     ).resolves.toBeUndefined();
-    await expect(
-      postAgentNavigate(createSession({ mainUrl: 'https://accounts.example.org/login' }), approved)
-    ).resolves.toStrictEqual({
+    await expect(postAgentNavigate(redirected(), approved, [])).resolves.toStrictEqual({
       from: approved,
       kind: 'origin_changed',
-      to: 'https://accounts.example.org',
+      to: landed,
     });
+  });
+
+  it('lets a redirect land on an origin the call may already open or read', async () => {
+    await expect(
+      postAgentNavigate(redirected(), approved, [{ class: 'navigate', origin: landed }])
+    ).resolves.toBeUndefined();
+    await expect(
+      postAgentNavigate(redirected(), approved, [
+        { class: 'read', origin: 'https://*.example.org' },
+      ])
+    ).resolves.toBeUndefined();
+  });
+
+  it('still reports a redirect whose landing origin is granted only to act on', async () => {
+    await expect(
+      postAgentNavigate(redirected(), approved, [{ class: 'act', origin: landed }])
+    ).resolves.toStrictEqual({ from: approved, kind: 'origin_changed', to: landed });
   });
 });
 
@@ -463,6 +889,40 @@ describe('sensitive steps', () => {
     });
   });
 
+  it('refuses typing through a label into the password field it names without a step token', async () => {
+    const label = fixtureElement(
+      '<form><label id="pw-label" for="pw">Password</label><input id="pw" type="password"></form>',
+      'pw-label'
+    );
+
+    const result = await run({
+      args: { target: 'e12', text: 'hunter2' },
+      session: createSession({ probeElements: { 'obj-12': label } }),
+      toolName: 'browser_type',
+    });
+
+    expect(sensitiveOf(result)).toStrictEqual({
+      element: 'e12',
+      origin: 'https://app.example.com',
+      reason: SENSITIVE_REASON.password,
+    });
+  });
+
+  it('lets a label for an ordinary field through without a step token', async () => {
+    const label = fixtureElement(
+      '<label id="email-label" for="email">Email</label><input id="email" type="email">',
+      'email-label'
+    );
+
+    const result = await run({
+      args: { target: 'e12', text: 'ada@example.com' },
+      session: createSession({ probeElements: { 'obj-12': label } }),
+      toolName: 'browser_type',
+    });
+
+    expect(result.ok).toBe(true);
+  });
+
   it('binds the token to the sensitive element, not the first target', async () => {
     const tokens = createStepTokenStore({ now: () => 1000, random: () => 'token-d' });
     const args = {
@@ -496,6 +956,7 @@ describe('sensitive steps', () => {
       element: 'e12',
       origin: 'https://app.example.com',
       reason: SENSITIVE_REASON.password,
+      session: 'session-1',
       tabId: 7,
       toolName: 'browser_fill_form',
     });
@@ -504,7 +965,7 @@ describe('sensitive steps', () => {
       tokens
     );
 
-    expect(allowed).toMatchObject({ ok: true, sensitiveToken: token });
+    expect(allowed).toMatchObject({ ok: true, sensitiveToken: { token } });
 
     const replay = await run(
       { args, session, stepTokens: [token], toolName: 'browser_fill_form' },
@@ -566,6 +1027,59 @@ describe('sensitive steps', () => {
     });
   });
 
+  it('redeems a cross-frame approval with the origin the gate bound, not the call\u2019s', async () => {
+    const tokens = createStepTokenStore({ now: () => 1000, random: () => 'token-f' });
+    const args = {
+      fields: [
+        { name: 'Name', target: 'e11', type: 'textbox', value: 'Igor' },
+        { name: 'Card', target: 'e12', type: 'textbox', value: '4242' },
+      ],
+    };
+    const session = createSession({
+      frameIdForBackendNode: frameIdForTestNode,
+      probeByObject: { 'obj-12': passwordProbe },
+    });
+    const refused = await run({ args, session, toolName: 'browser_fill_form' }, tokens);
+
+    // The step is sensitive, and its refusal labels the element's own frame rather than the call's origin.
+    expect(sensitiveOf(refused)).toStrictEqual({
+      element: 'e12',
+      origin: 'https://pay.example.com',
+      reason: SENSITIVE_REASON.password,
+    });
+
+    // The runtime issues the approval against the element and the origin the refusal reported.
+    const token = tokens.issue({
+      argumentHash: hashBrowserToolArguments(args),
+      element: 'e12',
+      origin: 'https://pay.example.com',
+      reason: SENSITIVE_REASON.password,
+      session: 'session-1',
+      tabId: 7,
+      toolName: 'browser_fill_form',
+    });
+    const allowed = allowedOf(
+      await run({ args, session, stepTokens: [token], toolName: 'browser_fill_form' }, tokens)
+    );
+
+    // The redeemed approval reports the origin it was stored under, so a file approval issued on its retry matches.
+    expect(allowed).toMatchObject({
+      sensitiveToken: { element: 'e12', origin: 'https://pay.example.com', token },
+    });
+    // The call's origin is the first target's frame; the approval stays bound to the sensitive element's.
+    expect([allowed.origin, allowed.sensitiveToken?.origin]).toStrictEqual([
+      'https://app.example.com',
+      'https://pay.example.com',
+    ]);
+
+    const replay = await run(
+      { args, session, stepTokens: [token], toolName: 'browser_fill_form' },
+      tokens
+    );
+
+    expect(replay.ok).toBe(false);
+  });
+
   it('fails closed when the focus chain enters a cross-origin frame', async () => {
     const session = createSession({ focusedNodeName: 'IFRAME' });
     const refusedGrant = await run({
@@ -598,7 +1112,7 @@ describe('sensitive steps', () => {
       args: { target: '#pw' },
       session: createSession({
         probeByObject: { 'obj-5': passwordProbe },
-        selectors: { '#pw': { frameId: 'main', nodeId: 5 } },
+        selectors: { '#pw': { nodeId: 5 } },
       }),
       toolName: 'browser_type',
     });
@@ -620,18 +1134,19 @@ describe('sensitive steps', () => {
     });
   });
 
-  it('asks for the frame origin of a selector inside an iframe', async () => {
+  it('reads a selector in the tab\u2019s own document, never inside a frame', async () => {
     const result = await run({
       args: { target: '#frame-field' },
-      authorized: [{ class: 'act', origin: 'https://app.example.com' }],
+      authorized: [{ class: 'act', origin: 'https://pay.example.com' }],
       session: createSession({
-        selectors: { '#frame-field': { frameId: 'f1', nodeId: 6 } },
+        selectors: { '#frame-field': { nodeId: 6 } },
       }),
       toolName: 'browser_type',
     });
 
+    // `DOM.querySelectorAll` answers from the tab's document root, so a selector can only name a node there.
     expect(failureOf(result)).toStrictEqual({
-      items: [{ class: 'act', frame: true, origin: 'https://pay.example.com' }],
+      items: [{ class: 'act', origin: 'https://app.example.com' }],
       kind: 'needs_permission',
     });
   });
@@ -641,7 +1156,7 @@ describe('sensitive steps', () => {
       args: { element: 'button', target: '#unique' },
       session: createSession({
         ambiguousSelectors: { button: 3 },
-        selectors: { '#unique': { frameId: 'main', nodeId: 7 } },
+        selectors: { '#unique': { nodeId: 7 } },
       }),
       toolName: 'browser_click',
     });
@@ -680,6 +1195,19 @@ describe('sensitive steps', () => {
     });
     // A call that cannot run never becomes a permission ask.
     expect(failureOf(result)).not.toHaveProperty('items');
+  });
+
+  it('answers a stale ref with the tool error instead of a sensitive-step ask', async () => {
+    const result = await run({
+      args: { element: 'the Click me button', target: 'e1' },
+      session: createSession({ unknownRefs: ['e1'] }),
+      toolName: 'browser_click',
+    });
+
+    expect(result).toStrictEqual({
+      failure: { error: STALE_REF_ERROR, kind: 'blocked' },
+      ok: false,
+    });
   });
 
   it('counts a selector that resolves nothing as sensitive', async () => {
@@ -796,6 +1324,7 @@ describe('sensitive steps', () => {
       element: 'e12',
       origin: 'https://app.example.com',
       reason: SENSITIVE_REASON.password,
+      session: 'session-1',
       tabId: 7,
       toolName: 'browser_type',
     });
@@ -805,7 +1334,7 @@ describe('sensitive steps', () => {
       tokens
     );
 
-    expect(result).toMatchObject({ ok: true, sensitiveToken: token });
+    expect(result).toMatchObject({ ok: true, sensitiveToken: { token } });
 
     const replay = await run(
       { args, probe: passwordProbe, stepTokens: [token], toolName: 'browser_type' },
@@ -822,6 +1351,7 @@ describe('sensitive steps', () => {
       element: 'e12',
       origin: 'https://app.example.com',
       reason: SENSITIVE_REASON.password,
+      session: 'session-1',
       tabId: 7,
       toolName: 'browser_type',
     });
@@ -864,6 +1394,42 @@ describe('sensitive steps', () => {
     expect(sensitiveReasonOf(result)).toBe(SENSITIVE_REASON.oauthConsent);
   });
 
+  it('does not judge a frame target by the top page when this read no longer knows its frame', async () => {
+    const frames = [
+      { id: 'main', origin: 'https://app.example.com', url: 'https://app.example.com/' },
+      {
+        id: 'f1',
+        origin: 'https://pay.example.com',
+        parentId: 'main',
+        url: 'https://pay.example.com/login/oauth/authorize',
+      },
+    ];
+    // The first read resolves the target's frame; the read before the action no longer lists it.
+    const reads = [frames, frames.slice(0, 1)];
+    const result = await run({
+      args: { target: 'e12' },
+      readFrames: async () => ({
+        childSessions: new Map(),
+        complete: true,
+        frames: reads.splice(0, 1).flat(),
+      }),
+      session: createSession({
+        nestedFrames: [
+          {
+            frameId: 'f1',
+            ownerBackendNodeId: 12,
+            securityOrigin: 'https://pay.example.com',
+            url: 'https://pay.example.com/login/oauth/authorize',
+          },
+        ],
+        targetNodeName: 'IFRAME',
+      }),
+      toolName: 'browser_click',
+    });
+
+    expect(sensitiveReasonOf(result)).toBe(SENSITIVE_REASON.frameUnverified);
+  });
+
   it('classifies a file upload as sensitive', async () => {
     const result = await run({
       args: { paths: ['/tmp/receipt.pdf'] },
@@ -871,6 +1437,113 @@ describe('sensitive steps', () => {
     });
 
     expect(sensitiveReasonOf(result)).toBe(SENSITIVE_REASON.fileUpload);
+  });
+
+  it('classifies a drop that hands the page local paths as sensitive, and allows the bound retry', async () => {
+    const tokens = createStepTokenStore({ now: () => 1000, random: () => 'token-d' });
+    const args = { paths: ['/tmp/receipt.pdf'], target: 'e1' };
+
+    const result = await run({ args, stepTokens: [], toolName: 'browser_drop' }, tokens);
+
+    expect(sensitiveReasonOf(result)).toBe(SENSITIVE_REASON.fileUpload);
+
+    const token = tokens.issue({
+      argumentHash: hashBrowserToolArguments(args),
+      origin: 'https://app.example.com',
+      reason: SENSITIVE_REASON.fileUpload,
+      session: 'session-1',
+      tabId: 7,
+      toolName: 'browser_drop',
+    });
+    const allowed = await run({ args, stepTokens: [token], toolName: 'browser_drop' }, tokens);
+
+    // The step names no file, so its approval buys the step alone.
+    expect(allowed).toMatchObject({ ok: true, sensitiveToken: { token } });
+  });
+
+  it('refuses a drop retry that hands the page a different file', async () => {
+    const tokens = createStepTokenStore({ now: () => 1000, random: () => 'token-e' });
+    const approved = { paths: ['/tmp/receipt.pdf'], target: 'e1' };
+    const token = tokens.issue({
+      argumentHash: hashBrowserToolArguments(approved),
+      origin: 'https://app.example.com',
+      reason: SENSITIVE_REASON.fileUpload,
+      session: 'session-1',
+      tabId: 7,
+      toolName: 'browser_drop',
+    });
+    const result = await run(
+      {
+        args: { paths: ['/tmp/other.pdf'], target: 'e1' },
+        stepTokens: [token],
+        toolName: 'browser_drop',
+      },
+      tokens
+    );
+
+    expect(sensitiveReasonOf(result)).toBe(SENSITIVE_REASON.fileUpload);
+  });
+
+  it('allows a drop that carries page-made data with no approval', async () => {
+    const result = await run({
+      args: { data: { 'text/plain': 'x' }, target: 'e1' },
+      toolName: 'browser_drop',
+    });
+
+    expect(result).toMatchObject({ class: 'act', ok: true });
+    expect(result).not.toHaveProperty('sensitiveToken');
+  });
+
+  it('hands the redeemed approval its one file back with the sensitive step', async () => {
+    const tokens = createStepTokenStore({ now: () => 1000, random: () => 'token-f' });
+    const args = { target: 'e12', text: 'hunter2' };
+    const need = {
+      kind: 'exact' as const,
+      tabId: 7,
+      url: 'https://app.example.com/invoice.pdf',
+    };
+    const token = tokens.issue({
+      argumentHash: hashBrowserToolArguments(args),
+      element: 'e12',
+      need,
+      origin: 'https://app.example.com',
+      reason: SENSITIVE_REASON.password,
+      session: 'session-1',
+      tabId: 7,
+      toolName: 'browser_type',
+    });
+
+    const result = await run(
+      { args, probe: passwordProbe, stepTokens: [token], toolName: 'browser_type' },
+      tokens
+    );
+
+    expect(result).toMatchObject({ ok: true, sensitiveToken: { element: 'e12', need, token } });
+  });
+
+  it('hands back the reason a redeemed approval was issued for', async () => {
+    const tokens = createStepTokenStore({ now: () => 1000, random: () => 'token-g' });
+    const args = { target: 'e12', text: 'hunter2' };
+    const token = tokens.issue({
+      argumentHash: hashBrowserToolArguments(args),
+      element: 'e12',
+      origin: 'https://app.example.com',
+      reason: SENSITIVE_REASON.download,
+      session: 'session-1',
+      tabId: 7,
+      toolName: 'browser_type',
+    });
+
+    const result = await run(
+      { args, probe: passwordProbe, stepTokens: [token], toolName: 'browser_type' },
+      tokens
+    );
+
+    // The runtime reads this to tell a download's own approval from one that buys only its step.
+    expect(result).toMatchObject({
+      ok: true,
+      sensitiveToken: { reason: SENSITIVE_REASON.download },
+    });
   });
 
   it('leaves an ordinary text field alone', async () => {
@@ -881,5 +1554,146 @@ describe('sensitive steps', () => {
     });
 
     expect(result.ok).toBe(true);
+  });
+});
+
+describe('script calls', () => {
+  it('refuses browser_evaluate when a readable frame holds a protected field', async () => {
+    const result = await run({
+      session: createSession({ presentFieldFrames: ['main'] }),
+      toolName: 'browser_evaluate',
+    });
+
+    expect(failureOf(result)).toStrictEqual({
+      items: [
+        { class: 'sensitive', origin: 'https://app.example.com', reason: SENSITIVE_REASON.script },
+      ],
+      kind: 'needs_permission',
+    });
+    expect(sensitiveReasonOf(result)).toBe(SENSITIVE_REASON.script);
+  });
+
+  it('runs browser_evaluate when no readable frame holds a protected field', async () => {
+    const result = await run({ toolName: 'browser_evaluate' });
+
+    expect(result).toMatchObject({ class: 'act', ok: true });
+  });
+
+  it('classifies a readable cross-origin frame that holds a card field', async () => {
+    const result = await run({
+      session: createSession({ presentFieldFrames: ['f1'] }),
+      toolName: 'browser_run_code_unsafe',
+    });
+
+    expect(sensitiveReasonOf(result)).toBe(SENSITIVE_REASON.script);
+  });
+
+  it('ignores a frame the CLI may not read', async () => {
+    const result = await run({
+      authorized: [
+        { class: 'act', origin: 'https://app.example.com' },
+        { class: 'read', origin: 'https://app.example.com' },
+      ],
+      session: createSession({ presentFieldFrames: ['f1'] }),
+      toolName: 'browser_evaluate',
+    });
+
+    expect(result).toMatchObject({ ok: true });
+  });
+
+  it('fails closed when a readable frame cannot be inspected', async () => {
+    const result = await run({
+      session: createSession({ fieldProbeFailureFrames: ['main'] }),
+      toolName: 'browser_evaluate',
+    });
+
+    expect(sensitiveReasonOf(result)).toBe(SENSITIVE_REASON.scriptUnverified);
+  });
+
+  it('refuses a page-registered tool call when a readable frame holds a protected field', async () => {
+    const result = await run({
+      args: { name: 'pay' },
+      session: createSession({ presentFieldFrames: ['main'] }),
+      toolName: 'browser_webmcp_call',
+    });
+
+    expect(failureOf(result)).toStrictEqual({
+      items: [
+        { class: 'sensitive', origin: 'https://app.example.com', reason: SENSITIVE_REASON.script },
+      ],
+      kind: 'needs_permission',
+    });
+    expect(sensitiveReasonOf(result)).toBe(SENSITIVE_REASON.script);
+  });
+
+  it('runs a page-registered tool call when no readable frame holds a protected field', async () => {
+    const result = await run({
+      args: { name: 'pay' },
+      session: createSession({}),
+      toolName: 'browser_webmcp_call',
+    });
+
+    expect(allowedOf(result)).toMatchObject({
+      class: 'act',
+      ok: true,
+      origin: 'https://app.example.com',
+    });
+    expect(sensitiveOf(result)).toBeUndefined();
+  });
+
+  it('fails closed on a page-registered tool call when a readable frame cannot be inspected', async () => {
+    const result = await run({
+      args: { name: 'pay' },
+      authorized: [
+        { class: 'act', origin: 'https://app.example.com' },
+        { class: 'read', origin: 'https://app.example.com' },
+        { class: 'read', origin: 'https://pay.example.com' },
+      ],
+      session: createSession({ fieldProbeFailureFrames: ['f1'] }),
+      toolName: 'browser_webmcp_call',
+    });
+
+    expect(sensitiveReasonOf(result)).toBe(SENSITIVE_REASON.scriptUnverified);
+  });
+
+  it('probes the tab origin for a page-registered tool call granted only on the tab origin', async () => {
+    const result = await run({
+      args: { name: 'pay' },
+      authorized: [
+        { class: 'act', origin: 'https://app.example.com' },
+        { class: 'read', origin: 'https://app.example.com' },
+      ],
+      session: createSession({ presentFieldFrames: ['main'] }),
+      toolName: 'browser_webmcp_call',
+    });
+
+    expect(sensitiveReasonOf(result)).toBe(SENSITIVE_REASON.script);
+  });
+
+  it('allows the retry that carries the token bound to the script call', async () => {
+    const tokens = createStepTokenStore({ now: () => 1000, random: () => 'token-s' });
+    const args = { function: '() => document.body.innerText' };
+    const token = tokens.issue({
+      argumentHash: hashBrowserToolArguments(args),
+      origin: 'https://app.example.com',
+      reason: SENSITIVE_REASON.script,
+      session: 'session-1',
+      tabId: 7,
+      toolName: 'browser_evaluate',
+    });
+    const session = createSession({ presentFieldFrames: ['main'] });
+    const result = await run(
+      { args, session, stepTokens: [token], toolName: 'browser_evaluate' },
+      tokens
+    );
+
+    expect(result).toMatchObject({ ok: true, sensitiveToken: { token } });
+
+    const replay = await run(
+      { args, session, stepTokens: [token], toolName: 'browser_evaluate' },
+      tokens
+    );
+
+    expect(replay.ok).toBe(false);
   });
 });

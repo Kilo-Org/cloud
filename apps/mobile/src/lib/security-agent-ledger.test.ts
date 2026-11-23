@@ -6,6 +6,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { i18n } from '@/i18n';
+import { SECURITY_ANALYSIS_REJECTED_MESSAGE } from '@kilocode/app-shared/security-agent';
 import {
   isSecurityTrialRefusal,
   isSecurityTrialRefusalCopyKey,
@@ -123,6 +124,13 @@ describe('localizedSecurityMarkerMessage with the reader role', () => {
 
   it('stays null for a failure no catalog explains', () => {
     expect(localizedSecurityMarkerMessage(new Error('Network request failed'), true)).toBeNull();
+  });
+
+  it('translates the analysis rejection marker instead of showing the raw English', () => {
+    const copy = localizedSecurityMarkerMessage(new Error(SECURITY_ANALYSIS_REJECTED_MESSAGE));
+
+    expect(copy).toBe(i18n.t('securityAgent.mutations.actionBlocked'));
+    expect(copy).not.toBe(SECURITY_ANALYSIS_REJECTED_MESSAGE);
   });
 });
 

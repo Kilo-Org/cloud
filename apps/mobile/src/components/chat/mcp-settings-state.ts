@@ -2,7 +2,12 @@ import { type KiloMcpState } from '@/lib/chat/kilo-mcp';
 import { type ChatFlag, chatFlagBehind, chatFlagValueOf } from '@/lib/chat/chat-flag';
 import { type RemoteMcpServerState } from '@/lib/chat/remote-mcp-state';
 import { type RemoteMcpServerDraft, type StoredRemoteMcpServer } from '@/lib/chat/remote-mcp-store';
-import { normalizeRemoteMcpUrl } from '@/lib/chat/remote-mcp-url';
+import {
+  normalizeRemoteMcpUrl,
+  REMOTE_MCP_URL_ERROR_KEYS,
+  RemoteMcpUrlError,
+  type RemoteMcpUrlProblem,
+} from '@/lib/chat/remote-mcp-url';
 
 /**
  * What the Kilo MCP control shows, from the connection and the chat's setting.
@@ -165,7 +170,7 @@ export function mcpSettingsView(state: KiloMcpState, flag: ChatFlag): McpSetting
         statusKey: 'modelChat.mcp.none',
         descriptionKey: 'modelChat.mcp.noneDescription',
         toolCount: 0,
-        retry: false,
+        retry: true,
         busy: false,
         tone: 'warn',
       };
@@ -334,7 +339,7 @@ export function kiloServerRow(view: McpSettingsView): KiloMcpServerRow {
 }
 
 /** The copy a server form shows under a field it cannot save yet. */
-type McpFormErrorKey = 'common.required' | 'modelChat.mcp.fieldUrlInvalid';
+type McpFormErrorKey = 'common.required' | (typeof REMOTE_MCP_URL_ERROR_KEYS)[RemoteMcpUrlProblem];
 
 /** Why a draft cannot be saved, per field. A field that is fine is absent. */
 export type McpServerFormErrors = {
@@ -351,8 +356,11 @@ function urlErrorFor(url: string): McpFormErrorKey | undefined {
   try {
     normalizeRemoteMcpUrl(url);
     return undefined;
-  } catch {
-    return 'modelChat.mcp.fieldUrlInvalid';
+  } catch (error) {
+    // Only the normalizer's own refusal names a problem; anything else is unparsed.
+    return error instanceof RemoteMcpUrlError
+      ? REMOTE_MCP_URL_ERROR_KEYS[error.problem]
+      : 'modelChat.mcp.fieldUrlInvalid';
   }
 }
 

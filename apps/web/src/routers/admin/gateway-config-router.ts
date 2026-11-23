@@ -3,16 +3,25 @@ import {
   GatewayConfigSchema,
   GatewayConfigInputSchema,
   DEFAULT_GATEWAY_CONFIG,
-  OrganizationFeaturesInputSchema,
+  OrganizationFeaturesCompatibleInputSchema,
+  AnthropicUserProfilesSettingsInputSchema,
+  GatewayAnthropicUserProfilesConfigSchema,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
 import type {
+  AnthropicUserProfilesSettings,
   GatewayConfig,
   OrganizationFeatures,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
 import { readOrganizationFeatures } from '@kilocode/web-shared/lib/ai-gateway/organization-features';
-import { ai_gateway_config, organizations } from '@kilocode/db/schema';
+import { readAnthropicUserProfilesSettings } from '@kilocode/web-shared/lib/ai-gateway/anthropic-user-profiles/settings';
+import {
+  ai_gateway_config,
+  anthropic_user_profile_deletions,
+  organizations,
+} from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { eq, inArray, sql } from 'drizzle-orm';
+import { TRPCError } from '@trpc/server';
+import { desc, eq, gte, inArray, isNull, or, sql } from 'drizzle-orm';
 
 async function readConfig(): Promise<GatewayConfig> {
   try {
@@ -61,9 +70,9 @@ export const adminGatewayConfigRouter = createTRPCRouter({
   }),
 
   previewOrganizationFeatures: adminProcedure
-    .input(OrganizationFeaturesInputSchema)
+    .input(OrganizationFeaturesCompatibleInputSchema)
     .query(async ({ input }) => {
-      const organizationIds = [...new Set(Object.values(input).flat())];
+      const organizationIds = [...new Set(Object.values(input).flatMap(ids => ids ?? []))];
       if (organizationIds.length === 0) return [];
 
       const rows = await db
@@ -83,10 +92,72 @@ export const adminGatewayConfigRouter = createTRPCRouter({
     }),
 
   setOrganizationFeatures: adminProcedure
-    .input(OrganizationFeaturesInputSchema)
+    .input(OrganizationFeaturesCompatibleInputSchema)
     .mutation(async ({ input }) => {
-      const organization_features: OrganizationFeatures = input;
+      const orgPermissionPolicy =
+        input.org_permission_policy ?? (await readOrganizationFeatures(db)).org_permission_policy;
+      const organization_features: OrganizationFeatures = {
+        experimental_byok: input.experimental_byok,
+        enkrypt_output_guardrail: input.enkrypt_output_guardrail,
+        gateway_settings: input.gateway_settings,
+        org_permission_policy: orgPermissionPolicy,
+      };
       await mergeIntoConfig({ organization_features });
       return organization_features;
     }),
+
+  getAnthropicUserProfiles: adminProcedure.query(async () => {
+    return readAnthropicUserProfilesSettings(db);
+  }),
+
+  setAnthropicUserProfiles: adminProcedure
+    .input(AnthropicUserProfilesSettingsInputSchema)
+    .mutation(async ({ input }) => {
+      const anthropic_user_profiles: AnthropicUserProfilesSettings = {
+        ...input,
+        revision: input.revision + 1,
+      };
+      await db.transaction(async tx => {
+        await tx.insert(ai_gateway_config).values({ id: 1 }).onConflictDoNothing();
+        const [row] = await tx
+          .select({ config: ai_gateway_config.config })
+          .from(ai_gateway_config)
+          .where(eq(ai_gateway_config.id, 1))
+          .for('update');
+        const current = GatewayAnthropicUserProfilesConfigSchema.parse(
+          row?.config ?? {}
+        ).anthropic_user_profiles;
+        if (current.revision !== input.revision) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message:
+              'The settings changed since you loaded them. Reload and apply your change again.',
+          });
+        }
+        await tx
+          .update(ai_gateway_config)
+          .set({
+            config: sql`${ai_gateway_config.config} || ${JSON.stringify({ anthropic_user_profiles })}::jsonb`,
+          })
+          .where(eq(ai_gateway_config.id, 1));
+      });
+      return anthropic_user_profiles;
+    }),
+
+  listAnthropicUserProfileDeletions: adminProcedure.query(async () => {
+    return db
+      .select()
+      .from(anthropic_user_profile_deletions)
+      .where(
+        or(
+          isNull(anthropic_user_profile_deletions.deleted_at),
+          gte(anthropic_user_profile_deletions.deleted_at, sql`now() - interval '30 days'`)
+        )
+      )
+      .orderBy(
+        sql`${anthropic_user_profile_deletions.deleted_at} desc nulls first`,
+        desc(anthropic_user_profile_deletions.queued_at)
+      )
+      .limit(500);
+  }),
 });

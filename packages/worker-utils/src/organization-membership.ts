@@ -44,14 +44,14 @@ export type OrganizationMembershipColumns = {
 };
 
 /** The organization is live: an "active" decision ignores soft-deleted rows. */
-function liveOrganizationCondition(organization: OrganizationColumns): SQL {
+export function liveOrganizationCondition(organization: OrganizationColumns): SQL {
   return isNull(organization.deleted_at);
 }
 
 /** The caller holds a membership row in the organization. */
 function membershipCondition(
   membership: OrganizationMembershipColumns,
-  organizationIdColumn: OrganizationIdColumn,
+  organizationIdColumn: string | AnyPgColumn,
   kiloUserId: string | AnyPgColumn
 ): SQL {
   return (
@@ -91,13 +91,18 @@ export function inheritedParentMembershipJoinCondition(
 /**
  * Join condition for the caller's membership in the row's organization.
  * Pair it with {@link activeOrganizationJoinCondition} so a soft-deleted
- * organization cannot satisfy the membership join.
+ * organization cannot satisfy the membership join. Both parameters admit a
+ * column, so the names state which role each one plays.
  */
-export function organizationMembershipJoinCondition(
-  kiloUserId: string | AnyPgColumn,
-  organizationIdColumn: OrganizationIdColumn
-): SQL {
-  return membershipCondition(organization_memberships, organizationIdColumn, kiloUserId);
+export function organizationMembershipJoinCondition(params: {
+  kiloUserId: string | AnyPgColumn;
+  organizationIdColumn: OrganizationIdColumn;
+}): SQL {
+  return membershipCondition(
+    organization_memberships,
+    params.organizationIdColumn,
+    params.kiloUserId
+  );
 }
 
 /**
@@ -110,6 +115,20 @@ export function activeOrganizationJoinCondition(organizationIdColumn: Organizati
     and(eq(organizations.id, organizationIdColumn), liveOrganizationCondition(organizations)) ??
     sql`false`
   );
+}
+
+/**
+ * Equality filters for the caller's own membership in a given organization,
+ * for a `.where()` clause rather than a join. {@link organizationMembershipJoinCondition}
+ * builds the same predicate against a column; both delegate to one definition.
+ * The arguments are named because both are strings: a swapped call would still
+ * compile.
+ */
+export function directOrganizationMembershipCondition(params: {
+  organizationId: string;
+  kiloUserId: string;
+}): SQL {
+  return membershipCondition(organization_memberships, params.organizationId, params.kiloUserId);
 }
 
 /**
@@ -243,10 +262,10 @@ export function organizationAccessQuery(
       activeOrganizationJoinCondition(organization_memberships.organization_id)
     )
     .where(
-      and(
-        eq(organization_memberships.organization_id, params.organizationId),
-        eq(organization_memberships.kilo_user_id, params.kiloUserId)
-      )
+      directOrganizationMembershipCondition({
+        organizationId: params.organizationId,
+        kiloUserId: params.kiloUserId,
+      })
     )
     .limit(1);
 }
@@ -280,7 +299,10 @@ export async function hasOrganizationAccess(
  * its live parent organization, then {@link ORGANIZATION_ROLE_PRIORITY} picks
  * the stronger of the two. A caller with no membership yields `null`.
  * {@link activeOrganizationAccessSql} holds the same conditions in predicate
- * form.
+ * form. This role is the role for reads: every direct role qualifies, and an
+ * inherited parent role qualifies when it is listed in
+ * {@link ORGANIZATION_PARENT_ACCESS_ROLES}. Runtime delegation and
+ * organization-scoped session creation define their own role sets.
  */
 export async function findEffectiveOrganizationMemberRole(
   db: OrganizationMembershipDb,
@@ -294,14 +316,19 @@ export async function findEffectiveOrganizationMemberRole(
     .from(organizations)
     .leftJoin(
       organization_memberships,
-      organizationMembershipJoinCondition(params.kiloUserId, organizations.id)
+      organizationMembershipJoinCondition({
+        kiloUserId: params.kiloUserId,
+        organizationIdColumn: organizations.id,
+      })
     )
     .leftJoin(parentOrganizationsTable, parentOrganizationJoinCondition())
     .leftJoin(
       parentOrganizationMembershipsTable,
       parentOrganizationMembershipJoinCondition(params.kiloUserId)
     )
-    .where(and(eq(organizations.id, params.organizationId), isNull(organizations.deleted_at)))
+    .where(
+      and(eq(organizations.id, params.organizationId), liveOrganizationCondition(organizations))
+    )
     .limit(1);
 
   const row = rows[0];
@@ -314,9 +341,23 @@ export async function findEffectiveOrganizationMemberRole(
 /**
  * True when the user may act for the organization through any membership the
  * read paths honour: a direct membership in the live organization, or a
- * permitted role in its live parent organization. Session reads gate on
- * {@link activeOrganizationAccessSql}, so a user who can read a session in an
- * organization can also create one there.
+ * permitted role in its live parent organization. Read predicates gate on
+ * {@link activeOrganizationAccessSql}. They accept a direct membership of any
+ * role, and an inherited parent role from
+ * {@link ORGANIZATION_PARENT_ACCESS_ROLES}.
+ *
+ * Read access, organization-scoped session creation, and runtime delegation
+ * each define their own role set:
+ * - Reads: every direct role, plus the inherited parent roles above.
+ * - Organization-scoped session creation:
+ *   `assertOrganizationMembership` in
+ *   `services/cloud-agent-next/src/router/handlers/organization-membership.ts`
+ *   requires a direct membership in the organization, whatever its role. The
+ *   Discord bot session surface in
+ *   `apps/web/src/lib/discord-bot/discord-session-authorization.ts` also
+ *   accepts an inherited parent `owner` or `admin`.
+ * - Runtime delegation: a direct membership whose role is `owner`, `admin` or
+ *   `member`, the enum beside `membershipRole` in `./runtime-authorization.ts`.
  */
 export async function hasEffectiveOrganizationAccess(
   db: OrganizationMembershipDb,

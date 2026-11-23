@@ -17,12 +17,22 @@ const SCHEMA_SQL = `
     status TEXT NOT NULL,
     run_id TEXT,
     failure_reason TEXT,
+    failure_class TEXT,
+    failure_attempts INTEGER NOT NULL DEFAULT 0,
+    model_failure_attempts INTEGER NOT NULL DEFAULT 0,
+    first_failed_at TEXT,
+    retry_after TEXT,
     requested_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     completed_at TEXT,
     platform_requested INTEGER NOT NULL DEFAULT 0,
     user_requested INTEGER NOT NULL DEFAULT 1,
     PRIMARY KEY (model, variant, engine_identity, repetitions)
+  );
+  CREATE TABLE scheduler_dispatch_lock (
+    id INTEGER PRIMARY KEY NOT NULL,
+    token TEXT,
+    lease_until INTEGER NOT NULL DEFAULT 0
   );
 `;
 
@@ -105,7 +115,7 @@ describe('markProfilesReadyForRunStatement (real SQLite)', () => {
   it('transitions running rows owned by this run_id to ready', () => {
     insertProfile(db, { model: 'm/owned', status: 'running', run_id: 'run-old' });
 
-    runQuery(db, toSql(markProfilesReadyForRunStatement(orm, 'run-old', now)));
+    runQuery(db, toSql(markProfilesReadyForRunStatement(orm, 'run-old', now, 0)));
 
     expect(allProfiles(db)).toEqual([
       {
@@ -129,7 +139,7 @@ describe('markProfilesReadyForRunStatement (real SQLite)', () => {
       updated_at: '2026-07-28T11:00:00.000Z',
     });
 
-    runQuery(db, toSql(markProfilesReadyForRunStatement(orm, 'run-old', now)));
+    runQuery(db, toSql(markProfilesReadyForRunStatement(orm, 'run-old', now, 0)));
 
     expect(allProfiles(db)).toEqual([
       {
@@ -150,7 +160,7 @@ describe('markProfilesReadyForRunStatement (real SQLite)', () => {
       completed_at: '2026-07-28T09:00:00.000Z',
     });
 
-    runQuery(db, toSql(markProfilesReadyForRunStatement(orm, 'run-other', now)));
+    runQuery(db, toSql(markProfilesReadyForRunStatement(orm, 'run-other', now, 0)));
 
     expect(allProfiles(db)).toEqual([
       {
@@ -177,7 +187,17 @@ describe('markProfilesFailedForRunStatement (real SQLite)', () => {
   it('transitions running rows owned by this run_id to failed', () => {
     insertProfile(db, { model: 'm/owned', status: 'running', run_id: 'run-old' });
 
-    runQuery(db, toSql(markProfilesFailedForRunStatement(orm, 'run-old', 'enqueue failed', now)));
+    runQuery(
+      db,
+      toSql(
+        markProfilesFailedForRunStatement(
+          orm,
+          'run-old',
+          { failureClass: 'run_init_failed', reason: 'enqueue failed' },
+          now
+        )
+      )
+    );
 
     expect(allProfiles(db)).toEqual([
       {
@@ -199,7 +219,17 @@ describe('markProfilesFailedForRunStatement (real SQLite)', () => {
       updated_at: '2026-07-28T11:00:00.000Z',
     });
 
-    runQuery(db, toSql(markProfilesFailedForRunStatement(orm, 'run-old', 'boom', now)));
+    runQuery(
+      db,
+      toSql(
+        markProfilesFailedForRunStatement(
+          orm,
+          'run-old',
+          { failureClass: 'unknown', reason: 'boom' },
+          now
+        )
+      )
+    );
 
     expect(allProfiles(db)).toEqual([
       {
@@ -220,7 +250,17 @@ describe('markProfilesFailedForRunStatement (real SQLite)', () => {
       completed_at: '2026-07-28T09:00:00.000Z',
     });
 
-    runQuery(db, toSql(markProfilesFailedForRunStatement(orm, 'run-other', 'late fail', now)));
+    runQuery(
+      db,
+      toSql(
+        markProfilesFailedForRunStatement(
+          orm,
+          'run-other',
+          { failureClass: 'unknown', reason: 'late fail' },
+          now
+        )
+      )
+    );
 
     expect(allProfiles(db)).toEqual([
       {
@@ -249,7 +289,17 @@ describe('markProfilesFailedForRunStatement (real SQLite)', () => {
     });
     insertProfile(db, { model: 'm/d', status: 'running', run_id: 'run-other' });
 
-    runQuery(db, toSql(markProfilesFailedForRunStatement(orm, 'run-old', 'timeout', now)));
+    runQuery(
+      db,
+      toSql(
+        markProfilesFailedForRunStatement(
+          orm,
+          'run-old',
+          { failureClass: 'run_timed_out', reason: 'timeout' },
+          now
+        )
+      )
+    );
 
     expect(allProfiles(db)).toEqual([
       {

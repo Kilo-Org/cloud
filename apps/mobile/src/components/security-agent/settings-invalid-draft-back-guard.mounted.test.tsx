@@ -23,7 +23,13 @@ const config = vi.hoisted(() => ({
 const save = vi.hoisted(() => ({ mutateAsync: vi.fn(), isPending: false }));
 const trackInteraction = vi.hoisted(() => ({ mutate: vi.fn() }));
 const router = vi.hoisted(() => ({ replace: vi.fn(), back: vi.fn(), push: vi.fn() }));
-const navigation = vi.hoisted(() => ({ dispatch: vi.fn(), goBack: vi.fn() }));
+const navigation = vi.hoisted(() => ({
+  dispatch: vi.fn(),
+  goBack: vi.fn(),
+  // `useSettledReplace` hears the navigator's transition events; every config
+  // here is enabled, so the bounce never dispatches.
+  addListener: () => () => undefined,
+}));
 const preventRemove = vi.hoisted(() => ({
   enabled: false,
   handler: undefined as
@@ -52,7 +58,19 @@ const confirmDialog = vi.hoisted(() => ({
 // The guard is under test end to end: this suite keeps the real
 // useSettingsBackGuard / useConfirmDialog and the real getSettingsDirtyState,
 // and stubs only the native surfaces they render through.
-vi.mock('react-native', () => ({ View: 'View', Alert: { alert: vi.fn() } }));
+vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
+vi.mock('@/components/ui/icons', () => ({
+  Bell: 'Bell',
+  Check: 'Check',
+  Clock: 'Clock',
+  Clock3: 'Clock3',
+  ShieldCheck: 'ShieldCheck',
+}));
+vi.mock('react-native', () => ({
+  View: 'View',
+  Alert: { alert: vi.fn() },
+  Platform: { OS: 'android' },
+}));
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
   useCommittedConnectivityStatus: () => 'online',
 }));
@@ -131,7 +149,7 @@ vi.mock('@/components/security-agent/settings-pill-group', () => ({ PillGroup: '
 vi.mock('@/components/security-agent/settings-save-button', () => ({
   SettingsSaveButton: 'SettingsSaveButton',
 }));
-vi.mock('@/components/security-agent/settings-toggle-row', () => ({ ToggleRow: 'ToggleRow' }));
+vi.mock('@/components/ui/preference-row', () => ({ PreferenceRow: 'ToggleRow' }));
 
 const mounted: TestRenderer.ReactTestRenderer[] = [];
 

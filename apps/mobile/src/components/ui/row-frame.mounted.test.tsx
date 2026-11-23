@@ -1,0 +1,379 @@
+/* eslint-disable typescript-eslint/no-deprecated -- DOM-free mounted React Native layout regression tests. */
+import { type ComponentProps, createElement } from 'react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { act, TestRenderer } from '@/test/renderer';
+import { compiledDimensions, compiledLengthDp } from '@/test/native-dimensions';
+
+import {
+  ROW_FRAME_CONTENT_DP,
+  ROW_FRAME_CONTENT_PRESS_CLASS,
+  ROW_TARGET_CLASS,
+  rowTargetHostClass,
+  textActionTargetDp,
+} from '@/lib/a11y/tap-target';
+
+import { ROW_FRAME_CLASS, ROW_FRAME_STACK_CLASS, RowFrame } from './row-frame';
+
+vi.mock('@/lib/haptics', () => ({ selectionHaptic: vi.fn() }));
+vi.mock('react-native', () => ({
+  Platform: { OS: 'android' },
+  Pressable: 'Pressable',
+  View: 'View',
+}));
+vi.mock('@/components/ui/icon-tile', () => ({ IconTile: 'IconTile' }));
+vi.mock('@/components/ui/row-check', () => ({ RowCheck: 'RowCheck' }));
+vi.mock('@/components/ui/row-chevron', () => ({ RowChevron: 'RowChevron' }));
+vi.mock('@/components/ui/switch', () => ({ Switch: 'Switch' }));
+vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ mutedForeground: '#8A8680', foreground: '#111111' }),
+}));
+
+type Props = ComponentProps<typeof RowFrame>;
+
+let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
+
+function renderFrame(props: Props) {
+  act(() => {
+    const element = createElement(RowFrame, props);
+    if (renderer) {
+      renderer.update(element);
+    } else {
+      renderer = TestRenderer.create(element);
+    }
+  });
+  if (!renderer) {
+    throw new Error('Missing RowFrame renderer');
+  }
+  return renderer.root;
+}
+
+function classesOf(node: TestRenderer.ReactTestInstance): string[] {
+  return String(node.props.className ?? '').split(' ');
+}
+
+/** The row's outermost element, which carries the frame geometry. */
+function frameOf(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
+  return root.find(
+    node => typeof node.props.className === 'string' && classesOf(node).includes('min-h-[48px]')
+  );
+}
+
+function pressableOf(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
+  return root.find(node => Object.is(node.type, 'Pressable'));
+}
+
+function textOf(root: TestRenderer.ReactTestInstance, content: string) {
+  return root.find(node => Object.is(node.type, 'Text') && node.children.includes(content));
+}
+
+beforeEach(() => {
+  (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+});
+afterEach(() => {
+  act(() => renderer?.unmount());
+  renderer = undefined;
+});
+
+describe('RowFrame geometry', () => {
+  it('owns the one row geometry', () => {
+    const classes = classesOf(frameOf(renderFrame({ title: 'General' })));
+
+    expect(classes).toEqual(
+      expect.arrayContaining(['min-h-[48px]', 'flex-row', 'items-center', 'gap-3', 'px-4', 'py-3'])
+    );
+    expect(ROW_FRAME_CLASS.split(' ')).toEqual(
+      expect.arrayContaining(['min-h-[48px]', 'px-4', 'py-3'])
+    );
+  });
+
+  it('derives the row’s content band from its frame and padding', async () => {
+    // `ROW_FRAME_CONTENT_DP` is what a placeholder and an overhang cancel
+    // derive from, so it has to equal the compiled frame less the compiled
+    // padding the row renders, not a hand-counted 27.
+    const frame = await compiledLengthDp(ROW_FRAME_CLASS, 'minHeight');
+    expect(frame - 2 * (await compiledLengthDp('py-3', 'paddingBlock'))).toBe(ROW_FRAME_CONTENT_DP);
+  });
+
+  it('gives a static row no pressable and no interactive state', () => {
+    const root = renderFrame({ title: 'General', testID: 'static-row' });
+
+    expect(root.findAllByType('Pressable' as never)).toHaveLength(0);
+    expect(root.findAll(node => node.props.accessibilityState !== undefined)).toHaveLength(0);
+    expect(frameOf(root).props.testID).toBe('static-row');
+  });
+
+  it('stacks the leading cell above the text block when asked', () => {
+    const classes = classesOf(frameOf(renderFrame({ title: 'General', stack: true })));
+
+    expect(classes).toEqual(expect.arrayContaining(['min-h-[48px]', 'gap-2', 'px-4', 'py-3']));
+    expect(classes).not.toContain('flex-row');
+    expect(ROW_FRAME_STACK_CLASS).toContain('gap-2');
+  });
+});
+
+describe('RowFrame interaction', () => {
+  it('makes the whole row one button', () => {
+    const onPress = vi.fn<() => void>();
+    const root = renderFrame({ title: 'General', onPress, testID: 'row-1' });
+    const row = pressableOf(root);
+
+    act(() => {
+      (row.props.onPress as () => void)();
+    });
+
+    expect(onPress).toHaveBeenCalledOnce();
+    expect(row.props.accessibilityRole).toBe('button');
+    expect(row.props.accessibilityState).toEqual({ disabled: false });
+    expect(row.props.testID).toBe('row-1');
+    expect(classesOf(row)).toContain('active:opacity-70');
+  });
+
+  it('takes a link role for a row that opens an outside destination', () => {
+    const root = renderFrame({
+      title: 'Advisory',
+      onPress: () => undefined,
+      accessibilityRole: 'link',
+    });
+
+    expect(pressableOf(root).props.accessibilityRole).toBe('link');
+  });
+
+  it('declares a disabled row inert and drops the pressed feedback', () => {
+    const root = renderFrame({ title: 'General', onPress: () => undefined, disabled: true });
+    const row = pressableOf(root);
+
+    expect(row.props.disabled).toBe(true);
+    expect(row.props.accessibilityState).toEqual({ disabled: true });
+    expect(classesOf(row)).not.toContain('active:opacity-70');
+  });
+
+  it('keeps the caller states on a disabled row instead of replacing them', () => {
+    const root = renderFrame({
+      title: 'Advanced',
+      onPress: () => undefined,
+      disabled: true,
+      accessibilityState: { expanded: true, busy: true },
+    });
+
+    expect(pressableOf(root).props.accessibilityState).toEqual({
+      expanded: true,
+      busy: true,
+      disabled: true,
+    });
+  });
+
+  it('passes hitSlop, onLayout, the hint and the caller name through', () => {
+    const onLayout = vi.fn();
+    const row = pressableOf(
+      renderFrame({
+        title: 'General',
+        onPress: () => undefined,
+        accessibilityLabel: 'Open general settings',
+        accessibilityHint: 'Opens the language, theme and notification preferences',
+        hitSlop: { top: 4, bottom: 4 },
+        onLayout,
+      })
+    );
+
+    expect(row.props.hitSlop).toEqual({ top: 4, bottom: 4 });
+    expect(row.props.onLayout).toBe(onLayout);
+    expect(row.props.accessibilityLabel).toBe('Open general settings');
+    expect(row.props.accessibilityHint).toBe(
+      'Opens the language, theme and notification preferences'
+    );
+  });
+
+  it('presses only the content when a trailing control owns its own touch', () => {
+    const root = renderFrame({
+      title: 'Notifications',
+      onPress: () => undefined,
+      pressTarget: 'content',
+      testID: 'pref-1',
+      trailing: { kind: 'switch', value: true, onValueChange: () => undefined },
+    });
+    const frame = root.find(
+      node =>
+        Object.is(node.type, 'View') &&
+        typeof node.props.testID === 'string' &&
+        node.props.testID === 'pref-1'
+    );
+    const content = pressableOf(root);
+
+    expect(classesOf(frame)).toEqual(expect.arrayContaining(['min-h-[48px]', 'px-4', 'py-3']));
+    expect(content.props.accessible).toBe(false);
+    expect(content.props.focusable).toBe(false);
+    expect(content.props.importantForAccessibility).toBe('no-hide-descendants');
+    expect(content.props.accessibilityElementsHidden).toBe(true);
+    // The frame already pads the row to its 48pt floor: a second floor on the
+    // content pressable made every preference row 69pt tall (27pt of text plus
+    // a 48pt box plus the frame's 21pt padding). The pressable cancels the
+    // frame's padding and pads itself back, so its own node spans the row.
+    expect(classesOf(content)).not.toContain(ROW_TARGET_CLASS);
+    expect(classesOf(content)).toEqual(
+      expect.arrayContaining(ROW_FRAME_CONTENT_PRESS_CLASS.split(' '))
+    );
+    expect(content.props.hitSlop).toBeUndefined();
+    // The switch is the frame's child, not a child of the content press.
+    expect(content.findAllByType('Switch' as never)).toHaveLength(0);
+    expect(root.findAllByType('Switch' as never)).toHaveLength(1);
+  });
+});
+
+describe('RowFrame trailing cell', () => {
+  /** The trailing cell a test passed, found by its own test handle. */
+  function trailingCell(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
+    return root.find(node => Object.is(node.type, 'View') && node.props.testID === 'trail-cell');
+  }
+
+  const targetCell = createElement('View', { testID: 'trail-cell' });
+
+  it('hosts a target-sized trailing control at the target when stacked', async () => {
+    // Stacked, the line lays its cells out on the row's 27pt content band, and
+    // Android delivers a touch only inside every ancestor view: a plain wrapper
+    // would hand the platform target's control a 27pt delivered area while a
+    // control-size audit still read the control's own 44/48pt rect.
+    const root = renderFrame({
+      title: 'GitHub',
+      stack: true,
+      trailing: { kind: 'node', target: true, node: targetCell },
+    });
+    const host = trailingCell(root).parent as TestRenderer.ReactTestInstance;
+    const classes = classesOf(host);
+
+    expect(classes).toEqual(expect.arrayContaining(rowTargetHostClass().split(' ')));
+    expect(classes).toContain('shrink-0');
+    // The host's own box is the platform target, not the 27pt band the line
+    // lays it out on. It does not cancel the overhang: it is the ancestor the
+    // platform measures, so its layout box must be the target, not the row's
+    // 27pt band — a cancelling margin would shrink it back and reintroduce the
+    // clipping.
+    const declarations = (await compiledDimensions(host.props.className as string)) as {
+      minHeight?: number;
+    }[];
+    const box = Object.assign({}, ...declarations) as { minHeight: number };
+    expect(box.minHeight).toBe(textActionTargetDp());
+    expect(classes.some(name => /^-my-|^my-/.test(name))).toBe(false);
+  });
+
+  it('keeps the plain wrapper for a stacked node that is not a target', () => {
+    // A node that is not a control takes the row's own band; a host at the
+    // target would grow the line it sits on.
+    const root = renderFrame({
+      title: 'GitHub',
+      stack: true,
+      trailing: { kind: 'node', node: targetCell },
+    });
+
+    expect(classesOf(trailingCell(root).parent as TestRenderer.ReactTestInstance)).toEqual([
+      'shrink-0',
+    ]);
+  });
+
+  it('keeps a flat frame’s trailing node a direct child with no host', () => {
+    // Flat, the control overhangs the frame's own `py-3` padding inside the
+    // row's bounds, so it needs no host; a wrapper here would add a node to
+    // every row that had none.
+    const root = renderFrame({
+      title: 'GitHub',
+      trailing: { kind: 'node', target: true, node: targetCell },
+    });
+    const row = trailingCell(root).parent as TestRenderer.ReactTestInstance;
+
+    expect(classesOf(row)).toEqual(expect.arrayContaining(ROW_FRAME_CLASS.split(' ')));
+    expect(root.findAll(node => classesOf(node).includes('shrink-0'))).toHaveLength(0);
+  });
+});
+
+describe('RowFrame text block', () => {
+  it('keeps the title on one line with a tail ellipsis', () => {
+    const title = textOf(renderFrame({ title: 'General' }), 'General');
+
+    expect(title.props.numberOfLines).toBe(1);
+    expect(title.props.ellipsizeMode).toBe('tail');
+    expect(classesOf(title)).toEqual(
+      expect.arrayContaining(['text-sm', 'font-medium', 'text-foreground'])
+    );
+  });
+
+  it('takes the caller title ink and a badge beside the title', () => {
+    const root = renderFrame({
+      title: 'Pixel 9',
+      titleClassName: 'text-muted-foreground',
+      titleBadge: createElement('Text', null, 'this device'),
+    });
+    const title = textOf(root, 'Pixel 9');
+
+    expect(classesOf(title)).toContain('text-muted-foreground');
+    expect(classesOf(title)).toContain('shrink');
+    expect(textOf(root, 'this device')).toBeTruthy();
+  });
+
+  it('renders a plain subtitle line under the title', () => {
+    const subtitle = textOf(
+      renderFrame({ title: 'General', subtitle: { text: 'English' } }),
+      'English'
+    );
+
+    expect(classesOf(subtitle)).toEqual(
+      expect.arrayContaining(['mt-0.5', 'text-xs', 'text-muted-foreground'])
+    );
+  });
+
+  it('takes the face and truncation a caller names for one line', () => {
+    const subtitle = textOf(
+      renderFrame({
+        title: 'Session',
+        subtitle: {
+          text: 'abcdef0123456789',
+          face: 'mono',
+          numberOfLines: 2,
+          ellipsizeMode: 'middle',
+        },
+      }),
+      'abcdef0123456789'
+    );
+
+    expect(subtitle.props.variant).toBe('mono');
+    expect(subtitle.props.numberOfLines).toBe(2);
+    expect(subtitle.props.ellipsizeMode).toBe('middle');
+  });
+
+  it('renders a second subtitle line under the first', () => {
+    const root = renderFrame({
+      title: 'Session',
+      subtitle: { text: 'Running' },
+      secondSubtitle: { text: 'device-42', face: 'mono' },
+    });
+
+    expect(textOf(root, 'Running')).toBeTruthy();
+    expect(textOf(root, 'device-42').props.variant).toBe('mono');
+  });
+
+  it('renders the placeholder in the subtitle slot until the text loads', () => {
+    const root = renderFrame({
+      title: 'Session',
+      subtitlePlaceholder: createElement('Text', null, 'loading-subtitle'),
+    });
+    expect(textOf(root, 'loading-subtitle')).toBeTruthy();
+
+    const loaded = renderFrame({
+      title: 'Session',
+      subtitle: { text: 'Ready' },
+      subtitlePlaceholder: createElement('Text', null, 'loading-subtitle'),
+    });
+    expect(textOf(loaded, 'Ready')).toBeTruthy();
+    expect(loaded.findAll(node => node.children.includes('loading-subtitle'))).toHaveLength(0);
+  });
+
+  it('renders caller content instead of the built text block', () => {
+    const root = renderFrame({
+      title: 'Ignored',
+      children: createElement('Text', null, 'custom row content'),
+    });
+
+    expect(textOf(root, 'custom row content')).toBeTruthy();
+    expect(root.findAll(node => node.children.includes('Ignored'))).toHaveLength(0);
+  });
+});

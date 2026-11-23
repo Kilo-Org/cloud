@@ -12,7 +12,9 @@
  * through on the way in.
  *
  * These rules name the parents a profile screen needs, and mark the pushes that
- * rebuild them so those pushes land without their own transitions.
+ * rebuild them so those pushes land without their own transitions. Removing the
+ * unparented copy afterwards is `profile-stack-retirement.ts`, which outlives the
+ * screen that asked for the repair.
  *
  * No React and no React Native imports: every function here is unit-tested
  * directly in `profile-route-stack.test.ts`.
@@ -181,6 +183,25 @@ export type ProfileStackParents = {
   /** The profile overview (`getProfileOverviewPath`). */
   overview: boolean;
 };
+
+/**
+ * A route name a trigger screen needs beneath itself: the triggers list, the
+ * same rule the profiles list gives the profile screens (`LIST_CHILD_PARENTS`).
+ * The repair hook reads it from `useRepairTriggerRouteStack`, whose `self` and
+ * parents resolve through the trigger routes rather than the profile ones.
+ */
+export const TRIGGERS_LIST_ROUTE_NAME = 'triggers/index';
+
+/**
+ * The route names the trigger screens register under in the Profile tab's
+ * Stack, the names the layout declares and the repair's focus check compares
+ * against (`use-repair-trigger-route-stack.ts`).
+ */
+export const TRIGGER_ROUTE_NAMES: readonly string[] = [
+  TRIGGERS_LIST_ROUTE_NAME,
+  'triggers/new',
+  'triggers/[trigger-id]',
+];
 
 /** The profile screens below the list: they only need the list beneath them. */
 export const LIST_CHILD_PARENTS: ProfileStackParents = { list: true, overview: false };

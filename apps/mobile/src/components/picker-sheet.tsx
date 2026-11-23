@@ -3,13 +3,17 @@ import { useRouter } from 'expo-router';
 import { type ReactNode, useCallback, useContext, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BackHandler, ScrollView, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/empty-state';
 import { SheetHeader } from '@/components/sheet-header';
 import { type SheetHeaderTopInset } from '@/lib/form-sheet';
 import { NavigationContext } from '@/lib/navigation/navigation-context';
 import { useRouteFocused } from '@/lib/navigation/route-focus';
+import {
+  useDetailScreenBottomPadding,
+  useSideInsetMarginStyle,
+  useSideInsetStyle,
+} from '@/lib/screen-insets';
 
 export function PickerSheet({
   title,
@@ -43,7 +47,9 @@ export function PickerSheet({
   /**
    * Set when the caller's data source (picker bridge) is gone — renders the
    * standard "Options expired" empty state instead of children. An expired
-   * shell that has a Cancel disables Done: there is nothing left to commit.
+   * shell that has a Cancel disables Done, because there is nothing left to
+   * commit, so the leading Cancel is its one way out; a shell with no Cancel
+   * keeps Done as its only exit.
    */
   expired?: boolean;
   /**
@@ -78,7 +84,9 @@ export function PickerSheet({
   topInset?: SheetHeaderTopInset;
 }) {
   const { t } = useTranslation();
-  const { bottom } = useSafeAreaInsets();
+  const bottomClearance = useDetailScreenBottomPadding();
+  const sideInsetStyle = useSideInsetStyle();
+  const sideInsetMarginStyle = useSideInsetMarginStyle();
   const routeFocused = useRouteFocused();
   // Back reads focus at press time, not from the render-time value: the native
   // dismissal can blur the route after the last render and before the key
@@ -163,13 +171,12 @@ export function PickerSheet({
           doneLabel={doneLabel}
           cancelLabel={cancelLabel}
           disabled={disabled}
-          // An expired shell holds nothing to commit: Done would promise a
-          // selection that cannot exist, so the leading Cancel becomes the one
-          // way out. A shell with no Cancel keeps Done as its only exit.
           doneDisabled={doneDisabled || (expired && onCancel !== undefined)}
           topInset={topInset}
         />
-        {!headerInBody && headerContent}
+        {!headerInBody && headerContent != null ? (
+          <View style={sideInsetStyle}>{headerContent}</View>
+        ) : null}
       </View>
       {scrollable && !expired ? (
         // "handled" is the shell's own rule for the sheets that live in it: a
@@ -179,7 +186,8 @@ export function PickerSheet({
         <ScrollView
           nestedScrollEnabled
           keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{ paddingBottom: bottom + 16 }}
+          style={sideInsetMarginStyle}
+          contentContainerStyle={{ paddingBottom: bottomClearance }}
         >
           {body}
         </ScrollView>

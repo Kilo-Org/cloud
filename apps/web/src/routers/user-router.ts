@@ -57,6 +57,7 @@ import {
   agent_configs,
   passkey_credentials,
   cli_sessions_v2,
+  coding_plan_subscriptions,
 } from '@kilocode/db/schema';
 import { eq, and, isNull, inArray, or, sql, gte, gt, desc, isNotNull, ne } from 'drizzle-orm';
 import crypto from 'crypto';
@@ -78,7 +79,13 @@ import {
   AutoTopUpAmountCentsSchema,
   DEFAULT_AUTO_TOP_UP_AMOUNT_CENTS,
 } from '@kilocode/web-shared/lib/autoTopUpConstants';
-import { getCreditBlocks } from '@/lib/getCreditBlocks';
+import {
+  getCreditBlocks,
+  creditGrantReasonOf,
+  CreditGrantReasonSchema,
+  CreditDeductionReasonSchema,
+} from '@/lib/getCreditBlocks';
+import { getCodingPlanPrice } from '@/lib/coding-plans/pricing';
 import { resolveStripeReceiptUrl } from '@kilocode/web-shared/lib/credits';
 import { getBalanceForUser } from '@kilocode/web-shared/lib/user/balance';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
@@ -88,6 +95,7 @@ import { refreshGlanceableScope } from '@kilocode/web-shared/lib/notifications-w
 
 const ACCOUNT_DELETION_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
 const CREDIT_PURCHASE_HISTORY_PAGE_SIZE = 25;
+const CREDIT_GRANT_HISTORY_LIMIT = 100;
 /** The description a Stripe automatic top-up writes on its own grant row. */
 const AUTO_TOP_UP_DESCRIPTION = 'Auto top-up via stripe';
 const PERSONAL_TOP_UP_DESCRIPTIONS = ['Top-up via stripe', AUTO_TOP_UP_DESCRIPTION];
@@ -224,6 +232,12 @@ const CreditDeductionSchema = z.object({
   description: z.string(),
   amount_mUsd: z.number(),
   kind: CreditDeductionKindSchema,
+  /**
+   * Why the row closed a grant, from its own category: an expiry or a
+   * voidance, null for every other deduction. A client titles such a row from
+   * it, so the title reads in the reader's language.
+   */
+  expiry: z.enum(['expired', 'voided']).nullable(),
   /** The grant this deduction closed, present for an expiry row. */
   purchase: z
     .object({
@@ -235,8 +249,27 @@ const CreditDeductionSchema = z.object({
       is_free: z.boolean(),
       /** The recorded purchase channel, null for legacy and internal grants. */
       credit_source: z.string().nullable(),
+      /** How the grant was earned; the client's row title is built from it. */
+      kind: CreditGrantReasonSchema,
     })
     .nullable(),
+  /** Why the row drew credit, from its own category: a usage charge, a coding plan, a store refund, a dispute, an administrator action or a balance correction. Null when the row's category carries no reason the app can name, so a client keeps the stored description. */
+  reason: CreditDeductionReasonSchema.nullable(),
+  /** The coding plan this row charged, verbatim from the plan catalog, so the client can name it inside its own template. Null for every other reason. */
+  planName: z.string().nullable(),
+});
+
+const CreditGrantSchema = z.object({
+  id: z.string(),
+  date: z.string(),
+  amount_mUsd: z.number().positive(),
+  kind: CreditGrantReasonSchema,
+  /**
+   * When the grant runs out, null for a category that never expires. A client
+   * prints it as the caption the purchase list already uses, so a reader can
+   * tell a grant that closes on a date from one that stays.
+   */
+  expiryDate: z.iso.datetime().nullable(),
 });
 
 const GetCreditBlocksOutputSchema = z.object({
@@ -245,6 +278,11 @@ const GetCreditBlocksOutputSchema = z.object({
   totalBalance_mUsd: z.number(),
   isFirstPurchase: z.boolean(),
   autoTopUpEnabled: z.boolean(),
+});
+
+const CreditGrantHistoryOutputSchema = z.object({
+  grants: z.array(CreditGrantSchema),
+  hasMore: z.boolean(),
 });
 
 const CreditPurchaseHistoryInputSchema = z.object({
@@ -308,6 +346,9 @@ type RawDeduction = {
   description: string;
   credit_category: string | null;
   amount_mUsd: number;
+  expiry: 'expired' | 'voided' | null;
+  reason: z.infer<typeof CreditDeductionReasonSchema> | null;
+  planName: string | null;
   purchase: {
     id: string;
     date: string;
@@ -315,6 +356,7 @@ type RawDeduction = {
     amount_mUsd: number;
     is_free: boolean;
     credit_source: string | null;
+    kind: z.infer<typeof CreditGrantReasonSchema>;
   } | null;
 };
 
@@ -424,6 +466,41 @@ function getTopUpConditions(userId: string, organizationId?: string) {
 }
 
 /**
+ * Map each coding-plan subscription a renewal charged to the plan it bought, as
+ * "<Provider> <Plan>", so the deduction row can name the plan when its category
+ * names only the subscription. Ids whose plan the catalog does not know are
+ * left out, so their rows keep the stored description.
+ */
+async function getCodingPlanNamesBySubscription(
+  userId: string,
+  transactions: { credit_category: string | null }[]
+): Promise<Map<string, string>> {
+  const subscriptionIds = new Set<string>();
+  for (const transaction of transactions) {
+    const subscriptionId = transaction.credit_category?.match(/^coding-plan:renewal:([^:]+):/)?.[1];
+    if (subscriptionId) subscriptionIds.add(subscriptionId);
+  }
+
+  const namesBySubscription = new Map<string, string>();
+  if (subscriptionIds.size === 0) return namesBySubscription;
+
+  const rows = await db
+    .select({ id: coding_plan_subscriptions.id, plan_id: coding_plan_subscriptions.plan_id })
+    .from(coding_plan_subscriptions)
+    .where(
+      and(
+        eq(coding_plan_subscriptions.user_id, userId),
+        inArray(coding_plan_subscriptions.id, [...subscriptionIds])
+      )
+    );
+  for (const row of rows) {
+    const plan = getCodingPlanPrice(row.plan_id);
+    if (plan) namesBySubscription.set(row.id, `${plan.providerName} ${plan.name}`);
+  }
+  return namesBySubscription;
+}
+
+/**
  * Enrich KiloClaw deduction descriptions with instance names so users
  * can distinguish charges across multiple instances.
  */
@@ -437,6 +514,9 @@ async function enrichDeductionsWithInstanceNames(
     description: string;
     amount_mUsd: number;
     kind: z.infer<typeof CreditDeductionKindSchema>;
+    expiry: RawDeduction['expiry'];
+    reason: RawDeduction['reason'];
+    planName: RawDeduction['planName'];
     purchase: RawDeduction['purchase'];
   }[]
 > {
@@ -528,6 +608,9 @@ async function enrichDeductionsWithInstanceNames(
       description,
       amount_mUsd: d.amount_mUsd,
       kind: getDeductionKind(d.credit_category),
+      expiry: d.expiry,
+      reason: d.reason,
+      planName: d.planName,
       purchase: d.purchase,
     };
   });
@@ -951,7 +1034,18 @@ export const userRouter = createTRPCRouter({
         ),
       });
 
-      const result = getCreditBlocks(transactions, now, ctx.user, ctx.user.id);
+      const codingPlanNamesBySubscription = await getCodingPlanNamesBySubscription(
+        ctx.user.id,
+        transactions
+      );
+
+      const result = getCreditBlocks(
+        transactions,
+        now,
+        ctx.user,
+        ctx.user.id,
+        codingPlanNamesBySubscription
+      );
 
       // Enrich KiloClaw deduction descriptions with instance names.
       const enrichedDeductions = await enrichDeductionsWithInstanceNames(
@@ -964,6 +1058,46 @@ export const userRouter = createTRPCRouter({
         deductions: enrichedDeductions,
         autoTopUpEnabled: ctx.user.auto_top_up_enabled,
       };
+    }),
+
+  // The positive free rows a purchase history cannot list: its predicate
+  // requires `is_free = false`, so a balance funded by a welcome grant or a
+  // referral bonus has a row here instead.
+  getCreditGrantHistory: baseProcedure
+    .input(z.object({}))
+    .output(CreditGrantHistoryOutputSchema)
+    .query(async ({ ctx }) => {
+      const rows = await db
+        .select({
+          id: credit_transactions.id,
+          date: credit_transactions.created_at,
+          amount_mUsd: credit_transactions.amount_microdollars,
+          creditCategory: credit_transactions.credit_category,
+          expiryDate: credit_transactions.expiry_date,
+        })
+        .from(credit_transactions)
+        .where(
+          and(
+            eq(credit_transactions.kilo_user_id, ctx.user.id),
+            isNull(credit_transactions.organization_id),
+            gt(credit_transactions.amount_microdollars, 0),
+            eq(credit_transactions.is_free, true),
+            isNull(credit_transactions.source_transaction_id)
+          )
+        )
+        .orderBy(desc(credit_transactions.created_at), desc(credit_transactions.id))
+        // One newest page, so the payload does not grow with the account's age.
+        .limit(CREDIT_GRANT_HISTORY_LIMIT + 1);
+
+      const hasMore = rows.length > CREDIT_GRANT_HISTORY_LIMIT;
+      const grants = rows.slice(0, CREDIT_GRANT_HISTORY_LIMIT).map(row => ({
+        id: row.id,
+        date: new Date(row.date).toISOString(),
+        amount_mUsd: row.amount_mUsd,
+        kind: creditGrantReasonOf(row.creditCategory),
+        expiryDate: row.expiryDate ? new Date(row.expiryDate).toISOString() : null,
+      }));
+      return { grants, hasMore };
     }),
 
   getCreditPurchaseHistory: baseProcedure

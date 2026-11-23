@@ -43,14 +43,20 @@ export function isInFlightReviewStatus(status: string): boolean {
   return isCodeReviewStatus(status) && IN_FLIGHT_STATUSES.has(status);
 }
 
-// Same semantics as isInFlightReviewStatus today — kept as a separate,
-// clearly-named predicate since the two call sites (polling vs. showing a
-// Cancel button) are conceptually distinct even though the sets currently
-// match exactly.
 export const isCancellableReviewStatus = isInFlightReviewStatus;
 
 export function isRetriggerableReviewStatus(status: string): boolean {
   return isCodeReviewStatus(status) && RETRIGGERABLE_STATUSES.has(status);
+}
+
+// A cancelled review whose `terminal_reason` is `superseded` was replaced by a
+// newer commit, so there is no head to re-review and the server refuses the
+// retry. The Retry control must not be offered for it.
+export function canRetriggerReview(review: {
+  status: string;
+  terminal_reason: string | null | undefined;
+}): boolean {
+  return isRetriggerableReviewStatus(review.status) && review.terminal_reason !== 'superseded';
 }
 
 export function hasInFlightReview(reviews: readonly { status: string }[]): boolean {

@@ -18,6 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useUrlOrganizationId } from '@/hooks/useUrlOrganizationId';
 import { CloudReadOnlyThread } from '@/components/cloud-agent-next/assistant-ui/CloudThread';
+import { QuestionUnreadableNotice } from '@/components/cloud-agent-next/QuestionUnreadableNotice';
 import { commandResult, commandRunner, sendNativePrompt } from './native-remote-events';
 
 const tokenSchema = z.object({ token: z.string() });
@@ -29,8 +30,12 @@ const agentsSchema = z.object({ agents: z.array(z.object({ id: z.string(), name:
 const createdSchema = z.object({ sessionID: z.string() });
 type NativeSelection = { id: string; organizationID?: string };
 
-async function getCredential() {
-  const response = await fetch('/api/native-remote/token', { method: 'POST', cache: 'no-store' });
+async function getCredential(signal?: AbortSignal) {
+  const response = await fetch('/api/native-remote/token', {
+    method: 'POST',
+    cache: 'no-store',
+    signal,
+  });
   if (!response.ok) throw new Error('Sign in to connect to native sessions.');
   return tokenSchema.parse(await response.json()).token;
 }
@@ -171,7 +176,12 @@ function NativeRemoteScope({ organizationID }: { organizationID: string | undefi
     if (await run('prompt', () => sendNativePrompt(connection, prompt, queue))) setPrompt('');
   }
   const conversation = useMemo(() => (state ? readNativeConversation(state) : undefined), [state]);
-  const pending = conversation?.pending ?? { permissions: [], questions: [] };
+  const pending = conversation?.pending ?? {
+    permissions: [],
+    questions: [],
+    unreadableQuestions: [],
+    unreadablePermissions: [],
+  };
   const canControl = state?.connection === 'connected' && state.runnerConnected;
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-6">
@@ -345,12 +355,27 @@ function NativeRemoteScope({ organizationID }: { organizationID: string | undefi
                 presentationMode="live"
               />
             )}
+            {conversation?.session && conversation.recoveryGaps > 0 && (
+              <p className="text-muted-foreground text-sm">
+                {conversation.recoveryGaps === 1
+                  ? '1 part of this transcript is missing.'
+                  : `${conversation.recoveryGaps} parts of this transcript are missing.`}{' '}
+                <Button
+                  disabled={state?.connection !== 'connected'}
+                  variant="outline"
+                  onClick={() => void sessionRef.current?.requestRecovery()}
+                >
+                  Retry
+                </Button>
+              </p>
+            )}
             {conversation?.session &&
               conversation.messages.length === 0 &&
               conversation.incompleteMessageIDs.length === 0 && (
                 <p className="text-muted-foreground text-sm">This session has no messages yet.</p>
               )}
           </div>
+          {pending.unreadableQuestions.length > 0 && <QuestionUnreadableNotice />}
           {pending.permissions.map(request => (
             <div className="space-y-2 rounded border p-3" key={request.id}>
               <p>Permission: {request.action}</p>

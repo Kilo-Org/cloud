@@ -1,16 +1,14 @@
 import { type Href } from 'expo-router';
-import { FolderGit2 } from '@/components/ui/icons';
+import { FolderGit2, ShieldCheck } from '@/components/ui/icons';
 import { type ReactNode } from 'react';
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
-import { CenteredState } from '@/components/centered-state';
-import { BitbucketSetupRecovery } from '@/components/code-reviewer/bitbucket-setup-recovery';
 import { repositoryEmptyCopy } from '@/components/code-reviewer/repository-empty-copy';
 import { RepositoryModelOverrides } from '@/components/code-reviewer/repository-model-overrides';
 import { RepositoryRowsList } from '@/components/code-reviewer/repository-rows-list';
 import { RepositorySyncFooter } from '@/components/code-reviewer/repository-sync-footer';
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { InvalidRouteState } from '@/components/invalid-route-state';
 import { QueryError } from '@/components/query-error';
 import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
@@ -18,16 +16,16 @@ import {
   AllRepositoriesSummary,
   RepositoryModeChoice,
 } from '@/components/code-reviewer/repository-selection-mode';
-import { Button } from '@/components/ui/button';
 import { RefreshControl } from '@/components/ui/refresh-control';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Text } from '@/components/ui/text';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { TAB_SCREEN_TRAILING_GAP, useTabScreenFrame } from '@/components/tab-screen';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { PLATFORM_CAPABILITIES, type ReviewerPlatform } from '@/lib/code-reviewer-config';
+import { BitbucketRepositoriesState } from '@/components/code-reviewer/bitbucket-repositories-state';
+import { classifyBitbucketConnection } from '@/lib/code-reviewer-bitbucket';
 import { repositoryModelOverrideHandlers } from '@/lib/code-reviewer-repo-models';
 import {
   isPersonal,
+  useBitbucketIntegrationStatus,
   useBitbucketReadiness,
   useGitHubRepositories,
   useGitLabRepositories,
@@ -66,6 +64,9 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
   const githubRepos = useGitHubRepositories(scope, platform === 'github');
   const gitlabRepos = useGitLabRepositories(scope, platform === 'gitlab');
   const bitbucketReadiness = useBitbucketReadiness(scope);
+  // The readiness read describes workspace access tokens only, so the
+  // integration status beside it names a Bitbucket OAuth connection.
+  const bitbucketStatus = useBitbucketIntegrationStatus(scope, platform === 'bitbucket');
   const bitbucketRepos =
     bitbucketReadiness.data?.repositoryCache.status === 'available'
       ? bitbucketReadiness.data.repositoryCache.repositories.map(repo => ({
@@ -92,9 +93,27 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
     },
   };
   const { query: reposQuery, rows: repoRows, syncedAt } = reposByPlatform[platform];
-  const reposLoading = reposQuery.isLoading;
+  // The readiness read covers workspace tokens only, so the status read beside
+  // it is what names an OAuth connection. Until that read answers, the recovery
+  // card's token form is not the truth — an OAuth organization would be given a
+  // form the server refuses — so the body waits or retries exactly as it does
+  // for its own read.
+  const bitbucketConnection =
+    platform === 'bitbucket'
+      ? classifyBitbucketConnection({ readiness: bitbucketReadiness, status: bitbucketStatus })
+      : null;
+  const statusFailure = bitbucketConnection?.kind === 'error' ? bitbucketConnection : null;
+  // A paused read (offline with no cache) is pending while it fetches nothing, so
+  // `isLoading` is false while the list has no answer yet. The query's own
+  // `isPending` covers both: an unanswered list is not an empty one, so the empty
+  // state and its copy wait for the answer, exactly as the new-session picker
+  // keeps that shape on its loading state. Bitbucket resolves the same window
+  // through its own connection classification below.
+  const reposLoading =
+    (platform === 'bitbucket' ? reposQuery.isLoading : reposQuery.isPending) ||
+    bitbucketConnection?.kind === 'loading';
   const reposError = reposQuery.isError;
-  const reposFetching = reposQuery.isFetching;
+  const reposFetching = reposQuery.isFetching || statusFailure?.isRetrying === true;
   const refetchRepos = () => void reposQuery.refetch();
 
   const selectedIds = data?.selectedRepositoryIds ?? [];
@@ -117,9 +136,10 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
   // Without the GitHub app the account can review nothing, so the two modes
   // differ only in a setting nobody can act on: their picker above an install
   // prompt offers a choice that changes nothing. The prompt owns the body, as
-  // it does for the other platforms' empty surfaces.
-  const githubAppMissing =
-    platform === 'github' && githubRepos.data?.integrationInstalled === false;
+  // it does for the other platforms' empty surfaces. The same status decides
+  // the empty copy: only a confirmed missing app asks to install.
+  const githubIntegrationInstalled = githubRepos.data?.integrationInstalled;
+  const githubAppMissing = platform === 'github' && githubIntegrationInstalled === false;
   const { manageAccess, resync, resyncing } = useRepositoryAccessSync(scope, platform);
   // Bitbucket has no provider sync to force, so its pull re-reads the snapshot.
   const refreshing = platform === 'bitbucket' ? reposFetching : resyncing;
@@ -139,7 +159,9 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
         time: timeAgo(parseTimestamp(syncedAt), undefined, now),
       })
     : null;
-  const emptyStateCopy = repositoryEmptyCopy(platform, t);
+  const emptyStateCopy = repositoryEmptyCopy(platform, t, {
+    githubAppInstalled: githubIntegrationInstalled,
+  });
 
   const setMode = (nextMode: 'all' | 'selected') => {
     save.mutate({ repositorySelectionMode: nextMode });
@@ -176,23 +198,18 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
         isRetrying={reposFetching}
       />
     );
-  } else if (!reposLoading && bitbucketNotReady) {
-    const readiness = bitbucketReadiness.data;
+  } else if (!reposLoading && bitbucketNotReady && bitbucketConnection !== null) {
+    // Both reads decide the body when the snapshot is not readable: an OAuth
+    // connection has no token to repair, a failed status read retries it, and
+    // only a token workspace offers the recovery card.
     repoState = (
-      <CenteredState>
-        {readiness ? (
-          <BitbucketSetupRecovery
-            scope={scope}
-            readiness={readiness}
-            message={t('common.couldNotLoadRepositories')}
-            className="mx-6"
-          />
-        ) : (
-          <Text variant="muted" className="text-center text-xs">
-            {t('common.couldNotLoadRepositories')}
-          </Text>
-        )}
-      </CenteredState>
+      <BitbucketRepositoriesState
+        scope={scope}
+        connection={bitbucketConnection}
+        onRetry={() => {
+          void reposQuery.refetch();
+        }}
+      />
     );
   } else if (confirmedEmpty) {
     repoState = (
@@ -206,14 +223,13 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
         description={emptyStateCopy.description}
         action={
           manageAccess ? (
-            <Button
-              className={STATE_ACTION_CLASS}
+            <StateAction
+              label={t('codeReviewer.repos.manageAccess')}
+              icon={ShieldCheck}
               loading={manageAccess.pending}
               disabled={manageAccess.pending}
               onPress={manageAccess.handlePress}
-            >
-              <Text>{t('codeReviewer.repos.manageAccess')}</Text>
-            </Button>
+            />
           ) : undefined
         }
       />
@@ -258,8 +274,8 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
 
       {rowsBody && reposLoading && (
         <View className="gap-3 pt-2">
-          <Skeleton className="h-12 w-full rounded-lg" />
-          <Skeleton className="h-12 w-full rounded-lg" />
+          <RowSkeleton subtitle />
+          <RowSkeleton subtitle />
         </View>
       )}
 

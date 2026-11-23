@@ -1,3 +1,4 @@
+import { type OrganizationRole } from '@kilocode/app-shared/organizations';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import Animated, { FadeOut } from 'react-native-reanimated';
@@ -7,8 +8,15 @@ import { OrganizationBoundary } from '@/components/organization/organization-bou
 import { PermissionDenied } from '@/components/organization/permission-denied';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
+import {
+  SettingsSearchScrollView,
+  SettingsTarget,
+} from '@/components/settings-search/settings-target';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { useConfirmDialog } from '@/components/ui/dialog';
+import { RowGroup } from '@/components/ui/row-group';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
+import { Section } from '@/components/ui/section';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { openAppShellHandoff } from '@/lib/app-shell-handoff';
@@ -22,22 +30,50 @@ import { useBitbucketIntegrationStatus } from '@/lib/hooks/use-bitbucket';
 import { bitbucketConnectHref } from '@/lib/bitbucket-connect-navigation';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { useOrgDeepLinkSelection } from '@/lib/hooks/use-org-deep-link-selection';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { buildIntegrationRows, type IntegrationRow } from '@/lib/integrations/integration-rows';
 import {
+  blockedConnectionRoles,
   type IntegrationProvider,
   integrationScope,
   providerLabelKey,
-  providerRowBlocked,
 } from '@/lib/integrations/provider-catalog';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
+import { type SettingsTargetProps } from '@/lib/settings-search/definitions';
+import { integrationProviderSetting } from '@/lib/settings-search/integration-provider-settings';
 import { isPermissionDeniedError, trpcErrorVariant } from '@/lib/trpc-error';
 
-type IntegrationsScreenProps = Readonly<{
-  /** Organization scope from the route; absent is the caller's personal scope. */
-  organizationId?: string;
-}>;
+/**
+ * The catalog key naming who can change the connections the viewer cannot. The
+ * hub names only the roles that can change at least one blocked row, so the
+ * sentence follows the providers the viewer is actually shut out of.
+ */
+export function blockedNoteKey(roles: readonly OrganizationRole[]): string | null {
+  if (roles.length === 0) {
+    return null;
+  }
+  const namesAdmin = roles.includes('admin');
+  const namesBilling = roles.includes('billing_manager');
+  if (namesAdmin && namesBilling) {
+    return 'integrations.managedByOwnerAdminOrBilling';
+  }
+  if (namesAdmin) {
+    return 'integrations.managedByOwnerOrAdmin';
+  }
+  if (namesBilling) {
+    return 'integrations.managedByOwnerOrBilling';
+  }
+  return 'integrations.managedByOwner';
+}
+
+type IntegrationsScreenProps = Readonly<
+  SettingsTargetProps & {
+    /** Organization scope from the route; absent is the caller's personal scope. */
+    organizationId?: string;
+  }
+>;
 
 /**
  * The integrations hub: one row per service, the account it is connected to,
@@ -45,7 +81,7 @@ type IntegrationsScreenProps = Readonly<{
  * that owns the OAuth flow, because the provider callbacks land there; the
  * screen refreshes when the browser returns.
  */
-export function IntegrationsScreen({ organizationId }: IntegrationsScreenProps) {
+export function IntegrationsScreen({ organizationId, settingsTarget }: IntegrationsScreenProps) {
   const { t } = useTranslation();
   const pushOnce = useSinglePushRoute();
   const scope = integrationScope(organizationId);
@@ -105,7 +141,16 @@ export function IntegrationsScreen({ organizationId }: IntegrationsScreenProps) 
   // once they exist; only a read that never landed takes over the screen.
   if (statuses.isError && statuses.data == null) {
     if (isPermissionDeniedError(statuses.error)) {
-      return <PermissionDenied description={t('integrations.permissionDenied')} />;
+      return (
+        <View className="flex-1 bg-background">
+          <ScreenHeader
+            title={t('integrations.title')}
+            subtitle={organizationName}
+            backFallback={PROFILE_TAB_HREF}
+          />
+          <PermissionDenied description={t('integrations.permissionDenied')} showBack={false} />
+        </View>
+      );
     }
     return (
       <View className="flex-1 bg-background">
@@ -134,27 +179,21 @@ export function IntegrationsScreen({ organizationId }: IntegrationsScreenProps) 
     bitbucketIntegrationPending: bitbucket.isPending,
   });
   const role = boundary.role ?? undefined;
-  // One row that offers the viewer no action is enough to need the sentence,
-  // and `owner` can change a connection in every role set these rows follow, so
-  // the hub names that role once here instead of under each blocked row.
-  const namesOwner =
-    scope === 'organization' &&
-    rows.some(
-      row =>
-        !row.actionPending &&
-        providerRowBlocked({
-          provider: row.provider,
-          scope,
-          role,
-          installed: row.installed,
-        })
-    );
+  // The hub names the roles once, above the list, instead of under every row
+  // that offers the viewer no action. It names only the roles that can change at
+  // least one of those rows, because the provider role sets differ.
+  const noteKey = blockedNoteKey(blockedConnectionRoles({ rows, scope, role }));
 
   // A GitHub row whose installations the hub cannot name is the only row with a
   // web management link, and it opens the app-shell integration page through a
-  // one-time hand-off. Bitbucket's controls run in the app's own connect sheet.
+  // one-time hand-off. A Bitbucket row has no web page here: its connect sheet
+  // is the app's own surface for that provider, and it states the connection's
+  // state and the roles that may change it for a viewer without them.
   const manageRowOnWeb = (provider: IntegrationProvider) => {
     if (provider === 'bitbucket') {
+      if (organizationId) {
+        pushOnce(bitbucketConnectHref(organizationId));
+      }
       return;
     }
     void openAppShellHandoff(
@@ -199,48 +238,45 @@ export function IntegrationsScreen({ organizationId }: IntegrationsScreenProps) 
         subtitle={organizationName}
         backFallback={PROFILE_TAB_HREF}
       />
-      <TabScreenScrollView
+      <SettingsSearchScrollView
+        settingsTarget={settingsTarget}
         className="flex-1"
-        contentContainerClassName="px-4 pt-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         showsVerticalScrollIndicator={false}
       >
-        <View className="gap-4">
-          <Text className="text-sm text-muted-foreground">{t('integrations.subtitle')}</Text>
-          {namesOwner ? (
-            <Text className="text-xs text-muted-foreground">
-              {t('integrations.managedByOwner')}
-            </Text>
-          ) : null}
+        <Section>
+          <Text variant="muted">{t('integrations.subtitle')}</Text>
+          {noteKey ? <Text variant="caption">{t(noteKey)}</Text> : null}
           {rows.length > 0 ? (
-            <View className="rounded-lg bg-secondary px-3">
-              {rows.map((row, index) => (
-                <IntegrationProviderRow
-                  key={row.provider}
-                  row={row}
-                  scope={scope}
-                  role={role}
-                  connecting={pendingProvider === row.provider}
-                  disconnecting={
-                    disconnect.isPending && disconnect.variables.provider === row.provider
-                  }
-                  onConnect={() => {
-                    connectProvider(row.provider);
-                  }}
-                  onDisconnect={() => {
-                    requestDisconnect(row);
-                  }}
-                  onManageOnWeb={() => {
-                    manageRowOnWeb(row.provider);
-                  }}
-                  onRetryConnection={() => void bitbucket.refetch()}
-                  retryingConnection={bitbucket.isFetching}
-                  last={index === rows.length - 1}
-                />
+            <RowGroup leadingTile>
+              {rows.map(row => (
+                <SettingsTarget key={row.provider} item={integrationProviderSetting(row.provider)}>
+                  <IntegrationProviderRow
+                    row={row}
+                    scope={scope}
+                    role={role}
+                    connecting={pendingProvider === row.provider}
+                    disconnecting={
+                      disconnect.isPending && disconnect.variables.provider === row.provider
+                    }
+                    onConnect={() => {
+                      connectProvider(row.provider);
+                    }}
+                    onDisconnect={() => {
+                      requestDisconnect(row);
+                    }}
+                    onOpenOnWeb={() => {
+                      manageRowOnWeb(row.provider);
+                    }}
+                    onRetryConnection={() => void bitbucket.refetch()}
+                    retryingConnection={bitbucket.isFetching}
+                  />
+                </SettingsTarget>
               ))}
-            </View>
+            </RowGroup>
           ) : null}
-        </View>
-      </TabScreenScrollView>
+        </Section>
+      </SettingsSearchScrollView>
       {dialog}
     </View>
   );
@@ -258,16 +294,21 @@ function IntegrationsSkeleton({ organizationName }: Readonly<{ organizationName?
       />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="px-4 pt-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         showsVerticalScrollIndicator={false}
       >
-        <Animated.View exiting={FadeOut.duration(150)} className="gap-4">
-          <Skeleton className="h-4 w-3/4 rounded" />
-          <View className="rounded-lg bg-secondary px-3">
-            {Array.from({ length: 5 }, (_, index) => (
-              <Skeleton key={index} className="my-3 h-9 w-full rounded" />
-            ))}
-          </View>
+        <Animated.View exiting={FadeOut.duration(150)}>
+          <Section>
+            {/* The section's intro copy runs to two lines on a phone; it is
+                reserved here so the rows do not rise when it arrives. */}
+            <Skeleton className="h-4 w-full rounded" />
+            <Skeleton className="h-4 w-2/3 rounded" />
+            <RowGroup leadingTile>
+              {Array.from({ length: 5 }, (_, index) => (
+                <RowSkeleton key={index} tile subtitle />
+              ))}
+            </RowGroup>
+          </Section>
         </Animated.View>
       </TabScreenScrollView>
     </View>

@@ -1,11 +1,10 @@
 import 'server-only';
 import { createHash, createPublicKey, createVerify, X509Certificate } from 'node:crypto';
-import { decode as decodeCbor } from 'cbor2';
+import { decode as decodeCbor, decodeSequence, getEncoded } from 'cbor2';
 import { AsnParser } from '@peculiar/asn1-schema';
 import { Certificate } from '@peculiar/asn1-x509';
 import * as asn1js from 'asn1js';
 import { APPLE_APP_BUNDLE_ID, APPLE_TEAM_ID } from '@kilocode/web-shared/lib/config.server';
-import { captureMessage } from '@sentry/nextjs';
 
 /**
  * Apple App Attest attestation verifier.
@@ -17,6 +16,12 @@ import { captureMessage } from '@sentry/nextjs';
  *
  * CBOR, X.509, and ASN.1 decoding are delegated to `cbor2`, `@peculiar/asn1-x509`,
  * and `asn1js`. Only the App Attest rules live here.
+ *
+ * Every refusal this verifier returns is counted by the admission layer
+ * (`countAdmissionCondition('apple_attestation_failed:<error>')`), so this
+ * module reports nothing itself: a refusal carries no per-request event and no
+ * client-supplied detail such as a certificate fingerprint or nonce prefix.
+ * Provider and infrastructure faults are reported where they are thrown.
  */
 
 /**
@@ -39,6 +44,75 @@ function asBuffer(value: unknown): Buffer | null {
   if (Buffer.isBuffer(value)) return value;
   if (value instanceof Uint8Array) return Buffer.from(value.buffer, value.byteOffset, value.length);
   return null;
+}
+
+/**
+ * Apple's authenticator-data extension keys.
+ * https://developer.apple.com/documentation/devicecheck/attestation-object-validation-guide
+ */
+const APPLE_BUNDLE_VERSION_KEY = 'apple_bundle_version_01';
+const APPLE_VALIDATION_CATEGORY_KEY = 'apple_validation_category_01';
+
+/**
+ * Validate the `extensions` map Apple appends after the COSE key. Only the
+ * documented value shapes are enforced; other keys are ignored because the
+ * nonce covers these bytes and a future Apple key must not refuse attestations
+ * from that iOS version.
+ */
+function isAppleExtensionsMap(value: unknown): boolean {
+  if (!(value instanceof Map)) return false;
+  for (const [key, entry] of value) {
+    if (typeof key !== 'string') return false;
+    if (key === APPLE_BUNDLE_VERSION_KEY) {
+      if (typeof entry !== 'string') return false;
+    } else if (key === APPLE_VALIDATION_CATEGORY_KEY) {
+      // Apple emits a four-byte byte string; the guide describes a UInt32.
+      const bytes = asBuffer(entry);
+      const isFourByteString = bytes !== null && bytes.length === 4;
+      const isUint32 =
+        typeof entry === 'number' && Number.isInteger(entry) && entry >= 0 && entry <= 0xffffffff;
+      if (!isFourByteString && !isUint32) return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * Parse the authenticator-data tail: one COSE key, then Apple's optional
+ * `extensions` map, with every byte accounted for. Older attestations end at
+ * the key and must keep parsing. Returns null for any other shape.
+ *
+ * https://developer.apple.com/documentation/devicecheck/attestation-object-validation-guide
+ */
+export function parseAppleAttestAuthDataTail(tail: Buffer): Map<unknown, unknown> | null {
+  let items: unknown[];
+  try {
+    items = [
+      ...decodeSequence(tail, {
+        preferMap: true,
+        saveOriginal: true,
+        rejectDuplicateKeys: true,
+      }),
+    ];
+  } catch {
+    return null;
+  }
+  if (items.length < 1 || items.length > 2) return null;
+
+  // Item encodings must cover the input exactly, so padding and extra items
+  // cannot slip past.
+  let covered = 0;
+  for (const item of items) {
+    const encoded = getEncoded(item);
+    if (!encoded) return null;
+    covered += encoded.length;
+  }
+  if (covered !== tail.length) return null;
+
+  const [coseKey, extensions] = items;
+  if (!(coseKey instanceof Map)) return null;
+  if (extensions !== undefined && !isAppleExtensionsMap(extensions)) return null;
+  return coseKey;
 }
 
 // Apple App Attestation Root CA, published at
@@ -81,7 +155,10 @@ export type AppleAttestError =
   | 'NONCE_MISMATCH'
   | 'KEY_ID_MISMATCH';
 
-export type AppleAssertionError = 'INVALID_ASSERTION' | 'KEY_NOT_FOUND';
+// The key-not-found outcome is owned by the caller (`verifyAppleAdmission` in
+// native-admission.ts), which resolves the key before calling this verifier,
+// so this verifier only ever reports an invalid assertion.
+export type AppleAssertionError = 'INVALID_ASSERTION';
 
 /**
  * The clientDataHash App Attest binds a challenge with.
@@ -111,12 +188,7 @@ export async function verifyAppleAttestation(
   | { ok: true; credentialId: Buffer; publicKeySpkiBase64: string }
   | { ok: false; error: AppleAttestError }
 > {
-  let buf: Buffer;
-  try {
-    buf = Buffer.from(attestationBase64, 'base64');
-  } catch {
-    return { ok: false, error: 'INVALID_ATTEST_FORMAT' };
-  }
+  const buf = Buffer.from(attestationBase64, 'base64');
 
   const attestMap = decodeCborMap(buf);
   if (!attestMap) return { ok: false, error: 'INVALID_ATTEST_FORMAT' };
@@ -179,11 +251,9 @@ export async function verifyAppleAttestation(
   if (terminalFingerprint !== ROOT_CA_SHA256) {
     try {
       if (!terminalCert.verify(APPLE_APP_ATTEST_ROOT_CERT.publicKey)) {
-        captureMessage(`apple_attest_unknown_ca: ${terminalFingerprint}`);
         return { ok: false, error: 'CERT_CHAIN_INVALID' };
       }
     } catch {
-      captureMessage(`apple_attest_unknown_ca: ${terminalFingerprint}`);
       return { ok: false, error: 'CERT_CHAIN_INVALID' };
     }
   }
@@ -213,6 +283,11 @@ export async function verifyAppleAttestation(
     return { ok: false, error: 'KEY_ID_MISMATCH' };
   }
 
+  // Structure validation of one COSE key plus Apple's optional extensions
+  // map. The nonce below still covers every tail byte.
+  const coseKey = parseAppleAttestAuthDataTail(authData.subarray(pos));
+  if (!coseKey) return { ok: false, error: 'INVALID_ATTEST_FORMAT' };
+
   // Nonce check. Apple's nonce is SHA256(authData || clientDataHash).
   // `@expo/app-integrity` computes clientDataHash as SHA256 over the UTF-8
   // bytes of the challenge string it was handed, so hash the same bytes here.
@@ -225,17 +300,13 @@ export async function verifyAppleAttestation(
 
   const nonceExt = extractAppleAttestNonce(credCertBuf);
   if (!nonceExt || nonceExt.toString('hex') !== expectedNonce) {
-    captureMessage(
-      `apple_attest_nonce_mismatch: expected=${expectedNonce.substring(0, 16)}... got=${nonceExt?.toString('hex').substring(0, 16) ?? 'null'}...`
-    );
     return { ok: false, error: 'NONCE_MISMATCH' };
   }
 
-  // Extract COSE public key and export it as SPKI DER
-  const coseKeyBuf = authData.subarray(pos);
+  // Export the parsed COSE key as SPKI DER.
   let publicKeySpkiBase64: string;
   try {
-    publicKeySpkiBase64 = coseKeyToPublicKey(coseKeyBuf)
+    publicKeySpkiBase64 = coseKeyToPublicKey(coseKey)
       .export({ type: 'spki', format: 'der' })
       .toString('base64');
   } catch {
@@ -305,11 +376,11 @@ export function extractAppleAttestNonce(certDer: Buffer): Buffer | null {
  *
  * The COSE coordinates go through a JWK, so Node builds the SPKI encoding and
  * validates the point instead of this module hand-writing DER.
+ *
+ * Exported so Apple's published sample key can be checked without forging a
+ * certificate.
  */
-function coseKeyToPublicKey(coseKeyBuf: Buffer) {
-  const coseKey = decodeCborMap(coseKeyBuf);
-  if (!coseKey) throw new Error('not a map');
-
+export function coseKeyToPublicKey(coseKey: Map<unknown, unknown>) {
   // COSE labels: 1=kty, -1=crv, -2=x, -3=y (all integers)
   if (coseKey.get(1) !== 2) throw new Error('not EC2');
   if (coseKey.get(-1) !== 1) throw new Error('not P-256');
@@ -342,12 +413,7 @@ export async function verifyAppleAssertion(
   assertionBase64: string,
   publicKeySpkiBase64: string
 ): Promise<{ ok: true; signCount: number } | { ok: false; error: AppleAssertionError }> {
-  let assertionBuf: Buffer;
-  try {
-    assertionBuf = Buffer.from(assertionBase64, 'base64');
-  } catch {
-    return { ok: false, error: 'INVALID_ASSERTION' };
-  }
+  const assertionBuf = Buffer.from(assertionBase64, 'base64');
 
   const assertionMap = decodeCborMap(assertionBuf);
   if (!assertionMap) return { ok: false, error: 'INVALID_ASSERTION' };

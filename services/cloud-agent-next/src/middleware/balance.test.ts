@@ -14,7 +14,6 @@ const { requireCurrentSessionAccessMock } = vi.hoisted(() => ({
 
 vi.mock('../balance-validation.js', async importOriginal => ({
   ...(await importOriginal<typeof BalanceValidationModule>()),
-  fetchOrgIdForSession: vi.fn(),
   validateBalanceOnly: vi.fn(),
 }));
 
@@ -33,7 +32,7 @@ vi.mock('../session-access.js', () => ({
 }));
 
 const { balanceMiddleware } = await import('./balance.js');
-const { fetchOrgIdForSession, validateBalanceOnly } = await import('../balance-validation.js');
+const { validateBalanceOnly } = await import('../balance-validation.js');
 const { createSessionManagementHandlers } =
   await import('../router/handlers/session-management.js');
 const { protectedProcedure, router, t } = await import('../router/auth.js');
@@ -51,11 +50,15 @@ describe('balanceMiddleware', () => {
     expiresAt: Math.floor(Date.now() / 1000) + 3600,
     ...overrides,
   });
-  const parentTokenEnv = (getToken: ReturnType<typeof vi.fn>) =>
+  const parentTokenEnv = (getToken: (authority: CloudAgentAuthority) => Promise<string>) =>
     ({
-      SANDBOX_SESSION: {
+      CLOUD_AGENT_WORKSPACE: {
         idFromName: (name: string) => name,
-        get: () => ({ getCloudAgentSpawnRuntimeToken: getToken }),
+        get: () => ({
+          getSpawnContext: async (authority: CloudAgentAuthority) => ({
+            token: await getToken(authority),
+          }),
+        }),
       },
     }) as unknown as Env;
 
@@ -722,7 +725,6 @@ describe('balanceMiddleware', () => {
 
     expect(response.status).toBe(200);
     expect(validateBalanceOnly).toHaveBeenCalledWith('token-123', orgId, env);
-    expect(fetchOrgIdForSession).not.toHaveBeenCalled();
   });
 
   it('validates caller-supplied organization context against the stored session scope', async () => {

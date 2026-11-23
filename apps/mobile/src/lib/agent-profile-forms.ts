@@ -147,12 +147,14 @@ export type SkillInputError = 'empty' | 'too-long' | 'bad-name' | 'no-content';
 
 /**
  * The skill name a pasted SKILL.md offers for the name field: its frontmatter
- * `name`, folded and reduced to the server's pattern. Case and diacritics are
- * folded the way the app's search folds them, each run outside `[a-z0-9]`
- * becomes one dash, and edge dashes are dropped, so `My Skill` fills `my-skill`
- * and `Müller` fills `muller`. A name with no ASCII letter or digit left — a
- * name written in another script — fills nothing, because filling it would only
- * produce a value `validateSkillInput` rejects.
+ * `name`, folded and reduced to the server's pattern. Case, diacritics and
+ * compatibility forms are folded the way the app's search folds them, each run
+ * outside `[a-z0-9]` becomes one dash, and edge dashes are dropped, so
+ * `My Skill` fills `my-skill`, `Müller` fills `muller`, and a full-width
+ * `Ｍｙ Ｓｋｉｌｌ` or `ﬁle` fills the letters they stand for. A name with no
+ * ASCII letter or digit left — a name written in another script — fills
+ * nothing, because filling it would only produce a value `validateSkillInput`
+ * rejects.
  */
 export function skillNameFromMarkdown(markdown: string): string | undefined {
   const { name } = parseSkillFrontmatter(markdown);
@@ -220,11 +222,11 @@ export type InstructionInputError =
   | 'content-too-long';
 
 /**
- * Reduce a typed instruction name to the server's slug shape: ASCII lower case,
- * each run outside `[a-z0-9]` becomes one dash, and edge dashes are dropped, so
- * `Release Notes` becomes `release-notes`. A name with nothing left in ASCII
- * stays empty, because a substituted value would be a different file name than
- * the reader typed.
+ * Reduce a typed instruction name to the server's slug shape: ASCII lower case
+ * with diacritics and compatibility forms folded, each run outside `[a-z0-9]`
+ * becomes one dash, and edge dashes are dropped, so `Release Notes` becomes
+ * `release-notes`. A name with nothing left in ASCII stays empty, because a
+ * substituted value would be a different file name than the reader typed.
  */
 export function cleanInstructionName(value: string): string {
   return foldForSearch(value)

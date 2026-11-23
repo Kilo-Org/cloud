@@ -3,9 +3,11 @@ import {
   type HomeWidgetData,
   type HomeWidgetSessionRow,
 } from '@kilocode/app-shared/home-widget';
+import { type GlanceableSnapshotStatusOverride } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { _resetHomeWidgetDataForTests } from '@/lib/glanceable/home-widget-data';
+import { copyTranslate } from '@/lib/glanceable/copy.test-helpers';
 
 import { setSurfaceExtras } from '@/lib/glanceable/surface-extras';
 
@@ -18,10 +20,22 @@ import {
 const NOW = 1_750_000_000_000;
 const WAKE = new Date(NOW + 7_200_000).toISOString();
 const COPY: Record<string, string> = {
-  'glanceable.needsInput': 'Needs input',
-  'common.working': 'Working',
-  'common.scheduled': 'Scheduled',
-  'common.idle': 'Idle',
+  'glanceable.countNoun.needsInput_one': 'Needs input',
+  'glanceable.countNoun.needsInput_other': 'Needs input',
+  'glanceable.countNoun.running_one': 'Working',
+  'glanceable.countNoun.running_other': 'Working',
+  'glanceable.countNoun.scheduled_one': 'Scheduled',
+  'glanceable.countNoun.scheduled_other': 'Scheduled',
+  'glanceable.countNoun.idle_one': 'Idle',
+  'glanceable.countNoun.idle_other': 'Idle',
+  'glanceable.count.needsInput_one': '{{displayCount}} Needs input',
+  'glanceable.count.needsInput_other': '{{displayCount}} Needs input',
+  'glanceable.count.running_one': '{{displayCount}} Working',
+  'glanceable.count.running_other': '{{displayCount}} Working',
+  'glanceable.count.scheduled_one': '{{displayCount}} Scheduled',
+  'glanceable.count.scheduled_other': '{{displayCount}} Scheduled',
+  'glanceable.count.idle_one': '{{displayCount}} Idle',
+  'glanceable.count.idle_other': '{{displayCount}} Idle',
   'glanceable.waiting': 'Waiting for agents',
   'glanceable.empty': 'No work in progress',
   'glanceable.stale': 'Updates delayed',
@@ -31,10 +45,11 @@ const COPY: Record<string, string> = {
   'glanceable.openAgents': 'Open agents',
   'glanceable.newAgent': 'New agent',
   'common.approve': 'Approve',
-  'glanceable.checked': 'Checked',
-  'glanceable.lastKnown': 'Last known',
-  'glanceable.nextRun': 'Next run',
+  'glanceable.footer.checked': 'Checked {{time}}',
+  'glanceable.footer.lastKnown': 'Last known · {{time}}',
+  'glanceable.wake.nextRun': 'Next run {{time}}',
   'glanceable.awaitingUpdate': 'Awaiting update',
+  'glanceable.wake.wasDue': 'Was due {{time}}',
   'common.agent': 'Agent',
   'glanceable.approving': 'Approving…',
   'glanceable.couldNotApprove': 'Could not approve',
@@ -42,10 +57,11 @@ const COPY: Record<string, string> = {
   'glanceable.answerNeeded': 'Answer needed',
   'glanceable.waitingToRetry': 'Waiting to retry',
   'glanceable.scheduledWakes': 'wakes {{time}}',
+  'common.listJoiner': ', ',
 };
-const translate = (key: string) => COPY[key] ?? key;
+const translate = copyTranslate(COPY);
 const clock = (at: string) => `clock:${at}`;
-function dataFor(sessions: HomeWidgetSessionRow[], status?: HomeWidgetData['snapshot']['status']) {
+function dataFor(sessions: HomeWidgetSessionRow[], status?: GlanceableSnapshotStatusOverride) {
   return buildHomeWidgetData({
     sessions,
     userId: 'user-private-id',
@@ -92,9 +108,9 @@ describe('shared Home presentation localization', () => {
       footer: `Checked clock:${MIXED.snapshot.updatedAt}`,
     });
     expect(props.homeCopy?.secondaryCounts).toEqual([
-      { kind: 'running', count: '1', label: 'Working' },
-      { kind: 'scheduled', count: '1', label: 'Scheduled' },
-      { kind: 'idle', count: '1', label: 'Idle' },
+      { kind: 'running', count: '1', label: 'Working', text: '1 Working' },
+      { kind: 'scheduled', count: '1', label: 'Scheduled', text: '1 Scheduled' },
+      { kind: 'idle', count: '1', label: 'Idle', text: '1 Idle' },
     ]);
     expect(propsFor(dataFor([{ status: 'busy' }])).homeCopy?.secondaryCounts).toEqual([]);
   });
@@ -208,13 +224,29 @@ describe('shared Home presentation localization', () => {
     ]);
     expect(propsFor(data).homeCopy).toMatchObject({
       wake: `Next run clock:${WAKE}`,
+      wakePassed: false,
       title: 'Wake',
     });
     vi.setSystemTime(Date.parse(WAKE));
     const props = propsFor(data);
-    expect(props.homeCopy).toMatchObject({ wake: 'Awaiting update', wakeOverdue: true });
+    expect(props.homeCopy).toMatchObject({ wake: 'Awaiting update', wakePassed: true });
     expect(props.home?.primaryKind).toBe('scheduled');
     expect(props.home?.primaryCount).toBe(1);
+  });
+
+  it('names the clock time a wake was due once its retry window has closed', () => {
+    const due = new Date(NOW - 16 * 60_000).toISOString();
+    const data = dataFor([{ status: 'scheduled', title: 'Wake', scheduledAt: due }]);
+    expect(propsFor(data).homeCopy).toMatchObject({
+      wake: `Was due clock:${due}`,
+      // A passed wake draws muted on every cell, like the awaiting line.
+      wakePassed: true,
+    });
+    expect(propsFor(data).home).toMatchObject({
+      primaryKind: 'scheduled',
+      scheduledAt: due,
+      awaitingUpdate: false,
+    });
   });
 
   it('keeps unknown wake times absent while retaining the scheduled count', () => {
@@ -257,6 +289,24 @@ describe('shared Home presentation localization', () => {
     setSurfaceExtras({ newestSessionTitle: 'not Home data', actionFeedback: 'couldNotApprove' });
     expect(propsFor(MIXED).homeCopy?.accessibilityLabel).toContain('Could not approve');
     expect(propsFor(dataFor([], 'privacy')).homeCopy?.actionLine).toBeNull();
+  });
+
+  it('joins both Android spoken labels with the catalog list joiner', () => {
+    const ideographic = (key: string): string =>
+      key === 'common.listJoiner' ? '、' : translate(key);
+    const props = buildAndroidWidgetProps(
+      MIXED.snapshot,
+      {},
+      ideographic,
+      String,
+      String,
+      clock,
+      MIXED
+    );
+    expect(props.accessibilityLabel).toContain('、');
+    expect(props.accessibilityLabel).not.toContain(', ');
+    expect(props.homeCopy?.accessibilityLabel).toContain('、');
+    expect(props.homeCopy?.accessibilityLabel).not.toContain(', ');
   });
 
   it('does not attach private titles to the generic no-account fallback', () => {

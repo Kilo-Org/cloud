@@ -3,6 +3,8 @@ import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { Text } from '@/components/ui/text';
+import { Card } from '@/components/ui/card';
+import { FormFieldLabel } from '@/components/ui/form-field-label';
 import { QueryError } from '@/components/query-error';
 import { RepoSelector } from '@/components/agents/repo-selector';
 import { RepositoryBranchSelector } from '@/components/agents/repository-branch-selector';
@@ -17,7 +19,8 @@ import {
   RepositoryRefreshButton,
   RepositoryUnavailableCard,
 } from '@/components/agents/repository-card-actions';
-import { connectNoteKey, PROVIDER_COPY } from '@/components/agents/repository-provider-copy';
+import { connectCardOffer, PROVIDER_COPY } from '@/components/agents/repository-provider-copy';
+import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import {
   type NewSessionRepository,
   type RepositoryGroup,
@@ -90,6 +93,10 @@ export function NewSessionRepositorySection({
 }: Readonly<NewSessionRepositorySectionProps>) {
   const { t } = useTranslation();
   const { collapsedCtas } = useCollapsedConnectCtas();
+  // The organization provider is mounted app-wide, so the route's scope resolves
+  // its membership here instead of through a prop. `role` is what decides
+  // whether a Bitbucket card can offer its connect action at all.
+  const { role } = useOrgBoundary(organizationId);
 
   const hasRepos = repositories.length > 0;
   const anyLoading = groups.some(group => group.status === 'loading');
@@ -103,14 +110,12 @@ export function NewSessionRepositorySection({
     null;
 
   return (
-    <View className="mt-5">
-      <Text className="mb-2 text-sm font-medium text-muted-foreground">
-        {t('common.repository')}
-      </Text>
+    <View className="gap-2">
+      <FormFieldLabel label={t('common.repository')} />
 
       {/*
         The picker renders unconditionally. Its trigger always reserves its
-        height and already covers loading ("Loading..."), empty ("Select
+        height and already covers loading ("Loading…"), empty ("Select
         repository") and disabled states, so gating it off (the old
         `hasRepos || anyLoading`) could leave the `Repository` heading as the
         section's only child — a blank void above Start session — while a
@@ -146,26 +151,33 @@ export function NewSessionRepositorySection({
                   isRetrying={isRetrying}
                 />
               ) : null}
-              {renderGroupCard(group.key, group.status)}
+              {renderGroupCard(group)}
             </Fragment>
           ))
         : null}
     </View>
   );
 
-  function renderGroupCard(
-    platform: RepositoryPlatform,
-    status: RepositoryGroup['status']
-  ): ReactElement | null {
-    switch (status) {
+  function renderGroupCard(group: RepositoryGroup): ReactElement | null {
+    const platform = group.key;
+    switch (group.status) {
       case 'connect': {
-        const noteKey = connectNoteKey(platform);
+        // `rowsUnlisted` separates a first connect from a connected workspace
+        // whose answer still asks for a selection or fresh credentials.
+        const needsReconnect = group.rowsUnlisted === true;
+        const offer = connectCardOffer(platform, role, needsReconnect);
         return selectedRepository === null ? (
-          renderConnectCard(platform)
+          renderConnectCard(platform, needsReconnect)
         ) : (
           <View className="mt-3 gap-2">
-            {noteKey ? <Text variant="muted">{t(noteKey)}</Text> : null}
-            {renderConnectActions(platform)}
+            {/* This row has no header, so its first-connect note names the provider
+                itself; the reconnect note is provider neutral, so this row states
+                that name on the line above instead. */}
+            {offer.compactContextKey ? (
+              <Text variant="muted">{t(offer.compactContextKey)}</Text>
+            ) : null}
+            {offer.compactNoteKey ? <Text variant="muted">{t(offer.compactNoteKey)}</Text> : null}
+            {offer.offersAction ? renderConnectActions(platform) : renderRefreshOnly()}
           </View>
         );
       }
@@ -213,19 +225,29 @@ export function NewSessionRepositorySection({
     }
   }
 
-  function renderConnectCard(platform: RepositoryPlatform): ReactElement | null {
+  function renderConnectCard(
+    platform: RepositoryPlatform,
+    needsReconnect: boolean
+  ): ReactElement | null {
     const copy = PROVIDER_COPY[platform];
-    const noteKey = connectNoteKey(platform);
+    const offer = connectCardOffer(platform, role, needsReconnect);
+    // The reconnect header names a step the reader cannot take, so it shows
+    // only where the card keeps the ask note instead of the action.
+    const title =
+      needsReconnect && !offer.offersAction
+        ? t('prReview.connect.reconnectTitleBitbucket')
+        : t(copy.connectTitle);
     return (
       <CollapsibleSection
-        className="mt-3 rounded-lg border border-border bg-card"
-        contentClassName="gap-3"
-        // The connected-but-empty card below is a `p-4` surface, and the two are
-        // mutually exclusive states of the same region, so this one keeps that
-        // 14 dp inset instead of the section's 10.5 dp default.
-        inset="roomy"
+        className="mt-3"
+        // The body is plain copy and buttons that belong to the header, so it
+        // sits on the header's own surface under a hairline: on the page, the
+        // copy read as apart from the filled header bar. It brings no surface of
+        // its own, so nothing is nested, and it takes the header row's gutter.
+        bodyOnSurface
+        contentClassName="gap-3 px-4"
         titleClassName="font-semibold"
-        title={t(copy.connectTitle)}
+        title={title}
         // The card stacks under the repository picker in a scrolling column,
         // and the picker's height settles asynchronously (repos load, the
         // selection changes), while the branch row mounts above the card once a
@@ -242,13 +264,32 @@ export function NewSessionRepositorySection({
           {copy.connectDescription ? (
             <Text variant="muted">{t(copy.connectDescription)}</Text>
           ) : null}
-          {noteKey ? <Text variant="muted">{t(noteKey)}</Text> : null}
+          {offer.noteKey ? <Text variant="muted">{t(offer.noteKey)}</Text> : null}
         </View>
-        {renderConnectActions(platform)}
+        {offer.offersAction ? renderConnectActions(platform) : renderRefreshOnly()}
       </CollapsibleSection>
     );
   }
 
+  /**
+   * The refresh a connect card keeps when it offers no connect action. The
+   * action row owns the same control, so a member who cannot connect still has
+   * the provider list's one way to ask again after someone else connects it.
+   */
+  function renderRefreshOnly(): ReactElement {
+    return (
+      <View className="flex-row justify-end">
+        <RepositoryRefreshButton onRefreshRepos={onRefreshRepos} isRetrying={isRetrying} />
+      </View>
+    );
+  }
+
+  /**
+   * The provider's connect action. Callers render it only when
+   * `connectCardOffer` offers it: a Bitbucket member without organization
+   * billing authority is refused by the server, so the card states that
+   * restriction instead of showing a tap that can only fail.
+   */
   function renderConnectActions(platform: RepositoryPlatform): ReactElement {
     const copy = PROVIDER_COPY[platform];
     return (
@@ -266,7 +307,7 @@ export function NewSessionRepositorySection({
   function renderConnectedEmptyCard(platform: RepositoryPlatform): ReactElement | null {
     const copy = PROVIDER_COPY[platform];
     return (
-      <View className="mt-3 gap-3 rounded-lg border border-border bg-card p-4">
+      <Card className="mt-3">
         <View className="gap-1">
           <Text className="text-sm font-semibold text-foreground">{t(copy.connectedTitle)}</Text>
           <Text variant="muted">{t(copy.emptyDescription)}</Text>
@@ -274,7 +315,7 @@ export function NewSessionRepositorySection({
         <View className="flex-row gap-2">
           <RepositoryRefreshButton onRefreshRepos={onRefreshRepos} isRetrying={isRetrying} />
         </View>
-      </View>
+      </Card>
     );
   }
 }

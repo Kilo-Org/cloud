@@ -5,7 +5,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { act, TestRenderer } from '@/test/renderer';
 
+import { i18n } from '@/i18n';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import { formatList } from '@/lib/format';
 
 import { ChoiceRow } from './choice-row';
 
@@ -15,7 +17,11 @@ vi.mock('react-native', () => ({
   View: 'View',
 }));
 vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
-vi.mock('@/components/ui/icons', () => ({ Check: 'Check' }));
+vi.mock('@/components/ui/icons', () => ({
+  Check: 'Check',
+  Square: 'Square',
+  SquareCheck: 'SquareCheck',
+}));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ foreground: '#111111', mutedForeground: '#6f6a61' }),
@@ -31,7 +37,8 @@ type RowProps = {
   busy?: boolean;
   multi?: boolean;
   disabled?: boolean;
-  onPress?: () => void;
+  onPress?: (() => void) | (() => boolean);
+  testID?: string;
   children?: ReactNode;
 };
 
@@ -55,13 +62,22 @@ function rowControl(root: TestRenderer.ReactTestInstance) {
   return root.find(node => Object.is(node.type, 'Pressable'));
 }
 
-afterEach(() => {
+afterEach(async () => {
   act(() => renderer?.unmount());
   renderer = undefined;
   vi.mocked(Haptics.selectionAsync).mockReset();
+  await i18n.changeLanguage('en');
 });
 
 describe('ChoiceRow accessible name', () => {
+  it('takes the contract row anatomy', () => {
+    const classes = String(
+      rowControl(renderRow({ label: 'Balanced', selected: false })).props.className
+    ).split(' ');
+
+    expect(classes).toEqual(expect.arrayContaining(['min-h-[48px]', 'px-4', 'py-3']));
+  });
+
   it('names a row after its label alone when it has no caption', () => {
     const control = rowControl(renderRow({ label: 'Balanced', selected: false }));
 
@@ -77,7 +93,7 @@ describe('ChoiceRow accessible name', () => {
       })
     );
 
-    expect(control.props.accessibilityLabel).toBe('Lenient and Only serious problems');
+    expect(control.props.accessibilityLabel).toBe('Lenient, Only serious problems');
   });
 
   it('keeps the name while the row reports a save in flight', () => {
@@ -91,12 +107,25 @@ describe('ChoiceRow accessible name', () => {
       })
     );
 
-    expect(control.props.accessibilityLabel).toBe('Lenient and Only serious problems');
+    expect(control.props.accessibilityLabel).toBe('Lenient, Only serious problems');
     expect(control.props.accessibilityState).toEqual({
       checked: false,
       disabled: true,
       busy: true,
     });
+  });
+
+  // The Hindi catalog writes "कोड लिखें" beside "कोड लिखें और बदलें", so a list
+  // conjunction reads the caption as a second offered item.
+  it('separates a Hindi label from its caption with punctuation', async () => {
+    await i18n.changeLanguage('hi');
+    const label = i18n.t('agentChat.modeOptions.code');
+    const description = i18n.t('agentChat.modeOptions.codeDescription');
+
+    const control = rowControl(renderRow({ label, description, selected: false }));
+
+    expect(control.props.accessibilityLabel).toBe(`${label}, ${description}`);
+    expect(control.props.accessibilityLabel).not.toBe(formatList([label, description], 'hi'));
   });
 
   it('leaves a custom-content row on the name its own text builds', () => {
@@ -131,6 +160,25 @@ describe('ChoiceRow accessible name', () => {
     const multiple = rowControl(renderRow({ label: 'Many', selected: true, multi: true }));
     expect(multiple.props.accessibilityRole).toBe('checkbox');
   });
+
+  it('marks every multi-select row, and holds a single choice blank until it is picked', () => {
+    // A multi-select list with no mark on its unselected rows read as inert
+    // text (focus areas), so each of its rows draws a box; a single choice keeps
+    // the one check, held transparent while the row is not the pick.
+    const glyph = (root: TestRenderer.ReactTestInstance) =>
+      root.find(node => ['Check', 'Square', 'SquareCheck'].includes(String(node.type)));
+
+    const unpicked = glyph(renderRow({ label: 'Many', selected: false, multi: true }));
+    expect(unpicked.type).toBe('Square');
+    expect(unpicked.props.color).toBe('#6f6a61');
+    expect(glyph(renderRow({ label: 'Many', selected: true, multi: true })).type).toBe(
+      'SquareCheck'
+    );
+
+    const single = glyph(renderRow({ label: 'One', selected: false }));
+    expect(single.type).toBe('Check');
+    expect(single.props.color).toBe('transparent');
+  });
 });
 
 describe('ChoiceRow selection haptic', () => {
@@ -145,6 +193,27 @@ describe('ChoiceRow selection haptic', () => {
     });
 
     expect(onPress).toHaveBeenCalledOnce();
+  });
+
+  // A press that the screen refuses — a save in flight, a locked scope — must
+  // not announce a choice that did not happen.
+  it('ticks only when the caller accepts the press', () => {
+    const accepted = rowControl(
+      renderRow({ label: 'Balanced', selected: false, onPress: () => true })
+    );
+    act(() => {
+      (accepted.props.onPress as () => void)();
+    });
+    expect(Haptics.selectionAsync).toHaveBeenCalledOnce();
+
+    vi.mocked(Haptics.selectionAsync).mockReset();
+    const refused = rowControl(
+      renderRow({ label: 'Balanced', selected: false, onPress: () => false })
+    );
+    act(() => {
+      (refused.props.onPress as () => void)();
+    });
+    expect(Haptics.selectionAsync).not.toHaveBeenCalled();
   });
 });
 
@@ -194,5 +263,15 @@ describe('ChoiceRow touch target', () => {
       expect(String(control.props.className).split(' ')).toContain(ROW_TARGET_CLASS);
       expect(control.props.hitSlop).toBeUndefined();
     }
+  });
+});
+
+describe('ChoiceRow test handle', () => {
+  it("puts the caller's testID on the row control", () => {
+    const control = rowControl(
+      renderRow({ label: 'Balanced', selected: true, testID: 'choice-1' })
+    );
+
+    expect(control.props.testID).toBe('choice-1');
   });
 });

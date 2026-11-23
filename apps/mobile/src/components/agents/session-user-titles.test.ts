@@ -226,9 +226,7 @@ describe('session-user-titles durable record', () => {
     await __flushUserSessionTitlesWritesForTests();
 
     expect(kvMock.getItem).toHaveBeenCalledTimes(2);
-    // The blob keeps both persisted entries and adds this run's title, instead
-    // of being replaced by a blob rebuilt from the map the failed read left
-    // empty. Map order is not the record's contract, so compare contents.
+    // Map order is not the record's contract, so compare contents.
     const stored = storedBlobEntries();
     expect(stored).toHaveLength(3);
     expect(stored).toEqual(

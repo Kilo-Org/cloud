@@ -35,6 +35,7 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/screen-insets', () => ({
   useSideInsetStyle: () => ({}),
   useScreenInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+  useDetailScreenBottomPadding: () => 0,
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({
@@ -123,6 +124,19 @@ afterEach(async () => {
   mountedRenderer.current?.unmount();
   // Other suites keep their catalog language; restore the default.
   await i18n.changeLanguage('en');
+});
+
+describe('LegalDocumentScreen body selection', () => {
+  it('renders the body as plain text, not as a focusable selection block', async () => {
+    await i18n.changeLanguage('en');
+    const renderer = mountScreen();
+
+    const bodies = renderer.root.findAll(isBody);
+    expect(bodies).toHaveLength(1);
+    // A selectable body becomes one focusable selection block per paragraph
+    // group, so a screen reader meets prose as controls.
+    expect(bodies[0]?.props.selectable).toBe(false);
+  });
 });
 
 describe('LegalDocumentScreen English-only notice', () => {

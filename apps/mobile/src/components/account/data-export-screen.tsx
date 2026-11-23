@@ -5,13 +5,18 @@ import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { ExportRow } from '@/components/account/data-export-row';
+import { CenteredState } from '@/components/centered-state';
+import { useShortCenteredBand } from '@/components/centered-state-band';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { FormField } from '@/components/ui/form-field';
 import { Archive, FileText, Share } from '@/components/ui/icons';
+import { RowGroup } from '@/components/ui/row-group';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
@@ -19,10 +24,30 @@ import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { codeFailureMessage, DOWNLOAD_CODE_PATTERN } from '@/lib/data-export-code';
 import { getDataExportFailureMessage, shareDataExport } from '@/lib/data-export-download';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { useTRPC } from '@/lib/trpc';
 
 const SKELETON_ROWS = [0, 1];
+
+/** The stack the unavailable answer paints — the notice's disc, title line and
+ *  two description lines — so that answer lands where the reserve painted. The
+ *  read error keeps the same band but carries its retry action below the copy,
+ *  which this reserve does not hold. A short band drops the disc, as the notice
+ *  it reserves does. */
+function ReleaseCheckSkeleton() {
+  const shortBand = useShortCenteredBand();
+  return (
+    <View className="items-center gap-4" testID="data-export-release-check">
+      {shortBand ? null : <Skeleton className="h-14 w-14 rounded-full" />}
+      <View className="items-center gap-1">
+        <Skeleton className="h-6 w-40 rounded" />
+        <Skeleton className="h-4 w-56 max-w-full rounded" />
+        <Skeleton className="h-4 w-32 max-w-full rounded" />
+      </View>
+    </View>
+  );
+}
 
 /** The emailed-code step: either closed, or open for one export. */
 type ExportChallenge =
@@ -129,10 +154,12 @@ export function DataExportScreen() {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={t('profile.dataExport.title')} backFallback={PROFILE_TAB_HREF} />
-        <View className="gap-3 px-4 pt-4">
-          <Skeleton className="h-[70px] rounded-lg" />
-          <Skeleton className="h-11 rounded-lg" />
-        </View>
+        <CenteredState>
+          {/* The two whole-surface answers — the notice and the read error —
+              land in this same centered band; the released answer becomes the
+              content screen below the header instead. */}
+          <ReleaseCheckSkeleton />
+        </CenteredState>
       </View>
     );
   }
@@ -151,6 +178,7 @@ export function DataExportScreen() {
       <View className="flex-1 bg-background">
         <ScreenHeader title={t('profile.dataExport.title')} backFallback={PROFILE_TAB_HREF} />
         <EmptyState
+          placement="center"
           icon={Archive}
           title={t('profile.dataExport.unavailableTitle')}
           description={t('profile.dataExport.unavailableDescription')}
@@ -164,15 +192,16 @@ export function DataExportScreen() {
   let body: ReactNode = null;
   if (exportsQuery.isPending) {
     body = (
-      <View className="gap-3">
+      <RowGroup>
         {SKELETON_ROWS.map(row => (
-          <Skeleton key={row} className="h-[70px] rounded-lg" />
+          <RowSkeleton key={row} tile lines={3} />
         ))}
-      </View>
+      </RowGroup>
     );
   } else if (exportsQuery.isError) {
     body = (
       <QueryError
+        placement="top"
         onRetry={() => void exportsQuery.refetch()}
         isRetrying={exportsQuery.isFetching}
       />
@@ -180,6 +209,7 @@ export function DataExportScreen() {
   } else if (exportsQuery.data.exports.length === 0) {
     body = (
       <EmptyState
+        placement="top"
         icon={Archive}
         title={t('profile.dataExport.emptyTitle')}
         description={t('profile.dataExport.emptyDescription')}
@@ -187,7 +217,7 @@ export function DataExportScreen() {
     );
   } else {
     body = (
-      <View className="gap-3">
+      <RowGroup leadingTile>
         {exportsQuery.data.exports.map(dataExport => (
           <ExportRow
             key={dataExport.id}
@@ -201,7 +231,7 @@ export function DataExportScreen() {
             }}
           />
         ))}
-      </View>
+      </RowGroup>
     );
   }
 
@@ -210,14 +240,12 @@ export function DataExportScreen() {
       <ScreenHeader title={t('profile.dataExport.title')} backFallback={PROFILE_TAB_HREF} />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="gap-6 px-4 pt-4"
+        contentContainerClassName={SCREEN_BODY_CLASS}
         automaticallyAdjustKeyboardInsets
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <Text variant="muted" className="text-xs">
-          {t('profile.dataExport.description')}
-        </Text>
+        <Text variant="muted">{t('profile.dataExport.description')}</Text>
         <Button
           className={STATE_ACTION_CLASS}
           loading={request.isPending}
@@ -231,10 +259,10 @@ export function DataExportScreen() {
         </Button>
         {body}
         {requestCodeError === null ? null : (
-          <Text className="text-sm text-destructive">{requestCodeError}</Text>
+          <Text className="text-destructive">{requestCodeError}</Text>
         )}
         {openChallenge === null ? null : (
-          <View className="gap-3">
+          <Card>
             <FormField
               key={openChallenge.challengeId}
               label={t('profile.dataExport.codeLabel')}
@@ -274,9 +302,9 @@ export function DataExportScreen() {
               <Text>{t('profile.dataExport.download')}</Text>
             </Button>
             {openChallenge.entryError === null ? null : (
-              <Text className="text-sm text-destructive">{openChallenge.entryError}</Text>
+              <Text className="text-destructive">{openChallenge.entryError}</Text>
             )}
-          </View>
+          </Card>
         )}
       </TabScreenScrollView>
     </View>

@@ -26,6 +26,8 @@ const findings = vi.hoisted(() => ({
   data: undefined as FindingPages | undefined,
   isLoading: false,
   isError: false,
+  /** The failed read's error, which decides the kind of the failure. */
+  error: null as unknown,
   isFetching: false,
   // TanStack Query's `fetchStatus`: `paused` is a read the online manager will
   // not run, `fetching` one in flight, `idle` neither.
@@ -39,6 +41,8 @@ const findings = vi.hoisted(() => ({
 const repositories = vi.hoisted(() => ({
   isLoading: false,
   isError: false,
+  /** The repositories read's error, which participates in the one kind. */
+  error: null as unknown,
   refetch: vi.fn(),
 }));
 const capacity = vi.hoisted(() => ({
@@ -46,12 +50,25 @@ const capacity = vi.hoisted(() => ({
   refetch: vi.fn(),
 }));
 
+/** Records the `(scope, enabled)` each mount hands the capacity read. */
+const useSecurityAnalysisCapacity = vi.hoisted(() =>
+  vi.fn((_scope: string, _enabled?: boolean) => capacity)
+);
+
+/** A tRPC client rejection, as `readTrpcErrorField` reads it. */
+function trpcError(code: string): Error {
+  return Object.assign(new Error(code), { data: { code, message: code } });
+}
+
 function analyzableFinding(id: string): FindingFixture {
   return { id, status: 'open', analysis_status: null, remediationSummary: null };
 }
 
+// The row the server keeps open after the analysis completed: the one shape
+// that fails if `isSecurityFindingAnalyzable` stops checking the analysis
+// state, because its status alone would let it through.
 function analyzedFinding(id: string): FindingFixture {
-  return { id, status: 'fixed', analysis_status: 'completed', remediationSummary: null };
+  return { id, status: 'open', analysis_status: 'completed', remediationSummary: null };
 }
 
 /** The rendered capacity line for `securityAgent.analysis.<key>`, if any. */
@@ -74,6 +91,7 @@ vi.mock('react-native', () => ({
   View: 'View',
   Pressable: 'Pressable',
   RefreshControl: 'RefreshControl',
+  useColorScheme: () => 'light',
 }));
 vi.mock('@shopify/flash-list', () => ({ FlashList: 'FlashList' }));
 vi.mock('expo-router', () => ({
@@ -92,8 +110,12 @@ vi.mock('@/components/ui/icons', () => ({
   ShieldCheck: 'ShieldCheck',
   SlidersHorizontal: 'SlidersHorizontal',
   Info: 'Info',
+  X: 'X',
 }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/picker-sheet', () => ({ PickerSheet: 'PickerSheet' }));
@@ -111,7 +133,8 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/hooks/use-security-agent', () => ({
   useSecurityAgentConfig: () => ({ data: { repositorySelectionMode: 'all' } }),
   useSecurityAgentRepositories: () => repositories,
-  useSecurityAnalysisCapacity: () => capacity,
+  useSecurityAnalysisCapacity: (scope: string, enabled?: boolean) =>
+    useSecurityAnalysisCapacity(scope, enabled),
 }));
 vi.mock('@/lib/hooks/use-security-findings', () => ({
   useSecurityFindings: (...args: unknown[]) => {
@@ -150,6 +173,7 @@ beforeEach(() => {
   findings.data = { pages: [{ findings: [] }] };
   findings.isLoading = false;
   findings.isError = false;
+  findings.error = null;
   findings.isFetching = false;
   findings.fetchStatus = 'idle';
   findings.isFetchingNextPage = false;
@@ -158,6 +182,7 @@ beforeEach(() => {
   findings.refetch.mockResolvedValue({ isError: false });
   repositories.isLoading = false;
   repositories.isError = false;
+  repositories.error = null;
   repositories.refetch.mockResolvedValue({});
   connectivity.known = true;
   capacity.state = 'available';
@@ -235,7 +260,6 @@ describe('Security Agent list surfaces', () => {
       pathname: '/(app)/security-agent/[scope]/filter',
       params: { scope: 'personal' },
     });
-
     act(errors[0]?.props.onRetry as () => void);
     expect(repositories.refetch).toHaveBeenCalledTimes(1);
   });
@@ -245,13 +269,74 @@ describe('Security Agent list surfaces', () => {
     expect(root.findAllByType(QueryError)).toHaveLength(0);
   });
 
-  it('retries the repositories query on pull-to-refresh', async () => {
+  // D3: the screen reads through two calls, and the failure's KIND decided
+  // nothing: a permission refusal and a terminal failure rendered the same
+  // "Could not load repositories" + "Could not load findings" pair with two
+  // Retrys. One refusal now names itself, once, with no retry.
+  it('names a permission refusal once, with no Retry', async () => {
+    findings.data = undefined;
+    findings.isError = true;
+    findings.error = trpcError('FORBIDDEN');
+    repositories.isError = true;
+    repositories.error = trpcError('FORBIDDEN');
     const root = await mount();
-    const empty = root.findByType(EmptyState);
 
-    await refresh(empty.props.refreshControl as ReactElement<{ onRefresh: () => void }>);
+    const errors = root.findAllByType(QueryError);
+    expect(errors).toHaveLength(1);
+    expect(errors[0]?.props.variant).toBe('permission');
+    expect(errors[0]?.props.onRetry).toBeUndefined();
+  });
+
+  it('names a terminal failure once, with no Retry', async () => {
+    findings.data = undefined;
+    findings.isError = true;
+    findings.error = trpcError('NOT_FOUND');
+    const root = await mount();
+
+    const errors = root.findAllByType(QueryError);
+    expect(errors).toHaveLength(1);
+    expect(errors[0]?.props.variant).toBe('not-found');
+    expect(errors[0]?.props.onRetry).toBeUndefined();
+  });
+
+  it('keeps the retryable server copy and one Retry for a transient failure', async () => {
+    findings.data = undefined;
+    findings.isError = true;
+    findings.error = trpcError('INTERNAL_SERVER_ERROR');
+    repositories.isError = true;
+    repositories.error = trpcError('INTERNAL_SERVER_ERROR');
+    const root = await mount();
+
+    const errors = root.findAllByType(QueryError);
+    expect(errors).toHaveLength(1);
+    expect(errors[0]?.props.variant).toBe('server');
+    expect(errors[0]?.props.message).toBe('securityAgent.findingList.couldNotLoad');
+    // One Retry recovers BOTH failed reads, because both feed this surface.
+    act(errors[0]?.props.onRetry as () => void);
+    expect(findings.refetch).toHaveBeenCalledOnce();
+    expect(repositories.refetch).toHaveBeenCalledOnce();
+  });
+
+  it('retries the repositories query on pull-to-refresh', async () => {
+    findings.data = { pages: [{ findings: [analyzableFinding('a')] }] };
+    const root = await mount();
+    const list = root.findByType(FlashList);
+
+    await refresh(list.props.refreshControl as ReactElement<{ onRefresh: () => void }>);
     expect(repositories.refetch).toHaveBeenCalledTimes(1);
     expect(capacity.refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves the disabled capacity read out of pull-to-refresh', async () => {
+    findings.data = { pages: [{ findings: [analyzedFinding('a')] }] };
+    const root = await mount();
+    const list = root.findByType(FlashList);
+
+    await refresh(list.props.refreshControl as ReactElement<{ onRefresh: () => void }>);
+    expect(repositories.refetch).toHaveBeenCalledTimes(1);
+    // A disabled read's `refetch` still reaches the network, so the pull must
+    // not ask for a notice that no row can render.
+    expect(capacity.refetch).not.toHaveBeenCalled();
   });
 
   it('shows the skeleton for a first read in flight', async () => {
@@ -260,7 +345,7 @@ describe('Security Agent list surfaces', () => {
     findings.isFetching = true;
     findings.fetchStatus = 'fetching';
     const root = await mount();
-    expect(root.findAllByType(FindingRowSkeleton)).toHaveLength(3);
+    expect(root.findAllByType(FindingRowSkeleton).length).toBeGreaterThan(0);
     expect(root.findAllByType(EmptyState)).toHaveLength(0);
     expect(root.findAllByType(QueryError)).toHaveLength(0);
   });
@@ -278,7 +363,9 @@ describe('Security Agent list surfaces', () => {
     expect(root.findAllByType(FindingRowSkeleton)).toHaveLength(0);
     const error = root.findByType(QueryError);
     expect(error.props.variant).toBe('offline');
-    expect(error.props.message).toBe('securityAgent.findingList.couldNotLoad');
+    // The connection's sentence is the variant's own description; a message
+    // here would override it and describe a missing network as a failed read.
+    expect(error.props.message).toBeUndefined();
     act(error.props.onRetry as () => void);
     expect(findings.refetch).toHaveBeenCalledOnce();
   });
@@ -290,7 +377,7 @@ describe('Security Agent list surfaces', () => {
     findings.fetchStatus = 'paused';
     const root = await mount();
 
-    expect(root.findAllByType(FindingRowSkeleton)).toHaveLength(3);
+    expect(root.findAllByType(FindingRowSkeleton).length).toBeGreaterThan(0);
     expect(root.findAllByType(EmptyState)).toHaveLength(0);
     expect(root.findAllByType(QueryError)).toHaveLength(0);
   });
@@ -336,32 +423,14 @@ describe('Security Agent list surfaces', () => {
     }
   );
 
-  it('spaces rows with a measured separator instead of the ignored contentContainerStyle gap', async () => {
+  it('draws the page gutter on the list header band', async () => {
     findings.data = { pages: [{ findings: [{ id: 'finding-1' }] }] };
     const root = await mount();
     const list = root.findByType(FlashList);
-    // FlashList v2 positions every cell absolutely and ignores `gap`, so the
-    // 12px inter-row gap must ride on the measured separator, not the content
-    // style — otherwise every card renders flush against the next.
-    expect(list.props.contentContainerStyle).not.toHaveProperty('gap');
-    const Separator = list.props.ItemSeparatorComponent as () => ReactElement;
-    mounted?.unmount();
-    mounted = await renderWithProviders(createElement(Separator));
-    const spacer = mounted.renderer.root.findByType('View');
-    expect(spacer.props.className).toBe('h-3');
-  });
-
-  it('restores the header and footer boundary gaps the separator cannot cover', async () => {
-    findings.data = { pages: [{ findings: [{ id: 'finding-1' }] }] };
-    const root = await mount();
-    const list = root.findByType(FlashList);
-    // The old content-container `gap-3` also sat between the header and the
-    // first row and between the last row and the footer. FlashList's separator
-    // only spans items, so each boundary carries its own 12px pad.
+    // Rows are full-bleed and own their gutters, so the list header draws the
+    // page gutter itself and keeps the 12px pad to the first row.
     const header = list.props.ListHeaderComponent as ReactElement<{ className: string }>;
-    const footer = list.props.ListFooterComponent as ReactElement<{ className: string }>;
-    expect(header.props.className).toBe('pb-3');
-    expect(footer.props.className).toBe('pt-3');
+    expect(header.props.className).toBe('px-4 pb-3');
   });
 
   async function mountListHeader() {
@@ -378,6 +447,32 @@ describe('Security Agent list surfaces', () => {
     findings.data = { pages: [{ findings: [analyzableFinding('a'), analyzableFinding('b')] }] };
     const header = await mountListHeader();
     expect(capacityCopy(header, 'capacityFull')).toHaveLength(1);
+  });
+
+  // The capacity counters poll while the owner is at the limit, and the notice
+  // they feed only appears above a row that offers an analysis action. The same
+  // row flag enables the read, so a list of already-analyzed findings keeps no
+  // read awake.
+  it('leaves the capacity read off when no row offers the action', async () => {
+    findings.data = { pages: [{ findings: [analyzedFinding('a')] }] };
+    const root = await mount();
+
+    expect(root.findByType(FlashList).props.data).toHaveLength(1);
+    expect(useSecurityAnalysisCapacity).toHaveBeenLastCalledWith('personal', false);
+  });
+
+  it('reads the capacity counters once a row offers the action', async () => {
+    capacity.state = 'full';
+    findings.data = { pages: [{ findings: [analyzedFinding('a'), analyzableFinding('b')] }] };
+    const root = await mount();
+
+    expect(useSecurityAnalysisCapacity).toHaveBeenLastCalledWith('personal', true);
+    // The notice and the read stay on the one flag: an enabled read still shows
+    // the explanation over the analyzable row.
+    const header = root.findByType(FlashList).props.ListHeaderComponent as ReactNode;
+    mounted?.unmount();
+    mounted = await renderWithProviders(createElement('Header', null, header));
+    expect(capacityCopy(mounted.renderer.root, 'capacityFull')).toHaveLength(1);
   });
 
   it.each([

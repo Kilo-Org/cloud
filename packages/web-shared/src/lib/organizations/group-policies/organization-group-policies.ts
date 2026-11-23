@@ -1,3 +1,4 @@
+import { hasVisibleText } from '@kilocode/app-shared/text';
 import type {
   OrganizationGroupPolicies,
   OrganizationGroupPolicy,
@@ -8,6 +9,10 @@ import {
   ORGANIZATION_GROUP_MODEL_ACCESS_POLICY_TYPE,
   OrganizationGroupModelAccessPolicySchema,
 } from './model-access/model-access.schema';
+import {
+  OrganizationGroupAgentPermissionsPolicySchema,
+  OrganizationPermissionPolicyTypeSchema,
+} from './permission-policy/permission-policy.schema';
 
 export * from './model-access/model-access.schema';
 
@@ -22,15 +27,37 @@ export type {
 
 export const MAX_ORGANIZATION_GROUP_POLICIES = 20;
 
+/** The longest group name the platform stores and accepts, and the field's `maxLength`. */
+export const ORGANIZATION_GROUP_NAME_MAX_LENGTH = 80;
+
+/**
+ * A group name a person can read on the row that shows it.
+ *
+ * `trim()` keeps zero-width and control characters, which would let a name of
+ * nothing visible pass the length check and save as a nameless row — the same
+ * reason `OrganizationNameSchema` refines with `hasVisibleText`. The order is
+ * the organization schema's: trim, then visibility, then the bound.
+ */
+export const OrganizationGroupNameSchema = z
+  .string()
+  .trim()
+  .refine(hasVisibleText, 'Group name is required')
+  .max(
+    ORGANIZATION_GROUP_NAME_MAX_LENGTH,
+    `Group name must be ${ORGANIZATION_GROUP_NAME_MAX_LENGTH} characters or fewer`
+  );
+
 export const ORGANIZATION_GROUPS_ENTERPRISE_ONLY_MESSAGE =
   'Groups are available to Enterprise organizations.';
 
 export const OrganizationGroupPolicyTypeSchema = z.enum([
   ORGANIZATION_GROUP_MODEL_ACCESS_POLICY_TYPE,
+  ...OrganizationPermissionPolicyTypeSchema.options,
 ]);
 
 export const OrganizationGroupPolicySchema = z.discriminatedUnion('type', [
   OrganizationGroupModelAccessPolicySchema,
+  OrganizationGroupAgentPermissionsPolicySchema,
 ]);
 
 export const OrganizationGroupPoliciesSchema = z
@@ -52,7 +79,7 @@ export const OrganizationGroupPoliciesSchema = z
 
 export const OrganizationGroupMetadataSchema = z
   .object({
-    name: z.string().trim().min(1).max(80),
+    name: OrganizationGroupNameSchema,
     description: z.string().max(500).nullable().optional(),
   })
   .strict();

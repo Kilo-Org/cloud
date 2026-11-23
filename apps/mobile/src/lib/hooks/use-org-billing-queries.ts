@@ -53,11 +53,26 @@ export type OrgAuditLogEntry = RouterOutputs['organizations']['auditLogs']['list
 type OrgAuditLogPage = RouterOutputs['organizations']['auditLogs']['list'];
 
 /**
+ * The one key of the organization's audit log, so the mutations that add a row
+ * refresh the entry this screen pages.
+ */
+export function orgAuditLogQueryKey(organizationId: string | null) {
+  return ['organizations.auditLogs.list', organizationId] as const;
+}
+
+/**
  * The audit log's cursor is `before` — a timestamp — and tRPC's
  * `infiniteQueryOptions` folds the page param into `cursor`, so this query
- * calls the procedure itself with its own key. Nothing else invalidates that
- * key: an audit entry is written by the server, not by a mutation this app
- * performs.
+ * calls the procedure itself with its own key.
+ *
+ * The entry originates on the server: it is written by the procedure the app
+ * calls, never by the app itself. The organization mutation hooks reconcile
+ * this key after every write that can add a row — organization update and
+ * rename, member invite, role, limit and removal, invite revocation, the
+ * minimum-balance alert, groups, custom modes, the code reviewer, model access
+ * and gateway settings, guardrails, and Bitbucket connect, token rotation and
+ * disconnect — so a reader who just made one of those changes sees it on the
+ * next open instead of the rows cached before it.
  */
 export function useOrgAuditLogPage(organizationId: string | null, enabled: boolean) {
   // Declared rather than cast: the first page carries no `before`, and the
@@ -65,7 +80,7 @@ export function useOrgAuditLogPage(organizationId: string | null, enabled: boole
   const initialPageParam: string | undefined = undefined;
   const query = useInfiniteQuery(
     withInfiniteRetention({
-      queryKey: ['organizations.auditLogs.list', organizationId] as const,
+      queryKey: orgAuditLogQueryKey(organizationId),
       enabled: enabled && organizationId != null,
       initialPageParam,
       queryFn: ({ pageParam }: { pageParam: string | undefined }) =>
@@ -107,7 +122,10 @@ export function useOrgRequestLogs(
   return useQuery(
     trpc.organizations.requestLogs.list.queryOptions(
       { organizationId: organizationId ?? '', startTime },
-      { enabled: enabled && organizationId != null }
+      // A paused first read leaves the window skeleton with no retry: the read
+      // neither answers nor fails while the online manager holds the device
+      // offline. It settles instead, and the reconnect refetch comes with it.
+      { enabled: enabled && organizationId != null, ...SETTLE_WHILE_OFFLINE }
     )
   );
 }

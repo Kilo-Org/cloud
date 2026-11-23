@@ -8,9 +8,9 @@ import {
 } from '@kilocode/web-shared/lib/organizations/organizations';
 import { KILO_ORGANIZATION_ID } from '@kilocode/web-shared/lib/organizations/constants';
 import type {
-  OpenRouterModel,
+  OpenRouterCatalogModel,
   OpenRouterModelsResponse,
-} from '@kilocode/web-shared/lib/organizations/organization-types';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import {
   type User,
   type Organization,
@@ -75,7 +75,7 @@ import {
 } from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 import { userHasCustomLlmAccess } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/access';
 
-function makeTestOpenRouterModel(id: string): OpenRouterModel {
+function makeTestOpenRouterModel(id: string): OpenRouterCatalogModel {
   return {
     id,
     name: id,
@@ -343,10 +343,24 @@ describe('organizations settings trpc router', () => {
       expect(updatedOrg?.settings?.model_deny_list).toEqual(['gpt-4', 'gpt-3.5-turbo', 'claude-3']);
       expect(updatedOrg?.settings?.provider_allow_list).toEqual(['openai', 'anthropic']);
     });
+
+    it('should store provider_allow_list in canonical provider slug form', async () => {
+      const caller = await createCallerForUser(owner.id);
+
+      const result = await caller.organizations.settings.updateAllowLists({
+        organizationId: testOrganization.id,
+        provider_allow_list: ['OpenAI', 'openai', ' anthropic/vertex ', '  '],
+      });
+
+      expect(result.settings.provider_allow_list).toEqual(['openai', 'anthropic']);
+
+      const updatedOrg = await getOrganizationById(testOrganization.id);
+      expect(updatedOrg?.settings?.provider_allow_list).toEqual(['openai', 'anthropic']);
+    });
   });
 
   describe('listAvailableModels procedure', () => {
-    function makeOpenRouterModel(id: string): OpenRouterModel {
+    function makeOpenRouterModel(id: string): OpenRouterCatalogModel {
       return {
         id,
         name: id,

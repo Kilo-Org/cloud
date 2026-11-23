@@ -86,7 +86,6 @@ describe('session metadata boundary', () => {
       sandboxId: 'ses-0123456789abcdef',
     },
     { sessionId: 'workspace_test', provider: 'cloudflare', sandboxId: 'ses-0123456789abcdef' },
-    { sessionId: 'workspace_test', provider: 'vercel', sandboxId: 'ses-0123456789abcdef' },
     {
       sessionId: 'workspace_test',
       provider: 'cloudflare-containers',
@@ -124,6 +123,21 @@ describe('session metadata boundary', () => {
       }
     }
   );
+
+  it('accepts an allowlist on a Vercel sandbox, but no audit without one', () => {
+    const parses = (policy: object) =>
+      CurrentSessionMetadataSchema.safeParse({
+        metadataSchemaVersion: 2,
+        identity: { sessionId: 'workspace_test', userId: 'user' },
+        auth: {},
+        workspace: { sandboxId: 'ses-0123456789abcdef', sandboxProvider: 'vercel', ...policy },
+        lifecycle: { version: 1, timestamp: 1 },
+      }).success;
+    expect(parses({ egressMode: 'allowlist', egressAllowlist: ['example.com'] })).toBe(true);
+    expect(parses({ egressMode: 'allowlist', egressAllowlist: [], egressAudit: true })).toBe(true);
+    expect(parses({ egressAudit: true })).toBe(false);
+    expect(parses({ egressMode: 'unrestricted', egressAudit: true })).toBe(false);
+  });
 
   it.each(['cloudflare', 'vercel', 'cloudflare-containers'] as const)(
     'preserves explicit unrestricted for provider %s without adding a list',
@@ -627,6 +641,30 @@ describe('session metadata boundary', () => {
 
     expect(parseSessionMetadata(current)).toEqual(current);
     expect(parseSessionMetadata(current)).not.toHaveProperty('clone');
+  });
+
+  it('round-trips the environment setup binding and rejects an unknown key', () => {
+    const current = {
+      metadataSchemaVersion: 2 as const,
+      identity: { sessionId: 'agent_setup', userId: 'user_setup' },
+      auth: {},
+      environmentSetup: {
+        runId: '22222222-2222-4222-8222-222222222222',
+        environmentId: '33333333-3333-4333-8333-333333333333',
+        role: 'verification' as const,
+      },
+      lifecycle: { version: 1, timestamp: 1 },
+    };
+
+    expect(parseSessionMetadata(current)).toEqual(current);
+    expect(serializeSessionMetadata(current)).toEqual(current);
+    expect(CurrentSessionMetadataSchema.parse(current)).toEqual(current);
+    expect(() =>
+      CurrentSessionMetadataSchema.parse({
+        ...current,
+        environmentSetup: { ...current.environmentSetup, extra: true },
+      })
+    ).toThrow();
   });
 
   describe('placed sandbox metadata', () => {
@@ -1617,5 +1655,40 @@ describe('continuation agent variant', () => {
 
   it('rejects a variant longer than 50 characters', () => {
     expect(() => parseSessionMetadata({ ...base, agent: { variant: 'x'.repeat(51) } })).toThrow();
+  });
+});
+
+describe('stored skill companion paths', () => {
+  const stored = {
+    metadataSchemaVersion: 2 as const,
+    identity: { sessionId: 'workspace_stored_skill', userId: 'user_stored_skill' },
+    auth: {},
+    lifecycle: { version: 1, timestamp: 1 },
+    profile: {
+      runtimeSkills: [
+        {
+          name: 'review',
+          rawMarkdown: '# Review',
+          files: { 'legacy/./notes.md': 'legacy', 'scripts/run.sh': 'echo ok' },
+        },
+      ],
+    },
+  };
+
+  it('drops only the companion entries the current path rule rejects', () => {
+    const parsed = parseSessionMetadata(stored);
+    expect(parsed.identity).toEqual(stored.identity);
+    expect(parsed.profile?.runtimeSkills).toEqual([
+      { name: 'review', rawMarkdown: '# Review', files: { 'scripts/run.sh': 'echo ok' } },
+    ]);
+  });
+
+  it('still rejects a stored companion map that is not a record', () => {
+    expect(() =>
+      parseSessionMetadata({
+        ...stored,
+        profile: { runtimeSkills: [{ name: 'review', rawMarkdown: '# Review', files: 'nope' }] },
+      })
+    ).toThrow();
   });
 });

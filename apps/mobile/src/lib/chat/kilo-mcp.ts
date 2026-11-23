@@ -168,7 +168,6 @@ const keyFor = (place: ChatPlace): string =>
 const lostConnection =
   (started: number, discovery: number) =>
   (error: RemoteMcpError): void => {
-    /* A sign-out of the account that made the call wins. */
     if (started !== generation) {
       return;
     }
@@ -187,10 +186,10 @@ const lostConnection =
  *
  * A server that named tools keeps them for the account and the epoch, so the
  * next chat does not open a second connection for the same list. A server that
- * answered with none is the one answer that must be asked again: the empty
- * sheet offers no Retry, so a catalog that was mid-deploy when the first chat
- * asked would leave every chat after it on "No tools available" until the app
- * was restarted. The next ask reconnects and says what the server offers now.
+ * answered with none is the one answer that must not stand in for later asks: it
+ * is not cached, so the next ask reconnects and reports what the server offers
+ * now — the same ask the sheet's Retry makes — and a catalog that was mid-deploy
+ * when the first chat asked does not leave every chat after it stuck.
  */
 const reusable = (state: KiloMcpState): boolean =>
   state.status !== 'ready' || state.tools.length > 0;
@@ -272,14 +271,11 @@ async function attempt(place: ChatPlace, timeoutMs: number): Promise<KiloMcpStat
 
 /**
  * Who is waiting for a discovery, which is the only thing that sets its
- * deadline. `automatic` is the four-second bound an open gets: a chat must not
- * wait on a server that has not answered by then. `retry` is the fifteen-second
- * bound a person's Retry gets, because they asked for it and the failure is what
- * is being given another chance.
+ * deadline. `automatic` is what a chat opening asks for; `retry` is what a
+ * person pressing Retry asks for.
  */
 export type KiloMcpRequest = 'automatic' | 'retry';
 
-/** The deadline for one request: the person's Retry waits longer than an open. */
 const deadlineFor = (request: KiloMcpRequest): number =>
   request === 'retry' ? RETRY_TIMEOUT_MS : AUTOMATIC_TIMEOUT_MS;
 
@@ -295,12 +291,13 @@ const deadlineFor = (request: KiloMcpRequest): number =>
  * followed a Retry wait the Retry's fifteen seconds.
  *
  * A failure is not cached as an answer: asking again reconnects. Neither is an
- * answer with no tools in it, because the empty sheet offers no Retry and the
- * next chat asking is what makes a transient empty catalog recoverable. A call
- * made while one is already running joins it when it asked for the same
- * deadline. One with another deadline opens its own connection, so an open that
- * meets a Retry keeps its four seconds and a Retry that meets an open keeps its
- * fifteen; the later discovery is the one the screen draws.
+ * answer with no tools in it, so the next ask — an automatic one, or the
+ * sheet's Retry — reconnects and reports what the server offers now, which is
+ * what makes a transient empty catalog recoverable. A call made while one is
+ * already running joins it when it asked for the same deadline. One with
+ * another deadline opens its own connection, so an open that meets a Retry
+ * keeps its four seconds and a Retry that meets an open keeps its fifteen; the
+ * later discovery is the one the screen draws.
  */
 export async function ensureKiloMcp(
   place: ChatPlace,

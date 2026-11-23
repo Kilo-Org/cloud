@@ -1,4 +1,15 @@
-const parseFloatOrNull = (value: string | null) => (value === null ? null : parseFloat(value));
+/**
+ * A finite decimal header value, or `null` for a header that is absent, blank, non-finite, or
+ * carries trailing text. `Number` is used rather than `parseFloat`, which would drop that
+ * trailing text and yield a truncated coordinate.
+ */
+const parseFiniteDecimalOrNull = (value: string | null): number | null => {
+  if (value === null) return null;
+  const trimmed = value.trim();
+  if (trimmed === '') return null;
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : null;
+};
 export const EmptyFraudDetectionHeaders = getFraudDetectionHeaders(new Headers());
 export type FraudDetectionHeaders = ReturnType<typeof getFraudDetectionHeaders>;
 export function getFraudDetectionHeaders(headers: Headers) {
@@ -6,8 +17,8 @@ export function getFraudDetectionHeaders(headers: Headers) {
     http_x_forwarded_for: headers.get('x-forwarded-for'),
     http_x_vercel_ip_city: headers.get('x-vercel-ip-city'),
     http_x_vercel_ip_country: headers.get('x-vercel-ip-country'),
-    http_x_vercel_ip_latitude: parseFloatOrNull(headers.get('x-vercel-ip-latitude')),
-    http_x_vercel_ip_longitude: parseFloatOrNull(headers.get('x-vercel-ip-longitude')),
+    http_x_vercel_ip_latitude: parseFiniteDecimalOrNull(headers.get('x-vercel-ip-latitude')),
+    http_x_vercel_ip_longitude: parseFiniteDecimalOrNull(headers.get('x-vercel-ip-longitude')),
     http_x_vercel_ja4_digest: headers.get('x-vercel-ja4-digest'),
     http_user_agent: headers.get('user-agent'),
   };

@@ -1,6 +1,6 @@
 import { MutationCache, QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, View } from 'react-native';
 import { initialWindowMetrics } from 'react-native-safe-area-context';
@@ -10,6 +10,8 @@ import { PrDiffFileNavigator } from '@/components/pr-review/diff/pr-diff-file-na
 import { PrMergeSheet } from '@/components/pr-review/merge/pr-merge-sheet';
 import { providerPrMergeTitles } from '@/components/pr-review/merge/pr-merge-titles';
 import { PrReviewChecksSection } from '@/components/pr-review/pr-review-checks-section';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { useSideInsetMarginStyle, useSideInsetStyle } from '@/lib/screen-insets';
 import { PrReviewCommentComposer } from '@/components/pr-review/pr-review-comment-composer';
 import {
   createFixtureClient,
@@ -27,12 +29,18 @@ import {
   type PrReviewOverviewFixtureSurface,
 } from '@/components/pr-review/pr-review-overview-copy-fixture';
 import { PrReviewReviewSubmitScreen } from '@/components/pr-review/pr-review-review-submit-screen';
+import { PrReviewRouteFixture } from '@/components/pr-review/pr-review-route-fixture';
 import {
   type PrReviewTabId,
   PrReviewTabSelector,
 } from '@/components/pr-review/pr-review-tab-selector';
 import { ScreenHeader } from '@/components/screen-header';
 import { FeedbackPromptProvider } from '@/components/use-feedback-prompt';
+import { clearDiffSelection, setDiffSelection } from '@/lib/pr-review/diff-selection-bridge';
+import {
+  FIXTURE_WRITE_REFUSED,
+  isRouteSurface,
+} from '@/lib/pr-review/pr-review-copy-fixture-route';
 import {
   pendingReviewDraftKey,
   PendingReviewProvider,
@@ -47,8 +55,15 @@ import { TRPCProvider } from '@/lib/trpc';
 // merge-request-missing,merge-request-error}.
 // The checks-not-available surface answers the checks read as not found, the
 // terminal that renders the section's unavailable message; the composer surface
-// mounts the comment composer on a line; the gate surfaces are
-// dev/pr-review-copy-fixture/gate-*.
+// mounts the comment composer on a line, with
+// dev/pr-review-copy-fixture/composer?side=LEFT reaching the deleted-line
+// (suggestions unavailable) state and composer?selected=1 the added line with a
+// seeded selection; the gate surfaces are dev/pr-review-copy-fixture/gate-*.
+// The screen surfaces open the REAL nested routes instead of re-created bodies:
+// dev/pr-review-copy-fixture/screen-{file-navigator,merge,review-submit,
+// comment-composer,conversation-comment,comment-edit}, with `?shape=gitlab`
+// reaching the provider route shape and `?state=long` the long body; the merge
+// surface takes `?mergeState=none` for the no-verdict arm.
 // Uses the app's selected language without changing its preference.
 // Real review consumers read owned fake DTOs across an asynchronous tRPC boundary.
 // Reads never invoke global fetch. The mutation cache rejects before any mutation
@@ -84,19 +99,29 @@ const scope: ProviderPrScope = {
 function ChecksSectionSurface() {
   const queries = useProviderPrQueries(triple);
   const read = useQuery(queries.checksOptions(headSha, true));
+  const sideInsetMarginStyle = useSideInsetMarginStyle();
   if (read.isLoading) {
     return null;
   }
   return (
-    <ScrollView contentContainerClassName="gap-4 p-6">
+    <ScrollView contentContainerClassName={SCREEN_BODY_CLASS} style={sideInsetMarginStyle}>
       <PrReviewChecksSection {...triple} checks={read} />
     </ScrollView>
   );
 }
 
 export function PrReviewCopyFixture() {
-  const { surface } = useLocalSearchParams<{ surface?: string }>();
+  const { surface, side, selected, mergeState } = useLocalSearchParams<{
+    surface?: string;
+    side?: string;
+    selected?: string;
+    mergeState?: string;
+  }>();
+  // The composer surface defaults to the added-line state; `side=LEFT` reaches
+  // the deleted-line state and `selected=1` seeds an added-line selection.
+  const fixtureSide = side === 'LEFT' ? 'LEFT' : 'RIGHT';
   const router = useRouter();
+  const sideInsetStyle = useSideInsetStyle();
   const { t } = useTranslation();
   const [queryClient] = useState(
     () =>
@@ -104,21 +129,49 @@ export function PrReviewCopyFixture() {
         defaultOptions: { queries: { retry: false, staleTime: Infinity } },
         mutationCache: new MutationCache({
           onMutate: () => {
-            throw new Error('Review copy fixture does not allow writes');
+            throw new Error(FIXTURE_WRITE_REFUSED);
           },
         }),
       })
   );
   const [client] = useState(() => createFixtureClient(surface));
+  // Point the selection bridge at the state the link asks for, before the
+  // composer below reads it. Applied once per distinct link, so navigating
+  // between the three composer surfaces does not leave one's selection on the
+  // next: the composer reads the bridge during render, not reactively.
+  const selectionKey = surface === 'composer' ? `${fixtureSide}:${selected ?? ''}` : null;
+  const appliedSelectionRef = useRef<string | null>(null);
+  if (selectionKey !== null && appliedSelectionRef.current !== selectionKey) {
+    appliedSelectionRef.current = selectionKey;
+    if (fixtureSide === 'RIGHT' && selected === '1') {
+      setDiffSelection({
+        owner: triple.owner,
+        repo: triple.repo,
+        number: triple.number,
+        path: 'src/greeting.ts',
+        side: 'RIGHT',
+        line: 2,
+        selectedText: 'export function greet(): string { return "hello"; }',
+      });
+    } else {
+      clearDiffSelection({ owner: triple.owner, repo: triple.repo, number: triple.number });
+    }
+  }
   const [tab, setTab] = useState<PrReviewTabId>('files');
   const header = (
     <ScreenHeader title={t('prReview.fileNavigator.title')} eyebrow="sample/review-copy#1" />
   );
   let content: ReactNode = null;
-  if (surface === 'tabs') {
+  if (isRouteSurface(surface)) {
+    // The real route screens (both route shapes), with the params and
+    // providers their layouts publish.
+    content = <PrReviewRouteFixture surface={surface} />;
+  } else if (surface === 'tabs') {
     content = (
-      <View className="px-4 pb-2 pt-3">
-        <PrReviewTabSelector activeTab={tab} onChange={setTab} discussionCount={3} />
+      <View style={sideInsetStyle}>
+        <View className="px-4 pb-2 pt-3">
+          <PrReviewTabSelector activeTab={tab} onChange={setTab} discussionCount={3} />
+        </View>
       </View>
     );
   } else if (surface === 'merge') {
@@ -146,15 +199,29 @@ export function PrReviewCopyFixture() {
           initialMethod="merge"
           mode="merge"
           prRef={scope.ref}
-          mergeState={{
-            canMerge: true,
-            approvalsRequired: 0,
-            pipelineMustSucceed: false,
-            conflicts: false,
-            blockedReasons: [],
-          }}
+          // The no-verdict arm is unreachable from the real screen (it never
+          // mounts the sheet without a state), so the gate reaches it here:
+          // `mergeState=none` withholds the read and renders the sheet's
+          // unknown terminal. Every other value keeps the allowed state.
+          mergeState={
+            mergeState === 'none'
+              ? undefined
+              : {
+                  canMerge: true,
+                  approvalsRequired: 0,
+                  pipelineMustSucceed: false,
+                  conflicts: false,
+                  blockedReasons: [],
+                }
+          }
           sheetTitle={providerPrMergeTitles(t, scope.ref.platform).title}
           eyebrow="sample/review-copy!1"
+          mergeStateRetry={{
+            retry: () => {
+              void queryClient.invalidateQueries();
+            },
+            isRetrying: false,
+          }}
           onRefetch={async () => {
             await queryClient.invalidateQueries();
           }}
@@ -212,7 +279,7 @@ export function PrReviewCopyFixture() {
           number={triple.number}
           mode={{ kind: 'create', headSha }}
           path="src/greeting.ts"
-          side="RIGHT"
+          side={fixtureSide}
           line={2}
           title={t('prReview.composer.addTitle')}
           eyebrow="sample/review-copy#1"

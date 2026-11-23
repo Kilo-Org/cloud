@@ -27,7 +27,9 @@ import { toast } from 'sonner-native';
 import { useTranslation } from 'react-i18next';
 
 import { AttachmentPreviewStrip } from '@/components/agents/attachment-preview-strip';
+import { QueryError } from '@/components/query-error';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
+import { InputFrame } from '@/components/ui/input-frame';
 import { RemainingCharactersCounter } from '@/components/ui/remaining-characters-counter';
 import {
   type ComposerSelection,
@@ -41,6 +43,7 @@ import {
   shouldEnableComposerInputScroll,
 } from '@/components/agents/chat-composer-input-height';
 import { useReturnSendsMessagePreference } from '@/lib/hooks/use-return-sends-message-preference';
+import { REWRITTEN_INPUT_AUTO_CORRECT } from '@/lib/input-suggestions';
 import {
   resolveNewSessionPromptControlState,
   resolvePromptCounterRemaining,
@@ -53,7 +56,6 @@ import { NewSessionPromptClone } from '@/components/agents/new-session-prompt-cl
 import { NewSessionPromptControls } from '@/components/agents/new-session-prompt-controls';
 import { type NewSessionPromptProps } from '@/components/agents/new-session-prompt-types';
 import { hasVisibleComposerText } from '@/lib/composer-text';
-import { QueryError } from '@/components/query-error';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useSharePrefill } from '@/lib/share-prefill';
 import { SharePrefillFailure } from '@/components/agents/share-prefill-failure';
@@ -173,6 +175,7 @@ export function NewSessionPrompt({
   model,
   variant,
   modelOptions,
+  modelSelectionFailure = null,
   onChangeText,
   onModeChange,
   onModelSelect,
@@ -511,43 +514,51 @@ export function NewSessionPrompt({
         isLoadingModels={isLoadingModels}
         isCreating={isCreating}
         onRefetchModels={onRefetchModels}
+        modelSelectionFailure={modelSelectionFailure}
       />
     );
   }
 
   return (
-    <View className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm shadow-[#0000000D]">
+    <InputFrame className="overflow-hidden">
       <View
         className="pb-2"
         onLayout={event => {
           setTopChromeHeight(event.nativeEvent.layout.height);
         }}
       >
-        {isModelsError && modelOptions.length === 0 ? (
+        {/* A failed models read keeps the toolbar: the pinned footer names that
+            failure as the reason Start waits and carries its Retry, so the
+            composer does not state it a second time above the prompt. */}
+        <ChatToolbar
+          modeControl={{ mode, onModeChange, customOptions }}
+          model={model}
+          variant={variant}
+          modelOptions={modelOptions}
+          onModelSelect={onModelSelect}
+          disabled={isCreating}
+          isLoadingModels={isLoadingModels}
+          modelLocked={modelLocked}
+          modelLockLabel={modelLockLabel}
+          onRetryModels={onRefetchModels}
+          className="border-b-[0.5px] border-hair-soft bg-neutral-100 dark:bg-neutral-900 px-3 py-3"
+        />
+        {/* The organization default was the only input left that could pick the
+            model, so its failed read is stated where the model row sits. The
+            toolbar keeps its tiles: the catalog itself may be fine. */}
+        {modelSelectionFailure ? (
           <QueryError
             placement="top"
+            compact
             variant="server"
-            title={t('agentChat.newSession.couldNotLoadModels')}
-            message={t('organization.boundary.loadErrorMessage')}
+            title={t('common.couldNotLoadModels')}
             onRetry={() => {
-              onRefetchModels();
+              modelSelectionFailure.onRetry();
             }}
-            className="border-b border-border py-4"
+            isRetrying={modelSelectionFailure.isRetrying}
+            className="px-3"
           />
-        ) : (
-          <ChatToolbar
-            modeControl={{ mode, onModeChange, customOptions }}
-            model={model}
-            variant={variant}
-            modelOptions={modelOptions}
-            onModelSelect={onModelSelect}
-            disabled={isCreating}
-            isLoadingModels={isLoadingModels}
-            modelLocked={modelLocked}
-            modelLockLabel={modelLockLabel}
-            className="border-b border-border bg-neutral-100 dark:bg-neutral-900 px-3 py-3"
-          />
-        )}
+        ) : null}
         {sharePrefill.failed ? (
           <SharePrefillFailure
             onRetry={() => {
@@ -625,6 +636,11 @@ export function NewSessionPrompt({
             submitBehavior={returnSendsMessage ? 'submit' : 'newline'}
             onSubmitEditing={returnSendsMessage ? handleReturnSubmit : undefined}
             maxFontSizeMultiplier={1}
+            // The app rewrites this field's text programmatically (voice
+            // transcript, paste, share prefill), so Android keeps the
+            // framework suggestion popup off — it crashes against rewritten
+            // text (see REWRITTEN_INPUT_AUTO_CORRECT).
+            autoCorrect={REWRITTEN_INPUT_AUTO_CORRECT}
             // Focus on arrival only when the form has nothing left to configure
             // (the host resolves this) and no share payload prefills it: the
             // keyboard it raises would otherwise shrink the frame past the
@@ -704,6 +720,6 @@ export function NewSessionPrompt({
           </NewSessionPromptControls>
         </View>
       </View>
-    </View>
+    </InputFrame>
   );
 }

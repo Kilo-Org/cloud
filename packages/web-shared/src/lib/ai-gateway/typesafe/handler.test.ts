@@ -44,7 +44,7 @@ import { getProviderSlugsForModel } from '@kilocode/web-shared/lib/ai-gateway/pr
 import {
   getCachedVercelInferenceProviderIdsForModel,
   getOpenRouterModelsMetadataFromDatabase,
-  getOpenRouterSystemOneModelsFromDatabase,
+  getOpenRouterSystemOneModelIdsFromDatabase,
   resolveOpenRouterModelAlias,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { generateProviderSpecificHash } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
@@ -97,7 +97,7 @@ jest.mock(
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
   getCachedVercelInferenceProviderIdsForModel: jest.fn(),
   getOpenRouterModelsMetadataFromDatabase: jest.fn(),
-  getOpenRouterSystemOneModelsFromDatabase: jest.fn(),
+  getOpenRouterSystemOneModelIdsFromDatabase: jest.fn(),
   resolveOpenRouterModelAlias: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/user/server', () => ({ getUserFromAuth: jest.fn() }));
@@ -187,6 +187,7 @@ const METERED_LATENCY_MS = 3 * CLOCK_STEP_MS;
 const METERED_COMPLETE_REQUEST_MS = 4 * CLOCK_STEP_MS;
 const OTHER_SYSTEM_ONE_MODEL = 'respan/span-01-lite:free';
 const SYSTEM_ONE_ALIAS = '~typesafe/jev-latest';
+const FREE_SYSTEM_ONE_ALIAS = '~respan/span-latest';
 const pricedSystemOneModels: Record<string, GatewayModelWithEndpoints> = {
   [TYPESAFE_MODEL]: {
     id: TYPESAFE_MODEL,
@@ -395,15 +396,17 @@ describe('handleSystemOneRequest', () => {
     jest.mocked(getRuntimeOrganizationFeatures).mockResolvedValue(DEFAULT_ORGANIZATION_FEATURES);
     jest.mocked(resolveOrganizationMemberModelDecision).mockResolvedValue(memberDecision);
     jest
-      .mocked(getOpenRouterSystemOneModelsFromDatabase)
-      .mockResolvedValue(new Set([TYPESAFE_MODEL, OTHER_SYSTEM_ONE_MODEL, SYSTEM_ONE_ALIAS]));
+      .mocked(getOpenRouterSystemOneModelIdsFromDatabase)
+      .mockResolvedValue(
+        new Set([TYPESAFE_MODEL, OTHER_SYSTEM_ONE_MODEL, SYSTEM_ONE_ALIAS, FREE_SYSTEM_ONE_ALIAS])
+      );
     jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue(pricedSystemOneModels);
     jest.mocked(getCachedVercelInferenceProviderIdsForModel).mockResolvedValue(null);
-    jest
-      .mocked(resolveOpenRouterModelAlias)
-      .mockImplementation(async modelId =>
-        modelId === SYSTEM_ONE_ALIAS ? TYPESAFE_MODEL : modelId
-      );
+    jest.mocked(resolveOpenRouterModelAlias).mockImplementation(async modelId => {
+      if (modelId === SYSTEM_ONE_ALIAS) return TYPESAFE_MODEL;
+      if (modelId === FREE_SYSTEM_ONE_ALIAS) return OTHER_SYSTEM_ONE_MODEL;
+      return modelId;
+    });
     jest.mocked(generateProviderSpecificHash).mockReturnValue('hashed-user');
     jest
       .mocked(resolveEmbeddingOrDecisionRoute)
@@ -826,6 +829,36 @@ describe('handleSystemOneRequest', () => {
     expect(mockedFetch).not.toHaveBeenCalled();
   });
 
+  it('classifies a latest alias by the free System One model it serves', async () => {
+    jest.mocked(isFreeModelRateLimited).mockResolvedValue(true);
+
+    const response = await handleSystemOneRequest(
+      makeRequest({ ...requestBody, model: FREE_SYSTEM_ONE_ALIAS })
+    );
+
+    expect(response.status).toBe(429);
+    await expect(response.json()).resolves.toMatchObject({ error_type: 'rate_limit_exceeded' });
+    expect(isFreeModelRateLimited).toHaveBeenCalledWith(expect.anything(), {
+      kind: 'account',
+      kiloUserId: user.id,
+    });
+  });
+
+  it('records the free class of the model a latest alias serves', async () => {
+    jest.mocked(isFreeModelRateLimited).mockResolvedValue(false);
+
+    const response = await handleSystemOneRequest(
+      makeRequest({ ...requestBody, model: FREE_SYSTEM_ONE_ALIAS })
+    );
+
+    expect(response.status).toBe(200);
+    await runAfter();
+    expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
+      expect.objectContaining({ cost_mUsd: 0 }),
+      expect.objectContaining({ requested_model: FREE_SYSTEM_ONE_ALIAS, is_free: true })
+    );
+  });
+
   it.each([
     { features: ['org-123'], status: 403 },
     { features: [], status: 200 },
@@ -907,7 +940,7 @@ describe('handleSystemOneRequest', () => {
   );
 
   it('answers 503 when the catalog has no metadata for the model', async () => {
-    jest.mocked(getOpenRouterSystemOneModelsFromDatabase).mockResolvedValue(new Set());
+    jest.mocked(getOpenRouterSystemOneModelIdsFromDatabase).mockResolvedValue(new Set());
 
     const response = await handleSystemOneRequest(
       makeRequest({ ...requestBody, model: 'vendor/unlisted-decide' })

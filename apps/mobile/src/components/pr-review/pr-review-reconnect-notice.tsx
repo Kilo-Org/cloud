@@ -1,8 +1,9 @@
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Text } from '@/components/ui/text';
+import { gitlabInstanceMismatch } from '@/lib/pr-review/pr-review-connect-gate-view';
 import { type ProviderPrPlatform, useProviderPrScopeOrNull } from '@/lib/pr-review/provider-pr-ref';
 import { useCheckGitHubConnection } from '@/lib/pr-review/use-check-github-connection';
 import { useCheckProviderConnection } from '@/lib/pr-review/use-check-provider-connection';
@@ -17,6 +18,11 @@ import { useCheckProviderConnection } from '@/lib/pr-review/use-check-provider-c
  * and its organization explicitly. A GitLab or Bitbucket arm re-checks its own
  * integration status, because a GitHub retry can never fix an expired GitLab
  * connection.
+ *
+ * The notice also reports the settled outcome to the surface that owns the
+ * latch: a check that ends with a connection able to serve the open item calls
+ * `onConnectionRestored`. Failure stays the hook's own toast, so the notice
+ * renders no error of its own.
  */
 type PrReviewReconnectNoticeProps = {
   /**
@@ -27,11 +33,18 @@ type PrReviewReconnectNoticeProps = {
   platform?: ProviderPrPlatform;
   /** The organization scope of that provider; null means the personal scope. */
   organizationId?: string | null;
+  /**
+   * Called once a check this notice started settles with a connection that can
+   * serve the open item. Absent on surfaces whose latch the check does not
+   * clear.
+   */
+  onConnectionRestored?: () => void;
 };
 
 export function PrReviewReconnectNotice({
   platform: explicitPlatform,
   organizationId: explicitOrganizationId,
+  onConnectionRestored,
 }: Readonly<PrReviewReconnectNoticeProps> = {}) {
   const connection = useCheckGitHubConnection();
   const providerConnection = useCheckProviderConnection();
@@ -53,24 +66,56 @@ export function PrReviewReconnectNotice({
   // the sentence below only says what to do about it.
   const message = t('prReview.reconnectNotice.message');
 
+  async function checkConnection() {
+    try {
+      if (!providerPlatform) {
+        const answer = await connection.mutateAsync();
+        if (answer.connected) {
+          onConnectionRestored?.();
+        }
+        return;
+      }
+      const status = await providerConnection.mutateAsync({
+        platform: providerPlatform,
+        organizationId,
+      });
+      if (!status.connected) {
+        return;
+      }
+      // A connected GitLab instance still cannot read a merge request that
+      // lives on another instance, so that answer is not a usable connection
+      // for this item: the server refuses the read exactly as the gate does.
+      if (
+        providerPlatform === 'gitlab' &&
+        scope?.ref.platform === 'gitlab' &&
+        gitlabInstanceMismatch({
+          instanceHint: scope.ref.instanceHint,
+          connectedInstanceUrl: status.instanceUrl ?? undefined,
+        }) !== null
+      ) {
+        return;
+      }
+      onConnectionRestored?.();
+    } catch {
+      // The check's hook already toasts its failure, so the notice owns no
+      // error of its own and a rejected check never reports a connection.
+    }
+  }
+
   return (
-    <View className="gap-3 rounded-lg bg-secondary p-4">
+    <Card>
       <Text className="text-sm font-medium text-foreground">{title}</Text>
       <Text className="text-sm text-muted-foreground">{message}</Text>
       <Button
         variant="outline"
         onPress={() => {
-          if (providerPlatform) {
-            providerConnection.mutate({ platform: providerPlatform, organizationId });
-            return;
-          }
-          connection.mutate();
+          void checkConnection();
         }}
         loading={providerPlatform ? providerConnection.isPending : connection.isPending}
         accessibilityLabel={t('prReview.checkConnection')}
       >
         <Text>{t('prReview.checkConnection')}</Text>
       </Button>
-    </View>
+    </Card>
   );
 }

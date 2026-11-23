@@ -100,7 +100,6 @@ describe('consent storage', () => {
     await acceptConsent('oauth/google:103283381342696699340');
     await acceptConsent('oauthgoogle103283381342696699340');
 
-    // Each gets its own key
     const keys = [...store.keys()];
     expect(keys.length).toBe(2);
     expect(keys[0]).not.toBe(keys[1]);
@@ -146,7 +145,6 @@ describe('consent storage', () => {
       // A legacy key carries no record the new screen may read a choice from.
       previousOptional: undefined,
     });
-    // Legacy key is removed
     expect(store.has('consent-accepted-oauthgooglefoo')).toBe(false);
   });
 
@@ -178,10 +176,8 @@ describe('consent storage', () => {
     await revokeConsent('user-1');
 
     expect(await hasAcceptedConsent('user-1')).toBe(false);
-    // Both hex and legacy keys for user-1 are deleted
     expect(store.has('consent-accepted-757365722d31')).toBe(false);
     expect(store.has('consent-accepted-user1')).toBe(false);
-    // User-2 keys are untouched
     expect(store.has('consent-accepted-757365722d32')).toBe(true);
     expect(store.has('consent-accepted-user2')).toBe(true);
   });

@@ -43,13 +43,6 @@ export function getGlanceableOrgConfirmationEpoch(): number {
   return orgConfirmationEpoch;
 }
 
-/**
- * Terminal blanking: signed-out and privacy states are written to every sink
- * (publish) and then every sink ends immediately. The 8 s terminal window is
- * skipped — logout, account switch, org switch, and confirmed lost org must
- * blank at once.
- */
-
 export type GlanceableOrgFenceState = {
   organizationId: string | null;
   orgs: readonly { organizationId: string }[] | undefined;
@@ -121,8 +114,7 @@ export function subscribeGlanceableTerminalEnd(end: () => void): () => void {
 }
 
 function writeTerminalAndEnd(status: 'signed_out' | 'privacy'): void {
-  // Arm the publisher gate before any sink writes, so a cache success that
-  // lands during this window can never emit for the torn-down session.
+  // Arm the publisher gate before any sink writes.
   terminalBlankEpoch += 1;
   // The ask names a session and an organization of the scope that is ending.
   // End it with that scope, in memory and in the mirror: the surfaces read the
@@ -134,7 +126,9 @@ function writeTerminalAndEnd(status: 'signed_out' | 'privacy'): void {
   getGlanceableDelivery().cleanupTokens('scope');
   const snapshot = buildTerminalSnapshot(status);
   // Write the snapshot first, then end: the surface shows the terminal copy
-  // before the native activity ends.
+  // before the native activity ends. The 8 s terminal window is skipped —
+  // logout, account switch, org switch, and confirmed lost org must blank at
+  // once.
   forEachSink('terminal_publish', sink => {
     sink.publish(snapshot);
   });

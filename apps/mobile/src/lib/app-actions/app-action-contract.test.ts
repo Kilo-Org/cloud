@@ -175,36 +175,66 @@ describe('resolveNeedsInputHref', () => {
   });
 
   it('ignores rows whose status is not attention', () => {
-    expect(resolveNeedsInputHref([{ id: 'ses_1', status: 'running', isAcked: false }])).toBe(
-      '/(app)/(tabs)/(2_agents)'
-    );
+    expect(
+      resolveNeedsInputHref([
+        { id: 'ses_1', status: 'running', hydration: 'ready', isAcked: false },
+      ])
+    ).toBe('/(app)/(tabs)/(2_agents)');
   });
 
   it('opens the only waiting session', () => {
-    expect(resolveNeedsInputHref([{ id: 'ses_1', status: 'question', isAcked: false }])).toBe(
-      '/(app)/agent-chat/ses_1'
-    );
+    expect(
+      resolveNeedsInputHref([
+        { id: 'ses_1', status: 'question', hydration: 'ready', isAcked: false },
+      ])
+    ).toBe('/(app)/agent-chat/ses_1');
   });
 
   it('opens the agents tab when two sessions wait', () => {
     expect(
       resolveNeedsInputHref([
-        { id: 'ses_1', status: 'question', isAcked: false },
-        { id: 'ses_2', status: 'permission', isAcked: false },
+        { id: 'ses_1', status: 'question', hydration: 'ready', isAcked: false },
+        { id: 'ses_2', status: 'permission', hydration: 'ready', isAcked: false },
       ])
     ).toBe('/(app)/(tabs)/(2_agents)');
   });
 
   it('does not count an acked row as waiting', () => {
-    expect(resolveNeedsInputHref([{ id: 'ses_1', status: 'question', isAcked: true }])).toBe(
-      '/(app)/(tabs)/(2_agents)'
-    );
     expect(
       resolveNeedsInputHref([
-        { id: 'ses_1', status: 'question', isAcked: true },
-        { id: 'ses_2', status: 'permission', isAcked: false },
+        { id: 'ses_1', status: 'question', hydration: 'ready', isAcked: true },
+      ])
+    ).toBe('/(app)/(tabs)/(2_agents)');
+    expect(
+      resolveNeedsInputHref([
+        { id: 'ses_1', status: 'question', hydration: 'ready', isAcked: true },
+        { id: 'ses_2', status: 'permission', hydration: 'ready', isAcked: false },
       ])
     ).toBe('/(app)/agent-chat/ses_2');
+  });
+
+  it('does not count a held row as waiting, and counts it once the store settles', () => {
+    // The ack store answers "not acked" for every raise while it loads, so a
+    // held row is not the destination even though it reads unacked.
+    expect(
+      resolveNeedsInputHref([
+        { id: 'ses_1', status: 'question', hydration: 'loading', isAcked: false },
+      ])
+    ).toBe('/(app)/(tabs)/(2_agents)');
+    // A held row beside a settled waiter leaves the settled one the only
+    // destination, and the same rows after settling count both.
+    expect(
+      resolveNeedsInputHref([
+        { id: 'ses_1', status: 'question', hydration: 'loading', isAcked: false },
+        { id: 'ses_2', status: 'permission', hydration: 'ready', isAcked: false },
+      ])
+    ).toBe('/(app)/agent-chat/ses_2');
+    expect(
+      resolveNeedsInputHref([
+        { id: 'ses_1', status: 'question', hydration: 'ready', isAcked: false },
+        { id: 'ses_2', status: 'permission', hydration: 'ready', isAcked: false },
+      ])
+    ).toBe('/(app)/(tabs)/(2_agents)');
   });
 });
 

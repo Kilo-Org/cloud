@@ -79,6 +79,37 @@ repository.
 
 ## Rules
 
+### Network secrets
+
+1. Environment and profile editors MUST list **Network secrets** separately from environment variables.
+   Commands can read environment values, including values hidden after save.
+2. A network secret MUST have a variable name, a write-only value, and one to ten exact allowed domains.
+   An environment or profile MUST hold at most twenty network secrets.
+   One name MUST NOT be both an environment variable and a network secret in the same source.
+3. A workspace with network secrets MUST use Cloudflare Containers. Another provider MUST fail
+   with `Network secrets require a Cloudflare sandbox`. It MUST NOT receive plaintext instead.
+4. Commands MUST receive an opaque placeholder, during workspace setup and during agent execution.
+   Cloudflare snapshot build scripts MUST also receive a build-scoped placeholder.
+   A Vercel snapshot builder MUST refuse network secrets, without plaintext fallback.
+   Build placeholders MUST stop working when the build ends. The editor MUST explain that saved
+   configuration files must reference the variable, not an expanded build placeholder.
+   Kilo MUST substitute it only in request headers or Basic passwords, for HTTPS on port 443
+   to a bound domain. Restricted network access MUST include these domains.
+5. A placeholder sent to a wrong domain MUST fail with `403 network_secret_host_mismatch`.
+   A denied response MUST identify the domain and, when known, the variable name, never its value
+   or placeholder. Unknown aliases and unsupported locations MUST fail closed.
+   A resolution fault MUST report `503 network_secret_unavailable`, not an unknown secret.
+   Its `retryable` field MUST reflect whether the resolver permits retry. Policy failures MUST use a permanent denial.
+6. Network secrets MUST follow the existing environment/profile/inline precedence per variable name.
+   A later representation MUST remove earlier representations of that name.
+   Inline public requests MUST NOT supply network secrets in this phase.
+7. Workspace creation MUST capture its network-secret configuration once. Sibling chats and
+   new physical allocations MUST retain that configuration and its placeholders.
+   Edits MUST apply to new workspaces, not change an existing workspace silently.
+8. The editor MUST explain domain reachability, token scope, response echo risk, and client token-format checks.
+   Network secrets restrict where Kilo sends a value, not which actions the agent can perform there.
+   Kilo MUST NOT promise response redaction or protection for raw TCP, SSH, or database protocols.
+
 ### Start
 
 1. A session MUST have a connected git provider and a selected repository before
@@ -110,7 +141,11 @@ repository.
 9. A session MUST start on the environment's sandbox size when the owner can
    use it. Otherwise the repository override applies, then the owner default,
    then the platform default. A request that names a sandbox wins over all of
-   them.
+   them. When the session has an egress allowlist or an egress audit, a
+   repository override or owner default on a sandbox that cannot enforce it
+   MUST be skipped. The environment's sandbox size and a requested sandbox
+   MUST NOT be skipped for this reason; such a start MUST fail with a specific
+   message.
 10. Saving an environment with a new sandbox size MUST fail when the owner
     cannot use that size for the repository. A saved size that later becomes
     unavailable MUST NOT block other edits to the environment.
@@ -155,9 +190,11 @@ repository.
     at `/workspace/<name>`, and the agent and setup MUST start at `/workspace`.
     Setup MUST run once. Each additional repository MAY have its own branch;
     otherwise it MUST use the session's generated branch.
-19. Saving a multi-repository environment with a Vercel sandbox MUST fail, and
-    so MUST a session request for one. A saved default of that kind (repository
-    or owner) MUST be skipped, and the session MUST start on another sandbox.
+19. A multi-repository environment MUST be able to run on every sandbox that
+    the picker offers, on every provider. A request whose URL names a
+    repository of the environment MUST get only the access of that repository.
+    A request that names no repository, for example a GraphQL request, uses
+    the access of the launch repository (Not Yet Implemented 4).
 20. A new session MUST NOT start on a sandbox that another workspace uses. The
     picker MUST NOT offer a shared sandbox. A request for the retired shared
     sandbox MUST fail with a specific message, and a saved shared default MUST
@@ -220,13 +257,12 @@ repository.
     by actual activity, and PR verification or other metadata writes MUST NOT
     move them or workspaces in activity order.
 11. A Cloud Agent permitted to launch child sessions MUST be able to orchestrate
-    stacked workspaces through its scoped launch tool when the user requests a
-    PR stack. Every new launch MUST use a fresh UUID `operationKey` and create a
+    stacked workspaces through its scoped launch tool. Every new launch MUST use a fresh UUID `operationKey` and create a
     registered workspace. The response MUST return its `worktreeId`, including
     on an identical retry. The orchestrator MAY launch worker A independently,
     then launch B with `stackOnWorktreeId` set to A's returned ID after A pushes.
-    The stack parent MAY be another owned worktree in the same personal or
-    organization scope. Completion callbacks MUST target the launching
+    The stack parent MUST be its own workspace or a direct child workspace.
+    Completion callbacks MUST target the launching
     orchestrator independently of the stack parent. The server MUST resolve the
     parent repository, branch, and pushed commit with the UI ownership checks.
     The agent MUST NOT select the resolved commit, override its lineage, or
@@ -318,6 +354,44 @@ repository.
    environment MUST cancel its builds.
 9. Automatic builds started by sessions MUST back off after repeated failures
    of one revision. A manual build MUST stay available during backoff.
+
+### Environment setup agent
+
+1. Personal owners and organization owners and admins MAY start an
+   environment setup run from the normal environment editor by choosing
+   the agent setup method, repositories, and a model. Guidance MUST be optional.
+   Without guidance, the agent MUST inspect the repositories and choose a useful
+   development setup. Model and variant controls MUST match new sessions.
+   The first repository MUST be on GitHub. Other members MAY only view runs.
+2. A run MUST work on a draft environment. Drafts MUST NOT be matched to
+   sessions, listed as environments, or built. Only the run's setup session
+   and its verification sessions MAY use the draft.
+3. The setup agent MUST NOT read secret values. It MAY write values it
+   generated. It MUST request user-owned credentials by key, with a reason
+   and repository references. Values MUST be entered in the environment
+   editor, never in chat. The editor MUST show the agent's reason as the
+   agent's, where the secret is stored, and that every session using the
+   environment can read it. Skip MUST always be available.
+4. The setup UI MUST NOT show network controls or host requests. The agent
+   MUST NOT discover, recommend, request, or set hosts. New environments use
+   the default network access. Refinements MUST retain existing policies.
+5. Existing required hosts and network restrictions MUST remain effective
+   during verification and subsequent sessions.
+6. A run MUST publish only after the completion gate passes: the latest
+   verification ran the draft's current revision, preparation succeeded,
+   every planned check passed, no request is pending, and the verification
+   ran under the network mode sessions will get. Publication MUST be
+   automatic after the gate passes, MUST NOT overwrite a target changed
+   after the draft was forked, and MUST keep the previous configuration so
+   an owner or admin MAY revert it. Reverting an environment changed after
+   publication MUST require explicit confirmation.
+7. The platform MUST NOT track pull requests for a run. When setup needs a
+   repository change, the agent MAY open a pull request and ask the user in
+   chat to merge it. Verification sessions MUST use the default branch, so
+   the gate passes only after the change is merged.
+8. A run MUST never wait silently. A stopped agent, the verification limit,
+   and publish failures MUST show their reason with a way to continue,
+   publish, or cancel.
 
 ### Workspace tail snapshots
 
@@ -572,20 +646,24 @@ repository.
     the worktree is created, MAY be restored when its runtime is rehydrated, and
     MUST be reused by later chats.
 15. A workspace's delegated Cloud Agent MCP connection MAY create independent
-    child sessions and list, inspect, check exact message results, interrupt, or
-    send prompt follow-ups to its direct children. Each management operation
+    child sessions from any origin with runtime authorization, including at
+    nested depth. It MAY list and inspect direct children, read their transcripts
+    and artifacts, answer questions, send follow-ups, cancel queued messages,
+    stop work, and sync or restack their branches. It MAY create a new chat in a
+    direct child's workspace. This chat MUST remain manageable by the caller;
+    creating it MUST NOT start a turn. Each management operation
     MUST check current canonical-parent authorization and persisted child
     lineage, owner and organization. It MUST NOT manage the parent itself,
     sibling chats or unrelated sessions. Child completion callbacks MUST target
     either a new chat created in the parent's workspace
     (`workspace:new-chat`) or one existing chat in that workspace
     (`workspace:<session-id>`). The server MUST verify that a session target is
-    a root or sibling chat with the same owner, organization and workspace, and
-    that it is still accessible; it MUST reject a target outside the spawning
-    parent's workspace or any target that is a child session. The target chat
+    accessible and has the same owner, organization and workspace. For a
+    standalone parent, it MUST target that session. The target chat
     learns its own session id from the `cloud-agent-context` line in its turns.
     A `workspace:new-chat` callback starts the new chat with the child result as
-    its first message, and every workspace callback MUST be idempotent for the
+    its first message. A pending child question MUST use a separate callback
+    from completion. Every workspace callback MUST be idempotent for the
     persisted callback message ID. A child completion callback MUST render as a
     distinct child session message that identifies the child session, shows its
     reported result or failure, and links to that session. It MUST NOT render
@@ -835,12 +913,24 @@ The following use SHOULD and are not enforced today:
    - A repository that cannot be authorized fails the start with a generic
      message that does not name it. A timeout while authorizing fails as a
      workspace setup failure.
-   - The sandbox picker does not know the environment. It can show a Vercel
-     default that the session skips.
    - With several repositories, the agent runs at `/workspace` and does not
      load the `AGENTS.md` or skills of each repository.
+5. The sandbox picker SHOULD show the sandbox that the session uses. (The
+   picker does not know the egress policy of the environment. It can show a
+   saved Vercel default that a session with an egress allowlist or audit skips
+   under Start rule 9.)
 
 ## Changelog
+
+### 2026-11-13 -- Multi-repository environments on Vercel
+
+- A multi-repository environment can now run on a Vercel sandbox. Saving one
+  with a Vercel sandbox no longer fails, and a saved Vercel default is no longer
+  skipped for it. Only the retired shared sandbox is still rejected.
+- A session with an egress allowlist or audit skips a saved repository or owner
+  default on a sandbox that cannot enforce the policy, such as Vercel, and
+  starts on another sandbox. The environment's sandbox and a requested sandbox
+  still fail with the egress message.
 
 ### 2026-11-12 -- Organization repository access
 
@@ -874,6 +964,12 @@ The following use SHOULD and are not enforced today:
   environment setup commands take effect after the next build.
 - Start commands also run after a session disk snapshot restore, because no
   process survives a snapshot.
+
+### 2026-11-04 -- Environment setup agent
+
+- Added environment setup runs: drafts, scoped setup agent, secret and
+  network requests, verification gate, automatic publication, and revert.
+  Repository changes go through pull requests that the user merges from chat.
 
 ### 2026-11-04 -- One sandbox per workspace
 

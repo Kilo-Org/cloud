@@ -2,10 +2,15 @@ import { afterAll, afterEach, beforeAll, describe, expect, test } from '@jest/gl
 import { custom_llm2 } from '@kilocode/db/schema';
 import type { CustomLlmDefinition } from '@kilocode/db/schema-types';
 import { captureException } from '@sentry/nextjs';
+import { sql } from 'drizzle-orm';
 import {
+  fetchCustomLlmsFromDatabase,
   findCustomLlm,
+  findPartnerCustomLlm,
+  getCustomLlmsById,
   getPublicCustomLlmInferenceProviders,
   isCustomLlm,
+  parseCustomLlmRows,
   requireCustomLlmsById,
   resetCustomLlmCacheForTest,
 } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
@@ -14,6 +19,7 @@ import {
   customLlmDefinition,
   deleteCustomLlmForTest,
   insertCustomLlmForTest,
+  partnerCustomLlmDefinition,
   publicCustomLlmDefinition,
 } from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 
@@ -25,11 +31,13 @@ describe('custom LLM catalog', () => {
   beforeAll(async () => {
     await insertCustomLlmForTest('Acme/Public-Model', publicCustomLlmDefinition(['acme']));
     await insertCustomLlmForTest('acme/private-model');
+    await insertCustomLlmForTest('Acme/Partner-Model', partnerCustomLlmDefinition('acme'));
   });
 
   afterAll(async () => {
     await deleteCustomLlmForTest('Acme/Public-Model');
     await deleteCustomLlmForTest('acme/private-model');
+    await deleteCustomLlmForTest('Acme/Partner-Model');
   });
 
   afterEach(() => {
@@ -117,5 +125,104 @@ describe('custom LLM catalog', () => {
     } finally {
       await deleteCustomLlmForTest('acme/malformed-model');
     }
+  });
+
+  test('reports a JSON null definition and keeps serving the valid rows', async () => {
+    const errorLog = jest.spyOn(console, 'error').mockImplementation(() => {});
+    await db
+      .insert(custom_llm2)
+      .values({ public_id: 'acme/null-definition', definition: sql`'null'::jsonb` });
+    try {
+      await expect(isCustomLlm('acme/public-model')).resolves.toBe(true);
+      await expect(requireCustomLlmsById()).resolves.toBeDefined();
+      expect(errorLog).toHaveBeenCalledWith(
+        'Failed to parse custom llm definition',
+        'acme/null-definition',
+        expect.anything()
+      );
+    } finally {
+      await deleteCustomLlmForTest('acme/null-definition');
+    }
+  });
+
+  test('skips disabled custom LLMs and partners', async () => {
+    await db.insert(custom_llm2).values([
+      {
+        public_id: 'acme/disabled-model',
+        definition: customLlmDefinition({ is_enabled: false }),
+      },
+      {
+        public_id: 'acme/disabled-partner',
+        definition: partnerCustomLlmDefinition('acme', { is_enabled: false }),
+      },
+    ]);
+    try {
+      await expect(findCustomLlm('acme/disabled-model')).resolves.toBeNull();
+      await expect(findPartnerCustomLlm('acme/disabled-partner')).resolves.toBeNull();
+      const fetched = await fetchCustomLlmsFromDatabase();
+      expect(fetched.map(customLlm => customLlm.public_id)).toEqual(
+        expect.not.arrayContaining(['acme/disabled-model'])
+      );
+      await expect(isCustomLlm('acme/private-model')).resolves.toBe(true);
+    } finally {
+      await deleteCustomLlmForTest('acme/disabled-model');
+      await deleteCustomLlmForTest('acme/disabled-partner');
+    }
+  });
+
+  describe('partners', () => {
+    test('finds a partner by id regardless of case', async () => {
+      await expect(findPartnerCustomLlm('acme/partner-model')).resolves.toMatchObject({
+        public_id: 'Acme/Partner-Model',
+        definition: { partner: { inference_provider: 'acme' } },
+      });
+      await expect(findPartnerCustomLlm(' ACME/PARTNER-MODEL ')).resolves.toMatchObject({
+        public_id: 'Acme/Partner-Model',
+      });
+    });
+
+    test('does not return custom LLMs that own their id as partners', async () => {
+      await expect(findPartnerCustomLlm('acme/public-model')).resolves.toBeNull();
+      await expect(findPartnerCustomLlm('acme/private-model')).resolves.toBeNull();
+      await expect(findPartnerCustomLlm('openai/gpt-4o')).resolves.toBeNull();
+    });
+
+    test('does not treat a partner as a custom LLM that owns its id', async () => {
+      await expect(findCustomLlm('acme/partner-model')).resolves.toBeNull();
+      await expect(isCustomLlm('acme/partner-model')).resolves.toBe(false);
+      expect((await getCustomLlmsById()).has('acme/partner-model')).toBe(false);
+      expect((await requireCustomLlmsById()).has('acme/partner-model')).toBe(false);
+      await expect(getPublicCustomLlmInferenceProviders('acme/partner-model')).resolves.toBeNull();
+    });
+
+    test('keeps partners out of the parsed rows and the database fetch', async () => {
+      const rows = await readDb.select().from(custom_llm2);
+      expect(rows.map(row => row.public_id)).toContain('Acme/Partner-Model');
+
+      expect(parseCustomLlmRows(rows).map(customLlm => customLlm.public_id)).toEqual(
+        expect.not.arrayContaining(['Acme/Partner-Model'])
+      );
+      expect(parseCustomLlmRows(rows).map(customLlm => customLlm.public_id)).toEqual(
+        expect.arrayContaining(['Acme/Public-Model', 'acme/private-model'])
+      );
+      const fetched = await fetchCustomLlmsFromDatabase();
+      expect(fetched.map(customLlm => customLlm.public_id)).toEqual(
+        expect.not.arrayContaining(['Acme/Partner-Model'])
+      );
+    });
+
+    test('drops a partner row without pricing as malformed', async () => {
+      jest.spyOn(console, 'error').mockImplementation(() => {});
+      await insertCustomLlmForTest(
+        'acme/unpriced-partner',
+        partnerCustomLlmDefinition('acme', { pricing: undefined })
+      );
+      try {
+        await expect(findPartnerCustomLlm('acme/unpriced-partner')).resolves.toBeNull();
+        await expect(findCustomLlm('acme/unpriced-partner')).resolves.toBeNull();
+      } finally {
+        await deleteCustomLlmForTest('acme/unpriced-partner');
+      }
+    });
   });
 });

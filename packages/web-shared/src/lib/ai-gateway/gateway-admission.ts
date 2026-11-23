@@ -7,16 +7,18 @@ import {
   type AnonymousUserContext,
 } from '@kilocode/web-shared/lib/anonymous';
 import { canSpendPaidUsage } from '@kilocode/worker-utils/account-access';
+import { gatewayBalanceRead } from '@kilocode/web-shared/lib/ai-gateway/benchmark-balance-policy';
 import type { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
-import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import {
   getBalanceAndOrgSettings,
   type BalanceAndOrgSettings,
 } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import {
-  hasBestEffortGuessDataCollectionRequirement,
+  isDeniedByProviderPrivacy,
   isFreeModel,
 } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import type {
   OrganizationPlan,
   OrganizationSettings,
@@ -26,16 +28,14 @@ import {
   composeProviderPreferences,
   getEffectiveProviderPrivacy,
 } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
-import {
-  isDataCollectionExplicitlyDisallowed,
-  type OpenRouterProviderConfig,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import type { OpenRouterProviderConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { withoutVirtualProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
 import {
   accountFreeModelLimitResponse,
   anonymousFreeModelLimitResponse,
   creditsBlockedResponse,
   dataCollectionRequiredResponse,
+  zeroDataRetentionUnavailableResponse,
   extractFraudAndProjectHeaders,
   extractHeaderAndLimitLength,
   gatewayAccountRateLimitResponse,
@@ -56,6 +56,11 @@ import {
   type FreeModelRateLimitSubject,
 } from '@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit';
 import { DEFAULT_BENCHMARK_USER_ID } from '@kilocode/auto-routing-contracts';
+import type { BenchmarkGatewayAssignment } from '@kilocode/auto-routing-contracts';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
+import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
+import { isUserBlacklistedByDomain } from '@kilocode/web-shared/lib/user/domain-gates';
+import { benchmarkRefusalResponse } from '@kilocode/web-shared/lib/ai-gateway/benchmark-case-admission';
 import {
   getGatewaySettingsRefusal,
   getOrganizationGatewaySettings,
@@ -72,6 +77,8 @@ export type SignedInGatewayCaller = {
   user: User;
   organizationId: string | undefined;
   botId?: string;
+  /** The request came through the Cloud Agent runtime credential proxy (verified attestation). */
+  cloudAgentRuntimeProxied: boolean;
 };
 export type AnonymousGatewayCaller = { kind: 'anonymous'; user: AnonymousUserContext };
 export type RejectedGatewayCaller = { kind: 'rejected'; response: NextResponse };
@@ -188,6 +195,7 @@ export function resolveGatewayCaller(
       user: auth.user,
       organizationId: auth.organizationId,
       botId: auth.botId,
+      cloudAgentRuntimeProxied: auth.cloudAgentRuntimeProxied === true,
     };
   }
   if (auth.rejectionReason === 'empty_organization_context') {
@@ -206,14 +214,73 @@ export function resolveGatewayCaller(
 export function readGatewayBalance(
   user: User,
   organizationId: string | undefined,
-  model: string
+  model: string,
+  /**
+   * `noAutoTopUp`: a benchmark case never initiates a purchase for its payer.
+   * `fresh`: read the primary. A benchmark payer was just debited by another case request in
+   * the same run, and a replica lag would admit the next request on a stale balance.
+   */
+  options: { noAutoTopUp?: boolean; fresh?: boolean } = {}
 ): Promise<BalanceAndOrgSettings> {
+  const read = gatewayBalanceRead({
+    isFreeModel: isFreeModel(model),
+    benchmark: Boolean(options.fresh || options.noAutoTopUp),
+  });
   return getBalanceAndOrgSettings(
     organizationId,
     user,
-    readDb,
-    isFreeModel(model) ? undefined : 'usage'
+    read.fresh ? db : readDb,
+    read.fundUsage ? 'usage' : undefined
   );
+}
+
+/**
+ * The account a benchmark case request runs as. The Worker signed the payer and the actor;
+ * this loads the actor row and, for an organization payer, the actor's membership is what
+ * `readGatewayBalance` needs. A payer that does not resolve fails closed: a case request is
+ * never served unbilled.
+ *
+ * This is not a user credential. It cannot be produced by a caller of the public proxy,
+ * because the assignment HMAC is verified before this runs.
+ */
+export async function resolveBenchmarkCaller(
+  assignment: BenchmarkGatewayAssignment
+): Promise<GatewayCaller> {
+  const subjectId =
+    assignment.payer?.type === 'user' ? assignment.payer.id : assignment.actorUserId;
+  const user = await findUserById(subjectId);
+  // An unresolvable payer is an identity refusal, never a payment one: the Worker keeps the
+  // account and pauses rather than rotating to someone the run never signed.
+  if (!user)
+    return { kind: 'rejected', response: benchmarkRefusalResponse('payer_unavailable', false) };
+  // Ordinary user/server auth refuses a blocked account and an audit-flagged blacklisted domain
+  // before serving a request; a balance read does not, so a personal payer would otherwise
+  // spend while blocked. Fail closed for both.
+  if (isBlockedAccount(user)) {
+    return { kind: 'rejected', response: benchmarkRefusalResponse('payer_unavailable', false) };
+  }
+  if (await isUserBlacklistedByDomain(user, readDb)) {
+    return { kind: 'rejected', response: benchmarkRefusalResponse('payer_unavailable', false) };
+  }
+  // A platform-covered call bills the signed benchmark organization; a paid call bills its
+  // signed payer (the organization, or nobody for a personal payer).
+  const organizationId =
+    assignment.payer?.type === 'organization'
+      ? assignment.payer.id
+      : assignment.payer === null
+        ? (assignment.platformOrganizationId ?? undefined)
+        : undefined;
+  if (assignment.payer === null && !organizationId) {
+    // The schema already refuses this; failing closed here keeps a future caller safe.
+    return { kind: 'rejected', response: benchmarkRefusalResponse('payer_unavailable', false) };
+  }
+  return {
+    kind: 'signed-in',
+    user,
+    organizationId,
+    botId: undefined,
+    cloudAgentRuntimeProxied: false,
+  };
 }
 
 /**
@@ -270,15 +337,16 @@ export function organizationProviderPreferences(params: {
   return { kind: 'allowed', provider: composed.provider };
 }
 
-/** Rejects a model that requires data collection under the effective provider privacy policy. */
+/** Rejects a model the effective provider privacy policy rules out; see `isDeniedByProviderPrivacy`. */
 export async function dataCollectionPolicyRejection(
   model: string,
   effectiveProviderPolicy: OpenRouterProviderConfig | undefined
 ): Promise<NextResponse | null> {
-  if (
-    (await hasBestEffortGuessDataCollectionRequirement(model)) &&
-    isDataCollectionExplicitlyDisallowed(effectiveProviderPolicy)
-  ) {
+  // Kilo does not vouch for zero data retention on any custom LLM.
+  if (effectiveProviderPolicy?.zdr === true && (await isCustomLlm(model))) {
+    return zeroDataRetentionUnavailableResponse();
+  }
+  if (await isDeniedByProviderPrivacy(model, effectiveProviderPolicy)) {
     return dataCollectionRequiredResponse();
   }
   return null;

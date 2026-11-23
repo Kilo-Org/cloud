@@ -280,6 +280,32 @@ describe('enforcedEnkryptInputDetectors', () => {
   });
 });
 
+describe('default detector objects', () => {
+  it('gives the input detectors a fresh object per call, so one caller cannot change the next', () => {
+    const expected = structuredClone(createKiloDefaultEnkryptInputDetectors());
+    const detectors = createKiloDefaultEnkryptInputDetectors();
+    detectors.injection_attack.action = 'block';
+    detectors.pii.enabled = true;
+    detectors.pii.entities.push('url');
+    detectors.keyword_detector.banned_keywords.push('Project Phoenix');
+    detectors.topic_detector.topic.push('weapons');
+    detectors.policy_violation.rules.push(rule);
+
+    expect(createKiloDefaultEnkryptInputDetectors()).toEqual(expected);
+  });
+
+  it('gives the output detectors a fresh object per call too', () => {
+    const expected = structuredClone(createEmptyEnkryptOutputDetectors());
+    const detectors = createEmptyEnkryptOutputDetectors();
+    detectors.nsfw.action = 'log';
+    detectors.pii.entities.push('url');
+    detectors.topic_detector.topic.push('weapons');
+    detectors.policy_violation.rules.push(rule);
+
+    expect(createEmptyEnkryptOutputDetectors()).toEqual(expected);
+  });
+});
+
 describe('detector metadata', () => {
   it('maps every summary key to a typed detector', () => {
     for (const detector of Object.values(ENKRYPT_SUMMARY_DETECTORS)) {

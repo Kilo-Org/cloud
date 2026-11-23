@@ -1,5 +1,5 @@
 import type { AgentConfig } from '@kilocode/db/schema-types';
-import type { LedgerDatabase } from '@kilocode/db/operation-ledger';
+import type { LedgerDatabase, LedgerTransaction } from '@kilocode/db/operation-ledger';
 
 /** Owner type for agent environment profiles - exactly one of organizationId or userId must be set. */
 export type ProfileOwner = { type: 'organization'; id: string } | { type: 'user'; id: string };
@@ -7,12 +7,22 @@ export type ProfileOwner = { type: 'organization'; id: string } | { type: 'user'
 /** Accepts a pool-backed database or an open transaction so callers can compose writes. */
 export type ProfileDatabase = LedgerDatabase;
 
+/**
+ * Work that must run inside one transaction. The type keeps every creation
+ * step in one unit: the locks are transaction-scoped, and the cap check and
+ * the insert read the same snapshot.
+ */
+export type ProfileTransaction = LedgerTransaction;
+
 export type RepositoryPlatform = 'github' | 'gitlab';
 
 export type ProfileOwnerType = ProfileOwner['type'];
 
 /** Profile variable response type (for API responses). Secret values are masked. */
 export type ProfileVarResponse = {
+  delivery?: 'env' | 'network';
+  allowedHosts?: string[] | null;
+  locations?: string[] | null;
   key: string;
   value: string; // Masked as '***' for secrets
   isSecret: boolean;

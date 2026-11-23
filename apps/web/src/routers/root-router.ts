@@ -51,6 +51,7 @@ import { providerReviewRouter } from '@/routers/provider-review-router';
 import { moderationRouter } from '@/routers/moderation-router';
 import { userExportsRouter } from '@/routers/user-exports-router';
 import { spendAlertRouter } from '@/routers/spend-alert-router';
+import { customRouterBenchmarksRouter } from '@/routers/custom-router-benchmarks-router';
 import { agentBriefingRouter } from '@/routers/agent-briefing-router';
 import { personalVercelComputeRouter } from '@/routers/organizations/organization-vercel-compute-router';
 import { computeBillingRouter } from '@/routers/compute-billing-router';
@@ -107,6 +108,7 @@ export const rootRouter = createTRPCRouter({
   moderation: moderationRouter,
   userExports: userExportsRouter,
   spendAlerts: spendAlertRouter,
+  customRouterBenchmarks: customRouterBenchmarksRouter,
   agentBriefing: agentBriefingRouter,
   computeBilling: computeBillingRouter,
 });

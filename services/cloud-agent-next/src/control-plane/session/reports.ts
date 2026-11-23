@@ -26,14 +26,14 @@ import {
 import {
   classifyControlPlaneRunFailure,
   type ControlPlaneRunFailure,
+  type ControlPlaneFailureClassification,
 } from '../../telemetry/control-plane-failure.js';
 import type { ReportAnchor } from '../../sandbox-session/report-outbox.js';
 import type { SessionMessage } from './messages.js';
 
 /**
- * Bounded assistant facts that only the outcome carries. The message row stores
- * no assistant facts (spec §5), so a report built after settlement must be told
- * them by the settling caller.
+ * Bounded facts supplied by the settling caller and retained in the message's
+ * settlement record for polling (spec §5).
  */
 export type ControlPlaneReportFacts = {
   assistantReason?: CloudAgentAssistantFailureReason;
@@ -84,29 +84,31 @@ export function classifySettledMessageFailure(
   });
 }
 
+export type SettledMessageFailure = SafeFailureProjection & ControlPlaneFailureClassification;
+
 /**
  * The structured failure a terminal callback carries. It mirrors the legacy
  * plane's `projectSafeFailure(state)` so a receiver can classify the failure
  * from structure (stage, code, workspace subtype, assistant reason) rather than
- * matching error text. Returns `undefined` for a non-terminal message.
+ * matching error text. Only failed or cancelled messages have a failure.
  */
 export function projectSettledMessageFailure(
   message: SessionMessage,
   facts: ControlPlaneReportFacts
-): SafeFailureProjection | undefined {
+): SettledMessageFailure | undefined {
   if (message.state !== 'failed' && message.state !== 'cancelled') return undefined;
   const classification = classifySettledMessageFailure(message, facts);
-  return projectSafeFailure({
-    failureStage: classification.stage,
-    failureCode: classification.code,
-    ...(facts.workspaceSubtype === undefined ? {} : { failureSubtype: facts.workspaceSubtype }),
-    ...(facts.assistantReason === undefined
-      ? {}
-      : { assistantFailureReason: facts.assistantReason }),
-    ...(facts.providerOwnership === undefined
-      ? {}
-      : { providerOwnership: facts.providerOwnership }),
-  });
+  return {
+    ...projectSafeFailure({
+      failureStage: classification.stage,
+      failureCode: classification.code,
+      failureSubtype: facts.workspaceSubtype,
+      assistantFailureReason: facts.assistantReason,
+      providerOwnership: facts.providerOwnership,
+    }),
+    stage: classification.stage,
+    code: classification.code,
+  };
 }
 
 function timestamp(value: number): string {

@@ -2,6 +2,7 @@ import jwt from 'jsonwebtoken';
 import { z } from 'zod';
 import { extractBearerToken } from '@kilocode/worker-utils';
 import { previewTargetSchema } from './shared/preview-target.js';
+import { AGENT_SANDBOX_PROVIDERS } from './shared/sandbox-provider.js';
 
 /**
  * The claims an entry ticket carries. The parse keeps only the declared
@@ -29,6 +30,7 @@ export const STREAM_TICKET_AUDIENCE = 'cloud-agent-stream';
 export const TERMINAL_TICKET_AUDIENCE = 'cloud-agent-terminal';
 export const PREVIEW_TICKET_AUDIENCE = 'cloud-agent-preview';
 export const PREVIEW_SESSION_AUDIENCE = 'cloud-agent-preview-session';
+export const WRAPPER_DISPATCH_TICKET_AUDIENCE = 'cloud-agent-wrapper-dispatch';
 
 /** The claims an entry ticket carries: who may open which target on which port. */
 const previewEntryClaimsSchema = z.intersection(
@@ -50,7 +52,7 @@ export type PreviewEntryClaims = z.infer<typeof previewEntryClaimsSchema>;
 const previewClaimsSchema = z.intersection(
   previewEntryClaimsSchema,
   z.object({
-    provider: z.literal('cloudflare-containers'),
+    provider: z.enum(AGENT_SANDBOX_PROVIDERS),
     logicalSandboxId: z.string().min(1),
     allocationRef: z.string().min(1),
   })
@@ -73,6 +75,29 @@ export type WrapperDispatchTicketClaims = {
   wrapperGeneration: number;
   wrapperConnectionId: string;
 };
+
+/**
+ * `type` stays `z.string()` so a ticket for another purpose reports its own
+ * error; every other field carries the type its claim declares.
+ */
+const wrapperDispatchTicketClaimsSchema = z.object({
+  type: z.string(),
+  userId: z.string(),
+  cloudAgentSessionId: z.string(),
+  kiloSessionId: z.string(),
+  wrapperRunId: z.string(),
+  wrapperGeneration: z.number(),
+  wrapperConnectionId: z.string(),
+});
+
+/** The audience is read on its own, before the payload schema, so it is reported first. */
+const wrapperDispatchTicketAudienceSchema = z.object({ aud: z.string().optional() });
+
+/** A payload expiry is required: the parser rejects a body without `exp`. */
+const wrapperDispatchTicketPayloadSchema = z.intersection(
+  wrapperDispatchTicketClaimsSchema,
+  z.object({ exp: z.number() })
+);
 
 const WRAPPER_DISPATCH_TICKET_MAX_LIFETIME_SECONDS = 4 * 60 * 60;
 
@@ -140,6 +165,7 @@ export function mintWrapperDispatchTicket(
   return jwt.sign(claims, secret, {
     algorithm: 'HS256',
     expiresIn: WRAPPER_DISPATCH_TICKET_MAX_LIFETIME_SECONDS,
+    audience: WRAPPER_DISPATCH_TICKET_AUDIENCE,
   });
 }
 
@@ -224,20 +250,6 @@ export function validatePreviewSessionToken(
   return previewClaimsFrom(payload);
 }
 
-function isWrapperDispatchTicketClaims(payload: unknown): payload is WrapperDispatchTicketClaims {
-  if (typeof payload !== 'object' || payload === null) return false;
-  const claims = payload as Record<string, unknown>;
-  return (
-    claims.type === 'wrapper_dispatch_ticket' &&
-    typeof claims.userId === 'string' &&
-    typeof claims.cloudAgentSessionId === 'string' &&
-    typeof claims.kiloSessionId === 'string' &&
-    typeof claims.wrapperRunId === 'string' &&
-    typeof claims.wrapperGeneration === 'number' &&
-    typeof claims.wrapperConnectionId === 'string'
-  );
-}
-
 export async function validateWrapperDispatchTicket(
   authHeader: string | null,
   secret: string | null | undefined
@@ -266,20 +278,22 @@ export async function validateWrapperDispatchTicket(
     return { success: false, error: 'Ticket validation failed' };
   }
 
-  if (!isWrapperDispatchTicketClaims(payload)) {
+  const audience = wrapperDispatchTicketAudienceSchema.safeParse(payload);
+  if (!audience.success || audience.data.aud !== WRAPPER_DISPATCH_TICKET_AUDIENCE) {
+    return { success: false, error: 'Invalid ticket audience' };
+  }
+
+  const parsed = wrapperDispatchTicketPayloadSchema.safeParse(payload);
+  if (!parsed.success) {
+    return { success: false, error: 'Invalid ticket payload' };
+  }
+
+  if (parsed.data.type !== 'wrapper_dispatch_ticket') {
     return { success: false, error: 'Invalid ticket type' };
   }
 
-  return {
-    success: true,
-    claims: {
-      type: payload.type,
-      userId: payload.userId,
-      cloudAgentSessionId: payload.cloudAgentSessionId,
-      kiloSessionId: payload.kiloSessionId,
-      wrapperRunId: payload.wrapperRunId,
-      wrapperGeneration: payload.wrapperGeneration,
-      wrapperConnectionId: payload.wrapperConnectionId,
-    },
-  };
+  // The schema keeps `type` a plain string so another purpose reports its own
+  // error; the check above established the literal this result carries.
+  const { exp: _exp, type: _type, ...claims } = parsed.data;
+  return { success: true, claims: { ...claims, type: 'wrapper_dispatch_ticket' } };
 }

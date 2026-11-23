@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { pool } from '@kilocode/web-shared/lib/drizzle';
+import { pool, taggedWriterPool } from '@kilocode/web-shared/lib/drizzle';
 
 type WriterPool = {
   options: { max: number };
@@ -13,7 +13,7 @@ type QueueSource = 'queue' | 'queue_vercel';
 type WriterClass = 'queue' | 'non_llm';
 type RejectionReason = 'queue_limit' | 'pool_waiting' | 'pool_busy';
 type Admission =
-  | { admitted: false; reason: RejectionReason }
+  | { admitted: false; reason: RejectionReason; classOnly?: true }
   | { admitted: true; release: () => void };
 type PoolGauges = { total: number; idle: number; waiting: number };
 type SlotWait = { slotWaitMs: number; waited: boolean };
@@ -25,12 +25,15 @@ type Waiter = {
 const IMMEDIATE: SlotWait = { slotWaitMs: 0, waited: false };
 
 /** Per-runtime writer bound, not a reservation of connections or global DB capacity. */
-export function createQueueWriterAdmission(writerPool: WriterPool) {
+export function createQueueWriterAdmission(
+  writerPool: WriterPool,
+  { dedicatedNonLlm = false }: { dedicatedNonLlm?: boolean } = {}
+) {
   const poolMax = writerPool.options.max;
-  const limit = Math.max(1, poolMax - 2);
-  // A ceiling inside `limit`, not a reservation: non-LLM usage writes may hold at most
-  // this many shared slots, and LLM queue writes can still use all of `limit`.
-  const nonLlmLimit = Math.max(1, Math.min(2, limit - 1));
+  const limit = dedicatedNonLlm ? poolMax : Math.max(1, poolMax - 2);
+  // The dedicated tagged budget uses its whole pool; the legacy shared budget
+  // retains its non-LLM ceiling for callers that explicitly request that class.
+  const nonLlmLimit = dedicatedNonLlm ? limit : Math.max(1, Math.min(2, limit - 1));
   let active = 0;
   let activeNonLlm = 0;
   // Released slots pass directly to the oldest waiter, so `active` stays at `limit`
@@ -127,7 +130,23 @@ export function createQueueWriterAdmission(writerPool: WriterPool) {
       take(writerClass);
     }
     report(source, writerClass, usageId, reason, gauges, wait);
-    return reason === null ? heldSlot(writerClass) : { admitted: false, reason };
+    if (reason === null) return heldSlot(writerClass);
+    // A dedicated tagged pool at its own ceiling is class-only pressure even when
+    // both connections are checked out. The shared pool needs spare headroom.
+    if (
+      reason === 'queue_limit' &&
+      (active < limit || (dedicatedNonLlm && classFull(writerClass))) &&
+      Number.isSafeInteger(poolMax) &&
+      Number.isSafeInteger(gauges.total) &&
+      Number.isSafeInteger(gauges.idle) &&
+      gauges.waiting === 0 &&
+      gauges.idle >= 0 &&
+      gauges.idle <= gauges.total &&
+      gauges.total <= poolMax &&
+      (dedicatedNonLlm || gauges.total - gauges.idle < limit)
+    )
+      return { admitted: false, reason, classOnly: true };
+    return { admitted: false, reason };
   }
 
   return {
@@ -193,3 +212,11 @@ export function createQueueWriterAdmission(writerPool: WriterPool) {
 }
 
 export const queueWriterAdmission = createQueueWriterAdmission(pool);
+
+let taggedAdmission: ReturnType<typeof createQueueWriterAdmission> | undefined;
+export const taggedWriterAdmission = {
+  acquire(...args: Parameters<ReturnType<typeof createQueueWriterAdmission>['acquire']>) {
+    taggedAdmission ??= createQueueWriterAdmission(taggedWriterPool, { dedicatedNonLlm: true });
+    return taggedAdmission.acquire(...args);
+  },
+};

@@ -2,6 +2,8 @@ import { timingSafeEqual } from '@kilocode/encryption';
 import { readBoundedStream } from '@kilocode/worker-utils/bounded-stream-reader';
 import {
   UsageRecordRequestSchema,
+  type EnkryptUsageQueueMessage,
+  type ExaUsageQueueMessage,
   type LlmUsageQueueMessage,
   type UsageQueueMessage,
 } from '@kilocode/usage-contracts';
@@ -14,15 +16,24 @@ export type Env = Omit<
   CloudflareEnv,
   | 'USAGE_INGEST_QUEUE'
   | 'USAGE_INGEST_HEDGE_QUEUE'
+  | 'USAGE_INGEST_ENKRYPT_QUEUE'
   | 'USAGE_WRITER_URL'
   | 'USAGE_INGEST_PARALLELISM'
   | 'USAGE_INGEST_HEDGE_MODE'
   | 'USAGE_INGEST_HEDGE_DELAY_MS'
   | 'USAGE_INGEST_HEDGE_PERCENT'
+  | 'USAGE_INGEST_DEDICATED_TAGGED_QUEUE_ENABLED'
 > & {
   USAGE_INGEST_QUEUE: Queue<UsageQueueMessage>;
   USAGE_INGEST_HEDGE_QUEUE?: Queue<UsageQueueMessage>;
+  /** Enkrypt usage and Exa fallback usage; the name predates Exa joining it. */
+  USAGE_INGEST_ENKRYPT_QUEUE: Queue<EnkryptUsageQueueMessage | ExaUsageQueueMessage>;
   USAGE_INGEST_PUBLISH_SECRET?: string;
+  /**
+   * A Wrangler var per environment. Exactly `true` sends tagged usage to the dedicated queue;
+   * anything else, including absent, keeps the shared queue.
+   */
+  USAGE_INGEST_DEDICATED_TAGGED_QUEUE_ENABLED?: string;
   USAGE_INGEST_PARALLELISM?: string;
   USAGE_INGEST_HEDGE_MODE?: string;
   USAGE_INGEST_HEDGE_DELAY_MS?: string;

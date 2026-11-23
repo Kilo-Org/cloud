@@ -3,6 +3,12 @@ import * as z from 'zod';
 import { TRPCError } from '@trpc/server';
 import type { EncryptedEnvelope } from '@kilocode/encryption';
 import type { EgressMode } from '@kilocode/worker-utils/egress-allowlist';
+import type {
+  NetworkSecretInput,
+  NetworkSecretChange,
+  NetworkSecretPolicy,
+  NetworkSecrets,
+} from '@kilocode/worker-utils/network-secrets';
 import { MASKED_SECRET_VALUE, type ProfileOwner } from './types';
 
 export const ENVIRONMENT_SECRET_PLACEHOLDER = '<unchanged>';
@@ -60,11 +66,10 @@ export const encryptedEnvelopeSchema = z.object({
 });
 
 /**
- * Keys the sandbox runtime owns. Mirrors
- * `services/cloud-agent-next/src/types.ts` `RESERVED_ENV_VARS` and
- * `services/cloud-agent-next/src/shared/runtime-environment.ts`
- * `CONTROL_RUNTIME_RESERVED_ENV_VARS`, plus the prefixes
- * `worktree-runtime.ts` drops. The profile package must not import from the
+ * Keys the sandbox runtime owns. Mirrors `RESERVED_ENV_VARS` and
+ * `CONTROL_RUNTIME_RESERVED_ENV_VARS` in
+ * `services/cloud-agent-next/src/shared/runtime-environment.ts`, plus the
+ * runtime-owned prefixes there. The profile package must not import from the
  * service, so the list is mirrored here; `environment-contracts.test.ts`
  * guards the documented contents.
  */
@@ -134,6 +139,7 @@ type EnvironmentCreateInputBase = {
   name: string;
   plainVars?: Record<string, string>;
   secrets?: Record<string, string>;
+  networkSecrets?: NetworkSecretInput[];
   commands?: string[];
   /** Commands run in every session after setup. Not a build input. */
   startCommands?: string[];
@@ -177,6 +183,7 @@ export type EnvironmentUpdateInput = {
   repositories?: EnvironmentRepositoryEntry[];
   plainVars?: Record<string, string>;
   secrets?: EnvironmentSecretChange[];
+  networkSecrets?: NetworkSecretChange[];
   commands?: string[];
   /** Replaces the start commands when supplied. Never advances the revision. */
   startCommands?: string[];
@@ -185,12 +192,15 @@ export type EnvironmentUpdateInput = {
   /** Absent keeps the stored policy; a supplied mode replaces it. */
   egressMode?: EgressMode;
   egressAllowlist?: string[];
+  /** Replaces the hosts the setup agent requires; absent keeps them. */
+  requiredHosts?: string[];
 };
 
 /** The primitives a repository environment contributes to a session. */
 export type EnvironmentSessionLayer = {
   envVars?: Record<string, string>;
   encryptedSecrets?: Record<string, EncryptedEnvelope>;
+  networkSecrets?: NetworkSecrets;
   setupCommands?: string[];
   /**
    * Commands every session runs after setup, including a session whose
@@ -228,6 +238,8 @@ export type EnvironmentForSession = {
   /** Saved policy; both null means the legacy unrestricted default. */
   egressMode: EgressMode | null;
   egressAllowlist: string[] | null;
+  /** Hosts the setup agent found; always part of an allowlist policy. */
+  egressRequiredHosts?: string[];
 };
 
 type EnvironmentBuildInputBase = {
@@ -235,11 +247,17 @@ type EnvironmentBuildInputBase = {
   commands: string[];
   plainVars: Record<string, string>;
   encryptedSecrets: Record<string, EncryptedEnvelope>;
+  networkSecrets?: NetworkSecrets;
   /**
    * The environment's saved allocation key, unvalidated. Build admission
    * resolves it with the repository and context settings to pin one target.
    */
   sandboxAllocation: string | null;
+  /**
+   * The environment's saved network policy. Build admission reads it so the
+   * build target skips the same saved defaults as a session of this environment.
+   */
+  egressMode: EgressMode | null;
 };
 
 /**
@@ -299,8 +317,12 @@ export type EnvironmentResponse = {
   /** Saved policy; both null means the legacy unrestricted default. */
   egressMode: EgressMode | null;
   egressAllowlist: string[] | null;
+  egressRequiredHosts: string[];
+  /** A draft is invisible to session matching, lists and builds until published. */
+  isDraft: boolean;
   /** Secret key names only. Values and envelopes are never returned. */
   secretKeys: string[];
+  networkSecrets?: Array<NetworkSecretPolicy & { key: string }>;
 } & EnvironmentIdentityResponse;
 
 /** A V1 summary carries the identity scalars; a V2 summary carries `repositories`. */

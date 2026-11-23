@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 
-import { computeDatabaseUrl, getDatabaseClientConfig } from './database-url';
+import {
+  computeDatabaseUrl,
+  getDatabaseClientConfig,
+  postgresConnectionTarget,
+} from './database-url';
 
 const originalCa = process.env.DATABASE_CA;
 const originalEnv = {
@@ -272,5 +276,81 @@ describe('getDatabaseClientConfig', () => {
 
       expect(config.ssl).toMatchObject({ ca: pem.replace(/\\n/g, '\n') });
     });
+  });
+});
+
+describe('postgresConnectionTarget', () => {
+  it('fills in the default port when the URL omits one', () => {
+    expect(postgresConnectionTarget('postgres://user:secret@localhost/mydb')).toEqual({
+      host: 'localhost',
+      port: 5432,
+      database: 'mydb',
+      user: 'user',
+    });
+  });
+
+  it('keeps an explicit port', () => {
+    expect(postgresConnectionTarget('postgres://user:secret@localhost:6543/mydb').port).toBe(6543);
+  });
+
+  it('decodes an escaped host and lowercases it', () => {
+    expect(postgresConnectionTarget('postgres://user:secret@db%2Eexample.com:5432/mydb').host).toBe(
+      'db.example.com'
+    );
+  });
+
+  it('lowercases an uppercase host', () => {
+    expect(postgresConnectionTarget('postgres://user:secret@LOCALHOST:5432/mydb').host).toBe(
+      'localhost'
+    );
+  });
+
+  it('decodes an escaped database name', () => {
+    expect(
+      postgresConnectionTarget('postgres://user:secret@localhost:5432/%70ostgres').database
+    ).toBe('postgres');
+  });
+
+  it('names the user database when the URL has no path', () => {
+    expect(postgresConnectionTarget('postgres://alice:p@localhost:5432/').database).toBe('alice');
+  });
+
+  it('keeps a trailing slash as part of the database name', () => {
+    expect(postgresConnectionTarget('postgres://alice:p@localhost:5432/postgres/').database).toBe(
+      'postgres/'
+    );
+  });
+
+  it('ignores the host and port query parameters that pg never reads here', () => {
+    expect(
+      postgresConnectionTarget('postgres://user:secret@localhost:5432/mydb?host=other&port=1')
+    ).toEqual({ host: 'localhost', port: 5432, database: 'mydb', user: 'user' });
+  });
+
+  it('reports the same target for a URL as for the equivalent string', () => {
+    expect(postgresConnectionTarget(new URL('postgres://user:secret@localhost:6543/mydb'))).toEqual(
+      postgresConnectionTarget('postgres://user:secret@localhost:6543/mydb')
+    );
+  });
+
+  it('decodes an escaped host and database name from a URL argument', () => {
+    expect(
+      postgresConnectionTarget(new URL('postgres://us%40er:p%40ss@db%2Eexample.com:5432/db%2Fname'))
+    ).toEqual({ host: 'db.example.com', port: 5432, database: 'db/name', user: 'us@er' });
+  });
+
+  it('fills in the default port when a URL argument omits one', () => {
+    expect(postgresConnectionTarget(new URL('postgres://user:secret@localhost/mydb'))).toEqual({
+      host: 'localhost',
+      port: 5432,
+      database: 'mydb',
+      user: 'user',
+    });
+  });
+
+  it('names the user database when a URL argument has an empty path', () => {
+    expect(postgresConnectionTarget(new URL('postgres://alice:p@localhost:5432/')).database).toBe(
+      'alice'
+    );
   });
 });

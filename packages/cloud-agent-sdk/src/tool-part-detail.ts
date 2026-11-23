@@ -5,7 +5,7 @@ import {
   sessionIdSchema,
 } from '@kilocode/session-ingest-contracts';
 import { cloudMessagePartSchema } from './cloud-conversation-schemas';
-import { hasUnresolvedKilo2Assets, readKilo2Messages } from './kilo2-source-messages';
+import { projectKilo2Message } from './kilo2-source-messages';
 import type { Part } from './types';
 import { readToolDetailMarker } from './tool-detail-marker';
 
@@ -71,20 +71,11 @@ export function readToolPartDetail(wire: unknown, preview: Part): ToolPartDetail
     part = parsed.success ? parsed.data : undefined;
   } else {
     const message = kilo2MessageSchema.safeParse(detail.message);
-    // An attachment without an authorized URL has no display: the preview
-    // stays on screen instead, as the history page and live source do.
-    if (message.success && !hasUnresolvedKilo2Assets(message.data)) {
-      try {
-        part = readKilo2Messages(detail.source.session, [message.data])[0]?.parts.find(
-          item => item.id === preview.id
-        );
-      } catch (error) {
-        console.error(
-          `[ConversationSource] Detail projection for message ${message.data.id} failed:`,
-          error
-        );
-      }
-    }
+    // A message with no possible display keeps the preview on screen instead.
+    if (message.success)
+      part = projectKilo2Message(detail.source.session, message.data)?.parts.find(
+        item => item.id === preview.id
+      );
   }
   if (
     part === undefined ||

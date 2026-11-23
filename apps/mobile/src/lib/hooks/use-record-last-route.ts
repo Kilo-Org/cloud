@@ -10,7 +10,7 @@ import {
 import { isRecordableLastRoute, lastRouteHrefFrom } from '@/lib/last-route-recordable';
 
 type RecordLastRouteInput = {
-  /** The account the record belongs to; null records nothing. */
+  /** The account the record belongs to; undefined records nothing. */
   readonly userId: string | undefined;
 };
 
@@ -36,9 +36,6 @@ export function useRecordLastRoute({ userId }: RecordLastRouteInput): void {
   const segments = useSegments();
   const globalHref = useUnstableGlobalHref();
   const lastRecorded = useRef<string | null>(null);
-  // Subscribed so this component re-renders when the restart read settles; the
-  // version is a dependency of the effect below, which otherwise never re-runs
-  // after hydration.
   const hydrationVersion = useSyncExternalStore(subscribeLastRoute, getLastRouteHydrationVersion);
 
   useEffect(() => {

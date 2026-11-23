@@ -19,7 +19,7 @@ import { consumeStreamTicketNonce } from './persistence/StreamTicketNonceDO.js';
 import { createNotFoundHandler } from '@kilocode/worker-utils';
 import { createWorkerErrorHandler } from './error-handler.js';
 import { createCallbackQueueConsumer } from './callbacks/index.js';
-import type { CallbackJob } from './callbacks/index.js';
+import type { CallbackQueueJob } from './callbacks/types.js';
 import {
   CLOUD_AGENT_REPORT_QUEUE_NAMES,
   consumeCloudAgentReportBatch,
@@ -47,6 +47,7 @@ import { withoutPreviewMarkers } from './shared/preview-headers.js';
 import { withDORetry } from './utils/do-retry.js';
 import { parseBearerCredential } from './sandbox-control/credential.js';
 import { admitSandboxWrapperUpgrade } from './sandbox-control/socket-admission.js';
+import { admitPreviewTunnelUpgrade } from './preview-tunnel/tunnel-admission.js';
 import { PtyIdSchema, sessionIdSchema } from './router/schemas.js';
 import { registerRuntimeArtifactRoutes } from './sandbox-control/runtime-artifact-routes.js';
 import { registerStartupFailureRoute } from './sandbox-control/startup-failure.js';
@@ -59,6 +60,10 @@ import {
   type RuntimeProxyHandleClaims,
   verifyRuntimeCredentialProxyHandle,
 } from './runtime-credential-proxy.js';
+import {
+  parseRuntimeProxyOriginProof,
+  RUNTIME_PROXY_ORIGIN_HEADER,
+} from './runtime-credential-proxy-origin.js';
 import {
   logRuntimeProxyRequestFailed,
   readUpstreamFailureEvidence,
@@ -95,7 +100,11 @@ import { z } from 'zod';
 import { isOrgInList } from './sandbox-id.js';
 import { containersBillingIdentity } from './container-usage-context.js';
 import { CLOUDFLARE_CONTAINERS_INSTANCES } from '@kilocode/worker-utils/sandbox-allocation';
-import { registerVercelScmBrokerRoute } from './scm-broker/vercel-route.js';
+import {
+  isVercelEgressPath,
+  loggableRequestPath,
+  registerVercelEgressRoute,
+} from './egress/vercel-egress-route.js';
 import { isAllowedStreamWebSocketOrigin, isAllowedWebSocketOrigin } from './ws-origin.js';
 
 const app = new Hono<HonoContext>();
@@ -251,7 +260,7 @@ async function handleTerminalWebSocket(request: Request, env: Env): Promise<Resp
 app.use('*', async (c: Context<HonoContext>, next: Next) => {
   await withLogTags({ source: 'worker-entry' }, async () => {
     const url = new URL(c.req.url);
-    logger.setTags({ method: c.req.method, path: url.pathname });
+    logger.setTags({ method: c.req.method, path: loggableRequestPath(url.pathname) });
     await next();
   });
 });
@@ -266,6 +275,8 @@ app.use('*', async (c: Context<HonoContext>, next: Next) => {
   if (!facadeBase) return next();
   const facadePath = new URL(facadeBase).pathname.replace(/\/+$/, '');
   const requestPath = new URL(c.req.url).pathname;
+  // A forwarded sandbox request belongs to the egress route, whatever its Authorization holds.
+  if (isVercelEgressPath(requestPath)) return next();
   const path = facadePath
     ? requestPath.startsWith(`${facadePath}/`)
       ? requestPath.slice(facadePath.length)
@@ -285,7 +296,7 @@ app.use('*', async (c: Context<HonoContext>, next: Next) => {
   return forwardRuntimeCredentialProxy(c, handle, claims, route, path);
 });
 
-registerVercelScmBrokerRoute(app);
+registerVercelEgressRoute(app);
 
 app.get('/health', (c: Context<HonoContext>) => {
   return c.json({
@@ -428,6 +439,10 @@ app.get('/sandbox-control/:sandboxId', async (c: Context<HonoContext>) => {
   return admitSandboxWrapperUpgrade(c.req.raw, c.env, c.req.param('sandboxId') ?? '');
 });
 
+app.get('/sandbox-preview-tunnel/:sandboxId', async (c: Context<HonoContext>) => {
+  return admitPreviewTunnelUpgrade(c.req.raw, c.env, c.req.param('sandboxId') ?? '');
+});
+
 app.get('/sandbox-terminal/:ownerId/:sessionId/:ptyId', async (c: Context<HonoContext>) => {
   if (c.req.header('Upgrade')?.toLowerCase() !== 'websocket') {
     return c.text('Expected WebSocket upgrade', 426);
@@ -499,6 +514,7 @@ function runtimeProxyHeaders(request: Request, token: string, organizationId?: s
     'Transfer-Encoding',
     'Upgrade',
     'X-Kilocode-OrganizationId',
+    RUNTIME_PROXY_ORIGIN_HEADER,
   ]) {
     headers.delete(name);
   }
@@ -612,7 +628,11 @@ async function forwardRuntimeCredentialProxy(
   try {
     credential = await withDORetry(
       () => getSandboxSessionStub(c.env, claims.userId, claims.sessionId),
-      session => session.resolveRuntimeCredentialProxyGrant(handle),
+      session =>
+        session.resolveRuntimeCredentialProxyGrant(
+          handle,
+          parseRuntimeProxyOriginProof(c.req.header(RUNTIME_PROXY_ORIGIN_HEADER))
+        ),
       'resolveRuntimeCredentialProxyGrant'
     );
   } catch {
@@ -1033,7 +1053,7 @@ const worker = {
   async queue(batch: MessageBatch<unknown>, env: Env, _ctx: ExecutionContext): Promise<void> {
     if (batch.queue.startsWith('cloud-agent-next-callback-queue')) {
       const consumer = createCallbackQueueConsumer(env);
-      return consumer(batch as MessageBatch<CallbackJob>);
+      return consumer(batch as MessageBatch<CallbackQueueJob>);
     }
     if (CLOUD_AGENT_REPORT_QUEUE_NAMES.has(batch.queue)) {
       return consumeCloudAgentReportBatch(batch, env);

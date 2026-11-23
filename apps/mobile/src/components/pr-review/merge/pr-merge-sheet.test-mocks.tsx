@@ -21,6 +21,7 @@ type Confirmation = {
 };
 
 const state = vi.hoisted(() => ({
+  insets: { left: 0, right: 0 },
   identity: { userId: 'u1' as string | undefined, isLoading: false },
   merge: {
     mutateAsync: vi.fn<(input: MergeVars) => Promise<MergeResult>>(),
@@ -42,12 +43,13 @@ export { state };
 vi.mock('react-native', () => ({
   // The commit fields render the shared Input, whose alignment helper reads
   // `I18nManager.isRTL` on every render.
-  I18nManager: { isRTL: false },
+  I18nManager: { isRTL: false, doLeftAndRightSwapInRTL: true },
   ScrollView: 'ScrollView',
   View: 'View',
   TextInput: 'TextInput',
   Switch: 'Switch',
   Pressable: 'Pressable',
+  ActivityIndicator: 'ActivityIndicator',
   Platform: { OS: 'ios' },
   useColorScheme: () => 'light',
   Keyboard: { addListener: vi.fn(() => ({ remove: vi.fn() })) },
@@ -58,6 +60,16 @@ vi.mock('react-native', () => ({
     },
   },
   useWindowDimensions: () => ({ height: 800, width: 400 }),
+}));
+// The merge body clears the window's side insets itself; a sheet on Android
+// reports none, and the suite asserts the landscape padding from this state.
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({
+    top: 0,
+    bottom: 0,
+    left: state.insets.left,
+    right: state.insets.right,
+  }),
 }));
 vi.mock('expo-haptics', () => ({
   notificationAsync: vi.fn(),
@@ -125,10 +137,16 @@ vi.mock('@/components/ui/radio-group', () => ({
   }),
 }));
 vi.mock('@/components/ui/icons', () => ({
+  AlertCircle: 'AlertCircle',
   AlertTriangle: 'AlertTriangle',
   GitBranch: 'GitBranch',
   GitPullRequest: 'GitPullRequest',
+  Lock: 'Lock',
+  RotateCcw: 'RotateCcw',
+  SearchX: 'SearchX',
+  ServerCrash: 'ServerCrash',
   ShieldAlert: 'ShieldAlert',
+  WifiOff: 'WifiOff',
   XCircle: 'XCircle',
 }));
 vi.mock('@/components/pr-review/pr-form-sheet-chrome', () => ({
@@ -139,6 +157,19 @@ vi.mock('@/components/pr-review/pr-form-sheet-chrome', () => ({
 vi.mock('@/components/pr-review/pr-review-reconnect-notice', () => ({
   PrReviewReconnectNotice: 'PrReviewReconnectNotice',
 }));
+// The shared error state (`QueryError` → `EmptyState`) and its action read
+// these tokens; the suite does not assert their values.
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({ mutedForeground: '#000000' }),
+  useThemeColors: () => ({
+    destructive: '#B0483A',
+    foreground: '#000000',
+    ink2: '#3C382F',
+    mutedForeground: '#000000',
+    primaryForeground: '#FFFFFF',
+  }),
+  useMutedDisabledInk: () => '#6F6A61',
 }));
+// The delete-branch row is a PreferenceRow, whose pending state draws the
+// shared ActivityIndicator; that reads the reduced-motion policy, which loads
+// `expo-battery` and with it the Expo runtime Node has no `__DEV__` for.
+vi.mock('@/lib/a11y/motion', () => ({ useMotionPolicy: () => ({ reducedMotion: false }) }));

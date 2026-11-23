@@ -9,7 +9,11 @@ import type { SandboxSessionV2 } from '../../src/control-plane/session/session-d
 import { controlPlaneMessages } from '../../src/control-plane/session/sqlite-schema.js';
 import { logger } from '../../src/logger.js';
 import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
-import type { ControlPlanePromptPayload } from '../../src/shared/control-plane-protocol.js';
+import { createMessageId } from '../../src/session/message-id.js';
+import type {
+  ControlPlaneEvent,
+  ControlPlanePromptPayload,
+} from '../../src/shared/control-plane-protocol.js';
 import { CONTROL_PLANE_TIMERS } from '../../src/shared/control-plane-timers.js';
 import { FakeSandboxPeer } from './helpers/fake-sandbox-peer.js';
 import { waitFor } from './wait-for.js';
@@ -120,13 +124,15 @@ async function readAlarm(stub: DurableObjectStub<SandboxSessionV2>): Promise<num
 
 async function setup(callbackUrl = 'https://callback.test/hook'): Promise<{
   sessionId: string;
+  kiloSessionId: string;
   stub: DurableObjectStub<SandboxSessionV2>;
   peer: FakeSandboxPeer;
 }> {
   const sessionId = newSessionId();
+  const sessionKiloSessionId = kiloSessionId();
   const sandboxId = `ses-${crypto.randomUUID().replaceAll('-', '')}`;
   const stub = sessions.getByName(sessionId);
-  const sessionMetadata = metadata({ sessionId, kiloSessionId: kiloSessionId(), sandboxId });
+  const sessionMetadata = metadata({ sessionId, kiloSessionId: sessionKiloSessionId, sandboxId });
   sessionMetadata.callback = { target: { url: callbackUrl } };
   await stub.registerSessionFromMetadata({
     metadata: sessionMetadata,
@@ -135,7 +141,7 @@ async function setup(callbackUrl = 'https://callback.test/hook'): Promise<{
   const peer = new FakeSandboxPeer();
   peer.prepareView = peer.view('ready');
   await installPeer(stub, peer);
-  return { sessionId, stub, peer };
+  return { sessionId, kiloSessionId: sessionKiloSessionId, stub, peer };
 }
 
 afterEach(async () => {
@@ -577,12 +583,46 @@ describe('SandboxSessionV2 reports and callbacks', () => {
     );
   });
   it('writes one report per terminal message and one batch callback under the session id', async () => {
-    const { sessionId, stub } = await setup();
+    const { sessionId, kiloSessionId, stub } = await setup();
     const captured = await installCapturedQueues(stub);
 
     await stub.send(promptPayload('m1'));
     await stub.send(promptPayload('m2'));
     await waitFor(async () => expect(await messageStatus(stub, 'm2')).toBe('running'));
+    await stub.onEvents({
+      events: [
+        ...['m1', 'm2'].map((id, index) => ({
+          type: 'message.updated',
+          properties: {
+            info: { id, sessionID: kiloSessionId, role: 'user', time: { created: index + 1 } },
+          },
+        })),
+        {
+          type: 'message.updated',
+          properties: {
+            info: {
+              id: 'msg_assistant',
+              sessionID: kiloSessionId,
+              role: 'assistant',
+              parentID: 'm2',
+              time: { created: 3 },
+            },
+          },
+        },
+        {
+          type: 'message.part.updated',
+          properties: {
+            part: {
+              id: 'prt_answer',
+              messageID: 'msg_assistant',
+              sessionID: kiloSessionId,
+              type: 'text',
+              text: 'Answer for m2',
+            },
+          },
+        },
+      ],
+    });
 
     await stub.onOutcome({
       sessionId,
@@ -611,10 +651,23 @@ describe('SandboxSessionV2 reports and callbacks', () => {
       status: 'completed',
       messageId: 'm2',
       gateResult: 'fail',
+      lastAssistantMessageText: 'Answer for m2',
+    });
+    await evictAllDurableObjects();
+    const earlierResult = await stub.getMessageResult('m1');
+    expect(earlierResult).toMatchObject({ type: 'found', result: { status: 'completed' } });
+    expect(earlierResult).not.toHaveProperty('result.assistant');
+    expect(await stub.getMessageResult('m2')).toMatchObject({
+      type: 'found',
+      result: {
+        status: 'completed',
+        assistant: { messageId: 'msg_assistant', text: 'Answer for m2' },
+        branch: 'main',
+      },
     });
   });
 
-  it('writes a failed report with its stage/code and one callback for a failure batch', async () => {
+  it('writes failed reports and matches polling failures to the batch callback', async () => {
     const { stub, peer } = await setup();
     const captured = await installCapturedQueues(stub);
 
@@ -639,10 +692,64 @@ describe('SandboxSessionV2 reports and callbacks', () => {
       expect(report.run.diagnostic).toBeDefined();
     }
     expect(captured.callbacks).toHaveLength(1);
-    expect(captured.callbacks[0]?.payload.status).toBe('failed');
-    expect(captured.callbacks[0]?.payload.clientError).toMatchObject({
-      code: 'WORKSPACE_SETUP_FAILED',
-      retryable: true,
+    const callback = captured.callbacks[0]?.payload;
+    const failure = {
+      stage: 'pre_dispatch',
+      code: 'workspace_setup_failed',
+      subtype: 'git_rate_limited',
+    };
+    expect(callback).toMatchObject({
+      messageId: 'm2',
+      status: 'failed',
+      failure,
+      clientError: { code: 'WORKSPACE_SETUP_FAILED', retryable: true },
+    });
+    const result = await stub.getMessageResult('m2');
+    expect(result).toMatchObject({ type: 'found', result: { messageId: 'm2', status: 'failed' } });
+    expect(result).toHaveProperty('result.failure', {
+      ...callback?.failure,
+      retryable: callback?.clientError?.retryable,
+    });
+    expect(await stub.getMessageResult('m1')).toMatchObject({
+      type: 'found',
+      result: { messageId: 'm1', status: 'failed', failure },
+    });
+  });
+
+  it('matches the polling failure to the callback for a BYOK assistant rate limit', async () => {
+    const { sessionId, stub } = await setup();
+    const captured = await installCapturedQueues(stub);
+
+    await stub.send(promptPayload('m1'));
+    await waitFor(async () => expect(await messageStatus(stub, 'm1')).toBe('running'));
+    await stub.onOutcome({
+      sessionId,
+      status: 'failed',
+      reason: 'Assistant request was rate limited',
+      assistantReason: 'rate_limited',
+      providerOwnership: 'byok',
+      lastMessageId: 'm1',
+    });
+    await flush(stub);
+
+    expect(captured.callbacks).toHaveLength(1);
+    const callback = captured.callbacks[0]?.payload;
+    expect(callback).toMatchObject({
+      messageId: 'm1',
+      status: 'failed',
+      failure: {
+        stage: 'agent_activity',
+        code: 'assistant_error',
+        assistantReason: 'rate_limited',
+        providerOwnership: 'byok',
+      },
+      clientError: { retryable: expect.any(Boolean) },
+    });
+    const result = await stub.getMessageResult('m1');
+    expect(result).toMatchObject({ type: 'found', result: { messageId: 'm1', status: 'failed' } });
+    expect(result).toHaveProperty('result.failure', {
+      ...callback?.failure,
+      retryable: callback?.clientError?.retryable,
     });
   });
 
@@ -812,6 +919,130 @@ describe('SandboxSessionV2 reports and callbacks', () => {
 
     expect(attempts).toBeGreaterThanOrEqual(2);
     expect(callbacks).toHaveLength(1);
+  });
+
+  it('matches each completed turn to its callback after a mid-turn synthetic message and a follow-up', async () => {
+    const { sessionId, kiloSessionId, stub } = await setup();
+    const captured = await installCapturedQueues(stub);
+    const promptId = createMessageId();
+    const source = {
+      version: 'v2',
+      session: {
+        id: kiloSessionId,
+        location: { directory: '/workspace/app' },
+        time: { created: 1, updated: 2 },
+      },
+    };
+    const conversationMessage = (
+      message: Record<string, unknown>,
+      parentID?: string
+    ): ControlPlaneEvent => ({
+      type: 'conversation.message.updated',
+      properties: {
+        sessionID: kiloSessionId,
+        source,
+        message,
+        ...(parentID === undefined ? {} : { parentID }),
+      },
+    });
+    const assistant = (id: string, text: string, parentID: string, created = 2) =>
+      conversationMessage(
+        {
+          id,
+          type: 'assistant',
+          time: { created, completed: created + 1 },
+          content: [{ type: 'text', text }],
+        },
+        parentID
+      );
+
+    await stub.send(promptPayload(promptId));
+    await waitFor(async () => expect(await messageStatus(stub, promptId)).toBe('running'));
+    await stub.onEvents({
+      events: [
+        conversationMessage({ id: promptId, type: 'user', time: { created: 1 }, text: 'hello' }),
+        assistant('msg_assistant_early', 'Start Docker in the background.', promptId),
+        conversationMessage({
+          id: 'msg_synthetic',
+          type: 'synthetic',
+          time: { created: 2 },
+          text: 'Background task finished.',
+        }),
+        assistant('msg_assistant_final', 'Final answer', 'msg_synthetic'),
+      ],
+    });
+    await stub.onOutcome({
+      sessionId,
+      status: 'completed',
+      lastMessageId: promptId,
+      gateResult: 'pass',
+    });
+    await flush(stub);
+
+    expect(captured.callbacks).toHaveLength(1);
+    const firstCallback = captured.callbacks[0]?.payload;
+    expect(firstCallback).toMatchObject({
+      messageId: promptId,
+      status: 'completed',
+      lastAssistantMessageText: 'Final answer',
+      lastSeenBranch: 'main',
+      gateResult: 'pass',
+    });
+    const firstResult = await stub.getMessageResult(promptId);
+    expect(firstResult).toMatchObject({
+      type: 'found',
+      result: {
+        messageId: promptId,
+        status: 'completed',
+        assistant: {
+          messageId: 'msg_assistant_final',
+          text: firstCallback?.lastAssistantMessageText,
+        },
+        branch: firstCallback?.lastSeenBranch,
+        gateResult: firstCallback?.gateResult,
+      },
+    });
+
+    const followUpId = createMessageId();
+    await stub.send(promptPayload(followUpId, 'follow-up'));
+    await waitFor(async () => expect(await messageStatus(stub, followUpId)).toBe('running'));
+    await stub.onEvents({
+      events: [
+        conversationMessage({
+          id: followUpId,
+          type: 'user',
+          time: { created: 4 },
+          text: 'follow-up',
+        }),
+        assistant('msg_assistant_follow_up', 'Follow-up answer', followUpId, 5),
+      ],
+    });
+    await stub.onOutcome({ sessionId, status: 'completed', lastMessageId: followUpId });
+    await flush(stub);
+
+    expect(captured.callbacks).toHaveLength(2);
+    const followUpCallback = captured.callbacks[1]?.payload;
+    expect(followUpCallback).toMatchObject({
+      messageId: followUpId,
+      status: 'completed',
+      lastAssistantMessageText: 'Follow-up answer',
+      lastSeenBranch: 'main',
+    });
+    const followUpResult = await stub.getMessageResult(followUpId);
+    expect(followUpResult).toMatchObject({
+      type: 'found',
+      result: {
+        messageId: followUpId,
+        status: 'completed',
+        assistant: {
+          messageId: 'msg_assistant_follow_up',
+          text: followUpCallback?.lastAssistantMessageText,
+        },
+        branch: followUpCallback?.lastSeenBranch,
+      },
+    });
+    expect(followUpResult).not.toHaveProperty('result.gateResult');
+    expect(await stub.getMessageResult(promptId)).toEqual(firstResult);
   });
 
   it('attributes initial and follow-up turns to the runtime harness the connected wrapper reported', async () => {

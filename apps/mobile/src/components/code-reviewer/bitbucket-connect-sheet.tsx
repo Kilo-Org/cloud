@@ -1,14 +1,19 @@
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
+import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations';
 
 import { BitbucketConnectForm } from '@/components/code-reviewer/bitbucket-connect-form';
+import { StateAction } from '@/components/empty-state';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { PermissionDenied } from '@/components/organization/permission-denied';
+import { useMetadataLeaveGuard } from '@/components/profiles/use-metadata-leave-guard';
 import { QueryError } from '@/components/query-error';
+import { SheetHeader } from '@/components/sheet-header';
 import { SheetScrollView } from '@/components/tab-screen';
+import { RotateCcw } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
@@ -16,6 +21,7 @@ import { bitbucketRepair } from '@/lib/code-reviewer-bitbucket';
 import { notificationHaptic } from '@/lib/haptics';
 import { useBitbucketIntegrationStatus, useBitbucketReadiness } from '@/lib/hooks/use-bitbucket';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { isPermissionDeniedError, trpcErrorVariant } from '@/lib/trpc-error';
 
 /**
@@ -26,18 +32,77 @@ import { isPermissionDeniedError, trpcErrorVariant } from '@/lib/trpc-error';
  * instead of connecting twice, which the server refuses.
  */
 export function BitbucketConnectSheet({ scope }: Readonly<{ scope: string | undefined }>) {
-  // Without a scope there is no organization to name, and the boundary explains
-  // which selection is missing instead of leaving the sheet blank.
-  if (scope === undefined) {
-    return <OrganizationBoundary />;
+  const router = useRouter();
+  const { t } = useTranslation();
+  // The route is a full-window modal on Android and a formSheet on iOS, so the
+  // surface reaches the window top there and the header clears the status bar
+  // itself; the native sheet presents below it and the header reserves nothing.
+  return (
+    <>
+      {/* Without a scope there is no organization to name, and the boundary
+          explains which selection is missing instead of leaving the sheet
+          blank. It still needs the close control, because this branch renders
+          before any scope-dependent state exists. */}
+      {scope === undefined ? (
+        <>
+          <SheetHeader
+            title={t('agentChat.repoPicker.platformBitbucket')}
+            variant="close"
+            topInset="android-window-top"
+            onDone={() => {
+              router.back();
+            }}
+          />
+          <OrganizationBoundary />
+        </>
+      ) : (
+        <ScopedBitbucketConnectSheet scope={scope} />
+      )}
+    </>
+  );
+}
+
+/**
+ * A denial's description as one paragraph per reason. A lone paragraph stays
+ * the bare string, so a sentence that already names the organization reads as
+ * one sentence; two or more become separate muted paragraphs in the same body
+ * token, one paragraph gap apart, so the reader sees two reasons rather than
+ * one cramped paragraph at a different size.
+ */
+function denialParagraphs(paragraphs: readonly string[]): ReactNode {
+  const [only] = paragraphs;
+  if (paragraphs.length === 1 && only !== undefined) {
+    return only;
   }
-  return <ScopedBitbucketConnectSheet scope={scope} />;
+  return (
+    <View className="items-center gap-2">
+      {paragraphs.map((paragraph, index) => (
+        <Text key={index} variant="muted" className="text-center">
+          {paragraph}
+        </Text>
+      ))}
+    </View>
+  );
 }
 
 function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
   const router = useRouter();
   const { t } = useTranslation();
-  const { role, org, isResolving, isError } = useOrgBoundary(scope);
+  // The token field is the sheet's only draft, and the header close control,
+  // the Android Back and the back gesture would drop whatever is typed in it.
+  // No second in-flight source exists: the form reports `dirty: false` while a
+  // connect is pending (`onDirtyChange?.(holdsDraft && !submitting &&
+  // !connectLanded)`), so a running connect has already disarmed the guard, and
+  // a landed one closes the sheet through `leaveWithoutAsking`.
+  const guard = useMetadataLeaveGuard({ enabled: true, saving: false });
+  const {
+    role,
+    org,
+    isResolving,
+    isError,
+    isFetching: isOrgFetching,
+    refetch,
+  } = useOrgBoundary(scope);
   const readiness = useBitbucketReadiness(scope);
   // The readiness read describes workspace access tokens only, so this is what
   // tells a Bitbucket OAuth connection apart from a workspace with none.
@@ -46,135 +111,229 @@ function ScopedBitbucketConnectSheet({ scope }: Readonly<{ scope: string }>) {
   // so a deep link never offers a submit the server would refuse.
   const canManage = canManageOrganizationBilling(role);
 
-  if (isResolving || readiness.isPending || status.isPending) {
-    return (
-      <SheetScrollView
-        className="flex-1 bg-background"
-        contentContainerClassName="gap-6 px-6 pt-4 pb-8"
-      >
-        <Skeleton className="mx-auto h-5 w-40 rounded" />
-        <View className="gap-2">
-          <Skeleton className="h-3.5 w-full rounded" />
-          <Skeleton className="h-3.5 w-4/5 rounded" />
-        </View>
-        <View className="gap-1.5">
-          <Skeleton className="h-3.5 w-32 rounded" />
-          <Skeleton className="h-11 rounded-md" />
-        </View>
-        <Skeleton className="h-11 rounded-md" />
-      </SheetScrollView>
-    );
-  }
-
-  if (isError || org == null) {
-    return <OrganizationBoundary organizationIdOverride={scope} />;
-  }
-
-  // An unanswered status read is not "no integration": it is the only read
-  // that can name a Bitbucket OAuth connection, so a failure asks again
-  // instead of offering a token form the server would refuse.
-  if (status.isError && status.data == null) {
-    return (
-      <>
-        <SheetTitle title={t('agentChat.repoPicker.platformBitbucket')} />
-        {isPermissionDeniedError(status.error) ? (
-          <PermissionDenied description={t('prReview.connect.bitbucketAdminOnlyDescription')} />
-        ) : (
-          <QueryError
-            className="bg-background"
-            variant={trpcErrorVariant(status.error)}
-            onRetry={() => void status.refetch()}
-            isRetrying={status.isFetching}
-          />
-        )}
-      </>
-    );
-  }
-
   const integrationId = readiness.data?.integrationId ?? null;
   const repair = readiness.data === undefined ? null : bitbucketRepair(readiness.data, status.data);
   // A workspace connected through Bitbucket OAuth has no token integration to
   // name, so the sheet is about the connection itself rather than about a form.
   const managesExisting = repair?.kind === 'manage-connection';
-  let title = t('prReview.connect.reconnectTitleBitbucket');
-  let deniedDescription = t('prReview.connect.gitlabReconnectAdminOnlyDescription');
-  if (managesExisting) {
-    title = t('agentChat.repoPicker.platformBitbucket');
-    deniedDescription = t('integrations.managedByOwner');
-  } else if (integrationId === null) {
-    title = t('common.connectBitbucket');
-    deniedDescription = t('codeReviewer.bitbucket.notConnectedReadOnly');
+  // Until the two reads settle the sheet cannot know which repair it will
+  // offer, and a failed read leaves the answer unknown, not "not connected":
+  // the title names the platform in both cases instead of promising a form the
+  // sheet may not render.
+  const readsSettled =
+    !isResolving &&
+    !readiness.isPending &&
+    !status.isPending &&
+    !(readiness.isError && readiness.data == null) &&
+    !(status.isError && status.data == null);
+  // A title that names a connect or reconnect action is offered only to a role
+  // that can finish it. A refused member reads the connection state when the
+  // workspace has no integration, and the platform name when one exists,
+  // because the body refuses that reconnect.
+  const platformTitle = t('agentChat.repoPicker.platformBitbucket');
+  let title = platformTitle;
+  if (readsSettled && !managesExisting) {
+    if (integrationId === null) {
+      title = canManage
+        ? t('common.connectBitbucket')
+        : t('prReview.connect.bitbucketNotConnectedTitle');
+    } else if (canManage) {
+      title = t('prReview.connect.reconnectTitleBitbucket');
+    }
   }
 
-  if (readiness.isError && readiness.data == null) {
-    return (
-      <>
-        <SheetTitle title={title} />
-        {isPermissionDeniedError(readiness.error) ? (
-          <PermissionDenied description={t('prReview.connect.bitbucketAdminOnlyDescription')} />
-        ) : (
-          <QueryError
-            className="bg-background"
-            variant={trpcErrorVariant(readiness.error)}
-            onRetry={() => void readiness.refetch()}
-            isRetrying={readiness.isFetching}
+  // One body per state, so the guard's confirmation renders beside all of them:
+  // a read that answers while a token is typed can replace the form with an
+  // error, and a Back there must still find a prompt to answer.
+  const renderBody = (): ReactNode => {
+    if (isResolving || readiness.isPending || status.isPending) {
+      return (
+        <SheetScrollView
+          className="flex-1 bg-background"
+          contentContainerClassName={SCREEN_BODY_CLASS}
+        >
+          {/* The header already paints the title, so the body reserves the
+              form's own blocks: the description, then the field and its action. */}
+          <View className="gap-2">
+            <Skeleton className="h-3.5 w-full rounded" />
+            <Skeleton className="h-3.5 w-4/5 rounded" />
+          </View>
+          <View className="gap-1.5">
+            <Skeleton className="h-3.5 w-32 rounded" />
+            <Skeleton className="h-11 rounded-md" />
+          </View>
+          <Skeleton className="h-11 rounded-md" />
+        </SheetScrollView>
+      );
+    }
+
+    if (isError || org == null) {
+      return <OrganizationBoundary organizationIdOverride={scope} />;
+    }
+
+    // An unanswered status read is not "no integration": it is the only read
+    // that can name a Bitbucket OAuth connection, so a failure asks again
+    // instead of offering a token form the server would refuse.
+    if (status.isError && status.data == null) {
+      return isPermissionDeniedError(status.error) ? (
+        <PermissionDenied
+          description={denialParagraphs([
+            t('prReview.connect.contextLine', { organization: org.organizationName }),
+            t('prReview.connect.bitbucketAdminOnlyDescription'),
+          ])}
+          showBack={false}
+        />
+      ) : (
+        <QueryError
+          className="bg-background"
+          variant={trpcErrorVariant(status.error)}
+          onRetry={() => void status.refetch()}
+          isRetrying={status.isFetching}
+        />
+      );
+    }
+
+    if (readiness.isError && readiness.data == null) {
+      return isPermissionDeniedError(readiness.error) ? (
+        <PermissionDenied
+          description={denialParagraphs([
+            t('prReview.connect.contextLine', { organization: org.organizationName }),
+            t('prReview.connect.bitbucketAdminOnlyDescription'),
+          ])}
+          showBack={false}
+        />
+      ) : (
+        <QueryError
+          className="bg-background"
+          variant={trpcErrorVariant(readiness.error)}
+          onRetry={() => void readiness.refetch()}
+          isRetrying={readiness.isFetching}
+        />
+      );
+    }
+
+    if (!canManage) {
+      // The repair this sheet would offer decides which trio can make it: an
+      // OAuth connection is an owner's to change, a stored token needs anyone
+      // who may reconnect it, and a first connect asks for whoever holds the
+      // permission. The reconnect and owner sentences name the organization
+      // whose rule refused, so a person in several of them reads which one this
+      // is. The first connect sentence is the shared ask the composer's
+      // Bitbucket card states beside the same restriction, and it leaves the
+      // organization implicit, so it is stated under the organization line.
+      let deniedDescription = t('prReview.connect.bitbucketAdminOnlyDescription');
+      if (managesExisting) {
+        deniedDescription = t('codeReviewer.bitbucketConnect.deniedManagedByOwner', {
+          organization: org.organizationName,
+        });
+      } else if (integrationId !== null) {
+        deniedDescription = t('codeReviewer.bitbucketConnect.deniedReconnectRole', {
+          organization: org.organizationName,
+        });
+      }
+      // The same organization's lapsed plan refuses every organization change,
+      // so a member must not read the role as the only blocker: the plan line
+      // under the role names the owner and the billing step that unblocks it.
+      // It is this sheet's own key because the retry below carries the step the
+      // shared ended-plan sentence keeps for the surfaces that have no control.
+      const deniedPlanLine =
+        !managesExisting && integrationId === null && org.isTrialExpiredForEnforcement
+          ? t('codeReviewer.bitbucket.notConnectedReadOnlyPlan')
+          : undefined;
+      // The denial's way out, offered only with the plan line: a retry here
+      // re-reads the three answers the page was decided from.
+      const deniedAction =
+        deniedPlanLine === undefined ? undefined : (
+          <StateAction
+            label={t('common.retry')}
+            icon={RotateCcw}
+            loading={readiness.isFetching || status.isFetching || isOrgFetching}
+            onPress={() => {
+              void refetch();
+              void readiness.refetch();
+              void status.refetch();
+            }}
           />
-        )}
-      </>
-    );
-  }
+        );
+      // The organization line leads the shared ask sentence, because that
+      // sentence leaves the organization implicit and the header names only the
+      // platform; the owner and reconnect sentences already name it, so they
+      // stay the one paragraph. The plan line closes the first-connect list when
+      // the plan blocks too.
+      const deniedParagraphs =
+        managesExisting || integrationId !== null
+          ? [deniedDescription]
+          : [
+              t('prReview.connect.contextLine', { organization: org.organizationName }),
+              deniedDescription,
+              ...(deniedPlanLine === undefined ? [] : [deniedPlanLine]),
+            ];
+      return (
+        <PermissionDenied
+          description={denialParagraphs(deniedParagraphs)}
+          showBack={false}
+          action={deniedAction}
+        />
+      );
+    }
 
-  if (!canManage) {
-    return (
-      <>
-        <SheetTitle title={title} />
-        <PermissionDenied description={deniedDescription} />
-      </>
-    );
-  }
-
-  // The connect mutation refuses a second Bitbucket integration for the same
-  // organization, and a Bitbucket OAuth connection can only be changed on the
-  // web page that runs its callback — which the app may not link to, so the
-  // sheet states where the connection is managed and offers no action.
-  if (managesExisting) {
-    return (
-      <>
-        <SheetTitle title={title} />
-        <View className="px-6 pt-2 pb-8">
+    // The connect mutation refuses a second Bitbucket integration for the same
+    // organization, and a Bitbucket OAuth connection can only be changed on the
+    // web page that runs its callback — which the app may not link to, so the
+    // sheet states where the connection is managed and offers no action.
+    if (managesExisting) {
+      return (
+        <View className="px-4 pt-3">
           <Text variant="muted" className="text-sm">
-            {t('codeReviewer.bitbucketConnect.managedOnWeb')}
+            {t('codeReviewer.bitbucketConnect.managedOnWeb', {
+              organization: org.organizationName,
+            })}
           </Text>
         </View>
-      </>
+      );
+    }
+
+    return (
+      <SheetScrollView
+        className="flex-1 bg-background"
+        contentContainerClassName={SCREEN_BODY_CLASS}
+        automaticallyAdjustKeyboardInsets
+        keyboardShouldPersistTaps="handled"
+      >
+        <BitbucketConnectForm
+          scope={scope}
+          integrationId={integrationId}
+          organizationName={org.organizationName}
+          onDirtyChange={guard.handleDirtyChange}
+          onConnected={() => {
+            notificationHaptic(Haptics.NotificationFeedbackType.Success);
+            announcingToast.success(t('common.bitbucketConnected'));
+            // The token was accepted, so there is no draft left to confirm.
+            guard.leaveWithoutAsking(() => {
+              router.back();
+            });
+          }}
+        />
+      </SheetScrollView>
     );
-  }
+  };
 
   return (
-    <SheetScrollView
-      className="flex-1 bg-background"
-      contentContainerClassName="gap-6 px-6 pt-4 pb-8"
-      automaticallyAdjustKeyboardInsets
-      keyboardShouldPersistTaps="handled"
-    >
-      <SheetTitle title={title} />
-      <BitbucketConnectForm
-        scope={scope}
-        integrationId={integrationId}
-        onConnected={() => {
-          notificationHaptic(Haptics.NotificationFeedbackType.Success);
-          announcingToast.success(t('common.bitbucketConnected'));
+    <>
+      {/* The sheet's own header is the shared one: the title stays pinned above
+          the scroll body in every state, and the X is the modal's one visible
+          dismissal. It dispatches the same route removal Back does, so the
+          leave guard answers it while a token is typed. */}
+      <SheetHeader
+        title={title}
+        variant="close"
+        topInset="android-window-top"
+        onDone={() => {
           router.back();
         }}
       />
-    </SheetScrollView>
-  );
-}
-
-function SheetTitle({ title }: Readonly<{ title: string }>) {
-  return (
-    <View collapsable={false} className="bg-background px-6 pt-4">
-      <Text className="text-center text-lg font-semibold text-foreground">{title}</Text>
-    </View>
+      {renderBody()}
+      {guard.dialog}
+    </>
   );
 }

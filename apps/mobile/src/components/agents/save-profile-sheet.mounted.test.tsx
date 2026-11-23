@@ -2,10 +2,13 @@ import { createElement, type ReactNode } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
-import { Text } from '@/components/ui/text';
-import { SaveProfileSheet, type SaveProfileSheetProps } from './save-profile-sheet';
+import {
+  type SaveProfileOutcome,
+  SaveProfileSheet,
+  type SaveProfileSheetProps,
+} from './save-profile-sheet';
 
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
@@ -69,7 +72,7 @@ function defaults(overrides: Partial<SaveProfileSheetProps> = {}): SaveProfileSh
     ],
     setupCommands: ['pnpm install'],
     onClose: vi.fn<() => void>(),
-    onSave: vi.fn<() => Promise<boolean>>().mockResolvedValue(true),
+    onSave: vi.fn<() => Promise<SaveProfileOutcome>>().mockResolvedValue({ saved: true }),
     ...overrides,
   };
 }
@@ -107,7 +110,7 @@ function texts(renderer: TestRenderer.ReactTestRenderer): string[] {
     .filter((child): child is string => typeof child === 'string');
 }
 
-/** The live refusal line's message: the reserved copy is hidden from readers. */
+/** The refusal line's message, or null while the sheet states none. */
 function liveMessage(renderer: TestRenderer.ReactTestRenderer): unknown {
   return renderer.root.findAllByType(AccessibleStatus)[0]?.props.message;
 }
@@ -138,7 +141,7 @@ describe('SaveProfileSheet', () => {
   it('shows the summary counts and the secrets note', () => {
     const renderer = mount();
 
-    expect(header(renderer).props.title).toBe('Save as Profile');
+    expect(header(renderer).props.title).toBe('Save as profile');
     expect(texts(renderer)).toContain('2 vars · 1 setup cmd');
     expect(texts(renderer)).toContain('Secrets are encrypted before storage.');
     expect(renderer.root.findByType('Lock' as never)).toBeTruthy();
@@ -152,7 +155,7 @@ describe('SaveProfileSheet', () => {
   });
 
   it('refuses an empty name with the profile copy and creates nothing', async () => {
-    const onSave = vi.fn<() => Promise<boolean>>().mockResolvedValue(true);
+    const onSave = vi.fn<() => Promise<SaveProfileOutcome>>().mockResolvedValue({ saved: true });
     const renderer = mount({ onSave });
 
     await submit(renderer);
@@ -162,7 +165,7 @@ describe('SaveProfileSheet', () => {
   });
 
   it('refuses an over-long name with the matching error', async () => {
-    const onSave = vi.fn<() => Promise<boolean>>().mockResolvedValue(true);
+    const onSave = vi.fn<() => Promise<SaveProfileOutcome>>().mockResolvedValue({ saved: true });
     const renderer = mount({ onSave });
 
     act(() => {
@@ -177,30 +180,25 @@ describe('SaveProfileSheet', () => {
   });
 
   it('follows the typed name after a refused submit, without waiting for another', async () => {
-    const onSave = vi.fn<() => Promise<boolean>>().mockResolvedValue(true);
+    const onSave = vi.fn<() => Promise<SaveProfileOutcome>>().mockResolvedValue({ saved: true });
     const renderer = mount({ onSave });
-    const type = (value: string) => {
-      act(() => {
-        (field(renderer, 'Profile name').props.onChangeText as (value: string) => void)(value);
-      });
-    };
 
     await submit(renderer);
     expect(field(renderer, 'Profile name').props.error).toBe('Enter a profile name');
 
-    type('x'.repeat(101));
+    typeInto(renderer, 'Profile name', 'x'.repeat(101));
     expect(field(renderer, 'Profile name').props.error).toBe('Profile name is too long');
 
-    type('My AWS');
+    typeInto(renderer, 'Profile name', 'My AWS');
     expect(field(renderer, 'Profile name').props.error).toBeUndefined();
 
-    type('');
+    typeInto(renderer, 'Profile name', '');
     expect(field(renderer, 'Profile name').props.error).toBe('Enter a profile name');
     expect(onSave).not.toHaveBeenCalled();
   });
 
   it('saves the trimmed fields and closes on success', async () => {
-    const onSave = vi.fn<() => Promise<boolean>>().mockResolvedValue(true);
+    const onSave = vi.fn<() => Promise<SaveProfileOutcome>>().mockResolvedValue({ saved: true });
     const onClose = vi.fn<() => void>();
     const renderer = mount({ onSave, onClose });
 
@@ -224,7 +222,9 @@ describe('SaveProfileSheet', () => {
   });
 
   it('shows the refused save inside the sheet and keeps Save live', async () => {
-    const onSave = vi.fn<() => Promise<boolean>>().mockResolvedValue(false);
+    const onSave = vi
+      .fn<() => Promise<SaveProfileOutcome>>()
+      .mockResolvedValue({ saved: false, refusal: 'A profile with this name already exists' });
     const renderer = mount({ onSave });
 
     act(() => {
@@ -233,55 +233,56 @@ describe('SaveProfileSheet', () => {
     await submit(renderer);
 
     // The sheet is the primary channel for a refused save: a toast would paint
-    // behind it. Save is live again, so the reader can correct and retry.
-    expect(texts(renderer)).toContain("Couldn't save profile");
-    expect(liveMessage(renderer)).toBe("Couldn't save profile");
+    // behind it. The line is the server's own sentence, not a guess about the
+    // connection. Save is live again, so the reader can correct and retry.
+    expect(texts(renderer)).toContain('A profile with this name already exists');
+    expect(liveMessage(renderer)).toBe('A profile with this name already exists');
     expect(header(renderer).props.doneDisabled).toBe(false);
   });
 
-  it('overlays the refusal on a reserved copy so a refused save moves no field', async () => {
-    const onSave = vi.fn<() => Promise<boolean>>().mockResolvedValue(false);
+  it('states the neutral connection line when the save had no answer', async () => {
+    const onSave = vi
+      .fn<() => Promise<SaveProfileOutcome>>()
+      .mockResolvedValue({ saved: false, refusal: null });
     const renderer = mount({ onSave });
-    const reserved = renderer.root.findAll(
-      node => node.props.testID === 'save-profile-status-reserve'
-    )[0];
-    if (!reserved) {
-      throw new TypeError('the sheet has no reserved refusal copy');
-    }
-
-    // The reserved copy is laid out at the device font scale and width and kept
-    // from readers, so the slot's height comes from the real translation: no
-    // measured style, and the height is final on the first layout.
-    expect(reserved.props.accessibilityElementsHidden).toBe(true);
-    expect(reserved.props.importantForAccessibility).toBe('no-hide-descendants');
-    const [line] = reserved.findAll(node => node.type === Text);
-    if (!line) {
-      throw new TypeError('the reserved refusal copy is empty');
-    }
-    expect(line.props.children).toBe("Couldn't save profile");
-    const slot = renderer.root.findAll(node => node.props.testID === 'save-profile-status')[0];
-    if (!slot) {
-      throw new TypeError('the sheet has no refusal slot');
-    }
-    expect(slot.props.style).toBeUndefined();
 
     typeInto(renderer, 'Profile name', 'Retry me');
     await submit(renderer);
 
-    // The live refusal is an absolute overlay on the reserved block, so the
-    // fields above it keep their position.
-    expect(
-      renderer.root.findAll(node => node.props.testID === 'save-profile-status-reserve')
-    ).toHaveLength(1);
-    const live = renderer.root.findAll(node => node.props.testID === 'save-profile-status-live')[0];
-    expect(String(live?.props.className)).toContain('absolute');
-    expect(texts(renderer)).toContain("Couldn't save profile");
-    expect(liveMessage(renderer)).toBe("Couldn't save profile");
+    // No server sentence arrived, so the outcome is unknown and the sheet says
+    // exactly that with the one unchanged key.
+    expect(liveMessage(renderer)).toBe(i18n.t('profiles.saveFailed'));
+    expect(header(renderer).props.doneDisabled).toBe(false);
+  });
+
+  it('states the refusal after the form, so the intro holds no empty line and a refused save moves no field', async () => {
+    const onSave = vi
+      .fn<() => Promise<SaveProfileOutcome>>()
+      .mockResolvedValue({ saved: false, refusal: 'A profile with this name already exists' });
+    const renderer = mount({ onSave });
+    const body = renderer.root.findByType('ScrollView' as never);
+    const lastBlock = () => {
+      const blocks = body.children.filter(
+        (child): child is TestRenderer.ReactTestInstance => typeof child !== 'string'
+      );
+      return blocks.at(-1);
+    };
+
+    // Before a save the status renders nothing, so no space is held for it.
+    expect(lastBlock()?.type).toBe(AccessibleStatus);
+    expect(liveMessage(renderer)).toBeNull();
+
+    typeInto(renderer, 'Profile name', 'Retry me');
+    await submit(renderer);
+
+    // The refusal is the body's last block: every field above it keeps its place.
+    expect(lastBlock()?.type).toBe(AccessibleStatus);
+    expect(liveMessage(renderer)).toBe('A profile with this name already exists');
   });
 
   it('closes a sheet with a save in flight without asking to discard', async () => {
-    const held = Promise.withResolvers<boolean>();
-    const onSave = vi.fn<() => Promise<boolean>>().mockReturnValue(held.promise);
+    const held = Promise.withResolvers<SaveProfileOutcome>();
+    const onSave = vi.fn<() => Promise<SaveProfileOutcome>>().mockReturnValue(held.promise);
     const onClose = vi.fn<() => void>();
     const confirm = vi.fn();
     confirmMock.current = request => {
@@ -308,7 +309,9 @@ describe('SaveProfileSheet', () => {
   });
 
   it('keeps the entered values and the sheet open when the save fails', async () => {
-    const onSave = vi.fn<() => Promise<boolean>>().mockResolvedValue(false);
+    const onSave = vi
+      .fn<() => Promise<SaveProfileOutcome>>()
+      .mockResolvedValue({ saved: false, refusal: null });
     const onClose = vi.fn<() => void>();
     const renderer = mount({ onSave, onClose });
 

@@ -35,6 +35,7 @@ import {
   createSignInTicket,
   deletePasskey,
   listPasskeysForUser,
+  readSignInTicket,
   renamePasskey,
   verifyAuthentication,
   verifyNativeRegistration,
@@ -673,6 +674,27 @@ describe('passkey', () => {
       const consumed = await consumeSignInTicket(ticket);
       expect(consumed?.kilo_user_id).toBe(userId);
       expect(await consumeSignInTicket(ticket)).toBeNull();
+    });
+
+    it('reads a ticket without redeeming it', async () => {
+      const ticket = await createSignInTicket(userId);
+
+      const first = await readSignInTicket(ticket);
+      const second = await readSignInTicket(ticket);
+      expect(first?.kilo_user_id).toBe(userId);
+      expect(second?.kilo_user_id).toBe(userId);
+
+      const rows = await db
+        .select()
+        .from(passkey_sign_in_tickets)
+        .where(eq(passkey_sign_in_tickets.ticket_hash, sha256Hex(ticket)));
+      expect(rows).toHaveLength(1);
+      expect(rows[0].consumed_at).toBeNull();
+
+      const consumed = await consumeSignInTicket(ticket);
+      expect(consumed?.kilo_user_id).toBe(userId);
+      expect(await consumeSignInTicket(ticket)).toBeNull();
+      expect(await readSignInTicket(ticket)).toBeNull();
     });
 
     it('refuses an expired ticket', async () => {

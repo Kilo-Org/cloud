@@ -9,6 +9,10 @@ import type {
   BrowserToolInputSchema,
   KiloBrowserToolName,
 } from './browser-tool-contract';
+import {
+  publishedBrowserToolDescription,
+  publishedBrowserToolInputSchema,
+} from './browser-tool-published-schema';
 import type { KiloGatewayToolDefinition } from './kilo-api-client';
 
 /*
@@ -100,9 +104,9 @@ const toDefinition = (entry: BrowserToolContractEntry): KiloGatewayToolDefinitio
 
   return {
     function: {
-      description: `${entry.title}\n${prefixToolNameReferences(entry.description)}`,
+      description: `${entry.title}\n${prefixToolNameReferences(publishedBrowserToolDescription(entry))}`,
       name,
-      parameters: withPrefixedSchemaDescriptions(entry.inputSchema),
+      parameters: withPrefixedSchemaDescriptions(publishedBrowserToolInputSchema(entry)),
     },
     type: 'function',
   };

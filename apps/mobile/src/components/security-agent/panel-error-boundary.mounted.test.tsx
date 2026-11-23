@@ -37,6 +37,8 @@ vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   ActivityIndicator: 'ActivityIndicator',
   Alert: { alert: vi.fn() },
+  // EmptyState reads the scheme for its dark disc and glyph ink.
+  useColorScheme: () => 'light',
   Platform: { OS: 'ios' },
   I18nManager: { isRTL: false },
 }));
@@ -50,6 +52,7 @@ vi.mock('react-i18next', () => ({
 }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/ui/icons', () => ({
+  RotateCcw: 'RotateCcw',
   ExternalLink: 'ExternalLink',
   ScanSearch: 'ScanSearch',
   Ban: 'Ban',
@@ -65,6 +68,7 @@ vi.mock('@/lib/hooks/use-security-agent', () => ({
 }));
 vi.mock('@/lib/hooks/use-security-findings', () => ({
   useStartSecurityAnalysis: () => startAnalysis,
+  useRetrySecurityAnalysis: () => ({ retry: vi.fn(), isRetrying: false }),
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useMutedDisabledInk: () => '#fff',
@@ -146,6 +150,9 @@ function mountBoundary(
           analysis={analysis}
           isLoading={false}
           isError={false}
+          isPending={false}
+          fetchStatus="idle"
+          connectivity="online"
           onRetry={() => undefined}
         />
       </PanelErrorBoundary>
@@ -257,6 +264,9 @@ describe('PanelErrorBoundary with the real analysis panel', () => {
           analysis={query}
           isLoading={false}
           isError={false}
+          isPending={false}
+          fetchStatus="idle"
+          connectivity="online"
           onRetry={() => undefined}
         />
       </PanelErrorBoundary>

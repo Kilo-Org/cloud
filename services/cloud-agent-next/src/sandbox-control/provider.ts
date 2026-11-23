@@ -22,7 +22,8 @@ export type ProviderCreationCause =
   | 'insufficient_credits'
   | 'stopping'
   | 'meter_unavailable'
-  | 'invalid_configuration';
+  | 'invalid_configuration'
+  | 'cleanup_required';
 
 export class ProviderCreationError extends AgentSandboxUnavailableError {
   constructor(
@@ -34,9 +35,11 @@ export class ProviderCreationError extends AgentSandboxUnavailableError {
         ? 'Sandbox billing requires additional credits'
         : code === 'invalid_configuration'
           ? 'Sandbox configuration is invalid or unsupported'
-          : code === 'stopping'
-            ? 'Sandbox is stopping'
-            : 'Sandbox billing admission is temporarily unavailable',
+          : code === 'cleanup_required'
+            ? 'Sandbox launch status requires support repair'
+            : code === 'stopping'
+              ? 'Sandbox is stopping'
+              : 'Sandbox billing admission is temporarily unavailable',
       code === 'insufficient_credits'
         ? 'billing_blocked'
         : code === 'invalid_configuration'
@@ -46,16 +49,36 @@ export class ProviderCreationError extends AgentSandboxUnavailableError {
     this.name = 'ProviderCreationError';
   }
 
-  get permanentReason(): 'billing_blocked' | 'invalid_configuration' | null {
+  get permanentReason():
+    | 'billing_blocked'
+    | 'invalid_configuration'
+    | 'provider_cleanup_required'
+    | null {
     return this.code === 'insufficient_credits'
       ? 'billing_blocked'
       : this.code === 'invalid_configuration'
         ? 'invalid_configuration'
-        : null;
+        : this.code === 'cleanup_required'
+          ? 'provider_cleanup_required'
+          : null;
+  }
+}
+
+/**
+ * A sandbox egress allowlist cannot be applied: the provider policy cannot be
+ * built from the list, so no sandbox is created and no update is sent.
+ */
+export class SandboxNetworkPolicyError extends Error {
+  readonly reason = 'network_policy_failed';
+
+  constructor() {
+    super('The sandbox network allowlist could not be applied');
+    this.name = 'SandboxNetworkPolicyError';
   }
 }
 
 export const sandboxProviderConfigurationSchema = z.discriminatedUnion('provider', [
+  z.object({ provider: z.literal('aws') }).strict(),
   z.object({ provider: z.literal('cloudflare') }).strict(),
   z
     .object({ provider: z.literal('vercel'), resources: vercelSandboxResourcesSchema.optional() })
@@ -75,6 +98,13 @@ export type SandboxProviderConfiguration = z.infer<typeof sandboxProviderConfigu
 export type ObserveResult = 'active' | 'terminal' | 'unknown';
 
 export type StopResult = 'terminal' | 'retryable';
+
+export class ProviderStoppedError extends Error {
+  constructor() {
+    super('The sandbox provider stopped the allocation');
+    this.name = 'ProviderStoppedError';
+  }
+}
 
 export type WrapperObservationStatus = 'absent' | 'present' | 'inspection-failed';
 
@@ -162,6 +192,14 @@ export type ProviderStartupCommand = {
 };
 
 export type ProviderAdapter = {
+  /** Recover an issued launch after coordinator restart. Unlike observe, this may replay provisioning. */
+  reconcileLaunch?(ref: string): Promise<ProviderLaunchResult | undefined>;
+  /** Absolute provider lifetime, including a cleanup margin. This is not a renewable lease. */
+  lifetimeDeadlineAt?(ref: string): Promise<number | undefined>;
+  /** Authenticated wrapper admission can revoke the one-time launch document. */
+  confirmAdmission?(ref: string): Promise<void>;
+  /** Validate launch-owned runtime configuration before welcoming the authenticated wrapper. */
+  validateWrapperAdmission?(ref: string): Promise<void>;
   describeRuntime?(ref: string): CloudAgentRunContainer | undefined;
   ensureBillingAdmission(ref: string, billing?: SandboxBillingInput): Promise<void>;
   /**

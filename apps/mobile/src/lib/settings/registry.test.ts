@@ -11,7 +11,20 @@ import { setDefaultModelForContext } from '@/lib/hooks/use-persisted-agent-model
 import { setThemePreference } from '@/lib/hooks/use-theme-preference';
 import { setTrustedHosts } from '@/lib/hooks/use-trusted-hosts';
 
+import { i18n } from '@/i18n';
+
+import type * as ConfirmModule from './confirm';
+import { GUARDED_CHANGES, guardedChangeFor } from './confirm';
 import { APP_SETTINGS, settingNamed, settingsService } from './registry';
+
+// The guarded settings reach a native confirm dialog. Its summary comes from
+// the real `guardedChangeSummary`, so the copy under test is the shipped copy;
+// only the answer is stubbed, per test.
+const confirmSettingChange = vi.hoisted(() => vi.fn<(summary: string) => Effect.Effect<boolean>>());
+vi.mock('@/lib/settings/confirm', async importOriginal => {
+  const actual = await importOriginal<typeof ConfirmModule>();
+  return { ...actual, confirmSettingChange };
+});
 
 const secureStore = vi.hoisted(() => ({
   getItemAsync: vi.fn().mockResolvedValue(null),
@@ -37,18 +50,35 @@ const applyLanguagePreference = vi.hoisted(() =>
 );
 vi.mock('@/i18n/apply-language', () => ({ applyLanguagePreference }));
 
-const notificationMutation = vi.hoisted(() => ({
-  mutate: vi.fn().mockResolvedValue(undefined),
-  query: vi.fn().mockResolvedValue({
+const notificationMutation = vi.hoisted(() => {
+  const defaults = {
     agentAttention: false,
     agentUpdates: true,
     sessionStatus: true,
     balanceAlerts: true,
     securityFindings: true,
+    spendAlerts: true,
     agentPushEnabled: true,
     notificationPreviews: 'full',
-  }),
-}));
+  };
+  const stored: Record<string, unknown> = { ...defaults };
+  const mutate = vi.fn((patch: Record<string, unknown>) => {
+    Object.assign(stored, patch);
+    return Promise.resolve();
+  });
+  const query = vi.fn(() => Promise.resolve({ ...stored }));
+  return {
+    // A write lands in this record, so a read after it proves the value moved.
+    // The call history goes too, so this test's calls are its own.
+    reset: () => {
+      Object.assign(stored, defaults);
+      mutate.mockClear();
+      query.mockClear();
+    },
+    mutate,
+    query,
+  };
+});
 vi.mock('@/lib/trpc', () => ({
   trpcClient: {
     user: {
@@ -72,6 +102,9 @@ beforeEach(() => {
   secureStore.getItemAsync.mockClear();
   secureStore.setItemAsync.mockClear();
   appearance.setColorScheme.mockClear();
+  confirmSettingChange.mockReset();
+  confirmSettingChange.mockReturnValue(Effect.succeed(true));
+  notificationMutation.reset();
 });
 
 describe('APP_SETTINGS', () => {
@@ -209,7 +242,7 @@ describe('settingsService one source of truth', () => {
     expect(Result.isFailure(badBoolean)).toBe(true);
   });
 
-  it('reads and rejects a non-list write for the trusted hosts', () => {
+  it('rejects a non-list write for the trusted hosts', () => {
     const bad = Effect.runSync(
       Effect.result(settingsService().write('trustedHosts', 'github.com'))
     );
@@ -225,11 +258,77 @@ describe('settingsService one source of truth', () => {
   });
 });
 
-/**
- * The agent's language write has to apply the way the manual picker does: the
- * stored preference alone leaves the running app in its old language, so the
- * write goes through the picker's own apply path and reports what happened.
- */
+/** Every case comes from the guarded table, so a name added there is covered here too. */
+describe('guarded settings ask the person first', () => {
+  const guarded = (name: string) => {
+    const found = guardedChangeFor(name);
+    if (found === undefined) {
+      throw new Error(`${name} is not a guarded setting`);
+    }
+    return found;
+  };
+  const read = (name: string) => Effect.runPromise(settingsService().read(name));
+  const answer = (confirmed: boolean) => {
+    confirmSettingChange.mockReset();
+    confirmSettingChange.mockReturnValue(Effect.succeed(confirmed));
+  };
+
+  it.each(GUARDED_CHANGES.map(change => [change.name, change.direction === 'on'] as const))(
+    'asks before writing the guarded direction of %s, and honours the answer',
+    async (name, guardedValue) => {
+      // The unguarded direction writes at once, without asking.
+      answer(true);
+      const flipped = await Effect.runPromise(settingsService().write(name, !guardedValue));
+
+      expect(confirmSettingChange).not.toHaveBeenCalled();
+      expect(flipped).toContain(String(!guardedValue));
+      expect(await read(name)).toBe(!guardedValue);
+
+      // The guarded direction asks, and the confirmed answer writes it.
+      const report = await Effect.runPromise(settingsService().write(name, guardedValue));
+
+      expect(confirmSettingChange).toHaveBeenCalledTimes(1);
+      expect(confirmSettingChange.mock.calls[0]?.[0]).toBe(
+        `${i18n.t(guarded(name).summaryKey)} (${name} = ${String(guardedValue)})`
+      );
+      expect(report).toContain(name);
+      expect(await read(name)).toBe(guardedValue);
+
+      // Back to the unguarded value so a refused write would show in the read.
+      await Effect.runPromise(settingsService().write(name, !guardedValue));
+
+      expect(await read(name)).toBe(!guardedValue);
+
+      // A refused answer leaves the setting where it was.
+      answer(false);
+      notificationMutation.mutate.mockClear();
+
+      const refused = await Effect.runPromise(
+        Effect.result(settingsService().write(name, guardedValue))
+      );
+
+      expect(Result.isFailure(refused)).toBe(true);
+      if (Result.isFailure(refused)) {
+        expect(String(refused.failure.cause)).toContain('did not confirm');
+      }
+      expect(await read(name)).toBe(!guardedValue);
+      if (name.startsWith('notifications.')) {
+        expect(notificationMutation.mutate).not.toHaveBeenCalled();
+      }
+    }
+  );
+
+  it('turns an alert channel back on through the mutation', async () => {
+    answer(true);
+
+    await Effect.runPromise(settingsService().write('notifications.spendAlerts', true));
+
+    expect(confirmSettingChange).not.toHaveBeenCalled();
+    expect(notificationMutation.mutate).toHaveBeenCalledWith({ spendAlerts: true });
+    expect(notificationMutation.mutate).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('the language write applies the change', () => {
   beforeEach(() => {
     applyLanguagePreference.mockReset();

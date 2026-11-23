@@ -2,12 +2,13 @@
   "generic": {
     "title": "Kilo",
     "body": {
-      "cloudAgentSession": "May update ang iyong agent session",
-      "lowBalance": "Kailangan ng atensyon ang iyong balance",
+      "cloudAgentSession": "May update ang iyong ahente session",
+      "lowBalance": "Kailangan ng atensyon ang iyong balanse",
       "spendAlert": "Kailangan ng atensyon ang iyong gastos",
       "securityFinding": "Kailangan ng atensyon ang isang security finding",
       "securityUpdate": "May update ang isang security check",
-      "activeAgentsGlanceable": "May update ang mga aktibong agent"
+      "agentBriefing": "Handa na ang iyong briefing ng agent",
+      "activeAgentsGlanceable": "May update ang mga aktibong ahente"
     }
   },
   "agentSession": {
@@ -17,8 +18,8 @@
   },
   "internal": {
     "lowBalance": {
-      "title": "Alerto sa mababang balance",
-      "body": "Bumaba sa ibaba ng ${{minimumBalanceUsd}} ang balance ng {{organizationName}}"
+      "title": "Alerto sa mababang balanse",
+      "body": "Bumaba sa ibaba ng ${{minimumBalanceUsd}} ang balanse ng {{organizationName}}"
     },
     "spendAlert": {
       "title": "Alerto sa gastos",
@@ -29,6 +30,12 @@
     },
     "securityFindingNew": {
       "title": "Bagong security finding ({{severity}})"
+    },
+    "securityFindingSeverity": {
+      "critical": "Kritikal",
+      "high": "Mataas",
+      "medium": "Katamtaman",
+      "low": "Mababa"
     },
     "securityFindingSlaWarning": {
       "title": "Babala sa SLA"

@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CONTROL_PLANE_DEADLINE_MS } from '@kilocode/event-service';
+import { QueryClient } from '@tanstack/react-query';
 import { type TelemetryBreadcrumb, type TelemetryEvent } from '@/lib/telemetry/error-sink';
 
 const httpLinkMock = vi.hoisted(() => vi.fn());
@@ -96,6 +97,11 @@ vi.mock('expo-application', () => ({
   nativeApplicationVersion: '1.0.4',
 }));
 
+// The module registry resets after each case, so a case that asserts on a module
+// `./trpc` imports (the token owner, the protected-data gate, the telemetry sink)
+// imports it inside the case rather than statically: a static import would hold a
+// copy from the graph the case never built.
+
 afterEach(() => {
   vi.resetModules();
   httpLinkMock.mockClear();
@@ -141,13 +147,31 @@ describe('getAuthHeaders', () => {
     const headers = await loadHeaders();
 
     await expect(headers()).resolves.toMatchObject({ Authorization: 'Bearer stored-token' });
-    // Cold path: one token read plus one expiry read.
     expect(secureStoreMock.getItemAsync).toHaveBeenCalledTimes(2);
 
-    // The resolved expiry was published into the owner: a normal request
-    // rereads neither key.
     await expect(headers()).resolves.toMatchObject({ Authorization: 'Bearer stored-token' });
     expect(secureStoreMock.getItemAsync).toHaveBeenCalledTimes(2);
+  });
+
+  it('reads TOKEN_EXPIRES_AT_KEY once for a session with only a token', async () => {
+    secureStoreMock.store.set('auth-token', 'stored-token');
+    const headers = await loadHeaders();
+
+    await expect(headers()).resolves.toMatchObject({ Authorization: 'Bearer stored-token' });
+    expect(secureStoreMock.getItemAsync).toHaveBeenCalledTimes(2);
+
+    // The completed read found no stored expiry, which is a resolved answer:
+    // normal requests read neither key again instead of retrying the cold read.
+    await expect(headers()).resolves.toMatchObject({ Authorization: 'Bearer stored-token' });
+    await expect(headers()).resolves.toMatchObject({ Authorization: 'Bearer stored-token' });
+    await expect(headers()).resolves.toMatchObject({ Authorization: 'Bearer stored-token' });
+    expect(secureStoreMock.getItemAsync).toHaveBeenCalledTimes(2);
+
+    const { getActiveTokenSnapshot } = await import('@/lib/auth/token-owner');
+    expect(getActiveTokenSnapshot()).toMatchObject({
+      token: 'stored-token',
+      expiry: { kind: 'absent' },
+    });
   });
 
   it('sends the app product token as the User-Agent on every tRPC call', async () => {
@@ -172,10 +196,7 @@ describe('getAuthHeaders', () => {
     await vi.waitFor(() => {
       expect(vi.mocked(secureStoreMock.getItemAsync)).toHaveBeenCalledWith('token-expires-at');
     });
-    // Publish a newer owner while the cold expiry read is still in flight.
     const newerExpiresAt = Date.now() + 3_600_000;
-    // `afterEach` resets the module registry, so the owner must be loaded from
-    // the same graph as `./trpc` inside the case rather than imported statically.
     const { getActiveTokenSnapshot, setActiveToken } = await import('@/lib/auth/token-owner');
     setActiveToken('newer-token', newerExpiresAt);
     secureStoreMock.releaseHeldExpiryRead();
@@ -187,13 +208,11 @@ describe('getAuthHeaders', () => {
     // the newer expiry instead of having been overwritten by it.
     expect(getActiveTokenSnapshot()).toMatchObject({
       token: 'newer-token',
-      expiresAtMs: newerExpiresAt,
+      expiry: { kind: 'known', atMs: newerExpiresAt },
     });
   });
 
   it('sends the held token without touching the keychain while protected data is unavailable', async () => {
-    // `afterEach` resets the module registry, so the owner and the gate must be
-    // loaded from the same graph as `./trpc` inside the case.
     const headers = await loadHeaders();
     const { getActiveTokenSnapshot, setActiveToken } = await import('@/lib/auth/token-owner');
     const { setProtectedDataAvailable } = await import('@/lib/protected-data');
@@ -206,7 +225,10 @@ describe('getAuthHeaders', () => {
       // the request.
       expect(secureStoreMock.getItemAsync).not.toHaveBeenCalled();
       // An unknown expiry is not published as a known one.
-      expect(getActiveTokenSnapshot()).toMatchObject({ token: 'held-token', expiresAtMs: null });
+      expect(getActiveTokenSnapshot()).toMatchObject({
+        token: 'held-token',
+        expiry: { kind: 'unknown' },
+      });
 
       // A later request behaves the same: the expiry is still unknown.
       await expect(headers()).resolves.toMatchObject({ Authorization: 'Bearer held-token' });
@@ -222,7 +244,7 @@ describe('getAuthHeaders', () => {
     expect(secureStoreMock.getItemAsync).toHaveBeenCalledWith('token-expires-at');
     expect(getActiveTokenSnapshot()).toMatchObject({
       token: 'held-token',
-      expiresAtMs: storedExpiresAt,
+      expiry: { kind: 'known', atMs: storedExpiresAt },
     });
   });
 
@@ -239,8 +261,6 @@ describe('getAuthHeaders', () => {
   });
 
   it('holds an unauthenticated request until the unlock instead of sending it bare', async () => {
-    // `afterEach` resets the module registry, so the sink, the owner, and the
-    // gate must be loaded from the same graph as `./trpc` inside the case.
     secureStoreMock.store.set('auth-token', 'stored-token');
     secureStoreMock.store.set('token-expires-at', String(Date.now() + 3_600_000));
     const events: TelemetryEvent[] = [];
@@ -283,8 +303,6 @@ describe('getAuthHeaders', () => {
     secureStoreMock.store.set('auth-token', 'stored-token');
     secureStoreMock.store.set('token-expires-at', String(Date.now() + 3_600_000));
     const headers = await loadHeaders();
-    // `afterEach` resets the module registry: the gate must come from the same
-    // graph as `./trpc`, so it is loaded here rather than statically.
     const { setProtectedDataAvailable } = await import('@/lib/protected-data');
     vi.useFakeTimers();
     setProtectedDataAvailable(false);
@@ -310,9 +328,6 @@ describe('getAuthHeaders', () => {
   });
 
   it('sends an unauthenticated request without waiting while protected data is available', async () => {
-    // Android has no protected-data source, so the gate always reports
-    // available there and this is the only path a foreground request takes: no
-    // wait, no timer, and therefore no way for the deferral to hold up the UI.
     const headers = await loadHeaders();
     vi.useFakeTimers();
     try {
@@ -327,9 +342,6 @@ describe('getAuthHeaders', () => {
   });
 
   it('sends the request unauthenticated when the lock outlasts the request budget', async () => {
-    // Not resolving is worse than sending: a background request must not
-    // outlive the app's own control-plane budget. Past the bound the request
-    // proceeds exactly as it did before the deferral — no credential, no event.
     secureStoreMock.store.set('auth-token', 'stored-token');
     secureStoreMock.store.set('token-expires-at', String(Date.now() + 3_600_000));
     const events: TelemetryEvent[] = [];
@@ -358,9 +370,6 @@ describe('getAuthHeaders', () => {
   });
 
   it('starts the request budget before the unlock wait it may spend', async () => {
-    // The wait is part of the request's own control-plane budget, not a free
-    // prelude to it: the header build records the instant the wait began, so
-    // the fetch that follows can be given only what the wait left.
     secureStoreMock.store.set('auth-token', 'stored-token');
     secureStoreMock.store.set('token-expires-at', String(Date.now() + 3_600_000));
     const headers = await loadHeaders();
@@ -385,8 +394,6 @@ describe('getAuthHeaders', () => {
   });
 
   it('leaves the request budget whole across a slow proactive refresh', async () => {
-    // A refresh has its own deadline and is no part of the request's: the
-    // build that waits ten seconds on it must not hand the request five.
     secureStoreMock.store.set('auth-token', 'stored-token');
     secureStoreMock.store.set('auth-refresh-token', 'stored-refresh');
     // Inside the five-minute refresh margin, so the build rotates first.
@@ -785,11 +792,48 @@ describe('latency wiring', () => {
     expect(condition({ path: 'some.unlisted.procedure', context: {} })).toBe(false);
   });
 
+  // The server admits a blocked account only for a request whose every call is
+  // a self-cleanup procedure, so each cleanup must ride the single link alone.
+  it('routes every self-cleanup procedure to the single link', async () => {
+    const { condition } = await loadLatencyLinks();
+
+    for (const path of [
+      'user.revokeCurrentDeviceSession',
+      'user.unregisterPushToken',
+      'user.unregisterActivityToken',
+    ]) {
+      expect(condition({ path, context: {} })).toBe(true);
+    }
+    expect(condition({ path: 'organizations.list', context: {} })).toBe(false);
+  });
+
   it('keeps the explicit skipBatch override for every path', async () => {
     const { condition } = await loadLatencyLinks();
 
     expect(condition({ path: 'kiloPass.getState', context: { skipBatch: true } })).toBe(true);
     expect(condition({ path: 'user.getMe', context: { skipBatch: true } })).toBe(true);
+  });
+
+  // A dev-only forced data state answers in the shared fetch, so the split
+  // must send a forced procedure to the single link, and the bootstrap reads
+  // stay where they were.
+  it('routes a procedure to the single link while a dev forced state holds it', async () => {
+    const { condition } = await loadLatencyLinks();
+    // The registry is reset after each test, so only a dynamic import here
+    // returns the instance trpc.ts just loaded.
+    const { applyForceStatePath, resetForceStateForTests } =
+      await import('@/lib/force-state-fixture');
+    const path = 'kiloPass.getState';
+    expect(condition({ path, context: {} })).toBe(false);
+
+    applyForceStatePath('kiloapp:///dev/force-state/retryable', new QueryClient());
+    try {
+      expect(condition({ path, context: {} })).toBe(true);
+      expect(condition({ path: 'organizations.list', context: {} })).toBe(false);
+    } finally {
+      resetForceStateForTests();
+    }
+    expect(condition({ path, context: {} })).toBe(false);
   });
 
   it('gives the single and batch links the same latency-wrapped fetch', async () => {
@@ -807,9 +851,6 @@ describe('latency wiring', () => {
     expect(sent.get('authorization')).toBe('Bearer token');
   });
 
-  // The id comes from the platform `crypto` API every build carries; a
-  // runtime that omits `randomUUID` still stamps a unique id, so neither
-  // platform loses a sample (or needs a native module just for the id).
   it('stamps a unique request id when the platform crypto API has no randomUUID', async () => {
     vi.stubGlobal('crypto', {});
     const { httpFetch } = await loadLatencyLinks();
@@ -827,10 +868,6 @@ describe('latency wiring', () => {
     expect(first).not.toBe(second);
   });
 
-  // tRPC's single `httpLink` leaves the body off a POST for a no-input call,
-  // and the server's fetch adapter rejects that empty body with 400. The
-  // shared fetch sends `{}` so an unbatched no-input query reaches its
-  // procedure.
   it('sends an empty JSON object body when a POST has none', async () => {
     const { httpFetch } = await loadLatencyLinks();
     mockFetch.mockResolvedValue(new Response('ok', { status: 200 }));

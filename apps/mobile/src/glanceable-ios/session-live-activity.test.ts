@@ -35,6 +35,7 @@ vi.mock('@expo/ui/swift-ui/modifiers', () => ({
   background: (style: unknown) => ({ $type: 'background', args: style }),
   buttonStyle: mockModifier('buttonStyle'),
   cornerRadius: mockModifier('cornerRadius'),
+  dynamicTypeSize: mockModifier('dynamicTypeSize'),
   environment: mockModifier('environment'),
   fixedSize: mockModifier('fixedSize'),
   font: mockModifier('font'),
@@ -579,6 +580,29 @@ describe('session card layout: Lock Screen budget', () => {
   }
 });
 
+describe('session card layout: Dynamic Type', () => {
+  const textSize = (node: unknown) =>
+    ((element(node)?.props.modifiers ?? []) as { $type: string; args?: unknown }[]).find(
+      modifier => modifier.$type === 'dynamicTypeSize'
+    )?.args;
+
+  for (const [name, state] of BUDGET_CASES) {
+    it(`grows a ${name} Lock Screen card up to xLarge and keeps the island at the default size`, () => {
+      const layout = render(state);
+      expect(textSize(layout.banner)).toEqual({ max: 'xLarge' });
+      expect(textSize(layout.bannerSmall)).toBe('large');
+      expect(textSize(layout.compactTrailing)).toBe('large');
+      expect(textSize(layout.expandedBottom)).toBe('large');
+      for (const textItem of collect(layout.banner).filter(item => item.kind === 'Text')) {
+        const modifiers = (textItem.props.modifiers ?? []) as { $type: string; args?: unknown }[];
+        expect(modifiers.find(modifier => modifier.$type === 'font')?.args).toHaveProperty(
+          'textStyle'
+        );
+      }
+    });
+  }
+});
+
 describe('session card layout: self-updating time', () => {
   const SELF_UPDATING = new Set(['elapsed', 'ago', 'relative', 'offset', 'timer']);
 
@@ -620,6 +644,21 @@ describe('session card layout: surfaces', () => {
     const { compactTrailing, minimal } = render(BASE);
     expect(collect(compactTrailing).map(item => item.kind)).toContain('Circle');
     expect(collect(minimal).map(item => item.kind)).toEqual(['HStack', 'Circle']);
+  });
+
+  it('paints the idle dot with the muted ink in both schemes', () => {
+    const idle: State = { ...BASE, statusKind: 'idle' };
+    const dotInk = (node: unknown) =>
+      (
+        (collect(node).find(item => item.kind === 'Circle')?.props.modifiers ?? []) as {
+          $type: string;
+          args?: unknown;
+        }[]
+      ).find(modifier => modifier.$type === 'foregroundStyle')?.args;
+    expect(dotInk(render(idle).banner)).toBe('#6F6A61');
+    expect(dotInk(render(idle, { colorScheme: 'dark' }).banner)).toBe('#8A8680');
+    // The Dynamic Island is always black, so it takes the dark muted ink too.
+    expect(dotInk(render(idle).minimal)).toBe('#8A8680');
   });
 
   it('carries the same status label spoken on every surface', () => {

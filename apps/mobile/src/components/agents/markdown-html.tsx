@@ -1,12 +1,14 @@
 /* oxlint-disable max-lines -- cohesive HTML segmentation, sanitization, and image/link wiring share one renderer */
-import { useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { marked, type Token } from 'marked';
 import {
   type AccessibilityActionEvent,
   type GestureResponderEvent,
+  type LayoutChangeEvent,
   Platform,
   Text,
   useWindowDimensions,
+  View,
 } from 'react-native';
 import RenderHTML, {
   type CustomBlockRenderer,
@@ -274,6 +276,63 @@ export type MarkdownHtmlSplit = {
   snapshot: MarkdownHtmlSnapshot;
 };
 
+/**
+ * The source text the splitter should segment, plus how it connects to the
+ * previous publish. Without `snapshot` or `previous` the whole `value` is
+ * segmented. With `snapshot` the value is the same source shape as that
+ * snapshot's value. With `previous` the publish must say how the new source
+ * connects: `appended` extends the previous raw value by that region and only
+ * it is folded through `previous.convert`, or `wholeConverted` replaces the
+ * previous converted source with a conversion of the whole raw value while
+ * the previous snapshot still verifies the head. A publish that sets
+ * `previous` without either field would silently drop its `value`, so the
+ * union forbids it.
+ *
+ * The intersection keeps the discriminant open for call sites that build the
+ * object in one expression; the function narrows with `previous !== undefined`.
+ */
+export type MarkdownHtmlIncrementalInput =
+  | { value: string; previous?: undefined; snapshot?: MarkdownHtmlSnapshot }
+  | ({
+      value: string;
+      previous: MarkdownHtmlIncrementalConverted;
+      snapshot?: undefined;
+    } & (
+      | { appended: string; wholeConverted?: undefined }
+      | { appended?: undefined; wholeConverted: string }
+    ));
+
+/**
+ * Where a publish's conversion stops being final for the next publish, and that
+ * region's conversion: `converted` is the conversion of `rawValue.slice(start)`,
+ * and `start` is 0 when nothing is final.
+ */
+export type MarkdownHtmlConversionTail = { start: number; converted: string };
+
+/**
+ * What the previous publish turned into segments, kept so the next publish can
+ * reuse it: `tail` is that publish's snapshot, `conversion` the tail its own
+ * publish carried, and `convert` folds raw source into the markdown the
+ * splitter segments, joining the previous converted source it is given:
+ * `(suffix, previous) => previous + converted(suffix)`. A publish that extends
+ * the previous raw value passes the appended region, so `convert` returns the
+ * previous converted source joined with the appended region's conversion; a
+ * publish the gate declines passes the whole converted value and `convert`
+ * returns it alone.
+ */
+export type MarkdownHtmlIncrementalConverted = {
+  tail: MarkdownHtmlSnapshot;
+  /** The raw source the previous publish saw, for the extends-previous guard. */
+  rawValue?: string;
+  /**
+   * Where the previous publish's conversion stops being final, with that
+   * region's conversion: the next publish proves its composition against it
+   * instead of converting the region a second time.
+   */
+  conversion?: MarkdownHtmlConversionTail;
+  convert: (suffix: string, previous: string) => string;
+};
+
 // Block types that absorb a following block across a blank line: a list takes
 // the next item and a blockquote keeps a quoted paragraph, so one of these must
 // stay in the tail while only a blank line separates it from text the next
@@ -400,18 +459,45 @@ function appendTokens(
 }
 
 /**
- * Streaming-aware `splitMarkdownHtml`: when `value` keeps the previous
+ * Streaming-aware `splitMarkdownHtml`: when the input keeps the previous
  * snapshot's head it re-lexes only the text from that snapshot's tail boundary
  * — the last block run and any list or blockquote that can still absorb it (see
  * `tailBoundaryIndex`) — and reuses the head segments unchanged, so a message
  * that grows one publish at a time stays proportional to the last block instead
  * of the whole value. The result is identical to `splitMarkdownHtml(value)` for
  * every value that keeps the head.
+ *
+ * The three input shapes make the same reuse available to a source that is
+ * produced, not stored, as HTML: the converted markdown of an HTML message is
+ * rebuilt on every publish, so a publish whose value extends the previous
+ * publish's converted source passes that source back through `previous` and
+ * only its appended region is converted again before this function sees a
+ * whole string that extends `previous.tail.value`.
  */
 export function splitMarkdownHtmlIncremental(
-  value: string,
-  previous?: MarkdownHtmlSnapshot
+  input: MarkdownHtmlIncrementalInput
 ): MarkdownHtmlSplit {
+  // The three forms reuse the same body over one string. A plain value and a
+  // snapshot value segment as stored; the previous form folds only the
+  // appended region through the previous publish's conversion and joins the
+  // result after that publish's source, so the body sees one string whose
+  // head is still the previous publish's exact value.
+  const previous = input.previous;
+  if (previous !== undefined) {
+    // The closure joins the previous converted source itself; joining here a
+    // second time would duplicate that source in every reuse. A gated publish
+    // passes only the appended region and the closure returns the previous
+    // converted source joined with the appended region's conversion; a
+    // declined publish passes the whole converted value, which replaces the
+    // previous source entirely.
+    const effective = input.wholeConverted ?? previous.convert(input.appended, previous.tail.value);
+    return splitFromSnapshot(effective, previous.tail);
+  }
+  return splitFromSnapshot(input.value, input.snapshot);
+}
+
+/** The snapshot-path body of `splitMarkdownHtmlIncremental`, over one string. */
+function splitFromSnapshot(value: string, previous?: MarkdownHtmlSnapshot): MarkdownHtmlSplit {
   // Fast path: `hasDirectHtml` and `routesNestedHtml` both need a `<` in the
   // raw token text, so a `<`-free value can never produce an html segment and
   // needs no lex at all. Keeping the whole value as the head means the next
@@ -544,7 +630,21 @@ export function MarkdownHtml({
   onLongPressLink,
   onPressLink,
 }: Readonly<MarkdownHtmlProps>) {
-  const { width } = useWindowDimensions();
+  const { width: windowWidth } = useWindowDimensions();
+  // The engine sizes the blocks it lays out from one number, and the app
+  // overrides every renderer that reads it today. Hosts still insets this
+  // renderer — a chat bubble keeps 82 % of the row and pads its content, a card
+  // pads its body — so the window is the wrong box to report: measuring the
+  // container gives the engine the width it actually lays out in, on every
+  // host, without each one passing its own inset. The window width answers for
+  // the first frame, before any layout has been reported.
+  const [measuredWidth, setMeasuredWidth] = useState<number | null>(null);
+  const handleLayout = useCallback((event: LayoutChangeEvent) => {
+    const next = event.nativeEvent.layout.width;
+    setMeasuredWidth(previous =>
+      previous !== null && Math.abs(previous - next) < 0.5 ? previous : next
+    );
+  }, []);
   const source = useMemo(() => ({ html }), [html]);
   const baseStyle = useMemo(
     () => ({
@@ -552,8 +652,9 @@ export function MarkdownHtml({
       fontSize: 16,
       lineHeight: 24,
       // Naming the body's own direction makes the engine resolve every block
-      // left to right and left aligned; chat leaves the interface's direction
-      // in place.
+      // left to right and left aligned; a content body (chat, a PR description)
+      // omits it and the engine resolves each paragraph from its own first
+      // strong character.
       ...(documentDirection === 'ltr' ? LTR_BASE_DIRECTION : {}),
     }),
     [palette, documentDirection]
@@ -672,18 +773,20 @@ export function MarkdownHtml({
   }, [baseStyle, documentDirection, onLongPressLink, onPressLink, selectable]);
 
   return (
-    <RenderHTML
-      baseStyle={baseStyle}
-      contentWidth={width}
-      customHTMLElementModels={HTML_ELEMENT_MODELS}
-      defaultTextProps={{ selectable }}
-      domVisitors={HTML_DOM_VISITORS}
-      enableCSSInlineProcessing={false}
-      ignoredDomTags={IGNORED_HTML_TAGS}
-      renderers={renderers}
-      renderersProps={renderersProps}
-      source={source}
-      tagsStyles={tagsStyles}
-    />
+    <View onLayout={handleLayout}>
+      <RenderHTML
+        baseStyle={baseStyle}
+        contentWidth={measuredWidth ?? windowWidth}
+        customHTMLElementModels={HTML_ELEMENT_MODELS}
+        defaultTextProps={{ selectable }}
+        domVisitors={HTML_DOM_VISITORS}
+        enableCSSInlineProcessing={false}
+        ignoredDomTags={IGNORED_HTML_TAGS}
+        renderers={renderers}
+        renderersProps={renderersProps}
+        source={source}
+        tagsStyles={tagsStyles}
+      />
+    </View>
   );
 }

@@ -42,27 +42,14 @@ function assertBaseUrlUsesHttps(definition: CustomLlmDefinition) {
   }
 }
 
-/**
- * Routing resolves custom LLMs before any other upstream, so a new id must not
- * hide an OpenRouter or direct BYOK model. Existing rows keep their id, so this
- * only runs when an id is claimed.
- */
-async function assertPublicIdIsClaimable(publicId: string) {
+/** A valid public id, unique ignoring case. Custom LLM lookups ignore case, so a case
+ * variant of an existing row would shadow it or be shadowed by it. */
+async function assertPublicIdIsValidAndUnique(publicId: string): Promise<string> {
   const parsedPublicId = CustomLlmPublicIdSchema.safeParse(publicId);
   if (!parsedPublicId.success) {
     badRequest(parsedPublicId.error.issues.map(issue => issue.message).join('; '));
   }
   const modelId = parsedPublicId.data;
-  const directByokProvider = DirectUserByokInferenceProviderIdSchema.options.find(providerId =>
-    modelId.startsWith(`${providerId}/`)
-  );
-  if (directByokProvider) {
-    badRequest(`public_id must not use the direct BYOK prefix "${directByokProvider}/"`);
-  }
-  if (Object.hasOwn(await getOpenRouterModelsMetadataFromDatabase(), modelId)) {
-    badRequest(`public_id "${modelId}" already exists in the OpenRouter model list`);
-  }
-  // Custom LLM lookups ignore case, so a case variant would shadow the other row.
   const [caseVariant] = await db
     .select({ public_id: custom_llm2.public_id })
     .from(custom_llm2)
@@ -73,6 +60,35 @@ async function assertPublicIdIsClaimable(publicId: string) {
   if (caseVariant) {
     badRequest(
       `public_id "${modelId}" differs only in case from the existing custom LLM "${caseVariant.public_id}"`
+    );
+  }
+  return modelId;
+}
+
+/**
+ * Routing resolves custom LLMs before any other upstream, so a new id must not
+ * hide an OpenRouter or direct BYOK model. Existing rows keep their id, so this
+ * only runs when an id is claimed.
+ */
+async function assertPublicIdIsClaimable(publicId: string) {
+  const modelId = await assertPublicIdIsValidAndUnique(publicId);
+  const directByokProvider = DirectUserByokInferenceProviderIdSchema.options.find(providerId =>
+    modelId.startsWith(`${providerId}/`)
+  );
+  if (directByokProvider) {
+    badRequest(`public_id must not use the direct BYOK prefix "${directByokProvider}/"`);
+  }
+  if (Object.hasOwn(await getOpenRouterModelsMetadataFromDatabase(), modelId)) {
+    badRequest(`public_id "${modelId}" already exists in the OpenRouter model list`);
+  }
+}
+
+/** A partner serves a catalog model, so its id must name one. */
+async function assertPartnerPublicIdIsCatalogModel(publicId: string) {
+  const modelId = await assertPublicIdIsValidAndUnique(publicId);
+  if (!Object.hasOwn(await getOpenRouterModelsMetadataFromDatabase(), modelId)) {
+    badRequest(
+      `public_id "${modelId}" must exist in the OpenRouter model list when partner is set`
     );
   }
 }
@@ -94,6 +110,11 @@ const DeleteCustomLlmSchema = z.object({
   public_id: publicIdSchema,
 });
 
+const SetCustomLlmEnabledSchema = z.object({
+  public_id: publicIdSchema,
+  is_enabled: z.boolean(),
+});
+
 export const adminCustomLlmRouter = createTRPCRouter({
   list: adminProcedure.query(async () => {
     const rows = await db
@@ -113,7 +134,11 @@ export const adminCustomLlmRouter = createTRPCRouter({
       where: eq(custom_llm2.public_id, input.public_id),
     });
 
-    if (!existing) {
+    if (input.definition.partner) {
+      // An existing partner stays editable after its model leaves the catalog.
+      if (!existing?.definition.partner) await assertPartnerPublicIdIsCatalogModel(input.public_id);
+    } else if (!existing || existing.definition.partner) {
+      // A former partner's id names a catalog model, which a custom LLM must not hide.
       await assertPublicIdIsClaimable(input.public_id);
     }
 
@@ -178,6 +203,9 @@ export const adminCustomLlmRouter = createTRPCRouter({
         message: `Custom LLM with public_id "${input.source_public_id}" not found`,
       });
     }
+    if (source.definition.partner) {
+      badRequest('A partner custom LLM cannot be copied');
+    }
     assertPricingMatchesPublicId(input.public_id, source.definition);
     await assertPublicIdIsClaimable(input.public_id);
 
@@ -206,6 +234,28 @@ export const adminCustomLlmRouter = createTRPCRouter({
     }
 
     return inserted;
+  }),
+
+  setEnabled: adminProcedure.input(SetCustomLlmEnabledSchema).mutation(async ({ input }) => {
+    const [updated] = await db
+      .update(custom_llm2)
+      .set({
+        definition: sql`${custom_llm2.definition} || jsonb_build_object('is_enabled', ${input.is_enabled}::boolean)`,
+      })
+      .where(eq(custom_llm2.public_id, input.public_id))
+      .returning({
+        public_id: custom_llm2.public_id,
+        definition: custom_llm2.definition,
+      });
+
+    if (!updated) {
+      throw new TRPCError({
+        code: 'NOT_FOUND',
+        message: `Custom LLM with public_id "${input.public_id}" not found`,
+      });
+    }
+
+    return updated;
   }),
 
   delete: adminProcedure.input(DeleteCustomLlmSchema).mutation(async ({ input }) => {

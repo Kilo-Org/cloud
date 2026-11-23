@@ -9,11 +9,13 @@ import type * as AuthContextModule from './auth-context';
 import type * as ContextScopeModule from '../context-scope';
 import type * as TokenOwnerModule from './token-owner';
 import {
+  ATTEST_KEY_ID_KEY,
   AUTH_TOKEN_KEY,
   CHAT_BACKENDS_KEY,
   ORGANIZATION_PERSONAL_STORAGE_KEY,
   REFRESH_TOKEN_KEY,
 } from '@/lib/storage-keys';
+import { type AuthSignOutCause } from './sign-out-telemetry';
 import { clearRecentPrs } from '@/lib/pr-review/recent-prs';
 
 // The mobile-app gate runs `vitest related` over ~170 files concurrently with
@@ -409,6 +411,17 @@ vi.mock('@/lib/agent-attachments/clipboard-image', () => ({
   clearClipboardImages: vi.fn(),
 }));
 
+// The staged share deliveries read expo-file-system / expo-crypto and the
+// share-intent native module on import. This suite asserts the teardown
+// ordering; the boundary behavior lives in `lib/share-*.test.ts`.
+vi.mock('@/lib/share-payload', () => ({
+  clearAccountStagedSharePayloads: vi.fn(),
+}));
+
+vi.mock('@/lib/share-navigation', () => ({
+  clearAccountStagedShareNavigation: vi.fn(),
+}));
+
 vi.mock('@/lib/temp-file-registry', () => ({
   reapTempFiles: vi.fn(),
 }));
@@ -481,6 +494,7 @@ vi.mock('@/lib/pr-review/viewed-files', () => ({
 
 vi.mock('@/lib/storage-keys', () => ({
   ACTIVE_USER_ID_KEY: 'active-user-id',
+  ATTEST_KEY_ID_KEY: 'auth-attest-key-id',
   AUTH_TOKEN_KEY: 'auth-token',
   CHAT_BACKENDS_KEY: 'chat-backends',
   KEEP_SCREEN_ON_KEY: 'keep-session-screen-on',
@@ -512,6 +526,7 @@ vi.mock('@/lib/config', () => ({
 
 vi.mock('react-native', () => ({
   AppState: hoisted.appState,
+  Platform: { OS: 'ios' },
 }));
 
 // ---- helpers ----
@@ -525,23 +540,21 @@ type AuthContextValue = {
   restoreFailed: boolean;
   retryRestore: () => void;
   signIn: (token: string, refreshToken?: string, expiresIn?: number) => Promise<void>;
-  signOut: (ended?: boolean) => Promise<void>;
+  signOut: (ended?: boolean, cause?: AuthSignOutCause) => Promise<void>;
 };
 
-/** Build a Kilo JWT whose payload carries `kiloUserId` (same shape as
- *  `generateApiToken` in packages/web-shared/src/lib/tokens.ts). */
 function base64url(input: string): string {
   return btoa(input).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
 }
 
+/** Build a Kilo JWT whose payload carries `kiloUserId` (same shape as
+ *  `generateApiToken` in packages/web-shared/src/lib/tokens.ts). */
 function makeToken(payload: Record<string, unknown>): string {
   return `${base64url('{"alg":"none"}')}.${base64url(JSON.stringify(payload))}.signature`;
 }
 
 /** Load the auth-context module from a fresh module registry so
- *  module-level state (preloadedToken) is clean. Returns the module
- *  and a helper to extract the context value from a mounted tree. */
-// oxlint-disable-next-line require-await -- dynamic import is awaited
+ *  module-level state (preloadedToken) is clean. */
 async function loadAuthModule() {
   vi.resetModules();
   const mod = await import('./auth-context');
@@ -688,9 +701,7 @@ describe('sign-out teardown ordering', () => {
       await ctx.signOut();
     });
 
-    // clearTelemetryDecision must be called
     expect(hoisted.controller.clearTelemetryDecision).toHaveBeenCalled();
-    // Sentry.setUser must be called
     expect(hoisted.sentry.setUser).toHaveBeenCalledWith(null);
 
     const capture = invocationOrder(hoisted.posthog.captureEvent);
@@ -749,17 +760,12 @@ describe('sign-out teardown ordering', () => {
       await ctx.signOut();
     });
 
-    // resetAppsFlyerState must be called
     expect(hoisted.appsflyer.resetAppsFlyerState).toHaveBeenCalled();
-    // discardPostHog must be called
     expect(hoisted.posthog.discardPostHog).toHaveBeenCalled();
-    // purgePostHogPersistence must be called
     expect(hoisted.posthogStorage.purgePostHogPersistence).toHaveBeenCalled();
 
-    // SDK teardown calls must appear before any SecureStore delete.
-    // The first 7 calls must be in this exact order (logout capture and flush
-    // precede the teardown steps; remote cleanup is awaited between them but
-    // pushes no callOrder entry).
+    // Remote cleanup is awaited between these steps but pushes no callOrder
+    // entry, so the pinned prefix is seven calls long.
     const expectedPreamble = hoisted.callOrder.slice(0, 7);
     expect(expectedPreamble).toEqual([
       'captureEvent',
@@ -825,6 +831,49 @@ describe('sign-out teardown ordering', () => {
 
     expect(hoisted.deepLinkLaunch.setCurrentDeepLinkUserId).toHaveBeenCalledWith(null);
 
+    unmount();
+  });
+
+  it.each([
+    ['user', true],
+    ['session_ended', false],
+  ] as const)('handles the stored App Attest key on %s sign-out', async (cause, retiresKey) => {
+    const { ctx, unmount } = await mountAndGetContext();
+
+    await act(async () => {
+      await ctx.signOut(cause !== 'user', cause);
+    });
+
+    expect(
+      hoisted.secureStore.deleteItemAsync.mock.calls.some(([key]) => key === ATTEST_KEY_ID_KEY)
+    ).toBe(retiresKey);
+    unmount();
+  });
+
+  it('retries a transient App Attest key deletion before sign-out completes', async () => {
+    const { ctx, unmount } = await mountAndGetContext();
+    let storedAttestId: string | undefined = 'previous-account-key';
+    let refused = false;
+
+    await hoisted.secureStore.deleteItemAsync.withImplementation(
+      (key: string) => {
+        if (key === ATTEST_KEY_ID_KEY) {
+          if (!refused) {
+            refused = true;
+            return Promise.reject(new Error('Keychain temporarily unavailable'));
+          }
+          storedAttestId = undefined;
+        }
+        return Promise.resolve();
+      },
+      async () => {
+        await act(async () => {
+          await ctx.signOut();
+        });
+      }
+    );
+
+    expect(storedAttestId).toBeUndefined();
     unmount();
   });
 
@@ -1055,6 +1104,9 @@ describe('sign-out teardown ordering', () => {
 
   it('keeps a parked account-independent launch destination on sign-in', async () => {
     const { ctx, unmount } = await mountAndGetContext();
+    // The signed-out launch of the mount cleared once already; this case counts
+    // the account boundary's own clear.
+    nativeLauncherSurfacesMock.clearLauncherSurfaces.mockClear();
     nativeLauncherSurfacesMock.takeAccountIndependentLaunchUrl.mockReturnValueOnce(
       'kiloapp:///cloud/sessions/new'
     );
@@ -1064,9 +1116,6 @@ describe('sign-out teardown ordering', () => {
       await ctx.signIn(makeToken({ kiloUserId: 'user-2' }));
     });
 
-    // The launcher clear that runs at this boundary takes the parked URL with
-    // it, so the destination that names no account is staged for this account
-    // and the signed-in mount still opens where the Quick Action points.
     expect(nativeLauncherSurfacesMock.takeAccountIndependentLaunchUrl).toHaveBeenCalled();
     expect(hoisted.deepLinkLaunch.setPendingDeepLink).toHaveBeenCalledWith(
       expect.stringContaining('/agent-chat/new'),
@@ -1079,6 +1128,9 @@ describe('sign-out teardown ordering', () => {
 
   it('keeps the destination already in the pending slot over the parked one', async () => {
     const { ctx, unmount } = await mountAndGetContext();
+    // The signed-out launch of the mount cleared once already; this case counts
+    // the account boundary's own clear.
+    nativeLauncherSurfacesMock.clearLauncherSurfaces.mockClear();
     nativeLauncherSurfacesMock.takeAccountIndependentLaunchUrl.mockReturnValueOnce(
       'kiloapp:///cloud/sessions/new'
     );
@@ -1091,8 +1143,6 @@ describe('sign-out teardown ordering', () => {
       await ctx.signIn(makeToken({ kiloUserId: 'user-2' }));
     });
 
-    // The parked URL has no deadline and the captured link is live, so the
-    // occupied slot keeps the destination the person opened.
     expect(hoisted.deepLinkLaunch.setPendingDeepLink).not.toHaveBeenCalled();
     expect(nativeLauncherSurfacesMock.clearLauncherSurfaces).toHaveBeenCalledTimes(1);
 
@@ -1136,6 +1186,11 @@ describe('sign-out teardown ordering', () => {
 
   it('clears the last-opened session and the launcher surfaces on sign-out', async () => {
     const { ctx } = await mountAndGetContext();
+    // The signed-out launch of the mount cleared once already; this case counts
+    // the sign-out body's own clear.
+    nativeLauncherSurfacesMock.clearLauncherSurfaces.mockClear();
+    lastOpenedSessionMock.clearLastOpenedSession.mockClear();
+    lastRouteMock.clearLastRoute.mockClear();
 
     await act(async () => {
       await ctx.signOut();
@@ -1330,7 +1385,6 @@ describe('stale sign-in continuation', () => {
   /** Mount the provider with a consumer that re-captures the context on
    *  every render, and resolve the preload effect. getCtx reads the latest
    *  captured value so a test can assert post-operation state. */
-  // oxlint-disable-next-line require-await -- dynamic import is awaited
   async function mountStaleTest(): Promise<{
     getCtx: () => AuthContextValue;
     unmount: () => void;
@@ -1948,8 +2002,6 @@ describe('bootstrap and foreground race fencing', () => {
   it('regression: a refused refresh from a superseded epoch does not sign out the newer session', async () => {
     const { getCtx, unmount } = await mountProvider();
 
-    // A session with a refresh token and an expiry inside the refresh margin,
-    // so a foreground event initiates a proactive refresh.
     await act(async () => {
       await getCtx().signIn('active-token', 'active-refresh', 3600);
     });
@@ -2017,8 +2069,6 @@ describe('bootstrap and foreground race fencing', () => {
   it('regression: the refusal-triggered sign-out cleanup still authenticates with the owner token', async () => {
     const { getCtx, unmount } = await mountProvider();
 
-    // A session with a refresh token and an expiry inside the refresh margin,
-    // so a foreground event initiates a proactive refresh.
     await act(async () => {
       await getCtx().signIn('active-token', 'active-refresh', 3600);
     });
@@ -2085,6 +2135,72 @@ describe('bootstrap and foreground race fencing', () => {
 
     const search = await import('@/lib/native-system-search');
     expect(vi.mocked(search.clearSystemSearchIndex)).toHaveBeenCalledTimes(1);
+
+    unmount();
+  });
+
+  it('regression: a signed-out launch clears the OS launcher surfaces the teardown may not have reached', async () => {
+    // The beforeEach leaves every read null: the launch positively restored no
+    // session, so this is the retry for a sign-out killed during its awaited
+    // teardown, before the account-boundary clear ran. The launcher shortcuts and
+    // Quick Actions label themselves from the departing account's sessions, so
+    // the launch must drop them too, not only the search index.
+    nativeLauncherSurfacesMock.clearLauncherSurfaces.mockClear();
+    const { getCtx, unmount } = await mountProvider();
+    expect(getCtx().isLoading).toBe(false);
+    expect(getCtx().token).toBeUndefined();
+    expect(getCtx().restoreFailed).toBe(false);
+
+    expect(nativeLauncherSurfacesMock.clearLauncherSurfaces).toHaveBeenCalledTimes(1);
+
+    unmount();
+  });
+
+  it('a restore-failure bootstrap leaves the launcher surfaces alone', async () => {
+    useFakeBackoffClock();
+    // Every credential read rejects: the account may still own the surfaces, so
+    // only a positively signed-out launch may drop them.
+    hoisted.secureStore.getItemAsync.mockRejectedValue(new Error('keychain unavailable'));
+    nativeLauncherSurfacesMock.clearLauncherSurfaces.mockClear();
+
+    const { getCtx, unmount } = await mountProvider();
+    await settleBootstrap(getCtx);
+    expect(getCtx().restoreFailed).toBe(true);
+
+    expect(nativeLauncherSurfacesMock.clearLauncherSurfaces).not.toHaveBeenCalled();
+
+    unmount();
+  }, 60_000);
+
+  it('regression: a signed-out launch stages the parked New agent tap before it clears the launcher surfaces', async () => {
+    // The launcher clear also drops the Quick Action URL a cold start parks
+    // natively, and the sign-in path is that URL's only staging reader. A
+    // launch that restored no session must stage the account-independent
+    // destination first, or the tap is lost before the sign-in that follows.
+    nativeLauncherSurfacesMock.takeAccountIndependentLaunchUrl.mockReturnValueOnce(
+      'kiloapp:///cloud/sessions/new'
+    );
+    // The earlier cases in this file leave a destination in the pending slot;
+    // this case starts with an empty slot so the parked tap is what is staged.
+    hoisted.deepLinkLaunch.getPendingDeepLinkSnapshot.mockReturnValue(null);
+    hoisted.deepLinkLaunch.setPendingDeepLink.mockClear();
+    // The staged destination must land before the clear drops the parked URL.
+    let stagedBeforeClear: boolean | null = null;
+    nativeLauncherSurfacesMock.clearLauncherSurfaces.mockImplementationOnce(() => {
+      stagedBeforeClear = hoisted.deepLinkLaunch.setPendingDeepLink.mock.calls.length > 0;
+    });
+
+    const { getCtx, unmount } = await mountProvider();
+    expect(getCtx().token).toBeUndefined();
+
+    expect(hoisted.deepLinkLaunch.setPendingDeepLink).toHaveBeenCalledWith(
+      expect.stringContaining('/agent-chat/new'),
+      'universal-link'
+    );
+    expect(stagedBeforeClear).toBe(true);
+    // The take drops the parked value, so the clear afterwards has nothing left
+    // to lose.
+    expect(nativeLauncherSurfacesMock.takeAccountIndependentLaunchUrl).toHaveBeenCalled();
 
     unmount();
   });
@@ -2281,6 +2397,188 @@ describe('bootstrap and foreground race fencing', () => {
 
     unmount();
   }, 30_000);
+
+  it('a USER_BLOCKED refresh refusal raises the explanation before the session ends and keeps it afterwards', async () => {
+    const storedToken = makeToken({ kiloUserId: 'user-1' });
+    hoisted.secureStore.getItemAsync
+      .mockResolvedValueOnce(storedToken)
+      .mockResolvedValueOnce('stored-refresh')
+      .mockResolvedValueOnce('9999999999999')
+      .mockResolvedValueOnce(storedToken);
+
+    const { getCtx, unmount } = await mountProvider();
+    expect(getCtx().token).toBe(storedToken);
+
+    // `mountProvider` resets the module registry, so a static import would
+    // read a different instance than the provider's: import after mount to
+    // get the one the provider writes, and start this case from the cleared
+    // state so the assertions below describe this refusal alone.
+    const blockedAccount = await import('@/lib/auth/blocked-account-state');
+    blockedAccount.setBlockedAccountExplanation(null);
+    expect(blockedAccount.isBlockedAccountActive()).toBe(false);
+
+    // Prove the ordering the sign-out depends on, not only the final state:
+    // the remote cleanup runs inside `signOut`, so reading the flag there
+    // catches a teardown that starts before the explanation is raised.
+    const blockedAtTeardown: boolean[] = [];
+    logoutCleanupMock.runLogoutCleanup.mockImplementationOnce(() => {
+      blockedAtTeardown.push(blockedAccount.isBlockedAccountActive());
+      return Promise.resolve();
+    });
+
+    // The refresh route names the blocked account in its 401 body.
+    hoisted.secureStore.getItemAsync.mockResolvedValue('stored-refresh');
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(Response.json({ error: 'USER_BLOCKED' }, { status: 401 }));
+    onTestFinished(() => {
+      fetchSpy.mockRestore();
+    });
+
+    const handler = unauthorizedMock.getHandler();
+    if (!handler) {
+      throw new Error('unauthorized handler was not registered');
+    }
+    await act(async () => {
+      await handler();
+    });
+
+    // The explanation was already raised when the teardown reached sign-out…
+    expect(blockedAtTeardown).toEqual([true]);
+    // …and it outlives the session it explains: the credential is gone, the
+    // session ended is recorded, and the reason stays on the signed-out surface.
+    expect(blockedAccount.isBlockedAccountActive()).toBe(true);
+    expect(getCtx().sessionEnded).toBe(true);
+    expect(getCtx().token).toBeUndefined();
+    expect(getCtx().restoreFailed).toBe(false);
+    expect(signOutTelemetryMock.reportAuthBranch).toHaveBeenCalledTimes(1);
+    expect(signOutTelemetryMock.reportAuthBranch).toHaveBeenCalledWith({
+      cause: 'session_ended',
+    });
+
+    unmount();
+  }, 30_000);
+
+  it('a plain refused refresh does not raise the explanation', async () => {
+    const storedToken = makeToken({ kiloUserId: 'user-1' });
+    hoisted.secureStore.getItemAsync
+      .mockResolvedValueOnce(storedToken)
+      .mockResolvedValueOnce('stored-refresh')
+      .mockResolvedValueOnce('9999999999999')
+      .mockResolvedValueOnce(storedToken);
+
+    const { getCtx, unmount } = await mountProvider();
+    expect(getCtx().token).toBe(storedToken);
+
+    const blockedAccount = await import('@/lib/auth/blocked-account-state');
+    blockedAccount.setBlockedAccountExplanation(null);
+    expect(blockedAccount.isBlockedAccountActive()).toBe(false);
+
+    // A 401 that names nothing but a rejected refresh token ends the session
+    // silently: there is no restriction to explain.
+    hoisted.secureStore.getItemAsync.mockResolvedValue('stored-refresh');
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(Response.json({ error: 'INVALID_REFRESH_TOKEN' }, { status: 401 }));
+    onTestFinished(() => {
+      fetchSpy.mockRestore();
+    });
+
+    const handler = unauthorizedMock.getHandler();
+    if (!handler) {
+      throw new Error('unauthorized handler was not registered');
+    }
+    await act(async () => {
+      await handler();
+    });
+
+    // The refusal really did sign out — the flag below is the only thing that
+    // stays unset.
+    expect(getCtx().sessionEnded).toBe(true);
+    expect(getCtx().token).toBeUndefined();
+    expect(blockedAccount.isBlockedAccountActive()).toBe(false);
+
+    unmount();
+  }, 30_000);
+
+  it('a successful sign-in clears the explanation', async () => {
+    const { getCtx, unmount } = await mountProvider();
+    const blockedAccount = await import('@/lib/auth/blocked-account-state');
+    blockedAccount.setBlockedAccountExplanation(null);
+
+    // The explanation is showing from a blocked refusal the person has since
+    // asked to sign in past: the published credentials prove it no longer
+    // applies.
+    blockedAccount.setBlockedAccountExplanation('account_blocked');
+    expect(blockedAccount.isBlockedAccountActive()).toBe(true);
+
+    await act(async () => {
+      await getCtx().signIn('active-token', 'active-refresh', 3600);
+    });
+
+    expect(getCtx().token).toBe('active-token');
+    expect(blockedAccount.isBlockedAccountActive()).toBe(false);
+
+    unmount();
+  }, 30_000);
+
+  it('a previous-session refusal cannot raise while a sign-in transition runs', async () => {
+    const { getCtx, unmount } = await mountProvider();
+    const blockedAccount = await import('@/lib/auth/blocked-account-state');
+    const { isSignOutActive } = await import('@/lib/auth/sign-out-state');
+    const { isSignOutTeardownActive } = await import('@/lib/auth/auth-transition-state');
+    const { releaseChatsForAccountSwitch } = await import('@/lib/chat/sign-out');
+    blockedAccount.setBlockedAccountExplanation(null);
+    expect(blockedAccount.isBlockedAccountActive()).toBe(false);
+
+    // Park the sign-in inside its transition: the release await is the gap
+    // where both fences were cleared before the token publishes, so a refusal
+    // from the previous session settling there would raise over the new
+    // account. The sample is taken only once the sign-in is parked there.
+    const releaseGate = Promise.withResolvers<undefined>();
+    const releasePark = Promise.withResolvers<undefined>();
+    vi.mocked(releaseChatsForAccountSwitch).mockImplementationOnce(async () => {
+      releaseGate.resolve(undefined);
+      await releasePark.promise;
+    });
+
+    let signInDone = false;
+    const trackSignIn = async (): Promise<void> => {
+      try {
+        await getCtx().signIn('active-token', 'active-refresh', 3600);
+      } finally {
+        signInDone = true;
+      }
+    };
+    const signInSettled = trackSignIn();
+    void signInSettled;
+    const signInPromise = signInSettled;
+
+    // Drive the sign-in to the parked release inside act, sample the fences
+    // there (the clears happen only at credential publication after this
+    // await), then let the release settle so the sign-in publishes.
+    await act(async () => {
+      await releaseGate.promise;
+    });
+    expect(signInDone).toBe(false);
+    expect([isSignOutActive(), isSignOutTeardownActive()]).toEqual([true, true]);
+
+    // The previous session's blocked refusal settles in this same gap; the
+    // fences keep it from raising (no direct raise call here: the assertion
+    // pins the fence state the raise reads, not a call made by hand).
+    expect(blockedAccount.isBlockedAccountActive()).toBe(false);
+
+    releasePark.resolve(undefined);
+    await act(async () => {
+      await signInPromise;
+    });
+
+    expect(signInDone).toBe(true);
+    expect(getCtx().token).toBe('active-token');
+    expect(blockedAccount.isBlockedAccountActive()).toBe(false);
+
+    unmount();
+  }, 30_000);
 });
 
 describe('reactive auth epoch', () => {
@@ -2292,7 +2590,6 @@ describe('reactive auth epoch', () => {
 
   /** Mount the provider with a consumer that re-captures the context on every
    *  render, so the test can read the epoch after sign-in or sign-out moved it. */
-  // oxlint-disable-next-line require-await -- dynamic import is awaited
   async function mountEpochTest(withConnection = false): Promise<{
     getCtx: () => AuthContextValue;
     unmount: () => void;

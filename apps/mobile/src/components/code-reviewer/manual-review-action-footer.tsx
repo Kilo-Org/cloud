@@ -1,8 +1,6 @@
 import { type ReactNode } from 'react';
-import { View } from 'react-native';
-import { useKeyboardState } from 'react-native-keyboard-controller';
 
-import { useTabBarBottomPadding } from '@/components/tab-screen';
+import { ScreenFooter } from '@/components/ui/screen-footer';
 
 /**
  * Pinned primary action for the manual-review form.
@@ -14,19 +12,9 @@ import { useTabBarBottomPadding } from '@/components/tab-screen';
  * to action is always fully legible.
  *
  * The host wraps this footer and the scroll body in the keyboard-lift view,
- * which owns the bottom space while the keyboard is open. The footer's own
- * clearance therefore covers only what the lift does not: a keyboard taller
- * than the clearance drops it to 0, while a shorter one (the hardware-keyboard
- * IME bar is one navigation bar tall) keeps the rest, so the action never lands
- * behind the bottom edge (e1-fill, 2026-09-19).
+ * which owns the bottom space while the keyboard is open; the shared footer
+ * handles its own lift against the IME, so the two never double-count.
  */
 export function ManualReviewActionFooter({ children }: Readonly<{ children: ReactNode }>) {
-  const bottomClearance = useTabBarBottomPadding();
-  const keyboardLift = useKeyboardState(state => state.height);
-  const bottomPadding = Math.max(0, bottomClearance - keyboardLift);
-  return (
-    <View className="bg-background px-6 pt-3" style={{ paddingBottom: bottomPadding }}>
-      {children}
-    </View>
-  );
+  return <ScreenFooter clearance="tab-bar">{children}</ScreenFooter>;
 }

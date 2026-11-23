@@ -7,14 +7,23 @@ import { HunkHeaderRow } from './pr-diff-hunk-rows';
 import { Text } from '@/components/ui/text';
 
 const i18nManager = vi.hoisted(() => ({ isRTL: false }));
-vi.mock('react-native', () => ({
-  I18nManager: i18nManager,
-  Pressable: 'Pressable',
-  Text: 'Text',
-  View: 'View',
-}));
+vi.mock('react-native', async () => {
+  // A `vi.mock` factory runs before this file's imports are initialised, so the
+  // shared flatten comes in dynamically; a static import would be unbound here.
+  // The shared `Text` reads a caller's own base direction through
+  // `StyleSheet.flatten` (`pinsTextDirection`), so this stub must flatten.
+  const { flattenStyle: flatten } = await import('@/test/style-sheet-mock');
+  return {
+    I18nManager: i18nManager,
+    Pressable: 'Pressable',
+    StyleSheet: { create: (styles: unknown) => styles, flatten },
+    Text: 'Text',
+    View: 'View',
+  };
+});
 vi.mock('@rn-primitives/slot', () => ({ Text: 'Slot.Text' }));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
+vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/icons', () => ({
   Check: 'Check',
   ChevronDown: 'ChevronDown',

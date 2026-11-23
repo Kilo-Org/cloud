@@ -68,6 +68,12 @@ vi.mock('expo-router', () => ({
 }));
 
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
+// The screen clears the window's side insets on the tab strip; the harness
+// calls the component as a plain function, so the hook is a value the tests
+// set (portrait by default).
+const sideInsets = vi.hoisted(() => ({ style: undefined as Record<string, number> | undefined }));
+vi.mock('@/lib/screen-insets', () => ({ useSideInsetStyle: () => sideInsets.style }));
+
 vi.mock('react-native', () => ({
   BackHandler: { addEventListener: () => ({ remove: vi.fn() }) },
   Pressable: 'Pressable',
@@ -103,7 +109,10 @@ vi.mock('@/components/ui/icons', () => ({
   Share: () => null,
 }));
 
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({
@@ -1061,5 +1070,26 @@ describe('PrReviewScreen Back target', () => {
 
     expect(routerDismissTo).toHaveBeenCalledExactlyOnceWith('/(app)/pr-review');
     expect(routerBack).not.toHaveBeenCalled();
+  });
+});
+
+describe('PrReviewScreen tab strip side insets', () => {
+  it('wraps the tab selector in the landscape side insets', () => {
+    const style = { paddingLeft: 51, paddingRight: 8 };
+    sideInsets.style = style;
+    // This suite calls the screen shell as a plain function (as the rest of its
+    // cases do), so the capitalised component name never reads as a call.
+    const renderScreen = PrReviewScreen;
+    const element = renderScreen({ owner: 'octocat', repo: 'hello', number: 7 });
+
+    // The strip keeps its 14 dp gutter inside a wrapper that clears the
+    // cutout: a padding written on the gutter box would replace that gutter.
+    const wrapper = findElement({ node: element, type: 'View', prop: 'style', value: style });
+    expect(wrapper).not.toBeNull();
+    expect(
+      findElement({ node: wrapper, type: 'View', prop: 'className', value: 'px-4 pb-2 pt-3' })
+    ).not.toBeNull();
+
+    sideInsets.style = undefined;
   });
 });

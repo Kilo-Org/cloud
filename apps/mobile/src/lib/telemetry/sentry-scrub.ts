@@ -13,23 +13,11 @@
  * dropping fields this walker isn't meant to know about. The scrubbers must
  * therefore accept and return opaque values. */
 
-/**
- * A URL authority's userinfo prefix, the part before the host.
- */
-const URL_USERINFO_PATTERN = /^([a-z][\da-z+.-]*:\/\/)[^/?#]*@/iu;
+import { stripQueryString } from '@/lib/telemetry/request-target';
 
-/**
- * Reduce a URL to its origin and path. Returns empty string for a non-string.
- * A plain string walk, since the React Native `URL` polyfill does not
- * implement every component.
- */
+/** {@link stripQueryString} for the opaque values a Sentry payload carries. */
 function stripQuery(url: unknown): string {
-  if (typeof url !== 'string') {
-    return '';
-  }
-  const cut = url.search(/[?#]/u);
-  const originAndPath = cut === -1 ? url : url.slice(0, cut);
-  return originAndPath.replace(URL_USERINFO_PATTERN, '$1');
+  return typeof url === 'string' ? stripQueryString(url) : '';
 }
 
 /**
@@ -339,7 +327,6 @@ function scrubPayload(value: unknown): Record<string, unknown> {
   return result;
 }
 
-/** The string at `key`, or undefined when it is absent or not a string. */
 function stringField(value: Record<string, unknown>, key: string): string | undefined {
   const field = value[key];
   return typeof field === 'string' ? field : undefined;
@@ -458,7 +445,6 @@ export function scrubEvent<T>(event: T): T {
 
     const e = event as Record<string, unknown>;
 
-    // request.url
     if (e.request != null && typeof e.request === 'object') {
       const req = e.request as Record<string, unknown>;
       if ('url' in req) {
@@ -466,7 +452,6 @@ export function scrubEvent<T>(event: T): T {
       }
     }
 
-    // contexts.response (nested under contexts)
     if (e.contexts != null && typeof e.contexts === 'object') {
       const ctx = e.contexts as Record<string, unknown>;
       if (ctx.response != null && typeof ctx.response === 'object') {
@@ -485,7 +470,6 @@ export function scrubEvent<T>(event: T): T {
       }
     }
 
-    // user identity
     if (e.user != null && typeof e.user === 'object') {
       const user = e.user as Record<string, unknown>;
       delete user.email;
@@ -493,7 +477,6 @@ export function scrubEvent<T>(event: T): T {
       delete user.ip_address;
     }
 
-    // extras and tags
     if ('extra' in e) {
       e.extra = redactTokens(e.extra as Record<string, unknown> | undefined, 'extra');
     }

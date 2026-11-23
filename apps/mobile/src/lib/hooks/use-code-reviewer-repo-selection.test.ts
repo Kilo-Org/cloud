@@ -7,6 +7,7 @@ import { i18n } from '@/i18n';
 import { bumpAuthEpoch, currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { setSignOutActive } from '@/lib/auth/sign-out-state';
 import { PERSONAL_SCOPE } from '@/lib/code-reviewer-config';
+import type * as InfiniteRetentionModule from '@/lib/query/infinite-retention';
 import { ORGANIZATION_TRIAL_EXPIRED_MESSAGE } from '@/lib/server-error-copy';
 
 import { clearRepoSelectionSenders, REPO_SELECTION_DEBOUNCE_MS } from './repo-selection-senders';
@@ -15,7 +16,7 @@ import { useRepoSelectionToggle } from './use-code-reviewer-repo-selection';
 type MutationOptions = {
   mutationFn?: (vars: unknown) => Promise<unknown>;
   onError?: (error: unknown, vars?: unknown) => void;
-  onSettled?: () => void;
+  onSettled?: (data?: unknown, error?: unknown, vars?: unknown) => Promise<void> | void;
   onSuccess?: (data: unknown, vars?: unknown) => void;
 };
 
@@ -24,6 +25,7 @@ const orgPatchMutateMock = vi.fn();
 const invalidateQueriesMock = vi.fn();
 const toastErrorMock = vi.fn();
 const mutateMock = vi.fn();
+const reconcileFirstPageMock = vi.hoisted(() => vi.fn(() => Promise.resolve()));
 
 let lastCapturedOptions: MutationOptions | null = null;
 let reviewConfigCache: { selectedRepositoryIds: (number | string)[] } | undefined = undefined;
@@ -51,6 +53,23 @@ vi.mock('react', () => ({
   }),
 }));
 
+// One object for every `useQueryClient` call, so an assertion can name the
+// client the hook handed the reconcile.
+const queryClientMock = {
+  getQueryData: () => reviewConfigCache,
+  setQueryData: setQueryDataMock,
+  invalidateQueries: invalidateQueriesMock,
+  getQueryCache: () => ({
+    // eslint-disable-next-line promise/prefer-await-to-callbacks -- a cache subscription is callback-based by design
+    subscribe: (cb: (event: unknown) => void) => {
+      subscriptionState.capturedSubscribe = cb;
+      return () => {
+        subscriptionState.capturedSubscribe = null;
+      };
+    },
+  }),
+};
+
 vi.mock('@tanstack/react-query', async () => {
   const actual = await vi.importActual<typeof TanStackQuery>('@tanstack/react-query');
   return {
@@ -59,21 +78,17 @@ vi.mock('@tanstack/react-query', async () => {
       lastCapturedOptions = opts;
       return { mutate: mutateMock };
     },
-    useQueryClient: () => ({
-      getQueryData: () => reviewConfigCache,
-      setQueryData: setQueryDataMock,
-      invalidateQueries: invalidateQueriesMock,
-      getQueryCache: () => ({
-        // eslint-disable-next-line promise/prefer-await-to-callbacks -- a cache subscription is callback-based by design
-        subscribe: (cb: (event: unknown) => void) => {
-          subscriptionState.capturedSubscribe = cb;
-          return () => {
-            subscriptionState.capturedSubscribe = null;
-          };
-        },
-      }),
-    }),
+    useQueryClient: () => queryClientMock,
   };
+});
+
+// `useSaveReviewConfigDelta` settles through `settleReviewerWrite`, which
+// reconciles the organization audit log for an organization scope. Only that
+// one export is replaced, so the rest of the module stays real and the call is
+// recorded without touching the delta suite's own cache fixtures.
+vi.mock('@/lib/query/infinite-retention', async importOriginal => {
+  const actual = await importOriginal<typeof InfiniteRetentionModule>();
+  return { ...actual, reconcileFirstPage: reconcileFirstPageMock };
 });
 
 vi.mock('@/lib/trpc', () => ({
@@ -126,6 +141,10 @@ vi.mock('@/lib/trial-refusal', () => ({
 // use-code-reviewer.ts re-exports from use-reviewer-permission, which imports
 // useRouter from expo-router. Loading the real module in node blows up on the
 // expo-router source map, so stub the surface the re-export reaches.
+// The reviewer permission hook now observes the shared memberships read, whose
+// owner gates it on the auth token; this suite exercises repo selection, not
+// the role read.
+vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => ({ token: 'token' }) }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
 }));
@@ -173,6 +192,7 @@ beforeEach(() => {
   personalPatchMutateMock.mockReset();
   orgPatchMutateMock.mockReset();
   invalidateQueriesMock.mockReset();
+  reconcileFirstPageMock.mockClear();
   toastErrorMock.mockReset();
   mutateMock.mockReset();
   billing.canManage = false;
@@ -615,5 +635,50 @@ describe('useSaveReviewConfigDelta mutationFn payload shape', () => {
     });
 
     expect(setQueryDataMock).not.toHaveBeenCalled();
+  });
+});
+
+// The delta save settles through the same refresh as the other reviewer
+// writes: the config read it changed, then the organization audit log's page
+// one. The personal scope writes no organization audit row, so it has none to
+// refresh, and a save superseded by a later sign-in refreshes nothing.
+describe('delta save refresh of the organization audit log', () => {
+  const ORG_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+
+  it('reconciles the audit log page one for an organization scope', async () => {
+    const { deltaOptions } = getToggleRepo(ORG_ID, 'github');
+
+    await deltaOptions.onSettled?.(undefined, undefined, { authEpoch: currentAuthEpoch() });
+
+    expect(reconcileFirstPageMock).toHaveBeenCalledExactlyOnceWith(queryClientMock, [
+      'organizations.auditLogs.list',
+      ORG_ID,
+    ]);
+    // The config invalidation this save already made stays exactly as it was.
+    expect(invalidateQueriesMock).toHaveBeenCalledWith({
+      queryKey: ['organizations', 'reviewAgent', 'getReviewConfig'],
+    });
+  });
+
+  it('reconciles nothing on the audit log for the personal scope', async () => {
+    const { deltaOptions } = getToggleRepo(PERSONAL_SCOPE, 'github');
+
+    await deltaOptions.onSettled?.(undefined, undefined, { authEpoch: currentAuthEpoch() });
+
+    expect(reconcileFirstPageMock).not.toHaveBeenCalled();
+    expect(invalidateQueriesMock).toHaveBeenCalledWith({
+      queryKey: ['personalReviewAgent', 'getReviewConfig'],
+    });
+  });
+
+  it('refreshes nothing for a save whose epoch a later sign-in superseded', async () => {
+    const { deltaOptions } = getToggleRepo(ORG_ID, 'github');
+    const staleEpoch = currentAuthEpoch();
+    bumpAuthEpoch();
+
+    await deltaOptions.onSettled?.(undefined, undefined, { authEpoch: staleEpoch });
+
+    expect(reconcileFirstPageMock).not.toHaveBeenCalled();
+    expect(invalidateQueriesMock).not.toHaveBeenCalled();
   });
 });

@@ -355,7 +355,7 @@ export class BuildStore {
 
   /** Secret envelopes are kept only while an allocation may still need them. */
   clearSecrets(buildId: string): void {
-    this.update(buildId, { encrypted_secrets: null });
+    this.update(buildId, { encrypted_secrets: null, network_secret_grants: null });
   }
 }
 

@@ -44,6 +44,9 @@ cloud-agent-next refactor.
    Next.js. A real-model session (`kilo-auto/efficient`, etc.) uses the same
    Worker URL and does not need a restart.
 
+If a Kilo Cloud sandbox image build fails with a certificate error while
+downloading `glab`, see [Docker build TLS trust](../../../../.kilo/skills/cloud-agent-sandbox/SKILL.md#docker-build-tls-trust).
+
 ## Kilo v2 drain checks
 
 Drain completion applies only to Kilo v2 (`0.0.0-v2-85` or newer), not the default v1 runtime.
@@ -216,6 +219,69 @@ non-loopback origin each fail before any resource is created (or deleted) with
 the concrete cause; there is no skip or production fallback.
 
 ## Running
+
+### Hosted multi-repository staging proof
+
+This is an opt-in HTTP scenario, not part of the local or deployed matrix. It
+requires an operator-approved staging Cloud Agent Worker with the E2E allocation
+inspector, a staging backend for control tokens and stream tickets, the matching
+staged Git token broker, and a fake LLM running the `file-read-pair` directive.
+The standard deployed E2E stack shares production resources; do not use it or
+any live fixture for this check. The scenario does not provision or deploy
+anything, read project env files, or substitute a default endpoint or repo.
+
+Provide a dedicated funded staging organization member, an authorized profile,
+and one GitHub App workflow installation with a primary and additional repo. Add
+a distinct single-line non-secret marker to each repo's default branch. Markers
+are 8-128 characters from `A-Z`, `a-z`, `0-9`, `_`, `-`; use repos with different
+leaf names. The read tool resolves `markerPath` under each repository's checkout
+directory, relative to the workspace root. A fixture configuration looks like:
+
+```json
+{
+  "target": "staging",
+  "workerUrl": "https://stage-worker.example.invalid",
+  "backendUrl": "https://stage-backend.example.invalid",
+  "organizationId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+  "integrationId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+  "profileId": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+  "primary": { "fullName": "fixture-org/primary", "markerPath": "marker.txt", "marker": "fixture-primary" },
+  "additional": { "id": 12345, "fullName": "fixture-org/additional", "markerPath": "marker.txt", "marker": "fixture-additional" },
+  "verifySibling": true,
+  "verifyIdle": true
+}
+```
+
+Use a separate mode-600 auth JSON file with `token` (the fixture member's
+ordinary personal Kilo API token) and `e2eInternalApiSecret` (the staging
+inspector secret, not a production secret). Invoke from the repository root:
+
+```sh
+E2E_HOSTED_MULTI_REPO_FIXTURE=/path/to/staging-fixture.json \
+E2E_HOSTED_MULTI_REPO_AUTH_FILE=/path/to/staging-auth.json \
+pnpm --filter cloud-agent-next exec tsx test/e2e/hosted-multi-repository.ts
+```
+
+The driver probes catalog version `1` and the selected ID/name, replays the
+same promptless create, checks that no turn, physical allocation or billing
+interval appeared, then proves both marker contents in a single first turn.
+`verifySibling` defaults to true and checks the same files and physical
+allocation through a second root. Set it false only if the staged provider does
+not support siblings. `verifyIdle` defaults to false; enable it on a stage with a
+predictable idle deadline to verify passive stop and a new physical allocation
+for the same workspace and session. The runtime inspector reads persisted
+allocation state, not provider liveness. The driver deletes run-created
+workspaces with `deleteWorktree`; if a create response is lost, use the printed
+operation key to correlate and reclaim its staging workspace.
+
+To document the result, retain the run output and record the actual Cloud Agent,
+Git token broker, backend, fake LLM, and runtime revisions. Correlate the
+printed catalog window and workspace IDs with staging traces to confirm there
+were no provider creates or billing starts during catalog lookup and promptless
+registration/replay. For idle evidence, confirm the provider stop was due to
+idleness. Record any explicitly skipped checks as not verified. A local test
+pass, a worker name without isolated staging bindings, or a staged fixture
+description alone is not staged evidence.
 
 ### Saved profiles on Kilo v2
 
@@ -428,8 +494,8 @@ tsx services/cloud-agent-next/test/e2e/run.ts large-stream _
 tsx services/cloud-agent-next/test/e2e/run.ts concurrent-chats _
 
 # Callback delivery — the scenario opens a callback sink and asserts on receipt.
-# `callbackTarget` is accepted by prepareSession only, so these scenarios pin
-# `api: 'legacy'` themselves; `--api=legacy` is not needed. Under local Docker
+# The scenarios use unified `start` and register `callbackTarget` after boot
+# through internal `updateSession`. Under local Docker
 # the sink is a host HTTP server (workerd can POST http://127.0.0.1:<ephemeral>
 # on the same host; no tunnel). Over HTTP the sink is the e2e surface
 # (`POST /__e2e/callbacks`) and the Worker self-fetches the returned URL. Use the
@@ -478,6 +544,32 @@ when the matrix includes worktree scenarios. The local dev container caps in
 
 The matrix starts with `cold-hot`, which pays one cold sandbox boot and then
 runs several hot same-session turns.
+
+### Workspace MCP authority check
+
+`workspace-mcp-authority-local.ts` follows the built-in `kilo-cloud-agent` MCP
+connection of a two-chat workspace through expiry, renewal, a sandbox restart,
+deletion of the first chat and a pepper revocation. It sends real MCP
+`tools/list` and `tools/call` requests to the local kilo-mcp. Runtime
+delegations normally last 24 hours, so add a development-only override to the
+local `services/cloud-agent-next/.dev.vars` and restart `cloud-agent-next`:
+
+```sh
+RUNTIME_AUTHORIZATION_LIFETIME_MS=480000
+```
+
+The Worker reads it only when `ENVIRONMENT=development`; never add it to
+`wrangler.jsonc`. Select steps with `WORKSPACE_MCP_STEPS` (default
+`expiry,restart`; also `delete-root` and `revoke`):
+
+```sh
+WORKSPACE_MCP_STEPS=expiry,restart,delete-root,revoke \
+  WORKER_URL=http://localhost:8794 KILO_MCP_URL=http://localhost:8815/mcp \
+  pnpm exec tsx services/cloud-agent-next/test/e2e/workspace-mcp-authority-local.ts
+```
+
+The script prints one JSON observation per step and does not assert. The run
+takes about 15 minutes because it waits for real expiry.
 
 ### Teardown
 
@@ -868,6 +960,7 @@ exactly `auth-reject`. The end-of-run output is a machine-readable contract:
 
 ```
 unsupported: <name>
+retried: <name>
 Summary: <pass> passed, <fail> failed, <unsupported> unsupported
 Wall time: <seconds>s
 ```
@@ -878,6 +971,14 @@ scenarios are filtered before spawn, a non-zero child exit is a failure: exit `1
 if any scenario failed, else `0`. A child that exceeds its watchdog deadline (its
 scenario budget plus ten minutes) is killed and reported as a failure. When
 `GITHUB_STEP_SUMMARY` is set the runner appends its `Summary:` line to that file.
+
+The matrix retries a scenario once if its failure result line names a known
+transient infrastructure fault, such as `Failed query:`, `fetch failed`,
+`Stream did not connect`, or a tRPC 502/503/504 response. Earlier logs and
+event summaries do not affect retry eligibility. The runner does not retry
+children killed by a signal or the watchdog. The retry starts after 60 s in a
+fresh child and fake-LLM scope and appears on a `retried:` line. If the second
+attempt fails, the matrix reports a failure.
 
 The `cloud-agent-e2e-tests` GitHub workflow
 (`.github/workflows/cloud-agent-e2e-tests.yml`) supports `workflow_dispatch`
@@ -1091,9 +1192,9 @@ reusable catalog of planned and existing scenarios, see
 | `interrupt-mid-stream` | Interrupt an actively paced fake request and assert the active message is interrupted, not a queued message. |
 | `unknown-model` | Use a model rejected by the fake validation route and require synchronous rejection before sandbox creation or fake chat dispatch. |
 | `auth-reject` | Probes the deployed fake Worker's public auth boundary (model routes and `/test/*`) with/without valid bearers; declares `deployedHttpAuthBoundary`, so it is unsupported locally. |
-| `callback-completion` | Open the profile's callback sink, register `callbackTarget.url`, run `echo:done`, assert the sink received `status: 'completed'`. |
+| `callback-completion` | Run a cold `echo:warmup` turn, then register the callback sink and run `echo:done`. After the completed callback, verify the boot result still has its own stream-correlated assistant ID and `warmup` text, completed preparation with no failed step, and no failure. Verify the follow-up result has a different assistant ID and matches the callback text. Both results must match the callback's non-empty branch. |
 | `callback-batch-followup` | Queue two turns behind a paced callback session, assert one callback for the final queued turn, then assert a later hot turn emits a fresh callback and no extra one after the batch settles. |
-| `callback-interrupt` | Paced active turn + `interruptSession`, assert callback fires with `status: 'interrupted'`. |
+| `callback-interrupt` | Interrupt an active paced turn. Require the callback and message result to report `interrupted` with failure stage `interruption` and code `user_interrupt`. Verify the result's retryability and branch match the callback. |
 | `worktree-multi-chat-parallel` | New-plane only (`controlPlaneV2` + `controlPlaneRuntime`). See the new-plane table above: proves two chats stream at the same instant. |
 | `control-plane-callbacks` | New-plane only. See the new-plane table above: new-plane callback + persisted `cloud_agent_session_runs` report row. |
 | `command` | New-plane only. See the new-plane table above: `/compact` command and a required increase in the Kilo summary count. |

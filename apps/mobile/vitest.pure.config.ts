@@ -22,6 +22,10 @@ export default defineProject({
     // The app build's config module cannot load in this project; the setup
     // file stubs the exports its importers read.
     setupFiles: ['./vitest.setup.ts'],
+    // `lucide-react-native` must be transformed here, not loaded by Node: its
+    // SVG backend cannot be required in Node, and the setup file's host stub
+    // only replaces modules this project resolves (see vitest.setup.ts).
+    server: { deps: { inline: ['lucide-react-native'] } },
     // The mobile-app gate runs `vitest related` over the branch's changed files
     // (170+ suites) beside Metro, the simulator, and the local services. On that
     // loaded machine the first transform/import of a heavy dependency
@@ -38,8 +42,11 @@ export default defineProject({
     execArgv: ['--disable-warning=ExperimentalWarning'],
     include: [
       'plugins/**/*.test.ts',
+      // Node-environment contract tests for the app scripts.
+      'scripts/**/*.test.ts',
       'src/i18n/**/*.test.ts',
       'src/lib/*.test.ts',
+      'src/lib/i18n/**/*.test.ts',
       'src/lib/a11y/**/*.test.ts',
       'src/lib/agent-attachments/**/*.test.ts',
       'src/lib/analytics/**/*.test.ts',
@@ -47,7 +54,9 @@ export default defineProject({
       'src/lib/byok/**/*.test.ts',
       'src/lib/chat/**/*.test.ts',
       'src/lib/design-gate/**/*.test.ts',
-      'src/lib/auth/**/*.test.tsx',
+      // `!(*.mounted)` keeps `*.mounted.test.tsx` in the mounted project only:
+      // this directory holds both kinds, and a file in both projects runs twice.
+      'src/lib/auth/**/!(*.mounted).test.tsx',
       'src/lib/apple-iap/**/*.test.ts',
       'src/lib/apple-iap/**/*.test.tsx',
       'src/lib/billing/**/*.test.ts',
@@ -80,9 +89,11 @@ export default defineProject({
       'src/lib/app-actions/**/!(*.mounted).test.tsx',
       'modules/kilo-app-actions/*.test.ts',
       'modules/kilo-apple-model/*.test.ts',
+      'modules/home-widget-refresh/*.test.ts',
       'modules/kilo-launcher-surfaces/*.test.ts',
       'src/lib/query/**/*.test.ts',
       'src/lib/settings/**/*.test.ts',
+      'src/lib/settings-search/**/*.test.ts',
       'src/lib/voice-input/**/*.test.ts',
       'src/lib/tool-summary-translation/**/*.test.ts',
       'src/lib/todos/**/*.test.ts',

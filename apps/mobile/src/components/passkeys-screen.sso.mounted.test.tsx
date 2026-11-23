@@ -105,7 +105,7 @@ describe('PasskeysScreen SSO approval', () => {
     expect(list.requestCode).toHaveBeenCalledWith('person@example.com');
     expect(list.startSso).toHaveBeenCalledWith({ operation: 'enroll' });
     expect(browser.open).toHaveBeenCalledWith(APPROVAL_URL);
-    expect(texts(view)).toContain('Waiting for approval...');
+    expect(texts(view)).toContain('Waiting for approval…');
     expect(hasButtonLabel(view, 'Open the approval page')).toBe(true);
     view.unmount();
   });

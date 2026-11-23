@@ -53,6 +53,9 @@ export function renderSelector(
     options: SessionModelOption[];
     acceptsVariant: boolean;
     isLoading: boolean;
+    disabled: boolean;
+    lockLabel: string;
+    onRetryModels: () => void;
   }> = {}
 ): TestRenderer.ReactTestRenderer {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
@@ -64,7 +67,10 @@ export function renderSelector(
         options: overrides.options ?? [],
         acceptsVariant: overrides.acceptsVariant ?? true,
         isLoading: overrides.isLoading ?? false,
+        disabled: overrides.disabled ?? false,
+        lockLabel: overrides.lockLabel,
         onSelect: vi.fn<(modelId: string, variant: string) => void>(),
+        onRetryModels: overrides.onRetryModels,
       })
     );
   });

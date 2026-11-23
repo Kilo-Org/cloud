@@ -2,16 +2,59 @@ import { z } from 'zod';
 import {
   cloudAgentChildSessionLineageSchema,
   cloudAgentSessionIdSchema,
+} from './cloud-agent-session-scope';
+import {
   cloudAgentWorktreeIdSchema,
   type CloudAgentWorktreeId,
-} from './cloud-agent-session-scope';
-import { storedSessionIdSchema } from './kilo-session-id';
+} from './cloud-agent-worktree-scope';
+import {
+  KILO_SESSION_ID_LENGTH,
+  KILO_SESSION_ID_PREFIX,
+  storedSessionIdSchema,
+} from './kilo-session-id';
+import { storedMessageIdSchema } from './message-id';
+import { MAX_GIT_BRANCH_LENGTH } from './git-branch';
 import { needsPartTextRepair } from './part-text';
+import { sessionLiveSummarySchema } from './session-live-summary';
+import { tokenUsageSchema } from './token-usage';
 
 export { cloudAgentSessionIdSchema, cloudAgentWorktreeIdSchema, type CloudAgentWorktreeId };
 
-export const sessionIdSchema = z.string().startsWith('ses_').length(30);
+/**
+ * A Kilo session id on the wire. Looser than `KILO_SESSION_ID_PATTERN` on the tail,
+ * so ids minted before the canonical shape stay readable.
+ */
+export const sessionIdSchema = z
+  .string()
+  .startsWith(KILO_SESSION_ID_PREFIX)
+  .length(KILO_SESSION_ID_LENGTH);
 
+export const sessionTitleSchema = z.string().trim().min(1).max(200);
+
+const statusTransitionIdSchema = z.string().regex(/^[0-7][0-9A-HJKMNP-TV-Z]{25}$/);
+
+/**
+ * The Session DO's projection of a Cloud Agent session into its `cli_sessions_v2` row. Kilo v2
+ * has no session-ingest client, so this is also how its transcript activity, native renames,
+ * session card summary and cost reach the row: `lastActivityAt` only moves forward, and
+ * `rename` is present only while a native rename is undelivered. A rename rides every
+ * publication from the first one that carried it, named by `rename.transitionId`, until one is
+ * delivered. Ingest applies it only while the stored status transition is older than
+ * `rename.transitionId`, so a late publication and a repeat after delivery cannot replace a newer
+ * title. A first delivery that has not landed still can, because a user rename carries no
+ * ordering signal.
+ *
+ * `liveSummary` and `totalCostMicrodollars` are present only for a Kilo v2 transcript; Kilo v1
+ * keeps reporting both through its ingest client. Ingest writes the summary with the status
+ * transition, so a late older publication cannot replace a newer summary, and moves the cost
+ * forward only, as it does for a Kilo v1 report. A publication whose `transitionId` is not newer
+ * than the stored one counts as stale and its summary is dropped, so every summary change must
+ * carry a new `transitionId`.
+ *
+ * The schema is strict: a receiver that predates a field rejects the whole publication, status
+ * included. Deploy a new field to the receiver before any sender sends it, and do not roll the
+ * receiver back past a sender that sends it.
+ */
 export const publishCloudAgentSessionStatusSchema = z
   .object({
     sessionId: sessionIdSchema,
@@ -19,7 +62,14 @@ export const publishCloudAgentSessionStatusSchema = z
     cloudAgentSessionId: cloudAgentSessionIdSchema,
     status: z.enum(['busy', 'retry', 'question', 'permission', 'idle', 'failed']),
     occurredAt: z.iso.datetime(),
-    transitionId: z.string().regex(/^[0-7][0-9A-HJKMNP-TV-Z]{25}$/),
+    transitionId: statusTransitionIdSchema,
+    lastActivityAt: z.iso.datetime().optional(),
+    rename: z
+      .object({ title: sessionTitleSchema, transitionId: statusTransitionIdSchema })
+      .strict()
+      .optional(),
+    liveSummary: sessionLiveSummarySchema.optional(),
+    totalCostMicrodollars: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).optional(),
   })
   .strict();
 export type PublishCloudAgentSessionStatusParams = z.infer<
@@ -48,10 +98,30 @@ export const CLI_SESSION_VERSION_BY_RUNTIME_HARNESS = {
   kilo2: 2,
 } as const satisfies Record<RecordCloudAgentSessionHarnessParams['runtimeHarness'], number>;
 
+const cloudAgentSessionTitleTargetSchema = z.object({
+  sessionId: sessionIdSchema,
+  kiloUserId: z.string().min(1),
+  cloudAgentSessionId: cloudAgentSessionIdSchema,
+});
+
+// Strip-mode, as the parameter objects these replace always were: an extra key
+// is dropped rather than rejected, so naming the schemas changes no caller.
+export const setGeneratedTitleForCloudAgentSchema = cloudAgentSessionTitleTargetSchema.extend({
+  title: sessionTitleSchema,
+});
+export type SetGeneratedTitleForCloudAgentParams = z.infer<
+  typeof setGeneratedTitleForCloudAgentSchema
+>;
+
+export const canGenerateTitleForCloudAgentSchema = cloudAgentSessionTitleTargetSchema;
+export type CanGenerateTitleForCloudAgentParams = z.infer<
+  typeof canGenerateTitleForCloudAgentSchema
+>;
+
 export const cloudAgentWorktreeLocationSchema = z
   .object({
     sandboxId: z.string().regex(/^[A-Za-z0-9._:-]{1,256}$/),
-    provider: z.enum(['cloudflare', 'vercel', 'cloudflare-containers']),
+    provider: z.enum(['cloudflare', 'vercel', 'cloudflare-containers', 'aws']),
   })
   .strict();
 export type CloudAgentWorktreeLocation = z.infer<typeof cloudAgentWorktreeLocationSchema>;
@@ -83,12 +153,20 @@ export const cloudAgentWorktreeDeletionSchema = z
     worktreeId: cloudAgentWorktreeIdSchema,
     kiloUserId: z.string().min(1),
     organizationId: z.uuid().optional(),
+  })
+  .strict();
+export type CloudAgentWorktreeDeletionParams = z.infer<typeof cloudAgentWorktreeDeletionSchema>;
+
+export const beginCloudAgentWorktreeDeletionSchema = cloudAgentWorktreeDeletionSchema
+  .extend({
     // Begin-only precondition: the worktree must still have exactly one root
     // session and it must be this session. Descendants are allowed.
     onlyIfSoleSessionId: sessionIdSchema.optional(),
   })
   .strict();
-export type CloudAgentWorktreeDeletionParams = z.infer<typeof cloudAgentWorktreeDeletionSchema>;
+export type BeginCloudAgentWorktreeDeletionParams = z.infer<
+  typeof beginCloudAgentWorktreeDeletionSchema
+>;
 
 export const cloudAgentWorktreeDeletionStateSchema = z
   .object({
@@ -190,18 +268,23 @@ export type CanDestroyCloudAgentWorktreeSandboxResult = z.infer<
   typeof canDestroyCloudAgentWorktreeSandboxResultSchema
 >;
 
-// Message and part ids become storage and item identities, so both refuse `/`
-// and U+0000.
-function createIdSchema(prefix: string, label: string) {
-  return z
-    .string()
-    .startsWith(prefix)
-    .refine(id => !id.includes('/') && !id.includes('\u0000'), {
-      message: `${label} must not contain / or U+0000`,
-    });
-}
-export const messageIdSchema = createIdSchema('msg', 'message IDs');
-export const partIdSchema = createIdSchema('prt', 'part IDs');
+/** The boundary name for the stored message-id rule; see `storedMessageIdSchema`. */
+export const messageIdSchema = storedMessageIdSchema;
+
+/**
+ * The stem every SDK part id starts with, declared once so the schema, the
+ * message-membership rule and the Durable Object's part-row reader cannot drift
+ * apart.
+ */
+export const PART_ID_PREFIX = 'prt';
+
+// Part ids become storage and item identities, so they refuse `/` and U+0000.
+export const partIdSchema = z
+  .string()
+  .startsWith(PART_ID_PREFIX)
+  .refine(id => !id.includes('/') && !id.includes('\u0000'), {
+    message: 'part IDs must not contain / or U+0000',
+  });
 const sdkMetadataSchema = z.record(z.string(), z.unknown());
 
 export const createSessionForCloudAgentSchema = z.object({
@@ -222,7 +305,7 @@ export const createSessionForCloudAgentSchema = z.object({
    * The branch the new working branch starts from. Omitted means the default
    * branch, or the stacked parent's branch when `parentWorktreeId` is set.
    */
-  baseBranch: z.string().min(1).max(256).optional(),
+  baseBranch: z.string().min(1).max(MAX_GIT_BRANCH_LENGTH).optional(),
   /** The exact commit the working branch starts from, resolved by the web router. */
   baseSha: z
     .string()
@@ -235,7 +318,7 @@ export const createSessionForCloudAgentSchema = z.object({
   // Compatibility: old Cloud Agent workers omit gitUrl; remove after all deployed workers send it.
   gitUrl: z.string().optional(),
   /** The workspace working branch, selected before the first registration. */
-  gitBranch: z.string().min(1).max(256).optional(),
+  gitBranch: z.string().min(1).max(MAX_GIT_BRANCH_LENGTH).optional(),
   // The profile the session was prepared with, as resolved by the caller
   // (explicit pick, effective default, or repository binding). Optional and
   // nullable so a caller that predates profile recording still creates the
@@ -362,13 +445,7 @@ const sdkSnapshotFileDiffBaseSchema = z.object({
   status: z.enum(['added', 'deleted', 'modified']).optional(),
 });
 
-const sdkTokenUsageSchema = z.object({
-  total: z.number().optional(),
-  input: z.number(),
-  output: z.number(),
-  reasoning: z.number(),
-  cache: z.object({ read: z.number(), write: z.number() }),
-});
+const sdkTokenUsageSchema = tokenUsageSchema.extend({ total: z.number().optional() });
 
 export const kiloSdkSessionInfoSchema = z.object({
   id: sessionIdSchema,
@@ -580,6 +657,20 @@ export function validateCloudAgentWorkspacesCursor(cursor: string): boolean {
   return workspacesCursorCodec.validate(cursor);
 }
 
+type OpaqueCursorValidator = (cursor: string) => boolean;
+
+/** Adds `<field> is not a valid <label>` when a present cursor does not validate. */
+function refineCursor(
+  cursor: string | undefined,
+  field: string,
+  label: string,
+  validate: OpaqueCursorValidator,
+  ctx: z.RefinementCtx
+): void {
+  if (cursor === undefined || validate(cursor)) return;
+  ctx.addIssue({ code: 'custom', path: [field], message: `${field} is not a valid ${label}` });
+}
+
 export const listCloudAgentRootSessionsSchema = z
   .object({
     kiloUserId: z.string().min(1),
@@ -589,15 +680,15 @@ export const listCloudAgentRootSessionsSchema = z
     start: z.number().int().nonnegative().max(8_640_000_000_000_000).optional(),
   })
   .strict()
-  .superRefine((params, ctx) => {
-    if (params.cursor !== undefined && !validateCloudAgentRootSessionsCursor(params.cursor)) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['cursor'],
-        message: 'cursor is not a valid Cloud Agent root sessions cursor',
-      });
-    }
-  });
+  .superRefine((params, ctx) =>
+    refineCursor(
+      params.cursor,
+      'cursor',
+      'Cloud Agent root sessions cursor',
+      validateCloudAgentRootSessionsCursor,
+      ctx
+    )
+  );
 export type ListCloudAgentRootSessionsParams = z.input<typeof listCloudAgentRootSessionsSchema>;
 export type CloudAgentRootSessionSummary = {
   kiloSessionId: string;
@@ -628,15 +719,15 @@ export const listCloudAgentWorkspacesSchema = z
     repositoryUrl: z.string().min(1).max(2048).optional(),
   })
   .strict()
-  .superRefine((params, ctx) => {
-    if (params.cursor !== undefined && !validateCloudAgentWorkspacesCursor(params.cursor)) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['cursor'],
-        message: 'cursor is not a valid Cloud Agent workspaces cursor',
-      });
-    }
-  });
+  .superRefine((params, ctx) =>
+    refineCursor(
+      params.cursor,
+      'cursor',
+      'Cloud Agent workspaces cursor',
+      validateCloudAgentWorkspacesCursor,
+      ctx
+    )
+  );
 export type ListCloudAgentWorkspacesParams = z.input<typeof listCloudAgentWorkspacesSchema>;
 
 export const getCloudAgentWorkspaceSchema = z
@@ -647,18 +738,15 @@ export const getCloudAgentWorkspaceSchema = z
     sessionCursor: z.string().min(1).max(256).optional(),
   })
   .strict()
-  .superRefine((params, ctx) => {
-    if (
-      params.sessionCursor !== undefined &&
-      !validateCloudAgentRootSessionsCursor(params.sessionCursor)
-    ) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['sessionCursor'],
-        message: 'sessionCursor is not a valid Cloud Agent root sessions cursor',
-      });
-    }
-  });
+  .superRefine((params, ctx) =>
+    refineCursor(
+      params.sessionCursor,
+      'sessionCursor',
+      'Cloud Agent root sessions cursor',
+      validateCloudAgentRootSessionsCursor,
+      ctx
+    )
+  );
 export type GetCloudAgentWorkspaceParams = z.input<typeof getCloudAgentWorkspaceSchema>;
 
 export type CloudAgentWorkspaceSummary = {
@@ -781,12 +869,9 @@ export const persistedSnapshotFileDiffsSchema = z
  * are stripped (not rejected) so a newer Kilo field cannot fail the read, and
  * an unknown status degrades to "no status" instead of an invalid file.
  */
-export const sessionDiffFileSchema = z.object({
-  file: z.string(),
+export const sessionDiffFileSchema = sdkSnapshotFileDiffBaseSchema.extend({
   patch: z.string(),
-  additions: z.number(),
-  deletions: z.number(),
-  status: z.enum(['added', 'deleted', 'modified']).optional().catch(undefined),
+  status: sdkSnapshotFileDiffBaseSchema.shape.status.catch(undefined),
 });
 export type SessionDiffFile = z.infer<typeof sessionDiffFileSchema>;
 
@@ -868,7 +953,8 @@ export const kiloSdkAssistantMessageSchema = z.object({
   role: z.literal('assistant'),
   time: z.object({ created: z.number(), completed: z.number().optional() }),
   error: sdkAssistantErrorSchema.optional(),
-  parentID: messageIdSchema,
+  // The v2 display projection uses an empty parent for unparented system messages.
+  parentID: z.union([messageIdSchema, z.literal('')]),
   modelID: z.string(),
   providerID: z.string(),
   mode: z.string(),
@@ -889,14 +975,48 @@ export const kiloSdkMessageSchema = z.discriminatedUnion('role', [
 ]);
 export type KiloSdkMessageInfo = z.infer<typeof kiloSdkMessageSchema>;
 
+/**
+ * The native display part-id suffix grammar, declared once so every reader of a
+ * native part id — the full-tail check, the sliced-suffix check and the schema —
+ * cannot drift apart. A native part id is a stored message id, `_`, then this
+ * suffix: six digits, then an optional `_summary` or `_file_<n>` marker.
+ */
+const NATIVE_PART_ID_SUFFIX = '[0-9]{6}(?:_summary|_file_[0-9]+)?';
+
+/** The whole-part-id form: the message id, `_`, then the suffix. */
+const NATIVE_PART_ID_TAIL_PATTERN = new RegExp(`_${NATIVE_PART_ID_SUFFIX}$`);
+/** The suffix alone, as it appears once the message id and its `_` are sliced off. */
+const NATIVE_PART_ID_SUFFIX_PATTERN = new RegExp(`^${NATIVE_PART_ID_SUFFIX}$`);
+
+/** A native v2 display part id: a stored message id plus the display suffix. */
+export const nativePartIdSchema = storedMessageIdSchema
+  .startsWith('msg_')
+  .regex(NATIVE_PART_ID_TAIL_PATTERN);
+
+/**
+ * The two id families a stored part can carry: the SDK's own `prt` id, and the
+ * native display id that the v2 projection retains from history and live replay.
+ */
+export const sdkPartIdSchema = z.union([partIdSchema, nativePartIdSchema]);
+
 const sdkPartBaseShape = {
-  id: partIdSchema,
+  id: sdkPartIdSchema,
   /** Same stored-session rule as the stored messages. */
   sessionID: storedSessionIdSchema,
   messageID: messageIdSchema,
 };
 const sdkPartBaseSchema = z.object(sdkPartBaseShape);
 export type KiloSdkPartBase = z.infer<typeof sdkPartBaseSchema>;
+
+export function sdkPartIdMatchesMessage(part: Pick<KiloSdkPartBase, 'id' | 'messageID'>): boolean {
+  if (part.id.startsWith(PART_ID_PREFIX)) return true;
+  const prefix = `${part.messageID}_`;
+  return (
+    part.messageID.startsWith('msg_') &&
+    part.id.startsWith(prefix) &&
+    NATIVE_PART_ID_SUFFIX_PATTERN.test(part.id.slice(prefix.length))
+  );
+}
 
 /**
  * The identity a part is PERSISTED under: `id` + `messageID`, with no
@@ -909,12 +1029,17 @@ export type KiloSdkPartBase = z.infer<typeof sdkPartBaseSchema>;
  * well-formed persisted data whose body this contract's union may still not
  * understand.
  */
-const persistedSdkPartIdentitySchema = z.object({
-  id: sdkPartBaseShape.id,
-  messageID: sdkPartBaseShape.messageID,
-});
+const persistedSdkPartIdentitySchema = z
+  .object({
+    id: sdkPartIdSchema,
+    messageID: sdkPartBaseShape.messageID,
+  })
+  .refine(sdkPartIdMatchesMessage, {
+    message: 'Native display part ID must belong to its message',
+    path: ['id'],
+  });
 
-export const sdkFilePartSchema = z.object({
+const sdkFilePartObjectSchema = z.object({
   ...sdkPartBaseShape,
   type: z.literal('file'),
   mime: z.string(),
@@ -947,6 +1072,10 @@ export const sdkFilePartSchema = z.object({
     ])
     .optional(),
 });
+export const sdkFilePartSchema = sdkFilePartObjectSchema.refine(sdkPartIdMatchesMessage, {
+  message: 'Native display part ID must belong to its message',
+  path: ['id'],
+});
 export type KiloSdkFilePart = z.infer<typeof sdkFilePartSchema>;
 
 export const sdkToolStateSchema = z.discriminatedUnion('status', [
@@ -977,7 +1106,7 @@ export const sdkToolStateSchema = z.discriminatedUnion('status', [
 ]);
 export type KiloSdkToolState = z.infer<typeof sdkToolStateSchema>;
 
-export const kiloSdkPartSchema = z.discriminatedUnion('type', [
+const sdkPartVariantsSchema = z.discriminatedUnion('type', [
   z.object({
     ...sdkPartBaseShape,
     type: z.literal('text'),
@@ -1012,7 +1141,11 @@ export const kiloSdkPartSchema = z.discriminatedUnion('type', [
     state: sdkToolStateSchema,
     metadata: sdkMetadataSchema.optional(),
   }),
-  z.object({ ...sdkPartBaseShape, type: z.literal('step-start'), snapshot: z.string().optional() }),
+  z.object({
+    ...sdkPartBaseShape,
+    type: z.literal('step-start'),
+    snapshot: z.string().optional(),
+  }),
   z.object({
     ...sdkPartBaseShape,
     type: z.literal('step-finish'),
@@ -1050,6 +1183,10 @@ export const kiloSdkPartSchema = z.discriminatedUnion('type', [
     tail_start_id: messageIdSchema.optional(),
   }),
 ]);
+export const kiloSdkPartSchema = sdkPartVariantsSchema.refine(sdkPartIdMatchesMessage, {
+  message: 'Native display part ID must belong to its message',
+  path: ['id'],
+});
 export type KiloSdkPart = z.infer<typeof kiloSdkPartSchema>;
 
 export const kiloSdkStoredMessageSchema = z.object({
@@ -1157,6 +1294,20 @@ function normalizePersistedKiloSdkParts(value: unknown): {
   return { parts, omittedItemCount };
 }
 
+/**
+ * Repair the three user-message `summary` shapes so one message cannot degrade
+ * the WHOLE history page to `invalid_data` and leave the transcript blank:
+ *
+ * - no `summary`, or a `summary` that is not a record: returned unchanged.
+ *   That is invalid data the caller must not silently paper over.
+ * - a record `summary` that carries `diffs`: only the diff list is normalized,
+ *   as before.
+ * - a record `summary` without `diffs`: returned as a copy with `diffs: []`.
+ *   `kiloSdkUserMessageSchema` requires `diffs` whenever `summary` is present,
+ *   and a compaction summary is persisted without one, so the strict page
+ *   would reject every message of the page. The SDK's wire normalizer
+ *   (`cloudMessageInfoSchema`) fills the same field for the same reason.
+ */
 function normalizePersistedKiloSdkStoredMessage(value: unknown): NormalizedPersistedStoredMessage {
   if (!isRecord(value)) {
     return { message: value, omittedItemCount: 0 };
@@ -1167,7 +1318,7 @@ function normalizePersistedKiloSdkStoredMessage(value: unknown): NormalizedPersi
     return { message, omittedItemCount: normalizedParts.omittedItemCount };
   }
   const summary = value['info']['summary'];
-  if (!isRecord(summary) || !('diffs' in summary)) {
+  if (!isRecord(summary)) {
     return { message, omittedItemCount: normalizedParts.omittedItemCount };
   }
   return {
@@ -1177,7 +1328,7 @@ function normalizePersistedKiloSdkStoredMessage(value: unknown): NormalizedPersi
         ...value['info'],
         summary: {
           ...summary,
-          diffs: normalizePersistedSnapshotFileDiffs(summary['diffs']),
+          diffs: 'diffs' in summary ? normalizePersistedSnapshotFileDiffs(summary['diffs']) : [],
         },
       },
     },
@@ -1331,13 +1482,7 @@ function refineMessageCursor(
   field: 'before' | 'cursor',
   ctx: z.RefinementCtx
 ): void {
-  if (cursor === undefined) return;
-  if (validateKiloSdkMessagesCursor(cursor)) return;
-  ctx.addIssue({
-    code: 'custom',
-    path: [field],
-    message: `${field} is not a valid message cursor`,
-  });
+  refineCursor(cursor, field, 'message cursor', validateKiloSdkMessagesCursor, ctx);
 }
 
 export const getCloudAgentRootSessionMessagesSchema = resolveCloudAgentRootSessionSchema
@@ -1369,17 +1514,16 @@ export type GetCloudAgentRootSessionMessagesResult = CloudAgentRootSessionMessag
 /**
  * Generic authorized paginated history request used by `cliSessionsV2` for any
  * Kilo session (root cloud-agent, child, or remote CLI) the user owns and
- * still has organization access to. Reuses the existing opaque cursor and
- * bounded DO reader so the new method is byte-identical to
- * `getCloudAgentRootSessionMessages` aside from the access-check boundary.
+ * still has organization access to. Reuses the opaque cursor codec and the
+ * bounded DO reader of `getCloudAgentRootSessionMessages`; the two request
+ * schemas differ in their `limit` bounds and in the `kiloSessionId` shape, as
+ * the paragraphs below state.
  *
  * `limit` is bounded by `MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE` and must be
  * a positive integer; the schema applies `DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE`
  * (50) when omitted so the request is always bounded before reaching the DO.
  * Unlike the legacy `getCloudAgentRootSessionMessagesSchema`, this generic
  * endpoint is always bounded, so `limit: 0` is rejected at the schema level.
- * `before` is capped at `MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH` so an oversized
- * value never reaches the decoder.
  *
  * `kiloSessionId` takes `storedSessionIdSchema`, not `sessionIdSchema`: the
  * store still addresses sessions created before the canonical id shape was
@@ -1408,11 +1552,9 @@ export type GetSessionMessagesResult = AuthorizedSessionMessages | null;
  * worker RPC). Sharing the schema keeps tRPC-level validation identical to
  * the worker's own bounded reader.
  *
- * `limit` is bounded by `MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE` and defaults
- * to `DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE` when omitted, so the request is
- * always bounded before it reaches the session store. `cursor` is the opaque
- * continuation cursor validated by `validateKiloSdkMessagesCursor`; a caller
- * receives one from a previous page and passes it back to walk older history.
+ * `cursor` is the opaque continuation cursor validated by
+ * `validateKiloSdkMessagesCursor`; a caller receives one from a previous page
+ * and passes it back to walk older history.
  *
  * `session_id` takes `storedSessionIdSchema`, the same rule the worker reader
  * applies. The boundary accepts exactly the ids the reader addresses: bounded,
@@ -1433,7 +1575,7 @@ export type SessionIngestRpcMethods = {
     params: RecordCloudAgentSessionHarnessParams
   ) => Promise<boolean>;
   beginCloudAgentWorktreeDeletion: (
-    params: CloudAgentWorktreeDeletionParams
+    params: BeginCloudAgentWorktreeDeletionParams
   ) => Promise<CloudAgentWorktreeDeletionState>;
   retireCloudAgentWorktreeIfSoleMember: (
     params: RetireCloudAgentWorktreeIfSoleMemberParams
@@ -1453,17 +1595,10 @@ export type SessionIngestRpcMethods = {
   createSessionForCloudAgent: (
     params: CreateSessionForCloudAgentParams
   ) => Promise<CreateSessionForCloudAgentResult>;
-  setGeneratedTitleForCloudAgent: (params: {
-    sessionId: string;
-    kiloUserId: string;
-    cloudAgentSessionId: string;
-    title: string;
-  }) => Promise<{ applied: boolean }>;
-  canGenerateTitleForCloudAgent: (params: {
-    sessionId: string;
-    kiloUserId: string;
-    cloudAgentSessionId: string;
-  }) => Promise<boolean>;
+  setGeneratedTitleForCloudAgent: (
+    params: SetGeneratedTitleForCloudAgentParams
+  ) => Promise<{ applied: boolean }>;
+  canGenerateTitleForCloudAgent: (params: CanGenerateTitleForCloudAgentParams) => Promise<boolean>;
   deleteSessionForCloudAgent: (params: DeleteSessionForCloudAgentParams) => Promise<void>;
   deleteHostedWorkspaceSession: (
     params: DeleteHostedWorkspaceSessionParams

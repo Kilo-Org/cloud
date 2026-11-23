@@ -1656,6 +1656,37 @@ describe('NotificationChannelDO per-token locale translation', () => {
     expect(messages[0].body).not.toBe('XSS in admin in acme/api');
   });
 
+  it('translates a finding severity in a pt-BR token', async () => {
+    installDbMock({
+      tokens: [{ user_id: 'user-severity', token: 'tok-severity', locale: 'pt-BR' }],
+      previews: 'full',
+    });
+    const stub = getDO('user-severity');
+    await stub.dispatchPush(
+      baseInput({
+        userId: 'user-severity',
+        idempotencyKey: 'k-severity',
+        push: {
+          title: 'New security finding (high)',
+          body: 'XSS in admin in acme/api',
+          i18nKey: 'internal.securityFindingNew',
+          i18nParams: {
+            severity: 'high',
+            findingTitle: 'XSS in admin',
+            repoFullName: 'acme/api',
+          },
+          data: { type: 'security_finding', findingId: 'finding-2', scope: 'org-1' },
+          sound: 'default',
+          priority: 'high',
+        },
+      })
+    );
+
+    const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
+    expect(messages[0].title).toBe('Novo achado de segurança (Nível alto)');
+    expect(messages[0].body).toBe('XSS in admin em acme/api');
+  });
+
   it('treats a null locale as English', async () => {
     installDbMock({
       tokens: [{ user_id: 'user-null-locale', token: 'tok-null', locale: null }],
@@ -1880,6 +1911,23 @@ describe('NotificationChannelDO morning briefing', () => {
     expect(messages?.[0]?.body).not.toContain('Private report');
     expect(messages?.[0]?.body).not.toBe('Active agents have an update');
     expect(messages?.[0]?.body?.length).toBeGreaterThan(0);
+  });
+
+  it('gives an English briefing token its own generic body, not the active-agents one', async () => {
+    installDbMock({
+      ...eligibleState(),
+      tokens: [{ user_id: 'user', token: 'tok1', locale: 'en', app_version: '1.0.12' }],
+    });
+    const result = await getDO('briefing-english-copy').dispatchPush(
+      briefingInput('briefing-english-copy')
+    );
+    expect(result.kind).toBe('delivered');
+    const [messages] = vi.mocked(sendPushNotifications).mock.calls[0] ?? [];
+    expect(messages?.[0]).toMatchObject({
+      title: 'Kilo',
+      body: 'Your agent brief is ready',
+    });
+    expect(messages?.[0]?.body).not.toBe('Active agents have an update');
   });
 
   it('keeps user/date dedup across later context publications, summary attachments, and cleanup', async () => {

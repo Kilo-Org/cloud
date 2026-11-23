@@ -7,6 +7,7 @@
       "spendAlert": "Tu gasto necesita atención",
       "securityFinding": "Un hallazgo de seguridad necesita atención",
       "securityUpdate": "Un control de seguridad tiene una actualización",
+      "agentBriefing": "Tu informe del agente está listo",
       "activeAgentsGlanceable": "Los agentes activos tienen una actualización"
     }
   },
@@ -29,6 +30,12 @@
     },
     "securityFindingNew": {
       "title": "Nuevo hallazgo de seguridad ({{severity}})"
+    },
+    "securityFindingSeverity": {
+      "critical": "Nivel crítico",
+      "high": "Nivel alto",
+      "medium": "Nivel medio",
+      "low": "Nivel bajo"
     },
     "securityFindingSlaWarning": {
       "title": "Aviso de SLA"

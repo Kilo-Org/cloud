@@ -1,11 +1,14 @@
 import { useMemo, useState, useSyncExternalStore } from 'react';
 import { I18nManager, Platform } from 'react-native';
-import { EnrichedMarkdownText, type MarkdownStyle } from 'react-native-enriched-markdown';
+import {
+  type AccessibilityLabels,
+  EnrichedMarkdownText,
+  type MarkdownStyle,
+} from 'react-native-enriched-markdown';
 import { useTranslation } from 'react-i18next';
 
 import { ImageViewer } from '@/components/ui/image-viewer';
 import { TOKEN_DARK_LIGHT } from '@/lib/pr-review/diff/syntax-colors';
-import { rtlBlockTextAlign } from '@/lib/rtl-text';
 
 import {
   type MarkdownCopyCodeHandler,
@@ -42,18 +45,16 @@ const CODE_FONT = Platform.OS === 'ios' ? 'Menlo' : 'monospace';
 
 const BODY_LINE_HEIGHT = 24;
 
-function enrichedStyle(palette: MarkdownPalette, alignBlocksWithInterface: boolean): MarkdownStyle {
+function enrichedStyle(palette: MarkdownPalette): MarkdownStyle {
   const { textColor, mutedTextColor, codeBackground, borderColor } = palette;
   const half = palette.codeTokenScheme === 'onLight' ? 'light' : 'dark';
   const headings = getMarkdownHeadingStyles(palette);
   // The native renderer resolves each paragraph's direction from its first
-  // strong character, so an English reply stays at the left edge of a
-  // right-to-left interface while the Thought row and the failure block around
-  // it sit on the start edge. Naming the interface start keeps the assistant
-  // turn in one column; the run inside the line still reads left to right. A
-  // body with its own base direction passes `false` and keeps the renderer's
-  // natural alignment.
-  const blockTextAlign = rtlBlockTextAlign(alignBlocksWithInterface);
+  // strong character. That is the rule for markdown, which is always copy the
+  // app did not write: an English reply keeps its left edge and the punctuation
+  // that ends it inside a right-to-left interface, and an Arabic one still sits
+  // on the right. Naming the interface's start edge instead right-aligned the
+  // English and left the punctuation of a wrapped line at the wrong end.
   const heading = (level: keyof typeof headings) => {
     const style = headings[level];
     return {
@@ -62,7 +63,6 @@ function enrichedStyle(palette: MarkdownPalette, alignBlocksWithInterface: boole
       fontWeight: style.fontWeight,
       marginTop: style.marginTop,
       marginBottom: style.marginBottom,
-      ...blockTextAlign,
     };
   };
   return {
@@ -76,7 +76,6 @@ function enrichedStyle(palette: MarkdownPalette, alignBlocksWithInterface: boole
       lineHeight: BODY_LINE_HEIGHT,
       marginTop: 0,
       marginBottom: 4,
-      ...blockTextAlign,
     },
     h1: heading('h1'),
     h2: heading('h2'),
@@ -167,12 +166,34 @@ export function MarkdownEnriched({
 }: Readonly<MarkdownEnrichedProps>) {
   const { t } = useTranslation();
   const [viewer, setViewer] = useState<{ uri: string; filename: string } | null>(null);
-  // A document body that names its own direction keeps the renderer's natural
-  // alignment, so the English legal text stays left aligned in a right-to-left
-  // interface; chat keeps naming the interface start edge.
-  const markdownStyle = useMemo(
-    () => enrichedStyle(palette, I18nManager.isRTL && documentDirection !== 'ltr'),
-    [palette, documentDirection]
+  // Markdown is always copy the app did not write, so every block keeps the
+  // renderer's own per-paragraph direction (`enrichedStyle`).
+  const markdownStyle = useMemo(() => enrichedStyle(palette), [palette]);
+  // The renderer's own screen-reader strings (table rows, list items,
+  // blockquotes, math, and the iOS rotor) so a translation is spoken in the
+  // app language instead of the library's English default. `t` changes
+  // identity on a language switch, so this memo tracks the app language.
+  const accessibilityLabels = useMemo<AccessibilityLabels>(
+    () => ({
+      list: {
+        bulletPoint: t('common.markdownA11y.list.bulletPoint'),
+        nestedBulletPoint: t('common.markdownA11y.list.nestedBulletPoint'),
+        orderedItem: t('common.markdownA11y.list.orderedItem'),
+        nestedOrderedItem: t('common.markdownA11y.list.nestedOrderedItem'),
+      },
+      blockquote: {
+        quote: t('common.markdownA11y.blockquote.quote'),
+        nestedQuote: t('common.markdownA11y.blockquote.nestedQuote'),
+      },
+      table: { row: t('common.markdownA11y.table.row') },
+      math: { equation: t('common.markdownA11y.math.equation') },
+      rotor: {
+        headings: t('common.markdownA11y.rotor.headings'),
+        links: t('common.markdownA11y.rotor.links'),
+        images: t('common.markdownA11y.rotor.images'),
+      },
+    }),
+    [t]
   );
   const images = useMemo(() => findMarkdownImages(value), [value]);
   // One flag per image, so trusting a host or confirming a URI re-renders
@@ -209,6 +230,7 @@ export function MarkdownEnriched({
         flavor="github"
         markdown={renderedMarkdown}
         markdownStyle={markdownStyle}
+        accessibilityLabels={accessibilityLabels}
         selectable={selectable}
         // A long press on a message opens the host's message details; the
         // library's own block menu would open on top of it. Copy stays on the
@@ -233,7 +255,7 @@ export function MarkdownEnriched({
           if (isMarkdownImageDisplayable(url)) {
             setViewer({
               uri: resolveMarkdownImageSrc(url),
-              filename: markdownImageFilename(url, altText),
+              filename: markdownImageFilename(url, altText, t('common.image')),
             });
           }
         }}

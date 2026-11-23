@@ -4,6 +4,7 @@ import {
   type WorkspaceSnapshotIdentity,
 } from '../sandbox/workspace-snapshot.js';
 import { readCustomerBillingFailure } from '../../persistence/customer-billing-failure.js';
+import { sameHostedGitHubRepositories } from '../../persistence/hosted-github-repositories.js';
 import { DurableObject } from 'cloudflare:workers';
 import { DEFAULT_DO_RETRY_CONFIG, withTimeout } from '@kilocode/worker-utils';
 import { normalizeGitUrl } from '@kilocode/worker-utils';
@@ -16,27 +17,28 @@ import {
 import type { RuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization-contract';
 import { RuntimeAuthorizationSchema } from '@kilocode/worker-utils/runtime-authorization-contract';
 import {
-  authorizeCloudAgentChild,
-  authorizeCloudAgentWorkspaceSibling,
-  issueCloudAgentMcpGrant,
-  assertCloudAgentParentAuthority,
-  CLOUD_AGENT_PARENT_AUTHORITY_DENIED,
-  type WorkspaceMcpBinding,
+  isWorkspaceAnchorMetadata,
+  workspaceSessionIdForMetadata,
+  type WorkspaceAuthoritySeed,
 } from '../../cloud-agent-authority.js';
-import {
-  CloudAgentAuthoritySchema,
-  type CloudAgentAuthority,
-} from '@kilocode/worker-utils/cloud-agent-authority';
+import { getWorkspaceStub } from '../workspace/workspace-stub.js';
 import { sessionCallbackContext } from './callback-context.js';
-import { createSessionListStatusOutbox, deriveSessionListStatus } from './list-status.js';
+import {
+  createSessionListStatusOutbox,
+  deriveSessionListStatus,
+  nativeSessionTitle,
+  TRANSCRIPT_EVENT_TYPES,
+} from './list-status.js';
+import { createNativeLiveSummary, type NativeLiveSummary } from './native-live-summary.js';
 import { createRuntimeHarnessRecorder } from './runtime-harness-record.js';
+import { readConversationSource } from './conversation-history.js';
 import {
   cloudAgentWorktreeIdSchema,
   cloudAgentWorktreeLocationSchema,
   type CloudAgentChildSessionLineage,
   type CloudAgentWorktreeLocation,
 } from '@kilocode/session-ingest-contracts';
-import { asc, eq, gt } from 'drizzle-orm';
+import { asc } from 'drizzle-orm';
 import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import { z } from 'zod';
@@ -70,7 +72,6 @@ import {
 import { sessionRuntimeLocator } from '../../sandbox-control/worktree-ownership.js';
 import { logRuntimeAuthorizationDiagnostic } from '../../session/runtime-authorization-diagnostics.js';
 import { applyControlPlanePreparingEvent } from '../../sandbox-session/control-plane-preparing.js';
-import { getSandboxSessionStub } from '../../sandbox-session/session-stub.js';
 import {
   applyPendingInteractionEvent,
   pendingInteractionsSchema,
@@ -79,10 +80,7 @@ import {
 import { handleCommandsAvailable } from '../../session/ingest-handlers/commands-available.js';
 import { createMessageId } from '../../session/message-id.js';
 import { generateSessionTitle } from '../../session/generate-session-title.js';
-import type {
-  SafeMessageResultResponse,
-  MessageResultRPCResponse,
-} from '../../session/message-result.js';
+import type { MessageResultRPCResponse } from '../../session/message-result.js';
 import { createSessionEventQueries, type SessionEventQueries } from './event-queries.js';
 import { createPreparationProgressRecorder } from '../../session/preparation-progress.js';
 import { isControlSession, sessionIdFromDoName } from '../../session-identity.js';
@@ -90,6 +88,7 @@ import {
   finalizePreparationAttempt,
   getPreparationSnapshots,
   listPreparationAttempts,
+  readLatestPreparationAttemptForMessage,
   readPreparationAttempt,
   readPreparationSteps,
   type PreparationOutcome,
@@ -103,6 +102,7 @@ import type {
 import {
   CONTROL_PLANE_SETUP_EVENTS,
   CONTROL_PLANE_WRAPPER_FINALIZING_EVENT,
+  controlPlaneAdmitAnswerPayloadSchema,
   controlPlaneAnswerPayloadSchema,
   controlPlaneCredentialSourceSchema,
   controlPlaneEventsNotificationSchema,
@@ -116,8 +116,11 @@ import {
   controlPlaneWorkspaceStoppedPayloadSchema,
   type ControlPlaneAnswerPayload,
   type ControlPlaneAnswerReply,
+  type ControlPlaneAnswerResult,
+  type ControlPlaneAdmitAnswerPayload,
   type ControlPlaneCancelWorkspacePayload,
   type ControlPlaneCancelWorkspaceResult,
+  type ControlPlaneContinuationAdmissionResult,
   type ControlPlaneControlResult,
   type ControlPlaneDeliverPayload,
   type ControlPlaneDeliverResult,
@@ -139,6 +142,7 @@ import {
   type ControlPlaneWorktreeCaptureInput,
   type ControlPlaneWorkspaceStoppedPayload,
 } from '../../shared/control-plane-protocol.js';
+import { projectStoredRouteSpec } from '../../shared/runtime-profile.js';
 import {
   worktreeBranchOperationResultSchema,
   type ControlPlaneWorktreeGitInput,
@@ -186,6 +190,7 @@ import {
   oldestOpenMessage,
   openMessages,
   queueMessage,
+  queuedBoundReached,
   renderQueuedMessageContent,
   settleAcceptedUpTo,
   settleMessages,
@@ -193,8 +198,21 @@ import {
   type SessionMessage,
   type SessionMessageState,
 } from './messages.js';
-import { answerMessageIntent } from './answers.js';
+import {
+  admittedPayload,
+  answerMessageIntent,
+  answerPromptText,
+  sameContinuationIntent,
+} from './answers.js';
 import { messageFailureText } from './failure-messages.js';
+import { projectMessageResult } from './message-result-projection.js';
+import {
+  parseMessageSettlement,
+  serializeMessageSettlement,
+  withMessageSettlements,
+  type MessageSettlement,
+} from './message-settlement.js';
+import { setupCommandLabel } from './setup-command-label.js';
 import {
   createControlPlaneWorktreeChanges,
   type ControlPlaneWorktreeChanges,
@@ -224,7 +242,7 @@ import {
   reportAnchorForQueue,
   type ControlPlaneReportFacts,
 } from './reports.js';
-import { createMessageCallbacks, type MessageCallbacks } from './callbacks.js';
+import { createMessageCallbacks, lastSeenBranch, type MessageCallbacks } from './callbacks.js';
 import {
   createReportOutbox,
   readReportAnchor,
@@ -243,8 +261,10 @@ import type {
 import {
   cloudAgentChildSessions,
   controlPlaneMessages,
+  costBackfillState,
   events,
   historyImport,
+  sessionCostTotals,
 } from './sqlite-schema.js';
 import {
   decodeSessionHistoryCursor,
@@ -360,12 +380,6 @@ const SETUP_COMMAND_PHASE_TITLES: Record<SetupCommandKind, string> = {
   session_setup: 'Running session setup',
   start: 'Running start commands',
 };
-const SETUP_COMMAND_LABELS: Record<SetupCommandKind, string> = {
-  build: 'Build command',
-  session_setup: 'Session setup command',
-  start: 'Start command',
-};
-
 function nonEmptyString(value: unknown): string | undefined {
   return typeof value === 'string' && value.length > 0 ? value : undefined;
 }
@@ -376,17 +390,6 @@ function setupCommandPhase(kind: SetupCommandKind | undefined): string {
 
 function setupCommandPhaseTitle(kind: SetupCommandKind | undefined): string {
   return kind === undefined ? 'Running setup commands' : SETUP_COMMAND_PHASE_TITLES[kind];
-}
-
-function setupCommandLabel(
-  kind: SetupCommandKind | undefined,
-  command: number,
-  commandText: string | undefined
-): string {
-  const name = kind === undefined ? 'Setup command' : SETUP_COMMAND_LABELS[kind];
-  return commandText === undefined
-    ? `${name} ${command}`
-    : `${name} ${command} · \`${commandText}\``;
 }
 
 /** Public `PreparingStep` for a control-plane route preparation step (spec §10). */
@@ -464,6 +467,18 @@ export const controlPlaneSessionRegistrationSchema = z
   .strict();
 export type ControlPlaneSessionRegistration = z.infer<typeof controlPlaneSessionRegistrationSchema>;
 
+/**
+ * A registration read back from storage carries the runtime skills written
+ * under an earlier path rule and runtime agents whose slug the CLI owns; it
+ * keeps the entries the current rules accept so the session still loads its
+ * identity and spec. The registration that arrives from the Worker is parsed
+ * with the strict schema above.
+ */
+const storedControlPlaneSessionRegistrationSchema = z.preprocess(raw => {
+  if (typeof raw !== 'object' || raw === null || !('spec' in raw)) return raw;
+  return { ...raw, spec: projectStoredRouteSpec(raw.spec) };
+}, controlPlaneSessionRegistrationSchema);
+
 function statusWorkspaceIdentity(registration: ControlPlaneSessionRegistration | null) {
   return registration === null
     ? null
@@ -474,31 +489,7 @@ function statusWorkspaceIdentity(registration: ControlPlaneSessionRegistration |
       );
 }
 
-const cloudAgentChildSessionIdSchema = z.templateLiteral(['workspace_', z.uuid()]);
-
-const cloudAgentChildSessionRegistrationSchema = z
-  .object({
-    cloudAgentSessionId: cloudAgentChildSessionIdSchema,
-    initialMessageId: z.string().min(1).max(200).optional(),
-    worktreeId: cloudAgentWorktreeIdSchema.optional(),
-  })
-  .strict();
-
-const cloudAgentChildSessionListSchema = z
-  .object({
-    limit: z.number().int().min(1).max(50),
-    cursor: z.uuid().optional(),
-  })
-  .strict();
-
-export type CloudAgentChildSessionPage = {
-  sessions: Array<{
-    cloudAgentSessionId: string;
-    initialMessageId?: string;
-    worktreeId?: string;
-  }>;
-  nextCursor?: string;
-};
+const LEGACY_CHILD_REGISTRY_EXPORT_LIMIT = 1_000;
 
 export type ControlPlaneSendResult =
   | { type: 'ok' }
@@ -572,7 +563,7 @@ export type ControlPlaneSandboxPeer = SharedWorktreeChangesPeer & {
   cancelWorkspace(
     payload: ControlPlaneCancelWorkspacePayload
   ): Promise<ControlPlaneCancelWorkspaceResult>;
-  answer(payload: ControlPlaneAnswerPayload): Promise<ControlPlaneDispatchResult>;
+  answer(payload: ControlPlaneAnswerPayload): Promise<ControlPlaneAnswerResult>;
   release(payload: ControlPlaneReleasePayload): Promise<void>;
   /** H4: the Sandbox DO returns the connected allocation fence for a bound handle. */
   getRuntimeCredentialProxyFence(input: {
@@ -581,12 +572,17 @@ export type ControlPlaneSandboxPeer = SharedWorktreeChangesPeer & {
     kiloSessionId: string;
     directory: string;
     handle: string;
+    /** The platform-added sandbox egress proof, when the request carried one. */
+    originProof?: string;
   }): Promise<ControlRuntimeCredentialProxyFenceScope | null>;
   /**
    * Asks the Sandbox DO to serve the handle on behalf of a surviving member of
    * the scope when this Session DO cannot resolve it locally.
    */
-  resolveScopeHandle(input: { handle: string }): Promise<ScopeHandleResolution>;
+  resolveScopeHandle(input: {
+    handle: string;
+    originProof?: string;
+  }): Promise<ScopeHandleResolution>;
   /** The locator a wiped issuer uses to keep resolving through a survivor. */
   getAcceptedHandleIssuerLocator(issuerSessionId: string): Promise<{
     scopeId: string;
@@ -688,6 +684,7 @@ function rowToMessage(row: SessionMessageRow): SessionMessage {
       ? {}
       : { billingFailure: readCustomerBillingFailure(row.billing_failure) }),
     ...(container === undefined ? {} : { container }),
+    settlement: parseMessageSettlement(row.settlement),
   };
 }
 
@@ -703,6 +700,7 @@ function messageToRow(message: SessionMessage): SessionMessageRow {
     billing_failure:
       message.billingFailure === undefined ? null : JSON.stringify(message.billingFailure),
     container: message.container === undefined ? null : JSON.stringify(message.container),
+    settlement: serializeMessageSettlement(message.settlement),
   };
 }
 
@@ -806,10 +804,19 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   private pendingInteractions: PendingInteractions | undefined;
   private availableCommands: CommandsAvailableData = { commands: [] };
   private rootStatus: RootStatus | undefined;
+  /**
+   * Latest transcript write, for the list row's activity time. Memory only:
+   * the list status snapshot keeps the last published value across eviction.
+   */
+  private transcriptActivityAt: number | undefined;
+  /** A Kilo v2 rename of the root not yet handed to the list status outbox. */
+  private pendingRootRename: string | undefined;
   private readonly historyHydrations = new Map<string, Promise<void>>();
   /** Report obligations for terminal messages (plan B5); repair is best effort. */
   private readonly reportOutbox: ReportOutbox;
   private readonly listStatusOutbox: ReturnType<typeof createSessionListStatusOutbox>;
+  /** The Kilo v2 root's session card summary, published with the list status. */
+  private readonly nativeLiveSummary: NativeLiveSummary;
   private readonly runtimeHarnessRecorder: ReturnType<typeof createRuntimeHarnessRecorder>;
   /** Terminal callback outbox (plan B5); one job per drained batch. */
   private readonly messageCallbacks: MessageCallbacks;
@@ -860,6 +867,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       storage: ctx.storage,
       publish: update => this.env.SESSION_INGEST.publishCloudAgentSessionStatus(update),
     });
+    this.nativeLiveSummary = createNativeLiveSummary(ctx.storage);
     this.runtimeHarnessRecorder = createRuntimeHarnessRecorder({
       storage: ctx.storage,
       record: params => this.env.SESSION_INGEST.recordCloudAgentSessionHarness(params),
@@ -1255,7 +1263,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     }
     await migrate(this.db, migrations);
     const raw = await this.ctx.storage.get<unknown>(REGISTRATION_KEY);
-    const parsed = controlPlaneSessionRegistrationSchema.safeParse(raw);
+    const parsed = storedControlPlaneSessionRegistrationSchema.safeParse(raw);
     this.registration = parsed.success ? parsed.data : null;
     const rawMetadata = await this.ctx.storage.get<unknown>(SESSION_METADATA_KEY);
     if (rawMetadata === undefined) {
@@ -1463,174 +1471,39 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     });
   }
 
-  async assertCloudAgentManagementAuthority(authority: unknown): Promise<void> {
+  /**
+   * The one-time adoption source for this chat's workspace authority: the
+   * stored runtime authorization and the legacy child registry, only when this
+   * chat created its workspace and may launch children. The workspace Durable
+   * Object owns both after adoption.
+   */
+  async exportWorkspaceAuthoritySeed(): Promise<WorkspaceAuthoritySeed | null> {
     await this.initialized;
-    const scope = CloudAgentAuthoritySchema.safeParse(authority);
-    const authorization = RuntimeAuthorizationSchema.safeParse(
-      await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
-    );
-    if (!scope.success || !authorization.success) {
-      throw new Error(CLOUD_AGENT_PARENT_AUTHORITY_DENIED);
+    const metadata = this.metadata;
+    if (metadata?.allowSubagentSessions !== true || !isWorkspaceAnchorMetadata(metadata)) {
+      return null;
     }
-    assertCloudAgentParentAuthority(this.metadata, authorization.data, scope.data);
-  }
-
-  async recordCloudAgentChildSession(input: unknown): Promise<{ success: true }> {
-    await this.initialized;
-    const child = cloudAgentChildSessionRegistrationSchema.parse(input);
-    if (this.metadata?.allowSubagentSessions !== true) {
-      throw new Error('Cloud Agent child registry denied');
-    }
-    if (child.cloudAgentSessionId === this.sessionId) {
-      throw new Error('Cloud Agent child registry requires another session');
-    }
-    this.db
-      .insert(cloudAgentChildSessions)
-      .values({
-        child_session_id: child.cloudAgentSessionId,
-        initial_message_id: child.initialMessageId ?? null,
-        worktree_id: child.worktreeId ?? null,
-        created_at: Date.now(),
-      })
-      .onConflictDoNothing()
-      .run();
-    return { success: true };
-  }
-
-  async forgetCloudAgentChildSession(input: unknown): Promise<{ success: true }> {
-    await this.initialized;
-    const childSessionId = cloudAgentChildSessionIdSchema.parse(input);
-    this.db
-      .delete(cloudAgentChildSessions)
-      .where(eq(cloudAgentChildSessions.child_session_id, childSessionId))
-      .run();
-    return { success: true };
-  }
-
-  async listCloudAgentChildSessions(input: unknown): Promise<CloudAgentChildSessionPage> {
-    await this.initialized;
-    const page = cloudAgentChildSessionListSchema.parse(input);
-    const cursorSessionId = page.cursor === undefined ? undefined : `workspace_${page.cursor}`;
-    const rows = this.db
+    const authorization = await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY);
+    if (authorization === undefined) return null;
+    const children = this.db
       .select({
         cloudAgentSessionId: cloudAgentChildSessions.child_session_id,
         initialMessageId: cloudAgentChildSessions.initial_message_id,
         worktreeId: cloudAgentChildSessions.worktree_id,
       })
       .from(cloudAgentChildSessions)
-      .where(
-        cursorSessionId === undefined
-          ? undefined
-          : gt(cloudAgentChildSessions.child_session_id, cursorSessionId)
-      )
       .orderBy(asc(cloudAgentChildSessions.child_session_id))
-      .limit(page.limit + 1)
+      .limit(LEGACY_CHILD_REGISTRY_EXPORT_LIMIT)
       .all();
-    const visible = rows.slice(0, page.limit);
-    const last = visible.at(-1);
-    const nextCursor =
-      rows.length > page.limit && last !== undefined
-        ? last.cloudAgentSessionId.slice('workspace_'.length)
-        : undefined;
     return {
-      sessions: visible.map(row => ({
+      metadata,
+      authorization,
+      children: children.map(row => ({
         cloudAgentSessionId: row.cloudAgentSessionId,
         ...(row.initialMessageId === null ? {} : { initialMessageId: row.initialMessageId }),
         ...(row.worktreeId === null ? {} : { worktreeId: row.worktreeId }),
       })),
-      ...(nextCursor === undefined ? {} : { nextCursor }),
     };
-  }
-
-  async getCloudAgentSpawnRuntimeToken(authority: CloudAgentAuthority): Promise<string> {
-    return (await this.getCloudAgentSpawnContext(authority)).token;
-  }
-
-  async getCloudAgentSpawnContext(
-    authority: CloudAgentAuthority
-  ): Promise<{ token: string; createdOnPlatform: string | undefined }> {
-    await this.initialized;
-    const scope = CloudAgentAuthoritySchema.safeParse(authority);
-    const authorization = RuntimeAuthorizationSchema.safeParse(
-      await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
-    );
-    if (!scope.success || !authorization.success) {
-      throw new Error(CLOUD_AGENT_PARENT_AUTHORITY_DENIED);
-    }
-    assertCloudAgentParentAuthority(this.metadata, authorization.data, scope.data);
-    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
-    if (!secret) throw new Error('Authentication unavailable');
-    const issued = await renewRuntimeAuthorization({
-      authorization: authorization.data,
-      secret,
-      connectionString: this.env.HYPERDRIVE.connectionString,
-    }).catch(error => {
-      if (
-        error instanceof RuntimeAuthorizationRevokedError ||
-        error instanceof RuntimeAuthorizationExpiredError
-      ) {
-        throw new Error(CLOUD_AGENT_PARENT_AUTHORITY_DENIED);
-      }
-      throw error;
-    });
-    const current = RuntimeAuthorizationSchema.safeParse(
-      await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
-    );
-    if (!current.success) throw new Error(CLOUD_AGENT_PARENT_AUTHORITY_DENIED);
-    assertCloudAgentParentAuthority(this.metadata, current.data, scope.data);
-    return {
-      token: issued.token,
-      createdOnPlatform: this.metadata?.identity.createdOnPlatform,
-    };
-  }
-
-  async authorizeCloudAgentChild(input: {
-    authority: CloudAgentAuthority;
-    childSessionId: string;
-  }): Promise<{ token: string; seal: string }> {
-    await this.initialized;
-    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
-    if (!secret) throw new Error('Authentication unavailable');
-    return authorizeCloudAgentChild({
-      ...input,
-      secret,
-      connectionString: this.env.HYPERDRIVE.connectionString,
-      metadata: () => this.getMetadata(),
-      authorization: () => this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY),
-    });
-  }
-
-  async authorizeCloudAgentWorkspaceSibling(input: {
-    siblingSessionId: string;
-  }): Promise<{ token: string; seal: string }> {
-    await this.initialized;
-    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
-    if (!secret) throw new Error('Authentication unavailable');
-    return authorizeCloudAgentWorkspaceSibling({
-      parentSessionId: this.metadata?.identity.sessionId ?? '',
-      siblingSessionId: input.siblingSessionId,
-      secret,
-      connectionString: this.env.HYPERDRIVE.connectionString,
-      metadata: () => this.getMetadata(),
-      authorization: () => this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY),
-    });
-  }
-
-  async issueCloudAgentMcpGrant(
-    workspace?: WorkspaceMcpBinding
-  ): Promise<{ url: string; token: string; expiresAt: number } | undefined> {
-    await this.initialized;
-    if (this.metadata?.allowSubagentSessions !== true) return undefined;
-    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
-    if (!secret) throw new Error('Authentication unavailable');
-    return issueCloudAgentMcpGrant({
-      workspace,
-      secret,
-      connectionString: this.env.HYPERDRIVE.connectionString,
-      metadata: () => this.getMetadata(),
-      authorization: () => this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY),
-      mcpUrl: this.env.CLOUD_AGENT_MCP_URL_OVERRIDE,
-    });
   }
 
   /**
@@ -1667,7 +1540,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
    * proxy endpoint. The handle is minted and bound by the Sandbox DO when it
    * sends `session.prepare` on a connected socket (R1).
    */
-  async resolveRuntimeCredentialProxyGrant(handle: string): Promise<{
+  async resolveRuntimeCredentialProxyGrant(
+    handle: string,
+    originProof?: string
+  ): Promise<{
     token: string;
     organizationId?: string;
     runtimeAuthorization: { userId: string; authorizationId: string; resourceId: string };
@@ -1707,6 +1583,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
               kiloSessionId,
               directory,
               handle,
+              originProof,
             },
             correlation: { sessionId: metadata.identity.sessionId, kiloSessionId, sandboxId },
           });
@@ -1717,13 +1594,12 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       });
     } catch (error) {
       const fenceOutcome = classifyRuntimeProxyFenceError(error);
-      // A stale accepted handle is a 401 denial; never serve the scope view or
-      // fall back. A fence transport failure rethrows the retryable 503.
+      // A stale accepted handle denies. A fence transport failure, and every
+      // other outcome, rethrows so the facade answers its retryable 503.
       if (fenceOutcome === 'deny') return null;
       if (fenceOutcome === 'retry') throw error;
-      // A revoked/expired authorization threw. Fall through to scope resolution
-      // so a surviving member can still serve; if none can, the original outcome
-      // (a 503) is preserved below.
+      // A revoked or expired local runtime authorization is the one outcome
+      // that scope resolution serves, through a surviving member.
       localError = error;
     }
     if (local)
@@ -1734,7 +1610,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       if (localError !== null) throw localError;
       return null;
     }
-    const fromScope = await this.resolveRuntimeCredentialProxyGrantFromScope(handle);
+    const fromScope = await this.resolveRuntimeCredentialProxyGrantFromScope(handle, originProof);
     if (fromScope) return fromScope;
     if (localError !== null) throw localError;
     return null;
@@ -1754,7 +1630,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
    * any failure to reach a decision within the total bound throws so the facade
    * returns its existing retryable 503 `Credential unavailable`.
    */
-  private async resolveRuntimeCredentialProxyGrantFromScope(handle: string): Promise<{
+  private async resolveRuntimeCredentialProxyGrantFromScope(
+    handle: string,
+    originProof: string | undefined
+  ): Promise<{
     token: string;
     organizationId?: string;
     runtimeAuthorization: { userId: string; authorizationId: string; resourceId: string };
@@ -1767,7 +1646,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       outcome = await withTimeout(
         withDORetry(
           () => this.scopeResolutionPeer() ?? peer,
-          current => current.resolveScopeHandle({ handle }),
+          current => current.resolveScopeHandle({ handle, originProof }),
           'resolveScopeHandle'
         ),
         this.sessionTimers().scopeResolutionMs,
@@ -1959,6 +1838,12 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       (existing.allowSubagentSessions ?? false) === (metadata.allowSubagentSessions ?? false) &&
       existing.parentCloudAgentSessionId === metadata.parentCloudAgentSessionId &&
       sameRepository(existing.repository, metadata.repository) &&
+      sameHostedGitHubRepositories(
+        existing.hostedGitHubRepositories,
+        metadata.hostedGitHubRepositories
+      ) &&
+      (existing.hostedGitHubRepositories === undefined ||
+        existing.workspace?.generatedBranchName === metadata.workspace?.generatedBranchName) &&
       sameSandboxProviderBinding(
         getSandboxProviderBinding(existing),
         getSandboxProviderBinding(metadata)
@@ -2255,7 +2140,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     });
   }
 
-  async answer(payload: ControlPlaneAnswerPayload): Promise<ControlPlaneDispatchResult> {
+  async answer(payload: ControlPlaneAnswerPayload): Promise<ControlPlaneAnswerResult> {
     await this.initialized;
     if (this.registration === null) return 'not_connected';
     const parsed = controlPlaneAnswerPayloadSchema.parse(payload);
@@ -2265,21 +2150,25 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       // A live turn takes the answer directly (spec §5). The route is named by
       // this DO, never by the caller, so a wrong id cannot reach a sibling.
       if (this.messages.some(message => message.state === 'accepted')) {
-        const peer = this.sandboxPeer();
-        if (peer === null) return 'not_connected';
-        let result: ControlPlaneDispatchResult;
-        try {
-          result = await peer.answer({ sessionId: this.sessionId, reply: parsed.reply });
-        } catch {
-          return 'not_connected';
-        }
-        if (result === 'sent') await this.resolvePendingInteraction(parsed.reply);
-        return result;
+        const forwarded = await this.forwardToLiveTurn(parsed.reply);
+        if (forwarded === 'sent') return 'sent';
+        // The forward resolves the interaction only when it succeeds, so a
+        // refusal while the interaction still waits is retryable, exactly as
+        // `admitAnswerContinuation` reports it.
+        return this.hasPendingInteraction(target.collection, target.id) ? 'retry' : 'not_connected';
       }
-      // The asking turn already settled: the answer becomes a new message that
-      // continues the chat (spec §5), admitted through the send path. Only a
-      // question/permission this session still waits on may do so, so a retry,
-      // an unknown id or an already-answered one cannot admit another turn.
+      // The asking turn already settled: the answer would become a new message
+      // that continues the chat (spec §5). A new message costs a turn, so this
+      // call only builds the intent; the Worker runs the same balance and model
+      // preflight every prompt mutation runs, then admits it through
+      // `admitAnswerContinuation`. Only a question/permission this session still
+      // waits on may do so, so a retry, an unknown id or an already-answered one
+      // cannot admit another turn.
+      //
+      // A reply with no text is its own result. It queues nothing, so capacity
+      // cannot be the cause, and the interaction still waits, so it is not the
+      // terminal refusal. The user can send a different reply instead.
+      if (answerPromptText(parsed.reply) === null) return 'invalid';
       const intent = answerMessageIntent(
         this.messages,
         parsed.reply,
@@ -2287,11 +2176,136 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         this.metadata?.agent?.model
       );
       if (intent === null) return 'not_connected';
-      const admitted = await this.admitMessage(intent);
-      if (admitted === 'queue-full') return 'not_connected';
+      // A session that cannot queue the new turn refuses it for capacity here,
+      // before the caller reads the payer balance, so the retryable capacity
+      // error is what the user sees rather than a payment error.
+      if (queuedBoundReached(this.messages)) return { result: 'queue-full' };
+      return { result: 'continuation', intent };
+    });
+  }
+
+  /**
+   * Admits the continuation a settled answer preflighted. The caller returns the
+   * exact intent `answer` produced; this call rebuilds it from the session's
+   * current state and refuses when the two differ, so the admitted turn is always
+   * the one that passed the preflight.
+   *
+   * The admitting call resolves its interaction, so a message that already exists
+   * for this id proves that interaction was resolved. When the reply still names
+   * a pending interaction of the same kind, that is a different interaction whose
+   * rendered text happens to match, and the replay is refused rather than
+   * resolving it. A live turn that appeared after the preflight takes the reply
+   * through the wrapper, exactly like a live answer. A queue that filled after
+   * the preflight refuses the continuation for capacity and keeps the
+   * interaction pending.
+   *
+   * A refusal only proves the reply is dead when the session no longer waits on
+   * the interaction or the caller's own reply disagrees with the intent it sent;
+   * a session that merely moved on (newer last turn, or a live forward that
+   * nothing took) reports `retry`, because the same reply is still admissible
+   * once the session settles again.
+   */
+  async admitAnswerContinuation(
+    payload: ControlPlaneAdmitAnswerPayload
+  ): Promise<ControlPlaneContinuationAdmissionResult> {
+    await this.initialized;
+    if (this.registration === null) return 'not_connected';
+    const parsed = controlPlaneAdmitAnswerPayloadSchema.parse(payload);
+    return this.enqueue(async () => {
+      const target = pendingInteractionTarget(parsed.reply);
+      const pending = this.hasPendingInteraction(target.collection, target.id);
+      const existing = this.messages.find(message => message.messageId === parsed.intent.messageId);
+      if (existing !== undefined) {
+        if (!sameContinuationIntent(existing.intent, parsed.intent)) return 'not_connected';
+        return pending ? 'not_connected' : 'sent';
+      }
+      if (!pending) return 'not_connected';
+      const rebuilt = answerMessageIntent(
+        this.messages,
+        parsed.reply,
+        parsed.intent.messageId,
+        this.metadata?.agent?.model
+      );
+      if (rebuilt === null) return 'not_connected';
+      if (!sameContinuationIntent(rebuilt, parsed.intent)) {
+        // The session's last turn changed since `answer` built this intent (a
+        // prompt with a different model queued from another tab, a newer
+        // finalization). When the caller's reply still renders the text it
+        // preflighted, the caller is consistent and only the session moved on:
+        // the interaction is still pending, so the same reply can be admitted
+        // once the session settles again instead of reading as gone.
+        return answerPromptText(parsed.reply) === parsed.intent.turn.prompt
+          ? 'retry'
+          : 'not_connected';
+      }
+      if (this.messages.some(message => message.state === 'accepted')) {
+        const forwarded = await this.forwardToLiveTurn(parsed.reply);
+        if (forwarded !== 'not_connected') return forwarded;
+        // The live turn did not take the reply, but the interaction is still
+        // pending, so this refusal is retryable rather than terminal. A forward
+        // that resolved the interaction reports `sent` above.
+        return this.hasPendingInteraction(target.collection, target.id) ? 'retry' : 'not_connected';
+      }
+      // Same callback context `send` injects, so a subagent the continuation
+      // spawns can route its completion back to this chat.
+      const admitted = await this.admitMessage(
+        await this.withSessionCallbackContext(admittedPayload(parsed.intent))
+      );
+      if (admitted === 'queue-full') return 'queue-full';
       await this.resolvePendingInteraction(parsed.reply);
       return 'sent';
     });
+  }
+
+  /**
+   * Hands a reply to the live turn that now owns it (spec §5). It only reports
+   * whether the route took the reply; the caller decides whether a failure is
+   * retryable, because the caller knows the interaction it named.
+   *
+   * A refusal is reported as retryable, so a reply that can never be delivered
+   * would otherwise show up only as repeated client retries. Each failure is
+   * logged once here, with the interaction it named and the cause; the reply
+   * text is never logged.
+   */
+  private async forwardToLiveTurn(
+    reply: ControlPlaneAnswerReply
+  ): Promise<'sent' | 'not_connected'> {
+    const target = pendingInteractionTarget(reply);
+    const logRefusal = (reason: 'no_peer' | 'rpc_failed' | 'refused', error?: unknown) => {
+      logger
+        .withFields({
+          sessionId: this.sessionId,
+          interaction: `${target.collection}:${target.id}`,
+          forwardReason: reason,
+          ...(error === undefined
+            ? {}
+            : {
+                errorName: error instanceof Error ? error.name : typeof error,
+                error: errorMessage(error),
+              }),
+        })
+        .warn('Live answer forward was not taken');
+    };
+    const peer = this.sandboxPeer();
+    if (peer === null) {
+      logRefusal('no_peer');
+      return 'not_connected';
+    }
+    let result: ControlPlaneAnswerResult;
+    try {
+      result = await peer.answer({ sessionId: this.sessionId, reply });
+    } catch (error) {
+      logRefusal('rpc_failed', error);
+      return 'not_connected';
+    }
+    // The Sandbox DO only answers a live turn, so it cannot report capacity or
+    // build a continuation.
+    if (result !== 'sent') {
+      logRefusal('refused');
+      return 'not_connected';
+    }
+    await this.resolvePendingInteraction(reply);
+    return 'sent';
   }
 
   /**
@@ -2595,10 +2609,18 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         }
         const next = applyPendingInteractionEvent(this.pendingInteractions, event);
         if (next !== undefined && next !== this.pendingInteractions) {
+          const questionId = event.properties.id;
+          const notify =
+            event.type === 'question.asked' &&
+            typeof questionId === 'string' &&
+            !this.hasPendingInteraction('questions', questionId) &&
+            this.messageCallbacks.persistQuestionCallback(event.properties);
           this.pendingInteractions = next;
           await this.ctx.storage.put(PENDING_INTERACTIONS_KEY, next);
+          if (notify) await this.armAlarm();
         }
         await this.recordRootStatus(event);
+        const rootRename = this.nativeRootRename(event);
         // A retried batch can be partially applied; commit its receipt with the row mutation.
         const stored = this.partText.transaction(() =>
           this.ctx.storage.transactionSync(() => {
@@ -2608,10 +2630,15 @@ export class SandboxSessionV2 extends DurableObject<Env> {
               queries: this.eventQueries,
               partText: this.partText,
             });
+            if (persisted !== null && persisted.id !== 0 && this.registration !== null)
+              this.nativeLiveSummary.observe(event, this.registration.spec.kiloSessionId);
             if (receiptKey !== undefined) this.ctx.storage.kv.put(receiptKey, index + 1);
             return persisted;
           })
         );
+        if (stored !== null && stored.id !== 0 && TRANSCRIPT_EVENT_TYPES.has(event.type))
+          this.transcriptActivityAt = Date.now();
+        if (rootRename !== undefined) this.pendingRootRename = rootRename;
         if (stored !== null) this.broadcast(stored);
         if (event.type === 'session.created' && this.registration !== null) {
           const info = z
@@ -2784,14 +2811,32 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         // Registration alone is not a transition. Native work may start without
         // a Cloud message, so do not gate those updates on message admission.
         if (this.messages.length > 0 || nativeStatus !== undefined || status !== 'idle') {
+          const liveSummary = this.nativeLiveSummary.settled(status);
           this.listStatusOutbox.record(
             {
               sessionId: this.registration.spec.kiloSessionId,
               kiloUserId: this.metadata.identity.userId,
               cloudAgentSessionId: this.sessionId,
             },
-            status
+            status,
+            Date.now(),
+            {
+              activityAt: this.transcriptActivityAt,
+              title: this.pendingRootRename,
+              // Kilo v1 reports its summary and cost through its own ingest client.
+              transcript:
+                liveSummary === undefined
+                  ? undefined
+                  : {
+                      liveSummary,
+                      totalCostMicrodollars: this.eventQueries.getTotalCostMicrodollars(
+                        this.sessionId,
+                        this.registration.spec.kiloSessionId
+                      ),
+                    },
+            }
           );
+          this.pendingRootRename = undefined;
         }
         statusDueAt = this.listStatusOutbox.nextDueAt();
       }
@@ -2893,6 +2938,20 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       ),
       ...(info.success && info.data.title !== undefined ? { title: info.data.title } : {}),
     };
+  }
+
+  async getSessionHistorySource(expectedRootKiloSessionId: string): Promise<'v1' | 'v2' | null> {
+    await this.initialized;
+    const rootKiloSessionId = this.registration?.spec.kiloSessionId;
+    if (rootKiloSessionId !== undefined && rootKiloSessionId !== expectedRootKiloSessionId)
+      return null;
+    // Legacy ingest history remains readable without a DO registration; the facade resolves ownership first.
+    return (
+      readConversationSource({
+        queries: this.eventQueries,
+        kiloSessionId: expectedRootKiloSessionId,
+      })?.version ?? 'v1'
+    );
   }
 
   async getSessionMessagesPage(
@@ -3148,26 +3207,44 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     return listPreparationAttempts(this.eventQueries);
   }
 
+  /** The most recent preparation attempt, for the session's read model. */
+  async getLatestPreparationAttempt(): Promise<PreparationAttempt | null> {
+    await this.initialized;
+    if (this.registration === null) return null;
+    return listPreparationAttempts(this.eventQueries).at(-1) ?? null;
+  }
+
   async getMessageResult(messageId: string): Promise<MessageResultRPCResponse> {
     await this.initialized;
     if (this.registration === null) return { type: 'session-not-found' };
     const message = this.messages.find(item => item.messageId === messageId);
     if (message === undefined) return { type: 'message-not-found' };
-    const result: SafeMessageResultResponse = {
-      messageId: message.messageId,
-      status:
-        message.state === 'queued'
-          ? 'queued'
-          : message.state === 'accepted'
-            ? 'running'
-            : message.state === 'cancelled'
-              ? 'interrupted'
-              : message.state,
-      createdAt: message.createdAt,
-      ...(message.acceptedAt === null ? {} : { acceptedAt: message.acceptedAt }),
-      ...(message.settledAt === null ? {} : { terminalAt: message.settledAt }),
+    const result = projectMessageResult({
       cloudAgentSessionId: this.sessionId,
-    };
+      message,
+      readAssistantText: assistantMessageId => {
+        try {
+          this.partText.flush();
+          return this.eventQueries.getAssistantAnswerByMessageId(this.sessionId, assistantMessageId)
+            ?.text;
+        } catch {
+          logger
+            .withFields({ sessionId: this.sessionId, messageId })
+            .warn('Unable to read the assistant answer for the message result');
+          return undefined;
+        }
+      },
+      readPreparation: () => {
+        try {
+          return readLatestPreparationAttemptForMessage(this.eventQueries, messageId);
+        } catch {
+          logger
+            .withFields({ sessionId: this.sessionId, messageId })
+            .warn('Unable to read preparation for the message result');
+          return undefined;
+        }
+      },
+    });
     return { type: 'found', result };
   }
 
@@ -3180,12 +3257,19 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   async getRuntimeAuthorizationStatus(): Promise<{
     state: 'legacy' | 'active' | 'expired' | 'revoked';
     id?: string;
+    /** The workspace whose Cloud Agent authority a user send in this chat may renew. */
+    workspaceSessionId?: string;
   }> {
     await this.initialized;
-    return readRuntimeAuthorizationRecoveryState({
+    const status = await readRuntimeAuthorizationRecoveryState({
       metadata: this.metadata,
       getAuthorization: () => this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY),
     });
+    const workspaceSessionId =
+      this.metadata?.allowSubagentSessions === true
+        ? workspaceSessionIdForMetadata(this.metadata)
+        : undefined;
+    return workspaceSessionId === undefined ? status : { ...status, workspaceSessionId };
   }
 
   /**
@@ -3344,6 +3428,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     await this.initialized;
     if (this.registration === null) return;
     await this.enqueue(async () => {
+      if (this.registration === null) return;
       const peer = this.sandboxPeer();
       if (peer !== null) {
         const standalone =
@@ -3359,6 +3444,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           'release'
         );
       }
+      await this.settleWorkspaceAuthorityBeforeDelete();
       await this.tearDownSession();
     });
   }
@@ -3414,13 +3500,17 @@ export class SandboxSessionV2 extends DurableObject<Env> {
 
   /**
    * Worktree deletion, phase 2 (legacy `finishWorktreeDeletion`): purge this
-   * session's data once the Sandbox DO confirmed the worktree cleanup. Idempotent
-   * and holds no per-worktree state: the Sandbox DO already removed the routes.
+   * session's data once the Sandbox DO confirmed the worktree cleanup, for the
+   * stored worktree binding. Idempotent and holds no per-worktree state: the
+   * Sandbox DO already removed the routes.
    */
   async finishWorktreeDeletion(worktreeId: string): Promise<void> {
     await this.initialized;
-    cloudAgentWorktreeIdSchema.parse(worktreeId);
+    const requested = cloudAgentWorktreeIdSchema.parse(worktreeId);
     if (this.registration === null) return;
+    if (this.metadata !== null && this.metadata.workspace?.worktreeId !== requested) {
+      throw new Error('Worktree identity conflict');
+    }
     await this.enqueue(async () => {
       await this.tearDownSession();
     });
@@ -3456,12 +3546,38 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     }
   }
 
+  /**
+   * A chat that created its workspace hands the workspace authority over
+   * before its own storage is wiped. A workspace chat leaves it to the
+   * workspace, which outlives this chat; a chat without a worktree is the whole
+   * workspace, so deleting it ends that authority.
+   */
+  private async settleWorkspaceAuthorityBeforeDelete(): Promise<void> {
+    const metadata = this.metadata;
+    if (metadata?.allowSubagentSessions !== true || !isWorkspaceAnchorMetadata(metadata)) return;
+    const ownerId = metadata.identity.userId;
+    const workspaceSessionId = metadata.identity.sessionId;
+    if (metadata.workspace?.worktreeId === undefined) {
+      await withDORetry(
+        () => getWorkspaceStub(this.env, ownerId, workspaceSessionId),
+        stub => stub.markDeleted(),
+        'markDeleted'
+      );
+      return;
+    }
+    await withDORetry(
+      () => getWorkspaceStub(this.env, ownerId, workspaceSessionId),
+      stub => stub.describe(),
+      'describe'
+    );
+  }
+
   private async pruneChildRegistryEntry(ownerId: string, parentSessionId: string): Promise<void> {
     try {
       await withDORetry(
-        () => getSandboxSessionStub(this.env, ownerId, parentSessionId),
-        stub => stub.forgetCloudAgentChildSession(this.sessionId),
-        'forgetCloudAgentChildSession'
+        () => getWorkspaceStub(this.env, ownerId, parentSessionId),
+        stub => stub.forgetChild(this.sessionId),
+        'forgetChild'
       );
     } catch (error) {
       logger
@@ -3470,7 +3586,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           parentSessionId,
           error: error instanceof Error ? error.message : String(error),
         })
-        .warn('Failed to prune deleted child from parent session registry');
+        .warn('Failed to prune deleted child from parent workspace registry');
     }
   }
 
@@ -3538,6 +3654,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         this.db.delete(events).run();
         this.db.delete(cloudAgentChildSessions).run();
         this.db.delete(historyImport).run();
+        this.db.delete(sessionCostTotals).run();
+        this.db.delete(costBackfillState).run();
       },
     });
     this.clearSessionInMemoryState();
@@ -4415,6 +4533,44 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     );
   }
 
+  private settlementFor(
+    message: SessionMessage,
+    facts: ControlPlaneReportFacts | undefined,
+    answerPromptId: string
+  ): MessageSettlement {
+    const metadata = this.metadata;
+    const settlement: MessageSettlement = {
+      branch: metadata === null ? undefined : lastSeenBranch(metadata),
+    };
+    if (facts !== undefined) {
+      const { assistantReason, providerOwnership, workspaceSubtype, gateResult } = facts;
+      if (
+        [assistantReason, providerOwnership, workspaceSubtype, gateResult].some(
+          value => value !== undefined
+        )
+      ) {
+        settlement.facts = { assistantReason, providerOwnership, workspaceSubtype, gateResult };
+      }
+    }
+    const kiloSessionId = metadata?.auth.kiloSessionId;
+    if (message.state === 'completed' && message.messageId === answerPromptId && kiloSessionId) {
+      try {
+        this.partText.flush();
+        settlement.assistantMessageId =
+          this.eventQueries.getAssistantAnswerMessageIdForUserMessage(
+            this.sessionId,
+            kiloSessionId,
+            message.messageId
+          ) ?? undefined;
+      } catch {
+        logger
+          .withFields({ sessionId: this.sessionId, messageId: message.messageId })
+          .warn('Unable to include the assistant answer in the message settlement');
+      }
+    }
+    return settlement;
+  }
+
   /**
    * One owner for the side effects of a terminal transition: durable rows,
    * terminal stream events, the `session_message_committed` diagnostic the
@@ -4427,18 +4583,22 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     facts?: ControlPlaneReportFacts,
     source: ControlPlaneMessageSource = 'coordinator'
   ): Promise<void> {
-    if (reduction.changed.length === 0) {
+    const answerPrompt = reduction.changed.at(-1);
+    if (answerPrompt === undefined) {
       await this.armAlarm();
       return;
     }
     const previousStates = new Map(
       this.messages.map(message => [message.messageId, message.state])
     );
-    this.messages = reduction.messages;
-    await this.persistMessages(reduction.changed);
-    if (reduction.changed.some(message => previousStates.get(message.messageId) === 'accepted'))
+    const { messages, changed } = withMessageSettlements(reduction, message =>
+      this.settlementFor(message, facts, answerPrompt.messageId)
+    );
+    this.messages = messages;
+    await this.persistMessages(changed);
+    if (changed.some(message => previousStates.get(message.messageId) === 'accepted'))
       await this.settleRootStatus();
-    for (const message of reduction.changed) {
+    for (const message of changed) {
       const lifecycleEventInserted = this.emitTerminal(message);
       this.recordReport(message, facts);
       logControlDiagnostic('session_message_committed', {
@@ -4455,7 +4615,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     }
     // Persist the callback, attempt delivery now, then arm only what remains:
     // a failed send keeps its due time and is retried by the alarm.
-    this.persistBatchCallback(reduction.changed, facts);
+    this.persistBatchCallback(changed, facts);
     await this.repairOutboxes();
     await this.armAlarm();
   }
@@ -4673,6 +4833,32 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     if (!parsed.success || parsed.data.sessionID !== this.registration?.spec.kiloSessionId) return;
     this.rootStatus = { type: parsed.data.status.type, settled: false };
     await this.ctx.storage.put(ROOT_STATUS_KEY, this.rootStatus);
+  }
+
+  /** A Kilo v2 rename of the root: its title against the source stored before this event. */
+  private nativeRootRename(event: {
+    type: string;
+    properties: Record<string, unknown>;
+  }): string | undefined {
+    const rootKiloSessionId = this.registration?.spec.kiloSessionId;
+    if (
+      rootKiloSessionId === undefined ||
+      event.type !== 'conversation.source' ||
+      event.properties.sessionID !== rootKiloSessionId
+    )
+      return undefined;
+    // persistConversationEvent drops a source that names another session, so it is no rename.
+    const title = nativeSessionTitle(event.properties.source, rootKiloSessionId);
+    if (title === undefined) return undefined;
+    const stored = this.eventQueries.findByEntityId(`conversation-source/${rootKiloSessionId}`);
+    const previous =
+      stored === null
+        ? undefined
+        : nativeSessionTitle(
+            readNativeEventPayload(stored.payload)?.properties.source,
+            rootKiloSessionId
+          );
+    return title === previous ? undefined : title;
   }
 
   private async settleRootStatus(): Promise<void> {

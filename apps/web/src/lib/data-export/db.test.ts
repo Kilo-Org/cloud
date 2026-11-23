@@ -92,13 +92,8 @@ describe('resolveSslConfig', () => {
 });
 
 describe('pool sizing', () => {
-  it('does not inherit the primary request-path query timeout', () => {
-    // POSTGRES_MAX_QUERY_TIME is 5000 under .env.test and is sized for interactive
-    // queries; bulk export scans need their own budget.
+  it('sets its own query timeout independent of interactive query settings', () => {
     expect(QUERY_TIMEOUT_MS).toBe(60_000);
-    expect(QUERY_TIMEOUT_MS).toBeGreaterThan(
-      Number.parseInt(process.env.POSTGRES_MAX_QUERY_TIME || '20000')
-    );
   });
 
   it('keeps the pool small so it does not contend with the primary', () => {

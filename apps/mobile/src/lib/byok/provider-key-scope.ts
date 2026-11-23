@@ -27,7 +27,7 @@ const PROVIDER_KEYS_PATH = '/(app)/(tabs)/(3_profile)/provider-keys';
 const PROVIDER_KEY_ADD_PATH = '/(app)/(tabs)/(3_profile)/provider-key-add';
 const PROVIDER_KEY_NEW_PATH = '/(app)/(tabs)/(3_profile)/provider-key-new';
 
-/** The scope a route's `org` parameter selects. No id means the caller's own keys. */
+/** The scope a route's `org` parameter selects. */
 export function providerKeyScope(organizationId: string | undefined): ProviderKeyScope {
   return organizationId ? { kind: 'organization', organizationId } : { kind: 'personal' };
 }

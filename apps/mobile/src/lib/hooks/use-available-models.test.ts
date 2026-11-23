@@ -27,17 +27,20 @@ vi.mock('@/lib/auth/token-owner', () => ({
 describe('toModelOptions', () => {
   it('passes pricing through to the ModelOption', () => {
     const pricing = { prompt: '0.00000175', completion: '0.000014' };
-    const result = toModelOptions({
-      data: [
-        {
-          id: 'priced/model',
-          name: 'Display: Priced Model',
-          pricing,
-          preferredIndex: 0,
-          opencode: { variants: { high: {} } },
-        },
-      ],
-    });
+    const result = toModelOptions(
+      {
+        data: [
+          {
+            id: 'priced/model',
+            name: 'Display: Priced Model',
+            pricing,
+            preferredIndex: 0,
+            opencode: { variants: { high: {} } },
+          },
+        ],
+      },
+      'en'
+    );
 
     expect(result).toHaveLength(1);
     expect(result[0]?.pricing).toEqual(pricing);
@@ -46,7 +49,44 @@ describe('toModelOptions', () => {
   });
 
   it('returns empty array for undefined data', () => {
-    expect(toModelOptions(undefined)).toEqual([]);
+    expect(toModelOptions(undefined, 'en')).toEqual([]);
+  });
+
+  it('re-sorts the non-preferred tail with the handed language', () => {
+    // Czech collation makes the "ch" in Schematron a letter after h, so it
+    // drops behind Seed; English keeps the plain S-t-i order. The call site
+    // hands `i18n.language` (the source the memo keys on), so the same rows
+    // sort differently per language with no other input.
+    const catalog = {
+      data: [
+        { id: 'c/seed', name: 'Seed 2.1 Turbo' },
+        { id: 'c/schematron', name: 'Schematron V2 Turbo' },
+      ],
+    };
+    expect(toModelOptions(catalog, 'en').map(option => option.id)).toEqual([
+      'c/schematron',
+      'c/seed',
+    ]);
+    expect(toModelOptions(catalog, 'cs').map(option => option.id)).toEqual([
+      'c/seed',
+      'c/schematron',
+    ]);
+  });
+
+  it('keeps a date-only retires_on on the option and drops an off-contract one', () => {
+    const options = toModelOptions(
+      {
+        data: [
+          { id: 'a', name: 'A', retires_on: '2026-07-01' },
+          { id: 'b', name: 'B', retires_on: '2026-07-01T00:00:00Z' },
+        ],
+      },
+      'en'
+    );
+    const byId = new Map(options.map(option => [option.id, option]));
+    expect(byId.get('a')?.retires_on).toBe('2026-07-01');
+    expect(byId.get('b')).toBeDefined();
+    expect(byId.get('b')?.retires_on).toBeUndefined();
   });
 });
 
@@ -79,6 +119,24 @@ describe('OpenRouterModelsResponseSchema', () => {
       data: [{ id: 'a', name: 'A', someUnknown: true }],
     });
     expect(parsed.data[0]).toEqual({ id: 'a', name: 'A' });
+  });
+
+  it('parses a date-only retires_on unchanged', () => {
+    const parsed = OpenRouterModelsResponseSchema.parse({
+      data: [{ id: 'a', name: 'A', retires_on: '2026-07-01' }],
+    });
+    expect(parsed.data[0]).toEqual({ id: 'a', name: 'A', retires_on: '2026-07-01' });
+  });
+
+  it('drops a non-string retires_on instead of rejecting the catalog', () => {
+    const parsed = OpenRouterModelsResponseSchema.parse({
+      data: [
+        { id: 'a', name: 'A', retires_on: null },
+        { id: 'b', name: 'B', retires_on: 42 },
+      ],
+    });
+    expect(parsed.data.map(entry => entry.id)).toEqual(['a', 'b']);
+    expect(parsed.data.map(entry => entry.retires_on)).toEqual([undefined, undefined]);
   });
 });
 
@@ -140,9 +198,6 @@ describe('model-catalog read failures', () => {
     );
   });
 
-  // A 401 is the answer a locked keychain or a sign-out teardown produces, so
-  // the shared network policy treats it as an expected answer: warning level,
-  // and `report: 'none'` because the global fetch wrapper already records it.
   it('files an expected 401 models answer as a warning, not an app error', async () => {
     fetchMock.mockResolvedValueOnce(refusal(401, 'Unauthorized'));
 

@@ -9,6 +9,7 @@ import {
   type LiveSessions,
 } from '@/components/home/live-session-state';
 import { Text } from '@/components/ui/text';
+import { LINE_ACTION_BOX_CLASS, LINE_ACTION_HIT_SLOP } from '@/lib/a11y/tap-target';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useUserWebConnectionHealth } from '@/lib/hooks/use-user-web-connection-state';
 import { createSubmitLock } from '@/lib/submit-lock';
@@ -42,11 +43,19 @@ export function useLiveSessionHeaderNotice(
   const connection = useUserWebConnection();
   const retryLock = useMemo(createSubmitLock, []);
   const [retrying, setRetrying] = useState(false);
-  const content = liveSessionContent(context, sessions);
+  const content = liveSessionContent(context, sessions, internet);
 
   const loadFailed = content === 'rows' && context.isReady && Boolean(sessions.terminalError);
   const connectionLost =
     content !== 'error' && context.isReady && !isConnected && reconnectExhausted;
+  // The offline card is the one statement for the outage. While it owns the
+  // surface, a header line beside it would name the same connection loss a
+  // second time — and an exhausted socket would add "Connection lost" with no
+  // action, because `canRetry` stands down offline. The notice speaks only for
+  // rows and confirmed-empty content, which stay readable through the outage.
+  if (content === 'offline') {
+    return null;
+  }
   let message: string | null = null;
   if (loadFailed) {
     message = failureLabel;
@@ -114,16 +123,25 @@ export function LiveSessionHeaderNotice({
         {notice.message}
       </Text>
       {notice.canRetry && (
+        // The box is the line action's: `Retry` is one `text-xs` line (14 dp),
+        // so a pressable sized by its label measured 25.1 × 14.1 dp, under the
+        // 28 dp floor. The box cancels its own height back to that line, so
+        // the header stays one line tall, and its slop carries the 44 dp reach.
+        // The header's notice slot spans the row's padding, so the whole box
+        // sits inside the view that receives its touches.
         <Pressable
           onPress={notice.handleRetry}
           disabled={notice.retrying}
           accessibilityState={{ busy: notice.retrying, disabled: notice.retrying }}
-          hitSlop={8}
+          hitSlop={LINE_ACTION_HIT_SLOP}
           accessibilityRole="button"
           accessibilityLabel={
             notice.loadFailed ? t('common.retry') : t('agentChat.sessionConnection.retryConnection')
           }
-          className="shrink-0 active:opacity-70"
+          className={cn(
+            LINE_ACTION_BOX_CLASS,
+            'min-w-10 shrink-0 items-center justify-center active:opacity-70'
+          )}
         >
           <Text className="text-xs font-medium text-primary">{t('common.retry')}</Text>
         </Pressable>

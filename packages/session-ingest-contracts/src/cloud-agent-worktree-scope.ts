@@ -1,9 +1,9 @@
 import { z } from 'zod';
 
-import {
-  containedKiloSessionIdSchema,
-  cloudAgentWorktreeIdSchema,
-} from './cloud-agent-session-scope';
+import { containedKiloSessionIdSchema } from './cloud-agent-session-scope';
+
+export const cloudAgentWorktreeIdSchema = z.templateLiteral(['worktree_', z.uuid()]);
+export type CloudAgentWorktreeId = z.infer<typeof cloudAgentWorktreeIdSchema>;
 
 export const cloudAgentSessionScopeProtocolVersionV2 = '2' as const;
 
@@ -15,16 +15,36 @@ export const cloudAgentSessionScopeV2Headers = {
 
 export const CLOUD_AGENT_SESSION_SCOPE_PERSONAL_ORGANIZATION = 'personal' as const;
 
+/** The organization id a v2 scope asserts: a bare UUID, never the wire's personal sentinel. */
+export const cloudAgentOrganizationIdSchema = z.uuid().brand<'CloudAgentOrganizationId'>();
+export type CloudAgentOrganizationId = z.infer<typeof cloudAgentOrganizationIdSchema>;
+
 export const MAX_CLOUD_AGENT_SESSION_SCOPE_MEMBER_ROOTS = 32;
-export const MAX_CLOUD_AGENT_SESSION_SCOPE_HEADER_BYTES = 4096;
+
+/**
+ * The budget for the sum of the encoded v2 header *values* only: the worktree
+ * id, the organization, and the comma-joined member roots. Header names, the
+ * `: ` separators, the line terminators, and the protocol header are left out,
+ * deliberately, because the parser compares exactly the value bytes the encoder
+ * writes. A caller that needs the true wire size adds that framing itself.
+ */
+export const MAX_CLOUD_AGENT_SESSION_SCOPE_HEADER_VALUE_BYTES = 4096;
 
 export const cloudAgentSessionScopeV2AssertionSchema = z.object({
   protocolVersion: z.literal(cloudAgentSessionScopeProtocolVersionV2),
   worktreeId: cloudAgentWorktreeIdSchema,
   expectedOrganization: z.union([
     z.literal(CLOUD_AGENT_SESSION_SCOPE_PERSONAL_ORGANIZATION),
-    z.uuid(),
+    cloudAgentOrganizationIdSchema,
   ]),
+  /**
+   * The member roots of the scope. The cap counts **entries**, and the two
+   * callers apply it to different lists: the encoder validates the caller's
+   * array as given, while `parseCloudAgentSessionScopeV2Headers` trims and
+   * de-duplicates the header value first. On the wire the cap therefore counts
+   * distinct roots, and a repeated array entry encodes unchanged but parses back
+   * as one root.
+   */
   memberRootKiloSessionIds: z
     .array(containedKiloSessionIdSchema)
     .min(1)
@@ -37,7 +57,7 @@ export type CloudAgentSessionScopeV2Assertion = z.infer<
 
 export type CloudAgentSessionScopeV2 = {
   worktreeId: CloudAgentSessionScopeV2Assertion['worktreeId'];
-  organizationId: CloudAgentSessionScopeV2Assertion['expectedOrganization'] | null;
+  organizationId: CloudAgentOrganizationId | null;
   memberRootKiloSessionIds: CloudAgentSessionScopeV2Assertion['memberRootKiloSessionIds'];
 };
 
@@ -55,7 +75,11 @@ function headerValue(value: string | undefined): string {
   return value ?? '';
 }
 
-export function measureCloudAgentSessionScopeV2HeaderBytes(
+/**
+ * Returns the encoded byte count of the three header values, the number
+ * `MAX_CLOUD_AGENT_SESSION_SCOPE_HEADER_VALUE_BYTES` bounds.
+ */
+export function measureCloudAgentSessionScopeV2HeaderValueBytes(
   input: CloudAgentSessionScopeV2HeaderInput
 ): number {
   const encoder = new TextEncoder();
@@ -105,6 +129,11 @@ export function tryEncodeCloudAgentSessionScopeV2Headers(
   };
 }
 
+/**
+ * Parses a v2 header block. It splits the member-root value, trims each entry,
+ * drops duplicates, then applies the same assertion schema, so the member-root
+ * cap counts distinct roots.
+ */
 export function parseCloudAgentSessionScopeV2Headers(
   input: CloudAgentSessionScopeV2HeaderInput
 ): CloudAgentSessionScopeV2ParseResult {
@@ -117,7 +146,8 @@ export function parseCloudAgentSessionScopeV2Headers(
     return { kind: 'invalid' };
   }
   if (
-    measureCloudAgentSessionScopeV2HeaderBytes(input) > MAX_CLOUD_AGENT_SESSION_SCOPE_HEADER_BYTES
+    measureCloudAgentSessionScopeV2HeaderValueBytes(input) >
+    MAX_CLOUD_AGENT_SESSION_SCOPE_HEADER_VALUE_BYTES
   ) {
     return { kind: 'invalid' };
   }
@@ -125,9 +155,6 @@ export function parseCloudAgentSessionScopeV2Headers(
   const rawMemberRoots = memberRootKiloSessionIds.split(',');
   if (rawMemberRoots.some(value => value.trim().length === 0)) return { kind: 'invalid' };
   const normalizedMemberRoots = [...new Set(rawMemberRoots.map(value => value.trim()))];
-  if (normalizedMemberRoots.length > MAX_CLOUD_AGENT_SESSION_SCOPE_MEMBER_ROOTS) {
-    return { kind: 'invalid' };
-  }
 
   const parsed = cloudAgentSessionScopeV2AssertionSchema.safeParse({
     protocolVersion: cloudAgentSessionScopeProtocolVersionV2,
@@ -137,14 +164,18 @@ export function parseCloudAgentSessionScopeV2Headers(
   });
   if (!parsed.success) return { kind: 'invalid' };
 
+  // The assertion union already resolved this arm to the branded domain id, so
+  // the sentinel check is the only narrowing left.
+  const parsedOrganization = parsed.data.expectedOrganization;
+
   return {
     kind: 'ok',
     scope: {
       worktreeId: parsed.data.worktreeId,
       organizationId:
-        parsed.data.expectedOrganization === CLOUD_AGENT_SESSION_SCOPE_PERSONAL_ORGANIZATION
+        parsedOrganization === CLOUD_AGENT_SESSION_SCOPE_PERSONAL_ORGANIZATION
           ? null
-          : parsed.data.expectedOrganization,
+          : parsedOrganization,
       memberRootKiloSessionIds: parsed.data.memberRootKiloSessionIds,
     },
   };

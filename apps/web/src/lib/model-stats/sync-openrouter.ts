@@ -1,7 +1,8 @@
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { modelStats } from '@kilocode/db/schema';
 import { eq, sql } from 'drizzle-orm';
-import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { modelNameWithRetirement } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/retirement';
+import type { OpenRouterCatalogModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import type { OpenRouterModel as OpenRouterApiModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
 import { deriveModelStatsIdentity } from '@kilocode/worker-utils/kilo-model-id';
 
@@ -37,7 +38,7 @@ export type SyncOpenRouterResult = {
  * @returns Summary of sync operation
  */
 export async function syncOpenRouterModels(
-  allModels: OpenRouterModel[],
+  allModels: OpenRouterCatalogModel[],
   preferredModelIds: string[],
   additionalModelIds: string[] = []
 ): Promise<SyncOpenRouterResult> {
@@ -70,7 +71,7 @@ export async function syncOpenRouterModels(
           isActive: true,
           isRecommended,
           ...deriveModelStatsIdentity(model.id),
-          name: model.name,
+          name: modelNameWithRetirement(model),
           description: model.description,
           priceInput: toPricePerMillion(model.pricing?.prompt),
           priceOutput: toPricePerMillion(model.pricing?.completion),
@@ -87,7 +88,7 @@ export async function syncOpenRouterModels(
         isRecommended,
         openrouterId: model.id,
         ...deriveModelStatsIdentity(model.id),
-        name: model.name,
+        name: modelNameWithRetirement(model),
         description: model.description,
         priceInput: toPricePerMillion(model.pricing?.prompt),
         priceOutput: toPricePerMillion(model.pricing?.completion),
@@ -116,7 +117,7 @@ export async function syncOpenRouterModels(
           // Note: NOT updating isActive - preserve user's setting
           isRecommended,
           ...deriveModelStatsIdentity(updatedModelData.id),
-          name: updatedModelData.name,
+          name: modelNameWithRetirement(updatedModelData),
           description: updatedModelData.description,
           priceInput: toPricePerMillion(updatedModelData.pricing?.prompt),
           priceOutput: toPricePerMillion(updatedModelData.pricing?.completion),

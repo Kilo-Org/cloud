@@ -1,5 +1,6 @@
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { Download } from '@/components/ui/icons';
+import { type TFunction } from 'i18next';
 import { memo, type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
@@ -8,6 +9,7 @@ import { Text } from '@/components/ui/text';
 import { toast } from 'sonner-native';
 
 import { i18n } from '@/i18n';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { isolateLtrBidiText } from '@/lib/bidi';
 import { formatDate, formatPrefixedMoney } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -60,13 +62,45 @@ function lookup<V>(dictionary: Readonly<Record<string, V>>, key: string): V | un
   return (dictionary as Readonly<Record<string, V | undefined>>)[key];
 }
 
-function statusMeta(status: string) {
+function statusMeta(status: string, t: TFunction) {
   const meta = lookup(STATUS_META, status);
   const labelKey = lookup(STATUS_LABEL_KEYS, status);
   return {
-    label: labelKey ? i18n.t(labelKey) : status,
+    label: labelKey ? t(labelKey) : status,
     pillClass: meta?.pillClass ?? NEUTRAL_BADGE.pillClass,
     textClass: meta?.textClass ?? NEUTRAL_BADGE.textClass,
+  };
+}
+
+/** The row's facts, in the reader's language. One source for paint and name. */
+type InvoiceRowFacts = Readonly<{
+  title: string;
+  /** The painted amount, kept in its own left-to-right run. */
+  amount: string;
+  date: string;
+  status: string;
+  pillClass: string;
+  textClass: string;
+}>;
+
+/**
+ * Every fact the row paints, formatted once. The paint and the row's accessible
+ * name both read this, so an amount the screen shows and the amount a screen
+ * reader hears cannot drift apart.
+ */
+function invoiceRowFacts(invoice: Invoice, t: TFunction): InvoiceRowFacts {
+  const meta = statusMeta(invoice.status, t);
+  return {
+    title: firstNonEmpty(
+      invoice.number,
+      invoice.description,
+      t('organization.invoices.invoiceFallback')
+    ),
+    amount: isolateLtrBidiText(formatPrefixedMoney(invoice.amount_due / 100, i18n.language)),
+    date: formatDate(new Date(invoice.created * 1000), i18n.language),
+    status: meta.label,
+    pillClass: meta.pillClass,
+    textClass: meta.textClass,
   };
 }
 
@@ -76,37 +110,25 @@ function statusMeta(status: string) {
  * amount up with the rows that carry the action. 20 dp is the spinner's box.
  */
 function InvoiceRowContent({
-  invoice,
+  facts,
   action,
 }: Readonly<{
-  invoice: Invoice;
+  facts: InvoiceRowFacts;
   action?: ReactNode;
 }>) {
-  const { t } = useTranslation();
-  const meta = statusMeta(invoice.status);
-  const title = firstNonEmpty(
-    invoice.number,
-    invoice.description,
-    t('organization.invoices.invoiceFallback')
-  );
-
   return (
     <View className="flex-row items-center gap-3">
       <View className="min-w-0 flex-1 gap-1">
         <View className="flex-row items-center justify-between gap-3">
           <Text className="min-w-0 flex-1 text-sm font-medium text-foreground" numberOfLines={1}>
-            {title}
+            {facts.title}
           </Text>
-          <Text className="text-sm font-medium text-foreground">
-            {isolateLtrBidiText(formatPrefixedMoney(invoice.amount_due / 100, i18n.language))}
-          </Text>
+          <Text className="text-sm font-medium text-foreground">{facts.amount}</Text>
         </View>
         <View className="flex-row items-center justify-between">
-          <Text className="text-xs text-muted-foreground">
-            {formatDate(new Date(invoice.created * 1000), i18n.language)}
-          </Text>
-          <View className={cn('rounded-full px-2 py-0.5', meta.pillClass)}>
-            <Text className={cn('text-[11px] font-medium', meta.textClass)}>{meta.label}</Text>
+          <Text className="text-xs text-muted-foreground">{facts.date}</Text>
+          <View className={cn('rounded-full px-2 py-0.5', facts.pillClass)}>
+            <Text className={cn('text-xs font-medium', facts.textClass)}>{facts.status}</Text>
           </View>
         </View>
       </View>
@@ -115,19 +137,31 @@ function InvoiceRowContent({
   );
 }
 
-export const InvoiceRow = memo(function InvoiceRow({ invoice }: Readonly<{ invoice: Invoice }>) {
+export const InvoiceRow = memo(function InvoiceRow({
+  invoice,
+  last = false,
+}: Readonly<{ invoice: Invoice; last?: boolean }>) {
   const { t } = useTranslation();
   const colors = useThemeColors();
+  const facts = invoiceRowFacts(invoice, t);
   const [sharing, setSharing] = useState(false);
   const rowState = selectInvoiceRowState({
     invoicePdf: invoice.invoice_pdf,
     sharing,
   });
 
+  // A flat list row: full-bleed, content from the page gutter, one hairline
+  // between rows and none after the last.
+  const rowClassName = cn(
+    ROW_TARGET_CLASS,
+    'flex-row items-center gap-3 px-4 py-3',
+    !last && 'border-b-[0.5px] border-hair-soft'
+  );
+
   if (rowState === 'no-affordance') {
     return (
-      <View className="rounded-lg bg-secondary p-3">
-        <InvoiceRowContent invoice={invoice} />
+      <View className={rowClassName}>
+        <InvoiceRowContent facts={facts} />
       </View>
     );
   }
@@ -161,13 +195,20 @@ export const InvoiceRow = memo(function InvoiceRow({ invoice }: Readonly<{ invoi
       disabled={busy}
       accessibilityState={{ busy }}
       accessibilityRole="button"
+      // The whole row is one button, so its name has to carry what a reader
+      // needs to pick this receipt out of the list: which invoice, its amount,
+      // its date and its status — the shape the credit-history receipt row
+      // uses. The action verb leads, because Android carries no spoken hint.
       accessibilityLabel={t('organization.invoices.downloadA11y', {
-        number: firstNonEmpty(invoice.number, invoice.description, invoice.id),
+        number: facts.title,
+        amount: facts.amount,
+        date: facts.date,
+        status: facts.status,
       })}
-      className="rounded-lg bg-secondary p-3 active:opacity-80 disabled:opacity-60"
+      className={cn(rowClassName, 'active:opacity-70')}
     >
       <InvoiceRowContent
-        invoice={invoice}
+        facts={facts}
         action={
           busy ? (
             <ActivityIndicator size="small" color={colors.mutedForeground} />

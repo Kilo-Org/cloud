@@ -7,6 +7,7 @@
       "spendAlert": "თქვენი ხარჯი ყურადღებას საჭიროებს",
       "securityFinding": "უსაფრთხოების დასკვნა ყურადღებას საჭიროებს",
       "securityUpdate": "უსაფრთხოების შემოწმებას განახლება აქვს",
+      "agentBriefing": "თქვენი აგენტის ანგარიში მზადაა",
       "activeAgentsGlanceable": "აქტიურ აგენტებს განახლება აქვთ"
     }
   },
@@ -29,6 +30,12 @@
     },
     "securityFindingNew": {
       "title": "ახალი უსაფრთხოების დასკვნა ({{severity}})"
+    },
+    "securityFindingSeverity": {
+      "critical": "კრიტიკული",
+      "high": "მაღალი",
+      "medium": "საშუალო",
+      "low": "დაბალი"
     },
     "securityFindingSlaWarning": {
       "title": "SLA გაფრთხილება"

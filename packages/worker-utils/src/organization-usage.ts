@@ -12,6 +12,10 @@ import {
   organization_memberships,
 } from '@kilocode/db/schema';
 import { eq, sql } from 'drizzle-orm';
+import {
+  directOrganizationMembershipCondition,
+  liveOrganizationCondition,
+} from './organization-membership';
 
 export type OrganizationTransaction = Parameters<Parameters<WorkerDb['transaction']>[0]>[0];
 
@@ -25,23 +29,42 @@ export type OrganizationUsageMutationResult = {
   >;
 };
 
-const NO_ORGANIZATION_BALANCE_ALERT: OrganizationUsageMutationResult = {
-  crossedMinimumBalance: false,
-  recipients: [],
-  minimumBalanceMicrodollars: null,
-};
+/**
+ * A result for a call that recorded no balance effect. Each call returns its own
+ * object, so a caller that appends to `recipients` cannot change what a later
+ * call receives.
+ */
+export function emptyOrganizationUsageResult(): OrganizationUsageMutationResult {
+  return {
+    crossedMinimumBalance: false,
+    recipients: [],
+    minimumBalanceMicrodollars: null,
+  };
+}
 
 export type OrganizationUsageMutationInput = Pick<
   MicrodollarUsage,
   'kilo_user_id' | 'organization_id' | 'cost' | 'created_at'
 >;
 
+/**
+ * Charges the organization for one usage row and records the member's daily
+ * usage against the organization's per-user limit.
+ *
+ * The balance update is authoritative for the charge. It runs for every usage
+ * that names an organization, including a soft-deleted organization and a
+ * caller who holds no membership row. The per-user daily row is derived from
+ * that charge, so it accrues only for a direct membership in a live
+ * organization — the same two conditions the read paths apply. The result
+ * reports the balance effects only; it does not say whether the per-user row
+ * was written.
+ */
 export async function mutateOrganizationUsage(
   tx: OrganizationTransaction,
   usage: OrganizationUsageMutationInput
 ): Promise<OrganizationUsageMutationResult> {
   const { cost, kilo_user_id, organization_id, created_at } = usage;
-  if (!organization_id) return NO_ORGANIZATION_BALANCE_ALERT;
+  if (!organization_id) return emptyOrganizationUsageResult();
 
   const limitType: OrganizationUserLimitType = 'daily';
   await tx.execute(sql`
@@ -65,13 +88,16 @@ export async function mutateOrganizationUsage(
     WHERE EXISTS (
       SELECT 1
       FROM ${organization_memberships}
-      WHERE ${organization_memberships.organization_id} = ${organization_id}
-        AND ${organization_memberships.kilo_user_id} = ${kilo_user_id}
+      WHERE ${directOrganizationMembershipCondition({
+        organizationId: organization_id,
+        kiloUserId: kilo_user_id,
+      })}
     )
       AND EXISTS (
         SELECT 1
         FROM ${organizations}
         WHERE ${organizations.id} = ${organization_id}
+          AND ${liveOrganizationCondition(organizations)}
       )
     ON CONFLICT (organization_id, kilo_user_id, limit_type, usage_date)
     DO UPDATE SET
@@ -104,7 +130,7 @@ export async function mutateOrganizationUsage(
     });
 
   const [orgData] = balanceRows;
-  if (!orgData) return NO_ORGANIZATION_BALANCE_ALERT;
+  if (!orgData) return emptyOrganizationUsageResult();
 
   const currentBalance = orgData.total_microdollars_acquired - orgData.previous_microdollars_used;
   const newBalance = orgData.total_microdollars_acquired - orgData.new_microdollars_used;

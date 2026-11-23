@@ -61,6 +61,7 @@ const CLASS_CASES: [string, string, string][] = [
 /** One code per entry in `STATUS_COPY_KEY_BY_CODE`, with its catalog key. */
 const STATUS_CASES: [SdkStatusMessageCode, string][] = [
   ['agent-connection-lost', 'agentChat.sessionConnection.connectionLost'],
+  ['agent-connection-reconnecting', 'agentChat.sessionConnection.reconnecting'],
   ['session-stopped', 'agentChat.session.stopped'],
   ['message-delivery-failed', 'agentChat.messageFailure.deliveryTitle'],
   ['setting-up-environment', 'agentChat.composer.preparingPlaceholder'],

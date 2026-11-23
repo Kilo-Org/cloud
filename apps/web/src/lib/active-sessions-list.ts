@@ -300,10 +300,8 @@ function mapEnrichedHeartbeatSession(
 function mapCloudCandidateRow(row: CloudCandidateRow): ActiveSession {
   const mapped: ActiveSession = {
     id: row.session_id,
-    // Cloud rows have no live heartbeat source (do NOT run
-    // resolveActiveSessionStatus): the stored status is synced
-    // asynchronously, so an open run upgrades a non-attention stored status
-    // to busy — a working session must never render idle.
+    // Cloud rows have no live heartbeat: never route them through
+    // resolveActiveSessionStatus.
     status: resolveCloudCandidateStatus(row.status, row.run_open),
     title: row.title ?? '',
     connectionId: CLOUD_AGENT_CONNECTION_ID,
@@ -518,12 +516,9 @@ export async function listActiveSessions({
           });
         }
         console.warn(`[active-sessions] fetch failed: ${response.status} ${response.statusText}`);
-        if (!includeCloudAgentSessions) {
-          return { sessions: [] as ActiveSession[] };
-        }
         // The merged answer decides at the end of this function (see
         // `upstreamReadFailed`): an empty one here would read as "nothing
-        // runs".
+        // runs", with or without the cloud merge.
         upstreamReadFailed = true;
       } else {
         const raw = await readJsonWithinBudget(
@@ -542,11 +537,8 @@ export async function listActiveSessions({
         });
       }
       console.warn('[active-sessions] error:', error);
-      if (!includeCloudAgentSessions) {
-        return { sessions: [] as ActiveSession[] };
-      }
       // Same reason as the non-OK branch above: an unreachable worker must not
-      // read as "nothing runs".
+      // read as "nothing runs", with or without the cloud merge.
       upstreamReadFailed = true;
     }
   }
@@ -567,8 +559,10 @@ export async function listActiveSessions({
   // and would still add the two reads' latencies together.
   const ids = parsed.sessions.map(s => s.id);
 
-  if (ids.length === 0 && !includeCloudAgentSessions) {
-    // Flag-off empty heartbeats: today's short-circuit (no DB).
+  if (ids.length === 0 && !includeCloudAgentSessions && !upstreamReadFailed) {
+    // Flag-off empty heartbeats: today's short-circuit (no DB). Skipped when
+    // the worker read failed, because the closing guard must report that
+    // instead of answering an empty list that reads as "nothing runs".
     return parsed;
   }
 
@@ -718,16 +712,6 @@ export async function listActiveSessions({
               livePredicate
             )
           )
-          // Newest-first, then capped at a ceiling far above the 100-agent
-          // target (`CLOUD_AGENT_CANDIDATE_LIMIT`; its doc comment states the
-          // accepted tradeoff). The warm-idle and recorded-activity branches are
-          // time-bounded, but an open `cloud_agent_session_runs` row with no
-          // `terminal_at` keeps its session a candidate until the 90-day session
-          // cascade, so the tail this drops is the oldest candidates — in
-          // practice the orphaned-run accumulation, which the order does not
-          // guarantee. The `(kilo_user_id, created_at)` index backs both the
-          // filter and this order, so the cap also stops the scan once it has 500
-          // matches instead of walking every orphaned candidate.
           .orderBy(desc(cli_sessions_v2.created_at))
           .limit(CLOUD_AGENT_CANDIDATE_LIMIT),
       mergeDeadlineAt,

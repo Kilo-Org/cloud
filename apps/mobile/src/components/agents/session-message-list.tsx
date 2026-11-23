@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { AccessibilityInfo, Pressable, View, type ViewStyle } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useStyleSideInsets } from '@/lib/screen-insets';
 
 import { useSessionListAutoScroll } from '@/components/agents/use-session-list-auto-scroll';
 import { useSessionListAnchorReport } from '@/components/agents/use-session-list-anchor-report';
@@ -205,7 +205,7 @@ export function SessionMessageList<T>({
   }, [onOpenSettledChange, openSettled, sessionId]);
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const { left, right } = useSafeAreaInsets();
+  const { left, right } = useStyleSideInsets();
 
   // Coalesce the trigger: only fire `onLoadOlderMessages` while there is
   // actually a cursor, we are not already loading, and we are not in a
@@ -477,10 +477,10 @@ export function SessionMessageList<T>({
                 // has to be this node's own box.
                 className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
               >
-                {/* The visible circle stays compact (explicit px, because
-                  NativeWind's 14pt rem renders `h-10` at 35pt): DESIGN.md keeps
-                  the target, not the visual, at 44pt. */}
-                <View className="h-[35px] w-[35px] items-center justify-center rounded-full border border-border bg-card shadow-lg shadow-[#00000040]">
+                {/* The visible circle stays compact: `h-10` renders at 35pt on
+                  the 14pt rem, while the pressable above keeps the 48pt target.
+                  DESIGN.md keeps the target, not the visual, at 44pt. */}
+                <View className="h-10 w-10 items-center justify-center rounded-full border border-border bg-card shadow-lg shadow-[#00000040]">
                   <ChevronDown size={20} color={colors.foreground} />
                 </View>
               </Pressable>

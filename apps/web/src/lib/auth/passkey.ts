@@ -499,11 +499,6 @@ export async function createAuthenticationOptions(): Promise<AuthenticationOptio
   return { challengeId, options };
 }
 
-/**
- * Advance a credential's signature counter as a compare-and-set against the
- * value that was just verified. A concurrent assertion read the same counter
- * and reaches this write with a stale expectation, so it updates no row.
- */
 export async function advancePasskeyCounter(
   credential: Pick<PasskeyCredential, 'id' | 'sign_count'>,
   newCounter: number,
@@ -635,13 +630,44 @@ export async function createSignInTicket(
 }
 
 /**
- * Redeem a sign-in ticket. The redemption is a single atomic UPDATE: a ticket
- * is usable exactly once, and never after its two-minute expiry.
+ * Read a sign-in ticket without redeeming it, so a caller can resolve which
+ * account the ticket names before committing to an irreversible step. The
+ * digest derivation is the one `consumeSignInTicket` uses, so the two can
+ * never disagree about which row a ticket denotes. A redeemed or expired
+ * ticket reads as absent.
  */
-export async function consumeSignInTicket(ticket: string): Promise<PasskeySignInTicket | null> {
+export async function readSignInTicket(ticket: string): Promise<PasskeySignInTicket | null> {
   const ticket_hash = hashSignInTicket(ticket);
 
   const [row] = await db
+    .select()
+    .from(passkey_sign_in_tickets)
+    .where(
+      and(
+        eq(passkey_sign_in_tickets.ticket_hash, ticket_hash),
+        isNull(passkey_sign_in_tickets.consumed_at),
+        sql`${passkey_sign_in_tickets.expires_at} > NOW()`
+      )
+    );
+
+  return row ?? null;
+}
+
+/**
+ * Redeem a sign-in ticket. The redemption is a single atomic UPDATE: a ticket
+ * is usable exactly once, and never after its two-minute expiry.
+ *
+ * `fromDb` lets a caller redeem the ticket inside the transaction that it
+ * guards, so a redemption lost to a concurrent winner also rolls back that
+ * transaction's writes (defaults to the pool, matching `createSignInTicket`).
+ */
+export async function consumeSignInTicket(
+  ticket: string,
+  fromDb: DrizzleConnection = db
+): Promise<PasskeySignInTicket | null> {
+  const ticket_hash = hashSignInTicket(ticket);
+
+  const [row] = await fromDb
     .update(passkey_sign_in_tickets)
     .set({ consumed_at: sql`NOW()` })
     .where(

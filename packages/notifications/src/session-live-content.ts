@@ -57,27 +57,28 @@ export const sessionLiveOutcomeSchema = z.object({
 });
 
 /**
- * The raw content-state one followed session's Live Activity renders
- * (`.specs/mobile-session-live-activity.md`). Unlike the aggregate card, it
- * carries the session title: the user started the card with Follow. The
- * session id routes taps and approval and is never drawn. It must never carry
- * an organization name, repository, generated text, or a raw account id.
+ * The content-state fields, declared apart from the schema below so the
+ * cross-field refinement can read their types.
  */
-export const sessionLiveActivityContentStateSchema = z.object({
+const sessionLiveActivityContentStateShape = {
   sessionId: nonEmptyStringSchema,
   /** Trimmed and capped display title; null for an untitled session. */
   title: z.string().max(GLANCEABLE_TITLE_LIMIT).nullable(),
   statusKind: z.enum(SESSION_CARD_STATUS_KINDS),
   /** ISO 8601; when the current status kind began. */
-  statusSince: z.string(),
+  statusSince: z.string().datetime(),
   /** ISO 8601 wake time for a scheduled session, else null. */
-  scheduledAt: z.string().nullable(),
-  /** True only when Approve can answer the waiting permission request. */
+  scheduledAt: z.string().datetime().nullable(),
+  /**
+   * True only when Approve can answer the waiting permission request, which is
+   * exactly when `approvalKey` is present; the refinement below holds the two
+   * together.
+   */
   awaitingPermission: z.boolean(),
   /** SHA-256 hex of `JSON.stringify([sessionId, permissionId])`, else null. */
   approvalKey: approvalKeySchema,
   /** ISO 8601; when the server confirmed this content. */
-  updatedAt: z.string(),
+  updatedAt: z.string().datetime(),
   /** The step the agent is on; null when the session is not working. */
   currentStep: sessionLiveStepSchema.nullable().optional(),
   /** Plan progress while the agent works from a todo list. */
@@ -87,7 +88,7 @@ export const sessionLiveActivityContentStateSchema = z.object({
   /** The diff this session produced so far. */
   changes: sessionLiveChangesSchema.nullable().optional(),
   /** ISO 8601; the last activity the server saw. */
-  lastActivityAt: z.string().nullable().optional(),
+  lastActivityAt: z.string().datetime().nullable().optional(),
   /** The cost so far, in microdollars. */
   costMicrodollars: z.number().int().nonnegative().nullable().optional(),
   /** How a finished session ended. */
@@ -95,8 +96,48 @@ export const sessionLiveActivityContentStateSchema = z.object({
   /** Why a finished turn failed; null while nothing failed. */
   failure: sessionLiveFailureSchema.nullable().optional(),
   /** ISO 8601; when the session started. */
-  startedAt: z.string().nullable().optional(),
-});
+  startedAt: z.string().datetime().nullable().optional(),
+};
+
+/** The shape's own type, so the refinement below reads the field types from the shape. */
+const sessionLiveActivityContentStateShapeSchema = z.object(sessionLiveActivityContentStateShape);
+
+/**
+ * `awaitingPermission` states that Approve can answer the waiting request, and
+ * `approvalKey` names that request. They answer one question, so a payload that
+ * sets one without the other describes a card that cannot exist: Approve with
+ * nothing to answer, or a request the card does not offer. The builder
+ * (`buildSessionLiveActivityContentState`) derives the flag from the key, so
+ * this check never rejects what the repository itself produces; it rejects a
+ * payload assembled anywhere else.
+ */
+function refineAwaitingPermission(
+  data: z.infer<typeof sessionLiveActivityContentStateShapeSchema>,
+  ctx: z.RefinementCtx
+): void {
+  if (data.awaitingPermission !== (data.approvalKey !== null)) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['approvalKey'],
+      message: 'approvalKey is present exactly when awaitingPermission is true',
+    });
+  }
+}
+
+/**
+ * The raw content-state one followed session's Live Activity renders
+ * (`.specs/mobile-session-live-activity.md`). Unlike the aggregate card, it
+ * carries the session title: the user started the card with Follow. The
+ * session id routes taps and approval and is never drawn. It must never carry
+ * an organization name, repository, generated text, or a raw account id.
+ *
+ * A refined object cannot be reshaped: zod refuses `.pick`, `.omit`, `.partial`
+ * and `.merge` on it, and `.extend` silently drops the refinement. Declare the
+ * fields in `sessionLiveActivityContentStateShape` and build the schema from
+ * that shape when a narrower or wider variant is needed.
+ */
+export const sessionLiveActivityContentStateSchema =
+  sessionLiveActivityContentStateShapeSchema.superRefine(refineAwaitingPermission);
 
 export type SessionLiveActivityContentState = z.infer<typeof sessionLiveActivityContentStateSchema>;
 

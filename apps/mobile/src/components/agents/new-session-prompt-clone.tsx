@@ -2,7 +2,9 @@ import { useTranslation } from 'react-i18next';
 
 import { ChatToolbar } from '@/components/agents/chat-toolbar';
 import { type AgentMode, type ModeOption } from '@/components/agents/mode-normalize';
+import { type ModelSelectionFailure } from '@/components/agents/new-session-prompt-types';
 import { QueryError } from '@/components/query-error';
+import { InputFrame } from '@/components/ui/input-frame';
 import { type ModelOption } from '@/lib/hooks/use-available-models';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { type ModelPickerSelection } from '@/lib/picker-bridge';
@@ -21,6 +23,8 @@ type NewSessionPromptCloneProps = {
   isLoadingModels: boolean;
   isCreating: boolean;
   onRefetchModels: () => void;
+  /** The organization-default read's failure while no model is selected, or null. */
+  modelSelectionFailure?: ModelSelectionFailure | null;
 };
 
 /**
@@ -42,35 +46,54 @@ export function NewSessionPromptClone({
   isLoadingModels,
   isCreating,
   onRefetchModels,
+  modelSelectionFailure = null,
 }: Readonly<NewSessionPromptCloneProps>) {
   const { t } = useTranslation();
   if (isModelsError && modelOptions.length === 0) {
     return (
-      <QueryError
-        placement="top"
-        variant="server"
-        title={t('agentChat.newSession.couldNotLoadModels')}
-        message={t('organization.boundary.loadErrorMessage')}
-        onRetry={() => {
-          onRefetchModels();
-        }}
-        className="rounded-2xl border border-border bg-card"
-      />
+      <InputFrame className="overflow-hidden">
+        <QueryError
+          placement="top"
+          inset="gutter"
+          variant="server"
+          title={t('agentChat.newSession.couldNotLoadModels')}
+          message={t('organization.boundary.loadErrorMessage')}
+          onRetry={() => {
+            onRefetchModels();
+          }}
+        />
+      </InputFrame>
     );
   }
   return (
-    <ChatToolbar
-      modeControl={{ mode, onModeChange, customOptions }}
-      model={model}
-      variant={variant}
-      modelOptions={modelOptions}
-      onModelSelect={onModelSelect}
-      disabled={isCreating}
-      isLoadingModels={isLoadingModels}
-      modelLocked={modelLocked}
-      modelLockLabel={modelLockLabel}
-      wrap
-      className="rounded-2xl border border-border bg-card px-3 py-3"
-    />
+    <InputFrame>
+      <ChatToolbar
+        modeControl={{ mode, onModeChange, customOptions }}
+        model={model}
+        variant={variant}
+        modelOptions={modelOptions}
+        onModelSelect={onModelSelect}
+        disabled={isCreating}
+        isLoadingModels={isLoadingModels}
+        modelLocked={modelLocked}
+        modelLockLabel={modelLockLabel}
+        wrap
+      />
+      {/* The full error above owns a failed catalog. This one is the model row's
+          own state: the catalog answered, the organization default did not. */}
+      {modelSelectionFailure ? (
+        <QueryError
+          placement="top"
+          compact
+          variant="server"
+          title={t('common.couldNotLoadModels')}
+          onRetry={() => {
+            modelSelectionFailure.onRetry();
+          }}
+          isRetrying={modelSelectionFailure.isRetrying}
+          className="px-3"
+        />
+      ) : null}
+    </InputFrame>
   );
 }

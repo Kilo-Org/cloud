@@ -1,21 +1,21 @@
-import { useQuery } from '@tanstack/react-query';
-import { type Href, useRouter } from 'expo-router';
+import { type Href } from 'expo-router';
 import { useEffect } from 'react';
 
 import { classifyPermission, type PermissionState } from '@/lib/code-reviewer-status';
 import { PERSONAL_SCOPE, type ReviewerPlatform } from '@/lib/code-reviewer-config';
-import { useTRPC } from '@/lib/trpc';
+import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
+import { useSettledReplace } from '@/lib/navigation/settled-replace';
 
 function isPersonal(scope: string) {
   return scope === PERSONAL_SCOPE;
 }
 
 export function useReviewerPermission(scope: string): PermissionState {
-  const trpc = useTRPC();
-  const query = useQuery({
-    ...trpc.organizations.list.queryOptions(),
-    enabled: !isPersonal(scope),
-  });
+  // These reviewer routes are reachable by URL, so this observer must not start
+  // the memberships read before the token resolves, and must settle while
+  // offline like the owner does: one hook owns the options of the one cache
+  // entry.
+  const query = useOrganizationsList({ enabled: !isPersonal(scope) });
   const role = query.data?.find(org => org.organizationId === scope)?.role;
   return classifyPermission({
     isPersonal: isPersonal(scope),
@@ -39,13 +39,16 @@ export function useReviewerPermission(scope: string): PermissionState {
  * still server-authorized).
  */
 export function useReviewerEditGuard(scope: string, platform: ReviewerPlatform) {
-  const router = useRouter();
+  const settledRouter = useSettledReplace();
   const permission = useReviewerPermission(scope);
   const readOnly = permission.status === 'ready' && !permission.canEdit;
 
   useEffect(() => {
     if (readOnly) {
-      router.replace(`/(app)/code-reviewer/${scope}/${platform}` as Href);
+      // The bounce can run while the link's own navigation is still
+      // transitioning, and a swap inside that commit crashes Android Fabric
+      // with `addViewAt … already has a parent`.
+      settledRouter.replace(`/(app)/code-reviewer/${scope}/${platform}` as Href);
     }
-  }, [readOnly, router, scope, platform]);
+  }, [readOnly, settledRouter, scope, platform]);
 }

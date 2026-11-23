@@ -45,13 +45,19 @@ export function getDeviceAuthOutcomeHeaderClassName(): string {
   return 'px-6 py-8 text-center sm:px-8 sm:py-10';
 }
 
+/**
+ * Close this page. The device-auth page is opened by the Kilo app in a browser,
+ * so closing it returns the person to the app they started from.
+ */
+export function closeDeviceAuthWindow(): void {
+  if (typeof window !== 'undefined') {
+    window.close();
+  }
+}
+
 export function closeDeviceAuthWindowIfAppMode(
   isAppMode: boolean,
-  closeWindow: () => void = () => {
-    if (typeof window !== 'undefined') {
-      window.close();
-    }
-  }
+  closeWindow: () => void = closeDeviceAuthWindow
 ): void {
   if (!isAppMode) {
     return;

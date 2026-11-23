@@ -36,6 +36,7 @@ vi.mock('@expo/ui/swift-ui/modifiers', () => ({
   background: (style: unknown) => ({ $type: 'background', args: style }),
   buttonStyle: mockModifier('buttonStyle'),
   cornerRadius: mockModifier('cornerRadius'),
+  dynamicTypeSize: mockModifier('dynamicTypeSize'),
   environment: mockModifier('environment'),
   fixedSize: mockModifier('fixedSize'),
   font: mockModifier('font'),
@@ -185,6 +186,46 @@ describe('Live Activity Lock Screen card (round 7)', () => {
         .find((modifier: { $type?: string }) => modifier.$type === 'activityBackgroundTint');
     expect(tint('light')).toEqual({ $type: 'activityBackgroundTint', args: '#FBFAF5' });
     expect(tint('dark')).toEqual({ $type: 'activityBackgroundTint', args: '#17171A' });
+  });
+
+  it('paints the idle dot with the muted ink in both schemes', () => {
+    const idle: State = {
+      ...PERMISSION,
+      needsInput: 0,
+      needsApproval: 0,
+      running: 0,
+      scheduled: 0,
+      idle: 1,
+    };
+    const firstDot = (node: unknown) => collect(node).find(item => item.kind === 'Circle') ?? null;
+    expect(modifierArgs(firstDot(render(idle).banner), 'foregroundStyle')).toBe('#6F6A61');
+    expect(
+      modifierArgs(firstDot(render(idle, { colorScheme: 'dark' }).banner), 'foregroundStyle')
+    ).toBe('#8A8680');
+    // The Dynamic Island is always black, so it takes the dark muted ink too.
+    expect(modifierArgs(firstDot(render(idle).minimal), 'foregroundStyle')).toBe('#8A8680');
+  });
+});
+
+type Modifier = { $type: string; args?: unknown };
+const modifierArgs = (item: Rendered | null, type: string) =>
+  ((item?.props.modifiers ?? []) as Modifier[]).find(modifier => modifier.$type === type)?.args;
+
+describe('Live Activity Dynamic Type', () => {
+  it('grows the Lock Screen card up to xLarge and keeps the island at the default size', () => {
+    const layout = render(PERMISSION);
+    expect(modifierArgs(element(layout.banner), 'dynamicTypeSize')).toEqual({ max: 'xLarge' });
+    expect(modifierArgs(element(layout.bannerSmall), 'dynamicTypeSize')).toBe('large');
+    expect(modifierArgs(element(layout.expandedBottom), 'dynamicTypeSize')).toBe('large');
+    // Every text run on the card follows a text style; only the count keeps a fixed size.
+    for (const item of collect(layout.banner).filter(entry => entry.kind === 'Text')) {
+      const font = modifierArgs(item, 'font');
+      if (item.props.children === '2') {
+        expect(font).toEqual({ size: 36, weight: 'bold' });
+      } else {
+        expect(font, String(item.props.children)).toHaveProperty('textStyle');
+      }
+    }
   });
 });
 

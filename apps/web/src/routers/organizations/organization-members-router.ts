@@ -12,6 +12,7 @@ import {
   getAcceptInviteUrl,
   lockOrganizationMembershipMutation,
   CHILD_ORGANIZATION_INVITE_REQUIRES_PARENT_MEMBER,
+  ORGANIZATION_MISSING_MESSAGE,
 } from '@kilocode/web-shared/lib/organizations/organizations';
 import { lockOrganizationGroupPolicy } from '@kilocode/web-shared/lib/organizations/organization-groups';
 import { updateOrganizationUserLimit } from '@kilocode/web-shared/lib/organizations/organization-usage';
@@ -288,6 +289,12 @@ export const organizationsMembersRouter = createTRPCRouter({
           actor_email: user.google_user_email,
           actor_id: user.id,
           actor_name: user.google_user_name,
+          details: {
+            id: 'member.role',
+            email: updatedUserEmail,
+            previous: targetMember.role,
+            next: role,
+          },
           message: `Changed role for user ${updatedUserEmail} from ${targetMember.role} to ${role}`,
           organization_id: organizationId,
           tx,
@@ -377,6 +384,15 @@ export const organizationsMembersRouter = createTRPCRouter({
       const childIds = childOrganizations.map(child => child.id).sort();
       const selectedChildOrganizationIds = new Set(childOrganizationIds);
       const { added, removed } = await db.transaction(async tx => {
+        // The audit rows name the parent organization, so read its display name
+        // once here rather than repeating the parent id for every child.
+        const [parentOrganization] = await tx
+          .select({ name: organizations.name })
+          .from(organizations)
+          .where(eq(organizations.id, organizationId))
+          .limit(1);
+        const parentOrganizationName = parentOrganization?.name ?? organizationId;
+
         for (const childId of childIds) {
           await lockOrganizationMembershipMutation(tx, childId, memberId);
         }
@@ -418,6 +434,11 @@ export const organizationsMembersRouter = createTRPCRouter({
               actor_email: user.google_user_email,
               actor_id: user.id,
               actor_name: user.google_user_name,
+              details: {
+                id: 'member.parentAdded',
+                email: parentMember.email,
+                parent: parentOrganizationName,
+              },
               message: `Added parent organization member ${parentMember.email} as a member from parent organization ${organizationId}`,
               organization_id: childOrganizationId,
               tx,
@@ -458,6 +479,11 @@ export const organizationsMembersRouter = createTRPCRouter({
             actor_email: user.google_user_email,
             actor_id: user.id,
             actor_name: user.google_user_name,
+            details: {
+              id: 'member.parentRemoved',
+              email: parentMember.email,
+              parent: parentOrganizationName,
+            },
             message: `Removed parent organization member ${parentMember.email} from child organization via parent organization ${organizationId}`,
             organization_id: childOrganizationId,
             tx,
@@ -557,6 +583,10 @@ export const organizationsMembersRouter = createTRPCRouter({
         actor_email: user.google_user_email,
         actor_id: user.id,
         actor_name: user.google_user_name,
+        details: {
+          id: 'member.removed',
+          email: removedUser?.google_user_email ?? 'unknown',
+        },
         message: `Removed user ${removedUser?.google_user_email || 'unknown'}`,
         organization_id: organizationId,
       });
@@ -638,6 +668,7 @@ export const organizationsMembersRouter = createTRPCRouter({
             actor_email: user.google_user_email,
             actor_id: user.id,
             actor_name: user.google_user_name,
+            details: { id: 'invite.sent', email, role },
             message: `Invited ${email} as ${role}`,
             organization_id: organization.id,
             tx,
@@ -702,6 +733,15 @@ export const organizationsMembersRouter = createTRPCRouter({
             throw new TRPCError({
               code: 'PRECONDITION_FAILED',
               message: ORGANIZATION_INVITE_SEAT_LIMIT_REACHED,
+            });
+          }
+          // The router already 404s an unknown organization before the
+          // transaction; this mapping covers a row deleted between that check
+          // and the invite write.
+          if (error.message === ORGANIZATION_MISSING_MESSAGE) {
+            throw new TRPCError({
+              code: 'NOT_FOUND',
+              message: ORGANIZATION_MISSING_MESSAGE,
             });
           }
           if (error.message === 'User must join this organization through SSO') {
@@ -778,6 +818,7 @@ export const organizationsMembersRouter = createTRPCRouter({
           actor_email: ctx.user.google_user_email,
           actor_id: ctx.user.id,
           actor_name: ctx.user.google_user_name,
+          details: { id: 'invite.revoked', email: invitation.email },
           message: `Revoked invitation for ${invitation.email}`,
           organization_id: organizationId,
           tx,

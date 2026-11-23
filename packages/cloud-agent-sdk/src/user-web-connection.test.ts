@@ -42,6 +42,7 @@ beforeEach(() => {
   // @ts-expect-error minimal WebSocket mock
   global.WebSocket = webSocketConstructor;
   (global.WebSocket as unknown as Record<string, number>).OPEN = 1;
+  (global.WebSocket as unknown as Record<string, number>).CONNECTING = 0;
   let nextId = 0;
   configureCloudAgentSdkRuntime({ randomUUID: () => `uuid-${++nextId}` });
 });
@@ -64,14 +65,20 @@ function inbound(msg: Record<string, unknown>, ws = sockets.at(-1)): void {
 
 function createDeferred<T>() {
   let resolvePromise: ((value: T) => void) | null = null;
-  const promise = new Promise<T>(resolve => {
+  let rejectPromise: ((reason: Error) => void) | null = null;
+  const promise = new Promise<T>((resolve, reject) => {
     resolvePromise = resolve;
+    rejectPromise = reject;
   });
   return {
     promise,
     resolve(value: T) {
       if (!resolvePromise) throw new Error('Deferred promise was not initialized');
       resolvePromise(value);
+    },
+    reject(reason: Error) {
+      if (!rejectPromise) throw new Error('Deferred promise was not initialized');
+      rejectPromise(reason);
     },
   };
 }
@@ -638,7 +645,10 @@ describe('createUserWebConnection', () => {
       for (let attempt = 0; attempt < 7; attempt += 1) {
         await Promise.resolve();
         await Promise.resolve();
-        jest.advanceTimersByTime(60_000);
+        // Step to the retry delay only. A single 60s jump would fire the 30s
+        // pre-socket deadline before the pending rejection's microtask could
+        // clear it, abandoning the attempt this loop is counting.
+        jest.advanceTimersByTime(Math.min(30_000, 1_000 * 2 ** attempt) / 2);
       }
       await Promise.resolve();
       await Promise.resolve();
@@ -776,7 +786,10 @@ describe('createUserWebConnection', () => {
 
       await Promise.resolve();
       await Promise.resolve();
-      jest.advanceTimersByTime(60_000);
+      // Step to the retry delay and flush the retry's rejection, so the series
+      // exhausts on the failure budget rather than on the 30s pre-socket
+      // deadline that a 60s jump would fire first.
+      jest.advanceTimersByTime(500);
       await Promise.resolve();
       await Promise.resolve();
       expect(client.isReconnectExhausted()).toBe(true);
@@ -793,7 +806,7 @@ describe('createUserWebConnection', () => {
       expect(getAuthToken).toHaveBeenCalledTimes(3);
       expect(client.isReconnectExhausted()).toBe(false);
 
-      jest.advanceTimersByTime(60_000);
+      jest.advanceTimersByTime(500);
       await Promise.resolve();
       await Promise.resolve();
 
@@ -874,6 +887,285 @@ describe('createUserWebConnection', () => {
       expect(webSocketConstructor).toHaveBeenCalledWith(
         `${WS_URL}?ticket=online-token&connectionId=uuid-1`
       );
+
+      release();
+      client.destroy();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('starts a second token request on manual retry while the first is still pending', async () => {
+    jest.useFakeTimers();
+    try {
+      const first = createDeferred<string>();
+      const second = createDeferred<string>();
+      const getAuthToken = jest
+        .fn()
+        .mockReturnValueOnce(first.promise)
+        .mockReturnValue(second.promise);
+      const client = createUserWebConnection({ websocketUrl: WS_URL, getAuthToken });
+      const release = client.retain();
+
+      await Promise.resolve();
+      expect(getAuthToken).toHaveBeenCalledTimes(1);
+      expect(webSocketConstructor).not.toHaveBeenCalled();
+
+      client.retryConnection();
+
+      expect(getAuthToken).toHaveBeenCalledTimes(2);
+      expect(webSocketConstructor).not.toHaveBeenCalled();
+
+      release();
+      client.destroy();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('joins a fresh pre-socket token request on resume and supersedes a stuck one', async () => {
+    jest.useFakeTimers();
+    try {
+      const onlineHandler: { current: (() => void) | null } = { current: null };
+      const first = createDeferred<string>();
+      const second = createDeferred<string>();
+      const getAuthToken = jest
+        .fn()
+        .mockReturnValueOnce(first.promise)
+        .mockReturnValue(second.promise);
+      const client = createUserWebConnection({
+        websocketUrl: WS_URL,
+        getAuthToken,
+        lifecycleHooks: {
+          onOnline: handler => {
+            onlineHandler.current = handler;
+            return () => {};
+          },
+        },
+      });
+      const release = client.retain();
+      const handleOnline = onlineHandler.current;
+      if (!handleOnline)
+        throw new Error('Expected online lifecycle handler before socket creation');
+
+      // Inside the join window one resume must not abandon the request the
+      // wake already started.
+      jest.advanceTimersByTime(10_000);
+      handleOnline();
+      expect(getAuthToken).toHaveBeenCalledTimes(1);
+
+      // Past the window the request counts as stuck and is superseded.
+      jest.advanceTimersByTime(6_000);
+      handleOnline();
+      expect(getAuthToken).toHaveBeenCalledTimes(2);
+      expect(webSocketConstructor).not.toHaveBeenCalled();
+
+      release();
+      client.destroy();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('routes a hung token request into the bounded series on the pre-socket deadline', async () => {
+    jest.useFakeTimers();
+    jest.spyOn(Math, 'random').mockReturnValue(0);
+    try {
+      const onError = jest.fn();
+      const first = createDeferred<string>();
+      const second = createDeferred<string>();
+      const getAuthToken = jest
+        .fn()
+        .mockReturnValueOnce(first.promise)
+        .mockReturnValue(second.promise);
+      const client = createUserWebConnection({
+        websocketUrl: WS_URL,
+        getAuthToken,
+        onError,
+        maxReconnectAttempts: 2,
+      });
+      const release = client.retain();
+
+      await Promise.resolve();
+      expect(getAuthToken).toHaveBeenCalledTimes(1);
+      expect(onError).not.toHaveBeenCalled();
+
+      jest.advanceTimersByTime(30_000);
+      await Promise.resolve();
+
+      expect(onError).toHaveBeenCalledWith('Failed to get auth token');
+      expect(getAuthToken).toHaveBeenCalledTimes(1);
+      expect(client.isReconnectExhausted()).toBe(false);
+
+      // The first timeout spends one attempt and still schedules the next one.
+      jest.advanceTimersByTime(500);
+      await Promise.resolve();
+      expect(getAuthToken).toHaveBeenCalledTimes(2);
+      expect(client.isReconnectExhausted()).toBe(false);
+
+      // The second timeout reaches the cap and publishes exhaustion instead of
+      // retrying forever.
+      jest.advanceTimersByTime(30_000);
+      await Promise.resolve();
+
+      expect(onError).toHaveBeenCalledTimes(2);
+      expect(client.isReconnectExhausted()).toBe(true);
+      expect(getAuthToken).toHaveBeenCalledTimes(2);
+
+      jest.advanceTimersByTime(600_000);
+      await Promise.resolve();
+      expect(getAuthToken).toHaveBeenCalledTimes(2);
+      expect(webSocketConstructor).not.toHaveBeenCalled();
+
+      release();
+      client.destroy();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('ignores a token that resolves after a manual retry superseded it', async () => {
+    jest.useFakeTimers();
+    try {
+      const first = createDeferred<string>();
+      const second = createDeferred<string>();
+      const getAuthToken = jest
+        .fn()
+        .mockReturnValueOnce(first.promise)
+        .mockReturnValue(second.promise);
+      const client = createUserWebConnection({ websocketUrl: WS_URL, getAuthToken });
+      const release = client.retain();
+
+      await Promise.resolve();
+      expect(getAuthToken).toHaveBeenCalledTimes(1);
+
+      client.retryConnection();
+      expect(getAuthToken).toHaveBeenCalledTimes(2);
+
+      first.resolve('stale-token');
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(webSocketConstructor).not.toHaveBeenCalled();
+      expect(webSocketConstructor).not.toHaveBeenCalledWith(
+        `${WS_URL}?ticket=stale-token&connectionId=uuid-1`
+      );
+
+      second.resolve('fresh-token');
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(webSocketConstructor).toHaveBeenCalledWith(
+        `${WS_URL}?ticket=fresh-token&connectionId=uuid-1`
+      );
+
+      release();
+      client.destroy();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('ignores a token that resolves after the pre-socket deadline abandoned it', async () => {
+    jest.useFakeTimers();
+    jest.spyOn(Math, 'random').mockReturnValue(0);
+    try {
+      const hung = createDeferred<string>();
+      const getAuthToken = jest.fn(() => hung.promise);
+      const client = createUserWebConnection({ websocketUrl: WS_URL, getAuthToken });
+      const release = client.retain();
+
+      await Promise.resolve();
+      expect(getAuthToken).toHaveBeenCalledTimes(1);
+
+      jest.advanceTimersByTime(30_000);
+      await Promise.resolve();
+      expect(webSocketConstructor).not.toHaveBeenCalled();
+
+      hung.resolve('late-token');
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(webSocketConstructor).not.toHaveBeenCalled();
+
+      release();
+      client.destroy();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('rejects a command queued behind a hung token request when the deadline fires', async () => {
+    jest.useFakeTimers();
+    jest.spyOn(Math, 'random').mockReturnValue(0);
+    try {
+      const hung = createDeferred<string>();
+      const getAuthToken = jest.fn(() => hung.promise);
+      const client = createUserWebConnection({ websocketUrl: WS_URL, getAuthToken });
+
+      const command = client.sendCommand('ses-1', 'send_message', { ok: true });
+      const rejected = expect(command).rejects.toThrow('Failed to get auth token');
+      await Promise.resolve();
+      expect(getAuthToken).toHaveBeenCalledTimes(1);
+      expect(webSocketConstructor).not.toHaveBeenCalled();
+
+      jest.advanceTimersByTime(30_000);
+      await rejected;
+
+      expect(webSocketConstructor).not.toHaveBeenCalled();
+
+      client.destroy();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('keeps the restarted attempt deadline when a failure signal retries synchronously', async () => {
+    jest.useFakeTimers();
+    jest.spyOn(Math, 'random').mockReturnValue(0);
+    try {
+      const first = createDeferred<string>();
+      const second = createDeferred<string>();
+      const getAuthToken = jest
+        .fn()
+        .mockReturnValueOnce(first.promise)
+        .mockReturnValue(second.promise);
+      // A surface that retries the moment the failure reaches it, before the
+      // failed attempt settles. The retry keeps the same generation.
+      let retried = false;
+      const onError = jest.fn(() => {
+        if (retried) return;
+        retried = true;
+        client.retryConnection();
+      });
+      const client = createUserWebConnection({
+        websocketUrl: WS_URL,
+        getAuthToken,
+        onError,
+        // A spent budget: the retry must reach exhaustion through its own
+        // deadline rather than through another scheduled retry.
+        maxReconnectAttempts: 1,
+      });
+      const release = client.retain();
+
+      await Promise.resolve();
+      expect(getAuthToken).toHaveBeenCalledTimes(1);
+
+      first.reject(new Error('token unavailable'));
+      // Flush the failed attempt's rejection and its `.finally` links.
+      for (let turn = 0; turn < 6; turn += 1) await Promise.resolve();
+
+      expect(getAuthToken).toHaveBeenCalledTimes(2);
+      expect(client.isReconnectExhausted()).toBe(true);
+
+      // The restarted attempt is still pending, so its deadline must still be
+      // armed: advancing it reports the failure instead of leaving the attempt
+      // parked forever.
+      jest.advanceTimersByTime(30_000);
+      for (let turn = 0; turn < 6; turn += 1) await Promise.resolve();
+
+      expect(onError).toHaveBeenCalledTimes(2);
+      expect(webSocketConstructor).not.toHaveBeenCalled();
 
       release();
       client.destroy();
@@ -1156,6 +1448,62 @@ describe('createUserWebConnection', () => {
     open();
 
     expect(webSocketConstructor).toHaveBeenCalledTimes(2);
+    client.destroy();
+  });
+
+  it('releases the legacy retain when the callback during that retain disconnects', () => {
+    const getAuthToken = jest
+      .fn()
+      .mockImplementationOnce(() => {
+        throw new Error('auth unavailable');
+      })
+      .mockReturnValue('token');
+    const clientRef: { current: ReturnType<typeof createUserWebConnection> | null } = {
+      current: null,
+    };
+    const client = createUserWebConnection({
+      websocketUrl: WS_URL,
+      getAuthToken,
+      onError: () => clientRef.current?.disconnect(),
+    });
+    clientRef.current = client;
+
+    client.connect();
+
+    // The synchronous disconnect inside the retain must not leave a retained
+    // lifetime behind: the next connect takes a fresh retain that starts the
+    // connection, and its disconnect stops it.
+    expect(webSocketConstructor).not.toHaveBeenCalled();
+    client.connect();
+    expect(webSocketConstructor).toHaveBeenCalledTimes(1);
+    client.disconnect();
+    expect(sockets[0].close).toHaveBeenCalledTimes(1);
+    client.destroy();
+  });
+
+  it('does not leak the legacy retain when the start throws', () => {
+    const getAuthToken = jest
+      .fn()
+      .mockImplementationOnce(() => {
+        throw new Error('auth unavailable');
+      })
+      .mockReturnValue('token');
+    const client = createUserWebConnection({
+      websocketUrl: WS_URL,
+      getAuthToken,
+      onError: () => {
+        throw new Error('onError exploded');
+      },
+    });
+
+    expect(() => client.connect()).toThrow('onError exploded');
+
+    // The failed start must not keep a lifetime: the next connect takes a
+    // fresh retain that starts the connection, and its disconnect stops it.
+    client.connect();
+    expect(webSocketConstructor).toHaveBeenCalledTimes(1);
+    client.disconnect();
+    expect(sockets[0].close).toHaveBeenCalledTimes(1);
     client.destroy();
   });
 
@@ -2079,6 +2427,37 @@ describe('createUserWebConnection connection-state API', () => {
     expect(listener).toHaveBeenLastCalledWith(false);
 
     unsubscribe();
+    client.destroy();
+  });
+
+  it('reports the socket phase before the first inbound message and after close', () => {
+    const client = createUserWebConnection({ websocketUrl: WS_URL, getAuthToken: () => 'token' });
+
+    expect(client.socketPhase()).toBe('absent');
+    expect(client.isConnected()).toBe(false);
+
+    client.retain();
+    // The handshake is in flight: no socket is usable yet.
+    expect(client.socketPhase()).toBe('connecting');
+    expect(client.isConnected()).toBe(false);
+
+    open();
+    // The socket is OPEN but no inbound frame has been parsed yet: the
+    // transport works, the message-level readiness has not flipped.
+    expect(client.socketPhase()).toBe('open');
+    expect(client.isConnected()).toBe(false);
+
+    inbound({ type: 'system', event: 'sessions.list', data: { sessions: [] } });
+    expect(client.isConnected()).toBe(true);
+
+    // A closed socket reports `absent` from its readyState alone, before any
+    // onclose handler runs.
+    sockets[0].readyState = 3;
+    expect(client.socketPhase()).toBe('absent');
+
+    sockets[0].onclose?.({ code: 1006 } as CloseEvent);
+    expect(client.socketPhase()).toBe('absent');
+
     client.destroy();
   });
 

@@ -13,6 +13,10 @@ import type { ComposerFocusRequest } from './useSessionComposerFocus';
 
 Object.assign(globalThis, { React });
 
+jest.mock('@/hooks/useEnvironmentSetupRuns', () => ({
+  useEnvironmentSetupRunBySession: () => ({ data: null }),
+}));
+
 let mockSessionId: string | null = 'ses_b';
 let mockAtParam: string | null = null;
 let mockWorktreeId: string | null = null;
@@ -245,6 +249,7 @@ jest.mock('./assistant-ui/CloudThread', () => ({
 }));
 jest.mock('./OlderMessagesHeader', () => ({ OlderMessagesHeader: () => null }));
 jest.mock('./ChildSessionDrawer', () => ({ ChildSessionDrawer: () => null }));
+jest.mock('./AgentBoardDrawer', () => ({ SessionAgentBoard: () => null }));
 jest.mock('./PreparationDrawer', () => ({ PreparationDrawer: () => null }));
 jest.mock('./SessionContinuationPanel', () => ({ SessionContinuationPanel: () => null }));
 jest.mock('@/components/SetPageTitle', () => ({ SetPageTitle: () => null }));
@@ -408,6 +413,7 @@ describe('CloudChatPage route-aware transcript phase', () => {
       supersededInFlightMessageIds: new Set(),
       preparationAttempts: [],
       commits: [],
+      unreadableQuestions: [],
       unreadablePermissions: [],
       chatUI: { shouldAutoScroll: true },
       isLoading: true,

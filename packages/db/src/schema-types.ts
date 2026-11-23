@@ -8,6 +8,8 @@ import {
   GATE_THRESHOLDS,
   REVIEW_STYLES,
 } from '@kilocode/app-shared/code-review';
+import { RESERVED_AGENT_SLUGS } from '@kilocode/app-shared/agent-profile';
+import { AUDIT_REGION_TAGS } from '@kilocode/app-shared/organizations';
 import * as z from 'zod';
 
 export const watchPrPolicySchema = z
@@ -844,6 +846,19 @@ export const ClaudeBillingConnectionStatus = {
 export type ClaudeBillingConnectionStatus =
   (typeof ClaudeBillingConnectionStatus)[keyof typeof ClaudeBillingConnectionStatus];
 
+/**
+ * Why the daily cleanup deleted an Anthropic user profile:
+ * - `unlinked`: no user or live organization references the profile.
+ * - `user_blocked`: only users blocked for at least 30 days reference it.
+ */
+export const AnthropicUserProfileDeletionReason = {
+  Unlinked: 'unlinked',
+  UserBlocked: 'user_blocked',
+} as const;
+
+export type AnthropicUserProfileDeletionReason =
+  (typeof AnthropicUserProfileDeletionReason)[keyof typeof AnthropicUserProfileDeletionReason];
+
 // --- Coding Plan enums ---
 
 export const BYOKManagementSource = {
@@ -1569,7 +1584,9 @@ export type OrganizationMcpConnectTarget =
   | { kind: 'package'; ecosystem: 'npm' | 'pypi'; identifier: string };
 
 // The Vercel AI Gateway inference regions: https://vercel.com/docs/ai-gateway/security-and-compliance/regional-inference
-export const OrganizationDataRegionSchema = z.enum(['us', 'eu', 'au', 'jp']);
+// The region list lives in @kilocode/app-shared/organizations so the audit-log
+// detail reader and this stored schema cannot drift.
+export const OrganizationDataRegionSchema = z.enum(AUDIT_REGION_TAGS);
 export type OrganizationDataRegion = z.infer<typeof OrganizationDataRegionSchema>;
 
 // How Kilo clients may drive a browser for this organization's members: anything the
@@ -1688,12 +1705,10 @@ export const MAX_ORGANIZATION_GROUPS = 100;
 export const MAX_ORGANIZATION_GROUP_ASSIGNMENTS = 1_000;
 
 // Persisted shape of organization group policies. The runtime Zod contracts,
-// per-policy schemas, limits, defaults, and helpers live in the web app
-// (`apps/web/src/lib/organizations/group-policies`) so this package stays
+// per-policy schemas, limits, defaults, and helpers live in web-shared
+// (`packages/web-shared/src/lib/organizations/group-policies`) so this package stays
 // focused on database concerns. These structural types exist only to type the
 // `jsonb` columns in `schema.ts`; the app-side schemas assert compatibility.
-export type OrganizationGroupPolicyType = 'model_access';
-
 export type OrganizationGroupModelAccessPolicy = {
   type: 'model_access';
   data:
@@ -1702,8 +1717,35 @@ export type OrganizationGroupModelAccessPolicy = {
     | { mode: 'selected'; model_allow_list: string[]; provider_allow_list: string[] };
 };
 
-export type OrganizationGroupPolicy = OrganizationGroupModelAccessPolicy;
+type OrganizationPermissionAction = 'allow' | 'ask' | 'deny';
+type OrganizationPermissionRule = { pattern: string; action: OrganizationPermissionAction };
+
+export type OrganizationGroupAgentPermissionsPolicy = {
+  type: 'agent_permissions';
+  data: {
+    schema_version: 1;
+    unrestricted_mode?: 'allow' | 'deny';
+    tools?: Record<
+      string,
+      | OrganizationPermissionAction
+      | { rules: OrganizationPermissionRule[]; fallback?: OrganizationPermissionAction }
+    >;
+    shell?: Partial<
+      Record<
+        'bash' | 'powershell',
+        { fallback: 'ask' | 'deny'; rules: OrganizationPermissionRule[] }
+      >
+    >;
+  };
+};
+
+export type OrganizationGroupPolicy =
+  | OrganizationGroupModelAccessPolicy
+  | OrganizationGroupAgentPermissionsPolicy;
+export type OrganizationGroupPolicyType = OrganizationGroupPolicy['type'];
 export type OrganizationGroupPolicies = OrganizationGroupPolicy[];
+
+export type NamedOrganizationPolicyKind = 'agent_permissions' | 'client_configuration';
 
 const GroupNameSchema = z.enum(['read', 'edit', 'browser', 'command', 'mcp']);
 
@@ -1876,6 +1918,7 @@ export const AuditLogAction = z.enum([
   'organization.group.default_policy.remove',
   'organization.group.policy_type.enable', // Legacy action retained for existing audit rows.
   'organization.group.policy_type.disable', // Legacy action retained for existing audit rows.
+  'organization.named_policy.change',
   'organization.created', // ✅
   'organization.token.generate', // ✅
   'organization.funds.distribute_to_children', // ✅
@@ -2171,20 +2214,11 @@ export const CouncilAggregationStrategySchema = z.enum(COUNCIL_AGGREGATION_STRAT
 // A specialist id doubles as the cloud-agent-next `runtimeAgents[].slug` (single-session
 // execution) AND the manifest correlation key, so it must satisfy the runtime-agent slug
 // contract: start with a lowercase letter, only lowercase letters/digits/hyphens, max 50
-// chars, and not collide with a built-in agent mode. Keep this in lockstep with
-// cloud-agent-next's `RuntimeAgentSchema.slug` + `AgentModes` (services/cloud-agent-next/src/schema.ts).
-// This must list EVERY built-in `AgentModes` value; a stale/partial copy lets a council id
-// pass web validation but fail cloud-agent-next session preparation.
-const RESERVED_AGENT_SLUGS = new Set([
-  'code',
-  'plan',
-  'debug',
-  'orchestrator',
-  'ask',
-  'build',
-  'architect',
-  'custom',
-]);
+// chars, and it uses an id of its own. `RESERVED_AGENT_SLUGS` in
+// @kilocode/app-shared/agent-profile holds the CLI ids: every built-in `AgentModes` value
+// plus the CLI's own agents, shared with `RuntimeAgentSchema.slug` and the web-side
+// profile service, so one set of ids holds everywhere a specialist id is used.
+const RESERVED_COUNCIL_SPECIALIST_SLUGS: ReadonlySet<string> = new Set(RESERVED_AGENT_SLUGS);
 
 // Cloud-agent-next caps a runtime-agent model slug at this many chars
 // (`Limits.MAX_RUNTIME_AGENT_MODEL_LENGTH`). Keep the per-specialist model constraint in
@@ -2203,7 +2237,7 @@ export const CouncilSpecialistSchema = z.object({
       'Specialist id must be a runtime-agent slug (start with a lowercase letter; lowercase letters, digits, or hyphens; max 50 chars)'
     )
     .refine(
-      id => !RESERVED_AGENT_SLUGS.has(id),
+      id => !RESERVED_COUNCIL_SPECIALIST_SLUGS.has(id),
       'Specialist id must not collide with a built-in agent mode'
     ),
   role: z.enum(COUNCIL_SPECIALIST_ROLES),
@@ -2963,6 +2997,8 @@ export const ReasoningDetailsTransform = {
   ReasoningContent: 'reasoning-content',
   /** The upstream sends reasoning as a plain `reasoning` string, without `reasoning_details`. */
   Reasoning: 'reasoning',
+  /** The upstream is Mistral's Chat Completions API, which sends reasoning as `thinking` content chunks. */
+  MistralThinking: 'mistral-thinking',
 } as const;
 
 export const ReasoningDetailsTransformSchema = z.enum(ReasoningDetailsTransform);
@@ -2987,6 +3023,45 @@ export function getCustomLlmClientApiKind(
   }
 }
 
+/** Segments `remove_from_body` paths never traverse: they reach prototypes, not request data. */
+export const REMOVE_FROM_BODY_BLOCKED_SEGMENTS: ReadonlySet<string> = new Set([
+  '__proto__',
+  'constructor',
+  'prototype',
+]);
+
+/**
+ * A dotted path into the request body, where `*` stands for every element of an array or every
+ * value of an object, for example `usage`, `tools.*.function.strict` or
+ * `messages.*.content.*.cache_control`. The last segment names the field to delete.
+ */
+const CustomLlmRemoveFromBodyPathSchema = z.string().superRefine((path, ctx) => {
+  const segments = path.split('.');
+  if (segments.some(segment => segment === '')) {
+    ctx.addIssue({ code: 'custom', message: 'Path segments must not be empty' });
+    return;
+  }
+  if (segments[segments.length - 1] === '*') {
+    ctx.addIssue({ code: 'custom', message: 'The last path segment must name a field, not *' });
+  }
+  const blocked = segments.find(segment => REMOVE_FROM_BODY_BLOCKED_SEGMENTS.has(segment));
+  if (blocked !== undefined) {
+    ctx.addIssue({ code: 'custom', message: `Path segment ${blocked} is not allowed` });
+  }
+});
+
+/**
+ * Replaces each reasoning effort a request names with the effort the upstream receives, for
+ * example `{ "xhigh": "high", "max": "high" }`. It rewrites only effort fields, so a disable sent
+ * another way, such as `reasoning.enabled: false`, is unaffected.
+ */
+export const ReasoningEffortMapSchema = z.partialRecord(
+  ReasoningEffortSchema,
+  ReasoningEffortSchema
+);
+
+export type ReasoningEffortMap = z.infer<typeof ReasoningEffortMapSchema>;
+
 export const CustomLlmApiConfigSchema = z.object({
   internal_id: z.string().min(1).optional(),
   /** Gateway APIs the upstream serves, including the one clients use. Without it, only that one. */
@@ -2998,8 +3073,9 @@ export const CustomLlmApiConfigSchema = z.object({
   sanitize_ref_fields: z.boolean().optional(),
   extra_headers: CustomLlmExtraHeadersSchema.optional(),
   extra_body: CustomLlmExtraBodySchema.optional(),
-  remove_from_body: z.array(z.string()).optional(),
+  remove_from_body: z.array(CustomLlmRemoveFromBodyPathSchema).optional(),
   reasoning_details_transform: ReasoningDetailsTransformSchema.optional(),
+  reasoning_effort_map: ReasoningEffortMapSchema.optional(),
 });
 
 export type CustomLlmApiConfig = z.infer<typeof CustomLlmApiConfigSchema>;
@@ -3118,6 +3194,22 @@ export const CustomLlmPublicSchema = z.object({
 
 export type CustomLlmPublic = z.infer<typeof CustomLlmPublicSchema>;
 
+/**
+ * Makes a custom LLM a partner route for the gateway catalog model with the same
+ * public id. It does not own the id: Kilo-paid requests for the model try the
+ * partner first and fall back to the regular route when it answers with an
+ * unsuccessful status. User BYOK keys and other user-paid routes are unaffected. When the
+ * definition declares `opencode_settings.reasoning_options`, a request for a reasoning effort
+ * outside them, after `reasoning_effort_map` applies, skips the partner up front.
+ */
+export const CustomLlmPartnerSchema = z.object({
+  /** The provider slug the partner serves the model as. Organization provider allow
+   * lists and request provider settings decide whether the partner may serve. */
+  inference_provider: CustomLlmInferenceProviderSlugSchema,
+});
+
+export type CustomLlmPartner = z.infer<typeof CustomLlmPartnerSchema>;
+
 /** An ISO 3166-1 alpha-2 code as sent in Vercel's `x-vercel-ip-country` header. */
 export const VercelCountryCodeSchema = z
   .string()
@@ -3169,6 +3261,8 @@ export const CustomLlmDefinitionSchema = z
     organization_ids: z.array(z.uuid()).optional(),
     group_ids: z.array(z.uuid()).optional(),
     public: CustomLlmPublicSchema.optional(),
+    /** Requires pricing, and excludes public, organization_ids, group_ids, and country_deny_list. */
+    partner: CustomLlmPartnerSchema.optional(),
     /** Hidden from model lists and refused by the gateway for requests from these countries.
      * A request without a known country is not restricted. */
     country_deny_list: z.array(VercelCountryCodeSchema).optional(),
@@ -3177,8 +3271,11 @@ export const CustomLlmDefinitionSchema = z
     pricing: CustomPricingTiersSchema.optional(),
     /** Whether the upstream may train on prompts. Only allowed with pricing; without it,
      * or when unset, the model is assumed to train on prompts. Set it to false only for
-     * an upstream with zero data retention. */
+     * an upstream that does not train on prompts. It never makes a custom LLM eligible
+     * for zero data retention (`provider.zdr`), which excludes every custom LLM. */
     may_train_on_prompts: z.boolean().optional(),
+    /** False keeps the row but serves it nowhere, as if it were deleted. Unset means enabled. */
+    is_enabled: z.boolean().optional(),
   })
   .superRefine((definition, ctx) => {
     const clientApiKind = getCustomLlmClientApiKind(definition.opencode_settings?.ai_sdk_provider);
@@ -3195,6 +3292,24 @@ export const CustomLlmDefinitionSchema = z
         path: ['may_train_on_prompts'],
         message: 'may_train_on_prompts must not be set without pricing',
       });
+    }
+    if (definition.partner) {
+      if (!definition.pricing) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['pricing'],
+          message: 'pricing must be set when partner is set',
+        });
+      }
+      for (const key of ['public', 'organization_ids', 'group_ids', 'country_deny_list'] as const) {
+        if (definition[key] !== undefined) {
+          ctx.addIssue({
+            code: 'custom',
+            path: [key],
+            message: `${key} must not be set when partner is set`,
+          });
+        }
+      }
     }
     if (!definition.public) return;
     for (const key of ['organization_ids', 'group_ids'] as const) {

@@ -88,7 +88,7 @@ vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }
 vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
 vi.mock('@/components/ui/preference-row', () => ({ PreferenceRow: 'PreferenceRow' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/text', () => ({ Text: 'Text', EYEBROW_LINE_HEIGHT_DP: 22 }));
 vi.mock('@/components/ui/icons', () => ({
   Bot: 'Bot',
   CornerDownLeft: 'CornerDownLeft',
@@ -132,6 +132,7 @@ describe('ProfileOverviewScreen offline refetch', () => {
     // The cached profile stays usable under the banner.
     expect(findField(renderer.root, 'Profile name')).toBeTruthy();
     expect(findAll(renderer.root, 'ConfigureRow').length).toBeGreaterThan(0);
+    expect(findOne(renderer.root, 'QueryError').props.placement).toBe('top');
 
     unmount();
   });
@@ -173,6 +174,10 @@ describe('ProfileOverviewScreen offline refetch', () => {
 
     expect(findOne(renderer.root, 'QueryError').props.variant).toBe('offline');
     expect(findAll(renderer.root, 'FormField')).toHaveLength(0);
+    // Nothing sits under the error, so it owns the surface: it centres and no
+    // tab scroller wraps it.
+    expect(findOne(renderer.root, 'QueryError').props.placement).toBe('center');
+    expect(findAll(renderer.root, 'TabScreenScrollView')).toHaveLength(0);
 
     unmount();
   });

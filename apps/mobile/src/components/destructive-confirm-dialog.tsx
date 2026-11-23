@@ -1,10 +1,12 @@
-import { useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
+import { SheetHeader } from '@/components/sheet-header';
 import { Button } from '@/components/ui/button';
 import { Sheet } from '@/components/ui/sheet';
 import { Text } from '@/components/ui/text';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 
 export type DestructiveConfirmDialogProps = {
   title: string;
@@ -20,6 +22,15 @@ export type DestructiveConfirmDialogProps = {
    * `onPress` runs once the dismissal finished.
    */
   extraAction?: { label: string; onPress: () => void };
+  /**
+   * Asks the dialog to dismiss itself with the safe choice, once, while the
+   * caller keeps rendering it: the caller's request lost its answer (an agent's
+   * interrupted call) and must go out the way a Cancel goes out. A choice the
+   * person already made wins — a pending action or a dismissal in flight is
+   * never overridden — and the sheet reports the finished dismissal through
+   * `onDismiss` as usual.
+   */
+  dismissRequested?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 };
@@ -58,20 +69,33 @@ export function DestructiveConfirmDialog({
   confirmLabel,
   cancelLabel,
   extraAction,
+  dismissRequested = false,
   onConfirm,
   onCancel,
 }: Readonly<DestructiveConfirmDialogProps>) {
   const { t } = useTranslation();
   const [visible, setVisible] = useState(true);
   const pendingAction = useRef<(() => void) | null>(null);
+  // The one-shot edge reads the latest handler without re-arming on the
+  // handler identity: the host re-renders the dialog with new handler
+  // closures while its flag stays true, and only the flag's edge starts a
+  // dismissal.
+  const onCancelRef = useRef(onCancel);
+  onCancelRef.current = onCancel;
 
-  function dismiss(action: () => void) {
+  const dismiss = useCallback((action: () => void) => {
     if (pendingAction.current !== null) {
       return;
     }
     pendingAction.current = action;
     setVisible(false);
-  }
+  }, []);
+
+  useEffect(() => {
+    if (dismissRequested) {
+      dismiss(onCancelRef.current);
+    }
+  }, [dismissRequested, dismiss]);
 
   return (
     <Sheet
@@ -86,13 +110,23 @@ export function DestructiveConfirmDialog({
       }}
       showHandle={false}
     >
-      <View className="gap-5 px-5 pt-6">
-        <View className="gap-2">
-          <Text accessibilityRole="header" className="text-lg font-semibold">
-            {title}
-          </Text>
-          <Text className="text-sm text-muted-foreground">{message}</Text>
-        </View>
+      <SheetHeader
+        title={title}
+        variant="close"
+        // The sheet floats above its content, never at the window top, so the
+        // header reserves no status-bar clearance.
+        topInset="never"
+        // The card draws no handle and no page chrome above the header, so the
+        // header's own padding is the whole band over the title: it takes the
+        // body's inset instead of the default `pt-4`, which left the title with
+        // twice the space over it that its divider leaves under it.
+        padTopToBody
+        onDone={() => {
+          dismiss(onCancel);
+        }}
+      />
+      <View className={SCREEN_BODY_CLASS}>
+        <Text variant="muted">{message}</Text>
         <View className="gap-2">
           <Button
             variant="destructive"
@@ -108,9 +142,6 @@ export function DestructiveConfirmDialog({
               variant="secondary"
               className="w-full"
               onPress={() => {
-                // Dismiss first, run after: the same hand-off Cancel and the
-                // destructive confirm use, so the reader is back on the screen
-                // — and sees whatever it reports — instead of under a sheet.
                 dismiss(extraAction.onPress);
               }}
             >

@@ -1,8 +1,10 @@
+import { MODE_SLUG_MAX_LENGTH, modeSlugFromName } from '@kilocode/app-shared/organizations';
 import {
   type inferRouterInputs,
   type inferRouterOutputs,
   type MobileRouter,
 } from '@kilocode/trpc/mobile';
+import * as z from 'zod';
 
 type OrgModeOutput =
   inferRouterOutputs<MobileRouter>['organizations']['modes']['list']['modes'][number];
@@ -44,10 +46,39 @@ export type OrgModeFormValues = Readonly<{
   editRestrictionLabel: string;
 }>;
 
+/**
+ * A mode form's durable draft: the whole typed form, so a restored draft seeds
+ * every field — not a per-field patch a person would have to reconcile.
+ */
+export type OrgModeFormDraft = OrgModeFormValues;
+
+/**
+ * The draft's stored shape. Strict on purpose: a value that carries any other
+ * key was written by a build with a different form, so the caller reads it as no
+ * draft and leaves it stored rather than coercing a shape it does not know.
+ */
+const orgModeFormDraftSchema = z.strictObject({
+  name: z.string(),
+  slug: z.string(),
+  roleDefinition: z.string(),
+  description: z.string(),
+  whenToUse: z.string(),
+  customInstructions: z.string(),
+  groups: z.array(z.enum(MODE_TOOL_GROUPS)),
+  editFileRegex: z.string(),
+  editRestrictionLabel: z.string(),
+});
+
+/** Shape guard for a stored mode form draft; another build's value is refused. */
+export function isOrgModeFormDraft(value: unknown): value is OrgModeFormDraft {
+  return orgModeFormDraftSchema.safeParse(value).success;
+}
+
 export type OrgModeFormErrorCode =
   | 'nameRequired'
   | 'identifierRequired'
   | 'identifierInvalid'
+  | 'identifierTooLong'
   | 'identifierTaken'
   | 'roleRequired'
   | 'restrictionInvalid';
@@ -64,12 +95,20 @@ export type OrgModeFormErrors = Readonly<{
   editFileRegex?: OrgModeFormErrorCode;
 }>;
 
+/**
+ * The form a save judges. A create has no stored row and derives an empty
+ * identifier from the name, so it can refuse neither an empty identifier nor a
+ * clash with itself; an update edits one stored row, which holds the identifier
+ * that a cleared field would drop.
+ */
+export type OrgModeFormTarget =
+  | Readonly<{ kind: 'create' }>
+  | Readonly<{ kind: 'update'; modeId: string }>;
+
 /** The server's mode-name bound. */
 export const ORG_MODE_NAME_MAX_LENGTH = 100;
 
-/** The server's mode-slug bound and character set. */
-export const ORG_MODE_SLUG_MAX_LENGTH = 50;
-
+/** The server's mode-slug character set; the length bound lives with the derivation. */
 const SLUG_PATTERN = /^[a-z0-9-]+$/;
 
 /** Whether a file pattern the person typed compiles as a regular expression. */
@@ -82,62 +121,38 @@ function isValidRegExp(source: string): boolean {
   }
 }
 
-/** The fallback a name with no letters or digits at all derives. */
-const FALLBACK_SLUG = 'mode';
-
-/**
- * The slug the create form derives from a name, as the web form derives it:
- * lowercase, every run of other characters folded to one hyphen, no leading or
- * trailing hyphen. A name that folds away completely — Arabic, Hebrew, `###` —
- * suggests `mode`, then `mode-2`, `mode-3`, … past the ones the organization
- * already holds, so the suggestion is never taken. An empty or whitespace-only
- * name suggests nothing (`''`): the fallback covers a name that folds away, not
- * a field the person has not filled. A derived slug is a suggestion the person
- * can replace.
- */
-export function modeSlugFromName(name: string, takenSlugs: readonly string[] = []): string {
-  // Nothing typed derives nothing; only a name whose characters fold away
-  // reaches the fallback counter below.
-  if (name.trim().length === 0) {
-    return '';
-  }
-  const folded = name
-    .toLowerCase()
-    .replaceAll(/[^a-z0-9]+/g, '-')
-    .replaceAll(/^-+|-+$/g, '');
-  if (folded.length > 0) {
-    return folded;
-  }
-  // The candidates outrun any set of taken slugs, so the loop below stops.
-  const taken = new Set(takenSlugs);
-  let attempt = 1;
-  const candidate = () => (attempt === 1 ? FALLBACK_SLUG : `${FALLBACK_SLUG}-${attempt}`);
-  while (taken.has(candidate())) {
-    attempt += 1;
-  }
-  return candidate();
-}
-
 /**
  * What the form refuses before it reaches the server: the required strings, the
- * slug's shape, a slug another mode in this organization already holds, and a
+ * slug's shape, a slug longer than the server's bound (reported apart from the
+ * character set, so a long suggestion reads as too long rather than as invalid
+ * characters), a slug another mode in this organization already holds, and a
  * file pattern that is not a regular expression. The server repeats the bounds,
  * so this only makes the refusal local. The pattern belongs to the `edit` group,
  * so it is checked only while that group is on — the same rule
  * `orgModeConfigInput` follows when it drops the restriction with the group.
+ *
+ * A create derives an empty identifier from the name on save, so only an update
+ * can lose one: the name is the one value a create must supply. An update is
+ * judged as the row it edits, so the identifier it already holds is not a clash
+ * with itself.
  */
 export function validateOrgModeForm(
   values: OrgModeFormValues,
   existingModes: readonly { id: string; slug: string }[],
-  editingModeId?: string
+  target: OrgModeFormTarget
 ): OrgModeFormErrors {
   const name = values.name.trim();
   const slug = values.slug.trim();
+  // The row an update edits, or nothing on create: the identifier a create would
+  // derive is checked against every mode, an update's own slug is not.
+  const editingModeId = target.kind === 'update' ? target.modeId : undefined;
   let slugError: OrgModeFormErrorCode | undefined = undefined;
   if (slug.length === 0) {
-    slugError = 'identifierRequired';
-  } else if (!SLUG_PATTERN.test(slug) || slug.length > ORG_MODE_SLUG_MAX_LENGTH) {
+    slugError = target.kind === 'update' ? 'identifierRequired' : undefined;
+  } else if (!SLUG_PATTERN.test(slug)) {
     slugError = 'identifierInvalid';
+  } else if (slug.length > MODE_SLUG_MAX_LENGTH) {
+    slugError = 'identifierTooLong';
   } else if (existingModes.some(mode => mode.slug === slug && mode.id !== editingModeId)) {
     slugError = 'identifierTaken';
   }

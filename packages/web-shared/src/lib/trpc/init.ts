@@ -1,5 +1,6 @@
 import 'server-only';
 import { headers } from 'next/headers';
+import { accountBlockedRefusalReason, isSelfCleanupProcedureCall } from '@kilocode/app-shared/auth';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { initTRPC, TRPCError } from '@trpc/server';
 import type { ProcedureType } from '@trpc/server';
@@ -20,22 +21,35 @@ import {
 } from '@kilocode/web-shared/lib/admin/admin-access-log';
 import {
   deriveCredentialKind,
+  type AdminStepUpDecision,
   type AdminStepUpState,
   type PrivilegedActionClass,
   type PrivilegedCredentialKind,
+  type PrivilegedTarget,
+  type PrivilegedTargetKind,
 } from '@kilocode/web-shared/lib/admin/privileged-access';
 import {
   actionClassForAdminProcedure,
   markPrivilegedGuard,
+  resolvesOwnStepUp,
+  targetIdFieldForAdminProcedure,
+  targetIdFromInput,
+  targetKindForInputField,
 } from '@kilocode/web-shared/lib/admin/privileged-inventory';
 import { runStepUpGuard } from '@kilocode/web-shared/lib/admin/step-up-guard';
+import { isOperationStepUpClass } from '@kilocode/web-shared/lib/admin/step-up-policy';
 import { isAdminStepUpEnabled } from '@kilocode/web-shared/lib/config.server';
-import { setTag, trpcMiddleware } from '@sentry/nextjs';
-import { AuthContextError, trpcErrorFormatter } from '@kilocode/web-shared/lib/trpc/transport';
+import { captureMessage, setTag, trpcMiddleware } from '@sentry/nextjs';
+import {
+  AccountBlockedError,
+  AuthContextError,
+  trpcErrorFormatter,
+} from '@kilocode/web-shared/lib/trpc/transport';
 import {
   appUpdateRequiredError,
   enforceMinimumVersion,
   getMinimumVersions,
+  NO_ROW_CACHE_TTL_MS,
 } from '@kilocode/web-shared/lib/trpc/min-version';
 import { APP_CLIENT_HEADER, isMobileClient } from '@kilocode/web-shared/lib/app-headers';
 import {
@@ -52,7 +66,26 @@ import {
 } from '@kilocode/web-shared/lib/trpc/control-plane-budget';
 
 export { UpstreamApiError } from '@kilocode/web-shared/lib/trpc/transport';
-// Define the context type
+
+// The admission is keyed on the whole request, never on the first call: a
+// batch that mixes a cleanup with any other call is refused as before, so the
+// exemption cannot carry another procedure through the gate. Which procedures
+// count as a cleanup, and why, is the shared list the mobile client also reads
+// (`@kilocode/app-shared/auth`): it keeps those calls out of its batch, so the
+// two sides cannot drift.
+//
+// The exemption covers self-scoped writes only. The request must itself be a
+// mutation, and each call must be a listed cleanup declared as one, so a query
+// never enters the exemption even if its path were added to the shared list: a
+// refused account cannot gain a read this way.
+function admitsRefusedAccount(info: ControlPlaneRequestInfo | null | undefined): boolean {
+  const type = info?.type;
+  const calls = info?.calls;
+  if (type !== 'mutation') return false;
+  if (!calls || calls.length === 0) return false;
+  return calls.every(call => isSelfCleanupProcedureCall({ path: call.path, type }));
+}
+
 export type TRPCContext = {
   user: User;
   deviceSessionId?: string;
@@ -84,6 +117,13 @@ export type TRPCContext = {
    */
   adminStepUpState?: AdminStepUpState;
   /**
+   * What the admin step-up middleware authorized for this request: the action
+   * class and target its guard measured. A specialized guard chained on it
+   * reads this to refuse reusing a decision that does not cover its own
+   * request.
+   */
+  adminStepUpDecision?: AdminStepUpDecision;
+  /**
    * Credential and privileged-inventory entry resolved once by the admin guard,
    * so the step-up enforcement chained after it and specialized guards cannot
    * name a different credential or action for the same request.
@@ -102,6 +142,8 @@ export type TRPCContext = {
    * `support` apart without re-querying.
    */
   organizationAccess?: OrganizationAccess;
+  /** Per-request step-up state. Each request gets its own set. */
+  stepUpClaims?: Set<string>;
   // Populated by `createTRPCContext` and read by the min-version middleware.
   headersList?: Headers;
   // `performance.now()` when the mobile control-plane budget started, set by
@@ -109,9 +151,10 @@ export type TRPCContext = {
   // as the shared auth read. Absent for web/CLI callers and test constructors.
   controlPlaneStartedAt?: number;
   /**
-   * Read client for model-stats snapshot loads. The gateway's REST facet sets
-   * `readDb` because its handlers run in `sfo1`; the web app leaves it unset and
-   * loads through the primary, which it must after a write invalidation.
+   * Read client for model-stats snapshot loads and the organization member gate's
+   * membership read. The gateway's REST facet sets `readDb` because its handlers
+   * run in `sfo1`; the web app leaves it unset and loads through the primary,
+   * which it must after a write invalidation.
    */
   fromDb?: ModelStatsLoadClient;
 };
@@ -148,6 +191,7 @@ export const createTRPCContext = async (opts?: CreateTRPCContextOpts): Promise<T
     internalApiUse,
     webSessionId,
     webSessionPepper,
+    refusalReason,
   } = await withControlPlaneBudget({
     path: controlPlanePathFromInfo(opts?.info),
     type: controlPlaneTypeFromInfo(opts?.info),
@@ -157,10 +201,40 @@ export const createTRPCContext = async (opts?: CreateTRPCContextOpts): Promise<T
         adminOnly: false,
         requestHeaders: headersList,
         requestPathname: opts?.req ? new URL(opts.req.url).pathname : undefined,
+        // A refused account still owns the session it is signing out of. The
+        // admission covers only the cleanup procedures (see
+        // admitsRefusedAccount), so every other call keeps the block refusal
+        // below.
+        allowRefusedAccountSelfCleanup: admitsRefusedAccount(opts?.info),
       }),
     startedAt,
     surface: 'context',
   });
+  // Authorization refused the account itself (R0 domain blacklist / R1 blocked
+  // account) while the session is intact. That is a different answer from a
+  // missing session: the mobile app must show why the account cannot be used
+  // and keep the user signed in, so this refuses with its own cause instead of
+  // reaching the AuthContextError branch below.
+  //
+  // Both refusals keep the same HTTP/tRPC shape (FORBIDDEN, `data.accountBlocked`)
+  // and differ only in the reason published beside it. The reason is what lets
+  // the app drop a retry: R1 (`account_blocked`) is one account's property,
+  // which support can lift, while R0 (`email_domain_blocked`) is the email
+  // domain's, so no retry, sign-out or sign-in can satisfy it.
+  //
+  // Only the first-party mobile client gets that answer. The web app already
+  // routes a blocked account to /account-blocked from its UNAUTHORIZED path
+  // (sign-in -> after-sign-in -> /account-blocked), and no web consumer reads
+  // `data.accountBlocked`, so every other client falls through to the
+  // merge-base UNAUTHORIZED answer unchanged.
+  const accountBlockedReason = accountBlockedRefusalReason(refusalReason);
+  if (accountBlockedReason !== null && isMobileClient(headersList?.get(APP_CLIENT_HEADER))) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Account access is blocked',
+      cause: new AccountBlockedError(accountBlockedReason),
+    });
+  }
   if (!user) {
     throw new TRPCError({
       code: 'UNAUTHORIZED',
@@ -178,11 +252,11 @@ export const createTRPCContext = async (opts?: CreateTRPCContextOpts): Promise<T
     deviceSessionId,
     cloudAgentAuthority,
     authViaToken,
-    credential: deriveCredentialKind({
+    credential: deriveContextCredential({
       authViaToken,
-      tokenSource: tokenSource ?? null,
+      tokenSource,
       internalApiUse,
-      delegatedWorkload: cloudAgentAuthority !== undefined,
+      cloudAgentAuthority,
     }),
     internalApiUse,
     tokenSource: tokenSource ?? null,
@@ -190,6 +264,7 @@ export const createTRPCContext = async (opts?: CreateTRPCContextOpts): Promise<T
     webSessionPepper: webSessionPepper ?? null,
     ip: clientIpFromHeaders(headersList),
     headersList,
+    stepUpClaims: new Set<string>(),
     controlPlaneStartedAt: isMobileClient(headersList?.get(APP_CLIENT_HEADER))
       ? startedAt
       : undefined,
@@ -252,9 +327,6 @@ export const timingMiddleware = async <TResult extends { ok: boolean }>({
   return result;
 };
 
-// Bounds a mobile query's procedure pipeline to whatever remains of the
-// control-plane budget started in `createTRPCContext`. Web/CLI callers and
-// mutations pass through untouched; see `control-plane-budget.ts`.
 const controlPlaneBudgetMiddleware = t.middleware(({ path, type, ctx, next }) =>
   withControlPlaneBudget({
     path,
@@ -277,15 +349,35 @@ const auditContextMiddleware = t.middleware(({ path, type, next }) =>
 // `isMobileClient` and pass without a DB read.
 // `getMinimumVersions` rejects with a retryable SERVICE_UNAVAILABLE when the
 // read failed and nothing is cached, and that rejection passes through here
-// unchanged, so only a version verdict becomes a FORBIDDEN app update here.
-// Runs before `sentryMiddleware`: both outcomes are expected gate verdicts, and
-// the read failure is already reported once per backoff window, so the tRPC
-// Sentry middleware must not capture one event per request during an outage
-// (its capture reaches `beforeSend`, which only drops tRPC 4xx errors).
+// unchanged. When the read succeeded but found no configuration row, it
+// resolves `null`: that is a missing configuration, not a version verdict, so
+// the call proceeds and the missing configuration is reported once per no-row
+// cache window. Only a version verdict becomes a FORBIDDEN app update here.
+// Runs before `sentryMiddleware`: all outcomes are expected gate verdicts, and
+// the read failure and the no-row report are throttled by their own windows, so
+// the tRPC Sentry middleware must not capture one event per request during an
+// outage (its capture reaches `beforeSend`, which only drops tRPC 4xx errors).
+let lastNoRowReportAt = 0;
 const minimumVersionMiddleware = t.middleware(async ({ ctx, next }) => {
   if (!isMobileClient(ctx.headersList?.get(APP_CLIENT_HEADER))) return next();
   const minimums = await getMinimumVersions();
-  if (!minimums || !enforceMinimumVersion(ctx.headersList, minimums).pass) {
+  if (minimums === null) {
+    // The gate's configuration is absent. Serve — an update cannot fix a
+    // missing row — but report so the missing configuration is visible.
+    const now = Date.now();
+    if (now - lastNoRowReportAt >= NO_ROW_CACHE_TTL_MS) {
+      lastNoRowReportAt = now;
+      captureMessage(
+        'SUSPICIOUS: no app_min_versions row configured; serving mobile callers unguarded',
+        {
+          level: 'error',
+          tags: { source: 'min_version_gate' },
+        }
+      );
+    }
+    return next();
+  }
+  if (!enforceMinimumVersion(ctx.headersList, minimums).pass) {
     throw appUpdateRequiredError();
   }
   return next();
@@ -326,21 +418,32 @@ export type AdminAttribution = {
   credential: PrivilegedCredentialKind;
   actionClass: PrivilegedActionClass;
   inventoryId: string | null;
+  targetKind: PrivilegedTargetKind;
 };
 
-// Derives the credential and the privileged-inventory entry once per admin
-// request. The guard publishes the result on the context, so the step-up
-// enforcement that runs after it reuses it instead of deriving the same two
-// values from the same inputs.
+/**
+ * The one credential-provenance derivation for a tRPC context, from the same
+ * four inputs at the request boundary and at the admin guard's fallback so a
+ * delegated caller is classified identically wherever the context was built
+ * or re-read.
+ */
+function deriveContextCredential(ctx: {
+  authViaToken?: boolean;
+  tokenSource?: string | null;
+  internalApiUse?: boolean;
+  cloudAgentAuthority?: CloudAgentAuthority;
+}): PrivilegedCredentialKind {
+  return deriveCredentialKind({
+    authViaToken: ctx.authViaToken ?? false,
+    tokenSource: ctx.tokenSource ?? null,
+    internalApiUse: ctx.internalApiUse,
+    delegatedWorkload: ctx.cloudAgentAuthority !== undefined,
+  });
+}
+
 function resolveAdminAttribution(ctx: TRPCContext, path: string, type: string): AdminAttribution {
   if (ctx.adminAttribution) return ctx.adminAttribution;
-  const credential =
-    ctx.credential ??
-    deriveCredentialKind({
-      authViaToken: ctx.authViaToken ?? false,
-      tokenSource: ctx.tokenSource ?? null,
-      internalApiUse: ctx.internalApiUse,
-    });
+  const credential = ctx.credential ?? deriveContextCredential(ctx);
   return { credential, ...actionClassForAdminProcedure(path, type) };
 }
 
@@ -411,26 +514,47 @@ const adminGuardMiddleware = t.middleware(adminGuardFn);
 // Enforcement for every admin procedure when the switch is on. When it is off
 // this performs no reads. `stepUp.*` is exempt so the dialog can read status and
 // the user can lock a session; both still require an admin browser session.
-// Specialized guards chained on adminProcedure reuse `adminStepUpState`.
-const adminStepUpEnforcementMiddleware = t.middleware(async ({ ctx, path, type, next }) => {
-  const enabled = isAdminStepUpEnabled();
-  if (!enabled || path.startsWith('stepUp.')) return next();
+// A procedure listed in `ADMIN_STEP_UP_SELF_GUARDED_ROUTES` is exempt because
+// its resolver binds the proof to the organization it acts on; the inventory
+// test keeps that list and those resolvers in step.
+// Specialized guards chained on adminProcedure reuse `adminStepUpState` and
+// check `adminStepUpDecision` before trusting it for their own request.
+const adminStepUpEnforcementMiddleware = t.middleware(
+  async ({ ctx, path, type, getRawInput, next }) => {
+    const enabled = isAdminStepUpEnabled();
+    if (!enabled || path.startsWith('stepUp.') || resolvesOwnStepUp(path)) return next();
 
-  const { credential, actionClass } = resolveAdminAttribution(ctx, path, type);
+    // The attribution lookup already resolved the inventory entry, which names
+    // the target kind; re-deriving it would be a second lookup for the same
+    // value.
+    const { credential, actionClass, targetKind } = resolveAdminAttribution(ctx, path, type);
+    // An operation proof is bound to the account or organization the request
+    // input names. A session-class decision ignores the target, so it stays
+    // unbound.
+    let target: PrivilegedTarget = { kind: targetKind, id: null };
+    if (isOperationStepUpClass(actionClass)) {
+      const field = targetIdFieldForAdminProcedure(path);
+      if (field !== null) {
+        const id = targetIdFromInput(field, await getRawInput());
+        if (id !== null) target = { kind: targetKindForInputField(field), id };
+      }
+    }
 
-  const adminStepUpState = await runStepUpGuard({
-    userId: ctx.user.id,
-    credential,
-    webSessionId: ctx.webSessionId,
-    actionClass,
-    enabled,
-    route: path,
-    method: type,
-    surface: 'trpc',
-  });
+    const adminStepUpState = await runStepUpGuard({
+      userId: ctx.user.id,
+      credential,
+      webSessionId: ctx.webSessionId,
+      actionClass,
+      target,
+      enabled,
+      route: path,
+      method: type,
+      surface: 'trpc',
+    });
 
-  return next({ ctx: { adminStepUpState } });
-});
+    return next({ ctx: { adminStepUpState, adminStepUpDecision: { actionClass, target } } });
+  }
+);
 
 export const adminProcedure = baseProcedure
   .use(adminGuardMiddleware)

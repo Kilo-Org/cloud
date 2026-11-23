@@ -486,8 +486,8 @@ test('the catalog job owns exactly the paths no mobile family selects', () => {
   const install = steps.find(step => step.name === 'Install dependencies');
   assert.equal(
     install?.run,
-    'pnpm --filter kilocode-monorepo install --frozen-lockfile --ignore-scripts',
-    'the catalog job installs only the root project the audit reads'
+    'pnpm --filter kilocode-monorepo --filter kilo-app install --frozen-lockfile --ignore-scripts',
+    'the catalog job installs the app too, because the audit reads the plural data the app bundle ships'
   );
   assert.deepEqual(
     steps.map(step => step.name).filter(Boolean),
@@ -527,19 +527,25 @@ test('only the shards and the typecheck skip a lint-only change', () => {
       `${name} must skip exactly a lint-only change`
     );
   }
-  for (const name of [
-    'prepare-harness-sdk',
-    'prepare-trpc',
-    'mobile-lint',
-    'i18n-leftover',
-    'check-unused',
-  ]) {
+  for (const name of ['prepare-trpc', 'mobile-lint', 'i18n-leftover', 'check-unused']) {
     assert.equal(
       mobile.jobs[name].if,
       "needs.mobile-changes.outputs.mobile == 'true'",
       `${name} must keep running for a lint-only change`
     );
   }
+  // The harness producer reads no detection output, so it starts beside change
+  // detection instead of behind it.
+  assert.equal(
+    mobile.jobs['prepare-harness-sdk'].needs,
+    undefined,
+    'the harness producer starts beside change detection'
+  );
+  assert.equal(
+    mobile.jobs['prepare-harness-sdk'].if,
+    undefined,
+    'the harness producer starts beside change detection'
+  );
   assert.equal(
     mobile.jobs['mobile-test-result'].if,
     '${{ !cancelled() }}',

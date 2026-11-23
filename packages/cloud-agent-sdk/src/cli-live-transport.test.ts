@@ -20,6 +20,13 @@ import {
   type UserWebSystemEvent,
 } from './user-web-connection';
 import type { KiloSessionId, SessionSnapshot, SessionSnapshotPageOutcome } from './types';
+import type { SessionSnapshotFailure } from './snapshot-page';
+import {
+  CLI_SNAPSHOT_BUFFER_MAX_EVENTS,
+  CLI_SNAPSHOT_REPLAY_DEADLINE_MS,
+  SNAPSHOT_READ_BASE_DELAY_MS,
+  SNAPSHOT_READ_MAX_RETRIES,
+} from './limits';
 import { kiloId, makeSnapshot, stubTextPart, stubUserMessage } from './test-helpers';
 import type { RemoteAttachmentPart } from './transport';
 
@@ -187,11 +194,11 @@ function createConnection(): FakeUserWebConnection {
 function createTransportWithSinks(opts?: {
   connection?: FakeUserWebConnection;
   fetchSnapshot?: (kiloSessionId: KiloSessionId) => Promise<SessionSnapshot>;
-  onError?: (message: string) => void;
+  onError?: (message: string, failure?: SessionSnapshotFailure) => void;
   onRemoteModelStateChange?: (state: RemoteModelState) => void;
   onRemoteCommandStateChange?: (state: RemoteCommandState) => void;
-  onCapabilityChange?: () => void;
-  onCapabilitiesChange?: (capabilities: { attachments?: boolean } | undefined) => void;
+  onComposerCapabilityChange?: () => void;
+  onCliCapabilitiesReported?: (capabilities: { attachments?: boolean } | undefined) => void;
 }) {
   const userWebConnection = opts?.connection ?? createConnection();
   const chatEvents: ChatEvent[] = [];
@@ -204,8 +211,8 @@ function createTransportWithSinks(opts?: {
     onError: opts?.onError,
     onRemoteModelStateChange: opts?.onRemoteModelStateChange,
     onRemoteCommandStateChange: opts?.onRemoteCommandStateChange,
-    onCapabilityChange: opts?.onCapabilityChange,
-    onCapabilitiesChange: opts?.onCapabilitiesChange,
+    onComposerCapabilityChange: opts?.onComposerCapabilityChange,
+    onCliCapabilitiesReported: opts?.onCliCapabilitiesReported,
   })({
     onChatEvent: event => chatEvents.push(event),
     onServiceEvent: event => serviceEvents.push(event),
@@ -476,6 +483,63 @@ describe('CliLiveTransport unified user web connection', () => {
           .mocked(connection.sendCommand)
           .mock.calls.filter(([, command]) => command === 'list_models')
       ).toHaveLength(2);
+      transport.destroy();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('keeps the last valid catalog when a refresh reports an empty catalog', async () => {
+    jest.useFakeTimers();
+    try {
+      const connection = createConnection();
+      let modelRequest = 0;
+      jest.mocked(connection.sendCommand).mockImplementation((_sessionId, command) => {
+        if (command === 'list_commands') return Promise.resolve(COMMAND_WIRE_CATALOG);
+        modelRequest += 1;
+        return Promise.resolve(modelRequest === 1 ? WIRE_CATALOG : EMPTY_WIRE_CATALOG);
+      });
+      const states: RemoteModelState[] = [];
+      const { transport } = createTransportWithSinks({
+        connection,
+        onRemoteModelStateChange: state => states.push(state),
+      });
+
+      transport.connect();
+      emitOwner(connection);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(states.at(-1)).toEqual({
+        ownerConnectionId: 'owner',
+        protocol: 'v1',
+        catalog: REMOTE_CATALOG,
+        refresh: 'idle',
+      });
+
+      transport.retryRemoteModels?.();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      // The empty refresh keeps the catalog validated on the last success, so
+      // a pending send still finds its model instead of failing.
+      expect(states.at(-1)).toEqual({
+        ownerConnectionId: 'owner',
+        protocol: 'v1',
+        catalog: REMOTE_CATALOG,
+        refresh: 'error',
+        error: 'Remote model catalog is empty',
+      });
+      expect(states).toContainEqual({
+        ownerConnectionId: 'owner',
+        protocol: 'v1',
+        catalog: REMOTE_CATALOG,
+        refresh: 'loading',
+      });
+      expect(states).not.toContainEqual(
+        expect.objectContaining({ refresh: 'error', catalog: undefined })
+      );
       transport.destroy();
     } finally {
       jest.useRealTimers();
@@ -902,7 +966,7 @@ describe('CliLiveTransport unified user web connection', () => {
     const capabilityChanges = jest.fn();
     const { transport } = createTransportWithSinks({
       connection,
-      onCapabilityChange: capabilityChanges,
+      onComposerCapabilityChange: capabilityChanges,
     });
 
     transport.connect();
@@ -935,6 +999,62 @@ describe('CliLiveTransport unified user web connection', () => {
       data: { sessions: [] },
     });
     expect(transport.canSend?.()).toBe(false);
+    transport.destroy();
+  });
+
+  it('drops the owner when catalog discovery is fenced by SESSION_OWNER_CHANGED', async () => {
+    const connection = createConnection();
+    jest.mocked(connection.sendCommand).mockImplementation((_sessionId, command) => {
+      if (command === 'list_models') return Promise.resolve(WIRE_CATALOG);
+      return Promise.reject(
+        new UserWebCommandError({ code: 'SESSION_OWNER_CHANGED', message: 'Session owner changed' })
+      );
+    });
+    const modelStates: RemoteModelState[] = [];
+    const commandStates: RemoteCommandState[] = [];
+    const { transport, serviceEvents } = createTransportWithSinks({
+      connection,
+      onRemoteModelStateChange: state => modelStates.push(state),
+      onRemoteCommandStateChange: state => commandStates.push(state),
+    });
+
+    transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // Command discovery is fenced: the owner is dropped instead of the fence
+    // being published as a catalog error.
+    expect(commandStates.at(-1)?.ownerConnectionId).toBeNull();
+    expect(commandStates.some(state => state.refresh === 'error')).toBe(false);
+
+    // The same fence on model discovery. `sendCommand` runs synchronously when
+    // the owner is adopted, so the new implementation must be in place before
+    // the second owner is emitted.
+    jest.mocked(connection.sendCommand).mockImplementation((_sessionId, command) => {
+      if (command === 'list_models') {
+        return Promise.reject(
+          new UserWebCommandError({
+            code: 'SESSION_OWNER_CHANGED',
+            message: 'Session owner changed',
+          })
+        );
+      }
+      return Promise.resolve(COMMAND_WIRE_CATALOG);
+    });
+    const modelStatesBeforeModelFence = modelStates.length;
+
+    emitOwner(connection, 'second-owner');
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(modelStates.at(-1)?.ownerConnectionId).toBeNull();
+    expect(
+      modelStates.slice(modelStatesBeforeModelFence).some(state => state.refresh === 'error')
+    ).toBe(false);
+    expect(serviceEvents.some(event => event.type === 'stopped' && event.reason === 'error')).toBe(
+      false
+    );
     transport.destroy();
   });
 
@@ -1276,50 +1396,76 @@ describe('CliLiveTransport unified user web connection', () => {
   });
 
   it('reports initial snapshot failure, drains buffered chat, and stays subscribed', async () => {
-    const onError = jest.fn();
-    const { userWebConnection, transport, chatEvents } = createTransportWithSinks({
-      fetchSnapshot: () => Promise.reject(new Error('snapshot unavailable')),
-      onError,
-    });
-    transport.connect();
-    emitMessageUpdated(userWebConnection);
+    jest.useFakeTimers();
+    try {
+      const onError = jest.fn();
+      const { userWebConnection, transport, chatEvents } = createTransportWithSinks({
+        fetchSnapshot: () => Promise.reject(new Error('snapshot unavailable')),
+        onError,
+      });
+      transport.connect();
+      emitMessageUpdated(userWebConnection);
 
-    await Promise.resolve();
-    await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      // A rejected read is retried under the bounded budget before it is
+      // reported, so nothing surfaces while the chain is still running.
+      expect(onError).not.toHaveBeenCalled();
+      expect(chatEvents).toHaveLength(0);
 
-    expect(onError).toHaveBeenCalledWith('snapshot unavailable');
-    expect(chatEvents).toHaveLength(1);
-    expect(userWebConnection.subscribeToCliSession).toHaveBeenCalledWith(KILO_SESSION_ID);
-    transport.destroy();
+      await jest.advanceTimersByTimeAsync(
+        SNAPSHOT_READ_BASE_DELAY_MS * (2 ** SNAPSHOT_READ_MAX_RETRIES - 1)
+      );
+
+      expect(onError).toHaveBeenCalledTimes(1);
+      expect(onError).toHaveBeenCalledWith('snapshot unavailable', undefined);
+      expect(chatEvents).toHaveLength(1);
+      expect(userWebConnection.subscribeToCliSession).toHaveBeenCalledWith(KILO_SESSION_ID);
+      transport.destroy();
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('replays a new snapshot after reconnect and drains pre-reconnect buffered chat on failure', async () => {
-    const firstSnapshot = new Promise<SessionSnapshot>(() => {});
-    const fetchSnapshot = jest
-      .fn()
-      .mockReturnValueOnce(firstSnapshot)
-      .mockRejectedValueOnce(new Error('replacement unavailable'))
-      .mockResolvedValueOnce(makeSnapshot({ id: KILO_SESSION_ID }));
-    const onError = jest.fn();
-    const { userWebConnection, transport, chatEvents, serviceEvents } = createTransportWithSinks({
-      fetchSnapshot,
-      onError,
-    });
-    transport.connect();
-    emitMessageUpdated(userWebConnection);
+    jest.useFakeTimers();
+    try {
+      const firstSnapshot = new Promise<SessionSnapshot>(() => {});
+      const fetchSnapshot = jest
+        .fn()
+        .mockReturnValueOnce(firstSnapshot)
+        .mockRejectedValueOnce(new Error('replacement unavailable'))
+        .mockRejectedValue(new Error('replacement unavailable'));
+      const onError = jest.fn();
+      const { userWebConnection, transport, chatEvents, serviceEvents } = createTransportWithSinks({
+        fetchSnapshot,
+        onError,
+      });
+      transport.connect();
+      emitMessageUpdated(userWebConnection);
 
-    userWebConnection.emitReconnect();
-    await Promise.resolve();
-    await Promise.resolve();
-    expect(chatEvents).toHaveLength(1);
-    expect(onError).not.toHaveBeenCalled();
+      // Every attempt of the reconnect chain rejects, so the pre-reconnect
+      // buffered chat is released once the chain is exhausted.
+      userWebConnection.emitReconnect();
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(chatEvents).toHaveLength(0);
+      await jest.advanceTimersByTimeAsync(
+        SNAPSHOT_READ_BASE_DELAY_MS * (2 ** SNAPSHOT_READ_MAX_RETRIES - 1)
+      );
+      expect(chatEvents).toHaveLength(1);
+      expect(onError).not.toHaveBeenCalled();
 
-    userWebConnection.emitReconnect();
-    await Promise.resolve();
-    await Promise.resolve();
-    expect(fetchSnapshot).toHaveBeenCalledTimes(3);
-    expect(serviceEvents).toContainEqual(expect.objectContaining({ type: 'session.created' }));
-    transport.destroy();
+      // A later reconnect whose read applies replays the snapshot.
+      fetchSnapshot.mockResolvedValueOnce(makeSnapshot({ id: KILO_SESSION_ID }));
+      userWebConnection.emitReconnect();
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(serviceEvents).toContainEqual(expect.objectContaining({ type: 'session.created' }));
+      transport.destroy();
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('sends a v1 CLI-catalog override as a structured model with a catalog-valid variant', async () => {
@@ -2372,6 +2518,46 @@ describe('CliLiveTransport remote command catalog', () => {
       type: 'commands.available',
       commands: replacementCatalog.commands,
     });
+    transport.destroy();
+  });
+
+  it('clears the published command catalog when connect supersedes a live owner', async () => {
+    const connection = createConnection();
+    jest
+      .mocked(connection.sendCommand)
+      .mockImplementation((_sessionId, command) =>
+        Promise.resolve(command === 'list_models' ? WIRE_CATALOG : COMMAND_WIRE_CATALOG)
+      );
+    const { transport, serviceEvents } = createTransportWithSinks({ connection });
+
+    transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(serviceEvents.filter(event => event.type === 'commands.available').at(-1)).toEqual({
+      type: 'commands.available',
+      commands: PARSED_COMMAND_CATALOG,
+    });
+
+    // A second connect re-enters with the owner still known, so it must take the
+    // same owner-replacement path as a real owner change: drop the cached
+    // catalog rather than keep serving commands the new connection may not have.
+    transport.connect();
+
+    expect(serviceEvents.filter(event => event.type === 'commands.available').at(-1)).toEqual({
+      type: 'commands.available',
+      commands: [],
+    });
+    transport.destroy();
+  });
+
+  it('keeps the command catalog when connect starts from no owner', async () => {
+    const { transport, serviceEvents } = createTransportWithSinks();
+
+    transport.connect();
+
+    expect(serviceEvents.filter(event => event.type === 'commands.available')).toEqual([]);
     transport.destroy();
   });
 
@@ -3709,19 +3895,22 @@ describe('CliLiveTransport exitSession', () => {
 
 type FetchPage = (
   kiloSessionId: KiloSessionId,
-  options: { cursor?: string }
+  options: { cursor?: string; signal?: AbortSignal }
 ) => Promise<SessionSnapshotPageOutcome | null>;
 
 type CreatePageTransportOptions = {
   fetchSnapshotPage: FetchPage;
-  fetchSnapshot?: (kiloSessionId: KiloSessionId) => Promise<SessionSnapshot>;
+  fetchSnapshot?: (
+    kiloSessionId: KiloSessionId,
+    options?: { signal?: AbortSignal }
+  ) => Promise<SessionSnapshot>;
   onInitialPageLoaded?: (page: {
     info: { id: string };
     messages: Array<{ info: { id: string; sessionID: string }; parts: unknown[] }>;
     nextCursor: string | null;
     omittedItemCount: number;
   }) => void;
-  onError?: (message: string) => void;
+  onError?: (message: string, failure?: SessionSnapshotFailure) => void;
 };
 
 function createPageTransport(options: CreatePageTransportOptions) {
@@ -3788,7 +3977,9 @@ describe('CliLiveTransport page-seam + reconnect', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(fetchSnapshotPage).toHaveBeenCalledWith(KILO_SESSION_ID, {});
+    expect(fetchSnapshotPage).toHaveBeenCalledWith(KILO_SESSION_ID, {
+      signal: expect.any(AbortSignal),
+    });
     expect(onInitialPageLoaded).toHaveBeenCalledWith(page);
     // session.created from the page must have flowed through.
     expect(serviceEvents.filter(event => event.type === 'session.created')).toHaveLength(1);
@@ -3912,23 +4103,189 @@ describe('CliLiveTransport page-seam + reconnect', () => {
   });
 
   it('surfaces retryable_failure on the initial read via onError but stays subscribed', async () => {
-    const onError = jest.fn();
-    const { transport, userWebConnection, onInitialPageLoaded, serviceEvents } =
-      createPageTransport({
+    jest.useFakeTimers();
+    try {
+      const onError = jest.fn();
+      const {
+        transport,
+        userWebConnection,
+        onInitialPageLoaded,
+        serviceEvents,
+        fetchSnapshotPage,
+      } = createPageTransport({
         fetchSnapshotPage: async () => ({ kind: 'retryable_failure' }),
         onError,
       });
 
-    transport.connect();
-    await Promise.resolve();
-    await Promise.resolve();
+      transport.connect();
+      await Promise.resolve();
+      await Promise.resolve();
 
-    expect(onError).toHaveBeenCalledWith('Session history temporarily unavailable');
-    expect(onInitialPageLoaded).not.toHaveBeenCalled();
-    // No session.created was emitted because no successful page replayed.
-    expect(serviceEvents.filter(event => event.type === 'session.created')).toHaveLength(0);
-    expect(userWebConnection.subscribeToCliSession).toHaveBeenCalledWith(KILO_SESSION_ID);
-    transport.destroy();
+      // A retryable page is retried under the bounded budget; the failure is
+      // reported once, when the chain is exhausted.
+      expect(onError).not.toHaveBeenCalled();
+      await jest.advanceTimersByTimeAsync(
+        SNAPSHOT_READ_BASE_DELAY_MS * (2 ** SNAPSHOT_READ_MAX_RETRIES - 1)
+      );
+
+      expect(fetchSnapshotPage).toHaveBeenCalledTimes(1 + SNAPSHOT_READ_MAX_RETRIES);
+      expect(onError).toHaveBeenCalledTimes(1);
+      expect(onError).toHaveBeenCalledWith('Session history temporarily unavailable', {
+        kind: 'retryable_failure',
+        message: 'Session history temporarily unavailable',
+      });
+      expect(onInitialPageLoaded).not.toHaveBeenCalled();
+      // No session.created was emitted because no successful page replayed.
+      expect(serviceEvents.filter(event => event.type === 'session.created')).toHaveLength(0);
+      expect(userWebConnection.subscribeToCliSession).toHaveBeenCalledWith(KILO_SESSION_ID);
+      transport.destroy();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('retries a rejected page read and applies the successful retry', async () => {
+    jest.useFakeTimers();
+    try {
+      const page = makeLivePage({ nextCursor: 'cursor-A' });
+      const fetchSnapshotPage = jest
+        .fn<Promise<SessionSnapshotPageOutcome | null>, [KiloSessionId, { cursor?: string }]>()
+        .mockRejectedValueOnce(new Error('page read failed'))
+        .mockResolvedValueOnce(page);
+      const onError = jest.fn();
+      const {
+        transport,
+        userWebConnection,
+        chatEvents,
+        serviceEvents,
+        onInitialPageLoaded,
+        getReplayCompleteCount,
+      } = createPageTransport({ fetchSnapshotPage, onError });
+
+      transport.connect();
+      await Promise.resolve();
+      await Promise.resolve();
+      emitMessageUpdated(userWebConnection);
+      await Promise.resolve();
+      // Both the page and the live event behind it wait for the retry.
+      expect(chatEvents).toHaveLength(0);
+      expect(serviceEvents).toHaveLength(0);
+
+      await jest.advanceTimersByTimeAsync(SNAPSHOT_READ_BASE_DELAY_MS);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(fetchSnapshotPage).toHaveBeenCalledTimes(2);
+      expect(onError).not.toHaveBeenCalled();
+      expect(onInitialPageLoaded).toHaveBeenCalledTimes(1);
+      expect(onInitialPageLoaded).toHaveBeenCalledWith(page);
+      expect(serviceEvents.filter(event => event.type === 'session.created')).toHaveLength(1);
+      expect(chatEvents).toHaveLength(1);
+      expect(getReplayCompleteCount()).toBe(1);
+      transport.destroy();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('buffers a live event across the retry backoff and drains it once the chain is exhausted', async () => {
+    jest.useFakeTimers();
+    try {
+      const fetchSnapshotPage = jest
+        .fn<Promise<SessionSnapshotPageOutcome | null>, [KiloSessionId, { cursor?: string }]>()
+        .mockResolvedValue({ kind: 'retryable_failure' });
+      const onError = jest.fn();
+      const {
+        transport,
+        userWebConnection,
+        chatEvents,
+        onInitialPageLoaded,
+        getReplayCompleteCount,
+      } = createPageTransport({ fetchSnapshotPage, onError });
+
+      transport.connect();
+      await Promise.resolve();
+      await Promise.resolve();
+      emitMessageUpdated(userWebConnection);
+      await Promise.resolve();
+      expect(chatEvents).toHaveLength(0);
+
+      await jest.advanceTimersByTimeAsync(
+        SNAPSHOT_READ_BASE_DELAY_MS * (2 ** SNAPSHOT_READ_MAX_RETRIES - 1)
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(fetchSnapshotPage).toHaveBeenCalledTimes(1 + SNAPSHOT_READ_MAX_RETRIES);
+      expect(onError).toHaveBeenCalledTimes(1);
+      expect(onError).toHaveBeenCalledWith('Session history temporarily unavailable', {
+        kind: 'retryable_failure',
+        message: 'Session history temporarily unavailable',
+      });
+      expect(chatEvents).toHaveLength(1);
+      expect(getReplayCompleteCount()).toBe(1);
+      expect(onInitialPageLoaded).not.toHaveBeenCalled();
+      transport.destroy();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('cancels a pending retry when a newer replay supersedes it', async () => {
+    jest.useFakeTimers();
+    try {
+      const fetchSnapshotPage = jest
+        .fn<Promise<SessionSnapshotPageOutcome | null>, [KiloSessionId, { cursor?: string }]>()
+        .mockRejectedValue(new Error('page read failed'));
+      const { transport, userWebConnection } = createPageTransport({ fetchSnapshotPage });
+
+      transport.connect();
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(fetchSnapshotPage).toHaveBeenCalledTimes(1);
+      expect(jest.getTimerCount()).toBe(1);
+
+      // The reconnect cancels the connect() retry and starts its own episode,
+      // whose first attempt runs immediately.
+      userWebConnection.emitReconnect();
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(fetchSnapshotPage).toHaveBeenCalledTimes(2);
+
+      await jest.advanceTimersByTimeAsync(SNAPSHOT_READ_BASE_DELAY_MS);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      // Only the surviving episode's retry read the snapshot; the cancelled
+      // one would have added a third call at the same 500 ms mark.
+      expect(fetchSnapshotPage).toHaveBeenCalledTimes(3);
+      transport.destroy();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('clears a pending retry on destroy', async () => {
+    jest.useFakeTimers();
+    try {
+      const fetchSnapshotPage = jest
+        .fn<Promise<SessionSnapshotPageOutcome | null>, [KiloSessionId, { cursor?: string }]>()
+        .mockRejectedValue(new Error('page read failed'));
+      const { transport } = createPageTransport({ fetchSnapshotPage });
+
+      transport.connect();
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(jest.getTimerCount()).toBe(1);
+
+      transport.destroy();
+      expect(jest.getTimerCount()).toBe(0);
+
+      await jest.advanceTimersByTimeAsync(SNAPSHOT_READ_BASE_DELAY_MS * 10);
+      expect(fetchSnapshotPage).toHaveBeenCalledTimes(1);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('surfaces too_large and invalid_data typed failures via onError', async () => {
@@ -3944,7 +4301,10 @@ describe('CliLiveTransport page-seam + reconnect', () => {
       transport.connect();
       await Promise.resolve();
       await Promise.resolve();
-      expect(onError).toHaveBeenCalledWith(failure.expected);
+      expect(onError).toHaveBeenCalledWith(failure.expected, {
+        kind: failure.kind,
+        message: failure.expected,
+      });
       expect(onInitialPageLoaded).not.toHaveBeenCalled();
       transport.destroy();
     }
@@ -3961,7 +4321,7 @@ describe('CliLiveTransport page-seam + reconnect', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(onError).toHaveBeenCalledWith('Session not found');
+    expect(onError).toHaveBeenCalledWith('Session not found', undefined);
     expect(onInitialPageLoaded).not.toHaveBeenCalled();
     transport.destroy();
   });
@@ -4031,38 +4391,242 @@ describe('CliLiveTransport page-seam + reconnect', () => {
   });
 
   it('swallows a rejected reconnect page without leaving events stranded', async () => {
-    const initial = makeLivePage({ nextCursor: 'cursor-A' });
-    const fetchSnapshotPage = jest
-      .fn<Promise<SessionSnapshotPageOutcome | null>, [KiloSessionId, { cursor?: string }]>()
-      .mockResolvedValueOnce(initial)
-      .mockRejectedValueOnce(new Error('reconnect refetch failed'));
-    const onError = jest.fn();
-    const { transport, userWebConnection, chatEvents, getReplayCompleteCount } =
-      createPageTransport({
-        fetchSnapshotPage,
+    jest.useFakeTimers();
+    try {
+      const initial = makeLivePage({ nextCursor: 'cursor-A' });
+      const fetchSnapshotPage = jest
+        .fn<Promise<SessionSnapshotPageOutcome | null>, [KiloSessionId, { cursor?: string }]>()
+        .mockResolvedValueOnce(initial)
+        .mockRejectedValue(new Error('reconnect refetch failed'));
+      const onError = jest.fn();
+      const { transport, userWebConnection, chatEvents, getReplayCompleteCount } =
+        createPageTransport({
+          fetchSnapshotPage,
+          onError,
+        });
+
+      transport.connect();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      // The initial page applied, so this live event passes straight through.
+      emitMessageUpdated(userWebConnection);
+      expect(chatEvents).toHaveLength(1);
+
+      userWebConnection.emitReconnect();
+      await Promise.resolve();
+      await Promise.resolve();
+      emitMessageUpdated(userWebConnection);
+      await Promise.resolve();
+      // The event emitted during the reconnect is buffered behind the retry
+      // chain, not delivered ahead of the page it waits for.
+      expect(chatEvents).toHaveLength(1);
+
+      await jest.advanceTimersByTimeAsync(
+        SNAPSHOT_READ_BASE_DELAY_MS * (2 ** SNAPSHOT_READ_MAX_RETRIES - 1)
+      );
+
+      // Initial reconnect errors must not surface to the manager — the live
+      // stream carries on. The buffered event must still be drained, once.
+      expect(onError).not.toHaveBeenCalled();
+      expect(fetchSnapshotPage).toHaveBeenCalledTimes(2 + SNAPSHOT_READ_MAX_RETRIES);
+      expect(chatEvents).toHaveLength(2);
+      expect(
+        chatEvents.filter(event => event.type === 'message.updated' && event.info.id === 'msg-live')
+      ).toHaveLength(2);
+      expect(getReplayCompleteCount()).toBeGreaterThanOrEqual(2);
+      transport.destroy();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('releases the buffer at the replay deadline when a page read stalls', async () => {
+    jest.useFakeTimers();
+    try {
+      // This package's `lib` target predates `Promise.withResolvers`.
+      let resolvePage!: (page: SessionSnapshotPageOutcome | null) => void;
+      let readOptions: { cursor?: string; signal?: AbortSignal } | undefined;
+      const {
+        transport,
+        userWebConnection,
+        chatEvents,
         onError,
+        onInitialPageLoaded,
+        getReplayCompleteCount,
+      } = createPageTransport({
+        fetchSnapshotPage: (_kiloSessionId, options) => {
+          readOptions = options;
+          return new Promise<SessionSnapshotPageOutcome | null>(resolve => {
+            resolvePage = resolve;
+          });
+        },
+      });
+
+      transport.connect();
+      await Promise.resolve();
+
+      // The live event waits behind the stalled read; it must not be held for
+      // the whole attach.
+      emitMessageUpdated(userWebConnection);
+      expect(chatEvents).toHaveLength(0);
+      expect(getReplayCompleteCount()).toBe(0);
+
+      jest.advanceTimersByTime(CLI_SNAPSHOT_REPLAY_DEADLINE_MS);
+      await Promise.resolve();
+
+      expect(readOptions?.signal?.aborted).toBe(true);
+      expect(chatEvents).toHaveLength(1);
+      expect(getReplayCompleteCount()).toBe(1);
+      expect(onError).toHaveBeenCalledTimes(1);
+      expect(onError).toHaveBeenCalledWith('Session history temporarily unavailable', {
+        kind: 'retryable_failure',
+        message: 'Session history temporarily unavailable',
+      });
+      expect(onInitialPageLoaded).not.toHaveBeenCalled();
+
+      // A page that lands after the deadline is dropped rather than replayed
+      // over the event already delivered.
+      resolvePage(makeLivePage());
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(chatEvents).toHaveLength(1);
+      expect(onInitialPageLoaded).not.toHaveBeenCalled();
+      expect(getReplayCompleteCount()).toBe(1);
+      transport.destroy();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('settles the read when the buffer reaches the cap and delivers every event in order once', async () => {
+    const { transport, userWebConnection, chatEvents, onError, getReplayCompleteCount } =
+      createPageTransport({
+        fetchSnapshotPage: () => new Promise<SessionSnapshotPageOutcome | null>(() => undefined),
       });
 
     transport.connect();
     await Promise.resolve();
-    await Promise.resolve();
 
-    emitMessageUpdated(userWebConnection);
-    userWebConnection.emitReconnect();
-    await Promise.resolve();
-    await Promise.resolve();
+    for (let index = 0; index < CLI_SNAPSHOT_BUFFER_MAX_EVENTS; index += 1) {
+      userWebConnection.emitCli({
+        sessionId: KILO_SESSION_ID,
+        event: 'message.updated',
+        data: {
+          info: {
+            id: `msg-${index}`,
+            sessionID: KILO_SESSION_ID,
+            role: 'assistant',
+            time: { created: 1 },
+          },
+        },
+      });
+    }
 
-    // Initial reconnect errors must not surface to the manager — the live
-    // stream carries on. The buffered event must still be drained.
-    expect(onError).not.toHaveBeenCalled();
-    expect(chatEvents).toHaveLength(1);
-    expect(getReplayCompleteCount()).toBeGreaterThanOrEqual(2);
+    const deliveredIds = chatEvents.map(event =>
+      event.type === 'message.updated' ? event.info.id : event.type
+    );
+    expect(deliveredIds).toEqual(
+      Array.from({ length: CLI_SNAPSHOT_BUFFER_MAX_EVENTS }, (_, index) => `msg-${index}`)
+    );
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(onError).toHaveBeenCalledWith('Session history temporarily unavailable', {
+      kind: 'retryable_failure',
+      message: 'Session history temporarily unavailable',
+    });
+    expect(getReplayCompleteCount()).toBe(1);
     transport.destroy();
+  });
+
+  it('releases the buffer when it reaches the cap during a retry backoff', async () => {
+    jest.useFakeTimers();
+    try {
+      const fetchSnapshotPage = jest
+        .fn<Promise<SessionSnapshotPageOutcome | null>, [KiloSessionId, { cursor?: string }]>()
+        .mockRejectedValue(new Error('page read failed'));
+      const { transport, userWebConnection, chatEvents, onError, getReplayCompleteCount } =
+        createPageTransport({ fetchSnapshotPage });
+
+      transport.connect();
+      await Promise.resolve();
+      await Promise.resolve();
+      // The first attempt was rejected, so the episode is in its backoff with
+      // no read in flight.
+      expect(fetchSnapshotPage).toHaveBeenCalledTimes(1);
+
+      for (let index = 0; index < CLI_SNAPSHOT_BUFFER_MAX_EVENTS; index += 1) {
+        userWebConnection.emitCli({
+          sessionId: KILO_SESSION_ID,
+          event: 'message.updated',
+          data: {
+            info: {
+              id: `msg-${index}`,
+              sessionID: KILO_SESSION_ID,
+              role: 'assistant',
+              time: { created: 1 },
+            },
+          },
+        });
+      }
+
+      // The cap releases the episode instead of delivering a newer event ahead
+      // of the buffered ones.
+      const deliveredIds = chatEvents.map(event =>
+        event.type === 'message.updated' ? event.info.id : event.type
+      );
+      expect(deliveredIds).toEqual(
+        Array.from({ length: CLI_SNAPSHOT_BUFFER_MAX_EVENTS }, (_, index) => `msg-${index}`)
+      );
+      expect(onError).toHaveBeenCalledTimes(1);
+      expect(onError).toHaveBeenCalledWith('Session history temporarily unavailable', {
+        kind: 'retryable_failure',
+        message: 'Session history temporarily unavailable',
+      });
+      expect(getReplayCompleteCount()).toBe(1);
+
+      // The pending backoff was cancelled by the release.
+      await jest.advanceTimersByTimeAsync(SNAPSHOT_READ_BASE_DELAY_MS * 10);
+      expect(fetchSnapshotPage).toHaveBeenCalledTimes(1);
+      transport.destroy();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('aborts the pending read on destroy and drops the buffered event', async () => {
+    jest.useFakeTimers();
+    try {
+      let readOptions: { cursor?: string; signal?: AbortSignal } | undefined;
+      const { transport, userWebConnection, chatEvents, getReplayCompleteCount } =
+        createPageTransport({
+          fetchSnapshotPage: (_kiloSessionId, options) => {
+            readOptions = options;
+            return new Promise<SessionSnapshotPageOutcome | null>(() => undefined);
+          },
+        });
+
+      transport.connect();
+      await Promise.resolve();
+      expect(readOptions?.signal?.aborted).toBe(false);
+
+      emitMessageUpdated(userWebConnection);
+      expect(chatEvents).toHaveLength(0);
+
+      transport.destroy();
+
+      expect(readOptions?.signal?.aborted).toBe(true);
+      expect(jest.getTimerCount()).toBe(0);
+      await Promise.resolve();
+      expect(chatEvents).toHaveLength(0);
+      expect(getReplayCompleteCount()).toBe(0);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });
 
 describe('CliLiveTransport remote attachment capabilities', () => {
-  it('publishes heartbeat attachments: true via onCapabilitiesChange', async () => {
+  it('publishes heartbeat attachments: true via onCliCapabilitiesReported', async () => {
     const connection = createConnection();
     jest
       .mocked(connection.sendCommand)
@@ -4072,7 +4636,7 @@ describe('CliLiveTransport remote attachment capabilities', () => {
     const capabilities: ({ attachments?: boolean } | undefined)[] = [];
     const { transport, userWebConnection } = createTransportWithSinks({
       connection,
-      onCapabilitiesChange: capability => capabilities.push(capability),
+      onCliCapabilitiesReported: capability => capabilities.push(capability),
     });
 
     transport.connect();
@@ -4104,7 +4668,7 @@ describe('CliLiveTransport remote attachment capabilities', () => {
     transport.destroy();
   });
 
-  it('publishes sessions.list capability changes via onCapabilitiesChange', async () => {
+  it('publishes sessions.list capability changes via onCliCapabilitiesReported', async () => {
     const connection = createConnection();
     jest
       .mocked(connection.sendCommand)
@@ -4114,7 +4678,7 @@ describe('CliLiveTransport remote attachment capabilities', () => {
     const capabilities: ({ attachments?: boolean } | undefined)[] = [];
     const { transport, userWebConnection } = createTransportWithSinks({
       connection,
-      onCapabilitiesChange: capability => capabilities.push(capability),
+      onCliCapabilitiesReported: capability => capabilities.push(capability),
     });
 
     transport.connect();
@@ -4166,7 +4730,7 @@ describe('CliLiveTransport remote attachment capabilities', () => {
     const capabilities: ({ attachments?: boolean } | undefined)[] = [];
     const { transport, userWebConnection } = createTransportWithSinks({
       connection,
-      onCapabilitiesChange: capability => capabilities.push(capability),
+      onCliCapabilitiesReported: capability => capabilities.push(capability),
     });
 
     transport.connect();

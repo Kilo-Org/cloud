@@ -21,11 +21,15 @@ vi.mock('react-native', () => ({
   BackHandler: { addEventListener: vi.fn(() => ({ remove: () => undefined })) },
   View: 'View',
   Platform: reactNativeMock.Platform,
+  I18nManager: { isRTL: false },
 }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: safeAreaMock.useSafeAreaInsets,
 }));
 vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'StateSurface' }));
+// The sheet renders the focus sink before its content; the sink's own suite
+// covers what it does, so this one only needs a host element for it.
+vi.mock('./sheet-focus-sink', () => ({ SheetFocusSink: 'SheetFocusSink' }));
 vi.mock('@/components/sheet-header', () => ({
   SheetHeader: 'SheetHeader',
 }));
@@ -101,6 +105,15 @@ function findByTestID(
   return root.findAll(node => node.props.testID === testID);
 }
 
+/** The nearest host element above `node`: the native view it renders inside. */
+function hostParent(node: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance | null {
+  let parent = node.parent;
+  while (parent && typeof parent.type !== 'string') {
+    parent = parent.parent;
+  }
+  return parent;
+}
+
 function sheet(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
   const found = findByType(root, 'BottomSheet');
   if (!found[0]) {
@@ -154,7 +167,7 @@ describe('SessionPageSheet mounted', () => {
     });
     const surfaces = findByType(renderer.root, 'StateSurface');
     expect(surfaces).toHaveLength(1);
-    expect(surfaces[0]?.parent).toBe(sheet(renderer.root));
+    expect(surfaces[0] && hostParent(surfaces[0])).toBe(sheet(renderer.root));
     expect(surfaces[0]?.props.className).toBe('flex-1 bg-background');
     expect(findByType(renderer.root, 'SheetHeader')[0]?.parent).toBe(surfaces[0]);
     expect(findByType(renderer.root, 'View')).toHaveLength(0);
@@ -261,7 +274,7 @@ describe('SessionPageSheet mounted', () => {
     renderer.unmount();
   });
 
-  it('keeps SheetHeader as the first surface child and routes Done to onClose', async () => {
+  it('keeps SheetHeader as the first visible surface child and routes Done to onClose', async () => {
     reactNativeMock.Platform.OS = 'android';
     const onClose = vi.fn<() => void>();
     const renderer = await mountSheet({
@@ -274,8 +287,14 @@ describe('SessionPageSheet mounted', () => {
     });
 
     const surface = findByTestID(renderer.root, 'session-page-sheet-surface')[0];
-    const firstChild = surface?.children[0];
-    expect(typeof firstChild === 'object' ? firstChild.type : undefined).toBe('SheetHeader');
+    // The sink leads the tree but paints nothing and takes no space, so the
+    // header is still the first thing the sheet shows. Read the surface's own
+    // children in order and drop the sink: the header must be what remains.
+    const ordered = (surface?.children ?? []).map(child =>
+      typeof child === 'object' ? String(child.type) : ''
+    );
+    const firstVisible = ordered.find(type => type !== '' && type !== 'SheetFocusSink');
+    expect(firstVisible).toBe('SheetHeader');
 
     const header = findByType(renderer.root, 'SheetHeader')[0];
     if (!header) {

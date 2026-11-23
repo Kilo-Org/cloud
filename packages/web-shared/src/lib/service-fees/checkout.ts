@@ -14,7 +14,6 @@ import {
   markServiceFeeAssessmentMissed,
   prepareServiceFeeAssessmentDecision,
   settleServiceFeeAssessment,
-  toServiceFeeTimestamp,
   upsertServiceFeeAssessment,
   type EffectiveExemptionLookup,
   type PreparedServiceFeeDecision,
@@ -46,6 +45,11 @@ import {
   type ServiceFeeLineMetadata,
   type ServiceFeeOutcome,
 } from '@kilocode/web-shared/lib/service-fees/types';
+import {
+  isServiceFeeFailureCode,
+  toIsoTimestamp,
+  trimToNull,
+} from '@kilocode/web-shared/lib/service-fees/values';
 
 export const SERVICE_FEE_ACTIVATION_BOUNDARY_WINDOW_SECONDS = 60;
 export const KILO_OWNED_AUTO_TOP_UP_INVOICE_TYPES = ['auto-topup', 'org-auto-topup'] as const;
@@ -164,7 +168,8 @@ export function isKiloOwnedAutoTopUpInvoice(
   invoice: Pick<Stripe.Invoice, 'metadata'> | { metadata?: Stripe.Metadata | null }
 ): boolean {
   const type = invoice.metadata?.type;
-  return type === 'auto-topup' || type === 'org-auto-topup';
+  if (!type) return false;
+  return (KILO_OWNED_AUTO_TOP_UP_INVOICE_TYPES as readonly string[]).includes(type);
 }
 
 export function isWithinServiceFeeActivationBoundaryWindow(unixSeconds: number): boolean {
@@ -519,7 +524,7 @@ export async function attachPreparedAutoTopUpInvoiceFee(params: {
   }
   if (!params.deps.createInvoiceItem) {
     return persistMissedAfterPrepare({
-      prepared: toCheckoutShaped(params.prepared),
+      prepared: params.prepared,
       stripeIds: {
         stripeCustomerId: params.prepared.decision.stripeCustomerId,
         stripeInvoiceId: params.prepared.invoiceId,
@@ -544,7 +549,7 @@ export async function attachPreparedAutoTopUpInvoiceFee(params: {
     });
   } catch (error) {
     return persistMissedAfterPrepare({
-      prepared: toCheckoutShaped(params.prepared),
+      prepared: params.prepared,
       stripeIds: {
         stripeCustomerId: params.prepared.decision.stripeCustomerId,
         stripeInvoiceId: params.prepared.invoiceId,
@@ -565,7 +570,7 @@ export async function settleTrustedTopUpCharge(params: {
 }): Promise<TopUpSettlementResult> {
   const now = params.deps.now ?? new Date();
   const metadata = params.paymentIntent.metadata ?? {};
-  const assessmentKey = nonempty(metadata.serviceFeeAssessmentKey);
+  const assessmentKey = trimToNull(metadata.serviceFeeAssessmentKey);
   const metadataPrincipal = parseMinor(metadata.serviceFeePrincipalMinor);
   const amountCentsPrincipal = parseMinor(metadata.amountCents);
   const grossPaidMinor = params.charge.amount;
@@ -609,7 +614,6 @@ export async function settleTrustedTopUpCharge(params: {
     const settled = await settleLoadedAssessment({
       assessment,
       principalMinor,
-      chargedFeeMinor: observedTopUpChargedFeeMinor(assessment),
       grossPaidMinor,
       stripeIds: {
         stripePaymentIntentId: params.paymentIntent.id,
@@ -716,7 +720,7 @@ export async function settleTrustedAutoTopUpInvoice(params: {
   const now = params.deps.now ?? new Date();
   const metadata = params.invoice.metadata ?? {};
   const assessmentKey =
-    nonempty(metadata.serviceFeeAssessmentKey) ??
+    trimToNull(metadata.serviceFeeAssessmentKey) ??
     (params.invoice.id ? createInvoiceServiceFeeAssessmentKey(params.invoice.id) : null);
   const metadataPrincipal = parseMinor(metadata.serviceFeePrincipalMinor);
   const grossPaidMinor = params.invoice.amount_paid;
@@ -724,13 +728,7 @@ export async function settleTrustedAutoTopUpInvoice(params: {
     unixToDate(params.invoice.status_transitions?.paid_at) ??
     unixToDate(params.invoice.created) ??
     now;
-  const paidCredit = stripePaidCreditGrant(
-    metadata,
-    (
-      unixToDate(params.invoice.status_transitions?.paid_at) ??
-      new Date(params.invoice.created * 1000)
-    ).getTime() / 1000
-  );
+  const paidCredit = stripePaidCreditGrant(metadata, paidAt.getTime() / 1000);
 
   if (assessmentKey) {
     const assessment = await params.deps.store.findByAssessmentKey(assessmentKey);
@@ -739,7 +737,6 @@ export async function settleTrustedAutoTopUpInvoice(params: {
       const settled = await settleLoadedAssessment({
         assessment,
         principalMinor,
-        chargedFeeMinor: observedTopUpChargedFeeMinor(assessment),
         grossPaidMinor,
         stripeIds: {
           stripeInvoiceId: params.invoice.id,
@@ -951,7 +948,7 @@ async function persistPreparedAssessment(params: {
   try {
     const decision = {
       ...params.prepared.decision,
-      eligibilityCreatedAt: toServiceFeeTimestamp(params.eligibilityCreatedAt),
+      eligibilityCreatedAt: toIsoTimestamp(params.eligibilityCreatedAt),
     };
     const record = await upsertServiceFeeAssessment({
       store: params.deps.store,
@@ -1004,7 +1001,10 @@ async function persistPreparedAssessment(params: {
 }
 
 async function persistMissedAfterPrepare(params: {
-  prepared: PreparedTopUpCheckoutFee;
+  prepared: Pick<
+    PreparedTopUpCheckoutFee,
+    'assessmentKey' | 'principalMinor' | 'decision' | 'expectedFeeMinor'
+  >;
   stripeIds: ServiceFeeStripeIds;
   deps: ServiceFeeCheckoutDependencies;
   failureCode: string;
@@ -1215,17 +1215,17 @@ function hasTrustedTopUpFeeLineIdentity(assessment: ServiceFeeAssessmentRecord):
   );
 }
 
-function observedTopUpChargedFeeMinor(assessment: ServiceFeeAssessmentRecord): number {
-  if (assessment.outcome !== 'charged') return 0;
-  if (assessment.chargedFeeMinor > 0) return assessment.chargedFeeMinor;
-  if (hasTrustedTopUpFeeLineIdentity(assessment)) return assessment.expectedFeeMinor;
-  return 0;
+function trustedObservedFeeMinor(assessment: ServiceFeeAssessmentRecord): number {
+  return assessment.chargedFeeMinor > 0
+    ? assessment.chargedFeeMinor
+    : hasTrustedTopUpFeeLineIdentity(assessment)
+      ? assessment.expectedFeeMinor
+      : 0;
 }
 
 async function settleLoadedAssessment(params: {
   assessment: ServiceFeeAssessmentRecord;
   principalMinor: number;
-  chargedFeeMinor: number;
   grossPaidMinor: number;
   stripeIds: ServiceFeeStripeIds;
   settledAt: Date;
@@ -1233,12 +1233,7 @@ async function settleLoadedAssessment(params: {
 }): Promise<ServiceFeeAssessmentRecord> {
   let assessment = params.assessment;
   if (assessment.outcome === 'pending') {
-    const trustedObservedFee =
-      params.chargedFeeMinor > 0
-        ? params.chargedFeeMinor
-        : hasTrustedTopUpFeeLineIdentity(assessment)
-          ? assessment.expectedFeeMinor
-          : 0;
+    const trustedObservedFee = trustedObservedFeeMinor(assessment);
     if (trustedObservedFee > 0) {
       assessment = await markServiceFeeAssessmentCharged({
         store: params.deps.store,
@@ -1265,8 +1260,7 @@ async function settleLoadedAssessment(params: {
     settledAt: params.settledAt,
     settledProductMinor: params.principalMinor,
     grossPaidMinor: params.grossPaidMinor,
-    chargedFeeMinor:
-      assessment.outcome === 'charged' ? params.chargedFeeMinor || assessment.chargedFeeMinor : 0,
+    chargedFeeMinor: assessment.outcome === 'charged' ? trustedObservedFeeMinor(assessment) : 0,
     stripeIds: params.stripeIds,
     now: params.deps.now,
   });
@@ -1313,19 +1307,6 @@ function inferFlowFromMetadata(metadata: Stripe.Metadata, organizationId?: strin
   return organizationId ? 'organization_top_up' : 'personal_top_up';
 }
 
-function toCheckoutShaped(prepared: PreparedAutoTopUpInvoiceFee): PreparedTopUpCheckoutFee {
-  return {
-    assessmentKey: prepared.assessmentKey,
-    flow: prepared.flow === 'organization_auto_top_up' ? 'organization_top_up' : 'personal_top_up',
-    principalMinor: prepared.principalMinor,
-    decision: prepared.decision,
-    outcome: prepared.outcome,
-    expectedFeeMinor: prepared.expectedFeeMinor,
-    commercialMetadata: prepared.commercialMetadata,
-    failureCode: prepared.failureCode,
-  };
-}
-
 async function alertForRecord(
   record: ServiceFeeAssessmentRecord,
   deps: ServiceFeeCheckoutDependencies
@@ -1346,20 +1327,12 @@ async function alertForRecord(
   });
 }
 
-async function alertMissed(params: {
-  assessmentKey: string;
-  flow: ServiceFeeFlow;
-  kiloUserId?: string | null;
-  organizationId?: string | null;
-  stripeCheckoutSessionId?: string | null;
-  stripeInvoiceId?: string | null;
-  stripePaymentIntentId?: string | null;
-  stripeChargeId?: string | null;
-  eligibleSubtotalMinor: number;
-  expectedFeeMinor: number;
-  failureCode: string;
-  deps: ServiceFeeCheckoutDependencies;
-}): Promise<void> {
+type MissedServiceFeeAlertPayload = Omit<
+  MissedServiceFeeAlertInput,
+  'currency' | 'attemptedAt' | 'livemode'
+> & { deps: ServiceFeeCheckoutDependencies };
+
+async function alertMissed(params: MissedServiceFeeAlertPayload): Promise<void> {
   const sendAlert = params.deps.sendAlert ?? sendMissedServiceFeeAlert;
   await sendAlert({
     assessmentKey: params.assessmentKey,
@@ -1379,20 +1352,14 @@ async function alertMissed(params: {
 }
 
 function failureCodeFromUnknown(error: unknown, fallback: string): string {
-  if (error instanceof Error && /^[a-z][a-z0-9_]{0,99}$/.test(error.message)) {
+  if (error instanceof Error && isServiceFeeFailureCode(error.message)) {
     return error.message;
   }
   return fallback;
 }
 
-function nonempty(value: string | null | undefined): string | null {
-  if (typeof value !== 'string') return null;
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
-}
-
 function parseMinor(value: string | null | undefined): number | null {
-  const raw = nonempty(value);
+  const raw = trimToNull(value);
   if (!raw) return null;
   if (!/^-?\d+$/.test(raw)) return null;
   const parsed = Number(raw);

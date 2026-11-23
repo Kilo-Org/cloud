@@ -24,7 +24,7 @@ import { useRouter } from 'expo-router';
 import { Search } from '@/components/ui/icons';
 import { memo, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Platform, Pressable, type TextInput, View, type ViewStyle } from 'react-native';
+import { Platform, View, type ViewStyle } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -32,7 +32,9 @@ import { CenteredState } from '@/components/centered-state';
 import { EmptyState } from '@/components/empty-state';
 import { NavigatorFileRow } from '@/components/pr-review/diff/pr-diff-navigator-file-row';
 import { usePrDiffStateCopy } from '@/components/pr-review/diff/pr-diff-state-copy';
-import { Input } from '@/components/ui/input';
+import { SearchField } from '@/components/ui/search-field';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
@@ -49,7 +51,7 @@ import { filterNavigatorFiles } from '@/lib/pr-review/diff/navigator-file-filter
 import { useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
 import { PrReviewUnavailableActions } from '@/components/pr-review/pr-review-unavailable-actions';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { cn } from '@/lib/utils';
+import { useSideInsetMarginStyle, useSideInsetStyle } from '@/lib/screen-insets';
 
 // Memoized row so recycled cells do not re-render on every keystroke: `file`
 // and `viewed` are stable across a search re-render, and the callbacks below
@@ -92,6 +94,8 @@ export function PrDiffFileNavigator({
 }: PrDiffFileNavigatorProps) {
   const router = useRouter();
   const colors = useThemeColors();
+  const sideInsetStyle = useSideInsetStyle();
+  const sideInsetMarginStyle = useSideInsetMarginStyle();
   const { t } = useTranslation();
   const searchRef = useRef<string>('');
   // The navigator is a formSheet whose bottom edge sits on the Android system
@@ -106,7 +110,6 @@ export function PrDiffFileNavigator({
   // TextInput on every keystroke (per iOS rule), so the value lives in
   // a ref and a version counter drives the filtered list.
   const [searchVersion, setSearchVersion] = useState(0);
-  const inputRef = useRef<TextInput | null>(null);
 
   const { query, files, firstPageErrorState, laterPageError } = usePrReviewFileListQuery({
     owner,
@@ -237,7 +240,7 @@ export function PrDiffFileNavigator({
     const isProviderScope = scope.ref.platform !== 'github';
     body = (
       <CenteredState>
-        <View className="items-center px-6">
+        <View className="items-center px-4">
           <Text className="text-center text-lg font-semibold text-foreground">
             {copy.unavailableTitle}
           </Text>
@@ -258,7 +261,7 @@ export function PrDiffFileNavigator({
   } else if (firstPageErrorState?.kind === 'permission') {
     body = (
       <CenteredState>
-        <View className="items-center px-6">
+        <View className="items-center px-4">
           <Text className="text-center text-lg font-semibold text-foreground">
             {t('common.accessDenied')}
           </Text>
@@ -271,41 +274,41 @@ export function PrDiffFileNavigator({
   } else if (firstPageErrorState) {
     body = (
       <CenteredState>
-        <View className="items-center gap-3 px-6">
+        <View className="items-center gap-3 px-4">
           <Text className="text-center text-lg font-semibold text-foreground">
             {t('prReview.fileNavigator.couldNotLoadFiles')}
           </Text>
           <Text variant="muted" className="text-center">
             {t('organization.boundary.loadErrorMessage')}
           </Text>
-          <Pressable
+          <Button
+            variant="outline"
+            size="sm"
+            className={STATE_ACTION_CLASS}
             onPress={() => {
               void query.refetch();
             }}
-            className={cn(
-              STATE_ACTION_CLASS,
-              'mt-1 rounded-md border border-border bg-card px-4 py-2 active:opacity-70'
-            )}
-            accessibilityRole="button"
             accessibilityLabel={t('prReview.fileNavigator.retryLoadingFiles')}
           >
-            <Text className="text-sm font-medium text-foreground">{t('common.retry')}</Text>
-          </Pressable>
+            <Text>{t('common.retry')}</Text>
+          </Button>
         </View>
       </CenteredState>
     );
   } else if (query.isLoading && files.length === 0) {
     body = (
-      <View className="flex-1 gap-3 px-4 pt-2">
-        {[0, 1, 2, 3, 4].map(index => (
-          <View key={`skeleton-${index}`} className="flex-row items-center gap-3 px-2 py-2">
-            <Skeleton className="h-5 w-5 rounded-md" />
-            <View className="flex-1 gap-1.5">
-              <Skeleton className="h-3.5 w-3/4 rounded-md" />
-              <Skeleton className="h-3 w-1/4 rounded-md" />
+      <View className="flex-1" style={sideInsetStyle}>
+        <View className="flex-1 gap-3 px-4 pt-2">
+          {[0, 1, 2, 3, 4].map(index => (
+            <View key={`skeleton-${index}`} className="flex-row items-center gap-3 px-2 py-2">
+              <Skeleton className="h-5 w-5 rounded-md" />
+              <View className="flex-1 gap-1.5">
+                <Skeleton className="h-3.5 w-3/4 rounded-md" />
+                <Skeleton className="h-3 w-1/4 rounded-md" />
+              </View>
             </View>
-          </View>
-        ))}
+          ))}
+        </View>
       </View>
     );
   } else if (files.length === 0) {
@@ -313,13 +316,13 @@ export function PrDiffFileNavigator({
       <EmptyState
         icon={Search}
         title={t('prReview.noFilesChanged')}
-        description={t('prReview.noFilesChangedDescription')}
+        description={copy.noChangesDescription ?? t('prReview.noFilesChangedDescription')}
       />
     );
   } else if (filtered.length === 0) {
     body = (
       <CenteredState>
-        <View className="px-6">
+        <View className="px-4">
           <Text variant="muted" className="text-center text-sm">
             {t('prReview.fileNavigator.noMatches', { query: searchRef.current })}
           </Text>
@@ -334,6 +337,7 @@ export function PrDiffFileNavigator({
         keyExtractor={file => file.path}
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
+        style={sideInsetMarginStyle}
         contentContainerStyle={listContentStyle}
         onEndReached={() => {
           if (!hasActiveSearch && query.hasNextPage && !query.isFetchingNextPage) {
@@ -362,81 +366,77 @@ export function PrDiffFileNavigator({
   // listing cap left fewer listed files than the overview's changed-file count.
   const isTruncated = query.hasNextPage || fetchAll.failure !== null || changedFiles > files.length;
 
+  // Two direct children only: react-native-screens honors a formSheet's pinned
+  // header when the content is `[header, scroll view]`, so the header and the
+  // fixed search column share the first child and the list is the second. The
+  // scroller cannot take a padded wrapper, so the insets go on the search
+  // column's own wrapper and on the list's own frame
+  // (`useSideInsetMarginStyle`). `collapsable={false}` keeps this first child
+  // from being flattened away, which would expose `{header}` on its own.
   return (
     <>
       <View collapsable={false} className="bg-background pb-2">
         {header}
-        <View className="mx-4 mt-2 flex-row items-center gap-2 rounded-md border border-border bg-card px-3 py-2">
-          <Search size={16} color={colors.mutedForeground} />
-          <Input
-            ref={inputRef}
+        <View style={sideInsetStyle}>
+          <SearchField
+            className="mx-4 mt-2"
             defaultValue=""
             editable={!query.isLoading || files.length > 0}
             placeholder={t('prReview.fileNavigator.filterPlaceholder')}
-            placeholderTextColor={colors.mutedForeground}
-            accessibilityLabel={t('prReview.fileNavigator.filterPlaceholder')}
+            hasText={searchRef.current !== ''}
             onChangeText={value => {
               searchRef.current = value;
               setSearchVersion(version => version + 1);
             }}
-            // The shared single-line box supplies the height floor and the one
-            // line box; this field keeps only its own size and text size.
-            className="flex-1 text-sm text-foreground"
-            returnKeyType="search"
-            autoCorrect={false}
-            autoCapitalize="none"
-            clearButtonMode="while-editing"
           />
-        </View>
 
-        {files.length > 0 && (
-          <View className="mx-4 mt-2 flex-row items-center justify-between">
-            <Text variant="muted" className="text-xs">
-              {/* `count` is the listed total: it selects the plural category
+          {files.length > 0 && (
+            <View className="mx-4 mt-2 flex-row items-center justify-between">
+              <Text variant="muted" className="text-xs">
+                {/* `count` is the listed total: it selects the plural category
                   whose participle agrees with it, while `total` carries the
                   locale-grouped figure the catalogs interpolate. */}
-              {isTruncated
-                ? t('prReview.fileNavigator.viewedOfListed', {
-                    count: files.length,
-                    viewed: formatNumber(viewedCount, i18n.language),
-                    total: formatNumber(files.length, i18n.language),
-                  })
-                : t('prReview.fileNavigator.viewedCount', {
-                    count: files.length,
-                    viewed: formatNumber(viewedCount, i18n.language),
-                    total: formatNumber(files.length, i18n.language),
-                  })}
-            </Text>
-            {fetchAll.feedback.status === 'pending' ? (
-              <View className="flex-row items-center gap-1.5">
-                <ActivityIndicator size="small" color={colors.mutedForeground} />
-                <Text variant="muted" className="text-xs">
-                  {t('prReview.fileNavigator.loadingFiles', {
-                    loaded: formatNumber(fetchAll.loadedFiles, i18n.language),
-                    total: formatNumber(changedFiles, i18n.language),
-                  })}
-                </Text>
-              </View>
-            ) : null}
-          </View>
-        )}
+                {isTruncated
+                  ? t('prReview.fileNavigator.viewedOfListed', {
+                      count: files.length,
+                      viewed: formatNumber(viewedCount, i18n.language),
+                      total: formatNumber(files.length, i18n.language),
+                    })
+                  : t('prReview.fileNavigator.viewedCount', {
+                      count: files.length,
+                      viewed: formatNumber(viewedCount, i18n.language),
+                      total: formatNumber(files.length, i18n.language),
+                    })}
+              </Text>
+              {fetchAll.feedback.status === 'pending' ? (
+                <View className="flex-row items-center gap-1.5">
+                  <ActivityIndicator size="small" color={colors.mutedForeground} />
+                  <Text variant="muted" className="text-xs">
+                    {t('prReview.fileNavigator.loadingFilesProgress', {
+                      loaded: formatNumber(fetchAll.loadedFiles, i18n.language),
+                      total: formatNumber(changedFiles, i18n.language),
+                    })}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+          )}
 
-        {showRetry ? (
-          <View className="mx-4 mt-2 flex-row items-center justify-between rounded-md border border-border bg-card px-3 py-2">
-            <Text className="text-xs text-destructive">{retryMessage}</Text>
-            <Pressable
-              onPress={() => void retryAction()}
-              className={cn(
-                STATE_ACTION_CLASS,
-                'rounded-md border border-border bg-card px-3 py-1 active:opacity-70'
-              )}
-              accessibilityRole="button"
-              accessibilityLabel={retryLabel}
-            >
-              <Text className="text-xs font-medium text-foreground">{t('common.retry')}</Text>
-            </Pressable>
-          </View>
-        ) : null}
+          {showRetry ? (
+            <Card className="mx-4 mt-2 flex-row items-center justify-between gap-3">
+              <Text className="text-xs text-destructive">{retryMessage}</Text>
+              <Button
+                variant="outline"
+                size="sm"
+                className={STATE_ACTION_CLASS}
+                onPress={() => void retryAction()}
+                accessibilityLabel={retryLabel}
+              >
+                <Text>{t('common.retry')}</Text>
+              </Button>
+            </Card>
+          ) : null}
+        </View>
       </View>
       {body}
     </>

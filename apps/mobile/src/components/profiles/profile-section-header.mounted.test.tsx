@@ -59,12 +59,13 @@ function renderHeader(
 
 /**
  * The header's text lines, in the order the heading renders them. The heading
- * only: the leading column lays a zero-ink twin of the subtitle line beside the
- * title, and that twin is not a line any reader sees.
+ * block only: the title and subtitle each sit in their own `min-w-0 flex-1`
+ * column under it, and the leading column lays a zero-ink twin of the subtitle
+ * beside the title that is not a line any reader sees.
  */
 function headerLines(renderer: TestRenderer.ReactTestRenderer): string[] {
   return renderer.root
-    .findByProps({ className: 'min-w-0 flex-1' })
+    .findByProps({ className: 'min-w-0 flex-1 justify-center' })
     .findAll(node => typeof node.type === 'string' && (node.type as string) === 'Text')
     .map(node => String(node.props.children));
 }
@@ -144,6 +145,22 @@ describe('ProfileSectionHeader mounted', () => {
     });
     expect(onBack).toHaveBeenCalledTimes(1);
     expect(h.back).not.toHaveBeenCalled();
+    renderer.unmount();
+  });
+
+  it("renders the caller's create control in the header's trailing slot", () => {
+    const renderer = renderHeader({
+      profileId: 'profile-1',
+      title: 'Profile agents',
+      backFallback: PROFILES_LIST_HREF,
+      headerRight: createElement('Text', { accessibilityLabel: 'Header create control' }, 'Add'),
+    });
+
+    const forwarded = renderer.root.find(
+      node =>
+        typeof node.type === 'string' && node.props.accessibilityLabel === 'Header create control'
+    );
+    expect(String(forwarded.props.children)).toBe('Add');
     renderer.unmount();
   });
 });

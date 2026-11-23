@@ -80,39 +80,55 @@ describe('useThemePreference store', () => {
   });
 
   it("defaults to 'system' when SecureStore returns null", async () => {
-    getItemAsync.mockResolvedValue(null);
-    const { getThemePreference, preloadThemePreference } = await import('./use-theme-preference');
+    // A read the case settles itself, so the value before it lands is observed
+    // instead of guessed at.
+    const read = Promise.withResolvers<string | null>();
+    getItemAsync.mockReturnValue(read.promise);
+    const { getThemePreference } = await import('./use-theme-preference');
 
-    preloadThemePreference();
+    // Importing the module constructs the store, and construction starts the
+    // read: nothing subscribes in this case.
     await vi.waitFor(() => {
       expect(getItemAsync).toHaveBeenCalledWith('theme-preference');
     });
+    expect(getThemePreference()).toBe('system');
+
+    read.resolve(null);
     await flushMicrotasks();
 
     expect(getThemePreference()).toBe('system');
   });
 
   it("falls back to 'system' for an unrecognized stored value", async () => {
-    getItemAsync.mockResolvedValue('high-contrast');
-    const { getThemePreference, preloadThemePreference } = await import('./use-theme-preference');
+    const read = Promise.withResolvers<string | null>();
+    getItemAsync.mockReturnValue(read.promise);
+    const { getThemePreference } = await import('./use-theme-preference');
 
-    preloadThemePreference();
     await vi.waitFor(() => {
       expect(getItemAsync).toHaveBeenCalledWith('theme-preference');
     });
+    expect(getThemePreference()).toBe('system');
+
+    read.resolve('high-contrast');
     await flushMicrotasks();
 
     expect(getThemePreference()).toBe('system');
   });
 
-  it("loads a persisted 'light' value through the preload", async () => {
-    getItemAsync.mockResolvedValue('light');
-    const { getThemePreference, preloadThemePreference } = await import('./use-theme-preference');
+  it("loads a persisted 'light' value with no subscriber", async () => {
+    const read = Promise.withResolvers<string | null>();
+    getItemAsync.mockReturnValue(read.promise);
+    const { getThemePreference } = await import('./use-theme-preference');
 
+    // The getter is the settings-registry read path and runs with no React
+    // tree, so the store's own read is what must deliver the stored value.
+    await vi.waitFor(() => {
+      expect(getItemAsync).toHaveBeenCalledWith('theme-preference');
+    });
     // Before the read settles the store shows its default.
     expect(getThemePreference()).toBe('system');
 
-    preloadThemePreference();
+    read.resolve('light');
     await vi.waitFor(() => {
       expect(getThemePreference()).toBe('light');
     });
@@ -123,10 +139,7 @@ describe('useThemePreference store', () => {
 
     setThemePreference('dark');
     expect(setColorScheme).toHaveBeenCalledWith('dark');
-    // Appearance must move before the store notification: a subscriber that
-    // mounts from that notification would otherwise see useColorScheme update
-    // mid-mount (LogBox over the tab bar). The wrapper mock records 0 here when
-    // the store notified first.
+    // The wrapper mock records 0 here when the store notified first.
     expect(notifySchemeCounts[0]).toBeGreaterThan(0);
     await flushMicrotasks();
     expect(setItemAsync).toHaveBeenCalledWith('theme-preference', 'dark');

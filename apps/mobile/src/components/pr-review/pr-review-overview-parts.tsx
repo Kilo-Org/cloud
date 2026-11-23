@@ -136,7 +136,7 @@ export function PrAvatar({
       className="size-6 items-center justify-center rounded-full bg-secondary-fill"
     >
       {initial ? (
-        <Text className="text-[11px] font-semibold text-secondary-foreground">{initial}</Text>
+        <Text className="text-xs font-semibold text-secondary-foreground">{initial}</Text>
       ) : (
         <UserRound size={12} color={colors.secondaryForeground} />
       )}
@@ -187,12 +187,7 @@ export function PrRefsRow({
           instead of running past the screen edge, while the short base ref
           keeps its full width. `min-w-0` lets the text go below its content
           width; without it the row overflows and hard-clips. */}
-      <Text
-        variant="mono"
-        className="min-w-0 shrink text-[13px]"
-        numberOfLines={1}
-        ellipsizeMode="middle"
-      >
+      <Text variant="mono" className="min-w-0 shrink" numberOfLines={1} ellipsizeMode="middle">
         {headRepoFullName && isCrossRepo ? `${headRepoFullName}:` : ''}
         {headRef}
       </Text>
@@ -200,12 +195,7 @@ export function PrRefsRow({
           13 px ref text, so its ink centers on the row instead of sitting on
           the baseline of a text glyph. */}
       <DirectionalArrowLeft size={13} color={colors.mutedForeground} />
-      <Text
-        variant="mono"
-        className="max-w-1/2 shrink-0 text-[13px]"
-        numberOfLines={1}
-        ellipsizeMode="middle"
-      >
+      <Text variant="mono" className="max-w-1/2 shrink-0" numberOfLines={1} ellipsizeMode="middle">
         {baseRef}
       </Text>
     </View>

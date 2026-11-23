@@ -95,12 +95,14 @@ export async function verifyOrgOwnsSessionV2ByCloudAgentId(
 }
 
 /**
- * Verifies that an organization owns a session by cloud_agent_session_id.
+ * Verifies that an organization owns a session by cloud_agent_session_id, for
+ * a user who is a member of that organization.
  *
  * Used for WebSocket ticket signing in organization context.
  *
  * @param fromDb - Database instance to query
  * @param organizationId - The organization's ID
+ * @param userId - The user whose organization membership the query requires
  * @param cloudAgentSessionId - The cloud-agent session ID to verify
  * @returns The kiloSessionId if organization owns the session, null otherwise
  */

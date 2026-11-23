@@ -14,7 +14,7 @@ const CONTROL_REASON_MESSAGES: Record<ControlPlaneFailureReason, string> = {
   workspace_setup_failed: 'Workspace setup failed',
   credential_upgrade_required: SESSION_CREDENTIAL_UPGRADE_REQUIRED_MESSAGE,
   repository_access_failed:
-    'A repository of this environment could not be accessed. Check that the integration covers every repository of the environment.',
+    'A workspace repository could not be accessed. Check that the integration covers every repository, then try again.',
   agent_unavailable: 'The agent became unavailable',
   billing_blocked: 'Sandbox billing requires additional credits',
   billing_unavailable:
@@ -23,6 +23,8 @@ const CONTROL_REASON_MESSAGES: Record<ControlPlaneFailureReason, string> = {
     'Container limit reached. Stop an existing container before starting another.',
   account_blocked: 'This account is blocked.',
   invalid_configuration: 'Sandbox configuration is invalid or unsupported',
+  network_secret_configuration_invalid:
+    'Network secret configuration is invalid. Check the variable names and allowed domains.',
   sandbox_create_failed: 'The sandbox could not be created',
   connection_lost: 'The sandbox connection was lost',
   sandbox_lost: 'The sandbox was lost',
@@ -38,13 +40,22 @@ const CONTROL_REASON_MESSAGES: Record<ControlPlaneFailureReason, string> = {
   prompt_failed: 'Prompt delivery failed',
   sandbox_stopped: 'The sandbox stopped while waiting for an answer',
   execution_limit: 'The turn exceeded its time limit',
-  byoc_credential_missing: 'Vercel compute credentials are no longer available',
+  provider_lifetime_exhausted:
+    'The sandbox reached its provider lifetime limit. Send a new message to start another sandbox.',
+  provider_cleanup_required:
+    'Sandbox launch status could not be recovered. Contact support to reconcile the allocation before starting another sandbox.',
+  byoc_credential_missing: 'The compute connection is no longer available',
+  byoc_aws_not_ready: 'AWS compute setup is not ready',
+  byoc_aws_forbidden:
+    'AWS rejected access to your compute account. Check the customer role and ExternalId.',
+  byoc_aws_stack_outdated: 'The AWS stack needs an update. Open Compute settings to update it.',
   byoc_vercel_not_ready: 'Vercel compute setup is not ready',
   byoc_vercel_forbidden: 'Vercel rejected access to your compute account',
   byoc_vercel_capacity: 'Vercel compute capacity is unavailable',
   byoc_vercel_snapshot_missing: 'The Vercel runtime snapshot is missing. Run setup again.',
-  provider_identity_mismatch:
-    'Vercel Git containment requires verified provider identity and transport support.',
+  provider_identity_mismatch: 'Sandbox credential containment could not verify provider identity.',
+  network_policy_failed:
+    'The network allowlist could not be applied to the sandbox, so the sandbox did not start or was stopped.',
 };
 
 export function isControlPlaneFailureReason(value: string): value is ControlPlaneFailureReason {

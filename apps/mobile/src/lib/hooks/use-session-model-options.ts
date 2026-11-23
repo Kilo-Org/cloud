@@ -35,6 +35,8 @@ export type SessionModelOption = {
   overrideSource?: RemoteModelOverride['source'];
   showGatewayMetadata: boolean;
   unavailable?: boolean;
+  /** The `yyyy-MM-dd` the model retires, when the catalog entry dates it. */
+  retires_on?: string;
   /**
    * What a custom or on-device chat model receives. Absent for Kilo models: all
    * of them receive tools, and the attach control shows which read images.
@@ -266,8 +268,6 @@ function projectSelection(
     : undefined;
 
   if (selection && !matched) {
-    // The catalogue no longer lists the selected model: keep it reachable as a
-    // head row, with no variant to carry.
     const unavailable = createUnavailableOption(selection.model, gatewayModels);
     return {
       options: [unavailable, ...options],

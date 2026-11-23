@@ -10,10 +10,30 @@ import {
 
 import { PrFormSheetFooter } from '@/components/pr-review/pr-form-sheet-chrome';
 import { PrReviewCapabilityBanner } from '@/components/pr-review/pr-review-capability-banner';
+import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Text } from '@/components/ui/text';
 import { formatNumber } from '@/lib/format';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { useSideInsetStyle } from '@/lib/screen-insets';
 import { i18n } from '@/i18n';
+
+/**
+ * The merge gate the sheet body renders from: `github` is the arm with no
+ * provider merge read at all, `unknown` is a provider arm whose merge-state
+ * read produced no value yet, and the two provider modes carry the verdict
+ * and — for auto-merge — the provider's capability answer.
+ */
+export type PrMergeGate =
+  | Readonly<{ kind: 'github' }>
+  | Readonly<{ kind: 'unknown' }>
+  | Readonly<{ kind: 'merge'; mergeState: ProviderPrMergeState }>
+  | Readonly<{
+      kind: 'auto-merge';
+      mergeState: ProviderPrMergeState;
+      capability?: ProviderReviewCapability;
+    }>;
 
 function providerBlockedReasonText(
   reason: ProviderPrMergeBlockedReason,
@@ -78,7 +98,7 @@ function MergeRestrictionsList({
     return null;
   }
   return (
-    <View className="gap-2 rounded-lg border border-border bg-secondary p-4">
+    <Card className="gap-2">
       <Text className="text-sm font-medium text-foreground">
         {t('prReview.merge.restrictions.title')}
       </Text>
@@ -88,45 +108,67 @@ function MergeRestrictionsList({
           {row.text}
         </Text>
       ))}
-    </View>
+    </Card>
   );
 }
 
 function ProviderAutoMergeBody({
   mergeState,
   term,
-}: Readonly<{ mergeState: ProviderPrMergeState | null | undefined; term: string }>) {
+}: Readonly<{ mergeState: ProviderPrMergeState; term: string }>) {
   const { t } = useTranslation();
+  const sideInsetStyle = useSideInsetStyle();
   return (
-    <View className="gap-4 px-6 pt-4">
-      {mergeState ? <MergeRestrictionsList mergeState={mergeState} term={term} /> : null}
-      <Text className="text-sm text-muted-foreground">
-        {t('prReview.merge.enableAutoMergeDescriptionTerm', { term })}
-      </Text>
+    <View style={sideInsetStyle}>
+      <View className={SCREEN_BODY_CLASS}>
+        <MergeRestrictionsList mergeState={mergeState} term={term} />
+        <Text className="text-sm text-muted-foreground">
+          {t('prReview.merge.enableAutoMergeDescriptionTerm', { term })}
+        </Text>
+      </View>
     </View>
   );
 }
 
+/**
+ * The provider arm's sheet body. The screen (`pr-review-merge-screen.tsx`)
+ * mounts the sheet only after the provider merge-state read returns, so an
+ * `unknown` gate is the contract-violation terminal: it renders the failure
+ * with the caller's merge-state retry (its retry drive and fetching flag, so
+ * the control reports the wait) and nothing else — the retry is its only
+ * action, and the sheet header's close control is its way out. Only an
+ * established allowed verdict or the GitHub arm reaches the child form. The
+ * restrictions list stays advisory: the merge write
+ * (`providerReview.mergePullRequest`) re-fetches the review, fences the
+ * expected head SHA and lets the provider refuse a merge its policy blocks, so
+ * the list is never the authorization.
+ */
 export function PrMergeProviderBody({
-  providerAutoMerge,
-  autoMergeCapability,
-  mergeState,
+  gate,
   term,
   isMutating,
   onConfirm,
   onCancel,
+  mergeStateRetry,
   children,
 }: Readonly<{
-  providerAutoMerge: boolean;
-  autoMergeCapability?: ProviderReviewCapability;
-  mergeState?: ProviderPrMergeState | null;
+  gate: PrMergeGate;
   term: string;
   isMutating: boolean;
   onConfirm: () => void;
   onCancel: () => void;
+  /**
+   * The caller's merge-state read: `retry` re-reads the state the `unknown`
+   * gate could not produce, `isRetrying` is that read's own fetching flag, so
+   * the retry control reports the wait instead of looking dead.
+   */
+  mergeStateRetry: Readonly<{ retry: () => void; isRetrying: boolean }>;
   children: ReactNode;
 }>) {
   const { t } = useTranslation();
+  const sideInsetStyle = useSideInsetStyle();
+  // `jsx-handler-names` wants a local binding per handler prop.
+  const retryMergeState = mergeStateRetry.retry;
   function cancelButton() {
     return (
       <Button
@@ -134,28 +176,44 @@ export function PrMergeProviderBody({
         onPress={onCancel}
         disabled={isMutating}
         className="mt-2"
-        accessibilityLabel={t('common.cancel')}
+        accessibilityLabel={t('common.discard')}
       >
-        <Text>{t('common.cancel')}</Text>
+        <Text>{t('common.discard')}</Text>
       </Button>
     );
   }
-
-  if (providerAutoMerge && autoMergeCapability?.supported === false) {
+  if (gate.kind === 'unknown') {
+    return (
+      <View className="flex-1 justify-center" style={sideInsetStyle}>
+        <QueryError
+          placement="static"
+          inset="gutter"
+          variant="neutral"
+          title={t('prReview.merge.couldNotDetermine')}
+          message={t('prReview.merge.blocked.unknownStateDetail')}
+          onRetry={retryMergeState}
+          isRetrying={mergeStateRetry.isRetrying}
+        />
+      </View>
+    );
+  }
+  if (gate.kind === 'auto-merge' && gate.capability?.supported === false) {
     return (
       <>
-        <View className="gap-4 px-6 pt-4">
-          <PrReviewCapabilityBanner capability={autoMergeCapability} />
+        <View style={sideInsetStyle}>
+          <View className="px-4 pt-3">
+            <PrReviewCapabilityBanner capability={gate.capability} />
+          </View>
         </View>
         <View className="flex-1" />
         <PrFormSheetFooter>{cancelButton()}</PrFormSheetFooter>
       </>
     );
   }
-  if (providerAutoMerge) {
+  if (gate.kind === 'auto-merge') {
     return (
       <>
-        <ProviderAutoMergeBody mergeState={mergeState} term={term} />
+        <ProviderAutoMergeBody mergeState={gate.mergeState} term={term} />
         <View className="flex-1" />
         <PrFormSheetFooter>
           <Button
@@ -171,11 +229,13 @@ export function PrMergeProviderBody({
       </>
     );
   }
-  if (mergeState && !mergeState.canMerge) {
+  if (gate.kind === 'merge' && !gate.mergeState.canMerge) {
     return (
       <>
-        <View className="gap-4 px-6 pt-4">
-          <MergeRestrictionsList mergeState={mergeState} term={term} />
+        <View style={sideInsetStyle}>
+          <View className={SCREEN_BODY_CLASS}>
+            <MergeRestrictionsList mergeState={gate.mergeState} term={term} />
+          </View>
         </View>
         <View className="flex-1" />
         <PrFormSheetFooter>{cancelButton()}</PrFormSheetFooter>
@@ -184,9 +244,11 @@ export function PrMergeProviderBody({
   }
   return (
     <>
-      {mergeState ? (
-        <View className="px-6 pt-4">
-          <MergeRestrictionsList mergeState={mergeState} term={term} />
+      {gate.kind === 'merge' ? (
+        <View style={sideInsetStyle}>
+          <View className="px-4 pt-3">
+            <MergeRestrictionsList mergeState={gate.mergeState} term={term} />
+          </View>
         </View>
       ) : null}
       {children}

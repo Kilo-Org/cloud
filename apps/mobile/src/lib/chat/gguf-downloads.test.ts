@@ -28,6 +28,14 @@ describe('downloading a curated model', () => {
     expect(JSON.parse(h.index.text ?? '[]')).toHaveLength(1);
   });
 
+  it('reports no retry while the first attempt runs', () => {
+    const h = harness();
+    h.store.start(CATALOG);
+    expect(h.store.snapshot().download).toMatchObject({ retrying: false });
+    taskAt(h.tasks, 0).progress({ bytesWritten: 400, totalBytes: 1000 });
+    expect(h.store.snapshot().download).toMatchObject({ retrying: false });
+  });
+
   it('refuses a second download while one runs, and a model already here', async () => {
     const h = harness();
     expect(h.store.start(CATALOG)).toBe(true);
@@ -130,10 +138,13 @@ describe('pausing, resuming and cancelling', () => {
       fileId: 'small',
       phase: 'downloading',
       written: 0,
+      retrying: true,
     });
 
     await finish(taskAt(h.tasks, 1), 1000);
 
+    // The retried transfer finished, so nothing says "retrying" any more.
+    expect(h.store.snapshot().download).toBeNull();
     expect(h.store.snapshot().failure).toBeNull();
     expect(h.store.model('small')).toMatchObject({ sizeBytes: 1000, contextWindow: 4096 });
     expect(h.files.has(ggufPartialName('small'))).toBe(false);
@@ -143,6 +154,7 @@ describe('pausing, resuming and cancelling', () => {
     const h = harness();
     h.store.start(CATALOG);
     await finish(taskAt(h.tasks, 0), 900);
+    expect(h.store.snapshot().download).toMatchObject({ retrying: true });
     await finish(taskAt(h.tasks, 1), 950);
 
     expect(h.tasks).toHaveLength(2);
@@ -200,11 +212,11 @@ describe('pausing, resuming and cancelling', () => {
     expect(h.files.has(ggufModelName('small'))).toBe(true);
   });
 
-  it('refuses a model it cannot move into place twice, and keeps nothing', async () => {
+  it('reports a model it cannot move into place twice as a write failure, and keeps nothing', async () => {
     const h = harness({ failMove: ggufModelName('small') });
     h.store.start(CATALOG);
     await finish(taskAt(h.tasks, 0), 1000);
-    expect(h.store.snapshot().failure).toEqual({ fileId: 'small', problem: 'invalidFile' });
+    expect(h.store.snapshot().failure).toEqual({ fileId: 'small', problem: 'writeFailed' });
     expect(h.files.size).toBe(0);
   });
 
@@ -218,11 +230,22 @@ describe('pausing, resuming and cancelling', () => {
     expect(h.store.model('small')).toBeUndefined();
   });
 
-  it('refuses a file the hash cannot read, and keeps nothing', async () => {
+  it('reads a hash the device refused once again, and keeps the model when the second read works', async () => {
+    const h = harness({ unreadableOnce: ggufPartialName('small') });
+    h.store.start(CATALOG);
+    await finish(taskAt(h.tasks, 0), 1000);
+    // A refused hash says nothing about the bytes, so the read runs again.
+    expect(h.hashed).toEqual(Array.from({ length: 2 }, () => ggufPartialName('small')));
+    expect(h.store.snapshot().failure).toBeNull();
+    expect(h.store.model('small')).toBeDefined();
+  });
+
+  it('refuses a hash the device will not compute twice as unreadable, and keeps nothing', async () => {
     const h = harness({ unreadable: ggufPartialName('small') });
     h.store.start(CATALOG);
     await finish(taskAt(h.tasks, 0), 1000);
-    expect(h.store.snapshot().failure).toEqual({ fileId: 'small', problem: 'checksum' });
+    // Nothing was ever read, so the problem names the refused check, not the bytes.
+    expect(h.store.snapshot().failure).toEqual({ fileId: 'small', problem: 'unreadable' });
     expect(h.inspected).toEqual([]);
     expect(h.files.size).toBe(0);
   });

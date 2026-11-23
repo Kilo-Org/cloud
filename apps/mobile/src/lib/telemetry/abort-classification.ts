@@ -51,9 +51,6 @@ function isExpoCanceledError(error: unknown): boolean {
     if (!byMessage.success) {
       return false;
     }
-    // A raw expo-modules-core error embeds the class name; the production
-    // `FetchError` wrapper does not, so match the native message as a suffix
-    // (`fetch failed: Fetch request has been canceled`).
     return (
       byMessage.data.message.includes(EXPO_CANCEL_NAME) ||
       byMessage.data.message.endsWith(EXPO_CANCEL_MESSAGE)
@@ -66,8 +63,7 @@ function isExpoCanceledError(error: unknown): boolean {
 /**
  * True when the value is an abort: an `AbortError` / `DOMException` or an Expo
  * `FetchRequestCanceledException`. The Expo cancellation is checked on the
- * error itself and one level of `cause`, since the SDK wraps it. Total: an
- * unrecognized value yields `false` and never throws.
+ * error itself and one level of `cause`, since the SDK wraps it.
  */
 export function isAbortError(error: unknown): boolean {
   try {

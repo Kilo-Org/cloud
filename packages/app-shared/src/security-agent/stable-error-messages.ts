@@ -9,7 +9,7 @@
  * ledger's other duplicated literals (`SECURITY_SERVICE_UNAVAILABLE_MESSAGE`,
  * the ledger marker sentences in `shared-handlers.ts`) keep their own web and
  * mobile copies. Moving them here is the same one-module-one-test pattern; this
- * module pins the two sentences the remediation work changed.
+ * module pins the sentences the security work changed.
  */
 
 /**
@@ -28,3 +28,18 @@ export const SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE = 'Security service is not 
  */
 export const SECURITY_REMEDIATION_REJECTED_MESSAGE =
   'Security remediation service request was rejected';
+
+/**
+ * Thrown by the analysis client for a definitive Worker rejection that is not
+ * an auth/config failure (a policy or request-schema rejection). The Worker's
+ * error body is never echoed, and the sentence never varies with the status,
+ * which is what lets the mobile ledger map it onto localized copy.
+ */
+export const SECURITY_ANALYSIS_REJECTED_MESSAGE = 'Security analysis service request was rejected';
+
+/**
+ * The marker a submission receives when its operation identity is already
+ * running. The mobile ledger and the web copy match it by exact string, so it
+ * never varies.
+ */
+export const SECURITY_OPERATION_IN_PROGRESS_MESSAGE = 'operation_in_progress';

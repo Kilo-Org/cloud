@@ -11,10 +11,9 @@ import { skillCompanionFileIssues } from '../contracts/skill-companion-files';
  * equivalence. Import validation must satisfy the intersection of these
  * constraints and the profile storage validators.
  *
- * Verified divergences from the storage contract: kilo command `agent` is
- * capped at 50 and `model` at 200 here, while the profile schema leaves both
- * unbounded; the runtime command name cap (100) is looser than the profile cap
- * (50).
+ * Cap relationships with the storage contract: the runtime command name cap
+ * (100) is looser than the profile cap (50); the kilo command `agent` (50) and
+ * `model` (200) caps are the same in both contracts.
  */
 export const RUNTIME_LIMITS = {
   MAX_RUNTIME_SKILLS: 50,
@@ -52,6 +51,7 @@ const RuntimeSkillFilesContractSchema = z
         pathInvalidCharacters: path => `Skill file path rejected: ${path}`,
         pathRejected: path => `Skill file path rejected: ${path}`,
         manifestInFiles: 'SKILL.md must be passed as rawMarkdown, not inside files',
+        duplicatePath: path => `Skill companion file path duplicates another file: ${path}`,
         fileTooLarge: () =>
           overLimitMessage(
             'Skill companion file',
@@ -132,11 +132,7 @@ export const RuntimeAgentContractSchema = z.object({
     }),
 });
 
-/**
- * Every kilo command field the runtime contract accepts. The schema below is
- * built from this map, and the import derives its allowed field sets from the
- * same keys, so a field added here is a field the import can carry.
- */
+/** Every kilo command field the runtime contract accepts. */
 const RUNTIME_KILO_COMMAND_SHAPE = {
   name: z
     .string()

@@ -21,7 +21,7 @@
   "scripts": {
     "build": "rm -rf dist && ttsc -p tsconfig.build.json",
     "check": "pnpm check:ci && pnpm test:perf",
-    "check:boundaries": "! grep -rln \"plugins/\" src/core --include='*.ts' | grep -v -e '\\.test\\.ts$' -e '\\-fixture\\.ts$'",
+    "check:boundaries": "ttsx --project scripts/tsconfig.boundaries.json scripts/check-boundaries.ts",
     "check:ci": "pnpm typecheck && pnpm typecheck:e2e && pnpm lint && pnpm check:boundaries && pnpm check:migrations && pnpm test && pnpm build && pnpm check:platform && pnpm check:package",
     "check:migrations": "ttsx --project scripts/tsconfig.json scripts/check-migrations.ts",
     "check:package": "ttsx --project scripts/tsconfig.json scripts/check-package.ts",
@@ -68,11 +68,11 @@
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "1.8.0",
-    "@ttsc/unplugin": "0.36.4",
+    "@ttsc/unplugin": "catalog:",
     "@types/node": "catalog:",
     "drizzle-kit": "catalog:",
     "openai": "7.55.0",
-    "ttsc": "0.36.4",
+    "ttsc": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:vitest5"
   },

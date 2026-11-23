@@ -9,6 +9,7 @@ import {
   type ProviderResponseTransforms,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { isRecord } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
+import { mapMistralThinkingToReasoningDetails } from '@kilocode/web-shared/lib/ai-gateway/providers/mistral';
 
 function getGoogleExtraContent(value: Record<string, unknown>) {
   const extraContent = value.extra_content;
@@ -157,7 +158,12 @@ export function applyReasoningDetailsResponseTransform(
     case ReasoningDetailsTransform.Reasoning:
       mapReasoningStringToDetails(value, 'reasoning');
       break;
+    case ReasoningDetailsTransform.MistralThinking:
+      mapMistralThinkingToReasoningDetails(value);
+      break;
     case null:
       break;
+    default:
+      return transform satisfies never;
   }
 }

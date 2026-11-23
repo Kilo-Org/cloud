@@ -16,6 +16,11 @@ import WIDGET_GALLERY_COPY from './plugins/widget-gallery-copy.json';
 // metadata, not app copy — see plugins/withAppIntentLocalizations.js.
 import APP_INTENT_COPY from './plugins/app-intent-copy.json';
 import { SENTRY_NATIVE_OPTIONS } from './src/lib/sentry-dsn';
+import {
+  SPLASH_BACKGROUND_COLOR,
+  SPLASH_LOGO_IMAGE,
+  SPLASH_LOGO_SIZE,
+} from './src/lib/splash-branding';
 import { UNIVERSAL_LINK_PATH_PATTERNS } from './src/lib/universal-link-paths';
 import {
   assertProductionHost,
@@ -143,7 +148,7 @@ const config: ExpoConfig = {
   // This version must stay at or above AGENT_CHANNEL_SPLIT_APP_VERSION in
   // @kilocode/notifications: that is the first build that creates the split
   // agent channels, so older tokens stay on the legacy `agent` channel.
-  version: '1.0.16',
+  version: '1.0.17',
   // Rotation is supported on iOS and Android: `default` resolves to portrait +
   // both landscapes in UISupportedInterfaceOrientations on iOS and all
   // orientations in the Android manifest, satisfying WCAG 1.3.4 (Orientation)
@@ -439,12 +444,14 @@ const config: ExpoConfig = {
     // One native splash configuration and shared AnimatedSplashOverlay lifecycle
     // for iOS and Android. The wrapper documents the native backing-surface
     // capability exception and owns its mod ordering with expo-splash-screen.
+    // The asset, colour and size come from src/lib/splash-branding.js, the one
+    // module the overlay reads too, so the two surfaces cannot drift.
     [
       './plugins/withBrandedSplash',
       {
-        image: './assets/images/logo-mark.png',
-        backgroundColor: '#FFDD00',
-        imageWidth: 100,
+        image: SPLASH_LOGO_IMAGE,
+        backgroundColor: SPLASH_BACKGROUND_COLOR,
+        imageWidth: SPLASH_LOGO_SIZE,
       },
     ],
     'expo-apple-authentication',

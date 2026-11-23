@@ -6,8 +6,6 @@ import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ShareRemoteFileError } from '@/lib/share-remote-file';
-
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { FilePartRenderer } from './file-part-renderer';
 import {
@@ -94,7 +92,7 @@ vi.mock('expo-file-system', () => ({
 const shareRemoteFileMock = vi.hoisted(() => ({
   downloadRemoteFile: vi.fn(),
   getSafeCacheFilename: vi.fn(),
-  getShareRemoteFileReason: vi.fn(),
+  getShareFailureKind: vi.fn(),
   shareLocalFile: vi.fn(),
   shareRemoteFile: vi.fn(),
 }));
@@ -102,8 +100,7 @@ const shareRemoteFileMock = vi.hoisted(() => ({
 vi.mock('@/lib/share-remote-file', () => ({
   downloadRemoteFile: shareRemoteFileMock.downloadRemoteFile,
   getSafeCacheFilename: shareRemoteFileMock.getSafeCacheFilename,
-  getShareRemoteFileReason: shareRemoteFileMock.getShareRemoteFileReason,
-  ShareRemoteFileError: class ShareRemoteFileErrorMock extends Error {},
+  getShareFailureKind: shareRemoteFileMock.getShareFailureKind,
   shareLocalFile: shareRemoteFileMock.shareLocalFile,
   shareRemoteFile: shareRemoteFileMock.shareRemoteFile,
 }));
@@ -218,7 +215,7 @@ beforeEach(() => {
   shareRemoteFileMock.getSafeCacheFilename.mockImplementation(
     ({ id, filename }: { id: string; filename: string }) => `${id}-${filename}`
   );
-  shareRemoteFileMock.getShareRemoteFileReason.mockReturnValue(null);
+  shareRemoteFileMock.getShareFailureKind.mockReturnValue('general');
   shareRemoteFileMock.shareLocalFile.mockResolvedValue(undefined);
   shareRemoteFileMock.shareRemoteFile.mockResolvedValue(undefined);
   shareRemoteFileMock.downloadRemoteFile.mockImplementation(
@@ -1133,7 +1130,7 @@ describe('FilePartRenderer mounted', () => {
     const root = renderer.root;
 
     shareRemoteFileMock.shareLocalFile.mockRejectedValueOnce(new Error('boom'));
-    shareRemoteFileMock.getShareRemoteFileReason.mockReturnValueOnce('sharing-unavailable');
+    shareRemoteFileMock.getShareFailureKind.mockReturnValueOnce('sharing-unavailable');
 
     await press(first(pressableByLabel(root, 'Open report.pdf')));
     await selectActionSheetOption('Open in external app');
@@ -1373,7 +1370,6 @@ describe('FilePartRenderer mounted', () => {
     await press(first(pressableByLabel(root, 'Open shot.png full screen')));
 
     shareRemoteFileMock.shareRemoteFile.mockRejectedValueOnce(new Error('boom'));
-    shareRemoteFileMock.getShareRemoteFileReason.mockReturnValueOnce(null);
 
     const viewers = findByType(root, 'ImageViewer');
     await act(async () => {
@@ -1404,7 +1400,6 @@ describe('FilePartRenderer mounted', () => {
         shareHolder.reject = reject;
       })
     );
-    shareRemoteFileMock.getShareRemoteFileReason.mockReturnValueOnce(null);
 
     const viewers = findByType(root, 'ImageViewer');
     await act(async () => {
@@ -1446,7 +1441,6 @@ describe('FilePartRenderer mounted', () => {
     await flushAsync();
 
     shareRemoteFileMock.shareLocalFile.mockRejectedValueOnce(new Error('boom'));
-    shareRemoteFileMock.getShareRemoteFileReason.mockReturnValueOnce(null);
 
     const headers = findByType(root, 'SheetHeader');
     await act(async () => {
@@ -1461,7 +1455,7 @@ describe('FilePartRenderer mounted', () => {
     const statuses = accessibleStatusNodes(root);
     expect(statuses).toHaveLength(1);
     expect(statuses[0]?.props.message).toBe('Share failed');
-    expect(statuses[0]?.props.className).toBe('px-6 pt-2 text-sm');
+    expect(statuses[0]?.props.className).toBe('px-4 pt-2 text-sm');
     const statusText = findByType(first(statuses), 'Text');
     expect(statusText[0]?.props.className).toContain('text-destructive');
 
@@ -1484,7 +1478,6 @@ describe('FilePartRenderer mounted', () => {
     await flushAsync();
 
     shareRemoteFileMock.shareLocalFile.mockRejectedValueOnce(new Error('boom'));
-    shareRemoteFileMock.getShareRemoteFileReason.mockReturnValueOnce(null);
 
     const headers = findByType(root, 'SheetHeader');
     await act(async () => {
@@ -1510,9 +1503,8 @@ describe('FilePartRenderer mounted', () => {
 
     await press(first(pressableByLabel(root, 'Open shot.png full screen')));
 
-    shareRemoteFileMock.shareRemoteFile.mockRejectedValueOnce(
-      new ShareRemoteFileError('download-failed')
-    );
+    shareRemoteFileMock.shareRemoteFile.mockRejectedValueOnce(new Error('network down'));
+    shareRemoteFileMock.getShareFailureKind.mockReturnValueOnce('retry');
 
     const viewers = findByType(root, 'ImageViewer');
     await act(async () => {
@@ -1544,7 +1536,7 @@ describe('FilePartRenderer mounted', () => {
     await flushAsync();
 
     shareRemoteFileMock.shareLocalFile.mockRejectedValueOnce(new Error('boom'));
-    shareRemoteFileMock.getShareRemoteFileReason.mockReturnValueOnce('sharing-unavailable');
+    shareRemoteFileMock.getShareFailureKind.mockReturnValueOnce('sharing-unavailable');
 
     const headers = findByType(root, 'SheetHeader');
     await act(async () => {
@@ -2079,7 +2071,7 @@ it('mounts projected native image/PDF results in the real file renderer and open
       time: { created: 1, updated: 2 },
     },
     snapshot: { position: 2, revision: 2 },
-    pending: { permissions: [], questions: [], unreadablePermissions: [] },
+    pending: { permissions: [], questions: [], unreadableQuestions: [], unreadablePermissions: [] },
     events: [],
     commands: {},
     assetURLs: {

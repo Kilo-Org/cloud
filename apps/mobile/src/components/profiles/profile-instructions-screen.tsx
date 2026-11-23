@@ -1,41 +1,52 @@
 /* eslint-disable max-lines -- profile-editor instructions: section body, sheet and delete flow share one screen */
 import { type Href } from 'expo-router';
-import { type ReactNode } from 'react';
+import { Fragment, type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import {
   InstructionFormSheet,
   type InstructionFormSubmission,
 } from '@/components/profiles/instruction-form-sheet';
+import {
+  type InstructionView,
+  InstructionViewSheet,
+} from '@/components/profiles/instruction-view-sheet';
 import { ProfileManageSlot } from '@/components/profiles/profile-manage-slot';
+import { selectProfileReadErrorView } from '@/components/profiles/profile-read-error-view';
 import { ProfileSectionHeader } from '@/components/profiles/profile-section-header';
 import { QueryError } from '@/components/query-error';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
-import { FileText, Pencil, Trash2 } from '@/components/ui/icons';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Switch } from '@/components/ui/switch';
+import { FileText, Plus, Trash2 } from '@/components/ui/icons';
+import { IconTile } from '@/components/ui/icon-tile';
+import { RowFrame } from '@/components/ui/row-frame';
+import { RowGroup } from '@/components/ui/row-group';
+import { renderRowTrailing, RowIconAction } from '@/components/ui/row-trailing';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Text } from '@/components/ui/text';
+import { NEUTRAL_TINT } from '@/lib/agent-color';
 import { HIDDEN_LABEL_PROPS } from '@/lib/a11y/hidden-label';
-import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { MAX_PROFILE_INSTRUCTIONS } from '@/lib/agent-profile-forms';
 import { isolateLtrBidiText } from '@/lib/bidi';
+import { useIsLargeFontScale } from '@/lib/font-scale/system-font-scale-context';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import {
   type AgentProfileInstructionRow,
   useAgentProfileInstructions,
 } from '@/lib/hooks/use-agent-profiles';
 import { useAgentProfileInstructionMutations } from '@/lib/hooks/use-agent-profile-instruction-mutations';
+import { useCloseEditorOnDeniedPermission } from '@/lib/hooks/use-close-editor-on-denied-permission';
 import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useProfileFormDraft } from '@/lib/hooks/use-profile-form-draft';
 import { useSheetRowTapGuard } from '@/lib/hooks/use-sheet-row-tap-guard';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { readTrpcErrorField } from '@/lib/trpc-error';
-import { cn } from '@/lib/utils';
 
 /** Stable empty fallback so the derived list is not a new array each render. */
 const NO_INSTRUCTIONS: AgentProfileInstructionRow[] = [];
@@ -51,6 +62,8 @@ type InstructionRowProps = Readonly<{
   onToggle?: (enabled: boolean) => void;
   onEdit?: () => void;
   onDelete?: () => void;
+  /** Opens the read-only detail sheet. The row uses it only while it is read-only. */
+  onView?: () => void;
 }>;
 
 /**
@@ -62,67 +75,103 @@ function hasUsableMessage(error: unknown): boolean {
 }
 
 /**
- * One instruction row: the rules file name in mono, the path it is applied as,
- * the enabled switch, and delete plus edit. Both painted lines are hidden from
- * assistive technology — the path repeats the name — so the switch's label
- * stays the only element a screen reader matches by the file name.
+ * One instruction row: the rules file name in mono, the enabled switch and
+ * delete. The content is the edit action, so the row carries two trailing
+ * controls instead of three. The row paints the name only: the path repeats
+ * `.kilocode/rules/` and the name's own extension on every row, so it rides the
+ * row's spoken name instead of a second painted line — the content press while
+ * the row opens the form, the row's own press when it does not.
+ *
+ * The name is one line at the default font scale, cut in the middle: two files
+ * that share a long prefix are told apart by the end of their names, which a
+ * tail ellipsis hides. A press on either arm shows the whole name on a surface
+ * of its own, so the name never needs a second painted line to be readable: an
+ * editable row opens the form, which carries the name in a field, and a
+ * read-only row opens the detail sheet, which paints it in full.
+ *
+ * The read-only row keeps the switch it cannot flip, because whether a rule
+ * file is applied is what the member came to read, and it takes no disclosure
+ * mark: the title needs every point the trailing cell does not take. That
+ * state also rides the row's spoken value: the row's single accessible press
+ * hides the switch from a reader on iOS, so the value is what keeps an enabled
+ * file from reading the same as a disabled one. The editable row leaves the
+ * value unset, because there the switch stays its own stop with its own state.
  */
 function InstructionRow({
   instruction,
   onToggle,
   onEdit,
   onDelete,
+  onView,
 }: Readonly<InstructionRowProps>) {
   const { t } = useTranslation();
   const colors = useThemeColors();
+  const contentIsPress = onEdit !== undefined;
+  // The row's title anatomy: one line here, two at a large font scale.
+  const nameLines = useIsLargeFontScale() ? 2 : 1;
+  const rulesPath = `.kilocode/rules/${instruction.name}.md`;
+  const contentAccessibilityLabel = contentIsPress
+    ? [t('profiles.instructionEdit', { name: instruction.name }), rulesPath].join(', ')
+    : undefined;
+  const rowAccessibilityLabel = contentIsPress
+    ? undefined
+    : [instruction.name, rulesPath].join(', ');
+  // Both arms hide the painted name: the editable row's content press names the
+  // file, and the read-only row's own press names it too. The row keeps one
+  // accessible stop per row instead of a text node repeating the name.
+  const trailing: ReactNode[] = [
+    <Fragment key="enable">
+      {renderRowTrailing({
+        kind: 'switch',
+        value: instruction.enabled,
+        accessibilityLabel: instruction.name,
+        disabled: onToggle === undefined,
+        onValueChange: next => {
+          onToggle?.(next);
+        },
+      })}
+    </Fragment>,
+  ];
+  if (onDelete !== undefined) {
+    trailing.push(
+      <RowIconAction
+        key="delete"
+        label={t('profiles.instructionDelete', { name: instruction.name })}
+        onPress={onDelete}
+      >
+        <Trash2 size={18} color={colors.mutedForeground} />
+      </RowIconAction>
+    );
+  }
   return (
-    <View className="min-h-16 flex-row items-center gap-1 rounded-lg bg-secondary px-3 py-2">
-      <View className="min-w-0 flex-1 gap-0.5">
-        <Text variant="mono" numberOfLines={1} {...HIDDEN_LABEL_PROPS}>
-          {instruction.name}
-        </Text>
-        <Text variant="muted" className="text-xs" numberOfLines={1} {...HIDDEN_LABEL_PROPS}>
-          {`.kilocode/rules/${instruction.name}.md`}
-        </Text>
-      </View>
-      <Switch
-        value={instruction.enabled}
-        accessibilityLabel={instruction.name}
-        disabled={onToggle === undefined}
-        onValueChange={onToggle}
-      />
-      {onEdit === undefined ? null : (
-        <Pressable
-          className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
-          accessibilityRole="button"
-          accessibilityLabel={t('profiles.instructionEdit', { name: instruction.name })}
-          onPress={onEdit}
-        >
-          <Pencil size={18} color={colors.mutedForeground} />
-        </Pressable>
-      )}
-      {onDelete === undefined ? null : (
-        <Pressable
-          className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
-          accessibilityRole="button"
-          accessibilityLabel={t('profiles.instructionDelete', { name: instruction.name })}
-          onPress={onDelete}
-        >
-          <Trash2 size={18} color={colors.mutedForeground} />
-        </Pressable>
-      )}
-    </View>
+    <RowFrame
+      leading={<IconTile icon={FileText} tint={NEUTRAL_TINT} />}
+      pressTarget={contentIsPress ? 'content' : 'row'}
+      onPress={contentIsPress ? onEdit : onView}
+      contentAccessibilityLabel={contentAccessibilityLabel}
+      accessibilityLabel={rowAccessibilityLabel}
+      accessibilityValue={
+        contentIsPress
+          ? undefined
+          : { text: instruction.enabled ? t('common.enabled') : t('common.disabled') }
+      }
+      trailing={{ kind: 'nodes', nodes: trailing }}
+    >
+      <Text variant="mono" numberOfLines={nameLines} ellipsizeMode="middle" {...HIDDEN_LABEL_PROPS}>
+        {contentIsPress ? instruction.name : isolateLtrBidiText(instruction.name)}
+      </Text>
+    </RowFrame>
   );
 }
 
 /** Content-shaped rows in the same slot and height as a loaded instruction row. */
 function InstructionsSkeleton() {
   return (
-    <View className="gap-3">
+    <RowGroup>
       {[0, 1, 2].map(index => (
-        <Skeleton key={index} className="h-16 w-full rounded-lg bg-muted-soft" />
+        <RowSkeleton key={index} tile subtitle trailingControl />
       ))}
-    </View>
+    </RowGroup>
   );
 }
 
@@ -134,6 +183,15 @@ export function ProfileInstructionsScreen({
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
   const profileQuery = useAgentProfileInstructions(profileId, organizationId);
+  const committedConnectivity = useCommittedConnectivityStatus();
+  // The row the read-only detail sheet shows the whole file name of. A row that
+  // can be edited opens the form instead, so this holds one only in the
+  // read-only arm.
+  const [preview, setPreview] = useState<InstructionView | null>(null);
+  const readError = selectProfileReadErrorView({
+    error: profileQuery.error,
+    connectivity: committedConnectivity,
+  });
   const { createInstruction, updateInstruction, deleteInstruction, setInstructionEnabled } =
     useAgentProfileInstructionMutations(organizationId);
   const permission = useOrganizationProfilePermission(organizationId);
@@ -144,7 +202,10 @@ export function ProfileInstructionsScreen({
   const draftScope = `profiles:instructions:${profileId}`;
   // The open sheet's refusal is the form's note: the mutation hook's toast sits
   // behind the sheet, and opening or closing resets the note with the rest of
-  // the draft.
+  // the draft. The form and its fields are a draft (`lib/form-draft`), so a
+  // remount reopens it on what was typed. The screen offers the sheet only
+  // while the permission allows the write, and a denial closes it and drops
+  // that draft, so a remount cannot reopen it.
   const form = useProfileFormDraft(draftScope, instructions, {
     saveFailure: null as SaveFailure | null,
   });
@@ -157,6 +218,10 @@ export function ProfileInstructionsScreen({
     markSheetClosed();
     form.close();
   };
+
+  // A denial is not a dismissal: nobody pressed anything, so the guard stays
+  // unarmed and the first row press after the screen settles still reaches it.
+  useCloseEditorOnDeniedPermission(permission, form.close);
 
   const setSaveFailure = (next: SaveFailure | null) => {
     form.setNotes({ saveFailure: next });
@@ -229,73 +294,74 @@ export function ProfileInstructionsScreen({
   };
 
   let content: ReactNode = null;
-  if (profileQuery.isError) {
-    content = (
-      <QueryError
-        variant="server"
-        placement="top"
-        title={t('profiles.loadFailed')}
-        onRetry={() => void profileQuery.refetch()}
-        isRetrying={profileQuery.isRefetching}
-      />
-    );
-  } else if (profileQuery.isPending) {
+  if (profileQuery.isPending) {
     content = <InstructionsSkeleton />;
   } else if (instructions.length === 0) {
     content = (
       <EmptyState
         icon={FileText}
         title={t('profiles.instructionsEmpty')}
-        description={t('profiles.instructionsEmptyDescription')}
+        description={
+          canManage
+            ? t('profiles.instructionsEmptyDescription')
+            : t('profiles.instructionsEmptyDescriptionReadOnly')
+        }
         placement="top"
         action={
           <ProfileManageSlot permission={permission}>
-            <Button className={STATE_ACTION_CLASS} onPress={handleStartAdd}>
-              <Text>{t('profiles.addInstruction')}</Text>
-            </Button>
+            <StateAction
+              label={t('profiles.addInstruction')}
+              icon={Plus}
+              onPress={handleStartAdd}
+            />
           </ProfileManageSlot>
         }
       />
     );
   } else {
     content = (
-      <>
-        {instructions.map(instruction => (
-          <InstructionRow
-            key={instruction.id}
-            instruction={instruction}
-            onToggle={
-              canManage
-                ? guardRowPress(enabled => {
-                    setInstructionEnabled.mutate(
-                      { profileId, instructionId: instruction.id, enabled },
-                      {
-                        onError: error => {
-                          if (!hasUsableMessage(error)) {
-                            toast.error(t('profiles.instructionToggleFailed'));
-                          }
-                        },
-                      }
-                    );
-                  })
-                : undefined
-            }
-            onEdit={
-              canManage
-                ? guardRowPress(() => {
-                    form.startEdit(instruction);
-                  })
-                : undefined
-            }
-            onDelete={
-              canManage
-                ? guardRowPress(() => {
-                    confirmDelete({ id: instruction.id, name: instruction.name });
-                  })
-                : undefined
-            }
-          />
-        ))}
+      <View className="gap-3">
+        <RowGroup leadingTile>
+          {instructions.map(instruction => (
+            <InstructionRow
+              key={instruction.id}
+              instruction={instruction}
+              onToggle={
+                canManage
+                  ? guardRowPress(enabled => {
+                      setInstructionEnabled.mutate(
+                        { profileId, instructionId: instruction.id, enabled },
+                        {
+                          onError: error => {
+                            if (!hasUsableMessage(error)) {
+                              toast.error(t('profiles.instructionToggleFailed'));
+                            }
+                          },
+                        }
+                      );
+                    })
+                  : undefined
+              }
+              onEdit={
+                canManage
+                  ? guardRowPress(() => {
+                      form.startEdit(instruction);
+                    })
+                  : undefined
+              }
+              onDelete={
+                canManage
+                  ? guardRowPress(() => {
+                      confirmDelete({ id: instruction.id, name: instruction.name });
+                    })
+                  : undefined
+              }
+              onView={guardRowPress(() => {
+                setPreview(instruction);
+              })}
+            />
+          ))}
+        </RowGroup>
         <ProfileManageSlot permission={permission}>
           {atInstructionCap ? (
             <AccessibleStatus
@@ -308,7 +374,7 @@ export function ProfileInstructionsScreen({
             <Text>{t('profiles.addInstruction')}</Text>
           </Button>
         </ProfileManageSlot>
-      </>
+      </View>
     );
   }
 
@@ -320,17 +386,30 @@ export function ProfileInstructionsScreen({
         title={t('profiles.instructionsTitle')}
         backFallback={backFallback}
       />
-      <TabScreenScrollView
-        className="flex-1"
-        contentContainerClassName="gap-3 px-6 pt-4 pb-8"
-        keyboardShouldPersistTaps="handled"
-        automaticallyAdjustKeyboardInsets
-        showsVerticalScrollIndicator={false}
-      >
-        {content}
-      </TabScreenScrollView>
+      {profileQuery.isError ? (
+        // The read owns the surface, so it centres in the band the header and
+        // the bottom band leave instead of scrolling as a banner.
+        <QueryError
+          variant={readError.variant}
+          placement="center"
+          title={readError.titleKey ? t(readError.titleKey) : undefined}
+          message={readError.descriptionKey ? t(readError.descriptionKey) : undefined}
+          onRetry={readError.showRetry ? () => void profileQuery.refetch() : undefined}
+          isRetrying={profileQuery.isRefetching}
+        />
+      ) : (
+        <TabScreenScrollView
+          className="flex-1"
+          contentContainerClassName={SCREEN_BODY_CLASS}
+          keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets
+          showsVerticalScrollIndicator={false}
+        >
+          {content}
+        </TabScreenScrollView>
+      )}
 
-      {form.isOpen ? (
+      {form.isOpen && canManage ? (
         <InstructionFormSheet
           draftScope={draftScope}
           instruction={form.editing}
@@ -341,6 +420,16 @@ export function ProfileInstructionsScreen({
           onSave={submission => saveInstruction(form.editing, submission)}
         />
       ) : null}
+
+      {/* The two sheets cannot be open together: a row offers the detail sheet
+          only while it has no edit press, and the form opens only through that
+          press, so a row that opens the form never opens the detail sheet. */}
+      <InstructionViewSheet
+        instruction={preview}
+        onClose={() => {
+          setPreview(null);
+        }}
+      />
 
       {dialog}
     </View>

@@ -5,10 +5,11 @@ import { act, TestRenderer } from '@/test/renderer';
 
 import { getAdmission } from '@/lib/auth/admission';
 import type * as AdmissionTypes from '@/lib/auth/admission';
+import { type PostAuthFailure } from '@/lib/auth/auth-fetch';
 import type * as AuthFetchTypes from '@/lib/auth/auth-fetch';
 import { type PendingLinkOffer } from '@/lib/auth/native-auth-contract';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 
 const authMock = vi.hoisted(() => ({ signIn: vi.fn() }));
 
@@ -126,6 +127,10 @@ type R = TestRenderer.ReactTestRenderer;
 type I = TestRenderer.ReactTestInstance;
 type StartFn = (mode: 'signin' | 'sso', ssoEmail?: string) => Promise<void>;
 
+/** The code step's wrong-code copy, which names both ways out of the refusal. */
+const INVALID_CODE_MESSAGE =
+  "That code is incorrect or expired. Use 'Resend code' or 'More sign-in options'.";
+
 function findAll(root: I, type: string): I[] {
   return root.findAll(n => typeof n.type === 'string' && (n.type as string) === type);
 }
@@ -155,6 +160,52 @@ async function mountIdleAuth(
     throw new Error('renderer was not created');
   }
   return renderer;
+}
+
+/** The code step's form, re-read after every update: its props carry the refusal. */
+function codeStep(root: I): I {
+  const form = findAll(root, 'EmailOtpForm')[0];
+  if (!form) {
+    throw new Error('EmailOtpForm not found');
+  }
+  return form;
+}
+
+/** Mounts the idle screen and lands on the code step, with the OTP route accepting the request. */
+async function mountCodeStep(
+  email: string,
+  props: Partial<React.ComponentProps<typeof IdleAuth>> = {}
+): Promise<R> {
+  mockPostAuth.mockResolvedValue({
+    ok: true,
+    data: { success: true, challengeId: 'c0000000-0000-4000-8000-000000000001' },
+  });
+  const renderer = await mountIdleAuth(props);
+  const field = findAll(renderer.root, 'FormField')[0];
+  if (!field) {
+    throw new Error('FormField not found');
+  }
+  act(() => {
+    (field.props.onChangeText as (value: string) => void)(email);
+  });
+  await act(async () => {
+    (continueButton(renderer.root).props.onPress as () => void)();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+  return renderer;
+}
+
+/** Answers the next verify with `failure`, then settles the step's update. */
+async function refuseVerify(renderer: R, failure: PostAuthFailure): Promise<void> {
+  mockPostAuth.mockResolvedValue(failure);
+  await act(async () => {
+    (codeStep(renderer.root).props.onVerify as (code: string) => void)('000000');
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+  });
 }
 
 describe('IdleAuth email sign-in flow (real useNativeAuth)', () => {
@@ -405,20 +456,175 @@ describe('IdleAuth email sign-in flow (real useNativeAuth)', () => {
     });
   });
 
-  it('renders a wrong-code refusal inline on the code step and clears it on edit', async () => {
+  it('keeps a wrong-code refusal and its options control while the person edits the code', async () => {
+    const renderer = await mountCodeStep('wrong@example.com');
+    expect(codeStep(renderer.root).props.error).toBeUndefined();
+
+    await refuseVerify(renderer, {
+      ok: false,
+      errorCode: 'INVALID_CODE',
+      ssoOrganizationId: undefined,
+    });
+
+    expect(codeStep(renderer.root).props.error).toBe(INVALID_CODE_MESSAGE);
+    // The server answers INVALID_CODE for an address it silently refused, so a
+    // resent code never arrives either: the step offers the other methods.
+    expect(codeStep(renderer.root).props.recovery).toBe('options');
+
+    // Typing is not a way out of that dead end, so the message and the control
+    // that names the real exit stay exactly where they are.
+    act(() => {
+      (codeStep(renderer.root).props.onCodeChange as () => void)();
+    });
+    expect(codeStep(renderer.root).props.error).toBe(INVALID_CODE_MESSAGE);
+    expect(codeStep(renderer.root).props.recovery).toBe('options');
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('keeps a wrong-code refusal and its options control when the resend is rate limited', async () => {
+    const renderer = await mountCodeStep('wrong-resend-rate-limited@example.com');
+    await refuseVerify(renderer, {
+      ok: false,
+      errorCode: 'INVALID_CODE',
+      ssoOrganizationId: undefined,
+    });
+    expect(codeStep(renderer.root).props.recovery).toBe('options');
+
+    // A refused resend delivers no code either, so clearing the refusal on the
+    // tap would drop the only control that can finish a sign-in for this address.
+    mockPostAuth.mockResolvedValue({
+      ok: false,
+      errorCode: 'RATE_LIMITED',
+      ssoOrganizationId: undefined,
+    });
+    await act(async () => {
+      await (codeStep(renderer.root).props.onResend as () => Promise<boolean>)();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(codeStep(renderer.root).props.error).toBe(INVALID_CODE_MESSAGE);
+    expect(codeStep(renderer.root).props.recovery).toBe('options');
+    expect(codeStep(renderer.root).props.busy).toBeUndefined();
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('keeps a wrong-code refusal and its options control when the resend succeeds', async () => {
+    const renderer = await mountCodeStep('wrong-resend-sent@example.com');
+    await refuseVerify(renderer, {
+      ok: false,
+      errorCode: 'INVALID_CODE',
+      ssoOrganizationId: undefined,
+    });
+    expect(codeStep(renderer.root).props.recovery).toBe('options');
+
+    // The resend the person tapped did deliver a challenge, but the field clears
+    // its code and the address stays one the code route cannot take: the refusal
+    // and its exit outlive the resend rather than vanishing with the field.
+    mockPostAuth.mockResolvedValue({
+      ok: true,
+      data: { success: true, challengeId: 'c0000000-0000-4000-8000-000000000002' },
+    });
+    await act(async () => {
+      await (codeStep(renderer.root).props.onResend as () => Promise<boolean>)();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(codeStep(renderer.root).props.error).toBe(INVALID_CODE_MESSAGE);
+    expect(codeStep(renderer.root).props.recovery).toBe('options');
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('clears a retryable verify refusal on edit and never offers the options control', async () => {
+    const renderer = await mountCodeStep('retryable@example.com');
+    await refuseVerify(renderer, {
+      ok: false,
+      errorCode: 'RATE_LIMITED',
+      ssoOrganizationId: undefined,
+    });
+
+    expect(codeStep(renderer.root).props.error).toBe(
+      'Too many sign-in attempts. Please wait and try again.'
+    );
+    // A code can still clear this one, so the browser action stays off.
+    expect(codeStep(renderer.root).props.recovery).toBeUndefined();
+
+    act(() => {
+      (codeStep(renderer.root).props.onCodeChange as () => void)();
+    });
+    expect(codeStep(renderer.root).props.error).toBeUndefined();
+    expect(codeStep(renderer.root).props.recovery).toBeUndefined();
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('retires a terminal refusal on Back, so the step the person returns to is fresh', async () => {
+    const renderer = await mountCodeStep('back-out@example.com');
+    await refuseVerify(renderer, {
+      ok: false,
+      errorCode: 'INVALID_CODE',
+      ssoOrganizationId: undefined,
+    });
+    expect(codeStep(renderer.root).props.error).toBe(INVALID_CODE_MESSAGE);
+
+    act(() => {
+      (codeStep(renderer.root).props.onBack as () => void)();
+    });
+    expect(findAll(renderer.root, 'EmailOtpForm')).toHaveLength(0);
+
+    // Back is the person leaving the step, so the step they open next starts clean.
+    mockPostAuth.mockResolvedValue({
+      ok: true,
+      data: { success: true, challengeId: 'c0000000-0000-4000-8000-000000000003' },
+    });
+    await act(async () => {
+      (continueButton(renderer.root).props.onPress as () => void)();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(codeStep(renderer.root).props.error).toBeUndefined();
+    expect(codeStep(renderer.root).props.recovery).toBeUndefined();
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  // The reported dead end: the signup rules or the domain blacklist silently
+  // refuse an address, so the OTP route answers 200 with a challenge but issues
+  // no code, and the token route answers INVALID_CODE. Resending never delivers,
+  // so the step must offer the other sign-in methods its copy names — and that
+  // control must start the browser flow.
+  it('offers the other sign-in methods when the server silently refused the address', async () => {
     mockPostAuth.mockResolvedValue({
       ok: true,
       data: { success: true, challengeId: 'c0000000-0000-4000-8000-000000000001' },
     });
+    const start = vi.fn<StartFn>().mockResolvedValue(undefined);
 
-    const renderer = await mountIdleAuth();
+    const renderer = await mountIdleAuth({ start });
 
     const field = findAll(renderer.root, 'FormField')[0];
     if (!field) {
       throw new Error('FormField not found');
     }
     act(() => {
-      (field.props.onChangeText as (value: string) => void)('wrong@example.com');
+      (field.props.onChangeText as (value: string) => void)('refused-domain@example.com');
     });
 
     await act(async () => {
@@ -432,29 +638,39 @@ describe('IdleAuth email sign-in flow (real useNativeAuth)', () => {
     if (!otpForm) {
       throw new Error('EmailOtpForm not found');
     }
-    expect(otpForm.props.error).toBeUndefined();
 
     mockPostAuth.mockResolvedValue({
       ok: false,
       errorCode: 'INVALID_CODE',
       ssoOrganizationId: undefined,
+      httpStatus: 401,
     });
     await act(async () => {
-      (otpForm.props.onVerify as (code: string) => void)('000000');
+      (otpForm.props.onVerify as (code: string) => void)('123456');
       await Promise.resolve();
       await Promise.resolve();
       await Promise.resolve();
     });
 
-    expect(findAll(renderer.root, 'EmailOtpForm')[0]?.props.error).toBe(
-      'That code is incorrect. Please try again.'
+    const refused = findAll(renderer.root, 'EmailOtpForm')[0];
+    if (!refused) {
+      throw new Error('EmailOtpForm not found');
+    }
+    expect(refused.props.error).toBe(
+      "That code is incorrect or expired. Use 'Resend code' or 'More sign-in options'."
     );
+    expect(refused.props.recovery).toBe('options');
+    expect(authMock.signIn).not.toHaveBeenCalled();
 
-    // Editing the code retires the refusal message.
-    act(() => {
-      (otpForm.props.onCodeChange as () => void)();
+    const onAlternativeSignIn = refused.props.onAlternativeSignIn as (() => void) | undefined;
+    if (!onAlternativeSignIn) {
+      throw new Error('alternative sign-in action not rendered');
+    }
+    await act(async () => {
+      onAlternativeSignIn();
+      await Promise.resolve();
     });
-    expect(findAll(renderer.root, 'EmailOtpForm')[0]?.props.error).toBeUndefined();
+    expect(start).toHaveBeenCalledWith('signin', undefined, undefined);
 
     act(() => {
       renderer.unmount();
@@ -536,7 +752,7 @@ describe('IdleAuth email sign-in flow (real useNativeAuth)', () => {
     });
 
     expect(findAll(renderer.root, 'EmailOtpForm')[0]?.props.error).toBe(
-      'We could not verify this device. Check your connection and try again.'
+      i18n.t('authErrors.retryableAdmission')
     );
     expect(mockPostAuth).not.toHaveBeenCalled();
     expect(authMock.signIn).not.toHaveBeenCalled();
@@ -548,6 +764,70 @@ describe('IdleAuth email sign-in flow (real useNativeAuth)', () => {
     await act(() => {
       (otpForm.props.onVerify as (code: string) => void)('123456');
     });
+    expect(authMock.signIn).toHaveBeenCalledExactlyOnceWith('at', 'rt', 3600);
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('offers the browser sign-in the admission refusal names and starts that flow', async () => {
+    mockPostAuth.mockResolvedValue({
+      ok: true,
+      data: { success: true, challengeId: 'c0000000-0000-4000-8000-000000000001' },
+    });
+    const start = vi.fn<StartFn>().mockResolvedValue(undefined);
+    const renderer = await mountIdleAuth({ start });
+    const field = findAll(renderer.root, 'FormField')[0];
+    if (!field) {
+      throw new Error('FormField not found');
+    }
+    act(() => {
+      (field.props.onChangeText as (value: string) => void)('blocked@example.com');
+    });
+    await act(async () => {
+      (continueButton(renderer.root).props.onPress as () => void)();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    const otpForm = findAll(renderer.root, 'EmailOtpForm')[0];
+    if (!otpForm) {
+      throw new Error('EmailOtpForm not found');
+    }
+
+    mockPostAuth.mockResolvedValue({
+      ok: false,
+      errorCode: 'ADMISSION_REQUIRED',
+      ssoOrganizationId: undefined,
+      httpStatus: 403,
+    });
+    await act(async () => {
+      (otpForm.props.onVerify as (code: string) => void)('123456');
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const refused = findAll(renderer.root, 'EmailOtpForm')[0];
+    if (!refused) {
+      throw new Error('EmailOtpForm not found');
+    }
+    expect(refused.props.error).toBe(
+      "Your device can't be verified. Use 'More sign-in options' to sign in on another device or through the web."
+    );
+    expect(refused.props.recovery).toBe('options');
+    const onAlternativeSignIn = refused.props.onAlternativeSignIn as (() => void) | undefined;
+    if (!onAlternativeSignIn) {
+      throw new Error('alternative sign-in action not rendered');
+    }
+
+    await act(async () => {
+      onAlternativeSignIn();
+      await Promise.resolve();
+    });
+    expect(start).toHaveBeenCalledWith('signin', undefined, undefined);
+    expect(authMock.signIn).not.toHaveBeenCalled();
+
     act(() => {
       renderer.unmount();
     });
@@ -616,6 +896,194 @@ describe('IdleAuth pending-link code step (real useNativeAuth)', () => {
     const refused = findAll(renderer.root, 'EmailOtpForm')[0];
     expect(refused?.props.error).toBe('Too many sign-in attempts. Please wait and try again.');
     expect(refused?.props.busy).toBeUndefined();
+    // A retryable resend refusal never offers the terminal browser action.
+    expect(refused?.props.recovery).toBeUndefined();
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('shows the newest refusal when a resend fails after a terminal verify refusal', async () => {
+    mockPostAuth.mockResolvedValue({ ok: true, data: { success: true } });
+    const renderer = await mountIdleAuth({
+      pendingLink: offer,
+      onPendingLink: vi.fn<(link: PendingLinkOffer) => void>(),
+    });
+
+    const send = findAll(renderer.root, 'Button').find(
+      b => b.props.accessibilityLabel === 'Email me a sign-in code'
+    );
+    if (!send) {
+      throw new Error('Email me a sign-in code button not found');
+    }
+    await act(async () => {
+      (send.props.onPress as () => void)();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // A terminal refusal stays on the step, which is what this PR adds.
+    mockPostAuth.mockResolvedValue({
+      ok: false,
+      errorCode: 'ADMISSION_REQUIRED',
+      ssoOrganizationId: undefined,
+      httpStatus: 403,
+    });
+    const otpForm = findAll(renderer.root, 'EmailOtpForm')[0];
+    if (!otpForm) {
+      throw new Error('EmailOtpForm not found');
+    }
+    await act(async () => {
+      (otpForm.props.onVerify as (code: string) => void)('123456');
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(findAll(renderer.root, 'EmailOtpForm')[0]?.props.recovery).toBe('options');
+
+    // The resend then fails for its own, different reason. The slot must read
+    // the newest refusal: the sticky terminal message would hide the failure and
+    // the tap would look like it did nothing.
+    mockPostAuth.mockResolvedValue({
+      ok: false,
+      errorCode: 'RATE_LIMITED',
+      ssoOrganizationId: undefined,
+    });
+    await act(async () => {
+      (codeStep(renderer.root).props.onResend as () => void)();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const afterResend = findAll(renderer.root, 'EmailOtpForm')[0];
+    expect(afterResend?.props.error).toBe('Too many sign-in attempts. Please wait and try again.');
+    expect(afterResend?.props.busy).toBeUndefined();
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('shows the newest refusal when a verify refusal follows a resend failure', async () => {
+    mockPostAuth.mockResolvedValue({ ok: true, data: { success: true } });
+    const renderer = await mountIdleAuth({
+      pendingLink: offer,
+      onPendingLink: vi.fn<(link: PendingLinkOffer) => void>(),
+    });
+
+    const send = findAll(renderer.root, 'Button').find(
+      b => b.props.accessibilityLabel === 'Email me a sign-in code'
+    );
+    if (!send) {
+      throw new Error('Email me a sign-in code button not found');
+    }
+    await act(async () => {
+      (send.props.onPress as () => void)();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    mockPostAuth.mockResolvedValue({
+      ok: false,
+      errorCode: 'RATE_LIMITED',
+      ssoOrganizationId: undefined,
+    });
+    await act(async () => {
+      (codeStep(renderer.root).props.onResend as () => void)();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(codeStep(renderer.root).props.error).toBe(
+      'Too many sign-in attempts. Please wait and try again.'
+    );
+
+    // The code exchange then refuses for its own reason: its message is the
+    // newest one, so the older resend failure retires instead of shadowing it.
+    mockPostAuth.mockResolvedValue({
+      ok: false,
+      errorCode: 'ADMISSION_REQUIRED',
+      ssoOrganizationId: undefined,
+      httpStatus: 403,
+    });
+    await act(async () => {
+      (codeStep(renderer.root).props.onVerify as (code: string) => void)('123456');
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const afterVerify = findAll(renderer.root, 'EmailOtpForm')[0];
+    expect(afterVerify?.props.error).toBe(
+      "Your device can't be verified. Use 'More sign-in options' to sign in on another device or through the web."
+    );
+    expect(afterVerify?.props.recovery).toBe('options');
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('signs in through the browser with the pending link token after an admission refusal', async () => {
+    mockPostAuth.mockResolvedValue({ ok: true, data: { success: true } });
+    const start = vi.fn<StartFn>().mockResolvedValue(undefined);
+    const renderer = await mountIdleAuth({
+      start,
+      pendingLink: offer,
+      onPendingLink: vi.fn<(link: PendingLinkOffer) => void>(),
+    });
+
+    const send = findAll(renderer.root, 'Button').find(
+      b => b.props.accessibilityLabel === 'Email me a sign-in code'
+    );
+    if (!send) {
+      throw new Error('Email me a sign-in code button not found');
+    }
+    await act(async () => {
+      (send.props.onPress as () => void)();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    mockPostAuth.mockResolvedValue({
+      ok: false,
+      errorCode: 'ADMISSION_REQUIRED',
+      ssoOrganizationId: undefined,
+      httpStatus: 403,
+    });
+    const otpForm = findAll(renderer.root, 'EmailOtpForm')[0];
+    if (!otpForm) {
+      throw new Error('EmailOtpForm not found');
+    }
+    await act(async () => {
+      (otpForm.props.onVerify as (code: string) => void)('123456');
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const refused = findAll(renderer.root, 'EmailOtpForm')[0];
+    if (!refused) {
+      throw new Error('EmailOtpForm not found');
+    }
+    expect(refused.props.error).toBe(
+      "Your device can't be verified. Use 'More sign-in options' to sign in on another device or through the web."
+    );
+    expect(refused.props.recovery).toBe('options');
+    const onAlternativeSignIn = refused.props.onAlternativeSignIn as (() => void) | undefined;
+    if (!onAlternativeSignIn) {
+      throw new Error('alternative sign-in action not rendered');
+    }
+    await act(async () => {
+      onAlternativeSignIn();
+      await Promise.resolve();
+    });
+    expect(start).toHaveBeenCalledWith('signin', undefined, 'link-token');
 
     act(() => {
       renderer.unmount();

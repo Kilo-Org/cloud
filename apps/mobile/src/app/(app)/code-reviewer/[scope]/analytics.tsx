@@ -9,21 +9,25 @@ import { InvalidRouteState } from '@/components/invalid-route-state';
 import { QueryError } from '@/components/query-error';
 import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
 import { ScopeAccessDeniedScreen } from '@/components/organization/scope-access-denied-screen';
+import {
+  AnalyticsSkeleton,
+  MetricCard,
+  PERIOD_OPTIONS,
+  PLATFORM_OPTIONS,
+} from '@/components/code-reviewer/analytics-chrome';
 import { ConfigureRow } from '@/components/ui/configure-row';
-import { FileText, GitPullRequest, LineChart, type LucideIcon } from '@/components/ui/icons';
+import { FileText, GitPullRequest, LineChart } from '@/components/ui/icons';
+import { RowGroup } from '@/components/ui/row-group';
+import { Section } from '@/components/ui/section';
 import { SegmentedControl } from '@/components/ui/segmented-control';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
 import { formatNumber } from '@/lib/format';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useCodeReviewerAnalyticsFilters } from '@/lib/hooks/use-code-reviewer-analytics-filters';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import {
-  PERSONAL_SCOPE,
-  PLATFORM_CAPABILITIES,
-  reviewerPlatformLabel,
-} from '@/lib/code-reviewer-config';
+import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
+import { PERSONAL_SCOPE, reviewerPlatformLabel } from '@/lib/code-reviewer-config';
 import { reviewerScopeTitle } from '@/lib/code-reviewer-scope-title';
 import { useReviewerScopeName } from '@/lib/hooks/use-reviewer-scope-title';
 import { classifyOrganizationScopeAccess } from '@/lib/organization-scope-access';
@@ -31,60 +35,6 @@ import { CODE_REVIEWER_HOME_PATH } from '@/lib/profile-agent-navigation';
 import { queryBodyFailure, useQueryBodyState } from '@/lib/hooks/use-query-body-state';
 import { useTRPC } from '@/lib/trpc';
 import { isRetryableTrpcError, trpcErrorVariant } from '@/lib/trpc-error';
-
-/**
- * The day window the dashboard covers. The label is the day count and its unit
- * in one existing catalog string — the same three the usage screen paints for
- * the same windows — so a segment reads "30 days" instead of a bare number the
- * reader cannot attribute to days.
- */
-const PERIOD_OPTIONS = [
-  { value: '7', labelKey: 'spendAlerts.window7d' },
-  { value: '30', labelKey: 'spendAlerts.window30d' },
-  { value: '90', labelKey: 'usage.range90d' },
-] as const;
-
-const PLATFORM_OPTIONS = (['github', 'gitlab'] as const).map(platform => ({
-  value: platform,
-  label: PLATFORM_CAPABILITIES[platform].label,
-}));
-
-function MetricCard({
-  icon: Icon,
-  label,
-  value,
-}: Readonly<{ icon: LucideIcon; label: string; value: string }>) {
-  const colors = useThemeColors();
-  return (
-    <View className="min-w-0 flex-1 justify-between gap-1 rounded-lg bg-secondary p-4">
-      <View className="flex-row items-center gap-2">
-        <Icon size={14} color={colors.mutedForeground} />
-        <Text variant="muted" className="min-w-0 flex-1 text-xs" numberOfLines={2}>
-          {label}
-        </Text>
-      </View>
-      <Text className="text-lg font-semibold">{value}</Text>
-    </View>
-  );
-}
-
-function AnalyticsSkeleton() {
-  return (
-    <View className="gap-3 pt-4">
-      <Skeleton className="h-10 w-full rounded-lg" />
-      <View className="flex-row gap-3">
-        <Skeleton className="h-20 flex-1 rounded-lg" />
-        <Skeleton className="h-20 flex-1 rounded-lg" />
-      </View>
-      <View className="flex-row gap-3">
-        <Skeleton className="h-20 flex-1 rounded-lg" />
-        <Skeleton className="h-20 flex-1 rounded-lg" />
-      </View>
-      <Skeleton className="h-12 w-full rounded-lg" />
-      <Skeleton className="h-12 w-full rounded-lg" />
-    </View>
-  );
-}
 
 export default function CodeReviewerAnalyticsRoute() {
   const { scope } = useLocalSearchParams<{ scope: string }>();
@@ -102,7 +52,7 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
   // The organization's own name for the header, and the row a denial titles
   // itself with. The route already rejected the personal scope, so this read
   // always has an organization to look up.
-  const organizations = useQuery(trpc.organizations.list.queryOptions());
+  const organizations = useOrganizationsList();
   // The name this app last showed stands in once the reader loses the
   // membership, so the denial below still names the organization it is about.
   const knownScopeName = useReviewerScopeName(scope, organizations.data);
@@ -158,11 +108,11 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
   if (access !== 'granted') {
     return (
       <ScopeAccessDeniedScreen
-        title={scopeTitle}
+        title={t('codeReviewer.analytics.title')}
         // The denied header carries the granted header's identity: this
         // screen's own name over the organization, so a lost membership still
         // reads as the analytics screen the reader tried to open.
-        eyebrow={t('codeReviewer.analytics.title')}
+        subtitle={scopeTitle}
         backFallback={CODE_REVIEWER_HOME_PATH}
         kind={access}
         onRetry={() => {
@@ -219,6 +169,8 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
       // platform without leaving the screen.
       <EmptyState
         placement="center"
+        // The scroll body already insets this state by the page gutter.
+        inset="none"
         icon={LineChart}
         title={t('codeReviewer.analytics.offTitle', {
           platform: reviewerPlatformLabel(settings.platform),
@@ -226,7 +178,7 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
         description={t('codeReviewer.analytics.offDescription')}
       />
     ) : (
-      <View className="gap-6 pt-4">
+      <View className="gap-6">
         {stale ? (
           <QueryError
             variant={stalePaused ? 'offline' : trpcErrorVariant(dashboard.error)}
@@ -289,12 +241,9 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
             description={t('codeReviewer.analytics.emptyDescription')}
           />
         ) : (
-          <View className="gap-2">
-            <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-              {t('common.repositories')}
-            </Text>
-            <View>
-              {repositories.map((repository, index) => (
+          <Section label={t('common.repositories')}>
+            <RowGroup leadingTile>
+              {repositories.map(repository => (
                 <ConfigureRow
                   key={repository.repository}
                   icon={GitPullRequest}
@@ -307,11 +256,10 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
                         repository.suggestionFindings
                     ),
                   })}
-                  last={index === repositories.length - 1}
                 />
               ))}
-            </View>
-          </View>
+            </RowGroup>
+          </Section>
         )}
       </View>
     );
@@ -320,22 +268,25 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
   return (
     <View className="flex-1 bg-background">
       <ReviewerHeader
-        title={scopeTitle}
-        // One line, like the review list this scope also opens: the name arrives
-        // with the membership read and a longer one tail-truncates inside the
-        // same line instead of growing the header. The eyebrow keeps the
-        // screen's own name there, since the organization name is user prose.
-        titleNumberOfLines={1}
-        eyebrow={t('codeReviewer.analytics.title')}
+        title={t('codeReviewer.analytics.title')}
+        // The scope sits on the subtitle line: the name arrives with the
+        // membership read and a longer one tail-truncates inside that line
+        // instead of growing the header.
+        subtitle={scopeTitle}
       />
-      <TabScreenScrollView className="flex-1" contentContainerClassName="gap-4 px-6 pt-4">
-        <View className="gap-2">
+      <TabScreenScrollView className="flex-1" contentContainerClassName={SCREEN_BODY_CLASS}>
+        {/* Two segmented controls of the same face, one under the other, read
+            as one control; each takes its own section label and the body's
+            section gap. */}
+        <Section label={t('common.platform')}>
           <SegmentedControl
             options={PLATFORM_OPTIONS}
             value={platform}
             accessibilityLabel={t('common.platform')}
             onChange={setPlatform}
           />
+        </Section>
+        <Section label={t('usage.rangePicker')}>
           <SegmentedControl
             options={periodOptions}
             value={String(period)}
@@ -347,7 +298,7 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
               }
             }}
           />
-        </View>
+        </Section>
         {body}
       </TabScreenScrollView>
     </View>

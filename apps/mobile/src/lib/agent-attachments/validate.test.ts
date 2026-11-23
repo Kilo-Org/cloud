@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   AGENT_ATTACHMENT_DENIED_EXTENSIONS,
+  AGENT_ATTACHMENT_MAX_BYTES,
   AGENT_ATTACHMENT_MIME_BY_EXTENSION,
   type AgentAttachmentExtension,
 } from './constants';
@@ -271,23 +272,23 @@ describe('classifyAttachment', () => {
   });
 
   it('rejects a file over the 20 MB cap', () => {
-    expect(classifyAttachment({ name: 'big.pdf', size: 21 * 1024 * 1024 })).toEqual({
+    expect(classifyAttachment({ name: 'big.pdf', size: AGENT_ATTACHMENT_MAX_BYTES + 1 })).toEqual({
       ok: false,
       reason: 'too-large',
     });
   });
 
   it('accepts a file exactly at the 20 MB cap', () => {
-    expect(classifyAttachment({ name: 'edge.pdf', size: 20 * 1024 * 1024 })).toEqual({
+    expect(classifyAttachment({ name: 'edge.pdf', size: AGENT_ATTACHMENT_MAX_BYTES })).toEqual({
       ok: true,
       kind: 'document',
       extension: 'pdf',
-      size: 20 * 1024 * 1024,
+      size: AGENT_ATTACHMENT_MAX_BYTES,
     });
   });
 
   it('checks the deny list before the size cap (a 20 MB .exe is denied, not too-large)', () => {
-    expect(classifyAttachment({ name: 'big.exe', size: 20 * 1024 * 1024 + 1 })).toEqual({
+    expect(classifyAttachment({ name: 'big.exe', size: AGENT_ATTACHMENT_MAX_BYTES + 1 })).toEqual({
       ok: false,
       reason: 'denied',
     });

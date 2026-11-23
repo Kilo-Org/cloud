@@ -10,10 +10,10 @@ import {
   fetchModelPreferences,
   removeModelFavorite,
 } from '@/src/shared/model-preferences-client';
+import { createSerialAsyncChain } from '@/src/shared/serial-async-chain';
 import { getModelPreferencesQueryKey } from '@/src/shared/side-panel-query-options';
 import {
   applyFavoriteToggleCompletionUi,
-  createSerialAsyncChain,
   deriveModelPreferencesStatus,
   emptyFavoriteIds,
   reduceTerminalLatch,
@@ -120,7 +120,6 @@ export const useModelPreferences = ({
 
       /* Capture at enqueue: stale-guard UI; cache ops keep this query key. */
       const enqueuedFingerprint = keyFingerprint;
-      const enqueuedOrganizationId = organizationId;
       const enqueuedQueryKey = [...queryKey];
       const enqueuedToken = auth.token;
 
@@ -135,14 +134,12 @@ export const useModelPreferences = ({
                   apiBaseUrl,
                   fetch: fetchFromWindow,
                   model: model.id,
-                  organizationId: enqueuedOrganizationId,
                   token: enqueuedToken,
                 })
               : addModelFavorite({
                   apiBaseUrl,
                   fetch: fetchFromWindow,
                   model: model.id,
-                  organizationId: enqueuedOrganizationId,
                   token: enqueuedToken,
                 }),
           queryClient,
@@ -180,7 +177,7 @@ export const useModelPreferences = ({
         setToggleError(next.toggleError);
       });
     },
-    [auth.token, keyFingerprint, organizationId, queryClient, queryKey, status]
+    [auth.token, keyFingerprint, queryClient, queryKey, status]
   );
 
   return {

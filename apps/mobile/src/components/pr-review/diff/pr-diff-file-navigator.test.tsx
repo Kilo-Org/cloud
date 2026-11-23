@@ -53,7 +53,10 @@ vi.mock('@shopify/flash-list', () => ({
       index: number;
     }) => ReactElement;
     return createElement(
-      Fragment,
+      // A host node, not a Fragment: the navigator's sheet contract is about
+      // where the scroller sits among the sheet's direct children, and a
+      // Fragment disappears from the tree before that can be asserted.
+      'FlashList',
       null,
       data.map((item, index) =>
         createElement(Fragment, { key: index }, renderItem({ item, index }))
@@ -66,11 +69,24 @@ vi.mock('expo-router', () => ({
   useRouter: () => ({ canGoBack: () => false, back: vi.fn() }),
 }));
 
-vi.mock('@/components/ui/icons', () => ({ Search: 'Search' }));
+vi.mock('@/components/ui/icons', () => ({
+  ChevronLeft: 'ChevronLeft',
+  ChevronRight: 'ChevronRight',
+  Search: 'Search',
+  X: 'X',
+}));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+// `Button` (the later-page retry CTA) wraps its label in this provider, so the
+// text mock must export the same context the real module does.
+vi.mock('@/components/ui/text', async () => {
+  const { createContext } = await import('react');
+  return { Text: 'Text', TextClassContext: createContext<string | undefined>(undefined) };
+});
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#888888' }),
 }));
@@ -355,10 +371,19 @@ describe('PrDiffFileNavigator stable row callbacks (finding 2)', () => {
       expect(renderer.root.findAll(node => String(node.type) === 'CenteredState')).toHaveLength(1);
       expect(flashListProps.current).toBeNull();
       expect(findSearchInput(renderer)).toBeDefined();
-      const retries = renderer.root.findAllByProps({ accessibilityLabel: 'Retry loading files' });
+      // The retry CTA is the shared `Button`, which forwards this label to the
+      // pressable it renders; count the host node so the composite and its
+      // element are not read as two controls.
+      const retries = renderer.root.findAll(
+        node =>
+          typeof node.type === 'string' && node.props.accessibilityLabel === 'Retry loading files'
+      );
       if (kind === 'retryable' || kind === 'reconnect') {
         expect(retries).toHaveLength(1);
-        const retry = renderer.root.findByProps({ accessibilityLabel: 'Retry loading files' });
+        const retry = retries[0];
+        if (!retry) {
+          throw new Error('missing retry');
+        }
         act(() => {
           (retry.props.onPress as () => void)();
         });
@@ -759,6 +784,24 @@ describe('PrDiffFileNavigator provider wording', () => {
     };
   }
 
+  // The 0-listed-files state: the read answered, and the navigator has no row
+  // to show, which is the empty state rather than a terminal error.
+  function setEmptyState() {
+    listQueryResult = {
+      query: {
+        isLoading: false,
+        isFetching: false,
+        isFetchingNextPage: false,
+        hasNextPage: false,
+        fetchNextPage: fetchNextPageMock,
+        refetch: vi.fn(),
+      },
+      files: [],
+      firstPageErrorState: null,
+      laterPageError: false,
+    };
+  }
+
   async function mountInScope(ref: ProviderPrRef) {
     const { renderer } = await renderWithProviders(
       <ProviderPrScopeProvider value={{ ref, organizationId: null }}>
@@ -813,6 +856,41 @@ describe('PrDiffFileNavigator provider wording', () => {
 
     expect(text).toContain("You don't have permission to view this pull request.");
   });
+
+  // The navigator's 0-listed-files state is the same shared empty state the
+  // Files tab renders, so it reads the provider key too: a GitLab merge
+  // request is never described as a pull request.
+  const PULL_REQUEST_EMPTY = 'This pull request has no file changes.';
+  const MERGE_REQUEST_EMPTY = 'This merge request has no file changes.';
+
+  function emptyDescription(renderer: RenderWithProvidersResult['renderer']) {
+    const empty = renderer.root.find(node => String(node.type) === 'EmptyState');
+    return empty.props.description as string;
+  }
+
+  it('describes a GitLab empty file list as a merge request', async () => {
+    setEmptyState();
+
+    const description = emptyDescription(await mountInScope(GITLAB_REF));
+
+    expect(description).toBe(MERGE_REQUEST_EMPTY);
+  });
+
+  it('keeps the pull-request empty copy for GitHub', async () => {
+    setEmptyState();
+
+    const description = emptyDescription(await mountInScope(GITHUB_REF));
+
+    expect(description).toBe(PULL_REQUEST_EMPTY);
+  });
+
+  it('keeps the pull-request empty copy for Bitbucket', async () => {
+    setEmptyState();
+
+    const description = emptyDescription(await mountInScope(BITBUCKET_REF));
+
+    expect(description).toBe(PULL_REQUEST_EMPTY);
+  });
 });
 
 // The listed-file progress line inflects for the language it renders in, so the
@@ -854,5 +932,110 @@ describe('PrDiffFileNavigator listed-file progress', () => {
 
     // Truncated: the copy names the listed files instead of the whole set.
     expect(renderedText(renderer)).toContain('1 sur 1 consulté parmi les fichiers affichés');
+  });
+});
+
+describe('PrDiffFileNavigator body side insets', () => {
+  const LANDSCAPE_LEFT = 51;
+
+  beforeEach(() => {
+    rowRenders.length = 0;
+    listQueryResult = {
+      query: {
+        isLoading: false,
+        isFetching: false,
+        isFetchingNextPage: false,
+        hasNextPage: false,
+        fetchNextPage: fetchNextPageMock,
+        refetch: vi.fn(),
+      },
+      files: [makeFile('src/a.ts')],
+      firstPageErrorState: null,
+      laterPageError: false,
+    };
+    viewedResult = { isViewed: () => false, toggle: vi.fn(() => undefined), isLoading: false };
+    fetchAllResult = {
+      run: fetchAllRunMock,
+      feedback: { status: 'idle' },
+      loadedFiles: 0,
+      totalFiles: null,
+      failure: null,
+    };
+    insetsState.left = 0;
+    insetsState.right = 0;
+  });
+
+  /** Every `View` that carries the helper's inline side padding. */
+  function paddedViews(renderer: Awaited<ReturnType<typeof mountNavigator>>['renderer']) {
+    return renderer.root.findAll(node => {
+      if (String(node.type) !== 'View') {
+        return false;
+      }
+      const style: unknown = node.props.style;
+      return typeof style === 'object' && style !== null && 'paddingLeft' in style;
+    });
+  }
+
+  it('clears the landscape cutout on the search block', async () => {
+    insetsState.left = LANDSCAPE_LEFT;
+    const { renderer } = await mountNavigator();
+
+    // The fixed block above the list takes the padding: the search row, the
+    // viewed count and the retry card are one column inside it. The 8 dp on
+    // the other side is the shared helper's clearance for a side status area
+    // that leaves the top inset at zero.
+    expect(paddedViews(renderer).map(node => node.props.style)).toEqual([
+      { paddingLeft: LANDSCAPE_LEFT, paddingRight: 8 },
+    ]);
+  });
+
+  it('keeps the list a direct child of the sheet and insets it by margin', async () => {
+    insetsState.left = LANDSCAPE_LEFT;
+    await mountNavigator();
+
+    // react-native-screens sizes a formSheet by finding the scroller among the
+    // sheet's direct children, so the list cannot sit inside a padded wrapper:
+    // it takes the same insets as a margin on its own frame.
+    expect(flashListProps.current?.style).toEqual({
+      marginLeft: LANDSCAPE_LEFT,
+      marginRight: 8,
+    });
+  });
+
+  it("keeps the header and the list as the sheet content's two children", async () => {
+    const { renderer } = await renderWithProviders(
+      createElement(PrDiffFileNavigator, {
+        ...BASE_PROPS,
+        header: createElement('NavigatorHeader'),
+      })
+    );
+
+    // react-native-screens honors a formSheet's pinned header only when the
+    // content's direct children are [header, scroll view]: the header and the
+    // fixed search column share the first child, and the scroller is the
+    // second. Keep them apart and a third sibling pins the list full-bleed over
+    // the header.
+    const blocks = renderer.root.findAll(
+      node => String(node.type) === 'View' && node.props.collapsable === false
+    );
+    expect(blocks).toHaveLength(1);
+    const block = blocks[0];
+    if (block === undefined) {
+      throw new Error('the navigator renders no header block');
+    }
+    const blockChildren = block.children.filter(child => typeof child !== 'string');
+    // The header, then the search column: what the header child owns.
+    expect(blockChildren).toHaveLength(2);
+    expect(block.findAll(node => String(node.type) === 'NavigatorHeader')).toHaveLength(1);
+    // The scroller is a sibling of that block, never inside it.
+    expect(block.findAll(node => String(node.type) === 'FlashList')).toHaveLength(0);
+    expect(renderer.root.findAll(node => String(node.type) === 'FlashList')).toHaveLength(1);
+  });
+
+  it('leaves the portrait body without an inset style', async () => {
+    const { renderer } = await mountNavigator();
+
+    expect(paddedViews(renderer)).toHaveLength(0);
+    expect(flashListProps.current?.style).toBeUndefined();
   });
 });

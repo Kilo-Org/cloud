@@ -6,23 +6,19 @@ import { unlinkTeamKiloUsers } from '@/lib/bot-identity';
 import { deleteInstallationByOrganizationId } from '@/lib/integrations/linear-service';
 import { LINEAR_WEBHOOK_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { PLATFORM } from '@/lib/integrations/core/constants';
+import { WebhookBodyTooLargeError, readBoundedRawBody } from '@/lib/webhook-body';
 
 /**
- * Linear's webhook signature format, confirmed against @linear/sdk's
- * `LinearWebhookClient.verify`:
+ * Linear's documented webhook scheme:
  *
- *   linear-signature  = hex(hmac-sha256(webhook_secret, raw_body))
- *   linear-timestamp  = unix millis, tolerance 60s
+ *   linear-signature = hex(hmac-sha256(webhook_secret, raw_body))
+ *   freshness        = `webhookTimestamp` in the signed body, tolerance 60s
  *
- * The @chat-adapter/linear adapter already verifies the signature inside its
- * own `handleWebhook`, but we need to also peel off `OAuthApp` revoke events
- * to clean up our own `platform_integrations` row and Redis identity cache.
- * Re-verifying the signature here makes the custom handler safe to trigger
- * the cleanup even before delegating to the adapter.
+ * Every accepted delivery carries a `webhookTimestamp` inside the signed body.
+ * Freshness is read from that field only.
  */
 
 const LINEAR_SIGNATURE_HEADER = 'linear-signature';
-const LINEAR_TIMESTAMP_HEADER = 'linear-timestamp';
 const LINEAR_TIMESTAMP_TOLERANCE_MS = 60 * 1000;
 
 type LinearOAuthAppRevokedPayload = {
@@ -33,17 +29,7 @@ type LinearOAuthAppRevokedPayload = {
 
 function verifyLinearSignature(rawBody: string, request: Request): boolean {
   const signature = request.headers.get(LINEAR_SIGNATURE_HEADER);
-  const timestamp = request.headers.get(LINEAR_TIMESTAMP_HEADER);
-
-  // Both headers are mandatory. Treating the timestamp as optional would let
-  // an attacker who captures a signed body replay it indefinitely simply by
-  // stripping the timestamp header — the HMAC is computed only over rawBody,
-  // so the signature alone proves nothing about freshness.
-  if (!signature || !timestamp) return false;
-
-  const timestampMs = Number.parseInt(timestamp, 10);
-  if (Number.isNaN(timestampMs)) return false;
-  if (Math.abs(Date.now() - timestampMs) > LINEAR_TIMESTAMP_TOLERANCE_MS) return false;
+  if (!signature) return false;
 
   const expectedHex = crypto
     .createHmac('sha256', LINEAR_WEBHOOK_SECRET)
@@ -60,6 +46,16 @@ function verifyLinearSignature(rawBody: string, request: Request): boolean {
   } catch {
     return false;
   }
+}
+
+function isFreshWebhookDelivery(payload: unknown): boolean {
+  if (!payload || typeof payload !== 'object') return false;
+  if (!('webhookTimestamp' in payload)) return false;
+
+  const webhookTimestamp = payload.webhookTimestamp;
+  if (typeof webhookTimestamp !== 'number' || !Number.isFinite(webhookTimestamp)) return false;
+
+  return Math.abs(Date.now() - webhookTimestamp) <= LINEAR_TIMESTAMP_TOLERANCE_MS;
 }
 
 function isLinearOAuthAppRevokedPayload(payload: unknown): payload is LinearOAuthAppRevokedPayload {
@@ -113,20 +109,32 @@ function cloneLinearRequest(request: Request, body: BodyInit): Request {
  */
 export function createLinearWebhookHandler(chat: Chat, linearAdapter: LinearAdapter) {
   return async (request: Request, options?: WebhookOptions): Promise<Response> => {
-    const body = await request.text();
+    let body: string;
+    try {
+      body = new TextDecoder().decode(await readBoundedRawBody(request));
+    } catch (error) {
+      if (error instanceof WebhookBodyTooLargeError) {
+        return new Response('Payload too large', { status: 413 });
+      }
+      throw error;
+    }
 
     if (!verifyLinearSignature(body, request)) {
       return new Response('Invalid signature', { status: 401 });
     }
 
-    await chat.initialize();
-
     let payload: unknown;
     try {
       payload = JSON.parse(body);
     } catch {
-      return linearAdapter.handleWebhook(cloneLinearRequest(request, body), options);
+      return new Response('Invalid signature', { status: 401 });
     }
+
+    if (!isFreshWebhookDelivery(payload)) {
+      return new Response('Invalid signature', { status: 401 });
+    }
+
+    await chat.initialize();
 
     if (isLinearOAuthAppRevokedPayload(payload)) {
       try {

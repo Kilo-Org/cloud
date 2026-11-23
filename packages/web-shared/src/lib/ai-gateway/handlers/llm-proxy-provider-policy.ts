@@ -14,13 +14,10 @@ import {
   paidUsageRejection,
   resolveOrganizationGatewaySettings,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
+import { resolveOpenRouterModelAlias } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { getIgnoredProviders } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
 import { isNonTrialEnterpriseOrganization } from '@kilocode/web-shared/lib/organizations/non-trial-enterprise';
-import {
-  findDirectByokProvider,
-  getDirectByokModel,
-  getDirectByokPolicyProviderId,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { isInferenceProviderUserByok } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { isVercelUserByokProviderAllowed } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import type { CustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
@@ -82,11 +79,21 @@ type ProviderPolicyInput = {
   organizationId: string | undefined;
   botId: string | undefined;
   countryCode: string | null;
+  /** The `x-kilocode-taskid` header. */
+  taskId: string | null;
   boundedSpending: boolean;
   providerMetadataCapture: AiProviderMetadataCapture | undefined;
   effectivePrivacy: ReturnType<typeof getEffectiveProviderPrivacy>;
   balanceAndSettingsPromise: Promise<BalanceAndOrgSettings>;
   organizationGroupPolicyPromise: Promise<EffectiveOrganizationModelPolicy | null>;
+  /** A benchmark measurement: Kilo's own route only, no stored key and no subscription route. */
+  managedRoutesOnly?: boolean;
+  /**
+   * Tags an authoritative pre-provider payer refusal with the Worker's reason so it can rotate
+   * to another payer. Only identity, membership and balance/allowance refusals qualify: they
+   * prove no provider call. A raw provider 402 never passes here.
+   */
+  markPayerRefusal?: (reason: 'payment_refused' | 'payer_unavailable') => NextResponseType<unknown>;
 };
 
 type ProviderPolicyResult =
@@ -201,6 +208,7 @@ export async function resolveProviderAndPolicy(
     botId: input.botId,
     boundedSpending: input.boundedSpending,
     countryCode: input.countryCode,
+    taskId: input.taskId,
     getRoutingProviderConfig: async () =>
       (isAnonymous ? undefined : (await getAccessCheck()).effectiveProviderConfig) ??
       request.body.provider,
@@ -209,6 +217,7 @@ export async function resolveProviderAndPolicy(
     isDirectByokProviderAllowed: isModelAllowedForPolicyProvider,
     kiloIgnoredProviders: getIgnoredProviders(model, isNonTrialEnterprise),
     openRouterDisabled: organizationGatewaySettings.openRouterDisabled,
+    managedRoutesOnly: input.managedRoutesOnly,
     onDecision: decision => input.providerMetadataCapture?.captureRoutingDecision(decision),
   });
   if (getProviderResult.kind === 'chatgpt-reconnect') {
@@ -270,7 +279,7 @@ export async function resolveProviderAndPolicy(
     if (orgAutoRouteTarget) {
       try {
         const directByokTarget = await getDirectByokModel(orgAutoRouteTarget);
-        if (directByokTarget.provider && route.provider.type !== 'direct-byok') {
+        if (directByokTarget && route.provider.type !== 'direct-byok') {
           return organizationAutoConfigurationResponse(
             `Organization Auto route target '${orgAutoRouteTarget}' is unavailable because this organization does not have an enabled BYOK credential for ${directByokTarget.provider.id}.`
           );
@@ -303,7 +312,12 @@ export async function resolveProviderAndPolicy(
         account: await input.balanceAndSettingsPromise,
         exempt: route.isFree || !!route.userByok || !!route.skipBalanceCheck,
       });
-      if (creditsBlocked) return await creditsBlocked();
+      if (creditsBlocked) {
+        // A benchmark payer that cannot fund this call is a trusted pre-provider refusal: the
+        // Worker may detach it and try the next payer. Ordinary requests keep the generic 402.
+        if (input.markPayerRefusal) return input.markPayerRefusal('payment_refused');
+        return await creditsBlocked();
+      }
     }
 
     // Organization model and provider policies cover catalog ids. The exemption here is
@@ -322,10 +336,9 @@ export async function resolveProviderAndPolicy(
     if (route.provider.type === 'direct-byok') {
       // A catalog-mode direct BYOK key is the request's only route, so the policy is checked
       // against the key's provider alone. Routing already skips keys it rejects.
-      const directByokProvider = findDirectByokProvider(route.userByok?.[0]?.providerId ?? '');
       if (
-        !directByokProvider ||
-        !(await isModelAllowedForPolicyProvider(getDirectByokPolicyProviderId(directByokProvider)))
+        !route.directByokPolicyProviderId ||
+        !(await isModelAllowedForPolicyProvider(route.directByokPolicyProviderId))
       ) {
         return poolRouted ? efficientPoolBlockedResponse() : modelNotAllowedResponse();
       }
@@ -363,7 +376,12 @@ export async function resolveProviderAndPolicy(
     }
   }
 
-  const dataCollectionRejected = await dataCollectionPolicyRejection(model, request.body.provider);
+  // The free class belongs to the model that is served and billed, which a `~` alias names by its target.
+  const dataCollectionModel = await resolveOpenRouterModelAlias(model);
+  const dataCollectionRejected = await dataCollectionPolicyRejection(
+    dataCollectionModel,
+    request.body.provider
+  );
   if (dataCollectionRejected) return reject(dataCollectionRejected);
 
   if (input.customLlm?.definition.public) {
@@ -390,13 +408,13 @@ export async function resolveProviderAndPolicy(
       try {
         failoverRoute = await resolveRoute();
       } catch (error) {
-        console.error('[byok-failover] Skipping a BYOK key that could not be resolved', {
+        console.error('[byok-failover] Skipping a failover route that could not be resolved', {
           errorType: error instanceof Error ? error.name : 'unknown',
         });
         return null;
       }
       if (await routeRejection(failoverRoute)) {
-        console.warn('[byok-failover] Skipping a BYOK key the policy refuses', {
+        console.warn('[byok-failover] Skipping a failover route the policy refuses', {
           providerIds: failoverRoute.userByok?.map(byok => byok.providerId) ?? [],
         });
         return null;

@@ -1,25 +1,54 @@
-import { characterCut } from '@kilocode/session-ingest-contracts/session-live-summary';
+import {
+  characterCut,
+  sessionLiveChangesSchema,
+  sessionLiveFailureSchema,
+  sessionLivePlanSchema,
+} from '@kilocode/session-ingest-contracts/session-live-summary';
 import { z } from 'zod';
 
 export const BRIEFING_MAX_SESSIONS = 32;
 export const BRIEFING_MAX_SOURCES = 256;
 export const BRIEFING_MAX_SOURCES_PER_SESSION = 32;
+// The schema's character cap for a title. `z.string().max(...)` counts UTF-16 code
+// units, so this bound is a code-unit count rather than a byte one. The byte cut is
+// the constant below.
 export const BRIEFING_MAX_TITLE_LENGTH = 160;
-export const BRIEFING_FALLBACK_TITLE = 'Agent session';
+// The title's UTF-8 byte budget for screening. It derives from the schema's character
+// bound: a screened title is later validated against that bound, so the byte cut must
+// never be the looser of the two.
+export const BRIEFING_MAX_TITLE_BYTES = BRIEFING_MAX_TITLE_LENGTH;
 export const BRIEFING_MAX_URL_LENGTH = 2048;
 export const BRIEFING_MAX_EXCERPT_BYTES = 1024;
 export const BRIEFING_MAX_SNAPSHOT_BYTES = 48 * 1024;
+
+/**
+ * An amount of money in microdollars, one millionth of a US dollar. Every producer of these
+ * fields sums a bigint cost column or rounds with `Math.ceil`, so a fraction is not a value
+ * this contract can receive.
+ */
+const microdollarsSchema = z.number().int();
+/** A duration in whole seconds. */
+const secondsSchema = z.number().int();
 
 export const briefingContextSchema = z.object({
   id: z.string(),
   organizationId: z.string().nullable(),
   name: z.string(),
 });
+/**
+ * The structured session facts a captured artifact carries. Each member is absent
+ * when capture did not observe it, so a client renders only what exists.
+ */
+export const briefingSourceMetadataSchema = z.object({
+  plan: sessionLivePlanSchema.optional(),
+  changes: sessionLiveChangesSchema.optional(),
+  failure: sessionLiveFailureSchema.optional(),
+});
 export const briefingSourceSchema = z.object({
   id: z.string(),
   sessionId: z.string(),
   kind: z.enum(['activity', 'pull_request', 'blocker', 'artifact']),
-  title: z.string().max(BRIEFING_MAX_TITLE_LENGTH),
+  title: z.string().max(BRIEFING_MAX_TITLE_LENGTH).optional(),
   url: z.string().max(BRIEFING_MAX_URL_LENGTH),
   occurredAt: z.string().datetime(),
   excerpt: z
@@ -29,6 +58,7 @@ export const briefingSourceSchema = z.object({
       'Excerpt exceeds UTF-8 byte limit'
     )
     .optional(),
+  metadata: briefingSourceMetadataSchema.optional(),
 });
 export const briefingSummaryErrorSchema = z.enum([
   'model_pricing_unavailable',
@@ -41,15 +71,16 @@ export const briefingSummaryErrorSchema = z.enum([
   'gateway_declined',
   'invalid_summary',
   'time_limit',
+  'not_admitted',
   'generation_failed',
 ]);
 export const briefingSummarySchema = z.object({
   status: z.enum(['disabled', 'pending', 'running', 'ready', 'failed', 'unavailable']),
   text: z.string().nullable(),
   model: z.string().nullable(),
-  costMicrodollars: z.number(),
+  costMicrodollars: microdollarsSchema,
   chargeStatus: z.enum(['pending', 'settled']),
-  estimatedCostMicrodollars: z.number().nullable(),
+  estimatedCostMicrodollars: microdollarsSchema.nullable(),
   startedAt: z.string().datetime().nullable(),
   finishedAt: z.string().datetime().nullable(),
   error: briefingSummaryErrorSchema.nullable(),
@@ -85,7 +116,7 @@ export const briefingReportSchema = z.object({
     .array(
       z.object({
         sessionId: z.string(),
-        title: z.string().max(BRIEFING_MAX_TITLE_LENGTH),
+        title: z.string().max(BRIEFING_MAX_TITLE_LENGTH).optional(),
         url: z.string().max(BRIEFING_MAX_URL_LENGTH),
         status: z.string().nullable(),
         sources: z.array(briefingSourceSchema).max(BRIEFING_MAX_SOURCES_PER_SESSION),
@@ -98,9 +129,9 @@ export const briefingReportSchema = z.object({
 });
 export const briefingEstimateSchema = z.object({
   model: z.string(),
-  estimatedCostMicrodollars: z.number(),
-  maximumCostMicrodollars: z.number(),
-  maxDurationSeconds: z.number(),
+  estimatedCostMicrodollars: microdollarsSchema,
+  maximumCostMicrodollars: microdollarsSchema,
+  maxDurationSeconds: secondsSchema,
   estimateToken: z.string(),
   canGenerate: z.boolean(),
   unavailableReason: briefingSummaryErrorSchema.nullable(),
@@ -109,8 +140,8 @@ export const briefingContextPreferencesSchema = z.object({
   context: briefingContextSchema,
   enabled: z.boolean(),
   model: z.string(),
-  maxDurationSeconds: z.number().int(),
-  maxSpendMicrodollars: z.number().int(),
+  maxDurationSeconds: secondsSchema,
+  maxSpendMicrodollars: microdollarsSchema,
 });
 export const briefingPreferencesSchema = z.object({
   timezone: z.string(),
@@ -124,6 +155,7 @@ export const briefingPreferencesSchema = z.object({
 });
 export type BriefingContext = z.infer<typeof briefingContextSchema>;
 export type BriefingSource = z.infer<typeof briefingSourceSchema>;
+export type BriefingSourceMetadata = z.infer<typeof briefingSourceMetadataSchema>;
 export type BriefingSummary = z.infer<typeof briefingSummarySchema>;
 export type BriefingScorecard = z.infer<typeof briefingScorecardSchema>;
 export type BriefingCoverage = z.infer<typeof briefingCoverageSchema>;
@@ -337,9 +369,29 @@ function credentialValue(name: string, text: string, from: number): string | und
 }
 
 /**
+ * Every credential assignment in the text, in ascending order: the key's start, the
+ * position its value begins at, and the value itself, which is absent when nothing
+ * resolvable follows the key. Detection and replacement both consume this one walk, so
+ * the definition of a credential site exists once.
+ */
+function credentialAssignmentSites(
+  text: string
+): Array<{ start: number; valueStart: number; value: string | undefined }> {
+  const sites: Array<{ start: number; valueStart: number; value: string | undefined }> = [];
+  for (const match of text.matchAll(CREDENTIAL_KEY)) {
+    const name = match[1];
+    if (!name || !isCredentialKeyName(name)) continue;
+    const start = match.index ?? 0;
+    const valueStart = start + match[0].length;
+    sites.push({ start, valueStart, value: credentialValue(name, text, valueStart) });
+  }
+  return sites;
+}
+
+/**
  * Every credential flag in the text, with the position and text of the value it carries.
  * A flag that does not name a credential is not consumed, so a credential flag that
- * follows it is examined on its own.
+ * follows it is examined on its own. A site is never a redaction placeholder.
  */
 function credentialFlagSites(text: string): Array<{ valueStart: number; value: string }> {
   const pattern = new RegExp(CREDENTIAL_FLAG_SOURCE, 'g');
@@ -353,7 +405,9 @@ function credentialFlagSites(text: string): Array<{ valueStart: number; value: s
     const value = match[4] ?? '';
     const valueStart = match.index + match[0].length - value.length;
     searchFrom = Math.max(valueStart - 1, match.index + 1);
-    if (isCredentialKeyName(flag.replace(/^-+/, ''))) sites.push({ valueStart, value });
+    if (!isCredentialKeyName(flag.replace(/^-+/, ''))) continue;
+    if (REDACTION_PLACEHOLDER.test(value)) continue;
+    sites.push({ valueStart, value });
   }
 }
 
@@ -368,17 +422,12 @@ function briefingExcerptCarriesCredential(text: string): boolean {
   };
   const isOpaque = (tail: string): boolean =>
     RESIDUAL_OPAQUE_TOKEN.test((tail.split(/\s+/)[0] ?? '').split('=')[0] ?? '');
-  for (const match of text.matchAll(CREDENTIAL_KEY)) {
-    const name = match[1];
-    if (!name || !isCredentialKeyName(name)) continue;
-    const valueStart = (match.index ?? 0) + match[0].length;
-    const value = credentialValue(name, text, valueStart);
+  for (const { valueStart, value } of credentialAssignmentSites(text)) {
     const tail = tailAfter(valueStart + (value?.length ?? 0));
     if (tail === undefined) continue;
     if (value === undefined || isOpaque(tail)) return true;
   }
   for (const { valueStart, value } of credentialFlagSites(text)) {
-    if (REDACTION_PLACEHOLDER.test(value)) continue;
     const tail = tailAfter(valueStart + value.length);
     if (tail !== undefined && isOpaque(tail)) return true;
   }
@@ -406,7 +455,6 @@ function replaceSpans(
 function redactCredentialFlags(text: string): string {
   const spans: Array<{ start: number; length: number }> = [];
   for (const { valueStart, value } of credentialFlagSites(text)) {
-    if (REDACTION_PLACEHOLDER.test(value)) continue;
     spans.push({ start: valueStart, length: value.length });
   }
   return replaceSpans(text, spans);
@@ -415,14 +463,9 @@ function redactCredentialFlags(text: string): string {
 /** Replaces the value of every credential assignment. */
 function redactCredentialAssignments(text: string): string {
   const spans: Array<{ start: number; length: number }> = [];
-  for (const key of text.matchAll(CREDENTIAL_KEY)) {
-    const name = key[1];
-    if (!name || !isCredentialKeyName(name)) continue;
-    const start = key.index ?? 0;
-    const valueStart = start + key[0].length;
-    const assigned = credentialValue(name, text, valueStart);
-    if (!assigned || REDACTION_PLACEHOLDER.test(assigned)) continue;
-    spans.push({ start, length: valueStart + assigned.length - start });
+  for (const { start, valueStart, value } of credentialAssignmentSites(text)) {
+    if (!value || REDACTION_PLACEHOLDER.test(value)) continue;
+    spans.push({ start, length: valueStart + value.length - start });
   }
   return replaceSpans(text, spans);
 }
@@ -456,13 +499,16 @@ export function redactBriefingExcerptOrDrop(
 }
 
 /**
- * A title for a session or a source. The report schema requires one, so a title that
- * screening cannot clear, or one whose first character is wider than the cap and so
- * truncates to nothing, becomes a neutral fallback.
+ * A title for a session or a source. When screening cannot clear a title, or the
+ * UTF-8 cut leaves nothing, the title is absent, and the client shows the row's
+ * kind label instead of a server-composed one.
  */
-export function redactBriefingTitle(value: string, maxBytes = BRIEFING_MAX_TITLE_LENGTH): string {
+export function redactBriefingTitle(
+  value: string,
+  maxBytes = BRIEFING_MAX_TITLE_BYTES
+): string | undefined {
   const title = redactBriefingExcerptOrDrop(value, maxBytes);
-  return title === undefined || title === '' ? BRIEFING_FALLBACK_TITLE : title;
+  return title === undefined || title === '' ? undefined : title;
 }
 
 export function truncateBriefingUtf8(value: string, maxBytes: number): string {

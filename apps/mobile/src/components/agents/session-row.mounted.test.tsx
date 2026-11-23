@@ -13,7 +13,11 @@ import { prefetchSessionTranscript } from '@/lib/agent-session-cache';
 import { createKiloAppQueryClient } from '@/lib/query-client';
 import { i18n } from '@/i18n';
 import { type ActiveSession, type StoredSession } from '@/lib/hooks/use-agent-sessions';
-import { __resetSessionAttentionForTests, ackSessionAttention } from '@/lib/session-attention';
+import {
+  __hydrateSessionAttentionForTests,
+  __resetSessionAttentionForTests,
+  ackSessionAttention,
+} from '@/lib/session-attention';
 import { RemoteSessionRow } from './remote-session-row';
 import { formatScheduledWake } from './session-list-helpers';
 import {
@@ -72,17 +76,16 @@ vi.mock('@/components/ui/icons', () => ({
 vi.mock('@/components/icons/github-icon', () => ({ GitHubIcon: 'GitHubIcon' }));
 vi.mock('@/components/icons/slack-icon', () => ({ SlackIcon: 'SlackIcon' }));
 vi.mock('@/components/ui/directional-icons', () => ({ DirectionalChevronRight: 'Chevron' }));
-vi.mock('@/components/ui/agent-badge', () => ({ AgentBadge: 'AgentBadge' }));
 vi.mock('@/components/ui/eyebrow', () => ({ Eyebrow: 'Eyebrow' }));
 vi.mock('@/components/ui/session-status-icon', () => ({ SessionStatusIcon: 'SessionStatusIcon' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/rename-modal', () => ({ RenameModal: 'RenameModal' }));
-vi.mock('@/components/destination-option-row', () => ({
-  DestinationOptionRow: 'DestinationOptionRow',
-}));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/agents/session-list-section-header', () => ({
@@ -192,10 +195,21 @@ function row(overrides: Partial<Parameters<typeof StoredSessionRow>[0]> = {}) {
   });
 }
 
+/**
+ * Reset the ack store and settle it. The reset returns the store to `loading`
+ * and the module-init hydrate does not re-arm, while every row holds its badge
+ * until the phase settles. A case that answers a raise acks it after settling,
+ * which is what the app does.
+ */
+async function resetAttention(): Promise<void> {
+  __resetSessionAttentionForTests();
+  await __hydrateSessionAttentionForTests();
+}
+
 describe('StoredSessionRow live speech', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-    __resetSessionAttentionForTests();
+    await resetAttention();
     vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-08-28T12:00:00.000Z'));
   });
   afterEach(async () => {
@@ -431,7 +445,6 @@ describe('StoredSessionRow live speech', () => {
             selectedId = selected.session_id;
           },
           onRetry: () => undefined,
-          onDismiss: () => undefined,
           instances: [],
           spawningConnectionId: null,
           instanceRowsDisabled: false,
@@ -522,9 +535,9 @@ describe('StoredSessionRow section heading', () => {
     minute: '2-digit',
   }).format(new Date('2026-08-27T11:55:00.000Z'));
 
-  beforeEach(() => {
+  beforeEach(async () => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-    __resetSessionAttentionForTests();
+    await resetAttention();
     vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-08-28T12:00:00.000Z'));
   });
 
@@ -564,9 +577,9 @@ describe('StoredSessionRow time follows the shared clock', () => {
   // is 21 hours later, so a label computed from an untraced `Date.now()` says
   // something else: React Compiler memoizes such a label against the row's
   // unchanged props and the list freezes at its first paint.
-  beforeEach(() => {
+  beforeEach(async () => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-    __resetSessionAttentionForTests();
+    await resetAttention();
     tickerNow.value = ROW_NOW;
     vi.spyOn(Date, 'now').mockReturnValue(ROW_NOW + 21 * HOUR);
   });
@@ -622,9 +635,9 @@ describe('StoredSessionRow long-press preview', () => {
   const onDelete = vi.fn<() => void>();
   const onRename = vi.fn<(newTitle: string) => void>();
 
-  beforeEach(() => {
+  beforeEach(async () => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-    __resetSessionAttentionForTests();
+    await resetAttention();
     vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-08-28T12:00:00.000Z'));
     vi.mocked(Haptics.impactAsync).mockClear();
     vi.mocked(prefetchSessionTranscript).mockClear();
@@ -753,9 +766,9 @@ describe('StoredSessionRow long-press preview', () => {
 describe('RemoteSessionRow live speech', () => {
   let client: QueryClient = createKiloAppQueryClient();
 
-  beforeEach(() => {
+  beforeEach(async () => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-    __resetSessionAttentionForTests();
+    await resetAttention();
     vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-08-28T12:00:00.000Z'));
     client = createKiloAppQueryClient();
     client.setDefaultOptions({ queries: { retry: false, gcTime: Infinity } });

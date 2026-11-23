@@ -19,6 +19,7 @@ import { type HfListedModel } from '@/lib/chat/hf-catalog';
 import { isHfGone, isHfRestricted } from '@/lib/chat/hf-request';
 import { useDeviceBudget, useHfModelSearch } from '@/lib/chat/use-hf-catalog';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useSideInsetStyle } from '@/lib/screen-insets';
 
 import { catalogEmptyCopy, type CatalogTab } from './model-catalog-empty';
 import { downloadBytes, LoadingRows, ModelRow, RecommendedRow } from './model-catalog-rows';
@@ -28,6 +29,7 @@ import { ModelSearchField, useModelSearch } from './model-catalog-search';
 export function ModelCatalogScreen() {
   const { t } = useTranslation();
   const colors = useThemeColors();
+  const sideInsetStyle = useSideInsetStyle();
   const budget = useDeviceBudget();
   const [tab, setTab] = useState<CatalogTab>('fits');
   const search = useModelSearch();
@@ -76,15 +78,16 @@ export function ModelCatalogScreen() {
   let empty = <LoadingRows />;
   if (models.isError && !hasPages) {
     if (isHfGone(models.error)) {
-      empty = <QueryError variant="not-found" placement="top" />;
+      empty = <QueryError variant="not-found" placement="top" inset="gutter" />;
     } else if (isHfRestricted(models.error)) {
-      empty = <QueryError variant="permission" placement="top" />;
+      empty = <QueryError variant="permission" placement="top" inset="gutter" />;
     } else {
       empty = (
         <QueryError
           variant="server"
           title={t('agentChat.newSession.couldNotLoadModels')}
           placement="top"
+          inset="gutter"
           onRetry={() => void models.refetch()}
           isRetrying={models.isFetching}
         />
@@ -97,6 +100,7 @@ export function ModelCatalogScreen() {
         title={t(emptyCopy.titleKey, { query })}
         {...(emptyCopy.descriptionKey ? { description: t(emptyCopy.descriptionKey) } : {})}
         placement="top"
+        inset="gutter"
       />
     );
   }
@@ -104,9 +108,9 @@ export function ModelCatalogScreen() {
   let footer = <View className="h-12" />;
   if (models.isError && hasPages) {
     footer = (
-      <View className="items-center gap-2 px-6 py-4">
+      <View className="items-center gap-2 px-4 py-4">
         <Text variant="muted" className="text-center text-xs">
-          {t('common.couldnTLoadMore')}
+          {t('common.couldNotLoadMore')}
         </Text>
         <Button
           size="sm"
@@ -130,60 +134,59 @@ export function ModelCatalogScreen() {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('modelChat.catalog.title')} />
-      <ModelSearchField search={search} />
-      <View className="px-[22px] pb-2">
-        <SegmentedControl
-          options={[
-            { value: 'fits', label: t('modelChat.catalog.fitsTab') },
-            { value: 'all', label: t('common.all') },
-          ]}
-          value={tab}
-          onChange={setTab}
-          accessibilityLabel={t('modelChat.catalog.tabs')}
+      <View className="flex-1" style={sideInsetStyle}>
+        <ModelSearchField search={search} />
+        <View className="px-4 pb-2">
+          <SegmentedControl
+            options={[
+              { value: 'fits', label: t('modelChat.catalog.fitsTab') },
+              { value: 'all', label: t('common.all') },
+            ]}
+            value={tab}
+            onChange={setTab}
+            accessibilityLabel={t('modelChat.catalog.tabs')}
+          />
+        </View>
+        <FlashList<HfListedModel>
+          ref={listRef}
+          maintainVisibleContentPosition={{ disabled: true }}
+          data={hasPages ? rows : []}
+          keyExtractor={model => model.id}
+          renderItem={({ item }) => (
+            <ModelRow model={item} budget={budget} fitsOnly={tab === 'fits'} />
+          )}
+          ListHeaderComponent={
+            <View className="gap-3 pt-2">
+              {recommended.length > 0 && (
+                <View className="gap-3 px-4 pb-3">
+                  <Eyebrow>{t('common.recommended')}</Eyebrow>
+                  <Text variant="muted" className="text-xs">
+                    {t('modelChat.catalog.recommendationsHelp')}
+                  </Text>
+                  {recommended.map(model => (
+                    <RecommendedRow key={model.fileId} model={model} budget={budget} />
+                  ))}
+                </View>
+              )}
+              <Eyebrow className="px-4 pb-1">{t('modelChat.catalog.fromHuggingFace')}</Eyebrow>
+              <Text variant="muted" className="px-4 pb-1 text-xs">
+                {t('modelChat.catalog.compatibilityHelp')}
+              </Text>
+            </View>
+          }
+          ListEmptyComponent={empty}
+          ListFooterComponent={footer}
+          onEndReached={() => {
+            if (models.hasNextPage && !models.isFetchingNextPage && !models.isError) {
+              void models.fetchNextPage();
+            }
+          }}
+          onEndReachedThreshold={0.5}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          automaticallyAdjustKeyboardInsets
         />
       </View>
-      <FlashList<HfListedModel>
-        ref={listRef}
-        maintainVisibleContentPosition={{ disabled: true }}
-        data={hasPages ? rows : []}
-        keyExtractor={model => model.id}
-        renderItem={({ item }) => (
-          <ModelRow model={item} budget={budget} fitsOnly={tab === 'fits'} />
-        )}
-        ListHeaderComponent={
-          <View className="gap-3 pt-2">
-            {recommended.length > 0 && (
-              <View className="gap-3 px-6 pb-3">
-                <Eyebrow>{t('common.recommended')}</Eyebrow>
-                <Text variant="muted" className="text-xs">
-                  {t('modelChat.catalog.recommendationsHelp')}
-                </Text>
-                <Text variant="muted" className="text-xs">
-                  {t('modelChat.catalog.quantizationsHelp')}
-                </Text>
-                {recommended.map(model => (
-                  <RecommendedRow key={model.fileId} model={model} budget={budget} />
-                ))}
-              </View>
-            )}
-            <Eyebrow className="px-6 pb-1">{t('modelChat.catalog.fromHuggingFace')}</Eyebrow>
-            <Text variant="muted" className="px-6 pb-1 text-xs">
-              {t('modelChat.catalog.compatibilityHelp')}
-            </Text>
-          </View>
-        }
-        ListEmptyComponent={empty}
-        ListFooterComponent={footer}
-        onEndReached={() => {
-          if (models.hasNextPage && !models.isFetchingNextPage && !models.isError) {
-            void models.fetchNextPage();
-          }
-        }}
-        onEndReachedThreshold={0.5}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="on-drag"
-        automaticallyAdjustKeyboardInsets
-      />
     </View>
   );
 }

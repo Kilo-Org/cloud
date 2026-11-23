@@ -32,6 +32,13 @@ vi.mock('expo-router', async () => {
     useFocusEffect: boundary.useTestFocusEffect,
   };
 });
+// The post-create hand-off goes through the push-then-retire hook that keeps
+// Android Fabric alive; its own mechanics have their own suite, so
+// here it ends in this suite's own stack model.
+vi.mock('@/lib/navigation/stack-safe-replace', async () => {
+  const boundary = await import('./todo-list-model-picker.mounted.test-helpers');
+  return { useStackSafeReplace: boundary.useTestStackSafeReplace };
+});
 vi.mock('react-native', async () => {
   const { NativeTextInput } = await import('./todo-list-model-picker.mounted.test-helpers');
   return {
@@ -63,7 +70,7 @@ vi.mock('@/lib/hooks/use-available-models', async importOriginal => {
   const actual = await importOriginal<typeof AvailableModels>();
   return {
     ...actual,
-    useAvailableModels: () => ({ models: state.models, isLoading: false }),
+    useAvailableModels: () => ({ models: state.models, isLoading: false, refetch: vi.fn() }),
   };
 });
 vi.mock('@/lib/hooks/use-todos', () => ({
@@ -106,6 +113,7 @@ vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/empty-state', () => ({
+  StateAction: 'StateAction',
   EmptyState: ({ title, action }: { title: string; action?: ReactNode }) =>
     createElement('EmptyState', { title }, action),
 }));
@@ -122,6 +130,7 @@ vi.mock('@/components/ui/icons', () => ({
   ImageIcon: 'ImageIcon',
   Info: 'Info',
   NotebookPen: 'NotebookPen',
+  RefreshCw: 'RefreshCw',
   Search: 'Search',
   SearchX: 'SearchX',
   Star: 'Star',

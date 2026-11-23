@@ -1,5 +1,5 @@
 /* oxlint-disable max-lines -- one query-client suite; the cache-behavior and app-error-reporting cases share the client scaffold */
-import { CancelledError, QueryObserver } from '@tanstack/react-query';
+import { CancelledError, type QueryClient, QueryObserver } from '@tanstack/react-query';
 
 import {
   deferred,
@@ -10,11 +10,18 @@ import {
 import {
   createKiloAppQueryClient,
   getActiveSessionsQueryMetadata,
+  hasActiveSessionsServerOutcome,
   subscribeActiveSessionsQueryMetadata,
 } from './query-client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { setTrpcUnauthorizedHandler } from '@/lib/auth/trpc-unauthorized';
+import {
+  isBlockedAccountActive,
+  setBlockedAccountExplanation,
+} from '@/lib/auth/blocked-account-state';
+import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';
+import { tagDispatchSession } from '@/lib/auth/dispatch-epoch';
 import { setTelemetrySink, type TelemetryEvent } from '@/lib/telemetry/error-sink';
 
 describe('createKiloAppQueryClient', () => {
@@ -37,6 +44,132 @@ describe('createKiloAppQueryClient', () => {
     await expect(mutation.execute(undefined)).rejects.toBe(error);
     expect(signedIn).toBe(false);
     clear();
+  });
+
+  it.each([
+    {
+      label: 'query',
+      fail: async (client: QueryClient) => {
+        const refusal = Object.assign(new Error('Access denied'), {
+          data: { code: 'FORBIDDEN', accountBlocked: true },
+        });
+        // The link tags the error at dispatch; the raise requires it.
+        tagDispatchSession(refusal);
+        try {
+          await client
+            .getQueryCache()
+            .build(client, {
+              queryKey: ['blocked', 'probe'],
+              queryFn: () => Promise.reject(refusal),
+            })
+            .fetch();
+        } catch {
+          // The refusal is the input; the rejection is expected.
+        }
+      },
+    },
+    {
+      label: 'mutation',
+      fail: async (client: QueryClient) => {
+        const refusal = Object.assign(new Error('Access denied'), {
+          data: { code: 'FORBIDDEN', accountBlocked: true },
+        });
+        tagDispatchSession(refusal);
+        try {
+          await client
+            .getMutationCache()
+            .build(client, {
+              mutationFn: async () => {
+                await Promise.resolve();
+                throw refusal;
+              },
+            })
+            .execute(undefined);
+        } catch {
+          // The refusal is the input; the rejection is expected.
+        }
+      },
+    },
+  ])('raises the blocked-account explanation from a failed $label refusal', async ({ fail }) => {
+    setBlockedAccountExplanation(null);
+    const client = createKiloAppQueryClient();
+    await fail(client);
+
+    expect(isBlockedAccountActive()).toBe(true);
+    setBlockedAccountExplanation(null);
+  });
+
+  it.each([
+    {
+      label: 'query',
+      fail: async (client: QueryClient, refusal: Error) => {
+        try {
+          await client
+            .getQueryCache()
+            .build(client, {
+              queryKey: ['blocked', 'probe-stale'],
+              queryFn: () => Promise.reject(refusal),
+            })
+            .fetch();
+        } catch {
+          // The refusal is the input; the rejection is expected.
+        }
+      },
+    },
+    {
+      label: 'mutation',
+      fail: async (client: QueryClient, refusal: Error) => {
+        try {
+          await client
+            .getMutationCache()
+            .build(client, {
+              mutationFn: async () => {
+                await Promise.resolve();
+                throw refusal;
+              },
+            })
+            .execute(undefined);
+        } catch {
+          // The refusal is the input; the rejection is expected.
+        }
+      },
+    },
+  ])(
+    'does not raise the explanation from a $label refusal dispatched by a previous session',
+    async ({ fail }) => {
+      setBlockedAccountExplanation(null);
+      const client = createKiloAppQueryClient();
+      const refusal = Object.assign(new Error('Access denied'), {
+        data: { code: 'FORBIDDEN', accountBlocked: true },
+      });
+      // Tagged by the session that dispatched the call; the sign-in that follows
+      // bumps the epoch and opens both boolean fences before the refusal settles.
+      tagDispatchSession(refusal);
+      bumpAuthEpoch();
+
+      await fail(client, refusal);
+
+      expect(isBlockedAccountActive()).toBe(false);
+      setBlockedAccountExplanation(null);
+    }
+  );
+
+  it('does not raise the explanation for an unrelated failure', async () => {
+    setBlockedAccountExplanation(null);
+    const client = createKiloAppQueryClient();
+    try {
+      await client
+        .getQueryCache()
+        .build(client, {
+          queryKey: ['blocked', 'probe-other'],
+          queryFn: () => Promise.reject(new Error('network')),
+        })
+        .fetch();
+    } catch {
+      // The failure is the input; the rejection is expected.
+    }
+
+    expect(isBlockedAccountActive()).toBe(false);
   });
 });
 
@@ -96,8 +229,6 @@ describe('query retry policy', () => {
     }
   );
 
-  // A bare top-level `code` also appears on filesystem, transport and domain
-  // errors, so it is not a server verdict and keeps the transient retries.
   it('retries a non-tRPC error that carries only a top-level code', async () => {
     const queryClient = createKiloAppQueryClient();
     const error = Object.assign(new Error('native refusal'), { code: 'UNAUTHORIZED' });
@@ -151,7 +282,6 @@ describe('permission-denied query removal', () => {
 
     expect(queryClient.getQueryData(org1Key)).toBeUndefined();
     expect(queryClient.getQueryData(org2Key)).toEqual({ members: ['b'] });
-    // Permission loss never signs the user out.
     expect(signOut).not.toHaveBeenCalled();
     clear();
   });
@@ -257,16 +387,12 @@ describe('permission-denied query removal', () => {
     const unsubscribe = observer.subscribe(() => undefined);
     await observer.refetch().catch(() => undefined);
 
-    // The org prefix covers the variant no screen observes: it leaves the
-    // cache, so a later mount cannot paint its rows.
     expect(queryClient.getQueryData(idleSiblingKey)).toBeUndefined();
     expect(
       queryClient.getQueryCache().find({ queryKey: idleSiblingKey, exact: true })
     ).toBeUndefined();
-    // The observed variant keeps its slot and loses only the denied rows.
     expect(queryClient.getQueryData(observedKey)).toBeUndefined();
     expect(queryClient.getQueryCache().find({ queryKey: observedKey, exact: true })).toBeDefined();
-    // Another organization is another prefix.
     expect(queryClient.getQueryData(otherOrgKey)).toEqual({ members: ['b'] });
     expect(signOut).not.toHaveBeenCalled();
     unsubscribe();
@@ -328,7 +454,6 @@ describe('permission-denied query removal', () => {
       })
     ).rejects.toBe(error);
 
-    // A non-permission failure must not drop the cached data.
     expect(queryClient.getQueryData(key)).toEqual({ members: ['a'] });
     expect(signOut).not.toHaveBeenCalled();
     clear();
@@ -547,6 +672,37 @@ describe('accepted active-session outcomes', () => {
       expect(published).toEqual([0]);
     }
   );
+
+  it.each([
+    ['an accepted empty result', () => emptyResult],
+    [
+      'a terminal failure',
+      () => {
+        throw Object.assign(new Error('gone'), { shape: { data: { code: 'NOT_FOUND' } } });
+      },
+    ],
+  ] as const)('drops the provenance of %s when the query is reset', async (_outcome, queryFn) => {
+    const client = makeClient();
+    try {
+      await client.query({ queryKey: QUERY_KEY, queryFn });
+    } catch {
+      // The failure case settles as the query's error; the metadata records it.
+    }
+    const query = client.getQueryCache().find({ queryKey: QUERY_KEY, exact: true });
+    expect(hasActiveSessionsServerOutcome(client, QUERY_KEY)).toBe(true);
+    const published: number[] = [];
+    subscribeActiveSessionsQueryMetadata(query, () => {
+      published.push(getActiveSessionsQueryMetadata(query).acceptedRevision);
+    });
+
+    await client.resetQueries({ queryKey: QUERY_KEY, exact: true });
+
+    // The reset keeps the same query object: it now holds no server answer.
+    expect(client.getQueryCache().find({ queryKey: QUERY_KEY, exact: true })).toBe(query);
+    expect(getActiveSessionsQueryMetadata(query)).toBe(getActiveSessionsQueryMetadata(undefined));
+    expect(hasActiveSessionsServerOutcome(client, QUERY_KEY)).toBe(false);
+    expect(published).toEqual([0]);
+  });
 
   it.each([
     { otherKey: [['activeSessions', 'list', 'detail'], { type: 'query' }] },

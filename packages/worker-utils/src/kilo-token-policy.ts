@@ -217,7 +217,7 @@ export type KiloCredentialExchangeEligibilityPolicy = {
   legacy: 'deny' | 'five-year-api';
 };
 
-const exchangeSafeClaimNames: ReadonlySet<string> = new Set([
+export const KILO_EXCHANGE_SAFE_CLAIM_NAMES: ReadonlySet<string> = new Set([
   'version',
   'kiloUserId',
   'apiTokenPepper',
@@ -230,16 +230,15 @@ const exchangeSafeClaimNames: ReadonlySet<string> = new Set([
   'deviceAuthRequestCode',
 ] satisfies (keyof KiloTokenPolicyClaims)[]);
 
-const legacyExchangeSafeClaimNames: Record<string, true> = {
-  ...Object.fromEntries([...exchangeSafeClaimNames].map(name => [name, true] as const)),
-  deviceSessionId: true,
-};
+const legacyExchangeSafeClaimNames: ReadonlySet<string> = new Set([
+  ...KILO_EXCHANGE_SAFE_CLAIM_NAMES,
+  'deviceSessionId',
+]);
 
 function hasOnlyExchangeSafeClaims(claimNames: readonly string[]): boolean {
-  return claimNames.every(name => exchangeSafeClaimNames.has(name));
+  return claimNames.every(name => KILO_EXCHANGE_SAFE_CLAIM_NAMES.has(name));
 }
 
-/** `kilo-api` on its own, as a scalar audience or a single-element array. */
 function hasSoleKiloApiAudience(audience: unknown): boolean {
   if (typeof audience === 'string') return audience === KILO_API_AUDIENCE;
   return Array.isArray(audience) && audience.length === 1 && audience[0] === KILO_API_AUDIENCE;
@@ -263,14 +262,14 @@ export function isKiloCredentialExchangeEligible(
   if (claims.iat > now || claims.exp <= now || claims.exp <= claims.iat) return false;
   if (claims.apiTokenPepper === undefined) return false;
   if (claims.tokenPurpose !== undefined || claims.credentialExchange !== undefined) {
-    if (!hasOnlyExchangeSafeClaims(auth.claimNames)) return false;
+    if (!hasExchangeSafeCredentialClaims(claims, auth.claimNames)) return false;
     return (
       claims.tokenPurpose === 'human-api' &&
       claims.credentialExchange === true &&
       hasSoleKiloApiAudience(claims.aud)
     );
   }
-  if (!auth.claimNames.every(name => legacyExchangeSafeClaimNames[name] === true)) return false;
+  if (!auth.claimNames.every(name => legacyExchangeSafeClaimNames.has(name))) return false;
   return (
     policy.legacy === 'five-year-api' &&
     claims.aud === undefined &&

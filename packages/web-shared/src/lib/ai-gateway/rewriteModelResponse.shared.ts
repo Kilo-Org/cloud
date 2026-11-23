@@ -16,8 +16,7 @@ import type {
   VercelProviderMetaData,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import { applyUsagePricing } from '@kilocode/web-shared/lib/ai-gateway/usage-cost';
-import { OPENAI_CHATGPT_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/provider-id';
-import { CLAUDE_BILLING_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/provider-id';
+import { isDelegatedBillingProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/provider-type-predicates';
 import { errorExceptInTest, logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { withRequestId } from '@kilocode/web-shared/lib/ai-gateway/request-id';
 import type { createParser } from 'eventsource-parser';
@@ -42,6 +41,8 @@ export type RewriteResponseParams = {
   capture: RequestLogCapture | null;
   vercelRequestId: string | null;
   reasoningEffort: string | null;
+  /** Only for the Cloud Agent runtime proxy caller; see `startFirstByteKeepAlive`. */
+  keepAliveUntilFirstByte?: boolean;
 };
 
 export type ResponseUsageContext = Pick<
@@ -301,6 +302,61 @@ export function partialCapturedBody(capturedChunks: string[] | null): string | u
   return capturedChunks && capturedChunks.length > 0 ? capturedChunks.join('') : undefined;
 }
 
+/** The comment the gateway sends for upstream keep-alives. SSE parsers ignore comment lines. */
+export const KEEP_ALIVE_COMMENT = ': KILO PROCESSING\n\n';
+
+export const FIRST_BYTE_KEEP_ALIVE_INTERVAL_MS = 2_000;
+
+export type FirstByteKeepAlive = {
+  /** The rewrite writes its output here; the first write ends the keep-alive. */
+  output: ReadableStreamDefaultController<string>;
+  stop(): void;
+};
+
+/**
+ * Sends a keep-alive comment at once and then every interval until the rewrite forwards its first
+ * output. Next.js sends the response headers only with the first body chunk, and the Cloud Agent
+ * runtime proxy (a Worker) notices that its own client closed only when it writes. Without these
+ * bytes, a run the user stopped keeps its upstream request open until the model answers. Only for
+ * the runtime proxy caller and a 2xx upstream answer: the status is final by then. The rewrite
+ * writes whole events, so a comment between its writes is always at an event boundary.
+ */
+export function startFirstByteKeepAlive(
+  controller: ReadableStreamDefaultController<string>,
+  options: { enabled: boolean | undefined; response: Response }
+): FirstByteKeepAlive | null {
+  if (options.enabled !== true || !options.response.ok) return null;
+  const stop = () => clearInterval(timer);
+  const send = () => {
+    try {
+      controller.enqueue(KEEP_ALIVE_COMMENT);
+    } catch {
+      // The client stream is already closed or cancelled.
+      stop();
+    }
+  };
+  const timer = setInterval(send, FIRST_BYTE_KEEP_ALIVE_INTERVAL_MS);
+  send();
+  const output: ReadableStreamDefaultController<string> = {
+    get desiredSize() {
+      return controller.desiredSize;
+    },
+    enqueue(chunk) {
+      stop();
+      controller.enqueue(chunk);
+    },
+    close() {
+      stop();
+      controller.close();
+    },
+    error(reason) {
+      stop();
+      controller.error(reason);
+    },
+  };
+  return { output, stop };
+}
+
 export async function rewriteSseStream(
   reader: ReadableStreamDefaultReader<Uint8Array>,
   parser: ReturnType<typeof createParser>,
@@ -312,7 +368,9 @@ export async function rewriteSseStream(
   vercelRequestId: string | null | undefined,
   capture: RequestLogCapture | null,
   capturedChunks: string[] | null,
-  reasoningEffort: string | null
+  reasoningEffort: string | null,
+  /** Stopped when the stream ends for any reason. */
+  keepAlive: FirstByteKeepAlive | null
 ) {
   const decoder = new TextDecoder();
   const settleReadError = (error: unknown) =>
@@ -373,6 +431,7 @@ export async function rewriteSseStream(
     controller.enqueue(serializeError(responseReadError));
     controller.close();
   } finally {
+    keepAlive?.stop();
     onFinally();
     reader.releaseLock();
   }
@@ -391,10 +450,7 @@ function rewriteUsageCost(
   vercelCosts: ReturnType<typeof computeVercelCostFields> | undefined
 ) {
   usage.cost = costs.cost_mUsd / 1_000_000;
-  usage.is_byok =
-    context.user_byok ||
-    context.provider === OPENAI_CHATGPT_PROVIDER_ID ||
-    context.provider === CLAUDE_BILLING_PROVIDER_ID;
+  usage.is_byok = context.user_byok || isDelegatedBillingProvider(context.provider);
   if (
     usage.cost_details?.upstream_inference_cost == null &&
     gateway &&

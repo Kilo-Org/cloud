@@ -1,3 +1,5 @@
+/* eslint-disable max-lines -- one mounted suite pins the card's skeleton, both error classifications, rows, pin and unbind */
+import { QueryClientProvider } from '@tanstack/react-query';
 import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -8,8 +10,6 @@ import {
   SECTION_ACTION_FRAME_DP,
   SECTION_ACTION_HIT_SLOP,
   SECTION_ACTION_HIT_SLOP_DP,
-  SECTION_ACTION_ROW_CANCEL_CLASS,
-  SECTION_HEADER_ROW_PADDING_CLASS,
   tapTargetReachDp,
   TOUCH_TARGET_DP,
 } from '@/lib/a11y/tap-target';
@@ -24,11 +24,21 @@ type TestBinding = {
 };
 type TestRepoOption = { platform: 'github' | 'gitlab'; fullName: string; private: boolean };
 
+/** The props the mocked `QueryError` host element carries; the renderer keeps them untyped. */
+type RenderedQueryError = {
+  variant?: string;
+  title?: string;
+  message?: string;
+  onRetry?: () => void;
+};
+
 const h = vi.hoisted(() => ({
   success: vi.fn(),
   error: vi.fn(),
+  connectivity: 'online' as string,
   bindingsQuery: {
     bindings: [] as TestBinding[],
+    error: undefined as unknown,
     isLoading: true,
     isError: false,
     isRefetching: false,
@@ -42,6 +52,7 @@ const h = vi.hoisted(() => ({
     repositories: [] as TestRepoOption[],
     isLoading: false,
     isError: false,
+    error: undefined as unknown,
     isRefetching: false,
     refetch: vi.fn(),
   },
@@ -53,8 +64,17 @@ vi.mock('@/lib/hooks/use-repo-bindings', () => ({
   useRepoOptions: () => h.repoOptions,
 }));
 vi.mock('sonner-native', () => ({ toast: { success: h.success, error: h.error } }));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => h.connectivity,
+}));
+vi.mock('expo-haptics', () => ({
+  selectionAsync: vi.fn(),
+  impactAsync: vi.fn(),
+  notificationAsync: vi.fn(),
+}));
 vi.mock('react-native', () => ({
   Keyboard: { dismiss: () => undefined },
+  Platform: { OS: 'ios' },
   View: 'View',
   ScrollView: 'ScrollView',
   Pressable: 'Pressable',
@@ -72,14 +92,25 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
     foreground: '#111111',
   }),
 }));
+// The repo picker sheet opens Connected services through the router; the real
+// `expo-router` entry cannot load in this project, so the suite stubs the one
+// hook the sheet calls.
+vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock('@/components/agents/session-page-sheet', () => ({
   SessionPageSheet: 'SessionPageSheet',
 }));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/text', () => ({
+  Text: 'Text',
+  EYEBROW_LATIN_DISPLAY: '',
+  EYEBROW_LINE_HEIGHT_DP: 22,
+}));
 vi.mock('@/components/ui/icons', () => ({
   Check: 'Check',
   GitBranch: 'GitBranch',
@@ -118,8 +149,10 @@ function mountSection(organizationId?: string, canManage = true) {
 describe('ProfileRepoPinsSection', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    h.connectivity = 'online';
     Object.assign(h.bindingsQuery, {
       bindings: [],
+      error: undefined,
       isLoading: true,
       isError: false,
       isRefetching: false,
@@ -144,14 +177,85 @@ describe('ProfileRepoPinsSection', () => {
   });
 
   it('retryable: a bindings failure shows QueryError and Retry refetches', async () => {
-    Object.assign(h.bindingsQuery, { isError: true, isLoading: false });
+    Object.assign(h.bindingsQuery, {
+      isError: true,
+      isLoading: false,
+      error: { data: { code: 'INTERNAL_SERVER_ERROR' } },
+    });
     const { renderer, unmount } = await mountSection();
-    const queryError = findAll(renderer.root, 'QueryError')[0];
+
+    // The renderer keeps host props untyped; the stub's props are the screen's own.
+    const queryError = findAll(renderer.root, 'QueryError')[0]?.props as
+      | RenderedQueryError
+      | undefined;
     if (!queryError) {
       throw new Error('QueryError was not rendered');
     }
+    expect(queryError.variant).toBe('server');
+    expect(queryError.title).toBe("Couldn't load profiles");
     act(() => {
-      (queryError.props as { onRetry: () => void }).onRetry();
+      queryError.onRetry?.();
+    });
+    expect(h.bindingsQuery.refetch).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
+  it('forbidden: names the permission state and offers no Retry', async () => {
+    Object.assign(h.bindingsQuery, {
+      isError: true,
+      isLoading: false,
+      error: { data: { code: 'FORBIDDEN' } },
+    });
+    const { renderer, unmount } = await mountSection();
+
+    const queryError = findAll(renderer.root, 'QueryError')[0]?.props as
+      | RenderedQueryError
+      | undefined;
+    expect(queryError?.variant).toBe('permission');
+    expect(queryError?.title).toBeUndefined();
+    // The permission state names who can grant access instead of repeating its
+    // own title.
+    expect(queryError?.message).toBe('Ask an organization owner or admin to grant you access.');
+    expect(queryError?.onRetry).toBeUndefined();
+    unmount();
+  });
+
+  it('forbidden: withholds the Pin a repo action on a terminal read', async () => {
+    Object.assign(h.bindingsQuery, {
+      isError: true,
+      isLoading: false,
+      error: { data: { code: 'FORBIDDEN' } },
+    });
+    const { renderer, unmount } = await mountSection();
+
+    // The section names a read failure, so it must not offer the write the
+    // failed read was going to show.
+    expect(
+      findAll(renderer.root, 'Pressable').some(
+        node => node.props.accessibilityLabel === 'Pin a repo'
+      )
+    ).toBe(false);
+
+    unmount();
+  });
+
+  it('offline: keeps the load-failure title and a Retry that refetches', async () => {
+    h.connectivity = 'offline';
+    Object.assign(h.bindingsQuery, {
+      isError: true,
+      isLoading: false,
+      error: { data: { code: 'INTERNAL_SERVER_ERROR' } },
+    });
+    const { renderer, unmount } = await mountSection();
+
+    const queryError = findAll(renderer.root, 'QueryError')[0]?.props as
+      | RenderedQueryError
+      | undefined;
+    expect(queryError?.variant).toBe('offline');
+    expect(queryError?.title).toBe("Couldn't load profiles");
+    expect(typeof queryError?.onRetry).toBe('function');
+    act(() => {
+      queryError?.onRetry?.();
     });
     expect(h.bindingsQuery.refetch).toHaveBeenCalledTimes(1);
     unmount();
@@ -222,7 +326,46 @@ describe('ProfileRepoPinsSection', () => {
     unmount();
   });
 
-  it('compact: the pin action renders on the section box inside a row that cancels its height', async () => {
+  it('closes the pin sheet when the read turns terminal under it', async () => {
+    Object.assign(h.bindingsQuery, { isLoading: false });
+
+    const { renderer, queryClient, unmount } = await mountSection();
+    pressPressable(renderer.root, 'Pin a repo');
+    expect(findAll(renderer.root, 'SessionPageSheet')).toHaveLength(1);
+
+    // The same read now answers terminally, so the sheet it opened closes with
+    // it; leaving the state set would reopen it without a tap once the key
+    // answered successfully again.
+    Object.assign(h.bindingsQuery, { isError: true, error: { data: { code: 'FORBIDDEN' } } });
+    await act(async () => {
+      renderer.update(
+        createElement(
+          QueryClientProvider,
+          { client: queryClient },
+          createElement(ProfileRepoPinsSection, { profileId: 'profile-1', canManage: true })
+        )
+      );
+      await Promise.resolve();
+    });
+    expect(findAll(renderer.root, 'SessionPageSheet')).toHaveLength(0);
+
+    Object.assign(h.bindingsQuery, { isError: false, error: undefined });
+    await act(async () => {
+      renderer.update(
+        createElement(
+          QueryClientProvider,
+          { client: queryClient },
+          createElement(ProfileRepoPinsSection, { profileId: 'profile-1', canManage: true })
+        )
+      );
+      await Promise.resolve();
+    });
+    expect(findAll(renderer.root, 'SessionPageSheet')).toHaveLength(0);
+
+    unmount();
+  });
+
+  it('compact: the pin action rides the section header box, so the header stays one line', async () => {
     Object.assign(h.bindingsQuery, { isLoading: false });
 
     const { renderer, unmount } = await mountSection();
@@ -233,30 +376,18 @@ describe('ProfileRepoPinsSection', () => {
     if (!action) {
       throw new Error('the pin action was not rendered');
     }
+    // The action is the section header's own box: its negative margins cancel
+    // the 28dp frame back to the one text line it sits on, so the card never
+    // grows a second line for it.
     const actionClasses = String(action.props.className).split(/\s+/);
     for (const token of SECTION_ACTION_BOX_CLASS.split(' ')) {
       expect(actionClasses).toContain(token);
     }
     expect(action.props.hitSlop).toEqual(SECTION_ACTION_HIT_SLOP);
-    expect(action.props.accessibilityState).toEqual({ disabled: false });
-
-    const headerRow = findAll(renderer.root, 'View').find(node =>
-      String(node.props.className).includes(SECTION_HEADER_ROW_PADDING_CLASS)
-    );
-    if (!headerRow) {
-      throw new Error('the header row was not rendered');
-    }
-    const rowClasses = String(headerRow.props.className).split(/\s+/);
-    for (const token of [
-      ...SECTION_HEADER_ROW_PADDING_CLASS.split(' '),
-      ...SECTION_ACTION_ROW_CANCEL_CLASS.split(' '),
-    ]) {
-      expect(rowClasses).toContain(token);
-    }
-
-    // The row gives back exactly what it reserves, so its bounds cannot drift
-    // from the slop they hold.
-    expect(SECTION_ACTION_ROW_CANCEL_CLASS).toBe(`-my-[${SECTION_ACTION_HIT_SLOP_DP}px]`);
+    expect(action.props.accessibilityRole).toBe('button');
+    expect(action.props.accessibilityState).toBeUndefined();
+    // The declared reach clears the design target, and the box is symmetric
+    // about the label's line, so the row keeps its height either way.
     expect(
       tapTargetReachDp(SECTION_ACTION_FRAME_DP, SECTION_ACTION_HIT_SLOP_DP)
     ).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);

@@ -36,6 +36,7 @@ import {
   useCopyCustomLlm,
   useUpsertCustomLlm,
   useDeleteCustomLlm,
+  useSetCustomLlmEnabled,
 } from '@/app/admin/api/custom-llms/hooks';
 import {
   CustomLlmCredentialsSchema,
@@ -46,8 +47,9 @@ import type { CustomLlmCredentials, CustomLlmDefinition } from '@kilocode/db/sch
 import { deepStrict } from '@/lib/zod/deep-strict';
 import { formatZodError } from '@/lib/zod/format-zod-error';
 import { toast } from 'sonner';
-import { ChevronRight, Copy as CopyIcon, Globe, Lock, Plus, Pencil } from 'lucide-react';
+import { ChevronRight, Copy as CopyIcon, Globe, Handshake, Lock, Plus, Pencil } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import Editor, { type EditorProps } from '@monaco-editor/react';
 
 const StrictCustomLlmDefinitionSchema = deepStrict(CustomLlmDefinitionSchema);
@@ -203,6 +205,7 @@ export function CustomLlmsContent() {
   const upsertMutation = useUpsertCustomLlm();
   const copyMutation = useCopyCustomLlm();
   const deleteMutation = useDeleteCustomLlm();
+  const setEnabledMutation = useSetCustomLlmEnabled();
   const [editor, setEditor] = useState<EditorState>(initialEditorState);
   const [copy, setCopy] = useState<CopyState | null>(null);
   const [pendingChange, setPendingChange] = useState<PendingChange | null>(null);
@@ -428,6 +431,18 @@ export function CustomLlmsContent() {
     if (change?.kind === 'copy') await submitCopy(change.input);
   }, [pendingChange, submitUpsert, submitCopy]);
 
+  const handleSetEnabled = useCallback(
+    async (publicId: string, isEnabled: boolean) => {
+      try {
+        await setEnabledMutation.mutateAsync({ public_id: publicId, is_enabled: isEnabled });
+        toast.success(isEnabled ? 'Custom LLM enabled' : 'Custom LLM disabled');
+      } catch (error) {
+        toast.error(formatZodError(error));
+      }
+    },
+    [setEnabledMutation]
+  );
+
   const handleDelete = useCallback(
     async (publicId: string) => {
       try {
@@ -458,6 +473,7 @@ export function CustomLlmsContent() {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead>Enabled</TableHead>
               <TableHead>Public ID</TableHead>
               <TableHead>Display Name</TableHead>
               <TableHead>Access</TableHead>
@@ -468,13 +484,29 @@ export function CustomLlmsContent() {
           <TableBody>
             {data?.items.length === 0 && (
               <TableRow>
-                <TableCell colSpan={5} className="text-muted-foreground text-center">
+                <TableCell colSpan={6} className="text-muted-foreground text-center">
                   No custom LLMs defined yet.
                 </TableCell>
               </TableRow>
             )}
             {data?.items.map(item => (
               <TableRow key={item.public_id}>
+                <TableCell>
+                  <Switch
+                    checked={item.definition.is_enabled !== false}
+                    onCheckedChange={checked => handleSetEnabled(item.public_id, checked)}
+                    disabled={
+                      setEnabledMutation.isPending &&
+                      setEnabledMutation.variables?.public_id === item.public_id
+                    }
+                    aria-label={`${item.definition.is_enabled !== false ? 'Disable' : 'Enable'} ${item.public_id}`}
+                    title={
+                      item.definition.is_enabled !== false
+                        ? 'Disable custom LLM'
+                        : 'Enable custom LLM'
+                    }
+                  />
+                </TableCell>
                 <TableCell className="font-mono text-sm">{item.public_id}</TableCell>
                 <TableCell>{item.definition.display_name}</TableCell>
                 <TableCell>
@@ -482,6 +514,11 @@ export function CustomLlmsContent() {
                     <Badge variant="new">
                       <Globe />
                       Public
+                    </Badge>
+                  ) : item.definition.partner ? (
+                    <Badge variant="secondary">
+                      <Handshake />
+                      Partner: {item.definition.partner.inference_provider}
                     </Badge>
                   ) : (
                     <Badge variant="secondary">
@@ -504,15 +541,17 @@ export function CustomLlmsContent() {
                     >
                       <Pencil className="h-3 w-3" />
                     </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => openCopy(item.public_id, item.definition)}
-                      aria-label={`Copy ${item.public_id}`}
-                      title="Copy custom LLM"
-                    >
-                      <CopyIcon className="h-3 w-3" />
-                    </Button>
+                    {!item.definition.partner && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => openCopy(item.public_id, item.definition)}
+                        aria-label={`Copy ${item.public_id}`}
+                        title="Copy custom LLM"
+                      >
+                        <CopyIcon className="h-3 w-3" />
+                      </Button>
+                    )}
                     <InlineDeleteConfirmation
                       onDelete={() => handleDelete(item.public_id)}
                       isLoading={deleteMutation.isPending}
@@ -643,6 +682,21 @@ export function CustomLlmsContent() {
                     as <code>/messages</code>.
                   </li>
                   <li>
+                    <code>remove_from_body</code> lists dotted paths to delete from the request
+                    body, such as <code>usage</code>, <code>tools.*.function.strict</code>, or{' '}
+                    <code>messages.*.content.*.cache_control</code>. <code>*</code> stands for every
+                    array element or object value; a plain segment does not reach into arrays.
+                    Missing fields are skipped, the last segment must be a field name, and{' '}
+                    <code>__proto__</code>, <code>constructor</code>, and <code>prototype</code> are
+                    rejected.
+                  </li>
+                  <li>
+                    <code>reasoning_effort_map</code> replaces requested reasoning efforts before
+                    they are sent upstream, such as{' '}
+                    <code>{'{ "xhigh": "high", "max": "high" }'}</code>. Partners check the replaced
+                    effort against <code>opencode_settings.reasoning_options</code>.
+                  </li>
+                  <li>
                     <code>api_kinds</code> lists the served APIs (<code>chat_completions</code>,{' '}
                     <code>messages</code>, <code>responses</code>). It must include the one{' '}
                     <code>opencode_settings.ai_sdk_provider</code> picks: Messages for{' '}
@@ -657,8 +711,20 @@ export function CustomLlmsContent() {
                   </li>
                   <li>
                     With <code>pricing</code>, set{' '}
-                    <code>&quot;may_train_on_prompts&quot;: false</code> only for zero data
-                    retention upstreams.
+                    <code>&quot;may_train_on_prompts&quot;: false</code> only for upstreams that do
+                    not train on prompts. Custom LLMs never serve requests that ask for zero data
+                    retention.
+                  </li>
+                  <li>
+                    A partner sets{' '}
+                    <code>
+                      &quot;partner&quot;: {'{'} &quot;inference_provider&quot;: &quot;acme&quot;{' '}
+                      {'}'}
+                    </code>{' '}
+                    and uses the catalog model ID it serves as its public ID. It needs{' '}
+                    <code>pricing</code> and must not set grants, <code>public</code>, or{' '}
+                    <code>country_deny_list</code>. Kilo-paid requests try it first and fall back to
+                    the gateway on an error.
                   </li>
                   <li>
                     Grant access with <code>organization_ids</code> or <code>group_ids</code>, or
@@ -669,6 +735,11 @@ export function CustomLlmsContent() {
                     </code>{' '}
                     to offer it to everyone, subject to organization provider allow lists. Without
                     any of these, nobody can use the model.
+                  </li>
+                  <li>
+                    <code>&quot;is_enabled&quot;: false</code> treats the custom LLM as deleted
+                    until it is enabled again; a disabled partner falls back to the gateway. Unset
+                    means enabled.
                   </li>
                   <li>
                     Routing picks up changes within about a minute; public models and new providers

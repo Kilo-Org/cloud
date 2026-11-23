@@ -7,6 +7,7 @@
       "spendAlert": "Dit forbrug kræver opmærksomhed",
       "securityFinding": "Et sikkerhedsfund kræver opmærksomhed",
       "securityUpdate": "En sikkerhedskontrol har en opdatering",
+      "agentBriefing": "Din agentbriefing er klar",
       "activeAgentsGlanceable": "Aktive agenter har en opdatering"
     }
   },
@@ -29,6 +30,12 @@
     },
     "securityFindingNew": {
       "title": "Nyt sikkerhedsfund ({{severity}})"
+    },
+    "securityFindingSeverity": {
+      "critical": "Kritisk",
+      "high": "Høj",
+      "medium": "Middel",
+      "low": "Lav"
     },
     "securityFindingSlaWarning": {
       "title": "SLA-advarsel"

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import type { ElementRef, Rect } from './findings';
+import { TOLERANCE_DP } from './rules/thresholds';
 
 export type { Rect } from './findings';
 
@@ -25,10 +26,25 @@ const ProbeNodeSchema = z.object({
   label: z.string().optional(),
   role: z.string().optional(),
   pressable: z.literal(true).optional(),
+  /**
+   * Read-only text a `TextInput` still renders: the platform lets the reader
+   * select it, which is why the field carries a press handler, but nothing
+   * acts on a press. The touch-target rule leaves it to the text rules.
+   */
+  readOnly: z.literal(true).optional(),
   hitSlop: InsetsSchema.optional(),
   lines: z.number().optional(),
   screenState: z.number().optional(),
   scrollAxes: z.object({ x: z.boolean(), y: z.boolean() }).optional(),
+  /**
+   * The platform says the user cannot see this node: it is transparent, laid out
+   * outside every pane that draws it, or hidden from the reader. An accessibility
+   * snapshot carries no style, so without this flag a box the app hides from
+   * sight still reads as an ordinary in-flow sibling — the to-do header's
+   * zero-opacity copy of its title did, and the `overlap` rule paired it with the
+   * pressable title for one line of collision no pixel shows.
+   */
+  invisible: z.literal(true).optional(),
   style: z.record(z.string(), z.union([z.string(), z.number()])).optional(),
 });
 
@@ -86,6 +102,8 @@ const TEXT_INPUT_TAGS = new Set([
   'RCTMultilineTextInputView',
 ]);
 const SCREEN_TAGS = new Set(['RNSScreen']);
+/** The track a UISwitch draws, as an iOS accessibility snapshot reports it. */
+export const IOS_SWITCH_TRACK_TAG = 'UISwitch';
 const STACK_TAGS = new Set(['RNSScreenStack']);
 /**
  * `@expo/ui` renders its Android `ModalBottomSheet` in a dialog window of its
@@ -96,7 +114,21 @@ const STACK_TAGS = new Set(['RNSScreenStack']);
  */
 const SHEET_HOST_TAG = 'ViewManagerAdapter_ExpoUI_HostView';
 const SHEET_CONTENT_TAG = 'ViewManagerAdapter_ExpoUI_RNHostView';
-const IGNORED_TAGS = new Set(['DebuggingOverlay', 'RNSScreenStackHeaderConfig']);
+/**
+ * Tags whose subtree never paints where the probe reports it.
+ *
+ * An iOS `InputAccessoryView` is a placeholder: its content paints only in the
+ * keyboard's accessory window, and only while the keyboard shows. The app tree
+ * still holds it at the screen's edge, so measuring it reported a "Done" bar
+ * cut off by the window that no screenshot ever showed.
+ */
+const IGNORED_TAGS = new Set([
+  'DebuggingOverlay',
+  'RNSScreenStackHeaderConfig',
+  'InputAccessoryView',
+]);
+/** The screen react-native-screens presents natively on iOS (form sheet, page sheet, modal). */
+const IOS_MODAL_TAG = 'RNSModalScreen';
 /**
  * Development-only overlays that float above whatever screen is measured.
  *
@@ -330,18 +362,29 @@ function hidden(node: ProbeNode): boolean {
     (node.owners ?? []).some(owner => IGNORED_OWNERS.has(owner)) ||
     node.style?.display === 'none' ||
     node.style?.opacity === 0 ||
-    (tags.isScreen(node.tag) && node.screenState === 0)
+    ((tags.isScreen(node.tag) || node.tag === IOS_MODAL_TAG) && node.screenState === 0)
   );
 }
 
-// A native stack keeps every pushed screen mounted and active; only its last screen is on top.
+// A native stack keeps every pushed screen mounted and active; only its last screen
+// is on top. A modal covers nothing below it (a sheet leaves the screen it opened
+// from painted), but anything the stack presents after a modal covers the modal.
 function coveredScreens(nodes: readonly ProbeNode[]): Set<number> {
   const lastScreen = new Map<number, number>();
+  const lastModal = new Map<number, number>();
   const covered = new Set<number>();
   nodes.forEach((node, index) => {
-    if (!tags.isScreen(node.tag) || node.parent < 0) return;
+    const modal = node.tag === IOS_MODAL_TAG;
+    if ((!tags.isScreen(node.tag) && !modal) || node.parent < 0) return;
     const stack = nodes[node.parent];
     if (!stack || !tags.isStack(stack.tag)) return;
+    const openModal = lastModal.get(node.parent);
+    if (openModal !== undefined) covered.add(openModal);
+    if (modal) {
+      lastModal.set(node.parent, index);
+      return;
+    }
+    lastModal.delete(node.parent);
     const previous = lastScreen.get(node.parent);
     if (previous !== undefined) covered.add(previous);
     lastScreen.set(node.parent, index);
@@ -390,39 +433,59 @@ function scrollAxes(node: ProbeNode, children: readonly ProbeNode[]): { x: boole
  * Where each sheet the platform presents in its own window really sits, keyed by
  * probe index.
  *
- * On Android `@expo/ui` renders `ModalBottomSheet` as a Material3 dialog, so the
- * RN children of its `RNHostView` report frames inside that dialog: the sheet
- * content's top is their origin. The platform anchors the dialog above the
- * navigation inset, so every frame in the subtree moves down by the difference
- * between the window and the sheet's own height. A content-sized sheet and a
- * partial detent both land where the platform paints them, and a full detent,
- * whose box already spans that area, stays where it is — its content then still
- * reaches under the status bar, which is exactly what the app pads for.
+ * `@expo/ui` renders `ModalBottomSheet` in a window of its own on both
+ * platforms (a Material3 dialog on Android, a SwiftUI sheet on iOS), so the RN
+ * children of its `RNHostView` report frames inside that window: the sheet
+ * content's top is their origin. The platform anchors the content above the
+ * bottom inset, so every frame in the subtree moves down by the difference
+ * between the window less that inset and the sheet's own height. A
+ * content-sized sheet and a partial detent both land where the platform paints
+ * them, and a full Android detent, whose box already spans that area, stays
+ * where it is — its content then still reaches under the status bar, which is
+ * exactly what the app pads for. An iOS large detent reports 778 pt on an
+ * 874 pt window with 34 pt below it, and its title paints 62 pt lower than the
+ * probe reports.
+ *
+ * On iOS react-native-screens presents a form sheet or a page sheet as an
+ * `RNSModalScreen` whose frames start at the sheet's own top: a 423 pt language
+ * sheet reports "Cancel" 14 pt from the window's top, where the status bar is.
+ * UIKit anchors the sheet to the window's bottom edge, so its subtree moves down
+ * by the window height less the sheet's. A modal as tall as the window covers it
+ * and stays where it is. The iOS 26 floating form sheet is also inset 8 pt and
+ * scaled; the placement ignores that, which leaves it a few points high.
  */
 function presentedSheets(
   nodes: readonly ProbeNode[],
   env: ProbeEnv
 ): Map<number, Readonly<{ space: number; dy: number }>> {
   const placements = new Map<number, Readonly<{ space: number; dy: number }>>();
-  if (env.platform !== 'android') return placements;
+  if (env.platform !== 'android' && env.platform !== 'ios') return placements;
+  const isHost = (node: ProbeNode) =>
+    node.tag === SHEET_HOST_TAG || (env.platform === 'ios' && node.tag === IOS_MODAL_TAG);
 
   // Each node's nearest sheet host, itself included, so one pass finds the
   // subtree a presented sheet owns.
   const hostOf: number[] = [];
   nodes.forEach((node, index) => {
-    if (node.tag === SHEET_HOST_TAG) hostOf.push(index);
+    if (isHost(node)) hostOf.push(index);
     else hostOf.push(node.parent >= 0 ? (hostOf[node.parent] ?? -1) : -1);
   });
   const sheets = new Set<number>();
   nodes.forEach((node, index) => {
     const host = hostOf[index];
-    if (host >= 0 && node.tag === SHEET_CONTENT_TAG) sheets.add(host);
+    if (host >= 0 && node.tag === SHEET_CONTENT_TAG && nodes[host].tag === SHEET_HOST_TAG)
+      sheets.add(host);
   });
   const anchoredBottom = env.window.height - env.safeArea.bottom;
   for (const host of sheets) {
     const dy = Math.max(0, anchoredBottom - nodes[host].rect[3]);
     placements.set(host, { space: host, dy });
   }
+  nodes.forEach((node, index) => {
+    const dy = env.window.height - node.rect[3];
+    if (env.platform === 'ios' && node.tag === IOS_MODAL_TAG && dy > TOLERANCE_DP)
+      placements.set(index, { space: index, dy });
+  });
   nodes.forEach((_, index) => {
     const host = hostOf[index];
     if (host < 0 || host === index) return;
@@ -483,7 +546,7 @@ export function normalize(dump: ProbeDump): LayoutTree {
     clipOf[index] = clips ? intersection(inheritedClip, rect) : inheritedClip;
     const isText = tags.isText(probe.tag);
     const isTextInput = tags.isTextInput(probe.tag);
-    const pressable = probe.pressable === true;
+    const pressable = probe.pressable === true && probe.readOnly !== true;
     const node: LayoutNode = {
       index,
       tag: probe.tag,

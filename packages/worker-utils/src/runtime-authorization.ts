@@ -16,6 +16,16 @@ import {
 export { RuntimeAuthorizationSchema };
 export type { RuntimeAuthorization };
 
+/*
+ * The role set for runtime delegation: a direct membership whose role is
+ * owner, admin or member, matching the direct-membership-only lookup in
+ * `getMembership` below. Organization-scoped session creation uses its own
+ * gate: the Cloud Agent Next `assertOrganizationMembership` requires a direct
+ * membership whatever its role, and the Discord bot session surface also
+ * accepts an inherited parent `owner` or `admin`. The read predicate
+ * `activeOrganizationAccessSql` in `./organization-membership.js` accepts
+ * every direct role, and also honours an inherited parent-organization role.
+ */
 const membershipRole = z.enum(['owner', 'admin', 'member']);
 const principalSchema = z.object({
   id: z.string().min(1),
@@ -148,6 +158,9 @@ async function getMembership(
     return membership === null ? null : membershipSchema.parse(membership);
   }
   const db = getWorkerDb(input.connectionString);
+  // The lookup is deliberately the direct membership row only: an inherited
+  // parent-organization role authorizes reads and organization-scoped session
+  // creation on the Discord bot surface, not runtime delegation.
   const [row] = await db
     .select({
       id: organization_memberships.id,
@@ -271,12 +284,21 @@ export async function createRuntimeAuthorization(
       resourceId: string;
       environment: RuntimeEnvironment;
       organizationId?: string;
+      /** A shorter delegation than the resource maximum; local expiry tests only. */
+      lifetimeMs?: number;
       now?: Date;
     }
 ): Promise<{ authorization: RuntimeAuthorization; token: string; expiresAt: string }> {
   const resourceKind = RuntimeResourceKindSchema.parse(input.resourceKind);
   const resourceId = z.string().min(1).parse(input.resourceId);
   const environment = RuntimeEnvironmentSchema.parse(input.environment);
+  const lifetimeMs = z
+    .number()
+    .int()
+    .positive()
+    .max(runtimeAuthorizationMaximumLifetimeMs(resourceKind))
+    .default(runtimeAuthorizationMaximumLifetimeMs(resourceKind))
+    .parse(input.lifetimeMs);
   const auth = await verifyKiloTokenForPolicy(input.token, input.secret, {
     audience: resourceKind,
     mode: 'allow-legacy',
@@ -368,9 +390,7 @@ export async function createRuntimeAuthorization(
     authorizationUserId: authorizationUser.id,
     organizationId: input.organizationId,
     issuedAt: now.toISOString(),
-    delegationExpiresAt: new Date(
-      now.getTime() + runtimeAuthorizationMaximumLifetimeMs(resourceKind)
-    ).toISOString(),
+    delegationExpiresAt: new Date(now.getTime() + lifetimeMs).toISOString(),
     state: 'active',
     bindings: {
       userPepperDigest: await digest(user.apiTokenPepper),

@@ -24,6 +24,10 @@ import {
   fetchGitHubInstallationDetails,
   fetchGitHubRepositories,
 } from '@/lib/integrations/platforms/github/adapter';
+import {
+  GITHUB_LISTING_BUDGET_MESSAGE,
+  GitHubListingBudgetExceededError,
+} from '@/lib/integrations/platforms/github/listing-budget';
 import { TRPCError } from '@trpc/server';
 import {
   resolveOwner,
@@ -36,6 +40,7 @@ import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import {
   getGitHubAppCredentials,
   getGitHubAppTypeForOrganization,
+  type GitHubAppType,
 } from '@/lib/integrations/platforms/github/app-selector';
 import { requireNumericPlatformRepositories } from '@/lib/integrations/core/types';
 import { createGitHubUserAuthorizationState } from '@/lib/integrations/platforms/github/user-authorization-state';
@@ -75,6 +80,30 @@ const PROVIDED_TOKEN_ERROR_CODES = {
   rate_limited: 'TOO_MANY_REQUESTS',
   temporarily_unavailable: 'BAD_GATEWAY',
 } as const satisfies Record<ProvidedGitHubTokenError['reason'], TRPCError['code']>;
+
+/**
+ * Reads the installation's repositories, answering a listing that passed the
+ * adapter's pagination budget as a permanent `PAYLOAD_TOO_LARGE` instead of a
+ * generic failure. Every other error is rethrown unchanged.
+ */
+async function fetchRepositoriesWithinBudget(
+  installationId: string,
+  appType: GitHubAppType,
+  integrationId: string
+) {
+  try {
+    return await fetchGitHubRepositories(installationId, appType, integrationId, 'management');
+  } catch (error) {
+    if (error instanceof GitHubListingBudgetExceededError) {
+      throw new TRPCError({
+        code: 'PAYLOAD_TOO_LARGE',
+        message: GITHUB_LISTING_BUDGET_MESSAGE,
+        cause: error,
+      });
+    }
+    throw error;
+  }
+}
 
 export const githubAppsRouter = createTRPCRouter({
   disconnectConnection: baseProcedure
@@ -473,6 +502,11 @@ export const githubAppsRouter = createTRPCRouter({
           actor_id: ctx.user.id,
           actor_email: ctx.user.google_user_email,
           actor_name: ctx.user.google_user_name,
+          details: {
+            id: 'integration.modelUpdated',
+            integration: 'github',
+            model: input.modelSlug,
+          },
           message: input.integrationId
             ? `Updated GitHub App installation ${input.integrationId} model to ${input.modelSlug}`
             : `Updated GitHub App integration model to ${input.modelSlug}`,
@@ -545,6 +579,7 @@ export const githubAppsRouter = createTRPCRouter({
           actor_id: ctx.user.id,
           actor_email: ctx.user.google_user_email,
           actor_name: ctx.user.google_user_name,
+          details: { id: 'integration.uninstalled', integration: 'github' },
           message: `Uninstalled Kilo GitHub App installation ${input.integrationId}`,
         });
       }
@@ -622,6 +657,7 @@ export const githubAppsRouter = createTRPCRouter({
           actor_id: ctx.user.id,
           actor_email: ctx.user.google_user_email,
           actor_name: ctx.user.google_user_name,
+          details: { id: 'integration.cancelled', integration: 'github' },
           message: 'Cancelled pending GitHub App installation request',
         });
       }
@@ -696,11 +732,10 @@ export const githubAppsRouter = createTRPCRouter({
         repositoryAccess: installationDetails.repository_selection,
         installedAt: installationDetails.created_at,
       });
-      const repositories = await fetchGitHubRepositories(
+      const repositories = await fetchRepositoriesWithinBudget(
         installationId,
         appType,
-        integration.id,
-        'management'
+        integration.id
       );
       await updateRepositoriesForIntegration(integration.id, repositories);
 
@@ -711,6 +746,7 @@ export const githubAppsRouter = createTRPCRouter({
           actor_id: ctx.user.id,
           actor_email: ctx.user.google_user_email,
           actor_name: ctx.user.google_user_name,
+          details: { id: 'integration.refreshed', integration: 'github' },
           message: `Refreshed GitHub App installation ${integration.id}`,
         });
       }
@@ -784,11 +820,10 @@ export const githubAppsRouter = createTRPCRouter({
         ((owner.type === 'org' && integration.owned_by_organization_id === owner.id) ||
           (owner.type === 'user' && integration.owned_by_user_id === owner.id));
       if (integration && belongsToOwner) {
-        const repositories = await fetchGitHubRepositories(
+        const repositories = await fetchRepositoriesWithinBudget(
           input.installationId,
           appType,
-          integration.id,
-          'management'
+          integration.id
         );
         await updateRepositoriesForIntegration(integration.id, repositories);
       }

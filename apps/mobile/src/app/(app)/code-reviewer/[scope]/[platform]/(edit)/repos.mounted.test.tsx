@@ -29,8 +29,9 @@ const state = vi.hoisted(() => ({
   platform: 'github' as 'github' | 'gitlab' | 'bitbucket',
   repositories: [] as { id: number; fullName: string; private: boolean }[],
   syncedAt: null as string | null,
-  githubAppInstalled: true,
+  githubAppInstalled: true as boolean | undefined,
   reposLoading: false,
+  reposUnanswered: false,
   reposError: false,
   resync: vi.fn(() => Promise.resolve()),
   resyncing: false,
@@ -91,9 +92,19 @@ vi.mock('@/components/query-error', () => ({
   },
 }));
 vi.mock('@/components/empty-state', () => ({
-  EmptyState: (props: { title: string; action?: ReactNode; className?: string }) => {
+  StateAction: 'StateAction',
+  EmptyState: (props: {
+    title: string;
+    description?: string;
+    action?: ReactNode;
+    className?: string;
+  }) => {
     state.emptyStateClassNames.push(props.className);
-    return createElement('EmptyState', { title: props.title }, props.action);
+    return createElement(
+      'EmptyState',
+      { title: props.title, description: props.description },
+      props.action
+    );
   },
 }));
 vi.mock('@/components/repo-toggle-row', () => ({ RepoToggleRow: 'RepoToggleRow' }));
@@ -125,6 +136,7 @@ vi.mock('@/components/ui/icons', () => ({
   Search: 'Search',
   SearchX: 'SearchX',
   X: 'X',
+  ShieldCheck: 'ShieldCheck',
 }));
 vi.mock('@/components/ui/input', () => ({ Input: 'TextInput' }));
 vi.mock('@/components/tab-screen', () => ({
@@ -180,6 +192,20 @@ vi.mock('@/lib/utils', () => ({
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
   useCommittedConnectivityStatus: () => 'online',
 }));
+// The Bitbucket web-managed notice names the organization from the membership
+// list; this suite never opens that state, so one resolved organization stands
+// in and keeps the real hook's tRPC client (and the expo runtime with it) out
+// of the module graph.
+vi.mock('@/lib/hooks/use-organization-queries', () => ({
+  useOrgBoundary: (organizationIdOverride?: string) => ({
+    org: {
+      organizationId: organizationIdOverride ?? state.scope,
+      organizationName: 'Acme Robotics',
+      role: 'owner',
+    },
+    isResolving: false,
+  }),
+}));
 vi.mock('@/lib/hooks/use-code-reviewer', () => ({
   PERSONAL_SCOPE: 'personal',
   isPersonal: (scope: string) => scope === 'personal',
@@ -187,17 +213,23 @@ vi.mock('@/lib/hooks/use-code-reviewer', () => ({
   useSaveReviewConfig: () => ({ mutate: vi.fn() }),
   useGitHubRepositories: () => ({
     isLoading: state.reposLoading,
+    // A paused read is pending with nothing in flight, so the mock reports the
+    // same predicate the screen reads: pending until the list answers.
+    isPending: state.reposLoading || state.reposUnanswered,
     isError: state.reposError,
     isFetching: false,
     refetch: vi.fn(),
-    data: {
-      repositories: state.platform === 'github' ? state.repositories : [],
-      syncedAt: state.syncedAt,
-      integrationInstalled: state.githubAppInstalled,
-    },
+    data: state.reposUnanswered
+      ? undefined
+      : {
+          repositories: state.platform === 'github' ? state.repositories : [],
+          syncedAt: state.syncedAt,
+          integrationInstalled: state.githubAppInstalled,
+        },
   }),
   useGitLabRepositories: () => ({
     isLoading: state.reposLoading,
+    isPending: state.reposLoading || state.reposUnanswered,
     isError: state.reposError,
     isFetching: false,
     refetch: vi.fn(),
@@ -212,6 +244,16 @@ vi.mock('@/lib/hooks/use-code-reviewer', () => ({
     isFetching: state.readinessFetching,
     refetch: state.readinessRefetch,
     data: state.readiness,
+  }),
+  useBitbucketIntegrationStatus: (_scope: string, enabled = true) => ({
+    isLoading: false,
+    isPending: !enabled,
+    isError: false,
+    isFetching: false,
+    // A token-only organization is the only shape this suite exercises; the
+    // disabled read (any other platform) answers nothing.
+    data: enabled ? { method: 'workspace_access_token', status: 'not_connected' } : undefined,
+    refetch: vi.fn(),
   }),
 }));
 vi.mock('@/lib/hooks/use-bitbucket', () => ({
@@ -250,6 +292,20 @@ vi.mock('@/lib/hooks/use-reviewer-models', () => ({
 vi.mock('@/components/code-reviewer/repository-model-overrides', () => ({
   RepositoryModelOverrides: 'RepositoryModelOverrides',
 }));
+// The screen's busy states draw the shared ActivityIndicator, whose
+// reduced-motion read loads `expo-battery` and the Expo runtime with it; Node
+// has no `__DEV__` for that module.
+vi.mock('@/lib/a11y/motion', () => ({ useMotionPolicy: () => ({ reducedMotion: false }) }));
+// Row skeletons draw the shared row frame, whose trailing primitives fire a
+// selection tick. `expo-haptics` loads the Expo runtime too, so the tick is a
+// no-op here.
+vi.mock('expo-haptics', () => ({
+  impactAsync: vi.fn(),
+  notificationAsync: vi.fn(),
+  selectionAsync: vi.fn(),
+  ImpactFeedbackStyle: { Light: 'Light', Medium: 'Medium', Heavy: 'Heavy' },
+  NotificationFeedbackType: { Success: 'Success', Warning: 'Warning', Error: 'Error' },
+}));
 
 const REPOSITORIES = [
   { id: 7000001, fullName: 'acme/acme-repo-1', private: false },
@@ -260,13 +316,15 @@ type Mounted = RenderWithProvidersResult;
 
 function buttons(renderer: Mounted['renderer']) {
   return renderer.root
-    .findAll(node => String(node.type) === 'Button')
+    .findAll(node => String(node.type) === 'Button' || String(node.type) === 'StateAction')
     .map(node => {
+      // A state action keeps its copy in `label`; a plain button renders it as text.
+      const props = node.props as ButtonPressProps & { label?: unknown };
       const [text] = node.findAll(child => String(child.type) === 'Text');
-      const label = text?.props.children;
+      const label = text?.props.children ?? props.label;
       return {
         label: typeof label === 'string' ? label : '',
-        props: node.props as ButtonPressProps,
+        props,
       };
     });
 }
@@ -284,6 +342,15 @@ function pullControl(renderer: Mounted['renderer']) {
   return control;
 }
 
+function emptyState(renderer: Mounted['renderer']) {
+  const [node] = renderer.root.findAll(candidate => String(candidate.type) === 'EmptyState');
+  if (!node) {
+    throw new Error('the repository surface rendered no empty state');
+  }
+  const props = node.props as { title?: string; description?: string };
+  return { title: props.title, description: props.description };
+}
+
 beforeEach(() => {
   state.scope = 'org-1';
   state.platform = 'github';
@@ -291,6 +358,7 @@ beforeEach(() => {
   state.syncedAt = '2026-10-20T06:04:13.436632+00';
   state.githubAppInstalled = true;
   state.reposLoading = false;
+  state.reposUnanswered = false;
   state.reposError = false;
   state.resync.mockClear();
   state.resyncing = false;
@@ -627,6 +695,59 @@ describe('all repositories mode body', () => {
     unmount();
   });
 
+  it('keeps the skeleton while the repositories read has not answered', async () => {
+    state.reposUnanswered = true;
+    const { renderer, unmount } = await renderWithProviders(createElement(ReposRoute));
+
+    await waitFor(() => texts(renderer).includes(ORGANIZATION_EXPLANATION));
+
+    // A paused read is pending with nothing in flight, so an unanswered list must
+    // not be graded: the empty copy would claim a settled empty snapshot.
+    expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(0);
+    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton')).toHaveLength(1);
+    expect(texts(renderer)).not.toContain('No repositories found');
+    unmount();
+  });
+
+  it('names the missing repository access instead of an install on an installed app', async () => {
+    state.repositories = [];
+    state.githubAppInstalled = true;
+    const { renderer, unmount } = await renderWithProviders(createElement(ReposRoute));
+
+    await waitFor(
+      () => renderer.root.findAll(node => String(node.type) === 'EmptyState').length === 1
+    );
+
+    // The app is installed, so the install prompt would ask for a step already
+    // taken; the state names the access to widen and keeps the action that
+    // widens it.
+    expect(emptyState(renderer)).toEqual({
+      title: 'No repositories found',
+      description: 'Check repository access for the Kilo GitHub App, then refresh.',
+    });
+    expect(button(renderer, 'Manage access')).toBeDefined();
+    unmount();
+  });
+
+  it('reads an unknown installation status as installed, not as an install prompt', async () => {
+    state.repositories = [];
+    state.githubAppInstalled = undefined;
+    const { renderer, unmount } = await renderWithProviders(createElement(ReposRoute));
+
+    await waitFor(
+      () => renderer.root.findAll(node => String(node.type) === 'EmptyState').length === 1
+    );
+
+    // A status that has not answered is not evidence the app is missing, so the
+    // body keeps the picker and names the access instead of asking to install.
+    expect(renderer.root.findAll(node => String(node.type) === 'ChoiceRow')).toHaveLength(2);
+    expect(emptyState(renderer).title).toBe('No repositories found');
+    expect(emptyState(renderer).description).toBe(
+      'Check repository access for the Kilo GitHub App, then refresh.'
+    );
+    unmount();
+  });
+
   it('gives the install prompt the body when the GitHub app is not installed', async () => {
     state.repositories = [];
     state.githubAppInstalled = false;
@@ -643,6 +764,10 @@ describe('all repositories mode body', () => {
     expect(countLines(renderer)).toEqual([]);
     // The prompt replaces the list, so it keeps the surface-level air.
     expect(state.emptyStateClassNames.at(-1)).toBeUndefined();
+    expect(emptyState(renderer)).toEqual({
+      title: 'Install the GitHub app',
+      description: 'Grant it access to the repositories you want reviewed.',
+    });
     expect(button(renderer, 'Manage access')).toBeDefined();
     unmount();
   });

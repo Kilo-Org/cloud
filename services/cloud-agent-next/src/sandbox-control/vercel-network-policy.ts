@@ -5,10 +5,14 @@ import type {
 import { EXA_PROXY_PATHS } from '../kilo/runtime-credential-proxy-routes.js';
 import { runtimeCredentialProxyFacadeBaseUrl } from '../runtime-credential-proxy.js';
 import { CLOUD_AGENT_SESSION_SYNC_ORIGIN } from '@kilocode/worker-utils/cloud-agent-session-sync';
+import { RUNTIME_PROXY_ORIGIN_HEADER } from '../runtime-credential-proxy-origin.js';
+import { egressDomainSchema } from '@kilocode/worker-utils/egress-allowlist';
 
 export type VercelCredentialPolicyInput = {
   rootSessionIds: string[];
   organizationId?: string;
+  /** This sandbox's egress proof, injected beside every runtime proxy credential. */
+  originProof?: string;
   runtimeProxy: {
     members?: Array<{ sessionId: string; kiloSessionId: string; handle: string }>;
     /**
@@ -29,6 +33,7 @@ type CredentialRuleInput = {
   expectedAuthorization: string;
   injectedAuthorization: string;
   organizationId?: string;
+  originProof?: string;
 };
 
 function invalidPolicy(): never {
@@ -44,6 +49,9 @@ function createCredentialRule(input: CredentialRuleInput): VercelSandboxInjectio
       ...(input.organizationId === undefined
         ? {}
         : { 'x-kilocode-organizationid': input.organizationId }),
+      ...(input.originProof === undefined
+        ? {}
+        : { [RUNTIME_PROXY_ORIGIN_HEADER]: input.originProof }),
     },
     match: {
       headers: [
@@ -65,7 +73,7 @@ function basePath(target: URL): string {
 function runtimeProxyInjectionRules(
   policy: VercelCredentialPolicyInput
 ): VercelSandboxInjectionRule[] {
-  const { runtimeProxy: input, organizationId } = policy;
+  const { runtimeProxy: input, organizationId, originProof } = policy;
   const targets = [
     new URL(input.targets.backendBaseUrl),
     new URL(input.targets.providerBaseUrl),
@@ -102,6 +110,7 @@ function runtimeProxyInjectionRules(
         methods,
         expectedAuthorization: authorization,
         injectedAuthorization: authorization,
+        originProof,
       })
     );
   const members = input.members ?? [];
@@ -120,6 +129,7 @@ function runtimeProxyInjectionRules(
         methods: ['GET', 'PUT', 'POST'],
         expectedAuthorization: authorization,
         injectedAuthorization: authorization,
+        originProof,
       })
     );
     const roots = adoptedHandles.has(handle)
@@ -166,7 +176,12 @@ function runtimeProxyInjectionRules(
       }
     }
     if (organizationId !== undefined) {
-      for (const prefix of ['/api/openrouter', '/api/gateway']) {
+      for (const prefix of [
+        '/api/openrouter',
+        '/api/gateway',
+        '/api/openrouter/api',
+        '/api/gateway/api',
+      ]) {
         add(
           provider,
           `${basePath(provider)}${prefix}/organizations/${organizationId}/models`,
@@ -187,6 +202,7 @@ function runtimeProxyInjectionRules(
         methods: ['POST'],
         expectedAuthorization: authorization,
         injectedAuthorization: authorization,
+        originProof,
       })
     );
     // Every member root is served by the shared handle, so each root's
@@ -249,7 +265,6 @@ export function buildVercelCredentialNetworkPolicy(input: VercelCredentialPolicy
         ...injectionRules.map(rule => rule.domain),
         new URL(input.runtimeProxy.targets.backendBaseUrl).hostname,
       ]),
-      '*',
     ],
     injectionRules,
   };
@@ -260,12 +275,49 @@ export function buildVercelTransformNetworkPolicy(
   injectionRules: readonly VercelSandboxInjectionRule[]
 ): VercelSandboxNetworkPolicy {
   const allow: VercelSandboxNetworkPolicy['allow'] = {};
-  for (const domain of allowedDomains) {
-    if (domain !== '*') allow[domain] = [];
-  }
+  for (const domain of allowedDomains) allow[domain] = [];
   for (const { domain, match, headers } of injectionRules) {
     (allow[domain] ??= []).push({ match, transform: [{ headers }] });
   }
-  if (allowedDomains.includes('*')) allow['*'] = [];
+  return { allow };
+}
+
+/**
+ * The egress default of a session without an egress allowlist: every other
+ * destination is allowed. This is the only place that adds `'*'`. A restricted
+ * policy starts from the credential rules only and goes through
+ * `restrictVercelEgress`, which never adds it.
+ */
+export function openVercelEgress(policy: VercelSandboxNetworkPolicy): VercelSandboxNetworkPolicy {
+  return { allow: { ...policy.allow, '*': [] } };
+}
+
+/**
+ * The policy of a session with an egress allowlist. The keys are the list and
+ * there is no `'*'`, so Vercel refuses every other name. Each host keeps its
+ * match-only credential rules first; then the Worker host gets the `host` pin
+ * (the Worker cannot proxy to itself) and every other host is forwarded to the
+ * egress route of the Worker. It returns null when the list has an entry that
+ * is not an exact host name, or when a credential rule names a host outside it.
+ */
+export function restrictVercelEgress(
+  credentials: VercelSandboxNetworkPolicy,
+  allowlist: readonly string[],
+  route: { forwardURL: string; workerHost: string }
+): VercelSandboxNetworkPolicy | null {
+  if (
+    allowlist.some(host => egressDomainSchema.safeParse(host).data !== host) ||
+    Object.keys(credentials.allow).some(host => !allowlist.includes(host))
+  )
+    return null;
+  const allow: VercelSandboxNetworkPolicy['allow'] = {};
+  for (const host of allowlist) {
+    allow[host] = [
+      ...(credentials.allow[host] ?? []).filter(rule => 'match' in rule),
+      host === route.workerHost
+        ? { transform: [{ headers: { host } }] }
+        : { forwardURL: route.forwardURL },
+    ];
+  }
   return { allow };
 }

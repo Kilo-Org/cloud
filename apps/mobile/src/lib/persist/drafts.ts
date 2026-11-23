@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one durable draft contract: the key helpers, the debounced store, and the pre-relaunch flush share one pending map */
 import * as Sentry from '@sentry/react-native';
 import * as z from 'zod';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
@@ -5,6 +6,7 @@ import { chainSave } from '@/lib/hooks/save-chain';
 import { utf8ByteLength } from '@/lib/utf8-utils';
 import { forgetShapeMismatch, reportShapeMismatch } from '@/lib/persist/draft-read-report';
 import * as encryptedKv from '@/lib/persist/encrypted-kv';
+import { hasVisibleComposerText } from '@/lib/composer-text';
 
 /**
  * Durable high-intent drafts over the encrypted SQLCipher KV store (DEC-01).
@@ -19,7 +21,9 @@ import * as encryptedKv from '@/lib/persist/encrypted-kv';
  * retargets an older timer — the old key receives only its own write. Each
  * write is epoch-fenced and serialized per full key via `chainSave`; values
  * over 64 KB are skipped (never written partially); a scope holds at most
- * 100 entries, evicting the oldest `updated_at` above the cap.
+ * 100 entries, and above the cap a draft with nothing visible in it goes
+ * first, then the oldest draft that holds text — so a save in one composer
+ * never drops another composer's text while an empty draft could go instead.
  *
  * A corrupt or unreadable stored value loads as null (start empty), is
  * reported to Sentry with no toast, and is then removed. Every composer mount
@@ -28,18 +32,8 @@ import * as encryptedKv from '@/lib/persist/encrypted-kv';
  * for the life of the install; removing it makes one entry one event and every
  * later mount start from an absent key.
  *
- * A valid-JSON value that fails the caller's shape validator is not corrupt:
- * another build of the app can read it, so it may be that build's draft (a
- * downgrade, or a field this build has not learned yet) and removing it would
- * discard the user's text for good. It loads as null and stays stored, and its
- * report is claimed once per process per key, so the per-mount read does not
- * file an event each time. A write that replaces the value, an eviction, or an
- * explicit clear releases the claim, because the next mismatch is new
- * information.
- *
- * Every asynchronous write (debounced timer, flush, clear) is caught at this
- * boundary: a storage failure is reported to Sentry and swallowed, so the
- * fire-and-forget `void` call sites can never leak an unhandled rejection.
+ * A valid-JSON value that fails the caller's shape validator is not corrupt
+ * and stays stored, but loads as null; `draft-read-report.ts` owns its report.
  *
  * Serialization runs when the debounce fires, not on the keystroke that reset
  * it: a value that cannot be JSON-serialized (a circular reference, or a
@@ -98,6 +92,9 @@ export const PENDING_SHARE_ID_DRAFT_KEY = 'pending-share-id';
 
 /** Agents session-list search query draft entity key. */
 export const SESSION_SEARCH_DRAFT_KEY = 'session-search-query';
+
+/** Create-organization form draft entity key. */
+export const CREATE_ORGANIZATION_FORM_DRAFT_KEY = 'organization-create-form';
 
 /** Pending-review draft entity key, unique per pull request. */
 export function prReviewDraftKey(owner: string, repo: string, number: number): string {
@@ -177,6 +174,40 @@ export function securityDismissDraftKey(scope: string, findingId: string): strin
 }
 
 /**
+ * Organization mode form draft entity key; `null` is the create form, so a
+ * new mode and an edited one never share typed text.
+ */
+export function orgModeFormDraftKey(organizationId: string, modeId: string | null): string {
+  return `org-mode-form:${organizationId}:${modeId ?? 'new'}`;
+}
+
+/**
+ * Organization group form draft entity key; `null` is the create form, so a
+ * new group and an edited one never share typed text.
+ */
+export function orgGroupFormDraftKey(organizationId: string, groupId: string | null): string {
+  return `org-group-form:${organizationId}:${groupId ?? 'new'}`;
+}
+
+/** Organization guardrails form draft entity key, unique per organization. */
+export function orgGuardrailsFormDraftKey(organizationId: string): string {
+  return `org-guardrails-form:${organizationId}`;
+}
+
+/** Organization model-access form draft entity key, unique per organization. */
+export function orgModelAccessFormDraftKey(organizationId: string): string {
+  return `org-model-access-form:${organizationId}`;
+}
+
+/**
+ * Spend-alerts form draft entity key; an undefined organization is the
+ * personal scope, which is also the key the personal alerts screen reads.
+ */
+export function spendAlertsFormDraftKey(organizationId: string | undefined): string {
+  return `spend-alerts-form:${organizationId ?? 'personal'}`;
+}
+
+/**
  * New-session initial-prompt precedence: a non-empty share prefill always
  * beats a stored draft (the share payload is the user's explicit current
  * intent); an empty or absent prefill falls back to the stored draft. The
@@ -213,13 +244,11 @@ type DraftWritePayload = {
 type PendingSave = {
   timer: ReturnType<typeof setTimeout>;
   epoch: number;
+  userId: string;
+  entityKey: string;
   value: unknown;
 };
 
-// One pending debounced write per full storage key. The timer, epoch, and
-// value are captured together under the full key, so a later save for a
-// different key (or a different account with the same entity key) can never
-// retarget it.
 const pendingSaves = new Map<string, PendingSave>();
 
 function fullKey(userId: string, entityKey: string): string {
@@ -323,16 +352,47 @@ async function writeDraftSafely(payload: DraftWritePayload): Promise<void> {
   }
 }
 
+/**
+ * Whether a stored draft value is a text draft a reader sees nothing in.
+ *
+ * Only a JSON string can be empty: the composers store their text as a JSON
+ * string, while the merge, pending-review, share and other structured drafts
+ * store an object or an array whose presence is the content. A value this
+ * module cannot parse is somebody's draft too (another build's shape), so it
+ * never counts as empty.
+ */
+function holdsNoVisibleText(raw: string): boolean {
+  let parsed = null;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return false;
+  }
+  return isStringDraft(parsed) && !hasVisibleComposerText(parsed);
+}
+
 async function evictOldestBeyondCap(scope: string): Promise<void> {
-  const entries = await encryptedKv.listEntries(scope);
-  if (entries.length <= DRAFT_MAX_ENTRIES) {
+  // The keys-only read is the cheap check every committed write makes; the
+  // values below are read only once the scope is actually over the cap.
+  const listed = await encryptedKv.listEntries(scope);
+  if (listed.length <= DRAFT_MAX_ENTRIES) {
     return;
   }
-  // `listEntries` is oldest-first; remove the oldest entries down to the cap.
-  const overflow = entries.length - DRAFT_MAX_ENTRIES;
-  const oldest = entries.slice(0, overflow);
+  const stored = await encryptedKv.listEntryValues(scope);
+  const overflow = stored.length - DRAFT_MAX_ENTRIES;
+  if (overflow <= 0) {
+    return;
+  }
+  // A draft with nothing visible in it goes before any draft that holds text,
+  // then the oldest text draft goes; each group keeps `updated_at` order.
+  const empty: encryptedKv.KVValuePair[] = [];
+  const withText: encryptedKv.KVValuePair[] = [];
+  for (const entry of stored) {
+    (holdsNoVisibleText(entry.v) ? empty : withText).push(entry);
+  }
+  const evicted = [...empty, ...withText].slice(0, overflow);
   await Promise.all(
-    oldest.map(async entry => {
+    evicted.map(async entry => {
       await encryptedKv.removeItem(scope, entry.k);
       forgetShapeMismatch(scope, entry.k);
     })
@@ -394,7 +454,7 @@ export function saveDraft(userId: string, entityKey: string, value: unknown): vo
     pendingSaves.delete(key);
     void writeDraftSafely({ epoch, userId, entityKey, value });
   }, DRAFT_DEBOUNCE_MS);
-  pendingSaves.set(key, { timer, epoch, value });
+  pendingSaves.set(key, { timer, epoch, userId, entityKey, value });
 }
 
 /**
@@ -414,7 +474,26 @@ export async function flushDraft(userId: string, entityKey: string): Promise<voi
   }
   clearTimeout(pending.timer);
   pendingSaves.delete(key);
-  await writeDraftSafely({ ...pending, userId, entityKey });
+  await writeDraftSafely(pending);
+}
+
+/**
+ * Forces every pending debounced write to run now. This is the save point
+ * before a relaunch that discards the JS context (`apply-language.ts`): that
+ * reload runs no React cleanup, so a draft still inside its 500 ms debounce
+ * window would be lost. The entries are drained first and their timers cleared,
+ * so no drained write also fires on its own; a key whose pending timer
+ * `clearDraft` already cancelled is not in the map, so a cleared draft is never
+ * resurrected. A no-op on an empty map; each write's failure is reported and
+ * swallowed at the `writeDraftSafely` boundary.
+ */
+export async function flushAllDrafts(): Promise<void> {
+  const pending = [...pendingSaves.values()];
+  pendingSaves.clear();
+  for (const entry of pending) {
+    clearTimeout(entry.timer);
+  }
+  await Promise.all(pending.map(entry => writeDraftSafely(entry)));
 }
 
 /**

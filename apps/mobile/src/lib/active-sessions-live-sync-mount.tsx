@@ -29,6 +29,7 @@ import {
 } from '@/lib/needs-input-notification';
 import { notificationIdentifierForSession } from '@/lib/needs-input-presentation';
 import { useOrganization } from '@/lib/organization-context';
+import { useSessionAttentionHydration } from '@/lib/session-attention';
 import { useTRPC } from '@/lib/trpc';
 
 /** Holds the socket lease across personal/organization context changes. */
@@ -124,10 +125,12 @@ function useNeedsInputLocalNotifications(): void {
   );
   const preferencesQueryHash = useMemo(() => hashKey(preferencesQueryKey), [preferencesQueryKey]);
   const enabled = Boolean(token) && !isLoading && !isSigningOut && isLoaded;
+  // The ack store answers "not acked" for every raise while it loads, so a plan
+  // derived then would post a notification for a raise the person already
+  // answered. The phase is a plan input: it sits in `recompute`'s dependency
+  // list, and both effects below key on `recompute`, so settling re-plans.
+  const attentionHydration = useSessionAttentionHydration();
 
-  // Subscribe/prefetch the preferences row at app start. The plan reads the
-  // cache and the query-cache subscription below re-plans when the value lands,
-  // so a cold start gates on the server row instead of an empty cache.
   useQuery({
     ...trpc.user.getNotificationPreferences.queryOptions(),
     enabled,
@@ -144,6 +147,13 @@ function useNeedsInputLocalNotifications(): void {
   const notified = useRef<NeedsInputNotificationRow[]>([]);
 
   const recompute = useCallback(() => {
+    // Hold the plan while the ack store loads: it answers "not acked" for
+    // every raise, so this plan would re-post a raise the person answered
+    // (the ack-resolved rows below read that store). Settling re-runs the
+    // effects that call this.
+    if (attentionHydration === 'loading') {
+      return;
+    }
     // The plan reads the ack-resolved rows, like every other surface that
     // presents a raise (`mount.tsx`, `widget-actions.ts`,
     // `approve-front-agent`). The session-attention ack is the app's record that
@@ -199,7 +209,7 @@ function useNeedsInputLocalNotifications(): void {
       });
     };
     void applyAndCorrect();
-  }, [queryClient, queryKey, preferencesQueryKey]);
+  }, [attentionHydration, queryClient, queryKey, preferencesQueryKey]);
 
   useEffect(() => {
     if (!enabled || isSignOutActive()) {

@@ -38,7 +38,14 @@ export function visibleHomeBriefing(
   );
 }
 
-export function briefingSummaryStatusKey(status: string): string {
+/**
+ * `not_admitted` marks a scheduled row the morning window never admitted, a
+ * skipped generation rather than a failure or a timeout.
+ */
+export function briefingSummaryStatusKey(status: string, error?: string | null): string {
+  if ((status === 'failed' || status === 'unavailable') && error === 'not_admitted') {
+    return 'agentBriefing.summaryNotAdmitted';
+  }
   switch (status) {
     case 'disabled': {
       return 'agentBriefing.summaryUnavailable';
@@ -55,6 +62,31 @@ export function briefingSummaryStatusKey(status: string): string {
     }
     default: {
       return 'agentBriefing.summaryUnavailable';
+    }
+  }
+}
+
+/**
+ * The body of the detail card's summary state. That card prints the
+ * `agentBriefing.summary` heading directly above this line, so the body never
+ * repeats the subject; the home card preview keeps
+ * {@link briefingSummaryStatusKey} because that surface has no heading. The
+ * card never renders this body for a `ready` summary.
+ */
+export function briefingSummaryBodyKey(status: string, error?: string | null): string {
+  if ((status === 'failed' || status === 'unavailable') && error === 'not_admitted') {
+    return 'agentBriefing.summaryNotAdmittedBody';
+  }
+  switch (status) {
+    case 'pending':
+    case 'running': {
+      return 'agentBriefing.summaryPendingBody';
+    }
+    case 'failed': {
+      return 'agentBriefing.snapshotSummaryFailedBody';
+    }
+    default: {
+      return 'agentBriefing.summaryUnavailableBody';
     }
   }
 }
@@ -105,25 +137,141 @@ export function briefingReportMissing(error: unknown): boolean {
   return readTrpcErrorField(error, 'code') === 'NOT_FOUND';
 }
 
+/**
+ * The phase one brief read renders in. Each state is a literal, so a screen
+ * switches on it and renders exactly one branch; a set of booleans read beside
+ * the data is the implicit state machine the State Machines rule forbids.
+ *
+ * `offline` is its own phase because an offline-paused first fetch stays
+ * pending forever: `isPending` alone cannot tell a slow network from a fetch
+ * that will not start, so connectivity is the discriminator. The detail screen
+ * renders this whole union; the list screen's settled-no-data state is `empty`
+ * instead of `failed` ({@link BriefingListPhase}).
+ */
+export type BriefingDetailPhase = 'loading' | 'offline' | 'denied' | 'missing' | 'failed' | 'ready';
+
+export type BriefingListPhase = 'loading' | 'offline' | 'denied' | 'failed' | 'empty' | 'ready';
+
+type BriefingReadSignals = {
+  /** A brief or preferences object the cache holds, so data can render now. */
+  readonly hasData: boolean;
+  readonly offline: boolean;
+  readonly isPending: boolean;
+  readonly isError: boolean;
+  readonly accessDenied: boolean;
+};
+
+/**
+ * The shared precedence of a brief read, in the one order the phases can claim
+ * their signals:
+ *
+ * 1. cached data is `ready`, whatever the live flags say — a read the cache can
+ *    answer keeps rendering it while offline, refetching or retrying;
+ * 2. `offline` beats a pending fetch (which never starts), a denial and a
+ *    transient failure, so the screen says why it is waiting;
+ * 3. `denied` beats the remaining signals: the abandoned pending read settles as
+ *    FORBIDDEN, and only that phase's copy tells the person what happened;
+ * 4. a pending fetch is `loading`;
+ * 5. anything else without data is `failed` — a settled read that answered
+ *    neither data nor a denial offers the retry the screen can start.
+ */
+function briefingReadPhase(signals: BriefingReadSignals): Exclude<BriefingDetailPhase, 'missing'> {
+  if (signals.hasData) {
+    return 'ready';
+  }
+  if (signals.offline) {
+    return 'offline';
+  }
+  if (signals.accessDenied) {
+    return 'denied';
+  }
+  if (signals.isPending) {
+    return 'loading';
+  }
+  return 'failed';
+}
+
+/**
+ * The list screen's phase. Data first, then offline, denial and loading, as
+ * {@link briefingReadPhase} orders them; a settled list with no reports and no
+ * error is `empty`, the one phase whose copy invites a first brief.
+ */
+export function selectBriefingListPhase(input: {
+  readonly hasReports: boolean;
+  readonly offline: boolean;
+  readonly isPending: boolean;
+  readonly isError: boolean;
+  readonly accessDenied: boolean;
+}): BriefingListPhase {
+  const phase = briefingReadPhase({ ...input, hasData: input.hasReports });
+  if (phase !== 'failed') {
+    return phase;
+  }
+  return input.isError ? 'failed' : 'empty';
+}
+
+/**
+ * The detail screen's phase. Precedence of {@link briefingReadPhase}, plus
+ * `missing` ahead of loading: a report the server says is gone (expired,
+ * deleted, or whose sources were removed) needs its own copy, never a retry
+ * loop or a permission claim.
+ */
+export function selectBriefingDetailPhase(input: {
+  readonly hasReport: boolean;
+  readonly offline: boolean;
+  readonly isPending: boolean;
+  readonly isError: boolean;
+  readonly accessDenied: boolean;
+  readonly missing: boolean;
+}): BriefingDetailPhase {
+  if (!input.hasReport && !input.offline && !input.accessDenied && input.missing) {
+    return 'missing';
+  }
+  return briefingReadPhase({ ...input, hasData: input.hasReport });
+}
+
+/**
+ * The settings screen's phase: the same precedence over the preferences read,
+ * which has no empty state — settled without data is a failure to retry, and a
+ * report cannot be missing here.
+ */
+export function selectBriefingSettingsPhase(input: {
+  readonly hasPreferences: boolean;
+  readonly offline: boolean;
+  readonly isPending: boolean;
+  readonly isError: boolean;
+  readonly accessDenied: boolean;
+}): Exclude<BriefingDetailPhase, 'missing'> {
+  return briefingReadPhase({ ...input, hasData: input.hasPreferences });
+}
+
 /** `agentBriefing.safeguardInput`: whole seconds, 1 to 600, and a positive safe-integer spend. */
 const MAX_BRIEFING_DURATION_SECONDS = 600;
 
-export type BriefingSafeguards = { maxDurationSeconds: number; maxSpendMicrodollars: number };
+type BriefingSafeguards = { maxDurationSeconds: number; maxSpendMicrodollars: number };
 
-export function parseBriefingSafeguards(
-  minutes: number,
-  dollars: number
-): BriefingSafeguards | null {
-  const maxDurationSeconds = Math.round(minutes * 60);
-  const maxSpendMicrodollars = Math.round(dollars * 1_000_000);
-  const valid =
-    Number.isFinite(minutes) &&
-    Number.isFinite(dollars) &&
-    maxDurationSeconds >= 1 &&
-    maxDurationSeconds <= MAX_BRIEFING_DURATION_SECONDS &&
-    maxSpendMicrodollars > 0 &&
-    Number.isSafeInteger(maxSpendMicrodollars);
-  return valid ? { maxDurationSeconds, maxSpendMicrodollars } : null;
+/** The safeguard field a refusal names, in the order the card lists them. */
+export type BriefingSafeguardField = 'duration' | 'spend';
+
+/** The typed fields: both limits, or every field the card must mark. */
+export type BriefingSafeguardInput =
+  | { readonly kind: 'valid'; readonly limits: BriefingSafeguards }
+  | { readonly kind: 'invalid'; readonly fields: readonly BriefingSafeguardField[] };
+
+/** Whole seconds from 1 to 600, or null when the minutes fall outside the server range. */
+export function briefingDurationSeconds(minutes: number): number | null {
+  const seconds = Math.round(minutes * 60);
+  return Number.isFinite(minutes) && seconds >= 1 && seconds <= MAX_BRIEFING_DURATION_SECONDS
+    ? seconds
+    : null;
+}
+
+/** Microdollars of a positive spend that is still a safe integer, or null. */
+export function briefingSpendMicrodollars(dollars: number): number | null {
+  const microdollars = Math.round(dollars * 1_000_000);
+  return Number.isFinite(dollars) && microdollars > 0 && Number.isSafeInteger(microdollars)
+    ? microdollars
+    : null;
 }
 
 /**
@@ -191,20 +339,32 @@ function readSafeguardAmount(text: string, locale: string): number | null {
 /**
  * The two safeguard fields as a person typed them in the active language: a
  * decimal comma in `de` is the decimal separator, not a bad value. Text the
- * language's number grammar cannot read leaves the fields invalid, and the
+ * language's number grammar cannot read leaves its field invalid, and the
  * existing inline message says so, so a value is never silently rescaled.
+ *
+ * An invalid pair names every field that failed, duration first, so the card
+ * marks the field at fault instead of the whole block.
  */
 export function parseBriefingSafeguardInput(
   minutes: string,
   dollars: string,
   locale: string
-): BriefingSafeguards | null {
+): BriefingSafeguardInput {
   const duration = readSafeguardAmount(minutes, locale);
   const spend = readSafeguardAmount(dollars, locale);
-  if (duration === null || spend === null) {
-    return null;
+  const maxDurationSeconds = duration === null ? null : briefingDurationSeconds(duration);
+  const maxSpendMicrodollars = spend === null ? null : briefingSpendMicrodollars(spend);
+  if (maxDurationSeconds === null || maxSpendMicrodollars === null) {
+    const fields: BriefingSafeguardField[] = [];
+    if (maxDurationSeconds === null) {
+      fields.push('duration');
+    }
+    if (maxSpendMicrodollars === null) {
+      fields.push('spend');
+    }
+    return { kind: 'invalid', fields };
   }
-  return parseBriefingSafeguards(duration, spend);
+  return { kind: 'valid', limits: { maxDurationSeconds, maxSpendMicrodollars } };
 }
 
 const SYNC_RETRY_DELAYS_MS = [0, 2000, 8000] as const;

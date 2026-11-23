@@ -110,7 +110,6 @@ export function parseReviewerPlatform(
     return null;
   }
   if (scope === PERSONAL_SCOPE) {
-    // Bitbucket is org-only; a personal-scope Bitbucket route is invalid.
     if (platform === 'bitbucket') {
       return null;
     }

@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { type OrgModeConfigInput } from '@/components/organization/org-mode-form-model';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
+import { orgAuditLogQueryKey } from '@/lib/hooks/use-org-billing-queries';
+import { reconcileFirstPage } from '@/lib/query/infinite-retention';
 import { organizationErrorMessage } from '@/lib/server-error-copy';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
@@ -24,18 +26,21 @@ export function useOrgModes(organizationId: string | null) {
  * Create, update and delete for the organization's modes. The web page shows
  * these controls to every member (the router's own procedures are member
  * mutations), so the screens gate on membership and these leave the policy to
- * the server.
+ * the server. The toast carries no billing step of its own, so a money role
+ * reads the refusal copy that names the destination instead of one that claims
+ * an owner must act.
  */
-export function useOrgModeMutations(organizationId: string) {
+export function useOrgModeMutations(organizationId: string, canManageBilling = false) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const modesFilter = trpc.organizations.modes.pathFilter();
   const scope = { id: `organization-modes:${organizationId}` };
   const onError = (error: unknown) => {
-    announcingToast.error(organizationErrorMessage(error));
+    announcingToast.error(organizationErrorMessage(error, canManageBilling, 'absent'));
   };
   const onSuccess = () => {
     void queryClient.invalidateQueries(modesFilter);
+    void reconcileFirstPage(queryClient, orgAuditLogQueryKey(organizationId));
   };
 
   return {

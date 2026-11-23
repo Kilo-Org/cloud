@@ -8,7 +8,8 @@ import { createElement, type ReactNode } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { MetaRow } from '@/components/code-reviewer/review-detail-sections';
+import { KvRow } from '@/components/ui/kv-row';
+import type * as EmptyStateModule from '@/components/empty-state';
 import { i18n } from '@/i18n';
 import { openExternalUrl } from '@/lib/external-link';
 import { ReviewDetailScreen } from './review-detail-screen';
@@ -35,8 +36,27 @@ const buttons = vi.hoisted(() => ({
   rendered: [] as { children?: unknown; onPress?: () => void }[],
 }));
 
+// `StateAction` is the state slot's one action, not a `Button` the screen
+// composes itself, so it is captured apart: its own props prove where the
+// recovery control lives and what it does.
+const stateActions = vi.hoisted(() => ({
+  rendered: [] as {
+    label: string;
+    onPress?: () => void;
+    loading?: boolean;
+    disabled?: boolean;
+    testID?: string;
+    emphasis?: 'primary' | 'quiet';
+  }[],
+}));
+
 const screenHeaders = vi.hoisted(() => ({
-  rendered: [] as { eyebrow?: string; reserveEyebrow?: boolean; eyebrowPlaceholder?: unknown }[],
+  rendered: [] as {
+    subtitle?: string;
+    reserveSubtitle?: boolean;
+    subtitlePlaceholder?: unknown;
+    titleAccessory?: unknown;
+  }[],
 }));
 
 const viewRenders = vi.hoisted(() => ({
@@ -103,7 +123,52 @@ vi.mock('react-native', () => ({
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 24, bottom: 34, left: 0, right: 0 }),
 }));
-vi.mock('@/components/ui/icons', () => ({ Share: 'Share' }));
+vi.mock('@/components/ui/icons', () => ({
+  RotateCcw: 'RotateCcw',
+  Settings: 'Settings',
+  Share: 'Share',
+}));
+// The state slot's one action renders through `Button`, but its own props are
+// what place the recovery control and say what it does, so it is captured
+// separately. The rest of the module stays real: `QueryError` in the screen's
+// tree draws `EmptyState` from it for the query states.
+vi.mock('@/components/empty-state', async importOriginal => {
+  const actual = await importOriginal<typeof EmptyStateModule>();
+  return {
+    ...actual,
+    StateAction: ({
+      label,
+      onPress,
+      loading,
+      disabled,
+      testID,
+      emphasis,
+    }: {
+      label: string;
+      onPress: () => void;
+      loading?: boolean;
+      disabled?: boolean;
+      testID?: string;
+      emphasis?: 'primary' | 'quiet';
+    }) => {
+      const busy = Boolean(loading);
+      stateActions.rendered.push({
+        label,
+        onPress: () => {
+          if (busy) {
+            return;
+          }
+          onPress();
+        },
+        loading,
+        disabled: Boolean(disabled) || busy,
+        testID,
+        emphasis,
+      });
+      return createElement('Text', {}, label);
+    },
+  };
+});
 vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => ({}) }));
 vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
@@ -122,6 +187,10 @@ vi.mock('expo-haptics', () => ({
 vi.mock('@kilocode/app-shared/code-review', () => ({
   isCancellableReviewStatus: () => statusHelpers.cancellable,
   isRetriggerableReviewStatus: () => statusHelpers.retriggerable,
+  // Mirrors the real predicate exactly (`packages/app-shared/src/code-review/status.ts`),
+  // so the superseded case exercises the real rule rather than a stub.
+  canRetriggerReview: (review: { status: string; terminal_reason?: string | null }) =>
+    statusHelpers.retriggerable && review.terminal_reason !== 'superseded',
   isInFlightReviewStatus: (status: string) =>
     status === 'pending' || status === 'queued' || status === 'running',
 }));
@@ -149,12 +218,15 @@ vi.mock('@/components/query-error', () => ({
 }));
 vi.mock('@/components/screen-header', () => ({
   ScreenHeader: (props: {
-    eyebrow?: string;
-    reserveEyebrow?: boolean;
-    eyebrowPlaceholder?: unknown;
+    subtitle?: string;
+    reserveSubtitle?: boolean;
+    subtitlePlaceholder?: unknown;
+    titleAccessory?: unknown;
   }) => {
     screenHeaders.rendered.push(props);
-    return null;
+    // The real header paints the accessory on the title line, so the stub does
+    // too: a test that asserts what the screen states must see that text.
+    return props.titleAccessory ?? null;
   },
 }));
 vi.mock('@/components/ui/button', () => ({
@@ -165,6 +237,18 @@ vi.mock('@/components/ui/button', () => ({
 }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: () => null }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+// The shared key/value row draws the label column and then the value column;
+// the stub keeps that order in the rendered text so a test can prove which row
+// carries which sentence, without dragging the row frame's native pieces in.
+vi.mock('@/components/ui/kv-row', () => ({
+  KvRow: (props: { label: string; value: string }) =>
+    createElement(
+      'KvRow',
+      props,
+      createElement('Text', { key: 'label' }, props.label),
+      createElement('Text', { key: 'value' }, props.value)
+    ),
+}));
 vi.mock('@/components/tab-screen', () => ({
   TabScreenScrollView: ({ children }: { children?: unknown }) => children,
 }));
@@ -335,6 +419,7 @@ beforeEach(() => {
   detail.refetch.mockClear();
   queryErrors.errors = [];
   buttons.rendered = [];
+  stateActions.rendered = [];
   screenHeaders.rendered = [];
   viewRenders.list = [];
   reviewConfig.query = { isPending: false, data: undefined };
@@ -376,7 +461,7 @@ beforeEach(() => {
 });
 
 describe('ReviewDetailScreen outcome-first order', () => {
-  it('leads with conclusion, then findings, council, gate, then metadata', () => {
+  it('leads with the conclusion in the header, then findings, council, gate, then metadata', () => {
     detail.data = {
       success: true,
       review: makeReview({
@@ -399,8 +484,11 @@ describe('ReviewDetailScreen outcome-first order', () => {
 
     const texts = renderScreen();
 
+    // The outcome leads: the header badge is the first thing the screen states,
+    // ahead of the pull-request title and every section below it.
     const idx = (marker: string) => texts.indexOf(marker);
     expect(idx('Completed')).toBeGreaterThanOrEqual(0);
+    expect(idx('Fix login')).toBeGreaterThan(idx('Completed'));
     expect(idx('Findings')).toBeGreaterThan(idx('Completed'));
     expect(idx('Council')).toBeGreaterThan(idx('Findings'));
     expect(idx('Gate')).toBeGreaterThan(idx('Council'));
@@ -408,7 +496,7 @@ describe('ReviewDetailScreen outcome-first order', () => {
     expect(texts).toContain('$123.00');
   });
 
-  it('states the review status once, above the findings', () => {
+  it('states the review status once, on the header line, and never in a section', () => {
     detail.data = {
       success: true,
       review: makeReview({ status: 'completed', completed_at: '2024-01-01T00:05:00.000Z' }),
@@ -416,13 +504,16 @@ describe('ReviewDetailScreen outcome-first order', () => {
     };
 
     const texts = renderScreen();
+
+    // The status is the header's accessory, so the header owns the word and no
+    // block in the body re-labels the outcome by hand.
+    expect(screenHeaders.rendered).toHaveLength(1);
+    expect(screenHeaders.rendered[0]?.titleAccessory).toBeTruthy();
+
     const findingsIndex = texts.indexOf('Findings');
     const detailsIndex = texts.indexOf('Details');
     expect(findingsIndex).toBeGreaterThanOrEqual(0);
     expect(detailsIndex).toBeGreaterThan(findingsIndex);
-
-    // The conclusion above the findings owns the status word; the council and
-    // gate cards never repeat it.
     expect(texts.slice(0, findingsIndex)).toContain('Completed');
     expect(texts.slice(findingsIndex, detailsIndex)).not.toContain('Completed');
   });
@@ -450,17 +541,140 @@ describe('ReviewDetailScreen outcome-first order', () => {
 
   it('replaces a failure dump while keeping retry mounted', () => {
     statusHelpers.retriggerable = true;
+    reviewConfig.query = { isPending: false, data: { isEnabled: true, actionRequired: null } };
     const dump = `Dispatch failed: ${'at Object.<anonymous> (worker.js:1:1234)\n'.repeat(60)}`;
     detail.data = {
       success: true,
-      review: makeReview({ status: 'failed', error_message: dump }),
+      review: makeReview({ status: 'failed', manual_config: null, error_message: dump }),
       tokenUsage: { input: 0, output: 0 },
     };
 
     const texts = renderScreen();
-    expect(texts).toContain('Retry review');
+    expect(stateActions.rendered.map(action => action.label)).toContain('Retry review');
     expect(texts).toContain(i18n.t('codeReviewer.reviewDetail.reviewFailed'));
     expect(texts.join(' ')).not.toContain('worker.js');
+  });
+
+  it('puts the retry control under the failure sentence instead of below the fold', () => {
+    statusHelpers.retriggerable = true;
+    reviewConfig.query = { isPending: false, data: { isEnabled: true, actionRequired: null } };
+    detail.data = {
+      success: true,
+      review: makeReview({ status: 'failed', manual_config: null, error_message: null }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+
+    const texts = renderScreen();
+    const sentence = i18n.t('codeReviewer.reviewDetail.reviewFailed');
+    const retry = stateActions.rendered.findLast(action => action.label === 'Retry review');
+
+    // The recovery control is part of the conclusion: its sentence comes first,
+    // its own action follows before anything else on the screen, and the copy
+    // no longer asks for a retry the block below would have to supply.
+    expect(texts).toContain(sentence);
+    expect(retry).toBeDefined();
+    expect(retry?.testID).toBe('review-detail-retry');
+    expect(texts.indexOf(sentence)).toBeGreaterThanOrEqual(0);
+    expect(texts.indexOf(sentence)).toBeLessThan(texts.indexOf('Retry review'));
+    expect(texts.indexOf('Retry review')).toBeLessThan(texts.indexOf('Findings'));
+    expect(sentence).toBe('The review failed.');
+  });
+
+  it('sits the settings link under the copy when Code Reviewer is off', () => {
+    statusHelpers.retriggerable = true;
+    reviewConfig.query = { isPending: false, data: { isEnabled: false, actionRequired: null } };
+    detail.data = {
+      success: true,
+      review: makeReview({
+        status: 'failed',
+        manual_config: null,
+        error_message: 'Raw diagnostic',
+      }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+
+    const texts = renderScreen();
+
+    // The sentence carries no next step of its own, so the card states the one
+    // the action performs, then offers it.
+    expect(texts).toContain(i18n.t('codeReviewer.reviewDetail.reviewFailed'));
+    expect(texts).toContain(i18n.t('codeReviewer.reviewDetail.retryNeedsSettings'));
+    expect(stateActions.rendered.map(action => action.label)).toContain('Fix settings');
+    expect(stateActions.rendered.map(action => action.label)).not.toContain('Retry review');
+    expect(texts.indexOf('Fix settings')).toBeLessThan(texts.indexOf('Findings'));
+    // One recovery control on the screen: the actions block below no longer
+    // repeats it.
+    expect(texts.filter(text => text === 'Fix settings')).toHaveLength(1);
+  });
+
+  it('offers only the settings action when the sentence already states the next step', () => {
+    statusHelpers.retriggerable = true;
+    reviewConfig.query = { isPending: false, data: { isEnabled: false, actionRequired: null } };
+    detail.data = {
+      success: true,
+      review: makeReview({
+        status: 'failed',
+        manual_config: null,
+        terminal_reason: 'github_installation_required',
+        error_message: 'Raw diagnostic',
+      }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+
+    const texts = renderScreen();
+
+    expect(texts).toContain(
+      i18n.t('codeReviewer.actionRequired.githubInstallationRequired.description')
+    );
+    expect(stateActions.rendered.map(action => action.label)).toContain('Fix settings');
+    // The description ends with its own instruction, so a second sentence
+    // under it would repeat it.
+    expect(texts).not.toContain(i18n.t('codeReviewer.reviewDetail.retryNeedsSettings'));
+  });
+
+  it('offers the recovery control once, in the card, not again in the actions block', () => {
+    statusHelpers.retriggerable = true;
+    reviewConfig.query = { isPending: false, data: { isEnabled: true, actionRequired: null } };
+    detail.data = {
+      success: true,
+      review: makeReview({ status: 'failed', manual_config: null, error_message: null }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+
+    const texts = renderScreen();
+
+    expect(texts.filter(text => text === 'Retry review')).toHaveLength(1);
+    // The actions block keeps the pull request, the transcript and Cancel
+    // review, in that order, and composes no second way out of the failure.
+    expect(texts).toContain('Open pull request');
+    expect(texts).toContain('Session transcript');
+    expect(
+      buttons.rendered.filter(
+        button => buttonText(button) === 'Retry review' || buttonText(button) === 'Fix settings'
+      )
+    ).toEqual([]);
+  });
+
+  it('offers no recovery control for a review a newer commit replaced', () => {
+    statusHelpers.retriggerable = true;
+    reviewConfig.query = { isPending: false, data: { isEnabled: true, actionRequired: null } };
+    detail.data = {
+      success: true,
+      review: makeReview({
+        status: 'cancelled',
+        manual_config: null,
+        terminal_reason: 'superseded',
+        error_message: 'Superseded by new push',
+      }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+
+    const texts = renderScreen();
+
+    expect(texts).toContain(i18n.t('codeReviewer.reviewDetail.cancelReasonSuperseded'));
+    expect(stateActions.rendered).toEqual([]);
+    expect(texts).not.toContain('Retry review');
+    expect(texts).not.toContain('Fix settings');
   });
 
   it('shows generic failure copy when a failed review has no persisted message', () => {
@@ -544,9 +758,9 @@ describe('ReviewDetailScreen outcome-first order', () => {
 describe('ReviewDetailScreen details metadata', () => {
   it('labels the completion-timestamp row in the Details list', () => {
     // The Details key-value list pairs every label with its value in one
-    // MetaRow. The completion row must pass the localized
-    // `common.completed` copy as MetaRow's label beside its
-    // timeAgo value; a value-only row would leave the label column blank
+    // shared key/value row. The completion row must pass the localized
+    // `common.completed` copy as the row's label beside its timeAgo value; a
+    // value-only row would leave the label column blank
     // (finding: review-detail.png).
     detail.data = {
       success: true,
@@ -562,19 +776,18 @@ describe('ReviewDetailScreen details metadata', () => {
     const completedLabel = i18n.t('common.completed');
 
     // `timeAgo` is mocked to "now" in this suite, so the completion row is the
-    // one MetaRow that carries the completion label and the timeAgo value.
+    // one key/value row that carries the completion label and the timeAgo
+    // value.
     const completionRows = renderer.root.findAll(
-      node => node.type === MetaRow && node.props.label === completedLabel
+      node => node.type === KvRow && node.props.label === completedLabel
     );
     expect(completionRows).toHaveLength(1);
-    // MetaRow renders the label column first, then the value column: assert the
-    // label is what the row draws beside its timestamp, not just a prop the
-    // screen passes.
-    expect(collectText(completionRows[0]?.children ?? [])).toEqual([completedLabel, 'now']);
+    expect(completionRows[0]?.props.value).toBe('now');
 
-    // The row belongs to the Details card. The Gate card carries the check run
-    // and the threshold only, so the review status paints once, as the
-    // conclusion above the findings.
+    // The row belongs to the Details group. The Gate group carries the check
+    // run and the threshold only, so the review status paints once, as the
+    // conclusion above the findings. The ordered text proves the row draws the
+    // label beside its timestamp, not just receives it as a prop.
     const texts = collectText(renderer.toJSON());
     const completionRowIndex = texts.findIndex(
       (text, index) => text === completedLabel && texts[index + 1] === 'now'
@@ -606,13 +819,13 @@ describe('ReviewDetailScreen details metadata', () => {
       const endedLabel = i18n.t('codeReviewer.reviewDetail.reviewEnded');
 
       const endRows = renderer.root.findAll(
-        node => node.type === MetaRow && node.props.label === endedLabel
+        node => node.type === KvRow && node.props.label === endedLabel
       );
       expect(endRows).toHaveLength(1);
-      expect(collectText(endRows[0]?.children ?? [])).toEqual([endedLabel, 'now']);
+      expect(endRows[0]?.props.value).toBe('now');
       expect(
         renderer.root.findAll(
-          node => node.type === MetaRow && node.props.label === i18n.t('common.completed')
+          node => node.type === KvRow && node.props.label === i18n.t('common.completed')
         )
       ).toHaveLength(0);
     }
@@ -632,7 +845,7 @@ describe('ReviewDetailScreen details metadata', () => {
     const completedLabel = i18n.t('common.completed');
 
     expect(
-      renderer.root.findAll(node => node.type === MetaRow && node.props.label === completedLabel)
+      renderer.root.findAll(node => node.type === KvRow && node.props.label === completedLabel)
     ).toHaveLength(0);
   });
 });
@@ -680,6 +893,10 @@ describe('ReviewDetailScreen empty council', () => {
     const texts = renderScreen();
     expect(texts).toContain(i18n.t('codeReviewer.reviewDetail.findingsUnavailable'));
     expect(texts).not.toContain(i18n.t('codeReviewer.reviewDetail.noFindings'));
+    // The suite renders English (vitest.setup stubs an en-US device and the i18n
+    // instance starts in `en`), so the copy is pinned literally as well: the
+    // section reports unavailable results rather than a clean run.
+    expect(texts).toContain('Results are unavailable.');
   });
 
   it.each(['failed', 'completed'])('preserves findings from a %s review', status => {
@@ -777,7 +994,7 @@ describe('ReviewDetailScreen gate threshold', () => {
     const renderer = mountScreen();
     const row = renderer.root.findAll(
       node =>
-        node.type === MetaRow && node.props.label === i18n.t('codeReviewer.reviewDetail.threshold')
+        node.type === KvRow && node.props.label === i18n.t('codeReviewer.reviewDetail.threshold')
     );
     expect(row).toHaveLength(1);
     expect(collectText(row[0]?.children ?? [])).toEqual([
@@ -1036,7 +1253,7 @@ describe('ReviewDetailScreen error states', () => {
     expect(queryErrors.errors[0]?.onRetry).toBeDefined();
   });
 
-  it('keeps the eyebrow line it reserved while loading through a failed read', () => {
+  it('keeps the subtitle line it reserved while loading through a failed read', () => {
     detail.isError = true;
     detail.error = { data: { code: 'INTERNAL_SERVER_ERROR' } };
     detail.data = null;
@@ -1048,9 +1265,9 @@ describe('ReviewDetailScreen error states', () => {
     // Nothing paints over the line while no read runs, so the header stops
     // pulsing as soon as the failure lands.
     expect(screenHeaders.rendered).toHaveLength(1);
-    expect(screenHeaders.rendered[0]?.eyebrow).toBeUndefined();
-    expect(screenHeaders.rendered[0]?.reserveEyebrow).toBe(true);
-    expect(screenHeaders.rendered[0]?.eyebrowPlaceholder).toBeUndefined();
+    expect(screenHeaders.rendered[0]?.subtitle).toBeUndefined();
+    expect(screenHeaders.rendered[0]?.reserveSubtitle).toBe(true);
+    expect(screenHeaders.rendered[0]?.subtitlePlaceholder).toBeUndefined();
   });
 
   it('reserves the line with the placeholder bar while the read runs', () => {
@@ -1059,23 +1276,23 @@ describe('ReviewDetailScreen error states', () => {
 
     renderScreen();
 
-    expect(screenHeaders.rendered[0]?.eyebrow).toBeUndefined();
-    expect(screenHeaders.rendered[0]?.reserveEyebrow).toBe(true);
-    expect(screenHeaders.rendered[0]?.eyebrowPlaceholder).toBeTruthy();
+    expect(screenHeaders.rendered[0]?.subtitle).toBeUndefined();
+    expect(screenHeaders.rendered[0]?.reserveSubtitle).toBe(true);
+    expect(screenHeaders.rendered[0]?.subtitlePlaceholder).toBeTruthy();
   });
 
-  it('keeps the eyebrow line through a not-found answer', () => {
+  it('keeps the subtitle line through a not-found answer', () => {
     detail.isError = true;
     detail.error = { data: { code: 'NOT_FOUND' } };
     detail.data = null;
 
     renderScreen();
 
-    expect(screenHeaders.rendered[0]?.reserveEyebrow).toBe(true);
-    expect(screenHeaders.rendered[0]?.eyebrowPlaceholder).toBeUndefined();
+    expect(screenHeaders.rendered[0]?.reserveSubtitle).toBe(true);
+    expect(screenHeaders.rendered[0]?.subtitlePlaceholder).toBeUndefined();
   });
 
-  it('paints the review repository on the eyebrow line once the read answers', () => {
+  it('paints the review repository on the subtitle line once the read answers', () => {
     detail.data = {
       success: true,
       review: makeReview(),
@@ -1084,8 +1301,8 @@ describe('ReviewDetailScreen error states', () => {
 
     renderScreen();
 
-    expect(screenHeaders.rendered[0]?.eyebrow).toBe('org/repo');
-    expect(screenHeaders.rendered[0]?.reserveEyebrow).toBe(false);
+    expect(screenHeaders.rendered[0]?.subtitle).toBe('org/repo');
+    expect(screenHeaders.rendered[0]?.reserveSubtitle).toBe(true);
   });
 });
 
@@ -1273,7 +1490,7 @@ describe('ReviewDetailScreen spectator transcript', () => {
     renderScreen();
 
     expect(buttons.rendered.some(button => buttonText(button) === 'Cancel review')).toBe(true);
-    expect(buttons.rendered.some(button => buttonText(button) === 'Retry review')).toBe(true);
+    expect(stateActions.rendered.some(action => action.label === 'Retry review')).toBe(true);
   });
 
   it('shows waiting copy for a running review without a session', () => {
@@ -1700,7 +1917,7 @@ describe('ReviewDetailScreen retry when Code Reviewer cannot run', () => {
       tokenUsage: { input: 0, output: 0 },
     };
     renderScreen();
-    return buttons.rendered.map(button => buttonText(button));
+    return stateActions.rendered.map(action => action.label);
   }
 
   it('links to the settings instead of Retry when Code Reviewer is off', () => {
@@ -1709,13 +1926,13 @@ describe('ReviewDetailScreen retry when Code Reviewer cannot run', () => {
     const labels = renderFailedReview();
 
     expect(labels).not.toContain('Retry review');
-    expect(labels).toContain('Fix settings');
+    expect(labels).toEqual(['Fix settings']);
     expect(reviewConfig.calls.at(-1)).toEqual({
       scope: 'personal',
       platform: 'github',
       enabled: true,
     });
-    const fixSettings = buttons.rendered.findLast(button => buttonText(button) === 'Fix settings');
+    const fixSettings = stateActions.rendered.findLast(action => action.label === 'Fix settings');
     act(() => {
       fixSettings?.onPress?.();
     });
@@ -1731,7 +1948,7 @@ describe('ReviewDetailScreen retry when Code Reviewer cannot run', () => {
     const labels = renderFailedReview();
 
     expect(labels).not.toContain('Retry review');
-    expect(labels).toContain('Fix settings');
+    expect(labels).toEqual(['Fix settings']);
   });
 
   it('keeps Retry when Code Reviewer is on', () => {
@@ -1739,8 +1956,113 @@ describe('ReviewDetailScreen retry when Code Reviewer cannot run', () => {
 
     const labels = renderFailedReview();
 
-    expect(labels).toContain('Retry review');
-    expect(labels).not.toContain('Fix settings');
+    expect(labels).toEqual(['Retry review']);
+  });
+
+  // `Open pull request` in the actions block is the screen's one primary action,
+  // so the conclusion card's recovery control takes the quiet outline face
+  // (DESIGN.md 'one primary action per surface'). Both controls the card owns
+  // hold the same weight, so the rule covers the settings link too.
+  it('renders the retry recovery control at the quiet emphasis', () => {
+    reviewConfig.query = { isPending: false, data: { isEnabled: true, actionRequired: null } };
+
+    renderFailedReview();
+
+    const retry = stateActions.rendered.findLast(action => action.label === 'Retry review');
+    expect(retry?.emphasis).toBe('quiet');
+  });
+
+  it('renders the settings recovery control at the quiet emphasis', () => {
+    reviewConfig.query = { isPending: false, data: { isEnabled: false, actionRequired: null } };
+
+    renderFailedReview();
+
+    const fixSettings = stateActions.rendered.findLast(action => action.label === 'Fix settings');
+    expect(fixSettings?.emphasis).toBe('quiet');
+  });
+
+  it('offers no Retry for a review a newer commit replaced', () => {
+    // A manual review always qualifies for Retry through its own config, so this
+    // isolates the superseded rule: only the terminal reason may remove the button.
+    reviewConfig.query = { isPending: false, data: { isEnabled: true, actionRequired: null } };
+
+    const labels = renderFailedReview({
+      status: 'cancelled',
+      manual_config: { agentConfig: {} },
+      terminal_reason: 'superseded',
+    });
+
+    expect(labels).toEqual([]);
+  });
+
+  it('keeps Retry for a cancelled review the user stopped', () => {
+    reviewConfig.query = { isPending: false, data: { isEnabled: true, actionRequired: null } };
+
+    const labels = renderFailedReview({
+      status: 'cancelled',
+      manual_config: { agentConfig: {} },
+      terminal_reason: 'user_cancelled',
+    });
+
+    expect(labels).toEqual(['Retry review']);
+  });
+
+  it('explains why the settings must change under a generic cancellation', () => {
+    // "This review was cancelled." names no next step of its own, so the card
+    // owns the sentence that says why the action below links to the settings.
+    statusHelpers.retriggerable = true;
+    reviewConfig.query = { isPending: false, data: { isEnabled: false, actionRequired: null } };
+    detail.data = {
+      success: true,
+      review: makeReview({
+        status: 'cancelled',
+        manual_config: null,
+        error_message: 'Cancelled by user',
+      }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+
+    const texts = renderScreen();
+
+    const sentence = i18n.t('codeReviewer.reviewDetail.cancelReasonCancelled');
+    expect(texts).toContain(sentence);
+    expect(texts).toContain(i18n.t('codeReviewer.reviewDetail.retryNeedsSettings'));
+    expect(stateActions.rendered.map(action => action.label)).toEqual(['Fix settings']);
+    expect(texts.filter(text => text === 'Fix settings')).toHaveLength(1);
+    // The explanation sits between the sentence it qualifies and the action it
+    // describes, and both stay inside the conclusion block.
+    expect(texts.indexOf(sentence)).toBeLessThan(
+      texts.indexOf(i18n.t('codeReviewer.reviewDetail.retryNeedsSettings'))
+    );
+    expect(texts.indexOf(i18n.t('codeReviewer.reviewDetail.retryNeedsSettings'))).toBeLessThan(
+      texts.indexOf('Fix settings')
+    );
+  });
+
+  it('keeps the settings line out of a cancellation that states its own step', () => {
+    // "Reconnect it, then re-run the review." already says what to do, so a
+    // second instruction under it would repeat the sentence above.
+    statusHelpers.retriggerable = true;
+    reviewConfig.query = { isPending: false, data: { isEnabled: false, actionRequired: null } };
+    detail.data = {
+      success: true,
+      review: makeReview({
+        status: 'cancelled',
+        manual_config: null,
+        error_message: 'Platform integration disconnected',
+      }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+
+    const texts = renderScreen();
+
+    expect(texts).toContain(
+      i18n.t('codeReviewer.reviewDetail.cancelReasonIntegrationDisconnected', {
+        platform: 'GitHub',
+      })
+    );
+    expect(stateActions.rendered.map(action => action.label)).toEqual(['Fix settings']);
+    expect(texts).not.toContain(i18n.t('codeReviewer.reviewDetail.retryNeedsSettings'));
   });
 
   it('shows neither control while the config loads', () => {
@@ -1748,8 +2070,7 @@ describe('ReviewDetailScreen retry when Code Reviewer cannot run', () => {
 
     const labels = renderFailedReview();
 
-    expect(labels).not.toContain('Retry review');
-    expect(labels).not.toContain('Fix settings');
+    expect(labels).toEqual([]);
   });
 
   it('keeps Retry for a manual review and does not read the config', () => {
@@ -1789,11 +2110,11 @@ describe('ReviewDetailScreen retry confirmation', () => {
       tokenUsage: { input: 0, output: 0 },
     };
     renderScreen();
-    const button = buttons.rendered.findLast(entry => buttonText(entry) === 'Retry review');
-    if (!button?.onPress) {
-      throw new Error('Retry button was not rendered');
+    const action = stateActions.rendered.findLast(entry => entry.label === 'Retry review');
+    if (!action?.onPress) {
+      throw new Error('Retry action was not rendered');
     }
-    return button;
+    return action;
   }
 
   type AlertAction = { text?: string; onPress?: () => void };
@@ -1821,14 +2142,14 @@ describe('ReviewDetailScreen retry confirmation', () => {
     expect(retrigger.mutate).toHaveBeenCalledWith({ reviewId: 'rev-1' }, expect.any(Object));
   });
 
-  it('shows the button busy and opens no second confirmation while the request runs', () => {
+  it('shows the action busy and opens no second confirmation while the request runs', () => {
     const button = renderRetryableReview();
     act(() => button.onPress?.());
     act(() => confirmAction().onPress?.());
 
     retrigger.isPending = true;
     renderScreen();
-    const busy = buttons.rendered.findLast(entry => buttonText(entry) === 'Retry review');
+    const busy = stateActions.rendered.findLast(entry => entry.label === 'Retry review');
 
     expect(busy).toMatchObject({ loading: true, disabled: true });
     act(() => busy?.onPress?.());
@@ -1843,7 +2164,7 @@ describe('ReviewDetailScreen retry confirmation', () => {
     const options = retrigger.mutate.mock.calls[0]?.[1] as { onSettled?: () => void } | undefined;
     act(() => options?.onSettled?.());
 
-    const again = buttons.rendered.findLast(entry => buttonText(entry) === 'Retry review');
+    const again = stateActions.rendered.findLast(entry => entry.label === 'Retry review');
     act(() => again?.onPress?.());
     act(() => confirmAction().onPress?.());
 

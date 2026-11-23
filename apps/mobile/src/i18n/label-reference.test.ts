@@ -10,14 +10,20 @@ import sr from './locales/sr.json';
 /**
  * A message that names a button must name it by key. `$t(key)` resolves in the
  * active language, so the message can never point at a control the user does
- * not see.
+ * not see. A message may name more than one control: `INVALID_CODE` names both
+ * the resend and the other sign-in methods the code step offers.
  */
-const MESSAGE_KEYS = [
-  'authErrors.differentOauth',
-  'authErrors.ssoError',
-  'authErrors.admissionRequired',
-] as const;
-const LABEL_KEY = 'login.moreSignInOptions';
+const MESSAGE_KEYS: readonly { key: string; labels: readonly string[] }[] = [
+  { key: 'authErrors.differentOauth', labels: ['login.moreSignInOptions'] },
+  { key: 'authErrors.ssoError', labels: ['login.moreSignInOptions'] },
+  { key: 'authErrors.admissionRequired', labels: ['login.moreSignInOptions'] },
+  // The step-up refusal on the code step: both controls it could name — the
+  // provider buttons and the options link — live one Back tap away.
+  { key: 'authErrors.signupStepUpBack', labels: ['login.moreSignInOptions'] },
+  // The refusal on the code step names both controls beside the field: the
+  // resend, and the other sign-in methods a silently refused address needs.
+  { key: 'authErrors.invalidCode', labels: ['login.resendCode', 'login.moreSignInOptions'] },
+];
 
 /** The category a language's own rules assign, the same rules i18next uses. */
 function category(tag: SupportedLanguage, count: number): string {
@@ -38,19 +44,21 @@ await i18n.init({
 
 describe('label references', () => {
   it('names the sign-in sheet by key in English', () => {
-    for (const key of MESSAGE_KEYS) {
-      expect(en.authErrors[key.split('.')[1] as keyof typeof en.authErrors]).toContain(
-        `$t(${LABEL_KEY})`
-      );
+    for (const { key, labels } of MESSAGE_KEYS) {
+      const message = en.authErrors[key.split('.')[1] as keyof typeof en.authErrors];
+      for (const label of labels) {
+        expect(message).toContain(`$t(${label})`);
+      }
     }
   });
 
   it.each(SUPPORTED_LANGUAGES)('resolves the label in %s', async tag => {
     await i18n.changeLanguage(tag);
-    const label = i18n.t(LABEL_KEY);
-    for (const key of MESSAGE_KEYS) {
+    for (const { key, labels: labelKeys } of MESSAGE_KEYS) {
       const message = i18n.t(key);
-      expect(message).toContain(label);
+      for (const labelKey of labelKeys) {
+        expect(message).toContain(i18n.t(labelKey));
+      }
       expect(message).not.toContain('$t(');
     }
   });
@@ -107,7 +115,7 @@ describe('catalog copy', () => {
     if (tag === 'ka') {
       return;
     }
-    for (const key of ['sessionRow.needsInput'] as const) {
+    for (const key of ['agents.sessionRow.needsInputBadge'] as const) {
       const value = i18n.t(key);
       expect(value, key).toBe(value.toLocaleUpperCase(tag));
     }

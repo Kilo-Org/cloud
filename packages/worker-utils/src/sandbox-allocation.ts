@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { SandboxProviderId } from './sandbox-provider-capabilities';
 
 export const sandboxAllocationSchema = z.enum([
   'isolated-standard',
@@ -8,6 +9,7 @@ export const sandboxAllocationSchema = z.enum([
   'cloudflare-containers-standard-4',
   'vercel-small',
   'vercel-large',
+  'aws-microvm-8g',
 ]);
 
 export type SandboxAllocation = z.infer<typeof sandboxAllocationSchema>;
@@ -32,6 +34,7 @@ export const SELECTABLE_SANDBOX_ALLOCATIONS = [
   'cloudflare-containers-standard-4',
   'vercel-small',
   'vercel-large',
+  'aws-microvm-8g',
 ] as const satisfies readonly SandboxAllocation[];
 
 /** Allocation auto-routed containers sessions run when the owner picks nothing. */
@@ -69,7 +72,15 @@ const containersAllocationRequestSchema = z
   })
   .strict();
 
+const awsAllocationRequestSchema = z
+  .object({
+    provider: z.object({ id: z.literal('aws'), account: z.literal('byoc') }).strict(),
+    instanceType: z.literal('microvm-8g'),
+  })
+  .strict();
+
 export const sandboxAllocationRequestSchema = z.union([
+  awsAllocationRequestSchema,
   cloudflareAllocationRequestSchema,
   vercelAllocationRequestSchema,
   containersAllocationRequestSchema,
@@ -86,6 +97,7 @@ function isContainersAllocationRequest(
 }
 
 const selectableSandboxAllocationRequestSchema = z.union([
+  awsAllocationRequestSchema,
   vercelAllocationRequestSchema,
   containersAllocationRequestSchema,
 ]);
@@ -95,6 +107,7 @@ export type SelectableSandboxAllocationRequest = z.infer<
 >;
 
 const allocationRequests = {
+  'aws-microvm-8g': { provider: { id: 'aws', account: 'byoc' }, instanceType: 'microvm-8g' },
   'isolated-standard': {
     provider: { id: 'cloudflare', account: 'kilo' },
     instanceType: 'isolated-standard',
@@ -177,6 +190,7 @@ export const selectableSandboxAllocationInputSchema = z.union([
 ]);
 
 export const sandboxDestinationSchema = z.union([
+  awsAllocationRequestSchema,
   cloudflareAllocationRequestSchema.extend({
     instanceType: z.enum(['single', 'shared', 'isolated-standard', 'devcontainer']),
   }),
@@ -187,7 +201,7 @@ export const sandboxDestinationSchema = z.union([
 export type SandboxDestination = z.infer<typeof sandboxDestinationSchema>;
 
 export function isSelectableSandboxAllocation(
-  allocation: SandboxAllocation | undefined
+  allocation: string | undefined
 ): allocation is SelectableSandboxAllocation {
   return (
     allocation !== undefined &&
@@ -202,19 +216,18 @@ export const vercelSandboxResourcesSchema = z.union([
 
 export type VercelSandboxResources = z.infer<typeof vercelSandboxResourcesSchema>;
 
-export function getSandboxAllocationProvider(allocation: SandboxAllocation) {
+export function getSandboxAllocationProvider(allocation: SandboxAllocation): SandboxProviderId {
   return allocationRequests[allocation].provider.id;
 }
 
 /**
  * A multi-repository environment keeps every repository in one workspace, so it
  * needs a sandbox that one session owns. The retired shared Cloudflare sandbox
- * and Vercel cannot give it one.
+ * cannot give it one. Every provider can: the shared SCM proxy selects each
+ * repository's capability from the request URL.
  */
 export function allocationSupportsMultiRepository(allocation: SandboxAllocation): boolean {
-  return (
-    allocation !== 'cloudflare-shared' && getSandboxAllocationProvider(allocation) !== 'vercel'
-  );
+  return allocation !== 'cloudflare-shared';
 }
 
 /**

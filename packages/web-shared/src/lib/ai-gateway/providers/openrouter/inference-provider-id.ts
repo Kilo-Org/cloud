@@ -1,7 +1,8 @@
 import { DIRECT_BYOK_PROVIDER_IDS } from '@kilocode/worker-utils/direct-byok-model';
 import * as z from 'zod';
-import { GoogleServiceAccountSigningKeySchema } from '@kilocode/db/schema-types';
-import { VertexCredentialsSchema } from '@kilocode/app-shared/byok-credentials';
+// The canonical provider-slug rule lives in app-shared so the mobile editor and
+// every web read path compare with the same rule.
+import { normalizeInferenceProviderId as normalizeInferenceProviderIdFromAppShared } from '@kilocode/app-shared/organizations/model-access-providers';
 
 export const OpenRouterInferenceProviderIdSchema = z.enum([
   'ai21',
@@ -190,7 +191,6 @@ export const UserByokTestModels = {
   [DirectUserByokInferenceProviderIdSchema.enum.edenai]: 'openai/gpt-5.6-luna',
   [DirectUserByokInferenceProviderIdSchema.enum['kimi-coding']]: 'kimi-for-coding',
   [DirectUserByokInferenceProviderIdSchema.enum['inceptron-byok']]: 'moonshotai/Kimi-K2.6',
-  [DirectUserByokInferenceProviderIdSchema.enum.martian]: 'google/gemini-3.5-flash',
   [DirectUserByokInferenceProviderIdSchema.enum['morph-byok']]: 'morph-qwen35-397b',
   [DirectUserByokInferenceProviderIdSchema.enum.neuralwatt]: 'Qwen/Qwen3.5-35B-A3B',
   [DirectUserByokInferenceProviderIdSchema.enum['nvidia-byok']]:
@@ -273,19 +273,33 @@ const openRouterToVercelInferenceProviderMapping = {
     VercelNonUserByokInferenceProviderIdSchema.enum.togetherai,
   [OpenRouterInferenceProviderIdSchema.enum.typesafe]:
     VercelNonUserByokInferenceProviderIdSchema.enum['typesafe-ai'],
-} as Record<string, VercelInferenceProviderId | undefined>;
+} satisfies Partial<Record<OpenRouterInferenceProviderId, VercelInferenceProviderId>>;
 
+const vercelInferenceProviderIdByOpenRouterId = new Map<string, VercelInferenceProviderId>(
+  Object.entries(openRouterToVercelInferenceProviderMapping)
+);
+
+// The rule itself lives in app-shared; this wrapper keeps the `undefined`
+// overload that callers pass an optional provider tag through.
 export function normalizeInferenceProviderId(providerId: string): string;
 export function normalizeInferenceProviderId(providerId: string | undefined): string | undefined;
 export function normalizeInferenceProviderId(providerId: string | undefined) {
   if (!providerId) return providerId;
-  const slashIndex = providerId.indexOf('/');
-  return (slashIndex >= 0 ? providerId.slice(0, slashIndex) : providerId).toLowerCase();
+  return normalizeInferenceProviderIdFromAppShared(providerId);
 }
+
+/**
+ * The canonical form of an allow list of provider slugs: each entry trimmed and
+ * through `normalizeInferenceProviderId`, entries that name no provider dropped,
+ * and the first occurrence of a slug kept. Writers store this form and every
+ * comparison against catalog slugs builds its set from it, so one stored value
+ * means the same provider whatever wrote it.
+ */
+export { normalizeInferenceProviderIds } from '@kilocode/app-shared/organizations/model-access-providers';
 
 export function openRouterToVercelInferenceProviderId(providerId: string): string {
   const normalizedProviderId = normalizeInferenceProviderId(providerId);
-  return openRouterToVercelInferenceProviderMapping[normalizedProviderId] ?? normalizedProviderId;
+  return vercelInferenceProviderIdByOpenRouterId.get(normalizedProviderId) ?? normalizedProviderId;
 }
 
 /** The Vercel provider a user BYOK key is sent to. Vercel serves Codestral keys as Mistral keys. */
@@ -361,25 +375,3 @@ export {
   type AzureCredentials,
   type VertexCredentials,
 } from '@kilocode/app-shared/byok-credentials';
-
-/**
- * A Google Cloud service account key file, as downloaded from the console, with
- * an optional Vertex AI `location`. Only the fields needed to sign token
- * requests and address the project are required.
- */
-export const GoogleServiceAccountKeyFileSchema = GoogleServiceAccountSigningKeySchema.extend({
-  type: z.literal('service_account'),
-  project_id: z.string().min(1),
-  location: z.string().trim().min(1).optional(),
-});
-
-/**
- * Direct Vertex AI BYOK accepts the Vercel-shaped credentials above, or a
- * service account key file with an optional `location` (default `global`).
- */
-export const DirectVertexCredentialsSchema = z.union([
-  VertexCredentialsSchema,
-  GoogleServiceAccountKeyFileSchema,
-]);
-
-export type DirectVertexCredentials = z.infer<typeof DirectVertexCredentialsSchema>;

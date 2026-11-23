@@ -1,22 +1,43 @@
 import { type ReactNode } from 'react';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 
-import { DirectionalChevronRight } from '@/components/ui/directional-icons';
-import { Switch } from '@/components/ui/switch';
+import { RowChevron } from '@/components/ui/row-chevron';
+import { RowFrame } from '@/components/ui/row-frame';
+import { renderRowTrailing } from '@/components/ui/row-trailing';
 import { Text } from '@/components/ui/text';
-import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { SETTINGS_SWITCH_ROW_CLASS } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
 
 /**
  * One titled block of an organization settings form: the title, its
- * description, and an optional master switch on the title row. Children render
- * only while the switch is on, which is how the web forms show a section's
- * fields.
+ * description, and an optional master switch on the title row. The heading and
+ * the fields below it are flat siblings at the page gutter, never a surface
+ * inside another surface.
+ *
+ * The title and its description sit on the tight inner gap (`gap-1`, 3.5dp),
+ * the gap the field groups below them and the card this header replaced use, so
+ * a title is never further from its own description than a field group's label
+ * is: both lines read as one pair.
+ *
+ * The title row of a section with a switch renders at the control-size floor
+ * (28dp), not at one heading line: the row is the switch's parent, and React
+ * Native delivers a touch only inside each ancestor's bounds, so a row shrunk to
+ * the heading line clipped the switch's own box and the band a touch could land
+ * in fell under the audit floor. The switch's centred box adds half a band over
+ * the heading line above the row's centre, so the row's bottom margin cancels
+ * exactly that half, and the title-to-description gap stays the tight inner gap
+ * of a section without a switch.
+ *
+ * The section gap separates the header group — title, description, and the
+ * `intro` copy that explains the fields — from each child group and each child
+ * group from the next, so unrelated groups do not read as one block. The intro
+ * keeps the header group's inner gap. The intro and the children render only
+ * while the switch is on, which is how the web forms show a section's fields.
  */
 export function SettingsSection({
   title,
   description,
+  intro,
   enabled,
   onEnabledChange,
   switchDisabled = false,
@@ -24,115 +45,83 @@ export function SettingsSection({
 }: Readonly<{
   title: string;
   description: string;
+  intro?: ReactNode;
   enabled?: boolean;
   onEnabledChange?: (next: boolean) => void;
   switchDisabled?: boolean;
   children?: ReactNode;
 }>) {
   const showsSwitch = enabled !== undefined && onEnabledChange !== undefined;
+  const showsFields = !showsSwitch || enabled;
   return (
-    <View className="gap-4 rounded-lg bg-secondary p-4">
-      <View className="flex-row items-start justify-between gap-3">
-        <View className="flex-1 gap-1">
-          <Text className="text-base font-semibold text-foreground">{title}</Text>
-          <Text className="text-xs text-muted-foreground">{description}</Text>
+    <View className="gap-6">
+      <View className="gap-3">
+        <View className="gap-1">
+          <View
+            className={cn(
+              'flex-row items-center justify-between gap-3',
+              showsSwitch && SETTINGS_SWITCH_ROW_CLASS
+            )}
+          >
+            <Text variant="heading" className="min-w-0 flex-1">
+              {title}
+            </Text>
+            {showsSwitch &&
+              renderRowTrailing({
+                kind: 'switch',
+                value: enabled,
+                disabled: switchDisabled,
+                onValueChange: onEnabledChange,
+                accessibilityLabel: title,
+              })}
+          </View>
+          <Text variant="caption">{description}</Text>
         </View>
-        {showsSwitch ? (
-          <Switch
-            value={enabled}
-            disabled={switchDisabled}
-            onValueChange={onEnabledChange}
-            accessibilityLabel={title}
-          />
-        ) : null}
+        {showsFields ? intro : null}
       </View>
-      {!showsSwitch || enabled ? children : null}
+      {showsFields ? children : null}
     </View>
   );
 }
 
-/** A one-line switch inside a settings section: the label, its note, and the control. */
-export function SettingsSwitchRow({
-  label,
-  description,
-  value,
-  onValueChange,
-  disabled = false,
-}: Readonly<{
-  label: string;
-  description?: string;
-  value: boolean;
-  onValueChange: (next: boolean) => void;
-  disabled?: boolean;
-}>) {
-  // One switch per row: the tap target around the copy is hidden from
-  // accessibility, and the native control carries the switch role, label, and
-  // state, so a tap runs one handler and a screen reader sees one target.
-  return (
-    <View className={cn(ROW_TARGET_CLASS, 'flex-row items-center justify-between gap-3')}>
-      <Pressable
-        accessible={false}
-        accessibilityElementsHidden
-        importantForAccessibility="no-hide-descendants"
-        className={cn(ROW_TARGET_CLASS, 'min-w-0 flex-1 justify-center active:opacity-70')}
-        disabled={disabled}
-        onPress={() => {
-          onValueChange(!value);
-        }}
-      >
-        <View className="gap-0.5">
-          <Text className={cn('text-sm', disabled ? 'text-muted-foreground' : 'text-foreground')}>
-            {label}
-          </Text>
-          {description ? (
-            <Text className="text-xs text-muted-foreground">{description}</Text>
-          ) : null}
-        </View>
-      </Pressable>
-      <Switch
-        value={value}
-        disabled={disabled}
-        onValueChange={onValueChange}
-        accessibilityLabel={label}
-        accessibilityHint={description}
-        accessibilityState={{ checked: value, disabled }}
-      />
-    </View>
-  );
-}
-
-/** A row that opens a picker: its label, the current choice, and the disclosure glyph. */
+/**
+ * A row for a setting's current choice: its label and value, plus the
+ * disclosure glyph when pressing it opens a picker. A row without `onPress`
+ * states a value the reader cannot change yet, so it carries neither the glyph
+ * nor a press target and reads as plain text in the same geometry.
+ */
 export function SettingsValueRow({
   label,
   value,
   onPress,
   disabled = false,
+  className,
 }: Readonly<{
   label: string;
   value: string;
-  onPress: () => void;
+  onPress?: () => void;
   disabled?: boolean;
+  /** Overrides for a row inside a padded block, e.g. `px-0`. */
+  className?: string;
 }>) {
-  const colors = useThemeColors();
   return (
-    <Pressable
-      className={cn(
-        ROW_TARGET_CLASS,
-        'flex-row items-center justify-between gap-3 py-2 active:opacity-70'
-      )}
-      disabled={disabled}
-      accessibilityRole="button"
-      accessibilityLabel={[label, value].join(', ')}
-      accessibilityState={{ disabled }}
+    <RowFrame
+      title={label}
       onPress={onPress}
-    >
-      <Text className="text-sm text-foreground">{label}</Text>
-      <View className="shrink flex-row items-center gap-2">
-        <Text className="shrink text-sm text-muted-foreground" numberOfLines={1}>
-          {value}
-        </Text>
-        <DirectionalChevronRight size={16} color={colors.mutedForeground} />
-      </View>
-    </Pressable>
+      disabled={disabled}
+      className={className}
+      accessibilityLabel={[label, value].join(', ')}
+      trailing={{
+        kind: 'node',
+        node: (
+          <View className="min-w-0 shrink flex-row items-center gap-2">
+            <Text variant="caption" className="shrink" numberOfLines={1}>
+              {value}
+            </Text>
+            {onPress === undefined ? null : <RowChevron />}
+          </View>
+        ),
+      }}
+    />
   );
 }

@@ -25,10 +25,13 @@ import { OwnedKeyboardLift } from './owned-keyboard-lift';
 import { SessionHistoryScreen } from './session-history-screen';
 
 type MockStoredSession = Pick<StoredSession, 'session_id' | 'organization_id'> &
-  Partial<Pick<StoredSession, 'git_url' | 'created_on_platform'>>;
+  Partial<Pick<StoredSession, 'git_url' | 'created_on_platform' | 'updated_at'>>;
 
 const listState = vi.hoisted(() => ({
   storedSessions: [] as MockStoredSession[],
+  // When set, the recent-repositories query returns exactly these git URLs, so
+  // a test can prove that source apart from the rows the list renders.
+  recentRepositoryGitUrls: null as string[] | null,
   isSearching: false,
   // Mirrors the hook's restorePending: the saved search has not reached the
   // search state yet, so the body must load instead of claiming a result.
@@ -39,6 +42,11 @@ const listState = vi.hoisted(() => ({
   // settles (isFetching false, isPending true).
   storedIsPending: false,
   storedIsFetching: false,
+  storedIsPaused: false,
+  // The search read's own flags: a paused search is offline with no cached
+  // page, so it is neither loading nor errored and never settles on its own.
+  searchIsPending: false,
+  searchIsPaused: false,
   storedFetchedSinceMount: true,
   storedLoadedPageCount: 1,
   hasNextPage: false,
@@ -163,6 +171,9 @@ const focusCallbacks = vi.hoisted(() => ({
   current: new Set<() => void>(),
 }));
 const handleRefetchSpy = vi.hoisted(() => vi.fn());
+// The search read's own refetch: a paused search must be re-issued through it,
+// and counting it here keeps the shared stored refetch out of the tally.
+const searchRefetchSpy = vi.hoisted(() => vi.fn());
 const readFilterRecord = vi.hoisted(() => vi.fn<(storageKey: string) => Promise<string | null>>());
 
 vi.mock('react-native', async () => {
@@ -283,6 +294,7 @@ vi.mock('@/lib/hooks/use-agent-sessions', async () => {
         activeIsError: false,
         storedIsError: listState.isError,
         storedIsPending: listState.storedIsPending,
+        storedIsPaused: listState.storedIsPaused,
         storedIsFetching: listState.storedIsFetching,
         storedFetchedSinceMount: listState.storedFetchedSinceMount,
         storedLoadedPageCount: listState.storedLoadedPageCount,
@@ -299,22 +311,38 @@ vi.mock('@/lib/hooks/use-agent-sessions', async () => {
         dateGroups: [],
         isError: listState.isError,
         isFetching: false,
-        isPending: false,
+        isPending: listState.searchIsPending,
+        isPaused: listState.searchIsPaused,
         hasNextPage: listState.hasNextPage,
         isFetchingNextPage: listState.isFetchingNextPage,
         isFetchNextPageError: listState.isFetchNextPageError,
         isPlaceholderData: false,
         fetchNextPage: listState.fetchNextPage,
-        refetch: handleRefetchSpy,
+        refetch: searchRefetchSpy,
       };
     },
     useRecentAgentRepositories: (options: Parameters<typeof useRecentAgentRepositories>[0]) => {
       listState.repositoryQuery(options);
+      if (listState.recentRepositoryGitUrls !== null) {
+        return {
+          data: {
+            repositories: listState.recentRepositoryGitUrls.map(gitUrl => ({ gitUrl })),
+          },
+        };
+      }
+      // The hook asks for repositories updated in the last 30 days, so an older
+      // session's repository never reaches the recent set. A session without
+      // `updated_at` counts as recent, which keeps the other tests unchanged.
+      const windowStart = Date.now() - 30 * 24 * 60 * 60 * 1000;
       return {
         data: {
-          repositories: listState.storedSessions.flatMap(session =>
-            session.git_url ? [{ gitUrl: session.git_url }] : []
-          ),
+          repositories: listState.storedSessions.flatMap(session => {
+            if (!session.git_url) {
+              return [];
+            }
+            const updatedAt = session.updated_at ? Date.parse(session.updated_at) : Date.now();
+            return updatedAt >= windowStart ? [{ gitUrl: session.git_url }] : [];
+          }),
         },
       };
     },
@@ -440,10 +468,16 @@ describe('SessionHistoryScreen', () => {
     keyboardState.clear();
     keyboardLift.setHeight(0);
     listState.storedSessions = [];
+    listState.recentRepositoryGitUrls = null;
     listState.isSearching = false;
     listState.isError = false;
     listState.storedIsPending = false;
     listState.storedIsFetching = false;
+    listState.storedIsPaused = false;
+    listState.searchIsPending = false;
+    listState.searchIsPaused = false;
+    searchRefetchSpy.mockClear();
+    searchRefetchSpy.mockResolvedValue(undefined);
     listState.storedFetchedSinceMount = true;
     listState.storedLoadedPageCount = 1;
     listState.hasNextPage = false;
@@ -548,13 +582,10 @@ describe('SessionHistoryScreen', () => {
       'https://github.com/kilo/delta.git',
       'https://github.com/kilo/epsilon.git',
     ];
+    // The recent-repositories query is the only option source here: no rendered
+    // row names four of these repositories.
+    listState.recentRepositoryGitUrls = gitUrls;
     listState.storedSessions = [
-      ...gitUrls.map((git_url, index) => ({
-        session_id: `s${index}`,
-        organization_id: null,
-        git_url,
-        created_on_platform: 'cloud-agent',
-      })),
       // The same repository again: the sheet must not render a duplicate row.
       {
         session_id: 'alpha-again',
@@ -569,8 +600,56 @@ describe('SessionHistoryScreen', () => {
     });
 
     const modal = findNodeByType(renderer, 'SessionFilterModal');
-    const options = modal.props.projectOptions as { gitUrl: string }[];
-    expect(options.map(option => option.gitUrl)).toEqual(gitUrls);
+    const options = modal.props.projectOptions as { displayName: string }[];
+    expect(options.map(option => option.displayName)).toEqual([
+      'kilo/alpha',
+      'kilo/beta',
+      'kilo/delta',
+      'kilo/epsilon',
+      'kilo/gamma',
+    ]);
+  });
+
+  it('offers a project row for a repository whose sessions are older than the recent window', async () => {
+    // The recent-repositories query covers 30 days only, so every repository
+    // here is old and none of them reaches that query: the rows must still
+    // supply the sheet's project options.
+    const oldUpdatedAt = new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString();
+    listState.storedSessions = [
+      {
+        session_id: 's1',
+        organization_id: null,
+        git_url: 'https://github.com/kilo/old-two.git',
+        created_on_platform: 'cloud-agent',
+        updated_at: oldUpdatedAt,
+      },
+      {
+        session_id: 's2',
+        organization_id: null,
+        git_url: 'https://github.com/kilo/old-one.git',
+        created_on_platform: 'cloud-agent',
+        updated_at: oldUpdatedAt,
+      },
+      {
+        session_id: 's3',
+        organization_id: null,
+        git_url: 'https://github.com/kilo/old-three.git',
+        created_on_platform: 'cloud-agent',
+        updated_at: oldUpdatedAt,
+      },
+    ];
+    const renderer = await renderScreen();
+    act(() => {
+      historyHeaderActions(renderer).onOpenFilters();
+    });
+
+    const modal = findNodeByType(renderer, 'SessionFilterModal');
+    const options = modal.props.projectOptions as { displayName: string }[];
+    expect(options.map(option => option.displayName)).toEqual([
+      'kilo/old-one',
+      'kilo/old-three',
+      'kilo/old-two',
+    ]);
   });
 
   it('keeps Retry busy until the history refetch settles', async () => {
@@ -927,6 +1006,50 @@ describe('SessionHistoryScreen', () => {
     const content = findNodeByType(renderer, 'AgentSessionListContent');
     expect(content.props.isLoading).toBe(false);
     expect(findNodeByType(renderer, 'AgentSessionListContent').props.sections).toHaveLength(1);
+  });
+
+  // Regression: an offline search that has no page of its own cached is paused,
+  // not loading. The body must hand the surface to the offline card with its
+  // own Retry — never skeletons that never land, and never the unfiltered
+  // stored list painting under a search that is still waiting on the network.
+  it('keeps the offline surface over a paused search and retries it', async () => {
+    listState.storedSessions = sessions;
+    listState.isSearching = true;
+    listState.searchIsPending = true;
+    listState.searchIsPaused = true;
+
+    const renderer = await renderScreen();
+
+    const content = findNodeByType(renderer, 'AgentSessionListContent');
+    expect(content.props.isPaused).toBe(true);
+    expect(content.props.isLoading).toBe(false);
+    // The paused search has no page of its own, so the stored groups are still
+    // handed down (an earlier answer keeps rendering); the offline surface is
+    // what owns the body above them.
+    expect((content.props.sections as unknown[]).length).toBeGreaterThan(0);
+
+    act(() => {
+      (content.props.onRetryPaused as () => void)();
+    });
+    expect(searchRefetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  // Regression: a paused read only owns the body when it has no page of its own
+  // to show. A settled empty history whose refetch is paused already answered —
+  // "nothing here" — so it keeps its empty body and New session action, and the
+  // app-wide offline banner speaks for the connection.
+  it('keeps a settled empty history when its refetch is paused', async () => {
+    listState.storedSessions = [];
+    listState.storedIsPending = false;
+    listState.storedIsPaused = true;
+    listState.storedLoadedPageCount = 1;
+
+    const renderer = await renderScreen();
+
+    const content = findNodeByType(renderer, 'AgentSessionListContent');
+    expect(content.props.isPaused).toBe(false);
+    expect(content.props.isLoading).toBe(false);
+    expect(content.props.hasAnySessions).toBe(false);
   });
 
   it('shows the settled empty state once the request completes with no rows', async () => {

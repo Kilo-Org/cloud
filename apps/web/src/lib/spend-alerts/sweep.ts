@@ -101,9 +101,9 @@ export const MAX_SCOPE_DECISIONS_PER_RUN = 5000;
 const MAX_REMAINDER_FLOOR = Math.floor(MAX_SCOPE_DECISIONS_PER_RUN / 2);
 
 /**
- * The cron interval the rotation window is keyed on (the five-minute schedule in
- * `apps/web/vercel.json:136`). Two runs in the same five-minute tick compute the
- * same window, so overlapping sweeps stay idempotent; consecutive ticks advance
+ * The cron interval the rotation window is keyed on (the five-minute
+ * `dispatch-spend-alerts` schedule in `apps/web/vercel.json`). Two runs in the
+ * same five-minute tick compute the same window, so overlapping sweeps stay idempotent; consecutive ticks advance
  * it by the slots that stretch was granted.
  */
 const TICK_INTERVAL_MS = 5 * 60 * 1000;

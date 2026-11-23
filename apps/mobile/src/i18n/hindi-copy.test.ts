@@ -1,0 +1,349 @@
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+
+import { describePrBadge } from '@/components/agents/session-pr-badge-model';
+import { i18n } from '@/i18n';
+import { formatList } from '@/lib/format';
+
+/**
+ * Hindi wording corrections. Each entry below disagreed with its English
+ * source: a replacement narrowed to another device, a singular noun paired
+ * with a plural auxiliary, a fallback in the direct case inside an oblique
+ * `द्वारा` slot, a plural adjective in the one category, an empty state that
+ * named only link hosts, "offline" read as a property of the produced text,
+ * and a voice-input notice that stopped before its remediation sentence.
+ *
+ * The agent-chat surfaces named the wrong thing too: the "Code" and "Debug"
+ * mode titles restated their own descriptions as imperatives, the open
+ * pull-request badge read as a command and asked the reader to open it, the
+ * permission subjects carried a direct infinitive that "की अनुमति दें?"
+ * cannot govern, and the generic failure line said no reply arrived instead
+ * of that the response failed. The attachment warning repeated its plural
+ * noun in the one-file form, the "Your Profiles" heading named a single
+ * profile where the screen lists several, the "Used" row was a
+ * finished-event clause rather than a label, and the spoken loading cost
+ * dropped the qualifier that marks it as still growing.
+ *
+ * The changelog sentence joins the areas a release touched with
+ * `Intl.ListFormat`, so the profile area label has to join its own two nouns
+ * without the list conjunction.
+ */
+
+beforeAll(async () => {
+  await i18n.changeLanguage('hi');
+});
+
+afterAll(async () => {
+  await i18n.changeLanguage('en');
+});
+
+describe('Hindi share copy', () => {
+  it('leaves the replacement place-neutral', () => {
+    expect(i18n.t('sessionShare.superseded')).toBe(
+      'यह लिंक कहीं और से बदल दिया गया है, इसलिए यह अब काम नहीं करता।'
+    );
+  });
+
+  it('agrees the one-file notice with its singular noun', () => {
+    const one = i18n.t('share.onlyFirstFilesAttached', { count: 1, displayCount: '1' });
+    const many = i18n.t('share.onlyFirstFilesAttached', { count: 3, displayCount: '3' });
+    expect(one).toBe('केवल पहली 1 फ़ाइल संलग्न की जाएगी।');
+    expect(many).toBe('केवल पहली 3 फ़ाइलें संलग्न की जाएँगी।');
+  });
+});
+
+describe('Hindi shared-session copy', () => {
+  it('composes the shared-by line in the oblique case when the owner is unknown', () => {
+    expect(i18n.t('sharedSession.sharedBy', { owner: i18n.t('sharedSession.someone') })).toBe(
+      'किसी व्यक्ति द्वारा शेयर किया गया'
+    );
+  });
+});
+
+describe('Hindi mode labels', () => {
+  it('names each mode with a noun and leaves the action to its description', () => {
+    expect(i18n.t('agentChat.modeOptions.code')).toBe('कोड');
+    expect(i18n.t('agentChat.modeOptions.debug')).toBe('डीबग');
+    expect(i18n.t('agentChat.modeOptions.ask')).toBe('प्रश्न');
+    expect(i18n.t('agentChat.modeOptions.codeDescription')).toBe('कोड लिखें और बदलें');
+    expect(i18n.t('agentChat.modeOptions.debugDescription')).toBe('समस्याएँ खोजें और ठीक करें');
+  });
+});
+
+describe('Hindi permission card', () => {
+  it('composes each subject with the allow question', () => {
+    const question = (permission: string) =>
+      i18n.t('agentChat.permissionCard.allowQuestion', { permission });
+    expect(question(i18n.t('agentChat.permissionCard.subjectExternalDirectory'))).toBe(
+      'प्रोजेक्ट के बाहर की निर्देशिका तक पहुँच की अनुमति दें?'
+    );
+    expect(question(i18n.t('agentChat.permissionCard.subjectSandboxEscalation'))).toBe(
+      'होस्ट एक्सेस की अनुमति दें?'
+    );
+    expect(question(i18n.t('agentChat.permissionCard.subjectDoomLoop'))).toBe(
+      'एक ही टूल कॉल का दोहराव की अनुमति दें?'
+    );
+    expect(question(i18n.t('agentChat.permissionCard.subjectAgentManager'))).toBe(
+      'एजेंट प्रबंधन की अनुमति दें?'
+    );
+  });
+});
+
+describe('Hindi pull-request badge', () => {
+  it('names the pull request state instead of asking the reader to open it', () => {
+    expect(
+      describePrBadge({
+        state: 'open',
+        number: 42,
+        reviewDecision: null,
+        reviewDecisionPending: false,
+      }).accessibilityLabel
+    ).toBe('खुली पुल रिक्वेस्ट संख्या 42');
+  });
+});
+
+describe('Hindi context usage', () => {
+  it('labels the used count and keeps the running cost qualified', () => {
+    expect(i18n.t('agentChat.contextUsage.used')).toBe('उपयोग किया गया');
+    expect(i18n.t('agentChat.contextUsage.loadingCostSpoken', { cost: '$0.04' })).toBe(
+      'अब तक की लागत $0.04।'
+    );
+  });
+});
+
+describe('Hindi attachment capacity warning', () => {
+  it('inflects the admitted count', () => {
+    const warning = (count: number) =>
+      i18n.t('agentChat.attachmentPicker.onlyAddingFiles', {
+        count,
+        accepted: String(count),
+        total: '5',
+        max: '3',
+      });
+    expect(warning(1)).toBe('5 में से केवल 1 फ़ाइल जोड़ी जा रही है (अधिकतम 3)');
+    expect(warning(2)).toBe('5 में से केवल 2 फ़ाइलें जोड़ी जा रही हैं (अधिकतम 3)');
+  });
+});
+
+describe('Hindi profile and session headings', () => {
+  it('keeps the plural heading and the reached nesting depth', () => {
+    expect(i18n.t('agentChat.newSession.yourProfiles')).toBe('आपकी प्रोफ़ाइलें');
+    expect(i18n.t('agentChat.childSession.maxNestingDepth')).toBe(
+      'अधिकतम नेस्टिंग गहराई पूरी हो गई है।'
+    );
+  });
+});
+
+describe('Hindi failed response', () => {
+  it('states that the response failed', () => {
+    expect(i18n.t('agentChat.messageFailure.assistantTitle')).toBe('उत्तर विफल रहा।');
+    expect(i18n.t('agentChat.messageFailure.assistantFailed')).toBe('उत्तर विफल रहा।');
+  });
+});
+
+describe('Hindi restore report', () => {
+  it('agrees with the masculine loanword', () => {
+    expect(i18n.t('agentChat.preparation.detailReasonMissingContent')).toBe(
+      'स्नैपशॉट में फ़ाइल का कोई कंटेंट नहीं था'
+    );
+  });
+});
+
+describe('Hindi changelog sentence', () => {
+  it('names three areas with one list conjunction', () => {
+    // The two areas the app never translates keep their product names; the
+    // third renders from the catalog, which is the value under test.
+    const areas = [
+      'Cloud Agent',
+      'Security Agent',
+      i18n.t('profile.changelogAreas.profileOrganizations'),
+    ];
+    expect(i18n.t('profile.changelogFixesIn', { areas: formatList(areas, 'hi') })).toBe(
+      'Cloud Agent, Security Agent, और प्रोफ़ाइल व संगठन में त्रुटि-सुधार और बेहतरी।'
+    );
+  });
+
+  it('states the empty-area fallback without a scope claim', () => {
+    expect(i18n.t('profile.changelogFixesPolish')).toBe('त्रुटि-सुधार और बेहतरी।');
+  });
+});
+
+describe('Hindi to-do copy', () => {
+  it('inflects the open count to the singular in the one category', () => {
+    expect(i18n.t('todos.lists.openCount', { count: 1 })).toBe('1 खुला');
+    expect(i18n.t('todos.lists.openCount', { count: 3 })).toBe('3 खुले');
+  });
+
+  it('keeps the plural wording for an empty list, which CLDR routes into the one category', () => {
+    expect(i18n.t('todos.lists.openCount', { count: 0 })).toBe('0 खुले');
+  });
+});
+
+describe('Hindi trusted-host and voice copy', () => {
+  it('names both host kinds in the empty state', () => {
+    expect(i18n.t('trustedHosts.emptyDescription')).toBe(
+      'जब आप किसी लिंक के होस्ट या किसी छवि होस्ट पर भरोसा करते हैं, तो वह बिना दोबारा पूछे खुल जाता है।'
+    );
+  });
+
+  it('states offline as the condition on transcription', () => {
+    expect(i18n.t('voiceInput.onlineMessage', { provider: 'Google' })).toBe(
+      'यह डिवाइस ऑफ़लाइन आवाज़ को टेक्स्ट में नहीं बदल सकता। आपकी रिकॉर्डिंग टेक्स्ट में बदलने के लिए Google को भेजी जाती है। Kilo ऑडियो सहेजकर नहीं रखता।'
+    );
+  });
+
+  it('keeps both recovery paths in the unavailable-language notice', () => {
+    expect(i18n.t('voiceInput.unavailableLanguage')).toBe(
+      'इस डिवाइस की भाषा के लिए वॉइस इनपुट उपलब्ध नहीं है। इसकी ऑफ़लाइन स्पीच फ़ाइलें इंस्टॉल करें या ऐप की कोई दूसरी भाषा इस्तेमाल करें।'
+    );
+  });
+});
+
+describe('Hindi Code Reviewer detail, analytics and review memory copy', () => {
+  // findings: label rows keep the canonical colon label and no terminal mark,
+  // the ended label names the review with feminine agreement, the uncounted
+  // line must read correctly at 0 and 1, and the two review-memory sentences
+  // must name the reconnect remedy and Kilo's own analysis.
+  it('keeps the transcript rows as labels without a terminal danda', () => {
+    expect(i18n.t('codeReviewer.reviewDetail.errorWithMessage', { message: 'boom' })).toBe(
+      'त्रुटि: boom'
+    );
+    expect(i18n.t('codeReviewer.reviewDetail.sessionError', { error: 'boom' })).toBe(
+      'सत्र त्रुटि: boom'
+    );
+    expect(i18n.t('codeReviewer.reviewDetail.toolNameError', { name: 'grep' })).toBe(
+      'टूल: grep — त्रुटि'
+    );
+  });
+
+  it('names the review in the ended label', () => {
+    expect(i18n.t('codeReviewer.reviewDetail.reviewEnded')).toBe('समीक्षा समाप्त हुई');
+  });
+
+  it('keeps one label and clause shape for a zero, a one and a many count', () => {
+    for (const count of [0, 1, 2, 5]) {
+      const line = i18n.t('codeReviewer.analytics.trackedReviewsUncounted', {
+        count,
+        displayCount: String(count),
+        total: 9,
+        displayTotal: '9',
+      });
+      expect(line).toBe(
+        `गिनती में नहीं: संगठन की 9 पूरी हो चुकी समीक्षाओं में से ${count} में परिणाम कैप्चर नहीं हुआ था।`
+      );
+    }
+  });
+
+  it('tells the reader to reconnect GitHub with access, not a connection that has it', () => {
+    const line = i18n.t('codeReviewer.reviewMemory.changeRequestNoGitHubAccess');
+    expect(line).toContain('पहुंच के साथ GitHub को फिर से कनेक्ट करें');
+    expect(line).not.toContain('पहुंच वाले GitHub कनेक्शन');
+  });
+
+  it('makes Kilo the analyzer of maintainer replies', () => {
+    const line = i18n.t('codeReviewer.reviewMemory.noProposalsDescription');
+    expect(line).toContain('Kilo मेंटेनरों के जवाबों का विश्लेषण करता है');
+    expect(line).not.toContain('Kilo के मेंटेनर');
+  });
+});
+
+describe('Hindi agent-chat wording corrections', () => {
+  it('gives the wait status the progressive form of its siblings', () => {
+    expect(i18n.t('agentChat.computeStatus.waitingForPermission')).toBe('अनुमति का इंतज़ार कर रहा है');
+  });
+
+  it('describes the used count against the whole window in that order', () => {
+    expect(i18n.t('agentChat.contextUsage.ofWindowTokens', { window: '200,000' })).toBe(
+      '200,000 टोकन में'
+    );
+  });
+
+  it('names the lost changes as the uncommitted ones from that workspace', () => {
+    for (const key of [
+      'agentChat.environment.startFreshMessage',
+      'agentChat.environment.startFreshMessageUnknown',
+    ] as const) {
+      expect(i18n.t(key, { when: 'today' })).toContain(
+        'उस वर्कस्पेस के जो बदलाव कमिट नहीं किए गए हैं, वे खो जाएँगे।'
+      );
+    }
+  });
+
+  it('labels the run target without a dangling demonstrative', () => {
+    expect(i18n.t('agentChat.instancePicker.runOn')).toBe('कहाँ चलाएँ');
+  });
+
+  it('labels the cache-write token row with a metric name', () => {
+    expect(i18n.t('agentChat.messageDetails.cacheWrite')).toBe('कैश राइट');
+  });
+
+  it('states what the default profile resolves to', () => {
+    expect(i18n.t('agentChat.newSession.defaultProfileResolvesTo', { name: 'Fast' })).toBe(
+      'Fast लागू होता है'
+    );
+  });
+
+  it('keeps the pick-them-below instruction free of an added qualifier', () => {
+    expect(i18n.t('agentChat.newSession.prefillRepoAndModelUnavailable')).toBe(
+      'मूल सत्र की रिपॉज़िटरी और मॉडल अब उपलब्ध नहीं हैं। नीचे रिपॉज़िटरी और मॉडल चुनें।'
+    );
+  });
+
+  it('writes the reusable-profile prefix with the visarga', () => {
+    expect(i18n.t('agentChat.newSession.saveProfileDescription')).toContain('पुनः प्रयोज्य');
+  });
+
+  it('names the omitted things as items in the one category too', () => {
+    expect(i18n.t('agentChat.olderMessages.omitted', { count: 1, displayCount: '1' })).toBe(
+      'इस सत्र के कुछ पुराने आइटम दिखाए नहीं जा सके।'
+    );
+    expect(i18n.t('agentChat.olderMessages.omitted', { count: 4, displayCount: '4' })).toBe(
+      'इस सत्र के 4 पुराने आइटम दिखाए नहीं जा सके।'
+    );
+  });
+
+  it('names the earlier messages the same way in every key', () => {
+    expect(i18n.t('agentChat.olderMessages.arrived')).toBe('पुराने संदेश लोड हो गए');
+  });
+
+  it('names the text display setting rather than the shown text', () => {
+    expect(i18n.t('agentChat.partDetail.textDisplay')).toBe('टेक्स्ट प्रदर्शन');
+  });
+
+  it('keeps the visible deny verb inside the accessible name', () => {
+    expect(i18n.t('agentChat.permissionCard.deny')).toBe('अस्वीकार करें');
+    expect(i18n.t('agentChat.permissionCard.denyPermission')).toContain('अस्वीकार करें');
+  });
+
+  it('writes the scope prefix number-neutrally and without a colon', () => {
+    expect(i18n.t('agentChat.permissionCard.appliesTo')).toBe('लागू क्षेत्र');
+  });
+
+  it('names the agent-management subject without narrowing it to subagents', () => {
+    expect(i18n.t('agentChat.permissionCard.subjectAgentManager')).toBe('एजेंट प्रबंधन');
+  });
+
+  it('counts the further missing files with a distinct word for more', () => {
+    expect(
+      i18n.t('agentChat.preparation.detailRestoreIncompleteMore', { listed: 'a.ts', omitted: '3' })
+    ).toBe('a.ts और 3 अन्य');
+  });
+
+  it('phrases the diff counts so a count of one stays grammatical', () => {
+    expect(
+      i18n.t('agentChat.sessionChanges.openFile', {
+        path: 'src/app.ts',
+        status: 'Modified',
+        additions: '1',
+        deletions: '12',
+      })
+    ).toBe('src/app.ts खोलें, Modified, जोड़: 1, हटाए: 12');
+  });
+
+  it('ends the goal suspense when its trigger fires, not when the goal completes', () => {
+    const description = i18n.t('agentChat.slashCommands.goalDescription');
+    expect(description).toContain('जब तक कोई ट्रिगर न हो जाए');
+    expect(description).not.toContain('जब तक वह पूरा न हो');
+    expect(description).toContain('/goal pause');
+    expect(description).toContain('/goal clear');
+  });
+});

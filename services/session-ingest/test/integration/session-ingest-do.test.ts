@@ -2494,6 +2494,138 @@ describe('SessionIngestDO integration', () => {
       });
     });
 
+    it('serves a stored native display part instead of failing the page as invalid_data', async () => {
+      const sessionId = 'ses_sdk_page_native_part_0000001';
+      const stub = getStub(kiloUserId, sessionId);
+      const info = {
+        id: 'msg_native',
+        sessionID: sessionId,
+        role: 'user' as const,
+        time: { created: 100 },
+        agent: 'build',
+        model: { providerID: 'provider', modelID: 'model' },
+      };
+      // Persistence stores a part under `id` + `messageID` only, and the native
+      // v2 display projection keeps its own id family: the message id plus the
+      // display suffix. Neither family may turn the whole page into invalid_data.
+      const part = {
+        id: 'msg_native_000001',
+        messageID: info.id,
+        type: 'text',
+        text: 'native display',
+      };
+      await stub.ingest([{ type: 'message', data: info }], kiloUserId, sessionId, 1);
+      await runInDurableObject(stub, async (_instance, state) => {
+        state.storage.sql.exec(
+          'INSERT INTO ingest_items (item_id, item_type, item_data) VALUES (?, ?, ?)',
+          `part/${info.id}/${part.id}`,
+          'part',
+          JSON.stringify(part)
+        );
+      });
+
+      await expect(stub.readKiloSdkMessages({ limit: 1 })).resolves.toEqual({
+        messages: [{ info, parts: [part] }],
+        nextCursor: null,
+        omittedItemCount: 0,
+      });
+    });
+
+    it('counts a native display part when later-shell rows are counted instead of hydrated', async () => {
+      const sessionId = 'ses_sdk_page_native_count_000001';
+      const stub = getStub(kiloUserId, sessionId);
+      const message = (id: string, created: number) => ({
+        id,
+        sessionID: sessionId,
+        role: 'user' as const,
+        time: { created },
+        agent: 'build',
+        model: { providerID: 'provider', modelID: 'model' },
+      });
+      const older = message('msg_100_older_parts', 100);
+      const newest = message('msg_200_newest_parts', 200);
+      // Enough part bytes on the newest message to exhaust the aggregate budget, so the older
+      // message's parts are only counted (the `partHydrationStopped` branch) and never hydrated.
+      const newestParts = [
+        'prt_200_first',
+        'prt_300_second',
+        'prt_400_third',
+        'prt_500_fourth',
+        'prt_600_fifth',
+        'prt_700_sixth',
+      ].map(id => ({
+        id,
+        sessionID: sessionId,
+        messageID: newest.id,
+        type: 'text' as const,
+        text: 'x'.repeat(1536 * 1024),
+      }));
+      const olderPart = {
+        id: 'msg_100_older_parts_000001',
+        messageID: older.id,
+        type: 'text' as const,
+        text: 'native display child of the counted shell',
+      };
+      await stub.ingest(
+        [
+          { type: 'message', data: older },
+          { type: 'part' as const, data: olderPart },
+          { type: 'message', data: newest },
+          ...newestParts.map(data => ({ type: 'part' as const, data })),
+        ],
+        kiloUserId,
+        sessionId,
+        1
+      );
+
+      const page = await stub.readKiloSdkMessages({ limit: 2 });
+      expect(page.messages.map(entry => entry.info.id)).toEqual([older.id, newest.id]);
+      expect(page.messages[0].parts).toEqual([]);
+      expect(page.messages[1].parts.map(part => part.id)).toEqual([
+        'prt_200_first',
+        'prt_300_second',
+        'prt_400_third',
+        'prt_500_fourth',
+        'prt_600_fifth',
+      ]);
+      expect(page.omittedItemCount).toBe(2);
+      expect(page.nextCursor).toBeNull();
+    });
+
+    it('returns invalid_data for a native display part id that names another message', async () => {
+      const sessionId = 'ses_sdk_page_native_foreign_0001';
+      const stub = getStub(kiloUserId, sessionId);
+      const info = {
+        id: 'msg_native',
+        sessionID: sessionId,
+        role: 'user' as const,
+        time: { created: 100 },
+        agent: 'build',
+        model: { providerID: 'provider', modelID: 'model' },
+      };
+      // The stored item id puts the part under this message, but the native display id names
+      // another one. The client contract rejects that pair, so the DO must not serve it.
+      const part = {
+        id: 'msg_other_000001',
+        messageID: info.id,
+        type: 'text',
+        text: 'native display naming another message',
+      };
+      await stub.ingest([{ type: 'message', data: info }], kiloUserId, sessionId, 1);
+      await runInDurableObject(stub, async (_instance, state) => {
+        state.storage.sql.exec(
+          'INSERT INTO ingest_items (item_id, item_type, item_data) VALUES (?, ?, ?)',
+          `part/${info.id}/${part.id}`,
+          'part',
+          JSON.stringify(part)
+        );
+      });
+
+      await expect(stub.readKiloSdkMessages({ limit: 1 })).resolves.toEqual({
+        kind: 'invalid_data',
+      });
+    });
+
     it('returns invalid_data for a persisted slash-bearing part body identity', async () => {
       const sessionId = 'ses_sdk_page_part_slash_body_001';
       const stub = getStub(kiloUserId, sessionId);
@@ -3338,6 +3470,45 @@ describe('SessionIngestDO integration', () => {
       expect(result.changes.find(c => c.name === 'orgId')?.value).toBe(
         '11111111-1111-1111-1111-111111111111'
       );
+    });
+  });
+
+  describe('live summary state', () => {
+    it('derives the list step target from the CLI filePath key', async () => {
+      const suffix = crypto.randomUUID().replaceAll('-', '');
+      const liveUserId = `usr_live_list_${suffix}`;
+      const sessionId = `ses_${suffix.slice(0, 26)}`;
+      const stub = getStub(liveUserId, sessionId);
+
+      await stub.ingest(
+        [
+          { type: 'session_open', data: {} },
+          { type: 'message', data: { id: 'msg_list_1', role: 'assistant', content: '' } },
+          {
+            type: 'part',
+            data: {
+              id: 'p_list_1',
+              messageID: 'msg_list_1',
+              type: 'tool',
+              tool: 'list',
+              state: { status: 'running', input: { filePath: '/repo/src/index.ts' } },
+            },
+          },
+        ],
+        liveUserId,
+        sessionId,
+        1
+      );
+
+      await runInDurableObject(stub, async (_instance, state) => {
+        const [row] = [
+          ...state.storage.sql.exec<{ value: string }>(
+            'SELECT value FROM ingest_meta WHERE key = ?',
+            'liveSummaryState'
+          ),
+        ];
+        expect(JSON.parse(row.value).step).toEqual({ verb: 'searching', target: 'index.ts' });
+      });
     });
   });
 

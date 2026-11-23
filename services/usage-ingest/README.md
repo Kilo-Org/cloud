@@ -33,7 +33,9 @@ Unrelated paths return 404; other methods on `/usage` return 405.
 
 Authenticated `POST /enkrypt-usage` accepts one bare Enkrypt usage record that
 parses under `EnkryptUsageWriteSchema` and sends exactly one
-`{kind: 'enkrypt_usage', v: 1, record}` message to the same `USAGE_INGEST_QUEUE`.
+`{kind: 'enkrypt_usage', v: 1, record}` message: to the dedicated `USAGE_INGEST_ENKRYPT_QUEUE`
+when the cutover switch is on, otherwise to `USAGE_INGEST_QUEUE` (see
+[Cutover switch](#cutover-switch)).
 The path names the kind, so this ingress is the only place that builds the
 envelope; an envelope-shaped body, an LLM usage body, or any other unknown key
 returns 400, and an Enkrypt record on `/usage` returns 400. It uses the same
@@ -48,7 +50,7 @@ messages before this ingress, and this ingress before any gateway publishes to i
 
 Authenticated `POST /exa-usage` works the same way for Exa: it accepts one bare record that
 parses under `ExaUsageRecordSchema` and sends exactly one `{kind: 'exa_usage', v: 1, record}`
-message to the same queue. An envelope-shaped body, an LLM usage body, an Enkrypt record or
+message to the same queue `/enkrypt-usage` selects. An envelope-shaped body, an LLM usage body, an Enkrypt record or
 any other unknown key returns 400, and an Exa record on `/usage` or `/enkrypt-usage` returns 400.
 The organization id stays a strict UUID, as the Exa contract defines. It uses the same
 `USAGE_INGEST_PUBLISH_SECRET`, checked before the body is read. The web app, the only Exa
@@ -64,6 +66,8 @@ fields, but Exa log values never include the user, organization, path, cost, fea
 | Production stall hedge | `usage-ingest` | `usage-ingest-processing` | `usage-ingest-processing-dlq` |
 | Staging (`env.staging`) | `usage-ingest-staging` | `usage-ingest-processing-staging-eu` | `usage-ingest-processing-dlq-staging-eu` |
 | Staging stall hedge | `usage-ingest-staging` | `usage-ingest-processing-staging` | `usage-ingest-processing-dlq-staging` |
+| Production Enkrypt and Exa fallback | `usage-ingest` | `usage-ingest-enkrypt-eu` | `usage-ingest-enkrypt-dlq-eu` |
+| Staging Enkrypt and Exa fallback | `usage-ingest-staging` | `usage-ingest-enkrypt-staging-eu` | `usage-ingest-enkrypt-dlq-staging-eu` |
 
 Each environment publishes to its EU pair. Production uses batch6/parallelism2/cap225 (up to 450 writer calls);
 staging keeps its EU consumer capped at200, batch size2. The old global pair of each
@@ -87,8 +91,11 @@ configuration and unavailable writes retry under the queue policy,
 then reach the DLQ. Processing logs contain the usage ID when valid, queue message
 ID, delivery attempt count, and categorical outcome/reason.
 
-Writer HTTP 429 and 503 also reject the queue invocation after all messages in the
-batch have been handled. Each successful message keeps its explicit ACK; failed
+Writer HTTP 429 and 503 reject the queue invocation after all messages in the
+batch have been handled, except for a validated tagged write with a recognized
+`queue_limit` 429 and the exact response header `x-usage-class-limit: non_llm`.
+That message takes its usual admission retry. A shared overload in any sibling
+still fails the invocation. Each successful message keeps its explicit ACK; failed
 messages keep their explicit retry using the per-message delay policy below and the shared retry/DLQ budget.
 There is no extra writer attempt within an invocation. Other failures retain
 per-message retries without being classified as overload. Overload retry logs add
@@ -182,8 +189,14 @@ read is not released again.
 
 ### Tagged Enkrypt and Exa usage
 
-The same queue can also carry Enkrypt guardrail usage and Exa usage. Such a message is a
-tagged envelope: `{"kind":"enkrypt_usage","v":1,"record":<EnkryptUsageWrite>}`
+Enkrypt guardrail usage and Exa fallback usage go to the shared queue until the
+[cutover switch](#cutover-switch) is on, and then only to the
+[dedicated tagged queue](#enkrypt-usage-queue). The same consumer code processes both queues, so
+either keeps draining whatever it already accepted. **Do not merge the change that turns the
+switch on** until the dedicated consumer's attachment is verified in both environments and a
+separate stall alert on the production dedicated source is deployed and verified; see
+[Rollout](#rollout). Such a
+message is a tagged envelope: `{"kind":"enkrypt_usage","v":1,"record":<EnkryptUsageWrite>}`
 (`EnkryptUsageQueueMessageSchema` in `@kilocode/usage-contracts`) or
 `{"kind":"exa_usage","v":1,"record":<ExaUsageRecord>}` (`ExaUsageQueueMessageSchema`).
 LLM usage stays untagged and unchanged; its ingress schema strips unknown keys, so a body
@@ -205,11 +218,17 @@ The consumer reads the tag before anything else:
 
 A message that never ACKs exhausts the shared 20-retry budget and goes to the DLQ,
 so the DLQ can hold all three kinds. A recognized admission 429 takes the admission
-retry schedule, and HTTP 429/503 rejects the invocation, exactly as for LLM usage.
+retry schedule. Only the explicitly marked class-only rejection is exempt from invocation failure.
 The invocation launch budget is shared. Consumer settings are unchanged. On the
 writer, these queue writes take the `non_llm` admission class described under
 [writer admission protection](#writer-admission-protection); its ceiling rejection
 is a recognized `queue_limit` 429.
+
+"Consumer settings" above means the existing shared consumer, which keeps its settings and still
+drains tagged messages published to it. With the cutover switch on, new tagged traffic has its
+own consumer, cap and launch budget on the dedicated queue; with it off, new tagged traffic still
+uses this shared consumer (the global source after a routing rollback). See
+[Dedicated tagged queue](#dedicated-tagged-queue-enkrypt-and-exa-fallback).
 
 The Enkrypt and Exa writer URLs are `USAGE_WRITER_URL` with its documented
 `/api/internal/usage/record` suffix replaced by the kind's path, so no new
@@ -244,7 +263,7 @@ diagnosis and log-derived counts/latency. `entrypoint` is `gateway`,
 |---|---|---|
 | Frankfurt gateway direct write or SFO local fallback | `gateway` | `unknown` |
 | Queue consumer through HTTP writer | `writer_endpoint` | `queue` |
-| Staging Vercel queue consumer through HTTP writer | `writer_endpoint` | `queue_vercel` |
+| Retired staging Vercel queue consumer, in older deployments only | `writer_endpoint` | `queue_vercel` |
 | SFO gateway handoff through HTTP writer | `writer_endpoint` | `region_handoff` |
 | HTTP writer without a classified caller, including classifier/grader writes | `writer_endpoint` | `unknown` |
 | Unclassified local caller | `unknown` | `unknown` |
@@ -255,8 +274,9 @@ classifier and benchmark grader, omit the marker. After internal API authenticat
 the writer route accepts only `queue`, `queue_vercel`, or `region_handoff`; missing
 or other values map to `unknown` without logging the raw header. This is caller-supplied diagnostic
 context, not an authorization or accounting input. Older clients remain compatible.
-See the [Vercel queue prototype runbook](../../packages/usage-queue/README.md) for
-the isolated staging transport and its `queue_vercel` caller label.
+The staging Vercel queue prototype is retired and new gateway builds no longer
+publish to it. The writer keeps accepting `queue_vercel` so older staging
+deployments that still contain its consumer can finish any retained work.
 `execution_region` identifies the persistence function's region when available:
 SFO HTTP handoffs record `fra1`; a local fallback in SFO records `sfo1`.
 Missing or unrecognized `VERCEL_REGION` values are reported as `unknown`.
@@ -269,8 +289,7 @@ one, inside a 40-second overall elapsed retry budget. Before retries it uses
 exponential full jitter: uniformly zero up to (excluding) 500 ms, 1,000 ms, then
 2,000 ms. Attempt timeouts and sleeps are clipped to remaining budget; no new
 attempt starts after exhaustion. Runtime scheduling can delay observation of
-these deadlines. Non-retry calls retain one two-second attempt; the separate
-Vercel queue transport is unchanged. Every attempt reuses the same serialized
+these deadlines. Non-retry calls retain one two-second attempt. Every attempt reuses the same serialized
 event and usage ID;
 ambiguous acceptance can create duplicate messages, which the writer deduplicates.
 Configuration failures and HTTP outcomes other than 408/429/5xx are not retried.
@@ -312,8 +331,8 @@ under 1,000 ms is logged only when a stable hash of its usage ID falls in a nomi
 line per attempt, four per publication, and about 1% of publications plus every
 slow, failed or retried attempt. The rows are not a uniform sample: weight fast
 rows by `1 / sample_rate` and do not read either subset as population percentiles.
-An attempt cut off by a process kill writes nothing. Configuration failures and the
-Vercel queue transport make no attempt and log nothing new. If writing the line
+An attempt cut off by a process kill writes nothing. Configuration failures make no
+attempt and log nothing new. If writing the line
 throws, the publisher reports a Sentry warning tagged `usage_publisher_attempt_log`
 and the publication continues with its existing outcome.
 
@@ -376,14 +395,14 @@ and [known limitations](https://developers.cloudflare.com/workers/observability/
 ## Queue policy
 
 EU consumers use batch size 6 in production and 2 in staging, with at most
-two writer slots per invocation. Global hedge consumers use batch size 1 and
-can use only one slot:
+two writer slots per invocation. Global hedge and dedicated tagged (Enkrypt and Exa fallback) consumers use
+batch size 1 and can use only one slot:
 
 | Consumer setting | Value | Purpose |
 |---|---|---|
-| `max_batch_size` | EU: `6` in production, `2` in staging; global hedge: `1` in both | Maximum messages delivered per invocation. |
+| `max_batch_size` | EU: `6` in production, `2` in staging; global hedge and Enkrypt: `1` in both | Maximum messages delivered per invocation. |
 | `max_batch_timeout` | `0` seconds | No intentional wait to fill a batch. |
-| `max_concurrency` | `225` in production, `200` in staging | Parallelism 2 allows at most `225 × 2 = 450` concurrent queue writer calls in production and `200 × 2 = 400` in staging. The [stall hedge](#stall-hedge-to-the-global-queue) consumer has cap `25` and adds `25 × 1 = 25`, for combined bounds of `475` / `425`. |
+| `max_concurrency` | `225` in production, `200` in staging; tagged: `50` in production, `10` in staging | Parallelism 2 allows at most `225 × 2 = 450` concurrent queue writer calls in production and `200 × 2 = 400` in staging. The [stall hedge](#stall-hedge-to-the-global-queue) consumer has cap `25` and adds `25 × 1 = 25`, for bounds of `475` / `425`. The [tagged consumer](#enkrypt-usage-queue) adds `50 × 1 = 50` in production and `10 × 1 = 10` in staging, for combined bounds of `525` / `435`. These are configured ceilings on concurrent writer HTTP calls, not database connections or measured capacity. |
 | `max_retries` | `20` | Initial delivery plus up to twenty retries, shared across failure classes. |
 | `retry_delay` | `60` seconds | Fallback for implicit/unexpected failures; handled failures use per-message jitter below. |
 | `dead_letter_queue` | Environment-specific name above | Retain exhausted failures separately from the source queue. |
@@ -403,7 +422,7 @@ Healthy events still make one HTTP call and ACK only a matching `recorded` or
 `duplicate` result, with no added delay. Failed items make no additional HTTP call
 inside the delivery: the consumer chooses a native `message.retry({delaySeconds})`
 for that item, freeing invocation slots while waiting for redelivery. Successful
-siblings retain their ACKs. Existing HTTP 429/503 overload feedback still rejects
+siblings retain their ACKs. Shared HTTP 429/503 overload feedback still rejects
 the invocation after all sibling processing and dispositions settle; other
 unavailable/configuration failures do not newly trigger that feedback.
 
@@ -485,15 +504,15 @@ because their next failure could immediately dead-letter them. Preserve stable I
 and reconcile ambiguous writes before replay; do not republish to reset attempts
 or discard accepted events.
 
-The isolated staging Vercel queue keeps its own retry settings; it shares only the
-bounded writer-response classification. No new environment knob or worker binding
+No new environment knob or worker binding
 is introduced. This preparation does not claim a healthy-traffic p95 improvement
 or authorize a production rollout, capacity increase, or replay.
 
 ### Writer admission protection
 
-The Frankfurt HTTP writer authenticates and validates the request before applying
-one admission guard to `queue` and `queue_vercel` callers. Both transports share a
+The Frankfurt LLM HTTP writer (`/api/internal/usage/record`) authenticates and
+validates the request before applying one admission guard to `queue` and
+`queue_vercel` callers. Both transports share a
 per-runtime active-call limit of `max(1, pool.options.max - 2)`, currently **8**
 with the unchanged pool maximum of 10. The writer returns HTTP **429** before usage
 database work as follows:
@@ -535,24 +554,48 @@ The two connections of nominal headroom are a starting local policy, **not
 reserved connections** or a measured global capacity bound. Other traffic can
 compete after the snapshot, a writer may perform several database operations,
 background work can outlive the awaited call, and each runtime instance has its
-own counter/pool. An admitted call can still wait. The pool maximum stays at 10,
-consumer concurrency at 225 in production (200 in staging), parallelism at 2, and
-batch size at 6 in production and 2 in staging; retry settings also stay unchanged.
-There is no new environment knob; merging this change activates queue rejection
-when the normal automatic deployment reaches the writer.
+own counter/pool. An admitted call can still wait. The LLM primary pool maximum
+stays at 10. Consumer concurrency, parallelism, batch size, retry settings and
+queue selection are unchanged by writer isolation. There is no new environment
+knob; the change reaches the writer through its normal deployment.
 
 Queue writes to the Enkrypt writer (`/api/internal/enkrypt-usage/record`) and the Exa
-writer (`/api/internal/exa-usage/record`) use the same guard and the same shared limit,
-as writer class `non_llm`; Enkrypt and Exa share that one class. That class has
-its own ceiling inside the shared limit: `max(1, min(2, limit - 1))`, currently
-**2 of 8**. A `non_llm` call over the ceiling gets the same HTTP 429 body with
-reason `queue_limit` and is not written. Its active plus queued calls never exceed
-the ceiling, so it cannot fill the FIFO either. LLM queue writes can still use all
-8 slots; the ceiling only stops non-LLM writes from taking more than 2. When the
-shared limit is 1 (pool maximum 3 or less), the ceiling is 1 and a non-LLM call
-can take the only slot. The total limit is unchanged. Like the shared limit, this
-is a per-runtime counter, not a connection reservation, and it makes no
-fleet-wide fairness claim.
+writer (`/api/internal/exa-usage/record`) instead use `taggedWriterAdmission`, an
+independent per-runtime gate, as writer class `non_llm`. The two routes share a
+**two-write** budget when co-located in one runtime. Their admitted transactions
+use `taggedWriterDb` and a dedicated primary pool with maximum **2** connections,
+not the LLM pool. All eight LLM admissions remain available while both tagged
+slots are held. An excess tagged call immediately receives the compatible HTTP
+429 body with reason `queue_limit`, without writing or entering the LLM FIFO.
+
+The tagged pool opens connections on demand, keeps the existing connection
+timeout and five-second idle timeout, and participates in Vercel suspension
+cleanup. In a co-located runtime the primary connection envelope is **12**
+(10 LLM/general plus 2 tagged), with replica pools additional and unchanged.
+Across N runtimes using the tagged pool, this can add up to **2N** connections.
+Separate function instances each have their own gate and pool: this is not a
+fleet-wide two-write limit. Deployed function mapping has not been verified;
+the regression proves independence even with co-location. This is not a measured
+production capacity increase. PostgreSQL row locks and server/pooler capacity
+remain shared. Direct and regional handoff writes retain the general primary
+pool; post-commit background work also retains its existing behavior.
+
+At the tagged ceiling, a consistent pool snapshot with zero waiting clients
+marks the rejection class-only (`x-usage-class-limit: non_llm`), including when
+both tagged connections are checked out. Missing or inconsistent gauges leave
+the rejection unmarked. Actual pool waiting/busy rejection remains distinct
+from this class ceiling. Older consumers ignore the header and the 429 body
+stays compatible. During an authorized rollout, compare backlog slope, native
+invocation exception ratio and concurrency with both pools' waiting and LLM
+429s. Halt rollout if shared database pressure rises or backlog growth and
+exceptions worsen. A lower exception ratio alone does not establish recovery.
+The Cloudflare consumer cap is a separate control; it does not reserve these
+writer slots or connections.
+
+The executable contract is the [co-location regression](../../apps/web/src/app/api/internal/usage/record/usage-writer-admission.test.ts),
+run with `pnpm --filter web test --runInBand usage-writer-admission`. It holds both
+tagged transactions, checks their actual connection application names, and
+verifies all eight LLM admissions and the tagged class-only rejection.
 
 `usage_writer_admission` diagnostics sample admitted decisions at 1% and warn on
 all rejected decisions. Fields contain only the bounded caller/outcome/reason,
@@ -614,23 +657,68 @@ For a full configuration rollback, restore absent parallelism (or `1`), batch 1,
 timeout 0 and the pre-trial cap 200 for the same single queue. Preserve the current writer
 route, retry delay/budget and per-message dispositions.
 
+## Main queue backlog alert
+
+The o11y Worker's existing every-minute scheduled evaluator independently reads
+native backlog metrics for the exact production queue `usage-ingest-processing-eu`,
+without relying on consumer logs. It resolves the current queue ID by exact name
+on every run with a bounded paginated lookup. Lookup or metrics failures fail the
+run rather than reporting an empty queue; other infrastructure checks still run.
+
+The main usage queue raises a ticket at 25,000 pending messages and one page
+on the first observation at or above 50,000. The page threshold is always 50,000,
+even if the first observation is much higher. While that page is active, no
+higher count triggers another page. Three consecutive observed readings below
+50,000 re-arm paging; any reading at or above 50,000 resets that recovery streak.
+The next crossing can then page again. These metric observations only re-arm
+the alert detector; they do not resolve the actual on-call incident. On-call may
+fix the underlying issue before queue depth drops. The outgoing Slack webhook
+cannot read or follow manual incident state, so manually resolving an incident
+while the backlog stays high does not trigger more pages. There is no manual
+reset UI or incident-system integration. Tickets retain their existing
+25,000 threshold and three-below-threshold re-arm policy. State is isolated by
+queue ID, and failed notifications leave state unchanged so the next tick retries.
+The generic ingest-queue monitor retains its existing 100,000-message page
+escalations; this once-per-episode page policy applies only to the main usage queue.
+These are count thresholds, not a backlog growth-rate detector or accounting SLO.
+The existing ingest-queue monitor and usage DLQ alert remain separate.
+
+Tickets use `O11Y_SLACK_WEBHOOK_TICKET`; pages use `O11Y_SLACK_WEBHOOK_PAGE`.
+Activation occurs on the next normal o11y deployment after merge. The existing
+`O11Y_CF_CONTAINERS_API_TOKEN` must already have Queues Read access to this
+account, including queue listing and metrics. No new secret or configuration is
+needed. Deploying while the backlog exceeds a threshold may alert immediately;
+this documentation does not establish that any live alert has been sent.
+
+The alert includes queue name and ID, pending count, bytes, oldest-message
+timestamp when available, severity and threshold. When it fires, compare count
+and oldest-message age across observations, check consumer delivery/errors and
+writer admission/latency, then inspect the [dead-letter alert](#dead-letter-alert).
+Coordinate incident ownership before changing controls or replaying messages.
+A falling count alone does not establish accounting reconciliation.
+
 ## Dead-letter alert
 
-The alert covers every usage kind on the queue: LLM, Enkrypt and Exa.
+The alert covers every usage kind: LLM, Enkrypt and Exa on the shared queue, and
+Enkrypt and Exa fallback on the dedicated tagged queue.
 
 ### What it watches
 
 The o11y Worker's every-minute cron (`services/o11y/src/alerting/`) reads the
-realtime backlog of the production DLQ, `usage-ingest-processing-dlq-eu`. The DLQ
-has no consumer, so its backlog is exactly the dead-lettered messages still
-retained, and it only grows when a message dead-letters. That backlog is the
-authoritative signal.
+realtime backlog of each production DLQ: `usage-ingest-processing-dlq-eu` and the
+dedicated tagged queue's `usage-ingest-enkrypt-dlq-eu` (Enkrypt and Exa fallback). A DLQ has no consumer, so
+its backlog is exactly the dead-lettered messages still retained, and it only grows
+when a message dead-letters. That backlog is the authoritative signal.
 
-o11y finds the queue by exact name on each run (`DEAD_LETTER_QUEUE_NAME` in
+o11y finds each queue by exact name on each run (`DEAD_LETTER_QUEUE_NAME` and
+`ENKRYPT_DEAD_LETTER_QUEUE_NAME` in
 `services/o11y/src/alerting/dead-letter-queue.ts`), then calls the Queues metrics
-API, using its existing `O11Y_CF_CONTAINERS_API_TOKEN` with Queues Read. A test in
-this service fails if that name drifts from `dead_letter_queue` in
-`wrangler.jsonc`. On an EU/global routing rollback, change both. The hedge
+API, using its existing `O11Y_CF_CONTAINERS_API_TOKEN` with Queues Read. Each DLQ
+has its own alert state and cooldown, and a failed lookup of one does not skip the
+other. Tests in this service fail if either name drifts from its consumer's
+`dead_letter_queue` in `wrangler.jsonc`. On an EU/global routing rollback, change the shared
+DLQ in both places; the tagged pair stays in EU, so `ENKRYPT_DEAD_LETTER_QUEUE_NAME` stays
+unchanged. The hedge
 queue's global DLQ, `usage-ingest-processing-dlq`, and staging's DLQs are not
 watched while the hedge is an experiment.
 
@@ -664,7 +752,11 @@ requires to deliver to #o11y-alerts. It does not page. Changing the severity to
 and shorten the cooldown to 15 minutes.
 
 It goes live with the next o11y deployment; no operator step or new credential is
-needed. If the DLQ already holds messages then, the first run alerts once.
+needed. If a DLQ already holds messages then, the first run alerts once. Until the
+tagged DLQ exists, its lookup fails each run and is reported as an o11y evaluation
+error without blocking the other alerts. The automatic workflow deploys changed Workers in
+parallel, so expect those errors until usage-ingest preparation has created the DLQ; errors
+that continue after that mean the DLQ is missing.
 
 ### Who receives it
 
@@ -703,6 +795,9 @@ only the source has a consumer. Exhausted failures route to that DLQ.
 `USAGE_INGEST_HEDGE_QUEUE` binds the global stall-hedge queue, which has its own
 consumer and DLQ; preparation creates or verifies that pair and never detaches its
 consumer. See [Stall hedge to the global queue](#stall-hedge-to-the-global-queue).
+`USAGE_INGEST_ENKRYPT_QUEUE` and `USAGE_INGEST_ENKRYPT_DLQ` bind the dedicated tagged
+pair for Enkrypt and Exa fallback usage, which has its own consumer; preparation creates or verifies it in EU after the
+other pairs and never detaches its consumer. See [Enkrypt usage queue](#enkrypt-usage-queue).
 
 To deploy directly from the repository root with Wrangler authenticated to the
 account in `wrangler.jsonc`:
@@ -758,10 +853,200 @@ they would fail every retry and reach the DLQ.
 The now-mixed DLQ needs a replay owner whose replay handles both LLM and Enkrypt messages, and
 the existing DLQ alerting must cover it.
 
+### Dedicated tagged queue (Enkrypt and Exa fallback)
+
+When the [cutover switch](#cutover-switch) is on, `/enkrypt-usage` and `/exa-usage` each send
+their envelope once, only to `USAGE_INGEST_ENKRYPT_QUEUE`. The queue, DLQ and binding names say
+Enkrypt because they predate Exa fallback joining the queue; they also carry Exa fallback usage.
+
+| Environment | Source | DLQ |
+|---|---|---|
+| Production | `usage-ingest-enkrypt-eu` | `usage-ingest-enkrypt-dlq-eu` |
+| Staging | `usage-ingest-enkrypt-staging-eu` | `usage-ingest-enkrypt-dlq-staging-eu` |
+
+The pair, its consumer and its DLQ alert are provisioned and attached on every deployment,
+whatever the switch says. Authentication, validation, the envelopes, usage IDs and every
+response are unchanged. Exa keeps its direct Frankfurt write as the normal path and posts to
+`/exa-usage` only when that write fails, exactly as before. A failed or ambiguous send still
+returns 503, and the producer resends the same usage ID within its existing publisher budget
+(four attempts, 40 seconds) before it logs the record as dropped; there is no later durable
+retry. Tagged ingress is never hedged and never falls back from one queue to the other or to a
+direct write, including when the switch is on and the dedicated binding is missing. With the
+switch on it has no global destination; with it off it uses whatever `USAGE_INGEST_QUEUE` binds,
+which is the global source only after a routing rollback. LLM `/usage` keeps `USAGE_INGEST_QUEUE` and its stall hedge to the global
+queue, unchanged.
+
+The same Worker consumes the dedicated queue with the same handler, so the writer protocol,
+ACK and retry rules, admission and class-only handling, overload invocation failure and the
+final-attempt log are identical for both kinds; an exhausted message goes to the tagged DLQ,
+while the shared DLQ can still hold tagged messages published to the shared queue. With the
+switch on, what changes is the failure domain on the queue side: a tagged batch never contains
+LLM messages, so a tagged writer 503 or unmarked 429 (the explicitly marked class-only 429 still
+does not fail an invocation) fails only a tagged invocation and only affects Cloudflare's scaling
+of this consumer, and tagged backlog and retries do not delay the shared queue. Enkrypt and Exa
+fallback do share this queue with each other. It does **not** isolate the writer, its pool or
+the database: queue writes still take the writer's `non_llm` admission class (at most 2 of the 8
+admitted writes, pool 10, per writer runtime), and tagged writes still touch the same
+organization rows as other usage.
+
+Consumer settings: batch `1`, timeout `0`, cap `50` in production and `10` in staging, retries
+`20`, `retry_delay` `60`, its own DLQ. The cap is one ceiling shared by Enkrypt and Exa fallback.
+These are configured ceilings, not measured database capacity:
+
+- Batch 1 means one tagged write per invocation, so an overload failure covers exactly one
+  message, and `USAGE_INGEST_PARALLELISM` has no effect.
+- The cap bounds this consumer's concurrent tagged writer calls at 50 in production and 10 in
+  staging, across Enkrypt and Exa fallback together. It is not a fleet-wide tagged limit: while
+  the switch is off, after a rollback, or while legacy tagged messages drain, the shared
+  consumer (up to 450 writer calls, shared with LLM) can process tagged messages at the same
+  time. Writer admission is unchanged: a call beyond a writer runtime's `non_llm`
+  ceiling gets the marked class-only 429 and retries on the admission schedule without failing
+  the invocation. How many of those 50 calls the writer and database actually complete at once
+  depends on writer runtimes and database load, which this ceiling does not measure.
+- A renewed Enkrypt surge, or a burst of Exa fallback during a direct-write outage, beyond what
+  that allows shows up as backlog in this queue rather than as concurrent writes on the shared
+  consumer. The cost is accounting latency for both kinds under such a burst: the backlog is
+  retained for the four-day source retention, and Cloudflare may run fewer invocations than the
+  cap. Changing the cap is a separate, measured decision.
+- Retries and `retry_delay` match the shared consumer, so the retry budget and delivery 21 as
+  the final attempt are unchanged.
+
+### Cutover switch
+
+`USAGE_INGEST_DEDICATED_TAGGED_QUEUE_ENABLED` is an optional Worker environment string.
+Exactly `true` sends both tagged routes to the dedicated queue. Absent, `false` or any other
+value sends them to `USAGE_INGEST_QUEUE`, which is the shared EU source, or the global source
+after a routing rollback. It only selects the producer's queue: both consumers, the dedicated
+pair's preparation and its DLQ alert stay in place for every value, and it never affects LLM
+`/usage`, the hedge or Exa's direct write.
+
+It is a plaintext `vars` entry in `wrangler.jsonc`, so the normal code deployment of each
+environment applies it and Git review owns every change:
+
+| Environment | Worker | Committed value | Tagged route |
+|---|---|---|---|
+| production | `usage-ingest` | `"true"` | `usage-ingest-enkrypt-eu` |
+| staging | `usage-ingest-staging` | `"true"` | `usage-ingest-enkrypt-staging-eu` |
+
+Staging does not inherit top-level `vars`, so each environment states its own value, and
+`src/queue-budget.test.ts` pins both. Change it only in `wrangler.jsonc`, not in the dashboard:
+a deployment replaces dashboard plaintext variables with the committed `vars`. See Cloudflare's
+[source of truth](https://developers.cloudflare.com/workers/wrangler/configuration/#source-of-truth)
+notes.
+
+The same name must not also exist as a Worker **secret** binding. An earlier version of this
+runbook set the switch as a dashboard secret, and normal deployments keep secrets, so a leftover
+secret would sit beside the committed var under one binding name. Do not rely on either value
+winning; Cloudflare is expected to reject the upload for the duplicate binding name. Before the
+first deployment that carries the committed value in an environment, check both
+`wrangler versions secret list` (deployed versions) and
+`wrangler versions secret list --latest-version` (the latest uploaded version, whose secrets the
+next deployment carries forward); add `--env staging` for staging. Secret values are never
+shown, only whether a binding exists. If either lists
+`USAGE_INGEST_DEDICATED_TAGGED_QUEUE_ENABLED`, remove it before that deployment with
+`wrangler secret delete USAGE_INGEST_DEDICATED_TAGGED_QUEUE_ENABLED` (`--env staging` for
+staging), which deploys a version without it at once, so tagged routing falls back to the
+shared queue until the code deployment applies the committed value. Then repeat both listings
+and confirm neither shows it. Do not register the name as a required secret.
+
+To confirm a change is live, check that the version created by that deployment is the
+one serving 100% of traffic on the Worker's **Deployments** page, or with
+`wrangler deployments status` (`--env staging` for staging).
+
+### Rollout
+
+One change commits `"true"` for staging and production together. **Do not merge it** until the
+dedicated consumer's attachment is verified in both environments, the separate stall alert on
+the production dedicated source is deployed and verified, and neither Worker has a same-name
+secret binding. A deployment with the switch not `true` provisions and attaches the dedicated
+infrastructure and keeps the existing producer routing.
+
+1. Before each environment's first deployment that carries the committed switch, confirm no
+   same-name secret binding exists there, and remove it if one does, as described under
+   [Cutover switch](#cutover-switch).
+2. Deploy usage-ingest normally. Preparation inspects every queue, then creates or reuses the
+   dedicated DLQ (EU, 14-day retention, no consumer, read back) and then the source (EU,
+   at least the four-day default retention, read back), after the shared and hedge
+   pairs, and detaches nothing. It stops before any write if an existing member fails those
+   checks or the source's `delivery_paused` value is explicitly `true` or malformed. An omitted
+   `delivery_paused` response or explicit `false` is accepted; omission is API-shape compatibility,
+   not proof of active delivery. Operator verification of attachment and the production source
+   stall alert below still gates merging the switch-on change.
+   Wrangler then uploads the Worker with provisioning disabled and attaches the dedicated
+   consumer beside the existing two. With the switch not `true`, tagged usage still goes to the
+   shared queue.
+3. o11y deploys from the same merge, possibly in parallel, and enrolls the production tagged
+   DLQ in the [dead-letter alert](#dead-letter-alert); its tagged DLQ evaluation errors until step
+   2 has created the DLQ. If the o11y deployment fails while usage-ingest succeeds, the tagged DLQ
+   is unwatched until o11y is redeployed; rerun its deployment.
+4. Read back, read-only, in each environment: both dedicated queues exist with jurisdiction
+   `eu`; the DLQ has no consumer and `message_retention_period` `1209600`; the dedicated source
+   is not paused, keeps at least `345600` seconds, and has exactly one consumer, the
+   `usage-ingest` (or `usage-ingest-staging`) Worker, with the settings above; the shared and
+   hedge consumers are unchanged.
+5. Deploy the separate stall alert on `usage-ingest-enkrypt-eu` and verify it, for example that
+   it fires on a stalled source and stays quiet on an empty one. The queue already exists after
+   step 2; no manual preparation is needed.
+6. Immediately before merging the change that commits `"true"` for both environments, repeat
+   step 1 in both. After merge, the normal staging and production deployments apply it; confirm
+   each new version serves 100% of traffic. Then verify processing in each environment:
+   `usage_ingest_processing` lines with `usage_kind` `enkrypt_usage` or `exa_usage` show
+   `queue: "usage-ingest-enkrypt-staging-eu"` in staging and `queue: "usage-ingest-enkrypt-eu"`
+   in production, with `queue_action: "ack"`.
+
+Instances that started before the switching deployment can still publish to the previous queue
+while traffic turns over; both consumers process them. Tagged messages on the shared queue keep
+their processing there, with unchanged idempotency and dispositions. No new shared
+`enkrypt_usage` or `exa_usage` processing for longer than the source retry window (see
+[Retention](#retention)) is only a supporting signal: a paused or backlogged consumer is also
+silent, and logs can be dropped. Before treating them as drained, also confirm from queue state
+that the shared consumer is attached and healthy and the shared backlog has turned over since
+the switch. Nothing moves, purges or replays messages between queues.
+
+### Replay identity and partial failure
+
+The Enkrypt and Exa writers each deduplicate on the pair `record.id` and `record.occurredAt`, so
+a copy delivered from either queue, or replayed from either DLQ, settles as `duplicate` with no
+second charge only when both are unchanged. A copy with the same `id` and a different
+`occurredAt` creates a new ledger row and can charge again, depending on the payer. A replay
+must resend the original record unchanged; any queue whose consumer runs this Worker processes
+it.
+
+- Preparation fails: nothing is uploaded and the previous version keeps running. Rerun after
+  fixing the error; created queues are reused.
+- Upload fails after preparation: the new queues exist with no producer or consumer, which is
+  harmless. Rerun.
+- Preparation stops because the dedicated source is paused: resume its delivery deliberately
+  (only after confirming why it was paused), then rerun the deployment. Preparation never
+  resumes it. A present malformed `delivery_paused` value also stops preparation; investigate the
+  response before rerunning. An omitted value or explicit `false` is accepted, but omission does
+  not prove active delivery or waive attachment or production source stall alert verification
+  before merging the switch-on change.
+- The Worker uploads but the dedicated consumer is not attached: with the switch on, tagged usage
+  waits undrained in the dedicated source for up to its retention. Commit `"false"` for that
+  environment and deploy it, then rerun the deployment and repeat the readback before turning the
+  switch back on.
+
+### Rollback
+
+To move tagged usage back to the shared queue, commit `"false"` for that environment in
+`wrangler.jsonc` and deploy it normally; do not add a secret or dashboard variable instead. Keep
+the dedicated consumer and its alert active so work the queue already accepted drains. Only the
+switch value changes; do not revert the queue routing code.
+
+Do not revert this change, or deploy a revision without the dedicated consumer, while the
+dedicated queue or its retries may hold messages: that revision does not declare a consumer for
+the queue, and whether an existing attachment survives is not relied on. Remove the consumer only
+after the dedicated source shows a zero backlog and no retries remain, in a later change, and
+never delete the queues.
+
+The dedicated source has no backlog alert in this change; only its DLQ is watched. Staging DLQs
+are not watched, as for the shared queue.
+
 ## Exa usage rollout
 
 Exa usage keeps its direct Frankfurt write as the normal path. The queue is only a durable
-fallback: when the direct write fails, the web app posts the same bare record, with the same
+fallback, published to the queue the [cutover switch](#cutover-switch) selects: when the direct write fails, the web app posts the same bare record, with the same
 `id` and `occurredAt`, to `/exa-usage`, and the ingress wraps it in the tagged envelope. The
 Exa writer is idempotent by the `id`/`occurredAt` pair, so a queued copy of a write that did
 commit returns `duplicate` and makes no second debit; a replay must keep both values. The
@@ -779,12 +1064,12 @@ queue already accepted. Never roll the consumer back to a version without Exa ro
 Exa messages may still be in the source queue or in flight: they would fail every retry and
 reach the DLQ.
 
-The mixed DLQ needs a replay owner whose replay handles LLM, Enkrypt and Exa messages, and the
-existing DLQ alerting must cover it.
+The shared DLQ and the tagged DLQ need a replay owner whose replay handles LLM, Enkrypt and Exa
+messages, and the existing DLQ alerting covers both.
 
 ## Retention
 
-Each selected DLQ, including the global stall-hedge DLQ, keeps messages for
+Each selected DLQ, including the global stall-hedge DLQ and the dedicated tagged DLQ, keeps messages for
 **14 days (1209600 seconds)**, Cloudflare's maximum. Retention is a property of the queue resource, and `wrangler.jsonc`
 cannot set it, so the queue preparation helper enforces it as
 `DLQ_MESSAGE_RETENTION_SECONDS`. It creates a missing DLQ with that retention. For
@@ -801,8 +1086,8 @@ period on its **Settings** tab. The read-only API equivalent is
 `result.settings.message_retention_period` from
 `GET /accounts/{account_id}/queues/{queue_id}`.
 
-Source queues keep Cloudflare's default of four days (345600 seconds), which the
-helper does not change. That is far longer than the source retry window: 20
+Source queues, including the dedicated tagged source, keep Cloudflare's default of
+four days (345600 seconds), which the helper does not change. That is far longer than the source retry window: 20
 retries at the 60-second `retry_delay`, and under nine hours even if all 21
 deliveries ran for the 15-minute invocation limit with the 600-second maximum
 handled retry delay.
@@ -962,9 +1247,10 @@ consumer handler is queue-agnostic and logs `batch.queue`. So:
   draining.
 - Turning it on needs nothing else.
 - Capacity: the hedge consumer adds up to 25 invocations × one message = 25 writer
-  calls, so the nominal production consumer ceiling is 475 instead of 450 (staging
-  425 instead of 400) while hedged copies are being consumed. Writer admission is
-  unchanged.
+  calls, so the shared plus hedge subtotal is 475 instead of 450 in production (425
+  instead of 400 in staging) while hedged copies are being consumed. With the dedicated
+  tagged consumer, the full configured ceiling is 525 in production and 435 in staging;
+  see [Queue policy](#queue-policy). Writer admission is unchanged.
 
 A hedged event can be accepted by both queues. Duplicate deliveries of one LLM usage
 ID are safe: the writer's insert conflicts, its transaction rolls back and there are
@@ -1033,8 +1319,9 @@ Removal is a forward PR, not a revert:
 
 A plain revert of this change restores the unconditional detach step and could leave
 hedge copies unprocessed, some of which may be the only accepted copy of an event.
-Queue preparation keeps accepting the legacy two-producer, one-consumer shape only so
-historical source revisions still deploy; that is not a safe rollback to an EU-only
+Queue preparation keeps accepting the shared shape without the hedge (now alongside the
+required tagged pair), and historical source revisions deploy with their own helper; that is
+not a safe rollback to an EU-only
 consumer once the hedge has been on. Any deployment whose config has that shape (a
 source revision from before this change, a plain revert, or a removal PR deployed
 before the hedge queue has drained) detaches the global consumer without checking the

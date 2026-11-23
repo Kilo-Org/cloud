@@ -1,177 +1,12 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "skipMiddlewareRequestBody": true,
-  "crons": [
-    {
-      "path": "/api/cron/expire-credits",
-      "schedule": "*/5 * * * *"
-    },
-    {
-      "path": "/api/cron/agent-briefing",
-      "schedule": "* * * * *"
-    },
-    {
-      "path": "/api/cron/agent-briefing-summaries",
-      "schedule": "* * * * *"
-    },
-    {
-      "path": "/api/cron/sync-enkrypt",
-      "schedule": "0 4 * * *"
-    },
-    {
-      "path": "/api/cron/cleanup-device-auth",
-      "schedule": "0 3 * * *"
-    },
-    {
-      "path": "/api/cron/cleanup-stale-analyses",
-      "schedule": "*/15 * * * *"
-    },
-    {
-      "path": "/api/cron/cleanup-webhook-events",
-      "schedule": "*/5 * * * *"
-    },
-    {
-      "path": "/api/cron/cleanup-admin-action-audit-logs",
-      "schedule": "30 3 * * *"
-    },
-    {
-      "path": "/api/cron/cleanup-mcp-connect-events",
-      "schedule": "45 3 * * *"
-    },
-    {
-      "path": "/api/cron/cleanup-pr-watches",
-      "schedule": "15 4 * * *"
-    },
-    {
-      "path": "/api/cron/kilo-pass-yearly-monthly-base",
-      "schedule": "0 * * * *"
-    },
-    {
-      "path": "/api/cron/kilo-pass-org-bonus-repair",
-      "schedule": "15 * * * *"
-    },
-    {
-      "path": "/api/cron/kilo-pass-org-issuance",
-      "schedule": "0 * * * *"
-    },
-    {
-      "path": "/api/cron/kilo-pass-expire-referral-rewards",
-      "schedule": "0 * * * *"
-    },
-    {
-      "path": "/api/cron/oss-monthly-reset",
-      "schedule": "0 0 * * *"
-    },
-    {
-      "path": "/api/cron/sales-demo-reset",
-      "schedule": "0 5 * * *"
-    },
-    {
-      "path": "/api/discord/gateway",
-      "schedule": "*/9 * * * *"
-    },
-    {
-      "path": "/api/cron/coding-plans-billing",
-      "schedule": "0 * * * *"
-    },
-    {
-      "path": "/api/cron/coding-plans-inventory-summary",
-      "schedule": "0 12 * * *"
-    },
-    {
-      "path": "/api/cron/usage-daily-rollup-repairs",
-      "schedule": "5 * * * *"
-    },
-    {
-      "path": "/api/cron/db-pool-metrics",
-      "schedule": "* * * * *"
-    },
-    {
-      "path": "/api/cron/db-replication-health",
-      "schedule": "* * * * *"
-    },
-    {
-      "path": "/api/cron/dispatch-affiliate-events",
-      "schedule": "* * * * *"
-    },
-    {
-      "path": "/api/cron/dispatch-analytics-outbox",
-      "schedule": "* * * * *"
-    },
-    {
-      "path": "/api/cron/dispatch-invite-email-outbox",
-      "schedule": "* * * * *"
-    },
-    {
-      "path": "/api/cron/store-credit-web-tip",
-      "schedule": "0 * * * *"
-    },
-    {
-      "path": "/api/cron/dispatch-bouncer-credit-event-outbox",
-      "schedule": "* * * * *"
-    },
-    {
-      "path": "/api/cron/dispatch-bouncer-usage-event-outbox",
-      "schedule": "* * * * *"
-    },
-    {
-      "path": "/api/cron/process-user-deletions",
-      "schedule": "* * * * *"
-    },
-    {
-      "path": "/api/cron/process-kiloclaw-stripe-renewals",
-      "schedule": "*/10 * * * *"
-    },
-    {
-      "path": "/api/cron/user-deletion-attention-summary",
-      "schedule": "0 12 * * *"
-    },
-    {
-      "path": "/api/cron/dispatch-pending-code-reviews",
-      "schedule": "*/10 * * * *"
-    },
-    {
-      "path": "/api/cron/reap-stale-code-reviews",
-      "schedule": "0 * * * *"
-    },
-    {
-      "path": "/api/cron/reap-abandoned-cloud-agent-uploads",
-      "schedule": "0 * * * *"
-    },
-    {
-      "path": "/api/cron/usage-partition-maintenance",
-      "schedule": "0 0 1 * *"
-    },
-    {
-      "path": "/api/cron/cleanup-review-memory",
-      "schedule": "0 */12 * * *"
-    },
-    {
-      "path": "/api/cron/dispatch-spend-alerts",
-      "schedule": "*/5 * * * *"
-    },
-    {
-      "path": "/api/cron/drain-spend-alert-deliveries",
-      "schedule": "*/5 * * * *"
-    },
-    {
-      "path": "/api/cron/prune-spend-alert-hourly",
-      "schedule": "0 1 * * *"
-    },
-    {
-      "path": "/api/cron/code-review-outcome-aggregate",
-      "schedule": "*/5 * * * *"
-    },
-    {
-      "path": "/api/cron/backfill-users",
-      "schedule": "20 2 * * *"
-    },
-    {
-      "path": "/api/cron/recover-code-reviews",
-      "schedule": "*/15 * * * *"
-    }
-  ],
   "schedules": {
+    "cleanup-environment-setup-runs": {
+      "schedule": "30 4 * * *",
+      "path": "/api/cron/cleanup-environment-setup-runs",
+      "requestMethod": "GET"
+    },
     "sync-model-stats": {
       "schedule": "0 */6 * * *",
       "path": "/api/cron/sync-model-stats",
@@ -195,6 +30,221 @@
     "cleanup-api-request-log": {
       "schedule": "*/5 * * * *",
       "path": "/api/cron/cleanup-api-request-log",
+      "requestMethod": "GET"
+    },
+    "anthropic-user-profile-cleanup": {
+      "schedule": "40 2 * * *",
+      "path": "/api/cron/anthropic-user-profile-cleanup",
+      "requestMethod": "GET"
+    },
+    "expire-credits": {
+      "schedule": "*/5 * * * *",
+      "path": "/api/cron/expire-credits",
+      "requestMethod": "GET"
+    },
+    "agent-briefing": {
+      "schedule": "* * * * *",
+      "path": "/api/cron/agent-briefing",
+      "requestMethod": "GET"
+    },
+    "agent-briefing-summaries": {
+      "schedule": "* * * * *",
+      "path": "/api/cron/agent-briefing-summaries",
+      "requestMethod": "GET"
+    },
+    "sync-enkrypt": {
+      "schedule": "0 4 * * *",
+      "path": "/api/cron/sync-enkrypt",
+      "requestMethod": "GET"
+    },
+    "cleanup-device-auth": {
+      "schedule": "0 3 * * *",
+      "path": "/api/cron/cleanup-device-auth",
+      "requestMethod": "GET"
+    },
+    "cleanup-stale-analyses": {
+      "schedule": "*/15 * * * *",
+      "path": "/api/cron/cleanup-stale-analyses",
+      "requestMethod": "GET"
+    },
+    "cleanup-webhook-events": {
+      "schedule": "*/5 * * * *",
+      "path": "/api/cron/cleanup-webhook-events",
+      "requestMethod": "GET"
+    },
+    "cleanup-admin-action-audit-logs": {
+      "schedule": "30 3 * * *",
+      "path": "/api/cron/cleanup-admin-action-audit-logs",
+      "requestMethod": "GET"
+    },
+    "cleanup-mcp-connect-events": {
+      "schedule": "45 3 * * *",
+      "path": "/api/cron/cleanup-mcp-connect-events",
+      "requestMethod": "GET"
+    },
+    "cleanup-pr-watches": {
+      "schedule": "15 4 * * *",
+      "path": "/api/cron/cleanup-pr-watches",
+      "requestMethod": "GET"
+    },
+    "kilo-pass-yearly-monthly-base": {
+      "schedule": "0 * * * *",
+      "path": "/api/cron/kilo-pass-yearly-monthly-base",
+      "requestMethod": "GET"
+    },
+    "kilo-pass-org-bonus-repair": {
+      "schedule": "15 * * * *",
+      "path": "/api/cron/kilo-pass-org-bonus-repair",
+      "requestMethod": "GET"
+    },
+    "kilo-pass-org-issuance": {
+      "schedule": "0 * * * *",
+      "path": "/api/cron/kilo-pass-org-issuance",
+      "requestMethod": "GET"
+    },
+    "kilo-pass-expire-referral-rewards": {
+      "schedule": "0 * * * *",
+      "path": "/api/cron/kilo-pass-expire-referral-rewards",
+      "requestMethod": "GET"
+    },
+    "oss-monthly-reset": {
+      "schedule": "0 0 * * *",
+      "path": "/api/cron/oss-monthly-reset",
+      "requestMethod": "GET"
+    },
+    "sales-demo-reset": {
+      "schedule": "0 5 * * *",
+      "path": "/api/cron/sales-demo-reset",
+      "requestMethod": "GET"
+    },
+    "discord-gateway": {
+      "schedule": "*/9 * * * *",
+      "path": "/api/discord/gateway",
+      "requestMethod": "GET"
+    },
+    "coding-plans-billing": {
+      "schedule": "0 * * * *",
+      "path": "/api/cron/coding-plans-billing",
+      "requestMethod": "GET"
+    },
+    "coding-plans-inventory-summary": {
+      "schedule": "0 12 * * *",
+      "path": "/api/cron/coding-plans-inventory-summary",
+      "requestMethod": "GET"
+    },
+    "usage-daily-rollup-repairs": {
+      "schedule": "5 * * * *",
+      "path": "/api/cron/usage-daily-rollup-repairs",
+      "requestMethod": "GET"
+    },
+    "db-pool-metrics": {
+      "schedule": "* * * * *",
+      "path": "/api/cron/db-pool-metrics",
+      "requestMethod": "GET"
+    },
+    "db-replication-health": {
+      "schedule": "* * * * *",
+      "path": "/api/cron/db-replication-health",
+      "requestMethod": "GET"
+    },
+    "dispatch-affiliate-events": {
+      "schedule": "* * * * *",
+      "path": "/api/cron/dispatch-affiliate-events",
+      "requestMethod": "GET"
+    },
+    "dispatch-analytics-outbox": {
+      "schedule": "* * * * *",
+      "path": "/api/cron/dispatch-analytics-outbox",
+      "requestMethod": "GET"
+    },
+    "dispatch-invite-email-outbox": {
+      "schedule": "* * * * *",
+      "path": "/api/cron/dispatch-invite-email-outbox",
+      "requestMethod": "GET"
+    },
+    "store-credit-web-tip": {
+      "schedule": "0 * * * *",
+      "path": "/api/cron/store-credit-web-tip",
+      "requestMethod": "GET"
+    },
+    "dispatch-bouncer-credit-event-outbox": {
+      "schedule": "* * * * *",
+      "path": "/api/cron/dispatch-bouncer-credit-event-outbox",
+      "requestMethod": "GET"
+    },
+    "dispatch-bouncer-usage-event-outbox": {
+      "schedule": "* * * * *",
+      "path": "/api/cron/dispatch-bouncer-usage-event-outbox",
+      "requestMethod": "GET"
+    },
+    "process-user-deletions": {
+      "schedule": "* * * * *",
+      "path": "/api/cron/process-user-deletions",
+      "requestMethod": "GET"
+    },
+    "process-kiloclaw-stripe-renewals": {
+      "schedule": "*/10 * * * *",
+      "path": "/api/cron/process-kiloclaw-stripe-renewals",
+      "requestMethod": "GET"
+    },
+    "user-deletion-attention-summary": {
+      "schedule": "0 12 * * *",
+      "path": "/api/cron/user-deletion-attention-summary",
+      "requestMethod": "GET"
+    },
+    "dispatch-pending-code-reviews": {
+      "schedule": "*/10 * * * *",
+      "path": "/api/cron/dispatch-pending-code-reviews",
+      "requestMethod": "GET"
+    },
+    "reap-stale-code-reviews": {
+      "schedule": "0 * * * *",
+      "path": "/api/cron/reap-stale-code-reviews",
+      "requestMethod": "GET"
+    },
+    "reap-abandoned-cloud-agent-uploads": {
+      "schedule": "0 * * * *",
+      "path": "/api/cron/reap-abandoned-cloud-agent-uploads",
+      "requestMethod": "GET"
+    },
+    "usage-partition-maintenance": {
+      "schedule": "0 0 1 * *",
+      "path": "/api/cron/usage-partition-maintenance",
+      "requestMethod": "GET"
+    },
+    "cleanup-review-memory": {
+      "schedule": "0 */12 * * *",
+      "path": "/api/cron/cleanup-review-memory",
+      "requestMethod": "GET"
+    },
+    "dispatch-spend-alerts": {
+      "schedule": "*/5 * * * *",
+      "path": "/api/cron/dispatch-spend-alerts",
+      "requestMethod": "GET"
+    },
+    "drain-spend-alert-deliveries": {
+      "schedule": "*/5 * * * *",
+      "path": "/api/cron/drain-spend-alert-deliveries",
+      "requestMethod": "GET"
+    },
+    "prune-spend-alert-hourly": {
+      "schedule": "0 1 * * *",
+      "path": "/api/cron/prune-spend-alert-hourly",
+      "requestMethod": "GET"
+    },
+    "code-review-outcome-aggregate": {
+      "schedule": "*/5 * * * *",
+      "path": "/api/cron/code-review-outcome-aggregate",
+      "requestMethod": "GET"
+    },
+    "backfill-users": {
+      "schedule": "20 2 * * *",
+      "path": "/api/cron/backfill-users",
+      "requestMethod": "GET"
+    },
+    "recover-code-reviews": {
+      "schedule": "*/15 * * * *",
+      "path": "/api/cron/recover-code-reviews",
       "requestMethod": "GET"
     }
   },

@@ -6,9 +6,7 @@ import { type SdkStatusMessageCode } from '@kilocode/cloud-agent-sdk';
 import { i18n } from '@/i18n';
 
 import { type MessageFailure } from './message-failure-state';
-import { SESSION_HISTORY_FAILURES } from './session-history-failures';
 import {
-  buildTerminalErrorCopyText,
   classifyTerminalError,
   describeSessionRuntimeFailure,
   describeTerminalFailure,
@@ -16,6 +14,8 @@ import {
   sessionStatusErrorMessage,
   statusIndicatorDuplicatesMessageFailure,
 } from './session-terminal-error';
+import { describeChildHistoryFailure } from './child-session-history-failure';
+import { buildTerminalErrorCopyText } from './terminal-error-copy-text';
 
 describe('classifyTerminalError', () => {
   it.each([
@@ -137,6 +137,51 @@ describe('describeSessionRuntimeFailure', () => {
   it('passes the Durable Object safety projection through unchanged', () => {
     const raw = 'Assistant request failed: model not found';
     expect(describeSessionRuntimeFailure(raw)).toEqual({ message: raw, detail: raw });
+  });
+});
+
+describe('describeChildHistoryFailure', () => {
+  // The typed failure of a child's first-page read decides both the copy and
+  // whether a Retry can recover it. The copy names the child as a sub-agent,
+  // the child sheet's own surface; the wire sentence stays in `detail`.
+  it.each([
+    {
+      kind: 'retryable_failure' as const,
+      message: 'Session history temporarily unavailable',
+      key: 'agentChat.childSessionSheet.historyTemporarilyUnavailable',
+      retryable: true,
+    },
+    {
+      kind: 'too_large' as const,
+      message: 'Session history too large to load',
+      key: 'agentChat.childSessionSheet.historyTooLarge',
+      retryable: false,
+    },
+    {
+      kind: 'invalid_data' as const,
+      message: 'Session history is unavailable',
+      key: 'agentChat.childSessionSheet.historyUnavailable',
+      retryable: false,
+    },
+  ])('describes the %s kind', ({ kind, message, key, retryable }) => {
+    expect(describeChildHistoryFailure({ kind, message })).toEqual({
+      variant: 'server',
+      title: i18n.t('agentChat.session.couldNotLoadThisSession'),
+      message: i18n.t(key),
+      retryable,
+      retryWith: 'session',
+      detail: message,
+    });
+  });
+
+  it('classifies an untyped failure from its sentence', () => {
+    // A null kind is a failure the paged read never typed — a dropped
+    // transport, or a worker 404 for a gone child — so it resolves exactly as
+    // any other raw SDK error string.
+    const message = 'Connection lost. Please retry in a moment.';
+    expect(describeChildHistoryFailure({ kind: null, message })).toEqual(
+      describeTerminalFailure(message)
+    );
   });
 });
 
@@ -264,26 +309,63 @@ describe('resolveSessionTerminalError', () => {
   });
 
   it.each([
-    SESSION_HISTORY_FAILURES.too_large.message,
-    SESSION_HISTORY_FAILURES.invalid_data.message,
-  ])('offers no Retry for a stored transcript that cannot be read: %s', message => {
-    // The stored page is oversize or unreadable, so the same read answers the
-    // same way every time: the reader gets the permanent not-available state
-    // instead of a Retry that cannot succeed.
+    ['too_large', 'agentChat.session.historyTooLarge'],
+    ['invalid_data', 'agentChat.session.historyUnavailable'],
+  ] as const)(
+    'offers no Retry for a stored transcript that cannot be read: %s',
+    (kind, copyKey) => {
+      // The stored page is oversize or unreadable, so the same read answers the
+      // same way every time. The kind decides the terminal state, not the error
+      // sentence, so the arbitrary wire text stays in `detail` and the reader
+      // gets the kind's own copy instead of a Retry that cannot succeed.
+      expect(
+        resolveSessionTerminalError({
+          error: 'boom',
+          statusIndicator: null,
+          messageCount: 0,
+          hasFailedPreparation: false,
+          historyFailureKind: kind,
+        })
+      ).toEqual({
+        variant: 'server',
+        title: i18n.t('agentChat.session.couldNotLoadThisSession'),
+        message: i18n.t(copyKey),
+        retryable: false,
+        retryWith: 'session',
+        detail: 'boom',
+      });
+    }
+  );
+
+  it('names the temporary outage and offers Retry for a retryable transcript read failure', () => {
+    // The kind names a temporary outage of this app's own read, not a sentence
+    // the transport forwarded, so the reader gets the history copy under the
+    // page-load title and a Retry that can recover it.
     expect(
       resolveSessionTerminalError({
-        error: message,
+        error: 'Session history temporarily unavailable',
         statusIndicator: null,
         messageCount: 0,
         hasFailedPreparation: false,
+        historyFailureKind: 'retryable_failure',
       })
-    ).toMatchObject({ retryable: false, detail: message });
+    ).toEqual({
+      variant: 'server',
+      title: i18n.t('agentChat.session.couldNotLoadThisSession'),
+      message: i18n.t('agentChat.session.historyTemporarilyUnavailable'),
+      retryable: true,
+      retryWith: 'session',
+      detail: 'Session history temporarily unavailable',
+    });
   });
 
-  it('still offers Retry for a transient transcript read failure', () => {
+  it('does not decide retry-vs-terminal from the error sentence alone', () => {
+    // A failure whose kind the manager did not carry (for example a plain
+    // transport failure) is classified like any other error: the transcript
+    // sentence is terminal only when its kind says so.
     expect(
       resolveSessionTerminalError({
-        error: SESSION_HISTORY_FAILURES.retryable_failure.message,
+        error: 'Session history too large to load',
         statusIndicator: null,
         messageCount: 0,
         hasFailedPreparation: false,
@@ -395,6 +477,26 @@ describe('resolveSessionTerminalError', () => {
       retryable: false,
       retryWith: 'session',
       detail: 'Session terminated',
+    });
+  });
+
+  // A session-ingest outage reaches the mobile first open as this code, so the
+  // page-load card must keep its Retry: the same open succeeds once ingest is back.
+  it('keeps Retry for a coded temporary service outage', () => {
+    expect(
+      resolveSessionTerminalError(
+        codedIndicatorFor(
+          'Service is temporarily unavailable. Please retry in a moment.',
+          'service-temporarily-unavailable'
+        )
+      )
+    ).toEqual({
+      variant: 'server',
+      title: "Couldn't load this session",
+      message: i18n.t('agentChat.session.serviceUnavailable'),
+      retryable: true,
+      retryWith: 'session',
+      detail: 'Service is temporarily unavailable. Please retry in a moment.',
     });
   });
 

@@ -2,8 +2,8 @@ import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detec
 import { applyTrackingIds } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
 import type OpenAI from 'openai';
 import type { GatewayRequest, OpenRouterChatCompletionRequest } from '../openrouter/types';
-import type { TransformRequestContext } from '../types';
 import { getAiSdkProvider } from '../model-settings';
+import type { DirectByokTransformRequestContext } from './types';
 import openCodeGo from './opencode-go';
 
 describe('OpenCode Go session headers', () => {
@@ -14,8 +14,8 @@ describe('OpenCode Go session headers', () => {
   ];
 
   function createContext(
-    overrides: Partial<TransformRequestContext> = {}
-  ): TransformRequestContext {
+    overrides: Partial<DirectByokTransformRequestContext> = {}
+  ): DirectByokTransformRequestContext {
     return {
       provider: {
         type: 'direct-byok',
@@ -29,6 +29,7 @@ describe('OpenCode Go session headers', () => {
         async transformRequest() {},
       },
       model: 'opencode-go/qwen3.7-plus',
+      directByokModel: { id: 'qwen3.7-plus' },
       request: requests[0],
       originalHeaders: EmptyFraudDetectionHeaders,
       extraHeaders: {},

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { KiloClawProvider } from '@kilocode/db/schema-types';
 import { KiloclawDestroyReasonSchema, KiloclawStartReasonSchema } from '@kilocode/worker-utils';
 import {
   ALL_SECRET_FIELD_KEYS,
@@ -70,8 +71,7 @@ export const CustomSecretMetaSchema = z.object({
 
 export type CustomSecretMeta = z.infer<typeof CustomSecretMetaSchema>;
 
-// Keep in sync with apps/web/src/lib/kiloclaw/types.ts KiloClawProviderId.
-export const ProviderIdSchema = z.enum(['fly', 'docker-local', 'northflank']);
+export const ProviderIdSchema = z.enum(KiloClawProvider);
 export type ProviderId = z.infer<typeof ProviderIdSchema>;
 
 export const FlyProviderStateSchema = z.object({

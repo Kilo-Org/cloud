@@ -4,8 +4,10 @@ import { useTranslation } from 'react-i18next';
 import { ExternalLink, RefreshCw } from '@/components/ui/icons';
 
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { providerLabelKey } from '@/lib/integrations/provider-catalog';
 import {
   PROVIDER_COPY,
   providerNeedsAttentionCopy,
@@ -54,6 +56,30 @@ export function RepositoryRefreshButton({
 }
 
 /**
+ * The accessible name of a provider's action. The visible label can be a bare
+ * verb ("Connect" under a card title that already names the provider), so the
+ * name adds the provider only when the label does not carry it: a label that
+ * already reads "Open GitHub" must not announce GitHub a second time. Brand
+ * names are not translated, so the comparison is case-insensitive and safe in
+ * every catalog. The phrase the name uses is the provider's own catalog connect
+ * phrase, the same words as its card title: joining the action and the brand
+ * with `common.sentenceJoiner` splits the name where the catalog puts the brand
+ * first or ends a sentence, and the phrase also carries the connector or case
+ * marker its language attaches to the brand, which a two-placeholder template
+ * cannot.
+ */
+export function repositoryActionAccessibleLabel(input: {
+  action: string;
+  provider: string;
+  providerPhrase: string;
+}): string {
+  const { action, provider, providerPhrase } = input;
+  return action.toLocaleLowerCase().includes(provider.toLocaleLowerCase())
+    ? action
+    : providerPhrase;
+}
+
+/**
  * The provider's open action plus its refresh. `labelKey` overrides the label a
  * provider would show by default; the open label already reads as the action
  * the card asks for.
@@ -68,12 +94,19 @@ export function RepositoryActionRow({
 }: RepositoryCardActionsProps & { labelKey: string }) {
   const colors = useThemeColors();
   const { t } = useTranslation();
-  // The label takes the row's remaining width and is pinned to one line: a
-  // label sized to its own content is measured at its longest word's width and
-  // wraps onto a second line the button's min height then clips. The logical
-  // `me-[24px]` inset keeps the centred label clear of the leading glyph in RTL
-  // as well, which a physical `mr-` would not. The explorer captures
-  // new-session-filled and new-session-kb-down both showed that wrap.
+  // A screen-reader user swiping controls hears which provider each one opens.
+  // The name repeats the provider only when the visible label leaves it out.
+  const action = t(labelKey);
+  const provider = t(providerLabelKey(platform));
+  const accessibilityLabel = repositoryActionAccessibleLabel({
+    action,
+    provider,
+    providerPhrase: t(PROVIDER_COPY[platform].connectTitle),
+  });
+  // The icon and the label share the row's centre as one group, so the glyph
+  // sits beside its text instead of at the start edge. The label stays on one
+  // line; a label wider than the button ellipsizes rather than wrapping into
+  // the button's min height.
   return (
     <View className="flex-row gap-2">
       <Button
@@ -82,13 +115,14 @@ export function RepositoryActionRow({
         onPress={() => {
           onConnect(platform);
         }}
+        accessibilityLabel={accessibilityLabel}
         // `loading` paints the spinner over the label, so the row keeps exactly
         // its width while the connect flow runs.
         disabled={isConnecting}
         loading={isConnecting}
       >
         <ExternalLink size={16} color={colors.foreground} />
-        <Text className="me-[24px] flex-1 text-center" numberOfLines={1}>
+        <Text className="shrink text-center" numberOfLines={1}>
           {t(labelKey)}
         </Text>
       </Button>
@@ -115,7 +149,7 @@ export function RepositoryUnavailableCard({
     return null;
   }
   return (
-    <View className="mt-3 gap-3 rounded-lg border border-border bg-card p-4">
+    <Card className="mt-4">
       <View className="gap-1">
         <Text className="text-sm font-semibold text-foreground">{t(attention.title)}</Text>
         <Text variant="muted">{t(attention.description)}</Text>
@@ -128,7 +162,7 @@ export function RepositoryUnavailableCard({
         onRefreshRepos={onRefreshRepos}
         isRetrying={isRetrying}
       />
-    </View>
+    </Card>
   );
 }
 
@@ -151,11 +185,11 @@ export function RepositoryPartialNotice({
     return null;
   }
   return (
-    <View className="mt-3 flex-row items-center gap-2 rounded-lg border border-border bg-card px-3 py-2">
+    <Card className="mt-4 flex-row items-center gap-2">
       <Text variant="muted" className="flex-1">
         {t(key)}
       </Text>
       <RepositoryRefreshButton onRefreshRepos={onRefreshRepos} isRetrying={isRetrying} />
-    </View>
+    </Card>
   );
 }

@@ -1,11 +1,12 @@
 import { type Href } from 'expo-router';
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { ProfileManageSlot } from '@/components/profiles/profile-manage-slot';
+import { selectProfileReadErrorView } from '@/components/profiles/profile-read-error-view';
 import { ProfileSectionHeader } from '@/components/profiles/profile-section-header';
 import {
   applyVariableEdit,
@@ -24,14 +25,17 @@ import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
-import { KeyRound } from '@/components/ui/icons';
+import { KeyRound, Plus } from '@/components/ui/icons';
+import { RowGroup } from '@/components/ui/row-group';
 import { Text } from '@/components/ui/text';
 import { useAgentProfileMutations, useAgentProfileVars } from '@/lib/hooks/use-agent-profiles';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { MAX_PROFILE_VARS } from '@/lib/agent-profile-forms';
 import { isolateLtrBidiText } from '@/lib/bidi';
 import { clearFormDraft, useFormDraftState } from '@/lib/form-draft';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { useCloseEditorOnDeniedPermission } from '@/lib/hooks/use-close-editor-on-denied-permission';
 import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 
 /** Stable empty fallback so the derived list is not a new array each render. */
 const NO_VARS: readonly ProfileVarSource[] = [];
@@ -72,6 +76,11 @@ export function ProfileVariablesScreen({
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
   const varsQuery = useAgentProfileVars(profileId, organizationId);
+  const committedConnectivity = useCommittedConnectivityStatus();
+  const readError = selectProfileReadErrorView({
+    error: varsQuery.error,
+    connectivity: committedConnectivity,
+  });
   const { setVar, deleteVar } = useAgentProfileMutations(organizationId);
   const permission = useOrganizationProfilePermission(organizationId);
   const canManage = permission === 'allowed';
@@ -89,7 +98,9 @@ export function ProfileVariablesScreen({
 
   // `null` = closed, `''` = the add form, any other value = the key being edited.
   // The form it opens is a draft: it and its fields survive a remount (see
-  // `lib/form-draft`), and saving or cancelling clears it.
+  // `lib/form-draft`), and saving or cancelling clears it. The form renders only
+  // while the permission allows the write. A `read-only` permission closes it
+  // and clears the draft, so a remount cannot reopen it.
   const draftScope = `profiles:variables:${profileId}`;
   const [editingKey, setEditingKey] = useFormDraftState<string | null>(
     draftScope,
@@ -103,8 +114,8 @@ export function ProfileVariablesScreen({
   // add control: it reads as closed, so the form and the add button render.
   const orphanedEdit =
     editingKey !== null && editingKey !== '' && !rows.some(row => row.key === editingKey);
-  const isAdding = editingKey === '';
-  const isEditing = editingKey !== null && !isAdding && !orphanedEdit;
+  const isAdding = canManage && editingKey === '';
+  const isEditing = canManage && editingKey !== null && !isAdding && !orphanedEdit;
   const atVariableCap = vars.length >= MAX_PROFILE_VARS;
   // The add control is what an orphaned edit would otherwise leave the reader
   // without, so it renders for that state exactly as it does when closed.
@@ -120,10 +131,12 @@ export function ProfileVariablesScreen({
     setEditingKey(key);
   };
 
-  const closeForm = () => {
+  const closeForm = useCallback(() => {
     setEditingKey(null);
     clearFormDraft(draftScope);
-  };
+  }, [draftScope, setEditingKey]);
+
+  useCloseEditorOnDeniedPermission(permission, closeForm);
 
   const saveEdit = async (edit: VariableEdit): Promise<boolean> => {
     const isNewKey = !vars.some(variable => variable.key === edit.key);
@@ -195,17 +208,7 @@ export function ProfileVariablesScreen({
   );
 
   let content: ReactNode = null;
-  if (varsQuery.isError) {
-    content = (
-      <QueryError
-        variant="server"
-        placement="top"
-        title={t('profiles.loadFailed')}
-        onRetry={() => void varsQuery.refetch()}
-        isRetrying={varsQuery.isRefetching}
-      />
-    );
-  } else if (varsQuery.isPending) {
+  if (varsQuery.isPending) {
     content = <VariablesSkeleton />;
   } else if (rows.length === 0 && !isAdding) {
     content = (
@@ -216,40 +219,51 @@ export function ProfileVariablesScreen({
         placement="top"
         action={
           <ProfileManageSlot permission={permission}>
-            <Button className={STATE_ACTION_CLASS} onPress={startAdd}>
-              <Text>{t('profiles.addVariable')}</Text>
-            </Button>
+            <StateAction label={t('profiles.addVariable')} icon={Plus} onPress={startAdd} />
           </ProfileManageSlot>
         }
       />
     );
   } else {
+    const renderRow = (row: VariableRow) => (
+      <VariableRowView
+        key={row.key}
+        row={row}
+        isDeleting={deleteVar.isPending}
+        onEdit={
+          canManage
+            ? () => {
+                beginEdit(row.key);
+              }
+            : undefined
+        }
+        onDelete={
+          canManage
+            ? () => {
+                confirmDelete(row.key);
+              }
+            : undefined
+        }
+      />
+    );
+    // The edited row's form takes that row's place in the group: the rows above
+    // and below keep their order around it, and each run of rows stays one
+    // `RowGroup` because the form block is not a row.
+    const editedIndex = rows.findIndex(row => isEditing && row.key === editingKey);
     content = (
-      <>
-        {rows.map(row =>
-          isEditing && row.key === editingKey ? (
-            renderEditForm(false, initialVariableEdit(row))
-          ) : (
-            <VariableRowView
-              key={row.key}
-              row={row}
-              isDeleting={deleteVar.isPending}
-              onEdit={
-                canManage
-                  ? () => {
-                      beginEdit(row.key);
-                    }
-                  : undefined
-              }
-              onDelete={
-                canManage
-                  ? () => {
-                      confirmDelete(row.key);
-                    }
-                  : undefined
-              }
-            />
-          )
+      <View className="gap-3">
+        {editedIndex === -1 ? (
+          <RowGroup>{rows.map(row => renderRow(row))}</RowGroup>
+        ) : (
+          <>
+            {editedIndex > 0 ? (
+              <RowGroup>{rows.slice(0, editedIndex).map(row => renderRow(row))}</RowGroup>
+            ) : null}
+            {renderEditForm(false, initialVariableEdit(rows[editedIndex]))}
+            {editedIndex < rows.length - 1 ? (
+              <RowGroup>{rows.slice(editedIndex + 1).map(row => renderRow(row))}</RowGroup>
+            ) : null}
+          </>
         )}
 
         {isAdding ? renderEditForm(true, initialVariableEdit(undefined)) : null}
@@ -268,7 +282,7 @@ export function ProfileVariablesScreen({
             </Button>
           ) : null}
         </ProfileManageSlot>
-      </>
+      </View>
     );
   }
 
@@ -280,15 +294,28 @@ export function ProfileVariablesScreen({
         title={t('profiles.variablesTitle')}
         backFallback={backFallback}
       />
-      <TabScreenScrollView
-        className="flex-1"
-        contentContainerClassName="gap-3 px-6 pt-4 pb-8"
-        keyboardShouldPersistTaps="handled"
-        automaticallyAdjustKeyboardInsets
-        showsVerticalScrollIndicator={false}
-      >
-        {content}
-      </TabScreenScrollView>
+      {varsQuery.isError ? (
+        // The read owns the surface, so it centres in the band the header and
+        // the bottom band leave instead of scrolling as a banner.
+        <QueryError
+          variant={readError.variant}
+          placement="center"
+          title={readError.titleKey ? t(readError.titleKey) : undefined}
+          message={readError.descriptionKey ? t(readError.descriptionKey) : undefined}
+          onRetry={readError.showRetry ? () => void varsQuery.refetch() : undefined}
+          isRetrying={varsQuery.isRefetching}
+        />
+      ) : (
+        <TabScreenScrollView
+          className="flex-1"
+          contentContainerClassName={SCREEN_BODY_CLASS}
+          keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets
+          showsVerticalScrollIndicator={false}
+        >
+          {content}
+        </TabScreenScrollView>
+      )}
 
       {dialog}
     </View>

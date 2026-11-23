@@ -40,6 +40,10 @@ import {
 
 Object.assign(globalThis, { React });
 
+jest.mock('@/hooks/useEnvironmentSetupRuns', () => ({
+  useEnvironmentSetupRunBySession: () => ({ data: null }),
+}));
+
 let mockSessionId: string | null = 'ses_recent';
 let mockAtParam: string | null = null;
 let mockWorktreeId: string | null = 'worktree_shared';
@@ -339,6 +343,7 @@ jest.mock('./assistant-ui/CloudThread', () => ({
 }));
 jest.mock('./OlderMessagesHeader', () => ({ OlderMessagesHeader: () => null }));
 jest.mock('./ChildSessionDrawer', () => ({ ChildSessionDrawer: () => null }));
+jest.mock('./AgentBoardDrawer', () => ({ SessionAgentBoard: () => null }));
 jest.mock('./PreparationDrawer', () => ({ PreparationDrawer: () => null }));
 jest.mock('./SessionContinuationPanel', () => ({ SessionContinuationPanel: () => null }));
 jest.mock('@/components/SetPageTitle', () => ({
@@ -628,6 +633,7 @@ describe('CloudChatPage terminal ownership across navigation', () => {
       supersededInFlightMessageIds: new Set(),
       preparationAttempts: [],
       commits: [],
+      unreadableQuestions: [],
       unreadablePermissions: [],
       chatUI: { shouldAutoScroll: false },
     };

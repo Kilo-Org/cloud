@@ -3,10 +3,11 @@
     "title": "Kilo",
     "body": {
       "cloudAgentSession": "ستاسو د اجنټ غونډه تازه شوې ده",
-      "lowBalance": "ستاسو توازن ته پاملرنه اړینه ده",
+      "lowBalance": "ستاسو بیلانس ته پاملرنه اړینه ده",
       "spendAlert": "ستاسو لګښت ته پاملرنه اړینه ده",
       "securityFinding": "یو امنیتي موندنې ته پاملرنه اړینه ده",
       "securityUpdate": "یوه امنیتي کتنه تازه معلومات لري",
+      "agentBriefing": "ستاسو د ایجنټ د فعالیت راپور چمتو دی",
       "activeAgentsGlanceable": "فعال اجنټان تازه معلومات لري"
     }
   },
@@ -17,8 +18,8 @@
   },
   "internal": {
     "lowBalance": {
-      "title": "د ټیټ توازن خبرتیا",
-      "body": "د {{organizationName}} توازن له ${{minimumBalanceUsd}} لاندې راښکته شو"
+      "title": "د کم بیلانس خبرتیا",
+      "body": "د {{organizationName}} بیلانس له ${{minimumBalanceUsd}} لاندې راښکته شو"
     },
     "spendAlert": {
       "title": "د لګښت خبرتیا",
@@ -29,6 +30,12 @@
     },
     "securityFindingNew": {
       "title": "نوې امنیتي موندنه ({{severity}})"
+    },
+    "securityFindingSeverity": {
+      "critical": "خورا جدي",
+      "high": "لوړ",
+      "medium": "منځنی",
+      "low": "ټیټ"
     },
     "securityFindingSlaWarning": {
       "title": "د SLA خبرداری"

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one overview screen: identity, the usage counts and every configuration section share one data layer and one scroll body */
 import { useQueryClient } from '@tanstack/react-query';
 import { type Href, useRouter } from 'expo-router';
 import { lazy, Suspense, useEffect, useState } from 'react';
@@ -38,12 +39,17 @@ import {
   Trash2,
 } from '@/components/ui/icons';
 import { PreferenceRow } from '@/components/ui/preference-row';
+import { RowChevron } from '@/components/ui/row-chevron';
+import { RowGroup } from '@/components/ui/row-group';
+import { RowValue } from '@/components/ui/row-value';
+import { Section } from '@/components/ui/section';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useAgentProfileMutations, useAgentProfileOverview } from '@/lib/hooks/use-agent-profiles';
 import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
 import { useLeaveMissingProfileRoute } from '@/lib/hooks/use-leave-missing-profile-route';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { usePopOnce } from '@/lib/navigation/pop-once';
 import { useTRPC } from '@/lib/trpc';
@@ -133,8 +139,12 @@ export function ProfileOverviewScreen({
   const canManage = permission === 'allowed';
   // Unsaved name or description edits ask before the route goes, the way the
   // profile form sheets do. A read-only viewer cannot edit the form, so the
-  // guard stays off for them.
-  const metadataGuard = useMetadataLeaveGuard({ enabled: canManage });
+  // guard stays off for them. A save or delete already in flight owns the
+  // route, so Back is dropped instead of offered a discard.
+  const metadataGuard = useMetadataLeaveGuard({
+    enabled: canManage,
+    saving: update.isPending || deleteProfile.isPending,
+  });
   // The config-import sheet is a modal over this screen, so it holds no route
   // and no draft of its own.
   const [importOpen, setImportOpen] = useState(false);
@@ -162,6 +172,24 @@ export function ProfileOverviewScreen({
   // same way). A retryable failure keeps the cached profile usable under the
   // banner.
   const showContent = profile !== undefined && (errorView === null || errorView.showRetry);
+  // With no profile to show, the error is the whole surface; a retryable
+  // failure over a cached profile keeps it a banner above the content.
+  const errorOwnsSurface = errorView !== null && !showContent;
+  const errorState =
+    errorView === null ? null : (
+      <QueryError
+        variant={errorView.variant}
+        placement={errorOwnsSurface ? 'center' : 'top'}
+        title={
+          errorView.variant === 'not-found' || errorView.variant === 'permission'
+            ? undefined
+            : t('profiles.loadFailed')
+        }
+        message={errorView.descriptionKey ? t(errorView.descriptionKey) : undefined}
+        onRetry={errorView.showRetry ? () => void profileQuery.refetch() : undefined}
+        isRetrying={profileQuery.isRefetching}
+      />
+    );
   // A deleted profile this screen already painted returns the tab to its root,
   // keyed to the profile it serves; see the hook for the rule.
   useLeaveMissingProfileRoute(profileId, {
@@ -239,120 +267,120 @@ export function ProfileOverviewScreen({
         titleNumberOfLines={2}
         backFallback={getProfilesPath(stack)}
       />
-      <TabScreenScrollView
-        className="flex-1"
-        contentContainerClassName="gap-6 px-6 pt-4"
-        automaticallyAdjustKeyboardInsets
-        showsVerticalScrollIndicator={false}
-      >
-        {/* A stale read keeps the cached profile usable: the error banner sits
-            above the content and only takes over when there is nothing to
-            show. A confirmed-offline device is a connectivity failure, not a
-            server one; `unknown` connectivity keeps the server variant. A
-            profile the server refuses (NOT_FOUND, FORBIDDEN) gets its own
-            state, drops the Retry that would re-issue the same refusal, and
-            replaces the editor. */}
-        {errorView ? (
-          <QueryError
-            variant={errorView.variant}
-            placement="top"
-            title={
-              errorView.variant === 'not-found' || errorView.variant === 'permission'
-                ? undefined
-                : t('profiles.loadFailed')
-            }
-            onRetry={errorView.showRetry ? () => void profileQuery.refetch() : undefined}
-            isRetrying={profileQuery.isRefetching}
-          />
-        ) : null}
+      {errorOwnsSurface ? (
+        // Nothing sits under a read with no profile to show, so it owns the
+        // surface and centres in the band the header and the bottom band leave.
+        errorState
+      ) : (
+        <TabScreenScrollView
+          className="flex-1"
+          contentContainerClassName={SCREEN_BODY_CLASS}
+          automaticallyAdjustKeyboardInsets
+          showsVerticalScrollIndicator={false}
+        >
+          {/* A stale read keeps the cached profile usable: the error banner sits
+              above the content. A confirmed-offline device is a connectivity
+              failure, not a server one; `unknown` connectivity keeps the server
+              variant. A profile the server refuses (NOT_FOUND, FORBIDDEN) gets
+              its own state, drops the Retry that would re-issue the same
+              refusal, and replaces the editor. */}
+          {errorView ? errorState : null}
 
-        {!profileQuery.isError && profile === undefined ? <ProfileOverviewSkeleton /> : null}
+          {!profileQuery.isError && profile === undefined ? <ProfileOverviewSkeleton /> : null}
 
-        {showContent ? (
-          <>
-            {/* A member sees the metadata form, the default switch, Import and
-                Delete disabled or absent, so the statement naming who may
-                change the profile sits above them, where the manager's action
-                would be. A manager's slot renders nothing. */}
-            <ProfileManageSlot permission={permission} />
-            <ProfileMetadataForm
-              key={metadataFormKey(profile)}
-              profile={profile}
-              isSaving={update.isPending}
-              onSave={saveMetadata}
-              onDirtyChange={metadataGuard.handleDirtyChange}
-              disabled={!canManage}
-            />
+          {showContent ? (
+            <>
+              {/* A member sees the metadata form, the default switch, Import and
+                  Delete disabled or absent, so the statement naming who may
+                  change the profile sits above them, where the manager's action
+                  would be. A manager's slot renders nothing. */}
+              <ProfileManageSlot permission={permission} />
+              <ProfileMetadataForm
+                key={metadataFormKey(profile)}
+                profile={profile}
+                isSaving={update.isPending}
+                onSave={saveMetadata}
+                onDirtyChange={metadataGuard.handleDirtyChange}
+                disabled={!canManage}
+              />
 
-            <PreferenceRow
-              icon={Star}
-              title={t('profiles.defaultSectionTitle')}
-              subtitle={t(defaultDescriptionKey(isOrgOwned))}
-              value={profile.isDefault}
-              disabled={!canManage || defaultPending}
-              busy={defaultPending}
-              onValueChange={next => {
-                if (next) {
-                  setAsDefault.mutate({ profileId });
-                } else {
-                  clearDefault.mutate({ profileId });
-                }
-              }}
-            />
+              <RowGroup>
+                <PreferenceRow
+                  icon={Star}
+                  title={t('profiles.defaultSectionTitle')}
+                  subtitle={t(defaultDescriptionKey(isOrgOwned))}
+                  value={profile.isDefault}
+                  disabled={!canManage || defaultPending}
+                  busy={defaultPending}
+                  onValueChange={next => {
+                    if (next) {
+                      setAsDefault.mutate({ profileId });
+                    } else {
+                      clearDefault.mutate({ profileId });
+                    }
+                  }}
+                />
+              </RowGroup>
 
-            <ProfileRepoPinsSection
-              profileId={profileId}
-              organizationId={organizationId}
-              canManage={canManage}
-            />
+              <ProfileRepoPinsSection
+                profileId={profileId}
+                organizationId={organizationId}
+                canManage={canManage}
+              />
 
-            <View className="gap-1">
-              <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-                {t('profiles.settingsSectionTitle')}
-              </Text>
-              <View>
-                {overviewSectionRows(profile).map((row, index, rows) => (
-                  <ConfigureRow
-                    key={row.key}
-                    icon={SECTION_ICONS[row.key]}
-                    title={t(row.titleKey)}
-                    subtitle={String(row.count)}
-                    last={index === rows.length - 1 && !canManage}
-                    onPress={() => {
-                      router.push(SECTION_PATHS[row.key](profileId, organizationId, stack));
-                    }}
-                  />
-                ))}
-                {canManage ? (
-                  <ConfigureRow
-                    icon={Download}
-                    title={t('profiles.importConfigTitle')}
-                    subtitle={t('profiles.importConfigRowSubtitle')}
-                    last
-                    onPress={() => {
-                      setImportOpen(true);
-                    }}
-                  />
-                ) : null}
-              </View>
-            </View>
+              <Section label={t('profiles.settingsSectionTitle')}>
+                <RowGroup leadingTile>
+                  {overviewSectionRows(profile).map(row => (
+                    <ConfigureRow
+                      key={row.key}
+                      icon={SECTION_ICONS[row.key]}
+                      title={t(row.titleKey)}
+                      // The count is a value, so it takes the trailing cell beside
+                      // the chevron; a section with nothing in it shows no number
+                      // rather than a bare zero under its name.
+                      trailing={
+                        <View className="flex-row items-center gap-2">
+                          {row.count > 0 ? (
+                            <RowValue text={String(row.count)} face="numeric" tone="muted" />
+                          ) : null}
+                          <RowChevron />
+                        </View>
+                      }
+                      onPress={() => {
+                        router.push(SECTION_PATHS[row.key](profileId, organizationId, stack));
+                      }}
+                    />
+                  ))}
+                  {canManage ? (
+                    <ConfigureRow
+                      icon={Download}
+                      title={t('profiles.importConfigTitle')}
+                      subtitle={t('profiles.importConfigRowSubtitle')}
+                      onPress={() => {
+                        setImportOpen(true);
+                      }}
+                    />
+                  ) : null}
+                </RowGroup>
+              </Section>
 
-            {!canManage ? null : (
-              <Button
-                variant="destructive"
-                loading={deleteProfile.isPending}
-                disabled={deleteProfile.isPending}
-                onPress={() => {
-                  confirmDelete(profile.name);
-                }}
-              >
-                <Trash2 size={16} color={colors.destructiveForeground} />
-                <Text>{t('common.delete')}</Text>
-              </Button>
-            )}
-          </>
-        ) : null}
-      </TabScreenScrollView>
+              {!canManage ? null : (
+                <Button
+                  variant="destructive"
+                  loading={deleteProfile.isPending}
+                  disabled={deleteProfile.isPending}
+                  onPress={() => {
+                    confirmDelete(profile.name);
+                  }}
+                >
+                  <Trash2 size={16} color={colors.destructiveForeground} />
+                  <Text>{t('common.delete')}</Text>
+                </Button>
+              )}
+            </>
+          ) : null}
+        </TabScreenScrollView>
+      )}
 
       {dialog}
       {metadataGuard.dialog}

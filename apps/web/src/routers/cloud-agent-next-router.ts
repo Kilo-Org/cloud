@@ -14,7 +14,7 @@ import { createWorktreeChat } from '@/lib/cloud-agent-next/worktree-chat';
 import { assertSessionWorktree } from '@/lib/cloud-agent-next/worktree-review-access';
 import { createCloudAgentControlToken } from '@/lib/cloud-agent-next/request-control-token';
 import { fetchGitHubRepositoriesForUser } from '@/lib/cloud-agent/github-integration-helpers';
-import { resolveGitHubIntegrationIdForRepository } from '@/lib/cloud-agent/github-integration-resolution';
+import { resolveGitHubPrepareParams } from '@/lib/cloud-agent-next/github-prepare-params';
 import {
   getGitLabInstanceUrlForUser,
   buildGitLabCloneUrl,
@@ -107,7 +107,10 @@ import { verifyUserOwnsSessionV2ByCloudAgentId } from '@/lib/cloud-agent/session
 import { TRPCError } from '@trpc/server';
 import { getBalanceForUser } from '@kilocode/web-shared/lib/user/balance';
 import { APP_CLIENT_HEADER, isMobileClient } from '@kilocode/web-shared/lib/app-headers';
-import { backgroundActivityInventorySchema } from '@kilocode/session-ingest-contracts';
+import {
+  agentBoardSchema,
+  backgroundActivityInventorySchema,
+} from '@kilocode/session-ingest-contracts';
 import { buildCloudAgentNextEligibility } from './cloud-agent-next-eligibility';
 import {
   getWorktreeChangesOutputSchema,
@@ -262,7 +265,9 @@ export const cloudAgentNextRouter = createTRPCRouter({
           ? undefined
           : await resolveStackedWorkspaceSource({
               db,
-              client,
+              client: ctx.cloudAgentAuthority
+                ? { getSession: id => client.getSession(id, undefined, stackOnWorktreeId) }
+                : client,
               userId: ctx.user.id,
               worktreeId: stackOnWorktreeId,
             });
@@ -335,30 +340,19 @@ export const cloudAgentNextRouter = createTRPCRouter({
         gitParams = { gitUrl: publicRepoUrl };
         repository = { platform: 'git', fullName: publicRepoUrl, canonicalUrl: publicRepoUrl };
       } else {
-        // The runtime's repository preflight runs only when the request names
-        // the integration that owns the repository, so resolve it for the
-        // caller here. An explicitly supplied id wins, and an unresolvable
-        // repository stays unqualified (the previous behaviour) rather than
-        // refusing a request the runtime can still serve.
-        const resolvedIntegrationId =
-          githubIntegrationId ??
-          (githubRepo === undefined
-            ? null
-            : await resolveGitHubIntegrationIdForRepository(
-                { type: 'user', id: ctx.user.id },
-                githubRepo
-              ));
-        gitParams = {
+        gitParams = await resolveGitHubPrepareParams({
+          userId: ctx.user.id,
           githubRepo,
-          githubIntegrationId: resolvedIntegrationId ?? undefined,
-          platform: PLATFORM.GITHUB,
-        };
+          ...(githubIntegrationId === undefined ? {} : { githubIntegrationId }),
+        });
         if (githubRepo) {
           repository = {
             platform: 'github',
             fullName: githubRepo,
             canonicalUrl: `https://github.com/${githubRepo}`,
-            ...(resolvedIntegrationId ? { githubIntegrationId: resolvedIntegrationId } : {}),
+            ...(gitParams.githubIntegrationId
+              ? { githubIntegrationId: gitParams.githubIntegrationId }
+              : {}),
           };
         }
       }
@@ -421,6 +415,7 @@ export const cloudAgentNextRouter = createTRPCRouter({
         user: ctx.user,
         headersList: ctx.headersList,
         sourceKiloSessionId: input.sourceKiloSessionId,
+        cloudAgentSessionId: input.cloudAgentSessionId,
         operationKey: input.operationKey,
         kiloSessionId: input.kiloSessionId,
       })
@@ -624,6 +619,7 @@ export const cloudAgentNextRouter = createTRPCRouter({
         userId: ctx.user.id,
         cloudAgentSessionId: input.cloudAgentSessionId,
         operation: 'sync',
+        scoped: Boolean(ctx.cloudAgentAuthority),
       });
     }),
 
@@ -639,6 +635,7 @@ export const cloudAgentNextRouter = createTRPCRouter({
         userId: ctx.user.id,
         cloudAgentSessionId: input.cloudAgentSessionId,
         operation: 'restack',
+        scoped: Boolean(ctx.cloudAgentAuthority),
       });
     }),
 
@@ -1050,6 +1047,15 @@ export const cloudAgentNextRouter = createTRPCRouter({
       await assertUserOwnsSession(ctx.user.id, input.cloudAgentSessionId);
       const token = await createCloudAgentControlToken(ctx.user, ctx.headersList);
       return createCloudAgentNextClient(token).getBackgroundActivity(input.cloudAgentSessionId);
+    }),
+
+  getAgentBoard: baseProcedure
+    .input(z.object({ cloudAgentSessionId: z.string().regex(/^workspace_[\w-]+$/) }).strict())
+    .output(agentBoardSchema.nullable())
+    .query(async ({ ctx, input }) => {
+      await assertUserOwnsSession(ctx.user.id, input.cloudAgentSessionId);
+      const token = await createCloudAgentControlToken(ctx.user, ctx.headersList);
+      return createCloudAgentNextClient(token).getAgentBoard(input.cloudAgentSessionId);
     }),
 
   /** Complete stored details for an expanded tool preview; authorized on every read. */

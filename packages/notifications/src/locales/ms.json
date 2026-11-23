@@ -7,6 +7,7 @@
       "spendAlert": "Perbelanjaan anda memerlukan perhatian",
       "securityFinding": "Penemuan keselamatan memerlukan perhatian",
       "securityUpdate": "Semakan keselamatan ada kemas kini",
+      "agentBriefing": "Laporan aktiviti agen anda sudah sedia",
       "activeAgentsGlanceable": "Ejen aktif ada kemas kini"
     }
   },
@@ -29,6 +30,12 @@
     },
     "securityFindingNew": {
       "title": "Penemuan keselamatan baharu ({{severity}})"
+    },
+    "securityFindingSeverity": {
+      "critical": "Kritikal",
+      "high": "Tinggi",
+      "medium": "Sederhana",
+      "low": "Rendah"
     },
     "securityFindingSlaWarning": {
       "title": "Amaran SLA"

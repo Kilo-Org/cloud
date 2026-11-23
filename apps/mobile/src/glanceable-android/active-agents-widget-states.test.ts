@@ -13,6 +13,7 @@ import {
   nodes,
   NOW,
   placed,
+  propsFor,
   rectOf,
   render,
   texts,
@@ -188,8 +189,10 @@ describe('Home widget states', () => {
 
   it.each(CELLS)('keeps German and Arabic/RTL copy inside the band at %dx%d', (width, height) => {
     for (const language of ['de', 'ar']) {
-      const translated = (key: string) =>
-        language === 'ar' ? `العربية ${translate(key)}` : `Deutsch ${translate(key)}`;
+      const translated = (key: string, options?: Record<string, unknown>) =>
+        language === 'ar'
+          ? `العربية ${translate(key, options)}`
+          : `Deutsch ${translate(key, options)}`;
       for (const [name, state] of Object.entries(STATES) as [string, State][]) {
         const props = stateProps(state, translated);
         const root = render(props, [width, height], language === 'ar').light;
@@ -200,6 +203,30 @@ describe('Home widget states', () => {
       const label = nodes(root).find(node => node.props.text === props.homeCopy?.primaryLabel);
       expect(label?.props.style?.textAlign).toBe(language === 'ar' ? 'right' : 'left');
     }
+  });
+
+  it.each(CELLS)('keeps Thai and Myanmar copy inside the band at %dx%d', (width, height) => {
+    for (const [language, tall] of [
+      ['th', 'กำลังทำงาน'],
+      ['my', 'အလုပ်လုပ်နေသည်'],
+    ] as const) {
+      const translated = (key: string) => `${tall} ${translate(key)}`;
+      for (const [name, state] of Object.entries(STATES) as [string, State][]) {
+        const props = stateProps(state, translated);
+        const root = render(props, [width, height]).light;
+        expectInsideBand(root, [width, height], `${language} ${name}`);
+      }
+    }
+  });
+
+  it('gives a Thai or Myanmar agent title its own fallback line box', () => {
+    const titleHeight = (title: string) => {
+      const root = render(propsFor([{ status: 'busy', title }]), DESIGN.large).light;
+      return rectOf(byKey(root, 'recent-title')).height;
+    };
+    const latin = titleHeight('Fix the flaky login test');
+    expect(titleHeight('แก้ไขการทดสอบเข้าสู่ระบบ')).toBeGreaterThan(latin);
+    expect(titleHeight('အလုပ်လုပ်နေသည်')).toBeGreaterThan(titleHeight('แก้ไขการทดสอบเข้าสู่ระบบ'));
   });
 
   it('uses the approved palettes', () => {
@@ -230,5 +257,30 @@ describe('Home widget states', () => {
       expect.arrayContaining(['3', 'Needs input', 'Last known · 8:00 PM'])
     );
     expect(hasKey(root, 'create-target')).toBe(true);
+  });
+});
+
+// The idle dot is the widget's only mark for a connected agent doing nothing,
+// so it takes the muted text ink. `mutedSoft` measured about 2.2:1 on the
+// widget's own surfaces and left the dot invisible; the contrast guard in
+// `use-theme-colors.contrast.test.ts` holds the floors those surfaces need.
+describe('Home widget status mark ink', () => {
+  it('paints the idle dot with the muted text ink in both schemes', () => {
+    const props = stateProps(STATES.idle);
+    const { light, dark } = render(props, DESIGN.row);
+    expect(nodes(light).find(node => node.key === 'dot')?.props.style?.backgroundColor).toBe(
+      lightColors.mutedForeground
+    );
+    expect(nodes(dark).find(node => node.key === 'dot')?.props.style?.backgroundColor).toBe(
+      darkColors.mutedForeground
+    );
+  });
+
+  it('paints the idle secondary count dot with the muted text ink', () => {
+    const props = stateProps(STATES.mixed);
+    const { light } = render(props, DESIGN.large);
+    expect(byKey(light, 'count-idle-dot').props.style?.backgroundColor).toBe(
+      lightColors.mutedForeground
+    );
   });
 });

@@ -12,6 +12,10 @@
  * exactly the "keep showing skeletons until the request settles" contract. It
  * is false as soon as any page is cached, so a background refetch never blanks
  * out rows that are already rendered.
+ *
+ * A paused read (offline, no page of its own cached) is unresolved rather than
+ * loading: it will not settle until the network returns, so it is not a
+ * skeleton state — the body offers the offline state with a retry instead.
  */
 export function selectSessionListIsLoading(input: {
   /** Query inputs (org, persisted filters, identity) have resolved. */
@@ -21,9 +25,15 @@ export function selectSessionListIsLoading(input: {
   searchIsPending: boolean;
   /** `stored.isPending` — no stored page cached yet. */
   storedIsPending: boolean;
+  /** `search.isPaused` — the search is paused with no cached page of its own. */
+  searchIsPaused: boolean;
+  /** `stored.isPaused` — the stored read is paused with no cached page. */
+  storedIsPaused: boolean;
 }): boolean {
   if (!input.ready) {
     return true;
   }
-  return input.isSearching ? input.searchIsPending : input.storedIsPending;
+  return input.isSearching
+    ? input.searchIsPending && !input.searchIsPaused
+    : input.storedIsPending && !input.storedIsPaused;
 }

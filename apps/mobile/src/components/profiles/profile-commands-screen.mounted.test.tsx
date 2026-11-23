@@ -18,14 +18,26 @@ import {
 } from '@/components/profiles/profile-commands-screen.test-helpers';
 import { MAX_SETUP_COMMANDS } from '@/components/profiles/profile-commands-model';
 import { i18n } from '@/i18n';
-import { act } from '@/test/renderer';
+import { act, type ReactTestInstance } from '@/test/renderer';
 import { waitFor } from '@/test/render-with-providers';
 import { resetFormDraftsForTests } from '@/lib/form-draft';
+import { COMPACT_CONTROL_BOX_CLASS, COMPACT_CONTROL_HIT_SLOP } from '@/lib/a11y/tap-target';
+
+/** The props the mocked `QueryError` host element carries; the renderer keeps them untyped. */
+type RenderedQueryError = {
+  variant?: string;
+  title?: string;
+  message?: string;
+  placement?: string;
+  onRetry?: () => void;
+};
 
 const h = vi.hoisted(() => ({
   error: vi.fn(),
+  connectivity: 'online' as string,
   query: {
     data: undefined as TestCommands | undefined,
+    error: undefined as unknown,
     isError: false,
     isPending: true,
     isRefetching: false,
@@ -55,6 +67,9 @@ vi.mock('expo-router', () => ({
   usePreventRemove: () => undefined,
 }));
 vi.mock('sonner-native', () => ({ toast: { error: h.error } }));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => h.connectivity,
+}));
 vi.mock('react-native', () => ({
   Platform: { OS: 'android' },
   View: 'View',
@@ -72,6 +87,7 @@ vi.mock('@/components/empty-state', async () => {
   // helpers must be loaded inside the factory.
   const { createElement } = await import('react');
   return {
+    StateAction: 'StateAction',
     // The real state renders its `action` below the title, so the manage slot's
     // sentence or the manager's CTA reaches the tree the way the screen hands it over.
     EmptyState: (props: { action?: unknown }) =>
@@ -82,27 +98,17 @@ vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/form-field', async () => {
   const { createElement, useRef } = await import('react');
   return {
-    FormField: (props: {
-      defaultValue?: string;
-      labelAccessory?: unknown;
-      onChangeText?: (value: string) => void;
-    }) => {
+    FormField: (props: { defaultValue?: string; onChangeText?: (value: string) => void }) => {
       // Native uncontrolled text only accepts defaultValue when mounted.
       const nativeText = useRef(props.defaultValue);
-      // The real field renders its label accessory beside the label, so the
-      // caller's row controls are children of the mocked field too.
-      return createElement(
-        'FormField',
-        {
-          ...props,
-          nativeText: nativeText.current,
-          onChangeText: (value: string) => {
-            nativeText.current = value;
-            props.onChangeText?.(value);
-          },
+      return createElement('FormField', {
+        ...props,
+        nativeText: nativeText.current,
+        onChangeText: (value: string) => {
+          nativeText.current = value;
+          props.onChangeText?.(value);
         },
-        props.labelAccessory as never
-      );
+      });
     },
   };
 });
@@ -113,6 +119,7 @@ vi.mock('@/components/ui/icons', () => ({
   ChevronUp: 'ChevronUp',
   Terminal: 'Terminal',
   Trash2: 'Trash2',
+  Plus: 'Plus',
 }));
 
 /** The role sentence a member reads in the action's place. */
@@ -120,7 +127,7 @@ const ROLE_SENTENCE = 'Only organization owners and admins can change organizati
 
 /** Press the add CTA the empty state renders through its `action` prop. */
 function pressEmptyAction(renderer: Awaited<ReturnType<typeof mountScreen>>['renderer']): void {
-  const action = findAll(findOne(renderer.root, 'EmptyState'), 'Button')[0];
+  const action = findAll(findOne(renderer.root, 'EmptyState'), 'StateAction')[0];
   if (!action) {
     throw new Error('the empty state rendered no add CTA');
   }
@@ -134,8 +141,10 @@ describe('ProfileCommandsScreen', () => {
     vi.clearAllMocks();
     resetFormDraftsForTests();
     permissionState.permission = 'allowed';
+    h.connectivity = 'online';
     Object.assign(h.query, {
       data: undefined,
+      error: undefined,
       isError: false,
       isPending: true,
       isRefetching: false,
@@ -152,13 +161,66 @@ describe('ProfileCommandsScreen', () => {
   });
 
   it('error: renders QueryError and Retry refetches', async () => {
-    Object.assign(h.query, { isError: true, isPending: false });
+    Object.assign(h.query, {
+      isError: true,
+      isPending: false,
+      error: { data: { code: 'INTERNAL_SERVER_ERROR' } },
+    });
 
     const { renderer, unmount } = await mountScreen();
 
     const queryError = findOne(renderer.root, 'QueryError');
     act(() => {
       (queryError.props as { onRetry: () => void }).onRetry();
+    });
+    expect(h.query.refetch).toHaveBeenCalledTimes(1);
+
+    unmount();
+  });
+
+  it('forbidden: names the permission state and offers no Retry', async () => {
+    Object.assign(h.query, {
+      isError: true,
+      isPending: false,
+      error: { data: { code: 'FORBIDDEN' } },
+    });
+
+    const { renderer, unmount } = await mountScreen();
+
+    // The renderer keeps host props untyped; the stub's props are the screen's own.
+    const queryError = findOne(renderer.root, 'QueryError').props as RenderedQueryError;
+    expect(queryError.variant).toBe('permission');
+    expect(queryError.title).toBeUndefined();
+    // The variant's own description would repeat the title, so the screen adds
+    // the line that names who can grant access.
+    expect(queryError.message).toBe('Ask an organization owner or admin to grant you access.');
+    expect(queryError.onRetry).toBeUndefined();
+    // A read with nothing under it owns the surface, so it centres and no
+    // tab scroller holds it.
+    expect(queryError.placement).toBe('center');
+    expect(findAll(renderer.root, 'ScrollView')).toHaveLength(0);
+
+    unmount();
+  });
+
+  it('server: keeps the load-failure title and a Retry that refetches', async () => {
+    Object.assign(h.query, {
+      isError: true,
+      isPending: false,
+      error: { data: { code: 'INTERNAL_SERVER_ERROR' } },
+    });
+
+    const { renderer, unmount } = await mountScreen();
+
+    const queryError = findOne(renderer.root, 'QueryError').props as RenderedQueryError;
+    expect(queryError.variant).toBe('server');
+    expect(queryError.title).toBe("Couldn't load profiles");
+    // The server variant's own description already says what to do, so the
+    // screen adds no second sentence.
+    expect(queryError.message).toBeUndefined();
+    expect(typeof queryError.onRetry).toBe('function');
+    act(() => {
+      queryError.onRetry?.();
     });
     expect(h.query.refetch).toHaveBeenCalledTimes(1);
 
@@ -323,6 +385,60 @@ describe('ProfileCommandsScreen', () => {
         .filter(node => String(node.props.accessibilityLabel).startsWith('Delete'))
         .map(node => node.props.accessibilityHint)
     ).toEqual(['1 / 3', '2 / 3', '3 / 3']);
+
+    unmount();
+  });
+
+  it('reaches the touch target from the item action line without covering the input', async () => {
+    h.query.data = testCommands(['a', 'b', 'c']);
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+
+    const labels = ['Move command 1 up', 'Move command 1 down', 'Delete command 1'];
+    const controls = findAll(renderer.root, 'Pressable').filter(node =>
+      labels.includes(String(node.props.accessibilityLabel))
+    );
+    // The first card's reorder and delete controls, in the order the labels
+    // name them; the two cards below it keep their own.
+    expect(controls.map(node => node.props.accessibilityLabel)).toEqual(labels);
+
+    // Each control is the shared 32 dp compact box, and its 8 dp slop is what
+    // reaches 48 dp. The box sits in the item's own action line — a host row
+    // laid out after the field — and that line carries the padding its slop
+    // needs, because React Native delivers a touch only inside the parent view
+    // (#11345). The mounted suite renders no layout engine, so it holds the
+    // contract at the tree's shape; the gate's frame dumps measure the rendered
+    // numbers. The test renderer keeps the wrapper components in the tree, so
+    // the walk climbs to the nearest host node.
+    for (const control of controls) {
+      expect(String(control.props.className)).toContain(COMPACT_CONTROL_BOX_CLASS);
+      expect(control.props.hitSlop).toEqual(COMPACT_CONTROL_HIT_SLOP);
+      let ancestor: ReactTestInstance | null = control.parent;
+      while (ancestor !== null && typeof ancestor.type !== 'string') {
+        ancestor = ancestor.parent;
+      }
+      expect(ancestor).not.toBeNull();
+      expect(String(ancestor?.props.className)).toContain('justify-end gap-5');
+      // The line's padding is the slop's room and its negative margin gives the
+      // height straight back, so the reach fits without growing the item.
+      const lineClasses = String(ancestor?.props.className).split(/\s+/);
+      for (const token of ['-mx-4', 'px-4', '-my-2', 'py-2']) {
+        expect(lineClasses).toContain(token);
+      }
+    }
+
+    // The controls end their item, under the field, so the label row above
+    // them stays one text line and the field keeps its own shared gap.
+    const actionLines = findAll(renderer.root, 'View').filter(node =>
+      String(node.props.className).includes('justify-end gap-5')
+    );
+    expect(actionLines).toHaveLength(3);
+    const fields = findAll(renderer.root, 'FormField');
+    expect(fields).toHaveLength(3);
+    for (const field of fields) {
+      expect(field.props.gapClassName).toBeUndefined();
+    }
 
     unmount();
   });

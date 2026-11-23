@@ -1,8 +1,8 @@
 import type { GatewayRequest, OpenRouterChatCompletionRequest } from '../openrouter/types';
-import { replaceReasoningObjectWithReasoningEffort } from '../openrouter/request-helpers';
+import { replaceReasoningObjectWithReasoningEffort } from '../request-helpers';
 import { applyReasoningDetailsTransform } from '../apply-provider-specific-logic';
-import type { Provider, TransformRequestContext } from '../types';
-import type { DirectByokProvider } from './types';
+import type { Provider } from '../types';
+import type { DirectByokProvider, DirectByokTransformRequestContext } from './types';
 import alibabaTokenPlan from './alibaba-token-plan';
 import byteplusCoding from './byteplus-coding';
 import chutes from './chutes-byok';
@@ -10,7 +10,7 @@ import edenai from './edenai';
 import inceptron from './inceptron-byok';
 import kimiCoding from './kimi-coding';
 import morph from './morph';
-import neuralwatt from './neurowatt';
+import neuralwatt from './neuralwatt';
 import nvidia from './nvidia-byok';
 import openCodeGo from './opencode-go';
 import ollamaCloud from './ollama-cloud';
@@ -33,7 +33,8 @@ async function transform(provider: DirectByokProvider, request: GatewayRequest) 
     kilo_user_id: 'user-1',
     session_id: 'session-1',
     provider: { type: 'direct-byok', apiKey: 'test-api-key' },
-  } as unknown as TransformRequestContext);
+    directByokModel: { id: 'test' },
+  } as unknown as DirectByokTransformRequestContext);
   const { responseTransforms } = await provider.resolveUpstream({
     credential: 'test-api-key',
     model: { id: 'test' },

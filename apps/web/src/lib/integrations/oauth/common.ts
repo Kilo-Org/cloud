@@ -24,7 +24,7 @@ import {
 } from '@/lib/integrations/provider-oauth-attempts';
 import { validateReturnPath } from '@/lib/integrations/validate-return-path';
 import type { Owner } from '@/lib/integrations/core/types';
-import type { RetainedOAuthPlatform, StandardOAuthPlatform } from '@/lib/integrations/oauth/paths';
+import type { OAuthConnectPlatform, StandardOAuthPlatform } from '@/lib/integrations/oauth/paths';
 
 /**
  * Maps an organization-access denial to a user-facing OAuth error code.
@@ -160,7 +160,7 @@ export function buildIntegrationOAuthRedirectPathFromState(
 }
 
 export function buildIntegrationOAuthConnectErrorPath(
-  platform: RetainedOAuthPlatform,
+  platform: OAuthConnectPlatform,
   organizationId: string | null | undefined,
   errorCode: string
 ): string {
@@ -308,7 +308,7 @@ function reportOAuthConnectFailure(
  */
 function oauthConnectFailure(
   request: NextRequest,
-  platform: RetainedOAuthPlatform,
+  platform: OAuthConnectPlatform,
   error: unknown,
   source: string
 ): Response {

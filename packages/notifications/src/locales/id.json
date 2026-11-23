@@ -7,6 +7,7 @@
       "spendAlert": "Pengeluaran Anda perlu diperhatikan",
       "securityFinding": "Temuan keamanan perlu diperhatikan",
       "securityUpdate": "Pemeriksaan keamanan memiliki pembaruan",
+      "agentBriefing": "Laporan aktivitas agen Anda sudah siap",
       "activeAgentsGlanceable": "Agen aktif memiliki pembaruan"
     }
   },
@@ -29,6 +30,12 @@
     },
     "securityFindingNew": {
       "title": "Temuan keamanan baru ({{severity}})"
+    },
+    "securityFindingSeverity": {
+      "critical": "Kritis",
+      "high": "Tinggi",
+      "medium": "Sedang",
+      "low": "Rendah"
     },
     "securityFindingSlaWarning": {
       "title": "Peringatan SLA"

@@ -397,7 +397,8 @@ jobs:
       # kilo-mcp-release and kilo-extension-release suites; dev/** for
       # dev-local; tools/oxlint/** for the plugin suite. The rewrites suite also
       # enumerates the route directories of both apps, the dev-local suites read
-      # the mobile design-gate sources, the web env example, the auto-routing and
+      # the mobile design-gate sources and the mobile route files (the coverage
+      # map needs a row per route), the web env example, the auto-routing and
       # meter dev-vars examples, the fake LLM used by the tunnel tests, the
       # native build workflow, the web load-env module and three workspace
       # packages. The extension suite pins the store build's sources allowlist in
@@ -423,6 +424,7 @@ jobs:
               - 'apps/web/src/lib/load-env.ts'
               - 'apps/web/.env.development.local.example'
               - 'apps/mobile/src/lib/design-gate/**'
+              - 'apps/mobile/src/app/**'
               - 'services/*/package.json'
               - 'services/*/wrangler.jsonc'
               - 'services/auto-routing/.dev.vars.example'
@@ -455,6 +457,7 @@ jobs:
               - 'apps/web/src/lib/load-env.ts'
               - 'apps/web/.env.development.local.example'
               - 'apps/mobile/src/lib/design-gate/**'
+              - 'apps/mobile/src/app/**'
               - 'services/*/package.json'
               - 'services/*/wrangler.jsonc'
               - 'services/auto-routing/.dev.vars.example'
@@ -642,7 +645,9 @@ jobs:
       # trips the script chain's filter, but that chain names it nowhere, and
       # this list is the only place the suite runs: the `test:mobile-sbom`
       # script that test-scripts reaches must not name it, or one run executes
-      # the file in two jobs.
+      # the file in two jobs. That is why the root `test:mobile-sbom` entry
+      # lists its five files instead of one `scripts/mobile-sbom*.test.mjs`
+      # glob, which would also collect `scripts/mobile-sbom-workflow.test.mjs`.
       - name: Test workflow wiring
         run: >-
           node --test
@@ -1057,7 +1062,6 @@ jobs:
       NODE_ENV: test
       POSTGRES_URL: postgresql://postgres:postgres@localhost:5432/postgres
       POSTGRES_CONNECT_TIMEOUT: 30000
-      POSTGRES_MAX_QUERY_TIME: 30000
       UPSTASH_REDIS_REST_URL: http://localhost:8079
       UPSTASH_REDIS_REST_TOKEN: example_token
       JEST_MAX_WORKERS: 4
@@ -1141,7 +1145,6 @@ jobs:
       NODE_ENV: test
       POSTGRES_URL: postgresql://postgres:postgres@localhost:5432/postgres
       POSTGRES_CONNECT_TIMEOUT: 30000
-      POSTGRES_MAX_QUERY_TIME: 30000
       UPSTASH_REDIS_REST_URL: http://localhost:8079
       UPSTASH_REDIS_REST_TOKEN: example_token
       JEST_MAX_WORKERS: 2
@@ -1227,7 +1230,7 @@ jobs:
         run: pnpm install --frozen-lockfile --filter 'web...' --filter kilocode-monorepo
 
       - name: Dependency cycle check
-        run: pnpm run dependency-cycle-check
+        run: pnpm run web:dependency-cycle-check
 
   # Required check. A skipped job (nothing relevant changed) passes; a failed
   # or cancelled job fails this one. Besides the web tests it covers the web
@@ -1381,8 +1384,8 @@ jobs:
           cp ../web/.env .env
           cp ../web/.env.test .env.production.local
 
-      - name: Check ai-gateway usage queue targets
-        run: pnpm --filter ai-gateway run test:usage-queue
+      - name: Check ai-gateway Vercel config
+        run: pnpm --filter ai-gateway run test:vercel-config
 
       - name: Build ai-gateway
         env:
@@ -1530,6 +1533,10 @@ jobs:
           ln -sfn "$build_dir/wrapper/node_modules" "$build_dir/node_modules"
           ln -s "$GITHUB_WORKSPACE/services/cloud-agent-next/node_modules/@sentry/cli" node_modules/@sentry/cli
           bun run build.ts --install-dir "$build_dir/bin"
+
+      - name: Test AWS runtime bundle and launch document
+        if: matrix.part == 'other'
+        run: pnpm --filter cloud-agent-next test:aws-runtime-bundle
 
       - name: Test cloud-agent-next checkers
         if: matrix.part == 'other'

@@ -126,6 +126,8 @@ const GITLAB_BROKER_REASONS = [
 /** Every reason string the broker client can already have returned. */
 export const GRANT_BROKER_REASONS = [
   ...GITHUB_AUTHORIZATION_REASONS,
+  'access_denied',
+  'repository_unavailable',
   ...CLIENT_BROKER_REASONS,
   ...BITBUCKET_BROKER_REASONS,
   ...GITLAB_BROKER_REASONS,
@@ -148,7 +150,7 @@ export const GRANT_FAILURE_REASONS = [
 ] as const;
 export type GrantFailureReason = (typeof GRANT_FAILURE_REASONS)[number];
 
-export const GRANT_PROVIDERS = ['cloudflare', 'vercel', 'cloudflare-containers'] as const;
+export const GRANT_PROVIDERS = ['cloudflare', 'vercel', 'cloudflare-containers', 'aws'] as const;
 export type GrantProvider = (typeof GRANT_PROVIDERS)[number];
 export const GRANT_CONTAINMENT = ['enabled', 'disabled'] as const;
 export type GrantContainment = (typeof GRANT_CONTAINMENT)[number];

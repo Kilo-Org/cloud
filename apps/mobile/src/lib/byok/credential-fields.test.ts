@@ -1,3 +1,6 @@
+// eslint-disable-next-line import/no-nodejs-modules -- test-only fixture key
+import { generateKeyPairSync } from 'node:crypto';
+
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -9,6 +12,11 @@ import {
   type ModelMapping,
   readStructuredCredential,
 } from './credential-fields';
+
+/** A real key, because the Vertex form now refuses anything that is not a PEM. */
+const { privateKey: fixtureKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+const exportedKey = fixtureKey.export({ type: 'pkcs8', format: 'pem' });
+const PEM_KEY = typeof exportedKey === 'string' ? exportedKey : exportedKey.toString('utf8');
 
 describe('credentialForm', () => {
   it('offers one API key and its region for the API-key Bedrock method', () => {
@@ -34,11 +42,11 @@ describe('credentialForm', () => {
 
   it('offers Vertex its project, location and service account', () => {
     const form = credentialForm('vertex-byok', 'apiKey');
-    expect(form?.fields.map(field => [field.id, field.multiline])).toEqual([
-      ['project', false],
-      ['location', false],
-      ['clientEmail', false],
-      ['privateKey', true],
+    expect(form?.fields.map(field => field.id)).toEqual([
+      'project',
+      'location',
+      'clientEmail',
+      'privateKey',
     ]);
   });
 
@@ -80,6 +88,26 @@ describe('firstMissingField', () => {
 });
 
 describe('credentialPayload', () => {
+  function vertexValues(privateKey: string) {
+    return {
+      project: 'p',
+      location: 'global',
+      clientEmail: 'service@example.test',
+      privateKey,
+    } satisfies CredentialValues;
+  }
+
+  it('refuses a value that is not a private key instead of storing it', () => {
+    expect(
+      credentialProblem({
+        providerId: 'vertex',
+        mode: 'apiKey',
+        values: vertexValues('not a key'),
+        modelMappings: [],
+      })
+    ).toEqual({ code: 'invalid-credential' });
+  });
+
   it('writes the Bedrock API-key method as the web form stores it', () => {
     expect(
       credentialPayload({
@@ -133,33 +161,75 @@ describe('credentialPayload', () => {
           project: 'project',
           location: 'global',
           clientEmail: 'service@example.test',
-          privateKey: 'pem',
+          privateKey: PEM_KEY,
         },
         modelMappings: [],
       })
     ).toEqual({
       project: 'project',
       location: 'global',
-      googleCredentials: { clientEmail: 'service@example.test', privateKey: 'pem' },
+      googleCredentials: { clientEmail: 'service@example.test', privateKey: PEM_KEY.trim() },
     });
   });
 });
 
 describe('readStructuredCredential', () => {
-  const form = credentialForm('azure', 'apiKey');
-
-  function readAzure(rows: readonly Partial<ModelMapping>[]) {
+  /** One form's fields read as the credential its provider takes. */
+  function read(
+    providerId: string,
+    values: CredentialValues,
+    rows: readonly Partial<ModelMapping>[] = []
+  ) {
+    const form = credentialForm(providerId, 'apiKey');
     if (!form) {
-      throw new Error('missing the Azure form');
+      throw new Error(`missing the ${providerId} form`);
     }
-    return readStructuredCredential({
-      providerId: 'azure',
-      mode: 'apiKey',
-      form,
-      values: { apiKey: 'k', resourceName: 'r' },
-      rows,
-    });
+    return readStructuredCredential({ providerId, mode: 'apiKey', form, values, rows });
   }
+  const readAzure = (rows: readonly Partial<ModelMapping>[]) =>
+    read('azure', { apiKey: 'k', resourceName: 'r' }, rows);
+  const readVertex = (privateKey: string) =>
+    read('vertex', { project: 'p', location: 'global', clientEmail: 'a@b.test', privateKey });
+
+  it('reads a key file the gateway can sign with as ready', () => {
+    expect(readVertex(PEM_KEY)).toMatchObject({ tag: 'ready' });
+  });
+
+  it('refuses an encrypted key with the passphrase cause on the private-key field', () => {
+    const encrypted = fixtureKey.export({
+      type: 'pkcs8',
+      format: 'pem',
+      cipher: 'aes-256-cbc',
+      passphrase: 'x',
+    });
+    const pem = typeof encrypted === 'string' ? encrypted : encrypted.toString('utf8');
+    expect(pem.startsWith('-----BEGIN ENCRYPTED PRIVATE KEY-----')).toBe(true);
+    expect(readVertex(pem)).toEqual({
+      tag: 'refused',
+      field: 'privateKey',
+      cause: 'key-encrypted',
+    });
+  });
+
+  it('refuses a truncated key block with the block cause, not the passphrase cause', () => {
+    const truncated = PEM_KEY.trim()
+      .split('\n')
+      .filter(line => !line.startsWith('-----END '))
+      .join('\n');
+    expect(readVertex(truncated)).toEqual({
+      tag: 'refused',
+      field: 'privateKey',
+      cause: 'key-block',
+    });
+  });
+
+  it('refuses a value that is not a key on the private-key field', () => {
+    expect(readVertex('not a key')).toEqual({
+      tag: 'refused',
+      field: 'privateKey',
+      cause: 'key-block',
+    });
+  });
 
   it('names the row a half-filled mapping sits in', () => {
     expect(readAzure([{ gatewayModelSlug: 'gpt-4' }])).toEqual({
@@ -218,7 +288,7 @@ describe('credentialProblem', () => {
           project: 'project',
           location: 'global',
           clientEmail: 'service@example.test',
-          privateKey: 'pem',
+          privateKey: PEM_KEY,
         },
         modelMappings: [],
       })

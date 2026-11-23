@@ -235,16 +235,19 @@ describe('sandbox allocation contract', () => {
     }
   );
 
-  it('keeps every selectable allocation in the containers and BYOC Vercel providers', () => {
+  it('keeps every selectable allocation in containers and customer providers', () => {
     expect(SELECTABLE_SANDBOX_ALLOCATIONS).toEqual([
       'cloudflare-containers-standard-3',
       'cloudflare-containers-standard-4',
       'vercel-small',
       'vercel-large',
+      'aws-microvm-8g',
     ]);
     for (const allocation of SELECTABLE_SANDBOX_ALLOCATIONS) {
       expect(sandboxAllocationSchema.safeParse(allocation).success).toBe(true);
-      expect(getSandboxAllocationProvider(allocation)).toMatch(/^(cloudflare-containers|vercel)$/);
+      expect(getSandboxAllocationProvider(allocation)).toMatch(
+        /^(cloudflare-containers|vercel|aws)$/
+      );
     }
   });
 
@@ -267,16 +270,14 @@ describe('sandbox allocation contract', () => {
 });
 
 describe('multi-repository allocation support', () => {
-  const unsupported = ['vercel-small', 'vercel-large'];
-
-  it.each(SELECTABLE_SANDBOX_ALLOCATIONS)('%s', allocation => {
-    expect(allocationSupportsMultiRepository(allocation)).toBe(!unsupported.includes(allocation));
+  it.each(SELECTABLE_SANDBOX_ALLOCATIONS)('%s holds several repositories', allocation => {
+    expect(allocationSupportsMultiRepository(allocation)).toBe(true);
   });
 
-  it('rejects exactly Vercel among selectable allocations', () => {
-    const rejected = SELECTABLE_SANDBOX_ALLOCATIONS.filter(
+  it('rejects exactly the shared sandbox among all allocations', () => {
+    const rejected = sandboxAllocationSchema.options.filter(
       allocation => !allocationSupportsMultiRepository(allocation)
     );
-    expect(rejected).toEqual(unsupported);
+    expect(rejected).toEqual(['cloudflare-shared']);
   });
 });

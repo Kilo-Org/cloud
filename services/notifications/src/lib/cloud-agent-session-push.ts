@@ -1,5 +1,7 @@
 import { presenceContextForCliSession, presenceContextForPlatform } from '@kilocode/event-service';
 import {
+  SESSION_READY_I18N_KEY,
+  classifyCloudAgentSessionPush,
   cloudAgentSessionCategorySchema,
   sendCloudAgentSessionNotificationInputSchema,
   sendSessionReadyNotificationInputSchema,
@@ -219,10 +221,10 @@ export async function dispatchCloudAgentSessionPush(
   deps: DispatchCloudAgentSessionPushDeps
 ): Promise<SendCloudAgentSessionNotificationResult> {
   const parsed = sendCloudAgentSessionNotificationInputSchema.parse(params);
-  // ponytail: Absent `category` is treated as 'status' at the read site
-  // (the existing rolling-deploy default). Producers that omit it keep
-  // being routed through `sessionStatusEnabled`.
-  const category: CloudAgentSessionCategory = parsed.category ?? 'status';
+  // Absent `category` is a status push: the shared classifier applies the
+  // schema default, so the preference gate below cannot disagree with the
+  // push kind and the history category.
+  const category: CloudAgentSessionCategory = classifyCloudAgentSessionPush(parsed);
   return dispatchSessionPush(
     parsed.userId,
     parsed.cliSessionId,
@@ -282,7 +284,7 @@ export async function dispatchSessionReadyPush(
         idempotencyKey: `cloud-agent:${parsed.cliSessionId}:session-ready`,
         title,
         body: 'Your Kilo session is ready to control from your phone',
-        i18nKey: 'sessionReady',
+        i18nKey: SESSION_READY_I18N_KEY,
         i18nParams: { sessionTitle: title },
         category: 'status',
       };

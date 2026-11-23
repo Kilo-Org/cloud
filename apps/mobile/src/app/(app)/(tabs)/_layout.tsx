@@ -1,7 +1,7 @@
 import { Tabs, usePathname, useSegments } from 'expo-router';
 import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { Bot, House, MessageCircle, UserRound } from '@/components/ui/icons';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Platform, useWindowDimensions, View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -9,7 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { SessionPreviewOverlay } from '@/components/agents/session-preview-overlay';
 import { StateSurfaceInsets } from '@/components/centered-state-surface';
 import { TabBarButton } from '@/components/tab-bar-button';
-import { TabBarLabel } from '@/components/tab-bar-label';
+import { TabBarLabel } from '@/components/ui/tab-bar-label';
 import { TabSwitchInputSettle } from '@/components/tab-screen-input-gate';
 import { BlurBar } from '@/components/ui/blur-bar';
 import { usePendingAppAction } from '@/lib/app-actions/use-pending-app-action';
@@ -20,10 +20,11 @@ import {
   isAttentionAcked,
   reconcileSessionAttention,
   shouldShowNeedsInput,
+  useSessionAttentionHydration,
   useSessionAttentionRevision,
 } from '@/lib/session-attention';
 import { publishRenderedTabBarHeight, TabBarLabelContext } from '@/lib/tab-bar-clearance';
-import { isFormSheetRoute } from '@/lib/form-sheet-routes';
+import { isFormSheetRoute, segmentsBeneathFormSheet } from '@/lib/form-sheet-routes';
 import { profileTabPressListeners, tabPressListeners } from '@/lib/tab-press-listeners';
 import {
   getEffectiveTabBarHeight,
@@ -61,16 +62,36 @@ export default function TabsLayout() {
   const { bottom, left, right } = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const fontScale = useLiveFontScale();
-  const hideTabs = shouldHideTabBar(pathname, segments);
+  // A form sheet covers the screen beneath it instead of becoming one, but a
+  // sheet the app stack presents replaces that screen's route in `segments`, so
+  // the layout keeps the last screen it showed. A sheet over a tab root then
+  // leaves the root's bar — and the bottom inset this layout publishes for it —
+  // in place, while a sheet over a pushed screen keeps the bar hidden. The
+  // memory is only read while a sheet is up, so an effect can fill it.
+  const sheetOverTabs = isFormSheetRoute(segments);
+  const [lastScreenSegments, setLastScreenSegments] = useState<readonly string[]>(
+    segmentsBeneathFormSheet(segments)
+  );
+  useEffect(() => {
+    if (sheetOverTabs) {
+      return;
+    }
+    setLastScreenSegments(previous =>
+      previous.length === segments.length &&
+      previous.every((segment, index) => segment === segments[index])
+        ? previous
+        : segments
+    );
+  }, [sheetOverTabs, segments]);
+  const hideTabs = shouldHideTabBar(pathname, sheetOverTabs ? lastScreenSegments : segments);
   // A form sheet presented inside a tab stack (the organization sheets, the
   // pickers) covers this tab's screen. The covered scene hides itself through
   // the stack's screen layout gate, but the bar is rendered by this navigator
   // beside the scenes, outside every scene gate, so its entries stay in the
   // accessibility tree and a reader reaches them before the sheet's content.
   // While a form sheet route is presented, the entries carry the same hiding
-  // presentation the covered scene uses. The bar stays visible and tappable for
-  // a sighted user; only the accessibility tree changes.
-  const sheetOverTabs = isFormSheetRoute(segments);
+  // presentation the covered scene uses: the sheet covers the bar, so it is
+  // neither seen nor reached, and only the accessibility tree changes.
   const tabCount = VISIBLE_TAB_COUNT;
   // The label box is the tab item minus the bar's side safe areas and the
   // tab item's own padding (subtracted inside `tabLabelFits`). A window whose
@@ -120,6 +141,7 @@ export default function TabsLayout() {
     enabled: orgLoaded,
   });
   const attentionRevision = useSessionAttentionRevision();
+  const attentionHydration = useSessionAttentionHydration();
   useEffect(() => {
     if (!orgLoaded) {
       return;
@@ -131,15 +153,20 @@ export default function TabsLayout() {
   const needsInputRows = activeSessions.map(session => ({
     id: session.id,
     status: session.status,
+    hydration: attentionHydration,
     isAcked: isAttentionAcked(session.id, {
       raiseId: session.statusUpdatedAt ?? session.status,
       status: session.status,
     }),
   }));
+  // A `hold` row is not counted: while the ack store is still loading it
+  // answers "not acked" for every raise, so the badge would appear and then
+  // disappear as a restored ack lands. `shouldShowNeedsInput` is false for a
+  // held row, which leaves the badge undefined until the phase settles.
   const needsInputCount = needsInputRows.filter(session =>
     shouldShowNeedsInput({
       status: session.status,
-      raiseId: session.status,
+      hydration: session.hydration,
       isAcked: session.isAcked,
     })
   ).length;
@@ -151,7 +178,7 @@ export default function TabsLayout() {
   // session it created. The consumer lives in `usePendingAppAction` and is
   // mounted here because this layout owns both the router and the live session
   // list — the destination is decided here and nowhere else.
-  usePendingAppAction({ needsInputRows, orgLoaded, isLoading, isError });
+  usePendingAppAction({ attentionHydration, needsInputRows, orgLoaded, isLoading, isError });
 
   // The centered-state band ends at the tab bar's top edge, the region the bar
   // does not cover. The 16pt scroll-content gap (`TAB_SCREEN_BOTTOM_GAP`) is
@@ -280,7 +307,7 @@ export default function TabsLayout() {
     </StateSurfaceInsets>
   );
   return (
-    <TabBarLabelContext value={labelState}>
+    <TabBarLabelContext value={hideTabs ? null : labelState}>
       {tabsLayout}
       <SessionPreviewOverlay />
     </TabBarLabelContext>

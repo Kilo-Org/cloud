@@ -1,6 +1,7 @@
 import type {
   AutoRouter,
   BenchmarkProfileEntryStatus,
+  BenchmarkProfileFailure,
   BenchmarkProfileQuotaError,
   BenchmarkProfileStatus,
   BenchmarkProfileStatusesResponse,
@@ -21,6 +22,7 @@ import { benchmarkProfiles, profileRequestEvents } from './db-schema';
 import { variantFromStorage, variantToStorage } from './reasoning-effort';
 import { computeEngineIdentity } from './run';
 import { noLiveBenchmarkChunks } from './profile-entry-claims';
+import { parseProfileState, wireProfileFailure, wireProfileStatus } from './profile-failure';
 
 /** Rolling 24h owner admission limit per base router (charged new/retry only). */
 export const PROFILE_ADMISSION_LIMIT = 20;
@@ -40,8 +42,8 @@ export type CurrentProfileContext = {
 
 /**
  * Shared currency predicate: a profile row is current only when it was measured
- * (or is being measured) under the live decider engine identity and the saved
- * deciderRepetitions, for the same exact Pool entry (model + variant). Platform and
+ * (or is being measured) under the live decider engine identity and the router's
+ * decider repetitions, for the same exact Pool entry (model + variant). Platform and
  * owner-pool tables require it; custom routers serve an older ready row flagged
  * stale instead (ADR 0005).
  */
@@ -62,22 +64,37 @@ export function isCurrentBenchmarkProfile(
 }
 
 export function currentProfileContextFromConfig(
-  config: PolicySettingSource & { router?: AutoRouter }
+  config: PolicySettingSource
 ): CurrentProfileContext {
   return {
-    router: config.router ?? 'efficient',
-    engineIdentity: computeEngineIdentity('decider', config.router ?? 'efficient'),
+    router: config.router,
+    engineIdentity: computeEngineIdentity('decider', config.router),
     repetitions: resolveEffectivePolicy(config).deciderRepetitions,
   };
 }
 
 export type AdmissionClass =
-  | { kind: 'report'; status: BenchmarkProfileStatus; failureReason?: string | null }
+  | {
+      kind: 'report';
+      status: BenchmarkProfileStatus;
+      failureReason?: string | null;
+      failure?: BenchmarkProfileFailure;
+    }
   | { kind: 'admit'; charged: boolean };
 
 /**
  * Pure classification of one entry against existing registry rows for that
  * exact pair. `retry` is true when the owner listed this entry in retryEntries.
+ * An explicit owner retry re-admits a retryable failed row and is charged. A
+ * permanently failed pair is only reported: the owner cannot re-admit it by
+ * paying, because re-admission is an explicit admin action after the catalog
+ * proves the model runnable today. Nothing re-admits a failed row automatically.
+ *
+ * The permanent verdict is scoped exactly like the attempt history and the paid
+ * quote/permit: (router, model, variant, engine identity), across repetition counts. A
+ * permanent row at another repetition count of the same engine therefore blocks this
+ * admission too — otherwise a new-repetition row would be admitted into a pair the
+ * permit path refuses. A row from another engine or router never blocks.
  */
 export function classifyProfileAdmission(
   entryRows: readonly ProfileRow[],
@@ -87,25 +104,42 @@ export function classifyProfileAdmission(
 ): AdmissionClass {
   const currentRow = entryRows.find(row => isCurrentBenchmarkProfile(row, current, entry));
   if (currentRow) {
-    if (
-      currentRow.status === 'ready' ||
-      currentRow.status === 'pending' ||
-      currentRow.status === 'running'
-    ) {
-      return { kind: 'report', status: currentRow.status };
-    }
-    // failed
-    if (retry) {
+    const state = parseProfileState(currentRow);
+    const failure = wireProfileFailure(state);
+    if (!failure) return { kind: 'report', status: wireProfileStatus(state) };
+    if (retry && failure.kind === 'retryable') {
       return { kind: 'admit', charged: true };
     }
     return {
       kind: 'report',
       status: 'failed',
       failureReason: currentRow.failure_reason,
+      failure,
     };
   }
 
-  // No current row: stale history (free) or never seen (charged).
+  // No current row, but the pair may be permanently failed at another repetition count of
+  // this engine. Same rule as the quote and the permit: the pair, not the row, is
+  // unavailable until an explicit admin re-admission clears it.
+  const permanentSibling = entryRows.find(
+    row =>
+      (row.router ?? 'efficient') === (current.router ?? 'efficient') &&
+      row.model === entry.model &&
+      row.variant === variantToStorage(entry.variant) &&
+      row.engine_identity === current.engineIdentity &&
+      row.status === 'unavailable'
+  );
+  if (permanentSibling) {
+    const failure = wireProfileFailure(parseProfileState(permanentSibling));
+    return {
+      kind: 'report',
+      status: 'failed',
+      failureReason: permanentSibling.failure_reason,
+      ...(failure ? { failure } : {}),
+    };
+  }
+
+  // No current or permanently failed row: stale history (free) or never seen (charged).
   if (entryRows.length > 0) {
     return { kind: 'admit', charged: false };
   }
@@ -221,10 +255,13 @@ function groupRowsByEntry(rows: readonly ProfileRow[]): Map<string, ProfileRow[]
 }
 
 function statusFromRow(entry: BenchmarkPair, row: ProfileRow): BenchmarkProfileEntryStatus {
+  const state = parseProfileState(row);
+  const failure = wireProfileFailure(state);
   return {
     entry,
-    status: row.status,
-    failureReason: row.status === 'failed' ? boundFailureReason(row.failure_reason) : null,
+    status: wireProfileStatus(state),
+    failureReason: failure ? boundFailureReason(row.failure_reason) : null,
+    ...(failure ? { failure } : {}),
   };
 }
 
@@ -311,8 +348,9 @@ const PROFILE_PK_TARGET = [
 
 /**
  * Register-path upsert: insert a pending current row, or only transition an
- * existing current row from `failed` → `pending`. Never regresses
- * pending/running/ready or clears their provenance.
+ * existing current failed row, retryable or permanent, to `pending`. Never
+ * regresses pending/running/ready or clears their provenance. The failure
+ * history stays, so the retry budgets keep counting.
  */
 export function pendingRegisterUpsertStatement(
   orm: ReturnType<typeof drizzle>,
@@ -327,12 +365,13 @@ export function pendingRegisterUpsertStatement(
         status: 'pending',
         run_id: null,
         failure_reason: null,
+        retry_after: null,
         requested_at: values.requested_at,
         updated_at: values.updated_at,
         completed_at: null,
       },
       where: and(
-        eq(benchmarkProfiles.status, 'failed'),
+        inArray(benchmarkProfiles.status, ['failed', 'unavailable']),
         noLiveBenchmarkChunks({
           router: values.router ?? 'efficient',
           model: values.model,
@@ -527,7 +566,7 @@ export type RegisterProfilesInput = {
  */
 export async function registerProfiles(
   db: D1Database,
-  config: PolicySettingSource & { router?: AutoRouter },
+  config: PolicySettingSource,
   input: RegisterProfilesInput
 ): Promise<BenchmarkProfileStatusesResponse> {
   assertUniquePairs(input.pairs);
@@ -664,6 +703,7 @@ export async function registerProfiles(
         classification.status === 'failed'
           ? boundFailureReason(classification.failureReason)
           : null,
+      ...(classification.failure ? { failure: classification.failure } : {}),
     };
   });
 
@@ -685,7 +725,7 @@ export type LookupProfileStatusesInput = {
  */
 export async function lookupProfileStatuses(
   db: D1Database,
-  config: PolicySettingSource & { router?: AutoRouter },
+  config: PolicySettingSource,
   input: LookupProfileStatusesInput
 ): Promise<BenchmarkProfileStatusesResponse> {
   assertUniquePairs(input.pairs);

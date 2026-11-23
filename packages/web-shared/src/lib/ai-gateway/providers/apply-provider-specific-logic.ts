@@ -1,6 +1,5 @@
 import * as z from 'zod';
 import type { OrganizationDataRegion } from '@kilocode/db/schema-types';
-import { GEMINI_THOUGHT_TAG_MARKER } from '@kilocode/web-shared/lib/ai-gateway/reasoning-details-transform';
 import {
   type GatewayResponsesRequest,
   type OpenRouterChatCompletionRequest,
@@ -10,6 +9,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
   applyMistralModelSettings,
+  applyMistralThinkingRequestTransform,
   isMistralModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/mistral';
 import { isRecord } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
@@ -56,105 +56,29 @@ import {
   fixResponsesRequest,
   mapReasoningDetailsToReasoning,
   mapReasoningDetailsToReasoningContent,
-  replaceReasoningObjectWithReasoningEffort,
   scrubOpenCodeSpecificProperties,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
+import { replaceReasoningObjectWithReasoningEffort } from '@kilocode/web-shared/lib/ai-gateway/providers/request-helpers';
 import { isQwenExplicitCacheModel } from '@kilocode/web-shared/lib/ai-gateway/providers/qwen';
-import { ReasoningFormat } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/format';
-import { ReasoningDetailType } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/reasoning-details';
 import type { CustomPricing } from '@kilocode/db/schema-types';
 import { getCustomPricing } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
 import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
 import { isGeminiModel } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
+import { applyGeminiReasoningRequestTransform } from '@kilocode/web-shared/lib/ai-gateway/providers/google-reasoning';
 import { sanitizeJsonRefToolResults } from '@kilocode/web-shared/lib/ai-gateway/providers/sanitize-json-ref-tool-results';
 import { isMuseModel } from '@kilocode/web-shared/lib/ai-gateway/providers/meta';
 import { addMissingToolSchemaEnumTypes } from '@kilocode/web-shared/lib/ai-gateway/providers/add-missing-tool-schema-enum-types';
 import { removeRecursiveToolSchemaRefs } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-recursive-tool-schema-refs';
 import { removeTopLevelToolSchemaCombinators } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-top-level-tool-schema-combinators';
+import { repairGeminiToolSchemas } from '@kilocode/web-shared/lib/ai-gateway/providers/repair-gemini-tool-schemas';
+import { moveInvalidToolPropertyKeys } from '@kilocode/web-shared/lib/ai-gateway/providers/move-invalid-tool-property-keys';
 import { removePaidServerFeatures } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-paid-server-features';
 import { removeWhitespaceOnlyMessages } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-whitespace-only-messages';
 import {
   addReflectionReasoningPlaceholders,
   isReflectionModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/reflection';
-
-function setGeminiThoughtSignature(value: Record<string, unknown>, signature: string) {
-  const extraContent = isRecord(value.extra_content) ? value.extra_content : {};
-  const google = isRecord(extraContent.google) ? extraContent.google : {};
-  value.extra_content = {
-    ...extraContent,
-    google: {
-      ...google,
-      thought_signature: signature,
-    },
-  };
-}
-
-function mapGeminiReasoningDetails(request: OpenRouterChatCompletionRequest) {
-  for (const message of request.messages) {
-    if (!isRecord(message)) {
-      continue;
-    }
-
-    delete message.thoughtSignature;
-    delete message.reasoning;
-
-    const toolCalls = Array.isArray(message.tool_calls) ? message.tool_calls.filter(isRecord) : [];
-    for (const toolCall of toolCalls) {
-      const legacySignature = toolCall.thoughtSignature;
-      delete toolCall.thoughtSignature;
-      if (typeof legacySignature === 'string') {
-        setGeminiThoughtSignature(toolCall, legacySignature);
-      }
-    }
-
-    const reasoningDetails = message.reasoning_details;
-    delete message.reasoning_details;
-    if (!Array.isArray(reasoningDetails)) {
-      continue;
-    }
-
-    for (const detail of reasoningDetails) {
-      if (
-        !isRecord(detail) ||
-        detail.type !== ReasoningDetailType.Encrypted ||
-        typeof detail.data !== 'string' ||
-        detail.format !== ReasoningFormat.GoogleGeminiV1
-      ) {
-        continue;
-      }
-
-      const toolCall =
-        typeof detail.id === 'string'
-          ? toolCalls.find(candidate => candidate.id === detail.id)
-          : undefined;
-      setGeminiThoughtSignature(toolCall ?? message, detail.data);
-    }
-  }
-}
-
-function applyGeminiReasoningTransform(request: OpenRouterChatCompletionRequest) {
-  const reasoningEffort = request.reasoning_effort;
-  const extra = request as typeof request & { google?: unknown };
-  delete extra.reasoning_effort;
-
-  if (reasoningEffort !== 'none') {
-    const existingGoogle = isRecord(extra.google) ? extra.google : {};
-    extra.google = {
-      ...existingGoogle,
-      thinking_config: {
-        ...(reasoningEffort !== undefined ? { thinking_level: reasoningEffort } : {}),
-        include_thoughts: true,
-      },
-      // Without streaming, thoughts and answer share one content string, and
-      // only these tags separate them. Streams flag thought chunks instead, and
-      // asking for tags there would also put the closing tag in the answer.
-      ...(request.stream !== true ? { thought_tag_marker: GEMINI_THOUGHT_TAG_MARKER } : {}),
-    };
-  }
-
-  mapGeminiReasoningDetails(request);
-}
+import { isGatewayBackend } from '@kilocode/web-shared/lib/ai-gateway/providers/provider-type-predicates';
 
 /**
  * Claude goes to Anthropic and OpenAI models go to Amazon Bedrock only for
@@ -295,7 +219,7 @@ export function applyReasoningDetailsTransform(
 
   switch (provider.responseTransforms) {
     case ReasoningDetailsTransform.GeminiThought:
-      applyGeminiReasoningTransform(requestToMutate.body);
+      applyGeminiReasoningRequestTransform(requestToMutate.body);
       break;
     case ReasoningDetailsTransform.ReasoningContent:
       replaceReasoningObjectWithReasoningEffort(requestToMutate);
@@ -305,34 +229,72 @@ export function applyReasoningDetailsTransform(
       replaceReasoningObjectWithReasoningEffort(requestToMutate);
       mapReasoningDetailsToReasoning(requestToMutate.body);
       break;
+    case ReasoningDetailsTransform.MistralThinking:
+      applyMistralThinkingRequestTransform(requestToMutate);
+      break;
     case null:
       break;
   }
 }
 
-export async function applyProviderSpecificLogic(
-  provider: Provider,
-  requestedModel: string,
-  requestToMutate: GatewayRequest,
-  extraHeaders: Record<string, string>,
-  userByok: BYOKResult[] | null,
-  originalHeaders: FraudDetectionHeaders,
-  userId: string,
-  organizationId: string | null,
-  sessionId: string | null,
-  taskId: string | null,
-  isNonTrialEnterprise: boolean,
-  dataRegion: OrganizationDataRegion | null
-) {
+/**
+ * Whose account the upstream provider bills, as the request-level routing and
+ * billing rules see it. Not the `Payer` of a routing decision
+ * (`providers/routing-decision.ts`), which names the selected route: that one
+ * has no user-gateway-key case, so the two vocabularies stay separate.
+ */
+type RequestPayer = 'kilo' | 'user_gateway' | 'user_byok';
+
+export type ApplyProviderSpecificLogicInput = {
+  provider: Provider;
+  requestedModel: string;
+  requestToMutate: GatewayRequest;
+  extraHeaders: Record<string, string>;
+  userByok: BYOKResult[] | null;
+  originalHeaders: FraudDetectionHeaders;
+  userId: string;
+  organizationId: string | null;
+  sessionId: string | null;
+  taskId: string | null;
+  isNonTrialEnterprise: boolean;
+  dataRegion: OrganizationDataRegion | null;
+};
+
+export async function applyProviderSpecificLogic({
+  provider,
+  requestedModel,
+  requestToMutate,
+  extraHeaders,
+  userByok,
+  originalHeaders,
+  userId,
+  organizationId,
+  sessionId,
+  taskId,
+  isNonTrialEnterprise,
+  dataRegion,
+}: ApplyProviderSpecificLogicInput) {
   // A user's own gateway key bills their account, so Kilo's routing preferences
   // do not override what the request and their account ask for, and the
   // gateway's paid server features bill that account rather than Kilo's.
   const usesUserGatewayKey =
     userByok?.some(byok => isGatewayUserByokProviderId(byok.providerId)) ?? false;
+  // The three payer cases, named once: Kilo pays, the user's own gateway key
+  // pays, or another user BYOK key pays. Every billing- and routing-sensitive
+  // branch below reads this classification instead of re-deriving the case from
+  // the two raw inputs.
+  const payer: RequestPayer =
+    userByok === null ? 'kilo' : usesUserGatewayKey ? 'user_gateway' : 'user_byok';
+  // The model the gateway serves and bills is a `~` alias's target, so the free class and the
+  // request rewrite read that id.
+  const servedModel = await resolveOpenRouterModelAlias(requestedModel);
 
   removeModelsFallback(requestedModel, requestToMutate);
-  if (isFreeModel(requestedModel) || (userByok !== null && !usesUserGatewayKey)) {
-    removePaidServerFeatures(provider, requestedModel, requestToMutate, userId);
+  // Kilo's paid server features are removed for a free model, and for a user BYOK
+  // key that is not a gateway key. A user gateway key keeps them: the gateway
+  // runs them on that account's key.
+  if (isFreeModel(servedModel) || payer === 'user_byok') {
+    removePaidServerFeatures(provider, servedModel, requestToMutate, userId);
   }
   applyTrackingIds(requestToMutate, provider, userId, taskId);
 
@@ -340,6 +302,8 @@ export async function applyProviderSpecificLogic(
 
   if (isGeminiModel(requestedModel)) {
     sanitizeJsonRefToolResults(requestToMutate);
+    // Gemini rejects tools with "schema specified other fields alongside any_of. When using any_of, it must be the only field set."
+    repairGeminiToolSchemas(requestToMutate);
   }
 
   if (isMuseModel(requestedModel)) {
@@ -350,6 +314,8 @@ export async function applyProviderSpecificLogic(
   if (isClaudeModel(requestedModel)) {
     // Anthropic rejects tools with "input_schema does not support oneOf, allOf, or anyOf at the top level"
     removeTopLevelToolSchemaCombinators(requestToMutate);
+    // Anthropic rejects tools with "input_schema.properties: Property keys should match pattern '^[a-zA-Z0-9_.-]{1,64}$'"
+    moveInvalidToolPropertyKeys(requestToMutate);
   }
 
   if (isKimiModel(requestedModel)) {
@@ -391,7 +357,7 @@ export async function applyProviderSpecificLogic(
   if (provider.type === 'openrouter' && requestedModel.startsWith('~')) {
     // Kilo pins a latest alias to its stored target, so OpenRouter serves that target rather than
     // the newest model it would pick.
-    requestToMutate.body.model = await resolveOpenRouterModelAlias(requestedModel);
+    requestToMutate.body.model = servedModel;
   }
 
   if (isClaudeModel(requestedModel)) {
@@ -403,7 +369,7 @@ export async function applyProviderSpecificLogic(
   }
 
   // Kilo's provider order and exclusions only shape routes Kilo pays for, never a user's own keys.
-  if (userByok === null && (provider.type === 'openrouter' || provider.type === 'vercel')) {
+  if (payer === 'kilo' && isGatewayBackend(provider.type)) {
     applyPreferredProvider(
       await getPreferredProviderOrderConfig(),
       requestedModel,
@@ -435,8 +401,8 @@ export async function applyProviderSpecificLogic(
     await applyVercelSettings(
       requestedModel,
       requestToMutate,
-      usesUserGatewayKey ? null : userByok,
-      userByok === null ? dataRegion : null
+      payer === 'user_gateway' ? null : userByok,
+      payer === 'kilo' ? dataRegion : null
     );
   }
 

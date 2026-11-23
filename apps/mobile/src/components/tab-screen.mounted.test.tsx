@@ -2,6 +2,7 @@
 import { act, createElement, useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { MIN_BODY_VIEWPORT } from '@/lib/body-viewport';
 import { TabBarLabelContext } from '@/lib/tab-bar-clearance';
 import {
   getEffectiveTabBarHeight,
@@ -11,10 +12,13 @@ import {
 import { type ReactTestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
-import { SheetScrollView, TabScreenScrollView, useTabBarBottomPadding } from './tab-screen';
+import {
+  SheetScrollView,
+  TAB_SCREEN_TRAILING_GAP,
+  TabScreenScrollView,
+  useTabBarBottomPadding,
+} from './tab-screen';
 
-/** Mirrors `TAB_SCREEN_BOTTOM_GAP` in `tab-screen.tsx`. */
-const TAB_SCREEN_BOTTOM_GAP = 16;
 const DEFAULT_FONT_SCALE = 1.5;
 const layout = vi.hoisted(() => ({
   bottom: 16,
@@ -129,7 +133,7 @@ describe('tab screen bottom clearance', () => {
     // At 1.5 the font-scale rule alone keeps the labels (the default answer);
     // the width rule dropped them, so the clearance must match the compact bar.
     await expect(clearanceFor(false)).resolves.toBe(
-      getTabBarIconForwardHeight(layout.bottom, 'android') + TAB_SCREEN_BOTTOM_GAP
+      getTabBarIconForwardHeight(layout.bottom, 'android') + TAB_SCREEN_TRAILING_GAP
     );
   });
 
@@ -139,7 +143,7 @@ describe('tab screen bottom clearance', () => {
         bottomInset: layout.bottom,
         platform: 'android',
         fontScale: layout.fontScale,
-      }) + TAB_SCREEN_BOTTOM_GAP
+      }) + TAB_SCREEN_TRAILING_GAP
     );
   });
 
@@ -147,7 +151,7 @@ describe('tab screen bottom clearance', () => {
     // The root stack draws no bar under its own screens, so their content
     // clears the inset alone; a bar's height here would leave a blank strip.
     layout.fontScale = 2.5;
-    await expect(clearanceFor(null)).resolves.toBe(layout.bottom + TAB_SCREEN_BOTTOM_GAP);
+    await expect(clearanceFor(null)).resolves.toBe(layout.bottom + TAB_SCREEN_TRAILING_GAP);
   });
 
   it('keeps the font-scale rule for a screen rendered under neither layout', async () => {
@@ -157,7 +161,7 @@ describe('tab screen bottom clearance', () => {
         bottomInset: layout.bottom,
         platform: 'android',
         fontScale: layout.fontScale,
-      }) + TAB_SCREEN_BOTTOM_GAP
+      }) + TAB_SCREEN_TRAILING_GAP
     );
   });
 });
@@ -363,21 +367,23 @@ describe('SheetScrollView', () => {
     );
     const [scroll] = renderer.root.findAllByType('ScrollView', { deep: false });
 
-    expect(scroll?.props.style).toEqual([
-      { backgroundColor: '#000' },
-      {
-        marginBottom: getEffectiveTabBarHeight({
-          bottomInset: 16,
-          platform: 'android',
-          fontScale: 1.5,
-        }),
-      },
-    ]);
+    const band = getEffectiveTabBarHeight({
+      bottomInset: 16,
+      platform: 'android',
+      fontScale: 1.5,
+    });
+    expect(scroll?.props.style).toEqual([{ backgroundColor: '#000' }, { marginBottom: band }]);
     // The 16pt breathing room rides on a trailing spacer, as on a tab screen.
     const childTypes = scroll?.children.map(child =>
       typeof child === 'string' ? child : child.type
     );
     expect(childTypes).toEqual(['Content', 'View']);
+    // Once the sheet reports its own room the margin is the band clamped to it:
+    // a tall room keeps the whole band, a collapsed one gives up the overflow.
+    layoutFrame(renderer, 402, 320);
+    expect(reservedMargin(renderer)).toBe(band);
+    layoutFrame(renderer, 402, 0);
+    expect(reservedMargin(renderer)).toBe(Math.max(0, band - MIN_BODY_VIEWPORT));
     unmount();
   });
 
@@ -397,6 +403,28 @@ describe('SheetScrollView', () => {
 
     expect(scroll?.props.style).toEqual([undefined, { marginBottom: 300 }]);
     expect(scroll?.props.automaticallyAdjustKeyboardInsets).toBe(true);
+    // A room tall enough for the IME and the floor keeps the whole band.
+    layoutFrame(renderer, 402, 400);
+    expect(reservedMargin(renderer)).toBe(300);
+    unmount();
+  });
+
+  it('floors the sheet viewport when the keyboard takes the whole room', async () => {
+    // A half-detent sheet with the keyboard up: the room is 300pt (a 300pt
+    // keyboard over a 300pt frame), so the first pass reports a collapsed body
+    // and the raw band would leave no viewport at all. The margin settles at
+    // 300 - MIN_BODY_VIEWPORT, and the next layout reports the 88pt body that
+    // margin leaves, so the floor is what stays on screen.
+    layout.platform = 'android';
+    layout.fontScale = 1;
+    layout.bottom = 0;
+    keyboard.occlusion = 300;
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(SheetScrollView, null, createElement('Content'))
+    );
+    layoutFrame(renderer, 402, 0);
+    layoutFrame(renderer, 402, 88);
+    expect(reservedMargin(renderer)).toBe(300 - MIN_BODY_VIEWPORT);
     unmount();
   });
 
@@ -430,8 +458,6 @@ describe('TabScreenScrollView keyboard occlusion', () => {
       createElement(TabScreenScrollView, null, createElement('Content'))
     );
     const [scroll] = renderer.root.findAllByType('ScrollView', { deep: false });
-    // 300, not 300 + the tab-bar height: `tabBarHideOnKeyboard` hides the bar, so
-    // the band is replaced while the IME is up.
     expect(scroll?.props.style).toEqual([undefined, { marginBottom: 300 }]);
     unmount();
   });

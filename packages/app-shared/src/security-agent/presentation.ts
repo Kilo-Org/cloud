@@ -139,6 +139,26 @@ export function getSecurityFindingAnalysisState(
   return 'not-analyzed';
 }
 
+type AnalysisStateVisual = { icon: FindingIconKey; tone: FindingTone; spinning?: boolean };
+
+// The twelve closed analysis states map to one visual. Each surface adds only
+// its own copy, so a new or re-toned state cannot diverge between the row and
+// the details panel.
+const ANALYSIS_STATE_VISUALS: Record<SecurityFindingAnalysisState, AnalysisStateVisual> = {
+  queued: { icon: 'loader', tone: 'warning', spinning: true },
+  analyzing: { icon: 'loader', tone: 'warning', spinning: true },
+  failed: { icon: 'x-circle', tone: 'danger' },
+  'extraction-failed': { icon: 'eye', tone: 'warning' },
+  exploitable: { icon: 'shield-alert', tone: 'danger' },
+  'not-exploitable': { icon: 'shield-check', tone: 'success' },
+  unknown: { icon: 'eye', tone: 'warning' },
+  'safe-to-dismiss': { icon: 'shield-check', tone: 'success' },
+  'manual-review': { icon: 'eye', tone: 'warning' },
+  'analysis-required': { icon: 'brain', tone: 'warning' },
+  completed: { icon: 'shield', tone: 'neutral' },
+  'not-analyzed': { icon: 'brain', tone: 'neutral' },
+};
+
 export function getSecurityAnalysisPresentation(
   finding: SecurityFinding
 ): FindingStatusPresentation {
@@ -149,43 +169,36 @@ export function getSecurityAnalysisPresentation(
   switch (analysisState) {
     case 'queued': {
       return {
-        icon: 'loader',
+        ...ANALYSIS_STATE_VISUALS.queued,
         label: 'Analysis queued',
-        tone: 'warning',
-        spinning: true,
         tooltip: 'Analysis is queued',
       };
     }
     case 'analyzing': {
       return {
-        icon: 'loader',
+        ...ANALYSIS_STATE_VISUALS.analyzing,
         label: 'Analyzing',
-        tone: 'warning',
-        spinning: true,
         tooltip: 'Analysis is running',
       };
     }
     case 'failed': {
       return {
-        icon: 'x-circle',
+        ...ANALYSIS_STATE_VISUALS.failed,
         label: 'Analysis failed',
-        tone: 'danger',
         tooltip: firstNonEmpty(finding.analysis_error, 'Analysis failed. Retry to run it again.'),
       };
     }
     case 'extraction-failed': {
       return {
-        icon: 'eye',
+        ...ANALYSIS_STATE_VISUALS['extraction-failed'],
         label: 'Needs review',
-        tone: 'warning',
         tooltip: 'Structured analysis result is unavailable. Review the technical report.',
       };
     }
     case 'exploitable': {
       return {
-        icon: 'shield-alert',
+        ...ANALYSIS_STATE_VISUALS.exploitable,
         label: 'Exploitable',
-        tone: 'danger',
         tooltip: firstNonEmpty(
           sandbox?.summary,
           'Codebase analysis confirmed this vulnerability is exploitable'
@@ -194,9 +207,8 @@ export function getSecurityAnalysisPresentation(
     }
     case 'not-exploitable': {
       return {
-        icon: 'shield-check',
+        ...ANALYSIS_STATE_VISUALS['not-exploitable'],
         label: 'Unreachable',
-        tone: 'success',
         tooltip: firstNonEmpty(
           sandbox?.summary,
           'Codebase analysis found no reachable vulnerable path'
@@ -205,9 +217,8 @@ export function getSecurityAnalysisPresentation(
     }
     case 'unknown': {
       return {
-        icon: 'eye',
+        ...ANALYSIS_STATE_VISUALS.unknown,
         label: 'Needs review',
-        tone: 'warning',
         tooltip: firstNonEmpty(
           sandbox?.summary,
           sandbox?.exploitabilityReasoning,
@@ -217,9 +228,8 @@ export function getSecurityAnalysisPresentation(
     }
     case 'safe-to-dismiss': {
       return {
-        icon: 'shield-check',
+        ...ANALYSIS_STATE_VISUALS['safe-to-dismiss'],
         label: 'Safe to dismiss',
-        tone: 'success',
         tooltip: firstNonEmpty(
           triage?.needsSandboxReasoning,
           'Triage determined this can be safely dismissed'
@@ -228,9 +238,8 @@ export function getSecurityAnalysisPresentation(
     }
     case 'manual-review': {
       return {
-        icon: 'eye',
+        ...ANALYSIS_STATE_VISUALS['manual-review'],
         label: 'Needs review',
-        tone: 'warning',
         tooltip: firstNonEmpty(
           triage?.needsSandboxReasoning,
           'Triage flagged this for manual review'
@@ -239,17 +248,16 @@ export function getSecurityAnalysisPresentation(
     }
     case 'analysis-required': {
       return {
-        icon: 'brain',
+        ...ANALYSIS_STATE_VISUALS['analysis-required'],
         label: 'Analysis required',
-        tone: 'warning',
         tooltip: firstNonEmpty(triage?.needsSandboxReasoning, 'Codebase analysis is required'),
       };
     }
     case 'completed': {
-      return { icon: 'shield', label: 'Analyzed', tone: 'neutral' };
+      return { ...ANALYSIS_STATE_VISUALS.completed, label: 'Analyzed' };
     }
     case 'not-analyzed': {
-      return { icon: 'brain', label: 'Not analyzed', tone: 'neutral' };
+      return { ...ANALYSIS_STATE_VISUALS['not-analyzed'], label: 'Not analyzed' };
     }
     default: {
       const exhaustiveCheck: never = analysisState;
@@ -269,7 +277,13 @@ export function getSupersedingFindingId(finding: SecurityFinding): string | null
   return findingId || null;
 }
 
-function isSupersededFinding(finding: SecurityFinding): boolean {
+/**
+ * Whether the finding is superseded: an ignored row that names the current
+ * finding which replaced it. Both surfaces derive their superseding id and
+ * badge from this, so a row that moved on from `ignored` is never called
+ * superseded while the rest of the row says otherwise.
+ */
+export function isSupersededFinding(finding: SecurityFinding): boolean {
   return finding.status === 'ignored' && getSupersedingFindingId(finding) !== null;
 }
 
@@ -355,13 +369,14 @@ export function getSecurityDeadlinePresentation(
 
   if (finding.status === 'ignored') {
     const updatedAt = parseTimestamp(finding.updated_at);
-    const label = isSupersededFinding(finding) ? 'Superseded' : 'Dismissed';
+    const superseded = isSupersededFinding(finding);
+    const label = superseded ? 'Superseded' : 'Dismissed';
     return {
       icon: 'clock',
       label,
       detail: `${label} ${formatFindingDate(updatedAt)}`,
       tone: 'neutral',
-      state: { kind: 'closed', superseded: isSupersededFinding(finding), at: updatedAt },
+      state: { kind: 'closed', superseded, at: updatedAt },
     };
   }
 
@@ -419,9 +434,7 @@ export function getSecurityDeadlinePresentation(
 }
 
 // ---------------------------------------------------------------------------
-// Details panel (ported from FindingDetailDialog.tsx:552 and its small
-// formatting helpers — condensed to plain label/tone data, no hero/action
-// narrative or web layout).
+// Details panel (ported from FindingDetailDialog.tsx:552).
 // ---------------------------------------------------------------------------
 
 /** Label/tone pair for facts that don't need an icon (severity, lifecycle status). */
@@ -444,7 +457,7 @@ export function getFindingSeverityPresentation(severity: string): FindingBadge {
 }
 
 export function getFindingLifecycleStatusPresentation(finding: SecurityFinding): FindingBadge {
-  if (getSupersedingFindingId(finding)) {
+  if (isSupersededFinding(finding)) {
     return { label: 'Superseded', tone: 'neutral' };
   }
   if (finding.status === 'fixed') {
@@ -467,17 +480,16 @@ const DISMISSAL_REASON_LABELS = {
   not_used: 'vulnerable code is not used',
 } as const;
 
-type DismissalReason = keyof typeof DISMISSAL_REASON_LABELS;
+/** Own-property lookup so inherited names such as 'constructor' cannot leak. */
+function ownLabel<T extends Record<string, string>>(table: T, key: string): string | undefined {
+  return Object.hasOwn(table, key) ? table[key] : undefined;
+}
 
 export function getDismissalReasonLabel(reason: string | null): string {
   if (!reason) {
     return 'after review';
   }
-  // Object.hasOwn (not `in`) so inherited keys like 'constructor' fall
-  // through to the humanized code instead of leaking prototype members.
-  return Object.hasOwn(DISMISSAL_REASON_LABELS, reason)
-    ? DISMISSAL_REASON_LABELS[reason as DismissalReason]
-    : reason.replaceAll('_', ' ');
+  return ownLabel(DISMISSAL_REASON_LABELS, reason) ?? reason.replaceAll('_', ' ');
 }
 
 export function getFindingSourceLabel(source: string): string {
@@ -488,9 +500,7 @@ export function getFindingSourceLabel(source: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Analysis panel (ported from FindingDetailDialog.tsx:985 — a single
-// title/description/tone/icon object per analysis state rather than the web
-// hero/summary/action/steps narrative; action buttons belong to a later task).
+// Analysis panel (ported from FindingDetailDialog.tsx:985).
 // ---------------------------------------------------------------------------
 
 type SecurityAnalysisDetailPresentation = {
@@ -513,124 +523,110 @@ export function getSecurityAnalysisDetailPresentation(
   switch (analysisState) {
     case 'queued': {
       return {
+        ...ANALYSIS_STATE_VISUALS.queued,
         title: 'Analysis queued',
         description: 'Waiting for analysis capacity to become available.',
-        tone: 'warning',
-        icon: 'loader',
-        spinning: true,
       };
     }
     case 'analyzing': {
       return {
+        ...ANALYSIS_STATE_VISUALS.analyzing,
         title: 'Analyzing',
         description: 'Checking whether application code can reach the affected feature.',
-        tone: 'warning',
-        icon: 'loader',
-        spinning: true,
       };
     }
     case 'failed': {
       return {
+        ...ANALYSIS_STATE_VISUALS.failed,
         title: 'Analysis failed',
         description: firstNonEmpty(
           analysisError,
           'Security Agent could not complete the analysis.'
         ),
-        tone: 'danger',
-        icon: 'x-circle',
       };
     }
     case 'extraction-failed': {
       return {
+        ...ANALYSIS_STATE_VISUALS['extraction-failed'],
         title: 'Needs review',
         description: 'The technical report could not be turned into a structured result.',
-        tone: 'warning',
-        icon: 'eye',
       };
     }
     case 'exploitable': {
       return {
+        ...ANALYSIS_STATE_VISUALS.exploitable,
         title: 'Exploitable',
         description: firstNonEmpty(
           sandbox?.summary,
           sandbox?.exploitabilityReasoning,
           'Application code can reach the affected feature.'
         ),
-        tone: 'danger',
-        icon: 'shield-alert',
       };
     }
     case 'not-exploitable': {
       return {
+        ...ANALYSIS_STATE_VISUALS['not-exploitable'],
         title: 'Unreachable',
         description: firstNonEmpty(
           sandbox?.summary,
           sandbox?.exploitabilityReasoning,
           'No reachable path was found in this repository.'
         ),
-        tone: 'success',
-        icon: 'shield-check',
       };
     }
     case 'unknown': {
       return {
+        ...ANALYSIS_STATE_VISUALS.unknown,
         title: 'Needs review',
         description: firstNonEmpty(
           sandbox?.summary,
           sandbox?.exploitabilityReasoning,
           'Analysis could not confirm whether the vulnerable feature is reachable.'
         ),
-        tone: 'warning',
-        icon: 'eye',
       };
     }
     case 'safe-to-dismiss': {
       return {
+        ...ANALYSIS_STATE_VISUALS['safe-to-dismiss'],
         title: 'Safe to dismiss',
         description: firstNonEmpty(
           triage?.needsSandboxReasoning,
           'Triage determined this can be safely dismissed without codebase analysis.'
         ),
-        tone: 'success',
-        icon: 'shield-check',
       };
     }
     case 'manual-review': {
       return {
+        ...ANALYSIS_STATE_VISUALS['manual-review'],
         title: 'Needs manual review',
         description: firstNonEmpty(
           triage?.needsSandboxReasoning,
           'Triage flagged this finding for manual review.'
         ),
-        tone: 'warning',
-        icon: 'eye',
       };
     }
     case 'analysis-required': {
       return {
+        ...ANALYSIS_STATE_VISUALS['analysis-required'],
         title: 'Codebase analysis required',
         description: firstNonEmpty(
           triage?.needsSandboxReasoning,
           'Triage recommends analyzing the repository before deciding a response.'
         ),
-        tone: 'warning',
-        icon: 'brain',
       };
     }
     case 'completed': {
       return {
+        ...ANALYSIS_STATE_VISUALS.completed,
         title: 'Analyzed',
         description: 'Analysis completed with no specific outcome recorded.',
-        tone: 'neutral',
-        icon: 'shield',
       };
     }
     case 'not-analyzed': {
       return {
+        ...ANALYSIS_STATE_VISUALS['not-analyzed'],
         title: 'Not analyzed',
         description: 'Codebase analysis has not run for this finding yet.',
-        tone: 'neutral',
-        icon: 'brain',
       };
     }
     default: {
@@ -641,13 +637,46 @@ export function getSecurityAnalysisDetailPresentation(
 }
 
 // ---------------------------------------------------------------------------
-// Remediation panel (ported from FindingDetailDialog.tsx:1849 and
-// remediation-unavailable-copy.ts:6 — the single source for remediation
-// status/blocker copy, also imported by use-security-findings.ts).
+// Remediation panel (ported from FindingDetailDialog.tsx:1849).
 // ---------------------------------------------------------------------------
 
 export function isActiveRemediationStatus(status: string | null | undefined): boolean {
   return status === 'queued' || status === 'launching' || status === 'running';
+}
+
+/** The remediation fields the stale-analysis rule reads, permissive so both
+ *  web's finding/analysis response and mobile's getAnalysis output satisfy it. */
+export type SecurityRemediationSignal = {
+  remediationAttempts: readonly unknown[];
+  remediationCapability?: { startReason: string | null; retryReason: string | null } | null;
+  remediationSummary?: {
+    latestAttemptId?: string | null;
+    latestAttempt?: { id?: string | null } | null;
+  } | null;
+};
+
+/** The server's own record that a remediation attempt already exists. */
+export function hasRegisteredRemediationAttempt(analysis: SecurityRemediationSignal): boolean {
+  return (
+    analysis.remediationAttempts.length > 0 ||
+    Boolean(
+      analysis.remediationSummary?.latestAttemptId ?? analysis.remediationSummary?.latestAttempt?.id
+    )
+  );
+}
+
+/**
+ * Whether a stale analysis is the only thing blocking remediation: no attempt
+ * was registered, and the capability rejects the start or the retry because the
+ * finding changed after the analysis that produced it. Shared by the web
+ * finding dialog and the mobile detail panels.
+ */
+export function remediationNeedsAnalysisRefresh(analysis: SecurityRemediationSignal): boolean {
+  return (
+    !hasRegisteredRemediationAttempt(analysis) &&
+    (analysis.remediationCapability?.startReason === 'stale_analysis' ||
+      analysis.remediationCapability?.retryReason === 'stale_analysis')
+  );
 }
 
 export function formatRemediationOrigin(origin: string): string {
@@ -765,15 +794,11 @@ export const REMEDIATION_UNAVAILABLE_COPY = {
     'Analysis completed before Auto Remediation was enabled. Manual remediation can still start when safety gates pass.',
 } as const;
 
-type RemediationUnavailableReason = keyof typeof REMEDIATION_UNAVAILABLE_COPY;
-
 export function getRemediationUnavailableCopy(reason: string | null | undefined): string | null {
   if (!reason || reason === 'eligible') {
     return null;
   }
-  // Object.hasOwn (not `in`) so inherited keys like 'constructor' fall
-  // through to the generic copy instead of leaking prototype members.
-  return Object.hasOwn(REMEDIATION_UNAVAILABLE_COPY, reason)
-    ? REMEDIATION_UNAVAILABLE_COPY[reason as RemediationUnavailableReason]
-    : 'Remediation is unavailable for this finding.';
+  return (
+    ownLabel(REMEDIATION_UNAVAILABLE_COPY, reason) ?? 'Remediation is unavailable for this finding.'
+  );
 }

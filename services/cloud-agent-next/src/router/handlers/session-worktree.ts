@@ -33,6 +33,7 @@ import { and, asc, eq, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 
 import { getPgDb } from '../../db/pg.js';
+import { sameHostedGitHubRepositories } from '../../persistence/hosted-github-repositories.js';
 import {
   CurrentSessionMetadataSchema,
   getSandboxProviderBinding,
@@ -42,6 +43,7 @@ import {
 import { logControlDiagnostic } from '../../sandbox-control/diagnostics.js';
 import { sameSandboxProviderBinding } from '../../sandbox-provider-binding.js';
 import { getSandboxSessionStub } from '../../sandbox-session/session-stub.js';
+import { getWorkspaceStub } from '../../control-plane/workspace/workspace-stub.js';
 import { generateSessionId } from '../../session-identity.js';
 import { buildControlPlaneSandboxSelection } from '../../session/control-plane-session-input.js';
 import { createMessageId } from '../../session/message-id.js';
@@ -58,8 +60,9 @@ import { generateKiloSessionId } from '../../utils/kilo-session-id.js';
 import { isInteractiveSessionOrigin } from '../../shared/control-plane-permission.js';
 import { resolveRuntimeEnvironment } from '@kilocode/worker-utils/runtime-authorization-contract';
 import { logRuntimeAuthorizationDiagnostic } from '../../session/runtime-authorization-diagnostics.js';
+import { runtimeAuthorizationLifetime } from '../../session/runtime-authorization-lifetime.js';
 import { getWorktreeWorkspacePath } from '../../workspace.js';
-import { protectedProcedure } from '../auth.js';
+import { cloudAgentManagedProcedure, protectedProcedure } from '../auth.js';
 import { resolveSecret } from '../../auth.js';
 import {
   AgentVariantSchema,
@@ -319,9 +322,9 @@ async function loadSourceMetadata(
   const workspace = metadata.workspace;
   const repository = metadata.repository;
   const sourceOriginAllowed =
+    ctx.cloudAgentAuthority !== undefined ||
+    requirements.allowInteractiveOrigin === true ||
     requirements.allowedOrigins.has(ownership.createdOnPlatform) ||
-    (requirements.allowInteractiveOrigin === true &&
-      isInteractiveSessionOrigin(ownership.createdOnPlatform)) ||
     (metadata.parentCloudAgentSessionId !== undefined &&
       isInteractiveSessionOrigin(ownership.createdOnPlatform));
   if (
@@ -339,7 +342,7 @@ async function loadSourceMetadata(
     !sourceOriginAllowed ||
     (requirements.requireSourceScopeId !== undefined &&
       ownership.cloudAgentSessionScopeId !== requirements.requireSourceScopeId) ||
-    metadata.identity.botId !== undefined ||
+    (metadata.identity.botId !== undefined && requirements.allowInteractiveOrigin !== true) ||
     retiredRuntimeMessage(metadata) !== null ||
     workspace.worktreeId !== worktreeId ||
     workspace.workspacePath !==
@@ -667,6 +670,7 @@ async function createDestinationRuntimeAuthorization(
       resourceKind: 'cloud-agent-next',
       resourceId: progress.cloudAgentSessionId,
       environment: resolveRuntimeEnvironment(ctx.env.ENVIRONMENT),
+      ...runtimeAuthorizationLifetime(ctx.env),
       onAdmissionRejected: reason =>
         logRuntimeAuthorizationDiagnostic(progress.cloudAgentSessionId, 'admission', reason),
       ...(organizationId ? { organizationId } : {}),
@@ -692,10 +696,7 @@ async function assertNewDestinationRuntimeAdmission(ctx: TRPCContext): Promise<v
  * (`loadSourceMetadata`), so the sandbox needs no check here.
  */
 function allowsSubagentSessionsForWorktree(source: WorktreeSource): boolean {
-  return (
-    source.metadata.allowSubagentSessions !== false &&
-    isInteractiveSessionOrigin(source.metadata.identity.createdOnPlatform)
-  );
+  return source.metadata.allowSubagentSessions === true;
 }
 
 function sourceWorktreeBranchName(source: WorktreeSource): string {
@@ -740,6 +741,9 @@ function buildRegistrationInput(
   // message. Siblings reuse their workspace's exclusive sandbox, never another workspace's.
   const metadata: SessionMetadata = {
     metadataSchemaVersion: 2,
+    ...(ctx.cloudAgentAuthority
+      ? { parentCloudAgentSessionId: ctx.cloudAgentAuthority.parentSessionId }
+      : {}),
     allowSubagentSessions:
       allowsSubagentSessionsForWorktree(source) && runtimeAuthorization !== undefined,
     identity: { ...source.metadata.identity, sessionId: progress.cloudAgentSessionId },
@@ -752,6 +756,9 @@ function buildRegistrationInput(
     repository,
     ...(source.metadata.profile ? { profile: source.metadata.profile } : {}),
     ...(source.metadata.environment ? { environment: source.metadata.environment } : {}),
+    ...(source.metadata.hostedGitHubRepositories
+      ? { hostedGitHubRepositories: source.metadata.hostedGitHubRepositories }
+      : {}),
     ...(source.metadata.finalization ? { finalization: source.metadata.finalization } : {}),
     workspace,
     ...(continuation ? { continuation: true as const } : {}),
@@ -812,6 +819,12 @@ function assertRegisteredMetadata(
       getSandboxProviderBinding(source.metadata)
     ) ||
     workspace.branchName !== sourceWorktreeBranchName(source) ||
+    !sameHostedGitHubRepositories(
+      metadata.hostedGitHubRepositories,
+      source.metadata.hostedGitHubRepositories
+    ) ||
+    (source.metadata.hostedGitHubRepositories !== undefined &&
+      workspace.generatedBranchName !== source.workspace.generatedBranchName) ||
     JSON.stringify(workspace.sandboxRoute) !== JSON.stringify(source.workspace.sandboxRoute) ||
     workspace.sandboxKind !== source.workspace.sandboxKind ||
     !metadata.repository ||
@@ -1484,7 +1497,21 @@ export type SiblingCreateRun = {
 export async function runSiblingCreate(
   run: SiblingCreateRun
 ): Promise<WorktreeResult | HostedWorkspaceSessionResult> {
-  const { db, ctx, source, intent, operationKey, organizationId, options } = run;
+  const { db, ctx, source, intent, operationKey, organizationId } = run;
+  const hostedGitHubRepositories = source.metadata.hostedGitHubRepositories;
+  const options =
+    hostedGitHubRepositories === undefined
+      ? run.options
+      : {
+          ...run.options,
+          fingerprint: await sha256Hex(
+            JSON.stringify({
+              fingerprint: run.options.fingerprint,
+              hostedGitHubRepositories,
+              generatedBranchName: source.workspace.generatedBranchName,
+            })
+          ),
+        };
   const preissuedRuntimeAuthorization = run.preissuedRuntimeAuthorization;
   const startedAt = Date.now();
   const admission = await admitOperation(db, {
@@ -1741,14 +1768,37 @@ async function discardUnadmittedSibling(
   }
 }
 
-const createWorktreeChatHandler = protectedProcedure
+const createWorktreeChatHandler = cloudAgentManagedProcedure
   .input(CreateWorktreeChatInput)
   .output(CreateWorktreeChatOutput)
   .mutation(async ({ input, ctx }) => {
     const db = getPgDb(ctx.env);
     const source = await loadWorktreeSource(db, ctx, input);
-    const fingerprint = await worktreeIntentFingerprint(input, source);
-    return CreateWorktreeChatOutput.parse(
+    const sourceFingerprint = await worktreeIntentFingerprint(input, source);
+    const authority = ctx.cloudAgentAuthority;
+    const fingerprint = authority
+      ? await sha256Hex(`${sourceFingerprint}:${authority.parentSessionId}`)
+      : sourceFingerprint;
+    const authorization = authority
+      ? await (async () => {
+          const hex = await sha256Hex(
+            `child-chat:${ctx.userId}:${authority.parentSessionId}:${input.operationKey}`
+          );
+          const chatSessionId = `workspace_${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+          const runtimeAuthorization = await withDORetry(
+            () => getWorkspaceStub(ctx.env, ctx.userId, authority.parentSessionId),
+            stub =>
+              stub.authorizeChildChat({
+                authority,
+                childSessionId: input.sourceCloudAgentSessionId,
+                chatSessionId,
+              }),
+            'authorizeChildChat'
+          );
+          return { chatSessionId, runtimeAuthorization };
+        })()
+      : undefined;
+    const result = CreateWorktreeChatOutput.parse(
       await runSiblingCreate({
         db,
         ctx,
@@ -1756,7 +1806,12 @@ const createWorktreeChatHandler = protectedProcedure
         intent: 'create_worktree_chat',
         operationKey: input.operationKey,
         organizationId: input.kilocodeOrganizationId,
-        options: { fingerprint, requestedKiloSessionId: input.kiloSessionId },
+        options: {
+          fingerprint,
+          requestedKiloSessionId: input.kiloSessionId,
+          requestedCloudAgentSessionId: authorization?.chatSessionId,
+        },
+        preissuedRuntimeAuthorization: authorization?.runtimeAuthorization,
         sourceSession: {
           kiloSessionId: input.sourceKiloSessionId,
           cloudAgentSessionId: input.sourceCloudAgentSessionId,
@@ -1764,6 +1819,26 @@ const createWorktreeChatHandler = protectedProcedure
         mapProgress: (progress, replayed) => resultFromProgress(progress, replayed),
       })
     );
+    if (authority) {
+      try {
+        await withDORetry(
+          () => getWorkspaceStub(ctx.env, ctx.userId, authority.parentSessionId),
+          stub =>
+            stub.recordChild({
+              cloudAgentSessionId: result.cloudAgentSessionId,
+              worktreeId: result.worktreeId,
+            }),
+          'recordChild'
+        );
+      } catch {
+        logControlDiagnostic(
+          'worktree_chat_child_registry_write_failed',
+          { cloudAgentSessionId: result.cloudAgentSessionId, worktreeId: result.worktreeId },
+          'warn'
+        );
+      }
+    }
+    return result;
   });
 
 const createHostedWorkspaceSessionHandler = protectedProcedure

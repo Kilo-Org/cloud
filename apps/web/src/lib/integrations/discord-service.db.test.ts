@@ -2,19 +2,34 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users, organizations, platform_integrations } from '@kilocode/db/schema';
 import { and, eq } from 'drizzle-orm';
 import type { Owner } from './core/types';
-import { PLATFORM } from './core/constants';
+import { INTEGRATION_STATUS, PLATFORM } from './core/constants';
+import { isPlatformIntegrationActive } from './core/health';
 import { withWorkspaceInstallationLock } from './oauth/workspace-installation-lock';
 import {
+  DISCORD_DISCONNECT_NEEDS_SUPPORT_MESSAGE,
   DiscordGuildAlreadyConnectedError,
   DiscordGuildRebindNotAllowedError,
   getInstallation,
   getInstallationByGuildId,
   getOwnerFromInstallation,
+  uninstallApp,
   upsertDiscordInstallation,
 } from './discord-service';
 
 jest.mock('@/lib/slack-bot/model-allow-list', () => ({
   getDefaultAllowedModel: jest.fn(async () => 'test-model'),
+}));
+
+// The removal path returns `unavailable` before it fetches when no bot token is
+// configured, so the authenticated-test environment supplies one.
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/config.server'),
+  DISCORD_BOT_TOKEN: 'bot-token',
+}));
+
+const mockCaptureException = jest.fn();
+jest.mock('@sentry/nextjs', () => ({
+  captureException: (...args: unknown[]) => mockCaptureException(...args),
 }));
 
 /**
@@ -61,6 +76,7 @@ describe('Discord installation lifecycle', () => {
   });
 
   afterEach(async () => {
+    jest.restoreAllMocks();
     await db
       .delete(platform_integrations)
       .where(eq(platform_integrations.owned_by_user_id, userId));
@@ -94,7 +110,7 @@ describe('Discord installation lifecycle', () => {
       .set({
         metadata: { model_slug: 'configured-model', custom_setting: true },
       })
-      .where(eq(platform_integrations.id, created.id));
+      .where(eq(platform_integrations.id, created.integration.id));
 
     const updated = await upsertDiscordInstallation(
       owner,
@@ -105,16 +121,17 @@ describe('Discord installation lifecycle', () => {
       { allowGuildRebind: owner.type === 'org' }
     );
 
-    expect(updated.id).toBe(created.id);
-    expect(updated.platform_installation_id).toBe(selectedGuild);
-    expect(updated.platform_account_id).toBe(selectedGuild);
-    expect(updated.metadata).toEqual({
+    expect(updated.integration.id).toBe(created.integration.id);
+    expect(updated.previousGuildId).toBe(firstGuild);
+    expect(updated.integration.platform_installation_id).toBe(selectedGuild);
+    expect(updated.integration.platform_account_id).toBe(selectedGuild);
+    expect(updated.integration.metadata).toEqual({
       model_slug: 'configured-model',
       custom_setting: true,
       guild_icon: 'test-icon',
     });
     const installation = await getInstallationByGuildId(selectedGuild);
-    expect(installation?.id).toBe(created.id);
+    expect(installation?.id).toBe(created.integration.id);
     expect(installation && getOwnerFromInstallation(installation)).toEqual(owner);
     expect(await getInstallationByGuildId(firstGuild)).toBeNull();
   });
@@ -141,7 +158,7 @@ describe('Discord installation lifecycle', () => {
     const [stored] = await db
       .select()
       .from(platform_integrations)
-      .where(eq(platform_integrations.id, created.id));
+      .where(eq(platform_integrations.id, created.integration.id));
     expect(stored.platform_installation_id).toBe('345678901234567890');
     expect(stored.platform_account_login).toBe('Bound Server');
   });
@@ -171,7 +188,7 @@ describe('Discord installation lifecycle', () => {
       const [stored] = await db
         .select()
         .from(platform_integrations)
-        .where(eq(platform_integrations.id, bound.id));
+        .where(eq(platform_integrations.id, bound.integration.id));
       expect(stored.owned_by_organization_id).toBe(otherOrgId);
       expect(stored.platform_installation_id).toBe(guild.id);
       const rows = await db
@@ -265,12 +282,12 @@ describe('Discord installation lifecycle', () => {
       await insertDiscordRow({ type: 'org', id: otherOrgId }, guild, { installationId: null });
 
       const installation = await getInstallationByGuildId(guild.id);
-      expect(installation?.id).toBe(canonical.id);
+      expect(installation?.id).toBe(canonical.integration.id);
 
       const updated = await upsertDiscordInstallation({ type: 'org', id: orgId }, response, {
         allowGuildRebind: true,
       });
-      expect(updated.id).toBe(canonical.id);
+      expect(updated.integration.id).toBe(canonical.integration.id);
     } finally {
       await db
         .delete(platform_integrations)
@@ -299,8 +316,8 @@ describe('Discord installation lifecycle', () => {
 
     const updated = await upsertDiscordInstallation(owner, response, { allowGuildRebind: true });
 
-    expect(updated.id).toBe(canonicalId);
-    expect(updated.platform_installation_id).toBe(guild.id);
+    expect(updated.integration.id).toBe(canonicalId);
+    expect(updated.integration.platform_installation_id).toBe(guild.id);
     const rows = await db
       .select({ id: platform_integrations.id })
       .from(platform_integrations)
@@ -332,14 +349,100 @@ describe('Discord installation lifecycle', () => {
         { allowGuildRebind: true }
       );
 
-      expect(created.platform_installation_id).toBe('122345678901234567');
-      expect((await getInstallationByGuildId('122345678901234567'))?.id).toBe(created.id);
+      expect(created.integration.platform_installation_id).toBe('122345678901234567');
+      expect((await getInstallationByGuildId('122345678901234567'))?.id).toBe(
+        created.integration.id
+      );
     } finally {
       await db
         .delete(platform_integrations)
         .where(eq(platform_integrations.owned_by_organization_id, otherOrgId));
       await db.delete(organizations).where(eq(organizations.id, otherOrgId));
     }
+  });
+
+  it('keeps a disconnect for a server a second connection records in the account column', async () => {
+    // Real Postgres proof that the ownership check reads both identifier
+    // columns: the second row carries the server only in `platform_account_id`,
+    // so the disconnect is kept while that row exists.
+    const otherUserId = crypto.randomUUID();
+    await db.insert(kilocode_users).values({
+      id: otherUserId,
+      google_user_email: `${otherUserId}@example.com`,
+      google_user_name: 'Discord Legacy Duplicate',
+      google_user_image_url: 'https://example.com/avatar.png',
+      stripe_customer_id: `cus_discord_dup_${otherUserId}`,
+    });
+    const guild = { id: '432109876543210987', name: 'Legacy Duplicate Server', icon: null };
+
+    try {
+      const ownRowId = await insertDiscordRow({ type: 'user', id: userId }, guild);
+      const secondRowId = await insertDiscordRow({ type: 'user', id: otherUserId }, guild, {
+        installationId: null,
+      });
+      const fetchSpy = jest
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(new Response(null, { status: 204 }));
+
+      await expect(uninstallApp({ type: 'user', id: userId })).rejects.toMatchObject({
+        code: 'SERVICE_UNAVAILABLE',
+        message: DISCORD_DISCONNECT_NEEDS_SUPPORT_MESSAGE,
+      });
+
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(mockCaptureException).toHaveBeenCalledWith(expect.any(Error), {
+        tags: { source: 'discord_disconnect', op: 'shared_server' },
+        extra: { guildId: guild.id },
+      });
+
+      const survivors = await db
+        .select({ id: platform_integrations.id })
+        .from(platform_integrations)
+        .where(
+          and(
+            eq(platform_integrations.platform, PLATFORM.DISCORD),
+            eq(platform_integrations.platform_account_id, guild.id)
+          )
+        );
+      expect(survivors.map(row => row.id).sort()).toEqual([ownRowId, secondRowId].sort());
+    } finally {
+      jest.restoreAllMocks();
+      await db
+        .delete(platform_integrations)
+        .where(eq(platform_integrations.owned_by_user_id, otherUserId));
+      await db.delete(kilocode_users).where(eq(kilocode_users.id, otherUserId));
+    }
+  });
+
+  it('removes the rows of this owner that record the released server', async () => {
+    // A connection can carry the server in both identifier columns, so a
+    // disconnect removes each row that records the server it released.
+    const guild = { id: '543210987654321098', name: 'Sibling Row Server', icon: null };
+
+    const canonicalId = await insertDiscordRow({ type: 'user', id: userId }, guild);
+    const legacyId = await insertDiscordRow({ type: 'user', id: userId }, guild, {
+      installationId: null,
+    });
+    const fetchSpy = jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response(null, { status: 204 }));
+
+    await expect(uninstallApp({ type: 'user', id: userId })).resolves.toEqual({ success: true });
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const remaining = await db
+      .select({ id: platform_integrations.id })
+      .from(platform_integrations)
+      .where(
+        and(
+          eq(platform_integrations.platform, PLATFORM.DISCORD),
+          eq(platform_integrations.owned_by_user_id, userId),
+          eq(platform_integrations.platform_account_id, guild.id)
+        )
+      );
+    expect(remaining.map(row => row.id)).not.toContain(canonicalId);
+    expect(remaining.map(row => row.id)).not.toContain(legacyId);
+    expect(remaining).toHaveLength(0);
   });
 
   it('serializes two owners connecting the same server', async () => {
@@ -387,5 +490,66 @@ describe('Discord installation lifecycle', () => {
         .where(eq(platform_integrations.owned_by_organization_id, otherOrgId));
       await db.delete(organizations).where(eq(organizations.id, otherOrgId));
     }
+  });
+});
+
+describe('Discord re-authorization of a recorded association', () => {
+  const userId = crypto.randomUUID();
+
+  beforeAll(async () => {
+    await db.insert(kilocode_users).values({
+      id: userId,
+      google_user_email: `${userId}@example.com`,
+      google_user_name: 'Discord Suspension Test',
+      google_user_image_url: 'https://example.com/avatar.png',
+      stripe_customer_id: `cus_discord_susp_${userId}`,
+    });
+  });
+
+  afterEach(async () => {
+    await db
+      .delete(platform_integrations)
+      .where(eq(platform_integrations.owned_by_user_id, userId));
+  });
+
+  afterAll(async () => {
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, userId));
+  });
+
+  it('records an active association without a suspension', async () => {
+    const owner: Owner = { type: 'user', id: userId };
+    const guild = { id: '345678901234567890', name: 'Suspension Server', icon: null };
+    const created = await upsertDiscordInstallation(owner, {
+      access_token: 'test-access',
+      refresh_token: 'test-refresh',
+      token_type: 'Bearer',
+      expires_in: 3600,
+      scope: 'bot guilds',
+      guild,
+    });
+    await db
+      .update(platform_integrations)
+      .set({
+        integration_status: 'suspended',
+        suspended_at: '2026-11-20T00:00:00.000Z',
+        suspended_by: 'integration-operator',
+      })
+      .where(eq(platform_integrations.id, created.integration.id));
+
+    const reauthorized = await upsertDiscordInstallation(owner, {
+      access_token: 'test-access-2',
+      refresh_token: 'test-refresh-2',
+      token_type: 'Bearer',
+      expires_in: 3600,
+      scope: 'bot guilds',
+      guild: { ...guild, name: 'Renamed Server' },
+    });
+
+    expect(reauthorized.integration.id).toBe(created.integration.id);
+    expect(reauthorized.previousGuildId).toBeNull();
+    expect(reauthorized.integration.integration_status).toBe(INTEGRATION_STATUS.ACTIVE);
+    expect(reauthorized.integration.suspended_at).toBeNull();
+    expect(reauthorized.integration.suspended_by).toBeNull();
+    expect(isPlatformIntegrationActive(reauthorized.integration)).toBe(true);
   });
 });

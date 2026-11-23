@@ -13,6 +13,7 @@ vi.mock('expo-router', () => ({
   useRouter: () => router,
 }));
 vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   View: 'View',
@@ -44,6 +45,10 @@ vi.mock('@/components/ui/text', async () => {
   return { Text: 'Text', TextClassContext: React.createContext<string | undefined>(undefined) };
 });
 vi.mock('@/components/ui/icons', () => ({ Check: 'Check' }));
+// The shared row's selection tick reaches `expo-haptics`, whose entry loads the
+// Expo async-require runtime (`__DEV__`) that this plain Node project cannot
+// evaluate. Haptics are decoration; the stub keeps the press behavior.
+vi.mock('@/lib/haptics', () => ({ selectionHaptic: vi.fn() }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ primary: '#0a84ff' }),
 }));
@@ -133,8 +138,12 @@ describe('BranchPickerScreen', () => {
     expect(texts(renderer)).toContain(i18n.t('agentChat.newSession.branchDefault'));
     expect(branchRow(renderer, 'release/2.0')?.props.accessibilityState).toEqual({
       selected: true,
+      disabled: false,
     });
-    expect(branchRow(renderer, 'main')?.props.accessibilityState).toEqual({ selected: false });
+    expect(branchRow(renderer, 'main')?.props.accessibilityState).toEqual({
+      selected: false,
+      disabled: false,
+    });
   });
 
   it('hands the picked branch name back and dismisses', () => {
@@ -158,7 +167,7 @@ describe('BranchPickerScreen', () => {
     expect(onSelect).toHaveBeenCalledWith('main');
   });
 
-  it('renders a long branch name in full so names that share a prefix stay distinguishable', () => {
+  it('keeps both ends of a long branch name so names that share a prefix stay distinguishable', () => {
     const branch =
       '89-validate-all-maintainers-are-represented-in-maintainers-and-reviewers-الذكية-لإدارة';
     setBridge({ branches: [branch, 'main'], defaultBranch: 'main', selectedBranch: 'main' });
@@ -168,11 +177,13 @@ describe('BranchPickerScreen', () => {
     if (!row) {
       throw new Error('The long branch row did not mount');
     }
-    // No line cap: the row grows with the name instead of cutting the tail that
-    // tells it apart from its siblings.
+    // One line with the middle ellipsis: the head (the ticket number) and the
+    // tail that tells one branch from its siblings both stay visible, so the
+    // row never cuts the distinguishing end.
     const name = row.findAll(node => String(node.type) === 'Text')[0];
     expect(name?.props.children).toBe(branch);
-    expect(name?.props.numberOfLines).toBeUndefined();
+    expect(name?.props.numberOfLines).toBe(1);
+    expect(name?.props.ellipsizeMode).toBe('middle');
   });
 
   it('says the list is incomplete when the provider holds more branches', () => {

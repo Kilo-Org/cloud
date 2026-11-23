@@ -37,7 +37,9 @@ export type VercelAdmissionContext = {
   liveSessionIds: readonly string[];
 };
 
-function providerContext(context: VercelAdmissionContext) {
+type AdmissionDenial = Extract<ControlPlaneScmForwardAdmissionResult, { ok: false }>;
+
+export function providerContext(context: VercelAdmissionContext) {
   return {
     ...context,
     available:
@@ -64,6 +66,60 @@ export function admitVercelScmForwardAtLocator(
   );
 }
 
+type VercelIdentityDependencies = {
+  env: Env;
+  contract: VercelSandboxIdentityContract | null;
+  fetchCredential?: typeof fetchByocVercelCredential;
+  keys?: typeof vercelJwksCache;
+  now: () => number;
+};
+
+/**
+ * Verifies that an OIDC token names this allocation's Vercel sandbox and this
+ * forward URL. It returns the token expiry in seconds.
+ */
+export async function verifyVercelForwardIdentity(
+  oidcToken: string,
+  context: Pick<
+    VercelAdmissionContext,
+    'sandboxId' | 'byoc' | 'locator' | 'allocation' | 'physicalName'
+  >,
+  deps: VercelIdentityDependencies
+): Promise<{ ok: true; exp: number } | AdmissionDenial> {
+  const deny = (code: string, status: 401 | 403 | 503 = 403): AdmissionDenial => ({
+    ok: false,
+    status,
+    code,
+  });
+  if (!context.byoc || !context.locator) return deny('allocation_unavailable');
+  const audience = configuredVercelForwardUrl(deps.env, context.sandboxId);
+  const providerRef = decodeVercelProviderRef(context.allocation.providerRef);
+  if (!audience || !providerRef) return deny('allocation_unavailable');
+  if (!deps.contract) return deny('provider_identity_mismatch', 503);
+  const credential = await (deps.fetchCredential ?? fetchByocVercelCredential)(
+    deps.env,
+    context.byoc
+  );
+  const expected = expectedVercelIdentity({
+    credential,
+    locator: context.locator,
+    providerRef,
+    physicalName: context.physicalName,
+    audience,
+    contract: deps.contract,
+  });
+  if (!expected) return deny('provider_identity_mismatch', 503);
+  const identity = await authenticateVercelForwardToken(oidcToken, expected, deps.keys, deps.now());
+  return identity ? { ok: true, exp: identity.exp } : deny('invalid_identity', 401);
+}
+
+/** Maps a provider account or key-service failure during identity verification. */
+export function vercelIdentityFailure(error: unknown): AdmissionDenial {
+  if (error instanceof OidcKeysUnavailable)
+    return { ok: false, status: 503, code: error.code, retryAfter: error.retryAfter };
+  return { ok: false, status: 503, code: 'byoc_unavailable' };
+}
+
 export async function admitVercelScmForward(
   input: ControlPlaneScmForwardAdmission,
   deps: {
@@ -87,12 +143,8 @@ export async function admitVercelScmForward(
     now?: () => number;
   }
 ): Promise<ControlPlaneScmForwardAdmissionResult> {
-  const deny = (
-    code: string,
-    status: 401 | 403 | 503 = 403
-  ): Extract<ControlPlaneScmForwardAdmissionResult, { ok: false }> => ({ ok: false, status, code });
   const parsed = controlPlaneScmForwardAdmissionSchema.safeParse(input);
-  if (!parsed.success) return deny('invalid_request', 401);
+  if (!parsed.success) return { ok: false, status: 401, code: 'invalid_request' };
   input = parsed.data;
   const now = deps.now ?? Date.now;
   try {
@@ -100,38 +152,14 @@ export async function admitVercelScmForward(
       ...deps,
       readContext: async () => providerContext(await deps.readContext()),
       authenticate: async context => {
-        if (!context.byoc || !context.locator) return deny('allocation_unavailable');
-        const audience = configuredVercelForwardUrl(deps.env, context.sandboxId);
-        const providerRef = decodeVercelProviderRef(context.allocation.providerRef);
-        if (!audience || !providerRef) return deny('allocation_unavailable');
-        if (!deps.contract) return deny('provider_identity_mismatch', 503);
-        const credential = await (deps.fetchCredential ?? fetchByocVercelCredential)(
-          deps.env,
-          context.byoc
-        );
-        const expected = expectedVercelIdentity({
-          credential,
-          locator: context.locator,
-          providerRef,
-          physicalName: context.physicalName,
-          audience,
-          contract: deps.contract,
+        const identity = await verifyVercelForwardIdentity(input.oidcToken, context, {
+          ...deps,
+          now,
         });
-        if (!expected) return deny('provider_identity_mismatch', 503);
-        const identity = await authenticateVercelForwardToken(
-          input.oidcToken,
-          expected,
-          deps.keys,
-          now()
-        );
-        return identity
-          ? { ok: true, isCurrent: () => identity.exp > now() / 1000 }
-          : deny('invalid_identity', 401);
+        return identity.ok ? { ok: true, isCurrent: () => identity.exp > now() / 1000 } : identity;
       },
     });
   } catch (error) {
-    if (error instanceof OidcKeysUnavailable)
-      return { ok: false, status: 503, code: error.code, retryAfter: error.retryAfter };
-    return deny('byoc_unavailable', 503);
+    return vercelIdentityFailure(error);
   }
 }

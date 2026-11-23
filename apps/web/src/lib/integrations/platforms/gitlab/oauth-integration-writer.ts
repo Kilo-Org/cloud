@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { randomBytes, randomUUID } from 'node:crypto';
-import { z } from 'zod';
+import { TRPCError } from '@trpc/server';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import type { Owner, PlatformRepository } from '@/lib/integrations/core/types';
@@ -16,9 +16,16 @@ import {
   mutateGitLabMetadataInTransaction,
   readGitLabMetadataInTransaction,
 } from './metadata-mutation';
-import { retireProjectCredentialsForReplacedAccount } from './project-credential-lifecycle';
-import { isDefaultGitLabInstanceUrl, normalizeGitLabInstanceUrl } from './instance-url';
 import {
+  gitlabProjectTokensUnsettledMessage,
+  listProjectIdsWithStoredTokens,
+  readStoredInstanceUrl,
+  retireProjectCredentialsForReplacedAccount,
+  storedInstanceUrlChanges,
+} from './project-token-handles';
+import { isDefaultGitLabInstanceUrl } from './instance-url';
+import {
+  ensureStoredProjectTokensSettledBeforeInstanceChange,
   gitLabCredentialActor,
   settleStoredProjectTokens,
 } from '@/lib/integrations/gitlab-service';
@@ -54,14 +61,6 @@ function generateWebhookSecret(): string {
   return randomBytes(32).toString('hex');
 }
 
-function instanceUrlChanged(existingUrl: string | undefined, newUrl: string): boolean {
-  try {
-    return normalizeGitLabInstanceUrl(existingUrl) !== newUrl;
-  } catch {
-    return true;
-  }
-}
-
 function readOptionalMetadataString(
   metadata: Readonly<Record<string, unknown>>,
   key: string
@@ -70,16 +69,6 @@ function readOptionalMetadataString(
   if (value === undefined) return undefined;
   if (typeof value !== 'string') throw new Error(`GitLab metadata ${key} must be a string`);
   return value;
-}
-
-const GitLabMetadataSnapshotSchema = z
-  .object({ gitlab_instance_url: z.string().optional() })
-  .passthrough();
-
-/** Instance URL a stored integration row names, read before its transaction. */
-function readStoredInstanceUrl(metadata: unknown): string | undefined {
-  const parsed = GitLabMetadataSnapshotSchema.safeParse(metadata);
-  return parsed.success ? parsed.data.gitlab_instance_url : undefined;
 }
 
 /**
@@ -135,23 +124,32 @@ export async function storeGitLabOAuthIntegration(
       existing.platform_account_id ?? existing.platform_installation_id ?? null;
     if (
       existing.integration_status === INTEGRATION_STATUS.SUSPENDED &&
-      !instanceUrlChanged(readStoredInstanceUrl(existing.metadata), input.providerBaseUrl) &&
+      !storedInstanceUrlChanges(readStoredInstanceUrl(existing.metadata), input.providerBaseUrl) &&
       (previousStoredAccountId === null || previousStoredAccountId === input.providerUser.id) &&
       input.scopes.includes('api')
     ) {
-      const settlement = await settleStoredProjectTokens(
-        existing,
-        gitLabCredentialActor(input.owner, input.authorizedByUserId),
-        input.accessToken
-      );
+      const settlement = await settleStoredProjectTokens(existing, input.accessToken);
       logExceptInTest('[storeGitLabOAuthIntegration] Reconnect settled retained project tokens', {
         integrationId: existing.id,
         settledProjectTokens: settlement,
       });
     }
 
+    const instanceChangeRequested = storedInstanceUrlChanges(
+      readStoredInstanceUrl(existing.metadata),
+      input.providerBaseUrl
+    );
+    if (instanceChangeRequested) {
+      await ensureStoredProjectTokensSettledBeforeInstanceChange(
+        existing,
+        gitLabCredentialActor(input.owner, input.authorizedByUserId)
+      );
+    }
+
+    let replacedAccountMetadata: Record<string, unknown> = {};
     await db.transaction(async tx => {
       const currentMetadata = await readGitLabMetadataInTransaction(tx, integrationId);
+      replacedAccountMetadata = currentMetadata;
       const [currentIntegration] = await tx
         .select({
           platform_account_id: platform_integrations.platform_account_id,
@@ -164,13 +162,34 @@ export async function storeGitLabOAuthIntegration(
         currentIntegration?.platform_account_id ??
         currentIntegration?.platform_installation_id ??
         null;
-      const currentInstanceUrl = readOptionalMetadataString(currentMetadata, 'gitlab_instance_url');
       const currentWebhookSecret = readOptionalMetadataString(currentMetadata, 'webhook_secret');
-      changedInstance = instanceUrlChanged(currentInstanceUrl, input.providerBaseUrl);
+      changedInstance = storedInstanceUrlChanges(
+        readStoredInstanceUrl(currentMetadata),
+        input.providerBaseUrl
+      );
       changedAccount =
         !changedInstance &&
         previousAccountId !== null &&
         previousAccountId !== input.providerUser.id;
+      if (!instanceChangeRequested && changedInstance) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message:
+            'GitLab integration changed while connecting. Reload the integration and try again.',
+        });
+      }
+      if (changedInstance) {
+        const remaining = await listProjectIdsWithStoredTokens({
+          id: integrationId,
+          metadata: currentMetadata,
+        });
+        if (remaining.length > 0) {
+          throw new TRPCError({
+            code: 'PRECONDITION_FAILED',
+            message: gitlabProjectTokensUnsettledMessage(remaining),
+          });
+        }
+      }
 
       await mutateGitLabMetadataInTransaction(tx, integrationId, {
         set: {
@@ -192,8 +211,7 @@ export async function storeGitLabOAuthIntegration(
           'client_secret',
           ...(isDefaultGitLabInstanceUrl(input.providerBaseUrl) ? ['gitlab_instance_url'] : []),
           ...(input.oauthClientId && input.oauthClientSecret ? [] : ['client_id']),
-          ...(changedInstance ? ['configured_webhooks'] : []),
-          ...(changedInstance || changedAccount ? ['project_tokens'] : []),
+          ...(changedInstance ? ['configured_webhooks', 'project_tokens'] : []),
         ],
       });
 
@@ -207,9 +225,13 @@ export async function storeGitLabOAuthIntegration(
           scopes: input.scopes,
           integration_status: INTEGRATION_STATUS.ACTIVE,
           // This transaction stores fresh credentials for the row, so the row
-          // records them as usable. The PAT connect clears the same columns.
+          // records them as usable. The PAT connect clears the same columns,
+          // and so does this write: a suspension recorded for the previous
+          // connection must not survive the reconnect that replaces it.
           auth_invalid_at: null,
           auth_invalid_reason: null,
+          suspended_at: null,
+          suspended_by: null,
           repositories: input.repositories,
           repositories_synced_at: repositoriesSyncedAt,
           updated_at: new Date().toISOString(),
@@ -265,9 +287,8 @@ export async function storeGitLabOAuthIntegration(
 
     if (changedAccount) {
       const retirement = await retireProjectCredentialsForReplacedAccount({
-        integrationId,
+        integration: { id: integrationId, metadata: replacedAccountMetadata },
         userToken: input.accessToken,
-        instanceUrl: input.providerBaseUrl,
         currentAccountId: input.providerUser.id,
       });
       logExceptInTest(

@@ -179,6 +179,22 @@ describe('filterLiveSessions', () => {
     ).toEqual(['cloud']);
   });
 
+  it('matches an accented title and PR title from an unaccented query', () => {
+    const accented = {
+      id: 'accented',
+      title: 'Revisão do fluxo',
+      gitUrl: null,
+      createdOnPlatform: 'cli',
+      associatedPr: { number: 7, title: 'Análise de desempenho' },
+    };
+    expect(
+      filterLiveSessions([accented], query({ searchQuery: 'revisao' })).map(s => s.id)
+    ).toEqual(['accented']);
+    expect(
+      filterLiveSessions([accented], query({ searchQuery: 'analise DE desempenho' })).map(s => s.id)
+    ).toEqual(['accented']);
+  });
+
   it('searches mid-string in other session metadata case-insensitively', () => {
     expect(
       filterLiveSessions(sessions, query({ searchQuery: 'SSION-SEA' })).map(s => s.id)
@@ -192,6 +208,37 @@ describe('filterLiveSessions', () => {
     expect(filterLiveSessions(sessions, query({ searchQuery: 'kilo/app' })).map(s => s.id)).toEqual(
       ['cli']
     );
+  });
+
+  it('searches the decoded branch the row paints, and the stored branch', () => {
+    // The row paints `sessionBranchLabel(gitBranch)`, so the visible branch
+    // text must find the row even though the stored value is percent-encoded.
+    const branchSessions = [
+      {
+        id: 'encoded',
+        title: 'Reissue the invoice export',
+        gitBranch: 'fix/%E8%AB%8B%E6%B1%82%E6%9B%B8',
+        createdOnPlatform: 'cli',
+      },
+      {
+        id: 'plain',
+        title: 'Backfill the retry budget',
+        gitBranch: 'fix/checkout-retries',
+        createdOnPlatform: 'cli',
+      },
+    ];
+    expect(
+      filterLiveSessions(
+        branchSessions,
+        query({ searchQuery: '請求書', platformFilter: [], projectFilter: [] })
+      ).map(s => s.id)
+    ).toEqual(['encoded']);
+    expect(
+      filterLiveSessions(
+        branchSessions,
+        query({ searchQuery: 'checkout', platformFilter: [], projectFilter: [] })
+      ).map(s => s.id)
+    ).toEqual(['plain']);
   });
 
   it('treats a whitespace-only query as no search', () => {

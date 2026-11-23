@@ -1,11 +1,12 @@
 import { type Href } from 'expo-router';
 /* eslint-disable max-lines -- one mounted case per slash-command screen state: list, add, duplicate, conflict, failure, and save */
+import { type QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createElement, type ReactNode, type Ref } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
 import { ProfileKiloCommandsScreen } from '@/components/profiles/profile-kilo-commands-screen';
-import { act, type ReactTestInstance } from '@/test/renderer';
+import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 import { COMPACT_CONTROL_HIT_SLOP_DP } from '@/lib/a11y/tap-target';
 import { MAX_PROFILE_KILO_COMMANDS } from '@/lib/agent-profile-forms';
@@ -19,8 +20,10 @@ const h = vi.hoisted(() => ({
   confirm: vi.fn(),
   error: vi.fn(),
   scrollTo: vi.fn(),
+  connectivity: 'online' as string,
   query: {
     data: undefined as unknown,
+    error: undefined as unknown,
     isError: false,
     isPending: true,
     isRefetching: false,
@@ -49,6 +52,9 @@ vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfileSectionMutations: () => h.mutations,
 }));
 vi.mock('sonner-native', () => ({ toast: { error: h.error } }));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => h.connectivity,
+}));
 vi.mock('react-native', async () => {
   const {
     createElement: createMockElement,
@@ -57,6 +63,7 @@ vi.mock('react-native', async () => {
   } = await import('react');
   return {
     Platform: { OS: 'ios' },
+    useColorScheme: () => 'light',
     View: 'View',
     Pressable: 'Pressable',
     Switch: 'Switch',
@@ -96,6 +103,7 @@ vi.mock('@/components/empty-state', async () => {
   // helpers must be loaded inside the factory.
   const { createElement: createMockElement } = await import('react');
   return {
+    StateAction: 'StateAction',
     // The real state renders its `action` below the title, so the manage slot's
     // sentence or the manager's CTA reaches the tree the way the screen hands it over.
     EmptyState: (props: { action?: ReactNode }) =>
@@ -113,6 +121,7 @@ vi.mock('@/components/ui/icons', () => ({
   Pencil: 'Pencil',
   Terminal: 'Terminal',
   Trash2: 'Trash2',
+  Plus: 'Plus',
 }));
 
 type TestCommand = {
@@ -216,6 +225,20 @@ function mountScreen() {
   );
 }
 
+/** Re-render the mounted screen against fresh mock state, keeping the providers. */
+function rerenderScreen(renderer: ReactTestRenderer, queryClient: QueryClient): void {
+  renderer.update(
+    createElement(
+      QueryClientProvider,
+      { client: queryClient },
+      createElement(ProfileKiloCommandsScreen, {
+        profileId: 'profile-1',
+        backFallback: PROFILES_LIST_HREF,
+      })
+    )
+  );
+}
+
 /**
  * Run `action` past the row tap guard window. The screen drops row presses for
  * a short span after its form sheet closed, so a test that presses a row right
@@ -235,8 +258,10 @@ describe('ProfileKiloCommandsScreen save refusals', () => {
     vi.clearAllMocks();
     // The open form is a draft now, so no case may reopen on an earlier one.
     resetFormDraftsForTests();
+    h.connectivity = 'online';
     Object.assign(h.query, {
       data: undefined,
+      error: undefined,
       isError: false,
       isPending: true,
       isRefetching: false,
@@ -588,6 +613,112 @@ describe('ProfileKiloCommandsScreen open form draft', () => {
   });
 });
 
+/** A sheet draft typed while the role allowed the write; the store keeps it past an unmount. */
+async function seedSheetDraft(): Promise<void> {
+  const first = await mountScreen();
+  pressAddButton(first.renderer.root);
+  changeText(first.renderer.root, 'Command name', 'summarize');
+  changeText(first.renderer.root, 'Template', 'Summarize the diff');
+  first.unmount();
+}
+
+describe('ProfileKiloCommandsScreen manage permission', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetFormDraftsForTests();
+    Object.assign(h.query, {
+      data: [testCommand()],
+      isError: false,
+      isPending: false,
+      isRefetching: false,
+    });
+    permissionState.permission = 'allowed';
+    for (const mutation of Object.values(h.mutations)) {
+      Object.assign(mutation, { isPending: false });
+    }
+  });
+
+  afterEach(() => {
+    // The draft is module-level: a later case in this file must not reopen on it.
+    resetFormDraftsForTests();
+  });
+
+  it('renders no sheet for a stored draft once the role is read-only, and states the role once', async () => {
+    await seedSheetDraft();
+    permissionState.permission = 'read-only';
+
+    const { renderer, unmount } = await mountScreen();
+
+    expect(findAll(renderer.root, 'SheetHeader')).toHaveLength(0);
+    expect(
+      findAll(renderer.root, 'Text').filter(
+        node => node.props.children === i18n.t('profiles.organizationRoleRequired')
+      )
+    ).toHaveLength(1);
+
+    unmount();
+  });
+
+  it('drops that draft with the denial, so a later allowed render stays closed', async () => {
+    await seedSheetDraft();
+    permissionState.permission = 'read-only';
+
+    const denied = await mountScreen();
+    expect(findAll(denied.renderer.root, 'SheetHeader')).toHaveLength(0);
+    denied.unmount();
+
+    permissionState.permission = 'allowed';
+    const allowed = await mountScreen();
+    expect(findAll(allowed.renderer.root, 'SheetHeader')).toHaveLength(0);
+    allowed.unmount();
+  });
+
+  it('keeps the draft while the role resolves, then reopens on the typed fields', async () => {
+    await seedSheetDraft();
+    permissionState.permission = 'resolving';
+
+    const resolving = await mountScreen();
+    expect(findAll(resolving.renderer.root, 'SheetHeader')).toHaveLength(0);
+
+    permissionState.permission = 'allowed';
+    await act(async () => {
+      rerenderScreen(resolving.renderer, resolving.queryClient);
+      await Promise.resolve();
+    });
+
+    expect(findOne(resolving.renderer.root, 'SheetHeader')).toBeTruthy();
+    expect(findField(resolving.renderer.root, 'Command name').props.defaultValue).toBe('summarize');
+    expect(findField(resolving.renderer.root, 'Template').props.defaultValue).toBe(
+      'Summarize the diff'
+    );
+
+    resolving.unmount();
+  });
+
+  it('closes the open sheet when the role is denied and does not reopen it when it returns', async () => {
+    const { renderer, queryClient, unmount } = await mountScreen();
+    pressAddButton(renderer.root);
+    expect(findOne(renderer.root, 'SheetHeader')).toBeTruthy();
+    changeText(renderer.root, 'Command name', 'summarize');
+
+    permissionState.permission = 'read-only';
+    await act(async () => {
+      rerenderScreen(renderer, queryClient);
+      await Promise.resolve();
+    });
+    expect(findAll(renderer.root, 'SheetHeader')).toHaveLength(0);
+
+    permissionState.permission = 'allowed';
+    await act(async () => {
+      rerenderScreen(renderer, queryClient);
+      await Promise.resolve();
+    });
+    expect(findAll(renderer.root, 'SheetHeader')).toHaveLength(0);
+
+    unmount();
+  });
+});
+
 describe('ProfileKiloCommandsScreen row controls', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -609,7 +740,12 @@ describe('ProfileKiloCommandsScreen row controls', () => {
     );
     expect(actions.map(node => node.props.accessibilityLabel)).toEqual(labels);
     for (const action of actions) {
-      expect(action.props.hitSlop).toBe(COMPACT_CONTROL_HIT_SLOP_DP);
+      expect(action.props.hitSlop).toEqual({
+        top: COMPACT_CONTROL_HIT_SLOP_DP,
+        bottom: COMPACT_CONTROL_HIT_SLOP_DP,
+        left: COMPACT_CONTROL_HIT_SLOP_DP,
+        right: COMPACT_CONTROL_HIT_SLOP_DP,
+      });
     }
 
     unmount();
@@ -906,6 +1042,78 @@ describe('ProfileKiloCommandsScreen command cap', () => {
         node => node.props.children === i18n.t('profiles.slashCommands.saveFailed')
       )
     ).toBe(false);
+
+    unmount();
+  });
+});
+
+/** The props the mocked `QueryError` host element carries; the renderer keeps them untyped. */
+type RenderedQueryError = {
+  variant?: string;
+  title?: string;
+  placement?: string;
+  onRetry?: () => void;
+};
+
+describe('ProfileKiloCommandsScreen load errors', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetFormDraftsForTests();
+    permissionState.permission = 'allowed';
+    h.connectivity = 'online';
+    Object.assign(h.query, {
+      data: undefined,
+      error: undefined,
+      isError: false,
+      isPending: false,
+      isRefetching: false,
+    });
+    for (const mutation of Object.values(h.mutations)) {
+      Object.assign(mutation, { isPending: false });
+    }
+  });
+
+  it('forbidden: names the permission state and offers no Retry', async () => {
+    Object.assign(h.query, {
+      isError: true,
+      error: { data: { code: 'FORBIDDEN' } },
+    });
+
+    const { renderer, unmount } = await mountScreen();
+
+    // The renderer keeps host props untyped; the stub's props are the screen's own.
+    const queryError = findAll(renderer.root, 'QueryError')[0]?.props as
+      | RenderedQueryError
+      | undefined;
+    expect(queryError?.variant).toBe('permission');
+    expect(queryError?.title).toBeUndefined();
+    expect(queryError?.onRetry).toBeUndefined();
+    // A read with nothing under it owns the surface, so it centres and no
+    // tab scroller holds it.
+    expect(queryError?.placement).toBe('center');
+    expect(findAll(renderer.root, 'TabScrollView')).toHaveLength(0);
+
+    unmount();
+  });
+
+  it('server: keeps the load-failure title and a Retry that refetches', async () => {
+    Object.assign(h.query, {
+      isError: true,
+      error: { data: { code: 'INTERNAL_SERVER_ERROR' } },
+    });
+
+    const { renderer, unmount } = await mountScreen();
+
+    const queryError = findAll(renderer.root, 'QueryError')[0]?.props as
+      | RenderedQueryError
+      | undefined;
+    expect(queryError?.variant).toBe('server');
+    expect(queryError?.title).toBe("Couldn't load profiles");
+    expect(typeof queryError?.onRetry).toBe('function');
+    act(() => {
+      queryError?.onRetry?.();
+    });
+    expect(h.query.refetch).toHaveBeenCalledTimes(1);
 
     unmount();
   });

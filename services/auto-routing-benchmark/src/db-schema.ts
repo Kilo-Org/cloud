@@ -26,6 +26,9 @@ import type {
 
 export type ClientProfileStatus = 'pending' | 'ready' | 'failed';
 
+/** Storage status: `failed` is retryable, `unavailable` is permanently failed. */
+export type BenchmarkProfileRowStatus = BenchmarkProfileStatus | 'unavailable';
+
 // Migrations are generated via `pnpm db:generate` (drizzle-kit) and applied
 // via wrangler d1 migrations apply.
 
@@ -117,9 +120,21 @@ export const benchmarkRuns = sqliteTable(
     // Which registry queue this run drained: 'platform' (saved platform decider
     // list) or 'user' (owner pools). Classifier runs are always 'platform'.
     purpose: text('purpose').$type<BenchmarkRunPurpose>().notNull().default('platform'),
+    // ACTIVE_MEASUREMENT_REVISION the run started under: which cases it runs and how it grades them.
+    // Runs from before the column existed measured revision 2.
+    measurement_revision: integer('measurement_revision').notNull().default(2),
+    // Post-cutover admission provenance: written only by the Worker that owns the paid
+    // flow. Null on every row an older Worker wrote, which is exactly how a run admitted
+    // during the deploy overlap is recognized and fenced — wall clock proves nothing.
+    // NULL means never claimable, initializable or dispatchable again.
+    admission_marker: text('admission_marker'),
   },
   table => [
-    uniqueIndex('UQ_benchmark_runs_one_running_per_router_kind_purpose')
+    // Decider queues run several runs at once; a classifier run derives one winner.
+    uniqueIndex('UQ_benchmark_runs_one_running_classifier_per_router_purpose')
+      .on(table.router, table.purpose)
+      .where(sql`${table.status} = 'running' AND ${table.kind} = 'classifier'`),
+    index('IX_benchmark_runs_running')
       .on(table.router, table.kind, table.purpose)
       .where(sql`${table.status} = 'running'`),
   ]
@@ -158,6 +173,10 @@ export const modelSummaries = sqliteTable(
     avg_latency_ms: real('avg_latency_ms').notNull(),
     p50_latency_ms: real('p50_latency_ms'),
     cases: integer('cases').notNull(),
+    // Rows whose cost_usd was reported: the denominator of avg_cost_usd. Null
+    // on rows written before it was captured, which the console reads as
+    // "unknown", never as "every case was priced".
+    costed_cases: integer('costed_cases'),
     errors: integer('errors').notNull(),
     p95_latency_ms: real('p95_latency_ms'),
     timeouts: integer('timeouts').notNull().default(0),
@@ -198,11 +217,17 @@ export const caseResults = sqliteTable(
     output_prefix: text('output_prefix'),
     event_count: integer('event_count'),
     last_event_types: text('last_event_types'),
+    // Tool evidence of the measured turn (src/kilo-events.ts ToolEvidence); null before it was
+    // recorded. tool_names is a JSON array of distinct names in first-use order.
+    tool_calls: integer('tool_calls'),
+    tool_names: text('tool_names'),
+    step_count: integer('step_count'),
+    final_finish_reason: text('final_finish_reason'),
     // Repetition index (0-based); together with run_id/model/variant/case_id forms the PK.
     rep: integer('rep').notNull().default(0),
     // 1 when the case was killed by the wall-clock timeout, 0 otherwise.
     timed_out: integer('timed_out').notNull().default(0),
-    // PROMPT_TRANSPORT_REVISION of the CLI call that produced this result.
+    // Measurement revision (src/measurement-revision.ts) of the call that produced this result.
     prompt_revision: integer('prompt_revision').notNull().default(1),
   },
   // The composite PK's leftmost column already serves run_id-prefix lookups
@@ -241,6 +266,9 @@ export const schedulerChunks = sqliteTable(
       .references(() => benchmarkRuns.id, { onDelete: 'cascade' }),
     model: text('model').notNull(),
     variant: text('variant').notNull(),
+    // Retired: nothing reads it, and writers store '[]'. SQLite's DROP COLUMN rewrites
+    // every row of this large table, and the previous worker still writes it until
+    // this release is deployed, so the column stays.
     providers: text('providers').notNull(),
     rep: integer('rep').notNull(),
     chunk: integer('chunk').notNull(),
@@ -255,6 +283,7 @@ export const schedulerChunks = sqliteTable(
     available_at: integer('available_at').notNull().default(0),
     attempts: integer('attempts').notNull().default(0),
     throttle_deferrals: integer('throttle_deferrals').notNull().default(0),
+    catalog_deferrals: integer('catalog_deferrals').notNull().default(0),
   },
   table => [
     index('IX_scheduler_chunks_pending').on(table.status, table.available_at),
@@ -309,9 +338,11 @@ export const schedulerExecutions = sqliteTable(
 /**
  * Scheduler lease rows. Row 1 serializes dispatch passes: a pass holds the lease while
  * it reads live occupancy and claims; another dispatcher that finds the lease held
- * returns immediately and the next completion or cron wake retries. Model,
- * provider and slot caps are only exact if one pass at a time reads occupancy.
- * Row 2, created on first use, serializes run initialization passes.
+ * returns immediately and the next completion or cron wake retries. Model and slot
+ * caps are only exact if one pass at a time reads occupancy.
+ * Row 2, created on first use, serializes run initialization passes. Row 3 is a
+ * production deploy's intent: while its lease is unexpired, no new dispatch pass takes
+ * row 1, so the deploy takes row 1 when the current pass ends.
  */
 export const schedulerDispatchLock = sqliteTable('scheduler_dispatch_lock', {
   id: integer('id').primaryKey(),
@@ -320,14 +351,14 @@ export const schedulerDispatchLock = sqliteTable('scheduler_dispatch_lock', {
 });
 
 /**
- * Model- and provider-wide throttle deadlines. Cooling is stored here rather than
- * stamped onto every pending chunk so one throttle event costs a bounded write
- * instead of rewriting the whole backlog.
+ * Per-model throttle deadlines. Cooling is stored here rather than stamped onto
+ * every pending chunk so one throttle event costs a bounded write instead of
+ * rewriting the whole backlog. Rows of the retired `provider` scope only expire.
  */
 export const schedulerCooldowns = sqliteTable(
   'scheduler_cooldowns',
   {
-    scope: text('scope').$type<'model' | 'provider'>().notNull(),
+    scope: text('scope').$type<'model' | 'provider' | 'catalog'>().notNull(),
     key: text('key').notNull(),
     until: integer('until').notNull(),
   },
@@ -342,6 +373,9 @@ export const schedulerSettings = sqliteTable('scheduler_settings', {
   id: integer('id').primaryKey(),
   slots: integer('slots'),
   model_concurrency: integer('model_concurrency'),
+  // Retired provider limits, no longer read or written. The previous worker still
+  // selects them until this release is deployed, and migrations apply before the
+  // deploy, so they are dropped in a later migration.
   provider_concurrency: integer('provider_concurrency'),
   unknown_provider_concurrency: integer('unknown_provider_concurrency'),
   updated_at: text('updated_at').notNull(),
@@ -364,6 +398,30 @@ export const routingTables = sqliteTable('routing_tables', {
   low_confidence_threshold: real('low_confidence_threshold'),
   effort_by_complexity: text('effort_by_complexity', { mode: 'json' }).$type<EffortByComplexity>(),
   source: text('source').notNull(),
+  // Exact published platform membership, so a republish is gated on a real desired-set
+  // change rather than on ranked routes (a configured-but-ineligible pair is absent).
+  desired_pairs: text('desired_pairs', { mode: 'json' }).$type<string[]>(),
+});
+
+/**
+ * Single row (id = 1) marking the first scheduler pass after the paid cutover. Pending
+ * work that predates it is parked instead of resurrected into a paid flow.
+ */
+export const benchmarkCutover = sqliteTable('benchmark_cutover', {
+  id: integer('id').primaryKey(),
+  cutover_at: text('cutover_at').notNull(),
+});
+
+/**
+ * One row per base router: a monotonic counter bumped by the `benchmark_profiles` triggers in the
+ * migration that adds this table, so any committed readiness or provenance change to a profile
+ * advances it inside the same transaction. The serving Worker reads this single row through the
+ * benchmark service binding before it trusts a cached custom routing table.
+ */
+export const benchmarkReadinessEpoch = sqliteTable('benchmark_readiness_epoch', {
+  router: text('router').$type<AutoRouter>().primaryKey().notNull(),
+  epoch: integer('epoch').notNull().default(0),
+  updated_at: text('updated_at').notNull(),
 });
 
 export const routingTableCandidates = sqliteTable(
@@ -406,10 +464,17 @@ export const benchmarkProfiles = sqliteTable(
     variant: text('variant').notNull().default(''),
     engine_identity: text('engine_identity').notNull(),
     repetitions: integer('repetitions').notNull(),
-    status: text('status').$type<BenchmarkProfileStatus>().notNull(),
+    status: text('status').$type<BenchmarkProfileRowStatus>().notNull(),
     // Provenance of the run that measured / is measuring this profile.
     run_id: text('run_id'),
     failure_reason: text('failure_reason'),
+    // Failure history since the last ready measurement, kept through requeue and re-run
+    // so the retry budgets count consecutive failed runs. Read through parseProfileState.
+    failure_class: text('failure_class'),
+    failure_attempts: integer('failure_attempts').notNull().default(0),
+    model_failure_attempts: integer('model_failure_attempts').notNull().default(0),
+    first_failed_at: text('first_failed_at'),
+    retry_after: text('retry_after'),
     invalidated_at: text('invalidated_at'),
     requested_at: text('requested_at').notNull(),
     updated_at: text('updated_at').notNull(),
@@ -444,6 +509,28 @@ export const benchmarkSubscriptions = sqliteTable(
 );
 
 /**
+ * Progress of one day's alias sync, per router. The daily cron starts it and the minute
+ * cron resumes it while the row says work is left: whether the platform aliases were
+ * re-resolved, and a keyset cursor over owner subscriptions. `attempts` bounds how much
+ * the day may repeat after a failure.
+ */
+export const benchmarkDailyAliasSync = sqliteTable('benchmark_daily_alias_sync', {
+  router: text('router').$type<AutoRouter>().primaryKey(),
+  day: text('day').notNull(),
+  attempts: integer('attempts').notNull().default(0),
+  platform_status: text('platform_status')
+    .$type<'pending' | 'ok' | 'failed'>()
+    .notNull()
+    .default('pending'),
+  platform_error: text('platform_error'),
+  owner_cursor_type: text('owner_cursor_type').$type<'user' | 'org'>(),
+  owner_cursor_id: text('owner_cursor_id'),
+  owner_pages: integer('owner_pages').notNull().default(0),
+  owner_done: integer('owner_done').notNull().default(0),
+  updated_at: text('updated_at').notNull(),
+});
+
+/**
  * Ready registry rows queued to re-measure the cases the revision-1 prompt transport
  * measured unreliably. Kept beside the profile so the profile stays `ready` on its
  * previous run and keeps serving: a run claims the row (`run_id`), copies the previous
@@ -467,6 +554,51 @@ export const profileRemeasures = sqliteTable(
       columns: [table.router, table.model, table.variant, table.engine_identity, table.repetitions],
     }),
     index('IDX_profile_remeasures_run').on(table.run_id),
+  ]
+);
+
+/**
+ * One-shot activation queue for a measurement revision: `remeasure` rows to queue in
+ * `profile_remeasures` and `readmit` rows to move back to `pending`, both written by the
+ * activating migration and consumed by the drain of the worker that ships with it
+ * (`applyProbeActivations` in `src/probe-activation.ts`).
+ *
+ * The rows exist only so the activation can ship as reviewed data before the new image
+ * is live: a migration applies before the container deploy, and the worker still serving
+ * during that window claims `profile_remeasures` rows and `pending` profiles directly, so
+ * a queue row written by the migration itself would be measured at the old revision. That
+ * worker never reads this table, and the apply is a no-op while the active revision is
+ * below the row's `required_revision` (see `applyProbeActivations`).
+ */
+export const probeActivations = sqliteTable(
+  'probe_activations',
+  {
+    router: text('router').$type<AutoRouter>().notNull(),
+    /** `remeasure` queues the pair in `profile_remeasures`; `readmit` re-admits it. */
+    action: text('action').$type<'remeasure' | 'readmit'>().notNull(),
+    /**
+     * The measurement revision the action needs. `applyProbeActivations` is a no-op below
+     * it and leaves the row staged, so deploying a worker that starts runs under an older
+     * `ACTIVE_MEASUREMENT_REVISION` never moves a row it cannot measure yet.
+     */
+    required_revision: integer('required_revision').notNull(),
+    model: text('model').notNull(),
+    variant: text('variant').notNull().default(''),
+    engine_identity: text('engine_identity').notNull(),
+    repetitions: integer('repetitions').notNull(),
+    requested_at: text('requested_at').notNull(),
+  },
+  table => [
+    primaryKey({
+      columns: [
+        table.router,
+        table.action,
+        table.model,
+        table.variant,
+        table.engine_identity,
+        table.repetitions,
+      ],
+    }),
   ]
 );
 
@@ -619,10 +751,513 @@ export const runLaneFailures = sqliteTable(
     chunk: integer('chunk').notNull().default(0),
     shard: integer('shard').notNull().default(0),
     failed_at: text('failed_at').notNull(),
+    // Null on rows written before lane causes were recorded.
+    failure_class: text('failure_class'),
   },
   table => [
     primaryKey({
       columns: [table.run_id, table.model, table.variant, table.rep, table.chunk, table.shard],
     }),
+  ]
+);
+
+export type PaidBenchmarkRequestRowStatus =
+  | 'preparing'
+  | 'active'
+  | 'paused'
+  | 'completed'
+  | 'failed';
+
+export type PaidBenchmarkRequestCaseRowStatus =
+  | 'queued'
+  | 'running'
+  | 'reused'
+  | 'done'
+  | 'failed'
+  | 'paused';
+
+/**
+ * A case run's lifecycle. `settled` means a valid result was committed; `cancelled`
+ * and `failed` never charge a user. One generation owns a case run at a time, and
+ * every transition is conditioned on (executor_run_id, executor_token, generation)
+ * so a callback from an earlier attempt cannot settle a newer one.
+ */
+export type PaidCaseRunRowStatus =
+  | 'queued'
+  | 'running'
+  | 'settled'
+  // The payer ran out of funds: the slot stops dispatching but is not a failure and the
+  // run itself stays healthy. Distinct from `cancelled` (explicit last voluntary pause).
+  | 'paused'
+  | 'cancelled'
+  | 'failed';
+
+/**
+ * Per-account eligibility for one case-run generation. `detached` removes an account that
+ * failed billing from future assignment while its earlier usage receipts stay. `accepted`
+ * is the account whose usage was recorded; `closed` is terminal bookkeeping.
+ */
+export type PaidCasePayerStatus = 'eligible' | 'detached' | 'accepted' | 'closed';
+
+/**
+ * One native model request: selecting → admitted → used (native receipt accepted) →
+ * completed, or refused (a trusted pre-upstream payment refusal).
+ */
+export type PaidModelRequestState = 'selecting' | 'admitted' | 'used' | 'completed' | 'refused';
+
+export type PaidCaseCancellationStatus = 'pending' | 'delivered';
+
+/** The only billing-adjacent effect D1 still writes: post-completion pin bookkeeping. */
+export type PaidBillingOutboxKind = 'pins';
+
+/** No automatic terminal status: a monetary intent retries until it is delivered. */
+export type PaidBillingOutboxStatus = 'pending' | 'delivered' | 'abandoned';
+
+/**
+ * One explicit user confirmation ('start') with its bound quote. Never created by a
+ * pool edit, subscription sync, alias scan, schedule or retry.
+ */
+export const paidBenchmarkRequests = sqliteTable(
+  'paid_benchmark_requests',
+  {
+    id: text('id').primaryKey(),
+    owner_type: text('owner_type').$type<'user' | 'organization'>().notNull(),
+    owner_id: text('owner_id').notNull(),
+    organization_id: text('organization_id'),
+    router: text('router').$type<AutoRouter>().notNull().default('efficient'),
+    router_id: text('router_id').notNull(),
+    pool_version: text('pool_version').notNull(),
+    engine_identity: text('engine_identity').notNull(),
+    status: text('status').$type<PaidBenchmarkRequestRowStatus>().notNull(),
+    quote_id: text('quote_id').notNull(),
+    estimate_microdollars: integer('estimate_microdollars').notNull(),
+    // The displayed maximum. Usage is billed just-in-time per model request; this is
+    // the amount the user approved, never a post-hoc D1 charge.
+    maximum_microdollars: integer('maximum_microdollars').notNull(),
+    // Accepted usage observed for this request's attached attempts (display only).
+    charged_microdollars: integer('charged_microdollars').notNull().default(0),
+    // The approved plan's case count and how many are durably staged. Activation
+    // requires them equal, so approval is never derived from a partially written plan.
+    plan_cases: integer('plan_cases').notNull().default(0),
+    staged_cases: integer('staged_cases').notNull().default(0),
+    // When staging last added a slot. `updated_at` also moves on a pass that writes nothing,
+    // so abandonment reads this: a request stays alive only while it is actually progressing.
+    last_staged_at: text('last_staged_at'),
+    // `no_funds` is the native payer's balance refusal; `owner` is a voluntary pause.
+    // The reviewed forecast is advisory only (no threshold-driven pause). A case
+    // cancelled because its last voluntary payer left is a case-level close reason.
+    pause_reason: text('pause_reason').$type<'no_funds' | 'owner'>(),
+    actor_user_id: text('actor_user_id').notNull(),
+    // Immutable pool context the quote was bound to.
+    context: text('context').notNull(),
+    created_at: text('created_at').notNull(),
+    updated_at: text('updated_at').notNull(),
+    activated_at: text('activated_at'),
+    paused_at: text('paused_at'),
+    completed_at: text('completed_at'),
+    failure_reason: text('failure_reason'),
+    failure_retryable: integer('failure_retryable', { mode: 'boolean' }).notNull().default(false),
+  },
+  table => [
+    index('IX_paid_benchmark_requests_owner').on(
+      table.owner_type,
+      table.owner_id,
+      table.router_id,
+      table.created_at
+    ),
+    index('IX_paid_benchmark_requests_status').on(table.status, table.updated_at),
+    // One live request per saved pool: a hidden second start would keep spending after
+    // the visible request is paused. Completed/failed rows do not block a fresh start.
+    uniqueIndex('UQ_paid_benchmark_requests_live_router')
+      .on(table.router_id)
+      .where(sql`${table.status} IN ('preparing', 'active')`),
+  ]
+);
+
+/**
+ * An expiring quote the user saw before clicking. `plan` is the selected case plan
+ * (case keys, per-case estimate, reused/covered/shared counts), bound to the owner,
+ * pool version, engine identity and context hash so a request cannot be started for a
+ * different pool or case set than the one priced.
+ */
+export const paidBenchmarkQuotes = sqliteTable(
+  'paid_benchmark_quotes',
+  {
+    id: text('id').primaryKey(),
+    owner_type: text('owner_type').$type<'user' | 'organization'>().notNull(),
+    owner_id: text('owner_id').notNull(),
+    organization_id: text('organization_id'),
+    router: text('router').$type<AutoRouter>().notNull().default('efficient'),
+    router_id: text('router_id').notNull(),
+    pool_version: text('pool_version').notNull(),
+    engine_identity: text('engine_identity').notNull(),
+    context: text('context').notNull(),
+    plan: text('plan').notNull(),
+    estimate_microdollars: integer('estimate_microdollars').notNull(),
+    maximum_microdollars: integer('maximum_microdollars').notNull(),
+    // Number of case slots the approved plan stages before a request may activate.
+    plan_cases: integer('plan_cases').notNull().default(0),
+    expires_at: text('expires_at').notNull(),
+    // Set by the one start that consumes the quote; a second start is rejected.
+    started_request_id: text('started_request_id'),
+    created_at: text('created_at').notNull(),
+    updated_at: text('updated_at').notNull(),
+  },
+  table => [
+    index('IX_paid_benchmark_quotes_owner').on(table.owner_type, table.owner_id, table.expires_at),
+  ]
+);
+
+/** One row per requested case slot: the displayed per-case progress and receipt. */
+export const paidBenchmarkRequestCases = sqliteTable(
+  'paid_benchmark_request_cases',
+  {
+    request_id: text('request_id')
+      .notNull()
+      .references(() => paidBenchmarkRequests.id, { onDelete: 'cascade' }),
+    engine_identity: text('engine_identity').notNull(),
+    model: text('model').notNull(),
+    variant: text('variant').notNull(),
+    rep: integer('rep').notNull(),
+    case_id: text('case_id').notNull(),
+    status: text('status').$type<PaidBenchmarkRequestCaseRowStatus>().notNull(),
+    /**
+     * The canonical case-run generation this request's row joined, written at staging from
+     * the run's current generation and corrected in the same claim batch. Nullable because
+     * rows staged before the column existed never recorded one; a null row matches no
+     * receipt, so it can never claim another generation's coverage.
+     */
+    generation: integer('generation'),
+    covered_by_kilo: integer('covered_by_kilo', { mode: 'boolean' }).notNull().default(false),
+    charged_microdollars: integer('charged_microdollars').notNull().default(0),
+    reason: text('reason'),
+    updated_at: text('updated_at').notNull(),
+  },
+  table => [
+    primaryKey({
+      columns: [
+        table.request_id,
+        table.engine_identity,
+        table.model,
+        table.variant,
+        table.rep,
+        table.case_id,
+      ],
+    }),
+    index('IX_paid_benchmark_request_cases_status').on(table.request_id, table.status),
+  ]
+);
+
+/**
+ * The cross-run case-key claim fence: one row per (engine identity, model, variant,
+ * repetition, case). A row is created queued by a paid request or claimed running by
+ * the executor chunk that will measure it. The primary key IS the fence, so two
+ * admitters of the same case run cannot both start inference.
+ */
+export const benchmarkCaseRuns = sqliteTable(
+  'benchmark_case_runs',
+  {
+    engine_identity: text('engine_identity').notNull(),
+    model: text('model').notNull(),
+    variant: text('variant').notNull(),
+    rep: integer('rep').notNull(),
+    case_id: text('case_id').notNull(),
+    status: text('status').$type<PaidCaseRunRowStatus>().notNull(),
+    // Incremented when a cancelled or failed generation is revived by a new paid
+    // attempt, so callbacks of the old attempt are fenced.
+    generation: integer('generation').notNull().default(1),
+    executor_run_id: text('executor_run_id'),
+    executor_token: text('executor_token'),
+    // Sticky: once the platform asked for this case run, it pays it even if the pair
+    // leaves the platform pool before settlement.
+    platform_covered: integer('platform_covered', { mode: 'boolean' }).notNull().default(false),
+    // A usable result exists for this case run (including one recovered after a
+    // cancel), so it is never measured or charged again.
+    result_usable: integer('result_usable', { mode: 'boolean' }).notNull().default(false),
+    cost_microdollars: integer('cost_microdollars'),
+    // Marks the settlement batch that froze this generation's payer set and output.
+    settlement_id: text('settlement_id'),
+    failure_reason: text('failure_reason'),
+    created_at: text('created_at').notNull(),
+    updated_at: text('updated_at').notNull(),
+    started_at: text('started_at'),
+    settled_at: text('settled_at'),
+  },
+  table => [
+    primaryKey({
+      columns: [table.engine_identity, table.model, table.variant, table.rep, table.case_id],
+    }),
+    index('IX_benchmark_case_runs_executor').on(table.executor_run_id),
+    index('IX_benchmark_case_runs_status').on(table.status, table.updated_at),
+  ]
+);
+
+/**
+ * Per-account eligibility for one case-run generation (one case, one measuring attempt).
+ * A `detached` account can no longer be selected; its receipts remain. Selection,
+ * admission and receipts are keyed by the model request UUID in `paid_model_requests`,
+ * and repeat calls of the same case rotate accounts by the generation's accepted count.
+ */
+export const benchmarkCasePayers = sqliteTable(
+  'benchmark_case_payers',
+  {
+    engine_identity: text('engine_identity').notNull(),
+    model: text('model').notNull(),
+    variant: text('variant').notNull(),
+    rep: integer('rep').notNull(),
+    case_id: text('case_id').notNull(),
+    generation: integer('generation').notNull(),
+    owner_type: text('owner_type').$type<'user' | 'organization'>().notNull(),
+    owner_id: text('owner_id').notNull(),
+    request_id: text('request_id').notNull(),
+    status: text('status').$type<PaidCasePayerStatus>().notNull(),
+    reason: text('reason'),
+    created_at: text('created_at').notNull(),
+    updated_at: text('updated_at').notNull(),
+  },
+  table => [
+    primaryKey({
+      columns: [
+        table.engine_identity,
+        table.model,
+        table.variant,
+        table.rep,
+        table.case_id,
+        table.generation,
+        table.owner_type,
+        table.owner_id,
+        table.request_id,
+      ],
+    }),
+    index('IX_benchmark_case_payers_owner').on(table.owner_type, table.owner_id, table.status),
+    index('IX_benchmark_case_payers_request').on(table.request_id, table.status),
+  ]
+);
+
+/**
+ * One native model request (one upstream call) of one case-run generation. The UUID is
+ * the client/model request id, so a duplicated HTTP delivery is the same row. `state`
+ * is the single authority: only an `admitted` row may reach the provider, and only its
+ * `assignment_id` can be admitted or detached, so a retried request cannot double-admit.
+ * A refused row keeps its candidate trail in `paid_model_request_attempts`.
+ */
+export const paidModelRequests = sqliteTable(
+  'paid_model_requests',
+  {
+    id: text('id').primaryKey(),
+    engine_identity: text('engine_identity').notNull(),
+    model: text('model').notNull(),
+    variant: text('variant').notNull(),
+    rep: integer('rep').notNull(),
+    case_id: text('case_id').notNull(),
+    generation: integer('generation').notNull(),
+    // The request the case belongs to (display/aggregation, not the billing unit).
+    pool_request_id: text('pool_request_id'),
+    state: text('state').$type<PaidModelRequestState>().notNull().default('selecting'),
+    // The payer account the current selection/admission is pinned to.
+    assignment_id: text('assignment_id'),
+    // Gateway call identity, for the authenticated admit callback.
+    api: text('api'),
+    executor_user_id: text('executor_user_id'),
+    project_id: text('project_id'),
+    usage_id: text('usage_id'),
+    // The organization the platform charged for a covered model request. Part of the
+    // signed assignment, so it is only stored and returned, never inferred.
+    platform_organization_id: text('platform_organization_id'),
+    owner_type: text('owner_type').$type<'user' | 'organization'>(),
+    owner_id: text('owner_id'),
+    platform_covered: integer('platform_covered', { mode: 'boolean' }).notNull().default(false),
+    reason: text('reason'),
+    created_at: text('created_at').notNull(),
+    updated_at: text('updated_at').notNull(),
+  },
+  table => [
+    index('IX_paid_model_requests_case').on(
+      table.engine_identity,
+      table.model,
+      table.variant,
+      table.rep,
+      table.case_id,
+      table.generation
+    ),
+    index('IX_paid_model_requests_state').on(table.state, table.updated_at),
+  ]
+);
+
+/**
+ * Selection trail of one model request: one row per attempted payer candidate. A
+ * `refused` attempt is the auditable reason another account was tried; it never bills.
+ */
+export const paidModelRequestAttempts = sqliteTable(
+  'paid_model_request_attempts',
+  {
+    model_request_id: text('model_request_id')
+      .notNull()
+      .references(() => paidModelRequests.id, { onDelete: 'cascade' }),
+    assignment_id: text('assignment_id').notNull(),
+    owner_type: text('owner_type').$type<'user' | 'organization'>().notNull(),
+    owner_id: text('owner_id').notNull(),
+    pool_request_id: text('pool_request_id').notNull(),
+    status: text('status').$type<'selected' | 'refused' | 'accepted'>().notNull(),
+    reason: text('reason'),
+    ordinal: integer('ordinal').notNull().default(0),
+    created_at: text('created_at').notNull(),
+    updated_at: text('updated_at').notNull(),
+  },
+  table => [
+    primaryKey({ columns: [table.model_request_id, table.assignment_id] }),
+    index('IX_paid_model_request_attempts_pool').on(table.pool_request_id, table.status),
+  ]
+);
+
+/**
+ * Read-only accounting receipt for usage the native usage writer billed against a model
+ * request. One row per native usage id, so a replay cannot double count; D1 never sends a
+ * charge from this table. `model_request_id` keeps the owner scope for progress totals.
+ */
+export const paidAttemptUsage = sqliteTable(
+  'paid_attempt_usage',
+  {
+    usage_id: text('usage_id').primaryKey(),
+    model_request_id: text('model_request_id').notNull(),
+    request_id: text('request_id').notNull(),
+    engine_identity: text('engine_identity').notNull(),
+    model: text('model').notNull(),
+    variant: text('variant').notNull(),
+    rep: integer('rep').notNull(),
+    case_id: text('case_id').notNull(),
+    generation: integer('generation').notNull(),
+    owner_type: text('owner_type').$type<'user' | 'organization'>().notNull(),
+    owner_id: text('owner_id').notNull(),
+    microdollars: integer('microdollars').notNull(),
+    platform_covered: integer('platform_covered', { mode: 'boolean' }).notNull().default(false),
+    created_at: text('created_at').notNull(),
+  },
+  table => [
+    // One receipt per model request: a second native usage id for the same admitted call
+    // is a mismatch and must not write accounting.
+    uniqueIndex('UQ_paid_attempt_usage_model_request').on(table.model_request_id),
+    index('IX_paid_attempt_usage_request').on(table.request_id, table.created_at),
+    // Covered-call lookup for shared cases: a covered receipt has no paying pool request,
+    // so progress must find it by the case key alone. Partial, so it stays tiny relative
+    // to the request-scoped rows the other indexes serve.
+    index('IX_paid_attempt_usage_covered_case')
+      .on(table.engine_identity, table.model, table.variant, table.rep, table.case_id)
+      .where(sql`${table.platform_covered} = 1`),
+    // Per-case aggregates for progress read this index only for the request's own rows.
+    index('IX_paid_attempt_usage_case').on(
+      table.request_id,
+      table.engine_identity,
+      table.model,
+      table.variant,
+      table.rep,
+      table.case_id,
+      table.platform_covered
+    ),
+  ]
+);
+
+/**
+ * Durable cancellation intent for a running generation. The case run is fenced the
+ * moment its terminal transition commits; this row carries the exact
+ * (run, token, generation) that must be signalled and is retried until delivered.
+ */
+export const paidCaseCancellations = sqliteTable(
+  'paid_benchmark_cancellations',
+  {
+    engine_identity: text('engine_identity').notNull(),
+    model: text('model').notNull(),
+    variant: text('variant').notNull(),
+    rep: integer('rep').notNull(),
+    case_id: text('case_id').notNull(),
+    generation: integer('generation').notNull(),
+    executor_run_id: text('executor_run_id').notNull(),
+    executor_token: text('executor_token').notNull(),
+    status: text('status').$type<PaidCaseCancellationStatus>().notNull().default('pending'),
+    attempts: integer('attempts').notNull().default(0),
+    available_at: integer('available_at').notNull().default(0),
+    created_at: integer('created_at').notNull(),
+    updated_at: integer('updated_at').notNull(),
+    delivered_at: integer('delivered_at'),
+    last_error: text('last_error'),
+  },
+  table => [
+    primaryKey({
+      columns: [
+        table.engine_identity,
+        table.model,
+        table.variant,
+        table.rep,
+        table.case_id,
+        table.generation,
+      ],
+    }),
+    index('IX_paid_benchmark_cancellations_pending').on(table.status, table.available_at),
+  ]
+);
+
+/**
+ * Durable billing intent outbox. `seq` is the delivery order (a pause release always
+ * follows the charges it settles); `id` is a deterministic operation id, so a replayed
+ * D1 batch cannot duplicate a hold, a charge or a release.
+ */
+export const paidBillingOutbox = sqliteTable(
+  'paid_benchmark_billing_outbox',
+  {
+    seq: integer('seq').primaryKey(),
+    id: text('id').notNull().unique(),
+    kind: text('kind').$type<PaidBillingOutboxKind>().notNull(),
+    request_id: text('request_id').notNull(),
+    case_engine_identity: text('case_engine_identity'),
+    case_model: text('case_model'),
+    case_variant: text('case_variant'),
+    case_rep: integer('case_rep'),
+    case_id: text('case_id'),
+    owner_type: text('owner_type').$type<'user' | 'organization'>().notNull(),
+    owner_id: text('owner_id').notNull(),
+    amount_microdollars: integer('amount_microdollars').notNull(),
+    status: text('status').$type<PaidBillingOutboxStatus>().notNull().default('pending'),
+    attempts: integer('attempts').notNull().default(0),
+    available_at: integer('available_at').notNull().default(0),
+    created_at: integer('created_at').notNull(),
+    updated_at: integer('updated_at').notNull(),
+    delivered_at: integer('delivered_at'),
+    last_error: text('last_error'),
+  },
+  table => [index('IX_paid_benchmark_billing_outbox_pending').on(table.status, table.available_at)]
+);
+
+/**
+ * One row per measured attempt of a benchmark pair, from the run ledger. It records the
+ * attempt outcome (completed / failed / unavailable) with the failure class and reason,
+ * so a pair that fails with no progress across attempts can be classified permanently
+ * unavailable from history. Create-table only: pre-ledger attempts stay unknown and no
+ * existing profile status is rewritten.
+ */
+export const profileAttemptHistory = sqliteTable(
+  'profile_attempt_history',
+  {
+    router: text('router').$type<AutoRouter>().notNull(),
+    model: text('model').notNull(),
+    variant: text('variant').notNull().default(''),
+    engine_identity: text('engine_identity').notNull(),
+    run_id: text('run_id').notNull(),
+    repetitions: integer('repetitions').notNull(),
+    outcome: text('outcome').notNull(),
+    failure_class: text('failure_class'),
+    failure_reason: text('failure_reason'),
+    attempted_at: text('attempted_at').notNull(),
+  },
+  table => [
+    primaryKey({
+      columns: [table.router, table.model, table.variant, table.engine_identity, table.run_id],
+    }),
+    index('IDX_profile_attempt_history_pair_time').on(
+      table.router,
+      table.model,
+      table.variant,
+      table.engine_identity,
+      table.attempted_at
+    ),
   ]
 );

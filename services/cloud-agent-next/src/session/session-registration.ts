@@ -20,6 +20,7 @@ import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import type { WorkerDb } from '@kilocode/db/client';
 import { cli_sessions_v2, kilocode_users, operation_ledgers } from '@kilocode/db/schema';
+import { ByocAwsProviderError, fetchAwsByocConnection } from '../byoc/aws-credential-resolver.js';
 import {
   isSelectableSandboxAllocation,
   sandboxAllocationSchema,
@@ -27,6 +28,7 @@ import {
 } from '@kilocode/worker-utils/sandbox-allocation';
 import {
   assertSandboxAllocationAvailable,
+  assertVercelRuntimeSupports,
   getSandboxSelectionCapabilities,
   isRetiredSandboxAllocation,
   isSandboxAllocationAvailable,
@@ -55,7 +57,10 @@ import {
 } from '@kilocode/session-ingest-contracts';
 import { normalizeGitUrl } from '@kilocode/worker-utils';
 import { generateBranchSlugFromSeed } from '@kilocode/worker-utils/deployment-slug';
-import type { CloudAgentAuthority } from '@kilocode/worker-utils/cloud-agent-authority';
+import {
+  CLOUD_AGENT_STACK_TARGET_DENIED,
+  type CloudAgentAuthority,
+} from '@kilocode/worker-utils/cloud-agent-authority';
 import {
   createRuntimeAuthorization,
   RuntimeAuthorizationRevokedError,
@@ -72,6 +77,7 @@ import {
   type CredentialContainment,
   type SessionMetadata,
 } from '../persistence/session-metadata.js';
+import { sameHostedGitHubRepositories } from '../persistence/hosted-github-repositories.js';
 import {
   bindingFromLegacyProvider,
   SandboxProviderBindingSchema,
@@ -113,6 +119,8 @@ import { sha256Hex } from '@kilocode/worker-utils/sha256';
 import { assertKiloModelAvailable } from '../model-validation.js';
 import { initialAdmissionFailure } from './admission-failure.js';
 import { logRuntimeAuthorizationDiagnostic } from './runtime-authorization-diagnostics.js';
+import { runtimeAuthorizationLifetime } from './runtime-authorization-lifetime.js';
+import { getWorkspaceStub } from '../control-plane/workspace/workspace-stub.js';
 import {
   createCloudAgentSessionReport,
   recordCloudAgentSandboxIdentity,
@@ -133,35 +141,23 @@ import {
   allocationCapabilityFor,
   assertEnvironmentSupportsSandbox,
   requestedSandboxAllocation,
+  requestNeedsEgressPolicy,
   withSavedSandboxAllocation,
 } from './sandbox-allocation-resolution.js';
 import type { SessionCreateRequest, SessionRepositoryRequest } from './session-requests.js';
-import { isInteractiveSessionOrigin } from '../shared/control-plane-permission.js';
 import { egressAllowlistSchema, egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
+import {
+  egressRequestSupported,
+  providerSupports,
+  type EgressRequest,
+} from '@kilocode/worker-utils/sandbox-provider-capabilities';
+import { PROVIDER_DESCRIPTORS } from '../shared/sandbox-provider.js';
 import {
   RUNTIME_BUILTIN_AGENT_SLUGS,
   type RuntimeBuiltinAgents,
 } from '../shared/runtime-profile.js';
 
 export type SessionRegistrationInput = SessionCreateRequest;
-
-/**
- * Whether a create may launch child Cloud Agent sessions. The capability is not
- * caller-controlled: a session gets it when a person created it through an
- * interactive client and it is not itself a spawned child. Every sandbox serves
- * one workspace, so the sandbox never removes the capability.
- */
-export function allowsSubagentSessions(
-  input: Pick<
-    SessionRegistrationInput,
-    'options' | 'parentCloudAgentSessionId' | 'runtime' | 'savedSandboxAllocation'
-  >
-): boolean {
-  return (
-    input.parentCloudAgentSessionId === undefined &&
-    isInteractiveSessionOrigin(input.options?.createdOnPlatform)
-  );
-}
 
 function assertSupportedSandboxAllocation(
   input: SessionRegistrationInput,
@@ -199,13 +195,36 @@ function assertEgressPolicyAllocation(
   input: SessionRegistrationInput,
   allocation: Pick<SessionRegistrationResult, 'sandboxProvider'>
 ): void {
-  if (input.runtime?.egressMode !== 'allowlist' && input.runtime?.egressAudit !== true) return;
-  if (allocation.sandboxProvider !== 'cloudflare-containers') {
+  if (
+    Object.keys(input.profile?.resolved?.networkSecrets ?? {}).length > 0 &&
+    allocation.sandboxProvider !== 'cloudflare-containers'
+  ) {
     throw new TRPCError({
       code: 'BAD_REQUEST',
-      message: 'Egress policy requires an isolated control-plane Cloudflare containers sandbox',
+      message: 'Network secrets require a Cloudflare sandbox',
     });
   }
+  const request = input.runtime ?? {};
+  const provider = allocation.sandboxProvider;
+  if (egressRequestSupported(provider, request)) return;
+  throw new TRPCError({
+    code: 'BAD_REQUEST',
+    message: unsupportedEgressMessage(request, provider),
+  });
+}
+
+function unsupportedEgressMessage(
+  request: EgressRequest,
+  provider: SessionRegistrationResult['sandboxProvider']
+): string {
+  const { label } = PROVIDER_DESCRIPTORS[provider];
+  if (request.egressMode === 'allowlist') {
+    return `Restricted network access is not available for ${label} sandboxes.`;
+  }
+  if (providerSupports(provider, 'egressProxy')) {
+    return `Egress audit needs an allowlist on ${label} sandboxes.`;
+  }
+  return `Egress audit is not available for ${label} sandboxes.`;
 }
 
 export type SessionRegistrationContext = {
@@ -852,16 +871,16 @@ async function recordParentChildSession(
   if (parentSessionId === undefined) return;
   try {
     await withDORetry(
-      () => getSandboxSessionStub(ctx.env, ctx.userId, parentSessionId),
+      () => getWorkspaceStub(ctx.env, ctx.userId, parentSessionId),
       stub =>
-        stub.recordCloudAgentChildSession({
+        stub.recordChild({
           cloudAgentSessionId: child.cloudAgentSessionId,
           ...(child.initialMessageId === undefined
             ? {}
             : { initialMessageId: child.initialMessageId }),
           ...(child.worktreeId === undefined ? {} : { worktreeId: child.worktreeId }),
         }),
-      'recordCloudAgentChildSession'
+      'recordChild'
     );
   } catch (error) {
     logger
@@ -905,13 +924,21 @@ async function issueSessionRuntimeAuthorization(
   if (ctx.cloudAgentAuthority) {
     const authority = ctx.cloudAgentAuthority;
     const runtimeAuthorization = await withDORetry(
-      () => getSandboxSessionStub(ctx.env, ctx.userId, authority.parentSessionId),
-      stub => stub.authorizeCloudAgentChild({ authority, childSessionId: cloudAgentSessionId }),
-      'authorizeCloudAgentChild'
-    ).catch(() => {
+      () => getWorkspaceStub(ctx.env, ctx.userId, authority.parentSessionId),
+      stub =>
+        stub.authorizeChild({
+          authority,
+          childSessionId: cloudAgentSessionId,
+          stackOnWorktreeId: input.parentWorktreeId,
+        }),
+      'authorizeChild'
+    ).catch((error: unknown) => {
       throw new TRPCError({
         code: 'FORBIDDEN',
-        message: 'Cloud Agent parent authorization unavailable',
+        message:
+          error instanceof Error && error.message === CLOUD_AGENT_STACK_TARGET_DENIED
+            ? CLOUD_AGENT_STACK_TARGET_DENIED
+            : 'Cloud Agent parent authorization unavailable',
       });
     });
     await assertKiloModelAvailable({
@@ -937,6 +964,7 @@ async function issueSessionRuntimeAuthorization(
       resourceKind: 'cloud-agent-next',
       resourceId: cloudAgentSessionId,
       environment: resolveRuntimeEnvironment(ctx.env.ENVIRONMENT),
+      ...runtimeAuthorizationLifetime(ctx.env),
       onAdmissionRejected: reason =>
         logRuntimeAuthorizationDiagnostic(cloudAgentSessionId, 'admission', reason),
       ...(orgId ? { organizationId: orgId } : {}),
@@ -952,6 +980,11 @@ async function issueSessionRuntimeAuthorization(
       token: created.token,
       seal: await sealRuntimeAuthorization(created.authorization, nextAuthSecret),
     };
+    // Only a model the caller's organization catalogue makes available may serve a
+    // session. This create-time check answers that for a prompt turn, which carries
+    // the model in this request. The AI gateway enforces the same requirement for
+    // the session at inference time (`resolveProviderAndPolicy` ->
+    // `getEffectiveModelDecision`), before any upstream request.
     if (initialTurn?.type === 'prompt') {
       await assertKiloModelAvailable({
         env: ctx.env,
@@ -1059,6 +1092,7 @@ async function allocateNewSession(
   await assertSandboxAllocationMembership(input, ctx);
   const requestedAllocation = requestedSandboxAllocation(input);
   const orgId = input.options?.kilocodeOrganizationId;
+  const capability = allocationCapabilityFor(input, options?.billingOrigin);
   // Every allocation is validated when it is allocated, whether the client chose
   // it or saved settings resolved it, so a pinned retry cannot outlive the
   // owner's access to sandbox selection.
@@ -1068,7 +1102,7 @@ async function allocateNewSession(
       { userId: ctx.userId, orgId },
       requestedAllocation,
       input.repository.type,
-      allocationCapabilityFor(input, options?.billingOrigin)
+      capability
     );
   }
   const initialTurn = input.initialTurn ? acceptInitialTurn(input.initialTurn) : undefined;
@@ -1182,12 +1216,36 @@ async function allocateNewSession(
       if (enrollment.setupStatus !== 'ready') {
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'byoc_vercel_not_ready' });
       }
+      await assertVercelRuntimeSupports(enrollment, capability);
       sandboxProviderBinding = {
         kind: 'vercel',
         source: {
           kind: 'byoc',
           ...byocVercelOwnerFields(enrollment),
           credentialId: enrollment.credentialId,
+        },
+      };
+    } else if (sandboxProvider === 'aws') {
+      let connection: Awaited<ReturnType<typeof fetchAwsByocConnection>>;
+      try {
+        connection = await fetchAwsByocConnection(
+          ctx.env,
+          orgId !== undefined ? { organizationId: orgId } : { userId: ctx.userId }
+        );
+      } catch (error) {
+        if (error instanceof ByocAwsProviderError && error.reason === 'byoc_credential_missing') {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'byoc_aws_not_ready' });
+        }
+        throw error;
+      }
+      if (connection.setupStatus !== 'ready')
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'byoc_aws_not_ready' });
+      sandboxProviderBinding = {
+        kind: 'aws',
+        source: {
+          kind: 'byoc',
+          ...byocVercelOwnerFields(connection),
+          credentialId: connection.credentialId,
         },
       };
     } else {
@@ -1527,10 +1585,7 @@ function buildSessionRegistrationCommand(
 ) {
   return {
     generatedBranch: allocation.generatedBranch,
-    allowSubagentSessions:
-      allowsSubagentSessions(input) &&
-      isPolicyBearingAuthToken(ctx.authToken) &&
-      ctx.botId === undefined,
+    allowSubagentSessions: ctx.botId === undefined && isPolicyBearingAuthToken(ctx.authToken),
     parentCloudAgentSessionId: input.parentCloudAgentSessionId,
     ...(input.parentWorktreeId === undefined ? {} : { parentWorktreeId: input.parentWorktreeId }),
     identity: {
@@ -1583,6 +1638,8 @@ function buildSessionRegistrationCommand(
           requestedEnvironmentRepositories: input.requestedEnvironment?.repositories ?? [],
         }
       : {}),
+    environmentSetup: input.environmentSetup,
+    hostedGitHubRepositories: input.hostedGitHubRepositories,
     finalization: input.finalization,
     callback: input.options?.callbackTarget ? { target: input.options.callbackTarget } : undefined,
     workspace: {
@@ -2010,7 +2067,7 @@ async function withLedgerSavedAllocation(
   freshAdmission: boolean
 ): Promise<SessionRegistrationInput> {
   const pinned = row.canonical_result?.[SESSION_CREATE_SAVED_ALLOCATION_KEY];
-  if (typeof pinned === 'string' && isSelectableSandboxAllocation(pinned as SandboxAllocation)) {
+  if (typeof pinned === 'string' && isSelectableSandboxAllocation(pinned)) {
     return { ...input, savedSandboxAllocation: pinned as SandboxAllocation };
   }
   // Admission always writes a canonical result, so its presence no longer means
@@ -2187,6 +2244,7 @@ export async function sessionCreateIntentFingerprint(
         appendSystemPrompt: input.profile?.overrides?.appendSystemPrompt || undefined,
       },
       repository: repositoryCreateIntent(input.repository),
+      hostedGitHubRepositories: input.hostedGitHubRepositories,
       // Only a client-sent selection is part of the intent; an implicit match is
       // not, so its fingerprint is unchanged. A different selection is a
       // different intent, so a same-key retry conflicts.
@@ -2194,9 +2252,8 @@ export async function sessionCreateIntentFingerprint(
       requireEnvironmentChoice: input.requireEnvironmentChoice,
       finalization: input.finalization,
       runtime:
-        input.runtime?.sandboxAllocation ||
-        input.runtime?.egressMode === 'allowlist' ||
-        input.runtime?.egressAudit === true
+        input.runtime &&
+        (input.runtime.sandboxAllocation || requestNeedsEgressPolicy(input.runtime))
           ? {
               ...(input.runtime.sandboxAllocation
                 ? { sandboxAllocation: input.runtime.sandboxAllocation }
@@ -2250,8 +2307,11 @@ async function assertCreateIntentUnchanged(
   ctx: SessionRegistrationContext,
   options?: { billingOrigin?: string; freshAdmission?: boolean }
 ): Promise<void> {
-  if (row.canonical_result === null) return;
   const stored = row.canonical_result?.[SESSION_CREATE_INTENT_FINGERPRINT_KEY];
+  if (input.hostedGitHubRepositories && (typeof stored !== 'string' || stored.length === 0)) {
+    throw new TRPCError({ code: 'CONFLICT', message: 'session_create_intent_conflict' });
+  }
+  if (row.canonical_result === null) return;
   const selectable = isExplicitSandboxAllocationChoice(input.runtime?.sandboxAllocation)
     ? input.runtime?.sandboxAllocation
     : undefined;
@@ -2273,9 +2333,7 @@ async function assertCreateIntentUnchanged(
     // saved choice is resolved after admission and is not part of the fingerprint.
     (!options?.freshAdmission &&
       !recordedSandboxAllocationMatchesRequest(recorded.data, requested, replacement)) ||
-    ((selectable !== undefined ||
-      input.runtime?.egressMode === 'allowlist' ||
-      input.runtime?.egressAudit === true) &&
+    ((selectable !== undefined || requestNeedsEgressPolicy(input.runtime)) &&
       (typeof stored !== 'string' || stored.length === 0))
   ) {
     throw new TRPCError({ code: 'BAD_REQUEST', message: 'session_creation_failed' });
@@ -2789,7 +2847,17 @@ async function resumeFirstWorktreeCreate(
       throw error;
     }
 
-    if (ingestResult?.status === 'rejected') {
+    if (ingestResult === undefined) {
+      // The ingest outcome is unknown without the acknowledgement. Leave the
+      // recorded destination in place: a first worktree create copies nothing,
+      // and the create is idempotent for the recorded ids, so the destination
+      // is either absent or the row this session already owns. The ledger row
+      // stays non-terminal so a same-key retry re-issues the create and the
+      // typed unavailable error tells the caller to retry.
+      await hooks.onTransportFailure();
+      throw new TRPCError({ code: 'SERVICE_UNAVAILABLE', message: 'session_clone_unavailable' });
+    }
+    if (ingestResult.status === 'rejected') {
       // A destination the ingest plane refuses must not be resumed: record
       // the IDs as retired so a same-key retry allocates fresh ones.
       if (ingestResult.code === 'session_retired') {
@@ -2801,7 +2869,7 @@ async function resumeFirstWorktreeCreate(
       await hooks.onFailure('ownership_row', ingestResult.code);
       throw ingestRejectionError(ingestResult.code);
     }
-    if (ingestResult?.status === 'in_progress') {
+    if (ingestResult.status === 'in_progress') {
       await hooks.onTransportFailure();
       throw creationInProgressError();
     }
@@ -2868,6 +2936,12 @@ async function readSessionMetadata(
     );
   } catch {
     throw creationInProgressError();
+  }
+  if (
+    metadata !== null &&
+    !sameHostedGitHubRepositories(metadata.hostedGitHubRepositories, input.hostedGitHubRepositories)
+  ) {
+    throw new TRPCError({ code: 'CONFLICT', message: 'session_create_intent_conflict' });
   }
   if (
     metadata !== null &&

@@ -22,7 +22,7 @@ import {
 import type * as z from 'zod';
 import { logger, withLogTags } from '../../logger.js';
 import { getSandboxSessionStub } from '../../sandbox-session/session-stub.js';
-import { isWorkspaceAnchorMetadata } from '../../cloud-agent-authority.js';
+import { getWorkspaceStub } from '../../control-plane/workspace/workspace-stub.js';
 import { requireCurrentSessionAccess } from '../../session-access.js';
 import { withDORetry } from '../../utils/do-retry.js';
 import type { TRPCContext } from '../../types.js';
@@ -88,30 +88,40 @@ async function validateCallbackTarget(
     });
   }
   const targetSessionId = parseWorkspaceSessionCallbackTarget(target.url);
-  if (targetSessionId === null) return { url: target.url };
-  const [targetSession, parentSession] = await Promise.all([
-    loadCallbackSession(ctx, authority.ownerId, targetSessionId),
-    targetSessionId === authority.parentSessionId
-      ? Promise.resolve(undefined)
-      : loadCallbackSession(ctx, authority.ownerId, authority.parentSessionId),
+  const sessionId = targetSessionId ?? target.launchingSessionId;
+  const [targetSession, workspace] = await Promise.all([
+    sessionId === undefined ? null : loadCallbackSession(ctx, authority.ownerId, sessionId),
+    withDORetry(
+      () => getWorkspaceStub(ctx.env, authority.ownerId, authority.parentSessionId),
+      stub => stub.describe(),
+      'describe'
+    ),
   ]);
-  const parent = targetSessionId === authority.parentSessionId ? targetSession : parentSession;
+  if (targetSessionId === null && workspace.worktreeId === null) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'A new-chat callback requires a worktree',
+    });
+  }
+  if (workspace.state !== 'active' || workspace.organizationId !== authority.organizationId) {
+    throw new TRPCError({ code: 'BAD_REQUEST', message: 'Callback workspace is not available' });
+  }
+  if (sessionId === undefined) return { url: target.url };
   if (
     !targetSession ||
-    !parent ||
-    targetSession.identity.sessionId !== targetSessionId ||
+    targetSession.identity.sessionId !== sessionId ||
     targetSession.identity.userId !== authority.ownerId ||
     (targetSession.identity.orgId ?? null) !== authority.organizationId ||
-    targetSession.parentCloudAgentSessionId !== undefined ||
-    targetSession.allowSubagentSessions !== true ||
-    !parent.identity.sessionId.startsWith('workspace_') ||
-    !isWorkspaceAnchorMetadata(parent) ||
-    parent.allowSubagentSessions !== true
+    targetSession.allowSubagentSessions !== true
   ) {
     throw new TRPCError({ code: 'BAD_REQUEST', message: 'Callback session is not available' });
   }
-  const worktreeId = parent.workspace?.worktreeId;
-  if (!worktreeId || targetSession.workspace?.worktreeId !== worktreeId) {
+  const worktreeId = workspace.worktreeId;
+  if (
+    worktreeId === null
+      ? sessionId !== authority.parentSessionId
+      : targetSession.workspace?.worktreeId !== worktreeId
+  ) {
     throw new TRPCError({
       code: 'BAD_REQUEST',
       message: 'Callback session is outside the child workspace',
@@ -120,11 +130,14 @@ async function validateCallbackTarget(
   await requireCurrentSessionAccess({
     env: ctx.env,
     kiloUserId: authority.ownerId,
-    cloudAgentSessionId: targetSessionId,
+    cloudAgentSessionId: sessionId,
     expectedOrganizationId: targetSession.identity.orgId ?? null,
     expectedKiloSessionId: targetSession.auth.kiloSessionId,
   });
-  return { url: target.url };
+  return {
+    url: target.url,
+    ...(targetSessionId === null ? { launchingSessionId: sessionId } : {}),
+  };
 }
 
 export function prepareInputToSessionCreateRequest(input: PrepareInput): SessionCreateRequest {
@@ -256,6 +269,8 @@ export function prepareInputToSessionCreateRequest(input: PrepareInput): Session
       gateThreshold: input.gateThreshold,
     },
     ...(input.requestedEnvironment ? { requestedEnvironment: input.requestedEnvironment } : {}),
+    ...(input.environmentSetupRunId ? { environmentSetupRunId: input.environmentSetupRunId } : {}),
+    ...(input.verificationOf ? { verificationOf: input.verificationOf } : {}),
     ...(input.requireEnvironmentChoice ? { requireEnvironmentChoice: true as const } : {}),
     options: {
       callbackTarget: input.callbackTarget,
@@ -323,7 +338,11 @@ const prepareSessionHandler = internalApiProtectedProcedure
         botId: ctx.botId,
         cloudAgentAuthority: ctx.cloudAgentAuthority,
       };
-      const billingOrigin = { billingOrigin: requestWithProfile.options?.createdOnPlatform };
+      const billingOrigin = {
+        billingOrigin: ctx.cloudAgentAuthority
+          ? 'cloud-agent'
+          : requestWithProfile.options?.createdOnPlatform,
+      };
       // Admit into the operation ledger only when the client supplied an
       // `operationKey` AND the effective `autoInitiate` is true. Otherwise the
       // key is ignored and the legacy split-flow behavior is preserved.

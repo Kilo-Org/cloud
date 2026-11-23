@@ -63,9 +63,9 @@ export type AgentAttachmentCandidate = {
 
 /**
  * How many local images are encoded at once when a message is sent. One decode
- * is already bounded to `MAX_EDGE`, so this is what keeps the peak independent
- * of how many photos the sender attached; two keeps a multi-photo send from
- * paying every encode in series.
+ * is already bounded to `AGENT_ATTACHMENT_IMAGE_MAX_EDGE`, so this is what keeps
+ * the peak independent of how many photos the sender attached; two keeps a
+ * multi-photo send from paying every encode in series.
  */
 const CONCURRENT_LOCAL_READS = 2;
 
@@ -105,6 +105,23 @@ async function runBestEffort(task: () => Promise<void>): Promise<void> {
     await task();
   } catch {
     // Best-effort operation: a failure leaves the 24-hour reaper to recover.
+  }
+}
+
+/**
+ * Delete the app-owned cache files of additions that never reach the composer
+ * — a copied document or a stripped image the loop above already created and
+ * registered. Every discard path (capacity overflow, stale generation,
+ * unmount) goes through this one helper so the stated invariant — a chip that
+ * never reaches the composer must not keep an app-owned cache file alive —
+ * holds at each of them. The delete is cache-scoped and best-effort, so it is
+ * safe to call after unmount.
+ */
+function deleteUncommittedOwnedFiles(chips: readonly AgentAttachment[]): void {
+  for (const chip of chips) {
+    if (chip.localFileOwned) {
+      deleteCacheOwnedFile(chip.localUri);
+    }
   }
 }
 
@@ -566,9 +583,11 @@ export function useAgentAttachmentUpload(
         return;
       }
       // Re-check the generation after the async strip/measure loop: a reset
-      // during that window must drop the additions.
+      // during that window must drop the additions — and delete the app-owned
+      // cache copies the loop already created, exactly like a capacity drop.
       // eslint-disable-next-line typescript-eslint/no-unnecessary-condition -- isMountedRef flips to false in the unmount cleanup, which can run during the awaited strip/measure work
       if (generationRef.current !== generation || !isMountedRef.current) {
+        deleteUncommittedOwnedFiles(additions);
         return;
       }
       // The room is recomputed against the live list, because a removal, a
@@ -577,13 +596,7 @@ export function useAgentAttachmentUpload(
       // chips are registered and uploaded: an excess candidate never presigns.
       const room = Math.max(0, AGENT_ATTACHMENT_MAX_FILES - attachmentsRef.current.length);
       const kept = additions.slice(0, room);
-      for (const dropped of additions.slice(kept.length)) {
-        // A chip that never reaches the composer must not keep an app-owned
-        // cache file (a copied document or a stripped image) alive.
-        if (dropped.localFileOwned) {
-          deleteCacheOwnedFile(dropped.localUri);
-        }
-      }
+      deleteUncommittedOwnedFiles(additions.slice(kept.length));
       if (kept.length === 0) {
         // The strip filled while this selection was measuring, so nothing
         // fits. Say so with the full-composer message instead of dropping the

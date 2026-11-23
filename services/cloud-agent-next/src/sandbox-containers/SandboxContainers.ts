@@ -72,11 +72,8 @@ import type { Env } from '../types.js';
 import type { ProviderStartupCommand } from '../sandbox-control/provider.js';
 import { EgressAuditRequestSchema, type GetEgressAuditInput } from '../shared/egress-audit.js';
 import { EgressAuditStore } from './egress-audit.js';
-import {
-  nativeEgressAllowlistSchema,
-  nativeEgressPolicySchema,
-  type NativeEgressPolicy,
-} from './egress-policy.js';
+import { nativeEgressAllowlistSchema } from '../sandbox-control/egress-policy.js';
+import { nativeEgressPolicySchema, type NativeEgressPolicy } from './egress-policy.js';
 import type { NativeRuntimeImage } from '../sandbox-control/startup-selection.js';
 import { ContainersLaunchInterruptedError } from './launch-interrupted.js';
 import { readSentryIdentity, sentryIdentityFromBilling } from '../sentry-identity.js';
@@ -103,13 +100,14 @@ export type ContainersLaunchInput = {
 
 /**
  * An environment builder start. The container DO named for one environment runs
- * only builders, from the image, with internet egress and no interception: the
- * builder holds a build-scoped repository credential, not contained aliases.
+ * only builders, from the image. Fresh builders use outbound interception;
+ * repository credentials keep the builder's existing delivery mode.
  */
 const BUILDER_RUNNER_ENV = ENVIRONMENT_BUILD_RUNNER_ENV;
 /** Atomic, owner-only write of the runner file; the value comes from exec env. */
 
 export type ContainersBuilderLaunchInput = {
+  networkSecretHosts?: string[];
   allocationRef: string;
   /** Written to the running builder by exec; the builder starts without it. */
   runner: EnvironmentBuildRunner;
@@ -478,11 +476,13 @@ export class SandboxContainers extends DurableObject<Env> {
       if (stored.allocationRef !== null && stored.allocationRef !== ref) {
         stored = await this.releaseSupersededAllocation(stored);
       }
+      const container = this.requiredContainer();
+      const networkSecrets = (input.networkSecretHosts?.length ?? 0) > 0;
       if (stored.allocationRef === ref && stored.state === 'running') {
+        if (networkSecrets) await this.installOutboundProxy(container, { allocationRef: ref });
         await this.deliverBuilderRunner(this.requiredContainer(), input.runner, input.deadlineAt);
         return { started: false, startSource: 'image' };
       }
-      const container = this.requiredContainer();
       if (stored.allocationRef === ref && stored.state === 'launching') {
         if (container.running !== true) {
           throw new Error('Builder start is pending and the container is not running');
@@ -497,6 +497,7 @@ export class SandboxContainers extends DurableObject<Env> {
         ) {
           throw new Error('Builder container main process is not the environment builder');
         }
+        if (networkSecrets) await this.installOutboundProxy(container, { allocationRef: ref });
         await this.deliverBuilderRunner(container, input.runner, input.deadlineAt);
         return { started: true, startSource: 'image' };
       }
@@ -511,10 +512,13 @@ export class SandboxContainers extends DurableObject<Env> {
           instance: input.instance,
           command: input.command,
           nativeImage: 'runtime-free',
+          containment: true,
         },
         'environment-builder',
         false
       );
+      // Refused starts can retain interception rules: every fresh builder must trust the CA.
+      await this.installOutboundProxy(container, { allocationRef: ref });
       const result = await this.issueNativeMainProcess(
         record,
         ref,
@@ -1255,7 +1259,7 @@ export class SandboxContainers extends DurableObject<Env> {
 
   private async installOutboundProxy(
     container: Container,
-    input: ContainersLaunchInput
+    input: Pick<ContainersLaunchInput, 'allocationRef' | 'egressAllowlist' | 'egressAudit'>
   ): Promise<void> {
     const outbound = this.ctx.exports.ContainersOutbound;
     const worker = outbound({

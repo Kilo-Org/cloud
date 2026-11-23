@@ -4,6 +4,7 @@ import { PgDialect } from 'drizzle-orm/pg-core';
 import type { SQL } from 'drizzle-orm';
 import type { TRPCContext } from '../../types.js';
 import type { ControlPlaneSessionMetadataSummary } from '../../control-plane/session/session-do.js';
+import type { PreparationAttempt } from '../../shared/protocol.js';
 
 const { access, getPgDb } = vi.hoisted(() => ({ access: vi.fn(), getPgDb: vi.fn() }));
 vi.mock('@cloudflare/sandbox', () => ({ getSandbox: vi.fn() }));
@@ -99,6 +100,7 @@ function setup(createdOnPlatform: string | undefined = 'slack', id = sessionId) 
       }),
     getCurrentMessageWork: vi.fn().mockResolvedValue(null),
     getLatestEventId: vi.fn().mockResolvedValue(null),
+    getLatestPreparationAttempt: vi.fn().mockResolvedValue(null),
   };
   const session = { idFromName: vi.fn(name => name), get: vi.fn(() => stub) };
   const ingest = { fetch: vi.fn() };
@@ -172,6 +174,50 @@ describe('background activity authorization', () => {
   });
 });
 
+describe('agent board reads', () => {
+  const board = { ownerSessionID: kiloSessionId, revision: 1, messages: [], hasMore: false };
+  it('reads only the registered session through the named operation', async () => {
+    const harness = setup();
+    harness.stub.kiloRequest.mockResolvedValueOnce({ ok: true, result: board });
+    await expect(harness.caller.getAgentBoard({ cloudAgentSessionId: sessionId })).resolves.toEqual(
+      board
+    );
+    expect(access).toHaveBeenCalledWith(
+      expect.objectContaining({ kiloUserId: userId, cloudAgentSessionId: sessionId })
+    );
+    expect(harness.stub.kiloRequest).toHaveBeenCalledWith({ name: 'session.board' });
+  });
+  it('does not read a foreign chat', async () => {
+    const harness = setup();
+    access.mockRejectedValueOnce(new Error('denied'));
+    await expect(harness.caller.getAgentBoard({ cloudAgentSessionId: sessionId })).rejects.toThrow(
+      'denied'
+    );
+    expect(harness.stub.kiloRequest).not.toHaveBeenCalled();
+  });
+  it('answers null for an offline sandbox or a runtime without a board, and unavailable for an invalid board', async () => {
+    const harness = setup();
+    harness.stub.kiloRequest.mockResolvedValueOnce({
+      ok: false,
+      error: { code: 'runtime_offline', message: 'Live runtime is not ready', retryable: true },
+    });
+    await expect(
+      harness.caller.getAgentBoard({ cloudAgentSessionId: sessionId })
+    ).resolves.toBeNull();
+    harness.stub.kiloRequest.mockResolvedValueOnce({
+      ok: false,
+      error: { code: 'unsupported', message: 'session.board is not supported', retryable: false },
+    });
+    await expect(
+      harness.caller.getAgentBoard({ cloudAgentSessionId: sessionId })
+    ).resolves.toBeNull();
+    harness.stub.kiloRequest.mockResolvedValueOnce({ ok: true, result: { messages: 'invalid' } });
+    await expect(
+      harness.caller.getAgentBoard({ cloudAgentSessionId: sessionId })
+    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+  });
+});
+
 describe('getSession runtime agents', () => {
   it('projects stored mode, hidden and disable while retaining subagents', async () => {
     const harness = setup();
@@ -217,7 +263,7 @@ describe('getSession runtime agents', () => {
     expect(result.parentCloudAgentSessionId).toBe(parentCloudAgentSessionId);
   });
 
-  it('returns only the environment ID from the stored environment reference', async () => {
+  it('returns the environment ID from the stored environment reference', async () => {
     const environmentId = '11111111-1111-4111-8111-111111111111';
     const { caller, stub } = setup();
     const metadata = await stub.getMetadata();
@@ -231,7 +277,6 @@ describe('getSession runtime agents', () => {
     const result = await caller.getSession({ cloudAgentSessionId: sessionId });
 
     expect(result.environmentId).toBe(environmentId);
-    expect(result).not.toHaveProperty('environment');
   });
 
   it('leaves the environment ID undefined for sessions without an environment', async () => {
@@ -245,6 +290,109 @@ describe('getSession runtime agents', () => {
   it('omits the parent Cloud Agent session id when the metadata has none', async () => {
     const result = await setup().caller.getSession({ cloudAgentSessionId: sessionId });
     expect(result).not.toHaveProperty('parentCloudAgentSessionId');
+  });
+});
+
+describe('getSession environment facts', () => {
+  it.each([false, true])('reports verification facts with setup failure: %s', async setupFailed => {
+    const harness = setup();
+    const metadata = await harness.stub.getMetadata();
+    metadata.environment = {
+      environmentId: '55555555-5555-4555-8555-555555555555',
+      owner: { type: 'user', id: userId },
+      configurationRevision: 4,
+      repository: { platform: 'github', repoFullName: 'acme/widgets' },
+    };
+    metadata.environmentSetup = {
+      runId: '66666666-6666-4666-8666-666666666666',
+      environmentId: '55555555-5555-4555-8555-555555555555',
+      role: 'verification',
+    };
+    metadata.workspace = {
+      sandboxId: 'ses-0123456789abcdef0123456789abcdef',
+      sandboxProvider: 'cloudflare-containers',
+      sandboxKind: 'isolated',
+      egressMode: 'allowlist',
+      egressAllowlist: ['registry.npmjs.org'],
+      egressAudit: true,
+    };
+    const attempt: PreparationAttempt = {
+      id: 'attempt-1',
+      triggerMessageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+      status: 'completed',
+      startedAt: 1_760_000_000_000,
+      completedAt: 1_760_000_030_000,
+      revision: 3,
+      steps: [
+        {
+          id: 'step-clone',
+          key: 'cloning',
+          kind: 'phase',
+          label: 'Clone repository',
+          status: 'completed',
+          startedAt: 1_760_000_000_000,
+          completedAt: 1_760_000_005_000,
+          revision: 1,
+        },
+        {
+          id: 'step-setup',
+          key: 'session_setup_commands',
+          kind: 'phase',
+          label: 'Run setup commands',
+          status: 'completed',
+          startedAt: 1_760_000_005_000,
+          completedAt: 1_760_000_030_000,
+          revision: 2,
+        },
+        ...(setupFailed
+          ? [
+              {
+                id: 'step-setup:setup_command:0',
+                key: 'session_setup_commands' as const,
+                kind: 'setup_command' as const,
+                label: 'Setup command 1',
+                status: 'failed' as const,
+                parentStepId: 'step-setup',
+                startedAt: 1_760_000_005_000,
+                completedAt: 1_760_000_030_000,
+                safeError: 'Setup command 1 failed',
+                revision: 3,
+              },
+            ]
+          : []),
+      ],
+    };
+    harness.stub.getLatestPreparationAttempt.mockResolvedValue(attempt);
+
+    const result = await harness.caller.getSession({ cloudAgentSessionId: sessionId });
+
+    expect(result.environment).toEqual({
+      environmentId: '55555555-5555-4555-8555-555555555555',
+      configurationRevision: 4,
+    });
+    expect(result.latestPreparation).toEqual({
+      status: setupFailed ? 'failed' : 'completed',
+      startedAt: 1_760_000_000_000,
+      completedAt: 1_760_000_030_000,
+      setupDurationMs: 25_000,
+      ...(setupFailed ? { safeError: 'Setup command 1 failed' } : {}),
+    });
+    expect(result.egress).toEqual({
+      mode: 'allowlist',
+      allowlist: ['registry.npmjs.org'],
+      audit: true,
+    });
+  });
+
+  it('omits the optional facts when the session recorded none', async () => {
+    const harness = setup();
+
+    const result = await harness.caller.getSession({ cloudAgentSessionId: sessionId });
+
+    expect(harness.stub.getLatestPreparationAttempt).not.toHaveBeenCalled();
+    expect(result.environment).toBeUndefined();
+    expect(result.latestPreparation).toBeUndefined();
+    expect(result.egress).toEqual({ mode: 'unrestricted', audit: false });
   });
 });
 

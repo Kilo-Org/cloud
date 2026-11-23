@@ -4,6 +4,7 @@
 import { FlexWidget, type HexColor, TextWidget } from 'react-native-android-widget';
 
 import { type AndroidWidgetHomeCopy } from './home-copy';
+import { ascent, BASELINE, LATIN_LINE, lineBox, wideAdvance } from './script-metrics';
 import { type AndroidWidgetProps } from './widget-props';
 
 /**
@@ -65,32 +66,111 @@ export function dotInk(kind: Copy['primaryKind']): keyof Palette {
 export const PAD = 14;
 export const CARD_PAD = 16;
 
-const TALL_SCRIPT = /[\u0600-\u08FF\u0900-\u0DFF]/u;
-
-/** Roboto's ascent plus font padding above the baseline, per unit of font size. */
-const BASELINE = 1.056;
-
-const LATIN_LINE = 1.32;
-
 /**
  * The line box a TextView draws one line in: Roboto with font padding (1.32em),
- * or the taller fallback box Arabic-Indic and Devanagari need (1.62em).
+ * or the box of the fallback font the line's script draws in.
  */
-export function lineBox(value: string, size: number): number {
-  return Math.ceil(size * (TALL_SCRIPT.test(value) ? 1.62 : LATIN_LINE));
-}
+export { lineBox };
 
-/** Top of the box whose Latin baseline sits at `baseline`; a taller script keeps the same centre. */
+/**
+ * Top of the box whose baseline sits at `baseline`. The box starts one ascent
+ * above the baseline whatever script draws: a taller fallback font raises the
+ * box's top by its own ascent, and the rest of its taller box hangs below the
+ * baseline as descent. Adding a share of the extra height here would lift the
+ * box off its ink and leave the glyphs' descent outside the box.
+ */
 export function boxTop(value: string, size: number, baseline: number): number {
-  return baseline - BASELINE * size - (lineBox(value, size) - Math.ceil(size * LATIN_LINE)) / 2;
+  return baseline - ascent(value, size);
 }
 
-/** The baseline whose line box (Latin or taller script) ends at `bottom`. */
+/** The baseline whose line box (Latin or taller script) ends exactly at `bottom`. */
 export function baselineAbove(value: string, size: number, bottom: number): number {
-  return bottom - lineBox(value, size) - boxTop(value, size, 0);
+  return bottom - lineBox(value, size) + ascent(value, size);
 }
 
-/** The baseline that centres a line of `size` on `cy`; a taller script grows evenly about it. */
+/** The baseline whose line box (Latin or taller script) starts exactly at `top`. */
+function baselineIn(value: string, size: number, top: number): number {
+  return top + ascent(value, size);
+}
+
+/** Float noise below a twentieth of a dp is not an overflow; the design grid is in whole dp. */
+const BAND_SLACK = 0.05;
+
+/** One line placed inside a band: which edge it must stay clear of, and how many lines it draws. */
+type BandSpec = {
+  value: string;
+  size: number;
+  baseline: number;
+  lines?: number;
+  top?: number;
+  bottom?: number;
+};
+
+/**
+ * A design baseline moved inside its band. A fallback font's taller box would
+ * otherwise rise above the top edge or end below the bottom one, and one box
+ * can overflow both at once, so both edges are corrected: down off the top edge
+ * first, then up off the bottom edge, and the top edge is checked again last —
+ * lifting a box clear of the bottom can raise it back through the top. When the
+ * band is shorter than the box no baseline clears both edges, so the top edge
+ * wins: a clipped first line is worse than a last line that ends a little below
+ * the band. Latin text, whose box is the design's own, keeps the baseline it
+ * was given, to the tenth of a dp.
+ */
+export function insideBand(spec: BandSpec): number {
+  const { value, size, baseline } = spec;
+  const lines = spec.lines ?? 1;
+  // The lowest baseline whose box starts on the top edge, and the highest whose
+  // box ends on the bottom one.
+  const floor = spec.top === undefined ? null : baselineIn(value, size, spec.top);
+  const ceiling =
+    spec.bottom === undefined
+      ? null
+      : baselineAbove(value, size, spec.bottom) - lineBox(value, size) * (lines - 1);
+  let placed = baseline;
+  if (floor !== null && floor - placed > BAND_SLACK) {
+    placed = floor;
+  }
+  if (ceiling !== null && placed - ceiling > BAND_SLACK) {
+    placed = ceiling;
+  }
+  // A band too short for the box cannot hold both edges: the top one wins.
+  if (floor !== null && placed < floor) {
+    placed = floor;
+  }
+  return placed;
+}
+
+/**
+ * The baseline that centres `value`'s own line box on `cy`. The box runs from
+ * `baseline - ascent` to that plus `lineBox`, so its centre is on `cy` when the
+ * baseline is `cy + ascent - lineBox / 2`. For Latin, `lineBox` is exactly
+ * `ceil(size * LATIN_LINE)`, so this is the number `centredBaseline` gives.
+ */
+export function centredLineBaseline(value: string, size: number, cy: number): number {
+  return cy + ascent(value, size) - lineBox(value, size) / 2;
+}
+
+/** The baseline that centres a shared row on `cy`: its box is its tallest part's. */
+export function centredRowBaseline(parts: readonly string[], size: number, cy: number): number {
+  let tallest = '';
+  let height = 0;
+  for (const part of parts) {
+    const box = lineBox(part, size);
+    if (box > height) {
+      tallest = part;
+      height = box;
+    }
+  }
+  return centredLineBaseline(tallest, size, cy);
+}
+
+/**
+ * The design's own centred slot: a `size` line on `cy`, whose box grows evenly
+ * about the design line whatever script draws in it. The extra ascent of a
+ * taller fallback then lifts the box centre off `cy`, so a label that must be
+ * centred in its own box uses `centredLineBaseline`.
+ */
 export function centredBaseline(size: number, cy: number): number {
   return cy + BASELINE * size - Math.ceil(size * LATIN_LINE) / 2;
 }
@@ -99,7 +179,7 @@ export function centredBaseline(size: number, cy: number): number {
 export function estimateWidth(value: string, size: number, bold = false): number {
   let ems = 0;
   for (const char of value) {
-    if (/[\u1100-\u115F\u2E80-\uA4CF\uAC00-\uD7A3\uF900-\uFAFF\uFF00-\uFF60]/u.test(char)) {
+    if (wideAdvance(char)) {
       ems += 1;
     } else if (/[\s.,:;'|!ilI]/u.test(char)) {
       ems += 0.28;
@@ -256,10 +336,16 @@ export function textRow(
     gap: number;
     fill: boolean;
     parts: Part[];
+    /** The band's top edge; a taller fallback box moves down into it instead of above it. */
+    top?: number;
   }
 ) {
   const height = Math.max(...spec.parts.map(part => lineBox(part.value, spec.size)));
   const tallest = spec.parts.find(part => lineBox(part.value, spec.size) === height)?.value ?? '';
+  const baseline =
+    spec.top === undefined
+      ? spec.baseline
+      : insideBand({ value: tallest, size: spec.size, baseline: spec.baseline, top: spec.top });
   const children = spec.parts.map((part, index) =>
     part.flex === true ? (
       flexText(f, `${key}-${index}`, { ...part, size: spec.size })
@@ -282,7 +368,7 @@ export function textRow(
   const row = { flexDirection: 'row', alignItems: 'center', flexGap: spec.gap } as const;
   const rect = place(f, {
     x: spec.x,
-    y: boxTop(tallest, spec.size, spec.baseline),
+    y: boxTop(tallest, spec.size, baseline),
     width: spec.width,
     height,
   });

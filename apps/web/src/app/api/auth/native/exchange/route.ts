@@ -5,17 +5,18 @@ import {
   getUserFromSessionForCredentialIssuance,
 } from '@kilocode/web-shared/lib/user/server';
 import {
-  createDeviceSession,
   createDeviceSessionWithAttestedKey,
-  issueSessionCredentials,
+  createDeviceSessionWithCredentials,
 } from '@/lib/auth/device-sessions';
 import {
   requireAdmissionPayload,
   countAdmissionCondition,
+  reportAttestedKeyCollision,
   verifyAdmissionAsync,
   KeyCollisionError,
   type VerifyAdmissionOk,
 } from '@/lib/auth/native-admission';
+import { isNativeTokenAddressRateLimited } from '@/lib/auth/native-token-rate-limit';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { withRestTiming } from '@kilocode/web-shared/lib/observability/request-timing';
 
@@ -33,17 +34,36 @@ import { withRestTiming } from '@kilocode/web-shared/lib/observability/request-t
  * creates the device session, so a key id the client stores always names a
  * server row. A key that belongs to another account is refused.
  *
+ * The caller-address firewall limit is counted first, before the admission
+ * gate and before any credential is read, and both native credential
+ * endpoints count the same rule at that point, so one caller-address budget
+ * covers both of them. Only a rule that answered `allowed` proceeds.
+ *
  * Response contract (frozen — mobile client is built against it):
  *   200 { token, refreshToken, expiresIn }
  *   401 — invalid or expired existing token
  *   403 — blocked user
  *   403 { error: 'ADMISSION_REQUIRED' } — missing, malformed, refused, or
  *         foreign proof
+ *   429 { error: 'RATE_LIMITED' } — the caller address is exchanging too fast;
+ *         the admission gate has not run, the old token stays valid and the
+ *         client retries on its next launch
  *   500 { error: 'INTERNAL_ERROR' } — admission provider or key-persistence
  *         infrastructure error; the old token stays valid and the client
  *         retries on its next launch
+ *   500 (no JSON body) — the limiter could not be consulted and its client
+ *         threw, so the framework answers rather than this handler; the old
+ *         token stays valid and the client retries on its next launch
  */
 export const POST = withRestTiming('/api/auth/native/exchange', async (request: Request) => {
+  // Counted first, so the admission gate and attestation verification run
+  // inside the caller's address budget. Both native credential endpoints
+  // count this rule at this point. Only a rule that answered `allowed`
+  // proceeds: a rule that is not configured refuses here.
+  if (await isNativeTokenAddressRateLimited(request)) {
+    return NextResponse.json({ error: 'RATE_LIMITED' }, { status: 429 });
+  }
+
   const body = await request.json().catch(() => undefined);
   const admissionPayload = requireAdmissionPayload(
     body && typeof body === 'object' ? (body as Record<string, unknown>) : {}
@@ -89,14 +109,11 @@ export const POST = withRestTiming('/api/auth/native/exchange', async (request: 
     return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
   }
 
-  // Bind the verified key in the same transaction that creates the device
-  // session, so a key id the client stored always names a server row. Android
-  // verification and the non-production sentinel carry no key id, so they
-  // persist nothing and take the plain session path.
+  // Android verification and the non-production sentinel carry no key id, so
+  // they persist nothing and take the plain session path.
   if (verification.keyId !== undefined) {
     try {
       const combined = await createDeviceSessionWithAttestedKey({
-        userId: auth.user.id,
         userAgent,
         user: auth.user,
         verification,
@@ -111,8 +128,7 @@ export const POST = withRestTiming('/api/auth/native/exchange', async (request: 
       );
     } catch (error) {
       if (error instanceof KeyCollisionError) {
-        captureMessage('native_attested_key_cross_user_collision');
-        countAdmissionCondition('native_admission_refused');
+        reportAttestedKeyCollision();
         return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
       }
       // Without the key row the client would hold an id the server cannot
@@ -122,15 +138,17 @@ export const POST = withRestTiming('/api/auth/native/exchange', async (request: 
     }
   }
 
-  const sessionId = await createDeviceSession({ userId: auth.user.id, userAgent });
-
-  const pair = await issueSessionCredentials(auth.user, sessionId);
+  const credentials = await createDeviceSessionWithCredentials({
+    userId: auth.user.id,
+    userAgent,
+    user: auth.user,
+  });
 
   return NextResponse.json(
     {
-      token: pair.token,
-      refreshToken: pair.refreshToken,
-      expiresIn: pair.expiresIn,
+      token: credentials.token,
+      refreshToken: credentials.refreshToken,
+      expiresIn: credentials.expiresIn,
     },
     { status: 200, headers: { 'Cache-Control': 'no-store' } }
   );

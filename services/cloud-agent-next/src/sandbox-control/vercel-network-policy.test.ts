@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
+import { CLOUD_AGENT_SESSION_SYNC_ORIGIN } from '@kilocode/worker-utils/cloud-agent-session-sync';
 import type { VercelSandboxNetworkPolicy } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
+import { RUNTIME_PROXY_ORIGIN_HEADER } from '../runtime-credential-proxy-origin.js';
 import { createControlPlaneCredential } from './managed-credential.js';
 import { buildControlNetworkPolicy, type SessionCredentialGrant } from './session-credentials.js';
 import {
   buildVercelCredentialNetworkPolicy,
   buildVercelTransformNetworkPolicy,
   findMatchingCredentialInjectionRule,
+  openVercelEgress,
   type VercelCredentialPolicyInput,
 } from './vercel-network-policy.js';
 
@@ -45,7 +48,7 @@ function grant(scopeId: string): SessionCredentialGrant {
 function matchingTransform(policy: VercelSandboxNetworkPolicy, request: Request) {
   const url = new URL(request.url);
   return (policy.allow[url.hostname] ?? policy.allow['*'] ?? [])
-    .filter(rule => 'transform' in rule)
+    .filter(rule => 'match' in rule)
     .find(({ match }) => {
       if (match.method && !match.method.includes(request.method)) return false;
       if (match.path) {
@@ -76,6 +79,7 @@ function request(url: string, method: string, authorization: string): Request {
 
 describe('provider organization catalog', () => {
   const input: VercelCredentialPolicyInput = {
+    originProof: 'synthetic-origin-proof',
     rootSessionIds: [root],
     organizationId: 'org-1',
     runtimeProxy: {
@@ -83,6 +87,30 @@ describe('provider organization catalog', () => {
       members: [{ sessionId, kiloSessionId: root, handle: 'member-handle' }],
     },
   };
+
+  it.each(['/api/openrouter', '/api/gateway', '/api/openrouter/api', '/api/gateway/api'])(
+    'adds proof to the supported %s organization catalog',
+    prefix => {
+      const policy = buildVercelCredentialNetworkPolicy(input);
+      const transformed = buildVercelTransformNetworkPolicy(
+        policy.allowedDomains,
+        policy.injectionRules
+      );
+      const url = `${targets.providerBaseUrl}${prefix}/organizations/org-1/models`;
+      const result = applyPolicy(transformed, request(url, 'GET', 'Bearer member-handle'));
+      expect(result.headers.get(RUNTIME_PROXY_ORIGIN_HEADER)).toBe(input.originProof);
+      for (const [pathname, method] of [
+        [`${prefix}/organizations/org-2/models`, 'GET'],
+        [`${prefix}/organizations/org-1/models`, 'POST'],
+      ]) {
+        const denied = applyPolicy(
+          transformed,
+          request(`${targets.providerBaseUrl}${pathname}`, method, 'Bearer member-handle')
+        );
+        expect(denied.headers.has(RUNTIME_PROXY_ORIGIN_HEADER)).toBe(false);
+      }
+    }
+  );
 
   it('allows only the session organization catalog', () => {
     const policy = buildVercelCredentialNetworkPolicy(input);
@@ -125,7 +153,8 @@ describe('Vercel ordered transform conversion', () => {
       original.injectionRules
     );
     expect(Object.keys(policy)).toEqual(['allow']);
-    expect(policy.allow['*']).toEqual([]);
+    expect(original.allowedDomains).not.toContain('*');
+    expect(policy.allow['*']).toBeUndefined();
     for (const domain of original.allowedDomains) {
       expect(policy.allow[domain]).toEqual(
         original.injectionRules
@@ -163,6 +192,23 @@ describe('Vercel ordered transform conversion', () => {
         }
       }
     }
+  });
+});
+
+describe('Vercel egress default', () => {
+  it('adds the open wildcard last and keeps every other entry', () => {
+    const rule = {
+      match: { headers: [], method: ['GET'] },
+      transform: [{ headers: { authorization: 'Bearer handle' } }],
+    };
+    const policy: VercelSandboxNetworkPolicy = {
+      allow: { 'a.example.com': [rule], 'b.example.com': [] },
+    };
+    const open = openVercelEgress(policy);
+    expect(Object.keys(open.allow)).toEqual(['a.example.com', 'b.example.com', '*']);
+    expect(open.allow['a.example.com']).toEqual([rule]);
+    expect(open.allow['*']).toEqual([]);
+    expect(policy.allow['*']).toBeUndefined();
   });
 });
 
@@ -260,5 +306,33 @@ describe('contained Vercel modern policy composition', () => {
     const url = `https://worker.example.com/api/session/${otherRoot}/export`;
     expect(matchingTransform(policy, request(url, 'GET', 'Bearer adopted-handle'))).toBeDefined();
     expect(matchingTransform(policy, request(url, 'GET', 'Bearer member-handle'))).toBeUndefined();
+  });
+});
+
+describe('Vercel runtime proxy origin proof', () => {
+  it('injects the sandbox proof with facade and Session Sync credentials', () => {
+    const policy = buildControlNetworkPolicy([grant('kilo')], undefined, {}, 'proof-1');
+    const transforms = (policy.allow['worker.example.com'] ?? []).filter(
+      rule => 'transform' in rule
+    );
+    expect(transforms.length).toBeGreaterThan(0);
+    for (const rule of transforms) {
+      expect(rule.transform[0]?.headers[RUNTIME_PROXY_ORIGIN_HEADER]).toBe('proof-1');
+    }
+    const sessionSync = request(
+      `${CLOUD_AGENT_SESSION_SYNC_ORIGIN}/v1/sessions`,
+      'GET',
+      'Bearer kilo'
+    );
+    sessionSync.headers.set(RUNTIME_PROXY_ORIGIN_HEADER, 'forged');
+    expect(matchingTransform(policy, sessionSync)).toBeDefined();
+    expect(applyPolicy(policy, sessionSync).headers.get(RUNTIME_PROXY_ORIGIN_HEADER)).toBe(
+      'proof-1'
+    );
+  });
+
+  it('does not add the header without a proof', () => {
+    const policy = buildControlNetworkPolicy([grant('kilo')]);
+    expect(JSON.stringify(policy)).not.toContain(RUNTIME_PROXY_ORIGIN_HEADER);
   });
 });

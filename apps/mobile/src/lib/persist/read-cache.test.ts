@@ -127,7 +127,6 @@ function successState(data: unknown) {
   };
 }
 
-/** One dehydrated query in a persisted blob fixture. */
 function persistedEntry(queryKey: QueryKey, data: unknown): PersistedEntry {
   return {
     queryHash: hashKey(queryKey),

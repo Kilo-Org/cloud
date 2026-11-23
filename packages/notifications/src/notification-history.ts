@@ -1,4 +1,4 @@
-import { type PushData } from './push-data';
+import { classifyCloudAgentSessionPush, type PushData } from './push-data';
 
 /**
  * Notification-settings categories a recorded push can belong to. These are the
@@ -34,10 +34,8 @@ const NOT_RECORDED = Symbol('notificationHistory.notRecorded');
 /** Resolve the settings category that gates one push kind. */
 type PushHistoryRule = (data: PushData) => NotificationHistoryCategory | null;
 
-/** A rule for a recorded kind, or the sentinel for a kind that is not recorded. */
 type PushHistoryDecision = PushHistoryRule | typeof NOT_RECORDED;
 
-/** One decision per push kind, keyed by kind. */
 type PushHistoryDecisions = Record<PushData['type'], PushHistoryDecision>;
 
 /**
@@ -58,12 +56,10 @@ type PushHistoryDecisions = Record<PushData['type'], PushHistoryDecision>;
  */
 const PUSH_HISTORY_DECISIONS = {
   // A needs-input raise is gated by `agentAttention`; a status/ready push by
-  // `sessionStatus`, and an omitted tag is a status push (the rolling-deploy
-  // default the dispatch gate applies).
+  // `sessionStatus`. The shared classifier applies the schema default, so an
+  // omitted category is a status push here too.
   cloud_agent_session: (data: PushData) =>
-    data.type === 'cloud_agent_session' && data.category === 'attention'
-      ? 'agentAttention'
-      : 'sessionStatus',
+    classifyCloudAgentSessionPush(data) === 'attention' ? 'agentAttention' : 'sessionStatus',
   low_balance: () => 'balanceAlerts',
   spend_alert: () => 'spendAlerts',
   security_finding: () => 'securityFindings',
@@ -77,8 +73,7 @@ const PUSH_HISTORY_DECISIONS = {
 /**
  * The same table read by an arbitrary string. A payload reaches the worker
  * unparsed, so its kind may be one this build does not hold; the open map
- * answers `undefined` for it. The sentinel keys are present in the table, so a
- * key check alone would call them recorded: the value test answers both.
+ * answers `undefined` for it.
  */
 const PUSH_HISTORY_DECISION_BY_TYPE: Readonly<Record<string, PushHistoryDecision | undefined>> =
   PUSH_HISTORY_DECISIONS;

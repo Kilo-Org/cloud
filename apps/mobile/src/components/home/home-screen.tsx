@@ -15,10 +15,12 @@ import { buildTimedGreeting } from '@/components/home/greeting';
 import { NewTaskButton } from '@/components/home/new-task-button';
 import { NewTaskFromPictureButton } from '@/components/home/new-task-from-picture-button';
 import { ProductChoices } from '@/components/home/product-choices';
-import { ContextControl } from '@/components/context-control';
+import { CONTEXT_CONTROL_INLINE_MIN_DP, ContextControl } from '@/components/context-control';
 import { ScreenHeader } from '@/components/screen-header';
 import { UpNextSection } from '@/components/todos/up-next-section';
 import { useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
+import { SCREEN_BODY_CLASS, SCREEN_SECTION_GAP_CLASS } from '@/lib/layout';
 import { useSideInsetStyle } from '@/lib/screen-insets';
 
 export function HomeScreen() {
@@ -33,7 +35,8 @@ export function HomeScreen() {
   const homeBriefing = useHomeBriefing();
   const refetch = context.isError ? context.refetch : sessions.refetch;
   const headerTitle = buildTimedGreeting();
-  const liveContent = liveSessionContent(context, sessions);
+  const connectivity = useCommittedConnectivityStatus();
+  const liveContent = liveSessionContent(context, sessions, connectivity);
   const centerFeedback = liveContent === 'error' && !context.isReady && !context.accountReady;
 
   const handleRefresh = useCallback(() => {
@@ -54,7 +57,7 @@ export function HomeScreen() {
         titleContent={
           <Image
             source={logo}
-            className="size-[40px] shrink-0"
+            className="size-10 shrink-0"
             contentFit="contain"
             transition={0}
             accessible={false}
@@ -82,23 +85,21 @@ export function HomeScreen() {
           <ContextControl failurePlacement={context.organizationId === null ? 'row' : 'none'} />
         }
         allowInlineActionsStacking={false}
-        // The logo is the header's only visible child, so this is the brand
-        // mark's leading edge: it must be the page gutter the sections, cards
-        // and actions use (`mx-4`), not a wider header-only gutter.
-        className="px-4 pb-1"
+        inlineActionsMinWidth={CONTEXT_CONTROL_INLINE_MIN_DP}
       />
       <View className="flex-1" style={centerFeedback ? sideInsetStyle : undefined}>
         {centerFeedback ? (
           <LiveSessionFeedback
             context={context}
             sessions={sessions}
-            failureLabel={t('home.couldNotLoadActiveSessions')}
+            failureLabel={t('agents.sessionList.couldNotLoadActive')}
             centered
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
           />
         ) : (
           <TabScreenScrollView
             className="flex-1"
+            contentContainerClassName={SCREEN_BODY_CLASS}
             showsVerticalScrollIndicator={false}
             refreshControl={
               // One indicator per surface: while the live section is `pending`
@@ -111,7 +112,10 @@ export function HomeScreen() {
               />
             }
           >
-            <Animated.View layout={LinearTransition} className="gap-2">
+            {/* The body class spaces the scroller's children and this wrapper
+                is its only one, so the section gap belongs here, on the element
+                whose children are the sections. */}
+            <Animated.View layout={LinearTransition} className={SCREEN_SECTION_GAP_CLASS}>
               <AgentSessionsSection
                 context={context}
                 sessions={sessions}
@@ -124,7 +128,7 @@ export function HomeScreen() {
               />
               <UpNextSection organizationId={context.organizationId} enabled={context.isReady} />
               {context.isReady && (
-                <View className="gap-2 pt-2">
+                <View className="gap-2">
                   <NewTaskButton organizationId={context.organizationId} />
                   <NewTaskFromPictureButton organizationId={context.organizationId} />
                 </View>

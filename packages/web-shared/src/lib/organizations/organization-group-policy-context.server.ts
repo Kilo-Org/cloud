@@ -2,18 +2,18 @@ import 'server-only';
 
 import {
   organization_group_memberships,
-  organization_group_policy_settings,
   organization_groups,
   organization_memberships,
-  organizations,
   type Organization,
 } from '@kilocode/db/schema';
 import { type OrganizationGroupPolicies } from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies';
 import {
-  DEFAULT_ORGANIZATION_GROUP_POLICIES,
-  parseOrganizationGroupPolicies,
+  parseGroupPolicies,
+  canonicalSettingsFrom,
+  readOrganizationGroupPolicySettingsRow,
 } from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies.server';
-import { and, eq, isNull } from 'drizzle-orm';
+import { readLiveOrganization } from '@kilocode/web-shared/lib/organizations/organization-read.server';
+import { and, eq } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 
@@ -33,11 +33,15 @@ export type OrganizationPolicySubject =
     }
   | { type: 'defaultAccess' };
 
+export type OrganizationGroupPolicyEntry = {
+  id: string;
+  policies: OrganizationGroupPolicies;
+};
+
 export type OrganizationGroupPolicyContext = {
   organization: Organization;
   defaultPolicies: OrganizationGroupPolicies;
-  groupIds: string[];
-  groupPolicies: OrganizationGroupPolicies[];
+  groups: OrganizationGroupPolicyEntry[];
   policyRevision: number;
 };
 
@@ -52,28 +56,13 @@ async function resolveOrganization(
   client: DrizzleTransaction,
   params: { organizationId: string; organization?: Organization }
 ): Promise<Organization> {
-  if (params.organization) {
-    if (params.organization.id !== params.organizationId) {
-      throw new TRPCError({
-        code: 'INTERNAL_SERVER_ERROR',
-        message: 'Organization group policy context received a mismatched organization',
-      });
-    }
-    // Soft-deleted organizations must fail closed here too.
-    if (params.organization.deleted_at) {
-      throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
-    }
-    return params.organization;
+  if (params.organization && params.organization.id !== params.organizationId) {
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Organization group policy context received a mismatched organization',
+    });
   }
-  const [organization] = await client
-    .select()
-    .from(organizations)
-    .where(and(eq(organizations.id, params.organizationId), isNull(organizations.deleted_at)))
-    .limit(1);
-  if (!organization) {
-    throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
-  }
-  return organization;
+  return await readLiveOrganization(client, params);
 }
 
 export async function getOrganizationGroupPolicyContext(params: {
@@ -115,25 +104,16 @@ export async function getOrganizationGroupPolicyContext(params: {
     }
   }
 
-  const [settings] = await client
-    .select()
-    .from(organization_group_policy_settings)
-    .where(eq(organization_group_policy_settings.organization_id, params.organizationId))
-    .limit(1);
+  const settings = await readOrganizationGroupPolicySettingsRow(client, params.organizationId);
 
-  const defaultPolicies = settings
-    ? parseOrganizationGroupPolicies(settings.default_policies, {
-        organizationId: params.organizationId,
-        source: 'default',
-      })
-    : DEFAULT_ORGANIZATION_GROUP_POLICIES;
+  const { defaultPolicies, policyRevision } = canonicalSettingsFrom(
+    settings,
+    params.organizationId
+  );
 
-  let groupIds: string[] = [];
-  let groupPolicies: OrganizationGroupPolicies[] = [];
-  // A non-member caller belongs to no group, so only organization-level policy
-  // applies to them.
+  let groups: OrganizationGroupPolicyEntry[] = [];
   if (params.subject.type === 'member' && isDirectMember) {
-    const groups = await client
+    const rows = await client
       .select({ id: organization_groups.id, policies: organization_groups.policies })
       .from(organization_group_memberships)
       .innerJoin(
@@ -149,21 +129,16 @@ export async function getOrganizationGroupPolicyContext(params: {
           eq(organization_group_memberships.kilo_user_id, params.subject.kiloUserId)
         )
       );
-    groupIds = groups.map(group => group.id);
-    groupPolicies = groups.map(group =>
-      parseOrganizationGroupPolicies(group.policies, {
-        organizationId: params.organizationId,
-        groupId: group.id,
-        source: 'group',
-      })
-    );
+    groups = rows.map(row => ({
+      id: row.id,
+      policies: parseGroupPolicies(row, params.organizationId),
+    }));
   }
 
   return {
     organization,
     defaultPolicies,
-    groupIds,
-    groupPolicies,
-    policyRevision: settings?.policy_revision ?? 0,
+    groups,
+    policyRevision,
   };
 }

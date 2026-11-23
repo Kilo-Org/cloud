@@ -1,5 +1,14 @@
 import { type MobileRouter } from '@kilocode/trpc/mobile';
-import { createTRPCClient, httpBatchLink, httpLink, splitLink } from '@trpc/client';
+import { type SelfCleanupProcedure } from '@kilocode/app-shared/auth';
+import {
+  createTRPCClient,
+  httpBatchLink,
+  httpLink,
+  type OperationResultObservable,
+  type OperationResultObserver,
+  splitLink,
+  type TRPCLink,
+} from '@trpc/client';
 import { createTRPCContext } from '@trpc/tanstack-react-query';
 import { CONTROL_PLANE_DEADLINE_MS, withDeadline } from '@kilocode/event-service';
 import * as SecureStore from '@/lib/auth/secure-store';
@@ -14,8 +23,12 @@ import { postLatencyBatch } from '@/lib/telemetry/latency-ingest';
 import { createLatencyBuffer, createLatencyFetch } from '@/lib/telemetry/request-latency';
 import { requestUrlString } from '@/lib/telemetry/request-target';
 import { isSignOutActive } from '@/lib/auth/sign-out-state';
+import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
+import { tagDispatchSessionAt } from '@/lib/auth/dispatch-epoch';
+import { isForcedProcedure, withForceState } from '@/lib/force-state-fixture';
 import {
   type ActiveTokenSnapshot,
+  expiryAtMs,
   getActiveToken,
   getActiveTokenSnapshot,
   getAuthTokenForRequest,
@@ -36,11 +49,40 @@ const trpcUrl = `${API_BASE_URL}/api/trpc`;
  * 3,475 batches / 5,836 caller-seconds lost, activeSessions.list 2,129,
  * cliSessionsV2.getSessionMessagesPage 1,597.
  */
-export const UNBATCHED_PROCEDURES = new Set([
+const UNBATCHED_PROCEDURE_PATHS = [
   'user.getMe',
   'activeSessions.list',
   'cliSessionsV2.getSessionMessagesPage',
-]);
+  // Self-cleanup: the context admits a blocked account only for a request
+  // whose every call is one of these procedures. Sign-out and the logout
+  // reconciliation fire cleanups while other screens are still mounted, so a
+  // batched cleanup would share its request with whatever else is pending and
+  // the whole request — cleanup included — would be refused. Keeping each on
+  // its own request means the gate only ever sees cleanup calls there.
+  //
+  // These three are the shared list the server reads
+  // (`@kilocode/app-shared/auth`), and the assertion below fails the typecheck
+  // when one of them is missing here.
+  'user.revokeCurrentDeviceSession',
+  'user.unregisterPushToken',
+  'user.unregisterActivityToken',
+] as const;
+
+type UnbatchedProcedure = (typeof UNBATCHED_PROCEDURE_PATHS)[number];
+
+/** Fails to compile with the offending name when `T` is not `never`. */
+type AssertNever<T extends never> = T;
+
+// A shared self-cleanup left out above would ride the batch, and the server
+// refuses every call in a mixed request, so the cleanup itself would fail.
+type UnlistedSelfCleanup = Exclude<SelfCleanupProcedure, UnbatchedProcedure>;
+
+// The set is typed with the assertion so the guard is consumed rather than an
+// exported alias no one imports: a shared cleanup missing above makes
+// `AssertNever` reject its own argument and the typecheck names it.
+export const UNBATCHED_PROCEDURES: ReadonlySet<string> = new Set<
+  UnbatchedProcedure | AssertNever<UnlistedSelfCleanup>
+>(UNBATCHED_PROCEDURE_PATHS);
 
 /**
  * E2E-only artificial backend latency (repro for latency-dependent UI states,
@@ -214,13 +256,13 @@ const measuredFetch = createLatencyFetch(withJsonBody, latencyBuffer, {
 });
 
 /**
- * The cold expiry read, as the owner has no expiry yet. While iOS protected
- * data is unavailable the keychain refuses every read and that refusal is the
- * documented, unreported state (see `lib/protected-data`): the read is skipped
- * and the expiry stays unknown, so the request goes out on the held token and
- * a later unlocked request resolves the expiry. Nothing is published on that
- * path — an unknown expiry must not become a known-`null` one. The guard's own
- * check runs synchronously inside `SecureStore.getItemAsync`, so the check here
+ * The cold expiry read, as the owner has no resolved expiry yet. While iOS
+ * protected data is unavailable the keychain refuses every read and that
+ * refusal is the documented, unreported state (see `lib/protected-data`): the
+ * read is skipped, nothing is published, and the expiry stays unknown — so the
+ * request goes out on the held token and a later unlocked request resolves it.
+ * An unknown expiry must not become a known-absent one. The guard's own check
+ * runs synchronously inside `SecureStore.getItemAsync`, so the check here
  * decides the call it wraps. Any other rejection keeps the caller's behavior.
  */
 async function readColdExpiry(active: ActiveTokenSnapshot | null): Promise<number | null> {
@@ -229,11 +271,17 @@ async function readColdExpiry(active: ActiveTokenSnapshot | null): Promise<numbe
   }
   const expiresAtStr = await SecureStore.getItemAsync(TOKEN_EXPIRES_AT_KEY);
   const resolvedExpiresAtMs = expiresAtStr ? Number(expiresAtStr) : null;
-  // Publish the resolved expiry into the owner that the cold read warmed.
-  // A newer owner published while the expiry was read keeps its own token
-  // and expiry.
+  // The read completed: publish what it found so this runs once per token.
+  // `absent` is a resolved answer, so a session with a token but no stored
+  // expiry never reads the keychain again. A newer owner published while the
+  // expiry was read keeps its own token and expiry.
   if (active) {
-    publishActiveTokenExpiry(active, resolvedExpiresAtMs);
+    publishActiveTokenExpiry(
+      active,
+      resolvedExpiresAtMs === null
+        ? { kind: 'absent' }
+        : { kind: 'known', atMs: resolvedExpiresAtMs }
+    );
   }
   return resolvedExpiresAtMs;
 }
@@ -306,11 +354,6 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
   // session: every record of a session is a keychain item.
   const signedOut = isSignOutTeardownActive() || isSignOutActive();
   if (!token && !isProtectedDataAvailable() && !signedOut) {
-    // The keychain supplied no bearer because it refuses every read while the
-    // device is locked: wait for the unlock rather than send a request the
-    // server would refuse as unauthenticated, then read the token again. A
-    // held token never takes this path, so an already-authenticated request
-    // is not delayed.
     unlockWaitStartMs = Date.now();
     await waitForProtectedData();
     token = await getAuthTokenForRequest();
@@ -324,14 +367,18 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
 
   // Proactive refresh: if the token is expiring within the margin, rotate
   // before this request hits a 401. performRefresh handles single-flight
-  // so concurrent requests share one rotation. The expiry comes from the
-  // in-memory owner when available; only the cold path (owner warmed by
-  // getAuthTokenForRequest without an expiry) reads TOKEN_EXPIRES_AT_KEY,
-  // and the resolved value is published back into the owner so normal
-  // requests never reread it. A refused read leaves the expiry unknown, so no
-  // rotation is attempted and the held token is used as it is.
+  // so concurrent requests share one rotation. A completed cold read is
+  // recorded in the owner as known or known-absent, so TOKEN_EXPIRES_AT_KEY is
+  // read once per token: a session with a token but no stored expiry reads it
+  // once and is answered `absent` from then on. A locked read publishes
+  // nothing and leaves the expiry unknown, so the next unlocked request reads
+  // it; while it is unknown no rotation is attempted and the held token is
+  // used as it is.
   const active = getActiveTokenSnapshot();
-  const expiresAtMs = active?.expiresAtMs ?? (await readColdExpiry(active));
+  const expiresAtMs =
+    active && active.expiry.kind !== 'unknown'
+      ? expiryAtMs(active.expiry)
+      : await readColdExpiry(active);
   // Prefer the newest owner token: a sign-in or refresh may have published a
   // newer one while the cold reads were in flight.
   const newest = getActiveToken();
@@ -355,23 +402,79 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
   );
 }
 
+// Both links share one latency-measured fetch. In a dev build it also answers
+// a dev-only forced data state (`force-state-fixture.ts`); the split below
+// sends every forced procedure to the single link, and a batched call passes.
+const linkFetch = __DEV__ ? withForceState(measuredFetch) : measuredFetch;
+
+/** The observer a link's result is subscribed with. */
+type ObserverOf = Partial<OperationResultObserver<MobileRouter, unknown>>;
+
+/**
+ * Tags every operation's error with the auth epoch captured when the operation
+ * started, so the shared raises can tell a refusal dispatched by the previous
+ * session from one the current session dispatched (see
+ * `auth/dispatch-epoch.ts`). It is first in `trpcLinks` so every call is tagged,
+ * including the ones the split sends to the single link.
+ */
+export function createDispatchSessionLink(): TRPCLink<MobileRouter> {
+  return () =>
+    ({ op, next }) => {
+      // Captured when the operation starts: the session that issued this call.
+      const epoch = currentAuthEpoch();
+      const result = {
+        subscribe(observer: ObserverOf) {
+          const subscription = next(op).subscribe({
+            next: value => {
+              observer.next?.(value);
+            },
+            error: error => {
+              tagDispatchSessionAt(error, epoch);
+              observer.error?.(error);
+            },
+            complete: () => {
+              observer.complete?.();
+            },
+          });
+          return {
+            unsubscribe: () => {
+              subscription.unsubscribe();
+            },
+          };
+        },
+      };
+      // `OperationResultObservable` also declares `pipe`, which only the
+      // `observable` helper in `@trpc/server` builds. The app cannot depend on
+      // that server package, and `@trpc/client` does not re-export the helper;
+      // the chain only ever calls `subscribe` on a link's result (its own
+      // `createChain` wraps each link in an observable and subscribes once), so
+      // the object above is the whole runtime contract, and `pipe` is the only
+      // member left to bridge.
+      return result as OperationResultObservable<MobileRouter, unknown>;
+    };
+}
+
 const singleLink = httpLink({
   url: trpcUrl,
   headers: getAuthHeaders,
-  fetch: measuredFetch,
+  fetch: linkFetch,
   methodOverride: 'POST',
 });
 
 const batchLink = httpBatchLink({
   url: trpcUrl,
   headers: getAuthHeaders,
-  fetch: measuredFetch,
+  fetch: linkFetch,
   methodOverride: 'POST',
 });
 
 const trpcLinks = [
+  createDispatchSessionLink(),
   splitLink({
-    condition: op => op.context.skipBatch === true || UNBATCHED_PROCEDURES.has(op.path),
+    condition: op =>
+      op.context.skipBatch === true ||
+      UNBATCHED_PROCEDURES.has(op.path) ||
+      (__DEV__ && isForcedProcedure(op.path)),
     true: singleLink,
     false: batchLink,
   }),

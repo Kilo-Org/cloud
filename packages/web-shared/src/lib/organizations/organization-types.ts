@@ -4,9 +4,10 @@ import {
   ORGANIZATION_ROLES,
 } from '@kilocode/app-shared/organizations';
 import type { Organization, organization_invitations } from '@kilocode/db/schema';
+import type { RunningTrialStage } from '@kilocode/organization-entitlement';
 import { hasVisibleText } from '@kilocode/app-shared/text';
 import type { Result } from '@kilocode/web-shared/lib/maybe-result';
-import { CompanyDomainSchema, normalizeSsoDomain } from './company-domain';
+import { CompanyDomainSchema } from './company-domain';
 
 // Re-export base types that don't depend on schema.ts
 export type {
@@ -26,7 +27,6 @@ export {
 
 import type { OrganizationRole, OrganizationPlan } from './organization-base-types';
 import { OrganizationPlanSchema, OrganizationSettingsSchema } from './organization-base-types';
-import { EnkryptPublishedBenchmarkSchema, OpenCodeSettingsSchema } from '@kilocode/db/schema-types';
 
 export const OrganizationRoleSchema = z.enum(ORGANIZATION_ROLES);
 
@@ -38,7 +38,6 @@ export function billingCycleToDb(cycle: BillingCycle): 'monthly' | 'yearly' {
   return cycle === 'annual' ? 'yearly' : 'monthly';
 }
 
-// Maps DB ('yearly') or Stripe ('year') interval values to the domain BillingCycle.
 export function toBillingCycle(source: 'monthly' | 'yearly' | 'month' | 'year'): BillingCycle {
   return source === 'yearly' || source === 'year' ? 'annual' : 'monthly';
 }
@@ -111,6 +110,29 @@ export type UserOrganizationWithSeats = {
    * balance, so the surfaced refusal always matches `requireActiveSubscriptionOrTrial`.
    */
   isTrialExpiredForEnforcement: boolean;
+  /**
+   * The stage of a trial that is still running, from the same
+   * `classifyOrganizationEntitlement` verdict as the gate above: one of the
+   * `RunningTrialStage` set (`trial_active`, `trial_ending_soon`,
+   * `trial_ending_very_soon`, or `trial_expires_today`). It is `null` whenever
+   * the trial is not the organization's operative state — a paying seat
+   * subscription, a sponsorship, suppressed trial messaging, or a disabled
+   * seat requirement replaced it, or the trial has already expired — so a
+   * client can render "on trial" from this field alone instead of re-deriving
+   * it on the device. The declared type is the set the server actually
+   * publishes: the expired stages and `subscribed` never appear here, so a
+   * consumer cannot render a stage the wire never sends.
+   */
+  trialStatus: RunningTrialStage | null;
+  /**
+   * The ISO instant the running trial ends, carrying
+   * `getOrganizationTrialEndDate`'s answer (`free_trial_end_at`, or creation
+   * plus the trial duration when the organization never set one). It is `null`
+   * exactly when `trialStatus` is, so the date is only ever published for a
+   * trial that is still running. Informational only: `isTrialExpiredForEnforcement`
+   * remains the verdict a client gates on.
+   */
+  trialEndsAt: string | null;
   seatCount: {
     used: number;
     total: number;
@@ -141,6 +163,15 @@ export const InvitedOrganizationMemberSchema = z.object({
 
 type InvitedMember = z.infer<typeof InvitedOrganizationMemberSchema>;
 
+export const ChildOrganizationSummarySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+});
+
+export const ChildOrganizationMembershipSchema = ChildOrganizationSummarySchema.extend({
+  role: OrganizationRoleSchema,
+});
+
 export const ActiveOrganizationMemberSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -151,11 +182,10 @@ export const ActiveOrganizationMemberSchema = z.object({
   imageUrl: z.string().nullable().optional(),
   dailyUsageLimitUsd: z.number().nullable(),
   currentDailyUsageUsd: z.number().nullable(),
+  childOrganizationMemberships: z.array(ChildOrganizationMembershipSchema).optional(),
 });
 
-type ActiveMember = z.infer<typeof ActiveOrganizationMemberSchema> & {
-  childOrganizationMemberships?: ChildOrganizationMembership[];
-};
+type ActiveMember = z.infer<typeof ActiveOrganizationMemberSchema>;
 
 export type OrganizationMember = InvitedMember | ActiveMember;
 
@@ -175,6 +205,7 @@ export const PublicInvitedOrganizationMemberSchema = InvitedOrganizationMemberSc
 export const PublicActiveOrganizationMemberSchema = ActiveOrganizationMemberSchema.omit({
   dailyUsageLimitUsd: true,
   currentDailyUsageUsd: true,
+  childOrganizationMemberships: true,
 });
 
 export const PublicOrganizationMemberSchema = z.discriminatedUnion('status', [
@@ -183,15 +214,6 @@ export const PublicOrganizationMemberSchema = z.discriminatedUnion('status', [
 ]);
 
 export const PublicOrganizationMembersSchema = z.array(PublicOrganizationMemberSchema);
-
-export const ChildOrganizationSummarySchema = z.object({
-  id: z.string(),
-  name: z.string(),
-});
-
-export const ChildOrganizationMembershipSchema = ChildOrganizationSummarySchema.extend({
-  role: OrganizationRoleSchema,
-});
 
 // Member-visible variants returned by `organizations.withMembers` for `member`
 // callers. The member response omits the Stripe customer id, the invite
@@ -209,8 +231,6 @@ export const MemberInvitedOrganizationMemberSchema = InvitedOrganizationMemberSc
 
 export const MemberActiveOrganizationMemberSchema = ActiveOrganizationMemberSchema.omit({
   currentDailyUsageUsd: true,
-}).extend({
-  childOrganizationMemberships: z.array(ChildOrganizationMembershipSchema).optional(),
 });
 
 export const MemberOrganizationMemberSchema = z.discriminatedUnion('status', [
@@ -218,7 +238,7 @@ export const MemberOrganizationMemberSchema = z.discriminatedUnion('status', [
   MemberInvitedOrganizationMemberSchema,
 ]);
 
-export const OrganizationWithMembersSchema = OrganizationSchema.extend({
+export const OrganizationRowWithMembersSchema = OrganizationSchema.extend({
   members: z.array(OrganizationMemberSchema),
 });
 
@@ -321,118 +341,3 @@ export type UsageDetails = {
 
 export const TimePeriodSchema = z.enum(['week', 'month', 'year', 'all']);
 export type TimePeriod = z.infer<typeof TimePeriodSchema>;
-
-const OpenRouterProviderSchema = z.object({
-  name: z.string(),
-  displayName: z.string(),
-  slug: z.string(),
-  baseUrl: z.string().optional(),
-  dataPolicy: z
-    .object({
-      /** Stores prompts for feedback or training; governed by `data_collection`. */
-      training: z.boolean().optional(),
-      /** Stores prompts for any reason, including compliance; governed by `zdr`. */
-      retainsPrompts: z.boolean().optional(),
-      canPublish: z.boolean().optional(),
-      termsOfServiceURL: z.string().optional(),
-      privacyPolicyURL: z.string().optional(),
-    })
-    .optional(),
-  headquarters: z.string().optional(),
-  datacenters: z.array(z.string()).optional(),
-  hasChatCompletions: z.boolean().optional(),
-  hasCompletions: z.boolean().optional(),
-  isAbortable: z.boolean().optional(),
-  moderationRequired: z.boolean().optional(),
-  editors: z.array(z.string()).optional(),
-  owners: z.array(z.string()).optional(),
-  adapterName: z.string().optional(),
-  isMultipartSupported: z.boolean().optional(),
-  statusPageUrl: z.string().nullable().optional(),
-  byokEnabled: z.boolean().optional(),
-  icon: z
-    .object({
-      url: z.string(),
-      className: z.string().optional(),
-    })
-    .optional(),
-  ignoredProviderModels: z.array(z.string()).optional(),
-});
-
-export const OpenRouterProvidersResponseSchema = z.object({
-  data: z.array(OpenRouterProviderSchema),
-});
-
-const OpenRouterModelSchema = z.object({
-  // kilocode additions:
-  preferredIndex: z.number().optional(),
-  isFree: z.boolean().optional(),
-  mayTrainOnYourPrompts: z.boolean().optional(),
-  hasUserByokAvailable: z.boolean().optional(),
-  /** A custom LLM (`custom_llm2`) configured by a Kilo admin. */
-  isCustomLlm: z.boolean().optional(),
-  autoRouting: z
-    .object({
-      models: z.array(z.string()),
-    })
-    .optional(),
-  terminalBench: z
-    .object({
-      overallScore: z.number(),
-      avgAttemptCostUsd: z.number(),
-    })
-    .optional(),
-  enkrypt: EnkryptPublishedBenchmarkSchema.optional(),
-  opencode: OpenCodeSettingsSchema.optional(),
-  alias_target: z.string().optional().catch(undefined),
-  inference_provider_ids: z.array(z.string()).optional(),
-
-  id: z.string(),
-  name: z.string(),
-  created: z.number(),
-  description: z.string(),
-  architecture: z.object({
-    modality: z.string().nullable().optional(),
-    input_modalities: z.array(z.string()),
-    output_modalities: z.array(z.string()),
-    tokenizer: z.string(),
-  }),
-  top_provider: z.object({
-    is_moderated: z.boolean(),
-    context_length: z.number().nullable().optional(),
-    max_completion_tokens: z.number().nullable().optional(),
-  }),
-  pricing: z.object({
-    prompt: z.string(),
-    completion: z.string(),
-    image: z.string().optional(),
-    request: z.string().optional(),
-    input_cache_read: z.string().optional(),
-    input_cache_write: z.string().optional(),
-    web_search: z.string().optional(),
-    internal_reasoning: z.string().optional(),
-    discount: z.number().optional(),
-  }),
-  context_length: z.number(),
-  per_request_limits: z.record(z.string(), z.unknown()).nullable().optional(),
-  supported_parameters: z.array(z.string()).optional(),
-  expiration_date: z.string().nullable().optional(), // format: yyyy-MM-dd
-});
-
-export const OpenRouterModelsResponseSchema = z.object({
-  data: z.array(OpenRouterModelSchema),
-});
-
-export type OpenRouterProvider = z.infer<typeof OpenRouterProviderSchema>;
-export type OpenRouterProvidersResponse = z.infer<typeof OpenRouterProvidersResponseSchema>;
-export type OpenRouterModel = z.infer<typeof OpenRouterModelSchema>;
-export type OpenRouterModelsResponse = z.infer<typeof OpenRouterModelsResponseSchema>;
-
-export const OrganizationSSODomainSchema = z.string().transform((input, ctx) => {
-  const normalized = normalizeSsoDomain(input);
-  if (normalized === null) {
-    ctx.addIssue({ code: 'custom', message: 'Please enter a valid domain (e.g. acme.com)' });
-    return z.NEVER;
-  }
-  return normalized;
-});

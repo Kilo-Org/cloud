@@ -65,7 +65,7 @@ describe('generation', () => {
     expect(currentGeneration()).toBe(afterFirst);
   });
 
-  it('increments when a new account is set after undefined', () => {
+  it('does not increment on the first decision after undefined, then increments on the next account change', () => {
     // From undefined to a defined decision is not an account change.
     setTelemetryDecision('acct-1', true);
     const afterFirst = currentGeneration();
@@ -188,8 +188,6 @@ describe('subscribeToTelemetryGeneration', () => {
     expect(listener).toHaveBeenCalledTimes(1);
     listener.mockClear();
 
-    // Same account: only the epoch advances, and the epoch scopes nothing to
-    // an account, so subscribers must not wake.
     setTelemetryDecision('acct-2', true);
     expect(listener).not.toHaveBeenCalled();
     expect(currentEpoch()).toBe(3);
@@ -217,6 +215,19 @@ describe('subscribeToTelemetryGeneration', () => {
     setTelemetryDecision('acct-2', true);
     clearTelemetryDecision();
 
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it('drops a listener subscribed before a reset', () => {
+    const listener = vi.fn<() => void>();
+    subscribeToTelemetryGeneration(listener);
+
+    resetTelemetryControllerForTests();
+
+    // The reset drops the subscriber, so a later account change
+    // (acct-1 -> acct-2; undefined -> acct-1 is not one) reaches nobody.
+    setTelemetryDecision('acct-1', true);
+    setTelemetryDecision('acct-2', true);
     expect(listener).not.toHaveBeenCalled();
   });
 

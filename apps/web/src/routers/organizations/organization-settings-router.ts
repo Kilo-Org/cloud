@@ -18,12 +18,14 @@ import { listAvailableModelsProcedure } from '@kilocode/web-shared/routers/organ
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
+import type { AuditDataCollectionTag } from '@kilocode/app-shared/organizations';
 import { KILO_ORGANIZATION_ID } from '@kilocode/web-shared/lib/organizations/constants';
 import { createAllowPredicateFromRestrictions } from '@kilocode/web-shared/lib/model-allow.server';
 import { getAvailableModelsForOrganization } from '@kilocode/web-shared/lib/organizations/organization-models';
 import { bumpOrganizationGroupPolicyRevision } from '@kilocode/web-shared/lib/organizations/organization-groups';
 import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
+import { normalizeInferenceProviderIds } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import {
   MAX_ORGANIZATION_BROWSER_ALLOWED_ORIGINS,
@@ -85,8 +87,10 @@ function createAccessListsDiffMessage(
   }
 
   if (old.provider_allow_list !== newSettings.provider_allow_list) {
-    const oldProviders = new Set(old.provider_allow_list || []);
-    const newProviders = new Set(newSettings.provider_allow_list || []);
+    const oldProviders = new Set(normalizeInferenceProviderIds(old.provider_allow_list || []));
+    const newProviders = new Set(
+      normalizeInferenceProviderIds(newSettings.provider_allow_list || [])
+    );
 
     const added = [...newProviders].filter(provider => !oldProviders.has(provider));
     const removed = [...oldProviders].filter(provider => !newProviders.has(provider));
@@ -139,6 +143,19 @@ function createDataCollectionMessage(
   return 'Data collection: follow extension setting';
 }
 
+/** The stored `allow`/`deny`/unset becomes the audit reader's own tag. */
+function dataCollectionAuditMode(
+  dataCollection: OrganizationSettings['data_collection']
+): AuditDataCollectionTag {
+  if (dataCollection === 'allow') {
+    return 'allowed';
+  }
+  if (dataCollection === 'deny') {
+    return 'denied';
+  }
+  return 'followSetting';
+}
+
 function assertOrganizationAutoRouteCount(routes: Record<string, string>): void {
   if (Object.keys(routes).length > MAX_ORGANIZATION_AUTO_ROUTES) {
     throw new TRPCError({
@@ -151,7 +168,7 @@ function assertOrganizationAutoRouteCount(routes: Record<string, string>): void 
 async function assertActiveOrganizationAutoTargetsAllowed(
   organization: Pick<NonNullable<Awaited<ReturnType<typeof getOrganizationById>>>, 'id' | 'plan'>,
   settings: OrganizationSettings,
-  dbClient: typeof db | DrizzleTransaction
+  tx: DrizzleTransaction
 ): Promise<void> {
   if (settings.default_model !== ORG_AUTO_MODEL.id || !settings.org_auto_model) {
     return;
@@ -166,7 +183,7 @@ async function assertActiveOrganizationAutoTargetsAllowed(
 
   for (const [slug, targetModelId] of Object.entries(settings.org_auto_model.routes)) {
     const validation = await validateOrganizationAutoTarget(validationOrganization, targetModelId, {
-      dbClient,
+      read: { tx },
     });
     if (validation.kind === 'error') {
       throw new TRPCError({
@@ -179,7 +196,7 @@ async function assertActiveOrganizationAutoTargetsAllowed(
   const fallbackValidation = await validateOrganizationAutoTarget(
     validationOrganization,
     settings.org_auto_model.fallback_model,
-    { dbClient }
+    { read: { tx } }
   );
   if (fallbackValidation.kind === 'error') {
     throw new TRPCError({
@@ -196,10 +213,6 @@ const UpdateAllowListsInputSchema = OrganizationIdInputSchema.extend({
 
 function dedupeModels(values: string[]): string[] {
   return [...new Set(values.map(value => normalizeModelId(value)))];
-}
-
-function dedupeStrings(values: string[]): string[] {
-  return [...new Set(values)];
 }
 
 async function validateOrganizationDefaultModel(
@@ -266,7 +279,7 @@ async function validateOrganizationDefaultReplacement(
         'Replacement default model could not be validated against the current model catalog.',
     });
   }
-  const availableModel = availableModels?.data.find(
+  const availableModel = availableModels.data.find(
     model => model.id.trim().toLowerCase() === validatedReplacementModel.toLowerCase()
   );
   if (!availableModel) {
@@ -486,11 +499,29 @@ export const organizationsSettingsRouter = createTRPCRouter({
           },
           tx
         );
+        // One row records both advanced gateway policies, so the detail names
+        // whichever of them changed. A region-only save leaves `openRouter`
+        // out, and an OpenRouter-only save leaves `region` out. Clearing the
+        // region back to global has no `RegionTag`, so that save carries no detail.
+        const openRouterChanged =
+          !!previousSettings.disable_openrouter !== !!settings.disable_openrouter;
+        const regionChanged =
+          (previousSettings.data_region ?? null) !== (settings.data_region ?? null);
         await createAuditLog({
           action: 'organization.settings.change',
           actor_email: ctx.user.google_user_email,
           actor_id: ctx.user.id,
           actor_name: ctx.user.google_user_name,
+          details:
+            openRouterChanged || (regionChanged && settings.data_region)
+              ? {
+                  id: 'setting.advancedPolicies',
+                  ...(openRouterChanged ? { openRouter: !settings.disable_openrouter } : {}),
+                  ...(regionChanged && settings.data_region
+                    ? { region: settings.data_region }
+                    : {}),
+                }
+              : undefined,
           message: createGatewaySettingsDiffMessage(previousSettings, settings),
           organization_id: organizationId,
           tx,
@@ -532,7 +563,8 @@ export const organizationsSettingsRouter = createTRPCRouter({
             const currentSettings = organization.settings || {};
             const settingsUpdate: OrganizationSettings = { ...currentSettings };
             if (provider_allow_list !== undefined) {
-              settingsUpdate.provider_allow_list = dedupeStrings(provider_allow_list);
+              settingsUpdate.provider_allow_list =
+                normalizeInferenceProviderIds(provider_allow_list);
             }
             if (model_deny_list !== undefined) {
               settingsUpdate.model_deny_list = dedupeModels(model_deny_list);
@@ -562,6 +594,7 @@ export const organizationsSettingsRouter = createTRPCRouter({
           actor_email: ctx.user.google_user_email,
           actor_id: ctx.user.id,
           actor_name: ctx.user.google_user_name,
+          details: { id: 'setting.accessLists' },
           message: createAccessListsDiffMessage(previousSettings, settings),
           organization_id: organizationId,
           tx,
@@ -632,6 +665,11 @@ export const organizationsSettingsRouter = createTRPCRouter({
           actor_email: ctx.user.google_user_email,
           actor_id: ctx.user.id,
           actor_name: ctx.user.google_user_name,
+          details: {
+            id: 'setting.defaultModel',
+            previous: previousSettings?.default_model,
+            next: settings.default_model,
+          },
           message: createDefaultModelDiffMessage(previousSettings, settings),
           organization_id: organizationId,
           tx,
@@ -662,7 +700,7 @@ export const organizationsSettingsRouter = createTRPCRouter({
           async organization => {
             assertOrganizationAutoEligible(organization);
             const validation = await validateOrganizationAutoTarget(organization, model_id, {
-              dbClient: tx,
+              read: { tx },
             });
             if (validation.kind === 'error') {
               throw new TRPCError({ code: 'BAD_REQUEST', message: validation.message });
@@ -695,6 +733,12 @@ export const organizationsSettingsRouter = createTRPCRouter({
             actor_email: ctx.user.google_user_email,
             actor_id: ctx.user.id,
             actor_name: ctx.user.google_user_name,
+            details: {
+              id: 'setting.autoRoute',
+              mode: mode_slug,
+              previous: previousRoute,
+              next: validatedModelId,
+            },
             message:
               previousRoute === undefined
                 ? `Set Organization Auto route for mode "${mode_slug}" to "${validatedModelId}"`
@@ -752,6 +796,7 @@ export const organizationsSettingsRouter = createTRPCRouter({
             actor_email: ctx.user.google_user_email,
             actor_id: ctx.user.id,
             actor_name: ctx.user.google_user_name,
+            details: { id: 'setting.autoRoute', mode: mode_slug, previous: removedRoute },
             message: `Cleared Organization Auto route for mode "${mode_slug}" (was "${removedRoute}")`,
             organization_id: organizationId,
             tx,
@@ -827,7 +872,7 @@ export const organizationsSettingsRouter = createTRPCRouter({
                 const routeValidation = await validateOrganizationAutoTarget(
                   organization,
                   targetModelId,
-                  { dbClient: tx }
+                  { read: { tx } }
                 );
                 if (routeValidation.kind === 'error') {
                   throw new TRPCError({
@@ -843,9 +888,7 @@ export const organizationsSettingsRouter = createTRPCRouter({
             const validation = await validateOrganizationAutoTarget(
               organization,
               requestedFallback,
-              {
-                dbClient: tx,
-              }
+              { read: { tx } }
             );
             if (validation.kind === 'error') {
               throw new TRPCError({ code: 'BAD_REQUEST', message: validation.message });
@@ -868,6 +911,10 @@ export const organizationsSettingsRouter = createTRPCRouter({
             actor_email: ctx.user.google_user_email,
             actor_id: ctx.user.id,
             actor_name: ctx.user.google_user_name,
+            details:
+              behavior === 'specific'
+                ? { id: 'setting.defaultBehavior', behavior, model: settings.default_model }
+                : { id: 'setting.defaultBehavior', behavior },
             message:
               behavior === 'auto'
                 ? 'Configured Organization Auto default behavior.'
@@ -917,6 +964,10 @@ export const organizationsSettingsRouter = createTRPCRouter({
             actor_email: ctx.user.google_user_email,
             actor_id: ctx.user.id,
             actor_name: ctx.user.google_user_name,
+            details: {
+              id: 'setting.dataCollection',
+              mode: dataCollectionAuditMode(dataCollection),
+            },
             message: createDataCollectionMessage(dataCollection),
             organization_id: organizationId,
             tx,
@@ -973,6 +1024,7 @@ export const organizationsSettingsRouter = createTRPCRouter({
             actor_email: ctx.user.google_user_email,
             actor_id: ctx.user.id,
             actor_name: ctx.user.google_user_name,
+            details: { id: 'setting.projectsUi', enabled: projects_ui_enabled },
             message: `Projects UI: ${projects_ui_enabled ? 'enabled' : 'disabled'}`,
             organization_id: organizationId,
             tx,
@@ -1034,6 +1086,14 @@ export const organizationsSettingsRouter = createTRPCRouter({
             actor_email: ctx.user.google_user_email,
             actor_id: ctx.user.id,
             actor_name: ctx.user.google_user_name,
+            details: enabled
+              ? {
+                  id: 'setting.minimumBalanceAlert',
+                  enabled,
+                  threshold: minimum_balance,
+                  emails: minimum_balance_alert_email,
+                }
+              : { id: 'setting.minimumBalanceAlert', enabled },
             message: enabled
               ? `Minimum balance alert: enabled (threshold: $${minimum_balance}, emails: ${minimum_balance_alert_email?.join(', ')})`
               : 'Minimum balance alert: disabled',
@@ -1090,6 +1150,7 @@ export const organizationsSettingsRouter = createTRPCRouter({
           actor_email: ctx.user.google_user_email,
           actor_id: ctx.user.id,
           actor_name: ctx.user.google_user_name,
+          details: { id: 'setting.recommendationsDigest', enabled },
           message: enabled ? 'Recommendations digest: enabled' : 'Recommendations digest: disabled',
           organization_id: organizationId,
         });
@@ -1151,6 +1212,11 @@ export const organizationsSettingsRouter = createTRPCRouter({
             actor_email: ctx.user.google_user_email,
             actor_id: ctx.user.id,
             actor_name: ctx.user.google_user_name,
+            details: {
+              id: 'setting.browserControl',
+              policy: nextPolicy.browserControl,
+              origins: nextPolicy.browserAllowedOrigins,
+            },
             message: createBrowserControlMessage(nextPolicy),
             organization_id: organizationId,
             tx,

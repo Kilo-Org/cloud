@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ScreenErrorBoundary } from '@/components/screen-error-boundary';
 import { QueryError } from '@/components/query-error';
-import { Button } from '@/components/ui/button';
+import { ScreenHeader } from '@/components/screen-header';
 import { act, TestRenderer } from '@/test/renderer';
 import { setRouteRecoveryScope } from '@/lib/navigation/route-recovery-scope';
 import { setTelemetrySink, type TelemetryEvent } from '@/lib/telemetry/error-sink';
@@ -38,12 +38,14 @@ vi.mock('expo-router', () => ({
   useRouter: () => router,
   useSegments: () => ['(app)', 'agent-chat', '[session-id]'],
 }));
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (key: string) => key }),
-}));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
-vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
-vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+// A no-history Back hands off through the push-then-retire hook (a literal
+// `router.replace` crashes Android Fabric); the assertion below
+// pins the destination it is handed.
+vi.mock('@/lib/navigation/stack-safe-replace', () => ({
+  useStackSafeReplace: () => ({ replace: router.replace }),
+}));
 
 function mount(props: { error: Error; retry: () => Promise<void> }) {
   const client = new QueryClient({
@@ -80,9 +82,9 @@ function pressRetry(tree: TestRenderer.ReactTestRenderer) {
 }
 
 function pressGoBack(tree: TestRenderer.ReactTestRenderer) {
-  const onPress = tree.root.findByType(Button as never).props.onPress as () => void;
+  const onBack = tree.root.findByType(ScreenHeader as never).props.onBack as () => void;
   act(() => {
-    onPress();
+    onBack();
   });
 }
 
@@ -99,14 +101,13 @@ beforeEach(() => {
 });
 
 describe('ScreenErrorBoundary', () => {
-  it('offers a retry and a way out of the failed route', () => {
+  it('offers a retry, and the header back as the one way out of the failed route', () => {
     const tree = mount({ error: new Error('route render failed'), retry: vi.fn() }).tree;
 
-    expect(tree.root.findByType(QueryError as never).props).toMatchObject({
-      placement: 'static',
-      isRetrying: false,
-    });
-    expect(tree.root.findAllByType(Button as never)).toHaveLength(1);
+    const error = tree.root.findByType(QueryError as never);
+    expect(error.props).toMatchObject({ isRetrying: false });
+    expect(error.props.action).toBeUndefined();
+    expect(tree.root.findByType(ScreenHeader as never).props.showBackButton).toBe(true);
 
     pressGoBack(tree);
 

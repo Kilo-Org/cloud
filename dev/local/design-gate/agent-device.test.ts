@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { agentDeviceArgs, agentDeviceToProbeDump } from './agent-device';
+import { agentDeviceArgs, agentDeviceToProbeDump, withScreenshotScale } from './agent-device';
 import { InfraError } from './capture';
 import { normalize } from './rules';
-import { checkTouchOverlap } from './rules/screen';
+import { checkOverlap, checkTouchOverlap, checkTouchTargets } from './rules/screen';
 import type { ProbeNode } from './tree';
 
 const APP = 'com.kilocode.kiloapp';
@@ -134,8 +134,118 @@ test('agent-device snapshot converts app nodes to a ProbeDump in dp', () => {
   assert.equal(dump.nodes[5]?.pressable, true);
 });
 
-test('agent-device snapshot without Android density is an infra failure', () => {
+test('agent-device snapshot that is neither iOS nor Android with density is an infra failure', () => {
   assert.throws(() => agentDeviceToProbeDump(JSON.stringify({ data: { nodes: [] } })), InfraError);
+});
+
+const iosNode = (
+  index: number,
+  parentIndex: number | null,
+  role: string,
+  rect: [number, number, number, number],
+  fields: Record<string, unknown> = {}
+) => ({
+  index,
+  parentIndex,
+  type: 'Other',
+  role,
+  kind: 'other',
+  hittable: true,
+  rect: { x: rect[0], y: rect[1], width: rect[2], height: rect[3] },
+  ...fields,
+});
+
+/** The notifications screen on an iPhone 17 simulator (iOS 26.5), in points. */
+const IOS_SNAPSHOT = JSON.stringify({
+  success: true,
+  data: {
+    appBundleId: APP,
+    nodes: [
+      iosNode(0, null, 'UIApplication', [0, 0, 402, 874], {
+        type: 'Application',
+        kind: 'application',
+      }),
+      iosNode(1, 0, 'UIWindow', [0, 0, 402, 874], { type: 'Window', kind: 'window' }),
+      // A development build wraps the React Native root in the dev launcher's view.
+      iosNode(
+        2,
+        1,
+        '_TtC13EXDevLauncherP33_867A144D7C8F5D750D0BFA9E58EDAFE322DevLauncherWrapperView',
+        [0, 0, 402, 874]
+      ),
+      iosNode(3, 2, 'RCTRootComponentView', [0, 0, 402, 874]),
+      iosNode(4, 3, 'RCTViewComponentView', [14, 186.33, 374, 54.67]),
+      iosNode(5, 4, 'RCTParagraphComponentView', [68.67, 197, 235.67, 17.67], {
+        type: 'StaticText',
+        kind: 'text',
+        label: 'Active agents',
+      }),
+      iosNode(6, 5, 'RCTAccessibilityElement', [68.67, 197, 235.67, 17.67], {
+        type: 'StaticText',
+        kind: 'text',
+        label: 'Active agents',
+      }),
+      iosNode(7, 4, 'RCTSwitchComponentView', [311, 188.33, 63, 44]),
+      iosNode(8, 7, 'UISwitch', [311, 188.33, 63, 28], {
+        type: 'Switch',
+        kind: 'switch',
+        label: 'Active agents',
+        identifier: 'notification-toggle-agents',
+      }),
+      iosNode(9, 3, 'RCTViewComponentView', [14, 300, 374, 52], { type: 'Button', kind: 'button' }),
+      iosNode(10, 3, '_UIScrollViewScrollIndicator', [395, 128.67, 3, 400]),
+      iosNode(11, 1, '_UIGrabber', [164.51, 455.03, 72.98, 24], { type: 'Button', kind: 'button' }),
+      iosNode(12, 0, 'UITextEffectsWindow', [0, 0, 402, 874], {
+        type: 'Application',
+        kind: 'application',
+      }),
+      iosNode(13, 12, 'UIAccessibilityElementKBKey', [0, 600, 40, 42], {
+        type: 'Key',
+        kind: 'key',
+      }),
+      iosNode(14, 1, 'UIDimmingView', [-402, -874, 1206, 2622]),
+    ],
+  },
+});
+
+test('agent-device iOS snapshot converts the app views in points', () => {
+  const dump = agentDeviceToProbeDump(IOS_SNAPSHOT);
+  assert.equal(dump.env.platform, 'ios');
+  assert.equal(dump.env.source, 'agent-device');
+  assert.deepEqual(dump.env.window, { width: 402, height: 874 });
+  assert.equal(dump.env.pixelRatio, 1);
+  assert.equal(dump.env.safeAreaKnown, false);
+  // The dimming view, grabber, scroll indicator, keyboard window, and the text's
+  // accessibility element are the system's; the React Native views are kept.
+  assert.deepEqual(
+    dump.nodes.map(node => [node.parent, node.tag, node.rect[1]]),
+    [
+      [-1, 'View', 0],
+      [0, 'View', 0],
+      [1, 'View', 186.33],
+      [2, 'Paragraph', 197],
+      [2, 'Switch', 188.33],
+      [4, 'UISwitch', 188.33],
+      [1, 'Button', 300],
+    ]
+  );
+  assert.equal(dump.nodes[3]?.text, 'Active agents');
+  assert.equal(dump.nodes[5]?.label, 'Active agents');
+  assert.equal(dump.nodes[5]?.testID, 'notification-toggle-agents');
+  // Every iOS view is hittable; a control kind is pressable, and so is the switch
+  // host, whose 44 pt frame is the touch area. The 28 pt track is not a control.
+  assert.deepEqual(
+    dump.nodes.map(node => node.pressable === true),
+    [false, false, false, false, true, false, true]
+  );
+  const layout = normalize(dump);
+  assert.deepEqual(checkTouchTargets(layout), []);
+  // The track keeps the box UIKit draws, which the row rule reads as the paint.
+  assert.deepEqual(dump.nodes[5]?.rect, [311, 188.33, 63, 28]);
+  // The screenshot supplies the scale the snapshot does not report.
+  assert.equal(withScreenshotScale(dump, 1206).env.pixelRatio, 3);
+  const android = agentDeviceToProbeDump(SNAPSHOT);
+  assert.equal(withScreenshotScale(android, 1206), android);
 });
 
 test('system bars establish safe insets before their nodes are filtered', () => {
@@ -288,5 +398,80 @@ test('agent-device snapshot marks a scrolled box as one that clips what it draws
 
 test('a clipped text run leaves one tap owner on the message row', () => {
   const findings = checkTouchOverlap(normalize(agentDeviceToProbeDump(SCROLLED_TRANSCRIPT)));
+  assert.deepEqual(findings, []);
+});
+
+/**
+ * Frames measured on a 1080x2400 emulator (density 2.625) over the to-do detail
+ * header, where the fit check mounts a zero-opacity copy of the title to read
+ * the title's natural width. The platform reports that copy and the text inside
+ * it as not visible to the user; the visible pressable title is reported as
+ * visible. An accessibility snapshot carries no style, so only this flag keeps
+ * the copy out of the collision rules.
+ */
+const HIDDEN_TITLE_COPY = JSON.stringify({
+  data: {
+    androidSnapshot: { pixelDensity: 2.625 },
+    viewport: { width: 1080, height: 2400 },
+    nodes: [
+      node({
+        index: 0,
+        type: 'android.view.ViewGroup',
+        visibleToUser: true,
+        rect: { x: 0, y: 0, width: 1080, height: 2400 },
+      }),
+      node({
+        index: 1,
+        parentIndex: 0,
+        type: 'android.view.ViewGroup',
+        visibleToUser: false,
+        rect: { x: 37, y: 157, width: 1006, height: 130 },
+      }),
+      node({
+        index: 2,
+        parentIndex: 1,
+        type: 'android.widget.TextView',
+        kind: 'text',
+        visibleToUser: false,
+        label: 'Rework the onboarding checklist so a new teammate can finish',
+        rect: { x: 37, y: 157, width: 1006, height: 130 },
+      }),
+      node({
+        index: 3,
+        parentIndex: 0,
+        type: 'android.widget.Button',
+        kind: 'button',
+        hittable: true,
+        visibleToUser: true,
+        label: 'Rework the onboarding checklist so a new teammate can finish, Rename task',
+        rect: { x: 135, y: 220, width: 908, height: 130 },
+      }),
+    ],
+  },
+});
+
+test('agent-device keeps a node the platform cannot show, marked as unseen', () => {
+  const dump = agentDeviceToProbeDump(HIDDEN_TITLE_COPY);
+  // The tree is not restructured: the copy stays, with its text under it, so the
+  // geometry rules still see the layout the app laid out.
+  assert.deepEqual(
+    dump.nodes.map(entry => [entry.tag, entry.invisible === true]),
+    [
+      ['View', false],
+      ['ViewGroup', false],
+      ['ViewGroup', true],
+      ['Paragraph', true],
+      ['Button', false],
+    ]
+  );
+  // A snapshot that never reports the flag reads as it did before.
+  assert.equal(
+    agentDeviceToProbeDump(SNAPSHOT).nodes.some(entry => entry.invisible === true),
+    false
+  );
+});
+
+test('a box the platform cannot show collides with nothing', () => {
+  const findings = checkOverlap(normalize(agentDeviceToProbeDump(HIDDEN_TITLE_COPY)));
   assert.deepEqual(findings, []);
 });

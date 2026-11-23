@@ -1,6 +1,7 @@
 import { i18n } from '@/i18n';
 import { formatDate } from '@/lib/format';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
+import { sessionBranchLabel } from '@/lib/session-branch-label';
 import { parseTimestamp } from '@/lib/utils';
 
 export type LabeledInstance = InstancePickerInstance & {
@@ -38,8 +39,11 @@ export function dedupeInstanceLabels(
 ): LabeledInstance[] {
   const labels = new Map<string, LabeledInstance>();
   return instances.map(instance => {
+    // The picker prints the branch a session row paints, so the stored
+    // percent-encoded form (`fix/%E8%AB%8B%E6%B1%82...`) never reaches the
+    // label; the shortening then counts the characters the user reads.
     // eslint-disable-next-line typescript-eslint/no-misused-spread -- Preserve the existing code-point shortening boundary without splitting surrogate pairs.
-    const branch = [...(instance.gitBranch ?? '')];
+    const branch = [...(sessionBranchLabel(instance.gitBranch) ?? '')];
     const displayBranch = branch.length > 20 ? `${branch.slice(0, 20).join('')}…` : branch.join('');
     const started =
       instance.startedAt === null

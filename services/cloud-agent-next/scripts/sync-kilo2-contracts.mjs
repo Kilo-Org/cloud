@@ -1,7 +1,17 @@
 import { readFile, writeFile } from 'node:fs/promises';
 
 // The Docker build context contains this service, not workspace packages.
-for (const name of ['kilo2-conversation', 'background-activity']) {
+// `kilo2-conversation` imports `./token-usage`, which stands on nothing but zod,
+// and `./kilo-session-id`, which imports `./base62`; `background-activity`
+// imports `./kilo-session-id` too, so every module on those chains is copied.
+for (const name of [
+  'kilo2-conversation',
+  'token-usage',
+  'background-activity',
+  'kilo-session-id',
+  'base62',
+  'agent-board',
+]) {
   const source = new URL(
     `../../../packages/session-ingest-contracts/src/${name}.ts`,
     import.meta.url

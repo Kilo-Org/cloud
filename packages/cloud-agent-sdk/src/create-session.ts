@@ -205,11 +205,6 @@ export async function createRemoteSessionOnConnection(
       ...(extendedMutationId !== undefined ? { mutationId: extendedMutationId } : {}),
     });
   } catch (error) {
-    // Only bare-retry when extended fields made the original wire differ from
-    // `{ protocolVersion: 1 }`; otherwise the retry is byte-identical noise.
-    // Old form is one bare protocolVersion 1 retry for extended fields; a
-    // clone id must never use that fallback because it would create a fresh
-    // session.
     if (!hasCloneField && hasExtendedFields && isInvalidCreateSessionCommand(error)) {
       return connection.sendCommandToConnection({
         command: 'create_session',

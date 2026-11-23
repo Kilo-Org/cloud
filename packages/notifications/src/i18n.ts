@@ -207,26 +207,28 @@ void i18n.init({
   returnNull: false,
 });
 
-/**
- * Resolve a stored token locale to a catalog tag. Null and unsupported tags
- * fall back to English; a token with no locale is treated as English.
- */
-export function resolvePushLocale(locale: string | null | undefined): string {
-  if (locale != null && Object.hasOwn(pushCatalogs, locale)) return locale;
+/** The locale tags a push catalog is registered under: every tag the resolver can return. */
+export type PushLocale = keyof typeof pushCatalogs;
+
+function isPushLocale(locale: string): locale is PushLocale {
+  return Object.hasOwn(pushCatalogs, locale);
+}
+
+export function resolvePushLocale(locale: string | null | undefined): PushLocale {
+  if (locale != null && isPushLocale(locale)) return locale;
   return 'en';
 }
 
 /**
- * Translate a catalog key for a push locale. Unknown locales use English.
- * An unknown key returns `fallback` when provided; otherwise it returns the
- * key itself (test-only convenience — production callers pass a fallback).
+ * Translate a catalog key for a push locale.
+ * An unknown key returns `fallback`, the English copy the caller owns.
  */
 export function translatePush(
   locale: string | null | undefined,
   key: string,
-  params?: Record<string, string>,
-  fallback?: string
+  params: Record<string, string> | undefined,
+  fallback: string
 ): string {
   const lng = resolvePushLocale(locale);
-  return i18n.t(key, { ...params, lng, defaultValue: fallback ?? key });
+  return i18n.t(key, { ...params, lng, defaultValue: fallback });
 }

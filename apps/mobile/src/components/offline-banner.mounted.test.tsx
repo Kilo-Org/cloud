@@ -36,16 +36,19 @@ vi.mock('react-native', () => ({
   View: 'View',
   Switch: 'Switch',
   Pressable: 'Pressable',
+  ActivityIndicator: 'ActivityIndicator',
 }));
 vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
   FadeIn: { duration: () => ({}) },
   FadeOut: { duration: () => ({}) },
+  useReducedMotion: () => false,
 }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 47, right: 0, bottom: 34, left: 0 }),
 }));
 vi.mock('@/components/ui/icons', () => ({
+  RotateCcw: 'RotateCcw',
   AlertCircle: 'AlertCircle',
   Bell: 'Bell',
   Clock: 'Clock',
@@ -54,12 +57,14 @@ vi.mock('@/components/ui/icons', () => ({
   Lock: 'Lock',
   SearchX: 'SearchX',
   ServerCrash: 'ServerCrash',
+  ShieldCheck: 'ShieldCheck',
   WifiOff: 'WifiOff',
   Zap: 'Zap',
 }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({ warnForeground: '#FFFFFF' }),
+  useMutedDisabledInk: () => '#FFFFFF',
+  useThemeColors: () => ({ warnSolidForeground: '#FFFFFF' }),
 }));
 vi.mock('@/lib/a11y/announce', () => ({ announceForA11y }));
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
@@ -85,6 +90,9 @@ vi.mock('@/lib/hooks/use-security-agent-mutations', () => ({
   useSetSecurityAgentEnabled: () => ({ mutate: vi.fn(), isPending: false }),
   useTrackSecurityAgentInteraction: () => ({ mutate: vi.fn() }),
 }));
+// The capability read reaches the hook that owns the shared memberships
+// options, and that hook reads the auth token; only the token matters here.
+vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => ({ token: 'token' }) }));
 vi.mock('@/components/security-agent/audit-report-button', () => ({
   AuditReportButton: 'AuditReportButton',
 }));
@@ -188,6 +196,13 @@ describe('OfflineBanner mounted with confirmed connectivity', () => {
     const alert = findHost(renderer.root, 'Animated.View')[0];
     expect(alert?.props.accessibilityRole).toBe('alert');
     expect(alert?.props.accessibilityLabel).toBe('No internet connection');
+    // The banner is a solid surface, not the warn ink token: the fill and the
+    // label ink come from the same solid pair, and the icon takes its ink as a
+    // prop because className colors do not reach a Lucide glyph.
+    expect(alert?.props.className).toContain('bg-warn-solid');
+    const label = findHost(renderer.root, 'Text')[0];
+    expect(label?.props.className).toContain('text-warn-solid-foreground');
+    expect(findHost(renderer.root, 'WifiOff')[0]?.props.color).toBe('#FFFFFF');
     expect(findHost(renderer.root, 'WifiOff')).toHaveLength(1);
     expect(announceForA11y).toHaveBeenCalledExactlyOnceWith('No internet connection');
   });
@@ -280,8 +295,11 @@ describe('OfflineBanner mounted with confirmed connectivity', () => {
       const banner = await mountTree();
       const screen = await mountTree(<SettingsOverviewScreen scope={scope} />);
       const activeQueries = harness.queryClient.getQueryCache().findAll({ type: 'active' });
+      // The capability read settles instead of pausing, so it runs here.
+      const settled = activeQueries.filter(query => query.state.fetchStatus !== 'paused');
+      expect(settled).toHaveLength(scope === 'personal' ? 0 : 1);
+      expect(settled.every(query => query.state.fetchStatus === 'fetching')).toBe(true);
       expect(activeQueries).toHaveLength(scope === 'personal' ? 2 : 3);
-      expect(activeQueries.every(query => query.state.fetchStatus === 'paused')).toBe(true);
       expect(activeQueries.every(query => query.state.data === undefined)).toBe(true);
       // The loading body is the skeleton, not the controls: how many blocks it
       // draws is its own shape, so only their presence matters here.
@@ -296,7 +314,9 @@ describe('OfflineBanner mounted with confirmed connectivity', () => {
       act(onRetry);
       await advanceBy(10);
       expect(harness.queryClient.isFetching()).toBe(activeQueries.length);
-      expect(findHost(screen.root, 'Button')[0]?.props.loading).toBe(true);
+      expect(
+        findHost(screen.root, 'Button')[0]?.props.accessibilityState as { busy?: boolean }
+      ).toMatchObject({ busy: true });
       await act(() => {
         response.resolve(undefined);
       });

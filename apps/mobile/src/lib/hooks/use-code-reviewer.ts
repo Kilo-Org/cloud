@@ -26,6 +26,7 @@ import {
   useReviewerBillingRefusal,
 } from '@/lib/hooks/reviewer-refusal';
 import { chainSave } from '@/lib/hooks/save-chain';
+import { settleReviewerWrite } from '@/lib/hooks/reviewer-settled-refresh';
 import { isTrialExpiredRefusal } from '@/lib/server-error-copy';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 import { pick } from '@/lib/utils';
@@ -253,7 +254,7 @@ export function useToggleReviewer(scope: string, platform: ReviewerPlatform) {
       announceReviewerSaveFailure(error, i18n.t('codeReviewer.updateFailed'), refusal);
     },
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
-    onSettled: () => queryClient.invalidateQueries({ queryKey }),
+    onSettled: () => settleReviewerWrite(queryClient, scope, queryKey),
   });
 }
 
@@ -437,7 +438,7 @@ export function useSaveReviewConfig(scope: string, platform: ReviewerPlatform) {
       announceReviewerSaveFailure(error, i18n.t('codeReviewer.configSaveFailed'), refusal);
     },
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
-    onSettled: () => queryClient.invalidateQueries({ queryKey }),
+    onSettled: () => settleReviewerWrite(queryClient, scope, queryKey),
   });
 }
 
@@ -449,10 +450,10 @@ export { classifyProviderState } from '@/lib/code-reviewer-status';
 export { useReviewerEditGuard, useReviewerPermission } from '@/lib/hooks/use-reviewer-permission';
 
 // Bitbucket hooks live in use-bitbucket.ts (keeps this file under the
-// max-lines limit); the readiness read is re-exported here so its call sites
-// are unchanged. The connect mutations are imported from use-bitbucket.ts
-// directly, next to the form that runs them.
-export { useBitbucketReadiness } from '@/lib/hooks/use-bitbucket';
+// max-lines limit); the readiness and integration-status reads are re-exported
+// here so their call sites are unchanged. The connect mutations are imported
+// from use-bitbucket.ts directly, next to the form that runs them.
+export { useBitbucketIntegrationStatus, useBitbucketReadiness } from '@/lib/hooks/use-bitbucket';
 
 // Review-memory hooks live in use-review-memory.ts (keeps this file under
 // the max-lines limit); re-exported here so call sites are unchanged.

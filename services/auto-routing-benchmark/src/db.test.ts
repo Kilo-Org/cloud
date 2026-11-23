@@ -3,6 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { rankCandidates, RoutingTableSchema } from '@kilocode/auto-routing-contracts';
 import type { RankedCandidate, RoutingTable } from '@kilocode/auto-routing-contracts';
 import {
+  adoptReusableCaseResult,
   exactPairKey,
   getRoutingCaseResultsForEntries,
   mapRunRow,
@@ -11,6 +12,7 @@ import {
   rowsToRoutingTable,
 } from './db';
 import type { BenchmarkModelSummary } from '@kilocode/auto-routing-contracts';
+import { applyBenchmarkMigrations, sqliteD1 } from '../test/sqlite-d1';
 import { variantFromStorage, variantToStorage } from './reasoning-effort';
 
 describe('routing case results provenance read', () => {
@@ -125,6 +127,7 @@ describe('mapSummaryRow', () => {
       p50_latency_ms: 300.0,
       p95_latency_ms: 300.0,
       cases: 50,
+      costed_cases: 50,
       errors: 2,
       timeouts: 0,
       route_accuracy: null,
@@ -145,6 +148,7 @@ describe('mapSummaryRow', () => {
       p50LatencyMs: 300.0,
       p95LatencyMs: 300.0,
       cases: 50,
+      costedCases: 50,
       errors: 2,
       timeouts: 0,
       routeAccuracy: null,
@@ -167,6 +171,7 @@ describe('mapSummaryRow', () => {
       p50_latency_ms: null,
       p95_latency_ms: null,
       cases: 30,
+      costed_cases: null,
       errors: 0,
       timeouts: 0,
       route_accuracy: null,
@@ -175,6 +180,8 @@ describe('mapSummaryRow', () => {
     const result = mapSummaryRow(row);
     expect(result.variant).toBeNull();
     expect(result.avgCostUsd).toBeNull();
+    // A row written before the count existed keeps it unknown, not zero.
+    expect(result.costedCases).toBeNull();
     expect(result.avgInputTokens).toBeNull();
     expect(result.avgCachedInputTokens).toBeNull();
     expect(result.avgOutputTokens).toBeNull();
@@ -188,7 +195,7 @@ describe('mapSummaryRow', () => {
 });
 
 describe('mapRunRow', () => {
-  it('maps a RunRow and attaches its summaries', () => {
+  it('maps a RunRow to the admin run shape', () => {
     const runRow = {
       id: 'run-abc',
       router: 'efficient' as const,
@@ -208,59 +215,22 @@ describe('mapRunRow', () => {
       repetitions: 1,
       classifier_max_p95_latency_ms: null,
       engine_identity: 'v1:deadbeef',
+      measurement_revision: 2,
       purpose: 'platform' as const,
+      // A completed run needs no admission marker: nothing claims it.
+      admission_marker: null,
     };
-    const summaries: BenchmarkModelSummary[] = [
-      {
-        model: 'openai/gpt-4o-mini',
-        routeKey: '*',
-        accuracy: 0.78,
-        avgCostUsd: 0.0002,
-        avgLatencyMs: 120,
-        p50LatencyMs: 110,
-        p95LatencyMs: null,
-        cases: 100,
-        errors: 5,
-        timeouts: 0,
-        routeAccuracy: null,
-      },
-    ];
-    const result = mapRunRow(runRow, summaries);
-    expect(result.id).toBe('run-abc');
-    expect(result.kind).toBe('classifier');
-    expect(result.status).toBe('completed');
-    expect(result.startedAt).toBe('2026-06-10T04:10:00.000Z');
-    expect(result.completedAt).toBe('2026-06-10T04:25:00.000Z');
-    expect(result.error).toBeNull();
-    expect(result.summaries).toHaveLength(1);
-    expect(result.summaries[0].model).toBe('openai/gpt-4o-mini');
-  });
-
-  it('attaches an empty summaries array when none are provided', () => {
-    const runRow = {
-      id: 'run-xyz',
-      router: 'efficient' as const,
-      accuracy_noise_band: 0.05,
-      frontier_min_accuracy_delta: 0,
-      kind: 'decider' as const,
-      status: 'running' as const,
-      started_at: '2026-06-11T05:10:00.000Z',
-      completed_at: null,
+    const result = mapRunRow(runRow);
+    expect(result).toEqual({
+      id: 'run-abc',
+      router: 'efficient',
+      kind: 'classifier',
+      purpose: 'platform',
+      status: 'completed',
+      startedAt: '2026-06-10T04:10:00.000Z',
+      completedAt: '2026-06-10T04:25:00.000Z',
       error: null,
-      min_accuracy: 0.7,
-      switch_cost_factor: 3,
-      best_accuracy_switch_threshold: 0.05,
-      max_concurrency: 4,
-      benchmark_user_id: null,
-      benchmark_org_id: null,
-      repetitions: 1,
-      classifier_max_p95_latency_ms: null,
-      engine_identity: 'v1:deadbeef',
-      purpose: 'platform' as const,
-    };
-    const result = mapRunRow(runRow, []);
-    expect(result.summaries).toEqual([]);
-    expect(result.completedAt).toBeNull();
+    });
   });
 });
 
@@ -453,6 +423,7 @@ describe('rowsToRoutingTable', () => {
       production_token_profile: null,
       switch_horizon_turns: null,
       low_confidence_threshold: null,
+      desired_pairs: null,
       effort_by_complexity: null,
       source: 'benchmark',
     };
@@ -493,6 +464,7 @@ describe('rowsToRoutingTable', () => {
       production_token_profile: null,
       switch_horizon_turns: null,
       low_confidence_threshold: null,
+      desired_pairs: null,
       effort_by_complexity: null,
       source: 'benchmark',
     };
@@ -519,5 +491,31 @@ describe('rowsToRoutingTable', () => {
     expect(cand?.variant).toBe('max');
     expect(cand).not.toHaveProperty('reasoningEffort');
     expect(RoutingTableSchema.parse(table)).toEqual(table);
+  });
+});
+
+describe('case adoption SQL prepares (production migrations and real SQLite)', () => {
+  it('runs both adoption statements against the real schema', async () => {
+    const sqlite = new DatabaseSync(':memory:');
+    applyBenchmarkMigrations(sqlite);
+    const db = sqliteD1(sqlite);
+    try {
+      // A prepared-statement syntax error (the derived-table/ON CONFLICT trap) rejects here,
+      // which is exactly how a broken adoption blocked every paid case before inference.
+      await expect(
+        adoptReusableCaseResult(db, {
+          runId: 'run-adopt-probe',
+          router: 'efficient',
+          engineIdentity: 'engine-adopt-probe',
+          model: 'vendor/model',
+          variant: '',
+          rep: 0,
+          caseId: 'case-a',
+          minimumRevision: 1,
+        })
+      ).resolves.toBe('none');
+    } finally {
+      sqlite.close();
+    }
   });
 });

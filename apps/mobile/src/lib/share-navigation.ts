@@ -1,5 +1,6 @@
 import {
   getSharePersistUserId,
+  peekSharePayload,
   putSharePayload,
   SHARE_PAYLOAD_MAX_ENTRIES,
   type ShareId,
@@ -33,7 +34,18 @@ export function shareDeliveryShareId(
 }
 
 /** FIFO of committed share destinations waiting for gate dismiss + delivery. */
-const pendingQueue: PendingShareNavigation[] = [];
+const pendingQueue: QueuedShareNavigation[] = [];
+
+/**
+ * One queued destination and the account that staged it. A null `stagedUserId`
+ * is a destination captured while signed out: it carries no account data and
+ * outlives the account boundary (DEC-01), so a same-process sign-in can still
+ * deliver it.
+ */
+type QueuedShareNavigation = {
+  pending: PendingShareNavigation;
+  stagedUserId: string | null;
+};
 
 /** Persists the current queue (debounced + flushed, no-op while signed out). */
 export async function persistShareNavigationNow(): Promise<void> {
@@ -42,16 +54,21 @@ export async function persistShareNavigationNow(): Promise<void> {
     return;
   }
   const { saveDraft, flushDraft, SHARE_NAV_DRAFT_KEY } = await getDrafts();
+  // Only the destinations staged under this account are persisted: one staged
+  // before an account resolved is memory-only (DEC-01), so it cannot be
+  // restored under an account that did not stage it.
   saveDraft(
     userId,
     SHARE_NAV_DRAFT_KEY,
-    pendingQueue.map(entry => ({ href: entry.href, shareId: entry.shareId }))
+    pendingQueue
+      .filter(entry => entry.stagedUserId === userId)
+      .map(entry => ({ href: entry.pending.href, shareId: entry.pending.shareId }))
   );
   await flushDraft(userId, SHARE_NAV_DRAFT_KEY);
 }
 
 export function setPendingShareNavigation(next: PendingShareNavigation): void {
-  pendingQueue.push(next);
+  pendingQueue.push({ pending: next, stagedUserId: getSharePersistUserId() });
   // Store evicts oldest beyond the same cap; keep navigation queue in lockstep.
   while (pendingQueue.length > SHARE_PAYLOAD_MAX_ENTRIES) {
     pendingQueue.shift();
@@ -61,7 +78,7 @@ export function setPendingShareNavigation(next: PendingShareNavigation): void {
 
 /** Read-and-remove the oldest pending navigation, or null when empty. */
 export function takePendingShareNavigation(): PendingShareNavigation | null {
-  const next = pendingQueue.shift() ?? null;
+  const next = pendingQueue.shift()?.pending ?? null;
   void persistShareNavigationNow();
   return next;
 }
@@ -69,25 +86,89 @@ export function takePendingShareNavigation(): PendingShareNavigation | null {
 /**
  * Restores the pending navigation queue from the durable draft for `userId`.
  * Call only after payloads have been restored, so a restored delivery can
- * point at a payload that is already in the in-memory map. Fills only an empty
- * queue: a navigation committed in this process wins over a stale or empty
- * draft. No-op while signed out, or when no draft exists.
+ * point at a payload that is already in the in-memory map. Merges the draft in:
+ * a destination this process staged for `userId` wins over the draft, and a
+ * destination staged before an account resolved (null stamp) keeps its
+ * memory-only place while the account's own draft resumes beside it, so the
+ * next snapshot can never erase the account's retained draft. No-op while
+ * signed out, or when no draft exists.
+ *
+ * `pendingShareId` is the durable pending-share hint the cold-start restore
+ * reads to re-open the gate, and it is the only thing that restore reads after
+ * these restores. The hinted destination is therefore pushed first: when it is
+ * deliverable at all, the selection keeps it, and only the room that is left
+ * goes to the newest other destinations. Without that rule a newer destination
+ * (a composer handoff committed after the share) fills the last slot the hint
+ * needs, and the account's destination is lost with no gate to show it again.
  */
-export async function restoreShareNavigation(userId: string): Promise<void> {
+export async function restoreShareNavigation(
+  userId: string,
+  pendingShareId: ShareId | null = null
+): Promise<void> {
   if (!userId) {
     return;
   }
   const { loadDraft, SHARE_NAV_DRAFT_KEY, isShareNavigationDraft } = await getDrafts();
   const draft = await loadDraft(userId, SHARE_NAV_DRAFT_KEY, isShareNavigationDraft);
-  if (pendingQueue.length > 0) {
+  // The identity can change while the draft read is in flight, and a restore
+  // belongs to the account it started for. When the persist scope moved, this
+  // read returns without filling the queue.
+  if (getSharePersistUserId() !== userId) {
+    return;
+  }
+  if (pendingQueue.some(entry => entry.stagedUserId === userId)) {
     return;
   }
   if (!draft) {
     return;
   }
-  pendingQueue.length = 0;
-  for (const entry of draft) {
-    pendingQueue.push({ href: entry.href, shareId: entry.shareId });
+  // Merge without evicting: a destination this process staged stays
+  // deliverable. The hinted destination is pushed first so a deliverable hint
+  // always keeps its slot when any room exists; the newest other retained
+  // destinations then fill the room that is left, matching the store's
+  // drop-the-oldest policy. A payload-bearing destination is queued only when
+  // its payload is staged, so delivery never receives an id the store cannot
+  // resolve; a destination with no payload (a Review PR route) has nothing to
+  // resolve and always queues.
+  const free = SHARE_PAYLOAD_MAX_ENTRIES - pendingQueue.length;
+  const deliverable = draft.filter(
+    entry => entry.shareId === null || peekSharePayload(entry.shareId) !== null
+  );
+  // `slice(-0)` is `slice(0)`, so no room must select nothing explicitly.
+  const room = Math.max(free, 0);
+  const hinted =
+    room > 0 && pendingShareId !== null
+      ? deliverable.find(entry => entry.shareId === pendingShareId)
+      : undefined;
+  const others = deliverable.filter(entry => entry !== hinted);
+  const spare = room - (hinted === undefined ? 0 : 1);
+  const selected = [
+    ...(hinted === undefined ? [] : [hinted]),
+    ...(spare > 0 ? others.slice(-spare) : []),
+  ];
+  for (const entry of selected) {
+    pendingQueue.push({
+      pending: { href: entry.href, shareId: entry.shareId },
+      stagedUserId: userId,
+    });
+  }
+}
+
+/**
+ * Drop every destination staged under a signed-in account, including a
+ * destination with no payload (a Review PR route). The account boundary calls
+ * this on sign-out and on a direct account switch, so a queued destination
+ * belongs to exactly one account session and leaves with it.
+ *
+ * A destination staged while no account is resolved keeps its place (DEC-01
+ * account scope): it is memory-only, and a same-process sign-in still delivers
+ * it.
+ */
+export function clearAccountStagedShareNavigation(): void {
+  for (let index = pendingQueue.length - 1; index >= 0; index -= 1) {
+    if (pendingQueue[index]?.stagedUserId !== null) {
+      pendingQueue.splice(index, 1);
+    }
   }
 }
 

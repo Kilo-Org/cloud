@@ -7,7 +7,7 @@ jest.mock('./apply-provider-specific-logic', () => ({
 jest.mock('./gateway-models-cache', () => ({
   ...jest.requireActual('./gateway-models-cache'),
   getOpenRouterModelsMetadataFromDatabase: jest.fn(),
-  getOpenRouterModelsFromDatabase: jest.fn(),
+  getOpenRouterChatModelIdsFromDatabase: jest.fn(),
   isValidOpenRouterModelId: jest.fn(),
 }));
 jest.mock('./openrouter', () => ({
@@ -25,7 +25,7 @@ jest.mock('./preferred-provider-order-config', () => ({
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import { randomUUID } from 'crypto';
 import type { GatewayModelWithEndpoints } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-model-metadata';
-import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type { OpenRouterCatalogModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/catalog-schemas';
 import type { BYOKResult } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { OPENAI_CHATGPT_NOT_ELIGIBLE_MESSAGE } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/eligibility';
@@ -40,7 +40,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
 import { applyProviderSpecificLogic } from './apply-provider-specific-logic';
 import {
-  getOpenRouterModelsFromDatabase,
+  getOpenRouterChatModelIdsFromDatabase,
   getOpenRouterModelsMetadataFromDatabase,
   isValidOpenRouterModelId,
 } from './gateway-models-cache';
@@ -68,7 +68,7 @@ describe('bounded spending provider enforcement', () => {
       { tag: 'expensive-route', pricing: { prompt: '0.000002', completion: '0.000004' } },
     ],
   };
-  const catalogEntry: OpenRouterModel = {
+  const catalogEntry: OpenRouterCatalogModel = {
     id: model.id,
     name: model.name,
     created: 0,
@@ -85,7 +85,7 @@ describe('bounded spending provider enforcement', () => {
     jest.mocked(isValidOpenRouterModelId).mockResolvedValue(true);
     jest.mocked(isValidVercelModelId).mockResolvedValue(true);
     jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({ [model.id]: model });
-    jest.mocked(getOpenRouterModelsFromDatabase).mockResolvedValue(new Set([model.id]));
+    jest.mocked(getOpenRouterChatModelIdsFromDatabase).mockResolvedValue(new Set([model.id]));
     jest.mocked(getRawOpenRouterModels).mockResolvedValue({ data: [catalogEntry] });
     jest.mocked(getPreferredProviderOrderConfig).mockResolvedValue({
       rules: [{ includes: ['test/'], providers: ['preferred-route'] }],
@@ -131,7 +131,7 @@ describe('bounded spending provider enforcement', () => {
   it('serves a connected customer without applying a Kilo debit limit to the external bill', async () => {
     jest
       .mocked(applyProviderSpecificLogic)
-      .mockImplementationOnce(async (_provider, _model, request) => {
+      .mockImplementationOnce(async ({ requestToMutate: request }) => {
         Object.assign(request.body, {
           billing_policy: { type: 'billing_policy', bill_to: 'user_profile' },
         });
@@ -253,7 +253,7 @@ describe('upstream model catalog validation', () => {
           };
     jest
       .mocked(applyProviderSpecificLogic)
-      .mockImplementation(async (_provider, _model, request) => {
+      .mockImplementation(async ({ requestToMutate: request }) => {
         request.body.model = wireModel;
       });
     return sendUpstreamAttempt({
@@ -405,21 +405,26 @@ describe('upstream model catalog validation', () => {
     expect(result.type).toBe(type);
   });
 
-  it.each(['direct-byok', 'mistral', 'inception', 'custom', 'custom-public', 'dev-tools'] as const)(
-    'does not validate %s models against a gateway catalog',
-    async providerId => {
-      const result = await attempt({
-        providerId,
-        requestedModel: 'not-in-catalog',
-        wireModel: 'provider-specific-model',
-      });
+  it.each([
+    'direct-byok',
+    'mistral',
+    'inception',
+    'custom',
+    'custom-public',
+    'partner',
+    'dev-tools',
+  ] as const)('does not validate %s models against a gateway catalog', async providerId => {
+    const result = await attempt({
+      providerId,
+      requestedModel: 'not-in-catalog',
+      wireModel: 'provider-specific-model',
+    });
 
-      expect(result.type).toBe('success');
-      expect(isValidOpenRouterModelId).not.toHaveBeenCalled();
-      expect(isValidVercelModelId).not.toHaveBeenCalled();
-      expect(upstreamRequest).toHaveBeenCalledTimes(1);
-    }
-  );
+    expect(result.type).toBe('success');
+    expect(isValidOpenRouterModelId).not.toHaveBeenCalled();
+    expect(isValidVercelModelId).not.toHaveBeenCalled();
+    expect(upstreamRequest).toHaveBeenCalledTimes(1);
+  });
 });
 describe('sendUpstreamAttempt with a ChatGPT connection (real database)', () => {
   let owner: OpenAiChatGptOwner;
@@ -444,11 +449,9 @@ describe('sendUpstreamAttempt with a ChatGPT connection (real database)', () => 
       user.id
     );
     // The real transform puts the delegated token in this header.
-    jest
-      .mocked(applyProviderSpecificLogic)
-      .mockImplementation(async (_provider, _model, _request, extraHeaders) => {
-        extraHeaders[OPENAI_ON_BEHALF_OF_TOKEN_HEADER] = ACCESS_TOKEN;
-      });
+    jest.mocked(applyProviderSpecificLogic).mockImplementation(async ({ extraHeaders }) => {
+      extraHeaders[OPENAI_ON_BEHALF_OF_TOKEN_HEADER] = ACCESS_TOKEN;
+    });
   });
 
   async function send(response: Response) {
@@ -542,14 +545,95 @@ describe('sendUpstreamAttempt with a ChatGPT connection (real database)', () => 
     await expect(readOpenAiChatGptUsageLimit(owner)).resolves.toBeNull();
 
     // The credential the row holds now still records its own limit.
-    jest
-      .mocked(applyProviderSpecificLogic)
-      .mockImplementation(async (_provider, _model, _request, extraHeaders) => {
-        extraHeaders[OPENAI_ON_BEHALF_OF_TOKEN_HEADER] = RECONNECTED_TOKEN;
-      });
+    jest.mocked(applyProviderSpecificLogic).mockImplementation(async ({ extraHeaders }) => {
+      extraHeaders[OPENAI_ON_BEHALF_OF_TOKEN_HEADER] = RECONNECTED_TOKEN;
+    });
     await send(usageLimitResponse());
     await expect(readOpenAiChatGptUsageLimit(owner)).resolves.toMatchObject({
       code: 'subscription_sharing_usage_limit_exceeded',
     });
+  });
+});
+
+describe('Anthropic user profile header', () => {
+  beforeEach(() => {
+    jest.mocked(applyProviderSpecificLogic).mockResolvedValue(undefined);
+    jest.mocked(upstreamRequest).mockClear();
+    jest.mocked(isValidOpenRouterModelId).mockResolvedValue(true);
+    jest.mocked(isValidVercelModelId).mockResolvedValue(true);
+  });
+
+  async function sentHeaders(params: {
+    providerId: string;
+    userByok?: BYOKResult[] | null;
+    model?: string;
+    anthropicUserProfileId?: string | null;
+  }) {
+    jest.mocked(upstreamRequest).mockResolvedValue({
+      type: 'success',
+      response: jsonResponse(200, { ok: true }),
+    } as never);
+    const model = params.model ?? 'anthropic/claude-sonnet-4.5';
+    await sendUpstreamAttempt({
+      dataRegion: null,
+      upstreamDurationBudgetMs,
+      providerContext: {
+        provider: { type: params.providerId },
+        userByok: params.userByok ?? null,
+      } as never,
+      requestedModel: model,
+      request: {
+        kind: 'chat_completions',
+        body: { model, messages: [{ role: 'user', content: 'Hi' }], stream: false },
+      } as never,
+      fraudHeaders: {} as never,
+      userId: 'test-user',
+      organizationId: null,
+      sessionId: null,
+      taskId: null,
+      isNonTrialEnterprise: false,
+      search: '',
+      method: 'POST',
+      anthropicUserProfileId:
+        params.anthropicUserProfileId === undefined ? 'uprof_kilo' : params.anthropicUserProfileId,
+    });
+    const [call] = jest.mocked(upstreamRequest).mock.calls;
+    return call?.[0].extraHeaders ?? {};
+  }
+
+  it('sends the profile on Kilo-paid Claude requests, whatever the provider', async () => {
+    for (const providerId of ['openrouter', 'vercel', 'custom']) {
+      jest.mocked(upstreamRequest).mockClear();
+      expect((await sentHeaders({ providerId }))['anthropic-user-profile-id']).toBe('uprof_kilo');
+    }
+  });
+
+  it('omits the profile on BYOK, Claude billing and ChatGPT routes', async () => {
+    const byok: BYOKResult[] = [{ decryptedAPIKey: 'key', providerId: 'anthropic' }];
+    expect(
+      (await sentHeaders({ providerId: 'vercel', userByok: byok }))['anthropic-user-profile-id']
+    ).toBeUndefined();
+    jest.mocked(upstreamRequest).mockClear();
+    expect(
+      (await sentHeaders({ providerId: 'claude-billing' }))['anthropic-user-profile-id']
+    ).toBeUndefined();
+    jest.mocked(upstreamRequest).mockClear();
+    expect(
+      (await sentHeaders({ providerId: 'openai-chatgpt' }))['anthropic-user-profile-id']
+    ).toBeUndefined();
+  });
+
+  it('omits the profile for other models and when there is none', async () => {
+    expect(
+      (await sentHeaders({ providerId: 'openrouter', model: 'openai/gpt-5' }))[
+        'anthropic-user-profile-id'
+      ]
+    ).toBeUndefined();
+    jest.mocked(upstreamRequest).mockClear();
+    expect(
+      (await sentHeaders({ providerId: 'openrouter', anthropicUserProfileId: null }))[
+        'anthropic-user-profile-id'
+      ]
+    ).toBeUndefined();
   });
 });

@@ -1,5 +1,10 @@
 import { z } from 'zod';
 
+import {
+  ACCOUNT_BLOCKED_REFUSAL_REASONS,
+  accountBlockedRefusalReason,
+  type AccountBlockedRefusalReason,
+} from '@kilocode/app-shared/auth';
 import { CONTROL_PLANE_TIMEOUT_MESSAGE } from '@kilocode/app-shared/control-plane';
 import { isUsageSourceNotConfigured } from '@kilocode/app-shared/usage-source';
 
@@ -14,6 +19,7 @@ const DirectErrorSchema = z.looseObject({
     code: z.string().optional(),
     message: z.string().optional(),
     upstreamCode: z.string().optional(),
+    zodError: z.unknown().optional(),
   }),
 });
 const ShapedErrorSchema = z.looseObject({
@@ -22,6 +28,7 @@ const ShapedErrorSchema = z.looseObject({
       code: z.string().optional(),
       message: z.string().optional(),
       upstreamCode: z.string().optional(),
+      zodError: z.unknown().optional(),
     }),
   }),
 });
@@ -73,15 +80,106 @@ export function readTrpcErrorField(
   return undefined;
 }
 
+/**
+ * The tRPC codes whose envelope carries a sentence the application wrote for a
+ * person. Everything else the wire can name is a framework or transport code —
+ * `PARSE_ERROR`, `METHOD_NOT_SUPPORTED`, `NOT_IMPLEMENTED`,
+ * `CLIENT_CLOSED_REQUEST`, `PAYLOAD_TOO_LARGE`, `TIMEOUT`,
+ * `UNPROCESSABLE_CONTENT`, `INTERNAL_SERVER_ERROR`, and any code added upstream
+ * — whose text nobody authored for a person. The check is an allowlist so a new
+ * framework code reaches the screen as the caller's neutral line, not as
+ * engineering text.
+ */
+const AUTHORED_REFUSAL_CODES = [
+  'BAD_REQUEST',
+  'CONFLICT',
+  'PRECONDITION_FAILED',
+  'FORBIDDEN',
+  'NOT_FOUND',
+  'TOO_MANY_REQUESTS',
+] as const;
+
+type AuthoredRefusalCode = (typeof AUTHORED_REFUSAL_CODES)[number];
+
+/**
+ * Whether this envelope carries a refusal the application wrote, so its
+ * sentence may be shown to a person.
+ *
+ * - An authored refusal, such as a duplicate name (`CONFLICT`), carries a
+ *   sentence written for the person, so the caller shows it.
+ * - `INTERNAL_SERVER_ERROR`, and every other code outside the allowlist,
+ *   carries diagnostic text, so the caller states its own neutral line.
+ * - `UNAUTHORIZED` is outside the allowlist. The one context-level auth
+ *   failure is already handled by the sign-out path, and every
+ *   procedure-level one carries an org-access diagnostic, so the caller
+ *   states its own line for both.
+ * - A non-null `zodError` names an input contract failure, which has no
+ *   reading for the person, so the caller states the neutral line too.
+ *
+ * An envelope without a code is not a server answer, so it yields no sentence.
+ */
+function isAuthoredRefusal(code: string | undefined, zodError: unknown): boolean {
+  if (code === undefined || !AUTHORED_REFUSAL_CODES.includes(code as AuthoredRefusalCode)) {
+    return false;
+  }
+  if (zodError !== undefined && zodError !== null) {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * The sentence a tRPC SERVER answered with, or undefined when this error is not
+ * a refusal the application wrote for a person.
+ *
+ * The envelope's code decides, not the presence of text: the server's formatted
+ * `data` carries the code, status, path and zod error, so the sentence lives on
+ * `Error.message` (`shape.data.message` when shaped). A 5xx or a validation
+ * payload yields no sentence, and the caller states its neutral line.
+ *
+ * A transport wrapper is named `TRPCClientError` too and carries no `data`, so
+ * it yields no sentence either.
+ */
+export function readTrpcServerMessage(error: unknown): string | undefined {
+  const direct = DirectErrorSchema.safeParse(error);
+  if (direct.success) {
+    const { code, zodError } = direct.data.data;
+    if (!isAuthoredRefusal(code, zodError)) {
+      return undefined;
+    }
+    return error instanceof Error ? error.message : undefined;
+  }
+  const shaped = ShapedErrorSchema.safeParse(error);
+  if (shaped.success) {
+    const { code, message, zodError } = shaped.data.shape.data;
+    return isAuthoredRefusal(code, zodError) ? message : undefined;
+  }
+  return undefined;
+}
+
 const TERMINAL_TRPC_CODES = [
   'BAD_REQUEST',
+  'CONFLICT',
   'FORBIDDEN',
   'UNAUTHORIZED',
   'NOT_FOUND',
   'UNPROCESSABLE_CONTENT',
 ] as const;
 
-/** True only for tRPC codes the user cannot recover from by retrying. */
+/**
+ * True only for tRPC codes the user cannot recover from by retrying.
+ *
+ * Each terminal code names a state the same request cannot change: a payload
+ * the input contract refuses, a record that is gone, a role or account session
+ * the caller has lost, an input the server will not accept, or a conflict with
+ * a state that already exists, such as a duplicate name. The action that
+ * produced the failure stays on screen, so the surface keeps its explanation
+ * and offers no Retry, and the copy beside the form is what the person acts on.
+ *
+ * `PRECONDITION_FAILED` stays retryable: the person can satisfy the
+ * precondition, then send the same request again. `TOO_MANY_REQUESTS` stays
+ * retryable too, because waiting resolves it.
+ */
 export function isTerminalTrpcCode(code: string | undefined): boolean {
   return TERMINAL_TRPC_CODES.includes(code as (typeof TERMINAL_TRPC_CODES)[number]);
 }
@@ -168,11 +266,21 @@ export function trpcErrorVariant(error: unknown): TrpcErrorVariant {
 type TrpcErrorData = {
   code?: string;
   authRequired?: boolean;
+  accountBlocked?: boolean;
+  accountBlockedReason?: AccountBlockedRefusalReason;
 };
 
 const TrpcErrorDataSchema = z.looseObject({
   code: z.string().optional(),
   authRequired: z.boolean().optional(),
+  accountBlocked: z.boolean().optional(),
+  // The shared reader drops a value this build does not know, so one unknown
+  // field cannot fail the whole parse and hide a refusal's other fields from
+  // `isAccountBlockedTrpcError` / `isPermissionDeniedError`.
+  accountBlockedReason: z.preprocess(
+    (value: unknown) => accountBlockedRefusalReason(value) ?? undefined,
+    z.enum(ACCOUNT_BLOCKED_REFUSAL_REASONS).optional()
+  ),
 });
 const TrpcErrorEnvelopeSchema = z.looseObject({
   data: z.unknown().optional(),
@@ -205,4 +313,39 @@ export function isPermissionDeniedError(error: unknown): boolean {
     return true;
   }
   return data?.code === 'UNAUTHORIZED' && data.authRequired !== true;
+}
+
+/**
+ * True when the server refused the call because this account is blocked. A
+ * blocked account's context-level refusal is a `FORBIDDEN` that is not a
+ * permission loss: it stays a refusal while the person is signed in, so the
+ * surface that explains it must be told apart from both an ordinary permission
+ * denial and the unauthorized handler's sign-out (which keeps
+ * `authRequired`). The formatter publishes `accountBlocked: true` and keeps
+ * `authRequired` unset; the wire carries no `cause`, so this flag is the one
+ * client-readable signal.
+ */
+export function isAccountBlockedTrpcError(error: unknown): boolean {
+  return readTrpcErrorData(error)?.accountBlocked === true;
+}
+
+/**
+ * Which of the two blocked-account refusals the server answered with, or null
+ * when this error is not one of them (or carries no recognisable reason).
+ *
+ * The two reasons need different actions, which is why presence alone
+ * (`isAccountBlockedTrpcError`) is not enough:
+ *
+ * - `'account_blocked'` is a property of one account, and support can lift it,
+ *   so re-reading the account over the refused session can succeed.
+ * - `'email_domain_blocked'` is a property of the account's email domain, so no
+ *   retry, sign-out or sign-in changes the answer.
+ *
+ * The value travels as `data.accountBlockedReason` (or
+ * `shape.data.accountBlockedReason`), and is validated through the shared
+ * reader so an unknown string reaching an older client reads as no reason at
+ * all rather than as a refused type.
+ */
+export function readAccountBlockedReason(error: unknown): AccountBlockedRefusalReason | null {
+  return accountBlockedRefusalReason(readTrpcErrorData(error)?.accountBlockedReason);
 }

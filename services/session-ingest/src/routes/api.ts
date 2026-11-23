@@ -832,7 +832,10 @@ api.get('/session/:sessionId/messages', async c => {
     .from(cli_sessions_v2)
     .leftJoin(
       organization_memberships,
-      organizationMembershipJoinCondition(kiloUserId, cli_sessions_v2.organization_id)
+      organizationMembershipJoinCondition({
+        kiloUserId,
+        organizationIdColumn: cli_sessions_v2.organization_id,
+      })
     )
     .leftJoin(organizations, activeOrganizationJoinCondition(cli_sessions_v2.organization_id))
     .leftJoin(parentOrganizationsTable, parentOrganizationJoinCondition())

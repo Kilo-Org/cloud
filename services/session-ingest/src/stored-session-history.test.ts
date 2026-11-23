@@ -59,6 +59,40 @@ function pageFor(sessionId: string) {
   };
 }
 
+/** The same page with an extra `summary` on its user message info. */
+function pageWithUserSummary(sessionId: string, summary: unknown) {
+  const page = pageFor(sessionId);
+  return {
+    ...page,
+    messages: [
+      { ...page.messages[0], info: { ...page.messages[0].info, summary } },
+      ...page.messages.slice(1),
+    ],
+  };
+}
+
+/** The same page with no caller-supplied `omittedItemCount`. */
+function pageWithoutOmittedItemCount(sessionId: string, summary: unknown) {
+  const { messages, nextCursor } = pageWithUserSummary(sessionId, summary);
+  return { messages, nextCursor };
+}
+
+/**
+ * The same page with one extra part on its user message. A persisted part
+ * carries `id` + `messageID` only; a native v2 display part adds its own id
+ * family on top of that.
+ */
+function pageWithUserPart(sessionId: string, part: Record<string, unknown>) {
+  const page = pageFor(sessionId);
+  return {
+    ...page,
+    messages: [
+      { ...page.messages[0], parts: [...page.messages[0].parts, part] },
+      ...page.messages.slice(1),
+    ],
+  };
+}
+
 describe('persisted message history for a stored session id', () => {
   it('parses a page whose messages and parts carry an id minted before the canonical shape', () => {
     // The store keeps sessions created before `ses_` + 26 was the only issued
@@ -80,5 +114,86 @@ describe('persisted message history for a stored session id', () => {
     expect(persistedKiloSdkMessageHistorySchema.safeParse(pageFor('ses_123/456')).success).toBe(
       false
     );
+  });
+
+  it('parses a user summary without a diffs list by filling it with an empty list', () => {
+    // Persistence stores a compaction summary without `diffs`, while the strict
+    // user message schema requires the list whenever `summary` is present: one
+    // such message used to degrade the whole page to `invalid_data`.
+    const summary = { title: 'Compacted history' };
+    const page = pageWithUserSummary('ses_12345678901234567890123456', summary);
+    const parsed = persistedKiloSdkMessageHistorySchema.safeParse(page);
+    expect(parsed.success).toBe(true);
+    expect(parsed.data).toMatchObject({
+      messages: [{ info: { summary: { title: 'Compacted history', diffs: [] } } }, {}],
+    });
+    // The repair copies rather than mutates the stored page.
+    expect(summary).toEqual({ title: 'Compacted history' });
+  });
+
+  it('does not count a repaired summary as an omitted item', () => {
+    const supplied = persistedKiloSdkMessageHistorySchema.safeParse(
+      pageWithUserSummary('ses_12345678901234567890123456', { title: 'Compacted history' })
+    );
+    expect(supplied.success).toBe(true);
+    expect(supplied.data).toMatchObject({ omittedItemCount: 0, messages: [{}, {}] });
+
+    const unsupplied = persistedKiloSdkMessageHistorySchema.safeParse(
+      pageWithoutOmittedItemCount('ses_12345678901234567890123456', {
+        title: 'Compacted history',
+      })
+    );
+    expect(unsupplied.success).toBe(true);
+    // The schema defaults the count to 0, so asserting it catches a repair that
+    // starts counting the message it only touches.
+    expect(unsupplied.data).toMatchObject({ omittedItemCount: 0, messages: [{}, {}] });
+  });
+
+  it('still rejects a page whose user summary is not a record', () => {
+    const parsed = persistedKiloSdkMessageHistorySchema.safeParse(
+      pageWithUserSummary('ses_12345678901234567890123456', 'summary')
+    );
+    expect(parsed.success).toBe(false);
+  });
+
+  it('still rejects a page whose summary diffs hold a malformed entry', () => {
+    const parsed = persistedKiloSdkMessageHistorySchema.safeParse(
+      pageWithUserSummary('ses_12345678901234567890123456', {
+        title: 'Compacted history',
+        diffs: [{ file: 'a.ts' }],
+      })
+    );
+    expect(parsed.success).toBe(false);
+  });
+
+  it('omits a native display part whose body this contract does not know', () => {
+    // The Durable Object serves a native v2 display part (`msg_…_000001`) as a
+    // persisted part; a client that does not understand its `type` must drop
+    // that part and count it, not lose the whole transcript.
+    const parsed = persistedKiloSdkMessageHistorySchema.safeParse(
+      pageWithUserPart('ses_12345678901234567890123456', {
+        id: 'msg_native_000001',
+        messageID: 'msg_native',
+        type: 'future-thing',
+      })
+    );
+    expect(parsed.success).toBe(true);
+    expect(parsed.data).toMatchObject({
+      omittedItemCount: 1,
+      messages: [{ parts: [{ id: 'prt_1' }] }, { parts: [{ id: 'prt_2' }] }],
+    });
+  });
+
+  it('rejects a native display part whose id does not belong to its message', () => {
+    // A native id that names another message is corrupt data, not an omission:
+    // accepting it would let one part masquerade under a different message.
+    const parsed = persistedKiloSdkMessageHistorySchema.safeParse(
+      pageWithUserPart('ses_12345678901234567890123456', {
+        id: 'msg_other_000001',
+        messageID: 'msg_native',
+        type: 'future-thing',
+      })
+    );
+    expect(parsed.success).toBe(false);
   });
 });

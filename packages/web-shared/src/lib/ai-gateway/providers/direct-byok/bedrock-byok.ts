@@ -72,6 +72,11 @@ function isAwsBedrockEndpoint(endpoint: string): endpoint is AwsBedrockEndpoint 
   return AwsBedrockEndpointSchema.safeParse(endpoint).success;
 }
 
+/**
+ * The endpoint that serves the model. A mantle endpoint comes only from explicit
+ * `model.endpoint` metadata; without one, the fallback is runtime-only: Anthropic Messages for
+ * Claude ids, and Chat Completions for every other id.
+ */
 export function getAwsBedrockEndpoint(model: Pick<DirectByokModel, 'id' | 'endpoint'>) {
   if (model.endpoint && isAwsBedrockEndpoint(model.endpoint)) return model.endpoint;
   return isClaudeModel(model.id) ? 'runtime-anthropic' : 'runtime-openai';
@@ -136,8 +141,10 @@ export function resolveAwsBedrockUpstream(
   };
 }
 
+const id = 'bedrock-byok';
+
 export default {
-  id: 'bedrock-byok',
+  id,
   openrouter_inference_provider_id: 'amazon-bedrock',
   models_dev_id: 'amazon-bedrock',
   transformRequest(context) {
@@ -146,7 +153,7 @@ export default {
     }
     dropThinkingBlocksOnPrefixMismatch(context);
   },
-  models: cachedDirectByokModelList('bedrock-byok'),
+  models: cachedDirectByokModelList(id),
   chatCompletionsHeaders: credentialHeaders,
   async resolveUpstream({ credential, model }) {
     return resolveAwsBedrockUpstream(credential, model);

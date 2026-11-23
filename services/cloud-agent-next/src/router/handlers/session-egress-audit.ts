@@ -1,15 +1,17 @@
+import { egressRequestSupported } from '@kilocode/worker-utils/sandbox-provider-capabilities';
 import { TRPCError } from '@trpc/server';
+import { egressAuditStore } from '../../egress/sandbox-egress.js';
 import { withLogTags } from '../../logger.js';
 import type { SessionMetadata } from '../../persistence/session-metadata.js';
 import { getSandboxSessionStub } from '../../sandbox-session/session-stub.js';
 import { requireCurrentSessionAccess } from '../../session-access.js';
 import { withDORetry } from '../../utils/do-retry.js';
-import { protectedProcedure } from '../auth.js';
+import { cloudAgentManagedProcedure } from '../auth.js';
 import { GetEgressAuditInput, GetEgressAuditOutput } from '../schemas.js';
 
 export function createSessionEgressAuditHandlers() {
   return {
-    getEgressAudit: protectedProcedure
+    getEgressAudit: cloudAgentManagedProcedure
       .input(GetEgressAuditInput)
       .output(GetEgressAuditOutput)
       .query(({ input, ctx }) =>
@@ -18,6 +20,9 @@ export function createSessionEgressAuditHandlers() {
             env: ctx.env,
             kiloUserId: ctx.userId,
             cloudAgentSessionId: input.cloudAgentSessionId,
+            ...(input.organizationId === undefined
+              ? {}
+              : { expectedOrganizationId: input.organizationId }),
           });
 
           const metadata = await withDORetry(
@@ -47,7 +52,8 @@ export function createSessionEgressAuditHandlers() {
             });
           }
           if (
-            workspace.sandboxProvider !== 'cloudflare-containers' ||
+            workspace.sandboxProvider === undefined ||
+            !egressRequestSupported(workspace.sandboxProvider, workspace) ||
             workspace.sandboxRoute !== undefined ||
             (workspace.sandboxKind !== undefined
               ? workspace.sandboxKind !== 'isolated'
@@ -60,7 +66,7 @@ export function createSessionEgressAuditHandlers() {
           }
 
           return withDORetry(
-            () => ctx.env.SANDBOX_CONTAINERS.getByName(sandboxId),
+            () => egressAuditStore(ctx.env, { logicalSandboxId: sandboxId }),
             sandbox => sandbox.getEgressAudit({ cursor: input.cursor, limit: input.limit }),
             'getEgressAudit'
           );

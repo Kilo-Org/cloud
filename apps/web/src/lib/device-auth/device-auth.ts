@@ -3,10 +3,15 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { device_auth_requests, device_sessions, kilocode_users } from '@kilocode/db/schema';
 import { eq, and, gt, isNull, isNotNull, not, sql, type SQL } from 'drizzle-orm';
 import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
-import { randomInt, createHash, randomBytes } from 'node:crypto';
-import { createDeviceSession, issueSessionCredentials } from '@/lib/auth/device-sessions';
+import { randomInt, randomBytes } from 'node:crypto';
+import { createDeviceSessionWithCredentials } from '@/lib/auth/device-sessions';
+import { hashOpaqueSecret } from '@/lib/auth/secret-hash';
 import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
-import { requestingClientOfRow, type RequestingClient } from './requesting-client';
+import {
+  requestingClientColumns,
+  requestingClientOfRow,
+  type RequestingClient,
+} from './requesting-client';
 import {
   getLivePendingLinkByHash,
   hashPendingLinkSecret,
@@ -14,24 +19,23 @@ import {
   type PendingLinkResult,
 } from '@/lib/auth/pending-link';
 import type { AuthProviderId } from '@kilocode/db/schema-types';
+import {
+  DEVICE_AUTH_PENDING_LIMIT_MESSAGE,
+  DEVICE_AUTH_REFUSAL_CODES,
+  DeviceAuthRefusalError,
+} from './refusal-codes';
+import { normalizeDeviceAuthUserCode } from './user-code';
 
 export type { RequestingClient } from './requesting-client';
-
-/**
- * Refusal when the approval does not confirm the client the request names. The
- * approval page shows the client, the approver confirms that exact client, and
- * a request that names one is never approved without it.
- */
-export const DEVICE_AUTH_CLIENT_CONFIRMATION_MESSAGE =
-  'Device authorization client confirmation does not match';
-
-/**
- * Refusal when an approval for a request carrying a live pending link does
- * not say whether to attach it. The approval page offers both choices and
- * preselects neither, so an approval without the choice is incomplete.
- */
-export const DEVICE_AUTH_PENDING_LINK_CHOICE_MESSAGE =
-  'Device authorization pending link choice is required';
+export {
+  DEVICE_AUTH_PENDING_LIMIT_MESSAGE,
+  DEVICE_AUTH_REFUSAL_CODES,
+  DeviceAuthRefusalError,
+  deviceAuthRefusalCopy,
+  refusalCopyFor,
+  type DeviceAuthRefusalCode,
+} from './refusal-codes';
+export { normalizeDeviceAuthUserCode } from './user-code';
 
 export type DeviceAuthPendingLink = {
   provider: AuthProviderId;
@@ -80,19 +84,6 @@ const PENDING_LIMIT_LOCK_NAMESPACE = 'device_auth_request_pending';
 export const DEVICE_AUTH_PENDING_LOCK_WAIT_MS = 5_000;
 /** SQLSTATE of a statement cancelled because it waited for a lock too long. */
 const LOCK_NOT_AVAILABLE = '55P03';
-
-/**
- * The stable machine-readable codes the clients match on the device-auth
- * refusals. A code never changes meaning; copy is carried separately.
- */
-export const DEVICE_AUTH_REFUSAL_CODES = {
-  invalidRequestingClient: 'INVALID_REQUESTING_CLIENT',
-  pendingLinkExpired: 'PENDING_LINK_EXPIRED',
-  rateLimited: 'RATE_LIMITED',
-} as const;
-
-export const DEVICE_AUTH_PENDING_LIMIT_MESSAGE =
-  'Too many sign-in attempts from this network. Try again later.';
 
 /** Rate-limit error thrown when an IP has too many live pending requests. */
 export class DeviceAuthPendingLimitError extends Error {
@@ -149,7 +140,7 @@ export function generateDeviceSecret(): string {
  * The secret is already high-entropy, so a plain digest is sufficient.
  */
 export function hashDeviceSecret(secret: string): string {
-  return createHash('sha256').update(secret).digest('hex');
+  return hashOpaqueSecret(secret);
 }
 
 /**
@@ -297,26 +288,17 @@ function isLockWaitTimeout(error: unknown): boolean {
   return false;
 }
 
-function requestingClientColumns(client: RequestingClient | null): {
-  requesting_client_id: string | null;
-  requesting_client_name: string | null;
-  requesting_redirect_origin: string | null;
-} {
-  return {
-    requesting_client_id: client?.clientId ?? null,
-    requesting_client_name: client?.clientName ?? null,
-    requesting_redirect_origin: client?.redirectOrigin ?? null,
-  };
-}
-
 /**
  * Get a device auth request by its displayed user code (approval side).
+ *
+ * The argument is normalized here, so every approval-side lookup accepts a code
+ * as a person typed it.
  */
 export async function getDeviceAuthRequest(userCode: string) {
   const [request] = await db
     .select()
     .from(device_auth_requests)
-    .where(eq(device_auth_requests.user_code, userCode))
+    .where(eq(device_auth_requests.user_code, normalizeDeviceAuthUserCode(userCode)))
     .limit(1);
 
   return request;
@@ -367,7 +349,8 @@ export async function approveDeviceAuthRequest(
   options: { confirmedClientId?: string; addPendingLink?: boolean } = {}
 ): Promise<void> {
   const now = new Date().toISOString();
-  const existing = await getDeviceAuthRequest(userCode);
+  const code = normalizeDeviceAuthUserCode(userCode);
+  const existing = await getDeviceAuthRequest(code);
   const requestingClientId = existing?.requesting_client_id ?? null;
   const actionable = existing?.status === 'pending' && !isDeviceAuthRequestExpired(existing, now);
   // An actionable row that names a client requires its confirmation before any
@@ -385,7 +368,7 @@ export async function approveDeviceAuthRequest(
     const livePending = await getLivePendingLinkByHash(existing.pending_link_secret_hash);
     if (livePending) {
       if (options.addPendingLink === undefined) {
-        throw new Error(DEVICE_AUTH_PENDING_LINK_CHOICE_MESSAGE);
+        throw new DeviceAuthRefusalError(DEVICE_AUTH_REFUSAL_CODES.pendingLinkChoiceRequired);
       }
       clearPendingLink = options.addPendingLink === false;
     }
@@ -402,7 +385,7 @@ export async function approveDeviceAuthRequest(
     })
     .where(
       and(
-        eq(device_auth_requests.user_code, userCode),
+        eq(device_auth_requests.user_code, code),
         eq(device_auth_requests.status, 'pending'),
         requestIsLiveAt(now)
       )
@@ -413,14 +396,14 @@ export async function approveDeviceAuthRequest(
     return;
   }
 
-  const request = await getDeviceAuthRequest(userCode);
+  const request = await getDeviceAuthRequest(code);
 
   if (!request) {
-    throw new Error('Device authorization request not found');
+    throw new DeviceAuthRefusalError(DEVICE_AUTH_REFUSAL_CODES.requestNotFound);
   }
 
   if (request.status !== 'pending') {
-    throw new Error('Device authorization request is not pending');
+    throw new DeviceAuthRefusalError(DEVICE_AUTH_REFUSAL_CODES.requestNotPending);
   }
 
   const [expired] = await db
@@ -428,7 +411,7 @@ export async function approveDeviceAuthRequest(
     .set({ status: 'expired' })
     .where(
       and(
-        eq(device_auth_requests.user_code, userCode),
+        eq(device_auth_requests.user_code, code),
         eq(device_auth_requests.status, 'pending'),
         not(requestIsLiveAt(now))
       )
@@ -436,14 +419,14 @@ export async function approveDeviceAuthRequest(
     .returning({ id: device_auth_requests.id });
 
   if (!expired) {
-    throw new Error('Device authorization request is not pending');
+    throw new DeviceAuthRefusalError(DEVICE_AUTH_REFUSAL_CODES.requestNotPending);
   }
-  throw new Error('Device authorization request has expired');
+  throw new DeviceAuthRefusalError(DEVICE_AUTH_REFUSAL_CODES.requestExpired);
 }
 
 function confirmRequestingClient(requestingClientId: string, confirmedClientId?: string): true {
   if (confirmedClientId !== requestingClientId) {
-    throw new Error(DEVICE_AUTH_CLIENT_CONFIRMATION_MESSAGE);
+    throw new DeviceAuthRefusalError(DEVICE_AUTH_REFUSAL_CODES.clientConfirmationMismatch);
   }
   return true;
 }
@@ -452,26 +435,27 @@ function confirmRequestingClient(requestingClientId: string, confirmedClientId?:
  * Deny a device authorization request by its displayed user code.
  */
 export async function denyDeviceAuthRequest(userCode: string): Promise<void> {
-  const request = await getDeviceAuthRequest(userCode);
+  const code = normalizeDeviceAuthUserCode(userCode);
+  const request = await getDeviceAuthRequest(code);
 
   if (!request) {
-    throw new Error('Device authorization request not found');
+    throw new DeviceAuthRefusalError(DEVICE_AUTH_REFUSAL_CODES.requestNotFound);
   }
 
   if (request.status !== 'pending') {
-    throw new Error('Device authorization request is not pending');
+    throw new DeviceAuthRefusalError(DEVICE_AUTH_REFUSAL_CODES.requestNotPending);
   }
 
   const [denied] = await db
     .update(device_auth_requests)
     .set({ status: 'denied' })
     .where(
-      and(eq(device_auth_requests.user_code, userCode), eq(device_auth_requests.status, 'pending'))
+      and(eq(device_auth_requests.user_code, code), eq(device_auth_requests.status, 'pending'))
     )
     .returning({ id: device_auth_requests.id });
 
   if (!denied) {
-    throw new Error('Device authorization request is not pending');
+    throw new DeviceAuthRefusalError(DEVICE_AUTH_REFUSAL_CODES.requestNotPending);
   }
 }
 
@@ -498,7 +482,7 @@ export async function cancelDeviceAuthRequest(code: string): Promise<void> {
     .limit(1);
 
   if (!request) {
-    throw new Error('Device authorization request not found');
+    throw new DeviceAuthRefusalError(DEVICE_AUTH_REFUSAL_CODES.requestNotFound);
   }
 
   // A request the approver denied, or that already expired, is cancelled.
@@ -506,7 +490,7 @@ export async function cancelDeviceAuthRequest(code: string): Promise<void> {
     return;
   }
 
-  throw new Error('Device authorization request is not pending');
+  throw new DeviceAuthRefusalError(DEVICE_AUTH_REFUSAL_CODES.requestNotPending);
 }
 
 /**
@@ -675,16 +659,17 @@ export async function consumeDeviceAuthByDeviceCode(
           userEmail: user.google_user_email,
         };
       }
-      sessionId = await createDeviceSession({
+      const credentials = await createDeviceSessionWithCredentials({
         userId: user.id,
         userAgent: request.user_agent ?? undefined,
+        user: user,
         deviceAuthRequestId: request.id,
       });
-      const pair = await issueSessionCredentials(user, sessionId);
+      sessionId = credentials.sessionId;
       return {
-        token: pair.token,
-        refreshToken: pair.refreshToken,
-        expiresIn: pair.expiresIn,
+        token: credentials.token,
+        refreshToken: credentials.refreshToken,
+        expiresIn: credentials.expiresIn,
         userId: user.id,
         userEmail: user.google_user_email,
       };

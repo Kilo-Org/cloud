@@ -6,11 +6,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import { toast } from 'sonner-native';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import {
-  getShareRemoteFileReason,
-  shareLocalFile,
-  ShareRemoteFileError,
-} from '@/lib/share-remote-file';
+import { getShareFailureKind, shareLocalFile } from '@/lib/share-remote-file';
 
 import { ToolCardFileAttachments } from './tool-card-file-attachments';
 import { __resetToolCardImageCacheForTests, cacheToolAttachment } from './tool-card-image-cache';
@@ -19,7 +15,10 @@ type FileInstance = {
   exists: boolean;
   uri: string;
   write: (content: string) => Promise<void>;
+  move: (destination: unknown, options?: { overwrite?: boolean }) => Promise<void>;
+  delete?: () => void;
   filename: string;
+  directory?: { name?: string };
 };
 
 const fileInstances: FileInstance[] = [];
@@ -32,11 +31,16 @@ const expoFileSystemMock = vi.hoisted(() => {
       create: directoryCreate,
     };
   });
-  const File = vi.fn(function FileMock(directory: { name?: string }, filename: string) {
-    const instance = {
+  const File = vi.fn(function FileMock(
+    directory: { name?: string },
+    filename: string
+  ): FileInstance {
+    const instance: FileInstance = {
       exists: false,
       uri: `file:///cache/tool-card-images/${filename}`,
       write: vi.fn(() => Promise.resolve()),
+      move: vi.fn(() => Promise.resolve()),
+      delete: vi.fn(() => undefined),
       filename,
       directory,
     };
@@ -48,6 +52,26 @@ const expoFileSystemMock = vi.hoisted(() => {
     File,
     Paths: { cache: 'file:///cache' },
     directoryCreate,
+    /** Queue the final-name + `<final>.tmp-<n>` pair a write attempt builds;
+     *  the awaited write runs on the temp instance. */
+    mockPendingWrite(write: () => Promise<void>): void {
+      const factory = File.getMockImplementation();
+      File.mockImplementationOnce(function FilePending(
+        directory: { name?: string },
+        filename: string
+      ) {
+        const existing = factory?.(directory, filename) as FileInstance;
+        File.mockImplementationOnce(function FileTemp(dir: { name?: string }, name: string) {
+          const instance: FileInstance = {
+            ...(factory?.(dir, name) as FileInstance),
+            write: vi.fn(() => write()),
+          };
+          fileInstances.push(instance);
+          return instance;
+        });
+        return existing;
+      });
+    },
   };
 });
 
@@ -61,8 +85,7 @@ vi.mock('@/lib/share-remote-file', () => ({
   shareLocalFile: vi.fn(async () => {
     await Promise.resolve();
   }),
-  getShareRemoteFileReason: vi.fn(() => null),
-  ShareRemoteFileError: class ShareRemoteFileErrorMock extends Error {},
+  getShareFailureKind: vi.fn(() => 'general'),
   getSafeCacheFilename: ({ id, filename }: { id: string; filename: string }) =>
     `${id}-${filename.replaceAll(/[^a-zA-Z0-9._-]/g, '_')}`,
 }));
@@ -243,20 +266,7 @@ describe('ToolCardFileAttachments mounted', () => {
 
   it('reserves the share slot and reports busy while the cache write is pending', async () => {
     const write = Promise.withResolvers<undefined>();
-    expoFileSystemMock.File.mockImplementationOnce(function FilePending(
-      directory: { name?: string },
-      filename: string
-    ) {
-      const instance = {
-        exists: false,
-        uri: `file:///cache/tool-card-images/${filename}`,
-        write: vi.fn(() => write.promise),
-        filename,
-        directory,
-      };
-      fileInstances.push(instance);
-      return instance;
-    });
+    expoFileSystemMock.mockPendingWrite(() => write.promise);
     seedFileCache();
     const renderer = await mount(makeToolPart('send_file', [reportPdf]));
     const root = renderer.root;
@@ -305,9 +315,17 @@ describe('ToolCardFileAttachments mounted', () => {
     const root = renderer.root;
 
     expect(shareButtons(root)).toHaveLength(0);
+    // The row keeps its file identity: the filename is the title line and the
+    // unavailable copy stands in for the mime subtitle, at the row's normal
+    // icon size, so a missing cache entry does not look like a broken card.
+    expect(texts(root).filter(text => text === 'report.pdf')).toHaveLength(1);
     expect(texts(root).filter(text => text === 'File unavailable in this session.')).toHaveLength(
       1
     );
+    expect(texts(root)).not.toContain('application/pdf');
+    const [icon] = root.findAll(node => (node.type as string) === 'FileIcon');
+    expect(icon?.props.size).toBe(16);
+    expect(root.findAll(node => (node.type as string) === 'Share2')).toHaveLength(0);
 
     await unmount(renderer);
   });
@@ -346,7 +364,8 @@ describe('ToolCardFileAttachments mounted', () => {
     const renderer = await mount(makeToolPart('send_file', [reportPdf]));
     const root = renderer.root;
 
-    vi.mocked(shareLocalFile).mockRejectedValueOnce(new ShareRemoteFileError('download-failed'));
+    vi.mocked(shareLocalFile).mockRejectedValueOnce(new Error('network down'));
+    vi.mocked(getShareFailureKind).mockReturnValueOnce('retry');
 
     await pressShare(root);
 
@@ -364,11 +383,29 @@ describe('ToolCardFileAttachments mounted', () => {
     const root = renderer.root;
 
     vi.mocked(shareLocalFile).mockRejectedValueOnce(new Error('boom'));
-    vi.mocked(getShareRemoteFileReason).mockReturnValueOnce('sharing-unavailable');
+    vi.mocked(getShareFailureKind).mockReturnValueOnce('sharing-unavailable');
 
     await pressShare(root);
 
     expect(toast.error).toHaveBeenCalledWith('File sharing is not available on this device.');
+
+    await unmount(renderer);
+  });
+
+  it('toasts that the file is gone when the server says the document is unavailable', async () => {
+    await act(async () => {
+      await Promise.resolve();
+      seedFileCache();
+    });
+    const renderer = await mount(makeToolPart('send_file', [reportPdf]));
+    const root = renderer.root;
+
+    vi.mocked(shareLocalFile).mockRejectedValueOnce(new Error('boom'));
+    vi.mocked(getShareFailureKind).mockReturnValueOnce('file-unavailable');
+
+    await pressShare(root);
+
+    expect(toast.error).toHaveBeenCalledWith('This file is no longer available to download');
 
     await unmount(renderer);
   });

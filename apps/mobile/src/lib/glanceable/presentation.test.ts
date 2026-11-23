@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildGlanceableSnapshot,
   type GlanceableAgentsSnapshot,
+  type GlanceableSnapshotStatusOverride,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
 import {
@@ -19,24 +20,27 @@ const NOW = 1_750_000_000_000;
 
 function snapshot(overrides: {
   sessions?: { status: string; scheduledAt?: string }[];
-  status?: GlanceableAgentsSnapshot['status'];
+  status?: GlanceableSnapshotStatusOverride;
 }): GlanceableAgentsSnapshot {
   return buildGlanceableSnapshot({
     sessions: overrides.sessions ?? [],
     userId: 'u1',
     organizationId: null,
     now: NOW,
-    status: overrides.status,
+    ...(overrides.status === undefined ? {} : { status: overrides.status }),
   });
 }
 
 describe('presentation precedence', () => {
   it('signed-out flag wins over org-invalid and the snapshot status', () => {
-    expect(resolveGlanceableStatus(snapshot({ status: 'happy' }), { signedOut: true })).toBe(
-      'signed_out'
-    );
     expect(
-      resolveGlanceableStatus(snapshot({ status: 'happy' }), { signedOut: true, orgInvalid: true })
+      resolveGlanceableStatus(snapshot({ sessions: [{ status: 'busy' }] }), { signedOut: true })
+    ).toBe('signed_out');
+    expect(
+      resolveGlanceableStatus(snapshot({ sessions: [{ status: 'busy' }] }), {
+        signedOut: true,
+        orgInvalid: true,
+      })
     ).toBe('signed_out');
   });
 
@@ -48,7 +52,7 @@ describe('presentation precedence', () => {
 
   it('falls back to the snapshot status when no flag is set', () => {
     expect(resolveGlanceableStatus(snapshot({ status: 'waiting' }))).toBe('waiting');
-    expect(resolveGlanceableStatus(snapshot({ status: 'happy' }))).toBe('happy');
+    expect(resolveGlanceableStatus(snapshot({ sessions: [{ status: 'busy' }] }))).toBe('happy');
   });
 });
 
@@ -103,14 +107,14 @@ describe('primary rank and locked copy keys', () => {
 
   it('maps each non-happy status to its locked copy key', () => {
     expect(glanceableStatusCopyKey(snapshot({ status: 'waiting' }))).toBe('glanceable.waiting');
-    expect(glanceableStatusCopyKey(snapshot({ status: 'empty' }))).toBe('glanceable.empty');
+    expect(glanceableStatusCopyKey(snapshot({}))).toBe('glanceable.empty');
     expect(glanceableStatusCopyKey(snapshot({ status: 'stale' }))).toBe('glanceable.stale');
     expect(glanceableStatusCopyKey(snapshot({ status: 'expired' }))).toBe('glanceable.expired');
     expect(glanceableStatusCopyKey(snapshot({ status: 'signed_out' }))).toBe(
       'glanceable.signedOut'
     );
     expect(glanceableStatusCopyKey(snapshot({ status: 'privacy' }))).toBe('glanceable.privacy');
-    expect(glanceableStatusCopyKey(snapshot({ status: 'happy' }))).toBeNull();
+    expect(glanceableStatusCopyKey(snapshot({ sessions: [{ status: 'busy' }] }))).toBeNull();
   });
 });
 
@@ -164,7 +168,7 @@ describe('spoken label shape', () => {
   });
 
   it('speaks the status word then Open agents for non-happy statuses', () => {
-    expect(glanceableSpokenLabelKeys(snapshot({ status: 'empty' }))).toEqual([
+    expect(glanceableSpokenLabelKeys(snapshot({}))).toEqual([
       'glanceable.empty',
       'glanceable.openAgents',
     ]);
@@ -175,24 +179,28 @@ describe('spoken label shape', () => {
   });
 });
 describe('numeric spoken label', () => {
+  // The keys stand in for translated copy, so this translator answers the list
+  // joiner the way a comma-joining catalog does and echoes every other key.
+  const echoTranslate = (key: string): string => (key === 'common.listJoiner' ? ', ' : key);
+
   it('speaks numeric counts then Open agents for happy', () => {
     const happy = snapshot({
       sessions: [{ status: 'busy' }, { status: 'busy' }, { status: 'question' }],
     });
-    expect(glanceableSpokenLabel(happy, {}, key => key)).toBe(
+    expect(glanceableSpokenLabel(happy, {}, echoTranslate, String)).toBe(
       '1 glanceable.needsInput, 2 common.working, glanceable.openAgents'
     );
   });
 
   it('speaks the status word, numeric counts, then Open agents for stale', () => {
     const stale = snapshot({ sessions: [{ status: 'busy' }], status: 'stale' });
-    expect(glanceableSpokenLabel(stale, {}, key => key)).toBe(
+    expect(glanceableSpokenLabel(stale, {}, echoTranslate, String)).toBe(
       'glanceable.stale, 1 common.working, glanceable.openAgents'
     );
   });
 
   it('speaks the status word then Open agents when no counts exist', () => {
-    expect(glanceableSpokenLabel(snapshot({ status: 'empty' }), {}, key => key)).toBe(
+    expect(glanceableSpokenLabel(snapshot({}), {}, echoTranslate, String)).toBe(
       'glanceable.empty, glanceable.openAgents'
     );
   });
@@ -201,7 +209,8 @@ describe('numeric spoken label', () => {
     const spoken = glanceableSpokenLabel(
       snapshot({ sessions: [{ status: 'busy' }] }),
       {},
-      key => key
+      echoTranslate,
+      String
     );
     expect(spoken).not.toContain('u1');
   });
@@ -220,29 +229,30 @@ describe('numeric spoken label', () => {
     'glanceable.signedOut': 'Sign in to see agents',
     'glanceable.privacy': 'Open Kilo to see agents',
     'glanceable.openAgents': 'Open agents',
+    'common.listJoiner': ', ',
   };
   const translate = (key: string): string => copy[key] ?? key;
   const mixed = {
-    ...snapshot({ status: 'happy' }),
+    ...snapshot({ sessions: [{ status: 'busy' }] }),
     needsInput: 2,
     idle: 3,
     running: 4,
   };
 
   it('speaks each numeric count in rank order before Open agents', () => {
-    expect(glanceableSpokenLabel(mixed, {}, translate)).toBe(
+    expect(glanceableSpokenLabel(mixed, {}, translate, String)).toBe(
       '2 Needs input, 4 Working, 3 Idle, Open agents'
     );
   });
 
   it('speaks the translated stale warning before retained numeric counts', () => {
-    expect(glanceableSpokenLabel({ ...mixed, status: 'stale' }, {}, translate)).toBe(
+    expect(glanceableSpokenLabel({ ...mixed, status: 'stale' }, {}, translate, String)).toBe(
       'Updates delayed, 2 Needs input, 4 Working, 3 Idle, Open agents'
     );
   });
 
   it('speaks stale copy without inventing counts when none remain', () => {
-    expect(glanceableSpokenLabel(snapshot({ status: 'stale' }), {}, translate)).toBe(
+    expect(glanceableSpokenLabel(snapshot({ status: 'stale' }), {}, translate, String)).toBe(
       'Updates delayed, Open agents'
     );
   });
@@ -254,16 +264,35 @@ describe('numeric spoken label', () => {
     ['signed_out', 'Sign in to see agents, Open agents'],
     ['privacy', 'Open Kilo to see agents, Open agents'],
   ] as const)('hides numeric counts when the status is %s', (status, expected) => {
-    expect(glanceableSpokenLabel({ ...mixed, status }, {}, translate)).toBe(expected);
+    expect(glanceableSpokenLabel({ ...mixed, status }, {}, translate, String)).toBe(expected);
   });
 
   it('keeps signed-out and privacy overrides ahead of stale counts', () => {
     const stale = { ...mixed, status: 'stale' as const };
-    expect(glanceableSpokenLabel(stale, { signedOut: true, orgInvalid: true }, translate)).toBe(
-      'Sign in to see agents, Open agents'
-    );
-    expect(glanceableSpokenLabel(stale, { orgInvalid: true }, translate)).toBe(
+    expect(
+      glanceableSpokenLabel(stale, { signedOut: true, orgInvalid: true }, translate, String)
+    ).toBe('Sign in to see agents, Open agents');
+    expect(glanceableSpokenLabel(stale, { orgInvalid: true }, translate, String)).toBe(
       'Open Kilo to see agents, Open agents'
+    );
+  });
+
+  it('separates the spoken parts with the catalog list joiner', () => {
+    const ideographic = (key: string): string =>
+      key === 'common.listJoiner' ? '、' : translate(key);
+    expect(
+      glanceableSpokenLabel(
+        snapshot({ sessions: [{ status: 'busy' }, { status: 'question' }] }),
+        {},
+        ideographic,
+        String
+      )
+    ).toBe('1 Needs input、1 Working、Open agents');
+  });
+
+  it('speaks counts through the surface formatter', () => {
+    expect(glanceableSpokenLabel(mixed, {}, translate, value => `[${value}]`)).toBe(
+      '[2] Needs input, [4] Working, [3] Idle, Open agents'
     );
   });
 });

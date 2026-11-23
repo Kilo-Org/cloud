@@ -7,6 +7,7 @@
       "spendAlert": "Вашата потрошувачка бара внимание",
       "securityFinding": "Безбедносно наоѓање бара внимание",
       "securityUpdate": "Безбедносна проверка има ажурирање",
+      "agentBriefing": "Вашиот извештај за активноста на агентот е готов",
       "activeAgentsGlanceable": "Активните агенти имаат ажурирање"
     }
   },
@@ -29,6 +30,12 @@
     },
     "securityFindingNew": {
       "title": "Ново безбедносно наоѓање ({{severity}})"
+    },
+    "securityFindingSeverity": {
+      "critical": "Критично",
+      "high": "Високо",
+      "medium": "Средно",
+      "low": "Ниско"
     },
     "securityFindingSlaWarning": {
       "title": "SLA предупредување"

@@ -14,7 +14,9 @@ import type {
 import { READ_BROWSER_TOOL_NAMES, runReadBrowserTool } from './browser-tool-read-actions';
 import type { BrowserReadToolOptions } from './browser-tool-read-actions';
 import type { BrowserToolPageSession } from './browser-tool-snapshot';
-import type { AgentReadScope } from './browser-agent-frames';
+import { createAgentFrameReader } from './browser-agent-frames';
+import type { AgentFrameInventory, AgentReadScope } from './browser-agent-frames';
+import { maskIsolatedAgentScreenshot } from './browser-agent-isolated-probe';
 import type { BrowserToolInteractSession } from './browser-tool-interact-actions';
 import type { BrowserToolSession } from './browser-tool-session';
 import type { EvalTabResult } from './tab-debugger';
@@ -48,6 +50,8 @@ export interface BrowserToolDispatchOptions {
   /** Frame scoping for a CLI agent caller; absent for the panel and workflow callers. */
   readonly agentScope?: AgentReadScope | undefined;
   readonly now?: () => number;
+  /** The call's shared frame inventory, so the preflight, the tool and the withheld report read one tree. */
+  readonly readFrames?: (() => Promise<AgentFrameInventory>) | undefined;
   readonly tabId?: number;
   readonly tabsApi?: BrowserToolPageTabsApi;
   readonly webMcpDiscover?: BrowserToolPageActionOptions['webMcpDiscover'];
@@ -73,10 +77,12 @@ const toUpstreamToolName = (name: string): string =>
 const readToolOptions = (options: BrowserToolDispatchOptions): BrowserReadToolOptions => ({
   ...(options.agentScope === undefined ? {} : { agentScope: options.agentScope }),
   ...(options.now === undefined ? {} : { now: options.now }),
+  ...(options.readFrames === undefined ? {} : { readFrames: options.readFrames }),
 });
 
 const pageToolOptions = (options: BrowserToolDispatchOptions): BrowserToolPageActionOptions => ({
   ...(options.agentAccess === undefined ? {} : { agentAccess: options.agentAccess }),
+  ...(options.agentScope === undefined ? {} : { agentScope: options.agentScope }),
   ...(options.noteTabCreated === undefined ? {} : { noteTabCreated: options.noteTabCreated }),
   ...(options.now === undefined ? {} : { now: options.now }),
   ...(options.tabId === undefined ? {} : { tabId: options.tabId }),
@@ -103,8 +109,8 @@ const pageEntries: [string, BrowserToolHandler][] = PAGE_BROWSER_TOOL_NAMES.map(
 /**
  * One handler per upstream `browser_*` tool, keyed by the upstream name. The
  * read, interact and page families each contribute their tools; the page
- * family's cross-frame `browser_webmcp_list` overrides the read family's
- * main-frame variant, which is what collapses 8 + 8 + 11 family entries onto
+ * family's `browser_webmcp_list`, which reads the live page, overrides the read
+ * family's variant, which is what collapses 8 + 8 + 11 family entries onto
  * the contract's 26 tools.
  */
 export const BROWSER_TOOL_HANDLERS: Record<string, BrowserToolHandler> = Object.fromEntries([
@@ -188,6 +194,13 @@ const validateBrowserToolArguments = (
 const contractEntryFor = (upstreamName: string): BrowserToolContractEntry | undefined =>
   BROWSER_TOOL_CONTRACT.find(entry => entry.name === upstreamName);
 
+/**
+ * The tools that only drive the tabs API. Their page-family handlers never
+ * speak the debugger protocol, and they carry the agent's group boundary
+ * (D9), so every backend runs them there.
+ */
+const TAB_ONLY_TOOL_NAMES: ReadonlySet<string> = new Set(['browser_close', 'browser_tabs']);
+
 export interface RunKiloBrowserToolInput {
   /** The model's verbatim tool arguments; absent arguments are treated as `{}`. */
   readonly arguments?: unknown;
@@ -243,12 +256,32 @@ export const runKiloBrowserTool = async ({
      * The family handlers drive `session.send`, whose scripting backend throws
      * unconditionally (Firefox exposes no debugger protocol). Where the session
      * factory selected the scripting backend, the only reachable
-     * implementation of the expressible tools is `session.callTool`, so the
-     * contract-validated arguments go there. The platform gate above has
+     * implementation of the expressible page tools is `session.callTool`, so
+     * the contract-validated arguments go there. The platform gate above has
      * already refused the tools Firefox cannot express.
      */
-    if (session.backend === 'scripting') {
-      return await session.callTool(toolName, parsedArgs.data);
+    if (session.backend === 'scripting' && !TAB_ONLY_TOOL_NAMES.has(upstreamName)) {
+      const scope = options?.agentScope;
+      const readFrames = options?.readFrames ?? createAgentFrameReader(session);
+      const result = await session.callTool(
+        toolName,
+        parsedArgs.data,
+        scope === undefined ? undefined : { ...scope, readFrames }
+      );
+
+      // The capture shows every frame and field on the page; an agent sees only what it may read.
+      if (upstreamName !== 'browser_take_screenshot' || scope === undefined) {
+        return result;
+      }
+
+      const inventory = await readFrames();
+
+      return await maskIsolatedAgentScreenshot({
+        capture: result,
+        frames: inventory.complete ? inventory.frames : [],
+        probe: inventory.complete ? session.isolatedProbe : undefined,
+        readableOrigins: scope.readableOrigins,
+      });
     }
 
     return await handler(parsedArgs.data, session, options ?? {});

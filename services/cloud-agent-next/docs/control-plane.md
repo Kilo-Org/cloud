@@ -35,9 +35,10 @@ out of scope; old session IDs are rejected.
 | Worker | Authentication, organization and worktree access, billing eligibility on send, tRPC, `/stream` and terminal WebSocket upgrade, preview on/off (`PREVIEW_HOST_SUFFIX`), `/preview/open` hop, preview hostname dispatch, entry-ticket validation, session-token cookie, entry 303, per-request access checks, and preview request/response header sanitisation (`src/shared/preview-headers.ts`), runtime artifact downloads by grant, startup-failure report admission | Message, route or sandbox state |
 | Session DO, one per session | Message queue and message states, route view, event log and client stream, question/permission projection, per-message reports and batch callback, current runtime authorization and delegated Kilo token renewal, preview eligibility and sandbox lookup | Sandbox lifecycle, preparation steps, Kilo health, turn outcome |
 | Sandbox DO, one per `sandboxId` | Allocation lifecycle through the provider adapter, startup mode and startup command, wrapper socket, per-session routes, forwarding in both directions, activity, idle stop and provider lease, billing admission and attribution, wrapper and session credentials, preview target coordinates | Message states, Kilo health, turn outcome, workspace steps, physical billing intervals (container lifecycle owns them) |
+| PreviewTunnel DO, one per allocation (`<sandboxId>:<allocationId>`) | The wrapper's preview tunnel socket, HTTP and WebSocket preview streams on it, stream slots, the tunnel demand | Access checks, allocation state, activity, any control path |
 | Bootstrap, inside the container, `downloaded` mode only | Verify and install the selected runtime, exec the supervisor, report one startup failure | Allocation decisions, retries |
 | Supervisor, inside the container | Restart a crashed wrapper, bounded | Anything else |
-| Wrapper, one per sandbox | Connection to the Sandbox DO, route preparation (clone, checkout, setup commands, Kilo runtime, Kilo session), Kilo supervision and restart, prompt submission, event streaming, turn outcome, finalization (auto-commit, condense), activity heartbeat, terminals, worktree changes | Sandbox lifecycle, message states |
+| Wrapper, one per sandbox | Connection to the Sandbox DO, route preparation (clone, checkout, setup commands, Kilo runtime, Kilo session), Kilo supervision and restart, prompt submission, event streaming, turn outcome, finalization (auto-commit, condense), activity heartbeat, terminals, worktree changes, the preview tunnel client (open on demand, forward to loopback) | Sandbox lifecycle, message states |
 | Kilo | Agent execution, provider retries, native history published to session-ingest | Infrastructure |
 
 Wrapper upgrades are authenticated before Sandbox DO stub lookup. The Worker validates a bounded
@@ -51,7 +52,79 @@ wrong-purpose/sandbox envelopes and credentials invalidated by signing-key rotat
 `shutdown` and prompt closure on a short-lived Worker-local socket, without DO lookup. A temporarily
 unavailable signing secret returns 503, so ordinary bounded-backoff reconnect remains possible.
 
+### Sandbox provider owners
+
+| Concern | Owner |
+|---|---|
+| Feature support | `SANDBOX_PROVIDER_CAPABILITIES` in `packages/worker-utils/src/sandbox-provider-capabilities.ts`, read with `providerSupports` |
+| Each unsupported feature and its class (`gap`, `intentional`, `retired`) | `src/sandbox-control/provider-gaps.test.ts` |
+| Provider facts that are not features: label, reserved ports, launch env, customer credential, unique allocation name, credential transport, retired | `PROVIDER_DESCRIPTORS` in `src/shared/sandbox-provider.ts` |
+| Adapter construction | `createProviderAdapter` in `src/control-plane/sandbox/provider-adapters.ts` |
+| Shared adapter behavior | `src/sandbox-control/provider-contract.test.ts` |
+
+Code gates a feature with `providerSupports`, not with a provider-name comparison. A new provider
+adds a table row, a descriptor, a `case` in `createProviderAdapter` and a contract harness. The type
+checker rejects the change until all four exist. The Sandbox DO calls snapshot methods only through
+the adapter's optional members, because a stub adapter has none.
+
 ## 3. Topology and identities
+
+### Network secrets
+
+Environment and profile rows can use `delivery: 'network'`. Existing rows keep `env` delivery.
+Network values store `{ "network": <RSA+AES envelope> }`, not an ordinary envelope.
+Older Workers reject this wrapper instead of delivering plaintext during a rollout or rollback.
+The profile merge carries encrypted `networkSecrets` separately from environment values.
+Only Cloudflare Containers can prepare a workspace with network secrets. Other providers fail
+with `Network secrets require a Cloudflare sandbox`; no plaintext fallback exists.
+
+The Sandbox DO stores one encrypted network-secret snapshot per workspace scope in
+`network_secret_snapshots`. Each entry has a `kcp1` alias with purpose `secret`.
+Allocation changes retire active grants, not this snapshot. Reissued grants reuse its aliases.
+Route release keeps the snapshot. Workspace or standalone session deletion removes it.
+The spec and wrapper receive only `KEY=<alias>`.
+Workspace setup commands and agent commands use the same aliases.
+
+Cloudflare snapshot builders also receive aliases in their setup environment. The environment
+coordinator stores encrypted, build-scoped grants and owns their allocation and deadline.
+Builder aliases use the same `kcp1` purpose and resolver RPC contract. Every fresh Cloudflare
+builder installs outbound interception, with or without network secrets, because a refused start
+can retain interception rules. All builder HTTP(S) egress therefore invokes `ContainersOutbound`
+once per request. Build tools must trust the injected CA; a client with pinned certificates fails.
+The shared resolver routes
+their `environment-build:<id>` scope to that coordinator, and uses the same admission helper.
+The proxy still authenticates the platform container identity. Only an active `preparing` build
+can resolve its aliases. Capture, cancellation, expiry, and terminal cleanup revoke them.
+Vercel builders refuse network secrets. Build aliases expire with the build; saved tool configuration
+should reference the variable name rather than persist an expanded build alias.
+
+`ContainersOutbound` checks egress policy, then routes network aliases before SCM forwarding.
+Restricted egress includes the snapshot's exact secret hosts. The existing credential admission
+checks the live allocation, container binding, owner, scope membership, and grant expiry.
+The existing `resolveCredential` RPC decrypts a network value only for an admitted request.
+The provider-neutral substitution module supports header values and Basic passwords.
+It replaces exact alias tokens only, pins the Host header, and never follows redirects.
+
+Network secrets require HTTPS on port 443. IP literals, local or metadata names, Kilo endpoints,
+and managed SCM endpoints cannot receive them. `npm.pkg.github.com` is an explicit exception.
+Configured Kilo and GitLab hosts are checked again at grant creation and resolution.
+An unknown alias, wrong host, unsupported URL placement, or mixed SCM/network request receives
+a specific `403 network_secret_*` response. Temporary resolver faults return retryable
+`503 network_secret_unavailable`, not an unknown-secret error. The retry flag follows the resolver's
+classification; permanent policy failures return a value-free denial. No upstream request follows a denial.
+Bodies and responses are not substituted. Header echoes and exchanged tokens can expose values.
+Clients that validate token formats locally can fail because they see an alias.
+
+Egress audit records include `credentialKey` and `credentialDecision` for one credential, or a
+`credentialDecisions` list on the same record for multiple credentials. They never include values,
+aliases, request paths, or query strings. A wrong host fails immediately instead of producing
+an unclear upstream authentication error. Token-format checks can fail before a request exists.
+
+Feature-era private route and audit records are not backward-compatible with pre-feature Workers.
+A rollback must retain a Worker version that understands these records. The PostgreSQL wrapper
+still prevents an older reader from projecting a network value as a plaintext environment variable.
+
+### Ownership
 
 - One Session DO per `sessionId` (`workspace_*`). One Sandbox DO per `sandboxId`.
 - Sandbox ownership has exactly two supported forms: **one standalone session without a workspace
@@ -111,7 +184,9 @@ unavailable signing secret returns 503, so ordinary bounded-backoff reconnect re
 
 A message stores `messageId`, its immutable intent (turn, agent, model, attachments,
 finalization), `state`, `createdAt`, `acceptedAt`, `settledAt` and a failure `reason` when
-terminal. Nothing else.
+terminal. It may also store a billing failure, container metadata and a settlement record.
+The settlement record holds the failure and gate facts, the final assistant message ID and
+the last seen branch available when the message settles.
 
 | Event | Effect |
 |---|---|
@@ -222,9 +297,19 @@ public stream has no reconnecting status today, so `reconnecting` changes no cli
   Public execution-stop notices retain their bounded reason and recovery guidance.
 - Pending questions and permissions are projected from events. Answers go to the wrapper through the
   Sandbox DO. If the turn already settled, for example because the sandbox stopped, the answer is
-  sent as a new message.
+  sent as a new message. The answer call itself also reports a retryable refusal. That happens when
+  the live route cannot take the reply and the interaction still waits. The same reply is then
+  admissible after the route returns. The answer call only preflights that new turn; the admit call
+  rebuilds it from the session's current state and reports `sent`, `queue-full`, `retry` or
+  `not_connected`. `retry` means the named interaction is still pending and this reply could not be
+  taken, so the caller can use the same reply again; `not_connected` is terminal for that reply.
+  The answer call reports a non-terminal `invalid` refusal instead when the reply of a settled turn
+  carries no text, so the interaction stays answerable by a different reply.
 - Each terminal message produces one report. The batch callback fires when no `queued` or
   `accepted` message remains (current callback semantics).
+- A new pending question in a child with a workspace callback target produces an interaction
+  callback. Its outbox entry is keyed by question ID independently of terminal reports.
+  The parent receives the question and options and can use `answer_question` or `reject_question`.
 - The per-user facade serves native `/event` and `/global/event`. `/event` first opens the same
   session `/stream?replay=false` log the client stream uses and buffers its live frames, then pages
   the `nativeSnapshot`, writes the fence, and delivers the buffered and later frames above it. The
@@ -688,8 +773,13 @@ snapshot (`src/environment-build/`); see `.specs/cloud-agent-session.md` "Enviro
   environment's build commands. They run only in the environment build, so the wrapper skips them on
   every session start. The remaining setup commands (request-supplied and profile) run as
   `session_setup`, then `startCommands` run as `start`, on a fresh start and an environment snapshot
-  start. Every list is non-fatal: each failure (kind, index, redacted command text, exit code or
-  timeout, bounded redacted output tail) is collected, the next command still runs, and
+  start. A re-prepare that keeps every prepared root unchanged and only adds roots does not run
+  them again: the commands already ran in that workspace, and a start command would launch a
+  second process beside the first. A re-prepare that removes a prepared root, changes a root's
+  branch, or adopts or re-clones a root it had already prepared runs them again, because that
+  workspace is no longer the one the commands were run on. Every list is non-fatal: each failure
+  (kind, index, redacted command text, exit code or timeout, bounded redacted output tail) is
+  collected, the next command still runs, and
   `session.ready` reports up to 20 as `commandFailures`. The Sandbox DO logs only kind, index, exit
   code, termination reason and elapsed time, and stores a note of at most 2000 characters for the
   route's attempt. The first prompt delivered after that preparation carries the note in its
@@ -711,6 +801,36 @@ snapshot (`src/environment-build/`); see `.specs/cloud-agent-session.md` "Enviro
   launch can install a newer compatible runtime over a snapshot. The artifact read grant travels in the installer
   command and expires at the startup deadline. A restored session supplies a new command and its
   own credentials. Native snapshot retention of start configuration still needs deployed validation.
+
+### Environment setup sessions
+
+- Grouped metadata MAY carry `environmentSetup: { runId, environmentId, role }`
+  with role `setup` or `verification`. Preflight sets it; clients cannot.
+- `setup`: accepted only from a non-authority internal-key `prepareSession`
+  with `environmentSetupRunId`, verified against
+  `cloud_agent_environment_setup_runs` (owner match, open status, draft equals
+  `requestedEnvironment.id`). The session may resolve its draft environment.
+  This role uses full network access with egress auditing for setup discovery,
+  even when the draft is restricted. It requires a Cloudflare Containers allocation.
+- `verification`: accepted only under a Cloud Agent authority whose
+  `environmentSetup` claim matches `verificationOf.runId` and
+  `requestedEnvironment.id`, and whose parent workspace authority recorded the
+  same binding from the setup session. The child resolves the draft and its
+  network policy instead of inheriting the parent workspace's policy.
+- The agent can read the discovery audit through `get_environment_draft` and
+  cite setup or verification audit records when requesting hosts. Pending host
+  requests block verification. Discovery alone cannot satisfy the completion gate.
+- The workspace MCP grant adds `environmentSetup` to `cloudAgentAuthority`
+  only for the workspace created by the setup session.
+- Drafts cannot be built into environment snapshots. Setup and verification
+  sessions run the draft's setup commands during session preparation.
+- When an environment applies and the resolved egress mode is `allowlist`,
+  the environment's required hosts are added to the allowlist.
+- `getSession` exposes the admitted environment revision, the latest
+  preparation outcome, and the workspace egress policy. A command failure
+  fails the verification preparation outcome without preventing the session
+  from starting. A setup authority can use `getEgressAudit` for the setup
+  session or a direct child.
 
 ### Workspace tail snapshots
 
@@ -772,7 +892,97 @@ keep environment snapshots and existing history/worktree recovery.
   The snapshot
   holds only the disk: like an environment snapshot, restore applies the current credentials,
   env, secrets and MCP configuration from the route before accepting work.
-  Existing native sessions are reused; missing native sessions use history-only recovery.
+  Existing native sessions are reused when their record names this workspace directory; a record
+  that names another directory takes history-only recovery, as Kilo v2 already requires.
+  Missing native sessions use history-only recovery.
+  A re-pointed record keeps the fields the import body can carry, including the wider shapes a record
+  may hold: the import accepts a summary that carries file diffs and a revert that carries a patch
+  diff, and the record read back returns the patch diff unchanged and each diff entry with its file,
+  additions, deletions and status. The import body cannot carry the record's own `metadata`, `agent`,
+  `model`, `path`, `cost` or `tokens`: it accepts those keys and silently drops them. A re-point
+  therefore clears the stored value of each. The record's own `slug` is carried: the import body has
+  a `slug` field, so a re-point keeps the share URL naming the record's own slug.
+  The native import also cannot carry a session permission ruleset or a session `metadata`, so both
+  obligations are remembered in one marker file per session beside the wrapper's durable state:
+  `$HOME/.kilo-control/rulesets/<encoded session id>.json` holds `{ permission?, metadata? }`,
+  either obligation may be present alone, and the file is deleted when neither remains. A marker
+  that holds a bare JSON array is read as `{ permission: array }`, which is the shape the earlier
+  code wrote. `agent` and `model` stay cleared on purpose: every prompt sends its own agent and
+  model from the route payload, so the stored pair is a mirror that no turn reads. `path` is not
+  restored either: no wrapper code reads it, and the import leaves it empty.
+  The marker goes down before the import commits the row, and the ruleset is applied right after the
+  metadata restore. Writing the marker before the import is what makes the guarantee hold: a marker
+  written only after a failed apply would leave a window where the process dies between the import
+  and the write, and the committed record then owes a ruleset and a metadata that nothing remembers.
+  The record's own `permission` is authoritative: when the marker and the record both hold a
+  ruleset, the record's set is the one applied, because the marker exists only because the native
+  import clears the row, and it is a durable copy of an obligation rather than a second source of
+  truth. The marker is rewritten before the import and only when it does not already name what the
+  record carries, so a directory that refuses the write cannot fail a route whose obligation is
+  already recorded. A rewrite that fails fails the route retryably with the record untouched, so the
+  retried prepare makes the same comparison again. A rule that only the marker held is dropped
+  rather than applied: the record's authenticated permission is the state of the session, and this
+  module is its only writer through the native API. Once the record's set is applied, the marker is
+  reduced to what is still owed and removed when nothing remains, so a rule the record does not
+  carry is not left behind as a standing obligation.
+  The wrapper restores `metadata` right after the import and before it applies the ruleset, because
+  metadata holds the session goal a user sees: a ruleset that cannot be applied throws, and the
+  next prepare settles that obligation without running the create path again, so a restore placed
+  after the apply would never reach the record. A metadata restore that fails is logged and does
+  not fail the route: the record is already committed, the metadata carries no authorization
+  decision, and the obligation stays recorded so the next prepare retries it.
+  The record's own `metadata` is authoritative in the same way its `permission` is: the wrapper
+  supplies an owed value only where the import left the record empty. The update replaces the whole
+  value and the server normalizes what it stores, so a record that carries a value may hold a newer
+  goal than the copy the marker kept, and writing that copy back would revert the user's own goal.
+  A marker obligation the record already satisfies is dropped without a write.
+  Every prepare settles both obligations through `settleOutstandingRuleset`, before the probe and
+  again after a successful history restore; a settle that finds no record leaves the marker in place
+  for the create path, which applies what it owes to the record it imports. A create path whose
+  marker already covers what the record carries does not rewrite it.
+  The ruleset is cleared only after the apply succeeds, and the apply is skipped when the record
+  already holds every rule, because the native update appends rather than replaces; a marker that
+  cannot be cleared is therefore not a failure, since the next prepare finds the stored rules and
+  does not repeat them. The marker ends with the record it describes: a worktree deletion removes the
+  marker of each session it deletes, because no later prepare can apply a ruleset to a record that no
+  longer exists. A release does not remove it, because release only stops the session and the record
+  survives with its obligation. A record that still names another directory never satisfies the
+  obligation, because the rules it carries belong to that directory; the marker waits for the record
+  the import re-points, and the settle first replaces the marker's metadata copy with that record's
+  own value, because the re-pointing import clears the column and that read is the last that can see
+  it. A marker that owes only a ruleset still takes that value. The remembered ruleset and a
+  record's own permission are parsed as rulesets before use: a value that is not a ruleset is never
+  applied and never becomes the record's grants, because a ruleset widens what the agent may do. A
+  marker that is present but not a ruleset fails the prepare with a permanent session-import reason
+  instead of reading as nothing owed, since reading it as nothing owed would drop rules the record
+  never received.
+  The marker directory is created `0700` and tightened to `0700` when it exists, and the file is
+  `0600`. There is no fallback to a shared temporary directory: a process without a home
+  directory cannot name the store, so recording or reading an obligation fails retryably instead of
+  reading as nothing owed, and forgetting one does nothing. The `0700` directory and the `0600` file
+  are defence in depth only while the wrapper and the agent share one uid inside the sandbox; a real
+  boundary needs wrapper-owned state outside any location the agent can write, which is a
+  sandbox-level change.
+  A record whose own permission is present but not a ruleset fails the create path the same way,
+  before the import, and the record is left unchanged: no rules are applied, so a later prepare in
+  the same allocation reads that record again and fails the same way until the record is replaced.
+  The settle path refuses a record that names the route directory and carries such a permission in
+  exactly the same way: it sends no update, keeps the remembered ruleset because the record is left
+  unchanged, and fails the prepare. A record under another directory is still treated as absent, so
+  the marker simply waits for the import to re-point it. Both entry points therefore refuse, rather
+  than prepare a route whose record lacks the rules it owes.
+  A marker or session read that cannot answer fails the prepare as retryable and sends no permission
+  update, because the retried step reads the same durable state and the native update appends. A
+  marker that cannot be written before the import fails as retryable too, because no record is
+  committed yet; a marker that reads but is not a ruleset, and a record whose permission is not a
+  ruleset, fail as the permanent session-import reason. The message names the store path and the
+  underlying cause in the wrapper log only — the marker path for a marker that cannot be
+  interpreted, the record's id for a record whose permission is not a ruleset — while the session
+  frame still carries the session-import reason with no detail. A settle whose permission update
+  fails fails retryably and reports the same session-import reason, because the marker is intact and
+  the retried step reads it again. An apply or a settle interrupted by the step budget's abort
+  reports the abort rather than the permanent or retryable ruleset classification, so the step keeps
+  its own classification and retry budget, and the marker stays for the next prepare.
   New chats and later siblings share that runtime and directory without resetting files.
 
   On a shared-workspace Kilo v2 runtime start without a workspace snapshot, the wrapper also preloads
@@ -788,6 +998,7 @@ keep environment snapshots and existing history/worktree recovery.
   always restore on demand, so history-only warmup cannot suppress their saved file patches.
   Cancelling a caller stops its wait immediately, but its import lock remains until the underlying
   harness open settles. A queued requested open keeps its own inputs and cancellation deadline.
+
 - **Diagnostics and retention.** Existing diagnostics report workspace, requesting session,
   allocation, capture time, selected source and skip/fallback reason. They never log handles,
   credentials or file contents. Replacing a descriptor makes the previous artifact unselectable;
@@ -1604,7 +1815,7 @@ remain decisive. No inspected validator enforces task-branch names or parses rec
 | GitLab | Identity, GraphQL, unrelated projects, origin/base-path escape, traversal, and non-enumerated web/Git paths cannot redeem managed credentials. |
 | Bitbucket | Other repositories, origin changes, traversal, and encoded path slashes cannot redeem managed credentials. |
 | Retry exclusions | Push/discovery for receive-pack, LFS, API requests, 403 responses, and responses without an observable reset never enter the GitHub retry loop. |
-| Current Vercel limits | Contained Vercel uses the same capability path as native providers. Live GitHub clone, fetch, push dry-run, and credential-denial checks passed. GitLab and Bitbucket parity checks remain synthetic. Explicit repository tokens are rejected, as on native providers. Restricted egress remains native-only. |
+| Current Vercel limits | Contained Vercel uses the same capability path as native providers. Live GitHub clone, fetch, push dry-run, and credential-denial checks passed. GitLab and Bitbucket parity checks remain synthetic. Explicit repository tokens are rejected, as on native providers. Restricted egress uses the shared [sandbox egress proxy](#sandbox-egress-proxy). |
 
 **Changed**
 
@@ -1725,6 +1936,105 @@ Workers HTTP duration has no fixed limit while connected, but Vercel forwarding 
 unverified beyond the tested 8 MiB transfers and Git operations. Before production rollout,
 confirm ingress and duration compatibility and resolve any confirmed reduction. See [Workers limits](https://developers.cloudflare.com/workers/platform/limits/).
 
+### Sandbox egress proxy
+
+An egress allowlist and an egress audit are product logic in one shared core,
+`proxySandboxEgress` (`src/egress/sandbox-egress.ts`). A provider supplies two primitives in the
+capability table (`packages/worker-utils/src/sandbox-provider-capabilities.ts`):
+
+| Feature | Meaning | Containers | Vercel | Cloudflare (retired) |
+|---|---|---|---|---|
+| `egressProxy` | Sandbox egress reaches the Worker proxy with a verified sandbox identity. | yes | yes | no |
+| `egressProxySeesAll` | The proxy sees all HTTP(S) egress, not only the listed hosts. | yes | no | no |
+
+One rule, `egressRequestSupported`, reads them: an allowlist needs `egressProxy`; an audit without
+an allowlist needs `egressProxySeesAll`; a session without an egress request is always supported.
+Registration, the sandbox selection and metadata schemas, the Sandbox DO pin checks, the
+saved-allocation skip and the web guidance use this rule. The pin checks and the schemas also
+require an isolated sandbox. The audit read requires `egressProxy`.
+
+**Core.** For each request: a strict URL check against the allowlist (`https` or `http`, the
+default port, no userinfo, an exact host); then one audit row when the policy has audit; then a 403
+`Egress destination disallowed`, or a fetch with `Host` from the URL and `redirect: 'manual'`.
+A failed audit write gives 502 `Egress audit unavailable` and sends nothing. Containers runs the
+core from its outbound handler. The audit store is one `EgressAuditStore` for each logical sandbox,
+reached only through `egressAuditStore` (`SANDBOX_CONTAINERS` by the logical sandbox id). Its use
+is provider-neutral: for a Vercel sandbox the object starts no container, sets no alarm and writes
+no billing record. Retention is the same on both providers: at most 256 chunks of 64 rows. When
+the store is full, a write deletes the oldest chunk if its last write is at least 60 seconds old;
+otherwise the write fails, and the request gets 502. Rows have no time-based expiry.
+
+**Vercel request path.** A restricted Vercel policy (`restrictVercelEgress`) has the effective
+allowlist as its keys and never `'*'`. The Worker host keeps its credential rules and a Host-pin
+transform; every other listed host keeps its credential rules and ends with a forward to
+`/scm/vercel/<sandboxId>`. An unlisted name does not resolve in the sandbox. A policy that cannot
+be built creates no sandbox and sends no update. The route then:
+
+1. reads the target from the `vercel-forwarded-*` headers;
+2. admits the request: the pin policy, then the live allocation (owner, allocation id, provider
+   ref, not stopping or stopped), then the Vercel OIDC token (issuer, audience, team, project,
+   sandbox name, `exp`). An unavailable allocation gives 403 `allocation_unavailable` before the
+   token check. A bad or expired token, or a token of another sandbox, gives 401;
+3. strips every `vercel-*`, `x-vercel-*` and `x-forwarded-*` header, the token and hop-by-hop
+   headers. It keeps `upgrade` only on a WebSocket upgrade;
+4. runs the core with the pin allowlist minus the Worker host, so the Worker host, another port,
+   userinfo, `http` and an IP literal give 403. The core writes a `denied` row only when the pin
+   has audit;
+5. sends an unmanaged request with `fetch`, and a managed SCM credential through the SCM admission.
+
+A Vercel sandbox without an allowlist keeps the SCM forward path unchanged. The route never
+proxies to a host outside the allowlist or the managed SCM targets.
+
+The runtime proxy facade middleware leaves `/scm/vercel/` paths alone, so a forwarded request with
+a runtime proxy handle in `Authorization` also reaches the route.
+
+**Admission caches.** The Sandbox DO caches a verified identity for each token hash and allocation
+(at most 64 entries, until the token `exp`); the live allocation check runs on every request. Each
+Worker isolate caches an admitted result by sandbox id and token hash: at most 256 entries, for at
+most 30 seconds and never past the token `exp`. A denial is not cached. So an isolate can admit a
+request for up to 30 seconds after the allocation stops or changes. In that window the request
+still passes the URL check against the admitted allowlist, and its audit row is still written.
+
+**Differences on Vercel.**
+
+| # | Case | Containers | Vercel |
+|---|---|---|---|
+| D1 | `http://` to a listed host | allowed | fails (connection reset); use `https://` |
+| D3 | unlisted host | 403, audited `denied` | does not resolve; not audited |
+| D13 | audit | any network mode | allowlist mode only |
+| D15 | Worker host; a request that a credential rule matches | through the proxy, audited | direct, not audited |
+| D16 | upload size | no edge limit | the request body limit of the Cloudflare plan |
+| D17 | HTTP/2-only client, gRPC | not checked | fails on forwarded hosts |
+
+**Failure.** Egress stays restricted in each case: a refused update leaves the old policy in
+force, and that policy has no `'*'`.
+
+| Path | Result of a policy that cannot be built or applied |
+|---|---|
+| Create | No sandbox. The routes fail with `network_policy_failed`. |
+| Release (`applyVercelNetworkPolicyOrStop`), workspace Stop (`cancelWorkspace`) | The sandbox stops: `network_policy_failed` on a restricted sandbox, `sandbox_lost` on an unrestricted one (`refusedPolicyStopReason`). |
+| Route grant at prepare (2 attempts) | That route fails with `workspace_setup_failed`, stage `credential_policy_unavailable`. The sandbox keeps running. |
+| A preparing route when the wrapper connects (`onWrapperConnected`) | That route fails with `workspace_setup_failed`. The sandbox keeps running. |
+| `bindRuntimeCredentialProxyHandle`, `updateNetworkPolicy` | The call fails. The sandbox keeps running. |
+
+**Rollback.**
+
+- No migration and no new Durable Object class.
+- Deploy the Worker before the web app: the web guidance reads the same capability table.
+- Revert of the Vercel `egressProxy = true` commit fails closed. Registration refuses a restricted
+  Vercel request, and a live restricted pin makes `readProviderPin` throw. The stored metadata and
+  registration of a restricted Vercel session fail validation, so the Session DO loads that session
+  as absent until the commit is deployed again. Audit rows stay in the store, but the audit read
+  refuses them. Nothing is deleted.
+- After that revert, a live restricted Vercel sandbox runs until the Vercel sandbox timeout.
+  `readProviderPin` runs in `initializeStorage`, so the Sandbox DO fails to initialize and cannot
+  stop the BYOC sandbox in the customer account. Egress stays closed: the Vercel policy stays in
+  force, and each forward gets 503 `forwarding_unavailable` because the admission cannot load the
+  pin. To prevent this, stop live restricted Vercel sandboxes before the rollback.
+- Revert the two `network_policy_failed` commits together (the reason, and the workspace Stop that
+  uses it), and only when no stored route row holds that reason: the failure reason schema is
+  strict, and a stored row with an unknown reason fails to parse.
+
 ### Compatibility and rollout
 
 Persisted sessions and credential grants without modern runtime authorization remain readable
@@ -1834,44 +2144,100 @@ per-socket record of sent configuration, so hibernation does not change the resu
 workspace runtime keys remain isolated.
 The runtime still rejects profile MCP drift on legacy preparation paths.
 
-The built-in `kilo-cloud-agent` MCP server uses workspace authority. The worktree UUID identifies
-the canonical workspace parent, the original root chat that remains the authorization anchor for
-the existing child-session API. Every grant renewal checks that root's authorization and its owner,
-organization and worktree. Deleting or revoking the root disables new grants; another sibling never
-becomes the anchor. Children and callbacks belong to that workspace, not necessarily the chat
-invoking MCP. The MCP transport does not send the invoking chat's identity, so a completion callback
-either opens a new sibling chat in the root's workspace (`workspace:new-chat`) or notifies one
-existing chat in that workspace (`workspace:<session-id>`). The new-chat form uses the child result
-as the new chat's first message and derives its operation and session identity from the persisted
-callback message ID. The session form checks that the target is a root or sibling chat with the
-same owner, organization and workspace, and that it is still accessible; the invoking chat learns
-its own session id from the `cloud-agent-context` line in its turns. Built-in credential
-refresh rotates the workspace MCP credential; it is not profile MCP drift and does not reconfigure
-the workspace's MCP set.
+#### Workspace Cloud Agent authority
 
-The scoped connection can create children, list direct children, inspect a child, read an exact
-message result, interrupt a child, and send a prompt follow-up. The personal and organization
-procedures are `prepareSession`, `listChildSessions`, `getSession`, `getMessageResult`,
-`interruptSession`, and `sendMessage`. Management revalidates the canonical parent's current
-authorization and the target's persisted spawn lineage, owner and organization; the parent itself,
-sibling chats and unrelated sessions are not valid targets. Follow-ups require a stable message ID
-and cannot change callbacks, runtime configuration or delegation lifetime. Interrupt stops work;
-it does not delete the child workspace.
+The built-in `kilo-cloud-agent` MCP server, child launches, child management and child callbacks
+use the workspace's own authority, not the authorization of any chat. One
+`CloudAgentWorkspace` Durable Object per workspace (`CLOUD_AGENT_WORKSPACE`, named
+`ownerId:workspace_<uuid>`) owns that authority. The canonical workspace ID is `workspace_<uuid>`,
+where `worktree_<uuid>` is the worktree; a session without a worktree is its own workspace. The ID
+names the workspace for its whole life, including after the chat with the same UUID is deleted.
+Credentials keep the `CloudAgentAuthority` v1 claim: `parentSessionId` is the canonical workspace ID
+and `authorizationId` is the workspace's current authorization.
 
-The parent Session DO durably indexes newly created children for bounded, cursor-paginated listing.
+The workspace record binds the canonical workspace ID, worktree, owner and organization. It stores
+the workspace's runtime delegation (at most 24 hours), revocation state, origin and network policy.
+The creating chat supplies these values once, if it has policy-bearing runtime authorization and
+does not use a legacy shared sandbox. Origin and child depth do not limit new registrations.
+Legacy tokens without runtime authorization do not provide MCP.
+
+New workspace records also retain the creating chat's resolved profile and environment for child
+launches. An explicit environment selection overrides this default. Inheritance applies only when
+the launch repository belongs to the inherited environment, if one is present. The Worker rechecks
+repository access before registration.
+
+Adoption copies the stored authorization, including expired or revoked state, and imports the
+creating chat's legacy child registry. A sibling chat cannot supply this data. Deleting the creating
+chat first completes adoption so the authority and registry survive. Deleting a standalone session
+or starting worktree deletion ends the workspace authority with a tombstone adoption cannot overwrite.
+
+Every issuance, launch, management call and delegation checks the stored record and then renews it,
+which rechecks the owner, organization membership, credential pepper and admitting device session in
+the database. A failed binding persists `revoked`. A transient database failure is unavailable, not
+revoked. The record must be unchanged after the check.
+
+The MCP credential expires with the workspace delegation. An expired authority is restored only when
+the owner sends a message with a user credential in any chat of the workspace: that send mints a new
+workspace delegation with live owner, organization and device-session checks, and the workspace
+accepts it only if its current authorization is the expired one it reported. A revoked or deleted
+workspace, a sibling chat's authorization, a Cloud Agent or delegated token, an automation
+admission, a sandbox restart and a stale credential never restore authority. MCP is optional, so a
+failed renewal never fails the send. Before a prompt, the Sandbox DO offers a newer workspace MCP
+credential when the one it last sent is missing or due, so a renewed authority reaches a running
+runtime without a restart; a preparation after a restart receives it in `session.prepare`. Built-in
+credential refresh is not profile MCP drift and does not reconfigure the workspace's MCP set.
+
+The MCP transport does not identify the invoking chat. A completion callback either opens a new
+chat in the launching workspace (`workspace:new-chat`) or notifies one existing chat in it
+(`workspace:<session-id>`). The new-chat form derives its operation and session identity from the
+persisted callback message ID and delegates the workspace authority to the new chat, so it needs an
+active authority. The session form needs a workspace that is not deleted or revoked; an expired
+authority can still notify an existing chat, which runs on that chat's own authorization. The target
+must be an accessible chat of the same worktree, owner and organization. A standalone parent
+can use `workspace:<session-id>` to receive the callback in its own chat. A deleted target fails
+the callback; it is never redirected to another chat. The
+invoking chat learns its own session id from the `cloud-agent-context` line in its turns.
+
+The scoped connection uses dedicated tools, not API `search` or `call`. It can discover repositories,
+branches, environments and models; launch children; attach files; read child history, message results
+and artifacts; answer or reject questions; send or cancel queued messages; and stop a child. It can
+file child workspaces, sync or restack child branches, and create chats in a direct child's workspace.
+Stacking is permitted on the caller's own workspace or a direct child. Management revalidates the workspace
+authority and the target's persisted spawn lineage (`parentCloudAgentSessionId` equals the canonical
+workspace ID), owner and organization; the workspace itself, its chats and unrelated sessions are not
+valid management targets, so a child cannot be managed from another workspace or organization. Each
+child can launch and manage its own children. Follow-ups require a
+stable message ID and cannot change callbacks, runtime configuration or delegation lifetime.
+Interrupt stops work; it does not delete the child workspace. Launch idempotency stays in the
+operation ledger by `operationKey`.
+
+The workspace durably indexes newly created children for bounded, cursor-paginated listing.
 Registry entries are discovery hints: every returned child is reauthorized, and database or DO
 outages fail the query rather than reporting an empty list. An empty page can still have a
-`nextCursor` when its entries no longer authorize. Children created before this index was introduced
-are not backfilled; explicit management by ID still checks their lineage and remains supported.
-Message-result queries preserve terminal assistant output and safe failure details. Prefer completion
-callbacks; bounded status checks are supported, but busy polling is not needed.
+`nextCursor` when its entries no longer authorize. Children created before the original index was
+introduced are not backfilled; explicit management by ID still checks their lineage.
+`getMessageResult` returns the message status, structured failure with stage and code, final
+assistant message ID and text, gate result, and last seen branch when available. It also returns
+a preparation summary for the requested message with attempt status, failed step label and safe
+reason, without commands or output. Only the final message settled by an outcome captures an
+assistant answer. Prefer completion callbacks for notification when a batch drains and for recent
+activity, which polling does not return. Use bounded polling to check a specific message's result.
+
+Rollout: existing workspaces adopt their creating chat's authorization on first use, with the same
+authorization ID, so MCP credentials issued before the rollout stay valid until their own expiry.
+Existing child records keep their lineage, because their `parentCloudAgentSessionId` already is the
+canonical workspace ID. Queued callbacks keep their payload and resolve the workspace through the
+child's lineage. A workspace whose creating chat was deleted before rollout has no adoption source
+and stays without MCP. Deploy the Worker with the `v16` migration; no other service changes.
 
 Sandbox DO ↔ wrapper (WebSocket frames): `hello`, `welcome`, `shutdown`, `heartbeat`, `heartbeat_ack`,
 `session.prepare`, `session.progress`, `session.ready`, `session.failed`, `workspace.capture` and
 `workspace.captured` (legacy wrappers only; always answered `ok: false`), `session.credentials`, `session.prompt`, `session.abort`, `session.answer`, `session.release`, `session.events`,
 `session.outcome`, `events_dropped`, terminal control requests, worktree-change requests,
 worktree-deletion requests (`worktree.prepareDeletion`, `worktree.delete`; both answer with
-`worktree.result`). Terminal bytes use the existing wrapper-to-Session-DO terminal socket.
+`worktree.result`), and `preview.tunnel` (Sandbox DO to wrapper: open a new preview tunnel; no
+reply, see [Preview tunnel](#preview-tunnel-wrapper-tunnel)). Terminal bytes use the existing
+wrapper-to-Session-DO terminal socket.
 `worktree.git` is the one new worktree frame: the Session DO forwards one Sync or Restack request
 and the wrapper answers with the same `worktree.result` envelope. Its request payload and result
 are the shared `worktreeBranchOperation*` schemas; the result discriminates
@@ -2009,6 +2375,9 @@ per-port hostname. It handles ordinary HTTP and WebSocket upgrades.
   The path exists because a WebSocket `Response` cannot cross an RPC boundary back to the Worker,
   while a `fetch()` response can. The Worker strips client-supplied `x-kilo-preview-*` headers once,
   at the top of its default `fetch`, so no route can forward one into a sandbox DO.
+  The `transport` in the coordinates selects the upstream (`src/preview/upstreams.ts`):
+  `durable-object` for `cloudflare-containers`, and `wrapper-tunnel` for every other provider that
+  supports preview (Vercel). See [Preview tunnel](#preview-tunnel-wrapper-tunnel).
 - **No start, no wake.** Preview never starts, resumes or wakes an allocation. A request for a
   session whose sandbox is stopped or asleep fails without creating a generation; the user starts
   the session again.
@@ -2016,10 +2385,11 @@ per-port hostname. It handles ordinary HTTP and WebSocket upgrades.
   activity lease. SandboxControl's existing idle deadline still stops the allocation, even with
   preview/HMR traffic. Normal active-agent heartbeats still renew leases.
 - **Reserved ports.** The physical DO refuses the provider's own control port with 403 before it
-  opens the container port: 3000 for `cloudflare`; `cloudflare-containers` reserves none (`vercel`
-  23456 is listed but unreachable while Vercel is unsupported). The physical DO owns this check
-  because it is the one check a leaked marker cannot bypass. Only 1024-65535 are eligible. The table
-  (`src/shared/reserved-ports.ts`) also feeds the Cloud Agent rules file, which tells the agent not
+  opens the container port: 3000 for `cloudflare`; `cloudflare-containers` reserves none. The
+  physical DO owns this check because it is the one check a leaked marker cannot bypass. On the
+  tunnel, the wrapper refuses the provider's port (`vercel` 23456) and the port of each of its own
+  `kilo serve` processes on loopback, so the answer is the same 403. Only 1024-65535 are eligible.
+  The table (`src/shared/reserved-ports.ts`) also feeds the Cloud Agent rules file, which tells the agent not
   to start servers on the reserved port, to use the port that its server prints, and to report the
   exact `http://localhost:<port>` URL. Legacy writers and the V2 wrapper (through
   `CONTROL_SANDBOX_PROVIDER` in its launch env) write the same `~/.kilocode/rules/cloud-agent.md`.
@@ -2045,7 +2415,7 @@ Request and response bodies stream; there is no body-size cap.
 | Proxied `/.kilo-preview/*` path | 404 | `Not found` |
 | WebSocket upgrade or non-`GET`/`HEAD` with a foreign, `null` or missing `Origin` | 403 | `Cross-origin preview request rejected` |
 | Access denied | 403 | `Session access denied` |
-| Reserved port (`cloudflare` 3000), refused by the physical DO | 403 | `That port is reserved` |
+| Reserved port (`cloudflare` 3000), refused by the physical DO; on the tunnel, the provider port or a `kilo serve` port, refused by the wrapper | 403 | `That port is reserved` |
 | Access database unavailable | 503 | `Session access is temporarily unavailable` |
 | Ineligible platform | 409 | `Preview is only available for interactive Cloud Agent sessions` |
 | Unsupported provider | 409 | `Preview is not available for this sandbox provider` |
@@ -2094,12 +2464,122 @@ Request and response bodies stream; there is no body-size cap.
   change: it shows the preview button once the Worker reports preview as enabled. The `kilo serve`
   password is in the wrapper, so ship a sandbox image with it before you enable preview; an older
   image leaves `kilo serve` open to a preview of its port.
-- **Second hosted provider (follow-up).** A provider-native inbound port is the eventual second
-  path, but it needs ports declared at sandbox creation: `createSandbox` in
-  `src/agent-sandbox/vercel/vercel-sandbox-rest-client.ts` sends none, and the creation response
-  carries `routes[{ url, subdomain, port }]`. Routing would follow those routes. The published URLs
-  are public, so a Worker proxy behind this auth would be required to keep the access check.
-  Until that exists the resolver returns 409 `unsupported_provider` without a provider call.
+
+#### Preview tunnel (`wrapper-tunnel`)
+
+A provider without a private network path to its sandbox (today Vercel) reaches the dev server
+through the wrapper. `resolvePreviewTarget` gives such a provider `wrapper-tunnel` coordinates with
+the allocation id as `allocationRef`. The allocation id fences the preview cookie: a cookie for a
+replaced allocation gets 401. All the checks above (host, cookie, access, `Origin`, header caps)
+run first, and the route's response sanitizer runs on every tunnel response, as on the Containers
+path.
+
+- **Path.** Browser → Worker preview route → `PreviewTunnel` DO named `<sandboxId>:<allocationId>`
+  → one binary WebSocket that the wrapper opened → wrapper → `127.0.0.1:<port>`. The wrapper
+  connects to `/sandbox-preview-tunnel/<sandboxId>` on the host of its control URL
+  (`previewTunnelUrl`). Hostname dispatch runs first, so a preview-host request to that path goes
+  to the preview route, never to tunnel admission.
+- **Admission.** The tunnel route checks the launch JWT first, as for the control socket. Then it
+  calls the mandatory Sandbox DO `admitPreviewTunnel` RPC, which runs
+  `validateAllocationCredential`: a stale allocation, a wrong credential, or a `stopping` or
+  `stopped` allocation is refused with 403. Only then does the Worker send a new upgrade request,
+  with the connect header and no client header, to the `PreviewTunnel` DO.
+- **Demand.** The tunnel opens on demand. When a request finds no tunnel, the DO calls Sandbox DO
+  `requestPreviewTunnel(allocationId)` once; requests that arrive during the wait share it. The
+  Sandbox DO sends `preview.tunnel` to the bound wrapper (`requested`), or answers `not_ready` (no
+  bound wrapper, or another allocation) or `outdated` (the wrapper did not advertise
+  `previewTunnel`). A request waits at most 10 s for the connect. Each `preview.tunnel` frame makes
+  the wrapper close its current tunnel and open a new one. A new connect replaces the old tunnel
+  with close 4001 and fails its open streams.
+- **Lifecycle.** The wrapper pings every 30 s and closes the tunnel after 2 missed pongs. It closes
+  the tunnel 5 minutes after its last stream ends, and it never reconnects by itself: the next
+  browser request asks again. The DO keeps no storage. An open HTTP stream keeps the DO in memory.
+  The tunnel socket and the browser WebSockets use the hibernation API, so a tunnel with only HMR
+  sockets can hibernate; a browser WebSocket survives a wake through its socket tags.
+- **No activity.** The demand RPC and the tunnel touch no queue, alarm, lease or activity anchor,
+  and the wrapper does not count tunnel streams in its heartbeat. An open tunnel never keeps a
+  sandbox running; the idle deadline still stops it.
+- **Protocol.** A frame is `[type u8][stream u32 big-endian][payload]`
+  (`src/shared/preview-tunnel-protocol.ts`). Types: 1 `open`, 2 `head`, 3 `data`, 4 `end`,
+  5 `reset`, 6 `credit`, 7 `ws_open`, 8 `ws_accept`, 9 `ws_text`, 10 `ws_binary`, 11 `ws_close`.
+  JSON payloads are strict schemas. The DO allocates every stream id: HTTP ids are below
+  `0x80000000`, WebSocket ids are at or above it. The wrapper acknowledges each `open` and
+  `ws_open` at once with a zero-byte `credit`, before its loopback connect; a `reset` (for example
+  `busy`) is also an acknowledgement. When an open has no acknowledgement in 3 s and the tunnel
+  sent no frame since that open, the tunnel is dead: the DO closes it with 4002, asks for a new
+  tunnel and tries once more. A tunnel that sent other frames is alive but slow, so the stream goes
+  on and its head or accept backstop bounds the wait; a burst of opens on a busy sandbox does not
+  drop the tunnel. HTTP bodies move within credit in both directions. WebSocket
+  messages move without credit, as on the Containers path.
+- **Untrusted wrapper.** The DO closes the tunnel on a text message (1003), an unknown type, a
+  frame for a stream it did not open, data over the credit, credit over the window, a second head
+  or an oversize frame (1008; a WebSocket message over 1 MiB is 1009). The only call out of the DO
+  is the demand, which carries no tunnel data, so no tunnel byte reaches a control path. A late
+  frame for a stream that ended recently is ignored.
+
+| Bound | Value |
+|---|---|
+| JSON payload (`open`, `head`, `ws_open`, `ws_accept`, `reset`, `ws_close`) | 64 KiB |
+| `data` payload | 64 KiB |
+| WebSocket message (`ws_text`, `ws_binary`) | 1 MiB |
+| Credit window, each stream and direction | 256 KiB |
+| Open streams, each tunnel | 128 HTTP + 128 WebSocket |
+| Requests that wait for a free stream | 512, each for at most 10 s, then 503 |
+| Acknowledgement from a silent tunnel / connect wait | 3 s, one retry / 10 s |
+| Time to response head | wrapper 60 s; DO backstop 65 s |
+| Time to an open loopback WebSocket | wrapper 10 s; DO backstop 15 s |
+| Ping / missed pongs / idle close (wrapper) | 30 s / 2 / 5 min with no stream |
+
+- **Memory.** The DO holds response data only within the credit it granted: at most 256 KiB for
+  each HTTP stream, so at most 32 MiB for 128 streams. Fixed receive storage coalesces DATA frames;
+  one-byte frames cannot retain one array per byte. Completed unread responses keep their slots
+  through tunnel replacement and late resets until the browser drains or cancels them.
+  This is a receive-storage bound, not a total isolate-memory bound. It reads a request body only within the
+  wrapper's credit, and a waiting request holds no body bytes. On each side a body pump also holds
+  one source read while it waits for credit. WebSocket messages have no credit: each message is at
+  most 1 MiB, and the runtime send buffers hold the rest, so the WebSocket relay has no total
+  bound. A body that breaks after the head resets the stream, and the browser sees a broken body.
+- **Wrapper body memory (open limit).** The wrapper has no bound for request or response bodies.
+  Bun's `fetch` reads the loopback response ahead of the DO's credit, and Bun's `node:http` client
+  does the same. `fetch` also pulls a streamed request body before the dev server reads it, so the
+  wrapper gives the request credit back early. Measured locally on Bun 1.3.14 with a dev server
+  that writes only when its socket drains: a browser that read 1 MiB/s got 4 MiB in 4 s, the dev
+  server wrote all 64 MiB in that time, and the wrapper RSS rose from 75 MiB to 280 MiB. One fast
+  64 MiB download raised it to 340 MiB. A `fetch` upload to a server that never reads pulled all
+  16 MiB in 2 s. So one large or endless body and a slow reader can fill the wrapper's memory
+  reservation. A paused `node:net` socket stops at the kernel buffers (about 2 MiB), so the
+  follow-up is a loopback HTTP/1.1 client on `node:net` that also writes the request body only
+  when its socket drains.
+
+| Failure on the tunnel | Status | Body |
+|---|---|---|
+| No bound wrapper, or the allocation changed | 503 + `Retry-After: 1` | `The sandbox is not ready` |
+| The wrapper did not advertise `previewTunnel` (older runtime) | 409 | `Preview needs a newer sandbox runtime. It works after the sandbox restarts.` |
+| No connect within 10 s, a silent tunnel again after the retry, or the tunnel closed during the request | 503 + `Retry-After: 1` | `Preview is temporarily unavailable` |
+| All streams busy after the 10 s wait, a full wait queue, or the wrapper's own cap | 503 + `Retry-After: 1` | `Too many open preview requests` |
+| Reserved port, refused by the wrapper | 403 | `That port is reserved` |
+| Nothing listens on the loopback port | 502 | `Nothing is listening on that port` |
+| No response head in time | 504 | `The server on that port did not respond in time` |
+| A head that preview cannot pass on: a status outside 200-599, a header the Worker cannot send, or a head over 64 KiB | 502 | `The server on that port sent a response that preview cannot pass on` |
+| An open frame over 64 KiB | 431 | `Preview request headers are too large` |
+| A request that the codec cannot carry | 400 | `Preview cannot pass on this request` |
+
+- **Cost.** Each browser request or WebSocket upgrade is one DO request; each tunnel connect and
+  each demand is one more. Cloudflare bills incoming WebSocket messages to the DO (tunnel frames,
+  browser messages) at 20 messages to one request; outgoing messages and incoming protocol pings are
+  free. The DO is billed for duration while an HTTP stream is open; a hibernated tunnel is not.
+- **Window limit.** One HTTP stream moves at most one window (256 KiB) for each round trip between
+  the wrapper and the DO. The DO is created near the first request that reaches it, which is the
+  browser's Worker location, not the sandbox. At a 90 ms round trip one stream moves about
+  2.8 MB/s (inferred, not measured); parallel streams add up. The follow-up is a location hint that
+  places the DO near the sandbox region. The integration run measures the real number.
+- **Release.** The wrapper advertises one optional `previewTunnel: true` hello field
+  (`z.literal(true)`). The Worker accepts it and the wrapper sends it in the same release, as for
+  `startCommands` and `worktreeGit`; the hello schema stays strict. A running older wrapper gets
+  409 until its sandbox restarts on the new runtime. The release adds the `PreviewTunnel` Durable
+  Object class with migration `v17` (`new_sqlite_classes`). Cloudflare blocks `wrangler rollback`
+  to a version before a Durable Object class change, so a Worker rollback across `v17` is not
+  possible: fix forward.
 
 ### Public mapping
 
@@ -2139,6 +2619,56 @@ Ingest checks the user and immutable Cloud Agent session owner
 under the row lock, applies the existing `status_transition_id` ordering, and
 broadcasts `session.status.updated` through the existing UserConnectionDO. A browser
 still uses one user-level WebSocket for the whole sidebar, not one per session.
+
+Kilo v2 has no session-ingest client, so the same publication also carries what that
+client writes for Kilo v1. `lastActivityAt` is the receipt time of the latest event
+that wrote the transcript (`TRANSCRIPT_EVENT_TYPES` in `list-status.ts`); ingest
+moves `cli_sessions_v2.last_activity_at` forward only, which keeps a working chat in
+the active-session list and dates its row. It rides status changes and refreshes,
+each at most once a minute: busy and retry refresh on any event, and any other
+status refreshes when transcript activity is newer than the last snapshot, so a
+wait on input while subagents keep working still proves the session live.
+`rename` is a native rename of the root: a root `conversation.source` whose source
+names the root too (one naming another session is never stored), whose session title
+differs from the stored source and is not a creation placeholder. A rename forces a
+snapshot and stays in newer snapshots
+until one is delivered, naming the snapshot that first carried it. Ingest applies it
+like a CLI rename report (it replaces a generated title), with a `session.updated`
+notification, in the status transaction and only while the stored
+`status_transition_id` is older than that first snapshot: a late publication cannot
+replace a newer rename, and a repeat of a delivered rename cannot replace a later user
+rename. Kilo v1 never sends `conversation.source`: its CLI keeps reporting its own
+titles.
+
+`liveSummary` and `totalCostMicrodollars` are the session card summary and cost total
+of a Kilo v2 root, the `cli_sessions_v2.live_summary` and `total_cost_microdollars`
+that the session-ingest client writes for Kilo v1. Lists, the session card and the
+briefing read them from the row; only an open chat reads the cost from the Session DO.
+`native-live-summary.ts` folds each stored root `conversation.message.updated` into a
+summary kept in DO storage, in the transaction that stores the event: the last started
+tool names the step through the shared step table (`shell` runs like `bash`), an
+unfinished reasoning item at the end of the content is `thinking`, the last `todowrite`
+is the plan, the latest assistant message's error is the failure (`aborted` is
+`cancelled`, `provider.*` is `provider`, `tool.*` is `tool`, anything else `other`),
+and a new root user message starts a turn with an empty summary. Kilo v2 reports no
+session diff, so `changes` stays null. The root's idle `session.status` clears the step
+and plan in the transaction that stores it, as the Kilo v1 idle transition does, so a
+turn that opens without a root user message (a background command's completion) does
+not start with the last turn's step; an idle or failed snapshot shows no step or plan.
+That turn's busy `session.status` clears the failure in the transaction that stores it,
+as the Kilo v1 busy transition does, so the working snapshot does not show the previous
+turn's failure while the session works; the failure otherwise stays until such a busy
+status or a new root user message starts a turn. The cost is the root's assistant-only cost
+total (`cost-total.ts`), the same value an open chat shows. Both ride every snapshot of
+a root with a native transcript and are absent for Kilo v1, whose ingest client keeps
+writing them. The first summary forces a snapshot; a changed one refreshes at most once
+per 10 seconds, the Kilo v1 summary write window, and status changes carry the final
+value of a turn. Ingest writes the summary in the status transaction only when the
+publication's status is not stale and the summary changed, so a late publication cannot
+replace a newer summary; a change under an unchanged status refreshes a session card
+that follows the session, as the Kilo v1 summary write does. It moves the cost forward
+only, together with the activity in one statement that writes no row version unless one
+of them advances.
 
 Publication has one durable, coalescing latest-status obligation per Session DO.
 Its monotonic ULID cursor survives eviction and clock rollback. Each RPC has a
@@ -2362,6 +2892,7 @@ A new preparation after stop creates a contained allocation. Sessions retain the
 Earlier branch work recorded live Vercel identity and GitHub checks.
 The shared admission refactor has local tests only; those earlier checks do not verify this change.
 Maximum payload and duration compatibility still require verification before production rollout.
+
 ## Customer billing schema maintenance
 
 The customer billing schema owner is `packages/session-ingest-contracts/src/cloud-agent-billing.ts`.
@@ -2373,3 +2904,40 @@ cp packages/session-ingest-contracts/src/cloud-agent-billing.ts services/cloud-a
 ```
 
 The mirror test requires exact source equality. Verify the standalone Docker wrapper build after schema changes.
+
+
+### Runtime proxy origin proof rollout
+
+Origin proof support ships in two releases. Deploy the compatibility release fully
+before merging the enforcement release. A PR merge alone is not the deployment gate.
+
+1. **Compatibility:** Containers outbound and Vercel network policies add
+   `x-kilo-runtime-proxy-origin`. The facade, Session DO, Sandbox DO RPC inputs and
+   Session Sync authorization binding accept and forward the optional proof.
+   Allocations do not require proof yet. Session Sync still omits the proof when
+   it calls the authorization binding, so its deployment order does not matter.
+2. **Enforcement:** Deploy Session Sync proof forwarding before Cloud Agent.
+   Cloud Agent then marks new allocations and requires their platform proof.
+   Existing allocations remain exempt until they stop.
+
+Before the enforcement release, verify that every active Cloud Agent version has
+the compatibility readers and outbound proof injection. Search Worker logs for
+`runtime_proxy_origin_proof_unavailable`: each line is an egress that sent no proof.
+Also run one live Vercel sandbox request that sets its own
+`x-kilo-runtime-proxy-origin`. The facade must receive only the injected proof.
+Readers treat a value that is not exactly one proof, such as a joined duplicate,
+as absent. Keep the releases separate;
+deploying both PRs together removes the compatibility boundary. For a rollback after
+enforcement, use the compatibility release as the Cloud Agent rollback target.
+
+### Containers allowlist and runtime facade
+
+New Containers allowlist allocations include the Worker runtime facade, Session Sync, and required repository hosts.
+Model, backend, and ingest upstreams remain behind the Worker facade. The wrapper receives a bound proxy handle before preparation.
+A legacy grant fails with `credential_upgrade_required`. A failed handle mint fails a per-session prepare and sends no prepare frame. An adopted worktree scope keeps serving its usable canonical handle.
+
+An active allocation keeps its exact persisted allowlist. `matchesActiveEgressPolicy` recognizes the previous direct-upstream baseline
+only when the requested destinations and audit setting are unchanged. It never broadens or rewrites the active pin.
+The next allocation uses the facade baseline after the previous allocation stops.
+Remove this compatibility comparison only after every pre-facade allocation is confirmed stopped, including hibernated Durable Objects.
+A release age or a successful new allocation does not prove that condition.

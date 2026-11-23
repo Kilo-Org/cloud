@@ -1,17 +1,25 @@
-/* eslint-disable typescript-eslint/no-deprecated -- DOM-free mounted React Native layout regression tests. */
+/* eslint-disable max-lines, typescript-eslint/no-deprecated -- DOM-free mounted React Native layout regression tests: one mock harness mounts every row shape, its trailing variants and its note line. */
 import { createElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { type LucideIcon } from '@/components/ui/icons';
+import { formatList } from '@/lib/format';
 import { darkColors, lightColors } from '@/lib/hooks/theme-colors.generated';
 import { act, TestRenderer } from '@/test/renderer';
 
 import { PreferenceRow } from './preference-row';
 
 const schemeState = vi.hoisted(() => ({ current: 'light' as 'light' | 'dark' }));
+// The shared switch paints its own muted pair on Android only: iOS fades a
+// disabled `UISwitch` itself, so the row's light override yields on both.
+const platformState = vi.hoisted(() => ({ os: 'ios' as 'ios' | 'android' }));
 
 vi.mock('react-native', () => ({
-  Platform: { OS: 'ios' },
+  Platform: {
+    get OS() {
+      return platformState.os;
+    },
+  },
   ActivityIndicator: 'ActivityIndicator',
   I18nManager: { isRTL: false },
   Pressable: 'Pressable',
@@ -24,6 +32,13 @@ vi.mock('@rn-primitives/slot', () => ({ Text: 'Slot.Text' }));
 vi.mock('@/components/ui/activity-indicator', () => ({
   ActivityIndicator: 'ActivityIndicator',
 }));
+// A switch row renders no chevron or check mark; the frame imports the marks
+// for its other trailing variants, so this suite stubs them out of its graph.
+vi.mock('@/components/ui/row-check', () => ({ RowCheck: 'RowCheck' }));
+vi.mock('@/components/ui/row-chevron', () => ({ RowChevron: 'RowChevron' }));
+// A flip ticks the selection haptic; the native module is out of this graph.
+const haptics = vi.hoisted(() => ({ selectionHaptic: vi.fn() }));
+vi.mock('@/lib/haptics', () => haptics);
 // The real palettes, so the switch-colour assertions below hold the token pairs
 // the screen actually renders rather than values invented for the test. The
 // import has to be dynamic: `vi.mock` factories are hoisted above this file's
@@ -37,7 +52,8 @@ vi.mock('@/lib/hooks/use-theme-colors', async () => {
   };
 });
 
-/** The row's icon prop takes a Lucide component; the test never inspects it. */
+/** The row's icon prop takes a Lucide component; this stub renders nothing, and
+ * the tile assertions read the element's own size and colour. */
 const Icon = (() => null) as unknown as LucideIcon;
 
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
@@ -48,8 +64,13 @@ function renderRow(props: {
   busy?: boolean;
   onValueChange: (next: boolean) => void;
   resolveValue?: () => boolean;
+  title?: string;
   subtitle?: string;
+  subtitleNumberOfLines?: number | 'all';
+  note?: string;
+  accessibilityLabel?: string;
   inactiveSubtitle?: string;
+  testID?: string;
 }) {
   act(() => {
     const element = createElement(PreferenceRow, {
@@ -75,6 +96,7 @@ afterEach(() => {
   act(() => renderer?.unmount());
   renderer = undefined;
   schemeState.current = 'light';
+  platformState.os = 'ios';
 });
 
 /** WCAG relative luminance, for the switch's contrast floor. */
@@ -96,6 +118,15 @@ function contrast(a: string, b: string): number {
 }
 
 describe('PreferenceRow', () => {
+  it('takes the contract row anatomy without owning a card', () => {
+    const root = renderRow({ value: false, onValueChange: () => undefined });
+    const outer = root.findAll(node => Object.is(node.type, 'View'))[0];
+    const classes = String(outer?.props.className).split(' ');
+
+    expect(classes).toEqual(expect.arrayContaining(['min-h-[48px]', 'px-4', 'py-3']));
+    expect(classes.some(name => name.startsWith('rounded-') || name.startsWith('bg-'))).toBe(false);
+  });
+
   it('moves the switch when the title is pressed, so a tap on the label is a tap on the control', () => {
     const seen: boolean[] = [];
     const root = renderRow({
@@ -128,6 +159,29 @@ describe('PreferenceRow', () => {
     });
 
     expect(seen).toEqual([false]);
+  });
+
+  it('ticks the selection haptic once per flip on either control, never per store update', () => {
+    haptics.selectionHaptic.mockClear();
+    const root = renderRow({ value: false, onValueChange: () => undefined });
+
+    const toggle = root.find(node => Object.is(node.type, 'Switch'));
+    act(() => {
+      (toggle.props.onValueChange as (next: boolean) => void)(true);
+    });
+    expect(haptics.selectionHaptic).toHaveBeenCalledTimes(1);
+
+    // The switch's own flip ticks inside the row frame; tapping the title is
+    // the same flip and answers the same way.
+    const label = root.find(node => Object.is(node.type, 'Pressable'));
+    act(() => {
+      (label.props.onPress as () => void)();
+    });
+    expect(haptics.selectionHaptic).toHaveBeenCalledTimes(2);
+
+    // A store write re-renders the row with a new value; it is not a flip.
+    renderRow({ value: true, onValueChange: () => undefined });
+    expect(haptics.selectionHaptic).toHaveBeenCalledTimes(2);
   });
 
   it('exposes the row as one switch carrying the title, subtitle and state', () => {
@@ -238,6 +292,128 @@ describe('PreferenceRow', () => {
     expect(copies[1]?.props.className).toContain('-ms-[100%]');
   });
 
+  it('pins one line cap on every subtitle copy, capped or uncapped', () => {
+    // The reserved pair and the visible overlay must carry the same cap: a
+    // mismatched pair changes the row's height the moment the state flips.
+    const subtitleCaps = (props: { subtitleNumberOfLines?: number | 'all' }) => {
+      const root = renderRow({
+        value: false,
+        subtitle: 'Applies now',
+        inactiveSubtitle: 'Has no effect right now',
+        onValueChange: () => undefined,
+        ...props,
+      });
+      // The title is `text-sm`; the subtitle copies are the `text-xs` ones.
+      const subtitles = root.findAll(
+        node => Object.is(node.type, 'Text') && String(node.props.className).includes('text-xs')
+      );
+
+      // Three subtitle copies plus the title, so a dropped branch fails here.
+      expect(root.findAll(node => Object.is(node.type, 'Text'))).toHaveLength(4);
+      expect(subtitles).toHaveLength(3);
+      return subtitles.map(node => node.props.numberOfLines);
+    };
+
+    // An omitted cap paints every line.
+    expect(subtitleCaps({})).toEqual([undefined, undefined, undefined]);
+
+    // A number clamps the reserved and the visible copy alike.
+    expect(subtitleCaps({ subtitleNumberOfLines: 2 })).toEqual([2, 2, 2]);
+
+    // `'all'` states the same uncapped intent as the omitted prop.
+    expect(subtitleCaps({ subtitleNumberOfLines: 'all' })).toEqual([
+      undefined,
+      undefined,
+      undefined,
+    ]);
+  });
+
+  it('paints the note as a third, smaller muted line under the subtitle', () => {
+    // A retiring model's date belongs to the model id, not to the subtitle's
+    // sentence: it reads model, what the switch controls, then when it goes, and
+    // takes the smaller muted face so it never competes with the title.
+    const root = renderRow({
+      value: true,
+      title: 'openrouter',
+      subtitle: 'Anthropic',
+      note: 'Retires Nov 22',
+      onValueChange: () => undefined,
+    });
+    const lines = root.findAll(node => Object.is(node.type, 'Text'));
+
+    expect(lines.map(node => node.props.children)).toEqual([
+      'openrouter',
+      'Anthropic',
+      'Retires Nov 22',
+    ]);
+    expect(String(lines[2]?.props.className)).toContain('text-muted-foreground');
+    expect(String(lines[2]?.props.className)).toContain('text-xs');
+    expect(String(lines[0]?.props.className)).not.toContain('text-xs');
+  });
+
+  it('gives the switch one spoken name, the title joined with the note', () => {
+    // A reader who cannot see the third line would hear only the model id; the
+    // retirement date joins it through the shared list formatter instead.
+    const root = renderRow({
+      value: true,
+      title: 'openrouter',
+      note: 'Retires Nov 22',
+      onValueChange: () => undefined,
+    });
+    const toggle = root.find(node => Object.is(node.type, 'Switch'));
+
+    expect(toggle.props.accessibilityLabel).toBe(
+      formatList(['openrouter', 'Retires Nov 22'], 'en')
+    );
+  });
+
+  it("joins the note to the caller's spoken override, never to the title", () => {
+    const root = renderRow({
+      value: true,
+      title: 'openrouter',
+      accessibilityLabel: 'Spend alerts for Acme',
+      note: 'Retires Nov 22',
+      onValueChange: () => undefined,
+    });
+    const toggle = root.find(node => Object.is(node.type, 'Switch'));
+    const label = toggle.props.accessibilityLabel as string;
+
+    expect(label).toBe(formatList(['Spend alerts for Acme', 'Retires Nov 22'], 'en'));
+    expect(label).not.toContain('openrouter');
+  });
+
+  it('keeps a row without a note to its own lines and its unjoined name', () => {
+    // The control case: the extra line exists only when a caller asks for it,
+    // and the spoken name is exactly the title the row already showed.
+    const root = renderRow({
+      value: true,
+      title: 'openrouter',
+      subtitle: 'Anthropic',
+      onValueChange: () => undefined,
+    });
+    const lines = root.findAll(node => Object.is(node.type, 'Text'));
+
+    expect(lines.map(node => node.props.children)).toEqual(['openrouter', 'Anthropic']);
+    expect(root.find(node => Object.is(node.type, 'Switch')).props.accessibilityLabel).toBe(
+      'openrouter'
+    );
+
+    // An override is the whole name when there is no note to join.
+    const overridden = renderRow({
+      value: true,
+      title: 'openrouter',
+      subtitle: undefined,
+      accessibilityLabel: 'Spend alerts for Acme',
+      onValueChange: () => undefined,
+    });
+    expect(
+      overridden.findAll(node => Object.is(node.type, 'Text')).map(node => node.props.children)
+    ).toEqual(['openrouter']);
+    expect(overridden.find(node => Object.is(node.type, 'Switch')).props.accessibilityLabel).toBe(
+      'Spend alerts for Acme'
+    );
+  });
+
   it('draws its icon in the shared neutral tile, the column the neighbouring destination rows use', () => {
     // A switch row standing above a `ConfigureRow` in one list (Voice input:
     // gateway transcription over transcription model and language) must start
@@ -270,9 +446,6 @@ describe('PreferenceRow', () => {
   });
 
   it('keeps the light off switch at 3:1 against the row it sits on', () => {
-    // Left alone on this light row, the shared switch's `mutedSoft` track sits
-    // at 2.1:1 over the `#F0EEE6` card, and Android's own default before it was
-    // 1.02:1, so the off control read as two barely-visible grey marks.
     schemeState.current = 'light';
     const root = renderRow({ value: false, onValueChange: () => undefined });
     const toggle = root.find(node => Object.is(node.type, 'Switch'));
@@ -301,5 +474,31 @@ describe('PreferenceRow', () => {
     expect(trackColor.true).toBe(darkColors.selection);
     expect(contrast(toggle.props.thumbColor as string, trackColor.false)).toBeGreaterThanOrEqual(3);
     expect(contrast(trackColor.false, darkColors.secondary)).toBeGreaterThanOrEqual(3);
+  });
+
+  it('paints an unavailable row with the quiet pair instead of the accent', () => {
+    // A dimmed title beside a full-strength accent track reads as both
+    // unavailable and on, and Android folds the colours into the switch
+    // drawables with no unavailable appearance of its own. The row therefore
+    // yields the light override and lets the shared switch paint its quiet pair.
+    schemeState.current = 'light';
+    platformState.os = 'android';
+    const root = renderRow({ value: true, disabled: true, onValueChange: () => undefined });
+    const toggle = root.find(node => Object.is(node.type, 'Switch'));
+    const trackColor = toggle.props.trackColor as { false: string; true: string };
+
+    expect(trackColor.false).toBe(lightColors.ringTrack);
+    expect(trackColor.true).toBe(lightColors.ringTrack);
+    expect(toggle.props.thumbColor).toBe(lightColors.muted);
+  });
+});
+
+describe('PreferenceRow test handle', () => {
+  it("puts the caller's testID on the row container", () => {
+    const row = renderRow({ value: true, onValueChange: () => undefined, testID: 'pref-1' }).find(
+      node => typeof node.type === 'string' && node.props.testID === 'pref-1'
+    );
+
+    expect(row.type).toBe('View');
   });
 });

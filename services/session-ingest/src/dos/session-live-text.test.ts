@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { sessionDisplayLine, sessionLiveText } from '@kilocode/session-ingest-contracts';
+import {
+  characterCut,
+  sessionDisplayLine,
+  sessionLiveText,
+  sessionLiveToolStep,
+} from '@kilocode/session-ingest-contracts';
 
 describe('sessionLiveText', () => {
   it('keeps only the characters it draws', () => {
@@ -113,6 +118,38 @@ describe('sessionLiveText', () => {
     }
   });
 
+  it('reads a cap outside the line as a boundary inside it', async () => {
+    const actual = globalThis.Intl;
+    try {
+      vi.stubGlobal('Intl', { Segmenter: undefined });
+      vi.resetModules();
+      // A dynamic import re-evaluates the module, which is the only way to reach
+      // the absent-segmenter branch once the module has cached its segmenter.
+      const { characterCut: withoutSegmenter } =
+        await import('@kilocode/session-ingest-contracts/session-live-summary');
+      for (const line of ['ab\u{1F1F7}\u{1F1F8}cd', 'ab\u{1F600}cd']) {
+        expect(withoutSegmenter(line, line.length)).toBe(line.length);
+        expect(withoutSegmenter(line, line.length + 5)).toBe(line.length);
+        expect(withoutSegmenter(line, 0)).toBe(0);
+        expect(withoutSegmenter(line, -3)).toBe(0);
+      }
+      // In-range caps keep the fallback's code unit boundary. A cap inside a
+      // surrogate pair reads as the pair's start, and the index just past a
+      // flag's first indicator is the boundary between the two indicators.
+      expect(withoutSegmenter('ab\u{1F1F7}\u{1F1F8}cd', 3)).toBe(2);
+      expect(withoutSegmenter('ab\u{1F1F7}\u{1F1F8}cd', 4)).toBe(4);
+      expect(withoutSegmenter('ab\u{1F600}cd', 3)).toBe(2);
+      expect(withoutSegmenter('ab\u{1F600}cd', 4)).toBe(4);
+    } finally {
+      vi.stubGlobal('Intl', actual);
+      vi.resetModules();
+    }
+    // The segmenter branch answers the same two cap ends.
+    const line = 'ab\u{1F600}cd';
+    expect(characterCut(line, line.length + 5)).toBe(line.length);
+    expect(characterCut(line, 0)).toBe(0);
+  });
+
   it('reads a segmenter that arrives after an earlier cut', async () => {
     const actual = globalThis.Intl;
     try {
@@ -134,9 +171,44 @@ describe('sessionLiveText', () => {
     }
   });
 
-  it('returns null for non-strings, blanks, and joiner-only text', () => {
+  it('returns null for non-strings, blanks, joiner-only text, and a limit below one', () => {
     expect(sessionLiveText(null, 40)).toBeNull();
     expect(sessionLiveText('\u200B\uFEFF\n', 40)).toBeNull();
     expect(sessionLiveText('\u200C\u200D', 40)).toBeNull();
+    // A limit below one has no room to draw anything, so even a real line reads null.
+    expect(sessionLiveText('a long line', 0)).toBeNull();
+    expect(sessionLiveText('a long line', -5)).toBeNull();
+    // The smallest usable limit still draws: the guard only rejects what has no room.
+    expect(sessionLiveText('abcdef', 1)).toBe('…');
+    expect(sessionLiveText('a', 1)).toBe('a');
+  });
+});
+
+describe('sessionLiveToolStep', () => {
+  it('resolves the last segment of a path with a long separator run within the step budget', () => {
+    const path = '/' + '/'.repeat(200_000) + 'file.ts';
+    const started = performance.now();
+    const step = sessionLiveToolStep('read', { path }, () => null);
+    const elapsed = performance.now() - started;
+    expect(step).toEqual({ verb: 'reading', target: 'file.ts' });
+    expect(elapsed).toBeLessThan(2000);
+  });
+
+  it('resolves the last segment of a long nested path', () => {
+    const path = 'x/'.repeat(100_000) + 'index.ts';
+    const started = performance.now();
+    const step = sessionLiveToolStep('read', { path }, () => null);
+    const elapsed = performance.now() - started;
+    expect(step).toEqual({ verb: 'reading', target: 'index.ts' });
+    expect(elapsed).toBeLessThan(2000);
+  });
+
+  it('ignores trailing separators on a long path', () => {
+    const path = 'x/'.repeat(100_000) + 'b.ts' + '/'.repeat(1000);
+    const started = performance.now();
+    const step = sessionLiveToolStep('list', { path }, () => null);
+    const elapsed = performance.now() - started;
+    expect(step).toEqual({ verb: 'searching', target: 'b.ts' });
+    expect(elapsed).toBeLessThan(2000);
   });
 });

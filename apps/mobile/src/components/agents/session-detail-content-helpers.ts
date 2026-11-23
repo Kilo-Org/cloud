@@ -234,6 +234,8 @@ export function lastVisibleMessageFailure({
  * The merged transcript then has the last word on what sits below the prompt: a
  * preparation group triggered by it states the turn's own failure, and a prompt
  * the read-only transcript drops as unrenderable has no row to attach a note to.
+ * A failed group the prompt's own row draws is not in the transcript, so the
+ * caller drops that prompt itself.
  *
  * Only a read-only session's record can be read this way. A stored user row
  * carries no delivery state, so the record cannot say whether the turn failed to

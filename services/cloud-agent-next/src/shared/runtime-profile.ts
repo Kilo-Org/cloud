@@ -1,5 +1,31 @@
 import * as z from 'zod';
-import { BUILTIN_AGENT_MODES } from './agent-modes.js';
+
+/**
+ * Agent ids the Kilo CLI owns, plus the cloud mode aliases that resolve to them.
+ * The wrapper build copies only `src/shared` and `wrapper`, so this list cannot
+ * come from a workspace package; a parity test keeps it equal to
+ * `RESERVED_AGENT_SLUGS` in `@kilocode/app-shared/agent-profile`.
+ */
+export const RESERVED_RUNTIME_AGENT_SLUGS = [
+  'code',
+  'plan',
+  'debug',
+  'orchestrator',
+  'ask',
+  'build',
+  'architect',
+  'custom',
+  'general',
+  'explore',
+  'compaction',
+  'title',
+  'summary',
+] as const;
+
+/** True when an agent id belongs to the CLI's own agents. */
+export function isReservedRuntimeAgentSlug(slug: string): boolean {
+  return RESERVED_RUNTIME_AGENT_SLUGS.some(reserved => reserved === slug);
+}
 
 export const RuntimeProfileLimits = {
   MAX_RUNTIME_INSTRUCTIONS: 50,
@@ -53,17 +79,44 @@ export type RuntimeInstructionInput = z.infer<typeof RuntimeInstructionSchema>;
 
 const SKILL_FILE_PATH_PATTERN = /^[a-zA-Z0-9._\-/]+$/;
 
-/** Shared by schema validation and the legacy writer that skips unsafe files. */
+/** Shared by schema validation and the writer that keeps only accepted paths. */
 export function isSafeSkillFilePath(path: string): boolean {
   return (
     path.length > 0 &&
     path.length <= RuntimeProfileLimits.MAX_RUNTIME_SKILL_COMPANION_PATH_LENGTH &&
     SKILL_FILE_PATH_PATTERN.test(path) &&
-    !path.startsWith('/') &&
+    path.split('/').every(segment => segment !== '' && segment !== '.' && segment !== '..') &&
     !path.includes('..') &&
-    !path.includes('//') &&
     path.toLowerCase() !== 'skill.md'
   );
+}
+
+export type AcceptedRuntimeSkillFiles = {
+  accepted: Record<string, string>;
+  rejected: Array<{ path: string; reason: 'path' | 'duplicate' }>;
+};
+
+/** Split a companion-file map into the entries the writer keeps and why the rest are dropped. */
+export function acceptedRuntimeSkillFiles(
+  files: Record<string, string>
+): AcceptedRuntimeSkillFiles {
+  const accepted: Array<[string, string]> = [];
+  const rejected: AcceptedRuntimeSkillFiles['rejected'] = [];
+  const seen = new Set<string>();
+  for (const [path, content] of Object.entries(files)) {
+    if (!isSafeSkillFilePath(path)) {
+      rejected.push({ path, reason: 'path' });
+      continue;
+    }
+    const folded = path.toLowerCase();
+    if (seen.has(folded)) {
+      rejected.push({ path, reason: 'duplicate' });
+      continue;
+    }
+    seen.add(folded);
+    accepted.push([path, content]);
+  }
+  return { accepted: Object.fromEntries(accepted), rejected };
 }
 
 /** Validate a map of companion files bundled with a skill. */
@@ -77,12 +130,20 @@ const RuntimeSkillFilesSchema = z
     `A skill may have at most ${RuntimeProfileLimits.MAX_RUNTIME_SKILL_COMPANION_FILES} companion files`
   )
   .superRefine((files, ctx) => {
+    const { accepted, rejected } = acceptedRuntimeSkillFiles(files);
+    const first = rejected[0];
+    if (first) {
+      ctx.addIssue({
+        code: 'custom',
+        message:
+          first.reason === 'path'
+            ? `Skill file path rejected: ${first.path}`
+            : `Skill file path duplicates another companion file: ${first.path}`,
+      });
+      return;
+    }
     let total = 0;
-    for (const [path, content] of Object.entries(files)) {
-      if (!isSafeSkillFilePath(path)) {
-        ctx.addIssue({ code: 'custom', message: `Skill file path rejected: ${path}` });
-        return;
-      }
+    for (const content of Object.values(accepted)) {
       total += content.length;
     }
     if (total > RuntimeProfileLimits.MAX_RUNTIME_SKILL_COMPANION_FILES_TOTAL) {
@@ -126,6 +187,71 @@ export const RuntimeSkillsSchema = z
     `Maximum ${RuntimeProfileLimits.MAX_RUNTIME_SKILLS} runtime skills allowed`
   );
 
+/** Keep only the companion files the current path rule accepts, whatever the stored shape. */
+export function projectStoredRuntimeSkills(value: unknown): unknown {
+  if (!Array.isArray(value)) return value;
+  const skills: unknown[] = value;
+  return skills.map(skill => {
+    if (typeof skill !== 'object' || skill === null || !('files' in skill)) return skill;
+    const files = skill.files;
+    if (typeof files !== 'object' || files === null || Array.isArray(files)) return skill;
+    const companions = Object.fromEntries(
+      Object.entries(files as Record<string, unknown>).filter(
+        (entry): entry is [string, string] => typeof entry[1] === 'string'
+      )
+    );
+    return { ...skill, files: acceptedRuntimeSkillFiles(companions).accepted };
+  });
+}
+
+/** Drop stored runtime agents whose slug the CLI owns, whatever the stored shape. */
+export function projectStoredRuntimeAgents(value: unknown): unknown {
+  if (!Array.isArray(value)) return value;
+  const agents: unknown[] = value;
+  return agents.filter(agent => {
+    if (typeof agent !== 'object' || agent === null) return true;
+    if (!('slug' in agent)) return true;
+    const slug = agent.slug;
+    return typeof slug !== 'string' || !isReservedRuntimeAgentSlug(slug);
+  });
+}
+
+/**
+ * Route spec read back from storage: its runtime skills keep the entries the
+ * current path rule accepts and its runtime agents keep the entries whose slug
+ * the CLI leaves to the profile, so a spec written under an earlier rule still
+ * loads. A spec that arrives on the wire is parsed with
+ * `controlPlaneRouteSpecSchema` and stays strict.
+ */
+export function projectStoredRouteSpec(spec: unknown): unknown {
+  if (typeof spec !== 'object' || spec === null) return spec;
+  let projected = spec;
+  if ('runtimeSkills' in projected) {
+    projected = {
+      ...projected,
+      runtimeSkills: projectStoredRuntimeSkills(projected.runtimeSkills),
+    };
+  }
+  if ('runtimeAgents' in projected) {
+    projected = {
+      ...projected,
+      runtimeAgents: projectStoredRuntimeAgents(projected.runtimeAgents),
+    };
+  }
+  return projected;
+}
+
+/**
+ * Runtime skills read back from storage. A bundle written under an earlier path
+ * rule keeps the companion files the current rule accepts, so a stored session
+ * or registration parses with the rest of its configuration. Anything a caller
+ * supplies is validated with `RuntimeSkillsSchema` instead.
+ */
+export const PersistedRuntimeSkillsSchema = z.preprocess(
+  projectStoredRuntimeSkills,
+  RuntimeSkillsSchema.optional()
+);
+
 export type RuntimeSkillInput = z.infer<typeof RuntimeSkillSchema>;
 
 const PermissionActionSchema = z.enum(['allow', 'ask', 'deny']);
@@ -140,10 +266,12 @@ const PermissionConfigSchema = z.union([PermissionActionSchema, z.record(z.strin
  * `KILO_CONFIG_CONTENT.agent.<slug>` at session preparation time. Mirrors the
  * CLI's AgentConfig shape so we pass through verbatim.
  *
- * Reserved built-in slugs (`code`, `plan`, `architect`, `custom`, …) are
- * rejected here so an inline or persisted runtime agent cannot override a
- * built-in agent's prompt or permissions inside the sandbox. The web-side
- * profile service applies the same rule when persisting agents.
+ * A runtime agent slug uses an id of its own. The CLI's own agent ids
+ * (`build`, `plan`, `general`, `explore`, `compaction`, `title`, `summary`) and
+ * the cloud mode aliases that resolve to them (`code`, `debug`, `orchestrator`,
+ * `ask`, `architect`, `custom`) stay reserved, for an inline runtime agent and
+ * for a stored one alike. The web-side profile service applies the same rule
+ * when persisting agents.
  */
 export const RuntimeAgentSchema = z.object({
   slug: z
@@ -151,7 +279,7 @@ export const RuntimeAgentSchema = z.object({
     .min(1)
     .max(RuntimeProfileLimits.MAX_RUNTIME_AGENT_SLUG_LENGTH)
     .regex(/^[a-z][a-z0-9-]*$/, 'Agent slug must start with a letter')
-    .refine(slug => !BUILTIN_AGENT_MODES.has(slug), {
+    .refine(slug => !isReservedRuntimeAgentSlug(slug), {
       message: 'Slug conflicts with a built-in agent; choose a different slug',
     }),
   name: z.string().min(1).max(RuntimeProfileLimits.MAX_RUNTIME_AGENT_NAME_LENGTH),
@@ -189,6 +317,17 @@ export const RuntimeAgentsSchema = z
     RuntimeProfileLimits.MAX_RUNTIME_AGENTS,
     `Maximum ${RuntimeProfileLimits.MAX_RUNTIME_AGENTS} runtime agents allowed`
   );
+
+/**
+ * Runtime agents read back from storage. A bundle written under an earlier
+ * slug rule keeps loading: entries whose slug the CLI owns are dropped, so a
+ * stored session or registration parses with the rest of its configuration.
+ * Anything a caller supplies is validated with `RuntimeAgentsSchema` instead.
+ */
+export const PersistedRuntimeAgentsSchema = z.preprocess(
+  projectStoredRuntimeAgents,
+  RuntimeAgentsSchema.optional()
+);
 
 export type RuntimeAgentInput = z.infer<typeof RuntimeAgentSchema>;
 

@@ -1,5 +1,10 @@
 import { z } from 'zod';
 
+import {
+  LEADERBOARD_MODEL_SQL,
+  LEADERBOARD_SERVED_MODEL_SQL,
+  resolveLeaderboardModel,
+} from '@/lib/leaderboard-model';
 import { normalizePublicInferenceProvider } from '@/lib/public-inference-provider';
 import {
   createPublicSnowflakeReport,
@@ -12,10 +17,7 @@ const MAXIMUM_ERROR_RATE = 0.5;
 
 const LEADERBOARD_MODEL_PROVIDER_USAGE_QUERY = `
 select
-     case
-        when mu.requested_model like '~%' then coalesce(mu.model, mu.requested_model)
-        else mu.requested_model
-      end as "model"
+     ${LEADERBOARD_MODEL_SQL} as "model"
     , mu.inference_provider as "provider"
     , sum(mu.total_cost_microdollars) as "sum_cost"
     , sum(mu.total_input_tokens) + sum(mu.total_output_tokens) as "sum_tokens"
@@ -23,6 +25,7 @@ select
     , sum(mu.total_cache_hit_tokens) as "sum_cache_hit_tokens"
     , sum(mu.request_count) as "sum_request_count"
     , sum(mu.error_count) as "sum_error_count"
+    , ${LEADERBOARD_SERVED_MODEL_SQL} as "served_model"
 from microdollar_usage_daily as mu
 where
     mu.usage_date >= dateadd(week, -1, current_date())
@@ -35,7 +38,7 @@ where
     and mu.total_output_tokens > 0
     and mu.is_user_byok = false
     and mu.requested_model not ilike '%mercury-edit%'
-group by 1, 2
+group by 1, 2, 9
 order by 4 desc;
 `;
 
@@ -65,35 +68,19 @@ type AggregatedUsage = {
   sumErrorCount: number;
 };
 
-function normalizeModel(model: string): string {
-  const withoutTrailingSlashes = model.replace(/\/+$/, '');
-  const slashIndex = withoutTrailingSlashes.lastIndexOf('/');
-  const withoutProvider = withoutTrailingSlashes.startsWith('openrouter/')
-    ? withoutTrailingSlashes
-    : slashIndex >= 0
-      ? withoutTrailingSlashes.slice(slashIndex + 1)
-      : withoutTrailingSlashes;
-  const colonIndex = withoutProvider.indexOf(':');
-
-  if (colonIndex < 0 || withoutProvider.slice(colonIndex) === ':free') {
-    return withoutProvider;
-  }
-
-  return withoutProvider.slice(0, colonIndex);
-}
-
 function ratio(numerator: number, denominator: number): number {
   return denominator === 0 ? 0 : numerator / denominator;
 }
 
-function parseAndAggregateUsage(rows: string[][]): ModelProviderUsage[] {
+async function parseAndAggregateUsage(rows: string[][]): Promise<ModelProviderUsage[]> {
   const usageByModelAndProvider = new Map<string, AggregatedUsage>();
 
   for (const row of rows) {
     const [rawModel, rawProvider, ...rawAggregates] = row;
     const [sumCost, sumTokens, sumInputTokens, sumCacheHitTokens, sumRequestCount, sumErrorCount] =
-      rawAggregates.map(Number);
-    const model = normalizeModel(rawModel?.trim() || '');
+      rawAggregates.slice(0, 6).map(Number);
+    const servedModel = rawAggregates[6];
+    const model = await resolveLeaderboardModel(rawModel || '', servedModel);
     const provider = normalizePublicInferenceProvider(rawProvider?.trim() || 'unknown');
 
     if (

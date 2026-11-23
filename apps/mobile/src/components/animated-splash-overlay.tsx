@@ -2,6 +2,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { TimeToFullDisplay } from '@sentry/react-native';
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { type ViewStyle } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -16,12 +17,24 @@ import { scheduleOnRN } from 'react-native-worklets';
 import logo from '@/../assets/images/logo-mark.png';
 import { Image } from '@/components/ui/image';
 import { SPLASH_CONTENT_OVERSCAN, splashContentScale } from '@/components/splash-reveal';
+import { SPLASH_BACKGROUND_COLOR, SPLASH_DISC_SIZE, SPLASH_LOGO_SIZE } from '@/lib/splash-branding';
 import { isStartupComplete, subscribeStartupComplete } from '@/lib/startup-timing';
 import { useMotionPolicy } from '@/lib/a11y/motion';
 
 const HIDE_SAFETY_MS = 2000;
 const LOGO_LOAD_SAFETY_MS = 500;
 const REVEAL_START_SAFETY_MS = 1000;
+
+/** The mark's box: the size the native splash paints it at, so nothing moves. */
+const logoBox = { width: SPLASH_LOGO_SIZE, height: SPLASH_LOGO_SIZE } satisfies ViewStyle;
+
+/** The reveal disc's box: the mark's size plus its ring. */
+const discBox = { width: SPLASH_DISC_SIZE, height: SPLASH_DISC_SIZE } satisfies ViewStyle;
+
+/** The field behind the mark: the same colour the native splash paints, taken
+ *  from the shared module rather than a class because NativeWind cannot
+ *  interpolate a constant into the animated style beside it. */
+const splashBackground = { backgroundColor: SPLASH_BACKGROUND_COLOR } satisfies ViewStyle;
 
 // Reveal timeline. The logo dips, punches through the viewer and clears the
 // frame, and only then does a disc of the app's own background wipe the yellow
@@ -37,7 +50,7 @@ const DISC_MS = 320;
 const HANDOVER_DELAY_MS = 480;
 const HANDOVER_MS = 170;
 /**
- * How far the 120dp reveal disc grows. 16x clears the diagonal of every phone
+ * How far the reveal disc grows. 16x clears the diagonal of every phone
  * and tablet this app runs on, so the disc never leaves a yellow wedge in a
  * corner; a fixed factor keeps the overlay free of any layout dependency. The
  * growth is linear so the wipe's leading edge crosses the screen at a steady
@@ -193,23 +206,24 @@ export function AnimatedSplashOverlay() {
       <TimeToFullDisplay ready={dismissed} />
       {dismissed ? null : (
         <>
-          {/* The overlay is yellow, so the status bar needs dark icons whatever the
-              theme is. Mounted after the root `style="auto"` bar, it wins the merge
-              until the reveal ends and this unmounts. */}
+          {/* The overlay paints SPLASH_BACKGROUND_COLOR, so the status bar needs
+              dark icons whatever the theme is. Mounted after the root
+              `style="auto"` bar, it wins the merge until the reveal ends and
+              this unmounts. */}
           <StatusBar style="dark" />
           <Animated.View
             pointerEvents="none"
-            className="absolute inset-0 items-center justify-center bg-[#FFDD00]"
-            style={overlayStyle}
+            className="absolute inset-0 items-center justify-center"
+            style={[overlayStyle, splashBackground]}
           >
             <Animated.View
-              className="absolute h-[120px] w-[120px] rounded-full bg-background"
-              style={discStyle}
+              className="absolute rounded-full bg-background"
+              style={[discBox, discStyle]}
             />
             <Animated.View style={logoStyle}>
               <Image
                 source={logo}
-                className="h-[100px] w-[100px]"
+                style={logoBox}
                 transition={0}
                 onLoad={() => {
                   setLogoLoaded(true);

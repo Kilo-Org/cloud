@@ -1,4 +1,10 @@
-import { describe, expect, it } from 'vitest';
+/* eslint-disable max-lines -- the format helpers and the device clock probe share one suite, and the probe's CommonJS seam needs its own stub: a second file would duplicate that seam */
+// eslint-disable-next-line import/no-nodejs-modules -- vitest-only probe seam: the app's clock probe reaches the native module through Node's own `require`, so the test must write to that cache
+import { createRequire } from 'node:module';
+// eslint-disable-next-line import/no-nodejs-modules -- vitest-only probe seam: the cache entry's `path` field is the resolved module's own directory
+import { dirname } from 'node:path';
+
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { SUPPORTED_LANGUAGES } from '@/i18n/languages';
 
@@ -15,9 +21,56 @@ import {
   formatNumber,
   formatPrefixedMoney,
   formatPrefixedUsd,
+  formatSignedPrefixedMoney,
   normalizeLocalizedNumber,
   parseLocalizedNumber,
 } from './format';
+
+/** The shape `formatPrefixedMoney` pins, and the four-digit shape below it. */
+const TWO_DIGITS = {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+} satisfies Intl.NumberFormatOptions;
+const FOUR_DIGITS = {
+  minimumFractionDigits: 4,
+  maximumFractionDigits: 4,
+} satisfies Intl.NumberFormatOptions;
+
+const nodeRequire = createRequire(import.meta.url);
+const deviceLocalizationPath = nodeRequire.resolve('expo-localization');
+
+/** Where the next case starts the fake clock, always past the probe's last memo stamp. */
+let deviceClock = Date.now();
+
+/**
+ * Answer the app's device clock probe with `uses24hourClock`.
+ *
+ * The probe reaches the native module through Node's own `require`, so
+ * `vi.mock('expo-localization')` cannot reach it: that mock only intercepts the
+ * module graph Vite builds. A test worker also has no native module to answer,
+ * so the real `require` throws. Installing an entry in the same CommonJS cache
+ * the probe reads is the seam both of those leave open, which is why this
+ * reaches through `createRequire` instead of stubbing a global. The probe
+ * memoizes for a second, so each case starts the fake clock past the stamp the
+ * previous case left in that memo; a fresh `vi.useFakeTimers()` alone starts at
+ * the real time and would read the memo instead of the stub.
+ */
+function stubDeviceCalendars(uses24hourClock: boolean | null): void {
+  nodeRequire.cache[deviceLocalizationPath] = {
+    children: [],
+    exports: { getCalendars: () => [{ uses24hourClock }] },
+    filename: deviceLocalizationPath,
+    id: deviceLocalizationPath,
+    isPreloading: false,
+    loaded: true,
+    parent: null,
+    path: dirname(deviceLocalizationPath),
+    paths: [],
+    require: nodeRequire,
+  } satisfies NodeJS.Module;
+  deviceClock += 2000;
+  vi.useFakeTimers({ now: deviceClock });
+}
 
 describe('formatPrefixedUsd', () => {
   it("leads the prefixed amount with the symbol and the locale's own sign", () => {
@@ -36,6 +89,42 @@ describe('formatPrefixedUsd', () => {
     const ar = formatPrefixedUsd(0, 'ar');
     expect(ar.startsWith('$')).toBe(true);
     expect(ar).not.toContain('\u00A0');
+  });
+
+  it('writes a negative that rounds to zero as the locale’s own unsigned zero', () => {
+    // The five inputs the two-decimal shape has to get right, side by side.
+    const twoDigits = [
+      [0, '$0.00'],
+      [-0, '$0.00'],
+      [-0.001, '$0.00'],
+      [0.004, '$0.00'],
+      [-5, '-$5.00'],
+    ] as const;
+    for (const [amount, expected] of twoDigits) {
+      expect(formatPrefixedUsd(amount, 'en-US', TWO_DIGITS)).toBe(expected);
+    }
+    // The locale's own zero, digits, separators and direction marks included.
+    for (const locale of ['de-DE', 'pt-BR', 'hi', 'ar-EG', 'fa']) {
+      expect(formatPrefixedUsd(-0.004, locale, TWO_DIGITS)).toBe(
+        `$${formatNumber(0, locale, TWO_DIGITS)}`
+      );
+    }
+    // The same input at four digits is a real amount, so it keeps its sign, and
+    // below the fourth digit it rounds back to that unsigned zero.
+    expect(formatPrefixedUsd(-0.001, 'en-US', FOUR_DIGITS)).toBe('-$0.0010');
+    expect(formatPrefixedUsd(-0.00004, 'en-US', FOUR_DIGITS)).toBe('$0.0000');
+  });
+
+  it('keeps a visible debit signed and refuses a caller plus', () => {
+    // A half cent rounds to a cent at these digits, so the debit is visible.
+    expect(formatPrefixedUsd(-0.005, 'en-US', TWO_DIGITS)).toBe('-$0.01');
+    expect(formatPrefixedUsd(-0.5, 'de-DE', TWO_DIGITS)).toBe('-$0,50');
+    // The plus is the ledger shape's job: a caller asking for one cannot sign
+    // an ordinary money figure, and cannot sign a rounded zero back into a plus.
+    expect(formatPrefixedUsd(5, 'en-US', { ...TWO_DIGITS, signDisplay: 'always' })).toBe('$5.00');
+    expect(formatPrefixedUsd(-0.004, 'en-US', { ...TWO_DIGITS, signDisplay: 'exceptZero' })).toBe(
+      '$0.00'
+    );
   });
 });
 
@@ -60,6 +149,13 @@ describe('formatPrefixedMoney', () => {
     expect(formatPrefixedMoney(-5, 'sv').startsWith('\u2212$')).toBe(true);
   });
 
+  it('drops the sign from a negative that rounds to zero cents', () => {
+    expect(formatPrefixedMoney(-0.004, 'en-US')).toBe('$0.00');
+    expect(formatPrefixedMoney(-0.004, 'de-DE')).toBe('$0,00');
+    // A half cent still rounds to a cent, and keeps its sign.
+    expect(formatPrefixedMoney(-0.005, 'en-US')).toBe('-$0.01');
+  });
+
   it('writes the symbol first and no separating space in a right-to-left language', () => {
     const ar = formatPrefixedMoney(1234.5, 'ar');
     expect(ar.startsWith('$')).toBe(true);
@@ -67,32 +163,96 @@ describe('formatPrefixedMoney', () => {
   });
 });
 
+describe('formatSignedPrefixedMoney', () => {
+  it('says the direction of a credit, a debit and a zero', () => {
+    expect(formatSignedPrefixedMoney(12.5, 'en-US')).toBe('+$12.50');
+    expect(formatSignedPrefixedMoney(-5, 'sv')).toBe('\u2212$5,00');
+    // A zero moved nothing, so it takes no direction mark at all — and neither
+    // does a debit the formatter rounds to that zero.
+    expect(formatSignedPrefixedMoney(0, 'en-US')).toBe('$0.00');
+    expect(formatSignedPrefixedMoney(-0, 'en-US')).toBe('$0.00');
+    expect(formatSignedPrefixedMoney(-0.004, 'en-US')).toBe('$0.00');
+    // A half cent is visible, so it keeps the direction it holds.
+    expect(formatSignedPrefixedMoney(-0.005, 'en-US')).toBe('-$0.01');
+    expect(formatSignedPrefixedMoney(0.005, 'en-US')).toBe('+$0.01');
+  });
+
+  it('keeps each locale’s digits, separators and minus glyph', () => {
+    expect(formatSignedPrefixedMoney(1234.5, 'de-DE')).toBe('+$1.234,50');
+    expect(formatSignedPrefixedMoney(0, 'ar-EG')).toBe('$٠٫٠٠');
+  });
+
+  it('drops the directional literal ICU writes beside a sign', () => {
+    // Arabic is where ICU adds it; the caller's isolate already pins the run,
+    // and a spoken label reads the bare figure.
+    expect(formatSignedPrefixedMoney(12.5, 'ar')).toBe('+$12.50');
+    // The ordinary shapes keep their bytes: this shape owns the strip.
+    expect(formatPrefixedMoney(12.5, 'ar')).toBe('$12.50');
+  });
+});
+
 describe('localized format helpers', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    // A fake in the CommonJS cache would answer another file in this worker.
+    // oxlint-disable-next-line typescript-eslint/no-dynamic-delete -- the cache is keyed by the resolved module path, so the key is only known at run time
+    delete nodeRequire.cache[deviceLocalizationPath];
+  });
+
   it('keeps the padded hour of a twenty-four-hour locale', () => {
+    stubDeviceCalendars(null);
     const twoForty = new Date(2026, 0, 1, 2, 40);
     expect(formatDate(twoForty, 'yo', { hour: 'numeric', minute: '2-digit' })).toBe('02:40');
     expect(formatClockTime(twoForty, 'yo')).toBe('02:40');
   });
 
-  it('leaves an unpadded clock untouched', () => {
-    const twoForty = new Date(2026, 0, 1, 2, 40);
-    expect(formatClockTime(twoForty, 'en')).toBe(
-      formatDate(twoForty, 'en', { hour: 'numeric', minute: '2-digit' })
-    );
+  it('reads a twenty-four-hour clock on a device set to one', () => {
+    stubDeviceCalendars(true);
+    expect(formatClockTime(new Date(2026, 0, 1, 13, 45), 'en')).toBe('13:45');
+  });
+
+  it('reads a twelve-hour clock on a device set to one', () => {
+    stubDeviceCalendars(false);
+    const quarterToTwo = new Date(2026, 0, 1, 13, 45);
+    // `de` writes 13:45 on its own clock, so only the forced twelve-hour cycle
+    // can print the day period there. `en` already writes twelve-hour time, and
+    // pins the shape the device setting must leave alone.
+    expect(formatClockTime(quarterToTwo, 'de')).toBe('1:45 PM');
+    expect(formatClockTime(quarterToTwo, 'en')).toBe('1:45 PM');
+  });
+
+  it('leaves the language clock in place on a device that reports no setting', () => {
+    stubDeviceCalendars(null);
+    expect(formatClockTime(new Date(2026, 0, 1, 13, 45), 'de')).toBe('13:45');
   });
 
   it('formats a list and preserves one grapheme', () => {
     expect(formatList(['A', 'B'], 'de')).toBe('A und B');
-    expect(formatFileSize(1024, 'de')).toContain('1 kB');
+    expect(formatFileSize(1024, 'de')).toBe('1,02 kB');
     expect(firstGrapheme('👨‍👩‍👧‍👦 family', 'en')).toBe('👨‍👩‍👧‍👦');
   });
 
   it('pluralizes a whole-byte size in the active language', () => {
     expect(formatFileSize(1, 'en')).toBe('1 byte');
     expect(formatFileSize(564, 'en')).toBe('564 bytes');
-    expect(formatFileSize(1023, 'en')).toBe('1,023 bytes');
-    // A count that reaches the kilobyte unit keeps the abbreviated form.
-    expect(formatFileSize(1024, 'en')).toBe('1 kB');
+    expect(formatFileSize(999, 'en')).toBe('999 bytes');
+    // A count of 1000 bytes or more reaches the kilobyte unit, which keeps the
+    // abbreviated form.
+    expect(formatFileSize(1000, 'en')).toBe('1 kB');
+    expect(formatFileSize(1024, 'en')).toBe('1.02 kB');
+    expect(formatFileSize(1_048_576, 'en')).toBe('1.05 MB');
+    expect(formatFileSize(1_073_741_824, 'en')).toBe('1.07 GB');
+    // A count that rounds up to the next step takes the next unit's name, so a
+    // figure the unit cannot hold is never printed.
+    expect(formatFileSize(999_500, 'en')).toBe('999.5 kB');
+    expect(formatFileSize(999_999, 'en')).toBe('1 MB');
+    expect(formatFileSize(999_999_999, 'en')).toBe('1 GB');
+    // The promotion rounds at the digits the unit shows, so a fractional byte
+    // count just under the step promotes instead of printing "1,000 bytes", and
+    // the top step is the last one, holding any larger count.
+    expect(formatFileSize(999.5, 'en')).toBe('1 kB');
+    expect(formatFileSize(1_000_000_000_000, 'en')).toBe('1 TB');
+    expect(formatFileSize(1_000_000_000_000_000, 'en')).toBe('1,000 TB');
   });
 
   it('parses localized numbers and rejects other input', () => {
@@ -234,7 +394,6 @@ describe('parseLocalizedNumber with the device keypad separator', () => {
   });
 
   it('rejects input the two readings disagree on', () => {
-    // A thousand in German, or 1.234 from a dot keypad: the text does not say.
     expect(parseLocalizedNumber('1.234', 'de-DE', '.')).toBeNull();
     expect(parseLocalizedNumber('12.345', 'de-DE', '.')).toBeNull();
     expect(parseLocalizedNumber('1,234', 'en-US', ',')).toBeNull();

@@ -2,11 +2,12 @@
   "generic": {
     "title": "Kilo",
     "body": {
-      "cloudAgentSession": "Ihre Agentensitzung hat ein Update",
-      "lowBalance": "Ihr Guthaben benötigt Aufmerksamkeit",
-      "spendAlert": "Ihre Ausgaben benötigen Aufmerksamkeit",
+      "cloudAgentSession": "Deine Agentensitzung hat ein Update",
+      "lowBalance": "Dein Guthaben benötigt Aufmerksamkeit",
+      "spendAlert": "Deine Ausgaben benötigen Aufmerksamkeit",
       "securityFinding": "Ein Sicherheitsbefund benötigt Aufmerksamkeit",
       "securityUpdate": "Eine Sicherheitsprüfung hat ein Update",
+      "agentBriefing": "Dein Agenten-Briefing ist bereit",
       "activeAgentsGlanceable": "Aktive Agenten haben ein Update"
     }
   },
@@ -30,6 +31,12 @@
     "securityFindingNew": {
       "title": "Neuer Sicherheitsbefund ({{severity}})"
     },
+    "securityFindingSeverity": {
+      "critical": "Kritisch",
+      "high": "Hoch",
+      "medium": "Mittel",
+      "low": "Niedrig"
+    },
     "securityFindingSlaWarning": {
       "title": "SLA-Warnung"
     },
@@ -38,7 +45,7 @@
     }
   },
   "sessionReady": {
-    "body": "Ihre Kilo-Sitzung ist bereit, von Ihrem Telefon aus gesteuert zu werden"
+    "body": "Deine Kilo-Sitzung ist bereit, von deinem Telefon aus gesteuert zu werden"
   },
   "session": {
     "title": "{{sessionTitle}}"

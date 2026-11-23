@@ -1,11 +1,22 @@
+import { cloudEnvironmentSetupRouter } from './cloud-environment-setup-router';
 import { createTRPCRouter, baseProcedure } from '@kilocode/web-shared/lib/trpc/init';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
-import { getOrganizationById } from '@kilocode/web-shared/lib/organizations/organizations';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { AGENT_ENV_VARS_PUBLIC_KEY } from '@kilocode/web-shared/lib/config.server';
 import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
 import { SELECTABLE_SANDBOX_ALLOCATIONS } from '@kilocode/worker-utils/sandbox-allocation';
-import { egressModeSchema, egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
+import { setupScriptSchema } from '@kilocode/cloud-agent-profile/setup-script';
+import {
+  egressDomainSchema,
+  egressModeSchema,
+  egressPolicySchema,
+} from '@kilocode/worker-utils/egress-allowlist';
+import {
+  NETWORK_SECRET_LIMITS,
+  networkSecretInputSchema,
+  networkSecretChangeSchema,
+  networkSecretStoredPolicySchema,
+} from '@kilocode/worker-utils/network-secrets';
 import { isUniqueViolation } from '@/lib/db-errors';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
@@ -18,9 +29,9 @@ import {
   updateEnvironment,
   ENVIRONMENT_KEY_PATTERN,
   ENVIRONMENT_LIMITS,
+  ENVIRONMENT_SETUP_LIMITS,
   environmentRepositoryEntrySchema,
   type EnvironmentCreateInput,
-  type EnvironmentOwner,
   type EnvironmentPlatform,
   type EnvironmentRepositoryIdentity,
 } from '@kilocode/cloud-agent-profile';
@@ -31,8 +42,8 @@ import {
   environmentRepositoryListSchema,
   toEnvironmentRepositoryEntry,
 } from '@/lib/cloud-agent/environment-repository-input';
-import { createControlTokenForRequest } from '@/lib/auth/resource-delegation';
-import { createEnvironmentBuildClient } from '@/lib/cloud-agent-next/environment-build-client';
+import { getOwner, requireActiveOrganization } from '@/lib/cloud-agent/environment-owner';
+import { environmentBuildClientFor } from '@/lib/cloud-agent-next/environment-build-client';
 import {
   assertAllocationOffered,
   loadSandboxCapabilities,
@@ -65,7 +76,7 @@ const environmentSecretsSchema = z.record(
   z.string().max(ENVIRONMENT_LIMITS.MAX_SECRET_VALUE_LENGTH)
 );
 const environmentCommandsSchema = z
-  .array(z.string().min(1).max(ENVIRONMENT_LIMITS.MAX_COMMAND_LENGTH))
+  .array(setupScriptSchema.min(1))
   .max(ENVIRONMENT_LIMITS.MAX_COMMANDS);
 /** A change list can remove every stored secret and add a full set at once. */
 export const environmentSecretChangesSchema = z
@@ -81,6 +92,10 @@ export const environmentSecretChangesSchema = z
   .max(2 * ENVIRONMENT_LIMITS.MAX_VARS);
 
 const environmentSandboxAllocationSchema = z.enum(SELECTABLE_SANDBOX_ALLOCATIONS).nullable();
+
+const environmentRequiredHostsSchema = z
+  .array(egressDomainSchema)
+  .max(ENVIRONMENT_SETUP_LIMITS.MAX_REQUIRED_HOSTS);
 
 const listRepositorySchema = z.discriminatedUnion('platform', [
   z.object({ platform: z.literal('github'), fullName: z.string().min(1).max(500) }),
@@ -147,10 +162,13 @@ const environmentResponseBaseSchema = {
   commands: z.array(z.string()),
   startCommands: z.array(z.string()),
   secretKeys: z.array(z.string()),
+  networkSecrets: z.array(networkSecretStoredPolicySchema.extend({ key: z.string() })).optional(),
   configurationRevision: z.number(),
   sandboxAllocation: z.string().nullable(),
   egressMode: egressModeSchema.nullable(),
   egressAllowlist: z.array(z.string()).nullable(),
+  egressRequiredHosts: z.array(z.string()),
+  isDraft: z.boolean(),
 };
 
 const environmentResponseSchema = z.union([
@@ -161,26 +179,6 @@ const environmentResponseSchema = z.union([
 const publicKey = AGENT_ENV_VARS_PUBLIC_KEY ?? '';
 
 const DUPLICATE_ENVIRONMENT_MESSAGE = 'This repository already has an environment.';
-
-function getOwner(organizationId: string | undefined, userId: string): EnvironmentOwner {
-  return organizationId
-    ? { type: 'organization', id: organizationId }
-    : { type: 'user', id: userId };
-}
-
-/** A Worker client acting as the caller, scoped to the organization when one is given. */
-async function environmentBuildClientFor(
-  user: User,
-  headersList: Headers | undefined,
-  organizationId: string | undefined
-) {
-  const { token } = await createControlTokenForRequest(user, 'cloud-agent-next', {
-    headers: headersList,
-    ...(organizationId ? { organizationId } : {}),
-    tokenSource: 'cloud-agent',
-  });
-  return createEnvironmentBuildClient(token);
-}
 
 /**
  * Rejects a sandbox the owner is not offered for every platform the environment
@@ -204,12 +202,6 @@ const environmentBuildScopeSchema = z.object({
   organizationId: z.uuid().optional(),
   environmentId: z.uuid(),
 });
-
-async function requireActiveOrganization(organizationId: string): Promise<void> {
-  if (!(await getOrganizationById(organizationId))) {
-    throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
-  }
-}
 
 async function listRepositoryIdentity(
   repository: z.infer<typeof listRepositorySchema>,
@@ -240,6 +232,7 @@ async function listRepositoryIdentity(
  * values or envelopes, only key names.
  */
 export const cloudEnvironmentsRouter = createTRPCRouter({
+  setupRuns: cloudEnvironmentSetupRouter,
   list: baseProcedure
     .input(z.object({ organizationId: z.uuid().optional(), repository: listRepositorySchema }))
     .output(z.array(environmentSummarySchema))
@@ -294,6 +287,10 @@ export const cloudEnvironmentsRouter = createTRPCRouter({
           repositories: environmentRepositoryListSchema.optional(),
           plainVars: environmentPlainVarsSchema.optional(),
           secrets: environmentSecretsSchema.optional(),
+          networkSecrets: z
+            .array(networkSecretInputSchema)
+            .max(NETWORK_SECRET_LIMITS.MAX_SECRETS)
+            .optional(),
           commands: environmentCommandsSchema.optional(),
           startCommands: environmentCommandsSchema.optional(),
           sandboxAllocation: environmentSandboxAllocationSchema.optional(),
@@ -336,6 +333,7 @@ export const cloudEnvironmentsRouter = createTRPCRouter({
         name: input.name,
         plainVars: input.plainVars,
         secrets: input.secrets,
+        networkSecrets: input.networkSecrets,
         commands: input.commands,
         startCommands: input.startCommands,
         sandboxAllocation: input.sandboxAllocation,
@@ -366,9 +364,14 @@ export const cloudEnvironmentsRouter = createTRPCRouter({
           repositories: environmentRepositoryListSchema.optional(),
           plainVars: environmentPlainVarsSchema.optional(),
           secrets: environmentSecretChangesSchema.optional(),
+          networkSecrets: z
+            .array(networkSecretChangeSchema)
+            .max(2 * NETWORK_SECRET_LIMITS.MAX_SECRETS)
+            .optional(),
           commands: environmentCommandsSchema.optional(),
           startCommands: environmentCommandsSchema.optional(),
           sandboxAllocation: environmentSandboxAllocationSchema.optional(),
+          requiredHosts: environmentRequiredHostsSchema.optional(),
         })
         .and(environmentEgressPolicySchema)
     )
@@ -415,11 +418,13 @@ export const cloudEnvironmentsRouter = createTRPCRouter({
           repositories,
           plainVars: input.plainVars,
           secrets: input.secrets,
+          networkSecrets: input.networkSecrets,
           commands: input.commands,
           startCommands: input.startCommands,
           sandboxAllocation: input.sandboxAllocation,
           egressMode: input.egressMode,
           egressAllowlist: input.egressAllowlist,
+          requiredHosts: input.requiredHosts,
         })
       );
       return { success: true, configurationRevision };

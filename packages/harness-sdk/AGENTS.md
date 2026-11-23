@@ -280,7 +280,7 @@ and `tsx` all emit code where every `createIs` and `createAssert` call throws
 | Tests | `pnpm test` (vitest, transformed by `@ttsc/unplugin`) |
 | Timing | `pnpm test:perf` (`vitest.perf.config.ts`, one file at a time) |
 | End-to-end | `pnpm test:e2e` (`ttsx`, not `tsx`) |
-| One live run | `pnpm test:e2e:` + `image`, `cancel`, `reasoning`, `stop`, `compact`, `shapes`, `session`, `resume`, `clone`, `replay`, `models`, `queue`, `together`, `subagent`, `tool-matrix`, `conversation`, `time`, `todo` |
+| One live run | `pnpm test:e2e:<name>`, where `<name>` is a `test:e2e:*` script in `package.json` other than `all` and `probe`. Add the name to `e2e/all.ts`'s `runs` as well, or the sweep skips it |
 | Every live run | `pnpm test:e2e:all` (add names to pick a few, `full` for all eleven models) |
 | Raw frames | `pnpm test:e2e:probe <shape> <model>` (asserts nothing) |
 
@@ -323,11 +323,12 @@ repository root fixed it.
 
 The transform needs the toolchain the root project installs, so install
 `--filter '@kilocode/harness-sdk...' --filter kilocode-monorepo`. That closure
-runs every `ttsx` step of `check:ci` — `check:migrations`, `check:package` and
-`check:platform` included — and the whole chain passed on 2026-11-11. CI uses
-the same command, in `kilo-app-ci.yml`, `mobile-native-build.yml` and the
-`harness-sdk` job of `ci.yml`. A bare `--filter @kilocode/harness-sdk` has
-failed this way, so never install the package alone.
+runs every `ttsx` step of `check:ci` — `check:boundaries`, `check:migrations`,
+`check:package` and `check:platform` — and the whole chain passed on
+2026-11-11. CI uses the same command, in `kilo-app-ci.yml`,
+`mobile-native-build.yml` and the `harness-sdk` job of `ci.yml`. A bare
+`--filter @kilocode/harness-sdk` has failed this way, so never install the
+package alone.
 
 ## Rules
 
@@ -917,13 +918,13 @@ same model varies by a factor of ten between runs — `xiaomi/mimo-v2.5` took
 1419 ms on one run, 20 s on the next, and 2023 ms on the one above.
 
 The ratios move too, and by more than the request does. `tencent/hy3` read
-0.79 of its input from the cache on one run and 0.99 on the next; `minimax/
-minimax-m3` went 0.80 to 0.9987, and `google/gemini-3.7-flash` 0.14 to 0.42, on
-the same prompts through the same code. What the ratio measures is whether the
-upstream provider still held the prefix, which is its decision and not this
-package's. Read one run as weather. The one number that is climate is the top
-of the table: a model whose provider caches at all lands above 0.99, and that
-has held on every run.
+0.79 of its input from the cache on one run and 0.99 on the next;
+`minimax/minimax-m3` went 0.80 to 0.9987, and `google/gemini-3.7-flash` 0.14 to
+0.42, on the same prompts through the same code. What the ratio measures is
+whether the upstream provider still held the prefix, which is its decision and
+not this package's. Read one run as weather. The one number that is climate is
+the top of the table: a model whose provider caches at all lands above 0.99,
+and that has held on every run.
 
 The prompts are identical between runs, so a ratio that fell is the provider
 having dropped a prefix it once held, not a change here. Do not chase one.
@@ -956,7 +957,7 @@ a caller's sessions idle and what its tokens cost, which is the caller's number
 and not one this package can guess. Read on 2026-09-04. Anything measured after
 an idle gap is measuring the expiry, not the breakpoints.
 
-Two lessons hold beyond any one run:
+Three lessons hold beyond any one run:
 
 - **The ratio is partly the provider's.** The package places the same
   breakpoints for every model, the spread above runs from 0.28 to 0.9997 on
@@ -1017,7 +1018,8 @@ cache. Three places may set it, and the nearest one wins:
 1. The question: `session.ask(text, { maxTokens })`.
 2. The session: `openSession({ maxTokens })`.
 3. The `ModelCatalog` plugin's `maxOutputTokens`, when neither names one.
-4. `4096`, when the catalog names none either.
+
+When the catalog names none either, the package uses `4096`.
 
 One session does one thing at a time, because two answers built on one prefix
 means the second one misses the cache. A second question asked while the first
@@ -1371,8 +1373,10 @@ answered nothing at all — no tool call and no text — which is not a judgemen
 not something a description can fix, and it answered normally on every run
 since. `tried` now retries an empty answer on the other shape and keeps a second
 one, because twice is a finding. That is the second time this run measured the
-wrong thing, and both are recorded here so the third is caught in review. The subagent
-description was not, and what it cost is the point of keeping this run:
+wrong thing, and both are recorded here so the third is caught in review. The
+subagent description was not a wrong measurement of the model: it read as
+allowing two uses, and the table below is the delegation rate for each of the
+description's three versions:
 
 | Description | Delegated |
 |---|---:|
@@ -1632,25 +1636,23 @@ instead of the provider would be a change to what the provider sealed.
 
 **The gateway sends the reasoning under different names again.** Measured
 2026-09-04: the responses shape relays Anthropic's thinking as
-`response.reasoning.delta`, not the documented `response.reasoning_summary_text
-.delta`, so both are read. Two providers relayed through the chat shape name it
-`reasoning` and `reasoning_content`, so both are read there.
+`response.reasoning.delta`, not the documented
+`response.reasoning_summary_text.delta`, so both are read. Two providers
+relayed through the chat shape name it `reasoning` and `reasoning_content`, so
+both are read there.
 
-A turn holds as many reasoning parts as the model produced, and an encrypted
-block closes the one open at the time. What still merges is two signed blocks
-with nothing between them: a signature does not close a block here, so both
-land in one part with the second signature. A model produces those between tool
-calls, which this package does not have. Split on the signature when it does.
+A turn holds as many reasoning parts as the model produced. The words and the
+signature arrive on separate events, so both land on the block still open, and
+a signature closes it: the next thinking event opens a new part. An encrypted
+block closes the one open at the time. A model produces two signed blocks in a
+row between tool calls, and merging them would hand the provider one block
+under the other's seal.
 
 Measured with `pnpm test:e2e:probe responses anthropic/claude-sonnet-4.5` on
 2026-09-04: one reasoning item and one message in a turn, 43
 `response.reasoning.delta` frames and a single `response.output_item.done`
-carrying the reasoning. So the merge loses nothing today, and the probe is how
-to check that again.
-
-A thinking block is closed by its seal, not by the next event. A model produces
-two signed blocks in a row between tool calls, and merging them would hand the
-provider one block under the other's seal.
+carrying the reasoning. So a turn holds one sealed block today, and the probe
+is how to check that again.
 
 The gateway then ends a block with a reasoning event carrying no words and no
 signature, after the signature has already arrived. That event opens no block:
@@ -1821,8 +1823,7 @@ the entry even with the key.
 `openai` and `@anthropic-ai/sdk` are the contract the three wires are written
 against, and every import of either is a type. Nothing of either survives the
 build, so both are dev dependencies and a consumer installs neither: 22.9 MiB
-and 16.5 MiB unpacked at `openai` 7.55.0 and `@anthropic-ai/sdk` 1.8.0,
-against 4 runtime dependencies that are all used.
+and 16.5 MiB unpacked at `openai` 7.55.0 and `@anthropic-ai/sdk` 1.8.0.
 
 That holds only while no published declaration names one. Exporting a type
 built out of one — `ContentBlock`, say, which two wires exported and neither
@@ -1942,7 +1943,8 @@ knows a model's own limit, so `ask.ts` reads
 
 `core/` holds the contracts and the pure domain. `plugins/` holds the
 implementations, including the ones this package owns. **A file in `core/` must
-never import from `plugins/`.** `pnpm check:boundaries` fails when one does.
+never import from `plugins/`.** `pnpm check:boundaries` fails when one does,
+and when `src/core` cannot be read, so a scan that did not run is not a pass.
 It exempts `*.test.ts`: a core test needs a plugin to run against.
 
 | Path | Purpose |
@@ -1987,7 +1989,11 @@ It exempts `*.test.ts`: a core test needs a plugin to run against.
 | `src/plugins/entropy/seeded.ts` | A repeatable source, for a test or a replay |
 | `src/plugins/token/static.ts` | One token for the life of the process |
 | `src/plugins/tools/question.ts` | The question tool, and the asker a caller writes |
+| `src/plugins/tools/settings.ts` | The list and set tools over a caller's app-settings service |
 | `src/plugins/tools/subagent.ts` | The subagent tool: `openSession` from inside a tool |
+| `src/plugins/tools/time.ts` | The clock, and the one option a harness sets |
+| `src/plugins/tools/todo.ts` | The list of steps the model keeps for itself |
+| `src/plugins/tools/index.ts` | The `/plugins/tools` entry point. It names what it publishes rather than wildcarding the five modules above, and `index.test.ts` asserts the list |
 | `src/plugins/retry/backoff.ts` | Exponential backoff with jitter, and no-retry |
 | `src/plugins/store/sqlite.ts` | Every query, written once for every platform |
 | `src/plugins/store/driver.ts` | The one-function seam an adapter fills, the write line, and `transact` |
@@ -2036,8 +2042,8 @@ There are eleven entry points: `@kilocode/harness-sdk`, `/core`,
 `/plugins/remote-mcp`, `/plugins/tools`, `/plugins/store/node`, `/plugins/store/expo`
 and `/testing`.
 The two stores have
-subpaths of their own because each names a platform: exporting them from the
-root would pull `node:sqlite` or `expo-sqlite` into every bundle. `/plugins/fetch`
+subpaths of their own because each names a platform: exporting the Node store
+from the root would pull `node:sqlite` into every bundle. `/plugins/fetch`
 and `/testing` have theirs because an entry point is what a consumer bundles and
 neither runs in production — a caller with a `fetch` of their own should not
 carry this one, and the conformance checks belong to a plugin author's test
@@ -2052,8 +2058,8 @@ The root is narrower than `/core` on purpose. It re-exports whole only the
 modules a caller uses whole, and names what it takes from the ones that hold
 the machinery a session runs on: `wiringFor`, `makeId`, `sinceSummary`,
 `onStore` and the rest are reached through `/core` instead. The tool contracts
-are at the root — a caller writes tools — while `resolveTools`, `toolNamed`,
-`definitionsOf` and `locksFor` are machinery and are not.
+are at the root — a caller writes tools — while `resolveTools`, `toolNamed`
+and `definitionsOf` are machinery and are not.
 
 `src/index.test.ts` asserts both halves, because a module left out of a barrel
 is invisible from outside the package and every test here imports by path. It
@@ -2088,8 +2094,10 @@ Add a row when you turn one off, and give the reason.
 | `typescript/require-await` | The same false positive as `require-await`, on the TypeScript side. |
 | `typescript/explicit-module-boundary-types` | Off for tests only. A test's helper reads better with an inferred return. |
 | `import/max-dependencies` | Off for tests only. A test wires every plugin it exercises. |
-| `import/no-namespace` | Off for `src/index.test.ts` only. Asking what a barrel exports needs the namespace; there is no other way to read it. |
+| `import/no-namespace` | Off for the two barrel tests only, `src/index.test.ts` and `src/plugins/tools/index.test.ts`. Asking what a barrel exports needs the namespace; there is no other way to read it. |
 | `typescript/no-unsafe-type-assertion` | Off for `src/plugins/remote-mcp/validator.ts` only. The permissive validator hands its `unknown` input back as the SDK's generic `T`, and an assertion is how it returns the value unchanged. |
+| `import/no-nodejs-modules` | Off for the files the override names: `src/plugins/store/node.ts`, every store test matched by the glob `src/plugins/store/*.test.ts`, `src/plugins/store/expo-fixture.ts`, the two remote-mcp fixtures, `src/plugins/conformance.test.ts`, `src/core/resume-fixture.ts` and `src/core/image.test.ts`. The store-test glob deliberately covers every store test, so a new one is exempt without an edit to this row. The store opens `node:sqlite` and the remote-mcp fixtures serve over `node:http`. The store is the package's own `/plugins/store/node` entry point, which a caller chooses to run on Node; the others are tests and fixtures. The root barrel reaches none of them. |
+| `unicorn/no-null` | Off for `src/plugins/remote-mcp/app.ts` only. `AppBridge` names `null` as the value of its first argument when the caller registers the handlers by hand, and this file does exactly that, so the argument is the SDK's `null` and not one this package invents. |
 
 The block under `no-underscore-dangle` in `.oxlintrc.json` — `node/no-sync`,
 `one-var`, the `typescript/*`, `unicorn/*` and `vitest/*` rules that follow it —

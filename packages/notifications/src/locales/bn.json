@@ -7,6 +7,7 @@
       "spendAlert": "আপনার ব্যয়ে মনোযোগ প্রয়োজন",
       "securityFinding": "একটি নিরাপত্তা সমস্যায় মনোযোগ প্রয়োজন",
       "securityUpdate": "একটি নিরাপত্তা পরীক্ষায় একটি আপডেট আছে",
+      "agentBriefing": "আপনার এজেন্ট ব্রিফিং প্রস্তুত",
       "activeAgentsGlanceable": "সক্রিয় এজেন্টগুলির একটি আপডেট আছে"
     }
   },
@@ -29,6 +30,12 @@
     },
     "securityFindingNew": {
       "title": "নতুন নিরাপত্তা সমস্যা ({{severity}})"
+    },
+    "securityFindingSeverity": {
+      "critical": "অতি গুরুতর",
+      "high": "উচ্চ",
+      "medium": "মাঝারি",
+      "low": "নিম্ন"
     },
     "securityFindingSlaWarning": {
       "title": "SLA সতর্কতা"

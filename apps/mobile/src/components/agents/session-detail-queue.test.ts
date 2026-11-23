@@ -473,8 +473,10 @@ vi.mock('@/components/agents/session-keep-awake', () => ({
 vi.mock('@/components/agents/session-focus-refetch', () => ({
   shouldRefetchOnFocus: () => false,
 }));
-vi.mock('@/components/agents/session-terminal-error', () => ({
+vi.mock('@/components/agents/terminal-error-copy-text', () => ({
   buildTerminalErrorCopyText: () => '',
+}));
+vi.mock('@/components/agents/session-terminal-error', () => ({
   resolveSessionTerminalError: () => null,
 }));
 vi.mock('@/components/agents/child-session-card-state', () => ({
@@ -587,6 +589,7 @@ vi.mock('@/components/agents/part-renderer', () => ({
 }));
 vi.mock('@/components/empty-state', () => ({
   EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
 }));
 vi.mock('@/components/query-error', () => ({
   QueryError: 'QueryError',
@@ -624,6 +627,7 @@ function makeManager() {
       isLoading: { value: false },
       isRefreshingCachedTranscript: { value: false },
       error: { value: null },
+      failedHistoryKind: { value: null },
       fetchedSessionData: {
         value: {
           associatedPr: null,
@@ -650,6 +654,7 @@ function makeManager() {
       activeSuggestion: { value: null },
       pendingQuestions: { value: [] },
       pendingPermissions: { value: [] },
+      unreadableQuestions: { value: [] },
       unreadablePermissions: { value: [] },
       totalCost: { value: null },
       childMessages: { value: () => new Map() },

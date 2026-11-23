@@ -1,19 +1,16 @@
-import { z } from 'zod';
-
 /**
  * The small derived summary of one session that the session card shows
  * (`.specs/mobile-session-live-activity.md` "Card data contract"). The ingest
  * service derives it from the tool, todo, diff and error items and stores only
  * this summary, never the raw text. It never carries assistant message text.
- *
- * It also owns the creation-title placeholder, the machine name the backend
- * seeds before a person names a session: every surface that decides whether a
- * session has a name yet reads it from here.
  */
+
+import { z } from 'zod';
 
 /**
  * The title the backend seeds at creation: `New session - <ISO>` for a root
- * session and `Child session - <ISO>` for a child.
+ * session and `Child session - <ISO>` for a child. Every surface that decides
+ * whether a session has a name yet reads the creation-title rule from here.
  */
 export const DEFAULT_SESSION_TITLE_PATTERN =
   /^(New session - |Child session - )\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
@@ -38,11 +35,30 @@ export const SESSION_LIVE_FAILURE_KINDS = ['provider', 'tool', 'cancelled', 'oth
 
 export type SessionLiveFailureKind = (typeof SESSION_LIVE_FAILURE_KINDS)[number];
 
+/**
+ * The todo statuses `sessionLivePlan` classifies: it leaves `cancelled` out of
+ * the count, counts `completed` as done, and shows the first `in_progress` step
+ * as the current one. They are the values the `todowrite` field description
+ * names, not values its schema enforces, so a plan can also carry a status
+ * outside this set. Such an entry is still a task the session has to do, so it
+ * counts toward the total and is neither done nor current. The mobile task list
+ * reads such an entry as an outstanding task the same way; the web todo
+ * projection leaves it out, so the two can differ for that input.
+ */
+export const SESSION_LIVE_TODO_STATUSES = [
+  'pending',
+  'in_progress',
+  'completed',
+  'cancelled',
+] as const;
+
+export type SessionLiveTodoStatus = (typeof SESSION_LIVE_TODO_STATUSES)[number];
+
 /** The longest step target (a file basename or a short tool target). */
 export const SESSION_LIVE_TARGET_LIMIT = 40;
-/** The longest plan step name. */
+/** The longest plan step text (`plan.current`). */
 export const SESSION_LIVE_PLAN_STEP_LIMIT = 40;
-/** The longest permission command. */
+/** The longest permission command the session card shows (`permissionCommand`), one line. */
 export const SESSION_LIVE_COMMAND_LIMIT = 60;
 
 export const sessionLiveStepSchema = z.object({
@@ -118,9 +134,7 @@ function isFormatControl(code: number): boolean {
  * collapses and bounds it.
  */
 export function sessionDisplayLine(raw: string): string {
-  // Iterating code points keeps a surrogate pair whole while the control set is
-  // applied. The set is compared numerically: a character class that names the
-  // control range reads as a control character in the source itself.
+  // Iterating code points keeps a surrogate pair whole while the control set is applied.
   return [...raw]
     .map(char => {
       const code = char.codePointAt(0) ?? 0;
@@ -161,17 +175,20 @@ function characterSegmenter(): Intl.Segmenter | null {
  * The end of the character at or before `maxIndex`, as the index just past it:
  * the largest extended grapheme cluster boundary no greater than `maxIndex`.
  * A runtime without segmentation falls back to a code unit boundary that keeps
- * a surrogate pair whole.
+ * a surrogate pair whole. A cap past the end of the line reads as the line end,
+ * and a cap at or below zero reads as zero.
  */
 export function characterCut(line: string, maxIndex: number): number {
+  // Clamping once keeps the two runtime branches on one contract.
+  const cap = Math.min(Math.max(maxIndex, 0), line.length);
   const segmenter = characterSegmenter();
   if (segmenter === null) {
-    const last = line.charCodeAt(maxIndex - 1);
-    return maxIndex > 0 && last >= 0xd800 && last <= 0xdbff ? maxIndex - 1 : maxIndex;
+    const last = line.charCodeAt(cap - 1);
+    return cap > 0 && last >= 0xd800 && last <= 0xdbff ? cap - 1 : cap;
   }
   let end = 0;
   for (const { index, segment } of segmenter.segment(line)) {
-    if (index + segment.length > maxIndex) break;
+    if (index + segment.length > cap) break;
     end = index + segment.length;
   }
   return end;
@@ -196,10 +213,14 @@ export function sessionLiveCut(text: string, limit: number): string {
  * `limit` ends with an ellipsis inside the limit. The cut falls on a character
  * boundary, so the line never ends half drawn, and the whole result stays
  * within `limit` UTF-16 code units. Empty text, white space, and text made only
- * of joiners give null.
+ * of joiners give null, and so does a limit below one: a caller that computed
+ * no room for text gets no text back, never an ellipsis that overruns the
+ * budget.
  */
 export function sessionLiveText(raw: unknown, limit: number): string | null {
   if (typeof raw !== 'string') return null;
+  // A non-positive limit cannot hold a drawn character, so it holds no text.
+  if (!(limit >= 1)) return null;
   const line = sessionDisplayLine(raw).replace(/\s+/g, ' ').trim();
   if (line === '') return null;
   // Joiners alone draw nothing, so they are empty display text like blanks.
@@ -213,4 +234,151 @@ export function sessionLiveText(raw: unknown, limit: number): string | null {
   }
   if (line.length <= limit) return line;
   return `${sessionLiveCut(line, limit - 1).trimEnd()}…`;
+}
+
+function basename(value: unknown): string | null {
+  const text = sessionLiveText(value, Number.MAX_SAFE_INTEGER);
+  if (text === null) return null;
+  // Trailing separators name no segment, so the target ends before them.
+  let end = text.length;
+  while (end > 0) {
+    const code = text.charCodeAt(end - 1);
+    if (code !== 0x2f && code !== 0x5c) break;
+    end--;
+  }
+  const last =
+    end === 0 ? -1 : Math.max(text.lastIndexOf('/', end - 1), text.lastIndexOf('\\', end - 1));
+  const base = last === -1 ? text.slice(0, end) : text.slice(last + 1, end);
+  return sessionLiveText(base, SESSION_LIVE_TARGET_LIMIT);
+}
+
+function firstString(input: Record<string, unknown>, keys: readonly string[]): unknown {
+  for (const key of keys) {
+    if (typeof input[key] === 'string') return input[key];
+  }
+  return null;
+}
+
+/** The path a file tool acted on: `filePath` (CLI), `file_path` or `path`. */
+const FILE_PATH_KEYS = ['filePath', 'file_path', 'path'] as const;
+
+/**
+ * The host a URL names, or null when the text is not a URL. The caller supplies
+ * it because this package compiles under consumers whose `lib` has no platform
+ * globals: `webUrlHost` in `@kilocode/worker-utils` is the implementation every
+ * producer passes.
+ */
+export type SessionLiveUrlHost = (url: string) => string | null;
+
+/** The URL host, or the whole trimmed URL when it does not parse. */
+function urlHost(value: unknown, webHost: SessionLiveUrlHost): string | null {
+  const text = sessionLiveText(value, Number.MAX_SAFE_INTEGER);
+  if (text === null) return null;
+  const host = webHost(text);
+  return sessionLiveText(host ?? text, SESSION_LIVE_TARGET_LIMIT);
+}
+
+/**
+ * The step a started tool call shows: its verb and a short target (a file
+ * basename, a command, a pattern or a host). Every producer of the summary
+ * names a tool through this one table; `webHost` reads a web fetch URL's host
+ * for the `webfetch` cases.
+ */
+export function sessionLiveToolStep(
+  tool: string,
+  input: Record<string, unknown>,
+  webHost: SessionLiveUrlHost
+): SessionLiveStep {
+  switch (tool.toLowerCase()) {
+    case 'edit':
+    case 'write':
+    case 'multiedit':
+    case 'patch':
+    case 'apply_patch':
+      return { verb: 'editing', target: basename(firstString(input, FILE_PATH_KEYS)) };
+    case 'read':
+      return { verb: 'reading', target: basename(firstString(input, FILE_PATH_KEYS)) };
+    case 'bash':
+      return {
+        verb: 'running',
+        target: sessionLiveText(input['command'], SESSION_LIVE_TARGET_LIMIT),
+      };
+    case 'grep':
+    case 'glob':
+      return {
+        verb: 'searching',
+        target: sessionLiveText(input['pattern'], SESSION_LIVE_TARGET_LIMIT),
+      };
+    case 'list':
+      return { verb: 'searching', target: basename(firstString(input, FILE_PATH_KEYS)) };
+    case 'codesearch':
+    case 'websearch':
+    case 'web_search':
+      return {
+        verb: 'searching',
+        target: sessionLiveText(input['query'], SESSION_LIVE_TARGET_LIMIT),
+      };
+    case 'webfetch':
+    case 'web_fetch':
+      return { verb: 'searching', target: urlHost(input['url'], webHost) };
+    default:
+      return { verb: 'other', target: null };
+  }
+}
+
+/**
+ * What each classified todo status means to the plan. `satisfies` a record of
+ * `SessionLiveTodoStatus`, so adding a status to that set fails the type check
+ * until its role is written here, and the counting below reads only this table.
+ */
+const TODO_STATUS_ROLES = {
+  cancelled: 'skipped',
+  completed: 'done',
+  in_progress: 'current',
+  pending: 'outstanding',
+} as const satisfies Readonly<
+  Record<SessionLiveTodoStatus, 'skipped' | 'done' | 'current' | 'outstanding'>
+>;
+
+/** Whether the status is one this projection classifies, narrowing it to the set. */
+function isClassifiedTodoStatus(status: string): status is SessionLiveTodoStatus {
+  return SESSION_LIVE_TODO_STATUSES.some(candidate => candidate === status);
+}
+
+const todoSchema = z.object({ content: z.string(), status: z.string() });
+const todoInputSchema = z.object({ todos: z.array(z.unknown()) });
+
+/**
+ * `todowrite` input: completed count, total (cancelled excluded) and the active
+ * step. `SESSION_LIVE_TODO_STATUSES` and `TODO_STATUS_ROLES` are the one place a
+ * status's meaning is written down; the loop only reads the role. The producer's
+ * schema declares `status` as a free string (its field description names the four
+ * values rather than enforcing them), so a status outside the set is possible: it
+ * counts toward `total` as an outstanding task that is neither done nor current.
+ * The mobile task list reads such an entry the same way; the web todo projection
+ * leaves it out, so the two can differ for that input. Null when no entry counts,
+ * which is an empty list and a list of only cancelled entries.
+ */
+export function sessionLivePlan(input: Record<string, unknown>): SessionLivePlan | null {
+  const parsed = todoInputSchema.safeParse(input);
+  if (!parsed.success) return null;
+  let done = 0;
+  let total = 0;
+  let current: string | null = null;
+  for (const raw of parsed.data.todos) {
+    const todo = todoSchema.safeParse(raw);
+    if (!todo.success) continue;
+    const { status } = todo.data;
+    // An unclassified status reads as outstanding: it still counts, so a task
+    // the plan cannot place is shown rather than dropped from the total.
+    const role = isClassifiedTodoStatus(status) ? TODO_STATUS_ROLES[status] : 'outstanding';
+    if (role === 'skipped') continue;
+    total++;
+    if (role === 'done') done++;
+    if (role === 'current' && current === null) {
+      current = sessionLiveText(todo.data.content, SESSION_LIVE_PLAN_STEP_LIMIT);
+    }
+  }
+  if (total === 0) return null;
+  return { done, total, current };
 }

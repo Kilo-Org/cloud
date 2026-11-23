@@ -11,10 +11,20 @@ import {
 import type { VercelSandboxRuntimeConfig } from '../agent-sandbox/vercel/vercel-runtime-config.js';
 import { DEADLINE_MS } from './deadlines.js';
 import { logControlDiagnostic } from './diagnostics.js';
-import { buildControlNetworkPolicy, type SessionCredentialGrant } from './session-credentials.js';
+import type { SecretBinding } from '../auth.js';
+import { runtimeProxyOriginProof } from '../runtime-credential-proxy-origin.js';
+import { configuredVercelForwardUrl } from '../scm-broker/targets.js';
+import { verifiedVercelSandboxIdentityContract } from '../scm-broker/vercel-identity.js';
+import type { VercelSandboxNetworkPolicy } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
+import {
+  buildControlCredentialPolicy,
+  buildControlNetworkPolicy,
+  type SessionCredentialGrant,
+} from './session-credentials.js';
+import { restrictVercelEgress } from './vercel-network-policy.js';
 import type { ObserveResult } from './provider.js';
 import type { ProviderAdapter, ProviderCreateIntent } from './provider.js';
-import { ProviderCreationError } from './provider.js';
+import { ProviderCreationError, SandboxNetworkPolicyError } from './provider.js';
 import { CONTROL_WRAPPER_LOG_PATH } from './container-paths.js';
 
 const LOG_MAX_BYTES = 1024 * 1024;
@@ -27,21 +37,21 @@ const ACTIVE_STATUSES = new Set<VercelSandboxSession['status']>([
 ]);
 const TERMINAL_STATUSES = new Set<VercelSandboxSession['status']>(['stopped', 'failed', 'aborted']);
 
-const providerRefSchema = z
-  .object({
-    sandboxName: z.string().min(1),
-    sessionId: z.string().min(1),
-    startSource: z.literal('repository').optional(),
-    metadata: z
-      .object({
-        region: z.string().min(1).max(128),
-        sourceSnapshotId: z.string().min(1).max(128).optional(),
-        instanceType: z.enum(['small', 'large']).optional(),
-      })
-      .strict()
-      .optional(),
-  })
-  .strict();
+// Not strict: a stored ref outlives a deploy. A Worker that is rolled back must still decode a ref
+// that a newer Worker wrote, or it cannot stop, lease or admit that allocation. Unknown fields are
+// dropped, and the adapter trusts only the fields below.
+const providerRefSchema = z.object({
+  sandboxName: z.string().min(1),
+  sessionId: z.string().min(1),
+  startSource: z.literal('repository').optional(),
+  metadata: z
+    .object({
+      region: z.string().min(1).max(128),
+      sourceSnapshotId: z.string().min(1).max(128).optional(),
+      instanceType: z.enum(['small', 'large']).optional(),
+    })
+    .optional(),
+});
 
 export type VercelProviderRef = z.infer<typeof providerRefSchema>;
 
@@ -119,9 +129,42 @@ function isNotFound(error: unknown): boolean {
   return error instanceof VercelSandboxRestError && error.status === 404;
 }
 
+/** The egress allowlist of the provider pin, with the logical sandbox that owns the egress route. */
+export type VercelRestrictedEgress = { allowlist: readonly string[]; logicalSandboxId: string };
+
+/**
+ * The network policy of one sandbox, at create and at each credential refresh.
+ * Without an allowlist it is the open policy of today; with one it is the
+ * restricted policy, or `invalid_configuration` when it cannot be built.
+ */
+function buildSandboxNetworkPolicy(
+  grants: readonly SessionCredentialGrant[],
+  handles: ReadonlyMap<string, readonly string[]> | undefined,
+  env: { WORKER_URL?: string } | undefined,
+  restricted: VercelRestrictedEgress | undefined,
+  originProof: string | undefined
+): VercelSandboxNetworkPolicy {
+  if (restricted === undefined) return buildControlNetworkPolicy(grants, handles, env, originProof);
+  const forwardURL = configuredVercelForwardUrl(env ?? {}, restricted.logicalSandboxId);
+  const policy =
+    forwardURL === null || !verifiedVercelSandboxIdentityContract
+      ? null
+      : restrictVercelEgress(
+          buildControlCredentialPolicy(grants, handles, originProof),
+          restricted.allowlist,
+          {
+            forwardURL,
+            workerHost: new URL(forwardURL).hostname,
+          }
+        );
+  if (policy === null) throw new SandboxNetworkPolicyError();
+  return policy;
+}
+
 export function createVercelProviderAdapter(deps: {
   sandboxName: string;
-  env?: { WORKER_URL?: string };
+  env?: { WORKER_URL?: string; NEXTAUTH_SECRET?: SecretBinding };
+  restrictedEgress?: VercelRestrictedEgress;
   config?: VercelSandboxRuntimeConfig;
   restClient?: VercelControlRestClient;
   now?: () => number;
@@ -160,6 +203,20 @@ export function createVercelProviderAdapter(deps: {
       fetch,
     });
   const now = deps.now ?? Date.now;
+  // Grants carry the logical sandbox id, which the Sandbox DO uses as this
+  // sandbox's egress id when it checks the runtime proxy origin proof.
+  const controlNetworkPolicy = async (grants: readonly SessionCredentialGrant[]) => {
+    const sandboxId = grants[0]?.sandboxId;
+    const originProof =
+      sandboxId === undefined ? null : await runtimeProxyOriginProof(deps.env ?? {}, sandboxId);
+    return buildSandboxNetworkPolicy(
+      grants,
+      await deps.readAcceptedRuntimeProxyHandles?.(),
+      deps.env,
+      deps.restrictedEgress,
+      originProof ?? undefined
+    );
+  };
   const decodeOwnedProviderRef = (ref: string | null): VercelProviderRef | null => {
     const parsed = decodeVercelProviderRef(ref);
     return parsed?.sandboxName === deps.sandboxName ? parsed : null;
@@ -199,11 +256,7 @@ export function createVercelProviderAdapter(deps: {
       // Read the authoritative grants and build the policy before the REST
       // create: the sandbox must never open with an empty or stale policy, so a
       // reader failure prevents the create entirely.
-      const networkPolicy = buildControlNetworkPolicy(
-        await deps.readContainedGrants(),
-        await deps.readAcceptedRuntimeProxyHandles?.(),
-        deps.env
-      );
+      const networkPolicy = await controlNetworkPolicy(await deps.readContainedGrants());
       const created = await restClient
         .createSandbox({
           name: intent.allocationName ?? deps.sandboxName,
@@ -367,11 +420,7 @@ export function createVercelProviderAdapter(deps: {
     async applyContainedCredentials(providerRef, grants) {
       const parsed = decodeOwnedProviderRef(providerRef);
       if (parsed === null) throw new Error('Invalid Vercel sandbox provider reference');
-      const networkPolicy = buildControlNetworkPolicy(
-        grants,
-        await deps.readAcceptedRuntimeProxyHandles?.(),
-        deps.env
-      );
+      const networkPolicy = await controlNetworkPolicy(grants);
       const session = await restClient.updateNetworkPolicy(
         parsed.sessionId,
         parsed.sandboxName,

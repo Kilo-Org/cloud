@@ -72,7 +72,7 @@ describe('platform model configuration', () => {
     expect(policy.switchCostFactor).toBe(3);
     expect(policy.lowConfidenceThreshold).toBeNull();
     expect(policy.classifierRepetitions).toBe(1);
-    expect(policy.deciderRepetitions).toBe(1);
+    expect(policy.deciderRepetitions).toBe(3);
     expect(policy.classifierMaxP95LatencyMs).toBeNull();
   });
 

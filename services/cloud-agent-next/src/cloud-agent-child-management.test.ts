@@ -34,6 +34,11 @@ vi.mock('./sandbox-session/session-stub.js', () => ({
   getSandboxSessionStub: getSandboxSessionStubMock,
 }));
 
+// The workspace and its chats share one fake namespace keyed by session id.
+vi.mock('./control-plane/workspace/workspace-stub.js', () => ({
+  getWorkspaceStub: getSandboxSessionStubMock,
+}));
+
 vi.mock('./session-access.js', () => ({
   requireCurrentSessionAccess: requireCurrentSessionAccessMock,
 }));
@@ -48,6 +53,8 @@ const ORG_ID = '11111111-1111-4111-8111-111111111111';
 const PARENT_ID = 'workspace_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const CHILD_ID = 'workspace_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const WORKTREE_ID = 'worktree_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+const SETUP_RUN_ID = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+const SETUP_ENVIRONMENT_ID = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
 
 function authority(overrides: Partial<CloudAgentAuthority> = {}): CloudAgentAuthority {
   return {
@@ -75,16 +82,16 @@ function managementRequest(
 }
 
 type Stub = {
-  assertCloudAgentManagementAuthority: ReturnType<typeof vi.fn>;
+  assertAuthority: ReturnType<typeof vi.fn>;
   getMetadata: ReturnType<typeof vi.fn>;
-  listCloudAgentChildSessions: ReturnType<typeof vi.fn>;
+  listChildren: ReturnType<typeof vi.fn>;
 };
 
 function stub(overrides: Partial<Stub> = {}): Stub {
   return {
-    assertCloudAgentManagementAuthority: vi.fn().mockResolvedValue(undefined),
+    assertAuthority: vi.fn().mockResolvedValue(undefined),
     getMetadata: vi.fn().mockResolvedValue(null),
-    listCloudAgentChildSessions: vi.fn().mockResolvedValue({ sessions: [] }),
+    listChildren: vi.fn().mockResolvedValue({ sessions: [] }),
     ...overrides,
   };
 }
@@ -119,23 +126,18 @@ beforeEach(() => {
   getSandboxSessionStubMock.mockReset();
   requireCurrentSessionAccessMock.mockReset();
   requireCurrentSessionAccessMock.mockResolvedValue({});
-  cloudAgentAuthorityProceduresMock.mockImplementation((scoped: CloudAgentAuthority) =>
-    scoped.organizationId === null
-      ? [
-          'cloudAgentNext.listChildSessions',
-          'cloudAgentNext.getSession',
-          'cloudAgentNext.getMessageResult',
-          'cloudAgentNext.interruptSession',
-          'cloudAgentNext.sendMessage',
-        ]
-      : [
-          'organizations.cloudAgentNext.listChildSessions',
-          'organizations.cloudAgentNext.getSession',
-          'organizations.cloudAgentNext.getMessageResult',
-          'organizations.cloudAgentNext.interruptSession',
-          'organizations.cloudAgentNext.sendMessage',
-        ]
-  );
+  cloudAgentAuthorityProceduresMock.mockImplementation((scoped: CloudAgentAuthority) => {
+    const prefix =
+      scoped.organizationId === null ? 'cloudAgentNext' : 'organizations.cloudAgentNext';
+    return [
+      `${prefix}.listChildSessions`,
+      `${prefix}.getSession`,
+      `${prefix}.getMessageResult`,
+      `${prefix}.interruptSession`,
+      `${prefix}.sendMessage`,
+      ...(scoped.environmentSetup === undefined ? [] : [`${prefix}.getEgressAudit`]),
+    ];
+  });
   cloudAgentAuthorityProcedureKindMock.mockImplementation(
     (procedure: string): 'query' | 'mutation' =>
       procedure.endsWith('.sendMessage') || procedure.endsWith('.interruptSession')
@@ -145,6 +147,61 @@ beforeEach(() => {
 });
 
 describe('assertCloudAgentManagementRequest', () => {
+  it.each([null, ORG_ID])(
+    'permits the setup parent audit in organization %s',
+    async organizationId => {
+      const shared = await vi.importActual<typeof CloudAgentAuthorityModule>(
+        '@kilocode/worker-utils/cloud-agent-authority'
+      );
+      cloudAgentAuthorityProceduresMock.mockImplementation(shared.cloudAgentAuthorityProcedures);
+      cloudAgentAuthorityProcedureKindMock.mockImplementation(
+        shared.cloudAgentAuthorityProcedureKind
+      );
+      validateCloudAgentAuthorityRequestMock.mockImplementation(
+        shared.validateCloudAgentAuthorityRequest
+      );
+      const scoped = authority({
+        organizationId,
+        environmentSetup: { runId: SETUP_RUN_ID, environmentId: SETUP_ENVIRONMENT_ID },
+      });
+      const parent = stub();
+      getSandboxSessionStubMock.mockReturnValue(parent);
+      await expect(
+        managementRequest({
+          env: {} as never,
+          authority: scoped,
+          path: 'getEgressAudit',
+          rawInput: {
+            cloudAgentSessionId: PARENT_ID,
+            ...(organizationId === null ? {} : { organizationId }),
+          },
+        })
+      ).resolves.toBeUndefined();
+      expect(parent.assertAuthority).toHaveBeenCalledWith(scoped);
+      expect(requireCurrentSessionAccessMock).not.toHaveBeenCalled();
+    }
+  );
+
+  it('rejects a revoked setup parent audit before allowing self access', async () => {
+    getSandboxSessionStubMock.mockReturnValue(
+      stub({
+        assertAuthority: vi
+          .fn()
+          .mockRejectedValue(new Error('Cloud Agent parent authority denied')),
+      })
+    );
+    await expectForbidden(
+      managementRequest({
+        env: {} as never,
+        authority: authority({
+          environmentSetup: { runId: SETUP_RUN_ID, environmentId: SETUP_ENVIRONMENT_ID },
+        }),
+        path: 'getEgressAudit',
+        rawInput: { cloudAgentSessionId: PARENT_ID },
+      })
+    );
+  });
+
   it('rejects a context user that does not match the authority owner', async () => {
     await expectForbidden(
       managementRequest({
@@ -225,7 +282,7 @@ describe('assertCloudAgentManagementRequest', () => {
     ['expired', () => Promise.reject(new Error('Cloud Agent parent authority denied'))],
     ['replaced', () => Promise.reject(new Error('Cloud Agent parent authority denied'))],
   ])('rejects a %s parent authority', async (_name, reject) => {
-    const parent = stub({ assertCloudAgentManagementAuthority: vi.fn(reject) });
+    const parent = stub({ assertAuthority: vi.fn(reject) });
     mockDirectChild();
     getSandboxSessionStubMock.mockImplementation((_env, _owner, sessionId) =>
       sessionId === PARENT_ID
@@ -244,7 +301,7 @@ describe('assertCloudAgentManagementRequest', () => {
 
   it('maps a transient parent lookup failure to SERVICE_UNAVAILABLE', async () => {
     const parent = stub({
-      assertCloudAgentManagementAuthority: vi.fn().mockRejectedValue(new Error('network down')),
+      assertAuthority: vi.fn().mockRejectedValue(new Error('network down')),
     });
     getSandboxSessionStubMock.mockImplementation((_env, _owner, sessionId) =>
       sessionId === PARENT_ID ? parent : stub()
@@ -368,12 +425,60 @@ describe('assertCloudAgentManagementRequest', () => {
     ).resolves.toMatchObject({ parentCloudAgentSessionId: PARENT_ID });
     expect(getSandboxSessionStubMock).toHaveBeenCalledWith(expect.anything(), USER_ID, CHILD_ID);
   });
+
+  it('permits the egress audit for a direct child under a setup claim', async () => {
+    mockDirectChild();
+    await expect(
+      managementRequest({
+        env: {} as never,
+        authority: authority({
+          environmentSetup: { runId: SETUP_RUN_ID, environmentId: SETUP_ENVIRONMENT_ID },
+        }),
+        path: 'getEgressAudit',
+        rawInput: { cloudAgentSessionId: CHILD_ID },
+      })
+    ).resolves.toBeUndefined();
+    expect(validateCloudAgentAuthorityRequestMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        environmentSetup: { runId: SETUP_RUN_ID, environmentId: SETUP_ENVIRONMENT_ID },
+      }),
+      'cloudAgentNext.getEgressAudit',
+      expect.objectContaining({ cloudAgentSessionId: CHILD_ID })
+    );
+  });
+
+  it('rejects the egress audit without a setup claim', async () => {
+    mockDirectChild();
+    await expectForbidden(
+      managementRequest({
+        env: {} as never,
+        authority: authority(),
+        path: 'getEgressAudit',
+        rawInput: { cloudAgentSessionId: CHILD_ID },
+      })
+    );
+    expect(getSandboxSessionStubMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects the egress audit for a session that is not a direct child', async () => {
+    mockDirectChild(metadata({ parentCloudAgentSessionId: undefined }));
+    await expectForbidden(
+      managementRequest({
+        env: {} as never,
+        authority: authority({
+          environmentSetup: { runId: SETUP_RUN_ID, environmentId: SETUP_ENVIRONMENT_ID },
+        }),
+        path: 'getEgressAudit',
+        rawInput: { cloudAgentSessionId: CHILD_ID },
+      })
+    );
+  });
 });
 
 describe('listCloudAgentChildSessions', () => {
   it('pages a registry hint but filters entries that no longer authorize', async () => {
     const parent = stub({
-      listCloudAgentChildSessions: vi.fn().mockResolvedValue({
+      listChildren: vi.fn().mockResolvedValue({
         sessions: [
           { cloudAgentSessionId: CHILD_ID },
           { cloudAgentSessionId: 'workspace_dddddddd-dddd-4ddd-8ddd-dddddddddddd' },
@@ -411,12 +516,12 @@ describe('listCloudAgentChildSessions', () => {
       ],
       nextCursor: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
     });
-    expect(parent.listCloudAgentChildSessions).toHaveBeenCalledWith({ limit: 20 });
+    expect(parent.listChildren).toHaveBeenCalledWith({ limit: 20 });
   });
 
   it('propagates a database service outage instead of returning an empty page', async () => {
     const parent = stub({
-      listCloudAgentChildSessions: vi.fn().mockResolvedValue({
+      listChildren: vi.fn().mockResolvedValue({
         sessions: [{ cloudAgentSessionId: CHILD_ID }],
       }),
     });
@@ -437,7 +542,7 @@ describe('listCloudAgentChildSessions', () => {
 
   it('propagates a child metadata outage instead of returning an empty page', async () => {
     const parent = stub({
-      listCloudAgentChildSessions: vi.fn().mockResolvedValue({
+      listChildren: vi.fn().mockResolvedValue({
         sessions: [{ cloudAgentSessionId: CHILD_ID }],
       }),
     });

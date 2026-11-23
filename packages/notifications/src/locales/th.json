@@ -7,6 +7,7 @@
       "spendAlert": "ค่าใช้จ่ายของคุณต้องได้รับการดูแล",
       "securityFinding": "พบปัญหาความปลอดภัยที่ต้องได้รับการดูแล",
       "securityUpdate": "การตรวจสอบความปลอดภัยมีการอัปเดต",
+      "agentBriefing": "รายงานกิจกรรมเอเจนต์ของคุณพร้อมแล้ว",
       "activeAgentsGlanceable": "เอเจนต์ที่กำลังทำงานมีการอัปเดต"
     }
   },
@@ -29,6 +30,12 @@
     },
     "securityFindingNew": {
       "title": "พบปัญหาความปลอดภัยใหม่ ({{severity}})"
+    },
+    "securityFindingSeverity": {
+      "critical": "วิกฤต",
+      "high": "สูง",
+      "medium": "ปานกลาง",
+      "low": "ต่ำ"
     },
     "securityFindingSlaWarning": {
       "title": "คำเตือน SLA"

@@ -1,6 +1,8 @@
 import { environmentReferenceSchema } from '../environment-build/reference.js';
+import { hostedGitHubRepositoriesSchema } from './hosted-github-repositories.js';
 import * as z from 'zod';
 import { egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
+import { egressRequestSupported } from '@kilocode/worker-utils/sandbox-provider-capabilities';
 import {
   cloudAgentWorktreeIdSchema,
   sessionIdSchema as kiloSessionIdSchema,
@@ -291,6 +293,7 @@ const SANDBOX_ALLOCATION_ID_CLASS: Record<
   'cloudflare-containers-standard-4': 'isolated-small',
   'vercel-small': 'isolated-small',
   'vercel-large': 'isolated-small',
+  'aws-microvm-8g': 'isolated-small',
 };
 
 function sandboxIdentityMatchesAllocation(
@@ -336,10 +339,8 @@ const MetadataWorkspaceSchema = egressPolicySchema
     sessionHome: z.string().optional(),
     branchName: z.string().optional(),
     /**
-     * The generated `kilo/<slug>` branch of a session on a V2 environment. The
-     * launch repository can run on `repository.branch` instead, so `branchName`
-     * is not always this value. A repository of the environment without a
-     * requested branch uses it.
+     * The generated `kilo/<slug>` branch for repositories without an explicit
+     * branch in a multi-repository workspace. The primary may run on `branchName` instead.
      */
     generatedBranchName: branchNameSchema.optional(),
     shallow: z.boolean().optional(),
@@ -408,10 +409,11 @@ const MetadataWorkspaceSchema = egressPolicySchema
   .refine(
     workspace =>
       (workspace.egressMode !== 'allowlist' && workspace.egressAudit !== true) ||
-      (workspace.sandboxProvider === 'cloudflare-containers' &&
+      (workspace.sandboxProvider !== undefined &&
+        egressRequestSupported(workspace.sandboxProvider, workspace) &&
         isIsolatedProviderWorkspace(workspace) &&
         workspace.sandboxRoute === undefined),
-    'Egress policy requires an isolated Cloudflare containers sandbox'
+    'Egress policy requires an isolated sandbox whose provider enforces it'
   )
   .refine(
     workspace => workspace.sandboxProvider !== 'vercel' || isIsolatedProviderWorkspace(workspace),
@@ -472,6 +474,14 @@ const MetadataCloneSchema = z
   })
   .strip();
 
+const MetadataEnvironmentSetupSchema = z
+  .object({
+    runId: z.string().uuid(),
+    environmentId: z.string().uuid(),
+    role: z.enum(['setup', 'verification']),
+  })
+  .strict();
+
 export const CurrentSessionMetadataSchema = z
   .object({
     metadataSchemaVersion: z.literal(2),
@@ -494,12 +504,30 @@ export const CurrentSessionMetadataSchema = z
     profile: SessionProfileBundleSchema.optional(),
     /** The repository environment this session admitted, for snapshot selection. */
     environment: environmentReferenceSchema.optional(),
+    environmentSetup: MetadataEnvironmentSetupSchema.optional(),
+    hostedGitHubRepositories: hostedGitHubRepositoriesSchema.optional(),
     callback: MetadataCallbackSchema.optional(),
     workspace: MetadataWorkspaceSchema.optional(),
     devcontainer: MetadataDevContainerSchema.optional(),
     lifecycle: MetadataLifecycleSchema,
   })
   .strip()
+  .refine(
+    ({ hostedGitHubRepositories: hosted, environment, identity, repository, workspace }) =>
+      hosted === undefined ||
+      (environment === undefined &&
+        Boolean(identity.orgId) &&
+        identity.botId === undefined &&
+        workspace?.worktreeId !== undefined &&
+        workspace.generatedBranchName !== undefined &&
+        !isLegacySharedSandboxWorkspace(workspace) &&
+        repository?.type === 'github' &&
+        repository.repo.toLowerCase() === hosted.primary.fullName.toLowerCase() &&
+        repository.githubIntegrationId === hosted.integrationId &&
+        (repository.githubAccessPurpose ?? 'workflow') === 'workflow' &&
+        repository.token === undefined),
+    'Hosted repositories require an organization workspace with a matching pinned GitHub primary'
+  )
   .refine(
     metadata =>
       (metadata.workspace?.sandboxProvider ?? 'cloudflare') === 'cloudflare' ||

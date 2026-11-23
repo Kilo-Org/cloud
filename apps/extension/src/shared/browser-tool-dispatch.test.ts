@@ -11,6 +11,9 @@ import type { BrowserToolDispatchSession } from './browser-tool-dispatch';
 import { createBrowserToolSession } from './browser-tool-session';
 import type { BrowserToolCallResult } from './browser-tool-session';
 import type { BrowserScriptingApi, BrowserTabsApi } from './tab-debugger';
+import type { BrowserToolPageTabsApi } from './browser-tool-page-actions';
+import { AGENT_TAB_OUTSIDE_GROUP_ERROR } from './browser-agent-checks';
+import type { IsolatedAgentProbe } from './browser-agent-isolated-probe';
 
 interface FakeSession extends BrowserToolDispatchSession {
   readonly commands: string[];
@@ -23,6 +26,7 @@ const createFakeSession = (unavailableError?: string): FakeSession => {
     attach: async () => {},
     backend: 'debugger',
     callTool: async (): Promise<BrowserToolCallResult> => ({ ok: true, value: undefined }),
+    captureViewportImage: async () => undefined,
     commands,
     consoleMessages: () => [],
     dispose: async () => {},
@@ -64,6 +68,7 @@ const createScriptingFakeSession = (
 
       return callToolResult ?? { ok: true, value: undefined };
     },
+    captureViewportImage: async () => undefined,
     commands,
     consoleMessages: () => [],
     dispose: async () => {},
@@ -188,6 +193,164 @@ describe('runKiloBrowserTool on the scripting backend', () => {
       ok: false,
     });
     expect(session.toolCalls).toStrictEqual([]);
+  });
+});
+
+/** The agent session's own tab (1) and the user's tab (2) behind it in browser order, with every tabs call recorded. */
+const createAgentTabs = () => {
+  const tabs = [
+    { id: 1, title: 'Agent', url: 'https://agent.example.com/' },
+    { id: 2, title: 'Bank', url: 'https://bank.example.com/' },
+  ];
+  const removed: number[] = [];
+  const activated: number[] = [];
+  const tabsApi: BrowserToolPageTabsApi = {
+    get: async tabId => tabs.find(tab => tab.id === tabId) ?? {},
+    query: async () => [...tabs],
+    remove: async tabId => {
+      removed.push(tabId);
+    },
+    update: async (tabId, properties) => {
+      if (properties.active === true) {
+        activated.push(tabId);
+      }
+
+      return tabs.find(tab => tab.id === tabId) ?? {};
+    },
+  };
+  const options = {
+    agentAccess: {
+      actOrigins: [],
+      groupTabs: [1],
+      navigateOrigins: [],
+      readableOrigins: ['https://agent.example.com'],
+    },
+    tabId: 1,
+    tabsApi,
+  };
+
+  return { activated, options, removed };
+};
+
+describe('runKiloBrowserTool tab actions on the scripting backend', () => {
+  it('refuses the browser index of the user’s tab for an agent', async () => {
+    const session = createScriptingFakeSession();
+    const tabs = createAgentTabs();
+
+    // The agent list holds one tab, so index 1 is past it and, in browser order, names the user's first tab.
+    await expect(
+      runKiloBrowserTool({
+        arguments: { action: 'select', index: 1 },
+        options: tabs.options,
+        session,
+        toolName: 'browser_tabs',
+      })
+    ).resolves.toStrictEqual({ error: AGENT_TAB_OUTSIDE_GROUP_ERROR, ok: false });
+    expect(tabs.activated).toStrictEqual([]);
+    expect(session.toolCalls).toStrictEqual([]);
+  });
+
+  it('refuses the browser index of the user’s tab for close', async () => {
+    const session = createScriptingFakeSession();
+    const tabs = createAgentTabs();
+
+    await expect(
+      runKiloBrowserTool({
+        arguments: { action: 'close', index: 1 },
+        options: tabs.options,
+        session,
+        toolName: 'browser_tabs',
+      })
+    ).resolves.toStrictEqual({ error: AGENT_TAB_OUTSIDE_GROUP_ERROR, ok: false });
+    expect(tabs.removed).toStrictEqual([]);
+  });
+
+  it('lists only the agent’s own tabs, with no user-tab entries', async () => {
+    const session = createScriptingFakeSession();
+    const tabs = createAgentTabs();
+
+    await expect(
+      runKiloBrowserTool({
+        arguments: { action: 'list' },
+        options: tabs.options,
+        session,
+        toolName: 'browser_tabs',
+      })
+    ).resolves.toStrictEqual({
+      ok: true,
+      value: '- 0: (current) [Agent](https://agent.example.com/)',
+    });
+  });
+
+  it('closes only the agent’s own tab for browser_close', async () => {
+    const session = createScriptingFakeSession();
+    const tabs = createAgentTabs();
+
+    await expect(
+      runKiloBrowserTool({
+        arguments: {},
+        options: tabs.options,
+        session,
+        toolName: 'browser_close',
+      })
+    ).resolves.toStrictEqual({ ok: true, value: 'Closed the tab.' });
+    expect(tabs.removed).toStrictEqual([1]);
+    expect(session.toolCalls).toStrictEqual([]);
+  });
+});
+
+describe('runKiloBrowserTool screenshots on the scripting backend', () => {
+  const capture = {
+    ok: true,
+    value: { dataUrl: 'data:image/png;base64,iVBORw0KGgo=', width: 1 },
+  } as const;
+  const framedProbe: IsolatedAgentProbe = request =>
+    Promise.resolve(
+      request.kind === 'frame'
+        ? [
+            {
+              frameId: 0,
+              result: JSON.stringify({
+                origin: 'https://shop.example.com',
+                parentFrameId: null,
+                url: 'https://shop.example.com/',
+              }),
+            },
+            {
+              frameId: 12,
+              result: JSON.stringify({
+                origin: 'https://pay.example.com',
+                parentFrameId: 0,
+                url: 'https://pay.example.com/',
+              }),
+            },
+          ]
+        : []
+    );
+
+  it('hands a panel caller the capture as taken', async () => {
+    const session = { ...createScriptingFakeSession(capture), isolatedProbe: framedProbe };
+
+    await expect(
+      runKiloBrowserTool({
+        arguments: { scale: 'css' },
+        session,
+        toolName: 'browser_take_screenshot',
+      })
+    ).resolves.toStrictEqual(capture);
+  });
+
+  it('never hands an agent a capture it could not mask', async () => {
+    const session = { ...createScriptingFakeSession(capture), isolatedProbe: framedProbe };
+
+    await expect(
+      runKiloBrowserTool({
+        arguments: { scale: 'css' },
+        options: { agentScope: { readableOrigins: [] } },
+        session,
+        toolName: 'browser_take_screenshot',
+      })
+    ).resolves.toMatchObject({ ok: false });
   });
 });
 

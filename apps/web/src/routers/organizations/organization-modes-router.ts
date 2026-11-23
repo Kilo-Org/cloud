@@ -5,7 +5,10 @@ import {
   organizationMemberProcedure,
   organizationMemberMutationProcedure,
 } from '@kilocode/web-shared/routers/organizations/utils';
-import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
+import {
+  MODE_SLUG_MAX_LENGTH,
+  ORGANIZATION_MANAGE_ROLES,
+} from '@kilocode/app-shared/organizations';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import {
@@ -22,12 +25,13 @@ import {
   type OrganizationSettings,
 } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
+import type { AuditModeFieldChange } from '@kilocode/app-shared/organizations';
 import {
   getOrganizationById,
   mutateOrganizationSettings,
 } from '@kilocode/web-shared/lib/organizations/organizations';
 import { successResult } from '@kilocode/web-shared/lib/maybe-result';
-import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { db, readDb, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import type { Organization } from '@kilocode/db/schema';
 import {
   DEFAULT_ORGANIZATION_AUTO_MODEL_SETTINGS,
@@ -50,11 +54,11 @@ const CreateModeInputSchema = OrganizationIdInputSchema.extend({
   name: z
     .string()
     .min(1, 'Mode name is required')
-    .max(100, 'Mode name must be less than 100 characters'),
+    .max(100, 'Mode name must be 100 characters or fewer'),
   slug: z
     .string()
     .min(1, 'Mode slug is required')
-    .max(50, 'Mode slug must be less than 50 characters')
+    .max(MODE_SLUG_MAX_LENGTH, `Mode slug must be ${MODE_SLUG_MAX_LENGTH} characters or fewer`)
     .regex(/^[a-z0-9-]+$/, 'Mode slug must contain only lowercase letters, numbers, and hyphens'),
   config: ModeConfigInputSchema.optional(),
   route_model: RouteModelInputSchema,
@@ -62,12 +66,16 @@ const CreateModeInputSchema = OrganizationIdInputSchema.extend({
 
 const UpdateModeInputSchema = OrganizationIdInputSchema.extend({
   modeId: z.uuid(),
-  name: z.string().min(1).max(100).optional(),
+  name: z
+    .string()
+    .min(1, 'Mode name is required')
+    .max(100, 'Mode name must be 100 characters or fewer')
+    .optional(),
   slug: z
     .string()
-    .min(1)
-    .max(50)
-    .regex(/^[a-z0-9-]+$/)
+    .min(1, 'Mode slug is required')
+    .max(MODE_SLUG_MAX_LENGTH, `Mode slug must be ${MODE_SLUG_MAX_LENGTH} characters or fewer`)
+    .regex(/^[a-z0-9-]+$/, 'Mode slug must contain only lowercase letters, numbers, and hyphens')
     .optional(),
   config: ModeConfigInputSchema.optional(),
   route_model: RouteModelInputSchema,
@@ -114,7 +122,7 @@ async function applyOrganizationAutoRouteChange(
     delete routes[modeSlug];
   } else {
     const validation = await validateOrganizationAutoTarget(organization, routeModel, {
-      dbClient: tx,
+      read: tx ? { tx } : { fromDb: readDb },
     });
 
     if (validation.kind === 'error') {
@@ -213,6 +221,54 @@ function createModeUpdateAuditMessage(
   return `Updated mode "${existingMode.name}"${changes.length > 0 ? `: ${changes.join(', ')}` : ''}`;
 }
 
+/**
+ * The fields one mode update actually changed, for the row's structured
+ * `details`.
+ *
+ * The web `message` keeps its own builder unchanged. This list exists because
+ * the message cannot be parsed reliably: it truncates prose to fifty characters
+ * and prints `(empty)` for an absent value, so a stored `null` against an
+ * incoming `''` reads there as `(empty) → (empty)` — a change the reader's
+ * language cannot state, because nothing changed. Comparing the normalised text
+ * drops that phantom pair, and prose fields travel as their label alone.
+ */
+function modeUpdateFields(
+  existingMode: OrganizationMode,
+  updates: { name?: string; slug?: string; config?: Partial<OrganizationModeConfig> }
+): AuditModeFieldChange[] {
+  const fields: AuditModeFieldChange[] = [];
+  if (updates.name && updates.name !== existingMode.name) {
+    fields.push({ field: 'name', previous: existingMode.name, next: updates.name });
+  }
+  if (updates.slug && updates.slug !== existingMode.slug) {
+    fields.push({ field: 'slug', previous: existingMode.slug, next: updates.slug });
+  }
+  const auditConfig = updates.config;
+  if (!auditConfig) {
+    return fields;
+  }
+  const proseFields = ['roleDefinition', 'whenToUse', 'description', 'customInstructions'] as const;
+  for (const field of proseFields) {
+    const next = auditConfig[field];
+    if (next === undefined) {
+      continue;
+    }
+    // An absent value reads as empty on both sides: the stored column keeps
+    // `null` where the incoming config carries `''`, and that is no change.
+    if ((next ?? '') !== (existingMode.config[field] ?? '')) {
+      fields.push({ field });
+    }
+  }
+  if (
+    auditConfig.groups !== undefined &&
+    existingMode.config.groups !== undefined &&
+    JSON.stringify(auditConfig.groups) !== JSON.stringify(existingMode.config.groups)
+  ) {
+    fields.push({ field: 'groups' });
+  }
+  return fields;
+}
+
 export const organizationModesRouter = createTRPCRouter({
   create: organizationMemberMutationProcedure
     .input(CreateModeInputSchema)
@@ -288,6 +344,7 @@ export const organizationModesRouter = createTRPCRouter({
           actor_email: ctx.user.google_user_email,
           actor_id: ctx.user.id,
           actor_name: ctx.user.google_user_name,
+          details: { id: 'mode.identity', name, slug },
           message: `Created mode "${name}" with slug "${slug}": ${JSON.stringify(config)}${routeAuditMessage ? `, ${routeAuditMessage}` : ''}`,
           organization_id: organizationId,
           tx,
@@ -446,11 +503,24 @@ export const organizationModesRouter = createTRPCRouter({
         }
 
         if (hasModeUpdates || routeAuditChanges.length > 0) {
+          // The structured fields come from the change list, not from parsing
+          // the sentence: an auto-route move is its own field, and a prose field
+          // reads as its label alone.
+          const changedFields = modeUpdateFields(existingMode, updates);
+          if (routeAuditChanges.length > 0) {
+            changedFields.push({ field: 'autoRoute' });
+          }
           await createAuditLog({
             action: 'organization.mode.update',
             actor_email: ctx.user.google_user_email,
             actor_id: ctx.user.id,
             actor_name: ctx.user.google_user_name,
+            details: {
+              id: 'mode.update',
+              name: updates.name ?? existingMode.name,
+              slug: updates.slug ?? existingMode.slug,
+              fields: changedFields,
+            },
             message: `${createModeUpdateAuditMessage(existingMode, updates)}${routeAuditChanges.length > 0 ? `, ${routeAuditChanges.join(', ')}` : ''}`,
             organization_id: existingMode.organization_id,
             tx,
@@ -557,6 +627,7 @@ export const organizationModesRouter = createTRPCRouter({
               actor_email: ctx.user.google_user_email,
               actor_id: ctx.user.id,
               actor_name: ctx.user.google_user_name,
+              details: { id: 'mode.identity', name: lockedMode.name, slug: lockedMode.slug },
               message: `Deleted mode "${lockedMode.name}" (slug: "${lockedMode.slug}")${routeAuditChanges.length > 0 ? `, ${routeAuditChanges.join(', ')}` : ''}`,
 
               organization_id: lockedMode.organization_id,

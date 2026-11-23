@@ -11,6 +11,7 @@ import {
   type KiloClawSubscription,
 } from '@kilocode/db';
 import { kiloclaw_subscriptions, kiloclaw_instances, kilocode_users } from '@kilocode/db/schema';
+import { isKiloClawPaidHostingAvailable } from '@kilocode/db/kiloclaw-paid-hosting';
 import { type KiloClawSubscriptionStatus } from '@kilocode/db/schema-types';
 import {
   getClawPlanForStripePriceId,
@@ -19,6 +20,10 @@ import {
   isIntroPriceId,
 } from '@kilocode/web-shared/lib/kiloclaw/stripe-price-ids.server';
 import { applyStripeFundedKiloClawPeriod } from '@/lib/kiloclaw/credit-billing';
+import {
+  cancelSubscriptionForEndedStripeSubscription,
+  isEndedStripeSubscriptionStatus,
+} from '@/lib/kiloclaw/ended-stripe-subscription';
 import { classifyKiloClawInvoiceLine } from '@/lib/kiloclaw/stripe-invoice-classifier.server';
 import { getStripeFundedKiloClawReportingFields } from '@/lib/kiloclaw/stripe-funded-reporting.server';
 import {
@@ -636,6 +641,7 @@ export async function ensureAutoIntroSchedule(
   stripeSubscriptionId: string,
   _userId?: string
 ): Promise<void> {
+  if (!isKiloClawPaidHostingAvailable()) return;
   const liveSub = await stripe.subscriptions.retrieve(stripeSubscriptionId);
 
   const priceId = liveSub.items.data[0]?.price?.id;
@@ -1494,24 +1500,31 @@ export async function handleKiloClawSubscriptionDeleted(params: {
 
     const targetRow = resolvedTarget.subscription;
 
+    // A final Commit term without explicit Standard consent must end at its
+    // boundary, so a stale pending conversion cannot keep the row alive.
+    const lacksFinalCommitContinuationConsent =
+      targetRow.pending_conversion &&
+      targetRow.plan === 'commit' &&
+      (targetRow.scheduled_plan !== 'standard' || targetRow.scheduled_by !== 'user');
+    if (lacksFinalCommitContinuationConsent) {
+      reportKnownCommitRetirementAnomaly({
+        subscription: targetRow,
+        reason: 'provider_state_mismatch',
+        summary: 'Final Commit Stripe conversion lacked explicit Standard continuation consent.',
+        stripeEventId: eventId,
+      });
+    }
+
     // Only convert to pure credit when the user explicitly accepted conversion
     // (pending_conversion flag set by acceptConversion). Checking Kilo Pass alone
     // is insufficient — subscription.deleted also fires for dunning/suspended rows
     // that Stripe auto-cancels, and restoring active status there would grant a
     // free grace window. See Standalone-to-Credit Conversion rule 4.
-    if (targetRow.pending_conversion) {
-      if (
-        targetRow.plan === 'commit' &&
-        (targetRow.scheduled_plan !== 'standard' || targetRow.scheduled_by !== 'user')
-      ) {
-        reportKnownCommitRetirementAnomaly({
-          subscription: targetRow,
-          reason: 'provider_state_mismatch',
-          summary: 'Final Commit Stripe conversion lacked explicit Standard continuation consent.',
-          stripeEventId: eventId,
-        });
-        return;
-      }
+    if (
+      isKiloClawPaidHostingAvailable() &&
+      targetRow.pending_conversion &&
+      !lacksFinalCommitContinuationConsent
+    ) {
       // Conversion path: clear Stripe subscription ID, set payment_source to
       // credits, and set credit_renewal_at to the existing period end so the
       // credit renewal sweep picks up the next renewal.
@@ -1560,34 +1573,22 @@ export async function handleKiloClawSubscriptionDeleted(params: {
       });
     } else {
       // Standard cancellation path
-      const [before] = await tx
-        .select()
-        .from(kiloclaw_subscriptions)
-        .where(eq(kiloclaw_subscriptions.id, targetRow.id))
-        .limit(1);
-      const [after] = await tx
-        .update(kiloclaw_subscriptions)
-        .set({
-          status: 'canceled',
-          cancel_at_period_end: false,
-          scheduled_plan: null,
-          scheduled_by: null,
-          stripe_schedule_id: null,
-        })
-        .where(eq(kiloclaw_subscriptions.id, targetRow.id))
-        .returning();
+      const { before, after } = await cancelSubscriptionForEndedStripeSubscription(
+        tx,
+        targetRow.id
+      );
 
       await insertStripeSubscriptionChangeLog(tx, {
         subscriptionId: after?.id ?? before?.id,
         action: 'canceled',
         reason: 'stripe_subscription_deleted',
-        before: before ?? null,
-        after: after ?? null,
+        before,
+        after,
         bestEffort: true,
       });
 
-      beforeSubscriptionForMarkerClear = before ?? null;
-      afterSubscriptionForMarkerClear = after ?? null;
+      beforeSubscriptionForMarkerClear = before;
+      afterSubscriptionForMarkerClear = after;
 
       logInfo('KiloClaw subscription.deleted processed', {
         stripe_event_id: eventId,
@@ -1812,6 +1813,7 @@ export async function handleKiloClawInvoicePaid(params: {
     userId: metadata.kiloUserId,
     metadataInstanceId: metadata.instanceId ?? undefined,
     stripeSubscriptionId,
+    stripeSubscriptionStatus: stripeSubscription.status,
     stripePaymentId,
     plan,
     priceVersion,
@@ -1826,7 +1828,7 @@ export async function handleKiloClawInvoicePaid(params: {
   });
 
   if (!applied) {
-    if (plan === 'commit') {
+    if (plan === 'commit' && !isEndedStripeSubscriptionStatus(stripeSubscription.status)) {
       await containProviderNonRenewal({
         stripeSubscriptionId,
         stripeEventId: eventId,

@@ -1,4 +1,4 @@
-import type { ToolPart } from '../opencode.gen';
+import type { ToolPart } from '../opencode';
 
 export type ToolDetailField = { key: string; value: string };
 
@@ -7,9 +7,9 @@ export type ToolDetailSummary = {
   summary?: string;
   /**
    * Whether `name` is a friendly known-tool label rather than a raw tool id or
-   * an `mcp` `server/tool` identifier. The label is English app prose (there is
-   * no catalog for a shared package), so a consumer that translates tool text
-   * must send it to the gateway; an identifier never is.
+   * an `mcp` `server/tool` identifier. `resolveName` produces only identifiers
+   * today, so this is always false; a consumer treats a true value as English
+   * app prose that must go to the gateway for translation.
    */
   nameIsLabel: boolean;
 };
@@ -93,8 +93,6 @@ function questionSummary(input: Record<string, unknown>): string | undefined {
   ) {
     question = input.question;
   }
-  // Bound the question text: the collapse must not regex-scan an unbounded
-  // question on the per-render row path.
   return question === undefined ? undefined : capSummarySource(question);
 }
 
@@ -113,8 +111,6 @@ function getArgumentSummary(args: Record<string, unknown>): string | undefined {
   if (label !== undefined) parts.push(capSummarySource(label));
   if (scalar !== undefined) {
     const [key, value] = scalar;
-    // Bound a string scalar before interpolating it, so a huge argument value
-    // never reaches the collapse as one string.
     parts.push(`${key}=${typeof value === 'string' ? capSummarySource(value) : String(value)}`);
   }
   const summary = parts.filter(part => part.length > 0).join(' · ');

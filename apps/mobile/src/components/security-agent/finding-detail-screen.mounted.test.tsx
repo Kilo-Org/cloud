@@ -14,6 +14,7 @@ import type * as ReactI18nextModule from 'react-i18next';
 
 import { CenteredState } from '@/components/centered-state';
 import { QueryError } from '@/components/query-error';
+import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { SettingsRecoveryStatus } from './settings-recovery-status';
 import { FindingDetailsPanel } from './finding-details-panel';
@@ -21,7 +22,6 @@ import { FindingAnalysisPanel } from './finding-analysis-panel';
 import { FindingRemediationPanel } from './finding-remediation-panel';
 import { Skeleton } from '@/components/ui/skeleton';
 import { type SecurityFinding } from '@/lib/security-agent';
-import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { TRIAL_ENDED_BILLING_COPY_KEY, TRIAL_ENDED_COPY_KEY } from '@/lib/trial-refusal-copy';
 import { FindingDetailScreen } from './finding-detail-screen';
 
@@ -35,6 +35,10 @@ const finding = vi.hoisted(() => ({
   isLoading: false,
   isFetching: false,
   isError: false,
+  isPending: false,
+  // TanStack Query's `fetchStatus`: `paused` is a read the online manager will
+  // not run, `fetching` one in flight, `idle` neither.
+  fetchStatus: 'idle' as 'fetching' | 'paused' | 'idle',
   error: null as unknown,
   data: undefined as Pick<SecurityFinding, 'status' | 'repo_full_name'> | undefined,
   refetch: vi.fn(),
@@ -43,8 +47,28 @@ const finding = vi.hoisted(() => ({
 const analysis = vi.hoisted(() => ({
   isLoading: false,
   isError: false,
+  isPending: false,
+  fetchStatus: 'idle' as 'fetching' | 'paused' | 'idle',
   data: undefined as unknown,
   refetch: vi.fn(),
+}));
+
+// The paused-read retry the screen offers for the finding: a plain `refetch`
+// would only join the promise the online manager is holding.
+const findingRetry = vi.hoisted(() => ({
+  retry: vi.fn<() => Promise<void>>(),
+  isRetrying: false,
+}));
+
+const connectivity = vi.hoisted(() => ({
+  status: 'online' as 'online' | 'offline' | 'unknown',
+}));
+
+// The panels are stubs here (their own suites own their bodies), so the props
+// the screen hands them are recorded to prove the read state reaches them.
+const panelProps = vi.hoisted(() => ({
+  analysis: null as Record<string, unknown> | null,
+  remediation: null as Record<string, unknown> | null,
 }));
 
 const useSecurityAnalysis = vi.hoisted(() =>
@@ -61,6 +85,9 @@ const focusEffect = vi.hoisted(() => vi.fn());
 vi.mock('react-native', () => ({
   View: 'View',
   Pressable: 'Pressable',
+  ActivityIndicator: 'ActivityIndicator',
+  // EmptyState reads the scheme for its dark disc and glyph ink.
+  useColorScheme: () => 'light',
   I18nManager: { isRTL: false },
   Platform: { OS: 'ios' },
   // The header reads the window to decide whether its actions share the title
@@ -68,6 +95,7 @@ vi.mock('react-native', () => ({
   useWindowDimensions: () => ({ width: 390, fontScale: 1, height: 844 }),
 }));
 vi.mock('@/components/ui/icons', () => ({
+  RotateCcw: 'RotateCcw',
   Ban: 'Ban',
   ShieldOff: 'ShieldOff',
   ChevronDown: 'ChevronDown',
@@ -98,7 +126,17 @@ vi.mock('expo-router', () => ({
   useNavigation: () => ({ getState: () => ({ index: navigation.history.length - 1 }) }),
   useFocusEffect: focusEffect,
 }));
+// Back with no local history hands off through the push-then-retire hook (a
+// literal `router.replace` crashes Android Fabric). Its own
+// mechanics have their suite; here it stands in for the navigation call so the
+// assertions stay about the resulting route list.
+vi.mock('@/lib/navigation/stack-safe-replace', () => ({
+  useStackSafeReplace: () => ({
+    replace: (href: string) => navigation.history.splice(-1, 1, href),
+  }),
+}));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useMutedDisabledInk: () => '#666',
   useThemeColors: () => ({ foreground: '#000', mutedForeground: '#666' }),
 }));
 // The refusal hooks read the reader's role through the organization query
@@ -121,8 +159,12 @@ vi.mock('@/lib/hooks/use-security-agent', () => ({
 }));
 vi.mock('@/lib/hooks/use-security-findings', () => ({
   useSecurityFinding: () => finding,
+  useRetrySecurityFinding: () => findingRetry,
   useSecurityAnalysis: (scope: string, findingId: string, enabled?: boolean) =>
     useSecurityAnalysis(scope, findingId, enabled),
+}));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => connectivity.status,
 }));
 const dismissFailureCopy = vi.hoisted(() =>
   vi.fn((draft: { lastError: string | null }) => draft.lastError ?? '')
@@ -142,14 +184,45 @@ vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }
 vi.mock('@/components/tab-screen', () => ({
   TabScreenScrollView: 'TabScreenScrollView',
 }));
+// The view switch is the shared segmented control, whose own suite owns its
+// track, floor and selection tick. Here it only has to hand the screen's
+// choices and the current one back, so a test can pick a view the way a press
+// does.
+const viewSwitch = vi.hoisted(() => ({
+  props: null as null | {
+    options: { value: string; label: string }[];
+    value: string;
+    onChange: (next: string) => void;
+    accessibilityLabel: string;
+    semantics?: 'choice' | 'tabs';
+  },
+}));
+vi.mock('@/components/ui/segmented-control', () => ({
+  SegmentedControl: (props: {
+    options: { value: string; label: string }[];
+    value: string;
+    onChange: (next: string) => void;
+    accessibilityLabel: string;
+    semantics?: 'choice' | 'tabs';
+  }) => {
+    viewSwitch.props = props;
+    return null;
+  },
+}));
 vi.mock('@/components/security-agent/finding-analysis-panel', () => ({
-  FindingAnalysisPanel: () => null,
+  FindingAnalysisPanel: (props: Record<string, unknown>) => {
+    panelProps.analysis = props;
+    return null;
+  },
 }));
 vi.mock('@/components/security-agent/finding-details-panel', () => ({
   FindingDetailsPanel: () => null,
 }));
 vi.mock('@/components/security-agent/finding-remediation-panel', () => ({
-  FindingRemediationPanel: () => null,
+  FindingRemediationPanel: (props: Record<string, unknown>) => {
+    panelProps.remediation = props;
+    return null;
+  },
 }));
 vi.mock('@/lib/utils', () => ({
   cn: (...args: unknown[]) => args.filter(Boolean).join(' '),
@@ -179,17 +252,20 @@ function press(tree: R, accessibilityLabel: string) {
   act(tree.root.findByProps({ accessibilityLabel }).props.onPress as () => void);
 }
 
-/**
- * The detail strip's entries. The mocked platform is iOS, where an entry is
- * typed as a button (see lib/a11y/tab-entry); the `tablist` container keeps
- * them apart from the header's own buttons.
- */
-function findingTabs(tree: R): TestRenderer.ReactTestInstance[] {
-  const strip = tree.root.findAllByProps({ accessibilityRole: 'tablist' })[0];
-  if (!strip) {
-    throw new Error('finding tabs not mounted');
+/** The view switch the screen mounted, as the shared control received it. */
+function mountedViewSwitch() {
+  const props = viewSwitch.props;
+  if (!props) {
+    throw new Error('finding view switch not mounted');
   }
-  return strip.findAllByProps({ role: 'button' });
+  return props;
+}
+
+/** Pick one of the screen's views the way a press on the control does. */
+function selectView(view: string): void {
+  act(() => {
+    mountedViewSwitch().onChange(view);
+  });
 }
 
 beforeEach(() => {
@@ -200,12 +276,22 @@ beforeEach(() => {
   finding.isLoading = false;
   finding.isFetching = false;
   finding.isError = false;
+  finding.isPending = false;
+  finding.fetchStatus = 'idle';
   finding.error = null;
   finding.data = { status: 'open', repo_full_name: 'org/repo' };
   finding.refetch.mockReset();
   analysis.isLoading = false;
   analysis.isError = false;
+  analysis.isPending = false;
+  analysis.fetchStatus = 'idle';
   analysis.data = undefined;
+  findingRetry.retry.mockReset();
+  findingRetry.retry.mockResolvedValue(undefined);
+  findingRetry.isRetrying = false;
+  connectivity.status = 'online';
+  panelProps.analysis = null;
+  panelProps.remediation = null;
   capability.canManage = true;
   navigation.history = [detailPath];
 });
@@ -215,20 +301,24 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('FindingDetailScreen tab touch target', () => {
-  // Regression: each tab was a `min-h-11` node, 38.5 dp in this app's rem, so
-  // the strip's upper and lower bands were not part of the tab. The floor has
-  // to be the tab node's own class; `hitSlop` would not move the rect a
-  // control-size audit measures.
-  it('carries the shared row floor on every tab node', () => {
-    const tree = renderScreen();
-    const tabs = findingTabs(tree);
+describe('FindingDetailScreen view switch', () => {
+  // The three views are the app's one view switch, so the screen mounts the
+  // shared segmented control instead of a strip of its own: the track, the
+  // selected pill and the control's floor are the primitive's.
+  it('mounts the shared segmented control over the three views', () => {
+    renderScreen();
+    const control = mountedViewSwitch();
 
-    expect(tabs).toHaveLength(3);
-    for (const tab of tabs) {
-      expect(String(tab.props.className).split(' ')).toContain(ROW_TARGET_CLASS);
-      expect(tab.props.hitSlop).toBeUndefined();
-    }
+    expect(control.options.map(option => option.value)).toEqual([
+      'details',
+      'analysis',
+      'remediation',
+    ]);
+    expect(control.value).toBe('details');
+    // Each view swaps the body below the strip, so a reader hears tabs, and the
+    // tab list is named by the screen's own title.
+    expect(control.semantics).toBe('tabs');
+    expect(control.accessibilityLabel).toBe('securityAgent.findingDetail.title');
   });
 });
 
@@ -240,9 +330,7 @@ describe('FindingDetailScreen pane containers', () => {
     finding.isError = true;
     finding.error = { data: { code: 'INTERNAL_SERVER_ERROR' } };
     const tree = renderScreen();
-    const tabs = findingTabs(tree);
-    const onPress = tabs[tab === 'analysis' ? 1 : 2]?.props.onPress as () => void;
-    act(onPress);
+    selectView(tab);
     expect(tree.root.findAllByType(TabScreenScrollView)).toHaveLength(0);
     expect(tree.root.findAllByType(Panel)).toHaveLength(1);
     expect(tree.root.findAllByType(CenteredState)).toHaveLength(0);
@@ -298,21 +386,21 @@ describe('FindingDetailScreen analysis query activation', () => {
     return useSecurityAnalysis.mock.lastCall?.[2];
   }
 
-  function pressTab(tree: R, index: number) {
-    act(findingTabs(tree)[index]?.props.onPress as () => void);
+  function pressTab(index: number) {
+    selectView(['details', 'analysis', 'remediation'][index] ?? 'details');
   }
 
   it('reads the analysis only while an analysis surface is selected', () => {
-    const tree = renderScreen();
+    renderScreen();
     expect(enabledArg()).toBeFalsy();
 
-    pressTab(tree, 1);
+    pressTab(1);
     expect(enabledArg()).toBe(true);
 
-    pressTab(tree, 2);
+    pressTab(2);
     expect(enabledArg()).toBe(true);
 
-    pressTab(tree, 0);
+    pressTab(0);
     expect(enabledArg()).toBeFalsy();
   });
 
@@ -475,14 +563,20 @@ describe.each([true, false])('finding load states with local history=%s', hasLoc
     );
   }
 
+  /** Whether the one rendered header keeps its subtitle line reserved. */
+  function reservesSubtitle(tree: R): boolean {
+    return tree.root.findByType(ScreenHeader).props.reserveSubtitle === true;
+  }
+
   it('keeps Back available during loading without offering Retry', () => {
     finding.isLoading = true;
     finding.isFetching = true;
     finding.data = undefined;
     const tree = renderScreen();
 
-    // Four body skeletons plus the bar on the header's reserved eyebrow line.
+    // Four body skeletons plus the bar on the header's reserved subtitle line.
     expect(tree.root.findAllByType(Skeleton)).toHaveLength(5);
+    expect(reservesSubtitle(tree)).toBe(true);
     expect(tree.root.findAllByType(QueryError)).toHaveLength(0);
     expect(tree.root.findAllByProps({ accessibilityLabel: 'common.retry' })).toHaveLength(0);
     expectSafeBack(tree);
@@ -495,9 +589,10 @@ describe.each([true, false])('finding load states with local history=%s', hasLoc
     const tree = renderScreen();
 
     expect(tree.root.findAllByType(QueryError)).toHaveLength(1);
-    // The header keeps the eyebrow line it reserved while loading, and no bar
+    // The header keeps the subtitle line it reserved while loading, and no bar
     // paints over it once the read has failed: this state leaves no skeleton.
     expect(tree.root.findAllByType(Skeleton)).toHaveLength(0);
+    expect(reservesSubtitle(tree)).toBe(true);
     expectSafeBack(tree);
   });
 
@@ -517,7 +612,7 @@ describe.each([true, false])('finding load states with local history=%s', hasLoc
 
     expect(tree.root.findAllByType(QueryError)).toHaveLength(1);
     expect(tree.root.findByType(QueryError).props.isRetrying).toBe(true);
-    // The body stays on the error surface; only the header's reserved eyebrow
+    // The body stays on the error surface; only the header's reserved subtitle
     // bar remains, so the retry window paints no body skeleton.
     expect(tree.root.findAllByType(Skeleton)).toHaveLength(1);
 
@@ -527,6 +622,32 @@ describe.each([true, false])('finding load states with local history=%s', hasLoc
 
     expect(tree.root.findAllByType(QueryError)).toHaveLength(0);
     expect(tree.root.findAllByProps({ children: 'org/recovered' })).toHaveLength(1);
+  });
+
+  it('returns to the paused face when the read re-pauses after a failed retry', () => {
+    // The deliberate retry runs even while offline, so it can fail and stamp
+    // the failure hold. Its own Retry is a plain refetch, which only re-pauses
+    // the read; the hold must not keep the paused card off the screen then,
+    // because that card holds the only attempt that can run while offline.
+    finding.isError = true;
+    finding.error = { data: { code: 'INTERNAL_SERVER_ERROR' } };
+    finding.data = undefined;
+    const tree = renderScreen();
+    expect(tree.root.findByType(QueryError).props.variant).toBeUndefined();
+
+    finding.isError = false;
+    finding.error = null;
+    finding.isPending = true;
+    finding.fetchStatus = 'paused';
+    finding.isFetching = false;
+    connectivity.status = 'offline';
+    renderScreen();
+
+    const error = tree.root.findByType(QueryError);
+    expect(error.props.variant).toBe('offline');
+    expect(error.props.message).toBe('securityAgent.dismiss.couldNotLoad');
+    act(error.props.onRetry as () => void);
+    expect(findingRetry.retry).toHaveBeenCalledOnce();
   });
 
   it('does not carry a failed load onto another finding', () => {
@@ -542,7 +663,7 @@ describe.each([true, false])('finding load states with local history=%s', hasLoc
     renderScreen('finding-2');
 
     expect(tree.root.findAllByType(QueryError)).toHaveLength(0);
-    // Four body skeletons plus the bar on the header's reserved eyebrow line.
+    // Four body skeletons plus the bar on the header's reserved subtitle line.
     expect(tree.root.findAllByType(Skeleton)).toHaveLength(5);
   });
 
@@ -582,11 +703,101 @@ describe.each([true, false])('finding load states with local history=%s', hasLoc
       tree.root.findAllByProps({ children: 'securityAgent.dismiss.notFoundDescription' })
     ).toHaveLength(1);
     expect(tree.root.findAllByProps({ accessibilityLabel: 'common.retry' })).toHaveLength(0);
-    expect(tree.root.findAllByType(QueryError)).toHaveLength(0);
+    const notFound = tree.root.findByType(QueryError);
+    expect(notFound.props.variant).toBe('not-found');
+    expect(notFound.props.onRetry).toBeUndefined();
     // The first frame of every open is the loading one, so the not-found answer
     // keeps the line it reserved then instead of pulling the title up — held
     // blank, because no read is running to fill it.
     expect(tree.root.findAllByType(Skeleton)).toHaveLength(0);
+    expect(reservesSubtitle(tree)).toBe(true);
     expectSafeBack(tree);
+  });
+});
+
+describe('FindingDetailScreen paused finding read', () => {
+  /** A first read the online manager paused: pending, not fetching, no data. */
+  function pausedFinding() {
+    finding.data = undefined;
+    finding.isLoading = false;
+    finding.isFetching = false;
+    finding.isPending = true;
+    finding.fetchStatus = 'paused';
+  }
+
+  it('names the connection instead of waiting on the skeleton', () => {
+    connectivity.status = 'offline';
+    pausedFinding();
+    const tree = renderScreen();
+
+    const error = tree.root.findByType(QueryError);
+    expect(error.props.variant).toBe('offline');
+    expect(error.props.message).toBe('securityAgent.dismiss.couldNotLoad');
+    // No skeleton anywhere: neither the body placeholders nor the header's
+    // reserved subtitle bar, which only a running read paints.
+    expect(tree.root.findAllByType(Skeleton)).toHaveLength(0);
+    expect(tree.root.findAllByType(TabScreenScrollView)).toHaveLength(0);
+    // The paused surface keeps the subtitle line the loading frame reserved.
+    expect(tree.root.findByType(ScreenHeader).props.reserveSubtitle).toBe(true);
+  });
+
+  it('offers the paused-read retry instead of a plain refetch', () => {
+    connectivity.status = 'offline';
+    pausedFinding();
+    const tree = renderScreen();
+
+    const error = tree.root.findByType(QueryError);
+    act(error.props.onRetry as () => void);
+
+    expect(findingRetry.retry).toHaveBeenCalledOnce();
+    expect(finding.refetch).not.toHaveBeenCalled();
+    expect(error.props.isRetrying).toBe(false);
+  });
+
+  it('keeps the skeleton while the connectivity is unsettled', () => {
+    connectivity.status = 'unknown';
+    pausedFinding();
+    const tree = renderScreen();
+
+    // Four body skeletons; the header paints no bar because no read is running.
+    expect(tree.root.findAllByType(Skeleton)).toHaveLength(4);
+    expect(tree.root.findAllByType(QueryError)).toHaveLength(0);
+  });
+
+  it('keeps the delivered finding on screen', () => {
+    connectivity.status = 'offline';
+    finding.isPending = false;
+    finding.fetchStatus = 'idle';
+    const tree = renderScreen();
+
+    expect(tree.root.findAllByType(QueryError)).toHaveLength(0);
+    expect(tree.root.findAllByType(TabScreenScrollView)).toHaveLength(1);
+    expect(tree.root.findAllByProps({ children: 'org/repo' })).toHaveLength(1);
+    expect(findingRetry.retry).not.toHaveBeenCalled();
+  });
+
+  it('hands both panels the analysis read state and the connectivity', () => {
+    analysis.isPending = true;
+    analysis.fetchStatus = 'paused';
+    connectivity.status = 'offline';
+    renderScreen();
+
+    selectView('analysis');
+    expect(panelProps.analysis).toMatchObject({
+      isPending: true,
+      fetchStatus: 'paused',
+      connectivity: 'offline',
+      isLoading: false,
+      isError: false,
+    });
+
+    selectView('remediation');
+    expect(panelProps.remediation).toMatchObject({
+      isPending: true,
+      fetchStatus: 'paused',
+      connectivity: 'offline',
+      isLoading: false,
+      isError: false,
+    });
   });
 });

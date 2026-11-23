@@ -1,9 +1,12 @@
 import { z } from 'zod';
-import { glanceableAgentsSnapshotSchema } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import {
+  glanceableAgentsSnapshotShape,
+  refineNewestResultPair,
+} from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { homeWidgetDetailsSchema } from '@kilocode/app-shared/home-widget';
 
 import { NEEDS_INPUT_ATTENTION_KINDS } from './needs-input-actions';
-import { securityLifecyclePayloadShape } from './notification-events';
+import { securityFindingPayloadShape, securityLifecyclePayloadShape } from './notification-events';
 import { sessionLiveActivityContentStateSchema } from './session-live-content';
 import { nonEmptyStringSchema } from './non-empty-string';
 import { refineSpendAlertScope, spendAlertScopeShape } from './spend-alert-scope';
@@ -14,6 +17,25 @@ import { refineSpendAlertScope, spendAlertScopeShape } from './spend-alert-scope
 // at the enforcement read site.
 export const cloudAgentSessionCategorySchema = z.enum(['attention', 'status']);
 export type CloudAgentSessionCategory = z.infer<typeof cloudAgentSessionCategorySchema>;
+
+/**
+ * The category a cloud-agent-session payload carries, applying the schema
+ * default ('status') at the enforcement read site. Every consumer of the
+ * category — the push kind, the history category, and the push worker's
+ * preference gate — reads this one function, so an omitted category cannot
+ * mean different things in different places.
+ *
+ * The parameter names the payload's discriminant beside `category` so a whole
+ * `PushData` union passes unchanged: a bare `{ category }` is a weak type and
+ * TypeScript rejects a union that shares no property with it. Only `category`
+ * is read.
+ */
+export function classifyCloudAgentSessionPush(data: {
+  type?: string | undefined;
+  category?: CloudAgentSessionCategory | undefined;
+}): CloudAgentSessionCategory {
+  return data.category ?? 'status';
+}
 
 // The needs-input raise fields every cloud-agent-session contract carries,
 // whatever envelope transports it: the visible push in this module and the
@@ -26,6 +48,54 @@ export const cloudAgentSessionRaiseShape = {
   attentionKind: z.enum(NEEDS_INPUT_ATTENTION_KINDS).optional(),
   prUrl: nonEmptyStringSchema.optional(),
 };
+
+// One followed session's Android ongoing notification
+// (`.specs/mobile-session-live-activity.md` "Android"). A high-priority
+// data-only message to the device that follows the session; the app
+// renders, updates, or cancels the notification from `content`. Only a
+// device that registered an `android_session_ongoing` row receives it, and
+// `schemaVersion` gates a later shape: a client that does not know the
+// version ignores the message.
+const sessionLiveUpdateShape = {
+  type: z.literal('session_live_update'),
+  schemaVersion: z.literal(1),
+  event: z.enum(['update', 'end']),
+  content: sessionLiveActivityContentStateSchema,
+  /**
+   * Only on an end: how long a finished notification stays in the shade.
+   * 0 removes it at once (the session is gone or out of scope).
+   */
+  dismissAfterMs: z.number().int().min(0).optional(),
+};
+
+/** The shape's own type, so the refinement below reads the event vocabulary from the enum. */
+const sessionLiveUpdateSchema = z.object(sessionLiveUpdateShape);
+
+/**
+ * Only an end carries `dismissAfterMs`. An update keeps the ongoing
+ * notification, so a duration on one has nothing to act on; a value there
+ * means a producer built the wrong event and the client would silently drop
+ * the field.
+ */
+function refineSessionLiveUpdate(
+  data: z.infer<typeof sessionLiveUpdateSchema>,
+  ctx: z.RefinementCtx
+): void {
+  if (data.dismissAfterMs !== undefined && data.event !== 'end') {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['dismissAfterMs'],
+      message: 'only an end carries dismissAfterMs',
+    });
+  }
+}
+
+/**
+ * Longest answer a result notification may carry for a reply that could not be
+ * delivered. The field is read back only by this app, so the cap is a
+ * payload-size bound, not a display rule.
+ */
+export const ANSWER_DRAFT_MAX_LENGTH = 2000;
 
 /**
  * Schema for the `data` blob attached to Expo push notifications.
@@ -51,6 +121,13 @@ export const pushDataSchema = z.discriminatedUnion('type', [
     // the session belongs to. Optional so a push from an older producer in a
     // rolling deploy still validates; absent means Personal.
     organizationId: nonEmptyStringSchema.optional(),
+    // The answer text someone typed into the notification's inline Reply when
+    // that reply could not be delivered. Only an app-posted result
+    // notification sets it; no server producer does, so its presence never
+    // changes what the push means. The bound lives here, where the payload is
+    // validated, so a longer answer is refused rather than silently carried
+    // into a notification the OS may truncate.
+    answerDraft: nonEmptyStringSchema.max(ANSWER_DRAFT_MAX_LENGTH).optional(),
   }),
   z.object({
     type: z.literal('agent_briefing'),
@@ -64,9 +141,6 @@ export const pushDataSchema = z.discriminatedUnion('type', [
   // amount, an email, or the configured threshold: this blob crosses the OS
   // lock screen, so the generic preview copy in `genericPushContentForPushData`
   // (`./push-copy.ts`) must stay content-free.
-  // The tap routes by the scope, so the scope and its id must agree: an
-  // organization alert without its id would open the personal spend view, and
-  // a personal alert naming an organization would open one that did not send.
   z
     .object({
       type: z.literal('spend_alert'),
@@ -75,8 +149,7 @@ export const pushDataSchema = z.discriminatedUnion('type', [
     .superRefine(refineSpendAlertScope),
   z.object({
     type: z.literal('security_finding'),
-    findingId: nonEmptyStringSchema,
-    scope: nonEmptyStringSchema,
+    ...securityFindingPayloadShape,
   }),
   // 1:1 map to SecurityAuditLogAction, shared with the internal dispatch
   // request schema: see SECURITY_LIFECYCLE_EVENTS in `notification-events.ts`
@@ -89,31 +162,24 @@ export const pushDataSchema = z.discriminatedUnion('type', [
   // travel beside it for background Home widget updates and are never copied
   // into Live Activity/ongoing content-state. Older producers omit them.
   //
-  // Derived from the one snapshot schema so a field, its bound and its default
+  // Built from the one snapshot shape so a field, its bound and its default
   // exist once. `accountEpoch` is left out deliberately: it is client-set (see
   // the shared schema's comment), and a server has no value to push for it.
-  glanceableAgentsSnapshotSchema.omit({ accountEpoch: true }).extend({
-    type: z.literal('active_agents_glanceable'),
-    homeWidgetDetails: homeWidgetDetailsSchema.optional(),
-  }),
-  // One followed session's Android ongoing notification
-  // (`.specs/mobile-session-live-activity.md` "Android"). A high-priority
-  // data-only message to the device that follows the session; the app
-  // renders, updates, or cancels the notification from `content`. Only a
-  // device that registered an `android_session_ongoing` row receives it, and
-  // `schemaVersion` gates a later shape: a client that does not know the
-  // version ignores the message.
-  z.object({
-    type: z.literal('session_live_update'),
-    schemaVersion: z.literal(1),
-    event: z.enum(['update', 'end']),
-    content: sessionLiveActivityContentStateSchema,
-    /**
-     * Only on an end: how long a finished notification stays in the shade.
-     * 0 removes it at once (the session is gone or out of scope).
-     */
-    dismissAfterMs: z.number().int().min(0).optional(),
-  }),
+  // The variant applies the shared newest-result refiner because reshaping
+  // cannot carry a refinement.
+  z
+    .object({
+      ...glanceableAgentsSnapshotShape,
+    })
+    .omit({ accountEpoch: true })
+    .extend({
+      type: z.literal('active_agents_glanceable'),
+      homeWidgetDetails: homeWidgetDetailsSchema.optional(),
+    })
+    .superRefine(refineNewestResultPair),
+  // One followed session's Android ongoing notification; see
+  // `sessionLiveUpdateSchema` above.
+  sessionLiveUpdateSchema.superRefine(refineSessionLiveUpdate),
 ]);
 
 export type PushData = z.infer<typeof pushDataSchema>;

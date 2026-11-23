@@ -5,6 +5,7 @@ import {
   CONTROL_PLANE_SUPERVISOR,
   GIT_CREDENTIAL_HELPER,
   RUNTIME_DISTRIBUTION,
+  RUNTIME_PROCESS_PATH,
   RUNTIME_RESERVED_ROOT,
   WRAPPER_BUNDLES,
   runtimeInstallPath,
@@ -52,11 +53,27 @@ const inheritedEnv = [
   'CONTROL_WORKLOAD_LIMIT_MB',
   CONTROL_PLANE_NATIVE_LOGS_ENV,
   'SANDBOX_INTERCEPT_HTTPS',
-  'NODE_EXTRA_CA_CERTS',
   CONTROL_SANDBOX_PROVIDER_ENV,
   'KILO_PLATFORM',
   'KILO_DISABLE_AUTOUPDATE',
   'KILO_DEBUG_SESSION_INGEST',
+];
+
+// Optional trust settings must stay absent when the launch did not supply them.
+const optionalInheritedEnv = [
+  'NODE_EXTRA_CA_CERTS',
+  'HTTPS_PROXY',
+  'HTTP_PROXY',
+  'NO_PROXY',
+  'https_proxy',
+  'http_proxy',
+  'no_proxy',
+  'NODE_USE_ENV_PROXY',
+  'SSL_CERT_FILE',
+  'SSL_CERT_DIR',
+  'GIT_SSL_CAINFO',
+  'CURL_CA_BUNDLE',
+  'REQUESTS_CA_BUNDLE',
 ];
 
 const INSTALLER = String.raw`
@@ -384,12 +401,13 @@ export function renderRuntimeBootstrap(input: {
   const environment = [
     '/usr/bin/env',
     '-i',
-    'PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
+    `PATH=${RUNTIME_PROCESS_PATH}`,
     'HOME=/root',
     'LANG=en_US.UTF-8',
     'LC_ALL=en_US.UTF-8',
     'DEBIAN_FRONTEND=noninteractive',
     ...inheritedEnv.map(name => `${name}="\${${name}:-}"`),
+    ...optionalInheritedEnv.map(name => `\${${name}+"${name}=\${${name}}"}`),
   ].join(' ');
   const installer = shellQuote(`${RUNTIME_ARCHIVE_SCANNER_SOURCE}\n${INSTALLER}`);
   const node = `${environment} /usr/local/bin/node --input-type=module -e`;

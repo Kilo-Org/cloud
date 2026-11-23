@@ -17,25 +17,33 @@ import { OrganizationBoundary } from '@/components/organization/organization-bou
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
-import { Button } from '@/components/ui/button';
+import { ConfigureRow } from '@/components/ui/configure-row';
 import { Copy, Plus, Workflow } from '@/components/ui/icons';
 import { IconButton } from '@/components/ui/icon-button';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Switch } from '@/components/ui/switch';
+import { RowGroup } from '@/components/ui/row-group';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
+import { renderRowTrailing } from '@/components/ui/row-trailing';
+import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { ICON_TARGET_BOX_CLASS, TOUCH_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { copyWebhookUrl } from '@/lib/cloud-triggers/copy-webhook-url';
 import { useCloudTriggers, useTriggerMutations } from '@/lib/cloud-triggers/use-cloud-triggers';
 import { type CloudTriggerListRow } from '@/lib/cloud-triggers/trigger-draft';
 import { triggerCreateHref, triggerDetailHref } from '@/lib/cloud-triggers/trigger-routes';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { cn } from '@/lib/utils';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 
 const SKELETON_ROWS = [0, 1];
 
-/** The height two rows occupy, held by every state so the New action never moves. */
-const BODY_BAND_CLASS = 'min-h-[220px]';
+/**
+ * The floor the pending band already occupies: two skeleton rows. Every state
+ * that is not the list keeps it, so the list never moves when the two
+ * placeholders are replaced by the settled state.
+ */
+const BODY_BAND_CLASS = 'min-h-32';
 
 type TriggersListScreenProps = Readonly<{
   /** Organization scope from the route; absent is the caller's own triggers. */
@@ -66,44 +74,72 @@ function TriggerRow({
   // roles) keeps its saved state but not a control the server would refuse.
   const showsInboundUrl = trigger.activationMode === 'webhook';
   const canToggle = trigger.canEdit === true;
+  // The row hosts a switch, so the press covers the leading tile and the text
+  // only: the switch owns its own touch and its own accessible node instead of
+  // sitting inside a button. The content press needs a name of its own, and the
+  // switch and the copy control each name their trigger through a catalog
+  // string with the trigger id interpolated, so a reader hears which trigger
+  // either control acts on.
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={trigger.triggerId}
-      onPress={onOpen}
-      className="gap-2 rounded-lg bg-secondary p-3 active:opacity-70"
-    >
-      <View className="flex-row items-center gap-2">
-        <Text className="min-w-0 flex-1 text-sm font-medium text-foreground" numberOfLines={1}>
-          {trigger.triggerId}
-        </Text>
-        <Switch
-          accessibilityLabel={t('cloudAgent.triggers.activeTitle')}
-          value={trigger.isActive}
-          onValueChange={onToggle}
-          disabled={busy || !canToggle}
-        />
-      </View>
-      <Text variant="muted" className="text-xs" numberOfLines={1}>
-        {details}
-      </Text>
+    <View>
+      <ConfigureRow
+        icon={Workflow}
+        title={trigger.triggerId}
+        subtitle={details}
+        pressTarget="content"
+        contentAccessibilityLabel={trigger.triggerId}
+        onPress={onOpen}
+        trailing={renderRowTrailing({
+          kind: 'switch',
+          accessibilityLabel: t('cloudAgent.triggers.activeSwitchA11y', {
+            name: trigger.triggerId,
+          }),
+          value: trigger.isActive,
+          onValueChange: onToggle,
+          disabled: busy || !canToggle,
+        })}
+      />
       {showsInboundUrl ? (
-        <View className="flex-row items-center gap-2">
-          <Text variant="mono" className="min-w-0 flex-1 text-xs" numberOfLines={1}>
+        // The inbound URL is a value of its own rather than the row's subtitle:
+        // it is copied, and a subtitle truncates it past the first line. The
+        // line itself is the copy control rather than the glyph beside it.
+        // React Native confines a touch to every ancestor view's bounds, so a
+        // control on this one-text-line row can never deliver a taller target
+        // and one that declares `hitSlop` loses it at the line's edge. The line
+        // carries the platform target on its own node — the shared
+        // `TOUCH_TARGET_CLASS` floor, which the icon box's 34 dp contribution
+        // plus `pb-3` already meets — so the target is real, the glyph keeps
+        // the place it has always had, and the URL stays closer to its own
+        // trigger row than to the next one. Sibling triggers in one scope share
+        // the URL except the trailing trigger id, so the tail, not the middle,
+        // is what tells rows apart.
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('cloudAgent.triggers.copyLinkA11y', {
+            name: trigger.triggerId,
+          })}
+          onPress={() => {
+            void copyWebhookUrl(trigger.inboundUrl);
+          }}
+          className={cn(
+            'flex-row items-center gap-2 px-4 pb-3 active:opacity-70',
+            TOUCH_TARGET_CLASS
+          )}
+        >
+          <Text
+            variant="mono"
+            className="min-w-0 flex-1 text-xs"
+            numberOfLines={1}
+            ellipsizeMode="middle"
+          >
             {trigger.inboundUrl}
           </Text>
-          <IconButton
-            accessibilityLabel={t('common.copyLink')}
-            onPress={() => {
-              void copyWebhookUrl(trigger.inboundUrl);
-            }}
-            className="-my-2"
-          >
+          <View className={cn(ICON_TARGET_BOX_CLASS, '-my-2 shrink-0')}>
             <Copy size={16} color={colors.mutedForeground} />
-          </IconButton>
-        </View>
+          </View>
+        </Pressable>
       ) : null}
-    </Pressable>
+    </View>
   );
 }
 
@@ -130,19 +166,25 @@ export function TriggersListScreen({ organizationId }: TriggersListScreenProps) 
     );
   }
 
+  const isEmpty = !list.isPending && !list.isError && list.data.length === 0;
+  // An empty or failed list is the whole surface. While the list is empty the
+  // header's "+" is the one create control and the intro would repeat the
+  // state's own description, so both the intro and the inline button wait for
+  // rows to exist.
+  const wholeSurface = isEmpty || list.isError;
+
   let body: ReactNode = null;
   if (list.isPending) {
     body = (
-      <View className="gap-3">
+      <RowGroup leadingTile>
         {SKELETON_ROWS.map(row => (
-          <Skeleton key={row} className="h-[104px] rounded-lg" />
+          <RowSkeleton key={row} tile subtitle />
         ))}
-      </View>
+      </RowGroup>
     );
   } else if (list.isError) {
     body = (
       <QueryError
-        placement="top"
         variant="server"
         title={t('cloudAgent.triggers.loadFailedTitle')}
         message={t('cloudAgent.triggers.loadFailedDescription')}
@@ -150,10 +192,9 @@ export function TriggersListScreen({ organizationId }: TriggersListScreenProps) 
         isRetrying={list.isFetching}
       />
     );
-  } else if (list.data.length === 0) {
+  } else if (isEmpty) {
     body = (
       <EmptyState
-        placement="top"
         icon={Workflow}
         title={t('cloudAgent.triggers.emptyTitle')}
         description={t('cloudAgent.triggers.emptyDescription')}
@@ -161,7 +202,7 @@ export function TriggersListScreen({ organizationId }: TriggersListScreenProps) 
     );
   } else {
     body = (
-      <View className="gap-3">
+      <RowGroup leadingTile>
         {list.data.map(trigger => (
           <TriggerRow
             key={trigger.id}
@@ -179,7 +220,7 @@ export function TriggersListScreen({ organizationId }: TriggersListScreenProps) 
             }}
           />
         ))}
-      </View>
+      </RowGroup>
     );
   }
 
@@ -198,28 +239,22 @@ export function TriggersListScreen({ organizationId }: TriggersListScreenProps) 
           </IconButton>
         }
       />
-      <TabScreenScrollView
-        className="flex-1"
-        contentContainerClassName="gap-3 px-4 pt-4"
-        showsVerticalScrollIndicator={false}
-      >
-        <Text variant="muted" className="text-xs">
-          {t('cloudAgent.triggers.subtitle')}
-        </Text>
-        <View className={BODY_BAND_CLASS} testID="triggers-list-body">
-          {body}
-        </View>
-        <Button
-          variant="outline"
-          className={STATE_ACTION_CLASS}
-          onPress={() => {
-            router.push(triggerCreateHref(organizationId) as Href);
-          }}
+      {wholeSurface ? (
+        body
+      ) : (
+        <TabScreenScrollView
+          className="flex-1"
+          contentContainerClassName={SCREEN_BODY_CLASS}
+          showsVerticalScrollIndicator={false}
         >
-          <Plus size={16} color={colors.foreground} />
-          <Text>{t('cloudAgent.triggers.new')}</Text>
-        </Button>
-      </TabScreenScrollView>
+          <Section>
+            <Text variant="muted">{t('cloudAgent.triggers.subtitle')}</Text>
+            <View className={BODY_BAND_CLASS} testID="triggers-list-body">
+              {body}
+            </View>
+          </Section>
+        </TabScreenScrollView>
+      )}
     </View>
   );
 }

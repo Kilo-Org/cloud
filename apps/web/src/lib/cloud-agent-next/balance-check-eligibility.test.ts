@@ -63,21 +63,32 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store', () => ({
     mockGetOpenAiChatGptStoredConnection(...args),
 }));
 
-const CONNECTED_CHATGPT = { connection: { status: 'connected' }, isEnabled: true };
+const mockOpenAiChatGptConnectorGone = jest.fn();
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/connector', () => ({
+  openAiChatGptConnectorGone: (...args: unknown[]) => mockOpenAiChatGptConnectorGone(...args),
+}));
+
+const CONNECTED_CHATGPT = {
+  connection: { status: 'connected' },
+  isEnabled: true,
+  createdBy: 'connector',
+};
 
 const mockGetClaudeBillingConnection = jest.fn();
 const mockResolveClaudeBillingModel = jest.fn();
-const mockResolveClaudeBillingConnector = jest.fn();
+const mockResolveConnectionConnector = jest.fn();
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/claude-billing/store', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/ai-gateway/claude-billing/store'),
   getGrantedClaudeBillingConnection: (...args: unknown[]) =>
     mockGetClaudeBillingConnection(...args),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/claude-billing/routing', () => ({
   resolveClaudeBillingModel: (...args: unknown[]) => mockResolveClaudeBillingModel(...args),
 }));
-jest.mock('@kilocode/web-shared/lib/ai-gateway/claude-billing/connector', () => ({
-  resolveClaudeBillingConnector: (...args: unknown[]) => mockResolveClaudeBillingConnector(...args),
+jest.mock('@kilocode/web-shared/lib/ai-gateway/connector', () => ({
+  resolveConnectionConnector: (...args: unknown[]) => mockResolveConnectionConnector(...args),
 }));
 
 import { computeCloudAgentNextBalanceCheckEligibility } from './balance-check-eligibility';
@@ -87,6 +98,20 @@ const PAID_MODEL = 'anthropic/claude-sonnet-4';
 const fakeDb = {} as never;
 const fakeUser = { id: 'user-1' };
 
+/** A mocked stored row whose grant gives it to the same scope, so both views agree. */
+function granted(row: Record<string, unknown> | null) {
+  return row
+    ? {
+        connection: row,
+        grant: {
+          kilo_user_id: row.kilo_user_id ?? null,
+          organization_id: row.organization_id ?? null,
+          created_by: row.created_by ?? '',
+        },
+      }
+    : null;
+}
+
 beforeEach(() => {
   jest.resetAllMocks();
   mockIsFreeModel.mockReturnValue(false);
@@ -94,14 +119,15 @@ beforeEach(() => {
   mockGetUserByokProviderIds.mockResolvedValue([]);
   mockGetOrganizationByokProviderIds.mockResolvedValue([]);
   mockGetEnabledByokProviders.mockResolvedValue([]);
-  mockGetDirectByokModel.mockResolvedValue({ provider: null, model: null });
+  mockGetDirectByokModel.mockResolvedValue(null);
   mockSupportsCatalogMode.mockReturnValue(false);
   mockGetDirectByokCatalogModelIds.mockResolvedValue(new Set());
   mockGetAllowedDirectByokCatalogModelIds.mockResolvedValue(new Set());
   mockIsCustomLlm.mockResolvedValue(false);
   mockResolveOrganizationMemberModelDecision.mockResolvedValue({ decision: { allowed: true } });
   mockGetOpenAiChatGptStoredConnection.mockResolvedValue(null);
-  mockResolveClaudeBillingConnector.mockResolvedValue({ kind: 'unrecorded' });
+  mockOpenAiChatGptConnectorGone.mockResolvedValue(false);
+  mockResolveConnectionConnector.mockResolvedValue({ kind: 'unrecorded' });
 });
 
 describe('computeCloudAgentNextBalanceCheckEligibility', () => {
@@ -200,6 +226,7 @@ describe('computeCloudAgentNextBalanceCheckEligibility', () => {
       kiloUserId: fakeUser.id,
       organizationId: null,
     });
+    expect(mockOpenAiChatGptConnectorGone).not.toHaveBeenCalled();
   });
 
   it("counts the organization's shared-services ChatGPT connection for service runs", async () => {
@@ -220,6 +247,42 @@ describe('computeCloudAgentNextBalanceCheckEligibility', () => {
     expect(await eligibility(false)).toEqual({ isFree: false, hasUserByokAvailable: false });
   });
 
+  it('does not count the shared-services row when its connector is gone', async () => {
+    mockGetOpenAiChatGptStoredConnection.mockImplementation(async (owner: { scope?: string }) =>
+      owner.scope === 'shared_services' ? CONNECTED_CHATGPT : null
+    );
+    mockOpenAiChatGptConnectorGone.mockResolvedValue(true);
+
+    const result = await computeCloudAgentNextBalanceCheckEligibility({
+      fromDb: fakeDb,
+      user: fakeUser,
+      modelId: 'openai/gpt-5',
+      organizationId: 'org-1',
+      includeSharedServicesConnection: true,
+    });
+
+    expect(result).toEqual({ isFree: false, hasUserByokAvailable: false });
+    expect(mockOpenAiChatGptConnectorGone).toHaveBeenCalledWith(CONNECTED_CHATGPT, fakeDb);
+  });
+
+  it('counts the shared-services row while its connector is present', async () => {
+    mockGetOpenAiChatGptStoredConnection.mockImplementation(async (owner: { scope?: string }) =>
+      owner.scope === 'shared_services' ? CONNECTED_CHATGPT : null
+    );
+    mockOpenAiChatGptConnectorGone.mockResolvedValue(false);
+
+    const result = await computeCloudAgentNextBalanceCheckEligibility({
+      fromDb: fakeDb,
+      user: fakeUser,
+      modelId: 'openai/gpt-5',
+      organizationId: 'org-1',
+      includeSharedServicesConnection: true,
+    });
+
+    expect(result).toEqual({ isFree: false, hasUserByokAvailable: true });
+    expect(mockOpenAiChatGptConnectorGone).toHaveBeenCalledWith(CONNECTED_CHATGPT, fakeDb);
+  });
+
   describe('Claude billing link', () => {
     const eligibility = (includeSharedServicesConnection: boolean, organizationId?: string) =>
       computeCloudAgentNextBalanceCheckEligibility({
@@ -236,7 +299,7 @@ describe('computeCloudAgentNextBalanceCheckEligibility', () => {
 
     it("counts the organization's Claude link for every request in it", async () => {
       mockGetClaudeBillingConnection.mockImplementation(async (owner: { kind: string }) =>
-        owner.kind === 'organization' ? { status: 'connected' } : null
+        granted(owner.kind === 'organization' ? { status: 'connected' } : null)
       );
       expect(await eligibility(true, 'org-1')).toEqual({
         isFree: false,
@@ -250,7 +313,7 @@ describe('computeCloudAgentNextBalanceCheckEligibility', () => {
 
     it("does not use the person's own Claude link for an organization request", async () => {
       mockGetClaudeBillingConnection.mockImplementation(async (owner: { kind: string }) =>
-        owner.kind === 'personal' ? { status: 'connected' } : null
+        granted(owner.kind === 'personal' ? { status: 'connected' } : null)
       );
 
       expect(await eligibility(true, 'org-1')).toEqual({
@@ -265,7 +328,7 @@ describe('computeCloudAgentNextBalanceCheckEligibility', () => {
 
     it("counts the person's own Claude link outside an organization", async () => {
       mockGetClaudeBillingConnection.mockImplementation(async (owner: { kind: string }) =>
-        owner.kind === 'personal' ? { status: 'connected' } : null
+        granted(owner.kind === 'personal' ? { status: 'connected' } : null)
       );
 
       expect(await eligibility(false)).toEqual({ isFree: false, hasUserByokAvailable: true });
@@ -276,25 +339,26 @@ describe('computeCloudAgentNextBalanceCheckEligibility', () => {
     });
 
     it('does not count an organization link whose recorded connector is gone', async () => {
-      mockGetClaudeBillingConnection.mockImplementation(async () => ({
-        status: 'connected',
-        created_by: 'connector',
-      }));
-      mockResolveClaudeBillingConnector.mockResolvedValue({ kind: 'gone' });
+      mockGetClaudeBillingConnection.mockImplementation(async () =>
+        granted({ status: 'connected', created_by: 'connector' })
+      );
+      mockResolveConnectionConnector.mockResolvedValue({ kind: 'gone' });
 
       expect(await eligibility(true, 'org-1')).toEqual({
         isFree: false,
         hasUserByokAvailable: false,
         reconnectRequired: 'claude_billing',
       });
-      expect(mockResolveClaudeBillingConnector).toHaveBeenCalledWith('connector', fakeDb);
+      expect(mockResolveConnectionConnector).toHaveBeenCalledWith('connector', fakeDb);
     });
 
     it('counts an organization link whose recorded connector still resolves', async () => {
       mockGetClaudeBillingConnection.mockImplementation(async (owner: { kind: string }) =>
-        owner.kind === 'organization' ? { status: 'connected', created_by: 'connector' } : null
+        granted(
+          owner.kind === 'organization' ? { status: 'connected', created_by: 'connector' } : null
+        )
       );
-      mockResolveClaudeBillingConnector.mockResolvedValue({ kind: 'present' });
+      mockResolveConnectionConnector.mockResolvedValue({ kind: 'present' });
 
       expect(await eligibility(true, 'org-1')).toEqual({
         isFree: false,
@@ -304,7 +368,11 @@ describe('computeCloudAgentNextBalanceCheckEligibility', () => {
 
     it('does not count an organization link that cannot bill', async () => {
       mockGetClaudeBillingConnection.mockImplementation(async (owner: { kind: string }) =>
-        owner.kind === 'organization' ? { status: 'billing_unavailable' } : { status: 'connected' }
+        granted(
+          owner.kind === 'organization'
+            ? { status: 'billing_unavailable' }
+            : { status: 'connected' }
+        )
       );
       expect(await eligibility(true, 'org-1')).toEqual({
         isFree: false,
@@ -457,9 +525,7 @@ describe('computeCloudAgentNextBalanceCheckEligibility', () => {
         allowNonMember: true,
         modelId: PAID_MODEL,
       });
-      const getRoutingProviderConfig = mockCanRouteToVercel.mock
-        .calls[0][1] as () => Promise<unknown>;
-      await expect(getRoutingProviderConfig()).resolves.toEqual({ only: ['groq'] });
+      expect(mockCanRouteToVercel).toHaveBeenCalledWith(PAID_MODEL, { only: ['groq'] });
     });
 
     it('does not count the key when routing would fall through to a Kilo-paid route', async () => {

@@ -15,13 +15,17 @@ import type { KiloSessionId, SlashCommandCatalogStatus } from './types';
 export * from './cloud-conversation-schemas';
 export { PREPARATION_MAX_DETAIL_LENGTH, preparationStepSchema } from './preparation-step';
 
-export const cloudWorktreeChangesReadyDataSchema = z
+/**
+ * The wire payload of either refresh channel: a strictly positive revision,
+ * rejected when any other field rides along.
+ */
+const channelRevisionDataSchema = z
   .object({ revision: z.number().int().positive().max(Number.MAX_SAFE_INTEGER) })
   .strict();
 
-export const cloudWorkspaceArtifactsChangedDataSchema = z
-  .object({ revision: z.number().int().positive().max(Number.MAX_SAFE_INTEGER) })
-  .strict();
+export const cloudWorktreeChangesReadyDataSchema = channelRevisionDataSchema;
+
+export const cloudWorkspaceArtifactsChangedDataSchema = channelRevisionDataSchema;
 
 export const streamErrorSchema = z.object({
   type: z.literal('error'),
@@ -397,6 +401,12 @@ export const SESSION_MAX_COMMITS = 256;
 export const SESSION_QUEUE_MAX_IDS = 1_000;
 /** Most questions a `question.asked` event may carry. */
 export const SESSION_QUESTION_MAX_QUESTIONS = 32;
+/** Most options one question may offer. */
+export const SESSION_QUESTION_MAX_OPTIONS = 32;
+/** Most actions one suggestion may offer. */
+export const SESSION_SUGGESTION_MAX_ACTIONS = 8;
+/** Longest suggestion-action text accepted on the wire. */
+export const SESSION_INTERACTION_MAX_STRING_LENGTH = 2_000;
 
 const remoteCommandStringSchema = z.string().max(REMOTE_COMMAND_MAX_STRING_LENGTH);
 const remoteSlashCommandInfoSchema = z
@@ -574,15 +584,26 @@ const REMOTE_DIRECTORY_MAX_STRING_LENGTH = 2_000;
 const remoteDirectoryEntrySchema = z
   .object({
     name: z.string().min(1).max(REMOTE_DIRECTORY_MAX_STRING_LENGTH),
-    path: z.string().min(1).max(REMOTE_DIRECTORY_MAX_STRING_LENGTH),
+    path: z
+      .string()
+      .min(1)
+      .max(REMOTE_DIRECTORY_MAX_STRING_LENGTH)
+      // The CLI emits entry paths relative to its launch directory, so a
+      // leading `/` (filesystem root) or a `..` segment (above the launch
+      // directory) is never a valid entry.
+      .refine(value => !value.startsWith('/') && !value.split('/').includes('..'), {
+        message: 'directory path must be relative to the launch directory',
+      }),
   })
   .strict();
 
 /**
  * Strict `list_directories` success body (protocol v1). The CLI returns the
- * resolved listing path and up to 256 contained directory entries. Anything
- * outside this envelope — extra keys, an over-limit entry array, an empty or
- * over-length entry string, or protocol drift — fails closed as `invalid`.
+ * resolved listing path, relative to its launch directory, and up to 256
+ * contained directory entries whose paths are relative to that same launch
+ * directory. Anything outside this envelope — extra keys, an over-limit entry
+ * array, an empty or over-length entry string, an absolute or parent-climbing
+ * entry path, or protocol drift — fails closed as `invalid`.
  */
 export const listDirectoriesV1Schema = z
   .object({
@@ -850,7 +871,7 @@ const questionOptionSchema = z.object({
 const questionInfoSchema = z.object({
   question: z.string(),
   header: z.string(),
-  options: z.array(questionOptionSchema),
+  options: z.array(questionOptionSchema).max(SESSION_QUESTION_MAX_OPTIONS),
   multiple: z.boolean().optional(),
   custom: z.boolean().optional(),
 });
@@ -882,7 +903,9 @@ function toQuestionInfo(parsed: z.infer<typeof questionInfoSchema>): QuestionInf
  * answer sliding onto the wrong question. No usable entry means the payload
  * carries no questions the client can render. A list longer than
  * `SESSION_QUESTION_MAX_QUESTIONS` fails the field, which the caller catches to
- * `undefined`.
+ * `undefined`. A question whose option list exceeds
+ * `SESSION_QUESTION_MAX_OPTIONS` fails that entry, so the kept prefix stops
+ * there, exactly as an over-limit question list does.
  */
 const questionListSchema = z
   .array(z.unknown())
@@ -899,10 +922,25 @@ const questionListSchema = z
 
 export const questionAskedDataSchema = z.object({
   id: z.string(),
-  tool: z.object({ callID: z.string() }).optional(),
+  // The question path never forwards `tool`, so a tool call id this app cannot
+  // read must not decide whether the question list is readable.
+  tool: z.object({ callID: z.string() }).optional().catch(undefined),
   questions: questionListSchema.optional().catch(undefined),
 });
 export type QuestionAskedData = z.infer<typeof questionAskedDataSchema>;
+
+/**
+ * The part of a question request that still identifies it when its list does
+ * not parse, or when it carries no questions at all. No answer card can stand
+ * for such a request, but the user must learn that one is waiting, so the event
+ * boundary forwards this identity instead of dropping the request silently. A
+ * payload with no readable `id` has nothing to key the notice to and no
+ * `question.replied` that could clear it, so it is still dropped.
+ */
+export const questionAskedIdentitySchema = z.object({
+  id: z.string().min(1),
+});
+export type QuestionAskedIdentity = z.infer<typeof questionAskedIdentitySchema>;
 
 export const questionRepliedDataSchema = z.object({
   requestID: z.string(),
@@ -955,9 +993,9 @@ export type PermissionRepliedData = z.infer<typeof permissionRepliedDataSchema>;
 // Older CLIs never emit these events, so no explicit version gate is needed here.
 
 export const suggestionActionSchema = z.object({
-  label: z.string(),
-  description: z.string().optional(),
-  prompt: z.string(),
+  label: z.string().max(SESSION_INTERACTION_MAX_STRING_LENGTH),
+  description: z.string().max(SESSION_INTERACTION_MAX_STRING_LENGTH).optional(),
+  prompt: z.string().max(SESSION_INTERACTION_MAX_STRING_LENGTH),
 });
 export type SuggestionActionData = z.infer<typeof suggestionActionSchema>;
 
@@ -965,7 +1003,7 @@ export const suggestionShownDataSchema = z.object({
   id: z.string(),
   sessionID: z.string().optional(),
   text: z.string(),
-  actions: z.array(suggestionActionSchema).catch([]),
+  actions: z.array(suggestionActionSchema).max(SESSION_SUGGESTION_MAX_ACTIONS).catch([]),
   tool: z.object({ messageID: z.string(), callID: z.string() }).optional(),
 });
 export type SuggestionShownData = z.infer<typeof suggestionShownDataSchema>;
@@ -973,7 +1011,7 @@ export type SuggestionShownData = z.infer<typeof suggestionShownDataSchema>;
 export const suggestionAcceptedDataSchema = z.object({
   requestID: z.string(),
   index: z.number(),
-  action: suggestionActionSchema.optional(),
+  action: suggestionActionSchema.optional().catch(undefined),
 });
 export type SuggestionAcceptedData = z.infer<typeof suggestionAcceptedDataSchema>;
 

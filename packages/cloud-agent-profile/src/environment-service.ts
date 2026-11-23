@@ -1,14 +1,30 @@
 import type { WorkerDb } from '@kilocode/db';
 import {
+  cloud_agent_environment_setup_runs,
   cloud_agent_environments,
   cloud_agent_environment_vars,
   organizations,
   type CloudAgentEnvironment,
 } from '@kilocode/db/schema';
-import { and, count, eq, inArray, sql } from 'drizzle-orm';
+import { and, count, eq, inArray, or, sql } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import { encryptWithPublicKey } from '@kilocode/encryption';
-import { egressPolicySchema, type EgressMode } from '@kilocode/worker-utils/egress-allowlist';
+import {
+  egressDomainSchema,
+  egressPolicySchema,
+  type EgressMode,
+} from '@kilocode/worker-utils/egress-allowlist';
+import {
+  networkSecretStoredPolicySchema,
+  type NetworkSecrets,
+} from '@kilocode/worker-utils/network-secrets';
+import {
+  assertNetworkSecretKeySpace,
+  assertNetworkSecretAllocation,
+  networkSecretColumns,
+  storedNetworkSecret,
+  validateNetworkSecretChanges,
+} from './network-secret-storage';
 import {
   encryptedEnvelopeSchema,
   assertValidEnvironmentKey,
@@ -34,6 +50,7 @@ import {
   selectActiveEnvironments,
   selectEnvironmentForSession,
   selectEnvironmentsContainingRepository,
+  setupRunOwnershipCondition,
   type EnvironmentSelection,
 } from './environment-lookup';
 import {
@@ -45,6 +62,11 @@ import {
   repositoryColumnsOfCreate,
   repositoryPathOf,
 } from './environment-repositories';
+import {
+  ENVIRONMENT_SETUP_LIMITS,
+  isOpenSetupRunStatus,
+  OPEN_SETUP_RUN_STATUSES,
+} from './environment-setup-contracts';
 
 /** A transaction executor, derived from the worker database connection. */
 export type EnvironmentTransaction = Parameters<Parameters<WorkerDb['transaction']>[0]>[0];
@@ -133,6 +155,56 @@ function resolveEnvironmentEgressPolicy(input: {
     : { egress_mode: 'unrestricted', egress_allowlist: null };
 }
 
+/**
+ * Validates required hosts with the shared hostname contract and returns the
+ * stored form: lowercased, in submitted order, without duplicates.
+ */
+function resolveEnvironmentRequiredHosts(
+  requiredHosts: string[] | undefined
+): string[] | undefined {
+  if (requiredHosts === undefined) return undefined;
+
+  const parsed: string[] = [];
+  for (const host of requiredHosts) {
+    const result = egressDomainSchema.safeParse(host);
+    if (!result.success) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: `Invalid required network host: ${host}`,
+      });
+    }
+    if (!parsed.includes(result.data)) parsed.push(result.data);
+  }
+
+  if (parsed.length > ENVIRONMENT_SETUP_LIMITS.MAX_REQUIRED_HOSTS) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: `At most ${ENVIRONMENT_SETUP_LIMITS.MAX_REQUIRED_HOSTS} required network hosts are allowed`,
+    });
+  }
+
+  return parsed;
+}
+
+/**
+ * The effective allowlist of a restricted policy is the user's allowed hosts
+ * plus the required hosts, so the shared egress cap covers both.
+ */
+export function assertEffectiveAllowlistWithinLimit(
+  allowedHosts: readonly string[],
+  requiredHosts: readonly string[]
+): void {
+  if (
+    new Set([...allowedHosts, ...requiredHosts]).size >
+    ENVIRONMENT_SETUP_LIMITS.MAX_EFFECTIVE_ALLOWLIST
+  ) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Required hosts and allowed hosts together exceed 100 hostnames',
+    });
+  }
+}
+
 function toBaseResponseColumns(environment: CloudAgentEnvironment): {
   id: string;
   name: string;
@@ -187,6 +259,7 @@ async function replacePlainVars(
     .where(
       and(
         eq(cloud_agent_environment_vars.environment_id, environmentId),
+        eq(cloud_agent_environment_vars.delivery, 'env'),
         eq(cloud_agent_environment_vars.is_secret, false)
       )
     );
@@ -244,6 +317,7 @@ async function applySecretChanges(
         and(
           eq(cloud_agent_environment_vars.environment_id, environmentId),
           inArray(cloud_agent_environment_vars.key, deleteKeys),
+          eq(cloud_agent_environment_vars.delivery, 'env'),
           eq(cloud_agent_environment_vars.is_secret, true)
         )
       )
@@ -321,10 +395,19 @@ export async function createEnvironment(
   const repositoryColumns = repositoryColumnsOfCreate(input);
   const plainVars = validateEnvironmentPlainVars(input.plainVars);
   const secrets = validateEnvironmentSecrets(input.secrets);
+  const networkSecrets = input.networkSecrets ?? [];
+  assertNetworkSecretAllocation(networkSecrets.length, input.sandboxAllocation);
+  validateNetworkSecretChanges(networkSecrets);
+  assertNetworkSecretKeySpace(
+    [...Object.keys(plainVars), ...Object.keys(secrets)],
+    networkSecrets.map(secret => secret.key)
+  );
   const commands = validateEnvironmentCommands(input.commands);
   const startCommands = validateEnvironmentCommands(input.startCommands, 'Start');
   assertNoPlainSecretCollision(plainVars, Object.keys(secrets));
-  validateEnvironmentVarCount(Object.keys(plainVars).length + Object.keys(secrets).length);
+  validateEnvironmentVarCount(
+    Object.keys(plainVars).length + Object.keys(secrets).length + networkSecrets.length
+  );
   const egress = resolveEnvironmentEgressPolicy(input);
 
   if (input.owner.type === 'organization') {
@@ -352,6 +435,10 @@ export async function createEnvironment(
   }
 
   const variableValues = [
+    ...networkSecrets.map(secret => ({
+      environment_id: environment.id,
+      ...networkSecretColumns(publicKeyBase64, secret),
+    })),
     ...Object.entries(plainVars).map(([key, value]) => ({
       environment_id: environment.id,
       key,
@@ -391,7 +478,10 @@ export async function updateEnvironment(
       ? undefined
       : validateEnvironmentCommands(input.startCommands, 'Start');
   const secretChanges = input.secrets;
+  const networkChanges = input.networkSecrets ?? [];
+  validateNetworkSecretChanges(networkChanges);
   const egress = resolveEnvironmentEgressPolicy(input);
+  const requiredHosts = resolveEnvironmentRequiredHosts(input.requiredHosts);
 
   if (secretChanges !== undefined) {
     for (const change of secretChanges) {
@@ -429,33 +519,72 @@ export async function updateEnvironment(
     throw new TRPCError({ code: 'NOT_FOUND', message: 'Environment not found' });
   }
 
+  if (
+    environment.is_draft &&
+    environment.draft_for_environment_id !== null &&
+    (input.egressMode !== undefined || input.egressAllowlist !== undefined)
+  ) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Change the network policy on the target environment',
+    });
+  }
+
+  if (requiredHosts !== undefined || egress !== undefined) {
+    const allowedHosts =
+      egress === undefined ? (environment.egress_allowlist ?? []) : (egress.egress_allowlist ?? []);
+    assertEffectiveAllowlistWithinLimit(
+      allowedHosts,
+      requiredHosts ?? environment.egress_required_hosts ?? []
+    );
+  }
+
   const changesVariables =
-    plainVars !== undefined || (secretChanges !== undefined && secretChanges.length > 0);
-  const storedVars = changesVariables
-    ? await tx
-        .select({
-          key: cloud_agent_environment_vars.key,
-          // Only plaintext values are compared, so secret envelopes stay out of
-          // the row payload.
-          plainValue: sql<
-            string | null
-          >`case when ${cloud_agent_environment_vars.is_secret} then null else ${cloud_agent_environment_vars.value} end`,
-          isSecret: cloud_agent_environment_vars.is_secret,
-        })
-        .from(cloud_agent_environment_vars)
-        .where(eq(cloud_agent_environment_vars.environment_id, input.environmentId))
-    : [];
+    plainVars !== undefined ||
+    (secretChanges !== undefined && secretChanges.length > 0) ||
+    networkChanges.length > 0;
+  const storedVars =
+    changesVariables || input.sandboxAllocation !== undefined
+      ? await tx
+          .select({
+            key: cloud_agent_environment_vars.key,
+            // Only plaintext values are compared, so secret envelopes stay out of
+            // the row payload.
+            plainValue: sql<
+              string | null
+            >`case when ${cloud_agent_environment_vars.is_secret} then null else ${cloud_agent_environment_vars.value} end`,
+            isSecret: cloud_agent_environment_vars.is_secret,
+            delivery: cloud_agent_environment_vars.delivery,
+          })
+          .from(cloud_agent_environment_vars)
+          .where(eq(cloud_agent_environment_vars.environment_id, input.environmentId))
+      : [];
   const storedPlainVars: Record<string, string> = {};
   for (const row of storedVars) {
-    if (!row.isSecret && row.plainValue !== null) {
+    if (row.delivery === 'env' && !row.isSecret && row.plainValue !== null) {
       storedPlainVars[row.key] = row.plainValue;
     }
   }
   const storedPlainKeys = new Set(Object.keys(storedPlainVars));
   const changedSecretKeys = new Set(finalSecretChanges.keys());
   const retainedSecretKeys = storedVars
-    .filter(row => row.isSecret && !changedSecretKeys.has(row.key))
+    .filter(row => row.delivery === 'env' && row.isSecret && !changedSecretKeys.has(row.key))
     .map(row => row.key);
+  const networkKeys = new Set(
+    storedVars.filter(row => row.delivery === 'network').map(row => row.key)
+  );
+  for (const change of networkChanges) {
+    if ('delete' in change) networkKeys.delete(change.key);
+    else networkKeys.add(change.key);
+  }
+  assertNetworkSecretKeySpace(
+    [...Object.keys(plainVars ?? storedPlainVars), ...retainedSecretKeys, ...addedSecretKeys],
+    networkKeys
+  );
+  assertNetworkSecretAllocation(
+    networkKeys.size,
+    input.sandboxAllocation === undefined ? environment.sandbox_allocation : input.sandboxAllocation
+  );
 
   // The variable cap is decided from the resulting set, before the first
   // write, so one request cannot spend database work per submitted entry.
@@ -469,7 +598,8 @@ export async function updateEnvironment(
         ? storedPlainKeys.size - reusedPlainKeys
         : Object.keys(plainVars).length) +
         retainedSecretKeys.length +
-        addedSecretKeys.length
+        addedSecretKeys.length +
+        networkKeys.size
     );
   }
   const repositoriesUpdate =
@@ -503,12 +633,40 @@ export async function updateEnvironment(
     buildInputsChanged = !sameRecord(plainVars, storedPlainVars);
   }
 
+  if (requiredHosts !== undefined && !buildInputsChanged) {
+    buildInputsChanged = !sameStrings(requiredHosts, environment.egress_required_hosts ?? []);
+  }
+
   if (plainVars !== undefined) {
     assertNoPlainSecretCollision(plainVars, [...retainedSecretKeys, ...addedSecretKeys]);
   }
 
-  // Secret changes run before the plaintext replacement so a deleted secret
-  // frees its key for a plaintext variable of the same name.
+  for (const change of networkChanges) {
+    if ('delete' in change) {
+      const deleted = await tx
+        .delete(cloud_agent_environment_vars)
+        .where(
+          and(
+            eq(cloud_agent_environment_vars.environment_id, input.environmentId),
+            eq(cloud_agent_environment_vars.key, change.key),
+            eq(cloud_agent_environment_vars.delivery, 'network')
+          )
+        )
+        .returning({ key: cloud_agent_environment_vars.key });
+      buildInputsChanged ||= deleted.length > 0;
+    } else {
+      const columns = networkSecretColumns(publicKeyBase64, change);
+      await tx
+        .insert(cloud_agent_environment_vars)
+        .values({ environment_id: input.environmentId, ...columns })
+        .onConflictDoUpdate({
+          target: [cloud_agent_environment_vars.environment_id, cloud_agent_environment_vars.key],
+          set: { ...columns, updated_at: new Date().toISOString() },
+        });
+      buildInputsChanged = true;
+    }
+  }
+
   if (secretChanges !== undefined && secretChanges.length > 0) {
     if (await applySecretChanges(tx, input.environmentId, publicKeyBase64, secretChanges)) {
       buildInputsChanged = true;
@@ -531,6 +689,13 @@ export async function updateEnvironment(
     await tx
       .update(cloud_agent_environments)
       .set({ start_commands: startCommands })
+      .where(eq(cloud_agent_environments.id, input.environmentId));
+  }
+
+  if (requiredHosts !== undefined) {
+    await tx
+      .update(cloud_agent_environments)
+      .set({ egress_required_hosts: requiredHosts })
       .where(eq(cloud_agent_environments.id, input.environmentId));
   }
 
@@ -575,16 +740,59 @@ export async function deleteEnvironment(
   environmentId: string,
   owner: EnvironmentOwner
 ): Promise<void> {
-  const rows = await db
-    .delete(cloud_agent_environments)
-    .where(
-      and(eq(cloud_agent_environments.id, environmentId), buildEnvironmentOwnershipCondition(owner))
-    )
-    .returning({ id: cloud_agent_environments.id });
+  await db.transaction(async tx => {
+    if (owner.type === 'organization') {
+      await lockActiveOrganization(tx, owner.id);
+    }
 
-  if (rows.length === 0) {
-    throw new TRPCError({ code: 'NOT_FOUND', message: 'Environment not found' });
-  }
+    const runs = cloud_agent_environment_setup_runs;
+    const openRuns = await tx
+      .select({ id: runs.id })
+      .from(runs)
+      .where(
+        and(
+          inArray(runs.status, [...OPEN_SETUP_RUN_STATUSES]),
+          or(
+            eq(runs.draft_environment_id, environmentId),
+            eq(runs.target_environment_id, environmentId)
+          )
+        )
+      )
+      .for('update');
+
+    const rows = await tx
+      .delete(cloud_agent_environments)
+      .where(
+        and(
+          eq(cloud_agent_environments.id, environmentId),
+          buildEnvironmentOwnershipCondition(owner)
+        )
+      )
+      .returning({ id: cloud_agent_environments.id });
+
+    // A setup run cannot continue without its draft or its target. Cancel after the
+    // delete: cancelling first made deleting a target fail with a draft foreign-key
+    // violation during the cascade (see the target deletion test).
+    if (openRuns.length > 0) {
+      await tx
+        .update(runs)
+        .set({
+          status: 'cancelled',
+          data: sql`${runs.data} || '{"status_reason":"draft_deleted"}'::jsonb`,
+          completed_at: new Date().toISOString(),
+        })
+        .where(
+          inArray(
+            runs.id,
+            openRuns.map(run => run.id)
+          )
+        );
+    }
+
+    if (rows.length === 0) {
+      throw new TRPCError({ code: 'NOT_FOUND', message: 'Environment not found' });
+    }
+  });
 }
 
 export async function getEnvironment(
@@ -604,7 +812,7 @@ export async function getEnvironment(
     throw new TRPCError({ code: 'NOT_FOUND', message: 'Environment not found' });
   }
 
-  const [plainVars, secretKeys] = await Promise.all([
+  const [plainVars, secretKeys, networkSecrets] = await Promise.all([
     db
       .select({
         key: cloud_agent_environment_vars.key,
@@ -616,6 +824,7 @@ export async function getEnvironment(
       .where(
         and(
           eq(cloud_agent_environment_vars.environment_id, environmentId),
+          eq(cloud_agent_environment_vars.delivery, 'env'),
           eq(cloud_agent_environment_vars.is_secret, false)
         )
       )
@@ -626,7 +835,22 @@ export async function getEnvironment(
       .where(
         and(
           eq(cloud_agent_environment_vars.environment_id, environmentId),
+          eq(cloud_agent_environment_vars.delivery, 'env'),
           eq(cloud_agent_environment_vars.is_secret, true)
+        )
+      )
+      .orderBy(cloud_agent_environment_vars.key),
+    db
+      .select({
+        key: cloud_agent_environment_vars.key,
+        allowedHosts: cloud_agent_environment_vars.allowed_hosts,
+        locations: cloud_agent_environment_vars.injection_locations,
+      })
+      .from(cloud_agent_environment_vars)
+      .where(
+        and(
+          eq(cloud_agent_environment_vars.environment_id, environmentId),
+          eq(cloud_agent_environment_vars.delivery, 'network')
         )
       )
       .orderBy(cloud_agent_environment_vars.key),
@@ -640,7 +864,13 @@ export async function getEnvironment(
     startCommands: environment.start_commands,
     egressMode: environment.egress_mode,
     egressAllowlist: environment.egress_allowlist,
+    egressRequiredHosts: environment.egress_required_hosts ?? [],
+    isDraft: environment.is_draft,
     secretKeys: secretKeys.map(row => row.key),
+    networkSecrets: networkSecrets.map(row => ({
+      key: row.key,
+      ...networkSecretStoredPolicySchema.parse(row),
+    })),
   };
 }
 
@@ -681,27 +911,42 @@ export async function listEnvironmentsForOwner(
   const environments = await db
     .select()
     .from(cloud_agent_environments)
-    .where(buildEnvironmentOwnershipCondition(owner))
+    .where(
+      and(buildEnvironmentOwnershipCondition(owner), eq(cloud_agent_environments.is_draft, false))
+    )
     .orderBy(cloud_agent_environments.name, cloud_agent_environments.id);
 
   return summarizeEnvironments(db, environments);
 }
 
 /** Split variable rows into plaintext values and parsed secret envelopes. */
-function splitVariables(vars: ReadonlyArray<{ key: string; value: string; isSecret: boolean }>): {
+function splitVariables(
+  vars: ReadonlyArray<{
+    key: string;
+    value: string;
+    isSecret: boolean;
+    delivery: string;
+    allowedHosts: string[] | null;
+    locations: string[] | null;
+  }>
+): {
   plainVars: Record<string, string>;
   encryptedSecrets: EnvironmentBuildInput['encryptedSecrets'];
+  networkSecrets: NetworkSecrets;
 } {
   const plainVars: Record<string, string> = {};
   const encryptedSecrets: EnvironmentBuildInput['encryptedSecrets'] = {};
+  const networkSecrets: NetworkSecrets = {};
   for (const variable of vars) {
-    if (variable.isSecret) {
+    if (variable.delivery === 'network') {
+      networkSecrets[variable.key] = storedNetworkSecret(variable);
+    } else if (variable.isSecret) {
       encryptedSecrets[variable.key] = encryptedEnvelopeSchema.parse(JSON.parse(variable.value));
     } else {
       plainVars[variable.key] = variable.value;
     }
   }
-  return { plainVars, encryptedSecrets };
+  return { plainVars, encryptedSecrets, networkSecrets };
 }
 
 async function readVariables(db: Pick<WorkerDb, 'select'>, environmentId: string) {
@@ -710,6 +955,9 @@ async function readVariables(db: Pick<WorkerDb, 'select'>, environmentId: string
       key: cloud_agent_environment_vars.key,
       value: cloud_agent_environment_vars.value,
       isSecret: cloud_agent_environment_vars.is_secret,
+      delivery: cloud_agent_environment_vars.delivery,
+      allowedHosts: cloud_agent_environment_vars.allowed_hosts,
+      locations: cloud_agent_environment_vars.injection_locations,
     })
     .from(cloud_agent_environment_vars)
     .where(eq(cloud_agent_environment_vars.environment_id, environmentId))
@@ -738,13 +986,52 @@ export type EnvironmentSessionResolution =
   | Exclude<EnvironmentSelection, { status: 'match' }>;
 
 /**
+ * The draft a session may see, if the caller asked to allow one: the run must
+ * belong to the owner, still be open and allowed to change, and its draft must
+ * be the requested environment. Any other case leaves the draft invisible.
+ */
+async function allowedDraftEnvironmentId(
+  tx: EnvironmentTransaction,
+  input: {
+    owner: EnvironmentOwner;
+    environmentId?: string;
+    allowDraft?: { setupRunId: string };
+  }
+): Promise<string | undefined> {
+  if (input.allowDraft === undefined || input.environmentId === undefined) return undefined;
+
+  const [run] = await tx
+    .select({
+      draft: cloud_agent_environment_setup_runs.draft_environment_id,
+      status: cloud_agent_environment_setup_runs.status,
+    })
+    .from(cloud_agent_environment_setup_runs)
+    .where(
+      and(
+        eq(cloud_agent_environment_setup_runs.id, input.allowDraft.setupRunId),
+        setupRunOwnershipCondition(input.owner)
+      )
+    );
+
+  if (
+    run?.draft === input.environmentId &&
+    isOpenSetupRunStatus(run.status) &&
+    run.status !== 'failed'
+  ) {
+    return input.environmentId;
+  }
+  return undefined;
+}
+
+/**
  * Load the environment of a session's launch repository: the primitives the
  * session merges, the authorized reference that travels beside them, and the saved
  * allocation. A V1 environment matches by its identity columns and a V2
  * environment by containment of the repository.
  *
  * With `environmentId`, only that environment is considered. Without one, several
- * matches are a `conflict` and no environment is chosen.
+ * matches are a `conflict` and no environment is chosen. Drafts stay invisible
+ * unless `allowDraft` names the setup run that owns the requested draft.
  */
 export async function loadEnvironmentForSession(
   db: WorkerDb,
@@ -752,15 +1039,22 @@ export async function loadEnvironmentForSession(
     owner: EnvironmentOwner;
     repository: EnvironmentRepositoryIdentity;
     environmentId?: string;
+    allowDraft?: { setupRunId: string };
   }
 ): Promise<EnvironmentSessionResolution> {
   return db.transaction(
     async tx => {
-      const selection = await selectEnvironmentForSession(tx, input);
+      const draftEnvironmentId = await allowedDraftEnvironmentId(tx, input);
+      const selection = await selectEnvironmentForSession(tx, {
+        owner: input.owner,
+        repository: input.repository,
+        ...(input.environmentId === undefined ? {} : { environmentId: input.environmentId }),
+        ...(draftEnvironmentId === undefined ? {} : { draftEnvironmentId }),
+      });
       if (selection.status !== 'match') return selection;
 
       const { environment } = selection;
-      const { plainVars, encryptedSecrets } = splitVariables(
+      const { plainVars, encryptedSecrets, networkSecrets } = splitVariables(
         await readVariables(tx, environment.id)
       );
       const repositories = readRepositories(environment);
@@ -770,6 +1064,7 @@ export async function loadEnvironmentForSession(
           layer: {
             envVars: plainVars,
             encryptedSecrets,
+            networkSecrets,
             setupCommands: environment.commands,
             startCommands: environment.start_commands,
             ...(repositories ? { repositories: repositories.map(referenceRepositoryOf) } : {}),
@@ -778,6 +1073,7 @@ export async function loadEnvironmentForSession(
           sandboxAllocation: environment.sandbox_allocation,
           egressMode: environment.egress_mode,
           egressAllowlist: environment.egress_allowlist,
+          egressRequiredHosts: environment.egress_required_hosts ?? [],
         },
       };
     },
@@ -812,7 +1108,7 @@ export async function loadEnvironmentBuildInput(
     async tx => {
       const environment = await readActiveEnvironment(tx, environmentId);
       if (environment === null) return null;
-      const { plainVars, encryptedSecrets } = splitVariables(
+      const { plainVars, encryptedSecrets, networkSecrets } = splitVariables(
         await readVariables(tx, environmentId)
       );
       const reference = referenceOf(environment);
@@ -821,7 +1117,9 @@ export async function loadEnvironmentBuildInput(
         commands: environment.commands,
         plainVars,
         encryptedSecrets,
+        networkSecrets,
         sandboxAllocation: environment.sandbox_allocation,
+        egressMode: environment.egress_mode,
       };
       return reference.repositories
         ? { ...common, repositories: reference.repositories }

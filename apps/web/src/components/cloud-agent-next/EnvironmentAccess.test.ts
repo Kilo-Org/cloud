@@ -11,6 +11,14 @@ import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globa
 
 Object.assign(globalThis, { React });
 
+jest.mock('@/hooks/useEnvironmentSetupRuns', () => ({
+  useEnvironmentSetupEnabled: () => ({ data: { enabled: false, canStart: false } }),
+  useEnvironmentSetupRunsForEnvironment: () => ({ data: [] }),
+  useEnvironmentSetupRunMutations: () => ({
+    resolveSecretRequests: { isPending: false, mutateAsync: jest.fn() },
+  }),
+}));
+
 let mockCanManage = false;
 let mockEnvironment: EnvironmentResponse;
 let mockEnvironments: EnvironmentSummary[];
@@ -231,6 +239,8 @@ const environmentDetail: EnvironmentResponse = {
   sandboxAllocation: environment.sandboxAllocation,
   egressMode: null,
   egressAllowlist: null,
+  egressRequiredHosts: [],
+  isDraft: false,
   secretKeys: ['API_KEY'],
 };
 
@@ -427,7 +437,7 @@ describe('environment access for members and managers', () => {
       expect(variables).not.toBeNull();
       expect(variables?.hasAttribute('readOnly')).toBe(true);
       expect(content?.textContent).toContain(
-        'Secret values are hidden. Only their names are shown.'
+        'Saved values are hidden. Only their names are shown.'
       );
 
       clickButton(content!, 'Close');

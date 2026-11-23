@@ -107,8 +107,9 @@ type PendingAttempt = Omit<ByokFailoverAttempt, 'error_code'> & {
 /**
  * Sends the request through its first route and, while a route's upstream fails with an
  * unsuccessful status, through the next of `failoverRoutes`. When every route fails, the last
- * failure is returned. `getProvider` lists only the owner's BYOK keys after the first route, so
- * failover never reaches Kilo's route or another payer's connection.
+ * failure is returned. `getProvider` lists only the owner's BYOK keys after a BYOK key, so
+ * failover never reaches Kilo's route or another payer's connection from one. A partner route
+ * fails over to Kilo's gateway route, which Kilo pays for as well.
  */
 export async function sendUpstreamAttemptWithByokFailover(
   input: Omit<SendUpstreamAttemptInput, 'upstreamDurationBudgetMs'>,
@@ -153,6 +154,7 @@ export async function sendUpstreamAttemptWithByokFailover(
       stopReason = 'client-disconnected';
       break;
     }
+    providerContext.onUpstreamFailure?.();
     // All attempts share one upstream budget, so the invocation still ends within the route's
     // maxDuration with time left for usage accounting.
     if (remainingBudgetMs(startedAt) < MIN_FAILOVER_BUDGET_MS) {
@@ -169,7 +171,9 @@ export async function sendUpstreamAttemptWithByokFailover(
       stopReason = 'budget-exhausted';
       break;
     }
-    console.warn('[byok-failover] BYOK upstream failed, trying the next BYOK key', {
+    console.warn('[byok-failover] Upstream failed, trying the next route', {
+      failedProviderType: providerContext.provider.type,
+      nextProviderType: next.provider.type,
       status: failed.status,
       failedProviderIds: byokProviderIds(providerContext),
       nextProviderIds: byokProviderIds(next),

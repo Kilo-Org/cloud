@@ -180,7 +180,7 @@ async function ensureBotIsOrgMember(botUserId: string, organizationId: string): 
   }
 
   // Add bot as organization member; a concurrent insert of the same pair is a no-op.
-  await db
+  const [inserted] = await db
     .insert(organization_memberships)
     .values({
       organization_id: organizationId,
@@ -189,12 +189,15 @@ async function ensureBotIsOrgMember(botUserId: string, organizationId: string): 
     })
     .onConflictDoNothing({
       target: [organization_memberships.organization_id, organization_memberships.kilo_user_id],
-    });
+    })
+    .returning({ id: organization_memberships.id });
 
-  logExceptInTest('[ensureBotIsOrgMember] Added bot to organization', {
-    botUserId,
-    organizationId,
-  });
+  logExceptInTest(
+    inserted
+      ? '[ensureBotIsOrgMember] Added bot to organization'
+      : '[ensureBotIsOrgMember] Bot is already an org member',
+    { botUserId, organizationId }
+  );
 }
 
 /**
@@ -217,9 +220,9 @@ export async function ensureBotUserForOrg(organizationId: string, botType: BotTy
       throw new Error(`Cannot use blocked bot user ${botId}`);
     }
 
-    logExceptInTest('[ensureBotUserForOrg] Bot user is ready', { botId, organizationId });
-
     await ensureBotIsOrgMember(botUser.id, organizationId);
+
+    logExceptInTest('[ensureBotUserForOrg] Bot user is ready', { botId, organizationId });
 
     return botUser;
   } catch (error) {

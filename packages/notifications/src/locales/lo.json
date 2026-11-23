@@ -7,6 +7,7 @@
       "spendAlert": "ລາຍຈ່າຍຂອງທ່ານຕ້ອງການຄວາມສົນໃຈ",
       "securityFinding": "ການກວດພົບຄວາມປອດໄພຕ້ອງການຄວາມສົນໃຈ",
       "securityUpdate": "ການກວດສອບຄວາມປອດໄພມີການອັບເດດ",
+      "agentBriefing": "ລາຍງານກິດຈະກຳຂອງເອເຈນຂຽນໂຄດຂອງທ່ານພ້ອມແລ້ວ",
       "activeAgentsGlanceable": "ຕົວແທນທີ່ກຳລັງເຮັດວຽກມີການອັບເດດ"
     }
   },
@@ -29,6 +30,12 @@
     },
     "securityFindingNew": {
       "title": "ການກວດພົບຄວາມປອດໄພໃໝ່ ({{severity}})"
+    },
+    "securityFindingSeverity": {
+      "critical": "ຮ້າຍແຮງ",
+      "high": "ສູງ",
+      "medium": "ປານກາງ",
+      "low": "ຕ່ຳ"
     },
     "securityFindingSlaWarning": {
       "title": "ຄຳເຕືອນ SLA"

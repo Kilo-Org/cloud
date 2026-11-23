@@ -1,14 +1,18 @@
 import { useRef, useState } from 'react';
 import { type TextInput, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { PermissionUnreadableNotice } from '@/components/agents/permission-unreadable-notice';
+import { displaySafeText } from '@kilocode/app-shared/display-text';
+import { UnreadableRequestNotices } from '@/components/agents/unreadable-request-notices';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Switch } from '@/components/ui/switch';
+import { renderRowTrailing } from '@/components/ui/row-trailing';
 import { Text } from '@/components/ui/text';
 import { Skeleton } from '@/components/ui/skeleton';
+import { formatNumber } from '@/lib/format';
+import { isolateBidiText, isolateLtrBidiText } from '@/lib/bidi';
 import { transcriptText } from '@/lib/native-remote/projections';
 import { type NativeRemoteSession } from '@/lib/native-remote/use-native-session';
+import { REWRITTEN_INPUT_AUTO_CORRECT } from '@/lib/input-suggestions';
 import { NativeRemoteQuestion } from './native-remote-question';
 import { NativeRemoteMessages } from './native-remote-lists';
 
@@ -30,39 +34,74 @@ export function NativeRemoteTranscript({
   sessionID: string;
   remote: NativeRemoteSession;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { state, conversation, pending, canControl } = remote;
   const commandStatus = state?.commands[remote.commandID];
   const loading = !state || conversation?.loading;
   return (
-    <View className="gap-3 border-t border-border pt-4">
+    <View className="gap-3 border-t-[0.5px] border-hair-soft pt-4">
       <Text accessibilityRole="header" selectable className="font-mono text-sm">
         {sessionID}
       </Text>
-      <Text accessibilityLiveRegion="polite" className="text-muted-foreground">
+      <Text accessibilityLiveRegion="polite" variant="muted">
         {t('nativeRemote.status', {
           connection: t(connectionKeys[state?.connection ?? 'connecting']),
           runner: state?.runnerConnected ? t('common.online') : t('chat.botStatus.offline'),
         })}
       </Text>
       {loading && <Skeleton className="h-80 rounded-md" />}
+      {!loading && conversation && conversation.recoveryGaps > 0 ? (
+        <View className="gap-2 rounded-lg border border-border p-3">
+          <Text accessibilityRole="alert">
+            {t('nativeRemote.recoveryGaps', {
+              count: conversation.recoveryGaps,
+              displayCount: formatNumber(conversation.recoveryGaps, i18n.language),
+            })}
+          </Text>
+          {/* Recovery reads the snapshot over the live socket; the runner's
+              restart does not take it down, so this is a connection guard. */}
+          <Button
+            variant="outline"
+            disabled={state.connection !== 'connected'}
+            onPress={() => void remote.recover()}
+          >
+            <Text>{t('common.retry')}</Text>
+          </Button>
+        </View>
+      ) : null}
       {!loading &&
         conversation?.session &&
         (conversation.messages.length > 0 || conversation.incompleteMessageIDs.length === 0) && (
           <NativeRemoteMessages messages={conversation.messages} />
         )}
-      {pending.unreadablePermissions.length > 0 ? (
-        // No consent card for these: the app never read the request's scope, so
-        // offering allow/deny would decide a permission nobody parsed. The
-        // notice points the user at the CLI, which can still answer it. The
-        // screen already pads this column, so the notice drops its own margin.
-        <PermissionUnreadableNotice inset={false} />
-      ) : null}
+      {/* No consent card and no answer card for these: the app never read the
+          request's scope or its questions, so offering allow/deny or a choice
+          would decide something nobody parsed. The notices point the user at
+          the CLI, which can still answer them. One host covers both so the iOS
+          announcement is read once instead of twice. The screen already pads
+          this column, so the notices drop their own margin. */}
+      <UnreadableRequestNotices
+        hasPermissions={pending.unreadablePermissions.length > 0}
+        hasQuestions={pending.unreadableQuestions.length > 0}
+        inset={false}
+      />
       {pending.permissions.map(permission => (
         <View key={permission.id} className="gap-2 rounded-lg border border-border p-3">
-          <Text>{permission.action}</Text>
-          <Text selectable>{permission.resources.join('\n')}</Text>
-          {permission.message ? <Text>{permission.message}</Text> : null}
+          <Text>{isolateLtrBidiText(displaySafeText(permission.action))}</Text>
+          <View className="gap-1">
+            {permission.resources.map((resource, index) => (
+              <Text key={index} selectable>
+                {'• '}
+                {isolateLtrBidiText(displaySafeText(resource))}
+              </Text>
+            ))}
+          </View>
+          {permission.message ? (
+            // The message is prose, so it keeps the direction of its own first
+            // strong character; the action and resources are machine values and
+            // stay pinned left to right.
+            <Text>{isolateBidiText(displaySafeText(permission.message))}</Text>
+          ) : null}
           <View className="flex-row flex-wrap gap-2">
             <Button
               disabled={!canControl}
@@ -118,7 +157,7 @@ export function NativeRemoteTranscript({
       {state?.events
         .filter(event => event.type === 'command.outcome')
         .map(event => (
-          <Text key={event.seq} selectable className="text-xs text-muted-foreground">
+          <Text key={event.seq} selectable variant="caption">
             {transcriptText(event.body)}
           </Text>
         ))}
@@ -153,7 +192,11 @@ function NativeRemoteComposer({ remote }: { remote: NativeRemoteSession }) {
         placeholder={t('nativeRemote.prompt')}
         defaultValue=""
         multiline
-        className="min-h-[96px] leading-[1.25rem]"
+        // Submit clears this field once the send confirms, so Android keeps
+        // the framework suggestion popup off — it crashes against rewritten
+        // text (see REWRITTEN_INPUT_AUTO_CORRECT).
+        autoCorrect={REWRITTEN_INPUT_AUTO_CORRECT}
+        className="min-h-24 rounded-md border border-input bg-background leading-tight"
         autoCapitalize="sentences"
         onChangeText={text => {
           prompt.current = text;
@@ -162,11 +205,12 @@ function NativeRemoteComposer({ remote }: { remote: NativeRemoteSession }) {
       />
       <View className="flex-row items-center justify-between gap-3">
         <Text className="min-w-0 flex-1">{t('nativeRemote.queueIfOffline')}</Text>
-        <Switch
-          accessibilityLabel={t('nativeRemote.queueIfOffline')}
-          value={queue}
-          onValueChange={setQueue}
-        />
+        {renderRowTrailing({
+          kind: 'switch',
+          accessibilityLabel: t('nativeRemote.queueIfOffline'),
+          value: queue,
+          onValueChange: setQueue,
+        })}
       </View>
       <View className="flex-row flex-wrap gap-2">
         <Button

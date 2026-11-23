@@ -29,21 +29,22 @@ export type UniversalLinkRoute = {
    * wildcard segment" must stay exact, and put every deeper path the app DOES
    * handle earlier in this table: AASA's first match wins, so those rows still
    * associate, and everything below them falls through to the exclusion.
-   * Android needs no counterpart here: the row below states its own
-   * one-segment `androidPathPattern`, and the runtime matcher compares
-   * segments. An Android `pathPattern` cannot express exclusions at all, so a
-   * literal page under the row reaches the app only through its own row above
-   * (the organization create pages do).
+   * Android has no counterpart: no `pathPattern` can say "exactly one
+   * segment", so the row declares `omitAndroidPathPattern` instead and the
+   * runtime matcher compares segments. A `pathPattern` cannot express
+   * exclusions either, so a literal page under the row reaches the app only
+   * through its own row above (the organization create pages do).
    */
   readonly excludeDeeperAasaPaths?: boolean;
   /**
-   * Android `pathPattern` override for this row. `pathPattern` is a full
-   * regular expression and the table compile of `*` is `.*`, which crosses
-   * `/` — so a row that must match exactly one segment states its own pattern
-   * here (`[^/]+`). Every row without an override keeps the compile it shipped
-   * with.
+   * Omit this row from the Android `pathPattern` list. Android's `pathPattern`
+   * is a simple glob: `.` is any character and `*` is zero or more of the
+   * preceding one. It has no character classes, so no pattern can match
+   * exactly one segment without also matching deeper paths. A row that must
+   * stay one segment therefore declares no Android filter here; Android keeps
+   * that page in the browser.
    */
-  readonly androidPathPattern?: string;
+  readonly omitAndroidPathPattern?: boolean;
 };
 
 export const UNIVERSAL_LINK_ROUTES: readonly UniversalLinkRoute[] = [
@@ -129,27 +130,30 @@ export const UNIVERSAL_LINK_ROUTES: readonly UniversalLinkRoute[] = [
   // the same name and plan), so the two web paths that mean "create one" open
   // it instead of a page. They are literal rows ahead of the bare organization
   // row: the bare row's wildcard would otherwise read `new` as an organization
-  // id. Android's `pathPattern` cannot exclude segments, so before these rows
-  // the org root's filter delivered both paths to the app and the handler had
-  // to hand them to the browser.
+  // id. On Android these two literal rows are the `pathPattern` filters for
+  // those paths, so they are what opens the create screen there.
   { webPath: '/organizations/new', appPath: '/(app)/(tabs)/(3_profile)/organization/create' },
   { webPath: '/organizations/create', appPath: '/(app)/(tabs)/(3_profile)/organization/create' },
   // The bare organization route: the web dashboard, and where an accepted
   // invitation lands (`apps/web` redirects to `/organizations/<id>`). Exactly
   // one segment — every deeper `/organizations/<id>/…` page without a row of
   // its own above (SSO, guardrails, request logs, payment details, …) is
-  // web-only, so those links stay in the browser. On iOS `*` crosses `/`, hence
-  // `excludeDeeperAasaPaths`; on Android the explicit `[^/]+` override keeps
-  // the filter to one segment without touching any other row's pattern. The
-  // create rows above claim their two literal paths first; the exclusions stay
-  // so a deeper `/organizations/new/…` page still falls through to the browser
+  // web-only, so those links stay in the browser. The row is one segment for
+  // the runtime matcher and for iOS; on iOS `*` crosses `/`, hence
+  // `excludeDeeperAasaPaths`. Android's `pathPattern` is a simple glob (`.`
+  // any character, `*` zero or more of the preceding character) with no
+  // character classes, so no Android filter can say "exactly one segment": the
+  // row emits no Android filter, `/organizations/<id>` opens in the browser on
+  // Android, the literal create rows above carry their own filters, and every
+  // app-owned nested organization row keeps its filter. The exclusions stay so
+  // a deeper `/organizations/new/…` page still falls through to the browser
   // instead of opening an organization screen for the id `new`.
   {
     webPath: '/organizations/*',
     appPath: '/(app)/(tabs)/(3_profile)/organization/<1>',
     exclusions: ['new', 'create'],
     excludeDeeperAasaPaths: true,
-    androidPathPattern: '/organizations/[^/]+',
+    omitAndroidPathPattern: true,
   },
   // Provider rows BEFORE the GitHub row: `/pr-review/gitlab/x/123` has the
   // same segment count as a GitHub PR path, and the literal platform segment
@@ -195,7 +199,6 @@ export function parseKiloWebPath(raw: string): string | null {
   const scheme = trimmed.slice(0, schemeEnd).toLowerCase();
   const afterScheme = trimmed.slice(schemeEnd + 3);
 
-  // Drop query and fragment before path work.
   const withoutQuery = stripQueryAndFragment(afterScheme);
 
   if (scheme === 'https' || scheme === 'http') {
@@ -274,12 +277,10 @@ function parseKiloappPath(authorityAndPath: string): string | null {
     return normalisePathname(pathPart.length === 0 ? '/' : pathPart);
   }
 
-  // Host is app.kilo.ai (case-insensitive) → path alone is the pathname.
   if (hostPart.toLowerCase() === KILO_WEB_HOST) {
     return normalisePathname(pathPart.length === 0 ? '/' : pathPart);
   }
 
-  // Non-empty host that is not app.kilo.ai: treat host + path as the path.
   const combined = `/${hostPart}${pathPart}`;
   return normalisePathname(combined);
 }
@@ -304,7 +305,6 @@ export function webPathToAppPath(webPath: string): string | null {
     }
 
     if (route.exclusions && route.exclusions.length > 0) {
-      // Exclusion applies to the final-segment wildcard (rightmost capture).
       const finalCapture = captures[captures.length - 1];
       if (finalCapture !== undefined && route.exclusions.includes(finalCapture)) {
         return null;
@@ -343,7 +343,6 @@ function matchPattern(pattern: string, path: string): string[] | null {
     }
 
     if (pSeg === '*') {
-      // Single non-empty segment; empty segments never appear after split.
       if (pathSeg.length === 0) {
         return null;
       }
@@ -357,8 +356,6 @@ function matchPattern(pattern: string, path: string): string[] | null {
   }
 
   if (hasTail) {
-    // One-or-more tail segments, joined into a single capture. splitSegments
-    // never yields empty ones, so the join is unambiguous.
     captures.push(pathSegments.slice(fixed.length).join('/'));
   }
 
@@ -432,11 +429,6 @@ export type AasaComponent = {
 /**
  * Compile the table to Apple AASA `components` entries.
  * Exclusion components are emitted immediately BEFORE their row.
- * Apple AASA `*` is a glob that crosses `/`; that superset is deliberate —
- * the table's `*` is kept verbatim in AASA output. A row that must not leak
- * to web-only subpages sets `excludeDeeperAasaPaths`, which emits
- * `<webPath>/*` as an exclusion right before the row (AASA is first match
- * wins, so rows earlier in the table keep their deeper paths associated).
  */
 export function aasaComponents(): AasaComponent[] {
   const components: AasaComponent[] = [];
@@ -470,20 +462,19 @@ function patternWithFinalWildcardReplaced(pattern: string, value: string): strin
 
 /**
  * Compile the table to Android `pathPattern` strings.
- * Each `*` or trailing `**` segment becomes `.*` (Android's pattern crosses
- * `/`, so the multi-segment tail needs no special form) — the compile every
- * shipped row uses. A row that must match exactly one segment states an
- * explicit `androidPathPattern` instead, so narrowing it changes no other
- * row's filter. Android cannot express exclusions — the runtime matcher
- * (`webPathToAppPath` / `resolveIncomingUrl`) is the exclusion enforcement.
+ * Each `*` or `**` segment becomes `.*`. `pathPattern` is a simple glob, not a
+ * regular expression: `.` matches any one character and `*` means zero or more
+ * of the preceding character, so `.*` crosses `/` and one filter covers the
+ * whole subtree. A row that must stay one segment declares
+ * `omitAndroidPathPattern` and contributes nothing. Android cannot express
+ * exclusions either — the runtime matcher (`webPathToAppPath` /
+ * `resolveIncomingUrl`) is the exclusion enforcement.
  */
 export function androidPathPatterns(): string[] {
-  return UNIVERSAL_LINK_ROUTES.map(
-    route =>
-      route.androidPathPattern ??
-      route.webPath
-        .split('/')
-        .map(seg => (seg === '*' || seg === '**' ? '.*' : seg))
-        .join('/')
+  return UNIVERSAL_LINK_ROUTES.filter(route => route.omitAndroidPathPattern !== true).map(route =>
+    route.webPath
+      .split('/')
+      .map(seg => (seg === '*' || seg === '**' ? '.*' : seg))
+      .join('/')
   );
 }

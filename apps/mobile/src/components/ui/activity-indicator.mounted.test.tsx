@@ -125,8 +125,36 @@ describe('ActivityIndicator reduced-motion fallback', () => {
     const [indicator] = byType(renderer.root, 'ActivityIndicator');
     expect(indicator?.props.animating).toBe(true);
     expect(indicator?.props.color).toBe('#123456');
-    expect(indicator?.props.accessibilityRole).toBeUndefined();
     expect(byType(renderer.root, 'View')).toHaveLength(0);
+
+    renderer.unmount();
+  });
+
+  // A platform spinner animates but says nothing: Android's indicator carries no
+  // name, and a reader announces a bare progress bar. The animated branch must
+  // speak the same wait the reduced-motion marker does.
+  it('names the wait on the animated branch too', async () => {
+    motion.reducedMotion = false;
+    const renderer = await mount({});
+
+    const [indicator] = byType(renderer.root, 'ActivityIndicator');
+    expect(indicator?.props.accessibilityRole).toBe('progressbar');
+    expect(indicator?.props.accessibilityLabel).toBe('common.loading');
+    expect(indicator?.props.accessibilityState).toEqual({ busy: true });
+
+    renderer.unmount();
+  });
+
+  it('keeps a caller name and idle state on the animated branch', async () => {
+    motion.reducedMotion = false;
+    const renderer = await mount({
+      accessibilityLabel: 'Uploading photo',
+      animating: false,
+    });
+
+    const [indicator] = byType(renderer.root, 'ActivityIndicator');
+    expect(indicator?.props.accessibilityLabel).toBe('Uploading photo');
+    expect(indicator?.props.accessibilityState).toEqual({ busy: false });
 
     renderer.unmount();
   });

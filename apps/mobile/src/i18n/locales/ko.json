@@ -19,7 +19,8 @@
     "presenceStatus": "호스트: {{connection}}",
     "commandStatus": "명령 전달: {{status}}",
     "delivered": "전달됨",
-    "expired": "만료됨"
+    "expired": "만료됨",
+    "recoveryGaps_other": "이 대화 기록의 {{displayCount}}개 부분이 누락되었습니다."
   },
   "common": {
     "manageOnWeb": "웹에서 관리",
@@ -57,6 +58,7 @@
     "link": "링크",
     "takingLonger": "예상보다 시간이 더 걸리고 있습니다. 이 화면을 닫고 나중에 다시 확인할 수 있습니다.",
     "model": "모델",
+    "notSelected": "선택 안 됨",
     "accessDenied": "접근 권한이 없습니다.",
     "allRepositories": "모든 저장소",
     "personal": "개인",
@@ -87,7 +89,9 @@
     "details": "세부 정보",
     "draft": "초안",
     "enabled": "활성화됨",
+    "fileUnavailable": "이 파일은 더 이상 다운로드할 수 없습니다",
     "github": "GitHub",
+    "image": "이미지",
     "imageUnavailable": "이미지를 표시할 수 없습니다.",
     "loading": "불러오는 중…",
     "loadMore": "더 보기",
@@ -119,10 +123,10 @@
     "connectProvider": "서비스 연결",
     "contentTruncated": "내용 일부 생략됨",
     "copyLink": "링크 복사",
+    "couldNotLoad": "불러오지 못했습니다.",
+    "couldNotLoadMore": "추가 항목을 불러오지 못했습니다.",
     "couldNotLoadOrganizations": "조직을 불러오지 못했습니다.",
     "couldNotLoadSessions": "세션을 불러오지 못했습니다.",
-    "couldnTLoad": "불러오지 못했습니다.",
-    "couldnTLoadMore": "추가 항목을 불러오지 못했습니다.",
     "deviceSessions": "기기 세션",
     "disabled": "비활성화됨",
     "email": "이메일",
@@ -137,6 +141,7 @@
     "keepRunning": "계속 실행",
     "newSession": "새 세션",
     "noModelsAvailable": "사용 가능한 모델 없음",
+    "modelRetires": "{{date}}에 단종",
     "notFound": "항목을 찾을 수 없습니다.",
     "online": "온라인",
     "open": "{{name}} 열기",
@@ -147,6 +152,7 @@
     "performance": "성능",
     "preferences": "환경설정",
     "privacyPolicy": "개인정보 처리방침",
+    "termsOfService": "서비스 약관",
     "profile": "프로필",
     "reactions": "반응",
     "recent": "최근",
@@ -158,7 +164,7 @@
     "retryLoadingMore": "추가 항목 불러오기 재시도",
     "reviewPr": "PR 리뷰",
     "role": "역할",
-    "searchModels": "모델 검색...",
+    "searchModels": "모델 검색…",
     "selectedRepositories": "선택한 저장소",
     "selectRepositories": "저장소 선택",
     "sendMessage": "메시지 보내기",
@@ -170,6 +176,7 @@
     "generating": "생성 중…",
     "working": "작업 중",
     "yourOwnRepositories": "내 저장소",
+    "organizationRepositories": "조직 저장소",
     "dismissed": "무시됨",
     "agent": "대리인",
     "durationMinuteShort": "min",
@@ -178,7 +185,32 @@
     "organizationTrialEnded": "조직의 체험이 종료되었으며 활성 요금제가 없습니다. 조직 소유자는 kilo.ai에서 결제 정보를 업데이트한 후 다시 시도하세요.",
     "privateRepositoryA11y": "{{name}}, 비공개 저장소",
     "legalDocumentEnglishOnly": "이 문서는 영어로만 제공됩니다.",
-    "organizationTrialEndedBilling": "조직의 체험이 종료되었으며 활성 요금제가 없습니다. 결제 정보를 업데이트한 후 다시 시도할 수 있습니다."
+    "organizationTrialEndedBilling": "조직의 체험이 종료되었으며 활성 요금제가 없습니다. 결제 정보를 업데이트한 후 다시 시도할 수 있습니다.",
+    "organizationTrialEndedBillingAtKiloAi": "조직의 체험이 종료되었으며 활성 요금제가 없습니다. kilo.ai에서 결제 정보를 업데이트한 후 다시 시도할 수 있습니다.",
+    "viewOnGitHub": "GitHub에서 PR 보기",
+    "markdownA11y": {
+      "list": {
+        "bulletPoint": "글머리 기호",
+        "nestedBulletPoint": "중첩 글머리 기호",
+        "orderedItem": "목록 항목 {n}",
+        "nestedOrderedItem": "중첩 목록 항목 {n}"
+      },
+      "blockquote": {
+        "quote": "인용",
+        "nestedQuote": "중첩 인용"
+      },
+      "table": {
+        "row": "행 {n}: {content}"
+      },
+      "math": {
+        "equation": "수학: {latex}"
+      },
+      "rotor": {
+        "headings": "제목",
+        "links": "링크",
+        "images": "이미지"
+      }
+    }
   },
   "language": {
     "restarting": "언어 적용을 위해 다시 시작 중",
@@ -201,7 +233,7 @@
     "openSignInPageInBrowser": "브라우저에서 로그인 페이지 열기",
     "copySignInLink": "로그인 링크 복사",
     "cancelSignIn": "로그인 취소",
-    "startingSignIn": "로그인 시작 중...",
+    "startingSignIn": "로그인 시작 중…",
     "organizationUsesSso": "조직에서 통합 로그인(SSO)을 사용합니다.",
     "continueWithSso": "SSO로 계속하기",
     "useDifferentEmail": "다른 이메일 사용",
@@ -216,8 +248,8 @@
     "verifyCode": "코드 확인",
     "resendCode": "코드 다시 보내기",
     "termsPrefix": "계속하면 다음 ",
+    "termsInSentence": "서비스 약관",
     "terms": "약관",
-    "termsInSentence": "약관",
     "termsConnector": " 및 ",
     "termsSuffix": "에 동의합니다.",
     "moreSignInOptions": "다른 방법으로 로그인",
@@ -272,9 +304,13 @@
     "credits": "크레딧",
     "failedToLoadBalance": "잔액을 불러오지 못했습니다. 눌러서 다시 시도하세요.",
     "balanceLoadFailed": "잔액을 불러오지 못했습니다",
+    "balanceUnreachable": "서버에 연결할 수 없습니다. 다시 시도하세요.",
+    "balanceAccessDenied": "이 잔액을 볼 권한이 없습니다.",
+    "balanceUnavailable": "잔액을 불러오지 못했습니다.",
     "hideBalance": "잔액 숨기기",
     "showBalance": "잔액 표시",
     "balanceHidden": "잔액이 숨겨짐",
+    "availableToSpendInOrganization": "이 조직에서 지출 가능",
     "signOutTitle": "로그아웃할까요?",
     "signOutMessage": "작업 영역을 이용하려면 다시 로그인해야 합니다.",
     "deleteAccountTitle": "계정을 삭제할까요?",
@@ -311,9 +347,9 @@
     "passkeyVerifyDescription": "보안을 위해 패스키를 변경하기 전에 본인 확인을 진행하세요.",
     "passkeyVerifyWithPasskey": "패스키로 확인",
     "passkeyVerifySendCode": "이메일로 코드 받기",
-    "passkeyVerifySendingCode": "코드 전송 중...",
+    "passkeyVerifySendingCode": "코드 전송 중…",
     "passkeyVerifyPasskeyPrompt": "계속하려면 패스키로 확인하세요.",
-    "passkeyVerifyChecking": "코드를 확인하는 중...",
+    "passkeyVerifyChecking": "코드를 확인하는 중…",
     "passkeyVerifyCodeSent": "{{email}}로 보낸 코드를 입력하세요.",
     "passkeyVerifyCodeRejected": "코드가 일치하지 않습니다. 다시 시도하세요.",
     "passkeyVerifyPasskeyFailed": "해당 패스키로 확인하지 못했습니다. 다시 시도하세요.",
@@ -321,8 +357,8 @@
     "passkeyVerifyInProgress": "해당 코드는 이미 확인 중입니다. 잠시 후 다시 시도하세요.",
     "passkeyVerifyTooManyAttempts": "시도 횟수가 너무 많습니다. 새 코드를 보내세요.",
     "passkeyVerifySsoRequired": "조직에서 싱글 사인온을 요구합니다. 브라우저에서 이 변경을 승인한 후 여기로 돌아오세요.",
-    "passkeyVerifySsoStarting": "승인 시작 중...",
-    "passkeyVerifySsoWaiting": "승인 대기 중...",
+    "passkeyVerifySsoStarting": "승인 시작 중…",
+    "passkeyVerifySsoWaiting": "승인 대기 중…",
     "passkeyVerifySsoOpen": "승인 페이지 열기",
     "passkeyVerifySsoExpired": "해당 승인이 만료되었거나 취소되었습니다. 다시 시도하세요.",
     "passkeyVerifySsoUnavailable": "지금은 싱글 사인온 승인을 사용할 수 없습니다. 다시 시도하세요.",
@@ -416,6 +452,17 @@
       "location": "Vertex 위치",
       "clientEmail": "서비스 계정 이메일",
       "privateKey": "서비스 계정 비공개 키",
+      "privateKeyBlockRequired": "BEGIN 줄부터 END 줄까지 전체 키 블록을 붙여넣으세요.",
+      "privateKeyEncrypted": "이 키 블록은 패스프레이즈로 보호되어 있습니다. 패스프레이즈가 없는 서비스 계정 키를 붙여넣으세요.",
+      "names": {
+        "codestral": "이전 버전 Codestral 전용",
+        "openai": "OpenAI API",
+        "openaiChatgpt": "OpenAI(ChatGPT로 로그인)",
+        "xiaomi": "Xiaomi(종량제)",
+        "zai": "Z.ai(종량제)",
+        "bedrockByok": "Amazon Bedrock(직접)",
+        "vertexByok": "Google Vertex AI(직접)"
+      },
       "modelMappings": "모델 매핑",
       "modelMappingsDescription": "게이트웨이 모델을 사용자 지정 배포 이름으로 보냅니다.",
       "mappingTitle": "매핑 {{number}}",
@@ -446,7 +493,7 @@
       "download": "파일 다운로드",
       "downloadFailed": "내보낸 데이터를 다운로드하지 못했습니다. 연결 상태를 확인한 후 다시 시도하세요.",
       "unavailableTitle": "아직 데이터 내보내기를 이용할 수 없습니다",
-      "unavailableDescription": "데이터 내보내기 기능은 순차적으로 제공되고 있습니다. 잠시 후 다시 확인하세요."
+      "unavailableDescription": "이 기능은 순차적으로 제공되고 있습니다. 잠시 후 다시 확인하세요."
     },
     "blockedPeople": {
       "title": "차단 및 뮤트한 사용자",
@@ -476,12 +523,13 @@
       "receiptLabel": "접수증",
       "copyReceiptId": "접수증 ID 복사",
       "appealLabel": "이의 제기",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "접수됨",
       "triageOpen": "검토 중",
       "triageActioned": "조치됨",
       "triageRejected": "조치 안 됨",
       "appealNone": "제출되지 않음",
-      "appealSubmitted": "검토 중",
+      "appealSubmitted": "이의 제기 검토 중",
       "appealAccepted": "수락됨",
       "appealRejected": "거절됨",
       "appeal": "이 결정에 이의 제기",
@@ -493,7 +541,25 @@
       "nextStepInReview": "결과는 이 화면에 표시되며, 결정 후 이의를 제기할 수 있습니다.",
       "nextStepAppeal": "이의 제기 결과는 이 화면에 표시됩니다.",
       "nextStepFinal": "이의 제기 결정은 최종입니다. 더 이상 이의를 제기할 수 없습니다.",
-      "viewReceipt": "접수증 보기"
+      "viewReceipt": "접수증 보기",
+      "targetLabel": "신고 대상",
+      "reasonLabel": "신고 사유",
+      "targetMessage": "AI 응답",
+      "targetComment": "풀 리퀘스트 댓글",
+      "targetUser": "사용자",
+      "reasonHarmful": "유해 콘텐츠",
+      "reasonIllegal": "불법 콘텐츠",
+      "reasonHarassment": "괴롭힘",
+      "reasonSpam": "스팸",
+      "reasonOther": "기타 사유"
+    },
+    "reportReceipts": {
+      "title": "신고 내역",
+      "rowSubtitle": "접수한 신고와 그 결과",
+      "emptyTitle": "아직 신고 내역이 없습니다",
+      "emptyDescription": "풀 리퀘스트 토론의 댓글이나 에이전트 세션의 AI 응답에서 접수한 신고가 결과와 함께 여기에 표시됩니다.",
+      "couldNotLoad": "신고 내역을 불러올 수 없습니다",
+      "capped": "최근 신고 내역만 표시됩니다."
     },
     "changelog": "새로운 기능",
     "changelogVersionPending": "{{version}} 버전의 릴리스 노트는 다음 앱 업데이트에 포함됩니다.",
@@ -502,7 +568,10 @@
     "changelogFixesPolish": "앱 전반의 수정 및 개선 사항.",
     "changelogAreas": {
       "signIn": "로그인",
-      "profileOrganizations": "프로필 및 조직"
+      "profileOrganizations": "프로필과 조직",
+      "chat": "채팅",
+      "notifications": "알림",
+      "integrations": "연동"
     }
   },
   "preferences": {
@@ -521,6 +590,7 @@
     "appearanceDark": "다크",
     "account": "계정",
     "accountSubtitle": "언어, 신뢰하는 호스트, 기기 세션",
+    "accountNotifications": "계정 및 알림",
     "prReviewAttribution": "PR 리뷰에 사용 앱 표시",
     "prReviewAttributionSubtitle": "리뷰를 제출할 때 Kilo로 리뷰했다는 문구를 하단에 추가합니다.",
     "returnSendsMessage": "리턴 키로 메시지 보내기",
@@ -596,6 +666,7 @@
       "emptyTitle": "아직 알림이 없습니다",
       "emptyCategoryTitle": "이 카테고리에 알림이 없습니다",
       "emptyBody": "이 계정이 받은 알림이 여기에 표시됩니다. {{days}}일 동안 보관됩니다.",
+      "emptyBody_other": "이 계정이 받은 알림이 여기에 표시됩니다. {{days}}일 동안 보관됩니다.",
       "capped": "최근 알림을 표시합니다.",
       "loadError": "알림 기록을 불러오지 못했습니다.",
       "openFailed": "이 알림은 더 이상 어디에서도 열 수 없습니다."
@@ -606,6 +677,7 @@
     "needsInputAction": {
       "approved": "요청이 승인되었습니다",
       "replied": "답장을 보냈습니다",
+      "empty": "답변을 입력한 후 보내세요.",
       "failed": "답변하지 못했습니다. 다시 탭하여 재시도하세요.",
       "unavailable": "이 요청은 더 이상 대기 중이 아닙니다."
     }
@@ -667,7 +739,7 @@
     },
     "instructions": {
       "title": "사용자 지정 지침",
-      "deprecation": "사용자 지정 지침 기능은 지원이 중단될 예정입니다. 이 지침을 저장소의 REVIEW.md 파일로 옮기세요.",
+      "deprecation": "사용자 지정 지침 기능은 제거될 예정입니다. 이 지침을 저장소의 REVIEW.md 파일로 옮기세요.",
       "placeholder": "예: 오류 처리 규칙 적용…",
       "clearTitle": "사용자 지정 지침을 제거하시겠습니까?",
       "clearMessage": "빈 필드를 저장하면 이 검토자에 대해 저장된 사용자 지정 지침이 삭제됩니다."
@@ -676,6 +748,7 @@
       "manageAccess": "접근 권한 관리",
       "bitbucketNoRepositoriesDescription": "이 Bitbucket 작업 영역에 사용 가능한 저장소가 없습니다.",
       "gitlabNoRepositoriesDescription": "GitLab에서 더 많은 그룹이나 프로젝트에 대한 접근 권한을 부여해야 할 수 있습니다.",
+      "githubNoRepositoriesDescription": "Kilo GitHub 앱의 저장소 접근 권한을 확인한 후 새로고침하세요.",
       "installGithubApp": "저장소에 GitHub 앱 설치",
       "installGithubAppDescription": "Kilo GitHub 앱에 리뷰할 저장소의 접근 권한을 부여하세요.",
       "repositoryAccess": "저장소 접근 권한",
@@ -692,11 +765,19 @@
     },
     "autoReviews": "자동 리뷰",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket이 연결되지 않았습니다. 조직 소유자, 관리자, 결제 관리자만 연결할 수 있습니다."
+      "notConnectedReadOnlyPlan": "조직의 체험이 종료되었으므로 소유자가 kilo.ai에서 결제 정보를 업데이트해야 합니다."
     },
     "bitbucketConnect": {
-      "managedOnWeb": "이 조직의 Bitbucket 연결은 컴퓨터에서 웹으로 관리됩니다.",
-      "description": "필요한 권한이 포함된 작업 영역 액세스 토큰을 생성하여 아래에 붙여넣으세요.",
+      "managedOnWeb": "{{organization}}의 Bitbucket 연결은 컴퓨터에서 웹으로 관리됩니다.",
+      "deniedManagedByOwner": "변경할 수 없는 연결은 {{organization}}의 소유자에게 변경을 요청하세요.",
+      "deniedConnectRole": "{{organization}}의 소유자, 관리자, 결제 관리자만 연결할 수 있습니다.",
+      "deniedReconnectRole": "{{organization}}의 소유자, 관리자 또는 결제 관리자에게 다시 연결해 달라고 요청하세요.",
+      "managedOnWebTitle": "웹에서 관리됨",
+      "managedOnWebShort": "이 연결은 컴퓨터에서 웹으로 관리됩니다.",
+      "managedOnWebRepositories": "컴퓨터에서 웹에 접속해 {{organization}}의 리포지토리를 선택하세요.",
+      "description": "{{organization}}용 작업 영역 액세스 토큰을 생성하여 아래에 붙여넣으세요.",
+      "descriptionReconnect": "{{organization}}용 새 작업 영역 액세스 토큰을 생성하여 아래에 붙여넣으세요.",
+      "descriptionOverview": "작업 영역 액세스 토큰을 생성한 다음 다음 화면에서 붙여넣으세요.",
       "scopes": "계정: 읽기 · 저장소: 읽기/쓰기 · 풀 리퀘스트: 읽기 · 웹훅: 읽기/쓰기",
       "tokenPlaceholder": "작업 영역 액세스 토큰",
       "tokenRefused": "Bitbucket에서 이 작업 영역 토큰을 수락하지 않았습니다. 위의 권한이 포함되어 있는지 확인한 후 다시 시도하세요."
@@ -732,11 +813,14 @@
     "platformList": {
       "activity": "활동",
       "checking": "확인 중…",
+      "needsAttention": "조치 필요",
       "platforms": "플랫폼",
       "statusUnavailable": "상태 확인 불가"
     },
     "providerConnect": {
       "description": "풀 리퀘스트를 자동으로 리뷰하려면 Kilo {{label}} 연결을 설정하세요.",
+      "notConnectedTitle": "{{platform}}이 연결되지 않았습니다",
+      "githubAdminOnlyDescription": "조직 소유자와 관리자만 연결할 수 있습니다.",
       "githubApp": "GitHub 앱",
       "githubError": "GitHub 설정을 열 수 없습니다. 다시 시도하세요.",
       "gitlabAccount": "GitLab 계정",
@@ -757,11 +841,11 @@
       "gateHidden": "숨김",
       "gateNone": "없음",
       "noFindings": "발견된 문제가 없습니다.",
-      "findingsUnavailable": "이 리뷰가 실패하여 결과를 확인할 수 없습니다.",
+      "findingsUnavailable": "결과를 확인할 수 없습니다.",
       "findingsInProgress": "이 리뷰는 아직 진행 중입니다. 완료되면 발견된 문제가 여기에 표시됩니다.",
       "findingsEndedWithoutResults": "이 리뷰는 발견된 문제가 만들어지기 전에 종료되었습니다.",
       "serviceUnavailable": "코드 리뷰 서비스에 연결할 수 없습니다. 서비스를 사용할 수 있게 되면 리뷰를 다시 시도해 주세요.",
-      "reviewFailed": "리뷰에 실패했습니다. 다시 시도해 주세요.",
+      "reviewFailed": "리뷰에 실패했습니다.",
       "retryMessage": "코드 리뷰가 다시 실행됩니다.",
       "retryReview": "리뷰 다시 시도",
       "retryNeedsSettings": "코드 리뷰어가 꺼져 있거나 설정을 확인해야 합니다. 설정을 수정한 다음 이 리뷰를 다시 시도하세요.",
@@ -781,7 +865,7 @@
       "transcriptRetry": "리뷰 대화록을 불러올 수 없습니다.",
       "transcriptLive": "실시간",
       "agentIdle": "에이전트 대기 중",
-      "agentWorking": "에이전트 작업 중...",
+      "agentWorking": "에이전트 작업 중…",
       "anErrorOccurred": "오류가 발생했습니다",
       "errorWithMessage": "오류가 발생했습니다: {{message}}",
       "executionStarted": "실행 시작됨",
@@ -871,7 +955,6 @@
     "overview": {
       "allAreas": "모든 영역",
       "nSelected": "{{displayCount}}개 선택됨",
-      "nSelected_one": "{{displayCount}}개 선택됨",
       "nSelected_other": "{{displayCount}}개 선택됨",
       "proposedReviewMdGuidance": "제안된 REVIEW.md 지침",
       "set": "설정됨",
@@ -950,7 +1033,6 @@
       "couldNotLoad": "분석을 불러오지 못했습니다",
       "trackedReviewsCaption": "이 기간 동안 분석이 켜진 상태에서 완료된 리뷰입니다. 실행 중이거나 실패한 리뷰는 계산에 포함되지 않습니다.",
       "trackedReviewsUncounted": "미집계: 조직의 완료된 리뷰 {{displayTotal}}개 중 {{displayCount}}개는 결과가 캡처되지 않았습니다.",
-      "trackedReviewsUncounted_one": "미집계: 조직의 완료된 리뷰 {{displayTotal}}개 중 {{displayCount}}개는 결과가 캡처되지 않았습니다.",
       "trackedReviewsUncounted_other": "미집계: 조직의 완료된 리뷰 {{displayTotal}}개 중 {{displayCount}}개는 결과가 캡처되지 않았습니다."
     },
     "council": {
@@ -962,7 +1044,9 @@
       "unavailablePersonallySwitchAction": "조직 전환",
       "unavailableOrganizationTitle": "협의체 리뷰를 이용할 수 없습니다",
       "unavailableForOrganization": "협의체 리뷰를 이용하려면 활성 구독 또는 체험이 있는 엔터프라이즈 요금제가 필요합니다. 현재 이 조직에는 그것이 없습니다.",
-      "unavailableForOrganizationNeutral": "현재 이 조직에서는 협의체 리뷰를 이용할 수 없습니다. 나중에 다시 시도해 주세요.",
+      "unavailablePlanCheck": "협의체 리뷰에서 이 조직의 요금제를 확인하지 못했습니다. 다시 시도하여 확인하세요.",
+      "unavailableFlagRollout": "협의체 리뷰는 아직 이 조직에서 사용할 수 없습니다. 사용하려면 앱을 최신 버전으로 업데이트하세요.",
+      "unavailableForOrganizationMember": "협의체 리뷰를 이용하려면 활성 구독 또는 체험이 있는 엔터프라이즈 요금제가 필요합니다. 조직 소유자가 요금제를 변경할 수 있습니다.",
       "unavailableOnBitbucket": "협의체 리뷰는 Bitbucket 저장소에서 사용할 수 없습니다.",
       "noRepositories": "아직 선택된 저장소가 없습니다. 먼저 저장소 설정에서 저장소를 선택하세요.",
       "specialists": "전문가",
@@ -1040,7 +1124,6 @@
       "triageReasoning": "분류 근거",
       "watchInCloudAgent": "클라우드 에이전트에서 보기",
       "whereFound": "발견 위치({{displayCount}})",
-      "whereFound_one": "발견 위치({{displayCount}})",
       "whereFound_other": "발견 위치({{displayCount}})",
       "yes": "예",
       "action": {
@@ -1069,7 +1152,6 @@
       "eventReason": "사유: {{reason}}",
       "eventSeverityChange": "$t(securityAgent.filter.severity): {{previous}} → {{next}}",
       "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
-      "eventsCount_one": "{{displayCount}}개 이벤트",
       "eventsCount_other": "{{displayCount}}개 이벤트",
       "generated": "{{generatedAt}}에 생성되었습니다.",
       "noActivity": "기록된 활동 없음",
@@ -1078,7 +1160,6 @@
       "repositoryNotRecorded": "저장소가 기록되지 않음",
       "reasonUnknown": "알 수 없는 사유",
       "severityCount": "{{displayCount}} {{label}}",
-      "severityCount_one": "{{displayCount}} {{label}}",
       "severityCount_other": "{{displayCount}} {{label}}",
       "summary": "보고서 요약",
       "title": "감사 보고서",
@@ -1129,14 +1210,14 @@
       "minimumSeverity": "최소 심각도",
       "queued": "기존 진단 결과 {{displayCount}}건을 분석 대기열에 추가했습니다.",
       "queued_other": "기존 진단 결과 {{displayCount}}건을 분석 대기열에 추가했습니다.",
-      "queued_one": "기존 문제 {{displayCount}}건을 분석 대기열에 추가했습니다.",
       "requireApproval": "자동 수정 전 승인 필요",
       "requireApprovalSubtitle": "자동 수정 시 승인을 받은 후 PR을 생성합니다.",
       "severityAll": "전체",
       "severityCriticalOnly": "치명적만 포함",
       "severityHighAndAbove": "높음 이상",
       "severityMediumAndAbove": "중간 이상",
-      "title": "자동화"
+      "title": "자동화",
+      "queued_one": "기존 문제 {{displayCount}}건을 분석 대기열에 추가했습니다."
     },
     "dashboard": {
       "actFirst": "우선 조치 항목",
@@ -1164,13 +1245,10 @@
       "refreshFailed": "새로고침하지 못했습니다. 마지막으로 동기화된 데이터를 표시합니다.",
       "repoSummary": "{{open}} · {{critical}} · {{high}}",
       "repoSummaryOpen": "미해결 {{displayCount}}건",
-      "repoSummaryOpen_one": "미해결 {{displayCount}}건",
       "repoSummaryOpen_other": "미해결 {{displayCount}}건",
       "repoSummaryCritical": "치명적 {{displayCount}}건",
-      "repoSummaryCritical_one": "치명적 {{displayCount}}건",
       "repoSummaryCritical_other": "치명적 {{displayCount}}건",
       "repoSummaryHigh": "높음 {{displayCount}}건",
-      "repoSummaryHigh_one": "높음 {{displayCount}}건",
       "repoSummaryHigh_other": "높음 {{displayCount}}건",
       "repositoryActionPlan": "저장소 조치 계획",
       "settings": "설정",
@@ -1178,9 +1256,7 @@
       "syncNow": "지금 동기화",
       "syncQueued": "동기화를 대기열에 추가했습니다.",
       "syncStatusUnavailable": "동기화 상태를 확인할 수 없습니다.",
-      "daysOverdue_one": "기한 {{displayCount}}일 초과",
       "daysOverdue_other": "기한 {{displayCount}}일 초과",
-      "findingsCount_one": "발견된 문제 {{displayCount}}건",
       "findingsCount_other": "발견된 문제 {{displayCount}}건"
     },
     "dashboardMetrics": {
@@ -1195,17 +1271,13 @@
       "deadlinePassedDetail": "{{critical}}, {{high}}",
       "deadlinePassedDetailWithMediumLow": "{{critical}}, {{high}}, {{mediumLow}}",
       "breakdownCritical": "치명적 {{displayCount}}건",
-      "breakdownCritical_one": "치명적 {{displayCount}}건",
       "breakdownCritical_other": "치명적 {{displayCount}}건",
       "breakdownHigh": "높음 {{displayCount}}건",
-      "breakdownHigh_one": "높음 {{displayCount}}건",
       "breakdownHigh_other": "높음 {{displayCount}}건",
       "breakdownMediumLow": "중간·낮음 {{displayCount}}건",
-      "breakdownMediumLow_one": "중간·낮음 {{displayCount}}건",
       "breakdownMediumLow_other": "중간·낮음 {{displayCount}}건",
       "dueThisWeek": "이번 주 마감",
       "dueThisWeekDetail": "이 중 악용 가능성이 확인된 문제 {{exploitable}}건",
-      "dueThisWeekDetail_one": "이 중 악용 가능성이 확인된 문제 {{exploitable}}건",
       "dueThisWeekDetail_other": "이 중 악용 가능성이 확인된 문제 {{exploitable}}건",
       "noDeadline": "마감일 없음",
       "reviewSlaAssignment": "SLA 지정 내역 검토",
@@ -1261,7 +1333,7 @@
       "couldNotLoad": "발견된 문제를 불러올 수 없습니다.",
       "couldNotLoadMore": "발견된 문제를 추가로 불러올 수 없습니다.",
       "emptyDescription": "현재 조치가 필요한 미해결 문제가 없습니다.",
-      "emptyTitle": "미해결 문제 없음",
+      "emptyTitle": "오픈 문제 없음",
       "noMatchesDescription": "선택한 필터를 변경하거나 초기화해 보세요.",
       "noMatchesTitle": "필터 조건에 맞는 문제 없음"
     },
@@ -1347,8 +1419,7 @@
       "notificationsCount": "2개 중 {{displayCount}}개 활성화됨",
       "on": "켜짐",
       "repositoriesCount": "저장소 {{displayCount}}개 선택됨",
-      "repositoriesCount_other": "저장소 {{displayCount}}개 선택됨",
-      "repositoriesCount_one": "저장소 {{displayCount}}개 선택됨"
+      "repositoriesCount_other": "저장소 {{displayCount}}개 선택됨"
     },
     "settingsSave": {
       "saveChanges": "변경 사항 저장",
@@ -1444,9 +1515,7 @@
       "dueTomorrow": "내일 마감",
       "dueInDays_other": "{{count}}일 후 마감",
       "overdue": "기한 {{count}}일 초과",
-      "overdue_one": "기한 {{count}}일 초과",
-      "dueInDays": "{{count}}일 후 마감",
-      "dueInDays_one": "{{count}}일 후 마감"
+      "dueInDays": "{{count}}일 후 마감"
     },
     "remediationStatus": {
       "notStarted": "시작 안 함",
@@ -1464,7 +1533,7 @@
     "remediationUnavailable": {
       "findingNotFound": "보안 문제가 더 이상 존재하지 않습니다.",
       "approvalRequired": "자동 수정에는 승인이 필요합니다. 승인하려면 수정을 수동으로 시작하세요.",
-      "findingNotOpen": "이 문제는 더 이상 미해결 상태가 아닙니다.",
+      "findingNotOpen": "이 문제는 더 이상 오픈 상태가 아닙니다.",
       "repoNotInScope": "이 저장소는 보안 에이전트의 모니터링 대상으로 선택되지 않았습니다.",
       "analysisRequired": "수정을 시작하기 전에 코드베이스 분석을 실행하세요.",
       "staleAnalysis": "분석 후 문제가 변경되었습니다. 수정을 시작하기 전에 분석을 다시 실행하세요.",
@@ -1528,11 +1597,11 @@
       "completedWillAppear": "완료된 세션이 여기에 표시됩니다.",
       "noPastSessions": "지난 세션 없음",
       "pastSessions": "지난 세션",
-      "sectionAccessibility_one": "{{title}}: 세션 {{displayCount}}개",
       "sectionAccessibility_other": "{{title}}: 세션 {{displayCount}}개",
       "sectionAccessibility": "{{title}}: 세션 {{displayCount}}개",
       "live": "실시간",
-      "updating": "업데이트 중"
+      "updating": "업데이트 중",
+      "retentionLimit": "최근 세션을 표시합니다."
     },
     "sessionRow": {
       "deleteTitle": "세션을 삭제할까요?",
@@ -1546,11 +1615,11 @@
       "actions": "세션 작업",
       "sessionDeleted": "세션이 삭제되었습니다.",
       "needsInput": "입력 필요",
+      "needsInputBadge": "입력 필요",
+      "scheduledBadge": "예약됨",
       "fromPlatform": "{{platform}}에서",
-      "cent_one": "센트",
       "cent": "센트",
       "cent_other": "센트",
-      "dollar_one": "달러",
       "dollar": "달러",
       "dollar_other": "달러",
       "costSpoken": "비용 {{cost}}",
@@ -1602,9 +1671,11 @@
       "scrollToBottom": "맨 아래로 스크롤",
       "emptyTitle": "아직 메시지가 없습니다",
       "emptyReadOnlyTitle": "이 세션에는 메시지가 없습니다",
-      "renameAccessibility": "세션 이름 변경: {{title}}",
       "cloningSession": "세션 복제 중",
       "couldNotLoadThisSession": "이 세션을 불러오지 못했습니다.",
+      "historyTooLarge": "이 세션의 기록이 너무 커서 불러올 수 없습니다.",
+      "historyUnavailable": "이 세션의 기록을 읽을 수 없습니다.",
+      "historyTemporarilyUnavailable": "이 세션의 기록을 일시적으로 불러올 수 없습니다.",
       "cloneFailedRetry": "이 세션을 복제하지 못했습니다. 다시 시도하세요.",
       "notEnoughCredits": "이 요청을 처리할 크레딧이 부족합니다. 크레딧을 충전하고 다시 시도하세요.",
       "previousTaskFinishing": "이전 작업을 아직 마무리하는 중입니다. 잠시 기다려 주세요.",
@@ -1681,6 +1752,7 @@
       "branchDefault": "기본값",
       "branchAccessibility": "브랜치: {{label}}",
       "branchLoading": "브랜치 불러오는 중",
+      "branchInactive": "저장소를 선택하면 브랜치를 불러옵니다.",
       "branchLoadError": "브랜치를 불러오지 못했습니다",
       "branchUnavailable": "이 저장소에서는 브랜치를 사용할 수 없습니다. 공급업체에서의 접근 권한을 확인한 후 다른 저장소를 선택하세요.",
       "branchEmpty": "사용 가능한 브랜치가 없습니다",
@@ -1837,7 +1909,6 @@
       "snapshotCaptured": "작업 공간 스냅샷 {{when}} 캡처됨"
     },
     "partRenderer": {
-      "updatedFileCount_one": "파일 {{displayCount}}개를 업데이트했습니다.",
       "updatedFileCount": "파일 {{displayCount}}개를 업데이트했습니다.",
       "updatedFileCount_other": "파일 {{displayCount}}개를 업데이트했습니다."
     },
@@ -1876,11 +1947,8 @@
       "linesBadge": "{{displayCount}}줄",
       "filesBadge": "파일 {{displayCount}}개",
       "matchesBadge": "{{displayCount}}건 일치",
-      "filesBadge_one": "파일 {{displayCount}}개",
       "filesBadge_other": "파일 {{displayCount}}개",
-      "linesBadge_one": "{{displayCount}}줄",
       "linesBadge_other": "{{displayCount}}줄",
-      "matchesBadge_one": "{{displayCount}}건 일치",
       "matchesBadge_other": "{{displayCount}}건 일치",
       "noOutput": "출력이 없습니다.",
       "translationFailed": "번역 실패"
@@ -1913,7 +1981,8 @@
       "customModes": "사용자 지정 모드"
     },
     "modeSelector": {
-      "accessibility": "모드: {{label}}"
+      "accessibility": "모드: {{label}}",
+      "customMode": "사용자 지정 모드"
     },
     "modeOptions": {
       "code": "코딩",
@@ -1933,8 +2002,7 @@
       "searchPlaceholder": "저장소 검색",
       "noMatches": "검색 결과 없음",
       "noRepositories": "사용 가능한 저장소가 없습니다",
-      "noRepositoriesDescription": "계정에 연결된 저장소가 없습니다.",
-      "loading": "불러오는 중…",
+      "noRepositoriesDescription": "저장소를 불러오려면 GitHub 또는 GitLab을 연결하세요.",
       "accessibility": "저장소: {{label}}",
       "platformBitbucket": "Bitbucket"
     },
@@ -1966,6 +2034,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "세부 정보를 확인할 수 없습니다.",
+      "detailsUnavailableDescription": "이 항목은 더 이상 세션에 없습니다.",
       "textDisplay": "텍스트 표시",
       "thinking": "추론 중",
       "thought": "추론 내용",
@@ -2009,6 +2078,7 @@
     "filePart": {
       "loadingImage": "이미지 불러오는 중",
       "imageUnavailableRetry": "이미지를 불러올 수 없습니다. 불러오기 다시 시도",
+      "imageUnavailableRetryWithAlt": "이미지를 불러올 수 없습니다. {{alt}}. 불러오기 다시 시도",
       "imagePreviewUnavailableInSession": "이 세션에서 이미지 미리보기를 사용할 수 없습니다.",
       "viewImage": "이미지 보기",
       "viewImageWithAlt": "{{alt}} 이미지 보기",
@@ -2140,7 +2210,9 @@
       "skip": "건너뛰기",
       "retrySkip": "건너뛰기 다시 시도",
       "submitting": "제출 중…",
-      "sendAnswers": "답변 보내기"
+      "sendAnswers": "답변 보내기",
+      "unreadableTitle": "질문을 표시할 수 없음",
+      "unreadableBody": "에이전트가 이 앱에서 표시할 수 없는 질문을 기다리고 있습니다. 계속 진행하려면 CLI에서 답하세요."
     },
     "blockingCard": {
       "questionUnavailable": "이 질문에는 더 이상 답변할 수 없습니다.",
@@ -2167,6 +2239,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "하위 에이전트 세션을 불러올 수 없습니다.",
+      "historyTooLarge": "이 하위 에이전트의 기록이 너무 커서 불러올 수 없습니다.",
+      "historyUnavailable": "이 하위 에이전트의 기록을 사용할 수 없습니다.",
+      "historyTemporarilyUnavailable": "이 하위 에이전트의 기록을 일시적으로 사용할 수 없습니다.",
       "failed": "하위 에이전트 세션이 실패했습니다.",
       "noMessages": "하위 에이전트 메시지 없음",
       "noMessagesDescription": "이 하위 에이전트 세션은 대화 기록 없이 완료되었습니다.",
@@ -2190,12 +2265,12 @@
     "olderMessages": {
       "arrived": "이전 메시지를 불러왔습니다",
       "retryHint": "이 세션의 이전 메시지를 다시 불러옵니다.",
-      "omitted_one": "이 세션의 이전 항목 일부를 표시하지 못했습니다.",
       "omitted": "이 세션의 이전 항목 {{displayCount}}개를 표시하지 못했습니다.",
       "omitted_other": "이 세션의 이전 항목 {{displayCount}}개를 표시하지 못했습니다.",
       "couldNotLoad": "이전 메시지를 불러오지 못했습니다.",
       "unavailable": "이전 메시지를 확인할 수 없습니다.",
-      "tooLarge": "이전 메시지의 용량이 너무 커서 불러올 수 없습니다."
+      "tooLarge": "이전 메시지의 용량이 너무 커서 불러올 수 없습니다.",
+      "omitted_one": "이 세션의 이전 항목 일부를 표시하지 못했습니다."
     },
     "sessionFilter": {
       "title": "세션 필터링",
@@ -2218,6 +2293,8 @@
     "modelPicker": {
       "title": "모델 선택",
       "noModelsDescription": "선택할 수 있는 모델이 없습니다.",
+      "allUnavailableTitle": "어떤 모델도 사용할 수 없습니다",
+      "allUnavailableDescription": "제공업체 키를 추가한 후 다시 시도하세요.",
       "favorites": "즐겨찾기"
     },
     "modelSelector": {
@@ -2229,7 +2306,7 @@
       "thinkingEffortAccessibility": "추론 강도: {{label}}",
       "thinkingEffortSelected": "추론 강도: {{label}}, 선택됨",
       "thinkingEffortWithModel": "{{model}}, 추론 강도: {{variant}}",
-      "lockedByAgent": ", 에이전트 \"{{agent}}\"에서 고정한 설정",
+      "lockedByAgent": "에이전트 \"{{agent}}\"에서 고정한 설정",
       "addToFavorites": "{{name}} 즐겨찾기에 추가",
       "removeFromFavorites": "{{name}} 즐겨찾기에서 제거",
       "sessionModel": "세션 모델"
@@ -2251,9 +2328,7 @@
       "couldNotOpenPhotoPicker": "사진 선택 화면을 열지 못했습니다. Kilo를 다시 시작한 후 다시 시도하세요.",
       "maxFilesAllowed": "최대 {{displayCount}}개의 파일을 첨부할 수 있습니다.",
       "onlyAddingFiles": "파일 {{total}}개 중 {{accepted}}개만 추가 (최대 {{max}}개)",
-      "maxFilesAllowed_one": "최대 {{displayCount}}개의 파일을 첨부할 수 있습니다.",
       "maxFilesAllowed_other": "최대 {{displayCount}}개의 파일을 첨부할 수 있습니다.",
-      "onlyAddingFiles_one": "파일 {{total}}개 중 {{accepted}}개만 추가 (최대 {{max}}개)",
       "onlyAddingFiles_other": "파일 {{total}}개 중 {{accepted}}개만 추가 (최대 {{max}}개)"
     },
     "composer": {
@@ -2265,8 +2340,8 @@
       "pasteFromClipboard": "클립보드에서 붙여넣기",
       "stopGenerating": "생성 중지",
       "selectModelBeforeSending": "메시지를 보내기 전에 모델을 선택하세요.",
-      "preparingPlaceholder": "환경 설정 중...",
-      "finalizingPlaceholder": "마무리 중...",
+      "preparingPlaceholder": "환경 설정 중…",
+      "finalizingPlaceholder": "마무리 중…",
       "sessionLoadFailed": "세션을 불러오지 못했습니다. 먼저 다시 시도하세요.",
       "cannotReceiveFiles": "이 세션은 파일을 받을 수 없습니다. 메시지를 보내려면 첨부 파일을 제거하세요.",
       "couldNotAttachFiles": "파일을 첨부하지 못했습니다. 보내기를 눌러 다시 시도하세요.",
@@ -2278,7 +2353,6 @@
       "discardAttachmentsTitle": "첨부 파일을 삭제할까요?",
       "charactersRemaining": "{{count}}자 남음",
       "insertNewline": "줄바꿈 삽입",
-      "charactersRemaining_one": "{{count}}자 남음",
       "charactersRemaining_other": "{{count}}자 남음"
     },
     "chatLink": {
@@ -2334,7 +2408,7 @@
       "windowUnavailable": "컨텍스트 창 크기 확인 불가",
       "tapToViewDetails": " 컨텍스트 세부 정보를 보려면 누르세요.",
       "costClause": ", 비용 {{cost}}",
-      "loadingCostSpoken": "비용 {{cost}}.",
+      "loadingCostSpoken": "지금까지의 비용 {{cost}}.",
       "tokensWindowUnavailable": "컨텍스트 토큰 {{used}}개 사용, 컨텍스트 창 크기 확인 불가{{costClause}}.",
       "tokensUsage": "컨텍스트 토큰 {{window}}개 중 {{used}}개 사용, {{percentage}} 사용{{costClause}}.",
       "title": "컨텍스트 사용량",
@@ -2354,13 +2428,10 @@
       "ofWindowTokens": "{{window}} 토큰 중",
       "tokens": "토큰",
       "tokens_other": "토큰",
-      "tokens_one": "토큰",
       "tokensWithPercentage": "토큰 ({{percentage}})",
-      "stepsCount_one": "{{steps}}단계",
       "stepsCount": "{{steps}}단계",
       "stepsCount_other": "{{steps}}단계",
       "modelAccessibilityLabel": "{{name}}, 제공업체: {{provider}}, {{steps}}, {{cost}}",
-      "modelsCount_one": "모델 ({{displayCount}})",
       "modelsCount_other": "모델 ({{displayCount}})"
     },
     "sessionChanges": {
@@ -2434,7 +2505,6 @@
     "toolRun": {
       "sheetTitle": "도구 호출",
       "condensedLabel": "{{itemCount}}개 항목; {{last}}",
-      "condensedLabel_one": "{{itemCount}}개 항목; {{last}}",
       "condensedLabel_other": "{{itemCount}}개 항목; {{last}}"
     }
   },
@@ -2445,6 +2515,12 @@
     "contentReady": "콘텐츠 준비됨",
     "retryLoadingAccount": "계정 정보 불러오기 다시 시도",
     "retryLoadingPrivacy": "개인정보 보호 설정 불러오기 다시 시도"
+  },
+  "accountBlocked": {
+    "title": "계정이 차단되었습니다",
+    "description": "Kilo가 이 계정을 차단했으며 다시 로그인해도 차단이 해제되지 않습니다. 지원팀은 요청 시 차단을 검토할 수 있습니다.",
+    "domainDescription": "Kilo가 이 이메일 도메인의 계정을 차단하며 다시 로그인해도 차단이 해제되지 않습니다. 지원팀은 요청 시 도메인을 검토할 수 있습니다.",
+    "contactSupport": "지원팀에 문의"
   },
   "addCredits": {
     "cta": "크레딧 충전",
@@ -2460,6 +2536,7 @@
     "noSessions": "로그인 중인 세션 없음",
     "noSessionsDescription": "다른 기기에서 Kilo 앱으로 로그인하면 여기에 표시됩니다.",
     "signedIn": "{{signedIn}}에 로그인함 · 마지막 활동 {{lastSeen}}",
+    "signedInThisDevice": "{{signedIn}}에 로그인함 · {{thisDevice}}",
     "signInScopeNote": "Kilo 앱, Kilo CLI 및 웹 브라우저의 로그인 내역이 여기에 표시됩니다. 에디터의 로그인 내역은 표시되지 않습니다.",
     "thisDevice": "이 기기",
     "viewProfile": "프로필 보기",
@@ -2482,7 +2559,6 @@
   },
   "home": {
     "couldNotLoadSessions": "세션을 불러올 수 없습니다.",
-    "couldNotLoadActiveSessions": "활성 세션을 불러올 수 없습니다.",
     "agentSessions": "현재 실행 중",
     "newCodingTask": "새 코딩 작업",
     "newTaskFromPicture": "사진에서 새 작업",
@@ -2509,6 +2585,7 @@
   "queryError": {
     "neutralDescription": "다시 시도하세요.",
     "offlineTitle": "불러오지 못했습니다.",
+    "offlineDescription": "서버에 연결할 수 없습니다.",
     "permissionDescription": "이 항목을 볼 권한이 없습니다.",
     "notFoundDescription": "이 항목이 삭제되었거나 더 이상 제공되지 않을 수 있습니다.",
     "serverTitle": "불러올 수 없습니다.",
@@ -2517,19 +2594,14 @@
     "timeoutDescription": "요청 시간이 초과되었습니다. 다시 시도하세요."
   },
   "screenHeader": {
-    "openMenu": "메뉴 열기",
-    "openMenuFor": "{{title}} 메뉴 열기"
+    "openMenu": "메뉴 열기"
   },
   "picker": {
     "optionsExpired": "선택 항목 만료",
     "optionsExpiredDescription": "이전 화면으로 돌아가 선택 화면을 다시 여세요."
   },
-  "sessionRow": {
-    "needsInput": "입력 필요",
-    "scheduled": "예약됨"
-  },
   "voiceInput": {
-    "listening": "음성 입력 중...",
+    "listening": "음성 입력 중…",
     "allow": "허용",
     "onlineMessage": "이 기기는 오프라인에서 음성을 텍스트로 변환할 수 없습니다. 녹음한 음성은 {{provider}}에 전송되어 텍스트로 변환됩니다. Kilo는 음성을 저장하지 않습니다.",
     "onlineTitle": "온라인 음성 처리 안내",
@@ -2551,7 +2623,7 @@
     "useOnlineTranscription": "온라인 음성 처리 허용",
     "offlineModelDownloadScheduled": "오프라인 음성 파일이 백그라운드에서 다운로드됩니다. 나중에 음성 입력을 다시 시도하세요.",
     "listeningStopped": "음성 입력이 중지되었습니다.",
-    "transcribing": "변환 중...",
+    "transcribing": "변환 중…",
     "gatewayUnreachable": "Kilo Gateway에 연결하지 못했습니다. 연결 상태를 확인하고 다시 시도하세요.",
     "gatewayTimeout": "변환에 시간이 너무 오래 걸렸습니다. 다시 시도하세요.",
     "gatewayModelUnavailable": "이 음성 텍스트 변환 모델은 사용할 수 없습니다. 환경설정에서 다른 모델을 선택하세요.",
@@ -2567,7 +2639,6 @@
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
     "searchPlaceholder": "최근 세션 검색",
     "connectedCli": "연결된 CLI",
-    "connectedCliAccessibility_one": "{{title}}: CLI {{displayCount}}개",
     "connectedCliAccessibility_other": "{{title}}: CLI {{displayCount}}개",
     "connectedCliAccessibility": "{{title}}: CLI {{displayCount}}개",
     "newSessionOn": "{{name}}의 새 세션",
@@ -2583,7 +2654,6 @@
     "cliCantReceiveFilesMessage": "이 세션을 실행하는 Kilo CLI가 파일을 받을 수 없습니다. 해당 컴퓨터에서 CLI를 업데이트하거나 새 세션으로 공유하세요.",
     "contentlessMessage": "텍스트나 파일이 없어 공유할 내용이 없습니다.",
     "couldNotReadContent": "공유된 내용을 읽지 못했습니다.",
-    "onlyFirstFilesAttached_one": "처음 {{displayCount}}개의 파일만 첨부됩니다.",
     "onlyFirstFilesAttached_other": "처음 {{displayCount}}개의 파일만 첨부됩니다."
   },
   "kiloPass": {
@@ -2591,6 +2661,11 @@
       "billingHistory": "결제 내역",
       "billingHistoryEmpty": "아직 결제 내역이 없습니다.",
       "billingHistoryError": "결제 내역을 불러올 수 없습니다",
+      "billingRowInitial": "첫 결제 · {{tier}}",
+      "billingRowRenewal": "갱신 · {{tier}}",
+      "billingRowSubscription": "구독 · {{tier}}",
+      "billingRowTrial": "무료 체험 · {{tier}}",
+      "billingRowUpgrade": "플랜 변경 · {{tier}}",
       "cancel": "구독 취소",
       "cancelDescription": "Kilo Pass는 현재 결제 기간이 끝날 때까지 유지되며 갱신되지 않습니다.",
       "cancelScheduled": "{{date}}에 취소 예정",
@@ -2616,6 +2691,8 @@
     "retryHint": "Kilo Pass 상태를 다시 확인합니다.",
     "endedOn": "{{date}}에 종료됨",
     "notAvailableInApp": "Kilo Pass는 앱에서 사용할 수 없습니다.",
+    "notAvailableTitle": "Kilo Pass는 앱에서 제공되지 않습니다",
+    "noPassDescription": "이 계정에는 Kilo Pass가 없습니다.",
     "statusActive": "활성",
     "statusTrialing": "체험 중",
     "statusPastDue": "결제 연체",
@@ -2686,6 +2763,7 @@
     "revokeConsent": "동의 철회",
     "revokeConsentTitle": "데이터 공유 동의를 철회할까요?",
     "acceptAndContinue": "동의하고 계속하기",
+    "loadingConsentSettings": "동의 설정을 불러오는 중…",
     "decline": "거부",
     "declineAndSignOut": "거부하고 로그아웃",
     "declineTitle": "데이터 공유를 거부할까요?",
@@ -2731,6 +2809,8 @@
     "why": "공유 목적",
     "who": "공유 대상",
     "installAttributionPromptMessage": "Kilo는 앱을 설치한 경로를 파악하는 데만 Apple의 추적 권한을 사용합니다. 프롬프트와 대화는 절대 사용하지 않습니다.",
+    "installAttributionRequestFailedTitle": "추적 프롬프트를 표시하지 못했습니다",
+    "installAttributionRequestFailedMessage": "Kilo가 시스템 프롬프트를 표시하지 못해 설치 경로 분석이 꺼진 채로 유지됩니다.",
     "installAttributionPromptTitle": "설치 경로 분석을 허용할까요?"
   },
   "prReview": {
@@ -2738,26 +2818,21 @@
     "checkConnection": "연결 확인",
     "checks": {
       "checksCount": "검사 {{displayCount}}개",
-      "checksCount_one": "검사 {{displayCount}}개",
       "checksCount_other": "검사 {{displayCount}}개",
       "couldNotLoad": "검사 결과를 불러오지 못했습니다.",
       "failed": "{{displayCount}}개 실패",
-      "failed_one": "{{displayCount}}개 실패",
       "failed_other": "{{displayCount}}개 실패",
       "noAccess": "이 저장소의 검사 결과를 볼 권한이 없습니다.",
       "noChecksReported": "보고된 검사 결과 없음",
       "notAvailable": "아직 검사 결과를 확인할 수 없습니다. 최신 커밋이 처리되지 않았거나 해당 커밋의 저장소에 Kilo GitHub 앱이 설치되지 않았을 수 있습니다.",
       "openDetails": "{{name}} 세부 정보 열기",
       "passed": "{{displayCount}}개 통과",
-      "passed_one": "{{displayCount}}개 통과",
       "passed_other": "{{displayCount}}개 통과",
       "pending": "{{displayCount}}개 대기 중",
       "retryChecks": "검사 다시 시도",
       "skipped": "{{displayCount}}개 건너뜀",
-      "skipped_one": "{{displayCount}}개 건너뜀",
       "skipped_other": "{{displayCount}}개 건너뜀",
       "title": "검사",
-      "viewOnGitHub": "GitHub에서 PR 보기",
       "checkDetails": "검사 세부 정보"
     },
     "composer": {
@@ -2796,9 +2871,10 @@
       "checkActiveConnection": "연결은 활성 상태이지만 이 항목은 여전히 불러올 수 없습니다.",
       "bitbucketOrgOnlyDescription": "Bitbucket 풀 리퀘스트를 검토하려면 위의 계정을 조직으로 전환하세요.",
       "bitbucketOrgOnlyNoOrganizationDescription": "이 계정에는 아직 조직이 없습니다. 조직을 만들거나 참여하면 Bitbucket 풀 리퀘스트를 검토할 수 있습니다.",
-      "gitlabReconnectAdminOnlyDescription": "조직 소유자, 관리자 또는 결제 관리자에게 다시 연결해 달라고 요청하세요.",
+      "reconnectAdminOnlyDescription": "조직 소유자, 관리자 또는 결제 관리자에게 다시 연결해 달라고 요청하세요.",
       "bitbucketNotConnectedTitle": "Bitbucket이 연결되지 않았습니다",
-      "bitbucketAdminOnlyDescription": "조직 소유자, 관리자, 결제 관리자만 연결할 수 있습니다.",
+      "bitbucketAdminOnlyDescription": "조직 소유자, 관리자 또는 결제 관리자에게 연결을 요청하세요.",
+      "adminOnlyConnectDescription": "조직 소유자, 관리자, 결제 관리자만 연결할 수 있습니다.",
       "contextLine": "{{organization}}용",
       "contextLinePersonal": "개인용"
     },
@@ -2818,6 +2894,8 @@
       "commentActions": "댓글 작업",
       "comment": "댓글 {{displayCount}}개",
       "comment_other": "댓글 {{displayCount}}개",
+      "conversationTruncated": "처음 {{displayCount}}개의 댓글만 표시합니다.",
+      "conversationTruncated_other": "처음 {{displayCount}}개의 댓글만 표시합니다.",
       "couldNotLoad": "토론을 불러오지 못했습니다.",
       "couldNotLoadMore": "댓글을 더 불러오지 못했습니다.",
       "loadMoreComments": "댓글 더 불러오기",
@@ -2845,13 +2923,11 @@
       "mutedUser": "{{login}} 님을 숨겼습니다.",
       "noDiscussion": "아직 토론 없음",
       "noDiscussionDescription": "이 풀 리퀘스트에는 아직 리뷰 스레드나 댓글이 없습니다.",
-      "comment_one": "댓글 1개",
       "outdated": "이전 버전",
       "quotedDiffSnippet": "인용된 변경 내용 일부",
       "reactionPill": "{{emoji}} {{countLabel}} {{displayCount}}개",
       "reaction": "반응",
       "reaction_other": "반응",
-      "reaction_one": "반응",
       "replyBadRequest": "이 답글을 게시할 수 없습니다. 스레드가 변경되었을 수 있습니다.",
       "replyBody": "답글 내용",
       "replyForbidden": "이 풀 리퀘스트에 답글을 달 권한이 없습니다.",
@@ -2871,7 +2947,6 @@
       "submitReply": "답글 제출",
       "termsAcceptRetry": "약관 동의를 처리하지 못했습니다. 인터넷 연결을 확인하고 다시 시도하세요.",
       "termsCopy": "만 13세 이상만 게시할 수 있습니다.",
-      "termsTitle": "서비스 약관",
       "threadAccessibilityLabel": "{{anchorLabel}} 토론 스레드",
       "unavailable": "토론을 볼 수 없습니다.",
       "unavailableMessage": "이 풀 리퀘스트가 삭제되었을 수 있습니다.",
@@ -2895,11 +2970,22 @@
         "fileComment": "파일 댓글",
         "outdatedOnPathLines": "{{path}} {{lines}} · 이전 버전",
         "outdatedOnLines": "{{lines}} · 이전 버전",
-        "outdatedOnPath": "{{path}} · 이전 버전"
+        "outdatedOnPath": "{{path}} · 이전 버전",
+        "line": "L{{line}}",
+        "lineRange": "L{{startLine}}–L{{endLine}}",
+        "lineOnlyLineSide": "L{{line}} ({{side}})",
+        "lineOnlyRangeSide": "{{lineRange}} ({{side}})",
+        "lineOnPathLineSide": "{{path}} L{{line}} ({{side}})",
+        "lineOnPathRangeSide": "{{path}} {{lineRange}} ({{side}})",
+        "sideLeft": "왼쪽",
+        "sideRight": "오른쪽",
+        "outdatedOnLinesSide": "{{lines}} · 이전 버전 ({{side}})",
+        "outdatedOnPathLinesSide": "{{path}} {{lines}} · 이전 버전 ({{side}})",
+        "outdatedSide": "이전 버전 ({{side}})",
+        "outdatedOnPathSide": "{{path}} · 이전 버전 ({{side}})"
       },
       "deletedUser": "삭제된 사용자",
       "replyForbiddenTerm": "이 {{term}}에 답글을 달 권한이 없습니다.",
-      "moreLinesAbove_one": "… 위에 {{displayCount}}줄이 더 있습니다.",
       "moreLinesAbove_other": "… 위에 {{displayCount}}줄이 더 있습니다.",
       "deleteComment": "댓글 삭제",
       "deleteCommentTitle": "댓글을 삭제할까요?",
@@ -2907,7 +2993,8 @@
       "commentEditFailed": "댓글을 저장하지 못했습니다. 인터넷 연결을 확인하고 다시 시도하세요.",
       "commentEditUnavailable": "이 댓글은 수정할 수 없습니다. 삭제되었을 수 있습니다.",
       "commentDeleteFailed": "댓글을 삭제하지 못했습니다. 인터넷 연결을 확인하고 다시 시도하세요.",
-      "commentDeleteUnavailable": "이 댓글은 삭제할 수 없습니다."
+      "commentDeleteUnavailable": "이 댓글은 삭제할 수 없습니다.",
+      "comment_one": "댓글 1개"
     },
     "entry": {
       "noRecentPrs": "최근 리뷰 없음",
@@ -2942,19 +3029,33 @@
       "diffTooLarge": "변경 내용이 너무 큼",
       "failedToLoadAllFiles": "모든 파일을 불러오지 못했습니다.",
       "filterPlaceholder": "경로로 파일 필터링",
-      "loadingFiles": "{{total}}개 중 {{loaded}}개 불러오는 중…",
+      "loadingFilesProgress": "{{total}}개 중 {{loaded}}개 불러오는 중…",
       "noMatches": "\"{{query}}\" 검색 결과에 해당하는 파일이 없습니다.",
       "openFile": "{{path}} 열기",
       "openFileViewed": "{{path}} 열기 (확인함)",
       "retryLoadingAllFiles": "모든 파일 불러오기 다시 시도",
       "retryLoadingFiles": "파일 불러오기 다시 시도",
       "retryLoadingMoreFiles": "파일 더 불러오기 다시 시도",
+      "loadingMoreFiles": "파일 더 불러오는 중…",
+      "failedToLoadMoreFiles": "파일 더 불러오기 실패 · 탭하여 다시 시도",
+      "retryLoadingNextPage": "다음 페이지 불러오기 다시 시도",
+      "loadingAllFiles": "모든 파일 불러오는 중 · {{loaded}}개…",
+      "loadingAllFilesOf": "모든 파일 불러오는 중 · {{total}}개 중 {{loaded}}개…",
+      "loadedOfTotalFiles": "파일 {{total}}개 중 {{loaded}}개 불러옴",
+      "loadedOfTotalFiles_other": "파일 {{total}}개 중 {{loaded}}개 불러옴",
+      "loadAllFiles": "모든 파일 불러오기",
+      "loadAll": "모두 불러오기",
+      "fileLoadedCount": "파일 {{displayCount}}개 불러옴",
+      "fileLoadedCount_other": "파일 {{displayCount}}개 불러옴",
+      "fileLoadedOfTotalCount": "파일 {{total}}개 중 {{displayCount}}개 불러옴",
+      "fileLoadedOfTotalCount_other": "파일 {{total}}개 중 {{displayCount}}개 불러옴",
+      "filesStillLoading": "아직 파일을 불러오는 중입니다. 아래로 당겨 새로고침하세요.",
+      "goToOverview": "개요로 이동",
+      "goToOverviewTab": "개요 탭으로 이동",
       "title": "파일",
       "viewedCount": "{{total}}개 중 {{viewed}}개 확인함",
-      "viewedCount_one": "{{total}}개 중 {{viewed}}개 확인함",
       "viewedCount_other": "{{total}}개 중 {{viewed}}개 확인함",
       "viewedOfListed": "목록에 표시된 파일 {{total}}개 중 {{viewed}}개 확인함",
-      "viewedOfListed_one": "목록에 표시된 파일 {{total}}개 중 {{viewed}}개 확인함",
       "viewedOfListed_other": "목록에 표시된 파일 {{total}}개 중 {{viewed}}개 확인함"
     },
     "fileRows": {
@@ -2986,37 +3087,14 @@
       "expandMoreContext": "주변 코드 더 펼치기",
       "expandMoreLines": "{{displayCount}}줄 더 펼치기 ({{start}}–{{end}})",
       "failedToLoadContext": "주변 코드 불러오기 실패 · 탭하여 다시 시도",
-      "failedToLoadMoreFiles": "파일 더 불러오기 실패 · 탭하여 다시 시도",
-      "fileLoadedCount_one": "파일 {{displayCount}}개 불러옴",
-      "fileLoadedOfTotalCount_one": "파일 {{total}}개 중 {{displayCount}}개 불러옴",
-      "fileLoadedCount": "파일 {{displayCount}}개 불러옴",
-      "fileLoadedCount_other": "파일 {{displayCount}}개 불러옴",
-      "fileLoadedOfTotalCount": "파일 {{total}}개 중 {{displayCount}}개 불러옴",
-      "fileLoadedOfTotalCount_other": "파일 {{total}}개 중 {{displayCount}}개 불러옴",
-      "filesStillLoading": "아직 파일을 불러오는 중입니다. 아래로 당겨 새로고침하세요.",
-      "goToOverview": "개요로 이동",
-      "goToOverviewTab": "개요 탭으로 이동",
       "hunkHeader": "변경 구간 헤더 {{header}}",
-      "loadAll": "모두 불러오기",
-      "loadAllFiles": "모든 파일 불러오기",
-      "loadedOfTotalFiles": "파일 {{total}}개 중 {{loaded}}개 불러옴",
-      "loadingAllFiles": "모든 파일 불러오는 중 · {{loaded}}개…",
-      "loadingAllFilesOf": "모든 파일 불러오는 중 · {{total}}개 중 {{loaded}}개…",
       "loadingContext": "주변 코드 불러오는 중…",
       "loadingLines": "{{total}}줄 중 {{loaded}}줄 불러오는 중…",
-      "loadingMoreFiles": "파일 더 불러오는 중…",
       "retryLoadingContext": "주변 코드 불러오기 다시 시도",
-      "retryLoadingNextPage": "다음 페이지 불러오기 다시 시도",
-      "expandAllLines_one": "{{displayCount}}줄 모두 펼치기",
       "expandAllLines_other": "{{displayCount}}줄 모두 펼치기",
-      "expandLines_one": "{{displayCount}}줄 펼치기 ({{start}}–{{end}})",
       "expandLines_other": "{{displayCount}}줄 펼치기 ({{start}}–{{end}})",
-      "expandLinesOfContext_one": "주변 코드 {{displayCount}}줄 펼치기",
       "expandLinesOfContext_other": "주변 코드 {{displayCount}}줄 펼치기",
-      "expandMoreLines_one": "{{displayCount}}줄 더 펼치기 ({{start}}–{{end}})",
-      "expandMoreLines_other": "{{displayCount}}줄 더 펼치기 ({{start}}–{{end}})",
-      "loadedOfTotalFiles_one": "파일 {{total}}개 중 {{loaded}}개 불러옴",
-      "loadedOfTotalFiles_other": "파일 {{total}}개 중 {{loaded}}개 불러옴"
+      "expandMoreLines_other": "{{displayCount}}줄 더 펼치기 ({{start}}–{{end}})"
     },
     "inbox": {
       "couldNotLoad": "받은 편지함을 불러오지 못했습니다.",
@@ -3099,7 +3177,6 @@
       },
       "restrictions": {
         "title": "병합 제한",
-        "approvalsRequired_one": "{{displayCount}}개의 승인 필요",
         "approvalsRequired_other": "{{displayCount}}개의 승인 필요",
         "pipelineMustSucceed": "병합하기 전에 파이프라인이 성공해야 합니다."
       },
@@ -3126,10 +3203,8 @@
     "overview": {
       "commit": "커밋",
       "commit_other": "커밋",
-      "commit_one": "커밋",
       "file": "파일",
       "file_other": "파일",
-      "file_one": "파일",
       "stateMerged": "병합됨",
       "stateOpen": "오픈",
       "stateOpenApproved": "열림 · 승인됨",
@@ -3192,15 +3267,13 @@
       "loadFailedTitle": "리뷰 제출 화면을 불러오지 못했습니다.",
       "pendingComment": "제출 대기 중인 댓글",
       "pendingComment_other": "제출 대기 중인 댓글",
-      "pendingComment_one": "제출 대기 중인 댓글",
       "summaryOptional": "요약(선택 사항)",
       "partialPostedFresh": "댓글 {{displayFreshCount}}개를 게시했습니다. ",
-      "partialPostedFresh_one": "댓글 {{displayFreshCount}}개를 게시했습니다. ",
       "partialPostedFresh_other": "댓글 {{displayFreshCount}}개를 게시했습니다. ",
       "partialPostedStale": "이전 커밋을 가리키는 댓글 {{displayStaleCount}}개는 대기열에 남았습니다.",
-      "partialPostedStale_one": "이전 커밋을 가리키는 댓글 {{displayStaleCount}}개는 대기열에 남았습니다.",
       "partialPostedStale_other": "이전 커밋을 가리키는 댓글 {{displayStaleCount}}개는 대기열에 남았습니다.",
       "submitCountOfTotal": "댓글 {{displayTotalCount}}개 중 {{displayFreshCount}}개 제출",
+      "submitCountOfTotal_other": "댓글 {{displayTotalCount}}개 중 {{displayFreshCount}}개 제출",
       "submitReview": "리뷰 제출",
       "blockedRequestChanges": "변경을 요청하려면 요약을 작성하거나 댓글을 하나 이상 추가하세요.",
       "blockedComment": "댓글 리뷰를 게시하려면 요약을 작성하거나 댓글을 하나 이상 추가하세요."
@@ -3213,8 +3286,11 @@
     },
     "tabs": {
       "discussion": "토론",
+      "discussionAccessibility": "{{title}}: 댓글 {{displayCount}}개",
+      "discussionAccessibility_other": "{{title}}: 댓글 {{displayCount}}개",
       "files": "파일",
-      "overview": "개요"
+      "overview": "개요",
+      "discussionAccessibility_one": "{{title}}: 댓글 1개"
     },
     "diff": {
       "selectedTapToChange": "{{label}} 선택됨, 탭하여 선택 변경",
@@ -3224,7 +3300,6 @@
       "lineLabel": "{{status}}, {{line}}번 줄: {{text}}",
       "lineLabelNoNumber": "{{status}}, {{text}}",
       "emptyLine": "(비어 있음)",
-      "truncationBanner_one": "GitHub API 제한으로 변경된 파일 {{total}}개 중 처음 {{limit}}개만 표시합니다.",
       "truncationBanner_other": "GitHub API 제한으로 변경된 파일 {{total}}개 중 처음 {{limit}}개만 표시합니다."
     },
     "linkPasteClipboardEmpty": "클립보드가 비어 있습니다.",
@@ -3279,7 +3354,7 @@
   "organization": {
     "auditLog": {
       "title": "감사 로그",
-      "permissionDenied": "Enterprise 요금제를 사용하는 조직의 소유자, 관리자 또는 결제 관리자만 감사 로그를 볼 수 있습니다.",
+      "permissionDenied": "Enterprise 요금제를 사용하는 조직의 소유자, 관리자 또는 결제 관리자만 감사 로그를 볼 수 있습니다. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "감사 이벤트 없음",
       "emptyDescription": "이 조직에서 수행된 작업이 여기에 표시됩니다.",
       "truncated": "최근 이벤트만 표시하고 있습니다.",
@@ -3329,11 +3404,142 @@
         "guardrailUpdate": "가드레일 업데이트됨",
         "guardrailRemove": "가드레일 제거됨",
         "unknown": "감사 이벤트"
+      },
+      "detail": {
+        "fieldChange": "{{field}}: {{change}}",
+        "modeIdentity": "모드 \"{{name}}\" (식별자: {{slug}})",
+        "modeUpdate": "모드 \"{{name}}\": {{changes}}",
+        "field": {
+          "name": "$t(organization.modes.nameLabel)",
+          "slug": "$t(organization.modes.identifierLabel)",
+          "roleDefinition": "$t(organization.modes.roleLabel)",
+          "whenToUse": "$t(organization.modes.whenToUseLabel)",
+          "description": "$t(organization.modes.descriptionLabel)",
+          "customInstructions": "$t(codeReviewer.instructions.title)",
+          "groups": "$t(profiles.agents.tools)",
+          "autoRoute": "자동 라우팅",
+          "defaultModel": "기본 모델"
+        },
+        "role": {
+          "owner": "$t(organization.members.roles.owner)",
+          "admin": "$t(organization.members.roles.admin)",
+          "billing_manager": "$t(organization.members.roles.billingManager)",
+          "member": "$t(organization.members.roles.member)"
+        },
+        "memberRole": "{{email}}: {{change}}",
+        "memberAdded": "{{email}}을(를) {{role}}(으)로 추가함",
+        "memberRemoved": "{{email}}을(를) 제거함",
+        "memberParentAdded": "상위 조직 {{parent}}에서 {{email}}을(를) 추가함",
+        "memberParentRemoved": "상위 조직 {{parent}}에서 {{email}}을(를) 제거함",
+        "inviteSent": "{{email}} — {{role}}",
+        "inviteRevoked": "{{email}}에 대한 초대 취소함",
+        "inviteAccepted": "{{email}} 초대 수락함",
+        "groupIdentity": "그룹 \"{{name}}\"",
+        "groupMembers": "그룹 \"{{name}}\": {{members}}",
+        "groupMemberGroups": "그룹 {{displayCount}}개",
+        "groupMemberGroups_other": "그룹 {{displayCount}}개",
+        "groupMemberGroupsOf": "{{email}}: 그룹 {{displayCount}}개",
+        "groupMemberGroupsOf_other": "{{email}}: 그룹 {{displayCount}}개",
+        "groupPolicySet": "그룹 \"{{name}}\": {{policy}} 정책 설정함",
+        "groupPolicyRemoved": "그룹 \"{{name}}\": {{policy}} 정책 제거함",
+        "groupDefaultPolicySet": "기본 {{policy}} 정책 설정함",
+        "groupDefaultPolicyRemoved": "기본 {{policy}} 정책 제거함",
+        "guardrailIdentity": "{{type}} \"{{name}}\"",
+        "guardrailStatus": "{{type}} \"{{name}}\" {{state}}",
+        "guardrailConfig": "인공지능 가드레일 {{state}}",
+        "guardrailConfigGroup": "그룹 \"{{group}}\": {{state}}",
+        "guardrailEnforcement": "{{target}}: {{value}}",
+        "guardrailSkill": "{{target}}: {{values}}",
+        "guardrailTarget": {
+          "mcp": "$t(profiles.mcp.title)",
+          "skill": "$t(profiles.skillsTitle)"
+        },
+        "ssoDomainSet": "SSO 도메인 {{domain}}",
+        "ssoDomainChanged": "{{domain}} (이전: {{previous}})",
+        "ssoDomainRemoved": "SSO 도메인 {{domain}} 제거함",
+        "fundsPurchased": "{{method}}(으)로 {{amount}}",
+        "fundsGranted": "{{amount}}",
+        "fundsDistributed": "하위 조직 {{displayCount}}곳에 {{amount}}",
+        "fundsDistributed_other": "하위 조직 {{displayCount}}곳에 {{amount}}",
+        "fundsReceived": "상위 조직 {{parent}}에서 {{amount}}",
+        "reviewAgentPlatform": "{{platform}}",
+        "reviewAgentConfig": "{{platform}} 구성",
+        "reviewAgentConfigStyle": "{{platform}}: 스타일 {{style}}",
+        "reviewAgentSecretsUpdated": "{{displayCount}}개 업데이트됨",
+        "reviewAgentSecretsUpdated_other": "{{displayCount}}개 업데이트됨",
+        "reviewAgentSecretsFailed": "{{displayCount}}개 오류",
+        "reviewAgentSecretsFailed_other": "{{displayCount}}개 오류",
+        "reviewAgentSecretRotated": "{{values}}",
+        "settingAdvancedPolicies": "{{values}}",
+        "settingAdvancedPoliciesOpenRouter": "OpenRouter {{state}}",
+        "settingAdvancedPoliciesRegion": "추론 리전: {{region}}",
+        "settingDefaultModelSet": "{{next}}",
+        "settingDefaultModelRemoved": "{{previous}}",
+        "settingAutoRoute": "모드 \"{{mode}}\": {{change}}",
+        "settingDefaultBehavior": {
+          "global": "전역 기본값",
+          "specific": "{{model}}",
+          "auto": "$t(models.auto.organization)"
+        },
+        "settingDataCollection": "{{mode}}",
+        "dataCollection": {
+          "allowed": "허용됨",
+          "denied": "거부됨",
+          "followSetting": "확장 프로그램 설정을 따름"
+        },
+        "region": {
+          "us": "$t(organizationModelAccess.region.us)",
+          "eu": "$t(organizationModelAccess.region.eu)",
+          "au": "$t(organizationModelAccess.region.au)",
+          "jp": "$t(organizationModelAccess.region.jp)"
+        },
+        "settingProjectsUi": "프로젝트 UI {{state}}",
+        "settingMinimumBalanceOn": "{{threshold}}에서 {{emails}}(으)로",
+        "settingMinimumBalanceThreshold": "{{threshold}}",
+        "settingRecommendationsDigest": "추천 다이제스트 {{state}}",
+        "settingBrowserControl": "{{policy}}",
+        "settingBrowserControlOrigins": "{{policy}}: {{origins}}",
+        "settingBrowserControlOriginsCleared": "{{policy}}: 허용된 출처 없음",
+        "settingName": "{{previous}}에서 {{next}}(으)로 이름 변경됨",
+        "enabled": "$t(common.enabled)",
+        "scanBeforeUseOn": "사용 전 검사 켬",
+        "scanBeforeUseOff": "사용 전 검사 끔",
+        "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingRemoved": "제거됨: {{models}}",
+        "browserPolicyOff": "브라우저 사용 차단됨",
+        "browserPolicyAllow": "허용된 출처만",
+        "browserPolicyPlaywrightOnly": "브라우저 사용만",
+        "disabled": "$t(common.disabled)",
+        "autoRouting": "모델 변경됨: {{values}}",
+        "integrationConnected": "{{integration}} 연결됨",
+        "integrationDisconnected": "{{integration}} 연결 해제됨",
+        "integrationRefreshed": "{{integration}} 새로 고침됨",
+        "integrationCancelled": "{{integration}} 취소됨",
+        "integrationModelUpdated": "{{integration}}: 모델 {{model}}",
+        "integrationKeyAdded": "{{provider}} 키 추가됨",
+        "integrationKeyUpdated": "{{provider}} 키 업데이트됨",
+        "integrationKeyDeleted": "{{provider}} 키 제거됨",
+        "integrationKeyToggled": "{{provider}} 키: {{state}}",
+        "namedPolicyCreated": "{{kind}} 정책 {{id}} 생성됨",
+        "namedPolicyUpdated": "{{kind}} 정책 {{id}} 업데이트됨",
+        "namedPolicyDeleted": "{{kind}} 정책 {{id}} 제거됨",
+        "namedPolicyLinked": "{{kind}} 정책 {{next}} 연결됨",
+        "webhookTriggerUpdated": "트리거 {{trigger}}",
+        "organizationRenamed": "조직 이름 변경됨: {{previous}}에서 {{next}}(으)로",
+        "brand": {
+          "github": "$t(common.github)",
+          "gitlab": "$t(common.gitlab)",
+          "bitbucket": "$t(agentChat.repoPicker.platformBitbucket)",
+          "discord": "$t(profile.providerDiscord)",
+          "slack": "$t(agentChat.sessionFilter.platformSlack)",
+          "linear": "$t(agentChat.sessionFilter.platformLinear)",
+          "byok": "자체 API 키"
+        }
       }
     },
     "billing": {
       "title": "결제",
-      "permissionDenied": "조직 소유자, 관리자 또는 결제 관리자만 조직의 결제 정보를 볼 수 있습니다.",
+      "permissionDenied": "조직 소유자, 관리자 또는 결제 관리자만 조직의 결제 정보를 볼 수 있습니다. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "구독",
       "state": "상태",
       "stateNone": "구독 없음",
@@ -3351,7 +3557,7 @@
       "manageOnWeb": "웹에서 결제 설정",
       "changePlan": "요금제 변경",
       "buySeats": "라이선스 구매",
-      "managedOnWeb": "요금제, 라이선스 및 자동 충전은 웹에서 관리됩니다.",
+      "managedOnWeb": "요금제, 라이선스 및 자동 충전은 kilo.ai에서 관리됩니다.",
       "setupAutoTopUp": "자동 충전 설정",
       "manageAutoTopUp": "자동 충전 관리",
       "opensOnWeb": "웹에서 열림"
@@ -3363,7 +3569,7 @@
       "loadErrorTitle": "조직 목록을 불러올 수 없습니다.",
       "membershipLostNotice": "이 조직에 더 이상 접근할 수 없습니다. {{target}}(으)로 전환되었습니다.",
       "noOrganization": "조직 없음",
-      "noOrganizationDescription": "이 계정은 어떤 조직에도 속해 있지 않습니다. 멤버 초대나 잔액 부족 알림 같은 조직 기능을 사용하려면 조직을 만드세요. 초대받은 조직에 참여하려면 웹을 여세요.",
+      "noOrganizationDescription": "이 계정은 어떤 조직에도 속해 있지 않습니다. 멤버 초대나 잔액 부족 알림 같은 조직 기능을 사용하려면 조직을 만드세요. 또는 조직에서 보낸 이메일에 있는 초대를 수락하세요.",
       "organizationUnavailable": "조직을 사용할 수 없습니다.",
       "selectDescriptionWithOrganizations": "귀하는 하나 이상의 조직에 속해 있습니다. 이 화면에서 사용할 계정을 선택하세요.",
       "selectOrganization": "조직 선택",
@@ -3395,19 +3601,19 @@
         "accounting_adjustment": "회계 조정",
         "credits_expired": "크레딧 만료"
       },
-      "truncated": "이전 크레딧 내역을 확인할 수 있습니다."
+      "truncated": "이전 크레딧 내역을 확인할 수 있습니다.",
+      "retentionLimit": "최근 크레딧 내역을 표시합니다."
     },
     "hub": {
       "balance": "잔액",
       "lowBalanceBelow": "{{amount}} 미만",
-      "organizationSeats": "조직 라이선스",
-      "plan": "조직 요금제",
+      "plan": "요금제",
       "planTeams": "Teams",
       "planEnterprise": "Enterprise",
       "planStatusLapsed": " · 종료됨",
       "planEnded": "조직의 체험이 종료되었으며 활성 요금제가 없습니다.",
       "manageBilling": "결제 관리",
-      "renamePlaceholder": "조직 이름",
+      "renamePlaceholder": "조직 이름을 입력하세요",
       "renameTitle": "조직 이름 변경"
     },
     "inviteMember": {
@@ -3418,6 +3624,7 @@
       "sendInvite": "초대 보내기",
       "title": "멤버 초대",
       "alreadyInvited": "이미 초대되었거나 이미 멤버입니다.",
+      "organizationUnavailable": "이 조직은 더 이상 사용할 수 없습니다.",
       "sendError": "초대를 보내지 못했습니다.",
       "pendingInvitation": "이 이메일에는 이미 보류 중인 초대가 있습니다.",
       "alreadyMember": "이 사용자는 이미 이 조직의 멤버입니다.",
@@ -3426,7 +3633,7 @@
       "noSeatsAvailable": "모든 시트가 사용 중입니다. 멤버를 더 초대하려면 먼저 조직 소유자에게 시트 추가를 요청하세요."
     },
     "invoices": {
-      "downloadA11y": "청구서 {{number}} 다운로드",
+      "downloadA11y": "청구서 {{number}}, {{amount}}, {{date}}, {{status}} 다운로드",
       "emptyDescription": "청구서는 청구 주기마다 자동으로 생성되며, 조직에 요금이 청구되면 여기에 표시됩니다.",
       "emptyTitle": "청구서 없음",
       "invoiceFallback": "청구서",
@@ -3439,10 +3646,11 @@
         "void": "무효",
         "uncollectible": "회수 불가"
       },
-      "truncated": "이전 청구서를 확인할 수 있습니다."
+      "truncated": "이전 청구서를 확인할 수 있습니다.",
+      "retentionLimit": "최근 청구서를 표시합니다."
     },
     "lowBalanceAlert": {
-      "enableA11y": "잔액 부족 알림 켜기",
+      "subtitle": "이 조직의 잔액이 설정한 금액 아래로 떨어지면 입력한 주소로 이메일 알림을 보냅니다.",
       "notifyEmailsLabel": "알림 수신 이메일 주소",
       "permissionDenied": "결제 알림을 관리할 권한이 없습니다.",
       "separateEmailsHint": "이메일 주소를 여러 개 입력할 때는 쉼표로 구분하세요.",
@@ -3505,7 +3713,6 @@
       "usageDetails": "사용량 세부정보",
       "providersAndModels": "제공업체 및 모델",
       "groups": "그룹",
-      "guardrails": "가드레일",
       "byok": "자체 키 사용(BYOK)",
       "ssoAndDomain": "SSO 및 도메인",
       "dataCollection": "데이터 수집",
@@ -3518,8 +3725,9 @@
       "truncated": "이 시간대에는 목록에 표시된 것보다 많은 요청이 있습니다.",
       "emptyTitle": "이 시간대에는 요청이 없습니다",
       "emptyDescription": "'이전 1시간'을 눌러 이전 요청을 확인하세요.",
+      "emptyBoundDescription": "요청 로그는 여기까지만 조회할 수 있습니다.",
       "loadError": "요청 로그를 불러오지 못했습니다.",
-      "permissionDenied": "조직의 소유자, 관리자 또는 결제 관리자만 요청 로그를 볼 수 있습니다.",
+      "permissionDenied": "조직의 소유자, 관리자 또는 결제 관리자만 요청 로그를 볼 수 있습니다. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "입력 {{input}} · 출력 {{output}}",
       "byok": "BYOK"
     },
@@ -3542,13 +3750,14 @@
       "identifierLabel": "식별자",
       "identifierRequired": "식별자를 입력하세요.",
       "identifierTaken": "다른 모드에서 이미 이 식별자를 사용합니다.",
+      "identifierTooLong": "식별자를 {{max}}자 이하로 유지하세요.",
       "nameLabel": "모드 이름",
       "nameRequired": "모드 이름을 입력하세요.",
       "notFound": "이 모드는 더 이상 존재하지 않습니다.",
-      "restrictionHint": "이 패턴과 일치하는 파일만 편집할 수 있습니다. 모든 파일을 허용하려면 비워 두세요.",
-      "restrictionInvalid": "올바른 패턴을 입력하세요.",
+      "restrictionHint": "정규식은 이 모드가 편집할 수 있는 파일을 선택합니다. 예를 들어 `\\.md$`는 마크다운 파일만 허용합니다. 모든 파일을 허용하려면 비워 두세요.",
+      "restrictionInvalid": "유효한 정규식을 입력하세요.",
       "restrictionLabel": "제한 레이블",
-      "restrictionPattern": "파일 패턴",
+      "restrictionPattern": "파일 제한",
       "roleLabel": "역할 정의",
       "roleRequired": "이 모드가 수행하는 역할을 설명하세요.",
       "tool": {
@@ -3570,7 +3779,6 @@
       "emptyTitle": "그룹이 아직 없습니다",
       "enterpriseOnly": "그룹은 엔터프라이즈 요금제에서 사용할 수 있습니다.",
       "memberCount": "멤버 {{displayCount}}명",
-      "memberCount_one": "멤버 {{displayCount}}명",
       "memberCount_other": "멤버 {{displayCount}}명",
       "memberViewEmpty": "이 조직의 어떤 그룹에도 속해 있지 않습니다.",
       "memberViewTitle": "내 그룹",
@@ -3592,14 +3800,14 @@
       "ended": "종료됨",
       "notSubscribed": "구독하지 않음",
       "overallocated": "Kilo Pass 배정 수가 유료 라이선스 수를 초과함",
-      "paidSeat_one": "유료 라이선스 {{displayCount}}개",
       "paidSeat": "유료 좌석 {{displayCount}}개",
       "paidSeat_other": "유료 좌석 {{displayCount}}개",
       "paymentNeedsAttention": "결제 확인 필요",
       "paymentPending": "결제 대기 중",
       "processingBlocked": "처리 차단됨",
       "processingNeedsReview": "처리 검토 필요",
-      "retryHint": "Kilo Pass 상태를 다시 불러옵니다."
+      "retryHint": "Kilo Pass 상태를 다시 불러옵니다.",
+      "paidSeat_one": "유료 라이선스 {{displayCount}}개"
     }
   },
   "feedback": {
@@ -3618,7 +3826,8 @@
     "signupStepUp": "계정 생성을 완료하려면 '$t(login.moreSignInOptions)' 항목을 선택하세요.",
     "signupStepUpApple": "계정 생성을 완료하려면 '$t(login.signInWithApple)' 항목을 선택하세요.",
     "signupStepUpGoogle": "계정 생성을 완료하려면 '$t(login.signInWithGoogle)' 항목을 선택하세요.",
-    "invalidCode": "코드가 올바르지 않습니다. 다시 시도하세요.",
+    "signupStepUpBack": "계정 생성을 완료하려면 뒤로 돌아가서 '$t(login.moreSignInOptions)' 항목을 선택하세요.",
+    "invalidCode": "코드가 올바르지 않거나 만료되었습니다. '$t(login.resendCode)' 버튼을 누르거나 '$t(login.moreSignInOptions)' 버튼을 선택하세요.",
     "codeInProgress": "코드를 처리 중입니다. 잠시 기다린 후 다시 시도하세요.",
     "tooManyAttempts": "시도 횟수가 너무 많습니다. 새 코드를 요청하세요.",
     "invalidToken": "로그인에 실패했습니다. 다시 시도하세요.",
@@ -3627,7 +3836,7 @@
     "emailDeliveryFailed": "일시적으로 이메일을 보낼 수 없습니다. 잠시 후 다시 시도하세요.",
     "admissionRequired": "기기를 인증할 수 없습니다. '$t(login.moreSignInOptions)' 항목을 선택해 다른 기기나 웹에서 로그인하세요.",
     "default": "문제가 발생했습니다. 다시 시도하세요.",
-    "retryableAdmission": "이 기기를 인증하지 못했습니다. 인터넷 연결을 확인하고 다시 시도하세요.",
+    "retryableAdmission": "이 기기를 확인하지 못했습니다. 다시 시도하세요.",
     "startSignInFailed": "로그인을 시작하지 못했습니다. 다시 시도하세요.",
     "couldNotOpenBrowser": "브라우저를 열지 못했습니다. 다시 시도하세요.",
     "signInTimedOut": "로그인 제한 시간이 초과되었습니다. 다시 시도하세요.",
@@ -3668,8 +3877,7 @@
     "imagesSectionEmpty": "신뢰하는 이미지 호스트 없음",
     "revoke": "{{host}} 신뢰 해제",
     "revokeMessage": "이 호스트로 향하는 링크는 다시 확인을 요청합니다.",
-    "revokeImageMessage": "이 호스트의 이미지는 다시 확인을 요청합니다.",
-    "backToPreferences": "환경설정으로 돌아가기"
+    "revokeImageMessage": "이 호스트의 이미지는 다시 확인을 요청합니다."
   },
   "glanceable": {
     "waiting": "에이전트 상태 업데이트 중",
@@ -3683,7 +3891,7 @@
     "newestSession": "최신: {{title}}",
     "noneWaiting": "대기 중인 에이전트 없음",
     "newAgent": "새 에이전트",
-    "approving": "승인 중...",
+    "approving": "승인 중…",
     "couldNotApprove": "승인할 수 없음",
     "channelName": "활성 에이전트",
     "activityKitDisabledBody": "잠금 화면에서 활성 에이전트를 보려면 설정에서 실시간 현황을 켜세요.",
@@ -3695,10 +3903,31 @@
     "lastKnown": "마지막 알려진 상태",
     "awaitingUpdate": "업데이트 대기",
     "nextRun": "다음 실행",
+    "wasDue": "예정이었음",
     "waitingForYou": "사용자 응답 대기",
     "nextScheduled": "다음 예약",
     "answerNeeded": "답변 필요",
     "waitingToRetry": "재시도 대기",
+    "countNoun": {
+      "needsInput_other": "입력 필요",
+      "running_other": "작업 중",
+      "scheduled_other": "예약됨",
+      "idle_other": "대기 중"
+    },
+    "count": {
+      "needsInput_other": "{{displayCount}} 입력 필요",
+      "running_other": "{{displayCount}} 작업 중",
+      "scheduled_other": "{{displayCount}} 예약됨",
+      "idle_other": "{{displayCount}} 대기 중"
+    },
+    "footer": {
+      "checked": "마지막 확인 {{time}}",
+      "lastKnown": "마지막 알려진 상태 · {{time}}"
+    },
+    "wake": {
+      "nextRun": "다음 실행 {{time}}",
+      "wasDue": "예정이었음 {{time}}"
+    },
     "step": {
       "editing": "편집 중",
       "reading": "읽는 중",
@@ -3747,6 +3976,7 @@
   },
   "modelChat": {
     "offlineFailure": "이 모델은 인터넷 연결이 필요합니다. 연결한 후 다시 시도하거나 이 기기의 모델로 전환하세요.",
+    "connectionLost": "모델과의 연결이 끊겼습니다. 연결 상태를 확인하고 다시 시도하세요.",
     "empty": {
       "title": "채팅 시작하기",
       "description": "모델과 대화하려면 메시지를 보내세요."
@@ -3754,7 +3984,10 @@
     "list": {
       "loadFailed": "채팅 기록을 불러올 수 없습니다.",
       "new": "새 채팅",
-      "deleteTitle": "이 채팅을 삭제할까요?"
+      "deleteTitle": "이 채팅을 삭제할까요?",
+      "resetNoticeTitle": "기기 내 채팅과 초안이 삭제되었습니다",
+      "resetNoticeBody": "Kilo가 이 기기에 저장된 채팅 기록을 불러올 수 없습니다. 클라우드 세션은 영향을 받지 않습니다.",
+      "resetNoticeDismiss": "알림 무시"
     },
     "rename": {
       "title": "채팅 이름 변경",
@@ -3804,6 +4037,11 @@
       "fieldName": "표시 이름",
       "fieldUrl": "서버 URL",
       "fieldUrlInvalid": "유효한 서버 URL을 입력하세요.",
+      "fieldUrlCredentials": "서버 URL에서 사용자 이름과 비밀번호를 제거하세요.",
+      "fieldUrlFragment": "서버 URL에서 # 부분을 제거하세요.",
+      "fieldUrlInsecure": "https 주소를 입력하고 http는 localhost에서만 사용하세요.",
+      "duplicateUrl": "이미 저장된 URL입니다.",
+      "serverNotFound": "이 서버는 더 이상 저장되어 있지 않습니다.",
       "enableServer": "이 서버 사용: {{name}}",
       "editServer": "서버 편집",
       "deleteServer": "서버 삭제",
@@ -3820,13 +4058,13 @@
       "settingsToolsOn": "켜짐 — 설정 도구가 모델로 전송됩니다",
       "settingsToolsOff": "꺼짐 — 설정 도구가 모델로 전송되지 않습니다",
       "serverChecking": "이 서버를 확인하는 중…",
-      "serverToolCount_one": "도구 {{count}}개",
       "serverToolCount_other": "도구 {{count}}개",
       "serverUnreachable": "이 서버에 연결할 수 없습니다",
       "serverOff": "이 서버는 꺼져 있습니다",
       "app": {
         "label": "도구 인터페이스",
         "failed": "이 도구의 인터페이스를 불러올 수 없습니다.",
+        "tooLarge": "이 도구의 인터페이스가 {{size}} 제한보다 큽니다.",
         "empty": "이 도구의 인터페이스에 표시할 항목이 없습니다."
       }
     },
@@ -3884,7 +4122,18 @@
       "checkHelp": "$t(modelChat.backends.checkConnection)은 선택한 프로토콜과 모델을 사용하여 이 엔드포인트에 짧은 추론 요청을 보냅니다. 제공업체에서 요금을 청구할 수 있습니다.",
       "connectionSucceeded": "모델이 이 프로토콜을 사용하여 요청을 완료했습니다.",
       "connectionFailed": "모델이 요청을 완료하지 못했습니다. API 루트, 프로토콜, 인증 정보 및 모델 ID를 확인하세요.",
+      "requestTimedOut": "엔드포인트가 시간 안에 응답하지 않았습니다. API 루트와 연결을 확인한 후 다시 시도하세요.",
+      "requestUnauthorized": "엔드포인트가 인증 정보를 거부했습니다. API 키와 사용자 지정 헤더를 확인한 후 다시 시도하세요.",
+      "requestNotFound": "엔드포인트 또는 모델을 찾을 수 없습니다. API 루트와 모델 ID를 확인하세요.",
+      "requestRateLimited": "엔드포인트가 요청을 제한하고 있습니다. 잠시 기다린 후 다시 시도하세요.",
+      "requestUnavailable": "엔드포인트를 지금 사용할 수 없습니다. 잠시 후 다시 시도하세요.",
+      "requestUnreachable": "엔드포인트에 연결할 수 없습니다. API 루트와 연결을 확인하세요.",
+      "requestInvalidResponse": "엔드포인트가 예상한 형식이 아닌 응답을 반환했습니다. API 루트와 프로토콜이 서버와 일치하는지 확인한 후 다시 시도하세요.",
+      "discoveryNoModels": "엔드포인트에 모델이 없습니다. 모델을 직접 입력하세요.",
+      "connectionIncomplete": "모델이 응답했지만 완료하지 못했습니다. 다시 시도하거나 모델 ID와 프로토콜을 확인하세요.",
       "invalidInput": "백엔드 이름, 유효한 헤더, 고유한 ID와 이름이 있는 모델을 하나 이상 입력하세요. 토큰 한도는 양의 정수여야 합니다.",
+      "invalidApiKey": "API 키에 전송할 수 없는 문자가 포함되어 있습니다. 줄바꿈 없이 문자, 숫자 및 표준 기호만 사용하세요.",
+      "invalidHeaders": "사용자 지정 헤더를 전송할 수 없습니다. 이름을 확인하고 줄바꿈 없이 문자, 숫자 및 표준 기호만 사용하세요.",
       "invalidUrl": "인증 정보, 쿼리 또는 프래그먼트가 없는 HTTP 또는 HTTPS API 루트를 입력하세요.",
       "publicHttp": "공개 HTTP 엔드포인트는 허용되지 않습니다. HTTPS 또는 비공개 로컬 엔드포인트를 사용하세요.",
       "httpApprovalRequired": "저장하거나 연결하기 전에 이 로컬 HTTP 엔드포인트를 승인하세요.",
@@ -3913,6 +4162,8 @@
       "downloading": "다운로드 중: {{written}}/{{total}}",
       "downloadingUnknown": "다운로드 중: {{written}}",
       "paused": "일시 중지됨: {{written}}/{{total}}",
+      "retrying": "재시도 중: {{written}}/{{total}}",
+      "retryingUnknown": "재시도 중: {{written}}",
       "verifying": "다운로드한 파일을 확인하는 중…",
       "downloaded": "다운로드됨 · {{size}}",
       "url": "직접 다운로드 링크",
@@ -3930,7 +4181,9 @@
         "space": "이 모델을 저장할 공간이 부족합니다. 공간을 확보한 후 다시 시도하세요.",
         "network": "다운로드가 완료되지 않았습니다. 연결을 확인한 후 다시 시도하세요.",
         "invalidFile": "다운로드한 파일은 이 앱에서 실행할 수 있는 모델이 아니므로 삭제되었습니다.",
-        "checksum": "다운로드한 파일이 게시된 체크섬과 일치하지 않으므로 삭제되었습니다. 다시 다운로드해 보세요."
+        "checksum": "다운로드한 파일이 게시된 체크섬과 일치하지 않으므로 삭제되었습니다. 다시 다운로드해 보세요.",
+        "unreadable": "이 기기에서는 다운로드한 파일을 확인하지 못해 삭제되었습니다. 다시 다운로드해 보세요.",
+        "writeFailed": "이 기기에서는 모델을 저장하지 못했습니다. 다시 다운로드해 보세요."
       }
     },
     "catalog": {
@@ -4003,7 +4256,9 @@
         "androidModelUnavailable": "이 기기에서 Gemini Nano를 지원하지 않거나 AICore 시스템 앱이 아직 설정 중입니다. 나중에 다시 시도하세요.",
         "aicoreUpdateRequired": "이 모델을 사용하려면 AICore 앱과 시스템 소프트웨어를 업데이트하세요.",
         "downloadable": "이 모델을 사용하려면 먼저 한 번 다운로드해야 합니다.",
-        "downloading": "모델을 다운로드하는 중입니다. 다운로드가 완료되면 사용할 수 있습니다."
+        "downloading": "모델을 다운로드하는 중입니다. 다운로드가 완료되면 사용할 수 있습니다.",
+        "batteryQuota": "기기 내 모델이 지금은 배터리 허용량을 모두 사용했습니다. 나중에 다시 시도하세요.",
+        "checkFailed": "앱이 이 모델을 확인하지 못했습니다. 다시 시도하세요."
       },
       "unavailable": "지금은 기기 내 모델을 사용할 수 없습니다. $t(modelChat.backends.title)에서 상태를 확인하세요.",
       "busy": "기기 내 모델이 다른 답변을 생성하는 중입니다. 완료된 후 다시 시도하세요.",
@@ -4013,15 +4268,33 @@
       "download": "기기 내 모델 다운로드",
       "downloading": "다운로드 중…",
       "downloadProgress": "다운로드 중… {{percent}}%",
-      "downloadFailed": "다운로드를 완료하지 못했습니다. 네트워크 연결과 저장 공간을 확인한 후 다시 시도하세요."
+      "downloadFailed": "다운로드를 완료하지 못했습니다. 네트워크 연결과 저장 공간을 확인한 후 다시 시도하세요.",
+      "cannotUse": "실행할 수 없습니다: {{items}}.",
+      "cannotUseOptions": "채울 수 없습니다: 일부 도구 옵션.",
+      "limitations": "제한 사항",
+      "tools": {
+        "time": "시간",
+        "settingsList": "설정 보기",
+        "settingsSet": "설정 변경"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "이 모델은 추론 강도를 지원합니다"
     },
-    "creditsRequired": "이 메시지를 보낼 크레딧이 부족합니다."
+    "creditsRequired": "이 메시지를 보낼 크레딧이 부족합니다.",
+    "providerKeyRefused": "제공자가 인증 정보를 거부했습니다. 제공자의 API 키를 확인한 후 다시 보내세요.",
+    "providerModelMissing": "이 백엔드에서 더 이상 이 모델을 제공하지 않습니다. 다른 것을 선택하세요.",
+    "providerRateLimited": "제공자가 요청을 제한하고 있습니다. 잠시 기다린 후 다시 보내세요.",
+    "providerUnavailable": "제공자를 지금 사용할 수 없습니다. 잠시 후 다시 보내세요."
   },
   "settingsTools": {
-    "confirmTitle": "이 변경 사항을 확인할까요?"
+    "confirmTitle": "이 변경 사항을 확인할까요?",
+    "guarded": {
+      "spendAlertsOff": "지출 알림을 끌까요? 지출 임계값 초과 및 시간별 급증에 대한 알림을 더 이상 받지 않게 됩니다.",
+      "balanceAlertsOff": "잔액 알림을 끌까요? 크레딧이 부족해질 때 오는 알림을 더 이상 받지 않게 됩니다.",
+      "securityFindingsOff": "보안 발견 사항 알림을 끌까요? 새로운 보안 발견 사항에 대한 알림을 더 이상 받지 않게 됩니다.",
+      "hideBalanceOn": "잔액을 숨길까요? 크레딧 잔액이 더 이상 프로필 화면과 조직 허브에 표시되지 않습니다."
+    }
   },
   "appActions": {
     "start": {
@@ -4070,16 +4343,11 @@
     "emptyDescription": "세션 전체에서 환경 변수, 설정 명령 및 기술을 재사용하기 위한 프로필을 만듭니다.",
     "loadFailed": "프로필을 로드할 수 없습니다.",
     "counts": {
-      "vars_one": "{{count}} 변수",
       "vars_other": "{{count}} 변수",
       "mcp": "{{count}} MCP",
-      "skills_one": "{{count}} 스킬",
       "skills_other": "{{count}} 스킬",
-      "commands_one": "{{count}} 명령",
       "commands_other": "{{count}} 명령",
-      "setupCommands_one": "{{count}} 설정 명령",
       "setupCommands_other": "{{count}} 설정 명령",
-      "agents_one": "{{count}} 에이전트",
       "agents_other": "{{count}} 에이전트"
     },
     "nameLabel": "프로필 이름",
@@ -4096,7 +4364,7 @@
     "personalDefaultDescription": "고정된 프로필이 있는 저장소가 없으면 자동으로 로드됩니다.",
     "organizationDefaultDescription": "개인 불이행이 없는 회원을 위해 자동으로 로드됩니다.",
     "setAsDefault": "기본값으로 설정",
-    "saveFailed": "프로필을 저장할 수 없습니다.",
+    "saveFailed": "프로필을 저장할 수 없습니다. 다시 시도해 주세요.",
     "organizationRoleRequired": "조직 소유자와 관리자만 조직 프로필을 변경할 수 있습니다.",
     "deleteTitle": "프로필 삭제",
     "deleteMessage": "이렇게 하면 프로필과 해당 설정이 영구적으로 제거됩니다. 이 작업은 취소할 수 없습니다.",
@@ -4166,6 +4434,7 @@
     "instructionsHint": "이 프로필을 사용하는 모든 세션에 적용되는 규칙 마크다운입니다.",
     "instructionsEmpty": "아직 지침 파일이 없습니다",
     "instructionsEmptyDescription": "이 프로필을 사용하는 모든 세션에 적용할 규칙 파일을 추가하세요.",
+    "instructionsEmptyDescriptionReadOnly": "여기에 추가된 규칙 파일은 이 프로필을 사용하는 모든 세션에 적용됩니다.",
     "instructionNameRequired": "파일 이름을 입력하세요",
     "instructionNameTooLong": "파일 이름은 {{max}}자 이하여야 합니다",
     "instructionNameInvalid": "영문 소문자 또는 숫자로 시작하고 소문자, 숫자, 대시만 사용하세요",
@@ -4181,6 +4450,7 @@
     "instructionSaveFailed": "지침을 저장하지 못했습니다",
     "instructionDeleteFailed": "지침을 삭제하지 못했습니다",
     "instructionToggleFailed": "지침을 업데이트하지 못했습니다",
+    "instructionViewTitle": "지침 파일",
     "instructionLimitReached": "프로필당 지침은 최대 {{max}}개까지 가능합니다. 하나를 삭제하고 추가하세요.",
     "mcp": {
       "title": "MCP 서버",
@@ -4195,7 +4465,6 @@
       "environment": "환경(JSON)",
       "headers": "헤더(JSON)",
       "timeout": "제한시간",
-      "secretCount_one": "{{count}} 비밀",
       "secretCount_other": "{{count}} 비밀",
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
@@ -4225,9 +4494,9 @@
     },
     "agents": {
       "title": "프로필 에이전트",
-      "add": "상담원 추가",
-      "empty": "아직 상담원 없음",
-      "name": "대리인 이름",
+      "add": "에이전트 추가",
+      "empty": "아직 에이전트 없음",
+      "name": "에이전트 이름",
       "slug": "에이전트 슬러그",
       "description": "에이전트 설명",
       "model": "모델 재정의",
@@ -4241,10 +4510,11 @@
       "topPPlaceholder": "예: 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "내 에이전트",
-      "promptPlaceholder": "당신은 ...",
+      "promptPlaceholder": "당신은 …",
       "tools": "도구",
       "wholeToolRule": "이 에이전트는 모든 도구에 한 번에 하나의 규칙을 적용합니다: {{rule}}. 이 스위치는 읽기 전용입니다.",
-      "visibility": "시계",
+      "toolRule": "저장된 규칙: {{rule}}",
+      "visibility": "표시 범위",
       "visibilityPrimary": "기본 — 선택기에 표시됨",
       "visibilitySubagent": "하위 에이전트 — 다른 사람에게서만 호출 가능",
       "visibilityAll": "모두 — 둘 다",
@@ -4254,7 +4524,7 @@
       "saveFailed": "에이전트를 저장할 수 없습니다.",
       "limitReached": "프로필에는 최대 {{max}}개의 에이전트를 보관할 수 있습니다. 다른 에이전트를 추가하려면 하나를 삭제하세요.",
       "deleteFailed": "에이전트를 삭제할 수 없습니다.",
-      "nameRequired": "상담사 이름을 입력하세요.",
+      "nameRequired": "에이전트 이름을 입력하세요.",
       "slugRequired": "에이전트 슬러그를 입력하세요",
       "slugInvalid": "슬러그는 ASCII 소문자로 시작해야 하며 ASCII 소문자, 숫자, 대시만 사용할 수 있습니다(최대 50자).",
       "slugConflict": "해당 슬러그는 내장 에이전트 또는 이 프로필의 다른 에이전트가 이미 사용 중입니다",
@@ -4350,21 +4620,48 @@
     "history": {
       "activityUnavailable": "크레딧 활동을 불러오지 못했습니다.",
       "appStoreReceipt": "App Store 영수증",
+      "deduction": {
+        "adminCancel": "관리자가 잔액을 마감함",
+        "adminDebit": "관리자가 크레딧을 회수함",
+        "codingPlan": "코딩 플랜: {{plan}}",
+        "correction": "잔액 정정",
+        "dispute": "결제 분쟁",
+        "refundAppStore": "App Store 크레딧 팩 환불",
+        "refundGooglePlay": "Google Play 크레딧 팩 환불"
+      },
       "deductionFallback": "크레딧 차감",
       "emptyDescription": "크레딧 구매, 영수증 및 사용 내역이 여기에 표시됩니다.",
       "emptyTitle": "크레딧 내역 없음",
+      "expiredGrant": "만료됨: {{description}}",
+      "expiredStatus": "만료됨",
       "googlePlayReceipt": "Google Play 영수증",
       "kind": {
         "adjustment": "조정",
         "balanceNeutral": "잔액 변동 없음",
         "deduction": "차감",
         "grant": "크레딧 지급",
+        "promotionalCredits": "프로모션 크레딧",
+        "welcomeCredits": "환영 크레딧",
         "purchase": "구매"
+      },
+      "program": {
+        "adminBulkGrant": "관리자 크레딧 지급",
+        "contributorChampion": "기여자 챔피언 크레딧",
+        "feedback": "피드백 크레딧",
+        "influencer": "인플루언서 크레딧",
+        "ossMonthlyReset": "OSS 후원 월간 초기화",
+        "ossSponsorship": "OSS 후원 크레딧",
+        "pullRequest": "PR 크레딧",
+        "usageIssue": "사용 문제 크레딧",
+        "vibeDay": "바이브 데이 크레딧"
       },
       "purchaseFallback": "크레딧 구매",
       "receipt": "영수증",
       "receiptA11y": "{{description}}, {{amount}}, {{date}} 영수증 열기",
-      "receiptUnavailable": "이 구매에 대한 영수증이 없습니다."
+      "receiptUnavailable": "이 구매에 대한 영수증이 없습니다.",
+      "retentionLimit": "최근 크레딧 기록을 표시합니다.",
+      "voidedGrant": "무효 처리됨: {{description}}",
+      "voidedStatus": "무효 처리됨"
     },
     "title": "크레딧 구매",
     "description": "크레딧은 Kilo 앱에서 AI 코딩 세션을 실행하기 위해 Kilo 잔액에 추가되는 일회성 구매입니다. 스토어가 계정에 요금을 청구하고 스토어가 결제를 확인한 후 크레딧이 추가됩니다.",
@@ -4391,6 +4688,7 @@
     "pickPackToBuyAgain": "새 구매를 시작하려면 위에서 팩을 선택하세요.",
     "purchasePending": "스토어에서 아직 이 결제를 처리하고 있습니다. 결제가 승인되면 크레딧이 지급됩니다.",
     "buyAgain": "다시 구매",
+    "checkPurchase": "구매 확인",
     "purchaseOwnedByAnotherAccount": "이 Apple Account의 크레딧은 다른 Kilo 계정에 속해 있습니다. 사용하려면 해당 Kilo 계정에 로그인하세요.",
     "purchaseOwnedByAnotherAccountPlay": "이 Google Play 계정의 크레딧은 다른 Kilo 계정에 속합니다. 사용하려면 해당 Kilo 계정으로 로그인하세요."
   },
@@ -4407,9 +4705,7 @@
       "couldNotLoad": "목록을 불러올 수 없습니다",
       "noRepository": "저장소 없음",
       "rowA11y": "{{name}} — {{openCount}}",
-      "openCount_one": "{{count}}개 열림",
       "openCount_other": "{{count}}개 열림",
-      "archived_one": "보관됨 ({{count}})",
       "archived_other": "보관됨 ({{count}})",
       "archive": "보관",
       "unarchive": "보관 해제",
@@ -4432,7 +4728,6 @@
       "addFailed": "할 일을 추가할 수 없습니다. 연결을 확인한 후 다시 시도해 주세요.",
       "empty": "아직 할 일이 없습니다",
       "setDefaults": "저장소, 모드 및 모델 설정",
-      "completed_one": "완료 ({{count}})",
       "completed_other": "완료 ({{count}})"
     },
     "item": {
@@ -4441,7 +4736,6 @@
       "markDonePrompt": "완료로 표시할까요?",
       "deleted": "할 일이 삭제되었습니다",
       "undo": "실행 취소",
-      "runCount_one": "실행 {{count}}회",
       "runCount_other": "실행 {{count}}회",
       "startNow": "리뷰 없이 시작",
       "startNowHint": "길게 눌러 리뷰 없이 시작",
@@ -4484,7 +4778,9 @@
     },
     "saveSheet": {
       "title": "목록에 저장",
-      "saved": "{{list}}에 저장됨"
+      "saved": "{{list}}에 저장됨",
+      "saveFailed": "할 일을 저장할 수 없습니다. 연결을 확인한 후 다시 시도해 주세요.",
+      "saveRefused": "할 일을 이 목록에 저장할 수 없습니다. 다른 목록을 선택해 주세요."
     }
   },
   "agentBriefing": {
@@ -4496,17 +4792,28 @@
     "empty": "이 브리핑 기간 동안 활동 없음",
     "emptyHint": "예약된 브리핑에 활동이 있으면 클라우드 및 CLI 코딩 세션이 여기에 표시됩니다.",
     "loadError": "브리핑을 불러올 수 없습니다",
+    "estimateLoadError": "예상 비용을 불러올 수 없습니다.",
     "view": "브리핑 읽기",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
+    "scorecardLabel": "$t(agentBriefing.view): $t(agentBriefing.selectedSessions) {{sessions}}, $t(agentBriefing.snapshotPullRequests) {{pullRequests}}, $t(agentBriefing.snapshotBlockers) {{blockers}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
+    "filterByContext": "컨텍스트별 필터",
+    "contextAll": "모든 컨텍스트",
     "dismiss": "브리핑 무시",
+    "dismissFailed": "아직 이 브리핑을 무시하지 못했습니다. 백그라운드에서 다시 시도합니다.",
+    "readMarkFailed": "이 브리핑을 읽음으로 표시하지 못했습니다. 브리핑이 다시 로드되면 다시 시도합니다.",
     "offline": "오프라인 · 저장된 브리핑",
-    "cached": "저장된 보고서 · 새로고침 불가",
+    "cached": "저장된 브리핑 · 새로고침 불가",
     "summary": "AI 요약",
     "summaryPending": "AI 요약을 생성 중입니다. 준비되면 여기에 첨부됩니다.",
-    "summaryUnavailable": "AI 요약을 사용할 수 없습니다. 구조화된 보고서는 계속 확인할 수 있습니다.",
+    "summaryPendingBody": "생성 중입니다. 준비되면 여기에 첨부됩니다.",
+    "summaryUnavailable": "AI 요약을 사용할 수 없습니다. 구조화된 브리핑은 계속 확인할 수 있습니다.",
+    "summaryUnavailableBody": "사용할 수 없습니다. 구조화된 브리핑은 계속 확인할 수 있습니다.",
+    "summaryNotAdmitted": "이 브리핑에 대한 AI 요약이 생성되지 않았습니다. 구조화된 브리핑은 계속 확인할 수 있습니다.",
+    "summaryNotAdmittedBody": "이 브리핑에 대해 생성되지 않았습니다. 구조화된 브리핑은 계속 확인할 수 있습니다.",
     "summaryCharge": "AI 요금 {{cost}}",
     "summaryChargePending": "AI 요금 정산 대기 중",
+    "summaryModel": "$t(common.model): {{model}}",
     "sources": "근거 및 아티팩트",
     "timezone": "브리핑 시간대",
     "deviceTimezone": "기기 시간대 사용",
@@ -4517,47 +4824,68 @@
     "morningEnd": "브리핑 제공 종료 시각",
     "timeHint": "브리핑 기간이 끝나면 오프라인 상태에서도 홈 카드가 실시간 상태로 돌아갑니다.",
     "invalidSchedule": "유효한 시간대와 비어 있지 않은 브리핑 기간을 선택하세요.",
+    "scheduleEmptyNight": "브리핑 기간이 비어 있습니다. 브리핑 기간 시작 이후의 준비 완료 시각을 선택하세요.",
+    "scheduleEmptyMorning": "브리핑 준비 완료 시각과 브리핑 제공 종료 시각이 같습니다. 브리핑을 얼마나 오래 제공할지 선택하세요.",
+    "scheduleFullDay": "두 브리핑 기간이 하루 전체를 차지합니다. 하루 중 일부는 브리핑 기간 밖으로 남겨 두세요.",
     "notificationsHint": "예약된 브리핑마다 일반 알림을 한 번 보냅니다. 유료 AI 요약과는 별개입니다.",
-    "notificationPermission": "브리핑을 받으려면 $t(common.notifications)에서 기기 알림을 켜세요.",
+    "notificationPermission": "브리핑을 받으려면 푸시 알림을 켜세요.",
     "defaultModel": "Kilo 기본 모델 사용",
     "duration": "시간 안전 한도(분)",
     "spendLimit": "지출 안전 한도(USD)",
-    "invalidSafeguards": "유한한 양수로 시간 및 지출 한도를 입력하세요.",
+    "invalidSafeguards": "허용 범위 안의 양수를 입력하세요.",
     "estimate": "예상 비용 {{estimate}} · 최대 {{maximum}}",
-    "estimateUnavailable": "이 설정에는 유료 요약을 사용할 수 없습니다.",
+    "estimateUnavailable": "이 설정에는 유료 요약을 사용할 수 없습니다. 모델이나 한도를 변경하거나 나중에 다시 시도하세요.",
     "confirmPaid": "{{context}}에 유료 요약을 사용하시겠습니까?",
     "paidDisclosure": "예상 {{estimate}}, 최대 {{maximum}}, 제한 시간 {{minutes}}분. 생성에 실패해도 요금이 부과됩니다.",
+    "paidDisclosure_other": "예상 {{estimate}}, 최대 {{maximum}}, 제한 시간 {{minutes}}분. 생성에 실패해도 요금이 부과됩니다.",
     "enable": "유료 요약 사용",
     "allContexts": "개인 및 조직 브리핑은 별도로 유지됩니다.",
     "emptyHistory": "저장된 브리핑 없음",
-    "estimatePermissionUnavailable": "이 컨텍스트의 잔액을 사용할 권한이 없습니다.",
-    "estimatePricingUnavailable": "이 모델의 가격 정보를 사용할 수 없습니다.",
-    "estimateBalanceUnavailable": "유료 요약을 위한 잔액이 부족합니다.",
-    "estimateModelNotAllowed": "이 모델은 여기서 사용할 수 없습니다.",
+    "estimatePermissionUnavailable": "이 컨텍스트의 잔액을 사용할 권한이 없습니다. 조직 소유자에게 사용 설정을 요청하세요.",
+    "estimatePricingUnavailable": "이 모델의 가격 정보를 사용할 수 없습니다. 다른 모델을 선택하세요.",
+    "estimateBalanceUnavailable": "유료 요약을 위한 잔액이 부족합니다. 이 컨텍스트의 잔액에 크레딧을 충전하세요.",
+    "estimateModelNotAllowed": "이 모델은 이 컨텍스트에서 사용할 수 없습니다. 다른 모델을 선택하세요.",
     "estimateSpendLimitTooLow": "이 요약을 허용하려면 지출 안전장치를 높이세요.",
     "saved": "브리핑 설정이 저장되었습니다",
     "selectedSessions": "선택된 세션",
-    "snapshotPullRequests": "선택된 세션의 PRs",
-    "snapshotBlockers": "선택된 세션의 차단 요소",
+    "snapshotPullRequests": "PRs",
+    "snapshotBlockers": "차단 요소",
     "capturedAt": "{{time}} 캡처",
     "snapshotHint": "예약된 아침 시각에 확인 가능한 최신 세션 상태를 가능한 범위에서 캡처한 스냅샷입니다. 수치는 선택된 세션에 대한 것으로, 밤사이 전체 활동을 나타내지 않습니다.",
     "snapshotTruncated": "스냅샷 크기를 제한하기 위해 일부 세션이나 근거 자료가 제외되었습니다.",
-    "snapshotSummaryFailed": "AI 요약에 실패했습니다. 구조화된 스냅샷은 계속 확인할 수 있습니다.",
+    "snapshotSummaryFailed": "AI 요약에 실패했습니다. 구조화된 브리핑은 계속 확인할 수 있습니다.",
+    "snapshotSummaryFailedBody": "실패했습니다. 구조화된 브리핑은 계속 확인할 수 있습니다.",
     "scheduledContextEnabled": "예약된 브리핑",
     "scheduledContextSettings": "예약된 브리핑 · {{context}}",
     "scheduledContextHint": "이 컨텍스트에만 예약 캡처와 유료 AI 요약을 사용하세요. 선택된 발췌문에서 민감한 정보를 가린 내용과 구조화된 정보가 모델에 전송됩니다. 요약은 브리핑 설정을 업데이트할 때 저장된 앱 언어를 사용합니다. 요금은 이 컨텍스트의 잔액에서 차감됩니다. 선택된 활동이 없는 스냅샷은 AI를 사용하지 않습니다.",
     "snapshotSafeguards": "요약별 시간 및 지출 안전 한도는 각 예약된 스냅샷에 적용되며, 일일 예산이 아닙니다.",
-    "snapshotEstimateInputTooLarge": "이 스냅샷의 근거 자료가 선택한 모델이 처리하기에 너무 많습니다.",
+    "snapshotEstimateInputTooLarge": "이 스냅샷의 근거 자료가 선택한 모델이 처리하기에 너무 많습니다. 입력 창이 더 큰 모델을 선택하세요.",
     "quietSnapshot": "이 스냅샷에 대해 선택된 세션 활동이 없습니다. AI 요약이 요청되거나 요금이 부과되지 않았습니다.",
     "noEnabledContexts": "예약된 브리핑이 활성화된 컨텍스트 없음",
     "sourceBlocker": "확인이 필요한 세션",
-    "sourceMetadata": "캡처된 세션 메타데이터"
+    "sourceMetadata": "캡처된 세션 메타데이터",
+    "metadataPlan_other": "계획: {{displayTotal}}단계 중 {{displayDone}}단계 완료",
+    "metadataPlan": "계획: {{displayTotal}}단계 중 {{displayDone}}단계 완료",
+    "metadataFiles_other": "{{displayCount}}개 파일 변경됨",
+    "metadataFiles": "{{displayCount}}개 파일 변경됨",
+    "metadataLinesAdded_other": "{{displayCount}}줄 추가됨",
+    "metadataLinesAdded": "{{displayCount}}줄 추가됨",
+    "metadataLinesRemoved_other": "{{displayCount}}줄 삭제됨",
+    "metadataLinesRemoved": "{{displayCount}}줄 삭제됨",
+    "metadataPlanCurrent": "현재 단계: {{current}}",
+    "metadataFailure": "지난 턴 실패: {{kind}}",
+    "sourceActivity": "제목 없는 활동",
+    "metadataFailureProvider": "프로바이더 오류",
+    "metadataFailureTool": "도구 오류",
+    "metadataStopped": "지난 턴 중단됨",
+    "metadataFailureOther": "기타 오류"
   },
   "systemSearch": {
     "couldNotOpenResult": "이 검색 결과를 열지 못했습니다"
   },
   "usage": {
     "title": "사용량",
+    "personalTitle": "개인 사용량",
     "orgTitle": "조직 사용량",
     "entrySubtitle": "비용, 요청, 토큰",
     "rangePicker": "기간",
@@ -4569,28 +4897,35 @@
     "topFeatures": "상위 기능",
     "emptyTitle": "이 기간에 사용량이 없습니다",
     "unavailableTitle": "사용량을 사용할 수 없습니다",
-    "unavailableDescription": "이 워크스페이스는 사용량을 보고하지 않습니다. 다시 시도해도 해결되지 않습니다.",
+    "unavailableDescription": "이 워크스페이스에는 사용량이 설정되어 있지 않습니다. 여기에 사용량이 표시되어야 한다면 지원팀에 문의하세요.",
     "orgSelfNotice": "이 조직에서 내 사용량을 보고 있습니다.",
-    "viewDetails": "사용량 세부 정보 보기"
+    "viewDetails": "사용량 세부 정보 보기",
+    "orgSelfEntryTitle": "내 사용량"
   },
   "integrations": {
     "title": "연동",
     "sectionTitle": "연결된 서비스",
     "entrySubtitle": "GitHub, Slack, Linear 등",
-    "subtitle": "개발 도구와 워크플로를 Kilo에 연결하세요",
+    "subtitle": "개발 도구와 워크플로를 Kilo에 연결하세요.",
     "disconnect": "연결 해제",
     "disconnectTitle": "{{provider}} 연결을 해제할까요?",
     "disconnectMessage": "Kilo가 더 이상 {{provider}}에서 응답하지 않습니다. 언제든지 다시 연결할 수 있습니다.",
     "connectedTo": "{{account}}에 연결됨",
     "disconnected": "{{provider}} 연결이 해제되었습니다",
     "disconnectFailed": "{{provider}} 연결을 해제하지 못했습니다",
+    "disconnectRetry": "Slack에서 연결 해제를 확인하지 못했습니다. 다시 시도하세요.",
+    "disconnectNeedsSupport": "Kilo가 이 연결에 저장된 Slack 액세스를 읽지 못했습니다. 연결 해제를 마치려면 지원팀에 문의하세요.",
     "couldNotLoad": "연동 목록을 불러오지 못했습니다",
     "permissionDenied": "이 연동을 관리할 권한이 없습니다.",
     "managedByOwner": "변경할 수 없는 연결은 조직 소유자에게 변경을 요청하세요.",
+    "managedByOwnerOrAdmin": "변경할 수 없는 연결은 조직 소유자 또는 관리자에게 변경을 요청하세요.",
+    "managedByOwnerOrBilling": "변경할 수 없는 연결은 조직 소유자 또는 결제 관리자에게 변경을 요청하세요.",
+    "managedByOwnerAdminOrBilling": "변경할 수 없는 연결은 조직 소유자, 관리자 또는 결제 관리자에게 변경을 요청하세요.",
     "connectFailed": "연결 페이지를 열지 못했습니다"
   },
   "invoices": {
-    "personalEmptyDescription": "결제가 청구되면 본인 구매에 대한 인보이스가 여기에 표시됩니다."
+    "personalEmptyDescription": "결제가 청구되면 본인 구매에 대한 인보이스가 여기에 표시됩니다. App Store 및 Google Play 영수증은 크레딧 내역에서 확인할 수 있습니다.",
+    "personalPeriod": "최근 12개월"
   },
   "cloudAgent": {
     "compute": {
@@ -4622,7 +4957,7 @@
       "new": "새 트리거",
       "create": "트리거 만들기",
       "emptyTitle": "아직 트리거가 없습니다",
-      "emptyDescription": "웹훅 호출 또는 일정에 따라 Cloud Agent 실행을 시작하려면 트리거를 만드세요.",
+      "emptyDescription": "첫 번째 트리거를 만드세요.",
       "loadFailedTitle": "트리거를 불러오지 못했습니다",
       "loadFailedDescription": "연결된 상태에서 다시 시도하세요.",
       "detailLoadFailedTitle": "이 트리거를 불러오지 못했습니다",
@@ -4645,7 +4980,6 @@
       "nameLocked": "트리거를 만든 후에는 이름을 변경할 수 없습니다.",
       "repositoryLocked": "트리거를 만든 후에는 저장소를 변경할 수 없습니다.",
       "environmentAutomatic": "저장소별 자동",
-      "notSelected": "선택 안 됨",
       "profileDefaults": "기본값 사용",
       "profileHelp": "프로필 설정은 트리거가 실행될 때 적용됩니다. 시크릿은 그때 확인됩니다.",
       "customAgent": "사용자 지정 에이전트",
@@ -4662,10 +4996,15 @@
       "autoCommit": "실행이 끝나면 변경 사항 커밋",
       "condenseOnComplete": "실행이 끝나면 컨텍스트 압축",
       "activeTitle": "트리거 활성",
+      "activeSwitchA11y": "트리거 활성: {{name}}",
+      "copyLinkA11y": "링크 복사: {{name}}",
       "activeDescription": "일시 중지된 웹훅은 404로 응답합니다.",
       "runAsCreator": "내 계정으로 실행",
       "runAsCreatorDescription": "모든 실행에서 내 계정을 사용하므로 시크릿 헤더가 필요합니다.",
       "saveFailedTitle": "트리거를 저장하지 못했습니다",
+      "nameTaken": "“{{name}}” 트리거가 이미 있습니다.",
+      "saveFailedRetry": "서버에 연결하지 못했습니다. 연결 상태를 확인한 후 다시 시도하세요.",
+      "saveFailedCheck": "양식의 값을 확인한 후 다시 시도하세요.",
       "deleteTitle": "이 트리거를 삭제할까요?",
       "deleteMessage": "{{name}}에 대한 호출이 실패합니다. 이 작업은 되돌릴 수 없습니다.",
       "deleteMessageScheduled": "{{name}} 트리거의 예약된 실행이 중지됩니다. 이 작업은 되돌릴 수 없습니다.",
@@ -4735,22 +5074,27 @@
   },
   "organizationGuardrails": {
     "title": "인공지능 가드레일",
-    "permissionDenied": "조직 소유자와 관리자만 인공지능 가드레일을 관리할 수 있습니다.",
-    "unavailable": "이 조직에서는 인공지능 가드레일을 사용할 수 없습니다.",
+    "permissionDenied": "조직 소유자와 관리자만 인공지능 가드레일을 관리할 수 있습니다. $t(organization.boundary.accessDeniedDescription)",
+    "unavailableTitle": "인공지능 가드레일이 활성화되어 있지 않습니다",
+    "unavailable": "Kilo는 요청에 따라 조직에 인공지능 가드레일을 활성화합니다. {{supportEmail}}로 문의하시면 Kilo 팀이 조직을 위해 활성화해 드립니다.",
+    "contactSupport": "지원팀에 문의",
     "loadError": "인공지능 가드레일을 불러오지 못했습니다",
     "statusSaving": "저장 중…",
     "statusSaved": "저장됨",
     "statusFailed": "저장하지 못했습니다.",
     "inputTitle": "입력 가드레일",
-    "inputDescription": "도구 결과를 포함하여 모든 입력을 Enkrypt AI로 검사합니다. 차단 탐지기는 Enkrypt AI를 사용할 수 없을 때 요청을 거부합니다.",
+    "inputDescription": "도구 결과를 포함하여 모든 입력을 Enkrypt AI로 검사합니다. Enkrypt AI를 사용할 수 없을 때 요청은 거부되지 않고 검사 없이 전송됩니다.",
     "outputTitle": "출력 가드레일",
     "outputDescription": "구성원이 응답을 받기 전에 Enkrypt AI로 응답을 검사합니다. 직접 켜지 않는 한 꺼져 있습니다.",
+    "outputUnavailable": "Kilo가 이 조직의 출력 스캔을 활성화하지 않아 응답이 검사되지 않으며 여기에서 설정할 항목이 없습니다. 활성화를 요청하려면 {{supportEmail}}로 문의하세요.",
     "detectorsHint": "차단은 표시된 요청을 거부합니다. 기록만은 요청을 지연시키지 않고 기록합니다.",
     "detectorsHintOutput": "차단은 표시된 응답을 실패 처리합니다. 기록만은 응답을 지연시키지 않고 기록합니다.",
     "choiceLog": "기록만",
     "applyTo": "적용 대상",
     "applyToAllMembers": "모든 구성원",
     "applyKiloDefault": "Kilo 기본값 적용",
+    "applyKiloDefaultEnglishNote": "Kilo 기본 정책 텍스트는 영어입니다. Kilo Gateway가 기록된 그대로 적용하기 때문입니다.",
+    "applyKiloDefaultReplaceMessage": "Kilo 기본 정책은 영어로 작성되어 있으며 정책 위반에서 설정한 내용을 대체합니다. 정책 텍스트 필드에 입력한 텍스트는 복구할 수 없습니다.",
     "invalidSavedTitle": "저장된 입력 탐지기 설정을 읽을 수 없습니다",
     "invalidSavedBody": "입력 탐지기를 다시 저장할 때까지 요청이 차단됩니다. 아래 탐지기는 Kilo 기본값에서 시작합니다.",
     "invalidSavedOutputTitle": "저장된 출력 탐지기 설정을 읽을 수 없습니다",
@@ -4871,7 +5215,7 @@
   },
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "엔터프라이즈 기능",
-    "enterpriseOnly": "이 기능은 엔터프라이즈 전용 기능입니다.",
+    "enterpriseOnly": "공급자와 모델은 엔터프라이즈 요금제에서 사용할 수 있습니다.",
     "readOnly": "조직 소유자와 관리자만 이 설정을 변경할 수 있습니다.",
     "loadError": "공급자와 모델을 불러오지 못했습니다",
     "tabModels": "모델",
@@ -4885,6 +5229,8 @@
     "providersDescription": "공급자를 끄면 이 조직에서 Kilo가 해당 공급자로 라우팅하지 않습니다.",
     "providersNeedCatalog": "전체 모델 카탈로그가 로드될 때까지 공급자 스위치는 읽기 전용입니다. 편집하려면 위에서 다시 시도를 누르세요.",
     "providersEmpty": "이 검색과 일치하는 공급자가 없습니다.",
+    "providersNone": "이 조직에서 사용할 수 있는 공급자가 없습니다.",
+    "providersUnavailable": "공급자 목록을 불러오지 못했습니다",
     "allowAllShown": "표시된 항목 모두 허용",
     "denyAllShown": "표시된 항목 모두 거부",
     "gatewaysDescription": "Kilo는 모델 요청을 Vercel AI Gateway 또는 OpenRouter를 통해 라우팅합니다. 비활성화된 게이트웨이는 해당 요청을 실패 처리합니다.",
@@ -4903,6 +5249,20 @@
       "eu": "유럽 연합",
       "au": "호주",
       "jp": "일본"
+    }
+  },
+  "settingsSearch": {
+    "placeholder": "환경설정 검색",
+    "noMatches": "일치하는 설정 없음",
+    "emptyDescription": "다른 설정 이름이나 검색어로 검색해 보세요.",
+    "resultsStatus": "찾은 설정: {{resultCount}}개",
+    "keywords": {
+      "signOut": "로그아웃|접속 종료",
+      "appearance": "테마|색상|화면 스타일",
+      "appUnlock": "생체 인증|얼굴 인식|지문",
+      "language": "언어|번역",
+      "notifications": "알림|푸시 알림",
+      "privacy": "분석|추적|개인정보"
     }
   }
 }

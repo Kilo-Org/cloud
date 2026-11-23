@@ -619,7 +619,7 @@ describe('getMetricsAccessibilityLabel locale terminators', () => {
         interactive: true,
         usageUnavailable: false,
       })
-    ).toBe('コスト 8 セント。タップするとコンテキストの詳細を表示します。');
+    ).toBe('これまでのコスト 8 セント。タップするとコンテキストの詳細を表示します。');
   });
 
   it('keeps the tap hint a separate sentence where no body mark closes the sentence', async () => {
@@ -635,6 +635,21 @@ describe('getMetricsAccessibilityLabel locale terminators', () => {
     expect(body.at(-1)).not.toMatch(/[\p{Sentence_Terminal}\u2026]/u);
     expect(hint.startsWith(' ')).toBe(true);
     expect(getMetricsAccessibilityLabel({ ...args, interactive: true })).toBe(`${body}${hint}`);
+  });
+
+  it('speaks the Telugu loading cost as accumulated so far', async () => {
+    // The English entry qualifies the figure as partial ("Cost so far"). The
+    // loading placeholder is the only place this entry is spoken, so the
+    // Telugu reading has to carry the same qualifier before the cost.
+    await i18n.changeLanguage('te');
+    expect(
+      getMetricsAccessibilityLabel({
+        info: undefined,
+        totalCostMicrodollars: 80_000,
+        interactive: false,
+        usageUnavailable: false,
+      })
+    ).toMatch(/^ఇంతవరకు ఖర్చు .+\.$/);
   });
 
   it('never puts two sentence terminators side by side in any supported locale', async () => {

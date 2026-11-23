@@ -18,7 +18,7 @@ import {
   hosted_domain_specials,
   SIGNUP_STEP_UP_METHODS,
 } from '@kilocode/web-shared/lib/auth/constants';
-import { consumeSignInTicket } from '@/lib/auth/passkey';
+import { consumeSignInTicket, readSignInTicket } from '@/lib/auth/passkey';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import {
   createOrUpdateUser,
@@ -33,18 +33,26 @@ import type { User } from '@kilocode/db/schema';
 import { checkDomainSignInEligibility } from '@/lib/auth/email-signin-eligibility';
 import { isBlockedAccount } from '@kilocode/web-shared/lib/user/account-status';
 import {
-  requireAdmissionPayload,
+  classifyAdmissionPayload,
   countAdmissionCondition,
+  reportAttestedKeyCollision,
+  requireAdmissionPayload,
   verifyAdmissionAsync,
   persistAttestedKey,
   KeyCollisionError,
   type VerifyAdmissionOk,
 } from '@/lib/auth/native-admission';
 import {
+  startNativeTokenTelemetry,
+  type NativeTokenTelemetry,
+} from '@/lib/auth/native-admission-telemetry';
+import {
   createDeviceSession,
   issueSessionCredentials,
   createDeviceSessionWithAttestedKey,
+  createDeviceSessionWithCredentials,
   revokeDeviceSession,
+  type DeviceSessionClaim,
 } from '@/lib/auth/device-sessions';
 import {
   isNativeTokenAddressRateLimited,
@@ -66,6 +74,21 @@ const posthogClient = PostHogClient();
 // server faults and must surface as 500, not be misreported as an invalid token.
 function isInvalidNativeTokenError(error: unknown): boolean {
   return error instanceof NativeIdTokenError || error instanceof AppleJwtClientError;
+}
+
+/**
+ * A session minted for a sign-in that ends without delivering its credentials
+ * stays revocable, and a failed revoke must not replace the original outcome.
+ */
+async function revokeAbandonedSession(sessionId: string | undefined) {
+  if (!sessionId) {
+    return;
+  }
+  try {
+    await revokeDeviceSession(sessionId, 'sign_in_not_completed');
+  } catch {
+    captureMessage('native_token_session_cleanup_failed');
+  }
 }
 
 function eligibilityResponse(
@@ -249,15 +272,46 @@ const requestSchema = z.discriminatedUnion('provider', [
  *   503 { error: 'NONCE_STORE_UNAVAILABLE' }
  *   403/503 { error: 'BLOCKED' | 'SSO_ERROR', ssoOrganizationId? }
  *   403 { error: AuthErrorType }
- *   403 { error: 'ADMISSION_REQUIRED' }
+ *   403 { error: 'ADMISSION_REQUIRED', recovery?: 'IOS_ASSERTION_UNKNOWN_KEY' }
+ *       `recovery` appears only when the device's assertion named a key id this
+ *       database has never seen, and only before any provider call, OTP
+ *       reservation, ticket consumption, or settlement. The client may drop its
+ *       stored key id and retry once with a fresh proof; no other refusal
+ *       carries the field.
  *   400 invalid request body
  *   500 admission provider or identity provider infrastructure error
  */
 export const POST = withRestTiming('/api/auth/native/token', async (request: Request) => {
-  const body = await request.json().catch(() => undefined);
+  // One record per request for the allowlisted mobile cohort. Created before
+  // any branch so an early refusal is counted too; every call is a no-op for
+  // other clients. A thrown request is still recorded, as the 500 it surfaces.
+  const telemetry = startNativeTokenTelemetry(request);
+  try {
+    const response = await runNativeTokenExchange(request, telemetry);
+    telemetry.emit(response.status);
+    return response;
+  } catch (error) {
+    telemetry.emit(500);
+    throw error;
+  }
+});
+
+async function runNativeTokenExchange(
+  request: Request,
+  telemetry: NativeTokenTelemetry
+): Promise<Response> {
+  // A body that did not parse is a transport error; a body that parsed but did
+  // not match the schema is a request error. They stay separate so neither is
+  // reported as an admission stage.
+  let parsed = true;
+  const body = await request.json().catch(() => {
+    parsed = false;
+    return undefined;
+  });
   const validation = requestSchema.safeParse(body);
 
   if (!validation.success) {
+    telemetry.requestRejected(parsed ? 'invalid_request' : 'invalid_json');
     return NextResponse.json({ error: 'INVALID_REQUEST' }, { status: 400 });
   }
 
@@ -269,16 +323,22 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
   // answered may let the exchange through: a rule that is not configured
   // refuses here, before any of that work, and is reported.
   if (await isNativeTokenAddressRateLimited(request)) {
+    telemetry.addressRateLimited();
     return NextResponse.json({ error: 'RATE_LIMITED' }, { status: 429 });
   }
 
   // ── Step 1: Admission gate ───────────────────────────────────────────────
-  // Credentials are issued only to an attested device. A missing or malformed
-  // proof is refused before any provider call, OTP reservation, ticket
-  // consumption, or user settlement, so no side effect precedes the gate.
   const admissionPayload = requireAdmissionPayload(body);
   if (!admissionPayload) {
     countAdmissionCondition('native_admission_missing');
+    // Only a refused request pays for this second classification: it names the
+    // shape rule that refused, so a record separates an absent field from a
+    // malformed one. The gate above decided; nothing here changes the response.
+    const refusal = classifyAdmissionPayload(body['admission']);
+    // A gate that refused without a matching shape rule cannot happen in
+    // production (both call the same classifier); leaving the branch
+    // unrecorded surfaces it as `incomplete` instead of inventing a reason.
+    if (!refusal.ok) telemetry.admissionMissing(refusal.reason);
     return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
   }
 
@@ -290,11 +350,20 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
     const verified = await verifyAdmissionAsync(admissionPayload);
     if (!verified.ok) {
       countAdmissionCondition('native_admission_refused');
-      return NextResponse.json({ error: verified.errorCode }, { status: 403 });
+      telemetry.admissionRefused(verified.detail);
+      return NextResponse.json(
+        {
+          error: verified.errorCode,
+          ...(verified.recovery ? { recovery: verified.recovery } : {}),
+        },
+        { status: 403 }
+      );
     }
     admissionVerification = verified;
+    telemetry.admissionPassed(verified.platform);
   } catch {
     captureMessage('native_admission_unavailable');
+    telemetry.admissionProviderFault();
     return NextResponse.json({ error: 'INTERNAL_ERROR' }, { status: 500 });
   }
 
@@ -308,10 +377,11 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
   let autoLinkToExistingUser: boolean;
 
   if (data.provider === 'passkey') {
-    // The ticket is single-use and short-lived, and was minted only after a
-    // WebAuthn assertion verified against a server-stored challenge, so
-    // redeeming it is the identity proof. A replay consumes no row.
-    const ticket = await consumeSignInTicket(data.ticket);
+    // The ticket is the identity proof: it was minted only after a WebAuthn
+    // assertion verified against a server-stored challenge. It is read here and
+    // redeemed only once this request is going to succeed, so a refusal or a
+    // provider fault below leaves the client's only proof usable.
+    const ticket = await readSignInTicket(data.ticket);
     if (!ticket) {
       return NextResponse.json({ error: 'INVALID_TICKET' }, { status: 401 });
     }
@@ -338,35 +408,64 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
       return rateLimited;
     }
 
-    const pendingLink = await resolvePendingLinkForUser(data.pendingLinkToken, user.id);
+    let sessionId: string | undefined;
 
-    if (data.supportsRefresh) {
-      const sid = await createDeviceSession({
+    try {
+      // The redemption is the session's claim: it runs after the insert (and
+      // the cap enforcement) inside the session's transaction, so a lost
+      // redemption rolls the session back and resolves to null with nothing
+      // left to revoke — the session-limit eviction rides the same rollback.
+      const claim: DeviceSessionClaim = tx => consumeSignInTicket(data.ticket, tx);
+
+      if (data.supportsRefresh) {
+        const credentials = await createDeviceSessionWithCredentials({
+          userId: user.id,
+          userAgent: request.headers.get('user-agent') ?? undefined,
+          user,
+          claim,
+        });
+        if (!credentials) {
+          return NextResponse.json({ error: 'INVALID_TICKET' }, { status: 401 });
+        }
+        sessionId = credentials.sessionId;
+        // The pending link is resolved only after the redemption settled and
+        // the session committed — the email branch's ordering, so the link is
+        // claimed by the request that owns the ticket.
+        const pendingLink = await resolvePendingLinkForUser(data.pendingLinkToken, user.id);
+
+        return NextResponse.json(
+          {
+            token: credentials.token,
+            refreshToken: credentials.refreshToken,
+            expiresIn: credentials.expiresIn,
+            created: false,
+            ...(pendingLink ? { pendingLink } : {}),
+          },
+          { status: 200 }
+        );
+      }
+
+      const session = await createDeviceSession({
         userId: user.id,
         userAgent: request.headers.get('user-agent') ?? undefined,
+        claim,
       });
-      const pair = await issueSessionCredentials(user, sid);
-      return NextResponse.json(
-        {
-          token: pair.token,
-          refreshToken: pair.refreshToken,
-          expiresIn: pair.expiresIn,
-          created: false,
-          ...(pendingLink ? { pendingLink } : {}),
-        },
-        { status: 200 }
-      );
-    }
+      if (!session) {
+        return NextResponse.json({ error: 'INVALID_TICKET' }, { status: 401 });
+      }
+      sessionId = session;
+      const pendingLink = await resolvePendingLinkForUser(data.pendingLinkToken, user.id);
 
-    return legacyTokenResponse({
-      user,
-      deviceSessionId: await createDeviceSession({
-        userId: user.id,
-        userAgent: request.headers.get('user-agent') ?? undefined,
-      }),
-      created: false,
-      ...(pendingLink ? { pendingLink } : {}),
-    });
+      return legacyTokenResponse({
+        user,
+        deviceSessionId: sessionId,
+        created: false,
+        ...(pendingLink ? { pendingLink } : {}),
+      });
+    } catch (error) {
+      await revokeAbandonedSession(sessionId);
+      throw error;
+    }
   }
 
   if (data.provider === 'apple') {
@@ -477,17 +576,6 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
     let preparedSessionId: string | undefined;
     let preparedCredentials: { token: string; refreshToken: string; expiresIn: number } | undefined;
 
-    const abandonPreparedCredentials = async () => {
-      if (!preparedSessionId) {
-        return;
-      }
-      try {
-        await revokeDeviceSession(preparedSessionId, 'sign_in_not_completed');
-      } catch {
-        captureMessage('native_token_session_cleanup_failed');
-      }
-    };
-
     try {
       const eligibility = await checkDomainSignInEligibility(email);
       if (!eligibility.ok) {
@@ -543,6 +631,7 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
         admissionVerification.existingKeyUserId !== result.user.id
       ) {
         captureMessage('native_attested_key_ownership_mismatch');
+        countAdmissionCondition('native_admission_refused');
         phase = 'release';
         return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
       }
@@ -563,7 +652,6 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
         // Bind key persistence and session creation in one transaction.
         try {
           const combined = await createDeviceSessionWithAttestedKey({
-            userId: result.user.id,
             userAgent: request.headers.get('user-agent') ?? undefined,
             user: result.user,
             verification: admissionVerification,
@@ -576,7 +664,7 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
           };
         } catch (err) {
           if (err instanceof KeyCollisionError) {
-            captureMessage('native_attested_key_cross_user_collision');
+            reportAttestedKeyCollision();
             phase = 'release';
             return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
           }
@@ -588,7 +676,7 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
           await persistAttestedKey(result.user.id, admissionVerification);
         } catch (err) {
           if (err instanceof KeyCollisionError) {
-            captureMessage('native_attested_key_cross_user_collision');
+            reportAttestedKeyCollision();
             phase = 'release';
             return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
           }
@@ -614,7 +702,7 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
       if (!committed) {
         const consumed = await consumeSignInCode(data.email, data.code, data.challengeId);
         if (!consumed) {
-          await abandonPreparedCredentials();
+          await revokeAbandonedSession(preparedSessionId);
           return NextResponse.json({ error: 'INVALID_CODE' }, { status: 401 });
         }
         captureMessage('native_token_code_reservation_lapsed');
@@ -648,12 +736,16 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
       });
     } catch (error) {
       // Nothing was delivered, so nothing minted for this request stays usable.
-      await abandonPreparedCredentials();
+      await revokeAbandonedSession(preparedSessionId);
       phase = 'release';
       throw error;
     } finally {
       if (phase === 'release') {
-        await releaseSignInCode(data.email, data.code, data.challengeId);
+        try {
+          await releaseSignInCode(data.email, data.code, data.challengeId);
+        } catch {
+          captureMessage('native_token_reservation_release_failed');
+        }
       }
     }
   }
@@ -699,6 +791,7 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
     admissionVerification.existingKeyUserId !== result.user.id
   ) {
     captureMessage('native_attested_key_ownership_mismatch');
+    countAdmissionCondition('native_admission_refused');
     return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
   }
 
@@ -707,88 +800,90 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
     return rateLimited;
   }
 
-  if (data.supportsRefresh) {
-    // Bind key persistence and session creation in one transaction.
-    try {
-      const combined = await createDeviceSessionWithAttestedKey({
+  try {
+    if (data.supportsRefresh) {
+      // Bind key persistence and session creation in one transaction.
+      try {
+        const combined = await createDeviceSessionWithAttestedKey({
+          userAgent: request.headers.get('user-agent') ?? undefined,
+          user: result.user,
+          verification: admissionVerification,
+        });
+        sessionId = combined.sessionId;
+        refreshCredentials = {
+          token: combined.token,
+          refreshToken: combined.refreshToken,
+          expiresIn: combined.expiresIn,
+        };
+      } catch (err) {
+        if (err instanceof KeyCollisionError) {
+          reportAttestedKeyCollision();
+          return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
+        }
+        captureMessage('native_attested_key_persist_failed_after_settlement');
+      }
+    } else {
+      try {
+        await persistAttestedKey(result.user.id, admissionVerification);
+      } catch (err) {
+        if (err instanceof KeyCollisionError) {
+          reportAttestedKeyCollision();
+          return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
+        }
+        captureMessage('native_attested_key_persist_failed_after_settlement');
+      }
+    }
+
+    // Emit deferred sign-in analytics after all gates pass.
+    if (result.deferredSignInEvent) {
+      posthogClient.capture(result.deferredSignInEvent);
+    }
+    const pendingLink = await resolvePendingLinkForUser(data.pendingLinkToken, result.user.id);
+
+    if (refreshCredentials) {
+      return NextResponse.json(
+        {
+          token: refreshCredentials.token,
+          refreshToken: refreshCredentials.refreshToken,
+          expiresIn: refreshCredentials.expiresIn,
+          created: result.isNew,
+          ...(pendingLink ? { pendingLink } : {}),
+        },
+        { status: 200 }
+      );
+    }
+
+    if (data.supportsRefresh) {
+      const credentials = await createDeviceSessionWithCredentials({
         userId: result.user.id,
         userAgent: request.headers.get('user-agent') ?? undefined,
         user: result.user,
-        verification: admissionVerification,
       });
-      sessionId = combined.sessionId;
-      refreshCredentials = {
-        token: combined.token,
-        refreshToken: combined.refreshToken,
-        expiresIn: combined.expiresIn,
-      };
-    } catch (err) {
-      if (err instanceof KeyCollisionError) {
-        captureMessage('native_attested_key_cross_user_collision');
-        return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
-      }
-      captureMessage('native_attested_key_persist_failed_after_settlement');
+      sessionId = credentials.sessionId;
+      return NextResponse.json(
+        {
+          token: credentials.token,
+          refreshToken: credentials.refreshToken,
+          expiresIn: credentials.expiresIn,
+          created: result.isNew,
+          ...(pendingLink ? { pendingLink } : {}),
+        },
+        { status: 200 }
+      );
     }
-  } else {
-    try {
-      await persistAttestedKey(result.user.id, admissionVerification);
-    } catch (err) {
-      if (err instanceof KeyCollisionError) {
-        captureMessage('native_attested_key_cross_user_collision');
-        return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
-      }
-      captureMessage('native_attested_key_persist_failed_after_settlement');
-    }
-  }
 
-  // Emit deferred sign-in analytics after all gates pass.
-  if (result.deferredSignInEvent) {
-    posthogClient.capture(result.deferredSignInEvent);
+    sessionId ??= await createDeviceSession({
+      userId: result.user.id,
+      userAgent: request.headers.get('user-agent') ?? undefined,
+    });
+    return legacyTokenResponse({
+      user: result.user,
+      deviceSessionId: sessionId,
+      created: result.isNew,
+      ...(pendingLink ? { pendingLink } : {}),
+    });
+  } catch (error) {
+    await revokeAbandonedSession(sessionId);
+    throw error;
   }
-  const pendingLink = await resolvePendingLinkForUser(data.pendingLinkToken, result.user.id);
-
-  if (refreshCredentials) {
-    return NextResponse.json(
-      {
-        token: refreshCredentials.token,
-        refreshToken: refreshCredentials.refreshToken,
-        expiresIn: refreshCredentials.expiresIn,
-        created: result.isNew,
-        ...(pendingLink ? { pendingLink } : {}),
-      },
-      { status: 200 }
-    );
-  }
-
-  if (data.supportsRefresh) {
-    const sid =
-      sessionId ??
-      (await createDeviceSession({
-        userId: result.user.id,
-        userAgent: request.headers.get('user-agent') ?? undefined,
-      }));
-    const pair = await issueSessionCredentials(result.user, sid);
-    return NextResponse.json(
-      {
-        token: pair.token,
-        refreshToken: pair.refreshToken,
-        expiresIn: pair.expiresIn,
-        created: result.isNew,
-        ...(pendingLink ? { pendingLink } : {}),
-      },
-      { status: 200 }
-    );
-  }
-
-  return legacyTokenResponse({
-    user: result.user,
-    deviceSessionId:
-      sessionId ??
-      (await createDeviceSession({
-        userId: result.user.id,
-        userAgent: request.headers.get('user-agent') ?? undefined,
-      })),
-    created: result.isNew,
-    ...(pendingLink ? { pendingLink } : {}),
-  });
-});
+}

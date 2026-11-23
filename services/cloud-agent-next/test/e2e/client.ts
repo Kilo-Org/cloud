@@ -12,6 +12,11 @@ import { randomUUID } from 'node:crypto';
 import WebSocket from 'ws';
 import { z } from 'zod';
 import {
+  CloudAgentFailureCodeSchema,
+  CloudAgentFailureStageSchema,
+  CloudAgentSafeFailureSchema,
+} from '@kilocode/worker-utils/cloud-agent-failure';
+import {
   getSandboxAllocationRequest,
   type SandboxAllocation,
 } from '@kilocode/worker-utils/sandbox-allocation';
@@ -318,8 +323,8 @@ export function deleteWorktree(
   config: DriverConfig,
   input: { worktreeId: string; kilocodeOrganizationId?: string; onlyIfSoleSessionId?: string },
   signal?: AbortSignal
-): Promise<{ success: true; deletedSessionIds: string[] }> {
-  return trpcCall<{ success: true; deletedSessionIds: string[] }>(config, 'deleteWorktree', input, {
+): Promise<{ success: true; deletedSessionIds: string[]; cleanup?: 'complete' | 'pending' }> {
+  return trpcCall(config, 'deleteWorktree', input, {
     internalApiSecret: config.internalApiSecret,
     ...(signal ? { signal } : {}),
   });
@@ -633,7 +638,7 @@ export type HostedWorkspaceCreateResult = HostedWorkspaceCreateResponse & {
 export type EmptyHostedWorkspaceCreateResult = HostedWorkspaceCreateResponse;
 
 export type HostedWorkspaceRepository =
-  | { type: 'github'; repo: string }
+  | { type: 'github'; repo: string; githubIntegrationId?: string }
   | { type: 'git'; url: string };
 
 export type HostedWorkspaceCreateInput = {
@@ -641,6 +646,7 @@ export type HostedWorkspaceCreateInput = {
   profileId: string;
   prompt?: string;
   repository?: HostedWorkspaceRepository;
+  additionalRepositoryIds?: number[];
 };
 
 /**
@@ -677,6 +683,9 @@ export async function createHostedWorkspace(
         (config.githubRepo
           ? { type: 'github', repo: config.githubRepo }
           : { type: 'git', url: config.gitUrl }),
+      ...(input.additionalRepositoryIds === undefined
+        ? {}
+        : { additionalRepositoryIds: input.additionalRepositoryIds }),
       profile: { id: input.profileId },
       ...(input.prompt === undefined ? {} : { message: { prompt: input.prompt } }),
       agent: { mode: 'code', model: config.model },
@@ -887,6 +896,21 @@ const messageResultSchema = z.object({
   cloudAgentSessionId: z.string(),
   messageId: z.string(),
   status: z.enum(['queued', 'running', 'completed', 'failed', 'interrupted']),
+  failure: CloudAgentSafeFailureSchema.safeExtend({
+    stage: CloudAgentFailureStageSchema,
+    code: CloudAgentFailureCodeSchema,
+    retryable: z.boolean(),
+  }).optional(),
+  assistant: z.object({ messageId: z.string().min(1), text: z.string().optional() }).optional(),
+  gateResult: z.enum(['pass', 'fail']).optional(),
+  branch: z.string().optional(),
+  preparation: z
+    .object({
+      status: z.enum(['running', 'completed', 'failed']),
+      failedStepLabel: z.string().optional(),
+      reason: z.string().optional(),
+    })
+    .optional(),
 });
 
 export async function getMessageResult(

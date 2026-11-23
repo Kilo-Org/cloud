@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { i18n } from '@/i18n';
 import { CLOUD_AGENT_CONNECTION_ID } from '@/lib/active-sessions-live';
 import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
+import { sessionBranchLabel } from '@/lib/session-branch-label';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
 
 import {
@@ -12,7 +13,6 @@ import {
   composeActiveSessionSpokenMeta,
   composeActiveSessionVisibleMeta,
   expandPlatformFilter,
-  formatGitUrlProject,
   formatMeta,
   formatScheduledWake,
   knownPlatformBucket,
@@ -46,30 +46,44 @@ function makeActive(over: Partial<ActiveSession> = {}): ActiveSession {
 }
 
 describe('composeSessionProvenanceSubtitle', () => {
-  it('returns "branch · #N" when both branch and PR number exist', () => {
-    expect(composeSessionProvenanceSubtitle({ branch: 'feature/x', prNumber: 42 })).toBe(
+  it('returns "label · #N" when both a branch label and a PR number exist', () => {
+    expect(composeSessionProvenanceSubtitle({ branchLabel: 'feature/x', prNumber: 42 })).toBe(
       'feature/x · #42'
     );
   });
 
-  it('returns the branch when only branch is present', () => {
-    expect(composeSessionProvenanceSubtitle({ branch: 'feature/x', prNumber: null })).toBe(
+  it('returns the label when only a branch label is present', () => {
+    expect(composeSessionProvenanceSubtitle({ branchLabel: 'feature/x', prNumber: null })).toBe(
       'feature/x'
     );
-    expect(composeSessionProvenanceSubtitle({ branch: 'feature/x', prNumber: undefined })).toBe(
-      'feature/x'
-    );
+    expect(
+      composeSessionProvenanceSubtitle({ branchLabel: 'feature/x', prNumber: undefined })
+    ).toBe('feature/x');
   });
 
   it('returns "#N" when only a PR number is present', () => {
-    expect(composeSessionProvenanceSubtitle({ branch: null, prNumber: 7 })).toBe('#7');
-    expect(composeSessionProvenanceSubtitle({ branch: undefined, prNumber: 7 })).toBe('#7');
+    expect(composeSessionProvenanceSubtitle({ branchLabel: null, prNumber: 7 })).toBe('#7');
   });
 
-  it('returns null when neither branch nor PR number is present', () => {
-    expect(composeSessionProvenanceSubtitle({ branch: null, prNumber: null })).toBeNull();
-    expect(composeSessionProvenanceSubtitle({ branch: undefined, prNumber: undefined })).toBeNull();
-    expect(composeSessionProvenanceSubtitle({ branch: '', prNumber: null })).toBeNull();
+  it('returns null when neither a branch label nor a PR number is present', () => {
+    expect(composeSessionProvenanceSubtitle({ branchLabel: null, prNumber: null })).toBeNull();
+    expect(composeSessionProvenanceSubtitle({ branchLabel: null, prNumber: undefined })).toBeNull();
+    expect(composeSessionProvenanceSubtitle({ branchLabel: '', prNumber: null })).toBeNull();
+    expect(composeSessionProvenanceSubtitle({ branchLabel: '', prNumber: 7 })).toBe('#7');
+  });
+
+  it('joins the label without decoding it again', () => {
+    // One decode: `a%2520b` decodes to `a%20b`, and composing the label must
+    // never turn that into `a b` while the spoken label still says `a%20b`.
+    expect(
+      composeSessionProvenanceSubtitle({
+        branchLabel: sessionBranchLabel('a%2520b'),
+        prNumber: null,
+      })
+    ).toBe('a%20b');
+    expect(composeSessionProvenanceSubtitle({ branchLabel: 'a%2520b', prNumber: null })).toBe(
+      'a%2520b'
+    );
   });
 });
 
@@ -422,56 +436,6 @@ describe('normalisePlatformSelection (persisted selection → sheet rows)', () =
     expect(
       expandPlatformFilter(normalisePlatformSelection(['cloud-agent-web'])).toSorted()
     ).toEqual(['cloud-agent', 'cloud-agent-web'].toSorted());
-  });
-});
-
-describe('formatGitUrlProject (percent-decoded segments)', () => {
-  it('decodes an encoded CJK repository name in an https URL', () => {
-    expect(formatGitUrlProject('https://github.com/org/%E5%B1%B1%E7%94%B0-API.git')).toBe(
-      'org/山田-API'
-    );
-    expect(formatGitUrlProject('https://github.com/org/%E5%B1%B1%E7%94%B0-API')).toBe(
-      'org/山田-API'
-    );
-  });
-
-  it('decodes an encoded CJK repository name in an ssh URL', () => {
-    expect(formatGitUrlProject('git@github.com:org/%E5%B1%B1%E7%94%B0-API.git')).toBe(
-      'org/山田-API'
-    );
-    expect(formatGitUrlProject('git@github.com:org/%E5%B1%B1%E7%94%B0-API')).toBe('org/山田-API');
-  });
-
-  it('decodes every path segment, not only the repository name', () => {
-    expect(
-      formatGitUrlProject(
-        'https://gitlab.com/%E7%A7%BB%E5%8A%A8%E7%AB%AF/%D0%BC%D0%B5%D1%82%D0%B0%D0%B4%D0%B0%D0%BD%D0%BD%D1%8B%D0%B5.git'
-      )
-    ).toBe('移动端/метаданные');
-  });
-
-  it('keeps the GitLab dash-separated project form while decoding', () => {
-    expect(
-      formatGitUrlProject('https://gitlab.com/group/%E7%A7%BB%E5%8A%A8%E7%AB%AF/-/tree/main')
-    ).toBe('group/移动端');
-  });
-
-  it('keeps a malformed escape raw instead of throwing', () => {
-    expect(formatGitUrlProject('https://github.com/org/%E5%B1%B1%ZZ-repo.git')).toBe(
-      'org/%E5%B1%B1%ZZ-repo'
-    );
-    expect(formatGitUrlProject('https://github.com/org/100%-repo.git')).toBe('org/100%-repo');
-    expect(formatGitUrlProject('git@github.com:org/100%-repo.git')).toBe('org/100%-repo');
-  });
-
-  it('decodes %25 to a single % and never decodes the value twice', () => {
-    expect(formatGitUrlProject('https://github.com/org/50%2525-off.git')).toBe('org/50%25-off');
-    expect(formatGitUrlProject('https://github.com/org/50%25-off.git')).toBe('org/50%-off');
-  });
-
-  it('leaves an already-decoded URL unchanged', () => {
-    expect(formatGitUrlProject('https://github.com/org/山田-API.git')).toBe('org/山田-API');
-    expect(formatGitUrlProject('git@github.com:org/метаданные.git')).toBe('org/метаданные');
   });
 });
 

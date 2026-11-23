@@ -27,8 +27,6 @@ describe('resolveLanguageTag', () => {
   });
 
   it('resolves Portuguese tags to pt-BR unless they name a European-Portuguese region', () => {
-    // iOS reports a pt-BR device as the bare tag `pt` with the region in
-    // `regionCode`, not in `languageTag`.
     expect(resolveLanguageTag([{ languageTag: 'pt', regionCode: 'BR' } as const])).toBe('pt-BR');
     expect(resolveLanguageTag([{ languageTag: 'pt-PT' }])).toBe('pt');
     expect(resolveLanguageTag([{ languageTag: 'pt', regionCode: 'PT' } as const])).toBe('pt');
@@ -84,9 +82,27 @@ describe('resolveLanguageTag', () => {
     expect(resolveLanguageTag([{ languageTag: 'zh' }])).toBe('zh-Hans');
   });
 
-  it('resolves the Android speech tag cmn-Hans-CN to zh-Hans', () => {
-    // Android's speech service names Mandarin with the ISO 639-3 code `cmn`;
-    // the app ships it as the zh scripts (p16, p4).
+  it('resolves a bare zh tag with a Traditional regionCode to zh-Hant', () => {
+    expect(resolveLanguageTag([{ languageTag: 'zh', regionCode: 'TW' }])).toBe('zh-Hant');
+    expect(resolveLanguageTag([{ languageTag: 'zh', regionCode: 'HK' }])).toBe('zh-Hant');
+    expect(resolveLanguageTag([{ languageTag: 'zh', regionCode: 'MO' }])).toBe('zh-Hant');
+  });
+
+  it('resolves a bare zh tag with another regionCode to zh-Hans', () => {
+    expect(resolveLanguageTag([{ languageTag: 'zh', regionCode: 'CN' }])).toBe('zh-Hans');
+    expect(resolveLanguageTag([{ languageTag: 'zh', regionCode: 'SG' }])).toBe('zh-Hans');
+  });
+
+  it('keeps an explicit script subtag over the regionCode', () => {
+    expect(resolveLanguageTag([{ languageTag: 'zh-Hans', regionCode: 'TW' }])).toBe('zh-Hans');
+    expect(resolveLanguageTag([{ languageTag: 'zh-Hant', regionCode: 'CN' }])).toBe('zh-Hant');
+  });
+
+  it('keeps the tag region over the regionCode', () => {
+    expect(resolveLanguageTag([{ languageTag: 'zh-CN', regionCode: 'TW' }])).toBe('zh-Hans');
+  });
+
+  it('resolves the Android speech tag cmn-Hans-CN to zh-Hans (p16, p4)', () => {
     expect(resolveSupportedLanguageTag([{ languageTag: 'cmn-Hans-CN' }])).toBe('zh-Hans');
   });
 
@@ -96,6 +112,10 @@ describe('resolveLanguageTag', () => {
 
   it('resolves a bare cmn tag to zh-Hans', () => {
     expect(resolveSupportedLanguageTag([{ languageTag: 'cmn' }])).toBe('zh-Hans');
+  });
+
+  it('resolves a bare cmn tag with a Traditional regionCode to zh-Hant', () => {
+    expect(resolveSupportedLanguageTag([{ languageTag: 'cmn', regionCode: 'TW' }])).toBe('zh-Hant');
   });
 });
 

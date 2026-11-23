@@ -4,6 +4,7 @@ import { Sparkles } from '@/components/ui/icons';
 import { type StandaloneSuggestion, type ToolPart } from '@kilocode/cloud-agent-sdk';
 import { useTranslation } from 'react-i18next';
 
+import { Card } from '@/components/ui/card';
 import { SelectableText } from '@/components/ui/selectable-text';
 
 import { FixedPartRow } from './fixed-part-row';
@@ -11,9 +12,10 @@ import { MonoScrollBlock } from './mono-scroll-block';
 import { useOpenPartDetail } from './open-part-detail-context';
 import { useOptionalSessionManager } from './session-manager-context';
 import { resolveSuggestionPresentation, suggestionToolInputSchema } from './suggestion-card-state';
-import { getToolDisplay, toolPartHasDetails } from './tool-card-display';
+import { toolPartHasDetails } from './tool-card-display';
 import { toolStatusLabel } from './tool-status-label';
 import { GenericToolCardBody } from './tool-cards/generic-tool-card';
+import { useToolDisplay } from './use-tool-display';
 
 // The session preview renders transcript rows without a live session, so it
 // has no active suggestion to show.
@@ -32,7 +34,7 @@ export function SuggestToolCard({ part }: Readonly<{ part: ToolPart }>) {
   const suggestion = useActiveToolSuggestion(part);
   const { t } = useTranslation();
   const openPartDetail = useOpenPartDetail();
-  const display = getToolDisplay(part);
+  const display = useToolDisplay(part);
   const label = suggestion?.text ?? display.subtitle ?? display.title;
   const hasDetails = suggestion !== null || toolPartHasDetails(part);
 
@@ -71,7 +73,7 @@ export function SuggestToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
     <View className="gap-3">
       <SelectableText className="text-sm text-foreground">{details.text}</SelectableText>
       {details.actions.map((action, index) => (
-        <View key={`${action.label}-${index}`} className="gap-1 rounded-lg bg-secondary p-3">
+        <Card key={`${action.label}-${index}`}>
           <SelectableText className="text-sm font-medium text-foreground">
             {action.label}
           </SelectableText>
@@ -81,7 +83,7 @@ export function SuggestToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
             </SelectableText>
           ) : null}
           <MonoScrollBlock content={action.prompt} textClassName="text-foreground" />
-        </View>
+        </Card>
       ))}
       {part.state.status === 'completed' && part.state.output ? (
         <MonoScrollBlock content={part.state.output} textClassName="text-foreground" />

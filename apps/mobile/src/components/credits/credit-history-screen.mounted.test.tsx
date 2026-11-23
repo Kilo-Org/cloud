@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, type TestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import { type CreditPurchaseEntry } from '@/lib/credits/credit-history';
 
 import { PersonalCreditHistoryScreen } from './credit-history-screen';
@@ -48,8 +48,17 @@ const state = vi.hoisted(() => ({
     },
     entries: [] as unknown[],
     hasMore: false,
+    isRetentionLimited: false,
   },
   blocks: {
+    data: undefined as unknown,
+    isError: false,
+    isPending: false,
+    isFetching: false,
+    error: null as unknown,
+    refetch: vi.fn(),
+  },
+  grants: {
     data: undefined as unknown,
     isError: false,
     isPending: false,
@@ -73,18 +82,26 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/tab-screen', () => ({ useTabBarBottomPadding: () => 0 }));
-vi.mock('@/lib/a11y/tap-target', () => ({ STATE_ACTION_CLASS: 'min-h-[48px]' }));
+vi.mock('@/lib/a11y/tap-target', () => ({
+  STATE_ACTION_CLASS: 'min-h-[48px]',
+  TOUCH_TARGET_OVERHANG_DP: 8,
+}));
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
 vi.mock('@/components/credits/credit-history-rows', () => ({
   PurchaseHistoryRow: 'PurchaseHistoryRow',
   LedgerHistoryRow: 'LedgerHistoryRow',
+  GrantHistoryRow: 'GrantHistoryRow',
 }));
 vi.mock('@/lib/hooks/use-personal-credits', () => ({
   useCreditPurchaseHistory: () => state.purchases,
   usePersonalCreditBlocks: () => state.blocks,
+  useCreditGrantHistory: () => state.grants,
 }));
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
@@ -141,12 +158,19 @@ beforeEach(() => {
   state.purchases.query.fetchNextPage.mockClear();
   state.purchases.entries = [];
   state.purchases.hasMore = false;
+  state.purchases.isRetentionLimited = false;
   state.blocks.data = undefined;
   state.blocks.isError = false;
   state.blocks.isPending = false;
   state.blocks.isFetching = false;
   state.blocks.error = null;
   state.blocks.refetch.mockClear();
+  state.grants.data = undefined;
+  state.grants.isError = false;
+  state.grants.isPending = false;
+  state.grants.isFetching = false;
+  state.grants.error = null;
+  state.grants.refetch.mockClear();
 });
 
 describe('PersonalCreditHistoryScreen', () => {
@@ -211,6 +235,105 @@ describe('PersonalCreditHistoryScreen', () => {
     expect(nodesOfType(renderer, 'ScreenHeader')[0]?.props.backFallback).toBe(
       '/(app)/(tabs)/(3_profile)'
     );
+    unmount();
+  });
+
+  it('names the retention bound with no Load more at the bound', async () => {
+    state.purchases.entries = [purchase()];
+    state.purchases.isRetentionLimited = true;
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(PersonalCreditHistoryScreen)
+    );
+
+    // The purchase read stopped at the cache's page bound, so the footer names
+    // the bound where "Load more" would otherwise sit.
+    expect(texts(renderer)).toContain(i18n.t('credits.history.retentionLimit'));
+    expect(
+      nodesOfType(renderer, 'Button').some(node => node.props.accessibilityLabel === 'Load more')
+    ).toBe(false);
+    expect(texts(renderer)).not.toContain('Older credit activity is available.');
+    unmount();
+  });
+
+  it('keeps the truncated note and Load more below the bound', async () => {
+    state.purchases.entries = [purchase()];
+    state.purchases.hasMore = true;
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(PersonalCreditHistoryScreen)
+    );
+
+    expect(texts(renderer)).toContain('Older credit activity is available.');
+    expect(texts(renderer)).not.toContain(i18n.t('credits.history.retentionLimit'));
+    expect(
+      nodesOfType(renderer, 'Button').some(node => node.props.accessibilityLabel === 'Load more')
+    ).toBe(true);
+    unmount();
+  });
+
+  it('never renders the two notes together when the impossible flag pairing is forced', async () => {
+    // The hooks can never return the bound flag next to `hasMore: true`, so
+    // force the pairing from the mock side and hold the footer to one note.
+    state.purchases.entries = [purchase()];
+    state.purchases.hasMore = true;
+    state.purchases.isRetentionLimited = true;
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(PersonalCreditHistoryScreen)
+    );
+
+    expect(texts(renderer)).not.toContain(i18n.t('credits.history.retentionLimit'));
+    expect(texts(renderer)).toContain('Older credit activity is available.');
+    unmount();
+  });
+
+  it('renders a positive grant from the grant history as its own row', async () => {
+    state.grants.data = {
+      grants: [
+        {
+          id: 'grant-1',
+          date: '2026-11-10T10:00:00.000Z',
+          amount_mUsd: 12_500_000,
+          kind: 'referral',
+        },
+      ],
+      hasMore: false,
+    };
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(PersonalCreditHistoryScreen)
+    );
+
+    const grants = nodesOfType(renderer, 'GrantHistoryRow');
+    expect(grants).toHaveLength(1);
+    expect(grants[0]?.props.grant).toMatchObject({ id: 'grant-1', amount_mUsd: 12_500_000 });
+    // A balance funded only by a grant still lists it, so the empty state
+    // cannot swallow the one row the account has.
+    expect(nodesOfType(renderer, 'EmptyState')).toHaveLength(0);
+    unmount();
+  });
+
+  it('names the grants that failed and keeps the loaded purchases under it', async () => {
+    state.purchases.entries = [purchase()];
+    state.grants.isError = true;
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(PersonalCreditHistoryScreen)
+    );
+
+    // The purchases answered, so their rows stay; the failed grants read says so
+    // instead of vanishing from the list without a word.
+    expect(nodesOfType(renderer, 'PurchaseHistoryRow')).toHaveLength(1);
+    expect(texts(renderer)).toContain(i18n.t('credits.history.activityUnavailable'));
+
+    const retry = nodesOfType(renderer, 'Button').find(
+      node => node.props.accessibilityLabel === 'Retry'
+    );
+    if (!retry) {
+      throw new Error('the grants retry action did not render');
+    }
+    act(() => {
+      (retry.props.onPress as () => void)();
+    });
+    expect(state.grants.refetch).toHaveBeenCalledTimes(1);
+    // Only the part that failed is re-read; the loaded purchases stay put.
+    expect(state.purchases.query.refetch).not.toHaveBeenCalled();
     unmount();
   });
 });

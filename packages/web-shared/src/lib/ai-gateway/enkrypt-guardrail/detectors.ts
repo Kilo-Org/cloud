@@ -46,12 +46,34 @@ const ENKRYPT_SUMMARY_DETECTOR_BY_NAME = new Map<string, EnkryptDetectorId>(
   Object.entries(ENKRYPT_SUMMARY_DETECTORS)
 );
 
-/**
- * The detector ID of one `summary` key of a detect response, or undefined when Enkrypt reports a
- * detector this map does not know.
- */
 export function enkryptSummaryDetectorId(name: string): EnkryptDetectorId | undefined {
   return ENKRYPT_SUMMARY_DETECTOR_BY_NAME.get(name);
+}
+
+type EnkryptSharedDetectorDefaults = {
+  [Id in EnkryptOutputDetectorId]: Omit<EnkryptOutputDetectors[Id], 'action'>;
+};
+
+/**
+ * Per-detector settings that the Kilo Default input detectors and the empty output detectors share,
+ * so a default lives in one place. A new output detector fails the typecheck here. A fresh object
+ * per call: callers set a detector on the result, and two calls must not share one.
+ */
+function enkryptDetectorDefaults(): EnkryptSharedDetectorDefaults {
+  return {
+    pii: { enabled: false, entities: ['secrets'] },
+    keyword_detector: { enabled: false, banned_keywords: [] },
+    topic_detector: { enabled: false, topic: [] },
+    policy_violation: {
+      enabled: false,
+      format: 'rules',
+      policy_text: '',
+      rules: [],
+    },
+    toxicity: { enabled: false },
+    nsfw: { enabled: false },
+    bias: { enabled: false },
+  };
 }
 
 /**
@@ -59,21 +81,16 @@ export function enkryptSummaryDetectorId(name: string): EnkryptDetectorId | unde
  * see `enforcedEnkryptInputDetectors`.
  */
 export function createKiloDefaultEnkryptInputDetectors(): EnkryptInputDetectors {
+  const defaults = enkryptDetectorDefaults();
   return {
     injection_attack: { enabled: true, action: 'log' },
-    pii: { enabled: false, action: 'log', entities: ['secrets'] },
-    keyword_detector: { enabled: false, action: 'block', banned_keywords: [] },
-    topic_detector: { enabled: false, topic: [] },
-    policy_violation: {
-      enabled: false,
-      action: 'block',
-      format: 'rules',
-      policy_text: '',
-      rules: [],
-    },
-    toxicity: { enabled: false },
-    nsfw: { enabled: false },
-    bias: { enabled: false, action: 'log' },
+    pii: { ...defaults.pii, action: 'log' },
+    keyword_detector: { ...defaults.keyword_detector, action: 'block' },
+    topic_detector: { ...defaults.topic_detector },
+    policy_violation: { ...defaults.policy_violation, action: 'block' },
+    toxicity: { ...defaults.toxicity },
+    nsfw: { ...defaults.nsfw },
+    bias: { ...defaults.bias, action: 'log' },
     sponge_attack: { enabled: false },
   };
 }
@@ -84,6 +101,17 @@ export const ENKRYPT_CONFIGURABLE_INPUT_DETECTOR_IDS = [
   'policy_violation',
 ] as const satisfies readonly EnkryptDetectorId[];
 
+type ConfigurableInputDetectorId = (typeof ENKRYPT_CONFIGURABLE_INPUT_DETECTOR_IDS)[number];
+
+/** Writes one configurable detector into a detector set, keeping the key and its value together. */
+function assignConfigurableDetector<Id extends ConfigurableInputDetectorId>(
+  target: EnkryptInputDetectors,
+  source: EnkryptInputDetectors,
+  id: Id
+): void {
+  target[id] = source[id];
+}
+
 /**
  * The input detectors the gateway enforces: the configurable ones as saved and Kilo Default, which
  * turns them off, for every other one, whatever was saved for it. A detector without input controls
@@ -92,18 +120,29 @@ export const ENKRYPT_CONFIGURABLE_INPUT_DETECTOR_IDS = [
 export function enforcedEnkryptInputDetectors(
   detectors: EnkryptInputDetectors
 ): EnkryptInputDetectors {
-  return {
-    ...createKiloDefaultEnkryptInputDetectors(),
-    injection_attack: detectors.injection_attack,
-    policy_violation: detectors.policy_violation,
-  };
+  const enforced: EnkryptInputDetectors = { ...createKiloDefaultEnkryptInputDetectors() };
+  for (const id of ENKRYPT_CONFIGURABLE_INPUT_DETECTOR_IDS) {
+    assignConfigurableDetector(enforced, detectors, id);
+  }
+  return enforced;
 }
 
-function withActionOnlyForLogging<Detector extends { enabled: boolean; action: 'log' | 'block' }>({
-  action,
-  ...detector
-}: Detector) {
-  return detector.enabled && action === 'log' ? { ...detector, action } : detector;
+type StorableEnkryptInputDetectors = z.input<typeof EnkryptInputDetectorsSchema>;
+
+/**
+ * Writes one configurable detector as saved. `Omit`ing `action` gives a union TypeScript cannot
+ * assign back to the one key it came from, so the narrowing lives in this copy of the detector.
+ */
+function assignStorableDetector<Id extends ConfigurableInputDetectorId>(
+  target: StorableEnkryptInputDetectors,
+  source: EnkryptInputDetectors,
+  id: Id
+): void {
+  const detector: StorableEnkryptInputDetectors[Id] = { ...source[id] };
+  const { action } = detector;
+  delete detector.action;
+  if (detector.enabled && action === 'log') detector.action = action;
+  target[id] = detector;
 }
 
 /**
@@ -114,18 +153,17 @@ function withActionOnlyForLogging<Detector extends { enabled: boolean; action: '
 export function storableEnkryptInputDetectors(
   detectors: EnkryptInputDetectors
 ): z.input<typeof EnkryptInputDetectorsSchema> {
-  return {
-    ...detectors,
-    injection_attack: withActionOnlyForLogging(detectors.injection_attack),
-    policy_violation: withActionOnlyForLogging(detectors.policy_violation),
-  };
+  const storable: StorableEnkryptInputDetectors = { ...detectors };
+  for (const id of ENKRYPT_CONFIGURABLE_INPUT_DETECTOR_IDS) {
+    assignStorableDetector(storable, detectors, id);
+  }
+  return storable;
 }
 
 export function enabledEnkryptDetectorIds(detectors: EnkryptInputDetectors): EnkryptDetectorId[] {
   return ENKRYPT_DETECTOR_IDS.filter(id => detectors[id].enabled);
 }
 
-/** Enabled configurable detectors whose detection blocks the request. */
 export function blockingEnkryptDetectorIds(detectors: EnkryptInputDetectors): EnkryptDetectorId[] {
   return ENKRYPT_CONFIGURABLE_INPUT_DETECTOR_IDS.filter(id => {
     const detector = detectors[id];
@@ -133,22 +171,17 @@ export function blockingEnkryptDetectorIds(detectors: EnkryptInputDetectors): En
   });
 }
 
-/** Output scanning has no Kilo Default, so every output detector starts off. */
+/** Output scanning has no Kilo Default, so every output detector starts off and blocks. */
 export function createEmptyEnkryptOutputDetectors(): EnkryptOutputDetectors {
+  const defaults = enkryptDetectorDefaults();
   return {
-    pii: { enabled: false, action: 'block', entities: ['secrets'] },
-    keyword_detector: { enabled: false, action: 'block', banned_keywords: [] },
-    topic_detector: { enabled: false, action: 'block', topic: [] },
-    policy_violation: {
-      enabled: false,
-      action: 'block',
-      format: 'rules',
-      policy_text: '',
-      rules: [],
-    },
-    toxicity: { enabled: false, action: 'block' },
-    nsfw: { enabled: false, action: 'block' },
-    bias: { enabled: false, action: 'block' },
+    pii: { ...defaults.pii, action: 'block' },
+    keyword_detector: { ...defaults.keyword_detector, action: 'block' },
+    topic_detector: { ...defaults.topic_detector, action: 'block' },
+    policy_violation: { ...defaults.policy_violation, action: 'block' },
+    toxicity: { ...defaults.toxicity, action: 'block' },
+    nsfw: { ...defaults.nsfw, action: 'block' },
+    bias: { ...defaults.bias, action: 'block' },
   };
 }
 
@@ -158,7 +191,6 @@ export function enabledEnkryptOutputDetectorIds(
   return ENKRYPT_OUTPUT_DETECTOR_IDS.filter(id => detectors[id].enabled);
 }
 
-/** Enabled output detectors whose detection blocks the response. */
 export function blockingEnkryptOutputDetectorIds(
   detectors: EnkryptOutputDetectors
 ): EnkryptOutputDetectorId[] {

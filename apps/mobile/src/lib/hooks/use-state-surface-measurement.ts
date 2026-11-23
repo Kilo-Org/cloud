@@ -15,57 +15,76 @@ export type SurfaceMeasurement = {
 
 export function useStateSurfaceMeasurement(androidSheet: boolean, nativeActive = true) {
   const nodeRef = useRef<ViewInstance | null>(null);
-  const [nativeNode, setNode] = useState<ViewInstance | null>(null);
+  // One value per attachment, not per node: the navigator detaches and re-hands
+  // the same view whenever it re-installs the props a scene layout owns, and
+  // that re-attachment owes a fresh window measurement. A node identity in
+  // state would collapse the detach and the re-attach into no change. `null`
+  // means nothing is attached.
+  const [attached, setAttached] = useState<{ node: ViewInstance } | null>(null);
+  const nativeNode = attached?.node ?? null;
   const native = useNativeStateGeometry(nativeActive ? nativeNode : null);
   const [frame, setFrame] = useState<StateFrame | null>(null);
   const { width, height } = useWindowDimensions();
   const requestRef = useRef(0);
 
-  const measure = useCallback(() => {
-    const node = nodeRef.current;
-    requestRef.current += 1;
-    const request = requestRef.current;
-    if (!node) {
-      setFrame(null);
-      return;
-    }
-    node.measureInWindow((...bounds) => {
-      const [, y, , measuredHeight] = bounds;
-      if (request !== requestRef.current) {
-        return;
-      }
-      const top = y - (androidSheet ? node.scrollTop : 0);
-      const bottom = top + measuredHeight;
-      if (
-        measuredHeight <= 0 ||
-        !Number.isFinite(top) ||
-        !Number.isFinite(bottom) ||
-        bottom <= top
-      ) {
+  const measureNode = useCallback(
+    (node: ViewInstance | null) => {
+      requestRef.current += 1;
+      const request = requestRef.current;
+      if (!node) {
         setFrame(null);
         return;
       }
-      setFrame(previous =>
-        previous?.top === top && previous.bottom === bottom ? previous : { top, bottom }
-      );
-    });
-  }, [androidSheet]);
-
-  const capture = useCallback(
-    (node: ViewInstance | null) => {
-      nodeRef.current = node;
-      setNode(node);
-      measure();
+      node.measureInWindow((...bounds) => {
+        const [, y, , measuredHeight] = bounds;
+        if (request !== requestRef.current) {
+          return;
+        }
+        const top = y - (androidSheet ? node.scrollTop : 0);
+        const bottom = top + measuredHeight;
+        if (
+          measuredHeight <= 0 ||
+          !Number.isFinite(top) ||
+          !Number.isFinite(bottom) ||
+          bottom <= top
+        ) {
+          setFrame(null);
+          return;
+        }
+        setFrame(previous =>
+          previous?.top === top && previous.bottom === bottom ? previous : { top, bottom }
+        );
+      });
     },
-    [measure]
+    [androidSheet]
   );
 
+  // One owner per measurement: the ref callback records the attachment, and the
+  // layout effect below spends the native pass on it. A ref callback runs in the
+  // commit's mutation phase and the effect right after it, so measuring in both
+  // spends two native layout measurements on one attach and the first lands only
+  // to be superseded on the next frame. Capture stays free of dependencies, so a
+  // sheet toggle cannot re-attach the ref at all.
+  const capture = useCallback((node: ViewInstance | null) => {
+    nodeRef.current = node;
+    setAttached(node ? { node } : null);
+  }, []);
+
+  const measure = useCallback(() => {
+    measureNode(nodeRef.current);
+  }, [measureNode]);
+
   useLayoutEffect(() => {
-    measure();
+    if (attached) {
+      measureNode(attached.node);
+    } else {
+      requestRef.current += 1;
+      setFrame(null);
+    }
     return () => {
       requestRef.current += 1;
     };
-  }, [measure, width, height]);
+  }, [measureNode, attached, width, height]);
 
   const failure = native.status === 'failed' ? native.failure : undefined;
   const measurement = useMemo<SurfaceMeasurement>(() => {

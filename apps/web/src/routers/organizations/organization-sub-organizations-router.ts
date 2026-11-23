@@ -196,6 +196,7 @@ const EffectiveSsoPolicySchema = z.discriminatedUnion('status', [
       'conflicting_child_policy',
       'unsupported_nested_parent',
       'invalid_domain',
+      'domain_unclaimed',
       'ambiguous_domain',
     ]),
   }),

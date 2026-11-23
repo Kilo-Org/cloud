@@ -47,6 +47,28 @@ describe('notificationHistoryCopy', () => {
     });
   });
 
+  it('translates a finding severity in the row language', () => {
+    const row = {
+      i18nKey: 'internal.securityFindingNew',
+      i18nParams: {
+        severity: 'high',
+        findingTitle: 'Prototype pollution in left-pad',
+        repoFullName: 'acme/api',
+      },
+      title: 'New security finding (high)',
+      body: 'Prototype pollution in left-pad in acme/api',
+    };
+
+    expect(notificationHistoryCopy(row, 'pt-BR')).toEqual({
+      headline: 'Novo achado de segurança (Nível alto)',
+      detail: 'Prototype pollution in left-pad em acme/api',
+    });
+    expect(notificationHistoryCopy(row, 'en')).toEqual({
+      headline: 'New security finding (High)',
+      detail: 'Prototype pollution in left-pad in acme/api',
+    });
+  });
+
   it('renders English copy for a locale the push catalog does not carry', () => {
     const copy = notificationHistoryCopy(
       { i18nKey: 'internal.lowBalance', i18nParams: LOW_BALANCE_PARAMS, title: '', body: '' },
@@ -96,7 +118,7 @@ describe('notificationHistoryCopy', () => {
     expect(copy).toEqual({ headline: 'A security check has an update', detail: null });
   });
 
-  it('matches the app name of the row language, not the English one', () => {
+  it('resolves the row title from its catalog key, not the stored copy', () => {
     const copy = notificationHistoryCopy(
       {
         i18nKey: 'internal.securityLifecycle',

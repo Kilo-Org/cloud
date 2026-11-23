@@ -11,6 +11,7 @@ import {
 import { ToolSummaryTranslationSettingsScreen } from '@/components/tool-summary-translation-settings-screen';
 import { type ModelOption } from '@/lib/hooks/use-available-models';
 import { renderWithProviders } from '@/test/render-with-providers';
+import { expectRenderedSettingsTargets } from '@/test/settings-search-targets';
 
 type PickerParams = {
   options: { id: string; name: string }[];
@@ -54,6 +55,10 @@ vi.mock('@/components/ui/icons', () => ({
 }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
+vi.mock('@/components/settings-search/settings-target', () => ({
+  SettingsSearchScrollView: 'ScrollView',
+  SettingsTarget: 'SettingsTarget',
+}));
 vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }));
 vi.mock('@/components/ui/preference-row', () => ({ PreferenceRow: 'PreferenceRow' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
@@ -135,16 +140,19 @@ describe('ToolSummaryTranslationSettingsScreen', () => {
     expect(findPreferenceRow(renderer).props).toMatchObject({
       icon: 'WandSparkles',
       title: 'Translate summaries',
-      subtitle:
-        'Send each tool summary to a model to translate it into your app language. The original is shown if translation fails.',
       value: false,
       disabled: false,
     });
+    // The explanation is the card's caption, so the switch row keeps its short
+    // subtitle budget and the copy still reads once, under the card.
+    expect(findPreferenceRow(renderer).props.subtitle).toBeUndefined();
+    expect(findTexts(renderer)).toContain(
+      'Send each tool summary to a model to translate it into your app language. The original is shown if translation fails.'
+    );
     expect(findConfigureRow(renderer, 'Model').props).toMatchObject({
       icon: 'Cpu',
       subtitle: 'Auto Small',
       disabled: true,
-      last: true,
     });
   });
 
@@ -194,67 +202,48 @@ describe('ToolSummaryTranslationSettingsScreen', () => {
     expect(findQueryErrors(renderer)).toHaveLength(0);
   });
 
-  it('shows the error state with a working retry and keeps the switch enabled', async () => {
-    preference.enabled = true;
-    const refetch = vi.fn<() => void>();
-    modelsState.models = [];
-    modelsState.isError = true;
-    modelsState.refetch = refetch;
-    const renderer = await mountScreen();
+  it.each([
+    {
+      isError: true,
+      expected: { variant: 'server', title: 'Could not load models' },
+    },
+    {
+      isError: false,
+      expected: { title: 'No models available' },
+    },
+  ])(
+    'shows the query state with a working retry and keeps the switch enabled',
+    async ({ isError, expected }) => {
+      preference.enabled = true;
+      const refetch = vi.fn<() => void>();
+      modelsState.models = [];
+      modelsState.isError = isError;
+      modelsState.refetch = refetch;
+      const renderer = await mountScreen();
 
-    // The row is disabled and carries no failure copy: the state block below is
-    // the single message, so the same failure is never read twice.
-    expect(findConfigureRow(renderer, 'Model').props).toMatchObject({
-      subtitle: '—',
-      disabled: true,
-    });
-    expect(findPreferenceRow(renderer).props.disabled).toBe(false);
+      // The row is disabled and carries no failure copy: the state block below
+      // is the single message, so the same failure is never read twice.
+      expect(findConfigureRow(renderer, 'Model').props).toMatchObject({
+        subtitle: '—',
+        disabled: true,
+      });
+      expect(findPreferenceRow(renderer).props.disabled).toBe(false);
 
-    const [errorState] = findQueryErrors(renderer);
-    if (!errorState) {
-      throw new Error('QueryError not found');
+      const [stateNode] = findQueryErrors(renderer);
+      if (!stateNode) {
+        throw new Error('QueryError not found');
+      }
+      expect(stateNode.props).toMatchObject({
+        placement: 'top',
+        isRetrying: false,
+        ...expected,
+      });
+      act(() => {
+        (stateNode.props.onRetry as () => void)();
+      });
+      expect(refetch).toHaveBeenCalledTimes(1);
     }
-    expect(errorState.props).toMatchObject({
-      variant: 'server',
-      placement: 'top',
-      title: 'Could not load models',
-      isRetrying: false,
-    });
-    act(() => {
-      (errorState.props.onRetry as () => void)();
-    });
-    expect(refetch).toHaveBeenCalledTimes(1);
-  });
-
-  it('shows the empty state with a working retry and keeps the switch enabled', async () => {
-    preference.enabled = true;
-    const refetch = vi.fn<() => void>();
-    modelsState.models = [];
-    modelsState.refetch = refetch;
-    const renderer = await mountScreen();
-
-    // The row is disabled and carries no failure copy: the state block below is
-    // the single message, so the same failure is never read twice.
-    expect(findConfigureRow(renderer, 'Model').props).toMatchObject({
-      subtitle: '—',
-      disabled: true,
-    });
-    expect(findPreferenceRow(renderer).props.disabled).toBe(false);
-
-    const [emptyState] = findQueryErrors(renderer);
-    if (!emptyState) {
-      throw new Error('QueryError not found');
-    }
-    expect(emptyState.props).toMatchObject({
-      placement: 'top',
-      title: 'No models available',
-      isRetrying: false,
-    });
-    act(() => {
-      (emptyState.props.onRetry as () => void)();
-    });
-    expect(refetch).toHaveBeenCalledTimes(1);
-  });
+  );
 
   it('opens the model picker with the stored value and writes the picked model', async () => {
     preference.enabled = true;
@@ -343,6 +332,13 @@ describe('ToolSummaryTranslationSettingsScreen', () => {
     });
     expect(findTexts(renderer)).not.toContain(
       'This model is no longer offered. Tap Model to choose another.'
+    );
+  });
+
+  it('renders a search target for every indexed translation row', async () => {
+    expectRenderedSettingsTargets(
+      await mountScreen(),
+      '/(app)/(tabs)/(3_profile)/tool-summary-translation'
     );
   });
 });

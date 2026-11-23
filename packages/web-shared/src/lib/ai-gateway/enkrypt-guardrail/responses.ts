@@ -171,7 +171,9 @@ export function enkryptGuardrailRejectionResponse(
   kind: GatewayChatApiKind,
   verdict: EnkryptGuardrailVerdict
 ): NextResponse | null {
-  if (verdict.action === 'skip' || verdict.action === 'allow') return null;
+  if (verdict.action === 'skip' || verdict.action === 'allow' || verdict.action === 'fail_open') {
+    return null;
+  }
   return rejectionJson(kind, guardrailRejection(verdict, 'input'));
 }
 

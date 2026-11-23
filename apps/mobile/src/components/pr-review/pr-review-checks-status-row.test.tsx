@@ -73,10 +73,10 @@ const EXPECTED = {
 
 let mounted: TestRenderer.ReactTestRenderer | undefined = undefined;
 
-function mountRow(status: PrReviewChecksStatus = 'success', count = 3, showSeparator = false) {
+function mountRow(status: PrReviewChecksStatus = 'success', count = 3) {
   act(() => {
     mounted = TestRenderer.create(
-      <PrReviewChecksStatusRow status={status} count={count} showSeparator={showSeparator}>
+      <PrReviewChecksStatusRow status={status} count={count}>
         {createElement('Text', null, 'group body')}
       </PrReviewChecksStatusRow>
     );
@@ -153,30 +153,6 @@ describe('PrReviewChecksStatusRow', () => {
     const renderer = mountRow('pending', 12);
 
     expect(header(renderer).props.accessibilityLabel).toBe('prReview.checks.pending=12/12');
-  });
-
-  it('draws the hairline only when it is not the last group row', () => {
-    const withSeparator = mountRow('success', 1, true);
-    expect(
-      withSeparator.root.findAll(
-        node =>
-          typeof node.props.className === 'string' &&
-          node.props.className.includes('border-b-[0.5px]')
-      )
-    ).toHaveLength(1);
-    act(() => {
-      withSeparator.unmount();
-    });
-    mounted = undefined;
-
-    const withoutSeparator = mountRow('success', 1, false);
-    expect(
-      withoutSeparator.root.findAll(
-        node =>
-          typeof node.props.className === 'string' &&
-          node.props.className.includes('border-b-[0.5px]')
-      )
-    ).toHaveLength(0);
   });
 
   it.each(STATUSES)('renders the %s row icon, spin state and label', status => {

@@ -21,11 +21,25 @@ const formDraftMock = vi.hoisted(() => ({
   clearFormDrafts: vi.fn(),
 }));
 
+const shareMock = vi.hoisted(() => ({
+  clearAccountStagedSharePayloads: vi.fn(),
+  clearAccountStagedShareNavigation: vi.fn(),
+}));
+
 const mergeOperationKeyMock = vi.hoisted(() => ({
   clearMergeOperationKeys: vi.fn(),
 }));
 
 vi.mock('@/lib/native-system-search', () => nativeSearchMock);
+
+// The staged share deliveries are the account-bound store this clear owns; its
+// own suites pin which entries survive the boundary and which do not.
+vi.mock('@/lib/share-payload', () => ({
+  clearAccountStagedSharePayloads: shareMock.clearAccountStagedSharePayloads,
+}));
+vi.mock('@/lib/share-navigation', () => ({
+  clearAccountStagedShareNavigation: shareMock.clearAccountStagedShareNavigation,
+}));
 
 // The App Intents catalog is the same titles in another place; the boundary's
 // real clear helper runs against this faked bridge.
@@ -69,7 +83,7 @@ import {
 } from './session-scoped-state';
 /* eslint-enable import/first */
 
-/** One tracked entry of the fake filesystem, keyed by the URI parts it was built from. */
+/** Shared deleted-URI log and root-existence state for the mocked expo-file-system. */
 const fakeFs = vi.hoisted(() => {
   const deleted: string[] = [];
   const state = { rootExists: true };
@@ -195,8 +209,6 @@ vi.mock('@/lib/last-opened-session', () => ({
   clearLastOpenedSession: mocks.clearLastOpenedSession,
 }));
 vi.mock('@/lib/last-route', () => ({ clearLastRoute: mocks.clearLastRoute }));
-// The platform provider bridge: sign-out has to tell an open Files app the tree
-// changed, or it keeps the listing it read before the wipe.
 vi.mock('@/lib/artifacts/artifact-provider-native', () => ({
   notifyArtifactsChanged: mocks.notifyArtifactsChanged,
 }));
@@ -221,6 +233,8 @@ const SESSION_MEMBERS = [
   mocks.clearChatBackends,
   mocks.clearSettingsToolsEnabled,
   mocks.clearRepoSelectionSenders,
+  shareMock.clearAccountStagedSharePayloads,
+  shareMock.clearAccountStagedShareNavigation,
   mocks.clearLauncherSurfaces,
   mocks.clearLastOpenedSession,
   mocks.clearLastRoute,
@@ -248,16 +262,36 @@ describe('clearSessionScopedState', () => {
   });
 
   it('drops the stored PR recents the index folds into every document set', () => {
-    // A direct account switch runs this clear but not sign-out's own recents
-    // clear; without it the collector re-indexes the previous account's PRs.
     clearSessionScopedState();
     expect(recentPrsMock.clearRecentPrs).toHaveBeenCalledTimes(1);
   });
 
+  it('drops the staged share deliveries at the account boundary', () => {
+    // Both boundaries (sign-out and a direct account switch) run this clear,
+    // so staged share state belongs to one account session.
+    clearSessionScopedState();
+    expect(shareMock.clearAccountStagedSharePayloads).toHaveBeenCalledTimes(1);
+    expect(shareMock.clearAccountStagedShareNavigation).toHaveBeenCalledTimes(1);
+
+    clearSessionScopedState();
+    expect(shareMock.clearAccountStagedSharePayloads).toHaveBeenCalledTimes(2);
+    expect(shareMock.clearAccountStagedShareNavigation).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps clearing after a staged-share clear throws', () => {
+    shareMock.clearAccountStagedSharePayloads.mockImplementationOnce(() => {
+      throw new Error('share store unavailable');
+    });
+
+    expect(() => {
+      clearSessionScopedState();
+    }).not.toThrow();
+
+    expect(shareMock.clearAccountStagedShareNavigation).toHaveBeenCalledTimes(1);
+    expect(nativeSearchMock.clearSystemSearchIndex).toHaveBeenCalledTimes(1);
+  });
+
   it('drops the App Intents catalog that names the previous account’s sessions', () => {
-    // The same titles the search index holds are also what Shortcuts and Siri
-    // offer; a boundary that cleared one and not the other would leave them
-    // addressable from outside the app.
     clearSessionScopedState();
     expect(sessionCatalogMock.clearNativeSessionCatalog).toHaveBeenCalledTimes(1);
 
@@ -280,7 +314,6 @@ describe('clearSessionScopedState', () => {
         tags: { 'error.subsystem': 'app-intent-catalog', 'error.operation': 'clear' },
       });
     });
-    // The members after it still ran.
     expect(nativeSearchMock.clearSystemSearchIndex).toHaveBeenCalledTimes(1);
   });
 
@@ -335,12 +368,19 @@ describe('clearSessionScopedState', () => {
     });
     const comment = { id: 'c1' } as unknown as ConversationComment;
     expect(
-      retainConversationAcrossMounts(retentionKey, [{ conversation: [comment] }], true)
-    ).toEqual([comment]);
+      retainConversationAcrossMounts(
+        retentionKey,
+        [{ conversation: [comment], truncated: true }],
+        true
+      )
+    ).toEqual({ comments: [comment], truncated: true });
 
     clearSessionScopedState();
 
-    expect(retainConversationAcrossMounts(retentionKey, [{ conversation: [] }], false)).toEqual([]);
+    expect(retainConversationAcrossMounts(retentionKey, [{ conversation: [] }], false)).toEqual({
+      comments: [],
+      truncated: false,
+    });
   });
 
   it('reports a rejected recents clear instead of leaving it unhandled', async () => {
@@ -393,6 +433,56 @@ describe('clearSystemSearchIndexOnSignedOutLaunch', () => {
     // Siri for the whole signed-out window.
     clearSystemSearchIndexOnSignedOutLaunch();
     expect(sessionCatalogMock.clearNativeSessionCatalog).toHaveBeenCalledTimes(1);
+  });
+
+  it('re-runs the OS launcher-surface clear for the signed-out launch', () => {
+    // The shortcuts, the quick-settings tile and the Quick Actions are
+    // device-wide and label themselves from the signed-in account's sessions, so
+    // a sign-out whose clear never landed must not keep offering the previous
+    // account's session for the whole signed-out window.
+    clearSystemSearchIndexOnSignedOutLaunch();
+
+    expect(mocks.clearLauncherSurfaces).toHaveBeenCalledTimes(1);
+
+    clearSystemSearchIndexOnSignedOutLaunch();
+
+    expect(mocks.clearLauncherSurfaces).toHaveBeenCalledTimes(2);
+  });
+
+  it('makes a mounted launcher publisher write its derivation again after the launch', () => {
+    // The clear runs outside the publisher, so the surface revision it records is
+    // what stops a publisher from treating its own last payload as current.
+    const publish = vi.fn<(payload: unknown) => void>();
+    const publisher = createLauncherSurfacesPublisher(publish, () => {
+      mocks.clearLauncherSurfaces();
+    });
+    const launcherTargets = {
+      newAgentUrl: 'kiloapp:///cloud/sessions/new',
+      needsInputUrl: null,
+      openLastSessionUrl: null,
+    };
+    const translate = (key: string): string => key;
+
+    publisher.apply(launcherTargets, translate);
+    expect(publish).toHaveBeenCalledTimes(1);
+
+    clearSystemSearchIndexOnSignedOutLaunch();
+
+    publisher.apply(launcherTargets, translate);
+    expect(publish).toHaveBeenCalledTimes(2);
+  });
+
+  it('re-runs the stored PR recents delete for the signed-out launch', () => {
+    // The recents key is device-global and the index collector folds it into the
+    // search documents, so a sign-out whose delete never landed would let the
+    // next account's first sync publish the previous account's pull requests.
+    clearSystemSearchIndexOnSignedOutLaunch();
+
+    expect(recentPrsMock.clearRecentPrs).toHaveBeenCalledTimes(1);
+
+    clearSystemSearchIndexOnSignedOutLaunch();
+
+    expect(recentPrsMock.clearRecentPrs).toHaveBeenCalledTimes(2);
   });
 
   it('deletes the mirror root once, then signals the provider', () => {
@@ -471,8 +561,6 @@ describe('clearSessionScopedState', () => {
   });
 
   it('signals the platform provider once the mirror is gone', () => {
-    // An open Files app keeps the listing it last read until the provider says
-    // the tree changed, so the signal must follow the wipe, never precede it.
     let mirrorWasGone: boolean | null = null;
     mocks.notifyArtifactsChanged.mockImplementationOnce(() => {
       mirrorWasGone = !fakeFs.state.rootExists;

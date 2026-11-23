@@ -3,13 +3,22 @@ import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
+import { RowSkeleton } from '@/components/ui/row-skeleton';
+
 import { ProfilePickerSheet, type ProfilePickerSheetProps } from './profile-picker-sheet';
 import { type SessionProfilePickerProfile } from './session-profile-picker-model';
 
 vi.mock('react-native', () => ({
+  I18nManager: { isRTL: false },
   Platform: { OS: 'android' },
   Pressable: 'Pressable',
+  Switch: 'Switch',
   View: 'View',
+  useColorScheme: () => 'light',
+  useWindowDimensions: () => ({ width: 390, height: 844, scale: 2, fontScale: 1 }),
+}));
+vi.mock('expo-haptics', () => ({
+  selectionAsync: vi.fn(),
 }));
 vi.mock('@/components/picker-sheet', () => ({
   PickerSheet: (props: {
@@ -31,17 +40,26 @@ vi.mock('@/components/picker-sheet', () => ({
     ),
 }));
 vi.mock('@/components/empty-state', () => ({
+  StateAction: ({ label, onPress }: { label: string; onPress: () => void }) =>
+    createElement('StateAction', { label, onPress }),
   EmptyState: (props: { title: string; description: unknown; action?: ReactNode }) =>
     createElement('EmptyState', props, props.action),
 }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+// The sheet classifies a failed read through the shared selector, which reads
+// the committed connectivity; this suite exercises the coded states online.
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => 'online',
+}));
+vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/ui/text', async () => {
   const React = await import('react');
   return { Text: 'Text', TextClassContext: React.createContext<string | undefined>(undefined) };
 });
 vi.mock('@/components/ui/icons', () => ({
   Check: 'Check',
+  RotateCcw: 'RotateCcw',
   Settings2: 'Settings2',
   SlidersHorizontal: 'SlidersHorizontal',
 }));
@@ -83,6 +101,7 @@ function defaults(overrides: Partial<ProfilePickerSheetProps> = {}): ProfilePick
     defaultProfileApplies: false,
     isLoading: false,
     isError: false,
+    error: undefined,
     needsAttention: false,
     onSelect: vi.fn<() => void>(),
     onManageProfiles: vi.fn<() => void>(),
@@ -105,7 +124,12 @@ function mount(props: Partial<ProfilePickerSheetProps> = {}) {
 }
 
 function radios(renderer: TestRenderer.ReactTestRenderer) {
-  return renderer.root.findAll(node => node.props.accessibilityRole === 'radio');
+  // A row primitive that takes the a11y props carries them on both its own
+  // composite node and the host control it renders; only the host is a control
+  // the platform sees, so the helper counts string-typed nodes.
+  return renderer.root.findAll(
+    node => typeof node.type === 'string' && node.props.accessibilityRole === 'radio'
+  );
 }
 
 function radio(renderer: TestRenderer.ReactTestRenderer, label: string) {
@@ -254,7 +278,7 @@ describe('ProfilePickerSheet', () => {
   it('renders skeleton rows while the profiles load', () => {
     const renderer = mount({ isLoading: true });
 
-    expect(renderer.root.findAllByType('Skeleton' as never)).toHaveLength(4);
+    expect(renderer.root.findAllByType(RowSkeleton)).toHaveLength(4);
     expect(radios(renderer)).toHaveLength(0);
   });
 
@@ -280,16 +304,33 @@ describe('ProfilePickerSheet', () => {
     }
   });
 
-  it('renders the retryable failure with Retry and refetches', () => {
+  // The sheet lists profiles, so a load failure names what did not load in the
+  // sheet's own words, not the Environment row's; an access refusal reads as
+  // the permission state, which offers no Retry.
+  const FAILED_READS = [
+    {
+      code: 'INTERNAL_SERVER_ERROR',
+      expected: { variant: 'server', title: "Couldn't load profiles", retryable: true },
+    },
+    { code: 'FORBIDDEN', expected: { variant: 'permission', retryable: false } },
+  ] as const;
+  it.each(FAILED_READS)('classifies a $code failure', ({ code, expected }) => {
     const onRetry = vi.fn<() => void>();
-    const renderer = mount({ isError: true, onRetry });
+    const renderer = mount({ isError: true, error: { data: { code } }, onRetry });
 
-    const empty = renderer.root.findByType('EmptyState' as never);
-    expect(empty.props.title).toBe("Couldn't load your environment");
-    const retry = renderer.root.findByType('Button' as never);
-    expect(retry.props.accessibilityLabel).toBe('Retry');
-    press(retry);
-    expect(onRetry).toHaveBeenCalledTimes(1);
+    const node = renderer.root.findByType('QueryError' as never);
+    const hasRetry = typeof node.props.onRetry === 'function';
+    expect({ variant: node.props.variant, title: node.props.title, retryable: hasRetry }).toEqual(
+      'title' in expected ? expected : { ...expected, title: undefined }
+    );
+    if (hasRetry) {
+      act(() => {
+        (node.props.onRetry as () => void)();
+      });
+      expect(onRetry).toHaveBeenCalledTimes(1);
+    } else {
+      expect(onRetry).not.toHaveBeenCalled();
+    }
     expect(radios(renderer)).toHaveLength(0);
   });
 
@@ -304,8 +345,8 @@ describe('ProfilePickerSheet', () => {
     expect(empty.props.description).toBe(
       'Create a profile to reuse environment variables, setup commands, and skills across sessions.'
     );
-    const manage = renderer.root.findByType('Button' as never);
-    expect(manage.props.accessibilityLabel).toBe('Manage profiles');
+    const manage = renderer.root.findByType('StateAction' as never);
+    expect(manage.props.label).toBe('Manage profiles');
     press(manage);
     expect(onManageProfiles).toHaveBeenCalledTimes(1);
     expect(radios(renderer)).toHaveLength(0);

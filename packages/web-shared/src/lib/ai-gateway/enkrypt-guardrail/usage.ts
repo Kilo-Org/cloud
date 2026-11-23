@@ -46,6 +46,8 @@ export type EnkryptGuardrailCall = {
   kiloUserId: string;
   sessionId: string | null;
   microdollarUsageId?: string;
+  /** A benchmark case: its guardrail spend must never trigger an automatic top-up. */
+  benchmarkCase?: boolean;
   apiKind: EnkryptGuardrailApiKind;
   decision: EnkryptGuardrailDecision;
   /** Enkrypt's `X-Enkrypt-Credits-Cost` header, or null when the call returned none. */
@@ -59,11 +61,11 @@ export type EnkryptGuardrailCall = {
   scannedCharacters: number;
   /** The text the scan covers, including what the verdict cache covered; see the ledger column. */
   totalCharacters: number;
+  /** How long this Enkrypt call took, in milliseconds; see the ledger column. */
+  addedLatencyMs: number;
 };
 
 export type EnkryptUsageRecord = EnkryptGuardrailCall & {
-  /** The request's wait for the verdict, on one call per request only; see the ledger column. */
-  addedLatencyMs: number | null;
   /** Defaults to the input guardrail. */
   guardrail?: EnkryptGuardrailDirection;
 };
@@ -192,12 +194,19 @@ async function detectorIds(
  * Runs on the primary; gateway code calls `recordEnkryptUsage` instead.
  */
 export async function recordEnkryptUsageLocally(
-  usageWrite: EnkryptUsageWrite
+  usageWrite: EnkryptUsageWrite,
+  fromDb: typeof db = db
 ): Promise<EnkryptUsageWriteResponse['status']> {
   const { id, occurredAt } = usageWrite;
-  const chargedMicrodollars = enkryptCreditsToMicrodollars(usageWrite.creditsCost);
+  // A benchmark case's policy scans run before the signed permit callback, so the payer is not
+  // yet admitted and may never be the one that pays this request. Kilo bears that policy-check
+  // overhead: the guardrail still scans, blocks and records telemetry and credits, but the write
+  // is non-billable, so no payer is debited and no top-up can start. Ordinary calls are unchanged.
+  const chargedMicrodollars = usageWrite.benchmarkCase
+    ? 0
+    : enkryptCreditsToMicrodollars(usageWrite.creditsCost);
 
-  const outcome = await db.transaction(async tx => {
+  const outcome = await fromDb.transaction(async tx => {
     const apiKindId = await lookupId(
       () =>
         tx

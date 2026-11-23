@@ -34,6 +34,10 @@ function summary(
     routeKey,
     accuracy,
     avgCostUsd,
+    avgInputTokens: null,
+    avgCachedInputTokens: null,
+    avgOutputTokens: null,
+    avgReasoningTokens: null,
     avgLatencyMs: 500,
     p50LatencyMs: 450,
     p95LatencyMs: null,
@@ -652,4 +656,125 @@ describe('buildRoutingTable', () => {
     // The published artifact must satisfy the contract schema (variant field allowed).
     expect(RoutingTableSchema.parse(table)).toEqual(table);
   });
+});
+
+describe('buildCustomRoutingTable tie order', () => {
+  // Tied fixtures: two models with one null variant that match on every ranking
+  // key, and one model whose two variants match each other. Nothing but the row
+  // order reaching the ranker can separate them, so a shuffle must not move a
+  // single candidate, route key or effort entry.
+  const base = {
+    generatedAt: '2026-01-01T00:00:00.000Z',
+    minAccuracy: 0.7,
+    switchCostFactor: 3,
+    bestAccuracySwitchThreshold: 0.05,
+  };
+  const pairs = [
+    { model: 'vendor/aaa', variant: null },
+    { model: 'vendor/m', variant: 'high' },
+    { model: 'vendor/m', variant: 'low' },
+    { model: 'vendor/zzz', variant: null },
+  ] as const;
+  const routes: TaxonomyRouteKey[] = ['implementation/code_generation', 'debugging/bug_fixing'];
+  const readyEntries = pairs.map(pair => ({ entry: { ...pair }, runId: 'run-tied' }));
+  const summaries = pairs.flatMap(pair =>
+    routes.map(routeKey => ({
+      ...summary(pair.model, routeKey, 0.9, 0.001),
+      variant: pair.variant,
+      runId: 'run-tied',
+    }))
+  );
+  const complexityLabels: ComplexityLabels = Object.fromEntries(
+    ['low', 'high'].flatMap(bucket =>
+      Array.from({ length: MIN_COMPLEXITY_CASES }, (_, i) => [`${bucket}-${i}`, bucket])
+    )
+  ) as ComplexityLabels;
+  const perCaseResults: OfflineSweep['pairs'] = pairs.map(pair => ({
+    model: pair.model,
+    variant: pair.variant,
+    results: routes.flatMap(routeKey =>
+      ['low', 'high'].flatMap(bucket =>
+        Array.from({ length: MIN_COMPLEXITY_CASES }, (_, i) => ({
+          caseId: `${bucket}-${i}`,
+          rep: 0,
+          routeKey,
+          split: 'train' as const,
+          score: 0.9,
+          costUsd: 0.001,
+          graderCostUsd: 0,
+          latencyMs: 100,
+          error: null,
+        }))
+      )
+    ),
+  }));
+
+  const build = (params: {
+    readyEntries: typeof readyEntries;
+    summaries: typeof summaries;
+    perCaseResults: typeof perCaseResults;
+  }) =>
+    buildCustomRoutingTable({
+      ...base,
+      ...params,
+      complexityLabels,
+    });
+
+  const canonical = build({ readyEntries, summaries, perCaseResults });
+  const baseline = JSON.stringify(canonical);
+
+  /** Fisher–Yates over a seeded PRNG so a failure names the seed that broke it. */
+  function shuffle<T>(rows: readonly T[], seed: number): T[] {
+    let state = seed >>> 0;
+    const random = () => {
+      state = (state + 0x6d2b79f5) >>> 0;
+      let t = state;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+    const out = [...rows];
+    for (let i = out.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(random() * (i + 1));
+      [out[i], out[j]] = [out[j], out[i]];
+    }
+    return out;
+  }
+
+  it('orders exactly tied candidates by identity, not by arrival', () => {
+    expect(canonical).not.toBeNull();
+    expect(
+      canonical!.routes['implementation/code_generation']?.map(c => [c.model, c.variant])
+    ).toEqual([
+      ['vendor/aaa', null],
+      ['vendor/m', 'high'],
+      ['vendor/m', 'low'],
+      ['vendor/zzz', null],
+    ]);
+    expect(canonical!.effortByComplexity?.['implementation/code_generation']?.['vendor/m']).toEqual(
+      {
+        low: 'high',
+        medium: 'high',
+        high: 'high',
+      }
+    );
+  });
+
+  it.each([1, 2, 3, 5, 8, 13, 21, 34])(
+    'keeps routes, effort and version for shuffle seed %i',
+    seed => {
+      const table = build({
+        readyEntries: shuffle(readyEntries, seed),
+        summaries: shuffle(summaries, seed + 1),
+        perCaseResults: shuffle(perCaseResults, seed + 2).map(pair => ({
+          ...pair,
+          results: shuffle(pair.results, seed + 3),
+        })),
+      });
+      expect(table?.version).toBe(canonical!.version);
+      expect(table?.routes).toEqual(canonical!.routes);
+      expect(table?.effortByComplexity).toEqual(canonical!.effortByComplexity);
+      expect(JSON.stringify(table)).toBe(baseline);
+    }
+  );
 });

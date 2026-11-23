@@ -6,12 +6,13 @@ import type {
   AzureCredentials,
   BedrockCredentials,
   VertexCredentials,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
+} from '@kilocode/app-shared/byok-credentials';
 import type Anthropic from '@anthropic-ai/sdk';
 import type { OrganizationDataRegion } from '@kilocode/db/schema-types';
 
-// Base types for OpenRouter API that don't depend on other lib files
-// This breaks circular dependencies with mistral.ts, minimax.ts, etc.
+// Imports here must be type-only, and this file never imports the provider modules that import it
+// (for example mistral.ts, openai.ts and reflection.ts), which is what keeps the cycle broken. Its
+// own `reasoning-details` and `byok-credentials` imports are the permitted kind: types only.
 
 export type OpenRouterProviderConfig = {
   order?: string[];
@@ -25,7 +26,15 @@ export type OpenRouterProviderConfig = {
   data_collection?: 'allow' | 'deny';
   /** `true` excludes providers that store prompts at all, so it also excludes training. */
   zdr?: boolean;
+  /**
+   * Best-effort preference for providers that support every requested parameter. Support varies
+   * by upstream; a provider may still serve the request without applying some parameters.
+   */
   require_parameters?: boolean;
+  /**
+   * Best-effort preference for upstream provider fallback. Support varies by upstream, and
+   * `false` does not prevent Kilo from retrying on another route.
+   */
   allow_fallbacks?: boolean;
   max_price?: { prompt?: number; completion?: number; request?: number; image?: number };
 };
@@ -65,6 +74,11 @@ export type OpenRouterPlugin = {
 export type OpenRouterReasoningConfig = {
   effort?: OpenAI.Chat.Completions.ChatCompletionReasoningEffort;
   max_tokens?: number;
+  /**
+   * Best-effort request to omit reasoning from Chat Completions responses, not to disable it.
+   * Support varies by upstream, and some models return reasoning that clients must replay on
+   * later turns.
+   */
   exclude?: boolean;
   enabled?: boolean;
 };
@@ -81,7 +95,9 @@ export type SharedGatewayRequestProperties = {
   provider?: OpenRouterProviderConfig;
   providerOptions?: VercelProviderConfig;
 
-  // Forwarded as providerOptions.gateway.models on the Vercel path
+  // Fallback models. Not supported on any route: `removeModelsFallback` drops
+  // `models` and `fallbacks` before a provider setting is built, so a fallback
+  // can never be served unpaid.
   // https://openrouter.ai/docs/api/api-reference/chat/send-chat-completion-request#request.body.models
   models?: string[];
 
@@ -112,6 +128,9 @@ export type GatewayMessagesRequest = SharedGatewayRequestProperties &
   Anthropic.MessageCreateParams & {
     user?: string;
     session_id?: string;
+    // Sampling parameters that clients still send but SDK 1.x dropped from `MessageCreateParams`.
+    temperature?: number;
+    top_p?: number;
     thinking?: Anthropic.ThinkingConfigParam & { block_binding?: ThinkingBlockBinding };
   };
 
@@ -126,6 +145,10 @@ export type OpenRouterChatCompletionRequest = OpenAI.Chat.ChatCompletionCreatePa
     // https://openrouter.ai/docs/use-cases/reasoning-tokens#controlling-reasoning-tokens
     reasoning?: OpenRouterReasoningConfig;
 
+    /**
+     * Legacy best-effort preference for returning reasoning. On OpenRouter, `false` is
+     * equivalent to `reasoning.exclude: true`. Other routes may not honor either flag.
+     */
     include_reasoning?: boolean;
   };
 

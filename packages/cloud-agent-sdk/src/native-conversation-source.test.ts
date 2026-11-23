@@ -1,6 +1,10 @@
-import { kilo2AssetKey, readKilo2Messages } from './kilo2-source-messages';
+import { kilo2AssetKey, kilo2ToolFileId, readKilo2Messages } from './kilo2-source-messages';
 import { applyNativeEvent, applyNativeSessionEvent } from './native-conversation-reducer';
-import { readNativeConversation, reduceNativePendingRequests } from './native-conversation-source';
+import {
+  readNativeConversation,
+  reduceNativePendingRequests,
+  retryableGapCount,
+} from './native-conversation-source';
 import type { NativeEvent, NativeSessionState } from './native-sync';
 import type { NativeSnapshotMessage } from './native-sync-snapshot';
 
@@ -18,7 +22,7 @@ const state: NativeSessionState = {
   connection: 'connected',
   runnerConnected: true,
   events: [],
-  pending: { permissions: [], questions: [], unreadablePermissions: [] },
+  pending: { permissions: [], questions: [], unreadableQuestions: [], unreadablePermissions: [] },
   commands: {},
 };
 function frame(type: string, data: Record<string, unknown>, seq = 10): NativeEvent {
@@ -54,78 +58,86 @@ function start(messages: NativeSnapshotMessage[] = []) {
 }
 
 test('native snapshots use the exact Cloud projector for files, errors, costs, metadata and message order', () => {
-  const messages: NativeSnapshotMessage[] = [
-    {
-      seq: 1,
-      message: {
-        id: 'msg_user',
-        type: 'user',
-        text: 'Read this',
-        time: { created: 1 },
-        metadata: { nested: { private: 'retained' } },
-        files: [
-          { mime: 'image/png', data: 'aW1hZ2U=', name: 'inline.png', source: { type: 'inline' } },
-          {
-            mime: 'text/plain',
-            data: '',
-            name: 'uri.txt',
-            source: { type: 'uri', uri: 'https://example.test/file.txt' },
-          },
-        ],
-      },
+  const projectedSession = { ...session, location: { directory: session.origin.directory } };
+  const user: NativeSnapshotMessage = {
+    seq: 1,
+    message: {
+      id: 'msg_user',
+      type: 'user',
+      text: 'Read this',
+      time: { created: 1 },
+      metadata: { nested: { private: 'retained' } },
+      files: [
+        { mime: 'image/png', data: 'aW1hZ2U=', name: 'inline.png', source: { type: 'inline' } },
+        // A legal native user file: inline bytes plus a source reference. The bytes are
+        // the display, so the reference beside them never becomes one.
+        {
+          mime: 'text/plain',
+          data: 'aGVsbG8=',
+          name: 'uri.txt',
+          source: { type: 'uri', uri: 'https://example.test/file.txt' },
+        },
+      ],
     },
-    {
-      seq: 2,
-      message: {
-        id: 'msg_answer',
-        type: 'assistant',
-        time: { created: 2, completed: 3 },
-        cost: 1.25,
-        tokens: { input: 4, output: 5, reasoning: 6, cache: { read: 7, write: 8 } },
-        error: { type: 'provider.error', message: 'Specific provider failure' },
-        content: [
-          {
-            type: 'reasoning',
-            text: 'Considering',
-            time: { created: 2, completed: 3 },
-            native: { nested: ['kept'] },
+  };
+  const answer: NativeSnapshotMessage = {
+    seq: 2,
+    message: {
+      id: 'msg_answer',
+      type: 'assistant',
+      time: { created: 2, completed: 3 },
+      cost: 1.25,
+      tokens: { input: 4, output: 5, reasoning: 6, cache: { read: 7, write: 8 } },
+      error: { type: 'provider.error', message: 'Specific provider failure' },
+      content: [
+        {
+          type: 'reasoning',
+          text: 'Considering',
+          time: { created: 2, completed: 3 },
+          native: { nested: ['kept'] },
+        },
+        {
+          type: 'tool',
+          id: 'call',
+          name: 'shell',
+          state: {
+            status: 'error',
+            input: { command: 'false' },
+            error: { type: 'tool.error', message: 'Exit code 1' },
+            metadata: { retained: { exact: true } },
           },
-          {
-            type: 'tool',
-            id: 'call',
-            name: 'shell',
-            state: {
-              status: 'error',
-              input: { command: 'false' },
-              error: { type: 'tool.error', message: 'Exit code 1' },
-              metadata: { retained: { exact: true } },
-            },
-          },
-          { type: 'text', text: 'Failed' },
-        ],
-      },
+        },
+        { type: 'text', text: 'Failed' },
+      ],
     },
-  ];
+  };
+  const messages = [user, answer];
   const result = readNativeConversation({ ...state, messages });
+  // Native values stay exactly as received; only the display is gated.
   expect(result.nativeMessages).toBe(messages);
+  expect(result.nativeMessages.map(item => item.message.id)).toEqual(['msg_user', 'msg_answer']);
   expect(result.session).toBe(session);
   expect(result.messages).toEqual(
     readKilo2Messages(
-      { ...session, location: { directory: session.origin.directory } },
+      projectedSession,
       messages.map(item => item.message)
     )
   );
   expect(result.messages.map(item => item.info.id)).toEqual(['msg_user', 'msg_answer']);
+  // Both files are legal native user files, so both display; the one that carries
+  // inline bytes displays those bytes rather than its source reference.
   expect(result.messages[0]?.parts).toMatchObject([
     { type: 'text' },
     { type: 'file', url: 'data:image/png;base64,aW1hZ2U=' },
-    { type: 'file', url: 'https://example.test/file.txt' },
+    { type: 'file', url: 'data:text/plain;base64,aGVsbG8=' },
   ]);
+  expect(JSON.stringify(result.messages)).not.toContain('https://example.test/file.txt');
+  expect(result.incompleteMessageIDs).toEqual([]);
+  expect(result.error).toBeUndefined();
   expect(result.messages[1]?.info).toMatchObject({
     cost: 1.25,
-    tokens: messages[1]?.message.tokens,
+    tokens: answer.message.tokens,
     error: { data: { message: 'Specific provider failure' } },
-    parentID: 'msg_user',
   });
   expect(result.messages[1]?.parts[1]).toMatchObject({
     type: 'tool',
@@ -287,7 +299,8 @@ test('incomplete native values never become a complete empty transcript and rese
   const before = readNativeConversation({ ...state, messages });
   expect(before.messages).toEqual([]);
   expect(before.incompleteMessageIDs).toEqual(['msg_answer']);
-  expect(before.error).toContain('incomplete');
+  expect(before.recoveryGaps).toBe(1);
+  expect(before.error).toBeUndefined();
   const after = applyNativeEvent(
     messages,
     frame('session.message.content.updated', {
@@ -307,6 +320,40 @@ test('incomplete native values never become a complete empty transcript and rese
   expect(
     readNativeConversation({ ...state, connection: 'disconnected', error: 'forbidden' }).error
   ).toBe('forbidden');
+  // A projection failure is a real error and charges no gap count: Retry
+  // cannot fill parts a broken projection dropped, so the count stays at the
+  // genuinely incomplete identities. The split lives in retryableGapCount —
+  // the projector's throws are unreachable through this boundary (the
+  // unresolved-asset filter subsumes them), so the helper is pinned directly.
+  expect(
+    retryableGapCount(
+      [
+        {
+          seq: 1,
+          incomplete: true,
+          message: { id: 'msg_a', type: 'assistant', time: { created: 1 } },
+        },
+      ],
+      ['msg_b'],
+      new Set(['msg_c']),
+      true
+    )
+  ).toBe(2);
+  expect(retryableGapCount([], undefined, new Set(['msg_c']), true)).toBe(0);
+  expect(
+    retryableGapCount(
+      [
+        {
+          seq: 1,
+          incomplete: true,
+          message: { id: 'msg_a', type: 'assistant', time: { created: 1 } },
+        },
+      ],
+      ['msg_b'],
+      new Set(['msg_c']),
+      false
+    )
+  ).toBe(3);
 });
 
 test('authoritative content replacement retains metadata and resets only obsolete source ordinals', () => {
@@ -378,7 +425,12 @@ test('pending inventory, full permission/form metadata and settlements survive a
     ...frame('remote.state', {}),
     body: { pending: { permissions: [], questions: [] } },
   });
-  expect(pending).toEqual({ permissions: [], questions: [], unreadablePermissions: [] });
+  expect(pending).toEqual({
+    permissions: [],
+    questions: [],
+    unreadableQuestions: [],
+    unreadablePermissions: [],
+  });
 });
 
 test.each([null, {}, { pending: null }, { pending: { permissions: [] } }])(
@@ -387,20 +439,160 @@ test.each([null, {}, { pending: null }, { pending: { permissions: [] } }])(
     const pending = {
       permissions: [{ id: 'stale', action: 'edit', resources: ['file'] }],
       questions: [{ id: 'stale-question', metadata: { kind: 'question' as const }, fields: [] }],
+      unreadableQuestions: [{ requestId: 'stale-unreadable-question' }],
       unreadablePermissions: [{ requestId: 'stale-unreadable' }],
     };
     expect(reduceNativePendingRequests(pending, { ...frame('remote.state', {}), body })).toEqual({
       permissions: [],
       questions: [],
+      unreadableQuestions: [],
       unreadablePermissions: [],
     });
   }
 );
 
+test('readable inventory entries survive beside an unreadable one, whose notice names only its request', () => {
+  const pending = reduceNativePendingRequests(state.pending, {
+    ...frame('remote.state', {}),
+    body: {
+      pending: {
+        permissions: [
+          { requestID: 'first', tool: 'shell', summary: 'Run tests' },
+          { requestID: 'unreadable', tool: 'unknown', summary: 3 },
+          { requestID: 'second', tool: 'edit', summary: 'Write file' },
+        ],
+        questions: [
+          { requestID: 'asked', fields: [{ type: 'string', key: 'q' }] },
+          { requestID: 'broken', fields: 'not an array' },
+        ],
+      },
+    },
+  });
+  expect(pending.permissions.map(item => item.id)).toEqual(['first', 'second']);
+  expect(pending.permissions).toMatchObject([
+    { id: 'first', action: 'shell', resources: ['Run tests'] },
+    { id: 'second', action: 'edit', resources: ['Write file'] },
+  ]);
+  expect(pending.unreadablePermissions).toEqual([{ requestId: 'unreadable' }]);
+  expect(pending.unreadableQuestions).toEqual([{ requestId: 'broken' }]);
+  expect(pending.questions.map(item => item.id)).toEqual(['asked']);
+  expect(pending.questions).toMatchObject([{ id: 'asked', metadata: { kind: 'question' } }]);
+});
+
+test('an unreadable inventory permission with no readable identity is dropped without a notice', () => {
+  const pending = reduceNativePendingRequests(state.pending, {
+    ...frame('remote.state', {}),
+    body: {
+      pending: {
+        permissions: [
+          { tool: 'shell', summary: 'Run tests' },
+          { requestID: '', tool: 'shell' },
+        ],
+        questions: [{ requestID: '', fields: [{ type: 'string', key: 'q' }] }],
+      },
+    },
+  });
+  expect(pending.permissions).toEqual([]);
+  expect(pending.unreadableQuestions).toEqual([]);
+  expect(pending.unreadablePermissions).toEqual([]);
+  expect(pending.questions).toEqual([]);
+});
+
+test('two unreadable inventory entries naming one request yield a single notice', () => {
+  const pending = reduceNativePendingRequests(state.pending, {
+    ...frame('remote.state', {}),
+    body: {
+      pending: {
+        permissions: [
+          { requestID: 'twice', tool: 'shell' },
+          { requestID: 'twice', tool: 'edit' },
+        ],
+      },
+    },
+  });
+  expect(pending.permissions).toEqual([]);
+  expect(pending.unreadablePermissions).toEqual([{ requestId: 'twice' }]);
+});
+
+test('an inventory question with no fields is a notice, not a card with nothing to answer', () => {
+  const pending = reduceNativePendingRequests(state.pending, {
+    ...frame('remote.state', {}),
+    body: {
+      pending: {
+        questions: [
+          { requestID: 'empty', fields: [] },
+          { requestID: 'answered', fields: [{ type: 'string', key: 'q' }] },
+        ],
+      },
+    },
+  });
+  expect(pending.questions.map(item => item.id)).toEqual(['answered']);
+  expect(pending.unreadableQuestions).toEqual([{ requestId: 'empty' }]);
+  // The inventory is authoritative: a card an earlier frame showed for the
+  // same id does not survive the frame that cannot describe its fields.
+  const stale = {
+    ...pending,
+    questions: [
+      ...pending.questions,
+      { id: 'empty', metadata: { kind: 'question' as const }, fields: [] },
+    ],
+  };
+  const rebuilt = reduceNativePendingRequests(stale, {
+    ...frame('remote.state', {}, 11),
+    body: { pending: { questions: [{ requestID: 'empty', fields: [] }] } },
+  });
+  expect(rebuilt.questions).toEqual([]);
+  expect(rebuilt.unreadableQuestions).toEqual([{ requestId: 'empty' }]);
+});
+
+test('an inventory rebuilds unreadable notices from its own contents', () => {
+  const pending = {
+    permissions: [],
+    questions: [],
+    unreadableQuestions: [{ requestId: 'settled' }, { requestId: 'now-readable' }],
+    unreadablePermissions: [{ requestId: 'settled' }, { requestId: 'now-readable' }],
+  };
+  const next = reduceNativePendingRequests(pending, {
+    ...frame('remote.state', {}),
+    body: {
+      pending: {
+        permissions: [
+          { requestID: 'now-readable', tool: 'shell', summary: 'Run tests' },
+          { requestID: 'still-unreadable', tool: 'shell' },
+        ],
+        questions: [
+          { requestID: 'now-readable', fields: [{ type: 'string', key: 'q' }] },
+          { requestID: 'still-unreadable', fields: [{ type: 'string', key: 'q' }, 3] },
+        ],
+      },
+    },
+  });
+  expect(next.permissions.map(item => item.id)).toEqual(['now-readable']);
+  expect(next.unreadablePermissions).toEqual([{ requestId: 'still-unreadable' }]);
+  expect(next.questions.map(item => item.id)).toEqual(['now-readable']);
+  expect(next.unreadableQuestions).toEqual([{ requestId: 'still-unreadable' }]);
+});
+
+test('an inventory that omits questions keeps the readable permissions it lists', () => {
+  const pending = {
+    permissions: [],
+    questions: [{ id: 'stale', metadata: { kind: 'question' as const }, fields: [] }],
+    unreadableQuestions: [],
+    unreadablePermissions: [],
+  };
+  const next = reduceNativePendingRequests(pending, {
+    ...frame('remote.state', {}),
+    body: { pending: { permissions: [{ requestID: 'listed', tool: 'shell', summary: 'Run' }] } },
+  });
+  expect(next.permissions.map(item => item.id)).toEqual(['listed']);
+  expect(next.questions).toEqual([]);
+});
+
 test('reports a malformed live permission by identity and keeps valid pending requests', () => {
   const pending = {
     permissions: [{ id: 'current', action: 'edit', resources: ['file'] }],
     questions: [],
+    unreadableQuestions: [],
     unreadablePermissions: [],
   };
   expect(
@@ -411,6 +603,7 @@ test('reports a malformed live permission by identity and keeps valid pending re
   ).toEqual({
     permissions: [{ id: 'current', action: 'edit', resources: ['file'] }],
     questions: [],
+    unreadableQuestions: [],
     unreadablePermissions: [{ requestId: 'invalid' }],
   });
   expect(
@@ -425,6 +618,7 @@ test('unreadable permission notices replace cards, clear on reply and yield to a
   const pending = {
     permissions: [{ id: 'current', action: 'edit', resources: ['file'] }],
     questions: [],
+    unreadableQuestions: [],
     unreadablePermissions: [],
   };
   let next = reduceNativePendingRequests(
@@ -458,6 +652,191 @@ test('unreadable permission notices replace cards, clear on reply and yield to a
     reduceNativePendingRequests(next, frame('permission.asked', { id: 'perm-1' }))
       .unreadablePermissions
   ).toEqual([{ requestId: 'perm-1' }, { requestId: 'perm-2' }]);
+});
+
+const emptyPending = {
+  permissions: [],
+  questions: [],
+  unreadableQuestions: [],
+  unreadablePermissions: [],
+};
+
+test('replayed permissions keep their card in place and a new request appends at the tail', () => {
+  let next = reduceNativePendingRequests(
+    emptyPending,
+    frame('permission.asked', { id: 'perm-1', action: 'shell', resources: ['build'] })
+  );
+  next = reduceNativePendingRequests(
+    next,
+    frame('permission.asked', { id: 'perm-2', action: 'edit', resources: ['file'] })
+  );
+  // The wrapper replays its pending list after a snapshot: the first request
+  // keeps the head of the oldest-first list and its card.
+  const replayed = reduceNativePendingRequests(
+    next,
+    frame('permission.asked', { id: 'perm-1', action: 'shell', resources: ['build again'] })
+  );
+  expect(replayed.permissions.map(item => item.id)).toEqual(['perm-1', 'perm-2']);
+  expect(replayed.permissions[0]?.resources).toEqual(['build again']);
+  const appended = reduceNativePendingRequests(
+    replayed,
+    frame('permission.asked', { id: 'perm-3', action: 'read', resources: ['log'] })
+  );
+  expect(appended.permissions.map(item => item.id)).toEqual(['perm-1', 'perm-2', 'perm-3']);
+});
+
+test('replayed questions keep their card in place and a new form appends at the tail', () => {
+  const form = (id: string, title: string) => ({
+    id,
+    title,
+    metadata: { kind: 'question' },
+    fields: [{ type: 'text', key: 'answer' }],
+  });
+  let next = reduceNativePendingRequests(
+    emptyPending,
+    frame('form.created', { form: form('question-1', 'First') })
+  );
+  next = reduceNativePendingRequests(
+    next,
+    frame('form.created', { form: form('question-2', 'Second') })
+  );
+  const replayed = reduceNativePendingRequests(
+    next,
+    frame('form.created', { form: form('question-1', 'First again') })
+  );
+  expect(replayed.questions.map(item => item.id)).toEqual(['question-1', 'question-2']);
+  expect(replayed.questions[0]?.title).toBe('First again');
+  const appended = reduceNativePendingRequests(
+    replayed,
+    frame('form.created', { form: form('question-3', 'Third') })
+  );
+  expect(appended.questions.map(item => item.id)).toEqual([
+    'question-1',
+    'question-2',
+    'question-3',
+  ]);
+});
+
+test('reports an unreadable live form by identity and keeps valid pending questions', () => {
+  const pending = {
+    permissions: [],
+    questions: [
+      {
+        id: 'current',
+        metadata: { kind: 'question' as const },
+        fields: [{ type: 'text', key: 'answer' }],
+      },
+    ],
+    unreadableQuestions: [],
+    unreadablePermissions: [],
+  };
+  expect(
+    reduceNativePendingRequests(
+      pending,
+      frame('form.created', {
+        form: { id: 'invalid', metadata: { kind: 'question' }, fields: 'not an array' },
+      })
+    )
+  ).toEqual({
+    permissions: [],
+    questions: pending.questions,
+    unreadableQuestions: [{ requestId: 'invalid' }],
+    unreadablePermissions: [],
+  });
+  expect(
+    reduceNativePendingRequests(
+      pending,
+      frame('form.created', { form: { metadata: { kind: 'question' }, fields: [] } })
+    )
+  ).toBe(pending);
+});
+
+test('a form of another kind never becomes a question notice', () => {
+  const pending = {
+    permissions: [],
+    questions: [],
+    unreadableQuestions: [],
+    unreadablePermissions: [],
+  };
+  for (const form of [
+    { id: 'form-1', metadata: { kind: 'permission' }, fields: 'not an array' },
+    { id: 'form-2', metadata: {}, fields: 'not an array' },
+    { id: 'form-3', fields: 'not an array' },
+  ]) {
+    expect(reduceNativePendingRequests(pending, frame('form.created', { form }))).toBe(pending);
+  }
+});
+
+test('a live form with no fields is a notice and removes a card already shown for its id', () => {
+  const pending = {
+    permissions: [],
+    questions: [
+      {
+        id: 'empty',
+        metadata: { kind: 'question' as const },
+        fields: [{ type: 'text', key: 'answer' }],
+      },
+    ],
+    unreadableQuestions: [],
+    unreadablePermissions: [],
+  };
+  const next = reduceNativePendingRequests(
+    pending,
+    frame('form.created', { form: { id: 'empty', metadata: { kind: 'question' }, fields: [] } })
+  );
+  expect(next.questions).toEqual([]);
+  expect(next.unreadableQuestions).toEqual([{ requestId: 'empty' }]);
+});
+
+test('unreadable question notices replace cards, clear on reply and yield to a readable form', () => {
+  const readable = (id: string) => ({
+    id,
+    metadata: { kind: 'question' as const },
+    fields: [{ type: 'text', key: 'answer' }],
+  });
+  const pending = {
+    permissions: [],
+    questions: [readable('current')],
+    unreadableQuestions: [],
+    unreadablePermissions: [],
+  };
+  let next = reduceNativePendingRequests(
+    pending,
+    frame('form.created', {
+      form: { id: 'current', metadata: { kind: 'question' }, fields: 'not an array' },
+    })
+  );
+  // A card must not stand for fields this app cannot read.
+  expect(next.questions).toEqual([]);
+  expect(next.unreadableQuestions).toEqual([{ requestId: 'current' }]);
+  next = reduceNativePendingRequests(
+    next,
+    frame('form.created', { form: { id: 'question-2', metadata: { kind: 'question' } } })
+  );
+  expect(next.unreadableQuestions).toEqual([{ requestId: 'current' }, { requestId: 'question-2' }]);
+  expect(
+    reduceNativePendingRequests(next, frame('form.replied', { id: 'current' })).unreadableQuestions
+  ).toEqual([{ requestId: 'question-2' }]);
+  expect(
+    reduceNativePendingRequests(next, frame('form.cancelled', { id: 'question-2' }))
+      .unreadableQuestions
+  ).toEqual([{ requestId: 'current' }]);
+  // A readable form for the same id supersedes its notice.
+  const restored = reduceNativePendingRequests(
+    next,
+    frame('form.created', { form: readable('current') })
+  );
+  expect(restored.unreadableQuestions).toEqual([{ requestId: 'question-2' }]);
+  expect(restored.questions.map(item => item.id)).toEqual(['current']);
+  // A replayed request keeps its place: the list is oldest first.
+  expect(
+    reduceNativePendingRequests(
+      { ...next, questions: [] },
+      frame('form.created', {
+        form: { id: 'current', metadata: { kind: 'question' }, fields: 3 },
+      })
+    ).unreadableQuestions
+  ).toEqual([{ requestId: 'current' }, { requestId: 'question-2' }]);
 });
 
 test('native live reduction shares untouched content, ignores late deltas and flags missing ordinals', () => {
@@ -512,7 +891,10 @@ test('native live reduction shares untouched content, ignores late deltas and fl
     })
   );
   expect(missing[0]?.incomplete).toBe(true);
-  expect(readNativeConversation({ ...state, messages: missing }).error).toContain('incomplete');
+  expect(readNativeConversation({ ...state, messages: missing })).toMatchObject({
+    recoveryGaps: 1,
+    error: undefined,
+  });
 });
 
 test('a socket handshake is still loading until its native snapshot read completes', () => {
@@ -522,6 +904,16 @@ test('a socket handshake is still loading until its native snapshot read complet
   expect(
     readNativeConversation({ ...state, snapshot: undefined, session: undefined }).error
   ).toBeUndefined();
+  // A dropped connection before the first snapshot still owes the reader a progress skeleton.
+  expect(
+    readNativeConversation({
+      ...state,
+      connection: 'disconnected',
+      runnerConnected: false,
+      snapshot: undefined,
+      session: undefined,
+    }).loading
+  ).toBe(true);
   expect(readNativeConversation({ ...state, messages: [] }).loading).toBe(false);
 });
 
@@ -624,7 +1016,8 @@ test('native session model and metadata changes preserve complete values, replac
   expect(replaced?.['metadata']).toEqual({ nested: { exact: 'new' } });
   const pendingMove = readNativeConversation({ ...state, pendingSnapshotMessageIDs: ['msg_move'] });
   expect(pendingMove.incompleteMessageIDs).toEqual(['msg_move']);
-  expect(pendingMove.error).toContain('incomplete');
+  expect(pendingMove.recoveryGaps).toBe(1);
+  expect(pendingMove.error).toBeUndefined();
 });
 
 test('unresolved live media stays explicit without hiding other messages or crashing the renderer', () => {
@@ -652,7 +1045,8 @@ test('unresolved live media stays explicit without hiding other messages or cras
   ];
   const unresolved = readNativeConversation({ ...state, messages });
   expect(unresolved.incompleteMessageIDs).toEqual(['msg_media']);
-  expect(unresolved.error).toContain('incomplete');
+  expect(unresolved.recoveryGaps).toBe(1);
+  expect(unresolved.error).toBeUndefined();
   expect(unresolved.messages.map(item => item.info.id)).toEqual(['msg_other']);
   const bytes = 'data:image/png;base64,aW1hZ2U=';
   const resolved = readNativeConversation({
@@ -691,6 +1085,124 @@ test('unresolved live media stays explicit without hiding other messages or cras
       assetURLs: { [kilo2AssetKey('msg_media_000001', uri, 'image/png')]: bytes },
     }).incompleteMessageIDs
   ).toEqual(['msg_media']);
+});
+
+test('a native message whose attachment can never display keeps its text without being reported incomplete', () => {
+  const messages: NativeSnapshotMessage[] = [
+    {
+      seq: 1,
+      message: {
+        id: 'msg_remote_file',
+        type: 'assistant',
+        time: { created: 1, completed: 2 },
+        content: [
+          { type: 'text', text: 'Retrieved the report' },
+          {
+            type: 'tool',
+            id: 'call_remote',
+            name: 'read',
+            state: {
+              status: 'completed',
+              input: { path: 'report.png' },
+              content: [
+                { type: 'file', uri: 'https://example.test/report.png', mime: 'image/png' },
+              ],
+            },
+          },
+        ],
+      },
+    },
+    {
+      seq: 2,
+      message: {
+        id: 'msg_after',
+        type: 'assistant',
+        time: { created: 3, completed: 4 },
+        content: [{ type: 'text', text: 'All done' }],
+      },
+    },
+  ];
+  const conversation = readNativeConversation({ ...state, messages });
+  // An absolute `http(s)` reference is never fetched on purpose, so only its file part is
+  // withheld: the message still displays and the transcript is NOT reported incomplete,
+  // because that reference was never expected from content storage.
+  expect(conversation.messages.map(item => item.info.id)).toEqual(['msg_remote_file', 'msg_after']);
+  expect(conversation.messages[0]?.parts.map(part => part.type)).toEqual(['text', 'tool']);
+  expect(conversation.incompleteMessageIDs).toEqual([]);
+  expect(conversation.recoveryGaps).toBe(0);
+  expect(conversation.error).toBeUndefined();
+  expect(JSON.stringify(conversation.messages)).not.toContain('https://example.test/report.png');
+  expect(conversation.nativeMessages).toBe(messages);
+});
+
+test('a snapshot-reported unavailable media key displays the message without a recovery signal', () => {
+  const uri = `media:${'c'.repeat(64)}`;
+  const messages: NativeSnapshotMessage[] = [
+    {
+      seq: 1,
+      message: {
+        id: 'msg_unavailable_media',
+        type: 'user',
+        time: { created: 1 },
+        text: 'Attached',
+        files: [{ uri, mime: 'image/png', source: { type: 'inline' } }],
+      },
+    },
+  ];
+  const conversation = readNativeConversation({
+    ...state,
+    messages,
+    // The producer wrote this message without its mapping, so this key never resolves.
+    unavailableAssetKeys: [kilo2AssetKey('msg_unavailable_media_000001', uri, 'image/png')],
+  });
+  expect(conversation.messages.map(item => item.info.id)).toEqual(['msg_unavailable_media']);
+  expect(conversation.messages[0]?.parts.map(part => part.type)).toEqual(['text']);
+  expect(conversation.incompleteMessageIDs).toEqual(['msg_unavailable_media']);
+  expect(conversation.recoveryGaps).toBe(0);
+  expect(conversation.error).toBeUndefined();
+  expect(JSON.stringify(conversation.messages)).not.toContain(uri);
+});
+
+test('a snapshot-reported unavailable remote key displays the message without a recovery signal', () => {
+  const uri = 'https://example.test/report.png';
+  const messages: NativeSnapshotMessage[] = [
+    {
+      seq: 1,
+      message: {
+        id: 'msg_unavailable_remote',
+        type: 'assistant',
+        time: { created: 1, completed: 2 },
+        content: [
+          { type: 'text', text: 'Retrieved the report' },
+          {
+            type: 'tool',
+            id: 'call_remote',
+            name: 'read',
+            state: {
+              status: 'completed',
+              input: { path: 'report.png' },
+              content: [{ type: 'file', uri, mime: 'image/png' }],
+            },
+          },
+        ],
+      },
+    },
+  ];
+  const conversation = readNativeConversation({
+    ...state,
+    messages,
+    // The snapshot declared this absolute reference unmapped, so it is reported even
+    // though an absolute `http(s)` reference is normally never fetched on purpose.
+    unavailableAssetKeys: [
+      kilo2AssetKey(kilo2ToolFileId('msg_unavailable_remote', 1, 0), uri, 'image/png'),
+    ],
+  });
+  expect(conversation.messages.map(item => item.info.id)).toEqual(['msg_unavailable_remote']);
+  expect(conversation.messages[0]?.parts.map(part => part.type)).toEqual(['text', 'tool']);
+  expect(conversation.incompleteMessageIDs).toEqual(['msg_unavailable_remote']);
+  expect(conversation.recoveryGaps).toBe(0);
+  expect(conversation.error).toBeUndefined();
+  expect(JSON.stringify(conversation.messages)).not.toContain(uri);
 });
 
 test.each<[string, Record<string, unknown>]>([

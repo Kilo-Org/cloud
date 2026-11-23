@@ -1,4 +1,4 @@
-/* eslint-disable max-lines -- one mounted case per panel state: both manual editors, the save flow, and the retryable save failure */
+/* eslint-disable max-lines -- one mounted case per panel state: both manual editors, the one atomic save, the refusal that must leave the draft intact, and the retry that must reissue the same payload */
 import { createElement, type ReactNode, useState } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -8,6 +8,7 @@ import { AdvancedConfigPanel } from './advanced-config-panel';
 import { SaveProfileSheet } from './save-profile-sheet';
 import { type ProfileSelectorProfile } from './profile-selector-model';
 import { MAX_SETUP_COMMANDS } from '@/components/profiles/profile-commands-model';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { SelectableText } from '@/components/ui/selectable-text';
 import { type VariableEdit } from '@/components/profiles/profile-variables-model';
 
@@ -87,20 +88,14 @@ const BACKEND: ProfileSelectorProfile = {
   ownerType: 'user',
 };
 
+// The panel's save is one atomic `create`, so there is no other mutation to
+// stub: a save that needed a follow-up write would throw here.
 type Mutations = {
   create: { mutateAsync: ReturnType<typeof vi.fn> };
-  setVar: { mutateAsync: ReturnType<typeof vi.fn> };
-  setCommands: { mutateAsync: ReturnType<typeof vi.fn> };
-  setAsDefault: { mutateAsync: ReturnType<typeof vi.fn> };
 };
 
 function mutations(): Mutations {
-  return {
-    create: { mutateAsync: vi.fn().mockResolvedValue({ id: 'new-1' }) },
-    setVar: { mutateAsync: vi.fn().mockResolvedValue({}) },
-    setCommands: { mutateAsync: vi.fn().mockResolvedValue({}) },
-    setAsDefault: { mutateAsync: vi.fn().mockResolvedValue({}) },
-  };
+  return { create: { mutateAsync: vi.fn().mockResolvedValue({ id: 'new-1' }) } };
 }
 
 type ListState = {
@@ -233,9 +228,9 @@ function layout(node: TestRenderer.ReactTestInstance, y: number) {
 }
 
 /**
- * The panel root, or the block it renders while expanded, found by the class
- * token that identifies it inside the panel. Both are the views whose layout
- * the reveal depends on. Matched by token, not by the whole class list, so a
+ * The panel root, or the block it renders while expanded, found by the handle
+ * that identifies it inside the panel. Both are the views whose layout the
+ * reveal depends on. Matched by token, not by the whole class list, so a
  * styling change to either view does not have to be mirrored here.
  */
 function layoutView(renderer: TestRenderer.ReactTestRenderer, token: string) {
@@ -250,6 +245,11 @@ function layoutView(renderer: TestRenderer.ReactTestRenderer, token: string) {
     throw new Error(`no view with layout class ${token}`);
   }
   return found;
+}
+
+/** The panel root: the view whose own offset the reveal reports. */
+function panelRoot(renderer: TestRenderer.ReactTestRenderer) {
+  return renderer.root.findByProps({ testID: 'advanced-config-panel' });
 }
 
 function byLabel(renderer: TestRenderer.ReactTestRenderer, label: string) {
@@ -303,17 +303,46 @@ function typeInto(renderer: TestRenderer.ReactTestRenderer, label: string, value
   });
 }
 
-/** First call position of a mock, for ordering assertions. */
-function callOrder(mock: ReturnType<typeof vi.fn>): number {
-  return mock.mock.invocationCallOrder[0] ?? 0;
-}
-
 function addVariable(renderer: TestRenderer.ReactTestRenderer, key: string, value: string) {
   press(buttonByText(renderer, 'Add variable'));
   typeInto(renderer, 'Key', key);
   typeInto(renderer, 'Value', value);
   press(buttonByText(renderer, 'Save'));
 }
+
+/** Expand the panel and fill one manual variable and one setup command. */
+function fillManualConfig(renderer: TestRenderer.ReactTestRenderer) {
+  press(byLabel(renderer, 'Advanced Configuration'));
+  addVariable(renderer, 'API_KEY', 'abc');
+  press(buttonByText(renderer, 'Add command'));
+  typeInto(renderer, 'Command 1', 'pnpm install');
+}
+
+/** Submit the open save sheet as `name` and let the save settle. */
+async function submitSave(renderer: TestRenderer.ReactTestRenderer, name: string) {
+  typeInto(renderer, 'Profile name', name);
+  await act(async () => {
+    (renderer.root.findByType('SheetHeader' as never).props.onDone as () => void)();
+    await Promise.resolve();
+  });
+}
+
+/** The line the open save sheet states, or null while it states none. */
+function saveSheetMessage(renderer: TestRenderer.ReactTestRenderer): unknown {
+  const sheet = renderer.root.findAll(node => node.type === SaveProfileSheet)[0];
+  if (!sheet) {
+    throw new Error('the save sheet was not mounted');
+  }
+  return sheet.findAllByType(AccessibleStatus as never)[0]?.props.message;
+}
+
+/** The one payload the manual draft must travel in, whatever the attempt. */
+const MANUAL_PAYLOAD = {
+  name: 'My Setup',
+  description: undefined,
+  vars: [{ key: 'API_KEY', value: 'abc', isSecret: false }],
+  commands: ['pnpm install'],
+};
 
 /** Add a variable marked secret, so its row offers the reveal control. */
 function addSecretVariable(renderer: TestRenderer.ReactTestRenderer, key: string, value: string) {
@@ -347,7 +376,7 @@ describe('AdvancedConfigPanel', () => {
     expect(disclosure?.props.accessibilityState).toMatchObject({ expanded: false });
     expect(byLabel(renderer, 'Pick a profile')).toBeUndefined();
     expect(texts(renderer)).not.toContain('Environment variables');
-    expect(buttonByText(renderer, 'Save as Profile')).toBeUndefined();
+    expect(buttonByText(renderer, 'Save as profile')).toBeUndefined();
   });
 
   it('expands to both manual editors and the summary', () => {
@@ -356,8 +385,8 @@ describe('AdvancedConfigPanel', () => {
 
     expect(texts(renderer)).toContain('Environment variables');
     expect(texts(renderer)).toContain('Setup commands');
-    // No manual config yet, so no Save as Profile.
-    expect(buttonByText(renderer, 'Save as Profile')).toBeUndefined();
+    // No manual config yet, so no Save as profile.
+    expect(buttonByText(renderer, 'Save as profile')).toBeUndefined();
   });
 
   it('nests the revealed body under the disclosure row it belongs to', () => {
@@ -401,7 +430,7 @@ describe('AdvancedConfigPanel', () => {
     const renderer = mount({ onRequestReveal });
 
     // The collapsed panel already reports where it sits in the scroll content.
-    layout(layoutView(renderer, 'mt-5'), 812);
+    layout(panelRoot(renderer), 812);
     press(byLabel(renderer, 'Advanced Configuration'));
     // The reveal waits for the expanded block: a scroll issued at the tap would
     // clamp against the collapsed content height and move nothing.
@@ -422,23 +451,23 @@ describe('AdvancedConfigPanel', () => {
 
     // Re-expanding reveals against the offset the panel last reported.
     press(byLabel(renderer, 'Advanced Configuration'));
-    layout(layoutView(renderer, 'mt-5'), 640);
+    layout(panelRoot(renderer), 640);
     layout(layoutView(renderer, 'mt-3'), 690);
     expect(onRequestReveal).toHaveBeenCalledTimes(2);
     expect(onRequestReveal).toHaveBeenLastCalledWith(640);
   });
 
-  it('only offers Save as Profile for commands that will be persisted', () => {
+  it('only offers Save as profile for commands that will be persisted', () => {
     const renderer = mount();
     press(byLabel(renderer, 'Advanced Configuration'));
     press(buttonByText(renderer, 'Add command'));
-    expect(buttonByText(renderer, 'Save as Profile')).toBeUndefined();
+    expect(buttonByText(renderer, 'Save as profile')).toBeUndefined();
     typeInto(renderer, 'Command 1', '   ');
-    expect(buttonByText(renderer, 'Save as Profile')).toBeUndefined();
+    expect(buttonByText(renderer, 'Save as profile')).toBeUndefined();
     typeInto(renderer, 'Command 1', 'pnpm install');
-    expect(buttonByText(renderer, 'Save as Profile')).toBeDefined();
+    expect(buttonByText(renderer, 'Save as profile')).toBeDefined();
     typeInto(renderer, 'Command 1', '');
-    expect(buttonByText(renderer, 'Save as Profile')).toBeUndefined();
+    expect(buttonByText(renderer, 'Save as profile')).toBeUndefined();
   });
 
   it('names each setup-command control after the command position', () => {
@@ -467,12 +496,12 @@ describe('AdvancedConfigPanel', () => {
     );
   });
 
-  it('offers Save as Profile once a manual variable exists', () => {
+  it('offers Save as profile once a manual variable exists', () => {
     const renderer = mount();
     press(byLabel(renderer, 'Advanced Configuration'));
     addVariable(renderer, 'API_KEY', 'abc');
 
-    expect(buttonByText(renderer, 'Save as Profile')).toBeDefined();
+    expect(buttonByText(renderer, 'Save as profile')).toBeDefined();
     expect(texts(renderer)).toContain('1 var');
   });
 
@@ -601,7 +630,7 @@ describe('AdvancedConfigPanel', () => {
     press(byLabel(renderer, 'Advanced Configuration'));
 
     addVariable(renderer, 'API_KEY', 'abc');
-    expect(buttonByText(renderer, 'Save as Profile')).toBeDefined();
+    expect(buttonByText(renderer, 'Save as profile')).toBeDefined();
   });
 
   it('includes the session-owned selected profile in resource counts', () => {
@@ -611,17 +640,12 @@ describe('AdvancedConfigPanel', () => {
     expect(texts(renderer)).toContain('3 vars · 1 setup cmd');
   });
 
-  it('saves the manual config in the web order and selects the new profile', async () => {
+  it('saves the manual config as one atomic create and selects the new profile', async () => {
     const mocks = mutations();
     const onSelectProfile = vi.fn<(id: string | null) => void>();
     const renderer = mount({ mocks, onSelectProfile });
-    press(byLabel(renderer, 'Advanced Configuration'));
-    addVariable(renderer, 'API_KEY', 'abc');
-    // A setup command.
-    press(buttonByText(renderer, 'Add command'));
-    typeInto(renderer, 'Command 1', 'pnpm install');
-    press(buttonByText(renderer, 'Save as Profile'));
-
+    fillManualConfig(renderer);
+    press(buttonByText(renderer, 'Save as profile'));
     typeInto(renderer, 'Profile name', 'My Setup');
     act(() => {
       (renderer.root.findByType('Switch' as never).props.onValueChange as (value: boolean) => void)(
@@ -633,34 +657,18 @@ describe('AdvancedConfigPanel', () => {
       await Promise.resolve();
     });
 
-    expect(callOrder(mocks.create.mutateAsync)).toBeLessThan(callOrder(mocks.setVar.mutateAsync));
-    expect(callOrder(mocks.setVar.mutateAsync)).toBeLessThan(
-      callOrder(mocks.setCommands.mutateAsync)
-    );
-    expect(callOrder(mocks.setCommands.mutateAsync)).toBeLessThan(
-      callOrder(mocks.setAsDefault.mutateAsync)
-    );
-    expect(mocks.create.mutateAsync).toHaveBeenCalledWith({
-      name: 'My Setup',
-      description: undefined,
+    // The vars, the commands and the default flag travel inside the create, so
+    // the server commits them together: nothing is left for a follow-up write.
+    expect(mocks.create.mutateAsync).toHaveBeenCalledExactlyOnceWith({
+      ...MANUAL_PAYLOAD,
+      setAsDefault: true,
     });
-    expect(mocks.setVar.mutateAsync).toHaveBeenCalledWith({
-      profileId: 'new-1',
-      key: 'API_KEY',
-      value: 'abc',
-      isSecret: false,
-    });
-    expect(mocks.setCommands.mutateAsync).toHaveBeenCalledWith({
-      profileId: 'new-1',
-      commands: ['pnpm install'],
-    });
-    expect(mocks.setAsDefault.mutateAsync).toHaveBeenCalledWith({ profileId: 'new-1' });
     expect(toast.success).toHaveBeenCalledTimes(1);
     expect(onSelectProfile).toHaveBeenCalledWith('new-1');
     // The profile carries the draft now, and the server appends a profile's
     // setup commands to the inline ones, so a kept draft would run them twice.
     expect(texts(renderer)).not.toContain('API_KEY');
-    expect(buttonByText(renderer, 'Save as Profile')).toBeUndefined();
+    expect(buttonByText(renderer, 'Save as profile')).toBeUndefined();
     expect(texts(renderer)).toContain('1 var · 1 setup cmd');
   });
 
@@ -671,7 +679,7 @@ describe('AdvancedConfigPanel', () => {
     const renderer = mount({ mocks });
     press(byLabel(renderer, 'Advanced Configuration'));
     addVariable(renderer, 'API_KEY', 'abc');
-    press(buttonByText(renderer, 'Save as Profile'));
+    press(buttonByText(renderer, 'Save as profile'));
     typeInto(renderer, 'Profile name', 'Broken');
 
     await act(async () => {
@@ -681,6 +689,488 @@ describe('AdvancedConfigPanel', () => {
 
     expect(field(renderer, 'Profile name')).toBeTruthy();
     expect(toast.success).not.toHaveBeenCalled();
+    // A bare `Error` carries no tRPC payload, so the panel cannot know whether
+    // the write landed and the sheet states the neutral line, not a server one.
+    expect(saveSheetMessage(renderer)).toBe(i18n.t('profiles.saveFailed'));
+    // The sheet is this flow's only failure surface: no toast repeats the line.
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it('asks the mutation hook for a quiet create, so the sheet alone states a refusal', () => {
+    const renderer = mount({ organizationId: 'org-1' });
+    expect(listMock.useAgentProfileMutations).toHaveBeenLastCalledWith('org-1', {
+      quietCreateErrorToast: true,
+    });
+    renderer.unmount();
+  });
+
+  it('a rejection that carries no Error and no server sentence states the sheet line only', async () => {
+    const mocks = mutations();
+    // The fallback the panel used to toast fired on a rejection that is not an
+    // Error, so this case fails if the panel takes a failure surface of its own.
+    mocks.create.mutateAsync.mockRejectedValue('nope');
+    const renderer = mount({ mocks });
+    fillManualConfig(renderer);
+    press(buttonByText(renderer, 'Save as profile'));
+
+    await submitSave(renderer, 'My Setup');
+
+    expect(mocks.create.mutateAsync).toHaveBeenCalledExactlyOnceWith(MANUAL_PAYLOAD);
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(saveSheetMessage(renderer)).toBe(i18n.t('profiles.saveFailed'));
+  });
+
+  it('a refusal with only a whitespace message states the sheet line only', async () => {
+    const mocks = mutations();
+    // The panel's old fallback fired on a message that trims to nothing, so this
+    // case fails if the panel takes a failure surface of its own.
+    mocks.create.mutateAsync.mockRejectedValue(new Error('   '));
+    const renderer = mount({ mocks });
+    fillManualConfig(renderer);
+    press(buttonByText(renderer, 'Save as profile'));
+
+    await submitSave(renderer, 'My Setup');
+
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(saveSheetMessage(renderer)).toBe(i18n.t('profiles.saveFailed'));
+  });
+
+  it('a refused save leaves the draft intact and writes nothing else', async () => {
+    const mocks = mutations();
+    // The production shape of the client deadline: named like a tRPC client
+    // error but payload-less, so its text is engineering detail, not a refusal.
+    mocks.create.mutateAsync.mockRejectedValue(
+      Object.assign(new Error('Request timed out after 15000ms'), { name: 'TRPCClientError' })
+    );
+    const onSelectProfile = vi.fn<(id: string | null) => void>();
+    const renderer = mount({ mocks, onSelectProfile });
+    fillManualConfig(renderer);
+    press(buttonByText(renderer, 'Save as profile'));
+
+    await submitSave(renderer, 'My Setup');
+
+    // The whole config travels in the refused call, so a partial profile was
+    // never possible and no follow-up write can be left to run.
+    expect(mocks.create.mutateAsync).toHaveBeenCalledExactlyOnceWith(MANUAL_PAYLOAD);
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(onSelectProfile).not.toHaveBeenCalled();
+    // The draft is still the person's: the save did not clear it, and Save is
+    // still offered.
+    expect(texts(renderer)).toContain('API_KEY');
+    expect(buttonByText(renderer, 'Save as profile')).toBeDefined();
+    // A transport failure is not a server answer, so the line stays neutral.
+    const message = saveSheetMessage(renderer);
+    expect(message).toBe(i18n.t('profiles.saveFailed'));
+    expect(message).not.toContain('Request timed out after 15000ms');
+  });
+
+  it('a lost connection reaches the person as the neutral line, not the transport text', async () => {
+    const mocks = mutations();
+    mocks.create.mutateAsync.mockRejectedValue(
+      Object.assign(new Error('fetch failed: Unable to resolve host'), {
+        name: 'TRPCClientError',
+      })
+    );
+    const renderer = mount({ mocks });
+    fillManualConfig(renderer);
+    press(buttonByText(renderer, 'Save as profile'));
+
+    await submitSave(renderer, 'My Setup');
+
+    expect(mocks.create.mutateAsync).toHaveBeenCalledExactlyOnceWith(MANUAL_PAYLOAD);
+    expect(toast.success).not.toHaveBeenCalled();
+    const message = saveSheetMessage(renderer);
+    expect(message).toBe(i18n.t('profiles.saveFailed'));
+    expect(message).not.toContain('Unable to resolve host');
+  });
+
+  it('shows the server sentence when the save is refused with a tRPC conflict', async () => {
+    const mocks = mutations();
+    const refusal = 'A profile with this name already exists';
+    // The shape measured against the local server: the formatted payload holds
+    // the code, status, path and zod error, and the server's sentence is the
+    // error's own message. A transport failure has the name but no payload, and
+    // the case above covers that.
+    mocks.create.mutateAsync.mockRejectedValue(
+      Object.assign(new Error(refusal), {
+        name: 'TRPCClientError',
+        data: { code: 'CONFLICT', httpStatus: 409, path: 'agentProfiles.create', zodError: null },
+      })
+    );
+    const renderer = mount({ mocks });
+    fillManualConfig(renderer);
+    press(buttonByText(renderer, 'Save as profile'));
+
+    await submitSave(renderer, 'My Setup');
+
+    expect(mocks.create.mutateAsync).toHaveBeenCalledExactlyOnceWith(MANUAL_PAYLOAD);
+    // The server answered, so its own sentence is the line the sheet shows.
+    expect(saveSheetMessage(renderer)).toBe(refusal);
+    // The sheet stayed open on the same typed name, so it can be corrected.
+    expect(renderer.root.findAll(node => node.type === SaveProfileSheet)).toHaveLength(1);
+    expect(renderer.root.findByType('SheetHeader' as never).props.doneDisabled).toBe(false);
+  });
+
+  it('states the neutral line when the save fails unexpectedly', async () => {
+    const mocks = mutations();
+    // An unexpected failure carries diagnostic text and a payload with the
+    // code, status, path and stack. The sheet states its own line and offers
+    // the retry, because the server wrote no sentence for a person.
+    mocks.create.mutateAsync.mockRejectedValue(
+      Object.assign(new Error('probe diagnostic text'), {
+        name: 'TRPCClientError',
+        data: {
+          code: 'INTERNAL_SERVER_ERROR',
+          httpStatus: 500,
+          path: 'agentProfiles.create',
+          stack: 'probe stack',
+        },
+      })
+    );
+    const renderer = mount({ mocks });
+    fillManualConfig(renderer);
+    press(buttonByText(renderer, 'Save as profile'));
+
+    await submitSave(renderer, 'My Setup');
+
+    expect(mocks.create.mutateAsync).toHaveBeenCalledExactlyOnceWith(MANUAL_PAYLOAD);
+    expect(toast.success).not.toHaveBeenCalled();
+    const message = saveSheetMessage(renderer);
+    expect(message).toBe(i18n.t('profiles.saveFailed'));
+    expect(message).not.toContain('probe diagnostic text');
+  });
+
+  it('a retry after a refusal reissues the same complete payload once more', async () => {
+    const mocks = mutations();
+    mocks.create.mutateAsync.mockRejectedValueOnce(new Error('Took too long'));
+    const renderer = mount({ mocks });
+    fillManualConfig(renderer);
+    press(buttonByText(renderer, 'Save as profile'));
+
+    await submitSave(renderer, 'My Setup');
+    // The sheet stays open with the typed name, so the retry is another submit.
+    await act(async () => {
+      (renderer.root.findByType('SheetHeader' as never).props.onDone as () => void)();
+      await Promise.resolve();
+    });
+
+    expect(mocks.create.mutateAsync).toHaveBeenCalledTimes(2);
+    // Both attempts carry every var, every command and the same name: the
+    // retry cannot create a second profile holding only part of the config.
+    expect(mocks.create.mutateAsync.mock.calls[0]).toEqual([MANUAL_PAYLOAD]);
+    expect(mocks.create.mutateAsync.mock.calls[1]).toEqual(mocks.create.mutateAsync.mock.calls[0]);
+  });
+
+  it('converges a retry that collides on the name onto the lost attempt that created it', async () => {
+    const mocks = mutations();
+    const refusal = 'A profile with this name already exists';
+    // The first attempt's response never arrives: a transport wrapper named like
+    // a client error, carrying no envelope, so the outcome is unknown.
+    mocks.create.mutateAsync
+      .mockRejectedValueOnce(
+        Object.assign(new Error('Network request failed'), { name: 'TRPCClientError' })
+      )
+      .mockRejectedValueOnce(
+        Object.assign(new Error(refusal), {
+          name: 'TRPCClientError',
+          data: { code: 'CONFLICT', httpStatus: 409, path: 'agentProfiles.create', zodError: null },
+        })
+      );
+    const created: ProfileSelectorProfile = {
+      id: 'prod-1',
+      name: 'prod',
+      varCount: 1,
+      commandCount: 1,
+      isDefault: false,
+      ownerType: 'user',
+    };
+    // The list the retry reads holds the profile the unanswered write stored.
+    const refetch = vi.fn().mockResolvedValue({ data: [BACKEND, created] });
+    const onSelectProfile = vi.fn<(id: string | null) => void>();
+    const renderer = mount({ mocks, list: { refetch }, onSelectProfile });
+    fillManualConfig(renderer);
+    press(buttonByText(renderer, 'Save as profile'));
+
+    await submitSave(renderer, 'prod');
+    await act(async () => {
+      (renderer.root.findByType('SheetHeader' as never).props.onDone as () => void)();
+      await Promise.resolve();
+    });
+
+    expect(mocks.create.mutateAsync).toHaveBeenCalledTimes(2);
+    // The row was absent before the attempt, so it is that attempt's own commit.
+    expect(refetch).toHaveBeenCalled();
+    expect(onSelectProfile).toHaveBeenCalledWith('prod-1');
+    expect(toast.success).toHaveBeenCalledTimes(1);
+    // The save completed, so the sheet closed, the draft it carried cleared and
+    // the duplicate sentence never reached the person.
+    expect(renderer.root.findAll(node => node.type === SaveProfileSheet)).toHaveLength(0);
+    expect(texts(renderer)).not.toContain('API_KEY');
+    expect(texts(renderer)).not.toContain(refusal);
+    expect(buttonByText(renderer, 'Save as profile')).toBeUndefined();
+  });
+
+  it('refuses a colliding retry whose draft no longer carries the lost attempt config', async () => {
+    const mocks = mutations();
+    const refusal = 'A profile with this name already exists';
+    // The first attempt's response never arrives, so its outcome is unknown.
+    mocks.create.mutateAsync
+      .mockRejectedValueOnce(
+        Object.assign(new Error('Network request failed'), { name: 'TRPCClientError' })
+      )
+      .mockRejectedValueOnce(
+        Object.assign(new Error(refusal), {
+          name: 'TRPCClientError',
+          data: { code: 'CONFLICT', httpStatus: 409, path: 'agentProfiles.create', zodError: null },
+        })
+      );
+    // The unanswered write stored the profile with the variable it submitted;
+    // the person then edits that variable before retrying the same name.
+    const created: ProfileSelectorProfile = {
+      id: 'prod-1',
+      name: 'prod',
+      varCount: 1,
+      commandCount: 1,
+      isDefault: false,
+      ownerType: 'user',
+    };
+    const refetch = vi.fn().mockResolvedValue({ data: [BACKEND, created] });
+    const onSelectProfile = vi.fn<(id: string | null) => void>();
+    const renderer = mount({ mocks, list: { refetch }, onSelectProfile });
+    fillManualConfig(renderer);
+    press(buttonByText(renderer, 'Save as profile'));
+
+    await submitSave(renderer, 'prod');
+    // The person closes the sheet and changes the draft value from `abc` to
+    // `xyz`, then reopens it under the same name.
+    const sheet = renderer.root.findAll(node => node.type === SaveProfileSheet)[0];
+    if (!sheet) {
+      throw new TypeError('the sheet was not mounted');
+    }
+    invokeHandler(sheet.props.onClose);
+    press(byLabel(renderer, 'API_KEY'));
+    typeInto(renderer, 'Value', 'xyz');
+    press(buttonByText(renderer, 'Save'));
+    press(buttonByText(renderer, 'Save as profile'));
+
+    await submitSave(renderer, 'prod');
+
+    expect(mocks.create.mutateAsync).toHaveBeenCalledTimes(2);
+    // The retry really carries the edited value, so the content is what differs.
+    expect(mocks.create.mutateAsync.mock.calls[1]).toEqual([
+      {
+        ...MANUAL_PAYLOAD,
+        name: 'prod',
+        vars: [{ key: 'API_KEY', value: 'xyz', isSecret: false }],
+      },
+    ]);
+    // The row carries the identity of the lost attempt but not its content, so
+    // adopting it would confirm a save whose variables never reached the server.
+    expect(saveSheetMessage(renderer)).toBe(refusal);
+    expect(texts(renderer)).toContain('API_KEY');
+    expect(texts(renderer)).toContain('xyz');
+    expect(onSelectProfile).not.toHaveBeenCalled();
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it('refuses a colliding retry that only adds a description', async () => {
+    const mocks = mutations();
+    const refusal = 'A profile with this name already exists';
+    // The first attempt's response never arrives, so its outcome is unknown; the
+    // retry then collides on the name.
+    mocks.create.mutateAsync
+      .mockRejectedValueOnce(
+        Object.assign(new Error('Network request failed'), { name: 'TRPCClientError' })
+      )
+      .mockRejectedValueOnce(
+        Object.assign(new Error(refusal), {
+          name: 'TRPCClientError',
+          data: { code: 'CONFLICT', httpStatus: 409, path: 'agentProfiles.create', zodError: null },
+        })
+      );
+    // The unanswered write stored the profile with the counts it submitted, and
+    // the create stores a description, so a description typed after the loss is
+    // content the refetched row does not hold.
+    const created: ProfileSelectorProfile = {
+      id: 'prod-1',
+      name: 'prod',
+      varCount: 1,
+      commandCount: 1,
+      isDefault: false,
+      ownerType: 'user',
+    };
+    const refetch = vi.fn().mockResolvedValue({ data: [BACKEND, created] });
+    const onSelectProfile = vi.fn<(id: string | null) => void>();
+    const renderer = mount({ mocks, list: { refetch }, onSelectProfile });
+    fillManualConfig(renderer);
+    press(buttonByText(renderer, 'Save as profile'));
+
+    await submitSave(renderer, 'prod');
+    // Only the description changes before the retry: the name, the variable and
+    // the command are the ones the lost attempt sent.
+    typeInto(renderer, 'Profile description', 'nightly build');
+    await act(async () => {
+      (renderer.root.findByType('SheetHeader' as never).props.onDone as () => void)();
+      await Promise.resolve();
+    });
+
+    expect(mocks.create.mutateAsync).toHaveBeenCalledTimes(2);
+    // The retry really carries the new description, so the description is what
+    // differs between the two attempts.
+    expect(mocks.create.mutateAsync.mock.calls[1]).toEqual([
+      { ...MANUAL_PAYLOAD, name: 'prod', description: 'nightly build' },
+    ]);
+    // The row was this flow's commit, but the description the person typed was in
+    // neither attempt, so adopting the row would confirm a save whose description
+    // never reached the server.
+    expect(saveSheetMessage(renderer)).toBe(refusal);
+    expect(texts(renderer)).toContain('API_KEY');
+    expect(onSelectProfile).not.toHaveBeenCalled();
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it('refuses to adopt a refetched row whose counts no longer match the attempt', async () => {
+    const mocks = mutations();
+    const refusal = 'A profile with this name already exists';
+    // The retry sends exactly what the lost attempt sent, so only the row itself
+    // can disagree.
+    mocks.create.mutateAsync
+      .mockRejectedValueOnce(
+        Object.assign(new Error('Network request failed'), { name: 'TRPCClientError' })
+      )
+      .mockRejectedValueOnce(
+        Object.assign(new Error(refusal), {
+          name: 'TRPCClientError',
+          data: { code: 'CONFLICT', httpStatus: 409, path: 'agentProfiles.create', zodError: null },
+        })
+      );
+    // The row carries the name and an id the panel did not know, but a second
+    // variable was added to it after the lost write.
+    const edited: ProfileSelectorProfile = {
+      id: 'prod-1',
+      name: 'prod',
+      varCount: 2,
+      commandCount: 1,
+      isDefault: false,
+      ownerType: 'user',
+    };
+    const refetch = vi.fn().mockResolvedValue({ data: [BACKEND, edited] });
+    const onSelectProfile = vi.fn<(id: string | null) => void>();
+    const renderer = mount({ mocks, list: { refetch }, onSelectProfile });
+    fillManualConfig(renderer);
+    press(buttonByText(renderer, 'Save as profile'));
+
+    await submitSave(renderer, 'prod');
+    await act(async () => {
+      (renderer.root.findByType('SheetHeader' as never).props.onDone as () => void)();
+      await Promise.resolve();
+    });
+
+    expect(mocks.create.mutateAsync).toHaveBeenCalledTimes(2);
+    expect(mocks.create.mutateAsync.mock.calls[1]).toEqual(mocks.create.mutateAsync.mock.calls[0]);
+    // The row holds more than this flow submitted, so it is not the save's own
+    // record and the draft stays with the person.
+    expect(saveSheetMessage(renderer)).toBe(refusal);
+    expect(texts(renderer)).toContain('API_KEY');
+    expect(onSelectProfile).not.toHaveBeenCalled();
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it('refuses to adopt a refetched row whose stored description no longer matches', async () => {
+    const mocks = mutations();
+    const refusal = 'A profile with this name already exists';
+    // The retry sends exactly what the lost attempt sent, so only the row's own
+    // stored description can disagree with it.
+    mocks.create.mutateAsync
+      .mockRejectedValueOnce(
+        Object.assign(new Error('Network request failed'), { name: 'TRPCClientError' })
+      )
+      .mockRejectedValueOnce(
+        Object.assign(new Error(refusal), {
+          name: 'TRPCClientError',
+          data: { code: 'CONFLICT', httpStatus: 409, path: 'agentProfiles.create', zodError: null },
+        })
+      );
+    // The row carries the name, an id the panel did not know and the submitted
+    // counts, but its description was changed after the lost write.
+    // The list row carries the stored description the panel reads, which the
+    // selector profile it builds does not.
+    const edited: ProfileSelectorProfile & { description: string | null } = {
+      id: 'prod-1',
+      name: 'prod',
+      description: 'changed elsewhere',
+      varCount: 1,
+      commandCount: 1,
+      isDefault: false,
+      ownerType: 'user',
+    };
+    const refetch = vi.fn().mockResolvedValue({ data: [BACKEND, edited] });
+    const onSelectProfile = vi.fn<(id: string | null) => void>();
+    const renderer = mount({ mocks, list: { refetch }, onSelectProfile });
+    fillManualConfig(renderer);
+    press(buttonByText(renderer, 'Save as profile'));
+
+    await submitSave(renderer, 'prod');
+    await act(async () => {
+      (renderer.root.findByType('SheetHeader' as never).props.onDone as () => void)();
+      await Promise.resolve();
+    });
+
+    // The row no longer holds the description this flow submitted, so it is not
+    // the save's own record and the draft stays with the person.
+    expect(saveSheetMessage(renderer)).toBe(refusal);
+    expect(texts(renderer)).toContain('API_KEY');
+    expect(onSelectProfile).not.toHaveBeenCalled();
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it('states the duplicate sentence when the name was taken before any attempt', async () => {
+    const mocks = mutations();
+    const refusal = 'A profile with this name already exists';
+    mocks.create.mutateAsync
+      .mockRejectedValueOnce(
+        Object.assign(new Error('Network request failed'), { name: 'TRPCClientError' })
+      )
+      .mockRejectedValueOnce(
+        Object.assign(new Error(refusal), {
+          name: 'TRPCClientError',
+          data: { code: 'CONFLICT', httpStatus: 409, path: 'agentProfiles.create', zodError: null },
+        })
+      );
+    const taken: ProfileSelectorProfile = {
+      id: 'prod-taken',
+      name: 'prod',
+      varCount: 0,
+      commandCount: 0,
+      isDefault: false,
+      ownerType: 'user',
+    };
+    // The only `prod` row the retry finds is one the panel already had, so the
+    // collision belongs to somebody else's profile, not to a lost commit.
+    const refetch = vi.fn().mockResolvedValue({ data: [BACKEND, taken] });
+    const onSelectProfile = vi.fn<(id: string | null) => void>();
+    const renderer = mount({
+      mocks,
+      list: { personalProfiles: [BACKEND, taken], refetch },
+      onSelectProfile,
+    });
+    fillManualConfig(renderer);
+    press(buttonByText(renderer, 'Save as profile'));
+
+    await submitSave(renderer, 'prod');
+    await act(async () => {
+      (renderer.root.findByType('SheetHeader' as never).props.onDone as () => void)();
+      await Promise.resolve();
+    });
+
+    // The draft is only cleared on a match: an unrelated profile must never take
+    // the person's configuration, so the sheet keeps both the sentence and the
+    // rows they entered.
+    expect(saveSheetMessage(renderer)).toBe(refusal);
+    expect(texts(renderer)).toContain('API_KEY');
+    expect(onSelectProfile).not.toHaveBeenCalled();
+    expect(toast.success).not.toHaveBeenCalled();
   });
 
   it('a late onClose from a closed save sheet leaves the reopened sheet open', () => {
@@ -688,7 +1178,7 @@ describe('AdvancedConfigPanel', () => {
     press(byLabel(renderer, 'Advanced Configuration'));
     addVariable(renderer, 'API_KEY', 'abc');
 
-    press(buttonByText(renderer, 'Save as Profile'));
+    press(buttonByText(renderer, 'Save as profile'));
     const firstSheet = renderer.root.findAll(node => node.type === SaveProfileSheet)[0];
     if (!firstSheet) {
       throw new TypeError('the first sheet was not mounted');
@@ -698,7 +1188,7 @@ describe('AdvancedConfigPanel', () => {
     // The person dismisses it, then opens it again.
     invokeHandler(firstClose);
     expect(renderer.root.findAll(node => node.type === SaveProfileSheet)).toHaveLength(0);
-    press(buttonByText(renderer, 'Save as Profile'));
+    press(buttonByText(renderer, 'Save as profile'));
     expect(renderer.root.findAll(node => node.type === SaveProfileSheet)).toHaveLength(1);
 
     // A settlement from the closed sheet arrives late: it must not close the

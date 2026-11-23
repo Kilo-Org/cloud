@@ -1,9 +1,9 @@
 const mockHeaders = jest.fn<Promise<Headers>, []>();
 const mockGetServerSession = jest.fn();
-const mockCreateDeviceSession = jest.fn();
 const mockCreateDeviceSessionWithAttestedKey = jest.fn();
-const mockIssueSessionCredentials = jest.fn();
+const mockCreateDeviceSessionWithCredentials = jest.fn();
 const mockVerifyAdmissionAsync = jest.fn();
+const mockAddressRateLimited = jest.fn<Promise<boolean>, [Request]>();
 
 jest.mock('next/headers', () => ({
   headers: () => mockHeaders(),
@@ -17,10 +17,10 @@ jest.mock('next-auth', () => ({
 }));
 
 jest.mock('@/lib/auth/device-sessions', () => ({
-  createDeviceSession: (...args: unknown[]) => mockCreateDeviceSession(...args),
   createDeviceSessionWithAttestedKey: (...args: unknown[]) =>
     mockCreateDeviceSessionWithAttestedKey(...args),
-  issueSessionCredentials: (...args: unknown[]) => mockIssueSessionCredentials(...args),
+  createDeviceSessionWithCredentials: (...args: unknown[]) =>
+    mockCreateDeviceSessionWithCredentials(...args),
 }));
 
 // The route refuses a request with no verified proof, and a real proof needs a
@@ -35,6 +35,13 @@ jest.mock('@/lib/auth/native-admission', () => ({
     payload: 'integrity-token',
   }),
   verifyAdmissionAsync: (...args: unknown[]) => mockVerifyAdmissionAsync(...args),
+}));
+
+// The caller-address firewall rule needs a live Vercel firewall, so the suite
+// answers it here. Every case defaults to `allowed`; the limited case covers
+// the 429 answer and that no session row is written.
+jest.mock('@/lib/auth/native-token-rate-limit', () => ({
+  isNativeTokenAddressRateLimited: (request: Request) => mockAddressRateLimited(request),
 }));
 
 import { NextRequest } from 'next/server';
@@ -66,37 +73,55 @@ function setCurrentSession(userId: string, webSessionPepper: string | null) {
 }
 
 function expectNoCredentialsIssued() {
-  expect(mockCreateDeviceSession).not.toHaveBeenCalled();
-  expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
+  expect(mockCreateDeviceSessionWithCredentials).not.toHaveBeenCalled();
 }
 
 describe('POST /api/auth/native/exchange integration', () => {
   beforeEach(() => {
     mockHeaders.mockReset();
     mockGetServerSession.mockReset();
-    mockCreateDeviceSession.mockReset();
     mockCreateDeviceSessionWithAttestedKey.mockReset();
-    mockIssueSessionCredentials.mockReset();
+    mockCreateDeviceSessionWithCredentials.mockReset();
     mockVerifyAdmissionAsync.mockReset();
     mockVerifyAdmissionAsync.mockResolvedValue({ ok: true, platform: 'android' });
+    mockAddressRateLimited.mockReset();
+    mockAddressRateLimited.mockResolvedValue(false);
+  });
+
+  test('answers 429 to a limited address and writes no device session', async () => {
+    const user = await insertTestUser({ api_token_pepper: null });
+    const token = generateApiToken(user);
+    mockAddressRateLimited.mockResolvedValue(true);
+
+    const response = await POST(createRequest({ Authorization: `Bearer ${token}` }));
+
+    expect(response.status).toBe(429);
+    expect(await response.json()).toEqual({ error: 'RATE_LIMITED' });
+    expect(mockAddressRateLimited).toHaveBeenCalledTimes(1);
+    expect(mockVerifyAdmissionAsync).not.toHaveBeenCalled();
+    expect(mockCreateDeviceSessionWithAttestedKey).not.toHaveBeenCalled();
+    expectNoCredentialsIssued();
+    expect(mockGetServerSession).not.toHaveBeenCalled();
   });
 
   test('exchanges a legacy generated API token with a null pepper and device authorization code', async () => {
     const user = await insertTestUser({ api_token_pepper: null });
     const token = generateApiToken(user, { deviceAuthRequestCode: 'ABCD-EFGH' });
-    mockCreateDeviceSession.mockResolvedValue('device-session-id');
-    mockIssueSessionCredentials.mockResolvedValue(credentials);
+    mockCreateDeviceSessionWithCredentials.mockResolvedValue({
+      ...credentials,
+      sessionId: 'device-session-id',
+    });
 
     const response = await POST(createRequest({ Authorization: `Bearer ${token}` }));
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual(credentials);
     expect(response.headers.get('cache-control')).toBe('no-store');
-    expect(mockCreateDeviceSession).toHaveBeenCalledWith({
+    expect(mockCreateDeviceSessionWithCredentials).toHaveBeenCalledWith({
       userId: user.id,
       userAgent: undefined,
+      user: expect.objectContaining({ id: user.id }),
     });
-    expect(mockIssueSessionCredentials).toHaveBeenCalledWith(user, 'device-session-id');
     expect(mockGetServerSession).not.toHaveBeenCalled();
   });
 
@@ -216,13 +241,11 @@ describe('POST /api/auth/native/exchange integration', () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual(credentials);
     expect(mockCreateDeviceSessionWithAttestedKey).toHaveBeenCalledWith({
-      userId: user.id,
       userAgent: undefined,
       user: expect.objectContaining({ id: user.id }),
       verification: { ok: true, platform: 'ios', keyId: 'ios-key', publicKey: 'spki' },
     });
-    expect(mockCreateDeviceSession).not.toHaveBeenCalled();
-    expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
+    expect(mockCreateDeviceSessionWithCredentials).not.toHaveBeenCalled();
   });
 
   test('refuses a key bound to a different account', async () => {

@@ -7,6 +7,7 @@
       "spendAlert": "Таны зарлага анхаарал шаарддаг",
       "securityFinding": "Аюулгүй байдлын олдолт анхаарал шаарддаг",
       "securityUpdate": "Аюулгүй байдлын шалгалт шинэчлэлттэй байна",
+      "agentBriefing": "Таны агентын тойм бэлэн боллоо",
       "activeAgentsGlanceable": "Идэвхтэй агентуудад шинэчлэлт бий"
     }
   },
@@ -29,6 +30,12 @@
     },
     "securityFindingNew": {
       "title": "Шинэ аюулгүй байдлын олдолт ({{severity}})"
+    },
+    "securityFindingSeverity": {
+      "critical": "Ноцтой",
+      "high": "Өндөр",
+      "medium": "Дунд",
+      "low": "Бага"
     },
     "securityFindingSlaWarning": {
       "title": "SLA анхааруулга"

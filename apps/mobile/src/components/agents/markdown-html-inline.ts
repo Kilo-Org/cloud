@@ -8,14 +8,17 @@ export type ConvertContext = { value: string; masks: readonly MaskRange[] };
 
 /**
  * Where inline content lands: whether a `<br>` may become a line break, whether
- * it is already inside link text, and the output characters around it, which
- * decide whether markdown reads a `**` there as emphasis (undefined: an edge).
+ * it is already inside link text, the output characters around it, which
+ * decide whether markdown reads a `**` there as emphasis (undefined: an edge),
+ * and how many elements the walk has entered, so nesting past the bound keeps
+ * its HTML form instead of recursing (only element enters increment it).
  */
 export type InlineOptions = {
   allowBreak: boolean;
   inLink: boolean;
   before?: string;
   after?: string;
+  depth?: number;
 };
 
 /**
@@ -104,8 +107,9 @@ function renderText(context: ConvertContext, start: number, end: number): string
   }
   let rendered = '';
   let cursor = start;
-  for (const mask of masks.slice(low)) {
-    if (mask.start >= end) {
+  for (let maskIndex = low; maskIndex < masks.length; maskIndex += 1) {
+    const mask = masks[maskIndex];
+    if (mask === undefined || mask.start >= end) {
       break;
     }
     const maskStart = Math.max(mask.start, cursor);
@@ -133,6 +137,13 @@ export function decodeEntities(source: string): string | null {
     return codePoint > 0 && codePoint <= MAX_CODE_POINT ? String.fromCodePoint(codePoint) : entity;
   });
 }
+
+// When the walk is already this deep, it stops recursing: `inlineContent`
+// refuses any further element node by returning null and the caller falls
+// back to the element's raw HTML slice. The bound keeps message-controlled
+// nesting from consuming a stack frame per level, whether or not the next
+// element would have a lossless markdown form.
+const MAX_INLINE_DEPTH = 128;
 
 // CommonMark's flanking rules: `**x**` is emphasis only when the opening run is
 // left-flanking and the closing run right-flanking, judged from the characters
@@ -163,22 +174,39 @@ function delimiterFits(before: string | undefined, core: string, after: string |
  */
 function joinInline(pieces: readonly InlinePiece[], options: InlineOptions): string | null {
   let joined = '';
+  // The last character `joined` holds, kept beside it: reading one back from the
+  // string flattens the growing result on every part, so joining would cost a
+  // pass over the output per piece instead of one pass in total. Set inside
+  // `append`, which flow analysis does not follow, hence the cast.
+  let last = undefined as string | undefined;
   // Set inside `append`, which flow analysis does not follow.
   let backticksTouch = false as boolean;
   // Collapsing across piece edges, as HTML collapses whitespace across tags.
   const append = (part: string) => {
     backticksTouch ||=
-      part.startsWith('`') && (joined === '' ? options.before === '`' : joined.endsWith('`'));
-    joined += joined.endsWith(' ') && part.startsWith(' ') ? part.slice(1) : part;
+      part.startsWith('`') && (joined === '' ? options.before === '`' : last === '`');
+    const written = last === ' ' && part.startsWith(' ') ? part.slice(1) : part;
+    joined += written;
+    if (written !== '') {
+      last = written.at(-1);
+    }
   };
+  // For each piece, the first character it contributes or, when every field is
+  // empty, the first one any later piece does; filled backwards so an emphasis
+  // run can see what follows it without rebuilding the pieces after it.
+  const ownFrom: (string | undefined)[] = Array.from(
+    { length: pieces.length + 1 },
+    (): string | undefined => undefined
+  );
+  for (let index = pieces.length - 1; index >= 0; index -= 1) {
+    const piece = pieces.at(index);
+    ownFrom[index] = piece?.lead[0] ?? piece?.delimiter[0] ?? piece?.core[0] ?? ownFrom[index + 1];
+  }
   for (const [index, piece] of pieces.entries()) {
     append(piece.lead);
     if (piece.delimiter !== '') {
-      let next = piece.trail[0];
-      for (const following of pieces.slice(index + 1)) {
-        next ??= (following.lead + following.delimiter + following.core)[0];
-      }
-      const previous = joined.length > 0 ? joined.at(-1) : options.before;
+      const next = piece.trail[0] ?? ownFrom[index + 1];
+      const previous = last ?? options.before;
       if (!delimiterFits(previous, piece.core, next ?? options.after)) {
         return null;
       }
@@ -186,7 +214,7 @@ function joinInline(pieces: readonly InlinePiece[], options: InlineOptions): str
     append(piece.delimiter + piece.core + piece.delimiter);
     append(piece.trail);
   }
-  return backticksTouch || (joined.endsWith('`') && options.after === '`') ? null : joined;
+  return backticksTouch || (last === '`' && options.after === '`') ? null : joined;
 }
 
 function linkDestination(href: string): string | null {
@@ -263,6 +291,7 @@ function elementPiece(
   element: HtmlElement,
   options: InlineOptions
 ): InlinePiece | null {
+  const depth = options.depth ?? 0;
   const delimiter = EMPHASIS_DELIMITERS.get(element.name);
   if (delimiter !== undefined) {
     const neighbour = delimiter[0];
@@ -270,6 +299,7 @@ function elementPiece(
       ...options,
       before: neighbour,
       after: neighbour,
+      depth: depth + 1,
     });
     const [, lead = '', core = '', trail = ''] = EDGE_WHITESPACE.exec(inner ?? '') ?? [];
     if (inner === null) {
@@ -312,6 +342,7 @@ function elementPiece(
     inLink: true,
     before: '[',
     after: ']',
+    depth: depth + 1,
   });
   if (destination === null || title === null || label === null || !bracketsBalanced(label)) {
     return null;
@@ -341,8 +372,12 @@ export function inlineContent(
   nodes: readonly HtmlNode[],
   options: InlineOptions
 ): string | null {
+  const depth = options.depth ?? 0;
   const pieces: InlinePiece[] = [];
   for (const node of nodes) {
+    if (node.kind !== 'text' && depth >= MAX_INLINE_DEPTH) {
+      return null;
+    }
     const piece = inlinePiece(context, node, options);
     if (piece === null) {
       return null;

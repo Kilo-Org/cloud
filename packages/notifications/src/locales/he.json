@@ -7,6 +7,7 @@
       "spendAlert": "ההוצאה שלך דורשת תשומת לב",
       "securityFinding": "ממצא אבטחה דורש תשומת לב",
       "securityUpdate": "לבדיקת אבטחה יש עדכון",
+      "agentBriefing": "דוח פעילות הסוכן שלך מוכן",
       "activeAgentsGlanceable": "לסוכנים הפעילים יש עדכון"
     }
   },
@@ -29,6 +30,12 @@
     },
     "securityFindingNew": {
       "title": "ממצא אבטחה חדש ({{severity}})"
+    },
+    "securityFindingSeverity": {
+      "critical": "קריטית",
+      "high": "גבוהה",
+      "medium": "בינונית",
+      "low": "נמוכה"
     },
     "securityFindingSlaWarning": {
       "title": "אזהרת SLA"

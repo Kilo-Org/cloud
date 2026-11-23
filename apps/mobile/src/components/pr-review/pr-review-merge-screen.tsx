@@ -84,7 +84,11 @@ export function PrReviewMergeScreen() {
     mode === 'enable-auto-merge'
       ? t('prReview.merge.enableAutoMerge')
       : providerPrMergeTitles(t, providerRef ? providerRef.platform : 'github').title;
-  const eyebrow = providerRef ? providerPrRefLabel(providerRef) : `${owner}/${repo}#${rawNumber}`;
+  const paramsValid = Boolean(owner) && Boolean(repo) && Number.isInteger(number) && number > 0;
+  // A route that names no request has no reference to show: an empty
+  // `owner/repo#number` would paint as "/#" under the title.
+  const githubEyebrow = paramsValid ? `${owner}/${repo}#${rawNumber}` : undefined;
+  const eyebrow = providerRef ? providerPrRefLabel(providerRef) : githubEyebrow;
   const dismiss = () => {
     router.back();
   };
@@ -100,7 +104,6 @@ export function PrReviewMergeScreen() {
 
   const trpc = useTRPC();
   const overviewOptions = useMemo(() => buildPrOverviewQueryOptions(trpc, scope), [trpc, scope]);
-  const paramsValid = Boolean(owner) && Boolean(repo) && Number.isInteger(number) && number > 0;
   const pr = useQuery({
     ...overviewOptions,
     enabled: paramsValid && isProviderScopeReady(scope),
@@ -144,9 +147,11 @@ export function PrReviewMergeScreen() {
   // (getCapabilities). Data presence, not `isSuccess`: a foreground refresh
   // whose refetch fails RETAINS the last good read, and gating on success
   // would unmount an open sheet — dropping the commit message the user typed
-  // — over data the sheet still has.
+  // — over data the sheet still has. The sheet refuses the confirm control
+  // for a provider arm that reaches it without a state.
   const isProviderArm = scope.ref.platform !== 'github';
-  const mergeStateReady = !isProviderArm || mergeStateQuery.data !== undefined;
+  const providerMergeState = isProviderArm ? mergeStateQuery.data : undefined;
+  const mergeStateReady = !isProviderArm || providerMergeState !== undefined;
   const capabilitiesReady = !needsAutoMergeCapability || capabilitiesQuery.data !== undefined;
 
   if (pr.data && mergeStateReady && capabilitiesReady) {
@@ -166,10 +171,16 @@ export function PrReviewMergeScreen() {
         sheetTitle={sheetTitle}
         eyebrow={eyebrow}
         prRef={providerRef && providerRef.platform !== 'github' ? providerRef : undefined}
-        mergeState={isProviderArm ? (mergeStateQuery.data ?? null) : undefined}
+        mergeState={providerMergeState}
         autoMergeCapability={
           needsAutoMergeCapability && capabilitiesData ? capabilitiesData.autoMerge : undefined
         }
+        mergeStateRetry={{
+          retry: () => {
+            void mergeStateQuery.refetch();
+          },
+          isRetrying: mergeStateQuery.isFetching,
+        }}
         onRefetch={async () => {
           await pr.refetch();
         }}

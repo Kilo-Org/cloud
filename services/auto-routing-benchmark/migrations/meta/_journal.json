@@ -225,6 +225,76 @@
       "when": 1793979873424,
       "tag": "0031_routing_selection_evidence",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "6",
+      "when": 1795133175213,
+      "tag": "0032_profile_failure_state",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "6",
+      "when": 1795152485834,
+      "tag": "0033_daily_alias_sync",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "6",
+      "when": 1795160874961,
+      "tag": "0034_measurement_revision_tool_evidence",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "6",
+      "when": 1795171285305,
+      "tag": "0035_probe_activation",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "6",
+      "when": 1795172697158,
+      "tag": "0036_concurrent_decider_runs",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "6",
+      "when": 1795175252958,
+      "tag": "0037_summary_costed_cases",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "6",
+      "when": 1795191560904,
+      "tag": "0038_clear_zzzax",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "6",
+      "when": 1795197652000,
+      "tag": "0039_router_readiness_epoch",
+      "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "6",
+      "when": 1795201236798,
+      "tag": "0040_reclaim_generation",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "6",
+      "when": 1795418314490,
+      "tag": "0041_paid_request_stage_liveness",
+      "breakpoints": true
     }
   ]
 }

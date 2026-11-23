@@ -20,6 +20,7 @@ import {
   branchNameSchema,
 } from './schemas.js';
 import { parseCanonicalBitbucketCloneUrl } from '../types.js';
+import { SAFE_FAILURE_MESSAGE_MAX_LENGTH } from '../session/safe-failure-projection.js';
 
 const validMessageId = 'msg_018f1e2d3c4bAbCdEfGhIjKlMn';
 const validSessionId = 'workspace_12345678-1234-1234-1234-123456789012';
@@ -679,6 +680,91 @@ describe('legacy live attachment input compatibility', () => {
   });
 });
 
+describe('prepareSession prompt rule', () => {
+  const prepareInput = {
+    prompt: 'Implement the task',
+    mode: 'code' as const,
+    model: 'claude-sonnet-4-5-20250929',
+    githubRepo: 'acme/repo',
+  };
+
+  it('refuses a whitespace-only launch prompt and keeps a real one', () => {
+    for (const prompt of ['   ', '\n\t ']) {
+      const result = PrepareSessionInput.safeParse({ ...prepareInput, prompt });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        const issue = result.error.issues.find(entry => entry.message === 'Prompt is required');
+        expect(issue?.path).toEqual(['prompt']);
+      }
+    }
+    expect(PrepareSessionInput.parse(prepareInput).prompt).toBe('Implement the task');
+  });
+
+  it('refuses a whitespace-only prompt-type initialPayload', () => {
+    const result = PrepareSessionInput.safeParse({
+      ...prepareInput,
+      initialPayload: {
+        type: 'prompt',
+        prompt: '   ',
+        mode: 'code',
+        model: 'claude-sonnet-4-5-20250929',
+      },
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const issue = result.error.issues.find(entry => entry.message === 'Prompt is required');
+      expect(issue?.path).toEqual(['initialPayload', 'prompt']);
+    }
+    expect(
+      PrepareSessionInput.safeParse({
+        ...prepareInput,
+        initialPayload: {
+          type: 'prompt',
+          prompt: 'Do the work',
+          mode: 'code',
+          model: 'claude-sonnet-4-5-20250929',
+        },
+      }).success
+    ).toBe(true);
+  });
+
+  it('keeps the attachment-only follow-up exemption on sendMessageV2', () => {
+    expect(
+      SendMessageV2Input.safeParse({
+        ...baseSendMessageInput,
+        prompt: '',
+        attachments: validAttachments,
+      }).success
+    ).toBe(true);
+  });
+
+  it('refuses a blank grouped start prompt and keeps a real one', () => {
+    for (const prompt of ['   ', '\n\t ', '']) {
+      const result = StartSessionInput.safeParse({
+        ...baseStartInput,
+        message: { ...baseStartInput.message, prompt },
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        const issue = result.error.issues.find(entry => entry.message === 'Prompt is required');
+        expect(issue?.path).toEqual(['message', 'prompt']);
+      }
+    }
+    expect(StartSessionInput.parse(baseStartInput).message.prompt).toBe('continue');
+  });
+
+  it('accepts a files-only grouped start message, blank or whitespace prompt', () => {
+    for (const prompt of ['', '   ']) {
+      expect(
+        StartSessionInput.safeParse({
+          ...baseStartInput,
+          message: { prompt, attachments: validAttachments },
+        }).success
+      ).toBe(true);
+    }
+  });
+});
+
 describe('prepareSession clone-only variant', () => {
   const baseCloneInput = {
     mode: 'code',
@@ -1073,6 +1159,7 @@ describe('getMessageResult contract', () => {
     status: 'completed' as const,
     createdAt: 1,
   };
+  const failure = { stage: 'agent_activity', code: 'assistant_error', retryable: false };
 
   it('requires an exact lookup input while rejecting invalid or unknown fields', () => {
     expect(GetMessageResultInput.safeParse({ cloudAgentSessionId: validSessionId }).success).toBe(
@@ -1098,7 +1185,7 @@ describe('getMessageResult contract', () => {
   });
 
   it('accepts public statuses and allowlisted structured result fields', () => {
-    for (const status of ['queued', 'running', 'completed', 'failed', 'interrupted']) {
+    for (const status of ['queued', 'running', 'completed']) {
       expect(GetMessageResultOutput.safeParse({ ...baseOutput, status }).success).toBe(true);
     }
     expect(
@@ -1120,31 +1207,56 @@ describe('getMessageResult contract', () => {
         acceptedAt: 3,
         terminalAt: 4,
         completionSource: 'wrapper_failure',
-        failure: {
-          stage: 'agent_activity',
-          code: 'assistant_error',
-          attempts: 2,
-          retryable: false,
-        },
+        failure: { ...failure, attempts: 2 },
       }).success
     ).toBe(true);
-  });
-
-  it('requires retryability on failed and interrupted failure details', () => {
     expect(
       GetMessageResultOutput.safeParse({
         ...baseOutput,
         status: 'interrupted',
-        failure: { retryable: true },
+        failure: { stage: 'agent_activity', code: 'user_interrupt', retryable: false },
       }).success
     ).toBe(true);
-    expect(
-      GetMessageResultOutput.safeParse({
-        ...baseOutput,
+  });
+
+  it.each(['failed', 'interrupted'])(
+    'requires failure stage, code, and retryability on %s',
+    status => {
+      for (const incompleteFailure of [
+        undefined,
+        { ...failure, stage: undefined },
+        { ...failure, code: undefined },
+        { ...failure, retryable: undefined },
+      ]) {
+        expect(
+          GetMessageResultOutput.safeParse({ ...baseOutput, status, failure: incompleteFailure })
+            .success
+        ).toBe(false);
+      }
+    }
+  );
+
+  it.each([
+    { branch: '', preparation: { status: 'running' } },
+    { branch: 'feature/example', preparation: { status: 'completed' } },
+    {
+      preparation: {
         status: 'failed',
-        failure: { code: 'assistant_error' },
-      }).success
-    ).toBe(false);
+        failedStepLabel: 'Clone repository',
+        reason: 'x'.repeat(SAFE_FAILURE_MESSAGE_MAX_LENGTH),
+      },
+    },
+  ])('accepts branch and safe preparation fields ($preparation.status)', fields => {
+    const output = { ...baseOutput, ...fields };
+    expect(GetMessageResultOutput.parse(output)).toEqual(output);
+  });
+
+  it.each([
+    { status: 'queued' },
+    { status: 'failed', command: 'echo test' },
+    { status: 'failed', reason: 'x'.repeat(SAFE_FAILURE_MESSAGE_MAX_LENGTH + 1) },
+  ])('rejects invalid preparation details ($status)', preparation => {
+    expect(GetMessageResultOutput.safeParse({ ...baseOutput, preparation }).success).toBe(false);
   });
 
   it('fails closed on contradictory lifecycle result fields', () => {
@@ -1152,9 +1264,14 @@ describe('getMessageResult contract', () => {
       { ...baseOutput, status: 'queued', acceptedAt: 2 },
       { ...baseOutput, status: 'queued', terminalAt: 2 },
       { ...baseOutput, status: 'running', completionSource: 'assistant_message_event' },
-      { ...baseOutput, status: 'queued', failure: { attempts: 1, retryable: true } },
-      { ...baseOutput, status: 'failed', assistant: { messageId: 'assistant_1', text: 'wrong' } },
-      { ...baseOutput, status: 'interrupted', gateResult: 'fail' },
+      { ...baseOutput, status: 'queued', failure },
+      {
+        ...baseOutput,
+        status: 'failed',
+        failure,
+        assistant: { messageId: 'assistant_1', text: 'wrong' },
+      },
+      { ...baseOutput, status: 'interrupted', failure, gateResult: 'fail' },
     ]) {
       expect(GetMessageResultOutput.safeParse(output).success).toBe(false);
     }
@@ -1172,14 +1289,14 @@ describe('getMessageResult contract', () => {
       GetMessageResultOutput.safeParse({
         ...baseOutput,
         status: 'failed',
-        failure: { attempts: -1 },
+        failure: { ...failure, attempts: -1 },
       }).success
     ).toBe(false);
     expect(
       GetMessageResultOutput.safeParse({
         ...baseOutput,
         status: 'failed',
-        failure: { error: 'token' },
+        failure: { ...failure, error: 'token' },
       }).success
     ).toBe(false);
     expect(

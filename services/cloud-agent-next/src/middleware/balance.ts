@@ -15,9 +15,12 @@ import {
   type BalanceOnlyResult,
 } from '../balance-validation.js';
 import { projectSessionAccessHttpError, requireCurrentSessionAccess } from '../session-access.js';
-import { getSandboxSessionStub } from '../sandbox-session/session-stub.js';
+import { getWorkspaceStub } from '../control-plane/workspace/workspace-stub.js';
 import { withDORetry } from '../utils/do-retry.js';
-import { CLOUD_AGENT_PARENT_AUTHORITY_DENIED } from '../cloud-agent-authority.js';
+import {
+  CLOUD_AGENT_PARENT_AUTHORITY_DENIED,
+  workspaceSpawnContextSchema,
+} from '../cloud-agent-authority.js';
 
 const SKIP_BALANCE_CHECK_HEADER = 'x-skip-balance-check';
 const INTERNAL_API_KEY_HEADER = 'x-internal-api-key';
@@ -184,11 +187,13 @@ export const balanceMiddleware = createMiddleware<HonoContext>(
       let token = authToken;
       if (authority !== undefined) {
         try {
-          token = await withDORetry(
-            () => getSandboxSessionStub(c.env, userId, authority.parentSessionId),
-            stub => stub.getCloudAgentSpawnRuntimeToken(authority),
-            'getCloudAgentSpawnRuntimeToken'
-          );
+          token = workspaceSpawnContextSchema.pick({ token: true }).parse(
+            await withDORetry(
+              () => getWorkspaceStub(c.env, userId, authority.parentSessionId),
+              stub => stub.getSpawnContext(authority),
+              'getSpawnContext'
+            )
+          ).token;
         } catch (error) {
           const denied =
             error instanceof Error && error.message.includes(CLOUD_AGENT_PARENT_AUTHORITY_DENIED);

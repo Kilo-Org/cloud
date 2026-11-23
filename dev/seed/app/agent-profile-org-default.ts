@@ -4,16 +4,17 @@ import {
   organization_memberships,
   organizations,
 } from '@kilocode/db/schema';
-import { eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 
 import { assertLocalSeedDatabase, getSeedDb } from '../lib/db';
 import { normalizeSeedEmail } from '../lib/email';
-import { isValidEmail } from '../lib/users';
+import { findSeedUserId, isValidEmail } from '../lib/users';
 import type { SeedResult } from '../index';
 
 export const usage = '<email>';
 
-const USER_ID = 'user_e2e_org_profile_default';
+/** The row an account with no sign-in yet gets; a signed-in one keeps its id. */
+const SEED_USER_ID = 'user_e2e_org_profile_default';
 /** Stable, so the deep link a previous run printed keeps opening the screen. */
 const ORGANIZATION_ID = 'c4a2f1e6-7b19-4d0e-9a53-2f6d8b1c7e40';
 const PROFILE_ID = 'b41d6f52-0c8e-4b7a-9d31-5e2a8c6f9031';
@@ -35,7 +36,8 @@ function printUsage(): void {
   console.log('the user that are not defaults. In that organization scope the new-session');
   console.log('Environment chip and the profile picker both resolve to the shared profile, and');
   console.log('the picker lists both owners.');
-  console.log('Re-running replaces the user, the organization, its membership and the profiles.');
+  console.log('Re-running replaces the organization, its membership and the profiles, and joins');
+  console.log('the account that already signed in.');
   console.log('');
   console.log('The deep link it prints opens the profile picker sheet in a dev build:');
   console.log(`  kiloapp:///dev/profile-picker-fixture?org=${ORGANIZATION_ID}`);
@@ -66,9 +68,14 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   const normalizedEmail = normalizeSeedEmail(trimmedEmail);
   assertLocalSeedDatabase('app:agent-profile-org-default');
   const db = getSeedDb();
+  // A fake account that already signed in keeps its own row and its own
+  // sign-in address: the fixture joins it. A row this fixture left under an
+  // earlier email is its own fixture, so it takes the requested address.
+  const adoptedUserId = await findSeedUserId(trimmedEmail);
+  const userId = adoptedUserId ?? SEED_USER_ID;
 
-  // Reset only this fixture's rows: the profiles, the membership, the
-  // organization and the user, by their stable ids.
+  // Reset only this fixture's rows: the profiles, the membership and the
+  // organization, by their stable ids.
   await db
     .delete(agent_environment_profiles)
     .where(inArray(agent_environment_profiles.id, [PROFILE_ID, ...PERSONAL_PROFILE_IDS]));
@@ -76,18 +83,45 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     .delete(organization_memberships)
     .where(eq(organization_memberships.organization_id, ORGANIZATION_ID));
   await db.delete(organizations).where(eq(organizations.id, ORGANIZATION_ID));
-  await db.delete(kilocode_users).where(eq(kilocode_users.id, USER_ID));
+  // The scope resolves to the shared profile only while the account has no
+  // personal default, so another topic's default is demoted rather than kept.
+  await db
+    .update(agent_environment_profiles)
+    .set({ is_default: false })
+    .where(
+      and(
+        eq(agent_environment_profiles.owned_by_user_id, userId),
+        eq(agent_environment_profiles.is_default, true)
+      )
+    );
 
-  await db.insert(kilocode_users).values({
-    id: USER_ID,
-    google_user_email: trimmedEmail,
-    google_user_name: 'Org profile default',
-    google_user_image_url: 'https://example.com/org-profile-default.png',
-    stripe_customer_id: STRIPE_CUSTOMER_ID,
-    normalized_email: normalizedEmail,
-    has_validation_stytch: true,
-    customer_source: 'dev-seed',
-  });
+  await db
+    .insert(kilocode_users)
+    .values({
+      id: userId,
+      google_user_email: trimmedEmail,
+      google_user_name: 'Org profile default',
+      google_user_image_url: 'https://example.com/org-profile-default.png',
+      stripe_customer_id: STRIPE_CUSTOMER_ID,
+      normalized_email: normalizedEmail,
+      has_validation_stytch: true,
+      customer_source: 'dev-seed',
+    })
+    // The fixed id is this fixture's own row. When no account holds the
+    // requested email, that row takes the address, so the account the
+    // organization is attached to is the one this run reports.
+    .onConflictDoUpdate({
+      target: kilocode_users.id,
+      set:
+        adoptedUserId === null
+          ? {
+              google_user_email: trimmedEmail,
+              normalized_email: normalizedEmail,
+              has_validation_stytch: true,
+              customer_source: 'dev-seed',
+            }
+          : { has_validation_stytch: true, customer_source: 'dev-seed' },
+    });
 
   await db.insert(organizations).values({
     id: ORGANIZATION_ID,
@@ -95,12 +129,12 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     plan: 'teams',
     seat_count: 1,
     require_seats: true,
-    created_by_kilo_user_id: USER_ID,
+    created_by_kilo_user_id: userId,
   });
 
   await db.insert(organization_memberships).values({
     organization_id: ORGANIZATION_ID,
-    kilo_user_id: USER_ID,
+    kilo_user_id: userId,
     role: 'owner',
   });
 
@@ -111,7 +145,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     .values({
       id: PROFILE_ID,
       owned_by_organization_id: ORGANIZATION_ID,
-      created_by_user_id: USER_ID,
+      created_by_user_id: userId,
       name: PROFILE_NAME,
       description: 'The shared profile the organization runs on by default.',
       is_default: true,
@@ -127,8 +161,8 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   await db.insert(agent_environment_profiles).values(
     PERSONAL_PROFILE_IDS.map((id, index) => ({
       id,
-      owned_by_user_id: USER_ID,
-      created_by_user_id: USER_ID,
+      owned_by_user_id: userId,
+      created_by_user_id: userId,
       name: PERSONAL_PROFILE_NAMES[index] ?? 'Personal profile',
       description: "One of the user's own profiles.",
       is_default: false,
@@ -142,7 +176,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   console.log(`Deep link: ${deepLink}`);
 
   return {
-    userId: USER_ID,
+    userId,
     email: trimmedEmail,
     organizationId: ORGANIZATION_ID,
     profileId: profile.id,

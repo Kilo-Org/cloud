@@ -6,10 +6,10 @@ import {
   type ModeToolGroup,
 } from '@/components/organization/org-mode-form-model';
 import { FormField } from '@/components/ui/form-field';
-import { FormFieldLabel } from '@/components/ui/form-field-label';
-import { Switch } from '@/components/ui/switch';
-import { Text } from '@/components/ui/text';
-import { cn } from '@/lib/utils';
+import { InlineCodeText } from '@/components/ui/inline-code-text';
+import { PreferenceRow } from '@/components/ui/preference-row';
+import { RowGroup } from '@/components/ui/row-group';
+import { Section } from '@/components/ui/section';
 
 const TOOL_LABEL_KEYS = {
   read: 'organization.modes.tool.read',
@@ -53,52 +53,50 @@ export function ModeToolsFields({
   const { t } = useTranslation();
   return (
     <>
-      <View className="gap-2">
-        <FormFieldLabel label={t('profiles.agents.tools')} />
-        <View className="overflow-hidden rounded-lg bg-secondary">
-          {MODE_TOOL_GROUPS.map((group, index) => (
-            <View
+      <Section label={t('profiles.agents.tools')}>
+        <RowGroup>
+          {MODE_TOOL_GROUPS.map(group => (
+            <PreferenceRow
               key={group}
-              className={cn(
-                'flex-row items-center gap-3 px-4 py-3',
-                index < MODE_TOOL_GROUPS.length - 1 && 'border-b-[0.5px] border-hair-soft'
-              )}
-            >
-              <Text className="flex-1 text-sm text-foreground">{t(TOOL_LABEL_KEYS[group])}</Text>
-              <Switch
-                value={groups.includes(group)}
-                disabled={disabled}
-                onValueChange={checked => {
-                  onToggleGroup(group, checked);
-                }}
-                accessibilityLabel={t(TOOL_LABEL_KEYS[group])}
-              />
-            </View>
+              title={t(TOOL_LABEL_KEYS[group])}
+              value={groups.includes(group)}
+              disabled={disabled}
+              accessibilityLabel={t(TOOL_LABEL_KEYS[group])}
+              onValueChange={checked => {
+                onToggleGroup(group, checked);
+              }}
+            />
           ))}
-        </View>
-      </View>
+        </RowGroup>
+      </Section>
 
       {groups.includes('edit') ? (
-        <View className="gap-4 rounded-lg border border-border p-4" onLayout={filePatternLayout}>
-          <FormField
-            label={t('organization.modes.restrictionPattern')}
-            defaultValue={editFileRegex}
-            autoCapitalize="none"
-            autoCorrect={false}
-            disabled={disabled}
-            error={filePatternError}
-            onChangeText={onChangeFilePattern}
-          />
-          <Text variant="muted" className="text-xs">
-            {t('organization.modes.restrictionHint')}
-          </Text>
+        <>
+          <View className="gap-1.5" onLayout={filePatternLayout}>
+            <FormField
+              label={t('organization.modes.restrictionPattern')}
+              defaultValue={editFileRegex}
+              autoCapitalize="none"
+              autoCorrect={false}
+              disabled={disabled}
+              error={filePatternError}
+              onChangeText={onChangeFilePattern}
+            />
+            <InlineCodeText
+              variant="caption"
+              // The mono variant is a step larger than the caption it sits in;
+              // the example keeps the caption's size and muted color.
+              codeClassName="text-muted-foreground text-xs"
+              value={t('organization.modes.restrictionHint')}
+            />
+          </View>
           <FormField
             label={t('organization.modes.restrictionLabel')}
             defaultValue={editRestrictionLabel}
             disabled={disabled}
             onChangeText={onChangeRestrictionLabel}
           />
-        </View>
+        </>
       ) : null}
     </>
   );

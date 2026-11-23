@@ -36,9 +36,51 @@ export type NativeTool = {
   readonly parameters: string;
 };
 
+/**
+ * An argument path from the tool's own root, such as `filter` or `where.lat`.
+ * A property inside a list argument keeps the list's item step, so `filters[].op`
+ * names the `op` of one item the model cannot fill in.
+ */
+type OmittedArgument = { readonly argument: string; readonly reason: string };
+
+/** A property's path below the tool's arguments, never leading with a dot. */
+function joinPath(path: string, name: string): string {
+  return path === '' ? name : `${path}.${name}`;
+}
+
+/** A refusal's path and words as one line, for the diagnostic copy. */
+function refusedAt(path: string, reason: string): string {
+  return path === '' ? reason : `${path}: ${reason}`;
+}
+
+/**
+ * One thing the on-device model cannot be given. A whole tool is left out when
+ * one of its required arguments has no native form; a single argument is left
+ * out when it is optional, and the tool still reaches the model without it.
+ */
+export type NativeOmission =
+  | { readonly kind: 'tool'; readonly tool: string; readonly reason: string }
+  | {
+      readonly kind: 'argument';
+      readonly tool: string;
+      readonly argument: string;
+      readonly reason: string;
+    };
+
+/** The tools the model can take, and everything left out of them. */
+export type NativeToolSet = {
+  readonly tools: readonly NativeTool[];
+  readonly omitted: readonly NativeOmission[];
+};
+
 type Converted =
-  | { readonly ok: true; readonly schema: NativeSchema; readonly omitted: readonly string[] }
-  | { readonly ok: false; readonly reason: string };
+  | {
+      readonly ok: true;
+      readonly schema: NativeSchema;
+      readonly omitted: readonly OmittedArgument[];
+    }
+  /** A refusal names the argument path it was found at, and its own words. */
+  | { readonly ok: false; readonly path: string; readonly reason: string };
 
 /** The keywords read here. Any other keyword stays on the node, so it can be refused by name. */
 const SchemaNode = z.looseObject({
@@ -119,14 +161,17 @@ function convertObject(node: SchemaNode, path: string): Converted {
     node.additionalProperties !== undefined &&
     node.additionalProperties !== false
   ) {
-    return { ok: false, reason: `${path}: an object with free keys` };
+    return { ok: false, path, reason: 'an object with free keys' };
   }
   const required = new Set(node.required);
   const converted: NativeProperty[] = [];
-  const omitted: string[] = [];
+  const omitted: OmittedArgument[] = [];
   for (const [name, value] of Object.entries(properties)) {
-    const property = convert(value, `${path}.${name}`);
+    const argument = joinPath(path, name);
+    const property = convert(value, argument);
     if (property.ok) {
+      // Every omission already names its own path from the tool's root, so a
+      // deeper level only adds the array markers it walked through.
       omitted.push(...property.omitted);
       const described = SchemaNode.safeParse(value);
       converted.push({
@@ -138,8 +183,13 @@ function convertObject(node: SchemaNode, path: string): Converted {
     } else if (required.has(name)) {
       return property;
     } else {
-      // The model cannot fill an optional key it is not shown; the tool still works without it.
-      omitted.push(property.reason);
+      /* The argument itself, or a child the model cannot express: the record
+         names the argument, and the failing path stays in the diagnostic copy. */
+      omitted.push({
+        argument,
+        reason:
+          property.path === argument ? property.reason : refusedAt(property.path, property.reason),
+      });
     }
   }
   return {
@@ -150,12 +200,16 @@ function convertObject(node: SchemaNode, path: string): Converted {
 }
 
 function convertArray(node: SchemaNode, path: string): Converted {
+  // An item's path keeps the marker the schema walk through it earns, so a
+  // nested omission names `filters[].op` rather than a path no argument has.
+  const itemPath = `${path}[]`;
   // A tuple (a list of item schemas) has no native form, and neither has a list of anything.
-  const items =
-    node.items === undefined || Array.isArray(node.items)
-      ? ({ ok: false, reason: `${path}: an array without one item schema` } as const)
-      : convert(node.items, `${path}[]`);
+  if (node.items === undefined || Array.isArray(node.items)) {
+    return { ok: false, path, reason: 'an array without one item schema' };
+  }
+  const items = convert(node.items, itemPath);
   if (!items.ok) {
+    // A refusal inside an item keeps the item's own path.
     return items;
   }
   return {
@@ -174,21 +228,21 @@ function convertArray(node: SchemaNode, path: string): Converted {
 function convert(value: unknown, path: string): Converted {
   const parsed = SchemaNode.safeParse(value);
   if (!parsed.success) {
-    return { ok: false, reason: `${path}: not a schema` };
+    return { ok: false, path, reason: 'not a schema' };
   }
   const unwrapped = withoutNull(parsed.data);
   if (!unwrapped.ok) {
-    return { ok: false, reason: `${path}: ${unwrapped.reason}` };
+    return { ok: false, path, reason: unwrapped.reason };
   }
   const { node } = unwrapped;
   const keyword = UNSUPPORTED_KEYWORDS.find(name => name in node);
   if (keyword !== undefined) {
-    return { ok: false, reason: `${path}: ${keyword}` };
+    return { ok: false, path, reason: keyword };
   }
   if (node.enum !== undefined) {
     const choices = StringChoices.safeParse(node.enum);
     return !choices.success || (node.type !== undefined && node.type !== 'string')
-      ? { ok: false, reason: `${path}: an enum that is not a list of strings` }
+      ? { ok: false, path, reason: 'an enum that is not a list of strings' }
       : {
           ok: true,
           schema: { type: 'string', ...descriptionOf(node), choices: choices.data },
@@ -197,7 +251,7 @@ function convert(value: unknown, path: string): Converted {
   }
   const type = node.type ?? (node.properties === undefined ? undefined : 'object');
   if (type === undefined) {
-    return { ok: false, reason: `${path}: no supported type` };
+    return { ok: false, path, reason: 'no supported type' };
   }
   switch (type) {
     case 'string':
@@ -213,42 +267,89 @@ function convert(value: unknown, path: string): Converted {
       return convertObject(node, path);
     }
     default: {
-      return { ok: false, reason: `${path}: no supported type` };
+      return { ok: false, path, reason: 'no supported type' };
     }
   }
 }
 
 /** The arguments schema of one tool, or why Foundation Models cannot take it. */
 export function nativeSchemaOf(tool: ToolDefinition): Converted {
-  const converted = convert(tool.parameters, tool.name);
+  const converted = convert(tool.parameters, '');
   if (converted.ok && converted.schema.type !== 'object') {
-    return { ok: false, reason: `${tool.name}: arguments are not an object` };
+    return { ok: false, path: '', reason: 'arguments are not an object' };
   }
   return converted;
 }
 
+/** One tool's conversion, and the record of everything it left out. */
+type ConvertedTool = {
+  readonly tool: NativeTool | undefined;
+  readonly omitted: readonly NativeOmission[];
+};
+
+function conversionOf(tool: ToolDefinition): ConvertedTool {
+  const converted = nativeSchemaOf(tool);
+  if (!converted.ok) {
+    return {
+      tool: undefined,
+      omitted: [
+        { kind: 'tool', tool: tool.name, reason: refusedAt(converted.path, converted.reason) },
+      ],
+    };
+  }
+  return {
+    tool: {
+      name: tool.name,
+      description: tool.description,
+      parameters: JSON.stringify(converted.schema),
+    },
+    omitted: converted.omitted.map(one => ({
+      kind: 'argument',
+      tool: tool.name,
+      argument: one.argument,
+      reason: one.reason,
+    })),
+  };
+}
+
+/** The words one omission is logged with, and the reason a screen shows. */
+function noteOf(omission: NativeOmission): string {
+  return omission.kind === 'tool'
+    ? `tool left out: ${omission.tool}: ${omission.reason}`
+    : `optional argument left out: ${omission.tool}.${omission.argument}: ${omission.reason}`;
+}
+
 /**
- * The tools Foundation Models can take. A tool whose schema it cannot express
- * is left out and logged, so the model never sees a call it could not write.
+ * The tools Foundation Models can take, and everything left out of them.
+ *
+ * A tool whose schema it cannot express is left out, so the model never sees a
+ * call it could not write, and an optional argument that has no native form is
+ * left out of a tool that still reaches the model. Every omission is logged
+ * here and also answered to the caller: a screen names the tools the person
+ * enabled that this model cannot run, which no log line can say.
  */
-export function nativeTools(tools: readonly ToolDefinition[]): NativeTool[] {
-  return tools.flatMap(tool => {
-    const converted = nativeSchemaOf(tool);
-    const notes = converted.ok
-      ? converted.omitted.map(reason => `optional argument left out: ${reason}`)
-      : [`tool left out: ${converted.reason}`];
-    for (const note of notes) {
-      // eslint-disable-next-line no-console -- a tool the model never sees has no UI to report it
-      console.warn(`[native-model] ${note}`);
+export function nativeTools(tools: readonly ToolDefinition[]): NativeToolSet {
+  const accepted: NativeTool[] = [];
+  const omitted: NativeOmission[] = [];
+  for (const tool of tools) {
+    const conversion = conversionOf(tool);
+    for (const omission of conversion.omitted) {
+      // eslint-disable-next-line no-console -- a diagnostic copy of what the answer already carries
+      console.warn(`[native-model] ${noteOf(omission)}`);
     }
-    return converted.ok
-      ? [
-          {
-            name: tool.name,
-            description: tool.description,
-            parameters: JSON.stringify(converted.schema),
-          },
-        ]
-      : [];
-  });
+    if (conversion.tool !== undefined) {
+      accepted.push(conversion.tool);
+    }
+    omitted.push(...conversion.omitted);
+  }
+  return { tools: accepted, omitted };
+}
+
+/**
+ * The same conversion without the log, for a screen that names the tools this
+ * model cannot run. It costs one schema walk per tool, so a caller reads it
+ * when the offered tools change rather than on every request.
+ */
+export function omittedTools(tools: readonly ToolDefinition[]): readonly NativeOmission[] {
+  return tools.flatMap(tool => conversionOf(tool).omitted);
 }

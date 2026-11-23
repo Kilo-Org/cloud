@@ -43,11 +43,14 @@ const focusEffect = vi.hoisted(() => vi.fn());
 vi.mock('react-native', () => ({
   View: 'View',
   Pressable: 'Pressable',
+  // EmptyState reads the scheme for its dark disc and glyph ink.
+  useColorScheme: () => 'light',
   I18nManager: { isRTL: false },
   Platform: { OS: 'ios' },
   useWindowDimensions: () => ({ width: 390, fontScale: 1, height: 844 }),
 }));
 vi.mock('@/components/ui/icons', () => ({
+  RotateCcw: 'RotateCcw',
   Ban: 'Ban',
   ShieldOff: 'ShieldOff',
   ChevronDown: 'ChevronDown',
@@ -85,7 +88,13 @@ vi.mock('expo-router', () => ({
   useNavigation: () => ({ getState: () => ({ index: navigation.history.length - 1 }) }),
   useFocusEffect: focusEffect,
 }));
+// The screen hands a no-history Back through the push-then-retire hook; no case
+// here presses Back, so the hook's replace is a plain double.
+vi.mock('@/lib/navigation/stack-safe-replace', () => ({
+  useStackSafeReplace: () => ({ replace: vi.fn() }),
+}));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useMutedDisabledInk: () => '#666',
   useThemeColors: () => ({ foreground: '#000', mutedForeground: '#666' }),
 }));
 vi.mock('@/lib/hooks/use-security-agent', () => ({
@@ -94,6 +103,7 @@ vi.mock('@/lib/hooks/use-security-agent', () => ({
 }));
 vi.mock('@/lib/hooks/use-security-findings', () => ({
   useSecurityFinding: () => finding,
+  useRetrySecurityFinding: () => ({ retry: vi.fn(), isRetrying: false }),
   useSecurityAnalysis: () => analysis,
 }));
 vi.mock('@/lib/hooks/use-security-dismiss-draft', () => ({
@@ -124,6 +134,17 @@ vi.mock('@/components/security-agent/finding-remediation-panel', () => ({
 vi.mock('@/lib/utils', () => ({
   cn: (...args: unknown[]) => args.filter(Boolean).join(' '),
 }));
+// The shared view switch, captured so the test picks a view the way a press
+// on the control does.
+const viewSwitch = vi.hoisted(() => ({
+  onChange: null as null | ((next: string) => void),
+}));
+vi.mock('@/components/ui/segmented-control', () => ({
+  SegmentedControl: (props: { onChange: (next: string) => void }) => {
+    viewSwitch.onChange = props.onChange;
+    return null;
+  },
+}));
 
 type R = TestRenderer.ReactTestRenderer;
 let renderer: R | undefined = undefined;
@@ -144,17 +165,15 @@ function renderScreen(): R {
   return renderer;
 }
 
-/**
- * The detail strip's entries. The mocked platform is iOS, where an entry is
- * typed as a button (see lib/a11y/tab-entry); the `tablist` container keeps
- * them apart from the header's own buttons.
- */
-function findingTabs(tree: R): TestRenderer.ReactTestInstance[] {
-  const strip = tree.root.findAllByProps({ accessibilityRole: 'tablist' })[0];
-  if (!strip) {
-    throw new Error('finding tabs not mounted');
+/** Pick one of the screen's views through the mounted view switch. */
+function selectView(view: string): void {
+  const onChange = viewSwitch.onChange;
+  if (!onChange) {
+    throw new Error('finding view switch not mounted');
   }
-  return strip.findAllByProps({ role: 'button' });
+  act(() => {
+    onChange(view);
+  });
 }
 
 beforeEach(() => {
@@ -189,8 +208,7 @@ describe('FindingDetailScreen analysis pane render crash', () => {
     });
     analysisPanel.crashOnRender = true;
     const tree = renderScreen();
-    const tabs = findingTabs(tree);
-    act(tabs[1]?.props.onPress as () => void);
+    selectView('analysis');
 
     const fallback = tree.root.findByType(QueryError);
     expect(fallback.props.message).toBe('securityAgent.analysis.couldNotLoad');

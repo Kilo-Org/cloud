@@ -1,8 +1,8 @@
 // The no-access surface is the product landings' shared state for an
 // organization the reader may not see. It must say who can grant access (or
-// that the organization is gone), and offer both recoveries: a Retry that
+// that the organization is gone). A denial offers both recoveries: a Retry that
 // re-resolves the membership and a way back to Profile that drops the stale
-// selection.
+// selection; a deleted organization offers the way back alone.
 
 import { type ComponentType, createElement, type ReactNode } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
@@ -15,12 +15,18 @@ const replaceMock = vi.hoisted(() => vi.fn());
 const retryMock = vi.hoisted(() => vi.fn());
 
 vi.mock('expo-router', () => ({
-  useRouter: () => ({ replace: replaceMock, push: vi.fn() }),
+  // The screen reaches Profile through the push-then-retire hook, so the router
+  // mock carries no `replace`: a literal one would fail here instead of passing.
+  useRouter: () => ({ push: vi.fn() }),
+}));
+
+vi.mock('@/lib/navigation/stack-safe-replace', () => ({
+  useStackSafeReplace: () => ({ replace: replaceMock }),
 }));
 
 vi.mock('@/components/screen-header', () => ({
-  ScreenHeader: (props: { title?: string; eyebrow?: string }) =>
-    createElement('ScreenHeaderMock', { title: props.title, eyebrow: props.eyebrow }),
+  ScreenHeader: (props: { title?: string; subtitle?: string }) =>
+    createElement('ScreenHeaderMock', { title: props.title, subtitle: props.subtitle }),
 }));
 
 vi.mock('@/components/query-error', () => ({
@@ -61,11 +67,19 @@ vi.mock('@/components/ui/text', () => ({
     createElement('TextMock', { className: props.className }, props.children),
 }));
 
-vi.mock('react-native', () => ({ View: 'View' }));
+vi.mock('react-native', () => ({
+  View: 'View',
+  I18nManager: { isRTL: false },
+  useColorScheme: () => 'light',
+}));
+
+// The centered state's geometry hook reports through `@sentry/react-native`,
+// whose real module loads react-native in Node; the reporter is stubbed here.
+vi.mock('@sentry/react-native', () => ({ captureException: vi.fn() }));
 
 const Denied = ScopeAccessDeniedScreen as ComponentType<{
   title: string;
-  eyebrow?: string;
+  subtitle?: string;
   kind: 'denied' | 'not-found';
   onRetry: () => void;
   isRetrying?: boolean;
@@ -73,7 +87,7 @@ const Denied = ScopeAccessDeniedScreen as ComponentType<{
 
 function mountScreen(props: {
   title?: string;
-  eyebrow?: string;
+  subtitle?: string;
   kind?: 'denied' | 'not-found';
   isRetrying?: boolean;
 }): TestRenderer.ReactTestRenderer {
@@ -82,7 +96,7 @@ function mountScreen(props: {
     ref.current = TestRenderer.create(
       createElement(Denied, {
         title: props.title ?? 'Security Agent',
-        eyebrow: props.eyebrow,
+        subtitle: props.subtitle,
         kind: props.kind ?? 'denied',
         onRetry: () => {
           retryMock();
@@ -131,33 +145,19 @@ describe('ScopeAccessDeniedScreen', () => {
     expect(description?.props.message).toBe(
       'Ask an organization owner or admin to grant you access.'
     );
-    // In the compact cell this sentence wrapped with one word alone on its last
-    // line, so the description carries a capped measure that breaks it into
-    // balanced lines instead.
-    expect(description?.props.className).toContain('max-w-[205px]');
     const back = button('Back to profile', renderer.root);
     const retry = button('Retry', renderer.root);
     expect(back).toBeDefined();
     expect(retry).toBeDefined();
 
-    // Leaving the stale selection is the recovery this state leads with, so the
-    // filled primary is Back to profile and it comes first.
-    const filled = findByType(renderer.root, 'ButtonMock').filter(
-      node => (node.props.variant ?? 'default') === 'default'
-    );
-    expect(filled).toHaveLength(1);
-    expect(filled[0]).toBe(back);
-    expect(findByType(renderer.root, 'ButtonMock')[0]).toBe(back);
-    // Dark --primary is the brand yellow that glares on the near-black page, so dark takes the muted lifted olive.
-    expect(String(back?.props.className)).toContain('bg-primary');
-    expect(String(back?.props.className)).toContain('dark:bg-selection');
-    const backLabel = back ? findByType(back, 'TextMock')[0] : undefined;
-    expect(String(backLabel?.props.className)).toContain('dark:text-selection-foreground');
-
-    // Retry only re-resolves the membership, so it is the outlined secondary,
-    // and the outline variant's own ink already paints its busy mark.
-    expect(retry?.props.variant).toBe('outline');
-    expect(String(retry?.props.className ?? '')).not.toContain('dark:bg-selection');
+    // Leaving the stale selection is the recovery this state leads with, so
+    // Back to profile comes first. Both ways out share the one state-action
+    // shape, so neither is an outlined or shadowed second control.
+    const actions = findByType(renderer.root, 'ButtonMock');
+    expect(actions).toHaveLength(2);
+    expect(actions[0]).toBe(back);
+    expect(actions[1]).toBe(retry);
+    expect(back?.props.className).toBe(retry?.props.className);
     expect(findByType(renderer.root, 'ScreenHeaderMock')[0]?.props.title).toBe('Security Agent');
 
     act(() => {
@@ -188,7 +188,7 @@ describe('ScopeAccessDeniedScreen', () => {
   });
 
   it('uses the unavailable copy for an organization that no longer exists', () => {
-    const renderer = mountScreen({ kind: 'not-found', eyebrow: 'Code Reviewer' });
+    const renderer = mountScreen({ kind: 'not-found', subtitle: 'Drain Labs' });
     const error = findByType(renderer.root, 'QueryErrorMock')[0];
 
     expect(error?.props.variant).toBe('not-found');
@@ -196,13 +196,13 @@ describe('ScopeAccessDeniedScreen', () => {
     expect(description?.props.message).toBe(
       'This organization is no longer available. Choose another account from the account picker to continue.'
     );
-    expect(findByType(renderer.root, 'ScreenHeaderMock')[0]?.props.eyebrow).toBe('Code Reviewer');
-    // A deleted organization does not come back by retrying either, so the
-    // filled primary and the order are the denied state's, not Retry's.
-    expect(findByType(renderer.root, 'ButtonMock')[0]).toBe(
-      button('Back to profile', renderer.root)
-    );
-    expect(button('Retry', renderer.root)?.props.variant).toBe('outline');
+    expect(findByType(renderer.root, 'ScreenHeaderMock')[0]?.props.subtitle).toBe('Drain Labs');
+    // A deleted organization does not come back by retrying, so the shared
+    // not-found state keeps one way out: Back to profile.
+    const actions = findByType(renderer.root, 'ButtonMock');
+    expect(actions).toHaveLength(1);
+    expect(actions[0]).toBe(button('Back to profile', renderer.root));
+    expect(button('Retry', renderer.root)).toBeUndefined();
 
     act(() => {
       renderer.unmount();

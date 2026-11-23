@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- a mounted case per card state: every option shape, the custom answer's selection, the keyboard and geometry rules, and the remembered answer the notification hands over */
 import { createElement } from 'react';
 import { MockTextInput } from '@/test/native-input.test-helpers';
 import { act, TestRenderer } from '@/test/renderer';
@@ -26,9 +27,6 @@ vi.mock('expo-haptics', () => ({
   impactAsync: vi.fn(),
   ImpactFeedbackStyle: { Light: 'light' },
 }));
-vi.mock('@/components/ui/icons', () => ({
-  Check: 'Check',
-}));
 vi.mock('@/components/ui/button', () => ({
   Button: 'Button',
 }));
@@ -41,9 +39,9 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 }));
 vi.mock('@/lib/a11y/announce', () => a11yMocks);
 
-// Custom answer contract: a multi-choice custom answer is a checkbox that
-// unchecks on re-activation or an empty field; a single-choice one is a radio
-// that stays selected, and a preset press replaces it.
+// Custom answer contract: the field is the custom option. Typing chooses it and
+// clearing the text drops it; a single-choice preset press replaces it. The
+// field states its choice in its accessible name, as the preset options do.
 
 type Question = {
   question: string;
@@ -74,21 +72,21 @@ const DESCRIBED = makeQuestion({ description: 'Deploy to production' });
 
 type Renderer = TestRenderer.ReactTestRenderer;
 
+type CardProps = {
+  questions: Question[];
+  onAnswer: (answers: string[][]) => void;
+  initialAnswer?: string | null;
+};
+
 async function renderCard(
   questions: Question[],
-  onAnswer: (answers: string[][]) => void = () => undefined
+  onAnswer: (answers: string[][]) => void = () => undefined,
+  initialAnswer: string | null = null
 ): Promise<Renderer> {
   const holder: { current?: Renderer } = {};
   await act(async () => {
     await Promise.resolve();
-    holder.current = TestRenderer.create(
-      createElement(QuestionCard, {
-        questions,
-        onAnswer,
-        onReject: () => undefined,
-        requestId: 'question-req-1',
-      })
-    );
+    holder.current = TestRenderer.create(cardElement({ questions, onAnswer, initialAnswer }));
   });
   const renderer = holder.current;
   if (renderer === undefined) {
@@ -97,16 +95,23 @@ async function renderCard(
   return renderer;
 }
 
-function customChoice(
-  root: TestRenderer.ReactTestInstance
-): TestRenderer.ReactTestInstance | undefined {
-  return root.findAll(
-    node =>
-      typeof node.type === 'string' &&
-      (node.type as string) === 'Pressable' &&
-      node.props.accessibilityLabel === 'Type your own answer'
-  )[0];
+function cardElement({ questions, onAnswer, initialAnswer }: CardProps) {
+  return createElement(QuestionCard, {
+    questions,
+    onAnswer,
+    onReject: () => undefined,
+    requestId: 'question-req-1',
+    initialAnswer,
+  });
 }
+
+function updateCard(renderer: Renderer, props: CardProps): void {
+  act(() => {
+    renderer.update(cardElement(props));
+  });
+}
+
+const CUSTOM_OPTION = 'Type your own answer';
 
 function customInput(
   root: TestRenderer.ReactTestInstance
@@ -144,12 +149,11 @@ function press(node: TestRenderer.ReactTestInstance | undefined): void {
 }
 
 function customChoiceChecked(root: TestRenderer.ReactTestInstance): boolean {
-  const choice = customChoice(root);
-  if (!choice) {
-    throw new Error('custom choice not found');
+  const label = customInput(root)?.props.accessibilityLabel;
+  if (label !== CUSTOM_OPTION && label !== `${CUSTOM_OPTION}, selected`) {
+    throw new Error(`custom field has an unexpected name: ${String(label)}`);
   }
-  const props = choice.props as { accessibilityState?: { checked?: boolean } };
-  return props.accessibilityState?.checked === true;
+  return label === `${CUSTOM_OPTION}, selected`;
 }
 
 function typeCustomText(root: TestRenderer.ReactTestInstance, text: string): void {
@@ -201,12 +205,8 @@ describe('QuestionCard custom answer selection', () => {
     vi.useRealTimers();
   });
 
-  it('unchecks a multi-choice custom answer on re-activation and on an empty field', async () => {
+  it('chooses a multi-choice custom answer while its field holds text', async () => {
     const renderer = await renderCard(makeQuestion({ multiple: true }));
-    press(customChoice(renderer.root));
-    expect(customChoiceChecked(renderer.root)).toBe(true);
-
-    press(customChoice(renderer.root));
     expect(customChoiceChecked(renderer.root)).toBe(false);
 
     typeCustomText(renderer.root, 'Manual input');
@@ -215,23 +215,19 @@ describe('QuestionCard custom answer selection', () => {
     expect(customChoiceChecked(renderer.root)).toBe(false);
   });
 
-  it('keeps a single-choice custom answer selected on re-activation', async () => {
-    const renderer = await renderCard(makeQuestion({ multiple: false }));
-    press(customChoice(renderer.root));
-    expect(customChoiceChecked(renderer.root)).toBe(true);
+  it('renders the custom answer as one field, with no second control that repeats it', async () => {
+    const renderer = await renderCard(makeQuestion());
 
-    press(customChoice(renderer.root));
-    expect(customChoiceChecked(renderer.root)).toBe(true);
-  });
-
-  it('deselects the custom answer when a single-choice preset option is picked', async () => {
-    const renderer = await renderCard(makeQuestion({ multiple: false }));
-
-    press(customChoice(renderer.root));
-    expect(customChoiceChecked(renderer.root)).toBe(true);
-
-    press(optionButton(renderer.root, 'Continue'));
-    expect(customChoiceChecked(renderer.root)).toBe(false);
+    expect(renderer.root.findAll(node => node.props.accessibilityRole === 'radio')).toHaveLength(0);
+    const named = renderer.root.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        typeof node.props.accessibilityLabel === 'string' &&
+        (node.props.accessibilityLabel as string).startsWith(CUSTOM_OPTION)
+    );
+    expect(named).toHaveLength(1);
+    expect(named[0]).toBe(customInput(renderer.root));
+    expect(customInput(renderer.root)?.props.placeholder).toBe('Type your own answer…');
   });
 
   it('pressing a preset after typing replaces the custom field instead of leaving text the card will not send', async () => {
@@ -257,7 +253,7 @@ describe('QuestionCard custom answer selection', () => {
     expect(submitted).toEqual([['Continue']]);
   });
 
-  it('re-pressing the selected custom radio keeps the typed answer on screen and in the submitted payload', async () => {
+  it('submits the typed single-choice answer', async () => {
     let submitted: string[][] = [];
     const renderer = await renderCard(makeQuestion({ multiple: false }), answers => {
       submitted = answers;
@@ -265,12 +261,6 @@ describe('QuestionCard custom answer selection', () => {
 
     typeCustomText(renderer.root, 'deploy staging');
     expect(customChoiceChecked(renderer.root)).toBe(true);
-    const inputBefore = customInput(renderer.root);
-
-    press(customChoice(renderer.root));
-    expect(customChoiceChecked(renderer.root)).toBe(true);
-    // The radio never remounts the field, so the typed answer stays put.
-    expect(customInput(renderer.root)).toBe(inputBefore);
 
     press(submitAction(renderer.root));
     expect(submitted).toEqual([['deploy staging']]);
@@ -358,19 +348,98 @@ describe('QuestionCard custom answer selection', () => {
   });
 });
 
-describe('QuestionCard custom answer placeholder contrast', () => {
-  // The custom answer field swaps its fill to `bg-primary` once its radio or
-  // checkbox is active. A placeholder painted for the plain background
-  // (`mutedForeground`, near-black) is invisible on that fill, so the field's
-  // purpose cannot be read (ios session-answer-kb-up finding). The placeholder
-  // colour must follow the fill, the same way the typed text does.
-  it('paints the placeholder with the fill foreground once the custom answer is active', async () => {
+describe('QuestionCard custom answer box', () => {
+  // The field is drawn as one more option: the outlined box of an unchosen
+  // option, and the filled box of a chosen one once it holds text.
+  it('wears the option outline until text chooses it, then the chosen fill', async () => {
     const renderer = await renderCard(makeQuestion());
+    const className = () => String(customInput(renderer.root)?.props.className);
 
-    expect(customInput(renderer.root)?.props.placeholderTextColor).toBe('#6F6A61');
+    expect(className()).toContain('border-input');
+    expect(className()).not.toContain('bg-primary');
 
-    press(customChoice(renderer.root));
+    typeCustomText(renderer.root, 'deploy staging');
 
-    expect(customInput(renderer.root)?.props.placeholderTextColor).toBe('#ffffff');
+    expect(className()).toContain('border-primary bg-primary');
+  });
+});
+
+describe('QuestionCard remembered reply answer', () => {
+  // An answer typed into a notification reply arrives as the first question's
+  // custom answer: the card offers it the way typing does, so the person can
+  // send it without retyping.
+  it('shows the remembered answer as the chosen custom answer and sends it', async () => {
+    let submitted: string[][] = [];
+    const renderer = await renderCard(
+      makeQuestion(),
+      answers => {
+        submitted = answers;
+      },
+      'ship it'
+    );
+
+    expect(customInput(renderer.root)?.props.defaultValue).toBe('ship it');
+    expect(customChoiceChecked(renderer.root)).toBe(true);
+    expect(submitAction(renderer.root).props.disabled).toBe(false);
+
+    press(submitAction(renderer.root));
+    expect(submitted).toEqual([['ship it']]);
+  });
+
+  it('marks the custom answer chosen for a multi-choice question too', async () => {
+    const renderer = await renderCard(makeQuestion({ multiple: true }), undefined, 'ship it');
+
+    expect(customChoiceChecked(renderer.root)).toBe(true);
+  });
+
+  it('leaves the field empty when the screen offers no answer', async () => {
+    const renderer = await renderCard(makeQuestion(), undefined, null);
+
+    expect(customInput(renderer.root)?.props.defaultValue).toBe('');
+    expect(customChoiceChecked(renderer.root)).toBe(false);
+  });
+
+  it('applies an answer that arrives after an empty field mounted', async () => {
+    const questions = makeQuestion();
+    const onAnswer = () => undefined;
+    const renderer = await renderCard(questions, onAnswer);
+    expect(customInput(renderer.root)?.props.defaultValue).toBe('');
+
+    updateCard(renderer, { questions, onAnswer, initialAnswer: 'ship it' });
+
+    expect(customInput(renderer.root)?.props.defaultValue).toBe('ship it');
+    expect(customChoiceChecked(renderer.root)).toBe(true);
+  });
+
+  it('never overrides the text the person typed before an answer arrives', async () => {
+    let submitted: string[][] = [];
+    const questions = makeQuestion();
+    const onAnswer = (answers: string[][]) => {
+      submitted = answers;
+    };
+    const renderer = await renderCard(questions, onAnswer);
+
+    typeCustomText(renderer.root, 'deploy staging');
+    updateCard(renderer, { questions, onAnswer, initialAnswer: 'ship it' });
+
+    expect(customInput(renderer.root)?.props.defaultValue).toBe('');
+    press(submitAction(renderer.root));
+    expect(submitted).toEqual([['deploy staging']]);
+  });
+
+  it('does not seed a question that takes no custom answer', async () => {
+    let submitted: string[][] = [];
+    const renderer = await renderCard(
+      makeQuestion({ custom: false }),
+      answers => {
+        submitted = answers;
+      },
+      'ship it'
+    );
+
+    expect(customInput(renderer.root)).toBeUndefined();
+    // Nothing is answered by the seed, so the card's submit stays disabled.
+    expect(submitAction(renderer.root).props.disabled).toBe(true);
+    expect(submitted).toEqual([]);
   });
 });

@@ -13,6 +13,7 @@ import {
 import { BitbucketIntegrationMetadataSchema, type BitbucketWorkspace } from './metadata';
 import { BitbucketRepositorySchema } from './token-service-client';
 import { platform_integrations, platform_oauth_credentials } from '@kilocode/db/schema';
+import { BITBUCKET_MAX_REPOSITORY_ITEMS } from '@kilocode/worker-utils/bitbucket-workspace-access-token';
 
 const CachedRepositorySchema = z
   .object({
@@ -59,7 +60,10 @@ function readCachedRepositories(
   workspace: BitbucketWorkspace
 ) {
   if (value === null || syncedAt === null) return emptyRepositoryCache();
-  const repositories = z.array(CachedRepositorySchema).safeParse(value);
+  const repositories = z
+    .array(CachedRepositorySchema)
+    .max(BITBUCKET_MAX_REPOSITORY_ITEMS)
+    .safeParse(value);
   if (!repositories.success) return emptyRepositoryCache();
 
   return {
@@ -258,7 +262,7 @@ export const BitbucketOrganizationRepositoryListResultSchema = z.discriminatedUn
   z
     .object({
       status: z.literal('available'),
-      repositories: z.array(BitbucketRepositorySchema),
+      repositories: z.array(BitbucketRepositorySchema).max(BITBUCKET_MAX_REPOSITORY_ITEMS),
       syncedAt: z.iso.datetime(),
     })
     .strict(),

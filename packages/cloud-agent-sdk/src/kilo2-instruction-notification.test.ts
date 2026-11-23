@@ -137,7 +137,7 @@ test('live instruction events and reloaded snapshots have the same notice and pr
     connection: 'connected',
     runnerConnected: true,
     events: [],
-    pending: { permissions: [], questions: [], unreadablePermissions: [] },
+    pending: { permissions: [], questions: [], unreadableQuestions: [], unreadablePermissions: [] },
     commands: {},
   };
   const live = readNativeConversation(state);

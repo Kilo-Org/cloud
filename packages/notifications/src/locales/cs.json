@@ -7,6 +7,7 @@
       "spendAlert": "Vaše útrata vyžaduje pozornost",
       "securityFinding": "Nález zabezpečení vyžaduje pozornost",
       "securityUpdate": "Kontrola zabezpečení má aktualizaci",
+      "agentBriefing": "Váš přehled agenta je připraven",
       "activeAgentsGlanceable": "Aktivní agenti mají aktualizaci"
     }
   },
@@ -29,6 +30,12 @@
     },
     "securityFindingNew": {
       "title": "Nový nález zabezpečení ({{severity}})"
+    },
+    "securityFindingSeverity": {
+      "critical": "Kritické",
+      "high": "Vysoké",
+      "medium": "Střední",
+      "low": "Nízké"
     },
     "securityFindingSlaWarning": {
       "title": "Varování o SLA"

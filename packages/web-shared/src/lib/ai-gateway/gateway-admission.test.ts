@@ -18,7 +18,8 @@ import {
   resolveGatewayCaller,
   resolveOrganizationGatewaySettings,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
-import { hasBestEffortGuessDataCollectionRequirement } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isDeniedByProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import type { OpenRouterProviderConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
   gatewayRateLimitKey,
@@ -40,7 +41,13 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/is-free-model', () => ({
   ...jest.requireActual<Record<string, unknown>>(
     '@kilocode/web-shared/lib/ai-gateway/is-free-model'
   ),
-  hasBestEffortGuessDataCollectionRequirement: jest.fn(),
+  isDeniedByProviderPrivacy: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog', () => ({
+  ...jest.requireActual<Record<string, unknown>>(
+    '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog'
+  ),
+  isCustomLlm: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit', () => ({
   gatewayRateLimitKey: jest.fn(),
@@ -106,7 +113,17 @@ describe('resolveGatewayCaller', () => {
       user,
       organizationId: 'org-1',
       botId: 'bot-1',
+      cloudAgentRuntimeProxied: false,
     });
+  });
+
+  it('marks a caller whose runtime claim the Cloud Agent runtime proxy attested', () => {
+    const caller = resolveGatewayCaller(
+      { user, authFailedResponse: null, cloudAgentRuntimeProxied: true },
+      { allowAnonymous: true, ipAddress: '192.0.2.1' }
+    );
+
+    expect(caller).toMatchObject({ kind: 'signed-in', cloudAgentRuntimeProxied: true });
   });
 
   it.each([
@@ -342,19 +359,37 @@ describe('organizationProviderPreferences', () => {
 describe('dataCollectionPolicyRejection', () => {
   const model = 'vendor/model';
 
+  beforeEach(() => {
+    jest.mocked(isCustomLlm).mockResolvedValue(false);
+  });
+
   it.each<OpenRouterProviderConfig>([
     { data_collection: 'deny' },
     { zdr: true },
     { data_collection: 'allow', zdr: true },
-  ])('rejects a model requiring data collection under %j', async provider => {
-    jest.mocked(hasBestEffortGuessDataCollectionRequirement).mockResolvedValue(true);
+  ])('rejects a model the provider privacy rules out under %j', async provider => {
+    jest.mocked(isDeniedByProviderPrivacy).mockResolvedValue(true);
 
     const response = await dataCollectionPolicyRejection(model, provider);
 
-    expect(hasBestEffortGuessDataCollectionRequirement).toHaveBeenCalledWith(model);
+    expect(isDeniedByProviderPrivacy).toHaveBeenCalledWith(model, provider);
     expect(response?.status).toBe(400);
     await expect(response?.json()).resolves.toMatchObject({
       error_type: ProxyErrorType.data_collection_required,
+      error: expect.stringContaining('Data collection is required'),
+    });
+  });
+
+  it('rejects a custom LLM under zdr as unavailable for zero data retention', async () => {
+    jest.mocked(isCustomLlm).mockResolvedValue(true);
+    jest.mocked(isDeniedByProviderPrivacy).mockResolvedValue(true);
+
+    const response = await dataCollectionPolicyRejection(model, { zdr: true });
+
+    expect(response?.status).toBe(400);
+    await expect(response?.json()).resolves.toMatchObject({
+      error_type: ProxyErrorType.data_collection_required,
+      error: expect.stringContaining('Zero data retention is not available'),
     });
   });
 
@@ -363,20 +398,12 @@ describe('dataCollectionPolicyRejection', () => {
     {},
     { data_collection: 'allow' },
     { zdr: false },
-  ])('admits a model requiring data collection under %j', async provider => {
-    jest.mocked(hasBestEffortGuessDataCollectionRequirement).mockResolvedValue(true);
+    { data_collection: 'deny' },
+  ])('admits a model the provider privacy does not rule out under %j', async provider => {
+    jest.mocked(isDeniedByProviderPrivacy).mockResolvedValue(false);
 
     await expect(dataCollectionPolicyRejection(model, provider)).resolves.toBeNull();
   });
-
-  it.each<OpenRouterProviderConfig>([{ data_collection: 'deny' }, { zdr: true }])(
-    'admits a model without a data collection requirement under %j',
-    async provider => {
-      jest.mocked(hasBestEffortGuessDataCollectionRequirement).mockResolvedValue(false);
-
-      await expect(dataCollectionPolicyRejection(model, provider)).resolves.toBeNull();
-    }
-  );
 });
 
 describe('gatewayUsageContextBase', () => {
@@ -394,7 +421,7 @@ describe('gatewayUsageContextBase', () => {
         'x-kilocode-taskid': 'task-1',
         'x-kilo-session': 'session-1',
       }),
-      { kind: 'signed-in', user, organizationId: 'org-1' },
+      { kind: 'signed-in', user, organizationId: 'org-1', cloudAgentRuntimeProxied: false },
       { requestStartedAt: 42 }
     );
 
@@ -449,7 +476,7 @@ describe('gatewayUsageContextBase', () => {
   ])('attributes a Kilo client from its own headers: %j', ({ headers, clientAttributed }) => {
     const base = gatewayUsageContextBase(
       request(headers),
-      { kind: 'signed-in', user, organizationId: undefined },
+      { kind: 'signed-in', user, organizationId: undefined, cloudAgentRuntimeProxied: false },
       { requestStartedAt: 0 }
     );
 
@@ -489,7 +516,12 @@ describe('gatewayAccountRateLimitRejection', () => {
 
 describe('freeModelRateLimitRejection', () => {
   const request = new NextRequest('http://localhost:3000/api/v1/embeddings', { method: 'POST' });
-  const signedIn = { kind: 'signed-in', user, organizationId: undefined } as const;
+  const signedIn = {
+    kind: 'signed-in',
+    user,
+    organizationId: undefined,
+    cloudAgentRuntimeProxied: false,
+  } as const;
   const anonymous = { kind: 'anonymous', user: createAnonymousContext('192.0.2.1') } as const;
 
   function reject(caller: typeof signedIn | typeof anonymous) {

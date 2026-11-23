@@ -21,24 +21,32 @@
 // distinguishable. `syntax-colors.test.ts` asserts this, and the light values
 // must also keep clearing the tinted diff tiles asserted by
 // `src/lib/hooks/use-theme-colors.contrast.test.ts`.
+//
+// The `dark` half takes DESIGN.md's saturated dark-surface steps (its
+// `syntax.number` / `syntax.property` / `syntax.constant` tokens and the
+// documented 400 step of each status hue). A near-white pastel per family
+// would clear contrast but the families would paint as one light ink on the
+// dim cards, so each family carries its light palette's hue at the darkness
+// it needs: keyword purple, builtin blue, number amber, string green, tag red,
+// comment/operator neutral grey.
 export const TOKEN_DARK_LIGHT = {
-  keyword: { light: '#772BB9', dark: '#EFE0FF' },
-  builtin: { light: '#0F4FB8', dark: '#D2E9FF' },
-  literal: { light: '#772BB9', dark: '#EFE0FF' },
-  number: { light: '#7A4A00', dark: '#FFE1BC' },
-  string: { light: '#1D6136', dark: '#C0F2D6' },
-  comment: { light: '#57534C', dark: '#EAE6DE' },
-  type: { light: '#0F4FB8', dark: '#D2E9FF' },
-  function: { light: '#0F4FB8', dark: '#D2E9FF' },
+  keyword: { light: '#772BB9', dark: '#C792EA' },
+  builtin: { light: '#0F4FB8', dark: '#9CDCFE' },
+  literal: { light: '#772BB9', dark: '#C792EA' },
+  number: { light: '#7A4A00', dark: '#F2B36B' },
+  string: { light: '#1D6136', dark: '#4ADE80' },
+  comment: { light: '#57534C', dark: '#A1A1AA' },
+  type: { light: '#0F4FB8', dark: '#9CDCFE' },
+  function: { light: '#0F4FB8', dark: '#9CDCFE' },
   variable: { light: '#14130F', dark: '#F2F0EB' },
-  property: { light: '#0F4FB8', dark: '#D2E9FF' },
-  tag: { light: '#8C3527', dark: '#FFDFD2' },
-  selector: { light: '#772BB9', dark: '#EFE0FF' },
-  attribute: { light: '#0F4FB8', dark: '#D2E9FF' },
-  operator: { light: '#57534C', dark: '#EAE6DE' },
-  meta: { light: '#57534C', dark: '#EAE6DE' },
-  add: { light: '#1D6136', dark: '#C0F2D6' },
-  del: { light: '#8C3527', dark: '#FFDFD2' },
+  property: { light: '#0F4FB8', dark: '#9CDCFE' },
+  tag: { light: '#8C3527', dark: '#F87171' },
+  selector: { light: '#772BB9', dark: '#C792EA' },
+  attribute: { light: '#0F4FB8', dark: '#9CDCFE' },
+  operator: { light: '#57534C', dark: '#A1A1AA' },
+  meta: { light: '#57534C', dark: '#A1A1AA' },
+  add: { light: '#1D6136', dark: '#4ADE80' },
+  del: { light: '#8C3527', dark: '#F87171' },
 } satisfies Record<string, { light: string; dark: string }>;
 
 export const DEFAULT_TOKEN_COLOR = { light: '#14130F', dark: '#F2F0EB' };

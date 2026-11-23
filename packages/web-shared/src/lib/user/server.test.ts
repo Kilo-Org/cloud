@@ -701,9 +701,125 @@ describe('getUserFromAuth', () => {
         error: 'Access denied (R0)',
       });
       expect(result.authorizationRefused).toBe(true);
+      // R0 is the domain refusal: nothing the person does changes it, so the
+      // client must not offer a retry.
+      expect(result.refusalReason).toBe('email_domain_blocked');
     } finally {
       await db.delete(blacklisted_domains).where(eq(blacklisted_domains.domain, blockedDomain));
     }
+  });
+
+  test('admits a refused email domain only for its own session cleanup', async () => {
+    const blockedDomain = `${crypto.randomUUID()}.blocked.example`;
+    const user = await insertTestUser({
+      google_user_email: `cleanup-domain@mail.${blockedDomain}`,
+      api_token_pepper: 'cleanup-domain-pepper',
+    });
+    await db.insert(blacklisted_domains).values({ domain: blockedDomain });
+    mockHeaders.mockResolvedValue(
+      new Headers({ Authorization: `Bearer ${generateApiToken(user)}` })
+    );
+
+    try {
+      const refused = await getUserFromAuth({ adminOnly: false });
+      expect(refused.user).toBeNull();
+      expect(refused.refusalReason).toBe('email_domain_blocked');
+
+      const admitted = await getUserFromAuth({
+        adminOnly: false,
+        allowRefusedAccountSelfCleanup: true,
+      });
+
+      // The account is admitted so the revoke can end its own session; nothing
+      // about the refusal itself changes for any other call.
+      expect(admitted.authFailedResponse).toBeNull();
+      expect(admitted.user?.id).toBe(user.id);
+    } finally {
+      await db.delete(blacklisted_domains).where(eq(blacklisted_domains.domain, blockedDomain));
+    }
+  });
+
+  test('admits a blocked account only for its own session cleanup', async () => {
+    const user = await insertTestUser({
+      blocked_reason: 'blocked for test',
+      api_token_pepper: 'cleanup-blocked-pepper',
+    });
+    mockHeaders.mockResolvedValue(
+      new Headers({ Authorization: `Bearer ${generateApiToken(user)}` })
+    );
+
+    const refused = await getUserFromAuth({ adminOnly: false });
+    expect(refused.user).toBeNull();
+    expect(refused.authorizationRefused).toBe(true);
+    expect(refused.refusalReason).toBe('account_blocked');
+
+    // The same admission the domain refusal gets: sign-out has to end the
+    // session and delete the device's own token rows while the block stands.
+    const admitted = await getUserFromAuth({
+      adminOnly: false,
+      allowRefusedAccountSelfCleanup: true,
+    });
+
+    expect(admitted.authFailedResponse).toBeNull();
+    expect(admitted.refusalReason).toBeUndefined();
+    expect(admitted.user?.id).toBe(user.id);
+  });
+
+  test('still refuses a self-cleanup request that lands on an admin-only gate', async () => {
+    // The domain-blacklist branch, not the block branch: before the fix the
+    // admission left that branch without an answer and the else-if chain ended
+    // there, so `adminOnly` was never evaluated. Only this fixture fails on the
+    // previous shape; a blocked account already reached the admin check.
+    const blockedDomain = `${crypto.randomUUID()}.blocked.example`;
+    const user = await insertTestUser({
+      google_user_email: `cleanup-domain-nonadmin@mail.${blockedDomain}`,
+      is_admin: false,
+      api_token_pepper: 'cleanup-domain-nonadmin-pepper',
+    });
+    await db.insert(blacklisted_domains).values({ domain: blockedDomain });
+    mockHeaders.mockResolvedValue(
+      new Headers({ Authorization: `Bearer ${generateApiToken(user)}` })
+    );
+
+    try {
+      // The admission covers the account refusal only, so an admin-only surface
+      // still answers with the non-admin refusal instead of admitting the account.
+      const result = await getUserFromAuth({
+        adminOnly: true,
+        allowRefusedAccountSelfCleanup: true,
+      });
+
+      expect(result.authFailedResponse).not.toBeNull();
+      expect(result.authFailedResponse?.status).toBe(403);
+      await expect(result.authFailedResponse?.json()).resolves.toEqual({
+        success: false,
+        error: 'Access denied (nonadmin)',
+      });
+      expect(result.user).toBeNull();
+    } finally {
+      await db.delete(blacklisted_domains).where(eq(blacklisted_domains.domain, blockedDomain));
+    }
+  });
+
+  test('admits a blocked account whose block timestamp is set for its own session cleanup', async () => {
+    const user = await insertTestUser({
+      blocked_reason: null,
+      blocked_at: '2026-01-15T12:00:00.000Z',
+      api_token_pepper: 'cleanup-blocked-at-pepper',
+    });
+    mockHeaders.mockResolvedValue(
+      new Headers({ Authorization: `Bearer ${generateApiToken(user)}` })
+    );
+
+    const refused = await getUserFromAuth({ adminOnly: false });
+    expect(refused.refusalReason).toBe('account_blocked');
+
+    const admitted = await getUserFromAuth({
+      adminOnly: false,
+      allowRefusedAccountSelfCleanup: true,
+    });
+
+    expect(admitted.user?.id).toBe(user.id);
   });
 
   test('authorizes a user whose email domain only shares a raw suffix with a refused domain', async () => {
@@ -1759,7 +1875,19 @@ describe('binary step-up enforcement (REST)', () => {
     const result = await getUserFromAuth({ adminOnly: true });
 
     expect((result.authFailedResponse as Response).status).toBe(403);
-    expect(await errorCode(result)).toEqual({ success: false, error: code });
+    // The refusal names the class the route resolves to, so the dialog can tell
+    // the admin what to verify for.
+    expect(await errorCode(result)).toMatchObject({
+      success: false,
+      error: code,
+      stepUp: {
+        code,
+        actionClass: 'platform_write',
+        purpose: 'session',
+        maxAgeSeconds: 1800,
+        binding: null,
+      },
+    });
   });
 
   it('denies a bearer credential with BEARER_NOT_ALLOWED when on', async () => {
@@ -1781,7 +1909,11 @@ describe('binary step-up enforcement (REST)', () => {
 
     expect(evaluateStepUp).not.toHaveBeenCalled();
     expect((result.authFailedResponse as Response).status).toBe(403);
-    expect(await errorCode(result)).toEqual({ success: false, error: 'BEARER_NOT_ALLOWED' });
+    expect(await errorCode(result)).toMatchObject({
+      success: false,
+      error: 'BEARER_NOT_ALLOWED',
+      stepUp: { code: 'BEARER_NOT_ALLOWED', actionClass: 'platform_write' },
+    });
   });
 
   it('fails closed with STEP_UP_UNAVAILABLE when evaluation errors', async () => {
@@ -1792,7 +1924,11 @@ describe('binary step-up enforcement (REST)', () => {
     const result = await getUserFromAuth({ adminOnly: true });
 
     expect((result.authFailedResponse as Response).status).toBe(403);
-    expect(await errorCode(result)).toEqual({ success: false, error: 'STEP_UP_UNAVAILABLE' });
+    expect(await errorCode(result)).toMatchObject({
+      success: false,
+      error: 'STEP_UP_UNAVAILABLE',
+      stepUp: { code: 'STEP_UP_UNAVAILABLE', actionClass: 'platform_write' },
+    });
   });
 
   it('skips enforcement only for the layout escape hatch', async () => {
@@ -1912,6 +2048,142 @@ describe('step-up refusal telemetry (REST)', () => {
     expect(
       events.filter(event => event.kind === 'privileged_access' && event.outcome === 'denied')
     ).toHaveLength(0);
+  });
+
+  test('skips the guard and reports wouldBlock false when the credential kind is exempted', async () => {
+    process.env.ADMIN_STEP_UP_ENABLED = 'true';
+    runStepUpGuard.mockClear();
+    const admin = await bearerAdmin('/api/private/users');
+
+    const result = await getUserFromAuth({
+      adminOnly: true,
+      requestMethod: 'GET',
+      stepUpExemptCredentials: ['human_bearer'],
+    });
+
+    expect(result.user?.id).toBe(admin.id);
+    expect(runStepUpGuard).not.toHaveBeenCalled();
+    expect(events.map(event => event.kind)).toEqual(['admin_guard', 'privileged_access']);
+    for (const event of events) {
+      expect(event).toMatchObject({
+        credential: 'human_bearer',
+        authVia: 'token',
+        wouldBlock: false,
+      });
+    }
+    expect(events[1]).toMatchObject({ outcome: 'succeeded', actionId: 'rest.private.users' });
+  });
+
+  test('still enforces the guard when the exemption names a different credential kind', async () => {
+    process.env.ADMIN_STEP_UP_ENABLED = 'true';
+    runStepUpGuard.mockClear();
+    await bearerAdmin('/api/private/users');
+
+    const result = await getUserFromAuth({
+      adminOnly: true,
+      requestMethod: 'GET',
+      stepUpExemptCredentials: ['delegated_workload', 'service_assertion'],
+    });
+
+    expect(runStepUpGuard).toHaveBeenCalledTimes(1);
+    expect((result.authFailedResponse as Response).status).toBe(403);
+    expect(events[1]).toMatchObject({ outcome: 'denied', wouldBlock: true });
+  });
+
+  test('never exempts a browser session, whatever the exemption list names', async () => {
+    process.env.ADMIN_STEP_UP_ENABLED = 'true';
+    runStepUpGuard.mockClear();
+    await sessionAdmin();
+    evaluateStepUp.mockResolvedValueOnce({
+      state: { status: 'not_enrolled' },
+      proof: null,
+      passkeyCount: 0,
+    });
+
+    const result = await getUserFromAuth({
+      adminOnly: true,
+      requestMethod: 'GET',
+      // The type forbids 'session'; the runtime check must hold if a caller
+      // gets past it anyway.
+      stepUpExemptCredentials: [
+        'session' as never,
+        'human_bearer',
+        'delegated_workload',
+        'service_assertion',
+      ],
+    });
+
+    expect(runStepUpGuard).toHaveBeenCalledTimes(1);
+    expect((result.authFailedResponse as Response).status).toBe(403);
+    expect(events.map(event => event.kind)).toEqual(['admin_guard']);
+    expect(events[0]).toMatchObject({ credential: 'session', wouldBlock: false });
+  });
+
+  test('ignores the exemption on a write-class request', async () => {
+    process.env.ADMIN_STEP_UP_ENABLED = 'true';
+    runStepUpGuard.mockClear();
+    await bearerAdmin('/api/private/users');
+
+    const result = await getUserFromAuth({
+      adminOnly: true,
+      requestMethod: 'POST',
+      stepUpExemptCredentials: ['human_bearer'],
+    });
+
+    expect(runStepUpGuard).toHaveBeenCalledTimes(1);
+    expect(runStepUpGuard).toHaveBeenCalledWith(
+      expect.objectContaining({ actionClass: 'platform_write' })
+    );
+    expect((result.authFailedResponse as Response).status).toBe(403);
+    expect(events[1]).toMatchObject({ outcome: 'denied', wouldBlock: true });
+  });
+
+  test('ignores the exemption on an operation-bound class', async () => {
+    process.env.ADMIN_STEP_UP_ENABLED = 'true';
+    runStepUpGuard.mockClear();
+    await bearerAdmin('/admin/api/users/add-credit');
+
+    const result = await getUserFromAuth({
+      adminOnly: true,
+      requestMethod: 'POST',
+      stepUpExemptCredentials: ['human_bearer'],
+    });
+
+    expect(runStepUpGuard).toHaveBeenCalledTimes(1);
+    const { actionClass } = runStepUpGuard.mock.calls[0][0] as { actionClass: string };
+    expect(['sensitive_write', 'support_write', 'worker_admin']).toContain(actionClass);
+    expect((result.authFailedResponse as Response).status).toBe(403);
+    expect(events[1]).toMatchObject({ outcome: 'denied', wouldBlock: true });
+  });
+
+  test('keeps wouldBlock true when a server-component layout skips the guard for a bearer request', async () => {
+    process.env.ADMIN_STEP_UP_ENABLED = 'true';
+    runStepUpGuard.mockClear();
+    await bearerAdmin('/admin');
+
+    await getUserFromAuth({
+      adminOnly: true,
+      stepUpSurface: 'server-component',
+      skipStepUpGuard: true,
+    });
+
+    expect(runStepUpGuard).not.toHaveBeenCalled();
+    expect(events.map(event => event.kind)).toEqual(['admin_guard', 'privileged_access']);
+    for (const event of events) {
+      expect(event).toMatchObject({ wouldBlock: true });
+    }
+  });
+
+  test('still reports wouldBlock true on both events for a guarded bearer request', async () => {
+    process.env.ADMIN_STEP_UP_ENABLED = 'false';
+    await bearerAdmin();
+
+    await getUserFromAuth({ adminOnly: true, requestMethod: 'GET' });
+
+    expect(events.map(event => event.kind)).toEqual(['admin_guard', 'privileged_access']);
+    for (const event of events) {
+      expect(event).toMatchObject({ wouldBlock: true });
+    }
   });
 
   test('carries the arriving surface through both events of one request', async () => {

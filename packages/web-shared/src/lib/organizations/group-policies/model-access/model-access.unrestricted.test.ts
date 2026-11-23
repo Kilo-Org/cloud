@@ -47,10 +47,10 @@ function context(
       directory_group_id: null,
       directory_idp_id: null,
       external_org_id: null,
+      anthropic_user_profile_id: null,
     },
     defaultPolicies: [],
-    groupIds: [],
-    groupPolicies: [],
+    groups: [],
     policyRevision: 1,
     ...overrides,
   };

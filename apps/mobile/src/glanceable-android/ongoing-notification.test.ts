@@ -1,9 +1,10 @@
 import {
   buildGlanceableSnapshot,
-  type GlanceableAgentsSnapshot,
   type GlanceableSessionRow,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { describe, expect, it } from 'vitest';
+
+import { copyTranslate } from '@/lib/glanceable/copy.test-helpers';
 
 import {
   buildOngoingNotificationContent,
@@ -14,13 +15,25 @@ import {
 const NOW = 1_750_000_000_000;
 const WAKE = new Date(NOW + 7_200_000).toISOString();
 const COPY: Record<string, string> = {
-  'glanceable.needsInput': 'Needs input',
-  'common.working': 'Working',
-  'common.scheduled': 'Scheduled',
-  'common.idle': 'Idle',
-  'glanceable.checked': 'Checked',
-  'glanceable.lastKnown': 'Last known',
-  'glanceable.nextRun': 'Next run',
+  'glanceable.countNoun.needsInput_one': 'Needs input',
+  'glanceable.countNoun.needsInput_other': 'Needs input',
+  'glanceable.countNoun.running_one': 'Working',
+  'glanceable.countNoun.running_other': 'Working',
+  'glanceable.countNoun.scheduled_one': 'Scheduled',
+  'glanceable.countNoun.scheduled_other': 'Scheduled',
+  'glanceable.countNoun.idle_one': 'Idle',
+  'glanceable.countNoun.idle_other': 'Idle',
+  'glanceable.count.needsInput_one': '{{displayCount}} Needs input',
+  'glanceable.count.needsInput_other': '{{displayCount}} Needs input',
+  'glanceable.count.running_one': '{{displayCount}} Working',
+  'glanceable.count.running_other': '{{displayCount}} Working',
+  'glanceable.count.scheduled_one': '{{displayCount}} Scheduled',
+  'glanceable.count.scheduled_other': '{{displayCount}} Scheduled',
+  'glanceable.count.idle_one': '{{displayCount}} Idle',
+  'glanceable.count.idle_other': '{{displayCount}} Idle',
+  'glanceable.footer.checked': 'Checked {{time}}',
+  'glanceable.footer.lastKnown': 'Last known · {{time}}',
+  'glanceable.wake.nextRun': 'Next run {{time}}',
   'glanceable.approving': 'Approving…',
   'glanceable.signedOut': 'Sign in to see agents',
   'glanceable.privacy': 'Open Kilo to see agents',
@@ -28,23 +41,20 @@ const COPY: Record<string, string> = {
   'glanceable.waiting': 'Updating agents',
   'glanceable.empty': 'No work in progress',
 };
+const translate = copyTranslate(COPY);
 const FORMAT: NotificationFormat = {
-  translate: key => COPY[key] ?? key,
+  translate,
   formatCount: String,
   formatClock: at => (at === WAKE ? '6:00 PM' : '4:32 PM'),
 };
 const IDLE: NotificationAction = { approving: false, failure: null };
 
-function snapshotFor(
-  sessions: GlanceableSessionRow[],
-  status?: GlanceableAgentsSnapshot['status']
-) {
+function snapshotFor(sessions: GlanceableSessionRow[]) {
   return buildGlanceableSnapshot({
     sessions,
     userId: 'u1',
     organizationId: null,
     now: NOW,
-    ...(status === undefined ? {} : { status }),
   });
 }
 const MIXED = snapshotFor([

@@ -7,6 +7,7 @@ import {
   background,
   buttonStyle,
   cornerRadius,
+  dynamicTypeSize,
   environment,
   fixedSize,
   font,
@@ -104,6 +105,8 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
   const status = props.status ?? 'empty';
   const statusLine = status === 'happy' ? null : (COPY[status] ?? null);
   const dark = activityEnvironment.colorScheme === 'dark';
+  // The idle dot is the only mark a connected but quiet agent draws, so it
+  // takes the palette's muted ink: that ink clears 3:1 on the card and the page.
   const palette = dark
     ? {
         bg: '#17171A',
@@ -112,7 +115,7 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
         warn: '#F2B05F',
         good: '#5FCB8E',
         info: '#60A5FA',
-        idle: '#56544F',
+        idle: '#8A8680',
         primary: '#FFDD00',
         primaryFg: '#1A1A10',
         secondary: '#26262B',
@@ -124,7 +127,7 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
         warn: '#956011',
         good: '#24784A',
         info: '#2260EB',
-        idle: '#A9A39A',
+        idle: '#6F6A61',
         primary: '#4F5A10',
         primaryFg: '#FFFFFF',
         secondary: '#F0EEE6',
@@ -156,6 +159,22 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
     .filter(line => line.count > 0 && line !== primary)
     .map(line => `${count(line.count)} ${line.label}`)
     .join(' · ');
+  // The card's text runs take the Dynamic Type text style whose default size
+  // is the design size, so they draw the design at the default text size and
+  // grow with the user's setting. The counts keep their fixed size. The Lock
+  // Screen card caps the growth at `xLarge`, where the status row still fits
+  // beside Approve; the island and the small banner keep the default size,
+  // because their system frames have no room to grow.
+  const TEXT_STYLES = {
+    11: 'caption2',
+    13: 'footnote',
+    15: 'subheadline',
+    16: 'callout',
+  } as const;
+  type TextSize = keyof typeof TEXT_STYLES;
+  const scaledFont = (size: TextSize, weight?: 'regular' | 'semibold') =>
+    font({ textStyle: TEXT_STYLES[size], weight });
+  const defaultTextSize = dynamicTypeSize('large');
   type Scheme = {
     fg: string;
     muted: string;
@@ -165,7 +184,7 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
     secondary: string;
     dots: Record<(typeof countLines)[number]['kind'], string>;
     countSize: number;
-    labelSize: number;
+    labelSize: TextSize;
   };
   const card: Scheme = {
     ...palette,
@@ -190,7 +209,7 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
       needsInput: '#F2B05F',
       running: '#5FCB8E',
       scheduled: '#60A5FA',
-      idle: '#56544F',
+      idle: '#8A8680',
     },
     countSize: 32,
     labelSize: 15,
@@ -232,11 +251,13 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
   // eslint-disable-next-line max-params -- a text run is its copy, size, colour and weight, named as the design names them
   const text = (
     value: string,
-    size: number,
+    size: TextSize,
     color: string,
     weight: 'regular' | 'semibold' = 'regular'
   ) => (
-    <Text modifiers={[font({ size, weight }), lineLimit(1), foregroundStyle(color)]}>{value}</Text>
+    <Text modifiers={[scaledFont(size, weight), lineLimit(1), foregroundStyle(color)]}>
+      {value}
+    </Text>
   );
   const dot = (diameter: number, color: string) => (
     <Circle modifiers={[frame({ width: diameter, height: diameter }), foregroundStyle(color)]} />
@@ -262,7 +283,7 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
         <Text
           date={date}
           dateStyle="time"
-          modifiers={[font({ size: 11 }), lineLimit(1), monospacedDigit(), foregroundStyle(color)]}
+          modifiers={[scaledFont(11), lineLimit(1), monospacedDigit(), foregroundStyle(color)]}
         />
       );
     }
@@ -279,7 +300,7 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
         <Text
           date={date}
           dateStyle="time"
-          modifiers={[font({ size: 11 }), lineLimit(1), monospacedDigit(), foregroundStyle(color)]}
+          modifiers={[scaledFont(11), lineLimit(1), monospacedDigit(), foregroundStyle(color)]}
         />
       );
     }
@@ -309,7 +330,7 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
   const pill = (label: string, width: number, tone: { fill: string; color: string }) => (
     <Text
       modifiers={[
-        font({ size: 13, weight: 'semibold' }),
+        scaledFont(13, 'semibold'),
         lineLimit(1),
         foregroundStyle(tone.color),
         fixedSize({ horizontal: true, vertical: false }),
@@ -396,7 +417,7 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
             date={scheduledAt}
             dateStyle="time"
             modifiers={[
-              font({ size: 13 }),
+              scaledFont(13),
               lineLimit(1),
               monospacedDigit(),
               foregroundStyle(scheme.muted),
@@ -428,6 +449,7 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
           // without this the times would be formatted in a different language
           // than the baked labels.
           environment({ key: 'locale', value: locale }),
+          dynamicTypeSize({ max: 'xLarge' }),
         ]}
       >
         {header(card)}
@@ -458,6 +480,7 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
           padding({ horizontal: 12, vertical: 10 }),
           frame({ maxWidth: 10_000, maxHeight: 10_000, alignment: 'leading' }),
           environment({ key: 'locale', value: locale }),
+          defaultTextSize,
         ]}
       >
         <HStack
@@ -590,6 +613,7 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
             bottom: islandLine === null ? 4 : 10,
           }),
           environment({ key: 'locale', value: locale }),
+          defaultTextSize,
         ]}
       >
         {header(island)}

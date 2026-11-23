@@ -1,39 +1,40 @@
 import 'server-only';
 
-import { openai_chatgpt_connections } from '@kilocode/db/schema';
 import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import { isRecord } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
-import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
-import {
-  OPENAI_CLIENT_ID,
-  OPENAI_CLIENT_SECRET,
-  BYOK_ENCRYPTION_KEY,
-} from '@kilocode/web-shared/lib/config.server';
+import { OPENAI_CLIENT_ID, OPENAI_CLIENT_SECRET } from '@kilocode/web-shared/lib/config.server';
 import {
   OPENAI_RESOURCE,
   OPENAI_TOKEN_ENDPOINT,
 } from '@kilocode/web-shared/lib/auth/openai/config';
 import {
   decryptOpenAiChatGptConnection,
+  healthyOpenAiChatGptConnection,
   markOpenAiChatGptConnectionErrored,
-  openAiChatGptOwnerWhere,
   openAiChatGptOwnerKey,
   readOpenAiChatGptConnectionRow,
+  writeOpenAiChatGptConnection,
   type OpenAiChatGptDatabase,
   type OpenAiChatGptOwner,
 } from './store';
 import type { OpenAiChatGptConnection } from './types';
 
-/**
+/*
  * Refreshes the delegated OpenAI access token for a "Sign in with ChatGPT"
- * connection. The stored access token is returned unchanged while it has more
- * than `REFRESH_WINDOW_SECONDS` left; otherwise the refresh request runs under
- * a row lock that is held for that one request, so one refresh happens per
- * connection even across concurrent instances, and neither a retry, its backoff
- * sleep, nor a stalled token endpoint keeps the lock or a pool connection open.
+ * connection. An unexpired stored access token is served while it has more than
+ * `OPENAI_CHATGPT_REFRESH_WINDOW_SECONDS` left, and also while OpenAI's
+ * `earliest_refresh_at` says the refresh window has not opened; an expired
+ * token is never served. Otherwise the refresh request runs under a row lock
+ * that is held for that one request, so one refresh happens per connection even
+ * across concurrent instances, and neither a retry, its backoff sleep, nor a
+ * stalled token endpoint keeps the lock or a pool connection open.
  *
- * Nothing here ever logs, returns or embeds a token or the client secret in an
- * exception message: only the OAuth error code and the user id are logged.
+ * Nothing here ever logs, returns or embeds a token, a refresh token or the
+ * client secret in an exception message. A failed refresh logs only the failure
+ * reason and the connection-owner key from `openAiChatGptOwnerKey(owner)`: the
+ * member's user id with their organization id (or `personal`), or
+ * `shared-services:<organizationId>` for a shared-services connection. The
+ * `logRefreshFailure` doc describes the code-plus-owner line it writes.
  */
 
 /** Refresh this many seconds before the access token actually expires. */
@@ -307,7 +308,7 @@ async function attemptRefresh(
     const accessToken = readStringField(body, 'access_token');
     const expiresIn = readExpiresIn(body);
     if (accessToken && expiresIn) {
-      const updated: OpenAiChatGptConnection = {
+      const updated = healthyOpenAiChatGptConnection({
         ...connection,
         access_token: accessToken,
         refresh_token: readStringField(body, 'refresh_token') ?? refreshToken,
@@ -317,18 +318,9 @@ async function attemptRefresh(
         earliest_refresh_at: readEarliestRefreshAt(body),
         scope: readStringField(body, 'scope') ?? connection.scope,
         token_type: readStringField(body, 'token_type') ?? connection.token_type,
-        status: 'connected',
-        error_message: undefined,
-        error_at: undefined,
-      };
+      });
 
-      await tx
-        .update(openai_chatgpt_connections)
-        .set({
-          encrypted_connection: encryptApiKey(JSON.stringify(updated), BYOK_ENCRYPTION_KEY),
-          is_enabled: true,
-        })
-        .where(openAiChatGptOwnerWhere(owner));
+      await writeOpenAiChatGptConnection(tx, owner, updated);
 
       return { kind: 'access_token', accessToken };
     }
@@ -417,10 +409,6 @@ async function resolveOpenAiChatGptAccessTokenUncached(
     }
 
     for (let attempt = 1; attempt <= OPENAI_CHATGPT_REFRESH_MAX_ATTEMPTS; attempt++) {
-      // The row lock is held for one refresh request only. The backoff between
-      // attempts runs with it released, and each attempt re-reads the row, so a
-      // sibling instance that refreshed meanwhile is adopted rather than
-      // refreshed over.
       const decision = await db.transaction(tx => resolveInsideLock(tx, owner));
 
       // A terminal decision has already disabled the row inside that transaction.

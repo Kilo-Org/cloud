@@ -21,11 +21,13 @@ describe('parseDeviceAuthCodeResponse', () => {
         user_code: 'USER-123',
         device_code: 'device-secret',
         verificationUrl: 'https://app.kilo.ai/device-auth?code=USER-123',
+        expiresIn: 600,
       })
     ).toEqual({
       userCode: 'USER-123',
       deviceCode: 'device-secret',
       verificationUrl: 'https://app.kilo.ai/device-auth?code=USER-123',
+      expiresIn: 600,
     });
   });
 
@@ -76,7 +78,7 @@ describe('parseTokenResponse', () => {
   });
 });
 
-// --- parseTokenPair (full refresh pair) ---
+// --- parseTokenPair ---
 
 describe('parseTokenPair', () => {
   it('parses a complete token pair', () => {
@@ -104,7 +106,6 @@ describe('parseTokenPair', () => {
   });
 
   it('returns null when expiresIn is zero', () => {
-    // expiresIn must be positive; zero is rejected by the schema
     expect(parseTokenPair({ token: 'abc', refreshToken: 'ref', expiresIn: 0 })).toBeNull();
   });
 
@@ -264,6 +265,25 @@ describe('parseAuthError', () => {
     });
     expect(parseAuthError({ error: 'SIGNUP-STEP-UP', methods: 'apple' })).toEqual({
       code: 'SIGNUP-STEP-UP',
+    });
+  });
+
+  it('returns the unknown-key recovery hint when the server names it', () => {
+    expect(
+      parseAuthError({ error: 'ADMISSION_REQUIRED', recovery: 'IOS_ASSERTION_UNKNOWN_KEY' })
+    ).toEqual({ code: 'ADMISSION_REQUIRED', recovery: 'IOS_ASSERTION_UNKNOWN_KEY' });
+  });
+
+  it('drops an unrecognised or malformed recovery hint without hiding the code', () => {
+    expect(parseAuthError({ error: 'ADMISSION_REQUIRED', recovery: 'SOMETHING_ELSE' })).toEqual({
+      code: 'ADMISSION_REQUIRED',
+    });
+    expect(parseAuthError({ error: 'ADMISSION_REQUIRED', recovery: 42 })).toEqual({
+      code: 'ADMISSION_REQUIRED',
+    });
+    // No hint at all stays byte-identical to the pre-hint shape.
+    expect(parseAuthError({ error: 'ADMISSION_REQUIRED' })).toEqual({
+      code: 'ADMISSION_REQUIRED',
     });
   });
 

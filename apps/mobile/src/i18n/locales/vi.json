@@ -379,7 +379,7 @@
       "rowSubtitle": "Liên kết LinkedIn và GitHub",
       "linkedinLabel": "URL LinkedIn",
       "githubLabel": "URL GitHub",
-      "emptyRemovesLink": "Lưu một trường để trống sẽ xóa liên kết đó.",
+      "emptyRemovesLink": "Lưu một trường để trống sẽ xóa liên kết đó",
       "invalidUrl": "Nhập URL bắt đầu bằng http:// hoặc https://",
       "saved": "Đã cập nhật hồ sơ"
     },

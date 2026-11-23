@@ -273,7 +273,13 @@ export function ProfileEditScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <Text variant="muted">{t('profile.editProfile.emptyRemovesLink')}</Text>
+        {/* The hint explains the fields, so the error state — whose body is only
+            the retry — omits it. It stays outside the body swap, so the
+            header-to-hint distance is the same while the fields load and once
+            they land. */}
+        {links.isError ? null : (
+          <Text variant="muted">{t('profile.editProfile.emptyRemovesLink')}</Text>
+        )}
         {body}
       </TabScreenScrollView>
     </View>

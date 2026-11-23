@@ -349,7 +349,7 @@ describe('ProfileEditScreen', () => {
     const hints = root.findAll(
       node =>
         Object.is(node.type, TEXT) &&
-        node.props.children === 'Saving an empty field deletes that link.'
+        node.props.children === 'Saving an empty field deletes that link'
     );
     expect(hints).toHaveLength(1);
 
@@ -410,6 +410,21 @@ describe('ProfileEditScreen', () => {
     state.error = true;
     const root = await mount();
 
+    expect(root.findAll(node => Object.is(node.type, 'QueryError'))).toHaveLength(1);
+  });
+
+  it('hides the empty-field hint when the retry is the whole body', async () => {
+    state.error = true;
+    const root = await mount();
+
+    // The hint explains what an emptied field does; the error body has no
+    // fields, so the rule is not shown beside a screen that cannot edit them.
+    const hints = root.findAll(
+      node =>
+        Object.is(node.type, TEXT) &&
+        node.props.children === 'Saving an empty field deletes that link'
+    );
+    expect(hints).toHaveLength(0);
     expect(root.findAll(node => Object.is(node.type, 'QueryError'))).toHaveLength(1);
   });
 

@@ -380,7 +380,7 @@
       "rowSubtitle": "Enllaços de LinkedIn i GitHub",
       "linkedinLabel": "URL de LinkedIn",
       "githubLabel": "URL de GitHub",
-      "emptyRemovesLink": "Desar un camp buit elimina aquest enllaç.",
+      "emptyRemovesLink": "Desar un camp buit elimina aquest enllaç",
       "invalidUrl": "Introdueix un URL que comenci per http:// o https://",
       "saved": "S'ha actualitzat el perfil"
     },

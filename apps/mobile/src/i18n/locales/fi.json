@@ -379,7 +379,7 @@
       "rowSubtitle": "LinkedIn- ja GitHub-linkit",
       "linkedinLabel": "LinkedIn-URL",
       "githubLabel": "GitHub-URL",
-      "emptyRemovesLink": "Tyhjän kentän tallentaminen poistaa kyseisen linkin.",
+      "emptyRemovesLink": "Tyhjän kentän tallentaminen poistaa kyseisen linkin",
       "invalidUrl": "Anna URL-osoite, joka alkaa http:// tai https://",
       "saved": "Profiili päivitetty"
     },

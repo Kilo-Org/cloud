@@ -380,7 +380,7 @@
       "rowSubtitle": "Poveznice na LinkedIn i GitHub",
       "linkedinLabel": "LinkedIn URL",
       "githubLabel": "GitHub URL",
-      "emptyRemovesLink": "Spremanje praznog polja briše tu poveznicu.",
+      "emptyRemovesLink": "Spremanje praznog polja briše tu poveznicu",
       "invalidUrl": "Unesi URL koji počinje s http:// ili https://",
       "saved": "Profil je ažuriran"
     },

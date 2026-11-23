@@ -379,7 +379,7 @@
       "rowSubtitle": "LinkedIn-ისა და GitHub-ის ბმულები",
       "linkedinLabel": "LinkedIn-ის URL",
       "githubLabel": "GitHub-ის URL",
-      "emptyRemovesLink": "ცარიელი ველის შენახვა ამ ბმულს შლის.",
+      "emptyRemovesLink": "ცარიელი ველის შენახვა ამ ბმულს შლის",
       "invalidUrl": "შეიყვანეთ URL, რომელიც იწყება http://-ით ან https://-ით",
       "saved": "პროფილი განახლდა"
     },

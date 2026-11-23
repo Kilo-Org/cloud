@@ -379,7 +379,7 @@
       "rowSubtitle": "LinkedIn- és GitHub-linkek",
       "linkedinLabel": "LinkedIn-URL",
       "githubLabel": "GitHub-URL",
-      "emptyRemovesLink": "Egy üres mező mentése törli az adott linket.",
+      "emptyRemovesLink": "Egy üres mező mentése törli az adott linket",
       "invalidUrl": "Adj meg egy http:// vagy https:// előtaggal kezdődő URL-t",
       "saved": "Profil frissítve"
     },

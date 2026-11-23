@@ -382,7 +382,7 @@
       "rowSubtitle": "Links ta' LinkedIn u GitHub",
       "linkedinLabel": "URL ta' LinkedIn",
       "githubLabel": "URL ta' GitHub",
-      "emptyRemovesLink": "Jekk issalva qasam vojt, dak il-link jitħassar.",
+      "emptyRemovesLink": "Jekk issalva qasam vojt, dak il-link jitħassar",
       "invalidUrl": "Daħħal URL li jibda b'http:// jew https://",
       "saved": "Il-profil ġie aġġornat"
     },

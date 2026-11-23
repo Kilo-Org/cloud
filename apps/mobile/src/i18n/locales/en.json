@@ -477,7 +477,7 @@
       "rowSubtitle": "LinkedIn and GitHub links",
       "linkedinLabel": "LinkedIn URL",
       "githubLabel": "GitHub URL",
-      "emptyRemovesLink": "Saving an empty field deletes that link.",
+      "emptyRemovesLink": "Saving an empty field deletes that link",
       "invalidUrl": "Enter a URL that starts with http:// or https://",
       "saved": "Profile updated"
     },

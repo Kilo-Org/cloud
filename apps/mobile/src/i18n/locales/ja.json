@@ -378,7 +378,7 @@
       "rowSubtitle": "LinkedInとGitHubのリンク",
       "linkedinLabel": "LinkedInのURL",
       "githubLabel": "GitHubのURL",
-      "emptyRemovesLink": "フィールドを空欄のまま保存すると、そのリンクが削除されます。",
+      "emptyRemovesLink": "フィールドを空欄のまま保存すると、そのリンクが削除されます",
       "invalidUrl": "http:// または https:// で始まるURLを入力してください",
       "saved": "プロフィールを更新しました"
     },

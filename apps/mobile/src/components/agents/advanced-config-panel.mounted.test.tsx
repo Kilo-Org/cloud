@@ -49,6 +49,10 @@ vi.mock('@/components/ui/button', () => ({
 vi.mock('@/components/ui/form-field', () => ({
   FormField: (props: Record<string, unknown>) => createElement('FormField', props),
 }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', async () => {
   const React = await import('react');
@@ -510,7 +514,7 @@ describe('AdvancedConfigPanel', () => {
     expect(texts(renderer)).toContain('1 var');
   });
 
-  it('replaces Save as profile with the plan refusal when the plan gate refuses', () => {
+  it('states the plan in place of Save as profile without announcing it again', () => {
     const planRefusal = i18n.t('common.organizationTrialEndedBillingAtKiloAi');
     const renderer = mount({ planRefusal, organizationId: 'org-1' });
     fillManualConfig(renderer);
@@ -519,7 +523,17 @@ describe('AdvancedConfigPanel', () => {
     // ended, so the entry is the state itself: a button here would only open a
     // sheet whose save the server rejects.
     expect(buttonByText(renderer, 'Save as profile')).toBeUndefined();
+    // The state is titled and silent: the form already announces this sentence
+    // above the composer, so expanding the panel must not add a live region
+    // that repeats it. The description's status is the only one left.
+    expect(texts(renderer)).toContain(i18n.t('common.planRequiredTitle'));
     expect(texts(renderer)).toContain(planRefusal);
+    expect(
+      renderer.root.findAllByType(AccessibleStatus as never).map(node => node.props.message)
+    ).toEqual([i18n.t('agentChat.newSession.advancedConfigDescription')]);
+    expect(announceForAccessibility.mock.calls).toEqual([
+      [i18n.t('agentChat.newSession.advancedConfigDescription')],
+    ]);
   });
 
   it('accepts an empty value in the session draft, matching prepare-session', () => {

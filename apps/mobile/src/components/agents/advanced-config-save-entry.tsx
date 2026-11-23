@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 
-import { OrganizationPlanRefusal } from '@/components/organization/plan-refusal';
+import { OrganizationPlanNotice } from '@/components/organization/plan-notice';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 
@@ -16,10 +16,15 @@ type AdvancedConfigSaveEntryProps = Readonly<{
 
 /**
  * The advanced configuration's save entry, split from the panel that the repo's
- * line cap no longer fits: `Save as profile`, or the plan refusal standing where
+ * line cap no longer fits: `Save as profile`, or the plan state standing where
  * it would be. Every organization profile write is refused while that gate
  * refuses, so the entry becomes the state instead of opening a sheet whose save
  * fails.
+ *
+ * The state is painted silently, as `OrganizationPlanNotice`'s titled surface
+ * rather than the live-region refusal: the new-session form already announces
+ * that same sentence above the composer, and a second `AccessibleStatus` here
+ * would announce it again the moment the panel is expanded.
  */
 export function AdvancedConfigSaveEntry({
   disabled,
@@ -28,7 +33,7 @@ export function AdvancedConfigSaveEntry({
 }: Readonly<AdvancedConfigSaveEntryProps>) {
   const { t } = useTranslation();
   if (planRefusal !== null) {
-    return <OrganizationPlanRefusal message={planRefusal} />;
+    return <OrganizationPlanNotice title={t('common.planRequiredTitle')} message={planRefusal} />;
   }
   return (
     <Button

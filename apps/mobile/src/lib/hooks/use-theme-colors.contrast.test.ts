@@ -286,9 +286,10 @@ describe('plated disabled primary action contrast (WCAG non-text and text)', () 
   it('light theme: the plate separates from the enabled brand fill by luminance', () => {
     // Measured 2.24:1 (#4f5a10 against #918c82): the plate is a full step
     // lighter than the dark brand fill. This is a luminance cue rather than a
-    // text ratio because the light brand is dark enough that no plate carrying
-    // legible ink can sit a text ratio away from it — the plate signals
-    // disabled with its lighter fill and inverted `--foreground` ink instead.
+    // text ratio because no plate can do better here: the 3:1 non-text floor
+    // against the page and the 4.5:1 floor for its own ink cap the separation
+    // from the brand fill at about 2.4:1. The plate signals disabled with its
+    // lighter fill and inverted `--foreground` ink instead.
     const light = contrastRatio(lightColors.primary, lightColors.primaryDisabledAction);
     expect(light, 'primary vs primary-disabled-action (light)').toBeGreaterThanOrEqual(2);
   });

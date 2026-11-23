@@ -40,11 +40,14 @@
    * replaces (#4f5a10) is itself dark: the palette's disabled neutral sat 1.4:1
    * from the brand by luminance and carried the same white label, so enabled
    * and disabled differed by hue alone and a greyscale reader saw no change.
-   * This step is the lightest plate that still clears 3:1 off the page and the
-   * card (3.2:1 and 3.4:1), so the disabled Save keeps the plate that makes it
-   * read as a control, while it sits 2.2:1 from the brand by luminance and
-   * takes `--foreground` ink (5.6:1) where the enabled label is white: two
-   * cues that survive greyscale. It is its own token because the dark plate
+   * This step keeps headroom above the palette's 3:1 non-text floor — 3.2:1
+   * off the page and 3.4:1 off the card — so the disabled Save keeps the plate
+   * that makes it read as a control, while it sits 2.2:1 from the brand by
+   * luminance and takes `--foreground` ink (5.6:1) where the enabled label is
+   * white: two cues that survive greyscale. A lighter plate would gain a little
+   * more luminance separation but lose the standoff that makes the plate an
+   * object, and the 3:1 floor together with the 4.5:1 ink floor caps the
+   * separation at about 2.4:1. It is its own token because the dark plate
    * that face needs differs from the dark `--primary-disabled`, which is too
    * bright a neutral to sit on the near-black page (see the dark block). */
   --primary-disabled-action: #918c82;

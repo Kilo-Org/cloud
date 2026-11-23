@@ -52,49 +52,96 @@ export async function organizationBouncerAccountId(
 }
 
 /**
- * Enqueues one credit event into the durable outbox. The soft-delete check locks the user row
- * `FOR UPDATE`, so it must run inside a transaction (the callers pass `db.transaction` or an open
- * transaction) for the lock to hold; the `BouncerCreditEventOutboxTransaction` parameter makes a
- * bare client a compile error, so the lock cannot be reduced to a single statement by accident.
- * That serializes the enqueue insert against a concurrent `softDeleteUser` (which updates the same
- * row) at the database boundary, so an in-flight late webhook cannot insert after the deletion
- * commits; it does not undo a delivery that already happened, and the drainer rechecks the owner
- * before sending. Passing the caller's transaction also makes the insert atomic with the primary
- * write. A DB error propagates, so the caller can let the payment or webhook provider retry instead
- * of losing the report. The insert is idempotent on `(eventId, event_type)`.
+ * The credit-event wire fields that describe the attributed account's client: its address, its
+ * TLS/HTTP fingerprint, and the card it used. An organization row publishes them only while its
+ * attributed account is active; an absent account row counts as gone.
+ */
+export const CREDIT_EVENT_CLIENT_FIELDS = [
+  'ip',
+  'ipCountry',
+  'ja4',
+  'cardFingerprint',
+  'cardCountry',
+] as const;
+
+/**
+ * Enqueues one credit event into the durable outbox. The attributed account's row is locked on
+ * every event, so it must run inside a transaction (the callers pass
+ * `db.transaction` or an open transaction) for the lock to hold; the
+ * `BouncerCreditEventOutboxTransaction` parameter makes a bare client a compile error, so the lock
+ * cannot be reduced to a single statement by accident. A personal event locks that row `FOR UPDATE`
+ * and is skipped when the account is gone/deleting; an organization event locks it `FOR SHARE` and
+ * is still enqueued, with the attributed client's fields withheld. Either lock serializes the
+ * enqueue against a concurrent `softDeleteUser` (which updates the same row) at the database
+ * boundary, so a late webhook that waits for the cleanup reads the committed state: a personal
+ * event is skipped, and an organization event that is still enqueued carries no client-derived
+ * fields. It does not undo a delivery that already happened, and the drainer rechecks the owner
+ * before sending a personal event. Passing the caller's transaction also makes the insert atomic
+ * with the primary write. A DB error propagates, so the caller can let the payment or webhook
+ * provider retry instead of losing the report. The insert is idempotent on `(eventId, event_type)`.
  *
  * The row keeps the raw `userId` (so a soft delete can find it by the real user id). `event_id` is
  * `bouncerWireEventId(event.eventId)` — the exact id when within bouncer's 128-character limit,
  * else a SHA-256 digest — so the dedupe key equals the id bouncer receives and two distinct source
- * events never merge. The payload is the same wire body. A gone/deleting account is skipped with a
- * visible log. An organization event is reported against the root of the organization family, with
- * the family's totals, so a sub-organization lands on the payer its family is known by.
+ * events never merge. The payload is the same wire body. A personal event whose account is
+ * gone/deleting is skipped with a visible log. An organization event is reported against the root of
+ * the organization family, with the family's totals, so a sub-organization lands on the payer its
+ * family is known by; its `userId` is attribution, so the attributed account's state does not decide
+ * the report. An absent attributed account row counts as gone for field withholding: it names no
+ * client in this deployment, so there are no client fields to publish.
  */
 export async function enqueueCreditEvent(
   database: BouncerCreditEventOutboxTransaction,
   event: CreditEvent
 ): Promise<EnqueueBouncerCreditEventResult> {
-  const [owner] = await database
-    .select({ blockedReason: kilocode_users.blocked_reason })
-    .from(kilocode_users)
-    .where(eq(kilocode_users.id, event.userId))
-    .limit(1)
-    .for('update');
-  if (owner && isGoneOrDeletingBlockedReason(owner.blockedReason)) {
-    logWarning('Skipped bouncer credit event for a soft-deleted user', {
-      eventType: event.type,
-      eventId: event.eventId,
-    });
-    return { enqueued: false };
+  // The gone/deleting skip is for the event's subject. A personal event's subject is the account
+  // in `userId`, so the `FOR UPDATE` lock serializes the insert against a concurrent soft delete.
+  // An organization event's subject is the organization, which `withOrganizationPayer` resolves
+  // to the family payer; its `userId` is attribution only, so the row is always enqueued and the
+  // attributed client's fields are withheld while that account is gone, deleting, or absent. That
+  // branch takes `FOR SHARE` for the same serialization: a concurrent soft delete of the attributed
+  // account waits for this transaction, so the state read below cannot be overtaken by the cleanup
+  // that deletes the account's outbox rows. Shared locks do not conflict with each other, so two
+  // organization enqueues attributed to one account still run together.
+  let attributedAccountGone = false;
+  if (!event.orgId) {
+    const [owner] = await database
+      .select({ blockedReason: kilocode_users.blocked_reason })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, event.userId))
+      .limit(1)
+      .for('update');
+    if (owner && isGoneOrDeletingBlockedReason(owner.blockedReason)) {
+      logWarning('Skipped bouncer credit event for a soft-deleted user', {
+        eventType: event.type,
+        eventId: event.eventId,
+      });
+      return { enqueued: false };
+    }
+  } else {
+    const [attributedAccount] = await database
+      .select({ blockedReason: kilocode_users.blocked_reason })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, event.userId))
+      .limit(1)
+      .for('share');
+    // An absent row means this deployment holds no client for the attributed account, so it has
+    // no client fields to publish either.
+    attributedAccountGone =
+      !attributedAccount || isGoneOrDeletingBlockedReason(attributedAccount.blockedReason);
   }
   const payerEvent = await withOrganizationPayer(database, event);
+  const payload = creditEventWireBody(payerEvent);
+  if (attributedAccountGone) {
+    for (const field of CREDIT_EVENT_CLIENT_FIELDS) delete payload[field];
+  }
   return enqueueBouncerCreditEvent(database, {
     // The dedupe key is the wire identity (exact when <=128 chars, else SHA-256), the same value
     // bouncer receives, so two source ids never collapse to one identity.
     eventId: bouncerWireEventId(event.eventId),
     eventType: event.type,
     userId: event.userId,
-    payload: creditEventWireBody(payerEvent),
+    payload,
   });
 }
 

@@ -11,6 +11,7 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   bouncer_credit_event_outbox,
+  kilocode_users,
   organizations,
   type BouncerCreditEventOutboxRow,
 } from '@kilocode/db/schema';
@@ -217,6 +218,234 @@ describe('bouncer credit-event outbox (integration)', () => {
     await db.delete(organizations).where(eq(organizations.id, child.id));
     await db.delete(organizations).where(eq(organizations.id, parent.id));
   });
+
+  it('enqueues an organization event when its attributed account is soft-deleted', async () => {
+    const userId = 'oauth/deleted-org-actor';
+    await insertTestUser({
+      id: userId,
+      blocked_reason: createSoftDeletedBlockedReason(),
+    });
+    const [org] = await db
+      .insert(organizations)
+      .values({
+        name: 'Organization with a deleted billing actor',
+        microdollars_used: 1_000,
+        total_microdollars_acquired: 50_000,
+      })
+      .returning();
+
+    const result = await db.transaction(tx =>
+      enqueueCreditEvent(tx, {
+        type: 'charge.attempted',
+        eventId: 'evt-org-deleted-actor',
+        occurredAt: new Date('2026-01-01T00:00:00.000Z'),
+        userId,
+        orgId: org.id,
+        flow: 'auto_topup',
+        amountCents: 50_000,
+        accountCreatedAt: org.created_at,
+        accountUsedMicrodollars: org.microdollars_used,
+        ip: '203.0.113.7',
+        ipCountry: 'DE',
+        ja4: 'ja4_digest_value',
+        cardFingerprint: 'card_fingerprint_value',
+        cardCountry: 'DE',
+      })
+    );
+
+    expect(result.enqueued).toBe(true);
+    const rows = await db
+      .select()
+      .from(bouncer_credit_event_outbox)
+      .where(eq(bouncer_credit_event_outbox.event_id, 'evt-org-deleted-actor'));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.user_id).toBe(userId);
+    expect(rows[0]?.payload.orgId).toBe(org.id);
+    expect(rows[0]?.payload.ip).toBeUndefined();
+    expect(rows[0]?.payload.ipCountry).toBeUndefined();
+    expect(rows[0]?.payload.ja4).toBeUndefined();
+    expect(rows[0]?.payload.cardFingerprint).toBeUndefined();
+    expect(rows[0]?.payload.cardCountry).toBeUndefined();
+
+    await db.delete(organizations).where(eq(organizations.id, org.id));
+  });
+
+  it('enqueues an organization event whose attributed account row is absent, withholding fields', async () => {
+    const userId = `oauth/absent-org-actor-${randomUUID()}`;
+    const [org] = await db
+      .insert(organizations)
+      .values({
+        name: 'Organization with an absent billing actor',
+        microdollars_used: 2_000,
+        total_microdollars_acquired: 60_000,
+      })
+      .returning();
+
+    const result = await db.transaction(tx =>
+      enqueueCreditEvent(tx, {
+        type: 'charge.attempted',
+        eventId: 'evt-org-absent-actor',
+        occurredAt: new Date('2026-01-01T00:00:00.000Z'),
+        userId,
+        orgId: org.id,
+        flow: 'auto_topup',
+        amountCents: 50_000,
+        accountCreatedAt: org.created_at,
+        accountUsedMicrodollars: org.microdollars_used,
+        ip: '203.0.113.7',
+        ipCountry: 'DE',
+        ja4: 'ja4_digest_value',
+        cardFingerprint: 'card_fingerprint_value',
+        cardCountry: 'DE',
+      })
+    );
+
+    expect(result.enqueued).toBe(true);
+    const rows = await db
+      .select()
+      .from(bouncer_credit_event_outbox)
+      .where(eq(bouncer_credit_event_outbox.event_id, 'evt-org-absent-actor'));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.payload.orgId).toBe(org.id);
+    expect(rows[0]?.payload.userId).toBe(userId);
+    expect(rows[0]?.payload.ip).toBeUndefined();
+    expect(rows[0]?.payload.ipCountry).toBeUndefined();
+    expect(rows[0]?.payload.ja4).toBeUndefined();
+    expect(rows[0]?.payload.cardFingerprint).toBeUndefined();
+    expect(rows[0]?.payload.cardCountry).toBeUndefined();
+
+    await db.delete(organizations).where(eq(organizations.id, org.id));
+  });
+
+  it('keeps the client fields of an organization event for an active attributed account', async () => {
+    const user = await insertTestUser();
+    const [org] = await db
+      .insert(organizations)
+      .values({
+        name: 'Organization with an active billing actor',
+        microdollars_used: 3_000,
+        total_microdollars_acquired: 20_000,
+      })
+      .returning();
+
+    const result = await db.transaction(tx =>
+      enqueueCreditEvent(tx, {
+        type: 'charge.attempted',
+        eventId: 'evt-org-active-actor',
+        occurredAt: new Date('2026-01-01T00:00:00.000Z'),
+        userId: user.id,
+        orgId: org.id,
+        flow: 'auto_topup',
+        amountCents: 5_000,
+        accountCreatedAt: org.created_at,
+        accountUsedMicrodollars: org.microdollars_used,
+        ip: '203.0.113.7',
+        ja4: 'ja4_digest_value',
+      })
+    );
+
+    expect(result.enqueued).toBe(true);
+    const rows = await db
+      .select()
+      .from(bouncer_credit_event_outbox)
+      .where(eq(bouncer_credit_event_outbox.event_id, 'evt-org-active-actor'));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.payload.ip).toBe('203.0.113.7');
+    expect(rows[0]?.payload.ja4).toBe('ja4_digest_value');
+
+    await db.delete(organizations).where(eq(organizations.id, org.id));
+  });
+
+  it('serializes an organization enqueue against a concurrent account cleanup', async () => {
+    const user = await insertTestUser();
+    const [org] = await db
+      .insert(organizations)
+      .values({
+        name: 'Organization charged during an account cleanup',
+        microdollars_used: 4_000,
+        total_microdollars_acquired: 30_000,
+      })
+      .returning();
+
+    const { promise: lockHeld, resolve: signalLockHeld } = Promise.withResolvers<number>();
+    const { promise: releaseGate, resolve: allowEnqueue } = Promise.withResolvers<void>();
+
+    // The holder mirrors `anonymizeCloudUserData`: it deletes this account's outbox rows and marks
+    // the row gone in one transaction, and keeps that row locked until it commits.
+    const cleanup = db.transaction(async tx => {
+      await tx
+        .delete(bouncer_credit_event_outbox)
+        .where(eq(bouncer_credit_event_outbox.user_id, user.id));
+      await tx
+        .update(kilocode_users)
+        .set({ blocked_reason: createSoftDeletedBlockedReason() })
+        .where(eq(kilocode_users.id, user.id));
+      const backend = await tx.execute<{ pid: number }>(sql`SELECT pg_backend_pid()::int AS pid`);
+      const pid = backend.rows[0]?.pid;
+      if (pid === undefined) throw new Error('PostgreSQL backend pid unavailable');
+      signalLockHeld(pid);
+      await releaseGate;
+    });
+
+    const holderPid = await lockHeld;
+    const enqueue = db.transaction(tx =>
+      enqueueCreditEvent(tx, {
+        type: 'charge.attempted',
+        eventId: 'evt-org-concurrent-cleanup',
+        occurredAt: new Date('2026-01-01T00:00:00.000Z'),
+        userId: user.id,
+        orgId: org.id,
+        flow: 'auto_topup',
+        amountCents: 7_000,
+        accountCreatedAt: org.created_at,
+        accountUsedMicrodollars: org.microdollars_used,
+        ip: '203.0.113.7',
+        ja4: 'ja4_digest_value',
+        cardFingerprint: 'card_fingerprint_value',
+      })
+    );
+
+    // The loop below proves the enqueue waits on the cleanup backend; it throws with diagnostics
+    // when the waiter never registers. Release the gate either way.
+    try {
+      const deadline = Date.now() + 10_000;
+      const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+      for (;;) {
+        const waiting = await db.execute(sql`
+          SELECT 1 FROM pg_stat_activity
+          WHERE datname = current_database()
+            AND wait_event_type = 'Lock'
+            AND ${holderPid} = ANY(pg_blocking_pids(pid))`);
+        if (waiting.rows.length > 0) break;
+        if (Date.now() > deadline) {
+          const diagnostics = await db.execute<{ wait: string | null; query: string }>(sql`
+            SELECT wait_event_type || ':' || coalesce(wait_event, '') AS wait, query
+            FROM pg_stat_activity
+            WHERE datname = current_database() AND pid <> pg_backend_pid()`);
+          throw new Error(
+            `timed out waiting for the cleanup backend to block the enqueue; activity: ${JSON.stringify(diagnostics.rows)}`
+          );
+        }
+        await sleep(20);
+      }
+    } finally {
+      allowEnqueue();
+    }
+
+    await Promise.all([cleanup, enqueue]);
+
+    const rows = await db
+      .select()
+      .from(bouncer_credit_event_outbox)
+      .where(eq(bouncer_credit_event_outbox.event_id, 'evt-org-concurrent-cleanup'));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.payload.orgId).toBe(org.id);
+    expect(rows[0]?.payload.ip).toBeUndefined();
+    expect(rows[0]?.payload.ja4).toBeUndefined();
+    expect(rows[0]?.payload.cardFingerprint).toBeUndefined();
+
+    await db.delete(organizations).where(eq(organizations.id, org.id));
+  }, 30_000);
 
   it('treats the same event_id with a different type as a distinct row', async () => {
     await enqueueBouncerCreditEvent(db, {

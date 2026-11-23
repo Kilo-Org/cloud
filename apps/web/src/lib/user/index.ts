@@ -1234,8 +1234,8 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  * - operation_ledgers (keyed by kilo_user_id)
  * - analytics_event_outbox (keyed by distinct_id: the user's email or, when the
  *   writer's email lookup failed, the user id)
- * - bouncer_credit_event_outbox (every row for the user; its payload carries the
- *   user id, client ip, and card fingerprint)
+ * - bouncer_credit_event_outbox (every row for the user, organization rows
+ *   included; the payload carries the user id, client ip, and card fingerprint)
  * - bouncer_usage_event_outbox (every row for the user; its payload carries the
  *   account id, client ip, and client-fingerprint digest)
  * - kiloclaw_instances.admin_size_override JSONB (contains admin actorEmail
@@ -1309,10 +1309,12 @@ export async function anonymizeCloudUserData(
   await tx
     .delete(analytics_event_outbox)
     .where(inArray(analytics_event_outbox.distinct_id, [originalEmail, userId]));
-  // Bouncer credit-event payloads carry the user id, client ip, and card
-  // fingerprint, so every row for the user is deleted rather than retained.
-  // `enqueueCreditEvent` also refuses to store new rows for a soft-deleted
-  // account, so a late webhook cannot reintroduce the PII.
+  // Bouncer credit-event payloads carry this account's client fields, so every row for the
+  // account is deleted, organization rows included. An organization event enqueued before this
+  // cleanup commits is therefore removed and never delivered; the survives-the-cleanup guarantee
+  // covers only events enqueued after it commits. Those attribute the account id (the contract's
+  // required attribution field, not client data) with the client-derived fields withheld, and the
+  // drainer rechecks the account and strips the client-derived fields before sending.
   await tx
     .delete(bouncer_credit_event_outbox)
     .where(eq(bouncer_credit_event_outbox.user_id, userId));

@@ -5,6 +5,7 @@
  */
 import { randomUUID } from 'crypto';
 import { eq, sql } from 'drizzle-orm';
+import { captureMessage } from '@sentry/nextjs';
 
 import {
   deliverBouncerCreditEventNow,
@@ -27,6 +28,7 @@ jest.mock('@sentry/nextjs', () => ({
 }));
 
 const mockDeliver = jest.mocked(deliverCreditEventWireBody);
+const mockCaptureMessage = jest.mocked(captureMessage);
 
 async function insertPending(
   overrides: Partial<typeof bouncer_credit_event_outbox.$inferInsert> = {}
@@ -49,6 +51,7 @@ describe('dispatchQueuedBouncerCreditEvents', () => {
   beforeEach(async () => {
     await db.delete(bouncer_credit_event_outbox).where(sql`true`);
     mockDeliver.mockReset();
+    mockCaptureMessage.mockClear();
   });
 
   afterAll(async () => {
@@ -130,6 +133,159 @@ describe('dispatchQueuedBouncerCreditEvents', () => {
       .from(bouncer_credit_event_outbox)
       .where(eq(bouncer_credit_event_outbox.id, row.id));
     expect(rows).toHaveLength(0);
+  });
+
+  it('delivers an organization row with organization-level fields only', async () => {
+    const user = await insertTestUser({ blocked_reason: createSoftDeletedBlockedReason() });
+    const row = await insertPending({
+      user_id: user.id,
+      event_type: 'charge.attempted',
+      payload: {
+        type: 'charge.attempted',
+        eventId: 'evt-org-deleted-owner',
+        userId: user.id,
+        orgId: '2f1c0a3e-0000-4000-8000-000000000001',
+        flow: 'auto_topup',
+        amountCents: 5_000,
+        ip: '203.0.113.7',
+        ipCountry: 'DE',
+        ja4: 'ja4_digest_value',
+        cardFingerprint: 'card_fingerprint_value',
+        cardCountry: 'DE',
+      },
+    });
+    mockDeliver.mockResolvedValue({ delivered: true, status: 200 });
+
+    const summary = await dispatchQueuedBouncerCreditEvents({ limit: 10 });
+
+    expect(summary.delivered).toBe(1);
+    expect(mockDeliver).toHaveBeenCalledTimes(1);
+    const delivered = mockDeliver.mock.calls[0]?.[0] ?? {};
+    expect(delivered.orgId).toBe('2f1c0a3e-0000-4000-8000-000000000001');
+    expect(delivered.userId).toBe(user.id);
+    expect(delivered.ip).toBeUndefined();
+    expect(delivered.ipCountry).toBeUndefined();
+    expect(delivered.ja4).toBeUndefined();
+    expect(delivered.cardFingerprint).toBeUndefined();
+    expect(delivered.cardCountry).toBeUndefined();
+    expect(mockCaptureMessage).toHaveBeenCalledWith(
+      'Withheld client fields of an organization credit event',
+      expect.anything()
+    );
+    const [after] = await db
+      .select()
+      .from(bouncer_credit_event_outbox)
+      .where(eq(bouncer_credit_event_outbox.id, row.id));
+    expect(after?.status).toBe('delivered');
+  });
+
+  it('delivers an organization row whose attributed account row is absent, withholding fields', async () => {
+    const userId = `oauth/absent-org-actor-${randomUUID()}`;
+    const row = await insertPending({
+      user_id: userId,
+      event_type: 'charge.attempted',
+      payload: {
+        type: 'charge.attempted',
+        eventId: 'evt-org-absent-owner',
+        userId,
+        orgId: '2f1c0a3e-0000-4000-8000-000000000003',
+        flow: 'auto_topup',
+        amountCents: 5_000,
+        ip: '203.0.113.7',
+        ipCountry: 'DE',
+        ja4: 'ja4_digest_value',
+        cardFingerprint: 'card_fingerprint_value',
+        cardCountry: 'DE',
+      },
+    });
+    mockDeliver.mockResolvedValue({ delivered: true, status: 200 });
+
+    const summary = await dispatchQueuedBouncerCreditEvents({ limit: 10 });
+
+    expect(summary.delivered).toBe(1);
+    expect(mockDeliver).toHaveBeenCalledTimes(1);
+    const delivered = mockDeliver.mock.calls[0]?.[0] ?? {};
+    expect(delivered.orgId).toBe('2f1c0a3e-0000-4000-8000-000000000003');
+    expect(delivered.userId).toBe(userId);
+    expect(delivered.ip).toBeUndefined();
+    expect(delivered.ipCountry).toBeUndefined();
+    expect(delivered.ja4).toBeUndefined();
+    expect(delivered.cardFingerprint).toBeUndefined();
+    expect(delivered.cardCountry).toBeUndefined();
+    expect(mockCaptureMessage).toHaveBeenCalledWith(
+      'Withheld client fields of an organization credit event',
+      expect.anything()
+    );
+    const [after] = await db
+      .select()
+      .from(bouncer_credit_event_outbox)
+      .where(eq(bouncer_credit_event_outbox.id, row.id));
+    expect(after?.status).toBe('delivered');
+  });
+
+  it('keeps the client fields of a personal row whose account row is absent', async () => {
+    const userId = `oauth/absent-personal-actor-${randomUUID()}`;
+    await insertPending({
+      user_id: userId,
+      event_type: 'charge.attempted',
+      payload: {
+        type: 'charge.attempted',
+        eventId: 'evt-personal-absent-owner',
+        userId,
+        flow: 'auto_topup',
+        amountCents: 5_000,
+        ip: '203.0.113.7',
+        ipCountry: 'DE',
+        ja4: 'ja4_digest_value',
+        cardFingerprint: 'card_fingerprint_value',
+        cardCountry: 'DE',
+      },
+    });
+    mockDeliver.mockResolvedValue({ delivered: true, status: 200 });
+
+    const summary = await dispatchQueuedBouncerCreditEvents({ limit: 10 });
+
+    expect(summary.delivered).toBe(1);
+    expect(mockDeliver).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId,
+        ip: '203.0.113.7',
+        ipCountry: 'DE',
+        ja4: 'ja4_digest_value',
+        cardFingerprint: 'card_fingerprint_value',
+        cardCountry: 'DE',
+      })
+    );
+    expect(mockCaptureMessage).not.toHaveBeenCalledWith(
+      'Withheld client fields of an organization credit event',
+      expect.anything()
+    );
+  });
+
+  it('keeps the client fields of an organization row for an active attributed account', async () => {
+    const user = await insertTestUser();
+    await insertPending({
+      user_id: user.id,
+      event_type: 'charge.attempted',
+      payload: {
+        type: 'charge.attempted',
+        eventId: 'evt-org-active-owner',
+        userId: user.id,
+        orgId: '2f1c0a3e-0000-4000-8000-000000000002',
+        flow: 'auto_topup',
+        amountCents: 5_000,
+        ip: '203.0.113.7',
+        ja4: 'ja4_digest_value',
+      },
+    });
+    mockDeliver.mockResolvedValue({ delivered: true, status: 200 });
+
+    const summary = await dispatchQueuedBouncerCreditEvents({ limit: 10 });
+
+    expect(summary.delivered).toBe(1);
+    expect(mockDeliver).toHaveBeenCalledWith(
+      expect.objectContaining({ ip: '203.0.113.7', ja4: 'ja4_digest_value' })
+    );
   });
 
   it('fails a row with an unvalidatable payload without calling the transport', async () => {

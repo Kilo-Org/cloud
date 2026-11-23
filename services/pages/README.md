@@ -265,8 +265,8 @@ workspaces and its events go to `app.kilo.ai`, and a Slack app has one event
 URL.
 
 `PAGES_SLACK_TEAM_ID` is not secret, but it is a Worker secret like the other
-two. Then the repository holds no workspace ID, the three values live in one
-place, and deleting any one of them turns the feature off without a deploy.
+two. Then the repository holds no workspace ID, and the three values live in
+one place.
 
 Set it up in this order. A Slack workspace admin does steps 1 to 3.
 
@@ -302,23 +302,31 @@ Check the endpoint without Slack:
 curl -s -o /dev/null -w '%{http_code}' https://pages-dev.kiloapps.io/api/slack/events
 ```
 
-A GET answers 404 while the feature is off and 405 once all three values are
-set.
+A GET answers 404 until all three values are set, and 405 after.
 
-Turn it off by deleting one value. The endpoint answers 404 again at once:
+Once the app lists `pages-dev.kiloapps.io` as an unfurl domain, Slack stops
+building its own preview from the Page's Open Graph tags and waits for the
+app. If the Worker cannot deliver the preview, the link posts with no preview
+at all, for everyone in the workspace. Check step 6 right after setup, and
+turn the feature off if it fails.
 
-```bash
-pnpm exec wrangler secret delete PAGES_SLACK_BOT_TOKEN --name pages-dev
-```
+Turn it off in the app's settings: Event Subscriptions, App unfurl domains,
+delete `pages-dev.kiloapps.io`, Save Changes. Slack then builds Open Graph
+previews again for new messages. Messages already posted keep no preview.
+Deleting a Worker secret does not turn it off: Slack still sends the links to
+the app, the endpoint answers 404, and links still post with no preview. To
+turn it back on, add the domain again and save.
 
-Links then post without a preview. Slack turns off an app's event delivery
-when most deliveries fail for an hour, so uninstall the app if it stays off.
-To turn it back on, set the value again and retry the request URL.
+When previews fail, `pnpm exec wrangler tail pages-dev` shows each delivery to
+`/api/slack/events`. A 503 with `"origin":["present",…]` means the Worker
+built the preview but Slack's `chat.unfurl` refused it or timed out. The
+Worker does not log Slack's error, so call `chat.unfurl` with the bot token to
+read it.
 
 To rotate the signing secret, regenerate it on Basic Information and put the
 new value. To rotate the bot token, reinstall the app and put the new token.
-Previews fail while Slack and the Worker hold different values; nothing else
-does.
+Links post with no preview while Slack and the Worker hold different values;
+nothing else changes.
 
 ## Environment Variables
 

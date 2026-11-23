@@ -30,7 +30,6 @@ vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'Accessi
 vi.mock('@/components/ui/icons', () => ({
   RotateCcw: () => null,
   AlertCircle: () => null,
-  Ban: () => null,
   Lock: () => null,
   SearchX: () => null,
   ServerCrash: () => null,

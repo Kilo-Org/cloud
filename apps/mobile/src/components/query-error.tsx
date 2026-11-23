@@ -1,6 +1,5 @@
 import {
   AlertCircle,
-  Ban,
   Lock,
   type LucideIcon,
   RotateCcw,
@@ -32,10 +31,9 @@ const VARIANT_ICONS = {
   permission: Lock,
   'not-found': SearchX,
   server: ServerCrash,
-  // The terminal state cannot be fixed by any action the reader has, so its
-  // glyph is the prohibition rather than the server's fault.
-  terminal: Ban,
-  // The slow-response state is named by its copy; it shares the generic icon.
+  // Two states are named by their copy rather than a distinct glyph, so they
+  // share the generic warning icon.
+  terminal: AlertCircle,
   timeout: AlertCircle,
 } satisfies Record<QueryErrorVariant, LucideIcon>;
 

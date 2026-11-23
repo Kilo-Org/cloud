@@ -14,13 +14,10 @@ import { getInstallation } from '@/lib/integrations/github-apps-service';
 import {
   fetchGitHubInstallationDetails,
   fetchGitHubRepositories,
-  generateGitHubInstallationToken,
 } from '@/lib/integrations/platforms/github/adapter';
 import {
   fetchAllGitHubRepositoriesForOrganization,
   fetchGitHubRepositoriesForUser,
-  getGitHubInstallationIdForUser,
-  getGitHubTokenForUser,
 } from '@/lib/cloud-agent/github-integration-helpers';
 import { createCallerForUser } from '@/routers/test-utils';
 
@@ -28,12 +25,10 @@ jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
   ...jest.requireActual<Record<string, unknown>>('@/lib/integrations/platforms/github/adapter'),
   fetchGitHubInstallationDetails: jest.fn(),
   fetchGitHubRepositories: jest.fn(),
-  generateGitHubInstallationToken: jest.fn(),
 }));
 
 const mockFetchGitHubInstallationDetails = jest.mocked(fetchGitHubInstallationDetails);
 const mockFetchGitHubRepositories = jest.mocked(fetchGitHubRepositories);
-const mockGenerateGitHubInstallationToken = jest.mocked(generateGitHubInstallationToken);
 
 const deletedInstallationIds = new Set<string>();
 
@@ -57,7 +52,6 @@ function requestedInstallationIds() {
   return [
     ...mockFetchGitHubInstallationDetails.mock.calls,
     ...mockFetchGitHubRepositories.mock.calls,
-    ...mockGenerateGitHubInstallationToken.mock.calls,
   ].map(([installationId]) => installationId);
 }
 
@@ -175,10 +169,6 @@ beforeEach(() => {
       { ...repository(`refreshed-${installationId}`), created_at: '2026-04-01T00:00:00.000Z' },
     ];
   });
-  mockGenerateGitHubInstallationToken.mockReset().mockImplementation(async installationId => {
-    rejectDeletedInstallation(installationId);
-    return { token: `token-for-${installationId}`, expires_at: '2099-01-01T00:00:00.000Z' };
-  });
 });
 
 describe('personal GitHub installation selection after a reinstall', () => {
@@ -205,7 +195,7 @@ describe('personal GitHub installation selection after a reinstall', () => {
     expect(suspended?.id).toBe(historical.association.id);
   });
 
-  it('lists repositories and mints credentials only for the reinstalled installation', async () => {
+  it('lists repositories only for the reinstalled installation', async () => {
     const { user, historical, current } = await seedReinstalledPersonalWorkspace();
 
     const cached = await fetchGitHubRepositoriesForUser(user.id);
@@ -218,8 +208,6 @@ describe('personal GitHub installation selection after a reinstall', () => {
     expect(refreshed.repositories.map(repo => repo.fullName)).toEqual([
       `synthetic-github-org/refreshed-${current.installationId}`,
     ]);
-    expect(await getGitHubTokenForUser(user.id)).toBe(`token-for-${current.installationId}`);
-    expect(await getGitHubInstallationIdForUser(user.id)).toBe(current.installationId);
 
     expect(requestedInstallationIds()).not.toContain(historical.installationId);
     await expectHistoricalAssociationPreserved(historical);
@@ -309,9 +297,6 @@ describe('personal GitHub workspace without a healthy installation', () => {
       errorMessage: testCase.message,
       unavailableReason: testCase.reason,
     });
-    expect(await getGitHubTokenForUser(user.id)).toBeUndefined();
-    expect(await getGitHubInstallationIdForUser(user.id)).toBeUndefined();
-    expect(mockGenerateGitHubInstallationToken).not.toHaveBeenCalled();
     expect(mockFetchGitHubRepositories).not.toHaveBeenCalled();
   });
 
@@ -326,8 +311,6 @@ describe('personal GitHub workspace without a healthy installation', () => {
     const result = await fetchGitHubRepositoriesForUser(user.id);
 
     expect(result.integrationInstalled).toBe(false);
-    expect(await getGitHubTokenForUser(user.id)).toBeUndefined();
-    expect(await getGitHubInstallationIdForUser(user.id)).toBeUndefined();
     expect(requestedInstallationIds()).toEqual([]);
   });
 });

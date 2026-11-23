@@ -8,10 +8,6 @@ import {
 import { computeCloudAgentNextBalanceCheckEligibility } from '@/lib/cloud-agent-next/balance-check-eligibility';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { runSessionToCompletion } from '@/lib/cloud-agent-next/run-session';
-import {
-  getGitHubTokenForUser,
-  getGitHubTokenForOrganization,
-} from '@/lib/cloud-agent/github-integration-helpers';
 import type OpenAI from 'openai';
 import type { Owner } from '@/lib/integrations/core/types';
 import {
@@ -208,14 +204,10 @@ async function spawnCloudAgentSession(
     model,
   });
 
-  let githubToken: string | undefined;
   let kilocodeOrganizationId: string | undefined;
 
   if (owner.type === 'org') {
-    githubToken = await getGitHubTokenForOrganization(owner.id);
     kilocodeOrganizationId = owner.id;
-  } else {
-    githubToken = await getGitHubTokenForUser(owner.id);
   }
 
   const user = await findUserById(ticketUserId);
@@ -259,10 +251,11 @@ async function spawnCloudAgentSession(
     client,
     prepareInput: {
       githubRepo: repository.full_name,
+      githubIntegrationId: repository.githubIntegrationId,
+      githubAccessPurpose: 'workflow',
       prompt: promptWithSignature,
       mode: (args.mode as PrepareSessionInput['mode']) || 'code',
       model,
-      githubToken,
       kilocodeOrganizationId,
       createdOnPlatform: 'discord',
     },

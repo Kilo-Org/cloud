@@ -3,12 +3,10 @@ import type { PlatformIntegration } from '@kilocode/db/schema';
 import {
   getIntegrationsByOrganization,
   getIntegrationForOwner,
-  getPrimaryGitHubIntegrationForOrganization,
   updateRepositoriesForIntegration,
 } from '@/lib/integrations/db/platform-integrations';
 import {
   fetchGitHubRepositories,
-  generateGitHubInstallationToken,
   checkExistingFork,
 } from '@/lib/integrations/platforms/github/adapter';
 import {
@@ -141,76 +139,6 @@ const unavailableIntegrationResponse = (
   ...missingIntegrationResponse(UNAVAILABLE_REASON_MESSAGES[reason]),
   unavailableReason: reason,
 });
-
-export async function getGitHubTokenForOrganization(
-  organizationId: string
-): Promise<string | undefined> {
-  const integration = await getPrimaryGitHubIntegrationForOrganization(organizationId);
-
-  if (!integration?.platform_installation_id) {
-    return undefined;
-  }
-
-  const appType = integration.github_app_type || 'standard';
-
-  try {
-    const tokenData = await generateGitHubInstallationToken(
-      integration.platform_installation_id,
-      appType
-    );
-    return tokenData.token;
-  } catch (_error) {
-    throw new TRPCError({
-      code: 'INTERNAL_SERVER_ERROR',
-      message: 'Failed to authenticate with GitHub integration',
-    });
-  }
-}
-
-export async function getGitHubTokenForUser(userId: string): Promise<string | undefined> {
-  const integration = await getIntegrationForOwner({ type: 'user', id: userId }, PLATFORM.GITHUB);
-
-  if (!isPlatformIntegrationHealthy(integration) || !integration.platform_installation_id) {
-    return undefined;
-  }
-
-  const appType = integration.github_app_type || 'standard';
-
-  try {
-    const tokenData = await generateGitHubInstallationToken(
-      integration.platform_installation_id,
-      appType
-    );
-    return tokenData.token;
-  } catch (_error) {
-    throw new TRPCError({
-      code: 'INTERNAL_SERVER_ERROR',
-      message: 'Failed to authenticate with GitHub integration',
-    });
-  }
-}
-
-/**
- * Get the GitHub App installation ID for an organization.
- * Used by cloud-agent to generate tokens on-demand with KV caching.
- */
-export async function getGitHubInstallationIdForOrganization(
-  organizationId: string
-): Promise<string | undefined> {
-  const integration = await getPrimaryGitHubIntegrationForOrganization(organizationId);
-  return integration?.platform_installation_id ?? undefined;
-}
-
-/**
- * Get the GitHub App installation ID for a user.
- * Used by cloud-agent to generate tokens on-demand with KV caching.
- */
-export async function getGitHubInstallationIdForUser(userId: string): Promise<string | undefined> {
-  const integration = await getIntegrationForOwner({ type: 'user', id: userId }, PLATFORM.GITHUB);
-  return isPlatformIntegrationHealthy(integration)
-    ? (integration.platform_installation_id ?? undefined)
-    : undefined;
-}
 
 /**
  * Aggregate the organization's GitHub installations into one repository list.

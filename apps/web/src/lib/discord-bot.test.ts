@@ -25,8 +25,6 @@ import { and, eq } from 'drizzle-orm';
 
 const mockRunBot = jest.fn<(input: BotRunInput) => Promise<BotRunResult>>();
 const mockRunSessionToCompletion = jest.fn<(input: RunSessionInput) => Promise<RunSessionResult>>();
-const mockGetGitHubTokenForUser = jest.fn<() => Promise<string | undefined>>();
-const mockGetGitHubTokenForOrganization = jest.fn<() => Promise<string | undefined>>();
 let mockDiscordContextForPrompt = '';
 
 // Factories delegate through lazy wrappers so the hoisted `jest.mock` calls do
@@ -42,11 +40,6 @@ jest.mock('@/lib/discord-bot/discord-channel-context', () => ({
 
 jest.mock('@/lib/cloud-agent-next/run-session', () => ({
   runSessionToCompletion: (input: RunSessionInput) => mockRunSessionToCompletion(input),
-}));
-
-jest.mock('@/lib/cloud-agent/github-integration-helpers', () => ({
-  getGitHubTokenForUser: () => mockGetGitHubTokenForUser(),
-  getGitHubTokenForOrganization: () => mockGetGitHubTokenForOrganization(),
 }));
 
 const CONNECTED_REPOSITORY = 'kilo-test/connected-repo';
@@ -74,7 +67,7 @@ async function createDiscordInstallation(ownerId: string): Promise<string> {
   return guildId;
 }
 
-async function connectGitHubRepository(ownerId: string): Promise<void> {
+async function connectGitHubRepository(ownerId: string): Promise<string> {
   const installationId = `1${String(Date.now()).slice(-6)}${String(discordIdSequence).padStart(5, '0')}`;
   const [installation] = await db
     .insert(github_app_installations)
@@ -87,26 +80,70 @@ async function connectGitHubRepository(ownerId: string): Promise<void> {
     })
     .returning();
 
-  await db.insert(platform_integrations).values({
-    owned_by_user_id: ownerId,
-    platform: 'github',
-    integration_type: 'app',
-    platform_installation_id: installationId,
-    platform_account_id: 'kilo-test',
-    platform_account_login: 'kilo-test',
-    integration_status: 'active',
-    repository_access: 'selected',
-    repositories: [
-      {
-        id: 424242,
-        name: 'connected-repo',
-        full_name: CONNECTED_REPOSITORY,
-        private: true,
-      },
-    ],
-    github_installation_id: installation.id,
-    github_connection_role: 'workflow',
-  });
+  const [association] = await db
+    .insert(platform_integrations)
+    .values({
+      owned_by_user_id: ownerId,
+      platform: 'github',
+      integration_type: 'app',
+      platform_installation_id: installationId,
+      platform_account_id: 'kilo-test',
+      platform_account_login: 'kilo-test',
+      integration_status: 'active',
+      repository_access: 'selected',
+      repositories: [
+        {
+          id: 424242,
+          name: 'connected-repo',
+          full_name: CONNECTED_REPOSITORY,
+          private: true,
+        },
+      ],
+      github_installation_id: installation.id,
+      github_connection_role: 'workflow',
+    })
+    .returning();
+  return association.id;
+}
+
+async function connectOrganizationGitHubRepository(
+  organizationId: string,
+  options: {
+    accountLogin: string;
+    repositories: Array<{ id: number; name: string; full_name: string; private: boolean }>;
+    createdAt: string;
+  }
+): Promise<string> {
+  const installationId = nextSnowflake();
+  const [installation] = await db
+    .insert(github_app_installations)
+    .values({
+      github_app_type: 'standard',
+      installation_id: installationId,
+      account_login: options.accountLogin,
+      account_type: 'Organization',
+      lifecycle_state: 'active',
+    })
+    .returning();
+
+  const [association] = await db
+    .insert(platform_integrations)
+    .values({
+      owned_by_organization_id: organizationId,
+      platform: 'github',
+      integration_type: 'app',
+      platform_installation_id: installationId,
+      platform_account_id: options.accountLogin,
+      platform_account_login: options.accountLogin,
+      integration_status: 'active',
+      repository_access: 'selected',
+      repositories: options.repositories,
+      github_installation_id: installation.id,
+      github_connection_role: 'workflow',
+      created_at: options.createdAt,
+    })
+    .returning();
+  return association.id;
 }
 
 async function linkDiscordAccount(kiloUserId: string, discordUserId: string): Promise<void> {
@@ -138,6 +175,7 @@ describe('processDiscordBotMessage session start authorization', () => {
   ) => Promise<DiscordBotMessageResult>;
   let installationOwner: User;
   let guildId: string;
+  let connectedAssociationId: string;
   let modelRequestedRepository: string;
 
   beforeAll(async () => {
@@ -167,12 +205,9 @@ describe('processDiscordBotMessage session start authorization', () => {
       hasError: false,
       statusMessages: [],
     });
-    mockGetGitHubTokenForUser.mockResolvedValue('github-installation-token');
-    mockGetGitHubTokenForOrganization.mockResolvedValue('github-installation-token');
-
     installationOwner = await insertTestUser();
     guildId = await createDiscordInstallation(installationOwner.id);
-    await connectGitHubRepository(installationOwner.id);
+    connectedAssociationId = await connectGitHubRepository(installationOwner.id);
   });
 
   function eventContext(discordUserId: string) {
@@ -360,11 +395,74 @@ describe('processDiscordBotMessage session start authorization', () => {
     const [sessionInput] = mockRunSessionToCompletion.mock.calls[0];
     expect(sessionInput.prepareInput).toMatchObject({
       githubRepo: CONNECTED_REPOSITORY,
-      githubToken: 'github-installation-token',
+      githubIntegrationId: connectedAssociationId,
+      githubAccessPurpose: 'workflow',
       createdOnPlatform: 'discord',
     });
+    expect(sessionInput.prepareInput).not.toHaveProperty('githubToken');
     expect(result.cloudAgentSessionId).toBe('cloud-session-1');
   });
+
+  it(
+    'credentials an organization session from the association that grants the repository',
+    async () => {
+      const organization = await createTestOrganization(
+        'Discord association workspace',
+        installationOwner.id,
+        0
+      );
+      await db
+        .update(platform_integrations)
+        .set({ owned_by_user_id: null, owned_by_organization_id: organization.id })
+        .where(
+          and(
+            eq(platform_integrations.owned_by_user_id, installationOwner.id),
+            eq(platform_integrations.platform, 'discord')
+          )
+        );
+      const primaryAssociationId = await connectOrganizationGitHubRepository(organization.id, {
+        accountLogin: 'kilo-test-primary',
+        repositories: [
+          {
+            id: 515151,
+            name: 'other-repo',
+            full_name: 'kilo-test-primary/other-repo',
+            private: true,
+          },
+        ],
+        createdAt: '2026-01-01T00:00:00.000Z',
+      });
+      const grantingAssociationId = await connectOrganizationGitHubRepository(organization.id, {
+        accountLogin: 'kilo-test',
+        repositories: [
+          {
+            id: 626262,
+            name: 'connected-repo',
+            full_name: CONNECTED_REPOSITORY,
+            private: true,
+          },
+        ],
+        createdAt: '2026-02-01T00:00:00.000Z',
+      });
+      const discordUserId = nextSnowflake();
+      await linkDiscordAccount(installationOwner.id, discordUserId);
+
+      const result = await processDiscordBotMessage(
+        `Inspect ${CONNECTED_REPOSITORY}`,
+        guildId,
+        eventContext(discordUserId)
+      );
+
+      expect(result.response).toBe('The session finished.');
+      expect(mockRunSessionToCompletion).toHaveBeenCalledTimes(1);
+      const [sessionInput] = mockRunSessionToCompletion.mock.calls[0];
+      expect(sessionInput.prepareInput.githubIntegrationId).toBe(grantingAssociationId);
+      expect(sessionInput.prepareInput.githubIntegrationId).not.toBe(primaryAssociationId);
+      expect(sessionInput.prepareInput.githubAccessPurpose).toBe('workflow');
+      expect(sessionInput.prepareInput.kilocodeOrganizationId).toBe(organization.id);
+      expect(sessionInput.prepareInput).not.toHaveProperty('githubToken');
+    }
+  );
 
   it.each(['user', 'org'] as const)(
     'authenticates %s session operations with bounded workflow authority',
@@ -450,7 +548,6 @@ describe('processDiscordBotMessage session start authorization', () => {
 
     expect(result.response).toContain('not available through this Discord installation');
     expect(mockRunSessionToCompletion).not.toHaveBeenCalled();
-    expect(mockGetGitHubTokenForUser).not.toHaveBeenCalled();
     expect(result.cloudAgentSessionId).toBeUndefined();
   });
 });

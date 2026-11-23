@@ -1489,7 +1489,7 @@ describe('createWorktreeChat ownership, metadata, and control-plane routing', ()
     );
   });
 
-  it('derives sibling spawn permission from the interactive origin and never copies delegated lineage', async () => {
+  it('does not copy delegated lineage to a user-created sibling', async () => {
     for (const scope of [
       { allowSubagentSessions: true },
       { parentCloudAgentSessionId: SOURCE_WORKSPACE_ID },
@@ -1504,11 +1504,15 @@ describe('createWorktreeChat ownership, metadata, and control-plane routing', ()
     }
   });
 
-  it('grants sibling spawn permission when the interactive source is isolated', async () => {
+  it('inherits sibling spawn permission from an MCP-enabled child in an isolated workspace', async () => {
     verifyKiloTokenForPolicyMock.mockResolvedValue({
       claims: { aud: 'cloud-agent-next', runtimeAdmission: {} },
     });
-    const metadata = sourceMetadataWithPreset('cloudflare-containers-standard-3');
+    const metadata = {
+      ...sourceMetadataWithPreset('cloudflare-containers-standard-3'),
+      allowSubagentSessions: true,
+      parentCloudAgentSessionId: SOURCE_WORKSPACE_ID,
+    };
     const { caller, input, destinationStub } = fixture({
       metadata,
       organizationId: ORGANIZATION_ID,

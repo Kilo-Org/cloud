@@ -19,7 +19,7 @@ import type { StreamTicketNonceDO } from './persistence/StreamTicketNonceDO.js';
 // Type-only exception to "no reverse import from production code": erased at
 // build time, so it cannot make the e2e sink reachable or ship e2e code.
 import type { E2eCallbackSink } from './persistence/E2eCallbackSink.js';
-import type { CallbackJob } from './callbacks/index.js';
+import type { CallbackQueueJob } from './callbacks/types.js';
 import { AGENT_SANDBOX_PROVIDERS, type AgentSandboxProvider } from './shared/sandbox-provider.js';
 import type { NotificationsBinding } from './notifications-binding.js';
 import type { SessionIngestBinding } from './session-ingest-binding.js';
@@ -551,7 +551,7 @@ export type Env = {
   /** The v2 release for `RUNTIME_KILO2_ORG_IDS`, in the same form as `RUNTIME_RELEASE_DESCRIPTOR`. */
   RUNTIME_RELEASE_DESCRIPTOR_KILO2?: string;
   /** Queue for callback messages (optional - supports incremental rollout) */
-  CALLBACK_QUEUE?: Queue<CallbackJob>;
+  CALLBACK_QUEUE?: Queue<CallbackQueueJob>;
   /** Dedicated best-effort Cloud Agent reporting queue. */
   CLOUD_AGENT_REPORT_QUEUE: Queue<CloudAgentQueueReport>;
   /** Service binding for centralized git token generation */

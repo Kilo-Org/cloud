@@ -50,6 +50,22 @@ describe('buildNativeEgressAllowlist', () => {
     );
   });
 
+  it('allows the configured MCP and R2 hosts only for MCP-enabled workspaces', () => {
+    const config = {
+      allowlist: [],
+      env: {
+        ...env,
+        CLOUD_AGENT_MCP_URL_OVERRIDE: 'https://mcp.example.com/mcp',
+        R2_ENDPOINT: 'https://account.r2.cloudflarestorage.com',
+      },
+    };
+    expect(buildNativeEgressAllowlist({ ...config, cloudAgentMcp: true })).toEqual(
+      expect.arrayContaining(['mcp.example.com', 'account.r2.cloudflarestorage.com'])
+    );
+    expect(buildNativeEgressAllowlist(config)).not.toContain('mcp.example.com');
+    expect(buildNativeEgressAllowlist(config)).not.toContain('account.r2.cloudflarestorage.com');
+  });
+
   it('uses the token-encoded provider instead of the configured provider', () => {
     const policy = buildNativeEgressAllowlist({
       allowlist: [],

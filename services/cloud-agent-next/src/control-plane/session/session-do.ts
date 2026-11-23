@@ -2609,8 +2609,15 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         }
         const next = applyPendingInteractionEvent(this.pendingInteractions, event);
         if (next !== undefined && next !== this.pendingInteractions) {
+          const questionId = event.properties.id;
+          const notify =
+            event.type === 'question.asked' &&
+            typeof questionId === 'string' &&
+            !this.hasPendingInteraction('questions', questionId) &&
+            this.messageCallbacks.persistQuestionCallback(event.properties);
           this.pendingInteractions = next;
           await this.ctx.storage.put(PENDING_INTERACTIONS_KEY, next);
+          if (notify) await this.armAlarm();
         }
         await this.recordRootStatus(event);
         const rootRename = this.nativeRootRename(event);

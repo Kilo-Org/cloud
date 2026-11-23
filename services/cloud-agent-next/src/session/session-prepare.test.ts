@@ -3422,7 +3422,7 @@ describe('createSessionWithLedger admission ladder', () => {
     'leaves %s browser sessions ungrouped with their requested auto-commit',
     async (_label, runtime, botId) => {
       const doStub = makeDoStub();
-      const ctx = { ...makeContext(doStub), ...(botId ? { botId } : {}) };
+      const ctx = { ...modernContext(makeContext(doStub)), botId };
       generateSessionIdMock.mockReturnValue(WORKSPACE_SESSION_ID);
 
       await runCreate(
@@ -3441,6 +3441,7 @@ describe('createSessionWithLedger admission ladder', () => {
       expect(createdMetadata(doStub)).toMatchObject(
         expect.objectContaining({
           finalization: { autoCommit: true },
+          allowSubagentSessions: false,
           workspace: expect.not.objectContaining({ worktreeId: expect.anything() }),
         })
       );
@@ -4668,7 +4669,7 @@ describe('createSessionWithLedger admission ladder', () => {
     expect(markReconcilePendingMock).not.toHaveBeenCalled();
   });
 
-  it('registers an authenticated scoped child as a worktree workspace without spawn authority', async () => {
+  it('registers an authenticated scoped child as a worktree workspace with spawn authority', async () => {
     const doStub = makeDoStub();
     const ctx = modernContext(scopedChildContext(makeContext(doStub)));
     const expectedWorktreeId = `worktree_${SANDBOX_SESSION_ID.slice('workspace_'.length)}`;
@@ -4695,7 +4696,7 @@ describe('createSessionWithLedger admission ladder', () => {
     const metadata = createdMetadata(doStub);
     expect(metadata).toMatchObject({
       parentCloudAgentSessionId: PARENT_SESSION_ID,
-      allowSubagentSessions: false,
+      allowSubagentSessions: true,
       identity: expect.objectContaining({ createdOnPlatform: 'cloud-agent-web' }),
       workspace: expect.objectContaining({
         worktreeId: expectedWorktreeId,

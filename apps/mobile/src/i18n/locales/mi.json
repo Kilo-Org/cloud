@@ -399,7 +399,7 @@
       "title": "Ngā kī kaiwhakarato",
       "rowSubtitle": "Whakamahia te pire o tō ake kaiwhakarato",
       "orgDescription": "Ka tiritiria ēnei kī ki te katoa o te whakahaere, ā, ka pirehia ki ōna pūkete kaiwhakarato.",
-      "viewOnly": "Ko te rangatira, te kaiwhakahaere, te kaiwhakahaere pire rānei o te whakahaere anake ka taea te huri i ōna kī.",
+      "viewOnly": "Ko te rangatira, te kaiwhakahaere, te kaiwhakahaere utu rānei o te whakahaere anake ka taea te huri i ōna kī.",
       "description": "Ko ngā tono mā ēnei kī ka pirehia ki tō pūkete kaiwhakarato, kaua ki tō toenga Kilo.",
       "managedByPlan": "Kei tō mahere waehere e whakahaere",
       "enableKey": "Whakahohea te kī {{provider}}",
@@ -1513,7 +1513,9 @@
       "githubError": "Kāore i taea te whakatuwhera i te whakarite GitHub. Whakamātau anō.",
       "gitlabAccount": "pūkete GitLab",
       "gitlabError": "Kāore i taea te whakatuwhera i te whakarite GitLab. Whakamātau anō.",
-      "description": "Honohonotia te {{label}} a Kilo hei arotake aunoa i ngā tono kume."
+      "description": "Honohonotia te {{label}} a Kilo hei arotake aunoa i ngā tono kume.",
+      "notConnectedTitle": "Kāore anō kia honoa a {{platform}}",
+      "githubAdminOnlyDescription": "Ko ngā rangatira o te rōpū me ngā kaiwhakahaere anake ka āhei ki te hono."
     },
     "overview": {
       "allAreas": "Ngā wāhanga katoa",
@@ -3418,7 +3420,7 @@
   "organization": {
     "auditLog": {
       "title": "Pūkete arotake",
-      "permissionDenied": "Mā te kaipupuri, te kaiwhakahaere, te kaiwhakahaere pire rānei o tētahi rōpū i runga i te mahere Enterprise anake e pānui tōna pūkete arotake.",
+      "permissionDenied": "Mā te kaipupuri, te kaiwhakahaere, te kaiwhakahaere utu rānei o tētahi rōpū i runga i te mahere Enterprise anake e pānui tōna pūkete arotake. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Kāore he takahanga arotake",
       "emptyDescription": "Ka puta ki konei ngā mahi i mahia i tēnei rōpū.",
       "truncated": "E whakaatu ana i ngā takahanga hou rawa.",
@@ -3608,7 +3610,7 @@
     },
     "billing": {
       "title": "Ngā utu",
-      "permissionDenied": "Ko te rangatira, te kaiwhakahaere, te kaiwhakahaere utu rānei anake o te rōpū ka kite i ōna utu.",
+      "permissionDenied": "Ko te rangatira, te kaiwhakahaere, te kaiwhakahaere utu rānei anake o te rōpū ka kite i ōna utu. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Ohaurunga",
       "state": "Tūnga",
       "stateNone": "Kāore he ohaurunga",
@@ -3785,7 +3787,7 @@
       "emptyDescription": "Whakamahia te Haora o mua hei kite i ngā tono o mua.",
       "emptyBoundDescription": "Koinei te tawhiti rawa e hoki ai ngā pūkete tono.",
       "loadError": "Kāore i taea te uta i ngā pūkete tono.",
-      "permissionDenied": "Mā te kaipupuri, te kaiwhakahaere, te kaiwhakahaere pire rānei o tētahi rōpū anake e pānui ōna pūkete tono.",
+      "permissionDenied": "Mā te kaipupuri, te kaiwhakahaere, te kaiwhakahaere utu rānei o tētahi rōpū anake e pānui ōna pūkete tono. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} ki roto · {{output}} ki waho",
       "byok": "BYOK"
     },
@@ -4886,7 +4888,7 @@
     "defaultModel": "Whakamahia te tauira taunoa a Kilo",
     "duration": "Ārai wā (meneti)",
     "spendLimit": "Ārai whakapaunga (USD)",
-    "invalidSafeguards": "Tāurua he tepe wā, whakapaunga hoki e tōrunga ana, e mutunga ana.",
+    "invalidSafeguards": "Tāurua he tau tōrunga i roto i te awhe whakaaetia.",
     "estimate": "Whakatau tata {{estimate}} · teitei rawa {{maximum}}",
     "estimateUnavailable": "Kāore he whakarāpopototanga utu mō ēnei tautuhinga. Hurihia te tauira, ngā here rānei, ka ngana anō a muri ake nei.",
     "confirmPaid": "Whakahohe i ngā whakarāpopototanga utu mō {{context}}?",
@@ -5052,6 +5054,8 @@
       "autoCommit": "Whakapūmau i ngā huringa ina mutu te rerenga",
       "condenseOnComplete": "Whakarāpopoto i te horopaki ina mutu te rerenga",
       "activeTitle": "Kaiwhakaara hohe",
+      "activeSwitchA11y": "Kaiwhakaara hohe: {{name}}",
+      "copyLinkA11y": "Tāruatia te hononga mō {{name}}",
       "activeDescription": "Ka whakautu ngā hononga tukutuku kua whakatahi me te 404.",
       "runAsCreator": "Rere hei ahau",
       "runAsCreatorDescription": "Ka whakamahi ia rerenga i tō pūkete, nō reira me whai pane muna.",

@@ -817,6 +817,8 @@
     },
     "providerConnect": {
       "description": "풀 리퀘스트를 자동으로 리뷰하려면 Kilo {{label}} 연결을 설정하세요.",
+      "notConnectedTitle": "{{platform}}이 연결되지 않았습니다",
+      "githubAdminOnlyDescription": "조직 소유자와 관리자만 연결할 수 있습니다.",
       "githubApp": "GitHub 앱",
       "githubError": "GitHub 설정을 열 수 없습니다. 다시 시도하세요.",
       "gitlabAccount": "GitLab 계정",
@@ -3410,7 +3412,7 @@
   "organization": {
     "auditLog": {
       "title": "감사 로그",
-      "permissionDenied": "Enterprise 요금제를 사용하는 조직의 소유자, 관리자 또는 결제 관리자만 감사 로그를 볼 수 있습니다.",
+      "permissionDenied": "Enterprise 요금제를 사용하는 조직의 소유자, 관리자 또는 결제 관리자만 감사 로그를 볼 수 있습니다. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "감사 이벤트 없음",
       "emptyDescription": "이 조직에서 수행된 작업이 여기에 표시됩니다.",
       "truncated": "최근 이벤트만 표시하고 있습니다.",
@@ -3600,7 +3602,7 @@
     },
     "billing": {
       "title": "결제",
-      "permissionDenied": "조직 소유자, 관리자 또는 결제 관리자만 조직의 결제 정보를 볼 수 있습니다.",
+      "permissionDenied": "조직 소유자, 관리자 또는 결제 관리자만 조직의 결제 정보를 볼 수 있습니다. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "구독",
       "state": "상태",
       "stateNone": "구독 없음",
@@ -3789,7 +3791,7 @@
       "emptyDescription": "'이전 1시간'을 눌러 이전 요청을 확인하세요.",
       "emptyBoundDescription": "요청 로그는 여기까지만 조회할 수 있습니다.",
       "loadError": "요청 로그를 불러오지 못했습니다.",
-      "permissionDenied": "조직의 소유자, 관리자 또는 결제 관리자만 요청 로그를 볼 수 있습니다.",
+      "permissionDenied": "조직의 소유자, 관리자 또는 결제 관리자만 요청 로그를 볼 수 있습니다. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "입력 {{input}} · 출력 {{output}}",
       "byok": "BYOK"
     },
@@ -4886,7 +4888,7 @@
     "defaultModel": "Kilo 기본 모델 사용",
     "duration": "시간 안전 한도(분)",
     "spendLimit": "지출 안전 한도(USD)",
-    "invalidSafeguards": "유한한 양수로 시간 및 지출 한도를 입력하세요.",
+    "invalidSafeguards": "허용 범위 안의 양수를 입력하세요.",
     "estimate": "예상 비용 {{estimate}} · 최대 {{maximum}}",
     "estimateUnavailable": "이 설정에는 유료 요약을 사용할 수 없습니다. 모델이나 한도를 변경하거나 나중에 다시 시도하세요.",
     "confirmPaid": "{{context}}에 유료 요약을 사용하시겠습니까?",
@@ -5052,6 +5054,8 @@
       "autoCommit": "실행이 끝나면 변경 사항 커밋",
       "condenseOnComplete": "실행이 끝나면 컨텍스트 압축",
       "activeTitle": "트리거 활성",
+      "activeSwitchA11y": "트리거 활성: {{name}}",
+      "copyLinkA11y": "링크 복사: {{name}}",
       "activeDescription": "일시 중지된 웹훅은 404로 응답합니다.",
       "runAsCreator": "내 계정으로 실행",
       "runAsCreatorDescription": "모든 실행에서 내 계정을 사용하므로 시크릿 헤더가 필요합니다.",

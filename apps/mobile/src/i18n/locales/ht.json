@@ -399,7 +399,7 @@
       "title": "Kle founisè",
       "rowSubtitle": "Sèvi ak pwòp faktirasyon founisè w",
       "orgDescription": "Kle sa yo pataje ak tout moun nan òganizasyon an, epi yo faktire sou kont founisè òganizasyon an.",
-      "viewOnly": "Se sèlman yon pwopriyetè, yon administratè oswa yon jesyonè faktirasyon òganizasyon an ki ka chanje kle li yo.",
+      "viewOnly": "Se sèlman yon pwopriyetè, yon administratè oswa yon responsab faktirasyon òganizasyon an ki ka chanje kle li yo.",
       "description": "Demann ki pase nan kle sa yo ap faktire sou kont founisè w la olye de balans Kilo w la.",
       "managedByPlan": "Plan kodaj ou a jere l",
       "enableKey": "Aktive kle {{provider}} an",
@@ -1513,7 +1513,9 @@
       "githubError": "Nou pa t ka louvri konfigirasyon GitHub la. Tanpri eseye ankò.",
       "gitlabAccount": "kont GitLab",
       "gitlabError": "Nou pa t ka louvri konfigirasyon GitLab la. Tanpri eseye ankò.",
-      "description": "Konekte {{label}} Kilo a pou revize demann fizyon yo otomatikman."
+      "description": "Konekte {{label}} Kilo a pou revize demann fizyon yo otomatikman.",
+      "notConnectedTitle": "{{platform}} pa konekte",
+      "githubAdminOnlyDescription": "Se sèlman pwopriyetè òganizasyon an ak administratè yo ki ka konekte li."
     },
     "overview": {
       "allAreas": "Tout domèn",
@@ -3418,7 +3420,7 @@
   "organization": {
     "auditLog": {
       "title": "Jounal odit",
-      "permissionDenied": "Se sèlman yon pwopriyetè, yon administratè oswa yon jesyonè faktirasyon nan yon òganizasyon ki sou plan Enterprise la ki ka li jounal odit li.",
+      "permissionDenied": "Se sèlman yon pwopriyetè, yon administratè oswa yon responsab faktirasyon nan yon òganizasyon ki sou plan Enterprise la ki ka li jounal odit li. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Pa gen evènman odit",
       "emptyDescription": "Aksyon yo fè nan òganizasyon sa a ap parèt la a.",
       "truncated": "N ap montre evènman ki pi resan yo.",
@@ -3608,7 +3610,7 @@
     },
     "billing": {
       "title": "Faktirasyon",
-      "permissionDenied": "Se sèlman yon pwopriyetè, yon administratè oswa yon jesyonè faktirasyon òganizasyon an ki ka wè faktirasyon li.",
+      "permissionDenied": "Se sèlman yon pwopriyetè, yon administratè oswa yon responsab faktirasyon òganizasyon an ki ka wè faktirasyon li. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Abònman",
       "state": "Eta",
       "stateNone": "Pa gen abònman",
@@ -3785,7 +3787,7 @@
       "emptyDescription": "Sèvi ak Èdtan anvan pou wè demann anvan yo.",
       "emptyBoundDescription": "Jounal demann yo pa ale pi lwen pase sa a.",
       "loadError": "Nou pa t ka chaje jounal demann yo.",
-      "permissionDenied": "Se sèlman yon pwopriyetè, yon administratè oswa yon jesyonè faktirasyon nan òganizasyon an ki ka li jounal demann li.",
+      "permissionDenied": "Se sèlman yon pwopriyetè, yon administratè oswa yon responsab faktirasyon nan òganizasyon an ki ka li jounal demann li. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} antre · {{output}} soti",
       "byok": "BYOK"
     },
@@ -4886,7 +4888,7 @@
     "defaultModel": "Sèvi ak modèl Kilo pa defo a",
     "duration": "Limit tan (minit)",
     "spendLimit": "Limit depans (USD)",
-    "invalidSafeguards": "Antre limit tan ak depans ki pozitif epi fini.",
+    "invalidSafeguards": "Antre yon chif pozitif nan limit ki pèmèt la.",
     "estimate": "Estime {{estimate}} · maksimòm {{maximum}}",
     "estimateUnavailable": "Pa gen rezime ki pou peye ki disponib pou paramèt sa yo. Chanje modèl la oswa limit yo, oswa eseye ankò pita.",
     "confirmPaid": "Aktive rezime peye pou {{context}}?",
@@ -5052,6 +5054,8 @@
       "autoCommit": "Komite chanjman yo lè egzekisyon an fini",
       "condenseOnComplete": "Kondanse kontèks la lè egzekisyon an fini",
       "activeTitle": "Deklanchè aktif",
+      "activeSwitchA11y": "Deklanchè aktif: {{name}}",
+      "copyLinkA11y": "Kopye lyen pou {{name}}",
       "activeDescription": "Wèbhuk an pòz reponn ak 404.",
       "runAsCreator": "Egzekite kòm mwen",
       "runAsCreatorDescription": "Chak egzekisyon sèvi ak kont ou, kidonk antèt sekrè a obligatwa.",

@@ -817,6 +817,8 @@
     },
     "providerConnect": {
       "description": "Çekme isteklerini otomatik olarak incelemek için Kilo bağlantısını kur: {{label}}.",
+      "notConnectedTitle": "{{platform}} bağlı değil",
+      "githubAdminOnlyDescription": "Yalnızca kuruluş sahipleri ve yöneticiler bağlayabilir.",
       "githubApp": "GitHub uygulaması",
       "githubError": "GitHub kurulumu açılamadı. Lütfen tekrar dene.",
       "gitlabAccount": "GitLab hesabı",
@@ -3410,7 +3412,7 @@
   "organization": {
     "auditLog": {
       "title": "Denetim günlüğü",
-      "permissionDenied": "Denetim günlüğünü yalnızca Enterprise planındaki kuruluşun sahibi, yöneticisi veya faturalandırma yöneticisi görüntüleyebilir.",
+      "permissionDenied": "Denetim günlüğünü yalnızca Enterprise planındaki kuruluşun sahibi, yöneticisi veya faturalandırma yöneticisi görüntüleyebilir. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Denetim olayı yok",
       "emptyDescription": "Bu kuruluşta gerçekleştirilen işlemler burada görünür.",
       "truncated": "En son olaylar gösteriliyor.",
@@ -3600,7 +3602,7 @@
     },
     "billing": {
       "title": "Faturalandırma",
-      "permissionDenied": "Faturalandırma bilgilerini yalnızca kuruluşun sahibi, yöneticisi veya faturalandırma yöneticisi görebilir.",
+      "permissionDenied": "Faturalandırma bilgilerini yalnızca kuruluşun sahibi, yöneticisi veya faturalandırma yöneticisi görebilir. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Abonelik",
       "state": "Durum",
       "stateNone": "Abonelik yok",
@@ -3789,7 +3791,7 @@
       "emptyDescription": "Daha önceki istekleri görmek için Önceki saat'i kullanın.",
       "emptyBoundDescription": "İstek kayıtları en fazla buraya kadar geriye gider.",
       "loadError": "İstek günlükleri yüklenemedi.",
-      "permissionDenied": "İstek günlüklerini yalnızca kuruluşun sahibi, yöneticisi veya faturalandırma yöneticisi görüntüleyebilir.",
+      "permissionDenied": "İstek günlüklerini yalnızca kuruluşun sahibi, yöneticisi veya faturalandırma yöneticisi görüntüleyebilir. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} giriş · {{output}} çıkış",
       "byok": "BYOK"
     },
@@ -4886,7 +4888,7 @@
     "defaultModel": "Kilo’nun varsayılan modelini kullan",
     "duration": "Süre sınırı (dakika)",
     "spendLimit": "Harcama sınırı (USD)",
-    "invalidSafeguards": "Pozitif ve sonlu süre ve harcama sınırları girin.",
+    "invalidSafeguards": "İzin verilen aralıkta pozitif bir sayı girin.",
     "estimate": "Tahmini {{estimate}} · en fazla {{maximum}}",
     "estimateUnavailable": "Bu ayarlar için ücretli özet mevcut değil. Modeli veya sınırları değiştirin ya da daha sonra tekrar deneyin.",
     "confirmPaid": "{{context}} için ücretli özetler etkinleştirilsin mi?",
@@ -5052,6 +5054,8 @@
       "autoCommit": "Çalıştırma bittiğinde değişiklikleri işle",
       "condenseOnComplete": "Çalıştırma bittiğinde bağlamı sıkıştır",
       "activeTitle": "Tetikleyici etkin",
+      "activeSwitchA11y": "Tetikleyici etkin: {{name}}",
+      "copyLinkA11y": "{{name}} için bağlantıyı kopyala",
       "activeDescription": "Duraklatılmış web kancaları 404 yanıtı verir.",
       "runAsCreator": "Benim adıma çalıştır",
       "runAsCreatorDescription": "Her çalıştırma hesabınızı kullanır, bu nedenle gizli başlık gerekir.",

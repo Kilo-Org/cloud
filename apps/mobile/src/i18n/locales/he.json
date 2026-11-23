@@ -400,7 +400,7 @@
       "title": "מפתחות ספקים",
       "rowSubtitle": "שימוש בחיוב דרך הספק שלך",
       "orgDescription": "מפתחות אלה משותפים לכל חברי הארגון, והחיוב מתבצע בחשבונות הספקים של הארגון.",
-      "viewOnly": "רק בעלים של הארגון, מנהל או אחראי חיובים יכולים לשנות את המפתחות שלו.",
+      "viewOnly": "רק בעלים של הארגון, אדמין או מנהל חיובים יכולים לשנות את המפתחות שלו.",
       "description": "בקשות שנשלחות באמצעות מפתחות אלה מחויבות בחשבון הספק שלך במקום ביתרת Kilo שלך.",
       "managedByPlan": "מנוהל במסגרת תוכנית הקידוד שלך",
       "enableKey": "הפעלת המפתח של {{provider}}",
@@ -819,6 +819,8 @@
     },
     "providerConnect": {
       "description": "חבר את {{label}} של Kilo כדי לסקור בקשות משיכה אוטומטית.",
+      "notConnectedTitle": "{{platform}} לא מחובר",
+      "githubAdminOnlyDescription": "רק בעלי הארגון ומנהלים יכולים לחבר אותו.",
       "githubApp": "אפליקציית GitHub",
       "githubError": "לא ניתן לפתוח את הגדרות GitHub. נסה שוב.",
       "gitlabAccount": "חשבון GitLab",
@@ -3473,7 +3475,7 @@
   "organization": {
     "auditLog": {
       "title": "יומן ביקורת",
-      "permissionDenied": "רק בעלים, אדמין או מנהל חיובים של ארגון בתוכנית Enterprise יכולים לצפות ביומן הביקורת שלו.",
+      "permissionDenied": "רק בעלים, אדמין או מנהל חיובים של ארגון בתוכנית Enterprise יכולים לצפות ביומן הביקורת שלו. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "אין אירועי ביקורת",
       "emptyDescription": "פעולות שמתבצעות בארגון הזה יופיעו כאן.",
       "truncated": "מוצגים האירועים האחרונים.",
@@ -3668,7 +3670,7 @@
     },
     "billing": {
       "title": "חיוב",
-      "permissionDenied": "רק בעלים, מנהל או מנהל חיובים של הארגון יכולים לראות את פרטי החיוב שלו.",
+      "permissionDenied": "רק בעלים, מנהל או מנהל חיובים של הארגון יכולים לראות את פרטי החיוב שלו. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "מינוי",
       "state": "סטטוס",
       "stateNone": "אין מינוי",
@@ -3857,7 +3859,7 @@
       "emptyDescription": "השתמשו ב-'שעה קודמת' כדי לראות בקשות קודמות.",
       "emptyBoundDescription": "יומני הבקשות לא מגיעים אחורה יותר מכך.",
       "loadError": "לא ניתן לטעון את יומני הבקשות.",
-      "permissionDenied": "רק בעלים, אדמין או מנהל חיובים של הארגון יכולים לצפות ביומני הבקשות שלו.",
+      "permissionDenied": "רק בעלים, אדמין או מנהל חיובים של הארגון יכולים לצפות ביומני הבקשות שלו. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "קלט {{input}} · פלט {{output}}",
       "byok": "BYOK"
     },
@@ -4975,7 +4977,7 @@
     "defaultModel": "שימוש במודל ברירת המחדל של Kilo",
     "duration": "מגבלת זמן (דקות)",
     "spendLimit": "מגבלת הוצאה (USD)",
-    "invalidSafeguards": "יש להזין מגבלות זמן והוצאה חיוביות וסופיות.",
+    "invalidSafeguards": "יש להזין מספר חיובי בטווח המותר.",
     "estimate": "הערכת עלות {{estimate}} · מקסימום {{maximum}}",
     "estimateUnavailable": "סיכום בתשלום אינו זמין עבור הגדרות אלה. יש לשנות את המודל או המגבלות, או לנסות שוב מאוחר יותר.",
     "confirmPaid": "להפעיל סיכומים בתשלום עבור {{context}}?",
@@ -5146,6 +5148,8 @@
       "autoCommit": "בצעו קומיט לשינויים כשההרצה מסתיימת",
       "condenseOnComplete": "כווצו את ההקשר כשההרצה מסתיימת",
       "activeTitle": "הטריגר פעיל",
+      "activeSwitchA11y": "טריגר פעיל: {{name}}",
+      "copyLinkA11y": "העתקת קישור עבור {{name}}",
       "activeDescription": "וובהוקים מושהים מחזירים 404.",
       "runAsCreator": "הרצה בשמי",
       "runAsCreatorDescription": "כל הרצה משתמשת בחשבון שלך, לכן כותרת הסוד נדרשת.",

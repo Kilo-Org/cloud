@@ -45,7 +45,7 @@
     "defaultModel": "Use Kilo’s default model",
     "duration": "Time safeguard (minutes)",
     "spendLimit": "Spend safeguard (USD)",
-    "invalidSafeguards": "Enter positive, finite time and spend limits.",
+    "invalidSafeguards": "Enter a positive limit within the allowed range.",
     "estimate": "Estimate {{estimate}} · maximum {{maximum}}",
     "estimateUnavailable": "A paid summary is not available for these settings. Change the model or the limits, or try again later.",
     "estimatePricingUnavailable": "Pricing for this model is unavailable. Choose another model.",
@@ -1611,7 +1611,9 @@
       "githubError": "Could not open GitHub setup. Please try again.",
       "gitlabAccount": "GitLab account",
       "gitlabError": "Could not open GitLab setup. Please try again.",
-      "description": "Connect the Kilo {{label}} to review pull requests automatically."
+      "description": "Connect the Kilo {{label}} to review pull requests automatically.",
+      "notConnectedTitle": "{{platform}} not connected",
+      "githubAdminOnlyDescription": "Only organization owners and admins can connect it."
     },
     "overview": {
       "allAreas": "All areas",
@@ -3528,7 +3530,7 @@
   "organization": {
     "auditLog": {
       "title": "Audit log",
-      "permissionDenied": "Only an organization owner, admin or billing manager on the Enterprise plan can read its audit log.",
+      "permissionDenied": "Only an organization owner, admin or billing manager on the Enterprise plan can read its audit log. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "No audit events",
       "emptyDescription": "Actions taken in this organization appear here.",
       "truncated": "Showing the most recent events.",
@@ -3718,7 +3720,7 @@
     },
     "billing": {
       "title": "Billing",
-      "permissionDenied": "Only an organization owner, admin or billing manager can see its billing.",
+      "permissionDenied": "Only an organization owner, admin or billing manager can see its billing. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Subscription",
       "state": "State",
       "stateNone": "No subscription",
@@ -3895,7 +3897,7 @@
       "emptyDescription": "Use Older hour to see earlier requests.",
       "emptyBoundDescription": "This is as far back as request logs go.",
       "loadError": "Couldn't load request logs.",
-      "permissionDenied": "Only an organization owner, admin or billing manager can read its request logs.",
+      "permissionDenied": "Only an organization owner, admin or billing manager can read its request logs. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} in · {{output}} out",
       "byok": "BYOK"
     },
@@ -5052,6 +5054,8 @@
       "autoCommit": "Commit changes when the run finishes",
       "condenseOnComplete": "Condense the context when the run finishes",
       "activeTitle": "Trigger active",
+      "activeSwitchA11y": "Trigger active: {{name}}",
+      "copyLinkA11y": "Copy link for {{name}}",
       "activeDescription": "Paused webhooks answer with 404.",
       "runAsCreator": "Run as me",
       "runAsCreatorDescription": "Every run uses your account, so the secret header is required.",

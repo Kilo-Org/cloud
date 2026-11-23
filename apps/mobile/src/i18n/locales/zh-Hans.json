@@ -817,6 +817,8 @@
     },
     "providerConnect": {
       "description": "连接 Kilo {{label}} 以自动审查拉取请求。",
+      "notConnectedTitle": "尚未连接 {{platform}}",
+      "githubAdminOnlyDescription": "只有组织所有者和管理员可以完成连接。",
       "githubApp": "GitHub 应用",
       "githubError": "无法打开 GitHub 配置页面。请重试。",
       "gitlabAccount": "GitLab 账户",
@@ -3410,7 +3412,7 @@
   "organization": {
     "auditLog": {
       "title": "审计日志",
-      "permissionDenied": "只有 Enterprise 套餐组织的所有者、管理员或账单管理员才能查看其审计日志。",
+      "permissionDenied": "只有 Enterprise 套餐组织的所有者、管理员或账单管理员才能查看其审计日志。 $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "暂无审计事件",
       "emptyDescription": "此组织中执行的操作会显示在这里。",
       "truncated": "仅显示最近的事件。",
@@ -3600,7 +3602,7 @@
     },
     "billing": {
       "title": "账单",
-      "permissionDenied": "只有组织所有者、管理员或账单管理员才能查看组织账单。",
+      "permissionDenied": "只有组织所有者、管理员或账单管理员才能查看组织账单。 $t(organization.boundary.accessDeniedDescription)",
       "subscription": "订阅",
       "state": "状态",
       "stateNone": "无订阅",
@@ -3789,7 +3791,7 @@
       "emptyDescription": "使用“上一小时”查看更早的请求。",
       "emptyBoundDescription": "请求日志最多只能追溯到此处。",
       "loadError": "无法加载请求日志。",
-      "permissionDenied": "只有组织的所有者、管理员或账单管理员才能查看其请求日志。",
+      "permissionDenied": "只有组织的所有者、管理员或账单管理员才能查看其请求日志。 $t(organization.boundary.accessDeniedDescription)",
       "tokens": "输入 {{input}} · 输出 {{output}}",
       "byok": "BYOK"
     },
@@ -4886,7 +4888,7 @@
     "defaultModel": "使用 Kilo 默认模型",
     "duration": "时间保护上限（分钟）",
     "spendLimit": "花费保护上限（USD）",
-    "invalidSafeguards": "请输入有限的正数时间和花费上限。",
+    "invalidSafeguards": "请输入允许范围内的正数。",
     "estimate": "预估 {{estimate}} · 最高 {{maximum}}",
     "estimateUnavailable": "这些设置下无法获取付费摘要。请更换模型或调整限制，或稍后重试。",
     "confirmPaid": "为 {{context}} 启用付费摘要？",
@@ -5052,6 +5054,8 @@
       "autoCommit": "运行结束时提交更改",
       "condenseOnComplete": "运行结束时压缩上下文",
       "activeTitle": "触发器已启用",
+      "activeSwitchA11y": "触发器已启用：{{name}}",
+      "copyLinkA11y": "复制链接：{{name}}",
       "activeDescription": "暂停的 Webhook 会返回 404。",
       "runAsCreator": "以我的身份运行",
       "runAsCreatorDescription": "每次运行都会使用你的账号，因此必须填写密钥请求头。",

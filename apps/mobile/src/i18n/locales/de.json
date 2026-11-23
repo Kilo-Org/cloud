@@ -399,7 +399,7 @@
       "title": "Anbieterschlüssel",
       "rowSubtitle": "Eigene Anbieterabrechnung nutzen",
       "orgDescription": "Diese Schlüssel werden mit allen in der Organisation geteilt und über deren Anbieterkonten abgerechnet.",
-      "viewOnly": "Nur Inhaber, Admins oder Abrechnungsverantwortliche der Organisation können ihre Schlüssel ändern.",
+      "viewOnly": "Nur Inhaber, Admins oder Abrechnungsmanager der Organisation können ihre Schlüssel ändern.",
       "description": "Anfragen über diese Schlüssel werden über dein Anbieterkonto statt über dein Kilo-Guthaben abgerechnet.",
       "managedByPlan": "Von deinem Coding-Plan verwaltet",
       "enableKey": "{{provider}}-Schlüssel aktivieren",
@@ -817,6 +817,8 @@
     },
     "providerConnect": {
       "description": "Stelle die Verbindung über Kilo her ({{label}}), um Pull-Requests automatisch prüfen zu lassen.",
+      "notConnectedTitle": "{{platform}} ist nicht verbunden",
+      "githubAdminOnlyDescription": "Nur Organisationsinhaber und Admins können die Verbindung herstellen.",
       "githubApp": "GitHub-App",
       "githubError": "Die GitHub-Einrichtung konnte nicht geöffnet werden. Bitte versuche es erneut.",
       "gitlabAccount": "GitLab-Konto",
@@ -3410,7 +3412,7 @@
   "organization": {
     "auditLog": {
       "title": "Audit-Log",
-      "permissionDenied": "Nur Inhaber, Admins oder Abrechnungsverantwortliche einer Organisation mit Enterprise-Plan können deren Audit-Log einsehen.",
+      "permissionDenied": "Nur Inhaber, Admins oder Abrechnungsmanager einer Organisation mit Enterprise-Plan können deren Audit-Log einsehen. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Keine Audit-Ereignisse",
       "emptyDescription": "Hier erscheinen Aktionen, die in dieser Organisation ausgeführt werden.",
       "truncated": "Es werden die neuesten Ereignisse angezeigt.",
@@ -3600,7 +3602,7 @@
     },
     "billing": {
       "title": "Abrechnung",
-      "permissionDenied": "Nur Inhaber, Admins oder Abrechnungsverantwortliche einer Organisation können deren Abrechnung sehen.",
+      "permissionDenied": "Nur Inhaber, Admins oder Abrechnungsmanager einer Organisation können deren Abrechnung sehen. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Abonnement",
       "state": "Status",
       "stateNone": "Kein Abonnement",
@@ -3789,7 +3791,7 @@
       "emptyDescription": "Tippe auf „Frühere Stunde“, um frühere Anfragen anzuzeigen.",
       "emptyBoundDescription": "Weiter zurück reichen die Anfrageprotokolle nicht.",
       "loadError": "Anfrage-Logs konnten nicht geladen werden.",
-      "permissionDenied": "Nur Inhaber, Admins oder Abrechnungsverantwortliche einer Organisation können deren Anfrage-Logs einsehen.",
+      "permissionDenied": "Nur Inhaber, Admins oder Abrechnungsmanager einer Organisation können deren Anfrage-Logs einsehen. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} ein · {{output}} aus",
       "byok": "BYOK"
     },
@@ -4886,7 +4888,7 @@
     "defaultModel": "Standardmodell von Kilo verwenden",
     "duration": "Zeitlimit (Minuten)",
     "spendLimit": "Kostenlimit (USD)",
-    "invalidSafeguards": "Gib positive, endliche Zeit- und Kostenlimits ein.",
+    "invalidSafeguards": "Gib eine positive Zahl im zulässigen Bereich ein.",
     "estimate": "Schätzung {{estimate}} · maximal {{maximum}}",
     "estimateUnavailable": "Für diese Einstellungen ist keine kostenpflichtige Zusammenfassung verfügbar. Ändere das Modell oder die Grenzwerte, oder versuche es später erneut.",
     "estimatePricingUnavailable": "Für dieses Modell liegen keine Preisinformationen vor. Wähle ein anderes Modell.",
@@ -5052,6 +5054,8 @@
       "autoCommit": "Änderungen festschreiben, wenn der Lauf endet",
       "condenseOnComplete": "Kontext verdichten, wenn der Lauf endet",
       "activeTitle": "Auslöser aktiv",
+      "activeSwitchA11y": "Auslöser aktiv: {{name}}",
+      "copyLinkA11y": "Link für {{name}} kopieren",
       "activeDescription": "Pausierte Webhooks antworten mit 404.",
       "runAsCreator": "In meinem Namen ausführen",
       "runAsCreatorDescription": "Jeder Lauf verwendet dein Konto, daher ist der geheime Header erforderlich.",

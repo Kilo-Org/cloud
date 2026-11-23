@@ -401,7 +401,7 @@
       "title": "Kľúče poskytovateľov",
       "rowSubtitle": "Používať vlastnú fakturáciu u poskytovateľa",
       "orgDescription": "Tieto kľúče zdieľajú všetci v organizácii a účtujú sa na jej účty u poskytovateľov.",
-      "viewOnly": "Kľúče organizácie môže meniť iba jej vlastník, správca alebo manažér fakturácie.",
+      "viewOnly": "Kľúče organizácie môže meniť iba jej vlastník, administrátor alebo správca fakturácie.",
       "description": "Požiadavky cez tieto kľúče sa účtujú na tvoj účet u poskytovateľa namiesto tvojho zostatku v Kilo.",
       "managedByPlan": "Spravované tvojím plánom pre kódovanie",
       "enableKey": "Povoliť kľúč {{provider}}",
@@ -1569,7 +1569,9 @@
       "githubError": "Nastavenie pripojenia k platforme GitHub sa nepodarilo otvoriť. Skúste to znova.",
       "gitlabAccount": "účet GitLab",
       "gitlabError": "Nastavenie pripojenia k platforme GitLab sa nepodarilo otvoriť. Skúste to znova.",
-      "description": "Prepojte službu Kilo cez {{label}}, aby sa PR kontrolovali automaticky."
+      "description": "Prepojte službu Kilo cez {{label}}, aby sa PR kontrolovali automaticky.",
+      "notConnectedTitle": "{{platform}} nie je pripojený",
+      "githubAdminOnlyDescription": "Pripojiť ju môžu iba vlastníci organizácie a správcovia."
     },
     "overview": {
       "allAreas": "Všetky oblasti",
@@ -3544,7 +3546,7 @@
   "organization": {
     "auditLog": {
       "title": "Protokol auditu",
-      "permissionDenied": "Protokol auditu si môže prezerať iba vlastník, administrátor alebo správca fakturácie organizácie s plánom Enterprise.",
+      "permissionDenied": "Protokol auditu si môže prezerať iba vlastník, administrátor alebo správca fakturácie organizácie s plánom Enterprise. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Žiadne udalosti auditu",
       "emptyDescription": "Tu sa zobrazia akcie vykonané v tejto organizácii.",
       "truncated": "Zobrazujú sa najnovšie udalosti.",
@@ -3744,7 +3746,7 @@
     },
     "billing": {
       "title": "Fakturácia",
-      "permissionDenied": "Fakturáciu organizácie môže zobraziť iba jej vlastník, administrátor alebo správca fakturácie.",
+      "permissionDenied": "Fakturáciu organizácie môže zobraziť iba jej vlastník, administrátor alebo správca fakturácie. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Predplatné",
       "state": "Stav",
       "stateNone": "Bez predplatného",
@@ -3921,7 +3923,7 @@
       "emptyDescription": "Ak chcete zobraziť skoršie požiadavky, použite tlačidlo „Staršia hodina“.",
       "emptyBoundDescription": "Záznamy požiadaviek nesiahajú ďalej do minulosti.",
       "loadError": "Protokoly požiadaviek sa nepodarilo načítať.",
-      "permissionDenied": "Protokoly požiadaviek si môže prezerať iba vlastník, administrátor alebo správca fakturácie organizácie.",
+      "permissionDenied": "Protokoly požiadaviek si môže prezerať iba vlastník, administrátor alebo správca fakturácie organizácie. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} vstup · {{output}} výstup",
       "byok": "BYOK"
     },
@@ -5064,7 +5066,7 @@
     "defaultModel": "Použiť predvolený model Kilo",
     "duration": "Časový limit (minúty)",
     "spendLimit": "Limit výdavkov (USD)",
-    "invalidSafeguards": "Zadajte kladné, konečné limity času a výdavkov.",
+    "invalidSafeguards": "Zadajte kladné číslo v povolenom rozsahu.",
     "estimate": "Odhad {{estimate}} · maximálne {{maximum}}",
     "estimateUnavailable": "Platený súhrn nie je pre tieto nastavenia dostupný. Zmeňte model alebo limity, prípadne to skúste neskôr znova.",
     "confirmPaid": "Povoliť platené zhrnutia pre {{context}}?",
@@ -5240,6 +5242,8 @@
       "autoCommit": "Commitnúť zmeny po dokončení spustenia",
       "condenseOnComplete": "Zhustiť kontext po dokončení spustenia",
       "activeTitle": "Spúšťač je aktívny",
+      "activeSwitchA11y": "Aktívny spúšťač: {{name}}",
+      "copyLinkA11y": "Kopírovať odkaz pre {{name}}",
       "activeDescription": "Pozastavené webhooky odpovedajú 404.",
       "runAsCreator": "Spustiť ako ja",
       "runAsCreatorDescription": "Každé spustenie používa váš účet, preto je tajná hlavička povinná.",

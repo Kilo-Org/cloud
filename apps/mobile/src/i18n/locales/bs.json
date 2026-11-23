@@ -1541,7 +1541,9 @@
       "githubError": "Nije moguće otvoriti podešavanje GitHuba. Pokušaj ponovo.",
       "gitlabAccount": "GitLab račun",
       "gitlabError": "Nije moguće otvoriti podešavanje GitLaba. Pokušaj ponovo.",
-      "description": "Poveži Kilo {{label}} za automatski pregled zahtjeva za spajanje."
+      "description": "Poveži Kilo {{label}} za automatski pregled zahtjeva za spajanje.",
+      "notConnectedTitle": "{{platform}} nije povezan",
+      "githubAdminOnlyDescription": "Samo vlasnici organizacije i administratori mogu je povezati."
     },
     "overview": {
       "allAreas": "Sva područja",
@@ -3481,7 +3483,7 @@
   "organization": {
     "auditLog": {
       "title": "Revizijski zapisnik",
-      "permissionDenied": "Revizijski zapisnik organizacije na planu Enterprise mogu čitati samo njen vlasnik, administrator ili menadžer naplate.",
+      "permissionDenied": "Revizijski zapisnik organizacije na planu Enterprise mogu čitati samo njen vlasnik, administrator ili menadžer naplate. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Nema revizijskih događaja",
       "emptyDescription": "Ovdje se prikazuju radnje izvršene u ovoj organizaciji.",
       "truncated": "Prikazuju se najnoviji događaji.",
@@ -3676,7 +3678,7 @@
     },
     "billing": {
       "title": "Naplata",
-      "permissionDenied": "Naplatu mogu vidjeti samo vlasnik, administrator ili menadžer naplate organizacije.",
+      "permissionDenied": "Naplatu mogu vidjeti samo vlasnik, administrator ili menadžer naplate organizacije. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Pretplata",
       "state": "Status",
       "stateNone": "Nema pretplate",
@@ -3853,7 +3855,7 @@
       "emptyDescription": "Odaberite Raniji sat da biste vidjeli ranije zahtjeve.",
       "emptyBoundDescription": "Zapisi zahtjeva ne sežu dalje u prošlost.",
       "loadError": "Učitavanje zapisnika zahtjeva nije uspjelo.",
-      "permissionDenied": "Zapisnike zahtjeva organizacije mogu čitati samo njen vlasnik, administrator ili menadžer naplate.",
+      "permissionDenied": "Zapisnike zahtjeva organizacije mogu čitati samo njen vlasnik, administrator ili menadžer naplate. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "Ulaz: {{input}} · Izlaz: {{output}}",
       "byok": "BYOK"
     },
@@ -4975,7 +4977,7 @@
     "defaultModel": "Koristi zadani Kilo model",
     "duration": "Vremensko ograničenje (minute)",
     "spendLimit": "Ograničenje potrošnje (USD)",
-    "invalidSafeguards": "Unesite pozitivna, konačna ograničenja vremena i potrošnje.",
+    "invalidSafeguards": "Unesite pozitivan broj u dozvoljenom opsegu.",
     "estimate": "Procjena {{estimate}} · maksimalno {{maximum}}",
     "estimateUnavailable": "Plaćeni sažetak nije dostupan za ove postavke. Promijenite model ili ograničenja, ili pokušajte kasnije.",
     "confirmPaid": "Omogućiti plaćene sažetke za {{context}}?",
@@ -5146,6 +5148,8 @@
       "autoCommit": "Commitaj promjene kada se pokretanje završi",
       "condenseOnComplete": "Sažmi kontekst kada se pokretanje završi",
       "activeTitle": "Okidač aktivan",
+      "activeSwitchA11y": "Aktivni okidač: {{name}}",
+      "copyLinkA11y": "Kopiraj vezu za {{name}}",
       "activeDescription": "Pauzirani webhookovi vraćaju 404.",
       "runAsCreator": "Pokreni u moje ime",
       "runAsCreatorDescription": "Svako pokretanje koristi vaš račun, pa je zaglavlje s tajnom obavezno.",

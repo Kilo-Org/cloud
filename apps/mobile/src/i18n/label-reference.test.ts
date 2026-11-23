@@ -60,28 +60,6 @@ describe('label references', () => {
   });
 });
 
-/**
- * The AI Guardrails denial names the next step by reusing the boundary sentence,
- * so a plain member reads the same ask wherever the app refuses a privileged
- * screen. The checker keeps the reference identical in every catalog; this pins
- * that the reference is still there, and that every language resolves it instead
- * of printing `$t(`.
- */
-describe('message references', () => {
-  const NEXT_STEP_KEY = 'organization.boundary.accessDeniedDescription';
-
-  it('names the guardrails next step by key in English', () => {
-    expect(en.organizationGuardrails.permissionDenied).toContain(`$t(${NEXT_STEP_KEY})`);
-  });
-
-  it.each(SUPPORTED_LANGUAGES)('resolves the guardrails next step in %s', async tag => {
-    await i18n.changeLanguage(tag);
-    const denial = i18n.t('organizationGuardrails.permissionDenied');
-    expect(denial).toContain(i18n.t(NEXT_STEP_KEY));
-    expect(denial).not.toContain('$t(');
-  });
-});
-
 describe('catalog copy', () => {
   it.each(SUPPORTED_LANGUAGES)(
     'keeps concise, translated settings and empty-state copy in %s',

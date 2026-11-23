@@ -399,7 +399,7 @@
       "title": "Mga key ng provider",
       "rowSubtitle": "Gamitin ang sarili mong billing sa provider",
       "orgDescription": "Ibinabahagi ang mga key na ito sa lahat ng nasa organisasyon at sinisingil sa mga akawnt nito sa provider.",
-      "viewOnly": "Ang may-ari, admin, o billing manager lang ng organisasyon ang makakapagpalit ng mga key nito.",
+      "viewOnly": "Ang may-ari, admin, o tagapamahala ng pagsingil lang ng organisasyon ang makakapagpalit ng mga key nito.",
       "description": "Ang mga request na dumadaan sa mga key na ito ay sisingilin sa akawnt mo sa provider sa halip na sa balanse mo sa Kilo.",
       "managedByPlan": "Pinamamahalaan ng iyong coding plan",
       "enableKey": "I-enable ang key ng {{provider}}",
@@ -1513,7 +1513,9 @@
       "githubError": "Hindi mabuksan ang setup ng GitHub. Pakisubukang muli.",
       "gitlabAccount": "account sa GitLab",
       "gitlabError": "Hindi mabuksan ang setup ng GitLab. Pakisubukang muli.",
-      "description": "Ikonekta ang Kilo {{label}} para awtomatikong suriin ang mga pull request."
+      "description": "Ikonekta ang Kilo {{label}} para awtomatikong suriin ang mga pull request.",
+      "notConnectedTitle": "Hindi nakakonekta ang {{platform}}",
+      "githubAdminOnlyDescription": "Mga may-ari ng organisasyon at admin lang ang maaaring magkonekta nito."
     },
     "overview": {
       "allAreas": "Lahat ng aspeto",
@@ -3418,7 +3420,7 @@
   "organization": {
     "auditLog": {
       "title": "Audit log",
-      "permissionDenied": "Ang may-ari, admin o billing manager lang ng organisasyon na nasa Enterprise plan ang puwedeng magbasa ng audit log nito.",
+      "permissionDenied": "Ang may-ari, admin o tagapamahala ng pagsingil lang ng organisasyon na nasa Enterprise plan ang puwedeng magbasa ng audit log nito. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Walang audit event",
       "emptyDescription": "Dito lalabas ang mga aksyong ginawa sa organisasyong ito.",
       "truncated": "Ipinapakita ang mga pinakabagong event.",
@@ -3608,7 +3610,7 @@
     },
     "billing": {
       "title": "Pagsingil",
-      "permissionDenied": "Ang may-ari, admin o billing manager lang ng organisasyon ang makakakita ng pagsingil nito.",
+      "permissionDenied": "Ang may-ari, admin o tagapamahala ng pagsingil lang ng organisasyon ang makakakita ng pagsingil nito. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Subscription",
       "state": "Katayuan",
       "stateNone": "Walang subscription",
@@ -3785,7 +3787,7 @@
       "emptyDescription": "Gamitin ang \"Mas lumang oras\" para makita ang mga naunang request.",
       "emptyBoundDescription": "Hanggang dito na lang ang kasaysayan ng mga request.",
       "loadError": "Hindi ma-load ang mga request log.",
-      "permissionDenied": "Ang may-ari, admin o billing manager lang ng organisasyon ang puwedeng magbasa ng mga request log nito.",
+      "permissionDenied": "Ang may-ari, admin o tagapamahala ng pagsingil lang ng organisasyon ang puwedeng magbasa ng mga request log nito. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} input · {{output}} output",
       "byok": "BYOK"
     },
@@ -4886,7 +4888,7 @@
     "defaultModel": "Gamitin ang default na model ng Kilo",
     "duration": "Limitasyon sa oras (minuto)",
     "spendLimit": "Limitasyon sa gastos (USD)",
-    "invalidSafeguards": "Maglagay ng mga positibong limitasyon sa oras at gastos na may hangganang halaga.",
+    "invalidSafeguards": "Maglagay ng positibong numero sa pinapayagang saklaw.",
     "estimate": "Tantiya {{estimate}} · maximum {{maximum}}",
     "estimateUnavailable": "Hindi available ang bayad na buod para sa mga setting na ito. Palitan ang modelo o ang mga limitasyon, o subukan itong muli mamaya.",
     "estimatePricingUnavailable": "Walang available na presyo para sa modelong ito. Pumili ng ibang modelo.",
@@ -5052,6 +5054,8 @@
       "autoCommit": "I-commit ang mga pagbabago kapag natapos ang pagtakbo",
       "condenseOnComplete": "Paikliin ang konteksto kapag natapos ang pagtakbo",
       "activeTitle": "Aktibo ang pampapagana",
+      "activeSwitchA11y": "Aktibong pampapagana: {{name}}",
+      "copyLinkA11y": "Kopyahin ang link para sa {{name}}",
       "activeDescription": "Ang mga nakapahingang webhook ay tumutugon ng 404.",
       "runAsCreator": "Patakbuhin bilang ako",
       "runAsCreatorDescription": "Ginagamit ng bawat pagtakbo ang iyong kuwenta, kaya kailangan ang sekretong header.",

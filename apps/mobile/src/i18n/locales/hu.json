@@ -399,7 +399,7 @@
       "title": "Szolgáltatói kulcsok",
       "rowSubtitle": "Saját szolgáltatói számlázás használata",
       "orgDescription": "Ezek a kulcsok a szervezet minden tagja számára közösek, és a költségek a szervezet szolgáltatói fiókjait terhelik.",
-      "viewOnly": "Csak a szervezet tulajdonosa, adminisztrátora vagy számlázási kezelője módosíthatja a szervezet kulcsait.",
+      "viewOnly": "Csak a szervezet tulajdonosa, adminisztrátora vagy számlázási felelőse módosíthatja a szervezet kulcsait.",
       "description": "Az ezekkel a kulcsokkal küldött kérések a szolgáltatói fiókodat terhelik a Kilo-egyenleged helyett.",
       "managedByPlan": "A kódolási csomagod kezeli",
       "enableKey": "A(z) {{provider}} kulcs engedélyezése",
@@ -1513,7 +1513,9 @@
       "githubError": "Nem sikerült megnyitni a GitHub beállítását. Próbáld újra.",
       "gitlabAccount": "GitLab-fiók",
       "gitlabError": "Nem sikerült megnyitni a GitLab beállítását. Próbáld újra.",
-      "description": "A PR-ek automatikus kódellenőrzéséhez hozd létre ezt a kapcsolatot a Kilo szolgáltatással: {{label}}."
+      "description": "A PR-ek automatikus kódellenőrzéséhez hozd létre ezt a kapcsolatot a Kilo szolgáltatással: {{label}}.",
+      "notConnectedTitle": "A {{platform}} nincs csatlakoztatva",
+      "githubAdminOnlyDescription": "Csak a szervezet tulajdonosai és adminisztrátorai csatlakoztathatják."
     },
     "overview": {
       "allAreas": "Minden terület",
@@ -3418,7 +3420,7 @@
   "organization": {
     "auditLog": {
       "title": "Auditnapló",
-      "permissionDenied": "Az auditnaplót csak az Enterprise csomagot használó szervezet tulajdonosa, adminisztrátora vagy számlázási felelőse olvashatja.",
+      "permissionDenied": "Az auditnaplót csak az Enterprise csomagot használó szervezet tulajdonosa, adminisztrátora vagy számlázási felelőse olvashatja. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Nincsenek auditesemények",
       "emptyDescription": "A szervezetben végrehajtott műveletek itt jelennek meg.",
       "truncated": "A legutóbbi események láthatók.",
@@ -3608,7 +3610,7 @@
     },
     "billing": {
       "title": "Számlázás",
-      "permissionDenied": "A számlázási adatokat csak a szervezet tulajdonosa, adminisztrátora vagy számlázási felelőse láthatja.",
+      "permissionDenied": "A számlázási adatokat csak a szervezet tulajdonosa, adminisztrátora vagy számlázási felelőse láthatja. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Előfizetés",
       "state": "Állapot",
       "stateNone": "Nincs előfizetés",
@@ -3785,7 +3787,7 @@
       "emptyDescription": "A Korábbi óra gombbal tekintheti meg a korábbi kéréseket.",
       "emptyBoundDescription": "A kérésnaplók ennél korábbra nem nyúlnak vissza.",
       "loadError": "Nem sikerült betölteni a kérésnaplókat.",
-      "permissionDenied": "A kérésnaplókat csak a szervezet tulajdonosa, adminisztrátora vagy számlázási felelőse olvashatja.",
+      "permissionDenied": "A kérésnaplókat csak a szervezet tulajdonosa, adminisztrátora vagy számlázási felelőse olvashatja. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} be · {{output}} ki",
       "byok": "BYOK"
     },
@@ -4886,7 +4888,7 @@
     "defaultModel": "A Kilo alapértelmezett modelljének használata",
     "duration": "Időkorlát (perc)",
     "spendLimit": "Költési korlát (USD)",
-    "invalidSafeguards": "Adj meg pozitív, véges idő- és költési korlátot.",
+    "invalidSafeguards": "Adj meg egy pozitív számot az engedélyezett tartományban.",
     "estimate": "Becsült {{estimate}} · legfeljebb {{maximum}}",
     "estimateUnavailable": "Fizetett összefoglaló nem elérhető ezekkel a beállításokkal. Változtasd meg a modellt vagy a korlátokat, vagy próbáld újra később.",
     "confirmPaid": "Engedélyezed a fizetős összefoglalókat ehhez: {{context}}?",
@@ -5052,6 +5054,8 @@
       "autoCommit": "A módosítások véglegesítése a futás befejezésekor",
       "condenseOnComplete": "A kontextus tömörítése a futás befejezésekor",
       "activeTitle": "Trigger aktív",
+      "activeSwitchA11y": "Aktív trigger: {{name}}",
+      "copyLinkA11y": "Hivatkozás másolása: {{name}}",
       "activeDescription": "A szüneteltetett webhookok 404-gyel válaszolnak.",
       "runAsCreator": "Futtatás a saját fiókommal",
       "runAsCreatorDescription": "Minden futás az Ön fiókját használja, ezért a titkos fejléc kötelező.",

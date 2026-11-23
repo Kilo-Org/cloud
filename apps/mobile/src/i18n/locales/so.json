@@ -1513,7 +1513,9 @@
       "githubError": "Dejinta GitHub lama furi karin. Fadlan mar kale isku day.",
       "gitlabAccount": "akoonka GitLab",
       "gitlabError": "Dejinta GitLab lama furi karin. Fadlan mar kale isku day.",
-      "description": "Ku xidh Kilo {{label}} si codsiyada isku darka dib loogu eego si otomaatig ah."
+      "description": "Ku xidh Kilo {{label}} si codsiyada isku darka dib loogu eego si otomaatig ah.",
+      "notConnectedTitle": "{{platform}} kuma xidhna",
+      "githubAdminOnlyDescription": "Milkiilayaasha ururka iyo maamulayaasha oo keliya ayaa ku xidhi kara."
     },
     "overview": {
       "allAreas": "Dhammaan meelaha",
@@ -3418,7 +3420,7 @@
   "organization": {
     "auditLog": {
       "title": "Diiwaanka hubinta",
-      "permissionDenied": "Kaliya milkiilaha ururka, maamulaha ama maareeyaha biilasha ee qorshaha Enterprise ayaa akhrin kara diiwaanka hubinta.",
+      "permissionDenied": "Kaliya milkiilaha ururka, maamulaha ama maareeyaha biilasha ee qorshaha Enterprise ayaa akhrin kara diiwaanka hubinta. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Ma jiraan dhacdooyin hubin",
       "emptyDescription": "Falalka lagu sameeyo ururkan halkan ayay ka muuqdaan.",
       "truncated": "Waxaa la muujinayaa dhacdooyinkii ugu dambeeyay.",
@@ -3608,7 +3610,7 @@
     },
     "billing": {
       "title": "Biilasha",
-      "permissionDenied": "Kaliya milkiilaha ururka, maamulaha ama maareeyaha biilasha ayaa arki kara biilasha ururka.",
+      "permissionDenied": "Kaliya milkiilaha ururka, maamulaha ama maareeyaha biilasha ayaa arki kara biilasha ururka. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Isdiiwaangelinta",
       "state": "Xaaladda",
       "stateNone": "Isdiiwaangelin ma jirto",
@@ -3785,7 +3787,7 @@
       "emptyDescription": "Isticmaal Saacaddii hore si aad u aragto codsiyadii hore.",
       "emptyBoundDescription": "Diiwaannada codsiyada halkan ayay ku egyihiin.",
       "loadError": "Lama soo rari karin diiwaannada codsiyada.",
-      "permissionDenied": "Kaliya milkiilaha ururka, maamulaha ama maareeyaha biilasha ayaa akhrin kara diiwaannada codsiyada ururka.",
+      "permissionDenied": "Kaliya milkiilaha ururka, maamulaha ama maareeyaha biilasha ayaa akhrin kara diiwaannada codsiyada ururka. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} gal · {{output}} bax",
       "byok": "BYOK"
     },
@@ -4886,7 +4888,7 @@
     "defaultModel": "Isticmaal moodeelka caadiga ah ee Kilo",
     "duration": "Ilaalinta waqtiga (daqiiqado)",
     "spendLimit": "Ilaalinta kharashka (USD)",
-    "invalidSafeguards": "Geli xadad waqti iyo kharash oo togan oo xaddidan.",
+    "invalidSafeguards": "Geli tiro togan oo ku jirta baaxadda la oggolaaday.",
     "estimate": "Qiimeyn {{estimate}} · ugu badnaan {{maximum}}",
     "estimateUnavailable": "Soo koobid lacag leh laguma heli karo dejimyadan. Beddel moodeelka ama xaddidaadaha, ama isku day mar dambe.",
     "confirmPaid": "Ma shidaysaa soo koobidda lacagta leh ee {{context}}?",
@@ -5052,6 +5054,8 @@
       "autoCommit": "Kaydi isbeddellada marka socodku dhammaado",
       "condenseOnComplete": "Soo koob macnaha guud marka socodku dhammaado",
       "activeTitle": "Kiciye firfircoon",
+      "activeSwitchA11y": "Kiciye firfircoon: {{name}}",
+      "copyLinkA11y": "Nuqul ka samee xiriiriyaha {{name}}",
       "activeDescription": "Wicitaannada web ee la hakiyay waxay ku jawaabaan 404.",
       "runAsCreator": "U soco sidayda",
       "runAsCreatorDescription": "Socod kastaa wuxuu isticmaalaa akoonkaaga, sidaas darteed madaxa sirta waa loo baahan yahay.",

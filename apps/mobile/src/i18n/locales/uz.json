@@ -1513,7 +1513,9 @@
       "githubError": "GitHubni sozlash sahifasini ochib bo'lmadi. Iltimos, qayta urinib ko'ring.",
       "gitlabAccount": "GitLab hisobi",
       "gitlabError": "GitLabni sozlash sahifasini ochib bo'lmadi. Iltimos, qayta urinib ko'ring.",
-      "description": "PRlarni avtomatik ko'rib chiqish uchun Kilo {{label}}ni ulang."
+      "description": "PRlarni avtomatik ko'rib chiqish uchun Kilo {{label}}ni ulang.",
+      "notConnectedTitle": "{{platform}} ulanmagan",
+      "githubAdminOnlyDescription": "Faqat tashkilot egalar va administratorlar uni ulashi mumkin."
     },
     "overview": {
       "allAreas": "Barcha yo'nalishlar",
@@ -3418,7 +3420,7 @@
   "organization": {
     "auditLog": {
       "title": "Audit jurnali",
-      "permissionDenied": "Audit jurnalini faqat Enterprise tarifidagi tashkilot egasi, administratori yoki to'lovlar menejeri ko'ra oladi.",
+      "permissionDenied": "Audit jurnalini faqat Enterprise tarifidagi tashkilot egasi, administratori yoki to'lovlar menejeri ko'ra oladi. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Audit hodisalari yo'q",
       "emptyDescription": "Bu tashkilotda bajarilgan amallar shu yerda ko'rinadi.",
       "truncated": "Eng so'nggi hodisalar ko'rsatilmoqda.",
@@ -3608,7 +3610,7 @@
     },
     "billing": {
       "title": "To'lovlar",
-      "permissionDenied": "To'lovlarni faqat tashkilot egasi, administratori yoki to'lovlar menejeri ko'ra oladi.",
+      "permissionDenied": "To'lovlarni faqat tashkilot egasi, administratori yoki to'lovlar menejeri ko'ra oladi. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Obuna",
       "state": "Holat",
       "stateNone": "Obuna yo'q",
@@ -3785,7 +3787,7 @@
       "emptyDescription": "Oldingi so'rovlarni ko'rish uchun «Oldingi soat» tugmasidan foydalaning.",
       "emptyBoundDescription": "So'rovlar jurnali bundan oldingi vaqtni qamrab olmaydi.",
       "loadError": "So'rovlar jurnallarini yuklab bo'lmadi.",
-      "permissionDenied": "So'rovlar jurnallarini faqat tashkilot egasi, administratori yoki to'lovlar menejeri ko'ra oladi.",
+      "permissionDenied": "So'rovlar jurnallarini faqat tashkilot egasi, administratori yoki to'lovlar menejeri ko'ra oladi. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} kirish · {{output}} chiqish",
       "byok": "BYOK"
     },
@@ -4886,7 +4888,7 @@
     "defaultModel": "Kilo standart modelidan foydalanish",
     "duration": "Vaqt cheklovi (daqiqa)",
     "spendLimit": "Xarajat cheklovi (USD)",
-    "invalidSafeguards": "Musbat, cheklangan vaqt va xarajat limitlarini kiriting.",
+    "invalidSafeguards": "Ruxsat etilgan oraliqda musbat son kiriting.",
     "estimate": "Taxminiy hisob {{estimate}} · maksimum {{maximum}}",
     "estimateUnavailable": "Bu sozlamalar uchun pullik xulosa mavjud emas. Modelni yoki chegaralarni o‘zgartiring, yoki keyinroq qayta urinib ko‘ring.",
     "confirmPaid": "{{context}} uchun pullik xulosalar yoqilsinmi?",
@@ -5052,6 +5054,8 @@
       "autoCommit": "Ishga tushirish tugagach oʻzgarishlarni qayd etish",
       "condenseOnComplete": "Ishga tushirish tugagach kontekstni ixchamlash",
       "activeTitle": "Ishga tushirgich faol",
+      "activeSwitchA11y": "Faol ishga tushirgich: {{name}}",
+      "copyLinkA11y": "{{name}} uchun havolani nusxalash",
       "activeDescription": "Toʻxtatilgan vebhooklar 404 bilan javob beradi.",
       "runAsCreator": "Men nomimdan ishga tushirish",
       "runAsCreatorDescription": "Har bir ishga tushirish hisobingizdan foydalanadi, shuning uchun maxfiy sarlavha majburiy.",

@@ -1513,7 +1513,9 @@
       "githubError": "GitHub সেটআপ খোলা যায়নি। আবার চেষ্টা করুন।",
       "gitlabAccount": "GitLab অ্যাকাউন্ট",
       "gitlabError": "GitLab সেটআপ খোলা যায়নি। আবার চেষ্টা করুন।",
-      "description": "পুল রিকোয়েস্ট স্বয়ংক্রিয়ভাবে পর্যালোচনা করতে Kilo {{label}} সংযুক্ত করুন।"
+      "description": "পুল রিকোয়েস্ট স্বয়ংক্রিয়ভাবে পর্যালোচনা করতে Kilo {{label}} সংযুক্ত করুন।",
+      "notConnectedTitle": "{{platform}} সংযুক্ত নয়",
+      "githubAdminOnlyDescription": "শুধুমাত্র সংস্থার মালিক এবং অ্যাডমিনরা এটি সংযুক্ত করতে পারেন।"
     },
     "overview": {
       "allAreas": "সব বিষয়",
@@ -3418,7 +3420,7 @@
   "organization": {
     "auditLog": {
       "title": "অডিট লগ",
-      "permissionDenied": "শুধুমাত্র Enterprise প্ল্যানে থাকা সংস্থার মালিক, অ্যাডমিন বা বিলিং ম্যানেজার এর অডিট লগ দেখতে পারেন।",
+      "permissionDenied": "শুধুমাত্র Enterprise প্ল্যানে থাকা সংস্থার মালিক, অ্যাডমিন বা বিলিং ম্যানেজার এর অডিট লগ দেখতে পারেন। $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "কোনো অডিট ইভেন্ট নেই",
       "emptyDescription": "এই সংস্থায় নেওয়া পদক্ষেপগুলো এখানে দেখা যাবে।",
       "truncated": "সাম্প্রতিকতম ইভেন্টগুলো দেখানো হচ্ছে।",
@@ -3608,7 +3610,7 @@
     },
     "billing": {
       "title": "বিলিং",
-      "permissionDenied": "শুধুমাত্র সংস্থার মালিক, অ্যাডমিন বা বিলিং ম্যানেজার এর বিলিং দেখতে পারেন।",
+      "permissionDenied": "শুধুমাত্র সংস্থার মালিক, অ্যাডমিন বা বিলিং ম্যানেজার এর বিলিং দেখতে পারেন। $t(organization.boundary.accessDeniedDescription)",
       "subscription": "সাবস্ক্রিপশন",
       "state": "অবস্থা",
       "stateNone": "কোনো সাবস্ক্রিপশন নেই",
@@ -3785,7 +3787,7 @@
       "emptyDescription": "পূর্ববর্তী রিকোয়েস্ট দেখতে আগের ঘণ্টা ব্যবহার করুন।",
       "emptyBoundDescription": "এর আগের কোনো রিকোয়েস্ট লগ উপলব্ধ নেই।",
       "loadError": "রিকোয়েস্ট লগ লোড করা যায়নি।",
-      "permissionDenied": "শুধুমাত্র সংস্থার মালিক, অ্যাডমিন বা বিলিং ম্যানেজার এর রিকোয়েস্ট লগ দেখতে পারেন।",
+      "permissionDenied": "শুধুমাত্র সংস্থার মালিক, অ্যাডমিন বা বিলিং ম্যানেজার এর রিকোয়েস্ট লগ দেখতে পারেন। $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} ইনপুট · {{output}} আউটপুট",
       "byok": "BYOK"
     },
@@ -4886,7 +4888,7 @@
     "defaultModel": "Kilo-র ডিফল্ট মডেল ব্যবহার করুন",
     "duration": "সময়ের সুরক্ষাসীমা (মিনিট)",
     "spendLimit": "খরচের সুরক্ষাসীমা (USD)",
-    "invalidSafeguards": "ধনাত্মক, সসীম সময় ও খরচের সীমা লিখুন।",
+    "invalidSafeguards": "অনুমোদিত পরিসরের মধ্যে একটি ধনাত্মক সংখ্যা লিখুন।",
     "estimate": "আনুমানিক {{estimate}} · সর্বোচ্চ {{maximum}}",
     "estimateUnavailable": "এই সেটিংসের জন্য পেইড সারাংশ পাওয়া যাচ্ছে না। মডেল বা সীমা পরিবর্তন করুন, অথবা পরে আবার চেষ্টা করুন।",
     "confirmPaid": "{{context}}-এর জন্য পেইড সারাংশ চালু করবেন?",
@@ -5052,6 +5054,8 @@
       "autoCommit": "চালনা শেষ হলে পরিবর্তন কমিট করুন",
       "condenseOnComplete": "চালনা শেষ হলে প্রসঙ্গ সংক্ষিপ্ত করুন",
       "activeTitle": "ট্রিগার সক্রিয়",
+      "activeSwitchA11y": "সক্রিয় ট্রিগার: {{name}}",
+      "copyLinkA11y": "{{name}} ট্রিগারের লিঙ্ক কপি করুন",
       "activeDescription": "স্থগিত ওয়েবহুকগুলি 404 ফেরত দেয়।",
       "runAsCreator": "আমার হিসেবে চালান",
       "runAsCreatorDescription": "প্রতিটি চালনা আপনার অ্যাকাউন্ট ব্যবহার করে, তাই সিক্রেট হেডার আবশ্যক।",

@@ -1513,7 +1513,9 @@
       "githubError": "Ezin izan da GitHub-en konfigurazioa ireki. Saiatu berriro.",
       "gitlabAccount": "GitLab-eko kontua",
       "gitlabError": "Ezin izan da GitLab-en konfigurazioa ireki. Saiatu berriro.",
-      "description": "Konektatu Kiloren {{label}} bateratze-eskaerak automatikoki berrikusteko."
+      "description": "Konektatu Kiloren {{label}} bateratze-eskaerak automatikoki berrikusteko.",
+      "notConnectedTitle": "{{platform}} ez dago konektatuta",
+      "githubAdminOnlyDescription": "Erakundeko jabeek eta administratzaileek soilik konekta dezakete."
     },
     "overview": {
       "allAreas": "Eremu guztiak",
@@ -3418,7 +3420,7 @@
   "organization": {
     "auditLog": {
       "title": "Ikuskaritza-erregistroa",
-      "permissionDenied": "Enterprise planeko erakunde baten jabeak, administratzaileak edo fakturazio-kudeatzaileak soilik irakur dezake haren ikuskaritza-erregistroa.",
+      "permissionDenied": "Enterprise planeko erakunde baten jabeak, administratzaileak edo fakturazio-kudeatzaileak soilik irakur dezake haren ikuskaritza-erregistroa. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Ez dago ikuskaritza-gertaerarik",
       "emptyDescription": "Erakunde honetan egindako ekintzak hemen agertzen dira.",
       "truncated": "Gertaera berrienak erakusten dira.",
@@ -3608,7 +3610,7 @@
     },
     "billing": {
       "title": "Fakturazioa",
-      "permissionDenied": "Erakundearen jabeak, administratzaileak edo fakturazio-kudeatzaileak soilik ikus dezake haren fakturazioa.",
+      "permissionDenied": "Erakundearen jabeak, administratzaileak edo fakturazio-kudeatzaileak soilik ikus dezake haren fakturazioa. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Harpidetza",
       "state": "Egoera",
       "stateNone": "Harpidetzarik ez",
@@ -3785,7 +3787,7 @@
       "emptyDescription": "Erabili «Aurreko ordua» aurreko eskaerak ikusteko.",
       "emptyBoundDescription": "Hemendik atzera ez dago eskaera-erregistrorik.",
       "loadError": "Ezin izan dira eskaeren erregistroak kargatu.",
-      "permissionDenied": "Erakunde baten jabeak, administratzaileak edo fakturazio-kudeatzaileak soilik irakur ditzake haren eskaeren erregistroak.",
+      "permissionDenied": "Erakunde baten jabeak, administratzaileak edo fakturazio-kudeatzaileak soilik irakur ditzake haren eskaeren erregistroak. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} sarrera · {{output}} irteera",
       "byok": "BYOK"
     },
@@ -4886,7 +4888,7 @@
     "defaultModel": "Erabili Kiloren eredu lehenetsia",
     "duration": "Denbora-muga (minutuak)",
     "spendLimit": "Gastu-muga (USD)",
-    "invalidSafeguards": "Sartu denbora- eta gastu-muga positibo eta finituak.",
+    "invalidSafeguards": "Sartu zenbaki positibo bat onartutako tartean.",
     "estimate": "Estimazioa {{estimate}} · gehienez {{maximum}}",
     "estimateUnavailable": "Ezarpen hauekin ez dago ordainpeko laburpenik erabilgarri. Aldatu eredua edo mugak, edo saiatu berriro geroago.",
     "estimatePricingUnavailable": "Eredu honen prezioa ez dago erabilgarri. Aukeratu beste eredu bat.",
@@ -5052,6 +5054,8 @@
       "autoCommit": "Erregistratu aldaketak exekuzioa amaitzean",
       "condenseOnComplete": "Laburtu testuingurua exekuzioa amaitzean",
       "activeTitle": "Abiarazlea aktibo",
+      "activeSwitchA11y": "Abiarazlea aktibo: {{name}}",
+      "copyLinkA11y": "Kopiatu esteka: {{name}}",
       "activeDescription": "Pausatutako webhookek 404 erantzuten dute.",
       "runAsCreator": "Exekutatu nire izenean",
       "runAsCreatorDescription": "Exekuzio bakoitzak zure kontua erabiltzen du, beraz, goiburu sekretua derrigorrezkoa da.",

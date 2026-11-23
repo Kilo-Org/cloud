@@ -3828,7 +3828,7 @@
       "noSeatsAvailable": "Visos vietos užimtos. Paprašykite organizacijos savininko pridėti vietų, prieš kviesdami daugiau narių."
     },
     "invoices": {
-      "downloadA11y": "Atsisiųsti sąskaitą {{number}}",
+      "downloadA11y": "Atsisiųsti sąskaitą {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Sąskaitos automatiškai parengiamos kiekvieną atsiskaitymo laikotarpį. Kai jūsų organizacijai bus išrašyta sąskaita, ji bus rodoma čia.",
       "emptyTitle": "Nėra sąskaitų",
       "invoiceFallback": "Sąskaita",

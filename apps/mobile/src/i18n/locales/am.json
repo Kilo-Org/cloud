@@ -3692,7 +3692,7 @@
       "noSeatsAvailable": "ሁሉም መቀመጫዎች በጥቅም ላይ ናቸው። ተጨማሪ አባላትን ከመጋበዝዎ በፊት የድርጅት ባለቤት መቀመጫዎችን እንዲጨምር ይጠይቁ።"
     },
     "invoices": {
-      "downloadA11y": "ደረሰኝ {{number}}ን ያውርዱ",
+      "downloadA11y": "ደረሰኝ {{number}}ን፣ {{amount}}፣ {{date}}፣ {{status}} ያውርዱ",
       "emptyDescription": "ደረሰኞች በእያንዳንዱ የክፍያ ዑደት በራስ ሰር ይዘጋጃሉ። ድርጅትዎ ክፍያ እንዲፈጽም ሲጠየቅ እዚህ ይታያሉ።",
       "emptyTitle": "ምንም ደረሰኞች የሉም",
       "invoiceFallback": "ደረሰኝ",

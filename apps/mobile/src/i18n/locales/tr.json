@@ -3696,7 +3696,7 @@
       "noSeatsAvailable": "Tüm koltuklar kullanımda. Daha fazla üye davet etmeden önce bir kuruluş sahibinden koltuk eklemesini iste."
     },
     "invoices": {
-      "downloadA11y": "{{number}} numaralı faturayı indir",
+      "downloadA11y": "{{number}} numaralı faturayı indir: {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Faturalar her fatura döneminde otomatik olarak oluşturulur. Kuruluşuna fatura kesildiğinde burada görünür.",
       "emptyTitle": "Fatura yok",
       "invoiceFallback": "Fatura",

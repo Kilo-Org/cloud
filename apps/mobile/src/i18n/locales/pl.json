@@ -3832,7 +3832,7 @@
       "noSeatsAvailable": "Wszystkie miejsca są zajęte. Poproś właściciela organizacji o dodanie miejsc, zanim zaprosisz kolejnych członków."
     },
     "invoices": {
-      "downloadA11y": "Pobierz fakturę {{number}}",
+      "downloadA11y": "Pobierz fakturę {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Faktury są wystawiane automatycznie w każdym cyklu rozliczeniowym. Pojawią się tutaj po naliczeniu opłat twojej organizacji.",
       "emptyTitle": "Brak faktur",
       "invoiceFallback": "Faktura",

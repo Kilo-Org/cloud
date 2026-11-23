@@ -3896,7 +3896,7 @@
       "noSeatsAvailable": "Il-postijiet kollha qed jintużaw. Staqsi lil sid tal-organizzazzjoni biex iżid postijiet qabel ma tistieden aktar membri."
     },
     "invoices": {
-      "downloadA11y": "Niżżel l-fattura {{number}}",
+      "downloadA11y": "Niżżel l-fattura {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Il-fatturi jinħolqu awtomatikament f'kull ċiklu tal-kontijiet u jidhru hawn meta tinħareġ fattura għall-organizzazzjoni tiegħek.",
       "emptyTitle": "L-ebda fattura",
       "invoiceFallback": "Fattura",

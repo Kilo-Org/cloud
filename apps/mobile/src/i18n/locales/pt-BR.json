@@ -3832,7 +3832,7 @@
       "noSeatsAvailable": "Todos os assentos estão em uso. Peça a um proprietário da organização que adicione assentos antes de convidar mais membros."
     },
     "invoices": {
-      "downloadA11y": "Baixar fatura {{number}}",
+      "downloadA11y": "Baixar fatura {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "As faturas são geradas automaticamente a cada ciclo de cobrança e aparecerão aqui assim que sua organização for cobrada.",
       "emptyTitle": "Nenhuma fatura",
       "invoiceFallback": "Fatura",

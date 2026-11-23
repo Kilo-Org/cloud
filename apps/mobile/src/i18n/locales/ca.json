@@ -3760,7 +3760,7 @@
       "noSeatsAvailable": "Totes les places estan en ús. Demana a un propietari de l'organització que afegeixi places abans de convidar més membres."
     },
     "invoices": {
-      "downloadA11y": "Baixa la factura {{number}}",
+      "downloadA11y": "Baixa la factura {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Les factures es generen automàticament cada cicle de facturació i apareixeran aquí quan es facturi a l'organització.",
       "emptyTitle": "No hi ha factures",
       "invoiceFallback": "Factura",

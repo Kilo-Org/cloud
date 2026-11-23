@@ -3696,7 +3696,7 @@
       "noSeatsAvailable": "모든 시트가 사용 중입니다. 멤버를 더 초대하려면 먼저 조직 소유자에게 시트 추가를 요청하세요."
     },
     "invoices": {
-      "downloadA11y": "청구서 {{number}} 다운로드",
+      "downloadA11y": "청구서 {{number}}, {{amount}}, {{date}}, {{status}} 다운로드",
       "emptyDescription": "청구서는 청구 주기마다 자동으로 생성되며, 조직에 요금이 청구되면 여기에 표시됩니다.",
       "emptyTitle": "청구서 없음",
       "invoiceFallback": "청구서",

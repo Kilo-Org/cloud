@@ -3692,7 +3692,7 @@
       "noSeatsAvailable": "Barcha o'rinlar band. Ko'proq a'zo taklif qilishdan oldin tashkilot egasidan o'rinlar qo'shishni so'rang."
     },
     "invoices": {
-      "downloadA11y": "{{number}} raqamli hisob-fakturani yuklab olish",
+      "downloadA11y": "{{number}} raqamli hisob-fakturani yuklab olish, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Hisob-fakturalar har bir hisob-kitob davrida avtomatik yaratiladi. Tashkilotingizga to'lov hisobi chiqarilgach, ular shu yerda ko'rinadi.",
       "emptyTitle": "Hisob-fakturalar yo'q",
       "invoiceFallback": "Hisob-faktura",

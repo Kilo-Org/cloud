@@ -3828,7 +3828,7 @@
       "noSeatsAvailable": "Todos os lugares estão ocupados. Peça a um proprietário da organização que adicione lugares antes de convidar mais membros."
     },
     "invoices": {
-      "downloadA11y": "Transferir fatura {{number}}",
+      "downloadA11y": "Transferir fatura {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "As faturas são geradas automaticamente em cada ciclo de faturação e aparecem aqui após a faturação à sua organização.",
       "emptyTitle": "Sem faturas",
       "invoiceFallback": "Fatura",

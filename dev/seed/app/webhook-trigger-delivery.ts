@@ -295,7 +295,7 @@ function printUsage(): void {
   console.log('            initial turn, and ingests nothing. Asserts session-ingest holds 0');
   console.log('            messages, the page holds 0 rows, and the admitted turn is the');
   console.log("            session's own initial turn with a row on the first page; reports");
-  console.log('            admittedMessages, the turn state and the preparation attempts, so');
+  console.log('            settledTurns, the turn state and the preparation attempts, so');
   console.log("            the stack's answer for a turn that never produces rows is visible.");
   console.log('--stack-dir=<path>');
   console.log('            the worktree whose running stack answers the calls (default: this');
@@ -630,20 +630,20 @@ async function pollIngestedMessages(
 }
 
 /**
- * The page's own count of admitted turns, when the page carries the field. A
- * sibling slice adds `admittedMessages`; against a stack built without it the
- * read is `null`, and the snapshot rows below are the DO's own answer instead.
+ * The page's own count of settled turns, when the page carries the field. A
+ * sibling slice adds `settledTurns`; against a stack built without it the read
+ * is `null`, and the snapshot rows below are the DO's own answer instead.
  */
-function readPageAdmittedMessages(page: TrpcData): number | null {
+function readPageSettledTurns(page: TrpcData): number | null {
   if (typeof page !== 'object' || page === null || Array.isArray(page)) return null;
-  const value = 'admittedMessages' in page ? page.admittedMessages : null;
+  const value = 'settledTurns' in page ? page.settledTurns : null;
   return typeof value === 'number' && Number.isInteger(value) ? value : null;
 }
 
 /** One settled read of the admitted turn: its page, its snapshot rows, and whether they settled. */
 type AdmittedTurnOutcome = {
   readonly page: TrpcData;
-  readonly admittedMessages: number | null;
+  readonly settledTurns: number | null;
   readonly snapshot: AdmissionSnapshot;
   readonly settled: boolean;
 };
@@ -668,7 +668,7 @@ async function waitForAdmittedTurnOutcome(
     const snapshot = readAdmissionSnapshot(page);
     const settled = snapshot.failedPreparationCount > 0 || snapshot.terminalFailureCount > 0;
     if (settled || Date.now() >= deadline) {
-      return { page, admittedMessages: readPageAdmittedMessages(page), snapshot, settled };
+      return { page, settledTurns: readPageSettledTurns(page), snapshot, settled };
     }
     await sleep(ADMISSION_SETTLE_POLL_INTERVAL_MS);
   }
@@ -833,7 +833,7 @@ async function main(args: string[]): Promise<SeedResult> {
   let storedPageCount: number;
   /** What session-ingest itself holds; `null` for a mode that never reads it. */
   let ingestedMessageCount: number | null = null;
-  let admittedMessages: number | null = null;
+  let settledTurns: number | null = null;
   let admittedTurn: AdmittedTurnOutcome | null = null;
   let initiateDelivery: string | null = null;
   let admittedMessageId: string | null = null;
@@ -895,7 +895,7 @@ async function main(args: string[]): Promise<SeedResult> {
       prepared.cloudAgentSessionId
     );
     page = admittedTurn.page;
-    admittedMessages = admittedTurn.admittedMessages;
+    settledTurns = admittedTurn.settledTurns;
     hydratedMessageCount = readMessageCount(page);
     storedPageCount = hydratedMessageCount;
   } else {
@@ -995,7 +995,7 @@ async function main(args: string[]): Promise<SeedResult> {
     initiateDelivery,
     initiatedAt: admittedRuntime?.initiatedAt ?? null,
     preparedAt: admittedRuntime?.preparedAt ?? null,
-    admittedMessages,
+    settledTurns,
     admissionEvidence,
     admittedTurnSettled: admittedTurn === null ? null : admittedTurn.settled,
     admittedQueuedMessageCount: snapshot === null ? null : snapshot.queuedMessageCount,

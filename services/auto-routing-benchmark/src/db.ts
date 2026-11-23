@@ -364,8 +364,8 @@ const ADMIT_DECIDER_RUN_SQL = `
  * classifier path keeps no occupancy or starting-run predicate: the admin start picks the one
  * run, and the unique partial index is its backstop. Like the decider insert, it stamps the
  * post-cutover admission marker (?18) so the row is never mistaken for legacy work: the
- * `--legacy-residue` inspection and `retireLegacyRuns` both treat an unmarked running row as
- * work the paid flow does not own, and neither filters classifiers out.
+ * kind-agnostic `--legacy-residue` inspection reports any unmarked running row, and
+ * `retireLegacyRuns` retires only deciders, so nothing would ever clear an unmarked classifier.
  */
 const ADMIT_CLASSIFIER_RUN_SQL = `
   INSERT INTO benchmark_runs (id, router, accuracy_noise_band, frontier_min_accuracy_delta,

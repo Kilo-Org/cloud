@@ -159,8 +159,9 @@ async function dispatchCreditEvent(
   // A row whose subject is a personal account is delivered only while that account is active: the
   // owner is rechecked here and a gone/deleting account's row is dropped. An organization row is
   // delivered, because the organization is its subject, and it publishes the client-derived fields
-  // only while its attributed account is active. The delete is fenced on this claim, so it never
-  // removes a row a newer claim owns.
+  // only while its attributed account is active; it keeps the account id, which is a required field
+  // of the credit-event contract and attribution rather than client data. The delete is fenced on
+  // this claim, so it never removes a row a newer claim owns.
   const organizationEvent = isOrganizationCreditEvent(row);
   const [owner] = await db
     .select({ blockedReason: kilocode_users.blocked_reason })

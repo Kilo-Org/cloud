@@ -358,20 +358,32 @@ describe('bouncer credit-event outbox (integration)', () => {
       })
     );
 
-    let blocked = false;
+    // The loop below proves the enqueue waits on the cleanup backend; it throws with diagnostics
+    // when the waiter never registers. Release the gate either way.
     try {
-      for (let attempt = 0; attempt < 2000 && !blocked; attempt += 1) {
+      const deadline = Date.now() + 10_000;
+      const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+      for (;;) {
         const waiting = await db.execute(sql`
           SELECT 1 FROM pg_stat_activity
           WHERE datname = current_database()
             AND wait_event_type = 'Lock'
             AND ${holderPid} = ANY(pg_blocking_pids(pid))`);
-        blocked = waiting.rows.length > 0;
+        if (waiting.rows.length > 0) break;
+        if (Date.now() > deadline) {
+          const diagnostics = await db.execute<{ wait: string | null; query: string }>(sql`
+            SELECT wait_event_type || ':' || coalesce(wait_event, '') AS wait, query
+            FROM pg_stat_activity
+            WHERE datname = current_database() AND pid <> pg_backend_pid()`);
+          throw new Error(
+            `timed out waiting for the cleanup backend to block the enqueue; activity: ${JSON.stringify(diagnostics.rows)}`
+          );
+        }
+        await sleep(20);
       }
     } finally {
       allowEnqueue();
     }
-    expect(blocked).toBe(true);
 
     await Promise.all([cleanup, enqueue]);
 
@@ -386,7 +398,7 @@ describe('bouncer credit-event outbox (integration)', () => {
     expect(rows[0]?.payload.cardFingerprint).toBeUndefined();
 
     await db.delete(organizations).where(eq(organizations.id, org.id));
-  });
+  }, 30_000);
 
   it('treats the same event_id with a different type as a distinct row', async () => {
     await enqueueBouncerCreditEvent(db, {

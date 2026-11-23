@@ -5346,6 +5346,18 @@ describe('User', () => {
           },
         },
         {
+          event_id: 'evt-deleted-user-org',
+          event_type: 'charge.attempted',
+          user_id: user1.id,
+          payload: {
+            type: 'charge.attempted',
+            eventId: 'evt-deleted-user-org',
+            userId: user1.id,
+            orgId: 'org-deleted-user-payload',
+            ip: '203.0.113.9',
+          },
+        },
+        {
           event_id: 'evt-retained-user',
           event_type: 'charge.attempted',
           user_id: user2.id,
@@ -5355,6 +5367,10 @@ describe('User', () => {
 
       await softDeleteUser(user1.id);
 
+      // Deliberate: the cleanup deletes every outbox row for the account, organization rows
+      // included, because the payloads carry the account's client fields. An organization event
+      // enqueued before this cleanup commits is therefore never delivered; the
+      // surviving-organization-event guarantee covers only events enqueued after it commits.
       const remainingForDeletedUser = await db
         .select()
         .from(bouncer_credit_event_outbox)

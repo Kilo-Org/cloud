@@ -132,9 +132,7 @@ function isFormatControl(code: number): boolean {
  * collapses and bounds it.
  */
 export function sessionDisplayLine(raw: string): string {
-  // Iterating code points keeps a surrogate pair whole while the control set is
-  // applied. The set is compared numerically: a character class that names the
-  // control range reads as a control character in the source itself.
+  // Iterating code points keeps a surrogate pair whole while the control set is applied.
   return [...raw]
     .map(char => {
       const code = char.codePointAt(0) ?? 0;

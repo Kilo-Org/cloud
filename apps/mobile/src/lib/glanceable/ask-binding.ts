@@ -77,8 +77,9 @@ function noteFailedBind(identity: string, at: number): void {
       failedBinds.delete(key);
     }
   }
-  // Insertion order is failure order: an expired entry is dropped above before
-  // it could be set again, so a re-set key always re-enters at the tail.
+  // Insertion order is failure order: an expired entry is dropped above, and a
+  // repeated failure re-enters at the tail, so eviction takes the oldest window.
+  failedBinds.delete(identity);
   while (failedBinds.size >= ASK_BIND_MAX_FAILED) {
     const oldest = failedBinds.keys().next().value;
     if (oldest === undefined) {

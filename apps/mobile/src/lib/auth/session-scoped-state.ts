@@ -81,9 +81,6 @@ export function clearSystemSearchIndexOnSignedOutLaunch(): void {
     clearLauncherSurfaces();
     noteLauncherSurfacesCleared();
   });
-  // The device-global PR recents the search index folds into its documents:
-  // leaving them would let the next account's first index sync publish the
-  // previous account's pull-request titles.
   runClear(clearRecentPrsBestEffort);
 }
 
@@ -184,10 +181,6 @@ export function clearSessionScopedState(): void {
   runClear(() => {
     reapTempFiles({ all: true });
   });
-  // The stored PR recents are account-bound data the index folds in, and the
-  // key is device-global, so the account boundary must drop them as well as the
-  // index itself. Without this, an account switch re-indexes the previous
-  // account's pull requests from the recents the new account then inherits.
   runClear(clearRecentPrsBestEffort);
   // Cross-account separation for the retained PR discussion conversation: the
   // sign-in account switch and the sign-out clear it with the other

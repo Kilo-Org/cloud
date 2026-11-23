@@ -113,10 +113,6 @@ export async function getAuthTokenForRequest(): Promise<string | null> {
   if (active) {
     return active.token;
   }
-  // The lock cannot supply a token and must not fail the caller: skip the
-  // keychain read (it would throw `ProtectedDataUnavailableError`) and warm
-  // nothing. The request goes out without a token and the next unlocked read
-  // resolves the stored one.
   if (!isProtectedDataAvailable()) {
     return null;
   }

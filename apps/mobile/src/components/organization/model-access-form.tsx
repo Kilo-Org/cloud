@@ -504,8 +504,11 @@ export function ModelAccessForm({
                   the row card then reads as clipped short of the bar.
                   The reserve is two lines: the refusal sentences this form shows
                   wrap at this width, and a one-line reserve would raise the pair
-                  when one appears instead of holding it still. */}
-              <View className="min-h-[35px] justify-center">
+                  when one appears instead of holding it still. `min-h-10` is
+                  exactly those two lines — 2.5 rem at the app's 14pt rem, twice
+                  the `text-sm` line height — so the reserve stays on the
+                  spacing scale. */}
+              <View className="min-h-10 justify-center">
                 <AccessibleStatus
                   message={statusMessage}
                   tone={feedback.status === 'failed' ? 'error' : 'status'}

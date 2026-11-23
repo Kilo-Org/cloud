@@ -8,7 +8,7 @@ import { getTenantStub } from '../dos/SessionSyncTenantDO';
 import { getPresenceStub } from '../dos/SessionPresenceDO';
 import { getRelayStub } from '../dos/SessionRelayDO';
 import type { Env } from '../env';
-import { ERROR_STATUS, errorBody, sessionIDSchema } from '../protocol';
+import { ERROR_STATUS, errorBody, sessionIDSchema, sourceClientSchema } from '../protocol';
 import { rateLimit } from '../rate-limit';
 import { readBoundedStream } from '@kilocode/worker-utils/bounded-stream-reader';
 import { LIVE_LIMITS, socketTicket } from './protocol';
@@ -203,23 +203,28 @@ live.post('/presence/instances/:instanceID/commands', async c => {
 });
 
 const cursorSchema = z.strictObject({
-  createdAt: z.number().int().nonnegative(),
+  updatedAt: z.number().int().nonnegative(),
   target: z.string().max(2048),
+});
+const listQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+  cursor: z.string().max(4096).optional(),
+  q: z.string().min(1).max(200).optional(),
+  client: sourceClientSchema.optional(),
+  directory: z.string().min(1).max(4096).optional(),
+  archived: z
+    .enum(['true', 'false'])
+    .transform(value => value === 'true')
+    .optional(),
 });
 live.get('/sessions', async c => {
   const auth = await principal(c);
   if (auth instanceof Response) return auth;
-  const limit = z.coerce
-    .number()
-    .int()
-    .min(1)
-    .max(100)
-    .safeParse(c.req.query('limit') ?? 50);
-  if (!limit.success) return error('invalid_request', 'Limit must be between 1 and 100');
+  const query = listQuerySchema.safeParse(c.req.query());
+  if (!query.success) return error('invalid_request', 'Invalid session list query');
+  const { cursor, q, client, directory, archived } = query.data;
   let before: z.infer<typeof cursorSchema> | undefined;
-  const cursor = c.req.query('cursor');
   if (cursor !== undefined) {
-    if (cursor.length > 4096) return error('invalid_request', 'Invalid session cursor');
     try {
       before = cursorSchema.parse(
         JSON.parse(
@@ -234,8 +239,12 @@ live.get('/sessions', async c => {
   }
   const [listed, presence] = await Promise.allSettled([
     getTenantStub(c.env, { type: 'user', id: auth.userID }).listCreatedSessions({
-      limit: limit.data,
+      limit: query.data.limit ?? 50,
       before,
+      q,
+      client,
+      directory,
+      archived,
     }),
     getPresenceStub(c.env, auth.userID).list(),
   ]);

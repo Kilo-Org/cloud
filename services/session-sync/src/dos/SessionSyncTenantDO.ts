@@ -1,5 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
-import { and, desc, eq, lt, or } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, isNotNull, isNull, lt, or, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import { z } from 'zod';
@@ -12,11 +12,19 @@ import {
   fail,
   ok,
   sessionIDSchema,
+  sessionListMetadataSchema,
+  sourceClientSchema,
   tenantSchema,
   type Result,
   type Tenant,
 } from '../protocol';
 import * as erasure from './session-sync/user-erasure';
+import { foldTitle } from './session-sync/notifications';
+
+/** Rows repaired per pass of the one-time index backfill. */
+const BACKFILL_PAGE = 64;
+/** Producers may run ahead of this object; a larger jump is a clock fault. */
+const MAX_CLOCK_SKEW_MS = 5 * 60_000;
 
 const inputSchema = z.strictObject({
   tenant: tenantSchema,
@@ -45,8 +53,54 @@ export class SessionSyncTenantDO extends DurableObject<Env> {
     void ctx.blockConcurrencyWhile(async () => {
       await migrate(this.db, migrations);
       this.db.insert(usage).values({ id: 1, sessions: 0, bytes: 0 }).onConflictDoNothing().run();
+      // One-time backfill: rows created before list metadata sort by creation
+      // time and need the folded title the search compares against.
+      if (!(await ctx.storage.get<boolean>('listMetadataBackfilled'))) {
+        this.db
+          .update(createdSessions)
+          .set({ updated_at: sql`${createdSessions.created_at}` })
+          .where(and(eq(createdSessions.updated_at, 0), sql`${createdSessions.created_at} > 0`))
+          .run();
+        this.foldLegacyTitles();
+        await ctx.storage.put('listMetadataBackfilled', true);
+      }
       await erasure.schedule(this.db, ctx);
     });
+  }
+
+  /** Folds one keyset page of titles written before the folded column existed. */
+  private foldTitlesPage(after?: string): { next: string | undefined; more: boolean } {
+    const rows = this.db
+      .select({ target: createdSessions.target, title: createdSessions.title })
+      .from(createdSessions)
+      .where(
+        and(
+          isNotNull(createdSessions.title),
+          isNull(createdSessions.title_folded),
+          after === undefined ? undefined : gt(createdSessions.target, after)
+        )
+      )
+      .orderBy(asc(createdSessions.target))
+      .limit(BACKFILL_PAGE)
+      .all();
+    for (const row of rows) {
+      this.db
+        .update(createdSessions)
+        .set({ title_folded: foldTitle(row.title ?? '') })
+        .where(eq(createdSessions.target, row.target))
+        .run();
+    }
+    return { next: rows.at(-1)?.target, more: rows.length === BACKFILL_PAGE };
+  }
+
+  /** Folds every page of legacy titles; the caller marks the pass done afterwards. */
+  private foldLegacyTitles(): void {
+    let after: string | undefined;
+    for (;;) {
+      const page = this.foldTitlesPage(after);
+      if (!page.more || page.next === undefined) return;
+      after = page.next;
+    }
   }
 
   async reserve(input: unknown): Promise<Result<{ bytes: number }>> {
@@ -122,38 +176,84 @@ export class SessionSyncTenantDO extends DurableObject<Env> {
     return ok(null);
   }
 
+  async updateCreatedSession(input: unknown): Promise<Result<null>> {
+    const parsed = z
+      .strictObject({
+        tenant: tenantSchema,
+        sessionID: sessionIDSchema,
+        metadata: sessionListMetadataSchema,
+      })
+      .safeParse(input);
+    if (!parsed.success) return fail('invalid_request', 'Invalid session list metadata');
+    const { tenant, sessionID, metadata } = parsed.data;
+    this.db
+      .update(createdSessions)
+      .set({
+        ...(metadata.title !== undefined
+          ? {
+              title: metadata.title,
+              title_folded: metadata.title ? foldTitle(metadata.title) : null,
+            }
+          : {}),
+        ...(metadata.directory !== undefined ? { directory: metadata.directory } : {}),
+        // Producers can clock-skew; the index never moves backwards and never
+        // lets one bad timestamp pin the row far into the future.
+        updated_at: sql`max(${createdSessions.updated_at}, ${Math.min(metadata.updatedAt, Date.now() + MAX_CLOCK_SKEW_MS)})`,
+        ...(metadata.archived !== undefined ? { archived: metadata.archived ? 1 : 0 } : {}),
+      })
+      .where(eq(createdSessions.target, JSON.stringify([tenant.type, tenant.id, sessionID])))
+      .run();
+    return ok(null);
+  }
+
   async listCreatedSessions(input: unknown) {
     const parsed = z
       .strictObject({
         limit: z.number().int().min(1).max(100),
         before: z
           .strictObject({
-            createdAt: z.number().int().nonnegative(),
+            updatedAt: z.number().int().nonnegative(),
             target: z.string().max(2048),
           })
           .optional(),
+        q: z.string().min(1).max(200).optional(),
+        client: sourceClientSchema.optional(),
+        directory: z.string().min(1).max(4096).optional(),
+        archived: z.boolean().optional(),
       })
       .safeParse(input);
     if (!parsed.success) return fail('invalid_request', 'Invalid session list page');
     if (this.db.select().from(userErasure).get()) {
       return ok({ items: [], next: null });
     }
-    const { before, limit } = parsed.data;
+    // A row written after the boot pass still has to match a folded search term;
+    // each query folds one more page, so repeated searches converge.
+    if (parsed.data.q !== undefined) this.foldTitlesPage();
+    const { before, limit, q, client, directory, archived } = parsed.data;
+    const escaped =
+      q === undefined ? undefined : foldTitle(q).replace(/[\\%_]/g, character => `\\${character}`);
+    const conditions = [
+      before
+        ? or(
+            lt(createdSessions.updated_at, before.updatedAt),
+            and(
+              eq(createdSessions.updated_at, before.updatedAt),
+              lt(createdSessions.target, before.target)
+            )
+          )
+        : undefined,
+      escaped !== undefined
+        ? sql`${createdSessions.title_folded} like ${`%${escaped}%`} escape '\\'`
+        : undefined,
+      client !== undefined ? eq(createdSessions.client, client) : undefined,
+      directory !== undefined ? eq(createdSessions.directory, directory) : undefined,
+      archived !== undefined ? eq(createdSessions.archived, archived ? 1 : 0) : undefined,
+    ].filter(condition => condition !== undefined);
     const rows = this.db
       .select()
       .from(createdSessions)
-      .where(
-        before
-          ? or(
-              lt(createdSessions.created_at, before.createdAt),
-              and(
-                eq(createdSessions.created_at, before.createdAt),
-                lt(createdSessions.target, before.target)
-              )
-            )
-          : undefined
-      )
-      .orderBy(desc(createdSessions.created_at), desc(createdSessions.target))
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(createdSessions.updated_at), desc(createdSessions.target))
       .limit(limit + 1)
       .all();
     const items = rows.slice(0, limit);
@@ -163,9 +263,14 @@ export class SessionSyncTenantDO extends DurableObject<Env> {
         sessionID: row.session_id,
         tenant: { type: row.tenant_type, id: row.tenant_id },
         createdAt: row.created_at,
+        updatedAt: row.updated_at,
+        title: row.title,
+        client: row.client,
+        directory: row.directory,
+        archived: row.archived === 1,
       })),
       next:
-        rows.length > limit && last ? { createdAt: last.created_at, target: last.target } : null,
+        rows.length > limit && last ? { updatedAt: last.updated_at, target: last.target } : null,
     });
   }
   async eraseUser(input: unknown): Promise<Result<null>> {

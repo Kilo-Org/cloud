@@ -78,7 +78,8 @@ const entityHeader = {
   kind: kindSchema,
   id: idSchema,
   revision: positionSchema,
-  sourceID: z.string().nullable().optional(),
+  // Side tag of the row's last writer; absent from pages served before it existed.
+  sourceID: z.string().min(1).max(256).nullable().optional(),
 };
 const entitySchema = z.union([
   z.strictObject({ ...entityHeader, value: z.json() }),

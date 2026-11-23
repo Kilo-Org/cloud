@@ -107,7 +107,7 @@ export function classifyUploadFailure(error: unknown) {
     }
     if (/status \d{3}/.test(error.message)) {
       // Only statuses outside 408, 429 and 5xx reach this branch, so these are
-      // the remaining non-terminal 3-digit statuses.
+      // the remaining 3-digit statuses, which the classifier treats as retryable.
       return { retryable: true, reason: i18n.t('chat.attachment.uploadFailed') };
     }
     return { retryable: true, reason: i18n.t('chat.attachment.uploadFailed') };

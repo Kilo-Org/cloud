@@ -1510,7 +1510,10 @@ function summarize(build: BuildRow): EnvironmentBuildSummary {
     trigger: build.trigger,
     state: build.state,
     outcome: build.outcome ?? null,
-    step: step === 'clone' || step === 'setup' || step === 'cleanup' ? step : null,
+    step:
+      step === 'clone' || step === 'setup' || step === 'cleanup' || step === 'archive'
+        ? step
+        : null,
     failureReason: build.failure_reason,
     failureDetail: build.failure_detail,
     sourceCommit: build.source_commit,

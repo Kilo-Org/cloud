@@ -324,7 +324,7 @@ describe('buildGlanceableSnapshot', () => {
 
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error.issues.map((issue) => issue.path)).toEqual([['newestResultAt']]);
+      expect(result.error.issues.map(issue => issue.path)).toEqual([['newestResultAt']]);
     }
   });
 
@@ -344,7 +344,7 @@ describe('buildGlanceableSnapshot', () => {
 
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error.issues.map((issue) => issue.path)).toEqual([['newestResultAt']]);
+      expect(result.error.issues.map(issue => issue.path)).toEqual([['newestResultAt']]);
     }
   });
 

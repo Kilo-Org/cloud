@@ -504,7 +504,7 @@ describe('pushDataSchema active_agents_glanceable snapshot shape', () => {
       const result = pushDataSchema.safeParse({ type: 'active_agents_glanceable', ...body });
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error.issues.map((issue) => issue.path)).toContainEqual(['newestResultAt']);
+        expect(result.error.issues.map(issue => issue.path)).toContainEqual(['newestResultAt']);
       }
     }
 

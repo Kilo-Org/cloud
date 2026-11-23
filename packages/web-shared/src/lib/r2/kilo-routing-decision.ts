@@ -48,8 +48,8 @@ export type AiProviderMetadataCapture = {
    * Registers the promise that the archive body races against
    * `vercel.completed`. Call it before the archive body runs. It holds one
    * promise only, so a later call replaces the earlier one. It swallows the
-   * rejection on purpose, so a failed parse is archived without its partial
-   * data instead of failing the upload.
+   * rejection on purpose: the upload then proceeds with whatever the collector
+   * already captured, instead of failing on the parse error.
    */
   waitFor: (promise: Promise<unknown>) => void;
 };

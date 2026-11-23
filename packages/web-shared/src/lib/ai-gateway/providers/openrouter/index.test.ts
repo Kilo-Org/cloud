@@ -880,6 +880,29 @@ describe('alias free class', () => {
       mayTrainOnYourPrompts: false,
     });
   });
+
+  it('reports the training flag of the model an alias serves', async () => {
+    jest.mocked(getDataCollectionRequiredModelIds).mockResolvedValueOnce(new Set([paidTarget.id]));
+    global.fetch = jest.fn(() =>
+      Promise.resolve(
+        createMockResponse({
+          jsonData: cataloguePayload([freeAlias, freeTarget, paidAlias, paidTarget]),
+        })
+      )
+    ) as unknown as typeof fetch;
+
+    const models = await getEnhancedOpenRouterModels({ countryCode: null });
+
+    // The listing reports one training flag per served model, whatever id the row carries.
+    expect(models.data.find(model => model.id === paidAlias.id)).toMatchObject({
+      isFree: false,
+      mayTrainOnYourPrompts: true,
+    });
+    expect(models.data.find(model => model.id === paidTarget.id)).toMatchObject({
+      isFree: false,
+      mayTrainOnYourPrompts: true,
+    });
+  });
 });
 
 describe.each(['minimax/minimax-m3:free', 'minimax/minimax-m2.7:free'])(

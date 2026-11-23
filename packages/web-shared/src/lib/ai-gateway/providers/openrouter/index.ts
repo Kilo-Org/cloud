@@ -409,7 +409,8 @@ async function enrichCatalogModels(
         preferredIndex: preferredIndex >= 0 ? preferredIndex : undefined,
         isFree: model.isFree ?? isFree,
         mayTrainOnYourPrompts:
-          model.mayTrainOnYourPrompts ?? (isFree || dataCollectionRequiredModelIds.has(model.id)),
+          model.mayTrainOnYourPrompts ??
+          (isFree || dataCollectionRequiredModelIds.has(servedModelId)),
         // A custom LLM's protocol comes only from its definition, as in routing.
         opencode: isPublicCustomLlmModel
           ? model.opencode

@@ -2896,7 +2896,9 @@
       "skip": "Saltar",
       "retrySkip": "Tentar saltar novamente",
       "submitting": "A enviar…",
-      "sendAnswers": "Enviar respostas"
+      "sendAnswers": "Enviar respostas",
+      "unreadableTitle": "Não foi possível mostrar esta pergunta",
+      "unreadableBody": "O agente está à espera de uma pergunta que esta aplicação não consegue mostrar. Responda à pergunta no CLI para continuar."
     },
     "blockingCard": {
       "questionUnavailable": "Esta pergunta já não está disponível.",

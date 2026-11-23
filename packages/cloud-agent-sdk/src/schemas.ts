@@ -911,10 +911,25 @@ const questionListSchema = z
 
 export const questionAskedDataSchema = z.object({
   id: z.string(),
-  tool: z.object({ callID: z.string() }).optional(),
+  // The question path never forwards `tool`, so a tool call id this app cannot
+  // read must not decide whether the question list is readable.
+  tool: z.object({ callID: z.string() }).optional().catch(undefined),
   questions: questionListSchema.optional().catch(undefined),
 });
 export type QuestionAskedData = z.infer<typeof questionAskedDataSchema>;
+
+/**
+ * The part of a question request that still identifies it when its list does
+ * not parse, or when it carries no questions at all. No answer card can stand
+ * for such a request, but the user must learn that one is waiting, so the event
+ * boundary forwards this identity instead of dropping the request silently. A
+ * payload with no readable `id` has nothing to key the notice to and no
+ * `question.replied` that could clear it, so it is still dropped.
+ */
+export const questionAskedIdentitySchema = z.object({
+  id: z.string().min(1),
+});
+export type QuestionAskedIdentity = z.infer<typeof questionAskedIdentitySchema>;
 
 export const questionRepliedDataSchema = z.object({
   requestID: z.string(),

@@ -130,6 +130,7 @@ it('shows one unreadable notice instead of consent controls and keeps readable c
       pending: {
         permissions: [],
         questions: [],
+        unreadableQuestions: [],
         unreadablePermissions: [{ requestId: 'perm-proof' }],
       },
     })
@@ -147,7 +148,12 @@ it('shows one unreadable notice instead of consent controls and keeps readable c
   await act(() =>
     fixture.publishSession('ses-first', {
       ...readySession,
-      pending: { permissions: [], questions: [], unreadablePermissions: [] },
+      pending: {
+        permissions: [],
+        questions: [],
+        unreadableQuestions: [],
+        unreadablePermissions: [],
+      },
     })
   );
   expect(text(renderer.root)).not.toContain('agentChat.permissionCard.unreadableTitle');
@@ -159,6 +165,7 @@ it('shows one unreadable notice instead of consent controls and keeps readable c
       pending: {
         permissions: [{ id: 'perm-readable', action: 'shell', resources: ['Run tests'] }],
         questions: [],
+        unreadableQuestions: [],
         unreadablePermissions: [{ requestId: 'perm-proof' }],
       },
     })
@@ -199,6 +206,7 @@ it('prints the permission action, resources and message as readable text', async
           },
         ],
         questions: [],
+        unreadableQuestions: [],
         unreadablePermissions: [],
       },
     })

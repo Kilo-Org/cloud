@@ -2228,7 +2228,9 @@
       "skip": "건너뛰기",
       "retrySkip": "건너뛰기 다시 시도",
       "submitting": "제출 중…",
-      "sendAnswers": "답변 보내기"
+      "sendAnswers": "답변 보내기",
+      "unreadableTitle": "질문을 표시할 수 없음",
+      "unreadableBody": "에이전트가 이 앱에서 표시할 수 없는 질문을 기다리고 있습니다. 계속 진행하려면 CLI에서 답하세요."
     },
     "blockingCard": {
       "questionUnavailable": "이 질문에는 더 이상 답변할 수 없습니다.",

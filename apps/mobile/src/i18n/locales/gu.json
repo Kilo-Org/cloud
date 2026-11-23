@@ -2790,7 +2790,9 @@
       "skip": "છોડો",
       "retrySkip": "છોડવાનો ફરી પ્રયાસ કરો",
       "submitting": "જવાબો મોકલાઈ રહ્યા છે…",
-      "sendAnswers": "જવાબો મોકલો"
+      "sendAnswers": "જવાબો મોકલો",
+      "unreadableTitle": "આ પ્રશ્ન દર્શાવી શકાયો નથી",
+      "unreadableBody": "એજન્ટ પ્રશ્નની રાહમાં છે જે આ એપ બતાવી શકતી નથી. ચાલુ રાખવા માટે CLI માં પ્રશ્નનો જવાબ આપો."
     },
     "blockingCard": {
       "questionUnavailable": "આ પ્રશ્ન હવે ઉપલબ્ધ નથી.",

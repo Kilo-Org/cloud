@@ -2790,7 +2790,9 @@
       "skip": "Slaan oor",
       "retrySkip": "Probeer weer oorslaan",
       "submitting": "Word ingedien…",
-      "sendAnswers": "Stuur antwoorde"
+      "sendAnswers": "Stuur antwoorde",
+      "unreadableTitle": "Hierdie vraag kon nie vertoon word nie",
+      "unreadableBody": "Die agent wag op 'n vraag wat hierdie app nie kan wys nie. Beantwoord die vraag in die CLI om voort te gaan."
     },
     "blockingCard": {
       "questionUnavailable": "Hierdie vraag is nie meer beskikbaar nie.",

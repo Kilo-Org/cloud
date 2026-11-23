@@ -2790,7 +2790,9 @@
       "skip": "Langkau",
       "retrySkip": "Cuba langkau semula",
       "submitting": "Menghantar…",
-      "sendAnswers": "Hantar jawapan"
+      "sendAnswers": "Hantar jawapan",
+      "unreadableTitle": "Soalan ini tidak dapat dipaparkan",
+      "unreadableBody": "Ejen sedang menunggu soalan yang tidak dapat ditunjukkan oleh aplikasi ini. Jawab soalan itu dalam CLI untuk meneruskan."
     },
     "blockingCard": {
       "questionUnavailable": "Soalan ini tidak lagi tersedia.",

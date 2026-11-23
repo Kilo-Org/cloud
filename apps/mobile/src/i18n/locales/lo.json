@@ -2790,7 +2790,9 @@
       "skip": "ຂ້າມ",
       "retrySkip": "ລອງຂ້າມໃໝ່",
       "submitting": "ກຳລັງສົ່ງ…",
-      "sendAnswers": "ສົ່ງຄຳຕອບ"
+      "sendAnswers": "ສົ່ງຄຳຕອບ",
+      "unreadableTitle": "ບໍ່ສາມາດສະແດງຄຳຖາມນີ້ໄດ້",
+      "unreadableBody": "ຕົວແທນກຳລັງລໍຖ້າຄຳຖາມທີ່ແອັບນີ້ບໍ່ສາມາດສະແດງໄດ້. ກະລຸນາຕອບມັນໃນ CLI ເພື່ອສືບຕໍ່."
     },
     "blockingCard": {
       "questionUnavailable": "ຄຳຖາມນີ້ຕອບບໍ່ໄດ້ແລ້ວ.",

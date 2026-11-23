@@ -2336,7 +2336,9 @@
       "skip": "تخطي",
       "retrySkip": "إعادة محاولة التخطي",
       "submitting": "جارٍ الإرسال…",
-      "sendAnswers": "إرسال الإجابات"
+      "sendAnswers": "إرسال الإجابات",
+      "unreadableTitle": "تعذّر عرض هذا السؤال",
+      "unreadableBody": "الوكيل في انتظار سؤال لا يستطيع هذا التطبيق عرضه. أجب عن السؤال في CLI للمتابعة."
     },
     "blockingCard": {
       "questionUnavailable": "لم يعد هذا السؤال متاحًا.",

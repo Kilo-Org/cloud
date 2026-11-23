@@ -2228,7 +2228,9 @@
       "skip": "Lewati",
       "retrySkip": "Coba lewati lagi",
       "submitting": "Mengirim…",
-      "sendAnswers": "Kirim jawaban"
+      "sendAnswers": "Kirim jawaban",
+      "unreadableTitle": "Pertanyaan ini tidak dapat ditampilkan",
+      "unreadableBody": "Agen sedang menunggu pertanyaan yang tidak dapat ditampilkan oleh aplikasi ini. Jawab pertanyaan itu di CLI untuk melanjutkan."
     },
     "blockingCard": {
       "questionUnavailable": "Pertanyaan ini tidak lagi tersedia.",

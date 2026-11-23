@@ -2896,7 +2896,9 @@
       "skip": "Přeskočit",
       "retrySkip": "Opakovat přeskočení",
       "submitting": "Odesílání…",
-      "sendAnswers": "Odeslat odpovědi"
+      "sendAnswers": "Odeslat odpovědi",
+      "unreadableTitle": "Tuto otázku nelze zobrazit",
+      "unreadableBody": "Agent čeká na otázku, kterou tato aplikace nedokáže zobrazit. Odpovězte na otázku v CLI a pokračujte."
     },
     "blockingCard": {
       "questionUnavailable": "Tato otázka již není k dispozici.",

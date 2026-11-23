@@ -2255,7 +2255,9 @@
       "skip": "Omitir",
       "retrySkip": "Volver a intentar omitir",
       "submitting": "Enviando…",
-      "sendAnswers": "Enviar respuestas"
+      "sendAnswers": "Enviar respuestas",
+      "unreadableTitle": "No se pudo mostrar esta pregunta",
+      "unreadableBody": "El agente está esperando una pregunta que esta aplicación no puede mostrar. Responde a la pregunta en la CLI para continuar."
     },
     "blockingCard": {
       "questionUnavailable": "Esta pregunta ya no está disponible.",

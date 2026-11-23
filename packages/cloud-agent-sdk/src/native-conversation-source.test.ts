@@ -22,7 +22,7 @@ const state: NativeSessionState = {
   connection: 'connected',
   runnerConnected: true,
   events: [],
-  pending: { permissions: [], questions: [], unreadablePermissions: [] },
+  pending: { permissions: [], questions: [], unreadableQuestions: [], unreadablePermissions: [] },
   commands: {},
 };
 function frame(type: string, data: Record<string, unknown>, seq = 10): NativeEvent {
@@ -425,7 +425,12 @@ test('pending inventory, full permission/form metadata and settlements survive a
     ...frame('remote.state', {}),
     body: { pending: { permissions: [], questions: [] } },
   });
-  expect(pending).toEqual({ permissions: [], questions: [], unreadablePermissions: [] });
+  expect(pending).toEqual({
+    permissions: [],
+    questions: [],
+    unreadableQuestions: [],
+    unreadablePermissions: [],
+  });
 });
 
 test.each([null, {}, { pending: null }, { pending: { permissions: [] } }])(
@@ -434,11 +439,13 @@ test.each([null, {}, { pending: null }, { pending: { permissions: [] } }])(
     const pending = {
       permissions: [{ id: 'stale', action: 'edit', resources: ['file'] }],
       questions: [{ id: 'stale-question', metadata: { kind: 'question' as const }, fields: [] }],
+      unreadableQuestions: [{ requestId: 'stale-unreadable-question' }],
       unreadablePermissions: [{ requestId: 'stale-unreadable' }],
     };
     expect(reduceNativePendingRequests(pending, { ...frame('remote.state', {}), body })).toEqual({
       permissions: [],
       questions: [],
+      unreadableQuestions: [],
       unreadablePermissions: [],
     });
   }
@@ -467,6 +474,7 @@ test('readable inventory entries survive beside an unreadable one, whose notice 
     { id: 'second', action: 'edit', resources: ['Write file'] },
   ]);
   expect(pending.unreadablePermissions).toEqual([{ requestId: 'unreadable' }]);
+  expect(pending.unreadableQuestions).toEqual([{ requestId: 'broken' }]);
   expect(pending.questions.map(item => item.id)).toEqual(['asked']);
   expect(pending.questions).toMatchObject([{ id: 'asked', metadata: { kind: 'question' } }]);
 });
@@ -485,6 +493,7 @@ test('an unreadable inventory permission with no readable identity is dropped wi
     },
   });
   expect(pending.permissions).toEqual([]);
+  expect(pending.unreadableQuestions).toEqual([]);
   expect(pending.unreadablePermissions).toEqual([]);
   expect(pending.questions).toEqual([]);
 });
@@ -505,10 +514,42 @@ test('two unreadable inventory entries naming one request yield a single notice'
   expect(pending.unreadablePermissions).toEqual([{ requestId: 'twice' }]);
 });
 
+test('an inventory question with no fields is a notice, not a card with nothing to answer', () => {
+  const pending = reduceNativePendingRequests(state.pending, {
+    ...frame('remote.state', {}),
+    body: {
+      pending: {
+        questions: [
+          { requestID: 'empty', fields: [] },
+          { requestID: 'answered', fields: [{ type: 'string', key: 'q' }] },
+        ],
+      },
+    },
+  });
+  expect(pending.questions.map(item => item.id)).toEqual(['answered']);
+  expect(pending.unreadableQuestions).toEqual([{ requestId: 'empty' }]);
+  // The inventory is authoritative: a card an earlier frame showed for the
+  // same id does not survive the frame that cannot describe its fields.
+  const stale = {
+    ...pending,
+    questions: [
+      ...pending.questions,
+      { id: 'empty', metadata: { kind: 'question' as const }, fields: [] },
+    ],
+  };
+  const rebuilt = reduceNativePendingRequests(stale, {
+    ...frame('remote.state', {}, 11),
+    body: { pending: { questions: [{ requestID: 'empty', fields: [] }] } },
+  });
+  expect(rebuilt.questions).toEqual([]);
+  expect(rebuilt.unreadableQuestions).toEqual([{ requestId: 'empty' }]);
+});
+
 test('an inventory rebuilds unreadable notices from its own contents', () => {
   const pending = {
     permissions: [],
     questions: [],
+    unreadableQuestions: [{ requestId: 'settled' }, { requestId: 'now-readable' }],
     unreadablePermissions: [{ requestId: 'settled' }, { requestId: 'now-readable' }],
   };
   const next = reduceNativePendingRequests(pending, {
@@ -519,18 +560,24 @@ test('an inventory rebuilds unreadable notices from its own contents', () => {
           { requestID: 'now-readable', tool: 'shell', summary: 'Run tests' },
           { requestID: 'still-unreadable', tool: 'shell' },
         ],
-        questions: [],
+        questions: [
+          { requestID: 'now-readable', fields: [{ type: 'string', key: 'q' }] },
+          { requestID: 'still-unreadable', fields: [{ type: 'string', key: 'q' }, 3] },
+        ],
       },
     },
   });
   expect(next.permissions.map(item => item.id)).toEqual(['now-readable']);
   expect(next.unreadablePermissions).toEqual([{ requestId: 'still-unreadable' }]);
+  expect(next.questions.map(item => item.id)).toEqual(['now-readable']);
+  expect(next.unreadableQuestions).toEqual([{ requestId: 'still-unreadable' }]);
 });
 
 test('an inventory that omits questions keeps the readable permissions it lists', () => {
   const pending = {
     permissions: [],
     questions: [{ id: 'stale', metadata: { kind: 'question' as const }, fields: [] }],
+    unreadableQuestions: [],
     unreadablePermissions: [],
   };
   const next = reduceNativePendingRequests(pending, {
@@ -545,6 +592,7 @@ test('reports a malformed live permission by identity and keeps valid pending re
   const pending = {
     permissions: [{ id: 'current', action: 'edit', resources: ['file'] }],
     questions: [],
+    unreadableQuestions: [],
     unreadablePermissions: [],
   };
   expect(
@@ -555,6 +603,7 @@ test('reports a malformed live permission by identity and keeps valid pending re
   ).toEqual({
     permissions: [{ id: 'current', action: 'edit', resources: ['file'] }],
     questions: [],
+    unreadableQuestions: [],
     unreadablePermissions: [{ requestId: 'invalid' }],
   });
   expect(
@@ -569,6 +618,7 @@ test('unreadable permission notices replace cards, clear on reply and yield to a
   const pending = {
     permissions: [{ id: 'current', action: 'edit', resources: ['file'] }],
     questions: [],
+    unreadableQuestions: [],
     unreadablePermissions: [],
   };
   let next = reduceNativePendingRequests(
@@ -604,7 +654,12 @@ test('unreadable permission notices replace cards, clear on reply and yield to a
   ).toEqual([{ requestId: 'perm-1' }, { requestId: 'perm-2' }]);
 });
 
-const emptyPending = { permissions: [], questions: [], unreadablePermissions: [] };
+const emptyPending = {
+  permissions: [],
+  questions: [],
+  unreadableQuestions: [],
+  unreadablePermissions: [],
+};
 
 test('replayed permissions keep their card in place and a new request appends at the tail', () => {
   let next = reduceNativePendingRequests(
@@ -660,6 +715,128 @@ test('replayed questions keep their card in place and a new form appends at the 
     'question-2',
     'question-3',
   ]);
+});
+
+test('reports an unreadable live form by identity and keeps valid pending questions', () => {
+  const pending = {
+    permissions: [],
+    questions: [
+      {
+        id: 'current',
+        metadata: { kind: 'question' as const },
+        fields: [{ type: 'text', key: 'answer' }],
+      },
+    ],
+    unreadableQuestions: [],
+    unreadablePermissions: [],
+  };
+  expect(
+    reduceNativePendingRequests(
+      pending,
+      frame('form.created', {
+        form: { id: 'invalid', metadata: { kind: 'question' }, fields: 'not an array' },
+      })
+    )
+  ).toEqual({
+    permissions: [],
+    questions: pending.questions,
+    unreadableQuestions: [{ requestId: 'invalid' }],
+    unreadablePermissions: [],
+  });
+  expect(
+    reduceNativePendingRequests(
+      pending,
+      frame('form.created', { form: { metadata: { kind: 'question' }, fields: [] } })
+    )
+  ).toBe(pending);
+});
+
+test('a form of another kind never becomes a question notice', () => {
+  const pending = {
+    permissions: [],
+    questions: [],
+    unreadableQuestions: [],
+    unreadablePermissions: [],
+  };
+  for (const form of [
+    { id: 'form-1', metadata: { kind: 'permission' }, fields: 'not an array' },
+    { id: 'form-2', metadata: {}, fields: 'not an array' },
+    { id: 'form-3', fields: 'not an array' },
+  ]) {
+    expect(reduceNativePendingRequests(pending, frame('form.created', { form }))).toBe(pending);
+  }
+});
+
+test('a live form with no fields is a notice and removes a card already shown for its id', () => {
+  const pending = {
+    permissions: [],
+    questions: [
+      {
+        id: 'empty',
+        metadata: { kind: 'question' as const },
+        fields: [{ type: 'text', key: 'answer' }],
+      },
+    ],
+    unreadableQuestions: [],
+    unreadablePermissions: [],
+  };
+  const next = reduceNativePendingRequests(
+    pending,
+    frame('form.created', { form: { id: 'empty', metadata: { kind: 'question' }, fields: [] } })
+  );
+  expect(next.questions).toEqual([]);
+  expect(next.unreadableQuestions).toEqual([{ requestId: 'empty' }]);
+});
+
+test('unreadable question notices replace cards, clear on reply and yield to a readable form', () => {
+  const readable = (id: string) => ({
+    id,
+    metadata: { kind: 'question' as const },
+    fields: [{ type: 'text', key: 'answer' }],
+  });
+  const pending = {
+    permissions: [],
+    questions: [readable('current')],
+    unreadableQuestions: [],
+    unreadablePermissions: [],
+  };
+  let next = reduceNativePendingRequests(
+    pending,
+    frame('form.created', {
+      form: { id: 'current', metadata: { kind: 'question' }, fields: 'not an array' },
+    })
+  );
+  // A card must not stand for fields this app cannot read.
+  expect(next.questions).toEqual([]);
+  expect(next.unreadableQuestions).toEqual([{ requestId: 'current' }]);
+  next = reduceNativePendingRequests(
+    next,
+    frame('form.created', { form: { id: 'question-2', metadata: { kind: 'question' } } })
+  );
+  expect(next.unreadableQuestions).toEqual([{ requestId: 'current' }, { requestId: 'question-2' }]);
+  expect(
+    reduceNativePendingRequests(next, frame('form.replied', { id: 'current' })).unreadableQuestions
+  ).toEqual([{ requestId: 'question-2' }]);
+  expect(
+    reduceNativePendingRequests(next, frame('form.cancelled', { id: 'question-2' }))
+      .unreadableQuestions
+  ).toEqual([{ requestId: 'current' }]);
+  // A readable form for the same id supersedes its notice.
+  const restored = reduceNativePendingRequests(
+    next,
+    frame('form.created', { form: readable('current') })
+  );
+  expect(restored.unreadableQuestions).toEqual([{ requestId: 'question-2' }]);
+  expect(restored.questions.map(item => item.id)).toEqual(['current']);
+  // A replayed request keeps its place: the list is oldest first.
+  expect(
+    reduceNativePendingRequests(
+      { ...next, questions: [] },
+      frame('form.created', {
+        form: { id: 'current', metadata: { kind: 'question' }, fields: 3 },
+      })
+    ).unreadableQuestions
+  ).toEqual([{ requestId: 'current' }, { requestId: 'question-2' }]);
 });
 
 test('native live reduction shares untouched content, ignores late deltas and flags missing ordinals', () => {

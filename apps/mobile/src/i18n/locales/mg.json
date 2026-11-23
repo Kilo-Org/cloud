@@ -2790,7 +2790,9 @@
       "skip": "Dingano",
       "retrySkip": "Andramo dinganina indray",
       "submitting": "Mandefa…",
-      "sendAnswers": "Alefaso ny valiny"
+      "sendAnswers": "Alefaso ny valiny",
+      "unreadableTitle": "Tsy afaka naseho ity fanontaniana ity",
+      "unreadableBody": "Miandry fanontaniana izay tsy afaka asehon'ity rindrankajy ity ny agent. Valio ao amin'ny CLI izy mba hahafahana manohy."
     },
     "blockingCard": {
       "questionUnavailable": "Tsy misy intsony ity fanontaniana ity.",

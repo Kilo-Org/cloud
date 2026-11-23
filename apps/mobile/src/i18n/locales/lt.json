@@ -2896,7 +2896,9 @@
       "skip": "Praleisti",
       "retrySkip": "Bandyti praleisti iš naujo",
       "submitting": "Siunčiama…",
-      "sendAnswers": "Siųsti atsakymus"
+      "sendAnswers": "Siųsti atsakymus",
+      "unreadableTitle": "Nepavyko parodyti šio klausimo",
+      "unreadableBody": "Agentas laukia klausimo, kurio ši programa negali parodyti. Atsakykite į jį CLI, kad galėtumėte tęsti."
     },
     "blockingCard": {
       "questionUnavailable": "Šis klausimas nebepasiekiamas.",

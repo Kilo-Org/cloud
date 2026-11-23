@@ -2282,7 +2282,9 @@
       "skip": "Pomiń",
       "retrySkip": "Ponów pomijanie",
       "submitting": "Wysyłanie…",
-      "sendAnswers": "Wyślij odpowiedzi"
+      "sendAnswers": "Wyślij odpowiedzi",
+      "unreadableTitle": "Nie można wyświetlić tego pytania",
+      "unreadableBody": "Agent czeka na pytanie, którego ta aplikacja nie może pokazać. Odpowiedz na pytanie w CLI, aby kontynuować."
     },
     "blockingCard": {
       "questionUnavailable": "To pytanie nie jest już dostępne.",

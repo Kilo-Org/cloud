@@ -2228,7 +2228,9 @@
       "skip": "Überspringen",
       "retrySkip": "Erneut überspringen",
       "submitting": "Wird gesendet…",
-      "sendAnswers": "Antworten senden"
+      "sendAnswers": "Antworten senden",
+      "unreadableTitle": "Diese Frage konnte nicht angezeigt werden",
+      "unreadableBody": "Der Agent wartet auf eine Frage, die diese App nicht anzeigen kann. Beantworte die Frage in der CLI, um fortzufahren."
     },
     "blockingCard": {
       "questionUnavailable": "Diese Frage ist nicht mehr verfügbar.",

@@ -2896,7 +2896,9 @@
       "skip": "Preskoči",
       "retrySkip": "Znova preskoči",
       "submitting": "Pošiljanje…",
-      "sendAnswers": "Pošlji odgovore"
+      "sendAnswers": "Pošlji odgovore",
+      "unreadableTitle": "Vprašanja ni bilo mogoče prikazati",
+      "unreadableBody": "Agent čaka na vprašanje, ki ga ta aplikacija ne more prikazati. Odgovorite na vprašanje v CLI, da nadaljujete."
     },
     "blockingCard": {
       "questionUnavailable": "To vprašanje ni več na voljo.",

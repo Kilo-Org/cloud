@@ -2790,7 +2790,9 @@
       "skip": "Sote",
       "retrySkip": "Eseye sote ankò",
       "submitting": "Ap soumèt…",
-      "sendAnswers": "Voye repons yo"
+      "sendAnswers": "Voye repons yo",
+      "unreadableTitle": "Kesyon sa a pa t ka montre",
+      "unreadableBody": "Ajan an ap tann yon kesyon ke aplikasyon sa a pa ka montre. Reponn li nan CLI a pou w ka kontinye."
     },
     "blockingCard": {
       "questionUnavailable": "Kesyon sa a pa disponib ankò.",

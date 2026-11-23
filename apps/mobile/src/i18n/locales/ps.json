@@ -2790,7 +2790,9 @@
       "skip": "تېر شئ",
       "retrySkip": "د تېرېدو بیا هڅه وکړئ",
       "submitting": "لېږل کېږي…",
-      "sendAnswers": "ځوابونه واستوئ"
+      "sendAnswers": "ځوابونه واستوئ",
+      "unreadableTitle": "دا پوښتنه ونه ښودل شوه",
+      "unreadableBody": "اجنټ د یوې پوښتنې په تمه دی چې دا اپلیکیشن یې ښودلی نشي. د دوام لپاره په CLI کې پوښتنې ته ځواب ورکړئ."
     },
     "blockingCard": {
       "questionUnavailable": "دا پوښتنه نور د لاسرسي وړ نه ده.",

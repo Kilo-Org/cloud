@@ -2790,7 +2790,9 @@
       "skip": "Ruka",
       "retrySkip": "Jaribu tena kuruka",
       "submitting": "Inawasilisha…",
-      "sendAnswers": "Tuma majibu"
+      "sendAnswers": "Tuma majibu",
+      "unreadableTitle": "Swali hili halikuweza kuonyeshwa",
+      "unreadableBody": "Wakala anasubiri swali ambalo programu hii haiwezi kuonyesha. Jibu swali hilo kwenye CLI ili kuendelea."
     },
     "blockingCard": {
       "questionUnavailable": "Swali hili halipatikani tena.",

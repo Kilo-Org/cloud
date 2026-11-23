@@ -54,7 +54,12 @@ it('shows the loading skeleton while disconnected with no session', async () => 
       connection: 'disconnected',
       runnerConnected: false,
       messages: [],
-      pending: { permissions: [], questions: [], unreadablePermissions: [] },
+      pending: {
+        permissions: [],
+        questions: [],
+        unreadableQuestions: [],
+        unreadablePermissions: [],
+      },
       events: [],
       commands: {},
     })

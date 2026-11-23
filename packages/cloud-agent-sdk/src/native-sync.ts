@@ -1070,7 +1070,12 @@ export class NativeSyncClient {
       connection: 'connecting',
       runnerConnected: false,
       messages: [],
-      pending: { permissions: [], questions: [], unreadablePermissions: [] },
+      pending: {
+        permissions: [],
+        questions: [],
+        unreadableQuestions: [],
+        unreadablePermissions: [],
+      },
       events: [],
       commands: {},
     };
@@ -1769,7 +1774,12 @@ export class NativeSyncClient {
           pendingSnapshotMessageIDs: undefined,
           assetURLs: undefined,
           messages: [],
-          pending: { permissions: [], questions: [], unreadablePermissions: [] },
+          pending: {
+            permissions: [],
+            questions: [],
+            unreadableQuestions: [],
+            unreadablePermissions: [],
+          },
           events: [],
           commands: {},
           snapshotFailure: undefined,

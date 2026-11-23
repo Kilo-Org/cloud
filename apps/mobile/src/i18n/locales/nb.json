@@ -2790,7 +2790,9 @@
       "skip": "Hopp over",
       "retrySkip": "Prøv å hoppe over på nytt",
       "submitting": "Sender inn…",
-      "sendAnswers": "Send svar"
+      "sendAnswers": "Send svar",
+      "unreadableTitle": "Dette spørsmålet kunne ikke vises",
+      "unreadableBody": "Agenten venter på et spørsmål som denne appen ikke kan vise. Svar på det i CLI for å fortsette."
     },
     "blockingCard": {
       "questionUnavailable": "Dette spørsmålet er ikke lenger tilgjengelig.",

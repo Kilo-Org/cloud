@@ -2790,7 +2790,9 @@
       "skip": "Kihagyás",
       "retrySkip": "Kihagyás újrapróbálása",
       "submitting": "Küldés…",
-      "sendAnswers": "Válaszok küldése"
+      "sendAnswers": "Válaszok küldése",
+      "unreadableTitle": "Nem sikerült megjeleníteni a kérdést",
+      "unreadableBody": "Az ügynök egy kérdésre vár, amelyet ez az alkalmazás nem tud megjeleníteni. Válaszoljon rá a CLI-ben a folytatáshoz."
     },
     "blockingCard": {
       "questionUnavailable": "Ez a kérdés már nem érhető el.",

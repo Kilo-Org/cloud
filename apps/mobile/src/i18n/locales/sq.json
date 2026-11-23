@@ -2790,7 +2790,9 @@
       "skip": "Anashkalo",
       "retrySkip": "Provo ta anashkalosh përsëri",
       "submitting": "Duke u dërguar…",
-      "sendAnswers": "Dërgo përgjigjet"
+      "sendAnswers": "Dërgo përgjigjet",
+      "unreadableTitle": "Kjo pyetje nuk mund të shfaqej",
+      "unreadableBody": "Agjenti po pret një pyetje që ky aplikacion nuk mund ta shfaqë. Përgjigju pyetjes në CLI për të vazhduar."
     },
     "blockingCard": {
       "questionUnavailable": "Kjo pyetje nuk është më e disponueshme.",

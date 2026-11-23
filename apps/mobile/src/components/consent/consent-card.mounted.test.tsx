@@ -174,31 +174,33 @@ function texts(root: I): string[] {
 }
 
 /**
- * The titles the shared row primitives render. Their rows are host elements in
- * this suite, so a title lives in the row's props rather than in a Text child.
+ * The titles of the rows that are host elements in this suite. Only
+ * `ConfigureRow` is mocked as a string, so it is the only row whose props this
+ * helper can read: `PreferenceRow` stays a real component, and a settled row
+ * paints its title and subtitle as Text children, which `texts` reads.
  */
 function rowTitles(root: I): string[] {
   return root
     .findAll(
       n =>
         typeof n.type === 'string' &&
-        ((n.type as string) === 'ConfigureRow' || (n.type as string) === 'PreferenceRow') &&
+        (n.type as string) === 'ConfigureRow' &&
         typeof n.props.title === 'string'
     )
     .map(n => n.props.title as string);
 }
 
 /**
- * The subtitles the shared row primitives render. Like the titles, a pending
- * row's subtitle lives in the row's props; a settled row paints it as a Text
- * child as well.
+ * The subtitle the pending placeholder row paints, read from its props. The
+ * settled `PreferenceRow` is a real component here, so its subtitle is a Text
+ * child and belongs to `texts`.
  */
-function rowSubtitles(root: I): string[] {
+function pendingRowSubtitles(root: I): string[] {
   return root
     .findAll(
       n =>
         typeof n.type === 'string' &&
-        ((n.type as string) === 'ConfigureRow' || (n.type as string) === 'PreferenceRow') &&
+        (n.type as string) === 'ConfigureRow' &&
         typeof n.props.subtitle === 'string'
     )
     .map(n => n.props.subtitle as string);
@@ -310,16 +312,16 @@ describe('ConsentCard', () => {
     expect(marks[0]?.props.accessibilityRole).toBe('image');
   });
 
-  it('renders review wording in the screen header and revoke alone', () => {
+  it('renders review wording in the screen header and revoke alone', async () => {
     const renderer = mountCard('review');
+    await act(flush);
     const header = renderer.root.find(node => String(node.type) === 'ScreenHeader');
     expect(header.props.title).toBe(i18n.t('profile.privacyChoices'));
     const t = texts(renderer.root);
     // The header takes the entry row's key, and the body does not repeat the
     // surface name as a large title beside it.
     expect(t).not.toContain(i18n.t('profile.privacyChoices'));
-    // The optional section header is the headword alone: the toggle row's own
-    // description names where the choice is changed.
+    // The optional section header is the headword alone.
     expect(t).toContain('Optional');
     expect(t).not.toContain('Before we get started');
     expect(t).not.toContain('Optional — on unless you turn it off');
@@ -336,22 +338,22 @@ describe('ConsentCard', () => {
     const revoke = findButton(renderer.root, 'Revoke consent');
     expect(revoke.props.variant).toBe('outline-destructive');
 
-    // The header above already names the surface, so the row's subtitle states
-    // what is shared and stops there instead of repeating the header as a
-    // location path on a third line.
-    const subtitle = rowSubtitles(renderer.root).find(text =>
-      text.startsWith(i18n.t('consent.helpImproveReviewDescription'))
+    // The header above already names the surface, so the settled row's
+    // subtitle states what is shared and stops there instead of repeating the
+    // header as a location path on a further line.
+    expect(t).toContain(i18n.t('consent.helpImproveReviewDescription'));
+    expect(i18n.t('consent.helpImproveReviewDescription')).not.toContain(i18n.t('common.profile'));
+    expect(i18n.t('consent.helpImproveReviewDescription')).not.toContain(
+      i18n.t('profile.privacyChoices')
     );
-    expect(subtitle).toBe(i18n.t('consent.helpImproveReviewDescription'));
-    expect(subtitle).not.toContain(i18n.t('common.profile'));
-    expect(subtitle).not.toContain(i18n.t('profile.privacyChoices'));
   });
 
-  it('names where the choice is changed on first run, before any tab visit', () => {
+  it('names where the choice is changed on first run, before any tab visit', async () => {
     const renderer = mountCard('onboarding');
+    await act(flush);
     // Onboarding has no header and comes before the Profile tab exists for the
     // reader, so its guidance carries the path.
-    expect(rowSubtitles(renderer.root)).toContain(i18n.t('consent.helpImproveDescription'));
+    expect(texts(renderer.root)).toContain(i18n.t('consent.helpImproveDescription'));
     expect(i18n.t('consent.helpImproveDescription')).toContain(i18n.t('common.profile'));
     expect(i18n.t('consent.helpImproveDescription')).toContain(i18n.t('profile.privacyChoices'));
   });
@@ -578,6 +580,11 @@ describe('ConsentCard', () => {
     );
     expect(placeholder).toHaveLength(1);
     expect(placeholder[0]?.props.subtitleNumberOfLines).toBe('all');
+    // The placeholder already paints the review-mode copy, so the branch that
+    // shows while the read is in flight reserves the settled row's height.
+    expect(pendingRowSubtitles(renderer.root)).toContain(
+      i18n.t('consent.helpImproveReviewDescription')
+    );
 
     await act(() => {
       deferred.resolve({ mandatory: true, optional: true });

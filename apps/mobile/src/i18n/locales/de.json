@@ -590,6 +590,7 @@
     "appearanceDark": "Dunkel",
     "account": "Konto",
     "accountSubtitle": "Sprache, vertrauenswürdige Hosts und Gerätesitzungen",
+    "accountNotifications": "Konto und Benachrichtigungen",
     "prReviewAttribution": "App-Hinweis zu PR-Prüfungen hinzufügen",
     "prReviewAttributionSubtitle": "Beim Einreichen einer Prüfung die Fußzeile „Mit Kilo geprüft“ hinzufügen.",
     "returnSendsMessage": "Eingabetaste sendet Nachricht",

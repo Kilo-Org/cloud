@@ -589,6 +589,7 @@
     "appearanceDark": "ダーク",
     "account": "アカウント",
     "accountSubtitle": "言語、信頼済みホスト、デバイスのセッション",
+    "accountNotifications": "アカウントと通知",
     "prReviewAttribution": "PRレビューに使用アプリ名を追加",
     "prReviewAttributionSubtitle": "レビューを送信すると、末尾にKiloでレビューしたことを示す文言を追加します。",
     "returnSendsMessage": "リターンキーでメッセージを送信",

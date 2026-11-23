@@ -590,6 +590,7 @@
     "appearanceDark": "Mørk",
     "account": "Konto",
     "accountSubtitle": "Sprog, betroede domæner og enhedssessioner",
+    "accountNotifications": "Konto og notifikationer",
     "prReviewAttribution": "Angiv appen i PR-gennemgange",
     "prReviewAttributionSubtitle": "Tilføj en sidefod om, at gennemgangen er lavet via Kilo, når du indsender den.",
     "returnSendsMessage": "Returtasten sender beskeden",

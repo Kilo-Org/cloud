@@ -590,6 +590,7 @@
     "appearanceDark": "Mörkt",
     "account": "Konto",
     "accountSubtitle": "Språk, betrodda värdar och enhetssessioner",
+    "accountNotifications": "Konto och aviseringar",
     "prReviewAttribution": "Ange appen i PR-granskningar",
     "prReviewAttributionSubtitle": "Lägg till en sidfot som anger att granskningen gjordes via Kilo när du skickar den.",
     "returnSendsMessage": "Returtangenten skickar meddelanden",

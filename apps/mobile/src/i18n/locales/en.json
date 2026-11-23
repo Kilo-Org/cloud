@@ -689,6 +689,7 @@
     "general": "General",
     "account": "Account",
     "accountSubtitle": "Language, trusted hosts, and device sessions",
+    "accountNotifications": "Account and notifications",
     "voiceInput": "Voice input",
     "prReviewAttribution": "Add app attribution to PR reviews",
     "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review.",

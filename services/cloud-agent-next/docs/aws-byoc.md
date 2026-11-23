@@ -422,3 +422,18 @@ ECS retains its issued proxy-token deadline. It does not inherit the MicroVM lif
 
 Local regressions verify both engines, concurrent refusal/success, interrupted cleanup, hello races and deadline handling.
 AWS responses are simulated. Live uncertain recovery and customer deployment acceptance remain unverified.
+
+## Prepared environment integration boundary
+
+This layer wires shared archive restore and builder coordination for both AWS engines.
+Public ECS selection and snapshot capability remain disabled until the activation layer.
+MicroVM prepared environments remain disabled pending separate live acceptance.
+
+The builder retires SCM authority through an authenticated, durable acknowledgement.
+It stops repository processes before retirement and uploads the archive only after acknowledgement.
+Display progress does not authorize archive upload or credential removal.
+Known SCM denial fails with a specific reason. Transient issuance failures use bounded retry.
+
+The archive preserves the engine and immutable base identity. Restore failures distinguish
+retryable storage faults from archive faults that require a rebuild. General AWS egress
+stays in the customer VPC; the Worker forwards authenticated SCM traffic.

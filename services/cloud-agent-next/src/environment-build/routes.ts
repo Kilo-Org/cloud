@@ -1,3 +1,5 @@
+import { environmentBuildArchiveRequestSchema } from '../shared/environment-build-archive.js';
+import { startupFailureReportSchema } from '../sandbox-control/startup-failure.js';
 import type { Context, Hono } from 'hono';
 import { z } from 'zod';
 import { resolveSecret } from '../auth.js';
@@ -66,6 +68,41 @@ function coordinator(c: RunnerContext, environmentId: string) {
 }
 
 export function registerEnvironmentBuildRoutes(app: Hono<HonoContext>): void {
+  app.post('/environment-build/:environmentId/:buildId/retire-scm', async c => {
+    const auth = await authenticate(c);
+    if (auth instanceof Response) return auth;
+    const reply = await coordinator(c, auth.environmentId).runnerRetireScm(auth);
+    if (reply !== 'ok') return refusalResponse(c, reply);
+    return c.json({ ok: true }, 200, { 'cache-control': 'no-store' });
+  });
+  app.post('/environment-build/:environmentId/:buildId/archive', async c => {
+    const auth = await authenticate(c);
+    if (auth instanceof Response) return auth;
+    let request;
+    try {
+      request = environmentBuildArchiveRequestSchema.parse(await readJson(c));
+    } catch {
+      return c.json({ error: 'invalid archive request' }, 400);
+    }
+    const reply = await coordinator(c, auth.environmentId).runnerArchive(auth, request);
+    if ('refused' in reply) return refusalResponse(c, reply);
+    return c.json(reply, 200, { 'cache-control': 'no-store' });
+  });
+  app.post('/environment-build/:environmentId/:buildId/startup-failure', async c => {
+    const auth = await authenticate(c);
+    if (auth instanceof Response) return auth;
+    let report;
+    try {
+      report = startupFailureReportSchema.parse(await readJson(c));
+    } catch {
+      return c.json({ error: 'invalid startup report' }, 400);
+    }
+    if (report.allocationId !== auth.allocationId) return c.json({ error: 'unauthorized' }, 401);
+    const reply = await coordinator(c, auth.environmentId).runnerStartupFailure(auth, report.code);
+    if (reply !== 'ok') return refusalResponse(c, reply);
+    return c.json({ ok: true });
+  });
+
   app.get('/environment-build/:environmentId/:buildId/input', async c => {
     const auth = await authenticate(c);
     if (auth instanceof Response) return auth;

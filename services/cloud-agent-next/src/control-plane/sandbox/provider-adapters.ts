@@ -1,3 +1,5 @@
+import { providerSupports } from '@kilocode/worker-utils/sandbox-provider-capabilities';
+import { prepareAwsSnapshotStartup } from '../../sandbox-control/aws-snapshot-startup.js';
 import type { SandboxBillingInput } from '../../container-usage-context.js';
 import {
   createByocVercelProviderAdapter,
@@ -57,6 +59,9 @@ export function createProviderAdapter(
   pin: StoredProviderPin,
   deps: ProviderAdapterDeps
 ): ProviderAdapter {
+  const prepareAwsSnapshot = providerSupports(pin.provider, 'environmentSnapshots')
+    ? prepareAwsSnapshotStartup
+    : undefined;
   const allocationName = pin.allocationName ?? deps.sandboxId;
   switch (pin.provider) {
     case 'aws-ecs': {
@@ -66,6 +71,7 @@ export function createProviderAdapter(
         source: pin.byoc,
         sandboxId: deps.sandboxId,
         storage: awsEcsOperationStorage(deps.operationStorage),
+        prepareSnapshot: prepareAwsSnapshot,
       });
     }
     case 'aws': {
@@ -75,6 +81,7 @@ export function createProviderAdapter(
         source: pin.byoc,
         sandboxId: deps.sandboxId,
         storage: awsOperationStorage(deps.operationStorage),
+        prepareSnapshot: prepareAwsSnapshot,
       });
     }
     case 'vercel': {

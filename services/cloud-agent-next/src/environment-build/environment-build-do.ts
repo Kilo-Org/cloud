@@ -1,3 +1,11 @@
+import type { AwsScmAdmission } from '../egress/aws-scm-admission.js';
+import type { ControlPlaneScmForwardAdmissionResult } from '../shared/control-plane-protocol.js';
+import { createAwsBuildEndpoints } from './aws-build-endpoints.js';
+import { createBuilderPreparation } from './builder-preparation.js';
+import { createAwsEnvironmentBuildServices } from './aws-build.js';
+import type { EnvironmentBuildArchiveRequest } from '../shared/environment-build-archive.js';
+import type { AwsEgressProof } from '../egress/aws-scoped-admission.js';
+import type { StartupFailureCode } from '../sandbox-control/startup-failure.js';
 import { assertContainerAccountAvailable } from '../container-account-admission.js';
 import { DurableObject } from 'cloudflare:workers';
 import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
@@ -82,6 +90,7 @@ export class EnvironmentBuild extends DurableObject<Env> {
   private readonly store: BuildStore;
   private readonly initialized: Promise<void>;
   private coordinator: EnvironmentBuildCoordinator | undefined;
+  private awsEndpoints: ReturnType<typeof createAwsBuildEndpoints> | undefined;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -112,6 +121,24 @@ export class EnvironmentBuild extends DurableObject<Env> {
       if (!secret) throw new Error('Environment build signing secret is unavailable');
       return secret;
     };
+    const aws = createAwsEnvironmentBuildServices({
+      env,
+      store: this.store,
+      transaction: write => storage.transactionSync(write),
+      reference: id => readEnvironmentReference(getPgDb(env), id),
+      actorAccess: (owner, userId) => environmentActorAccess(getPgDb(env), owner, userId),
+      refuse: async (buildId, reason) => {
+        if (!this.coordinator) throw new Error('Environment build coordinator is unavailable');
+        await this.coordinator.refuseBuild(buildId, reason);
+      },
+    });
+    this.awsEndpoints = createAwsBuildEndpoints({
+      aws,
+      authorizePreparing: auth => {
+        if (!this.coordinator) throw new Error('Environment build coordinator is unavailable');
+        return this.coordinator.authorizeRunner(auth, ['preparing']);
+      },
+    });
     return {
       networkSecretExcludedUrls: () => networkSecretInfrastructureUrls(env),
       now: () => Date.now(),
@@ -147,6 +174,7 @@ export class EnvironmentBuild extends DurableObject<Env> {
           }),
       },
       provider: createBuilderProvider({
+        aws,
         containers: env.SANDBOX_CONTAINERS,
         env,
       }),
@@ -165,8 +193,16 @@ export class EnvironmentBuild extends DurableObject<Env> {
         const secret = await signingSecret();
         return timingSafeEqual(await deriveRunnerCredential(secret, claims), credential);
       },
-      decryptSecrets: encrypted =>
-        mergeEnvVarsWithSecrets({}, encrypted as EncryptedSecrets, env.AGENT_ENV_VARS_PRIVATE_KEY),
+      preparation: createBuilderPreparation({
+        aws,
+        gitSource: input => resolveBuilderGitSource(env, input),
+        decryptSecrets: encrypted =>
+          mergeEnvVarsWithSecrets(
+            {},
+            encrypted as EncryptedSecrets,
+            env.AGENT_ENV_VARS_PRIVATE_KEY
+          ),
+      }),
       billingInput: ({ owner, actorUserId, sandboxId: billingSandboxId, buildId }) => {
         return {
           sandboxId: billingSandboxId as never,
@@ -181,6 +217,12 @@ export class EnvironmentBuild extends DurableObject<Env> {
       unsupportedReason: () => snapshotsRuntimeUnsupportedReason(env),
       log: (message, fields) => logger.withFields(fields).info(message),
     };
+  }
+
+  private async endpointsFor(environmentId: string) {
+    await this.coordinatorFor(environmentId);
+    if (!this.awsEndpoints) throw new Error('Environment build endpoints are unavailable');
+    return this.awsEndpoints;
   }
 
   // --- public operations (authorized by the Worker handler) -------------------
@@ -242,6 +284,40 @@ export class EnvironmentBuild extends DurableObject<Env> {
   }
 
   // --- builder callbacks (authenticated Worker routes) ------------------------
+
+  async runnerArchive(auth: RunnerAuth, request: EnvironmentBuildArchiveRequest) {
+    return (await this.endpointsFor(auth.environmentId)).archive(auth, request);
+  }
+  async runnerStartupFailure(auth: RunnerAuth, code: StartupFailureCode) {
+    return (await this.coordinatorFor(auth.environmentId)).runnerStartupFailure(auth, code);
+  }
+  async getAwsBuildEgressPolicy(
+    environmentId: string,
+    buildId: string,
+    proof: AwsEgressProof
+  ): Promise<Response> {
+    return (await this.endpointsFor(environmentId)).policy(buildId, proof);
+  }
+  async recordAwsBuildEgressAudit(
+    environmentId: string,
+    buildId: string,
+    proof: AwsEgressProof,
+    value: unknown
+  ): Promise<Response> {
+    return (await this.endpointsFor(environmentId)).audit(buildId, proof, value);
+  }
+  async admitAwsBuildScm(
+    environmentId: string,
+    buildId: string,
+    proof: AwsEgressProof,
+    request: AwsScmAdmission
+  ): Promise<ControlPlaneScmForwardAdmissionResult> {
+    return (await this.endpointsFor(environmentId)).admitScm(buildId, proof, request);
+  }
+
+  async runnerRetireScm(auth: RunnerAuth): Promise<'ok' | RunnerRefusal> {
+    return (await this.endpointsFor(auth.environmentId)).retireScm(auth);
+  }
 
   async runnerInput(auth: RunnerAuth): Promise<EnvironmentBuildInput | RunnerRefusal> {
     return (await this.coordinatorFor(auth.environmentId)).runnerInput(auth);

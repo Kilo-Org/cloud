@@ -1,3 +1,4 @@
+import type { prepareAwsSnapshotStartup } from '../sandbox-control/aws-snapshot-startup.js';
 import type { Env } from '../types.js';
 import type { AwsEcsByocConfiguration } from '@kilocode/worker-utils/aws-ecs';
 import type { ByocSource } from './owner.js';
@@ -13,8 +14,10 @@ export function createByocAwsEcsProviderAdapter(deps: {
   env: Env;
   source: ByocSource;
   sandboxId: string;
+  prepareSnapshot?: typeof prepareAwsSnapshotStartup;
   storage: AwsEcsOperationStorage;
 }) {
+  const prepareSnapshot = deps.prepareSnapshot;
   const access = createAwsEcsRuntimeAccessResolver(deps.env);
   const resolveRuntime = async (pinned?: AwsEcsByocConfiguration) =>
     access(pinned ?? (await resolveAwsEcsByocConfiguration(deps.env, deps.source)));
@@ -22,6 +25,23 @@ export function createByocAwsEcsProviderAdapter(deps: {
     sandboxId: deps.sandboxId,
     storage: deps.storage,
     resolveRuntime,
+    ...(prepareSnapshot
+      ? {
+          async prepareSnapshot(input) {
+            const runtime = await resolveRuntime(input.configuration);
+            return prepareSnapshot({
+              ...input,
+              provider: 'aws-ecs',
+              connectionId: deps.source.credentialId,
+              currentConfiguration: () => resolveAwsEcsByocConfiguration(deps.env, deps.source),
+              objects: runtime.objects,
+              workerUrl: deps.env.WORKER_URL,
+              sandboxId: deps.sandboxId,
+              allocationId: input.ref.intentId,
+            });
+          },
+        }
+      : {}),
     async prepareStartup(input) {
       const runtime = await resolveRuntime(input.configuration);
       await validateAwsEcsStartupStack({

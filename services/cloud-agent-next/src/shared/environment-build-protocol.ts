@@ -89,12 +89,16 @@ export const environmentBuildPinGroupSchema = z
   .strict();
 export type EnvironmentBuildPinGroup = z.infer<typeof environmentBuildPinGroupSchema>;
 
-const environmentBuildIdentityFields = {
+/**
+ * What the builder fetches once it starts. Secrets are decrypted only into this
+ * reply. A V1 build serves the `git` shape at the isolated directory. A V2 build
+ * serves its `members`, and `directory` is the cwd a session of that environment
+ * would have: `/workspace/<leaf>` for one repository, `/workspace` for several.
+ */
+const environmentBuildInputFields = {
   environmentId: z.string().uuid(),
   buildId: z.string().uuid(),
   allocationId: z.string().uuid(),
-};
-const environmentBuildRunFields = {
   commands: z.array(setupScriptSchema.min(1)).max(20),
   env: z.record(z.string().min(1).max(128), z.string().max(10_000)),
   /** Names of the secret entries in `env`, so the builder redacts their values. */
@@ -106,29 +110,21 @@ const environmentBuildRunFields = {
   deadlineAt: z.number().int().positive(),
 };
 
-/**
- * What the builder fetches once it starts. Secrets are decrypted only into this
- * reply. A V1 build serves the `git` shape at the isolated directory. A V2 build
- * serves its `members`, and `directory` is the cwd a session of that environment
- * would have: `/workspace/<leaf>` for one repository, `/workspace` for several.
- */
 export const environmentBuildInputSchema = z.union([
   z
     .object({
-      ...environmentBuildIdentityFields,
+      ...environmentBuildInputFields,
       git: environmentBuildGitSchema,
       members: z.undefined().optional(),
       directory: z.literal(ENVIRONMENT_BUILD_WORKSPACE),
-      ...environmentBuildRunFields,
     })
     .strict(),
   z
     .object({
-      ...environmentBuildIdentityFields,
+      ...environmentBuildInputFields,
       members: z.array(environmentBuildMemberSchema).min(1),
       git: z.undefined().optional(),
       directory: z.string().regex(/^\/workspace(\/[^/]+)?$/),
-      ...environmentBuildRunFields,
     })
     .strict(),
 ]);

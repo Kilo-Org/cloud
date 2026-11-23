@@ -1,4 +1,5 @@
-import { type AwsScmAdmission, type AwsEgressProof } from '../../egress/aws-admission.js';
+import type { AwsEgressProof } from '../../egress/aws-admission.js';
+import type { AwsScmAdmission } from '../../egress/aws-scm-admission.js';
 import { createAwsSandboxEgress } from '../../egress/aws-sandbox-context.js';
 import { assertContainerAccountAvailable } from '../../container-account-admission.js';
 import { billingFailureFromAdmission } from '../../billing-failure.js';
@@ -6478,10 +6479,11 @@ export class SandboxControlV2 extends DurableObject<Env> {
       log({ reason: 'no_build_commands' });
       return { options: {}, selection: null };
     }
+    const snapshotProvider = this.currentProvider();
     const lookup = await lookupEnvironmentSnapshot({
       namespace: this.env.ENVIRONMENT_BUILD,
       candidate,
-      provider: this.currentProvider() === 'vercel' ? 'vercel' : 'cloudflare-containers',
+      provider: snapshotProvider === 'cloudflare' ? 'cloudflare-containers' : snapshotProvider,
       launchDeadlineAt,
     });
     if (lookup.kind === 'resolved' && lookup.resolution.reason === 'provider_mismatch') {

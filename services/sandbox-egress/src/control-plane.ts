@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import {
-  awsEgressClaimsSchema,
+  awsProxyEgressClaimsSchema,
   awsEgressPolicySchema,
   awsEgressPublicDeploymentSchema,
   awsEgressSharedIdentitySchema,
@@ -36,7 +36,7 @@ export function parseEgressCredential(token: string) {
   if (parts.length !== 3 || !parts.every(part => /^[A-Za-z0-9_-]+$/.test(part))) return null;
   try {
     return (
-      awsEgressClaimsSchema.safeParse(
+      awsProxyEgressClaimsSchema.safeParse(
         JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'))
       ).data ?? null
     );
@@ -98,10 +98,12 @@ export function createControlPlaneClient(input: {
     return claims;
   }
   function endpoint(token: string, operation: 'policy' | 'audit' | 'scm') {
-    return new URL(
-      `/aws-egress/${encodeURIComponent(credential(token).sandboxId)}/${operation}`,
-      origin
-    );
+    const claims = credential(token);
+    const path =
+      claims.type === 'aws_build_egress'
+        ? `/environment-build/${encodeURIComponent(claims.environmentId)}/${encodeURIComponent(claims.buildId)}/aws-egress/${operation}`
+        : `/aws-egress/${encodeURIComponent(claims.sandboxId)}/${operation}`;
+    return new URL(path, origin);
   }
   function headers(token: string) {
     return new Headers({

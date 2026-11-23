@@ -501,7 +501,7 @@ describe('hosted multi-repository grants', () => {
       gitAuthor: { name: 'Kilo', email: 'bot@example.com' },
     }));
     await expect(prepareCredentialGrant(input)).rejects.toThrow(
-      'GitHub capability issuance is unavailable'
+      'SCM capability issuance is unavailable'
     );
     expect(issue).toHaveBeenCalledTimes(1);
   });

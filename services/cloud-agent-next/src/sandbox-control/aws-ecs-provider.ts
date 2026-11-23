@@ -1,7 +1,7 @@
 import type { AwsEcsByocConfiguration } from '@kilocode/worker-utils/aws-ecs';
 import jwt from 'jsonwebtoken';
 import { AwsRequestError } from '@kilocode/worker-utils/aws-client';
-import { awsEgressClaimsSchema } from '@kilocode/worker-utils/aws-egress';
+import { awsProxyEgressClaimsSchema } from '@kilocode/worker-utils/aws-egress';
 import { sha256Hex } from '@kilocode/worker-utils/sha256';
 import {
   AwsEcsRunRejectedError,
@@ -97,7 +97,7 @@ export function createAwsEcsProviderAdapter(deps: {
             field => field.name === 'HTTPS_PROXY'
           )?.value;
           const token = proxy ? decodeURIComponent(new URL(proxy).password) : '';
-          const claims = awsEgressClaimsSchema.parse(jwt.decode(token));
+          const claims = awsProxyEgressClaimsSchema.parse(jwt.decode(token));
           if (
             claims.sandboxId !== value.ref.sandboxId ||
             claims.allocationId !== value.ref.intentId ||

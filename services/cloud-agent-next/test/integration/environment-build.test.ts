@@ -1,3 +1,5 @@
+import { createBuilderPreparation } from '../../src/environment-build/builder-preparation.js';
+import { createBuilderLifecycleState } from '../../src/environment-build/builder-state.js';
 import {
   ContainerAccountBlockedError,
   ContainerCapacityUnavailableError,
@@ -211,7 +213,10 @@ async function setup(): Promise<Harness> {
       runnerCredential: async claims => `cred:${claims.buildId}:${claims.allocationId}`,
       runnerCredentialMatches: async (claims, credential) =>
         credential === `cred:${claims.buildId}:${claims.allocationId}`,
-      decryptSecrets: () => ({ TOKEN: 'secret-value' }),
+      preparation: createBuilderPreparation({
+        gitSource: input => deps.environment.gitSource(input),
+        decryptSecrets: () => ({ TOKEN: 'secret-value' }),
+      }),
       billingInput: ({ sandboxId, buildId }) => ({
         sandboxId: sandboxId as never,
         subject: { type: 'org', id: OWNER.id },
@@ -1392,5 +1397,65 @@ describe('environment snapshot resolution', () => {
     harness.launchError = null;
     await tick(harness);
     expect(harness.launches).toHaveLength(1);
+  });
+});
+
+describe('transactional shared builder state', () => {
+  it('preserves compute, SCM and archive changes across concurrent completions', async () => {
+    const harness = await setup();
+    const accepted = await manualBuild(harness);
+    if (accepted.status !== 'accepted') throw new Error('Build was not accepted');
+    await runInDurableObject(harness.stub, async (instance, state) => {
+      const store = (instance as unknown as { store: BuildStore }).store;
+      const lifecycle = createBuilderLifecycleState({
+        read: () => store.providerState(accepted.buildId),
+        write: value => store.setProviderState(accepted.buildId, value),
+        transaction: write => state.storage.transactionSync(write),
+      });
+      await lifecycle.set({ operation: { phase: 'launching' } });
+      await Promise.all([
+        lifecycle.update(current => ({
+          ...(current as Record<string, unknown>),
+          scm: { alias: 'synthetic-alias' },
+        })),
+        lifecycle.update(current => ({
+          ...(current as Record<string, unknown>),
+          archive: { reservedAt: 100 },
+        })),
+        lifecycle.update(current => ({
+          ...(current as Record<string, unknown>),
+          operation: { phase: 'running', id: 'synthetic-compute' },
+        })),
+      ]);
+      expect(store.providerState(accepted.buildId)).toEqual({
+        operation: { phase: 'running', id: 'synthetic-compute' },
+        scm: { alias: 'synthetic-alias' },
+        archive: { reservedAt: 100 },
+      });
+    });
+  });
+  it('rejects asynchronous or failed transitions without changing persisted state', async () => {
+    const harness = await setup();
+    const accepted = await manualBuild(harness);
+    if (accepted.status !== 'accepted') throw new Error('Build was not accepted');
+    await runInDurableObject(harness.stub, async (instance, state) => {
+      const store = (instance as unknown as { store: BuildStore }).store;
+      const lifecycle = createBuilderLifecycleState({
+        read: () => store.providerState(accepted.buildId),
+        write: value => store.setProviderState(accepted.buildId, value),
+        transaction: write => state.storage.transactionSync(write),
+      });
+      await lifecycle.set({ operation: { phase: 'launching' } });
+      await expect(lifecycle.update(() => Promise.resolve({ operation: null }))).rejects.toThrow(
+        'must be synchronous'
+      );
+      await expect(
+        lifecycle.update(current => {
+          delete (current as Record<string, unknown>).operation;
+          throw new Error('Synthetic failed transition');
+        })
+      ).rejects.toThrow('Synthetic failed transition');
+      expect(store.providerState(accepted.buildId)).toEqual({ operation: { phase: 'launching' } });
+    });
   });
 });

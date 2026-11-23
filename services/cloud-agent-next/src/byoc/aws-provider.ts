@@ -1,3 +1,4 @@
+import type { prepareAwsSnapshotStartup } from '../sandbox-control/aws-snapshot-startup.js';
 import { validateAwsStartupStack } from './aws-startup-stack.js';
 import { createAwsRuntimeAccessResolver } from './aws-runtime-access.js';
 import type { AwsByocConfiguration } from '@kilocode/worker-utils/aws-byoc';
@@ -13,8 +14,10 @@ export function createByocAwsProviderAdapter(deps: {
   env: Env;
   source: ByocSource;
   sandboxId: string;
+  prepareSnapshot?: typeof prepareAwsSnapshotStartup;
   storage: AwsOperationStorage;
 }) {
+  const prepareSnapshot = deps.prepareSnapshot;
   const access = createAwsRuntimeAccessResolver(deps.env);
   const resolveRuntime = async (pinned?: AwsByocConfiguration) =>
     access(pinned ?? (await resolveAwsByocConfiguration(deps.env, deps.source)));
@@ -22,6 +25,23 @@ export function createByocAwsProviderAdapter(deps: {
     sandboxId: deps.sandboxId,
     storage: deps.storage,
     resolveRuntime,
+    ...(prepareSnapshot
+      ? {
+          async prepareSnapshot(input) {
+            const runtime = await resolveRuntime(input.configuration);
+            return prepareSnapshot({
+              ...input,
+              provider: 'aws',
+              connectionId: deps.source.credentialId,
+              currentConfiguration: () => resolveAwsByocConfiguration(deps.env, deps.source),
+              objects: runtime.objects,
+              workerUrl: deps.env.WORKER_URL,
+              sandboxId: deps.sandboxId,
+              allocationId: input.ref.intentId,
+            });
+          },
+        }
+      : {}),
     async prepareStartup(input) {
       const access = await resolveRuntime(input.configuration);
       await validateAwsStartupStack({

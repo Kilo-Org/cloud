@@ -1192,6 +1192,39 @@ describe('useRemoteSpawnDispatch live-instance remap', () => {
     expect(spawnMock).not.toHaveBeenCalled();
     expect(setRunOnInstanceMock).not.toHaveBeenCalled();
   });
+
+  it('fails retryably without spawning when two live rows share the name and project', async () => {
+    const onSpawnFailedMock = vi.fn();
+    const setRunOnInstanceMock = vi.fn();
+    // Two peers advertise the selected host's name and project on new
+    // connectionIds, so the stale selection names no single live host.
+    const liveInstances = [
+      { ...INSTANCE, connectionId: 'conn-peer-a' },
+      { ...INSTANCE, connectionId: 'conn-peer-b' },
+    ];
+    const { onStart } = runHook({
+      organizationId: 'org-xyz',
+      setRunOnInstance: next => {
+        setRunOnInstanceMock(next);
+      },
+      // eslint-disable-next-line promise-function-async, prefer-await-to-then -- tension between lint rules
+      refetchInstances: () => Promise.resolve({ data: { instances: liveInstances } }),
+      onSpawnFailed: () => {
+        onSpawnFailedMock();
+      },
+    });
+
+    onStart();
+    await vi.waitFor(() => {
+      expect(onSpawnFailedMock).toHaveBeenCalledTimes(1);
+    });
+    expect(rerenderLastHook().remoteSpawnFailure).toEqual({
+      retryable: true,
+      message: remoteSpawnRetryableToast(),
+    });
+    expect(spawnMock).not.toHaveBeenCalled();
+    expect(setRunOnInstanceMock).not.toHaveBeenCalled();
+  });
 });
 
 describe('useRemoteSpawnDispatch stall watchdog', () => {

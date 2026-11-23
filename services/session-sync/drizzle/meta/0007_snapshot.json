@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "5d15f5cc-058b-46a3-be23-9fd9d3ddb756",
+  "id": "7025db47-386b-43b0-96ab-31ef04601c46",
   "prevId": "388235ac-ad7a-4bdd-9577-2a8c81a35592",
   "tables": {
     "blobs": {
@@ -149,8 +149,8 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "pending_list_metadata": {
-      "name": "pending_list_metadata",
+    "list_metadata": {
+      "name": "list_metadata",
       "columns": {
         "key": {
           "name": "key",
@@ -159,11 +159,18 @@
           "notNull": true,
           "autoincrement": false
         },
-        "value": {
-          "name": "value",
+        "owed": {
+          "name": "owed",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "pushed": {
+          "name": "pushed",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
           "autoincrement": false
         },
         "retry_at": {

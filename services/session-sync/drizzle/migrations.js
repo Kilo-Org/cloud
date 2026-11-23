@@ -6,7 +6,7 @@ import m0003 from './0003_slimy_doctor_spectrum.sql';
 import m0004 from './0004_session_roles.sql';
 import m0005 from './0005_session_status.sql';
 import m0006 from './0006_stiff_micromax.sql';
-import m0007 from './0007_same_master_mold.sql';
+import m0007 from './0007_nappy_doorman.sql';
 
   export default {
     journal,

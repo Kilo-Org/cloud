@@ -3,7 +3,7 @@ import { bytesToBase64url } from '@kilocode/worker-utils/base64url';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { describe, expect, it } from 'vitest';
 
-import { pendingListMetadata } from '../../src/db/sqlite-schema';
+import { listMetadata } from '../../src/db/sqlite-schema';
 import { getSessionSyncDOStub, type SessionSyncDO } from '../../src/dos/SessionSyncDO';
 import { getTenantStub } from '../../src/dos/SessionSyncTenantDO';
 import type { Env } from '../../src/env';
@@ -296,10 +296,10 @@ describe('creator index retries', () => {
     expect((await listing(api, '?q=retried')).items).toEqual([]);
 
     await runInDurableObject(stub, (_instance, state) => {
-      expect(drizzle(state.storage).select().from(pendingListMetadata).get()).toMatchObject({
+      expect(drizzle(state.storage).select().from(listMetadata).get()).toMatchObject({
         retry_at: expect.any(Number),
       });
-      drizzle(state.storage).update(pendingListMetadata).set({ retry_at: 0 }).run();
+      drizzle(state.storage).update(listMetadata).set({ retry_at: 0 }).run();
     });
     expect(await runDurableObjectAlarm(stub)).toBe(true);
 
@@ -313,7 +313,7 @@ describe('creator index retries', () => {
       archived: true,
     });
     await runInDurableObject(stub, (_instance, state) => {
-      expect(drizzle(state.storage).select().from(pendingListMetadata).get()).toBeUndefined();
+      expect(drizzle(state.storage).select().from(listMetadata).get()?.owed).toBeNull();
     });
   });
 });

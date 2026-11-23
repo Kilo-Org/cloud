@@ -71,11 +71,15 @@ export const entities = sqliteTable(
   ]
 );
 
-/** List metadata owed to the creator index; at most one row (`key` = 1). */
-export const pendingListMetadata = sqliteTable('pending_list_metadata', {
+/**
+ * Creator-index metadata. One row (`key` = 1): `owed` is metadata the index
+ * does not hold yet, `pushed` is what it last accepted, `retry_at` gates the
+ * next attempt after a refusal.
+ */
+export const listMetadata = sqliteTable('list_metadata', {
   key: integer('key').primaryKey(),
-  /** Serialized `SessionListMetadata` awaiting a retry. */
-  value: text('value').notNull(),
+  owed: text('owed'),
+  pushed: text('pushed'),
   retry_at: integer('retry_at').notNull(),
 });
 

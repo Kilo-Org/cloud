@@ -1016,7 +1016,7 @@ export class SessionSyncDO extends DurableObject<Env> {
    * so a transient tenant failure cannot leave the list stale forever.
    */
   private async flushListMetadata(): Promise<Result<null>> {
-    const owed = listMetadata.pending(this.db);
+    const owed = listMetadata.owed(this.db);
     if (!owed) return ok(null);
     if (Date.now() < owed.retryAt) {
       await this.scheduleSweep();
@@ -1039,14 +1039,14 @@ export class SessionSyncDO extends DurableObject<Env> {
     );
     if (!listed.ok) {
       this.tx(() => {
-        listMetadata.defer(this.db, Date.now() + listMetadata.LIST_METADATA_RETRY_MS);
+        listMetadata.refused(this.db, Date.now() + listMetadata.LIST_METADATA_RETRY_MS);
         return null;
       });
       await this.scheduleSweep();
       return listed;
     }
     this.tx(() => {
-      listMetadata.clear(this.db);
+      listMetadata.succeeded(this.db, owed.value);
       return null;
     });
     await this.scheduleSweep();
@@ -1070,7 +1070,7 @@ export class SessionSyncDO extends DurableObject<Env> {
         ? Math.max(Date.now() + 1, this.relayPurgeRetryAt)
         : null;
     const retentionDue = meta && meta.deleted_at === null ? this.retentionDeadline(meta) : null;
-    const owed = listMetadata.pending(this.db);
+    const owed = listMetadata.owed(this.db);
     const metadataDue = owed ? Math.max(owed.retryAt, Date.now() + 1) : null;
     const deadlines = [blobDue, leaseDue, retentionDue, relayDue, metadataDue].filter(
       value => value !== null

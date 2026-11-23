@@ -1,5 +1,6 @@
-CREATE TABLE `pending_list_metadata` (
+CREATE TABLE `list_metadata` (
 	`key` integer PRIMARY KEY NOT NULL,
-	`value` text NOT NULL,
+	`owed` text,
+	`pushed` text,
 	`retry_at` integer NOT NULL
 );

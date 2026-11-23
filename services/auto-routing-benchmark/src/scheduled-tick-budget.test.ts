@@ -377,7 +377,6 @@ describe('scheduled tick D1 budget (production migrations, real handler)', () =>
   let send: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
-    planReads.length = 0;
     vi.useFakeTimers();
     vi.setSystemTime(NOW);
     send = vi.fn(async () => undefined);
@@ -441,6 +440,7 @@ describe('scheduled tick D1 budget (production migrations, real handler)', () =>
       INTERNAL_API_SECRET_PROD: { get: async () => 'secret' },
       BOT_TOKEN_MINT_SECRET: { get: async () => 'bot-secret' },
     } as unknown as Env;
+    planReads.length = 0;
     await worker.scheduled({ cron: '* * * * *' } as ScheduledController, env);
     return { ...counts, planReads: planReads.length };
   }
@@ -472,14 +472,24 @@ describe('scheduled tick D1 budget (production migrations, real handler)', () =>
     seedPaidRequests(coveredSqlite, true);
     const covered = await runTick(coveredSqlite);
 
-    // Twelve wide plans preparing at once: ~250 KB of plan JSON each, so the served set is
-    // ~3 MB — past the 2 MB chunk budget, which means the read must split into more than one
-    // query. (Four would sit under it and never exercise the split.)
+    // Wide plans preparing at once, enough that their stored JSON together exceeds the 2 MB
+    // chunk budget (each plan is ~135 KB here), so the read must split into more than one query.
+    // The byte total is asserted from the database below, not assumed.
     const wideSqlite = newTickDb();
     seedRunningRuns(wideSqlite);
     seedPendingOutputs(wideSqlite);
     seedAliasSync(wideSqlite);
-    seedWidePreparingRequests(wideSqlite, 12);
+    seedWidePreparingRequests(wideSqlite, 20);
+    const wideStoredBytes = Number(
+      (
+        wideSqlite
+          .prepare(
+            `SELECT COALESCE(SUM(length(plan)), 0) AS bytes FROM paid_benchmark_quotes
+            WHERE id IN (SELECT quote_id FROM paid_benchmark_requests)`
+          )
+          .get() as { bytes: number } | undefined
+      )?.bytes ?? 0
+    );
     const wide = await runTick(wideSqlite);
 
     // Fifty preparing requests, each staging one 88-slot slice: the per-request fixed reads
@@ -500,6 +510,7 @@ describe('scheduled tick D1 budget (production migrations, real handler)', () =>
       manyWorst: many.queries,
       widePlans: wide.queries,
       widePlanReads: wide.planReads,
+      wideStoredBytes,
     };
     console.error(JSON.stringify(components));
 
@@ -542,12 +553,14 @@ describe('scheduled tick D1 budget (production migrations, real handler)', () =>
     // Several wide plans in one tick: their staging still fits, and every one of them advanced
     // (the byte-bounded read does not drop a request).
     expect(components.widePlans).toBeLessThanOrEqual(700);
-    // The split is real: the twelve wide plans are read in more than one query.
-    expect(wide.planReads).toBeGreaterThan(1);
+    // The split is real, measured on this tick alone: the served plans together exceed the
+    // chunk budget, so the read had to run more than once.
+    expect(components.wideStoredBytes).toBeGreaterThan(2 * 1024 * 1024);
+    expect(wide.planReads).toBeGreaterThanOrEqual(2);
     const wideStaged = wideSqlite
       .prepare(`SELECT COUNT(*) AS moved FROM paid_benchmark_requests WHERE staged_cases > 0`)
       .get() as { moved: number } | undefined;
-    expect(Number(wideStaged?.moved ?? 0)).toBe(12);
+    expect(Number(wideStaged?.moved ?? 0)).toBe(20);
     // The whole tick keeps a wide margin under D1's hard limit of 1,000 queries per
     // invocation: about a third stays free for anything a future addition needs.
     expect(components.worst).toBeLessThanOrEqual(700);

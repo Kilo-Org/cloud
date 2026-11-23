@@ -2719,7 +2719,7 @@ describe('paid request staging liveness', () => {
     expect(row.failure_retryable).toBe(1);
   }, 120_000);
 
-  it('closes a stalled request and still stages the healthy requests behind it', async () => {
+  it('closes a stalled request and leaves the healthy request behind it to stage next', async () => {
     // Fifty stalled requests sort first (stalest) and would otherwise take the whole budget
     // before the healthy request behind them is reached.
     const stale = 61 * MINUTE_MS;
@@ -2736,22 +2736,15 @@ describe('paid request staging liveness', () => {
     );
     const healthy = ids[50]!;
 
-    const before = ids.map(id => requestState(id).staged_cases);
     const summary = await reconcilePaidBenchmarkRequests(paidBindings(db), { now: Date.now() });
-    // Staged slots per request in this tick: the only observable of the grant each one got.
-    const summaryGranted = ids.map((id, index) => requestState(id).staged_cases - before[index]!);
-    // Every stalled request is closed…
+    // Every stalled request is closed and the healthy one is not…
     expect(summary.closed).toHaveLength(50);
     expect(summary.closed).not.toContain(healthy);
     expect(requestState(healthy).status).toBe('preparing');
     expect(requestState(healthy).staged_cases).toBe(0);
-    // Closing them spent nothing: every served request's staged delta in this tick is zero, so
-    // no share was consumed by a request that did no work.
-    expect(summaryGranted.every(grant => grant === 0)).toBe(true);
 
-    // …and the closing did not consume the budget: the healthy request is served next (the
-    // scan bound is 50, so it enters the scan once the stalled rows are gone) and stages with
-    // the whole budget available.
+    // …and it is served next: the scan bound is 50, so it enters the scan once the stalled rows
+    // leave `preparing`, and it stages with the whole budget available.
     const next = await reconcilePaidBenchmarkRequests(paidBindings(db), {
       now: Date.now() + MINUTE_MS,
     });

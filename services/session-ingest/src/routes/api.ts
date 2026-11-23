@@ -273,7 +273,10 @@ async function notifyWorkspaceUpdates(
     .from(cloud_agent_worktrees)
     .leftJoin(
       organization_memberships,
-      organizationMembershipJoinCondition(kiloUserId, cloud_agent_worktrees.organization_id)
+      organizationMembershipJoinCondition({
+        kiloUserId,
+        organizationIdColumn: cloud_agent_worktrees.organization_id,
+      })
     )
     .leftJoin(organizations, activeOrganizationJoinCondition(cloud_agent_worktrees.organization_id))
     .leftJoin(parentOrganizationsTable, parentOrganizationJoinCondition())

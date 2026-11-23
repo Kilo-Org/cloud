@@ -16,6 +16,13 @@ import { SectionHeader } from '@/components/ui/section-header';
 import { Text } from '@/components/ui/text';
 import { cn } from '@/lib/utils';
 
+/**
+ * The one assistive action a resting field offers: activating it enters the
+ * field, exactly as a press does. Declared once so a screen reader announces
+ * no action list of its own.
+ */
+const ACTIVATION_ACTIONS = [{ name: 'activate', label: undefined }] as const;
+
 type FormFieldProps = Omit<TextInputProps, 'value'> &
   React.RefAttributes<TextInput> & {
     label: string;
@@ -87,7 +94,10 @@ type FormFieldProps = Omit<TextInputProps, 'value'> &
  * Never pass a controlled `value` — use `defaultValue` + `onChangeText`
  * writing to a ref (see CLAUDE.md). All other `TextInputProps` pass through
  * to the native input, including `autoComplete`/`textContentType` — set
- * them at call sites to expose system autofill metadata.
+ * them at call sites to expose system autofill metadata. While a single-line
+ * field with a value rests, no native input is mounted, so the forwarded
+ * `TextInput` ref and the mount value write are inert until the person enters
+ * the field.
  */
 function FormField({
   label,
@@ -184,9 +194,18 @@ function FormField({
         {showsRestingPreview ? (
           <Pressable
             accessibilityLabel={formFieldA11y({ label, required, error: displayedError })}
-            accessibilityRole="button"
             accessibilityValue={{ text: valueRef.current }}
             accessibilityState={{ disabled }}
+            // The box keeps the field's own name and value and carries no role
+            // or hint of its own: the app localizes all of its copy, so the
+            // control introduces no English sentence. An assistive activation
+            // opens the editor, the same as a press.
+            accessibilityActions={ACTIVATION_ACTIONS}
+            onAccessibilityAction={event => {
+              if (!disabled && event.nativeEvent.actionName === 'activate') {
+                setEditing(true);
+              }
+            }}
             // The caller's test handle names the field's control, and while the
             // field rests that control is this preview: a harness that looks the
             // field up by its handle must find it in both states.
@@ -202,16 +221,18 @@ function FormField({
               // The box's height is the native input's `min-h-[44px]`, so the
               // one painted line sits on the same middle the value would.
               'justify-center',
-              controlClassName,
-              // The line height lands last for the same reason `Input` puts it
-              // after the caller's classes: `text-sm` carries a line height of
-              // its own, and `cn` keeps the later of two conflicting classes.
-              INPUT_BOX_LINE_HEIGHT_CLASS
+              controlClassName
             )}
           >
             <Text
               numberOfLines={1}
-              className="text-sm font-normal text-foreground"
+              className={cn('text-sm font-normal text-foreground', INPUT_BOX_LINE_HEIGHT_CLASS)}
+              // The line height belongs on the painted line: this control is a
+              // `View`, which ignores it, and the native input draws its value at
+              // the same height, so the resting line keeps the box it stands in.
+              selectable
+              // The value can be selected and copied here, as it could inside the
+              // native input this rests in place of.
               // A `Text` resolves the interface direction itself (the shared
               // `Text` sets the paragraph's base direction), so the preview only
               // carries the caller's own style and an explicit `textAlign`, the

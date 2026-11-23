@@ -86,7 +86,7 @@ vi.mock('react-native', () => ({
     // A prefilled single-line field rests as a preview that paints its value, so
     // the value a frame shows arrives through this control rather than a native
     // input. Record it where the input would have been recorded.
-    if (props.accessibilityRole === 'button' && props.accessibilityValue?.text !== undefined) {
+    if (props.accessibilityValue?.text !== undefined) {
       record.events.push({ kind: 'input', defaultValue: props.accessibilityValue.text });
     }
     return props.children ?? null;

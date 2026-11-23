@@ -438,4 +438,32 @@ describe('FormField resting value preview', () => {
     // The press is inert, so a disabled field cannot open an editor.
     expect(box.disabled).toBe(true);
   });
+
+  it('carries no role of its own and lets the value be selected', () => {
+    const mounted = mountField({ defaultValue: longValue });
+    const box = mounted.root.findByType('Pressable');
+    const text = box.findByType('Text');
+
+    // The field is a text field, not a button, and the app localizes every
+    // string it shows, so the resting box adds no role or hint of its own.
+    expect(box.props.accessibilityRole).toBeUndefined();
+    expect(box.props.accessibilityHint).toBeUndefined();
+    // A resting value can be selected and copied, as inside the native input.
+    expect(text.props.selectable).toBe(true);
+    // The line height lands on the painted line, not on the `View` around it.
+    expect(box.props.className).not.toContain('leading-[normal]');
+    expect(String(text.props.className)).toContain('leading-[normal]');
+  });
+
+  it('enters the field on an assistive activation, and not while disabled', () => {
+    const enabled = mountField({ defaultValue: longValue });
+    const handler = enabled.root.findByType('Pressable').props as {
+      onAccessibilityAction: (event: { nativeEvent: { actionName: string } }) => void;
+    };
+    act(() => {
+      handler.onAccessibilityAction({ nativeEvent: { actionName: 'activate' } });
+    });
+    expect(enabled.root.findAllByType('Pressable')).toHaveLength(0);
+    expect(enabled.root.findByType('TextInput')).toBeDefined();
+  });
 });

@@ -2110,6 +2110,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Відомості недоступні.",
+      "detailsUnavailableDescription": "Цього елемента більше немає в сеансі.",
       "textDisplay": "Перегляд тексту",
       "thinking": "Обмірковування",
       "thought": "Міркування",

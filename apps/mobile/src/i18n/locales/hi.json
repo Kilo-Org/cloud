@@ -2012,6 +2012,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "विवरण उपलब्ध नहीं है",
+      "detailsUnavailableDescription": "यह आइटम अब इस सत्र में नहीं है",
       "textDisplay": "दिखाया गया टेक्स्ट",
       "thinking": "सोच रहा है",
       "thought": "विचार",

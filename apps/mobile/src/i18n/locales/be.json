@@ -2724,6 +2724,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Падрабязнасці недаступныя.",
+      "detailsUnavailableDescription": "Гэтага элемента больш няма ў сеансе.",
       "textDisplay": "Адлюстраванне тэксту",
       "thinking": "Разважае",
       "thought": "Развагі",

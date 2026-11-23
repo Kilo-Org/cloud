@@ -2618,6 +2618,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Xehetasunak ez daude erabilgarri.",
+      "detailsUnavailableDescription": "Elementu hau ez dago jada saioan.",
       "textDisplay": "Bistaratutako testua",
       "thinking": "Pentsatzen",
       "thought": "Pentsamendua",

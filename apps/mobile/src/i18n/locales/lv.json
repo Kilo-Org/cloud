@@ -2671,6 +2671,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Detalizēta informācija nav pieejama.",
+      "detailsUnavailableDescription": "Šis vienums sesijā vairs nav.",
       "textDisplay": "Teksta attēlojums",
       "thinking": "Domā",
       "thought": "Domas",

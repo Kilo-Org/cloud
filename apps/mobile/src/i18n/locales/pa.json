@@ -2618,6 +2618,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "ਵੇਰਵੇ ਉਪਲਬਧ ਨਹੀਂ ਹਨ।",
+      "detailsUnavailableDescription": "ਇਹ ਆਈਟਮ ਹੁਣ ਸੈਸ਼ਨ ਵਿੱਚ ਨਹੀਂ ਹੈ।",
       "textDisplay": "ਟੈਕਸਟ ਵਾਲਾ ਖੇਤਰ",
       "thinking": "ਸੋਚ ਰਿਹਾ ਹੈ",
       "thought": "ਸੋਚ",

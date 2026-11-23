@@ -2031,6 +2031,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Detail tidak tersedia.",
+      "detailsUnavailableDescription": "Item ini tidak lagi ada di sesi.",
       "textDisplay": "Tampilan teks",
       "thinking": "Sedang berpikir",
       "thought": "Pemikiran",

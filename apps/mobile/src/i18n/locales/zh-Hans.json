@@ -2030,6 +2030,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "无法查看详情。",
+      "detailsUnavailableDescription": "此项目已不在会话中。",
       "textDisplay": "文本显示",
       "thinking": "正在思考",
       "thought": "思考过程",

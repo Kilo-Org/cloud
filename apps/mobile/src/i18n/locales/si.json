@@ -2618,6 +2618,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "විස්තර ලබා ගත නොහැක.",
+      "detailsUnavailableDescription": "මෙම අයිතමය තවදුරටත් සැසියේ නොමැත.",
       "textDisplay": "පෙළ සංදර්ශකය",
       "thinking": "සිතමින්",
       "thought": "සිතුවිල්ල",

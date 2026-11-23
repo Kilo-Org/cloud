@@ -2077,6 +2077,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Os detalhes não estão disponíveis.",
+      "detailsUnavailableDescription": "Este item não está mais na sessão.",
       "textDisplay": "Exibição de texto",
       "thinking": "Pensando",
       "thought": "Raciocínio",

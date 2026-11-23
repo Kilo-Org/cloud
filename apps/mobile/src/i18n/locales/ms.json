@@ -2570,6 +2570,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Butiran tidak tersedia.",
+      "detailsUnavailableDescription": "Item ini tiada lagi dalam sesi.",
       "textDisplay": "Paparan teks",
       "thinking": "Berfikir",
       "thought": "Pemikiran",

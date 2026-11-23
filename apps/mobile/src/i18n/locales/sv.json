@@ -2618,6 +2618,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Det finns ingen detaljinformation att visa.",
+      "detailsUnavailableDescription": "Det här objektet finns inte längre i sessionen.",
       "textDisplay": "Textvisning",
       "thinking": "Tänker",
       "thought": "Resonemang",

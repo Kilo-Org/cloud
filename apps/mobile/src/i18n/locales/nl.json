@@ -2056,6 +2056,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Er zijn geen details beschikbaar.",
+      "detailsUnavailableDescription": "Dit item staat niet meer in de sessie.",
       "textDisplay": "Tekstweergave",
       "thinking": "Nadenken",
       "thought": "Gedachtegang",

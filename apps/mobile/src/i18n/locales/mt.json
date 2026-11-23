@@ -2777,6 +2777,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Id-dettalji mhumiex disponibbli.",
+      "detailsUnavailableDescription": "Dan l-element m'għadux fis-sessjoni.",
       "textDisplay": "Wiri tat-test",
       "thinking": "Qed jaħseb",
       "thought": "Ħsieb",

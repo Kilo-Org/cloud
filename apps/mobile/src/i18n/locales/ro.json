@@ -2671,6 +2671,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Detaliile nu sunt disponibile.",
+      "detailsUnavailableDescription": "Acest element nu mai face parte din sesiune.",
       "textDisplay": "Afișarea textului",
       "thinking": "Se gândește",
       "thought": "Raționament",

@@ -2727,6 +2727,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Details unavailable",
+      "detailsUnavailableDescription": "This item is no longer in the session.",
       "textDisplay": "Text display",
       "thinking": "Thinking",
       "thought": "Thought",

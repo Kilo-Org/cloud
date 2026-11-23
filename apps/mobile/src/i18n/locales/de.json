@@ -2056,6 +2056,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Es sind keine Details verfügbar.",
+      "detailsUnavailableDescription": "Dieses Element ist nicht mehr in der Sitzung enthalten.",
       "textDisplay": "Textanzeige",
       "thinking": "Denkt nach",
       "thought": "Gedankengang",

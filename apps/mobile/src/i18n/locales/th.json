@@ -2570,6 +2570,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "ไม่มีรายละเอียด",
+      "detailsUnavailableDescription": "รายการนี้ไม่อยู่ในเซสชันแล้ว",
       "textDisplay": "การแสดงข้อความ",
       "thinking": "กำลังคิด",
       "thought": "ความคิด",

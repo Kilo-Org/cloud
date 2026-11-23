@@ -2164,6 +2164,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "التفاصيل غير متاحة.",
+      "detailsUnavailableDescription": "لم يعد هذا العنصر موجودًا في الجلسة.",
       "textDisplay": "عرض النص",
       "thinking": "جارٍ التفكير",
       "thought": "التفكير",

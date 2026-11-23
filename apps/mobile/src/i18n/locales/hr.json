@@ -2671,6 +2671,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Pojedinosti nisu dostupne.",
+      "detailsUnavailableDescription": "Ova stavka više nije u sesiji.",
       "textDisplay": "Prikaz teksta",
       "thinking": "Razmišljanje",
       "thought": "Misao",

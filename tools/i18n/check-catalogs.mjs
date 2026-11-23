@@ -1566,6 +1566,7 @@ function scanSource(catalog, root) {
   const keyPrefixes = new Set();
   const destructiveKeys = new Set();
   const { calledKeyOf, keyPrefixOf, collectsDestructiveKeys } = catalog;
+  const trees = [];
   for (const sourceRoot of catalog.sourceRoots) {
     // A fixture tree holds only the parts a test gives it; a root the tree does
     // not have has nothing to scan.
@@ -1577,41 +1578,54 @@ function scanSource(catalog, root) {
       root,
       isTestArtifact
     )) {
+      trees.push({ file, program });
       // A file the parser refused has an empty tree, so its keys would leave
       // both sets without a word. `check:i18n` runs oxlint first, so this
       // normally reports nothing.
       for (const problem of unparsed) {
         problems.push(problem);
       }
-      walk(program, node => {
-        if (node.type === 'Literal' && typeof node.value === 'string') {
-          if (node.value !== '') {
-            referenced.add(node.value);
-          }
-          return;
-        }
-        if (node.type === 'ObjectExpression') {
-          if (collectsDestructiveKeys) {
-            for (const key of destructiveLabels(node)) {
-              destructiveKeys.add(key);
-            }
-          }
-          return;
-        }
-        if (node.type !== 'CallExpression') {
-          return;
-        }
-        const found = calledKeyOf(node, file);
-        problems.push(...found.problems);
-        if (found.key !== null) {
-          called.add(found.key);
-        }
-        const prefix = keyPrefixOf === null ? null : keyPrefixOf(node);
-        if (prefix !== null) {
-          keyPrefixes.add(prefix);
-        }
-      });
     }
+  }
+  // A key builder is a function that returns a dotted-head template literal,
+  // such as `` genericBodyCatalogKey `` returning `` `generic.body.${leaf}` ``.
+  // The scan resolves a call to one before the usage pass, so a caller that
+  // names the leaf alone still contributes every key under that head.
+  const builders = new Map();
+  if (keyPrefixOf !== null) {
+    for (const { program } of trees) {
+      collectKeyBuilders(program, builders);
+    }
+  }
+  for (const { file, program } of trees) {
+    walk(program, node => {
+      if (node.type === 'Literal' && typeof node.value === 'string') {
+        if (node.value !== '') {
+          referenced.add(node.value);
+        }
+        return;
+      }
+      if (node.type === 'ObjectExpression') {
+        if (collectsDestructiveKeys) {
+          for (const key of destructiveLabels(node)) {
+            destructiveKeys.add(key);
+          }
+        }
+        return;
+      }
+      if (node.type !== 'CallExpression') {
+        return;
+      }
+      const found = calledKeyOf(node, file);
+      problems.push(...found.problems);
+      if (found.key !== null) {
+        called.add(found.key);
+      }
+      const prefix = keyPrefixOf === null ? null : keyPrefixOf(node, builders);
+      if (prefix !== null) {
+        keyPrefixes.add(prefix);
+      }
+    });
   }
   // A key the source builds from the catalog has no literal of its own, so the
   // literals beside it stand in for it: `generic.body.` plus `chatMessage` is
@@ -1693,23 +1707,74 @@ function pushCalledKey(call) {
 }
 
 /**
- * The static head of a `translatePush(locale, key, …)` key built as a template
- * literal, when that head names the dotted parent of the key:
- * `` `generic.body.${leaf}` `` reads `generic.body.`. A table of leaves builds
- * its key this way, so the leaf literals beside it name every key under the
- * head. Any other template literal — `` `${i18nKey}.title` ``, whose head is
- * empty — names no parent and returns null.
+ * The static head of a `translatePush(locale, key, …)` key that names a dotted
+ * parent: `` `generic.body.${leaf}` `` reads `generic.body.`. A table of leaves
+ * builds its key this way, so the leaf literals beside it name every key under
+ * the head. Any other template literal — `` `${i18nKey}.title` ``, whose head
+ * is empty — names no parent and returns null.
+ *
+ * A key the source builds through one small function instead of at the call
+ * site (`genericBodyCatalogKey(leaf)` returning `` `generic.body.${leaf}` ``)
+ * reads the same head from that function, so the key stays visible to this
+ * audit after the derivation moves behind it. A builder named at its own return
+ * is resolved by name; anything else is read from the call's own key.
  */
-function pushKeyPrefix(call) {
+function pushKeyPrefix(call, builders) {
   const value = translatePushKey(call);
   if (value === null) {
     return null;
+  }
+  if (value.type === 'CallExpression') {
+    return value.callee.type === 'Identifier' ? (builders.get(value.callee.name) ?? null) : null;
   }
   if (value.type !== 'TemplateLiteral' || value.expressions.length === 0) {
     return null;
   }
   const head = value.quasis[0].value.cooked;
   return typeof head === 'string' && head.endsWith('.') ? head : null;
+}
+
+/**
+ * Record every function in one file that returns a dotted-head template
+ * literal, by the name it is declared under: `function genericBodyCatalogKey
+ * (…) { return `generic.body.${leaf}`; }` and the same body in a const arrow
+ * both map to `generic.body.`. The head is the dotted parent such a builder
+ * prefixes, so a caller's leaf literals name every key beneath it.
+ */
+function collectKeyBuilders(program, builders) {
+  walk(program, node => {
+    if (node.type !== 'FunctionDeclaration' && node.type !== 'VariableDeclarator') {
+      return;
+    }
+    const name =
+      node.type === 'FunctionDeclaration'
+        ? node.id?.name
+        : node.id?.type === 'Identifier'
+          ? node.id.name
+          : undefined;
+    const fn = node.type === 'FunctionDeclaration' ? node : unwrap(node.init ?? {});
+    const isFunction =
+      fn.type === 'FunctionDeclaration' ||
+      fn.type === 'ArrowFunctionExpression' ||
+      fn.type === 'FunctionExpression';
+    if (typeof name !== 'string' || !isFunction) {
+      return;
+    }
+    const body = fn.body.type === 'BlockStatement' ? fn.body.body : [fn.body];
+    for (const statement of body) {
+      if (statement.type !== 'ReturnStatement') {
+        continue;
+      }
+      const returned = unwrap(statement.argument ?? {});
+      if (returned.type !== 'TemplateLiteral' || returned.expressions.length === 0) {
+        continue;
+      }
+      const head = returned.quasis[0].value.cooked;
+      if (typeof head === 'string' && head.endsWith('.')) {
+        builders.set(name, head);
+      }
+    }
+  });
 }
 
 /**

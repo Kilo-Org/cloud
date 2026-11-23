@@ -1,9 +1,16 @@
+/* eslint-disable max-lines -- one restart-read store: the hydration union, its three retry arms (timer, unlock, resume), the repair hand-off, and the test seams share one set of invariants, and splitting them would spread the single "failed is not absent" rule across files */
 import { z } from 'zod';
 
 import { currentRouteHref } from '@/lib/current-route-href';
 import { LAST_ROUTE_KEY } from '@/lib/storage-keys';
 import { isConcreteLastRouteHref, isUnrestorableLastRouteHref } from '@/lib/last-route-recordable';
 import { normalizedRoutePath } from '@/lib/last-route-repair';
+import {
+  assertProtectedDataAvailable,
+  isProtectedDataAvailable,
+  ProtectedDataUnavailableError,
+  subscribeToProtectedDataAvailable,
+} from '@/lib/protected-data';
 import { reportSecureStoreFailure } from '@/lib/telemetry/secure-store-events';
 
 /**
@@ -55,18 +62,95 @@ function getSecureStore(): SecureStoreLike {
   return require('expo-secure-store') as SecureStoreLike;
 }
 
+/** The subset of React Native's `AppState` this module reads. */
+type AppStateLike = {
+  readonly addEventListener: (
+    type: 'change',
+    listener: (state: string) => void
+  ) => { readonly remove: () => void };
+};
+
+// Injection seam, like the store one above: a suite that never retries a read
+// must not load react-native, and a suite that drives the resume retry needs a
+// listener registry the test controls.
+let appStateForTests: AppStateLike | null = null;
+
+function getAppState(): AppStateLike | null {
+  if (appStateForTests) {
+    return appStateForTests;
+  }
+  try {
+    // The lazy native module: react-native's own types cannot be loaded here,
+    // and the app build hands over the real `AppState`.
+    // eslint-disable-next-line typescript-eslint/no-require-imports, typescript-eslint/no-var-requires, unicorn/prefer-module -- lazy native load
+    const native = require('react-native') as { AppState: AppStateLike };
+    return native.AppState;
+  } catch {
+    // A host without the native module (a suite that never loads react-native)
+    // cannot hear a resume; the next reader and the unlock retry still re-read.
+    return null;
+  }
+}
+
 let record: LastRouteRecord | null = null;
-let hydration: Promise<void> | null = null;
-// False until the restart read has settled (found, absent, or failed). The
-// relaunch repair must not read the record before this, or a settle that runs
-// ahead of the SecureStore read would latch "no record" and never repair.
-let hydrated = false;
+// How many times the restart read runs before the launch settles without it.
+const READ_ATTEMPTS = 4;
+// The wait before the next attempt, the same cadence as
+// `lib/auth/secure-store-read`: the four attempts finish within 1.75 s.
+const READ_RETRY_DELAYS_MS = [250, 500, 1000] as const;
+const [FIRST_RETRY_DELAY_MS, SECOND_RETRY_DELAY_MS, THIRD_RETRY_DELAY_MS] = READ_RETRY_DELAYS_MS;
+
+/** The wait before the read after `attempt`; fixed entries keep the tuple typed. */
+function readRetryDelayMs(attempt: number): number {
+  if (attempt <= 1) {
+    return FIRST_RETRY_DELAY_MS;
+  }
+  return attempt === 2 ? SECOND_RETRY_DELAY_MS : THIRD_RETRY_DELAY_MS;
+}
+
+/**
+ * Where the restart read stands. `answered` is the only settled state that
+ * stays for the run: the store answered — a record, a malformed record, or no
+ * record — and asking again would return the same bytes. `failed` means the
+ * read never answered, so it must not read as "no record": the relaunch repair
+ * would latch an absence the store never stated and the cold start's route
+ * would overwrite the stored one. It stays `failed` (not `answered`) for
+ * exactly that reason, even after the budget is spent.
+ */
+type Hydration =
+  | { readonly status: 'idle' }
+  | { readonly status: 'pending'; readonly promise: Promise<void> }
+  | { readonly status: 'answered' }
+  | {
+      readonly status: 'failed';
+      /** The reads spent so far; the next one is `attempts + 1`. */
+      readonly attempts: number;
+      // null: the launch may settle; only a later reader, resume, or unlock
+      // retries.
+      readonly nextAttemptAt: number | null;
+    };
+let hydration: Hydration = { status: 'idle' };
+// The one timer armed for the next backoff step. It exists because the launch's
+// settle waits for the read: a refusal must not hold the first frame, so the
+// tree settles while the read keeps retrying behind it.
+let retryTimer: ReturnType<typeof setTimeout> | null = null;
+// The one re-read armed for the next unlock after a locked refusal, like
+// `last-opened-session`'s unlock retry.
+let unlockRetry: (() => void) | null = null;
+// The one re-read armed for the next resume once the budget is spent.
+let resumeRetry: (() => void) | null = null;
+// One report per process for a read that never answered.
+let readFailureReported = false;
+// True once the read settled with no attempt left. A later read that fails
+// again keeps that settled state and stays silent, so no reader can turn the
+// failure into a stream of notifications.
+let readExhausted = false;
 // Monotonic epoch bumped on every in-memory write and every clear, so a record
 // written while the restart read is pending can never be clobbered by the
 // stale persisted record, and a clear cannot be undone by a late read.
 let epoch = 0;
-// Bumped when `hydrated` flips, so a useSyncExternalStore subscriber re-renders
-// once the restart read settles.
+// Bumped when the hydration state settles, so a useSyncExternalStore subscriber
+// re-renders: once when the read answers, and once when it spends its budget.
 let hydrationVersion = 0;
 const listeners = new Set<() => void>();
 
@@ -142,40 +226,214 @@ function chainMirror(operation: () => Promise<void>): void {
   mirrorTail = run();
 }
 
-/**
- * Restore the in-memory record after a JS restart. Best effort: a failed or
- * malformed read leaves the in-memory record null. A write or clear that lands
- * during the read owns the state and skips the stale persisted record.
- */
-async function restore(): Promise<void> {
-  const startEpoch = epoch;
-  try {
-    const raw = await getSecureStore().getItemAsync(LAST_ROUTE_KEY);
-    if (raw === null || epoch !== startEpoch || record !== null) {
+function disarmRetryTimer(): void {
+  if (retryTimer !== null) {
+    clearTimeout(retryTimer);
+    retryTimer = null;
+  }
+}
+
+/** Arm the one re-read for the next backoff step; a newer refusal replaces it. */
+function armRetryTimer(delayMs: number): void {
+  disarmRetryTimer();
+  retryTimer = setTimeout(() => {
+    retryTimer = null;
+    const current = hydration;
+    if (current.status !== 'failed' || current.nextAttemptAt === null) {
       return;
     }
-    const parsed = parseStoredRecord(raw);
-    if (parsed !== null) {
-      record = parsed;
-      notify();
+    // The deadline is now: the timer may fire a hair early, and `hydrate` must
+    // not read that as "still inside the backoff" and drop the retry. The spent
+    // attempts stay, so the next read is the one after them.
+    hydration = { status: 'failed', attempts: current.attempts, nextAttemptAt: Date.now() };
+    void hydrate();
+  }, delayMs);
+}
+
+function disarmUnlockRetry(): void {
+  unlockRetry?.();
+}
+
+/**
+ * Arm one re-read for the next unlock: while the device is locked every
+ * keychain call is refused before it reaches the store, so the answer becomes
+ * readable at the unlock.
+ */
+function armUnlockRetry(): void {
+  if (unlockRetry !== null) {
+    return;
+  }
+  const release = subscribeToProtectedDataAvailable(() => {
+    disarmUnlockRetry();
+    // A spent budget has no wait left, so the unlock retries at once; a read
+    // that answered, or a newer read in flight, owns the state.
+    if (hydration.status !== 'failed') {
+      return;
     }
+    void hydrate();
+  });
+  unlockRetry = () => {
+    release();
+    unlockRetry = null;
+  };
+}
+
+function disarmResumeRetry(): void {
+  resumeRetry?.();
+}
+
+/**
+ * Arm one re-read for the next resume, so a read whose budget is spent still
+ * answers when the person comes back to the app.
+ */
+function armResumeRetry(): void {
+  if (resumeRetry !== null) {
+    return;
+  }
+  const appState = getAppState();
+  if (appState === null) {
+    return;
+  }
+  const subscription = appState.addEventListener('change', nextState => {
+    if (nextState !== 'active' || hydration.status !== 'failed') {
+      return;
+    }
+    disarmResumeRetry();
+    void hydrate();
+  });
+  resumeRetry = () => {
+    subscription.remove();
+    resumeRetry = null;
+  };
+}
+
+function disarmRetries(): void {
+  disarmRetryTimer();
+  disarmUnlockRetry();
+  disarmResumeRetry();
+}
+
+/** Settle the read as answered, once: the store answered, or a write or clear owns the state. */
+function settleAnswered(): void {
+  disarmRetries();
+  readExhausted = false;
+  if (hydration.status === 'answered') {
+    return;
+  }
+  hydration = { status: 'answered' };
+  hydrationVersion += 1;
+  notify();
+}
+
+/**
+ * Settle the read as failed with no attempt left. The launch may settle, but
+ * the record must not: an absent answer would latch the repair over a record
+ * the store may still return, so this state keeps recording held and the
+ * repair unlatched. It notifies only when it is entered, so a later read that
+ * fails again cannot form a render loop.
+ */
+function settleExhausted(attempts: number): void {
+  const alreadySettled = readExhausted;
+  readExhausted = true;
+  hydration = { status: 'failed', attempts, nextAttemptAt: null };
+  if (alreadySettled) {
+    // The launch already settled on this failure: reassign the same state so a
+    // later silent re-read cannot leave it pending, and stay silent.
+    return;
+  }
+  hydrationVersion += 1;
+  notify();
+}
+
+/** One read: the protected-data guard first, so a locked device never reaches the store. */
+async function readMirroredRecord(): Promise<string | null> {
+  assertProtectedDataAvailable();
+  // The `await` is load-bearing: it turns the guard's throw into this function's
+  // rejection, so `restore` records the failure a task later instead of while
+  // `hydrate` is still storing the pending state.
+  const raw = await getSecureStore().getItemAsync(LAST_ROUTE_KEY);
+  return raw;
+}
+
+/**
+ * Restore the in-memory record after a JS restart. Best effort: a read that
+ * refuses is retried on a bounded backoff, and one that never answers leaves
+ * the run `failed` rather than "no record". A write or clear that lands during
+ * the read owns the state and skips the stale persisted record.
+ */
+async function restore(attempt: number): Promise<void> {
+  const startEpoch = epoch;
+  try {
+    const raw = await readMirroredRecord();
+    // A write or a clear that landed while this read was in flight owns the
+    // state, and its answer is newer than these bytes.
+    if (epoch !== startEpoch) {
+      settleAnswered();
+      return;
+    }
+    if (record === null) {
+      const parsed = raw === null ? null : parseStoredRecord(raw);
+      if (parsed !== null) {
+        record = parsed;
+      }
+    }
+    // The read answered — a record, a malformed record, or nothing stored —
+    // so this is the run's answer and no later reader asks the store again.
+    settleAnswered();
   } catch (error) {
-    // A mirror that cannot be read is treated as absent; the next write fills it.
-    reportSecureStoreFailure('read', error);
-  } finally {
-    // Settled regardless of outcome, and only once: the subscribers the repair
-    // re-render needs already hold the subscription that started this read.
-    if (!hydrated) {
-      hydrated = true;
-      hydrationVersion += 1;
-      notify();
+    if (epoch !== startEpoch) {
+      settleAnswered();
+      return;
     }
+    disarmRetries();
+    // A locked device refuses every call before it reaches the store: no
+    // attempt is spent, nothing is filed, and the one unlock re-read answers.
+    if (!isProtectedDataAvailable() || error instanceof ProtectedDataUnavailableError) {
+      settleExhausted(attempt - 1);
+      armUnlockRetry();
+      return;
+    }
+    if (attempt < READ_ATTEMPTS) {
+      const delayMs = readRetryDelayMs(attempt);
+      hydration = { status: 'failed', attempts: attempt, nextAttemptAt: Date.now() + delayMs };
+      armRetryTimer(delayMs);
+      return;
+    }
+    // The budget is spent: report once, let the launch settle, and retry only
+    // when the app comes back or a reader asks again.
+    if (!readFailureReported) {
+      readFailureReported = true;
+      reportSecureStoreFailure('read', error);
+    }
+    settleExhausted(attempt);
+    armResumeRetry();
   }
 }
 
 async function hydrate(): Promise<void> {
-  hydration ??= restore();
-  await hydration;
+  const current = hydration;
+  // An answered read is the run's answer, and an attempt already in flight is
+  // shared by every reader that arrives meanwhile.
+  if (current.status === 'answered') {
+    return;
+  }
+  if (current.status === 'pending') {
+    await current.promise;
+    return;
+  }
+  // A retry still inside its backoff must wait for its timer; a spent budget
+  // has no timer left, so a reader, resume, or unlock retries at once.
+  if (
+    current.status === 'failed' &&
+    current.nextAttemptAt !== null &&
+    Date.now() < current.nextAttemptAt
+  ) {
+    return;
+  }
+  const attempt = current.status === 'failed' ? current.attempts + 1 : 1;
+  const promise = restore(attempt);
+  hydration = { status: 'pending', promise };
+  await promise;
 }
 
 /**
@@ -212,7 +470,10 @@ export function recordLastRoute(href: string, userId: string | null): boolean {
 
 /**
  * The route to reopen for the signed-in account, or null when the record
- * belongs to another account (or none was recorded).
+ * belongs to another account (or none was recorded). A restart read still in
+ * flight, or one that never answered, also answers null: callers that need the
+ * answer itself gate on `isLastRouteHydrated` (and `isLastRouteReadSettled` for
+ * the launch) instead of reading this.
  */
 export function getLastRoute(userId: string | null): string | null {
   void hydrate();
@@ -227,9 +488,22 @@ export function getLastRouteSnapshot(): LastRouteRecord | null {
   return record;
 }
 
-/** True once the restart read has settled; the repair must wait for this. */
+/** True once the restart read answered; the repair and recording must wait for this. */
 export function isLastRouteHydrated(): boolean {
-  return hydrated;
+  return hydration.status === 'answered';
+}
+
+/**
+ * True once the launch may settle: the read answered, or it failed with no
+ * attempt left. A settled failure is not an answer, so the repair stays
+ * unlatched and recording stays held until a later read answers.
+ */
+export function isLastRouteReadSettled(): boolean {
+  const current = hydration;
+  if (current.status === 'answered') {
+    return true;
+  }
+  return current.status === 'failed' && current.nextAttemptAt === null;
 }
 
 /** The hydration state version, for re-render subscription. */
@@ -256,11 +530,18 @@ export function subscribeLastRoute(listener: () => void): () => void {
  */
 export function clearLastRoute(): void {
   const hadRecord = record !== null;
+  const wasAnswered = hydration.status === 'answered';
   // Bump before the clear so an in-flight restart read cannot repopulate the
   // record after the caller dropped it.
   epoch += 1;
   record = null;
-  if (hadRecord) {
+  // A clear is this run's answer: a queued retry must not restore the record
+  // the caller just dropped, and the repair must not wait on it.
+  disarmRetries();
+  readExhausted = false;
+  hydration = { status: 'answered' };
+  if (hadRecord || !wasAnswered) {
+    hydrationVersion += 1;
     notify();
   }
   // Serialized behind any earlier mirror operation, so an in-flight write can
@@ -289,8 +570,15 @@ export function prepareLastRouteRepair(): void {
  * null when there is none (or it belongs to another account). The
  * repair-once semantics live in the caller's own latch; this only hands out
  * the record that survived the process death.
+ *
+ * A read still in flight or one that failed has no answer to repair from, so
+ * this hands out null and leaves recording held: latching there would open
+ * recording over a record the store may still return.
  */
 export function consumeLastRouteForRepair(userId: string | null): string | null {
+  if (hydration.status === 'pending' || hydration.status === 'failed') {
+    return null;
+  }
   repairEvaluated = true;
   if (userId === null || record === null || record.userId !== userId) {
     return null;
@@ -330,6 +618,10 @@ export function _setSecureStoreForTests(store: SecureStoreLike | null): void {
   secureStoreForTests = store;
 }
 
+export function _setAppStateForTests(next: AppStateLike | null): void {
+  appStateForTests = next;
+}
+
 export function _setLastRouteForTests(next: LastRouteRecord | null): void {
   epoch += 1;
   record = next;
@@ -337,19 +629,24 @@ export function _setLastRouteForTests(next: LastRouteRecord | null): void {
 
 /** Re-run the restart read from the current mirror (a simulated restart). */
 export async function _hydrateLastRouteForTests(): Promise<void> {
-  hydration = null;
+  disarmRetries();
+  readExhausted = false;
+  hydration = { status: 'idle' };
   await hydrate();
 }
 
 export function _resetLastRouteForTests(): void {
   record = null;
   epoch = 0;
-  hydration = null;
-  hydrated = false;
+  disarmRetries();
+  hydration = { status: 'idle' };
+  readFailureReported = false;
+  readExhausted = false;
   hydrationVersion = 0;
   repairEvaluated = false;
   restoredRouteOpenHref = null;
   mirrorTail = null;
   listeners.clear();
   secureStoreForTests = null;
+  appStateForTests = null;
 }

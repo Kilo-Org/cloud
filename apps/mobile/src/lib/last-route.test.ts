@@ -1,8 +1,12 @@
+/* eslint-disable max-lines -- one suite for the restart-read store: the record, the repair latch, and the retry arms share one SecureStore fixture and one controllable AppState, so a second file would duplicate the harness */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { setProtectedDataAvailable } from '@/lib/protected-data';
 
 import {
   _hydrateLastRouteForTests,
   _resetLastRouteForTests,
+  _setAppStateForTests,
   _setLastRouteForTests,
   _setSecureStoreForTests,
   clearLastRoute,
@@ -11,6 +15,7 @@ import {
   getLastRoute,
   getLastRouteSnapshot,
   isLastRouteHydrated,
+  isLastRouteReadSettled,
   type LastRouteRecord,
   noteRestoredRouteOpen,
   prepareLastRouteRepair,
@@ -18,9 +23,42 @@ import {
   subscribeLastRoute,
 } from './last-route';
 
+// The read failure is asserted through its one report, so the telemetry sink
+// stays out of the suite.
+const secureStoreReports = vi.hoisted(() => ({ report: vi.fn() }));
+
+vi.mock('@/lib/telemetry/secure-store-events', () => ({
+  reportSecureStoreFailure: secureStoreReports.report,
+}));
+
+// A controllable `AppState`, injected through the store's own test seam so the
+// suite never loads react-native.
+const appState = vi.hoisted(() => {
+  const listeners = new Set<(state: string) => void>();
+  return {
+    listeners,
+    addEventListener: vi.fn((_type: 'change', listener: (state: string) => void) => {
+      listeners.add(listener);
+      return {
+        remove: () => {
+          listeners.delete(listener);
+        },
+      };
+    }),
+    emit(state: string): void {
+      for (const listener of listeners) {
+        listener(state);
+      }
+    },
+  };
+});
+
 const KEY = 'last-route';
 
 const store = new Map<string, string>();
+
+// The refusal the next reads see; null lets the fake store answer.
+let readRefusal: Error | null = null;
 
 // Fake SecureStore surface backed by an in-memory Map, injected through the
 // test-only setter so the durable mirror never loads the real native module.
@@ -31,6 +69,9 @@ const secureStoreMock = {
   }),
   getItemAsync: vi.fn(async (key: string) => {
     await Promise.resolve();
+    if (readRefusal !== null) {
+      throw readRefusal;
+    }
     return store.get(key) ?? null;
   }),
   deleteItemAsync: vi.fn(async (key: string) => {
@@ -56,14 +97,21 @@ async function flushMirror(): Promise<void> {
 
 beforeEach(() => {
   store.clear();
+  readRefusal = null;
   secureStoreMock.setItemAsync.mockClear();
   secureStoreMock.getItemAsync.mockClear();
   secureStoreMock.deleteItemAsync.mockClear();
+  secureStoreReports.report.mockClear();
+  appState.listeners.clear();
+  appState.addEventListener.mockClear();
   _resetLastRouteForTests();
   _setSecureStoreForTests(secureStoreMock);
+  _setAppStateForTests(appState);
 });
 
 afterEach(() => {
+  vi.useRealTimers();
+  setProtectedDataAvailable(true);
   _resetLastRouteForTests();
   _setSecureStoreForTests(null);
 });
@@ -122,11 +170,23 @@ describe('hydration state', () => {
     expect(getLastRoute('u1')).toBe('/(app)/a');
   });
 
-  it('is hydrated when the mirror read fails', async () => {
-    secureStoreMock.getItemAsync.mockRejectedValueOnce(new Error('locked'));
+  it('is not hydrated when the mirror read fails, and settles after the budget', async () => {
+    vi.useFakeTimers();
+    readRefusal = new Error('locked');
     await _hydrateLastRouteForTests();
-    expect(isLastRouteHydrated()).toBe(true);
+
+    // A refused read is not "no record", so the launch must not settle on it.
+    expect(isLastRouteHydrated()).toBe(false);
+    expect(isLastRouteReadSettled()).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(250 + 500 + 1000);
+
+    // The budget is spent, so the launch may settle, but the read never
+    // answered: nothing is hydrated.
+    expect(isLastRouteHydrated()).toBe(false);
+    expect(isLastRouteReadSettled()).toBe(true);
     expect(getLastRouteSnapshot()).toBeNull();
+    expect(secureStoreReports.report).toHaveBeenCalledTimes(1);
   });
 
   it('notifies subscribers when hydration settles', async () => {
@@ -135,6 +195,142 @@ describe('hydration state', () => {
     await _hydrateLastRouteForTests();
     expect(listener).toHaveBeenCalled();
     unsubscribe();
+  });
+});
+
+describe('a restart read that refuses', () => {
+  it('restores the record on the first retry', async () => {
+    vi.useFakeTimers();
+    store.set(KEY, recordFor('/(app)/variables', 'u1'));
+    readRefusal = new Error('keychain busy');
+
+    await _hydrateLastRouteForTests();
+
+    expect(isLastRouteHydrated()).toBe(false);
+    expect(isLastRouteReadSettled()).toBe(false);
+    // The repair has no answer to read, and its latch stays open so recording
+    // stays held: the cold start's route cannot overwrite the stored record.
+    expect(consumeLastRouteForRepair('u1')).toBeNull();
+    expect(recordLastRoute('/(app)/(tabs)/(0_home)', 'u1')).toBe(false);
+    expect(store.get(KEY)).toBe(recordFor('/(app)/variables', 'u1'));
+
+    // The first backoff step (250 ms) runs the read that answers.
+    readRefusal = null;
+    await vi.advanceTimersByTimeAsync(250);
+
+    expect(getLastRoute('u1')).toBe('/(app)/variables');
+    expect(isLastRouteHydrated()).toBe(true);
+    expect(isLastRouteReadSettled()).toBe(true);
+    expect(consumeLastRouteForRepair('u1')).toBe('/(app)/variables');
+  });
+
+  it('settles the launch without latching after the budget is spent', async () => {
+    vi.useFakeTimers();
+    store.set(KEY, recordFor('/(app)/variables', 'u1'));
+    readRefusal = new Error('keychain unavailable');
+
+    await _hydrateLastRouteForTests();
+    expect(isLastRouteReadSettled()).toBe(false);
+
+    // 250 + 500 + 1000 ms: three retries after the first read.
+    await vi.advanceTimersByTimeAsync(250 + 500 + 1000);
+
+    expect(isLastRouteHydrated()).toBe(false);
+    expect(isLastRouteReadSettled()).toBe(true);
+    // The repair never latched, so the recorder still holds writes and the
+    // mirror keeps the record the launch could not read.
+    expect(consumeLastRouteForRepair('u1')).toBeNull();
+    expect(recordLastRoute('/(app)/(tabs)/(0_home)', 'u1')).toBe(false);
+    expect(store.get(KEY)).toBe(recordFor('/(app)/variables', 'u1'));
+    expect(secureStoreReports.report).toHaveBeenCalledTimes(1);
+
+    // A later read that fails again is silent: the launch already settled, so
+    // a further refusal must not notify the layout again.
+    const listener = vi.fn<() => void>();
+    const unsubscribe = subscribeLastRoute(listener);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(listener).not.toHaveBeenCalled();
+    expect(secureStoreReports.report).toHaveBeenCalledTimes(1);
+    unsubscribe();
+  });
+
+  it('a resume retry answers after the budget is spent', async () => {
+    vi.useFakeTimers();
+    store.set(KEY, recordFor('/(app)/variables', 'u1'));
+    readRefusal = new Error('keychain unavailable');
+
+    await _hydrateLastRouteForTests();
+    await vi.advanceTimersByTimeAsync(250 + 500 + 1000);
+    expect(isLastRouteReadSettled()).toBe(true);
+    expect(isLastRouteHydrated()).toBe(false);
+
+    readRefusal = null;
+    appState.emit('active');
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(isLastRouteHydrated()).toBe(true);
+    expect(getLastRoute('u1')).toBe('/(app)/variables');
+    expect(consumeLastRouteForRepair('u1')).toBe('/(app)/variables');
+    // The repair latched on the answer, so recording opens.
+    expect(recordLastRoute('/(app)/(tabs)/(0_home)', 'u1')).toBe(true);
+  });
+
+  it('settles again after a lock clears and the re-read spends the budget', async () => {
+    vi.useFakeTimers();
+    store.set(KEY, recordFor('/(app)/variables', 'u1'));
+    setProtectedDataAvailable(false);
+    readRefusal = new Error('keychain unavailable');
+
+    await _hydrateLastRouteForTests();
+
+    // A locked device spends no attempt: the launch settles without an answer
+    // and the unlock retry owns the next read.
+    expect(isLastRouteReadSettled()).toBe(true);
+    expect(isLastRouteHydrated()).toBe(false);
+    expect(secureStoreReports.report).not.toHaveBeenCalled();
+
+    // The unlock fires, and now the store refuses for a real reason: the read
+    // spends the whole budget and must leave a settled state, not the pending
+    // one it was in while reading.
+    setProtectedDataAvailable(true);
+    await vi.advanceTimersByTimeAsync(250 + 500 + 1000);
+
+    expect(isLastRouteReadSettled()).toBe(true);
+    expect(isLastRouteHydrated()).toBe(false);
+    expect(secureStoreReports.report).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the launch path working after an exhausted state re-reads and fails again', async () => {
+    vi.useFakeTimers();
+    store.set(KEY, recordFor('/(app)/variables', 'u1'));
+    readRefusal = new Error('keychain unavailable');
+
+    await _hydrateLastRouteForTests();
+    await vi.advanceTimersByTimeAsync(250 + 500 + 1000);
+    expect(isLastRouteReadSettled()).toBe(true);
+    expect(secureStoreReports.report).toHaveBeenCalledTimes(1);
+
+    // The resume retry is armed while failed; its re-read fails again, so the
+    // state must stay settled, stay silent, and stay unlatched.
+    appState.emit('active');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(isLastRouteReadSettled()).toBe(true);
+    expect(isLastRouteHydrated()).toBe(false);
+    expect(secureStoreReports.report).toHaveBeenCalledTimes(1);
+    expect(consumeLastRouteForRepair('u1')).toBeNull();
+    expect(recordLastRoute('/(app)/(tabs)/(0_home)', 'u1')).toBe(false);
+    expect(store.get(KEY)).toBe(recordFor('/(app)/variables', 'u1'));
+
+    // The failed re-read armed the resume retry again, so the next resume with
+    // a working store answers and the whole launch path opens up.
+    readRefusal = null;
+    appState.emit('active');
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(isLastRouteHydrated()).toBe(true);
+    expect(getLastRoute('u1')).toBe('/(app)/variables');
+    expect(consumeLastRouteForRepair('u1')).toBe('/(app)/variables');
+    expect(recordLastRoute('/(app)/(tabs)/(0_home)', 'u1')).toBe(true);
   });
 });
 

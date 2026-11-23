@@ -147,6 +147,7 @@ import {
   consumeLastRouteForRepair,
   getLastRouteHydrationVersion,
   isLastRouteHydrated,
+  isLastRouteReadSettled,
   noteRestoredRouteOpen,
   prepareLastRouteRepair,
   subscribeLastRoute,
@@ -701,8 +702,10 @@ function RootLayoutNav({
         // The relaunch repair navigates to the recorded screen in this same
         // flush. Revealing the tree before the root navigator accepts
         // navigation, or before the record's restart read settles, would paint
-        // the restored route first.
-        if (!navigationReady || !isLastRouteHydrated()) {
+        // the restored route first. A read that spent its retry budget settles
+        // the launch without an answer: the repair stays unlatched and waits
+        // for a later read rather than showing the base Intent's route.
+        if (!navigationReady || !isLastRouteReadSettled()) {
           return;
         }
         settle('app');
@@ -742,12 +745,15 @@ function RootLayoutNav({
   // hidden wrapper clears for the first frame, replace onto that route. A
   // missing, foreign-account, or gate route reads as no record: Home stays.
   //
-  // The latch waits for the mirror read: `getLastRoute` hydrates
+  // The latch waits for the mirror read to settle: `getLastRoute` hydrates
   // asynchronously, so a settle that runs before the read resolves would
-  // otherwise read "no record", latch done, and never repair. The store is
-  // observable (subscribeLastRoute notifies when the restored record lands),
-  // so the effect re-runs on the read's completion and only then latches.
-  // After that, one pass per process — a later navigation away from the
+  // otherwise read "no record", latch done, and never repair. A settled
+  // failure is not an answer, so the latch needs `isLastRouteHydrated` and not
+  // the settle gate alone: a record the retry budget never reached is still
+  // repairable on a later resume, unlock, or reader, and latching here would
+  // hold recording and skip that repair for the run. The store is observable
+  // (subscribeLastRoute notifies when the read settles), so the effect re-runs
+  // then. After that, one pass per process — a later navigation away from the
   // recorded route is never "repaired" back.
   const lastRouteRepairDone = useRef(false);
   useEffect(() => {

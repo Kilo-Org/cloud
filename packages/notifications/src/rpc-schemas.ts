@@ -374,9 +374,17 @@ declare const _dispatchPushOutcomeVocabularyChecked: AssertTrue<
 
 // ── internal dispatch (POST /internal/v1/dispatch) ─────────────────
 
+/**
+ * The batch-recipient contract every dispatch request that fans a push out to
+ * several users shares: one addressable recipient or more, each a non-empty id.
+ * Declared once, so the non-empty-id and non-empty-batch rules cannot be
+ * changed in one request and left behind in another.
+ */
+const recipientUserIdsSchema = z.array(nonEmptyStringSchema).min(1);
+
 export const internalDispatchLowBalanceRequestSchema = z.object({
   kind: z.literal('low_balance'),
-  recipientUserIds: z.array(nonEmptyStringSchema).min(1),
+  recipientUserIds: recipientUserIdsSchema,
   organizationId: nonEmptyStringSchema,
   organizationName: nonEmptyStringSchema,
   minimumBalanceUsd: z.number().nonnegative(),
@@ -399,7 +407,7 @@ export type InternalDispatchLowBalanceRequest = z.infer<
 export const internalDispatchSpendAlertRequestSchema = z
   .object({
     kind: z.literal('spend_alert'),
-    recipientUserIds: z.array(nonEmptyStringSchema).min(1),
+    recipientUserIds: recipientUserIdsSchema,
     ...spendAlertScopeShape,
     alertKind: z.enum(['threshold', 'anomaly']),
     scopeName: nonEmptyStringSchema,
@@ -434,7 +442,7 @@ export type InternalDispatchSecurityFindingRequest = z.infer<
 export const internalDispatchSecurityLifecycleRequestSchema = z.object({
   kind: z.literal('security_lifecycle'),
   ...securityLifecyclePayloadShape,
-  recipientUserIds: z.array(nonEmptyStringSchema).min(1),
+  recipientUserIds: recipientUserIdsSchema,
 });
 export type InternalDispatchSecurityLifecycleRequest = z.infer<
   typeof internalDispatchSecurityLifecycleRequestSchema

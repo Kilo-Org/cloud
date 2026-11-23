@@ -307,6 +307,9 @@ public stream has no reconnecting status today, so `reconnecting` changes no cli
   carries no text, so the interaction stays answerable by a different reply.
 - Each terminal message produces one report. The batch callback fires when no `queued` or
   `accepted` message remains (current callback semantics).
+- A new pending question in a child with a workspace callback target produces an interaction
+  callback. Its outbox entry is keyed by question ID independently of terminal reports.
+  The parent receives the question and options and can use `answer_question` or `reject_question`.
 - The per-user facade serves native `/event` and `/global/event`. `/event` first opens the same
   session `/stream?replay=false` log the client stream uses and buffers its live frames, then pages
   the `nativeSnapshot`, writes the fence, and delivers the buffered and later frames above it. The
@@ -995,6 +998,7 @@ keep environment snapshots and existing history/worktree recovery.
   always restore on demand, so history-only warmup cannot suppress their saved file patches.
   Cancelling a caller stops its wait immediately, but its import lock remains until the underlying
   harness open settles. A queued requested open keeps its own inputs and cancellation deadline.
+
 - **Diagnostics and retention.** Existing diagnostics report workspace, requesting session,
   allocation, capture time, selected source and skip/fallback reason. They never log handles,
   credentials or file contents. Replacing a descriptor makes the previous artifact unselectable;
@@ -2151,14 +2155,21 @@ names the workspace for its whole life, including after the chat with the same U
 Credentials keep the `CloudAgentAuthority` v1 claim: `parentSessionId` is the canonical workspace ID
 and `authorizationId` is the workspace's current authorization.
 
-The workspace record binds the canonical workspace ID, worktree, owner and organization, and stores
-its own runtime delegation (at most 24 hours), revocation state, origin and network policy. It is
-adopted once from the chat that created the workspace, only when that chat may launch children and
-does not use a legacy shared sandbox. Adoption copies the stored authorization as it is, including
-an expired or revoked state, and imports that chat's legacy child registry. A sibling chat is never
-an adoption source. Deleting the creating chat first completes adoption, so the authority and the
-registry survive; deleting a session without a worktree, or starting worktree deletion, permanently
-ends the workspace authority with a tombstone that adoption cannot overwrite.
+The workspace record binds the canonical workspace ID, worktree, owner and organization. It stores
+the workspace's runtime delegation (at most 24 hours), revocation state, origin and network policy.
+The creating chat supplies these values once, if it has policy-bearing runtime authorization and
+does not use a legacy shared sandbox. Origin and child depth do not limit new registrations.
+Legacy tokens without runtime authorization do not provide MCP.
+
+New workspace records also retain the creating chat's resolved profile and environment for child
+launches. An explicit environment selection overrides this default. Inheritance applies only when
+the launch repository belongs to the inherited environment, if one is present. The Worker rechecks
+repository access before registration.
+
+Adoption copies the stored authorization, including expired or revoked state, and imports the
+creating chat's legacy child registry. A sibling chat cannot supply this data. Deleting the creating
+chat first completes adoption so the authority and registry survive. Deleting a standalone session
+or starting worktree deletion ends the workspace authority with a tombstone adoption cannot overwrite.
 
 Every issuance, launch, management call and delegation checks the stored record and then renews it,
 which rechecks the owner, organization membership, credential pepper and admitting device session in
@@ -2182,19 +2193,20 @@ chat in the launching workspace (`workspace:new-chat`) or notifies one existing 
 persisted callback message ID and delegates the workspace authority to the new chat, so it needs an
 active authority. The session form needs a workspace that is not deleted or revoked; an expired
 authority can still notify an existing chat, which runs on that chat's own authorization. The target
-must be a chat of the same worktree, owner and organization without spawn lineage, and still
-accessible. A deleted target fails the callback; it is never redirected to another chat. The
+must be an accessible chat of the same worktree, owner and organization. A standalone parent
+can use `workspace:<session-id>` to receive the callback in its own chat. A deleted target fails
+the callback; it is never redirected to another chat. The
 invoking chat learns its own session id from the `cloud-agent-context` line in its turns.
 
-The scoped connection can create children, list direct children, inspect a child, read an exact
-message result, interrupt a child, and send a prompt follow-up. The personal and organization
-procedures are `prepareSession`, `listChildSessions`, `getSession`, `getMessageResult`,
-`interruptSession`, and `sendMessage`. Folder assignment and stacking on a child reach the same
-management checks through `getSession` and `listChildSessions`. Management revalidates the workspace
+The scoped connection uses dedicated tools, not API `search` or `call`. It can discover repositories,
+branches, environments and models; launch children; attach files; read child history, message results
+and artifacts; answer or reject questions; send or cancel queued messages; and stop a child. It can
+file child workspaces, sync or restack child branches, and create chats in a direct child's workspace.
+Stacking is permitted on the caller's own workspace or a direct child. Management revalidates the workspace
 authority and the target's persisted spawn lineage (`parentCloudAgentSessionId` equals the canonical
 workspace ID), owner and organization; the workspace itself, its chats and unrelated sessions are not
-valid targets, so a child cannot be managed from another workspace or organization. A child cannot
-launch children, so there are no grandchildren. Follow-ups require a
+valid management targets, so a child cannot be managed from another workspace or organization. Each
+child can launch and manage its own children. Follow-ups require a
 stable message ID and cannot change callbacks, runtime configuration or delegation lifetime.
 Interrupt stops work; it does not delete the child workspace. Launch idempotency stays in the
 operation ledger by `operationKey`.
@@ -2452,6 +2464,7 @@ Request and response bodies stream; there is no body-size cap.
   change: it shows the preview button once the Worker reports preview as enabled. The `kilo serve`
   password is in the wrapper, so ship a sandbox image with it before you enable preview; an older
   image leaves `kilo serve` open to a preview of its port.
+
 #### Preview tunnel (`wrapper-tunnel`)
 
 A provider without a private network path to its sandbox (today Vercel) reaches the dev server
@@ -2879,6 +2892,7 @@ A new preparation after stop creates a contained allocation. Sessions retain the
 Earlier branch work recorded live Vercel identity and GitHub checks.
 The shared admission refactor has local tests only; those earlier checks do not verify this change.
 Maximum payload and duration compatibility still require verification before production rollout.
+
 ## Customer billing schema maintenance
 
 The customer billing schema owner is `packages/session-ingest-contracts/src/cloud-agent-billing.ts`.
@@ -2915,3 +2929,15 @@ Readers treat a value that is not exactly one proof, such as a joined duplicate,
 as absent. Keep the releases separate;
 deploying both PRs together removes the compatibility boundary. For a rollback after
 enforcement, use the compatibility release as the Cloud Agent rollback target.
+
+### Containers allowlist and runtime facade
+
+New Containers allowlist allocations include the Worker runtime facade, Session Sync, and required repository hosts.
+Model, backend, and ingest upstreams remain behind the Worker facade. The wrapper receives a bound proxy handle before preparation.
+A legacy grant fails with `credential_upgrade_required`. A failed handle mint fails a per-session prepare and sends no prepare frame. An adopted worktree scope keeps serving its usable canonical handle.
+
+An active allocation keeps its exact persisted allowlist. `matchesActiveEgressPolicy` recognizes the previous direct-upstream baseline
+only when the requested destinations and audit setting are unchanged. It never broadens or rewrites the active pin.
+The next allocation uses the facade baseline after the previous allocation stops.
+Remove this compatibility comparison only after every pre-facade allocation is confirmed stopped, including hibernated Durable Objects.
+A release age or a successful new allocation does not prove that condition.

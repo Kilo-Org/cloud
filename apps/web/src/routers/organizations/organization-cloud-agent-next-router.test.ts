@@ -110,7 +110,10 @@ const mockGenerateCloudAgentAttachmentUploadUrl = jest.fn<
 const mockGetSession = jest.fn<(cloudAgentSessionId: string) => Promise<{ model?: string }>>();
 const mockGetPendingInteractions =
   jest.fn<
-    (cloudAgentSessionId: string) => Promise<{ questions: unknown[]; permissions: unknown[] }>
+    (
+      cloudAgentSessionId: string,
+      organizationId?: string
+    ) => Promise<{ questions: unknown[]; permissions: unknown[] }>
   >();
 const mockGetMessageResult = jest.fn<CloudAgentNextClient['getMessageResult']>();
 const mockGetEgressAudit =
@@ -532,11 +535,10 @@ describe('organizationCloudAgentNextRouter.getSessionMessagesPage', () => {
       user.id,
       sessionId
     );
-    expect(mockGetSessionMessagesPage).toHaveBeenCalledWith({
-      sessionId,
-      cursor: 'older',
-      limit: 25,
-    });
+    expect(mockGetSessionMessagesPage).toHaveBeenCalledWith(
+      { sessionId, cursor: 'older', limit: 25 },
+      undefined
+    );
     expect(mockCreateCloudAgentNextClient).toHaveBeenCalledWith('cloud-agent-token');
     expect(mockRequireActiveSubscription).not.toHaveBeenCalled();
     expect(mockComputeCloudAgentNextBalanceCheckEligibility).not.toHaveBeenCalled();
@@ -561,12 +563,15 @@ describe('organizationCloudAgentNextRouter.getSessionMessagesPage', () => {
       user.id,
       sessionId
     );
-    expect(mockGetSessionMessagesPage).toHaveBeenCalledWith({
-      sessionId,
-      kiloSessionId: childInput.kiloSessionId,
-      cursor: input.cursor,
-      limit: input.limit,
-    });
+    expect(mockGetSessionMessagesPage).toHaveBeenCalledWith(
+      {
+        sessionId,
+        kiloSessionId: childInput.kiloSessionId,
+        cursor: input.cursor,
+        limit: input.limit,
+      },
+      undefined
+    );
   });
 
   it('denies sessions outside the organization even for a current member', async () => {
@@ -1594,7 +1599,7 @@ describe('organizationCloudAgentNextRouter.getPendingInteractions', () => {
       user.id,
       cloudAgentSessionId
     );
-    expect(mockGetPendingInteractions).toHaveBeenCalledWith(cloudAgentSessionId);
+    expect(mockGetPendingInteractions).toHaveBeenCalledWith(cloudAgentSessionId, undefined);
   });
 
   it('denies a session outside the organization before reading interactions', async () => {

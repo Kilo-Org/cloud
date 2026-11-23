@@ -192,9 +192,10 @@ read is not released again.
 Enkrypt guardrail usage and Exa fallback usage go to the shared queue until the
 [cutover switch](#cutover-switch) is on, and then only to the
 [dedicated tagged queue](#enkrypt-usage-queue). The same consumer code processes both queues, so
-either keeps draining whatever it already accepted. **Do not enable the switch in production**
-until the dedicated consumer's attachment and staging processing are verified and a separate
-stall alert on the dedicated source is deployed and verified; see [Rollout](#rollout). Such a
+either keeps draining whatever it already accepted. **Do not merge the change that turns the
+switch on** until the dedicated consumer's attachment is verified in both environments and a
+separate stall alert on the production dedicated source is deployed and verified; see
+[Rollout](#rollout). Such a
 message is a tagged envelope: `{"kind":"enkrypt_usage","v":1,"record":<EnkryptUsageWrite>}`
 (`EnkryptUsageQueueMessageSchema` in `@kilocode/usage-contracts`) or
 `{"kind":"exa_usage","v":1,"record":<ExaUsageRecord>}` (`ExaUsageQueueMessageSchema`).
@@ -919,50 +920,61 @@ after a routing rollback. It only selects the producer's queue: both consumers, 
 pair's preparation and its DLQ alert stay in place for every value, and it never affects LLM
 `/usage`, the hedge or Exa's direct write.
 
-Set it as a Worker **secret** binding, even though the value is not sensitive: open the Worker
-(`usage-ingest` or `usage-ingest-staging`) in the Cloudflare dashboard, go to **Settings >
-Variables and Secrets**, add it with type **Secret** and value `true` (or `false`), then deploy
-that settings version. The Worker reads it as the same string. Normal Wrangler deployments
-replace dashboard plaintext variables with `wrangler.jsonc`, but keep secrets, so the value
-survives later code deployments without opting every variable into `keep_vars`. Do not add it to
-`wrangler.jsonc` `vars`, where a plaintext default would clash with the secret, and do not register
-it as a required secret: absence means off. See Cloudflare's
-[source of truth](https://developers.cloudflare.com/workers/wrangler/configuration/#source-of-truth)
-and [dashboard secrets](https://developers.cloudflare.com/workers/configuration/secrets/#via-the-dashboard)
-notes. Secret values are never shown, only whether a binding exists, and a version that is not
-yet deployed can differ from the deployed one. `wrangler versions secret list` lists the
-bindings of the deployed versions, and `wrangler versions secret list --latest-version` lists the
-latest uploaded version, whose bindings the next deployment carries forward (add `--env staging`
-for staging). The switch is known to be off only when neither lists it. If either does and its
-value is not independently known, set it explicitly to the intended value and deploy that
-settings version rather than assuming it.
+It is a plaintext `vars` entry in `wrangler.jsonc`, so the normal code deployment of each
+environment applies it and Git review owns every change:
 
-To confirm a settings change is live, check that the version created by that deployment is the
+| Environment | Worker | Committed value | Tagged route |
+|---|---|---|---|
+| production | `usage-ingest` | `"true"` | `usage-ingest-enkrypt-eu` |
+| staging | `usage-ingest-staging` | `"true"` | `usage-ingest-enkrypt-staging-eu` |
+
+Staging does not inherit top-level `vars`, so each environment states its own value, and
+`src/queue-budget.test.ts` pins both. Change it only in `wrangler.jsonc`, not in the dashboard:
+a deployment replaces dashboard plaintext variables with the committed `vars`. See Cloudflare's
+[source of truth](https://developers.cloudflare.com/workers/wrangler/configuration/#source-of-truth)
+notes.
+
+The same name must not also exist as a Worker **secret** binding. An earlier version of this
+runbook set the switch as a dashboard secret, and normal deployments keep secrets, so a leftover
+secret would sit beside the committed var under one binding name. Do not rely on either value
+winning; Cloudflare is expected to reject the upload for the duplicate binding name. Before the
+first deployment that carries the committed value in an environment, check both
+`wrangler versions secret list` (deployed versions) and
+`wrangler versions secret list --latest-version` (the latest uploaded version, whose secrets the
+next deployment carries forward); add `--env staging` for staging. Secret values are never
+shown, only whether a binding exists. If either lists
+`USAGE_INGEST_DEDICATED_TAGGED_QUEUE_ENABLED`, remove it before that deployment with
+`wrangler secret delete USAGE_INGEST_DEDICATED_TAGGED_QUEUE_ENABLED` (`--env staging` for
+staging), which deploys a version without it at once, so tagged routing falls back to the
+shared queue until the code deployment applies the committed value. Then repeat both listings
+and confirm neither shows it. Do not register the name as a required secret.
+
+To confirm a change is live, check that the version created by that deployment is the
 one serving 100% of traffic on the Worker's **Deployments** page, or with
 `wrangler deployments status` (`--env staging` for staging).
 
 ### Rollout
 
-**Do not enable the switch in production** until the dedicated consumer's attachment and staging
-processing are verified and the separate stall alert on the production dedicated source is
-deployed and verified. Deploying this change with the switch absent or not `true` provisions and
-attaches the dedicated infrastructure and keeps the existing producer routing.
+One change commits `"true"` for staging and production together. **Do not merge it** until the
+dedicated consumer's attachment is verified in both environments, the separate stall alert on
+the production dedicated source is deployed and verified, and neither Worker has a same-name
+secret binding. A deployment with the switch not `true` provisions and attaches the dedicated
+infrastructure and keeps the existing producer routing.
 
-1. Before the bootstrap deployment, make sure the switch is off in both environments. It is off
-   when neither `wrangler versions secret list` (deployed versions) nor
-   `wrangler versions secret list --latest-version` lists the binding. If either does, its value
-   is hidden: set it to `false`, deploy that settings version, and confirm that version is the
-   only active deployment, as described under [Cutover switch](#cutover-switch).
+1. Before each environment's first deployment that carries the committed switch, confirm no
+   same-name secret binding exists there, and remove it if one does, as described under
+   [Cutover switch](#cutover-switch).
 2. Deploy usage-ingest normally. Preparation inspects every queue, then creates or reuses the
    dedicated DLQ (EU, 14-day retention, no consumer, read back) and then the source (EU,
    at least the four-day default retention, read back), after the shared and hedge
    pairs, and detaches nothing. It stops before any write if an existing member fails those
    checks or the source's `delivery_paused` value is explicitly `true` or malformed. An omitted
    `delivery_paused` response or explicit `false` is accepted; omission is API-shape compatibility,
-   not proof of active delivery. Operator verification of attachment, staging processing and the
-   production source stall alert below still gates production cutover.
+   not proof of active delivery. Operator verification of attachment and the production source
+   stall alert below still gates merging the switch-on change.
    Wrangler then uploads the Worker with provisioning disabled and attaches the dedicated
-   consumer beside the existing two. Tagged usage still goes to the shared queue.
+   consumer beside the existing two. With the switch not `true`, tagged usage still goes to the
+   shared queue.
 3. o11y deploys from the same merge, possibly in parallel, and enrolls the production tagged
    DLQ in the [dead-letter alert](#dead-letter-alert); its tagged DLQ evaluation errors until step
    2 has created the DLQ. If the o11y deployment fails while usage-ingest succeeds, the tagged DLQ
@@ -972,16 +984,17 @@ attaches the dedicated infrastructure and keeps the existing producer routing.
    is not paused, keeps at least `345600` seconds, and has exactly one consumer, the
    `usage-ingest` (or `usage-ingest-staging`) Worker, with the settings above; the shared and
    hedge consumers are unchanged.
-5. Enable the switch in staging and verify processing: `usage_ingest_processing` lines with
-   `usage_kind` `enkrypt_usage` or `exa_usage` show `queue: "usage-ingest-enkrypt-staging-eu"`
-   and `queue_action: "ack"`.
-6. Deploy the separate stall alert on `usage-ingest-enkrypt-eu` and verify it, for example that
+5. Deploy the separate stall alert on `usage-ingest-enkrypt-eu` and verify it, for example that
    it fires on a stalled source and stays quiet on an empty one. The queue already exists after
    step 2; no manual preparation is needed.
-7. Only then enable the switch in production and verify the same processing lines show
-   `queue: "usage-ingest-enkrypt-eu"`.
+6. Immediately before merging the change that commits `"true"` for both environments, repeat
+   step 1 in both. After merge, the normal staging and production deployments apply it; confirm
+   each new version serves 100% of traffic. Then verify processing in each environment:
+   `usage_ingest_processing` lines with `usage_kind` `enkrypt_usage` or `exa_usage` show
+   `queue: "usage-ingest-enkrypt-staging-eu"` in staging and `queue: "usage-ingest-enkrypt-eu"`
+   in production, with `queue_action: "ack"`.
 
-Instances that started before the settings deployment can still publish to the previous queue
+Instances that started before the switching deployment can still publish to the previous queue
 while traffic turns over; both consumers process them. Tagged messages on the shared queue keep
 their processing there, with unchanged idempotency and dispositions. No new shared
 `enkrypt_usage` or `exa_usage` processing for longer than the source retry window (see
@@ -1007,16 +1020,19 @@ it.
   (only after confirming why it was paused), then rerun the deployment. Preparation never
   resumes it. A present malformed `delivery_paused` value also stops preparation; investigate the
   response before rerunning. An omitted value or explicit `false` is accepted, but omission does
-  not prove active delivery or waive attachment, staging processing or production source stall
-  alert verification before production cutover.
-- The Worker uploads but the dedicated consumer is not attached: with the switch off nothing
-  publishes there. Do not enable the switch; rerun the deployment and repeat the readback.
+  not prove active delivery or waive attachment or production source stall alert verification
+  before merging the switch-on change.
+- The Worker uploads but the dedicated consumer is not attached: with the switch on, tagged usage
+  waits undrained in the dedicated source for up to its retention. Commit `"false"` for that
+  environment and deploy it, then rerun the deployment and repeat the readback before turning the
+  switch back on.
 
 ### Rollback
 
-To move tagged usage back to the shared queue, set the switch to `false` (or remove it) and deploy
-that settings version. Keep the dedicated consumer and its alert active so work the queue already
-accepted drains. No code change or revert is needed.
+To move tagged usage back to the shared queue, commit `"false"` for that environment in
+`wrangler.jsonc` and deploy it normally; do not add a secret or dashboard variable instead. Keep
+the dedicated consumer and its alert active so work the queue already accepted drains. Only the
+switch value changes; do not revert the queue routing code.
 
 Do not revert this change, or deploy a revision without the dedicated consumer, while the
 dedicated queue or its retries may hold messages: that revision does not declare a consumer for

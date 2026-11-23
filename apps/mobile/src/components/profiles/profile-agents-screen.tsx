@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
-import { EmptyState, StateAction } from '@/components/empty-state';
+import { EmptyState } from '@/components/empty-state';
 import { AgentFormSheet, type AgentSaveFailure } from '@/components/profiles/agent-form-sheet';
 import { AgentRowView, AgentsSkeleton } from '@/components/profiles/profile-agents-row';
 import { agentRows, type AgentSource } from '@/components/profiles/profile-agents-model';
@@ -14,11 +14,10 @@ import { ProfileSectionHeader } from '@/components/profiles/profile-section-head
 import { QueryError } from '@/components/query-error';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
-import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Bot, Plus } from '@/components/ui/icons';
+import { IconButton } from '@/components/ui/icon-button';
 import { RowGroup } from '@/components/ui/row-group';
-import { Text } from '@/components/ui/text';
 import {
   type AgentProfileDetail,
   useAgentProfileAgents,
@@ -32,6 +31,7 @@ import { MAX_PROFILE_AGENTS } from '@/lib/agent-profile-forms';
 import { isolateBidiText } from '@/lib/bidi';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useSheetRowTapGuard } from '@/lib/hooks/use-sheet-row-tap-guard';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 
 /** Stable empty fallback so the derived list is not a new array each render. */
@@ -59,6 +59,10 @@ export function ProfileAgentsScreen({
     error: profileQuery.error,
     connectivity: committedConnectivity,
   });
+  // A failed read with no retry the screen offers leaves nothing to act on, so
+  // the header's create control stays out of the way of the error state.
+  const readErrorTerminal = profileQuery.isError && !readError.showRetry;
+  const colors = useThemeColors();
   const { createAgent, updateAgent, deleteAgent } = useAgentProfileSectionMutations(organizationId);
   const permission = useOrganizationProfilePermission(organizationId);
   const canManage = permission === 'allowed';
@@ -156,13 +160,10 @@ export function ProfileAgentsScreen({
       <EmptyState
         icon={Bot}
         title={t('profiles.agents.empty')}
-        description={null}
+        // A read-only member cannot add, so its state names the rule instead of
+        // an action the screen withholds.
+        description={permission === 'read-only' ? t('profiles.organizationRoleRequired') : null}
         placement="top"
-        action={
-          <ProfileManageSlot permission={permission}>
-            <StateAction label={t('profiles.agents.add')} icon={Plus} onPress={handleStartAdd} />
-          </ProfileManageSlot>
-        }
       />
     );
   } else {
@@ -207,9 +208,6 @@ export function ProfileAgentsScreen({
               className="text-sm"
             />
           ) : null}
-          <Button disabled={atAgentCap} onPress={handleStartAdd}>
-            <Text>{t('profiles.agents.add')}</Text>
-          </Button>
         </ProfileManageSlot>
       </View>
     );
@@ -222,6 +220,17 @@ export function ProfileAgentsScreen({
         organizationId={organizationId}
         title={t('profiles.agents.title')}
         backFallback={backFallback}
+        headerRight={
+          canManage && !readErrorTerminal ? (
+            <IconButton
+              accessibilityLabel={t('profiles.agents.add')}
+              disabled={atAgentCap}
+              onPress={handleStartAdd}
+            >
+              <Plus size={22} color={colors.foreground} />
+            </IconButton>
+          ) : undefined
+        }
       />
       {profileQuery.isError ? (
         // The read owns the surface, so it centres in the band the header and
@@ -246,7 +255,7 @@ export function ProfileAgentsScreen({
         </TabScreenScrollView>
       )}
 
-      {form.isOpen && canManage ? (
+      {form.isOpen && canManage && !readErrorTerminal ? (
         <AgentFormSheet
           draftScope={draftScope}
           agent={form.editing}

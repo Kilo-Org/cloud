@@ -7,8 +7,8 @@ import {
   hashBrowserToolArguments,
   isOAuthConsentUrl,
   isOriginGranted,
-  isScriptTool,
   isUploadCall,
+  runsPageCode,
   SENSITIVE_REASON,
   toBrowserOrigin,
   toolGrantClass,
@@ -39,6 +39,7 @@ import {
 } from './browser-agent-probes';
 import type { BrowserToolPageSession } from './browser-tool-snapshot';
 import type { BrowserToolDownload, BrowserToolSession } from './browser-tool-session';
+import type { WebMcpToolDescriptor } from './tab-debugger';
 
 /**
  * The agent check module (SPEC "Permission flow", D3, D4, D11): before a CLI
@@ -480,8 +481,10 @@ export const tabsNewDestinationCheck = (
  * Classifies one act call as a sensitive step: a call that hands a local file's
  * contents to the page (an upload, or a drop of local paths), an OAuth consent
  * page, typing into or submitting a password/one-time-code/payment field, or a
- * script call on a page whose script can reach such a field. A download that the
- * call starts is classified after it ran, by the runtime.
+ * call that runs page code — model-authored code or a page-registered tool — on
+ * a page whose script can reach such a field. A call that runs page code probes
+ * the tab's own origin plus every frame with a `read` grant, one probe per frame.
+ * A download that the call starts is classified after it ran, by the runtime.
  */
 const sensitiveStepFor = async (input: {
   readonly args: Record<string, unknown>;
@@ -507,8 +510,8 @@ const sensitiveStepFor = async (input: {
     return { origin: input.origin, reason: SENSITIVE_REASON.frameUnverified };
   }
 
-  if (isScriptTool(input.toolName)) {
-    // Model-authored code reaches every field a page script can reach: the tab's own origin, and any frame the extension may read. One probe per such frame.
+  if (runsPageCode(input.toolName)) {
+    // Model-authored code and page-registered code reach every field a page script can reach: the tab's own origin, and every frame with a `read` grant. One probe per such frame.
     const mainOrigin = mainFrameOf(input.frames)?.origin;
     const reachable = input.frames.filter(
       frame =>
@@ -611,6 +614,12 @@ export interface AgentPreflightInput {
   readonly authorized: readonly BrowserGrant[];
   /** The call's shared frame inventory, so the preflight and the tool read one tree. */
   readonly readFrames?: (() => Promise<AgentFrameInventory>) | undefined;
+  /**
+   * The WebMCP tools the tab's top-level document registers, or `undefined`
+   * when the page cannot report them. Required so no caller can skip the
+   * origin check by omission; the session's `discoverWebMcpTools` supplies it.
+   */
+  readonly readWebMcpTools: () => Promise<readonly WebMcpToolDescriptor[] | undefined>;
   /** Takes a token against this exact call and burns it; provided by the runtime's store. */
   readonly consumeStepToken: (token: string, binding: StepTokenBinding) => StepTokenTake;
   readonly session: GateSession;
@@ -655,6 +664,43 @@ export const preflightAgentCall = async (input: AgentPreflightInput): Promise<Ag
   }
 
   const destination = grantClass === 'navigate' ? navigationDestinationOf(input.args) : undefined;
+
+  /*
+   * `browser_webmcp_call` runs a tool the page registered, and discovery and
+   * execution both happen in the tab's top-level document. Page script controls
+   * the descriptor, so its `origin` is never a permission target: a descriptor
+   * that names no origin, or an origin other than the tab's own, is a call the
+   * grant cannot describe and is refused — not turned into a prompt. Checked
+   * before the required origins, so a mismatch never becomes `needs_permission`.
+   */
+  if (input.toolName === 'browser_webmcp_call') {
+    const requestedName = argumentString(input.args, 'name');
+
+    if (requestedName !== undefined) {
+      const tools = await input.readWebMcpTools();
+      const descriptor = tools?.find(tool => tool.name === requestedName);
+
+      if (descriptor !== undefined && descriptor.origin === '') {
+        return {
+          failure: {
+            error: `WebMCP tool "${requestedName}" does not name the origin it belongs to, so the call was refused.`,
+            kind: 'blocked',
+          },
+          ok: false,
+        };
+      }
+
+      if (descriptor !== undefined && descriptor.origin !== mainOrigin) {
+        return {
+          failure: {
+            error: `WebMCP tool "${requestedName}" reports origin ${descriptor.origin} but runs in the tab's own document (${mainOrigin}), so the call was refused.`,
+            kind: 'blocked',
+          },
+          ok: false,
+        };
+      }
+    }
+  }
 
   // A destination no grant can name (a data:, view-source: or chrome: URL) is refused before the tab is touched, matching the page path.
   if (destination?.kind === 'unresolvable') {

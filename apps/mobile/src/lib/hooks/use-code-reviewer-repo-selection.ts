@@ -13,6 +13,7 @@ import {
 } from '@/lib/hooks/repo-selection-senders';
 import { useReviewerBillingRefusal } from '@/lib/hooks/reviewer-refusal';
 import { chainSave } from '@/lib/hooks/save-chain';
+import { settleReviewerWrite } from '@/lib/hooks/reviewer-settled-refresh';
 import { MUTATE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { trpcClient } from '@/lib/trpc';
 
@@ -117,11 +118,11 @@ function useSaveReviewConfigDelta(scope: string, platform: ReviewerPlatform) {
       }
     },
     onSettled: async (_data, _error, vars) => {
-      // The invalidation runs only while the save's epoch is current.
+      // The refresh runs only while the save's epoch is current.
       if (!isRepoSelectionEpochCurrent(vars.authEpoch)) {
         return;
       }
-      await queryClient.invalidateQueries({ queryKey });
+      await settleReviewerWrite(queryClient, scope, queryKey);
     },
   });
 }

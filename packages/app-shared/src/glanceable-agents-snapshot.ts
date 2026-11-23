@@ -208,9 +208,9 @@ export type GlanceableCounts = {
 
 /**
  * The snapshot fields that describe the frame rather than the work in it. A
- * blank-work record must cover every other field of the snapshot, so a work
- * field added to the schema fails to compile here until it is either listed as
- * non-work or blanked by `NO_GLANCEABLE_WORK`.
+ * blank-work record must cover every other field of the snapshot, optional ones
+ * included, so a work field added to the schema fails to compile here until it
+ * is either listed as non-work or blanked by `NO_GLANCEABLE_WORK`.
  */
 type GlanceableFrameField =
   | 'schemaVersion'
@@ -225,12 +225,40 @@ type GlanceableFrameField =
   | 'newestResultAt';
 
 /**
+ * The blank-work record: a value for every work field of the snapshot. The keys
+ * come from an explicit union rather than from `Omit`, and a mapping over an
+ * explicit key union always emits required properties — `Omit` keeps an
+ * optional field's modifier, which is how an optional work fact used to escape
+ * this record. `-?` states that intent.
+ */
+type GlanceableBlankWork<T = GlanceableAgentsSnapshot> = {
+  [K in Exclude<keyof T, GlanceableFrameField>]-?: T[K];
+};
+
+/**
+ * The mapping above is the whole guard, so one assertion pins it: a snapshot
+ * widened with an optional work field must still require that field, so leaving
+ * it out is not a blank-work record. The check is an ambient declaration, so it
+ * compiles away and emits no runtime value.
+ */
+type AssertTrue<T extends true> = T;
+type OptionalWorkSnapshot = GlanceableAgentsSnapshot & { queued?: number };
+declare const _blankWorkRequiresOptionalWorkFields: AssertTrue<
+  Omit<
+    GlanceableBlankWork<OptionalWorkSnapshot>,
+    'queued'
+  > extends GlanceableBlankWork<OptionalWorkSnapshot>
+    ? false
+    : true
+>;
+
+/**
  * The work fields a frame carries when it asserts no work at all: one that has
  * lapsed, and one built for a terminal scope. Both producers spread this one
  * record instead of listing the fields again, so no path can blank a field the
  * other keeps.
  */
-export const NO_GLANCEABLE_WORK: Omit<GlanceableAgentsSnapshot, GlanceableFrameField> = {
+export const NO_GLANCEABLE_WORK: GlanceableBlankWork = {
   running: 0,
   needsInput: 0,
   needsApproval: 0,

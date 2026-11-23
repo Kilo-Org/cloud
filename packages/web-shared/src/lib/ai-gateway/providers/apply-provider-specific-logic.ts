@@ -78,6 +78,7 @@ import {
   addReflectionReasoningPlaceholders,
   isReflectionModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/reflection';
+import { isGatewayBackend } from '@kilocode/web-shared/lib/ai-gateway/providers/provider-type-predicates';
 
 /**
  * Claude goes to Anthropic and OpenAI models go to Amazon Bedrock only for
@@ -368,7 +369,7 @@ export async function applyProviderSpecificLogic({
   }
 
   // Kilo's provider order and exclusions only shape routes Kilo pays for, never a user's own keys.
-  if (payer === 'kilo' && (provider.type === 'openrouter' || provider.type === 'vercel')) {
+  if (payer === 'kilo' && isGatewayBackend(provider.type)) {
     applyPreferredProvider(
       await getPreferredProviderOrderConfig(),
       requestedModel,

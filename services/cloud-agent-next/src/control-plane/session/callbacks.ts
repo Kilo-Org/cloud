@@ -1,10 +1,17 @@
 import {
+  CALLBACK_QUEUE_MAX_SERIALIZED_BYTES,
   fitCallbackJobToQueueLimit,
   type CallbackJobQueueFitResult,
 } from '../../callbacks/queue-payload.js';
 import { isWorkspaceCallbackTargetUrl } from '@kilocode/worker-utils/cloud-agent-authority';
 import { createMessageId, isCanonicalMessageId } from '../../session/message-id.js';
-import type { CallbackJob, CallbackTarget } from '../../callbacks/types.js';
+import {
+  interactionCallbackJobSchema,
+  type CallbackJob,
+  type CallbackQueueJob,
+  type CallbackTarget,
+} from '../../callbacks/types.js';
+import { ChildQuestionSchema } from '@kilocode/worker-utils/cloud-agent-child-callback';
 import { renderRecentActivity } from '../../callbacks/recent-activity.js';
 import { logger } from '../../logger.js';
 import type { SessionMetadata } from '../../persistence/session-metadata.js';
@@ -18,11 +25,11 @@ export const CALLBACK_OUTBOX_PREFIX = 'callback_outbox:';
 export const CALLBACK_ENQUEUE_MAX_ATTEMPTS = 5;
 export const CALLBACK_ENQUEUE_RETRY_MS = 30_000;
 
-type CallbackQueue = Pick<Queue<CallbackJob>, 'send'>;
+type CallbackQueue = Pick<Queue<CallbackQueueJob>, 'send'>;
 type CallbackStorage = Pick<DurableObjectStorage, 'kv'>;
 
 export type PendingCallbackJob = {
-  job: CallbackJob;
+  job: CallbackQueueJob;
   attempts: number;
   dueAt: number;
 };
@@ -48,6 +55,7 @@ export type MessageCallbacksDependencies = {
 };
 
 export type MessageCallbacks = {
+  persistQuestionCallback(question: unknown): boolean;
   persistDrainedBatchCallback(
     messages: readonly SessionMessage[],
     newlyTerminalMessageIds: ReadonlySet<string>,
@@ -109,8 +117,11 @@ function parsePendingCallbackJob(value: unknown): PendingCallbackJob | undefined
   if (!isRecord(value)) return undefined;
   const attempts = value.attempts;
   const dueAt = value.dueAt;
+  const job = isCallbackJob(value.job)
+    ? value.job
+    : interactionCallbackJobSchema.safeParse(value.job).data;
   if (
-    !isCallbackJob(value.job) ||
+    job === undefined ||
     typeof attempts !== 'number' ||
     !Number.isInteger(attempts) ||
     typeof dueAt !== 'number' ||
@@ -121,7 +132,7 @@ function parsePendingCallbackJob(value: unknown): PendingCallbackJob | undefined
     return undefined;
   }
   return {
-    job: value.job,
+    job,
     attempts,
     dueAt,
   };
@@ -169,6 +180,49 @@ export function createMessageCallbacks(
     getRecentAssistantAnswersForUserMessage,
   } = dependencies;
   let repairInFlight: Promise<void> | undefined;
+
+  function persistQuestionCallback(raw: unknown): boolean {
+    const metadata = getMetadata();
+    const target = metadata?.callback?.target;
+    if (
+      !metadata?.parentCloudAgentSessionId ||
+      !target ||
+      !isWorkspaceCallbackTargetUrl(target.url)
+    )
+      return false;
+    const parsed = ChildQuestionSchema.safeParse(raw);
+    if (!parsed.success) {
+      logger
+        .withFields({ sessionId: metadata.identity.sessionId, reason: 'invalid_question' })
+        .warn('Child question callback was not queued');
+      return false;
+    }
+    const question = parsed.data;
+    const key = callbackKey(`question:${question.id}`);
+    if (storage.kv.get(key) !== undefined) return false;
+    const job = {
+      type: 'interaction' as const,
+      target: {
+        url: target.launchingSessionId ? `workspace:${target.launchingSessionId}` : target.url,
+      },
+      parentSession: { userId: metadata.identity.userId, messageId: createMessageId() },
+      payload: { cloudAgentSessionId: metadata.identity.sessionId, question },
+    };
+    const serializedBytes = new TextEncoder().encode(JSON.stringify(job)).byteLength;
+    if (serializedBytes > CALLBACK_QUEUE_MAX_SERIALIZED_BYTES) {
+      logger
+        .withFields({
+          sessionId: metadata.identity.sessionId,
+          reason: 'queue_payload_too_large',
+          serializedBytes,
+          maxSerializedBytes: CALLBACK_QUEUE_MAX_SERIALIZED_BYTES,
+        })
+        .warn('Child question callback was not queued');
+      return false;
+    }
+    storage.kv.put<PendingCallbackJob>(key, { job, attempts: 0, dueAt: Date.now() });
+    return true;
+  }
 
   function buildJob(
     message: SessionMessage,
@@ -344,12 +398,13 @@ export function createMessageCallbacks(
     return next;
   }
 
-  function logEnqueueFailure(job: CallbackJob, attempts: number, abandoned: boolean): void {
+  function logEnqueueFailure(job: CallbackQueueJob, attempts: number, abandoned: boolean): void {
     logger
       .withFields({
-        sessionId: job.payload.sessionId,
-        messageId: job.payload.messageId,
-        status: job.payload.status,
+        sessionId: job.payload.cloudAgentSessionId,
+        ...('type' in job
+          ? { status: job.type }
+          : { messageId: job.payload.messageId, status: job.payload.status }),
         attempts,
         callbackTarget: redactCallbackTargetUrl(job.target.url),
       })
@@ -415,6 +470,7 @@ export function createMessageCallbacks(
   }
 
   return {
+    persistQuestionCallback,
     persistDrainedBatchCallback,
     pendingCallbackCount,
     nextCallbackDueAt,

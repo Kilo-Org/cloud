@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { isPersonal } from '@/lib/code-reviewer-config';
+import { orgAuditLogQueryKey } from '@/lib/hooks/use-org-billing-queries';
+import { reconcileFirstPage } from '@/lib/query/infinite-retention';
 import { MUTATE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
@@ -67,6 +69,7 @@ export function useBitbucketIntegrationStatus(scope: string | undefined, enabled
 /** Connects a workspace the organization has no integration for yet. */
 export function useConnectBitbucket(scope: string) {
   const refresh = useBitbucketRefresh(scope);
+  const queryClient = useQueryClient();
   return useMutation({
     ...MUTATE_WHILE_OFFLINE,
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
@@ -75,8 +78,14 @@ export function useConnectBitbucket(scope: string) {
         organizationId: scope,
         accessToken: vars.accessToken,
       }),
-    // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
-    onSuccess: () => refresh(),
+    // A connect writes an organization audit row, so the log's page one is
+    // refreshed for the next open.
+    onSuccess: async () => {
+      await refresh();
+      if (!isPersonal(scope)) {
+        await reconcileFirstPage(queryClient, orgAuditLogQueryKey(scope));
+      }
+    },
   });
 }
 
@@ -87,6 +96,7 @@ export function useConnectBitbucket(scope: string) {
  */
 export function useReplaceBitbucketToken(scope: string) {
   const refresh = useBitbucketRefresh(scope);
+  const queryClient = useQueryClient();
   return useMutation({
     ...MUTATE_WHILE_OFFLINE,
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
@@ -96,8 +106,13 @@ export function useReplaceBitbucketToken(scope: string) {
         integrationId: vars.integrationId,
         accessToken: vars.accessToken,
       }),
-    // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
-    onSuccess: () => refresh(),
+    // A token rotation writes an organization audit row, like the connect.
+    onSuccess: async () => {
+      await refresh();
+      if (!isPersonal(scope)) {
+        await reconcileFirstPage(queryClient, orgAuditLogQueryKey(scope));
+      }
+    },
   });
 }
 

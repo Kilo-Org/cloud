@@ -5,7 +5,7 @@ import { isAccountBlockedTrpcError, readAccountBlockedReason } from '@/lib/trpc-
 // The blocked-account reason reader: the wire field is the only thing that
 // tells the two refusals apart, so its presence, absence and unknown values all
 // need their own case. `isAccountBlockedTrpcError` (the presence check) lives in
-// `trpc-error.test.ts`; the last case here joins the two, because a newer
+// `trpc-error.test.ts`; one case here joins the two, because a newer
 // server's unknown reason must not turn a blocked refusal into an unexplained
 // error on an older build.
 

@@ -27,7 +27,10 @@ import {
   MergeSheetFormBody,
   MergeSheetFormSkeleton,
 } from '@/components/pr-review/merge/pr-merge-sheet-parts';
-import { PrMergeProviderBody } from '@/components/pr-review/merge/pr-merge-provider-body';
+import {
+  type PrMergeGate,
+  PrMergeProviderBody,
+} from '@/components/pr-review/merge/pr-merge-provider-body';
 import { usePrMergeDraft } from '@/components/pr-review/merge/use-pr-merge-draft';
 import { usePrMergeSubmit } from '@/components/pr-review/merge/use-pr-merge-submit';
 import { providerPrNounKey } from '@/components/pr-review/pr-review-provider-noun';
@@ -37,6 +40,28 @@ import { type ProviderPrRef } from '@/lib/pr-review/provider-pr-ref';
 // flexGrow makes the ScrollView's content container at least the viewport
 // tall, so a short arm's spacer can push its footer to the sheet's bottom.
 const SHEET_SCROLL_CONTENT_STYLE = { flexGrow: 1, paddingBottom: 4 };
+
+function mergeGateFor({
+  prRef,
+  mergeState,
+  mode,
+  autoMergeCapability,
+}: Readonly<{
+  prRef: ProviderPrRef | undefined;
+  mergeState: ProviderPrMergeState | null | undefined;
+  mode: 'merge' | 'enable-auto-merge';
+  autoMergeCapability: ProviderReviewCapability | undefined;
+}>): PrMergeGate {
+  if (!prRef) {
+    return { kind: 'github' };
+  }
+  if (!mergeState) {
+    return { kind: 'unknown' };
+  }
+  return mode === 'enable-auto-merge'
+    ? { kind: 'auto-merge', mergeState, capability: autoMergeCapability }
+    : { kind: 'merge', mergeState };
+}
 
 type PrMergeSheetProps = Readonly<{
   owner: string;
@@ -54,8 +79,19 @@ type PrMergeSheetProps = Readonly<{
   /** The reference under the title; absent when the route names no request. */
   eyebrow?: string;
   prRef?: ProviderPrRef;
+  /**
+   * A provider arm normally carries the merge-state read; a missing value
+   * renders the body's unknown terminal, never a confirm control.
+   */
   mergeState?: ProviderPrMergeState | null;
   autoMergeCapability?: ProviderReviewCapability;
+  /**
+   * The caller's merge-state read: `retry` re-reads the state an `unknown`
+   * gate could not produce, `isRetrying` is that read's fetching flag. The
+   * sheet has no fallback of its own — the overview refetch cannot clear a
+   * gate derived from the merge state.
+   */
+  mergeStateRetry: Readonly<{ retry: () => void; isRetrying: boolean }>;
   onRefetch: () => Promise<void>;
   onDismiss: () => void;
 }>;
@@ -78,6 +114,7 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
     prRef,
     mergeState,
     autoMergeCapability,
+    mergeStateRetry,
     onRefetch,
     onDismiss,
   } = props;
@@ -93,6 +130,7 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
       })
     : null;
   const methodOptions = providerMethodOptions ?? mergeMethodOptionsFor(repoSettings);
+  const gate = mergeGateFor({ prRef, mergeState, mode, autoMergeCapability });
   const fallbackMethod: AllowedMergeMethod =
     methodOptions.find(o => o.value === initialMethod)?.value ??
     (providerMethodOptions
@@ -188,13 +226,12 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
       >
         {settled ? (
           <PrMergeProviderBody
-            providerAutoMerge={Boolean(prRef) && mode === 'enable-auto-merge'}
-            autoMergeCapability={autoMergeCapability}
-            mergeState={mergeState}
+            gate={gate}
             term={prRef ? t(providerPrNounKey(prRef.platform)) : ''}
             isMutating={isMutating}
             onConfirm={handleConfirmPress}
             onCancel={handleCancel}
+            mergeStateRetry={mergeStateRetry}
           >
             <MergeSheetFormBody
               noMethodsAllowed={noMethodsAllowed}

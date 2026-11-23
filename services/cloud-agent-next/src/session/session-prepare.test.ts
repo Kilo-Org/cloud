@@ -1337,12 +1337,12 @@ describe('explicit sandbox session creation', () => {
   );
 
   it.each(
-    SELECTABLE_SANDBOX_ALLOCATIONS.filter(allocation => !allocation.startsWith('vercel-')).flatMap(
-      preset => [
-        { preset, format: 'legacy' },
-        { preset, format: 'structured' },
-      ]
-    )
+    SELECTABLE_SANDBOX_ALLOCATIONS.filter(
+      allocation => getSandboxAllocationRequest(allocation).provider.account === 'kilo'
+    ).flatMap(preset => [
+      { preset, format: 'legacy' },
+      { preset, format: 'structured' },
+    ])
   )(
     'persists $format $preset with its canonical allocation and valid metadata',
     async ({ preset, format }) => {
@@ -1407,9 +1407,9 @@ describe('explicit sandbox session creation', () => {
   );
 
   it.each(
-    SELECTABLE_SANDBOX_ALLOCATIONS.filter(allocation => !allocation.startsWith('vercel-')).filter(
-      allocation => !allocation.startsWith('vercel-')
-    )
+    SELECTABLE_SANDBOX_ALLOCATIONS.filter(
+      allocation => getSandboxAllocationRequest(allocation).provider.account === 'kilo'
+    ).filter(allocation => !allocation.startsWith('vercel-'))
   )(
     'recovers %s on same-key takeover after membership lookup fails before progress',
     async sandboxAllocation => {
@@ -1535,9 +1535,9 @@ describe('explicit sandbox session creation', () => {
   );
 
   it.each(
-    SELECTABLE_SANDBOX_ALLOCATIONS.filter(allocation => !allocation.startsWith('vercel-')).filter(
-      allocation => !allocation.startsWith('vercel-')
-    )
+    SELECTABLE_SANDBOX_ALLOCATIONS.filter(
+      allocation => getSandboxAllocationRequest(allocation).provider.account === 'kilo'
+    ).filter(allocation => !allocation.startsWith('vercel-'))
   )(
     'creates the first worktree chat with %s and upstream finalization/containment semantics',
     async sandboxAllocation => {
@@ -1722,7 +1722,11 @@ describe('explicit sandbox session creation', () => {
     );
   });
 
-  it.each(SELECTABLE_SANDBOX_ALLOCATIONS.filter(allocation => !allocation.startsWith('vercel-')))(
+  it.each(
+    SELECTABLE_SANDBOX_ALLOCATIONS.filter(
+      allocation => getSandboxAllocationRequest(allocation).provider.account === 'kilo'
+    )
+  )(
     'replays a structured %s request against a legacy stored fingerprint',
     async sandboxAllocation => {
       const legacyRequest = requestForPreset(sandboxAllocation);
@@ -3422,7 +3426,7 @@ describe('createSessionWithLedger admission ladder', () => {
     'leaves %s browser sessions ungrouped with their requested auto-commit',
     async (_label, runtime, botId) => {
       const doStub = makeDoStub();
-      const ctx = { ...makeContext(doStub), ...(botId ? { botId } : {}) };
+      const ctx = { ...modernContext(makeContext(doStub)), botId };
       generateSessionIdMock.mockReturnValue(WORKSPACE_SESSION_ID);
 
       await runCreate(
@@ -3441,6 +3445,7 @@ describe('createSessionWithLedger admission ladder', () => {
       expect(createdMetadata(doStub)).toMatchObject(
         expect.objectContaining({
           finalization: { autoCommit: true },
+          allowSubagentSessions: false,
           workspace: expect.not.objectContaining({ worktreeId: expect.anything() }),
         })
       );
@@ -4668,7 +4673,7 @@ describe('createSessionWithLedger admission ladder', () => {
     expect(markReconcilePendingMock).not.toHaveBeenCalled();
   });
 
-  it('registers an authenticated scoped child as a worktree workspace without spawn authority', async () => {
+  it('registers an authenticated scoped child as a worktree workspace with spawn authority', async () => {
     const doStub = makeDoStub();
     const ctx = modernContext(scopedChildContext(makeContext(doStub)));
     const expectedWorktreeId = `worktree_${SANDBOX_SESSION_ID.slice('workspace_'.length)}`;
@@ -4695,7 +4700,7 @@ describe('createSessionWithLedger admission ladder', () => {
     const metadata = createdMetadata(doStub);
     expect(metadata).toMatchObject({
       parentCloudAgentSessionId: PARENT_SESSION_ID,
-      allowSubagentSessions: false,
+      allowSubagentSessions: true,
       identity: expect.objectContaining({ createdOnPlatform: 'cloud-agent-web' }),
       workspace: expect.objectContaining({
         worktreeId: expectedWorktreeId,

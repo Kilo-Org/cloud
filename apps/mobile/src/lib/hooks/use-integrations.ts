@@ -4,11 +4,13 @@ import { useState } from 'react';
 import { i18n } from '@/i18n';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { appShellHandoffUrl } from '@/lib/app-shell-handoff';
+import { orgAuditLogQueryKey } from '@/lib/hooks/use-org-billing-queries';
 import { type IntegrationProvider, providerLabelKey } from '@/lib/integrations/provider-catalog';
 import {
   openAuthorizationAndWaitForReturn,
   reportLateLaunchFailure,
 } from '@/lib/pr-review/connect-gate-platform';
+import { reconcileFirstPage } from '@/lib/query/infinite-retention';
 import { MUTATE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { isTrialExpiredRefusal, knownServerErrorMessage } from '@/lib/server-error-copy';
 import { announceTrialRefusal } from '@/lib/refusal-toast';
@@ -145,6 +147,11 @@ export function useDisconnectIntegration(organizationId: string | undefined) {
                 }),
               }),
             ]
+          : []),
+        // Only the Bitbucket branch writes an organization audit row; the
+        // other providers' disconnects record nothing the log pages.
+        ...(organizationId && variables.provider === 'bitbucket'
+          ? [reconcileFirstPage(queryClient, orgAuditLogQueryKey(organizationId))]
           : []),
       ]);
     },

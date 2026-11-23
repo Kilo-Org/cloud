@@ -9,6 +9,8 @@ export const RUNTIME_PROXY_ATTESTATION_ISSUER = 'kilocode-runtime-proxy';
 export const RUNTIME_PROXY_ATTESTATION_TYPE = 'cloud-agent-next-runtime-proxy';
 export const RUNTIME_PROXY_ATTESTATION_VERSION = 1;
 export const RUNTIME_PROXY_ATTESTATION_MAX_AGE_SECONDS = 30;
+/** Verifiers accept longer signed lifetimes so they can deploy before issuers extend them. */
+export const RUNTIME_PROXY_ATTESTATION_MAX_ACCEPTED_AGE_SECONDS = 120;
 /** Sanity bound on the untrusted header value in characters, checked before any JWT parsing runs. */
 export const RUNTIME_PROXY_ATTESTATION_MAX_VALUE_LENGTH = 4096;
 
@@ -47,7 +49,7 @@ const runtimeProxyAttestationClaims = z
   .superRefine((claims, ctx) => {
     if (
       claims.exp <= claims.iat ||
-      claims.exp - claims.iat > RUNTIME_PROXY_ATTESTATION_MAX_AGE_SECONDS
+      claims.exp - claims.iat > RUNTIME_PROXY_ATTESTATION_MAX_ACCEPTED_AGE_SECONDS
     ) {
       ctx.addIssue({ code: 'custom', message: 'Invalid runtime proxy attestation lifetime' });
     }
@@ -88,6 +90,10 @@ export async function issueRuntimeProxyAttestation(
     iat: issuedAt,
     exp: issuedAt + RUNTIME_PROXY_ATTESTATION_MAX_AGE_SECONDS,
   });
+  // The schema allows up to 120 seconds for verifiers, so issuance enforces its own lifetime.
+  if (claims.exp - claims.iat !== RUNTIME_PROXY_ATTESTATION_MAX_AGE_SECONDS) {
+    throw new Error('Invalid issued runtime proxy attestation lifetime');
+  }
   return new SignJWT(claims)
     .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
     .sign(signingKey(input.secret));

@@ -2,10 +2,13 @@ import type { CloudAgentFailureStage } from '@kilocode/worker-utils/cloud-agent-
 import type { ClientError } from '@kilocode/worker-utils/client-error';
 import type { SafeFailureProjection } from '../session/safe-failure-projection.js';
 import type { ModelNotFoundRuntimeDiagnostics } from '@kilocode/worker-utils/runtime-model-diagnostics';
+import { ChildQuestionSchema } from '@kilocode/worker-utils/cloud-agent-child-callback';
+import { z } from 'zod';
 
 export type CallbackTarget = {
   url: string;
   headers?: Record<string, string>;
+  launchingSessionId?: string;
 };
 
 export type CallbackTextTruncation = {
@@ -55,3 +58,17 @@ export type CallbackJob = {
   /** Server-owned routing context. Persisted once so queue retries reuse the same parent turn. */
   parentSession?: { userId: string; messageId: string };
 };
+
+export const interactionCallbackJobSchema = z.object({
+  type: z.literal('interaction'),
+  target: z.object({ url: z.string() }),
+  parentSession: z.object({ userId: z.string(), messageId: z.string() }),
+  payload: z.object({ cloudAgentSessionId: z.string(), question: ChildQuestionSchema }),
+});
+
+export type InteractionCallbackJob = z.infer<typeof interactionCallbackJobSchema>;
+export type CallbackQueueJob = CallbackJob | InteractionCallbackJob;
+export type CallbackDeliveryIdentity = Pick<
+  ExecutionCallbackPayload,
+  'cloudAgentSessionId' | 'kiloSessionId' | 'messageId'
+>;

@@ -17,7 +17,7 @@ describe('session callback context', () => {
   it('names the session id for a subagent-enabled workspace chat', () => {
     const context = sessionCallbackContext(metadata);
     expect(context).toContain(`session-id="${sessionId}"`);
-    expect(context).toContain(`"url":"workspace:${sessionId}"`);
+    expect(context).toContain(`<cloud-agent-worktree id="${worktreeId}" />`);
     expect(context).not.toContain('token');
   });
 
@@ -25,8 +25,10 @@ describe('session callback context', () => {
     expect(sessionCallbackContext({ ...metadata, allowSubagentSessions: false })).toBeUndefined();
   });
 
-  it('omits the context without a workspace', () => {
+  it('names a standalone session without a worktree', () => {
     const { workspace: _workspace, ...withoutWorkspace } = metadata;
-    expect(sessionCallbackContext(withoutWorkspace as SessionMetadata)).toBeUndefined();
+    expect(sessionCallbackContext(withoutWorkspace)).toBe(
+      `<cloud-agent-context session-id="${sessionId}" />`
+    );
   });
 });

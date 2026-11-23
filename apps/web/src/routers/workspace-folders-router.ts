@@ -8,6 +8,7 @@ import {
 import {
   cloudAgentWorktreeIdSchema,
   cloudAgentWorktreeLocationSchema,
+  type CloudAgentWorktreeLocation,
 } from '@kilocode/session-ingest-contracts';
 import { TRPCError } from '@trpc/server';
 import { and, asc, eq, inArray, isNull, max, sql } from 'drizzle-orm';
@@ -91,7 +92,7 @@ async function readWorktreeRuntimeLocations(
   tx: DrizzleTransaction,
   scope: SidebarScope,
   cloudAgentSessionId: string
-): Promise<{ sandboxId: string; provider: 'cloudflare' | 'vercel' | 'cloudflare-containers' }[]> {
+): Promise<CloudAgentWorktreeLocation[]> {
   const rows = await tx
     .select({
       organizationId: operation_ledgers.organization_id,
@@ -108,10 +109,7 @@ async function readWorktreeRuntimeLocations(
       )
     );
 
-  const locations = new Map<
-    string,
-    { sandboxId: string; provider: 'cloudflare' | 'vercel' | 'cloudflare-containers' }
-  >();
+  const locations = new Map<string, CloudAgentWorktreeLocation>();
   for (const row of rows) {
     // Match the row's scope the way deletion's allocation fallback does
     // (`allocationLocation`), rather than filtering `organization_id` in SQL:

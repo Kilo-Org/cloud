@@ -14,6 +14,7 @@ import {
   mergeRequiredHosts,
   profileMcpServersToClientRecord,
   ProfileNotFoundError,
+  sameRepositoryIdentity,
   type BuiltinAgentSettings,
   type EnvironmentForSession,
   type EnvironmentInlineArgs,
@@ -50,11 +51,14 @@ import { resolveHostedWorkspaceRepositories } from './hosted-workspace-repositor
 import { assertOrganizationMembership } from './organization-membership.js';
 import { assertRequestedRepositories } from './requested-environment-repositories.js';
 import { getWorkspaceStub } from '../../control-plane/workspace/workspace-stub.js';
+import {
+  workspaceSpawnContextSchema,
+  type WorkspaceSpawnConfiguration,
+} from '../../cloud-agent-authority.js';
 import { withDORetry } from '../../utils/do-retry.js';
 import { validateBalanceOnly } from '../../balance-validation.js';
 import { timingSafeEqual } from '@kilocode/encryption';
 import { isRepositoryAgentOrigin } from '../../shared/agent-modes.js';
-import { isInteractiveSessionOrigin } from '../../shared/control-plane-permission.js';
 import { logger } from '../../logger.js';
 import { NETWORK_SECRET_LIMITS } from '@kilocode/worker-utils/network-secrets';
 
@@ -124,7 +128,11 @@ async function resolveEnvironment(
   db?: WorkerDb,
   binding?: EnvironmentSetupBinding
 ): Promise<EnvironmentForSession | null> {
-  if (policy.defaultProfileResolution !== 'include-web-defaults' && binding === undefined)
+  if (
+    policy.defaultProfileResolution !== 'include-web-defaults' &&
+    input.requestedEnvironment === undefined &&
+    binding === undefined
+  )
     return null;
   const repository = launchRepositoryIdentity(input.repository);
   if (!repository) return null;
@@ -481,6 +489,32 @@ type InheritedEgressPolicy = {
   egressAudit?: boolean;
 };
 
+function inheritSpawnConfiguration(
+  request: SessionCreateRequest,
+  inherited: WorkspaceSpawnConfiguration | undefined
+): SessionCreateRequest | undefined {
+  if (inherited === undefined || request.requestedEnvironment !== undefined) return undefined;
+  const environment = inherited.environment;
+  const launch = launchRepositoryIdentity(request.repository);
+  const members =
+    environment?.repositories?.map(member => member.identity) ??
+    (environment?.repository ? [environment.repository] : []);
+  if (environment && (!launch || !members.some(member => sameRepositoryIdentity(member, launch))))
+    return undefined;
+  const scope =
+    environment?.repositories === undefined
+      ? environment
+      : {
+          ...environment,
+          repositories: environment.repositories.map(({ branch: _branch, ...member }) => member),
+        };
+  return {
+    ...request,
+    profile: { resolved: inherited.profile },
+    ...(scope ? { environment: scope } : {}),
+  };
+}
+
 function supportsEgressAudit(request: SessionCreateRequest): boolean {
   const allocation = request.runtime?.sandboxAllocation ?? request.environmentSandboxAllocation;
   if (allocation === undefined) return true;
@@ -622,6 +656,7 @@ export async function preflightSessionCreation(
   validateEndpoint?: EndpointValidator,
   policyOptions?: SessionCreationPolicyOptions
 ): Promise<SessionCreateRequest> {
+  let inheritedConfiguration: WorkspaceSpawnConfiguration | undefined;
   let workspaceEgress: InheritedEgressPolicy | undefined;
   let workspaceSetup: CloudAgentAuthority['environmentSetup'];
   if (ctx.cloudAgentAuthority) {
@@ -638,22 +673,19 @@ export async function preflightSessionCreation(
     try {
       // The workspace records the policy it was created with; the environment's
       // current settings do not apply to an existing workspace.
-      const workspace = await withDORetry(
-        () => getWorkspaceStub(ctx.env, ctx.userId, authority.parentSessionId),
-        stub => stub.getSpawnContext(authority),
-        'getSpawnContext'
+      const workspace = workspaceSpawnContextSchema.parse(
+        await withDORetry(
+          () => getWorkspaceStub(ctx.env, ctx.userId, authority.parentSessionId),
+          stub => stub.getSpawnContext(authority),
+          'getSpawnContext'
+        )
       );
       token = workspace.token;
       parentCreatedOnPlatform = workspace.createdOnPlatform;
+      inheritedConfiguration = workspace.configuration;
       workspaceEgress = workspace.egress;
       workspaceSetup = workspace.environmentSetup;
     } catch {
-      throw new TRPCError({
-        code: 'FORBIDDEN',
-        message: 'Cloud Agent parent authorization unavailable',
-      });
-    }
-    if (!isInteractiveSessionOrigin(parentCreatedOnPlatform)) {
       throw new TRPCError({
         code: 'FORBIDDEN',
         message: 'Cloud Agent parent authorization unavailable',
@@ -711,13 +743,11 @@ export async function preflightSessionCreation(
   const policy: ProfileResolutionPolicy = policyOptions?.includeWebDefaults
     ? { defaultProfileResolution: 'include-web-defaults' }
     : profileResolutionPolicyForSessionCreateOrigin(request.options?.createdOnPlatform);
-  let resolvedRequest = await resolveEffectiveSessionConfiguration(
-    ctx,
-    request,
-    policy,
-    db,
-    binding
-  );
+  const inheritedRequest =
+    binding === undefined ? inheritSpawnConfiguration(request, inheritedConfiguration) : undefined;
+  let resolvedRequest =
+    inheritedRequest ??
+    (await resolveEffectiveSessionConfiguration(ctx, request, policy, db, binding));
   if (policyOptions?.continuationModeResolution) {
     // Replace the agent object instead of mutating it: the resolution result
     // shares the caller's `agent` reference, and the continuation handler derives

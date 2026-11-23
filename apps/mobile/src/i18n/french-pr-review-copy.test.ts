@@ -145,7 +145,7 @@ describe('French PR-review labels and the names announced for them', () => {
   it('starts each accessible name with the visible label it belongs to', () => {
     const pairs = [
       ['prReview.floatingActions.clear', 'prReview.floatingActions.clearSelection'],
-      ['prReview.hunkRows.goToOverview', 'prReview.hunkRows.goToOverviewTab'],
+      ['prReview.fileNavigator.goToOverview', 'prReview.fileNavigator.goToOverviewTab'],
       ['prReview.review', 'prReview.reviewPullRequest'],
     ] as const;
     for (const [visible, name] of pairs) {

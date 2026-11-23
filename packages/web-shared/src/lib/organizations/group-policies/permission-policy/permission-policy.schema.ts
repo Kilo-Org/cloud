@@ -53,13 +53,13 @@ export const AgentPermissionFields = {
     // default. Both forms are valid together, and `tools.bash` objects stay
     // rejected because command rules belong in a shell profile.
     //
-    // A client that reads the layers applies both in every layer that states
-    // either, and takes the most restrictive outcome (`deny` over `ask` over
-    // `allow`) within a layer and across layers. Neither form overrides the
-    // other, so a permissive `tools.bash` cannot lift a shell rule or shell
-    // default, and a restrictive `tools.bash` narrows an allowing shell profile.
-    // A layer whose `shell` block names no profile for the shell that runs the
-    // command denies that command.
+    // The intended contract for a client that reads these layers is that both
+    // forms apply in every layer that states either, and the more restrictive
+    // outcome wins (`deny` over `ask` over `allow`) within a layer and across
+    // layers. Neither form overrides the other, so a permissive `tools.bash`
+    // cannot lift a shell rule or shell default, and a restrictive `tools.bash`
+    // narrows an allowing shell profile. A layer whose `shell` block names no
+    // profile for the shell that runs the command denies that command.
     .refine(
       tools => tools.bash === undefined || typeof tools.bash === 'string',
       'Use shell profiles for Bash command rules'

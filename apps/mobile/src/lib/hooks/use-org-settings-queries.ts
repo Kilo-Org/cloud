@@ -2,8 +2,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { toast } from 'sonner-native';
 
-import { organizationErrorMessage } from '@/lib/server-error-copy';
+import { orgAuditLogQueryKey } from '@/lib/hooks/use-org-billing-queries';
+import { reconcileFirstPage } from '@/lib/query/infinite-retention';
 import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
+import { organizationErrorMessage } from '@/lib/server-error-copy';
 import { useTRPC } from '@/lib/trpc';
 
 type RouterOutputs = inferRouterOutputs<MobileRouter>;
@@ -50,6 +52,9 @@ export function useSaveOrgGuardrails(organizationId: string | null, canManageBil
             organizationId: organizationId ?? '',
           }),
         });
+        if (organizationId != null) {
+          await reconcileFirstPage(queryClient, orgAuditLogQueryKey(organizationId));
+        }
       },
       onError: error => {
         toast.error(organizationErrorMessage(error, canManageBilling, 'absent'));
@@ -132,6 +137,7 @@ export function useSaveOrgModelAccess(organizationId: string | null, canManageBi
                 audience: 'member',
               }),
             }),
+            reconcileFirstPage(queryClient, orgAuditLogQueryKey(organizationId)),
           ]);
         }
       },
@@ -153,6 +159,7 @@ export function useSaveOrgGatewaySettings(organizationId: string | null, canMana
           await queryClient.invalidateQueries({
             queryKey: trpc.organizations.settings.getGatewaySettings.queryKey({ organizationId }),
           });
+          await reconcileFirstPage(queryClient, orgAuditLogQueryKey(organizationId));
         }
       },
       onError: error => {

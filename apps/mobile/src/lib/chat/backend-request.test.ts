@@ -124,7 +124,7 @@ describe('remote backend requests', () => {
   });
 
   it('leaves draft validation failures on the input contract', async () => {
-    // A model list is required input; without one the connection is invalid.
+    // Missing apiKey, headers and allowLocalHttp; discovery does not read models.
     const invalid: unknown = {
       baseUrl: 'https://remote.example/v1',
       apiKind: 'chat_completions',

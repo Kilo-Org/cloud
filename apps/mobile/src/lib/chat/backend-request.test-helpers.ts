@@ -32,7 +32,6 @@ export const profile: ChatBackendDraft = {
 export const OK_STREAM =
   'data: {"choices":[{"delta":{"content":"OK"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n';
 
-/** A provider failure event the wire reads as a stream reason, plus its pieces. */
 const DELTA = 'data: {"choices":[{"delta":{"content":"Hel"}}]}\n\n';
 const CUT_EVENT = 'data: {"error":{"message":"cut","type":"server_error"}}\n\n';
 const END_EVENT = 'data: [DONE]\n\n';

@@ -215,7 +215,6 @@ export const ggufModelProvider: LocalModelProvider = {
         };
   },
   supportsTools: fileId => ggufStore().model(fileId)?.tools ?? false,
-  // True only for a model whose projector llama.cpp reported as reading images.
   supportsImages: fileId => ggufStore().model(fileId)?.vision ?? false,
 };
 

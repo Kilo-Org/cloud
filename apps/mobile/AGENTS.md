@@ -182,6 +182,7 @@ Keep `pt-5` for the sheet grabber on top of that clearance.
 ## Implementation Rules
 
 - Write the smallest boring implementation. Reuse existing helpers, components, and contracts.
+- A handoff that swaps the focused native-stack screen uses `useStackSafeReplace()` from `@/lib/navigation/stack-safe-replace`, never a literal `router.replace`: one commit removes the old screen and inserts the new one, and React Native's Fabric mount throws `addViewAt … The specified child already has a parent` on Android. A route guard that must land at the same stack position uses `useSettledReplace()` from `@/lib/navigation/settled-replace`, which dispatches once the navigator has settled. `navigation-swap-contract.test.ts` fails a navigator `replace` outside its allowlist, under every binding shape: a `useRouter()`/`useNavigation()` object, a `replace` destructured from either call, and the literal `router.replace(`.
 - Derive mobile types from shared exports or tRPC results. Do not copy shapes.
 - Fetch backend data through tRPC. Zod-parse only genuinely untrusted HTTP input at entry; do not re-parse trusted tRPC or shared-package data in components.
 - Parse backend dates with `parseTimestamp()` from `@/lib/utils`; `new Date()` breaks on PostgreSQL timestamps in Hermes.
@@ -269,7 +270,7 @@ One contract, enforced by `pnpm --filter kilo-app run check:classes` (baseline i
 | Section header | A heading (the label carries the header role): 10pt mono uppercase eyebrow, muted; optional icon, 11pt mono primary action in a compact box that never changes the header's height, and notice. No hand-made labels. Gutter-free inside a padded body; `inset` for a full-bleed list; `actionTestID` for a native test handle. | `SectionHeader` from `@/components/ui/section-header`, or `Section` when it has content |
 | Settings and navigation rows | One grouped card per section; hairline between rows inset to the row text; none after the last. | `RowGroup` from `@/components/ui/row-group`; pass `leadingTile` for icon rows |
 | Grouped rows in a virtualized list | A list cannot pass its rows as one child array, so each cell draws its own rounded end, surface and trailing hairline. | `RowGroupItem` with `position` `first`/`middle`/`last` (`only` for a one-row section) |
-| Row anatomy | The one row geometry: `ROW_FRAME_CLASS` (`min-h-[48px] flex-row items-center justify-between gap-3 px-4 py-3`); 30pt `IconTile`; title `text-sm font-medium` on one line (two at a large font scale); up to two subtitle lines (`face: 'mono'` for an identifier, `ellipsizeMode: 'middle'` for a value); a typed trailing cell (chevron, check, switch, value, badge, action, node). Never re-spell it. | `RowFrame` from `@/components/ui/row-frame`; `ConfigureRow`, `PreferenceRow`, `KvRow` and `ChoiceRow` are thin wrappers over it (use them when their fixed anatomy fits, `RowFrame` directly for a link row, two subtitle lines or a mixed trailing cell) |
+| Row anatomy | The one row geometry: `ROW_FRAME_CLASS` (`min-h-[48px] flex-row items-center justify-between gap-3 px-4 py-3`); 30pt `IconTile`; title `text-sm font-medium` on one line (two at a large font scale); subtitle capped at one line by default, at two for a sentence or item list the reader must finish, and at every line when no fixed count bounds the copy (`face: 'mono'` for an identifier, `ellipsizeMode: 'middle'` for a value); a typed trailing cell (chevron, check, switch, value, badge, action, node). Never re-spell it. | `RowFrame` from `@/components/ui/row-frame`; `ConfigureRow`, `PreferenceRow`, `KvRow` and `ChoiceRow` are thin wrappers over it (use them when their fixed anatomy fits, `RowFrame` directly for a link row, two subtitle lines or a mixed trailing cell). `ConfigureRow` caps its subtitle at one line by default and takes `2` for prose or `"all"` when no count bounds the copy; `PreferenceRow`'s subtitle is the switch's explanation and paints every line unless the caller passes a cap |
 | Flat list rows | Full-bleed, no card, content from the 14pt gutter, `border-b-[0.5px] border-hair-soft` hairline, `RowChevron`. A hue strip sits at the gutter. | `SessionRow`, which owns that geometry; callers add no padding of their own. Rows own no card and no grouped divider |
 | Card | Non-row block (balance, metric, info, a field block on a non-form screen): `rounded-xl bg-secondary p-4`, inner `gap-3`, never nested. For full-bleed layered content the surface alone, with each layer owning its inset. | `Card` from `@/components/ui/card`; `padding="none"` for the bare surface |
 | Fields | A single-line `Input` owns its 44pt box and inset. A multiline field or a composer keeps its own text metrics inside the shared bordered surface; a read-only or preview box that swaps with a single-line field reuses its exported box. A form field's visible label renders through FormFieldLabel, and the field block owns the gap between that label and its control. | `Input` from `@/components/ui/input`; `InputFrame` for a multiline/composer surface; `INPUT_BOX_SHAPE_CLASS` for the preview box; FormFieldLabel for the label |
@@ -337,6 +338,12 @@ what a translator has to work from.
   merges: `check:i18n` fails on a key one of them lacks, so a change that adds
   copy either waits for the translation slice or lands the catalog values
   itself and says so.
+- A command run inside right-to-left prose carries a left-to-right isolate in the
+  catalog value: U+2066 before the command and U+2069 after it. The neutral `/`
+  then keeps the command's own order. Separators and sentence punctuation stay
+  outside the isolate. `nativeRemote.prompt`, `nativeRemote.unsafeCommand` and
+  `agentChat.slashCommands.goalDescription` follow this rule. Wrap the whole run,
+  so a command keeps its argument inside the isolate.
 
 ## Design
 

@@ -105,7 +105,6 @@ describe('requestToolSummaryTranslations', () => {
     expect(body.stream).toBe(false);
     expect(body.messages[0]?.role).toBe('system');
     expect(body.messages[0]?.content).toContain('Deutsch');
-    // The whole batch rides in the one user message as a JSON array.
     expect(body.messages[1]).toEqual({
       role: 'user',
       content: JSON.stringify(['Hello world', 'Second sentence']),

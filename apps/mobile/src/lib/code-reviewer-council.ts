@@ -33,19 +33,33 @@ const SPECIALIST_COPY = [
 ];
 
 const CUSTOM_SPECIALIST_COPY = {
+  kind: 'custom',
   nameKey: 'codeReviewer.council.specialistName.custom',
   descriptionKey: 'codeReviewer.council.specialist.custom',
-};
-
-/** The copy one council specialist preset renders: its name and its lens. */
-export type SpecialistCopy = typeof CUSTOM_SPECIALIST_COPY;
+} as const;
 
 /**
- * The catalog keys a specialist id renders. A custom specialist the server
- * stored (no preset) falls back to the generic name and lens.
+ * The copy one council specialist renders: its name and its lens.
+ *
+ * `kind` says whether a roster preset supplied the copy. The persisted
+ * specialist keeps the preset's English `name`, so a caller that also holds
+ * that stored name must show it only for `custom`: a `preset` row takes its
+ * name from the catalog, in the app language.
+ */
+export type SpecialistCopy =
+  | { kind: 'preset'; nameKey: string; descriptionKey: string }
+  | { kind: 'custom'; nameKey: string; descriptionKey: string };
+
+/**
+ * The catalog keys a specialist id renders, tagged with whether a preset
+ * supplied them. A custom specialist the server stored (no preset) falls back
+ * to the generic name and lens.
  */
 export function specialistCopy(id: string): SpecialistCopy {
-  return SPECIALIST_COPY.find(entry => entry.id === id) ?? CUSTOM_SPECIALIST_COPY;
+  const preset = SPECIALIST_COPY.find(entry => entry.id === id);
+  return preset === undefined
+    ? CUSTOM_SPECIALIST_COPY
+    : { kind: 'preset', nameKey: preset.nameKey, descriptionKey: preset.descriptionKey };
 }
 
 /** What the council route paints. */

@@ -5,6 +5,7 @@ import {
   type AgentEnvironmentProfileAgent,
 } from '@kilocode/db/schema';
 import { AgentConfigSchema, type AgentConfig } from '@kilocode/db/schema-types';
+import { isReservedAgentSlug } from '@kilocode/app-shared/agent-profile';
 import { and, eq, count } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import type { ProfileOwner, ProfileAgentResponse } from './types';
@@ -195,10 +196,22 @@ export type AgentForSession = {
   config: AgentConfig;
 };
 
-export async function getAgentsForSession(
-  db: WorkerDb,
-  profileId: string
-): Promise<AgentForSession[]> {
+export type SessionAgents = {
+  /** The agents a session materializes. */
+  agents: AgentForSession[];
+  /**
+   * Stored agents left out because their id belongs to the CLI. A caller logs
+   * them so a stored row that stops applying is measurable.
+   */
+  skippedSlugs: string[];
+};
+
+/**
+ * A stored agent whose id belongs to the CLI stays visible in the profile
+ * editor, and a session materializes only the agents that have an id of their
+ * own.
+ */
+export async function getAgentsForSession(db: WorkerDb, profileId: string): Promise<SessionAgents> {
   const rows = await db
     .select({
       slug: agent_environment_profile_agents.slug,
@@ -208,9 +221,14 @@ export async function getAgentsForSession(
     .from(agent_environment_profile_agents)
     .where(eq(agent_environment_profile_agents.profile_id, profileId))
     .orderBy(agent_environment_profile_agents.slug);
-  return rows.map(row => ({
-    slug: row.slug,
-    name: row.name,
-    config: AgentConfigSchema.parse(row.config ?? {}),
-  }));
+  return {
+    agents: rows
+      .filter(row => !isReservedAgentSlug(row.slug))
+      .map(row => ({
+        slug: row.slug,
+        name: row.name,
+        config: AgentConfigSchema.parse(row.config ?? {}),
+      })),
+    skippedSlugs: rows.filter(row => isReservedAgentSlug(row.slug)).map(row => row.slug),
+  };
 }

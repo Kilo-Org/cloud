@@ -8,6 +8,8 @@ import {
   CANCEL_ERROR,
   CHANGED_BY_DESIGN,
   EXIT,
+  LEAN_MAX_SCOPED_ROWS,
+  LEAN_SUMMED_FIELDS,
   PARKED_REQUESTED_AT,
   SCHEMA_TABLES_EXPECTED,
   buildStatements,
@@ -477,7 +479,9 @@ test('dry run reports the exact work and writes nothing', async () => {
         .sort(),
       ['run-live-a', 'run-live-b']
     );
-    assert.equal(result.lines.filter(line => line.startsWith('UPDATE ')).length, 5);
+    // Two runs × (park, flip) plus one global sweep of three statements.
+    assert.equal(result.lines.filter(line => line.startsWith('UPDATE ')).length, 7);
+    assert.equal(result.last('dry_run_ok').statements, 7);
     assert.deepEqual(readAll(f.sqlite), before, 'a dry run must not write');
   } finally {
     f.close();
@@ -1695,12 +1699,13 @@ test('a hostile number of running runs is refused before any write', async () =>
   }
 });
 
-test('a scope that would exceed the row envelope is refused before any write', async () => {
+test('a split run whose model group is still over the envelope is refused before any write', async () => {
   const f = fixture();
   try {
     seed(f.sqlite);
     const { LEAN_MAX_SCOPED_ROWS } = await import('./legacy-cancel.mjs');
-    // One live run carrying more scoped rows than the envelope allows.
+    // One live run carrying more scoped rows than the envelope allows, all under ONE model:
+    // the model split cannot shrink it, so it must refuse rather than widen the cap.
     const bulk = f.sqlite.prepare(
       `INSERT INTO case_results (run_id, model, variant, case_id, route_key, score, latency_ms,
          cost_usd, error, rep, timed_out, prompt_revision)
@@ -1712,10 +1717,651 @@ test('a scope that would exceed the row envelope is refused before any write', a
     const before = readAll(f.sqlite);
     const result = await leanRun(f.path, leanArgs('--apply', f.path));
     assert.equal(result.code, EXIT.verifyFailed);
+    assert.match(result.last('verify_failed').reason, /cannot be split below the bounded envelope/);
+    assert.deepEqual(readAll(f.sqlite), before);
+  } finally {
+    f.close();
+  }
+});
+
+test('a run too large to enumerate is refused before any read of its history', async () => {
+  const f = fixture();
+  try {
+    seed(f.sqlite);
+    const { LEAN_MAX_SPLIT_ROWS } = await import('./legacy-cancel.mjs');
+    const bulk = f.sqlite.prepare(
+      `INSERT INTO case_results (run_id, model, variant, case_id, route_key, score, latency_ms,
+         cost_usd, error, rep, timed_out, prompt_revision)
+       VALUES ('run-live-a', ?, 'high', ?, 'route/a', 1, 10, 0, NULL, 0, 0, 3)`
+    );
+    f.sqlite.exec('BEGIN');
+    // Spread across models so the split itself would be admissible; only the size refuses.
+    for (let i = 0; i < LEAN_MAX_SPLIT_ROWS + 1; i += 1) bulk.run(`vendor/m${i % 4}`, `bulk-${i}`);
+    f.sqlite.exec('COMMIT');
+    const before = readAll(f.sqlite);
+    const result = await leanRun(f.path, leanArgs('--apply', f.path));
+    assert.equal(result.code, EXIT.verifyFailed);
+    assert.match(result.last('verify_failed').reason, /refusing to enumerate a run that large/);
+    assert.deepEqual(readAll(f.sqlite), before);
+  } finally {
+    f.close();
+  }
+});
+
+test('a split enumerates models from every scoped table, not just case_results', async () => {
+  const f = fixture();
+  try {
+    seed(f.sqlite);
+    // One live run whose scoped rows sit almost entirely in `scheduler_executions`: production has
+    // a running run with 54,661 of them. Enumerating `case_results` alone would see one model and
+    // refuse (its 60,000 execution rows land in the `NOT IN` complement), or mis-split.
+    const insert = f.sqlite.prepare(
+      `INSERT INTO scheduler_executions (run_id, model, variant, rep, case_id, token)
+       VALUES ('run-live-b', ?, 'high', 0, ?, 'exec-token')`
+    );
+    f.sqlite.exec('BEGIN');
+    for (let i = 0; i < 60_000; i += 1) {
+      insert.run(i % 2 === 0 ? 'vendor/exec-a' : 'vendor/exec-b', `exec-case-${i}`);
+    }
+    f.sqlite.exec('COMMIT');
+    assert.equal(
+      f.sqlite.prepare("SELECT COUNT(*) n FROM case_results WHERE run_id = 'run-live-b'").get().n,
+      1,
+      'the fixture must keep graded results (and their models) out of the bulk'
+    );
+
+    const baseline = join(f.directory, 'baseline.json');
+    const applied = await leanRun(
+      f.path,
+      leanArgs('--apply', f.path, ['--baseline-out', baseline])
+    );
+    assert.equal(applied.code, EXIT.ok, JSON.stringify(applied.events));
+    const scope = applied.last('lean_scope');
+    const cancelled = scope.batches.filter(batch => batch.kind === 'cancelled');
+    assert.ok(cancelled.length > 1, 'the executions-heavy run must split into several batches');
+    for (const batch of cancelled) {
+      assert.ok(
+        batch.rows <= LEAN_MAX_SCOPED_ROWS,
+        `batch ${JSON.stringify(batch)} exceeds the cap`
+      );
+    }
+    // The execution rows are protected history: the apply must not remove any.
+    assert.equal(
+      f.sqlite
+        .prepare("SELECT COUNT(*) n FROM scheduler_executions WHERE run_id='run-live-b'")
+        .get().n,
+      60_000
+    );
+    // And verify accepts it: the same batches are re-sized and re-digested.
+    const verified = await leanRun(f.path, leanArgs('--verify', f.path, ['--baseline', baseline]));
+    assert.equal(verified.code, EXIT.ok, JSON.stringify(verified.events));
+  } finally {
+    f.close();
+  }
+});
+
+test('the model enumeration reads every scoped table through run_id within D1 limits', async () => {
+  const f = fixture();
+  try {
+    seed(f.sqlite);
+    const {
+      createLocalExecutor,
+      scopeRunModelsSql,
+      assertLeanPlan,
+      compoundTermCount,
+      D1_MAX_COMPOUND_TERMS,
+    } = await import('./legacy-cancel.mjs');
+    const inner = createLocalExecutor(f.path);
+    const tables = [
+      'case_results',
+      'model_summaries',
+      'scheduler_chunks',
+      'run_lane_failures',
+      'scheduler_executions',
+      'pending_decider_outputs',
+    ];
+    const seen = new Set();
+    let seeks = 0;
+    for (const part of [0, 1]) {
+      const sql = scopeRunModelsSql('run-live-a', part);
+      // D1 caps a compound statement at five SELECT terms; six tables must not be one UNION.
+      assert.ok(
+        compoundTermCount(sql) <= D1_MAX_COMPOUND_TERMS,
+        `part ${part} has ${compoundTermCount(sql)} compound terms`
+      );
+      // Each part is itself capped, so one run cannot stream an unbounded model set.
+      assert.match(
+        sql,
+        /GROUP BY model ORDER BY[\s\S]*LIMIT \d+/,
+        `part ${part} must cap its rows`
+      );
+      for (const table of tables) {
+        if (new RegExp(`FROM ${table} AS `).test(sql)) seen.add(table);
+      }
+      const plan = await assertLeanPlan({ plan: s => inner.plan(s) }, sql);
+      // Every branch is a run_id seek; nothing reads a history table by another key.
+      seeks += plan.filter(line => /^SEARCH /.test(line) && /run_id=\?/.test(line)).length;
+    }
+    assert.deepEqual([...seen].sort(), [...tables].sort(), 'every table must be enumerated');
+    assert.equal(seeks, 6, 'six keyed seeks across the two parts');
+    inner.close();
+  } finally {
+    f.close();
+  }
+});
+
+test('more than 64 models refuse, and no part transfers more than 65 distinct models', async () => {
+  const f = fixture();
+  try {
+    seed(f.sqlite);
+    const {
+      createLocalExecutor,
+      scopeRunModelsSql,
+      LEAN_MAX_MODEL_GROUPS,
+      LEAN_MAX_SCOPED_ROWS,
+      LEAN_MAX_SPLIT_ROWS,
+    } = await import('./legacy-cancel.mjs');
+    const inner = createLocalExecutor(f.path);
+    // The run must really NEED a split (over the per-batch envelope) before the model count is
+    // consulted, so it carries enough rows to exceed `LEAN_MAX_SCOPED_ROWS` while staying under
+    // the enumeration ceiling. Models are spread across BOTH parts, and two appear in both.
+    const shared = ['vendor/shared-a', 'vendor/shared-b'];
+    const part0Only = Array.from({ length: 40 }, (_, i) => `vendor/p0-${i}`);
+    const part1Only = Array.from({ length: 40 }, (_, i) => `vendor/p1-${i}`);
+    const all = [...shared, ...part0Only, ...part1Only];
+    assert.ok(all.length > LEAN_MAX_MODEL_GROUPS, 'the fixture must exceed the model cap');
+    const reps = 700;
+    // Both parts must saturate at the cap, so every model appears in a part-0 table AND a part-1
+    // table; otherwise the part that returned fewer rows would prove nothing about its limit.
+    const total = all.length * reps * 2;
+    assert.ok(all.length * reps > LEAN_MAX_SCOPED_ROWS, 'the fixture must need a split');
+    assert.ok(total < LEAN_MAX_SPLIT_ROWS, 'the fixture must stay under the enumeration ceiling');
+
+    const caseInsert = f.sqlite.prepare(
+      `INSERT INTO case_results (run_id, model, variant, case_id, route_key, score, latency_ms,
+         cost_usd, error, rep, timed_out, prompt_revision)
+       VALUES ('run-live-a', ?, 'high', ?, 'route/a', 1, 10, 0, NULL, 0, 0, 3)`
+    );
+    const execInsert = f.sqlite.prepare(
+      `INSERT INTO scheduler_executions (run_id, model, variant, rep, case_id, token)
+       VALUES ('run-live-a', ?, 'high', 0, ?, 'exec-token')`
+    );
+    f.sqlite.exec('BEGIN');
+    all.forEach((model, i) => {
+      // part 0 table: `case_results`. part 1 table: `scheduler_executions`.
+      for (let rep = 0; rep < reps; rep += 1) {
+        caseInsert.run(model, `c-${i}-${rep}`);
+        execInsert.run(model, `e-${i}-${rep}`);
+      }
+    });
+    f.sqlite.exec('COMMIT');
+
+    // Each part is capped independently: at most cap+1 DISTINCT models per statement.
+    for (const part of [0, 1]) {
+      const rows = inner.read(scopeRunModelsSql('run-live-a', part));
+      assert.equal(
+        rows.length,
+        LEAN_MAX_MODEL_GROUPS + 1,
+        `part ${part} must stop at the ${LEAN_MAX_MODEL_GROUPS + 1}-row cap, got ${rows.length}`
+      );
+      // The cap is on distinct models, so a capped part cannot hide duplicates behind it.
+      assert.equal(new Set(rows.map(row => String(row.model))).size, rows.length);
+    }
+
+    // The merged count still refuses: shared models must not collapse the total below 65.
+    const caseCount = f.sqlite
+      .prepare("SELECT COUNT(*) n FROM case_results WHERE run_id='run-live-a'")
+      .get().n;
+    const result = await leanRun(f.path, leanArgs('--apply', f.path));
+    assert.equal(result.code, EXIT.verifyFailed, JSON.stringify(result.events));
     assert.match(
       result.last('verify_failed').reason,
-      /more than \d+ cancelled case results|scoped rows/
+      /more than 64 model groups; refusing to split it further/
     );
+    assert.equal(
+      f.sqlite.prepare("SELECT COUNT(*) n FROM case_results WHERE run_id='run-live-a'").get().n,
+      caseCount,
+      'a refused enumeration must not write'
+    );
+    assert.equal(
+      f.sqlite.prepare("SELECT COUNT(*) n FROM benchmark_runs WHERE status='running'").get().n,
+      2,
+      'no run may be cancelled by a refused enumeration'
+    );
+
+    inner.close();
+  } finally {
+    f.close();
+  }
+});
+
+test('a model in both parts cannot hide the 65th, so the merge still refuses', async () => {
+  const f = fixture();
+  try {
+    seed(f.sqlite);
+    const { createLocalExecutor, scopeRunModelsSql, LEAN_MAX_MODEL_GROUPS, LEAN_MAX_SCOPED_ROWS } =
+      await import('./legacy-cancel.mjs');
+    const inner = createLocalExecutor(f.path);
+    // Exactly cap+1 distinct models, ALL of them present in BOTH parts, and enough rows to need a
+    // split. A merge that counted rows would double the total; one that deduplicated to the part
+    // cap could see only 64. Either way the boundary must still refuse.
+    const models = Array.from({ length: LEAN_MAX_MODEL_GROUPS + 1 }, (_, i) => `vendor/both-${i}`);
+    const reps = 800;
+    assert.ok(models.length * reps > LEAN_MAX_SCOPED_ROWS, 'the fixture must need a split');
+
+    const caseInsert = f.sqlite.prepare(
+      `INSERT INTO case_results (run_id, model, variant, case_id, route_key, score, latency_ms,
+         cost_usd, error, rep, timed_out, prompt_revision)
+       VALUES ('run-live-a', ?, 'high', ?, 'route/a', 1, 10, 0, NULL, 0, 0, 3)`
+    );
+    const execInsert = f.sqlite.prepare(
+      `INSERT INTO scheduler_executions (run_id, model, variant, rep, case_id, token)
+       VALUES ('run-live-a', ?, 'high', 0, ?, 'exec-token')`
+    );
+    f.sqlite.exec('BEGIN');
+    models.forEach((model, i) => {
+      for (let rep = 0; rep < reps; rep += 1) {
+        caseInsert.run(model, `c-${i}-${rep}`);
+        execInsert.run(model, `e-${i}-${rep}`);
+      }
+    });
+    f.sqlite.exec('COMMIT');
+
+    const partRows = [0, 1].map(part => inner.read(scopeRunModelsSql('run-live-a', part)));
+    // Both parts saturate at cap+1, so the union is provably at least cap+1 distinct models: a
+    // part returning the full cap cannot be hiding extra models behind a duplicate.
+    for (const rows of partRows) {
+      assert.equal(rows.length, LEAN_MAX_MODEL_GROUPS + 1, 'a part exceeded its own cap');
+      assert.equal(new Set(rows.map(row => String(row.model))).size, rows.length);
+    }
+    const union = new Set(partRows.flatMap(rows => rows.map(row => String(row.model))));
+    assert.equal(union.size, LEAN_MAX_MODEL_GROUPS + 1);
+
+    const result = await leanRun(f.path, leanArgs('--apply', f.path));
+    assert.equal(result.code, EXIT.verifyFailed, JSON.stringify(result.events));
+    assert.match(result.last('verify_failed').reason, /more than 64 model groups/);
+    inner.close();
+  } finally {
+    f.close();
+  }
+});
+
+// ---- batched bounded path: a scope whose history exceeds the per-batch envelope ------------
+//
+// Production has two live runs owning ~94k case results, so one run alone is larger than
+// `LEAN_MAX_SCOPED_ROWS`. The batched verifier must reach the same end state and the same
+// protected digests as the exhaustive one, keep every batch under the envelope, and still
+// refuse a mutation in any single batch.
+
+/**
+ * Add `rows` graded results to `runId`, spread over `models`, so no single model group is a
+ * history-sized read. Each row is unique on the scoped primary key.
+ */
+function bulkResults(sqlite, { runId, rows, models, score = 0.5, prefix = 'bulk' }) {
+  const insert = sqlite.prepare(
+    `INSERT INTO case_results (run_id, model, variant, case_id, route_key, score, latency_ms,
+       cost_usd, error, rep, timed_out, prompt_revision)
+     VALUES (?, ?, 'high', ?, 'route/a', ?, 10, 0.001, NULL, 0, 0, 3)`
+  );
+  sqlite.exec('BEGIN');
+  for (let i = 0; i < rows; i += 1) {
+    insert.run(runId, models[i % models.length], `${prefix}-${i}`, score);
+  }
+  sqlite.exec('COMMIT');
+}
+
+/**
+ * Replace the two timestamps the operation stamps with the DATABASE clock, so two otherwise
+ * identical databases can be compared: `benchmark_profiles.updated_at` (the park statement) and
+ * `benchmark_runs.completed_at` (the flip). Every other column is compared as stored.
+ */
+function normalizeClock(dump) {
+  return {
+    ...dump,
+    benchmark_profiles: dump.benchmark_profiles.map(row =>
+      row.status === 'pending' ? { ...row, updated_at: '<clock>' } : row
+    ),
+    benchmark_runs: dump.benchmark_runs.map(row =>
+      row.status === 'failed' && row.error === CANCEL_ERROR
+        ? { ...row, completed_at: '<clock>' }
+        : row
+    ),
+    // The lease horizon is wall-clock at seed time; two fixtures never share it.
+    scheduler_dispatch_lock: dump.scheduler_dispatch_lock.map(row => ({
+      ...row,
+      lease_until: '<clock>',
+    })),
+  };
+}
+
+/** A seeded fixture whose first live run owns more scoped rows than one batch may read. */
+function oversizedFixture() {
+  const f = fixture();
+  seed(f.sqlite);
+  bulkResults(f.sqlite, {
+    runId: 'run-live-a',
+    rows: LEAN_MAX_SCOPED_ROWS + 20_000,
+    models: ['vendor/bulk-a', 'vendor/bulk-b', 'vendor/bulk-c'],
+  });
+  return f;
+}
+
+test('a scope above the envelope is batched, and every batch stays under the cap', async () => {
+  const f = oversizedFixture();
+  try {
+    const result = await leanRun(f.path, leanArgs('--apply', f.path));
+    assert.equal(result.code, EXIT.ok, JSON.stringify(result.events));
+    const scope = result.last('lean_scope');
+    assert.ok(scope.batches.length > 2, 'the oversized run must be split into several batches');
+    for (const batch of scope.batches) {
+      assert.ok(
+        batch.rows <= LEAN_MAX_SCOPED_ROWS,
+        `batch ${JSON.stringify(batch)} exceeds the cap`
+      );
+    }
+    // Nothing live remains, and the cancelled run is terminal with the marker.
+    assert.equal(
+      f.sqlite.prepare("SELECT COUNT(*) n FROM benchmark_runs WHERE status='running'").get().n,
+      0
+    );
+    assert.equal(
+      f.sqlite
+        .prepare(
+          "SELECT COUNT(*) n FROM scheduler_chunks WHERE status IN ('pending','queued','active')"
+        )
+        .get().n,
+      0
+    );
+  } finally {
+    f.close();
+  }
+});
+
+test('batched apply and verify reach the same end state as one exhaustive run', async () => {
+  const batched = oversizedFixture();
+  const exhaustive = oversizedFixture();
+  try {
+    const batchedBaseline = join(batched.directory, 'baseline.json');
+    const applied = await leanRun(
+      batched.path,
+      leanArgs('--apply', batched.path, ['--baseline-out', batchedBaseline])
+    );
+    assert.equal(applied.code, EXIT.ok, JSON.stringify(applied.events));
+    const verified = await leanRun(
+      batched.path,
+      leanArgs('--verify', batched.path, ['--baseline', batchedBaseline])
+    );
+    assert.equal(verified.code, EXIT.ok, JSON.stringify(verified.events));
+
+    // The isolated transport keeps the exhaustive digest, so it is the reference.
+    const reference = await run(exhaustive.path, ['--apply', ...BASE_ARGS]);
+    assert.equal(reference.code, EXIT.ok, JSON.stringify(reference.events));
+
+    // Row-for-row equality over every table the operation may touch: a stronger claim than
+    // comparing two digests produced by different segmentation. The two columns the operation
+    // stamps with the CURRENT clock are excluded; every other field, including every historical
+    // timestamp, must match exactly.
+    assert.deepEqual(
+      normalizeClock(readAll(batched.sqlite)),
+      normalizeClock(readAll(exhaustive.sqlite))
+    );
+    // Every field of the batched digest must equal an INDEPENDENTLY computed value: the summed
+    // fields from plain SQL over the final database, the scope-free counters from plain SQL, and
+    // the served artifact from the exhaustive digest of an identical fixture. Nothing is skipped,
+    // so a field the bounded digest fails to fill in (a dropped `LEAN_SUMMED_FIELDS` entry leaves
+    // the global batch's literal zero) fails here instead of passing a self-consistent compare.
+    const batchedDigest = applied.last('after');
+    const one = sql => ({ ...batched.sqlite.prepare(sql).get() });
+    const cancelledWhere = "run_id IN ('run-live-a','run-live-b')";
+    const sum = (field, sql) => ({ field, sql, value: one(sql).v });
+
+    // The additive set the module must know about, listed here by hand: deriving it from
+    // `LEAN_SUMMED_FIELDS` would make the check agree with any mutation.
+    const SUMMED_FIELDS = [
+      'cancelled_case_results_n',
+      'cancelled_case_results_score',
+      'cancelled_case_results_timeouts',
+      'cancelled_summaries_n',
+      'cancelled_chunks_n',
+      'cancelled_chunk_attempts',
+      'cancelled_lane_failures_n',
+      'cancelled_executions_n',
+      'cancelled_pending_outputs_n',
+    ];
+    assert.deepEqual(
+      [...LEAN_SUMMED_FIELDS].sort(),
+      [...SUMMED_FIELDS].sort(),
+      'LEAN_SUMMED_FIELDS must cover exactly the additive digest fields'
+    );
+
+    const summed = [
+      sum(
+        'cancelled_case_results_n',
+        `SELECT COUNT(*) v FROM case_results WHERE ${cancelledWhere}`
+      ),
+      sum(
+        'cancelled_case_results_score',
+        `SELECT COALESCE(TOTAL(score),0) v FROM case_results WHERE ${cancelledWhere}`
+      ),
+      sum(
+        'cancelled_case_results_timeouts',
+        `SELECT COALESCE(SUM(COALESCE(timed_out,0)),0) v FROM case_results WHERE ${cancelledWhere}`
+      ),
+      sum(
+        'cancelled_summaries_n',
+        `SELECT COUNT(*) v FROM model_summaries WHERE ${cancelledWhere}`
+      ),
+      sum('cancelled_chunks_n', `SELECT COUNT(*) v FROM scheduler_chunks WHERE ${cancelledWhere}`),
+      sum(
+        'cancelled_chunk_attempts',
+        `SELECT COALESCE(TOTAL(attempts),0) v FROM scheduler_chunks WHERE ${cancelledWhere}`
+      ),
+      sum(
+        'cancelled_lane_failures_n',
+        `SELECT COUNT(*) v FROM run_lane_failures WHERE ${cancelledWhere}`
+      ),
+      sum(
+        'cancelled_executions_n',
+        `SELECT COUNT(*) v FROM scheduler_executions WHERE ${cancelledWhere}`
+      ),
+      sum(
+        'cancelled_pending_outputs_n',
+        `SELECT COUNT(*) v FROM pending_decider_outputs WHERE ${cancelledWhere}`
+      ),
+    ];
+    // The scope-free counters, compared literally: after the cancel none of the live-work ones
+    // may be non-zero, and every protected one is what the tables say.
+    const globals = [
+      sum('running_runs', `SELECT COUNT(*) v FROM benchmark_runs WHERE status='running'`),
+      sum(
+        'unfinished_chunks',
+        `SELECT COUNT(*) v FROM scheduler_chunks WHERE status IN ('pending','queued','active')`
+      ),
+      sum('pending_chunks', `SELECT COUNT(*) v FROM scheduler_chunks WHERE status='pending'`),
+      sum('queued_chunks', `SELECT COUNT(*) v FROM scheduler_chunks WHERE status='queued'`),
+      sum('active_chunks', `SELECT COUNT(*) v FROM scheduler_chunks WHERE status='active'`),
+      sum('running_profiles', `SELECT COUNT(*) v FROM benchmark_profiles WHERE status='running'`),
+      sum('pending_profiles', `SELECT COUNT(*) v FROM benchmark_profiles WHERE status='pending'`),
+      sum('ready_profiles', `SELECT COUNT(*) v FROM benchmark_profiles WHERE status='ready'`),
+      sum('failed_profiles', `SELECT COUNT(*) v FROM benchmark_profiles WHERE status='failed'`),
+      sum(
+        'platform_requested_sum',
+        `SELECT COALESCE(SUM(platform_requested),0) v FROM benchmark_profiles`
+      ),
+      sum('user_requested_sum', `SELECT COALESCE(SUM(user_requested),0) v FROM benchmark_profiles`),
+      sum('remeasures_n', `SELECT COUNT(*) v FROM profile_remeasures`),
+      sum(
+        'remeasure_claims_n',
+        `SELECT COUNT(*) v FROM profile_remeasures WHERE run_id IS NOT NULL`
+      ),
+      sum('subscriptions_n', `SELECT COUNT(*) v FROM benchmark_subscriptions`),
+      sum('probe_activations_n', `SELECT COUNT(*) v FROM probe_activations`),
+    ];
+    // The served artifact is per-run, so it is taken from the exhaustive digest of the identical
+    // fixture rather than re-derived (the field names differ between the two digests).
+    const referenceDigest = reference.last('after');
+    const SERVED_EQUIVALENT = {
+      served_case_results_n: 'case_results_n',
+      served_case_results_score: 'case_results_score',
+      served_case_results_cost: 'case_results_cost',
+      served_case_results_latency: 'case_results_latency',
+      served_case_results_timeouts: 'case_results_timeouts',
+      served_case_results_error_length: 'case_results_error_length',
+      served_case_results_key_length: 'case_results_key_length',
+      served_summaries_n: 'summaries_n',
+      served_summaries_accuracy: 'summaries_accuracy',
+      served_summaries_cases: 'summaries_cases',
+      served_routing_signature: 'routing_tables_signature',
+      served_candidates_n: 'candidates_n',
+      served_candidates_accuracy: 'candidates_accuracy',
+      served_candidates_cost: 'candidates_cost',
+    };
+    const served = Object.entries(SERVED_EQUIVALENT).map(([field, source]) => {
+      assert.ok(source in referenceDigest, `the exhaustive digest is missing ${source}`);
+      return { field, value: referenceDigest[source] };
+    });
+
+    const checked = new Set();
+    for (const { field, value } of [...summed, ...globals, ...served]) {
+      assert.ok(field in batchedDigest, `the bounded digest is missing ${field}`);
+      checked.add(field);
+      const actual = batchedDigest[field];
+      if (typeof value === 'number' && !Number.isInteger(value)) {
+        assert.ok(
+          Math.abs(Number(actual) - Number(value)) < 1e-6,
+          `${field}: batched ${actual} != independent ${value}`
+        );
+      } else {
+        assert.equal(
+          String(actual),
+          String(value),
+          `${field}: batched ${actual} != independent ${value}`
+        );
+      }
+    }
+    // No field may escape the check: an unlisted key means this test stopped covering the digest.
+    // `event` is the harness envelope key, not a digest field.
+    const unchecked = Object.keys(batchedDigest).filter(
+      field => field !== 'event' && !checked.has(field)
+    );
+    assert.deepEqual(unchecked, [], 'every bounded digest field must be compared');
+    assert.ok(
+      Number(batchedDigest.cancelled_case_results_n) >= LEAN_MAX_SCOPED_ROWS,
+      'the equivalence fixture must really span more than one batch'
+    );
+  } finally {
+    batched.close();
+    exhaustive.close();
+  }
+});
+
+test('a mutation confined to the first batch fails batched verify', async () => {
+  const f = oversizedFixture();
+  try {
+    const baseline = join(f.directory, 'baseline.json');
+    const applied = await leanRun(
+      f.path,
+      leanArgs('--apply', f.path, ['--baseline-out', baseline])
+    );
+    assert.equal(applied.code, EXIT.ok, JSON.stringify(applied.events));
+    const saved = JSON.parse(readFileSync(baseline, 'utf8'));
+    const first = saved.scope.batches.find(batch => batch.kind === 'cancelled');
+    assert.ok(first, 'the baseline must record its cancelled batches');
+
+    // Protected data inside the FIRST cancelled batch: one graded result lost its score.
+    const [model] = first.segments.find(segment => segment.models).models;
+    const runId = first.segments[0].runIds[0];
+    f.sqlite
+      .prepare(
+        `UPDATE case_results SET score = score - 0.25
+         WHERE rowid IN (SELECT rowid FROM case_results
+                         WHERE run_id = ? AND model = ? LIMIT 1)`
+      )
+      .run(runId, model);
+
+    const result = await leanRun(f.path, leanArgs('--verify', f.path, ['--baseline', baseline]));
+    assert.equal(result.code, EXIT.verifyFailed);
+    assert.match(JSON.stringify(result.last('verify_failed')), /cancelled_case_results_score/);
+  } finally {
+    f.close();
+  }
+});
+
+test('a mutation confined to the last batch fails batched verify', async () => {
+  const f = oversizedFixture();
+  try {
+    const baseline = join(f.directory, 'baseline.json');
+    const applied = await leanRun(
+      f.path,
+      leanArgs('--apply', f.path, ['--baseline-out', baseline])
+    );
+    assert.equal(applied.code, EXIT.ok, JSON.stringify(applied.events));
+    const saved = JSON.parse(readFileSync(baseline, 'utf8'));
+    const cancelledBatches = saved.scope.batches.filter(batch => batch.kind === 'cancelled');
+    const last = cancelledBatches.at(-1);
+    assert.ok(last, 'the baseline must record its cancelled batches');
+
+    // A run in the LAST batch becomes live again while the lease still holds: verify must
+    // refuse even though every other batch is unchanged.
+    const runId = last.segments.at(-1).runIds[0];
+    f.sqlite.prepare("UPDATE benchmark_runs SET status='running' WHERE id = ?").run(runId);
+
+    const result = await leanRun(f.path, leanArgs('--verify', f.path, ['--baseline', baseline]));
+    assert.equal(result.code, EXIT.verifyFailed);
+    assert.match(JSON.stringify(result.last('verify_failed')), /running_runs/);
+    // A run set back to running must not be re-cancelled by a read-only verify.
+    assert.equal(
+      f.sqlite.prepare('SELECT status FROM benchmark_runs WHERE id = ?').get(runId).status,
+      'running'
+    );
+  } finally {
+    f.close();
+  }
+});
+
+test('batched apply is idempotent and a pinned batch that grew is refused', async () => {
+  const f = oversizedFixture();
+  try {
+    const baseline = join(f.directory, 'baseline.json');
+    const first = await leanRun(f.path, leanArgs('--apply', f.path, ['--baseline-out', baseline]));
+    assert.equal(first.code, EXIT.ok, JSON.stringify(first.events));
+    const saved = JSON.parse(readFileSync(baseline, 'utf8'));
+
+    // Re-apply with the same lease: idempotent, no new work, same terminal state.
+    const again = await leanRun(f.path, leanArgs('--apply', f.path));
+    assert.equal(again.code, EXIT.ok, JSON.stringify(again.events));
+    assert.equal(again.last('apply_ok').closedChunks, 0, 'nothing is left to close');
+    assert.equal(
+      f.sqlite.prepare("SELECT COUNT(*) n FROM benchmark_runs WHERE status='running'").get().n,
+      0
+    );
+
+    // A late graded result appends to a pinned batch: still under the cap it verifies, but a
+    // batch pushed past the envelope must refuse instead of reading a history-sized range.
+    const cancelledBatch = saved.scope.batches.find(batch => batch.kind === 'cancelled');
+    const runId = cancelledBatch.segments[0].runIds[0];
+    bulkResults(f.sqlite, {
+      runId,
+      rows: LEAN_MAX_SCOPED_ROWS,
+      models: cancelledBatch.segments[0].models ?? ['vendor/late'],
+      prefix: 'late',
+    });
+    const grown = await leanRun(f.path, leanArgs('--verify', f.path, ['--baseline', baseline]));
+    assert.equal(grown.code, EXIT.verifyFailed);
+    assert.match(JSON.stringify(grown.last('verify_failed')), /scoped rows \(limit \d+\)/);
+  } finally {
+    f.close();
+  }
+});
+
+test('a re-apply under a lost lease is refused per batch with no write', async () => {
+  const f = oversizedFixture();
+  try {
+    holdOperatorLease(f.sqlite, OPERATOR, Date.now() + 60_000);
+    const before = readAll(f.sqlite);
+    const result = await leanRun(f.path, leanArgs('--apply', f.path));
+    assert.equal(result.code, EXIT.guardRefused);
+    assert.match(result.last('guard_refused').reason, /below the required/);
     assert.deepEqual(readAll(f.sqlite), before);
   } finally {
     f.close();
@@ -1726,8 +2372,7 @@ test('a rejected plan fails closed instead of scanning history', async () => {
   const f = fixture();
   try {
     seed(f.sqlite);
-    const { createLocalExecutor, leanStateSql, assertLeanPlan } =
-      await import('./legacy-cancel.mjs');
+    const { createLocalExecutor, assertLeanPlan } = await import('./legacy-cancel.mjs');
     const inner = createLocalExecutor(f.path);
     // A deliberately unbounded digest must be rejected by the guard.
     const unbounded = `SELECT (SELECT COUNT(*) FROM case_results) AS n`;
@@ -1736,11 +2381,14 @@ test('a rejected plan fails closed instead of scanning history', async () => {
       error => /plan was rejected/.test(error.message)
     );
     // The real bounded digest passes the same guard.
-    const ok = await assertLeanPlan(
-      { plan: sql => inner.plan(sql) },
-      leanStateSql({ runIds: ['run-live-a'], publishedRunIds: ['run-done'] })
-    );
+    const { leanGlobalSql, leanCancelledSql } = await import('./legacy-cancel.mjs');
+    const ok = await assertLeanPlan({ plan: sql => inner.plan(sql) }, leanGlobalSql(['run-done']));
     assert.ok(Array.isArray(ok));
+    const cancelled = await assertLeanPlan(
+      { plan: sql => inner.plan(sql) },
+      leanCancelledSql([{ runIds: ['run-live-a'] }])
+    );
+    assert.ok(Array.isArray(cancelled));
     inner.close();
   } finally {
     f.close();
@@ -1938,6 +2586,41 @@ function fakeWrangler(handler) {
   return { calls, spawnImpl };
 }
 
+/**
+ * Like `fakeWrangler`, but `handler` may return `{ exit, stdout, stderr }` to fail the way real
+ * wrangler does with `--json`: the error text goes to STDOUT and the process exits non-zero with
+ * an empty stderr.
+ */
+function fakeFailingWrangler(handler) {
+  const calls = [];
+  const spawnImpl = (binary, args) => {
+    const sql = args[args.indexOf('--command') + 1];
+    calls.push({ binary, args: [...args], sql });
+    const outcome = handler(sql, calls.length) ?? {};
+    const stdout = outcome.stdout ?? JSON.stringify([{ success: true, results: [] }]);
+    const stderr = outcome.stderr ?? '';
+    const code = outcome.exit ?? 0;
+    const listeners = { stdout: [], stderr: [], close: [], error: [] };
+    const child = {
+      stdout: { setEncoding() {}, on: (_e, fn) => listeners.stdout.push(fn) },
+      stderr: { setEncoding() {}, on: (_e, fn) => listeners.stderr.push(fn) },
+      on(event, fn) {
+        if (event === 'close') listeners.close.push(fn);
+        else if (event === 'error') listeners.error.push(fn);
+        return child;
+      },
+      kill() {},
+    };
+    queueMicrotask(() => {
+      if (stdout !== '') for (const fn of listeners.stdout) fn(stdout);
+      if (stderr !== '') for (const fn of listeners.stderr) fn(stderr);
+      for (const fn of listeners.close) fn(code);
+    });
+    return child;
+  };
+  return { calls, spawnImpl };
+}
+
 /** A real wrangler write envelope: `results: []`, count in `meta.changes`. */
 const writeEnvelope = changes => [{ success: true, results: [], meta: { changes } }];
 const rowsEnvelope = rows => [{ success: true, results: rows, meta: { changes: 0 } }];
@@ -1991,14 +2674,16 @@ test('the real remote transport reports per-statement write counts from meta.cha
     );
     const byStatement = pattern =>
       writes.filter(write => pattern.test(write.sql)).map(w => w.changes);
-    // Both captured runs flip; all six unfinished chunks close; three claims park; one
-    // re-measure parks. A second pass finds nothing left to do and reports real zeros.
-    assert.deepEqual(byStatement(/^UPDATE benchmark_runs/m), [2]);
+    // The cancel is per run: one flip per captured run, then one global sweep per pass. All six
+    // unfinished chunks close; three claims park; one re-measure parks. A second pass finds
+    // nothing left to do and reports real zeros.
+    assert.deepEqual(byStatement(/^UPDATE benchmark_runs/m), [1, 1]);
     assert.deepEqual(byStatement(/^UPDATE scheduler_chunks/m), [6, 0]);
     // SQLite counts a row an UPDATE matched even when the stored values already match, so
     // parking the same claim again on the second pass reports 1 rather than 0.
     assert.deepEqual(byStatement(/^UPDATE profile_remeasures/m), [1, 1]);
-    assert.deepEqual(byStatement(/^UPDATE benchmark_profiles[\s\S]*run_id IN/), [3]);
+    // Claim parking is per run: 2 claims on the first run, 1 on the second.
+    assert.deepEqual(byStatement(/^UPDATE benchmark_profiles[\s\S]*run_id IN/), [2, 1]);
     assert.ok(
       new Set(writes.map(write => write.changes)).size > 2,
       'per-statement counts must vary, not repeat one constant'
@@ -2023,6 +2708,230 @@ test('the real remote transport reports per-statement write counts from meta.cha
       'the publication lookup must be plan-checked'
     );
     local.close();
+  } finally {
+    f.close();
+  }
+});
+
+test('a non-zero wrangler exit reports the error text written to stdout', async () => {
+  const f = fixture();
+  try {
+    seed(f.sqlite);
+    const { createRemoteExecutor } = await import('./legacy-cancel.mjs');
+    // Real shape: `--json` puts the failure on STDOUT, stderr is empty, exit 1. Before this fix
+    // the reported reason was a bare `wrangler exited 1: ` with no cause at all.
+    const { spawnImpl } = fakeFailingWrangler(() => ({
+      exit: 1,
+      stdout: JSON.stringify({
+        error: { text: 'D1_ERROR: too many terms in compound SELECT', code: 7500 },
+      }),
+      stderr: '',
+    }));
+    const remote = createRemoteExecutor({ spawnImpl });
+    await assert.rejects(
+      () => remote.read('SELECT 1'),
+      error => {
+        assert.match(error.message, /wrangler exited 1/);
+        assert.match(error.message, /too many terms in compound SELECT/);
+        assert.doesNotMatch(error.message, /SELECT 1/, 'the statement must not be echoed');
+        return true;
+      }
+    );
+  } finally {
+    f.close();
+  }
+});
+
+test('the stdout error is truncated to 300 characters and never echoes the statement', async () => {
+  const f = fixture();
+  try {
+    const { describeD1Failure } = await import('./legacy-cancel.mjs');
+    const long = 'X'.repeat(4000);
+    const message = describeD1Failure({
+      code: 1,
+      stdout: JSON.stringify([{ success: false, error: { message: long } }]),
+      stderr: '',
+    });
+    assert.match(message, /^wrangler exited 1: X+…$/);
+    assert.ok(message.length <= 'wrangler exited 1: '.length + 301, `too long: ${message.length}`);
+
+    // A non-JSON stdout still yields text rather than an empty tail, and stderr is the fallback.
+    assert.match(describeD1Failure({ code: 2, stdout: 'boom', stderr: '' }), /exited 2: boom/);
+    assert.match(
+      describeD1Failure({ code: 3, stdout: '', stderr: 'stderr text' }),
+      /exited 3: stderr text/
+    );
+    assert.match(
+      describeD1Failure({ code: 4, stdout: '', stderr: '' }),
+      /exited 4: no error text on stdout or stderr/
+    );
+  } finally {
+    f.close();
+  }
+});
+
+test('a statement over a D1 limit is refused before it is sent, naming the builder', async () => {
+  const f = fixture();
+  try {
+    seed(f.sqlite);
+    const {
+      createRemoteExecutor,
+      assertStatementFitsD1,
+      D1_MAX_STATEMENT_BYTES,
+      D1_MAX_COMPOUND_TERMS,
+      compoundTermCount,
+    } = await import('./legacy-cancel.mjs');
+    // The shape that broke production: six tables as one UNION ALL is six SELECT terms, and D1
+    // documents a maximum of five. Local SQLite accepts it, which is why the copy proof passed.
+    const sixTerms = ['a', 'b', 'c', 'd', 'e', 'f']
+      .map(name => `SELECT 1 AS x FROM t_${name}`)
+      .join(' UNION ALL ');
+    assert.equal(compoundTermCount(sixTerms), 6);
+    assert.throws(
+      () => assertStatementFitsD1(sixTerms, 'model enumeration'),
+      error =>
+        /model enumeration/.test(error.message) &&
+        /6 compound SELECT terms/.test(error.message) &&
+        new RegExp(String(D1_MAX_COMPOUND_TERMS)).test(error.message)
+    );
+    // Five is the documented maximum, so it must pass.
+    const fiveTerms = ['a', 'b', 'c', 'd', 'e']
+      .map(name => `SELECT 1 AS x FROM t_${name}`)
+      .join(' UNION ALL ');
+    assert.doesNotThrow(() => assertStatementFitsD1(fiveTerms, 'five'));
+
+    const long = `SELECT '${'y'.repeat(D1_MAX_STATEMENT_BYTES)}' AS v`;
+    assert.ok(Buffer.byteLength(long, 'utf8') > D1_MAX_STATEMENT_BYTES);
+    assert.throws(
+      () => assertStatementFitsD1(long, 'oversized read'),
+      error => /oversized read/.test(error.message) && /100000-byte limit/.test(error.message)
+    );
+
+    // And the live transport enforces it, so nothing invalid reaches wrangler.
+    const { calls, spawnImpl } = fakeFailingWrangler(() => ({
+      stdout: JSON.stringify([{ success: true, results: [] }]),
+    }));
+    const remote = createRemoteExecutor({ spawnImpl });
+    await assert.rejects(() => remote.read(sixTerms), /compound SELECT terms/);
+    await assert.rejects(() => remote.write([long]), /100000-byte limit/);
+    assert.equal(calls.length, 0, 'no refused statement may reach wrangler');
+  } finally {
+    f.close();
+  }
+});
+
+test('an apply whose whole scope stays inside the D1 statement limits', async () => {
+  const f = oversizedFixture();
+  try {
+    // Every statement the batched path builds — including the two-part model enumeration — must
+    // fit D1's documented limits. This is the regression the production dry-run hit.
+    const {
+      createRemoteExecutor,
+      D1_MAX_STATEMENT_BYTES,
+      D1_MAX_COMPOUND_TERMS,
+      compoundTermCount,
+    } = await import('./legacy-cancel.mjs');
+    const { createLocalExecutor } = await import('./legacy-cancel.mjs');
+    const local = createLocalExecutor(f.path);
+    const kinds = [];
+    const { spawnImpl } = fakeFailingWrangler(sql => {
+      const bytes = Buffer.byteLength(sql, 'utf8');
+      if (bytes > D1_MAX_STATEMENT_BYTES) {
+        return {
+          exit: 1,
+          stdout: JSON.stringify({ error: { text: `statement too long: ${bytes}` } }),
+        };
+      }
+      if (compoundTermCount(sql) > D1_MAX_COMPOUND_TERMS) {
+        return {
+          exit: 1,
+          stdout: JSON.stringify({
+            error: { text: `too many terms in compound SELECT (${compoundTermCount(sql)})` },
+          }),
+        };
+      }
+      const explain = /^\s*EXPLAIN QUERY PLAN\s+([\s\S]+)$/i.exec(sql);
+      if (explain) {
+        kinds.push('explain');
+        return {
+          stdout: JSON.stringify(rowsEnvelope(local.plan(explain[1]).map(detail => ({ detail })))),
+        };
+      }
+      if (/^\s*(SELECT|WITH)/i.test(sql)) {
+        kinds.push('read');
+        return { stdout: JSON.stringify(rowsEnvelope(local.read(sql))) };
+      }
+      kinds.push('write');
+      const changed = local.write([sql]);
+      return { stdout: JSON.stringify(writeEnvelope(changed[0])) };
+    });
+    const remote = createRemoteExecutor({ spawnImpl });
+    const lines = [];
+    const code = await runLegacyCancel({
+      argv: ['--apply', '--remote', '--expect-token', OPERATOR, '--min-remaining-ms', '600000'],
+      executor: remote,
+      log: line => lines.push(line),
+    });
+    assert.equal(code, EXIT.ok, lines.join('\n'));
+    // The enumeration really ran, in two parts, and reads happened after it.
+    assert.ok(kinds.filter(kind => kind === 'read').length > 4);
+    assert.ok(kinds.includes('write'));
+    local.close();
+  } finally {
+    f.close();
+  }
+});
+
+test('packing keeps every batch inside the D1 statement budget, not just the row cap', async () => {
+  const f = fixture();
+  try {
+    seed(f.sqlite);
+    const { leanBatchSizeSql, leanCancelledSql, LEAN_MAX_BATCH_BYTES, D1_MAX_STATEMENT_BYTES } =
+      await import('./legacy-cancel.mjs');
+    // Six small runs, each split into many model groups: the row cap alone would pack dozens of
+    // OR-chained segments into one statement, which can exceed D1's 100 KB limit.
+    const runIds = Array.from({ length: 6 }, (_, i) => `user-2026-11-21T06-53-54-446Z-${i}`);
+    const models = Array.from(
+      { length: 64 },
+      (_, i) => `vendor/some-long-model-name-${String(i).padStart(2, '0')}`
+    );
+    const probed = [];
+    for (const runId of runIds) {
+      for (const model of models)
+        probed.push({ candidate: { runIds: [runId], models: [model] }, rows: 1 });
+    }
+    // The unpacked worst case really is over the limit: this is what makes the budget necessary.
+    const all = probed.map(p => p.candidate);
+    assert.ok(
+      Math.max(
+        Buffer.byteLength(leanBatchSizeSql(all), 'utf8'),
+        Buffer.byteLength(leanCancelledSql(all), 'utf8')
+      ) > D1_MAX_STATEMENT_BYTES,
+      'the fixture must exceed 100 KB if packed by rows alone'
+    );
+
+    // packBatches is the real packer the scope uses.
+    const { packBatches } = await import('./legacy-cancel.mjs');
+    const packed = packBatches(probed);
+    assert.ok(packed.length > 1, 'the byte budget must split the scope');
+    for (const segments of packed) {
+      // Every probed candidate is one row, so the row cap is the segment count here.
+      assert.ok(segments.length <= LEAN_MAX_SCOPED_ROWS, 'a packed batch exceeded the row cap');
+      assert.ok(
+        Buffer.byteLength(leanBatchSizeSql(segments), 'utf8') <= LEAN_MAX_BATCH_BYTES,
+        'a packed batch exceeded the byte budget'
+      );
+      assert.ok(
+        Buffer.byteLength(leanCancelledSql(segments), 'utf8') <= LEAN_MAX_BATCH_BYTES,
+        'a packed batch exceeded the byte budget'
+      );
+    }
+    // Every segment lands in exactly one batch: the byte budget must not drop or duplicate one.
+    const keys = packed.flatMap(segments =>
+      segments.map(segment => `${segment.runIds[0]}|${segment.models[0]}`)
+    );
+    assert.equal(new Set(keys).size, probed.length);
+    assert.equal(keys.length, probed.length);
   } finally {
     f.close();
   }

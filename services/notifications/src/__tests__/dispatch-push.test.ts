@@ -1913,6 +1913,23 @@ describe('NotificationChannelDO morning briefing', () => {
     expect(messages?.[0]?.body?.length).toBeGreaterThan(0);
   });
 
+  it('gives an English briefing token its own generic body, not the active-agents one', async () => {
+    installDbMock({
+      ...eligibleState(),
+      tokens: [{ user_id: 'user', token: 'tok1', locale: 'en', app_version: '1.0.12' }],
+    });
+    const result = await getDO('briefing-english-copy').dispatchPush(
+      briefingInput('briefing-english-copy')
+    );
+    expect(result.kind).toBe('delivered');
+    const [messages] = vi.mocked(sendPushNotifications).mock.calls[0] ?? [];
+    expect(messages?.[0]).toMatchObject({
+      title: 'Kilo',
+      body: 'Your agent brief is ready',
+    });
+    expect(messages?.[0]?.body).not.toBe('Active agents have an update');
+  });
+
   it('keeps user/date dedup across later context publications, summary attachments, and cleanup', async () => {
     installDbMock(eligibleState());
     const stub = getDO('briefing-one-per-morning');

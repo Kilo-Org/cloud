@@ -499,11 +499,6 @@ export async function createAuthenticationOptions(): Promise<AuthenticationOptio
   return { challengeId, options };
 }
 
-/**
- * Advance a credential's signature counter as a compare-and-set against the
- * value that was just verified. A concurrent assertion read the same counter
- * and reaches this write with a stale expectation, so it updates no row.
- */
 export async function advancePasskeyCounter(
   credential: Pick<PasskeyCredential, 'id' | 'sign_count'>,
   newCounter: number,

@@ -305,10 +305,10 @@ describe('live Agents list across a transient socket empty', () => {
     await render();
     expect(ids()).toEqual(['a1']);
 
-    // The redirect the finding reports: the app resets to Home while the cache
-    // is empty, and the mount that follows is a fresh hook instance with no
-    // retained rows. Its own fetch is held open so the test observes the state
-    // a real gap (slow network, socket reconnect) leaves on screen.
+    // A route reset back to the Agents tab: the app resets to Home while the
+    // cache is empty, and the mount that follows is a fresh hook instance with
+    // no retained rows. Its own fetch is held open so the test observes the
+    // state a real gap (slow network, socket reconnect) leaves on screen.
     const answer = deferred<CachedActiveSessionsData>();
     state.request.mockReturnValue(answer.promise);
     await act(async () => {

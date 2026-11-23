@@ -132,13 +132,21 @@ export function createOfflineBannerStore(options: {
   }
 
   function handleSourceState(sourceState: ConnectivityState): void {
+    const status = connectivityStatus(sourceState);
+    // A repeated disconnect report is the same evidence the confirmation window
+    // was opened for: the timer, or the probe that replaced it, owns the
+    // decision, so the deadline stays the one the first report set. Restarting
+    // it let a flapping source postpone the probe for as long as reports kept
+    // arriving.
+    if (status === 'offline' && phase.kind === 'confirming-offline') {
+      return;
+    }
     generation += 1;
     const attempt = generation;
     cancelPending();
     if (destroyed) {
       return;
     }
-    const status = connectivityStatus(sourceState);
     if (status === 'unknown') {
       // A disconnect report that was still being confirmed is not evidence either
       // way: the state it replaced stands, and a later report decides again.

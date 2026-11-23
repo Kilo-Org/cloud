@@ -7,14 +7,14 @@
     "directory": "پوشهٔ کاری",
     "createSession": "ایجاد نشست نیتیو",
     "queueIfOffline": "قرار دادن پرامپت در صف اگر میزبان آفلاین است",
-    "prompt": "پرامپت یا \u2066/command\u2069",
+    "prompt": "پرامپت یا ⁦/command⁩",
     "localClear": "پاک کردن نمای محلی",
     "abort": "لغو نوبت",
     "failed": "عملیات دسترسی از راه دور نیتیو ناموفق بود",
     "creationUnknown": "نتیجهٔ ایجاد نشست نامشخص است. پیش از تلاش دوباره، نشست‌ها را بازخوانی کنید.",
     "commandFailed": "فرمان اجراگر ناموفق بود",
     "invalidReply": "پاسخ اجراگر نامعتبر است",
-    "unsafeCommand": "از /compact، /new، /skill، /models، /agents یا /clear (فقط محلی) استفاده کنید.",
+    "unsafeCommand": "از ⁦/compact⁩، ⁦/new⁩، ⁦/skill⁩، ⁦/models⁩، ⁦/agents⁩ یا ⁦/clear⁩ (فقط محلی) استفاده کنید.",
     "status": "اتصال: {{connection}} · اجراگر: {{runner}}",
     "presenceStatus": "میزبان‌ها: {{connection}}",
     "commandStatus": "تحویل فرمان: {{status}}",
@@ -91,6 +91,7 @@
     "draft": "پیش‌نویس",
     "enabled": "فعال",
     "github": "GitHub",
+    "image": "تصویر",
     "imageUnavailable": "تصویر در دسترس نیست.",
     "loading": "در حال بارگذاری…",
     "loadMore": "بارگذاری بیشتر",
@@ -522,6 +523,7 @@
       "receiptLabel": "رسید",
       "copyReceiptId": "کپی شناسهٔ رسید",
       "appealLabel": "درخواست تجدیدنظر",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "دریافت شد",
       "triageOpen": "در حال بررسی",
       "triageActioned": "تأیید شد",
@@ -555,7 +557,7 @@
       "title": "گزارش‌ها",
       "rowSubtitle": "گزارش‌هایی که ثبت کرده‌اید و نتایج آن‌ها",
       "emptyTitle": "هنوز گزارشی ثبت نکرده‌اید",
-      "emptyDescription": "گزارش‌هایی که از یک نظر یا یک پاسخ هوش مصنوعی ثبت می‌کنید اینجا نمایش داده می‌شوند.",
+      "emptyDescription": "گزارش‌هایی که از نظر یک بحث درخواست ادغام یا از پاسخ هوش مصنوعی در نشست عامل ثبت می‌کنید، همراه با نتیجه‌شان اینجا نمایش داده می‌شوند.",
       "couldNotLoad": "گزارش‌های شما بارگذاری نشد",
       "capped": "جدیدترین گزارش‌های شما نمایش داده می‌شوند."
     },
@@ -1237,6 +1239,7 @@
     "needsInputAction": {
       "approved": "درخواست تأیید شد",
       "replied": "پاسخ ارسال شد",
+      "empty": "پاسخی بنویسید و سپس آن را ارسال کنید.",
       "failed": "پاسخ دادن ممکن نشد. برای تلاش دوباره دوباره ضربه بزنید.",
       "unavailable": "این درخواست دیگر در انتظار نیست."
     }
@@ -1501,7 +1504,9 @@
       "githubError": "باز کردن صفحه راه‌اندازی GitHub ممکن نشد. لطفاً دوباره تلاش کنید.",
       "gitlabAccount": "حساب GitLab",
       "gitlabError": "باز کردن صفحه راه‌اندازی GitLab ممکن نشد. لطفاً دوباره تلاش کنید.",
-      "description": "برای بررسی خودکار درخواست‌های ادغام، {{label}} مربوط به Kilo را متصل کنید."
+      "description": "برای بررسی خودکار درخواست‌های ادغام، {{label}} مربوط به Kilo را متصل کنید.",
+      "notConnectedTitle": "{{platform}} متصل نیست",
+      "githubAdminOnlyDescription": "فقط مالکان سازمان و مدیران می‌توانند آن را متصل کنند."
     },
     "overview": {
       "allAreas": "همه حوزه‌ها",
@@ -2175,7 +2180,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} نشست",
       "sectionAccessibility": "{{title}}: {{displayCount}} نشست",
       "live": "زنده",
-      "updating": "در حال به‌روزرسانی"
+      "updating": "در حال به‌روزرسانی",
+      "retentionLimit": "جدیدترین نشست‌ها نمایش داده می‌شوند."
     },
     "sessionRow": {
       "deleteTitle": "نشست حذف شود؟",
@@ -2245,11 +2251,11 @@
       "scrollToBottom": "رفتن به پایین",
       "emptyTitle": "هنوز پیامی وجود ندارد",
       "emptyReadOnlyTitle": "پیامی در این نشست وجود ندارد",
-      "renameAccessibility": "تغییر نام نشست: {{title}}",
       "cloningSession": "در حال کپی کردن نشست",
       "couldNotLoadThisSession": "بارگذاری این نشست ممکن نشد.",
       "historyTooLarge": "متن گفت‌وگوی این نشست برای بارگذاری بیش از حد بزرگ است.",
       "historyUnavailable": "متن گفت‌وگوی این نشست خوانده نمی‌شود.",
+      "historyTemporarilyUnavailable": "متن گفت‌وگوی این نشست موقتاً در دسترس نیست.",
       "cloneFailedRetry": "کپی کردن این نشست ممکن نشد. دوباره تلاش کنید.",
       "notEnoughCredits": "اعتبار کافی برای این درخواست وجود ندارد. اعتبار اضافه کنید و دوباره تلاش کنید.",
       "previousTaskFinishing": "کار قبلی هنوز تمام نشده است. لطفاً کمی صبر کنید.",
@@ -2655,6 +2661,7 @@
     "filePart": {
       "loadingImage": "در حال بارگذاری تصویر",
       "imageUnavailableRetry": "تصویر در دسترس نیست؛ تلاش دوباره برای بارگذاری",
+      "imageUnavailableRetryWithAlt": "تصویر در دسترس نیست؛ {{alt}}؛ تلاش دوباره برای بارگذاری",
       "imagePreviewUnavailableInSession": "پیش‌نمایش تصویر در این نشست در دسترس نیست.",
       "viewImage": "مشاهده تصویر",
       "viewImageWithAlt": "مشاهده تصویر {{alt}}",
@@ -2786,7 +2793,9 @@
       "skip": "گذشتن",
       "retrySkip": "تلاش دوباره برای گذشتن",
       "submitting": "در حال ارسال…",
-      "sendAnswers": "ارسال پاسخ‌ها"
+      "sendAnswers": "ارسال پاسخ‌ها",
+      "unreadableTitle": "این پرسش نمایش داده نشد",
+      "unreadableBody": "عامل منتظر پرسشی است که این برنامه نمی‌تواند آن را نمایش دهد. برای ادامه، به پرسش در CLI پاسخ بده."
     },
     "blockingCard": {
       "questionUnavailable": "این پرسش دیگر در دسترس نیست.",
@@ -2813,6 +2822,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "بارگذاری نشست زیرعامل ممکن نشد.",
+      "historyTooLarge": "تاریخچهٔ این زیرعامل برای بارگذاری بیش از حد بزرگ است.",
+      "historyUnavailable": "تاریخچهٔ این زیرعامل در دسترس نیست.",
+      "historyTemporarilyUnavailable": "تاریخچهٔ این زیرعامل موقتاً در دسترس نیست.",
       "failed": "نشست زیرعامل با خطا مواجه شد.",
       "noMessages": "پیامی از زیرعامل نیست",
       "noMessagesDescription": "این نشست زیرعامل بدون ثبت متن گفت‌وگو به پایان رسید.",
@@ -2962,7 +2974,7 @@
       "exitSession": "خروج از نشست",
       "clearSession": "پایان این نشست و شروع نشستی جدید",
       "compactDescription": "زمینهٔ نشست کنونی را فشرده کن",
-      "goalDescription": "به کار روی هدف نشست ادامه بده. /goal <objective> یا pause, resume, clear",
+      "goalDescription": "به کار روی هدف نشست ادامه بده. ⁦/goal <objective>⁩ یا pause, resume, clear",
       "initDescription": "راهاندازی هدایتشدهٔ AGENTS.md",
       "resumeClaudeDescription": "رونوشت نشست Claude Code را درونریزی کن",
       "resumeCodexDescription": "رونوشت نشست OpenAI Codex را درونریزی کن",
@@ -3094,6 +3106,12 @@
     "retryLoadingAccount": "تلاش مجدد برای بارگذاری حساب",
     "retryLoadingPrivacy": "تلاش مجدد برای بارگذاری گزینه‌های حریم خصوصی"
   },
+  "accountBlocked": {
+    "title": "حساب مسدود شده",
+    "description": "Kilo این حساب را مسدود کرده است و ورود دوباره آن را برطرف نمی‌کند. پشتیبانی می‌تواند بنا به درخواست مسدودیت را بررسی کند.",
+    "domainDescription": "Kilo حساب‌های روی این دامنه ایمیل را مسدود می‌کند و ورود دوباره آن را برطرف نمی‌کند. پشتیبانی می‌تواند بنا به درخواست دامنه را بررسی کند.",
+    "contactSupport": "تماس با پشتیبانی"
+  },
   "addCredits": {
     "cta": "افزودن اعتبار",
     "billingPage": "صفحه صورتحساب"
@@ -3166,8 +3184,7 @@
     "timeoutDescription": "درخواست پیش از تکمیل، منقضی شد. لطفاً دوباره تلاش کنید."
   },
   "screenHeader": {
-    "openMenu": "باز کردن منو",
-    "openMenuFor": "باز کردن منوی {{title}}"
+    "openMenu": "باز کردن منو"
   },
   "picker": {
     "optionsExpired": "گزینه‌ها منقضی شدند",
@@ -3386,6 +3403,8 @@
     "voiceTranscriptionWho": "دستگاه شما، Kilo Gateway با مدل تبدیل گفتار به متن انتخابی شما، یا Apple یا Google برای بازشناسی برخط.",
     "installAttributionPromptTitle": "اجازهٔ شناسایی منبع نصب را می‌دهید؟",
     "installAttributionPromptMessage": "Kilo از مجوز ردیابی Apple فقط برای شناسایی مسیر آشنایی شما با برنامه استفاده می‌کند. پیام‌ها و گفت‌وگوهای شما هرگز برای این کار استفاده نمی‌شوند.",
+    "installAttributionRequestFailedTitle": "درخواست ردیابی نمایش داده نشد",
+    "installAttributionRequestFailedMessage": "Kilo نتوانست درخواست سیستم را نمایش دهد، بنابراین شناسایی منبع نصب غیرفعال می‌ماند.",
     "what": "چه داده‌هایی",
     "why": "با چه هدفی",
     "who": "دریافت‌کننده"
@@ -3401,7 +3420,7 @@
   "organization": {
     "auditLog": {
       "title": "گزارش حسابرسی",
-      "permissionDenied": "فقط مالک، ادمین یا مدیر صورتحساب سازمانی که طرح Enterprise دارد می‌تواند گزارش حسابرسی آن را ببیند.",
+      "permissionDenied": "فقط مالک، مدیر یا مدیر صورتحساب سازمانی که طرح Enterprise دارد می‌تواند گزارش حسابرسی آن را ببیند. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "هیچ رویداد حسابرسی‌ای وجود ندارد",
       "emptyDescription": "اقداماتی که در این سازمان انجام می‌شود اینجا نمایش داده می‌شود.",
       "truncated": "جدیدترین رویدادها نمایش داده می‌شوند.",
@@ -3417,7 +3436,7 @@
         "promoCreditGranted": "اعتبار تبلیغاتی اعطا شد",
         "memberRemove": "عضو حذف شد",
         "memberChangeRole": "نقش عضو تغییر کرد",
-        "memberAdminAdd": "ادمین اضافه شد",
+        "memberAdminAdd": "مدیر اضافه شد",
         "memberAutoJoin": "عضو به‌طور خودکار پیوست",
         "ssoAutoProvision": "کاربر توسط SSO ایجاد شد",
         "ssoSetDomain": "دامنه SSO اضافه شد",
@@ -3451,11 +3470,147 @@
         "guardrailUpdate": "محدودیت ایمنی به‌روزرسانی شد",
         "guardrailRemove": "محدودیت ایمنی حذف شد",
         "unknown": "رویداد حسابرسی"
+      },
+      "detail": {
+        "fieldChange": "{{field}}: {{change}}",
+        "modeIdentity": "حالت \"{{name}}\" (شناسه: {{slug}})",
+        "modeUpdate": "حالت \"{{name}}\": {{changes}}",
+        "field": {
+          "name": "$t(organization.modes.nameLabel)",
+          "slug": "$t(organization.modes.identifierLabel)",
+          "roleDefinition": "$t(organization.modes.roleLabel)",
+          "whenToUse": "$t(organization.modes.whenToUseLabel)",
+          "description": "$t(organization.modes.descriptionLabel)",
+          "customInstructions": "$t(codeReviewer.instructions.title)",
+          "groups": "$t(profiles.agents.tools)",
+          "autoRoute": "مسیریابی خودکار",
+          "defaultModel": "مدل پیش‌فرض"
+        },
+        "role": {
+          "owner": "$t(organization.members.roles.owner)",
+          "admin": "$t(organization.members.roles.admin)",
+          "billing_manager": "$t(organization.members.roles.billingManager)",
+          "member": "$t(organization.members.roles.member)"
+        },
+        "memberRole": "{{email}}: {{change}}",
+        "memberAdded": "{{email}} به‌عنوان {{role}} اضافه شد",
+        "memberRemoved": "{{email}} حذف شد",
+        "memberParentAdded": "{{email}} از سازمان مادر {{parent}} اضافه شد",
+        "memberParentRemoved": "{{email}} از سازمان مادر {{parent}} حذف شد",
+        "inviteSent": "{{email}} به‌عنوان {{role}}",
+        "inviteRevoked": "دعوت‌نامه {{email}} لغو شد",
+        "inviteAccepted": "{{email}} پذیرفت",
+        "groupIdentity": "گروه \"{{name}}\"",
+        "groupMembers": "گروه \"{{name}}\": {{members}}",
+        "groupMemberGroups": "{{displayCount}} گروه",
+        "groupMemberGroups_one": "{{displayCount}} گروه",
+        "groupMemberGroups_other": "{{displayCount}} گروه",
+        "groupMemberGroupsOf": "{{email}}: {{displayCount}} گروه",
+        "groupMemberGroupsOf_one": "{{email}}: {{displayCount}} گروه",
+        "groupMemberGroupsOf_other": "{{email}}: {{displayCount}} گروه",
+        "groupPolicySet": "گروه \"{{name}}\": سیاست {{policy}} تنظیم شد",
+        "groupPolicyRemoved": "گروه \"{{name}}\": سیاست {{policy}} حذف شد",
+        "groupDefaultPolicySet": "سیاست پیش‌فرض {{policy}} تنظیم شد",
+        "groupDefaultPolicyRemoved": "سیاست پیش‌فرض {{policy}} حذف شد",
+        "guardrailIdentity": "{{type}} \"{{name}}\"",
+        "guardrailStatus": "{{type}} \"{{name}}\" {{state}}",
+        "guardrailConfig": "محدودیت‌های ایمنی AI {{state}}",
+        "guardrailConfigGroup": "{{state}} برای گروه \"{{group}}\"",
+        "guardrailEnforcement": "{{target}}: {{value}}",
+        "guardrailSkill": "{{target}}: {{values}}",
+        "guardrailTarget": {
+          "mcp": "$t(profiles.mcp.title)",
+          "skill": "$t(profiles.skillsTitle)"
+        },
+        "ssoDomainSet": "دامنه SSO {{domain}}",
+        "ssoDomainChanged": "{{domain}} (قبلاً {{previous}} بود)",
+        "ssoDomainRemoved": "دامنه SSO {{domain}} پاک شد",
+        "fundsPurchased": "{{amount}} با {{method}}",
+        "fundsGranted": "{{amount}}",
+        "fundsDistributed": "{{amount}} به {{displayCount}} سازمان زیرمجموعه",
+        "fundsDistributed_one": "{{amount}} به {{displayCount}} سازمان زیرمجموعه",
+        "fundsDistributed_other": "{{amount}} به {{displayCount}} سازمان زیرمجموعه",
+        "fundsReceived": "{{amount}} از {{parent}}",
+        "reviewAgentPlatform": "{{platform}}",
+        "reviewAgentConfig": "پیکربندی {{platform}}",
+        "reviewAgentConfigStyle": "{{platform}}: سبک {{style}}",
+        "reviewAgentSecretsUpdated": "{{displayCount}} به‌روزرسانی شد",
+        "reviewAgentSecretsUpdated_one": "{{displayCount}} به‌روزرسانی شد",
+        "reviewAgentSecretsUpdated_other": "{{displayCount}} به‌روزرسانی شد",
+        "reviewAgentSecretsFailed": "{{displayCount}} خطا",
+        "reviewAgentSecretsFailed_one": "{{displayCount}} خطا",
+        "reviewAgentSecretsFailed_other": "{{displayCount}} خطا",
+        "reviewAgentSecretRotated": "{{values}}",
+        "settingAdvancedPolicies": "{{values}}",
+        "settingAdvancedPoliciesOpenRouter": "OpenRouter {{state}}",
+        "settingAdvancedPoliciesRegion": "منطقه استنتاج: {{region}}",
+        "settingDefaultModelSet": "{{next}}",
+        "settingDefaultModelRemoved": "{{previous}}",
+        "settingAutoRoute": "حالت \"{{mode}}\": {{change}}",
+        "settingDefaultBehavior": {
+          "global": "پیش‌فرض سراسری",
+          "specific": "{{model}}",
+          "auto": "$t(models.auto.organization)"
+        },
+        "settingDataCollection": "{{mode}}",
+        "dataCollection": {
+          "allowed": "مجاز",
+          "denied": "غیرمجاز",
+          "followSetting": "مطابق تنظیم افزونه"
+        },
+        "region": {
+          "us": "$t(organizationModelAccess.region.us)",
+          "eu": "$t(organizationModelAccess.region.eu)",
+          "au": "$t(organizationModelAccess.region.au)",
+          "jp": "$t(organizationModelAccess.region.jp)"
+        },
+        "settingProjectsUi": "رابط کاربری Projects {{state}}",
+        "settingMinimumBalanceOn": "{{threshold}} به {{emails}}",
+        "settingMinimumBalanceThreshold": "{{threshold}}",
+        "settingRecommendationsDigest": "خلاصه توصیه‌ها {{state}}",
+        "settingBrowserControl": "{{policy}}",
+        "settingBrowserControlOrigins": "{{policy}}: {{origins}}",
+        "settingBrowserControlOriginsCleared": "{{policy}}: هیچ مبدأ مجازی وجود ندارد",
+        "settingName": "تغییر نام از {{previous}} به {{next}}",
+        "enabled": "$t(common.enabled)",
+        "scanBeforeUseOn": "اسکن پیش از استفاده فعال",
+        "scanBeforeUseOff": "اسکن پیش از استفاده غیرفعال",
+        "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingRemoved": "حذف شد: {{models}}",
+        "browserPolicyOff": "استفاده از مرورگر مسدود",
+        "browserPolicyAllow": "فقط مبدأهای مجاز",
+        "browserPolicyPlaywrightOnly": "فقط استفاده از مرورگر",
+        "disabled": "$t(common.disabled)",
+        "autoRouting": "مدل‌ها تغییر کرد: {{values}}",
+        "integrationConnected": "{{integration}} متصل شد",
+        "integrationDisconnected": "{{integration}} قطع شد",
+        "integrationRefreshed": "{{integration}} به‌روزرسانی شد",
+        "integrationCancelled": "{{integration}} لغو شد",
+        "integrationModelUpdated": "{{integration}}: مدل {{model}}",
+        "integrationKeyAdded": "کلید {{provider}} اضافه شد",
+        "integrationKeyUpdated": "کلید {{provider}} به‌روزرسانی شد",
+        "integrationKeyDeleted": "کلید {{provider}} حذف شد",
+        "integrationKeyToggled": "کلید {{provider}}: {{state}}",
+        "namedPolicyCreated": "سیاست {{kind}} {{id}} ایجاد شد",
+        "namedPolicyUpdated": "سیاست {{kind}} {{id}} به‌روزرسانی شد",
+        "namedPolicyDeleted": "سیاست {{kind}} {{id}} حذف شد",
+        "namedPolicyLinked": "سیاست {{kind}} به {{next}} پیوند شد",
+        "webhookTriggerUpdated": "تریگر {{trigger}}",
+        "organizationRenamed": "سازمان از {{previous}} به {{next}} تغییر نام یافت",
+        "brand": {
+          "github": "$t(common.github)",
+          "gitlab": "$t(common.gitlab)",
+          "bitbucket": "$t(agentChat.repoPicker.platformBitbucket)",
+          "discord": "$t(profile.providerDiscord)",
+          "slack": "$t(agentChat.sessionFilter.platformSlack)",
+          "linear": "$t(agentChat.sessionFilter.platformLinear)",
+          "byok": "استفاده از کلید خودتان"
+        }
       }
     },
     "billing": {
       "title": "صورت‌حساب",
-      "permissionDenied": "فقط مالک، مدیر یا مسئول صورت‌حساب سازمان می‌تواند صورت‌حساب آن را ببیند.",
+      "permissionDenied": "فقط مالک، مدیر یا مدیر صورتحساب سازمان می‌تواند صورت‌حساب آن را ببیند. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "اشتراک",
       "state": "وضعیت",
       "stateNone": "بدون اشتراک",
@@ -3598,7 +3753,7 @@
         "owner": "مالک",
         "admin": "مدیر",
         "member": "عضو",
-        "billingManager": "مدیر صورتحساب"
+        "billingManager": "مدیر صورت‌حساب"
       },
       "emailStatusFailed": "ارسال ایمیل ناموفق بود",
       "inviteCreated": "دعوت‌نامه ایجاد شد",
@@ -3632,7 +3787,7 @@
       "emptyDescription": "برای دیدن درخواست‌های پیشین از «ساعت قبل» استفاده کنید.",
       "emptyBoundDescription": "گزارش‌های درخواست بیش از این به عقب نمی‌روند.",
       "loadError": "بارگذاری گزارش‌های درخواست ناموفق بود.",
-      "permissionDenied": "فقط مالک، ادمین یا مدیر صورتحساب سازمان می‌تواند گزارش‌های درخواست آن را ببیند.",
+      "permissionDenied": "فقط مالک، مدیر یا مدیر صورتحساب سازمان می‌تواند گزارش‌های درخواست آن را ببیند. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} ورودی · {{output}} خروجی",
       "byok": "BYOK"
     },
@@ -3737,7 +3892,7 @@
     "signupStepUpApple": "برای تکمیل ساخت حساب خود، از «$t(login.signInWithApple)» استفاده کنید.",
     "signupStepUpGoogle": "برای تکمیل ساخت حساب خود، از «$t(login.signInWithGoogle)» استفاده کنید.",
     "signupStepUpBack": "برای تکمیل ساخت حساب خود، به صفحهٔ قبل برگردید و از «$t(login.moreSignInOptions)» استفاده کنید.",
-    "invalidCode": "کد واردشده نادرست است یا منقضی شده است. لطفاً دوباره تلاش کنید یا از «$t(login.resendCode)» استفاده کنید.",
+    "invalidCode": "کد واردشده نادرست است یا منقضی شده است. از «$t(login.resendCode)» یا «$t(login.moreSignInOptions)» استفاده کنید.",
     "codeInProgress": "کد شما در حال پردازش است. کمی صبر کنید و دوباره تلاش کنید.",
     "tooManyAttempts": "تعداد تلاش‌ها بیش از حد مجاز است. لطفاً کد جدیدی درخواست کنید.",
     "invalidToken": "ورود ناموفق بود. لطفاً دوباره تلاش کنید.",
@@ -3902,7 +4057,10 @@
     "list": {
       "loadFailed": "تاریخچه گفتگو بارگذاری نشد.",
       "new": "گفتگوی جدید",
-      "deleteTitle": "این گفتگو حذف شود؟"
+      "deleteTitle": "این گفتگو حذف شود؟",
+      "resetNoticeTitle": "گفتگوها و پیش‌نویس‌های محلی پاک شدند",
+      "resetNoticeBody": "Kilo نتوانست گفتگوهای ذخیره‌شده روی این دستگاه را باز کند. نشست‌های شما در فضای ابری تحت تأثیر قرار نگرفته‌اند.",
+      "resetNoticeDismiss": "نادیده گرفتن اعلان"
     },
     "rename": {
       "title": "تغییر نام گفتگو",
@@ -3952,6 +4110,9 @@
       "fieldName": "نام نمایشی",
       "fieldUrl": "نشانی URL سرور",
       "fieldUrlInvalid": "یک نشانی URL معتبر سرور وارد کنید.",
+      "fieldUrlCredentials": "نام کاربری و گذرواژه را از نشانی حذف کنید.",
+      "fieldUrlFragment": "بخش # را از نشانی حذف کنید.",
+      "fieldUrlInsecure": "یک نشانی https وارد کنید، یا http فقط برای localhost.",
       "duplicateUrl": "این نشانی URL قبلاً ذخیره شده است.",
       "serverNotFound": "این سرور دیگر ذخیره نشده است.",
       "enableServer": "فعال‌کردن این سرور: {{name}}",
@@ -3977,6 +4138,7 @@
       "app": {
         "label": "رابط ابزار",
         "failed": "رابط این ابزار بارگذاری نشد.",
+        "tooLarge": "رابط این ابزار از حد {{size}} بزرگ‌تر است.",
         "empty": "رابط این ابزار چیزی برای نمایش ندارد."
       }
     },
@@ -4044,6 +4206,8 @@
       "discoveryNoModels": "نقطهٔ پایانی هیچ مدلی را فهرست نکرد. مدل‌ها را به‌صورت دستی وارد کنید.",
       "connectionIncomplete": "مدل پاسخ داد اما کار را به پایان نرساند. دوباره امتحان کنید، یا شناسهٔ مدل و پروتکل را بررسی کنید.",
       "invalidInput": "نام سامانهٔ پشتیبان، سرآیندهای معتبر و دست‌کم یک مدل با شناسه و نام یکتا وارد کنید. محدودیت‌های توکن باید اعداد صحیح مثبت باشند.",
+      "invalidApiKey": "کلید API حاوی نویسه‌ای است که نمی‌توان آن را ارسال کرد. فقط از حروف، ارقام و نمادهای استاندارد استفاده کنید، بدون شکستن خط.",
+      "invalidHeaders": "سرآیند سفارشی قابل ارسال نیست. نام آن را بررسی کنید و فقط از حروف، ارقام و نمادهای استاندارد استفاده کنید، بدون شکستن خط.",
       "invalidUrl": "نشانی ریشهٔ API با HTTP یا HTTPS وارد کنید که فاقد اطلاعات احراز هویت، پارامترهای پرس‌وجو و بخش پس از علامت # باشد.",
       "publicHttp": "نقاط پایانی عمومی HTTP مجاز نیستند. از HTTPS یا یک نقطهٔ پایانی محلی خصوصی استفاده کنید.",
       "httpApprovalRequired": "پیش از ذخیره یا اتصال، استفاده از این نقطهٔ پایانی محلی HTTP را تأیید کنید.",
@@ -4092,6 +4256,7 @@
         "network": "دانلود کامل نشد. اتصال خود را بررسی کنید و دوباره تلاش کنید.",
         "invalidFile": "فایل دانلودشده مدلی نیست که این برنامه بتواند اجرا کند، بنابراین حذف شد.",
         "checksum": "فایل دانلودشده با کد بررسی منتشرشده‌اش مطابقت ندارد، بنابراین حذف شد. دوباره دانلود را امتحان کنید.",
+        "unreadable": "این دستگاه نتوانست فایل دانلودشده را بررسی کند، بنابراین حذف شد. دوباره دانلود را امتحان کنید.",
         "writeFailed": "این دستگاه نتوانست مدل را ذخیره کند. دوباره دانلود را امتحان کنید."
       }
     },
@@ -4177,7 +4342,15 @@
       "download": "بارگیری مدل روی دستگاه",
       "downloading": "در حال بارگیری…",
       "downloadProgress": "در حال بارگیری… {{percent}}%",
-      "downloadFailed": "بارگیری کامل نشد. اتصال اینترنت و فضای خالی دستگاه را بررسی کنید و دوباره امتحان کنید."
+      "downloadFailed": "بارگیری کامل نشد. اتصال اینترنت و فضای خالی دستگاه را بررسی کنید و دوباره امتحان کنید.",
+      "cannotUse": "اجرا نمی‌شود: {{items}}.",
+      "cannotUseOptions": "پر نمی‌شود: برخی گزینه‌های ابزار.",
+      "limitations": "محدودیت‌ها",
+      "tools": {
+        "time": "زمان",
+        "settingsList": "نمایش تنظیمات",
+        "settingsSet": "تغییر تنظیمات"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "این مدل از میزان تفکر پشتیبانی می‌کند"
@@ -4356,6 +4529,7 @@
     "instructionSaveFailed": "دستورالعمل ذخیره نشد",
     "instructionDeleteFailed": "دستورالعمل حذف نشد",
     "instructionToggleFailed": "دستورالعمل به‌روزرسانی نشد",
+    "instructionViewTitle": "فایل دستورالعمل",
     "instructionLimitReached": "هر پروفایل حداکثر {{max}} دستورالعمل می‌تواند داشته باشد. برای افزودن یکی دیگر، یکی را حذف کنید.",
     "mcp": {
       "title": "سرورهای MCP",
@@ -4530,6 +4704,7 @@
       "emptyDescription": "خریدهای اعتبار، رسیدها و مصرف در اینجا نمایش داده می‌شوند.",
       "emptyTitle": "تاریخچهٔ اعتباری وجود ندارد",
       "expiredGrant": "منقضی شد: {{description}}",
+      "expiredStatus": "منقضی شد",
       "googlePlayReceipt": "رسید از Google Play",
       "kind": {
         "adjustment": "اصلاحیه",
@@ -4556,7 +4731,8 @@
       "receiptA11y": "باز کردن رسید {{description}}، {{amount}}، از {{date}}",
       "receiptUnavailable": "رسیدی برای این خرید موجود نیست.",
       "retentionLimit": "جدیدترین تاریخچهٔ اعتباری نمایش داده می‌شود.",
-      "voidedGrant": "باطل شد: {{description}}"
+      "voidedGrant": "باطل شد: {{description}}",
+      "voidedStatus": "باطل شد"
     },
     "title": "خرید اعتبار",
     "description": "اعتبار یک خرید یکباره است که برای اجرای جلسات کدنویسی هوش مصنوعی در Kilo App به موجودی Kilo شما اضافه می‌شود. فروشگاه مبلغ را از حساب شما دریافت می‌کند و اعتبار پس از تأیید پرداخت توسط فروشگاه اضافه می‌شود.",
@@ -4700,6 +4876,7 @@
     "contextAll": "همه زمینه‌ها",
     "dismiss": "نادیده گرفتن گزارش",
     "dismissFailed": "فعلاً نادیده گرفتن این گزارش ممکن نشد. در پس‌زمینه دوباره تلاش می‌شود.",
+    "readMarkFailed": "این گزارش به‌عنوان خوانده‌شده علامت‌گذاری نشد. هنگام بارگذاری دوبارهٔ گزارش، دوباره تلاش می‌شود.",
     "offline": "آفلاین · گزارش ذخیره‌شده",
     "cached": "گزارش ذخیره‌شده · به‌روزرسانی در دسترس نیست",
     "summary": "خلاصه AI",
@@ -4719,12 +4896,15 @@
     "morningEnd": "گزارش در دسترس تا",
     "timeHint": "کارت خانه در پایان بازه گزارش، حتی به‌صورت آفلاین، وضعیت زنده را بازمی‌گرداند.",
     "invalidSchedule": "یک منطقه زمانی معتبر و یک بازه گزارش غیرخالی انتخاب کنید.",
+    "scheduleEmptyNight": "بازه گزارش خالی است. یک زمان آماده‌شدن دیرتر از شروع بازه انتخاب کنید.",
+    "scheduleEmptyMorning": "زمان آماده‌شدن و زمان در دسترس بودن تا یکسان هستند. انتخاب کنید گزارش چه مدت در دسترس بماند.",
+    "scheduleFullDay": "این دو بازه یک روز کامل را پوشش می‌دهند. بخشی از روز را خارج از گزارش بگذارید.",
     "notificationsHint": "برای هر گزارش زمان‌بندی‌شده یک اعلان کلی ارسال می‌شود. مستقل از خلاصه‌های پولی AI.",
     "notificationPermission": "برای دریافت گزارش، اعلان‌های فوری را روشن کنید.",
     "defaultModel": "استفاده از مدل پیش‌فرض Kilo",
     "duration": "محدودیت زمانی (دقیقه)",
     "spendLimit": "محدودیت هزینه (USD)",
-    "invalidSafeguards": "محدودیت زمان و هزینه را به‌صورت عددی مثبت و متناهی وارد کنید.",
+    "invalidSafeguards": "عددی مثبت در بازه مجاز وارد کنید.",
     "estimate": "تخمین {{estimate}} · حداکثر {{maximum}}",
     "estimateUnavailable": "خلاصه پولی برای این تنظیمات در دسترس نیست. مدل یا محدودیت‌ها را تغییر دهید یا بعداً دوباره امتحان کنید.",
     "estimatePricingUnavailable": "قیمت‌گذاری این مدل در دسترس نیست. مدل دیگری انتخاب کنید.",
@@ -4732,6 +4912,8 @@
     "estimateModelNotAllowed": "این مدل در این زمینه مجاز نیست. مدل دیگری انتخاب کنید.",
     "estimateSpendLimitTooLow": "حد خرج کردن را برای فعال شدن این خلاصه افزایش دهید.",
     "confirmPaid": "خلاصه‌های پولی برای {{context}} فعال شود؟",
+    "paidDisclosure_one": "تخمین {{estimate}}، حداکثر {{maximum}}، با محدودیت {{minutes}} دقیقه. حتی در صورت ناموفق بودن، هزینه دریافت می‌شود.",
+    "paidDisclosure_other": "تخمین {{estimate}}، حداکثر {{maximum}}، با محدودیت {{minutes}} دقیقه. حتی در صورت ناموفق بودن، هزینه دریافت می‌شود.",
     "paidDisclosure": "تخمین {{estimate}}، حداکثر {{maximum}}، با محدودیت {{minutes}} دقیقه. حتی در صورت ناموفق بودن، هزینه دریافت می‌شود.",
     "enable": "فعال‌سازی خلاصه‌های پولی",
     "allContexts": "گزارش‌های شخصی و سازمانی جدا از هم نگهداری می‌شوند.",
@@ -4771,7 +4953,7 @@
     "sourceActivity": "فعالیت بدون عنوان",
     "metadataFailureProvider": "خطای ارائهدهنده",
     "metadataFailureTool": "خطای ابزار",
-    "metadataFailureCancelled": "لغوشده",
+    "metadataStopped": "آخرین نوبت متوقف شد",
     "metadataFailureOther": "خطای نامشخص"
   },
   "systemSearch": {
@@ -4792,7 +4974,8 @@
     "unavailableTitle": "مصرف در دسترس نیست",
     "unavailableDescription": "مصرف برای این فضای کار تنظیم نشده است. اگر انتظار دارید مصرف را اینجا ببینید، با پشتیبانی تماس بگیرید.",
     "orgSelfNotice": "شما مصرف خودتان در این سازمان را می‌بینید.",
-    "viewDetails": "مشاهده جزئیات مصرف"
+    "viewDetails": "مشاهده جزئیات مصرف",
+    "orgSelfEntryTitle": "مصرف شما"
   },
   "integrations": {
     "title": "یکپارچه‌سازی‌ها",
@@ -4888,6 +5071,8 @@
       "autoCommit": "تغییرات را پس از پایان اجرا ثبت کنید.",
       "condenseOnComplete": "پس از پایان اجرا زمینه را فشرده کنید.",
       "activeTitle": "تریگر فعال",
+      "activeSwitchA11y": "تریگر فعال: {{name}}",
+      "copyLinkA11y": "کپی پیوند برای {{name}}",
       "activeDescription": "وب‌هوک‌های متوقف‌شده با 404 پاسخ می‌دهند.",
       "runAsCreator": "اجرا با هویت من",
       "runAsCreatorDescription": "هر اجرا از حساب شما استفاده می‌کند، بنابراین سرآیند محرمانه لازم است.",

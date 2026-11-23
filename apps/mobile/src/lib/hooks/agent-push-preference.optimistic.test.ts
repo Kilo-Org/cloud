@@ -121,9 +121,6 @@ describe('applyAgentPushOptimistic + rollbackAgentPushOptimistic (per-category)'
       next: false,
       category: 'agentUpdates',
     });
-    // No prior cache entry => previous is undefined; the optimistic write
-    // materializes the full row with the flipped value so the row reads
-    // consistently while the mutation is in flight.
     expect(context.previous).toBeUndefined();
     expect(readRow(qc).agentUpdates).toBe(false);
     expect(readRow(qc).balanceAlerts).toBe(DEFAULT_NOTIFICATION_PREFERENCE);
@@ -162,9 +159,6 @@ describe('applyAgentPushOptimistic + rollbackAgentPushOptimistic (per-category)'
       next: false,
       category: 'agentAttention',
     });
-    // After applying, the cache holds the promoted per-category shape with
-    // agentAttention flipped to false and agentUpdates carrying the legacy
-    // value (true).
     const after = readRow(qc);
     expect(after.agentAttention).toBe(false);
     expect(after.agentUpdates).toBe(true);
@@ -184,7 +178,6 @@ describe('applyAgentPushOptimistic + rollbackAgentPushOptimistic (per-category)'
     expect(() => {
       rollbackAgentPushOptimistic({ queryClient: qc, queryKey: key, context: undefined });
     }).not.toThrow();
-    // The cache is left intact when no context is provided.
     expect(qc.getQueryData(key)).toEqual(fullRow({ agentAttention: true }));
   });
 });

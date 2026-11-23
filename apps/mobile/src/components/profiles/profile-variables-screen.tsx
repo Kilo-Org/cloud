@@ -1,5 +1,5 @@
 import { type Href } from 'expo-router';
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { toast } from 'sonner-native';
@@ -33,6 +33,7 @@ import { MAX_PROFILE_VARS } from '@/lib/agent-profile-forms';
 import { isolateLtrBidiText } from '@/lib/bidi';
 import { clearFormDraft, useFormDraftState } from '@/lib/form-draft';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { useCloseEditorOnDeniedPermission } from '@/lib/hooks/use-close-editor-on-denied-permission';
 import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 
@@ -97,7 +98,9 @@ export function ProfileVariablesScreen({
 
   // `null` = closed, `''` = the add form, any other value = the key being edited.
   // The form it opens is a draft: it and its fields survive a remount (see
-  // `lib/form-draft`), and saving or cancelling clears it.
+  // `lib/form-draft`), and saving or cancelling clears it. The form renders only
+  // while the permission allows the write. A `read-only` permission closes it
+  // and clears the draft, so a remount cannot reopen it.
   const draftScope = `profiles:variables:${profileId}`;
   const [editingKey, setEditingKey] = useFormDraftState<string | null>(
     draftScope,
@@ -111,8 +114,8 @@ export function ProfileVariablesScreen({
   // add control: it reads as closed, so the form and the add button render.
   const orphanedEdit =
     editingKey !== null && editingKey !== '' && !rows.some(row => row.key === editingKey);
-  const isAdding = editingKey === '';
-  const isEditing = editingKey !== null && !isAdding && !orphanedEdit;
+  const isAdding = canManage && editingKey === '';
+  const isEditing = canManage && editingKey !== null && !isAdding && !orphanedEdit;
   const atVariableCap = vars.length >= MAX_PROFILE_VARS;
   // The add control is what an orphaned edit would otherwise leave the reader
   // without, so it renders for that state exactly as it does when closed.
@@ -128,10 +131,12 @@ export function ProfileVariablesScreen({
     setEditingKey(key);
   };
 
-  const closeForm = () => {
+  const closeForm = useCallback(() => {
     setEditingKey(null);
     clearFormDraft(draftScope);
-  };
+  }, [draftScope, setEditingKey]);
+
+  useCloseEditorOnDeniedPermission(permission, closeForm);
 
   const saveEdit = async (edit: VariableEdit): Promise<boolean> => {
     const isNewKey = !vars.some(variable => variable.key === edit.key);

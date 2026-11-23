@@ -341,6 +341,48 @@ function normalizeReasoningEffort(
   return undefined;
 }
 
+type ToolNamespaceLookup = {
+  topLevelNames: Set<string>;
+  namespaceByCallType: Record<'function' | 'custom', Map<string, string | null>>;
+};
+
+function indexToolNamespaces(tools: unknown[]): ToolNamespaceLookup {
+  const topLevelNames = new Set<string>();
+  const namespaceByCallType: ToolNamespaceLookup['namespaceByCallType'] = {
+    function: new Map(),
+    custom: new Map(),
+  };
+
+  for (const tool of tools) {
+    if (!isRecord(tool)) continue;
+    if (tool.type !== 'namespace') {
+      if (typeof tool.name === 'string') topLevelNames.add(tool.name);
+      continue;
+    }
+    if (typeof tool.name !== 'string' || !Array.isArray(tool.tools)) continue;
+
+    const functionNames = new Set<string>();
+    const customNames = new Set<string>();
+    for (const nestedTool of tool.tools) {
+      if (!isRecord(nestedTool) || typeof nestedTool.name !== 'string') continue;
+      if (nestedTool.type === 'function') functionNames.add(nestedTool.name);
+      else if (nestedTool.type === 'custom') customNames.add(nestedTool.name);
+    }
+
+    for (const [callType, names] of [
+      ['function', functionNames],
+      ['custom', customNames],
+    ] as const) {
+      const lookup = namespaceByCallType[callType];
+      for (const name of names) {
+        lookup.set(name, lookup.has(name) ? null : tool.name);
+      }
+    }
+  }
+
+  return { topLevelNames, namespaceByCallType };
+}
+
 function normalizeInputItems(
   body: GatewayResponsesRequest,
   upstreamModel: string,
@@ -362,6 +404,8 @@ function normalizeInputItems(
   });
   body.input = normalizedInput;
 
+  let toolNamespaces: ToolNamespaceLookup | undefined;
+
   for (const item of normalizedInput) {
     if (!isRecord(item)) continue;
 
@@ -376,28 +420,12 @@ function normalizeInputItems(
       typeof item.name === 'string' &&
       Array.isArray(body.tools)
     ) {
+      toolNamespaces ??= indexToolNamespaces(body.tools);
       const toolType = item.type === 'function_call' ? 'function' : 'custom';
-      if (
-        body.tools.some(
-          tool => isRecord(tool) && tool.type !== 'namespace' && tool.name === item.name
-        )
-      ) {
-        continue;
-      }
-      const namespaces = body.tools.flatMap(tool =>
-        isRecord(tool) &&
-        tool.type === 'namespace' &&
-        typeof tool.name === 'string' &&
-        Array.isArray(tool.tools) &&
-        tool.tools.some(
-          nestedTool =>
-            isRecord(nestedTool) && nestedTool.type === toolType && nestedTool.name === item.name
-        )
-          ? [tool.name]
-          : []
-      );
-      if (namespaces.length === 1) {
-        item.namespace = namespaces[0];
+      if (toolNamespaces.topLevelNames.has(item.name)) continue;
+      const namespace = toolNamespaces.namespaceByCallType[toolType].get(item.name);
+      if (namespace !== undefined && namespace !== null) {
+        item.namespace = namespace;
         normalizations.add('tool_namespace_added');
       }
     }
@@ -563,8 +591,6 @@ export async function checkOpenAiChatGptByok(
 
     const outcome = await resolveOpenAiChatGptAccessToken(owner);
 
-    // A terminally dead credential must fail readably instead of falling back
-    // to the next connection or another billing path.
     if (outcome.kind === 'terminal') {
       return { kind: 'reconnect', message: OPENAI_CHATGPT_RECONNECT_MESSAGE };
     }

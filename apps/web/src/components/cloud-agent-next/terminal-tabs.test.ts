@@ -629,6 +629,7 @@ describe('CloudChatPage terminal ownership across navigation', () => {
       supersededInFlightMessageIds: new Set(),
       preparationAttempts: [],
       commits: [],
+      unreadableQuestions: [],
       unreadablePermissions: [],
       chatUI: { shouldAutoScroll: false },
     };

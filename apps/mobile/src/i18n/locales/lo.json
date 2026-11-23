@@ -91,6 +91,7 @@
     "draft": "ສະບັບຮ່າງ",
     "enabled": "ເປີດໃຊ້ແລ້ວ",
     "github": "GitHub",
+    "image": "ຮູບພາບ",
     "imageUnavailable": "ບໍ່ສາມາດສະແດງຮູບໄດ້.",
     "loading": "ກຳລັງໂຫຼດ…",
     "loadMore": "ໂຫຼດເພີ່ມເຕີມ",
@@ -399,7 +400,7 @@
       "title": "ຄີຂອງຜູ້ໃຫ້ບໍລິການ",
       "rowSubtitle": "ໃຊ້ການຮຽກເກັບເງິນຂອງຜູ້ໃຫ້ບໍລິການຂອງທ່ານເອງ",
       "orgDescription": "ຄີເຫຼົ່ານີ້ຖືກແບ່ງປັນໃຫ້ທຸກຄົນໃນອົງກອນ ແລະ ຖືກຮຽກເກັບເງິນຈາກບັນຊີຜູ້ໃຫ້ບໍລິການຂອງອົງກອນ.",
-      "viewOnly": "ມີພຽງເຈົ້າຂອງອົງກອນ, ຜູ້ເບິ່ງແຍງລະບົບ ຫຼື ຜູ້ຈັດການການຮຽກເກັບເງິນເທົ່ານັ້ນທີ່ສາມາດປ່ຽນຄີຂອງອົງກອນໄດ້.",
+      "viewOnly": "ມີພຽງເຈົ້າຂອງອົງກອນ, ຜູ້ດູແລລະບົບ ຫຼື ຜູ້ຈັດການການຮຽກເກັບເງິນເທົ່ານັ້ນທີ່ສາມາດປ່ຽນຄີຂອງອົງກອນໄດ້.",
       "description": "ຄຳຂໍທີ່ສົ່ງຜ່ານຄີເຫຼົ່ານີ້ຈະຖືກຮຽກເກັບເງິນຈາກບັນຊີຜູ້ໃຫ້ບໍລິການຂອງທ່ານ ແທນຍອດເງິນ Kilo ຂອງທ່ານ.",
       "managedByPlan": "ຈັດການໂດຍແຜນການຂຽນໂຄດຂອງທ່ານ",
       "enableKey": "ເປີດໃຊ້ຄີ {{provider}}",
@@ -522,6 +523,7 @@
       "receiptLabel": "ໃບຮັບ",
       "copyReceiptId": "ຄັດລອກ ID ຂອງໃບຮັບ",
       "appealLabel": "ການອຸທອນ",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "ໄດ້ຮັບແລ້ວ",
       "triageOpen": "ກຳລັງກວດສອບ",
       "triageActioned": "ໄດ້ຮັບການຮັບຮອງ",
@@ -555,7 +557,7 @@
       "title": "ການລາຍງານ",
       "rowSubtitle": "ການລາຍງານທີ່ທ່ານໄດ້ຍື່ນ ແລະ ຜົນຂອງມັນ",
       "emptyTitle": "ຍັງບໍ່ມີການລາຍງານ",
-      "emptyDescription": "ການລາຍງານທີ່ທ່ານຍື່ນຈາກຄຳເຫັນ ຫຼື ຄຳຕອບຂອງ AI ຈະສະແດງຢູ່ນີ້.",
+      "emptyDescription": "ການລາຍງານທີ່ທ່ານຍື່ນຈາກຄຳເຫັນໃນການສົນທະນາໃນ pull request ຫຼື ຈາກຄຳຕອບ AI ໃນເຊດຊັນຂອງເອເຈນ ຈະສະແດງຢູ່ນີ້ ພ້ອມກັບຜົນຂອງມັນ.",
       "couldNotLoad": "ບໍ່ສາມາດໂຫຼດການລາຍງານຂອງທ່ານໄດ້",
       "capped": "ກຳລັງສະແດງການລາຍງານລ່າສຸດຂອງທ່ານ."
     },
@@ -1237,6 +1239,7 @@
     "needsInputAction": {
       "approved": "ອະນຸມັດຄຳຮ້ອງຂໍແລ້ວ",
       "replied": "ສົ່ງຄຳຕອບແລ້ວ",
+      "empty": "ພິມຄຳຕອບ ແລ້ວສົ່ງ.",
       "failed": "ບໍ່ສາມາດຕອບໄດ້. ແຕະອີກເທື່ອໜຶ່ງເພື່ອລອງໃໝ່.",
       "unavailable": "ຄຳຮ້ອງນີ້ບໍ່ລໍຖ້າຕື່ມແລ້ວ."
     }
@@ -1501,7 +1504,9 @@
       "githubError": "ບໍ່ສາມາດເປີດໜ້າຕັ້ງຄ່າ GitHub ໄດ້. ກະລຸນາລອງອີກຄັ້ງ.",
       "gitlabAccount": "ບັນຊີ GitLab",
       "gitlabError": "ບໍ່ສາມາດເປີດໜ້າຕັ້ງຄ່າ GitLab ໄດ້. ກະລຸນາລອງອີກຄັ້ງ.",
-      "description": "ເຊື່ອມຕໍ່ {{label}} ຂອງ Kilo ເພື່ອກວດສອບຄຳຂໍລວມໂຄ້ດອັດຕະໂນມັດ."
+      "description": "ເຊື່ອມຕໍ່ {{label}} ຂອງ Kilo ເພື່ອກວດສອບຄຳຂໍລວມໂຄ້ດອັດຕະໂນມັດ.",
+      "notConnectedTitle": "ຍັງບໍ່ໄດ້ເຊື່ອມຕໍ່ {{platform}}",
+      "githubAdminOnlyDescription": "ມີພຽງເຈົ້າຂອງອົງກອນ ແລະ ຜູ້ດູແລລະບົບທີ່ສາມາດເຊື່ອມຕໍ່ໄດ້."
     },
     "overview": {
       "allAreas": "ທຸກດ້ານ",
@@ -1587,7 +1592,7 @@
       "empty": "ຍັງບໍ່ມີການກວດສອບທີ່ມີຂໍ້ມູນວິເຄາະ",
       "emptyDescription": "ການວິເຄາະບັນທຶກການກວດສອບທີ່ສຳເລັດ ໃນຂະນະທີ່ເປີດໃຊ້ສຳລັບອົງກອນ.",
       "offTitle": "ການວິເຄາະຖືກປິດສຳລັບ{{platform}}",
-      "offDescription": "ບົດບາດດ້ານການເກັບເງິນຂອງອົງກອນ (ເຈົ້າຂອງ, ຜູ້ບໍລິຫານ ແລະ ຜູ້ຈັດການດ້ານການເກັບເງິນ) ສາມາດເປີດໃຊ້ການວິເຄາະໄດ້ ໃນການຕັ້ງຄ່າອົງກອນບົນເວັບ ເພື່ອບັນທຶກການກວດສອບທີ່ສຳເລັດ.",
+      "offDescription": "ບົດບາດດ້ານການເກັບເງິນຂອງອົງກອນ (ເຈົ້າຂອງ, ຜູ້ດູແລລະບົບ ແລະ ຜູ້ຈັດການການຮຽກເກັບເງິນ) ສາມາດເປີດໃຊ້ການວິເຄາະໄດ້ ໃນການຕັ້ງຄ່າອົງກອນບົນເວັບ ເພື່ອບັນທຶກການກວດສອບທີ່ສຳເລັດ.",
       "couldNotLoad": "ບໍ່ສາມາດໂຫຼດການວິເຄາະໄດ້",
       "trackedReviewsCaption": "ການກວດສອບທີ່ສຳເລັດ ທີ່ສິ້ນສຸດພາຍໃນໄລຍະເວລານີ້ ໃນຂະນະທີ່ເປີດໃຊ້ການວິເຄາະ. ການກວດສອບທີ່ກຳລັງດຳເນີນ ແລະ ທີ່ລົ້ມເຫຼວ ຈະບໍ່ຖືກນັບເລີຍ.",
       "trackedReviewsUncounted": "ບໍ່ໄດ້ນັບ: {{displayCount}} ຈາກ {{displayTotal}} ການກວດສອບທີ່ສິ້ນສຸດແລ້ວຂອງອົງກອນ ຜົນຂອງພວກມັນບໍ່ໄດ້ຖືກບັນທຶກ.",
@@ -2175,7 +2180,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} ເຊດຊັນ",
       "sectionAccessibility": "{{title}}: {{displayCount}} ເຊດຊັນ",
       "live": "ສົດ",
-      "updating": "ກຳລັງອັບເດດ"
+      "updating": "ກຳລັງອັບເດດ",
+      "retentionLimit": "ກຳລັງສະແດງເຊດຊັນທີ່ຜ່ານມາຫຼ້າສຸດ."
     },
     "sessionRow": {
       "deleteTitle": "ລຶບເຊດຊັນບໍ?",
@@ -2245,11 +2251,11 @@
       "scrollToBottom": "ເລື່ອນໄປລຸ່ມສຸດ",
       "emptyTitle": "ຍັງບໍ່ມີຂໍ້ຄວາມ",
       "emptyReadOnlyTitle": "ບໍ່ມີຂໍ້ຄວາມໃນເຊດຊັນນີ້",
-      "renameAccessibility": "ປ່ຽນຊື່ເຊດຊັນ: {{title}}",
       "cloningSession": "ກຳລັງສ້າງສຳເນົາເຊດຊັນ",
       "couldNotLoadThisSession": "ບໍ່ສາມາດໂຫຼດເຊດຊັນນີ້ໄດ້.",
       "historyTooLarge": "ບົດບັນທຶກຂອງເຊດຊັນນີ້ໃຫຍ່ເກີນໄປ ບໍ່ສາມາດໂຫຼດໄດ້.",
       "historyUnavailable": "ບໍ່ສາມາດອ່ານບົດບັນທຶກຂອງເຊດຊັນນີ້ໄດ້.",
+      "historyTemporarilyUnavailable": "ບົດບັນທຶກຂອງເຊດຊັນນີ້ບໍ່ພ້ອມໃຊ້ງານຊົ່ວຄາວ.",
       "cloneFailedRetry": "ບໍ່ສາມາດສ້າງສຳເນົາເຊດຊັນນີ້ໄດ້. ລອງໃໝ່.",
       "notEnoughCredits": "ເຄຣດິດບໍ່ພໍສຳລັບຄຳຂໍນີ້. ເຕີມເຄຣດິດແລ້ວລອງໃໝ່.",
       "previousTaskFinishing": "ວຽກກ່ອນໜ້າກຳລັງຈະສຳເລັດ. ກະລຸນາລໍຖ້າຈັກໜ້ອຍ.",
@@ -2655,6 +2661,7 @@
     "filePart": {
       "loadingImage": "ກຳລັງໂຫຼດຮູບພາບ",
       "imageUnavailableRetry": "ສະແດງຮູບພາບບໍ່ໄດ້, ລອງໂຫຼດໃໝ່",
+      "imageUnavailableRetryWithAlt": "ສະແດງຮູບພາບບໍ່ໄດ້, {{alt}}, ລອງໂຫຼດໃໝ່",
       "imagePreviewUnavailableInSession": "ບໍ່ສາມາດເບິ່ງຕົວຢ່າງຮູບພາບໃນເຊດຊັນນີ້ໄດ້.",
       "viewImage": "ເບິ່ງຮູບພາບ",
       "viewImageWithAlt": "ເບິ່ງຮູບພາບ {{alt}}",
@@ -2786,7 +2793,9 @@
       "skip": "ຂ້າມ",
       "retrySkip": "ລອງຂ້າມໃໝ່",
       "submitting": "ກຳລັງສົ່ງ…",
-      "sendAnswers": "ສົ່ງຄຳຕອບ"
+      "sendAnswers": "ສົ່ງຄຳຕອບ",
+      "unreadableTitle": "ບໍ່ສາມາດສະແດງຄຳຖາມນີ້ໄດ້",
+      "unreadableBody": "ຕົວແທນກຳລັງລໍຖ້າຄຳຖາມທີ່ແອັບນີ້ບໍ່ສາມາດສະແດງໄດ້. ກະລຸນາຕອບມັນໃນ CLI ເພື່ອສືບຕໍ່."
     },
     "blockingCard": {
       "questionUnavailable": "ຄຳຖາມນີ້ຕອບບໍ່ໄດ້ແລ້ວ.",
@@ -2813,6 +2822,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "ບໍ່ສາມາດໂຫຼດເຊດຊັນຂອງເອເຈນຍ່ອຍໄດ້.",
+      "historyTooLarge": "ປະຫວັດຂອງເອເຈນຍ່ອຍນີ້ໃຫຍ່ເກີນໄປ ບໍ່ສາມາດໂຫຼດໄດ້.",
+      "historyUnavailable": "ປະຫວັດຂອງເອເຈນຍ່ອຍນີ້ບໍ່ມີ.",
+      "historyTemporarilyUnavailable": "ປະຫວັດຂອງເອເຈນຍ່ອຍນີ້ບໍ່ພ້ອມໃຊ້ງານຊົ່ວຄາວ.",
       "failed": "ເຊດຊັນຂອງເອເຈນຍ່ອຍລົ້ມເຫຼວ.",
       "noMessages": "ບໍ່ມີຂໍ້ຄວາມຈາກເອເຈນຍ່ອຍ",
       "noMessagesDescription": "ເຊດຊັນຂອງເອເຈນຍ່ອຍນີ້ສຳເລັດແລ້ວ ແຕ່ບໍ່ມີບັນທຶກການສົນທະນາ.",
@@ -3094,6 +3106,12 @@
     "retryLoadingAccount": "ລອງໂຫຼດບັນຊີອີກຄັ້ງ",
     "retryLoadingPrivacy": "ລອງໂຫຼດຕົວເລືອກຄວາມເປັນສ່ວນຕົວອີກຄັ້ງ"
   },
+  "accountBlocked": {
+    "title": "ບັນຊີຖືກບລັອກ",
+    "description": "Kilo ໄດ້ບລັອກບັນຊີນີ້ ແລະ ການເຂົ້າສູ່ລະບົບອີກຄັ້ງຈະບໍ່ປົດການບລັອກ. ຝ່າຍສະໜັບສະໜູນສາມາດກວດສອບການບລັອກຕາມການຮ້ອງຂໍ.",
+    "domainDescription": "Kilo ບໍ່ອະນຸຍາດໃຫ້ມີບັນຊີໃນໂດເມນອີເມວນີ້ ແລະ ການເຂົ້າສູ່ລະບົບອີກຄັ້ງຈະບໍ່ປ່ຽນແປງການບລັອກ. ຝ່າຍສະໜັບສະໜູນສາມາດກວດສອບໂດເມນຕາມການຮ້ອງຂໍ.",
+    "contactSupport": "ຕິດຕໍ່ຝ່າຍສະໜັບສະໜູນ"
+  },
   "addCredits": {
     "cta": "ເຕີມເຄຣດິດ",
     "billingPage": "ໜ້າການຮຽກເກັບເງິນ"
@@ -3166,8 +3184,7 @@
     "timeoutDescription": "ຄຳຮ້ອງຂໍໃຊ້ເວລາເກີນກຳນົດໂດຍບໍ່ສຳເລັດ. ກະລຸນາລອງອີກຄັ້ງ."
   },
   "screenHeader": {
-    "openMenu": "ເປີດເມນູ",
-    "openMenuFor": "ເປີດເມນູສຳລັບ {{title}}"
+    "openMenu": "ເປີດເມນູ"
   },
   "picker": {
     "optionsExpired": "ຕົວເລືອກໝົດອາຍຸແລ້ວ",
@@ -3386,6 +3403,8 @@
     "voiceTranscriptionWho": "ອຸປະກອນຂອງທ່ານ, Kilo Gateway ພ້ອມກັບໂມເດລຖອດສຽງທີ່ທ່ານເລືອກ, ຫຼື Apple ຫຼື Google ສຳລັບການຮັບຮູ້ອອນລາຍ.",
     "installAttributionPromptTitle": "ອະນຸຍາດໃຫ້ລະບຸແຫຼ່ງທີ່ມາຂອງການຕິດຕັ້ງບໍ?",
     "installAttributionPromptMessage": "Kilo ໃຊ້ສິດການຕິດຕາມຂອງ Apple ພຽງເພື່ອຮູ້ວ່າທ່ານມາຈາກຊ່ອງທາງໃດ. ເຮົາບໍ່ເຄີຍນຳຂໍ້ຄວາມສັ່ງງານ ຫຼື ການສົນທະນາຂອງທ່ານມາໃຊ້ເພື່ອຈຸດປະສົງນີ້.",
+    "installAttributionRequestFailedTitle": "ບໍ່ສາມາດສະແດງການຮ້ອງຂໍການຕິດຕາມໄດ້",
+    "installAttributionRequestFailedMessage": "Kilo ບໍ່ສາມາດສະແດງການຮ້ອງຂໍຂອງລະບົບໄດ້ ດັ່ງນັ້ນການລະບຸແຫຼ່ງການຕິດຕັ້ງຈຶ່ງຢູ່ໃນສະຖານະປິດ.",
     "what": "ຂໍ້ມູນທີ່ແບ່ງປັນ",
     "why": "ຈຸດປະສົງ",
     "who": "ຜູ້ຮັບຂໍ້ມູນ"
@@ -3401,7 +3420,7 @@
   "organization": {
     "auditLog": {
       "title": "ບັນທຶກການກວດສອບ",
-      "permissionDenied": "ມີແຕ່ເຈົ້າຂອງອົງກອນ, ຜູ້ດູແລລະບົບ ຫຼື ຜູ້ຈັດການການເອີ້ນເກັບເງິນໃນແຜນ Enterprise ເທົ່ານັ້ນທີ່ສາມາດອ່ານບັນທຶກການກວດສອບຂອງອົງກອນໄດ້.",
+      "permissionDenied": "ມີແຕ່ເຈົ້າຂອງອົງກອນ, ຜູ້ດູແລລະບົບ ຫຼື ຜູ້ຈັດການການຮຽກເກັບເງິນໃນແຜນ Enterprise ເທົ່ານັ້ນທີ່ສາມາດອ່ານບັນທຶກການກວດສອບຂອງອົງກອນໄດ້. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "ບໍ່ມີເຫດການກວດສອບ",
       "emptyDescription": "ການດຳເນີນການທີ່ເກີດຂຶ້ນໃນອົງກອນນີ້ຈະສະແດງຢູ່ບ່ອນນີ້.",
       "truncated": "ກຳລັງສະແດງເຫດການຫຼ້າສຸດ.",
@@ -3451,11 +3470,147 @@
         "guardrailUpdate": "ແກ້ໄຂການປ້ອງກັນ",
         "guardrailRemove": "ຖອນການປ້ອງກັນ",
         "unknown": "ເຫດການກວດສອບ"
+      },
+      "detail": {
+        "fieldChange": "{{field}}: {{change}}",
+        "modeIdentity": "ໂໝດ \"{{name}}\" (ຕົວລະບຸ: {{slug}})",
+        "modeUpdate": "ໂໝດ \"{{name}}\": {{changes}}",
+        "field": {
+          "name": "$t(organization.modes.nameLabel)",
+          "slug": "$t(organization.modes.identifierLabel)",
+          "roleDefinition": "$t(organization.modes.roleLabel)",
+          "whenToUse": "$t(organization.modes.whenToUseLabel)",
+          "description": "$t(organization.modes.descriptionLabel)",
+          "customInstructions": "$t(codeReviewer.instructions.title)",
+          "groups": "$t(profiles.agents.tools)",
+          "autoRoute": "ການກຳນົດເສັ້ນທາງອັດຕະໂນມັດ",
+          "defaultModel": "ໂມເດວເລີ່ມຕົ້ນ"
+        },
+        "role": {
+          "owner": "$t(organization.members.roles.owner)",
+          "admin": "$t(organization.members.roles.admin)",
+          "billing_manager": "$t(organization.members.roles.billingManager)",
+          "member": "$t(organization.members.roles.member)"
+        },
+        "memberRole": "{{email}}: {{change}}",
+        "memberAdded": "ເພີ່ມ {{email}} ເປັນ {{role}}",
+        "memberRemoved": "ເອົາ {{email}} ອອກ",
+        "memberParentAdded": "ເພີ່ມ {{email}} ຈາກອົງກອນແມ່ {{parent}}",
+        "memberParentRemoved": "ເອົາ {{email}} ອອກຈາກອົງກອນແມ່ {{parent}}",
+        "inviteSent": "{{email}} ເປັນ {{role}}",
+        "inviteRevoked": "ຍົກເລີກຄຳເຊີນສຳລັບ {{email}}",
+        "inviteAccepted": "ຍອມຮັບ {{email}}",
+        "groupIdentity": "ກຸ່ມ \"{{name}}\"",
+        "groupMembers": "ກຸ່ມ \"{{name}}\": {{members}}",
+        "groupMemberGroups": "{{displayCount}} ກຸ່ມ",
+        "groupMemberGroups_one": "{{displayCount}} ກຸ່ມ",
+        "groupMemberGroups_other": "{{displayCount}} ກຸ່ມ",
+        "groupMemberGroupsOf": "{{email}}: {{displayCount}} ກຸ່ມ",
+        "groupMemberGroupsOf_one": "{{email}}: {{displayCount}} ກຸ່ມ",
+        "groupMemberGroupsOf_other": "{{email}}: {{displayCount}} ກຸ່ມ",
+        "groupPolicySet": "ກຸ່ມ \"{{name}}\": ຕັ້ງນະໂຍບາຍ {{policy}}",
+        "groupPolicyRemoved": "ກຸ່ມ \"{{name}}\": ຖອນນະໂຍບາຍ {{policy}}",
+        "groupDefaultPolicySet": "ຕັ້ງນະໂຍບາຍ {{policy}} ເລີ່ມຕົ້ນ",
+        "groupDefaultPolicyRemoved": "ຖອນນະໂຍບາຍ {{policy}} ເລີ່ມຕົ້ນ",
+        "guardrailIdentity": "{{type}} \"{{name}}\"",
+        "guardrailStatus": "{{type}} \"{{name}}\" {{state}}",
+        "guardrailConfig": "ລະບົບປ້ອງກັນ AI {{state}}",
+        "guardrailConfigGroup": "{{state}} ສຳລັບກຸ່ມ \"{{group}}\"",
+        "guardrailEnforcement": "{{target}}: {{value}}",
+        "guardrailSkill": "{{target}}: {{values}}",
+        "guardrailTarget": {
+          "mcp": "$t(profiles.mcp.title)",
+          "skill": "$t(profiles.skillsTitle)"
+        },
+        "ssoDomainSet": "ໂດເມນ SSO {{domain}}",
+        "ssoDomainChanged": "{{domain}} (ເຄີຍເປັນ {{previous}})",
+        "ssoDomainRemoved": "ລຶບໂດເມນ SSO {{domain}}",
+        "fundsPurchased": "{{amount}} ໂດຍ {{method}}",
+        "fundsGranted": "{{amount}}",
+        "fundsDistributed": "{{amount}} ໄປຍັງ {{displayCount}} ອົງກອນຍ່ອຍ",
+        "fundsDistributed_one": "{{amount}} ໄປຍັງ {{displayCount}} ອົງກອນຍ່ອຍ",
+        "fundsDistributed_other": "{{amount}} ໄປຍັງ {{displayCount}} ອົງກອນຍ່ອຍ",
+        "fundsReceived": "{{amount}} ຈາກ {{parent}}",
+        "reviewAgentPlatform": "{{platform}}",
+        "reviewAgentConfig": "ການຕັ້ງຄ່າ {{platform}}",
+        "reviewAgentConfigStyle": "{{platform}}: ຮູບແບບການກວດສອບ {{style}}",
+        "reviewAgentSecretsUpdated": "{{displayCount}} ອັບເດດແລ້ວ",
+        "reviewAgentSecretsUpdated_one": "{{displayCount}} ອັບເດດແລ້ວ",
+        "reviewAgentSecretsUpdated_other": "{{displayCount}} ອັບເດດແລ້ວ",
+        "reviewAgentSecretsFailed": "{{displayCount}} ຂໍ້ຜິດພາດ",
+        "reviewAgentSecretsFailed_one": "{{displayCount}} ຂໍ້ຜິດພາດ",
+        "reviewAgentSecretsFailed_other": "{{displayCount}} ຂໍ້ຜິດພາດ",
+        "reviewAgentSecretRotated": "{{values}}",
+        "settingAdvancedPolicies": "{{values}}",
+        "settingAdvancedPoliciesOpenRouter": "OpenRouter {{state}}",
+        "settingAdvancedPoliciesRegion": "ພູມິພາກການອະນຸມານ: {{region}}",
+        "settingDefaultModelSet": "{{next}}",
+        "settingDefaultModelRemoved": "{{previous}}",
+        "settingAutoRoute": "ໂໝດ \"{{mode}}\": {{change}}",
+        "settingDefaultBehavior": {
+          "global": "ຄ່າເລີ່ມຕົ້ນທົ່ວອົງກອນ",
+          "specific": "{{model}}",
+          "auto": "$t(models.auto.organization)"
+        },
+        "settingDataCollection": "{{mode}}",
+        "dataCollection": {
+          "allowed": "ອະນຸຍາດ",
+          "denied": "ປະຕິເສດ",
+          "followSetting": "ອີງຕາມການຕັ້ງຄ່າຂອງສ່ວນຂະຫຍາຍ"
+        },
+        "region": {
+          "us": "$t(organizationModelAccess.region.us)",
+          "eu": "$t(organizationModelAccess.region.eu)",
+          "au": "$t(organizationModelAccess.region.au)",
+          "jp": "$t(organizationModelAccess.region.jp)"
+        },
+        "settingProjectsUi": "ໂຄງການ UI {{state}}",
+        "settingMinimumBalanceOn": "{{threshold}} ສຳລັບ {{emails}}",
+        "settingMinimumBalanceThreshold": "{{threshold}}",
+        "settingRecommendationsDigest": "ສະຫຼຸບຄຳແນະນຳ {{state}}",
+        "settingBrowserControl": "{{policy}}",
+        "settingBrowserControlOrigins": "{{policy}}: {{origins}}",
+        "settingBrowserControlOriginsCleared": "{{policy}}: ບໍ່ມີຕົ້ນກຳເນີດທີ່ອະນຸຍາດ",
+        "settingName": "ປ່ຽນຊື່ຈາກ {{previous}} ເປັນ {{next}}",
+        "enabled": "$t(common.enabled)",
+        "scanBeforeUseOn": "ສະແກນກ່ອນໃຊ້ ເປີດ",
+        "scanBeforeUseOff": "ສະແກນກ່ອນໃຊ້ ປິດ",
+        "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingRemoved": "ລຶບແລ້ວ: {{models}}",
+        "browserPolicyOff": "ການໃຊ້ບຣາວເຊີຖືກຕິດຂັດ",
+        "browserPolicyAllow": "ສະເພາະຕົ້ນກຳເນີດທີ່ອະນຸຍາດ",
+        "browserPolicyPlaywrightOnly": "ໃຊ້ບຣາວເຊີເທົ່ານັ້ນ",
+        "disabled": "$t(common.disabled)",
+        "autoRouting": "ໂມເດວປ່ຽນແປງ: {{values}}",
+        "integrationConnected": "{{integration}} ເຊື່ອມຕໍ່ແລ້ວ",
+        "integrationDisconnected": "{{integration}} ຕັດການເຊື່ອມຕໍ່ແລ້ວ",
+        "integrationRefreshed": "{{integration}} ຣີເຟຣຊແລ້ວ",
+        "integrationCancelled": "{{integration}} ຍົກເລີກແລ້ວ",
+        "integrationModelUpdated": "{{integration}}: ໂມເດວ {{model}}",
+        "integrationKeyAdded": "ເພີ່ມກະແຈສຳລັບ {{provider}}",
+        "integrationKeyUpdated": "ແກ້ໄຂກະແຈສຳລັບ {{provider}}",
+        "integrationKeyDeleted": "ລຶບກະແຈສຳລັບ {{provider}}",
+        "integrationKeyToggled": "ກະແຈສຳລັບ {{provider}}: {{state}}",
+        "namedPolicyCreated": "ສ້າງນະໂຍບາຍ {{kind}} {{id}}",
+        "namedPolicyUpdated": "ແກ້ໄຂນະໂຍບາຍ {{kind}} {{id}}",
+        "namedPolicyDeleted": "ຖອນນະໂຍບາຍ {{kind}} {{id}}",
+        "namedPolicyLinked": "ເຊື່ອມໂຍງນະໂຍບາຍ {{kind}} ກັບ {{next}}",
+        "webhookTriggerUpdated": "ຕົວກະຕຸ້ນ {{trigger}}",
+        "organizationRenamed": "ປ່ຽນຊື່ອົງກອນຈາກ {{previous}} ເປັນ {{next}}",
+        "brand": {
+          "github": "$t(common.github)",
+          "gitlab": "$t(common.gitlab)",
+          "bitbucket": "$t(agentChat.repoPicker.platformBitbucket)",
+          "discord": "$t(profile.providerDiscord)",
+          "slack": "$t(agentChat.sessionFilter.platformSlack)",
+          "linear": "$t(agentChat.sessionFilter.platformLinear)",
+          "byok": "ກະແຈ API ຂອງທ່ານເອງ"
+        }
       }
     },
     "billing": {
       "title": "ການຮຽກເກັບເງິນ",
-      "permissionDenied": "ມີແຕ່ເຈົ້າຂອງອົງກອນ, ຜູ້ດູແລລະບົບ ຫຼື ຜູ້ຈັດການການຮຽກເກັບເງິນເທົ່ານັ້ນທີ່ສາມາດເບິ່ງຂໍ້ມູນການຮຽກເກັບເງິນຂອງອົງກອນໄດ້.",
+      "permissionDenied": "ມີແຕ່ເຈົ້າຂອງອົງກອນ, ຜູ້ດູແລລະບົບ ຫຼື ຜູ້ຈັດການການຮຽກເກັບເງິນເທົ່ານັ້ນທີ່ສາມາດເບິ່ງຂໍ້ມູນການຮຽກເກັບເງິນຂອງອົງກອນໄດ້. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "ການສະໝັກສະມາຊິກ",
       "state": "ສະຖານະ",
       "stateNone": "ບໍ່ມີການສະໝັກສະມາຊິກ",
@@ -3632,7 +3787,7 @@
       "emptyDescription": "ໃຊ້ຊົ່ວໂມງກ່ອນໜ້າເພື່ອເບິ່ງຄຳຮ້ອງຂໍທີ່ກ່ອນກວ່າ.",
       "emptyBoundDescription": "ບັນທຶກຄຳຮ້ອງຂໍມີຍ້ອນຫຼັງໄປໄດ້ພຽງເທົ່ານີ້.",
       "loadError": "ບໍ່ສາມາດໂຫຼດບັນທຶກຄຳຮ້ອງຂໍໄດ້.",
-      "permissionDenied": "ມີແຕ່ເຈົ້າຂອງອົງກອນ, ຜູ້ດູແລລະບົບ ຫຼື ຜູ້ຈັດການການເອີ້ນເກັບເງິນເທົ່ານັ້ນທີ່ສາມາດອ່ານບັນທຶກຄຳຮ້ອງຂໍຂອງອົງກອນໄດ້.",
+      "permissionDenied": "ມີແຕ່ເຈົ້າຂອງອົງກອນ, ຜູ້ດູແລລະບົບ ຫຼື ຜູ້ຈັດການການຮຽກເກັບເງິນເທົ່ານັ້ນທີ່ສາມາດອ່ານບັນທຶກຄຳຮ້ອງຂໍຂອງອົງກອນໄດ້. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "ເຂົ້າ {{input}} · ອອກ {{output}}",
       "byok": "BYOK"
     },
@@ -3737,7 +3892,7 @@
     "signupStepUpApple": "ໃຊ້ '$t(login.signInWithApple)' ເພື່ອສ້າງບັນຊີຂອງທ່ານໃຫ້ສຳເລັດ.",
     "signupStepUpGoogle": "ໃຊ້ '$t(login.signInWithGoogle)' ເພື່ອສ້າງບັນຊີຂອງທ່ານໃຫ້ສຳເລັດ.",
     "signupStepUpBack": "ກັບຄືນໄປ ແລ້ວໃຊ້ '$t(login.moreSignInOptions)' ເພື່ອສ້າງບັນຊີຂອງທ່ານໃຫ້ສຳເລັດ.",
-    "invalidCode": "ລະຫັດນັ້ນບໍ່ຖືກຕ້ອງ ຫຼື ໝົດອາຍຸແລ້ວ. ກະລຸນາລອງອີກຄັ້ງ ຫຼື ໃຊ້ '$t(login.resendCode)'.",
+    "invalidCode": "ລະຫັດນັ້ນບໍ່ຖືກຕ້ອງ ຫຼື ໝົດອາຍຸແລ້ວ. ໃຊ້ '$t(login.resendCode)' ຫຼື ໃຊ້ '$t(login.moreSignInOptions)'.",
     "codeInProgress": "ກຳລັງປະມວນຜົນລະຫັດຂອງທ່ານ. ລໍຖ້າຈັກໜ້ອຍແລ້ວລອງອີກຄັ້ງ.",
     "tooManyAttempts": "ທ່ານລອງຫຼາຍຄັ້ງເກີນໄປແລ້ວ. ກະລຸນາຂໍລະຫັດໃໝ່.",
     "invalidToken": "ເຂົ້າສູ່ລະບົບບໍ່ສຳເລັດ. ກະລຸນາລອງໃໝ່.",
@@ -3902,7 +4057,10 @@
     "list": {
       "loadFailed": "ບໍ່ສາມາດໂຫຼດປະຫວັດການສົນທະນາໄດ້.",
       "new": "ແຊັດໃໝ່",
-      "deleteTitle": "ລຶບແຊັດນີ້ບໍ?"
+      "deleteTitle": "ລຶບແຊັດນີ້ບໍ?",
+      "resetNoticeTitle": "ແຊັດໃນອຸປະກອນ ແລະ ສະບັບຮ່າງຖືກລຶບແລ້ວ",
+      "resetNoticeBody": "Kilo ບໍ່ສາມາດເປີດແຊັດທີ່ບັນທຶກໄວ້ໃນອຸປະກອນນີ້ໄດ້. ເຊສຊັນໃນເມກຂອງທ່ານບໍ່ໄດ້ຮັບຜົນກະທົບ.",
+      "resetNoticeDismiss": "ລະເວັ້ນການແຈ້ງເຕືອນ"
     },
     "rename": {
       "title": "ປ່ຽນຊື່ແຊັດ",
@@ -3952,6 +4110,9 @@
       "fieldName": "ຊື່ທີ່ສະແດງ",
       "fieldUrl": "URL ຂອງເຊີບເວີ",
       "fieldUrlInvalid": "ປ້ອນ URL ຂອງເຊີບເວີທີ່ຖືກຕ້ອງ.",
+      "fieldUrlCredentials": "ລຶບຊື່ຜູ້ໃຊ້ ແລະ ລະຫັດຜ່ານອອກຈາກ URL.",
+      "fieldUrlFragment": "ລຶບສ່ວນ # ອອກຈາກ URL.",
+      "fieldUrlInsecure": "ປ້ອນ URL ທີ່ໃຊ້ https, ຫຼື http ສະເພາະສຳລັບ localhost.",
       "duplicateUrl": "URL ນີ້ຖືກບັນທຶກໄວ້ແລ້ວ.",
       "serverNotFound": "ເຊີບເວີນີ້ບໍ່ຖືກບັນທຶກໄວ້ອີກແລ້ວ.",
       "enableServer": "ເປີດນຳໃຊ້ເຊີບເວີນີ້: {{name}}",
@@ -3977,6 +4138,7 @@
       "app": {
         "label": "ອິນເຕີເຟດຂອງເຄື່ອງມື",
         "failed": "ບໍ່ສາມາດໂຫຼດອິນເຕີເຟດຂອງເຄື່ອງມືນີ້ໄດ້.",
+        "tooLarge": "ອິນເຕີເຟດຂອງເຄື່ອງມືນີ້ໃຫຍ່ກວ່າຂີດຈຳກັດ {{size}}.",
         "empty": "ອິນເຕີເຟດຂອງເຄື່ອງມືນີ້ບໍ່ມີຫຍັງໃຫ້ສະແດງ."
       }
     },
@@ -4044,6 +4206,8 @@
       "discoveryNoModels": "ຈຸດເຊື່ອມຕໍ່ບໍ່ສະແດງລາຍການໂມເດວ. ປ້ອນໂມເດວດ້ວຍຕົນເອງ.",
       "connectionIncomplete": "ໂມເດວຕອບກັບແລ້ວ ແຕ່ບໍ່ໄດ້ສຳເລັດ. ລອງໃໝ່ອີກຄັ້ງ, ຫຼື ກວດສອບລະຫັດໂມເດວ ແລະ ໂປຣໂຕຄອນ.",
       "invalidInput": "ປ້ອນຊື່ລະບົບເບື້ອງຫຼັງ, ສ່ວນຫົວທີ່ຖືກຕ້ອງ ແລະ ຢ່າງໜ້ອຍໜຶ່ງໂມເດວທີ່ມີລະຫັດ ແລະ ຊື່ບໍ່ຊ້ຳກັນ. ຂີດຈຳກັດໂທເຄັນຕ້ອງເປັນຈຳນວນເຕັມບວກ.",
+      "invalidApiKey": "ກະແຈ API ມີຕົວອັກສອນໜຶ່ງທີ່ບໍ່ສາມາດສົ່ງໄດ້. ໃຫ້ໃຊ້ພຽງແຕ່ຕົວໜັງສື, ຕົວເລກ ແລະ ສັນຍາລັກມາດຕະຖານ ໂດຍບໍ່ມີການຂຶ້ນແຖວໃໝ່.",
+      "invalidHeaders": "ບໍ່ສາມາດສົ່ງສ່ວນຫົວທີ່ກຳນົດເອງໄດ້. ກວດສອບຊື່ຂອງມັນ ແລະ ໃຫ້ໃຊ້ພຽງແຕ່ຕົວໜັງສື, ຕົວເລກ ແລະ ສັນຍາລັກມາດຕະຖານ ໂດຍບໍ່ມີການຂຶ້ນແຖວໃໝ່.",
       "invalidUrl": "ປ້ອນ URL ຮາກຂອງ API ແບບ HTTP ຫຼື HTTPS ໂດຍບໍ່ມີຂໍ້ມູນຢືນຢັນຕົວຕົນ, ພາລາມິເຕີຄິວຣີ ຫຼື ສ່ວນລະບຸຕຳແໜ່ງພາຍໃນ.",
       "publicHttp": "ບໍ່ອະນຸຍາດໃຫ້ໃຊ້ຈຸດເຊື່ອມຕໍ່ HTTP ສາທາລະນະ. ໃຊ້ HTTPS ຫຼື ຈຸດເຊື່ອມຕໍ່ພາຍໃນເຄືອຂ່າຍສ່ວນຕົວ.",
       "httpApprovalRequired": "ອະນຸມັດຈຸດເຊື່ອມຕໍ່ HTTP ພາຍໃນນີ້ກ່ອນບັນທຶກ ຫຼື ເຊື່ອມຕໍ່.",
@@ -4092,6 +4256,7 @@
         "network": "ການດາວໂຫຼດບໍ່ສຳເລັດ. ກວດສອບການເຊື່ອມຕໍ່ ແລະ ລອງໃໝ່ອີກຄັ້ງ.",
         "invalidFile": "ໄຟລ໌ທີ່ດາວໂຫຼດບໍ່ແມ່ນໂມເດວທີ່ແອັບນີ້ເຮັດວຽກໄດ້, ດັ່ງນັ້ນຈຶ່ງຖືກລຶບອອກ.",
         "checksum": "ໄຟລ໌ທີ່ດາວໂຫຼດບໍ່ກົງກັບຄ່າກວດສອບທີ່ເຜີຍແຜ່ໄວ້, ດັ່ງນັ້ນຈຶ່ງຖືກລຶບອອກ. ກະລຸນາລອງດາວໂຫຼດອີກຄັ້ງ.",
+        "unreadable": "ອຸປະກອນນີ້ບໍ່ສາມາດກວດສອບໄຟລ໌ທີ່ດາວໂຫຼດໄດ້, ດັ່ງນັ້ນຈຶ່ງຖືກລຶບອອກ. ກະລຸນາລອງດາວໂຫຼດອີກຄັ້ງ.",
         "writeFailed": "ອຸປະກອນນີ້ບໍ່ສາມາດບັນທຶກໂມເດວໄດ້. ກະລຸນາລອງດາວໂຫຼດອີກຄັ້ງ."
       }
     },
@@ -4177,7 +4342,15 @@
       "download": "ດາວໂຫຼດໂມເດວຢູ່ໃນອຸປະກອນ",
       "downloading": "ກຳລັງດາວໂຫຼດ…",
       "downloadProgress": "ກຳລັງດາວໂຫຼດ… {{percent}}%",
-      "downloadFailed": "ການດາວໂຫຼດບໍ່ສຳເລັດ. ກວດສອບການເຊື່ອມຕໍ່ ແລະ ພື້ນທີ່ຈັດເກັບທີ່ຫວ່າງ, ແລ້ວລອງໃໝ່."
+      "downloadFailed": "ການດາວໂຫຼດບໍ່ສຳເລັດ. ກວດສອບການເຊື່ອມຕໍ່ ແລະ ພື້ນທີ່ຈັດເກັບທີ່ຫວ່າງ, ແລ້ວລອງໃໝ່.",
+      "cannotUse": "ບໍ່ສາມາດເຮັດວຽກ: {{items}}.",
+      "cannotUseOptions": "ບໍ່ສາມາດຕື່ມໄດ້: ບາງຕົວເລືອກຂອງເຄື່ອງມື.",
+      "limitations": "ຂໍ້ຈຳກັດ",
+      "tools": {
+        "time": "ເວລາ",
+        "settingsList": "ສະແດງການຕັ້ງຄ່າ",
+        "settingsSet": "ປ່ຽນການຕັ້ງຄ່າ"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "ໂມເດວນີ້ຮອງຮັບລະດັບການຄິດ"
@@ -4356,6 +4529,7 @@
     "instructionSaveFailed": "ບໍ່ສາມາດບັນທຶກຄຳແນະນຳໄດ້",
     "instructionDeleteFailed": "ບໍ່ສາມາດລຶບຄຳແນະນຳໄດ້",
     "instructionToggleFailed": "ບໍ່ສາມາດອັບເດດຄຳແນະນຳໄດ້",
+    "instructionViewTitle": "ໄຟລ໌ຄຳແນະນຳ",
     "instructionLimitReached": "ໜຶ່ງໂປຣໄຟລ໌ເກັບໄດ້ສູງສຸດ {{max}} ຄຳແນະນຳ. ລຶບອັນໜຶ່ງເພື່ອເພີ່ມອັນໃໝ່.",
     "mcp": {
       "title": "ເຊີບເວີ MCP",
@@ -4530,6 +4704,7 @@
       "emptyDescription": "ການຊື້ເຄຣດິດ, ໃບຮັບເງິນ ແລະ ການນຳໃຊ້ຈະສະແດງຢູ່ບ່ອນນີ້.",
       "emptyTitle": "ບໍ່ມີປະຫວັດເຄຣດິດ",
       "expiredGrant": "ໝົດອາຍຸແລ້ວ: {{description}}",
+      "expiredStatus": "ໝົດອາຍຸແລ້ວ",
       "googlePlayReceipt": "ໃບຮັບເງິນຈາກ Google Play",
       "kind": {
         "adjustment": "ການປັບປຸງ",
@@ -4556,7 +4731,8 @@
       "receiptA11y": "ເປີດໃບຮັບເງິນສຳລັບ {{description}}, {{amount}}, ຈາກ {{date}}",
       "receiptUnavailable": "ບໍ່ມີໃບຮັບເງິນສຳລັບການຊື້ນີ້.",
       "retentionLimit": "ກຳລັງສະແດງບັນທຶກເຄຣດິດຫຼ້າສຸດ.",
-      "voidedGrant": "ຍົກເລີກແລ້ວ: {{description}}"
+      "voidedGrant": "ຍົກເລີກແລ້ວ: {{description}}",
+      "voidedStatus": "ຍົກເລີກແລ້ວ"
     },
     "title": "ຊື້ເຄຣດິດ",
     "description": "ເຄຣດິດເປັນການຊື້ຄັ້ງດຽວທີ່ເພີ່ມໃສ່ຍອດ Kilo ຂອງທ່ານສຳລັບການແລ່ນເຊດຊັນການຂຽນໂຄ້ດ AI ໃນ Kilo App. ຮ້ານຄ້າຄິດຄ່າຈາກບັນຊີຂອງທ່ານ ແລະ ເຄຣດິດຈະຖືກເພີ່ມຫຼັງຈາກຮ້ານຄ້າຢືນຢັນການຊຳລະ.",
@@ -4700,6 +4876,7 @@
     "contextAll": "ບໍລິບົດທັງໝົດ",
     "dismiss": "ລະເວັ້ນລາຍງານ",
     "dismissFailed": "ຍັງບໍ່ສາມາດລະເວັ້ນລາຍງານນີ້ໄດ້. ລະບົບຈະລອງໃໝ່ໃນພື້ນຫຼັງ.",
+    "readMarkFailed": "ຍັງບໍ່ສາມາດໝາຍລາຍງານນີ້ວ່າອ່ານແລ້ວໄດ້. ລະບົບຈະລອງໃໝ່ເມື່ອໂຫຼດລາຍງານນີ້ຄືນໃໝ່.",
     "offline": "ອອບລາຍ · ລາຍງານທີ່ບັນທຶກໄວ້",
     "cached": "ລາຍງານທີ່ບັນທຶກໄວ້ · ບໍ່ສາມາດໂຫຼດຄືນໃໝ່",
     "summary": "ສະຫຼຸບໂດຍ AI",
@@ -4719,16 +4896,21 @@
     "morningEnd": "ລາຍງານມີຈົນເຖິງ",
     "timeHint": "ບັດໜ້າຫຼັກຈະກັບມາສະແດງສະຖານະປັດຈຸບັນເມື່ອຊ່ວງເວລາຂອງລາຍງານສິ້ນສຸດ, ເຖິງແມ່ນອອບລາຍ.",
     "invalidSchedule": "ເລືອກເຂດເວລາທີ່ຖືກຕ້ອງ ແລະ ຊ່ວງເວລາຂອງລາຍງານທີ່ບໍ່ຫວ່າງ.",
+    "scheduleEmptyNight": "ຊ່ວງເວລາຂອງລາຍງານຫວ່າງເປົ່າ. ເລືອກເວລາພ້ອມທີ່ຊ້າກວ່າເວລາເລີ່ມຕົ້ນຂອງຊ່ວງເວລາ.",
+    "scheduleEmptyMorning": "ເວລາພ້ອມ ແລະ ເວລາມີຈົນເຖິງກົງກັນ. ເລືອກວ່າລາຍງານຈະມີຢູ່ດົນປານໃດ.",
+    "scheduleFullDay": "ສອງຊ່ວງເວລານີ້ກວມເອົາໜຶ່ງມື້ເຕັມ. ໃຫ້ບາງສ່ວນຂອງມື້ຢູ່ນອກລາຍງານ.",
     "notificationsHint": "ການແຈ້ງເຕືອນທົ່ວໄປໜຶ່ງຄັ້ງຕໍ່ລາຍງານທີ່ກຳນົດໄວ້. ບໍ່ຂຶ້ນກັບສະຫຼຸບ AI ແບບເສຍເງິນ.",
     "notificationPermission": "ເປີດການແຈ້ງເຕືອນແບບດັນ ເພື່ອຮັບລາຍງານຂອງທ່ານ.",
     "defaultModel": "ໃຊ້ໂມເດລເລີ່ມຕົ້ນຂອງ Kilo",
     "duration": "ຂີດຈຳກັດເວລາ (ນາທີ)",
     "spendLimit": "ຂີດຈຳກັດຄ່າໃຊ້ຈ່າຍ (USD)",
-    "invalidSafeguards": "ປ້ອນຂີດຈຳກັດເວລາ ແລະ ຄ່າໃຊ້ຈ່າຍທີ່ເປັນບວກ ແລະ ມີຂອບເຂດ.",
+    "invalidSafeguards": "ປ້ອນຕົວເລກບວກພາຍໃນຂອບເຂດທີ່ອະນຸຍາດ.",
     "estimate": "ປະເມີນ {{estimate}} · ສູງສຸດ {{maximum}}",
     "estimateUnavailable": "ບໍ່ມີບົດສະຫຼຸບແບບຈ່າຍຄ່າສຳລັບການຕັ້ງຄ່າເຫຼົ່ານີ້. ປ່ຽນໂມເດລ ຫຼື ຂອບເຂດ, ຫຼື ລອງອີກຄັ້ງພາຍຫຼັງ.",
     "confirmPaid": "ເປີດສະຫຼຸບແບບເສຍເງິນສຳລັບ {{context}} ບໍ?",
+    "paidDisclosure_one": "ປະມານ {{estimate}}, ສູງສຸດ {{maximum}}, ຈຳກັດເວລາ {{minutes}} ນາທີ. ຈະມີຄ່າໃຊ້ຈ່າຍເຖິງແມ່ນການສ້າງລົ້ມເຫຼວ.",
     "paidDisclosure": "ປະມານ {{estimate}}, ສູງສຸດ {{maximum}}, ຈຳກັດເວລາ {{minutes}} ນາທີ. ຈະມີຄ່າໃຊ້ຈ່າຍເຖິງແມ່ນການສ້າງລົ້ມເຫຼວ.",
+    "paidDisclosure_other": "ປະມານ {{estimate}}, ສູງສຸດ {{maximum}}, ຈຳກັດເວລາ {{minutes}} ນາທີ. ຈະມີຄ່າໃຊ້ຈ່າຍເຖິງແມ່ນການສ້າງລົ້ມເຫຼວ.",
     "enable": "ເປີດສະຫຼຸບແບບເສຍເງິນ",
     "allContexts": "ລາຍງານສ່ວນຕົວ ແລະ ຂອງອົງກອນຖືກແຍກອອກຈາກກັນ.",
     "emptyHistory": "ບໍ່ມີລາຍງານທີ່ບັນທຶກໄວ້",
@@ -4767,7 +4949,7 @@
     "sourceActivity": "ກິດຈະກຳບໍ່ມີຊື່",
     "metadataFailureProvider": "ຂໍ້ຜິດພາດຈາກຜູ້ໃຫ້ບໍລິການ",
     "metadataFailureTool": "ຂໍ້ຜິດພາດຈາກເຄື່ອງມື",
-    "metadataFailureCancelled": "ຍົກເລີກແລ້ວ",
+    "metadataStopped": "ຄັ້ງຫຼ້າຖືກຢຸດ",
     "metadataFailureOther": "ຂໍ້ຜິດພາດທີ່ບໍ່ລະບຸ",
     "metadataPlan_one": "ແຜນ: ສຳເລັດ {{displayDone}} ຈາກ {{displayTotal}} ຂັ້ນຕອນ",
     "metadataFiles_one": "{{displayCount}} ໄຟລ໌ທີ່ປ່ຽນແປງ",
@@ -4792,7 +4974,8 @@
     "unavailableTitle": "ການນຳໃຊ້ບໍ່ສາມາດໃຊ້ໄດ້",
     "unavailableDescription": "ການນຳໃຊ້ຍັງບໍ່ໄດ້ຕັ້ງຄ່າສຳລັບ Workspace ນີ້. ກະລຸນາຕິດຕໍ່ຝ່າຍຊ່ວຍເຫຼືອ ຖ້າທ່ານຄາດວ່າຈະເຫັນການນຳໃຊ້ຢູ່ບ່ອນນີ້.",
     "orgSelfNotice": "ທ່ານກຳລັງເບິ່ງການນຳໃຊ້ຂອງທ່ານເອງໃນອົງກອນນີ້.",
-    "viewDetails": "ເບິ່ງລາຍລະອຽດການນຳໃຊ້"
+    "viewDetails": "ເບິ່ງລາຍລະອຽດການນຳໃຊ້",
+    "orgSelfEntryTitle": "ການນຳໃຊ້ຂອງທ່ານ"
   },
   "integrations": {
     "title": "ການເຊື່ອມໂຍງ",
@@ -4888,6 +5071,8 @@
       "autoCommit": "ຄອມມິດການປ່ຽນແປງເມື່ອການຣັນສິ້ນສຸດ",
       "condenseOnComplete": "ຫຍໍ້ບໍລິບົດເມື່ອການຣັນສິ້ນສຸດ",
       "activeTitle": "ຕົວກະຕຸ້ນເປີດໃຊ້ງານ",
+      "activeSwitchA11y": "ຕົວກະຕຸ້ນເປີດໃຊ້ງານ: {{name}}",
+      "copyLinkA11y": "ຄັດລອກລິ້ງສຳລັບ {{name}}",
       "activeDescription": "ເວັບຮຸກທີ່ຢຸດຊົ່ວຄາວຈະຕອບດ້ວຍ 404.",
       "runAsCreator": "ຣັນໃນນາມຂ້ອຍ",
       "runAsCreatorDescription": "ທຸກການຣັນໃຊ້ບັນຊີຂອງທ່ານ ດັ່ງນັ້ນຈຶ່ງຕ້ອງມີຫົວຂໍ້ຄວາມລັບ.",
@@ -4964,7 +5149,7 @@
   },
   "organizationGuardrails": {
     "title": "ລະບົບປ້ອງກັນ AI",
-    "permissionDenied": "ພຽງແຕ່ເຈົ້າຂອງອົງກອນ ແລະ ຜູ້ບໍລິຫານເທົ່ານັ້ນທີ່ສາມາດຈັດການລະບົບປ້ອງກັນ AI ໄດ້. $t(organization.boundary.accessDeniedDescription)",
+    "permissionDenied": "ພຽງແຕ່ເຈົ້າຂອງອົງກອນ ແລະ ຜູ້ດູແລລະບົບເທົ່ານັ້ນທີ່ສາມາດຈັດການລະບົບປ້ອງກັນ AI ໄດ້. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "ລະບົບປ້ອງກັນ AI ຍັງບໍ່ໄດ້ເປີດໃຊ້",
     "unavailable": "Kilo ເປີດໃຊ້ລະບົບປ້ອງກັນ AI ໃຫ້ກັບອົງກອນຕາມການຮ້ອງຂໍ. ຕິດຕໍ່ {{supportEmail}}, ແລະ ທີມ Kilo ຈະເປີດໃຊ້ງານສຳລັບອົງກອນຂອງທ່ານ.",
     "contactSupport": "ຕິດຕໍ່ຝ່າຍສະໜັບສະໜູນ",
@@ -5106,7 +5291,7 @@
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "ຄຸນສົມບັດສຳລັບອົງກອນຂະໜາດໃຫຍ່",
     "enterpriseOnly": "ຜູ້ໃຫ້ບໍລິການ ແລະ ຕົວແບບມີໃຫ້ໃຊ້ໃນແຜນ Enterprise.",
-    "readOnly": "ພຽງແຕ່ເຈົ້າຂອງອົງກອນ ແລະ ຜູ້ບໍລິຫານເທົ່ານັ້ນທີ່ສາມາດປ່ຽນການຕັ້ງຄ່າເຫຼົ່ານີ້ໄດ້.",
+    "readOnly": "ພຽງແຕ່ເຈົ້າຂອງອົງກອນ ແລະ ຜູ້ດູແລລະບົບເທົ່ານັ້ນທີ່ສາມາດປ່ຽນການຕັ້ງຄ່າເຫຼົ່ານີ້ໄດ້.",
     "loadError": "ຜູ້ໃຫ້ບໍລິການ ແລະ ຕົວແບບບໍ່ສາມາດໂຫລດໄດ້",
     "tabModels": "ຕົວແບບ",
     "tabProviders": "ຜູ້ໃຫ້ບໍລິການ",

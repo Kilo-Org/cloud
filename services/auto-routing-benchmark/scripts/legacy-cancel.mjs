@@ -122,6 +122,40 @@ const SQL_NOW_ISO = `strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`;
 
 const sqlString = value => `'${String(value).replaceAll("'", "''")}'`;
 
+/**
+ * D1's documented statement limits (https://developers.cloudflare.com/d1/platform/limits/):
+ * a statement may be at most 100,000 bytes, and a compound statement (`UNION`, `UNION ALL`,
+ * `INTERSECT`, `EXCEPT`) may carry at most five SELECT terms. SQLite accepts more of both, so a
+ * shape that passes the isolated copy can be refused by production; these are checked before a
+ * statement is sent so the refusal names the builder instead of arriving as an opaque
+ * `wrangler exited 1`.
+ */
+export const D1_MAX_STATEMENT_BYTES = 100_000;
+export const D1_MAX_COMPOUND_TERMS = 5;
+
+/** The compound-term count of a generated statement. Our literals never carry these keywords. */
+export function compoundTermCount(sql) {
+  return 1 + (sql.match(/\b(?:UNION(?:\s+ALL)?|EXCEPT|INTERSECT)\b/gi) ?? []).length;
+}
+
+/** Refuse a statement D1 is documented to reject, naming the builder that produced it. */
+export function assertStatementFitsD1(sql, kind = 'statement') {
+  const bytes = Buffer.byteLength(sql, 'utf8');
+  if (bytes > D1_MAX_STATEMENT_BYTES) {
+    throw new D1Error(
+      `the ${kind} statement is ${bytes} bytes, above D1's ${D1_MAX_STATEMENT_BYTES}-byte limit; ` +
+        'refusing to send it'
+    );
+  }
+  const terms = compoundTermCount(sql);
+  if (terms > D1_MAX_COMPOUND_TERMS) {
+    throw new D1Error(
+      `the ${kind} statement has ${terms} compound SELECT terms, above D1's ` +
+        `${D1_MAX_COMPOUND_TERMS}-term limit; refusing to send it`
+    );
+  }
+}
+
 class UsageError extends Error {}
 class GuardRefused extends Error {}
 class VerifyFailed extends Error {}
@@ -241,6 +275,10 @@ const idList = ids => `(${ids.map(sqlString).join(', ')})`;
 /**
  * The statements for one pass, in the only order whose every prefix is safe.
  *
+ * `runIds` selects the runs to cancel (statements 1-2); `sweep` selects the global sweep
+ * (statements 3-5). A batched apply calls this once per run with `sweep: false`, then once with
+ * `runIds: []` and `sweep: true`, so the sweep still runs exactly once per pass.
+ *
  * 1. Park the registry claims of the runs about to be cancelled. `status = 'running'` is
  *    part of the predicate, so a `ready` or `failed` row can never be parked by accident —
  *    `run_id IN (…)` alone would match a `ready` row whose provenance run id still points at
@@ -263,7 +301,7 @@ const idList = ids => `(${ids.map(sqlString).join(', ')})`;
  *    a kept `run_id` is what makes the row unclaimable; a NULL `claimed_at` also keeps it out
  *    of the orphan reaper's `claimed_at < cutoff` delete, so the demand survives as history.
  */
-export function buildStatements({ expectToken, minRemainingMs, runIds = [] }) {
+export function buildStatements({ expectToken, minRemainingMs, runIds = [], sweep = true }) {
   const guard = lockGuardSql(expectToken, minRemainingMs);
   const parkProfile = `UPDATE benchmark_profiles
 SET status = 'pending',
@@ -272,36 +310,43 @@ SET status = 'pending',
     updated_at = ${SQL_NOW_ISO}
 WHERE status = 'running'
   AND `;
+  const targeted = runIds.length > 0;
   return [
-    runIds.length === 0
-      ? null
-      : `${parkProfile}run_id IN ${idList(runIds)}
-  AND ${guard};`,
-    runIds.length === 0
-      ? null
-      : `UPDATE benchmark_runs
+    targeted
+      ? `${parkProfile}run_id IN ${idList(runIds)}
+  AND ${guard};`
+      : null,
+    targeted
+      ? `UPDATE benchmark_runs
 SET status = 'failed',
     error = ${sqlString(CANCEL_ERROR)},
     completed_at = ${SQL_NOW_ISO}
 WHERE status = 'running'
   AND id IN ${idList(runIds)}
-  AND ${guard};`,
-    `${parkProfile}(run_id IS NULL OR ${notRunning('benchmark_profiles.run_id')})
-  AND ${guard};`,
-    `UPDATE scheduler_chunks
+  AND ${guard};`
+      : null,
+    sweep
+      ? `${parkProfile}(run_id IS NULL OR ${notRunning('benchmark_profiles.run_id')})
+  AND ${guard};`
+      : null,
+    sweep
+      ? `UPDATE scheduler_chunks
 SET status = 'completed',
     slot = NULL,
     token = NULL,
     lease_until = 0
 WHERE status IN ('pending', 'queued', 'active')
   AND ${notRunning('scheduler_chunks.run_id')}
-  AND ${guard};`,
-    `UPDATE profile_remeasures
+  AND ${guard};`
+      : null,
+    sweep
+      ? `UPDATE profile_remeasures
 SET requested_at = ${sqlString(PARKED_REQUESTED_AT)},
     claimed_at = NULL
 WHERE run_id IS NOT NULL
   AND ${notRunning('profile_remeasures.run_id')}
-  AND ${guard};`,
+  AND ${guard};`
+      : null,
   ].filter(statement => statement !== null);
 }
 
@@ -511,6 +556,15 @@ export const MONOTONE_FIELDS = new Set(['platform_requested_sum', 'user_requeste
 export const LEAN_MAX_RUNS = 50;
 export const LEAN_MAX_SCOPED_ROWS = 50_000;
 export const LEAN_MAX_PUBLICATIONS = 2_000;
+/**
+ * A single run's history may exceed the per-batch envelope on its own. Such a run is split into
+ * disjoint `model` groups (the second column of every scoped primary key); this is the hard
+ * ceiling on how large ONE run may be before even the split is refused, so the model enumeration
+ * can never read an unbounded range.
+ */
+export const LEAN_MAX_SPLIT_ROWS = 4 * LEAN_MAX_SCOPED_ROWS;
+/** A split run's model groups are enumerated with this cap; more distinct models refuse. */
+export const LEAN_MAX_MODEL_GROUPS = 64;
 
 /** The routers whose published artifact is compared (`AUTO_ROUTERS` in the contracts package). */
 export const LEAN_ROUTERS = ['efficient', 'frontier'];
@@ -543,32 +597,75 @@ export function scopePublishedSql(routers = LEAN_ROUTERS) {
 
 const inList = ids => (ids.length === 0 ? 'IN (NULL)' : `IN (${ids.map(sqlString).join(', ')})`);
 
-/** Size probes: `LIMIT <cap+1>` stops at the cap; a missing field is an error, never zero. */
-export function leanScopeSizeSql(scope, cap = LEAN_MAX_SCOPED_ROWS) {
-  const runs = inList((scope.runIds ?? []).map(String));
-  const published = inList((scope.publishedRunIds ?? []).map(String));
-  const probe = (alias, from) => `(SELECT COUNT(*) FROM (
+/**
+ * One batch of the bounded scope. A batch is the unit whose scoped rows must fit inside
+ * `LEAN_MAX_SCOPED_ROWS`, and the unit `--verify` re-reads.
+ *
+ * - `{ kind: 'global' }` — every scope-free counter plus the CURRENT published artifact. Exactly
+ *   one per scope, always first.
+ * - `{ kind: 'cancelled', runIds: [...] }` — the whole history of those runs.
+ * - `{ kind: 'cancelled', runIds: [...], models: [...] }` — one `model` group of a run too large
+ *   for a single batch.
+ * - `{ kind: 'cancelled', runIds: [...], notModels: [...] }` — the rest of a split run. It is the
+ *   exact complement of the enumerated groups, so a model that appears after planning (or one
+ *   that only ever owned a chunk) is still read, and split batches still partition the run.
+ */
+function segmentWhere(batch, alias) {
+  const runIds = (batch.runIds ?? []).map(String);
+  const parts = [`${alias}.run_id ${inList(runIds)}`];
+  if (Array.isArray(batch.models)) {
+    if (batch.models.length === 0) throw new VerifyFailed('a bounded batch has an empty model set');
+    parts.push(`${alias}.model IN (${batch.models.map(sqlString).join(', ')})`);
+  }
+  if (Array.isArray(batch.notModels)) {
+    if (batch.notModels.length === 0) {
+      // `NOT IN ()` is invalid SQL, and an empty complement is the whole run, not nothing.
+      throw new VerifyFailed('a bounded batch has an empty model complement');
+    }
+    parts.push(`${alias}.model NOT IN (${batch.notModels.map(sqlString).join(', ')})`);
+  }
+  return parts.join(' AND ');
+}
+
+const probe = (alias, from, cap) => `(SELECT COUNT(*) FROM (
       SELECT 1 AS hit FROM ${from} LIMIT ${cap + 1}) AS ${alias})`;
+
+/**
+ * Size probes: `LIMIT <cap+1>` stops at the cap; a missing field is an error, never zero. The
+ * probe covers one batch (a set of disjoint segments), and counts every table the cancelled
+ * digest reads, so the envelope bounds the rows that will actually be read, not a proxy.
+ */
+export function leanBatchSizeSql(segments, cap = LEAN_MAX_SCOPED_ROWS) {
+  if (!Array.isArray(segments) || segments.length === 0) {
+    throw new VerifyFailed('a bounded batch has no segments');
+  }
+  const where = alias => segments.map(segment => `(${segmentWhere(segment, alias)})`).join(' OR ');
   return `SELECT
-  ${probe('cancelled_case_results', `case_results AS row WHERE row.run_id ${runs}`)} AS cancelled_case_results,
-  ${probe('served_case_results', `case_results AS row WHERE row.run_id ${published}`)} AS served_case_results,
-  ${probe('cancelled_summaries', `model_summaries AS row WHERE row.run_id ${runs}`)} AS cancelled_summaries,
-  ${probe('served_summaries', `model_summaries AS row WHERE row.run_id ${published}`)} AS served_summaries,
-  ${probe('cancelled_chunks', `scheduler_chunks AS chunk WHERE chunk.run_id ${runs}`)} AS cancelled_chunks`;
+  ${probe('cancelled_case_results', `case_results AS row WHERE ${where('row')}`, cap)} AS cancelled_case_results,
+  ${probe('cancelled_summaries', `model_summaries AS row WHERE ${where('row')}`, cap)} AS cancelled_summaries,
+  ${probe('cancelled_chunks', `scheduler_chunks AS chunk WHERE ${where('chunk')}`, cap)} AS cancelled_chunks,
+  ${probe('cancelled_lane_failures', `run_lane_failures AS failure WHERE ${where('failure')}`, cap)} AS cancelled_lane_failures,
+  ${probe('cancelled_executions', `scheduler_executions AS execution WHERE ${where('execution')}`, cap)} AS cancelled_executions,
+  ${probe('cancelled_pending_outputs', `pending_decider_outputs AS pending WHERE ${where('pending')}`, cap)} AS cancelled_pending_outputs`;
+}
+
+/** The served half of the envelope: the two published runs' artifact and its contributors. */
+export function leanServedSizeSql(publishedRunIds, cap = LEAN_MAX_SCOPED_ROWS) {
+  const published = inList((publishedRunIds ?? []).map(String));
+  return `SELECT
+  ${probe('served_case_results', `case_results AS row WHERE row.run_id ${published}`, cap)} AS served_case_results,
+  ${probe('served_summaries', `model_summaries AS row WHERE row.run_id ${published}`, cap)} AS served_summaries,
+  ${probe('served_candidates', `routing_table_candidates AS candidate WHERE candidate.run_id ${published}`, cap)} AS served_candidates`;
 }
 
 /**
- * Each CTE is an AGGREGATE (one row), so SQLite cannot inline it and each history table is read
- * once; the final SELECT cross-joins the one-row results. The query plan proves it.
+ * The scope-free counters plus the CURRENT published artifact. Every `cancelled_*` field is a
+ * literal zero here: the combined digest takes those from the cancelled batches, and the zeros
+ * keep the field set identical whether or not a scope has any cancelled runs.
  */
-export function leanStateSql(scope) {
-  const runs = inList((scope.runIds ?? []).map(String));
-  const published = inList((scope.publishedRunIds ?? []).map(String));
+export function leanGlobalSql(publishedRunIds) {
+  const published = inList((publishedRunIds ?? []).map(String));
   return `WITH
-  cancelled_case AS (SELECT
-      COUNT(*) AS n, COALESCE(TOTAL(score), 0) AS score,
-      COALESCE(SUM(COALESCE(timed_out, 0)), 0) AS timeouts
-    FROM case_results AS row WHERE row.run_id ${runs}),
   served_case AS (SELECT
       COUNT(*) AS n, COALESCE(TOTAL(score), 0) AS score,
       COALESCE(TOTAL(cost_usd), 0) AS cost, COALESCE(TOTAL(latency_ms), 0) AS latency,
@@ -576,26 +673,16 @@ export function leanStateSql(scope) {
       COALESCE(SUM(LENGTH(COALESCE(error, ''))), 0) AS error_length,
       COALESCE(SUM(LENGTH(model || variant || case_id)), 0) AS key_length
     FROM case_results AS row WHERE row.run_id ${published}),
-  cancelled_summary AS (SELECT COUNT(*) AS n
-    FROM model_summaries AS row WHERE row.run_id ${runs}),
   served_summary AS (SELECT COUNT(*) AS n, COALESCE(TOTAL(accuracy), 0) AS accuracy,
       COALESCE(SUM(cases), 0) AS cases
     FROM model_summaries AS row WHERE row.run_id ${published}),
-  cancelled_chunk AS (SELECT COUNT(*) AS n, COALESCE(TOTAL(attempts), 0) AS attempts
-    FROM scheduler_chunks AS chunk WHERE chunk.run_id ${runs}),
   served_routing AS (SELECT
       COALESCE(GROUP_CONCAT(t.run_id || '@' || t.published_at || '@'
         || t.generated_at || '@' || t.source, '|'), '') AS signature
     FROM routing_tables AS t WHERE t.run_id ${published}),
   served_candidate AS (SELECT COUNT(*) AS n, COALESCE(TOTAL(accuracy), 0) AS accuracy,
       COALESCE(TOTAL(avg_cost_usd), 0) AS cost
-    FROM routing_table_candidates AS candidate WHERE candidate.run_id ${published}),
-  cancelled_lane AS (SELECT COUNT(*) AS n FROM run_lane_failures AS failure
-    WHERE failure.run_id ${runs}),
-  cancelled_execution AS (SELECT COUNT(*) AS n FROM scheduler_executions AS execution
-    WHERE execution.run_id ${runs}),
-  cancelled_pending AS (SELECT COUNT(*) AS n FROM pending_decider_outputs AS pending
-    WHERE pending.run_id ${runs})
+    FROM routing_table_candidates AS candidate WHERE candidate.run_id ${published})
 SELECT
   (SELECT COUNT(*) FROM benchmark_runs AS run WHERE run.status = 'running') AS running_runs,
   (SELECT COUNT(*) FROM scheduler_chunks AS chunk
@@ -627,6 +714,43 @@ SELECT
   served_candidate.n AS served_candidates_n,
   served_candidate.accuracy AS served_candidates_accuracy,
   served_candidate.cost AS served_candidates_cost,
+  0 AS cancelled_case_results_n,
+  0 AS cancelled_case_results_score,
+  0 AS cancelled_case_results_timeouts,
+  0 AS cancelled_summaries_n,
+  0 AS cancelled_chunks_n,
+  0 AS cancelled_chunk_attempts,
+  0 AS cancelled_lane_failures_n,
+  0 AS cancelled_executions_n,
+  0 AS cancelled_pending_outputs_n
+FROM served_case, served_summary, served_routing, served_candidate;
+`;
+}
+
+/**
+ * The cancelled half of one batch. Each CTE is an AGGREGATE (one row), so SQLite cannot inline it
+ * and each history table is read once per batch; the final SELECT cross-joins the one-row results.
+ * The query plan proves it. Only `cancelled_*` fields come from here; a batch's rows are disjoint
+ * from every other batch's, so summing the batches equals one aggregate over the whole scope.
+ */
+export function leanCancelledSql(batches) {
+  const where = alias => batches.map(batch => `(${segmentWhere(batch, alias)})`).join(' OR ');
+  return `WITH
+  cancelled_case AS (SELECT
+      COUNT(*) AS n, COALESCE(TOTAL(score), 0) AS score,
+      COALESCE(SUM(COALESCE(timed_out, 0)), 0) AS timeouts
+    FROM case_results AS row WHERE ${where('row')}),
+  cancelled_summary AS (SELECT COUNT(*) AS n
+    FROM model_summaries AS row WHERE ${where('row')}),
+  cancelled_chunk AS (SELECT COUNT(*) AS n, COALESCE(TOTAL(attempts), 0) AS attempts
+    FROM scheduler_chunks AS chunk WHERE ${where('chunk')}),
+  cancelled_lane AS (SELECT COUNT(*) AS n FROM run_lane_failures AS failure
+    WHERE ${where('failure')}),
+  cancelled_execution AS (SELECT COUNT(*) AS n FROM scheduler_executions AS execution
+    WHERE ${where('execution')}),
+  cancelled_pending AS (SELECT COUNT(*) AS n FROM pending_decider_outputs AS pending
+    WHERE ${where('pending')})
+SELECT
   cancelled_case.n AS cancelled_case_results_n,
   cancelled_case.score AS cancelled_case_results_score,
   cancelled_case.timeouts AS cancelled_case_results_timeouts,
@@ -636,9 +760,39 @@ SELECT
   cancelled_lane.n AS cancelled_lane_failures_n,
   cancelled_execution.n AS cancelled_executions_n,
   cancelled_pending.n AS cancelled_pending_outputs_n
-FROM cancelled_case, served_case, cancelled_summary, served_summary, cancelled_chunk,
-     served_routing, served_candidate, cancelled_lane, cancelled_execution, cancelled_pending;
+FROM cancelled_case, cancelled_summary, cancelled_chunk, cancelled_lane,
+     cancelled_execution, cancelled_pending;
 `;
+}
+
+/** The additive fields the combined digest sums across disjoint batches. */
+export const LEAN_SUMMED_FIELDS = [
+  'cancelled_case_results_n',
+  'cancelled_case_results_score',
+  'cancelled_case_results_timeouts',
+  'cancelled_summaries_n',
+  'cancelled_chunks_n',
+  'cancelled_chunk_attempts',
+  'cancelled_lane_failures_n',
+  'cancelled_executions_n',
+  'cancelled_pending_outputs_n',
+];
+
+/** Combine per-batch digests into the one flat digest `compareLean` compares. */
+export function combineBatchStates(global, cancelledBatches) {
+  const digest = { ...global };
+  for (const field of LEAN_SUMMED_FIELDS) {
+    let total = 0;
+    for (const batch of cancelledBatches) {
+      const value = Number(batch?.[field]);
+      if (!Number.isFinite(value)) {
+        throw new VerifyFailed(`a bounded batch reported an invalid ${field}`);
+      }
+      total += value;
+    }
+    digest[field] = total;
+  }
+  return digest;
 }
 
 /** Fields this operation changes on purpose in the bounded digest. */
@@ -770,7 +924,203 @@ function compareLean(before, after) {
   });
 }
 
-/** Resolve and size the bounded scope, fail-closed; the identities go in the baseline. */
+/** Sum the probe fields of one batch; a missing field is a broken probe, never zero. */
+function sumProbe(size, fields, label) {
+  let rows = 0;
+  for (const field of fields) {
+    const raw = size?.[field];
+    // A missing, null, negative or non-integer count is a broken probe, never zero.
+    // `Number(null)` is 0, so null is rejected before the numeric check.
+    const value = typeof raw === 'number' ? raw : Number.NaN;
+    if (!Number.isInteger(value) || value < 0) {
+      throw new VerifyFailed(
+        `the ${label} size probe reported an invalid ${field} (${size?.[field]}); refusing an unsized read`
+      );
+    }
+    rows += value;
+  }
+  return rows;
+}
+
+const CANCELLED_SIZE_FIELDS = [
+  'cancelled_case_results',
+  'cancelled_summaries',
+  'cancelled_chunks',
+  'cancelled_lane_failures',
+  'cancelled_executions',
+  'cancelled_pending_outputs',
+];
+const SERVED_SIZE_FIELDS = ['served_case_results', 'served_summaries', 'served_candidates'];
+
+/**
+ * The `model` groups of one run, taken as the UNION of the models that appear in every table the
+ * batch probe counts. `case_results` alone is not enough: a run can hold its bulk in
+ * `scheduler_executions` (one row per executed case, and production has a run with 54,661 of
+ * them), in a chunk, or in a pending output that has no graded result yet. Enumerating only graded
+ * results would either refuse a splittable run ("no model groups") or push those rows into the
+ * `NOT IN` complement until it exceeded the cap.
+ *
+ * D1 allows at most FIVE SELECT terms in a compound statement, so six tables cannot be one
+ * `UNION ALL`: this is split into two statements of three branches each, run in order and merged.
+ * Every branch is its own `run_id` seek with its own GROUP BY, so SQLite materializes them instead
+ * of flattening the compound and reading a table by another key.
+ *
+ * Each part is wrapped in `GROUP BY model ... LIMIT cap+1`, so a part transfers at most
+ * `LEAN_MAX_MODEL_GROUPS + 1` DISTINCT models and a run with thousands of them cannot stream the
+ * whole set before the caller refuses. Because each part deduplicates before its own limit, a
+ * model that appears in both parts cannot hide another: a part that returns the full `cap+1` rows
+ * has at least `cap+1` distinct models on its own, so the merged count is never an undercount.
+ */
+export function scopeRunModelsSql(runId, part = 0, cap = LEAN_MAX_MODEL_GROUPS) {
+  const key = sqlString(runId);
+  const branch = (from, alias) =>
+    `SELECT ${alias}.model AS model, COUNT(*) AS n FROM ${from} AS ${alias}
+      WHERE ${alias}.run_id = ${key} GROUP BY ${alias}.model`;
+  const tables = [
+    ['case_results', 'row'],
+    ['model_summaries', 'summary'],
+    ['scheduler_chunks', 'chunk'],
+    ['run_lane_failures', 'failure'],
+    ['scheduler_executions', 'execution'],
+    ['pending_decider_outputs', 'pending'],
+  ];
+  if (part < 0 || part > 1) throw new UsageError('the model enumeration has two parts');
+  const slice = tables.slice(part * 3, part * 3 + 3);
+  const union = slice.map(([from, alias]) => branch(from, alias)).join('\n    UNION ALL ');
+  return `SELECT model, SUM(n) AS n FROM (
+    ${union}
+  ) GROUP BY model ORDER BY n DESC, model ASC LIMIT ${cap + 1}`;
+}
+
+/** Merge the two enumeration parts into `{ model, n }`, largest first. */
+function mergeModelGroups(parts) {
+  const totals = new Map();
+  for (const rows of parts) {
+    for (const row of rows) {
+      const model = String(row.model);
+      totals.set(model, (totals.get(model) ?? 0) + Number(row.n));
+    }
+  }
+  return [...totals.entries()]
+    .map(([model, n]) => ({ model, n }))
+    .sort((a, b) => b.n - a.n || (a.model < b.model ? -1 : a.model > b.model ? 1 : 0));
+}
+
+async function runModelGroups(executor, runId) {
+  const parts = [];
+  for (const part of [0, 1]) {
+    const sql = scopeRunModelsSql(runId, part);
+    assertStatementFitsD1(sql, 'model enumeration');
+    await assertLeanPlan(executor, sql);
+    parts.push(await executor.read(sql));
+  }
+  const rows = mergeModelGroups(parts);
+  if (rows.length > LEAN_MAX_MODEL_GROUPS) {
+    throw new VerifyFailed(
+      `the run has more than ${LEAN_MAX_MODEL_GROUPS} model groups; refusing to split it further`
+    );
+  }
+  const models = rows.map(row => row.model);
+  if (models.length === 0) throw new VerifyFailed('a split run has no model groups');
+  return models;
+}
+
+/**
+ * A run's total scoped rows, measured to the split ceiling rather than the batch cap: a run that
+ * exceeds the batch envelope is examined once, and the enumeration below is only reached when the
+ * run is provably under `LEAN_MAX_SPLIT_ROWS`. The probe stops at the ceiling, so it can never
+ * read an unbounded range.
+ */
+export function leanRunCeilingSql(runId, cap = LEAN_MAX_SPLIT_ROWS) {
+  const where = { runIds: [runId] };
+  return `SELECT
+  ${probe('cancelled_case_results', `case_results AS row WHERE ${segmentWhere(where, 'row')}`, cap)} AS cancelled_case_results,
+  ${probe('cancelled_summaries', `model_summaries AS row WHERE ${segmentWhere(where, 'row')}`, cap)} AS cancelled_summaries,
+  ${probe('cancelled_chunks', `scheduler_chunks AS chunk WHERE ${segmentWhere(where, 'chunk')}`, cap)} AS cancelled_chunks,
+  ${probe('cancelled_lane_failures', `run_lane_failures AS failure WHERE ${segmentWhere(where, 'failure')}`, cap)} AS cancelled_lane_failures,
+  ${probe('cancelled_executions', `scheduler_executions AS execution WHERE ${segmentWhere(where, 'execution')}`, cap)} AS cancelled_executions,
+  ${probe('cancelled_pending_outputs', `pending_decider_outputs AS pending WHERE ${segmentWhere(where, 'pending')}`, cap)} AS cancelled_pending_outputs`;
+}
+
+/**
+ * Split one run that exceeds the per-batch envelope into disjoint `model` groups plus the exact
+ * complement. Returns `{ candidate, rows }`; a group that is still over the cap is refused here,
+ * because `--apply` must stay bounded and there is no smaller disjoint key to split on.
+ */
+async function splitRun(executor, runId) {
+  const models = await runModelGroups(executor, runId);
+  const candidates = models.map(model => ({ runIds: [runId], models: [model] }));
+  candidates.push({ runIds: [runId], notModels: models });
+  const probed = [];
+  for (const [index, candidate] of candidates.entries()) {
+    const sql = leanBatchSizeSql([candidate]);
+    await assertLeanPlan(executor, sql);
+    const [size] = await executor.read(sql);
+    const rows = sumProbe(size, CANCELLED_SIZE_FIELDS, 'model-group');
+    if (rows > LEAN_MAX_SCOPED_ROWS) {
+      const label = candidates[index].models ? `model group ${index + 1}` : 'the remaining rows';
+      throw new VerifyFailed(
+        `run ${runId}'s ${label} holds ${rows} scoped rows (limit ${LEAN_MAX_SCOPED_ROWS}); ` +
+          'it cannot be split below the bounded envelope — this is an operator decision'
+      );
+    }
+    if (rows > 0) probed.push({ candidate, rows });
+  }
+  return probed;
+}
+
+/**
+ * A batch's generated statements must also fit D1's 100 KB statement limit. Packing is bounded by
+ * rows, but many small segments (six runs split into 64 model groups each) would otherwise combine
+ * into one very long `OR`-chained statement. This is the budget each batch's cancelled and size
+ * statements are kept under, leaving room for the `EXPLAIN QUERY PLAN ` prefix.
+ */
+export const LEAN_MAX_BATCH_BYTES = 60_000;
+
+/** The longest statement a batch of these segments produces. */
+function batchStatementBytes(segments) {
+  return Math.max(
+    Buffer.byteLength(leanBatchSizeSql(segments), 'utf8'),
+    Buffer.byteLength(leanCancelledSql(segments), 'utf8')
+  );
+}
+
+/**
+ * Pack probed candidates greedily so each batch's scoped rows stay inside the envelope AND its
+ * generated statements stay inside `LEAN_MAX_BATCH_BYTES`.
+ */
+export function packBatches(probed) {
+  const batches = [];
+  let current = null;
+  let currentRows = 0;
+  const flush = () => {
+    if (current !== null) batches.push(current);
+  };
+  for (const { candidate, rows } of probed) {
+    if (current !== null) {
+      const next = [...current, candidate];
+      const fits =
+        currentRows + rows <= LEAN_MAX_SCOPED_ROWS &&
+        batchStatementBytes(next) <= LEAN_MAX_BATCH_BYTES;
+      if (fits) {
+        current = next;
+        currentRows += rows;
+        continue;
+      }
+    }
+    flush();
+    current = [candidate];
+    currentRows = rows;
+  }
+  flush();
+  return batches;
+}
+
+/**
+ * Resolve the bounded scope into batches, fail-closed. Every invocation re-probes each batch, so
+ * a batch that grew past the envelope (a late graded result, a re-admitted run) refuses before any
+ * read or write. `--verify` passes the baseline's batches and the SAME measurement runs again.
+ */
 async function resolveLeanScope(executor, previous = null) {
   const runningSql = scopeRunsSql();
   const runningPlan = await readQueryPlan(executor, runningSql);
@@ -833,46 +1183,98 @@ async function resolveLeanScope(executor, previous = null) {
           `(${expected.length} vs ${publishedRunIds.length} run(s)); refusing to compare a different artifact`
       );
     }
+    if (!Array.isArray(previous.batches) || previous.batches.length === 0) {
+      throw new VerifyFailed('the bounded baseline has no valid batches');
+    }
+    const pinned = new Set(runIds.map(String));
+    for (const batch of previous.batches) {
+      if (batch?.kind !== 'cancelled') continue;
+      if (!Array.isArray(batch.segments) || batch.segments.length === 0) {
+        throw new VerifyFailed('a bounded baseline batch has no segments');
+      }
+      for (const segment of batch.segments) {
+        const owners = (segment?.runIds ?? []).map(String);
+        if (owners.length === 0 || owners.some(id => !pinned.has(id))) {
+          throw new VerifyFailed(
+            'a bounded baseline batch names a run outside the pinned scope; refusing to widen it'
+          );
+        }
+      }
+    }
   }
 
-  const sizeSql = leanScopeSizeSql({ runIds, publishedRunIds });
-  // The size probe is itself a live read: prove it is indexed before running it.
-  await assertLeanPlan(executor, sizeSql);
-  const [size] = await executor.read(sizeSql);
-  const sizeFields = [
-    'cancelled_case_results',
-    'served_case_results',
-    'cancelled_summaries',
-    'served_summaries',
-    'cancelled_chunks',
-  ];
-  let rows = 0;
-  for (const field of sizeFields) {
-    const raw = size?.[field];
-    // A missing, null, negative or non-integer count is a broken probe, never zero.
-    // `Number(null)` is 0, so null is rejected before the numeric check.
-    const value = typeof raw === 'number' ? raw : Number.NaN;
-    if (!Number.isInteger(value) || value < 0) {
+  // The served half is sized once, before any batch is read.
+  const servedSql = leanServedSizeSql(publishedRunIds);
+  await assertLeanPlan(executor, servedSql);
+  const [servedSize] = await executor.read(servedSql);
+  const servedRows = sumProbe(servedSize, SERVED_SIZE_FIELDS, 'published-artifact');
+
+  // A pinned baseline keeps its exact batches; a fresh scope is planned here.
+  const cancelledBatches = previous
+    ? previous.batches.filter(batch => batch?.kind === 'cancelled')
+    : await planBatches(executor, runIds);
+
+  const sizes = [];
+  for (const batch of cancelledBatches) {
+    const sql = leanBatchSizeSql(batch.segments);
+    // The size probe is itself a live read: prove it is indexed before running it.
+    await assertLeanPlan(executor, sql);
+    const [size] = await executor.read(sql);
+    const rows = sumProbe(size, CANCELLED_SIZE_FIELDS, 'batch');
+    if (rows > LEAN_MAX_SCOPED_ROWS) {
       throw new VerifyFailed(
-        `the scope size probe reported an invalid ${field} (${size?.[field]}); refusing an unsized read`
-      );
-    }
-    // LIMIT <cap+1> means any count above the cap is an overrun; the probe never reads further.
-    if (value > LEAN_MAX_SCOPED_ROWS) {
-      throw new VerifyFailed(
-        `the scope has more than ${LEAN_MAX_SCOPED_ROWS} ${field.replace(/_/g, ' ')}; ` +
+        `a bounded batch holds ${rows} scoped rows (limit ${LEAN_MAX_SCOPED_ROWS}); ` +
           'refusing a history-sized comparison on live D1 — use the isolated copy instead'
       );
     }
-    rows += value;
+    sizes.push(rows);
   }
-  if (rows > LEAN_MAX_SCOPED_ROWS) {
+  if (servedRows > LEAN_MAX_SCOPED_ROWS) {
     throw new VerifyFailed(
-      `bounded verification would read ${rows} scoped rows (limit ${LEAN_MAX_SCOPED_ROWS}); ` +
-        'refusing to run a history-sized comparison on live D1 — use the isolated copy instead'
+      `the published artifact holds ${servedRows} scoped rows (limit ${LEAN_MAX_SCOPED_ROWS}); ` +
+        'refusing a history-sized comparison on live D1 — use the isolated copy instead'
     );
   }
-  return { runIds, publishedRunIds, scopeRows: rows };
+
+  const batches = [
+    { kind: 'global', segments: [], rows: servedRows, served: true },
+    ...cancelledBatches.map((batch, index) => ({
+      kind: 'cancelled',
+      segments: batch.segments,
+      rows: sizes[index],
+    })),
+  ];
+  const scopeRows = sizes.reduce((total, rows) => total + rows, servedRows);
+  return { runIds, publishedRunIds, batches, scopeRows };
+}
+
+/** Plan the cancelled batches for a fresh scope: whole runs first, then splits if one is too big. */
+async function planBatches(executor, runIds) {
+  if (runIds.length === 0) return [];
+  // Probe every run as a single batch first; only an overrun needs the model split.
+  const whole = [];
+  for (const runId of runIds) {
+    const candidate = { runIds: [runId] };
+    const sql = leanRunCeilingSql(runId);
+    await assertLeanPlan(executor, sql);
+    const [size] = await executor.read(sql);
+    whole.push({ candidate, rows: sumProbe(size, CANCELLED_SIZE_FIELDS, 'run') });
+  }
+  const probed = [];
+  for (const entry of whole) {
+    if (entry.rows <= LEAN_MAX_SCOPED_ROWS) {
+      if (entry.rows > 0) probed.push(entry);
+      continue;
+    }
+    if (entry.rows > LEAN_MAX_SPLIT_ROWS) {
+      throw new VerifyFailed(
+        `run ${entry.candidate.runIds[0]} holds ${entry.rows} scoped rows (limit ${LEAN_MAX_SPLIT_ROWS}); ` +
+          'refusing to enumerate a run that large on live D1 — this is an operator decision'
+      );
+    }
+    probed.push(...(await splitRun(executor, entry.candidate.runIds[0])));
+  }
+  return packBatches(probed).map(segments => ({ segments }));
 }
 
 /** Reject a plan that scans a history table instead of reaching it by `run_id`. */
@@ -963,6 +1365,11 @@ function scopeReport(scope) {
   return {
     runs: scope.runIds.length,
     publishedRuns: scope.publishedRunIds.length,
+    batches: scope.batches.map(batch => ({
+      kind: batch.kind,
+      segments: batch.segments.length,
+      rows: batch.rows,
+    })),
     scopedRows: scope.scopeRows,
   };
 }
@@ -971,13 +1378,77 @@ function scopeReport(scope) {
 async function readState(executor, scope = null) {
   if (!executor.lean) return { digest: (await executor.read(stateSql()))[0], scope: null };
   const resolved = await resolveLeanScope(executor, scope);
-  const sql = leanStateSql(resolved);
-  await assertLeanPlan(executor, sql);
-  return { digest: (await executor.read(sql))[0], scope: resolved };
+  const globalSql = leanGlobalSql(resolved.publishedRunIds);
+  await assertLeanPlan(executor, globalSql);
+  const [global] = await executor.read(globalSql);
+  const cancelled = [];
+  for (const batch of resolved.batches) {
+    if (batch.kind !== 'cancelled') continue;
+    const sql = leanCancelledSql(batch.segments);
+    await assertLeanPlan(executor, sql);
+    const [rows] = await executor.read(sql);
+    cancelled.push(rows);
+  }
+  return { digest: combineBatchStates(global, cancelled), scope: resolved };
 }
 
 function report(sink, event, fields = {}) {
   sink(JSON.stringify({ event: `legacy_cancel_${event}`, ...fields }));
+}
+
+/**
+ * The error text of a non-zero `wrangler d1 execute`. With `--json`, wrangler writes the failure
+ * to STDOUT (stderr is usually empty), so stderr alone produced a bare `wrangler exited 1: `.
+ * This parses the JSON envelope's error out of stdout, falls back to a raw stdout/stderr tail,
+ * and truncates to 300 characters. It never echoes the command's parameters or any row data: the
+ * builders inline literals only from the operator token and run ids, and only the message text is
+ * reported.
+ */
+export function describeD1Failure({ code, stdout = '', stderr = '' }) {
+  const MAX = 300;
+  const clip = text => {
+    const flat = String(text ?? '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    return flat.length > MAX ? `${flat.slice(0, MAX)}…` : flat;
+  };
+  // A JSON envelope may carry the message at the top level or inside an entry.
+  const jsonError = text => {
+    const trimmed = String(text ?? '').trim();
+    if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) return null;
+    let parsed;
+    try {
+      parsed = JSON.parse(trimmed);
+    } catch {
+      return null;
+    }
+    const entries = Array.isArray(parsed) ? parsed : [parsed];
+    for (const entry of entries) {
+      if (entry === null || typeof entry !== 'object') continue;
+      const error = entry.error ?? entry.errors;
+      if (typeof error === 'string' && error.trim() !== '') return error;
+      if (Array.isArray(error)) {
+        const messages = error
+          .map(item => (typeof item === 'string' ? item : item?.message))
+          .filter(message => typeof message === 'string' && message.trim() !== '');
+        if (messages.length > 0) return messages.join('; ');
+      }
+      if (error !== null && typeof error === 'object') {
+        const message = error.message ?? error.text ?? error.detail;
+        if (typeof message === 'string' && message.trim() !== '') return message;
+      }
+      if (entry.success === false && typeof entry.message === 'string') return entry.message;
+    }
+    return null;
+  };
+  const detail =
+    jsonError(stdout) ??
+    (stdout.trim() === '' ? null : stdout) ??
+    (stderr.trim() === '' ? null : stderr);
+  if (detail === null) {
+    return `wrangler exited ${code}: no error text on stdout or stderr`;
+  }
+  return `wrangler exited ${code}: ${clip(detail)}`;
 }
 
 /**
@@ -1047,8 +1518,7 @@ export function createRemoteExecutor({ signal, spawnImpl = spawn } = {}) {
       child.on('error', error => reject(new D1Error(`wrangler could not start: ${error.message}`)));
       child.on('close', code => {
         if (code !== 0) {
-          const tail = stderr.trim().split('\n').slice(-5).join(' / ');
-          reject(new D1Error(`wrangler exited ${code}: ${tail}`));
+          reject(new D1Error(describeD1Failure({ code, stdout, stderr })));
           return;
         }
         try {
@@ -1062,10 +1532,18 @@ export function createRemoteExecutor({ signal, spawnImpl = spawn } = {}) {
   return {
     // The live path is the bounded one; `lean: true` is what selects it.
     lean: true,
-    read: sql => runEnvelope(sql).then(entries => entries.at(-1).results),
+    // Every statement is checked against D1's documented limits before it is sent, so an
+    // over-long or over-compounded shape refuses locally instead of as an opaque exit 1.
+    read: async sql => {
+      assertStatementFitsD1(sql, 'read');
+      return runEnvelope(sql).then(entries => entries.at(-1).results);
+    },
     /** `EXPLAIN QUERY PLAN` rows, as the real transport reports them. */
-    plan: sql =>
-      runEnvelope(`EXPLAIN QUERY PLAN ${sql}`).then(entries =>
+    plan: async sql => {
+      const explain = `EXPLAIN QUERY PLAN ${sql}`;
+      // The statement itself must fit; the prefixed text is what D1 actually receives.
+      assertStatementFitsD1(explain, 'EXPLAIN QUERY PLAN');
+      return runEnvelope(explain).then(entries =>
         entries
           .flatMap(entry => entry.results)
           .map(row => {
@@ -1074,10 +1552,12 @@ export function createRemoteExecutor({ signal, spawnImpl = spawn } = {}) {
             }
             return String(row.detail);
           })
-      ),
+      );
+    },
     write: async statements => {
       const changed = [];
       for (const statement of statements) {
+        assertStatementFitsD1(statement, 'write');
         // The affected count lives in `meta.changes`; `results` is normally empty.
         const entries = await runEnvelope(statement);
         const entry = entries.at(-1);
@@ -1222,18 +1702,40 @@ export async function runLegacyCancel({
       log('');
       log('-- lease guard, re-evaluated inside every statement --');
       log(lockGuardSql(args.expectToken, args.minRemainingMs));
-      const statements = buildStatements({
-        expectToken: args.expectToken,
-        minRemainingMs: args.minRemainingMs,
-        runIds: ids,
+      // The exact statement set the batched apply sends: per run (park, flip), then the sweep.
+      const planned = [];
+      for (const id of ids) {
+        planned.push({
+          runId: id,
+          statements: buildStatements({
+            expectToken: args.expectToken,
+            minRemainingMs: args.minRemainingMs,
+            runIds: [id],
+            sweep: false,
+          }),
+        });
+      }
+      planned.push({
+        runId: null,
+        statements: buildStatements({
+          expectToken: args.expectToken,
+          minRemainingMs: args.minRemainingMs,
+          runIds: [],
+          sweep: true,
+        }),
       });
-      for (const [index, statement] of statements.entries()) {
+      let total = 0;
+      for (const group of planned) {
         log('');
-        log(`-- ${index + 1}/${statements.length}`);
-        log(statement);
+        log(`-- ${group.runId === null ? 'global sweep' : `run ${group.runId}`} --`);
+        for (const statement of group.statements) {
+          total += 1;
+          log('');
+          log(statement);
+        }
       }
       if (args.baselineOut !== undefined) log('');
-      report(log, 'dry_run_ok', { statements: statements.length, writes: 0 });
+      report(log, 'dry_run_ok', { statements: total, writes: 0 });
       return EXIT.ok;
     }
 
@@ -1264,14 +1766,33 @@ export async function runLegacyCancel({
           }
         }
         for (const id of ids) cancelled.add(id);
+        // Statements 1 and 2 are per-run (park that run's claims, then flip it terminal); the
+        // global sweep (3-5) runs once per pass. Each batch's rows are read separately, so the
+        // WRITE side never needs a batch: it is the same guarded statement set, per run.
+        const changed = [];
+        for (const id of ids) {
+          changed.push(
+            ...(await executor.write(
+              buildStatements({
+                expectToken: args.expectToken,
+                minRemainingMs: args.minRemainingMs,
+                runIds: [id],
+                sweep: false,
+              })
+            ))
+          );
+        }
         // Terminal runs can still have unfinished chunks. Run the guarded sweep even
         // when there are no live runs to cancel.
-        const changed = await executor.write(
-          buildStatements({
-            expectToken: args.expectToken,
-            minRemainingMs: args.minRemainingMs,
-            runIds: ids,
-          })
+        changed.push(
+          ...(await executor.write(
+            buildStatements({
+              expectToken: args.expectToken,
+              minRemainingMs: args.minRemainingMs,
+              runIds: [],
+              sweep: true,
+            })
+          ))
         );
         passes += 1;
         report(log, 'pass', { pass: passes, runIds: ids, changed });

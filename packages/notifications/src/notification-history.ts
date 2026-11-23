@@ -73,8 +73,7 @@ const PUSH_HISTORY_DECISIONS = {
 /**
  * The same table read by an arbitrary string. A payload reaches the worker
  * unparsed, so its kind may be one this build does not hold; the open map
- * answers `undefined` for it. The sentinel keys are present in the table, so a
- * key check alone would call them recorded: the value test answers both.
+ * answers `undefined` for it.
  */
 const PUSH_HISTORY_DECISION_BY_TYPE: Readonly<Record<string, PushHistoryDecision | undefined>> =
   PUSH_HISTORY_DECISIONS;

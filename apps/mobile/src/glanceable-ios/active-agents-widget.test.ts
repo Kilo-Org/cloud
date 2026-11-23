@@ -469,12 +469,15 @@ describe('Home header', () => {
       );
     expect(background('light')).toBe('#FBFAF5');
     expect(background('dark')).toBe('#17171A');
-    const dot = (rows: HomeWidgetSessionRow[]) =>
-      collect(render(propsFor(rows), 'systemSmall')).find(node => node.kind === 'Circle');
+    const dot = (rows: HomeWidgetSessionRow[], scheme: 'light' | 'dark' = 'light') =>
+      collect(render(propsFor(rows), 'systemSmall', { colorScheme: scheme })).find(
+        node => node.kind === 'Circle'
+      );
     expect(modifier(dot([PERMISSION]), 'foregroundStyle')).toBe('#956011');
     expect(modifier(dot([BUSY]), 'foregroundStyle')).toBe('#24784A');
     expect(modifier(dot([scheduled('Usage report', null)]), 'foregroundStyle')).toBe('#2260EB');
-    expect(modifier(dot([IDLE]), 'foregroundStyle')).toBe('#A9A39A');
+    expect(modifier(dot([IDLE]), 'foregroundStyle')).toBe('#6F6A61');
+    expect(modifier(dot([IDLE], 'dark'), 'foregroundStyle')).toBe('#8A8680');
   });
 });
 

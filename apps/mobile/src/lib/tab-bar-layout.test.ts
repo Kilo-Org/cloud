@@ -35,6 +35,23 @@ const LABEL_SOURCE = readFileSync(
   fileURLToPath(new URL('../components/ui/tab-bar-label.tsx', import.meta.url)),
   'utf8'
 );
+const RTL_TEXT_SOURCE = readFileSync(
+  fileURLToPath(new URL('rtl-text.ts', import.meta.url)),
+  'utf8'
+);
+
+/**
+ * The regex literal assigned by `declaration` in `source`. The script classes
+ * here are plain `\uXXXX` ranges with no `/` inside, so the first two slashes
+ * after the declaration delimit the literal.
+ */
+function scriptLiteral(source: string, declaration: string): string {
+  const at = source.indexOf(declaration);
+  expect(at, `${declaration} in source`).toBeGreaterThanOrEqual(0);
+  const open = source.indexOf('/', at);
+  const close = source.indexOf('/', open + 1);
+  return source.slice(open, close + 1);
+}
 
 describe('getTabBarOverlayHeight', () => {
   it('includes the bottom safe area on iOS', () => {
@@ -100,21 +117,17 @@ describe('getEffectiveTabBarHeight', () => {
   });
 
   it('matches the rendered bar height at representative scales', () => {
-    // default scale: label-inclusive bar is 84pt on an iPhone-class bottom inset
     expect(getEffectiveTabBarHeight({ bottomInset: 34, platform: 'ios', fontScale: 1 })).toBe(84);
-    // large scale: icon-forward bar collapses back to 84pt (same as default scale)
     expect(getEffectiveTabBarHeight({ bottomInset: 34, platform: 'ios', fontScale: 3 })).toBe(84);
   });
 
   it('applies the same Android bottom padding as the overlay helpers', () => {
-    // Below the icon-forward threshold the label-inclusive overlay height is used.
     expect(getEffectiveTabBarHeight({ bottomInset: 16, platform: 'android', fontScale: 1 })).toBe(
       70
     );
     expect(getEffectiveTabBarHeight({ bottomInset: 16, platform: 'android', fontScale: 1.8 })).toBe(
       82.8
     );
-    // At and above the threshold the bar collapses to the icon-forward height.
     expect(getEffectiveTabBarHeight({ bottomInset: 16, platform: 'android', fontScale: 2 })).toBe(
       70
     );
@@ -217,11 +230,6 @@ describe('tabLabelWidth', () => {
   });
 
   it('counts RTL-script glyphs at the fallback-font advance, not the mono advance', () => {
-    // Arabic and Hebrew render in the system fallback font (`Text` drops the
-    // mono family for RTL-script copy, both scripts included), whose glyphs are
-    // far narrower than JetBrains Mono's 0.6em. Measuring them at the mono
-    // advance over-estimated the width until the width rule dropped every
-    // Arabic label at phone widths.
     expect(tabLabelWidth('الرئيسية')).toBeCloseTo(8 * (0.55 * 11 + 0.2), 5);
     expect(tabLabelWidth('הגדרות')).toBeCloseTo(6 * (0.55 * 11 + 0.2), 5);
     expect(tabLabelWidth('الملف الشخصي')).toBeCloseTo(11 * (0.55 * 11 + 0.2) + (0.6 * 11 + 0.2), 5);
@@ -234,6 +242,23 @@ describe('tabLabelWidth', () => {
       5 * (0.6 * 11 + 0.2) + 8 * (0.55 * 11 + 0.2),
       5
     );
+  });
+
+  it('counts joined-script glyphs at the fallback-font advance too', () => {
+    // `Text` drops the mono family for the joined scripts as well, so a
+    // Devanagari or Thai tab label renders in the same proportional fallback
+    // as Arabic and Hebrew. Measuring them at the mono advance would keep an
+    // estimate the renderer no longer draws.
+    // "अभी": 3 Devanagari code points.
+    expect(tabLabelWidth('अभी')).toBeCloseTo(3 * (0.55 * 11 + 0.2), 5);
+    // "ตอนนี้": 6 Thai code points (a vowel and a tone mark among them).
+    expect(tabLabelWidth('ตอนนี้')).toBeCloseTo(6 * (0.55 * 11 + 0.2), 5);
+  });
+
+  it('leaves the Latin glyphs of a mixed joined-script label at the mono advance', () => {
+    // "Home" (4 mono glyphs) + a space + "अभी" (3 joined-script glyphs): only
+    // the joined-script glyphs move to the fallback advance.
+    expect(tabLabelWidth('Home अभी')).toBeCloseTo(5 * (0.6 * 11 + 0.2) + 3 * (0.55 * 11 + 0.2), 5);
   });
 });
 
@@ -303,10 +328,6 @@ describe('tabLabelLines', () => {
 });
 
 describe('tab label shrink floor', () => {
-  // A one-line label asks the platform to shrink it and caps the shrink at
-  // TAB_LABEL_MINIMUM_FONT_SCALE on iOS (Android floors at RN's own minimum).
-  // The bar no longer drops the row when the cap cannot save a label: the label
-  // tail-truncates, so the row stays and the tab keeps its visible name.
   it('keeps one line for a word that cannot fit its tab even at the floor', () => {
     // Profile is 47.6dp wide; a 30dp label box would need a 0.63 shrink, below
     // the 0.75 cap, so the label tail-truncates instead of wrapping mid-word.
@@ -351,6 +372,18 @@ describe('mirrored tab label metrics', () => {
     expect(LABEL_SOURCE).toContain('numberOfLines={resolvedLines}');
     expect(tabLabelWidth('A')).toBeCloseTo(0.6 * 11 + 0.2);
   });
+
+  it('keeps the inlined script classes identical to the ones `Text` renders by', () => {
+    // The measure is only right while the classes it inlines are the classes
+    // `rtl-text.ts` hands `Text`: drift either way makes `tabLabelWidth` count
+    // copy the renderer no longer draws in the fallback font (or the reverse).
+    expect(scriptLiteral(LAYOUT_SOURCE, 'const RTL_SCRIPT =')).toBe(
+      scriptLiteral(RTL_TEXT_SOURCE, 'const RTL_SCRIPT =')
+    );
+    expect(scriptLiteral(LAYOUT_SOURCE, 'const JOINED_SCRIPT =')).toBe(
+      scriptLiteral(RTL_TEXT_SOURCE, 'export const JOINED_SCRIPT =')
+    );
+  });
 });
 
 describe('shouldHideTabBar', () => {
@@ -374,9 +407,6 @@ describe('shouldHideTabBar', () => {
   });
 
   it('reads the screen a form sheet covers instead of the sheet', () => {
-    // A sheet is not a screen of its own: over a pushed screen the bar keeps
-    // that screen's hidden state, and over a tab root it keeps the bar, so the
-    // covered root also keeps its bottom inset while the sheet is up.
     expect(
       shouldHideTabBar('/organization/invite-member', [
         '(app)',

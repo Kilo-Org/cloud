@@ -18,6 +18,7 @@ const listState = vi.hoisted(() => ({
   isError: false,
   storedIsPending: false,
   storedIsFetching: false,
+  storedIsPaused: false,
 }));
 
 const refetchControl = vi.hoisted(() => {
@@ -234,6 +235,7 @@ vi.mock('@/lib/hooks/use-agent-sessions', () => ({
       activeIsError: false,
       storedIsError: listState.isError,
       storedIsPending: listState.storedIsPending,
+      storedIsPaused: listState.storedIsPaused,
       storedIsFetching: listState.storedIsFetching,
       storedFetchedSinceMount: true,
       storedLoadedPageCount: 1,
@@ -249,6 +251,7 @@ vi.mock('@/lib/hooks/use-agent-sessions', () => ({
     isError: false,
     isFetching: false,
     isPending: false,
+    isPaused: false,
     hasNextPage: false,
     isFetchingNextPage: false,
     isFetchNextPageError: false,

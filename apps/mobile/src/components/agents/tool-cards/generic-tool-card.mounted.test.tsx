@@ -13,6 +13,9 @@ const i18nManager = vi.hoisted(() => ({ isRTL: false }));
 
 vi.mock('react-native', () => ({
   I18nManager: i18nManager,
+  // `SelectableText` renders its read-only `TextInput` on iOS only; the
+  // assertions here read that host, so the mock names the platform they assume.
+  Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   TextInput: MockTextInput,
   View: 'View',

@@ -348,8 +348,6 @@ export function useSettledSheetHeaderTopClearance(input: {
     if (!Number.isFinite(top)) {
       return;
     }
-    // Only a higher edge is news, and an unchanged value keeps the state
-    // identity, so a sheet that did not move does not re-render.
     setHeaderTop(current => (current === null || top < current ? top : current));
   }, [surfaceRef]);
 

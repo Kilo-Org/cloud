@@ -91,6 +91,7 @@
     "draft": "សេចក្តីព្រាង",
     "enabled": "បានបើក",
     "github": "GitHub",
+    "image": "រូបភាព",
     "imageUnavailable": "មិនអាចបង្ហាញរូបភាពបានទេ។",
     "loading": "កំពុងផ្ទុក…",
     "loadMore": "ផ្ទុកបន្ថែម",
@@ -522,6 +523,7 @@
       "receiptLabel": "បង្កាន់ដៃ",
       "copyReceiptId": "ចម្លងលេខសម្គាល់បង្កាន់ដៃ",
       "appealLabel": "ការប្ដឹងឧទ្ធរណ៍",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel)៖ {{status}}",
       "triageReceived": "បានទទួល",
       "triageOpen": "កំពុងពិនិត្យ",
       "triageActioned": "បានទទួលយក",
@@ -555,7 +557,7 @@
       "title": "របាយការណ៍",
       "rowSubtitle": "របាយការណ៍ដែលអ្នកបានដាក់ស្នើ និងលទ្ធផលរបស់វា",
       "emptyTitle": "មិនទាន់មានរបាយការណ៍ទេ",
-      "emptyDescription": "របាយការណ៍ដែលអ្នកដាក់ស្នើពីមតិយោបល់ ឬការឆ្លើយតបរបស់ AI នឹងបង្ហាញនៅទីនេះ។",
+      "emptyDescription": "របាយការណ៍ដែលអ្នកដាក់ស្នើពីមតិយោបល់ក្នុងការពិភាក្សា pull request ឬពីការឆ្លើយតប AI ក្នុងវគ្គភ្នាក់ងារ នឹងបង្ហាញនៅទីនេះ ព្រមទាំងលទ្ធផលរបស់វា។",
       "couldNotLoad": "មិនអាចផ្ទុករបាយការណ៍របស់អ្នកបានទេ",
       "capped": "កំពុងបង្ហាញរបាយការណ៍ថ្មីៗបំផុតរបស់អ្នក។"
     },
@@ -1237,6 +1239,7 @@
     "needsInputAction": {
       "approved": "សំណើត្រូវបានអនុម័ត",
       "replied": "បានផ្ញើចម្លើយ",
+      "empty": "សរសេរចម្លើយ រួចផ្ញើ។",
       "failed": "មិនអាចឆ្លើយបានទេ។ ចុចម្តងទៀតដើម្បីព្យាយាមម្តងទៀត។",
       "unavailable": "សំណើនេះលែងរង់ចាំទៀតហើយ។"
     }
@@ -1501,7 +1504,9 @@
       "githubError": "មិនអាចបើកការរៀបចំ GitHub បានទេ។ សូមព្យាយាមម្តងទៀត។",
       "gitlabAccount": "គណនី GitLab",
       "gitlabError": "មិនអាចបើកការរៀបចំ GitLab បានទេ។ សូមព្យាយាមម្តងទៀត។",
-      "description": "ភ្ជាប់ {{label}} របស់ Kilo ដើម្បីត្រួតពិនិត្យសំណើបញ្ចូលកូដដោយស្វ័យប្រវត្តិ។"
+      "description": "ភ្ជាប់ {{label}} របស់ Kilo ដើម្បីត្រួតពិនិត្យសំណើបញ្ចូលកូដដោយស្វ័យប្រវត្តិ។",
+      "notConnectedTitle": "{{platform}} មិនបានភ្ជាប់ទេ",
+      "githubAdminOnlyDescription": "មានតែម្ចាស់អង្គការ និងអ្នកគ្រប់គ្រងប៉ុណ្ណោះដែលអាចភ្ជាប់វាបាន។"
     },
     "overview": {
       "allAreas": "គ្រប់ផ្នែក",
@@ -1587,7 +1592,7 @@
       "empty": "មិនទាន់មានការត្រួតពិនិត្យដែលមានទិន្នន័យវិភាគទេ",
       "emptyDescription": "ការវិភាគកត់ត្រាការត្រួតពិនិត្យដែលបានបញ្ចប់ ខណៈពេលដែលវាត្រូវបានបើកសម្រាប់អង្គការ។",
       "offTitle": "ការវិភាគត្រូវបានបិទសម្រាប់{{platform}}",
-      "offDescription": "តួនាទីនានារបស់អង្គការដែលទទួលបន្ទុកវិក័យបត្រ អាចបើកការវិភាគនៅក្នុងការកំណត់របស់អង្គការនៅលើគេហទំព័រ ដើម្បីកត់ត្រាការត្រួតពិនិត្យដែលបានបញ្ចប់។",
+      "offDescription": "តួនាទីនានារបស់អង្គការដែលទទួលបន្ទុកការគិតប្រាក់ អាចបើកការវិភាគនៅក្នុងការកំណត់របស់អង្គការនៅលើគេហទំព័រ ដើម្បីកត់ត្រាការត្រួតពិនិត្យដែលបានបញ្ចប់។",
       "couldNotLoad": "មិនអាចផ្ទុកការវិភាគបានទេ",
       "trackedReviewsCaption": "ការត្រួតពិនិត្យដែលបានបញ្ចប់ក្នុងអំឡុងពេលនេះ ខណៈពេលដែលការវិភាគត្រូវបានបើក។ ការត្រួតពិនិត្យដែលកំពុងដំណើរការ និងដែលបរាជ័យ មិនដែលត្រូវរាប់បញ្ចូលទេ។",
       "trackedReviewsUncounted": "មិនបានរាប់បញ្ចូល៖ {{displayCount}} ក្នុងចំណោមការត្រួតពិនិត្យដែលបានបញ្ចប់ទាំង {{displayTotal}} របស់អង្គការ ដែលលទ្ធផលរបស់វាមិនត្រូវបានកត់ត្រាទេ។",
@@ -2175,7 +2180,8 @@
       "sectionAccessibility_other": "{{title}}: វគ្គ {{displayCount}}",
       "sectionAccessibility": "{{title}}: វគ្គ {{displayCount}}",
       "live": "ផ្ទាល់",
-      "updating": "កំពុងធ្វើបច្ចុប្បន្នភាព"
+      "updating": "កំពុងធ្វើបច្ចុប្បន្នភាព",
+      "retentionLimit": "បង្ហាញវគ្គថ្មីៗបំផុតរបស់អ្នក។"
     },
     "sessionRow": {
       "deleteTitle": "លុបវគ្គ?",
@@ -2245,11 +2251,11 @@
       "scrollToBottom": "រំកិលទៅខាងក្រោមបំផុត",
       "emptyTitle": "មិនទាន់មានសារទេ",
       "emptyReadOnlyTitle": "មិនមានសារនៅក្នុងវគ្គនេះទេ",
-      "renameAccessibility": "ប្តូរឈ្មោះវគ្គ: {{title}}",
       "cloningSession": "កំពុងចម្លងវគ្គ",
       "couldNotLoadThisSession": "មិនអាចផ្ទុកវគ្គនេះបានទេ",
       "historyTooLarge": "កំណត់ត្រាវគ្គនេះធំពេកមិនអាចផ្ទុកបានទេ។",
       "historyUnavailable": "មិនអាចអានកំណត់ត្រាវគ្គនេះបានទេ។",
+      "historyTemporarilyUnavailable": "កំណត់ត្រាវគ្គនេះមិនអាចប្រើបានជាបណ្តោះអាសន្នទេ។",
       "cloneFailedRetry": "មិនអាចចម្លងវគ្គនេះបានទេ។ សូមព្យាយាមម្តងទៀត។",
       "notEnoughCredits": "ឥណទានមិនគ្រប់គ្រាន់សម្រាប់សំណើនេះទេ។ បន្ថែមឥណទាន ហើយព្យាយាមម្តងទៀត។",
       "previousTaskFinishing": "កិច្ចការមុនមិនទាន់បញ្ចប់ទេ។ សូមរង់ចាំបន្តិច។",
@@ -2655,6 +2661,7 @@
     "filePart": {
       "loadingImage": "កំពុងផ្ទុករូបភាព",
       "imageUnavailableRetry": "មិនអាចបង្ហាញរូបភាពបានទេ សូមព្យាយាមផ្ទុកម្តងទៀត",
+      "imageUnavailableRetryWithAlt": "មិនអាចបង្ហាញរូបភាពបានទេ សូមព្យាយាមផ្ទុកម្តងទៀត {{alt}}",
       "imagePreviewUnavailableInSession": "មិនអាចមើលរូបភាពជាមុនក្នុងវគ្គនេះបានទេ។",
       "viewImage": "មើលរូបភាព",
       "viewImageWithAlt": "មើលរូបភាព {{alt}}",
@@ -2786,7 +2793,9 @@
       "skip": "រំលង",
       "retrySkip": "ព្យាយាមរំលងម្តងទៀត",
       "submitting": "កំពុងដាក់ស្នើ…",
-      "sendAnswers": "ផ្ញើចម្លើយ"
+      "sendAnswers": "ផ្ញើចម្លើយ",
+      "unreadableTitle": "មិនអាចបង្ហាញសំណួរនេះបានទេ",
+      "unreadableBody": "ភ្នាក់ងារកំពុងរង់ចាំសំណួរមួយ ដែលកម្មវិធីនេះមិនអាចបង្ហាញបានទេ។ សូមឆ្លើយវានៅក្នុង CLI ដើម្បីបន្ត។"
     },
     "blockingCard": {
       "questionUnavailable": "សំណួរនេះលែងមានទៀតហើយ។",
@@ -2813,6 +2822,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "មិនអាចផ្ទុកវគ្គភ្នាក់ងាររងបានទេ។",
+      "historyTooLarge": "ប្រវត្តិរបស់ភ្នាក់ងាររងនេះធំពេកមិនអាចផ្ទុកបានទេ។",
+      "historyUnavailable": "ប្រវត្តិរបស់ភ្នាក់ងាររងនេះមិនមានទេ។",
+      "historyTemporarilyUnavailable": "ប្រវត្តិរបស់ភ្នាក់ងាររងនេះមិនអាចប្រើបានជាបណ្តោះអាសន្នទេ។",
       "failed": "វគ្គភ្នាក់ងាររងបានបរាជ័យ។",
       "noMessages": "គ្មានសារភ្នាក់ងាររងទេ",
       "noMessagesDescription": "វគ្គភ្នាក់ងាររងនេះបានបញ្ចប់ដោយមិនបង្កើតកំណត់ត្រាសន្ទនា។",
@@ -3094,6 +3106,12 @@
     "retryLoadingAccount": "ព្យាយាមផ្ទុកគណនីម្តងទៀត",
     "retryLoadingPrivacy": "ព្យាយាមផ្ទុកជម្រើសឯកជនភាពម្តងទៀត"
   },
+  "accountBlocked": {
+    "title": "គណនីត្រូវបានទប់ស្កាត់",
+    "description": "Kilo បានទប់ស្កាត់គណនីនេះ ហើយការចូលម្តងទៀតនឹងមិនដោះស្រាយការទប់ស្កាត់នេះទេ។ ក្រុមជំនួយអាចពិនិត្យការទប់ស្កាត់តាមការស្នើសុំ។",
+    "domainDescription": "Kilo មិនអនុញ្ញាតគណនីនៅលើដែនអ៊ីមែលនេះទេ ហើយការចូលម្តងទៀតនឹងមិនផ្លាស់ប្តូរវាទេ។ ក្រុមជំនួយអាចពិនិត្យដែននេះតាមការស្នើសុំ។",
+    "contactSupport": "ទាក់ទងក្រុមជំនួយ"
+  },
   "addCredits": {
     "cta": "បន្ថែមឥណទាន",
     "billingPage": "ទំព័រគិតប្រាក់"
@@ -3166,8 +3184,7 @@
     "timeoutDescription": "សំណើបានហួសពេលមុននឹងបញ្ចប់។ សូមព្យាយាមម្តងទៀត។"
   },
   "screenHeader": {
-    "openMenu": "បើកម៉ឺនុយ",
-    "openMenuFor": "បើកម៉ឺនុយសម្រាប់ {{title}}"
+    "openMenu": "បើកម៉ឺនុយ"
   },
   "picker": {
     "optionsExpired": "ជម្រើសបានផុតកំណត់",
@@ -3386,6 +3403,8 @@
     "voiceTranscriptionWho": "ឧបករណ៍របស់អ្នក Kilo Gateway ជាមួយម៉ូដែលបម្លែងសំឡេងជាអត្ថបទដែលអ្នកបានជ្រើស ឬ Apple ឬ Google សម្រាប់ការស្គាល់តាមអ៊ីនធឺណិត។",
     "installAttributionPromptTitle": "អនុញ្ញាតឱ្យស្គាល់ប្រភពដំឡើង?",
     "installAttributionPromptMessage": "Kilo ប្រើសិទ្ធិតាមដានរបស់ Apple តែដើម្បីដឹងថាអ្នកមកពីប្រភពណាប៉ុណ្ណោះ។ យើងមិនដែលប្រើសេចក្តីណែនាំ និងការសន្ទនារបស់អ្នកទេ។",
+    "installAttributionRequestFailedTitle": "មិនអាចបង្ហាញការស្នើសុំតាមដានបានទេ",
+    "installAttributionRequestFailedMessage": "Kilo មិនអាចបង្ហាញការស្នើសុំរបស់ប្រព័ន្ធបានទេ ដូច្នេះការស្គាល់ប្រភពដំឡើងនៅតែបិទ។",
     "what": "ទិន្នន័យអ្វីខ្លះ",
     "why": "គោលបំណង",
     "who": "អ្នកទទួល"
@@ -3401,7 +3420,7 @@
   "organization": {
     "auditLog": {
       "title": "កំណត់ហេតុសវនកម្ម",
-      "permissionDenied": "មានតែម្ចាស់អង្គការ អ្នកគ្រប់គ្រង ឬអ្នកគ្រប់គ្រងវិក្កយបត្រលើគម្រោង Enterprise ប៉ុណ្ណោះ ដែលអាចអានកំណត់ហេតុសវនកម្មរបស់អង្គការបាន។",
+      "permissionDenied": "មានតែម្ចាស់អង្គការ អ្នកគ្រប់គ្រង ឬអ្នកគ្រប់គ្រងការគិតប្រាក់លើគម្រោង Enterprise ប៉ុណ្ណោះ ដែលអាចអានកំណត់ហេតុសវនកម្មរបស់អង្គការបាន។ $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "គ្មានព្រឹត្តិការណ៍សវនកម្ម",
       "emptyDescription": "សកម្មភាពដែលបានធ្វើក្នុងអង្គការនេះនឹងបង្ហាញនៅទីនេះ។",
       "truncated": "កំពុងបង្ហាញព្រឹត្តិការណ៍ថ្មីៗបំផុត។",
@@ -3451,11 +3470,147 @@
         "guardrailUpdate": "បានធ្វើបច្ចុប្បន្នភាពរបាំងសុវត្ថិភាព",
         "guardrailRemove": "បានដកចេញរបាំងសុវត្ថិភាព",
         "unknown": "ព្រឹត្តិការណ៍សវនកម្ម"
+      },
+      "detail": {
+        "fieldChange": "{{field}}: {{change}}",
+        "modeIdentity": "របៀប \"{{name}}\" (អត្តសញ្ញាណ៖ {{slug}})",
+        "modeUpdate": "របៀប \"{{name}}\"៖ {{changes}}",
+        "field": {
+          "name": "$t(organization.modes.nameLabel)",
+          "slug": "$t(organization.modes.identifierLabel)",
+          "roleDefinition": "$t(organization.modes.roleLabel)",
+          "whenToUse": "$t(organization.modes.whenToUseLabel)",
+          "description": "$t(organization.modes.descriptionLabel)",
+          "customInstructions": "$t(codeReviewer.instructions.title)",
+          "groups": "$t(profiles.agents.tools)",
+          "autoRoute": "ការបញ្ជូនផ្លូវស្វ័យប្រវត្តិ",
+          "defaultModel": "គំរូលំនាំដើម"
+        },
+        "role": {
+          "owner": "$t(organization.members.roles.owner)",
+          "admin": "$t(organization.members.roles.admin)",
+          "billing_manager": "$t(organization.members.roles.billingManager)",
+          "member": "$t(organization.members.roles.member)"
+        },
+        "memberRole": "{{email}}: {{change}}",
+        "memberAdded": "បានបន្ថែម {{email}} ជា {{role}}",
+        "memberRemoved": "បានដក {{email}}",
+        "memberParentAdded": "បានបន្ថែម {{email}} ពីអង្គការមេ {{parent}}",
+        "memberParentRemoved": "បានដក {{email}} ពីអង្គការមេ {{parent}}",
+        "inviteSent": "{{email}} ជា {{role}}",
+        "inviteRevoked": "បានដកការអញ្ជើញសម្រាប់ {{email}}",
+        "inviteAccepted": "បានទទួលយក {{email}}",
+        "groupIdentity": "ក្រុម \"{{name}}\"",
+        "groupMembers": "ក្រុម \"{{name}}\"៖ {{members}}",
+        "groupMemberGroups": "{{displayCount}} ក្រុម",
+        "groupMemberGroups_one": "{{displayCount}} ក្រុម",
+        "groupMemberGroups_other": "{{displayCount}} ក្រុម",
+        "groupMemberGroupsOf": "{{email}}៖ {{displayCount}} ក្រុម",
+        "groupMemberGroupsOf_one": "{{email}}៖ {{displayCount}} ក្រុម",
+        "groupMemberGroupsOf_other": "{{email}}៖ {{displayCount}} ក្រុម",
+        "groupPolicySet": "ក្រុម \"{{name}}\"៖ បានកំណត់គោលការណ៍ {{policy}}",
+        "groupPolicyRemoved": "ក្រុម \"{{name}}\"៖ បានដកចេញគោលការណ៍ {{policy}}",
+        "groupDefaultPolicySet": "បានកំណត់គោលការណ៍លំនាំដើម {{policy}}",
+        "groupDefaultPolicyRemoved": "បានដកចេញគោលការណ៍លំនាំដើម {{policy}}",
+        "guardrailIdentity": "{{type}} \"{{name}}\"",
+        "guardrailStatus": "{{type}} \"{{name}}\" {{state}}",
+        "guardrailConfig": "របាំងការពារ AI {{state}}",
+        "guardrailConfigGroup": "{{state}} សម្រាប់ក្រុម \"{{group}}\"",
+        "guardrailEnforcement": "{{target}}: {{value}}",
+        "guardrailSkill": "{{target}}: {{values}}",
+        "guardrailTarget": {
+          "mcp": "$t(profiles.mcp.title)",
+          "skill": "$t(profiles.skillsTitle)"
+        },
+        "ssoDomainSet": "ដែន SSO {{domain}}",
+        "ssoDomainChanged": "{{domain}} (ធ្លាប់ជា {{previous}})",
+        "ssoDomainRemoved": "បានសម្អាតដែន SSO {{domain}}",
+        "fundsPurchased": "{{amount}} ដោយ {{method}}",
+        "fundsGranted": "{{amount}}",
+        "fundsDistributed": "{{amount}} ទៅអង្គការកូនចំនួន {{displayCount}}",
+        "fundsDistributed_one": "{{amount}} ទៅអង្គការកូនចំនួន {{displayCount}}",
+        "fundsDistributed_other": "{{amount}} ទៅអង្គការកូនចំនួន {{displayCount}}",
+        "fundsReceived": "{{amount}} ពី {{parent}}",
+        "reviewAgentPlatform": "{{platform}}",
+        "reviewAgentConfig": "ការកំណត់រចនាសម្ព័ន្ធ {{platform}}",
+        "reviewAgentConfigStyle": "{{platform}}៖ រចនាប័ទ្ម {{style}}",
+        "reviewAgentSecretsUpdated": "{{displayCount}} បានធ្វើបច្ចុប្បន្នភាព",
+        "reviewAgentSecretsUpdated_one": "{{displayCount}} បានធ្វើបច្ចុប្បន្នភាព",
+        "reviewAgentSecretsUpdated_other": "{{displayCount}} បានធ្វើបច្ចុប្បន្នភាព",
+        "reviewAgentSecretsFailed": "{{displayCount}} កំហុស",
+        "reviewAgentSecretsFailed_one": "{{displayCount}} កំហុស",
+        "reviewAgentSecretsFailed_other": "{{displayCount}} កំហុស",
+        "reviewAgentSecretRotated": "{{values}}",
+        "settingAdvancedPolicies": "{{values}}",
+        "settingAdvancedPoliciesOpenRouter": "OpenRouter {{state}}",
+        "settingAdvancedPoliciesRegion": "តំបន់អនុមាន៖ {{region}}",
+        "settingDefaultModelSet": "{{next}}",
+        "settingDefaultModelRemoved": "{{previous}}",
+        "settingAutoRoute": "របៀប \"{{mode}}\"៖ {{change}}",
+        "settingDefaultBehavior": {
+          "global": "លំនាំដើមសកល",
+          "specific": "{{model}}",
+          "auto": "$t(models.auto.organization)"
+        },
+        "settingDataCollection": "{{mode}}",
+        "dataCollection": {
+          "allowed": "បានអនុញ្ញាត",
+          "denied": "បានបដិសេធ",
+          "followSetting": "ធ្វើតាមការកំណត់របស់ផ្នែកបន្ថែម"
+        },
+        "region": {
+          "us": "$t(organizationModelAccess.region.us)",
+          "eu": "$t(organizationModelAccess.region.eu)",
+          "au": "$t(organizationModelAccess.region.au)",
+          "jp": "$t(organizationModelAccess.region.jp)"
+        },
+        "settingProjectsUi": "Projects UI {{state}}",
+        "settingMinimumBalanceOn": "{{threshold}} ទៅ {{emails}}",
+        "settingMinimumBalanceThreshold": "{{threshold}}",
+        "settingRecommendationsDigest": "សេចក្តីសង្ខេបការណែនាំ {{state}}",
+        "settingBrowserControl": "{{policy}}",
+        "settingBrowserControlOrigins": "{{policy}}៖ {{origins}}",
+        "settingBrowserControlOriginsCleared": "{{policy}}៖ គ្មានប្រភពដែលបានអនុញ្ញាតទេ",
+        "settingName": "បានប្ដូរឈ្មោះពី {{previous}} ទៅ {{next}}",
+        "enabled": "$t(common.enabled)",
+        "scanBeforeUseOn": "ស្កេនមុនប្រើបានបើក",
+        "scanBeforeUseOff": "ស្កេនមុនប្រើបានបិទ",
+        "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingRemoved": "បានដកចេញ៖ {{models}}",
+        "browserPolicyOff": "ការប្រើកម្មវិធីរុករកត្រូវបានទប់ស្កាត់",
+        "browserPolicyAllow": "ប្រភពដែលបានអនុញ្ញាតតែប៉ុណ្ណោះ",
+        "browserPolicyPlaywrightOnly": "ប្រើបានតែកម្មវិធីរុករកប៉ុណ្ណោះ",
+        "disabled": "$t(common.disabled)",
+        "autoRouting": "បានផ្លាស់ប្ដូរម៉ូដែល៖ {{values}}",
+        "integrationConnected": "{{integration}} បានភ្ជាប់",
+        "integrationDisconnected": "{{integration}} បានផ្តាច់",
+        "integrationRefreshed": "{{integration}} បានធ្វើឱ្យស្រស់ថ្មី",
+        "integrationCancelled": "{{integration}} បានបោះបង់",
+        "integrationModelUpdated": "{{integration}}៖ គំរូ {{model}}",
+        "integrationKeyAdded": "បានបន្ថែមសោសម្រាប់ {{provider}}",
+        "integrationKeyUpdated": "បានធ្វើបច្ចុប្បន្នភាពសោសម្រាប់ {{provider}}",
+        "integrationKeyDeleted": "បានលុបសោសម្រាប់ {{provider}}",
+        "integrationKeyToggled": "សោសម្រាប់ {{provider}}: {{state}}",
+        "namedPolicyCreated": "បានបង្កើតគោលការណ៍ {{kind}} {{id}}",
+        "namedPolicyUpdated": "បានធ្វើបច្ចុប្បន្នភាពគោលការណ៍ {{kind}} {{id}}",
+        "namedPolicyDeleted": "បានលុបគោលការណ៍ {{kind}} {{id}}",
+        "namedPolicyLinked": "បានភ្ជាប់គោលការណ៍ {{kind}} {{next}}",
+        "webhookTriggerUpdated": "កេព {{trigger}}",
+        "organizationRenamed": "បានប្តូរឈ្មោះអង្គការពី {{previous}} ទៅ {{next}}",
+        "brand": {
+          "github": "$t(common.github)",
+          "gitlab": "$t(common.gitlab)",
+          "bitbucket": "$t(agentChat.repoPicker.platformBitbucket)",
+          "discord": "$t(profile.providerDiscord)",
+          "slack": "$t(agentChat.sessionFilter.platformSlack)",
+          "linear": "$t(agentChat.sessionFilter.platformLinear)",
+          "byok": "ប្រើសោផ្ទាល់ខ្លួន"
+        }
       }
     },
     "billing": {
       "title": "ការចេញវិក្កយបត្រ",
-      "permissionDenied": "មានតែម្ចាស់ អ្នកគ្រប់គ្រង ឬអ្នកគ្រប់គ្រងវិក្កយបត្ររបស់អង្គការប៉ុណ្ណោះ ដែលអាចមើលព័ត៌មានវិក្កយបត្ររបស់អង្គការបាន។",
+      "permissionDenied": "មានតែម្ចាស់ អ្នកគ្រប់គ្រង ឬអ្នកគ្រប់គ្រងការគិតប្រាក់របស់អង្គការប៉ុណ្ណោះ ដែលអាចមើលព័ត៌មានវិក្កយបត្ររបស់អង្គការបាន។ $t(organization.boundary.accessDeniedDescription)",
       "subscription": "ការជាវ",
       "state": "ស្ថានភាព",
       "stateNone": "គ្មានការជាវ",
@@ -3533,7 +3688,7 @@
       "pendingInvitation": "អ៊ីមែលនេះមានការអញ្ជើញដែលកំពុងរង់ចាំរួចហើយ។",
       "alreadyMember": "បុគ្គលនេះគឺជាសមាជិកនៃស្ថាប័ននេះរួចហើយ។",
       "seatsFull": "កៅអីទាំងអស់ត្រូវបានប្រើប្រាស់អស់ហើយ ({{used}}/{{total}})។ សូមស្នើសុំម្ចាស់ស្ថាប័នឱ្យបន្ថែមកៅអី មុនពេលអញ្ជើញសមាជិកបន្ថែមទៀត។",
-      "seatsFullCanInviteBilling": "កៅអីទាំងអស់ត្រូវបានប្រើប្រាស់អស់ហើយ ({{used}}/{{total}})។ អ្នកនៅតែអាចអញ្ជើញអ្នកគ្រប់គ្រងវិក្កយបត្របាន ដោយសារពួកគេមិនប្រើកៅអីទេ។",
+      "seatsFullCanInviteBilling": "កៅអីទាំងអស់ត្រូវបានប្រើប្រាស់អស់ហើយ ({{used}}/{{total}})។ អ្នកនៅតែអាចអញ្ជើញអ្នកគ្រប់គ្រងការគិតប្រាក់បាន ដោយសារពួកគេមិនប្រើកៅអីទេ។",
       "noSeatsAvailable": "កៅអីទាំងអស់ត្រូវបានប្រើប្រាស់អស់ហើយ។ សូមស្នើសុំម្ចាស់ស្ថាប័នឱ្យបន្ថែមកៅអី មុនពេលអញ្ជើញសមាជិកបន្ថែមទៀត។"
     },
     "invoices": {
@@ -3632,7 +3787,7 @@
       "emptyDescription": "ប្រើ \"ម៉ោងមុន\" ដើម្បីមើលសំណើមុនៗ។",
       "emptyBoundDescription": "កំណត់ហេតុសំណើមិនមានចាស់ជាងនេះទេ។",
       "loadError": "មិនអាចផ្ទុកកំណត់ហេតុសំណើបានទេ។",
-      "permissionDenied": "មានតែម្ចាស់អង្គការ អ្នកគ្រប់គ្រង ឬអ្នកគ្រប់គ្រងវិក្កយបត្រប៉ុណ្ណោះ ដែលអាចអានកំណត់ហេតុសំណើរបស់អង្គការបាន។",
+      "permissionDenied": "មានតែម្ចាស់អង្គការ អ្នកគ្រប់គ្រង ឬអ្នកគ្រប់គ្រងការគិតប្រាក់ប៉ុណ្ណោះ ដែលអាចអានកំណត់ហេតុសំណើរបស់អង្គការបាន។ $t(organization.boundary.accessDeniedDescription)",
       "tokens": "ចូល {{input}} · ចេញ {{output}}",
       "byok": "BYOK"
     },
@@ -3737,7 +3892,7 @@
     "signupStepUpApple": "ដើម្បីបញ្ចប់ការបង្កើតគណនីរបស់អ្នក ប្រើ '$t(login.signInWithApple)'។",
     "signupStepUpGoogle": "ដើម្បីបញ្ចប់ការបង្កើតគណនីរបស់អ្នក ប្រើ '$t(login.signInWithGoogle)'។",
     "signupStepUpBack": "ដើម្បីបញ្ចប់ការបង្កើតគណនីរបស់អ្នក សូមត្រឡប់ក្រោយ ហើយប្រើ '$t(login.moreSignInOptions)'។",
-    "invalidCode": "លេខកូដនោះមិនត្រឹមត្រូវ ឬផុតកំណត់ហើយ។ សូមព្យាយាមម្តងទៀត ឬប្រើ '$t(login.resendCode)'។",
+    "invalidCode": "លេខកូដនោះមិនត្រឹមត្រូវ ឬផុតកំណត់ហើយ។ សូមប្រើ '$t(login.resendCode)' ឬប្រើ '$t(login.moreSignInOptions)'។",
     "codeInProgress": "លេខកូដរបស់អ្នកកំពុងត្រូវបានដំណើរការ។ រង់ចាំមួយភ្លែត ហើយព្យាយាមម្តងទៀត។",
     "tooManyAttempts": "ការព្យាយាមច្រើនពេកហើយ។ សូមស្នើសុំលេខកូដថ្មី។",
     "invalidToken": "មិនអាចចូលគណនីបានទេ។ សូមព្យាយាមម្តងទៀត។",
@@ -3902,7 +4057,10 @@
     "list": {
       "loadFailed": "មិនអាចផ្ទុកប្រវត្តិជជែកបានទេ។",
       "new": "ការជជែកថ្មី",
-      "deleteTitle": "លុបការជជែកនេះ?"
+      "deleteTitle": "លុបការជជែកនេះ?",
+      "resetNoticeTitle": "ការជជែក និងសេចក្តីព្រាងលើឧបករណ៍ត្រូវបានលុប",
+      "resetNoticeBody": "Kilo មិនអាចបើកការជជែកដែលបានរក្សាទុកនៅលើឧបករណ៍នេះបានទេ។ វគ្គរបស់អ្នកនៅក្នុងពពកមិនរងផលប៉ះពាល់ទេ។",
+      "resetNoticeDismiss": "មិនអើពើនឹងការជូនដំណឹង"
     },
     "rename": {
       "title": "ប្តូរឈ្មោះការជជែក",
@@ -3952,6 +4110,9 @@
       "fieldName": "ឈ្មោះបង្ហាញ",
       "fieldUrl": "URL ម៉ាស៊ីនមេ",
       "fieldUrlInvalid": "បញ្ចូល URL ម៉ាស៊ីនមេត្រឹមត្រូវ។",
+      "fieldUrlCredentials": "លុបឈ្មោះអ្នកប្រើ និងពាក្យសម្ងាត់ចេញពី URL។",
+      "fieldUrlFragment": "លុបផ្នែក # ចេញពី URL។",
+      "fieldUrlInsecure": "បញ្ចូល URL https ឬ http សម្រាប់តែ localhost។",
       "duplicateUrl": "URL នេះត្រូវបានរក្សាទុករួចហើយ។",
       "serverNotFound": "ម៉ាស៊ីនមេនេះលែងត្រូវបានរក្សាទុកទៀតហើយ។",
       "enableServer": "បើកម៉ាស៊ីនមេនេះ: {{name}}",
@@ -3977,6 +4138,7 @@
       "app": {
         "label": "ចំណុចប្រទាក់ឧបករណ៍",
         "failed": "មិនអាចផ្ទុកចំណុចប្រទាក់ឧបករណ៍នេះបានទេ។",
+        "tooLarge": "ចំណុចប្រទាក់ឧបករណ៍នេះធំជាងដែនកំណត់ {{size}}។",
         "empty": "ចំណុចប្រទាក់ឧបករណ៍នេះគ្មានអ្វីត្រូវបង្ហាញទេ។"
       }
     },
@@ -4044,6 +4206,8 @@
       "discoveryNoModels": "ចំណុចភ្ជាប់មិនបានរាយគំរូណាមួយទេ។ បញ្ចូលគំរូដោយដៃ។",
       "connectionIncomplete": "គំរូបានឆ្លើយតប ប៉ុន្តែមិនបានបញ្ចប់ទេ។ ព្យាយាមម្ដងទៀត ឬពិនិត្យលេខសម្គាល់គំរូ និងពិធីការ។",
       "invalidInput": "បញ្ចូលឈ្មោះប្រព័ន្ធខាងក្រោយ ក្បាលសំណើត្រឹមត្រូវ និងគំរូយ៉ាងហោចណាស់មួយដែលមានលេខសម្គាល់ និងឈ្មោះមិនស្ទួនគ្នា។ កម្រិតកំណត់តូកិនត្រូវតែជាចំនួនគត់វិជ្ជមាន។",
+      "invalidApiKey": "សោ API មានតួអក្សរមួយដែលមិនអាចផ្ញើបាន។ ប្រើតែអក្សរ លេខ និងនិមិត្តសញ្ញាស្តង់ដារ ដោយគ្មានការចុះបន្ទាត់ថ្មី។",
+      "invalidHeaders": "មិនអាចផ្ញើក្បាលសំណើដែលកំណត់ផ្ទាល់ខ្លួនបានទេ។ ពិនិត្យឈ្មោះរបស់វា ហើយប្រើតែអក្សរ លេខ និងនិមិត្តសញ្ញាស្តង់ដារ ដោយគ្មានការចុះបន្ទាត់ថ្មី។",
       "invalidUrl": "បញ្ចូលអាសយដ្ឋានគោលរបស់ API ដែលប្រើ HTTP ឬ HTTPS ដោយគ្មានព័ត៌មានសម្គាល់សម្រាប់ផ្ទៀងផ្ទាត់ ខ្សែសំណួរ ឬផ្នែកបំណែកនៃ URL។",
       "publicHttp": "មិនអនុញ្ញាតឱ្យប្រើចំណុចភ្ជាប់ HTTP សាធារណៈទេ។ ប្រើ HTTPS ឬចំណុចភ្ជាប់ក្នុងបណ្តាញមូលដ្ឋានឯកជន។",
       "httpApprovalRequired": "អនុម័តចំណុចភ្ជាប់ HTTP ក្នុងបណ្តាញមូលដ្ឋាននេះ មុនពេលរក្សាទុក ឬភ្ជាប់។",
@@ -4092,6 +4256,7 @@
         "network": "ការទាញយកមិនបានបញ្ចប់ទេ។ សូមពិនិត្យការតភ្ជាប់របស់អ្នក ហើយព្យាយាមម្តងទៀត។",
         "invalidFile": "ឯកសារដែលបានទាញយកមិនមែនជាគំរូដែលកម្មវិធីនេះអាចដំណើរការបានទេ ដូច្នេះវាត្រូវបានលុបចេញ។",
         "checksum": "ឯកសារដែលបានទាញយកមិនត្រូវគ្នានឹងតម្លៃផ្ទៀងផ្ទាត់ (checksum) ដែលបានផ្សព្វផ្សាយទេ ដូច្នេះវាត្រូវបានលុបចេញ។ សូមព្យាយាមទាញយកម្តងទៀត។",
+        "unreadable": "ឧបករណ៍នេះមិនអាចពិនិត្យឯកសារដែលបានទាញយកបានទេ ដូច្នេះវាត្រូវបានលុបចេញ។ សូមព្យាយាមទាញយកម្តងទៀត។",
         "writeFailed": "ឧបករណ៍នេះមិនអាចរក្សាទុកគំរូនេះបានទេ។ សូមព្យាយាមទាញយកម្តងទៀត។"
       }
     },
@@ -4177,7 +4342,15 @@
       "download": "ទាញយកគំរូនៅលើឧបករណ៍",
       "downloading": "កំពុងទាញយក…",
       "downloadProgress": "កំពុងទាញយក… {{percent}}%",
-      "downloadFailed": "ការទាញយកមិនបានបញ្ចប់ទេ។ សូមពិនិត្យការតភ្ជាប់ និងទំហំផ្ទុកទំនេររបស់អ្នក រួចព្យាយាមម្តងទៀត។"
+      "downloadFailed": "ការទាញយកមិនបានបញ្ចប់ទេ។ សូមពិនិត្យការតភ្ជាប់ និងទំហំផ្ទុកទំនេររបស់អ្នក រួចព្យាយាមម្តងទៀត។",
+      "cannotUse": "មិនអាចដំណើរការបានទេ៖ {{items}}។",
+      "cannotUseOptions": "មិនអាចបំពេញបានទេ៖ ជម្រើសឧបករណ៍មួយចំនួន។",
+      "limitations": "ដែនកំណត់",
+      "tools": {
+        "time": "ពេលវេលា",
+        "settingsList": "បង្ហាញការកំណត់",
+        "settingsSet": "ផ្លាស់ប្តូរការកំណត់"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "គំរូនេះគាំទ្រកម្រិតនៃការគិត"
@@ -4356,6 +4529,7 @@
     "instructionSaveFailed": "មិនអាចរក្សាទុកការណែនាំបានទេ",
     "instructionDeleteFailed": "មិនអាចលុបការណែនាំបានទេ",
     "instructionToggleFailed": "មិនអាចធ្វើបច្ចុប្បន្នភាពការណែនាំបានទេ",
+    "instructionViewTitle": "ឯកសារការណែនាំ",
     "instructionLimitReached": "profile មួយអាចផ្ទុកការណែនាំបានរហូតដល់ {{max}}។ លុបមួយ ដើម្បីបន្ថែមមួយទៀត។",
     "mcp": {
       "title": "ម៉ាស៊ីនមេ MCP",
@@ -4530,6 +4704,7 @@
       "emptyDescription": "ការទិញក្រេឌីត បង្កាន់ដៃ និងការប្រើប្រាស់នឹងបង្ហាញនៅទីនេះ។",
       "emptyTitle": "គ្មានប្រវត្តិក្រេឌីត",
       "expiredGrant": "បានផុតកំណត់៖ {{description}}",
+      "expiredStatus": "បានផុតកំណត់",
       "googlePlayReceipt": "បង្កាន់ដៃពី Google Play",
       "kind": {
         "adjustment": "ការកែតម្រូវ",
@@ -4556,7 +4731,8 @@
       "receiptA11y": "បើកបង្កាន់ដៃសម្រាប់ {{description}}, {{amount}}, ពី {{date}}",
       "receiptUnavailable": "មិនមានបង្កាន់ដៃសម្រាប់ការទិញនេះទេ។",
       "retentionLimit": "បង្ហាញប្រវត្តិឥណទានថ្មីៗបំផុត។",
-      "voidedGrant": "បានលុបចោល៖ {{description}}"
+      "voidedGrant": "បានលុបចោល៖ {{description}}",
+      "voidedStatus": "បានលុបចោល"
     },
     "title": "ទិញឥណទាន",
     "description": "ឥណទានគឺជាការទិញតែម្តងដែលបន្ថែមទៅសមតុល្យ Kilo របស់អ្នកសម្រាប់ដំណើរការវគ្គសរសេរកូដ AI នៅក្នុង Kilo App។ ហាងគិតប្រាក់ពីគណនីរបស់អ្នក ហើយឥណទានត្រូវបានបន្ថែមបន្ទាប់ពីហាងបញ្ជាក់ការបង់ប្រាក់។",
@@ -4700,6 +4876,7 @@
     "contextAll": "បរិបទទាំងអស់",
     "dismiss": "មិនអើពើនឹងរបាយការណ៍",
     "dismissFailed": "ពេលនេះមិនអាចមិនអើពើនឹងរបាយការណ៍នេះបានទេ។ វានឹងព្យាយាមឡើងវិញនៅផ្ទៃខាងក្រោយ។",
+    "readMarkFailed": "មិនអាចសម្គាល់របាយការណ៍នេះថាបានអានបានទេ។ វានឹងព្យាយាមម្តងទៀតនៅពេលរបាយការណ៍ផ្ទុកឡើងវិញ។",
     "offline": "គ្មានអ៊ីនធឺណិត · របាយការណ៍ដែលបានរក្សាទុក",
     "cached": "របាយការណ៍ដែលបានរក្សាទុក · មិនអាចធ្វើឱ្យស្រស់បាន",
     "summary": "សេចក្តីសង្ខេប AI",
@@ -4719,16 +4896,21 @@
     "morningEnd": "របាយការណ៍អាចប្រើបានរហូតដល់",
     "timeHint": "កាតទំព័រដើមនឹងបង្ហាញស្ថានភាពផ្ទាល់វិញនៅពេលរយៈពេលរបាយការណ៍បញ្ចប់ ទោះគ្មានអ៊ីនធឺណិតក៏ដោយ។",
     "invalidSchedule": "ជ្រើសល្វែងម៉ោងត្រឹមត្រូវ និងរយៈពេលរបាយការណ៍ដែលមិនទទេ។",
+    "scheduleEmptyNight": "រយៈពេលរបាយការណ៍គឺទទេ។ ជ្រើសពេលរួចរាល់ឱ្យក្រោយពេលចាប់ផ្តើមរយៈពេល។",
+    "scheduleEmptyMorning": "ពេលរួចរាល់ និងពេលអាចប្រើបានរហូតដល់ ត្រូវគ្នា។ ជ្រើសរយៈពេលដែលរបាយការណ៍នៅតែអាចប្រើបាន។",
+    "scheduleFullDay": "រយៈពេលទាំងពីរគ្របដណ្តប់ពេញមួយថ្ងៃ។ ទុកផ្នែកមួយនៃថ្ងៃនៅក្រៅរបាយការណ៍។",
     "notificationsHint": "ការជូនដំណឹងទូទៅមួយក្នុងមួយរបាយការណ៍តាមកាលវិភាគ។ មិនពាក់ព័ន្ធនឹងសេចក្តីសង្ខេប AI បង់ប្រាក់។",
     "notificationPermission": "បើកការជូនដំណឹង push ដើម្បីទទួលរបាយការណ៍របស់អ្នក។",
     "defaultModel": "ប្រើម៉ូដែលលំនាំដើមរបស់ Kilo",
     "duration": "ដែនកំណត់ពេលវេលា (នាទី)",
     "spendLimit": "ដែនកំណត់ចំណាយ (USD)",
-    "invalidSafeguards": "បញ្ចូលដែនកំណត់ពេលវេលា និងចំណាយជាចំនួនវិជ្ជមានដែលមិនមែនជាអនន្ត។",
+    "invalidSafeguards": "បញ្ចូលលេខវិជ្ជមានក្នុងជួរដែលអនុញ្ញាត។",
     "estimate": "ការប្រមាណ {{estimate}} · អតិបរមា {{maximum}}",
     "estimateUnavailable": "សេចក្តីសង្ខេបដែលត្រូវបង់ប្រាក់មិនមានសម្រាប់ការកំណត់ទាំងនេះទេ។ សូមផ្លាស់ប្តូរម៉ូដែល ឬដែនកំណត់ ឬព្យាយាមម្តងទៀតនៅពេលក្រោយ។",
     "confirmPaid": "បើកសេចក្តីសង្ខេបបង់ប្រាក់សម្រាប់ {{context}}?",
+    "paidDisclosure_one": "ប៉ាន់ស្មាន {{estimate}} រហូតដល់ {{maximum}} ដែនកំណត់ {{minutes}} នាទី។ ការគិតថ្លៃអនុវត្ត ទោះការបង្កើតបរាជ័យក៏ដោយ។",
     "paidDisclosure": "ប៉ាន់ស្មាន {{estimate}} រហូតដល់ {{maximum}} ដែនកំណត់ {{minutes}} នាទី។ ការគិតថ្លៃអនុវត្ត ទោះការបង្កើតបរាជ័យក៏ដោយ។",
+    "paidDisclosure_other": "ប៉ាន់ស្មាន {{estimate}} រហូតដល់ {{maximum}} ដែនកំណត់ {{minutes}} នាទី។ ការគិតថ្លៃអនុវត្ត ទោះការបង្កើតបរាជ័យក៏ដោយ។",
     "enable": "បើកសេចក្តីសង្ខេបបង់ប្រាក់",
     "allContexts": "របាយការណ៍ផ្ទាល់ខ្លួន និងស្ថាប័នត្រូវបានរក្សាដាច់ដោយឡែក។",
     "emptyHistory": "មិនមានរបាយការណ៍ដែលបានរក្សាទុកទេ",
@@ -4767,7 +4949,7 @@
     "sourceActivity": "សកម្មភាពគ្មានចំណងជើង",
     "metadataFailureProvider": "កំហុសអ្នកផ្តល់សេវា",
     "metadataFailureTool": "កំហុសឧបករណ៍",
-    "metadataFailureCancelled": "បានបោះបង់",
+    "metadataStopped": "វេនចុងក្រោយត្រូវបានបញ្ឈប់",
     "metadataFailureOther": "កំហុសមិនបានបញ្ជាក់",
     "metadataPlan_one": "ផែនការ៖ បានបញ្ចប់ {{displayDone}} ក្នុងចំណោម {{displayTotal}} ជំហាន",
     "metadataFiles_one": "{{displayCount}} ឯកសារបានផ្លាស់ប្ដូរ",
@@ -4792,7 +4974,8 @@
     "unavailableTitle": "ការប្រើប្រាស់មិនអាចប្រើបានទេ",
     "unavailableDescription": "ការប្រើប្រាស់មិនទាន់ត្រូវបានរៀបចំសម្រាប់ Workspace នេះទេ។ សូមទាក់ទងផ្នែកជំនួយ ប្រសិនបើអ្នករំពឹងថានឹងឃើញការប្រើប្រាស់នៅទីនេះ។",
     "orgSelfNotice": "អ្នកកំពុងមើលការប្រើប្រាស់ផ្ទាល់ខ្លួនរបស់អ្នកក្នុងស្ថាប័ននេះ។",
-    "viewDetails": "មើលព័ត៌មានលម្អិតនៃការប្រើប្រាស់"
+    "viewDetails": "មើលព័ត៌មានលម្អិតនៃការប្រើប្រាស់",
+    "orgSelfEntryTitle": "ការប្រើប្រាស់របស់អ្នក"
   },
   "integrations": {
     "title": "ការរួមបញ្ចូល",
@@ -4888,6 +5071,8 @@
       "autoCommit": "ធ្វើកុម្មិតការផ្លាស់ប្ដូរនៅពេលដំណើរការបញ្ចប់",
       "condenseOnComplete": "បង្រួមបរិបទនៅពេលដំណើរការបញ្ចប់",
       "activeTitle": "ការកេះសកម្ម",
+      "activeSwitchA11y": "ការកេះសកម្ម: {{name}}",
+      "copyLinkA11y": "ចម្លងតំណសម្រាប់ {{name}}",
       "activeDescription": "វេបហុកដែលបានផ្អាកនឹងឆ្លើយតបជាមួយ 404។",
       "runAsCreator": "ដំណើរការក្នុងនាមខ្ញុំ",
       "runAsCreatorDescription": "រាល់ការដំណើរការប្រើគណនីរបស់អ្នក ដូច្នេះត្រូវការបឋមកថាសម្ងាត់។",

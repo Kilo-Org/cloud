@@ -646,6 +646,21 @@ describe('session card layout: surfaces', () => {
     expect(collect(minimal).map(item => item.kind)).toEqual(['HStack', 'Circle']);
   });
 
+  it('paints the idle dot with the muted ink in both schemes', () => {
+    const idle: State = { ...BASE, statusKind: 'idle' };
+    const dotInk = (node: unknown) =>
+      (
+        (collect(node).find(item => item.kind === 'Circle')?.props.modifiers ?? []) as {
+          $type: string;
+          args?: unknown;
+        }[]
+      ).find(modifier => modifier.$type === 'foregroundStyle')?.args;
+    expect(dotInk(render(idle).banner)).toBe('#6F6A61');
+    expect(dotInk(render(idle, { colorScheme: 'dark' }).banner)).toBe('#8A8680');
+    // The Dynamic Island is always black, so it takes the dark muted ink too.
+    expect(dotInk(render(idle).minimal)).toBe('#8A8680');
+  });
+
   it('carries the same status label spoken on every surface', () => {
     const label = (node: unknown) =>
       collect(node)

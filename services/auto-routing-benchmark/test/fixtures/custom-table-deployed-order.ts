@@ -31,6 +31,16 @@ export const TIED_MODELS = ['vendor/aaa', 'vendor/zzz'] as const;
 /** One model whose two variants tie on every ranking key. */
 export const VARIANT_MODEL = 'vendor/variants';
 export const VARIANT_KEYS = ['high', 'low'] as const;
+/**
+ * The same two-variant tie with the catalog declaring `low` before `high`.
+ *
+ * This is the shape that separates "the variant the catalog declared first" from "the variant
+ * whose name sorts first". The deployed build fed the effort builder one pair per resolved
+ * variant in catalog declaration order, so a tie resolved to `low` here; sorting the pairs by
+ * variant name resolves it to `high` while every served route stays byte-identical.
+ */
+export const VARIANT_REV_MODEL = 'vendor/variants-rev';
+export const VARIANT_REV_KEYS = ['low', 'high'] as const;
 
 export const FIXTURE_RUN_ID = 'run-deployed-order';
 
@@ -65,6 +75,17 @@ export const FIXTURE_SOURCE = {
             variants: {
               high: { reasoning: { enabled: true, effort: 'high' } },
               low: { reasoning: { enabled: true, effort: 'low' } },
+            },
+          },
+          pricing: { prompt: '0.000001', completion: '0.000002' },
+        },
+        {
+          // Declared low,high: the deployed tie resolution and a variant-name sort disagree.
+          id: 'vendor/variants-rev',
+          opencode: {
+            variants: {
+              low: { reasoning: { enabled: true, effort: 'low' } },
+              high: { reasoning: { enabled: true, effort: 'high' } },
             },
           },
           pricing: { prompt: '0.000001', completion: '0.000002' },
@@ -108,13 +129,36 @@ export const HIGH_CASES = [
 export const FIXTURE_COMPLEXITY_LABELS: ComplexityLabels =
   ComplexityLabelsSchema.parse(caseComplexity);
 
+/** One measured pair, as both fixtures declare and seed it. */
+export type PairRow = { model: string; variant: string | null };
+
 /** Every measured pair, in the primary-key order of `model_summaries`. */
-export const FIXTURE_PAIRS: readonly { model: string; variant: string | null }[] = [
+export const FIXTURE_PAIRS: readonly PairRow[] = [
   { model: 'vendor/aaa', variant: null },
   { model: VARIANT_MODEL, variant: 'high' },
   { model: VARIANT_MODEL, variant: 'low' },
   { model: 'vendor/zzz', variant: null },
 ];
+
+/**
+ * The measured pairs used by the effort-parity fixture: `FIXTURE_PAIRS` plus the model whose
+ * catalog declares `low` before `high`.
+ */
+export const EFFORT_PAIRS: readonly PairRow[] = [
+  { model: 'vendor/aaa', variant: null },
+  { model: VARIANT_MODEL, variant: 'high' },
+  { model: VARIANT_MODEL, variant: 'low' },
+  { model: VARIANT_REV_MODEL, variant: 'high' },
+  { model: VARIANT_REV_MODEL, variant: 'low' },
+  { model: 'vendor/zzz', variant: null },
+];
+
+/**
+ * The pool that exercises both variant declaration orders. Entry-resolution order is what the
+ * deployed build fed the effort builder, so this pool pins that the catalog's first variant (not
+ * the alphabetically first one) decides `effortByComplexity`.
+ */
+export const EFFORT_POOL = ['vendor/aaa', VARIANT_MODEL, VARIANT_REV_MODEL, 'vendor/zzz'] as const;
 
 export const FIXTURE_ROUTES: readonly TaxonomyRouteKey[] = [ROUTE_A, ROUTE_B];
 
@@ -129,13 +173,15 @@ export function fixtureContext(entries: readonly string[]): CustomRouterBenchmar
 }
 
 /** Ready entries, one per measured pair, in primary-key order. */
-export function fixtureReadyEntries() {
-  return FIXTURE_PAIRS.map(pair => ({ entry: { ...pair }, runId: FIXTURE_RUN_ID }));
+export function fixtureReadyEntries(pairs: readonly PairRow[] = FIXTURE_PAIRS) {
+  return pairs.map(pair => ({ entry: { ...pair }, runId: FIXTURE_RUN_ID }));
 }
 
 /** Per-route summaries for every measured pair; all values tie exactly. */
-export function fixtureSummaries(): BenchmarkModelSummaryWithRun[] {
-  return FIXTURE_PAIRS.flatMap(pair =>
+export function fixtureSummaries(
+  pairs: readonly PairRow[] = FIXTURE_PAIRS
+): BenchmarkModelSummaryWithRun[] {
+  return pairs.flatMap(pair =>
     FIXTURE_ROUTES.map<BenchmarkModelSummaryWithRun>(routeKey => ({
       model: pair.model,
       variant: pair.variant,
@@ -159,8 +205,10 @@ export function fixtureSummaries(): BenchmarkModelSummaryWithRun[] {
 }
 
 /** Graded cases for every measured pair, six per complexity bucket. */
-export function fixturePerCaseResults(): OfflineSweep['pairs'] {
-  return FIXTURE_PAIRS.map(pair => ({
+export function fixturePerCaseResults(
+  pairs: readonly PairRow[] = FIXTURE_PAIRS
+): OfflineSweep['pairs'] {
+  return pairs.map(pair => ({
     model: pair.model,
     variant: pair.variant,
     results: [...LOW_CASES, ...HIGH_CASES].map(caseId => ({
@@ -179,8 +227,8 @@ export function fixturePerCaseResults(): OfflineSweep['pairs'] {
 
 type ProfileRow = { model: string; variant: string };
 
-function profileRows(): ProfileRow[] {
-  return FIXTURE_PAIRS.map(pair => ({
+function profileRows(pairs: readonly PairRow[]): ProfileRow[] {
+  return pairs.map(pair => ({
     model: pair.model,
     variant: pair.variant ?? '',
   }));
@@ -188,8 +236,8 @@ function profileRows(): ProfileRow[] {
 
 type CaseRow = { model: string; variant: string; caseId: string; routeKey: string };
 
-function caseRows(): CaseRow[] {
-  return FIXTURE_PAIRS.flatMap(pair =>
+function caseRows(pairs: readonly PairRow[]): CaseRow[] {
+  return pairs.flatMap(pair =>
     [...LOW_CASES, ...HIGH_CASES].map(caseId => ({
       model: pair.model,
       variant: pair.variant ?? '',
@@ -212,13 +260,16 @@ function shuffled<T>(rows: readonly T[]): T[] {
  * ORDER BY, so their scans see primary-key order; the test asserts the current
  * assembly produces the same bytes regardless.
  */
-export function seedCustomTableFixture(sqlite: DatabaseSync): void {
+export function seedCustomTableFixture(
+  sqlite: DatabaseSync,
+  pairs: readonly PairRow[] = FIXTURE_PAIRS
+): void {
   const profile = sqlite.prepare(
     `INSERT INTO benchmark_profiles (router, model, variant, engine_identity, repetitions,
       status, run_id, requested_at, updated_at, completed_at, platform_requested, user_requested)
      VALUES ('efficient', ?, ?, ?, 3, 'ready', ?, '2026-11-01', '2026-11-01', '2026-11-01', 0, 1)`
   );
-  for (const row of shuffled(profileRows())) {
+  for (const row of shuffled(profileRows(pairs))) {
     profile.run(row.model, row.variant, FIXTURE_ENGINE, FIXTURE_RUN_ID);
   }
 
@@ -227,7 +278,7 @@ export function seedCustomTableFixture(sqlite: DatabaseSync): void {
       avg_latency_ms, p50_latency_ms, cases, errors, p95_latency_ms, timeouts)
      VALUES (?, ?, ?, ?, ?, 0.001, 800, 800, 20, 0, 900, 0)`
   );
-  for (const row of shuffled(fixtureSummaries())) {
+  for (const row of shuffled(fixtureSummaries(pairs))) {
     summary.run(FIXTURE_RUN_ID, row.model, row.variant ?? '', row.routeKey, row.accuracy);
   }
 
@@ -236,7 +287,7 @@ export function seedCustomTableFixture(sqlite: DatabaseSync): void {
       cost_usd, rep)
      VALUES (?, ?, ?, ?, ?, 0.9, 100, 0.001, 0)`
   );
-  for (const row of shuffled(caseRows())) {
+  for (const row of shuffled(caseRows(pairs))) {
     graded.run(FIXTURE_RUN_ID, row.model, row.variant, row.caseId, row.routeKey);
   }
 }

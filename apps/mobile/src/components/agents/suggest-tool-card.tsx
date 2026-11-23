@@ -12,9 +12,10 @@ import { MonoScrollBlock } from './mono-scroll-block';
 import { useOpenPartDetail } from './open-part-detail-context';
 import { useOptionalSessionManager } from './session-manager-context';
 import { resolveSuggestionPresentation, suggestionToolInputSchema } from './suggestion-card-state';
-import { getToolDisplay, toolPartHasDetails } from './tool-card-display';
+import { toolPartHasDetails } from './tool-card-display';
 import { toolStatusLabel } from './tool-status-label';
 import { GenericToolCardBody } from './tool-cards/generic-tool-card';
+import { useToolDisplay } from './use-tool-display';
 
 // The session preview renders transcript rows without a live session, so it
 // has no active suggestion to show.
@@ -33,7 +34,7 @@ export function SuggestToolCard({ part }: Readonly<{ part: ToolPart }>) {
   const suggestion = useActiveToolSuggestion(part);
   const { t } = useTranslation();
   const openPartDetail = useOpenPartDetail();
-  const display = getToolDisplay(part);
+  const display = useToolDisplay(part);
   const label = suggestion?.text ?? display.subtitle ?? display.title;
   const hasDetails = suggestion !== null || toolPartHasDetails(part);
 

@@ -43,6 +43,15 @@ export function useTestFocusEffect(effect: () => undefined | (() => void)) {
 }
 
 /**
+ * The push-then-retire hook's double: this stack model has no native
+ * transitions, so a hand-off is the same one-commit swap the hook ends in.
+ */
+export function useTestStackSafeReplace() {
+  const { router } = useRouteContext();
+  return { replace: router.replace };
+}
+
+/**
  * Models a navigation stack and focus: a pushed route mounts above the caller,
  * `back` unmounts it, and only the top route is focused. It does not model
  * native formSheet presentation.

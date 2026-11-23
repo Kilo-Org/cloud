@@ -22,6 +22,7 @@ import {
   isAttentionAcked,
   reconcileSessionAttention,
   shouldShowNeedsInput,
+  useSessionAttentionHydration,
   useSessionAttentionRevision,
 } from '@/lib/session-attention';
 import { sessionBranchLabel } from '@/lib/session-branch-label';
@@ -129,6 +130,7 @@ export const RemoteSessionRow = memo(function RemoteSessionRow({
   const canManage = interactive;
 
   const revision = useSessionAttentionRevision();
+  const hydration = useSessionAttentionHydration();
   // A live row's timestamp is minute-bucketed, so the clock is sampled at
   // least twice per bucket. The tick re-renders this row from the inside:
   // `memo` keeps the row out of a parent poll that changes no prop, so an
@@ -144,12 +146,12 @@ export const RemoteSessionRow = memo(function RemoteSessionRow({
       const raiseId = session.statusUpdatedAt ?? session.status;
       return shouldShowNeedsInput({
         status: session.status,
-        raiseId,
+        hydration,
         isAcked: isAttentionAcked(session.id, { raiseId, status: session.status }),
       });
     },
-    // eslint-disable-next-line react/exhaustive-deps -- the revision is a real input: `isAttentionAcked` reads the ack store, so the flag must re-derive when that store ticks.
-    [session, revision]
+    // eslint-disable-next-line react/exhaustive-deps -- the revision and the hydration phase are real inputs: `isAttentionAcked` reads the ack store, and the flag is held until that store's phase settles, so it must re-derive when either changes.
+    [session, revision, hydration]
   );
   useEffect(() => {
     reconcileSessionAttention(session.id, session.status, null);
@@ -273,6 +275,8 @@ export const RemoteSessionRow = memo(function RemoteSessionRow({
       live: true,
       statusKind: glanceableStatusKind(session.status),
       needsInput,
+      status: session.status,
+      statusUpdatedAt: session.statusUpdatedAt,
       totalCostMicrodollars: session.totalCostMicrodollars ?? null,
       onCopySessionId: () => {
         // Load the clipboard/action module at press time: the mounted row test

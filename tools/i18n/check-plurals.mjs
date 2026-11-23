@@ -697,9 +697,6 @@ function run() {
   const englishRead = readEnglishCatalog();
   const english = englishRead.catalog;
   problems.push(...englishRead.problems);
-  // The scan already read every file below the source root, the declaration
-  // modules included, so it owns their parse diagnostics; the declaration check
-  // skips the lines this scan already reported.
   const unparsed = findUnparsedFiles(scan);
   const reported = new Set(unparsed);
 

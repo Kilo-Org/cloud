@@ -185,10 +185,9 @@ function refreshInterval(
 }
 
 /**
- * The one display-title cut every glanceable surface draws: the text as one
- * line of what it draws, trimmed, then capped at `GLANCEABLE_TITLE_LIMIT` on a
+ * Trim to one line of what the surface draws, then apply `sessionLiveCut` at a
  * character boundary. A surface adds only its own empty or placeholder rule on
- * top, so the cap cannot drift between the Home widget and the session card.
+ * top.
  */
 export function glanceableTitle(value: string | null | undefined): string {
   const title = sessionDisplayLine(value ?? '').trim();
@@ -218,8 +217,6 @@ export function buildHomeWidgetDetails(
   const byStatusUpdatedAt = compareSessionInstant(row => row.statusUpdatedAt, 'earliest');
   // One status predicate owns both membership and the kind, so a needs-input
   // row and the label drawn for it cannot disagree.
-  // The schema is the one representation every payload enforces, so a row's key
-  // counts only when it parses; anything else reads as none.
   const waiting: {
     row: HomeWidgetSessionRow;
     kind: GlanceableNeedsInputKind;

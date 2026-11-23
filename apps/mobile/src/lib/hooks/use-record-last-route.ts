@@ -36,9 +36,6 @@ export function useRecordLastRoute({ userId }: RecordLastRouteInput): void {
   const segments = useSegments();
   const globalHref = useUnstableGlobalHref();
   const lastRecorded = useRef<string | null>(null);
-  // Subscribed so this component re-renders when the restart read settles; the
-  // version is a dependency of the effect below, which otherwise never re-runs
-  // after hydration.
   const hydrationVersion = useSyncExternalStore(subscribeLastRoute, getLastRouteHydrationVersion);
 
   useEffect(() => {

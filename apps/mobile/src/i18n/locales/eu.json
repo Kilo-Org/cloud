@@ -91,6 +91,7 @@
     "draft": "Zirriborroa",
     "enabled": "Gaituta",
     "github": "GitHub",
+    "image": "Irudi",
     "imageUnavailable": "Irudia ez dago eskuragarri.",
     "loading": "Kargatzen…",
     "loadMore": "Kargatu gehiago",
@@ -522,6 +523,7 @@
       "receiptLabel": "Agiria",
       "copyReceiptId": "Kopiatu agiriaren IDa",
       "appealLabel": "Helegitea",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Jasota",
       "triageOpen": "Berrikusten",
       "triageActioned": "Baietsita",
@@ -555,7 +557,7 @@
       "title": "Salaketak",
       "rowSubtitle": "Aurkeztu zenituen salaketak eta horien emaitzak",
       "emptyTitle": "Oraindik ez dago salaketarik",
-      "emptyDescription": "Iruzkin batetik edo AI baten erantzun batetik aurkezten dituzun salaketak hemen agertzen dira.",
+      "emptyDescription": "Pull request eztabaida bateko iruzkin batetik edo agentearen saio bateko AIaren erantzun batetik aurkezten dituzun salaketak beren emaitzarekin agertzen dira hemen.",
       "couldNotLoad": "Ezin izan dira zure salaketak kargatu",
       "capped": "Zure azken salaketak erakusten ari gara."
     },
@@ -1237,6 +1239,7 @@
     "needsInputAction": {
       "approved": "Eskaera onartu da",
       "replied": "Erantzuna bidali da",
+      "empty": "Idatzi erantzun bat eta gero bidali.",
       "failed": "Ezin izan da erantzun. Ukitu berriro saiatzeko.",
       "unavailable": "Eskaera honek jada ez du itxaroten."
     }
@@ -1501,7 +1504,9 @@
       "githubError": "Ezin izan da GitHub-en konfigurazioa ireki. Saiatu berriro.",
       "gitlabAccount": "GitLab-eko kontua",
       "gitlabError": "Ezin izan da GitLab-en konfigurazioa ireki. Saiatu berriro.",
-      "description": "Konektatu Kiloren {{label}} bateratze-eskaerak automatikoki berrikusteko."
+      "description": "Konektatu Kiloren {{label}} bateratze-eskaerak automatikoki berrikusteko.",
+      "notConnectedTitle": "{{platform}} ez dago konektatuta",
+      "githubAdminOnlyDescription": "Erakundeko jabeek eta administratzaileek soilik konekta dezakete."
     },
     "overview": {
       "allAreas": "Eremu guztiak",
@@ -2175,7 +2180,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} saio",
       "sectionAccessibility": "{{title}}: {{displayCount}} saio",
       "live": "ZUZENEAN",
-      "updating": "Eguneratzen"
+      "updating": "Eguneratzen",
+      "retentionLimit": "Azken saioak erakusten dira."
     },
     "sessionRow": {
       "deleteTitle": "Ezabatu saioa?",
@@ -2245,11 +2251,11 @@
       "scrollToBottom": "Joan behealdera",
       "emptyTitle": "Oraindik ez dago mezurik",
       "emptyReadOnlyTitle": "Saio honetan ez dago mezurik",
-      "renameAccessibility": "Berrizendatu saioa: {{title}}",
       "cloningSession": "Saioa klonatzen",
       "couldNotLoadThisSession": "Ezin izan da saio hau kargatu.",
       "historyTooLarge": "Saio honen transkripzioa kargatzeko handiegia da.",
       "historyUnavailable": "Ezin da irakurri saio honen transkripzioa.",
+      "historyTemporarilyUnavailable": "Saio honen transkripzioa ez dago aldi baterako erabilgarri.",
       "cloneFailedRetry": "Ezin izan da saio hau klonatu. Saiatu berriro.",
       "notEnoughCredits": "Ez dago nahikoa kreditu eskaera honetarako. Gehitu kredituak eta saiatu berriro.",
       "previousTaskFinishing": "Aurreko zeregina oraindik amaitzen ari da. Itxaron pixka bat.",
@@ -2655,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Irudia kargatzen",
       "imageUnavailableRetry": "Irudia ez dago erabilgarri, saiatu berriro kargatzen",
+      "imageUnavailableRetryWithAlt": "Irudia ez dago erabilgarri, {{alt}}, saiatu berriro kargatzen",
       "imagePreviewUnavailableInSession": "Irudiaren aurrebista ez dago erabilgarri saio honetan.",
       "viewImage": "Ikusi irudia",
       "viewImageWithAlt": "Ikusi irudia: {{alt}}",
@@ -2786,7 +2793,9 @@
       "skip": "Saltatu",
       "retrySkip": "Saiatu berriro saltatzen",
       "submitting": "Bidaltzen…",
-      "sendAnswers": "Bidali erantzunak"
+      "sendAnswers": "Bidali erantzunak",
+      "unreadableTitle": "Galdera hau ezin izan da erakutsi",
+      "unreadableBody": "Agentea galdera baten zain dago, eta aplikazio honek ezin du galdera hori erakutsi. Erantzun galderari CLI-n jarraitzeko."
     },
     "blockingCard": {
       "questionUnavailable": "Galdera hau jada ez dago erabilgarri.",
@@ -2813,6 +2822,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Ezin izan da azpiagentearen saioa kargatu.",
+      "historyTooLarge": "Azpiagente honen historia kargatzeko handiegia da.",
+      "historyUnavailable": "Azpiagente honen historia ez dago erabilgarri.",
+      "historyTemporarilyUnavailable": "Azpiagente honen historia ez dago aldi baterako erabilgarri.",
       "failed": "Azpiagentearen saioak huts egin du.",
       "noMessages": "Ez dago azpiagentearen mezurik",
       "noMessagesDescription": "Azpiagentearen saio hau transkripziorik sortu gabe amaitu da.",
@@ -3094,6 +3106,12 @@
     "retryLoadingAccount": "Saiatu kontua berriro kargatzen",
     "retryLoadingPrivacy": "Saiatu pribatutasun-aukerak berriro kargatzen"
   },
+  "accountBlocked": {
+    "title": "Kontua blokeatuta",
+    "description": "Kilok kontu hau blokeatu du, eta berriro saioa hasita ez da blokeoa kenduko. Laguntza-taldeak blokeoa berrikusi dezake eskatuz gero.",
+    "domainDescription": "Kilok e-posta domeinu honetako kontuak blokeatzen ditu, eta berriro saioa hasita ez da blokeoa aldatuko. Laguntza-taldeak domeinua berrikusi dezake eskatuz gero.",
+    "contactSupport": "Jarri harremanetan laguntza-taldearekin"
+  },
   "addCredits": {
     "cta": "Gehitu kredituak",
     "billingPage": "fakturazio-orria"
@@ -3166,8 +3184,7 @@
     "timeoutDescription": "Eskaera amaitu aurretik iraungi da. Saiatu berriro."
   },
   "screenHeader": {
-    "openMenu": "Ireki menua",
-    "openMenuFor": "Ireki {{title}}-ren menua"
+    "openMenu": "Ireki menua"
   },
   "picker": {
     "optionsExpired": "Aukerak iraungita",
@@ -3386,6 +3403,8 @@
     "voiceTranscriptionWho": "Zure gailua, Kilo Gateway aukeratutako transkripzio-ereduarekin, edo Apple edo Google lineako ezagutzarako.",
     "installAttributionPromptTitle": "Baimendu instalazioaren jatorria identifikatzea?",
     "installAttributionPromptMessage": "Kilo-k Apple-ren jarraipen-baimena hona zein kanalen bidez iritsi zaren jakiteko soilik erabiltzen du. Zure eskaerak eta elkarrizketak ez dira inoiz erabiltzen.",
+    "installAttributionRequestFailedTitle": "Ezin izan da jarraipen-eskaera erakutsi",
+    "installAttributionRequestFailedMessage": "Kilok ezin izan du sistemaren eskaera erakutsi, beraz instalazioaren jatorriaren identifikazioa itzalita geratzen da.",
     "what": "Zer",
     "why": "Zergatik",
     "who": "Nor"
@@ -3401,7 +3420,7 @@
   "organization": {
     "auditLog": {
       "title": "Ikuskaritza-erregistroa",
-      "permissionDenied": "Enterprise planeko erakunde baten jabeak, administratzaileak edo fakturazio-kudeatzaileak soilik irakur dezake haren ikuskaritza-erregistroa.",
+      "permissionDenied": "Enterprise planeko erakunde baten jabeak, administratzaileak edo fakturazio-kudeatzaileak soilik irakur dezake haren ikuskaritza-erregistroa. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Ez dago ikuskaritza-gertaerarik",
       "emptyDescription": "Erakunde honetan egindako ekintzak hemen agertzen dira.",
       "truncated": "Gertaera berrienak erakusten dira.",
@@ -3451,11 +3470,147 @@
         "guardrailUpdate": "Babes-muga eguneratu da",
         "guardrailRemove": "Babes-muga kendu da",
         "unknown": "Audit-gertaera"
+      },
+      "detail": {
+        "fieldChange": "{{field}}: {{change}}",
+        "modeIdentity": "Modua \"{{name}}\" (identifikatzailea: {{slug}})",
+        "modeUpdate": "Modua \"{{name}}\": {{changes}}",
+        "field": {
+          "name": "$t(organization.modes.nameLabel)",
+          "slug": "$t(organization.modes.identifierLabel)",
+          "roleDefinition": "$t(organization.modes.roleLabel)",
+          "whenToUse": "$t(organization.modes.whenToUseLabel)",
+          "description": "$t(organization.modes.descriptionLabel)",
+          "customInstructions": "$t(codeReviewer.instructions.title)",
+          "groups": "$t(profiles.agents.tools)",
+          "autoRoute": "Bideratze automatikoa",
+          "defaultModel": "Lehenetsitako modeloa"
+        },
+        "role": {
+          "owner": "$t(organization.members.roles.owner)",
+          "admin": "$t(organization.members.roles.admin)",
+          "billing_manager": "$t(organization.members.roles.billingManager)",
+          "member": "$t(organization.members.roles.member)"
+        },
+        "memberRole": "{{email}}: {{change}}",
+        "memberAdded": "{{email}} gehitu da {{role}} gisa",
+        "memberRemoved": "{{email}} kendu da",
+        "memberParentAdded": "{{email}} gehitu da {{parent}} erakunde nagusitik",
+        "memberParentRemoved": "{{email}} kendu da {{parent}} erakunde nagusitik",
+        "inviteSent": "{{email}} {{role}} gisa",
+        "inviteRevoked": "{{email}} erabiltzailearen gonbidapena ezeztatu da",
+        "inviteAccepted": "{{email}} onartu da",
+        "groupIdentity": "Taldea \"{{name}}\"",
+        "groupMembers": "Taldea \"{{name}}\": {{members}}",
+        "groupMemberGroups": "{{displayCount}} talde",
+        "groupMemberGroups_one": "{{displayCount}} talde",
+        "groupMemberGroups_other": "{{displayCount}} talde",
+        "groupMemberGroupsOf": "{{email}}: {{displayCount}} talde",
+        "groupMemberGroupsOf_one": "{{email}}: {{displayCount}} talde",
+        "groupMemberGroupsOf_other": "{{email}}: {{displayCount}} talde",
+        "groupPolicySet": "Taldea \"{{name}}\": {{policy}} politika ezarri da",
+        "groupPolicyRemoved": "Taldea \"{{name}}\": {{policy}} politika kendu da",
+        "groupDefaultPolicySet": "{{policy}} politika lehenetsia ezarri da",
+        "groupDefaultPolicyRemoved": "{{policy}} politika lehenetsia kendu da",
+        "guardrailIdentity": "{{type}} \"{{name}}\"",
+        "guardrailStatus": "{{type}} \"{{name}}\" {{state}}",
+        "guardrailConfig": "AA babes-mugak {{state}}",
+        "guardrailConfigGroup": "{{state}} \"{{group}}\" taldearentzat",
+        "guardrailEnforcement": "{{target}}: {{value}}",
+        "guardrailSkill": "{{target}}: {{values}}",
+        "guardrailTarget": {
+          "mcp": "$t(profiles.mcp.title)",
+          "skill": "$t(profiles.skillsTitle)"
+        },
+        "ssoDomainSet": "SSO domeinua {{domain}}",
+        "ssoDomainChanged": "{{domain}} (aurretik {{previous}})",
+        "ssoDomainRemoved": "SSO domeinua {{domain}} garbitu da",
+        "fundsPurchased": "{{amount}} {{method}} bidez",
+        "fundsGranted": "{{amount}}",
+        "fundsDistributed": "{{amount}} {{displayCount}} azpierakundeei",
+        "fundsDistributed_one": "{{amount}} {{displayCount}} azpierakundeei",
+        "fundsDistributed_other": "{{amount}} {{displayCount}} azpierakundeei",
+        "fundsReceived": "{{amount}} {{parent}} erakunde nagusitik",
+        "reviewAgentPlatform": "{{platform}}",
+        "reviewAgentConfig": "{{platform}} konfigurazioa",
+        "reviewAgentConfigStyle": "{{platform}}: estilo {{style}}",
+        "reviewAgentSecretsUpdated": "{{displayCount}} eguneratuta",
+        "reviewAgentSecretsUpdated_one": "{{displayCount}} eguneratuta",
+        "reviewAgentSecretsUpdated_other": "{{displayCount}} eguneratuta",
+        "reviewAgentSecretsFailed": "{{displayCount}} errore",
+        "reviewAgentSecretsFailed_one": "{{displayCount}} errore",
+        "reviewAgentSecretsFailed_other": "{{displayCount}} errore",
+        "reviewAgentSecretRotated": "{{values}}",
+        "settingAdvancedPolicies": "{{values}}",
+        "settingAdvancedPoliciesOpenRouter": "OpenRouter {{state}}",
+        "settingAdvancedPoliciesRegion": "Inferentzia-eskualdea: {{region}}",
+        "settingDefaultModelSet": "{{next}}",
+        "settingDefaultModelRemoved": "{{previous}}",
+        "settingAutoRoute": "Modua \"{{mode}}\": {{change}}",
+        "settingDefaultBehavior": {
+          "global": "Global lehenetsia",
+          "specific": "{{model}}",
+          "auto": "$t(models.auto.organization)"
+        },
+        "settingDataCollection": "{{mode}}",
+        "dataCollection": {
+          "allowed": "Baimenduta",
+          "denied": "Ukatuta",
+          "followSetting": "Luzapenaren ezarpenari jarraitzen dio"
+        },
+        "region": {
+          "us": "$t(organizationModelAccess.region.us)",
+          "eu": "$t(organizationModelAccess.region.eu)",
+          "au": "$t(organizationModelAccess.region.au)",
+          "jp": "$t(organizationModelAccess.region.jp)"
+        },
+        "settingProjectsUi": "Projects interfazea {{state}}",
+        "settingMinimumBalanceOn": "{{threshold}} {{emails}} helbideetara",
+        "settingMinimumBalanceThreshold": "{{threshold}}",
+        "settingRecommendationsDigest": "Gomendioen laburpena {{state}}",
+        "settingBrowserControl": "{{policy}}",
+        "settingBrowserControlOrigins": "{{policy}}: {{origins}}",
+        "settingBrowserControlOriginsCleared": "{{policy}}: jatorri baimendurik ez",
+        "settingName": "Izena aldatu da: {{previous}} → {{next}}",
+        "enabled": "$t(common.enabled)",
+        "scanBeforeUseOn": "Erabili aurretik eskaneatzea gaituta",
+        "scanBeforeUseOff": "Erabili aurretik eskaneatzea desgaituta",
+        "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingRemoved": "Kenduta: {{models}}",
+        "browserPolicyOff": "Nabigatzailearen erabilera blokeatuta",
+        "browserPolicyAllow": "Jatorri baimenduak soilik",
+        "browserPolicyPlaywrightOnly": "Nabigatzailearen erabilera soilik",
+        "disabled": "$t(common.disabled)",
+        "autoRouting": "Modeloak aldatu dira: {{values}}",
+        "integrationConnected": "{{integration}} konektatuta",
+        "integrationDisconnected": "{{integration}} deskonektatuta",
+        "integrationRefreshed": "{{integration}} berrituta",
+        "integrationCancelled": "{{integration}} ezeztatuta",
+        "integrationModelUpdated": "{{integration}}: modeloa {{model}}",
+        "integrationKeyAdded": "{{provider}} gakoa gehituta",
+        "integrationKeyUpdated": "{{provider}} gakoa eguneratuta",
+        "integrationKeyDeleted": "{{provider}} gakoa kenduta",
+        "integrationKeyToggled": "{{provider}} gakoa: {{state}}",
+        "namedPolicyCreated": "{{kind}} politika {{id}} sortuta",
+        "namedPolicyUpdated": "{{kind}} politika {{id}} eguneratuta",
+        "namedPolicyDeleted": "{{kind}} politika {{id}} kenduta",
+        "namedPolicyLinked": "{{kind}} politika {{next}}(e)kin lotuta",
+        "webhookTriggerUpdated": "Abiarazlea {{trigger}}",
+        "organizationRenamed": "Erakundea {{previous}}(e)tik {{next}}(e)ra berrizendatuta",
+        "brand": {
+          "github": "$t(common.github)",
+          "gitlab": "$t(common.gitlab)",
+          "bitbucket": "$t(agentChat.repoPicker.platformBitbucket)",
+          "discord": "$t(profile.providerDiscord)",
+          "slack": "$t(agentChat.sessionFilter.platformSlack)",
+          "linear": "$t(agentChat.sessionFilter.platformLinear)",
+          "byok": "Zeure API gakoa"
+        }
       }
     },
     "billing": {
       "title": "Fakturazioa",
-      "permissionDenied": "Erakundearen jabeak, administratzaileak edo fakturazio-kudeatzaileak soilik ikus dezake haren fakturazioa.",
+      "permissionDenied": "Erakundearen jabeak, administratzaileak edo fakturazio-kudeatzaileak soilik ikus dezake haren fakturazioa. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Harpidetza",
       "state": "Egoera",
       "stateNone": "Harpidetzarik ez",
@@ -3632,7 +3787,7 @@
       "emptyDescription": "Erabili «Aurreko ordua» aurreko eskaerak ikusteko.",
       "emptyBoundDescription": "Hemendik atzera ez dago eskaera-erregistrorik.",
       "loadError": "Ezin izan dira eskaeren erregistroak kargatu.",
-      "permissionDenied": "Erakunde baten jabeak, administratzaileak edo fakturazio-kudeatzaileak soilik irakur ditzake haren eskaeren erregistroak.",
+      "permissionDenied": "Erakunde baten jabeak, administratzaileak edo fakturazio-kudeatzaileak soilik irakur ditzake haren eskaeren erregistroak. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} sarrera · {{output}} irteera",
       "byok": "BYOK"
     },
@@ -3737,7 +3892,7 @@
     "signupStepUpApple": "Kontua sortzen amaitzeko, erabili '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Kontua sortzen amaitzeko, erabili '$t(login.signInWithGoogle)'.",
     "signupStepUpBack": "Kontua sortzen amaitzeko, itzuli atzera eta erabili '$t(login.moreSignInOptions)'.",
-    "invalidCode": "Kode hori okerra da edo iraungita dago. Saiatu berriro edo erabili '$t(login.resendCode)'.",
+    "invalidCode": "Kode hori okerra da edo iraungita dago. Erabili '$t(login.resendCode)' edo '$t(login.moreSignInOptions)'.",
     "codeInProgress": "Zure kodea prozesatzen ari da. Itxaron une bat eta saiatu berriro.",
     "tooManyAttempts": "Saiakera gehiegi. Eskatu kode berri bat.",
     "invalidToken": "Saioa hasteak huts egin du. Saiatu berriro.",
@@ -3902,7 +4057,10 @@
     "list": {
       "loadFailed": "Ezin izan da txat-historia kargatu.",
       "new": "Txat berria",
-      "deleteTitle": "Txat hau ezabatu?"
+      "deleteTitle": "Txat hau ezabatu?",
+      "resetNoticeTitle": "Tokiko txatak eta zirriborroak ezabatu dira",
+      "resetNoticeBody": "Kilok ezin izan zituen gailu honetan gordetako txatak ireki. Zure hodeiko saioei ez die eragin.",
+      "resetNoticeDismiss": "Baztertu oharra"
     },
     "rename": {
       "title": "Berrizendatu txata",
@@ -3952,6 +4110,9 @@
       "fieldName": "Erakusteko izena",
       "fieldUrl": "Zerbitzariaren URLa",
       "fieldUrlInvalid": "Sartu baliozko zerbitzari URLa.",
+      "fieldUrlCredentials": "Kendu erabiltzaile-izena eta pasahitza URLtik.",
+      "fieldUrlFragment": "Kendu URLaren # zatia.",
+      "fieldUrlInsecure": "Sartu https URL bat, edo http soilik localhostentzat.",
       "duplicateUrl": "URLa jada gordeta dago.",
       "serverNotFound": "Zerbitzari hau ez dago jada gordeta.",
       "enableServer": "Gaitu zerbitzari hau: {{name}}",
@@ -3977,6 +4138,7 @@
       "app": {
         "label": "Tresnaren interfazea",
         "failed": "Ezin izan da tresna honen interfazea kargatu.",
+        "tooLarge": "Tresna honen interfazea {{size}} muga baino handiagoa da.",
         "empty": "Tresna honen interfazeak ez du ezer erakusteko."
       }
     },
@@ -4044,6 +4206,8 @@
       "discoveryNoModels": "Amaiera-puntuak ez du modelorik zerrendatu. Sartu modeloak eskuz.",
       "connectionIncomplete": "Modeloak erantzun du, baina ez du amaitu. Saiatu berriro, edo egiaztatu modeloaren IDa eta protokoloa.",
       "invalidInput": "Sartu atzeko zerbitzuaren izena, baliozko goiburuak eta gutxienez ID eta izen bakarrak dituen modelo bat. Tokenen mugek zenbaki oso positiboak izan behar dute.",
+      "invalidApiKey": "API gakoak bidali ezin den karaktere bat dauka. Erabili letrak, digituak eta sinbolo estandarrak soilik, lerro-jauzirik gabe.",
+      "invalidHeaders": "Ezin da goiburu pertsonalizatu bat bidali. Egiaztatu bere izena eta erabili letrak, digituak eta sinbolo estandarrak soilik, lerro-jauzirik gabe.",
       "invalidUrl": "Sartu HTTP edo HTTPS APIaren erro bat, kredentzialik, kontsultarik edo zatirik gabe.",
       "publicHttp": "Ez dira onartzen HTTP amaierako puntu publikoak. Erabili HTTPS edo tokiko amaierako puntu pribatu bat.",
       "httpApprovalRequired": "Onartu tokiko HTTP amaierako puntu hau gorde edo konektatu aurretik.",
@@ -4092,6 +4256,7 @@
         "network": "Deskarga ez da amaitu. Egiaztatu zure konexioa eta saiatu berriro.",
         "invalidFile": "Deskargatutako fitxategia ez da aplikazio honek exekutatu dezakeen modeloa, beraz, kendu egin da.",
         "checksum": "Deskargatutako fitxategia ez dator bat argitaratutako kontrol-baturarekin, beraz, kendu egin da. Saiatu berriro deskargatzen.",
+        "unreadable": "Gailu honek ezin izan du deskargatutako fitxategia egiaztatu, beraz, kendu egin da. Saiatu berriro deskargatzen.",
         "writeFailed": "Gailu honek ezin izan du modeloa gorde. Saiatu berriro deskargatzen."
       }
     },
@@ -4177,7 +4342,15 @@
       "download": "Deskargatu gailuko modeloa",
       "downloading": "Deskargatzen…",
       "downloadProgress": "Deskargatzen… %{{percent}}",
-      "downloadFailed": "Deskarga ez da amaitu. Egiaztatu konexioa eta biltegiratze-toki librea, eta saiatu berriro."
+      "downloadFailed": "Deskarga ez da amaitu. Egiaztatu konexioa eta biltegiratze-toki librea, eta saiatu berriro.",
+      "cannotUse": "Ezin da exekutatu: {{items}}.",
+      "cannotUseOptions": "Ezin dira bete: tresna baten aukera batzuk.",
+      "limitations": "Mugak",
+      "tools": {
+        "time": "Ordua",
+        "settingsList": "Erakutsi ezarpenak",
+        "settingsSet": "Aldatu ezarpenak"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Modelo honek arrazoiketa-ahalegina onartzen du"
@@ -4356,6 +4529,7 @@
     "instructionSaveFailed": "Ezin izan da jarraibidea gorde",
     "instructionDeleteFailed": "Ezin izan da jarraibidea ezabatu",
     "instructionToggleFailed": "Ezin izan da jarraibidea eguneratu",
+    "instructionViewTitle": "Jarraibide fitxategia",
     "instructionLimitReached": "Profil batek {{max}} jarraibide izan ditzake gehienez. Ezabatu bat beste bat gehitzeko.",
     "mcp": {
       "title": "MCP zerbitzariak",
@@ -4530,6 +4704,7 @@
       "emptyDescription": "Kreditu-erosketak, ordainagiriak eta erabilera hemen agertuko dira.",
       "emptyTitle": "Ez dago kredituen historiarik",
       "expiredGrant": "Iraungita: {{description}}",
+      "expiredStatus": "Iraungita",
       "googlePlayReceipt": "Google Play-ko ordainagiria",
       "kind": {
         "adjustment": "Doikuntza",
@@ -4556,7 +4731,8 @@
       "receiptA11y": "Ireki honen ordainagiria: {{description}}, {{amount}}, {{date}}tik",
       "receiptUnavailable": "Ez dago ordainagiririk erosketa honetarako.",
       "retentionLimit": "Azken kreditu-historia erakusten da.",
-      "voidedGrant": "Baliogabetua: {{description}}"
+      "voidedGrant": "Baliogabetua: {{description}}",
+      "voidedStatus": "Baliogabetua"
     },
     "title": "Erosi kredituak",
     "description": "Kredituak Kilo App-en AI kodetze-saioak exekutatzeko zure Kilo saldoari gehitzen zaion behin betiko erosketa bat dira. Dendak zure kontuari kobratzen dio eta kredituak dendak ordainketa baieztatu ondoren gehitzen dira.",
@@ -4700,6 +4876,7 @@
     "contextAll": "Testuinguru guztiak",
     "dismiss": "Baztertu txostena",
     "dismissFailed": "Oraindik ezin izan da txosten hau baztertu. Atzeko planoan berriro saiatuko da.",
+    "readMarkFailed": "Ezin izan da txosten hau irakurritzat markatu. Berriro saiatuko da txostena hurrengoan kargatzean.",
     "offline": "Lineaz kanpo · gordetako txostena",
     "cached": "Gordetako txostena · ezin da freskatu",
     "summary": "AI laburpena",
@@ -4719,12 +4896,15 @@
     "morningEnd": "Txostena eskuragarri egoteko azken ordua",
     "timeHint": "Hasierako txartelak zuzeneko egoera berrezartzen du txosten-tartea amaitzean, lineaz kanpo ere bai.",
     "invalidSchedule": "Aukeratu ordu-zona baliodun bat eta txosten-tarte ez-huts bat.",
+    "scheduleEmptyNight": "Txosten-tartea hutsik dago. Aukeratu prest egoteko ordu bat tartearen hasiera baino beranduago.",
+    "scheduleEmptyMorning": "Prest egoteko ordua eta erabilgarri egongo den azken ordua bat datoz. Aukeratu txostena zenbat denbora egongo den erabilgarri.",
+    "scheduleFullDay": "Bi tarteek egun osoa hartzen dute. Utzi egunaren zati bat txosten-tartetik kanpo.",
     "notificationsHint": "Programatutako txosten bakoitzeko jakinarazpen orokor bat. Ordainpeko AI laburpenetatik independentea.",
     "notificationPermission": "Gaitu push jakinarazpenak zure txostena jasotzeko.",
     "defaultModel": "Erabili Kiloren eredu lehenetsia",
     "duration": "Denbora-muga (minutuak)",
     "spendLimit": "Gastu-muga (USD)",
-    "invalidSafeguards": "Sartu denbora- eta gastu-muga positibo eta finituak.",
+    "invalidSafeguards": "Sartu zenbaki positibo bat onartutako tartean.",
     "estimate": "Estimazioa {{estimate}} · gehienez {{maximum}}",
     "estimateUnavailable": "Ezarpen hauekin ez dago ordainpeko laburpenik erabilgarri. Aldatu eredua edo mugak, edo saiatu berriro geroago.",
     "estimatePricingUnavailable": "Eredu honen prezioa ez dago erabilgarri. Aukeratu beste eredu bat.",
@@ -4732,6 +4912,8 @@
     "estimateModelNotAllowed": "Eredu hau ez da onartzen testuinguru honetan. Aukeratu beste eredu bat.",
     "estimateSpendLimitTooLow": "Igo gastu-muga laburpen hau sortu ahal izateko.",
     "confirmPaid": "Gaitu ordainpeko laburpenak {{context}}-(e)rako?",
+    "paidDisclosure_one": "{{estimate}} estimatuta, gehienez {{maximum}}, {{minutes}} minutuko mugarekin. Karguak aplikatzen dira sorkuntzak huts egin arren.",
+    "paidDisclosure_other": "{{estimate}} estimatuta, gehienez {{maximum}}, {{minutes}} minutuko mugarekin. Karguak aplikatzen dira sorkuntzak huts egin arren.",
     "paidDisclosure": "{{estimate}} estimatuta, gehienez {{maximum}}, {{minutes}} minutuko mugarekin. Karguak aplikatzen dira sorkuntzak huts egin arren.",
     "enable": "Gaitu ordainpeko laburpenak",
     "allContexts": "Txosten pertsonalak eta erakundekoak bereizita daude.",
@@ -4771,7 +4953,7 @@
     "sourceActivity": "Izenbururik gabeko jarduera",
     "metadataFailureProvider": "hornitzailearen errorea",
     "metadataFailureTool": "tresnaren errorea",
-    "metadataFailureCancelled": "Ezeztatuta",
+    "metadataStopped": "Azken txanda gelditu egin da",
     "metadataFailureOther": "zehaztu gabeko errorea"
   },
   "systemSearch": {
@@ -4792,7 +4974,8 @@
     "unavailableTitle": "Erabilera ez dago erabilgarri",
     "unavailableDescription": "Erabilera ez dago konfiguratuta lan-eremu honetan. Hemen erabilera ikusi beharko zenukeela uste baduzu, jarri harremanetan laguntza-zerbitzuarekin.",
     "orgSelfNotice": "Erakunde honetan zure erabilera ikusten ari zara.",
-    "viewDetails": "Ikusi erabileraren xehetasunak"
+    "viewDetails": "Ikusi erabileraren xehetasunak",
+    "orgSelfEntryTitle": "Zure erabilera"
   },
   "integrations": {
     "title": "Integrazioak",
@@ -4888,6 +5071,8 @@
       "autoCommit": "Erregistratu aldaketak exekuzioa amaitzean",
       "condenseOnComplete": "Laburtu testuingurua exekuzioa amaitzean",
       "activeTitle": "Abiarazlea aktibo",
+      "activeSwitchA11y": "Abiarazlea aktibo: {{name}}",
+      "copyLinkA11y": "Kopiatu esteka: {{name}}",
       "activeDescription": "Pausatutako webhookek 404 erantzuten dute.",
       "runAsCreator": "Exekutatu nire izenean",
       "runAsCreatorDescription": "Exekuzio bakoitzak zure kontua erabiltzen du, beraz, goiburu sekretua derrigorrezkoa da.",

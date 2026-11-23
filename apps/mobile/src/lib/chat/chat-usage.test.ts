@@ -176,9 +176,19 @@ describe('parseChatUsage', () => {
     expect(parseChatUsage(JSON.stringify(usage))).toEqual(usage);
   });
 
+  it('keeps a readable model beside a corrupt entry and drops only the corrupt one', () => {
+    const stored = JSON.stringify({
+      'kilo/a': used(5, 0.05),
+      'local:apple': { inputTokens: '7' },
+    });
+
+    expect(parseChatUsage(stored)).toEqual({ 'kilo/a': used(5, 0.05) });
+  });
+
   it('reads a chat with no column, or a column it cannot parse, as nothing used', () => {
     expect(parseChatUsage(null)).toEqual({});
     expect(parseChatUsage('not json')).toEqual({});
     expect(parseChatUsage('{"kilo/a":{"inputTokens":"5"}}')).toEqual({});
+    expect(parseChatUsage('[1,2]')).toEqual({});
   });
 });

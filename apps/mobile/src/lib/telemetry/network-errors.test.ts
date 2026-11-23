@@ -341,11 +341,6 @@ describe('isAbortError', () => {
     expect(isAbortError({ message: 'wrapped', cause })).toBe(true);
   });
 
-  // Production shape: Expo's `FetchError.createFromError` rebuilds the native
-  // cancel as `new FetchError(error.message)`, and `FetchError` does
-  // `super(\`fetch failed: ${message}\`)` while the native exception's message
-  // is exactly `Fetch request has been canceled`. Neither `name` nor `code`
-  // survives the wrap, so only the message can identify the abort.
   it('is true for the production FetchError message without the class name', () => {
     const error = new Error('fetch failed: Fetch request has been canceled');
     expect(error.name).toBe('Error');
@@ -435,10 +430,8 @@ describe('createNetworkErrorFetch', () => {
     expect(events).toHaveLength(0);
   });
 
-  // Production shape: the native cancel is rebuilt as
-  // `Error('fetch failed: Fetch request has been canceled')`, with neither
-  // `name` nor `code` surviving the wrap. These are the shapes the store build
-  // reports as KILO-APP-GX; they must not emit a warning event.
+  // The shapes the store build reports as KILO-APP-GX; they must not emit a
+  // warning event.
   it('(b3) does not report the production FetchError message and re-throws it', async () => {
     const cancel = new Error('fetch failed: Fetch request has been canceled');
     const wrapped = createNetworkErrorFetch(rejectingFetch(cancel), { source: 'trpc' });
@@ -554,6 +547,58 @@ describe('createNetworkErrorFetch', () => {
     expect(errorMessageOf(event)).toBe('POST /api/trpc/a.b -> 412');
     expect(JSON.stringify(event)).not.toContain('abcdefghijklmnopqrst');
     expect(JSON.stringify(event?.fingerprint)).not.toContain('access_token');
+  });
+
+  it('(d4) leaves a breadcrumb and no event for a 403 carrying the blocked-account marker', async () => {
+    // The blocked-account refusal is the state the app renders deliberately
+    // (the blocked-account explanation): before the dedicated error shape it
+    // answered 401, which EXPECTED_HTTP_STATUSES already exempted. A 403
+    // without the marker still reports — see (d6).
+    const response = Response.json(
+      {
+        error: {
+          code: -32_600,
+          data: { code: 'FORBIDDEN', httpStatus: 403, accountBlocked: true },
+        },
+      },
+      { status: 403, statusText: 'Forbidden' }
+    );
+    const wrapped = createNetworkErrorFetch(resolvingFetch(response), {
+      source: 'trpc',
+      readResponseError: readTrpcResponseError,
+    });
+
+    const result = await wrapped('https://example.com/api/trpc/user.getMe');
+
+    expect(result).toBe(response);
+    expect(events).toHaveLength(0);
+    expect(breadcrumbs).toHaveLength(1);
+    expect(breadcrumbs[0]).toMatchObject({
+      category: 'network',
+      message: 'GET /api/trpc/user.getMe -> 403',
+    });
+  });
+
+  it('(d6) still reports a 403 whose body names no blocked-account marker', async () => {
+    const response = Response.json(
+      { error: { code: -32_600, data: { code: 'FORBIDDEN', httpStatus: 403 } } },
+      { status: 403, statusText: 'Forbidden' }
+    );
+    const wrapped = createNetworkErrorFetch(resolvingFetch(response), {
+      source: 'trpc',
+      readResponseError: readTrpcResponseError,
+    });
+
+    await wrapped('https://example.com/api/trpc/session.list');
+
+    expect(events).toHaveLength(1);
+    expect(breadcrumbs).toHaveLength(0);
+    expect(reportedEvent()?.fingerprint).toEqual([
+      'network-error',
+      'trpc',
+      'session.list',
+      'http.403',
+    ]);
   });
 
   it('(e) does not report a 200 response', async () => {

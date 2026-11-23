@@ -53,8 +53,8 @@ import { MessageErrorBoundary } from '@/components/agents/message-error-boundary
 import { ModelPickerSelectionScopeProvider } from '@/components/agents/model-selector';
 import { nextHeldQueuedIds } from '@/components/agents/queued-badge-hold';
 import { PermissionCard } from '@/components/agents/permission-card';
-import { PermissionUnreadableNotice } from '@/components/agents/permission-unreadable-notice';
 import { QuestionCard } from '@/components/agents/question-card';
+import { UnreadableRequestNotices } from '@/components/agents/unreadable-request-notices';
 import {
   type ContextSheetIdentity,
   getContextSheetMountState,
@@ -250,6 +250,11 @@ import {
   useSessionHeaderBack,
 } from '@/lib/navigation/back-to-agents-sessions';
 import { recordLastOpenedSession } from '@/lib/last-opened-session';
+import {
+  clearNeedsInputReplyDraft,
+  peekNeedsInputReplyDraft,
+  subscribeNeedsInputReplyDraft,
+} from '@/lib/needs-input-reply-draft';
 import { resolveSessionContextInfo } from '@/lib/session-context-info';
 import {
   areModelPickerSelectionScopesEqual,
@@ -437,7 +442,43 @@ export function SessionDetailContent({
   const activeSuggestion = useAtomValue(manager.atoms.activeSuggestion);
   const pendingQuestions = useAtomValue(manager.atoms.pendingQuestions);
   const pendingPermissions = useAtomValue(manager.atoms.pendingPermissions);
+  const unreadableQuestions = useAtomValue(manager.atoms.unreadableQuestions);
   const unreadablePermissions = useAtomValue(manager.atoms.unreadablePermissions);
+  // An answer typed into the needs-input notification waits in a memory slot for
+  // this session. Offer it to the card once, and only while a question is on
+  // screen: offering it any earlier would spend the answer on a screen that may
+  // never show the card. The subscription carries the case a route push cannot:
+  // a tap on the result while this screen is already on top changes no route
+  // param, so nothing remounts. A different raise clears the offer, so the card
+  // is never seeded with the previous question's text.
+  const [replyDraft, setReplyDraft] = useState<{
+    sessionId: KiloSessionId;
+    requestId: string;
+    text: string;
+  } | null>(null);
+  const activeQuestionRequestId = activeQuestion?.requestId ?? null;
+  useEffect(() => {
+    const offer = () => {
+      if (activeQuestionRequestId === null) {
+        return;
+      }
+      const text = peekNeedsInputReplyDraft(sessionId);
+      if (text === null) {
+        return;
+      }
+      // Store before clearing: the slot holds one answer, so one remember
+      // produces one card seed.
+      setReplyDraft({ sessionId, requestId: activeQuestionRequestId, text });
+      clearNeedsInputReplyDraft(sessionId);
+    };
+    setReplyDraft(previous =>
+      previous?.sessionId === sessionId && previous.requestId === activeQuestionRequestId
+        ? previous
+        : null
+    );
+    offer();
+    return subscribeNeedsInputReplyDraft(offer);
+  }, [activeQuestionRequestId, sessionId]);
   const totalCost = useAtomValue(manager.atoms.totalCost);
   const { totalMicrodollars, breakdownCostUsd } = selectSessionCostInputs(
     fetchedData?.kiloSessionId === sessionId ? fetchedData.totalCostMicrodollars : null,
@@ -758,11 +799,11 @@ export function SessionDetailContent({
   const { hideThinking, hasLoaded: hideThinkingLoaded } = useHideThinkingPreference();
   const { keepScreenOn, hasLoaded: keepScreenOnLoaded } = useKeepScreenOnPreference();
   const { condenseToolCalls } = useCondenseToolCallsPreference();
-  const { models: catalogModels, isLoading: gatewayCatalogLoading } = useAvailableModels(
-    organizationId,
-    'member',
-    { enabled: sessionDataLoaded }
-  );
+  const {
+    models: catalogModels,
+    isLoading: gatewayCatalogLoading,
+    refetch: refetchCatalog,
+  } = useAvailableModels(organizationId, 'member', { enabled: sessionDataLoaded });
   // The picker lists models only once the session's scope is resolved. Until
   // then it holds its loading state, so it never presents a model list for a
   // scope the screen has not settled.
@@ -1922,6 +1963,21 @@ export function SessionDetailContent({
     }
   }, [manager, t]);
 
+  // The chip's Retry for an empty catalog. The chip lists whichever catalog its
+  // source projects: a v1 CLI answer is re-asked through the connection, and a
+  // legacy session's rows come from the gateway catalog, which the CLI cannot
+  // refresh.
+  const handleRetryModels = useCallback(() => {
+    if (
+      sessionModels.source === 'remote-cli-catalog' ||
+      sessionModels.source === 'remote-unavailable'
+    ) {
+      manager.retryRemoteModels();
+    } else {
+      void refetchCatalog();
+    }
+  }, [manager, refetchCatalog, sessionModels.source]);
+
   const handleModelSelect = useCallback(
     (value: string, variant: string, pickerSelection?: ModelPickerSelection) => {
       if (activeSessionType === 'remote') {
@@ -2990,9 +3046,7 @@ export function SessionDetailContent({
             {...(rename.isTitleInteractive
               ? {
                   onTitlePress: rename.openModal,
-                  onTitlePressAccessibilityHint: t('agentChat.session.renameAccessibility', {
-                    title: rename.title,
-                  }),
+                  onTitlePressAccessibilityHint: t('agentChat.session.renameSession'),
                 }
               : {})}
           />
@@ -3263,7 +3317,15 @@ export function SessionDetailContent({
         {/* The blocking cards sit beside the side insets the transcript and
             the composer clear. */}
         <View className="shrink" style={sideInsetStyle}>
-          {unreadablePermissions.length > 0 ? <PermissionUnreadableNotice /> : null}
+          {/* No card is drawn for either unreadable request: the boundary never
+              read what it asked for, so a card would describe a scope or a
+              question nobody parsed, and the notice points the user at the CLI
+              that can still answer it. One host covers both so the iOS
+              announcement is read once instead of twice. */}
+          <UnreadableRequestNotices
+            hasPermissions={unreadablePermissions.length > 0}
+            hasQuestions={unreadableQuestions.length > 0}
+          />
 
           {blockingInteraction === 'question' && activeQuestion ? (
             <QuestionCard
@@ -3279,6 +3341,12 @@ export function SessionDetailContent({
               requestId={activeQuestion.requestId}
               submissionError={questionSubmissionError}
               pendingCount={blockingRequestCount}
+              initialAnswer={
+                replyDraft?.sessionId === sessionId &&
+                replyDraft.requestId === activeQuestion.requestId
+                  ? replyDraft.text
+                  : null
+              }
             />
           ) : null}
 
@@ -3404,6 +3472,8 @@ export function SessionDetailContent({
                 modelOptions={modelOptionsForToolbar}
                 modelLocked={modelLocked}
                 modelLockLabel={pinned.agentName}
+                isLoadingModels={sessionModels.isLoading}
+                onRetryModels={handleRetryModels}
                 onModelSelect={handleModelSelect}
                 organizationId={organizationId}
                 attachmentsEnabled={supportsAttachments}

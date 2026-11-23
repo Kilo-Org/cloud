@@ -132,9 +132,7 @@ function isFormatControl(code: number): boolean {
  * collapses and bounds it.
  */
 export function sessionDisplayLine(raw: string): string {
-  // Iterating code points keeps a surrogate pair whole while the control set is
-  // applied. The set is compared numerically: a character class that names the
-  // control range reads as a control character in the source itself.
+  // Iterating code points keeps a surrogate pair whole while the control set is applied.
   return [...raw]
     .map(char => {
       const code = char.codePointAt(0) ?? 0;
@@ -242,7 +240,7 @@ function basename(value: unknown): string | null {
   const trimmed = text.replace(/[/\\]+$/, '');
   const last = Math.max(trimmed.lastIndexOf('/'), trimmed.lastIndexOf('\\'));
   const base = last === -1 ? trimmed : trimmed.slice(last + 1);
-  return sessionLiveText(base === '' ? trimmed : base, SESSION_LIVE_TARGET_LIMIT);
+  return sessionLiveText(base, SESSION_LIVE_TARGET_LIMIT);
 }
 
 function firstString(input: Record<string, unknown>, keys: readonly string[]): unknown {
@@ -305,10 +303,6 @@ export function sessionLiveToolStep(
     case 'list':
       return { verb: 'searching', target: basename(input['path']) };
     case 'codesearch':
-      return {
-        verb: 'searching',
-        target: sessionLiveText(input['query'], SESSION_LIVE_TARGET_LIMIT),
-      };
     case 'websearch':
     case 'web_search':
       return {

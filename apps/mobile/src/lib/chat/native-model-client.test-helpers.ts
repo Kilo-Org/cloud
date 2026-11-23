@@ -9,10 +9,6 @@ import {
   type NativeModelEvent,
 } from './native-model-client';
 
-/**
- * A scripted native module and the request the native client tests send it.
- * Shared by the text and the tool tests beside this file.
- */
 export const AVAILABLE: NativeAvailability = {
   status: 'available',
   modelId: 'apple-system-language-model',

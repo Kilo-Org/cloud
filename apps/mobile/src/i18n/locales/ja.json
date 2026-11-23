@@ -91,6 +91,7 @@
     "draft": "下書き",
     "enabled": "有効",
     "github": "GitHub",
+    "image": "画像",
     "imageUnavailable": "画像を表示できません。",
     "loading": "読み込み中…",
     "loadMore": "さらに読み込む",
@@ -522,6 +523,7 @@
       "receiptLabel": "受付",
       "copyReceiptId": "受付IDをコピー",
       "appealLabel": "異議申し立て",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel)：{{status}}",
       "triageReceived": "受付済み",
       "triageOpen": "審査中",
       "triageActioned": "認められました",
@@ -555,7 +557,7 @@
       "title": "通報一覧",
       "rowSubtitle": "通報した内容とその結果",
       "emptyTitle": "通報はまだありません",
-      "emptyDescription": "コメントまたはAIの回答から通報した内容がここに表示されます。",
+      "emptyDescription": "プルリクエストのディスカッションのコメント、またはエージェントのセッションでのAIの応答から通報した内容が、その結果とともにここに表示されます。",
       "couldNotLoad": "通報を読み込めませんでした",
       "capped": "最新の通報を表示しています。"
     },
@@ -675,6 +677,7 @@
     "needsInputAction": {
       "approved": "リクエストを承認しました",
       "replied": "返信を送信しました",
+      "empty": "回答を入力してから送信してください。",
       "failed": "回答できませんでした。もう一度タップして再試行してください。",
       "unavailable": "このリクエストは待機中ではなくなりました。"
     }
@@ -816,6 +819,8 @@
     },
     "providerConnect": {
       "description": "プルリクエストを自動でレビューするには、Kiloの{{label}}を接続してください。",
+      "notConnectedTitle": "{{platform}}が接続されていません",
+      "githubAdminOnlyDescription": "接続できるのは組織のオーナーと管理者のみです。",
       "githubApp": "GitHub App",
       "githubError": "GitHubのセットアップを開けませんでした。もう一度お試しください。",
       "gitlabAccount": "GitLabアカウント",
@@ -1025,7 +1030,7 @@
       "empty": "分析データのあるレビューはまだありません",
       "emptyDescription": "分析機能は、組織で有効になっている間に完了したレビューを記録します。",
       "offTitle": "{{platform}}の分析がオフになっています",
-      "offDescription": "分析をオンにできるのは、組織のオーナー、管理者、請求マネージャーといった請求ロールです。Web 上の組織設定からオンにすると、完了したレビューが記録されます。",
+      "offDescription": "分析をオンにできるのは、組織のオーナー、管理者、請求管理者といった請求ロールです。Web 上の組織設定からオンにすると、完了したレビューが記録されます。",
       "couldNotLoad": "分析を読み込めませんでした",
       "trackedReviewsCaption": "分析が有効な状態でこの期間内に完了したレビューです。実行中のレビューと失敗したレビューは決してカウントされません。",
       "trackedReviewsUncounted": "カウント対象外：この組織の終了済みレビュー {{displayTotal}} 件のうち {{displayCount}} 件は、結果が記録されていません。",
@@ -1613,7 +1618,8 @@
       "sectionAccessibility_other": "{{title}}：{{displayCount}} 件のセッション",
       "sectionAccessibility": "{{title}}：{{displayCount}} 件のセッション",
       "live": "ライブ",
-      "updating": "更新中"
+      "updating": "更新中",
+      "retentionLimit": "最新のセッションを表示しています。"
     },
     "sessionRow": {
       "deleteTitle": "セッションを削除しますか？",
@@ -1683,11 +1689,11 @@
       "scrollToBottom": "一番下までスクロール",
       "emptyTitle": "メッセージはまだありません",
       "emptyReadOnlyTitle": "このセッションにメッセージはありません",
-      "renameAccessibility": "セッション「{{title}}」の名前を変更",
       "cloningSession": "セッションを複製中",
       "couldNotLoadThisSession": "このセッションを読み込めませんでした。",
       "historyTooLarge": "このセッションの履歴は大きすぎて読み込めません。",
       "historyUnavailable": "このセッションの履歴を読み取れません。",
+      "historyTemporarilyUnavailable": "このセッションの履歴は一時的に利用できません。",
       "cloneFailedRetry": "このセッションを複製できませんでした。もう一度お試しください。",
       "notEnoughCredits": "このリクエストに必要なクレジットが不足しています。クレジットを追加して、もう一度お試しください。",
       "previousTaskFinishing": "前のタスクの終了処理中です。少々お待ちください。",
@@ -2093,6 +2099,7 @@
     "filePart": {
       "loadingImage": "画像を読み込み中",
       "imageUnavailableRetry": "画像を表示できません。読み込みを再試行",
+      "imageUnavailableRetryWithAlt": "画像を表示できません。{{alt}}。読み込みを再試行",
       "imagePreviewUnavailableInSession": "このセッションでは画像のプレビューを表示できません。",
       "viewImage": "画像を表示",
       "viewImageWithAlt": "画像「{{alt}}」を表示",
@@ -2224,7 +2231,9 @@
       "skip": "スキップ",
       "retrySkip": "スキップを再試行",
       "submitting": "送信中…",
-      "sendAnswers": "回答を送信"
+      "sendAnswers": "回答を送信",
+      "unreadableTitle": "この質問を表示できませんでした",
+      "unreadableBody": "エージェントは、このアプリでは表示できない質問への回答を待っています。続行するには、CLIで回答してください。"
     },
     "blockingCard": {
       "questionUnavailable": "この質問には回答できなくなりました。",
@@ -2251,6 +2260,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "サブエージェントのセッションを読み込めませんでした。",
+      "historyTooLarge": "このサブエージェントの履歴は大きすぎて読み込めません。",
+      "historyUnavailable": "このサブエージェントの履歴は利用できません。",
+      "historyTemporarilyUnavailable": "このサブエージェントの履歴は一時的に利用できません。",
       "failed": "サブエージェントのセッションが失敗しました。",
       "noMessages": "サブエージェントのメッセージがありません",
       "noMessagesDescription": "このサブエージェントのセッションは、会話履歴を生成せずに完了しました。",
@@ -2532,6 +2544,12 @@
     "retryLoadingAccount": "アカウントの読み込みを再試行",
     "retryLoadingPrivacy": "プライバシー設定の読み込みを再試行"
   },
+  "accountBlocked": {
+    "title": "アカウントがブロックされています",
+    "description": "Kiloはこのアカウントをブロックしており、再度サインインしてもブロックは解除されません。サポートはご要望に応じてブロックを確認できます。",
+    "domainDescription": "Kiloはこのメールドメインのアカウントをブロックしており、再度サインインしてもブロックは解除されません。サポートはご要望に応じてドメインを確認できます。",
+    "contactSupport": "サポートに連絡"
+  },
   "addCredits": {
     "cta": "クレジットを追加",
     "billingPage": "請求ページ"
@@ -2604,8 +2622,7 @@
     "timeoutDescription": "リクエストが完了する前にタイムアウトしました。もう一度お試しください。"
   },
   "screenHeader": {
-    "openMenu": "メニューを開く",
-    "openMenuFor": "{{title}}のメニューを開く"
+    "openMenu": "メニューを開く"
   },
   "picker": {
     "optionsExpired": "選択肢の有効期限が切れました",
@@ -2826,6 +2843,8 @@
     "why": "利用目的",
     "who": "共有先",
     "installAttributionPromptMessage": "Kiloは、アプリのインストール元を把握するためにのみ、Appleのトラッキング権限を使用します。この目的でプロンプトや会話を使用することはありません。",
+    "installAttributionRequestFailedTitle": "トラッキングの確認を表示できませんでした",
+    "installAttributionRequestFailedMessage": "Kiloはシステムの確認画面を表示できなかったため、インストール元の特定はオフのままです。",
     "installAttributionPromptTitle": "インストール元の特定を許可しますか？"
   },
   "prReview": {
@@ -3393,7 +3412,7 @@
   "organization": {
     "auditLog": {
       "title": "監査ログ",
-      "permissionDenied": "監査ログを閲覧できるのは、Enterpriseプランの組織のオーナー、管理者、または請求管理者のみです。",
+      "permissionDenied": "監査ログを閲覧できるのは、Enterpriseプランの組織のオーナー、管理者、または請求管理者のみです。 $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "監査イベントはありません",
       "emptyDescription": "この組織で行われた操作がここに表示されます。",
       "truncated": "最新のイベントを表示しています。",
@@ -3443,11 +3462,147 @@
         "guardrailUpdate": "ガードレールを更新",
         "guardrailRemove": "ガードレールを削除",
         "unknown": "監査イベント"
+      },
+      "detail": {
+        "fieldChange": "{{field}}: {{change}}",
+        "modeIdentity": "モード「{{name}}」（識別子：{{slug}}）",
+        "modeUpdate": "モード「{{name}}」：{{changes}}",
+        "field": {
+          "name": "$t(organization.modes.nameLabel)",
+          "slug": "$t(organization.modes.identifierLabel)",
+          "roleDefinition": "$t(organization.modes.roleLabel)",
+          "whenToUse": "$t(organization.modes.whenToUseLabel)",
+          "description": "$t(organization.modes.descriptionLabel)",
+          "customInstructions": "$t(codeReviewer.instructions.title)",
+          "groups": "$t(profiles.agents.tools)",
+          "autoRoute": "自動ルーティング",
+          "defaultModel": "デフォルトモデル"
+        },
+        "role": {
+          "owner": "$t(organization.members.roles.owner)",
+          "admin": "$t(organization.members.roles.admin)",
+          "billing_manager": "$t(organization.members.roles.billingManager)",
+          "member": "$t(organization.members.roles.member)"
+        },
+        "memberRole": "{{email}}: {{change}}",
+        "memberAdded": "{{email}}を{{role}}として追加しました",
+        "memberRemoved": "{{email}}を削除しました",
+        "memberParentAdded": "親組織{{parent}}から{{email}}を追加しました",
+        "memberParentRemoved": "親組織{{parent}}から{{email}}を削除しました",
+        "inviteSent": "{{email}}を{{role}}として",
+        "inviteRevoked": "{{email}}の招待を取り消しました",
+        "inviteAccepted": "{{email}}が承諾しました",
+        "groupIdentity": "グループ「{{name}}」",
+        "groupMembers": "グループ「{{name}}」：{{members}}",
+        "groupMemberGroups": "{{displayCount}}個のグループ",
+        "groupMemberGroups_one": "{{displayCount}}個のグループ",
+        "groupMemberGroups_other": "{{displayCount}}個のグループ",
+        "groupMemberGroupsOf": "{{email}}：{{displayCount}}個のグループ",
+        "groupMemberGroupsOf_one": "{{email}}：{{displayCount}}個のグループ",
+        "groupMemberGroupsOf_other": "{{email}}：{{displayCount}}個のグループ",
+        "groupPolicySet": "グループ「{{name}}」：{{policy}}ポリシーを設定",
+        "groupPolicyRemoved": "グループ「{{name}}」：{{policy}}ポリシーを削除",
+        "groupDefaultPolicySet": "デフォルトの{{policy}}ポリシーを設定",
+        "groupDefaultPolicyRemoved": "デフォルトの{{policy}}ポリシーを削除",
+        "guardrailIdentity": "{{type}} \"{{name}}\"",
+        "guardrailStatus": "{{type}} \"{{name}}\" {{state}}",
+        "guardrailConfig": "AIガードレール{{state}}",
+        "guardrailConfigGroup": "グループ「{{group}}」：{{state}}",
+        "guardrailEnforcement": "{{target}}: {{value}}",
+        "guardrailSkill": "{{target}}: {{values}}",
+        "guardrailTarget": {
+          "mcp": "$t(profiles.mcp.title)",
+          "skill": "$t(profiles.skillsTitle)"
+        },
+        "ssoDomainSet": "SSOドメイン：{{domain}}",
+        "ssoDomainChanged": "{{domain}}（旧：{{previous}}）",
+        "ssoDomainRemoved": "SSOドメイン{{domain}}を削除しました",
+        "fundsPurchased": "{{method}}で{{amount}}",
+        "fundsGranted": "{{amount}}",
+        "fundsDistributed": "{{displayCount}}つの子組織に{{amount}}",
+        "fundsDistributed_one": "{{displayCount}}つの子組織に{{amount}}",
+        "fundsDistributed_other": "{{displayCount}}つの子組織に{{amount}}",
+        "fundsReceived": "{{parent}}から{{amount}}",
+        "reviewAgentPlatform": "{{platform}}",
+        "reviewAgentConfig": "{{platform}}設定",
+        "reviewAgentConfigStyle": "{{platform}}：スタイル{{style}}",
+        "reviewAgentSecretsUpdated": "更新{{displayCount}}件",
+        "reviewAgentSecretsUpdated_one": "更新{{displayCount}}件",
+        "reviewAgentSecretsUpdated_other": "更新{{displayCount}}件",
+        "reviewAgentSecretsFailed": "エラー{{displayCount}}件",
+        "reviewAgentSecretsFailed_one": "エラー{{displayCount}}件",
+        "reviewAgentSecretsFailed_other": "エラー{{displayCount}}件",
+        "reviewAgentSecretRotated": "{{values}}",
+        "settingAdvancedPolicies": "{{values}}",
+        "settingAdvancedPoliciesOpenRouter": "OpenRouter {{state}}",
+        "settingAdvancedPoliciesRegion": "推論リージョン：{{region}}",
+        "settingDefaultModelSet": "{{next}}",
+        "settingDefaultModelRemoved": "{{previous}}",
+        "settingAutoRoute": "モード「{{mode}}」：{{change}}",
+        "settingDefaultBehavior": {
+          "global": "全体のデフォルト",
+          "specific": "{{model}}",
+          "auto": "$t(models.auto.organization)"
+        },
+        "settingDataCollection": "{{mode}}",
+        "dataCollection": {
+          "allowed": "許可",
+          "denied": "拒否",
+          "followSetting": "拡張機能の設定に従う"
+        },
+        "region": {
+          "us": "$t(organizationModelAccess.region.us)",
+          "eu": "$t(organizationModelAccess.region.eu)",
+          "au": "$t(organizationModelAccess.region.au)",
+          "jp": "$t(organizationModelAccess.region.jp)"
+        },
+        "settingProjectsUi": "Projects UI {{state}}",
+        "settingMinimumBalanceOn": "{{emails}}に{{threshold}}",
+        "settingMinimumBalanceThreshold": "{{threshold}}",
+        "settingRecommendationsDigest": "レコメンドダイジェスト{{state}}",
+        "settingBrowserControl": "{{policy}}",
+        "settingBrowserControlOrigins": "{{policy}}：{{origins}}",
+        "settingBrowserControlOriginsCleared": "{{policy}}：許可されたオリジンはありません",
+        "settingName": "{{previous}}から{{next}}に名前を変更しました",
+        "enabled": "$t(common.enabled)",
+        "scanBeforeUseOn": "使用前スキャン有効",
+        "scanBeforeUseOff": "使用前スキャン無効",
+        "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingRemoved": "削除：{{models}}",
+        "browserPolicyOff": "ブラウザ使用をブロック",
+        "browserPolicyAllow": "許可されたオリジンのみ",
+        "browserPolicyPlaywrightOnly": "ブラウザ使用のみ",
+        "disabled": "$t(common.disabled)",
+        "autoRouting": "モデル変更：{{values}}",
+        "integrationConnected": "{{integration}} 接続済み",
+        "integrationDisconnected": "{{integration}} 切断済み",
+        "integrationRefreshed": "{{integration}} リフレッシュ済み",
+        "integrationCancelled": "{{integration}} キャンセル済み",
+        "integrationModelUpdated": "{{integration}}：モデル {{model}}",
+        "integrationKeyAdded": "{{provider}}のキーを追加しました",
+        "integrationKeyUpdated": "{{provider}}のキーを更新しました",
+        "integrationKeyDeleted": "{{provider}}のキーを削除しました",
+        "integrationKeyToggled": "{{provider}}のキー: {{state}}",
+        "namedPolicyCreated": "{{kind}}ポリシー{{id}}を作成しました",
+        "namedPolicyUpdated": "{{kind}}ポリシー{{id}}を更新しました",
+        "namedPolicyDeleted": "{{kind}}ポリシー{{id}}を削除しました",
+        "namedPolicyLinked": "{{kind}}ポリシー{{next}}をリンクしました",
+        "webhookTriggerUpdated": "トリガー {{trigger}}",
+        "organizationRenamed": "組織名を{{previous}}から{{next}}に変更しました",
+        "brand": {
+          "github": "$t(common.github)",
+          "gitlab": "$t(common.gitlab)",
+          "bitbucket": "$t(agentChat.repoPicker.platformBitbucket)",
+          "discord": "$t(profile.providerDiscord)",
+          "slack": "$t(agentChat.sessionFilter.platformSlack)",
+          "linear": "$t(agentChat.sessionFilter.platformLinear)",
+          "byok": "独自のAPIキー"
+        }
       }
     },
     "billing": {
       "title": "請求",
-      "permissionDenied": "請求情報を表示できるのは、組織のオーナー、管理者、請求管理者のみです。",
+      "permissionDenied": "請求情報を表示できるのは、組織のオーナー、管理者、請求管理者のみです。 $t(organization.boundary.accessDeniedDescription)",
       "subscription": "サブスクリプション",
       "state": "状態",
       "stateNone": "サブスクリプションなし",
@@ -3636,7 +3791,7 @@
       "emptyDescription": "「前の1時間」をタップすると、それより前のリクエストが表示されます。",
       "emptyBoundDescription": "リクエストログはここまでしかさかのぼれません。",
       "loadError": "リクエストログを読み込めませんでした。",
-      "permissionDenied": "リクエストログを閲覧できるのは、組織のオーナー、管理者、または請求管理者のみです。",
+      "permissionDenied": "リクエストログを閲覧できるのは、組織のオーナー、管理者、または請求管理者のみです。 $t(organization.boundary.accessDeniedDescription)",
       "tokens": "入力 {{input}} · 出力 {{output}}",
       "byok": "BYOK"
     },
@@ -3737,7 +3892,7 @@
     "signupStepUpApple": "アカウントの作成を完了するには、「$t(login.signInWithApple)」を選択してください。",
     "signupStepUpGoogle": "アカウントの作成を完了するには、「$t(login.signInWithGoogle)」を選択してください。",
     "signupStepUpBack": "アカウントの作成を完了するには、前の画面に戻って「$t(login.moreSignInOptions)」を選択してください。",
-    "invalidCode": "そのコードは正しくないか、有効期限が切れています。もう一度お試しいただくか、「$t(login.resendCode)」を選択してください。",
+    "invalidCode": "そのコードは正しくないか、有効期限が切れています。「$t(login.resendCode)」または「$t(login.moreSignInOptions)」を選択してください。",
     "codeInProgress": "コードを処理中です。しばらく待ってからもう一度お試しください。",
     "tooManyAttempts": "試行回数が多すぎます。新しいコードをリクエストしてください。",
     "invalidToken": "サインインに失敗しました。もう一度お試しください。",
@@ -3902,7 +4057,10 @@
     "list": {
       "loadFailed": "チャット履歴を読み込めませんでした。",
       "new": "新しいチャット",
-      "deleteTitle": "このチャットを削除しますか？"
+      "deleteTitle": "このチャットを削除しますか？",
+      "resetNoticeTitle": "ローカルのチャットと下書きが削除されました",
+      "resetNoticeBody": "Kiloはこのデバイスに保存されているチャット履歴を読み込めませんでした。クラウド上のセッションは影響を受けません。",
+      "resetNoticeDismiss": "お知らせを非表示にする"
     },
     "rename": {
       "title": "チャット名を変更",
@@ -3952,6 +4110,9 @@
       "fieldName": "表示名",
       "fieldUrl": "サーバーURL",
       "fieldUrlInvalid": "有効なサーバーURLを入力してください。",
+      "fieldUrlCredentials": "URLからユーザー名とパスワードを削除してください。",
+      "fieldUrlFragment": "URLから#の部分を削除してください。",
+      "fieldUrlInsecure": "httpsのURLを入力し、httpはlocalhostの場合に限り使用できます。",
       "duplicateUrl": "そのURLはすでに保存されています。",
       "serverNotFound": "このサーバーはもう保存されていません。",
       "enableServer": "このサーバーを有効にする：{{name}}",
@@ -3977,6 +4138,7 @@
       "app": {
         "label": "ツールインターフェース",
         "failed": "このツールのインターフェースを読み込めませんでした。",
+        "tooLarge": "このツールのインターフェースは{{size}}の上限を超えています。",
         "empty": "このツールのインターフェースには表示するものがありません。"
       }
     },
@@ -4044,6 +4206,8 @@
       "discoveryNoModels": "エンドポイントにモデルが一覧にありませんでした。モデルを手動で入力してください。",
       "connectionIncomplete": "モデルは応答しましたが、完了しませんでした。もう一度お試しいただくか、モデルIDとプロトコルを確認してください。",
       "invalidInput": "バックエンド名、有効なヘッダー、および一意のIDと名前を持つモデルを少なくとも1つ入力してください。トークン数の上限には正の整数を指定してください。",
+      "invalidApiKey": "APIキーに送信できない文字が含まれています。英字、数字、標準的な記号のみを使用し、改行を含めないでください。",
+      "invalidHeaders": "カスタムヘッダーを送信できません。名前を確認し、英字、数字、標準的な記号のみを使用して、改行を含めないでください。",
       "invalidUrl": "認証情報、クエリ、フラグメントを含まないHTTPまたはHTTPSのAPIルートURLを入力してください。",
       "publicHttp": "公開HTTPエンドポイントは許可されません。HTTPSまたは非公開のローカルエンドポイントを使用してください。",
       "httpApprovalRequired": "保存または接続する前に、このローカルHTTPエンドポイントを承認してください。",
@@ -4092,6 +4256,7 @@
         "network": "ダウンロードが完了しませんでした。接続を確認して、もう一度お試しください。",
         "invalidFile": "ダウンロードしたファイルはこのアプリで実行できるモデルではないため、削除されました。",
         "checksum": "ダウンロードしたファイルが公開されているチェックサムと一致しないため、削除されました。もう一度ダウンロードしてください。",
+        "unreadable": "このデバイスではダウンロードしたファイルを確認できなかったため、削除されました。もう一度ダウンロードしてください。",
         "writeFailed": "このデバイスではモデルを保存できませんでした。もう一度ダウンロードしてください。"
       }
     },
@@ -4177,7 +4342,15 @@
       "download": "オンデバイスモデルをダウンロード",
       "downloading": "ダウンロード中…",
       "downloadProgress": "ダウンロード中… {{percent}}%",
-      "downloadFailed": "ダウンロードが完了しませんでした。接続と空き容量を確認してから、もう一度お試しください。"
+      "downloadFailed": "ダウンロードが完了しませんでした。接続と空き容量を確認してから、もう一度お試しください。",
+      "cannotUse": "実行できません：{{items}}。",
+      "cannotUseOptions": "入力できません：一部のツールオプション。",
+      "limitations": "制限",
+      "tools": {
+        "time": "時刻",
+        "settingsList": "設定を表示",
+        "settingsSet": "設定を変更"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "このモデルは思考量の指定に対応しています"
@@ -4356,6 +4529,7 @@
     "instructionSaveFailed": "指示を保存できませんでした",
     "instructionDeleteFailed": "指示を削除できませんでした",
     "instructionToggleFailed": "指示を更新できませんでした",
+    "instructionViewTitle": "指示ファイル",
     "instructionLimitReached": "プロファイルには最大{{max}}件の指示を保存できます。追加するには1件削除してください。",
     "mcp": {
       "title": "MCPサーバー",
@@ -4530,6 +4704,7 @@
       "emptyDescription": "クレジットの購入、領収書、使用状況がここに表示されます。",
       "emptyTitle": "クレジット履歴はありません",
       "expiredGrant": "期限切れ: {{description}}",
+      "expiredStatus": "期限切れ",
       "googlePlayReceipt": "領収書は Google Play にあります",
       "kind": {
         "adjustment": "調整",
@@ -4556,7 +4731,8 @@
       "receiptA11y": "{{description}}、{{amount}}、{{date}}の領収書を開く",
       "receiptUnavailable": "この購入の領収書はありません。",
       "retentionLimit": "最新のクレジット履歴を表示しています。",
-      "voidedGrant": "無効化済み: {{description}}"
+      "voidedGrant": "無効化済み: {{description}}",
+      "voidedStatus": "無効化済み"
     },
     "title": "クレジットを購入",
     "description": "クレジットは、Kilo AppでAIコーディングセッションを実行するためにKilo残高に追加される買い切りの購入です。ストアがアカウントに請求し、ストアが支払いを確認した後にクレジットが追加されます。",
@@ -4700,6 +4876,7 @@
     "contextAll": "すべてのコンテキスト",
     "dismiss": "ブリーフィングを非表示にする",
     "dismissFailed": "このブリーフィングはまだ非表示にできませんでした。バックグラウンドで再試行されます。",
+    "readMarkFailed": "このブリーフィングを既読にできませんでした。再読み込み時に再試行します。",
     "offline": "オフライン · 保存済みブリーフィング",
     "cached": "保存済みブリーフィング · 更新できません",
     "summary": "AI要約",
@@ -4719,16 +4896,21 @@
     "morningEnd": "ブリーフの利用可能期限",
     "timeHint": "ブリーフ期間が終わると、オフラインでもホームカードはライブ状況に戻ります。",
     "invalidSchedule": "有効なタイムゾーンと、空でないブリーフ期間を選択してください。",
+    "scheduleEmptyNight": "ブリーフ期間が空です。ブリーフ期間の開始より後の準備完了時刻を選択してください。",
+    "scheduleEmptyMorning": "準備完了時刻と利用可能終了時刻が一致しています。ブリーフが利用可能な期間の長さを選択してください。",
+    "scheduleFullDay": "2つのブリーフ期間が1日全体をカバーしています。1日の一部をブリーフの対象外にしてください。",
     "notificationsHint": "スケジュールされたブリーフごとに1回、一般的な通知が届きます。有料のAI要約とは無関係です。",
     "notificationPermission": "ブリーフィングを受け取るには、プッシュ通知をオンにしてください。",
     "defaultModel": "Kiloのデフォルトモデルを使用",
     "duration": "時間の上限(分)",
     "spendLimit": "支出の上限(USD)",
-    "invalidSafeguards": "正の有限な時間と支出の上限を入力してください。",
+    "invalidSafeguards": "許容範囲内の正の値を入力してください。",
     "estimate": "推定 {{estimate}} · 最大 {{maximum}}",
     "estimateUnavailable": "これらの設定では有料サマリーを利用できません。モデルや上限を変更するか、後でもう一度お試しください。",
     "confirmPaid": "{{context}}の有料要約を有効にしますか?",
+    "paidDisclosure_other": "見積もり{{estimate}}、最大{{maximum}}、制限時間{{minutes}}分。生成に失敗しても料金が発生します。",
     "paidDisclosure": "見積もり{{estimate}}、最大{{maximum}}、制限時間{{minutes}}分。生成に失敗しても料金が発生します。",
+    "paidDisclosure_one": "見積もり{{estimate}}、最大{{maximum}}、制限時間{{minutes}}分。生成に失敗しても料金が発生します。",
     "enable": "有料要約を有効にする",
     "allContexts": "個人と組織のブリーフィングは別々に管理されます。",
     "emptyHistory": "保存済みのブリーフィングはありません",
@@ -4767,7 +4949,7 @@
     "sourceActivity": "無題のアクティビティ",
     "metadataFailureProvider": "プロバイダーエラー",
     "metadataFailureTool": "ツールエラー",
-    "metadataFailureCancelled": "キャンセル済み",
+    "metadataStopped": "前回のターンが停止されました",
     "metadataFailureOther": "不明なエラー",
     "metadataPlan_one": "プラン: {{displayTotal}}ステップ中{{displayDone}}完了",
     "metadataFiles_one": "{{displayCount}}件のファイルを変更",
@@ -4792,7 +4974,8 @@
     "unavailableTitle": "使用状況を利用できません",
     "unavailableDescription": "このワークスペースでは使用状況が設定されていません。ここに使用状況が表示されるはずの場合は、サポートにお問い合わせください。",
     "orgSelfNotice": "この組織でのあなた自身の使用状況を表示しています。",
-    "viewDetails": "使用状況の詳細を表示"
+    "viewDetails": "使用状況の詳細を表示",
+    "orgSelfEntryTitle": "あなたの使用状況"
   },
   "integrations": {
     "title": "連携",
@@ -4888,6 +5071,8 @@
       "autoCommit": "実行完了時に変更をコミットする",
       "condenseOnComplete": "実行完了時にコンテキストを圧縮する",
       "activeTitle": "トリガー有効",
+      "activeSwitchA11y": "トリガー有効：{{name}}",
+      "copyLinkA11y": "{{name}}のリンクをコピー",
       "activeDescription": "一時停止中のウェブフックは404を返します。",
       "runAsCreator": "自分として実行",
       "runAsCreatorDescription": "すべての実行があなたのアカウントを使用するため、シークレットヘッダーが必要です。",

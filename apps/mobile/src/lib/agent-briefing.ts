@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { toast } from 'sonner-native';
 
 import { i18n } from '@/i18n';
+import { purgeInaccessibleBriefingCache } from '@/lib/agent-briefing-cache';
 import {
   briefingAccessDenied,
   canReadBriefingContext,
@@ -145,22 +146,25 @@ export function useBriefingPreferences() {
 
 export function useBriefingInvalidation(error: unknown) {
   const client = useQueryClient();
-  const trpc = useTRPC();
+  const { authEpoch } = useAuth();
   const { userId } = useCurrentUserId();
+  const memberships = useOrganizationsList();
+  const denied = briefingAccessDenied(error);
+  // Only a settled membership list can say which contexts are still readable;
+  // an unsettled one would make every organization look inaccessible.
+  const membershipsData = memberships.isSuccess ? memberships.data : undefined;
   useEffect(() => {
-    if (!briefingAccessDenied(error)) {
+    if (!denied || !membershipsData || !userId) {
       return;
     }
-    client.removeQueries({ queryKey: trpc.agentBriefing.pathKey() });
-    if (userId) {
-      void (async () => {
-        try {
-          await encryptedKv.removeItem(readCacheScope(userId), 'read-cache');
-        } catch {
-          // Best-effort cache cleanup for a context the user can no longer
-          // read; a later read rebuilds it, so a failure is not actionable.
-        }
-      })();
-    }
-  }, [client, error, trpc, userId]);
+    const organizationIds = readableBriefingOrganizationIds(membershipsData);
+    void (async () => {
+      try {
+        await purgeInaccessibleBriefingCache(client, { userId, authEpoch }, organizationIds);
+      } catch {
+        // Best-effort: the denied screen already renders its permission state,
+        // and the next membership read runs this prune again.
+      }
+    })();
+  }, [authEpoch, client, denied, membershipsData, userId]);
 }

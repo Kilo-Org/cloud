@@ -91,6 +91,21 @@ export type SessionSnapshotFailure = {
   message: string;
 };
 
+/**
+ * Whether a read result is already one of the typed history failures. A hook
+ * can hand back a typed failure instead of a page; such a value must reach the
+ * retry and terminal classification unchanged, not as a shape failure.
+ */
+export function isSessionSnapshotFailure(value: unknown): value is SessionSnapshotFailure {
+  if (typeof value !== 'object' || value === null) return false;
+  if (!('kind' in value) || !('message' in value)) return false;
+  const { kind, message } = value;
+  return (
+    typeof message === 'string' &&
+    (kind === 'retryable_failure' || kind === 'too_large' || kind === 'invalid_data')
+  );
+}
+
 export function sessionSnapshotFailureMessage(
   kind: SessionSnapshotFailureKind
 ): SessionSnapshotFailure {

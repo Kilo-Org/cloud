@@ -36,6 +36,7 @@ import { useProfiles, useCombinedProfiles, useProfile } from '@/hooks/useCloudAg
 import { useRefreshRepositories } from '@/hooks/useRefreshRepositories';
 import { useSlashCommandAutocomplete } from '@/hooks/useSlashCommandAutocomplete';
 import { commandsOrDefault } from '@cloud-agent-shared';
+import { isReservedAgentSlug } from '@kilocode/app-shared/agent-profile';
 import { useOrganizationDefaults } from '@/app/api/organizations/hooks';
 import { modelNameWithRetirement } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/retirement';
 import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
@@ -606,10 +607,15 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
     enabled: !!effectiveAgentProfileId,
   });
   // Expose only agents that would actually surface in the chat picker:
-  // not disabled, not hidden, and not subagent-only. Matches the
-  // extension's `session.agents().filter(a => a.mode !== 'subagent' && !a.hidden)`.
+  // not disabled, not hidden, not subagent-only, and carrying an id of its own,
+  // because the profile read keeps reserved ids out of a session.
+  // Matches the extension's `session.agents().filter(a => a.mode !== 'subagent' && !a.hidden)`.
   const visibleCustomAgents = (selectedProfileDetails?.agents ?? []).filter(
-    a => !a.config.disable && !a.config.hidden && a.config.mode !== 'subagent'
+    a =>
+      !a.config.disable &&
+      !a.config.hidden &&
+      a.config.mode !== 'subagent' &&
+      !isReservedAgentSlug(a.slug)
   );
   const customModeOptions: ModeOption<AgentMode>[] = visibleCustomAgents.map(a => ({
     value: a.slug as AgentMode,

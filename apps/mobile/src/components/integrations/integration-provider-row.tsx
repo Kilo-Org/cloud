@@ -98,8 +98,11 @@ export function IntegrationProviderRow({
   } else if (row.accountLabel) {
     subtitle = t('integrations.connectedTo', { account: row.accountLabel });
   }
-  const namedAction = (action: string) => [action, label].join(t('common.sentenceJoiner'));
-
+  // The row's one action is named with its provider, so a screen reader can tell
+  // four Connect cells apart. The catalog's list joiner keeps the two apart: a
+  // space or a sentence joiner glued a standalone verb onto the brand, which
+  // reads as a broken phrase in languages that attach a connector to it.
+  const namedAction = (action: string) => [label, action].join(t('common.listJoiner'));
   // The row's one action lives in its trailing cell: the contract allows one
   // primary action per screen, and a hub of four filled buttons read as four of
   // them. Connect is that cell's text action; a management action stays a

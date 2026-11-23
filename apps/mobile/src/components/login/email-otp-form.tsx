@@ -55,8 +55,9 @@ export function EmailOtpForm({
   onCodeChange,
   onResend,
   onBack,
-  onBrowserSignIn,
-  browserSignInStarting = false,
+  recovery,
+  onAlternativeSignIn,
+  alternativeSignInStarting = false,
   onBelowFieldHeightChange,
 }: Readonly<{
   email: string;
@@ -73,13 +74,12 @@ export function EmailOtpForm({
    */
   onResend: () => Promise<boolean>;
   onBack: () => void;
-  /**
-   * Presents the browser sign-in the `ADMISSION_REQUIRED` copy names; only that
-   * terminal refusal sets it.
-   */
-  onBrowserSignIn?: () => void;
-  /** A browser sign-in already started, so every action stays disabled. */
-  browserSignInStarting?: boolean;
+  /** A refusal no further code can clear: the step offers the other sign-in methods its message names. */
+  recovery?: 'options';
+  /** Starts the other sign-in methods. The control renders from `recovery`, so a missing handler only disables its press. */
+  onAlternativeSignIn?: () => void;
+  /** An alternative sign-in already started, so every action stays disabled. */
+  alternativeSignInStarting?: boolean;
   /**
    * Reports the height of everything below the code field, so the login shell
    * can keep that much of the form clear of the keyboard. A refusal can wrap,
@@ -98,7 +98,7 @@ export function EmailOtpForm({
    * field: a code typed while the request was in flight is not thrown away.
    */
   const resendAttemptRef = useRef(0);
-  const authBusy = busy !== undefined || browserSignInStarting;
+  const authBusy = busy !== undefined || alternativeSignInStarting;
   const destination = formatCodeDestination(
     t('login.enterCodeSentTo', { email: ADDRESS_SLOT }),
     email
@@ -147,9 +147,13 @@ export function EmailOtpForm({
         }}
         accessibilityLabel={formFieldA11y({ label: t('login.signInCodeField'), required: true })}
       />
-      {/* The refusal and the action it belongs to, as one block: a refusal
-          wraps in some catalogs, so the shell reads this block's measured height
-          instead of assuming the action sits one row below the field. */}
+      {/* Everything the keyboard can cover below the field, as one measured
+          block in the order the user reads it: the refusal, the action it
+          belongs to, the resend that replaces the code, and — only while a
+          refusal a code cannot clear stands — the other sign-in methods its
+          copy names. A refusal wraps in some catalogs, so the shell reads this
+          block's measured height instead of assuming the actions sit one row
+          below the field. */}
       <View
         className="gap-3"
         onLayout={event => {
@@ -164,22 +168,6 @@ export function EmailOtpForm({
           >
             {error}
           </Text>
-        ) : null}
-        {onBrowserSignIn ? (
-          // The terminal refusal's copy names this control, so it sits with the
-          // message: a full-size action, one line like the others.
-          <Button
-            variant="outline"
-            size="lg"
-            disabled={authBusy}
-            loading={browserSignInStarting}
-            onPress={onBrowserSignIn}
-            accessibilityLabel={t('login.moreSignInOptions')}
-          >
-            <Text className="flex-1 text-center" numberOfLines={1} adjustsFontSizeToFit>
-              {t('login.moreSignInOptions')}
-            </Text>
-          </Button>
         ) : null}
         <Button
           size="lg"
@@ -196,40 +184,56 @@ export function EmailOtpForm({
             {t('login.verifyCode')}
           </Text>
         </Button>
+        <Button
+          variant="outline"
+          disabled={authBusy}
+          loading={busy === 'otp-send'}
+          onPress={() => {
+            const attempt = (resendAttemptRef.current += 1);
+            void (async () => {
+              const sent = await onResend();
+              // Only a request the field still owns may empty it: a code typed (or
+              // a second resend started) while this one ran stays as it is.
+              if (!sent || attempt !== resendAttemptRef.current) {
+                return;
+              }
+              // The field is uncontrolled (iOS text input rules), so the native
+              // box is emptied through the ref: the resend replaces the code, and
+              // the old one left in place read as if the new one had arrived.
+              inputRef.current?.clear();
+              codeRef.current = '';
+              setHasCompleteCode(false);
+            })();
+          }}
+          accessibilityLabel={t('login.resendCode')}
+        >
+          {/* One line, like every other label in this stack: the Arabic secondary
+              label ("إعادة إرسال الرمز") wrapped onto two lines inside the
+              full-width button, so the copy did not fit its control (2026-09-19
+              device finding). The label shrinks to fit that one line and then
+              ellipsizes instead of growing a second row; the full label stays the
+              control's accessible name. */}
+          <Text className="flex-1 text-center" numberOfLines={1} adjustsFontSizeToFit>
+            {t('login.resendCode')}
+          </Text>
+        </Button>
+        {recovery === 'options' ? (
+          // The refusal's copy names this control, so it renders from the data
+          // tag beside the message: a full-size action, one line like the others.
+          <Button
+            variant="outline"
+            size="lg"
+            disabled={authBusy}
+            loading={alternativeSignInStarting}
+            onPress={onAlternativeSignIn}
+            accessibilityLabel={t('login.moreSignInOptions')}
+          >
+            <Text className="flex-1 text-center" numberOfLines={1} adjustsFontSizeToFit>
+              {t('login.moreSignInOptions')}
+            </Text>
+          </Button>
+        ) : null}
       </View>
-      <Button
-        variant="outline"
-        disabled={authBusy}
-        loading={busy === 'otp-send'}
-        onPress={() => {
-          const attempt = (resendAttemptRef.current += 1);
-          void (async () => {
-            const sent = await onResend();
-            // Only a request the field still owns may empty it: a code typed (or
-            // a second resend started) while this one ran stays as it is.
-            if (!sent || attempt !== resendAttemptRef.current) {
-              return;
-            }
-            // The field is uncontrolled (iOS text input rules), so the native
-            // box is emptied through the ref: the resend replaces the code, and
-            // the old one left in place read as if the new one had arrived.
-            inputRef.current?.clear();
-            codeRef.current = '';
-            setHasCompleteCode(false);
-          })();
-        }}
-        accessibilityLabel={t('login.resendCode')}
-      >
-        {/* One line, like every other label in this stack: the Arabic secondary
-            label ("إعادة إرسال الرمز") wrapped onto two lines inside the
-            full-width button, so the copy did not fit its control (2026-09-19
-            device finding). The label shrinks to fit that one line and then
-            ellipsizes instead of growing a second row; the full label stays the
-            control's accessible name. */}
-        <Text className="flex-1 text-center" numberOfLines={1} adjustsFontSizeToFit>
-          {t('login.resendCode')}
-        </Text>
-      </Button>
       <Button
         variant="ghost"
         disabled={authBusy}

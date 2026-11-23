@@ -270,8 +270,6 @@ describe('htmlSanitizesToEmpty', () => {
     const readsOf = (tags: number): number => charactersRead('<input><source>'.repeat(tags / 2));
     const small = readsOf(1_000);
     const large = readsOf(4_000);
-    // Four times the input: the linear scan reads about 4×, a per-tag tail walk
-    // about 16×.
     expect(large).toBeLessThan(small * 5);
   });
 
@@ -287,8 +285,6 @@ describe('htmlSanitizesToEmpty', () => {
       charactersRead(`${'<input'.repeat(n)}>${'<input'.repeat(n)}`);
     const small = readsOf(1_000);
     const large = readsOf(4_000);
-    // Four times the input: the forwarding cursor reads about 4×, the per-tag
-    // rescan about 16×.
     expect(large).toBeLessThan(small * 5);
   });
 

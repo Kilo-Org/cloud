@@ -1954,11 +1954,60 @@ export async function anonymizeCloudUserData(
       )
     );
 
-  // Organization audit logs: keep the log entries, strip actor PII
+  // Organization audit logs: keep the log entries, strip the deleted user's PII.
+  //
+  // The actor columns belong to the person who acted, so they are cleared on
+  // the rows that person authored.
   await tx
     .update(organization_audit_logs)
     .set({ actor_email: null, actor_name: null })
     .where(eq(organization_audit_logs.actor_id, userId));
+
+  // A structured detail names its *subject*, which is usually someone else, so
+  // it is redacted by the address it holds rather than by the row's author.
+  // Clearing it where the author matched instead would have erased another
+  // member's address while leaving this one's in the rows about them. The
+  // detail schema requires `email`, so a redacted row's detail no longer parses
+  // and falls back to its event name — as a row written before the column did.
+  if (user.google_user_email) {
+    const address = user.google_user_email;
+    await tx
+      .update(organization_audit_logs)
+      .set({
+        details: sql`case when ${organization_audit_logs.details} is null then null else ${organization_audit_logs.details} - 'email' end`,
+      })
+      .where(eq(sql`${organization_audit_logs.details}->>'email'`, address));
+
+    // The same address can sit in a detail's `emails` list rather than in its
+    // `email` field: `setting.minimumBalanceAlert` stores the alert's recipients
+    // as an array. Those rows are selected by containment — the list holds the
+    // address — and the list is rebuilt without it. Every other detail key
+    // survives. A list the scrub empties is dropped rather than written as
+    // `[]`: the row's sentence names the recipients, so an empty list would
+    // leave it dangling, while the absent key states the threshold alone. A
+    // null detail is left null, and so is one that did not hold the address.
+    await tx.execute(sql`
+      UPDATE organization_audit_logs
+      SET details = (${organization_audit_logs.details} - 'emails') || jsonb_strip_nulls(
+        jsonb_build_object(
+          'emails',
+          NULLIF(
+            COALESCE(
+              (
+                SELECT jsonb_agg(entry.recipient)
+                FROM jsonb_array_elements_text(${organization_audit_logs.details}->'emails') AS entry(recipient)
+                WHERE entry.recipient <> ${address}::text
+              ),
+              '[]'::jsonb
+            ),
+            '[]'::jsonb
+          )
+        )
+      )
+      WHERE jsonb_typeof(${organization_audit_logs.details}->'emails') = 'array'
+        AND ${organization_audit_logs.details}->'emails' ? ${address}::text
+    `);
+  }
 
   await tx
     .update(organization_groups)

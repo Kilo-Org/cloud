@@ -32,9 +32,11 @@ import {
   type SessionSnapshotPageOutcome,
   type SessionStatusIndicator,
   type StandalonePermission,
+  type StandaloneQuestion,
   type StoredMessage,
   type ToolPart,
   type UnreadablePermissionState,
+  type UnreadableQuestionState,
 } from '@kilocode/cloud-agent-sdk';
 import { cloudAgentId, kiloId, stubTextPart } from '@kilocode/cloud-agent-sdk/test-helpers';
 
@@ -53,6 +55,7 @@ import {
 import { RemoteSessionExitFailure } from '@/components/agents/remote-session-exit-failure';
 import { PermissionCard } from '@/components/agents/permission-card';
 import { PermissionUnreadableNotice } from '@/components/agents/permission-unreadable-notice';
+import { QuestionUnreadableNotice } from '@/components/agents/question-unreadable-notice';
 import { setSessionAutoApproveEnabled } from '@/components/agents/session-auto-approve';
 import {
   isSessionGoalCollapsed,
@@ -102,6 +105,11 @@ import { i18n } from '@/i18n';
 import { captureEvent, SESSION_VIEWED_EVENT } from '@/lib/analytics/posthog';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { recordLastOpenedSession } from '@/lib/last-opened-session';
+import {
+  _resetNeedsInputReplyDraftForTests,
+  peekNeedsInputReplyDraft,
+  rememberNeedsInputReplyDraft,
+} from '@/lib/needs-input-reply-draft';
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 
 const managerSlot = vi.hoisted(() => ({ current: null as SessionManager | null }));
@@ -1050,6 +1058,7 @@ beforeEach(() => {
   scopeReads.profiles.length = 0;
   scopeReads.modes.length = 0;
   scopeReads.catalogModels = [];
+  _resetNeedsInputReplyDraftForTests();
   vi.mocked(createAndNavigateAgentSession).mockReset();
   vi.mocked(restartAgentSession).mockReset();
 });
@@ -1411,9 +1420,7 @@ describe('SessionDetailContent display scope', () => {
     expect(header.findByProps({ accessibilityLabel: i18n.t('common.goBack') })).toBeDefined();
     const rename = header.findByProps({
       accessibilityLabel: `Root ${ROOT_ID}`,
-      accessibilityHint: i18n.t('agentChat.session.renameAccessibility', {
-        title: `Root ${ROOT_ID}`,
-      }),
+      accessibilityHint: i18n.t('agentChat.session.renameSession'),
     });
     expect(rename.props.accessibilityLabel).toBe(`Root ${ROOT_ID}`);
     act(rename.props.onPress as () => void);
@@ -3326,7 +3333,11 @@ describe('session detail terminal load failure retry', () => {
         await Promise.resolve();
       });
       expect(errorCard(view).isRetrying).toBe(false);
-      expect(errorCard(view).message).toBe(i18n.t('agentChat.session.failedToLoadDetails'));
+      // The reopen answered with the typed retryable history failure, so the
+      // card names the temporary outage instead of the generic page-load line.
+      expect(errorCard(view).message).toBe(
+        i18n.t('agentChat.session.historyTemporarilyUnavailable')
+      );
       expect(cardRetryAction(view.renderer)).toBeDefined();
     } finally {
       vi.useRealTimers();
@@ -3889,6 +3900,48 @@ describe('session detail unreadable permission notice', () => {
     });
 
     expect(view.renderer.root.findAllByType(PermissionUnreadableNotice)).toHaveLength(0);
+  });
+});
+
+describe('session detail unreadable question notice', () => {
+  const waiting: readonly UnreadableQuestionState[] = [{ requestId: 'que-1' }];
+  const none: readonly UnreadableQuestionState[] = [];
+
+  it('explains the waiting question and draws no answer card', async () => {
+    const view = await mountDetails([]);
+    act(() => {
+      view.store.set(view.manager.atoms.unreadableQuestions, waiting);
+    });
+
+    expect(view.renderer.root.findAllByType(QuestionUnreadableNotice)).toHaveLength(1);
+    expect(view.renderer.root.findAllByType('QuestionCard')).toHaveLength(0);
+    expect(renderedText(view.renderer.root)).toContain(
+      'waiting on a question this app cannot show'
+    );
+  });
+
+  it('sits beside the unreadable permission notice', async () => {
+    const view = await mountDetails([]);
+    const unreadablePermission: readonly UnreadablePermissionState[] = [{ requestId: 'perm-1' }];
+    act(() => {
+      view.store.set(view.manager.atoms.unreadableQuestions, waiting);
+      view.store.set(view.manager.atoms.unreadablePermissions, unreadablePermission);
+    });
+
+    expect(view.renderer.root.findAllByType(QuestionUnreadableNotice)).toHaveLength(1);
+    expect(view.renderer.root.findAllByType(PermissionUnreadableNotice)).toHaveLength(1);
+  });
+
+  it('renders nothing once the request is answered', async () => {
+    const view = await mountDetails([]);
+    act(() => {
+      view.store.set(view.manager.atoms.unreadableQuestions, waiting);
+    });
+    act(() => {
+      view.store.set(view.manager.atoms.unreadableQuestions, none);
+    });
+
+    expect(view.renderer.root.findAllByType(QuestionUnreadableNotice)).toHaveLength(0);
   });
 });
 
@@ -6733,5 +6786,70 @@ describe('session detail compute polling', () => {
     computePolling.focusedAndActive = false;
     await mountDetails();
     expect(computeReadArgs.calls.at(-1)?.poll).toBe(false);
+  });
+});
+
+describe('session detail needs-input reply draft', () => {
+  const QUESTION: StandaloneQuestion = {
+    requestId: 'question-1',
+    questions: [
+      {
+        question: 'How should the agent proceed?',
+        header: 'Agent needs input',
+        options: [{ label: 'Continue', description: '' }],
+        multiple: false,
+        custom: true,
+      },
+    ],
+  };
+
+  function cardNodes(renderer: ReactTestRenderer): ReactTestInstance[] {
+    return renderer.root.findAll(node => Object.is(node.type, 'QuestionCard'));
+  }
+
+  async function mountQuestion() {
+    const view = await mountDetails([]);
+    act(() => {
+      view.store.set<StandaloneQuestion | null, [StandaloneQuestion | null], unknown>(
+        view.manager.atoms.activeQuestion,
+        QUESTION
+      );
+    });
+    await waitFor(() => cardNodes(view.renderer).length > 0);
+    return view;
+  }
+
+  // A reply typed into the needs-input notification waits in memory for this
+  // session. The card offers it, so the person does not type it again.
+  it('offers a reply remembered before the question reached the screen', async () => {
+    rememberNeedsInputReplyDraft(ROOT_ID, 'ship it');
+
+    const view = await mountQuestion();
+
+    expect(cardNodes(view.renderer)[0]?.props.initialAnswer).toBe('ship it');
+    // One remember produces one offer.
+    expect(peekNeedsInputReplyDraft(ROOT_ID)).toBeNull();
+  });
+
+  // The real flow: the chat screen is already on top showing the question when
+  // the tap lands, so no route param and no mount changes. Only the slot's own
+  // change reaches the card.
+  it('offers a reply remembered while the question is already on screen', async () => {
+    const view = await mountQuestion();
+    expect(cardNodes(view.renderer)[0]?.props.initialAnswer).toBeNull();
+
+    act(() => {
+      rememberNeedsInputReplyDraft(ROOT_ID, 'hold the release');
+    });
+    await waitFor(() => cardNodes(view.renderer)[0]?.props.initialAnswer === 'hold the release');
+
+    expect(cardNodes(view.renderer)[0]?.props.initialAnswer).toBe('hold the release');
+    expect(peekNeedsInputReplyDraft(ROOT_ID)).toBeNull();
+  });
+
+  it('leaves the card unseeded when the session holds no remembered reply', async () => {
+    const view = await mountQuestion();
+
+    expect(cardNodes(view.renderer)[0]?.props.initialAnswer).toBeNull();
   });
 });

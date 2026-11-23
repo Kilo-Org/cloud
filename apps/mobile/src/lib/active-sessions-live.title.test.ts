@@ -46,9 +46,7 @@ describe('sticky DB title across WS merges', () => {
       ],
     });
     expect(result[0]?.title).toBe('db-title');
-    // Sticky attention keeps the cached question status through the busy heartbeat.
     expect(result[0]?.status).toBe('question');
-    // Capabilities upgrade/downgrade unaffected.
     expect(result[0]?.capabilities).toEqual({ attachments: false });
   });
 
@@ -107,7 +105,6 @@ describe('applyActiveSessionTitle', () => {
     const result = applyActiveSessionTitle(current, 'a', 'new');
     expect(result[0]?.title).toBe('new');
     expect(result[1]?.title).toBe('other');
-    // Other rows untouched by identity.
     expect(result[1]).toBe(current[1]);
   });
 

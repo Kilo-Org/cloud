@@ -1,4 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useAutoSelectModel } from './use-auto-select-model';
@@ -10,6 +11,15 @@ const fixture = vi.hoisted(() => {
   return {
     stored,
     hasLoaded: true,
+    // The organization-default read's answer. Each case sets the phase it needs
+    // and `refetch` swaps in what the read answers on the retry.
+    orgDefault: {
+      defaultModel: undefined as string | undefined,
+      isPending: false,
+      isError: false,
+      isFetching: false,
+    },
+    refetch: () => undefined,
     save: (_input: { model: string; variant?: string }) => Promise.resolve(),
     read: () => Promise.resolve({ favorites: ['first'], lastSelected: { model: 'first' } }),
   };
@@ -24,7 +34,12 @@ vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 vi.mock('@/i18n', () => ({ i18n: { t: (key: string) => key } }));
 
 vi.mock('@/lib/hooks/use-available-models', () => ({
-  useOrgDefaultModel: () => ({ defaultModel: undefined, isLoading: false }),
+  useOrgDefaultModel: () => ({
+    ...fixture.orgDefault,
+    refetch: () => {
+      fixture.refetch();
+    },
+  }),
 }));
 vi.mock('@/lib/hooks/use-persisted-agent-model', () => ({
   usePersistedAgentModel: () => ({ stored: fixture.stored, hasLoaded: fixture.hasLoaded }),
@@ -60,15 +75,39 @@ vi.mock('@/lib/trpc', () => ({
 }));
 
 let selected = { model: '', variant: '' };
+let resultKind = 'waiting';
 let choose: () => void = () => {
   throw new Error('Form not mounted');
 };
+let retryOrgDefault: () => void = () => {
+  throw new Error('Form not mounted');
+};
 function Form() {
-  selected = useAutoSelectModel(models, undefined);
+  const [, bump] = useState(0);
+  const autoSelected = useAutoSelectModel(models, undefined);
+  resultKind = autoSelected.kind;
+  selected =
+    autoSelected.kind === 'selected'
+      ? { model: autoSelected.model, variant: autoSelected.variant }
+      : { model: '', variant: '' };
+  if (autoSelected.kind === 'org-default-failed') {
+    retryOrgDefault = autoSelected.onRetry;
+  }
   const { setLastSelected } = useModelPreferences(undefined);
   choose = () => {
     fixture.stored = { personal: { model: 'chosen', variant: 'high' } };
     setLastSelected({ model: 'chosen', variant: 'high' });
+  };
+  // The mocked read answers from the fixture, so the retry's own swap has to
+  // re-render this form the way the real query's state change would.
+  fixture.refetch = () => {
+    fixture.orgDefault = {
+      defaultModel: 'chosen',
+      isPending: false,
+      isError: false,
+      isFetching: false,
+    };
+    bump(count => count + 1);
   };
   return null;
 }
@@ -93,6 +132,14 @@ beforeEach(() => {
   vi.stubGlobal('__DEV__', false);
   fixture.stored = {};
   fixture.hasLoaded = true;
+  fixture.orgDefault = {
+    defaultModel: undefined,
+    isPending: false,
+    isError: false,
+    isFetching: false,
+  };
+  selected = { model: '', variant: '' };
+  resultKind = 'waiting';
   client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 });
 afterEach(() => {
@@ -199,6 +246,63 @@ describe('new-session preference resolution', () => {
     act(() => {
       renderForm('loading');
     });
+    expect(selected).toEqual({ model: 'chosen', variant: 'high' });
+  });
+
+  it('selects nothing while the organization default is still being read', () => {
+    fixture.orgDefault = {
+      defaultModel: undefined,
+      isPending: true,
+      isError: false,
+      isFetching: true,
+    };
+    client.setQueryData(queryKey, { favorites: [], lastSelected: null });
+    act(() => {
+      renderForm('org-default-pending');
+    });
+    expect(resultKind).toBe('waiting');
+    expect(selected).toEqual({ model: '', variant: '' });
+  });
+
+  it('reports a failed organization-default read instead of committing the first catalog row', () => {
+    fixture.orgDefault = {
+      defaultModel: undefined,
+      isPending: false,
+      isError: true,
+      isFetching: false,
+    };
+    client.setQueryData(queryKey, { favorites: [], lastSelected: null });
+    act(() => {
+      renderForm('org-default-failed');
+    });
+    expect(resultKind).toBe('org-default-failed');
+    expect(selected).toEqual({ model: '', variant: '' });
+
+    // Nothing was committed, so a later render has no choice to keep: the
+    // first catalog row is never written into the mount's selection.
+    act(() => {
+      renderForm('org-default-failed');
+    });
+    expect(selected).toEqual({ model: '', variant: '' });
+  });
+
+  it('applies the organization default once the retried read answers', () => {
+    fixture.orgDefault = {
+      defaultModel: undefined,
+      isPending: false,
+      isError: true,
+      isFetching: false,
+    };
+    client.setQueryData(queryKey, { favorites: [], lastSelected: null });
+    act(() => {
+      renderForm('org-default-retry');
+    });
+    expect(resultKind).toBe('org-default-failed');
+
+    act(() => {
+      retryOrgDefault();
+    });
+    expect(resultKind).toBe('selected');
     expect(selected).toEqual({ model: 'chosen', variant: 'high' });
   });
 });

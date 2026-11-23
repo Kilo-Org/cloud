@@ -93,6 +93,7 @@
     "draft": "Koncept",
     "enabled": "Zapnuto",
     "github": "GitHub",
+    "image": "Obrázek",
     "imageUnavailable": "Obrázek není k dispozici.",
     "loading": "Načítá se…",
     "loadMore": "Načíst více",
@@ -401,7 +402,7 @@
       "title": "Klíče poskytovatelů",
       "rowSubtitle": "Používat vlastní fakturaci u poskytovatele",
       "orgDescription": "Tyto klíče jsou sdíleny se všemi v organizaci a účtují se na její účty u poskytovatelů.",
-      "viewOnly": "Klíče organizace může měnit pouze její vlastník, administrátor nebo správce fakturace.",
+      "viewOnly": "Klíče organizace může měnit pouze její vlastník, správce nebo správce fakturace.",
       "description": "Požadavky přes tyto klíče se účtují na váš účet u poskytovatele, ne z vašeho zůstatku v Kilo.",
       "managedByPlan": "Spravuje váš programovací tarif",
       "enableKey": "Povolit klíč pro {{provider}}",
@@ -524,6 +525,7 @@
       "receiptLabel": "Potvrzení",
       "copyReceiptId": "Kopírovat ID potvrzení",
       "appealLabel": "Odvolání",
+      "appealStatusLine": "$t(profile.reportReceipt.appealLabel): {{status}}",
       "triageReceived": "Přijato",
       "triageOpen": "Posuzuje se",
       "triageActioned": "Uznáno",
@@ -557,7 +559,7 @@
       "title": "Nahlášení",
       "rowSubtitle": "Vámi podaná nahlášení a jejich výsledky",
       "emptyTitle": "Zatím žádná nahlášení",
-      "emptyDescription": "Nahlášení, která podáte z komentáře nebo z odpovědi AI, se zobrazí zde.",
+      "emptyDescription": "Nahlášení, která podáte z komentáře v diskuzi k pull requestu nebo z odpovědi AI v relaci agenta, se zde zobrazí včetně výsledku.",
       "couldNotLoad": "Nepodařilo se načíst vaše nahlášení",
       "capped": "Zobrazují se vaše nejnovější nahlášení."
     },
@@ -1293,6 +1295,7 @@
     "needsInputAction": {
       "approved": "Žádost schválena",
       "replied": "Odpověď odeslána",
+      "empty": "Napište odpověď a poté ji odešlete.",
       "failed": "Odpovědět se nepodařilo. Klepnutím to zkuste znovu.",
       "unavailable": "Tato žádost už nečeká."
     }
@@ -1557,7 +1560,9 @@
       "githubError": "Nastavení GitHubu se nepodařilo otevřít. Zkuste to prosím znovu.",
       "gitlabAccount": "účet GitLab",
       "gitlabError": "Nastavení GitLabu se nepodařilo otevřít. Zkuste to prosím znovu.",
-      "description": "Nastavte propojení služby Kilo ({{label}}), aby se PR kontrolovaly automaticky."
+      "description": "Nastavte propojení služby Kilo ({{label}}), aby se PR kontrolovaly automaticky.",
+      "notConnectedTitle": "{{platform}} není připojen",
+      "githubAdminOnlyDescription": "Připojit ji mohou pouze vlastníci organizace a správci."
     },
     "overview": {
       "allAreas": "Všechny oblasti",
@@ -2269,7 +2274,8 @@
       "sectionAccessibility_other": "{{title}}: {{displayCount}} relace",
       "sectionAccessibility": "{{title}}: {{displayCount}} relace",
       "live": "ŽIVĚ",
-      "updating": "Aktualizace"
+      "updating": "Aktualizace",
+      "retentionLimit": "Zobrazují se nejnovější relace."
     },
     "sessionRow": {
       "deleteTitle": "Smazat relaci?",
@@ -2343,11 +2349,11 @@
       "scrollToBottom": "Posunout na konec",
       "emptyTitle": "Zatím žádné zprávy",
       "emptyReadOnlyTitle": "Žádné zprávy v této relaci",
-      "renameAccessibility": "Přejmenovat relaci: {{title}}",
       "cloningSession": "Klonování relace",
       "couldNotLoadThisSession": "Tuto relaci se nepodařilo načíst.",
       "historyTooLarge": "Přepis této relace je příliš velký k načtení.",
       "historyUnavailable": "Přepis této relace nelze přečíst.",
+      "historyTemporarilyUnavailable": "Přepis této relace je dočasně nedostupný.",
       "cloneFailedRetry": "Tuto relaci se nepodařilo klonovat. Zkuste to znovu.",
       "notEnoughCredits": "Nemáte dost kreditů pro tento požadavek. Dobijte si kredity a zkuste to znovu.",
       "previousTaskFinishing": "Předchozí úkol se ještě dokončuje. Chvíli prosím počkejte.",
@@ -2761,6 +2767,7 @@
     "filePart": {
       "loadingImage": "Načítání obrázku",
       "imageUnavailableRetry": "Obrázek není k dispozici, znovu načíst",
+      "imageUnavailableRetryWithAlt": "Obrázek není k dispozici, {{alt}}, znovu načíst",
       "imagePreviewUnavailableInSession": "Náhled obrázku není v této relaci k dispozici.",
       "viewImage": "Zobrazit obrázek",
       "viewImageWithAlt": "Zobrazit obrázek {{alt}}",
@@ -2892,7 +2899,9 @@
       "skip": "Přeskočit",
       "retrySkip": "Opakovat přeskočení",
       "submitting": "Odesílání…",
-      "sendAnswers": "Odeslat odpovědi"
+      "sendAnswers": "Odeslat odpovědi",
+      "unreadableTitle": "Tuto otázku nelze zobrazit",
+      "unreadableBody": "Agent čeká na otázku, kterou tato aplikace nedokáže zobrazit. Odpovězte na otázku v CLI a pokračujte."
     },
     "blockingCard": {
       "questionUnavailable": "Tato otázka již není k dispozici.",
@@ -2919,6 +2928,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Relaci podřízeného agenta se nepodařilo načíst.",
+      "historyTooLarge": "Historie tohoto podřízeného agenta je příliš velká k načtení.",
+      "historyUnavailable": "Historie tohoto podřízeného agenta není dostupná.",
+      "historyTemporarilyUnavailable": "Historie tohoto podřízeného agenta je dočasně nedostupná.",
       "failed": "Relace podřízeného agenta selhala.",
       "noMessages": "Žádné zprávy podřízeného agenta",
       "noMessagesDescription": "Tato relace podřízeného agenta skončila bez vytvoření přepisu.",
@@ -3216,6 +3228,12 @@
     "retryLoadingAccount": "Znovu načíst účet",
     "retryLoadingPrivacy": "Znovu načíst nastavení soukromí"
   },
+  "accountBlocked": {
+    "title": "Účet zablokován",
+    "description": "Kilo zablokovalo tento účet a nové přihlášení to nezruší. Podpora může blokaci na požádání přezkoumat.",
+    "domainDescription": "Kilo zablokovalo účty na této e-mailové doméně a nové přihlášení to nezruší. Podpora může doménu na požádání přezkoumat.",
+    "contactSupport": "Kontaktovat podporu"
+  },
   "addCredits": {
     "cta": "Dobít kredity",
     "billingPage": "stránka fakturace"
@@ -3288,8 +3306,7 @@
     "timeoutDescription": "Požadavek vypršel dříve, než se dokončil. Zkuste to prosím znovu."
   },
   "screenHeader": {
-    "openMenu": "Otevřít nabídku",
-    "openMenuFor": "Otevřít nabídku pro {{title}}"
+    "openMenu": "Otevřít nabídku"
   },
   "picker": {
     "optionsExpired": "Platnost možností vypršela",
@@ -3512,6 +3529,8 @@
     "voiceTranscriptionWho": "Tvoje zařízení, Kilo Gateway s tebou zvoleným modelem přepisu, nebo Apple či Google pro online rozpoznávání.",
     "installAttributionPromptTitle": "Povolit zjištění zdroje instalace?",
     "installAttributionPromptMessage": "Kilo používá oprávnění ke sledování od Apple pouze ke zjištění, odkud k nám přicházíte. Vaše zadání ani konverzace k tomu nikdy nepoužívá.",
+    "installAttributionRequestFailedTitle": "Výzvu ke sledování se nepodařilo zobrazit",
+    "installAttributionRequestFailedMessage": "Kilo nemohl zobrazit systémovou výzvu, proto zjištění zdroje instalace zůstává vypnuté.",
     "what": "Co",
     "why": "Proč",
     "who": "Kdo"
@@ -3527,7 +3546,7 @@
   "organization": {
     "auditLog": {
       "title": "Auditní protokol",
-      "permissionDenied": "Auditní protokol organizace s plánem Enterprise si může prohlížet jen její vlastník, administrátor nebo správce fakturace.",
+      "permissionDenied": "Auditní protokol organizace s plánem Enterprise si může prohlížet jen její vlastník, správce nebo správce fakturace. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Žádné události auditu",
       "emptyDescription": "Zde se zobrazí akce provedené v této organizaci.",
       "truncated": "Zobrazují se nejnovější události.",
@@ -3543,7 +3562,7 @@
         "promoCreditGranted": "Propagační kredity přiděleny",
         "memberRemove": "Odebrání člena",
         "memberChangeRole": "Změna role člena",
-        "memberAdminAdd": "Přidání administrátora",
+        "memberAdminAdd": "Přidání správce",
         "memberAutoJoin": "Automatické připojení člena",
         "ssoAutoProvision": "Zřízení uživatele přes SSO",
         "ssoSetDomain": "Přidání domény SSO",
@@ -3577,11 +3596,157 @@
         "guardrailUpdate": "Ochranné pravidlo upraveno",
         "guardrailRemove": "Ochranné pravidlo odebráno",
         "unknown": "Událost auditu"
+      },
+      "detail": {
+        "fieldChange": "{{field}}: {{change}}",
+        "modeIdentity": "Režim \"{{name}}\" (identifikátor: {{slug}})",
+        "modeUpdate": "Režim \"{{name}}\": {{changes}}",
+        "field": {
+          "name": "$t(organization.modes.nameLabel)",
+          "slug": "$t(organization.modes.identifierLabel)",
+          "roleDefinition": "$t(organization.modes.roleLabel)",
+          "whenToUse": "$t(organization.modes.whenToUseLabel)",
+          "description": "$t(organization.modes.descriptionLabel)",
+          "customInstructions": "$t(codeReviewer.instructions.title)",
+          "groups": "$t(profiles.agents.tools)",
+          "autoRoute": "Automatické směrování",
+          "defaultModel": "Výchozí model"
+        },
+        "role": {
+          "owner": "$t(organization.members.roles.owner)",
+          "admin": "$t(organization.members.roles.admin)",
+          "billing_manager": "$t(organization.members.roles.billingManager)",
+          "member": "$t(organization.members.roles.member)"
+        },
+        "memberRole": "{{email}}: {{change}}",
+        "memberAdded": "Přidán {{email}} jako {{role}}",
+        "memberRemoved": "Odebrán {{email}}",
+        "memberParentAdded": "Přidán {{email}} z nadřazené organizace {{parent}}",
+        "memberParentRemoved": "Odebrán {{email}} z nadřazené organizace {{parent}}",
+        "inviteSent": "{{email}} jako {{role}}",
+        "inviteRevoked": "Zrušena pozvánka pro {{email}}",
+        "inviteAccepted": "Přijat {{email}}",
+        "groupIdentity": "Skupina \"{{name}}\"",
+        "groupMembers": "Skupina \"{{name}}\": {{members}}",
+        "groupMemberGroups": "{{displayCount}} skupiny",
+        "groupMemberGroups_few": "{{displayCount}} skupiny",
+        "groupMemberGroups_many": "{{displayCount}} skupin",
+        "groupMemberGroups_one": "{{displayCount}} skupina",
+        "groupMemberGroups_other": "{{displayCount}} skupiny",
+        "groupMemberGroupsOf": "{{email}}: {{displayCount}} skupiny",
+        "groupMemberGroupsOf_few": "{{email}}: {{displayCount}} skupiny",
+        "groupMemberGroupsOf_many": "{{email}}: {{displayCount}} skupin",
+        "groupMemberGroupsOf_one": "{{email}}: {{displayCount}} skupina",
+        "groupMemberGroupsOf_other": "{{email}}: {{displayCount}} skupiny",
+        "groupPolicySet": "Skupina \"{{name}}\": zásady {{policy}} nastaveny",
+        "groupPolicyRemoved": "Skupina \"{{name}}\": zásady {{policy}} odebrány",
+        "groupDefaultPolicySet": "Výchozí zásady {{policy}} nastaveny",
+        "groupDefaultPolicyRemoved": "Výchozí zásady {{policy}} odebrány",
+        "guardrailIdentity": "{{type}} \"{{name}}\"",
+        "guardrailStatus": "{{type}} \"{{name}}\" {{state}}",
+        "guardrailConfig": "Ochranná pravidla AI {{state}}",
+        "guardrailConfigGroup": "{{state}} pro skupinu \"{{group}}\"",
+        "guardrailEnforcement": "{{target}}: {{value}}",
+        "guardrailSkill": "{{target}}: {{values}}",
+        "guardrailTarget": {
+          "mcp": "$t(profiles.mcp.title)",
+          "skill": "$t(profiles.skillsTitle)"
+        },
+        "ssoDomainSet": "Doména SSO {{domain}}",
+        "ssoDomainChanged": "{{domain}} (dříve {{previous}})",
+        "ssoDomainRemoved": "Vymazána doména SSO {{domain}}",
+        "fundsPurchased": "{{amount}} pomocí {{method}}",
+        "fundsGranted": "{{amount}}",
+        "fundsDistributed": "{{amount}} do {{displayCount}} dceřiné organizace",
+        "fundsDistributed_few": "{{amount}} do {{displayCount}} dceřiných organizací",
+        "fundsDistributed_many": "{{amount}} do {{displayCount}} dceřiných organizací",
+        "fundsDistributed_one": "{{amount}} do {{displayCount}} dceřiné organizace",
+        "fundsDistributed_other": "{{amount}} do {{displayCount}} dceřiné organizace",
+        "fundsReceived": "{{amount}} od {{parent}}",
+        "reviewAgentPlatform": "{{platform}}",
+        "reviewAgentConfig": "Konfigurace {{platform}}",
+        "reviewAgentConfigStyle": "{{platform}}: styl {{style}}",
+        "reviewAgentSecretsUpdated": "{{displayCount}} aktualizováno",
+        "reviewAgentSecretsUpdated_few": "{{displayCount}} aktualizováno",
+        "reviewAgentSecretsUpdated_many": "{{displayCount}} aktualizováno",
+        "reviewAgentSecretsUpdated_one": "{{displayCount}} aktualizováno",
+        "reviewAgentSecretsUpdated_other": "{{displayCount}} aktualizováno",
+        "reviewAgentSecretsFailed": "{{displayCount}} chyby",
+        "reviewAgentSecretsFailed_few": "{{displayCount}} chyby",
+        "reviewAgentSecretsFailed_many": "{{displayCount}} chyb",
+        "reviewAgentSecretsFailed_one": "{{displayCount}} chyba",
+        "reviewAgentSecretsFailed_other": "{{displayCount}} chyby",
+        "reviewAgentSecretRotated": "{{values}}",
+        "settingAdvancedPolicies": "{{values}}",
+        "settingAdvancedPoliciesOpenRouter": "OpenRouter {{state}}",
+        "settingAdvancedPoliciesRegion": "Region inference: {{region}}",
+        "settingDefaultModelSet": "{{next}}",
+        "settingDefaultModelRemoved": "{{previous}}",
+        "settingAutoRoute": "Režim \"{{mode}}\": {{change}}",
+        "settingDefaultBehavior": {
+          "global": "Globální výchozí",
+          "specific": "{{model}}",
+          "auto": "$t(models.auto.organization)"
+        },
+        "settingDataCollection": "{{mode}}",
+        "dataCollection": {
+          "allowed": "Povoleno",
+          "denied": "Zakázáno",
+          "followSetting": "Řídí se nastavením rozšíření"
+        },
+        "region": {
+          "us": "$t(organizationModelAccess.region.us)",
+          "eu": "$t(organizationModelAccess.region.eu)",
+          "au": "$t(organizationModelAccess.region.au)",
+          "jp": "$t(organizationModelAccess.region.jp)"
+        },
+        "settingProjectsUi": "Projects UI {{state}}",
+        "settingMinimumBalanceOn": "{{threshold}} pro {{emails}}",
+        "settingMinimumBalanceThreshold": "{{threshold}}",
+        "settingRecommendationsDigest": "Souhrn doporučení {{state}}",
+        "settingBrowserControl": "{{policy}}",
+        "settingBrowserControlOrigins": "{{policy}}: {{origins}}",
+        "settingBrowserControlOriginsCleared": "{{policy}}: žádné povolené zdroje",
+        "settingName": "Přejmenováno z {{previous}} na {{next}}",
+        "enabled": "$t(common.enabled)",
+        "scanBeforeUseOn": "Skenování před použitím zapnuto",
+        "scanBeforeUseOff": "Skenování před použitím vypnuto",
+        "autoRoutingAdded": "{{provider}}: {{models}}",
+        "autoRoutingRemoved": "Odebráno: {{models}}",
+        "browserPolicyOff": "Použití prohlížeče blokováno",
+        "browserPolicyAllow": "Pouze povolené zdroje",
+        "browserPolicyPlaywrightOnly": "Pouze použití prohlížeče",
+        "disabled": "$t(common.disabled)",
+        "autoRouting": "Modely změněny: {{values}}",
+        "integrationConnected": "{{integration}} připojen",
+        "integrationDisconnected": "{{integration}} odpojen",
+        "integrationRefreshed": "{{integration}} obnoven",
+        "integrationCancelled": "{{integration}} zrušen",
+        "integrationModelUpdated": "{{integration}}: model AI {{model}}",
+        "integrationKeyAdded": "Klíč přidán pro {{provider}}",
+        "integrationKeyUpdated": "Klíč upraven pro {{provider}}",
+        "integrationKeyDeleted": "Klíč odebrán pro {{provider}}",
+        "integrationKeyToggled": "Klíč pro {{provider}}: {{state}}",
+        "namedPolicyCreated": "Vytvořena zásada {{kind}} {{id}}",
+        "namedPolicyUpdated": "Upravena zásada {{kind}} {{id}}",
+        "namedPolicyDeleted": "Odebrána zásada {{kind}} {{id}}",
+        "namedPolicyLinked": "Propojena zásada {{kind}} {{next}}",
+        "webhookTriggerUpdated": "Spouštěč {{trigger}}",
+        "organizationRenamed": "Organizace přejmenována z {{previous}} na {{next}}",
+        "brand": {
+          "github": "$t(common.github)",
+          "gitlab": "$t(common.gitlab)",
+          "bitbucket": "$t(agentChat.repoPicker.platformBitbucket)",
+          "discord": "$t(profile.providerDiscord)",
+          "slack": "$t(agentChat.sessionFilter.platformSlack)",
+          "linear": "$t(agentChat.sessionFilter.platformLinear)",
+          "byok": "Vlastní klíč"
+        }
       }
     },
     "billing": {
       "title": "Fakturace",
-      "permissionDenied": "Fakturaci organizace může zobrazit pouze vlastník, administrátor nebo správce fakturace.",
+      "permissionDenied": "Fakturaci organizace může zobrazit pouze vlastník, správce nebo správce fakturace. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Předplatné",
       "state": "Stav",
       "stateNone": "Bez předplatného",
@@ -3697,7 +3862,7 @@
       "limitLabel": "Limit (USD za den)",
       "memberNotFound": "Člen nebyl nalezen.",
       "noLimitPlaceholder": "Bez limitu",
-      "permissionDenied": "Limity útraty může spravovat pouze vlastník nebo administrátor organizace.",
+      "permissionDenied": "Limity útraty může spravovat pouze vlastník nebo správce organizace.",
       "removeLimit": "Zrušit limit",
       "title": "Denní limit útraty",
       "blankError": "Zadejte částku nebo níže klepněte na tlačítko Zrušit limit.",
@@ -3758,7 +3923,7 @@
       "emptyDescription": "Pomocí tlačítka „Starší hodina“ zobrazíte dřívější požadavky.",
       "emptyBoundDescription": "Záznamy požadavků dál do minulosti nesahají.",
       "loadError": "Protokoly požadavků se nepodařilo načíst.",
-      "permissionDenied": "Protokoly požadavků organizace si může prohlížet jen její vlastník, administrátor nebo správce fakturace.",
+      "permissionDenied": "Protokoly požadavků organizace si může prohlížet jen její vlastník, správce nebo správce fakturace. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} vstup · {{output}} výstup",
       "byok": "BYOK"
     },
@@ -3867,7 +4032,7 @@
     "signupStepUpApple": "Pro dokončení vytvoření účtu vyber „$t(login.signInWithApple)“.",
     "signupStepUpGoogle": "Pro dokončení vytvoření účtu vyber „$t(login.signInWithGoogle)“.",
     "signupStepUpBack": "Pro dokončení vytvoření účtu se vrať zpět a vyber „$t(login.moreSignInOptions)“.",
-    "invalidCode": "Tento kód je nesprávný nebo mu vypršela platnost. Zkus to znovu nebo vyber „$t(login.resendCode)“.",
+    "invalidCode": "Tento kód je nesprávný nebo mu vypršela platnost. Použij „$t(login.resendCode)“ nebo „$t(login.moreSignInOptions)“.",
     "codeInProgress": "Tvůj kód se zpracovává. Chvíli počkej a zkus to znovu.",
     "tooManyAttempts": "Proběhlo příliš mnoho pokusů. Vyžádej si nový kód.",
     "invalidToken": "Přihlášení se nezdařilo. Zkus to prosím znovu.",
@@ -4048,7 +4213,10 @@
     "list": {
       "loadFailed": "Historie chatu se nepodařila načíst.",
       "new": "Nový chat",
-      "deleteTitle": "Smazat tento chat?"
+      "deleteTitle": "Smazat tento chat?",
+      "resetNoticeTitle": "Místní chaty a koncepty byly vymazány",
+      "resetNoticeBody": "Kilo nemohlo otevřít chaty uložené v tomto zařízení. Vaše relace v cloudu nejsou dotčeny.",
+      "resetNoticeDismiss": "Skrýt oznámení"
     },
     "rename": {
       "title": "Přejmenovat chat",
@@ -4098,6 +4266,9 @@
       "fieldName": "Zobrazovaný název",
       "fieldUrl": "URL serveru",
       "fieldUrlInvalid": "Zadejte platnou URL serveru.",
+      "fieldUrlCredentials": "Odstraňte z adresy uživatelské jméno a heslo.",
+      "fieldUrlFragment": "Odstraňte z adresy část s #.",
+      "fieldUrlInsecure": "Zadejte adresu https, nebo http pouze pro localhost.",
       "duplicateUrl": "Tato URL je již uložena.",
       "serverNotFound": "Tento server již není uložen.",
       "enableServer": "Povolit tento server: {{name}}",
@@ -4125,6 +4296,7 @@
       "app": {
         "label": "Rozhraní nástroje",
         "failed": "Rozhraní tohoto nástroje se nepodařilo načíst.",
+        "tooLarge": "Rozhraní tohoto nástroje je větší než limit {{size}}.",
         "empty": "Rozhraní tohoto nástroje nemá co zobrazit."
       }
     },
@@ -4192,6 +4364,8 @@
       "discoveryNoModels": "Koncový bod neuvádí žádné modely. Zadejte modely ručně.",
       "connectionIncomplete": "Model odpověděl, ale nedokončil odpověď. Zkuste to znovu, nebo zkontrolujte ID modelu a protokol.",
       "invalidInput": "Zadejte název serveru, platné hlavičky a alespoň jeden model s jedinečným ID a názvem. Limity tokenů musí být kladná celá čísla.",
+      "invalidApiKey": "Klíč API obsahuje znak, který nelze odeslat. Používejte pouze písmena, číslice a standardní symboly, bez zlomů řádků.",
+      "invalidHeaders": "Vlastní hlavičku nelze odeslat. Zkontrolujte její název a používejte pouze písmena, číslice a standardní symboly, bez zlomů řádků.",
       "invalidUrl": "Zadejte základní URL API s HTTP nebo HTTPS bez přihlašovacích údajů, parametrů dotazu a fragmentu.",
       "publicHttp": "Veřejné koncové body HTTP nejsou povoleny. Použijte HTTPS nebo soukromý místní koncový bod.",
       "httpApprovalRequired": "Před uložením nebo připojením schvalte tento místní koncový bod HTTP.",
@@ -4240,6 +4414,7 @@
         "network": "Stahování se nedokončilo. Zkontrolujte připojení a zkuste to znovu.",
         "invalidFile": "Stažený soubor není model, který by tato aplikace mohla spustit, proto byl odstraněn.",
         "checksum": "Stažený soubor neodpovídá zveřejněnému kontrolnímu součtu, proto byl odstraněn. Zkuste jej stáhnout znovu.",
+        "unreadable": "Toto zařízení nemohlo stažený soubor zkontrolovat, proto byl odstraněn. Zkuste jej stáhnout znovu.",
         "writeFailed": "Toto zařízení nemohlo model uložit. Zkuste jej stáhnout znovu."
       }
     },
@@ -4325,7 +4500,15 @@
       "download": "Stáhnout model do zařízení",
       "downloading": "Stahování…",
       "downloadProgress": "Stahování… {{percent}} %",
-      "downloadFailed": "Stahování se nedokončilo. Zkontrolujte připojení a volné místo v úložišti a zkuste to znovu."
+      "downloadFailed": "Stahování se nedokončilo. Zkontrolujte připojení a volné místo v úložišti a zkuste to znovu.",
+      "cannotUse": "Nelze spustit: {{items}}.",
+      "cannotUseOptions": "Nelze vyplnit: některé možnosti nástroje.",
+      "limitations": "Omezení",
+      "tools": {
+        "time": "Čas",
+        "settingsList": "Zobrazit nastavení",
+        "settingsSet": "Změnit nastavení"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Tento model podporuje úroveň uvažování"
@@ -4514,6 +4697,7 @@
     "instructionSaveFailed": "Pokyn se nepodařilo uložit",
     "instructionDeleteFailed": "Pokyn se nepodařilo smazat",
     "instructionToggleFailed": "Pokyn se nepodařilo aktualizovat",
+    "instructionViewTitle": "Soubor pokynu",
     "instructionLimitReached": "Profil může obsahovat až {{max}} pokynů. Chcete-li přidat další, jeden smažte.",
     "mcp": {
       "title": "MCP servery",
@@ -4690,6 +4874,7 @@
       "emptyDescription": "Zde se zobrazí nákupy kreditů, účtenky a využití.",
       "emptyTitle": "Žádná historie kreditů",
       "expiredGrant": "Platnost vypršela: {{description}}",
+      "expiredStatus": "Platnost vypršela",
       "googlePlayReceipt": "Účtenka z Google Play",
       "kind": {
         "adjustment": "Úprava",
@@ -4716,7 +4901,8 @@
       "receiptA11y": "Otevřít účtenku pro {{description}}, {{amount}}, ze dne {{date}}",
       "receiptUnavailable": "Pro tento nákup není účtenka k dispozici.",
       "retentionLimit": "Zobrazuje se nejnovější historie kreditů.",
-      "voidedGrant": "Stornováno: {{description}}"
+      "voidedGrant": "Stornováno: {{description}}",
+      "voidedStatus": "Stornováno"
     },
     "title": "Koupit kredity",
     "description": "Kredity jsou jednorázový nákup přidaný do vašeho zůstatku Kilo pro spouštění AI programovacích relací v aplikaci Kilo. Obchod vám strhne platbu z účtu a kredity se přidají po potvrzení platby obchodem.",
@@ -4868,6 +5054,7 @@
     "contextAll": "Všechny kontexty",
     "dismiss": "Skrýt přehled",
     "dismissFailed": "Přehled se zatím nepodařilo skrýt. Pokus se automaticky opakuje na pozadí.",
+    "readMarkFailed": "Tento přehled se nepodařilo označit jako přečtený. Při příštím načtení přehledu se pokus zopakuje.",
     "offline": "Offline · uložený přehled",
     "cached": "Uložený přehled · obnovení nedostupné",
     "summary": "AI shrnutí",
@@ -4887,15 +5074,22 @@
     "morningEnd": "Přehled dostupný do",
     "timeHint": "Karta na domovské obrazovce obnoví živý stav po skončení období přehledu, i offline.",
     "invalidSchedule": "Zvolte platné časové pásmo a neprázdné období přehledu.",
+    "scheduleEmptyNight": "Okno přehledu je prázdné. Zvolte čas připravenosti později než začátek okna.",
+    "scheduleEmptyMorning": "Čas připravenosti a čas konce dostupnosti se shodují. Zvolte, jak dlouho přehled zůstane dostupný.",
+    "scheduleFullDay": "Obě okna pokrývají celý den. Nechte část dne mimo přehled.",
     "notificationsHint": "Jedno obecné oznámení na každý naplánovaný přehled. Nezávisí na placených AI shrnutích.",
     "notificationPermission": "Pro příjem přehledu zapněte push oznámení.",
     "defaultModel": "Použít výchozí model Kilo",
     "duration": "Časový limit (minuty)",
     "spendLimit": "Limit útraty (USD)",
-    "invalidSafeguards": "Zadejte kladné konečné limity času a útraty.",
+    "invalidSafeguards": "Zadejte kladné číslo v povoleném rozsahu.",
     "estimate": "Odhad {{estimate}} · maximum {{maximum}}",
     "estimateUnavailable": "Placené shrnutí není pro tato nastavení dostupné. Změňte model nebo limity, případně to zkuste později.",
     "confirmPaid": "Povolit placená shrnutí pro {{context}}?",
+    "paidDisclosure_one": "Odhad {{estimate}}, nejvýše {{maximum}}, s limitem {{minutes}} min. Poplatky se účtují i při selhání generování.",
+    "paidDisclosure_few": "Odhad {{estimate}}, nejvýše {{maximum}}, s limitem {{minutes}} min. Poplatky se účtují i při selhání generování.",
+    "paidDisclosure_many": "Odhad {{estimate}}, nejvýše {{maximum}}, s limitem {{minutes}} min. Poplatky se účtují i při selhání generování.",
+    "paidDisclosure_other": "Odhad {{estimate}}, nejvýše {{maximum}}, s limitem {{minutes}} min. Poplatky se účtují i při selhání generování.",
     "paidDisclosure": "Odhad {{estimate}}, nejvýše {{maximum}}, s limitem {{minutes}} min. Poplatky se účtují i při selhání generování.",
     "enable": "Povolit placená shrnutí",
     "allContexts": "Osobní a organizační přehledy zůstávají oddělené.",
@@ -4947,7 +5141,7 @@
     "sourceActivity": "Aktivita bez názvu",
     "metadataFailureProvider": "chyba poskytovatele",
     "metadataFailureTool": "chyba nástroje",
-    "metadataFailureCancelled": "Zrušeno",
+    "metadataStopped": "Poslední tah byl zastaven",
     "metadataFailureOther": "nespecifikovaná chyba"
   },
   "systemSearch": {
@@ -4968,7 +5162,8 @@
     "unavailableTitle": "Využití není k dispozici",
     "unavailableDescription": "Využití pro tento pracovní prostor není nastaveno. Pokud zde očekáváte údaje o využití, kontaktujte podporu.",
     "orgSelfNotice": "Vidíte své vlastní využití v této organizaci.",
-    "viewDetails": "Zobrazit podrobnosti o využití"
+    "viewDetails": "Zobrazit podrobnosti o využití",
+    "orgSelfEntryTitle": "Vaše využití"
   },
   "integrations": {
     "title": "Integrace",
@@ -5064,6 +5259,8 @@
       "autoCommit": "Zapsat změny po dokončení spuštění",
       "condenseOnComplete": "Zhuštit kontext po dokončení spuštění",
       "activeTitle": "Spouštěč aktivní",
+      "activeSwitchA11y": "Spouštěč aktivní: {{name}}",
+      "copyLinkA11y": "Kopírovat odkaz: {{name}}",
       "activeDescription": "Pozastavené webhooky odpovídají 404.",
       "runAsCreator": "Spouštět jako já",
       "runAsCreatorDescription": "Každé spuštění používá váš účet, takže je vyžadována tajná hlavička.",

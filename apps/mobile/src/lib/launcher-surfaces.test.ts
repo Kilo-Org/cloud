@@ -37,8 +37,6 @@ describe('launcher target deep links', () => {
     expect(url).toBe('kiloapp:///cloud/sessions/ses_1%2F2%203');
     expect(resolveIncomingUrl(url)).toBe('/(app)/agent-chat/ses_1%2F2%203');
 
-    // Unencoded, `id` splits across path segments and `/cloud/sessions/*`
-    // no longer matches: encoding is what keeps the link on the route.
     expect(resolveIncomingUrl(`kiloapp:///cloud/sessions/${id}`)).toBeNull();
   });
 
@@ -125,8 +123,6 @@ describe('waitedSinceFor', () => {
   });
 
   it('does not let a timestamp-less row outrank a real wait', () => {
-    // The regression: with a 0 fallback the timestamp-less row held the smallest
-    // key, so `longestWaiting` picked it over a session with a real wait.
     const targets = deriveLauncherTargets({
       waiting: [waiting('ses_unknown', waitedSinceFor(null)), waiting('ses_oldest', 1000)],
       lastOpenedSessionId: null,

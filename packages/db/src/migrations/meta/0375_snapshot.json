@@ -1,5 +1,5 @@
 {
-  "id": "a5e6078e-f8f1-4108-8344-dc221e9ec414",
+  "id": "454db8c2-eb6e-4704-b64a-6a491d12da8c",
   "prevId": "4858d294-b7fe-4ebc-9d19-095a7103ee1b",
   "version": "7",
   "dialect": "postgresql",
@@ -3160,22 +3160,6 @@
           "isUnique": false,
           "concurrently": false,
           "method": "btree",
-          "with": {}
-        },
-        "IDX_auto_routing_custom_routers_entries": {
-          "name": "IDX_auto_routing_custom_routers_entries",
-          "columns": [
-            {
-              "expression": "entries",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last",
-              "opclass": "jsonb_path_ops"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": true,
-          "method": "gin",
           "with": {}
         }
       },
@@ -26861,6 +26845,12 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
+        },
+        "details": {
+          "name": "details",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",

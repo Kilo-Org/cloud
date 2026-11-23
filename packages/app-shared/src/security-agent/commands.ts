@@ -67,8 +67,9 @@ export function securityCommandIdsKey(scope: string) {
   return ['security-agent-command-ids', scope] as const;
 }
 
-// Structural shape of a security command — only the fields these helpers
-// read, kept permissive so both web's and mobile's command types satisfy it.
+// Structural shape of a security command — the fields these helpers read plus
+// the redacted error diagnostics surfaces render, kept permissive so both web's
+// and mobile's command types satisfy it.
 export type SecurityCommand = {
   status: string;
   resultCode?: string | null;

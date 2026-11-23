@@ -97,8 +97,6 @@ export function installVoiceInputListeners(
     const nextDraft = appendVoiceTranscript(current.baseDraft, current.transcriptState.transcript);
     current.onDraftChange(nextDraft);
     if (event.isFinal) {
-      // A final transcript is a recognized word run: the session advanced, so
-      // an in-flight stop keeps waiting instead of abandoning it.
       current.progressAt = Date.now();
     }
   };

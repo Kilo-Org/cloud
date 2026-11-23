@@ -255,7 +255,7 @@ export function MarkdownEnriched({
           if (isMarkdownImageDisplayable(url)) {
             setViewer({
               uri: resolveMarkdownImageSrc(url),
-              filename: markdownImageFilename(url, altText),
+              filename: markdownImageFilename(url, altText, t('common.image')),
             });
           }
         }}

@@ -7,6 +7,8 @@
  * from here for its own use.
  */
 
+import { isReservedAgentSlug } from '@kilocode/app-shared/agent-profile';
+
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
 /**
@@ -92,11 +94,18 @@ export function normalizeAgentMode(mode: string | null | undefined): AgentMode {
 
 /**
  * Filter profile agents to those that would surface in the chat picker:
- * not disabled, not hidden, and not subagent-only. Matches web's
- * `NewSessionPanel` filter.
+ * not disabled, not hidden, not subagent-only, and carrying an id of its own,
+ * because the profile read keeps reserved ids out of a session.
+ * Matches web's `NewSessionPanel` filter.
  */
 export function visibleProfileAgents(agents: ProfileAgent[]): ProfileAgent[] {
-  return agents.filter(a => !a.config.disable && !a.config.hidden && a.config.mode !== 'subagent');
+  return agents.filter(
+    a =>
+      !a.config.disable &&
+      !a.config.hidden &&
+      a.config.mode !== 'subagent' &&
+      !isReservedAgentSlug(a.slug)
+  );
 }
 
 /** Map profile agents to picker options. */

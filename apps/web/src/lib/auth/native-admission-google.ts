@@ -247,16 +247,6 @@ function parseCertDigestAllowlist(): string[] {
   );
 }
 
-/**
- * Verify a Play Integrity verdict token.
- *
- * Binds the token to the server-issued challenge via the nonce field.
- * Requires MEETS_DEVICE_INTEGRITY in the deviceRecognitionVerdict array.
- * Verifies package name and signing certificate digest.
- *
- * Throws on infrastructure faults (network errors, auth failures) so the
- * admission layer can surface them as 5xx.
- */
 export type PlayIntegrityResult =
   | { ok: true; packageName: string }
   | { ok: false; error: PlayIntegrityError; diagnostics: PlayIntegrityDiagnostics };
@@ -271,6 +261,16 @@ const UNPARSED_VERDICT_DIAGNOSTICS: PlayIntegrityDiagnostics = {
   deviceIntegrity: 'missing',
 };
 
+/**
+ * Verify a Play Integrity verdict token.
+ *
+ * Binds the token to the server-issued challenge via the nonce field.
+ * Requires MEETS_DEVICE_INTEGRITY in the deviceRecognitionVerdict array.
+ * Verifies package name and signing certificate digest.
+ *
+ * Throws on infrastructure faults (network errors, auth failures) so the
+ * admission layer can surface them as 5xx.
+ */
 export async function verifyPlayIntegrity(
   integrityToken: string,
   challenge: string
@@ -362,9 +362,6 @@ export async function verifyPlayIntegrity(
     return { ok: false, error: 'INVALID_TOKEN', diagnostics: UNPARSED_VERDICT_DIAGNOSTICS };
   }
 
-  // The classification every refusal below reports. Built once from the parsed
-  // verdict, so the record says which fixed bucket the proof landed in and
-  // never carries Google's raw strings or the digest itself.
   const certDigests = payload.appIntegrity?.certificateSha256Digest ?? [];
   const diagnostics: PlayIntegrityDiagnostics = {
     appRecognition: classifyAppRecognition(payload.appIntegrity?.appRecognitionVerdict),

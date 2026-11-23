@@ -166,6 +166,7 @@ vi.mock('@/components/ui/icons', () => ({
   AlertCircle: 'AlertCircle',
   Info: 'Info',
   Plus: 'Plus',
+  RefreshCw: 'RefreshCw',
   Search: 'Search',
   SearchX: 'SearchX',
   X: 'X',
@@ -737,6 +738,50 @@ describe('ModelPickerContent all models unavailable', () => {
 
     expect(findByType(renderer.root, 'EmptyState')).toHaveLength(0);
     expect(listedDisplayIds(renderer)).toEqual(['model-0', 'model-1']);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  // An empty catalog has no query to clear and no row to pick, so the branch
+  // is not a dead end when the caller can refetch: its one action is Retry,
+  // wired to the bridge's refetch instead of the sheet's close.
+  it('offers Retry in the zero-row state and calls the bridge refetch', async () => {
+    const retryCatalog = vi.fn();
+    slotState.bridge = { ...makeBridge(), options: [], retryCatalog };
+    const renderer = await mount();
+
+    const emptyState = findByType(renderer.root, 'EmptyState');
+    expect(emptyState).toHaveLength(1);
+    /* eslint-disable typescript-eslint/no-unsafe-member-access -- react-test-renderer props are an index signature */
+    expect(emptyState[0]?.props.title).toBe(i18n.t('common.noModelsAvailable'));
+    /* eslint-enable typescript-eslint/no-unsafe-member-access */
+
+    const actions = findByType(renderer.root, 'StateAction');
+    expect(actions).toHaveLength(1);
+    const action = actions[0];
+    if (!action) {
+      throw new Error('retry action not found');
+    }
+    /* eslint-disable typescript-eslint/no-unsafe-member-access -- react-test-renderer props are an index signature */
+    expect(action.props.label).toBe(i18n.t('common.retry'));
+    expect(action.props.icon).toBe('RefreshCw');
+    const onPress = action.props.onPress as (() => void) | undefined;
+    /* eslint-enable typescript-eslint/no-unsafe-member-access */
+    if (typeof onPress !== 'function') {
+      throw new TypeError('retry action is not pressable');
+    }
+
+    await act(async () => {
+      onPress();
+      await Promise.resolve();
+    });
+
+    expect(retryCatalog).toHaveBeenCalledTimes(1);
+    // The open sheet kept the pick it opened on, so the refetch cannot fill it:
+    // Retry closes back to the chip that shows the arriving catalog.
+    expect(routerBack).toHaveBeenCalledTimes(1);
 
     act(() => {
       renderer.unmount();

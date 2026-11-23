@@ -48,6 +48,9 @@ catalogs:
     '@trpc/tanstack-react-query':
       specifier: 11.19.0
       version: 11.19.0
+    '@ttsc/unplugin':
+      specifier: 0.36.4
+      version: 0.36.4
     '@types/jsonwebtoken':
       specifier: 9.0.10
       version: 9.0.10
@@ -90,6 +93,9 @@ catalogs:
     tsx:
       specifier: 4.23.15
       version: 4.23.15
+    ttsc:
+      specifier: 0.36.4
+      version: 0.36.4
     typescript:
       specifier: 7.0.2
       version: 7.0.2
@@ -1613,6 +1619,9 @@ importers:
 
   packages/cloud-agent-profile:
     dependencies:
+      '@kilocode/app-shared':
+        specifier: workspace:*
+        version: link:../app-shared
       '@kilocode/db':
         specifier: workspace:*
         version: link:../db
@@ -1821,7 +1830,7 @@ importers:
         specifier: 1.8.0
         version: 1.8.0(zod@4.6.7)
       '@ttsc/unplugin':
-        specifier: 0.36.4
+        specifier: 'catalog:'
         version: 0.36.4(ttsc@0.36.4(typescript@7.0.2))
       '@types/node':
         specifier: 'catalog:'
@@ -1833,7 +1842,7 @@ importers:
         specifier: 7.55.0
         version: 7.55.0(@aws-sdk/credential-provider-node@3.972.21)(google-auth-library@10.6.2)(undici@7.30.1)(ws@8.21.0(bufferutil@4.2.0)(utf-8-validate@6.0.6))(zod@4.6.7)
       ttsc:
-        specifier: 0.36.4
+        specifier: 'catalog:'
         version: 0.36.4(typescript@7.0.2)
       typescript:
         specifier: 'catalog:'
@@ -2473,6 +2482,9 @@ importers:
       '@kilocode/cloud-agent-profile':
         specifier: workspace:*
         version: link:../../packages/cloud-agent-profile
+      '@kilocode/cloud-agent-sdk':
+        specifier: workspace:*
+        version: link:../../packages/cloud-agent-sdk
       '@kilocode/container-usage':
         specifier: workspace:*
         version: link:../../packages/container-usage

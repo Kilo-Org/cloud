@@ -25,12 +25,13 @@ export type AdmissionPayload = {
 };
 
 /**
- * Error thrown when the admission challenge could not be obtained — the
- * endpoint answers a non-ok response, the request fails (network error), the
- * request or its body outlasts `ADMISSION_CHALLENGE_TIMEOUT_MS`, or the
- * challenge body fails schema validation; `resolveAdmission` also rethrows
- * this sentinel for every provider failure. Callers map this to a retryable
- * sign-in message.
+ * Error thrown when the admission challenge could not be obtained: the
+ * endpoint answers a non-ok response, or the request or its body is aborted at
+ * the `ADMISSION_CHALLENGE_TIMEOUT_MS` deadline. Any other failure of the
+ * challenge request keeps its own error, and `getAdmission` rethrows a provider
+ * failure rather than converting it; `resolveAdmission` in
+ * `resolve-admission.ts` normalizes those errors into this sentinel. Callers
+ * map this to a retryable sign-in message.
  */
 export const ADMISSION_CHALLENGE_FAILED = 'admission_challenge_failed';
 

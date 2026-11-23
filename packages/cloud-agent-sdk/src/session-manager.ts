@@ -4382,14 +4382,18 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           store.set(billingFailureAtom, null);
           // The row is confirmed and only the answer was lost, so the text the
           // composer restored on its own rejection is the message that arrived.
-          // Publishing the delivery withdraws that restore in the same session,
-          // which is what the next open would otherwise have to do.
-          deliveredFailedPromptSequence += 1;
-          store.set(deliveredFailedPromptAtom, {
-            messageId,
-            text: messageText,
-            sequence: deliveredFailedPromptSequence,
-          });
+          // The publish waits one macrotask: the caller restores that text while
+          // handling this rejection, and a withdrawal published before the
+          // restore exists would find nothing to withdraw.
+          setTimeout(() => {
+            if (activeSessionId !== kiloSessionId) return;
+            deliveredFailedPromptSequence += 1;
+            store.set(deliveredFailedPromptAtom, {
+              messageId,
+              text: messageText,
+              sequence: deliveredFailedPromptSequence,
+            });
+          }, 0);
         }
         return true;
       }

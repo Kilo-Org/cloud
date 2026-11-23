@@ -3542,6 +3542,8 @@ describe('createSessionManager', () => {
 
       const sentId = mockSession.send.mock.calls[0][0].messageId;
       if (sentId === undefined) throw new Error('send carries no id');
+      // The publish waits one macrotask so the caller's restore exists first.
+      await new Promise(resolve => setTimeout(resolve, 0));
       expect(atomValue(config.store, mgr.atoms.deliveredFailedPrompt)).toEqual({
         messageId: sentId,
         text: 'Delivered while the answer was lost',

@@ -343,9 +343,13 @@ describe('ImageViewer mounted', () => {
     });
 
     // The renewal settled without a renewed uri, so the retried image has not
-    // loaded: the action takes the busy phase back.
+    // loaded: the action takes the busy phase back — and the decode stays
+    // mounted, because it may still paint.
     expect(announcedMessage(renderer.root)).toBe('Image unavailable');
     expect(first(retryActions(renderer.root), 'settled retry action').props.loading).toBe(false);
+    const settledImage = first(findByType(renderer.root, 'Image'), 'settled retried Image');
+    expect(settledImage.props.source).toEqual({ uri: REMOTE_URI });
+    expect(findByType(renderer.root, 'ResumableZoom')).toHaveLength(1);
 
     // A fresh press starts its own attempt, so the action is busy again and the
     // copy returns to the busy line.
@@ -363,6 +367,9 @@ describe('ImageViewer mounted', () => {
       false
     );
     expect(announcedMessage(renderer.root)).toBe('Image unavailable');
+    const secondSettledImage = first(findByType(renderer.root, 'Image'), 'second settled Image');
+    expect(secondSettledImage.props.source).toEqual({ uri: REMOTE_URI });
+    expect(findByType(renderer.root, 'ResumableZoom')).toHaveLength(1);
 
     renderer.unmount();
   });
@@ -402,6 +409,78 @@ describe('ImageViewer mounted', () => {
     expect(renderer.root.findAll(node => node.type === AccessibleStatus)).toHaveLength(0);
 
     renderer.unmount();
+  });
+
+  it('returns the action on a renewal that rejects, with no unhandled rejection and no dropped decode', async () => {
+    const rejection = Promise.withResolvers<undefined>();
+    const onRetry = vi.fn<() => Promise<undefined>>(() => rejection.promise);
+    const unhandledRejections: unknown[] = [];
+    const onUnhandledRejection = (reason: unknown) => {
+      unhandledRejections.push(reason);
+    };
+    process.on('unhandledRejection', onUnhandledRejection);
+    try {
+      const renderer = await mountViewer({ uri: REMOTE_URI, onRetry });
+
+      await fireDecode(renderer, 'onError');
+      await pressRetry(renderer, 'retry action');
+      expect(onRetry).toHaveBeenCalledOnce();
+      expect(first(retryActions(renderer.root), 'busy retry action').props.loading).toBe(true);
+
+      // The renewal rejects, and the next macrotask is the turn Node flags an
+      // unhandled rejection in.
+      await act(async () => {
+        rejection.reject(new Error('presign failed'));
+        const flushed = Promise.withResolvers<undefined>();
+        setImmediate(() => {
+          flushed.resolve(undefined);
+        });
+        await flushed.promise;
+      });
+
+      // A renewal that throws has the same outcome as one that returns a stale
+      // url: the action returns, the copy is the failure line, and the retried
+      // decode stays mounted so a late paint can still land on it.
+      expect(unhandledRejections).toEqual([]);
+      expect(first(retryActions(renderer.root), 'settled retry action').props.loading).toBe(false);
+      expect(unavailableText(renderer.root)).toHaveLength(1);
+      expect(announcedMessage(renderer.root)).toBe('Image unavailable');
+      const settledImage = first(findByType(renderer.root, 'Image'), 'settled retried Image');
+      expect(settledImage.props.source).toEqual({ uri: REMOTE_URI });
+
+      // A fresh press starts its own attempt: the action is busy again on a
+      // new renewal, and the mounted image is a NEW node.
+      const secondRejection = Promise.withResolvers<undefined>();
+      onRetry.mockImplementationOnce(() => secondRejection.promise);
+      await pressRetry(renderer, 'second retry action');
+      expect(onRetry).toHaveBeenCalledTimes(2);
+      expect(first(retryActions(renderer.root), 'second busy retry action').props.loading).toBe(
+        true
+      );
+      const repressedImage = first(findByType(renderer.root, 'Image'), 're-pressed Image');
+      expect(repressedImage).not.toBe(settledImage);
+      expect(repressedImage.props.source).toEqual({ uri: REMOTE_URI });
+
+      // That attempt settles the same way, still with nothing unhandled.
+      await act(async () => {
+        secondRejection.reject(new Error('presign failed again'));
+        const flushed = Promise.withResolvers<undefined>();
+        setImmediate(() => {
+          flushed.resolve(undefined);
+        });
+        await flushed.promise;
+      });
+      expect(unhandledRejections).toEqual([]);
+      expect(first(retryActions(renderer.root), 'second settled retry action').props.loading).toBe(
+        false
+      );
+      expect(announcedMessage(renderer.root)).toBe('Image unavailable');
+      expect(first(findByType(renderer.root, 'Image'), 'second settled Image')).toBe(repressedImage);
+
+      renderer.unmount();
+    } finally {
+      process.off('unhandledRejection', onUnhandledRejection);
+    }
   });
 
   it('offers no retry for a local file uri, which would re-read the same bytes', async () => {
@@ -652,7 +731,8 @@ describe('ImageViewer mounted', () => {
       expect(findByType(renderer.root, 'Image')).toHaveLength(1);
 
       // The owning attempt settles: the action returns, unpressed, and the
-      // retried image goes with it — no request is left in flight.
+      // retried image stays mounted — its decode may yet land, so the settle
+      // only returns the action.
       await flush(() => {
         secondRenewal.resolve(undefined);
       });
@@ -660,7 +740,9 @@ describe('ImageViewer mounted', () => {
         false
       );
       expect(announcedMessage(renderer.root)).toBe('Image unavailable');
-      expect(findByType(renderer.root, 'Image')).toHaveLength(0);
+      const stillMountedImage = first(findByType(renderer.root, 'Image'), 'still mounted Image');
+      expect(stillMountedImage).toBe(repressedImage);
+      expect(stillMountedImage.props.source).toEqual({ uri: REMOTE_URI });
 
       renderer.unmount();
     } finally {

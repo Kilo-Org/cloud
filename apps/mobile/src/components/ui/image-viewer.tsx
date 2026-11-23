@@ -72,9 +72,11 @@ function isRetryableUri(uri: string): boolean {
 }
 
 /**
- * One attempt's outcome. `stalled` is the same attempt after the busy bound
- * expires: the request may still land, so the retried image stays mounted while
- * the action becomes pressable again.
+ * One attempt's outcome. `failed` is the only phase that unmounts the decode,
+ * and only a real `onError` from the mounted image publishes it. `stalled` is
+ * the same attempt after its settle or the busy bound expires: the request may
+ * still land, so the retried image stays mounted while the action becomes
+ * pressable again.
  */
 type ViewerImageStatus = 'ready' | 'failed' | 'retrying' | 'stalled';
 
@@ -89,9 +91,12 @@ type ImageViewerProps = {
   shareError?: string | null;
   /**
    * A caller that owns a renewal path (a re-presign) passes it, and the retry
-   * awaits it before handing the state back to the action. Without it the retry
-   * only remounts the image for the same URI, which is all a local or
-   * already-fresh URL can do.
+   * awaits it before handing the state back to the action. Its settle — a
+   * return or a throw — only returns the action: the retried image stays
+   * mounted and its decode stays reachable, because the renewed bytes may yet
+   * paint. Only a real `onError` from that image publishes the failure. Without
+   * this prop the retry only remounts the image for the same URI, which is all
+   * a local or already-fresh URL can do.
    */
   onRetry?: () => void | Promise<void>;
   onClose: () => void;
@@ -161,8 +166,9 @@ export function ImageViewer({
   // A retry keeps the unavailable state mounted and marks it busy; the new
   // `Image` mounts at once and its `onLoad` clears the state, while its
   // `onError` returns it to the failed action. When the caller owns a renewal
-  // path, the action also stays busy until that path settles. The status says
-  // which phase is rendered; the attempt ref says which press owns it, because
+  // path, the action also stays busy until that path settles — and that settle
+  // returns the action without unmounting the decode. The status says which
+  // phase is rendered; the attempt ref says which press owns it, because
   // `stalled` makes the action pressable while the first attempt is still in
   // flight.
   const retryImage = useCallback(() => {
@@ -174,12 +180,19 @@ export function ImageViewer({
       return;
     }
     void (async () => {
-      await onRetry();
+      try {
+        await onRetry();
+      } catch {
+        // A renewal that throws has the same outcome as one that returns a
+        // stale url: return the action, never the pending decode.
+      }
       if (retryAttempt.current !== attempt) {
         return;
       }
-      // Fail back to the action unless a decode or a renewed uri took over.
-      setStatus(current => (current === 'retrying' ? 'failed' : current));
+      // The retried image is still mounted and may yet paint, so the settle
+      // returns the action in the phase that keeps it: `failed` would unmount
+      // the decode that is still in flight.
+      setStatus(current => (current === 'retrying' ? 'stalled' : current));
     })();
   }, [onRetry]);
 

@@ -415,7 +415,7 @@ function ClaudeBillingCardContent({
                       ? removeFailureCode === 'PRECONDITION_FAILED'
                         ? 'Kilo kept this Claude link. Unlink Kilo under Linked platforms in Claude Console, then remove it here again.'
                         : removeFailureCode === 'SERVICE_UNAVAILABLE'
-                          ? 'Anthropic did not confirm the unlink, so Kilo kept this Claude link. Try again.'
+                          ? 'Kilo kept this Claude link. Try again.'
                           : 'We could not remove your Claude link. Try again.'
                       : null
       }

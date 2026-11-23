@@ -9,7 +9,27 @@ jest.mock('@kilocode/web-shared/lib/auth/claude/config', () => ({
   isClaudeBillingLinkingConfigured: jest.fn(() => true),
 }));
 
+// The store and delete modules are transpiled to read-only namespace objects, so
+// a jest.spyOn cannot replace one exported function. Wrap the two boundaries the
+// router answers on instead, and keep every other export real.
+jest.mock('@kilocode/web-shared/lib/ai-gateway/claude-billing/store', () => {
+  const actual = jest.requireActual<typeof claudeBillingStore>(
+    '@kilocode/web-shared/lib/ai-gateway/claude-billing/store'
+  );
+  return { ...actual, shareClaudeBillingConnection: jest.fn(actual.shareClaudeBillingConnection) };
+});
+
+jest.mock('@/lib/claude-billing/delete', () => {
+  const actual = jest.requireActual<typeof claudeBillingDelete>('@/lib/claude-billing/delete');
+  return {
+    ...actual,
+    unlinkAndRemoveClaudeBillingGrant: jest.fn(actual.unlinkAndRemoveClaudeBillingGrant),
+  };
+});
+
 import type * as claudeConfigModule from '@kilocode/web-shared/lib/auth/claude/config';
+import type * as claudeBillingStore from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
+import type * as claudeBillingDelete from '@/lib/claude-billing/delete';
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import { eq } from 'drizzle-orm';
 import {
@@ -26,7 +46,12 @@ import {
   unlinkClaudeUserProfile,
 } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/operator';
 import { isClaudeBillingLinkingConfigured } from '@kilocode/web-shared/lib/auth/claude/config';
-import { getClaudeBillingConnection } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
+import {
+  ClaudeBillingLockBusyError,
+  getClaudeBillingConnection,
+  shareClaudeBillingConnection,
+} from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
+import { unlinkAndRemoveClaudeBillingGrant } from '@/lib/claude-billing/delete';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { claudeBillingRouter } from './claude-billing-router';
@@ -135,6 +160,21 @@ describe('claudeBillingRouter.sharePersonal', () => {
 
     await expect(caller.sharePersonal({ organizationId: org.id })).rejects.toMatchObject({
       code: 'CONFLICT',
+    });
+  });
+
+  it('answers a lock-busy share with SERVICE_UNAVAILABLE', async () => {
+    const user = await insertTestUser();
+    const org = await createTestOrganization('Claude router busy share', user.id, 0);
+    await seedConnectedPersonal(user.id);
+    const caller = await callerFor(user.id);
+    jest
+      .mocked(shareClaudeBillingConnection)
+      .mockRejectedValueOnce(new ClaudeBillingLockBusyError('claude_billing_grant:x'));
+
+    await expect(caller.sharePersonal({ organizationId: org.id })).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE',
+      message: 'Claude billing is busy. Try again.',
     });
   });
 
@@ -329,6 +369,18 @@ describe('claudeBillingRouter.remove', () => {
     expect(
       await getClaudeBillingConnection({ kind: 'personal', kiloUserId: user.id })
     ).toMatchObject({ status: 'connected', user_profile_id: payer.user_profile_id });
+  });
+
+  it('answers a lock-busy removal with SERVICE_UNAVAILABLE', async () => {
+    const { caller } = await connectedPersonalCaller();
+    jest
+      .mocked(unlinkAndRemoveClaudeBillingGrant)
+      .mockRejectedValueOnce(new ClaudeBillingLockBusyError('claude_billing_grant:x'));
+
+    await expect(caller.remove({})).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE',
+      message: 'Claude billing is busy. Try again.',
+    });
   });
 });
 

@@ -1,4 +1,4 @@
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it, jest } from '@jest/globals';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import {
   byok_api_keys,
@@ -11,6 +11,7 @@ import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organ
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   type ClaudeBillingShareError,
+  ClaudeBillingLockBusyError,
   claudeBillingEffectiveConnection,
   claudeBillingOwnerLockKey,
   claudeBillingPayerLockKey,
@@ -786,6 +787,86 @@ describe('Claude billing grants', () => {
           )
         )
     ).resolves.toEqual([expect.objectContaining({ payer_connection_id: payer.id })]);
+  }, 20000);
+
+  it('answers a budget spent on restarts with ClaudeBillingLockBusyError, not the restart signal', async () => {
+    const user = await insertTestUser();
+    // Four payers this person owns, each kept by an organization grant, so the
+    // removal hands every payer to its organization and frees that organization's
+    // occupant row first. Each occupant id sorts below the key taken so far, so
+    // every restart discovers one more occupant below every held key: the third
+    // attempt meets an occupant below a held key and spends the budget.
+    const fixtures = [
+      {
+        payerId: '44444444-4444-4444-8444-444444444401',
+        occupantId: '33333333-3333-4333-8333-333333333301',
+      },
+      {
+        payerId: '55555555-5555-4555-8555-555555555501',
+        occupantId: '22222222-2222-4222-8222-222222222201',
+      },
+      {
+        payerId: '66666666-6666-4666-8666-666666666601',
+        occupantId: '11111111-1111-4111-8111-111111111101',
+      },
+      {
+        payerId: '77777777-7777-4777-8777-777777777701',
+        occupantId: '00000000-0000-4000-8000-000000000001',
+      },
+    ];
+    for (const [index, fixture] of fixtures.entries()) {
+      const organization = await createTestOrganization(`Claude busy org ${index}`, user.id, 0);
+      // A payer row naming both the person and the organization is the shape the
+      // retired member scope wrote; the organization grant then outlives the
+      // person's own grant and becomes the payer's next owner.
+      await db.insert(claude_billing_connections).values({
+        id: fixture.payerId,
+        kilo_user_id: user.id,
+        organization_id: organization.id,
+        user_profile_id: `uprof_busy_${index}_${crypto.randomUUID()}`,
+        connection_id: `ocon_${crypto.randomUUID()}`,
+        status: 'connected',
+        connected_at: new Date().toISOString(),
+        created_by: user.id,
+      });
+      await db.insert(claude_billing_connection_grants).values({
+        payer_connection_id: fixture.payerId,
+        kilo_user_id: null,
+        organization_id: organization.id,
+        created_by: user.id,
+      });
+      await db.insert(claude_billing_connections).values({
+        id: fixture.occupantId,
+        kilo_user_id: null,
+        organization_id: organization.id,
+        user_profile_id: `uprof_occupant_${index}_${crypto.randomUUID()}`,
+        connection_id: `ocon_${crypto.randomUUID()}`,
+        status: 'connected',
+        connected_at: new Date().toISOString(),
+        created_by: user.id,
+      });
+    }
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const removal = removeUserClaudeBillingGrants(user.id, db);
+    const failure = await removal.catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(ClaudeBillingLockBusyError);
+    if (!(failure instanceof ClaudeBillingLockBusyError)) {
+      throw new Error('The removal did not reject with ClaudeBillingLockBusyError');
+    }
+
+    expect(warn.mock.calls).toEqual([
+      [
+        '[claude-billing] lock retry exhausted after %d attempts: %s',
+        3,
+        'claude_billing_grant:11111111-1111-4111-8111-111111111101',
+      ],
+    ]);
+    warn.mockRestore();
+    expect(failure.lockKey).toBe('claude_billing_grant:11111111-1111-4111-8111-111111111101');
+    expect(failure.message).toBe('Claude billing locks stayed busy; retry the request');
+    // The restart signal stays private: its sentence never reaches a caller.
+    expect(failure.message).not.toContain('ascending key order');
   }, 20000);
 
   it('takes the claim namespace below the payer namespace, and keeps the profile key outside that order', () => {

@@ -454,10 +454,22 @@ export class ClaudeBillingShareError extends Error {
 }
 
 /**
+ * The locks this operation needs stayed busy for every attempt it was allowed,
+ * so the work did not run. `lockKey` is the key it could not take in order.
+ * Callers may retry the request; the internal restart signal stays private.
+ */
+export class ClaudeBillingLockBusyError extends Error {
+  constructor(readonly lockKey: string) {
+    super('Claude billing locks stayed busy; retry the request');
+  }
+}
+
+/**
  * Signals that the transaction would have to wait for a lock key at or below a
  * key it already holds. The transaction aborts, and the caller restarts the
  * operation with that key added to its lock set. `lockKey` is the key the next
- * attempt must take as well.
+ * attempt must take as well. A budget spent on restarts surfaces as
+ * `ClaudeBillingLockBusyError`, never as this signal.
  */
 class ClaudeBillingLockRetry extends Error {
   constructor(readonly lockKey: string) {
@@ -554,7 +566,9 @@ function isAboveHeldLockKeys(lockKey: string, heldLockKeys: ReadonlySet<string>)
 
 /**
  * Runs `attempt` again, up to the attempt bound, when a transaction asks to
- * retake its locks, and passes the keys every attempt must take as well.
+ * retake its locks, and passes the keys every attempt must take as well. The
+ * bound spent surfaces as `ClaudeBillingLockBusyError`, so the restart signal
+ * never leaves this function.
  */
 async function withClaudeBillingLockRetry<T>(
   attempt: (extraLockKeys: ReadonlySet<string>) => Promise<T>
@@ -564,11 +578,14 @@ async function withClaudeBillingLockRetry<T>(
     try {
       return await attempt(extraLockKeys);
     } catch (error) {
-      if (
-        !(error instanceof ClaudeBillingLockRetry) ||
-        attemptNumber >= CLAUDE_BILLING_LOCK_ATTEMPTS
-      ) {
-        throw error;
+      if (!(error instanceof ClaudeBillingLockRetry)) throw error;
+      if (attemptNumber >= CLAUDE_BILLING_LOCK_ATTEMPTS) {
+        console.warn(
+          '[claude-billing] lock retry exhausted after %d attempts: %s',
+          CLAUDE_BILLING_LOCK_ATTEMPTS,
+          error.lockKey
+        );
+        throw new ClaudeBillingLockBusyError(error.lockKey);
       }
       extraLockKeys.add(error.lockKey);
     }
@@ -717,7 +734,8 @@ async function reassignPayerOwnerColumns(
  *
  * A transaction only ever waits for a key above every key it holds, so no two
  * holders can wait for each other. A re-read that resolves another payer restarts
- * the transaction with the wider key set, bounded to `CLAUDE_BILLING_LOCK_ATTEMPTS`.
+ * the transaction with the wider key set, and a budget spent on those restarts
+ * surfaces as `ClaudeBillingLockBusyError`.
  *
  * `work` also receives the keys this transaction holds, which it must pass to any
  * owner-column change so the ascending rule keeps holding.
@@ -773,10 +791,11 @@ export async function withClaudeBillingPayerLock<T>(
  * under the locks. Claim keys are never taken after the first batch: a claim key
  * sorts below every payer key, so a later claim would break the order. A re-read
  * that resolves a payer outside the locked union restarts the transaction with the
- * wider union, bounded to `CLAUDE_BILLING_LOCK_ATTEMPTS`. `work` receives the
- * re-read grants in the order of `owners`; a scope without a row contributes
- * `null`. `work` also receives the one key set of this transaction, and every
- * owner-column change it makes adds its keys to that same set.
+ * wider union, and a budget spent on those restarts surfaces as
+ * `ClaudeBillingLockBusyError`. `work` receives the re-read grants in the order of
+ * `owners`; a scope without a row contributes `null`. `work` also receives the one
+ * key set of this transaction, and every owner-column change it makes adds its
+ * keys to that same set.
  */
 export async function withClaudeBillingPayersLock<T>(
   owners: readonly ClaudeBillingOwner[],
@@ -1185,7 +1204,8 @@ export async function describeClaudeBillingSharing(
  * covers the whole loop, and every owner-column change adds the keys it takes to
  * it, so a later reassignment sees what an earlier one holds. A reassignment that
  * meets another payer row below a held key restarts the whole attempt: the
- * deletes and the reassignments are idempotent.
+ * deletes and the reassignments are idempotent. A budget spent on those restarts
+ * surfaces as `ClaudeBillingLockBusyError`.
  *
  * The account-deletion transaction calls this with its own `tx`. A restart is
  * then a savepoint restart: PostgreSQL releases the keys a savepoint took when it

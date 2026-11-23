@@ -252,3 +252,11 @@ test('does not treat chat-shaped frames without an api kind as metadata completi
   await collector.completed;
   expect(completed).toHaveBeenCalledTimes(1);
 });
+
+test('completes a sniffed chat stream on an error frame, before [DONE] arrives', async () => {
+  const collector = createVercelProviderMetadataCollector();
+  collector.capture({ choices: [{ delta: { provider_metadata: { kept: true } } }] });
+  collector.capture({ error: { message: 'upstream failed' } });
+  await collector.completed;
+  expect(collector.snapshot()).toEqual({ kept: true });
+});

@@ -4050,7 +4050,10 @@
     "list": {
       "loadFailed": "Nem sikerült betölteni a csevegés előzményeit.",
       "new": "Új csevegés",
-      "deleteTitle": "Törli ezt a csevegést?"
+      "deleteTitle": "Törli ezt a csevegést?",
+      "resetNoticeTitle": "A helyi csevegések és piszkozatok törlődtek",
+      "resetNoticeBody": "A Kilo nem tudta megnyitni az ezen az eszközön tárolt csevegéseket. A felhőben lévő munkameneteidet ez nem érinti.",
+      "resetNoticeDismiss": "Értesítés elvetése"
     },
     "rename": {
       "title": "Csevegés átnevezése",

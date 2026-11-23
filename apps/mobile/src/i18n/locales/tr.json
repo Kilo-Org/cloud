@@ -4050,7 +4050,10 @@
     "list": {
       "loadFailed": "Sohbet geçmişi yüklenemedi.",
       "new": "Yeni sohbet",
-      "deleteTitle": "Bu sohbet silinsin mi?"
+      "deleteTitle": "Bu sohbet silinsin mi?",
+      "resetNoticeTitle": "Yerel sohbetler ve taslaklar temizlendi",
+      "resetNoticeBody": "Kilo bu cihazda kayıtlı sohbetleri açamadı. Bulut oturumlarınız etkilenmedi.",
+      "resetNoticeDismiss": "Bildirimi yok say"
     },
     "rename": {
       "title": "Sohbeti yeniden adlandır",

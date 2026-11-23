@@ -4050,7 +4050,10 @@
     "list": {
       "loadFailed": "チャット履歴を読み込めませんでした。",
       "new": "新しいチャット",
-      "deleteTitle": "このチャットを削除しますか？"
+      "deleteTitle": "このチャットを削除しますか？",
+      "resetNoticeTitle": "ローカルのチャットと下書きが削除されました",
+      "resetNoticeBody": "Kiloはこのデバイスに保存されているチャット履歴を読み込めませんでした。クラウド上のセッションは影響を受けません。",
+      "resetNoticeDismiss": "お知らせを非表示にする"
     },
     "rename": {
       "title": "チャット名を変更",

@@ -4128,7 +4128,10 @@
     "list": {
       "loadFailed": "Neizdevās ielādēt tērzēšanas vēsturi.",
       "new": "Jauna tērzēšana",
-      "deleteTitle": "Vai dzēst šo tērzēšanu?"
+      "deleteTitle": "Vai dzēst šo tērzēšanu?",
+      "resetNoticeTitle": "Vietējās tērzēšanas un melnraksti notīrīti",
+      "resetNoticeBody": "Kilo nevarēja atvērt šajā ierīcē saglabātās tērzēšanas. Jūsu sesijas mākonī nav skartas.",
+      "resetNoticeDismiss": "Noraidīt paziņojumu"
     },
     "rename": {
       "title": "Pārdēvēt tērzēšanu",

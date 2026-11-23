@@ -4050,7 +4050,10 @@
     "list": {
       "loadFailed": "Kunne ikke indlæse chathistorik.",
       "new": "Ny chat",
-      "deleteTitle": "Slet denne chat?"
+      "deleteTitle": "Slet denne chat?",
+      "resetNoticeTitle": "Lokale chats og kladder blev ryddet",
+      "resetNoticeBody": "Kilo kunne ikke åbne de chats, der er gemt på denne enhed. Dine sessioner i skyen er ikke berørte.",
+      "resetNoticeDismiss": "Afvis meddelelse"
     },
     "rename": {
       "title": "Omdøb chat",

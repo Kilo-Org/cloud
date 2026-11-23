@@ -4206,7 +4206,10 @@
     "list": {
       "loadFailed": "Zgodovine klepeta ni bilo mogoče naložiti.",
       "new": "Nov klepet",
-      "deleteTitle": "Izbrišem ta klepet?"
+      "deleteTitle": "Izbrišem ta klepet?",
+      "resetNoticeTitle": "Lokalni klepeti in osnutki počiščeni",
+      "resetNoticeBody": "Kilo ni mogel odpreti klepetov, shranjenih na tej napravi. Vaše seje v oblaku niso prizadete.",
+      "resetNoticeDismiss": "Zavrzi obvestilo"
     },
     "rename": {
       "title": "Preimenuj klepet",

@@ -4128,7 +4128,10 @@
     "list": {
       "loadFailed": "Nije moguće učitati povijest razgovora.",
       "new": "Novi razgovor",
-      "deleteTitle": "Izbrisati ovaj razgovor?"
+      "deleteTitle": "Izbrisati ovaj razgovor?",
+      "resetNoticeTitle": "Lokalni razgovori i nacrti su izbrisani",
+      "resetNoticeBody": "Kilo nije mogao otvoriti razgovore spremljene na ovom uređaju. Vaše sesije u oblaku nisu pogođene.",
+      "resetNoticeDismiss": "Odbaci obavijest"
     },
     "rename": {
       "title": "Preimenuj razgovor",

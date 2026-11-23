@@ -4050,7 +4050,10 @@
     "list": {
       "loadFailed": "Tsy afaka nampidirina ny tantaran'ny resaka.",
       "new": "Resaka vaovao",
-      "deleteTitle": "Hamafa ity resaka ity?"
+      "deleteTitle": "Hamafa ity resaka ity?",
+      "resetNoticeTitle": "Voafafa ny resaka sy volavola eto amin'ny fitaovana",
+      "resetNoticeBody": "Tsy afaka nanokatra ny resaka voatahiry ao amin'ity fitaovana ity i Kilo. Tsy voakasika ny fotoam-piasanao ao amin'ny rahona.",
+      "resetNoticeDismiss": "Esory ny filazana"
     },
     "rename": {
       "title": "Ovay ny anaran'ny resaka",

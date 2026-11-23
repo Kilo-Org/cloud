@@ -4050,7 +4050,10 @@
     "list": {
       "loadFailed": "Kunne ikke laste inn chathistorikken.",
       "new": "Ny chat",
-      "deleteTitle": "Slette denne chatten?"
+      "deleteTitle": "Slette denne chatten?",
+      "resetNoticeTitle": "Lokale chatter og utkast ble slettet",
+      "resetNoticeBody": "Kilo kunne ikke åpne chattene som er lagret på denne enheten. Øktene dine i skyen er ikke påvirket.",
+      "resetNoticeDismiss": "Avvis varsel"
     },
     "rename": {
       "title": "Gi chatten nytt navn",

@@ -4128,7 +4128,10 @@
     "list": {
       "loadFailed": "Nije moguće učitati istoriju ćaskanja.",
       "new": "Novo ćaskanje",
-      "deleteTitle": "Izbrisati ovo ćaskanje?"
+      "deleteTitle": "Izbrisati ovo ćaskanje?",
+      "resetNoticeTitle": "Lokalna ćaskanja i nacrti su izbrisani",
+      "resetNoticeBody": "Kilo nije mogao da otvori ćaskanja sačuvana na ovom uređaju. Vaše sesije u oblaku nisu pogođene.",
+      "resetNoticeDismiss": "Odbaci obaveštenje"
     },
     "rename": {
       "title": "Preimenuj ćaskanje",

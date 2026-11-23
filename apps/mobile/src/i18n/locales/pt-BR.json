@@ -4206,7 +4206,10 @@
     "list": {
       "loadFailed": "Não foi possível carregar o histórico do chat.",
       "new": "Nova conversa",
-      "deleteTitle": "Excluir esta conversa?"
+      "deleteTitle": "Excluir esta conversa?",
+      "resetNoticeTitle": "Conversas locais e rascunhos foram excluídos",
+      "resetNoticeBody": "O Kilo não conseguiu abrir as conversas salvas neste dispositivo. Suas sessões na nuvem não foram afetadas.",
+      "resetNoticeDismiss": "Ignorar aviso"
     },
     "rename": {
       "title": "Renomear chat",

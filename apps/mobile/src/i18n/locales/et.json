@@ -4050,7 +4050,10 @@
     "list": {
       "loadFailed": "Vestluse ajaloo laadimine ei õnnestunud.",
       "new": "Uus vestlus",
-      "deleteTitle": "Kas kustutada see vestlus?"
+      "deleteTitle": "Kas kustutada see vestlus?",
+      "resetNoticeTitle": "Kohalikud vestlused ja mustandid kustutati",
+      "resetNoticeBody": "Kilo ei suutnud avada selles seadmes salvestatud vestlusi. Sinu pilve seansse see ei mõjuta.",
+      "resetNoticeDismiss": "Jäta teade kõrvale"
     },
     "rename": {
       "title": "Nimeta vestlus ümber",

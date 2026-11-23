@@ -4050,7 +4050,10 @@
     "list": {
       "loadFailed": "Haikuweza kupakia historia ya mazungumzo.",
       "new": "Gumzo jipya",
-      "deleteTitle": "Futa gumzo hili?"
+      "deleteTitle": "Futa gumzo hili?",
+      "resetNoticeTitle": "Magumzo ya kifaa na rasimu yamefutwa",
+      "resetNoticeBody": "Kilo haikuweza kufungua magumzo yaliyohifadhiwa kwenye kifaa hiki. Vikao vyako vya wingu havijaathirika.",
+      "resetNoticeDismiss": "Puuza arifa"
     },
     "rename": {
       "title": "Badilisha jina la gumzo",

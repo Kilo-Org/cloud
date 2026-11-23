@@ -4050,7 +4050,10 @@
     "list": {
       "loadFailed": "Kò lè ṣagbewọ ìtàn iwiregbe.",
       "new": "Ìjíròrò tuntun",
-      "deleteTitle": "Pa ìjíròrò yìí rẹ́?"
+      "deleteTitle": "Pa ìjíròrò yìí rẹ́?",
+      "resetNoticeTitle": "A ti pa ìjíròrò àti àkọsílẹ̀ àkọ́kọ́ ẹ̀rọ rẹ",
+      "resetNoticeBody": "Kilo kò lè ṣí àwọn ìjíròrò tí a fipamọ́ sórí ẹ̀rọ yìí. A kò yí àwọn ìgbà iṣẹ́ nínú kùrukùru rẹ padà.",
+      "resetNoticeDismiss": "Yọ ìfitónilétí kúrò"
     },
     "rename": {
       "title": "Yí orúkọ ìjíròrò padà",

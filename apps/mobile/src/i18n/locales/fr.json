@@ -4128,7 +4128,10 @@
     "list": {
       "loadFailed": "Impossible de charger l'historique des discussions.",
       "new": "Nouvelle discussion",
-      "deleteTitle": "Supprimer cette discussion ?"
+      "deleteTitle": "Supprimer cette discussion ?",
+      "resetNoticeTitle": "Discussions et brouillons locaux effacés",
+      "resetNoticeBody": "Kilo n'a pas pu ouvrir les discussions enregistrées sur cet appareil. Vos sessions dans le nuage ne sont pas affectées.",
+      "resetNoticeDismiss": "Ignorer la notification"
     },
     "rename": {
       "title": "Renommer la discussion",

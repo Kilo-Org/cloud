@@ -4284,7 +4284,10 @@
     "list": {
       "loadFailed": "Níorbh fhéidir stair an chomhrá a lódáil.",
       "new": "Comhrá nua",
-      "deleteTitle": "An comhrá seo a scriosadh?"
+      "deleteTitle": "An comhrá seo a scriosadh?",
+      "resetNoticeTitle": "Glanadh comhráite agus dréachtaí áitiúla",
+      "resetNoticeBody": "Níorbh fhéidir le Kilo na comhráite atá sábháilte ar an ngléas seo a oscailt. Níl aon tionchar ar do sheisiúin sa scamall.",
+      "resetNoticeDismiss": "Cuir an fógra as an áireamh"
     },
     "rename": {
       "title": "Athainmnigh an comhrá",

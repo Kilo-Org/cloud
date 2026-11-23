@@ -4050,7 +4050,10 @@
     "list": {
       "loadFailed": "Det gick inte att läsa in chatthistoriken.",
       "new": "Ny chatt",
-      "deleteTitle": "Ta bort den här chatten?"
+      "deleteTitle": "Ta bort den här chatten?",
+      "resetNoticeTitle": "Lokala chattar och utkast rensades",
+      "resetNoticeBody": "Kilo kunde inte öppna chattarna som sparats på den här enheten. Dina sessioner i molnet påverkas inte.",
+      "resetNoticeDismiss": "Avskriv avisering"
     },
     "rename": {
       "title": "Byt namn på chatten",

@@ -4206,7 +4206,10 @@
     "list": {
       "loadFailed": "Históriu chatu sa nepodarilo načítať.",
       "new": "Nový chat",
-      "deleteTitle": "Odstrániť tento chat?"
+      "deleteTitle": "Odstrániť tento chat?",
+      "resetNoticeTitle": "Lokálne chaty a koncepty boli vymazané",
+      "resetNoticeBody": "Kilo nedokázalo otvoriť chaty uložené v tomto zariadení. Vaše cloudové relácie nie sú ovplyvnené.",
+      "resetNoticeDismiss": "Ignorovať oznámenie"
     },
     "rename": {
       "title": "Premenovať chat",

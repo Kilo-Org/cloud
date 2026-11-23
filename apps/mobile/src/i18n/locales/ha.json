@@ -4050,7 +4050,10 @@
     "list": {
       "loadFailed": "Ba a iya loda tarihin tattaunawa.",
       "new": "Sabuwar tattaunawa",
-      "deleteTitle": "A share wannan tattaunawar?"
+      "deleteTitle": "A share wannan tattaunawar?",
+      "resetNoticeTitle": "An share tattaunawa da daftari a na'urar",
+      "resetNoticeBody": "Kilo bai iya buɗe tattaunawar da aka adana a wannan na'urar ba. Ba a shafi zaman girgije ba.",
+      "resetNoticeDismiss": "Yi watsi da sanarwa"
     },
     "rename": {
       "title": "Sauya sunan tattaunawa",

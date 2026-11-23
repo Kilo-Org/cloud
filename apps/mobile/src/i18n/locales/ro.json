@@ -4128,7 +4128,10 @@
     "list": {
       "loadFailed": "Nu s-a putut încărca istoricul de chat.",
       "new": "Chat nou",
-      "deleteTitle": "Ștergi acest chat?"
+      "deleteTitle": "Ștergi acest chat?",
+      "resetNoticeTitle": "Chat-urile și ciornele locale au fost șterse",
+      "resetNoticeBody": "Kilo nu a putut deschide chat-urile salvate pe acest dispozitiv. Sesiunile din cloud nu sunt afectate.",
+      "resetNoticeDismiss": "Ignoră notificarea"
     },
     "rename": {
       "title": "Redenumește chatul",

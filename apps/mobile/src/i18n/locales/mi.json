@@ -4050,7 +4050,10 @@
     "list": {
       "loadFailed": "Kāore i taea te uta i te hītori kōrero.",
       "new": "Kōrero hou",
-      "deleteTitle": "Muku i tēnei kōrero?"
+      "deleteTitle": "Muku i tēnei kōrero?",
+      "resetNoticeTitle": "Kua mukua ngā kōrero ā-rohe me ngā hukihuki",
+      "resetNoticeBody": "Kāore i taea e Kilo te whakatuwhera i ngā kōrero kua tiakina ki tēnei pūrere. Kāore he pānga ki ō wātū kapua.",
+      "resetNoticeDismiss": "Whakakorea te whakamōhiotanga"
     },
     "rename": {
       "title": "Whakaingoa anō te kōrerorero",

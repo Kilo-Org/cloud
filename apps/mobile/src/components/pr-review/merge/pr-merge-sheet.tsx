@@ -86,10 +86,12 @@ type PrMergeSheetProps = Readonly<{
   mergeState?: ProviderPrMergeState | null;
   autoMergeCapability?: ProviderReviewCapability;
   /**
-   * The provider arm's merge-state refetch. Omitted, it falls back to the
-   * sheet's own refetch.
+   * The caller's merge-state read: `retry` re-reads the state an `unknown`
+   * gate could not produce, `isRetrying` is that read's fetching flag. The
+   * sheet has no fallback of its own — the overview refetch cannot clear a
+   * gate derived from the merge state.
    */
-  onRetryMergeState?: () => void;
+  mergeStateRetry: Readonly<{ retry: () => void; isRetrying: boolean }>;
   onRefetch: () => Promise<void>;
   onDismiss: () => void;
 }>;
@@ -112,7 +114,7 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
     prRef,
     mergeState,
     autoMergeCapability,
-    onRetryMergeState,
+    mergeStateRetry,
     onRefetch,
     onDismiss,
   } = props;
@@ -229,12 +231,7 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
             isMutating={isMutating}
             onConfirm={handleConfirmPress}
             onCancel={handleCancel}
-            onRetryMergeState={
-              onRetryMergeState ??
-              (() => {
-                void onRefetch();
-              })
-            }
+            mergeStateRetry={mergeStateRetry}
           >
             <MergeSheetFormBody
               noMethodsAllowed={noMethodsAllowed}

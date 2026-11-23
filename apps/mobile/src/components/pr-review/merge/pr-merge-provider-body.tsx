@@ -134,7 +134,8 @@ function ProviderAutoMergeBody({
  * The provider arm's sheet body. The screen (`pr-review-merge-screen.tsx`)
  * mounts the sheet only after the provider merge-state read returns, so an
  * `unknown` gate is the contract-violation terminal: it renders the failure
- * with a merge-state retry and a Discard, never a confirm control. Only an
+ * with the caller's merge-state retry (its retry drive and fetching flag, so
+ * the control reports the wait) and a Discard, never a confirm control. Only an
  * established allowed verdict or the GitHub arm reaches the child form. The
  * restrictions list stays advisory: the merge write
  * (`providerReview.mergePullRequest`) re-fetches the review, fences the
@@ -147,7 +148,7 @@ export function PrMergeProviderBody({
   isMutating,
   onConfirm,
   onCancel,
-  onRetryMergeState,
+  mergeStateRetry,
   children,
 }: Readonly<{
   gate: PrMergeGate;
@@ -155,12 +156,18 @@ export function PrMergeProviderBody({
   isMutating: boolean;
   onConfirm: () => void;
   onCancel: () => void;
-  /** Re-reads the merge state the `unknown` gate could not produce. */
-  onRetryMergeState: () => void;
+  /**
+   * The caller's merge-state read: `retry` re-reads the state the `unknown`
+   * gate could not produce, `isRetrying` is that read's own fetching flag, so
+   * the retry control reports the wait instead of looking dead.
+   */
+  mergeStateRetry: Readonly<{ retry: () => void; isRetrying: boolean }>;
   children: ReactNode;
 }>) {
   const { t } = useTranslation();
   const sideInsetStyle = useSideInsetStyle();
+  // `jsx-handler-names` wants a local binding per handler prop.
+  const retryMergeState = mergeStateRetry.retry;
   function cancelButton() {
     return (
       <Button
@@ -180,10 +187,12 @@ export function PrMergeProviderBody({
         <View className="flex-1 justify-center" style={sideInsetStyle}>
           <QueryError
             placement="static"
+            inset="gutter"
             variant="neutral"
             title={t('prReview.merge.couldNotDetermine')}
             message={t('prReview.merge.blocked.unknownStateDetail')}
-            onRetry={onRetryMergeState}
+            onRetry={retryMergeState}
+            isRetrying={mergeStateRetry.isRetrying}
           />
         </View>
         <PrFormSheetFooter>{cancelButton()}</PrFormSheetFooter>

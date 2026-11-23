@@ -486,8 +486,7 @@ function htmlBlockTerminator(body: string): { from: number; terminator: string }
   const rest = body.slice(indent);
   const rawText = /^<(script|pre|style|textarea)\b/i.exec(rest);
   if (rawText !== null) {
-    const name = rawText[1] as string;
-    return { from: indent + rawText[0].length, terminator: `</${name.toLowerCase()}>` };
+    return { from: indent + rawText[0].length, terminator: `</${rawText[1] as string}>` };
   }
   if (rest.startsWith('<!--')) {
     return { from: indent + '<!--'.length, terminator: '-->' };
@@ -502,6 +501,17 @@ function htmlBlockTerminator(body: string): { from: number; terminator: string }
     return { from: indent + '<!'.length, terminator: '>' };
   }
   return undefined;
+}
+
+/**
+ * Whether `text` holds `terminator`, ignoring case: an HTML block's end marker
+ * is syntax, never copy, and a raw-text element's end tag may be spelled in any
+ * case. A case-insensitive pattern answers it without re-casing either string,
+ * which this file may not do for text that could reach the screen.
+ */
+function holdsHtmlTerminator(text: string, terminator: string): boolean {
+  const escaped = terminator.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+  return new RegExp(escaped, 'i').test(text);
 }
 
 /** A link reference definition: a label, a colon, and a destination. */
@@ -789,11 +799,11 @@ export function withoutLeadingDirectionMarks(markdown: string): string {
     // The block ends on the line that holds its terminator, or, for a block that
     // opens and closes on one line, on that line: the line under it opens a
     // block. A raw-text element's end tag is matched without regard to case,
-    // and the other terminators hold no letters, so one comparison serves all.
+    // while every other terminator holds no letter, so one comparison serves all.
     const closesHtml: boolean =
       openHtmlBlock !== undefined
-        ? line.toLowerCase().includes(openHtmlBlock)
-        : html !== undefined && line.slice(html.from).toLowerCase().includes(html.terminator);
+        ? holdsHtmlTerminator(line, openHtmlBlock)
+        : html !== undefined && holdsHtmlTerminator(line.slice(html.from), html.terminator);
     // A line that is an HTML block's raw text — the block's opening line, or a
     // line inside one — is not read as markdown: a `#` or a run of dashes inside
     // a `<pre>` is that block's copy, not a heading or an underline.

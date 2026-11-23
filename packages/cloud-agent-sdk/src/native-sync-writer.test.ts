@@ -928,7 +928,9 @@ describe('CLI golden fixtures', () => {
       ],
       1
     );
-    expect(changeValue(changes[0]!)).toStrictEqual({
+    const [messageChange] = changes;
+    if (!messageChange) throw new Error('Expected a message change');
+    expect(changeValue(messageChange)).toStrictEqual({
       seq: 0,
       message: {
         id: 'msg_asset_user',

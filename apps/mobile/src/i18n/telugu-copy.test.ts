@@ -15,7 +15,9 @@ import { i18n } from '@/i18n';
  * subject, the branch notices spell the repository loanword with a long
  * `ో`, and the repository search and question-card placeholders prompt the
  * reader instead of naming their field. This branch changes catalog values
- * only: no key, placeholder, or plural category moves.
+ * only: no key, placeholder, or plural category moves. The composer
+ * attachment refusal now states the inability the English capability
+ * sentence names rather than a finished non-delivery.
  */
 
 beforeAll(async () => {
@@ -375,5 +377,13 @@ describe('Telugu to-do counts', () => {
   it('keeps the run count singular for one run and plural for two', () => {
     expect(i18n.t('todos.item.runCount', { count: 1 })).toBe('1 అమలు');
     expect(i18n.t('todos.item.runCount', { count: 2 })).toBe('2 అమలులు');
+  });
+});
+
+describe('Telugu composer attachment refusal copy', () => {
+  it("names the session's inability to receive files rather than a past non-delivery", () => {
+    expect(i18n.t('agentChat.composer.cannotReceiveFiles')).toBe(
+      'ఈ సెషన్ ఫైళ్లను స్వీకరించలేకపోతోంది. మీ సందేశాన్ని పంపడానికి జోడింపులను తీసివేయండి.'
+    );
   });
 });

@@ -301,7 +301,7 @@ export function sessionLiveToolStep(
         target: sessionLiveText(input['pattern'], SESSION_LIVE_TARGET_LIMIT),
       };
     case 'list':
-      return { verb: 'searching', target: basename(input['path']) };
+      return { verb: 'searching', target: basename(firstString(input, FILE_PATH_KEYS)) };
     case 'codesearch':
     case 'websearch':
     case 'web_search':

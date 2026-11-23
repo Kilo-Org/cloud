@@ -498,3 +498,31 @@ describe('filled neutral action contrast (non-text)', () => {
     }
   });
 });
+
+// The patch-absent notice sits directly under a file row that paints
+// `bg-card`, and in dark that card is what `secondary` also paints, so the
+// notice takes the raised `secondary-fill` step to read as its own block. Its
+// link paints `ink2` — the quiet second-line ink, not the status blue — on
+// whichever surface the scheme gives it.
+describe('patch-absent notice contrast (WCAG AA text)', () => {
+  const MIN_VISIBLE_SURFACE_RATIO = 1.6;
+  const notices = [
+    ['light', lightColors, lightColors.secondary],
+    ['dark', darkColors, darkColors.secondaryFill],
+  ] as const;
+
+  it('every theme: the notice link clears 4.5:1 on its own notice surface', () => {
+    for (const [theme, colors, surface] of notices) {
+      expect(contrastRatio(colors.ink2, surface), `ink2 on ${theme} notice`).toBeGreaterThanOrEqual(
+        MIN_TEXT_RATIO
+      );
+    }
+  });
+
+  it('dark theme: the notice surface separates from the card row above it', () => {
+    expect(
+      contrastRatio(darkColors.secondaryFill, darkColors.card),
+      'notice vs card (dark)'
+    ).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
+  });
+});

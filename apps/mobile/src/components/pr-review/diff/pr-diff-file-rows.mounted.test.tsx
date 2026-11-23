@@ -15,6 +15,14 @@ import { FileHeaderRow, type FileViewedToggle, PatchMissingRow } from './pr-diff
 import { LTR_ISOLATE_CLOSE, LTR_ISOLATE_OPEN } from '@/lib/bidi';
 
 const i18nManager = vi.hoisted(() => ({ isRTL: false }));
+// The link's ink is read back by the provider-link test, so the palette the
+// component sees is one hoisted record instead of a literal inside the factory.
+const themeColors = vi.hoisted(() => ({
+  mutedForeground: '#888888',
+  info: '#0000ff',
+  foreground: '#000000',
+  ink2: '#3c382f',
+}));
 vi.mock('react-native', async () => {
   // A `vi.mock` factory runs before this file's imports are initialised, so the
   // shared flatten comes in dynamically; a static import would be unbound here.
@@ -49,7 +57,7 @@ vi.mock('@/lib/a11y/selectable-row', () => ({
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
 vi.mock('@/lib/haptics', () => ({ selectionHaptic: vi.fn() }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({ mutedForeground: '#888888', info: '#0000ff', foreground: '#000000' }),
+  useThemeColors: () => themeColors,
 }));
 
 const ADDITIONS_RUN = `${LTR_ISOLATE_OPEN}+3${LTR_ISOLATE_CLOSE}`;
@@ -345,5 +353,34 @@ describe('PatchMissingRow provider link', () => {
         node => Object.is(node.type, 'Pressable') && node.props.accessibilityRole === 'link'
       )
     ).toHaveLength(0);
+  });
+
+  /**
+   * The link is a caption action under the notice, not a status: it paints the
+   * quiet second-line ink and lets its leading glyph name it, instead of the
+   * bright status blue that pulled the eye off the file rows and the review
+   * action.
+   */
+  it('paints the provider link in the quiet second-line ink, not the status blue', () => {
+    mountPatchlessRow('provider_omitted', {
+      url: 'https://gitlab.example.com/group/sub/repo/-/merge_requests/12/diffs',
+      provider: 'gitlab',
+    });
+
+    const glyph = renderer?.root.find(node => Object.is(node.type, 'Link2'));
+    expect(glyph?.props.color).toBe(themeColors.ink2);
+
+    const label = hostTexts().find(
+      node =>
+        node.props.children === i18n.t('prReview.fileRows.openOnProvider', { provider: 'GitLab' })
+    );
+    expect(label).toBeDefined();
+    expect(String(label?.props.className).split(' ')).toEqual(
+      expect.arrayContaining(['text-sm', 'text-ink2'])
+    );
+    // The ink comes from the token class, not from an inline style, and no node
+    // in the row still carries the status blue.
+    expect(JSON.stringify(label?.props.style ?? null)).not.toContain(themeColors.info);
+    expect(renderer?.root.findAll(node => node.props.color === themeColors.info)).toHaveLength(0);
   });
 });

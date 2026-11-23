@@ -19,23 +19,49 @@ export type PrReviewFile = {
 };
 
 /**
- * Normalize one file read into the row shape. The rows distinguish "no cause"
- * with `=== null`, but a web deployment that predates the field sends
- * `undefined`, which is not `null` — so every file would read as patch-missing
- * and lose its hunks. Folding an absent cause to `null` here keeps that
- * version skew to the one boundary every page crosses.
+ * Normalize one file read into the row shape. Reads cross a deployment skew
+ * here, at the one boundary every page passes through.
+ *
+ * `patchMissingCause` arrives in three shapes. A current server names why a
+ * file has no patch, or sends an explicit `null` for a read that carried one
+ * (which the rows still answer as "no preview" when it holds no hunks). A
+ * server older than the field sends neither: it set `patchMissing` from
+ * `!patch`, so a null patch there has no cause to name. Resolving that absent
+ * cause from the patch keeps the row honest — a patch-less file stays
+ * non-expandable and prints its sentence instead of offering an expand control
+ * that opens nothing, while a file with a patch keeps its hunks.
  *
  * `status` crosses the same boundary: an older deployment sends a raw provider
  * word (`deleted`), and the closed status record has no entry for it, so the
  * row would render an undefined icon. Mapping it through the contract's own
  * normalizer keeps a pre-PR server readable at every row.
  */
-export function normalizePrReviewFile<T extends PrReviewFile>(file: T): T {
+export function normalizePrReviewFile<T extends PrReviewFileRead>(
+  file: T
+): Omit<T, 'status' | 'patchMissingCause'> & {
+  status: ProviderPrFileStatus;
+  patchMissingCause: ProviderPrFilePatchMissingCause | null;
+} {
   return {
     ...file,
     status: providerPrFileStatus(file.status),
-    patchMissingCause: file.patchMissingCause ?? null,
+    patchMissingCause: patchMissingCauseOf(file),
   };
+}
+
+/**
+ * One file read as a deployment older than `patchMissingCause` sends it: the
+ * key is absent, so the row type's required cause cannot describe it.
+ */
+export type PrReviewFileRead = Omit<PrReviewFile, 'patchMissingCause'> & {
+  patchMissingCause?: ProviderPrFilePatchMissingCause | null;
+};
+
+function patchMissingCauseOf(file: PrReviewFileRead): ProviderPrFilePatchMissingCause | null {
+  if (file.patchMissingCause !== undefined) {
+    return file.patchMissingCause;
+  }
+  return file.patch === null ? 'provider_omitted' : null;
 }
 
 export const PR_REVIEW_MAX_LISTED_FILES = 3000;

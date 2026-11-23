@@ -213,36 +213,54 @@ export function PatchMissingRow({
     file.patchMissingCause === null
       ? t('prReview.fileRows.noPreview')
       : t(PATCH_MISSING_COPY_KEY[file.patchMissingCause]);
-  const provider = link === null ? null : reviewerPlatformLabel(link.provider);
   return (
-    <View className="border-b-[0.5px] border-hair-soft bg-secondary px-4 py-3">
+    // The file row above paints `bg-card`, which in dark is what `secondary`
+    // also paints, so the notice would merge with the rows: it takes the raised
+    // neutral step there. Light keeps `secondary`, where `secondary-fill` is the
+    // same colour.
+    <View className="border-b-[0.5px] border-hair-soft bg-secondary px-4 py-3 dark:bg-secondary-fill">
       <View className="flex-row items-center gap-2">
         <Info size={14} color={colors.mutedForeground} />
         <Text className="flex-1 text-sm text-foreground">{causeCopy}</Text>
       </View>
-      {link === null || provider === null ? null : (
-        <Pressable
-          onPress={() => {
-            void openExternalUrl(link.url, {
-              label: t('prReview.fileRows.providerDiff', { provider }),
-            });
-          }}
-          accessibilityRole="link"
-          accessibilityLabel={t('prReview.fileRows.openDiffOnProvider', { provider })}
-          // The shared caption-line action box: it lifts the link's own node to
-          // the control-size floor, and its negative margin keeps the row's
-          // height unchanged. The matching hit slop reaches the 44 dp touch
-          // target the design gate measures.
-          className={cn(LINE_ACTION_BOX_CLASS, 'mt-2 flex-row items-center gap-1.5 self-start')}
-          hitSlop={LINE_ACTION_HIT_SLOP}
-        >
-          <Link2 size={14} color={colors.info} />
-          {/* eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic theme info color */}
-          <Text className="text-sm" style={{ color: colors.info }}>
-            {t('prReview.fileRows.openOnProvider', { provider })}
-          </Text>
-        </Pressable>
-      )}
+      {link === null ? null : <ProviderDiffLink link={link} />}
     </View>
+  );
+}
+
+/**
+ * The card's one control, when the diff has a provider page. `link` is
+ * non-null here, so the platform's name is read straight from it — every
+ * platform names itself, so there is no second "no label" case to guard.
+ *
+ * It is a caption action, not a status: the quiet second-line ink and the
+ * leading glyph carry it, as the linked-issues row does, instead of the status
+ * blue that pulled the eye off the file rows and the review action.
+ */
+function ProviderDiffLink({ link }: { link: { url: string; provider: ProviderPrPlatform } }) {
+  const colors = useThemeColors();
+  const { t } = useTranslation();
+  const provider = reviewerPlatformLabel(link.provider);
+  return (
+    <Pressable
+      onPress={() => {
+        void openExternalUrl(link.url, {
+          label: t('prReview.fileRows.providerDiff', { provider }),
+        });
+      }}
+      accessibilityRole="link"
+      accessibilityLabel={t('prReview.fileRows.openDiffOnProvider', { provider })}
+      // The shared caption-line action box: it lifts the link's own node to
+      // the control-size floor, and its negative margin keeps the row's
+      // height unchanged. The matching hit slop reaches the 44 dp touch
+      // target the design gate measures.
+      className={cn(LINE_ACTION_BOX_CLASS, 'mt-2 flex-row items-center gap-1.5 self-start')}
+      hitSlop={LINE_ACTION_HIT_SLOP}
+    >
+      <Link2 size={14} color={colors.ink2} />
+      <Text className="text-sm text-ink2">
+        {t('prReview.fileRows.openOnProvider', { provider })}
+      </Text>
+    </Pressable>
   );
 }

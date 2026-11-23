@@ -4424,7 +4424,7 @@
     "mcpLoadFailed": "Pa t 'kapab chaje MCP serveurs",
     "slashCommandsLoadFailed": "Pa t 'kapab chaje koupe kòmandman",
     "repoBindingsLoadFailed": "Pa t 'kapab chaje pwofil default",
-    "pinnedReposLoadFailed": "Pa t 'kapab chaje repozitwa yo ki mete sou yo",
+    "pinnedReposLoadFailed": "Pa t 'kapab chaje repozitwa yo ki gen pin",
     "counts": {
       "vars_one": "{{count}} varyab",
       "vars_other": "{{count}} varyab",

@@ -154,6 +154,25 @@ function isHiddenTitleCopy(node: TestInstance): boolean {
   );
 }
 
+/**
+ * Whether the reflowed cluster sits in the row that also holds the reserved
+ * title band, which is what a header reserving title space does so the band's
+ * slack absorbs the row (see `clusterInBand`). A header with no reserve keeps
+ * the cluster in a row of its own below that block, and has no band to find.
+ */
+function stackedRowSharesReservedBand(renderer: TestRenderer.ReactTestRenderer): boolean {
+  const band = renderer.root.findAll(
+    node =>
+      typeof node.type === 'string' &&
+      (node.type as string) === 'View' &&
+      String(node.props.className ?? '').includes('w-0 overflow-hidden')
+  )[0];
+  if (!band?.parent) {
+    throw new Error('the header renders no reserved band');
+  }
+  return band.parent.findAll(isStackedActionsRow).length === 1;
+}
+
 function findIcon(back: TestInstance, type: string): TestInstance {
   const icons = back.findAll(node => typeof node.type === 'string' && node.type === type);
   const icon = icons[0];
@@ -1031,6 +1050,21 @@ describe('ScreenHeader mounted', () => {
       reportWidth(first.copy, 210.67);
       reportWidth(fitTargets(renderer).box, 158.86);
       expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(1);
+    });
+
+    // A header that reserves title space holds the height of the whole cap, so
+    // the reflowed cluster belongs inside that row: the band's slack absorbs the
+    // row and the cluster sits one gap under the title. Outside it, a whole band
+    // stood between the title and the cluster (48dp on the session screen).
+    it('keeps the reflowed cluster inside the reserved title band', () => {
+      Object.assign(layout, { width: 360, fontScale: 1 });
+      const reserved = renderHeader({ ...session, reserveTitleSpace: true });
+      const first = fitTargets(reserved);
+      reportWidth(first.box, 158.86);
+      reportWidth(first.copy, 210.67);
+      reportWidth(fitTargets(reserved).box, 158.86);
+      expect(reserved.root.findAll(isStackedActionsRow)).toHaveLength(1);
+      expect(stackedRowSharesReservedBand(reserved)).toBe(true);
     });
   });
 

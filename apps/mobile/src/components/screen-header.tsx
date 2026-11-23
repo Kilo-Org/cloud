@@ -837,6 +837,23 @@ export function ScreenHeader({
   // zero one (see `inlineActionsSlot`).
   const pinnedInlineActions = inlineActions && !allowInlineActionsStacking;
 
+  // The reflowed cluster of the two rows this header can paint.
+  const stackedInlineActionsRow =
+    inlineActions && stackInlineActions ? (
+      <View className="mt-2 min-w-0">{inlineActions}</View>
+    ) : null;
+  // A header that reserves title space already holds the height of the full
+  // title cap, so a stacked cluster belongs inside that band: it takes the
+  // slack the current title leaves instead of adding a row under the band. The
+  // header then keeps its height when a longer title arrives (the loading
+  // header's short placeholder and the loaded name both stay inside the same
+  // band), and the cluster sits one row gap under the title rather than under
+  // the band's unused lines. Without the reserve there is no slack to take, so
+  // the cluster keeps a full-width row of its own below the title.
+  const clusterInBand = Boolean(inlineActions) && stackInlineActions && reserveTitleSpace;
+  const stackedInlineInHeading = clusterInBand ? stackedInlineActionsRow : null;
+  const stackedInlineAfterRow = clusterInBand ? null : stackedInlineActionsRow;
+
   // Which of the heading's lines the header paints, which decides whether the
   // header centres a leading spacer opposite the back control.
   const hasEyebrowLine = Boolean(eyebrow) || reserveEyebrow;
@@ -1090,6 +1107,7 @@ export function ScreenHeader({
       {eyebrowSlot}
       {titleNode}
       {subtitleSlot}
+      {stackedInlineInHeading}
     </View>
   );
 
@@ -1336,10 +1354,6 @@ export function ScreenHeader({
         {inlineActions}
       </View>
     ) : null;
-  const stackedInlineActionsRow =
-    inlineActions && stackInlineActions ? (
-      <View className="mt-2 min-w-0">{inlineActions}</View>
-    ) : null;
   // The heading is one block on the 14dp page gutter. Inside it every line
   // starts on the title's column — 34dp of the 48dp target plus the 3.5dp
   // `ms-1` gap — which the `gutter` rule reads as the header's own column
@@ -1406,6 +1420,7 @@ export function ScreenHeader({
           {trailingLineSpacer}
         </View>
       ) : null}
+      {stackedInlineInHeading}
     </View>
   );
   // The fit check's copy (see `measuresTitleFit`): it paints nothing, takes no
@@ -1456,7 +1471,7 @@ export function ScreenHeader({
               // inside it instead of running off the edge.
               <View className="mt-2 min-w-0">{headerRight}</View>
             ) : null}
-            {stackedInlineActionsRow}
+            {stackedInlineAfterRow}
           </>
         ) : (
           <>
@@ -1467,7 +1482,7 @@ export function ScreenHeader({
             {headerRight && stackActions ? (
               <View className="mt-2 min-w-0">{headerRight}</View>
             ) : null}
-            {stackedInlineActionsRow}
+            {stackedInlineAfterRow}
           </>
         )}
         {titleNaturalCopy}

@@ -299,7 +299,7 @@ describe('handleSlackOAuthCallback Slack bot-link', () => {
     expect(response.status).toBe(409);
     expect(body).toContain('already linked to a different Kilo account');
     expect(body).toContain('This Slack account is already linked');
-    expect(body).toContain('disconnect the slack integration');
+    expect(body).toContain('disconnect the Slack integration');
     await expect(mappedKiloUser()).resolves.toBe(OTHER_KILO_USER_ID);
     expect(mockAfter).not.toHaveBeenCalled();
   });

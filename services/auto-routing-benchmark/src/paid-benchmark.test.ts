@@ -20,12 +20,17 @@ import type { HonoEnv } from './hono-env';
 import { ACTIVE_MEASUREMENT_REVISION, deciderCasesForRouter } from './measurement-revision';
 import {
   pauseUnfundedPaidRequests,
+  planReadChunks,
+  stagePaidBenchmarkRequest,
   reconcilePaidBenchmarkRequests,
   reconcilePaidUsageReceipts,
   registerPaidBenchmarkRoutes,
 } from './paid-benchmark';
-import { selectPaidModelRequestPayerStatements } from './paid-case-store';
-import { SERVING_EVIDENCE_GONE_REASON } from './paid-benchmark-plan';
+import {
+  enqueuePaidCaseBatchStatements,
+  selectPaidModelRequestPayerStatements,
+} from './paid-case-store';
+import { SERVING_EVIDENCE_GONE_REASON, type PaidBenchmarkPlan } from './paid-benchmark-plan';
 import { computeEngineIdentity } from './run';
 
 const CATALOG = {
@@ -2062,5 +2067,971 @@ describe('terminal unusable measurement', () => {
     if (completed.status !== 'completed') return;
     expect(completed.counts.done).toBe(SLOTS);
     expect(completed.counts.failed).toBe(0);
+  });
+});
+
+describe('bounded plan reads', () => {
+  it('splits the served set so one plan query stays inside its byte budget', () => {
+    const rows = (count: number) =>
+      Array.from({ length: count }, (_, index) => ({ quote_id: `q${index}` }));
+    // Wide plans (~250 KB each) never share a query beyond the 2 MB budget.
+    const wide = new Map(rows(12).map(row => [row.quote_id, 250_000]));
+    const wideChunks = planReadChunks(rows(12), wide);
+    expect(wideChunks.map(chunk => chunk.length)).toEqual([8, 4]);
+    for (const chunk of wideChunks)
+      expect(
+        chunk.reduce((sum, row) => sum + (wide.get(row.quote_id) ?? 0), 0)
+      ).toBeLessThanOrEqual(2 * 1024 * 1024);
+    // Typical plans (~18 KB) all fit in one read.
+    const typical = new Map(rows(50).map(row => [row.quote_id, 18_000]));
+    expect(planReadChunks(rows(50), typical)).toHaveLength(1);
+    // A single oversized plan still gets its own chunk, so it can never be unreachable.
+    const huge = new Map([['q0', 9_000_000]]);
+    expect(planReadChunks(rows(1), huge)).toHaveLength(1);
+  });
+});
+
+describe('paid request staging liveness', () => {
+  /** Two extra catalog models, so a test can quote a pool of three or four concrete pairs. */
+  const WIDE_CATALOG = {
+    data: [
+      ...CATALOG.data,
+      { id: 'vendor/third', pricing: { prompt: 1e-6, completion: 2e-6 } },
+      { id: 'vendor/fourth', pricing: { prompt: 1e-6, completion: 2e-6 } },
+    ],
+  };
+  const MINUTE_MS = 60 * 1000;
+  const ABANDON_REASON = 'Benchmark request was never activated.';
+  /** The old cron staged `STAGE_BATCH_SLOTS * 2` (80) a minute: one hour of it is 4,800. */
+  const ONE_HOUR_OF_OLD_CRON_SLOTS = 4_800;
+
+  type PoolContext = typeof CONTEXT;
+
+  function poolContext(models: readonly string[]): PoolContext {
+    return {
+      ...CONTEXT,
+      entries: models.map(model => ({ kind: 'gateway' as const, model })),
+    };
+  }
+
+  async function quoteFor(context: PoolContext): Promise<PaidBenchmarkQuote> {
+    const response = await post({
+      action: 'quote',
+      ownerType: 'user',
+      ownerId: 'user-1',
+      routerId: ROUTER_ID,
+      poolVersion: 'pool-v1',
+      poolSlug: 'pool-one',
+      context,
+    });
+    expect(response.status).toBe(200);
+    return parseBody(response, PaidBenchmarkQuoteSchema);
+  }
+
+  /** A started request for `models`; throws unless the worker accepted the click. */
+  async function startFor(models: readonly string[]): Promise<{
+    requestId: string;
+    planCases: number;
+    context: PoolContext;
+  }> {
+    catalog = WIDE_CATALOG;
+    const context = poolContext(models);
+    const quoted = await quoteFor(context);
+    if (quoted.status !== 'ready') throw new Error(`quote not ready: ${quoted.status}`);
+    expect(quoted.cases.exclusive).toBe(models.length * SLOTS);
+    const started = await startResult(await post(startRequest(quoted.id, { context })));
+    if (started.status !== 'started' || started.request.status === 'empty')
+      throw new Error(`start refused: ${started.status}`);
+    return {
+      requestId: startedRequestId(started.request),
+      planCases: quoted.cases.exclusive,
+      context,
+    };
+  }
+
+  function requestState(requestId: string): {
+    status: string;
+    staged_cases: number;
+    plan_cases: number;
+    last_staged_at: string | null;
+    updated_at: string;
+    failure_reason: string | null;
+    failure_retryable: number;
+  } {
+    const row = sqlite
+      .prepare(
+        `SELECT status, staged_cases, plan_cases, last_staged_at, updated_at, failure_reason,
+          failure_retryable
+        FROM paid_benchmark_requests WHERE id = ?`
+      )
+      .get(requestId);
+    if (!row) throw new Error('request row missing');
+    return row as never;
+  }
+
+  function liveRequestCount(): number {
+    return countRows(
+      "SELECT COUNT(*) AS count FROM paid_benchmark_requests WHERE status IN ('preparing', 'active')"
+    );
+  }
+
+  it('keeps a two-hour-old request preparing while its staging is still progressing', async () => {
+    const { requestId, planCases } = await startFor([
+      'vendor/alpha',
+      'vendor/cheap',
+      'vendor/third',
+      'vendor/fourth',
+    ]);
+    const now = Date.now();
+    // Created two hours ago, which the old creation-age guard abandons outright, but a slot
+    // was staged a minute ago: the request is alive and must keep staging.
+    sqlite
+      .prepare(
+        `UPDATE paid_benchmark_requests
+        SET created_at = ?, last_staged_at = ?, updated_at = ? WHERE id = ?`
+      )
+      .run(
+        new Date(now - 120 * MINUTE_MS).toISOString(),
+        new Date(now - MINUTE_MS).toISOString(),
+        new Date(now - MINUTE_MS).toISOString(),
+        requestId
+      );
+
+    const summary = await reconcilePaidBenchmarkRequests(paidBindings(db), { now });
+    expect(summary.closed).toEqual([]);
+    const state = requestState(requestId);
+    expect(state.status).toBe('preparing');
+    // One cron pass stages the whole shared budget and the plan is wider than that, so it is
+    // still staging rather than terminal or active.
+    expect(state.staged_cases).toBeGreaterThan(0);
+    expect(state.staged_cases).toBeLessThan(planCases);
+    expect(state.failure_reason).toBeNull();
+  });
+
+  it('fails a request whose staging has made no progress for over an hour', async () => {
+    const { requestId } = await startFor([
+      'vendor/alpha',
+      'vendor/cheap',
+      'vendor/third',
+      'vendor/fourth',
+    ]);
+    const now = Date.now();
+    sqlite
+      .prepare(
+        `UPDATE paid_benchmark_requests
+        SET created_at = ?, last_staged_at = ?, updated_at = ? WHERE id = ?`
+      )
+      .run(
+        new Date(now - 180 * MINUTE_MS).toISOString(),
+        new Date(now - 61 * MINUTE_MS).toISOString(),
+        new Date(now - 61 * MINUTE_MS).toISOString(),
+        requestId
+      );
+
+    const summary = await reconcilePaidBenchmarkRequests(paidBindings(db), { now });
+    expect(summary.closed).toEqual([requestId]);
+    expect(requestState(requestId)).toMatchObject({
+      status: 'failed',
+      failure_reason: ABANDON_REASON,
+      failure_retryable: 1,
+    });
+    // The pool's only live-request slot is free again.
+    expect(liveRequestCount()).toBe(0);
+  });
+
+  it('never treats a staging pass that inserts nothing as progress', async () => {
+    const { requestId } = await startFor([
+      'vendor/alpha',
+      'vendor/cheap',
+      'vendor/third',
+      'vendor/fourth',
+    ]);
+    const base = Date.parse(requestState(requestId).last_staged_at ?? '');
+    expect(Number.isFinite(base)).toBe(true);
+    const stagedBefore = requestState(requestId).staged_cases;
+    expect(stagedBefore).toBeGreaterThan(0);
+    const row = sqlite
+      .prepare(
+        'SELECT engine_identity, model, variant, rep, case_id FROM benchmark_case_runs LIMIT 1'
+      )
+      .get() as {
+      engine_identity: string;
+      model: string;
+      variant: string;
+      rep: number;
+      case_id: string;
+    };
+    const key = {
+      engineIdentity: row.engine_identity,
+      model: row.model,
+      variant: row.variant,
+      rep: row.rep,
+      caseId: row.case_id,
+    };
+
+    // The cron keeps running staging passes that insert nothing. Each one rewrites the row
+    // (`updated_at` moves, which is exactly what made a stuck request look alive), so the
+    // liveness stamp must stay on the last slot that was actually written.
+    for (let minute = 1; minute <= 61; minute += 1) {
+      await db.batch(
+        enqueuePaidCaseBatchStatements(db, {
+          requestId,
+          cases: [{ ...key, coveredByKilo: false }],
+          now: base + minute * MINUTE_MS,
+        })
+      );
+      const state = requestState(requestId);
+      expect(state.staged_cases).toBe(stagedBefore);
+      expect(state.last_staged_at).toBe(new Date(base).toISOString());
+      expect(state.updated_at).toBe(new Date(base + minute * MINUTE_MS).toISOString());
+    }
+
+    const now = base + 62 * MINUTE_MS;
+    const summary = await reconcilePaidBenchmarkRequests(paidBindings(db), { now });
+    expect(summary.closed).toEqual([requestId]);
+    expect(requestState(requestId)).toMatchObject({
+      status: 'failed',
+      failure_reason: ABANDON_REASON,
+      failure_retryable: 1,
+    });
+    expect(liveRequestCount()).toBe(0);
+  });
+
+  it('stages a plan bigger than an hour of the old cron budget to active through cron alone', async () => {
+    // Three pairs are 3 × SLOTS slots, more than one hour of the old 80-slots-a-minute cron,
+    // and the browser never polls: every advance below is a scheduled reconcile pass.
+    const { requestId, planCases } = await startFor([
+      'vendor/alpha',
+      'vendor/cheap',
+      'vendor/third',
+    ]);
+    expect(planCases).toBeGreaterThan(ONE_HOUR_OF_OLD_CRON_SLOTS);
+    expect(requestState(requestId).status).toBe('preparing');
+
+    const now = Date.now();
+    let passes = 0;
+    let stagedBefore = requestState(requestId).staged_cases;
+    while (requestState(requestId).status === 'preparing' && passes < 5) {
+      passes += 1;
+      const summary = await reconcilePaidBenchmarkRequests(paidBindings(db), {
+        now: now + passes * MINUTE_MS,
+      });
+      expect(summary.closed).toEqual([]);
+      const stagedAfter = requestState(requestId).staged_cases;
+      // Each pass carries the raised budget (4,400), not the retired 80-slot slice.
+      expect(stagedAfter - stagedBefore).toBeLessThanOrEqual(4_400);
+      stagedBefore = stagedAfter;
+    }
+    // A plan one hour of the old cron could not finish inside the inactivity window (and three
+    // pairs of the measured case set is larger than the new per-tick budget) still activates
+    // from cron passes alone, in two of them.
+    expect(passes).toBe(2);
+    expect(requestState(requestId)).toMatchObject({ status: 'active', staged_cases: planCases });
+  });
+
+  it('lets the same owner and router start again after an abandon, and the retry activates', async () => {
+    const { requestId } = await startFor([
+      'vendor/alpha',
+      'vendor/cheap',
+      'vendor/third',
+      'vendor/fourth',
+    ]);
+    const now = Date.now();
+    sqlite
+      .prepare(`UPDATE paid_benchmark_requests SET last_staged_at = ?, updated_at = ? WHERE id = ?`)
+      .run(
+        new Date(now - 61 * MINUTE_MS).toISOString(),
+        new Date(now - 61 * MINUTE_MS).toISOString(),
+        requestId
+      );
+    const abandoned = await reconcilePaidBenchmarkRequests(paidBindings(db), { now });
+    expect(abandoned.closed).toEqual([requestId]);
+    expect(liveRequestCount()).toBe(0);
+
+    // The "Get a fresh estimate" retry: a new quote and click on the same router and owner.
+    // A failed row is outside the live-per-router unique index, so this creates a fresh
+    // request instead of colliding with the abandoned one.
+    const retried = await startFor(['vendor/alpha', 'vendor/cheap', 'vendor/third']);
+    expect(retried.requestId).not.toBe(requestId);
+    expect(requestState(retried.requestId).status).toBe('preparing');
+    expect(requestState(requestId).status).toBe('failed');
+
+    // Cron-only continuation reaches active with no browser polling.
+    let passes = 0;
+    while (requestState(retried.requestId).status === 'preparing' && passes < 5) {
+      passes += 1;
+      await reconcilePaidBenchmarkRequests(paidBindings(db), { now: now + passes * MINUTE_MS });
+    }
+    expect(requestState(retried.requestId).status).toBe('active');
+    // The abandoned request stays failed and was never relaunched.
+    expect(requestState(requestId).status).toBe('failed');
+  });
+
+  it('stays live across every tick the widest plan needs, and never expires midway', async () => {
+    // The widest observed pool: 68 concrete pairs, every slot unmeasured, which is the plan
+    // the staging budget was sized from. Inserted directly so the case list is exactly the
+    // measured one and the request is the widest possible.
+    const plan: PaidBenchmarkPlan = {
+      version: 1,
+      router: 'efficient',
+      engineIdentity: ENGINE,
+      revision: ACTIVE_MEASUREMENT_REVISION,
+      repetitions: REPS,
+      caseIds: CASES.map(benchCase => benchCase.id),
+      pairs: Array.from({ length: 68 }, (_, index) => ({
+        model: `vendor/wide-${index}`,
+        variant: '',
+        serving: false,
+        missing: btoa(String.fromCharCode(...new Uint8Array(Math.ceil(SLOTS / 8)).fill(0xff))),
+        covered: btoa(String.fromCharCode(...new Uint8Array(Math.ceil(SLOTS / 8)))),
+        cost: CASES.map(() => 1),
+      })),
+      counts: { reused: 0, covered: 0, shared: 0, exclusive: SLOTS * 68 },
+      estimateMicrodollars: SLOTS * 68,
+      maximumMicrodollars: SLOTS * 68,
+      aliases: [],
+      projectId: benchmarkProjectId({ scope: 'user', slug: 'pool-one', routerId: ROUTER_ID }),
+    };
+    const requestId = crypto.randomUUID();
+    const quoteId = crypto.randomUUID();
+    const at = new Date().toISOString();
+    sqlite
+      .prepare(
+        `INSERT INTO paid_benchmark_quotes
+          (id, owner_type, owner_id, organization_id, router, router_id, pool_version,
+            engine_identity, context, plan, estimate_microdollars, maximum_microdollars,
+            plan_cases, expires_at, started_request_id, created_at, updated_at)
+        VALUES (?, 'user', 'user-1', NULL, 'efficient', ?, 'pool-v1', ?, '{}', ?, 0, 0, ?,
+          '2027-01-01T00:00:00.000Z', ?, ?, ?)`
+      )
+      .run(quoteId, ROUTER_ID, ENGINE, JSON.stringify(plan), SLOTS * 68, requestId, at, at);
+    sqlite
+      .prepare(
+        `INSERT INTO paid_benchmark_requests
+          (id, owner_type, owner_id, organization_id, router, router_id, pool_version,
+            engine_identity, status, quote_id, estimate_microdollars, maximum_microdollars,
+            charged_microdollars, plan_cases, staged_cases, pause_reason, actor_user_id,
+            context, created_at, updated_at)
+        VALUES (?, 'user', 'user-1', NULL, 'efficient', ?, 'pool-v1', ?, 'preparing', ?, 0, 0, 0,
+          ?, 0, NULL, 'user-1', '{}', ?, ?)`
+      )
+      .run(requestId, ROUTER_ID, ENGINE, quoteId, SLOTS * 68, at, at);
+
+    const ticks = Math.ceil((SLOTS * 68) / 4_400) + 5;
+    let stagedBefore = 0;
+    let lastStamp = '';
+    let passes = 0;
+    for (let tick = 1; tick <= ticks; tick += 1) {
+      if (requestState(requestId).status !== 'preparing') break;
+      passes += 1;
+      const now = Date.now() + tick * MINUTE_MS;
+      const summary = await reconcilePaidBenchmarkRequests(paidBindings(db), { now });
+      // Every tick that stages keeps the pool's only live-request slot: it is never closed for
+      // age, never abandoned between passes, and its stamp advances with real progress.
+      expect(summary.closed).toEqual([]);
+      const state = requestState(requestId);
+      expect(['preparing', 'active']).toContain(state.status);
+      expect(state.staged_cases).toBeGreaterThan(stagedBefore);
+      expect(state.last_staged_at).not.toBeNull();
+      expect(Date.parse(state.last_staged_at ?? '')).toBe(now);
+      expect(state.last_staged_at).not.toBe(lastStamp);
+      stagedBefore = state.staged_cases;
+      lastStamp = state.last_staged_at ?? '';
+    }
+    // It finished on its own, inside the window, without a single browser poll: the final
+    // staging pass both completed the plan and activated the request.
+    const final = requestState(requestId);
+    expect(final.status).toBe('active');
+    expect(final.staged_cases).toBe(SLOTS * 68);
+    expect(liveRequestCount()).toBe(1);
+    expect(passes).toBeGreaterThan(20);
+  }, 120_000);
+
+  /** One single-pair efficient plan (the widest shape a pool can hold for one pair). */
+  function singlePairPlan(): PaidBenchmarkPlan {
+    return {
+      version: 1,
+      router: 'efficient',
+      engineIdentity: ENGINE,
+      revision: ACTIVE_MEASUREMENT_REVISION,
+      repetitions: REPS,
+      caseIds: CASES.map(benchCase => benchCase.id),
+      pairs: [
+        {
+          model: 'vendor/shared',
+          variant: '',
+          serving: false,
+          missing: btoa(String.fromCharCode(...new Uint8Array(Math.ceil(SLOTS / 8)).fill(0xff))),
+          covered: btoa(String.fromCharCode(...new Uint8Array(Math.ceil(SLOTS / 8)))),
+          cost: CASES.map(() => 1),
+        },
+      ],
+      counts: { reused: 0, covered: 0, shared: 0, exclusive: SLOTS },
+      estimateMicrodollars: SLOTS,
+      maximumMicrodollars: SLOTS,
+      aliases: [],
+      projectId: 'bench-pool-project',
+    };
+  }
+
+  /**
+   * `count` preparing requests, each its own pool. `stamp(index)` sets that request's creation
+   * and last-staged instants, which is what the stalest-first scan orders on.
+   */
+  function seedPreparingRequests(
+    count: number,
+    stamp: (index: number) => { createdAt: string; lastStagedAt: string | null } = () => ({
+      createdAt: new Date(Date.now() - 60_000).toISOString(),
+      lastStagedAt: null,
+    })
+  ): string[] {
+    const plan = singlePairPlan();
+    const ids: string[] = [];
+    for (let index = 0; index < count; index += 1) {
+      const requestId = crypto.randomUUID();
+      const quoteId = crypto.randomUUID();
+      const { createdAt, lastStagedAt } = stamp(index);
+      ids.push(requestId);
+      sqlite
+        .prepare(
+          `INSERT INTO paid_benchmark_quotes
+            (id, owner_type, owner_id, organization_id, router, router_id, pool_version,
+              engine_identity, context, plan, estimate_microdollars, maximum_microdollars,
+              plan_cases, expires_at, started_request_id, created_at, updated_at)
+          VALUES (?, 'user', ?, NULL, 'efficient', ?, 'pool-v1', ?, '{}', ?, 0, 0, ?,
+            '2027-01-01T00:00:00.000Z', ?, ?, ?)`
+        )
+        .run(
+          quoteId,
+          `user-${index}`,
+          crypto.randomUUID(),
+          ENGINE,
+          JSON.stringify(plan),
+          SLOTS,
+          requestId,
+          createdAt,
+          createdAt
+        );
+      sqlite
+        .prepare(
+          `INSERT INTO paid_benchmark_requests
+            (id, owner_type, owner_id, organization_id, router, router_id, pool_version,
+              engine_identity, status, quote_id, estimate_microdollars, maximum_microdollars,
+              charged_microdollars, plan_cases, staged_cases, pause_reason, actor_user_id,
+              context, created_at, updated_at, last_staged_at)
+          VALUES (?, 'user', ?, NULL, 'efficient', ?, 'pool-v1', ?, 'preparing', ?, 0, 0, 0,
+            ?, 0, NULL, ?, '{}', ?, ?, ?)`
+        )
+        .run(
+          requestId,
+          `user-${index}`,
+          crypto.randomUUID(),
+          ENGINE,
+          quoteId,
+          SLOTS,
+          `user-${index}`,
+          createdAt,
+          createdAt,
+          lastStagedAt
+        );
+    }
+    return ids;
+  }
+
+  it.each([1, 25, 100])(
+    'keeps the tick under budget and every waiting request alive with %i preparing requests',
+    async concurrent => {
+      const ids = seedPreparingRequests(concurrent);
+
+      // The scan's own order decides who is served: exactly the stalest `min(N, 50)` requests.
+      const scanOrder = (
+        sqlite
+          .prepare(
+            `SELECT id FROM paid_benchmark_requests WHERE status = 'preparing'
+            ORDER BY COALESCE(last_staged_at, created_at), id`
+          )
+          .all() as Array<{ id: string }>
+      ).map(row => row.id);
+      const servedFirstTick = new Set(scanOrder.slice(0, 50));
+
+      /** Progress of one tick: total staged, and which ids advanced. */
+      const tick = async (index: number) => {
+        const before = new Map(ids.map(id => [id, requestState(id).staged_cases]));
+        const summary = await reconcilePaidBenchmarkRequests(paidBindings(db), {
+          now: Date.now() + index * MINUTE_MS,
+        });
+        const advanced = ids.filter(id => requestState(id).staged_cases > (before.get(id) ?? 0));
+        const total = advanced.reduce(
+          (sum, id) => sum + requestState(id).staged_cases - (before.get(id) ?? 0),
+          0
+        );
+        return { summary, advanced, total };
+      };
+
+      const first = await tick(1);
+      // The budget is spent (>= 90% of whatever the served plans can absorb) and never
+      // exceeded, and only the stalest 50 are served.
+      const absorbable = Math.min(4_400, Math.min(concurrent, 50) * SLOTS);
+      expect(first.total).toBeLessThanOrEqual(4_400);
+      expect(first.total).toBeGreaterThanOrEqual(absorbable * 0.9);
+      expect(new Set(first.advanced)).toEqual(servedFirstTick);
+      expect(first.summary.closed).toEqual([]);
+
+      // The next tick serves the rest: every request is served within two consecutive ticks.
+      const second = await tick(2);
+      expect(second.total).toBeLessThanOrEqual(4_400);
+      expect(second.summary.closed).toEqual([]);
+      for (const id of ids) expect(requestState(id).staged_cases).toBeGreaterThan(0);
+      for (const id of ids) expect(['preparing', 'active']).toContain(requestState(id).status);
+    },
+    180_000
+  );
+  it('never closes a request that rotation skipped, and closes one that had budget and stalled', async () => {
+    // Ordering is stalest-first, so a request the cap skips is one whose stamp is no older than
+    // the served ones: the cap trims a queue of stale requests, and the trimmed tail must stay
+    // alive rather than be failed for a tick it was never offered.
+    const stale = 61 * MINUTE_MS;
+    // Seeded through the shared fixture; the assertions read the rows back by scan order.
+    seedPreparingRequests(60, () => ({
+      createdAt: new Date(Date.now() - 130 * MINUTE_MS).toISOString(),
+      lastStagedAt: new Date(Date.now() - stale).toISOString(),
+    }));
+    const scanOrder = (
+      sqlite
+        .prepare(
+          `SELECT id FROM paid_benchmark_requests WHERE status = 'preparing'
+          ORDER BY COALESCE(last_staged_at, created_at), id`
+        )
+        .all() as Array<{ id: string }>
+    ).map(row => row.id);
+    const skipped = scanOrder.slice(50);
+
+    const first = await reconcilePaidBenchmarkRequests(paidBindings(db), { now: Date.now() });
+    // The fifty this tick could offer budget to were stale and stalled: closed, correctly.
+    expect(first.closed).toHaveLength(50);
+    // The ten beyond the cap were never offered budget: all still live, none closed.
+    expect(first.closed.filter(id => skipped.includes(id))).toEqual([]);
+    for (const id of skipped) expect(requestState(id).status).toBe('preparing');
+
+    // The next tick reaches them: still stale, so they are offered budget and closed then.
+    const second = await reconcilePaidBenchmarkRequests(paidBindings(db), {
+      now: Date.now() + MINUTE_MS,
+    });
+    expect(new Set(second.closed)).toEqual(new Set(skipped));
+  }, 120_000);
+
+  it('serves a request the cap skipped on the next tick, and it stages normally', async () => {
+    // Fifty stale requests plus one fresh: tick one closes the stale fifty and cannot reach the
+    // fresh one; tick two serves it, and it stages.
+    const ids = seedPreparingRequests(51, index =>
+      index === 50
+        ? {
+            createdAt: new Date(Date.now() - 60_000).toISOString(),
+            lastStagedAt: null,
+          }
+        : {
+            createdAt: new Date(Date.now() - 130 * MINUTE_MS).toISOString(),
+            lastStagedAt: new Date(Date.now() - 61 * MINUTE_MS).toISOString(),
+          }
+    );
+    const skipped = ids[50]!;
+
+    const first = await reconcilePaidBenchmarkRequests(paidBindings(db), { now: Date.now() });
+    expect(first.closed).toHaveLength(50);
+    expect(first.closed).not.toContain(skipped);
+    expect(requestState(skipped).status).toBe('preparing');
+    expect(requestState(skipped).staged_cases).toBe(0);
+
+    const second = await reconcilePaidBenchmarkRequests(paidBindings(db), {
+      now: Date.now() + MINUTE_MS,
+    });
+    expect(second.closed).toEqual([]);
+    // It was served this tick: it staged real slots (and, with a plan this small, the same pass
+    // both finished staging and activated it).
+    expect(requestState(skipped).staged_cases).toBeGreaterThan(0);
+    expect(['preparing', 'active']).toContain(requestState(skipped).status);
+  }, 120_000);
+
+  /** Slots in the widest plan: 68 pairs × every measured case × every repetition. */
+  const WIDE_SLOTS = 68 * SLOTS;
+
+  /** The widest quotable plan (68 pairs × every case × every repetition), as a value. */
+  function singleWidePlan(): PaidBenchmarkPlan {
+    const plan = singlePairPlan();
+    const pairs = Array.from({ length: 68 }, (_, index) => ({
+      ...plan.pairs[0]!,
+      model: `vendor/wide-${index}`,
+    }));
+    return { ...plan, pairs, counts: { ...plan.counts, exclusive: WIDE_SLOTS } };
+  }
+
+  /**
+   * A request with every slot really staged and its status still `preparing`: the state a
+   * failed activation write leaves behind (rows written, activation not committed).
+   */
+  async function fullyStagedButUnactivated(requestId: string): Promise<void> {
+    const request = sqlite
+      .prepare('SELECT * FROM paid_benchmark_requests WHERE id = ?')
+      .get(requestId) as never;
+    const staged = await stagePaidBenchmarkRequest(
+      paidBindings(db) as never,
+      request,
+      singlePairPlan(),
+      { budgetSlots: Number.MAX_SAFE_INTEGER }
+    );
+    expect(staged.status).toBe('staged');
+    expect(requestState(requestId)).toMatchObject({ status: 'preparing' });
+    expect(requestState(requestId).staged_cases).toBe(requestState(requestId).plan_cases);
+  }
+
+  it('keeps a fully staged request for its own activation window, not the staging window', async () => {
+    const [requestId] = seedPreparingRequests(1);
+    await fullyStagedButUnactivated(requestId!);
+    sqlite
+      .prepare('UPDATE paid_benchmark_requests SET last_staged_at = ?, updated_at = ? WHERE id = ?')
+      .run(
+        new Date(Date.now() - 61 * MINUTE_MS).toISOString(),
+        new Date(Date.now() - 61 * MINUTE_MS).toISOString(),
+        requestId!
+      );
+    // 61 minutes: past the staging window, inside the activation window. It must not close and
+    // must activate, in this pass, with no browser call.
+    const first = await reconcilePaidBenchmarkRequests(paidBindings(db), { now: Date.now() });
+    expect(first.closed).toEqual([]);
+    expect(requestState(requestId!).status).toBe('active');
+
+    // The same state past the activation window closes with its own, clear reason.
+    const [secondId] = seedPreparingRequests(1);
+    await fullyStagedButUnactivated(secondId!);
+    sqlite
+      .prepare('UPDATE paid_benchmark_requests SET last_staged_at = ?, updated_at = ? WHERE id = ?')
+      .run(
+        new Date(Date.now() - 3 * 60 * MINUTE_MS).toISOString(),
+        new Date(Date.now() - 3 * 60 * MINUTE_MS).toISOString(),
+        secondId!
+      );
+    const closed = await reconcilePaidBenchmarkRequests(paidBindings(db), { now: Date.now() });
+    expect(closed.closed).toEqual([secondId]);
+    const row = sqlite
+      .prepare('SELECT failure_reason, failure_retryable FROM paid_benchmark_requests WHERE id = ?')
+      .get(secondId!) as { failure_reason: string; failure_retryable: number };
+    expect(row.failure_reason).toBe('The benchmark was ready but was not activated in time.');
+    expect(row.failure_retryable).toBe(1);
+  }, 120_000);
+
+  it('closes a stalled request and leaves the healthy request behind it to stage next', async () => {
+    // Fifty stalled requests sort first (stalest) and would otherwise take the whole budget
+    // before the healthy request behind them is reached.
+    const stale = 61 * MINUTE_MS;
+    const ids = seedPreparingRequests(51, index =>
+      index < 50
+        ? {
+            createdAt: new Date(Date.now() - 130 * MINUTE_MS).toISOString(),
+            lastStagedAt: new Date(Date.now() - stale).toISOString(),
+          }
+        : {
+            createdAt: new Date(Date.now() - 60_000).toISOString(),
+            lastStagedAt: null,
+          }
+    );
+    const healthy = ids[50]!;
+
+    const summary = await reconcilePaidBenchmarkRequests(paidBindings(db), { now: Date.now() });
+    // Every stalled request is closed and the healthy one is not…
+    expect(summary.closed).toHaveLength(50);
+    expect(summary.closed).not.toContain(healthy);
+    expect(requestState(healthy).status).toBe('preparing');
+    expect(requestState(healthy).staged_cases).toBe(0);
+
+    // …and it is served next: the scan bound is 50, so it enters the scan once the stalled rows
+    // leave `preparing`, and it stages with the whole budget available.
+    const next = await reconcilePaidBenchmarkRequests(paidBindings(db), {
+      now: Date.now() + MINUTE_MS,
+    });
+    expect(next.closed).toEqual([]);
+    expect(requestState(healthy).staged_cases).toBeGreaterThan(0);
+  }, 120_000);
+
+  it('grants each staging request exactly its share of the tick budget', async () => {
+    // Two wide plans (68 pairs each) staging together: the split is visible in how many slots
+    // each one actually staged in this tick.
+    const ids = seedPreparingRequests(2, () => ({
+      createdAt: new Date(Date.now() - 60_000).toISOString(),
+      lastStagedAt: null,
+    }));
+    // Give both requests the widest plan, so neither is capped by its own remaining slots.
+    const wide = JSON.stringify(singleWidePlan());
+    for (const id of ids) {
+      const quoteId = (
+        sqlite.prepare('SELECT quote_id FROM paid_benchmark_requests WHERE id = ?').get(id) as {
+          quote_id: string;
+        }
+      ).quote_id;
+      sqlite.prepare('UPDATE paid_benchmark_quotes SET plan = ? WHERE id = ?').run(wide, quoteId);
+      sqlite
+        .prepare('UPDATE paid_benchmark_requests SET plan_cases = ? WHERE id = ?')
+        .run(WIDE_SLOTS, id);
+    }
+
+    const summary = await reconcilePaidBenchmarkRequests(paidBindings(db), { now: Date.now() });
+    expect(summary.closed).toEqual([]);
+    const share = Math.floor(4_400 / 2);
+    const deltas = ids.map(id => requestState(id).staged_cases);
+    // Each got exactly its half — the divisor is measured on real grants, not asserted on
+    // literals — and the two together are the whole budget.
+    expect(deltas).toEqual([share, share]);
+    expect(deltas.reduce((sum, grant) => sum + grant, 0)).toBe(4_400);
+  }, 120_000);
+
+  it("does not let a fully staged request dilute a staging request's share", async () => {
+    // One wide plan that needs slots, plus nine fully staged requests waiting to activate.
+    const ids = seedPreparingRequests(9);
+    for (const id of ids) {
+      const request = sqlite
+        .prepare('SELECT * FROM paid_benchmark_requests WHERE id = ?')
+        .get(id) as never;
+      const staged = await stagePaidBenchmarkRequest(
+        paidBindings(db) as never,
+        request,
+        singlePairPlan(),
+        { budgetSlots: Number.MAX_SAFE_INTEGER }
+      );
+      expect(staged.status).toBe('staged');
+    }
+    const [wide] = seedPreparingRequests(1);
+
+    const summary = await reconcilePaidBenchmarkRequests(paidBindings(db), { now: Date.now() });
+    expect(summary.closed).toEqual([]);
+    // Every fully staged request activated…
+    for (const id of ids) expect(requestState(id).status).toBe('active');
+    // …and the wide plan staged its whole plan in this one tick: the share was the full budget,
+    // not a tenth of it (which is what a divisor counting the nine would have given).
+    expect(requestState(wide!).staged_cases).toBeGreaterThan(SLOTS * 0.9);
+  }, 120_000);
+
+  it('leaves requests untouched on a plan read fault and still drains the outbox', async () => {
+    // A D1 wrapper that fails the plan-body read once, after the sizes read succeeded.
+    const ids = seedPreparingRequests(2);
+    const faults = { planRead: 0 };
+    const faulty: D1Database = {
+      prepare(sql: string) {
+        if (!sql.includes('SELECT id, plan FROM paid_benchmark_quotes')) return db.prepare(sql);
+        return {
+          bind: (...values: never[]) => {
+            const bound = db.prepare(sql).bind(...values);
+            return {
+              run: () => bound.run(),
+              all: async () => {
+                faults.planRead += 1;
+                throw new Error('D1_ERROR: internal error');
+              },
+              first: () => bound.first(),
+              raw: () => bound.raw(),
+            } as unknown as D1PreparedStatement;
+          },
+        } as unknown as D1PreparedStatement;
+      },
+      batch: (statements: D1PreparedStatement[]) => db.batch(statements),
+      exec: (sql: string) => db.exec(sql),
+    } as D1Database;
+    sqlite
+      .prepare(
+        `INSERT INTO paid_benchmark_billing_outbox (id, kind, request_id, owner_type, owner_id,
+          amount_microdollars, attempts, available_at, created_at, updated_at, status)
+        VALUES (?, 'pins', ?, 'user', 'user-0', 0, 0, ?, ?, ?, 'pending')`
+      )
+      .run(
+        crypto.randomUUID(),
+        ids[0]!,
+        Date.now(),
+        new Date().toISOString(),
+        new Date().toISOString()
+      );
+
+    const summary = await reconcilePaidBenchmarkRequests({
+      BENCH_DB: faulty,
+      KILO_WEB_API_BASE_URL: 'https://web.test',
+      INTERNAL_API_SECRET_PROD: { get: async () => 'secret' },
+    } as never);
+    // The fault is infrastructure: neither request is closed, failed or charged…
+    expect(faults.planRead).toBeGreaterThan(0);
+    expect(summary.closed).toEqual([]);
+    expect(summary.failed).toEqual([]);
+    for (const id of ids) {
+      expect(requestState(id).status).toBe('preparing');
+      expect(requestState(id).staged_cases).toBe(0);
+    }
+    // …and the pass still reached the drain.
+    expect(
+      sqlite
+        .prepare(
+          `SELECT status, attempts, last_error FROM paid_benchmark_billing_outbox
+          WHERE request_id = ?`
+        )
+        .get(ids[0]!)
+    ).toEqual({ status: 'pending', attempts: 1, last_error: 'request_not_completed' });
+
+    // The next tick, without the fault, stages both.
+    await reconcilePaidBenchmarkRequests(paidBindings(db));
+    for (const id of ids) expect(requestState(id).staged_cases).toBeGreaterThan(0);
+  }, 120_000);
+
+  it('closes one unreadable plan, frees its live slot and still drains the outbox', async () => {
+    // Two staging requests on different pools; the second's stored plan is not valid JSON.
+    const ids = seedPreparingRequests(2);
+    const broken = ids[1]!;
+    const brokenQuote = (
+      sqlite.prepare('SELECT quote_id FROM paid_benchmark_requests WHERE id = ?').get(broken) as {
+        quote_id: string;
+      }
+    ).quote_id;
+    sqlite
+      .prepare('UPDATE paid_benchmark_quotes SET plan = ? WHERE id = ?')
+      .run('{not json', brokenQuote);
+    // A pending outbox intent proves the drain still runs at the end of the pass.
+    sqlite
+      .prepare(
+        `INSERT INTO paid_benchmark_billing_outbox (id, kind, request_id, owner_type, owner_id,
+          amount_microdollars, attempts, available_at, created_at, updated_at, status)
+        VALUES (?, 'pins', ?, 'user', 'user-0', 0, 0, ?, ?, ?, 'pending')`
+      )
+      .run(
+        crypto.randomUUID(),
+        ids[0]!,
+        Date.now(),
+        new Date().toISOString(),
+        new Date().toISOString()
+      );
+
+    const summary = await reconcilePaidBenchmarkRequests(paidBindings(db));
+    // The good request stages; the unreadable one closes with a retryable reason and no charge.
+    expect(requestState(ids[0]!).staged_cases).toBeGreaterThan(0);
+    expect(summary.failed).toEqual([broken]);
+    expect(requestState(broken)).toMatchObject({
+      status: 'failed',
+      failure_reason: 'The benchmark plan could not be read; request a new estimate.',
+      failure_retryable: 1,
+    });
+    // No charge was written for it.
+    expect(
+      sqlite
+        .prepare('SELECT charged_microdollars FROM paid_benchmark_requests WHERE id = ?')
+        .get(broken)
+    ).toEqual({ charged_microdollars: 0 });
+    // Its live-request slot is free: a new start on that same pool and router succeeds.
+    const brokenLive = sqlite
+      .prepare('SELECT router_id FROM paid_benchmark_requests WHERE id = ?')
+      .get(broken) as { router_id: string };
+    expect(
+      sqlite
+        .prepare(
+          `SELECT COUNT(*) AS live FROM paid_benchmark_requests
+          WHERE router_id = ? AND status IN ('preparing', 'active')`
+        )
+        .get(brokenLive.router_id)
+    ).toEqual({ live: 0 });
+    // A fresh request on that same pool and router is accepted: the partial unique index would
+    // reject it while the failed row still counted as live.
+    const freshId = crypto.randomUUID();
+    const freshQuote = crypto.randomUUID();
+    const plan = singlePairPlan();
+    const freshAt = new Date().toISOString();
+    sqlite
+      .prepare(
+        `INSERT INTO paid_benchmark_quotes
+          (id, owner_type, owner_id, organization_id, router, router_id, pool_version,
+            engine_identity, context, plan, estimate_microdollars, maximum_microdollars,
+            plan_cases, expires_at, started_request_id, created_at, updated_at)
+        VALUES (?, 'user', 'user-0', NULL, 'efficient', ?, 'pool-v1', ?, '{}', ?, 0, 0, ?,
+          '2027-01-01T00:00:00.000Z', ?, ?, ?)`
+      )
+      .run(
+        freshQuote,
+        brokenLive.router_id,
+        ENGINE,
+        JSON.stringify(plan),
+        SLOTS,
+        freshId,
+        freshAt,
+        freshAt
+      );
+    expect(() =>
+      sqlite
+        .prepare(
+          `INSERT INTO paid_benchmark_requests
+            (id, owner_type, owner_id, organization_id, router, router_id, pool_version,
+              engine_identity, status, quote_id, estimate_microdollars, maximum_microdollars,
+              charged_microdollars, plan_cases, staged_cases, pause_reason, actor_user_id,
+              context, created_at, updated_at)
+          VALUES (?, 'user', 'user-0', NULL, 'efficient', ?, 'pool-v1', ?, 'preparing', ?, 0, 0,
+            0, ?, 0, NULL, 'user-0', '{}', ?, ?)`
+        )
+        .run(freshId, brokenLive.router_id, ENGINE, freshQuote, SLOTS, freshAt, freshAt)
+    ).not.toThrow();
+    expect(requestState(freshId).status).toBe('preparing');
+    // The pass reached its end: the drain really processed the intent. A pins intent on a
+    // still-preparing request cannot be published, so the drain records the attempt and the
+    // reason — a change the guard can only see if the drain ran.
+    expect(
+      sqlite
+        .prepare(
+          `SELECT status, attempts, last_error FROM paid_benchmark_billing_outbox
+          WHERE request_id = ?`
+        )
+        .get(ids[0]!)
+    ).toEqual({ status: 'pending', attempts: 1, last_error: 'request_not_completed' });
+    expect(billing).toHaveLength(0);
+  }, 120_000);
+
+  it('answers a second start with the live request on its own plan, not the second quote', async () => {
+    // The live request's plan is wider than the second start's: three pairs versus one.
+    const { requestId } = await startFor(['vendor/alpha', 'vendor/cheap', 'vendor/third']);
+    expect(requestState(requestId).status).toBe('preparing');
+    expect(liveRequestCount()).toBe(1);
+    const stagedBefore = requestState(requestId).staged_cases;
+
+    // A second quote for a DIFFERENT (narrower) pool on the same router, then a click. The
+    // quote is read-only, so it succeeds; the click cannot create a request because the pool
+    // already holds its one live slot.
+    const quoted = await quoteFor(poolContext(['vendor/cheap']));
+    if (quoted.status !== 'ready') throw new Error('quote not ready');
+    const response = await post(startRequest(quoted.id));
+    expect(response.status).toBe(200);
+    const second = await startResult(response);
+    // The old web release validates this body too, so the answer keeps the `started` shape and
+    // marks the join with a field it ignores.
+    expect(second.status).toBe('started');
+    if (second.status !== 'started') return;
+    expect(second.alreadyInProgress).toBe(true);
+    // The caller is handed the request that is already live, with its real progress.
+    const progress = second.request;
+    if (progress.status === 'empty') throw new Error('already-in-progress request was empty');
+    expect(progress.status).toBe('preparing');
+    expect(progress.id).toBe(requestId);
+    // It kept staging against its OWN frozen three-pair plan: the narrower second quote never
+    // re-scoped it, and the live row's plan count is unchanged.
+    const live = requestState(requestId);
+    expect(live.plan_cases).toBe(3 * SLOTS);
+    expect(live.staged_cases).toBeGreaterThan(stagedBefore);
+    // Nothing new was created, and the second quote was not consumed.
+    expect(countRows('SELECT COUNT(*) AS count FROM paid_benchmark_requests')).toBe(1);
+    expect(
+      sqlite
+        .prepare('SELECT started_request_id FROM paid_benchmark_quotes WHERE id = ?')
+        .get(quoted.id)
+    ).toEqual({ started_request_id: null });
+    // The live request still reaches `active` on its own plan through cron passes only.
+    let passes = 0;
+    while (requestState(requestId).status === 'preparing' && passes < 5) {
+      passes += 1;
+      await reconcilePaidBenchmarkRequests(paidBindings(db), {
+        now: Date.now() + passes * MINUTE_MS,
+      });
+    }
+    expect(requestState(requestId)).toMatchObject({
+      status: 'active',
+      staged_cases: 3 * SLOTS,
+      plan_cases: 3 * SLOTS,
+    });
   });
 });

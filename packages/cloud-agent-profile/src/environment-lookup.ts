@@ -1,10 +1,11 @@
 import type { WorkerDb } from '@kilocode/db';
 import {
+  cloud_agent_environment_setup_runs,
   cloud_agent_environments,
   organizations,
   type CloudAgentEnvironment,
 } from '@kilocode/db/schema';
-import { and, asc, eq, isNull, sql, type SQL } from 'drizzle-orm';
+import { and, asc, eq, isNull, or, sql, type SQL } from 'drizzle-orm';
 import {
   normalizeBitbucketUuid,
   normalizeGitlabCloneUrl,
@@ -25,6 +26,13 @@ export function buildEnvironmentOwnershipCondition(owner: EnvironmentOwner) {
   return owner.type === 'user'
     ? eq(cloud_agent_environments.owned_by_user_id, owner.id)
     : eq(cloud_agent_environments.owned_by_organization_id, owner.id);
+}
+
+/** The same ownership alternative applied to setup runs. */
+export function setupRunOwnershipCondition(owner: EnvironmentOwner) {
+  return owner.type === 'user'
+    ? eq(cloud_agent_environment_setup_runs.owned_by_user_id, owner.id)
+    : eq(cloud_agent_environment_setup_runs.owned_by_organization_id, owner.id);
 }
 
 type IdentityColumn =
@@ -108,12 +116,21 @@ export function environmentContainsRepository(repository: EnvironmentRepositoryI
 /**
  * The environments that match a condition, ordered by name and id, whose owning
  * organization is active. A personal environment has no organization row, so the
- * left join keeps it.
+ * left join keeps it. Drafts are excluded unless the caller names the one draft
+ * it may see.
  */
 export async function selectActiveEnvironments(
   db: Pick<WorkerDb, 'select'>,
-  condition: SQL | undefined
+  condition: SQL | undefined,
+  options?: { includeDraftId?: string }
 ): Promise<CloudAgentEnvironment[]> {
+  const draftVisibility =
+    options?.includeDraftId === undefined
+      ? eq(cloud_agent_environments.is_draft, false)
+      : or(
+          eq(cloud_agent_environments.is_draft, false),
+          eq(cloud_agent_environments.id, options.includeDraftId)
+        );
   const rows = await db
     .select({ environment: cloud_agent_environments })
     .from(cloud_agent_environments)
@@ -121,7 +138,7 @@ export async function selectActiveEnvironments(
       organizations,
       eq(cloud_agent_environments.owned_by_organization_id, organizations.id)
     )
-    .where(and(condition, isNull(organizations.deleted_at)))
+    .where(and(condition, draftVisibility, isNull(organizations.deleted_at)))
     .orderBy(asc(cloud_agent_environments.name), asc(cloud_agent_environments.id));
   return rows.map(row => row.environment);
 }
@@ -163,6 +180,7 @@ export async function selectEnvironmentForSession(
     owner: EnvironmentOwner;
     repository: EnvironmentRepositoryIdentity;
     environmentId?: string;
+    draftEnvironmentId?: string;
   }
 ): Promise<EnvironmentSelection> {
   if (input.environmentId !== undefined) {
@@ -170,11 +188,16 @@ export async function selectEnvironmentForSession(
       eq(cloud_agent_environments.id, input.environmentId),
       buildEnvironmentOwnershipCondition(input.owner)
     );
-    const [environment] = await selectActiveEnvironments(db, owned);
+    const options =
+      input.draftEnvironmentId === undefined
+        ? undefined
+        : { includeDraftId: input.draftEnvironmentId };
+    const [environment] = await selectActiveEnvironments(db, owned, options);
     if (!environment) return { status: 'requested-not-found' };
     const [containing] = await selectActiveEnvironments(
       db,
-      and(owned, environmentContainsRepository(input.repository))
+      and(owned, environmentContainsRepository(input.repository)),
+      options
     );
     return containing
       ? { status: 'match', environment: containing }

@@ -81,17 +81,57 @@ import {
   type PaidBenchmarkPlan,
 } from './paid-benchmark-plan';
 import { drainPaidBillingOutbox } from './paid-billing';
+import { STAGE_SLICE_MAX_SLOTS } from './d1-limits';
 import { minimumCaseRevisions } from './measurement-revision';
 import { variantFromStorage } from './reasoning-effort';
 
 /** How long a displayed quote stays confirmable. */
 export const PAID_QUOTE_TTL_MS = 30 * 60 * 1000;
-/** Slots per staging batch: the store's own batch cap, well under D1's binding limit. */
-const STAGE_BATCH_SLOTS = 40;
-/** Slots one request or one cron pass may stage, so a maximal pool is paged, not dumped. */
+/**
+ * Slots per staging batch: the store's per-batch case cap (`STAGE_SLICE_MAX_SLOTS`), so one
+ * slice is exactly one accepted `batch()`. The slice is a transaction size, not a binding
+ * limit: the case and repetition lists travel as one JSON parameter each, so the batch's
+ * widest statement binds nine values whatever the slice names.
+ */
+const STAGE_BATCH_SLOTS = STAGE_SLICE_MAX_SLOTS;
+/** Slots one request or one browser poll may stage, so a maximal pool is paged, not dumped. */
 const STAGE_BUDGET_SLOTS = 400;
-/** A request that is not fully staged for this long is closed, never left dangling. */
+/**
+ * Slots the one-minute tick stages across all of its live `preparing` requests.
+ *
+ * Sized from the widest real pool rather than from one request: a saved pool holds up to 20
+ * entries and each expands into one concrete pair per catalog reasoning variant, so a large
+ * efficient pool plans tens of pairs. At the measured 597 cases × 3 repetitions that is 121,788
+ * slots for the widest quotable pool, and the old 80 slots a minute needed hours, so a large
+ * pool could only activate while the browser kept polling. 4,400 slots stage that plan in about
+ * 28 minutes — a 2.2× margin inside {@link STAGE_ABANDON_MS} — in 50 batches of 88, and keep
+ * the whole tick measured by `scheduled-tick-budget.test.ts` under 700 of the 1,000 queries one
+ * Worker invocation may send to D1, including the case where all 50 slots serve a request.
+ */
+const CRON_STAGE_BUDGET_SLOTS = 4_400;
+/**
+ * Live requests one tick will stage or settle. One live request per saved pool is the unique
+ * index's rule, and the pool cap per owner bounds the realistic population (10 pools × owners,
+ * far below this), so the bound exists only to keep one invocation's query count predictable;
+ * the scan is stalest-first, so a request beyond it is served first next tick rather than
+ * starved.
+ */
+const CRON_STAGE_MAX_REQUESTS_PER_TICK = 50;
+/**
+ * A request whose staging makes no progress for this long is closed, never left dangling.
+ * Measured from the last slot actually staged (`last_staged_at`, else creation) on a tick that
+ * offered the request budget, so a request that waited for the shared budget is not closed.
+ * It applies only while the plan is still incomplete.
+ */
 const STAGE_ABANDON_MS = 60 * 60 * 1000;
+/**
+ * How long a fully staged request may wait for activation. Activation normally happens in the
+ * same pass that stages its last slot, so this only covers a persistent failure (a storage
+ * fault on the activation write that every retry hits). Measured from the last staged slot and
+ * deliberately longer than {@link STAGE_ABANDON_MS}: the plan is complete, so the owner is not
+ * asked to redo staging, and nothing has been charged.
+ */
+const STAGE_ACTIVATION_GRACE_MS = 2 * STAGE_ABANDON_MS;
 /** A deferred native usage row lags its response by a moment; poll briefly, then disclose. */
 const RECEIPT_POLL_DELAYS_MS = [250, 500, 1_000];
 
@@ -149,8 +189,39 @@ async function readLatestRequest(
     .first<PaidBenchmarkRequestRow>();
 }
 
+/**
+ * The request currently holding this pool's only live-request slot, if any. One live request
+ * per saved pool is the unique index's own rule, so this is the same predicate, read as a row.
+ */
+async function readLiveRequest(
+  db: D1Database,
+  owner: PaidCreditOwner,
+  routerId: string
+): Promise<PaidBenchmarkRequestRow | null> {
+  return db
+    .prepare(
+      `SELECT * FROM paid_benchmark_requests
+      WHERE owner_type = ? AND owner_id = ? AND router_id = ?
+        AND status IN ('preparing', 'active')
+      ORDER BY created_at DESC LIMIT 1`
+    )
+    .bind(owner.ownerType, owner.ownerId, routerId)
+    .first<PaidBenchmarkRequestRow>();
+}
+
+/**
+ * A stored plan, or null when it is not readable. The text is a durable column that can be
+ * corrupted independently of this code, so a parse failure is a value (`null`), not a throw:
+ * the caller closes that one request instead of aborting the pass.
+ */
 function decodePlan(plan: string): PaidBenchmarkPlan | null {
-  const parsed = PaidBenchmarkPlanSchema.safeParse(JSON.parse(plan));
+  let raw: unknown;
+  try {
+    raw = JSON.parse(plan);
+  } catch {
+    return null;
+  }
+  const parsed = PaidBenchmarkPlanSchema.safeParse(raw);
   return parsed.success ? parsed.data : null;
 }
 
@@ -201,13 +272,20 @@ export async function stagePaidBenchmarkRequest(
   // plan's own pairs only and creates no measurement.
   const minimums = minimumCaseRevisions(plan.router, plan.revision);
   let budget = options.budgetSlots ?? STAGE_BUDGET_SLOTS;
+  // Kilo's ownership of a pair is a fact about the pair, not about the slice: a wide covered
+  // plan spans the same pairs batch after batch, so it is read once per pair per pass instead
+  // of once per slice (which would be one D1 query per batch on a fully covered pool).
+  const platformOwnership = new Map<string, boolean>();
   let counts = await readRequestCounts(db, request.id);
   if (counts.total === 0 && isPinOnlyPlan(plan) && !(await readServingPairsStillReady(db, plan)))
     return { status: 'aborted', reason: SERVING_EVIDENCE_GONE_REASON };
   while (counts.total < total && budget > 0) {
     const start = counts.total;
+    // The slice is the smaller of one D1-bound batch and what this request still has budget
+    // for, so a tick can never stage past the share it was offered.
+    const sliceSize = Math.min(STAGE_BATCH_SLOTS, budget, total - start);
     const slice: { pairIndex: number; caseIndex: number; rep: number }[] = [];
-    for (let index = start; index < Math.min(total, start + STAGE_BATCH_SLOTS); index += 1) {
+    for (let index = start; index < start + sliceSize; index += 1) {
       const slot = planSlotAt(plan, index);
       if (slot) slice.push(slot);
     }
@@ -297,6 +375,29 @@ export async function stagePaidBenchmarkRequest(
 
       const measurable: PaidCaseKey[] = [];
       const reusedSlots: { key: PaidCaseKey; covered: boolean }[] = [];
+      // Kilo's ownership of this pair is one fact about the pair, read once per slice: asking
+      // it per covered slot cost one D1 query per slot (thousands in a wide covered pool), which
+      // alone could exhaust an invocation's query budget. Only a slice that has a covered slot
+      // without its latched platform run needs the answer at all.
+      const needsOwnership = group.some(slot => {
+        if (!planSlotIsCovered(plan, slot.pairIndex, slot.caseIndex, slot.rep)) return false;
+        const open = openBySlot.get(slot.caseIndex * plan.repetitions + slot.rep);
+        return !open || open.platform_covered !== 1;
+      });
+      const ownershipKey = `${resolvedPair.model}\u001f${resolvedPair.variant}`;
+      let pairIsPlatformOwned = platformOwnership.get(ownershipKey) ?? false;
+      if (needsOwnership && !platformOwnership.has(ownershipKey)) {
+        pairIsPlatformOwned =
+          (
+            await readPlatformRequestedPairs(db, {
+              router: plan.router,
+              engineIdentity: plan.engineIdentity,
+              repetitions: plan.repetitions,
+              pairs: [resolvedPair],
+            })
+          ).size > 0;
+        platformOwnership.set(ownershipKey, pairIsPlatformOwned);
+      }
       for (const slot of group) {
         const key = planSlotKey(plan, slot);
         const bit = slot.caseIndex * plan.repetitions + slot.rep;
@@ -319,21 +420,13 @@ export async function stagePaidBenchmarkRequest(
           // The quote promised this slot as Kilo-paid. Revalidate against the same durable
           // source the quote used — a latched case run *or* live platform ownership of the
           // pair at this engine/repetition count — and refuse rather than charge silently if
-          // coverage is gone.
+          // coverage is gone. The ownership read is one per slice (`pairIsPlatformOwned`).
           const open = openBySlot.get(bit);
-          if (!open || open.platform_covered !== 1) {
-            const platformOwned = await readPlatformRequestedPairs(db, {
-              router: plan.router,
-              engineIdentity: plan.engineIdentity,
-              repetitions: plan.repetitions,
-              pairs: [resolvedPair],
-            });
-            if (platformOwned.size === 0)
-              return {
-                status: 'aborted',
-                reason: `Kilo platform coverage for ${pair.model} changed; request a new estimate.`,
-              };
-          }
+          if ((!open || open.platform_covered !== 1) && !pairIsPlatformOwned)
+            return {
+              status: 'aborted',
+              reason: `Kilo platform coverage for ${pair.model} changed; request a new estimate.`,
+            };
           // The platform pays this case run; the request only displays it as covered. The
           // approved covered bit travels with the slot: even if platform membership falls
           // between staging and the permit, the store's selection/admit guard refuses to make
@@ -705,6 +798,22 @@ async function startPaidBenchmark(
       };
     }
     if (Date.parse(reread.expires_at) <= now) return { status: 'quote_expired' };
+    // This pool already has a live request (one live-request slot per pool): another tab, or
+    // a quote taken before that request existed. Report it as such and continue it — staging
+    // that request is the only useful work, and nothing new is created, priced or charged.
+    // It continues with its OWN frozen plan: the second start's quote may name a different
+    // case set, and staging the live request against it would abort work the owner approved.
+    const live = await readLiveRequest(db, owner, input.routerId);
+    if (live) {
+      const liveQuote = await readPaidBenchmarkQuote(db, live.quote_id);
+      const livePlan = liveQuote ? decodePlan(liveQuote.plan) : null;
+      if (!livePlan) return { status: 'quote_mismatch', reason: 'live_plan_unreadable' };
+      return {
+        status: 'started',
+        request: await progressFor(env, live, livePlan, { now }),
+        alreadyInProgress: true,
+      };
+    }
     return { status: 'quote_mismatch', reason: 'quote_not_consumed' };
   }
 
@@ -1188,61 +1297,305 @@ export async function reconcilePaidBenchmarkRequests(
     failed: [] as string[],
     closed: [] as string[],
   };
-  const live = await db
+  // Preparing requests are served stalest-first: the request that has gone longest without
+  // staging a slot is the one this tick offers budget to, so a request can never be starved
+  // behind newer work. Active requests are served in their own pass (they stage nothing), and
+  // the scan is bounded to keep one invocation's query count predictable; the stalest-first
+  // order is what makes that bound fair.
+  const preparingRows = await db
     .prepare(
       `SELECT * FROM paid_benchmark_requests
-      WHERE status IN ('preparing', 'active')
-      ORDER BY updated_at LIMIT 50`
+      WHERE status = 'preparing'
+      ORDER BY COALESCE(last_staged_at, created_at), id
+      LIMIT ${CRON_STAGE_MAX_REQUESTS_PER_TICK}`
     )
     .all<PaidBenchmarkRequestRow>();
-  for (const request of live.results) {
-    const quote = await readPaidBenchmarkQuote(db, request.quote_id);
-    const plan = quote ? decodePlan(quote.plan) : null;
-    if (!plan) continue;
-    if (request.status === 'preparing' && now - Date.parse(request.created_at) > STAGE_ABANDON_MS) {
-      await db.batch(
-        failPaidBenchmarkRequestStatements(db, {
-          requestId: request.id,
-          reason: 'Benchmark request was never activated.',
-          retryable: true,
-          now,
+  const activeRows = await db
+    .prepare(
+      `SELECT * FROM paid_benchmark_requests
+      WHERE status = 'active'
+      ORDER BY updated_at, id LIMIT ${CRON_STAGE_MAX_REQUESTS_PER_TICK}`
+    )
+    .all<PaidBenchmarkRequestRow>();
+  // One tick's staging is hard-capped and divided over the requests that still need slots: the
+  // scan above already returns at most `CRON_STAGE_MAX_REQUESTS_PER_TICK` rows, so its length is
+  // the served count, and a fully staged request takes no budget, so counting it would dilute a
+  // wide plan's share for no gain. A request the tick cannot reach waits for the next one, which
+  // serves it first because the scan is stalest-first.
+  const staging = preparingRows.results.filter(row => row.staged_cases < row.plan_cases).length;
+  const offered = Math.floor(CRON_STAGE_BUDGET_SLOTS / Math.max(1, staging));
+  let remainingStageBudget = CRON_STAGE_BUDGET_SLOTS;
+  // The frozen plans are read in byte-bounded chunks rather than all at once: a wide pool's
+  // plan is hundreds of KB of JSON, and 100 of them in one query would be tens of MB against
+  // D1's result limit and the Worker's memory. A chunk is decoded and processed one request at
+  // a time, then dropped.
+  //
+  // A read fault here is infrastructure, not evidence about any request: it must neither close
+  // a request nor abort the pass. The sizes read is best-effort (on failure staging waits a
+  // tick), and a failed chunk read leaves that chunk's requests untouched for the next tick
+  // while the remaining chunks, the billing drain and the receipts still run.
+  const served = [...preparingRows.results, ...activeRows.results];
+  let chunks: PaidBenchmarkRequestRow[][];
+  try {
+    chunks = planReadChunks(
+      served,
+      await readPlanSizes(
+        db,
+        served.map(request => request.quote_id)
+      )
+    );
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        event: 'benchmark_paid_plan_sizes_failed',
+        requests: served.length,
+        error: error instanceof Error ? error.message : String(error),
+      })
+    );
+    chunks = [];
+  }
+  for (const chunk of chunks) {
+    let plans: Map<string, string>;
+    try {
+      plans = await readPlans(db, chunk);
+    } catch (error) {
+      console.error(
+        JSON.stringify({
+          event: 'benchmark_paid_plan_read_failed',
+          requests: chunk.map(request => request.id),
+          error: error instanceof Error ? error.message : String(error),
         })
       );
-      summary.closed.push(request.id);
       continue;
     }
-    let current = request;
-    if (current.status === 'active') {
-      // An active request must have its (deterministic, idempotent) paid run. A crash between
-      // activation and run creation, or a lost run, is repaired here; a paused or failed
-      // request never reaches this branch, so nothing auto-resumes a user or credit pause.
-      // The same classification as the click path: a permanent plan refusal becomes a visible
-      // failed request instead of an `active` row that silently does nothing forever.
-      // Settle first: a request whose staged slots already finished unusable is terminal on
-      // this confirmation and must never re-enter the launcher. `finish` is a no-op while
-      // any slot is still live, so real work is launched exactly as before.
-      const settledFirst = await finishPaidBenchmarkRequest(env, current, plan, { now });
-      if (settledFirst?.status === 'completed') {
-        summary.completed.push(request.id);
-        continue;
+    for (const request of chunk) {
+      // One request's failure must never abort the tick for the others: a read fault, an
+      // unexpected throw or an unreadable plan is that request's problem, logged and left for
+      // the next tick, while every other live request still stages, activates and settles.
+      try {
+        await reconcileOnePaidRequest(env, request, {
+          now,
+          summary,
+          plan: decodePlan(plans.get(request.quote_id) ?? ''),
+          offeredSlots: request.status === 'preparing' ? offered : 0,
+          takeStageBudget: (wanted: number) => {
+            const granted = Math.min(wanted, Math.max(0, remainingStageBudget));
+            remainingStageBudget -= granted;
+            return granted;
+          },
+        });
+      } catch (error) {
+        console.error(
+          JSON.stringify({
+            event: 'benchmark_paid_request_reconcile_failed',
+            requestId: request.id,
+            error: error instanceof Error ? error.message : String(error),
+          })
+        );
       }
-      if (settledFirst?.status === 'failed') {
-        summary.failed.push(request.id);
-        continue;
-      }
-      await launchPaidRun(env, current.id);
-      current = (await readPaidBenchmarkRequest(env.BENCH_DB, current.id)) ?? current;
-      summary.staged += 1;
-      // A resumed run may already have finished every slot (or the run may have completed
-      // instantly for a fully reused plan), so settle it in the same pass.
-      const settled = await finishPaidBenchmarkRequest(env, current, plan, { now });
-      if (settled?.status === 'completed') summary.completed.push(request.id);
-      if (settled?.status === 'failed') summary.failed.push(request.id);
-      continue;
     }
-    if (current.status === 'preparing') {
+  }
+  // A crash between completion and the pin callback leaves the notification on the outbox;
+  // draining it here is the replay, and it is idempotent per request and confirmation.
+  await drainPaidBillingOutbox(env, { limit: 25, fetchImpl: options.fetchImpl });
+  // Deferred native usage becomes an accounting receipt as soon as the primary gateway read
+  // sees it; anything still absent stays disclosed as pending.
+  await reconcilePaidUsageReceipts(env, { limit: 50, fetchImpl: options.fetchImpl });
+  return summary;
+}
+
+/**
+ * Bytes of plan JSON one query may return. A wide pool's plan is about 250 KB and a typical one
+ * about 18 KB, so this holds several wide plans or every served request in one read, while
+ * bounding a single result far below D1's 50 MB result limit and the Worker's memory.
+ */
+const PLAN_READ_BYTE_BUDGET = 2 * 1024 * 1024;
+
+/** The stored byte length of each quote's plan, so the read can be sized before it runs. */
+async function readPlanSizes(
+  db: D1Database,
+  quoteIds: readonly string[]
+): Promise<Map<string, number>> {
+  const sizes = new Map<string, number>();
+  if (quoteIds.length === 0) return sizes;
+  const rows = await db
+    .prepare(
+      `SELECT id, length(plan) AS bytes FROM paid_benchmark_quotes
+      WHERE id IN (SELECT value FROM json_each(?))`
+    )
+    .bind(JSON.stringify([...new Set(quoteIds)]))
+    .all<{ id: string; bytes: number }>();
+  for (const row of rows.results) sizes.set(row.id, Number(row.bytes));
+  return sizes;
+}
+
+/**
+ * Split the served requests into consecutive chunks whose plans fit `PLAN_READ_BYTE_BUDGET`.
+ *
+ * A single plan larger than the budget still gets its own chunk, so a pathological quote can
+ * never make a request unreachable; it is just read alone.
+ */
+export function planReadChunks<T extends { quote_id: string }>(
+  requests: readonly T[],
+  bytes: ReadonlyMap<string, number>
+): T[][] {
+  const chunks: T[][] = [];
+  let current: T[] = [];
+  let currentBytes = 0;
+  for (const request of requests) {
+    const size = bytes.get(request.quote_id) ?? 0;
+    if (current.length > 0 && currentBytes + size > PLAN_READ_BYTE_BUDGET) {
+      chunks.push(current);
+      current = [];
+      currentBytes = 0;
+    }
+    current.push(request);
+    currentBytes += size;
+  }
+  if (current.length > 0) chunks.push(current);
+  return chunks;
+}
+
+/** The plan JSON for one chunk of requests (one query). */
+async function readPlans(
+  db: D1Database,
+  requests: readonly { quote_id: string }[]
+): Promise<Map<string, string>> {
+  const plans = new Map<string, string>();
+  if (requests.length === 0) return plans;
+  const rows = await db
+    .prepare(
+      `SELECT id, plan FROM paid_benchmark_quotes
+      WHERE id IN (SELECT value FROM json_each(?))`
+    )
+    .bind(JSON.stringify([...new Set(requests.map(request => request.quote_id))]))
+    .all<{ id: string; plan: string }>();
+  for (const row of rows.results) plans.set(row.id, row.plan);
+  return plans;
+}
+
+/**
+ * Continue one live request: close it when it was offered budget and staged nothing for a
+ * full window, otherwise stage, activate or settle it.
+ *
+ * `takeStageBudget` is the tick's shared, hard-capped pool. A preparing request asks for its
+ * fair share and gets whatever is left, which may be zero: a tick that already spent the
+ * budget leaves the rest waiting rather than raising its D1 load, and a waiting request is
+ * never abandoned (its window counts only from the last slot it staged).
+ */
+async function reconcileOnePaidRequest(
+  env: PaidBenchmarkEnv,
+  request: PaidBenchmarkRequestRow,
+  input: {
+    now: number;
+    summary: { staged: number; completed: string[]; failed: string[]; closed: string[] };
+    /** The request's frozen plan, read with the rest of the served set. */
+    plan: PaidBenchmarkPlan | null;
+    /** Slots this tick is prepared to offer the request; 0 means it is not staging this tick. */
+    offeredSlots: number;
+    takeStageBudget: (wanted: number) => number;
+  }
+): Promise<void> {
+  const db = env.BENCH_DB;
+  const { now, summary } = input;
+  const plan = input.plan;
+  if (!plan) {
+    // An unreadable frozen plan can never be staged, activated or settled, and it is not a
+    // stall a waiting tick can fix. Leaving it `preparing` would hold the pool's single live
+    // request slot forever and block the owner from starting again, so it closes here — with a
+    // retryable reason, carrying no charge — and the pass moves on to the other requests.
+    await db.batch(
+      failPaidBenchmarkRequestStatements(db, {
+        requestId: request.id,
+        reason: 'The benchmark plan could not be read; request a new estimate.',
+        retryable: true,
+        now,
+      })
+    );
+    summary.failed.push(request.id);
+    console.error(
+      JSON.stringify({
+        event: 'benchmark_paid_plan_unreadable',
+        requestId: request.id,
+        quoteId: request.quote_id,
+        status: request.status,
+      })
+    );
+    return;
+  }
+  let current = request;
+  if (current.status === 'active') {
+    // An active request must have its (deterministic, idempotent) paid run. A crash between
+    // activation and run creation, or a lost run, is repaired here; a paused or failed
+    // request never reaches this branch, so nothing auto-resumes a user or credit pause.
+    // The same classification as the click path: a permanent plan refusal becomes a visible
+    // failed request instead of an `active` row that silently does nothing forever.
+    // Settle first: a request whose staged slots already finished unusable is terminal on
+    // this confirmation and must never re-enter the launcher. `finish` is a no-op while
+    // any slot is still live, so real work is launched exactly as before.
+    const settledFirst = await finishPaidBenchmarkRequest(env, current, plan, { now });
+    if (settledFirst?.status === 'completed') {
+      summary.completed.push(request.id);
+      return;
+    }
+    if (settledFirst?.status === 'failed') {
+      summary.failed.push(request.id);
+      return;
+    }
+    await launchPaidRun(env, current.id);
+    current = (await readPaidBenchmarkRequest(env.BENCH_DB, current.id)) ?? current;
+    summary.staged += 1;
+    // A resumed run may already have finished every slot (or the run may have completed
+    // instantly for a fully reused plan), so settle it in the same pass.
+    const settled = await finishPaidBenchmarkRequest(env, current, plan, { now });
+    if (settled?.status === 'completed') summary.completed.push(request.id);
+    if (settled?.status === 'failed') summary.failed.push(request.id);
+    return;
+  }
+  if (current.status === 'preparing') {
+    const lastProgress = Date.parse(current.last_staged_at ?? current.created_at);
+    // A fully staged request needs no more staging: it only has to activate. It is exempt from
+    // the staging-inactivity rule — its last slot is already written, so that clock stopped by
+    // definition — and instead expires on its own, longer window. It also needs no slot budget,
+    // so a tick that skipped it for rotation must still activate it here rather than defer it.
+    if (current.staged_cases >= planSlotCount(plan)) {
+      if (now - lastProgress > STAGE_ACTIVATION_GRACE_MS) {
+        await db.batch(
+          failPaidBenchmarkRequestStatements(db, {
+            requestId: current.id,
+            reason: 'The benchmark was ready but was not activated in time.',
+            retryable: true,
+            now,
+          })
+        );
+        summary.closed.push(request.id);
+        return;
+      }
+      current = await activateIfFullyStaged(env, current, plan, now);
+    } else {
+      // The abandonment check runs before budget is taken, for clarity rather than to change
+      // any grant: `offered = floor(budget / staging)` is computed over exactly the rows that
+      // can reach this call, so a stalled request's share is always its own and every staging
+      // request receives `offered` under either order. Taking nothing for a request that is
+      // being closed simply keeps the shared counter honest.
+      if (now - lastProgress > STAGE_ABANDON_MS) {
+        await db.batch(
+          failPaidBenchmarkRequestStatements(db, {
+            requestId: current.id,
+            reason: 'Benchmark request was never activated.',
+            retryable: true,
+            now,
+          })
+        );
+        summary.closed.push(current.id);
+        return;
+      }
+      const granted = input.takeStageBudget(input.offeredSlots);
+      // Nothing left: the request waits for the next tick. It is not failed for inactivity,
+      // because waiting is not a stall and its own window only advances on real staging.
+      if (granted === 0) return;
       const staged = await stagePaidBenchmarkRequest(env, current, plan, {
-        budgetSlots: STAGE_BATCH_SLOTS * 2,
+        budgetSlots: granted,
         now,
       });
       if (staged.status === 'aborted') {
@@ -1255,22 +1608,17 @@ export async function reconcilePaidBenchmarkRequests(
           })
         );
         summary.failed.push(request.id);
-        continue;
+        return;
       }
+      // Activation runs in the same pass that wrote the last slot: a request that just became
+      // fully staged is activated now, so no window exists between the two states.
       current = await activateIfFullyStaged(env, current, plan, now);
     }
-    summary.staged += 1;
-    const finished = await finishPaidBenchmarkRequest(env, current, plan, { now });
-    if (finished?.status === 'completed') summary.completed.push(request.id);
-    if (finished?.status === 'failed') summary.failed.push(request.id);
   }
-  // A crash between completion and the pin callback leaves the notification on the outbox;
-  // draining it here is the replay, and it is idempotent per request and confirmation.
-  await drainPaidBillingOutbox(env, { limit: 25, fetchImpl: options.fetchImpl });
-  // Deferred native usage becomes an accounting receipt as soon as the primary gateway read
-  // sees it; anything still absent stays disclosed as pending.
-  await reconcilePaidUsageReceipts(env, { limit: 50, fetchImpl: options.fetchImpl });
-  return summary;
+  summary.staged += 1;
+  const finished = await finishPaidBenchmarkRequest(env, current, plan, { now });
+  if (finished?.status === 'completed') summary.completed.push(request.id);
+  if (finished?.status === 'failed') summary.failed.push(request.id);
 }
 
 /**

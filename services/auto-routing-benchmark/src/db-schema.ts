@@ -840,6 +840,9 @@ export const paidBenchmarkRequests = sqliteTable(
     // requires them equal, so approval is never derived from a partially written plan.
     plan_cases: integer('plan_cases').notNull().default(0),
     staged_cases: integer('staged_cases').notNull().default(0),
+    // When staging last added a slot. `updated_at` also moves on a pass that writes nothing,
+    // so abandonment reads this: a request stays alive only while it is actually progressing.
+    last_staged_at: text('last_staged_at'),
     // `no_funds` is the native payer's balance refusal; `owner` is a voluntary pause.
     // The reviewed forecast is advisory only (no threshold-driven pause). A case
     // cancelled because its last voluntary payer left is a case-level close reason.

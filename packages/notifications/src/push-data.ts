@@ -1,5 +1,8 @@
 import { z } from 'zod';
-import { glanceableAgentsSnapshotSchema } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import {
+  glanceableAgentsSnapshotShape,
+  refineNewestResultPair,
+} from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { homeWidgetDetailsSchema } from '@kilocode/app-shared/home-widget';
 
 import { NEEDS_INPUT_ATTENTION_KINDS } from './needs-input-actions';
@@ -159,13 +162,21 @@ export const pushDataSchema = z.discriminatedUnion('type', [
   // travel beside it for background Home widget updates and are never copied
   // into Live Activity/ongoing content-state. Older producers omit them.
   //
-  // Derived from the one snapshot schema so a field, its bound and its default
+  // Built from the one snapshot shape so a field, its bound and its default
   // exist once. `accountEpoch` is left out deliberately: it is client-set (see
   // the shared schema's comment), and a server has no value to push for it.
-  glanceableAgentsSnapshotSchema.omit({ accountEpoch: true }).extend({
-    type: z.literal('active_agents_glanceable'),
-    homeWidgetDetails: homeWidgetDetailsSchema.optional(),
-  }),
+  // The variant applies the shared newest-result refiner because reshaping
+  // cannot carry a refinement.
+  z
+    .object({
+      ...glanceableAgentsSnapshotShape,
+    })
+    .omit({ accountEpoch: true })
+    .extend({
+      type: z.literal('active_agents_glanceable'),
+      homeWidgetDetails: homeWidgetDetailsSchema.optional(),
+    })
+    .superRefine(refineNewestResultPair),
   // One followed session's Android ongoing notification; see
   // `sessionLiveUpdateSchema` above.
   sessionLiveUpdateSchema.superRefine(refineSessionLiveUpdate),

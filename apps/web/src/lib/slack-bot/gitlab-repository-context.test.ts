@@ -2,6 +2,10 @@ import {
   formatGitLabRepositoriesForPrompt,
   type GitLabRepositoryContext,
 } from './gitlab-repository-context';
+import {
+  REPOSITORY_PROMPT_MAX_CHARACTERS,
+  REPOSITORY_PROMPT_MAX_REPOSITORIES,
+} from './repository-prompt-budget';
 
 describe('formatGitLabRepositoriesForPrompt', () => {
   test('shows account, instance, and repository list when repos are available', () => {
@@ -92,5 +96,57 @@ describe('formatGitLabRepositoriesForPrompt', () => {
 
     expect(resultNull).toContain('No GitLab repositories are currently connected');
     expect(resultEmpty).toContain('No GitLab repositories are currently connected');
+  });
+});
+
+describe('formatGitLabRepositoriesForPrompt budget', () => {
+  const baseContext: GitLabRepositoryContext = {
+    accountLogin: 'gitlab-user',
+    repositoryAccess: 'selected',
+    repositoriesSyncedAt: null,
+    instanceUrl: 'https://gitlab.com',
+    repositories: [],
+  };
+
+  const projectList = (result: string): string =>
+    result.split('Available GitLab projects:\n')[1].split('\n\nWhen the user asks')[0];
+
+  test('bounds the project list to the listed cap and one overflow line', () => {
+    const repositories = Array.from(
+      { length: REPOSITORY_PROMPT_MAX_REPOSITORIES + 5 },
+      (_, index) => ({
+        id: index + 1,
+        name: `project-${index}`,
+        full_name: `mygroup/project-${index}`,
+        private: false,
+      })
+    );
+
+    const list = projectList(formatGitLabRepositoriesForPrompt({ ...baseContext, repositories }));
+    const listLines = list.split('\n');
+
+    expect(listLines).toHaveLength(REPOSITORY_PROMPT_MAX_REPOSITORIES + 1);
+    expect(listLines[REPOSITORY_PROMPT_MAX_REPOSITORIES]).toBe(
+      '- Projects not listed here: 5. Ask the user for the exact group/project path of the project they want to use.'
+    );
+  });
+
+  test('keeps the project list within the character cap with long paths', () => {
+    const repositories = Array.from({ length: 60 }, (_, index) => ({
+      id: index + 1,
+      name: `project-${index}`,
+      full_name: `mygroup/${'sub'.repeat(20)}/project-${index}`,
+      private: true,
+    }));
+
+    const list = projectList(formatGitLabRepositoriesForPrompt({ ...baseContext, repositories }));
+    const listLines = list.split('\n');
+    const listed = listLines.length - 1;
+    const omitted = Number(/- Projects not listed here: (\d+)\./.exec(listLines[listed])?.[1]);
+
+    expect(list.length).toBeLessThanOrEqual(REPOSITORY_PROMPT_MAX_CHARACTERS);
+    expect(listed).toBeGreaterThan(0);
+    expect(listed).toBeLessThan(REPOSITORY_PROMPT_MAX_REPOSITORIES);
+    expect(listed + omitted).toBe(repositories.length);
   });
 });

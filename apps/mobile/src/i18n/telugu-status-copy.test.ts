@@ -92,7 +92,7 @@ const CASES: Case[] = [
   { key: 'agentChat.newSession.environment', value: 'వాతావరణం' },
   {
     key: 'agentChat.newSession.couldNotLoadEnvironment',
-    value: 'మీ వాతావరణాన్ని లోడ్ చేయలేకపోయాము.',
+    value: 'మీ వాతావరణాన్ని లోడ్ చేయలేకపోయాము',
   },
   {
     key: 'agentChat.newSession.retryLoadingEnvironment',

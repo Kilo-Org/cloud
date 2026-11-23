@@ -430,6 +430,58 @@ test('accepts theme tokens without an opacity modifier', () => {
   );
 });
 
+test('flags a bracketed opacity modifier on a theme token', () => {
+  const found = check(
+    'apps/mobile/src/panel.ts',
+    'export const a = "bg-card/[0.6] border-primary/[0.35] bg-card/[60%] bg-card/60 bg-card bg-white/50";\n'
+  );
+  const text = found.join('\n');
+  assert.equal(found.length, 4);
+  // The arbitrary spellings compile to the same deferred color-mix as the bare
+  // number, so the runtime drops them the same way.
+  for (const spelling of [
+    'bg-card/[0.6]',
+    'border-primary/[0.35]',
+    'bg-card/[60%]',
+    'bg-card/60',
+  ]) {
+    assert.ok(text.includes(`"${spelling}"`), `expected ${spelling} to be reported`);
+  }
+  assert.ok(found.every(line => line.includes('/opacity modifier is dropped')));
+  // A token with no modifier paints, and `white` is not a theme token.
+  assert.ok(!text.includes('"bg-card"'));
+  assert.ok(!text.includes('"bg-white/50"'));
+});
+
+test('flags a bracketed unitless leading and keeps explicit lengths', () => {
+  const found = check(
+    'apps/mobile/src/bans.ts',
+    'export const a = "leading-[1.5] leading-[9] leading-[.5] leading-9";\n' +
+      'export const b = "leading-[1.25rem] leading-[20px] leading-[1.5em] leading-[normal] leading-[150%]";\n'
+  );
+  const text = found.join('\n');
+  assert.equal(found.length, 4);
+  // `leading-[9]` and `leading-[.5]` compile to the same deferred `em`
+  // multiplier as `leading-9`.
+  for (const spelling of ['leading-[1.5]', 'leading-[9]', 'leading-[.5]', 'leading-9']) {
+    assert.ok(
+      text.includes(`"${spelling}" a numeric leading-N`),
+      `expected ${spelling} to be reported`
+    );
+  }
+  // An explicit length resolves as a length, and `normal` / a percentage emit no
+  // line height at all, so they keep passing.
+  for (const spelling of [
+    'leading-[1.25rem]',
+    'leading-[20px]',
+    'leading-[1.5em]',
+    'leading-[normal]',
+    'leading-[150%]',
+  ]) {
+    assert.ok(!text.includes(`"${spelling}"`), `expected ${spelling} to pass`);
+  }
+});
+
 test('flags a runtime Text import under any name and allows the type-only forms', () => {
   const found = checkAll({
     'apps/mobile/src/bare.tsx': "import { Text } from 'react-native';\n",
@@ -446,6 +498,55 @@ test('flags a runtime Text import under any name and allows the type-only forms'
   assert.match(text, /mixed\.tsx:1: imports Text from 'react-native'/);
   assert.doesNotMatch(text, /type-aliased/);
   assert.doesNotMatch(text, /type-import/);
+});
+
+test('flags a namespace or default Text import only where its binding is used as .Text', () => {
+  const found = checkAll({
+    'apps/mobile/src/namespace.tsx':
+      "import * as RN from 'react-native';\n\nexport const a = <RN.Text>hi</RN.Text>;\n",
+    'apps/mobile/src/default.tsx':
+      "import RNative from 'react-native';\n\nexport const a = <RNative.Text>hi</RNative.Text>;\n",
+    'apps/mobile/src/expression.tsx':
+      "import * as RN from 'react-native';\n\nexport const T = RN.Text;\n",
+    'apps/mobile/src/view-only.tsx':
+      "import * as RN from 'react-native';\n\nexport const a = <RN.View />;\n",
+    'apps/mobile/src/type-namespace.tsx':
+      "import type * as T from 'react-native';\n\nexport const a = <T.Text>hi</T.Text>;\n",
+    'apps/mobile/src/destructured.tsx':
+      "import * as RN from 'react-native';\n\nconst { Text } = RN;\n\nexport const a = <Text>hi</Text>;\n",
+    'apps/mobile/src/destructured-alias.tsx':
+      "import RNative from 'react-native';\n\nconst { Text: T } = RNative;\n\nexport const a = <T>hi</T>;\n",
+    'apps/mobile/src/destructured-computed.tsx':
+      "import * as RN from 'react-native';\n\nconst { ['Text']: T } = RN;\n\nexport const a = <T>hi</T>;\n",
+    'apps/mobile/src/destructured-view.tsx':
+      "import * as RN from 'react-native';\n\nconst { View } = RN;\n\nexport const a = <View />;\n",
+    'apps/mobile/src/destructured-elsewhere.tsx':
+      "import * as RN from 'react-native';\n\nconst { Text } = strings;\n\nexport const a = <Text>hi</Text>;\n",
+  });
+  const text = found.join('\n');
+  assert.equal(found.length, 6);
+  assert.match(
+    text,
+    /namespace\.tsx:1: imports Text from 'react-native' as RN\.Text; use @\/components\/ui\/text so the copy follows the RTL paragraph direction/
+  );
+  assert.match(text, /default\.tsx:1: imports Text from 'react-native' as RNative\.Text/);
+  // A bare `RN.Text` expression renders the same platform component.
+  assert.match(text, /expression\.tsx:1: imports Text from 'react-native' as RN\.Text/);
+  // Taking `Text` out of the namespace binding destructures the same member, so
+  // the aliased and computed-key forms are reported like the direct one.
+  assert.match(text, /destructured\.tsx:1: imports Text from 'react-native' as RN\.Text/);
+  assert.match(
+    text,
+    /destructured-alias\.tsx:1: imports Text from 'react-native' as RNative\.Text/
+  );
+  assert.match(text, /destructured-computed\.tsx:1: imports Text from 'react-native' as RN\.Text/);
+  assert.ok(!text.includes('view-only'), 'a binding used as RN.View alone renders no copy');
+  assert.ok(!text.includes('type-namespace'), 'a type-only namespace import is silent');
+  assert.ok(!text.includes('destructured-view'), 'destructuring View renders no copy');
+  assert.ok(
+    !text.includes('destructured-elsewhere'),
+    'a destructure from a binding that is not the react-native import is silent'
+  );
 });
 
 test('exempts the shared Text module by its own path, not by a suffix', () => {
@@ -549,8 +650,8 @@ function stubbedCompilerFixture(
 /**
  * A stylesheet still holding both declarations the bans warn about: a deferred
  * colorMix for `backgroundColor` and a deferred calc for `lineHeight`. It
- * answers every fixture that is not a text-align one, so a case that fails a
- * text-align pin leaves the other pins passing.
+ * answers every fixture that is not a text-align or unitless-line-height one,
+ * so a case that fails a text-align pin leaves the other pins passing.
  */
 const HOLDING_STYLESHEET =
   "{ s: [['x', [{ d: [" +
@@ -565,10 +666,16 @@ const HOLDING_STYLESHEET =
  * `textAlign.left` is null: it is the literal declaration the pins' read is
  * proven against. A `start` or `end` key makes that keyword's fixture emit
  * `{ textAlign: <value> }`; an omitted keyword emits no declaration, which is
- * what its pin holds on. Every other fixture emits `stylesheet` — the holding
- * declarations by default.
+ * what its pin holds on. The `line-height: 9` unitless fixture emits
+ * `unitless` — the deferred `em` descriptor by default — because the two
+ * line-height fixtures cannot share one stylesheet. Every other fixture emits
+ * `stylesheet` — the holding declarations by default.
  */
-function compilerStub({ textAlign = {}, stylesheet = HOLDING_STYLESHEET } = {}) {
+function compilerStub({
+  textAlign = {},
+  stylesheet = HOLDING_STYLESHEET,
+  unitless = [[['em', 9], 'lineHeight']],
+} = {}) {
   const branches = [];
   if (textAlign.left !== null) {
     branches.push(['text-align: left', JSON.stringify('left')]);
@@ -588,6 +695,10 @@ function compilerStub({ textAlign = {}, stylesheet = HOLDING_STYLESHEET } = {}) 
           `    if (css.includes('${fixture}')) return run([{ textAlign: ${value} }]);\n`
       )
       .join('') +
+    // The two line-height fixtures emit different declarations, and the pin's
+    // read returns only the first declaration of a property, so one stylesheet
+    // cannot answer both: the unitless fixture gets its own branch.
+    `    if (css.includes('line-height: 9')) return run(${JSON.stringify(unitless)});\n` +
     `    return { stylesheet() { return ${stylesheet}; } };\n` +
     '  },\n' +
     '};\n'
@@ -613,8 +724,10 @@ for (const [name, entrySource, expected, absent] of [
     [
       'the compiler failed on the color-mix over an @theme inline variable fixture',
       'the compiler failed on the spacing-scale line-height fixture',
+      'the compiler failed on the unitless line-height fixture',
       'color-mix over an @theme inline variable emits no',
       'a spacing-scale line height emits no',
+      'a unitless line height emits no',
       'drop the numeric leading rule',
     ],
   ],
@@ -628,6 +741,7 @@ for (const [name, entrySource, expected, absent] of [
       '  compile(css) {',
       "    if (css.includes('color-mix')) throw new Error('color-mix fixture exploded');",
       "    if (css.includes('text-align: left')) return runLeft();",
+      "    if (css.includes('line-height: 9')) return runUnitless();",
       '    return {',
       '      stylesheet() {',
       "        return { s: [['x', [{ d: [[['calc', [['var', ['--spacing']], '*', 5]], 'lineHeight']] }]]] };",
@@ -636,6 +750,7 @@ for (const [name, entrySource, expected, absent] of [
       '  },',
       '};',
       "function runLeft() { return { stylesheet() { return { s: [['x', [{ d: [{ textAlign: 'left' }] }]]] }; } }; }",
+      "function runUnitless() { return { stylesheet() { return { s: [['x', [{ d: [[['em', 9], 'lineHeight']] }]]] }; } }; }",
     ].join('\n') + '\n',
     [
       'the compiler failed on the color-mix over an @theme inline variable fixture (color-mix fixture exploded)',
@@ -692,6 +807,21 @@ for (const [name, entrySource, expected, absent] of [
     }),
     [
       'a spacing-scale line height emits no lineHeight declaration — the ban still applies, so keep the numeric leading rule',
+    ],
+    'drop the numeric leading rule',
+  ],
+  [
+    'folds the unitless line height to a length',
+    compilerStub({ unitless: [[{ lineHeight: 9 }, 'lineHeight']] }),
+    [
+      'a unitless line height now compiles to {"lineHeight":9} instead of a deferred em — drop the numeric leading rule',
+    ],
+  ],
+  [
+    'emits no lineHeight declaration for the unitless line-height fixture',
+    compilerStub({ unitless: [] }),
+    [
+      'a unitless line height emits no lineHeight declaration — the ban still applies, so keep the numeric leading rule',
     ],
     'drop the numeric leading rule',
   ],
@@ -2146,10 +2276,17 @@ test('names the missing global.css and keeps the other findings', context => {
   assert.doesNotMatch(result.stderr, /Error:/);
 });
 
-test('--write-layout-baseline reports a theme failure instead of rewriting the baseline', context => {
+test('--write-layout-baseline writes the layout counts when the theme cannot be read', context => {
+  // The theme tokens feed only the `/opacity` ban rule, so an unreadable theme
+  // cannot make a layout count short: the rewrite records what the walk saw and
+  // the ordinary run is where the missing theme is reported.
   const root = makeFixture(
     context,
-    { 'apps/mobile/src/screen.tsx': THEME_SOURCE },
+    {
+      'apps/mobile/src/screen.tsx': screen(
+        '<View className="mt-[6px] uppercase bg-secondary rounded-lg" />'
+      ),
+    },
     ':root { --x: 1; }\n'
   );
   const result = spawnSync(
@@ -2158,17 +2295,14 @@ test('--write-layout-baseline reports a theme failure instead of rewriting the b
     { cwd: root, encoding: 'utf8', timeout: 30_000 }
   );
   assert.ifError(result.error);
-  assert.equal(result.status, 1, result.stdout);
-  assert.match(
-    result.stderr,
-    /check-classes: cannot read the @theme inline tokens from apps\/mobile\/src\/global\.css \(no @theme inline block\)/
-  );
-  assert.match(result.stderr, /check-classes: 1 problem\(s\)/);
-  assert.doesNotMatch(result.stdout, /wrote/);
-  // A baseline written here would record a tree the audit never checked.
-  assert.throws(
-    () => readFileSync(join(root, 'tools/nativewind/layout-baseline.json'), 'utf8'),
-    /ENOENT/
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /wrote 1 file\(s\)/);
+  assert.doesNotMatch(result.stderr, /cannot read the @theme inline tokens/);
+  assert.deepEqual(
+    JSON.parse(readFileSync(join(root, 'tools/nativewind/layout-baseline.json'), 'utf8')),
+    {
+      'apps/mobile/src/screen.tsx': { L1: 1, L3: 1, L4: 1 },
+    }
   );
 });
 

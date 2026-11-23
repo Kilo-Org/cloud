@@ -12,7 +12,7 @@ on:
         # Only main publishes a runtime, so a branch dispatch must name a main
         # SHA and the deploy refuses any other revision before it installs
         # anything.
-        description: 'Main SHA whose published runtime to use; empty uses the run SHA'
+        description: 'Main SHA whose published runtime to use; empty uses the run SHA, which must be a main commit'
         required: false
         type: string
         default: ''

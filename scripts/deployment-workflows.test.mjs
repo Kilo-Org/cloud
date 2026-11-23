@@ -18,6 +18,7 @@ const staging = workflow('deploy-staging');
 const gate = workflow('check-deployment-changes');
 const workers = workflow('deploy-workers');
 const ci = workflow('ci');
+const e2eDeploy = workflow('cloud-agent-e2e-deploy');
 
 test('Cloud Agent source-map uploads are best-effort without masking build or deploy failures', () => {
   for (const [job, selector] of [
@@ -1531,4 +1532,132 @@ test('a Pages pin move deploys the output shell beside Pages', t => {
   git('checkout', '-q', '-b', 'docs', base);
   commit({ 'services/pages/README.md': 'Pages, again' }, 'docs');
   assert.deepEqual(detected('docs'), ['services/pages'], 'another Pages change leaves the shell');
+});
+
+test('Cloud Agent e2e deploy admits a main runtime source and scopes each credential to its step', () => {
+  const job = e2eDeploy.jobs.deploy;
+  const steps = job.steps;
+  assert.equal(job.env.CLOUDFLARE_API_TOKEN, undefined);
+  for (const value of Object.values(job.env)) {
+    assert.doesNotMatch(String(value), /secrets\./);
+  }
+
+  // Each production credential reaches only the step that consumes it.
+  const holders = new Map();
+  for (const step of steps) {
+    for (const value of [...Object.values(step.env ?? {}), ...Object.values(step.with ?? {})]) {
+      for (const [, secret] of String(value).matchAll(/secrets\.([A-Z0-9_]+)/g)) {
+        if (!holders.has(secret)) {
+          holders.set(secret, new Set());
+        }
+        holders.get(secret).add(step.name);
+      }
+    }
+  }
+  assert.deepEqual(
+    Object.fromEntries([...holders].map(([secret, names]) => [secret, [...names].sort()])),
+    {
+      CLOUD_AGENT_RUNTIME_R2_ACCESS_KEY_ID: ['Prepare downloaded Cloud Agent runtime'],
+      CLOUD_AGENT_RUNTIME_R2_SECRET_ACCESS_KEY: ['Prepare downloaded Cloud Agent runtime'],
+      CLOUDFLARE_API_TOKEN: [
+        'Deploy Cloud Agent e2e Worker',
+        'Deploy fake-LLM Worker',
+        'Prepare downloaded Cloud Agent runtime',
+      ],
+      E2E_INTERNAL_API_SECRET: ['Deploy Cloud Agent e2e Worker'],
+      FAKE_LLM_ADMIN_TOKEN: ['Deploy fake-LLM Worker'],
+    }
+  );
+
+  const index = name => steps.findIndex(step => step.name === name);
+  const admissionIndex = index('Checkout main for admission');
+  const runtimeSourceIndex = steps.findIndex(step => step.id === 'runtime_source');
+  const checkoutIndex = index('Checkout the runtime source');
+  const prepareIndex = index('Prepare downloaded Cloud Agent runtime');
+  const fakeIndex = index('Deploy fake-LLM Worker');
+  const workerIndex = index('Deploy Cloud Agent e2e Worker');
+  assert.ok(admissionIndex < runtimeSourceIndex);
+  assert.ok(runtimeSourceIndex < checkoutIndex);
+  assert.ok(checkoutIndex < prepareIndex);
+  assert.ok(prepareIndex < fakeIndex);
+  assert.ok(fakeIndex < workerIndex);
+
+  const runtimeSource = steps[runtimeSourceIndex];
+  assert.equal(runtimeSource.env.SOURCE_SHA, '${{ inputs.runtime_source_sha || github.sha }}');
+
+  const admission = steps[admissionIndex];
+  assert.deepEqual(admission.with, {
+    ref: 'refs/heads/main',
+    'fetch-depth': 0,
+    'persist-credentials': false,
+  });
+
+  const checkout = steps[checkoutIndex];
+  assert.equal(checkout.with.ref, '${{ steps.runtime_source.outputs.runtime_source_sha }}');
+  assert.equal(steps[prepareIndex].env.SOURCE_SHA, checkout.with.ref);
+
+  const switchStep = steps[index('Switch to the run SHA')];
+  assert.equal(switchStep.if, 'steps.runtime_source.outputs.runtime_source_sha != github.sha');
+  assert.ok(switchStep.run.indexOf('git fetch') < switchStep.run.indexOf('git diff --quiet'));
+});
+
+test('Cloud Agent e2e deploy refuses a runtime source outside main', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'e2e-runtime-source-'));
+  const git = (...args) => execFileSync('git', args, { cwd: directory, encoding: 'utf8' }).trim();
+  const commit = message => {
+    git('add', '.');
+    git('-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '-qm', message);
+  };
+  git('init', '-q', '--initial-branch=main', '.');
+  writeFileSync(join(directory, 'one.txt'), 'one');
+  commit('one');
+  const mainSha = git('rev-parse', 'HEAD');
+  git('update-ref', 'refs/remotes/origin/main', mainSha);
+  git('checkout', '-q', '-b', 'feature');
+  writeFileSync(join(directory, 'two.txt'), 'two');
+  commit('two');
+  const featureSha = git('rev-parse', 'HEAD');
+
+  const script = e2eDeploy.jobs.deploy.steps.find(step => step.id === 'runtime_source').run;
+  const runAdmission = sourceSha => {
+    const outputPath = join(directory, '.git', 'source-output');
+    writeFileSync(outputPath, '');
+    const result = spawnSync('bash', ['-e', '-c', script], {
+      cwd: directory,
+      encoding: 'utf8',
+      env: { ...process.env, SOURCE_SHA: sourceSha, GITHUB_OUTPUT: outputPath },
+    });
+    return {
+      status: result.status,
+      stdout: result.stdout,
+      stderr: result.stderr,
+      output: readFileSync(outputPath, 'utf8'),
+    };
+  };
+
+  try {
+    const accepted = runAdmission(mainSha);
+    assert.equal(accepted.status, 0, accepted.stderr);
+    assert.match(accepted.output, new RegExp(`runtime_source_sha=${mainSha}`));
+
+    const offMain = runAdmission(featureSha);
+    assert.equal(offMain.status, 1);
+    assert.match(`${offMain.stdout}${offMain.stderr}`, /::error::.*not on origin\/main/);
+    assert.doesNotMatch(offMain.output, /runtime_source_sha=/);
+
+    const absent = runAdmission('a'.repeat(40));
+    assert.equal(absent.status, 1);
+    assert.match(`${absent.stdout}${absent.stderr}`, /::error::.*not a commit on main/);
+    assert.doesNotMatch(absent.output, /runtime_source_sha=/);
+    assert.doesNotMatch(absent.stderr, /fatal:/);
+
+    for (const malformed of ['refs/heads/main', mainSha.slice(0, 7)]) {
+      const rejected = runAdmission(malformed);
+      assert.equal(rejected.status, 1);
+      assert.match(`${rejected.stdout}${rejected.stderr}`, /::error::.*40-character/);
+      assert.doesNotMatch(rejected.output, /runtime_source_sha=/);
+    }
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });

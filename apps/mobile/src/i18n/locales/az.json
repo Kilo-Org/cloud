@@ -4702,6 +4702,7 @@
       "emptyDescription": "Kredit alışları, qəbzlər və istifadə burada görünəcək.",
       "emptyTitle": "Kredit tarixçəsi yoxdur",
       "expiredGrant": "Müddəti bitib: {{description}}",
+      "expiredStatus": "Müddəti bitib",
       "googlePlayReceipt": "Google Play qəbzi",
       "kind": {
         "adjustment": "Düzəliş",
@@ -4728,7 +4729,8 @@
       "receiptA11y": "{{description}} üçün {{amount}}, {{date}} tarixli qəbzi açın",
       "receiptUnavailable": "Bu alış üçün qəbz mövcud deyil.",
       "retentionLimit": "Ən son kredit tarixçəsi göstərilir.",
-      "voidedGrant": "Ləğv edilib: {{description}}"
+      "voidedGrant": "Ləğv edilib: {{description}}",
+      "voidedStatus": "Ləğv edilib"
     },
     "title": "Kredit al",
     "description": "Kredit Kilo App-də AI kodlaşdırma sessiyalarını işə salmaq üçün Kilo balansına əlavə olunan birdəfəlik alışdır. Mağaza hesabından ödəniş alır və mağaza ödənişi təsdiqlədikdən sonra kredit əlavə olunur.",

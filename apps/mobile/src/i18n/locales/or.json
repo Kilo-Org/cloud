@@ -4702,6 +4702,7 @@
       "emptyDescription": "କ୍ରେଡିଟ୍ କ୍ରୟ, ରସିଦ ଏବଂ ବ୍ୟବହାର ଏଠାରେ ଦେଖାଯିବ।",
       "emptyTitle": "କୌଣସି କ୍ରେଡିଟ୍ ଇତିହାସ ନାହିଁ",
       "expiredGrant": "ମିଆଦ ସମାପ୍ତ: {{description}}",
+      "expiredStatus": "ମିଆଦ ସମାପ୍ତ",
       "googlePlayReceipt": "Google Playରୁ ରସିଦ",
       "kind": {
         "adjustment": "ସମାୟୋଜନ",
@@ -4728,7 +4729,8 @@
       "receiptA11y": "{{description}}, {{amount}}, {{date}} ପାଇଁ ରସିଦ ଖୋଲନ୍ତୁ",
       "receiptUnavailable": "ଏହି କ୍ରୟ ପାଇଁ କୌଣସି ରସିଦ ଉପଲବ୍ଧ ନାହିଁ।",
       "retentionLimit": "ସର୍ବାଧିକ ନୂଆ କ୍ରେଡିଟ୍ ଇତିହାସ ଦେଖାଯାଉଛି।",
-      "voidedGrant": "ବାତିଲ: {{description}}"
+      "voidedGrant": "ବାତିଲ: {{description}}",
+      "voidedStatus": "ବାତିଲ"
     },
     "title": "କ୍ରେଡିଟ୍ କିଣନ୍ତୁ",
     "description": "କ୍ରେଡିଟ୍ ହେଉଛି Kilo App ରେ AI କୋଡିଂ ସେସନ୍ ଚଲାଇବା ପାଇଁ ଆପଣଙ୍କ Kilo ବାଲାନ୍ସରେ ଯୋଡ଼ାଯାଉଥିବା ଏକ-ଥର କ୍ରୟ। ଷ୍ଟୋର ଆପଣଙ୍କ ଖାତାରୁ ଶୁଳ୍କ ନେଇଥାଏ ଏବଂ ଷ୍ଟୋର ଦେୟ ନିଶ୍ଚିତ କରିବା ପରେ କ୍ରେଡିଟ୍ ଯୋଡ଼ାଯାଏ।",

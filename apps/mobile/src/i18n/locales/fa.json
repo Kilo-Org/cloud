@@ -4702,6 +4702,7 @@
       "emptyDescription": "خریدهای اعتبار، رسیدها و مصرف در اینجا نمایش داده می‌شوند.",
       "emptyTitle": "تاریخچهٔ اعتباری وجود ندارد",
       "expiredGrant": "منقضی شد: {{description}}",
+      "expiredStatus": "منقضی شد",
       "googlePlayReceipt": "رسید از Google Play",
       "kind": {
         "adjustment": "اصلاحیه",
@@ -4728,7 +4729,8 @@
       "receiptA11y": "باز کردن رسید {{description}}، {{amount}}، از {{date}}",
       "receiptUnavailable": "رسیدی برای این خرید موجود نیست.",
       "retentionLimit": "جدیدترین تاریخچهٔ اعتباری نمایش داده می‌شود.",
-      "voidedGrant": "باطل شد: {{description}}"
+      "voidedGrant": "باطل شد: {{description}}",
+      "voidedStatus": "باطل شد"
     },
     "title": "خرید اعتبار",
     "description": "اعتبار یک خرید یکباره است که برای اجرای جلسات کدنویسی هوش مصنوعی در Kilo App به موجودی Kilo شما اضافه می‌شود. فروشگاه مبلغ را از حساب شما دریافت می‌کند و اعتبار پس از تأیید پرداخت توسط فروشگاه اضافه می‌شود.",

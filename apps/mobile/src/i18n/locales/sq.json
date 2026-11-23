@@ -4702,6 +4702,7 @@
       "emptyDescription": "Blerjet e kredive, dëftesat dhe përdorimi do të shfaqen këtu.",
       "emptyTitle": "Nuk ka historik kredish",
       "expiredGrant": "Skaduar: {{description}}",
+      "expiredStatus": "Skaduar",
       "googlePlayReceipt": "Dëftesë nga Google Play",
       "kind": {
         "adjustment": "Rregullim",
@@ -4728,7 +4729,8 @@
       "receiptA11y": "Hap dëftesën për {{description}}, {{amount}}, nga {{date}}",
       "receiptUnavailable": "Nuk ka dëftesë për këtë blerje.",
       "retentionLimit": "Po shfaqet historiku i kredive më i fundit.",
-      "voidedGrant": "Anuluar: {{description}}"
+      "voidedGrant": "Anuluar: {{description}}",
+      "voidedStatus": "Anuluar"
     },
     "title": "Bli kredite",
     "description": "Kreditet janë një blerje e njëhershme që shtohet në bilancin tuaj Kilo për të drejtuar seanca kodimi me AI në Kilo App. Dyqani të faturova llogarinë dhe kreditet shtohen pasi dyqani konfirmon pagesën.",

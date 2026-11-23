@@ -4872,6 +4872,7 @@
       "emptyDescription": "Zde se zobrazí nákupy kreditů, účtenky a využití.",
       "emptyTitle": "Žádná historie kreditů",
       "expiredGrant": "Platnost vypršela: {{description}}",
+      "expiredStatus": "Platnost vypršela",
       "googlePlayReceipt": "Účtenka z Google Play",
       "kind": {
         "adjustment": "Úprava",
@@ -4898,7 +4899,8 @@
       "receiptA11y": "Otevřít účtenku pro {{description}}, {{amount}}, ze dne {{date}}",
       "receiptUnavailable": "Pro tento nákup není účtenka k dispozici.",
       "retentionLimit": "Zobrazuje se nejnovější historie kreditů.",
-      "voidedGrant": "Stornováno: {{description}}"
+      "voidedGrant": "Stornováno: {{description}}",
+      "voidedStatus": "Stornováno"
     },
     "title": "Koupit kredity",
     "description": "Kredity jsou jednorázový nákup přidaný do vašeho zůstatku Kilo pro spouštění AI programovacích relací v aplikaci Kilo. Obchod vám strhne platbu z účtu a kredity se přidají po potvrzení platby obchodem.",

@@ -4787,6 +4787,7 @@
       "emptyDescription": "Šeit būs redzami kredītu pirkumi, kvītis un lietojums.",
       "emptyTitle": "Nav kredītu vēstures",
       "expiredGrant": "Termiņš beidzies: {{description}}",
+      "expiredStatus": "Termiņš beidzies",
       "googlePlayReceipt": "Kvīts pakalpojumā Google Play",
       "kind": {
         "adjustment": "Korekcija",
@@ -4813,7 +4814,8 @@
       "receiptA11y": "Atvērt kvīti: {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Šim pirkumam kvīts nav pieejama.",
       "retentionLimit": "Tiek rādīta jaunākā kredītu vēsture.",
-      "voidedGrant": "Anulēts: {{description}}"
+      "voidedGrant": "Anulēts: {{description}}",
+      "voidedStatus": "Anulēts"
     },
     "title": "Pirkt kredītus",
     "description": "Kredīti ir vienreizējs pirkums, kas tiek pievienots tavam Kilo bilancei AI kodēšanas sesiju vadīšanai Kilo App. Veikals iekasē maksu no tava konta, un kredīti tiek pievienoti pēc tam, kad veikals apstiprina maksājumu.",

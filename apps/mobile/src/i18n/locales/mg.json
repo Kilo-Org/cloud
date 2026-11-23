@@ -4702,6 +4702,7 @@
       "emptyDescription": "Hiseho eto ny fividianana kredita, ny rosia ary ny fampiasana.",
       "emptyTitle": "Tsy misy tantaran'ny kredita",
       "expiredGrant": "Lany fe-potoana: {{description}}",
+      "expiredStatus": "Lany fe-potoana",
       "googlePlayReceipt": "Rosia avy amin'ny Google Play",
       "kind": {
         "adjustment": "Fanitsiana",
@@ -4728,7 +4729,8 @@
       "receiptA11y": "Sokafy ny rosia ho an'ny {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Tsy misy rosia ho an'ity fividianana ity.",
       "retentionLimit": "Aseho ny tantaran'ny kredita farany indrindra.",
-      "voidedGrant": "Nofoanana: {{description}}"
+      "voidedGrant": "Nofoanana: {{description}}",
+      "voidedStatus": "Nofoanana"
     },
     "title": "Hividy kireditra",
     "description": "Ny kireditra dia fividianana indray mandeha ampiana amin'ny balan Kilo anao hanaovana session coding AI ao amin'ny Kilo App. Ny fivarotana no maka vola amin'ny kaontinao ary ampiana ny kireditra rehefa manamarina ny fandoavam-bola ny fivarotana.",

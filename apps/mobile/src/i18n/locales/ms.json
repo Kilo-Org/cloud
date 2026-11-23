@@ -4702,6 +4702,7 @@
       "emptyDescription": "Pembelian kredit, resit dan penggunaan akan dipaparkan di sini.",
       "emptyTitle": "Tiada sejarah kredit",
       "expiredGrant": "Tamat tempoh: {{description}}",
+      "expiredStatus": "Tamat tempoh",
       "googlePlayReceipt": "Resit daripada Google Play",
       "kind": {
         "adjustment": "Pelarasan",
@@ -4728,7 +4729,8 @@
       "receiptA11y": "Buka resit untuk {{description}}, {{amount}}, dari {{date}}",
       "receiptUnavailable": "Resit tidak tersedia untuk pembelian ini.",
       "retentionLimit": "Memaparkan sejarah kredit terkini.",
-      "voidedGrant": "Dibatalkan: {{description}}"
+      "voidedGrant": "Dibatalkan: {{description}}",
+      "voidedStatus": "Dibatalkan"
     },
     "title": "Beli kredit",
     "description": "Kredit ialah pembelian sekali sahaja yang ditambah pada baki Kilo anda untuk menjalankan sesi pengekodan AI dalam Apl Kilo. Kedai mengenakan caj pada akaun anda dan kredit ditambah selepas kedai mengesahkan pembayaran.",

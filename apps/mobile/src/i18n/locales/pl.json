@@ -4872,6 +4872,7 @@
       "emptyDescription": "Tutaj pojawią się zakupy kredytów, potwierdzenia i wykorzystanie.",
       "emptyTitle": "Brak historii kredytów",
       "expiredGrant": "Wygasło: {{description}}",
+      "expiredStatus": "Wygasło",
       "googlePlayReceipt": "Potwierdzenie w Google Play",
       "kind": {
         "adjustment": "Korekta",
@@ -4898,7 +4899,8 @@
       "receiptA11y": "Otwórz potwierdzenie dla: {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Potwierdzenie dla tego zakupu nie jest dostępne.",
       "retentionLimit": "Wyświetlana jest najnowsza historia kredytów.",
-      "voidedGrant": "Unieważniono: {{description}}"
+      "voidedGrant": "Unieważniono: {{description}}",
+      "voidedStatus": "Unieważniono"
     },
     "title": "Kup kredyty",
     "description": "Kredyty to jednorazowy zakup dodawany do Twojego salda Kilo na potrzeby sesji kodowania AI w aplikacji Kilo. Sklep obciąża Twoje konto, a kredyty są dodawane po potwierdzeniu płatności przez sklep.",

@@ -4702,6 +4702,7 @@
       "emptyDescription": "A kreditvásárlások, a nyugták és a felhasználás itt jelennek meg.",
       "emptyTitle": "Nincsenek kreditelőzmények",
       "expiredGrant": "Lejárt: {{description}}",
+      "expiredStatus": "Lejárt",
       "googlePlayReceipt": "A nyugta a Google Playen érhető el",
       "kind": {
         "adjustment": "Korrekció",
@@ -4728,7 +4729,8 @@
       "receiptA11y": "Nyugta megnyitása: {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Ehhez a vásárláshoz nem érhető el nyugta.",
       "retentionLimit": "A legutóbbi kreditelőzmények láthatók.",
-      "voidedGrant": "Érvénytelenítve: {{description}}"
+      "voidedGrant": "Érvénytelenítve: {{description}}",
+      "voidedStatus": "Érvénytelenítve"
     },
     "title": "Kreditek vásárlása",
     "description": "A kreditek egyszeri vásárlás, amely a Kilo egyenlegedhez adódik AI kódolási munkamenetek futtatásához a Kilo alkalmazásban. Az áruház terheli a fiókodat, és a kreditek az áruház fizetésigazolása után kerülnek jóváírásra.",

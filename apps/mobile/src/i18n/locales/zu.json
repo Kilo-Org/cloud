@@ -4702,6 +4702,7 @@
       "emptyDescription": "Ukuthengwa kwamakhredithi, amarisidi, nokusetshenziswa kuzovela lapha.",
       "emptyTitle": "Awukho umlando wamakhredithi",
       "expiredGrant": "Kuphelelwe yisikhathi: {{description}}",
+      "expiredStatus": "Kuphelelwe yisikhathi",
       "googlePlayReceipt": "Irisidi evela ku-Google Play",
       "kind": {
         "adjustment": "Ulungiso",
@@ -4728,7 +4729,8 @@
       "receiptA11y": "Vula irisidi ye-{{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Ayikho irisidi etholakalayo yalokhu kuthenga.",
       "retentionLimit": "Kuboniswa umlando wamakhredithi wakamuva.",
-      "voidedGrant": "Ikhanseliwe: {{description}}"
+      "voidedGrant": "Ikhanseliwe: {{description}}",
+      "voidedStatus": "Ikhanseliwe"
     },
     "title": "Thenga amakhredithi",
     "description": "Amakhredithi ukuthenga kwesikhathi esisodwa okwengezwa kubhalansi yakho ye-Kilo ukuze usebenzise amaseshini okubhala ikhodi e-AI ku-Kilo App. Isitolo sikhokhisa i-akhawunti yakho futhi amakhredithi engezwa ngemva kokuba isitolo siqinisekise inkokhelo.",

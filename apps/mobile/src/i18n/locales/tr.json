@@ -4702,6 +4702,7 @@
       "emptyDescription": "Kredi satın alımları, makbuzlar ve kullanım burada görünecek.",
       "emptyTitle": "Kredi geçmişi yok",
       "expiredGrant": "Süresi doldu: {{description}}",
+      "expiredStatus": "Süresi doldu",
       "googlePlayReceipt": "Makbuz Google Play'de",
       "kind": {
         "adjustment": "Düzeltme",
@@ -4728,7 +4729,8 @@
       "receiptA11y": "{{description}}, {{amount}}, {{date}} için makbuzu aç",
       "receiptUnavailable": "Bu satın alım için makbuz mevcut değil.",
       "retentionLimit": "En son kredi geçmişi gösteriliyor.",
-      "voidedGrant": "İptal edildi: {{description}}"
+      "voidedGrant": "İptal edildi: {{description}}",
+      "voidedStatus": "İptal edildi"
     },
     "title": "Kredi satın al",
     "description": "Krediler, Kilo App'te AI kodlama oturumları yürütmek için Kilo bakiyenize eklenen tek seferlik bir satın alımdır. Mağaza hesabınızdan ücret alır ve mağaza ödemeyi onayladıktan sonra krediler eklenir.",

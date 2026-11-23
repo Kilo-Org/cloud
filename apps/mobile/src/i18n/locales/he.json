@@ -4787,6 +4787,7 @@
       "emptyDescription": "רכישות קרדיטים, קבלות ושימוש יופיעו כאן.",
       "emptyTitle": "אין היסטוריית קרדיטים",
       "expiredGrant": "פג התוקף: {{description}}",
+      "expiredStatus": "פג התוקף",
       "googlePlayReceipt": "קבלה מ-Google Play",
       "kind": {
         "adjustment": "התאמה",
@@ -4813,7 +4814,8 @@
       "receiptA11y": "פתיחת הקבלה עבור {{description}}, {{amount}}, מתאריך {{date}}",
       "receiptUnavailable": "אין קבלה זמינה עבור רכישה זו.",
       "retentionLimit": "מוצגת היסטוריית הקרדיטים העדכנית ביותר.",
-      "voidedGrant": "בוטל: {{description}}"
+      "voidedGrant": "בוטל: {{description}}",
+      "voidedStatus": "בוטל"
     },
     "title": "קניית קרדיטים",
     "description": "קרדיטים הם רכישה חד-פעמית שמתווספת ליתרת ה-Kilo שלך להרצת מפגשי קידוד בינה מלאכותית ב-Kilo App. החנות מחייבת את החשבון שלך והקרדיטים מתווספים לאחר שהחנות מאשרת את התשלום.",

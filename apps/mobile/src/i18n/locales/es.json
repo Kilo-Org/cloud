@@ -4787,6 +4787,7 @@
       "emptyDescription": "Aquí aparecerán las compras de créditos, los recibos y el uso.",
       "emptyTitle": "No hay historial de créditos",
       "expiredGrant": "Caducado: {{description}}",
+      "expiredStatus": "Caducado",
       "googlePlayReceipt": "Recibo de Google Play",
       "kind": {
         "adjustment": "Ajuste",
@@ -4813,7 +4814,8 @@
       "receiptA11y": "Abrir el recibo de {{description}}, {{amount}}, de {{date}}",
       "receiptUnavailable": "No hay ningún recibo disponible para esta compra.",
       "retentionLimit": "Mostrando el historial de créditos más reciente.",
-      "voidedGrant": "Anulado: {{description}}"
+      "voidedGrant": "Anulado: {{description}}",
+      "voidedStatus": "Anulado"
     },
     "title": "Comprar créditos",
     "description": "Los créditos son una compra única que se añade a tu saldo de Kilo para ejecutar sesiones de codificación con IA en Kilo App. La tienda cobra en tu cuenta y los créditos se añaden cuando la tienda confirma el pago.",

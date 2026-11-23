@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
 import { type ConfigPatch, PERSONAL_SCOPE } from '@/lib/code-reviewer-config';
+import type * as InfiniteRetentionModule from '@/lib/query/infinite-retention';
 import { ORGANIZATION_TRIAL_EXPIRED_MESSAGE } from '@/lib/server-error-copy';
 
 import { useReviewConfig, useSaveReviewConfig, useToggleReviewer } from './use-code-reviewer';
@@ -16,7 +17,7 @@ type MutationOptions = {
   mutationFn?: (vars: unknown) => Promise<unknown>;
   onMutate?: (vars: unknown) => Promise<unknown> | unknown;
   onError?: (error: unknown, vars?: unknown, context?: unknown) => void;
-  onSettled?: () => void;
+  onSettled?: () => Promise<void> | void;
   onSuccess?: (data: unknown) => void;
   scope?: { id: string };
 };
@@ -54,6 +55,16 @@ const cancelQueriesMock = vi.fn();
 const getQueryDataMock = vi.fn();
 const setQueryDataMock = vi.fn();
 const toastErrorMock = vi.fn();
+const reconcileFirstPageMock = vi.hoisted(() => vi.fn(() => Promise.resolve()));
+
+// One object for every `useQueryClient` call, so an assertion can name the
+// client the hook handed the reconcile.
+const queryClientMock = {
+  cancelQueries: cancelQueriesMock,
+  getQueryData: getQueryDataMock,
+  setQueryData: setQueryDataMock,
+  invalidateQueries: invalidateQueriesMock,
+};
 
 let lastCapturedOptions: MutationOptions | null = null;
 const queryCalls: { queryKey?: unknown[]; enabled?: boolean }[] = [];
@@ -67,14 +78,18 @@ vi.mock('@tanstack/react-query', () => ({
     queryCalls.push(options);
     return { data: undefined };
   },
-  useQueryClient: () => ({
-    cancelQueries: cancelQueriesMock,
-    getQueryData: getQueryDataMock,
-    setQueryData: setQueryDataMock,
-    invalidateQueries: invalidateQueriesMock,
-  }),
+  useQueryClient: () => queryClientMock,
   hashKey: (key: unknown) => JSON.stringify(key),
 }));
+
+// `use-code-reviewer` settles its writes through `settleReviewerWrite`, which
+// reconciles the organization audit log for an organization scope. Only that
+// one export is replaced, so the rest of the module stays real and the call is
+// recorded without touching a query cache this suite never builds.
+vi.mock('@/lib/query/infinite-retention', async importOriginal => {
+  const actual = await importOriginal<typeof InfiniteRetentionModule>();
+  return { ...actual, reconcileFirstPage: reconcileFirstPageMock };
+});
 
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
@@ -195,6 +210,7 @@ beforeEach(() => {
   getQueryDataMock.mockReset();
   setQueryDataMock.mockReset();
   toastErrorMock.mockReset();
+  reconcileFirstPageMock.mockClear();
   billing.canManage = false;
   billing.action = undefined;
   // Default: each patch mutate resolves to a successful payload. Tests
@@ -733,5 +749,65 @@ describe('useToggleReviewer (generation guard + chain join)', () => {
 
     expect(toastErrorMock).toHaveBeenCalledWith(i18n.t('common.organizationTrialEnded'));
     expect(toastErrorMock).not.toHaveBeenCalledWith(ORGANIZATION_TRIAL_EXPIRED_MESSAGE);
+  });
+});
+
+// Both the toggle and the full config save settle through the same refresh:
+// the config read the write changed, then the organization audit log's page
+// one. The personal scope writes no organization audit row, so it has nothing
+// to refresh there.
+describe('reviewer writes refresh the organization audit log', () => {
+  const ORG_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+
+  it('the toggle reconciles the audit log page one for an organization scope', async () => {
+    const opts = getToggleOptions(ORG_ID, 'github');
+
+    await opts.onSettled?.();
+
+    expect(reconcileFirstPageMock).toHaveBeenCalledExactlyOnceWith(queryClientMock, [
+      'organizations.auditLogs.list',
+      ORG_ID,
+    ]);
+    // The config invalidation this write already made stays exactly as it was.
+    expect(invalidateQueriesMock).toHaveBeenCalledWith({
+      queryKey: ['organizations', 'reviewAgent', 'getReviewConfig'],
+    });
+  });
+
+  it('the config save reconciles the audit log page one for an organization scope', async () => {
+    const opts = getSaveOptions(ORG_ID, 'gitlab');
+
+    await opts.onSettled?.();
+
+    expect(reconcileFirstPageMock).toHaveBeenCalledExactlyOnceWith(queryClientMock, [
+      'organizations.auditLogs.list',
+      ORG_ID,
+    ]);
+    expect(invalidateQueriesMock).toHaveBeenCalledWith({
+      queryKey: ['organizations', 'reviewAgent', 'getReviewConfig'],
+    });
+  });
+
+  it('the toggle reconciles nothing on the audit log for the personal scope', async () => {
+    const opts = getToggleOptions(PERSONAL_SCOPE, 'github');
+
+    await opts.onSettled?.();
+
+    expect(reconcileFirstPageMock).not.toHaveBeenCalled();
+    // The personal config read is still invalidated.
+    expect(invalidateQueriesMock).toHaveBeenCalledWith({
+      queryKey: ['personalReviewAgent', 'getReviewConfig'],
+    });
+  });
+
+  it('the config save reconciles nothing on the audit log for the personal scope', async () => {
+    const opts = getSaveOptions(PERSONAL_SCOPE, 'github');
+
+    await opts.onSettled?.();
+
+    expect(reconcileFirstPageMock).not.toHaveBeenCalled();
+    expect(invalidateQueriesMock).toHaveBeenCalledWith({
+      queryKey: ['personalReviewAgent', 'getReviewConfig'],
+    });
   });
 });

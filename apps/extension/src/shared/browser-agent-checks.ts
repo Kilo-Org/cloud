@@ -371,9 +371,17 @@ export const UNSERVED_BROWSER_TOOL_NAMES: ReadonlySet<string> = new Set([
   'browser_run_code_unsafe',
 ]);
 
-/** The two tools that run model-authored page code (D11: they need the `act` grant). */
-export const isScriptTool = (toolName: string): boolean =>
-  toolName === 'browser_evaluate' || toolName === 'browser_run_code_unsafe';
+/**
+ * The tools that run code in the page: model-authored code (`browser_evaluate`
+ * and `browser_run_code_unsafe`) and page-registered code (`browser_webmcp_call`
+ * runs a tool the page registered). The D11 `act` grant class is expressed by
+ * `ACT_TOOL_NAMES`; this predicate decides which calls probe the page for a
+ * sensitive field, not which grant class they need.
+ */
+export const runsPageCode = (toolName: string): boolean =>
+  toolName === 'browser_evaluate' ||
+  toolName === 'browser_run_code_unsafe' ||
+  toolName === 'browser_webmcp_call';
 /** A CSS selector that names more than one element: a call that cannot run must not ask for permission. */
 export const ambiguousSelectorError = (matches: number): string =>
   `The selector matches ${String(matches)} elements. Use a snapshot ref or a selector that matches one element.`;
@@ -408,20 +416,6 @@ export const SENSITIVE_REASON = {
   scriptUnverified: 'a page script could reach a field that could not be inspected',
   unknownField: 'typing into a field that could not be inspected',
 } as const;
-
-/** The tool families whose act calls can be sensitive; read-only tools never are. */
-export const SENSITIVE_CAPABLE_TOOLS: ReadonlySet<string> = new Set([
-  'browser_click',
-  'browser_drag',
-  'browser_drop',
-  'browser_evaluate',
-  'browser_fill_form',
-  'browser_file_upload',
-  'browser_handle_dialog',
-  'browser_press_key',
-  'browser_run_code_unsafe',
-  'browser_type',
-]);
 
 const OAUTH_CONSENT_ROUTES: readonly {
   readonly host: string;

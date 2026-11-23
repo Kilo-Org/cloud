@@ -1529,6 +1529,66 @@ describe('script calls', () => {
     expect(sensitiveReasonOf(result)).toBe(SENSITIVE_REASON.scriptUnverified);
   });
 
+  it('refuses a page-registered tool call when a readable frame holds a protected field', async () => {
+    const result = await run({
+      args: { name: 'pay' },
+      session: createSession({ presentFieldFrames: ['main'] }),
+      toolName: 'browser_webmcp_call',
+    });
+
+    expect(failureOf(result)).toStrictEqual({
+      items: [
+        { class: 'sensitive', origin: 'https://app.example.com', reason: SENSITIVE_REASON.script },
+      ],
+      kind: 'needs_permission',
+    });
+    expect(sensitiveReasonOf(result)).toBe(SENSITIVE_REASON.script);
+  });
+
+  it('runs a page-registered tool call when no readable frame holds a protected field', async () => {
+    const result = await run({
+      args: { name: 'pay' },
+      session: createSession({}),
+      toolName: 'browser_webmcp_call',
+    });
+
+    expect(allowedOf(result)).toMatchObject({
+      class: 'act',
+      ok: true,
+      origin: 'https://app.example.com',
+    });
+    expect(sensitiveOf(result)).toBeUndefined();
+  });
+
+  it('fails closed on a page-registered tool call when a readable frame cannot be inspected', async () => {
+    const result = await run({
+      args: { name: 'pay' },
+      authorized: [
+        { class: 'act', origin: 'https://app.example.com' },
+        { class: 'read', origin: 'https://app.example.com' },
+        { class: 'read', origin: 'https://pay.example.com' },
+      ],
+      session: createSession({ fieldProbeFailureFrames: ['f1'] }),
+      toolName: 'browser_webmcp_call',
+    });
+
+    expect(sensitiveReasonOf(result)).toBe(SENSITIVE_REASON.scriptUnverified);
+  });
+
+  it('probes the tab origin for a page-registered tool call granted only on the tab origin', async () => {
+    const result = await run({
+      args: { name: 'pay' },
+      authorized: [
+        { class: 'act', origin: 'https://app.example.com' },
+        { class: 'read', origin: 'https://app.example.com' },
+      ],
+      session: createSession({ presentFieldFrames: ['main'] }),
+      toolName: 'browser_webmcp_call',
+    });
+
+    expect(sensitiveReasonOf(result)).toBe(SENSITIVE_REASON.script);
+  });
+
   it('allows the retry that carries the token bound to the script call', async () => {
     const tokens = createStepTokenStore({ now: () => 1000, random: () => 'token-s' });
     const args = { function: '() => document.body.innerText' };

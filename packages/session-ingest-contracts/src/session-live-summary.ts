@@ -219,7 +219,6 @@ export function sessionLiveCut(text: string, limit: number): string {
  */
 export function sessionLiveText(raw: unknown, limit: number): string | null {
   if (typeof raw !== 'string') return null;
-  // A non-positive limit cannot hold a drawn character, so it holds no text.
   if (!(limit >= 1)) return null;
   const line = sessionDisplayLine(raw).replace(/\s+/g, ' ').trim();
   if (line === '') return null;
@@ -340,7 +339,6 @@ const TODO_STATUS_ROLES = {
   Record<SessionLiveTodoStatus, 'skipped' | 'done' | 'current' | 'outstanding'>
 >;
 
-/** Whether the status is one this projection classifies, narrowing it to the set. */
 function isClassifiedTodoStatus(status: string): status is SessionLiveTodoStatus {
   return SESSION_LIVE_TODO_STATUSES.some(candidate => candidate === status);
 }
@@ -351,13 +349,8 @@ const todoInputSchema = z.object({ todos: z.array(z.unknown()) });
 /**
  * `todowrite` input: completed count, total (cancelled excluded) and the active
  * step. `SESSION_LIVE_TODO_STATUSES` and `TODO_STATUS_ROLES` are the one place a
- * status's meaning is written down; the loop only reads the role. The producer's
- * schema declares `status` as a free string (its field description names the four
- * values rather than enforcing them), so a status outside the set is possible: it
- * counts toward `total` as an outstanding task that is neither done nor current.
- * The mobile task list reads such an entry the same way; the web todo projection
- * leaves it out, so the two can differ for that input. Null when no entry counts,
- * which is an empty list and a list of only cancelled entries.
+ * status's meaning is written down; the loop only reads the role. Null when no
+ * entry counts, which is an empty list and a list of only cancelled entries.
  */
 export function sessionLivePlan(input: Record<string, unknown>): SessionLivePlan | null {
   const parsed = todoInputSchema.safeParse(input);
@@ -369,8 +362,6 @@ export function sessionLivePlan(input: Record<string, unknown>): SessionLivePlan
     const todo = todoSchema.safeParse(raw);
     if (!todo.success) continue;
     const { status } = todo.data;
-    // An unclassified status reads as outstanding: it still counts, so a task
-    // the plan cannot place is shown rather than dropped from the total.
     const role = isClassifiedTodoStatus(status) ? TODO_STATUS_ROLES[status] : 'outstanding';
     if (role === 'skipped') continue;
     total++;

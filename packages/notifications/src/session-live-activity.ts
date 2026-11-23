@@ -134,9 +134,6 @@ function outcomeKind(
  *   the ones a push delivered. The outcome follows that order: the row's own
  *   outcome first, then an opened pull request, then the remembered outcome,
  *   and the diff derivation last.
- * - `prOpened: false` is a stated fact, not an absent one: it reports that no
- *   pull request is open, so it does not carry the remembered outcome forward.
- *   Only a row that omits `prOpened` entirely keeps it.
  * - `failure` is one exception to that policy. A finished row with a
  *   failure reads as the `failed` kind, which the layout draws as a stopped
  *   turn. A row that carries `failure: null` reports no failure and clears the

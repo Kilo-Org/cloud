@@ -13,8 +13,7 @@ import { refineSpendAlertScope, spendAlertScopeShape } from './spend-alert-scope
 
 // Discriminates between attention-requiring and status-only cloud agent
 // session notifications. Optional everywhere it appears so old producers
-// in a rolling deploy still validate; the default ('status') is applied
-// at the enforcement read site.
+// in a rolling deploy still validate.
 export const cloudAgentSessionCategorySchema = z.enum(['attention', 'status']);
 export type CloudAgentSessionCategory = z.infer<typeof cloudAgentSessionCategorySchema>;
 

@@ -61,8 +61,6 @@ export function genericPushContentForPushData(
   // A token with no locale is English; resolvePushLocale owns that rule.
   locale?: string | null
 ): { title: string; body: string } {
-  // The one generic title is content-free and identical for every variant, so
-  // only the body's leaf differs.
   const leaf = GENERIC_BODY_LEAF_BY_TYPE[data.type];
   return {
     title: genericPushTitle(locale),

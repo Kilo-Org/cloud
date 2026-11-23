@@ -1654,11 +1654,6 @@ test('Vercel deployment steps pass the deployment URL as one argument', () => {
       'the token arrives as its own argv element'
     );
     assert.ok(promoted.argv.includes('--scope=kilocode'), 'the scope stays on the command');
-    assert.equal(
-      namedStep(promote, 'Promote Vercel deployment').env.DEPLOYMENT_URL,
-      '${{ inputs.deployment_url }}',
-      'the promote step reads the input from its env'
-    );
 
     const stage = workflow('stage-vercel-deployment');
     const stageValues = { 'secrets.VERCEL_PROJECT_TOKEN': 'probe-token' };

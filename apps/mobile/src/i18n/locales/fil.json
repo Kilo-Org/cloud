@@ -1591,7 +1591,7 @@
       "empty": "Wala pang pagsusuring may analitika",
       "emptyDescription": "Itinatala ng analitika ang mga natapos na pagsusuri habang pinagana ito para sa organisasyon.",
       "offTitle": "Naka-off ang analitika para sa {{platform}}",
-      "offDescription": "Maaaring paganahin ng mga role sa pagbabayad ng organisasyon ang analitika sa mga setting ng organisasyon sa web para itala ang mga natapos na pagsusuri.",
+      "offDescription": "Maaaring paganahin ng mga role sa pagsingil ng organisasyon ang analitika sa mga setting ng organisasyon sa web para itala ang mga natapos na pagsusuri.",
       "couldNotLoad": "Hindi ma-load ang analitika",
       "trackedReviewsCaption": "Mga natapos na pagsusuri sa panahong ito habang naka-on ang analitika. Hindi kailanman binibilang ang mga pagsusuring tumatakbo o nabigo.",
       "trackedReviewsUncounted": "Hindi binibilang: {{displayCount}} sa {{displayTotal}} natapos na pagsusuri ng organisasyon na walang naitalang resulta.",
@@ -3686,7 +3686,7 @@
       "pendingInvitation": "May nakabinbing imbitasyon na ang email na ito.",
       "alreadyMember": "Miembro na ng organisasyong ito ang taong ito.",
       "seatsFull": "Ginagamit na ang lahat ng seat ({{used}}/{{total}}). Hilingin sa isang may-ari ng organisasyon na magdagdag ng mga seat bago mag-imbita ng mas maraming miyembro.",
-      "seatsFullCanInviteBilling": "Ginagamit na ang lahat ng seat ({{used}}/{{total}}). Maaari ka pa ring mag-imbita ng mga billing manager, na hindi gumagamit ng seat.",
+      "seatsFullCanInviteBilling": "Ginagamit na ang lahat ng seat ({{used}}/{{total}}). Maaari ka pa ring mag-imbita ng mga tagapamahala ng pagsingil, na hindi gumagamit ng seat.",
       "noSeatsAvailable": "Ginagamit na ang lahat ng seat. Hilingin sa isang may-ari ng organisasyon na magdagdag ng mga seat bago mag-imbita ng mas maraming miyembro."
     },
     "invoices": {
@@ -5134,7 +5134,7 @@
   },
   "organizationGuardrails": {
     "title": "Mga AI Guardrail",
-    "permissionDenied": "Ang mga owner at admin lang ng organisasyon ang puwedeng mamahala ng Mga AI Guardrail. $t(organization.boundary.accessDeniedDescription)",
+    "permissionDenied": "Ang mga may-ari at admin lang ng organisasyon ang puwedeng mamahala ng Mga AI Guardrail. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Hindi naka-enable ang Mga AI Guardrail",
     "unavailable": "Ini-enable ng Kilo ang Mga AI Guardrail para sa isang organisasyon kapag hiniling. Makipag-ugnayan sa {{supportEmail}}, at i-on ito ng Kilo team para sa iyong organisasyon.",
     "contactSupport": "Makipag-ugnayan sa suporta",
@@ -5276,7 +5276,7 @@
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Feature ng Enterprise",
     "enterpriseOnly": "Makukuha ang mga provider at modelo sa Enterprise plan.",
-    "readOnly": "Ang mga owner at admin lang ng organisasyon ang puwedeng magbago ng mga setting na ito.",
+    "readOnly": "Ang mga may-ari at admin lang ng organisasyon ang puwedeng magbago ng mga setting na ito.",
     "loadError": "Hindi ma-load ang mga provider at modelo",
     "tabModels": "Mga modelo",
     "tabProviders": "Mga provider",

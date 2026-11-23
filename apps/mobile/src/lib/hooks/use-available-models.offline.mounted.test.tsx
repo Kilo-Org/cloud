@@ -299,8 +299,6 @@ describe('model catalogue reads while the online manager reports offline', () =>
     expect(catalogRead.current?.models.map(model => model.id)).toEqual(['c/schematron', 'c/seed']);
     expect(matching('/api/openrouter/models')).toBe(1);
 
-    // `applyLanguagePreference`'s LTR switch calls `i18n.changeLanguage` in
-    // place: no remount, no new catalog read, only the language moves.
     await act(async () => {
       await i18n.changeLanguage('cs');
     });

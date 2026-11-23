@@ -1035,7 +1035,7 @@
       "empty": "Brak przeglądów z analityką",
       "emptyDescription": "Analityka rejestruje ukończone przeglądy, dopóki jest włączona dla organizacji.",
       "offTitle": "Analityka jest wyłączona dla {{platform}}",
-      "offDescription": "Analitykę mogą włączyć w ustawieniach organizacji w wersji internetowej role związane z rozliczeniami — właściciele, administratorzy i menedżerowie rozliczeń — aby rejestrować ukończone przeglądy.",
+      "offDescription": "Analitykę mogą włączyć w ustawieniach organizacji w wersji internetowej role związane z rozliczeniami — właściciele, administratorzy i osoby zarządzające rozliczeniami — aby rejestrować ukończone przeglądy.",
       "couldNotLoad": "Nie udało się wczytać analityki",
       "trackedReviewsCaption": "Ukończone przeglądy, które zakończyły się w tym okresie przy włączonej analityce. Przeglądy w toku i zakończone niepowodzeniem nigdy nie są zliczane.",
       "trackedReviewsUncounted": "Nie zliczono: {{displayCount}} z {{displayTotal}} ukończonych przeglądów organizacji, których wynik nie został zapisany.",
@@ -3826,7 +3826,7 @@
       "pendingInvitation": "Ten adres e-mail ma już oczekujące zaproszenie.",
       "alreadyMember": "Ta osoba jest już członkiem tej organizacji.",
       "seatsFull": "Wszystkie miejsca są zajęte ({{used}}/{{total}}). Poproś właściciela organizacji o dodanie miejsc, zanim zaprosisz kolejnych członków.",
-      "seatsFullCanInviteBilling": "Wszystkie miejsca są zajęte ({{used}}/{{total}}). Nadal możesz zapraszać menedżerów rozliczeń, którzy nie zajmują miejsca.",
+      "seatsFullCanInviteBilling": "Wszystkie miejsca są zajęte ({{used}}/{{total}}). Nadal możesz zapraszać osoby zarządzające rozliczeniami, które nie zajmują miejsca.",
       "noSeatsAvailable": "Wszystkie miejsca są zajęte. Poproś właściciela organizacji o dodanie miejsc, zanim zaprosisz kolejnych członków."
     },
     "invoices": {

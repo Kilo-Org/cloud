@@ -1437,7 +1437,6 @@ export class NativeSyncClient {
                 throw noteSnapshotFailure(error) ?? error;
               }
               if (!epoch.current()) return;
-              // A read that still leaves an uncertified gap has not settled the transcript.
               if (transcriptSettled()) settleSnapshotStreak();
               lastSeq = frame.seq;
             }

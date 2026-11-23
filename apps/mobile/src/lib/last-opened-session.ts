@@ -251,9 +251,7 @@ export function recordLastOpenedSession(sessionId: string, userId: string | null
   epoch += 1;
   record = { sessionId, userId, storedAt: Date.now() };
   notify();
-  // The payload is captured now, at record time; only the write is serialized
-  // behind any earlier mirror operation, so a later record always lands after
-  // an earlier one and no write can jump a sign-out delete.
+  // The payload is captured now, at record time.
   const serialized = JSON.stringify(record);
   chainMirror(async () => {
     await mirrorRecord(serialized);
@@ -311,8 +309,6 @@ export function clearLastOpenedSession(): void {
   if (hadRecord) {
     notify();
   }
-  // Serialized behind any earlier mirror operation, so an in-flight write can
-  // never land after this delete. The in-memory clear is already visible.
   chainMirror(async () => {
     await dropMirroredRecord();
   });

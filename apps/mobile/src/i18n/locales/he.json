@@ -400,7 +400,7 @@
       "title": "מפתחות ספקים",
       "rowSubtitle": "שימוש בחיוב דרך הספק שלך",
       "orgDescription": "מפתחות אלה משותפים לכל חברי הארגון, והחיוב מתבצע בחשבונות הספקים של הארגון.",
-      "viewOnly": "רק בעלים של הארגון, אדמין או מנהל חיובים יכולים לשנות את המפתחות שלו.",
+      "viewOnly": "רק בעלים של הארגון, מנהל או מנהל חיובים יכולים לשנות את המפתחות שלו.",
       "description": "בקשות שנשלחות באמצעות מפתחות אלה מחויבות בחשבון הספק שלך במקום ביתרת Kilo שלך.",
       "managedByPlan": "מנוהל במסגרת תוכנית הקידוד שלך",
       "enableKey": "הפעלת המפתח של {{provider}}",
@@ -3473,7 +3473,7 @@
   "organization": {
     "auditLog": {
       "title": "יומן ביקורת",
-      "permissionDenied": "רק בעלים, אדמין או מנהל חיובים של ארגון בתוכנית Enterprise יכולים לצפות ביומן הביקורת שלו. $t(organization.boundary.accessDeniedDescription)",
+      "permissionDenied": "רק בעלים, מנהל או מנהל חיובים של ארגון בתוכנית Enterprise יכולים לצפות ביומן הביקורת שלו. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "אין אירועי ביקורת",
       "emptyDescription": "פעולות שמתבצעות בארגון הזה יופיעו כאן.",
       "truncated": "מוצגים האירועים האחרונים.",
@@ -3489,7 +3489,7 @@
         "promoCreditGranted": "ניתנו קרדיטים לקידום",
         "memberRemove": "החבר הוסר",
         "memberChangeRole": "תפקיד החבר שונה",
-        "memberAdminAdd": "אדמין נוסף",
+        "memberAdminAdd": "מנהל נוסף",
         "memberAutoJoin": "החבר הצטרף אוטומטית",
         "ssoAutoProvision": "המשתמש הוקצה על ידי SSO",
         "ssoSetDomain": "דומיין SSO נוסף",
@@ -3857,7 +3857,7 @@
       "emptyDescription": "השתמשו ב-'שעה קודמת' כדי לראות בקשות קודמות.",
       "emptyBoundDescription": "יומני הבקשות לא מגיעים אחורה יותר מכך.",
       "loadError": "לא ניתן לטעון את יומני הבקשות.",
-      "permissionDenied": "רק בעלים, אדמין או מנהל חיובים של הארגון יכולים לצפות ביומני הבקשות שלו. $t(organization.boundary.accessDeniedDescription)",
+      "permissionDenied": "רק בעלים, מנהל או מנהל חיובים של הארגון יכולים לצפות ביומני הבקשות שלו. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "קלט {{input}} · פלט {{output}}",
       "byok": "BYOK"
     },

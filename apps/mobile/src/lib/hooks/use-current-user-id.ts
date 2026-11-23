@@ -73,8 +73,6 @@ export function useCurrentUserId(options: UseCurrentUserIdOptions = {}) {
     refetch: () => {
       void refetch();
     },
-    // The same retry, awaitable, for a caller that must run a read this one
-    // gates (the credits catalog waits on the identity) as soon as it settles.
     refetchAsync,
   };
 }

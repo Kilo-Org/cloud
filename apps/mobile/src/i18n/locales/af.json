@@ -399,7 +399,7 @@
       "title": "Verskaffersleutels",
       "rowSubtitle": "Gebruik jou eie verskaffer se fakturering",
       "orgDescription": "Hierdie sleutels word met almal in die organisasie gedeel en aan die organisasie se verskafferrekeninge gefaktureer.",
-      "viewOnly": "Slegs 'n eienaar, admin of faktureringsbestuurder van die organisasie kan die organisasie se sleutels verander.",
+      "viewOnly": "Slegs 'n eienaar, administrateur of faktureringsbestuurder van die organisasie kan die organisasie se sleutels verander.",
       "description": "Versoeke via hierdie sleutels word aan jou verskafferrekening gefaktureer in plaas van van jou Kilo-saldo afgetrek.",
       "managedByPlan": "Bestuur deur jou koderingsplan",
       "enableKey": "Aktiveer die {{provider}}-sleutel",

@@ -493,7 +493,7 @@
       "download": "Fájl letöltése",
       "downloadFailed": "Nem sikerült letölteni az exportált adatokat. Ellenőrizd a kapcsolatot, és próbáld újra.",
       "unavailableTitle": "Az adatexportálás még nem érhető el",
-      "unavailableDescription": "Az adatexportálás fokozatosan válik elérhetővé. Nézz vissza hamarosan."
+      "unavailableDescription": "A funkció fokozatosan válik elérhetővé. Nézz vissza hamarosan."
     },
     "blockedPeople": {
       "title": "Letiltott és némított személyek",

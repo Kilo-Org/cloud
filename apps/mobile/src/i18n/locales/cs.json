@@ -495,7 +495,7 @@
       "download": "Stáhnout soubor",
       "downloadFailed": "Export se nepodařilo stáhnout. Zkontrolujte připojení a zkuste to znovu.",
       "unavailableTitle": "Export dat zatím není k dispozici",
-      "unavailableDescription": "Export dat zavádíme postupně. Zkuste to brzy znovu."
+      "unavailableDescription": "Funkce se zavádí postupně. Zkuste to brzy znovu."
     },
     "blockedPeople": {
       "title": "Zablokovaní a ztlumení uživatelé",

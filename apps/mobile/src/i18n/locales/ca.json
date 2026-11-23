@@ -494,7 +494,7 @@
       "download": "Baixa el fitxer",
       "downloadFailed": "No s'ha pogut baixar l'exportació. Comprova la connexió i torna-ho a provar.",
       "unavailableTitle": "L'exportació de dades encara no està disponible",
-      "unavailableDescription": "L'exportació de dades s'està desplegant gradualment. Torna-ho a comprovar aviat."
+      "unavailableDescription": "La funció s'està desplegant gradualment. Torna-ho a comprovar aviat."
     },
     "blockedPeople": {
       "title": "Persones bloquejades i silenciades",

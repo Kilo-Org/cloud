@@ -493,7 +493,7 @@
       "download": "Tải tệp xuống",
       "downloadFailed": "Không thể tải xuống bản xuất. Hãy kiểm tra kết nối và thử lại.",
       "unavailableTitle": "Xuất dữ liệu chưa sẵn sàng",
-      "unavailableDescription": "Tính năng xuất dữ liệu đang được triển khai dần. Vui lòng quay lại sau."
+      "unavailableDescription": "Tính năng đang được triển khai dần. Vui lòng quay lại sau."
     },
     "blockedPeople": {
       "title": "Người bị chặn và tắt tiếng",

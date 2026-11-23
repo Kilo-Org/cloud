@@ -37,13 +37,15 @@ export function isValidCallbackPath(path: string): boolean {
   ) {
     return true;
   }
-  if (isValidIntegrationOAuthConnectCallbackPath(path)) {
+  // Integration OAuth round trips resume at the platform's `connect` or
+  // `callback` API route, the latter carrying the provider's `code`/`state`.
+  if (isValidIntegrationOAuthPath(path)) {
     return true;
   }
   return CALLBACK_PATH_REGEX.test(path);
 }
 
-function isValidIntegrationOAuthConnectCallbackPath(path: string): boolean {
+function isValidIntegrationOAuthPath(path: string): boolean {
   if (!path.startsWith('/api/integrations/') || path.startsWith('//')) {
     return false;
   }
@@ -67,7 +69,7 @@ function isValidIntegrationOAuthConnectCallbackPath(path: string): boolean {
   return (
     api === 'api' &&
     integrations === 'integrations' &&
-    action === 'connect' &&
+    (action === 'connect' || action === 'callback') &&
     rest.length === 0 &&
     STANDARD_OAUTH_PLATFORM_SET.has(platform)
   );

@@ -55,6 +55,13 @@ export function MetricCard({
 const CAPTION_LINES = [2, 1] as const;
 
 /**
+ * The bar stands in for one `text-xs` line, so it holds that line's own height
+ * (14 dp, the box `RowSkeleton` uses for the same variant) rather than the
+ * 16 dp a hand-picked size would add to the band under the cards.
+ */
+const CAPTION_LINE_CLASS = 'h-3.5 w-full rounded bg-muted-soft';
+
+/**
  * The dashboard's first paint: the body alone. The platform and period controls
  * render outside the body in every state, so nothing stands in for them, and
  * every block the loaded body paints below the cards — the two caption lines and
@@ -87,7 +94,7 @@ export function AnalyticsSkeleton(): ReactNode {
         {CAPTION_LINES.map((lines, index) => (
           <View key={index}>
             {Array.from({ length: lines }, (_, line) => (
-              <Skeleton key={line} className="h-4 w-full rounded bg-muted-soft" />
+              <Skeleton key={line} className={CAPTION_LINE_CLASS} />
             ))}
           </View>
         ))}

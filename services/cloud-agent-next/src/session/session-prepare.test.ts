@@ -1337,12 +1337,12 @@ describe('explicit sandbox session creation', () => {
   );
 
   it.each(
-    SELECTABLE_SANDBOX_ALLOCATIONS.filter(allocation => !allocation.startsWith('vercel-')).flatMap(
-      preset => [
-        { preset, format: 'legacy' },
-        { preset, format: 'structured' },
-      ]
-    )
+    SELECTABLE_SANDBOX_ALLOCATIONS.filter(
+      allocation => getSandboxAllocationRequest(allocation).provider.account === 'kilo'
+    ).flatMap(preset => [
+      { preset, format: 'legacy' },
+      { preset, format: 'structured' },
+    ])
   )(
     'persists $format $preset with its canonical allocation and valid metadata',
     async ({ preset, format }) => {
@@ -1407,9 +1407,9 @@ describe('explicit sandbox session creation', () => {
   );
 
   it.each(
-    SELECTABLE_SANDBOX_ALLOCATIONS.filter(allocation => !allocation.startsWith('vercel-')).filter(
-      allocation => !allocation.startsWith('vercel-')
-    )
+    SELECTABLE_SANDBOX_ALLOCATIONS.filter(
+      allocation => getSandboxAllocationRequest(allocation).provider.account === 'kilo'
+    ).filter(allocation => !allocation.startsWith('vercel-'))
   )(
     'recovers %s on same-key takeover after membership lookup fails before progress',
     async sandboxAllocation => {
@@ -1535,9 +1535,9 @@ describe('explicit sandbox session creation', () => {
   );
 
   it.each(
-    SELECTABLE_SANDBOX_ALLOCATIONS.filter(allocation => !allocation.startsWith('vercel-')).filter(
-      allocation => !allocation.startsWith('vercel-')
-    )
+    SELECTABLE_SANDBOX_ALLOCATIONS.filter(
+      allocation => getSandboxAllocationRequest(allocation).provider.account === 'kilo'
+    ).filter(allocation => !allocation.startsWith('vercel-'))
   )(
     'creates the first worktree chat with %s and upstream finalization/containment semantics',
     async sandboxAllocation => {
@@ -1722,7 +1722,11 @@ describe('explicit sandbox session creation', () => {
     );
   });
 
-  it.each(SELECTABLE_SANDBOX_ALLOCATIONS.filter(allocation => !allocation.startsWith('vercel-')))(
+  it.each(
+    SELECTABLE_SANDBOX_ALLOCATIONS.filter(
+      allocation => getSandboxAllocationRequest(allocation).provider.account === 'kilo'
+    )
+  )(
     'replays a structured %s request against a legacy stored fingerprint',
     async sandboxAllocation => {
       const legacyRequest = requestForPreset(sandboxAllocation);

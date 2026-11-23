@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { createMicrovmClient, type MicrovmRunRequest } from './microvm-client.js';
+import {
+  createMicrovmClient,
+  AwsMicrovmRunRejectedError,
+  type MicrovmRunRequest,
+} from './microvm-client.js';
 import { createAwsObjectStore } from './object-store.js';
 
 const credentials = {
@@ -21,6 +25,27 @@ const request: MicrovmRunRequest = {
 };
 
 describe('AWS sandbox clients', () => {
+  it.each([
+    [403, 'AccessDeniedException', true],
+    [400, 'ValidationException', true],
+    [409, 'ConflictException', false],
+    [503, 'InternalServerException', false],
+  ])(
+    'classifies Run refusal %s %s without treating inspection as submission',
+    async (status, code, rejected) => {
+      const client = createMicrovmClient({
+        credentials,
+        region: 'us-east-1',
+        fetch: async () => new Response(null, { status, headers: { 'x-amzn-errortype': code } }),
+      });
+      const failure = await client.run(request).catch(error => error);
+      expect(failure instanceof AwsMicrovmRunRejectedError).toBe(rejected);
+      await expect(client.get('microvm-123')).rejects.not.toBeInstanceOf(
+        AwsMicrovmRunRejectedError
+      );
+    }
+  );
+
   it('retains unexpected networking and runtime authority for adapter rejection', async () => {
     const response = {
       microvmId: 'microvm-123',

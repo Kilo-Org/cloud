@@ -17,7 +17,7 @@ describe('AWS signed transport', () => {
         expect(request.headers.get('authorization')).toContain('/us-east-1/lambda/aws4_request');
         expect(request.headers.get('x-amz-security-token')).toBe('test-token');
         expect(await request.text()).toBe('{"clientToken":"intent-1"}');
-        expect(request.redirect).toBe('error');
+        expect(request.redirect).toBe('manual');
         return new Response('{}');
       },
     });

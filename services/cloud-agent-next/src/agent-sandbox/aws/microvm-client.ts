@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import {
+  AwsRequestError,
   createAwsClient,
   readAwsResponse,
   type AwsCredentials,
@@ -43,6 +44,9 @@ export const microvmSchema = z.object({
     .optional(),
 });
 
+/** The Run endpoint refused this submission before allocating compute. */
+export class AwsMicrovmRunRejectedError extends AwsRequestError {}
+
 export type Microvm = z.infer<typeof microvmSchema>;
 export type MicrovmClient = {
   run(request: MicrovmRunRequest): Promise<Microvm>;
@@ -77,13 +81,24 @@ export function createMicrovmClient(input: {
   return {
     async run(request) {
       const body = JSON.stringify(microvmRunRequestSchema.parse(request));
-      return read(
-        await client.request(base, {
+      let response: Response;
+      try {
+        response = await client.request(base, {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body,
-        })
-      );
+        });
+      } catch (error) {
+        if (
+          error instanceof AwsRequestError &&
+          (error.status === 403 ||
+            (error.status === 400 &&
+              ['AccessDeniedException', 'ValidationException'].includes(error.code)))
+        )
+          throw new AwsMicrovmRunRejectedError(error.status, error.code);
+        throw error;
+      }
+      return read(response);
     },
     async get(id) {
       return read(await client.request(resource(id)));

@@ -50,8 +50,25 @@ Observed AWS behavior: replay after termination returned the original MicroVM ID
 response. A separate `GetMicrovm` returned `TERMINATED`. Replay recovers identity; only a fresh read supplies state.
 `observe` remains read-only. Stop reconciles an ambiguous launch before confirming termination.
 
-Lambda limits total lifetime to eight hours. A provider-neutral absolute deadline must fail active work with a specific
-reason before AWS terminates the VM. Renewable leases cannot extend that deadline. Suspend and resume are unused.
+A request checkpoint records whether submission has started. Stop can retire an unsubmitted request without launching compute.
+A definite refusal of the first submission retires the operation, so the next message can allocate again.
+A refusal after an uncertain or concurrent submission cannot prove that no compute exists.
+Legacy records without submission evidence remain uncertain.
+Confirmed compute termination is saved before launch document cleanup. An S3 cleanup failure does not block the next allocation.
+
+One phase-transition table and pure operation reducer own durable state changes.
+The recovery decision distinguishes retired, identified, absent, unsubmitted, replayable and blocked operations without provider I/O.
+The adapter performs storage and AWS calls around those decisions. It claims submission atomically and rechecks current state after remote calls.
+The provider registry constructs AWS operation storage; the Sandbox DO supplies storage without AWS lifecycle logic.
+
+Recovery without a physical ID replays only within five minutes. AWS does not document permanent client-token retention.
+After that bound, `provider_cleanup_required` fails affected work promptly. The Worker retains the exact request
+and blocks replacement allocations. An operator must identify
+and terminate the MicroVM before repairing that allocation. Automatic recovery after this bound remains unsupported.
+A known physical ID can still be stopped after the replay window.
+
+Lambda limits total lifetime to eight hours. The shared control plane stops active work two minutes before that limit
+with `provider_lifetime_exhausted`. Renewable leases cannot extend the deadline. Suspend and resume are unused.
 
 ## Template and permission boundary
 
@@ -60,7 +77,8 @@ Customer enablement requires the forced proxy, DNS controls and reviewed admissi
 
 The customer role trusts one fixed Kilo role ARN and an owner-bound ExternalId. It does not trust an IAM user.
 Compute operations target one MicroVM image. The role has no image mutation, connector mutation, shell-token or
-`iam:PassRole` authority. Connector permission scoping requires live verification because AWS documentation differs.
+`iam:PassRole` authority. Same-account live checks verified the configured connector permission and rejected other connectors,
+public egress, an execution role and another image. Cross-account verification remains outstanding.
 The trusted adapter always selects the configured VPC connector and `NO_INGRESS`, with no execution role or idle policy.
 It verifies the networking and role fields returned by AWS before accepting an allocation.
 
@@ -69,3 +87,11 @@ read proxy-private prefixes. Launch PUT uses `If-None-Match: *`. Admission delet
 Signed URLs cannot outlive the assumed role credentials. AWS responses and transport errors never enter logs verbatim.
 
 The foundation reuses `aws4fetch`, already a production dependency of worker-utils. It adds no production dependency.
+
+## Internal M1 verification
+
+A local Worker used the encrypted connection and two chained STS roles to start the actual runtime on the test image.
+The public `octocat/Hello-World` repository prepared successfully. Kilo completed a deterministic fake-model turn through
+the model facade. A terminal accepted input in the repository. Preview ticket admission returned the fixture through
+PreviewTunnel and the wrapper; the same preview refused a request without its cookie. This is same-account proof.
+It does not verify a paid model, private repositories, forced production egress or a second customer account.

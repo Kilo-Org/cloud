@@ -18,11 +18,7 @@ import {
 } from '@kilocode/session-ingest-contracts';
 
 import { ingestItems } from '../db/sqlite-schema';
-import {
-  getPartItemIdentityRanges,
-  parsePartItemIdentity,
-  streamMessagePartRows,
-} from '../util/compaction';
+import { parsePartItemIdentity, streamMessagePartRows } from '../util/compaction';
 
 export const MAX_KILO_SDK_HISTORY_MATERIALIZATION_BYTES = 8 * 1024 * 1024;
 export const MAX_KILO_SDK_SESSION_SNAPSHOT_BYTES = 8 * 1024 * 1024;
@@ -549,7 +545,8 @@ function parsePersistedKiloSdkPartStorageIdentity(
  * corrupt and the caller fails the read.
  *
  * The id rule is applied in JavaScript through the contract's own schema, not re-spelled in SQL,
- * so this count accepts exactly the id families the clients accept. Only `item_id` is selected:
+ * so this count accepts exactly the id families the clients accept. The rows are streamed in
+ * bounded batches, one page per layout, and only the row position plus `item_id` is selected:
  * this path never reads item bodies, and the range plus `afterRowId` bound the rows it walks.
  */
 function countKiloSdkMessagePartRowsByMessageId(
@@ -559,23 +556,32 @@ function countKiloSdkMessagePartRowsByMessageId(
 ): KiloSdkMessagePartRowCount {
   if (!messageIdSchema.safeParse(messageId).success) return { kind: 'invalid_data' };
   let count = 0;
-  for (const partRange of getPartItemIdentityRanges(messageId)) {
-    const rows = db
-      .select({ item_id: ingestItems.item_id })
-      .from(ingestItems)
-      .where(
-        and(
-          eq(ingestItems.item_type, 'part'),
-          gte(ingestItems.item_id, partRange.start),
-          lt(ingestItems.item_id, partRange.end),
-          gt(ingestItems.id, afterRowId)
+  for (const row of streamMessagePartRows<PartStorageRow>({
+    messageId,
+    order: 'row-id',
+    batchSize: KILO_SDK_HISTORY_ENUMERATION_BATCH_SIZE,
+    fetchPage: (range, after, limit) =>
+      db
+        .select({
+          id: ingestItems.id,
+          item_id: ingestItems.item_id,
+          ingested_at: ingestItems.ingested_at,
+        })
+        .from(ingestItems)
+        .where(
+          and(
+            eq(ingestItems.item_type, 'part'),
+            gte(ingestItems.item_id, range.start),
+            lt(ingestItems.item_id, range.end),
+            gt(ingestItems.id, after?.id ?? afterRowId)
+          )
         )
-      )
-      .all();
-    for (const row of rows) {
-      if (!isDirectPartItemId(row.item_id, messageId)) return { kind: 'invalid_data' };
-      count += 1;
-    }
+        .orderBy(ingestItems.id)
+        .limit(limit)
+        .all(),
+  })) {
+    if (!isDirectPartItemId(row.item_id, messageId)) return { kind: 'invalid_data' };
+    count += 1;
   }
   return { kind: 'count', count };
 }

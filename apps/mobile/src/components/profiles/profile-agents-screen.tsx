@@ -253,7 +253,7 @@ export function ProfileAgentsScreen({
         {content}
       </TabScreenScrollView>
 
-      {form.isOpen && canManage ? (
+      {form.isOpen && canManage && !readErrorTerminal ? (
         <AgentFormSheet
           draftScope={draftScope}
           agent={form.editing}

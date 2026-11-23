@@ -4889,7 +4889,7 @@
     "cached": "Opgeslagen briefing · vernieuwen niet beschikbaar",
     "summary": "AI-samenvatting",
     "summaryPending": "AI-samenvatting wordt gemaakt. Deze verschijnt hier zodra hij klaar is.",
-    "summaryPendingBody": "Wordt gemaakt. Het verschijnt hier zodra het klaar is.",
+    "summaryPendingBody": "Wordt gemaakt. Deze verschijnt hier zodra hij klaar is.",
     "summaryUnavailable": "AI-samenvatting niet beschikbaar. Je gestructureerde briefing is nog steeds beschikbaar.",
     "summaryUnavailableBody": "Niet beschikbaar. Je gestructureerde briefing is nog steeds beschikbaar.",
     "summaryNotAdmitted": "De AI-samenvatting is voor deze briefing niet gegenereerd. Je gestructureerde briefing is nog steeds beschikbaar.",

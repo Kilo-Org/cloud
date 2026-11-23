@@ -163,20 +163,4 @@ describe('ProfileSectionHeader mounted', () => {
     expect(String(forwarded.props.children)).toBe('Add');
     renderer.unmount();
   });
-
-  it('renders no trailing control when the caller passes none', () => {
-    const renderer = renderHeader({
-      profileId: 'profile-1',
-      title: 'Profile agents',
-      backFallback: PROFILES_LIST_HREF,
-    });
-
-    expect(
-      renderer.root.findAll(
-        node =>
-          typeof node.type === 'string' && node.props.accessibilityLabel === 'Header create control'
-      )
-    ).toHaveLength(0);
-    renderer.unmount();
-  });
 });

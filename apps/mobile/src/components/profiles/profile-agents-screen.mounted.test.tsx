@@ -816,4 +816,32 @@ describe('ProfileAgentsScreen load errors', () => {
 
     unmount();
   });
+
+  // A terminal refusal hides the create control, so the form it opens must go
+  // with it: a sheet over a screen that offers nothing to act on has nowhere to
+  // save to.
+  it('terminal: hides the create control and any open add form', async () => {
+    h.query.data = [agent('alpha', 'primary')];
+    const { renderer, unmount } = await mountScreen();
+    pressAdd(renderer);
+    expect(nodesOfType(renderer, 'AgentFormSheet')).toHaveLength(1);
+
+    act(() => {
+      Object.assign(h.query, { isError: true, error: { data: { code: 'FORBIDDEN' } } });
+    });
+    await act(async () => {
+      renderer.update(
+        createElement(ProfileAgentsScreen, {
+          profileId: 'profile-1',
+          backFallback: PROFILES_LIST_HREF,
+        })
+      );
+      await Promise.resolve();
+    });
+
+    expect(addControl(renderer)).toBeUndefined();
+    expect(nodesOfType(renderer, 'AgentFormSheet')).toHaveLength(0);
+
+    unmount();
+  });
 });

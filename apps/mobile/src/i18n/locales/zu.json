@@ -2994,7 +2994,7 @@
       "windowUnavailable": "Umkhawulo womongo awutholakali",
       "tapToViewDetails": " Thepha ukuze ubone imininingwane yomongo.",
       "costClause": ", izindleko {{cost}}",
-      "loadingCostSpoken": "izindleko {{cost}}.",
+      "loadingCostSpoken": "izindleko kuze kube manje {{cost}}.",
       "tokensWindowUnavailable": "Umongo: amathokheni angu-{{used}}, umkhawulo awutholakali{{costClause}}.",
       "tokensUsage": "Umongo: amathokheni angu-{{used}} kwangu-{{window}}, kusetshenziswe {{percentage}}{{costClause}}.",
       "title": "Ukusetshenziswa komongo",

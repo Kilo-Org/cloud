@@ -459,25 +459,27 @@ describe('FormField resting value preview', () => {
     expect(String(text.props.className)).toContain('leading-[normal]');
   });
 
-  it('enters the field on an assistive activation, and not while disabled', () => {
+  it('enters the field on an assistive activation', () => {
     const enabled = mountField({ defaultValue: longValue });
-    const enabledHandler = enabled.root.findByType('Pressable').props as {
+    const handler = enabled.root.findByType('Pressable').props as {
       onAccessibilityAction: (event: { nativeEvent: { actionName: string } }) => void;
     };
     act(() => {
-      enabledHandler.onAccessibilityAction({ nativeEvent: { actionName: 'activate' } });
+      handler.onAccessibilityAction({ nativeEvent: { actionName: 'activate' } });
     });
     expect(enabled.root.findAllByType('Pressable')).toHaveLength(0);
     expect(enabled.root.findByType('TextInput')).toBeDefined();
+  });
 
-    // A disabled field has nothing to enter, so the same action changes nothing:
-    // the resting box stays and no editor opens.
+  it('ignores an assistive activation while the field is disabled', () => {
+    // A disabled field has nothing to enter, so the action changes nothing: the
+    // resting box stays and no editor opens.
     const disabled = mountField({ defaultValue: longValue, disabled: true });
-    const disabledHandler = disabled.root.findByType('Pressable').props as {
+    const handler = disabled.root.findByType('Pressable').props as {
       onAccessibilityAction: (event: { nativeEvent: { actionName: string } }) => void;
     };
     act(() => {
-      disabledHandler.onAccessibilityAction({ nativeEvent: { actionName: 'activate' } });
+      handler.onAccessibilityAction({ nativeEvent: { actionName: 'activate' } });
     });
     expect(disabled.root.findAllByType('Pressable')).toHaveLength(1);
     expect(disabled.root.findAllByType('TextInput')).toHaveLength(0);

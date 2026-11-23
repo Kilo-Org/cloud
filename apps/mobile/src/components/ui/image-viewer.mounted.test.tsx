@@ -34,10 +34,15 @@ vi.mock('@/components/ui/icons', () => ({
 vi.mock('@/components/empty-state', () => ({
   StateAction: (props: {
     label: string;
+    accessibilityLabel?: string;
     onPress?: () => void;
     loading?: boolean;
     surface?: 'default' | 'on-dark';
-  }) => createElement('Pressable', { ...props, accessibilityLabel: props.label }),
+  }) =>
+    createElement('Pressable', {
+      ...props,
+      accessibilityLabel: props.accessibilityLabel ?? props.label,
+    }),
 }));
 vi.mock('react-native-gesture-handler', () => ({
   GestureHandlerRootView: 'GestureHandlerRootView',
@@ -58,6 +63,8 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 
 const REMOTE_URI = 'https://example.invalid/photo.png';
 const RENEWED_REMOTE_URI = 'https://example.invalid/photo.png?signature=renewed';
+/** The retry action's announced name, from the real catalog the suite loads. */
+const UNAVAILABLE_RETRY_LABEL = 'Image unavailable, retry loading';
 
 function findByType(
   root: TestRenderer.ReactTestInstance,
@@ -156,7 +163,9 @@ async function fireDecode(
 }
 
 function retryActions(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance[] {
-  return findByType(root, 'Pressable').filter(node => node.props.accessibilityLabel === 'Retry');
+  return findByType(root, 'Pressable').filter(
+    node => node.props.accessibilityLabel === UNAVAILABLE_RETRY_LABEL
+  );
 }
 
 /** Presses the retry action the mock renders, inside the suite's one flush. */
@@ -241,6 +250,9 @@ describe('ImageViewer mounted', () => {
     const retryButtons = retryActions(renderer.root);
     expect(retryButtons).toHaveLength(1);
     const retry = first(retryButtons, 'retry action');
+    // The announced name names the failure, like the file-part card's action;
+    // the visible label stays the plain `Retry`.
+    expect(retry.props.accessibilityLabel).toBe('Image unavailable, retry loading');
     // The viewer paints one black surface in every scheme, so its action keeps
     // the brand pair that surface was designed for.
     expect(retry.props.surface).toBe('on-dark');
@@ -383,7 +395,7 @@ describe('ImageViewer mounted', () => {
     await pressRetry(renderer, 'retry action');
     expect(onRetry).toHaveBeenCalledOnce();
 
-    // The renewed uri lands first: the render-phase reset owns the state now.
+    // The renewed uri lands first: its commit owns the state now.
     await flush(() => {
       renderer.update(
         createElement(ImageViewer, {

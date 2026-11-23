@@ -149,14 +149,19 @@ export function ImageViewer({
   // renew writes a NEW signed URL; the reset must land in the same commit so
   // the refreshed image, not the "Image unavailable" row, renders. A failed
   // renew keeps the same URL, so the failure survives and the row stays until
-  // a new URL lands. The reset also takes ownership from any in-flight attempt,
-  // so a pending settle publishes nothing on top of the fresh image.
+  // a new URL lands.
   const [previousUri, setPreviousUri] = useState(uri);
   if (uri !== previousUri) {
     setPreviousUri(uri);
-    retryAttempt.current += 1;
     setStatus('ready');
   }
+
+  // A renewed URL takes ownership away from any in-flight attempt, so a pending
+  // settle publishes nothing on top of the fresh image. The bump lives in an
+  // effect because render must stay side-effect free.
+  useEffect(() => {
+    retryAttempt.current += 1;
+  }, [uri]);
 
   // A new image (or a reopen) retries the decode from a clean slate.
   useEffect(() => {
@@ -335,6 +340,7 @@ export function ImageViewer({
                     {isRetryableUri(uri) ? (
                       <StateAction
                         label={t('common.retry')}
+                        accessibilityLabel={t('agentChat.filePart.imageUnavailableRetry')}
                         icon={RotateCcw}
                         onPress={retryImage}
                         loading={status === 'retrying'}

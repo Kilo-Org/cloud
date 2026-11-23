@@ -3321,7 +3321,6 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Përpara se të fillojmë",
-    "summaryTitle": "Preferencat e ndarjes së të dhënave",
     "introDescription": "Kilo dërgon mesazhet e tua te ofruesit e AI për të gjeneruar përgjigje. Ja cilat të dhëna ndahen dhe me kë.",
     "required": "E nevojshme për të përdorur Kilo",
     "promptsTitle": "Kërkesat dhe bisedat e tua",
@@ -3336,7 +3335,8 @@
     "featureFlagsWhy": "Për të vendosur cilat veçori sheh, përfshirë ato që ende po i lançojmë gradualisht.",
     "featureFlagsWho": "PostHog, shërbimi i flamujve të veçorive.",
     "helpImprove": "Ndihmo në përmirësimin e Kilo",
-    "helpImproveDescription": "Ndaj të dhëna anonime për përdorimin e produktit dhe burimin e instalimit. Mund ta ndryshosh këtë në çdo kohë te cilësimet.",
+    "helpImproveDescription": "Ndaj të dhëna anonime për përdorimin e produktit dhe burimin e instalimit. Mund ta ndryshosh këtë në çdo kohë te $t(common.profile) · $t(profile.privacyChoices).",
+    "helpImproveReviewDescription": "Ndaj të dhëna anonime për përdorimin e produktit dhe burimin e instalimit.",
     "seeFullDetails": "Shiko detajet e plota",
     "privacyPolicyPrefix": "Të dhënat e tua trajtohen sipas",
     "privacyPolicy": "Politikës së privatësisë së Kilo",

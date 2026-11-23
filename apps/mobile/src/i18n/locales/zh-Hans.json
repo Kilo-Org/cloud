@@ -2724,7 +2724,6 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "开始之前",
-    "summaryTitle": "数据共享偏好设置",
     "introDescription": "Kilo 会将你的消息发送给 AI 提供商，以生成回复。下方列出了共享的数据及其接收方。",
     "required": "使用 Kilo 的必要授权",
     "promptsTitle": "你的提示词和对话",
@@ -2739,7 +2738,8 @@
     "featureFlagsWhy": "决定你能看到哪些功能，包括我们仍在逐步推出的功能。",
     "featureFlagsWho": "PostHog，功能开关服务。",
     "helpImprove": "帮助改进 Kilo",
-    "helpImproveDescription": "共享匿名的产品分析数据和安装来源。你可以随时在设置中更改此选项。",
+    "helpImproveDescription": "共享匿名的产品分析数据和安装来源。你可以随时在“$t(common.profile) · $t(profile.privacyChoices)”中更改此选项。",
+    "helpImproveReviewDescription": "共享匿名的产品分析数据和安装来源。",
     "seeFullDetails": "查看完整详情",
     "privacyPolicyPrefix": "处理你的数据所依据的政策为",
     "privacyPolicy": "Kilo 隐私政策",

@@ -2759,7 +2759,6 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Bevor wir beginnen",
-    "summaryTitle": "Einstellungen zur Datenweitergabe",
     "introDescription": "Kilo sendet deine Nachrichten an KI-Anbieter, um Antworten zu erstellen. Hier erfährst du, welche Daten an wen weitergegeben werden.",
     "required": "Für die Nutzung von Kilo erforderlich",
     "promptsTitle": "Deine Prompts und Unterhaltungen",
@@ -2774,7 +2773,8 @@
     "featureFlagsWhy": "Festlegen, welche Funktionen du siehst, einschließlich solcher, die wir noch schrittweise einführen.",
     "featureFlagsWho": "PostHog, der Feature-Flag-Dienst.",
     "helpImprove": "Zur Verbesserung von Kilo beitragen",
-    "helpImproveDescription": "Teile anonyme Daten zur Produktnutzung und zur Installationsquelle. Du kannst das jederzeit in den Einstellungen ändern.",
+    "helpImproveDescription": "Teile anonyme Daten zur Produktnutzung und zur Installationsquelle. Du kannst das jederzeit unter $t(common.profile) · $t(profile.privacyChoices) ändern.",
+    "helpImproveReviewDescription": "Teile anonyme Daten zur Produktnutzung und zur Installationsquelle.",
     "seeFullDetails": "Vollständige Details ansehen",
     "privacyPolicyPrefix": "Für die Verarbeitung deiner Daten gilt die",
     "privacyPolicy": "Kilo-Datenschutzrichtlinie",

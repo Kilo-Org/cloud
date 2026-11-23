@@ -3321,7 +3321,6 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Antes de comezar",
-    "summaryTitle": "Preferencias de compartición de datos",
     "introDescription": "Kilo envía as túas mensaxes aos provedores de IA para xerar respostas. Isto é o que se comparte e con quen.",
     "required": "Necesario para usar Kilo",
     "promptsTitle": "As túas instrucións e conversas",
@@ -3336,7 +3335,8 @@
     "featureFlagsWhy": "Decidir que funcións ves, incluídas as que aínda estamos a despregar.",
     "featureFlagsWho": "PostHog, o servizo de indicadores de funcións.",
     "helpImprove": "Axudar a mellorar Kilo",
-    "helpImproveDescription": "Comparte estatísticas de uso anónimas e a orixe da instalación. Podes cambiar esta opción en calquera momento na configuración.",
+    "helpImproveDescription": "Comparte estatísticas de uso anónimas e a orixe da instalación. Podes cambiar esta opción en calquera momento en $t(common.profile) · $t(profile.privacyChoices).",
+    "helpImproveReviewDescription": "Comparte estatísticas de uso anónimas e a orixe da instalación.",
     "seeFullDetails": "Ver todos os detalles",
     "privacyPolicyPrefix": "Os teus datos trátanse segundo a",
     "privacyPolicy": "Política de privacidade de Kilo",

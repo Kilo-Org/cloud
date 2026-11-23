@@ -3321,7 +3321,6 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Kafin mu fara",
-    "summaryTitle": "Zaɓukan rabawa na bayanai",
     "introDescription": "Kilo yana aika saƙonninka zuwa masu ba da sabis na AI don samar da amsoshi. Ga bayanan da ake rabawa da masu karɓarsu.",
     "required": "Ana buƙata don amfani da Kilo",
     "promptsTitle": "Umarnin aikinka da tattaunawarka",
@@ -3336,7 +3335,8 @@
     "featureFlagsWhy": "Don yanke shawarar fasalolin da za ka gani, har da waɗanda muke ci gaba da ƙaddamarwa.",
     "featureFlagsWho": "PostHog, sabis ɗin tutocin fasaloli.",
     "helpImprove": "Taimaka wajen inganta Kilo",
-    "helpImproveDescription": "Raba bayanan amfani da manhaja da ba sa bayyana ko kai wane ne, da inda ka samo manhajar. Za ka iya canza wannan a Saituna a kowane lokaci.",
+    "helpImproveDescription": "Raba bayanan amfani da manhaja da ba sa bayyana ko kai wane ne, da inda ka samo manhajar. Za ka iya canza wannan a kowane lokaci ƙarƙashin layin $t(common.profile) · $t(profile.privacyChoices).",
+    "helpImproveReviewDescription": "Raba bayanan amfani da manhaja da ba sa bayyana ko kai wane ne, da inda ka samo manhajar.",
     "seeFullDetails": "Duba cikakkun bayanai",
     "privacyPolicyPrefix": "Ana sarrafa bayananka bisa ga",
     "privacyPolicy": "Manufar sirrin Kilo",

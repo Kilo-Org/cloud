@@ -3321,7 +3321,6 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Før vi går i gang",
-    "summaryTitle": "Indstillinger for datadeling",
     "introDescription": "Kilo sender dine beskeder til AI-udbydere for at generere svar. Her kan du se, hvilke data vi deler, og hvem vi deler dem med.",
     "required": "Kræves for at bruge Kilo",
     "promptsTitle": "Dine forespørgsler og samtaler",
@@ -3336,7 +3335,8 @@
     "featureFlagsWhy": "For at afgøre hvilke funktioner du ser, også dem vi stadig er ved at udrulle.",
     "featureFlagsWho": "PostHog, tjenesten til funktionsflag.",
     "helpImprove": "Hjælp med at forbedre Kilo",
-    "helpImproveDescription": "Del anonyme data om brugen af appen og oplysninger om installationskilden. Du kan altid ændre dette i indstillingerne.",
+    "helpImproveDescription": "Del anonyme data om brugen af appen og oplysninger om installationskilden. Du kan altid ændre dette under $t(common.profile) · $t(profile.privacyChoices).",
+    "helpImproveReviewDescription": "Del anonyme data om brugen af appen og oplysninger om installationskilden.",
     "seeFullDetails": "Se alle oplysninger",
     "privacyPolicyPrefix": "Dine data håndteres i henhold til",
     "privacyPolicy": "Kilos privatlivspolitik",

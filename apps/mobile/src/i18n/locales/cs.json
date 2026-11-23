@@ -3447,7 +3447,6 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Než začneme",
-    "summaryTitle": "Předvolby sdílení dat",
     "introDescription": "Kilo odesílá vaše zprávy poskytovatelům AI, aby mohli vytvořit odpovědi. Zde zjistíte, co sdílíme a s kým.",
     "required": "Nezbytné pro používání Kilo",
     "promptsTitle": "Vaše zadání a konverzace",
@@ -3462,7 +3461,8 @@
     "featureFlagsWhy": "Určení, které funkce uvidíte, včetně těch, které teprve postupně zavádíme.",
     "featureFlagsWho": "PostHog, služba pro přepínače funkcí.",
     "helpImprove": "Pomozte vylepšit Kilo",
-    "helpImproveDescription": "Sdílejte anonymní údaje o používání aplikace a zdroji instalace. Tuto volbu můžete kdykoli změnit v nastavení.",
+    "helpImproveDescription": "Sdílejte anonymní údaje o používání aplikace a zdroji instalace. Tuto volbu můžete kdykoli změnit v sekci $t(common.profile) · $t(profile.privacyChoices).",
+    "helpImproveReviewDescription": "Sdílejte anonymní údaje o používání aplikace a zdroji instalace.",
     "seeFullDetails": "Zobrazit podrobnosti",
     "privacyPolicyPrefix": "Vaše data se zpracovávají podle",
     "privacyPolicy": "Zásad ochrany osobních údajů Kilo",

@@ -3321,7 +3321,6 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "ከመጀመራችን በፊት",
-    "summaryTitle": "የውሂብ ማጋራት ምርጫዎች",
     "introDescription": "Kilo ምላሾችን ለማመንጨት መልእክቶችዎን ለAI አቅራቢዎች ይልካል። የሚጋራው ውሂብ እና የሚቀበሉት ወገኖች ከታች ተዘርዝረዋል።",
     "required": "Kiloን ለመጠቀም አስፈላጊ",
     "promptsTitle": "ጥያቄዎችዎ እና ውይይቶችዎ",
@@ -3336,7 +3335,8 @@
     "featureFlagsWhy": "የትኞቹን ተግባሮች እንደሚያዩ ለመወሰን፣ አሁንም በመልቀቅ ላይ ያሉትንም ጨምሮ።",
     "featureFlagsWho": "PostHog፣ ተግባሮችን የሚያበራና የሚያጠፋ አገልግሎት።",
     "helpImprove": "Kiloን ለማሻሻል ይርዱ",
-    "helpImproveDescription": "ማንነትዎን የማይገልጽ የአጠቃቀም ትንታኔ ውሂብ እና መተግበሪያውን ያገኙበትን ምንጭ ያጋሩ። ይህን በማንኛውም ጊዜ በቅንብሮች ውስጥ መቀየር ይችላሉ።",
+    "helpImproveDescription": "ማንነትዎን የማይገልጽ የአጠቃቀም ትንታኔ ውሂብ እና መተግበሪያውን ያገኙበትን ምንጭ ያጋሩ። ይህን በማንኛውም ጊዜ በ$t(common.profile) · $t(profile.privacyChoices) ስር መቀየር ይችላሉ።",
+    "helpImproveReviewDescription": "ማንነትዎን የማይገልጽ የአጠቃቀም ትንታኔ ውሂብ እና መተግበሪያውን ያገኙበትን ምንጭ ያጋሩ።",
     "seeFullDetails": "ሙሉ ዝርዝሮችን ይመልከቱ",
     "privacyPolicyPrefix": "ውሂብዎን ለመያዝ የምንከተለው ፖሊሲ፦",
     "privacyPolicy": "የKilo የግላዊነት ፖሊሲ",

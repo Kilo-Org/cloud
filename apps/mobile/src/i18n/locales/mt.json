@@ -3510,7 +3510,6 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Qabel ma nibdew",
-    "summaryTitle": "Preferenzi tal-qsim tad-dejta",
     "introDescription": "Kilo jibgħat il-messaġġi tiegħek lill-fornituri tal-AI biex jiġġeneraw tweġibiet. Hawn tara x'naqsmu u ma' min.",
     "required": "Meħtieġ biex tuża Kilo",
     "promptsTitle": "L-istruzzjonijiet u l-konversazzjonijiet tiegħek",
@@ -3525,7 +3524,8 @@
     "featureFlagsWhy": "Biex jiġi deċiż liema funzjonijiet tara, inklużi dawk li għadna qed inniedu gradwalment.",
     "featureFlagsWho": "PostHog, is-servizz tal-bnadar tal-funzjonijiet.",
     "helpImprove": "Għin biex jitjieb Kilo",
-    "helpImproveDescription": "Aqsam dejta anonima għall-analiżi tal-prodott u s-sors tal-installazzjoni. Tista' tbiddel din l-għażla meta trid fis-settings.",
+    "helpImproveDescription": "Aqsam dejta anonima għall-analiżi tal-prodott u s-sors tal-installazzjoni. Tista' tbiddel din l-għażla meta trid taħt ir-ringiela $t(common.profile) · $t(profile.privacyChoices).",
+    "helpImproveReviewDescription": "Aqsam dejta anonima għall-analiżi tal-prodott u s-sors tal-installazzjoni.",
     "seeFullDetails": "Ara d-dettalji sħaħ",
     "privacyPolicyPrefix": "Id-dejta tiegħek tiġi mmaniġġjata skont il-",
     "privacyPolicy": "Politika tal-privatezza ta' Kilo",

@@ -2718,7 +2718,6 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Avant de commencer",
-    "summaryTitle": "Préférences de partage des données",
     "introDescription": "Kilo envoie vos messages à des fournisseurs d'IA pour générer des réponses. Voici ce qui est partagé et avec qui.",
     "required": "Requis pour utiliser Kilo",
     "promptsTitle": "Vos consignes et conversations",
@@ -2733,7 +2732,8 @@
     "featureFlagsWhy": "Déterminer les fonctionnalités que vous voyez, y compris celles que nous sommes encore en train de déployer.",
     "featureFlagsWho": "PostHog, le service de feature flags.",
     "helpImprove": "Aider à améliorer Kilo",
-    "helpImproveDescription": "Partager des données d'utilisation anonymes et l'origine de l'installation. Vous pouvez modifier ce choix à tout moment dans les réglages.",
+    "helpImproveDescription": "Partager des données d'utilisation anonymes et l'origine de l'installation. Vous pouvez modifier ce choix à tout moment sous la rubrique $t(common.profile) · $t(profile.privacyChoices).",
+    "helpImproveReviewDescription": "Partager des données d'utilisation anonymes et l'origine de l'installation.",
     "seeFullDetails": "Voir tous les détails",
     "privacyPolicyPrefix": "Vos données sont traitées conformément à la",
     "privacyPolicy": "Politique de confidentialité de Kilo",

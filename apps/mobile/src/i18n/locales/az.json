@@ -3321,7 +3321,6 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Başlamazdan əvvəl",
-    "summaryTitle": "Məlumat paylaşımı seçimləri",
     "introDescription": "Kilo cavab yaratmaq üçün mesajlarını AI təminatçılarına göndərir. Aşağıda hansı məlumatların kimlərlə paylaşıldığını görə bilərsən.",
     "required": "Kilo-dan istifadə üçün tələb olunanlar",
     "promptsTitle": "Sorğuların və söhbətlərin",
@@ -3336,7 +3335,8 @@
     "featureFlagsWhy": "Hansı funksiyaları görəcəyini müəyyən etmək üçün, o cümlədən hələ mərhələli təqdim etdiyimiz funksiyaları.",
     "featureFlagsWho": "PostHog, funksiya bayraqları xidməti.",
     "helpImprove": "Kilo-nu yaxşılaşdırmağa kömək et",
-    "helpImproveDescription": "Məhsulun istifadəsi haqqında anonim məlumatları və quraşdırma mənbəyini paylaş. Bunu istənilən vaxt parametrlərdə dəyişə bilərsən.",
+    "helpImproveDescription": "Məhsulun istifadəsi haqqında anonim məlumatları və quraşdırma mənbəyini paylaş. Bunu istənilən vaxt $t(common.profile) · $t(profile.privacyChoices) bölməsində dəyişə bilərsən.",
+    "helpImproveReviewDescription": "Məhsulun istifadəsi haqqında anonim məlumatları və quraşdırma mənbəyini paylaş.",
     "seeFullDetails": "Bütün təfərrüatlara bax",
     "privacyPolicyPrefix": "Məlumatlarının emalına tətbiq olunan qaydalar:",
     "privacyPolicy": "Kilo məxfilik siyasəti",

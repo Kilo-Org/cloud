@@ -3447,7 +3447,6 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Prieš pradedant",
-    "summaryTitle": "Duomenų bendrinimo nuostatos",
     "introDescription": "Kilo siunčia jūsų žinutes AI teikėjams, kad jie sugeneruotų atsakymus. Toliau nurodome, kokius duomenis perduodame ir kam.",
     "required": "Būtina norint naudotis Kilo",
     "promptsTitle": "Jūsų užklausos ir pokalbiai",
@@ -3462,7 +3461,8 @@
     "featureFlagsWhy": "Nuspręsti, kurias funkcijas matote, įskaitant tas, kurias dar diegiame palaipsniui.",
     "featureFlagsWho": "PostHog, funkcijų vėliavėlių paslauga.",
     "helpImprove": "Padėti tobulinti Kilo",
-    "helpImproveDescription": "Bendrinkite anoniminius naudojimo duomenis ir įdiegimo šaltinį. Šią parinktį bet kada galite pakeisti nustatymuose.",
+    "helpImproveDescription": "Bendrinkite anoniminius naudojimo duomenis ir įdiegimo šaltinį. Šią parinktį bet kada galite pakeisti profilio skirtuke, eilutėje „$t(common.profile) · $t(profile.privacyChoices)“.",
+    "helpImproveReviewDescription": "Bendrinkite anoniminius naudojimo duomenis ir įdiegimo šaltinį.",
     "seeFullDetails": "Peržiūrėti visą informaciją",
     "privacyPolicyPrefix": "Jūsų duomenys tvarkomi kaip aprašyta",
     "privacyPolicy": "Kilo privatumo politikoje",

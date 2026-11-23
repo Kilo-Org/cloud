@@ -3321,7 +3321,6 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Alohan'ny hanombohana",
-    "summaryTitle": "Safidy momba ny fizaràna angona",
     "introDescription": "Mandefa ny hafatrao any amin'ny mpamatsy AI ny Kilo mba hamoronana valiny. Ireto ny angona zaraina sy ny mpandray azy.",
     "required": "Ilaina amin'ny fampiasana Kilo",
     "promptsTitle": "Ny toromarikanao sy ny resakao",
@@ -3336,7 +3335,8 @@
     "featureFlagsWhy": "Mba hamaritana izay endri-javatra hitanao, anisan'izany ireo mbola avoakanay tsikelikely.",
     "featureFlagsWho": "PostHog, ilay tolotra fitantanana endri-javatra.",
     "helpImprove": "Ampio hanatsara ny Kilo",
-    "helpImproveDescription": "Zarao ny antontanisa fampiasana tsy ahafantarana anao sy ny loharanon'ny fametrahana. Azonao ovaina ao amin'ny Fikirana izany amin'ny fotoana rehetra.",
+    "helpImproveDescription": "Zarao ny antontanisa fampiasana tsy ahafantarana anao sy ny loharanon'ny fametrahana. Azonao ovaina amin'ny fotoana rehetra ao amin'ny andalana $t(common.profile) · $t(profile.privacyChoices).",
+    "helpImproveReviewDescription": "Zarao ny antontanisa fampiasana tsy ahafantarana anao sy ny loharanon'ny fametrahana.",
     "seeFullDetails": "Jereo ny antsipiriany feno",
     "privacyPolicyPrefix": "Ny angonao dia karakaraina araka ny",
     "privacyPolicy": "Politikan'ny Kilo momba ny fiainana manokana",

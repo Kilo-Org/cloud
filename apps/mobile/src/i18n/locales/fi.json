@@ -3321,7 +3321,6 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Ennen kuin aloitamme",
-    "summaryTitle": "Tietojen jakamisen asetukset",
     "introDescription": "Kilo lähettää viestisi AI-palveluntarjoajille vastausten tuottamista varten. Alla näet, mitä tietoja jaetaan ja kenelle.",
     "required": "Kilon käytön edellytykset",
     "promptsTitle": "Kehotteesi ja keskustelusi",
@@ -3336,7 +3335,8 @@
     "featureFlagsWhy": "Sen päättämiseen, mitä ominaisuuksia näet, mukaan lukien ominaisuudet, joita otamme vielä vaiheittain käyttöön.",
     "featureFlagsWho": "PostHog, ominaisuuslippupalvelu.",
     "helpImprove": "Auta parantamaan Kiloa",
-    "helpImproveDescription": "Jaa anonyymejä tietoja sovelluksen käytöstä ja asennuksen lähteestä. Voit muuttaa asetusta milloin tahansa asetuksissa.",
+    "helpImproveDescription": "Jaa anonyymejä tietoja sovelluksen käytöstä ja asennuksen lähteestä. Voit muuttaa asetusta milloin tahansa kohdassa $t(common.profile) · $t(profile.privacyChoices).",
+    "helpImproveReviewDescription": "Jaa anonyymejä tietoja sovelluksen käytöstä ja asennuksen lähteestä.",
     "seeFullDetails": "Näytä täydet tiedot",
     "privacyPolicyPrefix": "Tietojesi käsittelyä ohjaa",
     "privacyPolicy": "Kilon tietosuojakäytäntö",

@@ -3321,7 +3321,6 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Anvan nou kòmanse",
-    "summaryTitle": "Preferans pataje done",
     "introDescription": "Kilo voye mesaj ou yo bay founisè AI pou jenere repons. Men sa Kilo pataje ak moun ki resevwa li yo.",
     "required": "Obligatwa pou sèvi ak Kilo",
     "promptsTitle": "Enstriksyon ak konvèsasyon ou yo",
@@ -3336,7 +3335,8 @@
     "featureFlagsWhy": "Pou deside ki fonksyon ou wè, enkli fonksyon n ap lanse piti piti toujou.",
     "featureFlagsWho": "PostHog, sèvis drapo fonksyon yo.",
     "helpImprove": "Ede amelyore Kilo",
-    "helpImproveDescription": "Pataje done anonim sou itilizasyon aplikasyon an ak sous enstalasyon an. Ou ka chanje sa nenpòt lè nan Paramèt.",
+    "helpImproveDescription": "Pataje done anonim sou itilizasyon aplikasyon an ak sous enstalasyon an. Ou ka chanje sa nenpòt lè anba liy $t(common.profile) · $t(profile.privacyChoices).",
+    "helpImproveReviewDescription": "Pataje done anonim sou itilizasyon aplikasyon an ak sous enstalasyon an.",
     "seeFullDetails": "Gade tout detay yo",
     "privacyPolicyPrefix": "Yo jere done ou yo dapre",
     "privacyPolicy": "Politik konfidansyalite Kilo",

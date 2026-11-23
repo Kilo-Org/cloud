@@ -3447,7 +3447,6 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Preden začnemo",
-    "summaryTitle": "Nastavitve deljenja podatkov",
     "introDescription": "Kilo pošilja tvoja sporočila ponudnikom umetne inteligence, da ustvarijo odgovore. Spodaj je opisano, katere podatke delimo in s kom.",
     "required": "Obvezno za uporabo aplikacije Kilo",
     "promptsTitle": "Tvoji pozivi in pogovori",
@@ -3462,7 +3461,8 @@
     "featureFlagsWhy": "Za odločanje, katere funkcije vidiš, vključno s tistimi, ki jih še postopno uvajamo.",
     "featureFlagsWho": "PostHog, storitev za zastavice funkcij.",
     "helpImprove": "Pomagaj izboljšati Kilo",
-    "helpImproveDescription": "Deli anonimne podatke o uporabi aplikacije in viru namestitve. To lahko kadar koli spremeniš v nastavitvah.",
+    "helpImproveDescription": "Deli anonimne podatke o uporabi aplikacije in viru namestitve. To lahko kadar koli spremeniš pod $t(common.profile) · $t(profile.privacyChoices).",
+    "helpImproveReviewDescription": "Deli anonimne podatke o uporabi aplikacije in viru namestitve.",
     "seeFullDetails": "Prikaži vse podrobnosti",
     "privacyPolicyPrefix": "Tvoje podatke obdelujemo v skladu s",
     "privacyPolicy": "Politiko zasebnosti podjetja Kilo",

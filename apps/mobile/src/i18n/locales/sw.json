@@ -3321,7 +3321,6 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Kabla ya kuanza",
-    "summaryTitle": "Mapendeleo ya kushiriki data",
     "introDescription": "Kilo hutuma ujumbe wako kwa watoa huduma wa AI ili kutengeneza majibu. Hapa kuna maelezo ya data inayoshirikiwa na wanaoipokea.",
     "required": "Inahitajika ili utumie Kilo",
     "promptsTitle": "Maagizo na mazungumzo yako",
@@ -3336,7 +3335,8 @@
     "featureFlagsWhy": "Kuamua vipengele unavyoona, vikiwemo vile ambavyo bado tunavisambaza.",
     "featureFlagsWho": "PostHog, huduma ya kuwasha na kuzima vipengele.",
     "helpImprove": "Saidia kuboresha Kilo",
-    "helpImproveDescription": "Shiriki takwimu za matumizi zisizokutambulisha na chanzo cha usakinishaji. Unaweza kubadilisha hili wakati wowote kwenye mipangilio.",
+    "helpImproveDescription": "Shiriki takwimu za matumizi zisizokutambulisha na chanzo cha usakinishaji. Unaweza kubadilisha hili wakati wowote chini ya $t(common.profile) · $t(profile.privacyChoices).",
+    "helpImproveReviewDescription": "Shiriki takwimu za matumizi zisizokutambulisha na chanzo cha usakinishaji.",
     "seeFullDetails": "Tazama maelezo kamili",
     "privacyPolicyPrefix": "Data yako inashughulikiwa kwa mujibu wa",
     "privacyPolicy": "Sera ya faragha ya Kilo",

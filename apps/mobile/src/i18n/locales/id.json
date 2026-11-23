@@ -2726,7 +2726,6 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Sebelum kita mulai",
-    "summaryTitle": "Preferensi berbagi data",
     "introDescription": "Kilo mengirim pesanmu ke penyedia AI untuk menghasilkan respons. Berikut data yang dibagikan dan pihak yang menerimanya.",
     "required": "Wajib untuk menggunakan Kilo",
     "promptsTitle": "Instruksi dan percakapanmu",
@@ -2741,7 +2740,8 @@
     "featureFlagsWhy": "Untuk menentukan fitur mana yang kamu lihat, termasuk fitur yang masih kami luncurkan secara bertahap.",
     "featureFlagsWho": "PostHog, layanan feature flag.",
     "helpImprove": "Bantu tingkatkan Kilo",
-    "helpImproveDescription": "Bagikan data analitik produk anonim dan sumber pemasangan aplikasi. Kamu dapat mengubahnya kapan saja di Pengaturan.",
+    "helpImproveDescription": "Bagikan data analitik produk anonim dan sumber pemasangan aplikasi. Kamu dapat mengubahnya kapan saja di baris $t(common.profile) · $t(profile.privacyChoices).",
+    "helpImproveReviewDescription": "Bagikan data analitik produk anonim dan sumber pemasangan aplikasi.",
     "seeFullDetails": "Lihat detail lengkap",
     "privacyPolicyPrefix": "Datamu dikelola sesuai dengan",
     "privacyPolicy": "Kebijakan privasi Kilo",

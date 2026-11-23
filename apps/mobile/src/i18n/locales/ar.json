@@ -2907,7 +2907,6 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "قبل أن نبدأ",
-    "summaryTitle": "تفضيلات مشاركة البيانات",
     "introDescription": "يرسل Kilo رسائلك إلى مزودي نماذج الذكاء الاصطناعي لإنشاء الردود. إليك البيانات التي نشاركها والجهات التي تتلقاها.",
     "required": "مطلوب لاستخدام Kilo",
     "promptsTitle": "تعليماتك ومحادثاتك",
@@ -2922,7 +2921,8 @@
     "featureFlagsWhy": "لتحديد الميزات التي تظهر لك، بما فيها الميزات التي لا نزال نطرحها.",
     "featureFlagsWho": "PostHog، خدمة علامات الميزات.",
     "helpImprove": "المساعدة في تحسين Kilo",
-    "helpImproveDescription": "شارك بيانات تحليل استخدام المنتج دون الكشف عن هويتك، ومصدر تثبيت التطبيق. يمكنك تغيير هذا الخيار في أي وقت من الإعدادات.",
+    "helpImproveDescription": "شارك بيانات تحليل استخدام المنتج دون الكشف عن هويتك، ومصدر تثبيت التطبيق. يمكنك تغيير هذا الخيار في أي وقت ضمن $t(common.profile) · $t(profile.privacyChoices).",
+    "helpImproveReviewDescription": "شارك بيانات تحليل استخدام المنتج دون الكشف عن هويتك، ومصدر تثبيت التطبيق.",
     "seeFullDetails": "عرض التفاصيل الكاملة",
     "privacyPolicyPrefix": "نعالج بياناتك وفق",
     "privacyPolicy": "سياسة خصوصية Kilo",

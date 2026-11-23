@@ -5231,6 +5231,8 @@
       "autoCommit": "Įtraukti pakeitimus pasibaigus paleidimui",
       "condenseOnComplete": "Sutrumpinti kontekstą pasibaigus paleidimui",
       "activeTitle": "Trigeris aktyvus",
+      "activeSwitchA11y": "Aktyvus trigeris: {{name}}",
+      "copyLinkA11y": "Kopijuoti nuorodą: {{name}}",
       "activeDescription": "Pristabdyti žiniatinklio kabliukai atsako 404.",
       "runAsCreator": "Paleisti kaip mane",
       "runAsCreatorDescription": "Kiekvienas paleidimas naudoja jūsų paskyrą, todėl slaptoji antraštė yra privaloma.",

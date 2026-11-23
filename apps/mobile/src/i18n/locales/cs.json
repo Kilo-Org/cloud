@@ -5231,6 +5231,8 @@
       "autoCommit": "Zapsat změny po dokončení spuštění",
       "condenseOnComplete": "Zhuštit kontext po dokončení spuštění",
       "activeTitle": "Spouštěč aktivní",
+      "activeSwitchA11y": "Spouštěč aktivní: {{name}}",
+      "copyLinkA11y": "Kopírovat odkaz: {{name}}",
       "activeDescription": "Pozastavené webhooky odpovídají 404.",
       "runAsCreator": "Spouštět jako já",
       "runAsCreatorDescription": "Každé spuštění používá váš účet, takže je vyžadována tajná hlavička.",

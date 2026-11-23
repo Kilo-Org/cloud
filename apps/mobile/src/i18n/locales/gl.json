@@ -5043,6 +5043,8 @@
       "autoCommit": "Fai commit dos cambios cando remate a execución",
       "condenseOnComplete": "Condensa o contexto cando remate a execución",
       "activeTitle": "Disparador activo",
+      "activeSwitchA11y": "Disparador activo: {{name}}",
+      "copyLinkA11y": "Copiar a ligazón de {{name}}",
       "activeDescription": "Os webhooks en pausa responden cun 404.",
       "runAsCreator": "Executar como eu",
       "runAsCreatorDescription": "Cada execución usa a túa conta, polo que a cabeceira secreta é obrigatoria.",

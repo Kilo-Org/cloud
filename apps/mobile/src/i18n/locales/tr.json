@@ -5043,6 +5043,8 @@
       "autoCommit": "Çalıştırma bittiğinde değişiklikleri işle",
       "condenseOnComplete": "Çalıştırma bittiğinde bağlamı sıkıştır",
       "activeTitle": "Tetikleyici etkin",
+      "activeSwitchA11y": "Tetikleyici etkin: {{name}}",
+      "copyLinkA11y": "{{name}} için bağlantıyı kopyala",
       "activeDescription": "Duraklatılmış web kancaları 404 yanıtı verir.",
       "runAsCreator": "Benim adıma çalıştır",
       "runAsCreatorDescription": "Her çalıştırma hesabınızı kullanır, bu nedenle gizli başlık gerekir.",

@@ -5231,6 +5231,8 @@
       "autoCommit": "Consolidar alterações quando a execução terminar",
       "condenseOnComplete": "Condensar o contexto quando a execução terminar",
       "activeTitle": "Acionador ativo",
+      "activeSwitchA11y": "Acionador ativo: {{name}}",
+      "copyLinkA11y": "Copiar ligação para {{name}}",
       "activeDescription": "Os webhooks em pausa respondem com 404.",
       "runAsCreator": "Executar como eu",
       "runAsCreatorDescription": "Todas as execuções usam a sua conta, por isso o cabeçalho secreto é obrigatório.",

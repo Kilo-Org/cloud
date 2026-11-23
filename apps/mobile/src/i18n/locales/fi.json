@@ -5043,6 +5043,8 @@
       "autoCommit": "Vahvista muutokset, kun ajo päättyy",
       "condenseOnComplete": "Tiivistä konteksti, kun ajo päättyy",
       "activeTitle": "Liipaisin aktiivinen",
+      "activeSwitchA11y": "Liipaisin aktiivinen: {{name}}",
+      "copyLinkA11y": "Kopioi linkki: {{name}}",
       "activeDescription": "Keskeytetyt verkkokoukut vastaavat 404:llä.",
       "runAsCreator": "Suorita minuna",
       "runAsCreatorDescription": "Jokainen ajo käyttää tiliäsi, joten salainen otsake vaaditaan.",

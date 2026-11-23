@@ -5043,6 +5043,8 @@
       "autoCommit": "ሩጫው ሲጠናቀቅ ለውጦችን ያስመዝግቡ",
       "condenseOnComplete": "ሩጫው ሲጠናቀቅ ዐውዱን ያሳጥሩ",
       "activeTitle": "ቀስቅሴ ንቁ",
+      "activeSwitchA11y": "ቀስቅሴ ንቁ: {{name}}",
+      "copyLinkA11y": "የ{{name}} አገናኝ ቅዳ",
       "activeDescription": "የቆሙ ዌብሁኮች በ404 ምላሽ ይሰጣሉ።",
       "runAsCreator": "በእኔ ስም ያስኪዱ",
       "runAsCreatorDescription": "እያንዳንዱ ሩጫ የእርስዎን መለያ ይጠቀማል፣ ስለዚህ ምስጢራዊው ራስጌ ያስፈልጋል።",

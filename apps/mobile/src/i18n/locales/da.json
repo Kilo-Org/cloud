@@ -5043,6 +5043,8 @@
       "autoCommit": "Registrér ændringerne, når kørslen slutter",
       "condenseOnComplete": "Komprimér konteksten, når kørslen slutter",
       "activeTitle": "Udløser aktiv",
+      "activeSwitchA11y": "Udløser aktiv: {{name}}",
+      "copyLinkA11y": "Kopiér link til {{name}}",
       "activeDescription": "Pausede webhooks svarer med 404.",
       "runAsCreator": "Kør som mig",
       "runAsCreatorDescription": "Hver kørsel bruger din konto, så det hemmelige headerfelt er påkrævet.",

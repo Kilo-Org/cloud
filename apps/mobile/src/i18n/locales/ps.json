@@ -5043,6 +5043,8 @@
       "autoCommit": "کله چې چل پای ته ورسیږي، بدلونونه ثبت کړئ.",
       "condenseOnComplete": "کله چې چل پای ته ورسیږي، زمینه لنډه کړئ.",
       "activeTitle": "ټرېګر فعال",
+      "activeSwitchA11y": "ټرېګر فعال: {{name}}",
+      "copyLinkA11y": "د {{name}} لپاره لینک کاپي کړئ",
       "activeDescription": "ځنډول شوي ویب‌هوکونه د 404 سره ځواب ورکوي.",
       "runAsCreator": "زما په توګه چل کړه",
       "runAsCreatorDescription": "هره چلېدنه ستاسو حساب کاروي، نو پټ سرلیک اړین دی.",

@@ -5043,6 +5043,8 @@
       "autoCommit": "Hifadhi mabadiliko utekelezaji unapokamilika",
       "condenseOnComplete": "Fupisha muktadha utekelezaji unapokamilika",
       "activeTitle": "Kichocheo hai",
+      "activeSwitchA11y": "Kichocheo hai: {{name}}",
+      "copyLinkA11y": "Nakili kiungo cha {{name}}",
       "activeDescription": "Ndoano za wavuti zilizosimamishwa hujibu kwa 404.",
       "runAsCreator": "Tekeleza kama mimi",
       "runAsCreatorDescription": "Kila utekelezaji hutumia akaunti yako, kwa hiyo kichwa cha siri kinahitajika.",

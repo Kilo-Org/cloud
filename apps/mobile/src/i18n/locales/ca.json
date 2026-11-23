@@ -5137,6 +5137,8 @@
       "autoCommit": "Confirma els canvis quan acabi l'execució",
       "condenseOnComplete": "Condensa el context quan acabi l'execució",
       "activeTitle": "Disparador actiu",
+      "activeSwitchA11y": "Disparador actiu: {{name}}",
+      "copyLinkA11y": "Copia l'enllaç de {{name}}",
       "activeDescription": "Els ganxos web en pausa responen amb 404.",
       "runAsCreator": "Executa com a mi",
       "runAsCreatorDescription": "Cada execució utilitza el teu compte, així que la capçalera secreta és obligatòria.",

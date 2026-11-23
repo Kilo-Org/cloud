@@ -5137,6 +5137,8 @@
       "autoCommit": "Potvrdi promjene kad se pokretanje završi",
       "condenseOnComplete": "Sažmi kontekst kad se pokretanje završi",
       "activeTitle": "Okidač aktivan",
+      "activeSwitchA11y": "Okidač aktivan: {{name}}",
+      "copyLinkA11y": "Kopiraj poveznicu za {{name}}",
       "activeDescription": "Pauzirani webhookovi vraćaju 404.",
       "runAsCreator": "Pokreni kao ja",
       "runAsCreatorDescription": "Svako pokretanje upotrebljava vaš račun, pa je zaglavlje s tajnom obavezno.",

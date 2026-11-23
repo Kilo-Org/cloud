@@ -5231,6 +5231,8 @@
       "autoCommit": "Potrdi spremembe, ko se izvajanje konča",
       "condenseOnComplete": "Zgošči kontekst, ko se izvajanje konča",
       "activeTitle": "Sprožilec je aktiven",
+      "activeSwitchA11y": "Aktiven sprožilec: {{name}}",
+      "copyLinkA11y": "Kopiraj povezavo: {{name}}",
       "activeDescription": "Zaustavljeni spletni kavlji odgovorijo s 404.",
       "runAsCreator": "Izvajaj kot jaz",
       "runAsCreatorDescription": "Vsako izvajanje uporabi vaš račun, zato je skrivno zaglavje obvezno.",

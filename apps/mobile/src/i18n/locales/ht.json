@@ -5043,6 +5043,8 @@
       "autoCommit": "Komite chanjman yo lè egzekisyon an fini",
       "condenseOnComplete": "Kondanse kontèks la lè egzekisyon an fini",
       "activeTitle": "Deklanchè aktif",
+      "activeSwitchA11y": "Deklanchè aktif: {{name}}",
+      "copyLinkA11y": "Kopye lyen pou {{name}}",
       "activeDescription": "Wèbhuk an pòz reponn ak 404.",
       "runAsCreator": "Egzekite kòm mwen",
       "runAsCreatorDescription": "Chak egzekisyon sèvi ak kont ou, kidonk antèt sekrè a obligatwa.",

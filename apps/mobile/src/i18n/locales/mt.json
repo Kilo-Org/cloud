@@ -5325,6 +5325,8 @@
       "autoCommit": "Ikkommetti l-bidliet meta tintemm l-eżekuzzjoni",
       "condenseOnComplete": "Ikkondensa l-kuntest meta tintemm l-eżekuzzjoni",
       "activeTitle": "Skattatur attiv",
+      "activeSwitchA11y": "Skattatur attiv: {{name}}",
+      "copyLinkA11y": "Ikkopja l-ħolqa għal {{name}}",
       "activeDescription": "Il-webhooks ippawżati jwieġbu b'404.",
       "runAsCreator": "Eżegwi bħali",
       "runAsCreatorDescription": "Kull eżekuzzjoni tuża l-kont tiegħek, għalhekk l-intestatura sigrieta hija meħtieġa.",

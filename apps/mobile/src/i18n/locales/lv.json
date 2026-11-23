@@ -5137,6 +5137,8 @@
       "autoCommit": "Fiksēt izmaiņas, kad palaišana beidzas",
       "condenseOnComplete": "Saspiest kontekstu, kad palaišana beidzas",
       "activeTitle": "Trigeris aktīvs",
+      "activeSwitchA11y": "Trigeris aktīvs: {{name}}",
+      "copyLinkA11y": "Kopēt trigera saiti: {{name}}",
       "activeDescription": "Apturēti tīmekļa āķi atbild ar 404.",
       "runAsCreator": "Palaist manā vārdā",
       "runAsCreatorDescription": "Katra palaišana izmanto jūsu kontu, tāpēc noslēpuma galvene ir obligāta.",

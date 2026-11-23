@@ -5137,6 +5137,8 @@
       "autoCommit": "Esegui il commit delle modifiche al termine dell'esecuzione",
       "condenseOnComplete": "Condensa il contesto al termine dell'esecuzione",
       "activeTitle": "Attivatore attivo",
+      "activeSwitchA11y": "Attivatore attivo: {{name}}",
+      "copyLinkA11y": "Copia link per {{name}}",
       "activeDescription": "I webhook in pausa rispondono con 404.",
       "runAsCreator": "Esegui come me",
       "runAsCreatorDescription": "Ogni esecuzione usa il tuo account, quindi l'intestazione segreta è obbligatoria.",

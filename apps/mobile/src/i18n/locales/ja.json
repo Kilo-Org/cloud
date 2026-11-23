@@ -5043,6 +5043,8 @@
       "autoCommit": "実行完了時に変更をコミットする",
       "condenseOnComplete": "実行完了時にコンテキストを圧縮する",
       "activeTitle": "トリガー有効",
+      "activeSwitchA11y": "トリガー有効：{{name}}",
+      "copyLinkA11y": "{{name}}のリンクをコピー",
       "activeDescription": "一時停止中のウェブフックは404を返します。",
       "runAsCreator": "自分として実行",
       "runAsCreatorDescription": "すべての実行があなたのアカウントを使用するため、シークレットヘッダーが必要です。",

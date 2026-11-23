@@ -5043,6 +5043,8 @@
       "autoCommit": "Pleeg veranderinge wanneer die lopie klaar is",
       "condenseOnComplete": "Verdig die konteks wanneer die lopie klaar is",
       "activeTitle": "Sneller aktief",
+      "activeSwitchA11y": "Sneller aktief: {{name}}",
+      "copyLinkA11y": "Kopieer skakel vir {{name}}",
       "activeDescription": "Gepauzeerde webhake antwoord met 404.",
       "runAsCreator": "Loop as ek",
       "runAsCreatorDescription": "Elke lopie gebruik jou rekening, so die geheime-opskrif is nodig.",

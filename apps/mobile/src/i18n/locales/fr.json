@@ -5137,6 +5137,8 @@
       "autoCommit": "Valider les modifications à la fin de l’exécution",
       "condenseOnComplete": "Condenser le contexte à la fin de l’exécution",
       "activeTitle": "Déclencheur actif",
+      "activeSwitchA11y": "Déclencheur actif : {{name}}",
+      "copyLinkA11y": "Copier le lien pour {{name}}",
       "activeDescription": "Les webhooks en pause répondent par 404.",
       "runAsCreator": "Exécuter en tant que moi",
       "runAsCreatorDescription": "Chaque exécution utilise votre compte, l’en-tête secret est donc requis.",

@@ -5043,6 +5043,8 @@
       "autoCommit": "İcra bitdikdə dəyişiklikləri qeyd edin",
       "condenseOnComplete": "İcra bitdikdə konteksti yığcamlaşdırın",
       "activeTitle": "Tətikləyici aktivdir",
+      "activeSwitchA11y": "Aktiv tətikləyici: {{name}}",
+      "copyLinkA11y": "{{name}} üçün keçidi kopyala",
       "activeDescription": "Dayandırılmış vebhuklar 404 ilə cavab verir.",
       "runAsCreator": "Mənim hesabımla işlə",
       "runAsCreatorDescription": "Hər icra hesabınızdan istifadə edir, buna görə məxfi başlıq tələb olunur.",

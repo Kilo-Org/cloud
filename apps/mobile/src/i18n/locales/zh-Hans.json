@@ -5043,6 +5043,8 @@
       "autoCommit": "运行结束时提交更改",
       "condenseOnComplete": "运行结束时压缩上下文",
       "activeTitle": "触发器已启用",
+      "activeSwitchA11y": "触发器已启用：{{name}}",
+      "copyLinkA11y": "复制链接：{{name}}",
       "activeDescription": "暂停的 Webhook 会返回 404。",
       "runAsCreator": "以我的身份运行",
       "runAsCreatorDescription": "每次运行都会使用你的账号，因此必须填写密钥请求头。",

@@ -5043,6 +5043,8 @@
       "autoCommit": "Tabbatar da canje-canje idan gudanarwa ta ƙare",
       "condenseOnComplete": "Taƙaita mahallin idan gudanarwa ta ƙare",
       "activeTitle": "Mai jawowa yana aiki",
+      "activeSwitchA11y": "Mai jawowa mai aiki: {{name}}",
+      "copyLinkA11y": "Kwafa hanyar haɗi don {{name}}",
       "activeDescription": "Kiran yanar gizo da aka dakatar yana amsa da 404.",
       "runAsCreator": "Gudana a matsayina",
       "runAsCreatorDescription": "Kowace gudanarwa tana amfani da asusunka, don haka ana buƙatar kanun sirri.",

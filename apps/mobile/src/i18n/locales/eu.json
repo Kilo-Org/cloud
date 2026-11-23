@@ -5043,6 +5043,8 @@
       "autoCommit": "Erregistratu aldaketak exekuzioa amaitzean",
       "condenseOnComplete": "Laburtu testuingurua exekuzioa amaitzean",
       "activeTitle": "Abiarazlea aktibo",
+      "activeSwitchA11y": "Abiarazlea aktibo: {{name}}",
+      "copyLinkA11y": "Kopiatu esteka: {{name}}",
       "activeDescription": "Pausatutako webhookek 404 erantzuten dute.",
       "runAsCreator": "Exekutatu nire izenean",
       "runAsCreatorDescription": "Exekuzio bakoitzak zure kontua erabiltzen du, beraz, goiburu sekretua derrigorrezkoa da.",

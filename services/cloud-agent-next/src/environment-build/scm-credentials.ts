@@ -6,12 +6,16 @@ import {
 } from '@kilocode/cloud-agent-profile';
 import { isValidSandboxId } from '../sandbox-id.js';
 import { parseControlPlaneCredential } from '../sandbox-control/managed-credential.js';
-import { grantScmEntries, selectScmEntry } from '../sandbox-control/session-credential-members.js';
+import {
+  grantScmEntries,
+  resolveAdditionalMembers,
+  selectScmEntry,
+} from '../sandbox-control/session-credential-members.js';
 import {
   repositorySchema,
   scmSchema,
   refreshScmCapability,
-  type CredentialRepository,
+  type AdditionalScmRepository,
 } from '../sandbox-control/session-credentials.js';
 import { assertAwsScmRepositories } from '../scm-broker/aws-policy.js';
 import { hasManagedScmCapability, managedScmHosts } from '../scm-broker/targets.js';
@@ -73,7 +77,10 @@ export const buildScmGrantSchema = buildScmShape.superRefine((grant, ctx) => {
 });
 export type BuildScmGrant = z.infer<typeof buildScmGrantSchema>;
 
-function repositoryFor(member: EnvironmentReferenceRepository): CredentialRepository {
+/** A builder repository always has a contained SCM capability, so it is never plain git. */
+type BuildRepository = AdditionalScmRepository['repository'];
+
+function repositoryFor(member: EnvironmentReferenceRepository): BuildRepository {
   const identity = member.identity;
   switch (identity.platform) {
     case 'github':
@@ -115,23 +122,20 @@ export async function issueBuildScmGrant(input: {
   const repositories = input.members.map(repositoryFor);
   assertAwsScmRepositories(repositories);
   const outboundContainerId = `aws-environment-build:${input.owner.environmentId}:${input.owner.buildId}:${input.owner.allocationId}`;
-  const entries = [];
-  const aliases = new Map<string, string>();
-  for (const repository of repositories) {
-    let scm = await refreshScmCapability(
-      input.env,
-      input.owner,
-      repository,
-      outboundContainerId,
-      input.now
-    );
-    const alias = aliases.get(scm.purpose);
-    if (alias) scm = { ...scm, alias };
-    else if (scm.alias) aliases.set(scm.purpose, scm.alias);
-    entries.push({ repository, scm });
-  }
-  const [first, ...additionalRepositories] = entries;
-  if (!first) throw new Error('Missing build repository');
+  const issue = (repository: BuildRepository) =>
+    refreshScmCapability(input.env, input.owner, repository, outboundContainerId, input.now);
+  const [repository, ...additional] = repositories;
+  if (!repository) throw new Error('Missing build repository');
+  const scm = await issue(repository);
+  const additionalRepositories = await resolveAdditionalMembers({
+    members: additional.map((value, index) => ({
+      repoFullName: input.members[index + 1].repoFullName,
+      repository: value,
+    })),
+    launchScm: scm,
+    existing: undefined,
+    refresh: issue,
+  });
   const grant = buildScmGrantSchema.parse({
     ...input.owner,
     provider: 'aws',
@@ -139,7 +143,8 @@ export async function issueBuildScmGrant(input: {
     outboundContainerId,
     preparedAt: input.now,
     expiresAt: input.deadlineAt,
-    ...first,
+    repository,
+    scm,
     ...(additionalRepositories.length ? { additionalRepositories } : {}),
   });
   if (managedScmHosts(grant).length === 0) throw new Error('Build SCM host is unavailable');

@@ -66,6 +66,38 @@ describe('environment builder SCM issuance', () => {
     expect(grant.expiresAt).toBe(f.input.deadlineAt);
   });
 
+  it('issues the other repositories together after the launch repository', async () => {
+    const f = fixture();
+    f.input.members.push(member('acme/three'));
+    const issued = f.issue.getMockImplementation()!;
+    let inFlight = 0;
+    let peak = 0;
+    f.issue.mockImplementation(async () => {
+      inFlight++;
+      peak = Math.max(peak, inFlight);
+      await new Promise(resolve => setTimeout(resolve, 5));
+      inFlight--;
+      return issued();
+    });
+    const grant = await issueBuildScmGrant(f.input);
+    expect(f.issue).toHaveBeenCalledTimes(3);
+    expect(peak).toBe(2);
+    expect(grant.repository).toMatchObject({ repo: 'acme/one' });
+    expect(grant.additionalRepositories?.map(entry => entry.repository)).toMatchObject([
+      { repo: 'acme/two' },
+      { repo: 'acme/three' },
+    ]);
+  });
+
+  it('fails the whole grant when one repository cannot be issued', async () => {
+    const f = fixture();
+    f.issue.mockImplementationOnce(f.issue.getMockImplementation()!);
+    f.issue.mockRejectedValueOnce(new Error('synthetic issuance failure'));
+    await expect(issueBuildScmGrant(f.input)).rejects.toThrow(
+      'Environment repository credential is unavailable'
+    );
+  });
+
   it('renews the selected member and preserves every alias', async () => {
     const f = fixture();
     const grant = await issueBuildScmGrant(f.input);

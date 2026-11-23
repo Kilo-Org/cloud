@@ -15,6 +15,7 @@ import { View } from 'react-native';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Play, Trash2 } from '@/components/ui/icons';
+import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import {
@@ -183,12 +184,9 @@ export function TriggerEditPanel({
           </View>
         }
       />
-      <View className="gap-2">
-        <Text className="text-sm font-medium text-foreground">
-          {t('cloudAgent.triggers.deliveries')}
-        </Text>
+      <Section label={t('cloudAgent.triggers.deliveries')}>
         <TriggerDeliveries triggerId={detail.triggerId} organizationId={organizationId} />
-      </View>
+      </Section>
       {dialog}
     </View>
   );

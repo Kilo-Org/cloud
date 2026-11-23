@@ -226,4 +226,16 @@ describe('shipped push catalogs', () => {
       'every shipped catalog must render every push key with its placeholders filled'
     ).toEqual([]);
   });
+
+  it('keeps the English product name in every shipped catalog', () => {
+    const catalogs = readShippedCatalogs();
+    const productName = ownEntry(en, 'generic.title');
+    expect(typeof productName).toBe('string');
+    const drifted = Object.keys(catalogs)
+      .filter(locale => ownEntry(catalogs[locale], 'generic.title') !== productName)
+      .map(locale => `${locale}: ${String(ownEntry(catalogs[locale], 'generic.title'))}`);
+    // The push title is the product name, not translatable copy: one locale
+    // that renames it renames the product in the OS notification shade.
+    expect(drifted).toEqual([]);
+  });
 });

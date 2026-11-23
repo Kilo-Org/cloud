@@ -414,8 +414,7 @@ describe('Claude billing callback', () => {
     expect(response.headers.get('location')).toContain('claude_billing=failed');
     await expect(getGrantedClaudeBillingConnection(personal)).resolves.toBeNull();
     await expect(getGrantedClaudeBillingConnection(organizationOwner)).resolves.toMatchObject({
-      id: payer.id,
-      status: 'connected',
+      connection: { id: payer.id, status: 'connected' },
     });
   });
 
@@ -454,22 +453,25 @@ describe('Claude billing callback', () => {
     const declined = await callback(`state=${savedPending.state}&error=access_denied`);
     expect(declined.headers.get('location')).toContain('claude_billing=declined');
     await expect(getGrantedClaudeBillingConnection(personal)).resolves.toMatchObject({
-      status: 'pending',
-      connection_id: null,
+      connection: { status: 'pending', connection_id: null },
     });
 
     jest.mocked(consumeClaudeBillingPending).mockResolvedValueOnce(savedPending);
     const approved = await callback(`state=${savedPending.state}&code=one-use-code`);
     expect(approved.headers.get('location')).toContain('claude_billing=connected');
     await expect(getGrantedClaudeBillingConnection(personal)).resolves.toMatchObject({
-      user_profile_id: savedPending.userProfileId,
-      status: 'connected',
-      connection_id: 'ocon_new',
+      connection: {
+        user_profile_id: savedPending.userProfileId,
+        status: 'connected',
+        connection_id: 'ocon_new',
+      },
     });
     await expect(getGrantedClaudeBillingConnection(organizationOwner)).resolves.toMatchObject({
-      id: payer.id,
-      user_profile_id: payer.user_profile_id,
-      status: 'connected',
+      connection: {
+        id: payer.id,
+        user_profile_id: payer.user_profile_id,
+        status: 'connected',
+      },
     });
   });
 

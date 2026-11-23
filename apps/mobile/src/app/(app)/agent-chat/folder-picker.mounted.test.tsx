@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the body suite's states and the launch-relative reopen case share one react-native, FlashList and React Query harness */
 import { createElement, Fragment, type ReactNode } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { act, TestRenderer } from '@/test/renderer';
@@ -316,6 +317,61 @@ describe('FolderPickerScreen body', () => {
       renderer.unmount();
     });
     bridgeGone.gone = false;
+  });
+
+  it('confirms a launch-relative folder and lists it unchanged when reopened at it', async () => {
+    // The CLI answers every `path` relative to the launch directory (`""` for
+    // the launch itself), and the confirmed value is stored and reopened as-is.
+    // A reopen at a confirmed child therefore lists that relative path — one
+    // frame, no parent invented from a leading separator — and Done reports the
+    // same string again.
+    bridge.currentPath = '';
+    listFn.mockResolvedValueOnce({
+      ok: true,
+      path: '',
+      directories: [{ name: 'apps', path: 'apps' }],
+    });
+    listFn.mockResolvedValueOnce({ ok: true, path: 'apps', directories: [] });
+    const renderer = await mount();
+    const folder = findByType(renderer.root, 'Pressable')[0];
+    if (!folder) {
+      throw new Error('The launch folder did not mount');
+    }
+    await act(() => {
+      (folder.props.onPress as () => void)();
+    });
+    await settle();
+    const header = findByType(renderer.root, 'SheetHeader')[0];
+    if (!header) {
+      throw new Error('The picker header did not mount');
+    }
+    act(() => {
+      (header.props.onDone as () => void)();
+    });
+    expect(bridge.onSelect).toHaveBeenLastCalledWith('apps');
+    act(() => {
+      renderer.unmount();
+    });
+
+    bridge.currentPath = 'apps';
+    listFn.mockClear();
+    listFn.mockResolvedValueOnce({ ok: true, path: 'apps', directories: [] });
+    const reopened = await mount();
+    expect(listFn.mock.calls.map(call => call[2])).toEqual(['apps']);
+    const reopenedHeader = findByType(reopened.root, 'SheetHeader')[0];
+    if (!reopenedHeader) {
+      throw new Error('The reopened picker header did not mount');
+    }
+    act(() => {
+      (reopenedHeader.props.onDone as () => void)();
+    });
+    expect(bridge.onSelect).toHaveBeenLastCalledWith('apps');
+    act(() => {
+      reopened.unmount();
+    });
+
+    // The suite shares one bridge object, so later cases start at the launch.
+    bridge.currentPath = '';
   });
 });
 // Hardware Back behavior lives in folder-picker.back.mounted.test.tsx.

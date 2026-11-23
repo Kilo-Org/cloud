@@ -67,8 +67,7 @@ export function catalogEntryNames(dir, excludedKind) {
  * The tag's path must name a regular file, following symlinks: a directory
  * named like a catalog is not a catalog, and reading it as one would end the
  * audit in a stack trace, while a symlink to a real catalog audits like the
- * file it names. An entry stat cannot follow is kept as a tag anyway,
- * deliberately: the audit's own later read of that path reports the problem.
+ * file it names.
  */
 export function catalogTags(dir) {
   return catalogEntryNames(dir, 'other');

@@ -59,8 +59,11 @@ export async function ensureClaudeBillingProfile(
       sql`select pg_advisory_xact_lock(hashtext(${`claude_billing_profile:${lockKey}`}))`
     );
     const active = await getGrantedClaudeBillingConnection(owner, tx);
-    if (active && active.status !== ClaudeBillingConnectionStatus.Removed) {
-      return { userProfileId: active.user_profile_id, connectionVersion: active.updated_at };
+    if (active && active.connection.status !== ClaudeBillingConnectionStatus.Removed) {
+      return {
+        userProfileId: active.connection.user_profile_id,
+        connectionVersion: active.connection.updated_at,
+      };
     }
 
     const userProfileId = await createClaudeUserProfile();

@@ -8,7 +8,16 @@ import { z } from 'zod';
 import { createSecureStorePreference } from '@/lib/hooks/secure-store-preference';
 import { CHAT_BACKENDS_KEY } from '@/lib/storage-keys';
 
-import { BackendUrlError, hasControlCharacters, normalizeBackendUrl } from './backend-url';
+import {
+  backendHeadersSchema,
+  type BackendInputProblem,
+  draftSchema,
+  inputProblem,
+  storedDraftSchema,
+} from './backend-schema';
+import { BackendUrlError, normalizeBackendUrl } from './backend-url';
+
+export type { BackendInputProblem } from './backend-schema';
 
 export type BackendModel = {
   id: string;
@@ -34,17 +43,10 @@ export type StoredChatBackend = {
   allowLocalHttp: boolean;
 };
 export type ChatBackendDraft = Omit<StoredChatBackend, 'id' | 'revision'>;
-export type BackendInputProblem =
-  | 'invalidInput'
-  | 'invalidUrl'
-  | 'publicHttp'
-  | 'httpApprovalRequired'
-  | 'httpReleaseUnavailable'
-  | 'staleBackend'
-  | 'notLoaded';
-
 export const BACKEND_INPUT_ERROR_KEYS = {
   invalidInput: 'modelChat.backends.invalidInput',
+  invalidApiKey: 'modelChat.backends.invalidApiKey',
+  invalidHeaders: 'modelChat.backends.invalidHeaders',
   invalidUrl: 'modelChat.backends.invalidUrl',
   publicHttp: 'modelChat.backends.publicHttp',
   httpApprovalRequired: 'modelChat.backends.httpApprovalRequired',
@@ -98,82 +100,30 @@ export class BackendRequestError extends Error {
   }
 }
 
-const backendModelSchema = z
-  .object({
-    id: z
-      .string()
-      .trim()
-      .min(1)
-      .refine(value => !hasControlCharacters(value)),
-    name: z.string().trim().min(1),
-    contextWindow: z.number().int().positive().optional(),
-    maxOutputTokens: z.number().int().positive().optional(),
-    tools: z.boolean(),
-    // A profile stored before the flag existed reads as text-only.
-    images: z.boolean().default(false),
-    // A profile stored before the flag existed sends no effort.
-    reasoning: z.boolean().default(false),
-  })
-  .strip();
+/** The wrapper object puts the field name on every issue path, so one rule names the failure. */
+const headersInputSchema = z.object({ headers: backendHeadersSchema });
 
-const backendHeadersSchema = z.record(z.string(), z.string()).superRefine((headers, ctx) => {
-  const names = new Set<string>();
-  for (const [name, value] of Object.entries(headers)) {
-    const lower = name.toLowerCase();
-    if (
-      !/^[!#$%&'*+.^_`|~\da-z-]+$/i.test(name) ||
-      !/^[\u0020-\u007E\u0080-\u00FF]*$/.test(value) ||
-      lower.startsWith('x-kilo') ||
-      [
-        'host',
-        'content-length',
-        'content-type',
-        'connection',
-        'transfer-encoding',
-        'proxy-authorization',
-        '__proto__',
-        'constructor',
-        'prototype',
-      ].includes(lower) ||
-      names.has(lower)
-    ) {
-      ctx.addIssue({ code: 'custom', message: 'Invalid headers' });
-    }
-    names.add(lower);
-  }
-});
-
-export function parseChatBackendHeaders(input: string): ChatBackendDraft['headers'] {
+/** Unparseable JSON is not a header failure: it names no field at all. */
+function parseHeaderInput(input: string) {
   try {
-    const parsed: unknown = JSON.parse(input.trim() || '{}');
-    return backendHeadersSchema.parse(parsed);
+    return headersInputSchema.safeParse({ headers: JSON.parse(input.trim() || '{}') });
   } catch {
     throw new BackendInputError('invalidInput');
   }
 }
 
-const draftSchema = z
-  .object({
-    name: z.string().trim().min(1),
-    baseUrl: z.string(),
-    apiKind: z.enum(['chat_completions', 'responses', 'messages']),
-    completionTokenField: z
-      .enum(['max_completion_tokens', 'max_tokens'])
-      .default('max_completion_tokens'),
-    apiKey: z.string().refine(value => /^[\u0020-\u007E\u0080-\u00FF]*$/.test(value)),
-    headers: backendHeadersSchema,
-    models: z
-      .array(backendModelSchema)
-      .min(1)
-      .refine(models => new Set(models.map(model => model.id)).size === models.length),
-    allowLocalHttp: z.boolean(),
-  })
-  .strip();
+export function parseChatBackendHeaders(input: string): ChatBackendDraft['headers'] {
+  const parsed = parseHeaderInput(input);
+  if (!parsed.success) {
+    throw new BackendInputError(inputProblem(parsed.error));
+  }
+  return parsed.data.headers;
+}
 
 export function validateChatBackendDraft(input: unknown): ChatBackendDraft {
   const parsed = draftSchema.safeParse(input);
   if (!parsed.success) {
-    throw new BackendInputError('invalidInput');
+    throw new BackendInputError(inputProblem(parsed.error));
   }
   try {
     return {
@@ -193,7 +143,7 @@ export type BackendConnection = Pick<
 export function validateBackendConnection(input: unknown): BackendConnection {
   const parsed = draftSchema.omit({ name: true, models: true }).safeParse(input);
   if (!parsed.success) {
-    throw new BackendInputError('invalidInput');
+    throw new BackendInputError(inputProblem(parsed.error));
   }
   try {
     return {
@@ -217,6 +167,22 @@ function freezeBackend(backend: StoredChatBackend): StoredChatBackend {
   return Object.freeze(backend);
 }
 
+/** One stored profile read leniently; a structurally wrong one drops alone, never the list. */
+function readStoredBackend(item: unknown): StoredChatBackend | null {
+  const identity = storedIdentitySchema.safeParse(item);
+  const parsed = storedDraftSchema.safeParse(item);
+  if (!identity.success || !parsed.success) {
+    return null;
+  }
+  try {
+    const baseUrl = normalizeBackendUrl(parsed.data.baseUrl, parsed.data.allowLocalHttp);
+    return freezeBackend({ ...parsed.data, baseUrl, ...identity.data });
+  } catch {
+    // Drop only the invalid profile, without reporting secret-bearing data.
+    return null;
+  }
+}
+
 export function parseChatBackends(raw: string | null): StoredChatBackend[] {
   if (raw === null) {
     return [];
@@ -229,15 +195,10 @@ export function parseChatBackends(raw: string | null): StoredChatBackend[] {
     const profiles: StoredChatBackend[] = [];
     const ids = new Set<string>();
     for (const item of data) {
-      const identity = storedIdentitySchema.safeParse(item);
-      if (identity.success && !ids.has(identity.data.id)) {
-        try {
-          const draft = validateChatBackendDraft(item);
-          profiles.push(freezeBackend({ ...draft, ...identity.data }));
-          ids.add(identity.data.id);
-        } catch {
-          // Drop only the invalid profile, without reporting secret-bearing data.
-        }
+      const backend = readStoredBackend(item);
+      if (backend !== null && !ids.has(backend.id)) {
+        ids.add(backend.id);
+        profiles.push(backend);
       }
     }
     Object.freeze(profiles);

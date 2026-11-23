@@ -73,10 +73,16 @@ function directoryListing(path: string) {
     default:
       throw new Error('invalid list_directories path');
   }
+  // The real CLI answers with paths relative to its launch directory, not
+  // absolute ones: the launch directory itself is `''` and every entry is
+  // relative to it, so the app can split the reply into navigation frames.
   return listDirectoriesV1Schema.parse({
     protocolVersion: 1,
-    path: resolved,
-    directories: children.map(name => ({ name, path: posix.join(resolved, name) })),
+    path: posix.relative(LAUNCH_DIRECTORY, resolved),
+    directories: children.map(name => ({
+      name,
+      path: posix.relative(LAUNCH_DIRECTORY, posix.join(resolved, name)),
+    })),
   });
 }
 

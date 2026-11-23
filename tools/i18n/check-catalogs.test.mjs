@@ -1756,6 +1756,179 @@ test('leaves another locale’s ASCII sentence terminator alone', () => {
   assert.deepEqual(found, []);
 });
 
+const URDU_TERMINATORS_ENGLISH = {
+  common: { sentenceJoiner: '. ', listJoiner: ', ' },
+  work: {
+    empty: 'Nothing to do.',
+    waiting: 'Waiting...',
+    retry: 'Try again',
+    host: 'Open kilo.ai',
+    note: 'Contact support',
+    file: 'Read this file',
+  },
+};
+const URDU_TERMINATORS_SOURCE =
+  "t('common.sentenceJoiner');\nt('common.listJoiner');\nt('work.empty');\nt('work.waiting');\nt('work.retry');\nt('work.host');\nt('work.note');\nt('work.file');";
+const URDU_TERMINATOR_WORK = {
+  empty: 'کوئی کام نہیں۔',
+  waiting: 'انتظار...',
+  retry: 'دوبارہ کوشش کریں',
+  host: 'kilo.ai کھولیں۔',
+  note: 'رپورٹنگ Sentry.',
+  file: 'فائل.png کھولیں۔',
+};
+
+/** The Urdu catalog fixture: it declares the Urdu full stop as its joiner. */
+function urduTerminators(work = URDU_TERMINATOR_WORK) {
+  return { common: { sentenceJoiner: '۔ ', listJoiner: '، ' }, work };
+}
+
+test('accepts Urdu copy that closes its sentences with «۔»', () => {
+  const found = run({
+    language: 'ur',
+    english: URDU_TERMINATORS_ENGLISH,
+    translated: urduTerminators(),
+    source: URDU_TERMINATORS_SOURCE,
+  });
+  assert.deepEqual(found, []);
+});
+
+test('rejects Urdu copy with a terminal ASCII period', () => {
+  const found = run({
+    language: 'ur',
+    english: URDU_TERMINATORS_ENGLISH,
+    translated: urduTerminators({ ...URDU_TERMINATOR_WORK, empty: 'کوئی کام نہیں.' }),
+    source: URDU_TERMINATORS_SOURCE,
+  });
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(
+    found.join('\n'),
+    /mobile\/ur: "work\.empty" ends a sentence with the ASCII "\."; Urdu writes «۔»/
+  );
+});
+
+test('rejects Urdu copy with a period that joins two sentences', () => {
+  const found = run({
+    language: 'ur',
+    english: URDU_TERMINATORS_ENGLISH,
+    translated: urduTerminators({
+      ...URDU_TERMINATOR_WORK,
+      empty: 'پہلے یہ کریں. پھر دوبارہ کوشش کریں',
+    }),
+    source: URDU_TERMINATORS_SOURCE,
+  });
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(
+    found.join('\n'),
+    /mobile\/ur: "work\.empty" joins two sentences with the ASCII "\."; Urdu writes «۔»/
+  );
+});
+
+const URDU_JOIN_ENGLISH = {
+  common: { sentenceJoiner: '. ', listJoiner: ', ' },
+  goal: {
+    sectionAccessibility: '{{status}}. Goal: {{text}}',
+    note: 'Kilo (kilo.ai).',
+    closing: 'Reporting',
+  },
+};
+const URDU_JOIN_SOURCE =
+  "t('common.sentenceJoiner');\nt('common.listJoiner');\nt('goal.sectionAccessibility');\nt('goal.note');\nt('goal.closing');";
+
+/** The Urdu pair for the joining-period cases: a placeholder and a bracket. */
+function urduJoins(goal) {
+  return {
+    common: { sentenceJoiner: '۔ ', listJoiner: '، ' },
+    goal: {
+      sectionAccessibility: '{{status}}۔ ہدف: {{text}}',
+      note: 'دیکھیں Kilo (kilo.ai).',
+      closing: 'رپورٹنگ',
+      ...goal,
+    },
+  };
+}
+
+test('rejects Urdu copy whose period joins a sentence after a placeholder', () => {
+  // The dot follows `{{status}}` rather than an Urdu letter, but a word after
+  // it still means a second sentence starts there.
+  const found = run({
+    language: 'ur',
+    english: URDU_JOIN_ENGLISH,
+    translated: urduJoins({ sectionAccessibility: '{{status}}. ہدف: {{text}}' }),
+    source: URDU_JOIN_SOURCE,
+  });
+  assert.equal(found.length, 1, found.join('\n'));
+  assert.match(
+    found.join('\n'),
+    /mobile\/ur: "goal\.sectionAccessibility" joins two sentences with the ASCII "\."; Urdu writes «۔»/
+  );
+});
+
+test('accepts the same sentence joined by «۔» after a placeholder', () => {
+  const found = run({
+    language: 'ur',
+    english: URDU_JOIN_ENGLISH,
+    translated: urduJoins(),
+    source: URDU_JOIN_SOURCE,
+  });
+  assert.deepEqual(found, []);
+});
+
+test('leaves a value-final period after a closing bracket alone, and a host keeps its dots', () => {
+  // `Kilo (kilo.ai).` ends on a bracket rather than on an Urdu word, so its
+  // period closes no Urdu sentence and `kilo.ai` carries its own dots, while a
+  // value-final period after an Urdu word is still the same defect.
+  const clean = run({
+    language: 'ur',
+    english: URDU_JOIN_ENGLISH,
+    translated: urduJoins({ note: 'دیکھیں Kilo (kilo.ai).' }),
+    source: URDU_JOIN_SOURCE,
+  });
+  assert.deepEqual(clean, []);
+  const reported = run({
+    language: 'ur',
+    english: URDU_JOIN_ENGLISH,
+    translated: urduJoins({ closing: 'رپورٹنگ.' }),
+    source: URDU_JOIN_SOURCE,
+  });
+  assert.equal(reported.length, 1, reported.join('\n'));
+  assert.match(
+    reported.join('\n'),
+    /mobile\/ur: "goal\.closing" ends a sentence with the ASCII "\."; Urdu writes «۔»/
+  );
+});
+
+test('leaves an Urdu URL, product name and ellipsis alone', () => {
+  const found = run({
+    language: 'ur',
+    english: URDU_TERMINATORS_ENGLISH,
+    translated: urduTerminators({
+      ...URDU_TERMINATOR_WORK,
+      // A host and a file name continue after their dot, and a product name
+      // ends on a Latin letter rather than on an Urdu word.
+      host: 'یہ لنک کھولیں: kilo.ai',
+      note: 'رپورٹنگ Sentry.',
+      file: 'فائل.png',
+      waiting: 'انتظار...',
+    }),
+    source: URDU_TERMINATORS_SOURCE,
+  });
+  assert.deepEqual(found, []);
+});
+
+test('holds only the catalog that declares «۔» as its sentence joiner', () => {
+  const found = run({
+    language: 'ar',
+    english: URDU_TERMINATORS_ENGLISH,
+    translated: {
+      common: { sentenceJoiner: '.', listJoiner: '، ' },
+      work: { ...URDU_TERMINATOR_WORK, empty: 'لا يوجد شيء للقيام به.' },
+    },
+    source: URDU_TERMINATORS_SOURCE,
+  });
+  assert.deepEqual(found, []);
+});
+
 test('rejects a notification catalog the push locale registry omits', () => {
   const found = run({
     extraFiles: {
@@ -3132,6 +3305,39 @@ test('rejects an added plural form that quotes the English label', () => {
     found.join('\n'),
     /^mobile\/ru: "agents\.window_few" quotes the English label "Agents"; name its key with \$t\(\)$/m
   );
+});
+
+// English exempts nothing: a label it spells is a label it can name, so its own
+// catalog cannot quote another of its labels either.
+test('rejects an English label that quotes another English label', () => {
+  const found = run({
+    english: {
+      agents: { title: 'Agents', mention: 'Ask the "Agents" list' },
+    },
+    translated: {
+      agents: { title: 'Агенты', mention: 'Спросите у списка' },
+    },
+    source: "t('agents.title');\nt('agents.mention');",
+  });
+  assert.deepEqual(found, [
+    'mobile/en: "agents.mention" quotes the label "Agents"; name its key with $t()',
+  ]);
+});
+
+// A product name the locale keeps in its own catalog sits in a value barely
+// longer than the name, so a translated sentence that quotes it names no
+// control the user misses.
+test('accepts a locale that quotes a product name its own catalog keeps', () => {
+  const found = run({
+    english: {
+      agents: { brand: 'Kilo', hint: 'Open the Kilo console' },
+    },
+    translated: {
+      agents: { brand: 'Kilo Pass', hint: 'Откройте "Kilo" здесь' },
+    },
+    source: "t('agents.brand');\nt('agents.hint');",
+  });
+  assert.deepEqual(found, []);
 });
 
 // A zero category words its own answer — "none" beside a noun reads badly — so

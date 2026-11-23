@@ -17,8 +17,10 @@ function referenceDelta(
   entry: NativeSnapshotMessage,
   kind: 'text' | 'reasoning',
   ordinal: number,
-  delta: string
-): NativeSnapshotMessage | undefined {
+  delta: string,
+  created: number,
+  native: unknown
+): NativeSnapshotMessage {
   const content = [...(entry.message.content ?? [])];
   let index: number | undefined;
   let seen = 0;
@@ -28,8 +30,17 @@ function referenceDelta(
       break;
     }
   }
-  const previous = index === undefined ? undefined : content[index];
-  if (index === undefined || !previous) return undefined;
+  if (index === undefined) {
+    if (ordinal !== seen) return { ...entry, incomplete: true };
+    index = content.length;
+    content.push({
+      type: kind,
+      text: '',
+      ...(kind === 'reasoning' ? { time: { created }, native } : {}),
+    });
+  }
+  const previous = content[index];
+  if (!previous) return entry;
   content[index] = contentPartSchema.parse({ ...previous, text: `${previous.text ?? ''}${delta}` });
   const validated = messageSchema.parse({ ...entry.message, content });
   validated.content = content;
@@ -122,20 +133,22 @@ test('every delta entry equals the validated reference over a randomized text, r
     let expected: NativeSnapshotMessage | undefined;
     if (roll < 0.55) {
       const delta = chunks[Math.floor(next() * chunks.length)] ?? 'x';
+      const created = seq++;
       event = frame(
         'session.text.delta',
         { assistantMessageID: 'msg_answer', ordinal: 0, delta },
-        seq++
+        created
       );
-      expected = referenceDelta(previous, 'text', 0, delta);
+      expected = referenceDelta(previous, 'text', 0, delta, created, undefined);
     } else if (roll < 0.8) {
       const delta = chunks[Math.floor(next() * chunks.length)] ?? 'y';
+      const created = seq++;
       event = frame(
         'session.reasoning.delta',
         { assistantMessageID: 'msg_answer', ordinal: 0, delta },
-        seq++
+        created
       );
-      expected = referenceDelta(previous, 'reasoning', 0, delta);
+      expected = referenceDelta(previous, 'reasoning', 0, delta, created, undefined);
     } else if (roll < 0.9) {
       const delta = chunks[Math.floor(next() * chunks.length)] ?? 'z';
       event = frame(
@@ -177,14 +190,120 @@ test('a long accumulated part keeps the delta entry equal to the reference', () 
     long += delta;
     const previous = messages[1];
     if (!previous) throw new Error('Missing projected answer');
+    const created = seq++;
     const projection = projectNativeEvent(
       messages,
-      frame('session.text.delta', { assistantMessageID: 'msg_answer', ordinal: 0, delta }, seq++)
+      frame('session.text.delta', { assistantMessageID: 'msg_answer', ordinal: 0, delta }, created)
     );
-    expect(projection.changed?.[0]).toEqual(referenceDelta(previous, 'text', 0, delta));
+    expect(projection.changed?.[0]).toEqual(
+      referenceDelta(previous, 'text', 0, delta, created, undefined)
+    );
     messages = projection.messages;
   }
   expect(messages[1]?.message.content).toEqual([{ type: 'text', text: long }]);
+});
+
+test('a text delta at the replay frontier creates the first part the reference builds', () => {
+  const messages = startAnswer([other], 1);
+  const previous = messages[1];
+  if (!previous) throw new Error('Missing projected answer');
+  expect(previous.message.content).toEqual([]);
+  const projection = projectNativeEvent(
+    messages,
+    frame('session.text.delta', { assistantMessageID: 'msg_answer', ordinal: 0, delta: 'first' }, 2)
+  );
+  expect(projection.changed).toHaveLength(1);
+  expect(projection.changed?.[0]).toEqual(
+    referenceDelta(previous, 'text', 0, 'first', 2, undefined)
+  );
+  expect(projection.changed?.[0]?.message.content).toEqual([{ type: 'text', text: 'first' }]);
+  expect(projection.messages[1]).toBe(projection.changed?.[0]);
+  expect(projection.messages[0]).toBe(other);
+});
+
+test('a reasoning delta at the replay frontier creates the part with the frame time and native', () => {
+  const messages = startAnswer([other], 1);
+  const previous = messages[1];
+  if (!previous) throw new Error('Missing projected answer');
+  expect(previous.message.content).toEqual([]);
+  const native = { trace: 'trace_1', attempt: 2 };
+  const projection = projectNativeEvent(
+    messages,
+    frame(
+      'session.reasoning.delta',
+      { assistantMessageID: 'msg_answer', ordinal: 0, delta: 'thinking', native },
+      2
+    )
+  );
+  expect(projection.changed).toHaveLength(1);
+  expect(projection.changed?.[0]).toEqual(
+    referenceDelta(previous, 'reasoning', 0, 'thinking', 2, native)
+  );
+  expect(projection.changed?.[0]?.message.content?.[0]).toEqual({
+    type: 'reasoning',
+    text: 'thinking',
+    time: { created: 2 },
+    native,
+  });
+  expect(projection.messages[0]).toBe(other);
+});
+
+test('a delta past the replay frontier of empty content returns the incomplete marker', () => {
+  const messages = startAnswer([other], 1);
+  const previous = messages[1];
+  if (!previous) throw new Error('Missing projected answer');
+  expect(previous.message.content).toEqual([]);
+  const projection = projectNativeEvent(
+    messages,
+    frame('session.text.delta', { assistantMessageID: 'msg_answer', ordinal: 2, delta: 'x' }, 2)
+  );
+  expect(projection.changed).toHaveLength(1);
+  expect(projection.changed?.[0]).toEqual(referenceDelta(previous, 'text', 2, 'x', 2, undefined));
+  expect(projection.changed?.[0]?.incomplete).toBe(true);
+  expect(projection.messages[1]?.message).toBe(previous.message);
+  expect(projection.messages[0]).toBe(other);
+});
+
+test('a randomized frontier delta sequence keeps every entry equal to the reference', () => {
+  const next = random(20261123);
+  const chunks = ['a', 'bb', ' ', '\n', '…', ''];
+  let messages = startAnswer([other], 10);
+  const answer = messages[1];
+  if (!answer) throw new Error('Missing projected answer');
+  expect(answer.message.content).toEqual([]);
+  let seq = 11;
+  let createdParts = 0;
+  let incompleteMarkers = 0;
+  for (let step = 0; step < 120; step++) {
+    const previous = messages[1];
+    if (!previous) throw new Error('Missing projected answer');
+    const kind = next() < 0.55 ? 'text' : 'reasoning';
+    const ordinal = Math.floor(next() * 3);
+    const delta = chunks[Math.floor(next() * chunks.length)] ?? 'x';
+    const created = seq++;
+    const native = kind === 'reasoning' && next() < 0.5 ? { trace: `trace_${created}` } : undefined;
+    const projection = projectNativeEvent(
+      messages,
+      frame(
+        `session.${kind}.delta`,
+        { assistantMessageID: 'msg_answer', ordinal, delta, ...(native ? { native } : {}) },
+        created
+      )
+    );
+    const expected = referenceDelta(previous, kind, ordinal, delta, created, native);
+    if (expected.incomplete) incompleteMarkers++;
+    if ((expected.message.content?.length ?? 0) > (previous.message.content?.length ?? 0))
+      createdParts++;
+    expect(projection.changed).toHaveLength(1);
+    expect(projection.changed?.[0]).toEqual(expected);
+    expect(projection.messages[1]).toBe(projection.changed?.[0]);
+    // The unrelated message never moves, whichever frame runs.
+    expect(projection.messages[0]).toBe(other);
+    messages = projection.messages;
+  }
+  expect(createdParts).toBeGreaterThan(0);
+  expect(incompleteMarkers).toBeGreaterThan(0);
+  expect(messages[1]?.message.content?.length).toBeGreaterThan(1);
 });
 
 test('a delta on a completed message returns the input array and reports no change', () => {

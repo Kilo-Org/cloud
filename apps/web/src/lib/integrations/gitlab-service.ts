@@ -1719,6 +1719,7 @@ export async function connectWithPAT(
         integrationId: existingIntegration.id,
         retired: retirement.retired,
         retained: retirement.retained,
+        skipped: retirement.skipped,
       });
     }
 

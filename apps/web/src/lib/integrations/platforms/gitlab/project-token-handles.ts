@@ -566,23 +566,36 @@ export async function removeStoredProjectAccessToken(
 }
 
 /**
+ * Time the account-change walk may spend revoking project tokens. The walk runs
+ * inside the connect request that replaced the account, so it is bounded like
+ * the settlement walk of the same request.
+ */
+const REPLACED_ACCOUNT_RETIREMENT_BUDGET_MS = 20_000;
+
+/**
  * Retires every project token the integration stores for an account other than
  * the one now connected, using the credential the connect holds.
  *
  * A project keeps a handle that still belongs to the connected account, unless
  * its metadata entry names an older token id that only a revocation can settle.
- * A refusal keeps the handle and marks the credential unusable, so the connect
- * that replaced the account still succeeds.
+ * The walk has one deadline for the whole walk: a project the deadline does not
+ * reach keeps its handle and is marked unusable, so the connect that replaced
+ * the account still completes. A credential the provider already refused is not
+ * called again. A refusal keeps the handle and marks the credential unusable,
+ * so the connect that replaced the account still succeeds.
  */
 export async function retireProjectCredentialsForReplacedAccount(input: {
   integration: Pick<PlatformIntegration, 'id' | 'metadata'>;
   userToken: string;
   currentAccountId: string;
-}): Promise<{ retired: number; retained: number }> {
+  signal?: AbortSignal;
+}): Promise<{ retired: number; retained: number; skipped: number }> {
+  const signal = input.signal ?? AbortSignal.timeout(REPLACED_ACCOUNT_RETIREMENT_BUDGET_MS);
   const projectIds = await listProjectIdsWithStoredTokens(input.integration);
 
   let retired = 0;
   let retained = 0;
+  let skipped = 0;
   for (const projectId of projectIds) {
     const storedCredential = await getStoredProjectCredential(
       input.integration.id,
@@ -603,8 +616,36 @@ export async function retireProjectCredentialsForReplacedAccount(input: {
       continue;
     }
 
+    if (storedCredential !== null && storedCredential.unusable) {
+      retained += 1;
+      continue;
+    }
+
+    if (signal.aborted) {
+      retained += 1;
+      skipped += 1;
+      if (storedCredential !== null) {
+        await markStoredProjectCredentialUnusable({
+          integrationId: input.integration.id,
+          projectId,
+          credential: storedCredential,
+        }).catch(error => {
+          logExceptInTest(
+            '[retireProjectCredentialsForReplacedAccount] Unusable marker not stored',
+            {
+              integrationId: input.integration.id,
+              projectId,
+              error: error instanceof Error ? error.message : String(error),
+            }
+          );
+        });
+      }
+      continue;
+    }
+
     const outcome = await removeStoredProjectAccessToken(input.integration, projectId, {
       userToken: input.userToken,
+      signal,
     }).catch(error => {
       logExceptInTest(
         '[retireProjectCredentialsForReplacedAccount] Row changed during retirement',
@@ -646,6 +687,7 @@ export async function retireProjectCredentialsForReplacedAccount(input: {
     currentAccountId: input.currentAccountId,
     retired,
     retained,
+    skipped,
   });
-  return { retired, retained };
+  return { retired, retained, skipped };
 }

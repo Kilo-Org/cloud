@@ -494,7 +494,7 @@
       "download": "Descargar archivo",
       "downloadFailed": "No se pudo descargar la exportación. Comprueba tu conexión e inténtalo de nuevo.",
       "unavailableTitle": "La exportación de datos aún no está disponible",
-      "unavailableDescription": "La exportación de datos se está habilitando de forma gradual. Vuelve a consultarlo pronto."
+      "unavailableDescription": "La función se está habilitando de forma gradual. Vuelve a consultarlo pronto."
     },
     "blockedPeople": {
       "title": "Personas bloqueadas y silenciadas",

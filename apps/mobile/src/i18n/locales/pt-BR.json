@@ -495,7 +495,7 @@
       "download": "Baixar arquivo",
       "downloadFailed": "Não foi possível baixar a exportação. Verifique sua conexão e tente novamente.",
       "unavailableTitle": "A exportação de dados ainda não está disponível",
-      "unavailableDescription": "A exportação de dados está sendo liberada aos poucos. Volte em breve."
+      "unavailableDescription": "A funcionalidade está sendo liberada aos poucos. Volte em breve."
     },
     "blockedPeople": {
       "title": "Pessoas bloqueadas e silenciadas",

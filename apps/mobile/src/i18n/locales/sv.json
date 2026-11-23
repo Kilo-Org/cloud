@@ -493,7 +493,7 @@
       "download": "Ladda ned fil",
       "downloadFailed": "Det gick inte att ladda ned exporten. Kontrollera anslutningen och försök igen.",
       "unavailableTitle": "Dataexport är inte tillgänglig än",
-      "unavailableDescription": "Dataexport lanseras gradvis. Titta in igen snart."
+      "unavailableDescription": "Funktionen lanseras gradvis. Titta in igen snart."
     },
     "blockedPeople": {
       "title": "Blockerade och tystade personer",

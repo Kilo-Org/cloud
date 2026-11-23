@@ -493,7 +493,7 @@
       "download": "Laadi fail alla",
       "downloadFailed": "Eksporti ei õnnestunud alla laadida. Kontrolli ühendust ja proovi uuesti.",
       "unavailableTitle": "Andmete eksport pole veel saadaval",
-      "unavailableDescription": "Andmete eksporti võetakse kasutusele järk-järgult. Vaata peagi uuesti."
+      "unavailableDescription": "Funktsiooni võetakse kasutusele järk-järgult. Vaata peagi uuesti."
     },
     "blockedPeople": {
       "title": "Blokeeritud ja vaigistatud inimesed",

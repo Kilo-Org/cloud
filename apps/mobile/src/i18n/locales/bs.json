@@ -494,7 +494,7 @@
       "download": "Preuzmi datoteku",
       "downloadFailed": "Preuzimanje izvoza nije uspjelo. Provjeri vezu i pokušaj ponovo.",
       "unavailableTitle": "Izvoz podataka još nije dostupan",
-      "unavailableDescription": "Izvoz podataka uvodi se postepeno. Provjeri ponovo uskoro."
+      "unavailableDescription": "Funkcija se uvodi postepeno. Provjeri ponovo uskoro."
     },
     "blockedPeople": {
       "title": "Blokirane i utišane osobe",

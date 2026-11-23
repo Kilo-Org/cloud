@@ -493,7 +493,7 @@
       "download": "Lataa tiedosto",
       "downloadFailed": "Vientiä ei voitu ladata. Tarkista yhteys ja yritä uudelleen.",
       "unavailableTitle": "Tietojen vienti ei ole vielä saatavilla",
-      "unavailableDescription": "Tietojen vienti otetaan käyttöön vaiheittain. Tarkista pian uudelleen."
+      "unavailableDescription": "Ominaisuus otetaan käyttöön vaiheittain. Tarkista pian uudelleen."
     },
     "blockedPeople": {
       "title": "Estetyt ja mykistetyt henkilöt",

@@ -492,7 +492,7 @@
       "download": "파일 다운로드",
       "downloadFailed": "내보낸 데이터를 다운로드하지 못했습니다. 연결 상태를 확인한 후 다시 시도하세요.",
       "unavailableTitle": "아직 데이터 내보내기를 이용할 수 없습니다",
-      "unavailableDescription": "데이터 내보내기 기능은 순차적으로 제공되고 있습니다. 잠시 후 다시 확인하세요."
+      "unavailableDescription": "이 기능은 순차적으로 제공되고 있습니다. 잠시 후 다시 확인하세요."
     },
     "blockedPeople": {
       "title": "차단 및 뮤트한 사용자",

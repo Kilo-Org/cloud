@@ -494,7 +494,7 @@
       "download": "הורדת הקובץ",
       "downloadFailed": "לא ניתן היה להוריד את הייצוא. בדוק את החיבור ונסה שוב.",
       "unavailableTitle": "ייצוא הנתונים עדיין לא זמין",
-      "unavailableDescription": "ייצוא הנתונים נפתח בהדרגה. כדאי לבדוק שוב בקרוב."
+      "unavailableDescription": "התכונה נפתחת בהדרגה. כדאי לבדוק שוב בקרוב."
     },
     "blockedPeople": {
       "title": "אנשים חסומים ומושתקים",

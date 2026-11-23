@@ -3351,15 +3351,18 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     for (const [messageId, delivery] of state.getPendingMessages()) {
       if (delivery.status !== 'failed') continue;
       if (locallySentMessageIds.has(messageId)) continue;
+      // The replayed `cloud.message.queued` materialised this row locally.
+      // Without the footer it would render as an ordinary sent bubble for a
+      // prompt that was never delivered, so the row goes with the failure. A
+      // confirmed row (`synthetic` undefined) is server history and stays.
+      // This is not gated on `clearFailedMessage`: that returns true only for
+      // the entry that owned the terminal error, and a prompt that was never
+      // delivered replays as queued and unaccepted, which never owns one.
+      const info = currentSession?.storage.getMessageInfo(messageId);
+      if (info?.role === 'user' && info.synthetic === true) {
+        currentSession?.storage.deleteMessage(messageId);
+      }
       if (state.clearFailedMessage(messageId)) {
-        // The replayed `cloud.message.queued` materialised this row locally.
-        // Without the footer it would render as an ordinary sent bubble for a
-        // prompt that was never delivered, so the row goes with the failure.
-        // A confirmed row (`synthetic` undefined) is server history and stays.
-        const info = currentSession?.storage.getMessageInfo(messageId);
-        if (info?.role === 'user' && info.synthetic === true) {
-          currentSession?.storage.deleteMessage(messageId);
-        }
         store.set(errorAtom, null);
         store.set(failedHistoryKindAtom, null);
       }

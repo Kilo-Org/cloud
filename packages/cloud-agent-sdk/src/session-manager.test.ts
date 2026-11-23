@@ -31,6 +31,7 @@ import { createChatProcessor } from './chat-processor';
 import { sessionSnapshotFailureMessage, type SessionSnapshotFailure } from './snapshot-page';
 import { readKilo2Messages } from './kilo2-source-messages';
 import { createServiceState } from './service-state';
+import type { ServiceState } from './service-state';
 import type {
   AssistantMessage,
   UserMessage,
@@ -9239,6 +9240,105 @@ describe('createSessionManager', () => {
 
       expect(mockSession.state.clearFailedMessage).toHaveBeenCalledWith('m-resolved');
       expect(deleteMessage).not.toHaveBeenCalled();
+    });
+
+    /**
+     * A prompt that was never delivered replays as `cloud.message.queued` then
+     * `cloud.message.failed` with `delivery: 'queued'` and `accepted: false`.
+     * `processMessageFailed` does not treat that as the active turn, so it
+     * records no terminal error and `clearFailedMessage` answers `false` for
+     * exactly the ghosts `discardAppliedDeliveryFailures` exists to drop. The
+     * two cases above mock `clearFailedMessage` to return `true`, so they never
+     * cover it: these drive the real service state instead.
+     */
+    function replayUnacceptedQueuedFailure(): ServiceState {
+      const state = createServiceState({ rootSessionId: 'ses-1' });
+      state.process({ type: 'cloud.message.queued', messageId: 'm-ghost' });
+      state.process({
+        type: 'cloud.message.failed',
+        messageId: 'm-ghost',
+        delivery: 'queued',
+        accepted: false,
+        error: 'Message delivery failed',
+        reason: 'execution',
+      });
+      return state;
+    }
+
+    it('deletes the ghost row of a queued failure that never owned the terminal error', async () => {
+      const realState = replayUnacceptedQueuedFailure();
+
+      // The precondition that makes this a bug rather than a formality: the
+      // ghost sits in `pendingMessages` as a failure, yet it never set the
+      // terminal error, so clearing it cannot report that it undid one. Probed
+      // on a second state so this assertion does not consume the entry the
+      // manager is about to prune.
+      const probe = replayUnacceptedQueuedFailure();
+      expect(probe.getStatus()).toEqual({ type: 'idle' });
+      expect(probe.clearFailedMessage('m-ghost')).toBe(false);
+      expect(realState.getPendingMessages().get('m-ghost')?.status).toBe('failed');
+
+      const read = deferred<DurableDeliveryRecord<string>>();
+      const config = createMockConfig({
+        readResolvedDeliveryFailures: jest.fn(() => read.promise),
+      });
+      const mgr = createSessionManager(config);
+      const originalState = mockSession.state;
+      // The real object, not the jest mock: `getPendingMessages` and
+      // `clearFailedMessage` must decide the outcome on their own semantics.
+      mockSession.state = realState as unknown as MockSession['state'];
+      try {
+        await mgr.switchSession(kiloId('ses-1'));
+        const storage = mockSession.storage;
+        if (!storage) throw new Error('expected session storage');
+        // The row the replayed `queued` materialised: a client ghost, marked
+        // synthetic, that no server confirmation ever replaced.
+        storage.upsertMessage(
+          stubUserMessage({ id: 'm-ghost', sessionID: 'ses-1', synthetic: true })
+        );
+        // Calls through, so the row's removal is observed on the real storage.
+        const deleteMessage = jest.spyOn(storage, 'deleteMessage');
+
+        read.resolve({ items: [], complete: false });
+        await read.promise;
+        await Promise.resolve();
+
+        expect(deleteMessage).toHaveBeenCalledWith('m-ghost');
+        expect(realState.getPendingMessages().has('m-ghost')).toBe(false);
+        expect(storage.getMessageInfo('m-ghost')).toBeUndefined();
+      } finally {
+        mockSession.state = originalState;
+      }
+    });
+
+    it('keeps a server-confirmed row of a queued failure that never owned the terminal error', async () => {
+      const realState = replayUnacceptedQueuedFailure();
+
+      const read = deferred<DurableDeliveryRecord<string>>();
+      const config = createMockConfig({
+        readResolvedDeliveryFailures: jest.fn(() => read.promise),
+      });
+      const mgr = createSessionManager(config);
+      const originalState = mockSession.state;
+      mockSession.state = realState as unknown as MockSession['state'];
+      try {
+        await mgr.switchSession(kiloId('ses-1'));
+        const storage = mockSession.storage;
+        if (!storage) throw new Error('expected session storage');
+        storage.upsertMessage(stubUserMessage({ id: 'm-ghost', sessionID: 'ses-1' }));
+        const deleteMessage = jest.spyOn(storage, 'deleteMessage');
+
+        read.resolve({ items: [], complete: false });
+        await read.promise;
+        await Promise.resolve();
+
+        // The failure still goes; the row is server history and stays.
+        expect(deleteMessage).not.toHaveBeenCalled();
+        expect(realState.getPendingMessages().has('m-ghost')).toBe(false);
+        expect(storage.getMessageInfo('m-ghost')?.role).toBe('user');
+      } finally {
+        mockSession.state = originalState;
+      }
     });
 
     it('projects the seeded durable ids on the resolvedDeliveryFailures atom', async () => {

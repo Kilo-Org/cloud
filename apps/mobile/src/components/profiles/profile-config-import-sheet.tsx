@@ -30,6 +30,8 @@ import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
 import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
 import { configImportArchiveFromText } from '@/lib/config-import-archive';
+import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
+import { useCloseEditorOnDeniedPermission } from '@/lib/hooks/use-close-editor-on-denied-permission';
 import { useConfigImportMutations } from '@/lib/hooks/use-config-import-mutations';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
@@ -70,6 +72,12 @@ export function ProfileConfigImportSheet({
   const { confirm, dialog } = useConfirmDialog();
   const { previewConfigImport, applyConfigImport } = useConfigImportMutations(organizationId);
   const colors = useThemeColors();
+  const permission = useOrganizationProfilePermission(organizationId);
+  // The sheet lasts only as long as the permission that allows it. A
+  // `read-only` verdict closes it, and the unmount drops the pasted text, the
+  // preview and the selection with it. `resolving` keeps the sheet: the role is
+  // not known yet, and the server may still accept the import.
+  useCloseEditorOnDeniedPermission(permission, onClose);
 
   const textRef = useRef('');
   const archiveRef = useRef<string | null>(null);

@@ -365,6 +365,45 @@ describe('ProfileRepoPinsSection', () => {
     unmount();
   });
 
+  it('closes the pin sheet when the manage permission goes away', async () => {
+    Object.assign(h.bindingsQuery, { isLoading: false });
+
+    const { renderer, queryClient, unmount } = await mountSection();
+    pressPressable(renderer.root, 'Pin a repo');
+    expect(findAll(renderer.root, 'SessionPageSheet')).toHaveLength(1);
+
+    // The server refuses an organization bind without the manage role, so the
+    // sheet closes with the permission that offered it instead of staying up
+    // over a slot that no longer offers the action.
+    const rerenderWith = async (canManage: boolean) => {
+      await act(async () => {
+        renderer.update(
+          createElement(
+            QueryClientProvider,
+            { client: queryClient },
+            createElement(ProfileRepoPinsSection, { profileId: 'profile-1', canManage })
+          )
+        );
+        await Promise.resolve();
+      });
+    };
+
+    await rerenderWith(false);
+    expect(findAll(renderer.root, 'SessionPageSheet')).toHaveLength(0);
+    expect(
+      findAll(renderer.root, 'Pressable').some(
+        node => node.props.accessibilityLabel === 'Pin a repo'
+      )
+    ).toBe(false);
+
+    // The state closed with the permission, so a restored role shows the action
+    // again without reopening the sheet the tap once opened.
+    await rerenderWith(true);
+    expect(findAll(renderer.root, 'SessionPageSheet')).toHaveLength(0);
+
+    unmount();
+  });
+
   it('compact: the pin action rides the section header box, so the header stays one line', async () => {
     Object.assign(h.bindingsQuery, { isLoading: false });
 

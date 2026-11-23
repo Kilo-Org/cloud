@@ -146,7 +146,10 @@ export function ProfileOverviewScreen({
     saving: update.isPending || deleteProfile.isPending,
   });
   // The config-import sheet is a modal over this screen, so it holds no route
-  // and no draft of its own.
+  // and no draft of its own; its unmount drops the pasted text and the preview.
+  // It renders only while the overview read has not been refused terminally,
+  // and a `read-only` permission closes it from inside the sheet. The role does
+  // not gate the mount: a role still resolving must not discard a pasted config.
   const [importOpen, setImportOpen] = useState(false);
 
   const profile = profileQuery.data;
@@ -384,7 +387,7 @@ export function ProfileOverviewScreen({
 
       {dialog}
       {metadataGuard.dialog}
-      {importOpen ? (
+      {importOpen && showContent ? (
         <Suspense fallback={null}>
           <LazyProfileConfigImportSheet
             profileId={profileId}

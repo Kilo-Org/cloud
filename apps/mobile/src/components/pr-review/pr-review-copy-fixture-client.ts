@@ -253,7 +253,8 @@ const FilePageInput = z.object({ cursor: z.literal(100).nullish() });
 /**
  * One page of the fixture's file list: the surface's set, 100 at a time, with
  * the second page's cursor. Both route shapes read the page the same way, so a
- * provider navigator lists the same files as the GitHub one.
+ * provider navigator lists the same files as the GitHub one. Each file carries
+ * the pre-cause flag beside its cause, because the wire DTO has both.
  */
 function fixtureFilesPage(url: string, surface: string | undefined) {
   const pageInput = FilePageInput.parse(
@@ -262,11 +263,16 @@ function fixtureFilesPage(url: string, surface: string | undefined) {
   const offset = pageInput.cursor === 100 ? 100 : 0;
   const surfaceFiles = filesForSurface(surface);
   return {
-    // The fixture answers both route shapes, and the wire DTO carries the
-    // pre-cause flag beside the cause, so a page built here has to carry it too.
-    files: surfaceFiles
-      .slice(offset, offset + 100)
-      .map(file => ({ ...file, patchMissing: file.patchMissingCause !== null })),
+    files: surfaceFiles.slice(offset, offset + 100).map(file => ({
+      path: file.path,
+      previousPath: file.previousPath,
+      status: file.status,
+      additions: file.additions,
+      deletions: file.deletions,
+      patch: file.patch,
+      patchMissingCause: file.patchMissingCause,
+      patchMissing: file.patchMissingCause !== null,
+    })),
     nextCursor: offset + 100 < surfaceFiles.length ? offset + 100 : null,
   };
 }

@@ -242,6 +242,82 @@ function seedAliasSync(sqlite: DatabaseSync): void {
   }
 }
 
+/**
+ * `count` preparing requests, each its own pool with a 200-slot plan so one 88-slot slice is
+ * staged and the request stays `preparing`: the cost of serving many requests in one tick.
+ */
+function seedManyPreparingRequests(sqlite: DatabaseSync, count: number): void {
+  const caseCount = 200;
+  const plan: PaidBenchmarkPlan = {
+    version: 1,
+    router: 'efficient',
+    engineIdentity: ENGINE,
+    revision: 3,
+    repetitions: 1,
+    caseIds: Array.from({ length: caseCount }, (_, index) => `case-${index}`),
+    pairs: [
+      {
+        model: 'vendor/many',
+        variant: '',
+        serving: false,
+        missing: btoa(String.fromCharCode(...new Uint8Array(Math.ceil(caseCount / 8)).fill(0xff))),
+        covered: btoa(String.fromCharCode(...new Uint8Array(Math.ceil(caseCount / 8)))),
+        cost: Array.from({ length: caseCount }, () => 1),
+      },
+    ],
+    counts: { reused: 0, covered: 0, shared: 0, exclusive: caseCount },
+    estimateMicrodollars: caseCount,
+    maximumMicrodollars: caseCount,
+    aliases: [],
+    projectId: 'bench-pool-project',
+  };
+  for (let index = 0; index < count; index += 1) {
+    const requestId = crypto.randomUUID();
+    const quoteId = crypto.randomUUID();
+    sqlite
+      .prepare(
+        `INSERT INTO paid_benchmark_quotes
+          (id, owner_type, owner_id, organization_id, router, router_id, pool_version,
+            engine_identity, context, plan, estimate_microdollars, maximum_microdollars,
+            plan_cases, expires_at, started_request_id, created_at, updated_at)
+        VALUES (?, 'user', ?, NULL, 'efficient', ?, 'pool-v1', ?, '{}', ?, 0, 0, ?, ?, ?, ?, ?)`
+      )
+      .run(
+        quoteId,
+        `user-${index}`,
+        crypto.randomUUID(),
+        ENGINE,
+        JSON.stringify(plan),
+        caseCount,
+        new Date(NOW + 30 * 60_000).toISOString(),
+        requestId,
+        AT,
+        AT
+      );
+    sqlite
+      .prepare(
+        `INSERT INTO paid_benchmark_requests
+          (id, owner_type, owner_id, organization_id, router, router_id, pool_version,
+            engine_identity, status, quote_id, estimate_microdollars, maximum_microdollars,
+            charged_microdollars, plan_cases, staged_cases, pause_reason, actor_user_id,
+            context, created_at, updated_at)
+        VALUES (?, 'user', ?, NULL, 'efficient', ?, 'pool-v1', ?, 'preparing', ?, 0, 0, 0, ?, 0,
+          NULL, ?, '{}', ?, ?)`
+      )
+      .run(
+        requestId,
+        `user-${index}`,
+        crypto.randomUUID(),
+        ENGINE,
+        quoteId,
+        caseCount,
+        `user-${index}`,
+        AT,
+        AT
+      );
+  }
+}
+
 describe('scheduled tick D1 budget (production migrations, real handler)', () => {
   const opened: Array<{ directory: string; sqlite: DatabaseSync }> = [];
   let send: ReturnType<typeof vi.fn>;
@@ -330,12 +406,22 @@ describe('scheduled tick D1 budget (production migrations, real handler)', () =>
     seedPaidRequests(coveredSqlite, true);
     const covered = await runTick(coveredSqlite);
 
+    // Fifty preparing requests, each staging one 88-slot slice: the per-request fixed reads
+    // (quote, counts, settle) are what a cap of 50 actually costs per tick.
+    const manySqlite = newTickDb();
+    seedRunningRuns(manySqlite);
+    seedPendingOutputs(manySqlite);
+    seedAliasSync(manySqlite);
+    seedManyPreparingRequests(manySqlite, 50);
+    const many = await runTick(manySqlite);
+
     const components = {
       other: other.queries,
       staging: worst.queries - other.queries,
       worst: worst.queries,
       worstStatements: worst.statements,
       coveredWorst: covered.queries,
+      manyWorst: many.queries,
     };
     console.error(JSON.stringify(components));
 
@@ -372,6 +458,9 @@ describe('scheduled tick D1 budget (production migrations, real handler)', () =>
         .get()
     ).toEqual({ failed: 0 });
     expect(components.coveredWorst).toBeLessThanOrEqual(700);
+    // Serving the full cap: 50 requests each taking one slice, plus every other part of the
+    // tick, must still fit.
+    expect(components.manyWorst).toBeLessThanOrEqual(700);
     // The whole tick keeps a wide margin under D1's hard limit of 1,000 queries per
     // invocation: about a third stays free for anything a future addition needs.
     expect(components.worst).toBeLessThanOrEqual(700);

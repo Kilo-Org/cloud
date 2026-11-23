@@ -1199,9 +1199,10 @@ pool, then forwards its immutable context to `POST /admin/custom-router-benchmar
 
 Staging is paged, and the browser is not required to finish it: while a request is `preparing`,
 the one-minute tick stages a hard-capped budget of 4,400 slots (50 batches of 88, split as
-`floor(4,400 / preparing requests)` and served stalest-first) across its live requests, which
-activates the widest observed pool in about 28 minutes with the tab closed, and a `progress` read
-stages 400 more. A request stays
+`floor(4,400 / requests that still need slots)` and served stalest-first) across its live
+requests, which activates the widest observed pool in about 28 minutes with the tab closed, and a
+`progress` read stages 400 more. A request that is fully staged takes no slot budget — it only
+needs to activate, which the same tick does — so it never dilutes another request's share. A request stays
 alive while its staging keeps adding slots (`last_staged_at`) and is closed as "Benchmark request
 was never activated." — retryably, freeing its pool's only live-request slot — once it was offered
 budget and staged no slot for an hour. Row age, a tick that never reached it for budget, and passes

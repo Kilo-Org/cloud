@@ -106,15 +106,9 @@ const STAGE_BUDGET_SLOTS = 400;
  * pool could only activate while the browser kept polling. 4,400 slots stage that plan in about
  * 28 minutes — a 2.2× margin inside {@link STAGE_ABANDON_MS} — in 50 batches of 88, and keep
  * the whole tick measured by `scheduled-tick-budget.test.ts` under 700 of the 1,000 queries one
- * Worker invocation may send to D1.
+ * Worker invocation may send to D1, including the case where all 50 slots serve a request.
  */
 const CRON_STAGE_BUDGET_SLOTS = 4_400;
-/**
- * The most a tick gives one request even when it is the only one: the budget itself. A fixed
- * floor above this is impossible (it would raise the tick's total) and a fixed cap below the
- * fair share would starve a lone wide plan, so a lone request simply takes the whole budget.
- */
-const CRON_STAGE_MAX_SLOTS_PER_REQUEST = CRON_STAGE_BUDGET_SLOTS;
 /**
  * Live requests one tick will stage or settle. One live request per saved pool is the unique
  * index's rule, and the pool cap per owner bounds the realistic population (10 pools × owners,
@@ -1312,15 +1306,28 @@ export async function reconcilePaidBenchmarkRequests(
       ORDER BY updated_at, id LIMIT ${CRON_STAGE_MAX_REQUESTS_PER_TICK}`
     )
     .all<PaidBenchmarkRequestRow>();
-  // One tick's staging is hard-capped, divided over the requests this tick serves: the scan
-  // above already returns at most `CRON_STAGE_MAX_REQUESTS_PER_TICK` rows, so its length *is*
-  // the served count. The division keeps the total under the cap, and a request the tick cannot
-  // reach waits for the next one, which serves it first because the scan is stalest-first.
-  const preparing = preparingRows.results.length;
-  const fairShare = Math.floor(CRON_STAGE_BUDGET_SLOTS / Math.max(1, preparing));
-  const offered = Math.min(fairShare, CRON_STAGE_MAX_SLOTS_PER_REQUEST);
+  // One tick's staging is hard-capped and divided over the requests that still need slots: the
+  // scan above already returns at most `CRON_STAGE_MAX_REQUESTS_PER_TICK` rows, so its length is
+  // the served count, and a fully staged request takes no budget, so counting it would dilute a
+  // wide plan's share for no gain. A request the tick cannot reach waits for the next one, which
+  // serves it first because the scan is stalest-first.
+  const staging = preparingRows.results.filter(row => row.staged_cases < row.plan_cases).length;
+  const offered = Math.floor(CRON_STAGE_BUDGET_SLOTS / Math.max(1, staging));
   let remainingStageBudget = CRON_STAGE_BUDGET_SLOTS;
   const live = [...preparingRows.results, ...activeRows.results];
+  // The frozen plan of every request this tick serves, in one read: a per-request quote read
+  // is the tick's largest fixed cost once many requests stage at once.
+  const plans = new Map<string, PaidBenchmarkPlan | null>();
+  if (live.length > 0) {
+    const quotes = await db
+      .prepare(
+        `SELECT id, plan FROM paid_benchmark_quotes
+        WHERE id IN (SELECT value FROM json_each(?))`
+      )
+      .bind(JSON.stringify([...new Set(live.map(request => request.quote_id))]))
+      .all<{ id: string; plan: string }>();
+    for (const quote of quotes.results) plans.set(quote.id, decodePlan(quote.plan));
+  }
   for (const request of live) {
     // One request's failure must never abort the tick for the others: a read fault, an
     // unexpected throw or a bad quote is that request's problem, logged and left for the next
@@ -1329,6 +1336,7 @@ export async function reconcilePaidBenchmarkRequests(
       await reconcileOnePaidRequest(env, request, {
         now,
         summary,
+        plan: plans.get(request.quote_id) ?? null,
         offeredSlots: request.status === 'preparing' ? offered : 0,
         takeStageBudget: (wanted: number) => {
           const granted = Math.min(wanted, Math.max(0, remainingStageBudget));
@@ -1370,6 +1378,8 @@ async function reconcileOnePaidRequest(
   input: {
     now: number;
     summary: { staged: number; completed: string[]; failed: string[]; closed: string[] };
+    /** The request's frozen plan, read with the rest of the served set. */
+    plan: PaidBenchmarkPlan | null;
     /** Slots this tick is prepared to offer the request; 0 means it is not staging this tick. */
     offeredSlots: number;
     takeStageBudget: (wanted: number) => number;
@@ -1377,8 +1387,7 @@ async function reconcileOnePaidRequest(
 ): Promise<void> {
   const db = env.BENCH_DB;
   const { now, summary } = input;
-  const quote = await readPaidBenchmarkQuote(db, request.quote_id);
-  const plan = quote ? decodePlan(quote.plan) : null;
+  const plan = input.plan;
   if (!plan) return;
   let current = request;
   if (current.status === 'active') {
@@ -1430,13 +1439,9 @@ async function reconcileOnePaidRequest(
       }
       current = await activateIfFullyStaged(env, current, plan, now);
     } else {
-      const granted = input.takeStageBudget(input.offeredSlots);
-      // Nothing left: the request waits for the next tick. It is not failed for inactivity,
-      // because waiting is not a stall and its own window only advances on real staging.
-      if (granted === 0) return;
-      // This pass offered the request budget, so it now owns its liveness: a request that had
-      // budget in hand and still staged nothing for a full window is genuinely stuck. Waiting
-      // ticks cannot accumulate that window, because they never reach this check.
+      // The abandoned check runs BEFORE budget is taken: a stalled request is the stalest, so
+      // it is served first, and charging its share before closing it would starve the healthy
+      // requests behind it for that tick (or, with many stalled ones, for several).
       if (now - lastProgress > STAGE_ABANDON_MS) {
         await db.batch(
           failPaidBenchmarkRequestStatements(db, {
@@ -1446,9 +1451,13 @@ async function reconcileOnePaidRequest(
             now,
           })
         );
-        summary.closed.push(request.id);
+        summary.closed.push(current.id);
         return;
       }
+      const granted = input.takeStageBudget(input.offeredSlots);
+      // Nothing left: the request waits for the next tick. It is not failed for inactivity,
+      // because waiting is not a stall and its own window only advances on real staging.
+      if (granted === 0) return;
       const staged = await stagePaidBenchmarkRequest(env, current, plan, {
         budgetSlots: granted,
         now,

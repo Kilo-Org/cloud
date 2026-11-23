@@ -2684,6 +2684,66 @@ describe('paid request staging liveness', () => {
     expect(row.failure_retryable).toBe(1);
   }, 120_000);
 
+  it('closes stalled requests without spending their share, so healthy ones still stage', async () => {
+    // Fifty stalled requests sort first (stalest) and would otherwise take the whole budget
+    // before the healthy request behind them is reached.
+    const stale = 61 * MINUTE_MS;
+    const ids = seedPreparingRequests(51, index =>
+      index < 50
+        ? {
+            createdAt: new Date(Date.now() - 130 * MINUTE_MS).toISOString(),
+            lastStagedAt: new Date(Date.now() - stale).toISOString(),
+          }
+        : {
+            createdAt: new Date(Date.now() - 60_000).toISOString(),
+            lastStagedAt: null,
+          }
+    );
+    const healthy = ids[50]!;
+
+    const summary = await reconcilePaidBenchmarkRequests(paidBindings(db), { now: Date.now() });
+    // Every stalled request is closed…
+    expect(summary.closed).toHaveLength(50);
+    expect(summary.closed).not.toContain(healthy);
+    expect(requestState(healthy).status).toBe('preparing');
+    expect(requestState(healthy).staged_cases).toBe(0);
+
+    // …and the closing did not consume the budget: the healthy request is served next (the
+    // scan bound is 50, so it enters the scan once the stalled rows are gone) and stages with
+    // the whole budget available.
+    const next = await reconcilePaidBenchmarkRequests(paidBindings(db), {
+      now: Date.now() + MINUTE_MS,
+    });
+    expect(next.closed).toEqual([]);
+    expect(requestState(healthy).staged_cases).toBeGreaterThan(0);
+  }, 120_000);
+
+  it("does not let a fully staged request dilute a staging request's share", async () => {
+    // One wide plan that needs slots, plus nine fully staged requests waiting to activate.
+    const ids = seedPreparingRequests(9);
+    for (const id of ids) {
+      const request = sqlite
+        .prepare('SELECT * FROM paid_benchmark_requests WHERE id = ?')
+        .get(id) as never;
+      const staged = await stagePaidBenchmarkRequest(
+        paidBindings(db) as never,
+        request,
+        singlePairPlan(),
+        { budgetSlots: Number.MAX_SAFE_INTEGER }
+      );
+      expect(staged.status).toBe('staged');
+    }
+    const [wide] = seedPreparingRequests(1);
+
+    const summary = await reconcilePaidBenchmarkRequests(paidBindings(db), { now: Date.now() });
+    expect(summary.closed).toEqual([]);
+    // Every fully staged request activated…
+    for (const id of ids) expect(requestState(id).status).toBe('active');
+    // …and the wide plan staged its whole plan in this one tick: the share was the full budget,
+    // not a tenth of it (which is what a divisor counting the nine would have given).
+    expect(requestState(wide!).staged_cases).toBeGreaterThan(SLOTS * 0.9);
+  }, 120_000);
+
   it('answers a second start with the live request on its own plan, not the second quote', async () => {
     // The live request's plan is wider than the second start's: three pairs versus one.
     const { requestId } = await startFor(['vendor/alpha', 'vendor/cheap', 'vendor/third']);

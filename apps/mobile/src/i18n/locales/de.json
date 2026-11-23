@@ -4430,7 +4430,7 @@
       "agents_other": "{{count}} Agenten"
     },
     "nameLabel": "Profilname",
-    "namePlaceholder": "z.B. Backend-Debugging",
+    "namePlaceholder": "z. B. Backend-Debugging",
     "descriptionLabel": "Profilbeschreibung",
     "descriptionPlaceholder": "Optionale Beschreibung",
     "ownerLabel": "Profilinhaber",

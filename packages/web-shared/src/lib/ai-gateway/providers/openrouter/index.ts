@@ -389,6 +389,9 @@ async function enrichCatalogModels(
         ...new Set([...providerIds].map(id => normalizeInferenceProviderId(id))),
       ];
       const isPublicCustomLlmModel = publicCustomLlmProviders.has(model.id);
+      // The free class belongs to the model that is served and billed, which a `~` alias names by its target.
+      const servedModelId = providerLookupId(model);
+      const isFree = isFreeModel(servedModelId);
       const addPdf =
         !isPublicCustomLlmModel &&
         isPdfSupportingModel(model.id) &&
@@ -397,7 +400,6 @@ async function enrichCatalogModels(
         !isPublicCustomLlmModel && isFreeNemotronModel(model.id)
           ? model.description + '\n\n**Terms of service** ' + NVIDIA_TRIAL_TOS
           : model.description;
-      const isFree = isFreeModel(model.id);
       return {
         ...model,
         inference_provider_ids: inferenceProviderIds,

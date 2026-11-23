@@ -1029,7 +1029,7 @@
       "empty": "Henüz istatistiği olan inceleme yok",
       "emptyDescription": "İstatistikler, kuruluş için etkin olduğu sürece tamamlanan incelemeleri kaydeder.",
       "offTitle": "{{platform}} için istatistikler kapalı",
-      "offDescription": "Kuruluşun faturalama rollerine sahip kişiler (sahipler, yöneticiler ve faturalama yöneticileri), tamamlanan incelemeleri kaydetmek için istatistikleri web'deki kuruluş ayarlarından açabilir.",
+      "offDescription": "Kuruluşun faturalandırma rollerine sahip kişiler (sahipler, yöneticiler ve faturalandırma yöneticileri), tamamlanan incelemeleri kaydetmek için istatistikleri web'deki kuruluş ayarlarından açabilir.",
       "couldNotLoad": "İstatistikler yüklenemedi",
       "trackedReviewsCaption": "Bu dönemde istatistikler açıkken tamamlanan incelemeler. Devam eden ve başarısız olan incelemeler hiçbir zaman sayılmaz.",
       "trackedReviewsUncounted": "Sayılmadı: kuruluşun tamamlanan {{displayTotal}} incelemesinden {{displayCount}} tanesinin sonucu kaydedilmedi.",
@@ -3764,7 +3764,7 @@
       "shareInviteLink": "Davet bağlantısını paylaş",
       "resendInviteError": "Davet yeniden gönderilemedi.",
       "inviteNotResendable": "Bu davet artık yeniden gönderilemez.",
-      "ownerAuthority": "Yalnızca bir organizasyon sahibi sahipleri yönetebilir.",
+      "ownerAuthority": "Yalnızca bir kuruluş sahibi sahipleri yönetebilir.",
       "ownRoleChange": "Kendi rolünüzü değiştiremezsiniz.",
       "inviteExpired": "Bu davetin süresi dolmuş.",
       "inviteAccepted": "Bu davet zaten kabul edilmiş."

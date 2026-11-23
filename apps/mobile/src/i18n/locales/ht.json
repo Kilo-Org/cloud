@@ -1591,7 +1591,7 @@
       "empty": "Poko gen revizyon ak estatistik",
       "emptyDescription": "Estatistik yo anrejistre revizyon ki fini pandan yo aktive pou òganizasyon an.",
       "offTitle": "Estatistik yo dezaktive pou {{platform}}",
-      "offDescription": "Wòl faktirasyon òganizasyon an (pwopriyetè, administratè ak manadjè faktirasyon) ka aktive estatistik nan paramèt òganizasyon an sou wèb la pou anrejistre revizyon ki fini.",
+      "offDescription": "Wòl faktirasyon òganizasyon an (pwopriyetè, administratè ak responsab faktirasyon) ka aktive estatistik nan paramèt òganizasyon an sou wèb la pou anrejistre revizyon ki fini.",
       "couldNotLoad": "Nou pa t ka chaje estatistik yo",
       "trackedReviewsCaption": "Revizyon ki fini nan peryòd sa a pandan estatistik yo te aktive. Revizyon k ap kouri ak revizyon ki echwe pa janm konte.",
       "trackedReviewsUncounted": "Pa konte: {{displayCount}} sou {{displayTotal}} revizyon ki fini òganizasyon an genyen, rezilta yo pa te kaptire.",
@@ -3686,7 +3686,7 @@
       "pendingInvitation": "Imel sa a deja gen yon envitasyon ki an atant.",
       "alreadyMember": "Moun sa a deja yon manm nan òganizasyon sa a.",
       "seatsFull": "Tout plas yo okipe ({{used}}/{{total}}). Mande yon pwopriyetè òganizasyon pou li ajoute plas anvan ou envite plis manm.",
-      "seatsFullCanInviteBilling": "Tout plas yo okipe ({{used}}/{{total}}). Ou ka toujou envite jesyonè faktirasyon, paske yo pa pran okenn plas.",
+      "seatsFullCanInviteBilling": "Tout plas yo okipe ({{used}}/{{total}}). Ou ka toujou envite responsab faktirasyon, paske yo pa pran okenn plas.",
       "noSeatsAvailable": "Tout plas yo okipe. Mande yon pwopriyetè òganizasyon pou li ajoute plas anvan ou envite plis manm."
     },
     "invoices": {

@@ -399,7 +399,7 @@
       "title": "Teenusepakkuja võtmed",
       "rowSubtitle": "Kasuta oma teenusepakkuja arveldust",
       "orgDescription": "Neid võtmeid jagatakse kõigi organisatsiooni liikmetega ja kulud arveldatakse organisatsiooni teenusepakkuja kontodelt.",
-      "viewOnly": "Organisatsiooni võtmeid saavad muuta ainult selle omanik, administraator või arvelduse haldur.",
+      "viewOnly": "Organisatsiooni võtmeid saavad muuta ainult selle omanik, administraator või arveldushaldur.",
       "description": "Nende võtmetega tehtud päringud arveldatakse sinu teenusepakkuja kontolt, mitte Kilo saldolt.",
       "managedByPlan": "Haldab sinu kodeerimispakett",
       "enableKey": "Luba teenusepakkuja {{provider}} võti",
@@ -3418,7 +3418,7 @@
   "organization": {
     "auditLog": {
       "title": "Auditilogi",
-      "permissionDenied": "Auditilogi saavad lugeda ainult Enterprise-plaaniga organisatsiooni omanik, administraator või arvelduse haldur. $t(organization.boundary.accessDeniedDescription)",
+      "permissionDenied": "Auditilogi saavad lugeda ainult Enterprise-plaaniga organisatsiooni omanik, administraator või arveldushaldur. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Auditisündmusi pole",
       "emptyDescription": "Siin kuvatakse selles organisatsioonis tehtud toimingud.",
       "truncated": "Kuvatakse viimased sündmused.",
@@ -3608,7 +3608,7 @@
     },
     "billing": {
       "title": "Arveldus",
-      "permissionDenied": "Arveldusteavet näevad ainult organisatsiooni omanik, administraator või arvelduse haldur. $t(organization.boundary.accessDeniedDescription)",
+      "permissionDenied": "Arveldusteavet näevad ainult organisatsiooni omanik, administraator või arveldushaldur. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Tellimus",
       "state": "Olek",
       "stateNone": "Tellimus puudub",
@@ -3785,7 +3785,7 @@
       "emptyDescription": "Kasuta nuppu „Varasem tund”, et näha varasemaid päringuid.",
       "emptyBoundDescription": "Päringulogid ei ulatu sellest kaugemale tagasi.",
       "loadError": "Päringulogide laadimine ebaõnnestus.",
-      "permissionDenied": "Päringulogisid saavad lugeda ainult organisatsiooni omanik, administraator või arvelduse haldur. $t(organization.boundary.accessDeniedDescription)",
+      "permissionDenied": "Päringulogisid saavad lugeda ainult organisatsiooni omanik, administraator või arveldushaldur. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} sisse · {{output}} välja",
       "byok": "BYOK"
     },

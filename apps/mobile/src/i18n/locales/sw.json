@@ -1591,7 +1591,7 @@
       "empty": "Hakuna ukaguzi wenye takwimu bado",
       "emptyDescription": "Takwimu hurekodi ukaguzi uliokamilika wakati imewashwa kwa shirika.",
       "offTitle": "Takwimu zimezimwa kwa {{platform}}",
-      "offDescription": "Majukumu ya bili ya shirika — wamiliki, wasimamizi na mameneja wa bili — yanaweza kuwasha takwimu katika mipangilio ya shirika kwenye wavuti ili kurekodi ukaguzi uliokamilika.",
+      "offDescription": "Majukumu ya bili ya shirika — wamiliki, wasimamizi na wasimamizi wa bili — yanaweza kuwasha takwimu katika mipangilio ya shirika kwenye wavuti ili kurekodi ukaguzi uliokamilika.",
       "couldNotLoad": "Imeshindwa kupakia takwimu",
       "trackedReviewsCaption": "Ukaguzi uliokamilika ulioisha katika kipindi hiki wakati takwimu zilikuwa zimewashwa. Ukaguzi unaoendelea na ulioshindikana hauhesabiwi kamwe.",
       "trackedReviewsUncounted": "Hauhesabiwi: {{displayCount}} kati ya ukaguzi {{displayTotal}} uliokamilika wa shirika, matokeo yake hayakurekodiwa.",
@@ -3686,7 +3686,7 @@
       "pendingInvitation": "Barua pepe hii tayari ina mwaliko unaosubiri.",
       "alreadyMember": "Mtu huyu tayari ni mwanachama wa shirika hili.",
       "seatsFull": "Nafasi zote zinatumika ({{used}}/{{total}}). Muombe mmiliki wa shirika aongeze nafasi kabla ya kualika wanachama zaidi.",
-      "seatsFullCanInviteBilling": "Nafasi zote zinatumika ({{used}}/{{total}}). Bado unaweza kualika wasimamizi wa malipo, ambao hawatumii nafasi.",
+      "seatsFullCanInviteBilling": "Nafasi zote zinatumika ({{used}}/{{total}}). Bado unaweza kualika wasimamizi wa bili, ambao hawatumii nafasi.",
       "noSeatsAvailable": "Nafasi zote zinatumika. Muombe mmiliki wa shirika aongeze nafasi kabla ya kualika wanachama zaidi."
     },
     "invoices": {

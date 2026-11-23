@@ -81,9 +81,6 @@ export function clearSystemSearchIndexOnSignedOutLaunch(): void {
     clearLauncherSurfaces();
     noteLauncherSurfacesCleared();
   });
-  // The device-global PR recents the search index folds into its documents:
-  // leaving them would let the next account's first index sync publish the
-  // previous account's pull-request titles.
   runClear(clearRecentPrsBestEffort);
 }
 

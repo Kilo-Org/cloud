@@ -2926,7 +2926,7 @@
       "waitForUploads": "జోడింపుల అప్‌లోడ్ పూర్తయ్యే వరకు వేచి ఉండండి.",
       "pasteFromClipboard": "క్లిప్‌బోర్డ్ నుండి అతికించండి",
       "stopGenerating": "ప్రతిస్పందనను రూపొందించడం ఆపండి",
-      "selectModelBeforeSending": "పంపడానికి ముందు మోడల్‌ను ఎంచుకోండి.",
+      "selectModelBeforeSending": "పంపడానికి ముందు మోడల్‌ను ఎంచుకోండి",
       "preparingPlaceholder": "వాతావరణాన్ని సిద్ధం చేస్తోంది…",
       "finalizingPlaceholder": "ముగిస్తోంది…",
       "sessionLoadFailed": "సెషన్ను లోడ్ చేయలేకపోయాం. ముందుగా మళ్లీ ప్రయత్నించండి.",

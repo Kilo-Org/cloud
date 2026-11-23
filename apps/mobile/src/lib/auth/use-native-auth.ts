@@ -91,7 +91,9 @@ export type BusyAction = 'apple' | 'google' | 'passkey' | 'otp-send' | 'otp-veri
  * An inline refusal on the code step. `recovery: 'options'` marks the two refusals no
  * further code can clear — `ADMISSION_REQUIRED` and `INVALID_CODE` — so the step offers the
  * other sign-in methods its message names. The server answers `INVALID_CODE` for an address
- * it silently refused, so resending never delivers and only another method can proceed.
+ * it silently refused, so resending never delivers and only another method can proceed. A
+ * tagged refusal therefore outlives typing and every resend outcome: only Back, re-entering
+ * the step, or a pending link taking over retires it.
  */
 export type EmailCodeRefusal = {
   ok: false;

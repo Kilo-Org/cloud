@@ -2360,10 +2360,10 @@
       "attachmentUploadingToStart": "Yon fichye atache toujou ap voye. Retire l pou kòmanse san li.",
       "modelMissingToStart": "Chwazi yon modèl pou kòmanse.",
       "staleRepositoryToStart": "Depo ou chwazi a pa disponib ankò. Chwazi yon depo ankò pou kòmanse.",
-      "modelNeedsCreditsToStart": "Modèl sa a bezwen kredi. Chwazi yon modèl Gratis pou kòmanse.",
+      "modelNeedsCreditsToStart": "Modèl sa a bezwen kredi. Chwazi yon modèl gratis pou kòmanse.",
       "eligibility": {
-        "limitedTitle": "Modèl Gratis disponib",
-        "balance": "Balans ou se {{amount}}. Modèl Gratis yo toujou disponib.",
+        "limitedTitle": "Modèl gratis disponib",
+        "balance": "Balans ou se {{amount}}. Modèl gratis yo toujou disponib.",
         "unavailable": "Nou pa t ka tcheke balans ou."
       },
       "promptPlaceholder": "Sou ki sa ou ta renmen travay?",

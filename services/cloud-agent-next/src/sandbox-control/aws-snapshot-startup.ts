@@ -77,6 +77,7 @@ export async function prepareAwsSnapshotStartup(
     ...input.startup,
     command: renderAwsArchiveRestore({
       ...input,
+      workerUrl: input.workerUrl,
       snapshotId: input.snapshot.snapshotId,
       downloadUrl,
       reportUrl: new URL(

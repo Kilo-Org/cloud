@@ -47,6 +47,7 @@ function restoreInput(provider: 'aws' | 'aws-ecs') {
     snapshotId: encodeAwsArchiveSnapshot(snapshot),
     downloadUrl: `https://customer-artifacts.s3.us-east-1.amazonaws.com/${awsArchiveObjectKey(identity)}?synthetic=fixture`,
     reportUrl: 'https://worker.example.com/sandbox-control/sbx-test/startup-failure',
+    workerUrl: 'https://worker.example.com',
     allocationId: identity.allocationId,
     deadlineAt: Date.now() + 30_000,
     filesystemRoot: '/tmp/synthetic-archive-root',

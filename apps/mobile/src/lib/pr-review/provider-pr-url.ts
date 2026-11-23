@@ -30,7 +30,7 @@ const BITBUCKET_SLUG_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_.-]*$/;
 type SplitUrl = {
   /** Lowercased scheme, e.g. `https`. */
   scheme: string;
-  /** Lowercased authority (host, plus port when non-default). */
+  /** Lowercased authority: host plus any explicit port, kept verbatim. */
   host: string;
   /** Path segments, query and fragment dropped; empty segments preserved. */
   segments: string[];

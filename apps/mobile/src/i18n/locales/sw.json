@@ -2290,6 +2290,23 @@
       "connectionLost": "Muunganisho umekatika",
       "retryConnection": "Jaribu kuunganisha tena"
     },
+    "failureHistory": {
+      "title": "Historia ya kushindikana",
+      "messageFailures": "Kushindikana kwa ujumbe",
+      "runFallback": "Ujumbe umeshindikana",
+      "setupFallback": "Utayarishaji wa mazingira umeshindikana",
+      "accessDenied": "Huna ufikiaji wa uchunguzi wa kikao hiki.",
+      "loadFailedTitle": "Imeshindikana kupakia historia ya kushindikana.",
+      "loadFailedDescription": "Hitilafu ya muda imeficha sehemu hii. Angalia muunganisho wako kisha ujaribu tena.",
+      "exportJson": "Hamisha JSON",
+      "exportCsv": "Hamisha CSV",
+      "preparingJson": "Inatayarisha JSON…",
+      "preparingCsv": "Inatayarisha CSV…",
+      "exportFailed": "Imeshindikana kutayarisha faili ya uchunguzi. Jaribu tena.",
+      "fileDescription": "Faili hii inaorodhesha utekelezaji ulioshindikana pamoja na vitambulisho vya kikao na mihuri ya muda. Ambatisha kwenye tiketi ya usaidizi.",
+      "retention": "Orodha inaonyesha utekelezaji {{limit}} wa hivi karibuni kutoka siku {{window}} zilizopita. Uchunguzi huhifadhiwa kwa siku {{days}}.",
+      "summary": "{{failed}} imeshindwa · {{completed}} imekamilika"
+    },
     "goal": {
       "title": "Lengo",
       "statusActive": "Lengo amilifu",

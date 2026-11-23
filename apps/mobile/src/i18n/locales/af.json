@@ -2290,6 +2290,23 @@
       "connectionLost": "Verbinding verloor",
       "retryConnection": "Probeer weer koppel"
     },
+    "failureHistory": {
+      "title": "Mislukkingsgeskiedenis",
+      "messageFailures": "Boodskapmislukkings",
+      "runFallback": "Die boodskap het misluk",
+      "setupFallback": "Omgewingsopstelling het misluk",
+      "accessDenied": "Jy het nie toegang tot hierdie sessie se diagnostiek nie.",
+      "loadFailedTitle": "Kon nie die mislukkingsgeskiedenis laai nie.",
+      "loadFailedDescription": "'n Tydelike fout het hierdie afdeling versteek. Gaan jou verbinding na en probeer weer.",
+      "exportJson": "Voer JSON uit",
+      "exportCsv": "Voer CSV uit",
+      "preparingJson": "JSON word voorberei…",
+      "preparingCsv": "CSV word voorberei…",
+      "exportFailed": "Kon nie die diagnostiklêer voorberei nie. Probeer weer.",
+      "fileDescription": "Hierdie lêer lys mislukte lopies met sessie-IDs en tydstempels. Heg dit by 'n ondersteuningskaartjie aan.",
+      "retention": "Die lys wys die jongste {{limit}} lopies van die afgelope {{window}} dae. Diagnostiek word vir {{days}} dae gestoor.",
+      "summary": "{{failed}} misluk · {{completed}} voltooi"
+    },
     "goal": {
       "title": "Doel",
       "statusActive": "Aktiewe doel",

@@ -1707,6 +1707,23 @@
       "connectionLost": "連線中斷",
       "retryConnection": "重新連線"
     },
+    "failureHistory": {
+      "title": "失敗記錄",
+      "messageFailures": "訊息失敗",
+      "runFallback": "訊息執行失敗",
+      "setupFallback": "環境設定失敗",
+      "accessDenied": "你無權存取此工作階段的診斷資料。",
+      "loadFailedTitle": "無法載入失敗記錄。",
+      "loadFailedDescription": "暫時性錯誤導致此區段無法顯示。請檢查網路連線後再試一次。",
+      "exportJson": "匯出 JSON",
+      "exportCsv": "匯出 CSV",
+      "preparingJson": "準備 JSON 中…",
+      "preparingCsv": "準備 CSV 中…",
+      "exportFailed": "無法準備診斷檔案。請再試一次。",
+      "fileDescription": "此檔案列出失敗的執行，並包含工作階段 ID 與時間戳記。請將此檔案附加至支援工單。",
+      "retention": "清單顯示最近 {{window}} 天內最新的 {{limit}} 筆執行。診斷資料會保留 {{days}} 天。",
+      "summary": "{{failed}} 失敗 · {{completed}} 已完成"
+    },
     "goal": {
       "title": "目標",
       "statusActive": "進行中的目標",

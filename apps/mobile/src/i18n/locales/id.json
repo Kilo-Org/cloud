@@ -1706,6 +1706,23 @@
       "connectionLost": "Koneksi terputus",
       "retryConnection": "Coba sambungkan kembali"
     },
+    "failureHistory": {
+      "title": "Riwayat kegagalan",
+      "messageFailures": "Kegagalan pesan",
+      "runFallback": "Pesan gagal",
+      "setupFallback": "Penyiapan lingkungan gagal",
+      "accessDenied": "Kamu tidak memiliki akses ke diagnostik sesi ini.",
+      "loadFailedTitle": "Tidak dapat memuat riwayat kegagalan.",
+      "loadFailedDescription": "Kesalahan sementara menyembunyikan bagian ini. Periksa koneksimu dan coba lagi.",
+      "exportJson": "Ekspor JSON",
+      "exportCsv": "Ekspor CSV",
+      "preparingJson": "Menyiapkan JSON…",
+      "preparingCsv": "Menyiapkan CSV…",
+      "exportFailed": "Tidak dapat menyiapkan file diagnostik. Coba lagi.",
+      "fileDescription": "File ini mencantumkan eksekusi yang gagal beserta ID sesi dan stempel waktu. Lampirkan ke tiket dukungan.",
+      "retention": "Daftar ini menampilkan {{limit}} eksekusi terbaru dari {{window}} hari terakhir. Diagnostik disimpan selama {{days}} hari.",
+      "summary": "{{failed}} gagal · {{completed}} selesai"
+    },
     "goal": {
       "title": "Tujuan",
       "statusActive": "Tujuan aktif",

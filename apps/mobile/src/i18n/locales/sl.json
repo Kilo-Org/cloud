@@ -2388,6 +2388,23 @@
       "connectionLost": "Povezava prekinjena",
       "retryConnection": "Znova vzpostavi povezavo"
     },
+    "failureHistory": {
+      "title": "Zgodovina neuspehov",
+      "messageFailures": "Neuspehi sporočil",
+      "runFallback": "Sporočilo ni uspelo",
+      "setupFallback": "Priprava okolja ni uspela",
+      "accessDenied": "Nimaš dostopa do diagnostike te seje.",
+      "loadFailedTitle": "Zgodovine neuspehov ni bilo mogoče naložiti.",
+      "loadFailedDescription": "Začasna napaka je skrila ta razdelek. Preveri povezavo in poskusi znova.",
+      "exportJson": "Izvozi JSON",
+      "exportCsv": "Izvozi CSV",
+      "preparingJson": "Priprava JSON…",
+      "preparingCsv": "Priprava CSV…",
+      "exportFailed": "Diagnostične datoteke ni bilo mogoče pripraviti. Poskusi znova.",
+      "fileDescription": "Ta datoteka vsebuje seznam neuspešnih zagonov z ID-ji sej in časovnimi žigi. Priloži jo zahtevi za podporo.",
+      "retention": "Seznam prikazuje zadnjih {{limit}} zagonov iz zadnjih {{window}} dni. Diagnostika se hrani {{days}} dni.",
+      "summary": "{{failed}} neuspešnih · {{completed}} dokončanih"
+    },
     "goal": {
       "title": "Cilj",
       "statusActive": "Aktivni cilj",

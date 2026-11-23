@@ -2486,6 +2486,23 @@
       "connectionLost": "Cysylltiad wedi'i golli",
       "retryConnection": "Ceisio cysylltu eto"
     },
+    "failureHistory": {
+      "title": "Hanes methiannau",
+      "messageFailures": "Methiannau negeseuon",
+      "runFallback": "Methodd y neges",
+      "setupFallback": "Methodd gosod yr amgylchedd",
+      "accessDenied": "Nid oes gennych fynediad i ddiagnosteg y sesiwn hon.",
+      "loadFailedTitle": "Methu llwytho hanes methiannau.",
+      "loadFailedDescription": "Fe guddiodd gwall dros dro yr adran hon. Gwiriwch eich cysylltiad a rhowch gynnig arall arni.",
+      "exportJson": "Allforio JSON",
+      "exportCsv": "Allforio CSV",
+      "preparingJson": "Yn paratoi JSON…",
+      "preparingCsv": "Yn paratoi CSV…",
+      "exportFailed": "Methu paratoi'r ffeil diagnosteg. Rhowch gynnig eto.",
+      "fileDescription": "Mae'r ffeil hon yn rhestru rhediadau sydd wedi methu gydag IDau sesiwn a stampiau amser. Atodwch hi at docyn cymorth.",
+      "retention": "Mae'r rhestr yn dangos y {{limit}} rhediad diweddaraf o'r {{window}} diwrnod diwethaf. Cedwir diagnosteg am {{days}} diwrnod.",
+      "summary": "{{failed}} wedi methu · {{completed}} wedi'u cwblhau"
+    },
     "goal": {
       "title": "Nod",
       "statusActive": "Nod gweithredol",

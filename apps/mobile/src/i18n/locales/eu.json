@@ -2290,6 +2290,23 @@
       "connectionLost": "Konexioa galdu da",
       "retryConnection": "Saiatu berriro konektatzen"
     },
+    "failureHistory": {
+      "title": "Hutsegiteen historia",
+      "messageFailures": "Mezuen hutsegiteak",
+      "runFallback": "Mezuak huts egin du",
+      "setupFallback": "Ingurumenaren prestaketak huts egin du",
+      "accessDenied": "Ez duzu saio honen diagnostikoetarako sarbiderik.",
+      "loadFailedTitle": "Ezin izan da hutsegiteen historia kargatu.",
+      "loadFailedDescription": "Behin-behineko errore batek atal hau ezkutatu du. Egiaztatu konexioa eta saiatu berriro.",
+      "exportJson": "Esportatu JSON",
+      "exportCsv": "Esportatu CSV",
+      "preparingJson": "JSON prestatzen…",
+      "preparingCsv": "CSV prestatzen…",
+      "exportFailed": "Ezin izan da diagnostikoen fitxategia prestatu. Saiatu berriro.",
+      "fileDescription": "Fitxategi honek huts egindako exekuzioak zerrendatzen ditu, saioen IDekin eta denbora-markekin. Erantsi laguntza-txartel bati.",
+      "retention": "Zerrendak azken {{limit}} exekuzio erakusten ditu, azken {{window}} egunetakoak. Diagnostikoak {{days}} egunez gordetzen dira.",
+      "summary": "{{failed}} huts eginda · {{completed}} amaituta"
+    },
     "goal": {
       "title": "Helburua",
       "statusActive": "Helburu aktiboa",

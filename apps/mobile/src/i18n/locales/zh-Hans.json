@@ -1706,6 +1706,23 @@
       "connectionLost": "连接已断开",
       "retryConnection": "重新连接"
     },
+    "failureHistory": {
+      "title": "失败历史",
+      "messageFailures": "消息失败",
+      "runFallback": "消息运行失败",
+      "setupFallback": "环境设置失败",
+      "accessDenied": "你无权访问此会话的诊断。",
+      "loadFailedTitle": "无法加载失败历史",
+      "loadFailedDescription": "临时错误导致此部分无法显示。请检查网络连接后重试。",
+      "exportJson": "导出 JSON",
+      "exportCsv": "导出 CSV",
+      "preparingJson": "正在准备 JSON…",
+      "preparingCsv": "正在准备 CSV…",
+      "exportFailed": "无法准备诊断文件。请重试。",
+      "fileDescription": "此文件列出了失败的运行，包含会话 ID 和时间戳。请将其附在支持工单上。",
+      "retention": "此列表显示最近 {{window}} 天内最新的 {{limit}} 次运行。诊断信息保留 {{days}} 天。",
+      "summary": "{{failed}} 失败 · {{completed}} 已完成"
+    },
     "goal": {
       "title": "目标",
       "statusActive": "进行中的目标",

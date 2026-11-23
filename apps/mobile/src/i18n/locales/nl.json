@@ -1728,6 +1728,23 @@
       "connectionLost": "Verbinding verbroken",
       "retryConnection": "Opnieuw verbinden"
     },
+    "failureHistory": {
+      "title": "Foutgeschiedenis",
+      "messageFailures": "Berichtfouten",
+      "runFallback": "Het bericht is mislukt",
+      "setupFallback": "Voorbereiding van de omgeving mislukt",
+      "accessDenied": "Je hebt geen toegang tot de diagnostische gegevens van deze sessie.",
+      "loadFailedTitle": "De foutgeschiedenis kon niet worden geladen.",
+      "loadFailedDescription": "Een tijdelijke fout heeft dit gedeelte verborgen. Controleer je verbinding en probeer het opnieuw.",
+      "exportJson": "JSON exporteren",
+      "exportCsv": "CSV exporteren",
+      "preparingJson": "JSON voorbereiden…",
+      "preparingCsv": "CSV voorbereiden…",
+      "exportFailed": "Het diagnostische bestand kon niet worden voorbereid. Probeer het opnieuw.",
+      "fileDescription": "Dit bestand bevat een lijst van de mislukte uitvoeringen met sessie-ID's en tijdstempels. Voeg het toe aan een supportticket.",
+      "retention": "De lijst toont de laatste {{limit}} uitvoeringen van de afgelopen {{window}} dagen. Diagnostische gegevens worden {{days}} dagen bewaard.",
+      "summary": "{{failed}} mislukt · {{completed}} voltooid"
+    },
     "goal": {
       "title": "Doel",
       "statusActive": "Actief doel",

@@ -2339,6 +2339,23 @@
       "connectionLost": "Connexió perduda",
       "retryConnection": "Torna a provar la connexió"
     },
+    "failureHistory": {
+      "title": "Historial de fallades",
+      "messageFailures": "Fallades de missatges",
+      "runFallback": "El missatge ha fallat",
+      "setupFallback": "La preparació de l'entorn ha fallat",
+      "accessDenied": "No tens accés als diagnòstics d'aquesta sessió.",
+      "loadFailedTitle": "No s'ha pogut carregar l'historial de fallades.",
+      "loadFailedDescription": "Un error transitori ha amagat aquesta secció. Comprova la connexió i torna-ho a provar.",
+      "exportJson": "Exporta JSON",
+      "exportCsv": "Exporta CSV",
+      "preparingJson": "Preparant el JSON…",
+      "preparingCsv": "Preparant el CSV…",
+      "exportFailed": "No s'ha pogut preparar el fitxer de diagnòstics. Torna-ho a provar.",
+      "fileDescription": "Aquest fitxer llista les execucions fallides amb identificadors de sessió i marques de temps. Adjunta'l a un tiquet de suport.",
+      "retention": "La llista mostra les últimes {{limit}} execucions dels últims {{window}} dies. Els diagnòstics es conserven durant {{days}} dies.",
+      "summary": "{{failed}} fallides · {{completed}} completades"
+    },
     "goal": {
       "title": "Objectiu",
       "statusActive": "Objectiu actiu",

@@ -1643,6 +1643,23 @@
       "connectionLost": "Connexion perdue",
       "retryConnection": "Réessayer de se connecter"
     },
+    "failureHistory": {
+      "title": "Historique des échecs",
+      "messageFailures": "Échecs de messages",
+      "runFallback": "Le message a échoué",
+      "setupFallback": "Échec de la configuration de l'environnement",
+      "accessDenied": "Vous n'avez pas accès aux diagnostics de cette session.",
+      "loadFailedTitle": "Impossible de charger l'historique des échecs",
+      "loadFailedDescription": "Une erreur temporaire a masqué cette section. Vérifiez votre connexion et réessayez.",
+      "exportJson": "Exporter en JSON",
+      "exportCsv": "Exporter en CSV",
+      "preparingJson": "Préparation du JSON…",
+      "preparingCsv": "Préparation du CSV…",
+      "exportFailed": "Impossible de préparer le fichier de diagnostics. Réessayez.",
+      "fileDescription": "Ce fichier répertorie les exécutions échouées avec les identifiants de session et les horodatages. Joignez-le à un ticket d'assistance.",
+      "retention": "La liste affiche les {{limit}} dernières exécutions des {{window}} derniers jours. Les diagnostics sont conservés pendant {{days}} jours.",
+      "summary": "{{failed}} échouées · {{completed}} terminées"
+    },
     "goal": {
       "title": "Objectif",
       "statusActive": "Objectif actif",

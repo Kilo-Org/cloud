@@ -2290,6 +2290,23 @@
       "connectionLost": "Ühendus katkes",
       "retryConnection": "Proovi uuesti ühenduda"
     },
+    "failureHistory": {
+      "title": "Ebaõnnestumiste ajalugu",
+      "messageFailures": "Sõnumite ebaõnnestumised",
+      "runFallback": "Sõnumi käivitamine ebaõnnestus",
+      "setupFallback": "Keskkonna ettevalmistamine ebaõnnestus",
+      "accessDenied": "Sul puudub juurdepääs selle seansi diagnostikale.",
+      "loadFailedTitle": "Ebaõnnestumiste ajalugu ei õnnestunud laadida.",
+      "loadFailedDescription": "Ajutine tõrge peitis selle jaotise. Kontrolli ühendust ja proovi uuesti.",
+      "exportJson": "Ekspordi JSON",
+      "exportCsv": "Ekspordi CSV",
+      "preparingJson": "JSON-i ettevalmistamine…",
+      "preparingCsv": "CSV ettevalmistamine…",
+      "exportFailed": "Diagnostikafaili ei õnnestunud ette valmistada. Proovi uuesti.",
+      "fileDescription": "See fail loetleb ebaõnnestunud käivitused koos seansside ID-dega ja ajatemplitega. Lisa see tugipiletile.",
+      "retention": "Nimekiri näitab {{limit}} viimast käivitust viimase {{window}} päeva jooksul. Diagnostikat säilitatakse {{days}} päeva.",
+      "summary": "{{failed}} ebaõnnestunud · {{completed}} tehtud"
+    },
     "goal": {
       "title": "Eesmärk",
       "statusActive": "Aktiivne eesmärk",

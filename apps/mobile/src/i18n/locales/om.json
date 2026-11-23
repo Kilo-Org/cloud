@@ -2290,6 +2290,23 @@
       "connectionLost": "Walqabannaan citeera",
       "retryConnection": "Deebi'ii walqabsiisuuf yaali"
     },
+    "failureHistory": {
+      "title": "Seenaa kufaatii",
+      "messageFailures": "Kufaatiiwwan ergaa",
+      "runFallback": "Ergaan hin milkoofne",
+      "setupFallback": "Qophiin naannoo hin milkoofne",
+      "accessDenied": "Qorannoo turtii kanaa dhaqqabuu hin dandeessu.",
+      "loadFailedTitle": "Seenaa kufaatii fe'uu hin danda'amne.",
+      "loadFailedDescription": "Dogoggorri yeroo gabaabaa kutaa kana dhokse. Walqunnamtii kee mirkaneeffadhuutii deebi'ii yaali.",
+      "exportJson": "JSON baasi",
+      "exportCsv": "CSV baasi",
+      "preparingJson": "JSON qopheessaa jira…",
+      "preparingCsv": "CSV qopheessaa jira…",
+      "exportFailed": "Faayilii qorannoo qopheessuun hin milkoofne. Irra deebi'ii yaali.",
+      "fileDescription": "Faayilii kun raawwiiwwan hin milkoofne ID turtii fi mallattoo yeroo wajjin tarreessa. Tikkeettii deeggarsaatti maxxansi.",
+      "retention": "Tarreen raawwiiwwan {{limit}} dhihoo guyyoota {{window}} darban keessaa agarsiisa. Qorannoon guyyoota {{days}}f kuufama.",
+      "summary": "{{failed}} hin milkoofne · {{completed}} xumurame"
+    },
     "goal": {
       "title": "Kaayyoo",
       "statusActive": "Kaayyoo socho'aa",

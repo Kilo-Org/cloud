@@ -1740,6 +1740,23 @@
       "connectionLost": "Conexão perdida",
       "retryConnection": "Tentar reconectar"
     },
+    "failureHistory": {
+      "title": "Histórico de falhas",
+      "messageFailures": "Falhas de mensagens",
+      "runFallback": "A mensagem falhou",
+      "setupFallback": "Falha na preparação do ambiente",
+      "accessDenied": "Você não tem acesso ao diagnóstico desta sessão.",
+      "loadFailedTitle": "Não foi possível carregar o histórico de falhas.",
+      "loadFailedDescription": "Um erro temporário ocultou esta seção. Verifique sua conexão e tente novamente.",
+      "exportJson": "Exportar JSON",
+      "exportCsv": "Exportar CSV",
+      "preparingJson": "Preparando JSON…",
+      "preparingCsv": "Preparando CSV…",
+      "exportFailed": "Não foi possível preparar o arquivo de diagnóstico. Tente novamente.",
+      "fileDescription": "Este arquivo lista execuções com falha, incluindo IDs de sessão e carimbos de data e hora. Anexe-o a um ticket de suporte.",
+      "retention": "A lista mostra as {{limit}} execuções mais recentes dos últimos {{window}} dias. O diagnóstico é armazenado por {{days}} dias.",
+      "summary": "{{failed}} com falha · {{completed}} concluídas"
+    },
     "goal": {
       "title": "Meta",
       "statusActive": "Meta ativa",

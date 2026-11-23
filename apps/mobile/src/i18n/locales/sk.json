@@ -2388,6 +2388,23 @@
       "connectionLost": "Pripojenie sa prerušilo",
       "retryConnection": "Znova sa pripojiť"
     },
+    "failureHistory": {
+      "title": "História zlyhaní",
+      "messageFailures": "Zlyhania správ",
+      "runFallback": "Správa zlyhala",
+      "setupFallback": "Príprava prostredia zlyhala",
+      "accessDenied": "Nemáš prístup k diagnostike tejto relácie.",
+      "loadFailedTitle": "Históriu zlyhaní sa nepodarilo načítať.",
+      "loadFailedDescription": "Dočasná chyba skryla túto časť. Skontroluj pripojenie a skús to znova.",
+      "exportJson": "Exportovať JSON",
+      "exportCsv": "Exportovať CSV",
+      "preparingJson": "Pripravuje sa JSON…",
+      "preparingCsv": "Pripravuje sa CSV…",
+      "exportFailed": "Diagnostický súbor sa nepodarilo pripraviť. Skús to znova.",
+      "fileDescription": "Tento súbor uvádza zlyhané spustenia s ID relácií a časovými pečiatkami. Prilož ho k tiketu podpory.",
+      "retention": "Zoznam zobrazuje posledných {{limit}} spustení za posledných {{window}} dní. Diagnostika sa uchováva {{days}} dní.",
+      "summary": "{{failed}} zlyhaných · {{completed}} dokončených"
+    },
     "goal": {
       "title": "Cieľ",
       "statusActive": "Aktívny cieľ",

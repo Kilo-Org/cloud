@@ -1774,6 +1774,23 @@
       "connectionLost": "Utracono połączenie",
       "retryConnection": "Połącz ponownie"
     },
+    "failureHistory": {
+      "title": "Historia niepowodzeń",
+      "messageFailures": "Niepowodzenia wiadomości",
+      "runFallback": "Nie udało się przetworzyć wiadomości",
+      "setupFallback": "Przygotowanie środowiska nie powiodło się",
+      "accessDenied": "Nie masz dostępu do diagnostyki tej sesji.",
+      "loadFailedTitle": "Nie udało się wczytać historii niepowodzeń.",
+      "loadFailedDescription": "Chwilowy błąd ukrył tę sekcję. Sprawdź połączenie i spróbuj ponownie.",
+      "exportJson": "Eksportuj JSON",
+      "exportCsv": "Eksportuj CSV",
+      "preparingJson": "Przygotowywanie JSON…",
+      "preparingCsv": "Przygotowywanie CSV…",
+      "exportFailed": "Nie udało się przygotować pliku diagnostyki. Spróbuj ponownie.",
+      "fileDescription": "Ten plik zawiera listę nieudanych przebiegów z identyfikatorami sesji i znacznikami czasu. Dołącz go do zgłoszenia do pomocy technicznej.",
+      "retention": "Lista pokazuje najnowsze {{limit}} przebiegów z ostatnich {{window}} dni. Diagnostyka jest przechowywana przez {{days}} dni.",
+      "summary": "{{failed}} nieudanych · {{completed}} ukończonych"
+    },
     "goal": {
       "title": "Cel",
       "statusActive": "Aktywny cel",

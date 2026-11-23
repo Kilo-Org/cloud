@@ -1717,6 +1717,23 @@
       "connectionLost": "Connessione persa",
       "retryConnection": "Riprova a connetterti"
     },
+    "failureHistory": {
+      "title": "Cronologia degli errori",
+      "messageFailures": "Errori dei messaggi",
+      "runFallback": "Il messaggio non è riuscito",
+      "setupFallback": "Preparazione dell'ambiente non riuscita",
+      "accessDenied": "Non hai accesso alla diagnostica di questa sessione.",
+      "loadFailedTitle": "Impossibile caricare la cronologia degli errori.",
+      "loadFailedDescription": "Un errore temporaneo ha nascosto questa sezione. Controlla la connessione e riprova.",
+      "exportJson": "Esporta JSON",
+      "exportCsv": "Esporta CSV",
+      "preparingJson": "Preparazione JSON…",
+      "preparingCsv": "Preparazione CSV…",
+      "exportFailed": "Impossibile preparare il file di diagnostica. Riprova.",
+      "fileDescription": "Questo file elenca le esecuzioni non riuscite con ID delle sessioni e timestamp. Allegalo a un ticket di assistenza.",
+      "retention": "L'elenco mostra le ultime {{limit}} esecuzioni degli ultimi {{window}} giorni. La diagnostica viene conservata per {{days}} giorni.",
+      "summary": "{{failed}} non riuscite · {{completed}} completate"
+    },
     "goal": {
       "title": "Obiettivo",
       "statusActive": "Obiettivo attivo",

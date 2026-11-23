@@ -1728,6 +1728,23 @@
       "connectionLost": "Verbindung unterbrochen",
       "retryConnection": "Erneut verbinden"
     },
+    "failureHistory": {
+      "title": "Fehlerverlauf",
+      "messageFailures": "Fehlgeschlagene Nachrichten",
+      "runFallback": "Die Nachricht ist fehlgeschlagen",
+      "setupFallback": "Umgebungseinrichtung fehlgeschlagen",
+      "accessDenied": "Du hast keinen Zugriff auf die Diagnosedaten dieser Sitzung.",
+      "loadFailedTitle": "Fehlerverlauf konnte nicht geladen werden.",
+      "loadFailedDescription": "Ein vorübergehender Fehler hat diesen Abschnitt ausgeblendet. Prüfe deine Verbindung und versuche es erneut.",
+      "exportJson": "JSON exportieren",
+      "exportCsv": "CSV exportieren",
+      "preparingJson": "JSON wird vorbereitet…",
+      "preparingCsv": "CSV wird vorbereitet…",
+      "exportFailed": "Die Diagnosedatei konnte nicht vorbereitet werden. Versuche es erneut.",
+      "fileDescription": "Diese Datei listet fehlgeschlagene Durchläufe mit Sitzungs-IDs und Zeitstempeln auf. Hänge sie einem Support-Ticket an.",
+      "retention": "Die Liste zeigt die neuesten {{limit}} Durchläufe der letzten {{window}} Tage. Diagnosedaten werden {{days}} Tage lang aufbewahrt.",
+      "summary": "{{failed}} fehlgeschlagen · {{completed}} abgeschlossen"
+    },
     "goal": {
       "title": "Ziel",
       "statusActive": "Aktives Ziel",

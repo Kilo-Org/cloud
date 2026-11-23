@@ -2388,6 +2388,23 @@
       "connectionLost": "Ligação perdida",
       "retryConnection": "Tentar ligar novamente"
     },
+    "failureHistory": {
+      "title": "Histórico de falhas",
+      "messageFailures": "Falhas de mensagens",
+      "runFallback": "A mensagem falhou",
+      "setupFallback": "Falha na preparação do ambiente",
+      "accessDenied": "Não tens acesso aos diagnósticos desta sessão.",
+      "loadFailedTitle": "Não foi possível carregar o histórico de falhas.",
+      "loadFailedDescription": "Um erro temporário ocultou esta secção. Verifica a ligação e tenta novamente.",
+      "exportJson": "Exportar JSON",
+      "exportCsv": "Exportar CSV",
+      "preparingJson": "A preparar JSON…",
+      "preparingCsv": "A preparar CSV…",
+      "exportFailed": "Não foi possível preparar o ficheiro de diagnósticos. Tenta novamente.",
+      "fileDescription": "Este ficheiro lista execuções falhadas com IDs de sessão e datas. Anexa-o a um pedido de suporte.",
+      "retention": "A lista mostra as últimas {{limit}} execuções dos últimos {{window}} dias. Os diagnósticos são guardados durante {{days}} dias.",
+      "summary": "{{failed}} falhadas · {{completed}} concluídas"
+    },
     "goal": {
       "title": "Objetivo",
       "statusActive": "Objetivo ativo",

@@ -2388,6 +2388,23 @@
       "connectionLost": "Připojení přerušeno",
       "retryConnection": "Znovu se připojit"
     },
+    "failureHistory": {
+      "title": "Historie selhání",
+      "messageFailures": "Selhání zpráv",
+      "runFallback": "Zpráva selhala",
+      "setupFallback": "Příprava prostředí selhala",
+      "accessDenied": "K diagnostice této relace nemáte přístup.",
+      "loadFailedTitle": "Historii selhání se nepodařilo načíst.",
+      "loadFailedDescription": "Tuto část skryla přechodná chyba. Zkontrolujte připojení a zkuste to znovu.",
+      "exportJson": "Exportovat JSON",
+      "exportCsv": "Exportovat CSV",
+      "preparingJson": "Příprava JSON…",
+      "preparingCsv": "Příprava CSV…",
+      "exportFailed": "Diagnostický soubor se nepodařilo připravit. Zkuste to znovu.",
+      "fileDescription": "Tento soubor uvádí selhaná spuštění s ID relací a časovými razítky. Přiložte jej k tiketu podpory.",
+      "retention": "Seznam zobrazuje posledních {{limit}} spuštění z posledních {{window}} dnů. Diagnostika se uchovává {{days}} dnů.",
+      "summary": "{{failed}} selhalo · {{completed}} dokončeno"
+    },
     "goal": {
       "title": "Cíl",
       "statusActive": "Aktivní cíl",

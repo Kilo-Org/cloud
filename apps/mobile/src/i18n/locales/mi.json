@@ -2290,6 +2290,23 @@
       "connectionLost": "Kua motu te hononga",
       "retryConnection": "Whakamātau ki te hono anō"
     },
+    "failureHistory": {
+      "title": "Hītori rahunga",
+      "messageFailures": "Ngā rahunga karere",
+      "runFallback": "I rahua te karere",
+      "setupFallback": "I rahua te whakaritenga o te taiao",
+      "accessDenied": "Kāore ōu āheitanga ki ngā tātaritanga o tēnei wātū.",
+      "loadFailedTitle": "Kāore i taea te uta i te hītori rahunga",
+      "loadFailedDescription": "I hunaia tēnei wāhanga e tētahi hapa rangitahi. Tirohia tō hononga, ka whakamātau anō.",
+      "exportJson": "Kaweakehia te JSON",
+      "exportCsv": "Kaweakehia te CSV",
+      "preparingJson": "Kei te whakarite i te JSON…",
+      "preparingCsv": "Kei te whakarite i te CSV…",
+      "exportFailed": "Kāore i taea te whakarite i te kōnae tātaritanga. Whakamātau anō.",
+      "fileDescription": "Ka rārangi tēnei kōnae i ngā mahi rahua me ngā ID wātū me ngā tohu wā. Āpitihia ki tētahi tīkiti tautoko.",
+      "retention": "Ka whakaatu te rārangi i ngā mahi {{limit}} hou rawa mai i ngā rā {{window}} kua hipa. Ka tiakina ngā tātaritanga mō ngā rā {{days}}.",
+      "summary": "{{failed}} kua rahua · {{completed}} kua oti"
+    },
     "goal": {
       "title": "Whāinga",
       "statusActive": "Whāinga hohe",

@@ -2339,6 +2339,23 @@
       "connectionLost": "Savienojums pārtrūcis",
       "retryConnection": "Izveidot savienojumu vēlreiz"
     },
+    "failureHistory": {
+      "title": "Kļūdu vēsture",
+      "messageFailures": "Ziņojumu kļūdas",
+      "runFallback": "Ziņojums neizdevās",
+      "setupFallback": "Vides iestatīšana neizdevās",
+      "accessDenied": "Jums nav piekļuves šīs sesijas diagnostikai.",
+      "loadFailedTitle": "Neizdevās ielādēt kļūdu vēsturi.",
+      "loadFailedDescription": "Īslaicīga kļūda paslēpa šo sadaļu. Pārbaudi savienojumu un mēģini vēlreiz.",
+      "exportJson": "Eksportēt JSON",
+      "exportCsv": "Eksportēt CSV",
+      "preparingJson": "Sagatavo JSON…",
+      "preparingCsv": "Sagatavo CSV…",
+      "exportFailed": "Neizdevās sagatavot diagnostikas failu. Mēģini vēlreiz.",
+      "fileDescription": "Šis fails uzskaita neizdevušās izpildes ar sesiju ID un laikspiedoliem. Pievieno to atbalsta pieprasījumam.",
+      "retention": "Saraksts rāda jaunākās {{limit}} izpildes no pēdējām {{window}} dienām. Diagnostika tiek glabāta {{days}} dienas.",
+      "summary": "{{failed}} neizdevušās · {{completed}} pabeigtas"
+    },
     "goal": {
       "title": "Mērķis",
       "statusActive": "Aktīvs mērķis",

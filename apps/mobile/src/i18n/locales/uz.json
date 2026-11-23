@@ -2290,6 +2290,23 @@
       "connectionLost": "Ulanish uzildi",
       "retryConnection": "Qayta ulanish"
     },
+    "failureHistory": {
+      "title": "Muvaffaqiyatsizliklar tarixi",
+      "messageFailures": "Xabar muvaffaqiyatsizliklari",
+      "runFallback": "Xabar bajarilmadi",
+      "setupFallback": "Muhit tayyorlashda xatolik yuz berdi",
+      "accessDenied": "Bu sessiya diagnostikasiga kirish huquqingiz yo‘q.",
+      "loadFailedTitle": "Muvaffaqiyatsizliklar tarixini yuklab bo‘lmadi.",
+      "loadFailedDescription": "Vaqtinchalik xatolik bu bo‘limni yashirdi. Internet aloqasini tekshirib, qayta urinib ko‘ring.",
+      "exportJson": "JSONni eksport qilish",
+      "exportCsv": "CSVni eksport qilish",
+      "preparingJson": "JSON tayyorlanmoqda…",
+      "preparingCsv": "CSV tayyorlanmoqda…",
+      "exportFailed": "Diagnostika faylini tayyorlab bo‘lmadi. Qayta urinib ko‘ring.",
+      "fileDescription": "Bu faylda sessiya IDlari va vaqt belgilari bilan muvaffaqiyatsiz bajarishlar ro‘yxati keltirilgan. Uni qo‘llab-quvvatlash so‘roviga biriktiring.",
+      "retention": "Ro‘yxat so‘nggi {{window}} kundagi eng yangi {{limit}} ta bajarishni ko‘rsatadi. Diagnostika {{days}} kun saqlanadi.",
+      "summary": "{{failed}} ta muvaffaqiyatsiz · {{completed}} ta bajarildi"
+    },
     "goal": {
       "title": "Maqsad",
       "statusActive": "Faol maqsad",

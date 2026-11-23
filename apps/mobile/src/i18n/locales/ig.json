@@ -2249,6 +2249,23 @@
       "connectionLost": "Njikọ akwụsịla",
       "retryConnection": "Nwaa njikọ ọzọ"
     },
+    "failureHistory": {
+      "title": "Akụkọ ọdịda",
+      "messageFailures": "Ọdịda ozi",
+      "runFallback": "Ozi ahụ agaghị nke ọma",
+      "setupFallback": "Nkwadebe ebe ọrụ agaghị nke ọma",
+      "accessDenied": "Ị nweghị ohere ịnweta nchọpụta nsogbu nke nnọkọ a.",
+      "loadFailedTitle": "Enweghị ike ibudata akụkọ ọdịda.",
+      "loadFailedDescription": "Njehie nwa oge zoro ngalaba a. Lelee njikọ gị ma nwaa ọzọ.",
+      "exportJson": "Bupụ JSON",
+      "exportCsv": "Bupụ CSV",
+      "preparingJson": "Na-akwadebe JSON…",
+      "preparingCsv": "Na-akwadebe CSV…",
+      "exportFailed": "Enweghị ike ịkwadebe faịlụ nchọpụta nsogbu. Nwaa ọzọ.",
+      "fileDescription": "Faịlụ a na-edepụta ọsọ ndị dara nwere ID nnọkọ na akara oge. Kegide ya na tiketi nkwado.",
+      "retention": "Ndepụta ahụ na-egosi ọsọ {{limit}} kachasị ọhụrụ site na ụbọchị {{window}} gara aga. A na-echekwa nchọpụta nsogbu maka ụbọchị {{days}}.",
+      "summary": "{{failed}} dara · {{completed}} emechara"
+    },
     "goal": {
       "title": "Ebumnuche",
       "statusActive": "Ebumnuche na-arụ ọrụ",

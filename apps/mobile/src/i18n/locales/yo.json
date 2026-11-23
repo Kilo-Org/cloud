@@ -2251,6 +2251,23 @@
       "connectionLost": "Àsopọ̀ ti já",
       "retryConnection": "Gbìyànjú láti tún sopọ̀"
     },
+    "failureHistory": {
+      "title": "Ìtàn àwọn ìkùnà",
+      "messageFailures": "Àwọn ìkùnà ìfiránṣẹ́",
+      "runFallback": "Ìfiránṣẹ́ náà kùnà",
+      "setupFallback": "Ìmúrasílẹ̀ àyíká iṣẹ́ kùnà",
+      "accessDenied": "O kò ní ààyè sí àyẹ̀wò ìṣòro ìgbà iṣẹ́ yìí.",
+      "loadFailedTitle": "A kò lè gbé ìtàn àwọn ìkùnà wọlé.",
+      "loadFailedDescription": "Àṣìṣe ìgbà díẹ̀ fi apá yìí pamọ́. Ṣàyẹ̀wò ìsopọ̀ rẹ kí o sì gbìyànjú lẹ́ẹ̀kan sí i.",
+      "exportJson": "Gbé JSON jáde",
+      "exportCsv": "Gbé CSV jáde",
+      "preparingJson": "Ń mú JSON sílẹ̀…",
+      "preparingCsv": "Ń mú CSV sílẹ̀…",
+      "exportFailed": "A kò lè mú fáìlì àyẹ̀wò ìṣòro sílẹ̀. Tún gbìyànjú.",
+      "fileDescription": "Fáìlì yìí ṣàtòjọ àwọn ìgbésẹ̀ tó kùnà pẹ̀lú àwọn ID ìgbà iṣẹ́ àti àwọn àkókò. Fi í mọ́ tíkẹ́ẹ̀tì ìtìlẹ́yìn.",
+      "retention": "Àtòjọ náà fi àwọn ìgbésẹ̀ tuntun {{limit}} hàn láti inú àwọn ọjọ́ {{window}} tó kọjá. A máa ń tọ́jú àyẹ̀wò ìṣòro fún àwọn ọjọ́ {{days}}.",
+      "summary": "{{failed}} kùnà · {{completed}} ti parí"
+    },
     "goal": {
       "title": "Àfojúsùn",
       "statusActive": "Àfojúsùn tí ń ṣiṣẹ́",

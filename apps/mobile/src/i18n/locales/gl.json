@@ -2290,6 +2290,23 @@
       "connectionLost": "Perdeuse a conexión",
       "retryConnection": "Volver tentar a conexión"
     },
+    "failureHistory": {
+      "title": "Historial de fallos",
+      "messageFailures": "Fallos de mensaxes",
+      "runFallback": "A mensaxe fallou",
+      "setupFallback": "Fallou a preparación do contorno",
+      "accessDenied": "Non tes acceso aos diagnósticos desta sesión.",
+      "loadFailedTitle": "Non se puido cargar o historial de fallos.",
+      "loadFailedDescription": "Un erro transitorio ocultou esta sección. Comproba a conexión e téntao de novo.",
+      "exportJson": "Exportar JSON",
+      "exportCsv": "Exportar CSV",
+      "preparingJson": "Preparando JSON…",
+      "preparingCsv": "Preparando CSV…",
+      "exportFailed": "Non se puido preparar o ficheiro de diagnósticos. Téntao de novo.",
+      "fileDescription": "Este ficheiro enumera as execucións falladas con identificadores de sesión e marcas de tempo. Adxúnteo a un tícket de asistencia.",
+      "retention": "A lista mostra as últimas {{limit}} execucións dos últimos {{window}} días. Os diagnósticos gárdanse durante {{days}} días.",
+      "summary": "{{failed}} falladas · {{completed}} completadas"
+    },
     "goal": {
       "title": "Obxectivo",
       "statusActive": "Obxectivo activo",

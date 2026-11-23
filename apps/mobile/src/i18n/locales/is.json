@@ -2290,6 +2290,23 @@
       "connectionLost": "Tenging rofnaði",
       "retryConnection": "Reyna að tengjast aftur"
     },
+    "failureHistory": {
+      "title": "Mistakaferill",
+      "messageFailures": "Mistök skilaboða",
+      "runFallback": "Skilaboðin mistókust",
+      "setupFallback": "Uppsetning umhverfis mistókst",
+      "accessDenied": "Þú hefur ekki aðgang að greiningargögnum þessarar lotu.",
+      "loadFailedTitle": "Ekki tókst að hlaða mistakaferlinum.",
+      "loadFailedDescription": "Skammvinn villa faldi þennan hluta. Athugaðu nettenginguna og reyndu aftur.",
+      "exportJson": "Flytja út JSON",
+      "exportCsv": "Flytja út CSV",
+      "preparingJson": "Undirbýr JSON…",
+      "preparingCsv": "Undirbýr CSV…",
+      "exportFailed": "Ekki tókst að undirbúa greiningarskrána. Reyndu aftur.",
+      "fileDescription": "Þessi skrá telur upp keyrslur sem mistókust ásamt lotuauðkennum og tímasetningum. Hengdu henni við stuðningsbeiðni.",
+      "retention": "Listinn sýnir nýjustu {{limit}} keyrslurnar frá síðustu {{window}} dögum. Greiningargögn eru geymd í {{days}} daga.",
+      "summary": "{{failed}} mistókust · {{completed}} lokið"
+    },
     "goal": {
       "title": "Markmið",
       "statusActive": "Virkt markmið",

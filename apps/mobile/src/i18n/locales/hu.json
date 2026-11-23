@@ -2290,6 +2290,23 @@
       "connectionLost": "Megszakadt a kapcsolat",
       "retryConnection": "Csatlakozás újrapróbálása"
     },
+    "failureHistory": {
+      "title": "Hibaelőzmények",
+      "messageFailures": "Sikertelen üzenetek",
+      "runFallback": "Az üzenet futása sikertelen",
+      "setupFallback": "A környezet előkészítése meghiúsult",
+      "accessDenied": "Nincs hozzáférésed a munkamenet diagnosztikájához.",
+      "loadFailedTitle": "Nem sikerült betölteni a hibaelőzményeket.",
+      "loadFailedDescription": "Egy átmeneti hiba miatt ez a szakasz nem látható. Ellenőrizd a kapcsolatot, és próbáld újra.",
+      "exportJson": "JSON exportálása",
+      "exportCsv": "CSV exportálása",
+      "preparingJson": "JSON előkészítése…",
+      "preparingCsv": "CSV előkészítése…",
+      "exportFailed": "Nem sikerült előkészíteni a diagnosztikai fájlt. Próbáld újra.",
+      "fileDescription": "Ez a fájl a sikertelen futásokat listázza munkamenet-azonosítókkal és időbélyegekkel. Csatold egy támogatási jegyhez.",
+      "retention": "A lista a legutóbbi {{limit}} futást mutatja az elmúlt {{window}} napból. A diagnosztikát {{days}} napig tároljuk.",
+      "summary": "{{failed}} sikertelen · {{completed}} kész"
+    },
     "goal": {
       "title": "Cél",
       "statusActive": "Aktív cél",

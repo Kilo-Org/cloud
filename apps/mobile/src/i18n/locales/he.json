@@ -1751,6 +1751,23 @@
       "connectionLost": "החיבור נותק",
       "retryConnection": "ניסיון התחברות נוסף"
     },
+    "failureHistory": {
+      "title": "היסטוריית הכשלים",
+      "messageFailures": "כשלי הודעות",
+      "runFallback": "ההודעה נכשלה",
+      "setupFallback": "הגדרת הסביבה נכשלה",
+      "accessDenied": "אין לך גישה לנתוני האבחון של הסשן הזה.",
+      "loadFailedTitle": "לא ניתן היה לטעון את היסטוריית הכשלים.",
+      "loadFailedDescription": "שגיאה זמנית הסתירה את הקטע הזה. בדוק את החיבור ונסה שוב.",
+      "exportJson": "ייצוא JSON",
+      "exportCsv": "ייצוא CSV",
+      "preparingJson": "מכין JSON…",
+      "preparingCsv": "מכין CSV…",
+      "exportFailed": "לא ניתן היה להכין את קובץ האבחון. נסה שוב.",
+      "fileDescription": "קובץ זה מפרט הרצות שנכשלו עם מזהי סשן וחותמות זמן. צרף אותו לכרטיס תמיכה.",
+      "retention": "הרשימה מציגה את {{limit}} ההרצות האחרונות מ-{{window}} הימים האחרונים. נתוני האבחון נשמרים למשך {{days}} ימים.",
+      "summary": "{{failed}} נכשלו · {{completed}} הושלמו"
+    },
     "goal": {
       "title": "מטרה",
       "statusActive": "מטרה פעילה",

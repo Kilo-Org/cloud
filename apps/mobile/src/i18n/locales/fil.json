@@ -2290,6 +2290,23 @@
       "connectionLost": "Nawala ang koneksyon",
       "retryConnection": "Subukang kumonekta muli"
     },
+    "failureHistory": {
+      "title": "Kasaysayan ng mga pagkabigo",
+      "messageFailures": "Mga pagkabigo ng mensahe",
+      "runFallback": "Nabigo ang mensahe",
+      "setupFallback": "Nabigo ang paghahanda ng kapaligiran",
+      "accessDenied": "Wala kang access sa pagsusuri ng sesyong ito.",
+      "loadFailedTitle": "Hindi ma-load ang kasaysayan ng mga pagkabigo.",
+      "loadFailedDescription": "May pansamantalang error na nagtago sa seksyong ito. Suriin ang iyong koneksyon at subukang muli.",
+      "exportJson": "Mag-export ng JSON",
+      "exportCsv": "Mag-export ng CSV",
+      "preparingJson": "Inihahanda ang JSON…",
+      "preparingCsv": "Inihahanda ang CSV…",
+      "exportFailed": "Hindi maihanda ang file ng pagsusuri. Subukan muli.",
+      "fileDescription": "Inililista ng file na ito ang mga nabigong pagpapatakbo kasama ang mga ID ng sesyon at timestamp. Ilakip ito sa isang tiket sa suporta.",
+      "retention": "Ipinapakita ng listahan ang pinakabagong {{limit}} pagpapatakbo mula sa nakaraang {{window}} araw. Itinatago ang pagsusuri nang {{days}} araw.",
+      "summary": "{{failed}} ang nabigo · {{completed}} ang natapos"
+    },
     "goal": {
       "title": "Layunin",
       "statusActive": "Aktibong layunin",

@@ -1728,6 +1728,23 @@
       "connectionLost": "Mất kết nối",
       "retryConnection": "Thử kết nối lại"
     },
+    "failureHistory": {
+      "title": "Lịch sử thất bại",
+      "messageFailures": "Tin nhắn thất bại",
+      "runFallback": "Tin nhắn đã thất bại",
+      "setupFallback": "Thiết lập môi trường thất bại",
+      "accessDenied": "Bạn không có quyền truy cập chẩn đoán của phiên này.",
+      "loadFailedTitle": "Không thể tải lịch sử thất bại.",
+      "loadFailedDescription": "Một lỗi tạm thời đã ẩn phần này. Hãy kiểm tra kết nối và thử lại.",
+      "exportJson": "Xuất JSON",
+      "exportCsv": "Xuất CSV",
+      "preparingJson": "Đang chuẩn bị JSON…",
+      "preparingCsv": "Đang chuẩn bị CSV…",
+      "exportFailed": "Không thể chuẩn bị tệp chẩn đoán. Hãy thử lại.",
+      "fileDescription": "Tệp này liệt kê các lần chạy thất bại kèm ID phiên và dấu thời gian. Đính kèm tệp vào phiếu hỗ trợ.",
+      "retention": "Danh sách hiển thị {{limit}} lần chạy mới nhất trong {{window}} ngày qua. Chẩn đoán được lưu trong {{days}} ngày.",
+      "summary": "{{failed}} thất bại · {{completed}} đã xong"
+    },
     "goal": {
       "title": "Mục tiêu",
       "statusActive": "Mục tiêu đang hoạt động",

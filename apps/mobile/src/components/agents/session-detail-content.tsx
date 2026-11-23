@@ -84,6 +84,7 @@ import {
 } from '@/components/agents/session-goal-collapse';
 import { SessionContextMetrics } from '@/components/agents/session-context-metrics';
 import { SessionContextSheet } from '@/components/agents/session-context-sheet';
+import { SessionFailureHistorySection } from '@/components/agents/session-failure-history-section';
 import { resolveSelectionModelDisplay } from '@/components/agents/session-model-display';
 import { SessionFollowButton } from '@/components/agents/session-follow-button';
 import {
@@ -3094,6 +3095,14 @@ export function SessionDetailContent({
           ) : null}
           {keepScreenAwake ? <ActiveSessionKeepAwake sessionId={sessionId} /> : null}
           <VisibleSessionPublisher sessionId={sessionId} />
+
+          {/* The failure history sits with the session's own chrome, under the
+              goal and todo rows: it renders nothing unless this session
+              recorded a setup or run failure. */}
+          <SessionFailureHistorySection
+            cloudAgentSessionId={cloudAgentSessionId}
+            visible={isSessionLoaded}
+          />
 
           {/* The transcript and composer keep their layout while the keyboard
               moves: the pane translates them with the keyboard on the UI

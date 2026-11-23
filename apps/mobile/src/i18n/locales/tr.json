@@ -1728,6 +1728,23 @@
       "connectionLost": "Bağlantı koptu",
       "retryConnection": "Yeniden bağlanmayı dene"
     },
+    "failureHistory": {
+      "title": "Başarısızlık geçmişi",
+      "messageFailures": "Başarısız mesajlar",
+      "runFallback": "Mesaj başarısız oldu",
+      "setupFallback": "Ortam kurulumu başarısız oldu",
+      "accessDenied": "Bu oturumun tanılama verilerine erişimin yok.",
+      "loadFailedTitle": "Başarısızlık geçmişi yüklenemedi.",
+      "loadFailedDescription": "Geçici bir hata bu bölümü gizledi. Bağlantını kontrol edip tekrar dene.",
+      "exportJson": "JSON'u dışa aktar",
+      "exportCsv": "CSV'yi dışa aktar",
+      "preparingJson": "JSON hazırlanıyor…",
+      "preparingCsv": "CSV hazırlanıyor…",
+      "exportFailed": "Tanılama dosyası hazırlanamadı. Tekrar dene.",
+      "fileDescription": "Bu dosya, başarısız çalıştırmaları oturum kimlikleri ve zaman damgalarıyla listeler. Destek talebine ekle.",
+      "retention": "Liste, son {{window}} gün içindeki en yeni {{limit}} çalıştırmayı gösterir. Tanılama verileri {{days}} gün saklanır.",
+      "summary": "{{failed}} başarısız · {{completed}} tamamlandı"
+    },
     "goal": {
       "title": "Hedef",
       "statusActive": "Etkin hedef",

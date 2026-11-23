@@ -2437,6 +2437,23 @@
       "connectionLost": "Il-konnessjoni ntilfet",
       "retryConnection": "Erġa' pprova taqbad"
     },
+    "failureHistory": {
+      "title": "Storja tal-fallimenti",
+      "messageFailures": "Fallimenti tal-messaġġi",
+      "runFallback": "Il-messaġġ falla",
+      "setupFallback": "It-tħejjija tal-ambjent falliet",
+      "accessDenied": "M'għandekx aċċess għad-dijanjostika ta' din is-sessjoni.",
+      "loadFailedTitle": "Ma setgħetx titgħabba l-istorja tal-fallimenti.",
+      "loadFailedDescription": "Żball temporanju ħeba din is-sezzjoni. Iċċekkja l-konnessjoni tiegħek u erġa' pprova.",
+      "exportJson": "Esporta JSON",
+      "exportCsv": "Esporta CSV",
+      "preparingJson": "Qed jitħejja JSON…",
+      "preparingCsv": "Qed jitħejja CSV…",
+      "exportFailed": "Ma setax jitħejja l-fajl tad-dijanjostika. Erġa' pprova.",
+      "fileDescription": "Dan il-fajl jelenka eżekuzzjonijiet li fallu bl-IDs tas-sessjoni u bit-timestamps. Waħħlu ma' biljett ta' appoġġ.",
+      "retention": "Il-lista turi l-aħħar {{limit}} eżekuzzjonijiet mill-aħħar {{window}} ġranet. Id-dijanjostika tinżamm għal {{days}} ġranet.",
+      "summary": "{{failed}} fallu · {{completed}} kompluti"
+    },
     "goal": {
       "title": "Għan",
       "statusActive": "Għan attiv",

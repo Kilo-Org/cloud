@@ -2290,6 +2290,23 @@
       "connectionLost": "Xiriirku wuu go'ay",
       "retryConnection": "Mar kale isku day inaad ku xirmato"
     },
+    "failureHistory": {
+      "title": "Taariikhda fashilka",
+      "messageFailures": "Fashilka farriimaha",
+      "runFallback": "Farriintu way fashilantay",
+      "setupFallback": "Dejintu deegaanka way fashilantay",
+      "accessDenied": "Ma haysato ogolaansho aad ku gasho cilad-baarista kalfadhigan.",
+      "loadFailedTitle": "Taariikhda fashilka lama soo shubi karin.",
+      "loadFailedDescription": "Khalad ku meel gaar ah ayaa qariyay qaybtan. Hubi xiriirkaaga oo mar kale isku day.",
+      "exportJson": "Dhoofi JSON",
+      "exportCsv": "Dhoofi CSV",
+      "preparingJson": "JSON waa la diyaarinayaa…",
+      "preparingCsv": "CSV waa la diyaarinayaa…",
+      "exportFailed": "Faylka cilad-baarista lama diyaarin karin. Mar kale isku day.",
+      "fileDescription": "Faylkani wuxuu taxayaa socodyada fashilmay oo wata aqoonsiyada kalfadhiga iyo waqtiyada. Ku lifaaq tigidh taageero.",
+      "retention": "Liisku wuxuu muujinayaa {{limit}} socod ee ugu dambeeyay {{window}} maalmood ee la soo dhaafay. Cilad-baarista waxaa la kaydiyaa {{days}} maalmood.",
+      "summary": "{{failed}} fashilmay · {{completed}} dhammaaday"
+    },
     "goal": {
       "title": "Hadaf",
       "statusActive": "Hadaf firfircoon",

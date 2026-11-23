@@ -2290,6 +2290,23 @@
       "connectionLost": "Tapaka ny fifandraisana",
       "retryConnection": "Andramo mifandray indray"
     },
+    "failureHistory": {
+      "title": "Tantaran'ny tsy fahombiazana",
+      "messageFailures": "Tsy fahombiazan'ny hafatra",
+      "runFallback": "Tsy nahomby ny hafatra",
+      "setupFallback": "Tsy nahomby ny fanomanana ny tontolo fiasana",
+      "accessDenied": "Tsy manana fahazoan-dalana hijery ny fitiliana amin'ity fotoam-piasana ity ianao.",
+      "loadFailedTitle": "Tsy voaray ny tantaran'ny tsy fahombiazana.",
+      "loadFailedDescription": "Nafenin'ny hadisoana vetivety ity fizarana ity. Hamarino ny fifandraisanao ary andramo indray.",
+      "exportJson": "Aondrano ny JSON",
+      "exportCsv": "Aondrano ny CSV",
+      "preparingJson": "Manomana ny JSON…",
+      "preparingCsv": "Manomana ny CSV…",
+      "exportFailed": "Tsy voaomana ny rakitra fitiliana. Andramo indray.",
+      "fileDescription": "Ity rakitra ity dia mitanisa ny fanatanterahana tsy nahomby miaraka amin'ny ID amin'ny fotoam-piasana sy ny fotoana. Ampatohy amin'ny tapakila fanohanana izy.",
+      "retention": "Ny lisitra dia mampiseho ny fanatanterahana {{limit}} farany tao anatin'ny {{window}} andro farany. Tahiry mandritra ny {{days}} andro ny fitiliana.",
+      "summary": "{{failed}} tsy nahomby · {{completed}} vita"
+    },
     "goal": {
       "title": "Tanjona",
       "statusActive": "Tanjona mavitrika",

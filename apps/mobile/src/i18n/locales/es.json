@@ -1751,6 +1751,23 @@
       "connectionLost": "Conexión perdida",
       "retryConnection": "Reintentar la conexión"
     },
+    "failureHistory": {
+      "title": "Historial de fallos",
+      "messageFailures": "Fallos de mensajes",
+      "runFallback": "El mensaje ha fallado",
+      "setupFallback": "Error de preparación del entorno",
+      "accessDenied": "No tienes acceso a los diagnósticos de esta sesión.",
+      "loadFailedTitle": "No se pudo cargar el historial de fallos.",
+      "loadFailedDescription": "Un error transitorio ocultó esta sección. Comprueba tu conexión e inténtalo de nuevo.",
+      "exportJson": "Exportar JSON",
+      "exportCsv": "Exportar CSV",
+      "preparingJson": "Preparando JSON…",
+      "preparingCsv": "Preparando CSV…",
+      "exportFailed": "No se pudo preparar el archivo de diagnóstico. Inténtalo de nuevo.",
+      "fileDescription": "Este archivo enumera las ejecuciones fallidas con los ID de sesión y las marcas de tiempo. Adjúntalo a un ticket de soporte.",
+      "retention": "La lista muestra las últimas {{limit}} ejecuciones de los últimos {{window}} días. Los diagnósticos se conservan durante {{days}} días.",
+      "summary": "{{failed}} fallidas · {{completed}} completadas"
+    },
     "goal": {
       "title": "Objetivo",
       "statusActive": "Objetivo activo",

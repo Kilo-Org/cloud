@@ -2290,6 +2290,23 @@
       "connectionLost": "Bağlantı kəsildi",
       "retryConnection": "Yenidən qoşul"
     },
+    "failureHistory": {
+      "title": "Uğursuzluq tarixçəsi",
+      "messageFailures": "Mesaj uğursuzluqları",
+      "runFallback": "Mesaj uğursuz oldu",
+      "setupFallback": "Mühit quraşdırması uğursuz oldu",
+      "accessDenied": "Bu sessiyanın diaqnostikasına girişiniz yoxdur.",
+      "loadFailedTitle": "Uğursuzluq tarixçəsini yükləmək mümkün olmadı.",
+      "loadFailedDescription": "Müvəqqəti xəta bu bölməni gizlətdi. Bağlantını yoxla və yenidən cəhd et.",
+      "exportJson": "JSON ixrac et",
+      "exportCsv": "CSV ixrac et",
+      "preparingJson": "JSON hazırlanır…",
+      "preparingCsv": "CSV hazırlanır…",
+      "exportFailed": "Diaqnostika faylını hazırlamaq mümkün olmadı. Yenidən cəhd et.",
+      "fileDescription": "Bu fayl sessiya ID-ləri və zaman damğaları ilə uğursuz icraları sadalayır. Onu dəstək biletinə əlavə edin.",
+      "retention": "Siyahı son {{window}} gün ərzində ən son {{limit}} icranı göstərir. Diaqnostika {{days}} gün saxlanılır.",
+      "summary": "{{failed}} uğursuz · {{completed}} tamamlandı"
+    },
     "goal": {
       "title": "Məqsəd",
       "statusActive": "Aktiv məqsəd",

@@ -2388,6 +2388,23 @@
       "connectionLost": "Ryšys nutrūko",
       "retryConnection": "Bandyti prisijungti iš naujo"
     },
+    "failureHistory": {
+      "title": "Nepavykusių paleidimų istorija",
+      "messageFailures": "Nepavykę žinučių paleidimai",
+      "runFallback": "Žinutė nepavyko",
+      "setupFallback": "Nepavyko paruošti aplinkos",
+      "accessDenied": "Neturite prieigos prie šios sesijos diagnostikos.",
+      "loadFailedTitle": "Nepavyko įkelti nepavykusių paleidimų istorijos",
+      "loadFailedDescription": "Laikina klaida paslėpė šią skiltį. Patikrinkite ryšį ir bandykite dar kartą.",
+      "exportJson": "Eksportuoti JSON",
+      "exportCsv": "Eksportuoti CSV",
+      "preparingJson": "Rengiamas JSON…",
+      "preparingCsv": "Rengiamas CSV…",
+      "exportFailed": "Nepavyko paruošti diagnostikos failo. Bandykite dar kartą.",
+      "fileDescription": "Šiame faile išvardijami nepavykę paleidimai su sesijų ID ir laiko žymomis. Pridėkite jį prie pagalbos užklausos.",
+      "retention": "Sąraše rodomi naujausi {{limit}} paleidimų iš pastarųjų {{window}} dienų. Diagnostikos duomenys saugomi {{days}} dienų.",
+      "summary": "{{failed}} nepavyko · {{completed}} atlikta"
+    },
     "goal": {
       "title": "Tikslas",
       "statusActive": "Aktyvus tikslas",

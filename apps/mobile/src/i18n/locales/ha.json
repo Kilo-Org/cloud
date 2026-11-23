@@ -2290,6 +2290,23 @@
       "connectionLost": "Haɗi ya katse",
       "retryConnection": "Sake gwada haɗi"
     },
+    "failureHistory": {
+      "title": "Tarihin gazawa",
+      "messageFailures": "Gazawar saƙonni",
+      "runFallback": "Saƙon ya gaza",
+      "setupFallback": "An kasa shirya muhallin aiki",
+      "accessDenied": "Ba ka da damar binciken matsalar manhaja na wannan zaman.",
+      "loadFailedTitle": "An kasa loda tarihin gazawa.",
+      "loadFailedDescription": "Wani kuskure na wucin gadi ya ɓoye wannan sashe. Duba haɗin intanet ɗinka ka sake gwadawa.",
+      "exportJson": "Fitar da JSON",
+      "exportCsv": "Fitar da CSV",
+      "preparingJson": "Ana shirya JSON…",
+      "preparingCsv": "Ana shirya CSV…",
+      "exportFailed": "An kasa shirya fayil ɗin binciken matsalar manhaja. Sake gwadawa.",
+      "fileDescription": "Wannan fayil ɗin yana lissafa aiwatarwar da suka gaza tare da ID ɗin zaman da tambarin lokaci. Haɗa shi da tikitin tallafi.",
+      "retention": "Jerin yana nuna sabbin aiwatarwa {{limit}} daga kwanaki {{window}} na ƙarshe. Ana adana binciken matsalar manhaja na tsawon kwanaki {{days}}.",
+      "summary": "{{failed}} sun gaza · {{completed}} an kammala"
+    },
     "goal": {
       "title": "Manufa",
       "statusActive": "Manufa mai aiki",

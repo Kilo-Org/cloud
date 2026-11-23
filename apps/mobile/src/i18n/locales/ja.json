@@ -1706,6 +1706,23 @@
       "connectionLost": "接続切断",
       "retryConnection": "接続を再試行"
     },
+    "failureHistory": {
+      "title": "失敗履歴",
+      "messageFailures": "メッセージの失敗",
+      "runFallback": "メッセージに失敗しました",
+      "setupFallback": "環境のセットアップに失敗",
+      "accessDenied": "このセッションの診断情報にアクセスする権限がありません。",
+      "loadFailedTitle": "失敗履歴を読み込めませんでした。",
+      "loadFailedDescription": "一時的なエラーにより、このセクションは表示されませんでした。接続を確認して、もう一度お試しください。",
+      "exportJson": "JSON をエクスポート",
+      "exportCsv": "CSV をエクスポート",
+      "preparingJson": "JSON を準備中…",
+      "preparingCsv": "CSV を準備中…",
+      "exportFailed": "診断情報ファイルを準備できませんでした。もう一度お試しください。",
+      "fileDescription": "このファイルには、セッション ID とタイムスタンプを含む失敗した実行が一覧表示されます。サポートチケットに添付してください。",
+      "retention": "このリストには、最新 {{limit}} 件の実行が過去 {{window}} 日間分表示されます。診断情報は {{days}} 日間保存されます。",
+      "summary": "{{failed}} 件失敗 · {{completed}} 件完了"
+    },
     "goal": {
       "title": "ゴール",
       "statusActive": "アクティブなゴール",

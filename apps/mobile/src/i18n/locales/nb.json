@@ -2290,6 +2290,23 @@
       "connectionLost": "Tilkoblingen er brutt",
       "retryConnection": "Prøv å koble til på nytt"
     },
+    "failureHistory": {
+      "title": "Feilhistorikk",
+      "messageFailures": "Meldingsfeil",
+      "runFallback": "Meldingen mislyktes",
+      "setupFallback": "Miljøoppsettet mislyktes",
+      "accessDenied": "Du har ikke tilgang til diagnostikken for denne økten.",
+      "loadFailedTitle": "Kunne ikke laste inn feilhistorikken.",
+      "loadFailedDescription": "En forbigående feil skjulte denne delen. Sjekk tilkoblingen og prøv igjen.",
+      "exportJson": "Eksporter JSON",
+      "exportCsv": "Eksporter CSV",
+      "preparingJson": "Forbereder JSON…",
+      "preparingCsv": "Forbereder CSV…",
+      "exportFailed": "Kunne ikke forberede diagnostikkfilen. Prøv igjen.",
+      "fileDescription": "Denne filen viser mislykkede kjøringer med økt-ID-er og tidsstempler. Legg den ved en supporthenvendelse.",
+      "retention": "Listen viser de siste {{limit}} kjøringene fra de siste {{window}} dagene. Diagnostikken lagres i {{days}} dager.",
+      "summary": "{{failed}} mislykket · {{completed}} fullført"
+    },
     "goal": {
       "title": "Mål",
       "statusActive": "Aktivt mål",

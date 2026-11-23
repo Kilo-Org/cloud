@@ -2339,6 +2339,23 @@
       "connectionLost": "Veza izgubljena",
       "retryConnection": "Ponovo se poveži"
     },
+    "failureHistory": {
+      "title": "Historija neuspjeha",
+      "messageFailures": "Neuspjesi poruka",
+      "runFallback": "Poruka nije uspjela",
+      "setupFallback": "Priprema okruženja nije uspjela",
+      "accessDenied": "Nemaš pristup dijagnostici ove sesije.",
+      "loadFailedTitle": "Nije moguće učitati historiju neuspjeha.",
+      "loadFailedDescription": "Privremena greška je sakrila ovaj odjeljak. Provjeri vezu i pokušaj ponovo.",
+      "exportJson": "Izvezi JSON",
+      "exportCsv": "Izvezi CSV",
+      "preparingJson": "Priprema JSON…",
+      "preparingCsv": "Priprema CSV…",
+      "exportFailed": "Nije moguće pripremiti datoteku dijagnostike. Pokušaj ponovo.",
+      "fileDescription": "Ova datoteka navodi neuspjela pokretanja s ID-ovima sesija i vremenskim oznakama. Priloži je uz zahtjev za podršku.",
+      "retention": "Lista prikazuje najnovijih {{limit}} pokretanja iz posljednjih {{window}} dana. Dijagnostika se čuva {{days}} dana.",
+      "summary": "{{failed}} neuspjelo · {{completed}} završeno"
+    },
     "goal": {
       "title": "Cilj",
       "statusActive": "Aktivan cilj",

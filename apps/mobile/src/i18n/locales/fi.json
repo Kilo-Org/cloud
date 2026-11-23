@@ -2290,6 +2290,23 @@
       "connectionLost": "Yhteys katkesi",
       "retryConnection": "Yhdistä uudelleen"
     },
+    "failureHistory": {
+      "title": "Epäonnistumishistoria",
+      "messageFailures": "Viestien epäonnistumiset",
+      "runFallback": "Viesti epäonnistui",
+      "setupFallback": "Ympäristön valmistelu epäonnistui",
+      "accessDenied": "Sinulla ei ole oikeutta tämän istunnon diagnostiikkaan.",
+      "loadFailedTitle": "Epäonnistumishistoriaa ei voitu ladata",
+      "loadFailedDescription": "Tilapäinen virhe piilotti tämän osion. Tarkista yhteys ja yritä uudelleen.",
+      "exportJson": "Vie JSON",
+      "exportCsv": "Vie CSV",
+      "preparingJson": "Valmistellaan JSON…",
+      "preparingCsv": "Valmistellaan CSV…",
+      "exportFailed": "Diagnostiikkatiedostoa ei voitu valmistaa. Yritä uudelleen.",
+      "fileDescription": "Tämä tiedosto luettelee epäonnistuneet suoritukset istuntotunnuksineen ja aikaleimoineen. Liitä se tukipyyntöön.",
+      "retention": "Luettelo näyttää viimeisimmät {{limit}} suoritusta viimeiseltä {{window}} päivältä. Diagnostiikkaa säilytetään {{days}} päivää.",
+      "summary": "{{failed}} epäonnistunutta · {{completed}} valmista"
+    },
     "goal": {
       "title": "Tavoite",
       "statusActive": "Aktiivinen tavoite",

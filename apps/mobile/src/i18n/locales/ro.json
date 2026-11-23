@@ -2339,6 +2339,23 @@
       "connectionLost": "Conexiune pierdută",
       "retryConnection": "Încearcă din nou conectarea"
     },
+    "failureHistory": {
+      "title": "Istoricul eșecurilor",
+      "messageFailures": "Eșecuri de mesaje",
+      "runFallback": "Mesajul a eșuat",
+      "setupFallback": "Configurarea mediului a eșuat",
+      "accessDenied": "Nu ai acces la datele de diagnostic ale acestei sesiuni.",
+      "loadFailedTitle": "Nu s-a putut încărca istoricul eșecurilor.",
+      "loadFailedDescription": "O eroare temporară a ascuns această secțiune. Verifică-ți conexiunea și încearcă din nou.",
+      "exportJson": "Exportă JSON",
+      "exportCsv": "Exportă CSV",
+      "preparingJson": "Se pregătește JSON…",
+      "preparingCsv": "Se pregătește CSV…",
+      "exportFailed": "Nu s-a putut pregăti fișierul de diagnostic. Încearcă din nou.",
+      "fileDescription": "Acest fișier listează rulările eșuate cu ID-uri de sesiune și marcaje temporale. Atașează-l la un tichet de asistență.",
+      "retention": "Lista arată cele mai recente {{limit}} rulări din ultimele {{window}} zile. Datele de diagnostic sunt păstrate timp de {{days}} zile.",
+      "summary": "{{failed}} eșuate · {{completed}} finalizate"
+    },
     "goal": {
       "title": "Obiectiv",
       "statusActive": "Obiectiv activ",

@@ -2290,6 +2290,23 @@
       "connectionLost": "Ukuxhumana kunqamukile",
       "retryConnection": "Zama ukuxhuma futhi"
     },
+    "failureHistory": {
+      "title": "Umlando wokuhluleka",
+      "messageFailures": "Ukuhluleka kwemilayezo",
+      "runFallback": "Umlayezo uhlulekile",
+      "setupFallback": "Ukusetha kwendawo yokusebenza kwehlulekile",
+      "accessDenied": "Awunalo ilungelo lokufinyelela kukuhlolwa kwalesi seshini.",
+      "loadFailedTitle": "Asikwazanga ukulayisha umlando wokuhluleka.",
+      "loadFailedDescription": "Iphutha lesikhashana lifihlile lesi sigaba. Hlola uxhumano lwakho bese uzama futhi.",
+      "exportJson": "Thumela ngaphandle i-JSON",
+      "exportCsv": "Thumela ngaphandle i-CSV",
+      "preparingJson": "Kulungiswa i-JSON…",
+      "preparingCsv": "Kulungiswa i-CSV…",
+      "exportFailed": "Asikwazanga ukulungisa ifayela lokuhlolwa. Zama futhi.",
+      "fileDescription": "Le fayela ibala imizamo ehlulekile enama-ID eseshini nezikhathi. Yinamathisele ethikithini yokusekela.",
+      "retention": "Uhlu lubonisa {{limit}} imizamo yamuva kusukela ezinsukwini ezingu-{{window}} ezedlule. Ukuhlolwa kugcinwa izinsuku ezingu-{{days}}.",
+      "summary": "{{failed}} kwehlulekile · {{completed}} kuqediwe"
+    },
     "goal": {
       "title": "Umgomo",
       "statusActive": "Umgomo osebenzayo",

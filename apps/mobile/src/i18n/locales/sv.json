@@ -2290,6 +2290,23 @@
       "connectionLost": "Anslutningen bröts",
       "retryConnection": "Försök ansluta igen"
     },
+    "failureHistory": {
+      "title": "Felhistorik",
+      "messageFailures": "Meddelandefel",
+      "runFallback": "Meddelandet misslyckades",
+      "setupFallback": "Miljöförberedelserna misslyckades",
+      "accessDenied": "Du har inte åtkomst till den här sessionens diagnostik.",
+      "loadFailedTitle": "Det gick inte att läsa in felhistoriken",
+      "loadFailedDescription": "Ett tillfälligt fel döljde det här avsnittet. Kontrollera anslutningen och försök igen.",
+      "exportJson": "Exportera JSON",
+      "exportCsv": "Exportera CSV",
+      "preparingJson": "Förbereder JSON…",
+      "preparingCsv": "Förbereder CSV…",
+      "exportFailed": "Det gick inte att förbereda diagnostikfilen. Försök igen.",
+      "fileDescription": "Den här filen listar misslyckade körningar med sessions-ID och tidsstämplar. Bifoga den till ett supportärende.",
+      "retention": "Listan visar de senaste {{limit}} körningarna från de senaste {{window}} dagarna. Diagnostiken sparas i {{days}} dagar.",
+      "summary": "{{failed}} misslyckade · {{completed}} klara"
+    },
     "goal": {
       "title": "Mål",
       "statusActive": "Aktivt mål",

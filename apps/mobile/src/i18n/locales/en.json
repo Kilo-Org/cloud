@@ -2392,6 +2392,23 @@
       "connectionLost": "Connection lost",
       "retryConnection": "Retry connection"
     },
+    "failureHistory": {
+      "title": "Failure history",
+      "messageFailures": "Message failures",
+      "runFallback": "The message failed",
+      "setupFallback": "Environment preparation failed",
+      "accessDenied": "You do not have access to this session's diagnostics.",
+      "loadFailedTitle": "Could not load failure history",
+      "loadFailedDescription": "A transient error hid this section. Check your connection and try again.",
+      "exportJson": "Export JSON",
+      "exportCsv": "Export CSV",
+      "preparingJson": "Preparing JSON…",
+      "preparingCsv": "Preparing CSV…",
+      "exportFailed": "Could not prepare the diagnostics file. Try again.",
+      "fileDescription": "This file lists failed runs with session IDs and timestamps. Attach it to a support ticket.",
+      "retention": "The list shows the latest {{limit}} runs from the last {{window}} days. Diagnostics are stored for {{days}} days.",
+      "summary": "{{failed}} failed · {{completed}} completed"
+    },
     "goal": {
       "title": "Goal",
       "statusActive": "Active goal",

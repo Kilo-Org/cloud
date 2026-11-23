@@ -2246,6 +2246,23 @@
       "connectionLost": "Sambungan terputus",
       "retryConnection": "Cuba sambung semula"
     },
+    "failureHistory": {
+      "title": "Sejarah kegagalan",
+      "messageFailures": "Kegagalan mesej",
+      "runFallback": "Mesej gagal",
+      "setupFallback": "Penyediaan persekitaran gagal",
+      "accessDenied": "Anda tidak mempunyai akses kepada diagnostik sesi ini.",
+      "loadFailedTitle": "Tidak dapat memuatkan sejarah kegagalan.",
+      "loadFailedDescription": "Ralat sementara menyembunyikan bahagian ini. Semak sambungan anda dan cuba lagi.",
+      "exportJson": "Eksport JSON",
+      "exportCsv": "Eksport CSV",
+      "preparingJson": "Menyediakan JSON…",
+      "preparingCsv": "Menyediakan CSV…",
+      "exportFailed": "Tidak dapat menyediakan fail diagnostik. Cuba lagi.",
+      "fileDescription": "Fail ini menyenaraikan larian gagal dengan ID sesi dan cap masa. Lampirkannya pada tiket sokongan.",
+      "retention": "Senarai ini menunjukkan {{limit}} larian terkini daripada {{window}} hari terakhir. Diagnostik disimpan selama {{days}} hari.",
+      "summary": "{{failed}} gagal · {{completed}} selesai"
+    },
     "goal": {
       "title": "Matlamat",
       "statusActive": "Matlamat aktif",

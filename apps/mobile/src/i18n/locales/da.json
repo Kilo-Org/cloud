@@ -2290,6 +2290,23 @@
       "connectionLost": "Forbindelsen er afbrudt",
       "retryConnection": "Prøv at oprette forbindelse igen"
     },
+    "failureHistory": {
+      "title": "Fejlhistorik",
+      "messageFailures": "Beskedfejl",
+      "runFallback": "Beskeden mislykkedes",
+      "setupFallback": "Forberedelsen af miljøet mislykkedes",
+      "accessDenied": "Du har ikke adgang til denne sessions diagnostik.",
+      "loadFailedTitle": "Kunne ikke indlæse fejlhistorikken.",
+      "loadFailedDescription": "En forbigående fejl skjulte dette afsnit. Tjek din forbindelse, og prøv igen.",
+      "exportJson": "Eksportér JSON",
+      "exportCsv": "Eksportér CSV",
+      "preparingJson": "Forbereder JSON…",
+      "preparingCsv": "Forbereder CSV…",
+      "exportFailed": "Kunne ikke forberede diagnostikfilen. Prøv igen.",
+      "fileDescription": "Denne fil viser mislykkede kørsler med session-id'er og tidsstempler. Vedhæft den til en supportsag.",
+      "retention": "Listen viser de nyeste {{limit}} kørsler fra de seneste {{window}} dage. Diagnostik opbevares i {{days}} dage.",
+      "summary": "{{failed}} mislykkede · {{completed}} fuldførte"
+    },
     "goal": {
       "title": "Mål",
       "statusActive": "Aktivt mål",

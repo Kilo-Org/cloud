@@ -2290,6 +2290,23 @@
       "connectionLost": "ግንኙነቱ ተቋርጧል",
       "retryConnection": "እንደገና ለመገናኘት ይሞክሩ"
     },
+    "failureHistory": {
+      "title": "የአለመሳካት ታሪክ",
+      "messageFailures": "ያልተሳኩ መልእክቶች",
+      "runFallback": "መልእክቱ አልተሳካም",
+      "setupFallback": "የአካባቢ ማዋቀር አልተሳካም",
+      "accessDenied": "የዚህ ክፍለ ጊዜ ምርመራዎች ላይ መዳረሻ የለዎትም።",
+      "loadFailedTitle": "የአለመሳካት ታሪክን መጫን አልተቻለም።",
+      "loadFailedDescription": "ጊዜያዊ ስህተት ይህንን ክፍል ደብቆታል። ግንኙነትዎን ያረጋግጡና እንደገና ይሞክሩ።",
+      "exportJson": "JSON ወደ ውጭ ላክ",
+      "exportCsv": "CSV ወደ ውጭ ላክ",
+      "preparingJson": "JSON በማዘጋጀት ላይ…",
+      "preparingCsv": "CSV በማዘጋጀት ላይ…",
+      "exportFailed": "የምርመራ ፋይሉን ማዘጋጀት አልተቻለም። እንደገና ሞክር።",
+      "fileDescription": "ይህ ፋይል ያልተሳኩ አፈጻጸሞችን ከክፍለ ጊዜ መለያዎች እና የጊዜ ማህተሞች ጋር ይዘረዝራል። ለድጋፍ ትኬት ያያይዙት።",
+      "retention": "ዝርዝሩ የቅርብ ጊዜዎቹን {{limit}} አፈጻጸሞች ካለፉት {{window}} ቀናት ያሳያል። ምርመራዎች ለ{{days}} ቀናት ይቀመጣሉ።",
+      "summary": "{{failed}} አልተሳኩ · {{completed}} ተጠናቅቀዋል"
+    },
     "goal": {
       "title": "ግብ",
       "statusActive": "ንቁ ግብ",

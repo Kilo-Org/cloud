@@ -1820,6 +1820,23 @@
       "connectionLost": "انقطع الاتصال",
       "retryConnection": "إعادة محاولة الاتصال"
     },
+    "failureHistory": {
+      "title": "سجل حالات الفشل",
+      "messageFailures": "حالات فشل الرسائل",
+      "runFallback": "فشلت الرسالة",
+      "setupFallback": "فشل إعداد البيئة",
+      "accessDenied": "ليس لديك صلاحية الوصول إلى بيانات تشخيص هذه الجلسة.",
+      "loadFailedTitle": "تعذّر تحميل سجل حالات الفشل.",
+      "loadFailedDescription": "أخفى خطأ مؤقت هذا القسم. تحقق من اتصالك وحاول مرة أخرى.",
+      "exportJson": "تصدير JSON",
+      "exportCsv": "تصدير CSV",
+      "preparingJson": "جارٍ تحضير JSON…",
+      "preparingCsv": "جارٍ تحضير CSV…",
+      "exportFailed": "تعذّر تحضير ملف التشخيص. حاول مرة أخرى.",
+      "fileDescription": "يسرد هذا الملف عمليات التشغيل الفاشلة مع معرّفات الجلسات والطوابع الزمنية. أرفقه بتذكرة دعم.",
+      "retention": "تعرض القائمة أحدث {{limit}} عمليات تشغيل من آخر {{window}} يوم. تُحفظ بيانات التشخيص لمدة {{days}} يوم.",
+      "summary": "فشل {{failed}} · اكتمل {{completed}}"
+    },
     "goal": {
       "title": "الهدف",
       "statusActive": "هدف نشط",

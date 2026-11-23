@@ -2290,6 +2290,23 @@
       "connectionLost": "اړیکه پرې شوه",
       "retryConnection": "بیا د نښلېدو هڅه وکړئ"
     },
+    "failureHistory": {
+      "title": "د ناکامیو تاریخچه",
+      "messageFailures": "د پیغامونو ناکامۍ",
+      "runFallback": "پیغام ناکام شو",
+      "setupFallback": "د چاپېریال چمتوالی ناکام شو",
+      "accessDenied": "تاسو د دې ناستې د ستونزو تشخیص ته لاسرسی نه لرئ.",
+      "loadFailedTitle": "د ناکامیو تاریخچه بار نه شوه.",
+      "loadFailedDescription": "یوې لنډمهالې تېروتنې دا برخه پټه کړه. خپل اتصال وګورئ او بیا هڅه وکړئ.",
+      "exportJson": "JSON صادر کړئ",
+      "exportCsv": "CSV صادر کړئ",
+      "preparingJson": "JSON چمتو کېږي…",
+      "preparingCsv": "CSV چمتو کېږي…",
+      "exportFailed": "د ستونزو د تشخیص فایل چمتو نه شو. بیا هڅه وکړئ.",
+      "fileDescription": "دا فایل ناکامې هڅې د ناستې پېژندونکو او وختونو سره لیست کوي. دا د ملاتړ ټکټ ته ضمیمه کړئ.",
+      "retention": "لیست وروستۍ {{limit}} هڅې د تېرو {{window}} ورځو څخه ښیي. تشخیص {{days}} ورځې ساتل کېږي.",
+      "summary": "{{failed}} ناکامې · {{completed}} بشپړې شوې"
+    },
     "goal": {
       "title": "هدف",
       "statusActive": "فعال هدف",

@@ -190,6 +190,24 @@ export function preparationErrorText(error: string, t: TFunction): string {
   return resolvePreparationText(error, t) ?? t('agentChat.preparation.preparationFailed');
 }
 
+/**
+ * The app's own copy for a stored failure code, or `undefined` when no catalog
+ * sentence names it. The control plane records the code itself (a route reason,
+ * or the wrapper's own message), so a surface that showed the code raw would
+ * leak the control plane's vocabulary; this is the one place that reads the
+ * existing tables for a *code* rather than for a sentence.
+ *
+ * Only the codes this app already names resolve: everything else returns
+ * `undefined`, and the caller keeps the server's own `userVisibleError`.
+ */
+export function knownFailureCopy(code: string | null, t: TFunction): string | undefined {
+  if (code === null) {
+    return undefined;
+  }
+  const key = lookup(ERROR_KEYS, code) ?? lookup(MESSAGE_KEYS, code);
+  return key === undefined ? undefined : t(key);
+}
+
 /** A failure's one-line headline, and the sentence that continues it. */
 type FailureHeadline = {
   title: string;

@@ -2290,6 +2290,23 @@
       "connectionLost": "Koneksyon an koupe",
       "retryConnection": "Rekonekte"
     },
+    "failureHistory": {
+      "title": "Istwa pann yo",
+      "messageFailures": "Pann mesaj yo",
+      "runFallback": "Mesaj la echwe",
+      "setupFallback": "Konfigirasyon anviwònman an echwe",
+      "accessDenied": "Ou pa gen aksè a dyagnostik sesyon sa a.",
+      "loadFailedTitle": "Nou pa t ka chaje istwa pann yo.",
+      "loadFailedDescription": "Yon erè tanporè te kache seksyon sa a. Verifye koneksyon ou epi eseye ankò.",
+      "exportJson": "Ekspòte JSON",
+      "exportCsv": "Ekspòte CSV",
+      "preparingJson": "Ap prepare JSON…",
+      "preparingCsv": "Ap prepare CSV…",
+      "exportFailed": "Nou pa t ka prepare fichye dyagnostik la. Eseye ankò.",
+      "fileDescription": "Fichye sa a bay lis egzekisyon ki echwe yo ak ID sesyon yo ak dat ak lè yo. Tache l nan yon tikè sipò.",
+      "retention": "Lis la montre dènye {{limit}} egzekisyon nan {{window}} dènye jou ki sot pase yo. Yo kenbe dyagnostik yo pandan {{days}} jou.",
+      "summary": "{{failed}} echwe · {{completed}} fini"
+    },
     "goal": {
       "title": "Objektif",
       "statusActive": "Objektif aktif",

@@ -784,6 +784,38 @@ vi.mock('@/lib/trpc', () => ({
       share: { mutationOptions: () => ({}) },
       unshare: { mutationOptions: () => ({}) },
     },
+    // The session body mounts its failure-history section here, so that read must
+    // resolve too: these tests assert the header, the chrome rows and the sheet,
+    // so the stub reports a session with no failures and the section paints
+    // nothing. The export procedure is never reached.
+    cloudAgentNextFailures: {
+      getSessionFailureHistory: {
+        queryOptions: () => ({
+          queryKey: ['cloudAgentNextFailures', 'getSessionFailureHistory'],
+          queryFn: () =>
+            Promise.resolve({
+              session: {
+                cloudAgentSessionId: 'agent_design_gate_failures',
+                kiloSessionId: 'ses-123',
+                createdAt: null,
+                organizationId: null,
+                sandboxId: null,
+                title: null,
+                gitUrl: null,
+              },
+              setupFailure: null,
+              runs: [],
+              retention: { runWindowDays: 90, diagnosticDays: 30, historyRunLimit: 50 },
+            }),
+        }),
+      },
+      exportSessionDiagnostics: {
+        queryOptions: () => ({
+          queryKey: ['cloudAgentNextFailures', 'exportSessionDiagnostics'],
+          queryFn: () => Promise.resolve({}),
+        }),
+      },
+    },
     // The session header's active-profile chip reads the context profiles; the
     // hoisted rows let a test resolve a default, and the empty default keeps
     // the chip absent so the existing header assertions hold.

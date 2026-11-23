@@ -2290,6 +2290,23 @@
       "connectionLost": "Lidhja u humb",
       "retryConnection": "Provo të lidhesh përsëri"
     },
+    "failureHistory": {
+      "title": "Historiku i dështimeve",
+      "messageFailures": "Dështimet e mesazheve",
+      "runFallback": "Mesazhi dështoi",
+      "setupFallback": "Përgatitja e mjedisit dështoi",
+      "accessDenied": "Nuk ke akses në diagnostikën e kësaj seance.",
+      "loadFailedTitle": "Nuk u ngarkua historiku i dështimeve.",
+      "loadFailedDescription": "Një gabim i përkohshëm fshehu këtë seksion. Kontrollo lidhjen dhe provo përsëri.",
+      "exportJson": "Eksporto JSON",
+      "exportCsv": "Eksporto CSV",
+      "preparingJson": "Duke përgatitur JSON…",
+      "preparingCsv": "Duke përgatitur CSV…",
+      "exportFailed": "Nuk u përgatit skedari i diagnostikës. Provo përsëri.",
+      "fileDescription": "Ky skedar liston ekzekutimet e dështuara me ID-të e seancave dhe vulat kohore. Bashkëngjite në një kërkesë mbështetjeje.",
+      "retention": "Lista shfaq {{limit}} ekzekutimet më të fundit nga {{window}} ditët e fundit. Diagnostika ruhet për {{days}} ditë.",
+      "summary": "{{failed}} të dështuara · {{completed}} të përfunduara"
+    },
     "goal": {
       "title": "Qëllimi",
       "statusActive": "Qëllim aktiv",

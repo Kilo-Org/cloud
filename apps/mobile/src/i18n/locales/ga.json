@@ -2437,6 +2437,23 @@
       "connectionLost": "Cailleadh an nasc",
       "retryConnection": "Bain triail eile as nascadh"
     },
+    "failureHistory": {
+      "title": "Stair na dteipeanna",
+      "messageFailures": "Teipeanna teachtaireachtaí",
+      "runFallback": "Theip ar an teachtaireacht",
+      "setupFallback": "Theip ar ullmhú na timpeallachta",
+      "accessDenied": "Níl rochtain agat ar dhiagnóisic an tseisiúin seo.",
+      "loadFailedTitle": "Níorbh fhéidir stair na dteipeanna a lódáil.",
+      "loadFailedDescription": "Chuir earráid shealadach an chuid seo i bhfolach. Seiceáil do nasc agus bain triail eile as.",
+      "exportJson": "Easpórtáil JSON",
+      "exportCsv": "Easpórtáil CSV",
+      "preparingJson": "Ag ullmhú JSON…",
+      "preparingCsv": "Ag ullmhú CSV…",
+      "exportFailed": "Níorbh fhéidir comhad na diagnóisice a ullmhú. Bain triail eile as.",
+      "fileDescription": "Liostaíonn an comhad seo na ritheanna teipthe le haitheantóirí seisiúin agus stampaí ama. Ceangail le ticéad tacaíochta é.",
+      "retention": "Taispeánann an liosta na {{limit}} rith is déanaí ó na {{window}} lá seo caite. Stóráiltear diagnóisic ar feadh {{days}} lá.",
+      "summary": "{{failed}} teipthe · {{completed}} críochnaithe"
+    },
     "goal": {
       "title": "Sprioc",
       "statusActive": "Sprioc ghníomhach",

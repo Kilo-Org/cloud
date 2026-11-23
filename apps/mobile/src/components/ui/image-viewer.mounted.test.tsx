@@ -26,14 +26,11 @@ vi.mock('@/components/ui/icons', () => ({
   RotateCcw: 'RotateCcw',
 }));
 // The real action is a `Button`; a bare Pressable keeps the press observable
-// without loading the button layer into this suite.
+// without loading the button layer into this suite. `loading` rides through so
+// a test can see the action's busy state.
 vi.mock('@/components/empty-state', () => ({
-  StateAction: (props: { label: string; onPress?: () => void; testID?: string }) =>
-    createElement('Pressable', {
-      accessibilityLabel: props.label,
-      onPress: props.onPress,
-      testID: props.testID,
-    }),
+  StateAction: (props: { label: string; onPress?: () => void; loading?: boolean }) =>
+    createElement('Pressable', { ...props, accessibilityLabel: props.label }),
 }));
 vi.mock('react-native-gesture-handler', () => ({
   GestureHandlerRootView: 'GestureHandlerRootView',
@@ -59,6 +56,18 @@ function findByType(
   type: string
 ): TestRenderer.ReactTestInstance[] {
   return root.findAll(node => typeof node.type === 'string' && (node.type as string) === type);
+}
+
+/** The one node an assertion needs; a missing node fails the test by name. */
+function first(
+  nodes: TestRenderer.ReactTestInstance[],
+  what: string
+): TestRenderer.ReactTestInstance {
+  const node = nodes[0];
+  if (!node) {
+    throw new Error(`${what} missing`);
+  }
+  return node;
 }
 
 /**
@@ -99,12 +108,19 @@ function findRowWrapper(header: TestRenderer.ReactTestInstance): TestRenderer.Re
   return wrapper;
 }
 
+/** Runs one state change inside the renderer's async act, the suite's one flush. */
+async function flush(action: () => void): Promise<void> {
+  await act(async () => {
+    await Promise.resolve();
+    action();
+  });
+}
+
 async function mountViewer(
   props: Partial<ComponentProps<typeof ImageViewer>>
 ): Promise<TestRenderer.ReactTestRenderer> {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
-  await act(async () => {
-    await Promise.resolve();
+  await flush(() => {
     ref.current = TestRenderer.create(
       createElement(ImageViewer, {
         visible: true,
@@ -122,19 +138,35 @@ async function mountViewer(
   return renderer;
 }
 
-async function failDecode(renderer: TestRenderer.ReactTestRenderer): Promise<void> {
-  const image = findByType(renderer.root, 'Image')[0];
-  if (!image) {
-    throw new Error('viewer Image missing');
-  }
-  await act(async () => {
-    await Promise.resolve();
-    (image.props.onError as () => void)();
-  });
+/** Fires the mounted `Image`'s decode outcome, the one event the viewer acts on. */
+async function fireDecode(
+  renderer: TestRenderer.ReactTestRenderer,
+  handler: 'onError' | 'onLoad'
+): Promise<void> {
+  const image = first(findByType(renderer.root, 'Image'), 'viewer Image');
+  await flush(image.props[handler] as () => void);
 }
 
 function retryActions(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance[] {
   return findByType(root, 'Pressable').filter(node => node.props.accessibilityLabel === 'Retry');
+}
+
+function unavailableText(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance[] {
+  return findByType(root, 'Text').filter(node => node.props.children === 'Image unavailable');
+}
+
+/** The unavailable state's parts: the layer it covers the canvas from, its glyph
+ *  and its disc. The layer is a sibling of the zoom surface, not a flex peer. */
+function unavailableState(root: TestRenderer.ReactTestInstance) {
+  const layer = findByType(root, 'CenteredState')[0]?.parent;
+  const alert = findByType(root, 'AlertCircle')[0];
+  const disc = findByType(root, 'View').find(
+    node => typeof node.props.className === 'string' && node.props.className.includes('h-14 w-14')
+  );
+  if (!layer || !alert || !disc) {
+    throw new Error('unavailable state missing');
+  }
+  return { layer, alert, disc };
 }
 
 describe('ImageViewer mounted', () => {
@@ -147,35 +179,27 @@ describe('ImageViewer mounted', () => {
     const renderer = await mountViewer({ uri: REMOTE_URI, onShare });
 
     expect(findByType(renderer.root, 'Image')).toHaveLength(1);
-    await failDecode(renderer);
+    await fireDecode(renderer, 'onError');
 
     expect(findByType(renderer.root, 'Image')).toHaveLength(0);
     expect(findByType(renderer.root, 'StateSurface')).toHaveLength(1);
-    expect(findByType(renderer.root, 'CenteredState')).toHaveLength(1);
+
+    // The state is a layer covering the canvas, so a retried image can mount
+    // full size underneath it instead of splitting the canvas's flex line.
+    const { layer, alert, disc } = unavailableState(renderer.root);
+    expect(layer.props.className).toBe('absolute inset-0 bg-black');
+    expect(layer.parent?.props.className).toContain('flex-1 items-center justify-center');
 
     // The glyph is the fixed light ink on the neutral disc, not theme ink.
-    const alert = findByType(renderer.root, 'AlertCircle');
-    expect(alert).toHaveLength(1);
-    expect(alert[0]?.props.size).toBe(24);
-    expect(alert[0]?.props.color).toBe('#FFFFFF');
-
-    const disc = findByType(renderer.root, 'View').find(
-      node =>
-        typeof node.props.className === 'string' &&
-        node.props.className.includes('rounded-full') &&
-        node.props.className.includes('h-14 w-14')
-    );
-    expect(disc).toBeDefined();
-    expect(disc?.props.className).toContain('bg-neutral-800');
+    expect(alert.props.size).toBe(24);
+    expect(alert.props.color).toBe('#FFFFFF');
+    expect(disc.props.className).toContain('bg-neutral-800');
 
     // The copy announces through AccessibleStatus: one polite live region on
     // Android carrying the muted body ink, not the destructive error tone.
     const statuses = renderer.root.findAll(node => node.type === AccessibleStatus);
     expect(statuses).toHaveLength(1);
-    const unavailableStatus = statuses[0];
-    if (!unavailableStatus) {
-      throw new Error('unavailable AccessibleStatus not found');
-    }
+    const unavailableStatus = first(statuses, 'unavailable AccessibleStatus');
     expect(unavailableStatus.props.message).toBe('Image unavailable');
     const announced = findByType(unavailableStatus, 'Text');
     expect(announced).toHaveLength(1);
@@ -184,34 +208,48 @@ describe('ImageViewer mounted', () => {
     expect(announced[0]?.props.className).toContain('text-neutral-300');
     expect(announced[0]?.props.className).not.toContain('text-destructive');
 
-    const share = findByType(renderer.root, 'Pressable').find(
-      node =>
-        typeof node.props.accessibilityLabel === 'string' &&
-        node.props.accessibilityLabel.startsWith('Share ')
-    );
-    expect(share).toBeDefined();
+    const share = pressableByLabel(renderer.root, 'Share photo.png');
     expect(share?.props.disabled).toBe(false);
     expect(share?.props.accessibilityState).toEqual({ disabled: false, busy: false });
 
-    // Retry remounts the unmounted zoom surface: the same remote URI is fetched
-    // again and every state node clears.
+    // Retry remounts the zoom surface for the same remote URI while the
+    // unavailable state stays in place: the disc, the copy and the action do
+    // not blank, and the action reports itself busy instead of vanishing.
     const retryButtons = retryActions(renderer.root);
     expect(retryButtons).toHaveLength(1);
-    const retry = retryButtons[0];
-    if (!retry) {
-      throw new Error('retry action missing');
-    }
-    await act(async () => {
-      await Promise.resolve();
-      (retry.props.onPress as () => void)();
-    });
+    const retry = first(retryButtons, 'retry action');
+    await flush(retry.props.onPress as () => void);
 
+    // While the retry runs the image is mounted underneath and the state still
+    // covers it from its own full-canvas layer, so nothing blanks or shifts.
     const remounted = findByType(renderer.root, 'Image');
     expect(remounted).toHaveLength(1);
     expect(remounted[0]?.props.source).toEqual({ uri: REMOTE_URI });
+    expect(findByType(renderer.root, 'ResumableZoom')).toHaveLength(1);
+    const retrying = unavailableState(renderer.root);
+    expect(retrying.layer.props.className).toBe('absolute inset-0 bg-black');
+    expect(retrying.disc.props.className).toContain('bg-neutral-800');
+    expect(unavailableText(renderer.root)).toHaveLength(1);
+    expect(renderer.root.findAll(node => node.type === AccessibleStatus)).toHaveLength(1);
+    const busyActions = retryActions(renderer.root);
+    expect(busyActions).toHaveLength(1);
+    expect(busyActions[0]?.props.loading).toBe(true);
+
+    // The retry lands: the decode clears the state and leaves only the image.
+    await fireDecode(renderer, 'onLoad');
+    expect(findByType(renderer.root, 'Image')).toHaveLength(1);
     expect(findByType(renderer.root, 'AlertCircle')).toHaveLength(0);
+    expect(unavailableText(renderer.root)).toHaveLength(0);
     expect(retryActions(renderer.root)).toHaveLength(0);
     expect(renderer.root.findAll(node => node.type === AccessibleStatus)).toHaveLength(0);
+
+    // A retry that fails again returns to the same action, no longer busy.
+    await fireDecode(renderer, 'onError');
+    expect(findByType(renderer.root, 'Image')).toHaveLength(0);
+    expect(unavailableText(renderer.root)).toHaveLength(1);
+    const failedActions = retryActions(renderer.root);
+    expect(failedActions).toHaveLength(1);
+    expect(failedActions[0]?.props.loading).toBe(false);
 
     renderer.unmount();
   });
@@ -219,15 +257,12 @@ describe('ImageViewer mounted', () => {
   it('shows the unavailable row immediately on decode error and clears it in the same commit a renewed uri lands', async () => {
     const renderer = await mountViewer({});
 
-    await failDecode(renderer);
+    await fireDecode(renderer, 'onError');
 
     expect(findByType(renderer.root, 'Image')).toHaveLength(0);
-    expect(
-      findByType(renderer.root, 'Text').filter(node => node.props.children === 'Image unavailable')
-    ).toHaveLength(1);
+    expect(unavailableText(renderer.root)).toHaveLength(1);
 
-    await act(async () => {
-      await Promise.resolve();
+    await flush(() => {
       renderer.update(
         createElement(ImageViewer, {
           visible: true,
@@ -242,9 +277,7 @@ describe('ImageViewer mounted', () => {
     expect(findByType(renderer.root, 'Image')[0]?.props.source).toEqual({
       uri: 'file:///cache/renewed.png',
     });
-    expect(
-      findByType(renderer.root, 'Text').filter(node => node.props.children === 'Image unavailable')
-    ).toHaveLength(0);
+    expect(unavailableText(renderer.root)).toHaveLength(0);
 
     renderer.unmount();
   });
@@ -252,7 +285,7 @@ describe('ImageViewer mounted', () => {
   it('offers no retry for a local file uri, which would re-read the same bytes', async () => {
     const renderer = await mountViewer({ uri: 'file:///cache/photo.png' });
 
-    await failDecode(renderer);
+    await fireDecode(renderer, 'onError');
 
     expect(findByType(renderer.root, 'Image')).toHaveLength(0);
     expect(findByType(renderer.root, 'AlertCircle')).toHaveLength(1);
@@ -268,10 +301,7 @@ describe('ImageViewer mounted', () => {
 
     const statuses = renderer.root.findAll(node => node.type === AccessibleStatus);
     expect(statuses).toHaveLength(1);
-    const status = statuses[0];
-    if (!status) {
-      throw new Error('AccessibleStatus not found');
-    }
+    const status = first(statuses, 'AccessibleStatus');
     expect(status.props.message).toBe('Failed to share file. Please try again.');
     expect(status.props.className).toBe('text-center text-sm text-white dark:text-neutral-900');
 
@@ -318,20 +348,17 @@ describe('ImageViewer mounted', () => {
     const onClose = vi.fn<() => void>();
     const renderer = await mountViewer({ onClose });
 
-    const zoomSurface = findByType(renderer.root, 'ResumableZoom')[0];
-    if (!zoomSurface) {
-      throw new Error('zoom surface missing');
-    }
+    // The zoom surface runs `onSwipe` on the UI thread and hands the direction
+    // back through `scheduleOnRN`, mocked to run inline.
+    const zoomSurface = first(findByType(renderer.root, 'ResumableZoom'), 'zoom surface');
     const onSwipe = zoomSurface.props.onSwipe as (direction: string) => void;
 
-    await act(async () => {
-      await Promise.resolve();
+    await flush(() => {
       onSwipe('left');
     });
     expect(onClose).not.toHaveBeenCalled();
 
-    await act(async () => {
-      await Promise.resolve();
+    await flush(() => {
       onSwipe('down');
     });
     expect(onClose).toHaveBeenCalledTimes(1);

@@ -50,13 +50,24 @@ const VIEWER_SURFACE = '#000000';
 const VIEWER_INK = '#FFFFFF';
 
 /**
+ * The schemes a retry can help: a case-insensitive test, because a scheme is
+ * ASCII and re-casing display text to compare it is what the case guard bans.
+ */
+const RETRYABLE_SCHEME = /^https?:\/\//i;
+
+/**
  * Only a remote image can come back different: a local, content or data URI
  * re-reads the same bytes, so a retry could not change the result.
  */
 function isRetryableUri(uri: string): boolean {
-  const lower = uri.toLowerCase();
-  return lower.startsWith('http://') || lower.startsWith('https://');
+  return RETRYABLE_SCHEME.test(uri);
 }
+
+/**
+ * One attempt's outcome, so the unavailable state can stay in place while a
+ * retry is in flight instead of blanking the canvas.
+ */
+type ViewerImageStatus = 'ready' | 'failed' | 'retrying';
 
 type ImageViewerProps = {
   visible: boolean;
@@ -94,7 +105,7 @@ export function ImageViewer({
   // vertically.
   const sideInsetStyle = useSideInsetStyle();
 
-  const [imageError, setImageError] = useState(false);
+  const [status, setStatus] = useState<ViewerImageStatus>('ready');
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const measureViewport = useCallback(({ nativeEvent: { layout } }: LayoutChangeEvent) => {
     setViewport(current =>
@@ -103,26 +114,27 @@ export function ImageViewer({
         : { width: layout.width, height: layout.height }
     );
   }, []);
-  // Reset a prior decode error in render when the URL changes. A successful
+  // Reset a prior decode failure in render when the URL changes. A successful
   // renew writes a NEW signed URL; the reset must land in the same commit so
   // the refreshed image, not the "Image unavailable" row, renders. A failed
-  // renew keeps the same URL, so `imageError` survives and the row stays until
+  // renew keeps the same URL, so the failure survives and the row stays until
   // a new URL lands.
   const [previousUri, setPreviousUri] = useState(uri);
   if (uri !== previousUri) {
     setPreviousUri(uri);
-    setImageError(false);
+    setStatus('ready');
   }
 
   // A new image (or a reopen) retries the decode from a clean slate.
   useEffect(() => {
-    setImageError(false);
+    setStatus('ready');
   }, [visible]);
 
-  // The zoom surface is unmounted while `imageError` is true, so clearing it
-  // remounts `Image` and re-fetches the same URI.
+  // A retry keeps the unavailable state mounted and marks it busy; the new
+  // `Image` mounts at once and its `onLoad` clears the state, while its
+  // `onError` returns it to the failed action.
   const retryImage = useCallback(() => {
-    setImageError(false);
+    setStatus('retrying');
   }, []);
 
   const handleSwipe = useCallback(
@@ -183,8 +195,9 @@ export function ImageViewer({
             onLayout={measureViewport}
           >
             {/* Mounted only while the viewer is open and the bitmap decodes, so
-                every open starts at 1x and no zoom survives a close. */}
-            {visible && uri !== null && !imageError ? (
+                every open starts at 1x and no zoom survives a close. A retry
+                remounts it under the state layer, still at full size. */}
+            {visible && uri !== null && status !== 'failed' ? (
               <ResumableZoom
                 style={ZOOM_SURFACE_STYLE}
                 maxScale={VIEWER_MAX_SCALE}
@@ -200,27 +213,42 @@ export function ImageViewer({
                   // ResumableZoom measures an unconstrained child; percentages collapse it to zero.
                   style={viewport}
                   contentFit="contain"
+                  onLoad={() => {
+                    setStatus('ready');
+                  }}
                   onError={() => {
-                    setImageError(true);
+                    setStatus('failed');
                   }}
                 />
               </ResumableZoom>
             ) : null}
-            {uri !== null && imageError ? (
-              <CenteredState className="w-full">
-                <View className="items-center gap-4 px-6">
-                  <View className="h-14 w-14 items-center justify-center rounded-full bg-neutral-800">
-                    <AlertCircle size={24} color={VIEWER_INK} strokeWidth={1.5} />
+            {/* The state is a layer over the canvas, not a sibling that shares
+                its flex line: a retried `Image` mounts underneath at full size
+                while this covers it, so the canvas never splits. The wrapper
+                paints the viewer black itself, so no frame of the retried
+                bitmap shows through behind the disc and the copy. */}
+            {uri !== null && status !== 'ready' ? (
+              <View className="absolute inset-0 bg-black">
+                <CenteredState className="w-full">
+                  <View className="items-center gap-4 px-6">
+                    <View className="h-14 w-14 items-center justify-center rounded-full bg-neutral-800">
+                      <AlertCircle size={24} color={VIEWER_INK} strokeWidth={1.5} />
+                    </View>
+                    <AccessibleStatus
+                      message={t('common.imageUnavailable')}
+                      className="max-w-sm text-center text-base text-neutral-300"
+                    />
+                    {isRetryableUri(uri) ? (
+                      <StateAction
+                        label={t('common.retry')}
+                        icon={RotateCcw}
+                        onPress={retryImage}
+                        loading={status === 'retrying'}
+                      />
+                    ) : null}
                   </View>
-                  <AccessibleStatus
-                    message={t('common.imageUnavailable')}
-                    className="max-w-sm text-center text-base text-neutral-300"
-                  />
-                  {isRetryableUri(uri) ? (
-                    <StateAction label={t('common.retry')} icon={RotateCcw} onPress={retryImage} />
-                  ) : null}
-                </View>
-              </CenteredState>
+                </CenteredState>
+              </View>
             ) : null}
           </View>
         </GestureHandlerRootView>

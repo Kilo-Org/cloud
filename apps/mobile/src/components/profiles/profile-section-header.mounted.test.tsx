@@ -147,4 +147,36 @@ describe('ProfileSectionHeader mounted', () => {
     expect(h.back).not.toHaveBeenCalled();
     renderer.unmount();
   });
+
+  it("renders the caller's create control in the header's trailing slot", () => {
+    const renderer = renderHeader({
+      profileId: 'profile-1',
+      title: 'Profile agents',
+      backFallback: PROFILES_LIST_HREF,
+      headerRight: createElement('Text', { accessibilityLabel: 'Header create control' }, 'Add'),
+    });
+
+    const forwarded = renderer.root.find(
+      node =>
+        typeof node.type === 'string' && node.props.accessibilityLabel === 'Header create control'
+    );
+    expect(String(forwarded.props.children)).toBe('Add');
+    renderer.unmount();
+  });
+
+  it('renders no trailing control when the caller passes none', () => {
+    const renderer = renderHeader({
+      profileId: 'profile-1',
+      title: 'Profile agents',
+      backFallback: PROFILES_LIST_HREF,
+    });
+
+    expect(
+      renderer.root.findAll(
+        node =>
+          typeof node.type === 'string' && node.props.accessibilityLabel === 'Header create control'
+      )
+    ).toHaveLength(0);
+    renderer.unmount();
+  });
 });

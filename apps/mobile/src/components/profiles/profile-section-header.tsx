@@ -1,4 +1,5 @@
 import { type Href } from 'expo-router';
+import { type ReactNode } from 'react';
 
 import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -30,6 +31,7 @@ export function ProfileSectionHeader({
   title,
   backFallback,
   onBack,
+  headerRight,
 }: Readonly<{
   profileId: string;
   organizationId?: string;
@@ -41,6 +43,8 @@ export function ProfileSectionHeader({
    */
   backFallback: Href;
   onBack?: () => void;
+  /** The section's own create control, forwarded to ScreenHeader. */
+  headerRight?: ReactNode;
 }>) {
   const overview = useAgentProfileOverview(profileId, organizationId);
   return (
@@ -53,6 +57,7 @@ export function ProfileSectionHeader({
       reserveSubtitle
       backFallback={backFallback}
       onBack={onBack}
+      headerRight={headerRight ? <>{headerRight}</> : undefined}
     />
   );
 }

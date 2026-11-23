@@ -56,16 +56,23 @@ vi.mock('react-native', () => ({
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#000000', destructive: '#FF0000' }),
 }));
-vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+vi.mock('@/components/screen-header', () => ({
+  // The header slot is where this screen's add control now lives, so the stub
+  // renders it into the tree instead of dropping it.
+  ScreenHeader: (props: { headerRight?: ReactNode }) => props.headerRight ?? null,
+}));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
-vi.mock('@/components/empty-state', () => ({
-  StateAction: 'StateAction',
-  // The real state renders its action inside its body, so the slot that stands in
-  // for the add action belongs to the tree; the stub keeps only that slot.
-  EmptyState: (props: { action?: ReactNode }) => props.action,
-}));
-vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+vi.mock('@/components/empty-state', async () => {
+  // Hoisted above this module's imports, so React loads inside the factory.
+  const { createElement: create } = await import('react');
+  return {
+    // The state carries copy only, so the stub renders the description the
+    // reader sees and nothing else.
+    EmptyState: (props: { description?: ReactNode }) =>
+      props.description ? create('Text', null, props.description) : null,
+  };
+});
 vi.mock('@/components/ui/dialog', () => ({
   useConfirmDialog: () => ({ confirm: h.confirm, dialog: null }),
 }));
@@ -212,18 +219,10 @@ describe('ProfileAgentsScreen mode badge', () => {
   });
 });
 
-type PressableProps = { onPress: () => void; onClose?: () => void };
-
-/** Fire one handler a host stub carries; the stubs keep props untyped. */
-function press(node: { props: unknown }): void {
-  const props = node.props as PressableProps;
-  act(() => {
-    props.onPress();
-  });
-}
+type CloseProps = { onClose?: () => void };
 
 function pressClose(sheet: { props: unknown }): void {
-  const props = sheet.props as PressableProps;
+  const props = sheet.props as CloseProps;
   const onClose = props.onClose;
   if (typeof onClose !== 'function') {
     throw new TypeError('the sheet rendered no onClose');
@@ -242,11 +241,7 @@ describe('ProfileAgentsScreen form draft', () => {
   it('reopens the add sheet after a remount', async () => {
     h.query.data = [agent('alpha', 'primary')];
     const first = await mountScreen();
-    const addButton = first.renderer.root.findAll(node => String(node.type) === 'Button')[0];
-    if (!addButton) {
-      throw new Error('the add button was not rendered');
-    }
-    press(addButton);
+    pressAdd(first.renderer);
     expect(
       first.renderer.root.findAll(node => String(node.type) === 'AgentFormSheet')
     ).toHaveLength(1);
@@ -262,11 +257,7 @@ describe('ProfileAgentsScreen form draft', () => {
   it('keeps the add sheet closed after the form was cancelled', async () => {
     h.query.data = [agent('alpha', 'primary')];
     const first = await mountScreen();
-    const addButton = first.renderer.root.findAll(node => String(node.type) === 'Button')[0];
-    if (!addButton) {
-      throw new Error('the add button was not rendered');
-    }
-    press(addButton);
+    pressAdd(first.renderer);
     const sheet = first.renderer.root.findAll(node => String(node.type) === 'AgentFormSheet')[0];
     if (!sheet) {
       throw new Error('the sheet was not rendered');
@@ -305,13 +296,22 @@ function openSheet(renderer: MountedRenderer) {
   return sheet;
 }
 
+/** The header's create control, which the add label and its own icon identify. */
+function addControl(renderer: MountedRenderer) {
+  return nodesOfType(renderer, 'Pressable').find(node =>
+    String(node.props.accessibilityLabel).startsWith(i18n.t('profiles.agents.add'))
+  );
+}
+
 function pressAdd(renderer: MountedRenderer): void {
-  const button = nodesOfType(renderer, 'Button')[0];
-  if (!button) {
-    throw new Error('the add button was not rendered');
+  const control = addControl(renderer);
+  if (!control) {
+    throw new Error('the add control was not rendered');
   }
+  // The test renderer exposes host props untyped; the screen passes this handler.
+  const onPress = control.props.onPress as () => void;
   act(() => {
-    (button.props as { onPress: () => void }).onPress();
+    onPress();
   });
 }
 
@@ -438,7 +438,7 @@ describe('ProfileAgentsScreen manage slot', () => {
     const { renderer, unmount } = await mountScreen();
 
     expect(screenTexts(renderer)).toContain(i18n.t('profiles.organizationRoleRequired'));
-    expect(nodesOfType(renderer, 'Button')).toHaveLength(0);
+    expect(addControl(renderer)).toBeUndefined();
 
     unmount();
   });
@@ -449,7 +449,7 @@ describe('ProfileAgentsScreen manage slot', () => {
     const { renderer, unmount } = await mountScreen();
 
     expect(screenTexts(renderer)).toContain(i18n.t('profiles.organizationRoleRequired'));
-    expect(nodesOfType(renderer, 'Button')).toHaveLength(0);
+    expect(addControl(renderer)).toBeUndefined();
     expect(nodesOfType(renderer, 'Pressable')).toHaveLength(0);
 
     unmount();
@@ -461,7 +461,7 @@ describe('ProfileAgentsScreen manage slot', () => {
     const { renderer, unmount } = await mountScreen();
 
     expect(screenTexts(renderer)).not.toContain(i18n.t('profiles.organizationRoleRequired'));
-    expect(nodesOfType(renderer, 'Button')).toHaveLength(0);
+    expect(addControl(renderer)).toBeUndefined();
 
     unmount();
   });
@@ -587,32 +587,24 @@ describe('ProfileAgentsScreen agent cap', () => {
     }
   });
 
-  it('states the cap above the Add action and disables it at the cap', async () => {
+  it('states the cap and disables the header create control at the cap', async () => {
     h.query.data = agentsAt(MAX_PROFILE_AGENTS);
     const { renderer, unmount } = await mountScreen();
 
-    // One pre-order walk, so the indexes compare the footer's own order.
-    const ordered = renderer.root.findAll(
-      node => String(node.type) === 'Text' || String(node.type) === 'Button'
-    );
-    const noticeIndex = ordered.findIndex(node => node.props.children === capMessage());
-    const addIndex = ordered.findIndex(node => String(node.type) === 'Button');
-
-    expect(noticeIndex).toBeGreaterThan(-1);
-    expect(addIndex).toBeGreaterThan(-1);
-    expect(noticeIndex).toBeLessThan(addIndex);
-    expect(ordered[noticeIndex]?.props.className).toContain('text-warn');
-    expect(nodesOfType(renderer, 'Button')[0]?.props.disabled).toBe(true);
+    const notice = nodesOfType(renderer, 'Text').find(node => node.props.children === capMessage());
+    expect(notice).toBeDefined();
+    expect(notice?.props.className).toContain('text-warn');
+    expect(addControl(renderer)?.props.disabled).toBe(true);
 
     unmount();
   });
 
-  it('offers the Add action without a notice one agent below the cap', async () => {
+  it('offers the create control without a notice one agent below the cap', async () => {
     h.query.data = agentsAt(MAX_PROFILE_AGENTS - 1);
     const { renderer, unmount } = await mountScreen();
 
     expect(screenTexts(renderer)).not.toContain(capMessage());
-    expect(nodesOfType(renderer, 'Button')[0]?.props.disabled).toBe(false);
+    expect(addControl(renderer)?.props.disabled).toBe(false);
 
     unmount();
   });

@@ -233,7 +233,11 @@ describe('ProfileScreen settings search', () => {
     const { renderer } = await mountProfile();
     const root = renderer.root;
     const resets = () =>
-      scrollToFn.mock.calls.filter(([options]) => (options as { y?: number } | undefined)?.y === 0);
+      scrollToFn.mock.calls.filter(([options]) => {
+        const call = options as { y?: number; animated?: boolean } | undefined;
+        // Only the body reset scrolls instantly; a reveal animates to its row.
+        return call?.y === 0 && call.animated === false;
+      });
 
     expect(resets()).toHaveLength(0);
 
@@ -243,25 +247,30 @@ describe('ProfileScreen settings search', () => {
     expect(resets()).toHaveLength(1);
     expect(scrollToFn).toHaveBeenLastCalledWith({ y: 0, animated: false });
 
-    // A root result selects the row it highlights, so that swap belongs to the
-    // reveal and must not also reset the scroller.
+    // Clearing the query with no highlight set ends the search, so the settings
+    // body that replaces the results starts at its first row. This is the
+    // reported collapse: without it the replaced body keeps the results' offset.
+    query(root, '');
+    expect(resets()).toHaveLength(2);
+
+    // A root result selection owns the swap it makes: its reveal is the
+    // destination, so that swap is not also reset.
+    query(root, 'logout');
     const entry = results(root).find(result => result.entry.path === undefined);
     if (!entry) {
       throw new Error('the search renders no root result');
     }
-    const beforeSelection = resets().length;
     selectResult(root, entry);
-    expect(resets()).toHaveLength(beforeSelection);
+    expect(targetHighlights(root)).toHaveLength(1);
 
-    // Any other end of the search — the clear control, a nested result — resets.
-    query(root, 'theme');
-    const beforeNested = resets().length;
-    const nested = results(root).find(result => result.entry.path !== undefined);
-    if (!nested) {
-      throw new Error('the search renders no nested result');
-    }
-    selectResult(root, nested);
-    expect(resets().length).toBeGreaterThan(beforeNested);
+    // That highlight stays set. A later search and clear must still start the
+    // settings body at its first row, and must drop the highlight rather than
+    // return the body to a stale row far below the top.
+    query(root, 'logout');
+    const beforeClear = resets().length;
+    query(root, '');
+    expect(resets()).toHaveLength(beforeClear + 1);
+    expect(targetHighlights(root)).toEqual([]);
   });
 
   it('opens the privacy analytics setting on the consent review screen', async () => {

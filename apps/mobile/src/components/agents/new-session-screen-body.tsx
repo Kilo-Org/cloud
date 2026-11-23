@@ -2,13 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Keyboard, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import {
-  type Href,
-  useFocusEffect,
-  useLocalSearchParams,
-  usePreventRemove,
-  useRouter,
-} from 'expo-router';
+import { type Href, useLocalSearchParams, usePreventRemove, useRouter } from 'expo-router';
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { type KiloSessionId, type RemoteModelOverride } from '@kilocode/cloud-agent-sdk';
@@ -83,6 +77,7 @@ import { useAndroidPendingPickerRecovery } from '@/lib/agent-attachments/use-and
 import { hasVisibleComposerText } from '@/lib/composer-text';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useCloudAgentEligibility } from '@/lib/hooks/use-cloud-agent-eligibility';
+import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import {
   filterModelOptionsForLimitedAccess,
   PENDING_ELIGIBILITY,
@@ -548,20 +543,14 @@ export function NewSessionScreenBody() {
   const eligibilityApplies = isCloudTarget && !isCloneEntry;
   const refetchEligibility = eligibility.refetch;
   const handleEligibilityRetry = refetchEligibility;
-  // A return to this screen re-reads the balance: the credit purchase screen is
-  // another route, so buying credits and coming back is a route focus, not an
-  // app foreground, and the notice would otherwise describe the old balance.
-  // The first focus belongs to the mount's own read.
-  const eligibilityFocusedOnce = useRef(false);
-  useFocusEffect(
-    useCallback(() => {
-      if (!eligibilityFocusedOnce.current) {
-        eligibilityFocusedOnce.current = true;
-        return;
-      }
-      refetchEligibility();
-    }, [refetchEligibility])
-  );
+  // Re-read the balance when this screen regains freshness: a route focus after
+  // visiting the credit purchase screen, or the app returning to the
+  // foreground. Both procedures are listed, so an organization's balance
+  // refreshes the same way a person's does.
+  useRouteForegroundRefresh([
+    [['cloudAgentNext', 'checkEligibility']],
+    [['organizations', 'cloudAgentNext', 'checkEligibility']],
+  ]);
   const cloudEligibilityState = eligibilityApplies ? eligibility.state : PENDING_ELIGIBILITY;
   const allowedModelOptions = filterModelOptionsForLimitedAccess(
     modelView.options,

@@ -5,11 +5,11 @@
  *  and the `extra` spread bakes every entry, so an optional key must not be one
  *  of them. A URL key may be either kind, so the build-time URL contract reads
  *  both maps (see app.config.ts).
- *  Plain .js because scripts/assert-expo-config.mjs runs under plain Node,
- *  which cannot load workspace TS, and that script imports this module live.
- *  The sibling plain-.js modules the same script imports
- *  (android-notification-channels.js, splash-branding.js) cite this note
- *  instead of repeating it, so the constraint is described once here.
+ *  Plain .js, not TypeScript, because two build-time consumers read these
+ *  modules and neither can load workspace TS: the Expo config loader through
+ *  app.config.ts, and scripts/assert-expo-config.mjs, which runs under plain
+ *  Node. The sibling plain-.js modules beside this one cite this note instead
+ *  of repeating it, so the constraint is described once here.
  *  Checked by the mobile typecheck through tsconfig include — keep the entry. */
 export const ENV_KEYS = {
   apiBaseUrl: 'API_BASE_URL',

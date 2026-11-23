@@ -119,15 +119,14 @@ export function UnconfirmedImageChip({
     >
       {/* The Load control names the image, so the row's own copy stays out of
           the accessibility tree; otherwise a reader hears the description twice. */}
-      <View
-        className="min-w-0 flex-1"
+      <Text
+        className="min-w-0 flex-1 text-xs text-muted-foreground"
+        numberOfLines={2}
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants"
       >
-        <Text className="text-xs text-muted-foreground" numberOfLines={2}>
-          {label}
-        </Text>
-      </View>
+        {label}
+      </Text>
       <Pressable
         onPress={onLoad}
         onLongPress={onShowLinkActions}

@@ -4712,7 +4712,6 @@
       "deductionFallback": "Tegoedafschrijving",
       "emptyDescription": "Tegoedaankopen, bonnen en verbruik verschijnen hier.",
       "emptyTitle": "Geen tegoedgeschiedenis",
-      "expiredGrant": "Verlopen: {{description}}",
       "expiredStatus": "Verlopen",
       "googlePlayReceipt": "Bon in Google Play",
       "kind": {
@@ -4740,7 +4739,6 @@
       "receiptA11y": "Open de bon voor {{description}}, {{amount}}, van {{date}}",
       "receiptUnavailable": "Er is geen bon beschikbaar voor deze aankoop.",
       "retentionLimit": "De meest recente tegoedgeschiedenis wordt weergegeven.",
-      "voidedGrant": "Geannuleerd: {{description}}",
       "voidedStatus": "Geannuleerd"
     },
     "title": "Credits kopen",

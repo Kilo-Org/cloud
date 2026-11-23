@@ -4634,7 +4634,6 @@
       "deductionFallback": "點數扣除",
       "emptyDescription": "點數購買、收據與使用情況會顯示在這裡。",
       "emptyTitle": "尚無點數紀錄",
-      "expiredGrant": "已過期：{{description}}",
       "expiredStatus": "已過期",
       "googlePlayReceipt": "Google Play 收據",
       "kind": {
@@ -4662,7 +4661,6 @@
       "receiptA11y": "開啟「{{description}}」，{{amount}}，{{date}} 的收據",
       "receiptUnavailable": "此筆購買沒有可用的收據。",
       "retentionLimit": "顯示最近的點數紀錄。",
-      "voidedGrant": "已作廢：{{description}}",
       "voidedStatus": "已作廢"
     },
     "title": "購買點數",

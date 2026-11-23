@@ -4712,7 +4712,6 @@
       "deductionFallback": "Одбивање кредити",
       "emptyDescription": "Купувањата на кредити, сметките и користењето ќе се појават тука.",
       "emptyTitle": "Нема историја на кредити",
-      "expiredGrant": "Истечен рок: {{description}}",
       "expiredStatus": "Истечен рок",
       "googlePlayReceipt": "Сметка од Google Play",
       "kind": {
@@ -4740,7 +4739,6 @@
       "receiptA11y": "Отвори ја сметката за {{description}}, {{amount}}, од {{date}}",
       "receiptUnavailable": "Не е достапна сметка за ова купување.",
       "retentionLimit": "Се прикажува најновата историја на кредити.",
-      "voidedGrant": "Поништено: {{description}}",
       "voidedStatus": "Поништено"
     },
     "title": "Купи кредити",

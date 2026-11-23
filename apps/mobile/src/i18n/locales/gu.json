@@ -4712,7 +4712,6 @@
       "deductionFallback": "ક્રેડિટ કપાત",
       "emptyDescription": "ક્રેડિટ ખરીદીઓ, રસીદો અને વપરાશ અહીં દેખાશે.",
       "emptyTitle": "કોઈ ક્રેડિટ ઇતિહાસ નથી",
-      "expiredGrant": "સમયસીમા સમાપ્ત: {{description}}",
       "expiredStatus": "સમયસીમા સમાપ્ત",
       "googlePlayReceipt": "Google Playની રસીદ",
       "kind": {
@@ -4740,7 +4739,6 @@
       "receiptA11y": "{{description}}, {{amount}}, {{date}}ની રસીદ ખોલો",
       "receiptUnavailable": "આ ખરીદી માટે રસીદ ઉપલબ્ધ નથી.",
       "retentionLimit": "સૌથી તાજેતરનો ક્રેડિટ ઇતિહાસ દર્શાવવામાં આવે છે.",
-      "voidedGrant": "રદ કરેલ: {{description}}",
       "voidedStatus": "રદ કરેલ"
     },
     "title": "ક્રેડિટ ખરીદો",

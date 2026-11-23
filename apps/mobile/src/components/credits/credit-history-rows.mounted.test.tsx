@@ -46,10 +46,11 @@ async function render(element: ReactElement) {
   return renderer;
 }
 
-function renderRow(purchase: CreditPurchaseEntry) {
+function renderRow(purchase: CreditPurchaseEntry, status: CreditDeduction | null = null) {
   return render(
     createElement(PurchaseHistoryRow, {
       entry: purchase,
+      status,
       isOpeningReceipt: false,
       last: false,
       onOpenReceipt: () => undefined,
@@ -213,6 +214,73 @@ describe('PurchaseHistoryRow', () => {
     earlier.unmount();
     later.unmount();
   });
+
+  it('paints the status of a closed grant inside the purchase row', async () => {
+    const renderer = await renderRow(
+      entry({ creditSource: 'stripe', amount_mUsd: 10_000_000 }),
+      deduction({
+        description: 'Expired: Promotional credit',
+        expiry: 'expired',
+        amount_mUsd: -10_000_000,
+        purchase: deductionGrant({
+          id: 'purchase-1',
+          description: 'promotional-bonus',
+          kind: 'promotional',
+        }),
+      })
+    );
+
+    const painted = texts(renderer).map(text => readable(text));
+    // The row's own block names the grant and prints its date and expiry, so
+    // the status under it carries what closed the grant and none of that: one
+    // date line, one expiry line, then the status, its amount, and its type.
+    expect(painted).toContain('Credit purchase');
+    expect(painted).toContain('+$10.00');
+    expect(painted).toContain('Expired');
+    expect(painted).toContain('-$10.00');
+    expect(painted).toContain('Deduction');
+    expect(painted.filter(text => /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(text))).toEqual(['11/12/2026']);
+    expect(painted.filter(text => text.startsWith('Expires'))).toHaveLength(1);
+    expect(painted.indexOf('Expired')).toBeGreaterThan(painted.indexOf('+$10.00'));
+    renderer.unmount();
+  });
+
+  it('paints a voided grant as a voided status line under the purchase', async () => {
+    const renderer = await renderRow(
+      entry({ creditSource: 'stripe', expiryDate: null }),
+      deduction({
+        description: 'Credit voided from Orb system',
+        expiry: 'voided',
+        purchase: deductionGrant({ description: 'oss-bonus', kind: 'oss_sponsorship' }),
+      })
+    );
+
+    const painted = texts(renderer).map(text => readable(text));
+    // A voided grant was cancelled rather than left to run out, so the status
+    // line says so and never claims an expiry.
+    expect(painted).toContain('Voided');
+    expect(painted.some(text => text.startsWith('Expired'))).toBe(false);
+    renderer.unmount();
+  });
+
+  it('paints no status line when the closing row records no expiry', async () => {
+    const renderer = await renderRow(
+      entry({ creditSource: 'stripe', expiryDate: null }),
+      deduction({
+        description: 'Promotional credit',
+        expiry: null,
+        purchase: deductionGrant({ description: 'promotional-bonus', kind: 'promotional' }),
+      })
+    );
+
+    const painted = texts(renderer).map(text => readable(text));
+    // Only an expiry or a voidance is a status, so this purchase row has
+    // nothing to paint under its caption and keeps its own two lines.
+    expect(painted).not.toContain('Expired');
+    expect(painted).not.toContain('Voided');
+    expect(painted.filter(text => /^[+-]\$/.test(text))).toEqual(['+$10.00']);
+    renderer.unmount();
+  });
 });
 
 /** The row's own receipt action, which is the only pressable a card purchase paints. */
@@ -338,8 +406,10 @@ describe('LedgerHistoryRow', () => {
       expect(status).not.toBe(i18n.t('credits.history.expiredStatus', { lng: 'en' }));
       expect(painted).toContain('رصيد المؤثرين');
       expect(painted).toContain(status);
-      expect(painted).not.toContain(
-        i18n.t('credits.history.expiredGrant', { description: 'رصيد المؤثرين' })
+      // The status stands alone under the grant's own title, so no painted line
+      // repeats the grant's name beside it.
+      expect(painted.some(text => text.includes('رصيد المؤثرين') && text.includes(status))).toBe(
+        false
       );
       renderer.unmount();
     } finally {
@@ -392,26 +462,29 @@ describe('LedgerHistoryRow', () => {
     renderer.unmount();
   });
 
-  it('names the expiry once when the grant has its own purchase row above', async () => {
+  it('states a charge against a listed grant as its own event alone', async () => {
+    // The purchase row above already paints this grant's name, amount and date,
+    // so repeating them here would read as a second purchase. The charge keeps
+    // its own row, because the ledger records an event of its own.
     const renderer = await renderLedgerRow(
       deduction({
-        description: 'Expired: Promotional credit',
-        expiry: 'expired',
-        purchase: deductionGrant({ description: 'promotional-bonus', kind: 'promotional' }),
+        description: 'Deducting credits',
+        expiry: null,
+        amount_mUsd: -1_000_000,
+        purchase: deductionGrant({
+          is_free: false,
+          credit_source: 'stripe',
+          description: 'Top-up via stripe',
+        }),
       }),
       true
     );
 
     const painted = texts(renderer).map(text => readable(text));
-    // The purchase row above already carries the grant, so this row paints the
-    // expiry alone: the grant is titled from its reason, and the stored
-    // sentence must not gain a second prefix. With the grant's name absent
-    // here, the full form stays the row's main title, and no second line
-    // repeats the status on its own.
-    expect(painted).toContain('Expired: Promotional credits');
-    expect(painted).not.toContain('Expired');
-    expect(painted).not.toContain('Expired: Expired: Promotional credits');
-    expect(painted).not.toContain('promotional-bonus');
+    expect(painted).not.toContain('Credit purchase');
+    expect(painted.some(text => text.includes('Top-up via stripe'))).toBe(false);
+    expect(painted).not.toContain('+$10.00');
+    expect(painted).toContain('-$1.00');
     renderer.unmount();
   });
 

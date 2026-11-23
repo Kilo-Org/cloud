@@ -4712,7 +4712,6 @@
       "deductionFallback": "ക്രെഡിറ്റ് കിഴിവ്",
       "emptyDescription": "ക്രെഡിറ്റ് വാങ്ങലുകൾ, രസീതുകൾ, ഉപയോഗം എന്നിവ ഇവിടെ ദൃശ്യമാകും.",
       "emptyTitle": "ക്രെഡിറ്റ് ചരിത്രമില്ല",
-      "expiredGrant": "കാലഹരണപ്പെട്ടു: {{description}}",
       "expiredStatus": "കാലഹരണപ്പെട്ടു",
       "googlePlayReceipt": "Google Play-ൽ നിന്നുള്ള രസീത്",
       "kind": {
@@ -4740,7 +4739,6 @@
       "receiptA11y": "{{description}}, {{amount}}, {{date}} എന്നതിന്റെ രസീത് തുറക്കുക",
       "receiptUnavailable": "ഈ വാങ്ങലിന് രസീത് ലഭ്യമല്ല.",
       "retentionLimit": "ഏറ്റവും പുതിയ ക്രെഡിറ്റ് ചരിത്രം കാണിക്കുന്നു.",
-      "voidedGrant": "റദ്ദാക്കി: {{description}}",
       "voidedStatus": "റദ്ദാക്കി"
     },
     "title": "ക്രെഡിറ്റുകൾ വാങ്ങുക",

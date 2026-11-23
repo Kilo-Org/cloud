@@ -4635,7 +4635,6 @@
       "deductionFallback": "การหักเครดิต",
       "emptyDescription": "การซื้อเครดิต ใบเสร็จ และการใช้งานจะแสดงที่นี่",
       "emptyTitle": "ไม่มีประวัติเครดิต",
-      "expiredGrant": "หมดอายุแล้ว: {{description}}",
       "expiredStatus": "หมดอายุแล้ว",
       "googlePlayReceipt": "ใบเสร็จจาก Google Play",
       "kind": {
@@ -4663,7 +4662,6 @@
       "receiptA11y": "เปิดใบเสร็จสำหรับ {{description}} จำนวน {{amount}} วันที่ {{date}}",
       "receiptUnavailable": "ไม่มีใบเสร็จสำหรับการซื้อนี้",
       "retentionLimit": "กำลังแสดงประวัติเครดิตล่าสุด",
-      "voidedGrant": "ยกเลิกแล้ว: {{description}}",
       "voidedStatus": "ยกเลิกแล้ว"
     },
     "title": "ซื้อเครดิต",

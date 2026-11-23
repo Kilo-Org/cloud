@@ -4714,7 +4714,6 @@
       "deductionFallback": "క్రెడిట్ తగ్గింపు",
       "emptyDescription": "క్రెడిట్ కొనుగోళ్లు, రసీదులు మరియు వినియోగం ఇక్కడ కనిపిస్తాయి.",
       "emptyTitle": "క్రెడిట్ చరిత్ర లేదు",
-      "expiredGrant": "గడువు ముగిసింది: {{description}}",
       "expiredStatus": "గడువు ముగిసింది",
       "googlePlayReceipt": "Google Play నుండి రసీదు",
       "kind": {
@@ -4742,7 +4741,6 @@
       "receiptA11y": "{{date}} నాటి {{description}}, {{amount}} కోసం రసీదును తెరవండి",
       "receiptUnavailable": "ఈ కొనుగోలుకు రసీదు అందుబాటులో లేదు.",
       "retentionLimit": "ఇటీవలి క్రెడిట్ చరిత్ర చూపబడుతోంది.",
-      "voidedGrant": "రద్దు చేయబడింది: {{description}}",
       "voidedStatus": "రద్దు చేయబడింది"
     },
     "title": "క్రెడిట్‌లు కొనండి",

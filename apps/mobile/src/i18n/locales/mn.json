@@ -4712,7 +4712,6 @@
       "deductionFallback": "Кредитийн хасалт",
       "emptyDescription": "Кредитийн худалдан авалт, баримт, хэрэглээ энд харагдана.",
       "emptyTitle": "Кредитийн түүх алга",
-      "expiredGrant": "Хугацаа нь дууссан: {{description}}",
       "expiredStatus": "Хугацаа нь дууссан",
       "googlePlayReceipt": "Google Play-н баримт",
       "kind": {
@@ -4740,7 +4739,6 @@
       "receiptA11y": "Баримтыг нээх: {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Энэ худалдан авалтад баримт байхгүй байна.",
       "retentionLimit": "Кредитийн хамгийн сүүлийн түүхийг харуулж байна.",
-      "voidedGrant": "Хүчингүй болгосон: {{description}}",
       "voidedStatus": "Хүчингүй болгосон"
     },
     "title": "Кредит худалдан авах",

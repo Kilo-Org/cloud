@@ -4712,7 +4712,6 @@
       "deductionFallback": "Kredit yechilishi",
       "emptyDescription": "Kredit xaridlari, cheklar va sarflar shu yerda ko‘rinadi.",
       "emptyTitle": "Kreditlar tarixi yo‘q",
-      "expiredGrant": "Muddati tugagan: {{description}}",
       "expiredStatus": "Muddati tugagan",
       "googlePlayReceipt": "Chek Google Play’da",
       "kind": {
@@ -4740,7 +4739,6 @@
       "receiptA11y": "{{description}}, {{amount}}, {{date}} chekini ochish",
       "receiptUnavailable": "Bu xarid uchun chek mavjud emas.",
       "retentionLimit": "Kreditlarning eng so'nggi tarixi ko'rsatilmoqda.",
-      "voidedGrant": "Bekor qilingan: {{description}}",
       "voidedStatus": "Bekor qilingan"
     },
     "title": "Kredit sotib olish",

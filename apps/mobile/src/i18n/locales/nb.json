@@ -4712,7 +4712,6 @@
       "deductionFallback": "Kredittrekk",
       "emptyDescription": "Kjøp av kreditter, kvitteringer og forbruk vises her.",
       "emptyTitle": "Ingen kreditthistorikk",
-      "expiredGrant": "Utløpt: {{description}}",
       "expiredStatus": "Utløpt",
       "googlePlayReceipt": "Kvittering fra Google Play",
       "kind": {
@@ -4740,7 +4739,6 @@
       "receiptA11y": "Åpne kvitteringen for {{description}}, {{amount}}, fra {{date}}",
       "receiptUnavailable": "Det finnes ingen kvittering for dette kjøpet.",
       "retentionLimit": "Viser den nyeste kreditthistorikken.",
-      "voidedGrant": "Annullert: {{description}}",
       "voidedStatus": "Annullert"
     },
     "title": "Kjøp kreditter",

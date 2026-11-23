@@ -4712,7 +4712,6 @@
       "deductionFallback": "Kredi düşümü",
       "emptyDescription": "Kredi satın alımları, makbuzlar ve kullanım burada görünecek.",
       "emptyTitle": "Kredi geçmişi yok",
-      "expiredGrant": "Süresi doldu: {{description}}",
       "expiredStatus": "Süresi doldu",
       "googlePlayReceipt": "Makbuz Google Play'de",
       "kind": {
@@ -4740,7 +4739,6 @@
       "receiptA11y": "{{description}}, {{amount}}, {{date}} için makbuzu aç",
       "receiptUnavailable": "Bu satın alım için makbuz mevcut değil.",
       "retentionLimit": "En son kredi geçmişi gösteriliyor.",
-      "voidedGrant": "İptal edildi: {{description}}",
       "voidedStatus": "İptal edildi"
     },
     "title": "Kredi satın al",

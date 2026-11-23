@@ -4712,7 +4712,6 @@
       "deductionFallback": "Kreditu-kenketa",
       "emptyDescription": "Kreditu-erosketak, ordainagiriak eta erabilera hemen agertuko dira.",
       "emptyTitle": "Ez dago kredituen historiarik",
-      "expiredGrant": "Iraungita: {{description}}",
       "expiredStatus": "Iraungita",
       "googlePlayReceipt": "Google Play-ko ordainagiria",
       "kind": {
@@ -4740,7 +4739,6 @@
       "receiptA11y": "Ireki honen ordainagiria: {{description}}, {{amount}}, {{date}}tik",
       "receiptUnavailable": "Ez dago ordainagiririk erosketa honetarako.",
       "retentionLimit": "Azken kreditu-historia erakusten da.",
-      "voidedGrant": "Baliogabetua: {{description}}",
       "voidedStatus": "Baliogabetua"
     },
     "title": "Erosi kredituak",

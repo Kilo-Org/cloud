@@ -4712,7 +4712,6 @@
       "deductionFallback": "କ୍ରେଡିଟ୍ କଟାଣ",
       "emptyDescription": "କ୍ରେଡିଟ୍ କ୍ରୟ, ରସିଦ ଏବଂ ବ୍ୟବହାର ଏଠାରେ ଦେଖାଯିବ।",
       "emptyTitle": "କୌଣସି କ୍ରେଡିଟ୍ ଇତିହାସ ନାହିଁ",
-      "expiredGrant": "ମିଆଦ ସମାପ୍ତ: {{description}}",
       "expiredStatus": "ମିଆଦ ସମାପ୍ତ",
       "googlePlayReceipt": "Google Playରୁ ରସିଦ",
       "kind": {
@@ -4740,7 +4739,6 @@
       "receiptA11y": "{{description}}, {{amount}}, {{date}} ପାଇଁ ରସିଦ ଖୋଲନ୍ତୁ",
       "receiptUnavailable": "ଏହି କ୍ରୟ ପାଇଁ କୌଣସି ରସିଦ ଉପଲବ୍ଧ ନାହିଁ।",
       "retentionLimit": "ସର୍ବାଧିକ ନୂଆ କ୍ରେଡିଟ୍ ଇତିହାସ ଦେଖାଯାଉଛି।",
-      "voidedGrant": "ବାତିଲ: {{description}}",
       "voidedStatus": "ବାତିଲ"
     },
     "title": "କ୍ରେଡିଟ୍ କିଣନ୍ତୁ",

@@ -5052,7 +5052,6 @@
       "deductionFallback": "Didyniad credyd",
       "emptyDescription": "Bydd pryniannau credyd, derbynebau a defnydd yn ymddangos yma.",
       "emptyTitle": "Dim hanes credydau",
-      "expiredGrant": "Wedi dod i ben: {{description}}",
       "expiredStatus": "Wedi dod i ben",
       "googlePlayReceipt": "Derbynneb gan Google Play",
       "kind": {
@@ -5080,7 +5079,6 @@
       "receiptA11y": "Agor y dderbynneb ar gyfer {{description}}, {{amount}}, o {{date}}",
       "receiptUnavailable": "Nid oes derbynneb ar gael ar gyfer y pryniant hwn.",
       "retentionLimit": "Yn dangos yr hanes credydau diweddaraf.",
-      "voidedGrant": "Wedi'i ddirymu: {{description}}",
       "voidedStatus": "Wedi'i ddirymu"
     },
     "title": "Prynu credydau",

@@ -4712,7 +4712,6 @@
       "deductionFallback": "ক্রেডিট কর্তন",
       "emptyDescription": "ক্রেডিট কেনাকাটা, রসিদ এবং ব্যবহার এখানে দেখা যাবে।",
       "emptyTitle": "কোনো ক্রেডিট ইতিহাস নেই",
-      "expiredGrant": "মেয়াদ শেষ: {{description}}",
       "expiredStatus": "মেয়াদ শেষ",
       "googlePlayReceipt": "Google Play-এর রসিদ",
       "kind": {
@@ -4740,7 +4739,6 @@
       "receiptA11y": "{{description}}-এর {{amount}} এবং {{date}} তারিখের রসিদ খুলুন",
       "receiptUnavailable": "এই কেনাকাটার জন্য কোনো রসিদ পাওয়া যাচ্ছে না।",
       "retentionLimit": "সাম্প্রতিকতম ক্রেডিট ইতিহাস দেখানো হচ্ছে।",
-      "voidedGrant": "বাতিল: {{description}}",
       "voidedStatus": "বাতিল"
     },
     "title": "ক্রেডিট কিনুন",

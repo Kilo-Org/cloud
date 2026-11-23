@@ -4712,7 +4712,6 @@
       "deductionFallback": "Credit-Abzug",
       "emptyDescription": "Credit-Käufe, Belege und Nutzung werden hier angezeigt.",
       "emptyTitle": "Kein Credit-Verlauf",
-      "expiredGrant": "Abgelaufen: {{description}}",
       "expiredStatus": "Abgelaufen",
       "googlePlayReceipt": "Beleg bei Google Play",
       "kind": {
@@ -4740,7 +4739,6 @@
       "receiptA11y": "Beleg für {{description}}, {{amount}}, vom {{date}} öffnen",
       "receiptUnavailable": "Für diesen Kauf ist kein Beleg verfügbar.",
       "retentionLimit": "Es wird der neueste Credit-Verlauf angezeigt.",
-      "voidedGrant": "Storniert: {{description}}",
       "voidedStatus": "Storniert"
     },
     "title": "Guthaben kaufen",

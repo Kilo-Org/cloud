@@ -4633,7 +4633,6 @@
       "deductionFallback": "积分扣除",
       "emptyDescription": "积分购买、收据和使用情况将显示在这里。",
       "emptyTitle": "暂无积分记录",
-      "expiredGrant": "已过期：{{description}}",
       "expiredStatus": "已过期",
       "googlePlayReceipt": "收据位于 Google Play",
       "kind": {
@@ -4661,7 +4660,6 @@
       "receiptA11y": "打开 {{description}}，{{amount}}，{{date}} 的收据",
       "receiptUnavailable": "此购买暂无可用收据。",
       "retentionLimit": "仅显示最近的积分记录。",
-      "voidedGrant": "已作废：{{description}}",
       "voidedStatus": "已作废"
     },
     "title": "购买额度",

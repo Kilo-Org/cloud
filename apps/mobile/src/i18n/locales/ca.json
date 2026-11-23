@@ -4797,7 +4797,6 @@
       "deductionFallback": "Deducció de crèdits",
       "emptyDescription": "Les compres de crèdits, els rebuts i l'ús apareixeran aquí.",
       "emptyTitle": "No hi ha historial de crèdits",
-      "expiredGrant": "Caducat: {{description}}",
       "expiredStatus": "Caducat",
       "googlePlayReceipt": "Rebut de Google Play",
       "kind": {
@@ -4825,7 +4824,6 @@
       "receiptA11y": "Obre el rebut de {{description}}, {{amount}}, del {{date}}",
       "receiptUnavailable": "No hi ha cap rebut disponible per a aquesta compra.",
       "retentionLimit": "Es mostra l'historial de crèdits més recent.",
-      "voidedGrant": "Anul·lat: {{description}}",
       "voidedStatus": "Anul·lat"
     },
     "title": "Compra crèdits",

@@ -4712,7 +4712,6 @@
       "deductionFallback": "क्रेडिट वजावट",
       "emptyDescription": "क्रेडिट खरेदी, पावत्या आणि वापर येथे दिसतील.",
       "emptyTitle": "क्रेडिट इतिहास नाही",
-      "expiredGrant": "कालबाह्य: {{description}}",
       "expiredStatus": "कालबाह्य",
       "googlePlayReceipt": "Google Play कडून पावती",
       "kind": {
@@ -4740,7 +4739,6 @@
       "receiptA11y": "{{description}}, {{amount}}, {{date}} ची पावती उघडा",
       "receiptUnavailable": "या खरेदीसाठी पावती उपलब्ध नाही.",
       "retentionLimit": "सर्वात अलीकडचा क्रेडिट इतिहास दाखवला जात आहे.",
-      "voidedGrant": "रद्द केले: {{description}}",
       "voidedStatus": "रद्द केले"
     },
     "title": "क्रेडिट्स खरेदी करा",

@@ -4639,7 +4639,6 @@
       "deductionFallback": "Mwepụ kredit",
       "emptyDescription": "Ịzụ kredit, rịsịt, na ojiji ga-apụta ebe a.",
       "emptyTitle": "Enweghị akụkọ kredit",
-      "expiredGrant": "Oge agwụla: {{description}}",
       "expiredStatus": "Oge agwụla",
       "googlePlayReceipt": "Rịsịt sitere na Google Play",
       "kind": {
@@ -4667,7 +4666,6 @@
       "receiptA11y": "Mepee rịsịt maka {{description}}, {{amount}}, site na {{date}}",
       "receiptUnavailable": "Enweghị rịsịt maka ihe a zụrụ a.",
       "retentionLimit": "Na-egosi akụkọ kredit kachasị ọhụrụ.",
-      "voidedGrant": "E kagbuola: {{description}}",
       "voidedStatus": "E kagbuola"
     },
     "title": "Zụta ego ojiji",

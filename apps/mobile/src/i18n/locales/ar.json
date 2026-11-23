@@ -5052,7 +5052,6 @@
       "deductionFallback": "خصم من الرصيد",
       "emptyDescription": "ستظهر هنا مشتريات الرصيد والإيصالات والاستخدام.",
       "emptyTitle": "لا يوجد سجل للرصيد",
-      "expiredGrant": "منتهي الصلاحية: {{description}}",
       "expiredStatus": "منتهي الصلاحية",
       "googlePlayReceipt": "الإيصال من Google Play",
       "kind": {
@@ -5080,7 +5079,6 @@
       "receiptA11y": "فتح إيصال {{description}}، {{amount}}، من {{date}}",
       "receiptUnavailable": "لا يتوفر إيصال لعملية الشراء هذه.",
       "retentionLimit": "يتم عرض أحدث حركات سجل الرصيد.",
-      "voidedGrant": "ملغى: {{description}}",
       "voidedStatus": "ملغى"
     },
     "title": "شراء الرصيد",

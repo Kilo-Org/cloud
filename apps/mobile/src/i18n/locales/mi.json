@@ -4712,7 +4712,6 @@
       "deductionFallback": "Tangohanga whiwhinga",
       "emptyDescription": "Ka puta mai ki konei ngā hoko whiwhinga, ngā rihīti, me te whakamahinga.",
       "emptyTitle": "Kāore he hītori whiwhinga",
-      "expiredGrant": "Kua pau te wā: {{description}}",
       "expiredStatus": "Kua pau te wā",
       "googlePlayReceipt": "Rihīti mai i Google Play",
       "kind": {
@@ -4740,7 +4739,6 @@
       "receiptA11y": "Huakina te rihīti mō {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Kāore he rihīti mō tēnei hoko.",
       "retentionLimit": "E whakaatu ana i te hītori whiwhinga tino hou.",
-      "voidedGrant": "Kua whakakorea: {{description}}",
       "voidedStatus": "Kua whakakorea"
     },
     "title": "Hoko whiwhinga",

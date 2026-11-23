@@ -47,6 +47,22 @@ function creditGrant(overrides: Partial<CreditGrant>): CreditGrant {
   };
 }
 
+/** The paid grant a listed purchase row paints, as a ledger row reports it. */
+function listedGrant(
+  overrides: Partial<NonNullable<CreditDeduction['purchase']>> = {}
+): NonNullable<CreditDeduction['purchase']> {
+  return {
+    id: 'p1',
+    date: '2026-01-01T00:00:00.000Z',
+    description: 'Top-up via stripe',
+    amount_mUsd: 20_000_000,
+    is_free: false,
+    credit_source: 'stripe',
+    kind: 'promotional',
+    ...overrides,
+  };
+}
+
 describe('creditPurchaseChannel', () => {
   it.each([
     ['apple', 'app_store'],
@@ -122,6 +138,33 @@ describe('buildCreditHistoryItems', () => {
     expect(items.map(item => item.key)).toEqual(['ledger:a', 'purchase:b']);
   });
 
+  it('keeps the key order for an expiry whose grant is not listed', () => {
+    // A grant the purchase pages do not hold has no row to fold into, so its
+    // expiry stays a row of its own and keeps the key order it always had.
+    const items = buildCreditHistoryItems(
+      [purchase({ id: 'b', date: '2026-01-01T00:00:00.000Z' })],
+      [
+        deduction({
+          id: 'a',
+          date: '2026-01-01T00:00:00.000Z',
+          kind: 'adjustment',
+          purchase: {
+            id: 'free-grant',
+            date: '2026-01-01T00:00:00.000Z',
+            description: 'Welcome credits',
+            amount_mUsd: 5_000_000,
+            is_free: true,
+            credit_source: null,
+            kind: 'welcome',
+          },
+        }),
+      ],
+      []
+    );
+
+    expect(items.map(item => item.key)).toEqual(['ledger:a', 'purchase:b']);
+  });
+
   it('returns nothing for an account with no history', () => {
     expect(buildCreditHistoryItems([], [], [])).toEqual([]);
   });
@@ -156,7 +199,7 @@ describe('buildCreditHistoryItems', () => {
     expect(items.map(item => item.key)).toEqual(['ledger:dated', 'ledger:broken']);
   });
 
-  it('marks a ledger row whose grant already has its purchase row', () => {
+  it('folds a listed grant status row into its purchase row', () => {
     const items = buildCreditHistoryItems(
       [purchase({ id: 'p1', date: '2026-01-01T00:00:00.000Z' })],
       [
@@ -164,22 +207,75 @@ describe('buildCreditHistoryItems', () => {
           id: 'expiry',
           date: '2026-04-01T00:00:00.000Z',
           kind: 'adjustment',
-          purchase: {
-            id: 'p1',
-            date: '2026-01-01T00:00:00.000Z',
-            description: 'Top-up via stripe',
-            amount_mUsd: 20_000_000,
-            is_free: false,
-            credit_source: 'stripe',
-            kind: 'promotional',
-          },
+          expiry: 'expired',
+          purchase: listedGrant(),
         }),
       ],
       []
     );
 
-    const ledger = items.find(item => item.key === 'ledger:expiry');
-    expect(ledger).toMatchObject({ kind: 'ledger', grantListed: true });
+    // The status belongs to the purchase row's own block, so the ledger paints
+    // no second row for it and the pair cannot drift apart.
+    expect(items.map(item => item.key)).toEqual(['purchase:p1']);
+    expect(items[0]).toMatchObject({ kind: 'purchase', status: { id: 'expiry' } });
+  });
+
+  it('keeps the newest close as the status and lists the older one', () => {
+    // The ledger hands its rows over newest first, so the newer voidance is the
+    // row the block paints; the older expiry stays a row of its own.
+    const items = buildCreditHistoryItems(
+      [purchase({ id: 'p1', date: '2026-01-01T00:00:00.000Z' })],
+      [
+        deduction({
+          id: 'voided',
+          date: '2026-05-01T00:00:00.000Z',
+          kind: 'adjustment',
+          expiry: 'voided',
+          purchase: listedGrant(),
+        }),
+        deduction({
+          id: 'expiry',
+          date: '2026-04-01T00:00:00.000Z',
+          kind: 'adjustment',
+          expiry: 'expired',
+          purchase: listedGrant(),
+        }),
+      ],
+      []
+    );
+
+    // One block can paint one status line, so the second row of the same grant
+    // stays a row of its own below the purchase rather than disappearing.
+    expect(items.map(item => item.key)).toEqual(['purchase:p1', 'ledger:expiry']);
+    expect(items.find(item => item.kind === 'purchase')).toMatchObject({
+      status: { id: 'voided' },
+    });
+  });
+
+  it('keeps a charge against a listed grant as its own row', () => {
+    // A spend row names the grant it drew on but records no expiry: it is an
+    // event of its own, so folding it into the purchase block would paint it
+    // nowhere at all.
+    const items = buildCreditHistoryItems(
+      [purchase({ id: 'p1', date: '2026-01-01T00:00:00.000Z' })],
+      [
+        deduction({
+          id: 'spend',
+          date: '2026-04-01T00:00:00.000Z',
+          description: 'Deducting credits',
+          expiry: null,
+          purchase: listedGrant({ kind: 'adjustment' }),
+        }),
+      ],
+      []
+    );
+
+    // The charge keeps its own row, flagged so the row states the event alone
+    // instead of repeating the grant the purchase above already paints, and it
+    // follows that purchase at the instant the two share.
+    expect(items.map(item => item.key)).toEqual(['purchase:p1', 'ledger:spend']);
+    expect(items.find(item => item.kind === 'purchase')).toMatchObject({ status: null });
+    expect(items.find(item => item.kind === 'ledger')).toMatchObject({ grantListed: true });
   });
 
   it('keeps the grant line while its purchase page is not loaded', () => {
@@ -190,22 +286,16 @@ describe('buildCreditHistoryItems', () => {
           id: 'expiry',
           date: '2026-04-01T00:00:00.000Z',
           kind: 'adjustment',
-          purchase: {
-            id: 'p1',
-            date: '2026-01-01T00:00:00.000Z',
-            description: 'Top-up via stripe',
-            amount_mUsd: 20_000_000,
-            is_free: false,
-            credit_source: 'stripe',
-            kind: 'promotional',
-          },
+          purchase: listedGrant(),
         }),
       ],
       []
     );
 
-    const ledger = items.find(item => item.key === 'ledger:expiry');
-    expect(ledger).toMatchObject({ kind: 'ledger', grantListed: false });
+    // Nothing can print the grant's purchase row, so the ledger row has to
+    // carry the grant itself; the item carries no purchase-only field.
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({ kind: 'ledger', deduction: { id: 'expiry' } });
   });
 
   it('lists the grant that funds a balance with no purchases', () => {

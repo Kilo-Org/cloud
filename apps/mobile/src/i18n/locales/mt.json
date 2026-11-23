@@ -4967,7 +4967,6 @@
       "deductionFallback": "Tnaqqis tal-krediti",
       "emptyDescription": "Ix-xiri, l-irċevuti u l-użu tal-krediti se jidhru hawn.",
       "emptyTitle": "L-ebda storja tal-krediti",
-      "expiredGrant": "Skada: {{description}}",
       "expiredStatus": "Skada",
       "googlePlayReceipt": "Irċevuta minn Google Play",
       "kind": {
@@ -4995,7 +4994,6 @@
       "receiptA11y": "Iftaħ l-irċevuta għal {{description}}, {{amount}}, minn {{date}}",
       "receiptUnavailable": "M'hemmx irċevuta disponibbli għal dan ix-xiri.",
       "retentionLimit": "Qed tintwera l-istorja tal-krediti l-aktar reċenti.",
-      "voidedGrant": "Annullat: {{description}}",
       "voidedStatus": "Annullat"
     },
     "title": "Ixtri krediti",

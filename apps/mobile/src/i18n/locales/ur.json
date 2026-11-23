@@ -4712,7 +4712,6 @@
       "deductionFallback": "کریڈٹ کی کٹوتی",
       "emptyDescription": "کریڈٹ کی خریداریاں، رسیدیں اور استعمال یہاں نظر آئیں گے۔",
       "emptyTitle": "کریڈٹ کی کوئی تاریخچہ نہیں",
-      "expiredGrant": "میعاد ختم ہو گئی: {{description}}",
       "expiredStatus": "میعاد ختم ہو گئی",
       "googlePlayReceipt": "Google Play کی رسید",
       "kind": {
@@ -4740,7 +4739,6 @@
       "receiptA11y": "{{description}}، {{amount}}، {{date}} کی رسید کھولیں",
       "receiptUnavailable": "اس خریداری کی رسید دستیاب نہیں ہے۔",
       "retentionLimit": "کریڈٹ کی حالیہ ترین تاریخچہ دکھائی جا رہی ہے۔",
-      "voidedGrant": "منسوخ: {{description}}",
       "voidedStatus": "منسوخ"
     },
     "title": "کریڈٹس خریدیں",

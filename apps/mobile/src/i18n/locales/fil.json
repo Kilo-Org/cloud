@@ -4712,7 +4712,6 @@
       "deductionFallback": "Bawas sa credit",
       "emptyDescription": "Lalabas dito ang mga pagbili, resibo, at paggamit ng credit.",
       "emptyTitle": "Walang kasaysayan ng credit",
-      "expiredGrant": "Nag-expire: {{description}}",
       "expiredStatus": "Nag-expire",
       "googlePlayReceipt": "Resibo mula sa Google Play",
       "kind": {
@@ -4740,7 +4739,6 @@
       "receiptA11y": "Buksan ang resibo para sa {{description}}, {{amount}}, mula noong {{date}}",
       "receiptUnavailable": "Walang available na resibo para sa pagbiling ito.",
       "retentionLimit": "Ipinapakita ang pinakabagong kasaysayan ng credit.",
-      "voidedGrant": "Kinansela: {{description}}",
       "voidedStatus": "Kinansela"
     },
     "title": "Bumili ng kredito",

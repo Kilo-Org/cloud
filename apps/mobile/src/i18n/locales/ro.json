@@ -4797,7 +4797,6 @@
       "deductionFallback": "Deducere de credite",
       "emptyDescription": "Achizițiile de credite, chitanțele și utilizarea vor apărea aici.",
       "emptyTitle": "Niciun istoric de credite",
-      "expiredGrant": "Expirat: {{description}}",
       "expiredStatus": "Expirat",
       "googlePlayReceipt": "Chitanță din Google Play",
       "kind": {
@@ -4825,7 +4824,6 @@
       "receiptA11y": "Deschide chitanța pentru {{description}}, {{amount}}, din {{date}}",
       "receiptUnavailable": "Nu există o chitanță disponibilă pentru această achiziție.",
       "retentionLimit": "Se afișează cel mai recent istoric de credite.",
-      "voidedGrant": "Anulat: {{description}}",
       "voidedStatus": "Anulat"
     },
     "title": "Cumpără credite",

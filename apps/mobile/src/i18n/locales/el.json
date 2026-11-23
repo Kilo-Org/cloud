@@ -4712,7 +4712,6 @@
       "deductionFallback": "Αφαίρεση μονάδων",
       "emptyDescription": "Οι αγορές μονάδων, οι αποδείξεις και η χρήση θα εμφανίζονται εδώ.",
       "emptyTitle": "Δεν υπάρχει ιστορικό μονάδων",
-      "expiredGrant": "Έληξε: {{description}}",
       "expiredStatus": "Έληξε",
       "googlePlayReceipt": "Απόδειξη από το Google Play",
       "kind": {
@@ -4740,7 +4739,6 @@
       "receiptA11y": "Άνοιγμα της απόδειξης για {{description}}, {{amount}}, από {{date}}",
       "receiptUnavailable": "Δεν υπάρχει διαθέσιμη απόδειξη για αυτήν την αγορά.",
       "retentionLimit": "Εμφανίζεται το πιο πρόσφατο ιστορικό μονάδων.",
-      "voidedGrant": "Ακυρωμένο: {{description}}",
       "voidedStatus": "Ακυρωμένο"
     },
     "title": "Αγορά πιστώσεων",

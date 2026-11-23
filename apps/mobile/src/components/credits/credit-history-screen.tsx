@@ -97,6 +97,7 @@ export function PersonalCreditHistoryScreen() {
         return (
           <PurchaseHistoryRow
             entry={item.entry}
+            status={item.status}
             isOpeningReceipt={openingReceiptId === item.entry.id}
             onOpenReceipt={openReceipt}
             last={last}

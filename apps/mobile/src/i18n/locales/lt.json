@@ -4882,7 +4882,6 @@
       "deductionFallback": "Kreditų nurašymas",
       "emptyDescription": "Čia bus rodomi kreditų pirkimai, kvitai ir naudojimas.",
       "emptyTitle": "Kreditų istorijos nėra",
-      "expiredGrant": "Galiojimas baigėsi: {{description}}",
       "expiredStatus": "Galiojimas baigėsi",
       "googlePlayReceipt": "Kvitas iš Google Play",
       "kind": {
@@ -4910,7 +4909,6 @@
       "receiptA11y": "Atidaryti kvitą: {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Šiam pirkimui kvito nėra.",
       "retentionLimit": "Rodoma naujausia kreditų istorija.",
-      "voidedGrant": "Anuliuota: {{description}}",
       "voidedStatus": "Anuliuota"
     },
     "title": "Pirkti kreditus",

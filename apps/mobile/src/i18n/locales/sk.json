@@ -4882,7 +4882,6 @@
       "deductionFallback": "Odpočet kreditov",
       "emptyDescription": "Tu sa zobrazia nákupy kreditov, doklady a ich využitie.",
       "emptyTitle": "Žiadna história kreditov",
-      "expiredGrant": "Platnosť vypršala: {{description}}",
       "expiredStatus": "Platnosť vypršala",
       "googlePlayReceipt": "Doklad v obchode Google Play",
       "kind": {
@@ -4910,7 +4909,6 @@
       "receiptA11y": "Otvoriť doklad za {{description}}, {{amount}}, z {{date}}",
       "receiptUnavailable": "Pre tento nákup nie je k dispozícii doklad.",
       "retentionLimit": "Zobrazuje sa najnovšia história kreditov.",
-      "voidedGrant": "Stornované: {{description}}",
       "voidedStatus": "Stornované"
     },
     "title": "Kúpiť kredity",

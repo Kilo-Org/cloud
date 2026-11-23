@@ -4712,7 +4712,6 @@
       "deductionFallback": "Frádráttur inneignar",
       "emptyDescription": "Kaup á inneign, kvittanir og notkun birtast hér.",
       "emptyTitle": "Enginn inneignarferill",
-      "expiredGrant": "Útrunnið: {{description}}",
       "expiredStatus": "Útrunnið",
       "googlePlayReceipt": "Kvittun frá Google Play",
       "kind": {
@@ -4740,7 +4739,6 @@
       "receiptA11y": "Opna kvittun fyrir {{description}}, {{amount}}, frá {{date}}",
       "receiptUnavailable": "Engin kvittun er tiltæk fyrir þessi kaup.",
       "retentionLimit": "Nýjasti inneignarferillinn er sýndur.",
-      "voidedGrant": "Ógilt: {{description}}",
       "voidedStatus": "Ógilt"
     },
     "title": "Kaupa inneign",

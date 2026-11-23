@@ -4712,7 +4712,6 @@
       "deductionFallback": "Kreditlevonás",
       "emptyDescription": "A kreditvásárlások, a nyugták és a felhasználás itt jelennek meg.",
       "emptyTitle": "Nincsenek kreditelőzmények",
-      "expiredGrant": "Lejárt: {{description}}",
       "expiredStatus": "Lejárt",
       "googlePlayReceipt": "A nyugta a Google Playen érhető el",
       "kind": {
@@ -4740,7 +4739,6 @@
       "receiptA11y": "Nyugta megnyitása: {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Ehhez a vásárláshoz nem érhető el nyugta.",
       "retentionLimit": "A legutóbbi kreditelőzmények láthatók.",
-      "voidedGrant": "Érvénytelenítve: {{description}}",
       "voidedStatus": "Érvénytelenítve"
     },
     "title": "Kreditek vásárlása",

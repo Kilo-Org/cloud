@@ -4712,7 +4712,6 @@
       "deductionFallback": "Ukudonswa kwamakhredithi",
       "emptyDescription": "Ukuthengwa kwamakhredithi, amarisidi, nokusetshenziswa kuzovela lapha.",
       "emptyTitle": "Awukho umlando wamakhredithi",
-      "expiredGrant": "Kuphelelwe yisikhathi: {{description}}",
       "expiredStatus": "Kuphelelwe yisikhathi",
       "googlePlayReceipt": "Irisidi evela ku-Google Play",
       "kind": {
@@ -4740,7 +4739,6 @@
       "receiptA11y": "Vula irisidi ye-{{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Ayikho irisidi etholakalayo yalokhu kuthenga.",
       "retentionLimit": "Kuboniswa umlando wamakhredithi wakamuva.",
-      "voidedGrant": "Ikhanseliwe: {{description}}",
       "voidedStatus": "Ikhanseliwe"
     },
     "title": "Thenga amakhredithi",

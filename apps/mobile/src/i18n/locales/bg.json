@@ -4712,7 +4712,6 @@
       "deductionFallback": "Приспадане на кредити",
       "emptyDescription": "Покупките на кредити, разписките и използването ще се показват тук.",
       "emptyTitle": "Няма история на кредитите",
-      "expiredGrant": "Изтекъл срок: {{description}}",
       "expiredStatus": "Изтекъл срок",
       "googlePlayReceipt": "Разписка от Google Play",
       "kind": {
@@ -4740,7 +4739,6 @@
       "receiptA11y": "Отваряне на разписката за {{description}}, {{amount}}, от {{date}}",
       "receiptUnavailable": "Няма налична разписка за тази покупка.",
       "retentionLimit": "Показва се най-новата история на кредитите.",
-      "voidedGrant": "Анулиран: {{description}}",
       "voidedStatus": "Анулиран"
     },
     "title": "Купи кредити",

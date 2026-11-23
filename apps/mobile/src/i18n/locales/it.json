@@ -4797,7 +4797,6 @@
       "deductionFallback": "Detrazione crediti",
       "emptyDescription": "Qui appariranno acquisti, ricevute e utilizzo dei crediti.",
       "emptyTitle": "Nessuna cronologia crediti",
-      "expiredGrant": "Scaduto: {{description}}",
       "expiredStatus": "Scaduto",
       "googlePlayReceipt": "Ricevuta da Google Play",
       "kind": {
@@ -4825,7 +4824,6 @@
       "receiptA11y": "Apri la ricevuta di {{description}}, {{amount}}, del {{date}}",
       "receiptUnavailable": "Nessuna ricevuta disponibile per questo acquisto.",
       "retentionLimit": "Viene mostrata la cronologia crediti più recente.",
-      "voidedGrant": "Annullato: {{description}}",
       "voidedStatus": "Annullato"
     },
     "title": "Acquista crediti",

@@ -4635,7 +4635,6 @@
       "deductionFallback": "Potongan kredit",
       "emptyDescription": "Pembelian kredit, resit dan penggunaan akan dipaparkan di sini.",
       "emptyTitle": "Tiada sejarah kredit",
-      "expiredGrant": "Tamat tempoh: {{description}}",
       "expiredStatus": "Tamat tempoh",
       "googlePlayReceipt": "Resit daripada Google Play",
       "kind": {
@@ -4663,7 +4662,6 @@
       "receiptA11y": "Buka resit untuk {{description}}, {{amount}}, dari {{date}}",
       "receiptUnavailable": "Resit tidak tersedia untuk pembelian ini.",
       "retentionLimit": "Memaparkan sejarah kredit terkini.",
-      "voidedGrant": "Dibatalkan: {{description}}",
       "voidedStatus": "Dibatalkan"
     },
     "title": "Beli kredit",

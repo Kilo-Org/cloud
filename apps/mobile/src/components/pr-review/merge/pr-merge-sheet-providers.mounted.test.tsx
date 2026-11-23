@@ -156,10 +156,7 @@ describe('PrMergeSheet provider behavior', () => {
       mergeStateRetry: { retry, isRetrying: false },
     });
     expect(hosts(renderer, 'TextInput')).toHaveLength(0);
-    expect(hosts(renderer, 'Button').map(node => node.props.accessibilityLabel)).toEqual([
-      'Retry',
-      'Discard',
-    ]);
+    expect(hosts(renderer, 'Button').map(node => node.props.accessibilityLabel)).toEqual(['Retry']);
     const text = visibleText(renderer);
     expect(text).toContain("Couldn't determine mergeability.");
     expect(hosts(renderer, 'AccessibleStatus').map(node => node.props.message)).toContain(
@@ -167,8 +164,6 @@ describe('PrMergeSheet provider behavior', () => {
     );
     await press(renderer, 'Retry');
     expect(retry).toHaveBeenCalledOnce();
-    await press(renderer, 'Discard');
-    expect(baseProps.onDismiss).toHaveBeenCalledOnce();
     expect(state.merge.mutateAsync).not.toHaveBeenCalled();
   });
 
@@ -203,10 +198,7 @@ describe('PrMergeSheet provider behavior', () => {
       mode: 'enable-auto-merge',
       autoMergeCapability: { supported: true, reason: '' },
     });
-    expect(hosts(renderer, 'Button').map(node => node.props.accessibilityLabel)).toEqual([
-      'Retry',
-      'Discard',
-    ]);
+    expect(hosts(renderer, 'Button').map(node => node.props.accessibilityLabel)).toEqual(['Retry']);
     expect(visibleText(renderer)).toContain("Couldn't determine mergeability.");
     expect(state.autoMerge.mutateAsync).not.toHaveBeenCalled();
   });

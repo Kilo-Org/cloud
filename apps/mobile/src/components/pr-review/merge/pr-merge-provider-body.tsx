@@ -135,7 +135,8 @@ function ProviderAutoMergeBody({
  * mounts the sheet only after the provider merge-state read returns, so an
  * `unknown` gate is the contract-violation terminal: it renders the failure
  * with the caller's merge-state retry (its retry drive and fetching flag, so
- * the control reports the wait) and a Discard, never a confirm control. Only an
+ * the control reports the wait) and nothing else — the retry is its only
+ * action, and the sheet header's close control is its way out. Only an
  * established allowed verdict or the GitHub arm reaches the child form. The
  * restrictions list stays advisory: the merge write
  * (`providerReview.mergePullRequest`) re-fetches the review, fences the
@@ -183,20 +184,17 @@ export function PrMergeProviderBody({
   }
   if (gate.kind === 'unknown') {
     return (
-      <>
-        <View className="flex-1 justify-center" style={sideInsetStyle}>
-          <QueryError
-            placement="static"
-            inset="gutter"
-            variant="neutral"
-            title={t('prReview.merge.couldNotDetermine')}
-            message={t('prReview.merge.blocked.unknownStateDetail')}
-            onRetry={retryMergeState}
-            isRetrying={mergeStateRetry.isRetrying}
-          />
-        </View>
-        <PrFormSheetFooter>{cancelButton()}</PrFormSheetFooter>
-      </>
+      <View className="flex-1 justify-center" style={sideInsetStyle}>
+        <QueryError
+          placement="static"
+          inset="gutter"
+          variant="neutral"
+          title={t('prReview.merge.couldNotDetermine')}
+          message={t('prReview.merge.blocked.unknownStateDetail')}
+          onRetry={retryMergeState}
+          isRetrying={mergeStateRetry.isRetrying}
+        />
+      </View>
     );
   }
   if (gate.kind === 'auto-merge' && gate.capability?.supported === false) {

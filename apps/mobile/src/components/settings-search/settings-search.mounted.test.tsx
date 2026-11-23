@@ -25,12 +25,9 @@ const copy = vi.hoisted(() => {
     'consent.helpImprove': 'Help improve Kilo',
     'preferences.hideThinking': 'Hide thinking details',
   };
+  // The two keyword concepts this suite indexes; the real catalog holds six.
   const keywords: Record<string, readonly string[]> = {
-    'settingsSearch.keywords.signOut': ['logout', 'log off'],
     'settingsSearch.keywords.appearance': ['theme', 'color scheme'],
-    'settingsSearch.keywords.appUnlock': ['biometrics', 'face ID', 'fingerprint'],
-    'settingsSearch.keywords.language': ['locale', 'translation'],
-    'settingsSearch.keywords.notifications': ['alerts', 'push notifications'],
     'settingsSearch.keywords.privacy': ['analytics', 'tracking'],
   };
   return { values, keywords };

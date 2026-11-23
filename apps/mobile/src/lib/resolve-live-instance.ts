@@ -30,14 +30,13 @@ export function resolveLiveInstance(
 
   let sameHost: InstancePickerInstance | null = null;
   for (const instance of instances) {
-    if (instance.name !== selected.name || instance.projectName !== selected.projectName) {
-      continue;
+    if (instance.name === selected.name && instance.projectName === selected.projectName) {
+      if (sameHost !== null) {
+        // A second live peer shares the pair: the selection names no single host.
+        return null;
+      }
+      sameHost = instance;
     }
-    if (sameHost !== null) {
-      // A second live peer shares the pair: the selection names no single host.
-      return null;
-    }
-    sameHost = instance;
   }
   return sameHost;
 }

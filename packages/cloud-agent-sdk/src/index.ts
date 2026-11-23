@@ -3,6 +3,10 @@ export type {
   NativeSyncOptions,
   NativeEvent,
   NativeSessionSummary,
+  ListedSession,
+  ListSessionsParams,
+  NativeClientKind,
+  NativeDeleteResult,
   NativePresenceState,
   NativeSessionState,
   NativePresenceConnection,
@@ -11,6 +15,32 @@ export type {
   NativeSocket,
   NativeSocketConstructor,
 } from './native-sync';
+export {
+  NativeSyncWriter,
+  encodeSessionEntity,
+  encodeMessageChanges,
+  packetAdmissionViolation,
+  nextSeq,
+  classifyConflict,
+} from './native-sync-writer';
+export type {
+  NativeEntityKind,
+  NativeSyncChange,
+  NativeSyncPacket,
+  NativeSyncReceipt,
+  NativeSessionLiveState,
+  NativeSessionSource,
+  PortableContent,
+  PortableMessage,
+  PortableModel,
+  PortableSession,
+  PulledMessage,
+  PulledSnapshot,
+  NativeRegisterResult,
+  NativeCommitResult,
+  NativePullResult,
+  PacketAdmissionViolation,
+} from './native-sync-writer';
 export { listNativeModels } from './native-sync-discovery';
 export type { NativeDiscoveredModel } from './native-sync-discovery';
 export { projectNativeSnapshot } from './native-sync-snapshot';

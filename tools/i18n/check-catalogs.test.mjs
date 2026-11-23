@@ -1824,6 +1824,80 @@ test('rejects Urdu copy with a period that joins two sentences', () => {
   );
 });
 
+const URDU_JOIN_ENGLISH = {
+  common: { sentenceJoiner: '. ', listJoiner: ', ' },
+  goal: {
+    sectionAccessibility: '{{status}}. Goal: {{text}}',
+    note: 'Kilo (kilo.ai).',
+    closing: 'Reporting',
+  },
+};
+const URDU_JOIN_SOURCE =
+  "t('common.sentenceJoiner');\nt('common.listJoiner');\nt('goal.sectionAccessibility');\nt('goal.note');\nt('goal.closing');";
+
+/** The Urdu pair for the joining-period cases: a placeholder and a bracket. */
+function urduJoins(goal) {
+  return {
+    common: { sentenceJoiner: '۔ ', listJoiner: '، ' },
+    goal: {
+      sectionAccessibility: '{{status}}۔ ہدف: {{text}}',
+      note: 'دیکھیں Kilo (kilo.ai).',
+      closing: 'رپورٹنگ',
+      ...goal,
+    },
+  };
+}
+
+test('rejects Urdu copy whose period joins a sentence after a placeholder', () => {
+  // The dot follows `{{status}}` rather than an Urdu letter, but a word after
+  // it still means a second sentence starts there.
+  const found = run({
+    language: 'ur',
+    english: URDU_JOIN_ENGLISH,
+    translated: urduJoins({ sectionAccessibility: '{{status}}. ہدف: {{text}}' }),
+    source: URDU_JOIN_SOURCE,
+  });
+  assert.equal(found.length, 1, found.join('\n'));
+  assert.match(
+    found.join('\n'),
+    /mobile\/ur: "goal\.sectionAccessibility" joins two sentences with the ASCII "\."; Urdu writes «۔»/
+  );
+});
+
+test('accepts the same sentence joined by «۔» after a placeholder', () => {
+  const found = run({
+    language: 'ur',
+    english: URDU_JOIN_ENGLISH,
+    translated: urduJoins(),
+    source: URDU_JOIN_SOURCE,
+  });
+  assert.deepEqual(found, []);
+});
+
+test('leaves a value-final period after a closing bracket alone, and a host keeps its dots', () => {
+  // `Kilo (kilo.ai).` ends on a bracket rather than on an Urdu word, so its
+  // period closes no Urdu sentence and `kilo.ai` carries its own dots, while a
+  // value-final period after an Urdu word is still the same defect.
+  const clean = run({
+    language: 'ur',
+    english: URDU_JOIN_ENGLISH,
+    translated: urduJoins({ note: 'دیکھیں Kilo (kilo.ai).' }),
+    source: URDU_JOIN_SOURCE,
+  });
+  assert.deepEqual(clean, []);
+  const reported = run({
+    language: 'ur',
+    english: URDU_JOIN_ENGLISH,
+    translated: urduJoins({ closing: 'رپورٹنگ.' }),
+    source: URDU_JOIN_SOURCE,
+  });
+  assert.equal(reported.length, 1, reported.join('\n'));
+  assert.match(
+    reported.join('\n'),
+    /mobile\/ur: "goal\.closing" ends a sentence with the ASCII "\."; Urdu writes «۔»/
+  );
+});
+
 test('leaves an Urdu URL, product name and ellipsis alone', () => {
   const found = run({
     language: 'ur',

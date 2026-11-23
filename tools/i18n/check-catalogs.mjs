@@ -1210,8 +1210,11 @@ function isArabicLetter(char) {
  * a tag list for the same reason `checkBorrowedDanda` does: the joiner is the
  * catalog's own statement of which mark closes its sentences, so a catalog that
  * declares another mark keeps its ASCII periods and none is named here. Only a
- * mark that closes a sentence is read: an ellipsis, a host or file name, a
- * decimal, a `{{token}}` and a Latin product name keep theirs.
+ * mark that closes a sentence is read: an ellipsis, a host or file name and a
+ * decimal keep theirs. A period followed by whitespace and a word closes one
+ * sentence and opens the next whatever precedes it, so the sentence it joins is
+ * reported after a `{{token}}` or a closing bracket too; a value-final period
+ * is read only after an Urdu word, which leaves a Latin product name alone.
  */
 function checkUrduSentenceTerminator(values, label) {
   const problems = [];
@@ -1232,12 +1235,19 @@ function checkUrduSentenceTerminator(values, label) {
       if (LATIN_OR_NUMBER_AFTER_DOT.test(value[index + 1] ?? '')) {
         continue;
       }
-      // Only a dot after an Urdu word closes a sentence: `Sentry.` and
-      // `{{status}}.` name a product and a value, not a sentence.
+      // A word after the dot means a second sentence follows it, whatever the
+      // dot follows: `{{status}}. ہدف` joins two sentences as surely as a dot
+      // after an Urdu word does.
+      if (/^\s+\p{L}/u.test(value.slice(index + 1))) {
+        problems.push(`${label}: "${key}" joins two sentences with the ASCII "."; Urdu writes «۔»`);
+        continue;
+      }
+      // A dot that ends the value, or runs straight into the next word with no
+      // space, closes a sentence only after an Urdu word: `Sentry.` names a
+      // product and `{{status}}.` a value, not a sentence.
       if (!isArabicLetter(value[index - 1])) {
         continue;
       }
-      // A word after the dot means a second sentence follows it.
       if (/\p{L}/u.test(value.slice(index + 1))) {
         problems.push(`${label}: "${key}" joins two sentences with the ASCII "."; Urdu writes «۔»`);
         continue;

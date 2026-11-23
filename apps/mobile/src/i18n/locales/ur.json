@@ -2300,7 +2300,7 @@
       "removeConfirmTitle": "ہدف ہٹائیں؟",
       "removeConfirmMessage": "CLI اس سیشن کا ہدف صاف کر دیتا ہے۔",
       "updateFailed": "ہدف اپ ڈیٹ نہیں ہو سکا۔",
-      "sectionAccessibility": "{{status}}. ہدف: {{text}}",
+      "sectionAccessibility": "{{status}}۔ ہدف: {{text}}",
       "collapse": "ہدف چھپائیں",
       "expand": "ہدف دکھائیں"
     },
@@ -4168,7 +4168,7 @@
       "edit": "چیٹ بیک اینڈ میں ترمیم کریں",
       "name": "بیک اینڈ کا نام",
       "baseUrl": "API کا بنیادی URL",
-      "baseUrlHelp": "API کا بنیادی URL درج کریں، مثلاً https://api.openai.com/v1. اس میں درخواست کا راستہ، اسناد، کوئری یا فریگمنٹ شامل نہ کریں۔",
+      "baseUrlHelp": "API کا بنیادی URL درج کریں، مثلاً https://api.openai.com/v1۔ اس میں درخواست کا راستہ، اسناد، کوئری یا فریگمنٹ شامل نہ کریں۔",
       "protocol": "استدلال کا پروٹوکول",
       "chatCompletions": "Chat Completions",
       "responses": "Responses",

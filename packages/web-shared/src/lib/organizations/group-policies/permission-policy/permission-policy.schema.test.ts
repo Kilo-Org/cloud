@@ -4,7 +4,7 @@ import {
   MemberPermissionPolicySchema,
   OrganizationPermissionPolicySchema,
 } from './permission-policy.schema';
-import * as z from 'zod';
+import type * as z from 'zod';
 import fixtures from './v1-fixtures.json';
 
 test.each([fixtures.layered, fixtures.enabled_empty, fixtures.disabled])(

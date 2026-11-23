@@ -44,6 +44,29 @@ export class SlackWorkspaceRebindNotAllowedError extends Error {
   }
 }
 
+/**
+ * Why a rebind cannot settle the workspace it would replace.
+ * `read_failed` is a read that threw: a retry can produce a token to revoke.
+ * `credential_unreadable` is a handle this code can never revoke, so only the
+ * operator path can clear it.
+ */
+export type SlackWorkspaceRebindUnsettledReason = 'read_failed' | 'credential_unreadable';
+
+/**
+ * A rebind to a different Slack workspace would replace the only record of a
+ * bot token whose revocation could not be prepared. The previous binding is kept.
+ */
+export class SlackWorkspaceRebindUnsettledError extends Error {
+  constructor(readonly reason: SlackWorkspaceRebindUnsettledReason) {
+    super(
+      reason === 'read_failed'
+        ? 'Slack could not confirm the move away from the previous workspace. Try again.'
+        : 'Kilo could not read the Slack access saved for the previous workspace, so the connection was not moved. Contact support to finish disconnecting it.'
+    );
+    this.name = 'SlackWorkspaceRebindUnsettledError';
+  }
+}
+
 // Slack OAuth scopes for the integration
 // These should be kept in sync with the scopes requested in the Slack app configuration
 export const SLACK_SCOPES = [
@@ -497,12 +520,56 @@ export async function getSlackBotToken(integration: PlatformIntegration): Promis
   return read.status === 'available' ? read.token : null;
 }
 
+export type PreviousSlackWorkspace = {
+  /** Slack team id the owner's connection was bound to before this install. */
+  teamId: string;
+  /**
+   * Bot token to revoke once the rebind has committed, or null when the store
+   * holds nothing live for the previous workspace.
+   */
+  botToken: string | null;
+};
+
+/**
+ * Read the bot token of the workspace a rebind replaces, before the write that
+ * overwrites its only record. A read that yields no token refuses the rebind,
+ * because after the write this code could never revoke it: `read_failed` is
+ * worth a retry, and an unreadable credential needs the operator path.
+ */
+async function readReplacedSlackWorkspace(
+  existing: PlatformIntegration,
+  teamId: string
+): Promise<PreviousSlackWorkspace> {
+  const read = await readSlackBotToken(existing);
+  if (read.status === 'unavailable') {
+    throw new SlackWorkspaceRebindUnsettledError(
+      read.reason === 'read_failed' ? 'read_failed' : 'credential_unreadable'
+    );
+  }
+  return { teamId, botToken: read.status === 'available' ? read.token : null };
+}
+
+export type UpsertSlackInstallationResult = {
+  integration: PlatformIntegration;
+  /**
+   * The workspace this install replaces, when the owner installs onto a different
+   * Slack workspace. The caller retires it after its transaction has committed;
+   * see `retirePreviousSlackWorkspace`.
+   */
+  previousWorkspace: PreviousSlackWorkspace | null;
+};
+
 /**
  * Create or update Slack installation from the Chat SDK OAuth callback result.
  *
  * An organization connection holds a shared bot token and model policy, so moving
  * it to another Slack workspace is refused unless the caller passes
  * `allowWorkspaceRebind` after verifying organization-management authority.
+ *
+ * A move to a different workspace replaces the only row that names the previous
+ * workspace's bot token, so the token is read here, before the write, and handed
+ * back for revocation once the rebind commits. When that read cannot produce a
+ * token to revoke, the rebind is refused and the previous binding stays.
  */
 export async function upsertSlackInstallation(
   {
@@ -523,7 +590,7 @@ export async function upsertSlackInstallation(
     defaultModel?: string | null;
   },
   database: typeof db | DrizzleTransaction = db
-): Promise<PlatformIntegration> {
+): Promise<UpsertSlackInstallationResult> {
   const existing = await getInstallation(owner, database);
   const teamName = installation.teamName || 'Unknown Team';
   // Legacy rows can carry the workspace id only in `platform_account_id`.
@@ -543,6 +610,11 @@ export async function upsertSlackInstallation(
   ) {
     throw new SlackWorkspaceRebindNotAllowedError();
   }
+
+  const previousWorkspace =
+    existing && boundTeamId && boundTeamId !== teamId
+      ? await readReplacedSlackWorkspace(existing, boundTeamId)
+      : null;
 
   // For org integrations, get a model that respects org access policy. A null
   // result means the policy allows none of the candidates; the installation then
@@ -611,7 +683,7 @@ export async function upsertSlackInstallation(
           tx
         );
 
-        return updated;
+        return { integration: updated, previousWorkspace };
       });
     } catch (error) {
       if (isSlackWorkspaceUniqueViolation(error)) {
@@ -622,8 +694,8 @@ export async function upsertSlackInstallation(
   }
 
   try {
-    return await database.transaction(async tx => {
-      const [created] = await tx
+    const created = await database.transaction(async tx => {
+      const [inserted] = await tx
         .insert(platform_integrations)
         .values({
           owned_by_user_id: owner.type === 'user' ? owner.id : null,
@@ -642,7 +714,7 @@ export async function upsertSlackInstallation(
 
       await writeSlackCredential(
         {
-          integrationId: created.id,
+          integrationId: inserted.id,
           slackTeamId: teamId,
           owner,
           botToken: installation.botToken,
@@ -651,8 +723,10 @@ export async function upsertSlackInstallation(
         tx
       );
 
-      return created;
+      return inserted;
     });
+    // A new row has no earlier workspace to replace.
+    return { integration: created, previousWorkspace: null };
   } catch (error) {
     if (isSlackWorkspaceUniqueViolation(error)) {
       throw new SlackWorkspaceAlreadyConnectedError(teamName);
@@ -726,6 +800,39 @@ export async function uninstallApp(owner: Owner, options: SlackUninstallOptions 
   await db.delete(platform_integrations).where(eq(platform_integrations.id, integration.id));
 
   return { success: true };
+}
+
+/**
+ * Retire the workspace a successful install replaced. Call this only after the
+ * caller's transaction has committed: the connection row already names the new
+ * workspace, so the previous one's token and Chat SDK state are settled beside it.
+ *
+ * A token Slack does not confirm as revoked is reported with its team id, the
+ * only place that still names it, rather than thrown: the new connection stands.
+ */
+export async function retirePreviousSlackWorkspace(
+  previous: PreviousSlackWorkspace,
+  options: SlackUninstallOptions = {}
+): Promise<void> {
+  try {
+    if (previous.botToken) {
+      const revocation = await revokeSlackToken(previous.botToken);
+      if (revocation.status === 'temporary_failure') {
+        captureException(new Error('Slack token revocation did not settle a replaced workspace'), {
+          tags: { component: 'slack-service', op: 'retire-previous-workspace' },
+          extra: { teamId: previous.teamId, reason: revocation.reason },
+        });
+      }
+    }
+    await options.deleteChatSdkInstallation?.(previous.teamId);
+    await options.deleteChatSdkIdentityCache?.(previous.teamId);
+  } catch (error) {
+    // The new connection is already committed; this cleanup runs beside it.
+    captureException(error, {
+      tags: { component: 'slack-service', op: 'retire-previous-workspace' },
+      extra: { teamId: previous.teamId },
+    });
+  }
 }
 
 /**

@@ -13,6 +13,8 @@ import {
 
 jest.mock('@/lib/integrations/platforms/slack/credential-store', () => ({
   writeSlackCredential: async () => ({ id: 'credential-1' }),
+  getSlackCredentialByIntegrationId: async () => null,
+  decryptSlackBotToken: () => null,
 }));
 
 const DETACHED_AT = '2026-10-20T00:00:00.000Z';
@@ -193,11 +195,12 @@ describe('Slack workspace re-authorization', () => {
       },
     });
 
-    expect(updated).toMatchObject({
+    expect(updated.integration).toMatchObject({
       id: canonical.id,
       integration_status: INTEGRATION_STATUS.ACTIVE,
       platform_installation_id: 'T0PAIRED',
     });
+    expect(updated.previousWorkspace).toBeNull();
 
     const [legacyRow] = await db
       .select()
@@ -253,5 +256,46 @@ describe('Slack workspace re-authorization', () => {
       .from(platform_integrations)
       .where(eq(platform_integrations.id, detached.id));
     expect(rows).toHaveLength(1);
+  });
+
+  it('rebinds the active row to a new workspace and names the one it replaced', async () => {
+    const owner = await insertTestUser();
+    testUserIds.push(owner.id);
+    const [previous] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: owner.id,
+        platform: PLATFORM.SLACK,
+        integration_type: 'oauth',
+        platform_installation_id: 'T0MOVEOLD',
+        platform_account_id: 'T0MOVEOLD',
+        platform_account_login: 'Old Workspace',
+        scopes: [],
+        integration_status: INTEGRATION_STATUS.ACTIVE,
+      })
+      .returning();
+
+    const result = await upsertSlackInstallation({
+      owner: { type: 'user', id: owner.id },
+      teamId: 'T0MOVENEW',
+      installation: {
+        botToken: 'xoxb-authorized-token',
+        botUserId: 'U_BOT',
+        teamName: 'New Workspace',
+      },
+    });
+
+    expect(result.previousWorkspace).toEqual({ teamId: 'T0MOVEOLD', botToken: null });
+
+    const [row] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, previous.id));
+    expect(row).toMatchObject({
+      platform_installation_id: 'T0MOVENEW',
+      platform_account_id: 'T0MOVENEW',
+      platform_account_login: 'New Workspace',
+      integration_status: INTEGRATION_STATUS.ACTIVE,
+    });
   });
 });

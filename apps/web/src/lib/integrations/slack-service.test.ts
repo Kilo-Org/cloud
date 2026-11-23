@@ -85,9 +85,11 @@ import {
   deleteInstallationByTeamId,
   getMissingSlackScopes,
   readSlackBotToken,
+  retirePreviousSlackWorkspace,
   revokeSlackToken,
   SlackWorkspaceAlreadyConnectedError,
   SlackWorkspaceRebindNotAllowedError,
+  SlackWorkspaceRebindUnsettledError,
   SLACK_SCOPES,
   testConnection,
   uninstallApp,
@@ -966,8 +968,20 @@ describe('upsertSlackInstallation organization workspace binding', () => {
     mockUpdateReturning.mockResolvedValue([buildSlackIntegration()]);
     mockWriteSlackCredential.mockReset();
     mockWriteSlackCredential.mockResolvedValue({ id: 'credential-1' });
+    // A rebind reads the replaced workspace's token; no test scripted a row here.
+    mockGetSlackCredentialByIntegrationId.mockReset();
+    mockGetSlackCredentialByIntegrationId.mockResolvedValue(null);
+    mockDecryptSlackBotToken.mockReset();
     mockGetDefaultAllowedModel.mockReset();
     mockGetDefaultAllowedModel.mockResolvedValue(DEFAULT_BOT_MODEL);
+    mockTransaction.mockReset();
+    mockTransaction.mockImplementation(
+      async (fn: (tx: Record<string, unknown>) => Promise<unknown>) =>
+        fn({
+          update: () => ({ set: mockUpdateSet }),
+          insert: () => ({ values: mockInsertValues }),
+        })
+    );
   });
 
   it('uses the supplied default model without resolving organization policy again', async () => {
@@ -1075,5 +1089,234 @@ describe('upsertSlackInstallation organization workspace binding', () => {
     expect(mockUpdateSet).toHaveBeenCalledWith(
       expect.objectContaining({ platform_installation_id: 'T_NEW' })
     );
+  });
+});
+
+describe('upsertSlackInstallation workspace rebind', () => {
+  const installation = {
+    botToken: 'xoxb-new-token',
+    botUserId: 'U_NEW_BOT',
+    teamName: 'Kilo Team',
+  } satisfies SlackInstallation;
+
+  function integrationBoundTo(teamId: string) {
+    return buildSlackIntegration({
+      platform_installation_id: teamId,
+      platform_account_id: teamId,
+    });
+  }
+
+  beforeEach(() => {
+    mockLimit.mockReset();
+    // A workspace lookup the test does not script finds no row.
+    mockLimit.mockResolvedValue([]);
+    mockUpdateSet.mockReset();
+    mockUpdateWhere.mockReset();
+    mockUpdateReturning.mockReset();
+    mockUpdateSet.mockReturnValue({ where: mockUpdateWhere });
+    mockUpdateWhere.mockReturnValue({ returning: mockUpdateReturning });
+    mockUpdateReturning.mockResolvedValue([integrationBoundTo('T_NEW')]);
+    mockInsertValues.mockReset();
+    mockInsertReturning.mockReset();
+    mockInsertValues.mockReturnValue({ returning: mockInsertReturning });
+    mockInsertReturning.mockResolvedValue([integrationBoundTo('T_NEW')]);
+    mockWriteSlackCredential.mockReset();
+    mockWriteSlackCredential.mockResolvedValue({ id: 'credential-1' });
+    mockGetSlackCredentialByIntegrationId.mockReset();
+    mockGetSlackCredentialByIntegrationId.mockResolvedValue(null);
+    mockDecryptSlackBotToken.mockReset();
+    mockCaptureException.mockReset();
+    // The upsert wraps both writes in one transaction and awaits its callback.
+    mockTransaction.mockReset();
+    mockTransaction.mockImplementation(
+      async (fn: (tx: Record<string, unknown>) => Promise<unknown>) =>
+        fn({
+          update: () => ({ set: mockUpdateSet }),
+          insert: () => ({ values: mockInsertValues }),
+        })
+    );
+    mockGetDefaultAllowedModel.mockReset();
+  });
+
+  it('hands back the replaced workspace token when a personal owner rebinds', async () => {
+    mockLimit.mockResolvedValueOnce([integrationBoundTo('T_OLD')]).mockResolvedValueOnce([]);
+    mockGetSlackCredentialByIntegrationId.mockResolvedValue({ id: 'credential-old' });
+    mockDecryptSlackBotToken.mockReturnValue('$$SLACKTOKEN_OLDWORKSPACE:L$$');
+
+    const result = await upsertSlackInstallation({ owner, teamId: 'T_NEW', installation });
+
+    expect(result.previousWorkspace).toEqual({
+      teamId: 'T_OLD',
+      botToken: '$$SLACKTOKEN_OLDWORKSPACE:L$$',
+    });
+    expect(mockUpdateSet).toHaveBeenCalledWith(
+      expect.objectContaining({ platform_installation_id: 'T_NEW' })
+    );
+  });
+
+  it('hands back the replaced workspace without a token when no credential is stored', async () => {
+    mockLimit.mockResolvedValueOnce([integrationBoundTo('T_OLD')]).mockResolvedValueOnce([]);
+
+    const result = await upsertSlackInstallation({ owner, teamId: 'T_NEW', installation });
+
+    expect(result.previousWorkspace).toEqual({ teamId: 'T_OLD', botToken: null });
+    expect(mockUpdateSet).toHaveBeenCalledWith(
+      expect.objectContaining({ platform_installation_id: 'T_NEW' })
+    );
+  });
+
+  it('refuses the rebind and writes nothing when the credential store read fails', async () => {
+    mockLimit.mockResolvedValueOnce([integrationBoundTo('T_OLD')]).mockResolvedValueOnce([]);
+    mockGetSlackCredentialByIntegrationId.mockRejectedValue(new Error('database is down'));
+
+    const rebind = upsertSlackInstallation({ owner, teamId: 'T_NEW', installation });
+
+    await expect(rebind).rejects.toBeInstanceOf(SlackWorkspaceRebindUnsettledError);
+    await expect(rebind).rejects.toMatchObject({ reason: 'read_failed' });
+    expect(mockUpdateSet).not.toHaveBeenCalled();
+    expect(mockWriteSlackCredential).not.toHaveBeenCalled();
+  });
+
+  it('refuses the rebind and writes nothing when the stored credential cannot be decrypted', async () => {
+    mockLimit.mockResolvedValueOnce([integrationBoundTo('T_OLD')]).mockResolvedValueOnce([]);
+    mockGetSlackCredentialByIntegrationId.mockResolvedValue({ id: 'credential-old' });
+    mockDecryptSlackBotToken.mockImplementation(() => {
+      throw new SlackCredentialDecryptionError('access');
+    });
+
+    const rebind = upsertSlackInstallation({ owner, teamId: 'T_NEW', installation });
+
+    await expect(rebind).rejects.toBeInstanceOf(SlackWorkspaceRebindUnsettledError);
+    await expect(rebind).rejects.toMatchObject({ reason: 'credential_unreadable' });
+    expect(mockUpdateSet).not.toHaveBeenCalled();
+    expect(mockWriteSlackCredential).not.toHaveBeenCalled();
+  });
+
+  it('reports no replaced workspace when the same workspace is reinstalled', async () => {
+    mockLimit.mockResolvedValueOnce([integrationBoundTo('T123')]).mockResolvedValueOnce([]);
+
+    const result = await upsertSlackInstallation({ owner, teamId: 'T123', installation });
+
+    expect(result.previousWorkspace).toBeNull();
+    expect(mockGetSlackCredentialByIntegrationId).not.toHaveBeenCalled();
+    expect(mockUpdateSet).toHaveBeenCalledWith(
+      expect.objectContaining({ platform_installation_id: 'T123' })
+    );
+  });
+
+  it('reports no replaced workspace for a first installation', async () => {
+    mockLimit.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+
+    const result = await upsertSlackInstallation({ owner, teamId: 'T123', installation });
+
+    expect(result.previousWorkspace).toBeNull();
+    expect(mockGetSlackCredentialByIntegrationId).not.toHaveBeenCalled();
+  });
+});
+
+describe('retirePreviousSlackWorkspace', () => {
+  beforeEach(() => {
+    mockAuthRevoke.mockReset();
+    mockCaptureException.mockReset();
+  });
+
+  it('revokes the replaced token before clearing the Chat SDK state of its workspace', async () => {
+    const steps: string[] = [];
+    mockAuthRevoke.mockImplementation(async () => {
+      steps.push('revoke');
+      return { ok: true };
+    });
+    const deleteChatSdkInstallation = jest.fn(async (teamId: string): Promise<void> => {
+      steps.push(`installation:${teamId}`);
+    });
+    const deleteChatSdkIdentityCache = jest.fn(async (teamId: string): Promise<void> => {
+      steps.push(`identity:${teamId}`);
+    });
+
+    await retirePreviousSlackWorkspace(
+      { teamId: 'T_OLD', botToken: '$$SLACKTOKEN_OLDWORKSPACE:L$$' },
+      { deleteChatSdkInstallation, deleteChatSdkIdentityCache }
+    );
+
+    expect(mockAuthRevoke).toHaveBeenCalledTimes(1);
+    expect(steps).toEqual(['revoke', 'installation:T_OLD', 'identity:T_OLD']);
+    expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
+  it('settles quietly when Slack accepts the revoke', async () => {
+    mockAuthRevoke.mockResolvedValue({ ok: true });
+
+    await expect(
+      retirePreviousSlackWorkspace({ teamId: 'T_OLD', botToken: 'xoxb-old' })
+    ).resolves.toBeUndefined();
+
+    expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
+  it('settles quietly when Slack reports the token already invalid', async () => {
+    mockAuthRevoke.mockRejectedValue({
+      code: 'slack_webapi_platform_error',
+      data: { ok: false, error: 'invalid_auth' },
+    });
+
+    await expect(
+      retirePreviousSlackWorkspace({ teamId: 'T_OLD', botToken: 'xoxb-old' })
+    ).resolves.toBeUndefined();
+
+    expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
+  it('still clears the Chat SDK state and reports when the revoke fails temporarily', async () => {
+    mockAuthRevoke.mockRejectedValue({ code: 'slack_webapi_http_error', statusCode: 503 });
+    const deleteChatSdkInstallation = jest.fn(async (_teamId: string): Promise<void> => {});
+    const deleteChatSdkIdentityCache = jest.fn(async (_teamId: string): Promise<void> => {});
+
+    await expect(
+      retirePreviousSlackWorkspace(
+        { teamId: 'T_OLD', botToken: 'xoxb-old' },
+        { deleteChatSdkInstallation, deleteChatSdkIdentityCache }
+      )
+    ).resolves.toBeUndefined();
+
+    expect(deleteChatSdkInstallation).toHaveBeenCalledWith('T_OLD');
+    expect(deleteChatSdkIdentityCache).toHaveBeenCalledWith('T_OLD');
+    // revokeSlackToken reports the failed revocation, and the retire reports that
+    // the replaced workspace's token was not settled.
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        tags: expect.objectContaining({ op: 'retire-previous-workspace' }),
+      })
+    );
+  });
+
+  it('reports a failing identity-cache cleanup without rejecting', async () => {
+    mockAuthRevoke.mockResolvedValue({ ok: true });
+    const deleteChatSdkIdentityCache = jest.fn(async (_teamId: string): Promise<void> => {
+      throw new Error('redis unavailable');
+    });
+
+    await expect(
+      retirePreviousSlackWorkspace(
+        { teamId: 'T_OLD', botToken: 'xoxb-old' },
+        { deleteChatSdkIdentityCache }
+      )
+    ).resolves.toBeUndefined();
+
+    expect(mockCaptureException).toHaveBeenCalledTimes(1);
+    expect(mockCaptureException.mock.calls[0]![0]).toBeInstanceOf(Error);
+  });
+
+  it('does not call Slack when the replaced workspace stored no token', async () => {
+    const deleteChatSdkInstallation = jest.fn(async (_teamId: string): Promise<void> => {});
+
+    await retirePreviousSlackWorkspace(
+      { teamId: 'T0PRIOR', botToken: null },
+      { deleteChatSdkInstallation }
+    );
+
+    expect(mockAuthRevoke).not.toHaveBeenCalled();
+    expect(deleteChatSdkInstallation).toHaveBeenCalledWith('T0PRIOR');
+    expect(mockCaptureException).not.toHaveBeenCalled();
   });
 });

@@ -38,6 +38,10 @@ type SlackIntegrationDetailsProps = {
 const slackConnectionErrorMessages: Record<string, string> = {
   workspace_already_connected:
     'This Slack workspace is already connected to another Kilo account or organization. Disconnect it there before connecting it here.',
+  previous_workspace_unconfirmed:
+    'Slack could not confirm the move away from the previous workspace, so the connection was not changed. Try again.',
+  previous_workspace_unreadable:
+    'Kilo could not read the Slack access saved for the previous workspace, so the connection was not changed. Contact support to finish disconnecting it.',
   permission_required:
     'Only organization owners and admins can connect or change the organization Slack integration.',
   organization_access_required:

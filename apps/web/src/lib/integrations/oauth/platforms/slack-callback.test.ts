@@ -3,6 +3,7 @@ process.env.NEXTAUTH_SECRET ||= 'test-nextauth-secret';
 const mockEnsureOrganizationAccess = jest.fn();
 const mockConsumeProviderOAuthAttempt = jest.fn();
 const mockUpsertSlackInstallation = jest.fn();
+const mockRetirePreviousSlackWorkspace = jest.fn();
 const mockExchangeSlackOAuthCode = jest.fn();
 const mockCaptureException = jest.fn();
 const mockCaptureMessage = jest.fn();
@@ -21,12 +22,16 @@ jest.mock('@sentry/nextjs', () => ({
 jest.mock('@/lib/bot', () => ({
   bot: {
     initialize: jest.fn(async () => {}),
+    getState: () => ({}),
     getAdapter: () => ({
       getInstallation: jest.fn(async () => null),
       setInstallation: jest.fn(async () => {}),
       deleteInstallation: jest.fn(async () => {}),
     }),
   },
+}));
+jest.mock('@/lib/bot-identity', () => ({
+  unlinkTeamKiloUsers: jest.fn(async () => 0),
 }));
 jest.mock('@/lib/slack-bot/model-allow-list', () => ({
   getDefaultAllowedModel: jest.fn(async () => 'test/default-model'),
@@ -43,10 +48,18 @@ jest.mock('@/lib/integrations/slack-service', () => {
       this.name = 'SlackWorkspaceAlreadyConnectedError';
     }
   }
+  class SlackWorkspaceRebindUnsettledError extends Error {
+    constructor(readonly reason: 'read_failed' | 'credential_unreadable') {
+      super(`The previous Slack workspace could not be settled: ${reason}`);
+      this.name = 'SlackWorkspaceRebindUnsettledError';
+    }
+  }
   return {
     SlackWorkspaceAlreadyConnectedError,
+    SlackWorkspaceRebindUnsettledError,
     exchangeSlackOAuthCode: (...args: unknown[]) => mockExchangeSlackOAuthCode(...args),
     getConflictingSlackInstallation: jest.fn(async () => null),
+    retirePreviousSlackWorkspace: (...args: unknown[]) => mockRetirePreviousSlackWorkspace(...args),
     upsertSlackInstallation: (...args: unknown[]) => mockUpsertSlackInstallation(...args),
   };
 });
@@ -56,6 +69,7 @@ import { NextRequest } from 'next/server';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
 import { createOAuthState } from '@/lib/integrations/oauth-state';
+import { SlackWorkspaceRebindUnsettledError } from '@/lib/integrations/slack-service';
 import { handleSlackOAuthCallback } from './slack-callback';
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
@@ -115,7 +129,10 @@ describe('handleSlackOAuthCallback organization authority', () => {
     } as never);
     mockEnsureOrganizationAccess.mockResolvedValue('owner');
     mockConsumeProviderOAuthAttempt.mockResolvedValue(true);
-    mockUpsertSlackInstallation.mockResolvedValue({ id: 'integration-1' });
+    mockUpsertSlackInstallation.mockResolvedValue({
+      integration: { id: 'integration-1' },
+      previousWorkspace: null,
+    });
     mockExchangeSlackOAuthCode.mockResolvedValue({ installationId: 'T123', installation });
   });
 
@@ -183,7 +200,10 @@ describe('handleSlackOAuthCallback diagnostics', () => {
     } as never);
     mockEnsureOrganizationAccess.mockResolvedValue('owner');
     mockConsumeProviderOAuthAttempt.mockResolvedValue(true);
-    mockUpsertSlackInstallation.mockResolvedValue({ id: 'integration-1' });
+    mockUpsertSlackInstallation.mockResolvedValue({
+      integration: { id: 'integration-1' },
+      previousWorkspace: null,
+    });
     mockExchangeSlackOAuthCode.mockResolvedValue({ installationId: 'T123', installation });
   });
 
@@ -247,5 +267,66 @@ describe('handleSlackOAuthCallback diagnostics', () => {
       'installation_failed'
     );
     expectRedactedDiagnostic(state, 'code-1');
+  });
+});
+
+describe('handleSlackOAuthCallback replaced workspace settlement', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: { id: USER_ID, is_admin: false },
+      authFailedResponse: null,
+    } as never);
+    mockEnsureOrganizationAccess.mockResolvedValue('owner');
+    mockConsumeProviderOAuthAttempt.mockResolvedValue(true);
+    mockExchangeSlackOAuthCode.mockResolvedValue({ installationId: 'T123', installation });
+  });
+
+  it('retires the workspace a rebind replaced after the install commits', async () => {
+    const previousWorkspace = { teamId: 'T_OLD', botToken: 'xoxb-old' };
+    mockUpsertSlackInstallation.mockResolvedValue({
+      integration: { id: 'integration-1' },
+      previousWorkspace,
+    });
+
+    const { response } = await callCallback(`user_${USER_ID}`);
+
+    expect(mockRetirePreviousSlackWorkspace).toHaveBeenCalledTimes(1);
+    expect(mockRetirePreviousSlackWorkspace).toHaveBeenCalledWith(
+      previousWorkspace,
+      expect.objectContaining({
+        deleteChatSdkInstallation: expect.any(Function),
+        deleteChatSdkIdentityCache: expect.any(Function),
+      })
+    );
+    expect(new URL(response.headers.get('location') ?? '').searchParams.get('success')).toBe(
+      'installed'
+    );
+  });
+
+  it('asks for another attempt when the replaced workspace token cannot be read', async () => {
+    mockUpsertSlackInstallation.mockRejectedValue(
+      new SlackWorkspaceRebindUnsettledError('read_failed')
+    );
+
+    const { response } = await callCallback(`user_${USER_ID}`);
+
+    expect(new URL(response.headers.get('location') ?? '').searchParams.get('error')).toBe(
+      'previous_workspace_unconfirmed'
+    );
+    expect(mockRetirePreviousSlackWorkspace).not.toHaveBeenCalled();
+  });
+
+  it('names the support path when the replaced workspace credential cannot be decrypted', async () => {
+    mockUpsertSlackInstallation.mockRejectedValue(
+      new SlackWorkspaceRebindUnsettledError('credential_unreadable')
+    );
+
+    const { response } = await callCallback(`user_${USER_ID}`);
+
+    expect(new URL(response.headers.get('location') ?? '').searchParams.get('error')).toBe(
+      'previous_workspace_unreadable'
+    );
+    expect(mockRetirePreviousSlackWorkspace).not.toHaveBeenCalled();
   });
 });

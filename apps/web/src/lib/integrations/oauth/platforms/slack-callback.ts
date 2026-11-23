@@ -8,11 +8,14 @@ import {
   exchangeSlackOAuthCode,
   getConflictingSlackInstallation,
   SlackWorkspaceAlreadyConnectedError,
+  SlackWorkspaceRebindUnsettledError,
+  retirePreviousSlackWorkspace,
   upsertSlackInstallation,
 } from '@/lib/integrations/slack-service';
 import { verifyOAuthState } from '@/lib/integrations/oauth-state';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { bot } from '@/lib/bot';
+import { unlinkTeamKiloUsers } from '@/lib/bot-identity';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import {
   appendIntegrationOAuthRedirectQuery,
@@ -29,6 +32,26 @@ import { withWorkspaceInstallationLock } from '@/lib/integrations/oauth/workspac
 import { restoreProviderInstallation } from '@/lib/integrations/oauth/provider-installation-restore';
 import { getDefaultAllowedModel } from '@/lib/slack-bot/model-allow-list';
 import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';
+
+async function deleteChatSdkSlackInstallation(teamId: string): Promise<void> {
+  await bot.getAdapter('slack').deleteInstallation(teamId);
+}
+
+async function deleteChatSdkSlackIdentityCache(teamId: string): Promise<void> {
+  await unlinkTeamKiloUsers(bot.getState(), PLATFORM.SLACK, teamId);
+}
+
+/**
+ * Redirect an install that could not settle the workspace it would replace. The
+ * retryable reason asks for another attempt; an unreadable credential needs the
+ * support path, because no retry of the same install can revoke it.
+ */
+function settlementRedirectPath(error: unknown): string | null {
+  if (!(error instanceof SlackWorkspaceRebindUnsettledError)) return null;
+  return error.reason === 'read_failed'
+    ? 'error=previous_workspace_unconfirmed'
+    : 'error=previous_workspace_unreadable';
+}
 
 /**
  * Slack OAuth Callback
@@ -181,49 +204,82 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
       )
     );
 
-    return await withWorkspaceInstallationLock(PLATFORM.SLACK, owner, installationId, async tx => {
-      const conflicting = await getConflictingSlackInstallation(owner, installationId, tx);
-      if (conflicting) {
-        return conflictRedirect;
-      }
-
-      const previousInstallation = await slackAdapter.getInstallation(installationId);
-      await slackAdapter.setInstallation(installationId, installation);
-
-      try {
-        await upsertSlackInstallation(
-          {
-            owner,
-            teamId: installationId,
-            installation,
-            allowWorkspaceRebind: owner.type === 'org',
-            defaultModel,
-          },
-          tx
-        );
-      } catch (error) {
-        // The installation store is not part of the database transaction, so a
-        // rolled-back write must put back what this install replaced.
-        await restoreProviderInstallation({
-          provider: 'slack',
-          previousInstallation,
-          setInstallation: restored => slackAdapter.setInstallation(installationId, restored),
-          deleteInstallation: () => slackAdapter.deleteInstallation(installationId),
-        });
-
-        if (error instanceof SlackWorkspaceAlreadyConnectedError) {
-          return conflictRedirect;
+    // A rebind settles the workspace it replaces only after this transaction has
+    // committed: the row then names the new workspace, and the previous one's
+    // token is revoked against the team id that no row records any more.
+    const install = await withWorkspaceInstallationLock(
+      PLATFORM.SLACK,
+      owner,
+      installationId,
+      async tx => {
+        const conflicting = await getConflictingSlackInstallation(owner, installationId, tx);
+        if (conflicting) {
+          return { response: conflictRedirect, previousWorkspace: null };
         }
 
-        throw error;
+        const previousInstallation = await slackAdapter.getInstallation(installationId);
+        await slackAdapter.setInstallation(installationId, installation);
+
+        try {
+          const { previousWorkspace } = await upsertSlackInstallation(
+            {
+              owner,
+              teamId: installationId,
+              installation,
+              allowWorkspaceRebind: owner.type === 'org',
+              defaultModel,
+            },
+            tx
+          );
+
+          const successPath = verified.returnTo
+            ? appendIntegrationOAuthRedirectQuery(verified.returnTo, 'success=slack_installed')
+            : buildIntegrationOAuthRedirectPath(PLATFORM.SLACK, owner, 'success=installed');
+
+          return {
+            response: NextResponse.redirect(new URL(successPath, APP_URL)),
+            previousWorkspace,
+          };
+        } catch (error) {
+          // The installation store is not part of the database transaction, so a
+          // rolled-back write must put back what this install replaced.
+          await restoreProviderInstallation({
+            provider: 'slack',
+            previousInstallation,
+            setInstallation: restored => slackAdapter.setInstallation(installationId, restored),
+            deleteInstallation: () => slackAdapter.deleteInstallation(installationId),
+          });
+
+          if (error instanceof SlackWorkspaceAlreadyConnectedError) {
+            return { response: conflictRedirect, previousWorkspace: null };
+          }
+
+          const unsettledPath = settlementRedirectPath(error);
+          if (unsettledPath) {
+            return {
+              response: NextResponse.redirect(
+                new URL(
+                  buildIntegrationOAuthRedirectPathFromState(PLATFORM.SLACK, state, unsettledPath),
+                  APP_URL
+                )
+              ),
+              previousWorkspace: null,
+            };
+          }
+
+          throw error;
+        }
       }
+    );
 
-      const successPath = verified.returnTo
-        ? appendIntegrationOAuthRedirectQuery(verified.returnTo, 'success=slack_installed')
-        : buildIntegrationOAuthRedirectPath(PLATFORM.SLACK, owner, 'success=installed');
+    if (install.previousWorkspace) {
+      await retirePreviousSlackWorkspace(install.previousWorkspace, {
+        deleteChatSdkInstallation: deleteChatSdkSlackInstallation,
+        deleteChatSdkIdentityCache: deleteChatSdkSlackIdentityCache,
+      });
+    }
 
-      return NextResponse.redirect(new URL(successPath, APP_URL));
-    });
+    return install.response;
   } catch (error) {
     console.error('Error handling Slack OAuth callback:', error);
 

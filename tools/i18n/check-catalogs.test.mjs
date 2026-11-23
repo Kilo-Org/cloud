@@ -3986,6 +3986,17 @@ test('reports an id outside the six only through the keyword rule', () => {
   assert.doesNotMatch(text, /which no source file uses/);
 });
 
+test('still holds a locale keyword list to translation', () => {
+  // The keyword section is skipped by the prose value rules, but the English-copy
+  // rule still judges it: a list a locale left in English is reported, exactly as
+  // it was for the joined string.
+  const found = runKeywords({ translatedKeywords: SETTINGS_KEYWORDS_ENGLISH });
+  assert.match(
+    found.join('\n'),
+    /^mobile\/ru: "settingsSearch\.keywords\.signOut" is English; translate it/m
+  );
+});
+
 for (const [name, keywords, reason] of [
   [
     'an empty list',

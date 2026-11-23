@@ -11,7 +11,7 @@ import { INPUT_BOX_LINE_HEIGHT_CLASS, INPUT_BOX_SHAPE_CLASS } from './input-box'
 // The box's geometry lives in `./input-box`: a preview box that stands in for a
 // resting single-line field needs the same strings without importing the native
 // component, and it must not carry a second, drifting copy.
-export { INPUT_BOX_LINE_HEIGHT_CLASS, INPUT_BOX_SHAPE_CLASS };
+export { INPUT_BOX_SHAPE_CLASS };
 
 /**
  * The box's own vertical geometry, folded into the flattened style behind the

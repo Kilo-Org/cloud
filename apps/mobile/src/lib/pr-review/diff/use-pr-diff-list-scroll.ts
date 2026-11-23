@@ -47,8 +47,9 @@ export function usePrDiffListScroll({
           return;
         }
         const target = itemsRef.current[index];
-        // A file with no renderable diff has a disabled chevron, so force-expanding
-        // it from the navigator would leave a second row the user cannot close.
+        // A file with no renderable diff has no expand control at all, so
+        // force-expanding it from the navigator would set a flag nothing can
+        // clear and still paint no hunks.
         if (target?.kind === 'file-header' && target.hasDiff) {
           setExpanded(prev => (prev[request.path] ? prev : { ...prev, [request.path]: true }));
         }

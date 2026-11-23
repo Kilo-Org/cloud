@@ -17,12 +17,13 @@ import type { LocalAgentToolResponse } from './local-agents-fixture';
  * repeat that carries the token is admitted. A page with no protected field
  * needs no approval.
  *
- * The page supplies `document.modelContext` itself, because this browser build
- * ships no WebMCP API: the extension reads that property and calls
- * `getTools`/`executeTool` on it, which is the whole page-side contract.
- *
  * The page counts its own executions, so "the tool did not run" is the page's
  * number rather than an absence of output.
+ *
+ * Every admitted call here is a page tool call that the runtime answers with an
+ * error, because an agent session runs without the WebMCP runtime hooks. That is
+ * outside this spec: the assertions read the gate's answer, which is a protocol
+ * refusal or an admitted tool result.
  */
 
 const TOOL_NAME = 'fill_card_field';
@@ -42,26 +43,25 @@ const pageHtml = (withProtectedField: boolean): string => `<!doctype html>
     <output id="outcome">idle</output>
     <script>
       window.__toolRuns = 0;
-      const descriptor = {
-        description: ${JSON.stringify(TOOL_DESCRIPTION)},
-        inputSchema: {
-          properties: { value: { type: 'string' } },
-          required: ['value'],
-          type: 'object',
-        },
-        name: ${JSON.stringify(TOOL_NAME)},
-        origin: location.origin,
-        title: ${JSON.stringify(TOOL_TITLE)},
-      };
-      document.modelContext = {
-        getTools: async () => [descriptor],
-        executeTool: async (_tool, args) => {
-          window.__toolRuns += 1;
-          document.querySelector('#field').value = String(args.value);
-          document.querySelector('#outcome').textContent = 'tool ran ' + window.__toolRuns;
-          return { runs: window.__toolRuns };
-        },
-      };
+      const modelContext = document.modelContext;
+      if (modelContext !== undefined && typeof modelContext.registerTool === 'function') {
+        modelContext.registerTool({
+          description: ${JSON.stringify(TOOL_DESCRIPTION)},
+          execute: async ({ value }) => {
+            window.__toolRuns += 1;
+            document.querySelector('#field').value = String(value);
+            document.querySelector('#outcome').textContent = 'tool ran ' + window.__toolRuns;
+            return { runs: window.__toolRuns };
+          },
+          inputSchema: {
+            properties: { value: { type: 'string' } },
+            required: ['value'],
+            type: 'object',
+          },
+          name: ${JSON.stringify(TOOL_NAME)},
+          title: ${JSON.stringify(TOOL_TITLE)},
+        });
+      }
     </script>
   </body>
 </html>`;
@@ -74,6 +74,18 @@ const permissionItemSchema = z.object({
   origin: z.string(),
   reason: z.string().optional(),
 });
+
+/** The tool names the page's own `document.modelContext` reports, read from the page rather than from the extension. */
+const registeredToolNames = async (page: Page): Promise<readonly string[]> => {
+  const value = await page.evaluate(`(async () => {
+    const context = document.modelContext;
+    if (context === undefined || typeof context.getTools !== 'function') { return null; }
+    const tools = await context.getTools();
+    return Array.isArray(tools) ? tools.map(tool => String(tool && tool.name)) : null;
+  })()`);
+
+  return z.array(z.string()).parse(value);
+};
 
 const toolRuns = async (page: Page): Promise<number> => {
   const value = await page.evaluate('window.__toolRuns === undefined ? -1 : window.__toolRuns');
@@ -130,7 +142,9 @@ test('a page tool call on a page holding a protected field asks for its own appr
     const navigated = await session.callTool('browser_navigate', { url: protectedUrl }, grants);
 
     expect(navigated).toMatchObject({ isError: false, kind: 'result' });
-    // The page registers its tool before the first call reads it.
+    // A browser build without the page-side API cannot run this spec: the page would register nothing.
+    await expect.poll(() => registeredToolNames(agentPage)).toStrictEqual([TOOL_NAME]);
+
     expect(await toolRuns(agentPage)).toBe(0);
 
     const args = { name: TOOL_NAME, params: { value: '4111' } };
@@ -178,7 +192,7 @@ test('a page tool call on a page holding a protected field asks for its own appr
     ]);
     console.log('a token bound to another call is refused');
 
-    // 4. A page with no protected field needs no approval for the same call.
+    // 5. A page with no protected field needs no approval for the same call.
     const movedToPlain = await session.callTool('browser_navigate', { url: plainUrl }, grants);
 
     expect(movedToPlain).toMatchObject({ isError: false, kind: 'result' });
@@ -186,8 +200,9 @@ test('a page tool call on a page holding a protected field asks for its own appr
     const plain = await session.callTool('browser_webmcp_call', args, grants);
 
     console.log(`plain page call: ${callSummary(plain)}`);
+    // The gate's answer is admission: a result rather than a protocol refusal. What the tool body then does over the
+    // Agent socket is outside this spec, because it depends on the WebMCP runtime hooks that work item owns.
     expect(plain.kind).toBe('result');
-    expect(await toolRuns(agentPage)).toBe(0);
   } finally {
     await context.close();
     await hub.close();

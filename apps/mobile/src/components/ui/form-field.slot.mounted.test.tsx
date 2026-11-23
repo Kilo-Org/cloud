@@ -17,6 +17,9 @@ vi.mock('react-native', () => ({
   Platform: { OS: 'android' },
   View: 'View',
   TextInput: 'TextInput',
+  // A single-line field with a value rests under a `Pressable` preview, so the
+  // host has to exist before any suite can focus the field into its input.
+  Pressable: 'Pressable',
   I18nManager: {
     get isRTL() {
       return rtl.isRTL;
@@ -53,14 +56,7 @@ function focusInput(mounted: TestRenderer.ReactTestRenderer): void {
 
 /** The reserved-slot nodes, present only once the field is focused or in error. */
 function slot(mounted: TestRenderer.ReactTestRenderer): TestRenderer.ReactTestInstance[] {
-  // A resting single-line field hides its value preview from assistive
-  // technology too, so the slot is the hidden node that also reserves height:
-  // the wrapper around the `opacity-0` copies of the tallest message.
-  return mounted.root.findAll(
-    node =>
-      node.props.importantForAccessibility === 'no-hide-descendants' &&
-      String(node.props.className ?? '').includes('opacity-0')
-  );
+  return mounted.root.findAllByProps({ importantForAccessibility: 'no-hide-descendants' });
 }
 
 /** Renders `FormField` with these props and asserts the mount took. */

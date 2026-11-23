@@ -215,6 +215,27 @@ function visibleLabel(
   return match;
 }
 
+/**
+ * The name the field's control is announced under. A prefilled single-line field
+ * paints a pressable preview in place of the native input, and the name travels
+ * with the value into that preview, so the control carrying it is either node.
+ */
+function announcedName(
+  mounted: TestRenderer.ReactTestRenderer,
+  copy: string
+): TestRenderer.ReactTestInstance {
+  const named = [
+    ...mounted.root.findAllByType('Input'),
+    ...mounted.root.findAllByType('Pressable'),
+  ].filter(node => node.props.accessibilityLabel === copy);
+  expect(named).toHaveLength(1);
+  const control = named[0];
+  if (!control) {
+    throw new Error(`no control is announced as ${copy}`);
+  }
+  return control;
+}
+
 describe.each([
   ['English', 'en'],
   ['Hindi', 'hi'],
@@ -227,7 +248,7 @@ describe.each([
     // The label is what the reader sees; the field's name must be that string,
     // not a second key that can drift from it.
     expect(visibleLabel(mounted, copy)).toBeDefined();
-    expect(mounted.root.findByType('Input').props.accessibilityLabel).toBe(copy);
+    expect(announcedName(mounted, copy).props.accessibilityLabel).toBe(copy);
   });
 });
 

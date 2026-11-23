@@ -201,7 +201,22 @@ function byType(renderer: ReactTestRenderer, nodeType: string): ReactTestInstanc
   return renderer.root.findAll(node => node.type === nodeType);
 }
 
+/**
+ * The field's real input, by the name it is announced under. A prefilled
+ * single-line field rests under a pressable preview that paints the value from
+ * its start, so entering the field is a press: that is what a person does, and
+ * the press swaps the native input in for the typing below.
+ */
 function inputByLabel(renderer: ReactTestRenderer, label: string): ReactTestInstance {
+  const resting = byType(renderer, 'Pressable').find(node =>
+    String(node.props.accessibilityLabel).startsWith(label)
+  );
+  if (resting) {
+    const press = resting.props as { onPress: () => void };
+    act(() => {
+      press.onPress();
+    });
+  }
   const input = byType(renderer, 'TextInput').find(node =>
     String(node.props.accessibilityLabel).startsWith(label)
   );

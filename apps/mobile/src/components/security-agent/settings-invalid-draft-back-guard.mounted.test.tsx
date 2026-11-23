@@ -37,13 +37,17 @@ const preventRemove = vi.hoisted(() => ({
     | undefined,
 }));
 // The day inputs record their props on render so the test drives a real edit
-// through the screen's own onChangeText, not a fabricated dirty flag.
+// through the screen's own onChangeText, not a fabricated dirty flag. A
+// prefilled single-line field rests as a pressable preview that paints its
+// value, so the press that swaps the real input in is recorded too and replayed
+// before a case types.
 const inputs = vi.hoisted(() => ({
   fields: [] as {
     accessibilityLabel?: string;
     defaultValue?: string;
     onChangeText?: (text: string) => void;
   }[],
+  resting: [] as { accessibilityLabel?: string; onPress?: () => void }[],
 }));
 const confirmDialog = vi.hoisted(() => ({
   current: null as null | {
@@ -70,6 +74,12 @@ vi.mock('react-native', () => ({
   View: 'View',
   Alert: { alert: vi.fn() },
   Platform: { OS: 'android' },
+  // A prefilled single-line field rests as a pressable preview that swaps the
+  // real input in when it is pressed; the press is replayed before a case types.
+  Pressable: (props: { accessibilityLabel?: string; onPress?: () => void }) => {
+    inputs.resting.push(props);
+    return null;
+  },
 }));
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
   useCommittedConnectivityStatus: () => 'online',
@@ -182,6 +192,26 @@ const configData = {
   slaLowDays: 30,
 };
 
+/**
+ * Enters a resting field the way a person does: a prefilled single-line field
+ * paints a pressable preview, and the press swaps the real input in. Pressing
+ * inside the caller's `act` would nest renders, so a case presses first and
+ * then edits inside its own `act`.
+ */
+function pressResting(accessibilityLabel: string) {
+  // The newest recorded press belongs to the render on screen.
+  const resting = inputs.resting.findLast(
+    candidate => candidate.accessibilityLabel?.startsWith(accessibilityLabel) === true
+  );
+  if (!resting?.onPress) {
+    throw new Error(`resting preview not found: ${accessibilityLabel}`);
+  }
+  const press = resting.onPress;
+  act(() => {
+    press();
+  });
+}
+
 function field(accessibilityLabel: string) {
   const input = inputs.fields.find(
     candidate => candidate.accessibilityLabel === accessibilityLabel
@@ -221,6 +251,7 @@ beforeEach(() => {
   preventRemove.enabled = false;
   preventRemove.handler = undefined;
   inputs.fields = [];
+  inputs.resting = [];
   confirmDialog.current = null;
 });
 
@@ -295,6 +326,7 @@ describe('a settings draft whose only change is invalid', () => {
     const renderer = mount(NotificationSettingsScreen);
     expect(preventRemove.enabled).toBe(false);
 
+    pressResting(leadTimeField);
     act(() => {
       field(leadTimeField).onChangeText?.('366');
     });
@@ -310,6 +342,7 @@ describe('a settings draft whose only change is invalid', () => {
     config.data = configData;
     mount(NotificationSettingsScreen);
 
+    pressResting(leadTimeField);
     act(() => {
       field(leadTimeField).onChangeText?.('10');
     });

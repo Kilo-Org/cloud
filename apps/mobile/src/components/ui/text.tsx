@@ -123,9 +123,9 @@ function Text({
      * The paragraph's base direction. App copy omits it and names the
      * interface's. `auto` is for copy the app did not write — a server's
      * message, a finding's description, a user's own text — which names its
-     * own direction, named for the node's layout as well, which is what makes
-     * English content keep its left edge and the punctuation that ends it
-     * inside a right-to-left interface (`contentTextDirection`).
+     * own direction, and the node's layout with it, so English content keeps
+     * its left edge and the punctuation that ends it inside a right-to-left
+     * interface (`contentTextDirection`).
      */
     direction?: 'auto';
   }) {

@@ -1961,9 +1961,8 @@ describe('platform attempt cap — a block can never be re-chunked with a fresh 
     // Only a run that already left `running` is pruned, and nothing in production writes a
     // run back to `running` (no UPDATE benchmark_runs ... 'running' exists; a requeue starts
     // a brand-new run id). So there is no later initialization that could recreate the row.
-    // The run's initialization marker names it for the prune, exactly as a real completed
-    // run's does.
-    sqlite.prepare("INSERT INTO scheduler_runs (run_id) VALUES ('pruned')").run();
+    // The initialization marker the schedule pass already wrote names it for the prune,
+    // exactly as a real completed run's does.
     sqlite
       .prepare("UPDATE benchmark_runs SET status = 'failed', completed_at = ? WHERE id = 'pruned'")
       .run(new Date(NOW).toISOString());

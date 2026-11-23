@@ -4,7 +4,6 @@ import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
-import { i18n } from '@/i18n';
 import { CenteredState } from '@/components/centered-state';
 import { SheetHeader } from '@/components/sheet-header';
 import { SelectableText } from '@/components/ui/selectable-text';
@@ -26,6 +25,7 @@ import { isPartStreaming, isReasoningPart, isToolPart } from './part-types';
 import { useToolCardImageUri } from './tool-card-image-cache';
 import { ToolPartDetailBody } from './tool-part-detail-body';
 import { usePartDetailAutoScroll } from './use-part-detail-auto-scroll';
+import { VanishedPartState } from './vanished-part-state';
 
 type PartDetailSheetProps = {
   visible: boolean;
@@ -35,14 +35,7 @@ type PartDetailSheetProps = {
   onDismiss?: () => void;
 };
 
-function renderPartContent(part: Part | null): ReactNode {
-  if (part === null) {
-    return (
-      <Text className="text-sm text-muted-foreground">
-        {i18n.t('agentChat.partDetail.detailsUnavailable')}
-      </Text>
-    );
-  }
+function renderPartContent(part: Part): ReactNode {
   if (isReasoningPart(part)) {
     // While streaming, plain Text instead of SelectableText: the read-only
     // TextInput re-lays-out the whole growing UITextView on every tick
@@ -63,10 +56,11 @@ function renderPartContent(part: Part | null): ReactNode {
 /**
  * Detail sheet for a non-message transcript part. Follows the message-details
  * sheet: a pageSheet modal with a SheetHeader, scroll content, and a safe-area
- * footer. A vanished part shows a muted "Details unavailable" line; tool parts
- * render the shared body dispatcher; reasoning parts render full selectable
- * text. Reasoning and mono blocks are selectable here because the sheet is
- * outside `InMessageBubbleContext`.
+ * footer. A vanished part (its id no longer resolves in the live messages)
+ * shows `VanishedPartState` as the sheet body; tool parts render the shared body
+ * dispatcher; reasoning parts render full selectable text. Reasoning and mono
+ * blocks are selectable here because the sheet is outside
+ * `InMessageBubbleContext`.
  *
  * Mono text display mode: defaults to `wrap`, delivered to mounted mono blocks
  * through `MonoScrollSheetContext` with a presence tracker that shows the
@@ -125,22 +119,56 @@ export function PartDetailSheet({
   const attachmentUri = useToolCardImageUri(part?.id ?? '');
   const imageFailed =
     failedImage !== null && failedImage.partId === part?.id && failedImage.uri === attachmentUri;
-  const centered = shouldCenterPartDetail(part, attachmentUri !== undefined, imageFailed);
-  const content = (
-    <MonoScrollSheetProvider value={sheetContext}>
-      {part && isToolPart(part) ? (
-        <ToolPartDetailBody
-          part={part}
-          imageFailed={imageFailed}
-          onImageError={uri => {
-            setFailedImage({ partId: part.id, uri });
-          }}
-        />
-      ) : (
-        renderPartContent(part)
-      )}
-    </MonoScrollSheetProvider>
-  );
+  const centered =
+    part !== null && shouldCenterPartDetail(part, attachmentUri !== undefined, imageFailed);
+  const content =
+    part === null ? null : (
+      <MonoScrollSheetProvider value={sheetContext}>
+        {isToolPart(part) ? (
+          <ToolPartDetailBody
+            part={part}
+            imageFailed={imageFailed}
+            onImageError={uri => {
+              setFailedImage({ partId: part.id, uri });
+            }}
+          />
+        ) : (
+          renderPartContent(part)
+        )}
+      </MonoScrollSheetProvider>
+    );
+
+  const renderBody = (): ReactNode => {
+    if (part === null) {
+      // The part id no longer resolves in the live messages: the shared state
+      // block is the whole body, so it must not sit in a second CenteredState.
+      return <VanishedPartState />;
+    }
+    if (centered) {
+      return (
+        <CenteredState contentContainerClassName="px-4">
+          <View className="items-center py-6">{content}</View>
+        </CenteredState>
+      );
+    }
+    return (
+      <ScrollView
+        ref={autoFollow.scrollRef}
+        className="flex-1"
+        contentContainerClassName={cn(SCREEN_BODY_CLASS, 'pb-6')}
+        onScroll={autoFollow.handleScroll}
+        onScrollBeginDrag={autoFollow.handleScrollBeginDrag}
+        onScrollEndDrag={autoFollow.handleScrollEndDrag}
+        onMomentumScrollBegin={autoFollow.handleMomentumScrollBegin}
+        onMomentumScrollEnd={autoFollow.handleMomentumScrollEnd}
+        onContentSizeChange={autoFollow.handleContentSizeChange}
+        onLayout={autoFollow.handleLayout}
+        scrollEventThrottle={16}
+      >
+        {content}
+      </ScrollView>
+    );
+  };
 
   return (
     <SessionPageSheet visible={visible} onClose={onClose} onDismiss={handleDismiss} dismissible>
@@ -165,27 +193,7 @@ export function PartDetailSheet({
         </View>
       ) : null}
 
-      {centered ? (
-        <CenteredState contentContainerClassName="px-4">
-          <View className="items-center py-6">{content}</View>
-        </CenteredState>
-      ) : (
-        <ScrollView
-          ref={autoFollow.scrollRef}
-          className="flex-1"
-          contentContainerClassName={cn(SCREEN_BODY_CLASS, 'pb-6')}
-          onScroll={autoFollow.handleScroll}
-          onScrollBeginDrag={autoFollow.handleScrollBeginDrag}
-          onScrollEndDrag={autoFollow.handleScrollEndDrag}
-          onMomentumScrollBegin={autoFollow.handleMomentumScrollBegin}
-          onMomentumScrollEnd={autoFollow.handleMomentumScrollEnd}
-          onContentSizeChange={autoFollow.handleContentSizeChange}
-          onLayout={autoFollow.handleLayout}
-          scrollEventThrottle={16}
-        >
-          {content}
-        </ScrollView>
-      )}
+      {renderBody()}
 
       <View style={{ height: insets.bottom }} className="bg-background" />
     </SessionPageSheet>

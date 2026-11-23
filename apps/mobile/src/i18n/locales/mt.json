@@ -2777,6 +2777,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Id-dettalji mhumiex disponibbli.",
+      "detailsUnavailableDescription": "Dan l-element m'għadux fis-sessjoni.",
       "textDisplay": "Wiri tat-test",
       "thinking": "Qed jaħseb",
       "thought": "Ħsieb",
@@ -3165,7 +3166,7 @@
       "windowUnavailable": "Id-daqs tat-tieqa tal-kuntest mhux disponibbli",
       "tapToViewDetails": " Tektek biex tara d-dettalji tal-kuntest.",
       "costClause": ", spiża {{cost}}",
-      "loadingCostSpoken": "spiża ta' {{cost}}.",
+      "loadingCostSpoken": "spiża s'issa {{cost}}.",
       "tokensWindowUnavailable": "Kuntest: {{used}} unitajiet tat-test, daqs tat-tieqa mhux disponibbli{{costClause}}.",
       "tokensUsage": "Kuntest: {{used}} minn {{window}} unitajiet tat-test, {{percentage}} użat{{costClause}}.",
       "title": "Użu tal-kuntest",

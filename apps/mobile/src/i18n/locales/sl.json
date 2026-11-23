@@ -2724,6 +2724,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Podrobnosti niso na voljo.",
+      "detailsUnavailableDescription": "Ta element ni več v seji.",
       "textDisplay": "Prikaz besedila",
       "thinking": "Razmišljanje",
       "thought": "Misel",
@@ -3108,7 +3109,7 @@
       "windowUnavailable": "Velikost kontekstnega okna ni na voljo",
       "tapToViewDetails": " Tapni za prikaz podrobnosti konteksta.",
       "costClause": ", strošek {{cost}}",
-      "loadingCostSpoken": "strošek {{cost}}.",
+      "loadingCostSpoken": "dosedanji strošek {{cost}}.",
       "tokensWindowUnavailable": "Žetoni v kontekstu: {{used}}, velikost okna ni na voljo{{costClause}}.",
       "tokensUsage": "Žetoni v kontekstu: {{used}} od {{window}}, poraba: {{percentage}}{{costClause}}.",
       "title": "Poraba konteksta",

@@ -2618,6 +2618,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Detay yo pa disponib.",
+      "detailsUnavailableDescription": "Atik sa a pa nan sesyon an ankò.",
       "textDisplay": "Afichaj tèks",
       "thinking": "Ap reflechi",
       "thought": "Refleksyon",
@@ -2994,7 +2995,7 @@
       "windowUnavailable": "Gwosè fenèt kontèks la pa disponib",
       "tapToViewDetails": " Peze pou wè detay kontèks la.",
       "costClause": ", pri {{cost}}",
-      "loadingCostSpoken": "pri {{cost}}.",
+      "loadingCostSpoken": "pri jiska kounye a {{cost}}.",
       "tokensWindowUnavailable": "Kontèks: {{used}} jeton, gwosè fenèt la pa disponib{{costClause}}.",
       "tokensUsage": "Kontèks: {{used}} sou {{window}} jeton, {{percentage}} itilize{{costClause}}.",
       "title": "Itilizasyon kontèks",

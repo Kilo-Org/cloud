@@ -2671,6 +2671,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Detalji nisu dostupni.",
+      "detailsUnavailableDescription": "Ova stavka više nije u sesiji.",
       "textDisplay": "Prikaz teksta",
       "thinking": "Razmišljanje",
       "thought": "Misao",
@@ -3051,7 +3052,7 @@
       "windowUnavailable": "Veličina kontekstnog prozora nije dostupna",
       "tapToViewDetails": " Dodirni za prikaz detalja konteksta.",
       "costClause": ", trošak {{cost}}",
-      "loadingCostSpoken": "trošak {{cost}}.",
+      "loadingCostSpoken": "trošak do sada {{cost}}.",
       "tokensWindowUnavailable": "Kontekst: {{used}} tokena, veličina prozora nije dostupna{{costClause}}.",
       "tokensUsage": "Kontekst: {{used}} od {{window}} tokena, iskorišteno {{percentage}}{{costClause}}.",
       "title": "Iskorištenost konteksta",

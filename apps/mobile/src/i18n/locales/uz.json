@@ -2618,6 +2618,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Tafsilotlar mavjud emas.",
+      "detailsUnavailableDescription": "Bu element endi sessiyada yo'q.",
       "textDisplay": "Matn ko'rinishi",
       "thinking": "Fikrlamoqda",
       "thought": "Fikr",
@@ -2994,7 +2995,7 @@
       "windowUnavailable": "Kontekst oynasining hajmi noma'lum",
       "tapToViewDetails": " Kontekst tafsilotlarini ko'rish uchun bosing.",
       "costClause": ", xarajat {{cost}}",
-      "loadingCostSpoken": "xarajati {{cost}}.",
+      "loadingCostSpoken": "hozirgacha xarajati {{cost}}.",
       "tokensWindowUnavailable": "Kontekst: {{used}} ta token, oyna hajmi noma'lum{{costClause}}.",
       "tokensUsage": "Kontekst: {{window}} ta tokendan {{used}} tasi ishlatilgan, {{percentage}}{{costClause}}.",
       "title": "Kontekstdan foydalanish",

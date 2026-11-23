@@ -2618,6 +2618,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Οι λεπτομέρειες δεν είναι διαθέσιμες.",
+      "detailsUnavailableDescription": "Αυτό το στοιχείο δεν βρίσκεται πλέον στη συνεδρία.",
       "textDisplay": "Εμφάνιση κειμένου",
       "thinking": "Σκέφτεται",
       "thought": "Σκέψη",
@@ -2994,7 +2995,7 @@
       "windowUnavailable": "Μη διαθέσιμο μέγεθος παραθύρου συμφραζομένων",
       "tapToViewDetails": " Πάτησε για να δεις τις λεπτομέρειες των συμφραζομένων.",
       "costClause": ", κόστος {{cost}}",
-      "loadingCostSpoken": "κόστος {{cost}}.",
+      "loadingCostSpoken": "κόστος μέχρι τώρα {{cost}}.",
       "tokensWindowUnavailable": "Συμφραζόμενα: {{used}} διακριτικά, μη διαθέσιμο μέγεθος παραθύρου{{costClause}}.",
       "tokensUsage": "Συμφραζόμενα: {{used}} από {{window}} διακριτικά, χρήση {{percentage}}{{costClause}}.",
       "title": "Χρήση συμφραζομένων",

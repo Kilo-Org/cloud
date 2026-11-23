@@ -2618,6 +2618,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "ዝርዝሮች አይገኙም።",
+      "detailsUnavailableDescription": "ይህ ንጥል ከአሁን በኋላ በክፍለ ጊዜው ውስጥ የለም።",
       "textDisplay": "የጽሑፍ ማሳያ",
       "thinking": "በማሰብ ላይ",
       "thought": "ሐሳብ",
@@ -2994,7 +2995,7 @@
       "windowUnavailable": "የዐውድ መስኮቱ መጠን አይገኝም",
       "tapToViewDetails": " የዐውድ ዝርዝሮችን ለማየት ይንኩ።",
       "costClause": "፣ ወጪ {{cost}}",
-      "loadingCostSpoken": "ወጪ {{cost}}።",
+      "loadingCostSpoken": "እስካሁን ወጪ {{cost}}።",
       "tokensWindowUnavailable": "ዐውድ፦ {{used}} ቶከኖች፣ የመስኮቱ መጠን አይገኝም{{costClause}}።",
       "tokensUsage": "ዐውድ፦ ከ{{window}} ቶከኖች {{used}}፣ {{percentage}} ጥቅም ላይ ውሏል{{costClause}}።",
       "title": "የዐውድ አጠቃቀም",

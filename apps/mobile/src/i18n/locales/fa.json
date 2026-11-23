@@ -2618,6 +2618,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "جزئیات در دسترس نیست.",
+      "detailsUnavailableDescription": "این مورد دیگر در این نشست نیست.",
       "textDisplay": "نمایش متن",
       "thinking": "در حال تفکر",
       "thought": "تفکر",
@@ -2994,7 +2995,7 @@
       "windowUnavailable": "اندازه پنجره زمینه در دسترس نیست",
       "tapToViewDetails": " برای مشاهدهٔ جزئیات زمینه، بزنید.",
       "costClause": "، هزینه {{cost}}",
-      "loadingCostSpoken": "هزینه {{cost}}.",
+      "loadingCostSpoken": "هزینه تاکنون {{cost}}.",
       "tokensWindowUnavailable": "زمینه: {{used}} توکن، اندازهٔ پنجره در دسترس نیست{{costClause}}.",
       "tokensUsage": "زمینه: {{used}} از {{window}} توکن، {{percentage}} استفاده‌شده{{costClause}}.",
       "title": "میزان استفاده از زمینه",

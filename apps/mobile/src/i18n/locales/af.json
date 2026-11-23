@@ -2618,6 +2618,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Die besonderhede is nie beskikbaar nie.",
+      "detailsUnavailableDescription": "Hierdie item is nie meer in die sessie nie.",
       "textDisplay": "Teksvertoning",
       "thinking": "Dink",
       "thought": "Gedagte",
@@ -2994,7 +2995,7 @@
       "windowUnavailable": "Konteksvenstergrootte onbeskikbaar",
       "tapToViewDetails": " Tik om konteksbesonderhede te bekyk.",
       "costClause": ", koste {{cost}}",
-      "loadingCostSpoken": "koste {{cost}}.",
+      "loadingCostSpoken": "koste tot dusver {{cost}}.",
       "tokensWindowUnavailable": "Konteks: {{used}} tekens, venstergrootte onbeskikbaar{{costClause}}.",
       "tokensUsage": "Konteks: {{used}} van {{window}} tekens, {{percentage}} gebruik{{costClause}}.",
       "title": "Konteksgebruik",

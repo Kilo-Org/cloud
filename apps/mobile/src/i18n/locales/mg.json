@@ -2618,6 +2618,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Tsy azo aseho ny antsipiriany.",
+      "detailsUnavailableDescription": "Tsy ao anatin'ny fotoam-piasana intsony io singa io.",
       "textDisplay": "Fampisehoana soratra",
       "thinking": "Mieritreritra",
       "thought": "Eritreritra",
@@ -2994,7 +2995,7 @@
       "windowUnavailable": "Tsy fantatra ny fetra ho an'ny angon'ny resaka",
       "tapToViewDetails": " Tsindrio hahitana ny antsipirian'ny angon'ny resaka.",
       "costClause": ", vidiny {{cost}}",
-      "loadingCostSpoken": "sarany {{cost}}.",
+      "loadingCostSpoken": "sarany hatreto {{cost}}.",
       "tokensWindowUnavailable": "Sombin-tsoratra {{used}} ao amin'ny angon'ny resaka, tsy fantatra ny fetra{{costClause}}.",
       "tokensUsage": "Sombin-tsoratra {{used}} amin'ny {{window}} ao amin'ny angon'ny resaka, {{percentage}} no ampiasaina{{costClause}}.",
       "title": "Fampiasana ny angon'ny resaka",

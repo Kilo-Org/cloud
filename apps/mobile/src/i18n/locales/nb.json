@@ -2618,6 +2618,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Detaljene er ikke tilgjengelige.",
+      "detailsUnavailableDescription": "Dette elementet er ikke lenger i økten.",
       "textDisplay": "Tekstvisning",
       "thinking": "Tenker",
       "thought": "Resonnement",
@@ -2994,7 +2995,7 @@
       "windowUnavailable": "Størrelsen på kontekstvinduet er ukjent",
       "tapToViewDetails": " Trykk for å se kontekstdetaljer.",
       "costClause": ", kostnad {{cost}}",
-      "loadingCostSpoken": "kostnad {{cost}}.",
+      "loadingCostSpoken": "kostnad så langt {{cost}}.",
       "tokensWindowUnavailable": "Kontekst: {{used}} tokener, størrelsen på kontekstvinduet er ukjent{{costClause}}.",
       "tokensUsage": "Kontekst: {{used}} av {{window}} tokener, {{percentage}} brukt{{costClause}}.",
       "title": "Kontekstbruk",

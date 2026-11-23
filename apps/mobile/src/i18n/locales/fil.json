@@ -2618,6 +2618,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Hindi makuha ang mga detalye.",
+      "detailsUnavailableDescription": "Wala na ang item na ito sa sesyon.",
       "textDisplay": "Pagpapakita ng teksto",
       "thinking": "Nag-iisip",
       "thought": "Naisip",
@@ -2994,7 +2995,7 @@
       "windowUnavailable": "Hindi makuha ang kapasidad ng konteksto",
       "tapToViewDetails": " I-tap para tingnan ang mga detalye ng konteksto.",
       "costClause": ", gastos {{cost}}",
-      "loadingCostSpoken": "gastos na {{cost}}.",
+      "loadingCostSpoken": "gastos hanggang ngayon {{cost}}.",
       "tokensWindowUnavailable": "Konteksto: {{used}} na token, hindi makuha ang kapasidad{{costClause}}.",
       "tokensUsage": "Konteksto: {{used}} sa {{window}} na token, {{percentage}} ang nagamit{{costClause}}.",
       "title": "Paggamit ng konteksto",

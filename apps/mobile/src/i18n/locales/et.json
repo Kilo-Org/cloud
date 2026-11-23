@@ -2618,6 +2618,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Üksikasjad pole saadaval",
+      "detailsUnavailableDescription": "See üksus ei ole enam seansis",
       "textDisplay": "Tekstikuva",
       "thinking": "Mõtlemine",
       "thought": "Mõttekäik",
@@ -2994,7 +2995,7 @@
       "windowUnavailable": "Kontekstiakna suurus pole saadaval",
       "tapToViewDetails": " Konteksti üksikasjade vaatamiseks puuduta.",
       "costClause": ", kulu {{cost}}",
-      "loadingCostSpoken": "kulu {{cost}}.",
+      "loadingCostSpoken": "senine kulu {{cost}}.",
       "tokensWindowUnavailable": "Kontekstis {{used}} tokenit, kontekstiakna suurus pole saadaval{{costClause}}.",
       "tokensUsage": "Kontekstis {{used}} tokenit {{window}} tokenist, {{percentage}} kasutatud{{costClause}}.",
       "title": "Konteksti kasutus",

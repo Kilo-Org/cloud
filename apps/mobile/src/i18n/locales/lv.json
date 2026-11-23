@@ -2671,6 +2671,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "Detalizēta informācija nav pieejama.",
+      "detailsUnavailableDescription": "Šis vienums sesijā vairs nav.",
       "textDisplay": "Teksta attēlojums",
       "thinking": "Domā",
       "thought": "Domas",
@@ -3051,7 +3052,7 @@
       "windowUnavailable": "Konteksta loga lielums nav pieejams",
       "tapToViewDetails": " Pieskaries, lai skatītu detalizētu informāciju par kontekstu.",
       "costClause": ", izmaksas {{cost}}",
-      "loadingCostSpoken": "izmaksas {{cost}}.",
+      "loadingCostSpoken": "līdzšinējās izmaksas {{cost}}.",
       "tokensWindowUnavailable": "Kontekstā izmantotie tokeni: {{used}}, konteksta loga lielums nav pieejams{{costClause}}.",
       "tokensUsage": "Konteksts: {{used}} no {{window}} tokeniem, izmantoti {{percentage}}{{costClause}}.",
       "title": "Konteksta izmantojums",

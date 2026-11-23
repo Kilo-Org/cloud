@@ -2618,6 +2618,7 @@
     },
     "partDetail": {
       "detailsUnavailable": "විස්තර ලබා ගත නොහැක.",
+      "detailsUnavailableDescription": "මෙම අයිතමය තවදුරටත් සැසියේ නොමැත.",
       "textDisplay": "පෙළ සංදර්ශකය",
       "thinking": "සිතමින්",
       "thought": "සිතුවිල්ල",
@@ -2994,7 +2995,7 @@
       "windowUnavailable": "සන්දර්භ කවුළුවේ ප්‍රමාණය ලබා ගත නොහැක",
       "tapToViewDetails": " සන්දර්භ විස්තර බැලීමට තට්ටු කරන්න.",
       "costClause": ", පිරිවැය {{cost}}",
-      "loadingCostSpoken": "පිරිවැය {{cost}}.",
+      "loadingCostSpoken": "මෙතෙක් පිරිවැය {{cost}}.",
       "tokensWindowUnavailable": "සන්දර්භයේ ටෝකන {{used}}, කවුළුවේ ප්‍රමාණය ලබා ගත නොහැක{{costClause}}.",
       "tokensUsage": "සන්දර්භයේ ටෝකන {{window}} න් {{used}}, {{percentage}} භාවිත කර ඇත{{costClause}}.",
       "title": "සන්දර්භ භාවිතය",

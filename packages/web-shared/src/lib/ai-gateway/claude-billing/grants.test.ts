@@ -68,8 +68,8 @@ describe('Claude billing grants', () => {
         getGrantedClaudeBillingConnection(organizationOwner),
       ])
     ).resolves.toEqual([
-      expect.objectContaining({ id: payer.id }),
-      expect.objectContaining({ id: payer.id }),
+      expect.objectContaining({ connection: expect.objectContaining({ id: payer.id }) }),
+      expect.objectContaining({ connection: expect.objectContaining({ id: payer.id }) }),
     ]);
     await expect(activeGrants(payer.id)).resolves.toHaveLength(2);
 
@@ -80,7 +80,10 @@ describe('Claude billing grants', () => {
         getGrantedClaudeBillingConnection(organizationOwner),
         getGrantedClaudeBillingConnection(personal),
       ])
-    ).resolves.toEqual([null, expect.objectContaining({ id: payer.id })]);
+    ).resolves.toEqual([
+      null,
+      expect.objectContaining({ connection: expect.objectContaining({ id: payer.id }) }),
+    ]);
   });
 
   it('shares an organization-first link back to personal and deletes only the personal Anthropic key', async () => {
@@ -129,9 +132,9 @@ describe('Claude billing grants', () => {
         getGrantedClaudeBillingConnection(sharedB),
       ])
     ).resolves.toEqual([
-      expect.objectContaining({ id: sharedFirstPayer.id }),
-      expect.objectContaining({ id: sharedFirstPayer.id }),
-      expect.objectContaining({ id: sharedFirstPayer.id }),
+      expect.objectContaining({ connection: expect.objectContaining({ id: sharedFirstPayer.id }) }),
+      expect.objectContaining({ connection: expect.objectContaining({ id: sharedFirstPayer.id }) }),
+      expect.objectContaining({ connection: expect.objectContaining({ id: sharedFirstPayer.id }) }),
     ]);
 
     const remainingKeys = await db
@@ -171,12 +174,10 @@ describe('Claude billing grants', () => {
       .where(eq(claude_billing_connections.id, secondProfile.id));
 
     await expect(getGrantedClaudeBillingConnection(organizationOwner)).resolves.toMatchObject({
-      id: firstPayer.id,
-      status: 'connected',
+      connection: { id: firstPayer.id, status: 'connected' },
     });
     await expect(getGrantedClaudeBillingConnection(personal)).resolves.toMatchObject({
-      id: secondProfile.id,
-      status: 'connected',
+      connection: { id: secondProfile.id, status: 'connected' },
     });
 
     const personalChoices = await describeClaudeBillingSharing(user.id, personal, true, null);
@@ -297,10 +298,10 @@ describe('Claude billing grants', () => {
       reason: 'target_connected',
     } satisfies Partial<ClaudeBillingShareError>);
     await expect(getGrantedClaudeBillingConnection(organizationOwner)).resolves.toMatchObject({
-      id: organizationPayer.id,
+      connection: { id: organizationPayer.id },
     });
     await expect(getGrantedClaudeBillingConnection(personal)).resolves.toMatchObject({
-      id: personalPayer.id,
+      connection: { id: personalPayer.id },
     });
   });
 
@@ -380,7 +381,7 @@ describe('Claude billing grants', () => {
     await shareClaudeBillingConnection(personal, organizationOwner, user.id);
 
     await expect(getGrantedClaudeBillingConnection(organizationOwner)).resolves.toMatchObject({
-      id: payer.id,
+      connection: { id: payer.id },
     });
     await expect(
       db
@@ -428,7 +429,7 @@ describe('Claude billing grants', () => {
     await shareClaudeBillingConnection(personal, organizationOwner, user.id);
 
     await expect(getGrantedClaudeBillingConnection(organizationOwner)).resolves.toMatchObject({
-      id: payer.id,
+      connection: { id: payer.id },
     });
     await expect(
       db
@@ -470,16 +471,20 @@ describe('Claude billing grants', () => {
     await shareClaudeBillingConnection(personal, organizationOwner, user.id);
     await removeClaudeBillingGrant(personal);
     await expect(getGrantedClaudeBillingConnection(organizationOwner)).resolves.toMatchObject({
-      id: payer.id,
-      kilo_user_id: null,
-      organization_id: organization.id,
+      connection: {
+        id: payer.id,
+        kilo_user_id: null,
+        organization_id: organization.id,
+      },
     });
 
     await removeUserClaudeBillingGrants(user.id, db);
     await expect(getGrantedClaudeBillingConnection(organizationOwner)).resolves.toMatchObject({
-      id: payer.id,
-      kilo_user_id: null,
-      organization_id: organization.id,
+      connection: {
+        id: payer.id,
+        kilo_user_id: null,
+        organization_id: organization.id,
+      },
     });
     const retainedOldRows = await db
       .select()

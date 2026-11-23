@@ -57,7 +57,7 @@ Before you build a UI element, find the library that already does it.
 
 1. Check the element map below. If the concern has an entry, use that element.
 2. Check `@expo/ui` (`node_modules/@expo/ui/build/`), which ships native modules for `58.x`: universal
-   `BottomSheet`, `Picker`, `Switch`, `TextInput`, `List`, `Host`, plus
+   `BottomSheet`, `Picker`, `TextInput`, `List`, `Host`, plus
    `community/{segmented-control, picker, datetime-picker, masked-view, menu, pager-view, slider}`.
 3. Check the Expo SDK 58 docs for the concern.
 4. Check npm for a maintained package. A release in the last six months is the bar.
@@ -89,6 +89,7 @@ authoritative list; this table summarizes the main concerns.
 | Toast | `sonner-native` | `react-native-toast-message`, `burnt` |
 | Images | `Image` from `@/components/ui/image` | `Image` from `react-native`, `expo-image` |
 | Segmented control | `SegmentedControl` from `@/components/ui/segmented-control` | `@react-native-segmented-control/segmented-control` |
+| Switch | `Switch` from `@/components/ui/switch` | `Switch` from `react-native`, `@expo/ui` |
 | Icons | `@/components/ui/icons` | `lucide-react-native` |
 | Markdown | `MarkdownText` from `@/components/agents/markdown-text`, rendered by `react-native-enriched-markdown` | `react-native-marked`, `react-native-markdown-display` |
 | HTML in markdown | `MarkdownText`: `markdown-html-convert` turns HTML markdown can express into markdown; the rest renders through `MarkdownHtml` (`@native-html/render`) | `react-native-render-html` |
@@ -138,9 +139,8 @@ The conversation list follows the newest message when its viewport shrinks; it m
 A surface whose content
 pads the platform's bottom inset itself passes `height={Math.max(0, keyboardHeight - bottom)}` to
 `@/components/keyboard-lift-view` — the provider's Android height spans the translucent navigation bar, so
-without the reduction the content floats a navigation-bar height above the keyboard. That view pads by the
-height the screen computes from `useKeyboardState` and animates it with the keyboard's own motion progress;
-a library `KeyboardAvoidingView` derives its lift from a container frame an async native call reports, and a
+without the reduction the content floats a navigation-bar height above the keyboard.
+A library `KeyboardAvoidingView` derives its lift from a container frame an async native call reports, and a
 frame that has not landed yet leaves the lift short by the container's own top (the pinned new-session footer
 stayed behind the keyboard that way).
 
@@ -220,7 +220,7 @@ A phase that several flags, refs, nullable fields, or timers encode together is 
 - Import `Switch` from `@/components/ui/switch`. It mirrors `disabled` into `accessibilityState`, which iOS needs to report the control as disabled to assistive technology, and paints the palette's muted pair on Android, where the platform draws no disabled appearance of its own. Mute the row's title beside it; never dim a whole row with opacity.
 - Add reusables with `pnpm reusables add <component> --styling-library nativewind`, in a terminal: it asks before overwriting a file you edited. It runs the version pinned in `package.json`; bump it there, never through a moving tag or `dlx`/`npx`, and never pass `-y`, which auto-answers setup and dependency prompts.
 - Style with Tailwind `className`. No inline styles, no `StyleSheet.create`. Merge classes with `cn()` from `@/lib/utils`.
-- Opacity modifiers do not work on theme colors (CSS variables): `bg-destructive/10` is dropped. Where a `*-tile-bg` / `*-tile-border` pair exists — `danger` for `destructive`, plus `good`, `warn`, `info`, the agent colors and the row hues — use it; otherwise use a concrete color with a dark variant. `<utility>-black/<alpha>` compiles to an unparseable `#NaN` color and paints nothing either; use a concrete value, for example `bg-[#0000000d]` for 5%. `pnpm check:classes` enforces both.
+- Opacity modifiers do not work on theme colors (CSS variables): `bg-destructive/10` is dropped. Where a `*-tile-bg` / `*-tile-border` pair exists — `danger` for `destructive`, plus `good`, `warn`, `info`, the agent colors and the row hues — use it; otherwise use a concrete color with a dark variant. `<utility>-black/<alpha>` compiles to an unparseable `#NaN` color and paints nothing either; use a concrete value, for example `bg-[#0000000d] dark:bg-[#ffffff14]` (5% in light, 8% in dark). `pnpm check:classes` enforces both.
 - Type dynamic Expo Router paths as `Href`. Never silence route types with `as never`.
 - Use Lucide icons, never emoji. Color icons with `color={colors.<token>}` from `useThemeColors()`; `className` colors do not work on them.
 
@@ -244,7 +244,7 @@ A phase that several flags, refs, nullable fields, or timers encode together is 
 - Prefer native sheets, alerts, pickers, gestures, and keyboard behavior. Confirm a non-destructive action with `Alert.alert()`. Confirm a destructive action with `@/components/ui/dialog`, because Android's native `AlertDialog` drops the `style: 'destructive'` affordance.
 - Every pressable gives lightweight feedback unless navigation or a native control already provides it.
 - Every data screen handles loading, empty, error, and happy states. Use `Skeleton` matching final dimensions, `EmptyState`, and pagination when results can grow.
-- Use `ActivityIndicator` only for inline waits. Where layout would jump, use the existing Reanimated `FadeIn`/`FadeOut`/`LinearTransition` patterns.
+- Use `ActivityIndicator` only for inline waits. Where layout would jump, use the existing Reanimated `FadeIn`/`FadeOut`/`LinearTransition` patterns. Gate every mandated animation on Reduce Motion through `useMotionPolicy`/`selectReducedMotionEntrance` from `@/lib/a11y/motion`, so the system setting turns it into an in-place change.
 - Use haptics for commits and outcomes only, never passive interaction.
 - Set `transition={0}` on small or header `expo-image` images to avoid flicker.
 - A scroll view takes a horizontal inset through `contentContainerClassName`, never `className`: the scroller's own style does not narrow the scroll content, so an inset there leaves the end side flush in right-to-left layouts. `CenteredState` applies that class to its content box instead, because a `contentContainerStyle` of its own drops the caller's class.
@@ -270,7 +270,7 @@ One contract, enforced by `pnpm --filter kilo-app run check:classes` (baseline i
 | Section header | A heading (the label carries the header role): 10pt mono uppercase eyebrow, muted; optional icon, 11pt mono primary action in a compact box that never changes the header's height, and notice. No hand-made labels. Gutter-free inside a padded body; `inset` for a full-bleed list; `actionTestID` for a native test handle. | `SectionHeader` from `@/components/ui/section-header`, or `Section` when it has content |
 | Settings and navigation rows | One grouped card per section; hairline between rows inset to the row text; none after the last. | `RowGroup` from `@/components/ui/row-group`; pass `leadingTile` for icon rows |
 | Grouped rows in a virtualized list | A list cannot pass its rows as one child array, so each cell draws its own rounded end, surface and trailing hairline. | `RowGroupItem` with `position` `first`/`middle`/`last` (`only` for a one-row section) |
-| Row anatomy | The one row geometry: `ROW_FRAME_CLASS` (`min-h-[48px] flex-row items-center justify-between gap-3 px-4 py-3`); 30pt `IconTile`; title `text-sm font-medium` on one line (two at a large font scale); up to two subtitle lines (`face: 'mono'` for an identifier, `ellipsizeMode: 'middle'` for a value); a typed trailing cell (chevron, check, switch, value, badge, action, node). Never re-spell it. | `RowFrame` from `@/components/ui/row-frame`; `ConfigureRow`, `PreferenceRow`, `KvRow` and `ChoiceRow` are thin wrappers over it (use them when their fixed anatomy fits, `RowFrame` directly for a link row, two subtitle lines or a mixed trailing cell) |
+| Row anatomy | The one row geometry: `ROW_FRAME_CLASS` (`min-h-[48px] flex-row items-center justify-between gap-3 px-4 py-3`); 30pt `IconTile`; title `text-sm font-medium` on one line (two at a large font scale); subtitle capped at one line by default, at two for a sentence or item list the reader must finish, and at every line when no fixed count bounds the copy (`face: 'mono'` for an identifier, `ellipsizeMode: 'middle'` for a value); a typed trailing cell (chevron, check, switch, value, badge, action, node). Never re-spell it. | `RowFrame` from `@/components/ui/row-frame`; `ConfigureRow`, `PreferenceRow`, `KvRow` and `ChoiceRow` are thin wrappers over it (use them when their fixed anatomy fits, `RowFrame` directly for a link row, two subtitle lines or a mixed trailing cell). `ConfigureRow` caps its subtitle at one line by default and takes `2` for prose or `"all"` when no count bounds the copy; `PreferenceRow`'s subtitle is the switch's explanation and paints every line unless the caller passes a cap |
 | Flat list rows | Full-bleed, no card, content from the 14pt gutter, `border-b-[0.5px] border-hair-soft` hairline, `RowChevron`. A hue strip sits at the gutter. | `SessionRow`, which owns that geometry; callers add no padding of their own. Rows own no card and no grouped divider |
 | Card | Non-row block (balance, metric, info, a field block on a non-form screen): `rounded-xl bg-secondary p-4`, inner `gap-3`, never nested. For full-bleed layered content the surface alone, with each layer owning its inset. | `Card` from `@/components/ui/card`; `padding="none"` for the bare surface |
 | Fields | A single-line `Input` owns its 44pt box and inset. A multiline field or a composer keeps its own text metrics inside the shared bordered surface; a read-only or preview box that swaps with a single-line field reuses its exported box. A form field's visible label renders through FormFieldLabel, and the field block owns the gap between that label and its control. | `Input` from `@/components/ui/input`; `InputFrame` for a multiline/composer surface; `INPUT_BOX_SHAPE_CLASS` for the preview box; FormFieldLabel for the label |
@@ -338,6 +338,12 @@ what a translator has to work from.
   merges: `check:i18n` fails on a key one of them lacks, so a change that adds
   copy either waits for the translation slice or lands the catalog values
   itself and says so.
+- A command run inside right-to-left prose carries a left-to-right isolate in the
+  catalog value: U+2066 before the command and U+2069 after it. The neutral `/`
+  then keeps the command's own order. Separators and sentence punctuation stay
+  outside the isolate. `nativeRemote.prompt`, `nativeRemote.unsafeCommand` and
+  `agentChat.slashCommands.goalDescription` follow this rule. Wrap the whole run,
+  so a command keeps its argument inside the isolate.
 
 ## Design
 

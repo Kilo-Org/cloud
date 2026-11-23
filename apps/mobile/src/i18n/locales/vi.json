@@ -3696,7 +3696,7 @@
       "noSeatsAvailable": "Tất cả chỗ đã được sử dụng. Hãy yêu cầu chủ sở hữu tổ chức thêm chỗ trước khi mời thêm thành viên."
     },
     "invoices": {
-      "downloadA11y": "Tải xuống hóa đơn {{number}}",
+      "downloadA11y": "Tải xuống hóa đơn {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Hóa đơn được tạo tự động theo từng chu kỳ thanh toán và xuất hiện tại đây khi có khoản phí tính cho tổ chức.",
       "emptyTitle": "Chưa có hóa đơn",
       "invoiceFallback": "Hóa đơn",
@@ -4206,6 +4206,8 @@
       "discoveryNoModels": "Điểm cuối không liệt kê mô hình nào. Hãy nhập mô hình thủ công.",
       "connectionIncomplete": "Mô hình đã phản hồi nhưng không hoàn tất. Hãy thử lại, hoặc kiểm tra ID mô hình và giao thức.",
       "invalidInput": "Nhập tên máy chủ, các trường tiêu đề hợp lệ và ít nhất một mô hình có ID và tên không trùng lặp. Giới hạn token phải là số nguyên dương.",
+      "invalidApiKey": "Khóa API chứa ký tự không thể gửi. Chỉ sử dụng chữ cái, chữ số và ký hiệu tiêu chuẩn, không có ngắt dòng.",
+      "invalidHeaders": "Không thể gửi trường tiêu đề tùy chỉnh. Hãy kiểm tra tên của trường tiêu đề và chỉ sử dụng chữ cái, chữ số và ký hiệu tiêu chuẩn, không có ngắt dòng.",
       "invalidUrl": "Nhập URL gốc của API dùng HTTP hoặc HTTPS, không có thông tin xác thực, chuỗi truy vấn hoặc phần định danh đoạn.",
       "publicHttp": "Không cho phép các điểm cuối HTTP công khai. Hãy dùng HTTPS hoặc một điểm cuối riêng trong mạng cục bộ.",
       "httpApprovalRequired": "Chấp thuận điểm cuối HTTP cục bộ này trước khi lưu hoặc kết nối.",
@@ -4702,6 +4704,7 @@
       "emptyDescription": "Các giao dịch mua tín dụng, biên lai và mức sử dụng sẽ hiển thị tại đây.",
       "emptyTitle": "Chưa có lịch sử tín dụng",
       "expiredGrant": "Đã hết hạn: {{description}}",
+      "expiredStatus": "Đã hết hạn",
       "googlePlayReceipt": "Biên lai từ Google Play",
       "kind": {
         "adjustment": "Điều chỉnh",
@@ -4728,7 +4731,8 @@
       "receiptA11y": "Mở biên lai cho {{description}}, {{amount}}, từ {{date}}",
       "receiptUnavailable": "Không có biên lai cho giao dịch mua này.",
       "retentionLimit": "Đang hiển thị lịch sử tín dụng gần đây nhất.",
-      "voidedGrant": "Đã hủy: {{description}}"
+      "voidedGrant": "Đã hủy: {{description}}",
+      "voidedStatus": "Đã hủy"
     },
     "title": "Mua tín dụng",
     "description": "Tín dụng là giao dịch mua một lần được thêm vào số dư Kilo của bạn để chạy các phiên lập trình AI trong Kilo App. Cửa hàng tính phí vào tài khoản của bạn và tín dụng được thêm sau khi cửa hàng xác nhận thanh toán.",

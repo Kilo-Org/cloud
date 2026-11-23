@@ -3832,7 +3832,7 @@
       "noSeatsAvailable": "Wszystkie miejsca są zajęte. Poproś właściciela organizacji o dodanie miejsc, zanim zaprosisz kolejnych członków."
     },
     "invoices": {
-      "downloadA11y": "Pobierz fakturę {{number}}",
+      "downloadA11y": "Pobierz fakturę {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Faktury są wystawiane automatycznie w każdym cyklu rozliczeniowym. Pojawią się tutaj po naliczeniu opłat twojej organizacji.",
       "emptyTitle": "Brak faktur",
       "invoiceFallback": "Faktura",
@@ -4364,6 +4364,8 @@
       "discoveryNoModels": "Punkt końcowy nie zwrócił żadnych modeli. Wprowadź modele ręcznie.",
       "connectionIncomplete": "Model odpowiedział, ale nie ukończył żądania. Spróbuj ponownie lub sprawdź ID modelu i protokół.",
       "invalidInput": "Wprowadź nazwę backendu, prawidłowe nagłówki i co najmniej jeden model z unikalnym ID i nazwą. Limity tokenów muszą być dodatnimi liczbami całkowitymi.",
+      "invalidApiKey": "Klucz API zawiera znak, którego nie można wysłać. Użyj wyłącznie liter, cyfr i standardowych symboli, bez podziałów wiersza.",
+      "invalidHeaders": "Nie można wysłać niestandardowego nagłówka. Sprawdź jego nazwę i używaj wyłącznie liter, cyfr i standardowych symboli, bez podziałów wiersza.",
       "invalidUrl": "Wprowadź główny adres API HTTP lub HTTPS bez danych uwierzytelniających, zapytania ani fragmentu.",
       "publicHttp": "Publiczne punkty końcowe HTTP są niedozwolone. Użyj HTTPS lub prywatnego lokalnego punktu końcowego.",
       "httpApprovalRequired": "Zatwierdź ten lokalny punkt końcowy HTTP przed zapisaniem lub połączeniem.",
@@ -4872,6 +4874,7 @@
       "emptyDescription": "Tutaj pojawią się zakupy kredytów, potwierdzenia i wykorzystanie.",
       "emptyTitle": "Brak historii kredytów",
       "expiredGrant": "Wygasło: {{description}}",
+      "expiredStatus": "Wygasło",
       "googlePlayReceipt": "Potwierdzenie w Google Play",
       "kind": {
         "adjustment": "Korekta",
@@ -4898,7 +4901,8 @@
       "receiptA11y": "Otwórz potwierdzenie dla: {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Potwierdzenie dla tego zakupu nie jest dostępne.",
       "retentionLimit": "Wyświetlana jest najnowsza historia kredytów.",
-      "voidedGrant": "Unieważniono: {{description}}"
+      "voidedGrant": "Unieważniono: {{description}}",
+      "voidedStatus": "Unieważniono"
     },
     "title": "Kup kredyty",
     "description": "Kredyty to jednorazowy zakup dodawany do Twojego salda Kilo na potrzeby sesji kodowania AI w aplikacji Kilo. Sklep obciąża Twoje konto, a kredyty są dodawane po potwierdzeniu płatności przez sklep.",

@@ -3896,7 +3896,7 @@
       "noSeatsAvailable": "Il-postijiet kollha qed jintużaw. Staqsi lil sid tal-organizzazzjoni biex iżid postijiet qabel ma tistieden aktar membri."
     },
     "invoices": {
-      "downloadA11y": "Niżżel l-fattura {{number}}",
+      "downloadA11y": "Niżżel l-fattura {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Il-fatturi jinħolqu awtomatikament f'kull ċiklu tal-kontijiet u jidhru hawn meta tinħareġ fattura għall-organizzazzjoni tiegħek.",
       "emptyTitle": "L-ebda fattura",
       "invoiceFallback": "Fattura",
@@ -4443,6 +4443,8 @@
       "discoveryNoModels": "Il-punt ta' aċċess ma llista l-ebda mudell. Daħħal il-mudelli manwalment.",
       "connectionIncomplete": "Il-mudell wieġeb iżda ma lestiex. Erġa' pprova, jew iċċekkja l-ID tal-mudell u l-protokoll.",
       "invalidInput": "Daħħal isem għas-servizz, intestaturi validi u mill-inqas mudell wieħed b'ID u isem uniċi. Il-limiti tal-unitajiet tat-test iridu jkunu numri sħaħ pożittivi.",
+      "invalidApiKey": "Iċ-ċavetta tal-API fiha karattru li ma jistax jintbagħat. Uża biss ittri, ċifri u simboli standard, mingħajr ebda qlib tal-linja.",
+      "invalidHeaders": "Intestatura personalizzata ma tistax tintbagħat. Iċċekkja isimha u uża biss ittri, ċifri u simboli standard, mingħajr ebda qlib tal-linja.",
       "invalidUrl": "Daħħal URL bażi tal-API li juża HTTP jew HTTPS mingħajr kredenzjali, parametri ta' mistoqsija jew framment.",
       "publicHttp": "Punti ta' aċċess pubbliċi li jużaw HTTP mhumiex permessi. Uża HTTPS jew punt ta' aċċess lokali privat.",
       "httpApprovalRequired": "Approva dan il-punt ta' aċċess lokali li juża HTTP qabel issalva jew tikkonnettja.",
@@ -4957,6 +4959,7 @@
       "emptyDescription": "Ix-xiri, l-irċevuti u l-użu tal-krediti se jidhru hawn.",
       "emptyTitle": "L-ebda storja tal-krediti",
       "expiredGrant": "Skada: {{description}}",
+      "expiredStatus": "Skada",
       "googlePlayReceipt": "Irċevuta minn Google Play",
       "kind": {
         "adjustment": "Aġġustament",
@@ -4983,7 +4986,8 @@
       "receiptA11y": "Iftaħ l-irċevuta għal {{description}}, {{amount}}, minn {{date}}",
       "receiptUnavailable": "M'hemmx irċevuta disponibbli għal dan ix-xiri.",
       "retentionLimit": "Qed tintwera l-istorja tal-krediti l-aktar reċenti.",
-      "voidedGrant": "Annullat: {{description}}"
+      "voidedGrant": "Annullat: {{description}}",
+      "voidedStatus": "Annullat"
     },
     "title": "Ixtri krediti",
     "description": "Il-krediti huma xiri ta' darba li jiżdied mal-bilanċ Kilo tiegħek biex imexxi sessjonijiet ta' kodifikazzjoni bl-AI fl-App Kilo. Il-ħanut jaddebita l-kont tiegħek u l-krediti jiżdiedu wara li l-ħanut jikkonferma l-ħlas.",

@@ -3692,7 +3692,7 @@
       "noSeatsAvailable": "Kõik kohad on kasutusel. Palu organisatsiooni omanikul enne uute liikmete kutsumist kohti juurde lisada."
     },
     "invoices": {
-      "downloadA11y": "Laadi alla arve {{number}}",
+      "downloadA11y": "Laadi alla arve {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Arved koostatakse automaatselt igal arveldusperioodil ja kuvatakse siin pärast sinu organisatsioonile arve esitamist.",
       "emptyTitle": "Arveid pole",
       "invoiceFallback": "Arve",
@@ -4206,6 +4206,8 @@
       "discoveryNoModels": "Lõpp-punkt ei loetlenud ühtki mudelit. Sisesta mudelid käsitsi.",
       "connectionIncomplete": "Mudel vastas, kuid ei lõpetanud. Proovi uuesti või kontrolli mudeli ID-d ja protokolli.",
       "invalidInput": "Sisesta taustsüsteemi nimi, kehtivad päised ja vähemalt üks kordumatu ID ja nimega mudel. Tokenite piirangud peavad olema positiivsed täisarvud.",
+      "invalidApiKey": "API võti sisaldab märki, mida ei saa saata. Kasuta ainult tähti, numbreid ja standardseid sümboleid, ilma reavahetusteta.",
+      "invalidHeaders": "Kohandatud päist ei saa saata. Kontrolli selle nime ja kasuta ainult tähti, numbreid ja standardseid sümboleid, ilma reavahetusteta.",
       "invalidUrl": "Sisesta HTTP või HTTPS API juur-URL ilma autentimisandmete, päringustringi ja fragmendita.",
       "publicHttp": "Avalikud HTTP lõpp-punktid pole lubatud. Kasuta HTTPS-i või privaatset kohalikku lõpp-punkti.",
       "httpApprovalRequired": "Enne salvestamist või ühenduse loomist kiida see kohalik HTTP lõpp-punkt heaks.",
@@ -4702,6 +4704,7 @@
       "emptyDescription": "Krediidiostud, kviitungid ja kasutus kuvatakse siin.",
       "emptyTitle": "Krediitide ajalugu puudub",
       "expiredGrant": "Aegunud: {{description}}",
+      "expiredStatus": "Aegunud",
       "googlePlayReceipt": "Kviitung Google Playst",
       "kind": {
         "adjustment": "Korrigeerimine",
@@ -4728,7 +4731,8 @@
       "receiptA11y": "Ava kviitung: {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Selle ostu kohta kviitung puudub.",
       "retentionLimit": "Kuvatakse kõige hiljutisem krediitide ajalugu.",
-      "voidedGrant": "Tühistatud: {{description}}"
+      "voidedGrant": "Tühistatud: {{description}}",
+      "voidedStatus": "Tühistatud"
     },
     "title": "Osta krediiti",
     "description": "Krediit on ühekordne ost, mis lisatakse sinu Kilo saldole AI kodeerimisseansside käitamiseks Kilo Appis. Pood võtab tasu sinu kontolt ja krediit lisatakse pärast seda, kui pood makse kinnitab.",

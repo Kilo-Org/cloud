@@ -3692,7 +3692,7 @@
       "noSeatsAvailable": "Kaikki paikat ovat käytössä. Pyydä organisaation omistajaa lisäämään paikkoja ennen kuin kutsut lisää jäseniä."
     },
     "invoices": {
-      "downloadA11y": "Lataa lasku {{number}}",
+      "downloadA11y": "Lataa lasku {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Laskut luodaan automaattisesti joka laskutusjaksolla. Ne näkyvät tässä, kun organisaatiotasi on laskutettu.",
       "emptyTitle": "Ei laskuja",
       "invoiceFallback": "Lasku",
@@ -4206,6 +4206,8 @@
       "discoveryNoModels": "Päätepiste ei luetellut malleja. Lisää mallit käsin.",
       "connectionIncomplete": "Malli vastasi mutta ei suorittanut pyyntöä loppuun. Yritä uudelleen tai tarkista mallin tunniste ja protokolla.",
       "invalidInput": "Anna taustapalvelun nimi, kelvolliset otsakkeet ja vähintään yksi malli, jolla on yksilöllinen tunniste ja nimi. Tokenrajojen on oltava positiivisia kokonaislukuja.",
+      "invalidApiKey": "API-avain sisältää merkin, jota ei voi lähettää. Käytä vain kirjaimia, numeroita ja tavallisia symboleja ilman rivinvaihtoja.",
+      "invalidHeaders": "Mukautettua otsaketta ei voi lähettää. Tarkista sen nimi ja käytä vain kirjaimia, numeroita ja tavallisia symboleja ilman rivinvaihtoja.",
       "invalidUrl": "Anna API:n HTTP- tai HTTPS-juuriosoite ilman tunnistetietoja, kyselyä tai fragmenttia.",
       "publicHttp": "Julkisia HTTP-päätepisteitä ei sallita. Käytä HTTPS-yhteyttä tai yksityistä paikallista päätepistettä.",
       "httpApprovalRequired": "Hyväksy tämä paikallinen HTTP-päätepiste ennen tallentamista tai yhteyden muodostamista.",
@@ -4702,6 +4704,7 @@
       "emptyDescription": "Krediittien ostot, kuitit ja käyttö näkyvät täällä.",
       "emptyTitle": "Ei krediittihistoriaa",
       "expiredGrant": "Vanhentunut: {{description}}",
+      "expiredStatus": "Vanhentunut",
       "googlePlayReceipt": "Kuitti Google Playssa",
       "kind": {
         "adjustment": "Oikaisu",
@@ -4728,7 +4731,8 @@
       "receiptA11y": "Avaa kuitti: {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Tälle ostolle ei ole saatavilla kuittia.",
       "retentionLimit": "Näytetään uusin krediittihistoria.",
-      "voidedGrant": "Mitätöity: {{description}}"
+      "voidedGrant": "Mitätöity: {{description}}",
+      "voidedStatus": "Mitätöity"
     },
     "title": "Osta krediittejä",
     "description": "Krediitit ovat kertaostos, joka lisätään Kilo-saldoosi AI-koodausistuntojen ajamista varten Kilo-sovelluksessa. Kauppa veloittaa tiliäsi ja krediitit lisätään, kun kauppa vahvistaa maksun.",

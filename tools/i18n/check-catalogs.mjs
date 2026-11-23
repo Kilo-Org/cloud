@@ -119,6 +119,7 @@ const TWO_SENSE_COPY = new Map([
     'receipt',
     'the confirmation a moderation report produces, versus the proof of payment for a credit purchase',
   ],
+  ['expired', 'the state of a native-remote command delivery, versus the state of a credit grant'],
   ['block', 'the verb, block a discussion participant, versus the reviewer decision to block'],
   ['merge', 'the verb in the merge section header, versus the name of the merge method on a badge'],
   ['review', 'the noun, a review, versus the verb in the onboarding step'],
@@ -1188,6 +1189,72 @@ function checkBorrowedDanda(values, label) {
         ? `${label}: "${key}" writes the Devanagari danda «।» while this catalog joins its sentences with "${joiner}"`
         : `${label}: "${key}" writes the Devanagari danda «।», and this catalog writes no sentence mark of its own`
     );
+  }
+  return problems;
+}
+
+/** The mark an Urdu catalog declares as its sentence terminator. */
+const URDU_SENTENCE_TERMINATOR = '\u06D4';
+/** What continues a token after a dot rather than starting a sentence. */
+const LATIN_OR_NUMBER_AFTER_DOT = /[A-Za-z0-9/%-]/;
+
+/** Whether the character is a letter of the Arabic script, as Urdu words are. */
+function isArabicLetter(char) {
+  return char !== undefined && /\p{Script=Arabic}/u.test(char) && /\p{L}/u.test(char);
+}
+
+/**
+ * The Urdu full stop `۔` (U+06D4) closes a sentence written in the Arabic
+ * script, and a catalog that declares it in `common.sentenceJoiner` has stated
+ * that this mark ends its sentences. An ASCII `.` left at a boundary then puts
+ * two conventions on one screen. The rule reads that declared joiner instead of
+ * a tag list for the same reason `checkBorrowedDanda` does: the joiner is the
+ * catalog's own statement of which mark closes its sentences, so a catalog that
+ * declares another mark keeps its ASCII periods and none is named here. Only a
+ * mark that closes a sentence is read: an ellipsis, a host or file name and a
+ * decimal keep theirs. A period followed by whitespace and a word closes one
+ * sentence and opens the next whatever precedes it, so the sentence it joins is
+ * reported after a `{{token}}` or a closing bracket too; a value-final period
+ * is read only after an Urdu word, which leaves a Latin product name alone.
+ */
+function checkUrduSentenceTerminator(values, label) {
+  const problems = [];
+  const joiner = values.get('common.sentenceJoiner');
+  if (typeof joiner !== 'string' || !joiner.startsWith(URDU_SENTENCE_TERMINATOR)) {
+    return problems;
+  }
+  for (const [key, value] of values) {
+    for (let index = 0; index < value.length; index += 1) {
+      if (value[index] !== '.') {
+        continue;
+      }
+      // A run of dots is an ellipsis, a wait state rather than a sentence end.
+      if (value[index - 1] === '.' || value[index + 1] === '.') {
+        continue;
+      }
+      // A host, file name or decimal continues with its own characters.
+      if (LATIN_OR_NUMBER_AFTER_DOT.test(value[index + 1] ?? '')) {
+        continue;
+      }
+      // A word after the dot means a second sentence follows it, whatever the
+      // dot follows: `{{status}}. ہدف` joins two sentences as surely as a dot
+      // after an Urdu word does.
+      if (/^\s+\p{L}/u.test(value.slice(index + 1))) {
+        problems.push(`${label}: "${key}" joins two sentences with the ASCII "."; Urdu writes «۔»`);
+        continue;
+      }
+      // A dot that ends the value, or runs straight into the next word with no
+      // space, closes a sentence only after an Urdu word: `Sentry.` names a
+      // product and `{{status}}.` a value, not a sentence.
+      if (!isArabicLetter(value[index - 1])) {
+        continue;
+      }
+      if (/\p{L}/u.test(value.slice(index + 1))) {
+        problems.push(`${label}: "${key}" joins two sentences with the ASCII "."; Urdu writes «۔»`);
+        continue;
+      }
+      problems.push(`${label}: "${key}" ends a sentence with the ASCII "."; Urdu writes «۔»`);
+    }
   }
   return problems;
 }
@@ -2348,8 +2415,6 @@ function checkTranslatedValue({
   mustTranslateKeys,
 }) {
   const problems = [];
-  // A catalog that writes no sentence mark may hold nothing but the space it
-  // separates sentences with; any other whitespace-only value is untranslated.
   const separatorOnly =
     key === 'common.sentenceJoiner' && MARKLESS_SENTENCE_TAGS.has(tag) && value !== '';
   if (value.trim() === '' && !separatorOnly) {
@@ -2673,6 +2738,7 @@ function checkCatalogLocales({
     problems.push(...checkAgentEditorCopy(translated, english, label));
     problems.push(...checkPullRequestTerm(translated, label));
     problems.push(...checkArmenianSentenceTerminator(tag, translated, label));
+    problems.push(...checkUrduSentenceTerminator(translated, label));
     problems.push(...checkBorrowedDanda(translated, label));
     problems.push(...checkChangelogAreaLabels(tag, translated, label));
 

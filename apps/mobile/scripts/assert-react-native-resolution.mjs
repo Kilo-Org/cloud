@@ -134,7 +134,6 @@ const STYLED_COMPONENTS = {
   View: component('View'),
 };
 
-// The stub builds on both maps, so a name added to one is stubbed and checked at once.
 function stubReactNative() {
   return {
     ...FORWARDED_EXPORTS,

@@ -3696,7 +3696,7 @@
       "noSeatsAvailable": "所有席位皆已使用。請先請組織擁有者增加席位，再邀請更多成員。"
     },
     "invoices": {
-      "downloadA11y": "下載發票 {{number}}",
+      "downloadA11y": "下載發票 {{number}}，{{amount}}，{{date}}，{{status}}",
       "emptyDescription": "每個帳單週期都會自動產生發票，並在組織完成計費後顯示在這裡。",
       "emptyTitle": "尚無發票",
       "invoiceFallback": "發票",
@@ -4206,6 +4206,8 @@
       "discoveryNoModels": "端點未列出任何模型。請手動輸入模型。",
       "connectionIncomplete": "模型已回應但未完成。請再試一次，或檢查模型 ID 與協定。",
       "invalidInput": "請輸入後端名稱、有效的標頭，以及至少一個具有唯一 ID 和名稱的模型。詞元上限必須為正整數。",
+      "invalidApiKey": "API 金鑰含有無法傳送的字元。請僅使用字母、數字與標準符號，且不得包含換行。",
+      "invalidHeaders": "無法傳送自訂標頭。請檢查其名稱，並僅使用字母、數字與標準符號，且不得包含換行。",
       "invalidUrl": "請輸入 HTTP 或 HTTPS API 根 URL，且不得包含驗證憑證、查詢參數或片段識別碼。",
       "publicHttp": "不允許使用公開的 HTTP 端點。請使用 HTTPS 或私有的本機端點。",
       "httpApprovalRequired": "儲存或連線前，請先核准此本機 HTTP 端點。",
@@ -4702,6 +4704,7 @@
       "emptyDescription": "點數購買、收據與使用情況會顯示在這裡。",
       "emptyTitle": "尚無點數紀錄",
       "expiredGrant": "已過期：{{description}}",
+      "expiredStatus": "已過期",
       "googlePlayReceipt": "Google Play 收據",
       "kind": {
         "adjustment": "調整",
@@ -4728,7 +4731,8 @@
       "receiptA11y": "開啟「{{description}}」，{{amount}}，{{date}} 的收據",
       "receiptUnavailable": "此筆購買沒有可用的收據。",
       "retentionLimit": "顯示最近的點數紀錄。",
-      "voidedGrant": "已作廢：{{description}}"
+      "voidedGrant": "已作廢：{{description}}",
+      "voidedStatus": "已作廢"
     },
     "title": "購買點數",
     "description": "點數是一次性購買，會加入你的 Kilo 餘額，用於在 Kilo App 中執行 AI 程式設計工作階段。商店會向你的帳戶收費，商店確認付款後點數才會入帳。",

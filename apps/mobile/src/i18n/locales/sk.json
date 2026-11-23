@@ -3828,7 +3828,7 @@
       "noSeatsAvailable": "Všetky miesta sú obsadené. Pred pozvaním ďalších členov požiadaj vlastníka organizácie o pridanie miest."
     },
     "invoices": {
-      "downloadA11y": "Stiahnuť faktúru {{number}}",
+      "downloadA11y": "Stiahnuť faktúru {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Faktúry sa vytvárajú automaticky za každé fakturačné obdobie. Zobrazia sa tu po vyúčtovaní služieb tvojej organizácii.",
       "emptyTitle": "Žiadne faktúry",
       "invoiceFallback": "Faktúra",
@@ -4364,6 +4364,8 @@
       "discoveryNoModels": "Koncový bod neuviedol žiadne modely. Zadajte modely ručne.",
       "connectionIncomplete": "Model odpovedal, ale nedokončil odpoveď. Skúste to znova alebo skontrolujte ID modelu a protokol.",
       "invalidInput": "Zadajte názov servera, platné hlavičky a aspoň jeden model s jedinečným ID a názvom. Limity tokenov musia byť kladné celé čísla.",
+      "invalidApiKey": "API kľúč obsahuje znak, ktorý sa nedá odoslať. Používajte iba písmená, číslice a štandardné symboly, bez zalomení riadkov.",
+      "invalidHeaders": "Vlastnú hlavičku nie je možné odoslať. Skontrolujte jej názov a používajte iba písmená, číslice a štandardné symboly, bez zalomení riadkov.",
       "invalidUrl": "Zadajte základnú URL API s HTTP alebo HTTPS bez prihlasovacích údajov, parametrov dopytu alebo fragmentu.",
       "publicHttp": "Verejné koncové body HTTP nie sú povolené. Použite HTTPS alebo súkromný lokálny koncový bod.",
       "httpApprovalRequired": "Pred uložením alebo pripojením schváľte tento lokálny koncový bod HTTP.",
@@ -4872,6 +4874,7 @@
       "emptyDescription": "Tu sa zobrazia nákupy kreditov, doklady a ich využitie.",
       "emptyTitle": "Žiadna história kreditov",
       "expiredGrant": "Platnosť vypršala: {{description}}",
+      "expiredStatus": "Platnosť vypršala",
       "googlePlayReceipt": "Doklad v obchode Google Play",
       "kind": {
         "adjustment": "Úprava",
@@ -4898,7 +4901,8 @@
       "receiptA11y": "Otvoriť doklad za {{description}}, {{amount}}, z {{date}}",
       "receiptUnavailable": "Pre tento nákup nie je k dispozícii doklad.",
       "retentionLimit": "Zobrazuje sa najnovšia história kreditov.",
-      "voidedGrant": "Stornované: {{description}}"
+      "voidedGrant": "Stornované: {{description}}",
+      "voidedStatus": "Stornované"
     },
     "title": "Kúpiť kredity",
     "description": "Kredity sú jednorazový nákup pridaný do vášho zostatku Kilo na spúšťanie AI programovacích relácií v aplikácii Kilo. Obchod vám strhne platbu z účtu a kredity sa pripíšu po potvrdení platby obchodom.",

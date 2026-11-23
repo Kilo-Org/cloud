@@ -3692,7 +3692,7 @@
       "noSeatsAvailable": "Efa ampiasaina avokoa ny toerana rehetra. Angataho amin'ny tompon'ny fikambanana iray ny hanampy toerana alohan'ny hanasanao mpikambana fanampiny."
     },
     "invoices": {
-      "downloadA11y": "Alao ny faktiora {{number}}",
+      "downloadA11y": "Alao ny faktiora {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Foronina ho azy isaky ny fe-potoana fandoavana ny faktiora. Hiseho eto izany rehefa ampandoavina ny fikambananao.",
       "emptyTitle": "Tsy misy faktiora",
       "invoiceFallback": "Faktiora",
@@ -4206,6 +4206,8 @@
       "discoveryNoModels": "Tsy nisy modely notanisain'ny adiresy fifandraisana. Ampidiro amin'ny tanana ny modely.",
       "connectionIncomplete": "Namaly ny modely fa tsy nahavita. Andramo indray, na hamarino ny famantarana ny modely sy ny fitsipika fifandraisana.",
       "invalidInput": "Ampidiro ny anaran'ny rafitra mpizara, ny sahan-doha manan-kery ary modely iray farafahakeliny manana famantarana sy anarana tsy miverina. Tsy maintsy isa manontolo miabo ny fetran'ny singa lahatsoratra.",
+      "invalidApiKey": "Misy marika tsy azo alefa ao amin'ny fanalahidy API. Ampiasao litera, isa ary marika mahazatra ihany, tsy misy fitoloana andalana.",
+      "invalidHeaders": "Tsy azo alefa ny sahan-doha namboarina manokana. Hamarino ny anarany ary ampiasao litera, isa ary marika mahazatra ihany, tsy misy fitoloana andalana.",
       "invalidUrl": "Ampidiro ny fototry ny API mampiasa HTTP na HTTPS, tsy misy mombamomba ny fidirana, masontsivana fikarohana na sombin'ny URL.",
       "publicHttp": "Tsy azo ampiasaina ny adiresy fifandraisana HTTP ho an'ny daholobe. Mampiasà HTTPS na adiresy fifandraisana eo an-toerana tsy azon'ny daholobe idirana.",
       "httpApprovalRequired": "Ankatoavy ity adiresy fifandraisana HTTP eo an-toerana ity alohan'ny hitahirizana na hifandraisana.",
@@ -4702,6 +4704,7 @@
       "emptyDescription": "Hiseho eto ny fividianana kredita, ny rosia ary ny fampiasana.",
       "emptyTitle": "Tsy misy tantaran'ny kredita",
       "expiredGrant": "Lany fe-potoana: {{description}}",
+      "expiredStatus": "Lany fe-potoana",
       "googlePlayReceipt": "Rosia avy amin'ny Google Play",
       "kind": {
         "adjustment": "Fanitsiana",
@@ -4728,7 +4731,8 @@
       "receiptA11y": "Sokafy ny rosia ho an'ny {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Tsy misy rosia ho an'ity fividianana ity.",
       "retentionLimit": "Aseho ny tantaran'ny kredita farany indrindra.",
-      "voidedGrant": "Nofoanana: {{description}}"
+      "voidedGrant": "Nofoanana: {{description}}",
+      "voidedStatus": "Nofoanana"
     },
     "title": "Hividy kireditra",
     "description": "Ny kireditra dia fividianana indray mandeha ampiana amin'ny balan Kilo anao hanaovana session coding AI ao amin'ny Kilo App. Ny fivarotana no maka vola amin'ny kaontinao ary ampiana ny kireditra rehefa manamarina ny fandoavam-bola ny fivarotana.",

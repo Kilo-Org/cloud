@@ -3692,7 +3692,7 @@
       "noSeatsAvailable": "Nafasi zote zinatumika. Muombe mmiliki wa shirika aongeze nafasi kabla ya kualika wanachama zaidi."
     },
     "invoices": {
-      "downloadA11y": "Pakua ankara {{number}}",
+      "downloadA11y": "Pakua ankara {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Ankara hutengenezwa kiotomatiki kila mzunguko wa bili na zitaonekana hapa shirika lako likishatozwa.",
       "emptyTitle": "Hakuna ankara",
       "invoiceFallback": "Ankara",
@@ -4206,6 +4206,8 @@
       "discoveryNoModels": "Sehemu ya muunganisho haikuorodhesha modeli yoyote. Ingiza modeli mwenyewe.",
       "connectionIncomplete": "Modeli ilijibu lakini haikukamilisha. Jaribu tena, au angalia kitambulisho cha modeli na itifaki.",
       "invalidInput": "Weka jina la huduma, vichwa halali na angalau modeli moja yenye kitambulisho na jina la kipekee. Vikomo vya tokeni lazima viwe namba kamili kubwa kuliko sifuri.",
+      "invalidApiKey": "Ufunguo wa API una herufi ambayo haiwezi kutumwa. Tumia herufi, namba na alama za kawaida tu, bila mapumziko ya mstari.",
+      "invalidHeaders": "Kichwa maalumu hakiwezi kutumwa. Angalia jina lake na tumia herufi, namba na alama za kawaida tu, bila mapumziko ya mstari.",
       "invalidUrl": "Weka URL ya msingi ya API inayotumia HTTP au HTTPS bila taarifa za uthibitishaji, hoja ya utafutaji au kipande cha URL.",
       "publicHttp": "Sehemu za muunganisho za HTTP za umma haziruhusiwi. Tumia HTTPS au sehemu ya muunganisho ya ndani ya mtandao binafsi.",
       "httpApprovalRequired": "Idhinisha sehemu hii ya muunganisho ya HTTP ya ndani kabla ya kuhifadhi au kuunganisha.",
@@ -4702,6 +4704,7 @@
       "emptyDescription": "Ununuzi wa salio, risiti na matumizi vitaonekana hapa.",
       "emptyTitle": "Hakuna historia ya salio",
       "expiredGrant": "Muda wake umeisha: {{description}}",
+      "expiredStatus": "Muda wake umeisha",
       "googlePlayReceipt": "Risiti kutoka Google Play",
       "kind": {
         "adjustment": "Marekebisho",
@@ -4728,7 +4731,8 @@
       "receiptA11y": "Fungua risiti ya {{description}}, {{amount}}, kutoka {{date}}",
       "receiptUnavailable": "Hakuna risiti ya ununuzi huu.",
       "retentionLimit": "Inaonyesha historia ya salio ya hivi karibuni.",
-      "voidedGrant": "Imebatilishwa: {{description}}"
+      "voidedGrant": "Imebatilishwa: {{description}}",
+      "voidedStatus": "Imebatilishwa"
     },
     "title": "Nunua salio",
     "description": "Salio ni ununuzi wa mara moja unaoongezwa kwenye usawa wako wa Kilo kwa kuendesha vikao vya kuandika msimbo kwa AI katika Kilo App. Duka hukutoza akaunti yako na salio huongezwa baada ya duka kuthibitisha malipo.",

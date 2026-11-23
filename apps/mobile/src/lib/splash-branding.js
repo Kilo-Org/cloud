@@ -4,8 +4,7 @@
  * the mark's size in dp. app.config.ts paints them natively through the
  * `withBrandedSplash` plugin, and `AnimatedSplashOverlay` paints the same ones
  * while the native splash hides, so the handover never moves or resizes
- * anything. Plain .js because scripts/assert-expo-config.mjs runs under plain
- * Node, which cannot load workspace TS (same reason env-keys.js exists).
+ * anything. Plain .js for the reason env-keys.js states.
  * Checked by the mobile typecheck through tsconfig include — keep the entry.
  */
 

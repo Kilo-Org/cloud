@@ -3828,7 +3828,7 @@
       "noSeatsAvailable": "Todos os lugares estão ocupados. Peça a um proprietário da organização que adicione lugares antes de convidar mais membros."
     },
     "invoices": {
-      "downloadA11y": "Transferir fatura {{number}}",
+      "downloadA11y": "Transferir fatura {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "As faturas são geradas automaticamente em cada ciclo de faturação e aparecem aqui após a faturação à sua organização.",
       "emptyTitle": "Sem faturas",
       "invoiceFallback": "Fatura",
@@ -4364,6 +4364,8 @@
       "discoveryNoModels": "O ponto de acesso não listou nenhum modelo. Introduz os modelos manualmente.",
       "connectionIncomplete": "O modelo respondeu mas não terminou. Tenta novamente ou verifica o ID do modelo e o protocolo.",
       "invalidInput": "Introduz um nome de serviço, cabeçalhos válidos e pelo menos um modelo com ID e nome únicos. Os limites de tokens têm de ser números inteiros positivos.",
+      "invalidApiKey": "A chave da API contém um caractere que não pode ser enviado. Utiliza apenas letras, dígitos e símbolos padrão, sem quebras de linha.",
+      "invalidHeaders": "Um cabeçalho personalizado não pode ser enviado. Verifica o nome dele e utiliza apenas letras, dígitos e símbolos padrão, sem quebras de linha.",
       "invalidUrl": "Introduz um URL base da API com HTTP ou HTTPS, sem credenciais, parâmetros de consulta ou fragmentos.",
       "publicHttp": "Não são permitidos pontos de acesso HTTP públicos. Usa HTTPS ou um ponto de acesso local privado.",
       "httpApprovalRequired": "Autoriza este ponto de acesso HTTP local antes de guardar ou estabelecer ligação.",
@@ -4872,6 +4874,7 @@
       "emptyDescription": "Compras, recibos e uso de créditos aparecerão aqui.",
       "emptyTitle": "Nenhum histórico de créditos",
       "expiredGrant": "Expirado: {{description}}",
+      "expiredStatus": "Expirado",
       "googlePlayReceipt": "Recibo do Google Play",
       "kind": {
         "adjustment": "Ajuste",
@@ -4898,7 +4901,8 @@
       "receiptA11y": "Abrir o recibo de {{description}}, {{amount}}, de {{date}}",
       "receiptUnavailable": "Não há recibo disponível para esta compra.",
       "retentionLimit": "A mostrar o histórico de créditos mais recente.",
-      "voidedGrant": "Anulado: {{description}}"
+      "voidedGrant": "Anulado: {{description}}",
+      "voidedStatus": "Anulado"
     },
     "title": "Comprar créditos",
     "description": "Os créditos são uma compra única adicionada ao seu saldo Kilo para executar sessões de programação com IA na aplicação Kilo. A loja cobra na sua conta e os créditos são adicionados depois de a loja confirmar o pagamento.",

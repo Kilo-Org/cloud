@@ -43,7 +43,7 @@ const ALLOWED_NON_DISPLAY: Readonly<Record<string, string>> = {
   'lib/agent-profile-forms.ts': 'environment-variable key normalization',
   'lib/chat/remote-mcp-store.ts': 'callable-name slug normalization',
   'lib/chat/backend-request.ts': 'HTTP header-name normalization',
-  'lib/chat/backend-store.ts': 'HTTP header-name comparison',
+  'lib/chat/backend-schema.ts': 'HTTP header-name comparison',
   'lib/chat/backend-url.ts': 'hostname comparison',
   'lib/chat/gguf-catalog.ts': 'file-extension comparison',
   'lib/chat/hf-catalog.ts': 'SPDX id lookup key',

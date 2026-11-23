@@ -3692,7 +3692,7 @@
       "noSeatsAvailable": "Alle pladser er i brug. Bed en organisationsejer om at tilføje pladser, før du inviterer flere medlemmer."
     },
     "invoices": {
-      "downloadA11y": "Download faktura {{number}}",
+      "downloadA11y": "Download faktura {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Fakturaer oprettes automatisk for hver faktureringsperiode og vises her, når din organisation bliver faktureret.",
       "emptyTitle": "Ingen fakturaer",
       "invoiceFallback": "Faktura",
@@ -4206,6 +4206,8 @@
       "discoveryNoModels": "Endepunktet angav ingen modeller. Tilføj modeller manuelt.",
       "connectionIncomplete": "Modellen svarede, men blev ikke færdig. Prøv igen, eller tjek model-ID'et og protokollen.",
       "invalidInput": "Indtast et servernavn, gyldige headere og mindst én model med et entydigt ID og navn. Tokengrænser skal være positive heltal.",
+      "invalidApiKey": "API-nøglen indeholder et tegn, som ikke kan sendes. Brug kun bogstaver, tal og standardtegn, uden linjeskift.",
+      "invalidHeaders": "En brugerdefineret header kan ikke sendes. Kontroller dens navn, og brug kun bogstaver, tal og standardtegn, uden linjeskift.",
       "invalidUrl": "Indtast en HTTP- eller HTTPS-API-rod uden loginoplysninger, forespørgselsparametre eller et fragment.",
       "publicHttp": "Offentlige HTTP-endepunkter er ikke tilladt. Brug HTTPS eller et privat lokalt endepunkt.",
       "httpApprovalRequired": "Godkend dette lokale HTTP-endepunkt, før du gemmer eller opretter forbindelse.",
@@ -4702,6 +4704,7 @@
       "emptyDescription": "Kreditkøb, kvitteringer og forbrug vises her.",
       "emptyTitle": "Ingen kredithistorik",
       "expiredGrant": "Udløbet: {{description}}",
+      "expiredStatus": "Udløbet",
       "googlePlayReceipt": "Kvittering fra Google Play",
       "kind": {
         "adjustment": "Justering",
@@ -4728,7 +4731,8 @@
       "receiptA11y": "Åbn kvitteringen for {{description}}, {{amount}}, fra {{date}}",
       "receiptUnavailable": "Der er ingen kvittering for dette køb.",
       "retentionLimit": "Viser den seneste kredithistorik.",
-      "voidedGrant": "Annulleret: {{description}}"
+      "voidedGrant": "Annulleret: {{description}}",
+      "voidedStatus": "Annulleret"
     },
     "title": "Køb kreditter",
     "description": "Kreditter er et engangskøb, der lægges til din Kilo-saldo til at køre AI-kodningssessioner i Kilo App. Butikken opkræver betaling på din konto, og kreditterne tilføjes, når butikken bekræfter betalingen.",

@@ -3692,7 +3692,7 @@
       "noSeatsAvailable": "Barcha o'rinlar band. Ko'proq a'zo taklif qilishdan oldin tashkilot egasidan o'rinlar qo'shishni so'rang."
     },
     "invoices": {
-      "downloadA11y": "{{number}} raqamli hisob-fakturani yuklab olish",
+      "downloadA11y": "{{number}} raqamli hisob-fakturani yuklab olish, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Hisob-fakturalar har bir hisob-kitob davrida avtomatik yaratiladi. Tashkilotingizga to'lov hisobi chiqarilgach, ular shu yerda ko'rinadi.",
       "emptyTitle": "Hisob-fakturalar yo'q",
       "invoiceFallback": "Hisob-faktura",
@@ -4206,6 +4206,8 @@
       "discoveryNoModels": "Ulanish manzili hech qanday model koʻrsatmadi. Modellarni qoʻlda kiriting.",
       "connectionIncomplete": "Model javob berdi, lekin tugatmadi. Qaytadan urinib koʻring yoki model ID si va protokolni tekshiring.",
       "invalidInput": "Server nomi, yaroqli sarlavhalar va takrorlanmaydigan ID hamda nomga ega kamida bitta modelni kiriting. Token chegaralari musbat butun sonlar boʻlishi kerak.",
+      "invalidApiKey": "API kaliti yuborib boʻlmaydigan belgini oʻz ichiga oladi. Faqat harflar, raqamlar va standart belgilardan foydalaning, qator uzilishlarisiz.",
+      "invalidHeaders": "Maxsus sarlavhani yuborib boʻlmaydi. Uning nomini tekshirib, faqat harflar, raqamlar va standart belgilardan foydalaning, qator uzilishlarisiz.",
       "invalidUrl": "Kirish maʼlumotlari, soʻrov parametrlari yoki fragmentsiz HTTP yoki HTTPS API asosiy manzilini kiriting.",
       "publicHttp": "Ommaviy HTTP ulanish manzillariga ruxsat berilmaydi. HTTPS yoki xususiy mahalliy ulanish manzilidan foydalaning.",
       "httpApprovalRequired": "Saqlash yoki ulanishdan oldin bu mahalliy HTTP ulanish manzilini tasdiqlang.",
@@ -4702,6 +4704,7 @@
       "emptyDescription": "Kredit xaridlari, cheklar va sarflar shu yerda ko‘rinadi.",
       "emptyTitle": "Kreditlar tarixi yo‘q",
       "expiredGrant": "Muddati tugagan: {{description}}",
+      "expiredStatus": "Muddati tugagan",
       "googlePlayReceipt": "Chek Google Play’da",
       "kind": {
         "adjustment": "Tuzatish",
@@ -4728,7 +4731,8 @@
       "receiptA11y": "{{description}}, {{amount}}, {{date}} chekini ochish",
       "receiptUnavailable": "Bu xarid uchun chek mavjud emas.",
       "retentionLimit": "Kreditlarning eng so'nggi tarixi ko'rsatilmoqda.",
-      "voidedGrant": "Bekor qilingan: {{description}}"
+      "voidedGrant": "Bekor qilingan: {{description}}",
+      "voidedStatus": "Bekor qilingan"
     },
     "title": "Kredit sotib olish",
     "description": "Kreditlar Kilo App'da AI kodlash sessiyalarini ishga tushirish uchun Kilo balansingizga qo'shiladigan bir martalik xariddir. Do'kon hisobingizdan to'lov oladi va do'kon to'lovni tasdiqlaganidan keyin kreditlar qo'shiladi.",

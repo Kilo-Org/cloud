@@ -3696,7 +3696,7 @@
       "noSeatsAvailable": "すべてのシートが使用中です。さらにメンバーを招待する前に、組織のオーナーにシートの追加を依頼してください。"
     },
     "invoices": {
-      "downloadA11y": "請求書{{number}}をダウンロード",
+      "downloadA11y": "請求書{{number}}をダウンロード、{{amount}}、{{date}}、{{status}}",
       "emptyDescription": "請求書は請求サイクルごとに自動発行されます。組織への請求が発生すると、ここに表示されます。",
       "emptyTitle": "請求書はありません",
       "invoiceFallback": "請求書",
@@ -4206,6 +4206,8 @@
       "discoveryNoModels": "エンドポイントにモデルが一覧にありませんでした。モデルを手動で入力してください。",
       "connectionIncomplete": "モデルは応答しましたが、完了しませんでした。もう一度お試しいただくか、モデルIDとプロトコルを確認してください。",
       "invalidInput": "バックエンド名、有効なヘッダー、および一意のIDと名前を持つモデルを少なくとも1つ入力してください。トークン数の上限には正の整数を指定してください。",
+      "invalidApiKey": "APIキーに送信できない文字が含まれています。英字、数字、標準的な記号のみを使用し、改行を含めないでください。",
+      "invalidHeaders": "カスタムヘッダーを送信できません。名前を確認し、英字、数字、標準的な記号のみを使用して、改行を含めないでください。",
       "invalidUrl": "認証情報、クエリ、フラグメントを含まないHTTPまたはHTTPSのAPIルートURLを入力してください。",
       "publicHttp": "公開HTTPエンドポイントは許可されません。HTTPSまたは非公開のローカルエンドポイントを使用してください。",
       "httpApprovalRequired": "保存または接続する前に、このローカルHTTPエンドポイントを承認してください。",
@@ -4702,6 +4704,7 @@
       "emptyDescription": "クレジットの購入、領収書、使用状況がここに表示されます。",
       "emptyTitle": "クレジット履歴はありません",
       "expiredGrant": "期限切れ: {{description}}",
+      "expiredStatus": "期限切れ",
       "googlePlayReceipt": "領収書は Google Play にあります",
       "kind": {
         "adjustment": "調整",
@@ -4728,7 +4731,8 @@
       "receiptA11y": "{{description}}、{{amount}}、{{date}}の領収書を開く",
       "receiptUnavailable": "この購入の領収書はありません。",
       "retentionLimit": "最新のクレジット履歴を表示しています。",
-      "voidedGrant": "無効化済み: {{description}}"
+      "voidedGrant": "無効化済み: {{description}}",
+      "voidedStatus": "無効化済み"
     },
     "title": "クレジットを購入",
     "description": "クレジットは、Kilo AppでAIコーディングセッションを実行するためにKilo残高に追加される買い切りの購入です。ストアがアカウントに請求し、ストアが支払いを確認した後にクレジットが追加されます。",

@@ -3692,7 +3692,7 @@
       "noSeatsAvailable": "Eserleku guztiak erabiltzen ari dira. Eskatu erakundearen jabe bati eserlekuak gehitzeko kide gehiago gonbidatu aurretik."
     },
     "invoices": {
-      "downloadA11y": "Deskargatu {{number}} faktura",
+      "downloadA11y": "Deskargatu {{number}} faktura, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Fakturak automatikoki sortzen dira fakturazio-ziklo bakoitzean, eta hemen agertuko dira zure erakundeari faktura egin ondoren.",
       "emptyTitle": "Ez dago fakturarik",
       "invoiceFallback": "Faktura",
@@ -4206,6 +4206,8 @@
       "discoveryNoModels": "Amaiera-puntuak ez du modelorik zerrendatu. Sartu modeloak eskuz.",
       "connectionIncomplete": "Modeloak erantzun du, baina ez du amaitu. Saiatu berriro, edo egiaztatu modeloaren IDa eta protokoloa.",
       "invalidInput": "Sartu atzeko zerbitzuaren izena, baliozko goiburuak eta gutxienez ID eta izen bakarrak dituen modelo bat. Tokenen mugek zenbaki oso positiboak izan behar dute.",
+      "invalidApiKey": "API gakoak bidali ezin den karaktere bat dauka. Erabili letrak, digituak eta sinbolo estandarrak soilik, lerro-jauzirik gabe.",
+      "invalidHeaders": "Ezin da goiburu pertsonalizatu bat bidali. Egiaztatu bere izena eta erabili letrak, digituak eta sinbolo estandarrak soilik, lerro-jauzirik gabe.",
       "invalidUrl": "Sartu HTTP edo HTTPS APIaren erro bat, kredentzialik, kontsultarik edo zatirik gabe.",
       "publicHttp": "Ez dira onartzen HTTP amaierako puntu publikoak. Erabili HTTPS edo tokiko amaierako puntu pribatu bat.",
       "httpApprovalRequired": "Onartu tokiko HTTP amaierako puntu hau gorde edo konektatu aurretik.",
@@ -4702,6 +4704,7 @@
       "emptyDescription": "Kreditu-erosketak, ordainagiriak eta erabilera hemen agertuko dira.",
       "emptyTitle": "Ez dago kredituen historiarik",
       "expiredGrant": "Iraungita: {{description}}",
+      "expiredStatus": "Iraungita",
       "googlePlayReceipt": "Google Play-ko ordainagiria",
       "kind": {
         "adjustment": "Doikuntza",
@@ -4728,7 +4731,8 @@
       "receiptA11y": "Ireki honen ordainagiria: {{description}}, {{amount}}, {{date}}tik",
       "receiptUnavailable": "Ez dago ordainagiririk erosketa honetarako.",
       "retentionLimit": "Azken kreditu-historia erakusten da.",
-      "voidedGrant": "Baliogabetua: {{description}}"
+      "voidedGrant": "Baliogabetua: {{description}}",
+      "voidedStatus": "Baliogabetua"
     },
     "title": "Erosi kredituak",
     "description": "Kredituak Kilo App-en AI kodetze-saioak exekutatzeko zure Kilo saldoari gehitzen zaion behin betiko erosketa bat dira. Dendak zure kontuari kobratzen dio eta kredituak dendak ordainketa baieztatu ondoren gehitzen dira.",

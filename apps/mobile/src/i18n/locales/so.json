@@ -3692,7 +3692,7 @@
       "noSeatsAvailable": "Dhammaan kuraasta waa la wada isticmaalayaa. Ka codso milkiilaha ururka inuu kuraas ku daro ka hor intaadan casuumin xubno kale."
     },
     "invoices": {
-      "downloadA11y": "Soo deji qaansheegta {{number}}",
+      "downloadA11y": "Soo deji qaansheegta {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Qaansheegyada si toos ah ayaa loo sameeyaa xilli kasta oo biil bixin ah. Halkan ayay ka soo muuqan doonaan marka ururkaaga biil loo soo saaro.",
       "emptyTitle": "Ma jiraan qaansheegyo",
       "invoiceFallback": "Qaansheeg",
@@ -4206,6 +4206,8 @@
       "discoveryNoModels": "Liiska barta adeegga ma ku jirin moodeellada. Moodeellada gacanta ku geli.",
       "connectionIncomplete": "Moodeelka jawaabu wuu bixiyay, laakiin waanu dhammeeyn. Isku dayna mar kale, ama hubi aqoonsiga moodeelka iyo hab-maamuuska.",
       "invalidInput": "Geli magaca adeegga gadaale, madaxyo sax ah, iyo ugu yaraan hal moodeel oo leh aqoonsi iyo magac u gaar ah. Xaddidaadaha unugyada qoraalku waa inay noqdaan tirooyin dhan oo ka weyn eber.",
+      "invalidApiKey": "Furaha API waxaa ku jira xaraf aan la diri karin. Isticmaal oo keliya xarfo, tirooyin, iyo calaamado caadi ah, oo aan lahayn jajab xariiqeed.",
+      "invalidHeaders": "Madax gaar ah lama diri karo. Hubi magaciisa oo isticmaal oo keliya xarfo, tirooyin, iyo calaamado caadi ah, oo aan lahayn jajab xariiqeed.",
       "invalidUrl": "Geli URL-ka asalka API ee HTTP ama HTTPS oo aan lahayn xogta aqoonsiga, qaybta weydiinta, ama jajabka URL-ka.",
       "publicHttp": "Baraha adeegga HTTP ee dadweynaha lama oggola. Isticmaal HTTPS, ama bar adeeg oo gaar ah oo shabakadda gudaha ah.",
       "httpApprovalRequired": "Oggolow bartan adeegga HTTP ee gudaha ka hor intaadan kaydin ama ku xirmin.",
@@ -4702,6 +4704,7 @@
       "emptyDescription": "Iibsiyada kiredit-ka, rasiidhada, iyo isticmaalka halkan ayay ka muuqan doonaan.",
       "emptyTitle": "Ma jirto taariikh kiredit",
       "expiredGrant": "Waqtigiisu dhacay: {{description}}",
+      "expiredStatus": "Waqtigiisu dhacay",
       "googlePlayReceipt": "Rasiid ka yimid Google Play",
       "kind": {
         "adjustment": "Hagaajin",
@@ -4728,7 +4731,8 @@
       "receiptA11y": "Fur rasiidka {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Iibsashadan rasiid looma hayo.",
       "retentionLimit": "Waxaa la muujinayaa taariikhda kireditka ugu dambeysa.",
-      "voidedGrant": "La buriyay: {{description}}"
+      "voidedGrant": "La buriyay: {{description}}",
+      "voidedStatus": "La buriyay"
     },
     "title": "Iibso lacag adeeg",
     "description": "Lacagta adeeg waa iib hal mar ah oo lagu daraa dheelitirkaaga Kilo si loogu shaqeeyo kalfadhiyada codeynta AI ee app-ka Kilo. Dukaanku wuxuu ka qaadaa akoonkaaga, lacagta adeegna waxaa lagu daraa ka dib marka dukaanku xaqiijiyo lacag bixinta.",

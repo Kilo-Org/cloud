@@ -3760,7 +3760,7 @@
       "noSeatsAvailable": "Totes les places estan en ús. Demana a un propietari de l'organització que afegeixi places abans de convidar més membres."
     },
     "invoices": {
-      "downloadA11y": "Baixa la factura {{number}}",
+      "downloadA11y": "Baixa la factura {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Les factures es generen automàticament cada cicle de facturació i apareixeran aquí quan es facturi a l'organització.",
       "emptyTitle": "No hi ha factures",
       "invoiceFallback": "Factura",
@@ -4285,6 +4285,8 @@
       "discoveryNoModels": "El punt de connexió no ha llistat cap model. Introdueix els models manualment.",
       "connectionIncomplete": "El model ha respost però no ha acabat. Torna-ho a provar o comprova l'ID del model i el protocol.",
       "invalidInput": "Introdueix un nom de servidor, capçaleres vàlides i almenys un model amb un ID i un nom únics. Els límits de tòkens han de ser nombres enters positius.",
+      "invalidApiKey": "La clau de l'API conté un caràcter que no es pot enviar. Utilitza només lletres, dígits i símbols estàndard, sense salts de línia.",
+      "invalidHeaders": "No es pot enviar una capçalera personalitzada. Comprova'n el nom i utilitza només lletres, dígits i símbols estàndard, sense salts de línia.",
       "invalidUrl": "Introdueix una arrel d'API HTTP o HTTPS sense credencials, consulta ni fragment.",
       "publicHttp": "No es permeten punts de connexió HTTP públics. Utilitza HTTPS o un punt de connexió local privat.",
       "httpApprovalRequired": "Autoritza aquest punt de connexió HTTP local abans de desar-lo o connectar-t'hi.",
@@ -4787,6 +4789,7 @@
       "emptyDescription": "Les compres de crèdits, els rebuts i l'ús apareixeran aquí.",
       "emptyTitle": "No hi ha historial de crèdits",
       "expiredGrant": "Caducat: {{description}}",
+      "expiredStatus": "Caducat",
       "googlePlayReceipt": "Rebut de Google Play",
       "kind": {
         "adjustment": "Ajust",
@@ -4813,7 +4816,8 @@
       "receiptA11y": "Obre el rebut de {{description}}, {{amount}}, del {{date}}",
       "receiptUnavailable": "No hi ha cap rebut disponible per a aquesta compra.",
       "retentionLimit": "Es mostra l'historial de crèdits més recent.",
-      "voidedGrant": "Anul·lat: {{description}}"
+      "voidedGrant": "Anul·lat: {{description}}",
+      "voidedStatus": "Anul·lat"
     },
     "title": "Compra crèdits",
     "description": "Els crèdits són una compra única que s'afegeix al teu saldo de Kilo per executar sessions de programació amb IA a l'aplicació Kilo. La botiga cobra al teu compte i els crèdits s'afegeixen quan la botiga confirma el pagament.",

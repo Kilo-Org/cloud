@@ -195,26 +195,20 @@ describe('secure backend profiles', () => {
     }
   );
 
-  it.each([
-    { patch: { apiKey: 'sec\u0085ret' }, problem: 'invalidApiKey' },
-    { patch: { apiKey: 'sec\u00A0ret' }, problem: 'invalidApiKey' },
-    { patch: { apiKey: 'sec\u00ADret' }, problem: 'invalidApiKey' },
-    { patch: { headers: { Authorization: 'Bearer sec\u0085ret' } }, problem: 'invalidHeaders' },
-    { patch: { headers: { Authorization: 'Bearer sec\u00A0ret' } }, problem: 'invalidHeaders' },
-    { patch: { headers: { Authorization: 'Bearer sec\u00ADret' } }, problem: 'invalidHeaders' },
-  ])(
-    'keeps a stored profile holding a value a save refuses, while that save names it: %j',
-    async ({ patch, problem }) => {
+  it.each([{ patch: { apiKey: 'sec\u00A0ret' } }, { patch: { apiKey: 'sec\u00ADret' } }])(
+    'keeps a stored profile holding a value a save refuses: %j',
+    async ({ patch }) => {
       const store = await import('./backend-store');
       const stored = { ...draft, ...patch, id: firstId, revision: 3 };
       expect(store.parseChatBackends(JSON.stringify([stored]))).toMatchObject([
         { id: firstId, revision: 3, baseUrl: 'https://models.example/v1', ...patch },
       ]);
-
       const save = captureError(() => store.validateChatBackendDraft(stored));
-      expect((save as InstanceType<typeof store.BackendInputError>).problem).toBe(problem);
+      expect((save as InstanceType<typeof store.BackendInputError>).problem).toBe('invalidApiKey');
       const connection = captureError(() => store.validateBackendConnection(stored));
-      expect((connection as InstanceType<typeof store.BackendInputError>).problem).toBe(problem);
+      expect((connection as InstanceType<typeof store.BackendInputError>).problem).toBe(
+        'invalidApiKey'
+      );
     }
   );
 

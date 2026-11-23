@@ -248,12 +248,12 @@ paid or not. A platform block may use two: the first run plus one automatic retr
 the chunk's own `attempts` column across every automatic path — the chunk deferral, the
 lease-expiry reclaim, the claim itself, and the in-process empty-output retry (which spends
 the same column before it pays). Once both are spent the block fails into the ordinary failure
-path, so only the manual "Requeue retryable" requeue admits it again. A wait that made no
-model call — a lost claim, another executor's generation, a launch-fence refusal or an
-unreachable gateway — returns the attempt, so only executions that reached the model are
-counted. Unbilled throttle and catalog-load deferrals already refund their attempt and count
-their own budgets instead. A user block keeps its six automatic attempts and is never replayed
-in-process, as before.
+path, so only the manual "Requeue retryable" requeue admits it again. A user block gets exactly
+one: a user pool never re-runs an errored block on its own — not through a deferral, not through
+a lease reclaim, not through the throttle/catalog budgets and not in-process — so an errored
+user block also waits for the manual requeue. Waits that made no model call — a lost claim,
+another executor's generation, a launch-fence refusal or an unreachable gateway — return the
+attempt for both purposes, so only executions that reached the model are counted.
 
 A chunk that finds a ledgered case without output waits for it instead of failing its lane.
 It keeps its slot, so the wait cannot oversubscribe the model or slot caps, and its

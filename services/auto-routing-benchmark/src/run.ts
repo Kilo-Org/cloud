@@ -2795,6 +2795,7 @@ async function processScheduledChunk(env: Env, id: string, token: string): Promi
         }
       );
     } else if (
+      state?.purpose !== 'user' &&
       error instanceof BenchmarkThrottleError &&
       claim.throttle_deferrals < SCHEDULER_MAX_THROTTLE_DEFERRALS
     ) {
@@ -2806,6 +2807,7 @@ async function processScheduledChunk(env: Env, id: string, token: string): Promi
         { delaySeconds }
       );
     } else if (
+      state?.purpose !== 'user' &&
       error instanceof BenchmarkCatalogLoadError &&
       error.category === 'catalog_load' &&
       claim.catalog_deferrals < SCHEDULER_MAX_CATALOG_DEFERRALS

@@ -136,11 +136,13 @@ export async function saveSchedulerOverrides(
 export const SCHEDULER_ACTIVE_LEASE_MS = 20 * 60_000;
 export const SCHEDULER_QUEUE_LEASE_MS = 30 * 60_000;
 /**
- * Automatic attempts one block of a USER pool may use. The runner never replays a user
- * generation on its own, so this only bounds how often an errored block is re-admitted
- * through the queue; it keeps the six attempts it has always had.
+ * Automatic attempts one block of a USER pool may use: exactly one model call. A user pool
+ * never re-runs an errored block on its own — not through a deferral, not through a lease
+ * reclaim, and not through a redelivered queue message — so an errored user block waits for
+ * the manual "Requeue retryable" CTA. Waits that made no model call return this attempt
+ * ({@link deferNoModelCallChunk}), so a lost claim or a launch-fence refusal does not burn it.
  */
-export const SCHEDULER_MAX_USER_ATTEMPTS = 6;
+export const SCHEDULER_MAX_USER_ATTEMPTS = 1;
 /**
  * Automatic attempts one block of a PLATFORM pool may use: the first run plus one
  * automatic retry, counted on the chunk's own `attempts` across every automatic path
@@ -729,10 +731,9 @@ export async function deferChunk(
  * lost claim, another executor's generation, unreachable infrastructure, or a launch-fence
  * refusal.
  *
- * A platform block gives the claim's attempt back in the same statement, because its budget
- * counts executions of the model only — with a two-attempt cap, charging a wait would fail a
- * block that never ran. A user block keeps the counted semantics it has always had: here
- * this behaves exactly like {@link deferChunk}, so user runs are unchanged.
+ * The claim's attempt is given back in the same statement, because every block's budget counts
+ * executions of the model only: charging a wait would fail a block that never ran, and a user
+ * block has exactly one attempt to lose.
  */
 export async function deferNoModelCallChunk(
   db: D1Database,
@@ -741,7 +742,7 @@ export async function deferNoModelCallChunk(
   availableAt: number,
   onlyQueued = false
 ): Promise<void> {
-  const refund = `(CASE WHEN ${chunkIsUserSql('scheduler_chunks')} THEN 0 ELSE 1 END)`;
+  const refund = '1';
   await db
     .prepare(`UPDATE scheduler_chunks SET
     status = CASE WHEN attempts - ${refund} >= ${chunkAttemptCapSql('scheduler_chunks')}

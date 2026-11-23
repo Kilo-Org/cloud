@@ -2823,6 +2823,86 @@ describe('processJob — scheduler waits and paid-call safety', () => {
     expect(finishChunk).toHaveBeenCalledWith(env.BENCH_DB, 'chunk-1', 'token-1');
   });
 
+  /** Switches the mocked run snapshot to a user-purpose run, as the paid flow creates one. */
+  async function mockUserRunSnapshot(): Promise<void> {
+    const snapshot = await getRunWithModels(env.BENCH_DB, runId);
+    if (!snapshot) throw new Error('Run snapshot missing');
+    vi.mocked(getRunWithModels).mockResolvedValue({
+      ...snapshot,
+      run: {
+        ...snapshot.run,
+        purpose: 'user',
+        admission_marker: '2026-06-16T00:00:00.000Z',
+      },
+    });
+  }
+
+  it('never re-runs a user-pool block on a throttled provider failure', async () => {
+    // A throttle refunds a platform block's attempt and re-admits it under its own budget.
+    // A user block has exactly one model call, so the same failure is terminal: the lane
+    // records provider_unavailable and the block fails, with no deferral and no second call.
+    await mockUserRunSnapshot();
+    const claim = mockClaim();
+    vi.mocked(runDeciderCaseViaCli).mockResolvedValueOnce({
+      ...successfulCliResult,
+      text: '',
+      exitCode: 1,
+      costUsd: 0,
+      stderrTail: 'HTTP 429 rate limited',
+    });
+    vi.mocked(deferChunk).mockResolvedValueOnce('failed');
+
+    await processJob(env, deciderMessage());
+
+    expect(runDeciderCaseViaCli).toHaveBeenCalledTimes(1);
+    expect(deferThrottledChunk).not.toHaveBeenCalled();
+    expect(deferCatalogChunk).not.toHaveBeenCalled();
+    // One ordinary deferral, decided by the row's own counter, and it fails the block.
+    expect(deferChunk).toHaveBeenCalledTimes(1);
+    expect(deferChunk).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      claim.id,
+      claim.token,
+      expect.any(Number)
+    );
+    expect(recordLaneFailure).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.objectContaining({ model, failureClass: 'provider_unavailable' })
+    );
+    expect(upsertCaseResult).not.toHaveBeenCalled();
+  });
+
+  it('never re-runs a user-pool block on a catalog-load failure', async () => {
+    await mockUserRunSnapshot();
+    const claim = mockClaim();
+    vi.mocked(runDeciderCaseViaCli).mockResolvedValueOnce({
+      ...successfulCliResult,
+      text: '',
+      exitCode: 1,
+      costUsd: 0,
+      stderrTail: 'Failed to load Kilo model catalog: fetch failed',
+    });
+    vi.mocked(deferChunk).mockResolvedValueOnce('failed');
+
+    await processJob(env, deciderMessage());
+
+    expect(runDeciderCaseViaCli).toHaveBeenCalledTimes(1);
+    expect(deferCatalogChunk).not.toHaveBeenCalled();
+    expect(cooldownCatalog).not.toHaveBeenCalled();
+    expect(deferChunk).toHaveBeenCalledTimes(1);
+    expect(deferChunk).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      claim.id,
+      claim.token,
+      expect.any(Number)
+    );
+    expect(recordLaneFailure).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.objectContaining({ model, failureClass: 'catalog_load' })
+    );
+    expect(upsertCaseResult).not.toHaveBeenCalled();
+  });
+
   it.each([
     { name: 'a signal kill before any event', timedOut: false, eventCount: 0, calls: 2 },
     { name: 'a timeout', timedOut: true, eventCount: 0, calls: 1 },

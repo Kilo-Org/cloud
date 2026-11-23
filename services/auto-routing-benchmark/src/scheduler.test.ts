@@ -868,7 +868,7 @@ describe('scheduler (production migrations and real SQLite)', () => {
       chunkSize: 1,
     });
     const config = schedulerConfig('{"slots":1}');
-    const throttles = SCHEDULER_MAX_USER_ATTEMPTS + 2;
+    const throttles = SCHEDULER_MAX_PLATFORM_ATTEMPTS + 2;
     for (let throttle = 1; throttle <= throttles; throttle++) {
       const [claim] = await claimMany(db, config, 1, `throttle-${throttle}`, NOW + throttle);
       if (!claim) throw new Error(`Expected throttled claim ${throttle}`);
@@ -918,7 +918,7 @@ describe('scheduler (production migrations and real SQLite)', () => {
     expect(liveChunks(sqlite)).toEqual([]);
   });
 
-  it('keeps a user block on six lease attempts, as it always had', async () => {
+  it('fails a user block on its first lease reclaim, never re-running the model', async () => {
     insertRun(sqlite, 'user-exhausted', { purpose: 'user' });
     await scheduleRunChunks(db, {
       runId: 'user-exhausted',
@@ -937,10 +937,14 @@ describe('scheduler (production migrations and real SQLite)', () => {
       const failed = await recoverChunks(db, now);
       expect(failed).toHaveLength(attempt === SCHEDULER_MAX_USER_ATTEMPTS ? 1 : 0);
     }
+    expect(SCHEDULER_MAX_USER_ATTEMPTS).toBe(1);
     expect(storedChunks(sqlite)[0]).toMatchObject({
       status: 'failed',
       attempts: SCHEDULER_MAX_USER_ATTEMPTS,
     });
+    // The expired lease is a failure, not a second model call: nothing is claimable again.
+    expect(await claimMany(db, config, 2, 'after-user-lease', now)).toEqual([]);
+    expect(liveChunks(sqlite)).toEqual([]);
   });
 
   it('fails a platform block on its second ordinary deferral', async () => {
@@ -969,7 +973,7 @@ describe('scheduler (production migrations and real SQLite)', () => {
     expect(await claimMany(db, config, 2, 'after-platform-failure', NOW + 10)).toEqual([]);
   });
 
-  it('keeps a user block deferring through all six attempts, as before', async () => {
+  it('fails a user block on its first ordinary deferral, never re-running the model', async () => {
     insertRun(sqlite, 'user-defer', { purpose: 'user' });
     await scheduleRunChunks(db, {
       runId: 'user-defer',
@@ -985,16 +989,14 @@ describe('scheduler (production migrations and real SQLite)', () => {
       if (!claim) throw new Error(`Expected user claim ${attempt}`);
       outcomes.push(await deferChunk(db, claim.id, claim.token, NOW + attempt));
     }
-    // Six attempts, then the same sixth-attempt failure the old shared budget produced: a
-    // user block's deferral behaviour is unchanged.
-    expect(outcomes).toEqual([
-      ...Array(SCHEDULER_MAX_USER_ATTEMPTS - 1).fill('deferred'),
-      'failed',
-    ]);
+    // A deferral is the errored block's whole automatic life: its single model call is spent,
+    // so the block fails instead of being re-admitted, and only the manual CTA brings it back.
+    expect(outcomes).toEqual(['failed']);
     expect(storedChunks(sqlite)[0]).toMatchObject({
       status: 'failed',
       attempts: SCHEDULER_MAX_USER_ATTEMPTS,
     });
+    expect(await claimMany(db, config, 2, 'after-user-defer', NOW + 10)).toEqual([]);
   });
 
   it('does not spend a platform attempt on a wait that never reached the model', async () => {

@@ -310,7 +310,7 @@ async function reportWebhookCreditEvent(
   const cardFingerprint =
     event.cardFingerprint ??
     (fingerprintChargeId ? await bouncerCardFingerprintForChargeId(fingerprintChargeId) : null);
-  // The transaction holds the user-row lock the enqueue's soft-delete check takes.
+  // The transaction holds the lock the enqueue takes on the attributed account's row.
   await db.transaction(tx =>
     enqueueCreditEvent(tx, {
       ...event,

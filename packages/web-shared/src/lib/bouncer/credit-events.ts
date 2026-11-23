@@ -65,17 +65,19 @@ export const CREDIT_EVENT_CLIENT_FIELDS = [
 ] as const;
 
 /**
- * Enqueues one credit event into the durable outbox. For a personal event, the soft-delete check
- * locks the user row `FOR UPDATE`, so it must run inside a transaction (the callers pass
+ * Enqueues one credit event into the durable outbox. The attributed account's row is locked on
+ * every event, so it must run inside a transaction (the callers pass
  * `db.transaction` or an open transaction) for the lock to hold; the
  * `BouncerCreditEventOutboxTransaction` parameter makes a bare client a compile error, so the lock
- * cannot be reduced to a single statement by accident. That serializes the enqueue insert against a
- * concurrent `softDeleteUser` (which updates the same row) at the database boundary, so an in-flight
- * late webhook cannot insert after the deletion commits; it does not undo a delivery that already
- * happened, and the drainer rechecks the owner before sending a personal event. Passing the caller's
- * transaction also makes the insert atomic with the primary write. A DB error propagates, so the
- * caller can let the payment or webhook provider retry instead of losing the report. The insert is
- * idempotent on `(eventId, event_type)`.
+ * cannot be reduced to a single statement by accident. A personal event locks that row `FOR UPDATE`
+ * and is skipped when the account is gone/deleting; an organization event locks it `FOR SHARE` and
+ * is still enqueued, with the attributed client's fields withheld. Either lock serializes the
+ * enqueue insert against a concurrent `softDeleteUser` (which updates the same row) at the database
+ * boundary, so an in-flight late webhook cannot insert after the deletion commits; it does not undo
+ * a delivery that already happened, and the drainer rechecks the owner before sending a personal
+ * event. Passing the caller's transaction also makes the insert atomic with the primary write. A DB
+ * error propagates, so the caller can let the payment or webhook provider retry instead of losing
+ * the report. The insert is idempotent on `(eventId, event_type)`.
  *
  * The row keeps the raw `userId` (so a soft delete can find it by the real user id). `event_id` is
  * `bouncerWireEventId(event.eventId)` — the exact id when within bouncer's 128-character limit,
@@ -94,7 +96,11 @@ export async function enqueueCreditEvent(
   // in `userId`, so the `FOR UPDATE` lock serializes the insert against a concurrent soft delete.
   // An organization event's subject is the organization, which `withOrganizationPayer` resolves
   // to the family payer; its `userId` is attribution only, so the row is always enqueued and the
-  // attributed client's fields are withheld while that account is gone or deleting.
+  // attributed client's fields are withheld while that account is gone or deleting. That branch
+  // takes `FOR SHARE` for the same serialization: a concurrent soft delete of the attributed
+  // account waits for this transaction, so the state read below cannot be overtaken by the cleanup
+  // that deletes the account's outbox rows. Shared locks do not conflict with each other, so two
+  // organization enqueues attributed to one account still run together.
   let attributedAccountGone = false;
   if (!event.orgId) {
     const [owner] = await database
@@ -115,7 +121,8 @@ export async function enqueueCreditEvent(
       .select({ blockedReason: kilocode_users.blocked_reason })
       .from(kilocode_users)
       .where(eq(kilocode_users.id, event.userId))
-      .limit(1);
+      .limit(1)
+      .for('share');
     attributedAccountGone = Boolean(
       attributedAccount && isGoneOrDeletingBlockedReason(attributedAccount.blockedReason)
     );

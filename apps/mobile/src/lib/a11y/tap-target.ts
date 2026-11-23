@@ -18,6 +18,16 @@ export const MIN_TAP_TARGET_DP = 28;
 export const TOUCH_TARGET_DP = 44;
 
 /**
+ * What a `min-h-[28px]` box lays out at on Android: density 2.625 draws whole
+ * physical pixels, so the 28dp floor rounds down to 27.8dp.
+ * {@link LINE_ACTION_HIT_SLOP} already carries 9dp a side for this reason —
+ * 27.8 + 2 * 9 = 45.8dp holds, while 8dp a side lands at 43.8dp. Every reach
+ * assertion measures from this value rather than from {@link MIN_TAP_TARGET_DP},
+ * because the declared 28dp is what makes 8dp look sufficient.
+ */
+export const FLOOR_BOX_MEASURED_DP = 27.8;
+
+/**
  * The floor a control renders on its own node at {@link TOUCH_TARGET_DP}.
  * Explicit px, because NativeWind's rem is 14pt here — no scale step lands on
  * 44pt (`min-h-12` measures 42).
@@ -639,15 +649,19 @@ export const INLINE_LINK_OUTER_HIT_SLOP_DP = 12;
  * Per-side vertical `hitSlop` for a {@link INLINE_LINK_BOX_CLASS} whose sentence
  * carries no second link to reach across: the consent sentence's policy link is
  * the only control in its row. `DESIGN.md:364` asks for the touch region in both
- * axes, so the vertical slop is 8: 28 + 2 * 8 = 44pt, and each side reaches
- * `(28 - 17.5) / 2 + 8 = 13.25dp` past the sentence's text line — inside the
- * free space {@link INLINE_LINK_ROW_CLASS} reserves for it.
+ * axes, and the box only carries past that target once it is measured: a
+ * `min-h-[28px]` box lays out at 27.8dp on Android, where the floor at density
+ * 2.625 rounds to whole physical pixels, so 8dp a side lands at 43.8dp. The slop
+ * is therefore 9dp, the rule {@link LINE_ACTION_HIT_SLOP} already uses:
+ * 27.8 + 2 * 9 = 45.8dp measured, 28 + 2 * 9 = 46dp as declared. Each side
+ * reaches `(28 - 17.5) / 2 + 9 = 14.25dp` past the sentence's text line — inside
+ * the free space {@link INLINE_LINK_ROW_CLASS} reserves for it.
  *
  * A sentence with two links uses {@link inlineLinkHitSlop} instead: those two
  * boxes can land on adjacent wrapped lines, where a reach toward the neighbour
  * would put both touch regions over one point.
  */
-export const INLINE_LINK_VERTICAL_HIT_SLOP_DP = 8;
+export const INLINE_LINK_VERTICAL_HIT_SLOP_DP = 9;
 
 /**
  * The vertical `hitSlop` of an inline link pointing at its neighbour link in the
@@ -663,12 +677,13 @@ export const INLINE_LINK_FACING_VERTICAL_HIT_SLOP_DP = 0;
 /**
  * The vertical `hitSlop` on the side away from the neighbour. The facing side
  * gives up its half of the reach, so the far side carries all of it:
- * 28 + 16 = 44pt, and the two vertical sides of a link still sum to
- * `2 * {@link INLINE_LINK_VERTICAL_HIT_SLOP_DP}`. That reach leaves the row's
- * free space, which is why {@link INLINE_LINK_ROW_CLASS} carries the margin its
- * neighbours need.
+ * 28 + 18 = 46dp, and the two vertical sides of a link still sum to
+ * `2 * {@link INLINE_LINK_VERTICAL_HIT_SLOP_DP}`. Measured on Android the box is
+ * 27.8dp, so the far side alone reaches 27.8 + 18 = 45.8dp and still clears
+ * {@link TOUCH_TARGET_DP}. That reach leaves the row's free space, which is why
+ * {@link INLINE_LINK_ROW_CLASS} carries the margin its neighbours need.
  */
-export const INLINE_LINK_OUTER_VERTICAL_HIT_SLOP_DP = 16;
+export const INLINE_LINK_OUTER_VERTICAL_HIT_SLOP_DP = 18;
 
 /**
  * The `hitSlop` of the legal link that sits at the given end of the sentence.
@@ -720,23 +735,23 @@ export const INLINE_LINK_LINE_GAP_CLASS = 'gap-y-[11px]';
 /**
  * The extra vertical margin the legal sentence row carries, and its class.
  *
- * With the whole 44pt vertical reach on the far side of each link
+ * With the whole vertical reach on the far side of each link
  * ({@link INLINE_LINK_OUTER_VERTICAL_HIT_SLOP_DP}), a link's region reaches
- * `(28 - {@link INLINE_LINK_SENTENCE_LINE_DP}) / 2 + 16 = 21.25dp` past the text
+ * `(28 - {@link INLINE_LINK_SENTENCE_LINE_DP}) / 2 + 18 = 23.25dp` past the text
  * line it sits on. The screen's `gap-3` gutter to the Continue button above the
- * row (and to the ghost button below it) is 10.5dp — 10.75dp short — so without
+ * row (and to the ghost button below it) is 10.5dp — 12.75dp short — so without
  * the row's own margin the region would cover most of the Continue button's
  * bottom strip and a tap there would open Terms instead of sending the code (an
  * earlier revision capped the region to avoid exactly that and lost the target).
- * The row therefore adds 11dp: 10.5 + 11 = 21.5dp of free space each side, which
+ * The row therefore adds 13dp: 10.5 + 13 = 23.5dp of free space each side, which
  * holds the whole region clear of both neighbours. The row itself still lays out
  * on one text line; the margin is the extra gutter the target needs, and it is
  * part of the row's box, not its height. The wrapped-line gap
  * ({@link INLINE_LINK_LINE_GAP_CLASS}) is separate from it: this margin is
  * outside the row, that gap is between the row's own lines.
  */
-export const INLINE_LINK_ROW_MARGIN_DP = 11;
-export const INLINE_LINK_ROW_CLASS = 'my-[11px] gap-y-[11px]';
+export const INLINE_LINK_ROW_MARGIN_DP = 13;
+export const INLINE_LINK_ROW_CLASS = 'my-[13px] gap-y-[11px]';
 
 /**
  * The box a text action renders at the end of a line of copy — the code
@@ -750,13 +765,13 @@ export const INLINE_LINK_ROW_CLASS = 'my-[11px] gap-y-[11px]';
  * 28dp box is the audit floor ({@link MIN_TAP_TARGET_DP}) and reaches
  * `(28 - 14) / 2 = 7dp` past the line, which that gap absorbs. The vertical
  * slop carries the rest of the 44pt target, as {@link INLINE_LINK_BOX_CLASS}
- * does for prose; it is 9dp rather than the inline link's 8dp because a
- * `min-h-[28px]` box measures 27.8dp on Android, and 8dp a side would then
- * land a fifth of a dp short of 44. The horizontal side is 5dp for the same
- * reason: a call site keeps a 36dp minimum width for a short label in another
- * locale, and that floor can lay out at about 35.81dp, so 4dp a side reached
- * 43.81dp. 36 + 5 + 5 = 46dp holds the reach past 44 whatever the pixel
- * rounding does.
+ * does for prose; it is 9dp because a `min-h-[28px]` box measures 27.8dp on
+ * Android, and 8dp a side would then land a fifth of a dp short of 44 — the same
+ * measurement that sets {@link INLINE_LINK_VERTICAL_HIT_SLOP_DP}. The
+ * horizontal side is 5dp for the same reason: a call site keeps a 36dp minimum
+ * width for a short label in another locale, and that floor can lay out at
+ * about 35.81dp, so 4dp a side reached 43.81dp. 36 + 5 + 5 = 46dp holds the
+ * reach past 44 whatever the pixel rounding does.
  */
 export const LINE_ACTION_BOX_CLASS = 'min-h-[28px] -my-[7px]';
 

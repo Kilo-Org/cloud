@@ -1053,6 +1053,10 @@ export function NewSessionScreenBody() {
       }
     }
     promptRef.current = '';
+    // The published state follows the cleared ref, so the append fast path in
+    // `handlePromptChange` never reads a stale "has text" answer.
+    publishedHasPromptRef.current = false;
+    setHasPrompt(false);
     // A staged payload a failed delivery put back is abandoned with the draft.
     if (shareId !== undefined) {
       clearSharePayload(shareId);

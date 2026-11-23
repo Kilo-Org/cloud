@@ -247,4 +247,23 @@ describe('NewSessionPrompt content size reports', () => {
     expect(findPromptInput(renderer).props.scrollEnabled).toBe(true);
     renderer.unmount();
   });
+
+  it('re-derives the gate when the field fit changes and no new report arrives', async () => {
+    const renderer = await mountPrompt();
+
+    // A height between the one-line and three-line floors: closed at three
+    // lines, past the floor of a one-line fit.
+    const betweenFloors = resolveNewSessionPromptHeight(NEW_SESSION_PROMPT_LINE_HEIGHT, 1) + 12;
+    reportContentHeight(renderer, betweenFloors);
+    expect(findPromptInput(renderer).props.scrollEnabled).toBe(false);
+
+    // The keyboard opening shrinks the field's fit; the input reports nothing,
+    // so only the fit change can reopen the gate.
+    act(() => {
+      renderer.update(createElement(NewSessionPrompt, makeProps({ lineCount: 1 })));
+    });
+
+    expect(findPromptInput(renderer).props.scrollEnabled).toBe(true);
+    renderer.unmount();
+  });
 });

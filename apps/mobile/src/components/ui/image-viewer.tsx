@@ -1,4 +1,4 @@
-import { AlertCircle, Share, X } from '@/components/ui/icons';
+import { AlertCircle, RotateCcw, Share, X } from '@/components/ui/icons';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { type LayoutChangeEvent, Platform, Pressable, View } from 'react-native';
@@ -10,10 +10,10 @@ import { scheduleOnRN } from 'react-native-worklets';
 
 import { CenteredState } from '@/components/centered-state';
 import { StateSurface } from '@/components/centered-state-surface';
+import { StateAction } from '@/components/empty-state';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Image } from '@/components/ui/image';
 import { Sheet } from '@/components/ui/sheet';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 /**
  * The app's full-screen image viewer: pinch, pan, double-tap and swipe-to-
@@ -34,6 +34,29 @@ const VIEWER_MAX_SCALE = 5;
 
 /** Fills the viewer area; `alignSelf: 'stretch'` overrides the parent's centering. */
 const ZOOM_SURFACE_STYLE = { flex: 1, alignSelf: 'stretch' } as const;
+
+/**
+ * The viewer surface: the exact value `bg-black` paints. Fixed rather than the
+ * `background` token because the viewer paints one black surface in every
+ * colour scheme — a light-mode sheet behind the canvas would flash white.
+ */
+const VIEWER_SURFACE = '#000000';
+
+/**
+ * The chrome glyph ink on that surface: fixed rather than `foreground` because
+ * theme ink is scheme-dependent, and light `--foreground` measures 1.1:1 on
+ * black.
+ */
+const VIEWER_INK = '#FFFFFF';
+
+/**
+ * Only a remote image can come back different: a local, content or data URI
+ * re-reads the same bytes, so a retry could not change the result.
+ */
+function isRetryableUri(uri: string): boolean {
+  const lower = uri.toLowerCase();
+  return lower.startsWith('http://') || lower.startsWith('https://');
+}
 
 type ImageViewerProps = {
   visible: boolean;
@@ -56,7 +79,6 @@ export function ImageViewer({
   onClose,
   onShare,
 }: ImageViewerProps) {
-  const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
   // iOS presents the sheet below the status bar; Android expands it over the
@@ -97,6 +119,12 @@ export function ImageViewer({
     setImageError(false);
   }, [visible]);
 
+  // The zoom surface is unmounted while `imageError` is true, so clearing it
+  // remounts `Image` and re-fetches the same URI.
+  const retryImage = useCallback(() => {
+    setImageError(false);
+  }, []);
+
   const handleSwipe = useCallback(
     (direction: 'up' | 'down' | 'left' | 'right') => {
       // One image per viewer, so a horizontal swipe has nothing to move to.
@@ -114,11 +142,11 @@ export function ImageViewer({
       onClose={onClose}
       snapPoints={VIEWER_SNAP_POINTS}
       showHandle={false}
-      background={colors.background}
+      background={VIEWER_SURFACE}
     >
-      <StateSurface className="flex-1 bg-background">
+      <StateSurface className="flex-1 bg-black">
         <View
-          className="border-b border-border bg-background"
+          className="bg-black"
           style={{ paddingTop: headerTopInset, height: headerTopInset + 56 }}
         >
           <View
@@ -127,22 +155,22 @@ export function ImageViewer({
           >
             <Pressable
               onPress={onClose}
-              className="min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-md bg-secondary active:opacity-70"
+              className="min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-md bg-neutral-800 active:opacity-70"
               accessibilityRole="button"
               accessibilityLabel={t('imageViewer.close', { filename })}
             >
-              <X size={20} color={colors.foreground} />
+              <X size={20} color={VIEWER_INK} />
             </Pressable>
             {onShare !== undefined ? (
               <Pressable
                 onPress={onShare}
                 disabled={sharing || uri === null}
                 accessibilityState={{ disabled: uri === null, busy: sharing }}
-                className="min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-md bg-secondary active:opacity-70 disabled:opacity-50"
+                className="min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-md bg-neutral-800 active:opacity-70 disabled:opacity-50"
                 accessibilityRole="button"
                 accessibilityLabel={t('imageViewer.share', { filename })}
               >
-                <Share size={20} color={colors.foreground} />
+                <Share size={20} color={VIEWER_INK} />
               </Pressable>
             ) : null}
           </View>
@@ -180,12 +208,17 @@ export function ImageViewer({
             ) : null}
             {uri !== null && imageError ? (
               <CenteredState className="w-full">
-                <View className="flex-row items-center justify-center gap-2 px-6">
-                  <AlertCircle size={14} color="#ffffff" />
+                <View className="items-center gap-4 px-6">
+                  <View className="h-14 w-14 items-center justify-center rounded-full bg-neutral-800">
+                    <AlertCircle size={24} color={VIEWER_INK} strokeWidth={1.5} />
+                  </View>
                   <AccessibleStatus
                     message={t('common.imageUnavailable')}
-                    className="text-xs text-white"
+                    className="max-w-sm text-center text-base text-neutral-300"
                   />
+                  {isRetryableUri(uri) ? (
+                    <StateAction label={t('common.retry')} icon={RotateCcw} onPress={retryImage} />
+                  ) : null}
                 </View>
               </CenteredState>
             ) : null}

@@ -12,6 +12,8 @@ vi.mock('react-native', () => ({
   BackHandler: { addEventListener: vi.fn(() => ({ remove: () => undefined })) },
   I18nManager: { isRTL: false, doLeftAndRightSwapInRTL: true },
   Platform: { OS: 'android' as const },
+  // The real Sheet reads theme colours for its handle and backdrop.
+  useColorScheme: () => 'light',
   Pressable: 'Pressable',
   View: 'View',
 }));
@@ -21,6 +23,17 @@ vi.mock('@/components/ui/icons', () => ({
   Share: 'Share',
   X: 'X',
   AlertCircle: 'AlertCircle',
+  RotateCcw: 'RotateCcw',
+}));
+// The real action is a `Button`; a bare Pressable keeps the press observable
+// without loading the button layer into this suite.
+vi.mock('@/components/empty-state', () => ({
+  StateAction: (props: { label: string; onPress?: () => void; testID?: string }) =>
+    createElement('Pressable', {
+      accessibilityLabel: props.label,
+      onPress: props.onPress,
+      testID: props.testID,
+    }),
 }));
 vi.mock('react-native-gesture-handler', () => ({
   GestureHandlerRootView: 'GestureHandlerRootView',
@@ -38,9 +51,8 @@ vi.mock('react-native-safe-area-context', () => ({
 }));
 vi.mock('@/components/ui/image', () => ({ Image: 'Image' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
-vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({ foreground: '#111827', mutedForeground: '#6b7280' }),
-}));
+
+const REMOTE_URI = 'https://example.invalid/photo.png';
 
 function findByType(
   root: TestRenderer.ReactTestInstance,
@@ -50,17 +62,20 @@ function findByType(
 }
 
 /**
- * The outer header container: it keeps the border, background, and the fixed
+ * The outer header container: it carries the viewer surface and the fixed
  * vertical geometry (`paddingTop`/`height`); the controls row lives in an inner
- * wrapper that carries only the landscape side insets.
+ * wrapper that carries only the landscape side insets. The canvas `View` also
+ * paints `bg-black`, but inside a longer class list and without a `style`.
  */
 function findHeaderContainer(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
   return root.find(
     node =>
       typeof node.type === 'string' &&
       (node.type as string) === 'View' &&
-      typeof node.props.className === 'string' &&
-      node.props.className.includes('border-b')
+      node.props.className === 'bg-black' &&
+      typeof node.props.style === 'object' &&
+      node.props.style !== null &&
+      'height' in node.props.style
   );
 }
 
@@ -68,12 +83,7 @@ function pressableByLabel(
   node: TestRenderer.ReactTestInstance,
   label: string
 ): TestRenderer.ReactTestInstance | undefined {
-  return node.find(
-    child =>
-      typeof child.type === 'string' &&
-      (child.type as string) === 'Pressable' &&
-      child.props.accessibilityLabel === label
-  );
+  return findByType(node, 'Pressable').find(child => child.props.accessibilityLabel === label);
 }
 
 function findRowWrapper(header: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
@@ -112,52 +122,66 @@ async function mountViewer(
   return renderer;
 }
 
+async function failDecode(renderer: TestRenderer.ReactTestRenderer): Promise<void> {
+  const image = findByType(renderer.root, 'Image')[0];
+  if (!image) {
+    throw new Error('viewer Image missing');
+  }
+  await act(async () => {
+    await Promise.resolve();
+    (image.props.onError as () => void)();
+  });
+}
+
+function retryActions(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance[] {
+  return findByType(root, 'Pressable').filter(node => node.props.accessibilityLabel === 'Retry');
+}
+
 describe('ImageViewer mounted', () => {
   beforeEach(() => {
     Object.assign(safeArea, { top: 0, bottom: 0, left: 0, right: 0 });
   });
 
-  it('shows the Image unavailable fallback and keeps Share enabled on decode failure', async () => {
+  it('shows the Image unavailable state on a remote decode failure, retries it, and keeps Share enabled', async () => {
     const onShare = vi.fn<() => void>();
-    const renderer = await mountViewer({ onShare });
+    const renderer = await mountViewer({ uri: REMOTE_URI, onShare });
 
-    const images = findByType(renderer.root, 'Image');
-    expect(images).toHaveLength(1);
-
-    const image = images[0];
-    if (!image) {
-      throw new Error('viewer Image missing');
-    }
-    await act(async () => {
-      await Promise.resolve();
-      (image.props.onError as () => void)();
-    });
+    expect(findByType(renderer.root, 'Image')).toHaveLength(1);
+    await failDecode(renderer);
 
     expect(findByType(renderer.root, 'Image')).toHaveLength(0);
     expect(findByType(renderer.root, 'StateSurface')).toHaveLength(1);
     expect(findByType(renderer.root, 'CenteredState')).toHaveLength(1);
+
+    // The glyph is the fixed light ink on the neutral disc, not theme ink.
     const alert = findByType(renderer.root, 'AlertCircle');
     expect(alert).toHaveLength(1);
-    expect(alert[0]?.props.color).toBe('#ffffff');
-    const unavailable = findByType(renderer.root, 'Text').filter(
-      node => node.props.children === 'Image unavailable'
-    );
-    expect(unavailable).toHaveLength(1);
-    expect(unavailable[0]?.props.className).toContain('text-white');
+    expect(alert[0]?.props.size).toBe(24);
+    expect(alert[0]?.props.color).toBe('#FFFFFF');
 
-    // The row announces through AccessibleStatus: one polite live region on
-    // Android carrying the same white text, not the destructive error tone.
+    const disc = findByType(renderer.root, 'View').find(
+      node =>
+        typeof node.props.className === 'string' &&
+        node.props.className.includes('rounded-full') &&
+        node.props.className.includes('h-14 w-14')
+    );
+    expect(disc).toBeDefined();
+    expect(disc?.props.className).toContain('bg-neutral-800');
+
+    // The copy announces through AccessibleStatus: one polite live region on
+    // Android carrying the muted body ink, not the destructive error tone.
     const statuses = renderer.root.findAll(node => node.type === AccessibleStatus);
     expect(statuses).toHaveLength(1);
-    const fallbackStatus = statuses[0];
-    if (!fallbackStatus) {
-      throw new Error('fallback AccessibleStatus not found');
+    const unavailableStatus = statuses[0];
+    if (!unavailableStatus) {
+      throw new Error('unavailable AccessibleStatus not found');
     }
-    expect(fallbackStatus.props.message).toBe('Image unavailable');
-    const announced = findByType(fallbackStatus, 'Text');
+    expect(unavailableStatus.props.message).toBe('Image unavailable');
+    const announced = findByType(unavailableStatus, 'Text');
     expect(announced).toHaveLength(1);
     expect(announced[0]?.props.accessibilityLiveRegion).toBe('polite');
-    expect(announced[0]?.props.className).toContain('text-white');
+    expect(announced[0]?.props.className).toContain('text-base');
+    expect(announced[0]?.props.className).toContain('text-neutral-300');
     expect(announced[0]?.props.className).not.toContain('text-destructive');
 
     const share = findByType(renderer.root, 'Pressable').find(
@@ -169,20 +193,33 @@ describe('ImageViewer mounted', () => {
     expect(share?.props.disabled).toBe(false);
     expect(share?.props.accessibilityState).toEqual({ disabled: false, busy: false });
 
+    // Retry remounts the unmounted zoom surface: the same remote URI is fetched
+    // again and every state node clears.
+    const retryButtons = retryActions(renderer.root);
+    expect(retryButtons).toHaveLength(1);
+    const retry = retryButtons[0];
+    if (!retry) {
+      throw new Error('retry action missing');
+    }
+    await act(async () => {
+      await Promise.resolve();
+      (retry.props.onPress as () => void)();
+    });
+
+    const remounted = findByType(renderer.root, 'Image');
+    expect(remounted).toHaveLength(1);
+    expect(remounted[0]?.props.source).toEqual({ uri: REMOTE_URI });
+    expect(findByType(renderer.root, 'AlertCircle')).toHaveLength(0);
+    expect(retryActions(renderer.root)).toHaveLength(0);
+    expect(renderer.root.findAll(node => node.type === AccessibleStatus)).toHaveLength(0);
+
     renderer.unmount();
   });
 
   it('shows the unavailable row immediately on decode error and clears it in the same commit a renewed uri lands', async () => {
     const renderer = await mountViewer({});
 
-    const image = findByType(renderer.root, 'Image')[0];
-    if (!image) {
-      throw new Error('viewer Image missing');
-    }
-    await act(async () => {
-      await Promise.resolve();
-      (image.props.onError as () => void)();
-    });
+    await failDecode(renderer);
 
     expect(findByType(renderer.root, 'Image')).toHaveLength(0);
     expect(
@@ -208,6 +245,18 @@ describe('ImageViewer mounted', () => {
     expect(
       findByType(renderer.root, 'Text').filter(node => node.props.children === 'Image unavailable')
     ).toHaveLength(0);
+
+    renderer.unmount();
+  });
+
+  it('offers no retry for a local file uri, which would re-read the same bytes', async () => {
+    const renderer = await mountViewer({ uri: 'file:///cache/photo.png' });
+
+    await failDecode(renderer);
+
+    expect(findByType(renderer.root, 'Image')).toHaveLength(0);
+    expect(findByType(renderer.root, 'AlertCircle')).toHaveLength(1);
+    expect(retryActions(renderer.root)).toHaveLength(0);
 
     renderer.unmount();
   });
@@ -242,11 +291,25 @@ describe('ImageViewer mounted', () => {
     // override the wrapper's `px-4` className gutter).
     const header = findHeaderContainer(renderer.root);
     expect(header.props.style).toEqual({ paddingTop: 0, height: 56 });
+    // The header band and the canvas are one surface, so the container paints
+    // only the viewer black — no divider and no theme background.
+    expect(header.props.className).toBe('bg-black');
     const wrapper = findRowWrapper(header);
     expect(wrapper.props.style).toBeUndefined();
     expect(wrapper.props.className).toContain('px-4');
     expect(wrapper.props.className).toContain('flex-row');
     expect(wrapper.props.className).toContain('justify-between');
+
+    // Both chips are the fixed neutral step, and both glyphs the fixed light
+    // ink, in either colour scheme.
+    const close = pressableByLabel(wrapper, 'Close photo.png');
+    const share = pressableByLabel(wrapper, 'Share photo.png');
+    expect(close?.props.className).toContain('bg-neutral-800');
+    expect(close?.props.className).not.toContain('bg-secondary');
+    expect(share?.props.className).toContain('bg-neutral-800');
+    expect(share?.props.className).not.toContain('bg-secondary');
+    expect(findByType(wrapper, 'X')[0]?.props.color).toBe('#FFFFFF');
+    expect(findByType(wrapper, 'Share')[0]?.props.color).toBe('#FFFFFF');
 
     renderer.unmount();
   });

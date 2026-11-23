@@ -145,6 +145,11 @@ export function useAgentSessionSearch(options: UseAgentSessionSearchOptions) {
     dateGroups,
     timeZone,
     isPending: query.isPending,
+    // A paused search (offline, no cached page of its own) is neither loading
+    // nor errored: it has no rows and will not resolve until the network
+    // returns, so callers must offer a retry instead of a skeleton that never
+    // settles.
+    isPaused: query.isPaused,
     // Header-level fetch only — footer spinner has its own flag.
     isFetching: query.isFetching && !query.isFetchingNextPage,
     isError: query.isError,

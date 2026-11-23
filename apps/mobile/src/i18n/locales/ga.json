@@ -2507,6 +2507,13 @@
       "attachmentUploadingToStart": "Tá ceangaltán fós á uaslódáil. Bain é chun tosú gan é.",
       "modelMissingToStart": "Roghnaigh samhail chun tosú.",
       "staleRepositoryToStart": "Níl an stór roghnaithe ar fáil a thuilleadh. Roghnaigh stór arís chun tosú.",
+      "modelNeedsCreditsToStart": "Teastaíonn creidmheasanna ón tsamhail seo. Roghnaigh samhail shaor in aisce chun tosú.",
+      "modelNeedsCreditsPinnedToStart": "Teastaíonn creidmheasanna ó shamhail an ghníomhaire seo. Cuir creidmheasanna leis nó roghnaigh gníomhaire eile.",
+      "eligibility": {
+        "limitedTitle": "Samhlacha saora in aisce ar fáil",
+        "balance": "Tá d'iarmhéid {{amount}}. Tá samhlacha saora in aisce ar fáil fós.",
+        "unavailable": "Níorbh fhéidir do iarmhéid a sheiceáil."
+      },
       "promptPlaceholder": "Cad ar mhaith leat oibriú air?",
       "couldNotLoadModels": "Níorbh fhéidir na samhlacha a lódáil.",
       "prefillRepoAndModelUnavailable": "Níl stór ná samhail an tseisiúin bhunaidh ar fáil a thuilleadh. Roghnaigh stór agus samhail thíos.",

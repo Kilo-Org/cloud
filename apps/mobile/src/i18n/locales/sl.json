@@ -2458,6 +2458,13 @@
       "attachmentUploadingToStart": "Priponka se še nalaga. Odstrani jo, da začneš brez nje.",
       "modelMissingToStart": "Izberi model za začetek.",
       "staleRepositoryToStart": "Izbrano skladišče ni več na voljo. Znova izberi skladišče za začetek.",
+      "modelNeedsCreditsToStart": "Ta model potrebuje kredite. Izberi brezplačni model za začetek.",
+      "modelNeedsCreditsPinnedToStart": "Model tega agenta potrebuje kredite. Dodaj kredite ali izberi drugega agenta.",
+      "eligibility": {
+        "limitedTitle": "Na voljo so brezplačni modeli",
+        "balance": "Tvoje stanje je {{amount}}. Brezplačni modeli so še vedno na voljo.",
+        "unavailable": "Tvojega stanja ni bilo mogoče preveriti."
+      },
       "promptPlaceholder": "Česa se želiš lotiti?",
       "couldNotLoadModels": "Modelov ni bilo mogoče naložiti.",
       "prefillRepoAndModelUnavailable": "Skladišče in model prvotne seje nista več na voljo. Izberi ju spodaj.",

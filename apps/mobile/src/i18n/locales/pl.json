@@ -1844,6 +1844,13 @@
       "attachmentUploadingToStart": "Załącznik wciąż się przesyła. Usuń go, aby rozpocząć bez niego.",
       "modelMissingToStart": "Wybierz model, aby rozpocząć.",
       "staleRepositoryToStart": "Wybrane repozytorium nie jest już dostępne. Wybierz repozytorium ponownie, aby rozpocząć.",
+      "modelNeedsCreditsToStart": "Ten model wymaga środków. Wybierz bezpłatny model, aby rozpocząć.",
+      "modelNeedsCreditsPinnedToStart": "Model tego agenta wymaga środków. Doładuj konto lub wybierz innego agenta.",
+      "eligibility": {
+        "limitedTitle": "Dostępne bezpłatne modele",
+        "balance": "Twoje saldo wynosi {{amount}}. Bezpłatne modele są nadal dostępne.",
+        "unavailable": "Nie udało się sprawdzić salda."
+      },
       "promptPlaceholder": "Nad czym chcesz pracować?",
       "couldNotLoadModels": "Nie udało się wczytać modeli.",
       "prefillRepoAndModelUnavailable": "Repozytorium i model z pierwotnej sesji nie są już dostępne. Wybierz je poniżej.",

@@ -2360,6 +2360,13 @@
       "attachmentUploadingToStart": "Kei te tukuna ake tonu tētahi whakapirihanga. Tangohia kia tīmata ai me te kore whakapirihanga.",
       "modelMissingToStart": "Kōwhiria he tauira hei tīmata.",
       "staleRepositoryToStart": "Kāore te putunga waehere i kōwhiria e wātea ana ināianei. Kōwhiria anō he putunga waehere hei tīmata.",
+      "modelNeedsCreditsToStart": "E hiahia ana tēnei tauira ki ngā moni tōmua. Kōwhiria he tauira koreutu hei tīmata.",
+      "modelNeedsCreditsPinnedToStart": "E hiahia ana te tauira whakakapi o tēnei māngai ki ngā moni tōmua. Tāpirihia he moni tōmua, kōwhiria rānei he māngai kē atu.",
+      "eligibility": {
+        "limitedTitle": "Ngā tauira koreutu e wātea ana",
+        "balance": "Ko tō toenga {{amount}}. Kei te wātea tonu ngā tauira koreutu.",
+        "unavailable": "Kāore i taea te tirotiro i tō toenga."
+      },
       "promptPlaceholder": "He aha tāu e hiahia ana ki te mahi?",
       "couldNotLoadModels": "Kāore i taea te uta i ngā tauira",
       "prefillRepoAndModelUnavailable": "Kāore te putunga waehere me te tauira o te wātū taketake e wātea ana ināianei. Kōwhiria he mea kē ki raro nei.",

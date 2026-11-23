@@ -2409,6 +2409,13 @@
       "attachmentUploadingToStart": "Pielikums vēl tiek augšupielādēts. Lai sāktu bez tā, noņem to.",
       "modelMissingToStart": "Lai sāktu, izvēlies modeli.",
       "staleRepositoryToStart": "Izvēlētais repozitorijs vairs nav pieejams. Lai sāktu, vēlreiz izvēlies repozitoriju.",
+      "modelNeedsCreditsToStart": "Šim modelim nepieciešami kredīti. Lai sāktu, izvēlies bezmaksas modeli.",
+      "modelNeedsCreditsPinnedToStart": "Šī aģenta modelim nepieciešami kredīti. Papildini kredītus vai izvēlies citu aģentu.",
+      "eligibility": {
+        "limitedTitle": "Pieejami bezmaksas modeļi",
+        "balance": "Tavs atlikums ir {{amount}}. Bezmaksas modeļi joprojām ir pieejami.",
+        "unavailable": "Neizdevās pārbaudīt tavu atlikumu."
+      },
       "promptPlaceholder": "Pie kā vēlētos strādāt?",
       "couldNotLoadModels": "Neizdevās ielādēt modeļus.",
       "prefillRepoAndModelUnavailable": "Sākotnējās sesijas repozitorijs un modelis vairs nav pieejami. Izvēlies tos zemāk.",

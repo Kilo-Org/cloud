@@ -2409,6 +2409,13 @@
       "attachmentUploadingToStart": "Un atașament încă se încarcă. Elimină-l pentru a începe fără el.",
       "modelMissingToStart": "Selectează un model pentru a începe.",
       "staleRepositoryToStart": "Depozitul selectat nu mai este disponibil. Selectează din nou un depozit pentru a începe.",
+      "modelNeedsCreditsToStart": "Acest model necesită credite. Alege un model gratuit pentru a începe.",
+      "modelNeedsCreditsPinnedToStart": "Modelul acestui agent necesită credite. Adaugă credite sau alege un alt agent.",
+      "eligibility": {
+        "limitedTitle": "Modele gratuite disponibile",
+        "balance": "Soldul tău este {{amount}}. Modelele gratuite sunt încă disponibile.",
+        "unavailable": "Nu s-a putut verifica soldul."
+      },
       "promptPlaceholder": "La ce vrei să lucrezi?",
       "couldNotLoadModels": "Nu s-au putut încărca modelele.",
       "prefillRepoAndModelUnavailable": "Depozitul și modelul sesiunii inițiale nu mai sunt disponibile. Alege altele mai jos.",

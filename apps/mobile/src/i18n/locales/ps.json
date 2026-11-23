@@ -2360,6 +2360,13 @@
       "attachmentUploadingToStart": "یوه ضمیمه لا پورته کېږي. پرته له دې د پیل لپاره یې لرې کړئ.",
       "modelMissingToStart": "د پیل لپاره یو ماډل وټاکئ.",
       "staleRepositoryToStart": "ټاکل شوی زېرمتون نور نشته. د پیل لپاره بیا یو زېرمتون وټاکئ.",
+      "modelNeedsCreditsToStart": "دا ماډل کریډیټ ته اړتیا لري. د پیل لپاره یو وړیا ماډل وټاکئ.",
+      "modelNeedsCreditsPinnedToStart": "د دې اجنټ موډل کریډیټ ته اړتیا لري. کریډیټ زیات کړئ یا بل اجنټ وټاکئ.",
+      "eligibility": {
+        "limitedTitle": "وړیا ماډلونه شته",
+        "balance": "ستاسو بیلانس {{amount}} دی. وړیا ماډلونه لا هم شته.",
+        "unavailable": "ستاسو بیلانس ونه څېړل شو."
+      },
       "promptPlaceholder": "غواړئ پر څه کار وکړئ؟",
       "couldNotLoadModels": "ماډلونه بار نه شول.",
       "prefillRepoAndModelUnavailable": "د اصلي ناستې زېرمتون او ماډل نور د لاسرسي وړ نه دي. لاندې یې غوره کړئ.",

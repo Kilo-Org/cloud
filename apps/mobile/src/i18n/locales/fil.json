@@ -2360,6 +2360,13 @@
       "attachmentUploadingToStart": "Nilo-load pa ang isang kalakip. Alisin ito para magsimula nang wala ito.",
       "modelMissingToStart": "Pumili ng modelo para magsimula.",
       "staleRepositoryToStart": "Hindi na available ang napiling imbakan ng code. Pumili ulit ng imbakan ng code para magsimula.",
+      "modelNeedsCreditsToStart": "Kailangan ng kredito ang modelong ito. Pumili ng libreng modelo para magsimula.",
+      "modelNeedsCreditsPinnedToStart": "Kailangan ng kredito ang modelo ng ahenteng ito. Magdagdag ng kredito o pumili ng ibang ahente.",
+      "eligibility": {
+        "limitedTitle": "Mga libreng modelong available",
+        "balance": "Ang iyong balanse ay {{amount}}. May mga libreng modelo pa rin.",
+        "unavailable": "Hindi ma-check ang iyong balanse."
+      },
       "promptPlaceholder": "Ano ang gusto mong gawin?",
       "couldNotLoadModels": "Hindi ma-load ang mga modelo.",
       "prefillRepoAndModelUnavailable": "Hindi na magamit ang imbakan ng code at modelo ng orihinal na sesyon. Pumili ng mga kapalit sa ibaba.",

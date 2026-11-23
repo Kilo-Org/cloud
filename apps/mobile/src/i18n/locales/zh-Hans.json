@@ -1776,6 +1776,13 @@
       "attachmentUploadingToStart": "附件仍在上传。移除它即可不带附件开始。",
       "modelMissingToStart": "选择一个模型以开始。",
       "staleRepositoryToStart": "所选仓库已不可用。请重新选择仓库以开始。",
+      "modelNeedsCreditsToStart": "此模型需要额度。请选择一个免费模型以开始。",
+      "modelNeedsCreditsPinnedToStart": "此智能体的模型需要额度。请充值额度或选择其他智能体。",
+      "eligibility": {
+        "limitedTitle": "免费模型可用",
+        "balance": "你的余额为 {{amount}}。免费模型仍可用。",
+        "unavailable": "无法检查你的余额。"
+      },
       "promptPlaceholder": "你想完成什么任务？",
       "couldNotLoadModels": "无法加载模型。",
       "prefillRepoAndModelUnavailable": "原会话的仓库和模型已不可用。请在下方重新选择。",

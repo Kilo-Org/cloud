@@ -131,6 +131,13 @@ export function resolveNewSessionStartDisabled(input: {
   /** True when the selected repo key still resolves to a picker row. */
   selectedRepositoryResolved: boolean;
   profileGate: NewSessionProfileGate;
+  /**
+   * True when the account's balance leaves the picked model paid-only: the
+   * server refuses a session on it, so the phone must not offer it. The
+   * composer filters the picker to the models the balance covers, so this is
+   * reachable only through a remembered or pinned selection.
+   */
+  modelNeedsCredits: boolean;
 }): boolean {
   // A selected key that no longer resolves to a row (after a refresh or a
   // provider change) must not submit: the create body would carry no
@@ -148,7 +155,8 @@ export function resolveNewSessionStartDisabled(input: {
       model: input.model,
       selectedRepo: input.selectedRepo,
     }) ||
-    input.profileGate.kind !== 'ready'
+    input.profileGate.kind !== 'ready' ||
+    input.modelNeedsCredits
   );
 }
 
@@ -203,6 +211,8 @@ export type NewSessionStartBlockedReason =
   | 'profile-error'
   /** Cloud Agent needs a model; an empty or unavailable one disables Start. */
   | 'model-missing'
+  /** The picked model needs credits the account does not have yet. */
+  | 'model-needs-credits'
   /** A selected repository that no longer resolves to a picker row blocks Start. */
   | 'stale-selection';
 
@@ -282,6 +292,9 @@ function resolveComposerBlockedReason(
   }
   if (input.gate.model === '') {
     return 'model-missing';
+  }
+  if (input.gate.modelNeedsCredits) {
+    return 'model-needs-credits';
   }
   return null;
 }

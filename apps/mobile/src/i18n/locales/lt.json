@@ -2458,6 +2458,13 @@
       "attachmentUploadingToStart": "Priedas vis dar įkeliamas. Jei norite pradėti be jo, pašalinkite jį.",
       "modelMissingToStart": "Norėdami pradėti, pasirinkite modelį.",
       "staleRepositoryToStart": "Pasirinktos saugyklos nebepasiekiama. Norėdami pradėti, dar kartą pasirinkite saugyklą.",
+      "modelNeedsCreditsToStart": "Šiam modeliui reikia kreditų. Pasirinkite nemokamą modelį, kad pradėtumėte.",
+      "modelNeedsCreditsPinnedToStart": "Šio agento modeliui reikia kreditų. Papildykite kreditus arba pasirinkite kitą agentą.",
+      "eligibility": {
+        "limitedTitle": "Galimi nemokami modeliai",
+        "balance": "Jūsų likutis yra {{amount}}. Nemokami modeliai vis dar galimi.",
+        "unavailable": "Nepavyko patikrinti jūsų likučio."
+      },
       "promptPlaceholder": "Ką norėtumėte atlikti?",
       "couldNotLoadModels": "Nepavyko įkelti modelių",
       "prefillRepoAndModelUnavailable": "Pradinės sesijos saugykla ir modelis nebepasiekiami. Pasirinkite kitus žemiau.",

@@ -2360,6 +2360,13 @@
       "attachmentUploadingToStart": "Et vedlegg lastes fortsatt opp. Fjern det for å starte uten det.",
       "modelMissingToStart": "Velg en modell for å starte.",
       "staleRepositoryToStart": "Det valgte kodelageret er ikke lenger tilgjengelig. Velg et kodelager på nytt for å starte.",
+      "modelNeedsCreditsToStart": "Denne modellen trenger kreditter. Velg en gratis modell for å starte.",
+      "modelNeedsCreditsPinnedToStart": "Denne agentens modell trenger kreditter. Fyll på kreditter eller velg en annen agent.",
+      "eligibility": {
+        "limitedTitle": "Gratis modeller tilgjengelig",
+        "balance": "Saldoen din er {{amount}}. Gratis modeller er fortsatt tilgjengelig.",
+        "unavailable": "Kunne ikke sjekke saldoen."
+      },
       "promptPlaceholder": "Hva vil du jobbe med?",
       "couldNotLoadModels": "Kunne ikke laste inn modellene.",
       "prefillRepoAndModelUnavailable": "Kodelageret og modellen fra den opprinnelige økten er ikke lenger tilgjengelige. Velg nye nedenfor.",

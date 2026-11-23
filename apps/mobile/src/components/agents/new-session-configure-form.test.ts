@@ -520,6 +520,7 @@ describe('NewSessionConfigureForm', () => {
         isSubmitting: false,
         model: 'claude-opus-4-7',
         profileGate: { kind: 'ready' },
+        modelNeedsCredits: false,
       },
     });
     expect(reason).toBe('attachment-uploading');

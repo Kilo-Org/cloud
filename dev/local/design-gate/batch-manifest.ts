@@ -426,6 +426,7 @@ const DEV_ROUTES: readonly (readonly [RegExp, string, 'self'?])[] = [
   [/^dev\/attachment-chip-fixture/, '(app)/attachment-chip-fixture'],
   [/^dev\/preparation-copy-fixture/, '(app)/preparation-copy-fixture'],
   [/^dev\/new-session-plan-refusal-fixture/, '(app)/new-session-plan-refusal-fixture'],
+  [/^dev\/new-session-eligibility-fixture/, '(app)/new-session-eligibility-fixture'],
   [/^dev\/low-balance-alert-refusal-fixture/, '(app)/low-balance-alert-refusal-fixture'],
   [
     /^dev\/transcript-(credits-failure|readonly-failure|execution-failure|preparation-failure|failure|terminal-failure|undelivered)-fixture/,

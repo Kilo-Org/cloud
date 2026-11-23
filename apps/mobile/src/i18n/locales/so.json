@@ -2360,6 +2360,13 @@
       "attachmentUploadingToStart": "Lifaaq ayaa weli la soo gudbinayaa. Ka saar si aad ugu bilowdo la'aantiis.",
       "modelMissingToStart": "Dooro moodel si aad u bilowdo.",
       "staleRepositoryToStart": "Kaydka la doortay hadda lama heli karo. Dooro kayd mar kale si aad u bilowdo.",
+      "modelNeedsCreditsToStart": "Moodelkani wuxuu u baahan yahay lacagta isticmaalka. Dooro moodel bilaash ah si aad u bilowdo.",
+      "modelNeedsCreditsPinnedToStart": "Moodelka wakiilkan wuxuu u baahan yahay lacagta isticmaalka. Ku dar lacagta isticmaalka ama dooro wakiil kale.",
+      "eligibility": {
+        "limitedTitle": "Moodeellada bilaashka ah ee la heli karo",
+        "balance": "Hadhaagaagu waa {{amount}}. Moodeellada bilaashka ah ayaa wali la heli karo.",
+        "unavailable": "Hadhaagaaga lama hubin karin."
+      },
       "promptPlaceholder": "Maxaad rabtaa inaad ka shaqayso?",
       "couldNotLoadModels": "Moodeellada lama soo shubi karin.",
       "prefillRepoAndModelUnavailable": "Kaydka iyo moodeelka kalfadhigii asalka ahaa mar dambe lama heli karo. Hoos ka dooro kuwo kale.",

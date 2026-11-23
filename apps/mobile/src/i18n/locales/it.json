@@ -1787,6 +1787,13 @@
       "attachmentUploadingToStart": "Un allegato è ancora in caricamento. Rimuovilo per iniziare senza di esso.",
       "modelMissingToStart": "Seleziona un modello per iniziare.",
       "staleRepositoryToStart": "Il repository selezionato non è più disponibile. Seleziona di nuovo un repository per iniziare.",
+      "modelNeedsCreditsToStart": "Questo modello richiede crediti. Seleziona un modello gratuito per iniziare.",
+      "modelNeedsCreditsPinnedToStart": "Il modello di questo agente richiede crediti. Aggiungi crediti o scegli un altro agente.",
+      "eligibility": {
+        "limitedTitle": "Modelli gratuiti disponibili",
+        "balance": "Il tuo saldo è {{amount}}. I modelli gratuiti sono ancora disponibili.",
+        "unavailable": "Impossibile verificare il saldo."
+      },
       "promptPlaceholder": "Su cosa vuoi lavorare?",
       "couldNotLoadModels": "Impossibile caricare i modelli.",
       "prefillRepoAndModelUnavailable": "Il repository e il modello della sessione originale non sono più disponibili. Selezionali qui sotto.",

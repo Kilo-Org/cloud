@@ -2409,6 +2409,13 @@
       "attachmentUploadingToStart": "Prilog se još otprema. Ukloni ga da započneš bez njega.",
       "modelMissingToStart": "Izaberi model da započneš.",
       "staleRepositoryToStart": "Izabrani repozitorijum više nije dostupan. Ponovo izaberi repozitorijum da započneš.",
+      "modelNeedsCreditsToStart": "Ovaj model zahteva kredite. Izaberi besplatan model da započneš.",
+      "modelNeedsCreditsPinnedToStart": "Model ovog agenta zahteva kredite. Dodaj kredite ili izaberi drugog agenta.",
+      "eligibility": {
+        "limitedTitle": "Dostupni besplatni modeli",
+        "balance": "Tvoj saldo je {{amount}}. Besplatni modeli su i dalje dostupni.",
+        "unavailable": "Provera salda nije uspela."
+      },
       "promptPlaceholder": "Na čemu želiš da radiš?",
       "couldNotLoadModels": "Učitavanje modela nije uspelo.",
       "prefillRepoAndModelUnavailable": "Repozitorijum i model izvorne sesije više nisu dostupni. Izaberi druge ispod.",

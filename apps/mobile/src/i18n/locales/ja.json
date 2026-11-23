@@ -1776,6 +1776,13 @@
       "attachmentUploadingToStart": "添付ファイルをアップロード中です。これを使わずに開始するには削除してください。",
       "modelMissingToStart": "開始するにはモデルを選択してください。",
       "staleRepositoryToStart": "選択したリポジトリは利用できなくなりました。開始するにはリポジトリをもう一度選択してください。",
+      "modelNeedsCreditsToStart": "このモデルにはクレジットが必要です。開始するには無料のモデルを選択してください。",
+      "modelNeedsCreditsPinnedToStart": "このエージェントのモデルにはクレジットが必要です。クレジットを追加するか、別のエージェントを選択してください。",
+      "eligibility": {
+        "limitedTitle": "無料モデルが利用可能",
+        "balance": "残高は{{amount}}です。無料モデルは引き続き利用できます。",
+        "unavailable": "残高を確認できませんでした。"
+      },
       "promptPlaceholder": "何に取り組みますか？",
       "couldNotLoadModels": "モデルを読み込めませんでした。",
       "prefillRepoAndModelUnavailable": "元のセッションのリポジトリとモデルは利用できなくなりました。以下で選択してください。",

@@ -2360,6 +2360,13 @@
       "attachmentUploadingToStart": "Egy csatolmány feltöltése még folyamatban van. Távolítsd el, hogy nélküle indíts.",
       "modelMissingToStart": "Válassz egy modellt az indításhoz.",
       "staleRepositoryToStart": "A kiválasztott adattár már nem érhető el. Válassz újra adattárat az indításhoz.",
+      "modelNeedsCreditsToStart": "Ehhez a modellhez kreditek kellenek. Válassz egy ingyenes modellt az indításhoz.",
+      "modelNeedsCreditsPinnedToStart": "Ehhez az ügynökhöz tartozó modellhez kreditek kellenek. Töltsd fel az egyenleget, vagy válassz egy másik ügynököt.",
+      "eligibility": {
+        "limitedTitle": "Elérhető ingyenes modellek",
+        "balance": "Az egyenleged {{amount}}. Az ingyenes modellek továbbra is elérhetők.",
+        "unavailable": "Nem sikerült ellenőrizni az egyenlegedet."
+      },
       "promptPlaceholder": "Min szeretnél dolgozni?",
       "couldNotLoadModels": "Nem sikerült betölteni a modelleket.",
       "prefillRepoAndModelUnavailable": "Az eredeti munkamenet adattára és modellje már nem érhető el. Válassz helyettük másikat az alábbiak közül.",

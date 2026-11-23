@@ -2360,6 +2360,13 @@
       "attachmentUploadingToStart": "Daar laai nog 'n aanhegsel. Verwyder dit om sonder dit te begin.",
       "modelMissingToStart": "Kies 'n model om te begin.",
       "staleRepositoryToStart": "Die gekose bewaarplek is nie meer beskikbaar nie. Kies weer 'n bewaarplek om te begin.",
+      "modelNeedsCreditsToStart": "Hierdie model het krediete nodig. Kies 'n gratis model om te begin.",
+      "modelNeedsCreditsPinnedToStart": "Hierdie agent se model het krediete nodig. Voeg krediete by of kies 'n ander agent.",
+      "eligibility": {
+        "limitedTitle": "Gratis modelle beskikbaar",
+        "balance": "Jou saldo is {{amount}}. Gratis modelle is steeds beskikbaar.",
+        "unavailable": "Die saldo kon nie nagegaan word nie."
+      },
       "promptPlaceholder": "Waaraan wil jy werk?",
       "couldNotLoadModels": "Die modelle kon nie gelaai word nie.",
       "prefillRepoAndModelUnavailable": "Die oorspronklike sessie se bewaarplek en model is nie meer beskikbaar nie. Kies hieronder 'n nuwe bewaarplek en model.",

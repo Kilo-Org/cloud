@@ -2321,6 +2321,13 @@
       "attachmentUploadingToStart": "Àsomọ́ kan ṣì ń gbé sókè. Yọ ọ́ kúrò láti bẹ̀rẹ̀ láìsí rẹ̀.",
       "modelMissingToStart": "Yan awoṣe kan láti bẹ̀rẹ̀.",
       "staleRepositoryToStart": "Ibi ìpamọ́ kóòdù tí o yàn kò sí mọ́. Tun yan ibi ìpamọ́ kóòdù láti bẹ̀rẹ̀.",
+      "modelNeedsCreditsToStart": "Awoṣe yìí nílò kirẹ́dítì. Yan awoṣe ọ̀fẹ́ kan láti bẹ̀rẹ̀.",
+      "modelNeedsCreditsPinnedToStart": "Awoṣe aṣoju yìí nílò kirẹ́dítì. Fi kirẹ́dítì kún un tàbí yan aṣoju mìíràn.",
+      "eligibility": {
+        "limitedTitle": "Àwọn awoṣe ọ̀fẹ́ wà",
+        "balance": "Owó tó kù lọ́wọ́ rẹ jẹ́ {{amount}}. Àwọn awoṣe ọ̀fẹ́ ṣì wà.",
+        "unavailable": "A kò lè yẹ owó tó kù lọ́wọ́ rẹ wò."
+      },
       "promptPlaceholder": "Kí ni o fẹ́ ṣiṣẹ́ lórí?",
       "couldNotLoadModels": "A kò lè gbé àwọn àwòṣe wọlé.",
       "prefillRepoAndModelUnavailable": "Ibi ìpamọ́ kóòdù àti àwòṣe ìgbà iṣẹ́ ìpilẹ̀ṣẹ̀ kò sí mọ́. Yan àwọn mìíràn ní ìsàlẹ̀.",

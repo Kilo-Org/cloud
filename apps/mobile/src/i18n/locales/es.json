@@ -2878,6 +2878,8 @@
     "why": "Para qué",
     "who": "Con quién",
     "installAttributionPromptMessage": "Kilo usa el permiso de seguimiento de Apple solo para saber cómo has llegado a la aplicación. Nunca usa tus instrucciones ni tus conversaciones para este fin.",
+    "installAttributionRequestFailedTitle": "No se pudo mostrar la solicitud de seguimiento",
+    "installAttributionRequestFailedMessage": "Kilo no pudo mostrar la solicitud del sistema, así que la identificación del origen de la instalación sigue desactivada.",
     "installAttributionPromptTitle": "¿Permitir que se identifique el origen de la instalación?"
   },
   "prReview": {

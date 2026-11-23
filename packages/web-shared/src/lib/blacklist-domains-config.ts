@@ -15,8 +15,6 @@ import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 export const DEFAULT_BLOCKED_SIGNUP_TLDS = ['shop', 'top'];
 
 export const BlacklistDomainsSettingsSchema = z.object({
-  // TLDs whose new signups are refused. Absent until an admin saves a list, so readers fall
-  // back to the deployment default. An empty array means "no TLD blocked".
   blocked_signup_tlds: z.array(z.string()).optional(),
   updated_at: z.string().nullable(),
   updated_by: z.string().nullable(),

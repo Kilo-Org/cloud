@@ -1,7 +1,3 @@
-/**
- * Utility functions for working with AI models
- */
-
 import { isMuseModel } from '@kilocode/web-shared/lib/ai-gateway/providers/meta';
 import { isGeminiModel } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import { isGrokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/xai';

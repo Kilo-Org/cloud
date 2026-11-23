@@ -134,8 +134,6 @@ function withdrawSettingsConfirm(id: number): void {
   if (request === undefined) {
     return;
   }
-  // The head's place is kept for its reported dismissal; anything still queued
-  // behind it was never drawn and leaves outright.
   requests =
     requests[0] === request
       ? requests.map(item => (item.id === id ? { ...item, withdrawn: true } : item))
@@ -246,9 +244,6 @@ export function confirmSettingChange(summary: string): Effect.Effect<boolean> {
       resume(Effect.succeed(false));
       return Effect.void;
     }
-    // Publish and register in one step: the resolver is already in place when
-    // the store's listeners hear about the request, so an answer given during
-    // the publish reaches the waiting tool call.
     const id = requestSettingsConfirmChange(summary, confirmed => {
       resume(Effect.succeed(confirmed));
     });

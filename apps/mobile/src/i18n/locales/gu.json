@@ -3401,6 +3401,8 @@
     "voiceTranscriptionWho": "તમારું ઉપકરણ, તમે પસંદ કરેલા ટ્રાન્સક્રિપ્શન મોડેલ સાથે Kilo Gateway, અથવા ઑનલાઇન ઓળખ માટે Apple અથવા Google.",
     "installAttributionPromptTitle": "ઇન્સ્ટોલનો સ્ત્રોત ઓળખવાની મંજૂરી આપવી છે?",
     "installAttributionPromptMessage": "તમે કયા માધ્યમથી અહીં આવ્યા તે જાણવા માટે જ Kilo Appleની ટ્રેકિંગ પરવાનગી વાપરે છે. આ માટે તમારા પ્રોમ્પ્ટ અને વાતચીત ક્યારેય વપરાતાં નથી.",
+    "installAttributionRequestFailedTitle": "ટ્રેકિંગ પ્રોમ્પ્ટ બતાવી શકાયો નહીં",
+    "installAttributionRequestFailedMessage": "Kilo સિસ્ટમ પ્રોમ્પ્ટ બતાવી શક્યું નહીં, તેથી ઇન્સ્ટોલના સ્ત્રોતની ઓળખ બંધ રહે છે.",
     "what": "શું",
     "why": "કેમ",
     "who": "કોણ"
@@ -3432,7 +3434,7 @@
         "promoCreditGranted": "પ્રોમોશનલ ક્રેડિટ આપી",
         "memberRemove": "સભ્યને દૂર કર્યો",
         "memberChangeRole": "સભ્યની ભૂમિકા બદલી",
-        "memberAdminAdd": "એડમિનિસ્ટ્રેટર ઉમેર્યો",
+        "memberAdminAdd": "એડમિન ઉમેર્યો",
         "memberAutoJoin": "સભ્ય આપમેળે જોડાયો",
         "ssoAutoProvision": "SSO દ્વારા વપરાશકર્તા ફાળવ્યો",
         "ssoSetDomain": "SSO ડોમેન ઉમેર્યું",

@@ -1029,7 +1029,7 @@
       "empty": "尚無含有分析資料的審查",
       "emptyDescription": "在組織啟用分析期間，系統會記錄已完成的審查。",
       "offTitle": "已關閉 {{platform}} 的分析",
-      "offDescription": "組織的帳務角色（擁有者、管理員與帳務管理員）可在網頁版的組織設定中啟用分析，以記錄已完成的審查。",
+      "offDescription": "組織的帳單角色（擁有者、管理員與帳單管理員）可在網頁版的組織設定中啟用分析，以記錄已完成的審查。",
       "couldNotLoad": "無法載入分析資料",
       "trackedReviewsCaption": "此期間內在啟用分析的狀態下完成的審查。執行中與失敗的審查一律不計入。",
       "trackedReviewsUncounted": "未計入：組織共有 {{displayTotal}} 筆已完成的審查，其中 {{displayCount}} 筆未擷取結果。",
@@ -2841,6 +2841,8 @@
     "why": "用途",
     "who": "對象",
     "installAttributionPromptMessage": "Kilo 僅使用 Apple 的追蹤權限，了解你透過哪個管道安裝應用程式。絕不會使用你的提示詞或對話。",
+    "installAttributionRequestFailedTitle": "無法顯示追蹤提示",
+    "installAttributionRequestFailedMessage": "Kilo 無法顯示系統提示，因此安裝來源追蹤保持關閉。",
     "installAttributionPromptTitle": "允許追蹤安裝來源？"
   },
   "prReview": {
@@ -3688,7 +3690,7 @@
       "pendingInvitation": "這個電子郵件地址已有待處理的邀請。",
       "alreadyMember": "這個人已經是此組織的成員。",
       "seatsFull": "所有席位皆已使用（{{used}}/{{total}}）。請先請組織擁有者增加席位，再邀請更多成員。",
-      "seatsFullCanInviteBilling": "所有席位皆已使用（{{used}}/{{total}}）。你仍可邀請帳務管理員，他們不會佔用席位。",
+      "seatsFullCanInviteBilling": "所有席位皆已使用（{{used}}/{{total}}）。你仍可邀請帳單管理員，他們不會佔用席位。",
       "noSeatsAvailable": "所有席位皆已使用。請先請組織擁有者增加席位，再邀請更多成員。"
     },
     "invoices": {

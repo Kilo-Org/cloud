@@ -401,7 +401,7 @@
       "title": "Klíče poskytovatelů",
       "rowSubtitle": "Používat vlastní fakturaci u poskytovatele",
       "orgDescription": "Tyto klíče jsou sdíleny se všemi v organizaci a účtují se na její účty u poskytovatelů.",
-      "viewOnly": "Klíče organizace může měnit pouze její vlastník, administrátor nebo správce fakturace.",
+      "viewOnly": "Klíče organizace může měnit pouze její vlastník, správce nebo správce fakturace.",
       "description": "Požadavky přes tyto klíče se účtují na váš účet u poskytovatele, ne z vašeho zůstatku v Kilo.",
       "managedByPlan": "Spravuje váš programovací tarif",
       "enableKey": "Povolit klíč pro {{provider}}",
@@ -3527,6 +3527,8 @@
     "voiceTranscriptionWho": "Tvoje zařízení, Kilo Gateway s tebou zvoleným modelem přepisu, nebo Apple či Google pro online rozpoznávání.",
     "installAttributionPromptTitle": "Povolit zjištění zdroje instalace?",
     "installAttributionPromptMessage": "Kilo používá oprávnění ke sledování od Apple pouze ke zjištění, odkud k nám přicházíte. Vaše zadání ani konverzace k tomu nikdy nepoužívá.",
+    "installAttributionRequestFailedTitle": "Výzvu ke sledování se nepodařilo zobrazit",
+    "installAttributionRequestFailedMessage": "Kilo nemohl zobrazit systémovou výzvu, proto zjištění zdroje instalace zůstává vypnuté.",
     "what": "Co",
     "why": "Proč",
     "who": "Kdo"
@@ -3542,7 +3544,7 @@
   "organization": {
     "auditLog": {
       "title": "Auditní protokol",
-      "permissionDenied": "Auditní protokol organizace s plánem Enterprise si může prohlížet jen její vlastník, administrátor nebo správce fakturace. $t(organization.boundary.accessDeniedDescription)",
+      "permissionDenied": "Auditní protokol organizace s plánem Enterprise si může prohlížet jen její vlastník, správce nebo správce fakturace. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Žádné události auditu",
       "emptyDescription": "Zde se zobrazí akce provedené v této organizaci.",
       "truncated": "Zobrazují se nejnovější události.",
@@ -3558,7 +3560,7 @@
         "promoCreditGranted": "Propagační kredity přiděleny",
         "memberRemove": "Odebrání člena",
         "memberChangeRole": "Změna role člena",
-        "memberAdminAdd": "Přidání administrátora",
+        "memberAdminAdd": "Přidání správce",
         "memberAutoJoin": "Automatické připojení člena",
         "ssoAutoProvision": "Zřízení uživatele přes SSO",
         "ssoSetDomain": "Přidání domény SSO",
@@ -3742,7 +3744,7 @@
     },
     "billing": {
       "title": "Fakturace",
-      "permissionDenied": "Fakturaci organizace může zobrazit pouze vlastník, administrátor nebo správce fakturace. $t(organization.boundary.accessDeniedDescription)",
+      "permissionDenied": "Fakturaci organizace může zobrazit pouze vlastník, správce nebo správce fakturace. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Předplatné",
       "state": "Stav",
       "stateNone": "Bez předplatného",
@@ -3858,7 +3860,7 @@
       "limitLabel": "Limit (USD za den)",
       "memberNotFound": "Člen nebyl nalezen.",
       "noLimitPlaceholder": "Bez limitu",
-      "permissionDenied": "Limity útraty může spravovat pouze vlastník nebo administrátor organizace.",
+      "permissionDenied": "Limity útraty může spravovat pouze vlastník nebo správce organizace.",
       "removeLimit": "Zrušit limit",
       "title": "Denní limit útraty",
       "blankError": "Zadejte částku nebo níže klepněte na tlačítko Zrušit limit.",
@@ -3919,7 +3921,7 @@
       "emptyDescription": "Pomocí tlačítka „Starší hodina“ zobrazíte dřívější požadavky.",
       "emptyBoundDescription": "Záznamy požadavků dál do minulosti nesahají.",
       "loadError": "Protokoly požadavků se nepodařilo načíst.",
-      "permissionDenied": "Protokoly požadavků organizace si může prohlížet jen její vlastník, administrátor nebo správce fakturace. $t(organization.boundary.accessDeniedDescription)",
+      "permissionDenied": "Protokoly požadavků organizace si může prohlížet jen její vlastník, správce nebo správce fakturace. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} vstup · {{output}} výstup",
       "byok": "BYOK"
     },

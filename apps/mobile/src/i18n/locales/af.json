@@ -399,7 +399,7 @@
       "title": "Verskaffersleutels",
       "rowSubtitle": "Gebruik jou eie verskaffer se fakturering",
       "orgDescription": "Hierdie sleutels word met almal in die organisasie gedeel en aan die organisasie se verskafferrekeninge gefaktureer.",
-      "viewOnly": "Slegs 'n eienaar, admin of faktureringsbestuurder van die organisasie kan die organisasie se sleutels verander.",
+      "viewOnly": "Slegs 'n eienaar, administrateur of faktureringsbestuurder van die organisasie kan die organisasie se sleutels verander.",
       "description": "Versoeke via hierdie sleutels word aan jou verskafferrekening gefaktureer in plaas van van jou Kilo-saldo afgetrek.",
       "managedByPlan": "Bestuur deur jou koderingsplan",
       "enableKey": "Aktiveer die {{provider}}-sleutel",
@@ -3401,6 +3401,8 @@
     "voiceTranscriptionWho": "Jou toestel, die Kilo Gateway met jou gekose transkripsiemodel, of Apple of Google vir aanlyn herkenning.",
     "installAttributionPromptTitle": "Installasietoeskrywing toelaat?",
     "installAttributionPromptMessage": "Kilo gebruik Apple se nasporingstoestemming net om vas te stel watter kanaal jou hierheen gebring het. Jou opdragte en gesprekke word nooit gebruik nie.",
+    "installAttributionRequestFailedTitle": "Kon nie die nasporingsversoek wys nie",
+    "installAttributionRequestFailedMessage": "Kilo kon nie die stelselversoek wys nie, daarom bly installasietoeskrywing uit.",
     "what": "Wat",
     "why": "Hoekom",
     "who": "Wie"

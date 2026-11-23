@@ -1029,7 +1029,7 @@
       "empty": "Chưa có lượt rà soát nào có dữ liệu phân tích",
       "emptyDescription": "Phân tích ghi lại các lượt rà soát đã hoàn tất khi tính năng này được bật cho tổ chức.",
       "offTitle": "Phân tích đang tắt cho {{platform}}",
-      "offDescription": "Những người có vai trò thanh toán của tổ chức (chủ sở hữu, quản trị viên và quản lý thanh toán) có thể bật tính năng phân tích trong phần cài đặt của tổ chức trên web để ghi lại các lượt rà soát đã hoàn tất.",
+      "offDescription": "Những người có vai trò thanh toán của tổ chức (chủ sở hữu, quản trị viên và người quản lý thanh toán) có thể bật tính năng phân tích trong phần cài đặt của tổ chức trên web để ghi lại các lượt rà soát đã hoàn tất.",
       "couldNotLoad": "Không thể tải dữ liệu phân tích",
       "trackedReviewsCaption": "Các lượt rà soát đã hoàn tất kết thúc trong kỳ này khi tính năng phân tích được bật. Các lượt rà soát đang chạy hoặc thất bại không bao giờ được tính.",
       "trackedReviewsUncounted": "Chưa tính: {{displayCount}} trong tổng số {{displayTotal}} lượt rà soát đã hoàn tất của tổ chức chưa được ghi kết quả.",
@@ -2841,6 +2841,8 @@
     "why": "Mục đích",
     "who": "Bên nhận dữ liệu",
     "installAttributionPromptMessage": "Kilo chỉ dùng quyền theo dõi của Apple để biết bạn tìm đến ứng dụng qua kênh nào. Nội dung yêu cầu và cuộc trò chuyện của bạn không bao giờ được dùng cho mục đích này.",
+    "installAttributionRequestFailedTitle": "Không thể hiển thị lời nhắc theo dõi",
+    "installAttributionRequestFailedMessage": "Kilo không thể hiển thị lời nhắc hệ thống, nên việc xác định nguồn cài đặt vẫn tắt.",
     "installAttributionPromptTitle": "Cho phép xác định nguồn cài đặt?"
   },
   "prReview": {

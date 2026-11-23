@@ -1591,7 +1591,7 @@
       "empty": "Enweghị nyocha nwere ọnụọgụgụ nyocha",
       "emptyDescription": "Ọnụọgụgụ nyocha na-edekọ nyocha ndị gụchara mgbe agbanyere ya maka nzukọ.",
       "offTitle": "Agbanyụrụ ọnụọgụgụ nyocha maka {{platform}}",
-      "offDescription": "Ndị nọ n'ọrụ ụgwọ nke nzukọ (ndị nwe ya, ndị nchịkwa na ndị njikwa ụgwọ) nwere ike ịgbanye ọnụọgụgụ nyocha n'ime ntọala nzukọ dị na weebụ iji dekọ nyocha ndị gụchara.",
+      "offDescription": "Ndị nọ n'ọrụ ụgwọ nke nzukọ (ndị nwe ya, ndị nchịkwa na ndị njikwa ịgba ụgwọ) nwere ike ịgbanye ọnụọgụgụ nyocha n'ime ntọala nzukọ dị na weebụ iji dekọ nyocha ndị gụchara.",
       "couldNotLoad": "Enweghị ike ibudata ọnụọgụgụ nyocha",
       "trackedReviewsCaption": "Nyocha ndị gụchara n'oge a mgbe agbanyere ọnụọgụgụ nyocha. Ọ dịghị mgbe a na-agụta nyocha ndị na-agba ma ọ bụ ndị dara.",
       "trackedReviewsUncounted": "Agụtaghị ọnụ: {{displayCount}} n’ime {{displayTotal}} nyocha ndị gụchara nke nzukọ, e jideghị mmasị ha.",
@@ -3401,6 +3401,8 @@
     "voiceTranscriptionWho": "Ngwaọrụ gị, Kilo Gateway na ụdị ntụgharị okwu ị họọrọ, ma ọ bụ Apple ma ọ bụ Google maka mmata n'ịntanetị.",
     "installAttributionPromptTitle": "Kwe ka a mata ebe ị si nweta ngwa?",
     "installAttributionPromptMessage": "Kilo na-eji ikike nsuso Apple naanị iji mata ụzọ wetara gị ebe a. A naghị eji ihe ị na-ede ma ọ bụ mkparịta ụka gị eme nke a.",
+    "installAttributionRequestFailedTitle": "Enweghị ike igosi arịrịọ nsuso",
+    "installAttributionRequestFailedMessage": "Kilo enweghị ike igosi arịrịọ sistemụ, ya mere ịmata ebe e si nweta ngwa ka na-agbanyụ.",
     "what": "Gịnị",
     "why": "Gịnị kpatara",
     "who": "Ònye"
@@ -3684,7 +3686,7 @@
       "pendingInvitation": "Adreesị ozi ịntanetị a enwetala òkù na-echere.",
       "alreadyMember": "Onye a abụrụla onye otu nke òtù a.",
       "seatsFull": "A na-eji oche niile ugbu a ({{used}}/{{total}}). Rịọ onye nwe òtù ka ọ tinyekwuo oche tupu ị kpọọ ndị otu ọzọ òkù.",
-      "seatsFullCanInviteBilling": "A na-eji oche niile ugbu a ({{used}}/{{total}}). Ị ka nwere ike ịkpọ ndị njikwa ịkwụ ụgwọ òkù, ndị anaghị eji oche ọ bụla.",
+      "seatsFullCanInviteBilling": "A na-eji oche niile ugbu a ({{used}}/{{total}}). Ị ka nwere ike ịkpọ ndị njikwa ịgba ụgwọ òkù, ndị anaghị eji oche ọ bụla.",
       "noSeatsAvailable": "A na-eji oche niile ugbu a. Rịọ onye nwe òtù ka ọ tinyekwuo oche tupu ị kpọọ ndị otu ọzọ òkù."
     },
     "invoices": {

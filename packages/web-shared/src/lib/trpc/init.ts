@@ -86,7 +86,6 @@ function admitsRefusedAccount(info: ControlPlaneRequestInfo | null | undefined):
   return calls.every(call => isSelfCleanupProcedureCall({ path: call.path, type }));
 }
 
-// Define the context type
 export type TRPCContext = {
   user: User;
   deviceSessionId?: string;

@@ -499,10 +499,6 @@ describe('planNeedsInputNotifications', () => {
   });
 
   it('withholds posting, and keeps what is posted, until the preference row loads', () => {
-    // Before the `agentAttention` row is in the cache the plan must not fall
-    // back to ON (it would alert a category the user turned off after a
-    // restart) and must not fall back to OFF (it would drop a standing raise):
-    // it waits, leaving both the publish and dismiss sets empty.
     const plan = planNeedsInputNotifications({
       previous: [notifiedRow(), notifiedRow({ sessionId: 'ses_gone', kind: 'permission' })],
       next: [makeCached({ id: 'ses_1', status: 'question' })],
@@ -731,9 +727,6 @@ describe('applyNeedsInputNotifications', () => {
   });
 
   it('does not silence a re-post the same plan dismissed', async () => {
-    // The dismissal runs before the post, so the notification the post creates
-    // is new: it must carry the sound and time-sensitive level a fresh raise
-    // carries.
     const plan = planNeedsInputNotifications({
       previous: [notifiedRow({ organizationId: null })],
       next: [

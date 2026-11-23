@@ -209,8 +209,6 @@ export async function checkClaudeBilling(
   try {
     connection = await getAuthoritativeClaudeBillingState(owner);
   } catch (error) {
-    // A reply outside the wire contract names a release mismatch, so the
-    // refusal stays without a retry hint; other failures stay retryable.
     if (error instanceof ClaudeBillingPayerStateParseError) {
       return {
         kind: 'unavailable',

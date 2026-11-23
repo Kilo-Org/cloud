@@ -1591,7 +1591,7 @@
       "empty": "Engar yfirferðir með tölfræði ennþá",
       "emptyDescription": "Tölfræðin skráir yfirferðir sem klárast meðan hún er virk fyrir fyrirtækið.",
       "offTitle": "Tölfræðin er óvirk fyrir {{platform}}",
-      "offDescription": "Eigendur, stjórnendur og rekningastjórar fyrirtækisins geta kveikt á tölfræðinni í stillingum fyrirtækisins á vefnum til að skrá yfirferðir sem klárast.",
+      "offDescription": "Eigendur, stjórnendur og innheimtustjórar fyrirtækisins geta kveikt á tölfræðinni í stillingum fyrirtækisins á vefnum til að skrá yfirferðir sem klárast.",
       "couldNotLoad": "Tókst ekki að sækja tölfræðina",
       "trackedReviewsCaption": "Yfirferðir sem klárast á þessu tímabili, meðan tölfræðin er virk. Yfirferðir í gangi eða misheppnaðar teljast aldrei.",
       "trackedReviewsUncounted": "Ekki taldar: {{displayCount}} af {{displayTotal}} yfirferðum fyrirtækisins sem hafa klárast, niðurstöðan þeirra ekki skráð.",
@@ -3401,6 +3401,8 @@
     "voiceTranscriptionWho": "Tækið þitt, Kilo Gateway með umritunarlíkaninu sem þú velur, eða Apple eða Google fyrir auðkenningu á netinu.",
     "installAttributionPromptTitle": "Leyfa rakningu á uppruna uppsetningar?",
     "installAttributionPromptMessage": "Kilo notar rakningarheimild Apple aðeins til að sjá hvernig þú fannst forritið. Skilaboðin þín og samtöl eru aldrei notuð í þeim tilgangi.",
+    "installAttributionRequestFailedTitle": "Ekki tókst að sýna rakningarbeiðnina",
+    "installAttributionRequestFailedMessage": "Kilo gat ekki sýnt kerfisbeiðnina, svo rakning á uppruna uppsetningar helst óvirk.",
     "what": "Hvað",
     "why": "Hvers vegna",
     "who": "Hver"
@@ -3684,7 +3686,7 @@
       "pendingInvitation": "Þetta tölvupóstfang er þegar með boð í bið.",
       "alreadyMember": "Þessi einstaklingur er þegar meðlimur í þessu fyrirtæki.",
       "seatsFull": "Öll sæti eru í notkun ({{used}}/{{total}}). Biddu eiganda fyrirtækisins að bæta við sætum áður en þú býður fleiri meðlimum.",
-      "seatsFullCanInviteBilling": "Öll sæti eru í notkun ({{used}}/{{total}}). Þú getur samt boðið greiðslustjórum, sem nota ekki sæti.",
+      "seatsFullCanInviteBilling": "Öll sæti eru í notkun ({{used}}/{{total}}). Þú getur samt boðið innheimtustjórum, sem nota ekki sæti.",
       "noSeatsAvailable": "Öll sæti eru í notkun. Biddu eiganda fyrirtækisins að bæta við sætum áður en þú býður fleiri meðlimum."
     },
     "invoices": {

@@ -434,9 +434,7 @@ export function getSecurityDeadlinePresentation(
 }
 
 // ---------------------------------------------------------------------------
-// Details panel (ported from FindingDetailDialog.tsx:552 and its small
-// formatting helpers — condensed to plain label/tone data, no hero/action
-// narrative or web layout).
+// Details panel (ported from FindingDetailDialog.tsx:552).
 // ---------------------------------------------------------------------------
 
 /** Label/tone pair for facts that don't need an icon (severity, lifecycle status). */
@@ -502,9 +500,7 @@ export function getFindingSourceLabel(source: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Analysis panel (ported from FindingDetailDialog.tsx:985 — a single
-// title/description/tone/icon object per analysis state rather than the web
-// hero/summary/action/steps narrative; action buttons belong to a later task).
+// Analysis panel (ported from FindingDetailDialog.tsx:985).
 // ---------------------------------------------------------------------------
 
 type SecurityAnalysisDetailPresentation = {
@@ -641,9 +637,7 @@ export function getSecurityAnalysisDetailPresentation(
 }
 
 // ---------------------------------------------------------------------------
-// Remediation panel (ported from FindingDetailDialog.tsx:1849 and
-// remediation-unavailable-copy.ts:6 — the single source for remediation
-// status/blocker copy, also imported by use-security-findings.ts).
+// Remediation panel (ported from FindingDetailDialog.tsx:1849).
 // ---------------------------------------------------------------------------
 
 export function isActiveRemediationStatus(status: string | null | undefined): boolean {

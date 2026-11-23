@@ -1591,7 +1591,7 @@
       "empty": "Ammatti sakatta'a istaatiksii qabu hin jiru",
       "emptyDescription": "Istaatiksiin sakatta'awwan xumuraman yeroo dhaabbataaf banamu galmeessa.",
       "offTitle": "Istaatiksiin {{platform}} cufameera",
-      "offDescription": "Taayitoonni kaffaltii dhaabbataa — abbootii, adminoota fi mannijaroota kaffaltii — istaatiksii banuu danda'u; kunis web irratti, qindeessa dhaabbataa keessatti, akka sakatto'awwan xumuraman galmeessaniitan.",
+      "offDescription": "Taayitoonni kaffaltii dhaabbataa — abbootii, bulchitootaa fi bulchitoonni kaffaltii — istaatiksii banuu danda'u; kunis web irratti, qindeessa dhaabbataa keessatti, akka sakatto'awwan xumuraman galmeessaniitan.",
       "couldNotLoad": "Istaatiksii fe'uun hin danda'amne",
       "trackedReviewsCaption": "Sakatto'awwan xumuraman yeroo kana keessatti istaatiksii banan xumuraman. Sakatto'awwan itti fufaanii fi sakatto'awwan hanqatan hin lakkaa'amanII.,",
       "trackedReviewsUncounted": "Hin lakkaa’aman: {{displayCount}} / {{displayTotal}} dhaabbataan qabu xumuraman bu’aan qabamee hin boolu.",
@@ -2015,7 +2015,7 @@
     },
     "scopeEntry": {
       "connectDescription": "Akeekkachiisa Dependabot ofumaan walsimsiisuuf fi argamoota nageenyaa kuusaawwan koodii kee keessatti bulchuuf aplikeeshinii GitHub kan Kilo fe'i.",
-      "connectOwnerOnly": "Abbaa dhaabbataa ykn bulchitaa tokko {{platform}} walqabsiisuuf gaafadhu.",
+      "connectOwnerOnly": "Abbaa dhaabbataa ykn bulchaa tokko {{platform}} walqabsiisuuf gaafadhu.",
       "connectTitle": "Jalqabuuf GitHub walqabsiisi",
       "couldNotLoad": "Eejentii nageenyaa fe'uun hin danda'amne.",
       "installApp": "Aplikeeshinii GitHub fe'i",
@@ -3401,6 +3401,8 @@
     "voiceTranscriptionWho": "Meeshaa keessan, Kilo Gateway moodeela hiikkaa isin filattaniin, yookaan Apple yookaan Google adda baasuu online.",
     "installAttributionPromptTitle": "Maddi fe'iinsaa akka beekamu hayyamtaa?",
     "installAttributionPromptMessage": "Kilo karaa asitti si fide beekuuf qofa hayyama hordoffii Apple fayyadama. Gaaffiiwwanii fi mariiwwan kee gonkumaa kanaaf hin fayyadamu.",
+    "installAttributionRequestFailedTitle": "Gaaffii hordoffii agarsiisuun hin danda'amne",
+    "installAttributionRequestFailedMessage": "Kilo gaaffii sirnaa agarsiisuu hin dandeenye, kanaaf maddi fe'iinsaa beekamuun cufaa ta'ee hafa.",
     "what": "Maal",
     "why": "Maaliif",
     "who": "Eenyu"

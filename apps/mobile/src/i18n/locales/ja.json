@@ -1029,7 +1029,7 @@
       "empty": "分析データのあるレビューはまだありません",
       "emptyDescription": "分析機能は、組織で有効になっている間に完了したレビューを記録します。",
       "offTitle": "{{platform}}の分析がオフになっています",
-      "offDescription": "分析をオンにできるのは、組織のオーナー、管理者、請求マネージャーといった請求ロールです。Web 上の組織設定からオンにすると、完了したレビューが記録されます。",
+      "offDescription": "分析をオンにできるのは、組織のオーナー、管理者、請求管理者といった請求ロールです。Web 上の組織設定からオンにすると、完了したレビューが記録されます。",
       "couldNotLoad": "分析を読み込めませんでした",
       "trackedReviewsCaption": "分析が有効な状態でこの期間内に完了したレビューです。実行中のレビューと失敗したレビューは決してカウントされません。",
       "trackedReviewsUncounted": "カウント対象外：この組織の終了済みレビュー {{displayTotal}} 件のうち {{displayCount}} 件は、結果が記録されていません。",
@@ -2841,6 +2841,8 @@
     "why": "利用目的",
     "who": "共有先",
     "installAttributionPromptMessage": "Kiloは、アプリのインストール元を把握するためにのみ、Appleのトラッキング権限を使用します。この目的でプロンプトや会話を使用することはありません。",
+    "installAttributionRequestFailedTitle": "トラッキングの確認を表示できませんでした",
+    "installAttributionRequestFailedMessage": "Kiloはシステムの確認画面を表示できなかったため、インストール元の特定はオフのままです。",
     "installAttributionPromptTitle": "インストール元の特定を許可しますか？"
   },
   "prReview": {

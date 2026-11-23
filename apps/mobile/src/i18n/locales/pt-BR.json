@@ -1002,7 +1002,7 @@
       "empty": "Nenhuma revisão com estatísticas ainda",
       "emptyDescription": "As estatísticas registram revisões concluídas enquanto estão ativadas para a organização.",
       "offTitle": "As estatísticas estão desativadas para {{platform}}",
-      "offDescription": "As funções de faturamento da organização (proprietários, administradores e gerentes de faturamento) podem ativar as estatísticas nas configurações da organização na web para registrar revisões concluídas.",
+      "offDescription": "As funções de faturamento da organização (proprietários, administradores e gerentes de cobrança) podem ativar as estatísticas nas configurações da organização na web para registrar revisões concluídas.",
       "couldNotLoad": "Não foi possível carregar as estatísticas",
       "trackedReviewsCaption": "Revisões concluídas neste período com as estatísticas ativadas. Revisões em andamento e com falha nunca são contadas.",
       "trackedReviewsUncounted": "Não contadas: {{displayCount}} das {{displayTotal}} revisões concluídas que a organização tem sem resultado capturado.",
@@ -2915,6 +2915,8 @@
     "why": "Finalidade",
     "who": "Destinatários",
     "installAttributionPromptMessage": "O Kilo usa a permissão de rastreamento da Apple apenas para saber qual canal trouxe você até aqui. Seus prompts e conversas nunca são usados.",
+    "installAttributionRequestFailedTitle": "Não foi possível mostrar o prompt de rastreamento",
+    "installAttributionRequestFailedMessage": "O Kilo não conseguiu mostrar o prompt do sistema, então a atribuição de instalação continua desativada.",
     "installAttributionPromptTitle": "Permitir atribuição de instalação?"
   },
   "prReview": {
@@ -3824,7 +3826,7 @@
       "pendingInvitation": "Este e-mail já tem um convite pendente.",
       "alreadyMember": "Esta pessoa já é membro desta organização.",
       "seatsFull": "Todos os assentos estão em uso ({{used}}/{{total}}). Peça a um proprietário da organização que adicione assentos antes de convidar mais membros.",
-      "seatsFullCanInviteBilling": "Todos os assentos estão em uso ({{used}}/{{total}}). Você ainda pode convidar gerentes de faturamento, que não ocupam um assento.",
+      "seatsFullCanInviteBilling": "Todos os assentos estão em uso ({{used}}/{{total}}). Você ainda pode convidar gerentes de cobrança, que não ocupam um assento.",
       "noSeatsAvailable": "Todos os assentos estão em uso. Peça a um proprietário da organização que adicione assentos antes de convidar mais membros."
     },
     "invoices": {

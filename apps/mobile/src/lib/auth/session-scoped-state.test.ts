@@ -83,7 +83,7 @@ import {
 } from './session-scoped-state';
 /* eslint-enable import/first */
 
-/** One tracked entry of the fake filesystem, keyed by the URI parts it was built from. */
+/** Shared deleted-URI log and root-existence state for the mocked expo-file-system. */
 const fakeFs = vi.hoisted(() => {
   const deleted: string[] = [];
   const state = { rootExists: true };
@@ -209,8 +209,6 @@ vi.mock('@/lib/last-opened-session', () => ({
   clearLastOpenedSession: mocks.clearLastOpenedSession,
 }));
 vi.mock('@/lib/last-route', () => ({ clearLastRoute: mocks.clearLastRoute }));
-// The platform provider bridge: sign-out has to tell an open Files app the tree
-// changed, or it keeps the listing it read before the wipe.
 vi.mock('@/lib/artifacts/artifact-provider-native', () => ({
   notifyArtifactsChanged: mocks.notifyArtifactsChanged,
 }));
@@ -294,9 +292,6 @@ describe('clearSessionScopedState', () => {
   });
 
   it('drops the App Intents catalog that names the previous account’s sessions', () => {
-    // The same titles the search index holds are also what Shortcuts and Siri
-    // offer; a boundary that cleared one and not the other would leave them
-    // addressable from outside the app.
     clearSessionScopedState();
     expect(sessionCatalogMock.clearNativeSessionCatalog).toHaveBeenCalledTimes(1);
 
@@ -319,7 +314,6 @@ describe('clearSessionScopedState', () => {
         tags: { 'error.subsystem': 'app-intent-catalog', 'error.operation': 'clear' },
       });
     });
-    // The members after it still ran.
     expect(nativeSearchMock.clearSystemSearchIndex).toHaveBeenCalledTimes(1);
   });
 
@@ -567,8 +561,6 @@ describe('clearSessionScopedState', () => {
   });
 
   it('signals the platform provider once the mirror is gone', () => {
-    // An open Files app keeps the listing it last read until the provider says
-    // the tree changed, so the signal must follow the wipe, never precede it.
     let mirrorWasGone: boolean | null = null;
     mocks.notifyArtifactsChanged.mockImplementationOnce(() => {
       mirrorWasGone = !fakeFs.state.rootExists;

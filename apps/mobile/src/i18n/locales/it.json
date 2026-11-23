@@ -999,7 +999,7 @@
       "empty": "Nessuna revisione con statistiche",
       "emptyDescription": "Le statistiche registrano le revisioni completate mentre sono attive per l'organizzazione.",
       "offTitle": "Le statistiche sono disattivate per {{platform}}",
-      "offDescription": "I ruoli di fatturazione dell'organizzazione (proprietari, amministratori e gestori della fatturazione) possono attivare le statistiche nelle impostazioni dell'organizzazione sul web per registrare le revisioni completate.",
+      "offDescription": "I ruoli di fatturazione dell'organizzazione (proprietari, amministratori e responsabili della fatturazione) possono attivare le statistiche nelle impostazioni dell'organizzazione sul web per registrare le revisioni completate.",
       "couldNotLoad": "Impossibile caricare le statistiche",
       "trackedReviewsCaption": "Revisioni completate che si sono concluse in questo periodo con le statistiche attive. Le revisioni in corso e non riuscite non vengono mai conteggiate.",
       "trackedReviewsUncounted": "Senza conteggio: {{displayCount}} delle {{displayTotal}} revisioni terminate dell’organizzazione con risultato non registrato.",
@@ -2878,6 +2878,8 @@
     "why": "Perché",
     "who": "Chi",
     "installAttributionPromptMessage": "Kilo usa l'autorizzazione al tracciamento di Apple solo per capire quale canale ti ha portato qui. I tuoi prompt e le tue conversazioni non vengono mai usati.",
+    "installAttributionRequestFailedTitle": "Impossibile mostrare la richiesta di tracciamento",
+    "installAttributionRequestFailedMessage": "Kilo non è riuscito a mostrare la richiesta di sistema, quindi l'attribuzione dell'installazione resta disattivata.",
     "installAttributionPromptTitle": "Consentire l'attribuzione dell'installazione?"
   },
   "prReview": {

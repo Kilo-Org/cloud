@@ -956,7 +956,7 @@ a caller's sessions idle and what its tokens cost, which is the caller's number
 and not one this package can guess. Read on 2026-09-04. Anything measured after
 an idle gap is measuring the expiry, not the breakpoints.
 
-Two lessons hold beyond any one run:
+Three lessons hold beyond any one run:
 
 - **The ratio is partly the provider's.** The package places the same
   breakpoints for every model, the spread above runs from 0.28 to 0.9997 on

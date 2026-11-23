@@ -1591,7 +1591,7 @@
       "empty": "Hakuna ukaguzi wenye takwimu bado",
       "emptyDescription": "Takwimu hurekodi ukaguzi uliokamilika wakati imewashwa kwa shirika.",
       "offTitle": "Takwimu zimezimwa kwa {{platform}}",
-      "offDescription": "Majukumu ya bili ya shirika — wamiliki, wasimamizi na mameneja wa bili — yanaweza kuwasha takwimu katika mipangilio ya shirika kwenye wavuti ili kurekodi ukaguzi uliokamilika.",
+      "offDescription": "Majukumu ya bili ya shirika — wamiliki, wasimamizi na wasimamizi wa bili — yanaweza kuwasha takwimu katika mipangilio ya shirika kwenye wavuti ili kurekodi ukaguzi uliokamilika.",
       "couldNotLoad": "Imeshindwa kupakia takwimu",
       "trackedReviewsCaption": "Ukaguzi uliokamilika ulioisha katika kipindi hiki wakati takwimu zilikuwa zimewashwa. Ukaguzi unaoendelea na ulioshindikana hauhesabiwi kamwe.",
       "trackedReviewsUncounted": "Hauhesabiwi: {{displayCount}} kati ya ukaguzi {{displayTotal}} uliokamilika wa shirika, matokeo yake hayakurekodiwa.",
@@ -3401,6 +3401,8 @@
     "voiceTranscriptionWho": "Kifaa chako, Kilo Gateway na modeli ya unukuzi uliyochagua, au Apple au Google kwa utambuzi mtandaoni.",
     "installAttributionPromptTitle": "Ungependa kuruhusu utambuzi wa chanzo cha usakinishaji?",
     "installAttributionPromptMessage": "Kilo hutumia ruhusa ya ufuatiliaji ya Apple kujua tu njia iliyokuleta hapa. Maagizo na mazungumzo yako hayatumiwi kamwe kwa hili.",
+    "installAttributionRequestFailedTitle": "Imeshindwa kuonyesha ombi la ufuatiliaji",
+    "installAttributionRequestFailedMessage": "Kilo haikuweza kuonyesha ombi la mfumo, kwa hivyo utambuzi wa chanzo cha usakinishaji unabaki umezimwa.",
     "what": "Nini",
     "why": "Kwa nini",
     "who": "Nani"
@@ -3684,7 +3686,7 @@
       "pendingInvitation": "Barua pepe hii tayari ina mwaliko unaosubiri.",
       "alreadyMember": "Mtu huyu tayari ni mwanachama wa shirika hili.",
       "seatsFull": "Nafasi zote zinatumika ({{used}}/{{total}}). Muombe mmiliki wa shirika aongeze nafasi kabla ya kualika wanachama zaidi.",
-      "seatsFullCanInviteBilling": "Nafasi zote zinatumika ({{used}}/{{total}}). Bado unaweza kualika wasimamizi wa malipo, ambao hawatumii nafasi.",
+      "seatsFullCanInviteBilling": "Nafasi zote zinatumika ({{used}}/{{total}}). Bado unaweza kualika wasimamizi wa bili, ambao hawatumii nafasi.",
       "noSeatsAvailable": "Nafasi zote zinatumika. Muombe mmiliki wa shirika aongeze nafasi kabla ya kualika wanachama zaidi."
     },
     "invoices": {

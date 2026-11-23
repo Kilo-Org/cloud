@@ -3511,6 +3511,8 @@
     "voiceTranscriptionWho": "Your device, the Kilo gateway with your chosen transcription model, or Apple or Google for online recognition.",
     "installAttributionPromptTitle": "Allow install attribution?",
     "installAttributionPromptMessage": "Kilo uses Apple's tracking permission only to learn which channel brought you here. Your prompts and conversations are never used.",
+    "installAttributionRequestFailedTitle": "Couldn't show the tracking prompt",
+    "installAttributionRequestFailedMessage": "Kilo couldn't show the system prompt, so install attribution stays off.",
     "what": "What",
     "why": "Why",
     "who": "Who"

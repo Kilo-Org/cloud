@@ -2802,6 +2802,8 @@
     "revokeConsent": "Retirer le consentement",
     "revokeConsentTitle": "Retirer le consentement au partage des données ?",
     "installAttributionPromptMessage": "Kilo utilise l'autorisation de suivi d'Apple uniquement pour savoir comment vous avez découvert l'application. Vos consignes et conversations ne sont jamais utilisées.",
+    "installAttributionRequestFailedTitle": "Impossible d'afficher l'invite de suivi",
+    "installAttributionRequestFailedMessage": "Kilo n'a pas pu afficher l'invite système, donc le suivi de l'origine de l'installation reste désactivé.",
     "installAttributionPromptTitle": "Autoriser le suivi de l'origine de l'installation ?"
   },
   "agents": {
@@ -3756,7 +3758,7 @@
       "pendingInvitation": "Cette adresse e-mail a déjà une invitation en attente.",
       "alreadyMember": "Cette personne est déjà membre de cette organisation.",
       "seatsFull": "Toutes les places sont occupées ({{used}}/{{total}}). Demandez à un propriétaire de l'organisation d'ajouter des places avant d'inviter d'autres membres.",
-      "seatsFullCanInviteBilling": "Toutes les places sont occupées ({{used}}/{{total}}). Vous pouvez toujours inviter des gestionnaires de facturation, qui n'occupent pas de place.",
+      "seatsFullCanInviteBilling": "Toutes les places sont occupées ({{used}}/{{total}}). Vous pouvez toujours inviter des responsables de la facturation, qui n'occupent pas de place.",
       "noSeatsAvailable": "Toutes les places sont occupées. Demandez à un propriétaire de l'organisation d'ajouter des places avant d'inviter d'autres membres."
     },
     "invoices": {

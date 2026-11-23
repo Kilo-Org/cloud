@@ -3401,6 +3401,8 @@
     "voiceTranscriptionWho": "Ձեր սարքը, ձեր ընտրած տեքստի փոխակերպման մոդելով Kilo Gateway-ը, կամ Apple-ը կամ Google-ը՝ առցանց ճանաչման համար։",
     "installAttributionPromptTitle": "Թույլատրե՞լ որոշել տեղադրման աղբյուրը",
     "installAttributionPromptMessage": "Kilo-ն Apple-ի հետագծման թույլտվությունն օգտագործում է միայն պարզելու համար, թե որ աղբյուրից եք եկել։ Ձեր հուշումներն ու զրույցները երբեք չեն օգտագործվում։",
+    "installAttributionRequestFailedTitle": "Չհաջողվեց ցուցադրել հետագծման թույլտվության հարցումը",
+    "installAttributionRequestFailedMessage": "Kilo-ն չկարողացավ ցուցադրել համակարգի հարցումը, ուստի տեղադրման աղբյուրի որոշումը մնում է անջատված։",
     "what": "Ի՞նչ",
     "why": "Ինչո՞ւ",
     "who": "Ո՞վ"
@@ -5132,7 +5134,7 @@
   },
   "organizationGuardrails": {
     "title": "ԱԲ պաշտպանիչներ",
-    "permissionDenied": "Միայն կազմակերպության սեփականատերերը և ադմինները կարող են կառավարել ԱԲ պաշտպանիչները։ $t(organization.boundary.accessDeniedDescription)",
+    "permissionDenied": "Միայն կազմակերպության սեփականատերերը և ադմինիստրատորները կարող են կառավարել ԱԲ պաշտպանիչները։ $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "ԱԲ պաշտպանիչները միացված չեն",
     "unavailable": "Kilo-ն կազմակերպության համար միացնում է ԱԲ պաշտպանիչները՝ ըստ հայտի։ Կապվեք {{supportEmail}}-ի հետ, և Kilo թիմը դրանք միացնում է ձեր կազմակերպության համար։",
     "contactSupport": "Կապվել աջակցության ծառայության հետ",
@@ -5274,7 +5276,7 @@
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Ձեռնարկային գործառույթ",
     "enterpriseOnly": "Մատակարարները և մոդելները հասանելի են Enterprise պլանում։",
-    "readOnly": "Միայն կազմակերպության սեփականատերերը և ադմինները կարող են փոխել այս կարգավորումները։",
+    "readOnly": "Միայն կազմակերպության սեփականատերերը և ադմինիստրատորները կարող են փոխել այս կարգավորումները։",
     "loadError": "Չհաջողվեց բեռնել մատակարարներին և մոդելները",
     "tabModels": "Մոդելներ",
     "tabProviders": "Մատակարարներ",

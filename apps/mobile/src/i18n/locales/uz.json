@@ -399,7 +399,7 @@
       "title": "Provayder kalitlari",
       "rowSubtitle": "O'z provayderingiz orqali to'lash",
       "orgDescription": "Bu kalitlar tashkilotdagi barcha a'zolar bilan ulashiladi va to'lov tashkilotning provayder hisoblaridan olinadi.",
-      "viewOnly": "Tashkilot kalitlarini faqat uning egasi, administratori yoki to'lovlar menejeri o'zgartira oladi.",
+      "viewOnly": "Tashkilot kalitlarini faqat uning egasi, administratori yoki to'lov menejeri o'zgartira oladi.",
       "description": "Bu kalitlar orqali yuborilgan so'rovlar uchun to'lov Kilo balansingizdan emas, provayder hisobingizdan olinadi.",
       "managedByPlan": "Kodlash tarifingiz orqali boshqariladi",
       "enableKey": "{{provider}} kalitini yoqish",
@@ -1591,7 +1591,7 @@
       "empty": "Statistikasi bor koʻrib chiqishlar hozircha yoʻq",
       "emptyDescription": "Statistika tashkilot uchun yoqilgan boʻlsa, tugallangan koʻrib chiqishlarni qayd etadi.",
       "offTitle": "{{platform}} uchun statistika oʻchirilgan",
-      "offDescription": "Tashkilotning billing rollari — egalar, administratorlar va billing menejerlari — tugallangan koʻrib chiqishlarni qayd etish uchun statistikani vebdagi tashkilot sozlamalarida yoqishi mumkin.",
+      "offDescription": "Tashkilotning to'lov rollari — egalar, administratorlar va to'lov menejerlari — tugallangan koʻrib chiqishlarni qayd etish uchun statistikani vebdagi tashkilot sozlamalarida yoqishi mumkin.",
       "couldNotLoad": "Statistikani yuklab boʻlmadi",
       "trackedReviewsCaption": "Bu davrda statistika yoqilgan holda tugallangan koʻrib chiqishlar. Jarayondagi va muvaffaqiyatsiz yakunlangan koʻrib chiqishlar hech qachon hisobga olinmaydi.",
       "trackedReviewsUncounted": "Hisobga olinmagan: {{displayCount}} / {{displayTotal}} tashkilotdagi tugallangan ko’rib chiqishning, ularning natijasi qayd etilmagan.",
@@ -3401,6 +3401,8 @@
     "voiceTranscriptionWho": "Qurilmangiz, siz tanlagan transkripsiya modeli bilan Kilo Gateway yoki onlayn tanib olish uchun Apple yoki Google.",
     "installAttributionPromptTitle": "O'rnatish manbasini aniqlashga ruxsat berilsinmi?",
     "installAttributionPromptMessage": "Kilo Apple tizimidagi kuzatish ruxsatidan faqat ilovani qaysi manba orqali topganingizni bilish uchun foydalanadi. Bunda so'rovlaringiz va suhbatlaringiz hech qachon ishlatilmaydi.",
+    "installAttributionRequestFailedTitle": "Kuzatish so'rovini ko'rsatib bo'lmadi",
+    "installAttributionRequestFailedMessage": "Kilo tizim so'rovini ko'rsata olmadi, shu sababli o'rnatish manbasini aniqlash o'chiq qoladi.",
     "what": "Qaysi ma'lumotlar",
     "why": "Nima uchun",
     "who": "Kimga"
@@ -3416,7 +3418,7 @@
   "organization": {
     "auditLog": {
       "title": "Audit jurnali",
-      "permissionDenied": "Audit jurnalini faqat Enterprise tarifidagi tashkilot egasi, administratori yoki to'lovlar menejeri ko'ra oladi. $t(organization.boundary.accessDeniedDescription)",
+      "permissionDenied": "Audit jurnalini faqat Enterprise tarifidagi tashkilot egasi, administratori yoki to'lov menejeri ko'ra oladi. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Audit hodisalari yo'q",
       "emptyDescription": "Bu tashkilotda bajarilgan amallar shu yerda ko'rinadi.",
       "truncated": "Eng so'nggi hodisalar ko'rsatilmoqda.",
@@ -3606,7 +3608,7 @@
     },
     "billing": {
       "title": "To'lovlar",
-      "permissionDenied": "To'lovlarni faqat tashkilot egasi, administratori yoki to'lovlar menejeri ko'ra oladi. $t(organization.boundary.accessDeniedDescription)",
+      "permissionDenied": "To'lovlarni faqat tashkilot egasi, administratori yoki to'lov menejeri ko'ra oladi. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Obuna",
       "state": "Holat",
       "stateNone": "Obuna yo'q",
@@ -3684,7 +3686,7 @@
       "pendingInvitation": "Bu elektron pochta uchun allaqachon kutilayotgan taklifnoma mavjud.",
       "alreadyMember": "Bu shaxs allaqachon ushbu tashkilotning a'zosi.",
       "seatsFull": "Barcha o'rinlar band ({{used}}/{{total}}). Ko'proq a'zo taklif qilishdan oldin tashkilot egasidan o'rinlar qo'shishni so'rang.",
-      "seatsFullCanInviteBilling": "Barcha o'rinlar band ({{used}}/{{total}}). Siz hali ham o'rin egallamaydigan hisob-kitob menejerlarini taklif qilishingiz mumkin.",
+      "seatsFullCanInviteBilling": "Barcha o'rinlar band ({{used}}/{{total}}). Siz hali ham o'rin egallamaydigan to'lov menejerlarini taklif qilishingiz mumkin.",
       "noSeatsAvailable": "Barcha o'rinlar band. Ko'proq a'zo taklif qilishdan oldin tashkilot egasidan o'rinlar qo'shishni so'rang."
     },
     "invoices": {
@@ -3783,7 +3785,7 @@
       "emptyDescription": "Oldingi so'rovlarni ko'rish uchun «Oldingi soat» tugmasidan foydalaning.",
       "emptyBoundDescription": "So'rovlar jurnali bundan oldingi vaqtni qamrab olmaydi.",
       "loadError": "So'rovlar jurnallarini yuklab bo'lmadi.",
-      "permissionDenied": "So'rovlar jurnallarini faqat tashkilot egasi, administratori yoki to'lovlar menejeri ko'ra oladi. $t(organization.boundary.accessDeniedDescription)",
+      "permissionDenied": "So'rovlar jurnallarini faqat tashkilot egasi, administratori yoki to'lov menejeri ko'ra oladi. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} kirish · {{output}} chiqish",
       "byok": "BYOK"
     },

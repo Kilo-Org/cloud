@@ -1591,7 +1591,7 @@
       "empty": "Inga granskningar med statistik än",
       "emptyDescription": "Statistiken registrerar slutförda granskningar så länge den är aktiverad för organisationen.",
       "offTitle": "Statistiken är avstängd för {{platform}}",
-      "offDescription": "Organisationens faktureringsroller (ägare, administratörer och fakturahanterare) kan aktivera statistiken i organisationens inställningar på webben för att registrera slutförda granskningar.",
+      "offDescription": "Organisationens faktureringsroller (ägare, administratörer och faktureringsansvariga) kan aktivera statistiken i organisationens inställningar på webben för att registrera slutförda granskningar.",
       "couldNotLoad": "Det gick inte att läsa in statistiken",
       "trackedReviewsCaption": "Slutförda granskningar som avslutades under den här perioden medan statistiken var aktiverad. Pågående och misslyckade granskningar räknas aldrig.",
       "trackedReviewsUncounted": "Räknas inte: {{displayCount}} av organisationens {{displayTotal}} avslutade granskningar utan registrerat resultat.",
@@ -3401,6 +3401,8 @@
     "voiceTranscriptionWho": "Din enhet, Kilo Gateway med den transkriberingsmodell du väljer, eller Apple eller Google för identifiering online.",
     "installAttributionPromptTitle": "Tillåt spårning av installationskälla?",
     "installAttributionPromptMessage": "Kilo använder Apples spårningsbehörighet bara för att ta reda på vilken kanal du hittade appen genom. Dina prompter och konversationer används aldrig.",
+    "installAttributionRequestFailedTitle": "Det gick inte att visa förfrågan om spårning",
+    "installAttributionRequestFailedMessage": "Kilo kunde inte visa systemförfrågan, så spårningen av installationskälla förblir avstängd.",
     "what": "Vad",
     "why": "Varför",
     "who": "Vem"

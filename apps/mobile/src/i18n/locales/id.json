@@ -1029,7 +1029,7 @@
       "empty": "Belum ada tinjauan dengan analitik",
       "emptyDescription": "Analitik mencatat tinjauan yang selesai selama fitur ini aktif untuk organisasi.",
       "offTitle": "Analitik nonaktif untuk {{platform}}",
-      "offDescription": "Peran penagihan organisasi (pemilik, admin, dan pengelola penagihan) dapat mengaktifkan analitik di pengaturan organisasi di web untuk mencatat tinjauan yang selesai.",
+      "offDescription": "Peran penagihan organisasi (pemilik, admin, dan manajer penagihan) dapat mengaktifkan analitik di pengaturan organisasi di web untuk mencatat tinjauan yang selesai.",
       "couldNotLoad": "Tidak dapat memuat analitik",
       "trackedReviewsCaption": "Tinjauan yang selesai selama periode ini dengan analitik aktif. Tinjauan yang sedang berjalan dan gagal tidak pernah dihitung.",
       "trackedReviewsUncounted": "Tidak dihitung: {{displayCount}} dari {{displayTotal}} tinjauan yang selesai milik organisasi, hasilnya tidak terekam.",
@@ -2841,6 +2841,8 @@
     "why": "Tujuan",
     "who": "Penerima",
     "installAttributionPromptMessage": "Kilo menggunakan izin pelacakan Apple hanya untuk mengetahui saluran yang memperkenalkan Kilo kepadamu. Instruksi dan percakapanmu tidak pernah digunakan.",
+    "installAttributionRequestFailedTitle": "Tidak dapat menampilkan permintaan pelacakan",
+    "installAttributionRequestFailedMessage": "Kilo tidak dapat menampilkan permintaan sistem, jadi pelacakan sumber pemasangan tetap nonaktif.",
     "installAttributionPromptTitle": "Izinkan pelacakan sumber pemasangan?"
   },
   "prReview": {
@@ -3424,7 +3426,7 @@
         "promoCreditGranted": "Kredit promosi diberikan",
         "memberRemove": "Anggota dihapus",
         "memberChangeRole": "Peran anggota diubah",
-        "memberAdminAdd": "Administrator ditambahkan",
+        "memberAdminAdd": "Admin ditambahkan",
         "memberAutoJoin": "Anggota bergabung otomatis",
         "ssoAutoProvision": "Pengguna disediakan oleh SSO",
         "ssoSetDomain": "Domain SSO ditambahkan",
@@ -3688,7 +3690,7 @@
       "pendingInvitation": "Email ini sudah memiliki undangan yang tertunda.",
       "alreadyMember": "Orang ini sudah menjadi anggota organisasi ini.",
       "seatsFull": "Semua kursi sudah terpakai ({{used}}/{{total}}). Minta pemilik organisasi untuk menambah kursi sebelum mengundang lebih banyak anggota.",
-      "seatsFullCanInviteBilling": "Semua kursi sudah terpakai ({{used}}/{{total}}). Kamu masih dapat mengundang pengelola penagihan, yang tidak menggunakan kursi.",
+      "seatsFullCanInviteBilling": "Semua kursi sudah terpakai ({{used}}/{{total}}). Kamu masih dapat mengundang manajer penagihan, yang tidak menggunakan kursi.",
       "noSeatsAvailable": "Semua kursi sudah terpakai. Minta pemilik organisasi untuk menambah kursi sebelum mengundang lebih banyak anggota."
     },
     "invoices": {
@@ -5132,7 +5134,7 @@
   },
   "organizationGuardrails": {
     "title": "Pagar Pengaman Kecerdasan Artifisial",
-    "permissionDenied": "Hanya pemilik dan administrator organisasi yang dapat mengelola Pagar Pengaman Kecerdasan Artifisial. $t(organization.boundary.accessDeniedDescription)",
+    "permissionDenied": "Hanya pemilik dan admin organisasi yang dapat mengelola Pagar Pengaman Kecerdasan Artifisial. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Pagar Pengaman Kecerdasan Artifisial tidak diaktifkan",
     "unavailable": "Kilo mengaktifkan Pagar Pengaman Kecerdasan Artifisial untuk sebuah organisasi atas permintaan. Hubungi {{supportEmail}}, dan tim Kilo mengaktifkannya untuk organisasi Anda.",
     "contactSupport": "Hubungi tim dukungan",
@@ -5274,7 +5276,7 @@
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Fitur perusahaan",
     "enterpriseOnly": "Penyedia dan model tersedia di paket Enterprise.",
-    "readOnly": "Hanya pemilik dan administrator organisasi yang dapat mengubah pengaturan ini.",
+    "readOnly": "Hanya pemilik dan admin organisasi yang dapat mengubah pengaturan ini.",
     "loadError": "Penyedia dan model tidak dapat dimuat",
     "tabModels": "Model",
     "tabProviders": "Penyedia",

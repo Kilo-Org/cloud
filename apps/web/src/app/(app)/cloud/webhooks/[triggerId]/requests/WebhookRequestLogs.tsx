@@ -120,7 +120,7 @@ export function WebhookRequestLogs({
             {incompleteMessageCount > 0 && (
               <p role="status" className="text-muted-foreground mb-2">
                 Transcript incomplete: {incompleteMessageCount}{' '}
-                {incompleteMessageCount === 1 ? 'message' : 'messages'} could not be loaded.
+                {incompleteMessageCount === 1 ? 'message has' : 'messages have'} missing content.
               </p>
             )}
             {hasTranscript && data.transcript ? (

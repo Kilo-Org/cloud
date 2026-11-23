@@ -3401,6 +3401,8 @@
     "voiceTranscriptionWho": "የእርስዎ መሣሪያ፣ Kilo Gateway ከመረጡት የጽሑፍ ቅየራ ሞዴል ጋር፣ ወይም Apple ወይም Google ለመስመር ላይ መለያ።",
     "installAttributionPromptTitle": "የመተግበሪያውን ምንጭ ለመለየት ይፈቅዳሉ?",
     "installAttributionPromptMessage": "Kilo የApple መከታተያ ፈቃድን የሚጠቀመው እዚህ በምን መንገድ እንደደረሱ ለማወቅ ብቻ ነው። ጥያቄዎችዎና ውይይቶችዎ በፍጹም ጥቅም ላይ አይውሉም።",
+    "installAttributionRequestFailedTitle": "የመከታተያ ጥያቄውን ማሳየት አልተቻለም",
+    "installAttributionRequestFailedMessage": "Kilo የስርዓቱን ጥያቄ ማሳየት አልቻለም፣ ስለዚህ የመተግበሪያውን ምንጭ መለየት ተዘግቷል።",
     "what": "ምን",
     "why": "ለምን",
     "who": "ማን"
@@ -3684,7 +3686,7 @@
       "pendingInvitation": "ይህ ኢሜይል አስቀድሞ በመጠባበቅ ላይ ያለ ግብዣ አለው።",
       "alreadyMember": "ይህ ሰው አስቀድሞ የዚህ ድርጅት አባል ነው።",
       "seatsFull": "ሁሉም መቀመጫዎች በጥቅም ላይ ናቸው ({{used}}/{{total}})። ተጨማሪ አባላትን ከመጋበዝዎ በፊት የድርጅት ባለቤት መቀመጫዎችን እንዲጨምር ይጠይቁ።",
-      "seatsFullCanInviteBilling": "ሁሉም መቀመጫዎች በጥቅም ላይ ናቸው ({{used}}/{{total}})። መቀመጫ የማይይዙ የሂሳብ አከፋፈል አስተዳዳሪዎችን አሁንም መጋበዝ ይችላሉ።",
+      "seatsFullCanInviteBilling": "ሁሉም መቀመጫዎች በጥቅም ላይ ናቸው ({{used}}/{{total}})። መቀመጫ የማይይዙ የክፍያ አስተዳዳሪዎችን አሁንም መጋበዝ ይችላሉ።",
       "noSeatsAvailable": "ሁሉም መቀመጫዎች በጥቅም ላይ ናቸው። ተጨማሪ አባላትን ከመጋበዝዎ በፊት የድርጅት ባለቤት መቀመጫዎችን እንዲጨምር ይጠይቁ።"
     },
     "invoices": {

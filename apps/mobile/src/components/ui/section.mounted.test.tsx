@@ -12,6 +12,9 @@ vi.mock('react-native', () => ({
   View: 'View',
 }));
 vi.mock('@rn-primitives/slot', () => ({ Text: 'Slot.Text' }));
+// The chevron is a theme-coloured glyph, so it mounts as its own type here: the
+// assertions read its presence, not its paint.
+vi.mock('@/components/ui/row-chevron', () => ({ RowChevron: 'RowChevron' }));
 
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 
@@ -56,6 +59,33 @@ describe('Section mounted layout', () => {
 
     expect(action.props.testID).toBe('section-see-all');
     expect(action.props.accessibilityLabel).toBe('See all');
+  });
+
+  it('ends the action in the shared chevron only when asked to', () => {
+    const withChevron = mount(
+      <Section label="Usage" actionLabel="Usage" actionChevron onActionPress={() => undefined}>
+        <Child />
+      </Section>
+    );
+    const action = withChevron.findByProps({ accessibilityRole: 'button' });
+
+    // The chevron sits inside the button, after the copy, and adds no name of
+    // its own: the button's label is the action's alone.
+    expect(action.findAllByType('RowChevron' as never)).toHaveLength(1);
+    expect(action.props.accessibilityLabel).toBe('Usage');
+    expect(String(action.props.className)).toContain('gap-1');
+
+    act(() => renderer?.unmount());
+    const textOnly = mount(
+      <Section label="Usage" actionLabel="Usage" onActionPress={() => undefined}>
+        <Child />
+      </Section>
+    );
+    const plainAction = textOnly.findByProps({ accessibilityRole: 'button' });
+
+    expect(plainAction.findAllByType('RowChevron' as never)).toHaveLength(0);
+    // A text-only action keeps the box it had, gap included.
+    expect(String(plainAction.props.className)).not.toContain('gap-1');
   });
 
   it('renders the header and its content in one stack', () => {

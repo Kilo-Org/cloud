@@ -102,6 +102,19 @@ type OrgUsageStatsProps = {
  * tiles are not elements of their own: a reader moving by element must reach
  * the grid once, not a text stop per tile followed by the control that opens
  * the screen.
+ *
+ * The pressable grid also carries a visible destination in the section header —
+ * the usage area's short name (`usage.title`), painted in the section action —
+ * because the grid's hint is announced to a screen reader and invisible to a
+ * sighted member, who would otherwise see four read-only-looking cards. The
+ * action ends in the chevron the hub's other destinations carry, so the header
+ * reads as one more way out of the screen. It is that short name rather than
+ * the hint's wording ("View usage details"): that copy measured 145 dp at the
+ * gate's widest cell and pushed the action onto a second line in a 360 dp
+ * compact header, away from the eyebrow it belongs to, and the screen's own
+ * title (`usage.orgTitle`, "Organization usage") is no shorter. The header
+ * action is painted only in the pressable state, so the informational grid
+ * keeps the header and the geometry it has.
  */
 export function OrgUsageStats({ organizationId, onPress }: Readonly<OrgUsageStatsProps>) {
   const { t } = useTranslation();
@@ -111,6 +124,9 @@ export function OrgUsageStats({ organizationId, onPress }: Readonly<OrgUsageStat
   // same source the offline banner paints.
   const committedConnectivity = useCommittedConnectivityStatus();
   const unavailable = data == null && (isError || committedConnectivity === 'offline');
+  // One condition decides both surfaces of the destination: the section
+  // header's link and the pressable wrapper around the grid.
+  const opensUsage = onPress !== undefined && !unavailable;
   // A tile with no totals yet shows a loading block while the first request is
   // outstanding, the dash when the section cannot load at all, and the cached
   // totals through a refetch error.
@@ -166,7 +182,7 @@ export function OrgUsageStats({ organizationId, onPress }: Readonly<OrgUsageStat
               key={tile.label}
               label={tile.label}
               value={tile.value}
-              asElement={onPress === undefined || unavailable}
+              asElement={!opensUsage}
             />
           ))}
         </View>
@@ -175,10 +191,14 @@ export function OrgUsageStats({ organizationId, onPress }: Readonly<OrgUsageStat
   );
 
   return (
-    <Section label={t('organization.usageStats.orgLast30Days')}>
-      {onPress === undefined || unavailable ? (
-        grid
-      ) : (
+    <Section
+      label={t('organization.usageStats.orgLast30Days')}
+      actionLabel={opensUsage ? t('usage.title') : undefined}
+      actionChevron
+      onActionPress={onPress}
+      actionTestID={opensUsage ? 'org-usage-action' : undefined}
+    >
+      {opensUsage ? (
         // The button wraps the grid, not the section: the eyebrow stays its own
         // heading stop beside it on both platforms.
         <Pressable
@@ -190,6 +210,8 @@ export function OrgUsageStats({ organizationId, onPress }: Readonly<OrgUsageStat
         >
           {grid}
         </Pressable>
+      ) : (
+        grid
       )}
       {unavailable && (
         <View className="gap-2">

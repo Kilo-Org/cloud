@@ -11,6 +11,13 @@ type SectionProps = {
   icon?: ReactNode;
   actionLabel?: string;
   onActionPress?: () => void;
+  /**
+   * Ends the action in the shared `RowChevron` the destination rows of the same
+   * screen carry, for an action that leaves the screen. Opt-in: an in-place
+   * action (Home's `SEE ALL` opening a sheet, Credits' `ADD CREDITS`) keeps its
+   * text-only look.
+   */
+  actionChevron?: boolean;
   /** Test handle for the section's action control. */
   actionTestID?: string;
   actionHidden?: boolean;
@@ -29,6 +36,7 @@ export function Section({
   icon,
   actionLabel,
   onActionPress,
+  actionChevron,
   actionTestID,
   actionHidden,
   actionDisabled,
@@ -45,6 +53,7 @@ export function Section({
           icon={icon}
           actionLabel={actionLabel}
           onActionPress={onActionPress}
+          actionChevron={actionChevron}
           actionTestID={actionTestID}
           actionHidden={actionHidden}
           actionDisabled={actionDisabled}

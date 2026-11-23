@@ -2360,6 +2360,12 @@
       "attachmentUploadingToStart": "Üks manus laaditakse veel üles. Eemalda see, et alustada ilma selleta.",
       "modelMissingToStart": "Alustamiseks vali mudel.",
       "staleRepositoryToStart": "Valitud hoidla pole enam saadaval. Alustamiseks vali hoidla uuesti.",
+      "modelNeedsCreditsToStart": "See mudel vajab krediiti. Alustamiseks vali tasuta mudel.",
+      "eligibility": {
+        "limitedTitle": "Tasuta mudelid saadaval",
+        "balance": "Sinu saldo on {{amount}}. Tasuta mudelid on endiselt saadaval.",
+        "unavailable": "Saldo kontrollimine ebaõnnestus."
+      },
       "promptPlaceholder": "Mille kallal tahaksid töötada?",
       "couldNotLoadModels": "Mudeleid ei õnnestunud laadida.",
       "prefillRepoAndModelUnavailable": "Algse seansi hoidla ja mudel pole enam saadaval. Vali allpool uus hoidla ja mudel.",

@@ -2507,6 +2507,12 @@
       "attachmentUploadingToStart": "Anness għadu qed jitgħabba. Neħħih biex tibda mingħajru.",
       "modelMissingToStart": "Agħżel mudell biex tibda.",
       "staleRepositoryToStart": "Ir-repożitorju magħżul m'għadux disponibbli. Erġa' agħżel repożitorju biex tibda.",
+      "modelNeedsCreditsToStart": "Dan il-mudell jeħtieġ krediti. Agħżel mudell b'xejn biex tibda.",
+      "eligibility": {
+        "limitedTitle": "Mudelli b'xejn disponibbli",
+        "balance": "Il-bilanċ tiegħek huwa {{amount}}. Il-mudelli b'xejn għadhom disponibbli.",
+        "unavailable": "Ma setax jiġi ċċekkjat il-bilanċ tiegħek."
+      },
       "promptPlaceholder": "Fuq xiex tixtieq taħdem?",
       "couldNotLoadModels": "Ma setgħux jitgħabbew il-mudelli.",
       "prefillRepoAndModelUnavailable": "Ir-repożitorju u l-mudell tas-sessjoni oriġinali m'għadhomx disponibbli. Agħżel oħrajn hawn taħt.",

@@ -1798,6 +1798,12 @@
       "attachmentUploadingToStart": "Bir ek hâlâ yükleniyor. Onsuz başlamak için kaldır.",
       "modelMissingToStart": "Başlamak için bir model seç.",
       "staleRepositoryToStart": "Seçilen depo artık kullanılamıyor. Başlamak için yeniden bir depo seç.",
+      "modelNeedsCreditsToStart": "Bu model kredi gerektiriyor. Başlamak için ücretsiz bir model seç.",
+      "eligibility": {
+        "limitedTitle": "Ücretsiz modeller mevcut",
+        "balance": "Bakiyen {{amount}}. Ücretsiz modeller hâlâ mevcut.",
+        "unavailable": "Bakiyen kontrol edilemedi."
+      },
       "promptPlaceholder": "Ne üzerinde çalışmak istersin?",
       "couldNotLoadModels": "Modeller yüklenemedi.",
       "prefillRepoAndModelUnavailable": "Önceki oturumun deposu ve modeli artık kullanılamıyor. Aşağıdan yeni bir depo ve model seç.",

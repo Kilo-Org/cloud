@@ -2360,6 +2360,12 @@
       "attachmentUploadingToStart": "Ana ci gaba da ɗora wani haɗe. Cire shi don farawa ba tare da shi ba.",
       "modelMissingToStart": "Zaɓi samfuri don farawa.",
       "staleRepositoryToStart": "Ma'ajiyar da aka zaɓa ba ta wanzuwa kuma. Sake zaɓar ma'ajiya don farawa.",
+      "modelNeedsCreditsToStart": "Wannan samfurin yana buƙatar kuɗin amfani. Zaɓi samfuri na kyauta don farawa.",
+      "eligibility": {
+        "limitedTitle": "Akwai samfura kyauta",
+        "balance": "Ragowar kuɗinka ita ce {{amount}}. Har yanzu akwai samfura kyauta.",
+        "unavailable": "An kasa duba ragowar kuɗinka."
+      },
       "promptPlaceholder": "Me kake so ka yi aiki a kai?",
       "couldNotLoadModels": "An kasa loda samfura.",
       "prefillRepoAndModelUnavailable": "An daina samun ma'ajiya da samfurin da aka yi amfani da su a zaman na asali. Zaɓi wasu a ƙasa.",

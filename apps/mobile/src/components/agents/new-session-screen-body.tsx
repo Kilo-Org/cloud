@@ -76,6 +76,13 @@ import {
 import { useAndroidPendingPickerRecovery } from '@/lib/agent-attachments/use-android-pending-picker-recovery';
 import { hasVisibleComposerText } from '@/lib/composer-text';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
+import { useCloudAgentEligibility } from '@/lib/hooks/use-cloud-agent-eligibility';
+import {
+  filterModelOptionsForLimitedAccess,
+  PENDING_ELIGIBILITY,
+  selectionNeedsCredits,
+} from '@/lib/cloud-agent-eligibility';
+import { CloudAgentEligibilityNotice } from '@/components/agents/cloud-agent-eligibility-notice';
 import { useCliAgents } from '@/lib/hooks/use-cli-agents';
 import { useCollapsedConnectCtas } from '@/lib/hooks/use-collapsed-connect-ctas-preference';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
@@ -454,10 +461,6 @@ export function NewSessionScreenBody() {
   const pinned = isCloneEntry ? {} : resolvePinnedAgentModel({ slug: mode, profileAgents });
   const displayModel = pinned.model ?? modelView.selectedValue;
   const displayVariant = pinned.model ? (pinned.variant ?? '') : modelView.selectedVariant;
-  const modelOptionsForToolbar =
-    pinned.model && !modelView.options.some(option => option.id === pinned.model)
-      ? [...modelView.options, lockedModelOption(pinned)]
-      : modelView.options;
 
   const trpc = useTRPC();
   const {
@@ -532,6 +535,33 @@ export function NewSessionScreenBody() {
   });
   const [environmentSheetOpen, setEnvironmentSheetOpen] = useState(false);
   const isCloudTarget = runOnInstance === null && !computerTargetSelected;
+  // The Cloud Agent access answer for the account this session is created in.
+  // Only the ordinary Cloud Agent entry reads it: a computer target runs on the
+  // person's own machine and spends no Cloud Agent balance, and the clone entry
+  // has no composer or model picker to restrict.
+  const eligibility = useCloudAgentEligibility(organizationId);
+  const eligibilityApplies = isCloudTarget && !isCloneEntry;
+  const handleEligibilityRetry = eligibility.retry;
+  const cloudEligibilityState = eligibilityApplies ? eligibility.state : PENDING_ELIGIBILITY;
+  const allowedModelOptions = filterModelOptionsForLimitedAccess(
+    modelView.options,
+    cloudEligibilityState
+  );
+  // The pinned agent's own model is not a pick — the locked chip names it — so
+  // it is added back after the filter instead of being hidden from the row that
+  // shows it.
+  const modelOptionsForToolbar =
+    pinned.model && !allowedModelOptions.some(option => option.id === pinned.model)
+      ? [...allowedModelOptions, lockedModelOption(pinned)]
+      : allowedModelOptions;
+  // A remembered or pinned selection can name a model the filter removed. The
+  // gate reads the catalog row itself rather than the filtered list, so the
+  // person sees the model they have and the reason Start waits.
+  const cloudModelNeedsCredits = selectionNeedsCredits({
+    state: cloudEligibilityState,
+    selection: displayModel,
+    option: modelView.options.find(option => option.id === displayModel),
+  });
   const environmentSelection = sessionEnvironment.selection;
   const selectedEnvironmentId = sessionEnvironment.environment?.id ?? null;
   const environmentBlocked =
@@ -1235,6 +1265,7 @@ export function NewSessionScreenBody() {
       selectedRepo,
       selectedRepositoryResolved: selectedRepository !== null,
       profileGate,
+      modelNeedsCredits: cloudModelNeedsCredits,
     });
   }
 
@@ -1292,6 +1323,7 @@ export function NewSessionScreenBody() {
             isSubmitting,
             model: displayModel,
             profileGate,
+            modelNeedsCredits: cloudModelNeedsCredits,
           },
         }
   );
@@ -1363,6 +1395,11 @@ export function NewSessionScreenBody() {
     startBlockedAction = { label: t('common.retry'), onPress: () => void refetchProfile() };
   } else if (startBlockedReasonKey === 'model-missing') {
     startBlockedReason = t('agentChat.newSession.modelMissingToStart');
+  } else if (startBlockedReasonKey === 'model-needs-credits') {
+    // The notice under the composer states the balance and offers the top-up;
+    // the footer names the one step that clears this gate without leaving the
+    // form, which is the pick of a free model.
+    startBlockedReason = t('agentChat.newSession.modelNeedsCreditsToStart');
   } else if (startBlockedReasonKey === 'stale-selection') {
     // The repository section already asked for a new pick; the footer says why
     // Start stayed disabled after a refresh dropped the selected row.
@@ -1566,6 +1603,16 @@ export function NewSessionScreenBody() {
         onRetryCloudCreate={handleStartSession}
         planRefusal={planRefusal}
         planRefusalAction={planRefusalAction}
+        eligibilityNotice={
+          eligibilityApplies ? (
+            <CloudAgentEligibilityNotice
+              state={cloudEligibilityState}
+              organizationId={organizationId}
+              onRetry={handleEligibilityRetry}
+              isRetrying={eligibility.isRetrying}
+            />
+          ) : null
+        }
         remoteSpawnFailure={remoteSpawn.remoteSpawnFailure}
         onRetryRemoteSpawn={handleStartSession}
       />

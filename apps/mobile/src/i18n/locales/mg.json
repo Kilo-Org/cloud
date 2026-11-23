@@ -2360,6 +2360,12 @@
       "attachmentUploadingToStart": "Mbola ampidirina ny rakitra ampiarahina. Esory izy raha hanombohana tsy misy azy.",
       "modelMissingToStart": "Misafidiana modely hanombohana.",
       "staleRepositoryToStart": "Tsy azo ampiasaina intsony ny tahirin-kaody voafidy. Misafidiana tahirin-kaody indray hanombohana.",
+      "modelNeedsCreditsToStart": "Mila kireditra ity modely ity. Misafidiana modely maimaimpoana hanombohana.",
+      "eligibility": {
+        "limitedTitle": "Misy modely maimaimpoana",
+        "balance": "Ny ambim-bolinao dia {{amount}}. Mbola misy modely maimaimpoana.",
+        "unavailable": "Tsy voamarina ny ambim-bolinao."
+      },
       "promptPlaceholder": "Inona no tianao hiasana?",
       "couldNotLoadModels": "Tsy voaray ny modely.",
       "prefillRepoAndModelUnavailable": "Tsy azo ampiasaina intsony ny tahirin-kaody sy ny modelin'ny fotoam-piasana niandohana. Misafidiana etsy ambany.",

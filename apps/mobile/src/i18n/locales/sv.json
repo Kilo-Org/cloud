@@ -2360,6 +2360,12 @@
       "attachmentUploadingToStart": "En bilaga laddas fortfarande upp. Ta bort den för att starta utan den.",
       "modelMissingToStart": "Välj en modell för att starta.",
       "staleRepositoryToStart": "Det valda kodarkivet är inte längre tillgängligt. Välj ett kodarkiv igen för att starta.",
+      "modelNeedsCreditsToStart": "Den här modellen kräver krediter. Välj en gratis modell för att starta.",
+      "eligibility": {
+        "limitedTitle": "Gratis modeller tillgängliga",
+        "balance": "Ditt saldo är {{amount}}. Gratis modeller är fortfarande tillgängliga.",
+        "unavailable": "Kunde inte kontrollera saldot."
+      },
       "promptPlaceholder": "Vad vill du arbeta med?",
       "couldNotLoadModels": "Det gick inte att läsa in modellerna.",
       "prefillRepoAndModelUnavailable": "Den ursprungliga sessionens kodarkiv och modell är inte längre tillgängliga. Välj ett nytt kodarkiv och en ny modell nedan.",

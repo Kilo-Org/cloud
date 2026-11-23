@@ -2360,6 +2360,12 @@
       "attachmentUploadingToStart": "Liite latautuu yhä. Poista se jatkaaksesi ilman sitä.",
       "modelMissingToStart": "Valitse malli aloittaaksesi.",
       "staleRepositoryToStart": "Valittu koodivarasto ei ole enää saatavilla. Valitse koodivarasto uudelleen aloittaaksesi.",
+      "modelNeedsCreditsToStart": "Tämä malli tarvitsee krediittejä. Valitse ilmainen malli aloittaaksesi.",
+      "eligibility": {
+        "limitedTitle": "Ilmaiset mallit saatavilla",
+        "balance": "Saldosi on {{amount}}. Ilmaisia malleja on edelleen saatavilla.",
+        "unavailable": "Saldoa ei voitu tarkistaa."
+      },
       "promptPlaceholder": "Mitä haluaisit tehdä?",
       "couldNotLoadModels": "Malleja ei voitu ladata.",
       "prefillRepoAndModelUnavailable": "Alkuperäisen istunnon koodivarasto ja malli eivät ole enää käytettävissä. Valitse uudet alta.",

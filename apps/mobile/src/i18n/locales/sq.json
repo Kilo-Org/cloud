@@ -2360,6 +2360,12 @@
       "attachmentUploadingToStart": "Një bashkëngjitje po ngarkohet ende. Hiqe për të filluar pa të.",
       "modelMissingToStart": "Zgjidh një model për të filluar.",
       "staleRepositoryToStart": "Depoja e zgjedhur nuk është më e disponueshme. Zgjidh përsëri një depo për të filluar.",
+      "modelNeedsCreditsToStart": "Ky model kërkon kredite. Zgjidh një model falas për të filluar.",
+      "eligibility": {
+        "limitedTitle": "Modelet falas të disponueshme",
+        "balance": "Gjendja jote është {{amount}}. Modelet falas janë ende të disponueshme.",
+        "unavailable": "Nuk u kontrollua gjendja jote."
+      },
       "promptPlaceholder": "Me çfarë do të punosh?",
       "couldNotLoadModels": "Nuk u ngarkuan modelet.",
       "prefillRepoAndModelUnavailable": "Depoja dhe modeli i seancës fillestare nuk janë më të disponueshëm. Zgjidhi më poshtë.",

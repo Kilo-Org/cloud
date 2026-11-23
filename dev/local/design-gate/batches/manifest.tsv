@@ -117,6 +117,8 @@ T2-G08a	T2	signed-in	base	android,ios	happy	-	kiloapp:///dev/agent-chat-fixture?
 T2-G08c	T2	signed-in	base	android,ios	happy	-	kiloapp:///dev/attachment-chip-fixture	screen	(app)/attachment-chip-fixture
 T2-G08c	T2	signed-in	base	android,ios	happy	-	kiloapp:///dev/preparation-copy-fixture	screen	(app)/preparation-copy-fixture
 T2-G08c	T2	signed-in	base	android,ios	happy	-	kiloapp:///dev/new-session-plan-refusal-fixture	screen	(app)/new-session-plan-refusal-fixture
+T2-G08c	T2	signed-in	base	android,ios	happy	-	kiloapp:///dev/new-session-eligibility-fixture	screen	(app)/new-session-eligibility-fixture
+T2-G08c	T2	signed-in	base	android,ios	retryable-error	-	kiloapp:///dev/new-session-eligibility-fixture?state=unavailable	screen	(app)/new-session-eligibility-fixture
 T2-G09a	T2	signed-in	base	android,ios	happy	-	kiloapp:///(app)/agent-briefing/settings	screen	(app)/agent-briefing/settings
 T2-G09a	T2	signed-in	base	android,ios	happy	-	kiloapp:///(app)/agent-chat/{{seed:sessions.rootSessionId}}	screen	(app)/agent-chat/[session-id]
 T2-G09a	T2	signed-in	base	android,ios	happy	-	kiloapp:///(app)/agent-chat/{{seed:sessions.childSessionId}}	screen	(app)/agent-chat/[session-id]

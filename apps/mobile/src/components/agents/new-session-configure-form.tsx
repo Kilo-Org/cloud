@@ -167,6 +167,7 @@ export function NewSessionConfigureForm({
   onRetryCloudCreate,
   planRefusal = null,
   planRefusalAction,
+  eligibilityNotice = null,
   remoteSpawnFailure = null,
   onRetryRemoteSpawn,
 }: Readonly<NewSessionConfigureFormProps & NewSessionProfileOverrideProps>) {
@@ -320,6 +321,11 @@ export function NewSessionConfigureForm({
         {planRefusal !== null ? (
           <OrganizationPlanRefusal message={planRefusal} action={planRefusalAction} />
         ) : null}
+        {/* The account's Cloud Agent access, known before the press like the
+            plan refusal above: it states a balance that leaves the session on
+            free models, or a read that failed, and never takes height from the
+            fields below it. */}
+        {eligibilityNotice}
         {accountSection}
         <NewSessionRunTarget
           showRunOnSelector={showRunOnSelector}

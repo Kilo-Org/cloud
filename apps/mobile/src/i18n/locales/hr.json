@@ -2409,6 +2409,12 @@
       "attachmentUploadingToStart": "Privitak se još prenosi. Ukloni ga da započneš bez njega.",
       "modelMissingToStart": "Odaberi model za početak.",
       "staleRepositoryToStart": "Odabrani repozitorij više nije dostupan. Ponovno odaberi repozitorij za početak.",
+      "modelNeedsCreditsToStart": "Ovaj model treba kredite. Odaberi besplatan model za početak.",
+      "eligibility": {
+        "limitedTitle": "Dostupni besplatni modeli",
+        "balance": "Tvoj saldo je {{amount}}. Besplatni modeli su i dalje dostupni.",
+        "unavailable": "Nije moguće provjeriti tvoj saldo."
+      },
       "promptPlaceholder": "Na čemu želiš raditi?",
       "couldNotLoadModels": "Nije moguće učitati modele.",
       "prefillRepoAndModelUnavailable": "Repozitorij i model izvorne sesije više nisu dostupni. Odaberi ih u nastavku.",

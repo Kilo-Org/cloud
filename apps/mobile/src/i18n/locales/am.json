@@ -2360,6 +2360,12 @@
       "attachmentUploadingToStart": "አንድ አባሪ አሁንም በመስቀል ላይ ነው። ያለ እሱ ለመጀመር ያስወግዱት።",
       "modelMissingToStart": "ለመጀመር ሞዴል ይምረጡ።",
       "staleRepositoryToStart": "የተመረጠው ማከማቻ ከእንግዲህ አይገኝም። ለመጀመር እንደገና ማከማቻ ይምረጡ።",
+      "modelNeedsCreditsToStart": "ይህ ሞዴል ክሬዲት ይፈልጋል። ለመጀመር ነፃ ሞዴል ይምረጡ።",
+      "eligibility": {
+        "limitedTitle": "ነፃ ሞዴሎች ይገኛሉ",
+        "balance": "ቀሪ ሂሳብዎ {{amount}} ነው። ነፃ ሞዴሎች አሁንም ይገኛሉ።",
+        "unavailable": "ቀሪ ሂሳብዎን መፈተሽ አልተቻለም።"
+      },
       "promptPlaceholder": "በምን ላይ መስራት ይፈልጋሉ?",
       "couldNotLoadModels": "ሞዴሎችን መጫን አልተቻለም።",
       "prefillRepoAndModelUnavailable": "የመጀመሪያው ክፍለ ጊዜ ማከማቻና ሞዴል ከእንግዲህ አይገኙም። ከታች ሌሎችን ይምረጡ።",

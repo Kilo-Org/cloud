@@ -53,6 +53,12 @@ export function NewSessionModelProvider({
   const [model, setModel] = useState('');
   const [variant, setVariant] = useState('');
   const { models } = useAvailableModels(organizationId);
+  // The catalog is NOT filtered by the Cloud Agent access state here. This
+  // provider selects the gateway model for BOTH run targets, and a computer
+  // target spends no Cloud Agent balance, so a filter would change what a
+  // remote spawn sends for an account the balance rule does not govern. A
+  // remembered paid model under a limited balance is kept, exactly as the web
+  // composer keeps it, and the form's own Start gate names it (`modelNeedsCredits`).
   const autoSelected = useAutoSelectModel(models, organizationId);
   // The selection is resolved from the account the form shows: the catalog, the
   // route prefill and the auto-selection all read this one scope, so the model

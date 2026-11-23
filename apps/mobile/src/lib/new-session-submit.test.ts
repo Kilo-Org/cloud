@@ -158,6 +158,7 @@ describe('resolveNewSessionStartDisabled', () => {
       ...validInput(),
       selectedRepositoryResolved: true,
       profileGate: { kind: 'ready' },
+      modelNeedsCredits: false,
       ...overrides,
     };
   }
@@ -388,6 +389,65 @@ describe('resolveContinueStartDisabled', () => {
   });
 });
 
+describe('the Cloud Agent credits gate', () => {
+  function creditsInput(modelNeedsCredits: boolean) {
+    return {
+      ...validInput(),
+      selectedRepositoryResolved: true,
+      profileGate: { kind: 'ready' as const },
+      modelNeedsCredits,
+    };
+  }
+
+  it('leaves Start enabled when the balance covers the picked model', () => {
+    expect(resolveNewSessionStartDisabled(creditsInput(false))).toBe(false);
+  });
+
+  it('disables Start for a model the balance does not cover', () => {
+    // The picker lists only the models a limited balance covers; a remembered
+    // model the catalog still carries is kept, and this gate is what stops the
+    // press instead of letting the server refuse it.
+    expect(resolveNewSessionStartDisabled(creditsInput(true))).toBe(true);
+  });
+
+  it('names the credits reason above an otherwise ready form', () => {
+    expect(
+      resolveNewSessionStartBlockedReason(
+        newSessionReasonInput({
+          selectedRepo: 'org/repo',
+          gate: newSessionGate({ modelNeedsCredits: true }),
+        })
+      )
+    ).toBe('model-needs-credits');
+  });
+
+  it('keeps the empty-model reason ahead of the credits reason', () => {
+    // An empty selection has no cost to report; its own copy names the pick the
+    // person still has to make.
+    expect(
+      resolveNewSessionStartBlockedReason(
+        newSessionReasonInput({
+          selectedRepo: 'org/repo',
+          gate: newSessionGate({ model: '', modelNeedsCredits: true }),
+        })
+      )
+    ).toBe('model-missing');
+  });
+
+  it('names no credits reason for a remote target, which spends no Cloud Agent balance', () => {
+    // The remote entry names its own blockers, and its Start gate reads the
+    // composer's content rather than the balance.
+    expect(
+      resolveNewSessionStartBlockedReason(
+        newSessionReasonInput({
+          isRemoteTargetSelected: true,
+          gate: newSessionGate({ isRemoteTargetSelected: true, modelNeedsCredits: true }),
+        })
+      )
+    ).toBeNull();
+  });
+});
+
 type NewSessionGateInput = Omit<
   Parameters<typeof resolveNewSessionStartDisabled>[0],
   'selectedRepo' | 'selectedRepositoryResolved'
@@ -403,6 +463,7 @@ function newSessionGate(overrides: Partial<NewSessionGateInput> = {}): NewSessio
     isSubmitting: false,
     model: 'claude-opus-4-7',
     profileGate: { kind: 'ready' },
+    modelNeedsCredits: false,
     ...overrides,
   };
 }

@@ -2360,6 +2360,12 @@
       "attachmentUploadingToStart": "Okunamathiselwe kusalayishwa. Kususe ukuze uqale ngaphandle kwakho.",
       "modelMissingToStart": "Khetha imodeli ukuze uqale.",
       "staleRepositoryToStart": "Inqolobane yekhodi ekhethiwe ayisatholakali. Khetha inqolobane yekhodi futhi ukuze uqale.",
+      "modelNeedsCreditsToStart": "Le modeli idinga amakhredithi. Khetha imodeli yamahhala ukuze uqale.",
+      "eligibility": {
+        "limitedTitle": "Amamodeli amahhala ayatholakala",
+        "balance": "Ibhalansi yakho ingu-{{amount}}. Amamodeli amahhala asatholakala.",
+        "unavailable": "Asikwazanga ukuhlola ibhalansi yakho."
+      },
       "promptPlaceholder": "Ungathanda ukusebenza ngani?",
       "couldNotLoadModels": "Asikwazanga ukulayisha amamodeli.",
       "prefillRepoAndModelUnavailable": "Inqolobane yekhodi nemodeli yeseshini yokuqala akusatholakali. Khetha okunye ngezansi.",

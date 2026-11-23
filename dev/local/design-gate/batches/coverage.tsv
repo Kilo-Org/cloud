@@ -221,6 +221,8 @@ file	screen	source	platform	loading	empty	happy	retryable-error	non-retryable-er
 (app)/model-catalog/index.tsx	(app)/model-catalog	route	ios	none	none	T2-G04b kiloapp:///(app)/model-catalog	none	B:T2-G04b (not-found/permission variants)	B:T2-G04b	none	B:T2-G04b
 (app)/native-remote.tsx	(app)/native-remote	route	android	none	n/a	T1-G08a kiloapp:///(app)/native-remote	none	none	n/a	none	none
 (app)/native-remote.tsx	(app)/native-remote	route	ios	none	n/a	T1-G08a kiloapp:///(app)/native-remote	none	none	n/a	none	none
+(app)/new-session-eligibility-fixture.tsx	(app)/new-session-eligibility-fixture	dev-fixture	android	none	none	T2-G08c kiloapp:///dev/new-session-eligibility-fixture	T2-G08c kiloapp:///dev/new-session-eligibility-fixture?state=unavailable	none	none	none	none
+(app)/new-session-eligibility-fixture.tsx	(app)/new-session-eligibility-fixture	dev-fixture	ios	none	none	T2-G08c kiloapp:///dev/new-session-eligibility-fixture	T2-G08c kiloapp:///dev/new-session-eligibility-fixture?state=unavailable	none	none	none	none
 (app)/new-session-plan-refusal-fixture.tsx	(app)/new-session-plan-refusal-fixture	dev-fixture	android	n/a	n/a	T2-G08c kiloapp:///dev/new-session-plan-refusal-fixture	n/a	n/a	F:dev/new-session-plan-refusal-fixture?billing=1	n/a	none
 (app)/new-session-plan-refusal-fixture.tsx	(app)/new-session-plan-refusal-fixture	dev-fixture	ios	n/a	n/a	T2-G08c kiloapp:///dev/new-session-plan-refusal-fixture	n/a	n/a	F:dev/new-session-plan-refusal-fixture?billing=1	n/a	none
 (app)/notifications.tsx	(app)/notifications	route	android	none	n/a: switch rows	T1-G04c kiloapp:///(app)/notifications	none	B:T1-G04c (OS permission denied is terminal)	B:T1-G04c	none	n/a

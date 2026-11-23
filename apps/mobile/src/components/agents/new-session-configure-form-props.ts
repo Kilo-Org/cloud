@@ -1,4 +1,4 @@
-import { type RefObject } from 'react';
+import { type ReactNode, type RefObject } from 'react';
 
 import {
   type NewSessionRepository,
@@ -155,6 +155,13 @@ export type NewSessionConfigureFormProps = {
    * and a fixture can paint either one.
    */
   planRefusalAction?: TrialRefusalAction;
+  /**
+   * The Cloud Agent access notice for the run target's account, or null when
+   * the account's balance is enough (or the read has not answered). Like the
+   * plan refusal, the verdict is known before the press and the caller owns the
+   * read, so the form renders the block it is handed.
+   */
+  eligibilityNotice?: ReactNode;
   /** The remote spawn's settled or timed-out failure, or null before one. */
   remoteSpawnFailure?: RemoteSpawnFailure | null;
   /** Re-runs the remote spawn with the same draft (the retryable recovery). */

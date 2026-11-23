@@ -195,6 +195,13 @@ export function redirectSystemPath({
     if (planRefusalFixture) {
       return `/(app)/new-session-plan-refusal-fixture${planRefusalFixture[1] ?? ''}`;
     }
+    // Dev-only Cloud Agent access notice at the new-session composer. The
+    // optional query picks the state (`?state=unavailable` is the read that
+    // failed), so it is forwarded.
+    const eligibilityFixture = /(?:^|\/)dev\/new-session-eligibility-fixture\/?(\?.*)?$/.exec(path);
+    if (eligibilityFixture) {
+      return `/(app)/new-session-eligibility-fixture${eligibilityFixture[1] ?? ''}`;
+    }
     // Dev-only plan refusal on the low-balance alert sheet's form. The same
     // optional query picks the reader's state (`?billing=1` is the role that
     // may change the plan), so it is forwarded the same way.

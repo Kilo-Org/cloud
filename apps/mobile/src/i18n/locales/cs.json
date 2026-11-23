@@ -2458,6 +2458,12 @@
       "attachmentUploadingToStart": "Příloha se stále nahrává. Odeberte ji, abyste mohli začít bez ní.",
       "modelMissingToStart": "Vyberte model, abyste mohli začít.",
       "staleRepositoryToStart": "Vybraný repozitář už není dostupný. Vyberte repozitář znovu, abyste mohli začít.",
+      "modelNeedsCreditsToStart": "Tento model vyžaduje kredity. Chcete-li začít, vyberte model Zdarma.",
+      "eligibility": {
+        "limitedTitle": "Dostupné modely Zdarma",
+        "balance": "Váš zůstatek je {{amount}}. Modely Zdarma jsou stále k dispozici.",
+        "unavailable": "Zůstatek se nepodařilo zkontrolovat."
+      },
       "promptPlaceholder": "Na čem chcete pracovat?",
       "couldNotLoadModels": "Modely se nepodařilo načíst.",
       "prefillRepoAndModelUnavailable": "Repozitář a model původní relace už nejsou dostupné. Níže vyberte jiný repozitář a model.",

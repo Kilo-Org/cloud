@@ -1810,6 +1810,12 @@
       "attachmentUploadingToStart": "Um anexo ainda está sendo enviado. Remova-o para começar sem ele.",
       "modelMissingToStart": "Selecione um modelo para começar.",
       "staleRepositoryToStart": "O repositório selecionado não está mais disponível. Selecione um repositório novamente para começar.",
+      "modelNeedsCreditsToStart": "Este modelo precisa de créditos. Escolha um modelo grátis para começar.",
+      "eligibility": {
+        "limitedTitle": "Modelos grátis disponíveis",
+        "balance": "Seu saldo é de {{amount}}. Modelos grátis ainda estão disponíveis.",
+        "unavailable": "Não foi possível verificar seu saldo."
+      },
       "promptPlaceholder": "No que você quer trabalhar?",
       "couldNotLoadModels": "Não foi possível carregar os modelos.",
       "prefillRepoAndModelUnavailable": "O repositório e o modelo da sessão original não estão mais disponíveis. Escolha-os abaixo.",

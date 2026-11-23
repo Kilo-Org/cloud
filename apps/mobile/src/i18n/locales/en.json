@@ -2462,6 +2462,12 @@
       "attachmentUploadingToStart": "An attachment is still uploading. Remove it to start without it.",
       "modelMissingToStart": "Pick a model to start.",
       "staleRepositoryToStart": "The selected repository is no longer available. Pick a repository again to start.",
+      "modelNeedsCreditsToStart": "This model needs credits. Pick a free model to start.",
+      "eligibility": {
+        "limitedTitle": "Free models available",
+        "balance": "Your balance is {{amount}}. Free models are still available.",
+        "unavailable": "Couldn't check your balance."
+      },
       "promptPlaceholder": "What would you like to work on?",
       "couldNotLoadModels": "Couldn't load models",
       "prefillRepoAndModelUnavailable": "The original session's repository and model are no longer available. Pick them below.",

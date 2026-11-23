@@ -788,7 +788,7 @@ describe('Claude billing grants', () => {
     ).resolves.toEqual([expect.objectContaining({ payer_connection_id: payer.id })]);
   }, 20000);
 
-  it('sorts the claim namespace below the payer namespace and the profile namespace above both', () => {
+  it('takes the claim namespace below the payer namespace, and keeps the profile key outside that order', () => {
     const owner: ClaudeBillingOwner = { kind: 'organization', organizationId: 'scope-order' };
     const personal: ClaudeBillingOwner = { kind: 'personal', kiloUserId: 'scope-order' };
     const payerId = 'scope-order';
@@ -799,8 +799,12 @@ describe('Claude billing grants', () => {
       const profileKey = claudeBillingProfileLockKey(scope);
       expect(claimKey.startsWith('claude_billing_claim:')).toBe(true);
       expect(payerKey.startsWith('claude_billing_grant:')).toBe(true);
-      expect(profileKey.startsWith('claude_billing_profile:')).toBe(true);
+      // The module's ascending order covers the claim and payer namespaces only.
       expect(claimKey < payerKey).toBe(true);
+      // The profile key is not part of that order: it sorts last, and the only
+      // safe use is a transaction that takes it before any claim or payer key and
+      // that no other holder waits on. A different namespace keeps it out.
+      expect(profileKey.startsWith('claude_billing_profile:')).toBe(true);
       expect(payerKey < profileKey).toBe(true);
     }
   });

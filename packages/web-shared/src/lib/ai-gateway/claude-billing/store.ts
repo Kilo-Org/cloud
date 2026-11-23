@@ -486,10 +486,17 @@ export function claudeBillingOwnerLockKey(owner: ClaudeBillingOwner): string {
 
 /**
  * The lock key that serialises first-time profile creation for a scope.
- * `claude_billing_profile:` sorts above every claim and payer key. A transaction
- * takes it before any key from this module and never after one, because
- * first-time profile creation wraps an external provider call and must not hold a
- * key that sharing waits on for that call.
+ *
+ * This key sits outside the module's ascending order, and it is safe only under
+ * one premise: no transaction ever waits for it while holding a claim or payer
+ * key. Nothing else takes a profile key, so no billing writer can be blocked by
+ * one, and `ensureClaudeBillingProfile` takes it before it reaches
+ * `insertClaudeBillingProfile`, which then takes claim and payer keys. Keep that
+ * order if another path ever coordinates profile creation: a reader that took a
+ * claim or payer key and then waited on a profile key would close a wait cycle
+ * that no retry covers. It is not taken inside `insertClaudeBillingProfile`
+ * because first-time creation wraps an external provider call, and sharing must
+ * not wait on that call.
  */
 export function claudeBillingProfileLockKey(owner: ClaudeBillingOwner): string {
   return `claude_billing_profile:${claudeBillingOwnerKey(owner)}`;
@@ -500,10 +507,9 @@ async function lockClaudeBillingPayer(tx: DrizzleTransaction, payerConnectionId:
 }
 
 /**
- * Locks every distinct key in ascending order. Keys come from three namespaces,
- * in this sort order: `claude_billing_claim:` per scope that takes a payer,
- * `claude_billing_grant:` per payer row, and `claude_billing_profile:` per scope
- * that creates its first profile.
+ * Locks every distinct key in ascending order. Keys come from two namespaces, in
+ * this sort order: `claude_billing_claim:` per scope that takes a payer, then
+ * `claude_billing_grant:` per payer row.
  *
  * A transaction that holds keys only ever waits for a key greater than every key
  * it holds. Two holders therefore cannot wait for each other, so no wait cycle
@@ -511,8 +517,10 @@ async function lockClaudeBillingPayer(tx: DrizzleTransaction, payerConnectionId:
  * holds aborts its transaction with `ClaudeBillingLockRetry` and retries from
  * scratch with that key added, which takes the wider set in order. The claim
  * namespace sorts before the payer namespace, so a claim key never has to be
- * taken after a discovered payer key, and a profile key is taken first for the
- * reason `claudeBillingProfileLockKey` states.
+ * taken after a discovered payer key.
+ *
+ * `claude_billing_profile:` is deliberately not part of this order; see
+ * `claudeBillingProfileLockKey` for the premise that keeps it safe.
  */
 async function lockClaudeBillingKeys(
   tx: DrizzleTransaction,

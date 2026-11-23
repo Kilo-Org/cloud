@@ -54,8 +54,9 @@ export async function ensureClaudeBillingProfile(
   );
 
   return await db.transaction(async tx => {
-    // This key sorts above the module's claim and payer keys, so it is taken
-    // first and no billing key is taken before it.
+    // This key sits outside the module's ascending payer order: it is taken
+    // here, before any claim or payer key, and no other path ever waits on it.
+    // Keep that order if another path coordinates profile creation.
     await tx.execute(
       sql`select pg_advisory_xact_lock(hashtext(${claudeBillingProfileLockKey(owner)}))`
     );

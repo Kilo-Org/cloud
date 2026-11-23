@@ -91,6 +91,7 @@
     "draft": "Konsep",
     "enabled": "Aangeskakel",
     "github": "GitHub",
+    "image": "Afbeelding",
     "imageUnavailable": "Die prent is nie beskikbaar nie.",
     "loading": "Laai…",
     "loadMore": "Laai meer",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Laai afbeelding",
       "imageUnavailableRetry": "Afbeelding onbeskikbaar, probeer weer om dit te laai",
+      "imageUnavailableRetryWithAlt": "Afbeelding onbeskikbaar, {{alt}}, probeer weer om dit te laai",
       "imagePreviewUnavailableInSession": "'N Voorskou van die afbeelding is nie in hierdie sessie beskikbaar nie.",
       "viewImage": "Bekyk afbeelding",
       "viewImageWithAlt": "Bekyk afbeelding {{alt}}",

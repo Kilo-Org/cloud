@@ -91,6 +91,7 @@
     "draft": "ฉบับร่าง",
     "enabled": "เปิดใช้งานแล้ว",
     "github": "GitHub",
+    "image": "รูปภาพ",
     "imageUnavailable": "ไม่สามารถแสดงรูปภาพได้",
     "loading": "กำลังโหลด…",
     "loadMore": "โหลดเพิ่ม",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "กำลังโหลดรูปภาพ",
       "imageUnavailableRetry": "รูปภาพไม่พร้อมใช้งาน ลองโหลดใหม่",
+      "imageUnavailableRetryWithAlt": "รูปภาพไม่พร้อมใช้งาน ลองโหลดใหม่ {{alt}}",
       "imagePreviewUnavailableInSession": "ไม่สามารถแสดงตัวอย่างรูปภาพในเซสชันนี้ได้",
       "viewImage": "ดูรูปภาพ",
       "viewImageWithAlt": "ดูรูปภาพ {{alt}}",

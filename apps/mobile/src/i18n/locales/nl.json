@@ -91,6 +91,7 @@
     "draft": "Concept",
     "enabled": "Ingeschakeld",
     "github": "GitHub",
+    "image": "Afbeelding",
     "imageUnavailable": "De afbeelding is niet beschikbaar.",
     "loading": "Laden…",
     "loadMore": "Meer laden",
@@ -2098,6 +2099,7 @@
     "filePart": {
       "loadingImage": "Afbeelding laden",
       "imageUnavailableRetry": "Afbeelding niet beschikbaar, opnieuw laden",
+      "imageUnavailableRetryWithAlt": "Afbeelding niet beschikbaar, {{alt}}, opnieuw laden",
       "imagePreviewUnavailableInSession": "Er is geen voorbeeld van de afbeelding beschikbaar in deze sessie.",
       "viewImage": "Afbeelding bekijken",
       "viewImageWithAlt": "Afbeelding bekijken: {{alt}}",

@@ -93,6 +93,7 @@
     "draft": "Чернетка",
     "enabled": "Увімкнено",
     "github": "GitHub",
+    "image": "Зображення",
     "imageUnavailable": "Зображення недоступне.",
     "loading": "Завантаження…",
     "loadMore": "Завантажити ще",
@@ -2152,6 +2153,7 @@
     "filePart": {
       "loadingImage": "Завантаження зображення",
       "imageUnavailableRetry": "Зображення недоступне, повторіть завантаження",
+      "imageUnavailableRetryWithAlt": "Зображення недоступне, {{alt}}, повторіть завантаження",
       "imagePreviewUnavailableInSession": "Попередній перегляд зображення недоступний у цьому сеансі.",
       "viewImage": "Переглянути зображення",
       "viewImageWithAlt": "Переглянути зображення {{alt}}",

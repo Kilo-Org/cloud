@@ -93,6 +93,7 @@
     "draft": "Wersja robocza",
     "enabled": "Włączone",
     "github": "GitHub",
+    "image": "Obraz",
     "imageUnavailable": "Obraz jest niedostępny.",
     "loading": "Ładowanie…",
     "loadMore": "Pokaż więcej",
@@ -2152,6 +2153,7 @@
     "filePart": {
       "loadingImage": "Wczytywanie obrazu",
       "imageUnavailableRetry": "Obraz jest niedostępny. Wczytaj go ponownie",
+      "imageUnavailableRetryWithAlt": "Obraz jest niedostępny. {{alt}}. Wczytaj go ponownie",
       "imagePreviewUnavailableInSession": "Podgląd obrazu jest niedostępny w tej sesji.",
       "viewImage": "Wyświetl obraz",
       "viewImageWithAlt": "Wyświetl obraz: {{alt}}",

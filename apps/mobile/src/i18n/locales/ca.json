@@ -92,6 +92,7 @@
     "draft": "Esborrany",
     "enabled": "Activat",
     "github": "GitHub",
+    "image": "Imatge",
     "imageUnavailable": "La imatge no està disponible.",
     "loading": "S'està carregant…",
     "loadMore": "Carrega'n més",
@@ -2713,6 +2714,7 @@
     "filePart": {
       "loadingImage": "Carregant la imatge",
       "imageUnavailableRetry": "La imatge no està disponible. Torna a provar de carregar-la",
+      "imageUnavailableRetryWithAlt": "La imatge no està disponible. {{alt}}. Torna a provar de carregar-la",
       "imagePreviewUnavailableInSession": "La previsualització de la imatge no està disponible en aquesta sessió.",
       "viewImage": "Mostra la imatge",
       "viewImageWithAlt": "Mostra la imatge {{alt}}",

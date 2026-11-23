@@ -93,6 +93,7 @@
     "draft": "Koncept",
     "enabled": "Zapnuté",
     "github": "GitHub",
+    "image": "Obrázok",
     "imageUnavailable": "Obrázok nie je dostupný.",
     "loading": "Načítava sa…",
     "loadMore": "Načítať viac",
@@ -2766,6 +2767,7 @@
     "filePart": {
       "loadingImage": "Načítava sa obrázok",
       "imageUnavailableRetry": "Obrázok nie je dostupný, skúsiť ho znova načítať",
+      "imageUnavailableRetryWithAlt": "Obrázok nie je dostupný, {{alt}}, skúsiť ho znova načítať",
       "imagePreviewUnavailableInSession": "Náhľad obrázka nie je v tejto relácii dostupný.",
       "viewImage": "Zobraziť obrázok",
       "viewImageWithAlt": "Zobraziť obrázok {{alt}}",

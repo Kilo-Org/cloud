@@ -93,6 +93,7 @@
     "draft": "Черновик",
     "enabled": "Включено",
     "github": "GitHub",
+    "image": "Изображение",
     "imageUnavailable": "Изображение недоступно.",
     "loading": "Загрузка…",
     "loadMore": "Показать ещё",
@@ -2152,6 +2153,7 @@
     "filePart": {
       "loadingImage": "Загрузка изображения",
       "imageUnavailableRetry": "Изображение недоступно, повторите загрузку",
+      "imageUnavailableRetryWithAlt": "Изображение недоступно, {{alt}}, повторите загрузку",
       "imagePreviewUnavailableInSession": "В этом сеансе недоступен предварительный просмотр изображения.",
       "viewImage": "Просмотреть изображение",
       "viewImageWithAlt": "Просмотреть изображение {{alt}}",

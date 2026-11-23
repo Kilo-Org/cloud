@@ -91,6 +91,7 @@
     "draft": "Draf",
     "enabled": "Aktif",
     "github": "GitHub",
+    "image": "Gambar",
     "imageUnavailable": "Gambar tidak tersedia.",
     "loading": "Memuat…",
     "loadMore": "Muat lebih banyak",
@@ -2098,6 +2099,7 @@
     "filePart": {
       "loadingImage": "Memuat gambar",
       "imageUnavailableRetry": "Gambar tidak tersedia, coba muat ulang",
+      "imageUnavailableRetryWithAlt": "Gambar tidak tersedia, {{alt}}, coba muat ulang",
       "imagePreviewUnavailableInSession": "Pratinjau gambar tidak tersedia di sesi ini.",
       "viewImage": "Lihat gambar",
       "viewImageWithAlt": "Lihat gambar {{alt}}",

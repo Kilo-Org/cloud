@@ -93,6 +93,7 @@
     "draft": "Juodraštis",
     "enabled": "Įjungta",
     "github": "GitHub",
+    "image": "Paveikslėlis",
     "imageUnavailable": "Paveikslėlis nepasiekiamas",
     "loading": "Įkeliama…",
     "loadMore": "Įkelti daugiau",
@@ -2766,6 +2767,7 @@
     "filePart": {
       "loadingImage": "Įkeliamas paveikslėlis",
       "imageUnavailableRetry": "Paveikslėlis nepasiekiamas, bandyti įkelti iš naujo",
+      "imageUnavailableRetryWithAlt": "Paveikslėlis nepasiekiamas, {{alt}}, bandyti įkelti iš naujo",
       "imagePreviewUnavailableInSession": "Paveikslėlio peržiūra šioje sesijoje nepasiekiama.",
       "viewImage": "Peržiūrėti paveikslėlį",
       "viewImageWithAlt": "Peržiūrėti paveikslėlį „{{alt}}“",

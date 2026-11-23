@@ -91,6 +91,7 @@
     "draft": "草稿",
     "enabled": "已启用",
     "github": "GitHub",
+    "image": "图片",
     "imageUnavailable": "无法显示图片",
     "loading": "加载中…",
     "loadMore": "加载更多",
@@ -2098,6 +2099,7 @@
     "filePart": {
       "loadingImage": "正在加载图片",
       "imageUnavailableRetry": "无法加载图片，重新加载",
+      "imageUnavailableRetryWithAlt": "无法加载图片，{{alt}}，重新加载",
       "imagePreviewUnavailableInSession": "无法在此会话中预览图片。",
       "viewImage": "查看图片",
       "viewImageWithAlt": "查看图片 {{alt}}",

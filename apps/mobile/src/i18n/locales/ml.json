@@ -91,6 +91,7 @@
     "draft": "ഡ്രാഫ്റ്റ്",
     "enabled": "പ്രവർത്തനക്ഷമം",
     "github": "GitHub",
+    "image": "ചിത്രം",
     "imageUnavailable": "ചിത്രം ലഭ്യമല്ല.",
     "loading": "ലോഡ് ചെയ്യുന്നു…",
     "loadMore": "കൂടുതൽ ലോഡ് ചെയ്യുക",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "ചിത്രം ലോഡ് ചെയ്യുന്നു",
       "imageUnavailableRetry": "ചിത്രം ലഭ്യമല്ല. ലോഡ് ചെയ്യാൻ വീണ്ടും ശ്രമിക്കുക",
+      "imageUnavailableRetryWithAlt": "ചിത്രം ലഭ്യമല്ല. {{alt}}. ലോഡ് ചെയ്യാൻ വീണ്ടും ശ്രമിക്കുക",
       "imagePreviewUnavailableInSession": "ഈ സെഷനിൽ ചിത്രത്തിന്റെ പ്രിവ്യൂ ലഭ്യമല്ല.",
       "viewImage": "ചിത്രം കാണുക",
       "viewImageWithAlt": "{{alt}} എന്ന ചിത്രം കാണുക",

@@ -91,6 +91,7 @@
     "draft": "ડ્રાફ્ટ",
     "enabled": "ચાલુ",
     "github": "GitHub",
+    "image": "છબી",
     "imageUnavailable": "છબી ઉપલબ્ધ નથી.",
     "loading": "લોડ થઈ રહ્યું છે…",
     "loadMore": "વધુ લોડ કરો",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "છબી લોડ થઈ રહી છે",
       "imageUnavailableRetry": "છબી ઉપલબ્ધ નથી, લોડ કરવા ફરી પ્રયાસ કરો",
+      "imageUnavailableRetryWithAlt": "છબી ઉપલબ્ધ નથી, {{alt}}, લોડ કરવા ફરી પ્રયાસ કરો",
       "imagePreviewUnavailableInSession": "આ સત્રમાં છબીનું પૂર્વાવલોકન ઉપલબ્ધ નથી.",
       "viewImage": "છબી જુઓ",
       "viewImageWithAlt": "છબી જુઓ: {{alt}}",

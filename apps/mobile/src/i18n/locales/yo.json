@@ -91,6 +91,7 @@
     "draft": "Àkọsílẹ̀ àkọ́kọ́",
     "enabled": "A ti mú ṣiṣẹ́",
     "github": "GitHub",
+    "image": "Àwòrán",
     "imageUnavailable": "Àwòrán kò sí.",
     "loading": "Ń gbé dátà wọlé…",
     "loadMore": "Gbé síi wọlé",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Ń gbé àwòrán wọlé",
       "imageUnavailableRetry": "Àwòrán kò sí, gbìyànjú láti tún un gbé wọlé",
+      "imageUnavailableRetryWithAlt": "Àwòrán kò sí, {{alt}}, gbìyànjú láti tún un gbé wọlé",
       "imagePreviewUnavailableInSession": "A kò lè fi àwòrán hàn ṣáájú nínú ìgbà iṣẹ́ yìí.",
       "viewImage": "Wo àwòrán",
       "viewImageWithAlt": "Wo àwòrán {{alt}}",

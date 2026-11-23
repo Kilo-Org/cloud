@@ -91,6 +91,7 @@
     "draft": "Piszkozat",
     "enabled": "Engedélyezve",
     "github": "GitHub",
+    "image": "Kép",
     "imageUnavailable": "A kép nem érhető el",
     "loading": "Betöltés…",
     "loadMore": "Továbbiak betöltése",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Kép betöltése",
       "imageUnavailableRetry": "A kép nem érhető el, próbáld újra a betöltést",
+      "imageUnavailableRetryWithAlt": "A kép nem érhető el, {{alt}}, próbáld újra a betöltést",
       "imagePreviewUnavailableInSession": "A kép előnézete nem érhető el ebben a munkamenetben.",
       "viewImage": "Kép megtekintése",
       "viewImageWithAlt": "Kép megtekintése: {{alt}}",

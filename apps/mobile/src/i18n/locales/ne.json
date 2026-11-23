@@ -91,6 +91,7 @@
     "draft": "मस्यौदा",
     "enabled": "चालु",
     "github": "GitHub",
+    "image": "तस्बिर",
     "imageUnavailable": "तस्बिर उपलब्ध छैन।",
     "loading": "लोड हुँदै…",
     "loadMore": "थप लोड गर्नुहोस्",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "तस्बिर लोड गर्दै",
       "imageUnavailableRetry": "तस्बिर उपलब्ध छैन, लोड गर्न पुनः प्रयास गर्नुहोस्",
+      "imageUnavailableRetryWithAlt": "तस्बिर उपलब्ध छैन, {{alt}}, लोड गर्न पुनः प्रयास गर्नुहोस्",
       "imagePreviewUnavailableInSession": "यो सत्रमा तस्बिरको पूर्वावलोकन उपलब्ध छैन।",
       "viewImage": "तस्बिर हेर्नुहोस्",
       "viewImageWithAlt": "{{alt}} तस्बिर हेर्नुहोस्",

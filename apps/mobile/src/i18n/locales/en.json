@@ -189,6 +189,7 @@
     "draft": "Draft",
     "enabled": "Enabled",
     "github": "GitHub",
+    "image": "Image",
     "imageUnavailable": "Image unavailable",
     "loading": "Loading…",
     "loadMore": "Load more",
@@ -2769,6 +2770,7 @@
     "filePart": {
       "loadingImage": "Loading image",
       "imageUnavailableRetry": "Image unavailable, retry loading",
+      "imageUnavailableRetryWithAlt": "Image unavailable, {{alt}}, retry loading",
       "imagePreviewUnavailableInSession": "Image preview unavailable in this session.",
       "viewImage": "View image",
       "viewImageWithAlt": "View image {{alt}}",

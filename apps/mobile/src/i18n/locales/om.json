@@ -91,6 +91,7 @@
     "draft": "Wixinee",
     "enabled": "Hojii irra jira",
     "github": "GitHub",
+    "image": "Suuraa",
     "imageUnavailable": "Suuraan hin argamu.",
     "loading": "Fe'amaa jira…",
     "loadMore": "Dabalata fe'i",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Suuraa fe'aa jira",
       "imageUnavailableRetry": "Suuraan hin argamu, fe'uuf deebi'ii yaali",
+      "imageUnavailableRetryWithAlt": "Suuraan hin argamu, {{alt}}, fe'uuf deebi'ii yaali",
       "imagePreviewUnavailableInSession": "Turtii kana keessatti durargiin suuraa hin argamu.",
       "viewImage": "Suuraa ilaali",
       "viewImageWithAlt": "Suuraa {{alt}} ilaali",

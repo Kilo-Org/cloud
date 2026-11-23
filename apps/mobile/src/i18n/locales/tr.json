@@ -91,6 +91,7 @@
     "draft": "Taslak",
     "enabled": "Etkin",
     "github": "GitHub",
+    "image": "Görsel",
     "imageUnavailable": "Görsel kullanılamıyor.",
     "loading": "Yükleniyor…",
     "loadMore": "Daha fazla yükle",
@@ -2098,6 +2099,7 @@
     "filePart": {
       "loadingImage": "Görsel yükleniyor",
       "imageUnavailableRetry": "Görsel kullanılamıyor, yüklemeyi tekrar dene",
+      "imageUnavailableRetryWithAlt": "Görsel kullanılamıyor, {{alt}}, yüklemeyi tekrar dene",
       "imagePreviewUnavailableInSession": "Bu oturumda görsel önizlemesi kullanılamıyor.",
       "viewImage": "Görseli görüntüle",
       "viewImageWithAlt": "Görseli görüntüle: {{alt}}",

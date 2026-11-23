@@ -91,6 +91,7 @@
     "draft": "Kladde",
     "enabled": "Aktiveret",
     "github": "GitHub",
+    "image": "Billede",
     "imageUnavailable": "Billedet er ikke tilgængeligt.",
     "loading": "Indlæser…",
     "loadMore": "Indlæs flere",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Indlæser billede",
       "imageUnavailableRetry": "Billedet er ikke tilgængeligt. Prøv at indlæse det igen",
+      "imageUnavailableRetryWithAlt": "Billedet er ikke tilgængeligt. {{alt}}. Prøv at indlæse det igen",
       "imagePreviewUnavailableInSession": "Billedet kan ikke forhåndsvises i denne session.",
       "viewImage": "Vis billede",
       "viewImageWithAlt": "Vis billede {{alt}}",

@@ -91,6 +91,7 @@
     "draft": "مسوده",
     "enabled": "فعال",
     "github": "GitHub",
+    "image": "انځور",
     "imageUnavailable": "انځور نشته",
     "loading": "بارېږي…",
     "loadMore": "نور بار کړئ",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "انځور بارېږي",
       "imageUnavailableRetry": "انځور د لاسرسي وړ نه دی، د بارولو بیا هڅه وکړئ",
+      "imageUnavailableRetryWithAlt": "انځور د لاسرسي وړ نه دی، {{alt}}، د بارولو بیا هڅه وکړئ",
       "imagePreviewUnavailableInSession": "په دې ناسته کې د انځور مخکتنه د لاسرسي وړ نه ده.",
       "viewImage": "انځور وګورئ",
       "viewImageWithAlt": "د {{alt}} انځور وګورئ",

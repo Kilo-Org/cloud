@@ -91,6 +91,7 @@
     "draft": "მონახაზი",
     "enabled": "ჩართულია",
     "github": "GitHub",
+    "image": "სურათი",
     "imageUnavailable": "სურათი მიუწვდომელია.",
     "loading": "იტვირთება…",
     "loadMore": "მეტის ჩატვირთვა",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "სურათის ჩატვირთვა",
       "imageUnavailableRetry": "სურათი მიუწვდომელია. სცადეთ ხელახლა ჩატვირთვა",
+      "imageUnavailableRetryWithAlt": "სურათი მიუწვდომელია. {{alt}}. სცადეთ ხელახლა ჩატვირთვა",
       "imagePreviewUnavailableInSession": "ამ სესიაში სურათის წინასწარი ნახვა შეუძლებელია.",
       "viewImage": "სურათის ნახვა",
       "viewImageWithAlt": "სურათის ნახვა: {{alt}}",

@@ -94,6 +94,7 @@
     "draft": "Abbozz",
     "enabled": "Attivat",
     "github": "GitHub",
+    "image": "Immaġni",
     "imageUnavailable": "L-immaġni mhix disponibbli.",
     "loading": "Qed jgħabbi…",
     "loadMore": "Għabbi aktar",
@@ -2819,6 +2820,7 @@
     "filePart": {
       "loadingImage": "Qed titgħabba l-immaġni",
       "imageUnavailableRetry": "L-immaġni mhix disponibbli, erġa' pprova tgħabbiha",
+      "imageUnavailableRetryWithAlt": "L-immaġni mhix disponibbli, {{alt}}, erġa' pprova tgħabbiha",
       "imagePreviewUnavailableInSession": "Il-previżjoni tal-immaġni mhix disponibbli f'din is-sessjoni.",
       "viewImage": "Ara l-immaġni",
       "viewImageWithAlt": "Ara l-immaġni {{alt}}",

@@ -91,6 +91,7 @@
     "draft": "مسودہ",
     "enabled": "فعال",
     "github": "GitHub",
+    "image": "تصویر",
     "imageUnavailable": "تصویر دستیاب نہیں ہے۔",
     "loading": "لوڈ ہو رہا ہے…",
     "loadMore": "مزید لوڈ کریں",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "تصویر لوڈ ہو رہی ہے",
       "imageUnavailableRetry": "تصویر دستیاب نہیں، دوبارہ لوڈ کرنے کی کوشش کریں",
+      "imageUnavailableRetryWithAlt": "تصویر دستیاب نہیں، {{alt}}، دوبارہ لوڈ کرنے کی کوشش کریں",
       "imagePreviewUnavailableInSession": "اس سیشن میں تصویر کا پیش نظارہ دستیاب نہیں۔",
       "viewImage": "تصویر دیکھیں",
       "viewImageWithAlt": "{{alt}} تصویر دیکھیں",

@@ -95,6 +95,7 @@
     "draft": "مسودة",
     "enabled": "مفعّل",
     "github": "GitHub",
+    "image": "صورة",
     "imageUnavailable": "الصورة غير متاحة.",
     "loading": "جارٍ التحميل…",
     "loadMore": "تحميل المزيد",
@@ -2206,6 +2207,7 @@
     "filePart": {
       "loadingImage": "جارٍ تحميل الصورة",
       "imageUnavailableRetry": "الصورة غير متاحة، أعد محاولة التحميل",
+      "imageUnavailableRetryWithAlt": "الصورة غير متاحة، {{alt}}، أعد محاولة التحميل",
       "imagePreviewUnavailableInSession": "معاينة الصورة غير متاحة في هذه الجلسة.",
       "viewImage": "عرض الصورة",
       "viewImageWithAlt": "عرض الصورة: {{alt}}",

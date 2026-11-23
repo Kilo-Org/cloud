@@ -91,6 +91,7 @@
     "draft": "Burador",
     "enabled": "Naka-enable",
     "github": "GitHub",
+    "image": "Larawan",
     "imageUnavailable": "Hindi maipakita ang larawan.",
     "loading": "Naglo-load…",
     "loadMore": "Magpakita pa",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Naglo-load ng larawan",
       "imageUnavailableRetry": "Hindi maipakita ang larawan, subukang i-load muli",
+      "imageUnavailableRetryWithAlt": "Hindi maipakita ang larawan, {{alt}}, subukang i-load muli",
       "imagePreviewUnavailableInSession": "Hindi maipakita ang paunang tingin sa larawan sa sesyong ito.",
       "viewImage": "Tingnan ang larawan",
       "viewImageWithAlt": "Tingnan ang larawan: {{alt}}",

@@ -92,6 +92,7 @@
     "draft": "Borrador",
     "enabled": "Activado",
     "github": "GitHub",
+    "image": "Imagen",
     "imageUnavailable": "La imagen no está disponible.",
     "loading": "Cargando…",
     "loadMore": "Cargar más",
@@ -2125,6 +2126,7 @@
     "filePart": {
       "loadingImage": "Cargando imagen",
       "imageUnavailableRetry": "Imagen no disponible. Reintentar la carga",
+      "imageUnavailableRetryWithAlt": "Imagen no disponible. {{alt}}. Reintentar la carga",
       "imagePreviewUnavailableInSession": "La vista previa de la imagen no está disponible en esta sesión.",
       "viewImage": "Ver imagen",
       "viewImageWithAlt": "Ver imagen: {{alt}}",

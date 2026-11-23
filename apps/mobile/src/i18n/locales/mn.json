@@ -91,6 +91,7 @@
     "draft": "Ноорог",
     "enabled": "Идэвхтэй",
     "github": "GitHub",
+    "image": "Зураг",
     "imageUnavailable": "Зургийг харуулах боломжгүй.",
     "loading": "Ачаалж байна…",
     "loadMore": "Цааш ачаалах",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Зургийг ачаалж байна",
       "imageUnavailableRetry": "Зургийг харах боломжгүй, дахин ачаалах",
+      "imageUnavailableRetryWithAlt": "Зургийг харах боломжгүй, {{alt}}, дахин ачаалах",
       "imagePreviewUnavailableInSession": "Энэ сессэд зургийг урьдчилан харах боломжгүй.",
       "viewImage": "Зургийг үзэх",
       "viewImageWithAlt": "{{alt}} зургийг үзэх",

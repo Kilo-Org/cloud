@@ -91,6 +91,7 @@
     "draft": "Zirriborroa",
     "enabled": "Gaituta",
     "github": "GitHub",
+    "image": "Irudi",
     "imageUnavailable": "Irudia ez dago eskuragarri.",
     "loading": "Kargatzen…",
     "loadMore": "Kargatu gehiago",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Irudia kargatzen",
       "imageUnavailableRetry": "Irudia ez dago erabilgarri, saiatu berriro kargatzen",
+      "imageUnavailableRetryWithAlt": "Irudia ez dago erabilgarri, {{alt}}, saiatu berriro kargatzen",
       "imagePreviewUnavailableInSession": "Irudiaren aurrebista ez dago erabilgarri saio honetan.",
       "viewImage": "Ikusi irudia",
       "viewImageWithAlt": "Ikusi irudia: {{alt}}",

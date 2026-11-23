@@ -91,6 +91,7 @@
     "draft": "초안",
     "enabled": "활성화됨",
     "github": "GitHub",
+    "image": "이미지",
     "imageUnavailable": "이미지를 표시할 수 없습니다.",
     "loading": "불러오는 중…",
     "loadMore": "더 보기",
@@ -2098,6 +2099,7 @@
     "filePart": {
       "loadingImage": "이미지 불러오는 중",
       "imageUnavailableRetry": "이미지를 불러올 수 없습니다. 불러오기 다시 시도",
+      "imageUnavailableRetryWithAlt": "이미지를 불러올 수 없습니다. {{alt}}. 불러오기 다시 시도",
       "imagePreviewUnavailableInSession": "이 세션에서 이미지 미리보기를 사용할 수 없습니다.",
       "viewImage": "이미지 보기",
       "viewImageWithAlt": "{{alt}} 이미지 보기",

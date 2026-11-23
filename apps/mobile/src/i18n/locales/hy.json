@@ -91,6 +91,7 @@
     "draft": "Սևագիր",
     "enabled": "Միացված",
     "github": "GitHub",
+    "image": "Պատկեր",
     "imageUnavailable": "Պատկերը հասանելի չէ։",
     "loading": "Բեռնվում է…",
     "loadMore": "Բեռնել ավելին",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Պատկերը բեռնվում է",
       "imageUnavailableRetry": "Պատկերն անհասանելի է, կրկին փորձել բեռնել",
+      "imageUnavailableRetryWithAlt": "Պատկերն անհասանելի է, {{alt}}, կրկին փորձել բեռնել",
       "imagePreviewUnavailableInSession": "Պատկերի նախադիտումն անհասանելի է այս նստաշրջանում։",
       "viewImage": "Դիտել պատկերը",
       "viewImageWithAlt": "Դիտել պատկերը՝ {{alt}}",

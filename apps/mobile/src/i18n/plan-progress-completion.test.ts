@@ -13,8 +13,8 @@ import { formatNumber } from '@/lib/format';
  * Each catalog below moved its completed clause to a form with no number
  * agreement — the catalog's invariant completion word, or a verbless nominal
  * phrase — so the row reads correctly at every done count. The test pins the
- * whole value at the three states a reader meets: one finished step of a
- * multi-step plan, a finished plan, and a single-step plan.
+ * whole value at each state a reader meets inside a three-step plan (no step,
+ * one, two and all three finished) and on a single-step plan.
  */
 
 type LocaleCase = {

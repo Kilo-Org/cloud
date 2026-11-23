@@ -42,10 +42,14 @@ export function LocalResetNoticeCard({ onDismiss }: { readonly onDismiss: () => 
       testID="chat-reset-notice"
       className="mx-4 mt-2 rounded-xl border border-warn-tile-border bg-warn-tile-bg p-4"
     >
-      <View className="flex-row items-center pe-14">
+      <View className="flex-row items-center gap-2">
         <Text className="min-w-0 flex-1 text-base font-medium text-warn">
           {t('modelChat.list.resetNoticeTitle')}
         </Text>
+        {/* The empty cell beside the title covers the floating control's width,
+            so the title wraps before it instead of running under it. It carries
+            no height, so the title still sets the row's line. */}
+        <View className="w-14" />
       </View>
       {/* The live region sits on the body `Text`, which is the node that
           changes: the announcement hook covers a platform without live

@@ -146,7 +146,8 @@ describe('POST /api/pages-auth/exchange', () => {
     test.each([undefined, '', 'false', 'TRUE', '1'])(
       'advertises nothing and mints no proof while the setting is %j',
       async value => {
-        if (value !== undefined) process.env.PAGES_MEMBER_SEARCH_ENABLED = value;
+        if (value === undefined) delete process.env.PAGES_MEMBER_SEARCH_ENABLED;
+        else process.env.PAGES_MEMBER_SEARCH_ENABLED = value;
 
         const response = await exchange({ code: codeFor(), audience: PAGES, state: STATE });
         const body = await response.json();

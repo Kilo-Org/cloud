@@ -172,14 +172,15 @@ describe('findOrganizationMembers', () => {
       const { organization, owner } = await organizationWithOwner();
       await memberOf(organization, { google_user_name: 'Jade Wildcard' });
       await memberOf(organization, { google_user_name: 'J_ Literal' });
+      await memberOf(organization, { google_user_name: 'J\\ Backslash' });
 
       expect(await findOrganizationMembers(owner.id, organization.id, { query: 'J%' })).toEqual([]);
       expect(
         names(await findOrganizationMembers(owner.id, organization.id, { query: 'J_' }))
       ).toEqual(['J_ Literal']);
-      expect(await findOrganizationMembers(owner.id, organization.id, { query: 'J\\' })).toEqual(
-        []
-      );
+      expect(
+        names(await findOrganizationMembers(owner.id, organization.id, { query: 'J\\' }))
+      ).toEqual(['J\\ Backslash']);
     });
 
     it(`answers at most ${ORGANIZATION_MEMBER_SEARCH_LIMIT}, ordered by name`, async () => {

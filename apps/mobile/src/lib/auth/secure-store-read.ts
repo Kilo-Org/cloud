@@ -43,9 +43,7 @@ async function readOnce(
 ): Promise<string | null> {
   if (isFaultWindowOpen()) {
     // No key in the message: the exhausted-read report attaches this error, and
-    // the report must carry no key material, like the real store's error. The
-    // error is an `E2eInjectedFaultError` so the Sentry `beforeSend` gate drops
-    // a harness fault instead of filing it as a product issue.
+    // the report must carry no key material, like the real store's error.
     throw new E2eInjectedFaultError('E2E secure-store fault window is open: read rejected');
   }
   const value = await (firstAttempt ?? readStoredValue(key, options));

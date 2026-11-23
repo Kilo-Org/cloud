@@ -447,7 +447,7 @@ describe('FormField resting value preview', () => {
     const box = preview(mounted);
 
     expect(box.disabled).toBe(true);
-    expect(mounted.root.findByType('Pressable').props.accessibilityState.disabled).toBe(true);
+    expect(box.accessibilityState.disabled).toBe(true);
     // A press and an assistive activation both leave the field resting.
     act(() => {
       preview(mounted).onPress();

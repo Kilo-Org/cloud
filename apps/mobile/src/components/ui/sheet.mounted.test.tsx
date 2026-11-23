@@ -213,6 +213,17 @@ describe('Sheet', () => {
     expect(renderer.root.findAllByProps({ testID: 'sheet-content' })).toHaveLength(1);
   });
 
+  it('waits for a content-sized sheet to measure, and never for a detented one', async () => {
+    // A content-sized sheet knows its height only once its content laid out: without the wait
+    // Material3 presents it at the drag handle it measured first, then jumps to the content's
+    // height in one frame. A detented sheet must present at its detent instead.
+    const { renderer } = await mount();
+    expect(sheet(renderer)?.props.deferUntilMeasured).toBe(true);
+
+    const { renderer: detented } = await mount({ snapPoints: ['50%', '90%'] });
+    expect(sheet(detented)?.props.deferUntilMeasured).toBe(false);
+  });
+
   it('turns only the drag gesture off when the content scrolls', async () => {
     const { renderer } = await mount({ dismissGestures: false });
     const node = sheet(renderer);

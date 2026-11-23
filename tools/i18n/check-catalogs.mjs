@@ -20,7 +20,7 @@
  * Usage: node tools/i18n/check-catalogs.mjs
  */
 import { existsSync, readFileSync } from 'node:fs';
-import { dirname, join, relative as relativePath, sep } from 'node:path';
+import { dirname, join, relative as relativePath, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { isTranslateCallee, propertyName, stringLiteralValue, unwrap, walk } from '../lib/ast.mjs';
@@ -1567,18 +1567,33 @@ function destructiveLabels(object) {
  * All three come from the syntax tree (tools/lib/ast.mjs), so text that only
  * looks like a call — in a comment, in a string, in a type annotation — moves no
  * key, and an apostrophe in prose cannot throw the quote pairing out of step.
+ *
+ * The scan also returns `complete`: false when a file could not be read or
+ * parsed, or when a source root the audit had to have was missing. A key that
+ * sits in such a file is invisible to all three sets, so the dead-key rule
+ * reads this flag and names nothing from an incomplete scan — the same reason
+ * `findOrphanedNoAgreementEntries` in tools/i18n/check-plurals.mjs returns
+ * nothing from a scan with problems. `requiresSourceRoots` says the audit is
+ * reading the repository root itself, where every declared root must be there:
+ * a fixture tree holds only the parts a test gives it, so a root it does not
+ * have has nothing to scan and is skipped without a word. When it is true, the
+ * missing root is reported instead, because there every key under it would
+ * otherwise read as dead.
  */
-function scanSource(catalog, root) {
+function scanSource(catalog, root, requiresSourceRoots) {
   const problems = [];
   const called = new Set();
   const referenced = new Set();
   const keyPrefixes = new Set();
   const destructiveKeys = new Set();
+  let complete = true;
   const { calledKeyOf, keyPrefixOf, collectsDestructiveKeys } = catalog;
   for (const sourceRoot of catalog.sourceRoots) {
-    // A fixture tree holds only the parts a test gives it; a root the tree does
-    // not have has nothing to scan.
     if (!existsSync(sourceRoot)) {
+      if (requiresSourceRoots) {
+        problems.push(`${catalog.name}: no source tree at ${relativePath(root, sourceRoot)}`);
+        complete = false;
+      }
       continue;
     }
     for (const { file, program, problems: unparsed } of parseSourceTree(
@@ -1588,9 +1603,14 @@ function scanSource(catalog, root) {
     )) {
       // A file the parser refused has an empty tree, so its keys would leave
       // both sets without a word. `check:i18n` runs oxlint first, so this
-      // normally reports nothing.
+      // normally reports nothing. A read the filesystem refused arrives the
+      // same way, and either one leaves the scan incomplete: the keys of that
+      // file are simply not in the sets.
       for (const problem of unparsed) {
         problems.push(problem);
+      }
+      if (unparsed.length > 0) {
+        complete = false;
       }
       walk(program, node => {
         if (node.type === 'Literal' && typeof node.value === 'string') {
@@ -1633,7 +1653,7 @@ function scanSource(catalog, root) {
       referenced.add(`${prefix}${value}`);
     }
   }
-  return { called, referenced, destructiveKeys, problems };
+  return { called, referenced, destructiveKeys, problems, complete };
 }
 
 /**
@@ -3146,7 +3166,26 @@ function checkSettingsKeywordLists(document, label) {
   return problems;
 }
 
-/** Every key the source names exists, and every English key is used. */
+/**
+ * Every key the source names exists, and every English key is used.
+ *
+ * The first rule holds either way: a key the source calls and English does not
+ * define is a real gap, and a scan that missed a file cannot excuse it.
+ *
+ * The second rule needs a complete scan. A file the scan could not read or
+ * parse left its keys out of `referenced`, so reporting an English key as
+ * unused would call a live key dead — a fix that deletes copy a screen still
+ * renders. An incomplete scan therefore proves no key dead and names none; its
+ * own problem lines already say why, which is the same reason
+ * `findOrphanedNoAgreementEntries` in tools/i18n/check-plurals.mjs drops its
+ * per-key lines for a scan with problems.
+ *
+ * The guard reads `source.complete`, not `source.problems.length`. A `t()` call
+ * with a template-literal key reports a problem but leaves its file read and
+ * parsed, so nothing is invisible there and the dead-key rule must keep
+ * running for every other key; a coarse problem count would silently disable
+ * the rule for a whole catalog whenever one call took a template literal.
+ */
 function checkSourceUsage({
   catalogName,
   english,
@@ -3163,6 +3202,9 @@ function checkSourceUsage({
     if (!english.has(key) && !englishFamilies.has(key)) {
       problems.push(`${catalogName}: source uses "${key}", which en.json does not define`);
     }
+  }
+  if (!source.complete) {
+    return problems;
   }
   for (const key of english.keys()) {
     if (holdsStructuredData(structuredKeys, key)) {
@@ -3290,6 +3332,10 @@ export function checkCatalogs(root = ROOT) {
   const supported = tags === null ? null : new Set(tags);
 
   const catalogs = catalogsOf(root);
+  // An audit of the repository root itself must have every declared source
+  // tree; a fixture tree holds only the parts a test gives it. Read once,
+  // because every catalog's scan needs the same answer.
+  const requiresSourceRoots = resolve(root) === resolve(ROOT);
   // The parsed English map and locale values of each catalog a scan read, keyed
   // by catalog name. A rule that compares the two catalogs reads them here; a
   // catalog whose English parse failed stays out, so the rule cannot compare
@@ -3337,7 +3383,7 @@ export function checkCatalogs(root = ROOT) {
     }
     // One scan of this catalog's own source roots serves the usage check, and
     // its destructive-confirm rule for the mobile catalog.
-    const source = scanSource(catalog, root);
+    const source = scanSource(catalog, root, requiresSourceRoots);
     problems.push(...source.problems);
     // The base each catalog's consumers append their own part to: a plural stem
     // in the app, a `.title`/`.body` part in the push runtime.

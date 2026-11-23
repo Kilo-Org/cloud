@@ -47,9 +47,8 @@ export function subscribeToTelemetryGeneration(listener: TelemetryGenerationList
   };
 }
 
-/** Write a decision for the given account. `generation` moves only between two
- *  defined accounts, so the first decision after `undefined` is not an account
- *  change. */
+/** Write a decision for the given account. The first decision after
+ *  `undefined` counts as no account change. */
 export function setTelemetryDecision(accountId: string, optional: boolean): void {
   const accountChanged = decision !== undefined && decision.accountId !== accountId;
   if (accountChanged) {

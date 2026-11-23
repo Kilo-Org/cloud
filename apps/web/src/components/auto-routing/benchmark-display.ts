@@ -203,6 +203,14 @@ export function startFailureCopy(result: PaidBenchmarkStartResult): BenchmarkFai
   switch (result.status) {
     case 'started':
       return null;
+    case 'already_in_progress':
+      // Not a failure: the pool's live request is shown instead, and nothing was started or
+      // charged. The dialog renders this as a notice, not an error.
+      return {
+        title: 'A benchmark is already running for this pool',
+        description: 'Showing the request already in progress. Nothing new was started or charged.',
+        retryable: false,
+      };
     case 'insufficient_balance': {
       const required =
         result.requiredMicrodollars === undefined

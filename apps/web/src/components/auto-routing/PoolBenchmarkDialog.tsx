@@ -59,6 +59,7 @@ export function PoolBenchmarkDialog({ router, organizationId, onClose }: Props) 
   const [requestId, setRequestId] = useState<string | undefined>(undefined);
   const [showQuote, setShowQuote] = useState(false);
   const [startFailure, setStartFailure] = useState<BenchmarkFailureCopy | null>(null);
+  const [startNotice, setStartNotice] = useState<BenchmarkFailureCopy | null>(null);
   const [pauseFailure, setPauseFailure] = useState<BenchmarkFailureCopy | null>(null);
   const [filter, setFilter] = useState<PaidBenchmarkCaseStatus | 'all'>('all');
   const [pagination, setPagination] = useState<CasePageState | null>(null);
@@ -105,11 +106,20 @@ export function PoolBenchmarkDialog({ router, organizationId, onClose }: Props) 
   const startMutation = useMutation(
     trpc.customRouterBenchmarks.start.mutationOptions({
       onSuccess: result => {
-        if (result.status !== 'started') {
-          setStartFailure(startFailureCopy(result));
+        const copy = startFailureCopy(result);
+        if (result.status === 'started') {
+          setStartNotice(null);
+          setStartFailure(null);
+        } else if (result.status === 'already_in_progress') {
+          // Another tab, or a quote taken before this request existed: show the request that
+          // is already staging instead of failing. Nothing new was created or charged.
+          setStartNotice(copy);
+          setStartFailure(null);
+        } else {
+          setStartFailure(copy);
+          setStartNotice(null);
           return;
         }
-        setStartFailure(null);
         setPauseFailure(null);
         setFilter('all');
         setPagination(null);
@@ -279,7 +289,7 @@ export function PoolBenchmarkDialog({ router, organizationId, onClose }: Props) 
                 loadingMore={loadingMore}
                 onLoadMore={() => void loadMore()}
                 pausePending={pauseMutation.isPending}
-                error={pauseFailure ?? loadMoreFailure}
+                error={pauseFailure ?? loadMoreFailure ?? startNotice}
                 onPause={() => {
                   if (activeProgress !== undefined) {
                     pauseMutation.mutate({

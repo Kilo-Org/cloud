@@ -86,8 +86,13 @@ import { variantFromStorage } from './reasoning-effort';
 
 /** How long a displayed quote stays confirmable. */
 export const PAID_QUOTE_TTL_MS = 30 * 60 * 1000;
-/** Slots per staging batch: the store's own batch cap, well under D1's binding limit. */
-const STAGE_BATCH_SLOTS = 40;
+/**
+ * Slots per staging batch. One slice of a plan is one pair group (and one `batch()` call), so
+ * a wider slice is strictly fewer D1 round trips per slot: 4,800 slots cost 48 batches of 100
+ * instead of 120 of 40, which is what keeps the whole one-minute tick inside its query budget.
+ * The store's own batch cap accepts it (100 selected cases per batch).
+ */
+const STAGE_BATCH_SLOTS = 100;
 /** Slots one request or one browser poll may stage, so a maximal pool is paged, not dumped. */
 const STAGE_BUDGET_SLOTS = 400;
 /**
@@ -97,13 +102,11 @@ const STAGE_BUDGET_SLOTS = 400;
  * entries and each expands into one concrete pair per catalog reasoning variant, so a large
  * efficient pool plans tens of pairs. At the measured 597 cases × 3 repetitions that is well
  * over 100,000 slots, and the old 80 slots a minute needed hours, so a large pool could only
- * activate while the browser kept polling. 120 batches of {@link STAGE_BATCH_SLOTS} stage the
- * widest observed plan in about 25 minutes — under half of {@link STAGE_ABANDON_MS} — and stay
- * inside D1 limits: a `batch()` counts as one of the 1,000 queries a Worker invocation may
- * send, and a staging batch reads at most ~5 more (three slice reads, its own batch, one
- * recount), so 120 × 6 = 720 queries.
+ * activate while the browser kept polling. 4,800 slots stage that plan in about 26 minutes —
+ * under half of {@link STAGE_ABANDON_MS} — and cost about 350 of the 1,000 queries one Worker
+ * invocation may send to D1, which `scheduled-tick-budget.test.ts` measures for the whole tick.
  */
-const CRON_STAGE_BUDGET_SLOTS = STAGE_BATCH_SLOTS * 120;
+const CRON_STAGE_BUDGET_SLOTS = 4_800;
 /** What a tick still gives each live request when several stage at once (shares the budget). */
 const CRON_STAGE_MIN_SLOTS_PER_REQUEST = STAGE_BATCH_SLOTS * 2;
 /**
@@ -163,6 +166,26 @@ async function readLatestRequest(
     .prepare(
       `SELECT * FROM paid_benchmark_requests
       WHERE owner_type = ? AND owner_id = ? AND router_id = ?
+      ORDER BY created_at DESC LIMIT 1`
+    )
+    .bind(owner.ownerType, owner.ownerId, routerId)
+    .first<PaidBenchmarkRequestRow>();
+}
+
+/**
+ * The request currently holding this pool's only live-request slot, if any. One live request
+ * per saved pool is the unique index's own rule, so this is the same predicate, read as a row.
+ */
+async function readLiveRequest(
+  db: D1Database,
+  owner: PaidCreditOwner,
+  routerId: string
+): Promise<PaidBenchmarkRequestRow | null> {
+  return db
+    .prepare(
+      `SELECT * FROM paid_benchmark_requests
+      WHERE owner_type = ? AND owner_id = ? AND router_id = ?
+        AND status IN ('preparing', 'active')
       ORDER BY created_at DESC LIMIT 1`
     )
     .bind(owner.ownerType, owner.ownerId, routerId)
@@ -725,6 +748,15 @@ async function startPaidBenchmark(
       };
     }
     if (Date.parse(reread.expires_at) <= now) return { status: 'quote_expired' };
+    // This pool already has a live request (one live-request slot per pool): another tab, or
+    // a quote taken before that request existed. Report it as such and continue it — staging
+    // that request is the only useful work, and nothing new is created, priced or charged.
+    const live = await readLiveRequest(db, owner, input.routerId);
+    if (live)
+      return {
+        status: 'already_in_progress',
+        request: await progressFor(env, live, plan, { now }),
+      };
     return { status: 'quote_mismatch', reason: 'quote_not_consumed' };
   }
 

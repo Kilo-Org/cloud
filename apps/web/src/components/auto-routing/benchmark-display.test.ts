@@ -192,6 +192,17 @@ describe('start failure copy', () => {
     }
   });
 
+  it('shows the running request instead of an error when a start finds one live', () => {
+    const copy = startFailureCopy({
+      status: 'already_in_progress',
+      request: progress('preparing', { queued: 3 }),
+    });
+    expect(copy?.title).toBe('A benchmark is already running for this pool');
+    expect(copy?.description).toContain('already in progress');
+    expect(copy?.description).toContain('Nothing new was started or charged');
+    expect(copy?.retryable).toBe(false);
+  });
+
   it('keeps the server retryability of a blocked request', () => {
     expect(
       startFailureCopy({ status: 'blocked', reason: 'Busy', retryable: true })?.retryable

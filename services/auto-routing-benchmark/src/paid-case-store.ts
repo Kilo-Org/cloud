@@ -360,8 +360,14 @@ function schedulerGuardParams(input: {
  * Bounded set-based form: a 20-entry pool with several variants and repetitions is
  * thousands of slots, so the controller chunks its plan into these batches. Approval is
  * never inferred from a partial plan: activation requires `staged_cases = plan_cases`.
+ *
+ * The bound is what one `batch()` may carry and still be a small statement: the case list is
+ * one JSON binding (~110 bytes per case when selected, so ~11 KB here against D1's 100 KB
+ * statement limit) and a handful of scalars against its 100-binding limit. A wider slice is
+ * fewer D1 round trips per staged slot, which is what keeps a whole tick inside its query
+ * budget; the staging slice is aligned to this cap.
  */
-export const PAID_CASE_BATCH_LIMIT = 50;
+export const PAID_CASE_BATCH_LIMIT = 100;
 
 /**
  * Recount one request's staged slots and stamp the moment staging last added a slot.

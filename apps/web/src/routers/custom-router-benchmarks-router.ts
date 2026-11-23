@@ -209,6 +209,10 @@ export const customRouterBenchmarksRouter = createTRPCRouter({
    * reachable by automation: a bearer token — human or delegated — is refused here, before the
    * Worker sees anything. The check fails closed, so a context without a derived credential
    * (an unusual constructor) is also refused. Quotes, reads and pause keep their authority.
+   *
+   * A pool holds one live request, so a second confirmation (`already_in_progress`) answers
+   * with that request's progress rather than an error: the UI shows the run in flight and no
+   * second request, quote consumption or charge happens.
    */
   start: baseProcedure
     .input(StartBenchmarkInput)

@@ -28,7 +28,7 @@ import {
   enqueuePaidCaseBatchStatements,
   selectPaidModelRequestPayerStatements,
 } from './paid-case-store';
-import { SERVING_EVIDENCE_GONE_REASON } from './paid-benchmark-plan';
+import { SERVING_EVIDENCE_GONE_REASON, type PaidBenchmarkPlan } from './paid-benchmark-plan';
 import { computeEngineIdentity } from './run';
 
 const CATALOG = {
@@ -2339,5 +2339,113 @@ describe('paid request staging liveness', () => {
     expect(requestState(retried.requestId).status).toBe('active');
     // The abandoned request stays failed and was never relaunched.
     expect(requestState(requestId).status).toBe('failed');
+  });
+
+  it('stays live across every tick the widest plan needs, and never expires midway', async () => {
+    // The widest observed pool: 68 concrete pairs, every slot unmeasured, which is the plan
+    // the staging budget was sized from. Inserted directly so the case list is exactly the
+    // measured one and the request is the widest possible.
+    const plan: PaidBenchmarkPlan = {
+      version: 1,
+      router: 'efficient',
+      engineIdentity: ENGINE,
+      revision: ACTIVE_MEASUREMENT_REVISION,
+      repetitions: REPS,
+      caseIds: CASES.map(benchCase => benchCase.id),
+      pairs: Array.from({ length: 68 }, (_, index) => ({
+        model: `vendor/wide-${index}`,
+        variant: '',
+        serving: false,
+        missing: btoa(String.fromCharCode(...new Uint8Array(Math.ceil(SLOTS / 8)).fill(0xff))),
+        covered: btoa(String.fromCharCode(...new Uint8Array(Math.ceil(SLOTS / 8)))),
+        cost: CASES.map(() => 1),
+      })),
+      counts: { reused: 0, covered: 0, shared: 0, exclusive: SLOTS * 68 },
+      estimateMicrodollars: SLOTS * 68,
+      maximumMicrodollars: SLOTS * 68,
+      aliases: [],
+      projectId: benchmarkProjectId({ scope: 'user', slug: 'pool-one', routerId: ROUTER_ID }),
+    };
+    const requestId = crypto.randomUUID();
+    const quoteId = crypto.randomUUID();
+    const at = new Date().toISOString();
+    sqlite
+      .prepare(
+        `INSERT INTO paid_benchmark_quotes
+          (id, owner_type, owner_id, organization_id, router, router_id, pool_version,
+            engine_identity, context, plan, estimate_microdollars, maximum_microdollars,
+            plan_cases, expires_at, started_request_id, created_at, updated_at)
+        VALUES (?, 'user', 'user-1', NULL, 'efficient', ?, 'pool-v1', ?, '{}', ?, 0, 0, ?,
+          '2027-01-01T00:00:00.000Z', ?, ?, ?)`
+      )
+      .run(quoteId, ROUTER_ID, ENGINE, JSON.stringify(plan), SLOTS * 68, requestId, at, at);
+    sqlite
+      .prepare(
+        `INSERT INTO paid_benchmark_requests
+          (id, owner_type, owner_id, organization_id, router, router_id, pool_version,
+            engine_identity, status, quote_id, estimate_microdollars, maximum_microdollars,
+            charged_microdollars, plan_cases, staged_cases, pause_reason, actor_user_id,
+            context, created_at, updated_at)
+        VALUES (?, 'user', 'user-1', NULL, 'efficient', ?, 'pool-v1', ?, 'preparing', ?, 0, 0, 0,
+          ?, 0, NULL, 'user-1', '{}', ?, ?)`
+      )
+      .run(requestId, ROUTER_ID, ENGINE, quoteId, SLOTS * 68, at, at);
+
+    const ticks = Math.ceil((SLOTS * 68) / 4_800) + 5;
+    let stagedBefore = 0;
+    let lastStamp = '';
+    let passes = 0;
+    for (let tick = 1; tick <= ticks; tick += 1) {
+      if (requestState(requestId).status !== 'preparing') break;
+      passes += 1;
+      const now = Date.now() + tick * MINUTE_MS;
+      const summary = await reconcilePaidBenchmarkRequests(paidBindings(db), { now });
+      // Every tick that stages keeps the pool's only live-request slot: it is never closed for
+      // age, never abandoned between passes, and its stamp advances with real progress.
+      expect(summary.closed).toEqual([]);
+      const state = requestState(requestId);
+      expect(['preparing', 'active']).toContain(state.status);
+      expect(state.staged_cases).toBeGreaterThan(stagedBefore);
+      expect(state.last_staged_at).not.toBeNull();
+      expect(Date.parse(state.last_staged_at ?? '')).toBe(now);
+      expect(state.last_staged_at).not.toBe(lastStamp);
+      stagedBefore = state.staged_cases;
+      lastStamp = state.last_staged_at ?? '';
+    }
+    // It finished on its own, inside the window, without a single browser poll: the final
+    // staging pass both completed the plan and activated the request.
+    const final = requestState(requestId);
+    expect(final.status).toBe('active');
+    expect(final.staged_cases).toBe(SLOTS * 68);
+    expect(liveRequestCount()).toBe(1);
+    expect(passes).toBeGreaterThan(20);
+  }, 120_000);
+
+  it('answers a second start while a request is preparing with its live request, not an error', async () => {
+    const { requestId } = await startFor(['vendor/alpha', 'vendor/cheap', 'vendor/third']);
+    expect(requestState(requestId).status).toBe('preparing');
+    expect(liveRequestCount()).toBe(1);
+
+    // A second quote and click for the same pool: the quote is read-only, so it succeeds; the
+    // click cannot create a request because the pool already holds its one live slot.
+    const quoted = await quoteFor(poolContext(['vendor/alpha', 'vendor/cheap', 'vendor/third']));
+    if (quoted.status !== 'ready') throw new Error('quote not ready');
+    const response = await post(startRequest(quoted.id));
+    expect(response.status).toBe(200);
+    const second = await startResult(response);
+    expect(second.status).toBe('already_in_progress');
+    if (second.status !== 'already_in_progress') return;
+    // The caller is handed the request that is already live, with its real progress.
+    const progress = second.request;
+    if (progress.status === 'empty') throw new Error('already-in-progress request was empty');
+    expect(progress.status).toBe('preparing');
+    expect(progress.id).toBe(requestId);
+    // Nothing new was created, and the refused quote was not consumed.
+    expect(countRows('SELECT COUNT(*) AS count FROM paid_benchmark_requests')).toBe(1);
+    expect(
+      sqlite
+        .prepare('SELECT started_request_id FROM paid_benchmark_quotes WHERE id = ?')
+        .get(quoted.id)
+    ).toEqual({ started_request_id: null });
   });
 });

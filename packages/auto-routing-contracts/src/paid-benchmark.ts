@@ -91,6 +91,10 @@ export type PaidBenchmarkProgress = z.infer<typeof PaidBenchmarkProgressSchema>;
 
 export const PaidBenchmarkStartResultSchema = z.discriminatedUnion('status', [
   z.object({ status: z.literal('started'), request: PaidBenchmarkProgressSchema }),
+  // A second explicit confirmation while this pool's request is still live (another tab, a
+  // stale quote) joins the request already staging instead of failing: nothing new is
+  // created, priced or charged, and the caller gets that request's progress to show.
+  z.object({ status: z.literal('already_in_progress'), request: PaidBenchmarkProgressSchema }),
   z.object({
     status: z.literal('insufficient_balance'),
     requiredMicrodollars: BenchmarkMicrodollarsSchema.optional(),

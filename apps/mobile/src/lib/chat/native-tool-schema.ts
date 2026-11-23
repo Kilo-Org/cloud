@@ -36,7 +36,11 @@ export type NativeTool = {
   readonly parameters: string;
 };
 
-/** An argument path from the tool's own root, such as `filter` or `where.lat`. */
+/**
+ * An argument path from the tool's own root, such as `filter` or `where.lat`.
+ * A property inside a list argument keeps the list's item step, so `filters[].op`
+ * names the `op` of one item the model cannot fill in.
+ */
 type OmittedArgument = { readonly argument: string; readonly reason: string };
 
 /** A property's path below the tool's arguments, never leading with a dot. */

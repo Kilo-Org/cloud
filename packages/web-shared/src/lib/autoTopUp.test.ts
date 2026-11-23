@@ -7,7 +7,7 @@ import {
   organizations,
 } from '@kilocode/db/schema';
 import type { User, Organization } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   createOrganization,
@@ -1288,6 +1288,7 @@ describe('automatic top-up charge standing', () => {
       where: eq(auto_top_up_configs.id, config.id),
     });
     expect(savedConfig?.attempt_started_at).toBeNull();
+    expect(savedConfig?.charge_refused_at).not.toBeNull();
     expect(savedConfig?.disabled_reason).toBeNull();
     const savedUser = await db.query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, user.id),
@@ -1309,6 +1310,46 @@ describe('automatic top-up charge standing', () => {
     );
     expect(request).not.toHaveProperty('ip', expect.anything());
     expect(request).not.toHaveProperty('ja4', expect.anything());
+  });
+
+  test('a recent refusal suppresses the next attempt for the same payer', async () => {
+    const { user, config } = await insertPayerWithConfig();
+    mockChargeDecide.mockResolvedValue({ enforced: true, flags: [] });
+
+    await maybePerformAutoTopUp(user);
+    await maybePerformAutoTopUp(user);
+
+    expect(mockChargeDecide).toHaveBeenCalledTimes(1);
+    expect(client.invoices.create).not.toHaveBeenCalled();
+    expect(client.invoices.pay).not.toHaveBeenCalled();
+
+    const savedConfig = await db.query.auto_top_up_configs.findFirst({
+      where: eq(auto_top_up_configs.id, config.id),
+    });
+    expect(savedConfig?.charge_refused_at).not.toBeNull();
+    expect(savedConfig?.attempt_started_at).toBeNull();
+  });
+
+  test('a refusal older than the cooldown asks bouncer again and charges', async () => {
+    const { user, config } = await insertPayerWithConfig();
+    mockChargeDecide.mockResolvedValueOnce({ enforced: true, flags: [] });
+
+    await maybePerformAutoTopUp(user);
+    expect(mockChargeDecide).toHaveBeenCalledTimes(1);
+    expect(client.invoices.create).not.toHaveBeenCalled();
+
+    await db
+      .update(auto_top_up_configs)
+      .set({ charge_refused_at: sql`NOW() - INTERVAL '20 minutes'` })
+      .where(eq(auto_top_up_configs.id, config.id));
+    stubPaidInvoice('inv_gate_after_cooldown');
+    mockChargeDecide.mockResolvedValueOnce({ enforced: false, flags: [] });
+
+    await maybePerformAutoTopUp(user);
+
+    expect(mockChargeDecide).toHaveBeenCalledTimes(2);
+    expect(client.invoices.create).toHaveBeenCalledTimes(1);
+    expect(client.invoices.pay).toHaveBeenCalledTimes(1);
   });
 
   test('a refusing verdict asks about the organization payer family root', async () => {

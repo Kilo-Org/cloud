@@ -1,0 +1,1 @@
+ALTER TABLE "auto_top_up_configs" ADD COLUMN "charge_refused_at" timestamp with time zone;

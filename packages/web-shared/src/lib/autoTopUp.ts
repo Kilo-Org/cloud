@@ -29,6 +29,7 @@ import { KiloPassIssuanceItemKind } from '@kilocode/web-shared/lib/kilo-pass/enu
 
 import {
   AUTO_TOP_UP_ATTEMPT_LOCK_TIMEOUT_SECONDS,
+  AUTO_TOP_UP_CHARGE_REFUSAL_COOLDOWN_SECONDS,
   AUTO_TOP_UP_THRESHOLD_DOLLARS,
   MAX_ORG_AUTO_TOP_UP_THRESHOLD_CENTS,
   parseOrgAutoTopUpThresholdCents,
@@ -148,6 +149,23 @@ async function readOrganizationAutoTopUpThresholdCents(
   return config?.threshold_cents;
 }
 
+/**
+ * Whether bouncer refused this payer's charge recently enough that the standing question is
+ * suppressed. The comparison runs in SQL so the stored text shape never becomes a JS date; a
+ * payer with no config row has never been refused.
+ */
+async function chargeRefusalIsFresh(entity: AutoTopUpEntity): Promise<boolean> {
+  const { ownerColumn, ownerId } = entityIdentity(entity);
+  const [config] = await db
+    .select({
+      refused: sql<boolean>`coalesce(${auto_top_up_configs.charge_refused_at} > NOW() - INTERVAL '${sql.raw(String(AUTO_TOP_UP_CHARGE_REFUSAL_COOLDOWN_SECONDS))} second', false)`,
+    })
+    .from(auto_top_up_configs)
+    .where(eq(ownerColumn, ownerId))
+    .limit(1);
+  return config?.refused ?? false;
+}
+
 async function shouldWaitForKiloPassBonusCredits(kiloUserId: string): Promise<boolean> {
   const subscription = await getKiloPassStateForUser(db, kiloUserId);
   if (!subscription) return false;
@@ -234,6 +252,15 @@ async function maybePerformAutoTopUpForEntity(entity: AutoTopUpEntity): Promise<
     if (shouldWait) {
       return;
     }
+  }
+
+  if (await chargeRefusalIsFresh(entity)) {
+    const { ownerId, label: entityLabel } = entityIdentity(entity);
+    logExceptInTest(`Auto-top-up skipped for ${entityLabel}: a standing refusal was recent`, {
+      entity_type: entity.type,
+      entity_id: ownerId,
+    });
+    return;
   }
 
   const traceId = randomUUID();
@@ -369,6 +396,10 @@ async function performAutoTopUpForEntity(
       requestId: `auto_topup:${config.id}:${traceId}`,
     });
     if (chargeVerdict?.enforced) {
+      await db
+        .update(auto_top_up_configs)
+        .set({ charge_refused_at: sql`NOW()` })
+        .where(eq(auto_top_up_configs.id, config.id));
       return failureResult('charge_refused');
     }
 

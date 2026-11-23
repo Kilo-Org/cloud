@@ -32,11 +32,11 @@ import {
   DEFAULT_CHAT_FILTERS,
   type MergedChatRow,
 } from '@/lib/chat/sync/sync-list';
+import { startBackfill } from '@/lib/chat/sync/sync-backfill-run';
 import {
   deleteEverywhere,
   deleteServerSession,
   importServerSession,
-  startBackfill,
 } from '@/lib/chat/sync/sync-service';
 import {
   useChatSyncGate,

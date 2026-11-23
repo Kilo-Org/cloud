@@ -34,11 +34,8 @@ import { type EffortChoices, effortOfVariant, variantOfEffort } from '@/lib/chat
 import { ICON_TARGET_BOX_CLASS, ICON_TARGET_DP } from '@/lib/a11y/tap-target';
 import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { cn } from '@/lib/utils';
-import {
-  discardAndReload,
-  prepareSend,
-  pullOpenedChat,
-} from '@/lib/chat/sync/sync-service';
+import { prepareSend } from '@/lib/chat/sync/sync-send';
+import { discardAndReload, pullOpenedChat } from '@/lib/chat/sync/sync-service';
 import {
   useChatSyncGate,
   useChatSyncUploader,

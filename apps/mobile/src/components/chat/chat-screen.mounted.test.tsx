@@ -196,6 +196,12 @@ vi.mock('@/lib/chat/sync/use-chat-sync', () => ({
   useDeletedElsewhere: () => undefined,
   useChatSyncNotice: () => ({ visible: false, dismiss: () => undefined }),
 }));
+vi.mock('@/lib/chat/sync/sync-send', () => ({
+  prepareSend: async () => ({ kind: 'local' }),
+}));
+vi.mock('@/lib/chat/sync/sync-backfill-run', () => ({
+  startBackfill: async () => undefined,
+}));
 vi.mock('@/lib/chat/sync/sync-service', () => ({
   prepareSend: async () => ({ kind: 'local' }),
   pullOpenedChat: async () => undefined,

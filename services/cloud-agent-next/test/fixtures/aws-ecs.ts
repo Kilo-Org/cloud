@@ -241,7 +241,6 @@ export function ecsProviderFixture(sandboxId = 'ses-abcdef') {
       throw new Error('Unexpected archive upload');
     },
     inspectArchive: async () => null,
-    deleteArchive: async () => {},
   };
   return {
     setSnapshotPreparation(hook: (startup: ProviderStartup) => Promise<ProviderStartup>) {

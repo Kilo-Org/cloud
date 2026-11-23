@@ -260,7 +260,10 @@ describe('ProfileScreen settings search', () => {
     if (!entry) {
       throw new Error('the search renders no root result');
     }
+    const resetsBeforeSelection = resets().length;
     selectResult(root, entry);
+    // The selection's own body swap must not also reset the replaced body: its reveal owns that transition.
+    expect(resets()).toHaveLength(resetsBeforeSelection);
     expect(targetHighlights(root)).toHaveLength(1);
 
     // That highlight stays set. A later search and clear must still start the

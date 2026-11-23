@@ -18,6 +18,7 @@ const staging = workflow('deploy-staging');
 const gate = workflow('check-deployment-changes');
 const workers = workflow('deploy-workers');
 const ci = workflow('ci');
+const e2eDeploy = workflow('cloud-agent-e2e-deploy');
 
 test('Cloud Agent source-map uploads are best-effort without masking build or deploy failures', () => {
   for (const [job, selector] of [
@@ -1531,6 +1532,273 @@ test('a Pages pin move deploys the output shell beside Pages', t => {
   git('checkout', '-q', '-b', 'docs', base);
   commit({ 'services/pages/README.md': 'Pages, again' }, 'docs');
   assert.deepEqual(detected('docs'), ['services/pages'], 'another Pages change leaves the shell');
+});
+
+test('Cloud Agent e2e deploy admits a main runtime source and scopes each credential to its step', () => {
+  const job = e2eDeploy.jobs.deploy;
+  const steps = job.steps;
+  assert.equal(job.env.CLOUDFLARE_API_TOKEN, undefined);
+  for (const value of Object.values(job.env)) {
+    assert.doesNotMatch(String(value), /secrets\./);
+  }
+
+  // Each production credential reaches only the step that consumes it.
+  const holders = new Map();
+  for (const step of steps) {
+    for (const value of [...Object.values(step.env ?? {}), ...Object.values(step.with ?? {})]) {
+      for (const [, secret] of String(value).matchAll(/secrets\.([A-Z0-9_]+)/g)) {
+        if (!holders.has(secret)) {
+          holders.set(secret, new Set());
+        }
+        holders.get(secret).add(step.name);
+      }
+    }
+  }
+  assert.deepEqual(
+    Object.fromEntries([...holders].map(([secret, names]) => [secret, [...names].sort()])),
+    {
+      CLOUD_AGENT_RUNTIME_R2_ACCESS_KEY_ID: ['Prepare downloaded Cloud Agent runtime'],
+      CLOUD_AGENT_RUNTIME_R2_SECRET_ACCESS_KEY: ['Prepare downloaded Cloud Agent runtime'],
+      CLOUDFLARE_API_TOKEN: [
+        'Deploy Cloud Agent e2e Worker',
+        'Deploy fake-LLM Worker',
+        'Prepare downloaded Cloud Agent runtime',
+      ],
+      E2E_INTERNAL_API_SECRET: ['Deploy Cloud Agent e2e Worker'],
+      FAKE_LLM_ADMIN_TOKEN: ['Deploy fake-LLM Worker'],
+    }
+  );
+
+  const index = name => steps.findIndex(step => step.name === name);
+  const admissionIndex = index('Checkout main for admission');
+  const runtimeSourceIndex = steps.findIndex(step => step.id === 'runtime_source');
+  const checkoutIndex = index('Checkout the runtime source');
+  const guardIndex = index('Verify the run SHA shares the runtime Worker config');
+  const prepareIndex = index('Prepare downloaded Cloud Agent runtime');
+  const fakeIndex = index('Deploy fake-LLM Worker');
+  const workerIndex = index('Deploy Cloud Agent e2e Worker');
+  assert.ok(admissionIndex < runtimeSourceIndex);
+  assert.ok(runtimeSourceIndex < checkoutIndex);
+  assert.ok(checkoutIndex < guardIndex);
+  assert.ok(guardIndex < index('Setup pnpm'));
+  assert.ok(guardIndex < prepareIndex);
+  assert.ok(prepareIndex < fakeIndex);
+  assert.ok(fakeIndex < workerIndex);
+
+  const runtimeSource = steps[runtimeSourceIndex];
+  assert.equal(runtimeSource.env.SOURCE_SHA, '${{ inputs.runtime_source_sha || github.sha }}');
+
+  const admission = steps[admissionIndex];
+  assert.deepEqual(admission.with, {
+    ref: 'refs/heads/main',
+    'fetch-depth': 0,
+    'persist-credentials': false,
+  });
+
+  const checkout = steps[checkoutIndex];
+  assert.equal(checkout.with.ref, '${{ steps.runtime_source.outputs.runtime_source_sha }}');
+  assert.equal(steps[prepareIndex].env.SOURCE_SHA, checkout.with.ref);
+
+  const switchStep = steps[index('Switch to the run SHA')];
+  assert.equal(switchStep.if, 'steps.runtime_source.outputs.runtime_source_sha != github.sha');
+
+  // The guard compares the run SHA's Worker config with the runtime SHA's
+  // before preparation, so a mismatch fails in seconds instead of waiting for
+  // a publication the run could never use.
+  const guardStep = steps[guardIndex];
+  assert.equal(guardStep.if, switchStep.if);
+  assert.equal(
+    guardStep.env.RUNTIME_SOURCE_SHA,
+    '${{ steps.runtime_source.outputs.runtime_source_sha }}'
+  );
+  assert.equal(guardStep.env.RUN_SHA, '${{ github.sha }}');
+  assert.ok(guardStep.run.indexOf('git fetch') < guardStep.run.indexOf('git diff --quiet'));
+  assert.match(guardStep.run, /services\/cloud-agent-next\/wrangler\.jsonc/);
+  assert.match(guardStep.run, /services\/cloud-agent-next\/runtime-targets\.json/);
+  assert.match(
+    guardStep.run,
+    /if ! git diff --quiet[\s\S]*echo "::error::wrangler\.jsonc or runtime-targets\.json differs from the runtime SHA"\n\s*exit 1/
+  );
+
+  // The guard fetched and checked the run SHA, so switching only moves the
+  // prepared config aside and checks the revision out.
+  assert.doesNotMatch(switchStep.run, /git diff --quiet/);
+  assert.match(switchStep.run, /git checkout --detach/);
+  assert.match(switchStep.run, /wrangler\.runtime-generated\.json/);
+});
+
+test('Cloud Agent e2e deploy refuses a run SHA whose runtime Worker config differs', () => {
+  // The guard is the only step between the runtime-source checkout and
+  // preparation, so a refusal here is what keeps a mismatched run SHA from
+  // waiting on that preparation.
+  const directory = mkdtempSync(join(tmpdir(), 'e2e-runtime-config-'));
+  const git = (...args) => execFileSync('git', args, { cwd: directory, encoding: 'utf8' }).trim();
+  const commit = message => {
+    git('-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '-qm', message);
+  };
+  git('init', '-q', '--initial-branch=main', '.');
+  mkdirSync(join(directory, 'services', 'cloud-agent-next'), { recursive: true });
+  const wrangler = join(directory, 'services', 'cloud-agent-next', 'wrangler.jsonc');
+  const targets = join(directory, 'services', 'cloud-agent-next', 'runtime-targets.json');
+  writeFileSync(wrangler, '{ "name": "cloud-agent-next" }\n');
+  writeFileSync(targets, '["cloud-agent-next-e2e"]\n');
+  git('add', 'services');
+  commit('runtime config');
+  const mainSha = git('rev-parse', 'HEAD');
+
+  // A run SHA must be fetchable from origin by its full SHA, so the fixture
+  // publishes each branch to a bare repository the guard's fetch reads.
+  const origin = join(directory, 'origin.git');
+  git('clone', '-q', '--bare', directory, origin);
+  git('remote', 'add', 'origin', origin);
+
+  git('checkout', '-q', '-b', 'same');
+  writeFileSync(join(directory, 'unrelated.txt'), 'unrelated change\n');
+  git('add', 'unrelated.txt');
+  commit('unrelated change');
+  const sameSha = git('rev-parse', 'HEAD');
+  git('push', '-q', 'origin', 'same');
+
+  git('checkout', '-q', '-b', 'differs');
+  writeFileSync(wrangler, '{ "name": "cloud-agent-next", "workers_dev": true }\n');
+  git('add', 'services');
+  commit('worker config change');
+  const diffSha = git('rev-parse', 'HEAD');
+  git('push', '-q', 'origin', 'differs');
+
+  const script = e2eDeploy.jobs.deploy.steps.find(
+    step => step.name === 'Verify the run SHA shares the runtime Worker config'
+  ).run;
+  const runGuard = runSha =>
+    spawnSync('bash', ['-e', '-c', script], {
+      cwd: directory,
+      encoding: 'utf8',
+      env: { ...process.env, RUNTIME_SOURCE_SHA: mainSha, RUN_SHA: runSha },
+    });
+
+  try {
+    // The run SHA may change anything but the two Worker config files.
+    const same = runGuard(sameSha);
+    assert.equal(same.status, 0, `${same.stdout}${same.stderr}`);
+    assert.doesNotMatch(`${same.stdout}${same.stderr}`, /::error::/);
+
+    const differs = runGuard(diffSha);
+    assert.equal(differs.status, 1);
+    assert.match(
+      `${differs.stdout}${differs.stderr}`,
+      /::error::wrangler\.jsonc or runtime-targets\.json differs from the runtime SHA/
+    );
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('Cloud Agent e2e deploy refuses a runtime source outside main', () => {
+  // The admission step reads origin/main, the remote-tracking ref the checkout
+  // action creates from `ref: refs/heads/main` with full history, so the
+  // fixture clones a bare origin instead of writing that ref by hand.
+  const directory = mkdtempSync(join(tmpdir(), 'e2e-runtime-source-'));
+  const source = join(directory, 'source');
+  const origin = join(directory, 'origin.git');
+  const work = join(directory, 'work');
+  const git = (...args) => execFileSync('git', args, { cwd: source, encoding: 'utf8' }).trim();
+  const commit = message => {
+    git('add', '.');
+    git('-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '-qm', message);
+  };
+  mkdirSync(source);
+  git('init', '-q', '--initial-branch=main', '.');
+  writeFileSync(join(source, 'one.txt'), 'one');
+  commit('one');
+  const mainSha = git('rev-parse', 'HEAD');
+  execFileSync('git', ['clone', '-q', '--bare', source, origin]);
+  git('remote', 'add', 'origin', origin);
+  git('push', '-q', 'origin', 'main');
+
+  git('checkout', '-q', '-b', 'feature');
+  writeFileSync(join(source, 'two.txt'), 'two');
+  commit('two');
+  const featureSha = git('rev-parse', 'HEAD');
+  git('push', '-q', 'origin', 'feature');
+
+  execFileSync('git', ['clone', '-q', origin, work]);
+  const workGit = (...args) => execFileSync('git', args, { cwd: work, encoding: 'utf8' }).trim();
+
+  const script = e2eDeploy.jobs.deploy.steps.find(step => step.id === 'runtime_source').run;
+  const runAdmission = sourceSha => {
+    const outputPath = join(work, '.git', 'source-output');
+    writeFileSync(outputPath, '');
+    const result = spawnSync('bash', ['-e', '-c', script], {
+      cwd: work,
+      encoding: 'utf8',
+      env: { ...process.env, SOURCE_SHA: sourceSha, GITHUB_OUTPUT: outputPath },
+    });
+    return {
+      status: result.status,
+      stdout: result.stdout,
+      stderr: result.stderr,
+      output: readFileSync(outputPath, 'utf8'),
+    };
+  };
+
+  try {
+    const accepted = runAdmission(mainSha);
+    assert.equal(accepted.status, 0, accepted.stderr);
+    assert.match(accepted.output, new RegExp(`runtime_source_sha=${mainSha}`));
+
+    const offMain = runAdmission(featureSha);
+    assert.equal(offMain.status, 1);
+    assert.match(`${offMain.stdout}${offMain.stderr}`, /::error::.*not on origin\/main/);
+    assert.doesNotMatch(offMain.output, /runtime_source_sha=/);
+
+    const absent = runAdmission('a'.repeat(40));
+    assert.equal(absent.status, 1);
+    assert.match(`${absent.stdout}${absent.stderr}`, /::error::.*not a commit on main/);
+    assert.doesNotMatch(absent.output, /runtime_source_sha=/);
+    assert.doesNotMatch(absent.stderr, /fatal:/);
+
+    for (const malformed of ['refs/heads/main', mainSha.slice(0, 7)]) {
+      const rejected = runAdmission(malformed);
+      assert.equal(rejected.status, 1);
+      assert.match(`${rejected.stdout}${rejected.stderr}`, /::error::.*40-character/);
+      assert.doesNotMatch(rejected.output, /runtime_source_sha=/);
+    }
+
+    // A dispatch may paste the SHA in either case: the step accepts both and
+    // writes the lowercase form for the later git calls and the checkout.
+    const uppercase = runAdmission(mainSha.toUpperCase());
+    assert.equal(uppercase.status, 0, uppercase.stderr);
+    assert.equal(uppercase.output, `runtime_source_sha=${mainSha}\n`);
+
+    // A 40-character string that is not hexadecimal still fails the guard.
+    const nonHex = runAdmission('g'.repeat(40));
+    assert.equal(nonHex.status, 1);
+    assert.match(`${nonHex.stdout}${nonHex.stderr}`, /::error::.*40-character/);
+    assert.doesNotMatch(nonHex.output, /runtime_source_sha=/);
+
+    // A dispatch expression may carry the SHA with surrounding whitespace, and
+    // the step writes the bare lowercase SHA the later git calls consume.
+    for (const padded of [`${mainSha} `, `${mainSha}\n`]) {
+      const stripped = runAdmission(padded);
+      assert.equal(stripped.status, 0, stripped.stderr);
+      assert.equal(stripped.output, `runtime_source_sha=${mainSha}\n`);
+    }
+
+    // Last, so nothing after it depends on the ref: a checkout without
+    // origin/main must say the main commit cannot be confirmed instead of
+    // blaming the input SHA.
+    workGit('update-ref', '-d', 'refs/remotes/origin/main');
+    const unconfirmed = runAdmission(mainSha);
+    assert.equal(unconfirmed.status, 1);
+    assert.match(
+      `${unconfirmed.stdout}${unconfirmed.stderr}`,
+      /::error::origin\/main is missing from the admission checkout/
+    );
+    assert.doesNotMatch(unconfirmed.output, /runtime_source_sha=/);
+    assert.doesNotMatch(`${unconfirmed.stdout}${unconfirmed.stderr}`, /not on origin\/main/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test('Vercel deployment steps pass the deployment URL as one argument', () => {

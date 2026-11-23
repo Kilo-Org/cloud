@@ -4,14 +4,17 @@ on:
   workflow_dispatch:
     inputs:
       runtime_source_sha:
-        description: 'Main SHA whose published runtime to use (for a branch run); empty uses the run SHA'
+        # Only main publishes a runtime. A dispatch from a branch must name a
+        # main SHA, and an empty input falls back to the run SHA, which the
+        # resolution step then requires to be a main commit as well.
+        description: 'Main SHA whose published runtime to use; empty uses the run SHA, which must be a main commit'
         required: false
         type: string
         default: ''
   workflow_call:
     inputs:
       runtime_source_sha:
-        description: 'Main SHA whose published runtime to use; empty uses the run SHA'
+        description: 'Main SHA whose published runtime to use; empty uses the run SHA, which must be a main commit'
         required: false
         type: string
         default: ''
@@ -35,20 +38,70 @@ jobs:
     # Runtime preparation may wait up to 45 minutes for the exact-SHA handoff.
     timeout-minutes: 75
     env:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      FAKE_LLM_ADMIN_TOKEN: ${{ secrets.FAKE_LLM_ADMIN_TOKEN }}
-      E2E_INTERNAL_API_SECRET: ${{ secrets.E2E_INTERNAL_API_SECRET }}
       FAKE_LLM_WORKER_URL: https://fake-llm.engineering-e11.workers.dev
-      # Runtime publication runs only for main SHAs. A branch run can borrow the
-      # runtime of a main SHA; the Worker and fake LLM still deploy from the run SHA.
-      RUNTIME_SOURCE_SHA: ${{ inputs.runtime_source_sha || github.sha }}
-      # The e2e Worker writes to production Postgres and R2, so this deployed
-      # stack is a deliberate opt-in, not an isolation boundary.
     steps:
-      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+      # Admission code and history come from main, never from the caller-named
+      # revision, and full history is what the ancestry check reads.
+      - name: Checkout main for admission
+        uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
         with:
-          ref: ${{ env.RUNTIME_SOURCE_SHA }}
+          ref: refs/heads/main
+          fetch-depth: 0
+          persist-credentials: false
+
+      # Only main publishes a runtime, so the runtime source must be a main
+      # commit. Refusing here costs a second; preparation would wait up to 45
+      # minutes for a publication that can never arrive.
+      - name: Verify the runtime source is a main commit
+        id: runtime_source
+        env:
+          SOURCE_SHA: ${{ inputs.runtime_source_sha || github.sha }}
+        run: |
+          set -euo pipefail
+          SOURCE_SHA="${SOURCE_SHA//[[:space:]]/}"
+          if [[ ! "$SOURCE_SHA" =~ ^[0-9a-fA-F]{40}$ ]]; then
+            echo "::error::runtime_source_sha must be a full 40-character hexadecimal commit SHA"
+            exit 1
+          fi
+          SOURCE_SHA="${SOURCE_SHA,,}"
+          if ! git rev-parse --verify --quiet "$SOURCE_SHA^{commit}" > /dev/null; then
+            echo "::error::runtime_source_sha is not a commit on main; a branch dispatch must name a main SHA"
+            exit 1
+          fi
+          if ! git rev-parse --verify --quiet refs/remotes/origin/main > /dev/null; then
+            echo "::error::origin/main is missing from the admission checkout; the runtime source cannot be confirmed as a main commit"
+            exit 1
+          fi
+          if ! git merge-base --is-ancestor "$SOURCE_SHA" origin/main; then
+            echo "::error::runtime_source_sha is not on origin/main; a branch dispatch must name a main SHA"
+            exit 1
+          fi
+          echo "runtime_source_sha=$SOURCE_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout the runtime source
+        uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+        with:
+          ref: ${{ steps.runtime_source.outputs.runtime_source_sha }}
           lfs: true
+
+      # The prepared config is rendered from the runtime SHA's Worker config, so
+      # the run SHA may borrow the runtime only when the two agree. Comparing
+      # here costs one shallow fetch and fails before preparation, which can
+      # wait up to 45 minutes for a publication the run could never use.
+      - name: Verify the run SHA shares the runtime Worker config
+        if: steps.runtime_source.outputs.runtime_source_sha != github.sha
+        env:
+          RUNTIME_SOURCE_SHA: ${{ steps.runtime_source.outputs.runtime_source_sha }}
+          RUN_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin "$RUN_SHA"
+          if ! git diff --quiet "$RUNTIME_SOURCE_SHA" "$RUN_SHA" -- \
+            services/cloud-agent-next/wrangler.jsonc \
+            services/cloud-agent-next/runtime-targets.json; then
+            echo "::error::wrangler.jsonc or runtime-targets.json differs from the runtime SHA"
+            exit 1
+          fi
 
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
@@ -70,43 +123,44 @@ jobs:
       - name: Prepare downloaded Cloud Agent runtime
         working-directory: services/cloud-agent-next
         env:
-          SOURCE_SHA: ${{ env.RUNTIME_SOURCE_SHA }}
+          SOURCE_SHA: ${{ steps.runtime_source.outputs.runtime_source_sha }}
           RUNTIME_R2_ACCOUNT_ID: ${{ vars.CLOUD_AGENT_RUNTIME_ACCOUNT_ID }}
           RUNTIME_R2_BUCKET: ${{ vars.CLOUD_AGENT_RUNTIME_BUCKET }}
           RUNTIME_R2_ACCESS_KEY_ID: ${{ secrets.CLOUD_AGENT_RUNTIME_R2_ACCESS_KEY_ID }}
           RUNTIME_R2_SECRET_ACCESS_KEY: ${{ secrets.CLOUD_AGENT_RUNTIME_R2_SECRET_ACCESS_KEY }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUD_AGENT_RUNTIME_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           # Read-only: lets preparation stop waiting once the SHA's publication has failed.
           GITHUB_TOKEN: ${{ github.token }}
         run: pnpm exec tsx scripts/prepare-runtime-deploy.ts production "$SOURCE_SHA"
 
+      # The Worker and fake LLM deploy from the run's own checkout; the runtime
+      # revision only lends its published runtime and its Worker config.
       - name: Switch to the run SHA
-        if: env.RUNTIME_SOURCE_SHA != github.sha
+        if: steps.runtime_source.outputs.runtime_source_sha != github.sha
         env:
           RUN_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
           generated=services/cloud-agent-next/wrangler.runtime-generated.json
           mv "$generated" "$RUNNER_TEMP/wrangler.runtime-generated.json"
-          git fetch --no-tags --depth=1 origin "$RUN_SHA"
-          # The prepared config is rendered from the runtime SHA's Worker config.
-          # Borrowing it is only valid when the run SHA has the same config.
-          if ! git diff --quiet "$RUNTIME_SOURCE_SHA" "$RUN_SHA" -- \
-            services/cloud-agent-next/wrangler.jsonc \
-            services/cloud-agent-next/runtime-targets.json; then
-            echo "::error::wrangler.jsonc or runtime-targets.json differs from the runtime SHA"
-            exit 1
-          fi
+          # The Worker config matches the runtime SHA; the earlier comparison
+          # already fetched this revision and refused a mismatch.
           git checkout --detach "$RUN_SHA"
           pnpm install --frozen-lockfile
           mv "$RUNNER_TEMP/wrangler.runtime-generated.json" "$generated"
 
       - name: Deploy fake-LLM Worker
         working-directory: services/cloud-agent-next
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          FAKE_LLM_ADMIN_TOKEN: ${{ secrets.FAKE_LLM_ADMIN_TOKEN }}
         run: test/e2e/deploy/deploy-fake-llm.sh deploy
 
       - name: Deploy Cloud Agent e2e Worker
         working-directory: services/cloud-agent-next
         env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          E2E_INTERNAL_API_SECRET: ${{ secrets.E2E_INTERNAL_API_SECRET }}
           FAKE_LLM_BASE_URL: ${{ env.FAKE_LLM_WORKER_URL }}/api/openrouter
         run: test/e2e/deploy/deploy-e2e-worker.sh deploy

@@ -60,7 +60,7 @@
     "takingLonger": "इसमें अपेक्षा से अधिक समय लग रहा है। आप इसे बंद करके फिर से जाँच सकते हैं।",
     "model": "मॉडल",
     "notSelected": "चयनित नहीं",
-    "accessDenied": "पहुँच की अनुमति नहीं है।",
+    "accessDenied": "पहुँच अस्वीकृत",
     "allRepositories": "सभी रिपॉज़िटरी",
     "personal": "व्यक्तिगत",
     "connectGithub": "GitHub जोड़ें",
@@ -702,13 +702,13 @@
       "classificationUnreadable": "यह फ़ाइल पढ़ी नहीं जा सकी।",
       "announceUploaded": "अटैचमेंट अपलोड हो गया",
       "cantUpload": "यह फ़ाइल अपलोड नहीं की जा सकती।",
-      "networkError": "नेटवर्क में त्रुटि हुई।",
+      "networkError": "नेटवर्क त्रुटि",
       "uploadFailed": "अपलोड विफल हुआ।",
       "nothingToPaste": "पेस्ट करने के लिए कुछ नहीं है।",
       "metadataStripFailed": "फ़ोटो का मेटाडेटा हटाया नहीं जा सका।"
     },
     "attachmentPreview": {
-      "accessibility": "{{filename}}, स्थिति: {{status}}"
+      "accessibility": "{{filename}}, {{status}}"
     },
     "conversationList": {
       "today": "आज",
@@ -1600,7 +1600,7 @@
   "agents": {
     "search": {
       "searchSessions": "सत्र की खोज",
-      "searchSessionsPlaceholder": "सत्र की खोज",
+      "searchSessionsPlaceholder": "सत्र खोजें…",
       "searching": "खोज जारी है"
     },
     "sessionList": {
@@ -1657,7 +1657,7 @@
       "cannotCompleteTitle": "इंस्टॉलेशन पूरा नहीं किया जा सकता",
       "notAdminMessage": "केवल उस खाते का GitHub एडमिन ही इसे कनेक्ट कर सकता है। Kilo इंस्टॉल करने के लिए संगठन के एडमिन से कहें।",
       "alreadyClaimedMessage": "वह GitHub इंस्टॉलेशन पहले से किसी दूसरे Kilo खाते से कनेक्ट है। पहले वहाँ इसे डिस्कनेक्ट करें।",
-      "installationUnavailableMessage": "यह GitHub App इंस्टॉलेशन सस्पेंड है या अब उपलब्ध नहीं है। इसे GitHub में रीस्टोर करें या फिर से इंस्टॉल करें, फिर दोबारा शुरू करें।",
+      "installationUnavailableMessage": "यह GitHub ऐप इंस्टॉलेशन सस्पेंड है या अब उपलब्ध नहीं है। इसे GitHub में रीस्टोर करें या फिर से इंस्टॉल करें, फिर दोबारा शुरू करें।",
       "multipleInstallationsMessage": "यह Kilo संगठन अभी सिर्फ़ एक ही GitHub संगठन से कनेक्ट हो सकता है।",
       "didNotCompleteTitle": "इंस्टॉलेशन पूरा नहीं हुआ",
       "didNotCompleteMessage": "GitHub ऐप का इंस्टॉलेशन पूरा नहीं हुआ। ऐप से फिर से कोशिश करें।"
@@ -3892,7 +3892,7 @@
     "signupStepUpGoogle": "अपना खाता बनाना पूरा करने के लिए '$t(login.signInWithGoogle)' का उपयोग करें।",
     "signupStepUpBack": "अपना खाता बनाना पूरा करने के लिए वापस जाएँ और '$t(login.moreSignInOptions)' का उपयोग करें।",
     "invalidCode": "यह कोड गलत है या इसकी समय-सीमा समाप्त हो गई है। '$t(login.resendCode)' या '$t(login.moreSignInOptions)' का उपयोग करें।",
-    "codeInProgress": "आपके कोड पर कार्रवाई जारी है। थोड़ा इंतज़ार करें और फिर से कोशिश करें।",
+    "codeInProgress": "आपका कोड संसाधित किया जा रहा है। थोड़ा इंतज़ार करें और फिर से कोशिश करें।",
     "tooManyAttempts": "आपने बहुत बार कोशिश की है। कृपया नया कोड माँगें।",
     "invalidToken": "साइन इन नहीं हो सका। कृपया फिर से कोशिश करें।",
     "invalidEmail": "इस पते पर ईमेल नहीं भेजा जा सकता। कृपया किसी दूसरे ईमेल पते का उपयोग करें।",
@@ -3900,13 +3900,13 @@
     "emailDeliveryFailed": "फ़िलहाल ईमेल नहीं भेजा जा सकता। कृपया बाद में फिर से कोशिश करें।",
     "admissionRequired": "आपके डिवाइस की पुष्टि नहीं की जा सकती। किसी दूसरे डिवाइस पर या वेब के माध्यम से साइन इन करने के लिए '$t(login.moreSignInOptions)' का उपयोग करें।",
     "default": "कुछ गड़बड़ हो गई। कृपया फिर से कोशिश करें।",
-    "retryableAdmission": "इस डिवाइस की पुष्टि नहीं हो सकी। फिर से प्रयास करें।",
+    "retryableAdmission": "इस डिवाइस की पुष्टि नहीं हो सकी। कृपया फिर से कोशिश करें।",
     "startSignInFailed": "साइन-इन शुरू नहीं हो सका। कृपया फिर से कोशिश करें।",
     "couldNotOpenBrowser": "ब्राउज़र नहीं खुल सका। कृपया फिर से कोशिश करें।",
     "signInTimedOut": "साइन-इन का समय समाप्त हो गया। कृपया फिर से कोशिश करें।",
     "networkError": "नेटवर्क में समस्या है। कृपया फिर से कोशिश करें।",
     "accessDeniedByUser": "उपयोगकर्ता ने अनुमति नहीं दी।",
-    "codeExpired": "कोड की समय-सीमा समाप्त हो गई है।",
+    "codeExpired": "कोड समाप्त",
     "tooManySignInAttempts": "साइन इन करने की बहुत बार कोशिश की गई है। कृपया थोड़ा इंतज़ार करें और फिर से कोशिश करें।"
   },
   "models": {
@@ -5052,7 +5052,7 @@
       "urlCopied": "वेबहुक यूआरएल कॉपी हो गया",
       "deliveries": "डिलीवरी",
       "deliveriesEmptyTitle": "अभी कोई डिलीवरी नहीं है",
-      "deliveriesEmptyDescription": "वेबहुक कॉल या शेड्यूल पर चला रन आने के बाद यहाँ दिखाई देता है।",
+      "deliveriesEmptyDescription": "वेबहुक कॉल या शेड्यूल किया गया रन आने के बाद यहाँ दिखाई देता है।",
       "deliveriesLoadFailedTitle": "डिलीवरी लोड नहीं हो सकीं",
       "openSession": "सेशन देखें",
       "activationWebhook": "वेबहुक कॉल",
@@ -5069,7 +5069,7 @@
       "customAgent": "कस्टम एजेंट",
       "agentHelp": "रिपॉज़िटरी की .kilo/agent निर्देशिका में मौजूद एजेंट, या कोई अंतर्निहित मोड।",
       "fieldBodySchema": "बॉडी स्कीमा",
-      "bodySchemaHelp": "वैकल्पिक JSON Schema। जिस अनुरोध का बॉडी इससे मेल नहीं खाता, वह अस्वीकार हो जाता है।",
+      "bodySchemaHelp": "वैकल्पिक JSON Schema। जिस अनुरोध की बॉडी इससे मेल नहीं खाती, वह अस्वीकार हो जाता है।",
       "authTitle": "सीक्रेट हेडर",
       "authDescription": "अनुरोधों को साझा सीक्रेट के साथ यह हेडर भेजना होगा।",
       "authHeaderLabel": "हेडर का नाम",
@@ -5097,8 +5097,8 @@
       "created": "ट्रिगर बनाया गया",
       "saved": "ट्रिगर सहेजा गया",
       "statusArrived": "पहुँच गया",
-      "defaultPromptWebhook": "इस वेबहुक अनुरोध की पेलोड (या बॉडी) का वर्णन करें:\n\n{{body}}",
-      "defaultPromptScheduled": "निर्धारित कार्य चलाएँ। रन {{scheduledTime}} पर शुरू हुआ।",
+      "defaultPromptWebhook": "इस वेबहुक अनुरोध की पेलोड का वर्णन करें:\n\n{{body}}",
+      "defaultPromptScheduled": "निर्धारित कार्य चलाएँ। यह {{scheduledTime}} पर ट्रिगर हुआ।",
       "problems": {
         "nameRequired": "नाम दर्ज करें।",
         "nameTooShort": "कम से कम 8 अक्षर उपयोग करें।",

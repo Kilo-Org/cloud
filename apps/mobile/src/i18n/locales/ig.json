@@ -4958,6 +4958,23 @@
       "openService": "Mepee {{name}} na port {{port}}",
       "portLabel": "localhost:{{port}}"
     },
+    "artifacts": {
+      "title": "Ihe ndị echekwara",
+      "loading": "Na-ebudata ihe ndị echekwara…",
+      "loadError": "Enweghị ike ibudata ihe ndị echekwara.",
+      "empty": "Enweghị ihe echekwara ọ bụla ugbu a. Faịlụ ndị echekwara na /artifacts na-apụta ebe a mgbe emechara ndakọrịta.",
+      "sandboxNotRunning": "Sandbox anaghị arụ ọrụ. Faịlụ ndị echekwara ka dị, mana mgbanwe ọhụrụ anaghị edakọta.",
+      "deleteConfirmTitle": "Hichapụ {{fileName}}?",
+      "deleteConfirmBody": "Nke a na-ewepụ faịlụ ahụ na ihe ndị echekwara gị. Otu nnomi nwere ike ịnọgide na sandbox na-arụ ọrụ.",
+      "deleteConfirmAction": "Hichapụ ihe echekwara",
+      "deleteChanged": "{{fileName}} agbanweela kemgbe ebudatara ndepụta a. Ebugharịala ndepụta ahụ; lelee ụdị ọhụrụ ahụ ma nwaa ọzọ.",
+      "keptUntil": "A na-edebe ya ruo mgbe ehichapụrụ ebe ọrụ ma ọ bụ nnọkọ.",
+      "deleteA11y": "Hichapụ {{fileName}}",
+      "downloadA11y": "Budata {{fileName}}",
+      "downloadError": "Enweghị ike ịmepụta njikọ nbudata maka {{fileName}}. Bugharịa ma nwaa ọzọ.",
+      "downloadShareFailed": "Enweghị ike imepe {{fileName}} iji kekọrịta. Nwaa ọzọ.",
+      "fileCount_other": "{{count}} faịlụ"
+    },
     "triggers": {
       "title": "Ihe mkpalite na webhook",
       "subtitle": "Mee ka ọsọ Cloud Agent na-akpaghị aka site na oku webhook ma ọ bụ nhazi oge.",

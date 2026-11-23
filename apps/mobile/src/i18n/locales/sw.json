@@ -5040,6 +5040,24 @@
       "openService": "Fungua {{name}} kwenye mlango {{port}}",
       "portLabel": "localhost:{{port}}"
     },
+    "artifacts": {
+      "title": "Faili zilizohifadhiwa",
+      "loading": "Inapakia faili zilizohifadhiwa…",
+      "loadError": "Imeshindikana kupakia faili zilizohifadhiwa.",
+      "empty": "Bado hakuna faili zilizohifadhiwa. Faili zinazohifadhiwa katika /artifacts huonekana hapa baada ya usawazishaji.",
+      "sandboxNotRunning": "Sandbox haifanyi kazi. Faili zilizohifadhiwa zinaendelea kupatikana, lakini mabadiliko mapya hayasawazishwi.",
+      "deleteConfirmTitle": "Ungependa kufuta {{fileName}}?",
+      "deleteConfirmBody": "Hii huondoa faili hii kutoka kwenye orodha yako ya faili zilizohifadhiwa. Nakala inaweza kubaki kwenye sandbox inayoendelea kufanya kazi.",
+      "deleteConfirmAction": "Futa faili iliyohifadhiwa",
+      "deleteChanged": "{{fileName}} imebadilika tangu orodha hii ilipochukuliwa. Orodha imeonyeshwa upya; pitia toleo jipya na ujaribu tena.",
+      "keptUntil": "Huhifadhiwa hadi nafasi ya kazi au kikao kifutwe.",
+      "deleteA11y": "Futa {{fileName}}",
+      "downloadA11y": "Pakua {{fileName}}",
+      "downloadError": "Imeshindikana kuunda kiungo cha kupakua cha {{fileName}}. Onyesha upya na ujaribu tena.",
+      "downloadShareFailed": "Imeshindikana kufungua {{fileName}} ili kuishiriki. Jaribu tena.",
+      "fileCount_one": "Faili {{count}}",
+      "fileCount_other": "Faili {{count}}"
+    },
     "triggers": {
       "title": "Vichocheo na ndoano za wavuti",
       "subtitle": "Endesha utekelezaji wa Cloud Agent kiotomatiki kutoka kwa mwito wa ndoano ya wavuti au kwa ratiba.",

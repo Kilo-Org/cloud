@@ -5040,6 +5040,24 @@
       "openService": "Louvri {{name}} sou pò {{port}}",
       "portLabel": "localhost:{{port}}"
     },
+    "artifacts": {
+      "title": "Atifak",
+      "loading": "Ap chaje atifak…",
+      "loadError": "Pa t ka chaje atifak yo.",
+      "empty": "Poko gen atifak sovgade. Fichye ki sovgade nan /artifacts parèt isit la apre senkronizasyon.",
+      "sandboxNotRunning": "Sandbox la pa ap kouri. Fichye sovgade yo rete disponib, men nouvo chanjman yo pa ap senkronize.",
+      "deleteConfirmTitle": "Efase {{fileName}}?",
+      "deleteConfirmBody": "Sa a retire fichye a nan atifak ou yo. Yon kopi ka rete nan yon sandbox k ap kouri.",
+      "deleteConfirmAction": "Efase atifak",
+      "deleteChanged": "{{fileName}} chanje depi lis la te chaje. Yo rafrechi lis la; gade nouvo vèsyon an epi eseye ankò.",
+      "keptUntil": "Kenbe jiskaske yo efase espas travay la oswa sesyon an.",
+      "deleteA11y": "Efase {{fileName}}",
+      "downloadA11y": "Telechaje {{fileName}}",
+      "downloadError": "Pa t ka kreye yon lyen telechajman pou {{fileName}}. Rafrechi epi eseye ankò.",
+      "downloadShareFailed": "Pa t ka louvri {{fileName}} pou pataje. Eseye ankò.",
+      "fileCount_one": "{{count}} fichye",
+      "fileCount_other": "{{count}} fichye"
+    },
     "triggers": {
       "title": "Deklanchè ak wèbhuk",
       "subtitle": "Otomatize egzekisyon Cloud Agent soti nan yon apèl wèbhuk oswa yon pwogramasyon.",

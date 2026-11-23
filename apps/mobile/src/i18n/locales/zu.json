@@ -5040,6 +5040,24 @@
       "openService": "Vula {{name}} kuphothi {{port}}",
       "portLabel": "localhost:{{port}}"
     },
+    "artifacts": {
+      "title": "Amafayela agciniwe",
+      "loading": "Kulayishwa amafayela agciniwe…",
+      "loadError": "Kwehlulekile ukulayisha amafayela agciniwe.",
+      "empty": "Awekho amafayela agciniwe okwamanje. Amafayela agcinwe ku-/artifacts avela lapha ngemva kokuvumelanisa.",
+      "sandboxNotRunning": "Isandbox imisiwe. Amafayela agciniwe asatholakala, kodwa izinguquko ezintsha azivumelanisi.",
+      "deleteConfirmTitle": "Susa ifayela {{fileName}}?",
+      "deleteConfirmBody": "Lokhu kususa ifayela kumafayela akho agciniwe. Ikhophi ingase isale kusandbox esebenzayo.",
+      "deleteConfirmAction": "Susa ifayela eligciniwe",
+      "deleteChanged": "Ifayela {{fileName}} lishintshile selokhu lolu hlu lwalayishwa. Uhlu luvuselelwe; buyekeza inguqulo entsha bese uzama futhi.",
+      "keptUntil": "Kugcinwa kuze kube yilapho indawo yokusebenza noma iseshini isuswa.",
+      "deleteA11y": "Susa {{fileName}}",
+      "downloadA11y": "Landa {{fileName}}",
+      "downloadError": "Kwehlulekile ukwakha isixhumanisi sokulanda sefayela {{fileName}}. Vuselela bese uzama futhi.",
+      "downloadShareFailed": "Kwehlulekile ukuvula ifayela {{fileName}} ukuze kwabelwane ngalo. Zama futhi.",
+      "fileCount_one": "{{count}} ifayela",
+      "fileCount_other": "{{count}} amafayela"
+    },
     "triggers": {
       "title": "Izibangeli nama-webhook",
       "subtitle": "Yenza kuzenzekele ukusebenza kwe-Cloud Agent kusuka ocingweni lwe-webhook noma ohlelweni lwesikhathi.",

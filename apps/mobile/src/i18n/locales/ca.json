@@ -5134,6 +5134,25 @@
       "openService": "Obre {{name}} al port {{port}}",
       "portLabel": "localhost:{{port}}"
     },
+    "artifacts": {
+      "title": "Artefactes",
+      "loading": "S'està carregant els artefactes…",
+      "loadError": "No s'han pogut carregar els artefactes.",
+      "empty": "Encara no hi ha artefactes desats. Els fitxers desats a /artifacts apareixen aquí després de la sincronització.",
+      "sandboxNotRunning": "L'entorn aïllat no s'està executant. Els fitxers desats continuen disponibles, però els canvis nous no se sincronitzen.",
+      "deleteConfirmTitle": "Vols eliminar {{fileName}}?",
+      "deleteConfirmBody": "Això elimina el fitxer dels teus artefactes. Pot quedar una còpia en un entorn aïllat en execució.",
+      "deleteConfirmAction": "Elimina l'artefacte",
+      "deleteChanged": "{{fileName}} ha canviat des que es va carregar aquesta llista. La llista s'ha actualitzat; revisa la versió nova i torna-ho a provar.",
+      "keptUntil": "Es conserva fins que s'elimini l'espai de treball o la sessió.",
+      "deleteA11y": "Elimina {{fileName}}",
+      "downloadA11y": "Baixa {{fileName}}",
+      "downloadError": "No s'ha pogut crear un enllaç de baixada per a {{fileName}}. Actualitza i torna-ho a provar.",
+      "downloadShareFailed": "No s'ha pogut obrir {{fileName}} per compartir-lo. Torna-ho a provar.",
+      "fileCount_one": "{{count}} fitxer",
+      "fileCount_many": "{{count}} fitxers",
+      "fileCount_other": "{{count}} fitxers"
+    },
     "triggers": {
       "title": "Disparadors i ganxos web",
       "subtitle": "Automatitza execucions del Cloud Agent a partir d'una crida de ganxo web o d'una programació.",

@@ -5040,6 +5040,24 @@
       "openService": "Hap {{name}} në portën {{port}}",
       "portLabel": "localhost:{{port}}"
     },
+    "artifacts": {
+      "title": "Artefakte",
+      "loading": "Duke u ngarkuar artefaktet…",
+      "loadError": "Nuk u ngarkuan dot artefaktet.",
+      "empty": "Ende nuk ka artefakte të ruajtura. Skedarët e ruajtur në /artifacts shfaqen këtu pas sinkronizimit.",
+      "sandboxNotRunning": "Sandbox-i nuk është duke punuar. Skedarët e ruajtur mbeten të disponueshëm, por ndryshimet e reja nuk po sinkronizohen.",
+      "deleteConfirmTitle": "Të fshihet {{fileName}}?",
+      "deleteConfirmBody": "Kjo e heq skedarin nga artefaktet e tua. Një kopje mund të mbetet në një sandbox që po punon.",
+      "deleteConfirmAction": "Fshi artefaktin",
+      "deleteChanged": "{{fileName}} ka ndryshuar që kur u ngarkua kjo listë. Lista u rifreskua; shqyrto versionin e ri dhe provo përsëri.",
+      "keptUntil": "Ruhet derisa të fshihet hapësira e punës ose sesioni.",
+      "deleteA11y": "Fshi {{fileName}}",
+      "downloadA11y": "Shkarko {{fileName}}",
+      "downloadError": "Nuk u krijua dot një lidhje shkarkimi për {{fileName}}. Rifresko dhe provo përsëri.",
+      "downloadShareFailed": "Nuk u hap dot {{fileName}} për ta ndarë. Provo përsëri.",
+      "fileCount_one": "{{count}} skedar",
+      "fileCount_other": "{{count}} skedarë"
+    },
     "triggers": {
       "title": "Shkaktarët dhe webhook-et",
       "subtitle": "Automatizo ekzekutimet e Cloud Agent nga një thirrje webhook ose një planifikim.",

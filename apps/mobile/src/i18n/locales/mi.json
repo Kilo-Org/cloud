@@ -5040,6 +5040,24 @@
       "openService": "Whakatuwhera i a {{name}} i te tauranga {{port}}",
       "portLabel": "localhost:{{port}}"
     },
+    "artifacts": {
+      "title": "Ngā Huanga",
+      "loading": "Kei te uta ngā huanga…",
+      "loadError": "Kāore i taea te uta ngā huanga.",
+      "empty": "Kāore anō he huanga kua tiakina. Ka puta mai ki konei ngā kōnae kua tiakina ki /artifacts i muri i te tukutahitanga.",
+      "sandboxNotRunning": "Kāore te pāpoke e rere ana. Ka noho wātea tonu ngā kōnae kua tiakina, engari kāore ngā huringa hou e tukutahi ana.",
+      "deleteConfirmTitle": "Mukua a {{fileName}}?",
+      "deleteConfirmBody": "Ka tangohia tēnei kōnae mai i ō huanga. Tērā pea ka noho tonu tētahi tāruatanga ki tētahi pāpoke e rere ana.",
+      "deleteConfirmAction": "Mukua te huanga",
+      "deleteChanged": "Kua huria a {{fileName}} mai i te hopukanga o tēnei rārangi. Kua whakahoutia te rārangi; arotakehia te putanga hou, kātahi ka whakamātau anō.",
+      "keptUntil": "Ka tiakina kia mukua rā te wāhi mahi, te wātū rānei.",
+      "deleteA11y": "Mukua a {{fileName}}",
+      "downloadA11y": "Tikiakehia a {{fileName}}",
+      "downloadError": "Kāore i taea te hanga i tētahi hononga tikiake mō {{fileName}}. Whakahou, kātahi ka whakamātau anō.",
+      "downloadShareFailed": "Kāore i taea a {{fileName}} te whakatuwhera hei tuari. Whakamātau anō.",
+      "fileCount_one": "{{count}} kōnae",
+      "fileCount_other": "{{count}} kōnae"
+    },
     "triggers": {
       "title": "Ngā kaiwhakaara me ngā hononga tukutuku",
       "subtitle": "Whakahaere aunoa i ngā rerenga Cloud Agent mai i tētahi karanga hononga tukutuku, i tētahi hōtaka wā rānei.",

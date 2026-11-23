@@ -5134,6 +5134,25 @@
       "openService": "Abrir {{name}} en el puerto {{port}}",
       "portLabel": "localhost:{{port}}"
     },
+    "artifacts": {
+      "title": "Artefactos",
+      "loading": "Cargando artefactos…",
+      "loadError": "No se pudieron cargar los artefactos.",
+      "empty": "Aún no hay artefactos guardados. Los archivos guardados en /artifacts aparecen aquí después de la sincronización.",
+      "sandboxNotRunning": "El sandbox no está en ejecución. Los archivos guardados siguen disponibles, pero los cambios nuevos no se están sincronizando.",
+      "deleteConfirmTitle": "¿Eliminar {{fileName}}?",
+      "deleteConfirmBody": "Esto elimina el archivo de tus artefactos. Es posible que quede una copia en un sandbox en ejecución.",
+      "deleteConfirmAction": "Eliminar artefacto",
+      "deleteChanged": "{{fileName}} cambió desde que se cargó esta lista. La lista se ha actualizado; revisa la nueva versión y vuelve a intentarlo.",
+      "keptUntil": "Se conserva hasta que se elimine el espacio de trabajo o la sesión.",
+      "deleteA11y": "Eliminar {{fileName}}",
+      "downloadA11y": "Descargar {{fileName}}",
+      "downloadError": "No se pudo crear un enlace de descarga para {{fileName}}. Actualiza y vuelve a intentarlo.",
+      "downloadShareFailed": "No se pudo abrir {{fileName}} para compartirlo. Vuelve a intentarlo.",
+      "fileCount_one": "{{count}} archivo",
+      "fileCount_many": "{{count}} de archivos",
+      "fileCount_other": "{{count}} archivos"
+    },
     "triggers": {
       "title": "Disparadores y webhooks",
       "subtitle": "Automatiza ejecuciones de Cloud Agent desde una llamada de webhook o una programación.",

@@ -4952,6 +4952,23 @@
       "openService": "打开端口 {{port}} 上的 {{name}}",
       "portLabel": "localhost:{{port}}"
     },
+    "artifacts": {
+      "title": "产物",
+      "loading": "正在加载产物…",
+      "loadError": "无法加载产物。",
+      "empty": "尚无已保存的产物。保存到 /artifacts 的文件会在同步后显示在这里。",
+      "sandboxNotRunning": "沙盒未运行。已保存的文件仍可用，但新更改不会同步。",
+      "deleteConfirmTitle": "删除 {{fileName}}？",
+      "deleteConfirmBody": "这将从你的产物中移除此文件。运行中的沙盒里可能仍保留副本。",
+      "deleteConfirmAction": "删除产物",
+      "deleteChanged": "{{fileName}} 在此列表加载后已更改。列表已刷新；请查看新版本后重试。",
+      "keptUntil": "保留至工作区或会话被删除。",
+      "deleteA11y": "删除 {{fileName}}",
+      "downloadA11y": "下载 {{fileName}}",
+      "downloadError": "无法为 {{fileName}} 创建下载链接。请刷新后重试。",
+      "downloadShareFailed": "无法打开 {{fileName}} 进行分享。请重试。",
+      "fileCount_other": "{{count}} 个文件"
+    },
     "triggers": {
       "title": "触发器和 Webhook",
       "subtitle": "通过 Webhook 调用或计划自动运行 Cloud Agent。",

@@ -5040,6 +5040,24 @@
       "openService": "Opna {{name}} á gátt {{port}}",
       "portLabel": "localhost:{{port}}"
     },
+    "artifacts": {
+      "title": "Afurðir",
+      "loading": "Hleðsla afurða…",
+      "loadError": "Ekki tókst að hlaða afurðum.",
+      "empty": "Engar vistaðar afurðir enn. Skrár sem vistaðar eru í /artifacts birtast hér eftir samstillingu.",
+      "sandboxNotRunning": "Sandkassinn er ekki í gangi. Vistaðar skrár eru áfram aðgengilegar, en nýjar breytingar samstillast ekki.",
+      "deleteConfirmTitle": "Eyða {{fileName}}?",
+      "deleteConfirmBody": "Þetta fjarlægir skrána úr afurðunum þínum. Eintak getur verið eftir í sandkassa sem er í gangi.",
+      "deleteConfirmAction": "Eyða afurð",
+      "deleteChanged": "{{fileName}} breyttist síðan þessi listi var sóttur. Listinn hefur verið endurnýjaður; skoðaðu nýju útgáfuna og reyndu aftur.",
+      "keptUntil": "Geymt þar til vinnusvæðinu eða lotunni er eytt.",
+      "deleteA11y": "Eyða {{fileName}}",
+      "downloadA11y": "Sækja {{fileName}}",
+      "downloadError": "Ekki tókst að búa til niðurhalstengil fyrir {{fileName}}. Endurnýjaðu og reyndu aftur.",
+      "downloadShareFailed": "Ekki tókst að opna {{fileName}} til að deila. Reyndu aftur.",
+      "fileCount_one": "{{count}} skrá",
+      "fileCount_other": "{{count}} skrár"
+    },
     "triggers": {
       "title": "Kveikjur og vefkrókar",
       "subtitle": "Gera keyrslur Cloud Agent sjálfvirkar úr vefkrókarkalli eða á áætlun.",

@@ -5040,6 +5040,24 @@
       "openService": "Åpne {{name}} på port {{port}}",
       "portLabel": "localhost:{{port}}"
     },
+    "artifacts": {
+      "title": "Artefakter",
+      "loading": "Laster inn artefakter…",
+      "loadError": "Kunne ikke laste inn artefakter.",
+      "empty": "Ingen lagrede artefakter ennå. Filer som lagres i /artifacts, vises her etter synkronisering.",
+      "sandboxNotRunning": "Sandkassen kjører ikke. Lagrede filer forblir tilgjengelige, men nye endringer synkroniseres ikke.",
+      "deleteConfirmTitle": "Slette {{fileName}}?",
+      "deleteConfirmBody": "Dette fjerner filen fra artefaktene dine. En kopi kan bli liggende i en kjørende sandkasse.",
+      "deleteConfirmAction": "Slett artefakt",
+      "deleteChanged": "{{fileName}} er endret siden denne listen ble lastet inn. Listen er oppdatert; se gjennom den nye versjonen og prøv igjen.",
+      "keptUntil": "Beholdes til arbeidsområdet eller økten slettes.",
+      "deleteA11y": "Slett {{fileName}}",
+      "downloadA11y": "Last ned {{fileName}}",
+      "downloadError": "Kunne ikke opprette en nedlastingskobling for {{fileName}}. Oppdater og prøv igjen.",
+      "downloadShareFailed": "Kunne ikke åpne {{fileName}} for deling. Prøv igjen.",
+      "fileCount_one": "{{count}} fil",
+      "fileCount_other": "{{count}} filer"
+    },
     "triggers": {
       "title": "Triggere og webhooker",
       "subtitle": "Automatiser Cloud Agent-kjøringer fra et webhook-kall eller en tidsplan.",

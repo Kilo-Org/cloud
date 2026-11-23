@@ -5228,6 +5228,25 @@
       "openService": "Abrir {{name}} na porta {{port}}",
       "portLabel": "localhost:{{port}}"
     },
+    "artifacts": {
+      "title": "Artefactos",
+      "loading": "A carregar artefactos…",
+      "loadError": "Não foi possível carregar os artefactos.",
+      "empty": "Ainda não há artefactos guardados. Os ficheiros guardados em /artifacts aparecem aqui após a sincronização.",
+      "sandboxNotRunning": "A sandbox não está em execução. Os ficheiros guardados continuam disponíveis, mas as novas alterações não estão a ser sincronizadas.",
+      "deleteConfirmTitle": "Eliminar {{fileName}}?",
+      "deleteConfirmBody": "Isto remove o ficheiro dos seus artefactos. Pode permanecer uma cópia numa sandbox em execução.",
+      "deleteConfirmAction": "Eliminar artefacto",
+      "deleteChanged": "O ficheiro {{fileName}} foi alterado desde que esta lista foi carregada. A lista foi atualizada; reveja a nova versão e tente novamente.",
+      "keptUntil": "Mantido até que o espaço de trabalho ou a sessão sejam eliminados.",
+      "deleteA11y": "Eliminar {{fileName}}",
+      "downloadA11y": "Transferir {{fileName}}",
+      "downloadError": "Não foi possível criar uma ligação de transferência para {{fileName}}. Atualize e tente novamente.",
+      "downloadShareFailed": "Não foi possível abrir {{fileName}} para partilhar. Tente novamente.",
+      "fileCount_one": "{{count}} ficheiro",
+      "fileCount_many": "{{count}} de ficheiros",
+      "fileCount_other": "{{count}} ficheiros"
+    },
     "triggers": {
       "title": "Acionadores e webhooks",
       "subtitle": "Automatize execuções do Cloud Agent a partir de uma chamada de webhook ou de uma programação.",

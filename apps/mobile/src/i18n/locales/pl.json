@@ -5228,6 +5228,26 @@
       "openService": "Otwórz {{name}} na porcie {{port}}",
       "portLabel": "localhost:{{port}}"
     },
+    "artifacts": {
+      "title": "Artefakty",
+      "loading": "Ładowanie artefaktów…",
+      "loadError": "Nie udało się załadować artefaktów.",
+      "empty": "Nie zapisano jeszcze żadnych artefaktów. Pliki zapisane w /artifacts pojawią się tutaj po synchronizacji.",
+      "sandboxNotRunning": "Piaskownica nie jest uruchomiona. Zapisane pliki pozostają dostępne, ale nowe zmiany nie są synchronizowane.",
+      "deleteConfirmTitle": "Usunąć {{fileName}}?",
+      "deleteConfirmBody": "Spowoduje to usunięcie pliku z artefaktów. Kopia może pozostać w uruchomionej piaskownicy.",
+      "deleteConfirmAction": "Usuń artefakt",
+      "deleteChanged": "Plik {{fileName}} zmienił się od czasu wczytania tej listy. Lista została odświeżona; przejrzyj nową wersję i spróbuj ponownie.",
+      "keptUntil": "Przechowywane do momentu usunięcia obszaru roboczego lub sesji.",
+      "deleteA11y": "Usuń {{fileName}}",
+      "downloadA11y": "Pobierz {{fileName}}",
+      "downloadError": "Nie udało się utworzyć linku do pobrania pliku {{fileName}}. Odśwież i spróbuj ponownie.",
+      "downloadShareFailed": "Nie udało się otworzyć pliku {{fileName}} do udostępnienia. Spróbuj ponownie.",
+      "fileCount_one": "{{count}} plik",
+      "fileCount_few": "{{count}} pliki",
+      "fileCount_many": "{{count}} plików",
+      "fileCount_other": "{{count}} pliku"
+    },
     "triggers": {
       "title": "Wyzwalacze i webhooki",
       "subtitle": "Automatyzuj uruchomienia Cloud Agent przez wywołanie webhooka lub harmonogram.",

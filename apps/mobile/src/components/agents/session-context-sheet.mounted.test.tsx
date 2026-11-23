@@ -77,7 +77,9 @@ vi.mock('react-i18next', async importOriginal => {
   const actual = await importOriginal<typeof ReactI18next>();
   return {
     ...actual,
-    useTranslation: () => ({ t: (key: string) => i18n.t(key) }),
+    // The sandbox section reads the active language off the same hook, so the
+    // stub answers with the app's instance rather than only its lookup.
+    useTranslation: () => ({ t: (key: string) => i18n.t(key), i18n }),
   };
 });
 vi.mock('react-native', () => ({
@@ -115,6 +117,7 @@ vi.mock('@/components/ui/text', async () => {
   return { Text: 'Text', TextClassContext: React.createContext<string | undefined>(undefined) };
 });
 vi.mock('@/components/ui/icons', () => ({
+  Archive: 'Archive',
   Bot: 'Bot',
   ChevronDown: 'ChevronDown',
   ChevronUp: 'ChevronUp',
@@ -131,6 +134,11 @@ vi.mock('@/components/agents/session-page-sheet', () => ({
 }));
 vi.mock('@/components/todos/session-todo-link', () => ({
   SessionTodoLinkRow: 'SessionTodoLinkRow',
+}));
+// The sandbox block has its own suite and reads a timestamp shape this sheet's
+// single mocked query does not produce, so it is stubbed here.
+vi.mock('@/components/agents/session-sandbox-section', () => ({
+  SessionSandboxSection: 'SessionSandboxSection',
 }));
 
 const WARNING_COPY =
@@ -726,6 +734,35 @@ describe('SessionContextSheet copy row values', () => {
       await unmount(renderer);
     }
   );
+});
+
+describe('SessionContextSheet artifacts row', () => {
+  it('sits directly under the view changes row for a session the control plane knows', async () => {
+    const renderer = await mountSheet({
+      cloudAgentSessionId: 'workspace_12345678-1234-4234-9234-123456789abc',
+    });
+    const ids = renderer.root
+      .findAll(node => typeof node.props.testID === 'string')
+      .map(node => node.props.testID as string);
+
+    // It sits in the same group as the changes row, directly under it and above
+    // the rows that follow (the id copy row).
+    const artifacts = ids.indexOf('session-context-sheet-artifacts');
+    expect(artifacts).toBeGreaterThan(ids.indexOf('session-context-sheet-view-changes'));
+    expect(artifacts).toBeLessThan(ids.indexOf('session-context-sheet-copy-id'));
+    expect(textValues(renderer)).toContain(i18n.t('cloudAgent.artifacts.title'));
+    await unmount(renderer);
+  });
+
+  it('is absent for a stored-only session, which has no saved files', async () => {
+    const renderer = await mountSheet();
+    const ids = renderer.root
+      .findAll(node => typeof node.props.testID === 'string')
+      .map(node => node.props.testID as string);
+
+    expect(ids).not.toContain('session-context-sheet-artifacts');
+    await unmount(renderer);
+  });
 });
 
 describe('SessionContextSheet view changes row touch target', () => {

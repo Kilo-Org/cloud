@@ -5040,6 +5040,24 @@
       "openService": "{{name}} poortii {{port}} irratti bani",
       "portLabel": "localhost:{{port}}"
     },
+    "artifacts": {
+      "title": "Faayiliiwwan qabaman",
+      "loading": "Faayiliiwwan qabaman fe'amaa jiru…",
+      "loadError": "Faayiliiwwan qabaman fe'amuun hin danda'amne.",
+      "empty": "Ammallee faayiliiwwan qabaman hin jiran. Faayiliiwwan /artifacts keessatti qabaman erga walqunnamee booda asitti mul'atu.",
+      "sandboxNotRunning": "Saandiboksiin kun dhaabateera. Faayiliiwwan qabaman ammallee ni argamu, garuu jijjiiramoonni haaraan walqunnamuu hin jiran.",
+      "deleteConfirmTitle": "{{fileName}} balleessuu?",
+      "deleteConfirmBody": "Kun faayilii kana faayiliiwwan qabaman keessaa baasa. Koppiin tokko saandiboksi hojjechaa jiru keessatti hafuu danda'a.",
+      "deleteConfirmAction": "Faayilii qabame balleessi",
+      "deleteChanged": "{{fileName}} erga tarreen kun fe'amee booda jijjiirameera. Tarreen haaromfameera; gosa haaraa sana ilaaliitii irra deebi'ii yaali.",
+      "keptUntil": "Hanga bakki hojii yookaan turtiin balleeffamutti ni tura.",
+      "deleteA11y": "{{fileName}} balleessi",
+      "downloadA11y": "{{fileName}} buufadhu",
+      "downloadError": "{{fileName}}f liinkii buufannaa uumuun hin danda'amne. Haaromsiitii irra deebi'ii yaali.",
+      "downloadShareFailed": "{{fileName}} qooduuf banuun hin milkoofne. Irra deebi'ii yaali.",
+      "fileCount_one": "{{count}} faayilii",
+      "fileCount_other": "{{count}} faayiliiwwan"
+    },
     "triggers": {
       "title": "Kakaawwan fi weebhuukiiwwan",
       "subtitle": "Waamicha weebhuukii yookaan sagantaa irraa hojiiwwan Cloud Agent ofumaan akka hojjetan gochuu.",

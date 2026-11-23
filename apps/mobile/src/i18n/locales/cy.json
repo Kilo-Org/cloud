@@ -5416,6 +5416,28 @@
       "openService": "Agor {{name}} ar borth {{port}}",
       "portLabel": "localhost:{{port}}"
     },
+    "artifacts": {
+      "title": "Artiffactau",
+      "loading": "Yn llwytho artiffactau…",
+      "loadError": "Methu llwytho artiffactau.",
+      "empty": "Dim artiffactau wedi'u cadw eto. Mae ffeiliau a gedwir yn /artifacts yn ymddangos yma ar ôl cydamseru.",
+      "sandboxNotRunning": "Nid yw'r blwch tywod yn rhedeg. Mae ffeiliau wedi'u cadw yn parhau ar gael, ond nid yw newidiadau newydd yn cydamseru.",
+      "deleteConfirmTitle": "Dileu {{fileName}}?",
+      "deleteConfirmBody": "Mae hyn yn tynnu'r ffeil o'ch artiffactau. Efallai y bydd copi yn parhau mewn blwch tywod sy'n rhedeg.",
+      "deleteConfirmAction": "Dileu artiffact",
+      "deleteChanged": "Mae {{fileName}} wedi newid ers i'r rhestr hon lwytho. Mae'r rhestr wedi'i hadnewyddu; adolygwch y fersiwn newydd a rhowch gynnig eto.",
+      "keptUntil": "Wedi'i gadw nes i'r gweithle neu'r sesiwn gael eu dileu.",
+      "deleteA11y": "Dileu {{fileName}}",
+      "downloadA11y": "Lawrlwytho {{fileName}}",
+      "downloadError": "Methu creu dolen lawrlwytho ar gyfer {{fileName}}. Adnewyddwch a rhowch gynnig eto.",
+      "downloadShareFailed": "Methu agor {{fileName}} i'w rannu. Rhowch gynnig eto.",
+      "fileCount_zero": "{{count}} ffeil",
+      "fileCount_one": "{{count}} ffeil",
+      "fileCount_two": "{{count}} ffeil",
+      "fileCount_few": "{{count}} ffeil",
+      "fileCount_many": "{{count}} ffeil",
+      "fileCount_other": "{{count}} ffeil"
+    },
     "triggers": {
       "title": "Sbardunau a bachynnau gwe",
       "subtitle": "Awtomeiddio rhediadau Cloud Agent o alwad bachyn gwe neu o atodlen.",

@@ -5228,6 +5228,26 @@
       "openService": "Otevřít {{name}} na portu {{port}}",
       "portLabel": "localhost:{{port}}"
     },
+    "artifacts": {
+      "title": "Artefakty",
+      "loading": "Načítají se artefakty…",
+      "loadError": "Artefakty se nepodařilo načíst.",
+      "empty": "Zatím žádné uložené artefakty. Soubory uložené v /artifacts se zde zobrazí po synchronizaci.",
+      "sandboxNotRunning": "Sandbox není spuštěný. Uložené soubory zůstávají dostupné, ale nové změny se nesynchronizují.",
+      "deleteConfirmTitle": "Smazat {{fileName}}?",
+      "deleteConfirmBody": "Tímto se soubor odebere z vašich artefaktů. Kopie může zůstat v běžícím sandboxu.",
+      "deleteConfirmAction": "Smazat artefakt",
+      "deleteChanged": "{{fileName}} se od načtení tohoto seznamu změnil. Seznam byl obnoven; zkontrolujte novou verzi a zkuste to znovu.",
+      "keptUntil": "Uchováno, dokud se nesmaže pracovní prostor nebo relace.",
+      "deleteA11y": "Smazat {{fileName}}",
+      "downloadA11y": "Stáhnout {{fileName}}",
+      "downloadError": "Pro {{fileName}} se nepodařilo vytvořit odkaz ke stažení. Obnovte a zkuste to znovu.",
+      "downloadShareFailed": "{{fileName}} se nepodařilo otevřít ke sdílení. Zkuste to znovu.",
+      "fileCount_one": "{{count}} soubor",
+      "fileCount_few": "{{count}} soubory",
+      "fileCount_many": "{{count}} souboru",
+      "fileCount_other": "{{count}} souborů"
+    },
     "triggers": {
       "title": "Spouštěče a webhooky",
       "subtitle": "Automatizujte spouštění Cloud Agent voláním webhooku nebo podle plánu.",

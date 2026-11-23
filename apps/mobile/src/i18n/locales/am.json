@@ -5040,6 +5040,24 @@
       "openService": "{{name}}ን በፖርት {{port}} ላይ ክፈት",
       "portLabel": "localhost:{{port}}"
     },
+    "artifacts": {
+      "title": "ቅርሶች",
+      "loading": "ቅርሶችን በመጫን ላይ…",
+      "loadError": "ቅርሶችን መጫን አልተቻለም።",
+      "empty": "እስካሁን ምንም የተቀመጡ ቅርሶች የሉም። በ /artifacts ውስጥ የተቀመጡ ፋይሎች ከተመሳሰሉ በኋላ እዚህ ይታያሉ።",
+      "sandboxNotRunning": "sandbox ቆሟል። የተቀመጡ ፋይሎች አሁንም ይገኛሉ፣ ግን አዲሶቹ ለውጦች አይመሳሰሉም።",
+      "deleteConfirmTitle": "{{fileName}} ይሰረዝ?",
+      "deleteConfirmBody": "ይህ ፋይሉን ከቅርሶችዎ ውስጥ ያስወግዳል። በሚሰራ sandbox ውስጥ ቅጂ ሊቀር ይችላል።",
+      "deleteConfirmAction": "ቅርሱን ሰርዝ",
+      "deleteChanged": "ይህ ዝርዝር ከተጫነ በኋላ {{fileName}} ተቀይሯል። ዝርዝሩ ታድሷል፤ አዲሱን ስሪት ተመልከትና እንደገና ሞክር።",
+      "keptUntil": "የስራ ቦታው ወይም ክፍለ ጊዜው እስኪሰረዝ ድረስ ይቀመጣል።",
+      "deleteA11y": "{{fileName}}ን ሰርዝ",
+      "downloadA11y": "{{fileName}}ን አውርድ",
+      "downloadError": "ለ{{fileName}} የማውረድ አገናኝ መፍጠር አልተቻለም። አድስና እንደገና ሞክር።",
+      "downloadShareFailed": "{{fileName}}ን ለማጋራት መክፈት አልተቻለም። እንደገና ሞክር።",
+      "fileCount_one": "{{count}} ፋይል",
+      "fileCount_other": "{{count}} ፋይሎች"
+    },
     "triggers": {
       "title": "ቀስቅሴዎች እና ዌብሁኮች",
       "subtitle": "የCloud Agent ሩጫዎችን ከዌብሁክ ጥሪ ወይም ከመርሐ ግብር በራስ-ሰር ያድርጉ።",

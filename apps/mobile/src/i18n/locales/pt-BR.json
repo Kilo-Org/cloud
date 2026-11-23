@@ -5228,6 +5228,25 @@
       "openService": "Abrir {{name}} na porta {{port}}",
       "portLabel": "localhost:{{port}}"
     },
+    "artifacts": {
+      "title": "Artefatos",
+      "loading": "Carregando artefatos…",
+      "loadError": "Não foi possível carregar os artefatos.",
+      "empty": "Nenhum artefato salvo ainda. Os arquivos salvos em /artifacts aparecem aqui após a sincronização.",
+      "sandboxNotRunning": "O sandbox não está em execução. Os arquivos salvos continuam disponíveis, mas as novas alterações não estão sendo sincronizadas.",
+      "deleteConfirmTitle": "Excluir {{fileName}}?",
+      "deleteConfirmBody": "Isso remove o arquivo dos seus artefatos. Uma cópia pode permanecer em um sandbox em execução.",
+      "deleteConfirmAction": "Excluir artefato",
+      "deleteChanged": "{{fileName}} mudou desde que esta lista foi carregada. A lista foi atualizada; revise a nova versão e tente novamente.",
+      "keptUntil": "Mantido até que o espaço de trabalho ou a sessão sejam excluídos.",
+      "deleteA11y": "Excluir {{fileName}}",
+      "downloadA11y": "Baixar {{fileName}}",
+      "downloadError": "Não foi possível criar um link de download para {{fileName}}. Atualize e tente novamente.",
+      "downloadShareFailed": "Não foi possível abrir {{fileName}} para compartilhar. Tente novamente.",
+      "fileCount_one": "{{count}} arquivo",
+      "fileCount_many": "{{count}} arquivos",
+      "fileCount_other": "{{count}} arquivos"
+    },
     "triggers": {
       "title": "Gatilhos e webhooks",
       "subtitle": "Automatize execuções do Cloud Agent a partir de uma chamada de webhook ou de um agendamento.",

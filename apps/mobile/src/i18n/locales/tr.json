@@ -5040,6 +5040,24 @@
       "openService": "{{port}} numaralı bağlantı noktasında {{name}} hizmetini aç",
       "portLabel": "localhost:{{port}}"
     },
+    "artifacts": {
+      "title": "Çıktılar",
+      "loading": "Çıktılar yükleniyor…",
+      "loadError": "Çıktılar yüklenemedi.",
+      "empty": "Henüz kaydedilmiş çıktı yok. /artifacts konumuna kaydedilen dosyalar eşitleme tamamlandıktan sonra burada görünür.",
+      "sandboxNotRunning": "Kum havuzu çalışmıyor. Kaydedilen dosyalar kullanılabilir durumda kalır, ancak yeni değişiklikler eşitlenmiyor.",
+      "deleteConfirmTitle": "{{fileName}} silinsin mi?",
+      "deleteConfirmBody": "Bu işlem dosyayı çıktılarından kaldırır. Çalışan bir kum havuzunda bir kopyası kalabilir.",
+      "deleteConfirmAction": "Çıktıyı sil",
+      "deleteChanged": "{{fileName}}, liste alındıktan sonra değişti. Liste yenilendi; yeni sürümü inceleyip tekrar dene.",
+      "keptUntil": "Çalışma alanı veya oturum silinene kadar saklanır.",
+      "deleteA11y": "{{fileName}} dosyasını sil",
+      "downloadA11y": "{{fileName}} dosyasını indir",
+      "downloadError": "{{fileName}} için indirme bağlantısı oluşturulamadı. Yenile ve tekrar dene.",
+      "downloadShareFailed": "{{fileName}} paylaşmak için açılamadı. Tekrar dene.",
+      "fileCount_one": "{{count}} dosya",
+      "fileCount_other": "{{count}} dosya"
+    },
     "triggers": {
       "title": "Tetikleyiciler ve web kancaları",
       "subtitle": "Cloud Agent çalıştırmalarını web kancası çağrısıyla veya zamanlamayla otomatikleştirin.",

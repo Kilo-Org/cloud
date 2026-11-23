@@ -5040,6 +5040,24 @@
       "openService": "{{name}} xidmətini {{port}} portunda aç",
       "portLabel": "localhost:{{port}}"
     },
+    "artifacts": {
+      "title": "Artefaktlar",
+      "loading": "Artefaktlar yüklənir…",
+      "loadError": "Artefaktları yükləmək mümkün olmadı.",
+      "empty": "Hələ yadda saxlanmış artefakt yoxdur. /artifacts qovluğunda saxlanmış fayllar sinxronizasiyadan sonra burada görünür.",
+      "sandboxNotRunning": "Sandbox işləmir. Yadda saxlanmış fayllar əlçatan qalır, lakin yeni dəyişikliklər sinxronlaşdırılmır.",
+      "deleteConfirmTitle": "{{fileName}} silinsin?",
+      "deleteConfirmBody": "Bu, faylı artefaktlarınızdan silir. İşləyən sandbox-da onun bir kopyası qala bilər.",
+      "deleteConfirmAction": "Artefaktı sil",
+      "deleteChanged": "Siyahı alındıqdan sonra {{fileName}} dəyişib. Siyahı yeniləndi; yeni versiyaya bax və yenidən cəhd et.",
+      "keptUntil": "İş sahəsi və ya sessiya silinənə qədər saxlanılır.",
+      "deleteA11y": "{{fileName}} faylını sil",
+      "downloadA11y": "{{fileName}} faylını yüklə",
+      "downloadError": "{{fileName}} üçün yükləmə linki yaratmaq mümkün olmadı. Yenilə və yenidən cəhd et.",
+      "downloadShareFailed": "{{fileName}} faylını paylaşmaq üçün açmaq mümkün olmadı. Yenidən cəhd et.",
+      "fileCount_one": "{{count}} fayl",
+      "fileCount_other": "{{count}} fayl"
+    },
     "triggers": {
       "title": "Tətikləyicilər və vebhuklar",
       "subtitle": "Cloud Agent icralarını vebhuk çağırışı və ya cədvəl vasitəsilə avtomatlaşdırın.",

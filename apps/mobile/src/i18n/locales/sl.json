@@ -5228,6 +5228,26 @@
       "openService": "Odpri {{name}} na vratih {{port}}",
       "portLabel": "localhost:{{port}}"
     },
+    "artifacts": {
+      "title": "Artefakti",
+      "loading": "Nalaganje artefaktov…",
+      "loadError": "Artefaktov ni bilo mogoče naložiti.",
+      "empty": "Ni še shranjenih artefaktov. Datoteke, shranjene v /artifacts, se tukaj prikažejo po sinhronizaciji.",
+      "sandboxNotRunning": "Peskovnik ne deluje. Shranjene datoteke ostanejo na voljo, vendar se nove spremembe ne sinhronizirajo.",
+      "deleteConfirmTitle": "Izbrišem {{fileName}}?",
+      "deleteConfirmBody": "To odstrani datoteko iz tvojih artefaktov. Kopija lahko ostane v delujočem peskovniku.",
+      "deleteConfirmAction": "Izbriši artefakt",
+      "deleteChanged": "{{fileName}} se je spremenila, odkar je bil ta seznam naložen. Seznam je bil osvežen; preglej novo različico in poskusi znova.",
+      "keptUntil": "Ohranjeno do izbrisa delovnega prostora ali seje.",
+      "deleteA11y": "Izbriši {{fileName}}",
+      "downloadA11y": "Prenesi {{fileName}}",
+      "downloadError": "Za {{fileName}} ni bilo mogoče ustvariti povezave za prenos. Osveži in poskusi znova.",
+      "downloadShareFailed": "{{fileName}} ni bilo mogoče odpreti za deljenje. Poskusi znova.",
+      "fileCount_one": "{{count}} datoteka",
+      "fileCount_two": "{{count}} datoteki",
+      "fileCount_few": "{{count}} datoteke",
+      "fileCount_other": "{{count}} datotek"
+    },
     "triggers": {
       "title": "Sprožilci in spletni kavlji",
       "subtitle": "Avtomatizirajte izvajanja Cloud Agent s klicem spletnega kavlja ali po urniku.",

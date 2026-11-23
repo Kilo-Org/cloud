@@ -217,3 +217,10 @@ T3-L05	T2	signed-in	base	android,ios	loading	loading	kiloapp:///(app)/pr-review/
 T3-L05	T2	signed-in	base	android,ios	loading	loading	kiloapp:///(app)/agent-chat/new	screen	(app)/agent-chat/new
 T3-L05	T2	signed-in	base	android,ios	loading	loading	kiloapp:///(app)/credits	screen	(app)/credits
 T3-L05	T2	signed-in	base	android,ios	loading	loading	kiloapp:///(app)/usage	screen	(app)/usage
+T2-G19	T2	signed-in	standard	android,ios	loading	-	kiloapp:///dev/session-artifacts-fixture/loading	screen	(app)/session-artifacts-fixture
+T2-G19	T2	signed-in	standard	android,ios	happy	-	kiloapp:///dev/session-artifacts-fixture/loaded	screen	(app)/session-artifacts-fixture
+T2-G19	T2	signed-in	standard	android,ios	happy	-	kiloapp:///dev/session-artifacts-fixture/sandbox-not-running	screen	(app)/session-artifacts-fixture
+T2-G19	T2	signed-in	standard	android,ios	empty	-	kiloapp:///dev/session-artifacts-fixture/empty	screen	(app)/session-artifacts-fixture
+T2-G19	T2	signed-in	standard	android,ios	retryable-error	-	kiloapp:///dev/session-artifacts-fixture/load-error	screen	(app)/session-artifacts-fixture
+T2-G19	T2	signed-in	standard	android,ios	non-retryable-error	-	kiloapp:///dev/session-artifacts-fixture/terminal-error	screen	(app)/session-artifacts-fixture
+T2-G19	T2	signed-in	standard	android,ios	long-content	-	kiloapp:///dev/session-artifacts-fixture/delete-changed	screen	(app)/session-artifacts-fixture

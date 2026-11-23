@@ -4956,6 +4956,23 @@
       "openService": "Buka {{name}} di port {{port}}",
       "portLabel": "localhost:{{port}}"
     },
+    "artifacts": {
+      "title": "Artefak",
+      "loading": "Memuat artefak…",
+      "loadError": "Tidak dapat memuat artefak.",
+      "empty": "Belum ada artefak tersimpan. Berkas yang disimpan di /artifacts muncul di sini setelah sinkronisasi.",
+      "sandboxNotRunning": "Sandbox tidak berjalan. Berkas yang tersimpan tetap tersedia, tetapi perubahan baru tidak disinkronkan.",
+      "deleteConfirmTitle": "Hapus {{fileName}}?",
+      "deleteConfirmBody": "Tindakan ini menghapus berkas dari artefak Anda. Salinan mungkin tetap ada di sandbox yang berjalan.",
+      "deleteConfirmAction": "Hapus artefak",
+      "deleteChanged": "{{fileName}} berubah sejak daftar ini dimuat. Daftar telah dimuat ulang; tinjau versi baru dan coba lagi.",
+      "keptUntil": "Disimpan hingga ruang kerja atau sesi dihapus.",
+      "deleteA11y": "Hapus {{fileName}}",
+      "downloadA11y": "Unduh {{fileName}}",
+      "downloadError": "Tidak dapat membuat tautan unduhan untuk {{fileName}}. Muat ulang dan coba lagi.",
+      "downloadShareFailed": "Tidak dapat membuka {{fileName}} untuk dibagikan. Coba lagi.",
+      "fileCount_other": "{{count}} berkas"
+    },
     "triggers": {
       "title": "Pemicu & webhook",
       "subtitle": "Otomatiskan eksekusi Cloud Agent dari panggilan webhook atau jadwal.",

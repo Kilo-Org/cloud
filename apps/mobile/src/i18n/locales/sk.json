@@ -5228,6 +5228,26 @@
       "openService": "Otvoriť {{name}} na porte {{port}}",
       "portLabel": "localhost:{{port}}"
     },
+    "artifacts": {
+      "title": "Artefakty",
+      "loading": "Načítavajú sa artefakty…",
+      "loadError": "Nepodarilo sa načítať artefakty.",
+      "empty": "Zatiaľ tu nie sú žiadne uložené artefakty. Súbory uložené v /artifacts sa tu zobrazia po synchronizácii.",
+      "sandboxNotRunning": "Sandbox nie je spustený. Uložené súbory zostávajú dostupné, ale nové zmeny sa nesynchronizujú.",
+      "deleteConfirmTitle": "Odstrániť {{fileName}}?",
+      "deleteConfirmBody": "Týmto sa súbor odstráni z vašich artefaktov. Kópia môže zostať v spustenom sandboxe.",
+      "deleteConfirmAction": "Odstrániť artefakt",
+      "deleteChanged": "Súbor {{fileName}} sa od načítania tohto zoznamu zmenil. Zoznam bol obnovený; skontrolujte novú verziu a skúste to znova.",
+      "keptUntil": "Uchovávajú sa, kým sa neodstráni pracovný priestor alebo relácia.",
+      "deleteA11y": "Odstrániť {{fileName}}",
+      "downloadA11y": "Stiahnuť {{fileName}}",
+      "downloadError": "Nepodarilo sa vytvoriť odkaz na stiahnutie pre {{fileName}}. Obnovte a skúste to znova.",
+      "downloadShareFailed": "Nepodarilo sa otvoriť {{fileName}} na zdieľanie. Skúste to znova.",
+      "fileCount_one": "{{count}} súbor",
+      "fileCount_few": "{{count}} súbory",
+      "fileCount_many": "{{count}} súboru",
+      "fileCount_other": "{{count}} súborov"
+    },
     "triggers": {
       "title": "Spúšťače a webhooky",
       "subtitle": "Automatizujte spustenia Cloud Agent pomocou volania webhooku alebo podľa plánu.",

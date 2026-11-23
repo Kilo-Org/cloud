@@ -5134,6 +5134,25 @@
       "openService": "Otvori {{name}} na portu {{port}}",
       "portLabel": "localhost:{{port}}"
     },
+    "artifacts": {
+      "title": "Artefakti",
+      "loading": "Učitavanje artefakata…",
+      "loadError": "Nije moguće učitati artefakte.",
+      "empty": "Još nema sačuvanih artefakata. Datoteke sačuvane u /artifacts pojavit će se ovdje nakon sinhronizacije.",
+      "sandboxNotRunning": "Sandbox nije pokrenut. Sačuvane datoteke ostaju dostupne, ali nove izmjene se ne sinhroniziraju.",
+      "deleteConfirmTitle": "Obrisati {{fileName}}?",
+      "deleteConfirmBody": "Ovim se datoteka uklanja iz tvojih artefakata. Kopija može ostati u pokrenutom sandboxu.",
+      "deleteConfirmAction": "Obriši artefakt",
+      "deleteChanged": "Datoteka {{fileName}} je izmijenjena otkako je ova lista učitana. Lista je osvježena; pregledaj novu verziju i pokušaj ponovo.",
+      "keptUntil": "Čuva se dok se radni prostor ili sesija ne obriše.",
+      "deleteA11y": "Obriši {{fileName}}",
+      "downloadA11y": "Preuzmi {{fileName}}",
+      "downloadError": "Nije moguće stvoriti vezu za preuzimanje datoteke {{fileName}}. Osvježi i pokušaj ponovo.",
+      "downloadShareFailed": "Nije moguće otvoriti datoteku {{fileName}} za dijeljenje. Pokušaj ponovo.",
+      "fileCount_one": "{{count}} datoteka",
+      "fileCount_few": "{{count}} datoteke",
+      "fileCount_other": "{{count}} datoteka"
+    },
     "triggers": {
       "title": "Okidači i webhookovi",
       "subtitle": "Automatizirajte pokretanja Cloud Agent-a putem webhook poziva ili rasporeda.",

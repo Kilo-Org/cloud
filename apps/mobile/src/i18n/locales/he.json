@@ -5134,6 +5134,25 @@
       "openService": "פתיחת {{name}} ביציאה {{port}}",
       "portLabel": "localhost:{{port}}"
     },
+    "artifacts": {
+      "title": "תוצרים",
+      "loading": "טוען תוצרים…",
+      "loadError": "לא ניתן לטעון את התוצרים.",
+      "empty": "אין עדיין תוצרים שמורים. קבצים שנשמרו ב-/artifacts יופיעו כאן לאחר סנכרון.",
+      "sandboxNotRunning": "ארגז החול אינו פועל. הקבצים השמורים נשארים זמינים, אך שינויים חדשים לא מסונכרנים.",
+      "deleteConfirmTitle": "למחוק את {{fileName}}?",
+      "deleteConfirmBody": "הפעולה מסירה את הקובץ מהתוצרים שלך. ייתכן שעותק יישאר בארגז חול פעיל.",
+      "deleteConfirmAction": "מחיקת תוצר",
+      "deleteChanged": "{{fileName}} השתנה מאז שהרשימה נטענה. הרשימה רועננה; יש לעיין בגרסה החדשה ולנסות שוב.",
+      "keptUntil": "נשמר עד למחיקת סביבת העבודה או הסשן.",
+      "deleteA11y": "מחיקת {{fileName}}",
+      "downloadA11y": "הורדת {{fileName}}",
+      "downloadError": "לא ניתן ליצור קישור הורדה עבור {{fileName}}. יש לרענן ולנסות שוב.",
+      "downloadShareFailed": "לא ניתן לפתוח את {{fileName}} לשיתוף. יש לנסות שוב.",
+      "fileCount_one": "{{count}} קובץ",
+      "fileCount_two": "{{count}} קבצים",
+      "fileCount_other": "{{count}} קבצים"
+    },
     "triggers": {
       "title": "טריגרים ווובהוקים",
       "subtitle": "אוטומציה של הרצות Cloud Agent מקריאת וובהוק או מלוח זמנים.",

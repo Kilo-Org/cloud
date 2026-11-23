@@ -5040,6 +5040,24 @@
       "openService": "Fur {{name}} ee ku jira dekedda {{port}}",
       "portLabel": "localhost:{{port}}"
     },
+    "artifacts": {
+      "title": "Faylalka la kaydiyay",
+      "loading": "Faylalka la kaydiyay ayaa soo raraya…",
+      "loadError": "Lama soo rari karin faylalka la kaydiyay.",
+      "empty": "Weli ma jiraan faylal la kaydiyay. Faylalka lagu kaydiyo /artifacts halkan ayay ka soo muuqdaan ka dib marka la isku waafajiyo.",
+      "sandboxNotRunning": "Sandbox-ku ma shaqeynayo. Faylalka la kaydiyay wali way diyaar yihiin, laakiin isbeddellada cusub lama isku waafajinayo.",
+      "deleteConfirmTitle": "Ma la tirtiraa {{fileName}}?",
+      "deleteConfirmBody": "Tani waxay faylka ka saaraysaa faylalkaaga la kaydiyay. Koobi ayaa laga yaabaa inuu ku sii jiro sandbox shaqaynaya.",
+      "deleteConfirmAction": "Tirtir faylka la kaydiyay",
+      "deleteChanged": "{{fileName}} wuu isbeddelay tan iyo markii liiskan la soo raray. Liiska waa la cusboonaysiiyay; dib u eeg nooca cusub oo mar kale isku day.",
+      "keptUntil": "Waxaa la hayaa ilaa goobta shaqada ama kalfadhiga la tirtiro.",
+      "deleteA11y": "Tirtir {{fileName}}",
+      "downloadA11y": "Soo deji {{fileName}}",
+      "downloadError": "Lama abuuri karin xiriirka soo dejinta ee {{fileName}}. Cusboonaysii oo mar kale isku day.",
+      "downloadShareFailed": "Lama furi karin {{fileName}} si loo wadaago. Mar kale isku day.",
+      "fileCount_one": "{{count}} fayl",
+      "fileCount_other": "{{count}} faylal"
+    },
     "triggers": {
       "title": "Kiciyeyaal iyo wicitaanno web",
       "subtitle": "Otomaatig u samee socodka Cloud Agent ee ka imanaya wicitaan web ama jadwal.",

@@ -4954,6 +4954,23 @@
       "openService": "Buka {{name}} pada port {{port}}",
       "portLabel": "localhost:{{port}}"
     },
+    "artifacts": {
+      "title": "Artifak",
+      "loading": "Memuatkan artifak…",
+      "loadError": "Tidak dapat memuatkan artifak.",
+      "empty": "Belum ada artifak disimpan. Fail yang disimpan dalam /artifacts akan muncul di sini selepas penyegerakan.",
+      "sandboxNotRunning": "Kotak pasir tidak berjalan. Fail yang disimpan masih tersedia, tetapi perubahan baharu tidak disegerakkan.",
+      "deleteConfirmTitle": "Padam {{fileName}}?",
+      "deleteConfirmBody": "Ini akan mengalih keluar fail daripada artifak anda. Salinan mungkin masih ada dalam kotak pasir yang sedang berjalan.",
+      "deleteConfirmAction": "Padam artifak",
+      "deleteChanged": "{{fileName}} telah berubah sejak senarai ini dimuatkan. Senarai telah dimuat semula; semak versi baharu dan cuba lagi.",
+      "keptUntil": "Dikekalkan sehingga ruang kerja atau sesi dipadam.",
+      "deleteA11y": "Padam {{fileName}}",
+      "downloadA11y": "Muat turun {{fileName}}",
+      "downloadError": "Tidak dapat mencipta pautan muat turun untuk {{fileName}}. Muat semula dan cuba lagi.",
+      "downloadShareFailed": "Tidak dapat membuka {{fileName}} untuk dikongsi. Cuba lagi.",
+      "fileCount_other": "{{count}} fail"
+    },
     "triggers": {
       "title": "Pencetus & webhook",
       "subtitle": "Automatkan larian Cloud Agent daripada panggilan webhook atau jadual.",

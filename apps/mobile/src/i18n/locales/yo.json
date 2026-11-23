@@ -4960,6 +4960,23 @@
       "openService": "Ṣí {{name}} lórí port {{port}}",
       "portLabel": "localhost:{{port}}"
     },
+    "artifacts": {
+      "title": "Àwọn ìtújáde",
+      "loading": "Ń gbé àwọn ìtújáde wọlé…",
+      "loadError": "A kò lè gbé àwọn ìtújáde wọlé.",
+      "empty": "Kò sí àwọn ìtújáde tí a fipamọ́ síbẹ̀. Àwọn fáìlì tí a fipamọ́ sínú /artifacts yóò hàn níbí lẹ́yìn ìsopọ̀.",
+      "sandboxNotRunning": "Sandbox kò ń ṣiṣẹ́. Àwọn fáìlì tí a fipamọ́ ṣì wà, ṣùgbọ́n àwọn àyípadà tuntun kò ń sopọ̀.",
+      "deleteConfirmTitle": "Pa {{fileName}} rẹ́?",
+      "deleteConfirmBody": "Èyí yọ fáìlì náà kúrò nínú àwọn ìtújáde rẹ. Ẹ̀dà kan lè wà nínú sandbox tó ń ṣiṣẹ́.",
+      "deleteConfirmAction": "Pa ìtújáde rẹ́",
+      "deleteChanged": "{{fileName}} ti yípadà láti ìgbà tí a ti gbé àkójọ yìí wọlé. A ti sọ àkójọ náà dọ̀tun; wo ẹ̀dà tuntun náà kí o sì tún gbìyànjú.",
+      "keptUntil": "A máa pa á mọ́ títí tí a ó fi pa ààyè iṣẹ́ tàbí ìgbà iṣẹ́ rẹ́.",
+      "deleteA11y": "Pa {{fileName}} rẹ́",
+      "downloadA11y": "Gba {{fileName}} sílẹ̀",
+      "downloadError": "A kò lè dá ìsopọ̀ ìgbàsílẹ̀ fún {{fileName}}. Sọ ọ́ di tuntun kí o sì tún gbìyànjú.",
+      "downloadShareFailed": "A kò lè ṣí {{fileName}} láti pín. Tún gbìyànjú.",
+      "fileCount_other": "àwọn fáìlì {{count}}"
+    },
     "triggers": {
       "title": "Àwọn ìmúṣiṣẹ́ àti àwọn wẹ́ẹ̀bùhóòkù",
       "subtitle": "Ṣe àdáṣe àwọn ìṣiṣẹ́ Cloud Agent láti ìpè wẹ́ẹ̀bùhóòkù tàbí ìtòlẹ́sẹẹsẹ.",

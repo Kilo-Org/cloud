@@ -58,6 +58,7 @@ import {
 import { friendlyModelName, resolveModelProviderName } from './session-model-display';
 import { Row, TokenRow } from './session-detail-rows';
 import { SessionPageSheet } from './session-page-sheet';
+import { SessionArtifactsRow } from './session-artifacts/session-artifacts-row';
 import { SessionSandboxSection } from './session-sandbox-section';
 import { copySessionId, copySessionLink } from './session-row-actions';
 import { type SessionConnectionDisplay } from './session-connection-indicator-state';
@@ -416,6 +417,11 @@ export function SessionContextSheet({
           ) : null}
 
           <SessionChangesRow sessionId={sessionId} onClose={onClose} />
+
+          <SessionArtifactsRow
+            cloudAgentSessionId={cloudAgentSessionId}
+            organizationId={organizationId}
+          />
 
           <CopyRow
             testID="session-context-sheet-copy-id"

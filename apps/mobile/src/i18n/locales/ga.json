@@ -5322,6 +5322,27 @@
       "openService": "Oscail {{name}} ar phort {{port}}",
       "portLabel": "localhost:{{port}}"
     },
+    "artifacts": {
+      "title": "Déantáin",
+      "loading": "Ag lódáil déantán…",
+      "loadError": "Níorbh fhéidir déantáin a lódáil.",
+      "empty": "Níl aon dhéantáin shábháilte fós. Taispeántar comhaid a shábháiltear in /artifacts anseo tar éis sioncrónaithe.",
+      "sandboxNotRunning": "Níl an bosca gainimh ag rith. Fanann comhaid shábháilte ar fáil, ach níl athruithe nua á sioncrónú.",
+      "deleteConfirmTitle": "Scrios {{fileName}}?",
+      "deleteConfirmBody": "Baineann sé seo an comhad de do dhéantáin. D'fhéadfadh cóip fanacht i mbosca gainimh atá ag rith.",
+      "deleteConfirmAction": "Scrios déantán",
+      "deleteChanged": "D'athraigh {{fileName}} ó lódáladh an liosta seo. Athnuíodh an liosta; déan athbhreithniú ar an leagan nua agus bain triail eile as.",
+      "keptUntil": "Coinnítear go dtí go scriosfar an spás oibre nó an seisiún.",
+      "deleteA11y": "Scrios {{fileName}}",
+      "downloadA11y": "Íoslódáil {{fileName}}",
+      "downloadError": "Níorbh fhéidir nasc íoslódála a chruthú do {{fileName}}. Athnuaigh agus bain triail eile as.",
+      "downloadShareFailed": "Níorbh fhéidir {{fileName}} a oscailt le comhroinnt. Bain triail eile as.",
+      "fileCount_one": "{{count}} chomhad",
+      "fileCount_two": "{{count}} chomhad",
+      "fileCount_few": "{{count}} chomhaid",
+      "fileCount_many": "{{count}} gcomhaid",
+      "fileCount_other": "{{count}} comhaid"
+    },
     "triggers": {
       "title": "Truicir agus crúcaí gréasáin",
       "subtitle": "Uathoibrigh ritheanna Cloud Agent ó ghlao crúca gréasáin nó ó sceideal.",

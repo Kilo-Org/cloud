@@ -5134,6 +5134,25 @@
       "openService": "Deschide {{name}} pe portul {{port}}",
       "portLabel": "localhost:{{port}}"
     },
+    "artifacts": {
+      "title": "Artefacte",
+      "loading": "Se încarcă artefactele…",
+      "loadError": "Nu s-au putut încărca artefactele.",
+      "empty": "Nu există încă artefacte salvate. Fișierele salvate în /artifacts apar aici după sincronizare.",
+      "sandboxNotRunning": "Sandboxul este oprit. Fișierele salvate rămân disponibile, dar modificările noi nu se sincronizează.",
+      "deleteConfirmTitle": "Ștergi {{fileName}}?",
+      "deleteConfirmBody": "Fișierul va fi eliminat din artefactele tale. O copie poate rămâne într-un sandbox pornit.",
+      "deleteConfirmAction": "Șterge artefactul",
+      "deleteChanged": "{{fileName}} s-a modificat de la încărcarea listei. Lista a fost reîmprospătată; verifică noua versiune și încearcă din nou.",
+      "keptUntil": "Se păstrează până la ștergerea spațiului de lucru sau a sesiunii.",
+      "deleteA11y": "Șterge {{fileName}}",
+      "downloadA11y": "Descarcă {{fileName}}",
+      "downloadError": "Nu s-a putut crea un link de descărcare pentru {{fileName}}. Reîmprospătează și încearcă din nou.",
+      "downloadShareFailed": "Nu s-a putut deschide {{fileName}} pentru partajare. Încearcă din nou.",
+      "fileCount_one": "{{count}} fișier",
+      "fileCount_few": "{{count}} fișiere",
+      "fileCount_other": "{{count}} de fișiere"
+    },
     "triggers": {
       "title": "Declanșatoare și webhook-uri",
       "subtitle": "Automatizează rulările Cloud Agent dintr-un apel webhook sau conform unui program.",

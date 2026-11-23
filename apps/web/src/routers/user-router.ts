@@ -12,6 +12,7 @@ import {
   SoftDeletePreconditionError,
   unlinkAuthProviderFromUser,
 } from '@/lib/user';
+import { capitalize } from '@/lib/utils';
 import {
   sendAccountDeletionConfirmationEmail,
   sendAccountDeletionSupportNotification,
@@ -389,13 +390,9 @@ function formatKiloClawDeductionDescription(
     return instanceName ? `${storedDescription} (${instanceName})` : storedDescription;
   }
   const plan = match[1].toLowerCase() === 'commit' ? 'Commit' : 'Standard';
-  const action = capitalizeFirst(match[2]);
+  const action = capitalize(match[2]);
   const suffix = instanceName ? ` (${instanceName})` : '';
   return `KiloClaw Hosting - ${plan}: ${action}${suffix}`;
-}
-
-function capitalizeFirst(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 // Scope key for the per-(user, organization) activity-token registration lock.

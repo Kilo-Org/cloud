@@ -1,14 +1,9 @@
 import { getByokProviderDisplayName } from '@/lib/byok/provider-names';
 import type { RequestLogByokFailoverAttempt } from '@/lib/request-logs/routing-details';
+import { capitalize } from '@/lib/utils';
 import { DetailSection, ToneBadge } from './detail-primitives';
 import { formatDurationMs } from './format';
-import {
-  capitalize,
-  gatewayName,
-  isPartnerFailover,
-  partnerName,
-  type StepTone,
-} from './routing-labels';
+import { gatewayName, isPartnerFailover, partnerName, type StepTone } from './routing-labels';
 
 const OUTCOMES: Record<string, { label: string; tone: StepTone }> = {
   'failed-over': { label: 'Failed, tried next key', tone: 'rejected' },

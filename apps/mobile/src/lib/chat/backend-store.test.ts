@@ -259,6 +259,12 @@ describe('secure backend profiles', () => {
       expect(() => store.parseChatBackendHeaders(JSON.stringify(headers))).toThrow(
         /^invalidHeaders$/u
       );
+      // The stored read keeps what an older build wrote, so the profile still lists and can
+      // be fixed; the save above is what refuses it.
+      const stored = { ...draft, headers, id: secondId, revision: 1 };
+      expect(store.parseChatBackends(JSON.stringify([stored]))).toMatchObject([
+        { id: secondId, headers },
+      ]);
     }
   );
 

@@ -1308,8 +1308,8 @@ describe('automatic top-up charge standing', () => {
         flow: 'auto_topup',
       })
     );
-    expect(request).not.toHaveProperty('ip', expect.anything());
-    expect(request).not.toHaveProperty('ja4', expect.anything());
+    expect(request?.ip).toBeUndefined();
+    expect(request?.ja4).toBeUndefined();
   });
 
   test('a recent refusal suppresses the next attempt for the same payer', async () => {

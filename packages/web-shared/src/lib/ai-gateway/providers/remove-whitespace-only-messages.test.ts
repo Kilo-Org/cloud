@@ -458,7 +458,10 @@ describe('createCacheControlCarrier', () => {
     };
     const carriedTail: Anthropic.MessageParam = {
       role: 'assistant',
-      content: [{ ...toolUse, cache_control: ephemeral }, { type: 'text', text: 'Answer' }],
+      content: [
+        { ...toolUse, cache_control: ephemeral },
+        { type: 'text', text: 'Answer' },
+      ],
     };
     const carrier = createCacheControlCarrier();
     carrier.keep(previousMessage);

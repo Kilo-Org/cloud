@@ -13,7 +13,17 @@ const SCM_HOSTS = {
   bitbucket: [new URL(BITBUCKET_GIT_ORIGIN).host, new URL(BITBUCKET_API_ORIGIN).host],
 };
 
-export function hasManagedScmCapability(grant: SessionCredentialGrant): boolean {
+export type ScmCapabilityAuthority = Pick<
+  SessionCredentialGrant,
+  | 'containmentEnabled'
+  | 'repository'
+  | 'scm'
+  | 'additionalRepositories'
+  | 'outboundContainerId'
+  | 'sandboxId'
+>;
+
+export function hasManagedScmCapability(grant: ScmCapabilityAuthority): boolean {
   const scm = grant.scm;
   const alias = scm?.alias && parseControlPlaneCredential(scm.alias);
   return Boolean(
@@ -46,13 +56,18 @@ export function managedScmForwardingTargets(
       grant.members.length === 0
     )
       continue;
-    const scm = grant.scm;
-    if (!scm) continue;
-    for (const host of scmForwardingHosts(scm)) targets.add(host);
-    for (const entry of grant.additionalRepositories ?? []) {
-      if (!additionalEntryProjectsHosts(grant, entry)) continue;
-      for (const host of scmForwardingHosts(entry.scm)) targets.add(host);
-    }
+    for (const host of managedScmHosts(grant)) targets.add(host);
+  }
+  return [...targets].sort();
+}
+
+/** Repository destinations only. The owning admission adapter supplies active scope authority. */
+export function managedScmHosts(grant: ScmCapabilityAuthority): string[] {
+  if (!hasManagedScmCapability(grant) || !grant.scm) return [];
+  const targets = new Set(scmForwardingHosts(grant.scm));
+  for (const entry of grant.additionalRepositories ?? []) {
+    if (!additionalEntryProjectsHosts(grant, entry)) continue;
+    for (const host of scmForwardingHosts(entry.scm)) targets.add(host);
   }
   return [...targets].sort();
 }
@@ -85,7 +100,7 @@ function scmForwardingHosts(scm: NonNullable<SessionCredentialGrant['scm']>): st
 }
 
 function additionalEntryProjectsHosts(
-  grant: SessionCredentialGrant,
+  grant: ScmCapabilityAuthority,
   entry: NonNullable<SessionCredentialGrant['additionalRepositories']>[number]
 ): boolean {
   const scm = entry.scm;

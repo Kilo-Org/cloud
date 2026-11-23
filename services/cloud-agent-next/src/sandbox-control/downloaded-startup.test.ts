@@ -1,3 +1,11 @@
+import { renderRuntimeBootstrap } from './runtime-bootstrap.js';
+import { renderAwsArchiveRestore } from './aws-archive-bootstrap.js';
+import {
+  awsArchiveBaseImage,
+  awsArchiveObjectKey,
+  encodeAwsArchiveSnapshot,
+} from '../shared/aws-archive.js';
+import { AWS_TEST_CONFIGURATION } from '../../test/fixtures/aws-provider.js';
 import { Hono } from 'hono';
 import jwt from 'jsonwebtoken';
 import { describe, expect, it } from 'vitest';
@@ -796,6 +804,8 @@ describe('startup failure admission', () => {
     );
     for (const [body, status] of [
       [JSON.stringify({ allocationId, code: 'artifact_invalid' }), 204],
+      [JSON.stringify({ allocationId, code: 'environment_restore_unavailable' }), 204],
+      [JSON.stringify({ allocationId, code: 'environment_restore_failed' }), 204],
       [JSON.stringify({ allocationId: crypto.randomUUID(), code: 'artifact_invalid' }), 400],
       [JSON.stringify({ allocationId, code: 'unknown' }), 400],
       ['x'.repeat(1025), 413],
@@ -809,7 +819,7 @@ describe('startup failure admission', () => {
           )
         ).status
       ).toBe(status);
-    expect(dispatches).toBe(1);
+    expect(dispatches).toBe(3);
   });
   it('maps only permanent codes to the public pre-dispatch contract', () => {
     for (const value of Object.values(STARTUP_FAILURES)) {
@@ -821,4 +831,86 @@ describe('startup failure admission', () => {
     }
     expect(STARTUP_FAILURES.base_incompatible.reason).toBeNull();
   });
+});
+
+describe('AWS archive launch size and target admission', () => {
+  function input() {
+    const connectionId = '11111111-1111-4111-8111-111111111111';
+    const allocationId = '22222222-2222-4222-8222-222222222222';
+    const archive = {
+      format: 1 as const,
+      baseImage: awsArchiveBaseImage(connectionId, AWS_TEST_CONFIGURATION),
+      sha256: 'c'.repeat(64),
+      size: 10240,
+      expandedBytes: 100,
+      fileCount: 2,
+      deletedCount: 1,
+    };
+    const snapshot = {
+      format: 1 as const,
+      captureId: '33333333-3333-4333-8333-333333333333',
+      environmentId: '44444444-4444-4444-8444-444444444444',
+      buildId: '55555555-5555-4555-8555-555555555555',
+      allocationId,
+      archive,
+    };
+    const reportUrl = 'https://worker.example.com/sandbox-control/sbx-test/startup-failure';
+    const deadlineAt = Date.now() + 300000;
+    return {
+      snapshotId: encodeAwsArchiveSnapshot(snapshot),
+      connectionId,
+      configuration: AWS_TEST_CONFIGURATION,
+      downloadUrl: `https://customer-artifacts.s3.us-east-1.amazonaws.com/${awsArchiveObjectKey(snapshot)}?synthetic-signature=fixture`,
+      reportUrl,
+      workerUrl: 'https://worker.example.com',
+      allocationId,
+      deadlineAt,
+      filesystemRoot: '/',
+      command: renderRuntimeBootstrap({
+        descriptor: text,
+        artifactBaseUrl: 'https://worker.example.com/runtime-artifacts',
+        reportUrl,
+        allocationId,
+        grant: 'synthetic-runtime-artifact-grant',
+        deadlineAt,
+      }),
+    };
+  }
+  it('fits the actual runtime command, archive helper and launch environment into the AWS envelope', () => {
+    const value = input();
+    const startup = renderAwsArchiveRestore(value);
+    const document = JSON.stringify({
+      format: 1,
+      deadlineAt: value.deadlineAt,
+      argv: startup.argv,
+      env: {
+        SANDBOX_CONTROL_CREDENTIAL: 'a'.repeat(1500),
+        HTTPS_PROXY: 'http://kilo:' + 'b'.repeat(1500) + '@proxy.kilo.internal:3128',
+        KILO_AWS_EGRESS_CA_CERTIFICATE: 'public-ca-certificate'.repeat(200),
+      },
+    });
+    expect(new TextEncoder().encode(document).byteLength).toBeLessThanOrEqual(262144);
+    expect(startup.argv.every(arg => new TextEncoder().encode(arg).byteLength < 128 * 1024)).toBe(
+      true
+    );
+  });
+  it.each(['foreign-host', 'foreign-path', 'foreign-base', 'foreign-report'])(
+    'rejects %s before startup',
+    change => {
+      const value = input();
+      if (change === 'foreign-host')
+        value.downloadUrl = value.downloadUrl.replace('customer-artifacts.', 'foreign-artifacts.');
+      if (change === 'foreign-path')
+        value.downloadUrl = value.downloadUrl.replace('/kilo/archives/', '/kilo/proxy/');
+      if (change === 'foreign-base')
+        value.configuration = { ...value.configuration, imageVersion: '99.0' };
+      if (change === 'foreign-report')
+        value.reportUrl = 'https://attacker.example.com/sandbox-control/sbx-test/startup-failure';
+      expect(() => renderAwsArchiveRestore(value)).toThrow(
+        change === 'foreign-base'
+          ? 'AWS archive base is incompatible'
+          : 'Invalid AWS archive startup'
+      );
+    }
+  );
 });

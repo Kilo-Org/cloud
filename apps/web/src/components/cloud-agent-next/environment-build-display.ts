@@ -32,6 +32,7 @@ export function buildStageLabel(summary: EnvironmentBuildSummary): string {
       if (summary.step === 'clone') return 'Cloning the default branch';
       if (summary.step === 'setup') return 'Running setup commands';
       if (summary.step === 'cleanup') return 'Removing credentials';
+      if (summary.step === 'archive') return 'Archiving the prepared filesystem';
       return 'Starting the builder';
     case 'capturing':
       return 'Capturing the snapshot';
@@ -65,6 +66,7 @@ const FAILURE_TEXT: Record<string, string> = {
   setup_timeout: 'A setup command timed out. See the build log.',
   cleanup_failed: 'Credentials could not be removed, so no snapshot was taken.',
   capture_failed: 'The snapshot could not be captured.',
+  archive_failed: 'The prepared filesystem could not be archived.',
   capture_uncertain: 'The snapshot result was lost; the build was not published.',
   deadline: 'The build did not finish within 30 minutes.',
   builder_lost: 'The builder stopped reporting.',

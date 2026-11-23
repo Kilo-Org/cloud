@@ -237,6 +237,7 @@ export const COUNTED_FAILURE_REASONS: ReadonlySet<string> = new Set([
   'setup_failed',
   'setup_timeout',
   'cleanup_failed',
+  'archive_failed',
   'capture_failed',
   'capture_uncertain',
   'deadline',

@@ -64,6 +64,7 @@ describe('environment build display', () => {
   it('names the active stage from the coordinator state and builder step', () => {
     expect(buildStageLabel(summary({ state: 'queued' }))).toBe('Queued');
     expect(buildStageLabel(summary({ step: 'setup' }))).toBe('Running setup commands');
+    expect(buildStageLabel(summary({ step: 'archive' }))).toBe('Archiving the prepared filesystem');
     expect(buildStageLabel(summary({ state: 'capturing' }))).toBe('Capturing the snapshot');
     expect(buildStageLabel(summary({ state: 'stopping', outcome: 'succeeded' }))).toBe(
       'Published; stopping the builder'
@@ -131,6 +132,7 @@ describe('environment build display', () => {
 
   it('explains failures and formats snapshot age for the detail pane', () => {
     expect(failureText('setup_failed')).toBe('A setup command failed. See the build log.');
+    expect(failureText('archive_failed')).toBe('The prepared filesystem could not be archived.');
     expect(failureText('runtime_base_incompatible')).toBe(
       'The selected runtime release could not be installed.'
     );

@@ -2,6 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { isControlPlaneFailureReason, messageFailureText } from './failure-messages.js';
 
 describe('messageFailureText', () => {
+  it('preserves retry advice for an interrupted restore and rebuild advice for a bad archive', () => {
+    expect(messageFailureText('environment_restore_unavailable')).toContain(
+      'Send a new message to retry'
+    );
+    expect(messageFailureText('environment_restore_unavailable')).not.toContain('Rebuild');
+    expect(messageFailureText('environment_restore_failed')).toContain('Rebuild');
+  });
   it('shows the specific recovery message for unconfirmed completion', () => {
     expect(isControlPlaneFailureReason('completion_unconfirmed')).toBe(true);
     expect(messageFailureText('completion_unconfirmed')).toBe(

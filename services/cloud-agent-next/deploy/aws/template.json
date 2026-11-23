@@ -224,6 +224,12 @@
               "AbortIncompleteMultipartUpload": {
                 "DaysAfterInitiation": 1
               }
+            },
+            {
+              "Id": "ExpirePreparedArchives",
+              "Status": "Enabled",
+              "Prefix": "kilo/archives/environments/",
+              "ExpirationInDays": 30
             }
           ]
         }

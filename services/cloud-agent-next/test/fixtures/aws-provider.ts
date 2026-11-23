@@ -26,6 +26,7 @@ export function awsProviderFixture(sandboxId = 'ses-abcdef') {
   const operations = new Map<string, AwsOperation>();
   const objects = new Map<string, string>();
   const submitted: MicrovmRunRequest[] = [];
+  const runStarted = Promise.withResolvers<void>();
   const vms = new Map<string, { request: MicrovmRunRequest; initial: Microvm; current: Microvm }>();
   let now = 10_000;
   let loseReply = false;
@@ -54,6 +55,7 @@ export function awsProviderFixture(sandboxId = 'ses-abcdef') {
   const client: MicrovmClient = {
     async run(request) {
       submitted.push(structuredClone(request));
+      runStarted.resolve();
       if (runError) {
         const error = runError;
         runError = undefined;
@@ -104,6 +106,10 @@ export function awsProviderFixture(sandboxId = 'ses-abcdef') {
     },
   };
   const objectStore: AwsObjectStore = {
+    prepareArchiveUpload: async () => {
+      throw new Error('Archive uploads unavailable in lifecycle fixture');
+    },
+    inspectArchive: async () => null,
     async putLaunch(key, body) {
       if (putGate) await putGate;
       if (objects.has(key)) throw new AwsRequestError(412, 'PreconditionFailed');
@@ -116,9 +122,6 @@ export function awsProviderFixture(sandboxId = 'ses-abcdef') {
     async downloadUrl(key) {
       signedUrls++;
       return `https://customer-artifacts.s3.us-east-1.amazonaws.com/${key}?test-signature=${signedUrls}`;
-    },
-    async uploadUrl(key) {
-      return `https://customer-artifacts.s3.us-east-1.amazonaws.com/${key}?test-upload=1`;
     },
   };
   function adapter(operationStorage: AwsOperationStorage = storage) {
@@ -139,6 +142,7 @@ export function awsProviderFixture(sandboxId = 'ses-abcdef') {
     operations,
     objects,
     submitted,
+    runStarted: runStarted.promise,
     vms,
     storage,
     setNow(value: number) {

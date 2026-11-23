@@ -1965,7 +1965,7 @@ describe('Organizations', () => {
       }
     });
 
-    test('retires a child organization invitation when its SSO source changes', async () => {
+    test('retires a child organization invitation when the parent organization changes', async () => {
       const owner = await insertTestUser();
       const invitee = await insertTestUser({ google_user_email: 'source-move@example.com' });
       const formerParent = await createOrganization('Former SSO Parent', owner.id);

@@ -21,6 +21,7 @@ export const TOKEN_KEYS = [
   ['primary', '--primary'],
   ['primaryForeground', '--primary-foreground'],
   ['primaryDisabled', '--primary-disabled'],
+  ['primaryDisabledFill', '--primary-disabled-fill'],
   ['secondary', '--secondary'],
   ['secondaryForeground', '--secondary-foreground'],
   ['secondaryFill', '--secondary-fill'],

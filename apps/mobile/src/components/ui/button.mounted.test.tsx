@@ -280,12 +280,15 @@ describe('Button native target contract', () => {
   it('keeps a disabled primary label legible instead of dimming the brand pair', () => {
     const button = renderButton({ disabled: true });
     const classes = (button.props.className as string).split(' ');
-    // The neutral plate must win over the variant's brand fill and its ink: the
-    // fill and the ink are the palette's neutral pair in both themes.
-    expect(classes).toContain('bg-secondary-fill');
+    // The disabled primary plate must win over the variant's brand fill and its
+    // ink: the fill and the ink are the palette's disabled pair in both themes.
+    expect(classes).toContain('bg-primary-disabled-fill');
     expect(classes).not.toContain('bg-primary');
     expect(classes).not.toContain('bg-primary-disabled');
     expect(classes).not.toContain('opacity-50');
+    // The disabled plate must not share the fill of an enabled `secondary`
+    // action, or an unavailable primary would look like an available one.
+    expect(classes).not.toContain('bg-secondary-fill');
     // The plate draws no border, so an enabled-to-disabled transition changes
     // no geometry.
     expect(classes).not.toContain('border');
@@ -297,7 +300,7 @@ describe('Button native target contract', () => {
 
     const busy = renderButton({ disabled: true, loading: true });
     const busyClasses = (busy.props.className as string).split(' ');
-    expect(busyClasses).not.toContain('bg-secondary-fill');
+    expect(busyClasses).not.toContain('bg-primary-disabled-fill');
     const busyLabelClasses = (busy.findByType(NativeText).props.className as string).split(' ');
     expect(busyLabelClasses).not.toContain('dark:text-ink2');
     expect(busyLabelClasses).not.toContain('text-muted-foreground');
@@ -306,7 +309,7 @@ describe('Button native target contract', () => {
     // face a border, so the frame does not change when the action becomes
     // unavailable.
     const enabled = (renderButton({}).props.className as string).split(' ');
-    expect(enabled).not.toContain('bg-secondary-fill');
+    expect(enabled).not.toContain('bg-primary-disabled-fill');
     expect(enabled).not.toContain('border');
     const geometry = (face: string[]) =>
       face.filter(token =>
@@ -316,13 +319,14 @@ describe('Button native target contract', () => {
     expect(geometry(classes).length).toBeGreaterThan(0);
     expect(geometry(classes).sort()).toEqual(geometry(enabled).sort());
 
-    // The plate belongs to the disabled primary alone: a dimmed outlined control
-    // keeps its own foreground ink, so neither the fill nor its dark ink leaks.
+    // The disabled primary plate belongs to the disabled primary alone: a dimmed
+    // outlined control keeps its own foreground ink, so neither the fill nor its
+    // dark ink leaks.
     const outlined = renderButton({ variant: 'outline', disabled: true });
-    expect((outlined.props.className as string).split(' ')).not.toContain('bg-secondary-fill');
-    expect((outlined.findByType(NativeText).props.className as string).split(' ')).not.toContain(
-      'dark:text-ink2'
-    );
+    const face = (outlined.props.className as string).split(' ');
+    const label = (outlined.findByType(NativeText).props.className as string).split(' ');
+    expect(face).not.toContain('bg-primary-disabled-fill');
+    expect(label).not.toContain('dark:text-ink2');
   });
 
   it('keeps a busy primary on its brand fill so it still reads as working', () => {

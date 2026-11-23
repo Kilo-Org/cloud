@@ -243,15 +243,17 @@ describe('NewSessionStartButton', () => {
     renderer.unmount();
   });
 
-  // A disabled Start paints the shared disabled primary plate: the palette's
-  // `--secondary-fill` neutral step in both schemes, which reads as a distinct
-  // plate on a card instead of merging with it.
+  // A disabled Start paints the shared disabled primary fill
+  // (`--primary-disabled-fill`): a faint tint in both schemes, which reads as a
+  // distinct plate on a card instead of merging with it, and which an enabled
+  // `secondary` action never shares.
   it('draws a disabled Start in the shared disabled primary pair', async () => {
     const renderer = await mountButton({ isStartDisabled: true });
     const button = hostByType(renderer.root, 'Pressable')[0];
     const classes = String(button?.props.className).split(' ');
-    expect(classes).toContain('bg-secondary-fill');
+    expect(classes).toContain('bg-primary-disabled-fill');
     expect(classes).not.toContain('bg-muted');
+    expect(classes).not.toContain('bg-secondary-fill');
     expect(classes).not.toContain('dark:bg-control-idle');
     expect(classes).not.toContain('border');
 

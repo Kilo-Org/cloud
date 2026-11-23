@@ -273,7 +273,7 @@ export function QuestionCard({
   const interactionDisabled = isSubmitting || isInert;
   const submitDisabled = !allQuestionsAnswered || interactionDisabled;
   // The spinner only shows while submitting, and every button that carries it
-  // is disabled then, so it sits on the muted fill a disabled primary paints.
+  // is disabled then, so it sits on the disabled primary fill.
   const submittingSpinner = isSubmitting ? (
     <ActivityIndicator size="small" color={mutedDisabledInk} />
   ) : null;

@@ -227,31 +227,34 @@ describe('disabled toolbar badge label contrast (WCAG AA text)', () => {
 
 describe('disabled primary action fill contrast (WCAG AA text)', () => {
   // A disabled default-variant Button paints its label on the palette's
-  // `--secondary-fill` plate. In light that label keeps `--muted-foreground`; in
-  // dark it takes `--ink2`, because `--muted-foreground` measures under the text
-  // floor on the dark plate. Both pairs clear 4.5:1, and each plate stays
-  // clearly below the enabled brand fill so an inactive Start never reads as a
-  // second action colour.
+  // `--primary-disabled-fill` plate. That token is a faint tint of the surface,
+  // not the palette's step for an enabled filled control: an unavailable action
+  // must recede, and it must not share the fill an enabled `secondary` action
+  // paints. In light that label keeps `--muted-foreground`; in dark it takes
+  // `--ink2`, because `--muted-foreground` measures under the text floor on the
+  // dark plate. Both pairs clear 4.5:1, and each plate stays clearly below the
+  // enabled brand fill so an inactive Start never reads as a second action
+  // colour.
   //
-  // The light face's fill equals `--muted` and `--secondary`, so it is the
-  // preexisting light fill and out of this change's scope; the perceived-step
-  // guard below is dark-only for that reason. 1.6 is this file's perception
-  // floor for a control's own surface, the same value the idle composer circle
-  // and the ring track are held to below.
+  // The light face's fill keeps the value it has always painted, so it equals
+  // `--secondary-fill` there and the perception guard below is dark-only. 1.6 is
+  // this file's perception floor for an enabled control's own surface, the same
+  // value the idle composer circle and the ring track are held to below; a
+  // disabled plate must stay under it.
   const MIN_VISIBLE_SURFACE_RATIO = 1.6;
 
-  it('light theme: mutedForeground vs secondaryFill >= 4.5:1', () => {
+  it('light theme: mutedForeground vs primaryDisabledFill >= 4.5:1', () => {
     // A light label that fell below the floor would make the disabled action's
     // text unreadable on its own plate.
-    const ratio = contrastRatio(lightColors.mutedForeground, lightColors.secondaryFill);
+    const ratio = contrastRatio(lightColors.mutedForeground, lightColors.primaryDisabledFill);
     expect(ratio).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
   });
 
-  it('dark theme: ink2 vs secondaryFill >= 4.5:1', () => {
+  it('dark theme: ink2 vs primaryDisabledFill >= 4.5:1', () => {
     // The dark label's only ink is `--ink2`; a regression to the muted ink is
     // caught by the next test, and a palette change to this token is caught
     // here.
-    const ratio = contrastRatio(darkColors.ink2, darkColors.secondaryFill);
+    const ratio = contrastRatio(darkColors.ink2, darkColors.primaryDisabledFill);
     expect(ratio).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
   });
 
@@ -259,23 +262,39 @@ describe('disabled primary action fill contrast (WCAG AA text)', () => {
     // This is why the dark label takes `--ink2`: if the muted ink ever cleared
     // the floor here, the dark label override would be dead weight and the
     // comment in `button.tsx` would be wrong.
-    expect(contrastRatio(darkColors.mutedForeground, darkColors.secondaryFill)).toBeLessThan(
+    expect(contrastRatio(darkColors.mutedForeground, darkColors.primaryDisabledFill)).toBeLessThan(
       MIN_TEXT_RATIO
     );
   });
 
-  it('dark theme: the disabled plate reads as a visible step off every surface it sits on', () => {
+  it('dark theme: the disabled plate is a visible but faint step off the surfaces it sits on', () => {
     // A plate that matched its surface would leave a disabled primary with no
-    // shape at all, as the old `--muted` fill did on a card.
+    // shape at all. The lower bound is what a disabled plate needs to read as a
+    // plate; the upper bound is why it stays quieter than any enabled fill, so a
+    // disabled plate can never be promoted to an enabled step.
     for (const surface of ['secondary', 'card', 'background'] as const) {
-      expect(
-        contrastRatio(darkColors.secondaryFill, darkColors[surface]),
-        `secondaryFill vs ${surface} (dark)`
-      ).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
+      const ratio = contrastRatio(darkColors.primaryDisabledFill, darkColors[surface]);
+      expect(ratio, `primaryDisabledFill vs ${surface} (dark)`).toBeGreaterThanOrEqual(1.15);
+      expect(ratio, `primaryDisabledFill vs ${surface} (dark)`).toBeLessThan(
+        MIN_VISIBLE_SURFACE_RATIO
+      );
     }
-    // The light plate keeps its preexisting fill, which equals both `--muted`
-    // and `--secondary`, so the light step guard is out of scope: a change to
-    // either light token would separate them and fail here.
+  });
+
+  it('dark theme: the disabled plate is its own step, not the enabled secondary action fill', () => {
+    // An unavailable primary that shared the enabled `secondary` fill would look
+    // like an available secondary action beside it.
+    expect(darkColors.primaryDisabledFill).not.toBe(darkColors.secondaryFill);
+    expect(
+      contrastRatio(darkColors.secondaryFill, darkColors.primaryDisabledFill),
+      'secondaryFill vs primaryDisabledFill (dark)'
+    ).toBeGreaterThanOrEqual(1.2);
+  });
+
+  it('light theme: the disabled plate keeps the fill it has always painted', () => {
+    // The light disabled fill is unchanged: a change to either light token would
+    // separate them and fail here.
+    expect(lightColors.primaryDisabledFill).toBe(lightColors.secondaryFill);
     expect(lightColors.secondaryFill).toBe(lightColors.muted);
     expect(lightColors.secondaryFill).toBe(lightColors.secondary);
   });
@@ -284,7 +303,9 @@ describe('disabled primary action fill contrast (WCAG AA text)', () => {
     // The plate must read as a superseded control next to the enabled brand
     // fill, not as a second brand colour, or a disabled Start would look
     // tappable and an enabled one would lose its emphasis.
-    expect(contrastRatio(darkColors.primary, darkColors.secondaryFill)).toBeGreaterThanOrEqual(1.5);
+    expect(
+      contrastRatio(darkColors.primary, darkColors.primaryDisabledFill)
+    ).toBeGreaterThanOrEqual(1.5);
   });
 });
 

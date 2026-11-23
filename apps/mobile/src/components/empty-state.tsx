@@ -287,7 +287,7 @@ export function StateAction({
   // A busy action keeps its enabled face — the fill and the label ink the
   // button paints on it (`Button` never dims or mutes a control that announces
   // busy) — so its mark must take that same ink. The muted ink is only for the
-  // disabled face, whose fill is the palette's muted surface; on the brand fill
+  // disabled face, whose fill is `--primary-disabled-fill`; on the brand fill
   // it measures about 1.4:1 and the spinner all but disappears.
   const showMutedInk = disabled === true && !busy;
   // The quiet face is an outlined control, whose label ink `Button` paints as

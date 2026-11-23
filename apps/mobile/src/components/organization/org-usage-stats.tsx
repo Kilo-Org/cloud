@@ -104,15 +104,17 @@ type OrgUsageStatsProps = {
  * the screen.
  *
  * The pressable grid also carries a visible destination in the section header —
- * the usage screen's own title (`usage.title`), painted in the section action —
+ * the usage area's short name (`usage.title`), painted in the section action —
  * because the grid's hint is announced to a screen reader and invisible to a
  * sighted member, who would otherwise see four read-only-looking cards. The
  * action ends in the chevron the hub's other destinations carry, so the header
- * reads as one more way out of the screen. It is the screen's title rather than
- * "view details" because that copy rendered 145 dp wide and pushed a 360 dp
- * compact header onto two lines, away from the eyebrow it belongs to. The
- * header action is painted only in the pressable state, so the informational
- * grid keeps the header and the geometry it has.
+ * reads as one more way out of the screen. It is that short name rather than
+ * the hint's wording ("view details"): that copy measured 145 dp at the gate's
+ * widest cell and pushed the action onto a second line in a 360 dp compact
+ * header, away from the eyebrow it belongs to, and the screen's own title
+ * (`usage.orgTitle`, "Organization usage") is no shorter. The header action is
+ * painted only in the pressable state, so the informational grid keeps the
+ * header and the geometry it has.
  */
 export function OrgUsageStats({ organizationId, onPress }: Readonly<OrgUsageStatsProps>) {
   const { t } = useTranslation();

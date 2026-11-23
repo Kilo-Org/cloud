@@ -108,7 +108,9 @@ describe('Telugu updated-file count', () => {
       '3 ఫైళ్లను నవీకరించారు'
     );
   });
+});
 
+describe('Telugu setup command label', () => {
   it('names the setup command by its place in the total', () => {
     expect(
       i18n.t('agentChat.preparation.setupCommandOf', { index: '1', count: 1, displayCount: '1' })

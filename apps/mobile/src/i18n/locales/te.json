@@ -1309,7 +1309,7 @@
       "manageAccess": "యాక్సెస్‌ను నిర్వహించండి",
       "bitbucketNoRepositoriesDescription": "ఈ Bitbucket వర్క్‌స్పేస్‌లో రిపోజిటరీలు అందుబాటులో లేవు.",
       "gitlabNoRepositoriesDescription": "GitLabలో మరిన్ని గ్రూప్‌లు లేదా ప్రాజెక్ట్‌లకు యాక్సెస్ ఇవ్వాల్సి రావచ్చు.",
-      "githubNoRepositoriesDescription": "Kilo GitHub యాప్‌కు రిపోజిటరీలను యాక్సెస్ చేసే అనుమతి ఉందో తనిఖీ చేసి, రిఫ్రెష్ చేయండి.",
+      "githubNoRepositoriesDescription": "Kilo GitHub యాప్‌లో రిపోజిటరీలను యాక్సెస్ చేసే అనుమతులను తనిఖీ చేసి, రిఫ్రెష్ చేయండి.",
       "installGithubApp": "రిపోజిటరీల్లో GitHub యాప్‌ను ఇన్‌స్టాల్ చేయండి",
       "installGithubAppDescription": "మీరు సమీక్ష చేయించాలనుకునే రిపోజిటరీలను యాక్సెస్ చేయడానికి Kilo GitHub యాప్‌కు అనుమతి ఇవ్వండి.",
       "repositoryAccess": "రిపోజిటరీ యాక్సెస్",

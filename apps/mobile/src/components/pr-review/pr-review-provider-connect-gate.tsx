@@ -2,11 +2,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { useSegments } from 'expo-router';
 import { GitMerge, PlugZap, RefreshCcw, ShieldAlert } from '@/components/ui/icons';
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { EmptyState, StateAction } from '@/components/empty-state';
-import { toast } from 'sonner-native';
 
 import { PrReviewContextLine } from '@/components/pr-review/pr-review-context-line';
 import { PrReviewGateActionGroup } from '@/components/pr-review/pr-review-gate-action-group';
@@ -17,14 +16,10 @@ import { PrReviewGateSurface } from '@/components/pr-review/pr-review-gate-surfa
 import { OrgOnlyDescription } from '@/components/pr-review/pr-review-org-only-description';
 import { QueryError } from '@/components/query-error';
 import { Text } from '@/components/ui/text';
-import { appShellHandoffUrl } from '@/lib/app-shell-handoff';
 import { PERSONAL_SCOPE } from '@/lib/code-reviewer-config';
 import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
 import { useReviewerPermission } from '@/lib/hooks/use-reviewer-permission';
-import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
-import { bitbucketConnectHref } from '@/lib/bitbucket-connect-navigation';
 import { useOrganization } from '@/lib/organization-context';
-import { launchConnectGateBrowser } from '@/lib/pr-review/connect-gate-platform';
 import {
   PR_REVIEW_GATE_ICON_TILE_CLASS,
   usePrReviewGateIconColor,
@@ -39,6 +34,7 @@ import {
   type ProviderPrRef,
   useProviderPrScopeOrNull,
 } from '@/lib/pr-review/provider-pr-ref';
+import { useReconnectHandoff } from '@/lib/pr-review/use-reconnect-handoff';
 import { useTRPC } from '@/lib/trpc';
 
 /**
@@ -77,7 +73,6 @@ export function ProviderConnectGate({
   children: ReactNode;
 }>) {
   const trpc = useTRPC();
-  const pushOnce = useSinglePushRoute();
   // The current route segments: an arm must not tear down a presented sheet
   // (see `PrReviewGateSurface`).
   const segments = useSegments();
@@ -150,64 +145,26 @@ export function ProviderConnectGate({
   const gitlabStatus = organizationId ? organizationGitlabStatus : personalGitlabStatus;
   const status = platform === 'gitlab' ? gitlabStatus : bitbucketStatus;
 
-  const [connecting, setConnecting] = useState(false);
-  const connectAbort = useRef<AbortController | null>(null);
-  useEffect(() => () => connectAbort.current?.abort(), []);
-
-  const handleConnect = async () => {
-    // A retry supersedes the attempt still waiting: abort it first, so its late
-    // report cannot speak for this one.
-    connectAbort.current?.abort();
-    const controller = new AbortController();
-    connectAbort.current = controller;
-    setConnecting(true);
+  async function refreshStatus() {
     try {
-      // GitLab's OAuth callback lands on the web, so its connection stays a
-      // hand-off: mint the shell integration page's single-use URL and re-check
-      // the status on return. Bitbucket's token is pasted in the app's sheet.
-      await launchConnectGateBrowser(
-        await appShellHandoffUrl({
-          page: 'integration',
-          platform: 'gitlab',
-          ...(organizationId ? { organizationId } : {}),
-        }),
-        {
-          signal: controller.signal,
-          onOpenFailure: () => void toast.error(t('authErrors.couldNotOpenBrowser')),
-          onReturn: () => {
-            // Detached on purpose: the browser closing is the user's edge, so the
-            // CTA returns to idle as soon as it happens. A status read that stays
-            // pending (the default `networkMode: 'online'` never settles while the
-            // online manager reports offline) must not keep Connect disabled — the
-            // read's own states carry the outcome, and a real failure renders the
-            // retryable QueryError below.
-            void status.refetch().catch(() => undefined);
-            return Promise.resolve();
-          },
-        }
-      );
+      await status.refetch();
     } catch {
-      // A mint that failed never reached the browser, so nothing else reported
-      // it. `launchConnectGateBrowser` reports a failed launch through
-      // `onOpenFailure`; the status read's own states carry the rest.
-      if (!controller.signal.aborted) {
-        void toast.error(t('authErrors.couldNotOpenBrowser'));
-      }
-    } finally {
-      if (!controller.signal.aborted) {
-        setConnecting(false);
-      }
+      // The read's own states carry a failure, and a real one renders the
+      // retryable QueryError below; the gate keeps its current arm either way.
     }
-  };
+  }
 
-  const openBitbucketConnect = () => {
-    if (organizationId === null) {
-      return;
-    }
-    // The connect sheet changes the same status this gate reads, so its
-    // invalidation is what closes the gate; nothing else has to run on return.
-    pushOnce(bitbucketConnectHref(organizationId));
-  };
+  const handoff = useReconnectHandoff({
+    platform,
+    organizationId,
+    onReturn: () => {
+      // Detached on purpose: the browser closing is the user's edge, so the CTA
+      // returns to idle as soon as it happens. A status read that stays pending
+      // (the default `networkMode: 'online'` never settles while the online
+      // manager reports offline) must not keep Connect disabled.
+      void refreshStatus();
+    },
+  });
 
   // A GitLab connection serves exactly one instance, and the status read names
   // it. When the opened merge request lives on another host the server refuses
@@ -416,14 +373,10 @@ export function ProviderConnectGate({
                     // A first connect carries the provider's mark, as the Code
                     // Reviewer connect actions do; only a reconnection refreshes.
                     icon={reconnect ? RefreshCcw : GitMerge}
-                    loading={connecting}
-                    disabled={connecting}
+                    loading={handoff.busy}
+                    disabled={handoff.busy}
                     onPress={() => {
-                      if (platform === 'bitbucket') {
-                        openBitbucketConnect();
-                        return;
-                      }
-                      void handleConnect();
+                      handoff.reconnect();
                     }}
                   />
                 ) : null}

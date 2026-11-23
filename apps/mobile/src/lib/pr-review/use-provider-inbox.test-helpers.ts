@@ -1,4 +1,4 @@
-import { createElement, type ReactNode } from 'react';
+import { createElement, type ReactNode, useEffect } from 'react';
 import { vi } from 'vitest';
 
 import type * as UtilsModule from '@/lib/utils';
@@ -29,8 +29,20 @@ vi.mock('react-native', () => ({ View: 'View', Pressable: 'Pressable' }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
-vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
+vi.mock('expo-router', () => ({
+  useRouter: () => ({ push: vi.fn() }),
+  useFocusEffect: (effect: () => undefined | (() => void)) => {
+    useEffect(effect, [effect]);
+  },
+}));
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
+// The reconnect notice imports the browser hand-off at module scope; its native
+// module has no binary in a Node worker, and no case here opens a browser.
+vi.mock('expo-web-browser', () => ({
+  openAuthSessionAsync: vi.fn(),
+  openBrowserAsync: vi.fn(),
+  WebBrowserResultType: { OPENED: 'opened', DISMISS: 'dismiss', CANCEL: 'cancel' },
+}));
 vi.mock('@/components/empty-state', () => ({
   EmptyState: 'EmptyState',
   StateAction: 'StateAction',
@@ -48,6 +60,12 @@ vi.mock('@/components/ui/directional-icons', () => ({
   DirectionalChevronRight: 'DirectionalChevronRight',
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => ({}) }));
+// The reconnect notice's offer reads the caller's organization role, and the
+// memberships chain behind it pulls the auth provider into a tree that never
+// signs in. A billing role keeps the offer's button.
+vi.mock('@/lib/hooks/use-reviewer-permission', () => ({
+  useReviewerPermission: () => ({ status: 'ready', canEdit: true, canManage: true }),
+}));
 vi.mock('@shopify/flash-list', () => ({
   FlashList: (props: {
     data: readonly { key: string }[];

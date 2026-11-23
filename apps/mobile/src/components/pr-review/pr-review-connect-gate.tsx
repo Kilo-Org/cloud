@@ -1,10 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSegments } from 'expo-router';
 import { PlugZap, ShieldAlert } from '@/components/ui/icons';
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
-import { toast } from 'sonner-native';
 
 import { EmptyState, StateAction } from '@/components/empty-state';
 import { GitHubIcon } from '@/components/icons/github-icon';
@@ -16,13 +15,13 @@ import { PrReviewGateSurface } from '@/components/pr-review/pr-review-gate-surfa
 import { ProviderConnectGate } from '@/components/pr-review/pr-review-provider-connect-gate';
 import { QueryError } from '@/components/query-error';
 import { Text } from '@/components/ui/text';
-import { launchConnectGateBrowser } from '@/lib/pr-review/connect-gate-platform';
 import {
   PR_REVIEW_GATE_ICON_TILE_CLASS,
   usePrReviewGateIconColor,
 } from '@/lib/pr-review/pr-review-gate-illustration';
 import { selectPrReviewGateView } from '@/lib/pr-review/pr-review-connect-gate-view';
 import { type ProviderPrPlatform, type ProviderPrRef } from '@/lib/pr-review/provider-pr-ref';
+import { useReconnectHandoff } from '@/lib/pr-review/use-reconnect-handoff';
 import { useTRPC } from '@/lib/trpc';
 
 type PrReviewConnectGateProps = {
@@ -107,56 +106,30 @@ function GitHubConnectGate({
   const iconColor = usePrReviewGateIconColor();
   const { t } = useTranslation();
   const authorization = useQuery(trpc.githubApps.getUserAuthorization.queryOptions());
-  const connect = useMutation(
-    trpc.githubApps.connectUserAuthorization.mutationOptions({
-      onError: error => {
-        toast.error(error.message);
-      },
-    })
-  );
 
-  const [connecting, setConnecting] = useState(false);
-  const connectAbort = useRef<AbortController | null>(null);
-  useEffect(() => () => connectAbort.current?.abort(), []);
-
-  const handleConnect = async () => {
-    // A retry supersedes the attempt still waiting: abort it first, so its late
-    // report cannot speak for this one.
-    connectAbort.current?.abort();
-    const controller = new AbortController();
-    connectAbort.current = controller;
-    setConnecting(true);
+  async function refreshAuthorization() {
     try {
-      const result = await connect.mutateAsync();
-      await launchConnectGateBrowser(result.authorizationUrl, {
-        signal: controller.signal,
-        onOpenFailure: () => void toast.error(t('authErrors.couldNotOpenBrowser')),
-        onReturn: () => {
-          // Detached on purpose: the sheet closing is the user's edge, so the
-          // CTA returns to idle as soon as it happens. A status read that stays
-          // pending (the default `networkMode: 'online'` never settles while the
-          // online manager reports offline) must not keep Connect disabled — the
-          // read's own states carry the outcome, and a real failure renders the
-          // retryable QueryError below.
-          void authorization
-            .refetch()
-            .then(() =>
-              queryClient.invalidateQueries({
-                queryKey: trpc.githubApps.getUserAuthorization.queryKey(),
-              })
-            )
-            .catch(() => undefined);
-          return Promise.resolve();
-        },
+      await authorization.refetch();
+      await queryClient.invalidateQueries({
+        queryKey: trpc.githubApps.getUserAuthorization.queryKey(),
       });
     } catch {
-      // mutateAsync toasted the server error; keep the gate showing.
-    } finally {
-      if (!controller.signal.aborted) {
-        setConnecting(false);
-      }
+      // The read's own states carry a failure, and a real one renders the
+      // retryable QueryError below; the gate keeps its current arm either way.
     }
-  };
+  }
+
+  const handoff = useReconnectHandoff({
+    platform: 'github',
+    organizationId: null,
+    onReturn: () => {
+      // Detached on purpose: the sheet closing is the user's edge, so the CTA
+      // returns to idle as soon as it happens. A status read that stays pending
+      // (the default `networkMode: 'online'` never settles while the online
+      // manager reports offline) must not keep Connect disabled.
+      void refreshAuthorization();
+    },
+  });
 
   const view = selectPrReviewGateView({
     platform: 'github',
@@ -232,10 +205,10 @@ function GitHubConnectGate({
                 <StateAction
                   label={revoked ? t('prReview.connect.reconnectTitle') : t('common.connectGithub')}
                   icon={GitHubIcon}
-                  loading={connecting}
-                  disabled={connecting}
+                  loading={handoff.busy}
+                  disabled={handoff.busy}
                   onPress={() => {
-                    void handleConnect();
+                    handoff.reconnect();
                   }}
                 />
               </PrReviewGateActionGroup>

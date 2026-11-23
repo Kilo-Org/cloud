@@ -1,6 +1,8 @@
+/* eslint-disable max-lines -- one harness drives every check outcome and every provider arm of the notice, and the offer cases share its mocks. */
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { QueryObserver } from '@tanstack/react-query';
-import { act, type ComponentProps } from 'react';
+import { act, type ComponentProps, useEffect } from 'react';
+import { type PermissionState } from '@/lib/code-reviewer-status';
 import { type ProviderPrScope, ProviderPrScopeProvider } from '@/lib/pr-review/provider-pr-ref';
 import { createTestQueryClient, renderWithProviders, waitFor } from '@/test/render-with-providers';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -22,19 +24,44 @@ type GitLabStatusAnswer = {
 };
 type BitbucketReadinessAnswer = Pick<BitbucketReadiness, 'connected'>;
 
+const permissionState = vi.hoisted((): { value: PermissionState } => ({
+  value: { status: 'ready', canEdit: true, canManage: true },
+}));
+
 const mocks = vi.hoisted(() => ({
   authorization: vi.fn<() => Promise<{ connected: boolean; revoked: boolean }>>(),
   review: vi.fn<() => Promise<string>>(),
   gitlabStatus: vi.fn<() => Promise<GitLabStatusAnswer>>(),
+  organizationGitlabStatus: vi.fn<() => Promise<GitLabStatusAnswer>>(),
   bitbucketReadiness: vi.fn<() => Promise<BitbucketReadinessAnswer>>(),
+  connectAuthorization: vi.fn<() => Promise<{ authorizationUrl: string }>>(),
+  appShellHandoff: vi.fn<() => Promise<string>>(),
+  launch: vi.fn<(url: string) => Promise<void>>(),
   toastError: vi.fn(),
 }));
 const authorizationKey = ['githubApps', 'getUserAuthorization'];
 const reviewKey = ['githubPrReview', 'getPullRequest'];
 const gitlabStatusKey = ['personalReviewAgent', 'getGitLabStatus'];
+const organizationGitlabStatusKey = ['organizations', 'reviewAgent', 'getGitLabStatus'];
 const bitbucketReadinessKey = ['organizations', 'reviewAgent', 'getBitbucketReadiness'];
+const router = vi.hoisted(() => ({ push: vi.fn() }));
 
 vi.mock('react-native', () => ({ View: 'View' }));
+vi.mock('expo-router', () => ({
+  useRouter: () => router,
+  useFocusEffect: (effect: () => undefined | (() => void)) => {
+    useEffect(effect, [effect]);
+  },
+}));
+vi.mock('@/lib/pr-review/connect-gate-platform', () => ({
+  launchConnectGateBrowser: mocks.launch,
+}));
+// The mint is the browser module's other importer; the notice never reaches it
+// without pressing a GitLab arm, and the stub keeps the native module out.
+vi.mock('@/lib/app-shell-handoff', () => ({ appShellHandoffUrl: mocks.appShellHandoff }));
+vi.mock('@/lib/hooks/use-reviewer-permission', () => ({
+  useReviewerPermission: () => permissionState.value,
+}));
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
   // `Card` reaches `@/lib/utils` and therefore the app's i18n singleton, which
@@ -54,6 +81,9 @@ vi.mock('@/lib/trpc', () => ({
           staleTime: Infinity,
         }),
       },
+      connectUserAuthorization: {
+        mutationOptions: () => ({ mutationFn: mocks.connectAuthorization }),
+      },
     },
     githubPrReview: { pathFilter: () => ({ queryKey: ['githubPrReview'] }) },
     // The provider arm is driven through the real check hook, so the mock
@@ -66,6 +96,12 @@ vi.mock('@/lib/trpc', () => ({
     },
     organizations: {
       reviewAgent: {
+        getGitLabStatus: {
+          queryOptions: () => ({
+            queryKey: organizationGitlabStatusKey,
+            queryFn: mocks.organizationGitlabStatus,
+          }),
+        },
         getBitbucketReadiness: {
           queryOptions: () => ({
             queryKey: bitbucketReadinessKey,
@@ -92,7 +128,17 @@ beforeEach(() => {
     connected: true,
     integration: { instanceUrl: 'https://gitlab.com' },
   });
+  mocks.organizationGitlabStatus.mockResolvedValue({
+    connected: true,
+    integration: { instanceUrl: 'https://gitlab.com' },
+  });
   mocks.bitbucketReadiness.mockResolvedValue({ connected: true });
+  mocks.connectAuthorization.mockResolvedValue({
+    authorizationUrl: 'https://github.example/authorize',
+  });
+  mocks.launch.mockResolvedValue(undefined);
+  mocks.appShellHandoff.mockResolvedValue('https://web.example/app-shell/handoff?token=notice');
+  permissionState.value = { status: 'ready', canEdit: true, canManage: true };
 });
 
 afterEach(() => {
@@ -133,10 +179,50 @@ function button() {
 
 async function checkConnection() {
   await act(async () => {
-    button().onPress();
+    buttonLabelled('prReview.checkConnection').onPress();
     await Promise.resolve();
   });
-  await waitFor(() => !button().loading && client.isMutating() === 0);
+  // The notice may swap its own check for the reconnect offer while the answer
+  // settles, so only a check still on screen can be loading.
+  await waitFor(() => {
+    const settled = view?.renderer.root
+      .findAllByType('Button')
+      .find(node => node.props.accessibilityLabel === 'prReview.checkConnection');
+    return client.isMutating() === 0 && settled?.props.loading !== true;
+  });
+}
+
+type ButtonProps = { onPress: () => void; loading?: boolean; disabled?: boolean };
+
+/** The Button whose child Text carries `label`, so a press targets one of two. */
+function buttonLabelled(label: string): ButtonProps {
+  const target = view?.renderer.root
+    .findAllByType('Button')
+    .find(node => node.findAllByType('Text').some(text => text.children.includes(label)));
+  if (!target) {
+    throw new Error(`Button labelled ${label} not found`);
+  }
+  return target.props as ButtonProps;
+}
+
+/** Every string the notice rendered, so a test can assert on the visible copy. */
+function textLabels(): string[] {
+  const labels: string[] = [];
+  for (const node of view?.renderer.root.findAllByType('Text') ?? []) {
+    for (const child of node.children) {
+      if (typeof child === 'string') {
+        labels.push(child);
+      }
+    }
+  }
+  return labels;
+}
+
+async function press(label: string) {
+  await act(async () => {
+    buttonLabelled(label).onPress();
+    await Promise.resolve();
+  });
 }
 
 describe('PrReviewReconnectNotice', () => {
@@ -301,5 +387,122 @@ describe('PrReviewReconnectNotice — provider scope', () => {
     // connected readiness answer is already able to serve the opened PR.
     expect(mocks.bitbucketReadiness).toHaveBeenCalledOnce();
     expect(onConnectionRestored).toHaveBeenCalledOnce();
+  });
+});
+
+describe('PrReviewReconnectNotice — reconnect offer', () => {
+  it('offers the GitHub authorization once the check still finds it revoked', async () => {
+    mocks.authorization.mockResolvedValue({ connected: false, revoked: true });
+    const onConnectionRestored = vi.fn<() => void>();
+    await mountNotice({ offerReconnect: true, onConnectionRestored });
+    await checkConnection();
+
+    // The surface has no gate of its own, so the card replaces the inert check
+    // with the authorization the gate would have offered.
+    expect(() => buttonLabelled('prReview.checkConnection')).toThrow();
+    await press('prReview.connect.reconnectTitle');
+
+    await waitFor(() => mocks.launch.mock.calls.length === 1);
+    expect(mocks.connectAuthorization).toHaveBeenCalledOnce();
+    expect(mocks.launch.mock.calls[0]?.[0]).toBe('https://github.example/authorize');
+    expect(onConnectionRestored).not.toHaveBeenCalled();
+  });
+
+  it('keeps the check and reports a connection the check finds usable', async () => {
+    const onConnectionRestored = vi.fn<() => void>();
+    await mountNotice({ offerReconnect: true, onConnectionRestored });
+    await checkConnection();
+
+    // A usable answer is the surface's latch to clear; nothing is left to
+    // reconnect, so the offer never appears.
+    expect(onConnectionRestored).toHaveBeenCalledOnce();
+    expect(textLabels()).not.toContain('prReview.connect.reconnectTitle');
+  });
+
+  it('stays inert for a revoked check on a surface with its own gate', async () => {
+    mocks.authorization.mockResolvedValue({ connected: false, revoked: true });
+    await mountNotice();
+    await checkConnection();
+
+    // The composer, the checks section and the merge sheet keep today's card:
+    // their own gate carries the reconnection.
+    expect(textLabels()).not.toContain('prReview.connect.reconnectTitle');
+    expect(buttonLabelled('prReview.checkConnection').loading).toBe(false);
+  });
+
+  it('offers the GitLab integration page for an organization', async () => {
+    mocks.organizationGitlabStatus.mockResolvedValue({ connected: false, integration: null });
+    await mountNotice({ platform: 'gitlab', organizationId: 'org_1', offerReconnect: true });
+    await checkConnection();
+
+    expect(mocks.organizationGitlabStatus).toHaveBeenCalledOnce();
+    expect(buttonLabelled('prReview.connect.reconnectTitleGitLab').disabled).toBe(false);
+  });
+
+  it('names the roles that can reconnect GitLab instead of offering a refused action', async () => {
+    mocks.organizationGitlabStatus.mockResolvedValue({ connected: false, integration: null });
+    permissionState.value = { status: 'ready', canEdit: false, canManage: false };
+    await mountNotice({ platform: 'gitlab', organizationId: 'org_1', offerReconnect: true });
+    await checkConnection();
+
+    // The integration page refuses a member's reconnect, so the card names who
+    // can act and offers no control the reader cannot complete.
+    expect(textLabels()).toContain('prReview.connect.reconnectAdminOnlyDescription');
+    expect(view?.renderer.root.findAllByType('Button')).toHaveLength(0);
+  });
+
+  it('offers the Bitbucket connect sheet for an organization', async () => {
+    mocks.bitbucketReadiness.mockResolvedValue({ connected: false });
+    await mountNotice({ platform: 'bitbucket', organizationId: 'org_1', offerReconnect: true });
+    await checkConnection();
+
+    await press('prReview.connect.reconnectTitleBitbucket');
+
+    // The sheet's own invalidation closes the surface, so the offer is the push
+    // and nothing else.
+    expect(router.push).toHaveBeenCalledWith({
+      pathname: '/(app)/bitbucket-connect',
+      params: { scope: 'org_1' },
+    });
+  });
+
+  it('names the organization scope for a personal Bitbucket reader', async () => {
+    await mountNotice({ platform: 'bitbucket', organizationId: null, offerReconnect: true });
+    await checkConnection();
+
+    // A personal scope has no review connection to reconnect and nothing a
+    // retry could fix, so the card explains the organization-only rule.
+    expect(textLabels()).toContain('agentChat.newSession.bitbucketOrganizationsOnly');
+    expect(view?.renderer.root.findAllByType('Button')).toHaveLength(0);
+  });
+
+  it('offers nothing when the GitLab connection is for another instance', async () => {
+    mocks.organizationGitlabStatus.mockResolvedValue({
+      connected: true,
+      integration: { instanceUrl: 'https://gitlab.com' },
+    });
+    await mountNotice(
+      { platform: 'gitlab', organizationId: 'org_1', offerReconnect: true },
+      GITLAB_SELF_MANAGED
+    );
+    await checkConnection();
+
+    // The account is bound to another host, so no read can succeed and the
+    // reconnection is not the remedy: the card keeps its check and says
+    // nothing more.
+    expect(textLabels()).not.toContain('prReview.connect.reconnectTitleGitLab');
+    expect(buttonLabelled('prReview.checkConnection').loading).toBe(false);
+  });
+
+  it('offers nothing when the check itself rejects', async () => {
+    mocks.authorization.mockRejectedValue(new Error('Connection check failed'));
+    await mountNotice({ offerReconnect: true });
+    await checkConnection();
+
+    // The hook's toast owns the failure; a check that never settled says
+    // nothing about the connection, so the card keeps its check.
+    expect(mocks.toastError).toHaveBeenCalledWith('Connection check failed');
+    expect(textLabels()).not.toContain('prReview.connect.reconnectTitle');
+    expect(buttonLabelled('prReview.checkConnection').loading).toBe(false);
   });
 });

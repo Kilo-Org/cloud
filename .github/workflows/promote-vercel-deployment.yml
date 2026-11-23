@@ -86,6 +86,8 @@ jobs:
           "$VERCEL_CLI_PREFIX/bin/vercel" --version
 
       - name: Promote Vercel deployment
+        # The stage workflow checks the form of this URL before it publishes it
+        # as an output; this step passes it to the CLI as one argument.
         env:
           DEPLOYMENT_URL: ${{ inputs.deployment_url }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}

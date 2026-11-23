@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { describePrBadge } from '@/components/agents/session-pr-badge-model';
+import { repoCountCopy } from '@/components/security-agent/settings-overview-copy';
 import { i18n } from '@/i18n';
 import { formatList } from '@/lib/format';
 
@@ -26,6 +27,13 @@ import { formatList } from '@/lib/format';
  * The changelog sentence joins the areas a release touched with
  * `Intl.ListFormat`, so the profile area label has to join its own two nouns
  * without the list conjunction.
+ *
+ * The Security Agent copy had its own drift: the retry confirmation named the
+ * action with a second adverb, the unavailable line recast remediation as a
+ * facility, the recommended-review reason read as the mandatory one beside it,
+ * "significant" exposure read as exposure on a large scale, the repository
+ * subtitle changed clause order with the count, and the cleared-findings toast
+ * kept a plural participle at one.
  */
 
 beforeAll(async () => {
@@ -194,6 +202,58 @@ describe('Hindi trusted-host and voice copy', () => {
   it('keeps both recovery paths in the unavailable-language notice', () => {
     expect(i18n.t('voiceInput.unavailableLanguage')).toBe(
       'इस डिवाइस की भाषा के लिए वॉइस इनपुट उपलब्ध नहीं है। इसकी ऑफ़लाइन स्पीच फ़ाइलें इंस्टॉल करें या ऐप की कोई दूसरी भाषा इस्तेमाल करें।'
+    );
+  });
+});
+
+describe('Hindi Security Agent copy', () => {
+  it('echoes the retry control in the queued confirmation', () => {
+    const queued = i18n.t('securityAgent.remediation.retryQueued');
+    expect(queued).toBe('सुधार की फिर से कोशिश का अनुरोध कतार में जोड़ा गया।');
+    expect(queued).not.toContain('दोबारा');
+  });
+
+  it('names remediation with the term its timeline siblings use', () => {
+    expect(i18n.t('securityAgent.remediation.unavailable')).toBe(
+      'इस समस्या के लिए सुधार उपलब्ध नहीं है।'
+    );
+  });
+
+  it('recommends manual review where the analysis does, and reserves the requirement for its own reason', () => {
+    const recommended = i18n.t('securityAgent.remediationUnavailable.manualReviewRequired');
+    expect(recommended).toBe(
+      'विश्लेषण मानवीय समीक्षा की सलाह देता है, इसलिए एक क्लिक में सुधार उपलब्ध नहीं है।'
+    );
+    expect(recommended).not.toContain('मानवीय समीक्षा ज़रूरी है');
+    expect(i18n.t('securityAgent.remediationUnavailable.exploitabilityUnknown')).toContain(
+      'मानवीय समीक्षा ज़रूरी है'
+    );
+  });
+
+  it('states the high-severity exposure as serious rather than wide', () => {
+    const high = i18n.t('securityAgent.sla.highDescription');
+    expect(high).toBe('गंभीर डेटा उजागर होने की संभावना।');
+    expect(high).not.toContain('बड़े पैमाने पर');
+  });
+
+  it('renders the repository selection subtitle the same way at every count', () => {
+    const subtitle = (selectionCount: number) =>
+      repoCountCopy({
+        selectionMode: 'selected',
+        selectionCount,
+        language: 'hi',
+        grantsSettledEmpty: false,
+      });
+    expect(subtitle(1)).toBe('1 रिपॉज़िटरी चयनित');
+    expect(subtitle(3)).toBe('3 रिपॉज़िटरी चयनित');
+  });
+
+  it('agrees the cleared-findings toast with the count it reports', () => {
+    expect(i18n.t('securityAgent.orphanedFindings.cleared', { count: 1 })).toBe(
+      'निष्कर्ष हटाया गया: 1'
+    );
+    expect(i18n.t('securityAgent.orphanedFindings.cleared', { count: 3 })).toBe(
+      'हटाए गए निष्कर्ष: 3'
     );
   });
 });

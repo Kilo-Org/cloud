@@ -36,6 +36,7 @@ const mocks = vi.hoisted(() => ({
   runNeedsInputInteraction: vi.fn(),
   refreshGlanceableSurfacesFromTray: vi.fn(),
   rememberNeedsInputReplyDraft: vi.fn(),
+  peekNeedsInputReplyDraft: vi.fn(),
   captureException: vi.fn(),
 }));
 
@@ -64,6 +65,7 @@ vi.mock('./glanceable/approve-front-agent', () => ({
 // whole module graph resolves.
 vi.mock('@/lib/needs-input-reply-draft', () => ({
   rememberNeedsInputReplyDraft: mocks.rememberNeedsInputReplyDraft,
+  peekNeedsInputReplyDraft: mocks.peekNeedsInputReplyDraft,
   takeNeedsInputReplyDraft: vi.fn(() => null),
   clearNeedsInputReplyDraft: vi.fn(),
   _resetNeedsInputReplyDraftForTests: vi.fn(),
@@ -145,6 +147,8 @@ beforeEach(() => {
   mocks.runNeedsInputInteraction.mockReset();
   mocks.refreshGlanceableSurfacesFromTray.mockReset().mockResolvedValue(undefined);
   mocks.rememberNeedsInputReplyDraft.mockReset();
+  // The default is an empty slot, so a tap restores whatever its payload holds.
+  mocks.peekNeedsInputReplyDraft.mockReset().mockReturnValue(null);
   mocks.captureException.mockReset();
 });
 
@@ -679,6 +683,71 @@ describe('handleNeedsInputNotificationResponse — approve and reply', () => {
     expect(report).not.toHaveBeenCalled();
   });
 
+  it('holds the typed reply when a retryable reply result fails to post', async () => {
+    mocks.runNeedsInputInteraction.mockResolvedValue('retryable');
+    mocks.scheduleNotificationAsync.mockRejectedValue(new Error('native scheduler unavailable'));
+
+    await handleNeedsInputNotificationResponse(
+      raiseResponse({
+        actionIdentifier: NEEDS_INPUT_ACTION_IDS.reply,
+        userText: 'ship it',
+      }),
+      { runInteraction: mocks.runNeedsInputInteraction }
+    );
+
+    // The notification that stays holds its earlier payload, so the slot is the
+    // only place the text survives.
+    expect(mocks.rememberNeedsInputReplyDraft).toHaveBeenCalledWith('ses_1', 'ship it');
+    expect(mocks.captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        tags: expect.objectContaining({ 'error.operation': 'needs_input_action_publish' }),
+      })
+    );
+  });
+
+  it('holds nothing when a reply result posts', async () => {
+    mocks.runNeedsInputInteraction.mockResolvedValue('ok');
+
+    await handleNeedsInputNotificationResponse(
+      raiseResponse({
+        actionIdentifier: NEEDS_INPUT_ACTION_IDS.reply,
+        userText: 'ship it',
+      }),
+      { runInteraction: mocks.runNeedsInputInteraction }
+    );
+
+    // The posted payload carries the text, so the slot stays empty.
+    expect(mocks.rememberNeedsInputReplyDraft).not.toHaveBeenCalled();
+  });
+
+  it('holds nothing when a failed post answers an approve', async () => {
+    mocks.runNeedsInputInteraction.mockResolvedValue('retryable');
+    mocks.scheduleNotificationAsync.mockRejectedValue(new Error('native scheduler unavailable'));
+
+    await handleNeedsInputNotificationResponse(raiseResponse(), {
+      runInteraction: mocks.runNeedsInputInteraction,
+    });
+
+    // An approve has no typed text to keep.
+    expect(mocks.rememberNeedsInputReplyDraft).not.toHaveBeenCalled();
+  });
+
+  it('holds nothing when a failed reply had no visible text', async () => {
+    mocks.runNeedsInputInteraction.mockResolvedValue('retryable');
+    mocks.scheduleNotificationAsync.mockRejectedValue(new Error('native scheduler unavailable'));
+
+    await handleNeedsInputNotificationResponse(
+      raiseResponse({
+        actionIdentifier: NEEDS_INPUT_ACTION_IDS.reply,
+        userText: '   ',
+      }),
+      { runInteraction: mocks.runNeedsInputInteraction }
+    );
+
+    expect(mocks.rememberNeedsInputReplyDraft).not.toHaveBeenCalled();
+  });
+
   it('keeps the session raise when the replied push is already gone, as iOS removes it', async () => {
     mocks.runNeedsInputInteraction.mockResolvedValue('retryable');
     mocks.scheduleNotificationAsync.mockRejectedValue(new Error('native scheduler unavailable'));
@@ -1087,6 +1156,37 @@ describe('handleNeedsInputNotificationResponse — reply draft handoff', () => {
     );
 
     expect(mocks.rememberNeedsInputReplyDraft).not.toHaveBeenCalled();
+  });
+});
+
+describe('handleNeedsInputNotificationResponse — held reply precedence', () => {
+  const bodyTap = (answerDraft: string) =>
+    raiseResponse({
+      actionIdentifier: 'expo.modules.notifications.actions.DEFAULT',
+      data: raiseData({ answerDraft }),
+    });
+
+  it('keeps a held reply over the payload draft of an older notification', async () => {
+    mocks.peekNeedsInputReplyDraft.mockReturnValue('ship it');
+
+    await handleNeedsInputNotificationResponse(bodyTap('Use the staging bucket.'), {
+      runInteraction: mocks.runNeedsInputInteraction,
+    });
+
+    // The held text is never overwritten by a payload that predates it.
+    expect(mocks.rememberNeedsInputReplyDraft).not.toHaveBeenCalled();
+    expect(getPendingDeepLinkSnapshot()).toBe('/(app)/agent-chat/ses_1?via=push');
+  });
+
+  it('restores the payload draft when no reply is held', async () => {
+    await handleNeedsInputNotificationResponse(bodyTap('Use the staging bucket.'), {
+      runInteraction: mocks.runNeedsInputInteraction,
+    });
+
+    expect(mocks.rememberNeedsInputReplyDraft).toHaveBeenCalledWith(
+      'ses_1',
+      'Use the staging bucket.'
+    );
   });
 });
 

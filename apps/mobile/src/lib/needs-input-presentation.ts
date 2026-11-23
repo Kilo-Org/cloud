@@ -65,7 +65,8 @@ export function markNeedsInputReplyResult(kiloSessionId: string, identifier: str
 /**
  * Dismiss the session's recorded reply result, when it has one: it belongs to
  * the session's raise, so it ends with it. A failure goes to `report` and the
- * raise's own dismissal or post carries on.
+ * raise's own dismissal or post carries on; the identifier stays recorded, so a
+ * later retirement retries it.
  */
 export async function retireNeedsInputReplyResult(
   kiloSessionId: string,
@@ -75,11 +76,18 @@ export async function retireNeedsInputReplyResult(
   if (identifier === undefined) {
     return;
   }
-  replyResults.delete(kiloSessionId);
   try {
     await Notifications.dismissNotificationAsync(identifier);
   } catch (error) {
+    // The entry is the only record of the result's OS identity, so a failure
+    // keeps it: the next retirement of this session dismisses it again.
     report(error);
+    return;
+  }
+  // An answer that lands while the dismissal awaits may record a newer result
+  // under the same session; that one must survive.
+  if (replyResults.get(kiloSessionId) === identifier) {
+    replyResults.delete(kiloSessionId);
   }
 }
 

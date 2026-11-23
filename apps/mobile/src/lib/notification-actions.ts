@@ -39,7 +39,10 @@ import * as Sentry from '@sentry/react-native';
 
 import { getLanguageSnapshot, i18n } from '@/i18n';
 import { hasVisibleComposerText } from '@/lib/composer-text';
-import { rememberNeedsInputReplyDraft } from '@/lib/needs-input-reply-draft';
+import {
+  peekNeedsInputReplyDraft,
+  rememberNeedsInputReplyDraft,
+} from '@/lib/needs-input-reply-draft';
 
 import { type PendingDeepLinkOptions, setPendingDeepLink } from './deep-link-launch';
 import {
@@ -404,10 +407,17 @@ export function pendingDeepLinkOptionsForData(data: PushData): PendingDeepLinkOp
  * Hand the answer an undelivered reply parked in the result's payload to the
  * session's composer, so the tap opens the raise with the person's text
  * already typed instead of losing it. Only a retryable reply carries a draft;
- * every other result has none, and the tap changes nothing.
+ * every other result has none, and the tap changes nothing. A reply already
+ * held in the slot wins over the payload.
  */
 export function restoreReplyDraftFromData(data: PushData): void {
   if (data.type !== 'cloud_agent_session' || data.answerDraft === undefined) {
+    return;
+  }
+  // A held answer is newer than any payload: a payload draft is written when its
+  // result post lands, and the slot is written when one does not, so a payload
+  // can only predate the held text.
+  if (peekNeedsInputReplyDraft(data.cliSessionId) !== null) {
     return;
   }
   rememberNeedsInputReplyDraft(data.cliSessionId, data.answerDraft);
@@ -609,6 +619,22 @@ async function runAnswerAction(args: {
     categoryIdentifier: presentation.categoryIdentifier,
     interruptionLevel: presentation.interruptionLevel,
   });
+  if (
+    !posted &&
+    outcome === 'retryable' &&
+    action === 'reply' &&
+    response.userText !== undefined &&
+    hasVisibleComposerText(response.userText)
+  ) {
+    // The result that would carry the text never landed, and the notification
+    // that stays still holds its earlier payload, so the slot is the only
+    // carrier left. Same check and cap as `resumeAnswerDraft`.
+    rememberNeedsInputReplyDraft(
+      data.cliSessionId,
+      response.userText.slice(0, ANSWER_DRAFT_MAX_LENGTH)
+    );
+  }
+
   if (
     posted &&
     identities.resultIdentifier !== notificationIdentifierForSession(data.cliSessionId)

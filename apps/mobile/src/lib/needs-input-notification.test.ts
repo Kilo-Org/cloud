@@ -15,6 +15,7 @@ import {
   markNeedsInputReplyResult,
   notificationIdentifierForSession,
   readNeedsInputPresentation,
+  retireNeedsInputReplyResult,
 } from './needs-input-presentation';
 
 const mocks = vi.hoisted(() => ({
@@ -792,6 +793,31 @@ describe('applyNeedsInputNotifications', () => {
     expect(mocks.dismissNotificationAsync.mock.invocationCallOrder[0]).toBeLessThan(
       mocks.scheduleNotificationAsync.mock.invocationCallOrder[0] ?? 0
     );
+  });
+
+  it('retries a reply result dismissal that failed', async () => {
+    markNeedsInputReplyResult('ses_1', 'fcm-remote-1');
+    const error = new Error('shade unavailable');
+    mocks.dismissNotificationAsync.mockRejectedValueOnce(error);
+    const report = vi.fn<(failure: unknown) => void>();
+
+    await retireNeedsInputReplyResult('ses_1', report);
+
+    // The identifier stays recorded, because it is the only record of the
+    // result's OS identity.
+    expect(report).toHaveBeenCalledExactlyOnceWith(error);
+    expect(mocks.dismissNotificationAsync).toHaveBeenCalledTimes(1);
+
+    await retireNeedsInputReplyResult('ses_1', report);
+
+    expect(mocks.dismissNotificationAsync).toHaveBeenCalledTimes(2);
+    expect(mocks.dismissNotificationAsync).toHaveBeenNthCalledWith(2, 'fcm-remote-1');
+
+    await retireNeedsInputReplyResult('ses_1', report);
+
+    // The second dismissal landed, so the entry is gone and nothing retries.
+    expect(mocks.dismissNotificationAsync).toHaveBeenCalledTimes(2);
+    expect(report).toHaveBeenCalledTimes(1);
   });
 
   it('alerts again once the raise was dismissed and comes back', async () => {

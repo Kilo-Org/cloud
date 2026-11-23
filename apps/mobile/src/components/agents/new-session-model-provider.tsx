@@ -5,7 +5,6 @@ import {
   type SetStateAction,
   useContext,
   useMemo,
-  useRef,
   useState,
 } from 'react';
 
@@ -58,12 +57,14 @@ export function NewSessionModelProvider({
   // The selection is resolved from the account the form shows: the catalog, the
   // route prefill and the auto-selection all read this one scope, so the model
   // and variant the form holds belong to the account the session is created in.
+  // The latch lives in state beside the pair, so a render React discards drops
+  // the latch and the clears together and the next render runs the reset.
   // `null` is the personal account, so it never shares a key with an
-  // organization.
+  // organization; `undefined` is the unset latch.
   const scope = organizationId ?? null;
-  const resolvedScope = useRef<{ scope: string | null } | null>(null);
-  if (resolvedScope.current?.scope !== scope) {
-    resolvedScope.current = { scope };
+  const [resolvedScope, setResolvedScope] = useState<string | null | undefined>(undefined);
+  if (resolvedScope !== scope) {
+    setResolvedScope(scope);
     if (model !== '' || variant !== '') {
       setModel('');
       setVariant('');

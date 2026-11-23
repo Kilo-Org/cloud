@@ -18,6 +18,7 @@ import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { KvRow } from '@/components/ui/kv-row';
+import { RowGroup } from '@/components/ui/row-group';
 import { Section } from '@/components/ui/section';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -62,7 +63,7 @@ function ReadOnlyTrigger({
     enabled: model !== '',
   });
   return (
-    <View>
+    <RowGroup>
       <KvRow label={t('common.repository')} value={detail.githubRepo ?? t('common.unknown')} />
       <KvRow
         label={t('cloudAgent.triggers.fieldActivation')}
@@ -85,7 +86,7 @@ function ReadOnlyTrigger({
         }
         valueFace="text"
       />
-    </View>
+    </RowGroup>
   );
 }
 

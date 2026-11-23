@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import {
   AlertCircle,
@@ -16,7 +16,9 @@ import {
   validateEnvironmentCommands,
   validateEnvironmentName,
 } from '@kilocode/cloud-agent-profile';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -29,6 +31,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { EnvironmentSecretRequestList } from './EnvironmentSecretRequestList';
+import { omitUnresolvedSeededSecrets, seedPendingSecretKeys } from './environment-setup-secrets';
+import {
+  useEnvironmentSetupEnabled,
+  useEnvironmentSetupRunMutations,
+  type SetupRunResponse,
+} from '@/hooks/useEnvironmentSetupRuns';
+import { EnvironmentAgentUpdateButton } from './EnvironmentAgentUpdateButton';
+import { EnvironmentSetupComposer } from './EnvironmentSetupComposer';
+import { supportsAgentSetup } from './useEnvironmentSetupAgent';
 import { EnvironmentDeleteDialog } from './EnvironmentDeleteDialog';
 import {
   useCloudAgentEnvironment,
@@ -39,12 +51,10 @@ import {
 import { useEnvironmentProfiles } from '@/hooks/useEnvironmentProfiles';
 import {
   hasEnvironmentFormChanges,
-  buildEgressPolicy,
   toEnvironmentCommands,
   toEnvironmentScript,
   toNetworkAccessDraft,
 } from './environment-form';
-import { EnvironmentNetworkField } from './EnvironmentNetworkField';
 import { EnvironmentBuildPanel } from './EnvironmentBuildPanel';
 import {
   buildEnvironmentVariableChanges,
@@ -70,6 +80,9 @@ import {
 import { splitRepositoryName, toSelectableAllocation } from './settings/settings-options';
 
 type EnvironmentDialogProps = {
+  initialPage?: EnvironmentEditorPage;
+  setupRun?: SetupRunResponse;
+  onSetupStarted?: () => void;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   organizationId?: string;
@@ -86,16 +99,28 @@ export function EnvironmentDialog({
   open,
   onOpenChange,
   environmentId,
+  repository,
   ...props
 }: EnvironmentDialogProps) {
+  const [saving, setSaving] = useState(false);
   const detailQuery = useCloudAgentEnvironment(environmentId, {
     organizationId: props.organizationId,
     enabled: open,
   });
   const isLoading = !!environmentId && detailQuery.isLoading;
   const isError = !!environmentId && !detailQuery.data && !detailQuery.isLoading;
+  const handleSetupStarted = () => {
+    setSaving(false);
+    onOpenChange(false);
+    props.onSetupStarted?.();
+  };
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={next => {
+        if (!saving) onOpenChange(next);
+      }}
+    >
       <DialogContent className="flex max-h-[85vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
         {isLoading || isError ? (
           <>
@@ -111,12 +136,22 @@ export function EnvironmentDialog({
               </div>
             )}
           </>
-        ) : (
+        ) : environmentId ? (
           <EnvironmentForm
-            key={environmentId ?? 'new'}
+            key={environmentId}
             {...props}
             existing={detailQuery.data}
             variant="dialog"
+            onSavingChange={setSaving}
+            onSetupStarted={handleSetupStarted}
+          />
+        ) : (
+          <NewEnvironmentEditor
+            {...props}
+            initialRepositories={repository ? [repository] : []}
+            variant="dialog"
+            onSavingChange={setSaving}
+            onSetupStarted={handleSetupStarted}
           />
         )}
       </DialogContent>
@@ -126,10 +161,9 @@ export function EnvironmentDialog({
 
 type EnvironmentDetailPaneProps = {
   active?: boolean;
-  environmentId: string | null;
+  onSetupStarted?: () => void;
+  environmentId: string;
   organizationId?: string;
-  repository?: EnvironmentRepository;
-  repositoryLabel?: string;
   selectedProfileId?: string | null;
   canManage: boolean;
   initialPage?: EnvironmentEditorPage;
@@ -137,14 +171,13 @@ type EnvironmentDetailPaneProps = {
   onSavingChange?: (saving: boolean) => void;
   onSaved: (environmentId: string) => void;
   onDeleted: () => void;
-  onCancel?: () => void;
   onDirtyChange?: (dirty: boolean) => void;
 };
 
+/** The inline editor for a saved environment. */
 export function EnvironmentDetailPane({
   active = true,
   environmentId,
-  onCancel,
   onDirtyChange,
   onPageChange,
   onSavingChange,
@@ -153,10 +186,10 @@ export function EnvironmentDetailPane({
 }: EnvironmentDetailPaneProps) {
   const detailQuery = useCloudAgentEnvironment(environmentId, {
     organizationId: props.organizationId,
-    enabled: active && !!environmentId,
+    enabled: active,
   });
-  const isLoading = !!environmentId && detailQuery.isLoading;
-  const isError = !!environmentId && !detailQuery.data && !detailQuery.isLoading;
+  const isLoading = detailQuery.isLoading;
+  const isError = !detailQuery.data && !detailQuery.isLoading;
 
   if (isLoading) {
     return (
@@ -180,7 +213,7 @@ export function EnvironmentDetailPane({
 
   return (
     <EnvironmentForm
-      key={environmentId ?? 'new'}
+      key={environmentId}
       {...props}
       existing={detailQuery.data}
       variant="inline"
@@ -188,7 +221,6 @@ export function EnvironmentDetailPane({
       initialPage={initialPage}
       onPageChange={onPageChange}
       onSavingChange={onSavingChange}
-      onCancel={onCancel}
       onDirtyChange={onDirtyChange}
     />
   );
@@ -198,7 +230,9 @@ type EnvironmentFormProps = Omit<
   EnvironmentDialogProps,
   'open' | 'onOpenChange' | 'environmentId' | 'repository'
 > & {
-  repository?: EnvironmentRepository;
+  /** The repositories a new environment starts with; a saved environment uses its own. */
+  initialRepositories?: EnvironmentRepository[];
+  onRepositoriesChange?: (repositories: EnvironmentRepository[]) => void;
   existing: EnvironmentResponse | undefined;
   variant: 'dialog' | 'inline';
   active?: boolean;
@@ -215,6 +249,113 @@ export type EnvironmentEditorPage =
   | 'variables'
   | 'network-secrets';
 
+type NewEnvironmentEditorProps = Omit<EnvironmentFormProps, 'existing' | 'initialRepositories'> & {
+  initialRepositories: EnvironmentRepository[];
+};
+
+/**
+ * A new environment starts with the setup agent when the owner can run it. The
+ * owner can switch to manual configuration, which is the only option otherwise.
+ */
+export function NewEnvironmentEditor({
+  initialRepositories,
+  onRepositoriesChange,
+  ...props
+}: NewEnvironmentEditorProps) {
+  const { organizationId, canManage, variant, active = true } = props;
+  const access = useEnvironmentSetupEnabled({ organizationId, enabled: active && canManage });
+  const [repositories, setRepositories] = useState(initialRepositories);
+  const [manual, setManual] = useState(() => !supportsAgentSetup(initialRepositories));
+  const [starting, setStarting] = useState(false);
+  const { onSavingChange } = props;
+  const changeStarting = useCallback(
+    (next: boolean) => {
+      setStarting(next);
+      onSavingChange?.(next);
+    },
+    [onSavingChange]
+  );
+  const changeRepositories = (next: EnvironmentRepository[]) => {
+    setRepositories(next);
+    onRepositoriesChange?.(next);
+  };
+
+  const checkingAccess = canManage && access.isLoading;
+  if (!checkingAccess && (manual || access.data?.canStart !== true)) {
+    return (
+      <EnvironmentForm
+        {...props}
+        existing={undefined}
+        initialRepositories={repositories}
+        onRepositoriesChange={onRepositoriesChange}
+      />
+    );
+  }
+
+  const body = checkingAccess ? (
+    <div className="flex min-h-40 items-center justify-center">
+      <Loader2 className="text-muted-foreground size-5 animate-spin" aria-label="Loading" />
+    </div>
+  ) : (
+    <EnvironmentSetupComposer
+      organizationId={organizationId}
+      repositories={repositories}
+      onRepositoriesChange={changeRepositories}
+      onConfigureManually={() => setManual(true)}
+      onStarted={props.onSetupStarted}
+      onDirtyChange={props.onDirtyChange}
+      onStartingChange={changeStarting}
+    />
+  );
+
+  if (variant === 'dialog') {
+    return (
+      <>
+        <DialogHeader className="shrink-0 px-6 pt-6 pb-2 text-left">
+          <DialogTitle>Set up environment</DialogTitle>
+          <DialogDescription className="sr-only">
+            Start an agent that prepares the environment, or configure it manually.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="min-h-0 overflow-y-auto px-6 pt-2 pb-6">{body}</div>
+      </>
+    );
+  }
+
+  return (
+    <div className="flex h-full min-w-0 flex-col">
+      <div className="flex min-h-12 shrink-0 items-center gap-2 border-b px-4 py-2">
+        <h3 className="truncate text-sm font-semibold">New environment</h3>
+        <EnvironmentDraftBadge />
+        {props.onCancel && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="ml-auto"
+            disabled={starting}
+            onClick={props.onCancel}
+          >
+            Discard
+          </Button>
+        )}
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-8">{body}</div>
+    </div>
+  );
+}
+
+export function EnvironmentDraftBadge({ className }: { className?: string }) {
+  return (
+    <Badge
+      variant="outline"
+      className={cn('border-primary/40 bg-primary/10 text-primary shrink-0', className)}
+    >
+      Draft
+    </Badge>
+  );
+}
+
 function isEditorPage(value: string): value is EnvironmentEditorPage {
   return (
     value === 'overview' ||
@@ -227,10 +368,13 @@ function isEditorPage(value: string): value is EnvironmentEditorPage {
 
 function EnvironmentForm({
   organizationId,
-  repository,
+  initialRepositories: newEnvironmentRepositories,
+  onRepositoriesChange,
   repositoryLabel,
   selectedProfileId,
   canManage,
+  setupRun,
+  onSetupStarted,
   existing,
   variant,
   active = true,
@@ -245,10 +389,16 @@ function EnvironmentForm({
   const { createEnvironment, updateEnvironment, deleteEnvironment } =
     useCloudAgentEnvironmentMutations();
   const [page, setPage] = useState<EnvironmentEditorPage>(initialPage ?? 'overview');
+  const { resolveSecretRequests } = useEnvironmentSetupRunMutations();
+  const [skippedSecrets, setSkippedSecrets] = useState<string[]>([]);
   const [initialRepositories] = useState<EnvironmentRepository[]>(() =>
-    existing ? repositoriesForEnvironment(existing) : repository ? [repository] : []
+    existing ? repositoriesForEnvironment(existing) : (newEnvironmentRepositories ?? [])
   );
   const [repositories, setRepositories] = useState(initialRepositories);
+  const changeRepositories = (next: EnvironmentRepository[]) => {
+    setRepositories(next);
+    onRepositoriesChange?.(next);
+  };
   const repositoriesChanged = !sameRepositories(initialRepositories, repositories);
   const isMultiRepository = !existing || existing.repositories !== undefined || repositoriesChanged;
   const launchName = repositories[0] ? repositoryName(repositories[0]) : (repositoryLabel ?? '');
@@ -266,8 +416,7 @@ function EnvironmentForm({
   const [initialNetworkAccess] = useState(() =>
     toNetworkAccessDraft(existing?.egressMode ?? null, existing?.egressAllowlist ?? null)
   );
-  const [networkAccess, setNetworkAccess] = useState(initialNetworkAccess);
-  const [networkAccessError, setNetworkAccessError] = useState<string | null>(null);
+  const networkAccess = initialNetworkAccess;
   const sandboxRepository = repositories[0]
     ? { platform: repositories[0].platform, fullName: repositoryName(repositories[0]) }
     : undefined;
@@ -287,14 +436,20 @@ function EnvironmentForm({
   const startCommands =
     existing && startScript === initialStartScript ? undefined : toEnvironmentCommands(startScript);
   // Retain the baseline shown when editing starts, even if queries refresh in the background.
-  const [savedVariables] = useState(() => ({
+  const [savedVariables, setSavedVariables] = useState<{
+    plainVars: { key: string; value: string }[];
+    secretKeys: string[];
+  }>(() => ({
     plainVars: existing?.plainVars ?? [],
     secretKeys: existing?.secretKeys ?? [],
   }));
   const [initialVariablesText] = useState(() =>
     formatEnvironmentVariables(savedVariables.plainVars, savedVariables.secretKeys)
   );
-  const [variablesText, setVariablesText] = useState(initialVariablesText);
+  const [seededSecrets] = useState(() =>
+    seedPendingSecretKeys(initialVariablesText, setupRun?.secretRequests ?? [])
+  );
+  const [variablesText, setVariablesText] = useState(seededSecrets.text);
   const [initialNetworkSecrets] = useState<NetworkSecretDraft[]>(existing?.networkSecrets ?? []);
   const [networkSecrets, setNetworkSecrets] = useState(initialNetworkSecrets);
   const [networkSecretForm, setNetworkSecretForm] = useState(emptyNetworkSecretForm);
@@ -320,7 +475,7 @@ function EnvironmentForm({
   let variablesError: string | null = null;
   try {
     variables = buildEnvironmentVariableChanges(
-      variablesText,
+      omitUnresolvedSeededSecrets(variablesText, seededSecrets.seededKeys, skippedSecrets),
       savedVariables.plainVars,
       savedVariables.secretKeys
     );
@@ -333,7 +488,8 @@ function EnvironmentForm({
   ]);
   const hasScript = script.trim().length > 0;
   const hasStartScript = startScript.trim().length > 0;
-  const isSaving = createEnvironment.isPending || updateEnvironment.isPending;
+  const isSaving =
+    resolveSecretRequests.isPending || createEnvironment.isPending || updateEnvironment.isPending;
   const deletePending = deleteEnvironment.isPending;
   const isInline = variant === 'inline';
 
@@ -359,13 +515,6 @@ function EnvironmentForm({
       changePage('variables');
       return;
     }
-    const egress = buildEgressPolicy(networkAccess, initialNetworkAccess);
-    if (egress.error) {
-      setNetworkAccessError(egress.error);
-      changePage('overview');
-      return;
-    }
-    setNetworkAccessError(null);
     setError(null);
     try {
       validateEnvironmentName(savedName);
@@ -388,8 +537,25 @@ function EnvironmentForm({
           commands,
           startCommands,
           sandboxAllocation,
-          ...egress.policy,
         });
+        if (setupRun) {
+          setSavedVariables({
+            plainVars: Object.entries(variables.plainVars).map(([key, value]) => ({ key, value })),
+            secretKeys: variables.keys.filter(key => !(key in variables.plainVars)),
+          });
+          try {
+            await resolveSecretRequests.mutateAsync({
+              organizationId,
+              runId: setupRun.id,
+              skipped: skippedSecrets,
+            });
+          } catch (caught) {
+            setError(
+              `The environment was saved, but the requests could not be resolved: ${caught instanceof Error ? caught.message : 'Try saving again.'}`
+            );
+            return;
+          }
+        }
         if (isInline) toast.success('Environment saved');
         onSaved(existing.id);
       } else {
@@ -414,7 +580,6 @@ function EnvironmentForm({
           commands,
           startCommands,
           sandboxAllocation,
-          ...egress.policy,
         });
         if (isInline) toast.success('Environment created');
         onSaved(created.id);
@@ -455,7 +620,7 @@ function EnvironmentForm({
         <EnvironmentRepositoriesField
           organizationId={organizationId}
           repositories={repositories}
-          onChange={setRepositories}
+          onChange={changeRepositories}
         />
       </fieldset>
       {sandboxRepository && (
@@ -467,20 +632,21 @@ function EnvironmentForm({
           onChange={setSandboxAllocation}
         />
       )}
-      <EnvironmentNetworkField
-        value={networkAccess}
-        sandboxAllocation={sandboxAllocation}
-        error={networkAccessError}
-        disabled={!canManage || isSaving}
-        onChange={next => {
-          setNetworkAccessError(null);
-          setNetworkAccess(next);
-        }}
-      />
     </>
   );
 
-  const buildPanel = existing ? (
+  const agentUpdate = canManage && existing && !existing.isDraft && (
+    <EnvironmentAgentUpdateButton
+      active={active}
+      organizationId={organizationId}
+      environmentId={existing.id}
+      repositories={initialRepositories}
+      hasUnsavedChanges={hasUnsavedChanges}
+      onStarted={onSetupStarted}
+    />
+  );
+
+  const buildPanel = existing?.isDraft ? null : existing ? (
     <EnvironmentBuildPanel
       organizationId={organizationId}
       environmentId={existing.id}
@@ -538,6 +704,20 @@ function EnvironmentForm({
     profileQuery.isLoading ||
     profileQuery.isError ||
     pendingNetworkSecret;
+  const secretRequests = setupRun && (
+    <EnvironmentSecretRequestList
+      run={setupRun}
+      organizationId={organizationId}
+      skipped={skippedSecrets}
+      onSkippedChange={setSkippedSecrets}
+      disabled={!canManage || isSaving}
+    />
+  );
+  const saveAction = canManage && (
+    <Button size="sm" onClick={handleSave} disabled={saveDisabled}>
+      {isSaving && <Loader2 className="mr-2 size-4 animate-spin" />}Save environment
+    </Button>
+  );
 
   const handleTabChange = (value: string) => {
     if (isEditorPage(value)) changePage(value);
@@ -547,10 +727,12 @@ function EnvironmentForm({
     return (
       <Tabs value={page} onValueChange={handleTabChange} className="flex h-full min-w-0 flex-col">
         <div className="shrink-0 border-b">
-          <div className="flex items-center gap-2 px-4 py-2.5">
+          <div className="flex min-h-12 items-center gap-2 px-4 py-2">
             <h3 className="truncate text-sm font-semibold">
               {existing ? existing.name : 'New environment'}
             </h3>
+            {!existing && <EnvironmentDraftBadge />}
+            {agentUpdate && <div className="ml-auto">{agentUpdate}</div>}
           </div>
           {!canManage && (
             <p className="text-muted-foreground border-t px-4 py-2 text-xs" role="note">
@@ -560,16 +742,32 @@ function EnvironmentForm({
         </div>
         <div className="shrink-0 overflow-x-auto border-b px-2 py-1">
           <TabsList aria-label="Environment configuration" className="w-max">
-            <TabsTrigger value="overview" className="gap-1 text-xs pointer-coarse:min-h-11">
+            <TabsTrigger
+              disabled={isSaving}
+              value="overview"
+              className="gap-1 text-xs pointer-coarse:min-h-11"
+            >
               Overview
             </TabsTrigger>
-            <TabsTrigger value="scripts" className="gap-1 text-xs pointer-coarse:min-h-11">
+            <TabsTrigger
+              disabled={isSaving}
+              value="scripts"
+              className="gap-1 text-xs pointer-coarse:min-h-11"
+            >
               Snapshot
             </TabsTrigger>
-            <TabsTrigger value="start" className="gap-1 text-xs pointer-coarse:min-h-11">
+            <TabsTrigger
+              disabled={isSaving}
+              value="start"
+              className="gap-1 text-xs pointer-coarse:min-h-11"
+            >
               Workspace start
             </TabsTrigger>
-            <TabsTrigger value="variables" className="gap-1 text-xs pointer-coarse:min-h-11">
+            <TabsTrigger
+              disabled={isSaving}
+              value="variables"
+              className="gap-1 text-xs pointer-coarse:min-h-11"
+            >
               Variables
             </TabsTrigger>
             <TabsTrigger value="network-secrets" className="gap-1 text-xs pointer-coarse:min-h-11">
@@ -608,7 +806,8 @@ function EnvironmentForm({
                 readOnly={!canManage}
               />
             </TabsContent>
-            <TabsContent value="variables" className="mt-0">
+            <TabsContent value="variables" className="mt-0 space-y-4">
+              {secretRequests}
               <EnvironmentVariablesEditor
                 text={variablesText}
                 readOnly={!canManage}
@@ -645,11 +844,7 @@ function EnvironmentForm({
                 Cancel
               </Button>
             )}
-            {canManage && (
-              <Button size="sm" onClick={handleSave} disabled={saveDisabled}>
-                {isSaving && <Loader2 className="mr-2 size-4 animate-spin" />}Save environment
-              </Button>
-            )}
+            {saveAction}
           </div>
         </div>
       </Tabs>
@@ -659,7 +854,7 @@ function EnvironmentForm({
   return (
     <>
       <DialogHeader className="shrink-0 px-6 pt-6 pb-4 text-left">
-        <div className="flex items-center gap-2 pr-8">
+        <div className="flex min-h-8 items-center gap-2 pr-8">
           {page !== 'overview' && (
             <Button
               type="button"
@@ -685,6 +880,7 @@ function EnvironmentForm({
                       ? 'Environment'
                       : 'Set up environment'}
           </DialogTitle>
+          {page === 'overview' && agentUpdate && <div className="ml-auto">{agentUpdate}</div>}
         </div>
         <DialogDescription className="sr-only">
           Configure repositories, snapshot build and workspace start scripts, and environment
@@ -759,13 +955,16 @@ function EnvironmentForm({
             />
           )}
           {page === 'variables' && (
-            <EnvironmentVariablesEditor
-              text={variablesText}
-              readOnly={!canManage}
-              onChange={setVariablesText}
-              removedKeys={variables?.removedKeys ?? []}
-              error={variablesError}
-            />
+            <>
+              {secretRequests}
+              <EnvironmentVariablesEditor
+                text={variablesText}
+                readOnly={!canManage}
+                onChange={setVariablesText}
+                removedKeys={variables?.removedKeys ?? []}
+                error={variablesError}
+              />
+            </>
           )}
           {page === 'network-secrets' && (
             <NetworkSecretsEditor
@@ -800,11 +999,7 @@ function EnvironmentForm({
               {canManage ? 'Cancel' : 'Close'}
             </Button>
           </DialogClose>
-          {canManage && (
-            <Button size="sm" onClick={handleSave} disabled={saveDisabled}>
-              {isSaving && <Loader2 className="mr-2 size-4 animate-spin" />}Save environment
-            </Button>
-          )}
+          {saveAction}
         </div>
       </DialogFooter>
     </>

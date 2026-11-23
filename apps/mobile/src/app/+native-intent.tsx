@@ -7,6 +7,7 @@ import { contextPickerFixtureRoute } from '@/lib/context-picker-fixture';
 import { redirectSystemPath as mapWebPath } from '@/lib/deep-link-handler';
 import { applyForceStatePath } from '@/lib/force-state-fixture';
 import { handleGlanceableFixturePath } from '@/lib/glanceable/fixture-harness';
+import { handleHomeWidgetScopeFixturePath } from '@/lib/glanceable/home-widget-scope-fixture';
 import { handleHomeFixturePath } from '@/lib/home-fixture';
 import { instancePickerFixtureRoute } from '@/lib/instance-picker-fixture';
 import { handleLockedKeychainFixturePath } from '@/lib/locked-keychain-fixture';
@@ -51,6 +52,10 @@ export function redirectSystemPath({
   }
   // Dev-only glanceable fixture links (`kiloapp:///dev/glanceable-fixture/<name>`).
   if (__DEV__ && handleGlanceableFixturePath(path)) {
+    return null;
+  }
+  // Dev-only widget scope fixture (`kiloapp:///dev/home-widget-scope-fixture/<step>`).
+  if (__DEV__ && handleHomeWidgetScopeFixturePath(path)) {
     return null;
   }
   // Dev-only native-remote transcript fixtures (`kiloapp:///dev/native-remote-

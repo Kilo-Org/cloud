@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import type { DatabaseSync, SQLInputValue, SQLOutputValue } from 'node:sqlite';
 import { URL } from 'node:url';
+import { D1_MAX_BOUND_PARAMETERS } from '../src/d1-limits';
 
 type SqliteD1Result = {
   success: true;
@@ -74,10 +75,15 @@ export function sqliteD1(sqlite: DatabaseSync, onRoundTrip: () => void = () => {
   }
 
   function prepare(sqlText: string, params: SQLInputValue[] = []): D1PreparedStatement {
+    // D1 rejects a statement that binds more than 100 parameters ("too many SQL variables"),
+    // and so does production: a staging slice once bound one value per case and exceeded it on
+    // a wide pool. The harness must fail the same way instead of accepting what D1 refuses.
+    if (params.length > D1_MAX_BOUND_PARAMETERS)
+      throw new Error(
+        `D1 statements cannot bind more than ${D1_MAX_BOUND_PARAMETERS} parameters (this one binds ${params.length})`
+      );
     const statement = {
       bind(...values: SQLInputValue[]) {
-        if (values.length > 100)
-          throw new Error('D1 statements cannot bind more than 100 variables');
         return prepare(sqlText, values);
       },
       async run() {

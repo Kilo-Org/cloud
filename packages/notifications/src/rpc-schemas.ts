@@ -93,7 +93,6 @@ export type InternalDispatchResponse = z.infer<typeof internalDispatchResponseSc
 export const badgeBucketSchema = nonEmptyStringSchema;
 export type BadgeBucket = z.infer<typeof badgeBucketSchema>;
 
-/** The count every badge route reports: a whole, never-negative number. */
 const badgeCountSchema = z.number().int().nonnegative();
 
 export const badgeCountRowSchema = z.object({

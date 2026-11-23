@@ -3341,6 +3341,45 @@ describe('SessionIngestDO integration', () => {
     });
   });
 
+  describe('live summary state', () => {
+    it('derives the list step target from the CLI filePath key', async () => {
+      const suffix = crypto.randomUUID().replaceAll('-', '');
+      const liveUserId = `usr_live_list_${suffix}`;
+      const sessionId = `ses_${suffix.slice(0, 26)}`;
+      const stub = getStub(liveUserId, sessionId);
+
+      await stub.ingest(
+        [
+          { type: 'session_open', data: {} },
+          { type: 'message', data: { id: 'msg_list_1', role: 'assistant', content: '' } },
+          {
+            type: 'part',
+            data: {
+              id: 'p_list_1',
+              messageID: 'msg_list_1',
+              type: 'tool',
+              tool: 'list',
+              state: { status: 'running', input: { filePath: '/repo/src/index.ts' } },
+            },
+          },
+        ],
+        liveUserId,
+        sessionId,
+        1
+      );
+
+      await runInDurableObject(stub, async (_instance, state) => {
+        const [row] = [
+          ...state.storage.sql.exec<{ value: string }>(
+            'SELECT value FROM ingest_meta WHERE key = ?',
+            'liveSummaryState'
+          ),
+        ];
+        expect(JSON.parse(row.value).step).toEqual({ verb: 'searching', target: 'index.ts' });
+      });
+    });
+  });
+
   describe('attention signals', () => {
     /** A completed signal requires a previously stored status, so tests start sessions as busy. */
     async function ingestBusyStatus(stub: ReturnType<typeof getStub>, sessionId: string) {

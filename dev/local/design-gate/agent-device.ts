@@ -20,6 +20,13 @@ type AgentNode = {
   bundleId?: string;
   systemBar?: string | null;
   hittable?: boolean | null;
+  /**
+   * Android: whether the platform says the user can see this node. A node it
+   * says cannot be seen is transparent, laid out outside every pane that draws
+   * it, or hidden from the reader — and this snapshot carries no style that
+   * would show that.
+   */
+  visibleToUser?: boolean | null;
   rect: AgentRect;
 };
 
@@ -233,6 +240,10 @@ function convert(
     }
     if (node.identifier && how.testID(node.identifier)) converted.testID = node.identifier;
     if (how.pressable(node)) converted.pressable = true;
+    // The snapshot carries no style, so the platform's own answer is the only
+    // record that a box cannot be seen. Keep the node — the tree it draws is
+    // still the layout's — and let the rule that measures collisions skip it.
+    if (node.visibleToUser === false) converted.invisible = true;
     if (node.kind === 'scroll-area') converted.scrollAxes = snapshotScrollAxes(converted.tag);
     nodes.push(converted);
   }

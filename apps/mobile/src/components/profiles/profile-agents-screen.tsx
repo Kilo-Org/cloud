@@ -149,18 +149,7 @@ export function ProfileAgentsScreen({
   };
 
   let content: ReactNode = null;
-  if (profileQuery.isError) {
-    content = (
-      <QueryError
-        variant={readError.variant}
-        placement="top"
-        title={readError.titleKey ? t(readError.titleKey) : undefined}
-        message={readError.descriptionKey ? t(readError.descriptionKey) : undefined}
-        onRetry={readError.showRetry ? () => void profileQuery.refetch() : undefined}
-        isRetrying={profileQuery.isRefetching}
-      />
-    );
-  } else if (profileQuery.isPending) {
+  if (profileQuery.isPending) {
     content = <AgentsSkeleton />;
   } else if (rows.length === 0) {
     content = (
@@ -234,15 +223,28 @@ export function ProfileAgentsScreen({
         title={t('profiles.agents.title')}
         backFallback={backFallback}
       />
-      <TabScreenScrollView
-        className="flex-1"
-        contentContainerClassName={SCREEN_BODY_CLASS}
-        keyboardShouldPersistTaps="handled"
-        automaticallyAdjustKeyboardInsets
-        showsVerticalScrollIndicator={false}
-      >
-        {content}
-      </TabScreenScrollView>
+      {profileQuery.isError ? (
+        // The read owns the surface, so it centres in the band the header and
+        // the bottom band leave instead of scrolling as a banner.
+        <QueryError
+          variant={readError.variant}
+          placement="center"
+          title={readError.titleKey ? t(readError.titleKey) : undefined}
+          message={readError.descriptionKey ? t(readError.descriptionKey) : undefined}
+          onRetry={readError.showRetry ? () => void profileQuery.refetch() : undefined}
+          isRetrying={profileQuery.isRefetching}
+        />
+      ) : (
+        <TabScreenScrollView
+          className="flex-1"
+          contentContainerClassName={SCREEN_BODY_CLASS}
+          keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets
+          showsVerticalScrollIndicator={false}
+        >
+          {content}
+        </TabScreenScrollView>
+      )}
 
       {form.isOpen && canManage ? (
         <AgentFormSheet

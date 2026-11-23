@@ -103,6 +103,21 @@ function authorizationMatches(params: {
   );
 }
 
+/**
+ * The one translation from a presented check to the match predicate, so the
+ * read-only validation and the consuming redemption always name the same
+ * grant.
+ */
+function authorizationMatchParams(check: PasskeyManagementAuthorizationCheck) {
+  return {
+    tokenHash: hashAuthorizationToken(check.token),
+    userId: check.userId,
+    deviceSessionId: check.deviceSessionId,
+    operation: check.operation,
+    challengeId: check.challengeId,
+  };
+}
+
 export type MintedPasskeyManagementAuthorization = {
   id: string;
   token: string;
@@ -293,6 +308,26 @@ export type CollectedPasskeyManagementGrant = {
 };
 
 /**
+ * The one definition of the live-session existence read. It returns the query
+ * so a caller can add row locking to it; the read itself locks nothing.
+ */
+function liveDeviceSessionRow(
+  executor: DrizzleConnection,
+  params: { deviceSessionId: string; userId: string }
+) {
+  return executor
+    .select({ id: device_sessions.id })
+    .from(device_sessions)
+    .where(
+      liveDeviceSessionCondition({
+        deviceSessionId: params.deviceSessionId,
+        userId: params.userId,
+      })
+    )
+    .limit(1);
+}
+
+/**
  * Hold the caller's device session for the rest of the caller's transaction, so
  * a concurrent revocation either lands before that work or waits for it. The
  * row lock is the point: without it a revocation could commit between this read
@@ -302,18 +337,7 @@ async function lockLiveDeviceSession(
   executor: DrizzleConnection,
   params: { deviceSessionId: string; userId: string }
 ): Promise<boolean> {
-  const [session] = await executor
-    .select({ id: device_sessions.id })
-    .from(device_sessions)
-    .where(
-      liveDeviceSessionCondition({
-        deviceSessionId: params.deviceSessionId,
-        userId: params.userId,
-      })
-    )
-    .limit(1)
-    .for('share');
-
+  const [session] = await liveDeviceSessionRow(executor, params).for('share');
   return session !== undefined;
 }
 
@@ -420,16 +444,7 @@ export async function hasActiveNativeDeviceSession(params: {
   deviceSessionId: string;
   userId: string;
 }): Promise<boolean> {
-  const [row] = await db
-    .select({ id: device_sessions.id })
-    .from(device_sessions)
-    .where(
-      liveDeviceSessionCondition({
-        deviceSessionId: params.deviceSessionId,
-        userId: params.userId,
-      })
-    )
-    .limit(1);
+  const [row] = await liveDeviceSessionRow(db, params);
   return row !== undefined;
 }
 
@@ -479,15 +494,7 @@ export async function validatePasskeyManagementAuthorization(
   const [row] = await db
     .select({ id: passkey_management_authorizations.id })
     .from(passkey_management_authorizations)
-    .where(
-      authorizationMatches({
-        tokenHash: hashAuthorizationToken(params.token),
-        userId: params.userId,
-        deviceSessionId: params.deviceSessionId,
-        operation: params.operation,
-        challengeId: params.challengeId,
-      })
-    )
+    .where(authorizationMatches(authorizationMatchParams(params)))
     .limit(1);
 
   return row !== undefined;
@@ -518,15 +525,7 @@ export async function consumePasskeyManagementAuthorization(
   const consumed = await executor
     .update(passkey_management_authorizations)
     .set({ consumed_at: sql`NOW()` })
-    .where(
-      authorizationMatches({
-        tokenHash: hashAuthorizationToken(params.token),
-        userId: params.userId,
-        deviceSessionId: params.deviceSessionId,
-        operation: params.operation,
-        challengeId: params.challengeId,
-      })
-    )
+    .where(authorizationMatches(authorizationMatchParams(params)))
     .returning({ id: passkey_management_authorizations.id });
 
   return consumed.length > 0;

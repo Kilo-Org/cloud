@@ -7,7 +7,11 @@ import { db, isUSRegion } from '@kilocode/web-shared/lib/drizzle';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { parseInternalServiceEndpoint } from '@kilocode/web-shared/lib/internal-service-url';
-import { getGrantedClaudeBillingConnection, type ClaudeBillingOwner } from './store';
+import {
+  claudeBillingEffectiveConnection,
+  getGrantedClaudeBillingConnection,
+  type ClaudeBillingOwner,
+} from './store';
 import { claudeBillingOwnerMatches } from './owner';
 import { fetchClaudeWithRetry } from '@kilocode/web-shared/lib/auth/claude/http';
 
@@ -77,8 +81,10 @@ export async function getAuthoritativeClaudeBillingState(
 ): Promise<ClaudeBillingPayerState | null> {
   // A stale absent row would switch payer after connect. Read the primary in
   // Frankfurt; SFO delegates there without holding a cross-region pool connection.
-  if (!isUSRegion())
-    return claudeBillingPayerState(await getGrantedClaudeBillingConnection(owner, db));
+  if (!isUSRegion()) {
+    const granted = await getGrantedClaudeBillingConnection(owner, db);
+    return claudeBillingPayerState(granted ? claudeBillingEffectiveConnection(granted) : null);
+  }
   if (!INTERNAL_API_SECRET) throw new Error('Claude payer-state authentication is not configured');
   const payerStateUrl = parseInternalServiceEndpoint(
     APP_URL,

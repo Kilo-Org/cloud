@@ -20,10 +20,10 @@
  * Usage: node tools/i18n/check-catalogs.mjs
  */
 import { existsSync, readFileSync } from 'node:fs';
-import { dirname, join, relative as relativePath, sep } from 'node:path';
+import { dirname, join, relative as relativePath, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { isTranslateCallee, propertyName, unwrap, walk } from '../lib/ast.mjs';
+import { isTranslateCallee, propertyName, stringLiteralValue, unwrap, walk } from '../lib/ast.mjs';
 import {
   catalogEntryNames,
   catalogTags,
@@ -32,6 +32,8 @@ import {
   missingPluralCategories,
   pluralFamilyBases,
   pluralParts,
+  selectablePluralCategories,
+  unselectablePluralCategories,
 } from '../lib/catalogs.mjs';
 import { runIfMain } from '../lib/entry-point.mjs';
 import { isTestArtifact, parseSourceEntry, parseSourceTree } from '../lib/source-files.mjs';
@@ -60,6 +62,9 @@ function catalogsOf(root) {
       dir: join(root, 'apps/mobile/src/i18n/locales'),
       sourceRoots: [join(root, 'apps/mobile/src')],
       baseKeyOf: pluralBaseKey,
+      // The app renders on Hermes, which has no `Intl.PluralRules`, so the
+      // FormatJS polyfill data the bundle ships decides the suffix.
+      selectableCategoriesOf: tag => selectablePluralCategories(root, tag),
       englishCopyRules: [
         checkEnglishCopies,
         checkMobileEnglishIdentical,
@@ -75,6 +80,10 @@ function catalogsOf(root) {
       localeRegistry: join(root, 'packages/notifications/src/i18n.ts'),
       sourceRoots: [join(root, 'packages/notifications/src'), join(root, 'services')],
       baseKeyOf: pushBaseKey,
+      // Push copy renders on a Worker, whose runtime brings its own
+      // `Intl.PluralRules` and ships no polyfill data.
+      selectableCategoriesOf: tag =>
+        new Set([...new Intl.PluralRules(tag).resolvedOptions().pluralCategories, 'zero']),
       englishCopyRules: [checkEnglishCopies, checkPushEnglishCopy],
       calledKeyOf: pushCalledKeyOf,
       keyPrefixOf: pushKeyPrefix,
@@ -1437,15 +1446,34 @@ function holdsLabel(values, run) {
 }
 
 /**
+ * The quoted runs of `value` that spell an English label: each names a control
+ * this reader must see as `$t(key)`, not as the English word.
+ *
+ * The one exemption is an explicit parameter, not a second scan: `ownValues`
+ * holds the locale's own values, and a run one of them holds is that locale's
+ * copy of a name it does not translate, so quoting it is right. English passes
+ * an empty set, because a label English spells is a label English can name.
+ */
+function quotedLabelRuns({ value, englishValues, ownValues }) {
+  const runs = [];
+  for (const run of quotedRuns(value)) {
+    if (englishValues.has(run) && !holdsLabel(ownValues, run)) {
+      runs.push(run);
+    }
+  }
+  return runs;
+}
+
+/**
  * The catalog key a node names as a plain string: unwrapped from its
  * TypeScript-only wrappers, a `Literal` string, and non-empty. Any other node,
- * including a template literal and an empty string, names no key here.
+ * including a template literal and an empty string, names no key here. The read
+ * itself is the shared one, so a key rule cannot see a literal shape the others
+ * do not; the non-empty requirement is this layer's own.
  */
 function staticStringKey(node) {
-  const value = unwrap(node);
-  return value.type === 'Literal' && typeof value.value === 'string' && value.value !== ''
-    ? value.value
-    : null;
+  const value = stringLiteralValue(node);
+  return value !== null && value !== '' ? value : null;
 }
 
 /** The catalog key a property's value translates, when it is `t('literal')`. */
@@ -1530,18 +1558,33 @@ function destructiveLabels(object) {
  * All three come from the syntax tree (tools/lib/ast.mjs), so text that only
  * looks like a call — in a comment, in a string, in a type annotation — moves no
  * key, and an apostrophe in prose cannot throw the quote pairing out of step.
+ *
+ * The scan also returns `complete`: false when a file could not be read or
+ * parsed, or when a source root the audit had to have was missing. A key that
+ * sits in such a file is invisible to all three sets, so the dead-key rule
+ * reads this flag and names nothing from an incomplete scan — the same reason
+ * `findOrphanedNoAgreementEntries` in tools/i18n/check-plurals.mjs returns
+ * nothing from a scan with problems. `requiresSourceRoots` says the audit is
+ * reading the repository root itself, where every declared root must be there:
+ * a fixture tree holds only the parts a test gives it, so a root it does not
+ * have has nothing to scan and is skipped without a word. When it is true, the
+ * missing root is reported instead, because there every key under it would
+ * otherwise read as dead.
  */
-function scanSource(catalog, root) {
+function scanSource(catalog, root, requiresSourceRoots) {
   const problems = [];
   const called = new Set();
   const referenced = new Set();
   const keyPrefixes = new Set();
   const destructiveKeys = new Set();
+  let complete = true;
   const { calledKeyOf, keyPrefixOf, collectsDestructiveKeys } = catalog;
   for (const sourceRoot of catalog.sourceRoots) {
-    // A fixture tree holds only the parts a test gives it; a root the tree does
-    // not have has nothing to scan.
     if (!existsSync(sourceRoot)) {
+      if (requiresSourceRoots) {
+        problems.push(`${catalog.name}: no source tree at ${relativePath(root, sourceRoot)}`);
+        complete = false;
+      }
       continue;
     }
     for (const { file, program, problems: unparsed } of parseSourceTree(
@@ -1551,9 +1594,14 @@ function scanSource(catalog, root) {
     )) {
       // A file the parser refused has an empty tree, so its keys would leave
       // both sets without a word. `check:i18n` runs oxlint first, so this
-      // normally reports nothing.
+      // normally reports nothing. A read the filesystem refused arrives the
+      // same way, and either one leaves the scan incomplete: the keys of that
+      // file are simply not in the sets.
       for (const problem of unparsed) {
         problems.push(problem);
+      }
+      if (unparsed.length > 0) {
+        complete = false;
       }
       walk(program, node => {
         if (node.type === 'Literal' && typeof node.value === 'string') {
@@ -1596,7 +1644,7 @@ function scanSource(catalog, root) {
       referenced.add(`${prefix}${value}`);
     }
   }
-  return { called, referenced, destructiveKeys, problems };
+  return { called, referenced, destructiveKeys, problems, complete };
 }
 
 /**
@@ -2208,6 +2256,8 @@ function checkSerializedJson(label, key, value) {
 /** The value rules English itself must pass. */
 function checkEnglishValues({ catalogName, english, englishValues }) {
   const problems = [];
+  // English exempts nothing: a label it spells is a label it can name.
+  const ownValues = new Set();
   for (const [key, value] of english) {
     if (value.trim() === '') {
       problems.push(`${catalogName}/en: "${key}" is empty`);
@@ -2222,12 +2272,10 @@ function checkEnglishValues({ catalogName, english, englishValues }) {
     }
     // English must not spell a label it can name, or every translator copies
     // the English word into a sentence they otherwise translated.
-    for (const run of quotedRuns(value)) {
-      if (englishValues.has(run)) {
-        problems.push(
-          `${catalogName}/en: "${key}" quotes the label "${run}"; name its key with $t()`
-        );
-      }
+    for (const run of quotedLabelRuns({ value, englishValues, ownValues })) {
+      problems.push(
+        `${catalogName}/en: "${key}" quotes the label "${run}"; name its key with $t()`
+      );
     }
   }
   return problems;
@@ -2247,6 +2295,8 @@ function checkEnglishCatalog({ catalogName, english, englishValues }) {
 /** The keys a locale owes English, then the keys English does not name. */
 function checkKeyParity({
   label,
+  tag,
+  selectableCategories,
   english,
   translated,
   englishFamilies,
@@ -2254,11 +2304,18 @@ function checkKeyParity({
   localeFamilies,
 }) {
   const problems = [];
+  const selectable = selectableCategories(tag);
   for (const key of english.keys()) {
     if (translated.has(key)) {
       continue;
     }
     const parts = pluralParts(key);
+    if (parts && !selectable.has(parts.category)) {
+      // The locale can never select this category, so it owes no such form:
+      // the key would be copy no reader of this language sees. A `_zero`
+      // member stays owed, because i18next looks that suffix up itself.
+      continue;
+    }
     if (
       parts &&
       englishFamilies.has(parts.base) &&
@@ -2285,12 +2342,63 @@ function checkKeyParity({
   return problems;
 }
 
-/** The categories a locale's plural families lack. */
-function checkPluralCategories({ label, tag, english, translated }) {
+/**
+ * The categories a locale's plural families lack, judged by the categories its
+ * catalog's runtime can both require and render.
+ *
+ * This rule demands a form and the unreachable-form rule rejects one, so the two
+ * must read one truth source or they can contradict each other: a category the
+ * host requires but the runtime cannot select would be demanded by one rule and
+ * rejected by the other, leaving the audit unsatisfiable. The required list is
+ * therefore the intersection of the host's categories and the catalog's own
+ * selectable set, and it keeps `zero` wherever the host list carries it: a
+ * language that selects that category itself (Arabic, Welsh, Latvian) still owes
+ * its `_zero` form.
+ *
+ * The demand therefore never includes a form the runtime cannot render. It also
+ * cannot demand a category only the shipped data selects, so a family a locale
+ * declares under a flat counted English key is not asked for that form; a
+ * family English declares is still covered by the key-parity rule.
+ */
+function checkPluralCategories({ label, tag, english, translated, selectableCategories }) {
   const problems = [];
-  for (const [family, absent] of missingPluralCategories(english, translated, tag)) {
+  const host = new Intl.PluralRules(tag).resolvedOptions().pluralCategories;
+  const selectable = selectableCategories(tag);
+  // The intersection, with no separate `zero` rule: `zero` is in the host list
+  // only for a language that really selects it (Arabic, Welsh, Latvian), so a
+  // family of one of those still owes its `_zero` form. For every other
+  // language the host list has no `zero` to carry through.
+  const required = host.filter(category => selectable.has(category));
+  for (const [family, absent] of missingPluralCategories(english, translated, tag, required)) {
     for (const category of absent) {
       problems.push(`${label}: plural family "${family}" lacks the ${category} category of ${tag}`);
+    }
+  }
+  return problems;
+}
+
+/**
+ * The plural forms no reader of this language can see: a form whose category
+ * the runtime never selects for this tag, and whose copy is identical to its
+ * family's `other` copy.
+ *
+ * Both conditions are needed before the rule names a line. The first says the
+ * runtime does not pick this form; the second says that even a runtime which
+ * does pick it renders exactly the same text, so the entry is a duplicate of
+ * copy its family already carries. A form with text of its own is left alone,
+ * because a runtime the audit does not measure may select it. `zero` is never
+ * reported: i18next consults it directly at a zero count.
+ */
+function checkUnselectablePluralCategories({ label, tag, translated, selectableCategories }) {
+  const problems = [];
+  for (const [family, categories] of unselectablePluralCategories(
+    translated,
+    selectableCategories(tag)
+  )) {
+    for (const category of categories) {
+      problems.push(
+        `${label}: plural family "${family}" declares a ${category} form that ${tag} never selects`
+      );
     }
   }
   return problems;
@@ -2415,8 +2523,6 @@ function checkTranslatedValue({
   mustTranslateKeys,
 }) {
   const problems = [];
-  // A catalog that writes no sentence mark may hold nothing but the space it
-  // separates sentences with; any other whitespace-only value is untranslated.
   const separatorOnly =
     key === 'common.sentenceJoiner' && MARKLESS_SENTENCE_TAGS.has(tag) && value !== '';
   if (value.trim() === '' && !separatorOnly) {
@@ -2454,13 +2560,9 @@ function checkTranslatedValue({
  * the message points at a button this user never sees.
  */
 function checkQuotedLabels({ label, key, value, englishValues, ownValues }) {
-  const problems = [];
-  for (const run of quotedRuns(value)) {
-    if (englishValues.has(run) && !holdsLabel(ownValues, run)) {
-      problems.push(`${label}: "${key}" quotes the English label "${run}"; name its key with $t()`);
-    }
-  }
-  return problems;
+  return quotedLabelRuns({ value, englishValues, ownValues }).map(
+    run => `${label}: "${key}" quotes the English label "${run}"; name its key with $t()`
+  );
 }
 
 /**
@@ -2700,6 +2802,7 @@ function checkSharedWordings({ label, tag, translated, sharedWordings, wordingEx
  */
 function checkCatalogLocales({
   catalog,
+  selectableCategories,
   present,
   supported,
   english,
@@ -2745,21 +2848,30 @@ function checkCatalogLocales({
     problems.push(...checkChangelogAreaLabels(tag, translated, label));
 
     // The families this locale declares itself, through a member key with a
-    // category suffix. The English `_one`/`_other` siblings of a family
-    // English declares stay mandatory in the missing-key rule below, except
-    // where the locale carries the flat base key instead.
+    // category suffix. The English siblings of a family English declares stay
+    // mandatory in the missing-key rule below, except where the locale carries
+    // the flat base key instead, and except a category this tag can never
+    // select: a Japanese catalog owes no `_one` form, because i18next never
+    // asks for one there.
     const localeFamilies = pluralFamilyBases(translated);
     problems.push(
       ...checkKeyParity({
         label,
+        tag,
         english,
         translated,
         englishFamilies,
         englishCountedBases,
         localeFamilies,
+        selectableCategories,
       })
     );
-    problems.push(...checkPluralCategories({ label, tag, english, translated }));
+    problems.push(
+      ...checkPluralCategories({ label, tag, english, translated, selectableCategories })
+    );
+    problems.push(
+      ...checkUnselectablePluralCategories({ label, tag, translated, selectableCategories })
+    );
     problems.push(
       ...checkTranslatedValues({
         label,
@@ -2878,13 +2990,35 @@ function checkPushEnglishCopy({ catalogName, english, localeValues }) {
   return problems;
 }
 
-/** Every key the source names exists, and every English key is used. */
+/**
+ * Every key the source names exists, and every English key is used.
+ *
+ * The first rule holds either way: a key the source calls and English does not
+ * define is a real gap, and a scan that missed a file cannot excuse it.
+ *
+ * The second rule needs a complete scan. A file the scan could not read or
+ * parse left its keys out of `referenced`, so reporting an English key as
+ * unused would call a live key dead — a fix that deletes copy a screen still
+ * renders. An incomplete scan therefore proves no key dead and names none; its
+ * own problem lines already say why, which is the same reason
+ * `findOrphanedNoAgreementEntries` in tools/i18n/check-plurals.mjs drops its
+ * per-key lines for a scan with problems.
+ *
+ * The guard reads `source.complete`, not `source.problems.length`. A `t()` call
+ * with a template-literal key reports a problem but leaves its file read and
+ * parsed, so nothing is invisible there and the dead-key rule must keep
+ * running for every other key; a coarse problem count would silently disable
+ * the rule for a whole catalog whenever one call took a template literal.
+ */
 function checkSourceUsage({ catalogName, english, source, baseKeyOf, englishFamilies }) {
   const problems = [];
   for (const key of source.called) {
     if (!english.has(key) && !englishFamilies.has(key)) {
       problems.push(`${catalogName}: source uses "${key}", which en.json does not define`);
     }
+  }
+  if (!source.complete) {
+    return problems;
   }
   for (const key of english.keys()) {
     if (!source.referenced.has(key) && !source.referenced.has(baseKeyOf(key))) {
@@ -3009,6 +3143,10 @@ export function checkCatalogs(root = ROOT) {
   const supported = tags === null ? null : new Set(tags);
 
   const catalogs = catalogsOf(root);
+  // An audit of the repository root itself must have every declared source
+  // tree; a fixture tree holds only the parts a test gives it. Read once,
+  // because every catalog's scan needs the same answer.
+  const requiresSourceRoots = resolve(root) === resolve(ROOT);
   // The parsed English map and locale values of each catalog a scan read, keyed
   // by catalog name. A rule that compares the two catalogs reads them here; a
   // catalog whose English parse failed stays out, so the rule cannot compare
@@ -3056,7 +3194,7 @@ export function checkCatalogs(root = ROOT) {
     }
     // One scan of this catalog's own source roots serves the usage check, and
     // its destructive-confirm rule for the mobile catalog.
-    const source = scanSource(catalog, root);
+    const source = scanSource(catalog, root, requiresSourceRoots);
     problems.push(...source.problems);
     // The base each catalog's consumers append their own part to: a plural stem
     // in the app, a `.title`/`.body` part in the push runtime.
@@ -3090,6 +3228,7 @@ export function checkCatalogs(root = ROOT) {
 
     const locales = checkCatalogLocales({
       catalog,
+      selectableCategories: catalog.selectableCategoriesOf,
       present,
       supported,
       english,

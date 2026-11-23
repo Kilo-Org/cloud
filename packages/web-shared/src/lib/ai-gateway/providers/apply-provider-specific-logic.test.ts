@@ -40,7 +40,11 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', 
     '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache'
   ),
   resolveOpenRouterModelAlias: jest.fn(async (model: string) =>
-    model === '~vendor/model-latest' ? 'vendor/model-2' : model
+    model === '~vendor/model-latest'
+      ? 'vendor/model-2'
+      : model === '~vendor/free-latest'
+        ? 'vendor/model:free'
+        : model
   ),
 }));
 
@@ -1465,6 +1469,20 @@ describe('applyProviderSpecificLogic paid server features', () => {
 
     expect(body.plugins).toEqual([{ id: 'file-parser', pdf: { engine: 'cloudflare-ai' } }]);
     expect(body.tools).toEqual([fields.tools[1]]);
+    warn.mockRestore();
+  });
+
+  it('applies the free-model server-feature rules to a latest alias by its target', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    const body = await applyTo('~vendor/free-latest');
+
+    expect(body.plugins).toEqual([{ id: 'file-parser', pdf: { engine: 'cloudflare-ai' } }]);
+    expect(body.tools).toEqual([fields.tools[1]]);
+    expect(warn).toHaveBeenCalledWith(
+      '[applyProviderSpecificLogic] Removed paid server features from free or BYOK request',
+      expect.objectContaining({ model: 'vendor/model:free' })
+    );
     warn.mockRestore();
   });
 

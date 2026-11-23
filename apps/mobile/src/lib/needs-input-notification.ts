@@ -27,7 +27,7 @@
  * change) can tell a row that just raised from one already raised: an unchanged
  * raise is not published again, and a raise whose shape changed is re-published
  * in place under the same per-session identifier, not stacked as a second
- * notification. A plan that publishes nothing still reports what to dismiss.
+ * notification.
  */
 
 import * as Notifications from 'expo-notifications';

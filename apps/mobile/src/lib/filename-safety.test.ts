@@ -28,6 +28,12 @@ describe('stripUnsafeFilenameCharacters', () => {
     expect(stripUnsafeFilenameCharacters('line\nbreak\r\tname.txt')).toBe('linebreakname.txt');
   });
 
+  it('removes the line and paragraph separators, which are not controls', () => {
+    // U+2028 and U+2029 are Zl and Zp, so a control-character test misses them
+    // and a name holding one draws across two lines.
+    expect(stripUnsafeFilenameCharacters('line\u2028sep\u2029par.txt')).toBe('lineseppar.txt');
+  });
+
   it('removes a bidi override and the isolates', () => {
     // `report\u202Etxt.exe` displays as `reportexe.txt`, and an isolate hides
     // where a name starts and ends.

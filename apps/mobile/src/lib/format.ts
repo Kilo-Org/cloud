@@ -146,8 +146,27 @@ export function formatClockTime(date: Date, locale: string): string {
   return formatted.replace(hour, hour.slice(zero.length));
 }
 
+/** A calendar day a date field holds: `YYYY-MM-DD`, and nothing else. */
+const CALENDAR_DAY = /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/u;
+
+/**
+ * A calendar day in the reader's locale. The field holds a day, not an instant,
+ * so it is read at UTC midnight and drawn in UTC: the day shown is the day sent.
+ *
+ * A value the field cannot hold — empty, an instant, a non-padded or impossible
+ * day — writes `UNMEASURED_VALUE` rather than throwing while the row renders.
+ * `Intl.DateTimeFormat.format` throws on an invalid date, and the round-trip
+ * test rejects a day that only exists by rolling over (`2026-02-30`).
+ */
 export function formatCalendarDate(value: string, locale: string): string {
-  return dateTimeFormat(locale, { timeZone: 'UTC' }).format(new Date(`${value}T00:00:00Z`));
+  if (!CALENDAR_DAY.test(value)) {
+    return UNMEASURED_VALUE;
+  }
+  const date = new Date(`${value}T00:00:00Z`);
+  if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value) {
+    return UNMEASURED_VALUE;
+  }
+  return dateTimeFormat(locale, { timeZone: 'UTC' }).format(date);
 }
 
 export function formatNumber(

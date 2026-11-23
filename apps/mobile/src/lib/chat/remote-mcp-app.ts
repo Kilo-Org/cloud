@@ -44,7 +44,8 @@ export function viewArguments(input: Readonly<Record<string, unknown>>) {
 /**
  * The largest view the sandbox takes. The HTML is handed to the page as a
  * JavaScript string, so a document far larger than a UI is not one; it is
- * refused rather than turned into a bridge message.
+ * refused rather than turned into a bridge message. It is measured in UTF-8
+ * bytes, not string length, so the cap does not depend on the script.
  */
 export const MAX_VIEW_BYTES = 1_000_000;
 

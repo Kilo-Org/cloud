@@ -24,6 +24,7 @@ import {
   formatSignedPrefixedMoney,
   normalizeLocalizedNumber,
   parseLocalizedNumber,
+  UNMEASURED_VALUE,
 } from './format';
 
 /** The shape `formatPrefixedMoney` pins, and the four-digit shape below it. */
@@ -315,6 +316,14 @@ describe('localized format helpers', () => {
 
   it('formats a calendar date without a time-zone shift', () => {
     expect(formatCalendarDate('2026-08-03', 'en-US')).toBe('8/3/2026');
+  });
+
+  it('writes the placeholder for a value that is not a calendar day', () => {
+    expect(formatCalendarDate('', 'en-US')).toBe(UNMEASURED_VALUE);
+    expect(formatCalendarDate('2026-08-03T10:00:00.000Z', 'en-US')).toBe(UNMEASURED_VALUE);
+    expect(formatCalendarDate('2026-8-3', 'en-US')).toBe(UNMEASURED_VALUE);
+    expect(formatCalendarDate('2026-13-01', 'en-US')).toBe(UNMEASURED_VALUE);
+    expect(formatCalendarDate('2026-02-30', 'en-US')).toBe(UNMEASURED_VALUE);
   });
 });
 

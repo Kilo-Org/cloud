@@ -9,6 +9,8 @@ import {
 } from '@kilocode/harness-sdk/plugins/remote-mcp';
 import { Effect } from 'effect';
 
+import { utf8ByteLength } from '@/lib/utf8-utils';
+
 import { contentSecurityPolicy, MAX_VIEW_BYTES, viewDocument } from './remote-mcp-app';
 import { type RemoteMcpToolView } from './remote-mcp-state';
 
@@ -72,7 +74,14 @@ export async function readViewDocument(
     if (html === undefined || html.trim() === '') {
       return { kind: 'empty' };
     }
+    // A code unit is never less than one byte, so the length test refuses the
+    // documents that are far too big without walking them; the byte test is the
+    // cap the copy names, because three-byte characters count once each as
+    // length and three times each as bytes.
     if (html.length > MAX_VIEW_BYTES) {
+      return { kind: 'tooLarge' };
+    }
+    if (utf8ByteLength(html) > MAX_VIEW_BYTES) {
       return { kind: 'tooLarge' };
     }
     return {

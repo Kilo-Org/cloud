@@ -3,7 +3,7 @@
 jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store', () => ({
   getOpenAiChatGptConnection: jest.fn(),
   getOpenAiChatGptStoredConnectionFromPrimary: jest.fn(),
-  clearOpenAiChatGptConnection: jest.fn(),
+  disconnectOpenAiChatGptConnection: jest.fn(),
   readOpenAiChatGptUsageLimit: jest.fn(),
   openAiChatGptSharedServicesOwner: (organizationId: string) => ({
     organizationId,
@@ -29,7 +29,7 @@ import { beforeEach, describe, expect, it } from '@jest/globals';
 import { createCallerFactory } from '@kilocode/web-shared/lib/trpc/init';
 import { rootRouter } from '@/routers/root-router';
 import {
-  clearOpenAiChatGptConnection,
+  disconnectOpenAiChatGptConnection,
   getOpenAiChatGptConnection,
   getOpenAiChatGptStoredConnectionFromPrimary,
   readOpenAiChatGptUsageLimit,
@@ -313,30 +313,30 @@ describe('openAiChatGpt.disconnect', () => {
   it('clears the connection in one call and returns the new status', async () => {
     let stored: OpenAiChatGptConnection | null = connectedConnection();
     jest.mocked(getOpenAiChatGptConnection).mockImplementation(async () => stored);
-    jest.mocked(clearOpenAiChatGptConnection).mockImplementation(async () => {
+    jest.mocked(disconnectOpenAiChatGptConnection).mockImplementation(async () => {
       stored = null;
     });
 
     await expect(callerFor({ id: USER_ID }).openAiChatGpt.disconnect({})).resolves.toEqual({
       state: 'disconnected',
     });
-    expect(clearOpenAiChatGptConnection).toHaveBeenCalledWith(USER_OWNER);
+    expect(disconnectOpenAiChatGptConnection).toHaveBeenCalledWith(USER_OWNER);
   });
 
   it('clears the organization connection after an access check', async () => {
     jest.mocked(ensureOrganizationAccess).mockResolvedValue('owner');
-    jest.mocked(clearOpenAiChatGptConnection).mockResolvedValue(undefined);
+    jest.mocked(disconnectOpenAiChatGptConnection).mockResolvedValue(undefined);
 
     await callerFor({ id: USER_ID }).openAiChatGpt.disconnect({ organizationId: ORG_ID });
 
-    expect(clearOpenAiChatGptConnection).toHaveBeenCalledWith(ORG_OWNER);
+    expect(disconnectOpenAiChatGptConnection).toHaveBeenCalledWith(ORG_OWNER);
   });
 });
 
 describe('openAiChatGpt authentication', () => {
   beforeEach(() => {
     jest.mocked(getOpenAiChatGptConnection).mockReset();
-    jest.mocked(clearOpenAiChatGptConnection).mockReset();
+    jest.mocked(disconnectOpenAiChatGptConnection).mockReset();
   });
 
   it('refuses an unauthenticated caller on status without reading the store', async () => {
@@ -350,6 +350,6 @@ describe('openAiChatGpt authentication', () => {
     await expect(callerFor(null).openAiChatGpt.disconnect({})).rejects.toMatchObject({
       code: 'UNAUTHORIZED',
     });
-    expect(clearOpenAiChatGptConnection).not.toHaveBeenCalled();
+    expect(disconnectOpenAiChatGptConnection).not.toHaveBeenCalled();
   });
 });

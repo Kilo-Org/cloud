@@ -12,7 +12,7 @@ import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { openAiChatGptConnectorGone } from './connector';
 import {
-  clearOpenAiChatGptConnection,
+  disconnectOpenAiChatGptConnection,
   clearOpenAiChatGptUsageLimit,
   getOpenAiChatGptStoredConnection,
   openAiChatGptSharedServicesOwner,
@@ -448,11 +448,11 @@ describe('openai-chatgpt shared-services connection (real database)', () => {
     await expect(readOpenAiChatGptUsageLimit(personalOwner)).resolves.toBeNull();
   });
 
-  it('deletes the shared row and leaves the member row in place', async () => {
+  it('disconnects the shared connection without affecting the member connection', async () => {
     const shared = openAiChatGptSharedServicesOwner(organization.id);
     const memberOwner = { kiloUserId: owner.id, organizationId: organization.id };
 
-    await clearOpenAiChatGptConnection(shared);
+    await disconnectOpenAiChatGptConnection(shared);
 
     await expect(getOpenAiChatGptStoredConnection(shared)).resolves.toBeNull();
     expect((await getOpenAiChatGptStoredConnection(memberOwner))?.connection.email).toBe(

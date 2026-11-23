@@ -44,8 +44,6 @@ describe('hasRetentionBudget', () => {
   });
 
   it('refuses a page at or past the bound', () => {
-    // At the bound the next page would push the cache past `maxPages`, and the
-    // forward-fetch trim drops index 0 — page one, the newest page.
     expect(hasRetentionBudget(5, 5)).toBe(false);
     expect(hasRetentionBudget(6, 5)).toBe(false);
   });
@@ -232,9 +230,6 @@ describe('reconcileFirstPage', () => {
 
     await reconcileFirstPage(queryClient, prefix);
 
-    // Nothing renders these rows, so the entry goes: its next mount fetches page
-    // one instead of fanning out over every retained page, and a zero-page
-    // success is never stored (that shape reads as "loaded and empty").
     expect(calls).toEqual([]);
     expect(queryClient.getQueryState(fullKey)).toBeUndefined();
     expect(queryClient.getQueryData(fullKey)).toBeUndefined();
@@ -267,8 +262,6 @@ describe('reconcileFirstPage', () => {
 
     await reconcileFirstPage(queryClient, prefix);
 
-    // `query.fetch` ignores `enabled`, so the reconcile has to respect it: the
-    // app has not loaded what the read depends on yet.
     expect(calls).toEqual([]);
     // The rows stay, because the mounted list is only waiting to enable.
     expect(queryClient.getQueryData(fullKey)).toEqual({
@@ -372,7 +365,6 @@ describe('infinite-query refetch fan-out through withInfiniteRetention', () => {
     // A 4th page exists; the cap of 3 must evict the oldest page instead of
     // retaining it. Without the helper's maxPages, the pages array would grow
     // to 4 and the refetch below would fan out 4 requests.
-    // eslint-disable-next-line no-await-in-loop -- the cursor chain continues from page 3.
     await observer.fetchNextPage();
     expect(observer.getCurrentResult().data?.pages).toHaveLength(3);
 

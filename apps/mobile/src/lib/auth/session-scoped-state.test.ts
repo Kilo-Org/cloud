@@ -264,8 +264,6 @@ describe('clearSessionScopedState', () => {
   });
 
   it('drops the stored PR recents the index folds into every document set', () => {
-    // A direct account switch runs this clear but not sign-out's own recents
-    // clear; without it the collector re-indexes the previous account's PRs.
     clearSessionScopedState();
     expect(recentPrsMock.clearRecentPrs).toHaveBeenCalledTimes(1);
   });

@@ -163,14 +163,7 @@ export function Sheet({
    * close the one that replaced it.
    */
   const owedReportsRef = useRef({ close: false, dismiss: false, presentation: 0 });
-  /**
-   * The presentation generation the mounted native instance represents. Every
-   * report is matched against it: the adapter dispatches through its latest props,
-   * so without an identity a report belonging to a dismissal the app already ended
-   * would close the presentation that replaced it. A dismissal the deadline ends
-   * also replaces the instance (see the `key`), because the replaced adapter keeps
-   * its own teardown state and would not present again from an unchanged index.
-   */
+  /** The presentation generation the mounted native instance represents. */
   const [presentation, setPresentation] = useState(0);
   const presentationRef = useRef(presentation);
   presentationRef.current = presentation;

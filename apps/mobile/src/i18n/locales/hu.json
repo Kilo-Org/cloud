@@ -2264,6 +2264,7 @@
       "couldNotLoadThisSession": "Nem sikerült betölteni ezt a munkamenetet.",
       "historyTooLarge": "Ez a munkamenet leirata túl nagy a betöltéshez.",
       "historyUnavailable": "Ez a munkamenet leirata nem olvasható.",
+      "historyTemporarilyUnavailable": "Ez a munkamenet leirata átmenetileg nem érhető el.",
       "cloneFailedRetry": "Nem sikerült klónozni ezt a munkamenetet. Próbáld újra.",
       "notEnoughCredits": "Nincs elég kredit ehhez a kéréshez. Töltsd fel az egyenleged, és próbáld újra.",
       "previousTaskFinishing": "Az előző feladat még nem fejeződött be. Várj egy kicsit.",
@@ -2800,7 +2801,9 @@
       "skip": "Kihagyás",
       "retrySkip": "Kihagyás újrapróbálása",
       "submitting": "Küldés…",
-      "sendAnswers": "Válaszok küldése"
+      "sendAnswers": "Válaszok küldése",
+      "unreadableTitle": "Nem sikerült megjeleníteni a kérdést",
+      "unreadableBody": "Az ügynök egy kérdésre vár, amelyet ez az alkalmazás nem tud megjeleníteni. Válaszoljon rá a CLI-ben a folytatáshoz."
     },
     "blockingCard": {
       "questionUnavailable": "Ez a kérdés már nem érhető el.",
@@ -2827,6 +2830,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Nem sikerült betölteni az alügynök munkamenetét",
+      "historyTooLarge": "Az alügynök előzményei túl nagyok a betöltéshez.",
+      "historyUnavailable": "Az alügynök előzményei nem érhetők el.",
+      "historyTemporarilyUnavailable": "Az alügynök előzményei átmenetileg nem érhetők el.",
       "failed": "Az alügynök munkamenete sikertelenül zárult",
       "noMessages": "Az alügynöknek nincsenek üzenetei",
       "noMessagesDescription": "Az alügynök munkamenete átirat nélkül fejeződött be.",
@@ -4057,7 +4063,10 @@
     "list": {
       "loadFailed": "Nem sikerült betölteni a csevegés előzményeit.",
       "new": "Új csevegés",
-      "deleteTitle": "Törli ezt a csevegést?"
+      "deleteTitle": "Törli ezt a csevegést?",
+      "resetNoticeTitle": "A helyi csevegések és piszkozatok törlődtek",
+      "resetNoticeBody": "A Kilo nem tudta megnyitni az ezen az eszközön tárolt csevegéseket. A felhőben lévő munkameneteidet ez nem érinti.",
+      "resetNoticeDismiss": "Értesítés elvetése"
     },
     "rename": {
       "title": "Csevegés átnevezése",
@@ -4958,7 +4967,8 @@
     "unavailableTitle": "A használat nem érhető el",
     "unavailableDescription": "Ehhez a munkaterülethez nincs beállítva a használat. Ha itt használati adatokat vár, forduljon az ügyfélszolgálathoz.",
     "orgSelfNotice": "A saját használatodat látod ebben a szervezetben.",
-    "viewDetails": "Használati részletek megtekintése"
+    "viewDetails": "Használati részletek megtekintése",
+    "orgSelfEntryTitle": "Saját használatod"
   },
   "integrations": {
     "title": "Integrációk",

@@ -2264,6 +2264,7 @@
       "couldNotLoadThisSession": "Bu sessiyanı yükləmək mümkün olmadı.",
       "historyTooLarge": "Bu sessiyanın transkripti yükləmək üçün çox böyükdür.",
       "historyUnavailable": "Bu sessiyanın transkripti oxuna bilmir.",
+      "historyTemporarilyUnavailable": "Bu sessiyanın transkripti müvəqqəti olaraq əlçatan deyil.",
       "cloneFailedRetry": "Bu sessiyanı klonlamaq mümkün olmadı. Yenidən cəhd et.",
       "notEnoughCredits": "Bu sorğu üçün kifayət qədər kredit yoxdur. Kredit əlavə et və yenidən cəhd et.",
       "previousTaskFinishing": "Əvvəlki tapşırıq hələ tamamlanmayıb. Bir az gözlə.",
@@ -2800,7 +2801,9 @@
       "skip": "Ötür",
       "retrySkip": "Yenidən ötürməyə çalış",
       "submitting": "Göndərilir…",
-      "sendAnswers": "Cavabları göndər"
+      "sendAnswers": "Cavabları göndər",
+      "unreadableTitle": "Bu sual göstərilə bilmədi",
+      "unreadableBody": "Agent bu tətbiqin göstərə bilmədiyi sualı gözləyir. Davam etmək üçün suala CLI-də cavab verin."
     },
     "blockingCard": {
       "questionUnavailable": "Bu sual artıq mövcud deyil.",
@@ -2827,6 +2830,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Alt agentin sessiyasını yükləmək mümkün olmadı.",
+      "historyTooLarge": "Bu alt agentin tarixçəsi yükləmək üçün çox böyükdür.",
+      "historyUnavailable": "Bu alt agentin tarixçəsi əlçatan deyil.",
+      "historyTemporarilyUnavailable": "Bu alt agentin tarixçəsi müvəqqəti olaraq əlçatan deyil.",
       "failed": "Alt agentin sessiyası uğursuz oldu.",
       "noMessages": "Alt agentin mesajı yoxdur",
       "noMessagesDescription": "Alt agentin bu sessiyası yazışma tarixçəsi yaratmadan tamamlandı.",
@@ -4057,7 +4063,10 @@
     "list": {
       "loadFailed": "Söhbət tarixçəsi yüklənə bilmədi.",
       "new": "Yeni söhbət",
-      "deleteTitle": "Bu söhbət silinsin?"
+      "deleteTitle": "Bu söhbət silinsin?",
+      "resetNoticeTitle": "Lokal söhbətlər və qaralamalar təmizləndi",
+      "resetNoticeBody": "Kilo bu cihazda saxlanılan söhbətləri aça bilmədi. Bulud sessiyalarınız təsirlənmədi.",
+      "resetNoticeDismiss": "Bildirişi rədd et"
     },
     "rename": {
       "title": "Söhbətin adını dəyiş",
@@ -4958,7 +4967,8 @@
     "unavailableTitle": "İstifadə mövcud deyil",
     "unavailableDescription": "Bu iş sahəsi üçün istifadə qurulmayıb. Burada istifadəni görməyi gözləyirsinizsə, dəstək xidməti ilə əlaqə saxlayın.",
     "orgSelfNotice": "Bu təşkilatda öz istifadənizi görürsünüz.",
-    "viewDetails": "İstifadə təfərrüatlarına baxın"
+    "viewDetails": "İstifadə təfərrüatlarına baxın",
+    "orgSelfEntryTitle": "Sizin istifadəniz"
   },
   "integrations": {
     "title": "İnteqrasiyalar",

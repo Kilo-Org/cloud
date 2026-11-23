@@ -1691,6 +1691,7 @@
       "couldNotLoadThisSession": "Tidak dapat memuat sesi ini.",
       "historyTooLarge": "Transkrip sesi ini terlalu besar untuk dimuat.",
       "historyUnavailable": "Transkrip sesi ini tidak dapat dibaca.",
+      "historyTemporarilyUnavailable": "Transkrip sesi ini untuk sementara tidak tersedia.",
       "cloneFailedRetry": "Tidak dapat menyalin sesi ini. Coba lagi.",
       "notEnoughCredits": "Kredit tidak cukup untuk permintaan ini. Tambah kredit dan coba lagi.",
       "previousTaskFinishing": "Tugas sebelumnya belum selesai. Tunggu sebentar.",
@@ -2227,7 +2228,9 @@
       "skip": "Lewati",
       "retrySkip": "Coba lewati lagi",
       "submitting": "Mengirim…",
-      "sendAnswers": "Kirim jawaban"
+      "sendAnswers": "Kirim jawaban",
+      "unreadableTitle": "Pertanyaan ini tidak dapat ditampilkan",
+      "unreadableBody": "Agen sedang menunggu pertanyaan yang tidak dapat ditampilkan oleh aplikasi ini. Jawab pertanyaan itu di CLI untuk melanjutkan."
     },
     "blockingCard": {
       "questionUnavailable": "Pertanyaan ini tidak lagi tersedia.",
@@ -2254,6 +2257,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Tidak dapat memuat sesi subagen.",
+      "historyTooLarge": "Riwayat subagen ini terlalu besar untuk dimuat.",
+      "historyUnavailable": "Riwayat subagen ini tidak tersedia.",
+      "historyTemporarilyUnavailable": "Riwayat subagen ini untuk sementara tidak tersedia.",
       "failed": "Sesi subagen gagal.",
       "noMessages": "Tidak ada pesan subagen",
       "noMessagesDescription": "Sesi subagen ini selesai tanpa menghasilkan transkrip.",
@@ -4057,7 +4063,10 @@
     "list": {
       "loadFailed": "Tidak dapat memuat riwayat obrolan.",
       "new": "Obrolan baru",
-      "deleteTitle": "Hapus obrolan ini?"
+      "deleteTitle": "Hapus obrolan ini?",
+      "resetNoticeTitle": "Obrolan dan draf di perangkat ini telah dihapus",
+      "resetNoticeBody": "Kilo tidak dapat membuka obrolan yang tersimpan di perangkat ini. Sesi cloud Anda tidak terpengaruh.",
+      "resetNoticeDismiss": "Abaikan pemberitahuan"
     },
     "rename": {
       "title": "Ganti nama obrolan",
@@ -4958,7 +4967,8 @@
     "unavailableTitle": "Penggunaan tidak tersedia",
     "unavailableDescription": "Penggunaan belum disiapkan untuk workspace ini. Hubungi dukungan jika Anda berharap melihat penggunaan di sini.",
     "orgSelfNotice": "Anda melihat penggunaan Anda sendiri di organisasi ini.",
-    "viewDetails": "Lihat detail penggunaan"
+    "viewDetails": "Lihat detail penggunaan",
+    "orgSelfEntryTitle": "Penggunaan Anda"
   },
   "integrations": {
     "title": "Integrasi",

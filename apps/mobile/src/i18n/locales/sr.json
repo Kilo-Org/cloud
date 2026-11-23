@@ -2313,6 +2313,7 @@
       "couldNotLoadThisSession": "Učitavanje ove sesije nije uspelo.",
       "historyTooLarge": "Pepis ove sesije je prevelik za učitavanje.",
       "historyUnavailable": "Pepis ove sesije se ne može pročitati.",
+      "historyTemporarilyUnavailable": "Pepis ove sesije je privremeno nedostupan.",
       "cloneFailedRetry": "Kloniranje ove sesije nije uspelo. Pokušaj ponovo.",
       "notEnoughCredits": "Nema dovoljno kredita za ovaj zahtev. Dodaj kredite i pokušaj ponovo.",
       "previousTaskFinishing": "Prethodni zadatak se privodi kraju. Sačekaj trenutak.",
@@ -2853,7 +2854,9 @@
       "skip": "Preskoči",
       "retrySkip": "Pokušaj ponovo da preskočiš",
       "submitting": "Slanje…",
-      "sendAnswers": "Pošalji odgovore"
+      "sendAnswers": "Pošalji odgovore",
+      "unreadableTitle": "Pitanje nije moglo da se prikaže",
+      "unreadableBody": "Agent čeka na pitanje koje ova aplikacija ne može da prikaže. Odgovorite na pitanje u CLI-ju da biste nastavili."
     },
     "blockingCard": {
       "questionUnavailable": "Ovo pitanje više nije dostupno.",
@@ -2880,6 +2883,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Učitavanje sesije podagenta nije uspelo.",
+      "historyTooLarge": "Istorija ovog podagenta je prevelika za učitavanje.",
+      "historyUnavailable": "Istorija ovog podagenta nije dostupna.",
+      "historyTemporarilyUnavailable": "Istorija ovog podagenta je privremeno nedostupna.",
       "failed": "Sesija podagenta nije uspela.",
       "noMessages": "Nema poruka podagenta",
       "noMessagesDescription": "Ova sesija podagenta je završena bez transkripta.",
@@ -4135,7 +4141,10 @@
     "list": {
       "loadFailed": "Nije moguće učitati istoriju ćaskanja.",
       "new": "Novo ćaskanje",
-      "deleteTitle": "Izbrisati ovo ćaskanje?"
+      "deleteTitle": "Izbrisati ovo ćaskanje?",
+      "resetNoticeTitle": "Lokalna ćaskanja i nacrti su izbrisani",
+      "resetNoticeBody": "Kilo nije mogao da otvori ćaskanja sačuvana na ovom uređaju. Vaše sesije u oblaku nisu pogođene.",
+      "resetNoticeDismiss": "Odbaci obaveštenje"
     },
     "rename": {
       "title": "Preimenuj ćaskanje",
@@ -5052,7 +5061,8 @@
     "unavailableTitle": "Korišćenje nije dostupno",
     "unavailableDescription": "Korišćenje nije podešeno za ovaj radni prostor. Obratite se podršci ako ovde očekujete podatke o korišćenju.",
     "orgSelfNotice": "Vidite sopstveno korišćenje u ovoj organizaciji.",
-    "viewDetails": "Prikaži detalje korišćenja"
+    "viewDetails": "Prikaži detalje korišćenja",
+    "orgSelfEntryTitle": "Vaše korišćenje"
   },
   "integrations": {
     "title": "Integracije",

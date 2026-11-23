@@ -319,8 +319,6 @@ describe('remote MCP server store', () => {
     );
     const mod = await freshStore();
 
-    // The store's default is the empty list, so a screen that trusts the length
-    // alone would draw "no servers" for a returning user whose list is on disk.
     expect(mod.getRemoteMcpServersHasLoaded()).toBe(false);
 
     read.resolve(null);

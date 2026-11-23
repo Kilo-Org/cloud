@@ -56,12 +56,8 @@ type GatedStoreOptions = { keychainAccessible?: number };
 export const LOCK_READABLE_METADATA_KEYS = [ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY] as const;
 
 /**
- * The marker that records the class upgrade finished. Its presence is the proof
- * a `null` record needs: it is written with the same class, so it answers only
- * while the keychain is open for that class, and it is written after every item,
- * so every item carries the class by the time it lands. Until then "nothing
- * stored" and "not readable" are indistinguishable, and a `null` reads as an
- * unreadable one.
+ * Written with the class, after every item; its presence is what makes a `null`
+ * mean "absent".
  */
 export const WIDGET_STORE_CLASS_MARKER = {
   key: 'widget-store-accessibility',

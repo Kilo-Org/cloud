@@ -2362,6 +2362,7 @@
       "couldNotLoadThisSession": "Nepavyko įkelti šios sesijos",
       "historyTooLarge": "Šios sesijos nuorašas per didelis, kad jį būtų galima įkelti.",
       "historyUnavailable": "Šios sesijos nuorašo skaityti negalima.",
+      "historyTemporarilyUnavailable": "Šios sesijos nuorašas laikinai nepasiekiamas.",
       "cloneFailedRetry": "Nepavyko klonuoti šios sesijos. Bandykite dar kartą.",
       "notEnoughCredits": "Nepakanka kreditų šiai užklausai. Papildykite kreditus ir bandykite dar kartą.",
       "previousTaskFinishing": "Ankstesnė užduotis dar nebaigta. Šiek tiek palaukite.",
@@ -2906,7 +2907,9 @@
       "skip": "Praleisti",
       "retrySkip": "Bandyti praleisti iš naujo",
       "submitting": "Siunčiama…",
-      "sendAnswers": "Siųsti atsakymus"
+      "sendAnswers": "Siųsti atsakymus",
+      "unreadableTitle": "Nepavyko parodyti šio klausimo",
+      "unreadableBody": "Agentas laukia klausimo, kurio ši programa negali parodyti. Atsakykite į jį CLI, kad galėtumėte tęsti."
     },
     "blockingCard": {
       "questionUnavailable": "Šis klausimas nebepasiekiamas.",
@@ -2933,6 +2936,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Nepavyko įkelti subagento sesijos",
+      "historyTooLarge": "Šio subagento istorija per didelė, kad ją būtų galima įkelti.",
+      "historyUnavailable": "Šio subagento istorija nepasiekiama.",
+      "historyTemporarilyUnavailable": "Šio subagento istorija laikinai nepasiekiama.",
       "failed": "Subagento sesija baigėsi klaida",
       "noMessages": "Nėra subagento žinučių",
       "noMessagesDescription": "Ši subagento sesija baigėsi nesukūrusi pokalbio išrašo.",
@@ -4213,7 +4219,10 @@
     "list": {
       "loadFailed": "Nepavyko įkelti pokalbio istorijos.",
       "new": "Naujas pokalbis",
-      "deleteTitle": "Ištrinti šį pokalbį?"
+      "deleteTitle": "Ištrinti šį pokalbį?",
+      "resetNoticeTitle": "Vietiniai pokalbiai ir juodraščiai išvalyti",
+      "resetNoticeBody": "Kilo negalėjo atidaryti šiame įrenginyje išsaugotų pokalbių. Jūsų sesijos debesyje nebuvo paveiktos.",
+      "resetNoticeDismiss": "Atmesti pranešimą"
     },
     "rename": {
       "title": "Pervadinti pokalbį",
@@ -5146,7 +5155,8 @@
     "unavailableTitle": "Naudojimas nepasiekiamas",
     "unavailableDescription": "Šioje darbo srityje naudojimas nenustatytas. Jei tikitės čia matyti naudojimą, susisiekite su palaikymo komanda.",
     "orgSelfNotice": "Matote savo naudojimą šioje organizacijoje.",
-    "viewDetails": "Peržiūrėti naudojimo informaciją"
+    "viewDetails": "Peržiūrėti naudojimo informaciją",
+    "orgSelfEntryTitle": "Jūsų naudojimas"
   },
   "integrations": {
     "title": "Integracijos",

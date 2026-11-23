@@ -201,11 +201,6 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
   // Reactive snapshot of the module auth epoch, advanced synchronously at the
   // start of sign-in and sign-out so a subscriber can resubscribe on the bump.
   const [authEpoch, setAuthEpoch] = useState(() => currentAuthEpoch());
-  // Reactive view of the one sign-out flag the cache write fence also reads.
-  // `setSignOutActive` flips it synchronously at the start of sign-out (same
-  // render as the epoch bump) so the read-cache mount cannot resubscribe while
-  // the old user id is still cached; it is cleared only after a sign-in's
-  // credential publication succeeds.
   const isSigningOut = useSyncExternalStore(subscribeSignOutActive, isSignOutActive);
   const isSignedOutReference = useRef(false);
 

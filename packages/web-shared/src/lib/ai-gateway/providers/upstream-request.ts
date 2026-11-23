@@ -346,6 +346,13 @@ export type UpstreamFetchResult =
        * when the URL policy refused the request or its redirect.
        */
       fetchFailure?: { timedOut: boolean };
+      /**
+       * Affirmative proof that nothing was dialled: the gateway refused the target before it
+       * opened a connection. Only the URL-policy refusal sets it. A redirect refusal and every
+       * fetch failure leave it unset because the request reached the network, so "no
+       * `fetchFailure`" alone never means "the provider was not called".
+       */
+      notInvoked?: true;
     };
 
 type UpstreamFetchInput = {
@@ -473,7 +480,8 @@ async function sendUpstreamFetch({
       : null;
     if (urlPolicy?.rejected) {
       budgetSignal.removeEventListener('abort', onBudgetExceeded);
-      return { type: 'error', response: urlPolicy.rejected };
+      // The policy answers before any connection is opened, so the provider was never dialled.
+      return { type: 'error', response: urlPolicy.rejected, notInvoked: true };
     }
 
     // The request below dials the hop this process opens, so it connects to the
@@ -497,6 +505,19 @@ async function sendUpstreamFetch({
       signal: combinedSignal,
       ...(dispatcher ? { dispatcher } : {}),
     };
+    // An abort that is already signalled here has dialled nothing: the check runs before the
+    // fetch call, so the provider cannot have been reached. Reporting it as such is what lets a
+    // caller distinguish "never called" from "fetch threw after it was attempted".
+    if (combinedSignal.aborted) {
+      budgetSignal.removeEventListener('abort', onBudgetExceeded);
+      return {
+        type: 'error',
+        response: signal?.aborted
+          ? clientDisconnectResponse(vercelRequestId)
+          : upstreamFetchFailureResponse('request_timeout', vercelRequestId, reasoningEffort),
+        notInvoked: true,
+      };
+    }
     const response =
       provider.type === 'claude-billing'
         ? await fetchClaudeWithRetry(

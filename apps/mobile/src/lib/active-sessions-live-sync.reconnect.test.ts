@@ -30,13 +30,10 @@ describe('ActiveSessionsLiveSync — reconnect (onConnectionChange rising edge)'
     conn.__fireConnection(true);
     await sync.getFetchQueue();
     expect(queryFn).toHaveBeenCalledTimes(1);
-    // Repeated true → still no new refresh.
     conn.__fireConnection(true);
     expect(queryFn).toHaveBeenCalledTimes(1);
-    // false transition does not trigger.
     conn.__fireConnection(false);
     expect(queryFn).toHaveBeenCalledTimes(1);
-    // Second rising edge → second refresh.
     conn.__fireConnection(true);
     await sync.getFetchQueue();
     expect(queryFn).toHaveBeenCalledTimes(2);
@@ -68,13 +65,11 @@ describe('ActiveSessionsLiveSync — reconnect (onConnectionChange rising edge)'
     const detach1 = sync.attach();
     detach1();
     expect(release).toHaveBeenCalledTimes(1);
-    // Re-attach while already connected → no initial refresh.
     conn.__setConnected(true);
     sync.attach();
     conn.__fireConnection(true);
     await sync.getFetchQueue();
     expect(queryFn).toHaveBeenCalledTimes(0);
-    // Cycle: false → true (rising edge) → exactly one refresh.
     conn.__setConnected(false);
     conn.__fireConnection(false);
     conn.__fireConnection(true);

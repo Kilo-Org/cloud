@@ -2362,6 +2362,7 @@
       "couldNotLoadThisSession": "Tuto relaci se nepodařilo načíst.",
       "historyTooLarge": "Přepis této relace je příliš velký k načtení.",
       "historyUnavailable": "Přepis této relace nelze přečíst.",
+      "historyTemporarilyUnavailable": "Přepis této relace je dočasně nedostupný.",
       "cloneFailedRetry": "Tuto relaci se nepodařilo klonovat. Zkuste to znovu.",
       "notEnoughCredits": "Nemáte dost kreditů pro tento požadavek. Dobijte si kredity a zkuste to znovu.",
       "previousTaskFinishing": "Předchozí úkol se ještě dokončuje. Chvíli prosím počkejte.",
@@ -2906,7 +2907,9 @@
       "skip": "Přeskočit",
       "retrySkip": "Opakovat přeskočení",
       "submitting": "Odesílání…",
-      "sendAnswers": "Odeslat odpovědi"
+      "sendAnswers": "Odeslat odpovědi",
+      "unreadableTitle": "Tuto otázku nelze zobrazit",
+      "unreadableBody": "Agent čeká na otázku, kterou tato aplikace nedokáže zobrazit. Odpovězte na otázku v CLI a pokračujte."
     },
     "blockingCard": {
       "questionUnavailable": "Tato otázka již není k dispozici.",
@@ -2933,6 +2936,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Relaci podřízeného agenta se nepodařilo načíst.",
+      "historyTooLarge": "Historie tohoto podřízeného agenta je příliš velká k načtení.",
+      "historyUnavailable": "Historie tohoto podřízeného agenta není dostupná.",
+      "historyTemporarilyUnavailable": "Historie tohoto podřízeného agenta je dočasně nedostupná.",
       "failed": "Relace podřízeného agenta selhala.",
       "noMessages": "Žádné zprávy podřízeného agenta",
       "noMessagesDescription": "Tato relace podřízeného agenta skončila bez vytvoření přepisu.",
@@ -4213,7 +4219,10 @@
     "list": {
       "loadFailed": "Historie chatu se nepodařila načíst.",
       "new": "Nový chat",
-      "deleteTitle": "Smazat tento chat?"
+      "deleteTitle": "Smazat tento chat?",
+      "resetNoticeTitle": "Místní chaty a koncepty byly vymazány",
+      "resetNoticeBody": "Kilo nemohlo otevřít chaty uložené v tomto zařízení. Vaše relace v cloudu nejsou dotčeny.",
+      "resetNoticeDismiss": "Skrýt oznámení"
     },
     "rename": {
       "title": "Přejmenovat chat",
@@ -5146,7 +5155,8 @@
     "unavailableTitle": "Využití není k dispozici",
     "unavailableDescription": "Využití pro tento pracovní prostor není nastaveno. Pokud zde očekáváte údaje o využití, kontaktujte podporu.",
     "orgSelfNotice": "Vidíte své vlastní využití v této organizaci.",
-    "viewDetails": "Zobrazit podrobnosti o využití"
+    "viewDetails": "Zobrazit podrobnosti o využití",
+    "orgSelfEntryTitle": "Vaše využití"
   },
   "integrations": {
     "title": "Integrace",

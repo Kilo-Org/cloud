@@ -76,7 +76,7 @@ export function reportAdmissionRefusalOnce(metric: string): void {
   captureMessage(metric);
 }
 
-/** Exported for tests: flush any pending counters and reset the interval. */
+/** Exported for tests: drop any pending counters and reset the window and report throttle without emitting them. */
 export function resetAdmissionCountersForTests(): void {
   admissionCounters.clear();
   admissionCountersWindowStart = 0;

@@ -130,7 +130,6 @@ export async function exchangeLegacyToken(): Promise<{
     if (!isCurrentAuthEpoch(epoch)) {
       return null;
     }
-    // Persist the marker so we never exchange again.
     await SecureStore.setItemAsync(LEGACY_EXCHANGE_DONE_KEY, '1');
     if (!isCurrentAuthEpoch(epoch)) {
       await SecureStore.deleteItemAsync(LEGACY_EXCHANGE_DONE_KEY);

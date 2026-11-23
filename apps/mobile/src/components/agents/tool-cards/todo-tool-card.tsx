@@ -8,9 +8,10 @@ import { SelectableText } from '@/components/ui/selectable-text';
 import { FixedPartRow } from '../fixed-part-row';
 import { MonoScrollBlock } from '../mono-scroll-block';
 import { useOpenPartDetail } from '../open-part-detail-context';
-import { getToolDisplay, toolPartHasDetails } from '../tool-card-display';
+import { toolPartHasDetails } from '../tool-card-display';
 import { toolStatusLabel } from '../tool-status-label';
 import { buildTodoListModel } from '../tool-list-model';
+import { useToolDisplay } from '../use-tool-display';
 import { TodoTaskRows } from './todo-task-rows';
 
 /**
@@ -47,7 +48,7 @@ export function TodoToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
 export function TodoToolCard({ part }: Readonly<{ part: ToolPart }>) {
   const openPartDetail = useOpenPartDetail();
   const { t } = useTranslation();
-  const display = getToolDisplay(part);
+  const display = useToolDisplay(part);
   const hasDetails = toolPartHasDetails(part);
 
   return (

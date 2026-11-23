@@ -2411,6 +2411,7 @@
       "couldNotLoadThisSession": "Ma setgħetx titgħabba din is-sessjoni.",
       "historyTooLarge": "It-transkrizzjoni ta' din is-sessjoni hija kbira wisq biex titgħabba.",
       "historyUnavailable": "It-transkrizzjoni ta' din is-sessjoni ma tistax tiġi maqruża.",
+      "historyTemporarilyUnavailable": "It-transkrizzjoni ta' din is-sessjoni mhix disponibbli temporanjament.",
       "cloneFailedRetry": "Ma setgħetx tiġi kklonjata din is-sessjoni. Erġa' pprova.",
       "notEnoughCredits": "M'għandekx biżżejjed krediti għal din it-talba. Żid krediti u erġa' pprova.",
       "previousTaskFinishing": "Il-kompitu ta' qabel għadu qed jitlesta. Stenna ftit.",
@@ -2959,7 +2960,9 @@
       "skip": "Aqbeż",
       "retrySkip": "Erġa' pprova taqbeż",
       "submitting": "Qed jibgħat…",
-      "sendAnswers": "Ibgħat it-tweġibiet"
+      "sendAnswers": "Ibgħat it-tweġibiet",
+      "unreadableTitle": "Din il-mistoqsija ma setgħetx tintwera",
+      "unreadableBody": "L-agent qed jistenna mistoqsija li din l-app ma tistax turi. Wieġeb għaliha fil-CLI biex tkompli."
     },
     "blockingCard": {
       "questionUnavailable": "Din il-mistoqsija m'għadhiex disponibbli.",
@@ -2986,6 +2989,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Ma setgħetx titgħabba s-sessjoni tas-subaġent.",
+      "historyTooLarge": "L-istorja ta' dan is-subaġent hija kbira wisq biex titgħabba.",
+      "historyUnavailable": "L-istorja ta' dan is-subaġent mhix disponibbli.",
+      "historyTemporarilyUnavailable": "L-istorja ta' dan is-subaġent mhix disponibbli temporanjament.",
       "failed": "Is-sessjoni tas-subaġent falliet.",
       "noMessages": "L-ebda messaġġ tas-subaġent",
       "noMessagesDescription": "Din is-sessjoni tas-subaġent tlestiet mingħajr ma pproduċiet traskrizzjoni.",
@@ -4291,7 +4297,10 @@
     "list": {
       "loadFailed": "Ma setgħux jitgħabbew l-istorja taċ-chat.",
       "new": "Chat ġdid",
-      "deleteTitle": "Tħassar dan iċ-chat?"
+      "deleteTitle": "Tħassar dan iċ-chat?",
+      "resetNoticeTitle": "Iċ-chats lokali u l-abbozzi tħassru",
+      "resetNoticeBody": "Kilo ma setax jiftaħ iċ-chats salvati fuq dan l-apparat. Is-sessjonijiet tiegħek fil-cloud mhumiex affettwati.",
+      "resetNoticeDismiss": "Warrab l-avviż"
     },
     "rename": {
       "title": "Ibdel l-isem taċ-chat",
@@ -5240,7 +5249,8 @@
     "unavailableTitle": "L-użu mhux disponibbli",
     "unavailableDescription": "L-użu mhuwiex konfigurat għal dan il-workspace. Ikkuntattja l-appoġġ jekk tistenna li tara l-użu hawnhekk.",
     "orgSelfNotice": "Qed tara l-użu tiegħek stess f'din l-organizzazzjoni.",
-    "viewDetails": "Ara d-dettalji tal-użu"
+    "viewDetails": "Ara d-dettalji tal-użu",
+    "orgSelfEntryTitle": "L-użu tiegħek"
   },
   "integrations": {
     "title": "Integrazzjonijiet",

@@ -1691,6 +1691,7 @@
       "couldNotLoadThisSession": "Deze sessie kon niet worden geladen.",
       "historyTooLarge": "Het transcript van deze sessie is te groot om te laden.",
       "historyUnavailable": "Het transcript van deze sessie kan niet worden gelezen.",
+      "historyTemporarilyUnavailable": "Het transcript van deze sessie is tijdelijk niet beschikbaar.",
       "cloneFailedRetry": "Deze sessie kon niet worden gekloond. Probeer het opnieuw.",
       "notEnoughCredits": "Je hebt onvoldoende tegoed voor dit verzoek. Vul je tegoed aan en probeer het opnieuw.",
       "previousTaskFinishing": "De vorige taak wordt nog afgerond. Wacht even.",
@@ -2227,7 +2228,9 @@
       "skip": "Overslaan",
       "retrySkip": "Opnieuw overslaan",
       "submitting": "Verzenden…",
-      "sendAnswers": "Antwoorden verzenden"
+      "sendAnswers": "Antwoorden verzenden",
+      "unreadableTitle": "Deze vraag kon niet worden weergegeven",
+      "unreadableBody": "De agent wacht op een vraag die deze app niet kan tonen. Beantwoord hem in de CLI om door te gaan."
     },
     "blockingCard": {
       "questionUnavailable": "Deze vraag is niet meer beschikbaar.",
@@ -2254,6 +2257,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "De sessie van de hulpagent kon niet worden geladen.",
+      "historyTooLarge": "De geschiedenis van deze hulpagent is te groot om te laden.",
+      "historyUnavailable": "De geschiedenis van deze hulpagent is niet beschikbaar.",
+      "historyTemporarilyUnavailable": "De geschiedenis van deze hulpagent is tijdelijk niet beschikbaar.",
       "failed": "De sessie van de hulpagent is mislukt.",
       "noMessages": "Geen berichten van de hulpagent",
       "noMessagesDescription": "De sessie van deze hulpagent is voltooid zonder gespreksverloop vast te leggen.",
@@ -4057,7 +4063,10 @@
     "list": {
       "loadFailed": "Kon de chatgeschiedenis niet laden.",
       "new": "Nieuwe chat",
-      "deleteTitle": "Deze chat verwijderen?"
+      "deleteTitle": "Deze chat verwijderen?",
+      "resetNoticeTitle": "Lokale chats en concepten gewist",
+      "resetNoticeBody": "Kilo kon de chatgeschiedenis op dit apparaat niet laden. Je sessies in de cloud zijn niet aangetast.",
+      "resetNoticeDismiss": "Melding negeren"
     },
     "rename": {
       "title": "Chat hernoemen",
@@ -4958,7 +4967,8 @@
     "unavailableTitle": "Gebruik niet beschikbaar",
     "unavailableDescription": "Gebruik is niet ingesteld voor deze workspace. Neem contact op met de ondersteuning als je hier gebruik verwacht te zien.",
     "orgSelfNotice": "Je ziet je eigen gebruik in deze organisatie.",
-    "viewDetails": "Gebruiksdetails bekijken"
+    "viewDetails": "Gebruiksdetails bekijken",
+    "orgSelfEntryTitle": "Jouw gebruik"
   },
   "integrations": {
     "title": "Integraties",

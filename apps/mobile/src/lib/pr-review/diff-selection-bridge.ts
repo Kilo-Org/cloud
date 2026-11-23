@@ -36,12 +36,7 @@ export type DiffSelection = PrIdentity & {
   selectedText: string;
 };
 
-/**
- * The bridge slot key for one PR identity. Mirrors `viewedFilesKey`: the
- * GitHub-shaped legacy bytes, suffixed with the provider ref identity when a
- * provider ref is present, so every slot resolves under the same
- * provider-scoped identity rule 17 the viewed-files and draft keys use.
- */
+/** Mirrors `viewedFilesKey`: the legacy bytes, plus `@<providerPrRefKey>` for a non-GitHub ref. */
 function bridgeRouteKey(pr: PrIdentity): RouteKey {
   const legacy = prRouteKey(pr);
   if (!pr.ref || pr.ref.platform === 'github') {

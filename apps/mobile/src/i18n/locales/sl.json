@@ -2362,6 +2362,7 @@
       "couldNotLoadThisSession": "Te seje ni bilo mogoče naložiti.",
       "historyTooLarge": "Zapis te seje je prevelik za nalaganje.",
       "historyUnavailable": "Zapisa te seje ni mogoče prebrati.",
+      "historyTemporarilyUnavailable": "Zapis te seje začasno ni na voljo.",
       "cloneFailedRetry": "Te seje ni bilo mogoče klonirati. Poskusi znova.",
       "notEnoughCredits": "Za to zahtevo ni dovolj kreditov. Dodaj kredite in poskusi znova.",
       "previousTaskFinishing": "Prejšnja naloga se še zaključuje. Počakaj trenutek.",
@@ -2906,7 +2907,9 @@
       "skip": "Preskoči",
       "retrySkip": "Znova preskoči",
       "submitting": "Pošiljanje…",
-      "sendAnswers": "Pošlji odgovore"
+      "sendAnswers": "Pošlji odgovore",
+      "unreadableTitle": "Vprašanja ni bilo mogoče prikazati",
+      "unreadableBody": "Agent čaka na vprašanje, ki ga ta aplikacija ne more prikazati. Odgovorite na vprašanje v CLI, da nadaljujete."
     },
     "blockingCard": {
       "questionUnavailable": "To vprašanje ni več na voljo.",
@@ -2933,6 +2936,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Seje podagenta ni bilo mogoče naložiti.",
+      "historyTooLarge": "Zgodovina tega podagenta je prevelika za nalaganje.",
+      "historyUnavailable": "Zgodovina tega podagenta ni na voljo.",
+      "historyTemporarilyUnavailable": "Zgodovina tega podagenta začasno ni na voljo.",
       "failed": "Seja podagenta ni uspela.",
       "noMessages": "Ni sporočil podagenta",
       "noMessagesDescription": "Ta seja podagenta se je končala brez zapisa pogovora.",
@@ -4213,7 +4219,10 @@
     "list": {
       "loadFailed": "Zgodovine klepeta ni bilo mogoče naložiti.",
       "new": "Nov klepet",
-      "deleteTitle": "Izbrišem ta klepet?"
+      "deleteTitle": "Izbrišem ta klepet?",
+      "resetNoticeTitle": "Lokalni klepeti in osnutki počiščeni",
+      "resetNoticeBody": "Kilo ni mogel odpreti klepetov, shranjenih na tej napravi. Vaše seje v oblaku niso prizadete.",
+      "resetNoticeDismiss": "Zavrzi obvestilo"
     },
     "rename": {
       "title": "Preimenuj klepet",
@@ -5146,7 +5155,8 @@
     "unavailableTitle": "Poraba ni na voljo",
     "unavailableDescription": "Poraba za ta delovni prostor ni nastavljena. Če pričakujete, da boste tukaj videli porabo, se obrnite na podporo.",
     "orgSelfNotice": "Prikazana je vaša lastna poraba v tej organizaciji.",
-    "viewDetails": "Ogled podrobnosti porabe"
+    "viewDetails": "Ogled podrobnosti porabe",
+    "orgSelfEntryTitle": "Vaša poraba"
   },
   "integrations": {
     "title": "Integracije",

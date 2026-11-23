@@ -241,11 +241,8 @@ describe('isShortViewport', () => {
   });
 
   it('reads a tablet in landscape as tall, so the state keeps its full stack', () => {
-    // Wide but not short: the band there is taller than the whole stack.
     expect(isShortViewport(1024, 768)).toBe(false);
-    // A 600dp-short-edge tablet is Android's smallest (the `sw600dp`
-    // qualifier, the 1024x600 emulator). It is wide but still a tablet: its
-    // band is ~384dp against the ~167dp stack, so it keeps the full stack too.
+    // The 1024x600 emulator's band is ~384dp against the ~167dp stack.
     expect(isShortViewport(1024, 600)).toBe(false);
   });
 
@@ -346,10 +343,6 @@ describe('getPendingCenteredStateStyle', () => {
   });
 
   it('matches the measured placement outside the strip its content nearly fills', () => {
-    // The layout engine pins content inside the last `2 * STATE_GAP` of the band
-    // where the measured layout still centers it. Everywhere else the two boxes
-    // agree: both center a shorter state, and both pin one gap below the band's
-    // top when it is taller than the band.
     const geometry = { window: { top: 0, bottom: 200 }, viewport: { top: 0, bottom: 200 } };
     const bandStyle = getCenteredStateBandStyle(geometry);
     const difference = (contentHeight: number) =>

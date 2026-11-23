@@ -346,8 +346,6 @@ export function nativeModelClient(bridge: NativeModelBridge): ModelClientService
         }).pipe(
           Effect.filterOrFail(
             availability => availability.status === 'available',
-            // The reason the model gave at send time carries its own next step; a
-            // restricted status without one falls back on the status itself.
             availability => nativeModelFailure(reasonAtSendTime(availability), false)
           ),
           Effect.map(availability => answer(provider, availability, request))

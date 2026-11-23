@@ -1691,6 +1691,7 @@
       "couldNotLoadThisSession": "Diese Sitzung konnte nicht geladen werden.",
       "historyTooLarge": "Das Protokoll dieser Sitzung ist zum Laden zu groß.",
       "historyUnavailable": "Das Protokoll dieser Sitzung kann nicht gelesen werden.",
+      "historyTemporarilyUnavailable": "Das Protokoll dieser Sitzung ist vorübergehend nicht verfügbar.",
       "cloneFailedRetry": "Diese Sitzung konnte nicht geklont werden. Versuche es erneut.",
       "notEnoughCredits": "Dein Guthaben reicht für diese Anfrage nicht aus. Lade Guthaben auf und versuche es erneut.",
       "previousTaskFinishing": "Die vorherige Aufgabe wird noch abgeschlossen. Bitte warte einen Moment.",
@@ -2227,7 +2228,9 @@
       "skip": "Überspringen",
       "retrySkip": "Erneut überspringen",
       "submitting": "Wird gesendet…",
-      "sendAnswers": "Antworten senden"
+      "sendAnswers": "Antworten senden",
+      "unreadableTitle": "Diese Frage konnte nicht angezeigt werden",
+      "unreadableBody": "Der Agent wartet auf eine Frage, die diese App nicht anzeigen kann. Beantworte die Frage in der CLI, um fortzufahren."
     },
     "blockingCard": {
       "questionUnavailable": "Diese Frage ist nicht mehr verfügbar.",
@@ -2254,6 +2257,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Die Sitzung des Unteragenten konnte nicht geladen werden.",
+      "historyTooLarge": "Der Verlauf dieses Unteragenten ist zum Laden zu groß.",
+      "historyUnavailable": "Der Verlauf dieses Unteragenten ist nicht verfügbar.",
+      "historyTemporarilyUnavailable": "Der Verlauf dieses Unteragenten ist vorübergehend nicht verfügbar.",
       "failed": "Die Sitzung des Unteragenten ist fehlgeschlagen.",
       "noMessages": "Keine Nachrichten vom Unteragenten",
       "noMessagesDescription": "Die Sitzung dieses Unteragenten wurde ohne Protokoll abgeschlossen.",
@@ -4057,7 +4063,10 @@
     "list": {
       "loadFailed": "Chatverlauf konnte nicht geladen werden.",
       "new": "Neuer Chat",
-      "deleteTitle": "Diesen Chat löschen?"
+      "deleteTitle": "Diesen Chat löschen?",
+      "resetNoticeTitle": "Lokale Chats und Entwürfe gelöscht",
+      "resetNoticeBody": "Kilo konnte die lokal gespeicherten Chats nicht öffnen. Deine Cloud-Sitzungen sind nicht betroffen.",
+      "resetNoticeDismiss": "Hinweis ausblenden"
     },
     "rename": {
       "title": "Chat umbenennen",
@@ -4958,7 +4967,8 @@
     "unavailableTitle": "Nutzung nicht verfügbar",
     "unavailableDescription": "Die Nutzungserfassung ist für diesen Workspace nicht eingerichtet. Wende dich an den Kundendienst, wenn du hier Nutzungsdaten erwartest.",
     "orgSelfNotice": "Du siehst deine eigene Nutzung in dieser Organisation.",
-    "viewDetails": "Nutzungsdetails anzeigen"
+    "viewDetails": "Nutzungsdetails anzeigen",
+    "orgSelfEntryTitle": "Deine Nutzung"
   },
   "integrations": {
     "title": "Integrationen",

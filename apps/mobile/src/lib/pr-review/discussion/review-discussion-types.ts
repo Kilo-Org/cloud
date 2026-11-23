@@ -4,9 +4,6 @@
 // The discussion tab is built from three pure contracts:
 //   1. The trpc DTO shapes (thread / comment / reaction) — these
 //      mirror the committed S2 read DTO and S3 mutation DTOs.
-//      We re-declare the narrowest types here (rather than depending
-//      on the trpc root type) so the helpers stay testable in plain
-//      Node and so the type contracts are explicit in this slice.
 //   2. `selectThreadAnchorLabel` — turns a thread's nullable anchor
 //      (file-level vs line-anchored vs outdated) into the label shown
 //      in the thread header. Pure, no React.
@@ -349,7 +346,6 @@ export function applyReactionToggle(args: {
               ),
             };
           }
-          // Add to existing bucket.
           return {
             ...comment,
             reactions: comment.reactions.map(r =>
@@ -357,7 +353,6 @@ export function applyReactionToggle(args: {
             ),
           };
         }
-        // Reaction bucket not present yet — append a new one.
         return {
           ...comment,
           reactions: [...comment.reactions, { content, count: 1, viewerHasReacted: true }],
@@ -467,8 +462,6 @@ export function applyCommentRemoval(
       if (index === -1) {
         return [thread];
       }
-      // GitHub deletes the thread with its root comment: drop the whole thread
-      // rather than leaving a thread with no root.
       if (index === 0) {
         return [];
       }

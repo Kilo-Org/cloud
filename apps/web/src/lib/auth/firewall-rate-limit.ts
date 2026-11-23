@@ -93,10 +93,8 @@ export async function checkFirewallRateLimit(
 }
 
 /**
- * The refusal a route returns for a limiter result: 429 when the caller exceeded
- * the rule, 503 when the limiter could not be consulted, and `null` when the
- * branch may proceed. Routes that guard a branch call this so the status codes
- * and `{ error }` bodies are written once.
+ * Routes that guard a branch call this so the status codes and `{ error }` bodies
+ * are written once.
  */
 export function firewallRateLimitRefusal(limit: FirewallRateLimitResult): NextResponse | null {
   if (limit === 'limited') {

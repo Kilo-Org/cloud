@@ -2264,6 +2264,7 @@
       "couldNotLoadThisSession": "Tätä istuntoa ei voitu ladata",
       "historyTooLarge": "Tämän istunnon keskustelutallenne on liian suuri ladattavaksi.",
       "historyUnavailable": "Tämän istunnon keskustelutallennetta ei voi lukea.",
+      "historyTemporarilyUnavailable": "Tämän istunnon keskustelutallenne ei ole tilapäisesti saatavilla.",
       "cloneFailedRetry": "Tätä istuntoa ei voitu kloonata. Yritä uudelleen.",
       "notEnoughCredits": "Krediitit eivät riitä tähän pyyntöön. Lisää krediittejä ja yritä uudelleen.",
       "previousTaskFinishing": "Edellistä tehtävää viimeistellään vielä. Odota hetki.",
@@ -2800,7 +2801,9 @@
       "skip": "Ohita",
       "retrySkip": "Yritä ohittaa uudelleen",
       "submitting": "Lähetetään…",
-      "sendAnswers": "Lähetä vastaukset"
+      "sendAnswers": "Lähetä vastaukset",
+      "unreadableTitle": "Kysymystä ei voitu näyttää",
+      "unreadableBody": "Agentti odottaa kysymystä, jota tämä sovellus ei voi näyttää. Vastaa kysymykseen CLI:ssä jatkaaksesi."
     },
     "blockingCard": {
       "questionUnavailable": "Tämä kysymys ei ole enää käytettävissä.",
@@ -2827,6 +2830,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Aliagentin istuntoa ei voitu ladata",
+      "historyTooLarge": "Tämän aliagentin historia on liian suuri ladattavaksi.",
+      "historyUnavailable": "Tämän aliagentin historia ei ole saatavilla.",
+      "historyTemporarilyUnavailable": "Tämän aliagentin historia ei ole tilapäisesti saatavilla.",
       "failed": "Aliagentin istunto epäonnistui",
       "noMessages": "Ei aliagentin viestejä",
       "noMessagesDescription": "Tämä aliagentin istunto päättyi ilman viestihistoriaa.",
@@ -4057,7 +4063,10 @@
     "list": {
       "loadFailed": "Keskusteluhistoriaa ei voitu ladata.",
       "new": "Uusi keskustelu",
-      "deleteTitle": "Poistetaanko tämä keskustelu?"
+      "deleteTitle": "Poistetaanko tämä keskustelu?",
+      "resetNoticeTitle": "Laitteen keskustelut ja luonnokset poistettu",
+      "resetNoticeBody": "Kilo ei voinut avata tähän laitteeseen tallennettuja keskusteluja. Pilvessä olevat istuntosi ovat tallessa.",
+      "resetNoticeDismiss": "Sivuuta ilmoitus"
     },
     "rename": {
       "title": "Nimeä keskustelu uudelleen",
@@ -4958,7 +4967,8 @@
     "unavailableTitle": "Käyttö ei ole saatavilla",
     "unavailableDescription": "Käyttöä ei ole määritetty tälle työtilalle. Ota yhteyttä tukeen, jos käytön pitäisi näkyä tässä.",
     "orgSelfNotice": "Näet oman käyttösi tässä organisaatiossa.",
-    "viewDetails": "Näytä käytön tiedot"
+    "viewDetails": "Näytä käytön tiedot",
+    "orgSelfEntryTitle": "Sinun käyttösi"
   },
   "integrations": {
     "title": "Integraatiot",

@@ -1737,6 +1737,7 @@
       "couldNotLoadThisSession": "Nie udało się wczytać tej sesji.",
       "historyTooLarge": "Zapis tej sesji jest zbyt duży, żeby go wczytać.",
       "historyUnavailable": "Nie można odczytać zapisu tej sesji.",
+      "historyTemporarilyUnavailable": "Zapis tej sesji jest chwilowo niedostępny.",
       "cloneFailedRetry": "Nie udało się sklonować tej sesji. Spróbuj ponownie.",
       "notEnoughCredits": "Brakuje środków na to żądanie. Doładuj konto i spróbuj ponownie.",
       "previousTaskFinishing": "Trwa kończenie poprzedniego zadania. Poczekaj chwilę.",
@@ -2281,7 +2282,9 @@
       "skip": "Pomiń",
       "retrySkip": "Ponów pomijanie",
       "submitting": "Wysyłanie…",
-      "sendAnswers": "Wyślij odpowiedzi"
+      "sendAnswers": "Wyślij odpowiedzi",
+      "unreadableTitle": "Nie można wyświetlić tego pytania",
+      "unreadableBody": "Agent czeka na pytanie, którego ta aplikacja nie może pokazać. Odpowiedz na pytanie w CLI, aby kontynuować."
     },
     "blockingCard": {
       "questionUnavailable": "To pytanie nie jest już dostępne.",
@@ -2308,6 +2311,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Nie udało się wczytać sesji podagenta.",
+      "historyTooLarge": "Historia tego podagenta jest zbyt duża, żeby ją wczytać.",
+      "historyUnavailable": "Historia tego podagenta jest niedostępna.",
+      "historyTemporarilyUnavailable": "Historia tego podagenta jest chwilowo niedostępna.",
       "failed": "Sesja podagenta zakończyła się błędem.",
       "noMessages": "Brak wiadomości podagenta",
       "noMessagesDescription": "Ta sesja podagenta zakończyła się bez utworzenia zapisu rozmowy.",
@@ -4213,7 +4219,10 @@
     "list": {
       "loadFailed": "Nie udało się wczytać historii czatu.",
       "new": "Nowy czat",
-      "deleteTitle": "Usunąć ten czat?"
+      "deleteTitle": "Usunąć ten czat?",
+      "resetNoticeTitle": "Wyczyszczono lokalne czaty i wersje robocze",
+      "resetNoticeBody": "Kilo nie mogło otworzyć czatów zapisanych na tym urządzeniu. Twoje sesje w chmurze pozostały nienaruszone.",
+      "resetNoticeDismiss": "Odrzuć powiadomienie"
     },
     "rename": {
       "title": "Zmień nazwę czatu",
@@ -5146,7 +5155,8 @@
     "unavailableTitle": "Użycie niedostępne",
     "unavailableDescription": "Użycie nie jest skonfigurowane dla tej przestrzeni roboczej. Skontaktuj się z pomocą techniczną, jeśli spodziewasz się zobaczyć tutaj użycie.",
     "orgSelfNotice": "Widzisz własne użycie w tej organizacji.",
-    "viewDetails": "Wyświetl szczegóły użycia"
+    "viewDetails": "Wyświetl szczegóły użycia",
+    "orgSelfEntryTitle": "Twoje użycie"
   },
   "integrations": {
     "title": "Integracje",

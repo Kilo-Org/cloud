@@ -2362,6 +2362,7 @@
       "couldNotLoadThisSession": "Couldn't load this session",
       "historyTooLarge": "This session's transcript is too large to load.",
       "historyUnavailable": "This session's transcript can't be read.",
+      "historyTemporarilyUnavailable": "This session's transcript is temporarily unavailable.",
       "cloneFailedRetry": "Couldn't clone this session. Try again.",
       "notEnoughCredits": "Not enough credits for this request. Add credits and try again.",
       "previousTaskFinishing": "The previous task is still finishing. Please wait a moment.",
@@ -2917,7 +2918,9 @@
       "skip": "Skip",
       "retrySkip": "Retry skip",
       "submitting": "Submitting…",
-      "sendAnswers": "Send answers"
+      "sendAnswers": "Send answers",
+      "unreadableTitle": "This question could not be displayed",
+      "unreadableBody": "The agent is waiting on a question this app cannot show. Answer it in the CLI to continue."
     },
     "blockingCard": {
       "questionUnavailable": "This question is no longer available.",
@@ -2944,6 +2947,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Could not load subagent session",
+      "historyTooLarge": "This sub-agent's history is too large to load.",
+      "historyUnavailable": "This sub-agent's history isn't available.",
+      "historyTemporarilyUnavailable": "This sub-agent's history is temporarily unavailable.",
       "failed": "Subagent session failed",
       "noMessages": "No subagent messages",
       "noMessagesDescription": "This subagent session completed without producing a transcript.",
@@ -4155,7 +4161,10 @@
     "list": {
       "loadFailed": "Could not load chat history.",
       "new": "New chat",
-      "deleteTitle": "Delete this chat?"
+      "deleteTitle": "Delete this chat?",
+      "resetNoticeTitle": "Local chats and drafts were cleared",
+      "resetNoticeBody": "Kilo could not open the chats saved on this device. Your cloud sessions are not affected.",
+      "resetNoticeDismiss": "Dismiss notice"
     },
     "rename": {
       "title": "Rename chat",
@@ -4958,7 +4967,8 @@
     "unavailableTitle": "Usage is unavailable",
     "unavailableDescription": "Usage isn't set up for this workspace. Contact support if you expect to see usage here.",
     "orgSelfNotice": "You're seeing your own usage in this organization.",
-    "viewDetails": "View usage details"
+    "viewDetails": "View usage details",
+    "orgSelfEntryTitle": "Your usage"
   },
   "integrations": {
     "title": "Integrations",

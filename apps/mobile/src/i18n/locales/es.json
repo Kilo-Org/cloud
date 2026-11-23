@@ -1714,6 +1714,7 @@
       "couldNotLoadThisSession": "No se pudo cargar esta sesión.",
       "historyTooLarge": "La transcripción de esta sesión es demasiado grande para cargarla.",
       "historyUnavailable": "No se puede leer la transcripción de esta sesión.",
+      "historyTemporarilyUnavailable": "La transcripción de esta sesión no está disponible temporalmente.",
       "cloneFailedRetry": "No se pudo clonar esta sesión. Inténtalo de nuevo.",
       "notEnoughCredits": "No hay suficientes créditos para esta solicitud. Añade créditos e inténtalo de nuevo.",
       "previousTaskFinishing": "La tarea anterior aún no ha terminado. Espera un momento.",
@@ -2254,7 +2255,9 @@
       "skip": "Omitir",
       "retrySkip": "Volver a intentar omitir",
       "submitting": "Enviando…",
-      "sendAnswers": "Enviar respuestas"
+      "sendAnswers": "Enviar respuestas",
+      "unreadableTitle": "No se pudo mostrar esta pregunta",
+      "unreadableBody": "El agente está esperando una pregunta que esta aplicación no puede mostrar. Responde a la pregunta en la CLI para continuar."
     },
     "blockingCard": {
       "questionUnavailable": "Esta pregunta ya no está disponible.",
@@ -2281,6 +2284,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "No se pudo cargar la sesión del subagente.",
+      "historyTooLarge": "El historial de este subagente es demasiado grande para cargarlo.",
+      "historyUnavailable": "El historial de este subagente no está disponible.",
+      "historyTemporarilyUnavailable": "El historial de este subagente no está disponible temporalmente.",
       "failed": "La sesión del subagente ha fallado.",
       "noMessages": "No hay mensajes del subagente",
       "noMessagesDescription": "Esta sesión del subagente terminó sin generar una transcripción.",
@@ -4135,7 +4141,10 @@
     "list": {
       "loadFailed": "No se pudo cargar el historial del chat.",
       "new": "Chat nuevo",
-      "deleteTitle": "¿Eliminar este chat?"
+      "deleteTitle": "¿Eliminar este chat?",
+      "resetNoticeTitle": "Chats locales y borradores eliminados",
+      "resetNoticeBody": "Kilo no pudo abrir los chats guardados en este dispositivo. Tus sesiones en la nube no se ven afectadas.",
+      "resetNoticeDismiss": "Descartar aviso"
     },
     "rename": {
       "title": "Cambiar nombre del chat",
@@ -5052,7 +5061,8 @@
     "unavailableTitle": "Uso no disponible",
     "unavailableDescription": "El uso no está configurado para este espacio de trabajo. Contacta con soporte si esperas ver el uso aquí.",
     "orgSelfNotice": "Estás viendo tu propio uso en esta organización.",
-    "viewDetails": "Ver detalles de uso"
+    "viewDetails": "Ver detalles de uso",
+    "orgSelfEntryTitle": "Tu uso"
   },
   "integrations": {
     "title": "Integraciones",

@@ -490,7 +490,6 @@ describe('getAdmission', () => {
       payload: 'integrity-token',
     });
     expect(AppIntegrity.prepareIntegrityTokenProviderAsync).toHaveBeenCalledWith('1234567890');
-    // Standard requests bind through requestHash: base64 SHA-256 of the challenge.
     expect(digestStringAsync).toHaveBeenCalledWith(
       CryptoDigestAlgorithm.SHA256,
       'server-challenge',
@@ -506,8 +505,6 @@ describe('getAdmission', () => {
       .mockResolvedValueOnce('replacement-token');
 
     await expect(getAdmission()).resolves.toMatchObject({ payload: 'replacement-token' });
-    // The Expo module keeps the provider it prepared, so a new one is prepared
-    // rather than reusing the stale one.
     expect(AppIntegrity.prepareIntegrityTokenProviderAsync).toHaveBeenCalledTimes(2);
     expect(AppIntegrity.requestIntegrityCheckAsync).toHaveBeenCalledTimes(2);
   });
@@ -624,8 +621,6 @@ describe('getAdmission', () => {
 
   describe('clearAttestKeyOnRefusal', () => {
     it('drops the stored key id so the next attempt re-attests', async () => {
-      // The server refuses an assertion for a key it never persisted. Without
-      // the clear, the device asserts against that key forever.
       await clearAttestKeyOnRefusal('ADMISSION_REQUIRED');
 
       expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith(ATTEST_KEY_ID_KEY);

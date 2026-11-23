@@ -2411,6 +2411,7 @@
       "couldNotLoadThisSession": "Níorbh fhéidir an seisiún seo a lódáil.",
       "historyTooLarge": "Tá tras-scríbhinn an tseisiúin seo rómhór le lódáil.",
       "historyUnavailable": "Ní féidir tras-scríbhinn an tseisiúin seo a léamh.",
+      "historyTemporarilyUnavailable": "Níl tras-scríbhinn an tseisiúin seo ar fáil go sealadach.",
       "cloneFailedRetry": "Níorbh fhéidir an seisiún seo a chlónáil. Bain triail as arís.",
       "notEnoughCredits": "Níl go leor creidmheasanna agat don iarratas seo. Cuir creidmheasanna leis agus bain triail as arís.",
       "previousTaskFinishing": "Níl an tasc roimhe seo críochnaithe fós. Fan nóiméad, le do thoil.",
@@ -2959,7 +2960,9 @@
       "skip": "Scipeáil",
       "retrySkip": "Bain triail eile as scipeáil",
       "submitting": "Ag seoladh…",
-      "sendAnswers": "Seol freagraí"
+      "sendAnswers": "Seol freagraí",
+      "unreadableTitle": "Níorbh fhéidir an cheist seo a thaispeáint",
+      "unreadableBody": "Tá an gníomhaire ag fanacht le ceist nach féidir leis an aip seo a thaispeáint. Freagair an cheist sa CLI chun leanúint ar aghaidh."
     },
     "blockingCard": {
       "questionUnavailable": "Níl an cheist seo ar fáil a thuilleadh.",
@@ -2986,6 +2989,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Níorbh fhéidir seisiún an fhoghníomhaire a lódáil.",
+      "historyTooLarge": "Tá stair an fhoghníomhaire seo rómhór le lódáil.",
+      "historyUnavailable": "Níl stair an fhoghníomhaire seo ar fáil.",
+      "historyTemporarilyUnavailable": "Níl stair an fhoghníomhaire seo ar fáil go sealadach.",
       "failed": "Theip ar sheisiún an fhoghníomhaire.",
       "noMessages": "Níl aon teachtaireacht ón bhfoghníomhaire ann",
       "noMessagesDescription": "Críochnaíodh seisiún an fhoghníomhaire seo gan athscríbhinn a chruthú.",
@@ -4291,7 +4297,10 @@
     "list": {
       "loadFailed": "Níorbh fhéidir stair an chomhrá a lódáil.",
       "new": "Comhrá nua",
-      "deleteTitle": "An comhrá seo a scriosadh?"
+      "deleteTitle": "An comhrá seo a scriosadh?",
+      "resetNoticeTitle": "Glanadh comhráite agus dréachtaí áitiúla",
+      "resetNoticeBody": "Níorbh fhéidir le Kilo na comhráite atá sábháilte ar an ngléas seo a oscailt. Níl aon tionchar ar do sheisiúin sa scamall.",
+      "resetNoticeDismiss": "Cuir an fógra as an áireamh"
     },
     "rename": {
       "title": "Athainmnigh an comhrá",
@@ -5240,7 +5249,8 @@
     "unavailableTitle": "Níl úsáid ar fáil",
     "unavailableDescription": "Níl úsáid socraithe don spás oibre seo. Déan teagmháil leis an tacaíocht má tá súil agat úsáid a fheiceáil anseo.",
     "orgSelfNotice": "Tá d'úsáid féin san eagraíocht seo á feiceáil agat.",
-    "viewDetails": "Féach ar shonraí úsáide"
+    "viewDetails": "Féach ar shonraí úsáide",
+    "orgSelfEntryTitle": "D'úsáid féin"
   },
   "integrations": {
     "title": "Comhtháthuithe",

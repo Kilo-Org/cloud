@@ -8,6 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { briefingEstimateUnavailableKey } from '@/lib/agent-briefing-state';
 import { briefingMoney } from '@/lib/agent-briefing-format';
+import { useBriefingLocale } from './briefing-locale';
 
 /**
  * The quote line's one phase per settled state of the estimate read. The
@@ -85,7 +86,8 @@ export function parseBriefingEstimateLineQuote(
  * offline phase, and the card's Retry for the failed one.
  */
 export function BriefingEstimateLine({ quote }: { readonly quote: BriefingEstimateLineQuote }) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
+  const locale = useBriefingLocale();
   switch (quote.kind) {
     case 'invalid': {
       // The sentence shows on the safeguard field at fault, and that field's own
@@ -141,8 +143,8 @@ export function BriefingEstimateLine({ quote }: { readonly quote: BriefingEstima
       return (
         <Text className="text-xs text-muted-foreground">
           {t('agentBriefing.estimate', {
-            estimate: briefingMoney(quote.quote.estimatedCostMicrodollars, i18n.language),
-            maximum: briefingMoney(quote.quote.maximumCostMicrodollars, i18n.language),
+            estimate: briefingMoney(quote.quote.estimatedCostMicrodollars, locale),
+            maximum: briefingMoney(quote.quote.maximumCostMicrodollars, locale),
           })}
         </Text>
       );

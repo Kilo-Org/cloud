@@ -2264,6 +2264,7 @@
       "couldNotLoadThisSession": "Ezin izan da saio hau kargatu.",
       "historyTooLarge": "Saio honen transkripzioa kargatzeko handiegia da.",
       "historyUnavailable": "Ezin da irakurri saio honen transkripzioa.",
+      "historyTemporarilyUnavailable": "Saio honen transkripzioa ez dago aldi baterako erabilgarri.",
       "cloneFailedRetry": "Ezin izan da saio hau klonatu. Saiatu berriro.",
       "notEnoughCredits": "Ez dago nahikoa kreditu eskaera honetarako. Gehitu kredituak eta saiatu berriro.",
       "previousTaskFinishing": "Aurreko zeregina oraindik amaitzen ari da. Itxaron pixka bat.",
@@ -2800,7 +2801,9 @@
       "skip": "Saltatu",
       "retrySkip": "Saiatu berriro saltatzen",
       "submitting": "Bidaltzen…",
-      "sendAnswers": "Bidali erantzunak"
+      "sendAnswers": "Bidali erantzunak",
+      "unreadableTitle": "Galdera hau ezin izan da erakutsi",
+      "unreadableBody": "Agentea galdera baten zain dago, eta aplikazio honek ezin du galdera hori erakutsi. Erantzun galderari CLI-n jarraitzeko."
     },
     "blockingCard": {
       "questionUnavailable": "Galdera hau jada ez dago erabilgarri.",
@@ -2827,6 +2830,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Ezin izan da azpiagentearen saioa kargatu.",
+      "historyTooLarge": "Azpiagente honen historia kargatzeko handiegia da.",
+      "historyUnavailable": "Azpiagente honen historia ez dago erabilgarri.",
+      "historyTemporarilyUnavailable": "Azpiagente honen historia ez dago aldi baterako erabilgarri.",
       "failed": "Azpiagentearen saioak huts egin du.",
       "noMessages": "Ez dago azpiagentearen mezurik",
       "noMessagesDescription": "Azpiagentearen saio hau transkripziorik sortu gabe amaitu da.",
@@ -4057,7 +4063,10 @@
     "list": {
       "loadFailed": "Ezin izan da txat-historia kargatu.",
       "new": "Txat berria",
-      "deleteTitle": "Txat hau ezabatu?"
+      "deleteTitle": "Txat hau ezabatu?",
+      "resetNoticeTitle": "Tokiko txatak eta zirriborroak ezabatu dira",
+      "resetNoticeBody": "Kilok ezin izan zituen gailu honetan gordetako txatak ireki. Zure hodeiko saioei ez die eragin.",
+      "resetNoticeDismiss": "Baztertu oharra"
     },
     "rename": {
       "title": "Berrizendatu txata",
@@ -4958,7 +4967,8 @@
     "unavailableTitle": "Erabilera ez dago erabilgarri",
     "unavailableDescription": "Erabilera ez dago konfiguratuta lan-eremu honetan. Hemen erabilera ikusi beharko zenukeela uste baduzu, jarri harremanetan laguntza-zerbitzuarekin.",
     "orgSelfNotice": "Erakunde honetan zure erabilera ikusten ari zara.",
-    "viewDetails": "Ikusi erabileraren xehetasunak"
+    "viewDetails": "Ikusi erabileraren xehetasunak",
+    "orgSelfEntryTitle": "Zure erabilera"
   },
   "integrations": {
     "title": "Integrazioak",

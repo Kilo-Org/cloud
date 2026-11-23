@@ -100,18 +100,6 @@ describe('SectionHeader mounted layout', () => {
       expect(text.props.style).toBeUndefined();
     }
 
-    // The action copy must sit at the row's end in both directions: the row's
-    // main axis starts at the gutter, so the label always begins there, and the
-    // action box takes the free space in front of itself (`ms-auto`) — a lone
-    // action box on a wrapped line still lands on the row's outer edge. The box
-    // must not grow: when both children grew the row split in half and the
-    // action sat at the inner edge of its half (the screen centre in Arabic)
-    // instead of the margin the tab bar, cards and rows below share
-    // (home-arabic-rtl, home). The layout is direction-relative and identical
-    // under RTL: the auto margin resolves to the row's end in either direction,
-    // never through a physical text alignment. The row must not pack its lines
-    // to the end (`justify-end`), or a label that is not the growing item lands
-    // at the outer edge — the wide-window "CATEGORIES" and "PERSONAL" labels.
     const rowClasses = ((action.parent?.props.className as string | undefined) ?? '').split(' ');
     expect(rowClasses).toContain('flex-wrap');
     expect(rowClasses).not.toContain('justify-end');
@@ -121,9 +109,6 @@ describe('SectionHeader mounted layout', () => {
     expect(actionBoxClasses).toContain('ms-auto');
     expect(actionBoxClasses).not.toContain('grow');
     expect(actionBoxClasses).not.toContain('justify-end');
-    // The row keeps its one-line content edge, and the action box is centred on
-    // that line: the box cancels its own height, so its copy sits on the label's
-    // line without the row growing for it (home section-label gap).
     expect(rowClasses.filter(name => name.startsWith('items-'))).toEqual(['items-end']);
     expect(actionBoxClasses).toContain('items-center');
     const actionTextClasses = (text.props.className as string).split(' ');
@@ -211,12 +196,6 @@ describe('SectionHeader mounted layout', () => {
     }
   );
 
-  // The display treatment belongs to the copy's script, not to the interface
-  // direction: Latin copy keeps the capitals and tracking in either direction,
-  // while right-to-left script copy drops them inside an RTL interface. The
-  // header's label and its action take the same rule (`keepsLatinDisplay`), so
-  // the two labels of one row cannot drift apart (home-ar-loading; design gate,
-  // section header actions in the rtl cell).
   it.each([
     { isRTL: false, label: 'Sessions running now', action: 'See all', tracked: true },
     { isRTL: true, label: 'Sessions running now', action: 'See all', tracked: true },
@@ -504,9 +483,6 @@ describe('SectionHeader mounted layout', () => {
     const withActionSkeleton = shape(createElement(SectionHeaderSkeleton, { action: true }));
     expect(withActionSkeleton.row).toEqual(withActionHeader.row);
     expect(withActionSkeleton.bars).toHaveLength(2);
-    // The action reserves the label's own line, so it holds no height of its
-    // own: a header with an action keeps the plain header's row exactly, and the
-    // action cannot grow the header when it arrives.
     expect(withActionHeader.row).toEqual(plainHeader.row);
     expect(withActionSkeleton.row).toEqual(plainSkeleton.row);
     expect(withActionSkeleton.bars[1]).toEqual(expect.arrayContaining(['h-3.5', 'w-12']));

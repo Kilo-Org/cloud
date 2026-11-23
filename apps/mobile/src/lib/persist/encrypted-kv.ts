@@ -21,7 +21,11 @@ import {
   ProtectedDataUnavailableError,
   whenProtectedDataAvailable,
 } from '@/lib/protected-data';
-import { PERSIST_DB_KEY, PERSIST_MIGRATION_FAILURES_KEY } from '@/lib/storage-keys';
+import {
+  PERSIST_DB_KEY,
+  PERSIST_MIGRATION_FAILURES_KEY,
+  PERSIST_RESET_NOTICE_KEY,
+} from '@/lib/storage-keys';
 import { kv } from './schema';
 
 /**
@@ -452,6 +456,26 @@ async function keepDatabaseAndRethrow(db: KVDatabase | undefined, cause: unknown
   throw cause;
 }
 
+/**
+ * Writes the marker the chat list reads as the reset notice.
+ *
+ * The marker follows the delete: only a file that was actually removed may be
+ * reported, so this runs after `deleteDatabaseAsync` resolves. A marker that
+ * did not land leaves the data deleted with no explanation and no record, so
+ * the refusal is reported here. `writeStoredValueSafe` reports a rejected
+ * write itself, but answers `false` silently while the keychain is closed, and
+ * the delete above can land in exactly that window.
+ */
+async function markResetNotice(): Promise<void> {
+  if (await writeStoredValueSafe(PERSIST_RESET_NOTICE_KEY, '1')) {
+    return;
+  }
+  Sentry.captureException(new Error('reset notice marker not written'), {
+    level: 'warning',
+    tags: { 'error.subsystem': 'encrypted-kv', 'error.operation': 'reset-notice-marker' },
+  });
+}
+
 async function openEncryptedDatabase(): Promise<KVDatabase> {
   const key = await readOrCreateKey();
   let db: KVDatabase | undefined = undefined;
@@ -550,7 +574,17 @@ async function openEncryptedDatabase(): Promise<KVDatabase> {
     }
     let reopened: KVDatabase | undefined = undefined;
     try {
+      // The delete is the step that removes the data, and only what it
+      // actually removed may be reported: the marker is written after it
+      // resolves, so a refused or failed delete can never strand a notice
+      // claiming a loss that did not happen. The window this leaves is the
+      // opposite one — a crash between the delete and the write reports
+      // nothing — which loses an explanation in a rare process death instead of
+      // inventing one the person never suffered. A marker that the keychain
+      // refuses is reported by {@link markResetNotice}: the data is already
+      // gone, so a silent refusal would leave a loss with no record.
       await SQLite.deleteDatabaseAsync(DATABASE_NAME);
+      await markResetNotice();
       const freshKey = await generateAndStoreKey();
       reopened = await openWithKey(freshKey);
       probeSchema(reopened);
@@ -707,6 +741,50 @@ export function resetEncryptedKvOpenForTests(): void {
 export async function encryptedDatabase(): Promise<SQLite.SQLiteDatabase> {
   const db = await openDatabase();
   return db.$client;
+}
+
+/**
+ * Resolves once the store's own open attempt has settled, whether it succeeded
+ * or rejected, and never rejects itself.
+ *
+ * The reset that writes the notice marker runs inside that first open. A
+ * caller that read the marker at mount, before the open settled, would read
+ * "no reset" on exactly the launch whose open cleared the file, and the loss
+ * would show as an ordinary empty store until the next relaunch. Awaiting this
+ * is what makes the notice appear on the launch that lost the data.
+ */
+export async function whenEncryptedStoreOpenSettled(): Promise<void> {
+  try {
+    await openDatabase();
+  } catch {
+    // An open that failed says nothing about the marker: the read below still
+    // returns whatever the reset wrote before it failed.
+  }
+}
+
+/**
+ * Whether the encrypted store was reset and the person has not been told yet.
+ *
+ * True only for the marker's own value: any other stored value, a failed read,
+ * or a locked keychain reads as "no notice", because a notice about a loss the
+ * marker cannot prove must never appear.
+ *
+ * The read waits for the store's first open to settle first: the reset writes
+ * the marker as part of that open, so a read that raced it would miss the one
+ * launch the notice exists for.
+ */
+export async function readPersistedResetNotice(): Promise<boolean> {
+  await whenEncryptedStoreOpenSettled();
+  return (await readStoredValueSafe(PERSIST_RESET_NOTICE_KEY)) === '1';
+}
+
+/**
+ * Clears the reset marker after the notice was dismissed. The total delete: a
+ * keychain that refuses the clear leaves the marker, and the notice returns on
+ * the next launch instead of failing the dismissal that already happened.
+ */
+export async function clearPersistedResetNotice(): Promise<void> {
+  await deleteStoredValueSafe(PERSIST_RESET_NOTICE_KEY);
 }
 
 /** Reads one value; returns null when the key is absent. */

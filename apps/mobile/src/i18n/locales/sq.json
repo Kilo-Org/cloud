@@ -2264,6 +2264,7 @@
       "couldNotLoadThisSession": "Nuk u ngarkua kjo seancë.",
       "historyTooLarge": "Transkripti i kësaj seance është shumë i madh për t'u ngarkuar.",
       "historyUnavailable": "Transkripti i kësaj seance nuk mund të lexohet.",
+      "historyTemporarilyUnavailable": "Transkripti i kësaj seance është përkohësisht i padisponueshëm.",
       "cloneFailedRetry": "Nuk u klonua kjo seancë. Provo përsëri.",
       "notEnoughCredits": "Nuk ke mjaft kredite për këtë kërkesë. Shto kredite dhe provo përsëri.",
       "previousTaskFinishing": "Detyra e mëparshme nuk ka përfunduar ende. Prit pak.",
@@ -2800,7 +2801,9 @@
       "skip": "Anashkalo",
       "retrySkip": "Provo ta anashkalosh përsëri",
       "submitting": "Duke u dërguar…",
-      "sendAnswers": "Dërgo përgjigjet"
+      "sendAnswers": "Dërgo përgjigjet",
+      "unreadableTitle": "Kjo pyetje nuk mund të shfaqej",
+      "unreadableBody": "Agjenti po pret një pyetje që ky aplikacion nuk mund ta shfaqë. Përgjigju pyetjes në CLI për të vazhduar."
     },
     "blockingCard": {
       "questionUnavailable": "Kjo pyetje nuk është më e disponueshme.",
@@ -2827,6 +2830,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Nuk u ngarkua seanca e nënagjentit.",
+      "historyTooLarge": "Historiku i këtij nënagjenti është shumë i madh për t'u ngarkuar.",
+      "historyUnavailable": "Historiku i këtij nënagjenti nuk është i disponueshëm.",
+      "historyTemporarilyUnavailable": "Historiku i këtij nënagjenti është përkohësisht i padisponueshëm.",
       "failed": "Seanca e nënagjentit dështoi.",
       "noMessages": "Nuk ka mesazhe nga nënagjenti",
       "noMessagesDescription": "Kjo seancë e nënagjentit përfundoi pa krijuar një transkript.",
@@ -4057,7 +4063,10 @@
     "list": {
       "loadFailed": "Nuk u arrit të ngarkohej historia e bisedës.",
       "new": "Bisedë e re",
-      "deleteTitle": "Ta fshini këtë bisedë?"
+      "deleteTitle": "Ta fshini këtë bisedë?",
+      "resetNoticeTitle": "Bisedat lokale dhe paraprakët u fshinë",
+      "resetNoticeBody": "Kilo nuk i hapi dot bisedat e ruajtura në këtë pajisje. Sesionet e tu në re nuk janë prekur.",
+      "resetNoticeDismiss": "Hidh poshtë njoftimin"
     },
     "rename": {
       "title": "Riemërto bisedën",
@@ -4958,7 +4967,8 @@
     "unavailableTitle": "Përdorimi nuk është i disponueshëm",
     "unavailableDescription": "Përdorimi nuk është konfiguruar për këtë hapësirë pune. Kontaktoni mbështetjen nëse prisni të shihni përdorim këtu.",
     "orgSelfNotice": "Po shihni përdorimin tuaj në këtë organizatë.",
-    "viewDetails": "Shiko detajet e përdorimit"
+    "viewDetails": "Shiko detajet e përdorimit",
+    "orgSelfEntryTitle": "Përdorimi juaj"
   },
   "integrations": {
     "title": "Integrimet",

@@ -1714,6 +1714,7 @@
       "couldNotLoadThisSession": "לא ניתן היה לטעון את הסשן הזה.",
       "historyTooLarge": "ההתעתק של הסשן הזה גדול מדי מכדי לטעון.",
       "historyUnavailable": "לא ניתן לקרוא את ההתעתק של הסשן הזה.",
+      "historyTemporarilyUnavailable": "ההתעתק של הסשן הזה אינו זמין באופן זמני.",
       "cloneFailedRetry": "לא ניתן היה לשכפל את הסשן הזה. נסה שוב.",
       "notEnoughCredits": "אין מספיק קרדיטים לבקשה הזו. הוסף קרדיטים ונסה שוב.",
       "previousTaskFinishing": "המשימה הקודמת עדיין לא הסתיימה. המתן רגע.",
@@ -2254,7 +2255,9 @@
       "skip": "דילוג",
       "retrySkip": "ניסיון דילוג נוסף",
       "submitting": "שולח…",
-      "sendAnswers": "שליחת התשובות"
+      "sendAnswers": "שליחת התשובות",
+      "unreadableTitle": "לא ניתן להציג את השאלה",
+      "unreadableBody": "הסוכן ממתין לשאלה שאין באפשרות האפליקציה הזו להציג. יש להשיב לשאלה ב-CLI כדי להמשיך."
     },
     "blockingCard": {
       "questionUnavailable": "השאלה הזו אינה זמינה עוד.",
@@ -2281,6 +2284,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "לא ניתן היה לטעון את הסשן של תת-הסוכן.",
+      "historyTooLarge": "ההיסטוריה של תת-הסוכן הזה גדולה מדי מכדי לטעון.",
+      "historyUnavailable": "ההיסטוריה של תת-הסוכן הזה אינה זמינה.",
+      "historyTemporarilyUnavailable": "ההיסטוריה של תת-הסוכן הזה אינה זמינה באופן זמני.",
       "failed": "הסשן של תת-הסוכן נכשל.",
       "noMessages": "אין הודעות מתת-הסוכן",
       "noMessagesDescription": "הסשן של תת-הסוכן הסתיים ללא תמליל.",
@@ -4135,7 +4141,10 @@
     "list": {
       "loadFailed": "לא ניתן היה לטעון את היסטוריית השיחה.",
       "new": "צ'אט חדש",
-      "deleteTitle": "למחוק את הצ'אט הזה?"
+      "deleteTitle": "למחוק את הצ'אט הזה?",
+      "resetNoticeTitle": "הצ'אטים והטיוטות במכשיר נוקו",
+      "resetNoticeBody": "Kilo לא הצליח לפתוח את הצ'אטים השמורים במכשיר הזה. הסשנים בענן שלך לא נפגעו.",
+      "resetNoticeDismiss": "התעלמות מההודעה"
     },
     "rename": {
       "title": "שינוי שם הצ׳אט",
@@ -5052,7 +5061,8 @@
     "unavailableTitle": "השימוש אינו זמין",
     "unavailableDescription": "השימוש אינו מוגדר עבור סביבת העבודה הזו. פנו לתמיכה אם אתם מצפים לראות כאן נתוני שימוש.",
     "orgSelfNotice": "מוצג השימוש שלך בארגון זה.",
-    "viewDetails": "הצגת פרטי השימוש"
+    "viewDetails": "הצגת פרטי השימוש",
+    "orgSelfEntryTitle": "השימוש שלך"
   },
   "integrations": {
     "title": "אינטגרציות",

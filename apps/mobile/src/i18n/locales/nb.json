@@ -2264,6 +2264,7 @@
       "couldNotLoadThisSession": "Kunne ikke laste inn denne økten.",
       "historyTooLarge": "Øktens logg er for stor til å laste inn.",
       "historyUnavailable": "Øktens logg kan ikke leses.",
+      "historyTemporarilyUnavailable": "Øktens logg er midlertidig utilgjengelig.",
       "cloneFailedRetry": "Kunne ikke klone denne økten. Prøv igjen.",
       "notEnoughCredits": "Du har ikke nok kreditter til denne forespørselen. Fyll på kreditter og prøv igjen.",
       "previousTaskFinishing": "Den forrige oppgaven er ikke helt avsluttet ennå. Vent et øyeblikk.",
@@ -2800,7 +2801,9 @@
       "skip": "Hopp over",
       "retrySkip": "Prøv å hoppe over på nytt",
       "submitting": "Sender inn…",
-      "sendAnswers": "Send svar"
+      "sendAnswers": "Send svar",
+      "unreadableTitle": "Dette spørsmålet kunne ikke vises",
+      "unreadableBody": "Agenten venter på et spørsmål som denne appen ikke kan vise. Svar på det i CLI for å fortsette."
     },
     "blockingCard": {
       "questionUnavailable": "Dette spørsmålet er ikke lenger tilgjengelig.",
@@ -2827,6 +2830,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Kunne ikke laste inn underagentøkten.",
+      "historyTooLarge": "Underagentens historikk er for stor til å laste inn.",
+      "historyUnavailable": "Underagentens historikk er ikke tilgjengelig.",
+      "historyTemporarilyUnavailable": "Underagentens historikk er midlertidig utilgjengelig.",
       "failed": "Underagentøkten mislyktes.",
       "noMessages": "Ingen meldinger fra underagenten",
       "noMessagesDescription": "Denne underagentøkten ble fullført uten en samtalelogg.",
@@ -4057,7 +4063,10 @@
     "list": {
       "loadFailed": "Kunne ikke laste inn chathistorikken.",
       "new": "Ny chat",
-      "deleteTitle": "Slette denne chatten?"
+      "deleteTitle": "Slette denne chatten?",
+      "resetNoticeTitle": "Lokale chatter og utkast ble slettet",
+      "resetNoticeBody": "Kilo kunne ikke åpne chattene som er lagret på denne enheten. Øktene dine i skyen er ikke påvirket.",
+      "resetNoticeDismiss": "Avvis varsel"
     },
     "rename": {
       "title": "Gi chatten nytt navn",
@@ -4958,7 +4967,8 @@
     "unavailableTitle": "Forbruk er ikke tilgjengelig",
     "unavailableDescription": "Forbruk er ikke satt opp for dette arbeidsområdet. Kontakt brukerstøtte hvis du forventer å se forbruk her.",
     "orgSelfNotice": "Du ser ditt eget forbruk i denne organisasjonen.",
-    "viewDetails": "Vis forbruksdetaljer"
+    "viewDetails": "Vis forbruksdetaljer",
+    "orgSelfEntryTitle": "Ditt forbruk"
   },
   "integrations": {
     "title": "Integrasjoner",

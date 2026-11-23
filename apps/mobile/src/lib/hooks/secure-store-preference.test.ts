@@ -595,9 +595,6 @@ describe('createSecureStorePreference', () => {
     // until the reconciliation write lands).
     const mergedAt = seen.findIndex(entry => entry.length === 2);
     expect(mergedAt).toBeGreaterThanOrEqual(0);
-    // Every repaint after the merge keeps the disk entries; none drops back to
-    // the pre-merge target, which would hide them until the reconciliation
-    // write lands.
     expect(seen.slice(mergedAt).every(entry => entry.length === 2)).toBe(true);
     expect(seen.at(-1)).toEqual(['disk', 'local']);
     unsubscribe();

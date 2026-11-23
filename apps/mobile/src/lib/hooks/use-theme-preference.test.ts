@@ -139,10 +139,7 @@ describe('useThemePreference store', () => {
 
     setThemePreference('dark');
     expect(setColorScheme).toHaveBeenCalledWith('dark');
-    // Appearance must move before the store notification: a subscriber that
-    // mounts from that notification would otherwise see useColorScheme update
-    // mid-mount (LogBox over the tab bar). The wrapper mock records 0 here when
-    // the store notified first.
+    // The wrapper mock records 0 here when the store notified first.
     expect(notifySchemeCounts[0]).toBeGreaterThan(0);
     await flushMicrotasks();
     expect(setItemAsync).toHaveBeenCalledWith('theme-preference', 'dark');

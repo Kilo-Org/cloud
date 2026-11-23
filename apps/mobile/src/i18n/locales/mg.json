@@ -2264,6 +2264,7 @@
       "couldNotLoadThisSession": "Tsy voaray ity fotoam-piasana ity.",
       "historyTooLarge": "Lava loatra ny firaketan'ity fotoam-piasana ity havoaka.",
       "historyUnavailable": "Tsy azo vakiana ny firaketan'ity fotoam-piasana ity.",
+      "historyTemporarilyUnavailable": "Tsy azo jerena vonjimaika ny firaketan'ity fotoam-piasana ity.",
       "cloneFailedRetry": "Tsy nahomby ny famoronana dika mitovy amin'ity fotoam-piasana ity. Andramo indray.",
       "notEnoughCredits": "Tsy ampy ny kireditra ho an'ity fangatahana ity. Ampio kireditra ary andramo indray.",
       "previousTaskFinishing": "Mbola eo am-pamaranana ny asa teo aloha. Andraso kely azafady.",
@@ -2800,7 +2801,9 @@
       "skip": "Dingano",
       "retrySkip": "Andramo dinganina indray",
       "submitting": "Mandefa…",
-      "sendAnswers": "Alefaso ny valiny"
+      "sendAnswers": "Alefaso ny valiny",
+      "unreadableTitle": "Tsy afaka naseho ity fanontaniana ity",
+      "unreadableBody": "Miandry fanontaniana izay tsy afaka asehon'ity rindrankajy ity ny agent. Valio ao amin'ny CLI izy mba hahafahana manohy."
     },
     "blockingCard": {
       "questionUnavailable": "Tsy misy intsony ity fanontaniana ity.",
@@ -2827,6 +2830,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Tsy voaray ny fotoam-piasan'ny mpanampy lefitra.",
+      "historyTooLarge": "Lava loatra ny tantaran'ny mpanampy lefitra ity havoaka.",
+      "historyUnavailable": "Tsy misy ny tantaran'ny mpanampy lefitra ity.",
+      "historyTemporarilyUnavailable": "Tsy azo jerena vonjimaika ny tantaran'ny mpanampy lefitra ity.",
       "failed": "Tsy nahomby ny fotoam-piasan'ny mpanampy lefitra.",
       "noMessages": "Tsy misy hafatra avy amin'ny mpanampy lefitra",
       "noMessagesDescription": "Vita ity fotoam-piasan'ny mpanampy lefitra ity nefa tsy namokatra rakitsoratra.",
@@ -4057,7 +4063,10 @@
     "list": {
       "loadFailed": "Tsy afaka nampidirina ny tantaran'ny resaka.",
       "new": "Resaka vaovao",
-      "deleteTitle": "Hamafa ity resaka ity?"
+      "deleteTitle": "Hamafa ity resaka ity?",
+      "resetNoticeTitle": "Voafafa ny resaka sy volavola eto amin'ny fitaovana",
+      "resetNoticeBody": "Tsy afaka nanokatra ny resaka voatahiry ao amin'ity fitaovana ity i Kilo. Tsy voakasika ny fotoam-piasanao ao amin'ny rahona.",
+      "resetNoticeDismiss": "Esory ny filazana"
     },
     "rename": {
       "title": "Ovay ny anaran'ny resaka",
@@ -4958,7 +4967,8 @@
     "unavailableTitle": "Tsy azo ny fampiasana",
     "unavailableDescription": "Tsy voalamina ho an'ity toeram-piasana ity ny fampiasana. Mifandraisa amin'ny ekipa mpanampy raha manantena ny hahita fampiasana eto ianao.",
     "orgSelfNotice": "Ny fampiasanao manokana ato amin'ity fikambanana ity no hitanao.",
-    "viewDetails": "Hijery ny antsipirian'ny fampiasana"
+    "viewDetails": "Hijery ny antsipirian'ny fampiasana",
+    "orgSelfEntryTitle": "Ny fampiasanao"
   },
   "integrations": {
     "title": "Fampifandraisana",

@@ -1691,6 +1691,7 @@
       "couldNotLoadThisSession": "无法加载此会话",
       "historyTooLarge": "此会话的对话记录过大，无法加载。",
       "historyUnavailable": "无法读取此会话的对话记录。",
+      "historyTemporarilyUnavailable": "此会话的对话记录暂时不可用。",
       "cloneFailedRetry": "无法克隆此会话。请重试。",
       "notEnoughCredits": "额度不足，无法处理此请求。请充值后重试。",
       "previousTaskFinishing": "上一个任务正在收尾，请稍等。",
@@ -2227,7 +2228,9 @@
       "skip": "跳过",
       "retrySkip": "再次尝试跳过",
       "submitting": "正在提交……",
-      "sendAnswers": "发送答案"
+      "sendAnswers": "发送答案",
+      "unreadableTitle": "无法显示此问题",
+      "unreadableBody": "Agent 正在等待一个此应用无法显示的问题。请在 CLI 中回答此问题以继续。"
     },
     "blockingCard": {
       "questionUnavailable": "此问题已失效。",
@@ -2254,6 +2257,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "无法加载子智能体会话",
+      "historyTooLarge": "此子智能体的历史记录过大，无法加载。",
+      "historyUnavailable": "此子智能体的历史记录不可用。",
+      "historyTemporarilyUnavailable": "此子智能体的历史记录暂时不可用。",
       "failed": "子智能体会话失败",
       "noMessages": "暂无子智能体消息",
       "noMessagesDescription": "此子智能体会话已完成，但未生成会话记录。",
@@ -4057,7 +4063,10 @@
     "list": {
       "loadFailed": "无法加载聊天历史。",
       "new": "新聊天",
-      "deleteTitle": "删除这个聊天？"
+      "deleteTitle": "删除这个聊天？",
+      "resetNoticeTitle": "本地聊天和草稿已清除",
+      "resetNoticeBody": "Kilo 无法打开保存在此设备上的聊天。你的云端会话不受影响。",
+      "resetNoticeDismiss": "忽略通知"
     },
     "rename": {
       "title": "重命名聊天",
@@ -4958,7 +4967,8 @@
     "unavailableTitle": "用量不可用",
     "unavailableDescription": "此工作区尚未设置用量。如果认为此处应显示用量，请联系支持团队。",
     "orgSelfNotice": "你看到的是你自己在此组织中的用量。",
-    "viewDetails": "查看用量详情"
+    "viewDetails": "查看用量详情",
+    "orgSelfEntryTitle": "你的用量"
   },
   "integrations": {
     "title": "集成",

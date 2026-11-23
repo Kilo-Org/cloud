@@ -1609,6 +1609,7 @@
       "couldNotLoadThisSession": "Impossible de charger cette session",
       "historyTooLarge": "La transcription de cette session est trop volumineuse pour être chargée.",
       "historyUnavailable": "Impossible de lire la transcription de cette session.",
+      "historyTemporarilyUnavailable": "La transcription de cette session est temporairement indisponible.",
       "cloneFailedRetry": "Impossible de cloner cette session. Réessayez.",
       "notEnoughCredits": "Crédits insuffisants pour cette requête. Ajoutez des crédits et réessayez.",
       "previousTaskFinishing": "La tâche précédente se termine. Patientez un instant.",
@@ -2149,7 +2150,9 @@
       "skip": "Passer",
       "retrySkip": "Réessayer de passer",
       "submitting": "Envoi…",
-      "sendAnswers": "Envoyer les réponses"
+      "sendAnswers": "Envoyer les réponses",
+      "unreadableTitle": "Impossible d'afficher cette question",
+      "unreadableBody": "L'agent attend une question que cette application ne peut pas afficher. Répondez à la question dans le CLI pour continuer."
     },
     "blockingCard": {
       "questionUnavailable": "Cette question n'est plus disponible.",
@@ -2176,6 +2179,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Impossible de charger la session du sous-agent",
+      "historyTooLarge": "L'historique de ce sous-agent est trop volumineux pour être chargé.",
+      "historyUnavailable": "L'historique de ce sous-agent n'est pas disponible.",
+      "historyTemporarilyUnavailable": "L'historique de ce sous-agent est temporairement indisponible.",
       "failed": "La session du sous-agent a échoué",
       "noMessages": "Aucun message du sous-agent",
       "noMessagesDescription": "Cette session de sous-agent s'est terminée sans produire de transcription.",
@@ -4135,7 +4141,10 @@
     "list": {
       "loadFailed": "Impossible de charger l'historique des discussions.",
       "new": "Nouvelle discussion",
-      "deleteTitle": "Supprimer cette discussion ?"
+      "deleteTitle": "Supprimer cette discussion ?",
+      "resetNoticeTitle": "Discussions et brouillons locaux effacés",
+      "resetNoticeBody": "Kilo n'a pas pu ouvrir les discussions enregistrées sur cet appareil. Vos sessions dans le nuage ne sont pas affectées.",
+      "resetNoticeDismiss": "Ignorer la notification"
     },
     "rename": {
       "title": "Renommer la discussion",
@@ -5052,7 +5061,8 @@
     "unavailableTitle": "Utilisation indisponible",
     "unavailableDescription": "Le suivi de l'utilisation n'est pas configuré pour cet espace de travail. Contactez l'assistance si vous vous attendez à voir l'utilisation ici.",
     "orgSelfNotice": "Vous voyez votre propre utilisation dans cette organisation.",
-    "viewDetails": "Voir les détails d'utilisation"
+    "viewDetails": "Voir les détails d'utilisation",
+    "orgSelfEntryTitle": "Votre utilisation"
   },
   "integrations": {
     "title": "Intégrations",

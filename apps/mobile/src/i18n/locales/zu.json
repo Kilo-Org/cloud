@@ -2264,6 +2264,7 @@
       "couldNotLoadThisSession": "Asikwazanga ukulayisha le seshini.",
       "historyTooLarge": "Umyalezo wale seshini mude kakhulu ukuthi ulayishwe.",
       "historyUnavailable": "Iyalelephu wale seshini ayikwazi ukufundwa.",
+      "historyTemporarilyUnavailable": "Umyalezo wale seshini awutholakali okwesikhashana.",
       "cloneFailedRetry": "Asikwazanga ukwenza ikhophi yale seshini. Zama futhi.",
       "notEnoughCredits": "Awekho amakhredithi anele kulesi sicelo. Engeza amakhredithi bese uzama futhi.",
       "previousTaskFinishing": "Umsebenzi wangaphambilini usaphethwa. Sicela ulinde isikhashana.",
@@ -2800,7 +2801,9 @@
       "skip": "Yeqa",
       "retrySkip": "Zama ukweqa futhi",
       "submitting": "Kuyathunyelwa…",
-      "sendAnswers": "Thumela izimpendulo"
+      "sendAnswers": "Thumela izimpendulo",
+      "unreadableTitle": "Umbuzo awukwazile ukuboniswa",
+      "unreadableBody": "I-agent ilinde umbuzo ongakwazi ukuboniswa kule app. Phendula umbuzo ku-CLI ukuze uqhubeke."
     },
     "blockingCard": {
       "questionUnavailable": "Lo mbuzo awusatholakali.",
@@ -2827,6 +2830,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Asikwazanga ukulayisha iseshini yomenzeli ongaphansi.",
+      "historyTooLarge": "Umlando womenzeli ongaphansi ude kakhulu ukuthi ulayishwe.",
+      "historyUnavailable": "Umlando womenzeli ongaphansi awutholakali.",
+      "historyTemporarilyUnavailable": "Umlando womenzeli ongaphansi awutholakali okwesikhashana.",
       "failed": "Iseshini yomenzeli ongaphansi yehlulekile.",
       "noMessages": "Ayikho imilayezo yomenzeli ongaphansi",
       "noMessagesDescription": "Le seshini yomenzeli ongaphansi iphelile ngaphandle kokukhiqiza umbhalo.",
@@ -4057,7 +4063,10 @@
     "list": {
       "loadFailed": "Asikwazanga ukulayisha umlando wengxoxo.",
       "new": "Ingxoxo entsha",
-      "deleteTitle": "Susa le ngxoxo?"
+      "deleteTitle": "Susa le ngxoxo?",
+      "resetNoticeTitle": "Kususiwe izingxoxo nokusalungiswa kule divayisi",
+      "resetNoticeBody": "I-Kilo ayikwazanga ukuvula izingxoxo ezigcinwe kule divayisi. Amaseshini akho asefini awathintekile.",
+      "resetNoticeDismiss": "Chitha isaziso"
     },
     "rename": {
       "title": "Qamba kabusha ingxoxo",
@@ -4958,7 +4967,8 @@
     "unavailableTitle": "Ukusetshenziswa akutholakali",
     "unavailableDescription": "Ukusetshenziswa akukasethwa kule ndawo yokusebenza. Xhumana nosekelo uma ulindele ukubona ukusetshenziswa lapha.",
     "orgSelfNotice": "Ubona ukusetshenziswa kwakho kule nhlangano.",
-    "viewDetails": "Buka imininingwane yokusetshenziswa"
+    "viewDetails": "Buka imininingwane yokusetshenziswa",
+    "orgSelfEntryTitle": "Ukusetshenziswa kwakho"
   },
   "integrations": {
     "title": "Ukuhlanganiswa",

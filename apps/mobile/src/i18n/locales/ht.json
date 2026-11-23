@@ -2264,6 +2264,7 @@
       "couldNotLoadThisSession": "Nou pa t ka chaje sesyon sa a.",
       "historyTooLarge": "Transksipsyon sesyon sa a twò gwo pou chaje.",
       "historyUnavailable": "Pa ka li transksipsyon sesyon sa a.",
+      "historyTemporarilyUnavailable": "Transksipsyon sesyon sa a pa disponib pou kounye a.",
       "cloneFailedRetry": "Nou pa t ka klone sesyon sa a. Eseye ankò.",
       "notEnoughCredits": "Pa gen ase kredi pou demann sa a. Ajoute kredi epi eseye ankò.",
       "previousTaskFinishing": "Travay anvan an poko fini. Tanpri tann yon ti moman.",
@@ -2800,7 +2801,9 @@
       "skip": "Sote",
       "retrySkip": "Eseye sote ankò",
       "submitting": "Ap soumèt…",
-      "sendAnswers": "Voye repons yo"
+      "sendAnswers": "Voye repons yo",
+      "unreadableTitle": "Kesyon sa a pa t ka montre",
+      "unreadableBody": "Ajan an ap tann yon kesyon ke aplikasyon sa a pa ka montre. Reponn li nan CLI a pou w ka kontinye."
     },
     "blockingCard": {
       "questionUnavailable": "Kesyon sa a pa disponib ankò.",
@@ -2827,6 +2830,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Nou pa t ka chaje sesyon sou-ajan an.",
+      "historyTooLarge": "Istorik sou-ajan sa a twò gwo pou chaje.",
+      "historyUnavailable": "Istorik sou-ajan sa a pa disponib.",
+      "historyTemporarilyUnavailable": "Istorik sou-ajan sa a pa disponib pou kounye a.",
       "failed": "Sesyon sou-ajan an echwe.",
       "noMessages": "Pa gen mesaj sou-ajan",
       "noMessagesDescription": "Sesyon sou-ajan sa a fini san li pa pwodui yon transkripsyon.",
@@ -4057,7 +4063,10 @@
     "list": {
       "loadFailed": "Pa t ka chaje istwa chat la.",
       "new": "Nouvo chat",
-      "deleteTitle": "Efase chat sa a?"
+      "deleteTitle": "Efase chat sa a?",
+      "resetNoticeTitle": "Yo efase chat lokal yo ak bwouyon yo",
+      "resetNoticeBody": "Kilo pa t ka louvri chat yo ki sove sou aparèy sa a. Sesyon yo nan nwaj la pa afekte.",
+      "resetNoticeDismiss": "Rejte avi a"
     },
     "rename": {
       "title": "Chanje non chat la",
@@ -4958,7 +4967,8 @@
     "unavailableTitle": "Itilizasyon pa disponib",
     "unavailableDescription": "Itilizasyon pa konfigire pou espas travay sa a. Kontakte sipò si ou panse ou ta dwe wè itilizasyon isit la.",
     "orgSelfNotice": "W ap wè pwòp itilizasyon pa w nan òganizasyon sa a.",
-    "viewDetails": "Wè detay itilizasyon"
+    "viewDetails": "Wè detay itilizasyon",
+    "orgSelfEntryTitle": "Itilizasyon ou"
   },
   "integrations": {
     "title": "Entegrasyon",

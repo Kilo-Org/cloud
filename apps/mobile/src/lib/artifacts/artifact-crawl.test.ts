@@ -456,7 +456,7 @@ describe('materializeArtifact', () => {
     ['a loopback URL', 'http://127.0.0.1:3000/local.png'],
     ['a LAN URL', 'http://192.168.1.10/local.png'],
     ['a link-local URL', 'http://169.254.169.254/latest/meta-data/'],
-  ])('reports %s as unsupported without issuing any request', async (_case, url) => {
+  ])('reports %s as a terminal miss without issuing any request', async (_case, url) => {
     const { file, tracked } = target();
     const downloadFile = vi.fn<ArtifactCrawlDeps['downloadFile']>();
 

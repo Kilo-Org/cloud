@@ -2264,6 +2264,7 @@
       "couldNotLoadThisSession": "An kasa loda wannan zaman.",
       "historyTooLarge": "Rubutun wannan zaman ya yi girma don a loda shi.",
       "historyUnavailable": "Ba a iya karantawa rubutun wannan zaman ba.",
+      "historyTemporarilyUnavailable": "Rubutun wannan zaman ba ya samuwa na ɗan lokaci.",
       "cloneFailedRetry": "An kasa yin kwafin wannan zaman. Sake gwadawa.",
       "notEnoughCredits": "Kuɗin amfani ba su isa don wannan buƙata ba. Ƙara kuɗin amfani ka sake gwadawa.",
       "previousTaskFinishing": "Ba a gama aikin da ya gabata ba tukuna. Jira ɗan lokaci.",
@@ -2800,7 +2801,9 @@
       "skip": "Tsallake",
       "retrySkip": "Sake gwada tsallakewa",
       "submitting": "Ana aikawa…",
-      "sendAnswers": "Aika amsoshi"
+      "sendAnswers": "Aika amsoshi",
+      "unreadableTitle": "Ba a iya nuna wannan tambayar ba",
+      "unreadableBody": "Wakilin yana jiran tambayar da wannan manhajar ba za ta iya nunawa ba. Amsa tambayar a cikin CLI domin ci gaba."
     },
     "blockingCard": {
       "questionUnavailable": "An daina samun wannan tambayar.",
@@ -2827,6 +2830,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "An kasa loda zaman ƙaramin wakili.",
+      "historyTooLarge": "Tarihin wannan ƙaramin wakili ya yi girma don a loda shi.",
+      "historyUnavailable": "Tarihin wannan ƙaramin wakili ba ya samuwa.",
+      "historyTemporarilyUnavailable": "Tarihin wannan ƙaramin wakili ba ya samuwa na ɗan lokaci.",
       "failed": "Zaman ƙaramin wakili ya gaza.",
       "noMessages": "Babu saƙonnin ƙaramin wakili",
       "noMessagesDescription": "Wannan zaman ƙaramin wakili ya ƙare ba tare da samar da tarihin tattaunawa ba.",
@@ -4057,7 +4063,10 @@
     "list": {
       "loadFailed": "Ba a iya loda tarihin tattaunawa.",
       "new": "Sabuwar tattaunawa",
-      "deleteTitle": "A share wannan tattaunawar?"
+      "deleteTitle": "A share wannan tattaunawar?",
+      "resetNoticeTitle": "An share tattaunawa da daftari a na'urar",
+      "resetNoticeBody": "Kilo bai iya buɗe tattaunawar da aka adana a wannan na'urar ba. Ba a shafi zaman girgije ba.",
+      "resetNoticeDismiss": "Yi watsi da sanarwa"
     },
     "rename": {
       "title": "Sauya sunan tattaunawa",
@@ -4958,7 +4967,8 @@
     "unavailableTitle": "Amfani ba ya samuwa",
     "unavailableDescription": "Ba a saita amfani a wannan sararin aiki ba. Tuntuɓi tallafi idan kuna sa ran ganin amfani a nan.",
     "orgSelfNotice": "Kuna ganin amfaninku na kanku a wannan ƙungiyar.",
-    "viewDetails": "Duba bayanan amfani"
+    "viewDetails": "Duba bayanan amfani",
+    "orgSelfEntryTitle": "Amfanin ku"
   },
   "integrations": {
     "title": "Haɗe-haɗe",

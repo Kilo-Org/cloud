@@ -153,7 +153,7 @@ describe('consumeLastRouteForRepair', () => {
     expect(getLastRoute('u1')).toBe('/(app)/(tabs)/(0_home)');
   });
 
-  it('returns the record once, then null', async () => {
+  it('keeps returning the record; the caller latches the repair once', async () => {
     store.set(KEY, recordFor('/(app)/variables', 'u1'));
     await _hydrateLastRouteForTests();
 
@@ -249,9 +249,6 @@ describe('subscribeLastRoute (the restart read)', () => {
   });
 
   it('a mirrored route pattern reads as absent', async () => {
-    // Written before hrefs were concrete: the segment list carried the
-    // `[profileId]` route pattern, and restoring it opens a screen whose data
-    // reads cannot resolve.
     store.set(KEY, recordFor('/(app)/(tabs)/(3_profile)/profiles/[profileId]/variables', 'u1'));
     await _hydrateLastRouteForTests();
 
@@ -325,12 +322,13 @@ describe('subscribeLastRoute (the restart read)', () => {
     expect(getLastRouteSnapshot()).toBeNull();
   });
 
-  it('notifies subscribers on every record change', () => {
+  it('stops notifying an unsubscribed listener', () => {
+    consumeLastRouteForRepair('u1');
     const listener = vi.fn<() => void>();
     const unsubscribe = subscribeLastRoute(listener);
     unsubscribe();
 
-    recordLastRoute('/(app)/a', 'u1');
+    expect(recordLastRoute('/(app)/a', 'u1')).toBe(true);
     expect(listener).not.toHaveBeenCalled();
   });
 
@@ -359,7 +357,6 @@ describe('clearLastRoute', () => {
 
 describe('record shape', () => {
   it('records the href, the account and a timestamp through the write path', () => {
-    // The layout's repair consumes (and latches) before any write is accepted.
     consumeLastRouteForRepair('u1');
     recordLastRoute('/(app)/(tabs)/(0_home)', 'u1');
 

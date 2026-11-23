@@ -2264,6 +2264,7 @@
       "couldNotLoadThisSession": "Tidak dapat memuatkan sesi ini.",
       "historyTooLarge": "Transkrip sesi ini terlalu besar untuk dimuatkan.",
       "historyUnavailable": "Transkrip sesi ini tidak dapat dibaca.",
+      "historyTemporarilyUnavailable": "Transkrip sesi ini buat sementara waktu tidak tersedia.",
       "cloneFailedRetry": "Tidak dapat mengklon sesi ini. Cuba semula.",
       "notEnoughCredits": "Kredit tidak mencukupi untuk permintaan ini. Tambah kredit dan cuba semula.",
       "previousTaskFinishing": "Tugasan sebelumnya masih dalam proses penyelesaian. Sila tunggu sebentar.",
@@ -2800,7 +2801,9 @@
       "skip": "Langkau",
       "retrySkip": "Cuba langkau semula",
       "submitting": "Menghantar…",
-      "sendAnswers": "Hantar jawapan"
+      "sendAnswers": "Hantar jawapan",
+      "unreadableTitle": "Soalan ini tidak dapat dipaparkan",
+      "unreadableBody": "Ejen sedang menunggu soalan yang tidak dapat ditunjukkan oleh aplikasi ini. Jawab soalan itu dalam CLI untuk meneruskan."
     },
     "blockingCard": {
       "questionUnavailable": "Soalan ini tidak lagi tersedia.",
@@ -2827,6 +2830,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Tidak dapat memuatkan sesi subejen.",
+      "historyTooLarge": "Sejarah subejen ini terlalu besar untuk dimuatkan.",
+      "historyUnavailable": "Sejarah subejen ini tidak tersedia.",
+      "historyTemporarilyUnavailable": "Sejarah subejen ini buat sementara waktu tidak tersedia.",
       "failed": "Sesi subejen gagal.",
       "noMessages": "Tiada mesej subejen",
       "noMessagesDescription": "Sesi subejen ini selesai tanpa menghasilkan transkrip.",
@@ -4057,7 +4063,10 @@
     "list": {
       "loadFailed": "Tidak dapat memuatkan sejarah sembang.",
       "new": "Sembang baharu",
-      "deleteTitle": "Padam sembang ini?"
+      "deleteTitle": "Padam sembang ini?",
+      "resetNoticeTitle": "Sembang dan draf setempat telah dikosongkan",
+      "resetNoticeBody": "Kilo tidak dapat membuka sembang yang disimpan pada peranti ini. Sesi awan anda tidak terjejas.",
+      "resetNoticeDismiss": "Ketepikan notis"
     },
     "rename": {
       "title": "Namakan semula sembang",
@@ -4958,7 +4967,8 @@
     "unavailableTitle": "Penggunaan tidak tersedia",
     "unavailableDescription": "Penggunaan belum disediakan untuk ruang kerja ini. Hubungi sokongan jika anda menjangkakan penggunaan dipaparkan di sini.",
     "orgSelfNotice": "Anda sedang melihat penggunaan anda sendiri dalam organisasi ini.",
-    "viewDetails": "Lihat butiran penggunaan"
+    "viewDetails": "Lihat butiran penggunaan",
+    "orgSelfEntryTitle": "Penggunaan anda"
   },
   "integrations": {
     "title": "Integrasi",

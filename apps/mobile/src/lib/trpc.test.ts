@@ -97,6 +97,11 @@ vi.mock('expo-application', () => ({
   nativeApplicationVersion: '1.0.4',
 }));
 
+// The module registry resets after each case, so a case that asserts on a module
+// `./trpc` imports (the token owner, the protected-data gate, the telemetry sink)
+// imports it inside the case rather than statically: a static import would hold a
+// copy from the graph the case never built.
+
 afterEach(() => {
   vi.resetModules();
   httpLinkMock.mockClear();
@@ -142,11 +147,8 @@ describe('getAuthHeaders', () => {
     const headers = await loadHeaders();
 
     await expect(headers()).resolves.toMatchObject({ Authorization: 'Bearer stored-token' });
-    // Cold path: one token read plus one expiry read.
     expect(secureStoreMock.getItemAsync).toHaveBeenCalledTimes(2);
 
-    // The resolved expiry was published into the owner: a normal request
-    // rereads neither key.
     await expect(headers()).resolves.toMatchObject({ Authorization: 'Bearer stored-token' });
     expect(secureStoreMock.getItemAsync).toHaveBeenCalledTimes(2);
   });
@@ -156,7 +158,6 @@ describe('getAuthHeaders', () => {
     const headers = await loadHeaders();
 
     await expect(headers()).resolves.toMatchObject({ Authorization: 'Bearer stored-token' });
-    // Cold path: one token read plus one expiry read.
     expect(secureStoreMock.getItemAsync).toHaveBeenCalledTimes(2);
 
     // The completed read found no stored expiry, which is a resolved answer:
@@ -166,8 +167,6 @@ describe('getAuthHeaders', () => {
     await expect(headers()).resolves.toMatchObject({ Authorization: 'Bearer stored-token' });
     expect(secureStoreMock.getItemAsync).toHaveBeenCalledTimes(2);
 
-    // `afterEach` resets the module registry, so the owner must be loaded from
-    // the same graph as `./trpc` inside the case rather than imported statically.
     const { getActiveTokenSnapshot } = await import('@/lib/auth/token-owner');
     expect(getActiveTokenSnapshot()).toMatchObject({
       token: 'stored-token',
@@ -197,10 +196,7 @@ describe('getAuthHeaders', () => {
     await vi.waitFor(() => {
       expect(vi.mocked(secureStoreMock.getItemAsync)).toHaveBeenCalledWith('token-expires-at');
     });
-    // Publish a newer owner while the cold expiry read is still in flight.
     const newerExpiresAt = Date.now() + 3_600_000;
-    // `afterEach` resets the module registry, so the owner must be loaded from
-    // the same graph as `./trpc` inside the case rather than imported statically.
     const { getActiveTokenSnapshot, setActiveToken } = await import('@/lib/auth/token-owner');
     setActiveToken('newer-token', newerExpiresAt);
     secureStoreMock.releaseHeldExpiryRead();
@@ -217,8 +213,6 @@ describe('getAuthHeaders', () => {
   });
 
   it('sends the held token without touching the keychain while protected data is unavailable', async () => {
-    // `afterEach` resets the module registry, so the owner and the gate must be
-    // loaded from the same graph as `./trpc` inside the case.
     const headers = await loadHeaders();
     const { getActiveTokenSnapshot, setActiveToken } = await import('@/lib/auth/token-owner');
     const { setProtectedDataAvailable } = await import('@/lib/protected-data');
@@ -267,8 +261,6 @@ describe('getAuthHeaders', () => {
   });
 
   it('holds an unauthenticated request until the unlock instead of sending it bare', async () => {
-    // `afterEach` resets the module registry, so the sink, the owner, and the
-    // gate must be loaded from the same graph as `./trpc` inside the case.
     secureStoreMock.store.set('auth-token', 'stored-token');
     secureStoreMock.store.set('token-expires-at', String(Date.now() + 3_600_000));
     const events: TelemetryEvent[] = [];
@@ -311,8 +303,6 @@ describe('getAuthHeaders', () => {
     secureStoreMock.store.set('auth-token', 'stored-token');
     secureStoreMock.store.set('token-expires-at', String(Date.now() + 3_600_000));
     const headers = await loadHeaders();
-    // `afterEach` resets the module registry: the gate must come from the same
-    // graph as `./trpc`, so it is loaded here rather than statically.
     const { setProtectedDataAvailable } = await import('@/lib/protected-data');
     vi.useFakeTimers();
     setProtectedDataAvailable(false);
@@ -338,9 +328,6 @@ describe('getAuthHeaders', () => {
   });
 
   it('sends an unauthenticated request without waiting while protected data is available', async () => {
-    // Android has no protected-data source, so the gate always reports
-    // available there and this is the only path a foreground request takes: no
-    // wait, no timer, and therefore no way for the deferral to hold up the UI.
     const headers = await loadHeaders();
     vi.useFakeTimers();
     try {
@@ -355,9 +342,6 @@ describe('getAuthHeaders', () => {
   });
 
   it('sends the request unauthenticated when the lock outlasts the request budget', async () => {
-    // Not resolving is worse than sending: a background request must not
-    // outlive the app's own control-plane budget. Past the bound the request
-    // proceeds exactly as it did before the deferral — no credential, no event.
     secureStoreMock.store.set('auth-token', 'stored-token');
     secureStoreMock.store.set('token-expires-at', String(Date.now() + 3_600_000));
     const events: TelemetryEvent[] = [];
@@ -386,9 +370,6 @@ describe('getAuthHeaders', () => {
   });
 
   it('starts the request budget before the unlock wait it may spend', async () => {
-    // The wait is part of the request's own control-plane budget, not a free
-    // prelude to it: the header build records the instant the wait began, so
-    // the fetch that follows can be given only what the wait left.
     secureStoreMock.store.set('auth-token', 'stored-token');
     secureStoreMock.store.set('token-expires-at', String(Date.now() + 3_600_000));
     const headers = await loadHeaders();
@@ -413,8 +394,6 @@ describe('getAuthHeaders', () => {
   });
 
   it('leaves the request budget whole across a slow proactive refresh', async () => {
-    // A refresh has its own deadline and is no part of the request's: the
-    // build that waits ten seconds on it must not hand the request five.
     secureStoreMock.store.set('auth-token', 'stored-token');
     secureStoreMock.store.set('auth-refresh-token', 'stored-refresh');
     // Inside the five-minute refresh margin, so the build rotates first.
@@ -872,9 +851,6 @@ describe('latency wiring', () => {
     expect(sent.get('authorization')).toBe('Bearer token');
   });
 
-  // The id comes from the platform `crypto` API every build carries; a
-  // runtime that omits `randomUUID` still stamps a unique id, so neither
-  // platform loses a sample (or needs a native module just for the id).
   it('stamps a unique request id when the platform crypto API has no randomUUID', async () => {
     vi.stubGlobal('crypto', {});
     const { httpFetch } = await loadLatencyLinks();
@@ -892,10 +868,6 @@ describe('latency wiring', () => {
     expect(first).not.toBe(second);
   });
 
-  // tRPC's single `httpLink` leaves the body off a POST for a no-input call,
-  // and the server's fetch adapter rejects that empty body with 400. The
-  // shared fetch sends `{}` so an unbatched no-input query reaches its
-  // procedure.
   it('sends an empty JSON object body when a POST has none', async () => {
     const { httpFetch } = await loadLatencyLinks();
     mockFetch.mockResolvedValue(new Response('ok', { status: 200 }));

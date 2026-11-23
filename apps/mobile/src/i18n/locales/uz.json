@@ -2264,6 +2264,7 @@
       "couldNotLoadThisSession": "Bu sessiyani yuklab bo'lmadi.",
       "historyTooLarge": "Bu sessiya transkripti yuklash uchun juda katta.",
       "historyUnavailable": "Bu sessiya transkriptini o'qish mumkin emas.",
+      "historyTemporarilyUnavailable": "Bu sessiya transkripti vaqtincha mavjud emas.",
       "cloneFailedRetry": "Ushbu sessiyani klonlab bo'lmadi. Qayta urinib ko'ring.",
       "notEnoughCredits": "Bu so'rov uchun kreditlar yetarli emas. Kreditlar qo'shing va qayta urinib ko'ring.",
       "previousTaskFinishing": "Oldingi vazifa hali yakunlanmoqda. Biroz kuting.",
@@ -2800,7 +2801,9 @@
       "skip": "O'tkazib yuborish",
       "retrySkip": "Qayta o'tkazib yuborish",
       "submitting": "Yuborilmoqda…",
-      "sendAnswers": "Javoblarni yuborish"
+      "sendAnswers": "Javoblarni yuborish",
+      "unreadableTitle": "Savolni ko'rsatib bo'lmadi",
+      "unreadableBody": "Agent bu ilova ko'rsata olmaydigan savolni kutmoqda. Davom etish uchun savolga CLI'da javob bering."
     },
     "blockingCard": {
       "questionUnavailable": "Bu savol endi mavjud emas.",
@@ -2827,6 +2830,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Yordamchi agent sessiyasini yuklab bo'lmadi.",
+      "historyTooLarge": "Bu yordamchi agentning tarixi yuklash uchun juda katta.",
+      "historyUnavailable": "Bu yordamchi agentning tarixi mavjud emas.",
+      "historyTemporarilyUnavailable": "Bu yordamchi agentning tarixi vaqtincha mavjud emas.",
       "failed": "Yordamchi agent sessiyasida xatolik yuz berdi.",
       "noMessages": "Yordamchi agentdan xabar yo'q",
       "noMessagesDescription": "Bu yordamchi agent sessiyasi yozishmalarsiz yakunlandi.",
@@ -4057,7 +4063,10 @@
     "list": {
       "loadFailed": "Suhbat tarixini yuklab bo'lmadi.",
       "new": "Yangi chat",
-      "deleteTitle": "Bu chat oʻchirilsinmi?"
+      "deleteTitle": "Bu chat oʻchirilsinmi?",
+      "resetNoticeTitle": "Mahalliy chatlar va qoralamalar tozalandi",
+      "resetNoticeBody": "Kilo bu qurilmada saqlangan chatlarni ocha olmadi. Bulutdagi seanslaringizga esa taʼsir qilmadi.",
+      "resetNoticeDismiss": "Bildirishnomani e’tiborsiz qoldirish"
     },
     "rename": {
       "title": "Chat nomini o‘zgartirish",
@@ -4958,7 +4967,8 @@
     "unavailableTitle": "Foydalanish mavjud emas",
     "unavailableDescription": "Bu Workspace uchun foydalanish sozlanmagan. Agar bu yerda foydalanish ma'lumotlarini ko'rishni kutsangiz, qo'llab-quvvatlash xizmatiga murojaat qiling.",
     "orgSelfNotice": "Siz ushbu tashkilotdagi o'z foydalanishingizni ko'ryapsiz.",
-    "viewDetails": "Foydalanish tafsilotlarini ko'rish"
+    "viewDetails": "Foydalanish tafsilotlarini ko'rish",
+    "orgSelfEntryTitle": "Sizning foydalanishingiz"
   },
   "integrations": {
     "title": "Integratsiyalar",

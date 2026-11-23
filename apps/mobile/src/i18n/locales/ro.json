@@ -2313,6 +2313,7 @@
       "couldNotLoadThisSession": "Nu s-a putut încărca această sesiune.",
       "historyTooLarge": "Transcrierea acestei sesiuni este prea mare pentru a fi încărcată.",
       "historyUnavailable": "Transcrierea acestei sesiuni nu poate fi citită.",
+      "historyTemporarilyUnavailable": "Transcrierea acestei sesiuni este temporar indisponibilă.",
       "cloneFailedRetry": "Nu s-a putut clona această sesiune. Încearcă din nou.",
       "notEnoughCredits": "Nu ai suficiente credite pentru această solicitare. Adaugă credite și încearcă din nou.",
       "previousTaskFinishing": "Sarcina anterioară este în curs de finalizare. Așteaptă puțin.",
@@ -2853,7 +2854,9 @@
       "skip": "Sari peste",
       "retrySkip": "Încearcă din nou să omiți",
       "submitting": "Se trimite…",
-      "sendAnswers": "Trimite răspunsurile"
+      "sendAnswers": "Trimite răspunsurile",
+      "unreadableTitle": "Această întrebare nu a putut fi afișată",
+      "unreadableBody": "Agentul așteaptă o întrebare pe care această aplicație nu o poate afișa. Răspunde la întrebare în CLI pentru a continua."
     },
     "blockingCard": {
       "questionUnavailable": "Această întrebare nu mai este disponibilă.",
@@ -2880,6 +2883,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Nu s-a putut încărca sesiunea agentului secundar.",
+      "historyTooLarge": "Istoricul acestui agent secundar este prea mare pentru a fi încărcat.",
+      "historyUnavailable": "Istoricul acestui agent secundar nu este disponibil.",
+      "historyTemporarilyUnavailable": "Istoricul acestui agent secundar este temporar indisponibil.",
       "failed": "Sesiunea agentului secundar a eșuat.",
       "noMessages": "Niciun mesaj de la agentul secundar",
       "noMessagesDescription": "Această sesiune a agentului secundar s-a încheiat fără a genera o transcriere.",
@@ -4135,7 +4141,10 @@
     "list": {
       "loadFailed": "Nu s-a putut încărca istoricul de chat.",
       "new": "Chat nou",
-      "deleteTitle": "Ștergi acest chat?"
+      "deleteTitle": "Ștergi acest chat?",
+      "resetNoticeTitle": "Chat-urile și ciornele locale au fost șterse",
+      "resetNoticeBody": "Kilo nu a putut deschide chat-urile salvate pe acest dispozitiv. Sesiunile din cloud nu sunt afectate.",
+      "resetNoticeDismiss": "Ignoră notificarea"
     },
     "rename": {
       "title": "Redenumește chatul",
@@ -5052,7 +5061,8 @@
     "unavailableTitle": "Utilizarea nu este disponibilă",
     "unavailableDescription": "Utilizarea nu este configurată pentru acest spațiu de lucru. Contactați asistența dacă vă așteptați să vedeți utilizarea aici.",
     "orgSelfNotice": "Vezi propria utilizare în această organizație.",
-    "viewDetails": "Vezi detaliile utilizării"
+    "viewDetails": "Vezi detaliile utilizării",
+    "orgSelfEntryTitle": "Utilizarea ta"
   },
   "integrations": {
     "title": "Integrări",

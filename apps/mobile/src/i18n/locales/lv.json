@@ -2313,6 +2313,7 @@
       "couldNotLoadThisSession": "Neizdevās ielādēt šo sesiju.",
       "historyTooLarge": "Šīs sesijas ieraksts ir pārāk liels, lai to ielādētu.",
       "historyUnavailable": "Šīs sesijas ierakstu nevar nolasīt.",
+      "historyTemporarilyUnavailable": "Šīs sesijas ieraksts īslaicīgi nav pieejams.",
       "cloneFailedRetry": "Neizdevās klonēt šo sesiju. Mēģini vēlreiz.",
       "notEnoughCredits": "Nepietiek kredītu šim pieprasījumam. Papildini kredītus un mēģini vēlreiz.",
       "previousTaskFinishing": "Iepriekšējā uzdevuma izpilde vēl nav beigusies. Lūdzu, nedaudz uzgaidi.",
@@ -2853,7 +2854,9 @@
       "skip": "Izlaist",
       "retrySkip": "Mēģināt izlaist vēlreiz",
       "submitting": "Nosūta…",
-      "sendAnswers": "Nosūtīt atbildes"
+      "sendAnswers": "Nosūtīt atbildes",
+      "unreadableTitle": "Šo jautājumu nevarēja parādīt",
+      "unreadableBody": "Aģents gaida jautājumu, ko šī lietotne nevar parādīt. Atbildēt uz to CLI, lai turpinātu."
     },
     "blockingCard": {
       "questionUnavailable": "Šis jautājums vairs nav pieejams.",
@@ -2880,6 +2883,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Neizdevās ielādēt apakšaģenta sesiju.",
+      "historyTooLarge": "Šī apakšaģenta vēsture ir pārāk liela, lai to ielādētu.",
+      "historyUnavailable": "Šī apakšaģenta vēsture nav pieejama.",
+      "historyTemporarilyUnavailable": "Šī apakšaģenta vēsture īslaicīgi nav pieejama.",
       "failed": "Apakšaģenta sesija beidzās ar kļūdu.",
       "noMessages": "Nav apakšaģenta ziņojumu",
       "noMessagesDescription": "Šī apakšaģenta sesija beidzās bez sarakstes.",
@@ -4135,7 +4141,10 @@
     "list": {
       "loadFailed": "Neizdevās ielādēt tērzēšanas vēsturi.",
       "new": "Jauna tērzēšana",
-      "deleteTitle": "Vai dzēst šo tērzēšanu?"
+      "deleteTitle": "Vai dzēst šo tērzēšanu?",
+      "resetNoticeTitle": "Vietējās tērzēšanas un melnraksti notīrīti",
+      "resetNoticeBody": "Kilo nevarēja atvērt šajā ierīcē saglabātās tērzēšanas. Jūsu sesijas mākonī nav skartas.",
+      "resetNoticeDismiss": "Noraidīt paziņojumu"
     },
     "rename": {
       "title": "Pārdēvēt tērzēšanu",
@@ -5052,7 +5061,8 @@
     "unavailableTitle": "Lietojums nav pieejams",
     "unavailableDescription": "Šai darbvietai lietojums nav iestatīts. Ja sagaidāt, ka šeit būs redzams lietojums, sazinieties ar atbalsta dienestu.",
     "orgSelfNotice": "Jūs redzat savu lietojumu šajā organizācijā.",
-    "viewDetails": "Skatīt lietojuma informāciju"
+    "viewDetails": "Skatīt lietojuma informāciju",
+    "orgSelfEntryTitle": "Jūsu lietojums"
   },
   "integrations": {
     "title": "Integrācijas",

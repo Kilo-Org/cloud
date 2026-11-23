@@ -1691,6 +1691,7 @@
       "couldNotLoadThisSession": "このセッションを読み込めませんでした。",
       "historyTooLarge": "このセッションの履歴は大きすぎて読み込めません。",
       "historyUnavailable": "このセッションの履歴を読み取れません。",
+      "historyTemporarilyUnavailable": "このセッションの履歴は一時的に利用できません。",
       "cloneFailedRetry": "このセッションを複製できませんでした。もう一度お試しください。",
       "notEnoughCredits": "このリクエストに必要なクレジットが不足しています。クレジットを追加して、もう一度お試しください。",
       "previousTaskFinishing": "前のタスクの終了処理中です。少々お待ちください。",
@@ -2227,7 +2228,9 @@
       "skip": "スキップ",
       "retrySkip": "スキップを再試行",
       "submitting": "送信中…",
-      "sendAnswers": "回答を送信"
+      "sendAnswers": "回答を送信",
+      "unreadableTitle": "この質問を表示できませんでした",
+      "unreadableBody": "エージェントは、このアプリでは表示できない質問への回答を待っています。続行するには、CLIで回答してください。"
     },
     "blockingCard": {
       "questionUnavailable": "この質問には回答できなくなりました。",
@@ -2254,6 +2257,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "サブエージェントのセッションを読み込めませんでした。",
+      "historyTooLarge": "このサブエージェントの履歴は大きすぎて読み込めません。",
+      "historyUnavailable": "このサブエージェントの履歴は利用できません。",
+      "historyTemporarilyUnavailable": "このサブエージェントの履歴は一時的に利用できません。",
       "failed": "サブエージェントのセッションが失敗しました。",
       "noMessages": "サブエージェントのメッセージがありません",
       "noMessagesDescription": "このサブエージェントのセッションは、会話履歴を生成せずに完了しました。",
@@ -4057,7 +4063,10 @@
     "list": {
       "loadFailed": "チャット履歴を読み込めませんでした。",
       "new": "新しいチャット",
-      "deleteTitle": "このチャットを削除しますか？"
+      "deleteTitle": "このチャットを削除しますか？",
+      "resetNoticeTitle": "ローカルのチャットと下書きが削除されました",
+      "resetNoticeBody": "Kiloはこのデバイスに保存されているチャット履歴を読み込めませんでした。クラウド上のセッションは影響を受けません。",
+      "resetNoticeDismiss": "お知らせを非表示にする"
     },
     "rename": {
       "title": "チャット名を変更",
@@ -4958,7 +4967,8 @@
     "unavailableTitle": "使用状況を利用できません",
     "unavailableDescription": "このワークスペースでは使用状況が設定されていません。ここに使用状況が表示されるはずの場合は、サポートにお問い合わせください。",
     "orgSelfNotice": "この組織でのあなた自身の使用状況を表示しています。",
-    "viewDetails": "使用状況の詳細を表示"
+    "viewDetails": "使用状況の詳細を表示",
+    "orgSelfEntryTitle": "あなたの使用状況"
   },
   "integrations": {
     "title": "連携",

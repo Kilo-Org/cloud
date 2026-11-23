@@ -2313,6 +2313,7 @@
       "couldNotLoadThisSession": "No s'ha pogut carregar aquesta sessió.",
       "historyTooLarge": "La transcripció d'aquesta sessió és massa gran per carregar-la.",
       "historyUnavailable": "No es pot llegir la transcripció d'aquesta sessió.",
+      "historyTemporarilyUnavailable": "La transcripció d'aquesta sessió no està disponible temporalment.",
       "cloneFailedRetry": "No s'ha pogut clonar aquesta sessió. Torna-ho a provar.",
       "notEnoughCredits": "No tens prou crèdits per a aquesta sol·licitud. Afegeix crèdits i torna-ho a provar.",
       "previousTaskFinishing": "La tasca anterior encara no ha acabat. Espera un moment.",
@@ -2853,7 +2854,9 @@
       "skip": "Omet",
       "retrySkip": "Torna a provar d'ometre",
       "submitting": "Enviant…",
-      "sendAnswers": "Envia les respostes"
+      "sendAnswers": "Envia les respostes",
+      "unreadableTitle": "No s'ha pogut mostrar aquesta pregunta",
+      "unreadableBody": "L'agent està esperant una pregunta que aquesta aplicació no pot mostrar. Responeu la pregunta al CLI per continuar."
     },
     "blockingCard": {
       "questionUnavailable": "Aquesta pregunta ja no està disponible.",
@@ -2880,6 +2883,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "No s'ha pogut carregar la sessió de l'agent secundari.",
+      "historyTooLarge": "L'historial d'aquest agent secundari és massa gran per carregar-lo.",
+      "historyUnavailable": "L'historial d'aquest agent secundari no està disponible.",
+      "historyTemporarilyUnavailable": "L'historial d'aquest agent secundari no està disponible temporalment.",
       "failed": "La sessió de l'agent secundari ha fallat.",
       "noMessages": "No hi ha missatges de l'agent secundari",
       "noMessagesDescription": "La sessió de l'agent secundari ha acabat sense generar cap transcripció.",
@@ -4135,7 +4141,10 @@
     "list": {
       "loadFailed": "No s'ha pogut carregar l'historial del xat.",
       "new": "Xat nou",
-      "deleteTitle": "Vols suprimir aquest xat?"
+      "deleteTitle": "Vols suprimir aquest xat?",
+      "resetNoticeTitle": "Els xats i esborranys locals s'han esborrat",
+      "resetNoticeBody": "Kilo no ha pogut obrir els xats desats en aquest dispositiu. Les teves sessions al núvol no es veuen afectades.",
+      "resetNoticeDismiss": "Descarta l'avís"
     },
     "rename": {
       "title": "Reanomena el xat",
@@ -5052,7 +5061,8 @@
     "unavailableTitle": "Ús no disponible",
     "unavailableDescription": "L'ús no està configurat per a aquest espai de treball. Contacta amb el servei d'assistència si esperes veure l'ús aquí.",
     "orgSelfNotice": "Estàs veient el teu propi ús en aquesta organització.",
-    "viewDetails": "Mostra els detalls d'ús"
+    "viewDetails": "Mostra els detalls d'ús",
+    "orgSelfEntryTitle": "El teu ús"
   },
   "integrations": {
     "title": "Integracions",

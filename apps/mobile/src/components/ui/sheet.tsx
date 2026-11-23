@@ -395,6 +395,9 @@ export function Sheet({
         enablePanDownToClose
         dismissGestures={dismissGestures}
         contentOwnsTopInset={contentOwnsTopInset}
+        // A content-sized sheet knows its height only after its content laid out; without this
+        // it presents at a drag-handle peek and jumps to full height in one frame.
+        deferUntilMeasured={!snapPoints?.length}
         // The iOS sheet draws the dimmed backdrop through its presentation, so the
         // app's view tree cannot see that tap: the library reports it and this
         // wrapper answers it the way Android Back is answered, `onRequestDismiss`

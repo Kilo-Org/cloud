@@ -14,10 +14,10 @@ index 231d50775f7c9ca7679f1a733b5fd26eecfb75fe..21e27cf9ddd1ce96e9b330606ec8eb65
    // Testing
    testImplementation 'junit:junit:4.13.2'
 diff --git a/android/src/main/java/expo/modules/ui/ModalBottomSheetView.kt b/android/src/main/java/expo/modules/ui/ModalBottomSheetView.kt
-index 9ca09321e7068ced9a490fdd06dac7a2d8ec3949..5b8a51218058dab88a72b805721e195b7d8706c7 100644
+index 9ca09321e7068ced9a490fdd06dac7a2d8ec3949..72f8840ef0cdf1ee48067c8e7e082c55bc9ab572 100644
 --- a/android/src/main/java/expo/modules/ui/ModalBottomSheetView.kt
 +++ b/android/src/main/java/expo/modules/ui/ModalBottomSheetView.kt
-@@ -5,9 +5,16 @@ package expo.modules.ui
+@@ -5,9 +5,18 @@ package expo.modules.ui
  import android.app.Activity
  import android.app.Dialog
  import android.content.Context
@@ -29,38 +29,48 @@ index 9ca09321e7068ced9a490fdd06dac7a2d8ec3949..5b8a51218058dab88a72b805721e195b
  import android.view.inputmethod.InputMethodManager
 +import androidx.activity.compose.BackHandler
 +import androidx.core.view.WindowCompat
++import androidx.compose.foundation.layout.Box
++import androidx.compose.foundation.layout.WindowInsets
 +import androidx.compose.foundation.layout.WindowInsetsSides
 +import androidx.compose.foundation.layout.only
  import androidx.compose.material3.BottomSheetDefaults
  import androidx.compose.material3.ExperimentalMaterial3Api
  import androidx.compose.material3.MaterialTheme
-@@ -16,12 +23,17 @@ import androidx.compose.material3.ModalBottomSheetProperties
+@@ -16,12 +25,23 @@ import androidx.compose.material3.ModalBottomSheetProperties
  import androidx.compose.material3.contentColorFor
  import androidx.compose.material3.rememberModalBottomSheetState
  import androidx.compose.runtime.Composable
 +import androidx.compose.runtime.CompositionLocalProvider
  import androidx.compose.runtime.DisposableEffect
  import androidx.compose.runtime.LaunchedEffect
++import androidx.compose.runtime.getValue
++import androidx.compose.runtime.mutableIntStateOf
 +import androidx.compose.runtime.remember
  import androidx.compose.runtime.rememberCoroutineScope
 +import androidx.compose.runtime.rememberUpdatedState
++import androidx.compose.runtime.setValue
++import androidx.compose.runtime.withFrameNanos
++import androidx.compose.ui.Modifier
  import androidx.compose.ui.graphics.Color as ComposeColor
  import androidx.compose.ui.graphics.luminance
  import androidx.compose.ui.graphics.takeOrElse
++import androidx.compose.ui.layout.onSizeChanged
 +import androidx.compose.ui.platform.LocalConfiguration
 +import androidx.compose.ui.platform.LocalResources
  import androidx.compose.ui.platform.LocalView
  import androidx.compose.ui.window.DialogWindowProvider
  import expo.modules.kotlin.records.Field
-@@ -32,6 +44,7 @@ import expo.modules.kotlin.views.ComposeProps
+@@ -31,7 +51,9 @@ import expo.modules.kotlin.views.AsyncFunctionHandle
+ import expo.modules.kotlin.views.ComposeProps
  import expo.modules.kotlin.views.FunctionalComposableScope
  import expo.modules.kotlin.views.OptimizedComposeProps
++import kotlinx.coroutines.delay
  import kotlinx.coroutines.withContext
 +import java.util.Locale
  import kotlin.coroutines.cancellation.CancellationException
  
  @OptimizedRecord
-@@ -49,6 +62,25 @@ data class ModalBottomSheetViewProps(
+@@ -49,10 +71,57 @@ data class ModalBottomSheetViewProps(
    val scrimColor: Color? = null,
    val showDragHandle: Boolean = true,
    val sheetGesturesEnabled: Boolean = true,
@@ -83,10 +93,42 @@ index 9ca09321e7068ced9a490fdd06dac7a2d8ec3949..5b8a51218058dab88a72b805721e195b
 +   * bottom inset stays with the sheet, whose insets it measures reliably.
 +   */
 +  val contentOwnsTopInset: Boolean = false,
++  /**
++   * Repo-local: present a content-sized sheet in one motion from hidden to its final height.
++   * Material3's `ModalBottomSheet` presents itself as soon as the sheet has an `Expanded` anchor —
++   * `if (sheetState.hasExpandedState) LaunchedEffect(sheetState) { sheetState.show() }` — and
++   * `BottomSheet` adds that anchor only when the surface measured a non-zero height of its own
++   * (`if (sheetHeight != 0f) Expanded at max(0f, fullHeight - sheetHeight)`, read by
++   * `SheetState.hasExpandedState`). The hosted content is a `RNHostView` with `matchContents`:
++   * it is zero-sized until its React Native child lays out, so the sheet used to present at the
++   * only thing the surface composed by then — the drag handle — and then jump to the content's
++   * height in one frame when the anchor appeared (`AnchoredDraggableState.updateAnchors` →
++   * `trySnapTo`, which writes the offset with no animation).
++   *
++   * When true, the sheet composes nothing that gives the surface a height of its own while the
++   * content has not settled: no drag handle and no window insets, so no `Expanded` anchor exists
++   * and Material3's own `show()` runs once, after the height is final, animating hidden → final
++   * height while the scrim fades in from zero. The drag handle, the window insets and the
++   * content's height come back in the same composition, so the sheet presents settled.
++   *
++   * Only for a content-sized sheet: a sheet with explicit detents must present at its detent, so
++   * it leaves this false and keeps the behaviour above.
++   */
++  val deferUntilMeasured: Boolean = false,
    val properties: ModalBottomSheetPropertiesRecord = ModalBottomSheetPropertiesRecord(),
    val modifiers: ModifierList = emptyList()
  ) : ComposeProps
-@@ -62,6 +94,12 @@ private fun Activity.isAcceptingText(): Boolean {
+ 
++/**
++ * How long a `deferUntilMeasured` sheet waits for its content to report a height before it
++ * presents anyway, so a content that never lays out cannot hold the sheet back.
++ */
++private const val DeferContentBoundMillis = 1000L
++
+ /**
+  * True while the input method has an active connection to a view that accepts text, for example a
+  * focused TextInput. `expo-dev-menu` makes the same check in `DevMenuFragment.onKeyUp`.
+@@ -62,6 +131,12 @@ private fun Activity.isAcceptingText(): Boolean {
    return inputMethodManager?.isAcceptingText == true
  }
  
@@ -99,7 +141,7 @@ index 9ca09321e7068ced9a490fdd06dac7a2d8ec3949..5b8a51218058dab88a72b805721e195b
  /**
   * Material3 shows [ModalBottomSheet] in its own dialog window. Android sends key events to the
   * focused window, so the activity does not get them while the sheet is open. Key triggers that
-@@ -74,7 +112,8 @@ private fun Activity.isAcceptingText(): Boolean {
+@@ -74,7 +149,8 @@ private fun Activity.isAcceptingText(): Boolean {
   * Without this check, typing "rr" in a sheet TextInput reloads the app.
   */
  @Composable
@@ -109,7 +151,7 @@ index 9ca09321e7068ced9a490fdd06dac7a2d8ec3949..5b8a51218058dab88a72b805721e195b
    val dialog = (LocalView.current.parent as? DialogWindowProvider)?.window?.callback as? Dialog
    if (dialog == null || activity == null) {
      return
-@@ -82,6 +121,10 @@ private fun ForwardKeyEventsToActivity(activity: Activity?) {
+@@ -82,6 +158,10 @@ private fun ForwardKeyEventsToActivity(activity: Activity?) {
  
    DisposableEffect(dialog, activity) {
      dialog.setOnKeyListener { _, keyCode, event ->
@@ -120,7 +162,7 @@ index 9ca09321e7068ced9a490fdd06dac7a2d8ec3949..5b8a51218058dab88a72b805721e195b
        val isForwardable = event.action == KeyEvent.ACTION_UP &&
          keyCode != KeyEvent.KEYCODE_BACK &&
          keyCode != KeyEvent.KEYCODE_ESCAPE &&
-@@ -94,6 +137,33 @@ private fun ForwardKeyEventsToActivity(activity: Activity?) {
+@@ -94,6 +174,33 @@ private fun ForwardKeyEventsToActivity(activity: Activity?) {
    }
  }
  
@@ -154,12 +196,37 @@ index 9ca09321e7068ced9a490fdd06dac7a2d8ec3949..5b8a51218058dab88a72b805721e195b
  @Composable
  fun FunctionalComposableScope.ModalBottomSheetContent(
    props: ModalBottomSheetViewProps,
-@@ -153,31 +223,64 @@ fun FunctionalComposableScope.ModalBottomSheetContent(
+@@ -153,31 +260,118 @@ fun FunctionalComposableScope.ModalBottomSheetContent(
      }
    val resolvedScrimColor = props.scrimColor.composeOrNull ?: BottomSheetDefaults.ScrimColor
    val dragHandleSlotView = findChildSlotView(view, "dragHandle")
 +  val appLocaleResources = remember(props.locale) {
 +    localizedResources(appContext.reactContext ?: appContext.currentActivity, props.locale)
++  }
++  // Repo-local: see the `deferUntilMeasured` field above. `pendingHeight` is the newest non-zero
++  // height the hosted content reported, and `settledHeight` the one the sheet presents at: the
++  // height that survived a short frame wait, so a second layout pass inside the same mount cannot
++  // leave the sheet at an intermediate height. Android reports a layout listener only when the
++  // bounds change, so "unchanged since the last report" cannot be observed; a frame wait can.
++  var pendingHeight by remember { mutableIntStateOf(0) }
++  var settledHeight by remember { mutableIntStateOf(0) }
++  val awaitingContent = props.deferUntilMeasured && settledHeight == 0
++  if (props.deferUntilMeasured) {
++    LaunchedEffect(pendingHeight) {
++      if (pendingHeight <= 0) return@LaunchedEffect
++      // The React Native child's first layout and any immediate second pass land inside these two
++      // frames, so a height that changes within them restarts this effect and the last one wins.
++      withFrameNanos { }
++      withFrameNanos { }
++      settledHeight = pendingHeight
++    }
++    LaunchedEffect(Unit) {
++      // Bound: 1000 ms covers a slow first React Native layout on a cold start by a wide margin,
++      // and a content that never reports a height (or reports nothing to show) must still present
++      // instead of holding the sheet back forever. The surface then has only what it composes.
++      delay(DeferContentBoundMillis)
++      if (settledHeight == 0) settledHeight = pendingHeight.coerceAtLeast(1)
++    }
 +  }
  
 -  ModalBottomSheet(
@@ -181,18 +248,30 @@ index 9ca09321e7068ced9a490fdd06dac7a2d8ec3949..5b8a51218058dab88a72b805721e195b
 +      scrimColor = resolvedScrimColor,
 +      sheetGesturesEnabled = props.sheetGesturesEnabled,
 +      contentWindowInsets = {
-+        val sheetInsets = BottomSheetDefaults.modalWindowInsets
-+        // Repo-local: see the `contentOwnsTopInset` field above.
-+        if (props.contentOwnsTopInset) sheetInsets.only(WindowInsetsSides.Bottom) else sheetInsets
++        if (awaitingContent) {
++          // Repo-local: see the `deferUntilMeasured` field above. The insets are padding on the
++          // surface (androidx.compose.material3.BottomSheet's Column), so they would give the sheet
++          // a height of its own and an `Expanded` anchor before the content measured.
++          WindowInsets(0, 0, 0, 0)
++        } else {
++          val sheetInsets = BottomSheetDefaults.modalWindowInsets
++          // Repo-local: see the `contentOwnsTopInset` field above.
++          if (props.contentOwnsTopInset) sheetInsets.only(WindowInsetsSides.Bottom) else sheetInsets
++        }
 +      },
-+      dragHandle = when {
-+        dragHandleSlotView != null -> {
-+          { with(UIComposableScope()) { with(dragHandleSlotView) { Content() } } }
++      dragHandle = if (awaitingContent) {
++        // Repo-local: see the `deferUntilMeasured` field above: the drag handle alone is a height.
++        null
++      } else {
++        when {
++          dragHandleSlotView != null -> {
++            { with(UIComposableScope()) { with(dragHandleSlotView) { Content() } } }
++          }
++          props.showDragHandle -> {
++            { BottomSheetDefaults.DragHandle() }
++          }
++          else -> null
 +        }
-+        props.showDragHandle -> {
-+          { BottomSheetDefaults.DragHandle() }
-+        }
-+        else -> null
 +      },
 +      properties = ModalBottomSheetProperties(
 +        // Repo-local: Material3 answers a back press by hiding the sheet itself,
@@ -211,12 +290,20 @@ index 9ca09321e7068ced9a490fdd06dac7a2d8ec3949..5b8a51218058dab88a72b805721e195b
 +        if (props.contentOwnsTopInset) stopDecorFittingSystemBars(sheetView)
 +        // The window keeps this for as long as it exists, so nothing undoes it here.
 +        onDispose { }
-       }
--      props.showDragHandle -> {
--        { BottomSheetDefaults.DragHandle() }
++      }
 +      // Registered inside the dialog, so it runs before the wrapper's fallback.
 +      if (props.properties.shouldDismissOnBackPress) {
 +        BackHandler { onDismissRequest() }
+       }
+-      props.showDragHandle -> {
+-        { BottomSheetDefaults.DragHandle() }
++      ForwardKeyEventsToActivity(appContext.currentActivity) {
++        if (props.properties.shouldDismissOnBackPress && (!sheetState.isVisible || sheetState.isAnimationRunning)) {
++          onDismissRequest()
++          true
++        } else {
++          false
++        }
        }
 -      else -> null
 -    },
@@ -228,21 +315,30 @@ index 9ca09321e7068ced9a490fdd06dac7a2d8ec3949..5b8a51218058dab88a72b805721e195b
 -  ) {
 -    ForwardKeyEventsToActivity(appContext.currentActivity)
 -    Children(UIComposableScope(), filter = { !isSlotView(it) })
-+      ForwardKeyEventsToActivity(appContext.currentActivity) {
-+        if (props.properties.shouldDismissOnBackPress && (!sheetState.isVisible || sheetState.isAnimationRunning)) {
-+          onDismissRequest()
-+          true
-+        } else {
-+          false
++      // Repo-local: see the `deferUntilMeasured` field above. When the sheet waits, the content is
++      // measured through this Box, which records the slot's own height (never its width: the app
++      // pins the child's width first, so a width alone must not settle the gate). The Box is
++      // composed for the whole life of a waiting sheet, so the settle flip below never disposes
++      // the hosted views, and a sheet that does not wait composes exactly what it did before.
++      if (props.deferUntilMeasured) {
++        Box(
++          modifier = Modifier.onSizeChanged { size ->
++            // Once the sheet presented, a later height change is a content change and must not
++            // re-gate it.
++            if (settledHeight == 0 && size.height > 0) pendingHeight = size.height
++          }
++        ) {
++          Children(UIComposableScope(), filter = { !isSlotView(it) })
 +        }
++      } else {
++        Children(UIComposableScope(), filter = { !isSlotView(it) })
 +      }
-+      Children(UIComposableScope(), filter = { !isSlotView(it) })
 +    }
    }
  
    LaunchedEffect(Unit) {
 diff --git a/build/community/bottom-sheet/BottomSheet.android.js b/build/community/bottom-sheet/BottomSheet.android.js
-index cafa206f5c4fefe8aa31ceaea3fe021ac07ed7f0..c665f4e0bbcc1293a3d5e61d49d5c748a2cbb543 100644
+index cafa206f5c4fefe8aa31ceaea3fe021ac07ed7f0..323bbb297504389105508c3d1fd079a8a1b63117 100644
 --- a/build/community/bottom-sheet/BottomSheet.android.js
 +++ b/build/community/bottom-sheet/BottomSheet.android.js
 @@ -37,7 +37,7 @@ function findNearestSnapPointIndex(snapPoints, position) {
@@ -250,7 +346,7 @@ index cafa206f5c4fefe8aa31ceaea3fe021ac07ed7f0..c665f4e0bbcc1293a3d5e61d49d5c748
   * `snapToIndex(0)` maps to partial, `snapToIndex(lastIndex)` maps to expanded.
   */ export function BottomSheet(props) {
 -    const { ref, snapPoints: snapPointsProp, index: indexProp = 0, onChange, onClose, onDismiss, enablePanDownToClose = false, enableDynamicSizing = true, handleComponent, backgroundStyle, children } = props;
-+    const { ref, snapPoints: snapPointsProp, index: indexProp = 0, onChange, onClose, onDismiss, enablePanDownToClose = false, dismissGestures = enablePanDownToClose, onRequestDismiss, locale, contentOwnsTopInset, enableDynamicSizing = true, handleComponent, backgroundStyle, children } = props;
++    const { ref, snapPoints: snapPointsProp, index: indexProp = 0, onChange, onClose, onDismiss, enablePanDownToClose = false, dismissGestures = enablePanDownToClose, onRequestDismiss, locale, contentOwnsTopInset, deferUntilMeasured, enableDynamicSizing = true, handleComponent, backgroundStyle, children } = props;
      const { width } = useWindowDimensions();
      const hasMultipleSnapPoints = snapPointsProp != null && snapPointsProp.length > 1;
      const fitToContents = enableDynamicSizing && (!snapPointsProp || snapPointsProp.length === 0);
@@ -344,7 +440,7 @@ index cafa206f5c4fefe8aa31ceaea3fe021ac07ed7f0..c665f4e0bbcc1293a3d5e61d49d5c748
          snapPointsProp
      ]);
      useImperativeHandle(ref, ()=>methods, [
-@@ -179,7 +184,9 @@ function findNearestSnapPointIndex(snapPoints, position) {
+@@ -179,7 +184,10 @@ function findNearestSnapPointIndex(snapPoints, position) {
                      skipPartiallyExpanded: skipPartially,
                      initialFullyExpanded: hasMultipleSnapPoints && pendingIndexRef.current === maxIndex,
                      showDragHandle: handleComponent !== null,
@@ -352,6 +448,7 @@ index cafa206f5c4fefe8aa31ceaea3fe021ac07ed7f0..c665f4e0bbcc1293a3d5e61d49d5c748
 +                    sheetGesturesEnabled: dismissGestures,
 +                    locale: locale,
 +                    contentOwnsTopInset: contentOwnsTopInset,
++                    deferUntilMeasured: deferUntilMeasured,
                      containerColor: containerColor,
                      properties: {
                          shouldDismissOnBackPress: enablePanDownToClose,
@@ -422,10 +519,10 @@ index 7aff3986d0287f80e8dd9d5e248dd61d0e2e56a8..e721357b3a7e5748deccb18670126962
                      children: /*#__PURE__*/ _jsx(Group, {
                          modifiers: modifiers,
 diff --git a/build/community/bottom-sheet/types.d.ts b/build/community/bottom-sheet/types.d.ts
-index cf72b27f4304b6772a844acd0eb144796c03b5c0..f7b8c3184f7f4ade0844190f8ae78388da1f6f31 100644
+index cf72b27f4304b6772a844acd0eb144796c03b5c0..aa885683838a80a3f74eed2912eb2cf8aad71dda 100644
 --- a/build/community/bottom-sheet/types.d.ts
 +++ b/build/community/bottom-sheet/types.d.ts
-@@ -169,6 +169,40 @@ export interface BottomSheetProps {
+@@ -169,6 +169,48 @@ export interface BottomSheetProps {
       * On Android, this also controls back button and scrim tap dismiss.
       */
      enablePanDownToClose?: boolean;
@@ -463,14 +560,22 @@ index cf72b27f4304b6772a844acd0eb144796c03b5c0..f7b8c3184f7f4ade0844190f8ae78388
 +    locale?: string;
 +
 +    contentOwnsTopInset?: boolean;
++    /**
++     * Repo-local, Android: present a content-sized sheet in one motion from
++     * hidden to its final height, after its content has settled, instead of
++     * presenting at a drag-handle peek and jumping to full height in one frame.
++     * Bounded, so a content that never reports a height still presents. Only for
++     * a sheet without `snapPoints`.
++     */
++    deferUntilMeasured?: boolean;
      /**
       * Whether the sheet should automatically size to fit its content.
       * @default true
 diff --git a/build/jetpack-compose/ModalBottomSheet/index.d.ts b/build/jetpack-compose/ModalBottomSheet/index.d.ts
-index 6d3806c8213034310a304287da1e609453d30243..57038a48ffb2eaa2a3115a5ce67af0f57596eba1 100644
+index 6d3806c8213034310a304287da1e609453d30243..70e82dae1dd821508a1b05d5990b48043277a026 100644
 --- a/build/jetpack-compose/ModalBottomSheet/index.d.ts
 +++ b/build/jetpack-compose/ModalBottomSheet/index.d.ts
-@@ -78,6 +78,15 @@ export interface ModalBottomSheetProps {
+@@ -78,6 +78,24 @@ export interface ModalBottomSheetProps {
       * @default true
       */
      sheetGesturesEnabled?: boolean;
@@ -483,18 +588,28 @@ index 6d3806c8213034310a304287da1e609453d30243..57038a48ffb2eaa2a3115a5ce67af0f5
 +    locale?: string;
 +
 +    contentOwnsTopInset?: boolean;
++    /**
++     * Repo-local: present a content-sized sheet in one motion from hidden to its
++     * final height, after its content has settled, instead of presenting at a
++     * drag-handle peek and jumping to full height in one frame. Bounded, so a
++     * content that never reports a height still presents. Leave it false for a
++     * sheet with explicit detents. Repo-local.
++     * @platform android
++     */
++    deferUntilMeasured?: boolean;
      /**
       * Properties for the modal window behavior.
       */
 diff --git a/build/jetpack-compose/ModalBottomSheet/index.js b/build/jetpack-compose/ModalBottomSheet/index.js
-index ba36efa65298eff84f5614318ee5b3e8c76ec0f7..4f3919c528a498641ea798b35c3e7c058512a10c 100644
+index ba36efa65298eff84f5614318ee5b3e8c76ec0f7..754482abb315a10a2494697ccc6f0cd90232a2aa 100644
 --- a/build/jetpack-compose/ModalBottomSheet/index.js
 +++ b/build/jetpack-compose/ModalBottomSheet/index.js
-@@ -12,6 +12,7 @@ function transformProps(props) {
+@@ -12,6 +12,8 @@ function transformProps(props) {
          ...restProps,
          skipPartiallyExpanded: props.skipPartiallyExpanded ?? false,
          initialFullyExpanded: props.initialFullyExpanded ?? false,
 +        contentOwnsTopInset: props.contentOwnsTopInset ?? false,
++        deferUntilMeasured: props.deferUntilMeasured ?? false,
          onDismissRequest: ()=>{
              onDismissRequest?.();
          }
@@ -826,10 +941,10 @@ index 7dfe0a9dc9fafb625067dbb29f80d82f767d63e1..a56405cb660d045d2ad30c6815cad033
        text = Text(date, style: props.dateStyle?.toSwiftUI() ?? .date)
      } else {
 diff --git a/src/community/bottom-sheet/BottomSheet.android.tsx b/src/community/bottom-sheet/BottomSheet.android.tsx
-index 2900e1221c3e24dea5ee121e6d5c9f64771644f5..08afe39c1f5d81d5dea08bd0b0406fac6bc85d53 100644
+index 2900e1221c3e24dea5ee121e6d5c9f64771644f5..3858fdcd68457dc92c57f898f612cdf47625040d 100644
 --- a/src/community/bottom-sheet/BottomSheet.android.tsx
 +++ b/src/community/bottom-sheet/BottomSheet.android.tsx
-@@ -61,6 +61,18 @@ export function BottomSheet(props: BottomSheetProps) {
+@@ -61,6 +61,21 @@ export function BottomSheet(props: BottomSheetProps) {
      onClose,
      onDismiss,
      enablePanDownToClose = false,
@@ -845,10 +960,13 @@ index 2900e1221c3e24dea5ee121e6d5c9f64771644f5..08afe39c1f5d81d5dea08bd0b0406fac
 +    // Repo-local: the caller clears the status bar itself, so the dialog window
 +    // must not also fit it — see the Kotlin prop's comment.
 +    contentOwnsTopInset,
++    // Repo-local: a content-sized sheet waits for its content's height so it presents once, at
++    // its final size — see the Kotlin prop's comment.
++    deferUntilMeasured,
      enableDynamicSizing = true,
      handleComponent,
      backgroundStyle,
-@@ -97,6 +109,8 @@ export function BottomSheet(props: BottomSheetProps) {
+@@ -97,6 +112,8 @@ export function BottomSheet(props: BottomSheetProps) {
    onCloseRef.current = onClose;
    const onDismissRef = useRef(onDismiss);
    onDismissRef.current = onDismiss;
@@ -857,7 +975,7 @@ index 2900e1221c3e24dea5ee121e6d5c9f64771644f5..08afe39c1f5d81d5dea08bd0b0406fac
  
    const fireCloseCallbacks = useCallback(() => {
      if (closedRef.current) return;
-@@ -106,32 +120,47 @@ export function BottomSheet(props: BottomSheetProps) {
+@@ -106,32 +123,47 @@ export function BottomSheet(props: BottomSheetProps) {
      onChangeRef.current?.(-1);
    }, []);
  
@@ -917,7 +1035,7 @@ index 2900e1221c3e24dea5ee121e6d5c9f64771644f5..08afe39c1f5d81d5dea08bd0b0406fac
          return;
        }
        const clampedIndex = clampIndex(index);
-@@ -152,13 +181,7 @@ export function BottomSheet(props: BottomSheetProps) {
+@@ -152,13 +184,7 @@ export function BottomSheet(props: BottomSheetProps) {
        onChangeRef.current?.(clampedIndex);
      };
  
@@ -932,7 +1050,7 @@ index 2900e1221c3e24dea5ee121e6d5c9f64771644f5..08afe39c1f5d81d5dea08bd0b0406fac
  
      return {
        snapToIndex,
-@@ -171,7 +194,7 @@ export function BottomSheet(props: BottomSheetProps) {
+@@ -171,7 +197,7 @@ export function BottomSheet(props: BottomSheetProps) {
        present: () => snapToIndex(0),
        dismiss: close,
      };
@@ -941,7 +1059,7 @@ index 2900e1221c3e24dea5ee121e6d5c9f64771644f5..08afe39c1f5d81d5dea08bd0b0406fac
  
    useImperativeHandle(ref, () => methods, [methods]);
  
-@@ -194,7 +217,9 @@ export function BottomSheet(props: BottomSheetProps) {
+@@ -194,7 +220,10 @@ export function BottomSheet(props: BottomSheetProps) {
              skipPartiallyExpanded={skipPartially}
              initialFullyExpanded={hasMultipleSnapPoints && pendingIndexRef.current === maxIndex}
              showDragHandle={handleComponent !== null}
@@ -949,6 +1067,7 @@ index 2900e1221c3e24dea5ee121e6d5c9f64771644f5..08afe39c1f5d81d5dea08bd0b0406fac
 +            sheetGesturesEnabled={dismissGestures}
 +            locale={locale}
 +            contentOwnsTopInset={contentOwnsTopInset}
++            deferUntilMeasured={deferUntilMeasured}
              containerColor={containerColor}
              properties={{
                shouldDismissOnBackPress: enablePanDownToClose,
@@ -1022,10 +1141,10 @@ index ee198cf8a3fe168cc319acb7460f11bcb4690c6e..9534e5c7e4c8842f9a4abe6c1a4c6c85
              <Group modifiers={modifiers}>
                <RNHostView matchContents={fitToContents ? { vertical: true } : false}>
 diff --git a/src/community/bottom-sheet/types.ts b/src/community/bottom-sheet/types.ts
-index 51326fbfdeb9642f52e6fe244093cc697fa585f7..e7d2260ffe0197475368e9a7e061b2d684f7354d 100644
+index 51326fbfdeb9642f52e6fe244093cc697fa585f7..df7c333381bc403b4ba868b89043472dddfd1305 100644
 --- a/src/community/bottom-sheet/types.ts
 +++ b/src/community/bottom-sheet/types.ts
-@@ -191,6 +191,62 @@ export interface BottomSheetProps {
+@@ -191,6 +191,76 @@ export interface BottomSheetProps {
     */
    enablePanDownToClose?: boolean;
  
@@ -1085,14 +1204,28 @@ index 51326fbfdeb9642f52e6fe244093cc697fa585f7..e7d2260ffe0197475368e9a7e061b2d6
 +   */
 +  contentOwnsTopInset?: boolean;
 +
++  /**
++   * Repo-local, Android: present a content-sized sheet in one motion from hidden
++   * to its final height instead of presenting at a drag-handle peek and jumping
++   * to full height in one frame. Material3 presents a modal sheet as soon as it
++   * has an `Expanded` anchor, and that anchor needs a non-zero sheet height, while
++   * a hosted React Native content lays out after the sheet first measured. While
++   * true, the sheet composes nothing that gives its surface a height of its own
++   * until the content's own height has settled, so it presents once over the
++   * final height. Bounded, so a content that never reports a height still
++   * presents. Only for a sheet without `snapPoints`: a sheet with detents must
++   * present at its detent.
++   */
++  deferUntilMeasured?: boolean;
++
    /**
     * Whether the sheet should automatically size to fit its content.
     * @default true
 diff --git a/src/jetpack-compose/ModalBottomSheet/index.tsx b/src/jetpack-compose/ModalBottomSheet/index.tsx
-index c3225b1d9c7c0636d366203e2b23f536fec9e54e..0a133ca1524a7dbfbe38f90ce21ee1ac08d71505 100644
+index c3225b1d9c7c0636d366203e2b23f536fec9e54e..22da72ae8b5c48483a45a6c6523e1ea029a3332b 100644
 --- a/src/jetpack-compose/ModalBottomSheet/index.tsx
 +++ b/src/jetpack-compose/ModalBottomSheet/index.tsx
-@@ -92,6 +92,20 @@ export interface ModalBottomSheetProps {
+@@ -92,6 +92,34 @@ export interface ModalBottomSheetProps {
     * @default true
     */
    sheetGesturesEnabled?: boolean;
@@ -1110,6 +1243,20 @@ index c3225b1d9c7c0636d366203e2b23f536fec9e54e..0a133ca1524a7dbfbe38f90ce21ee1ac
 +   * @platform android
 +   */
 +  contentOwnsTopInset?: boolean;
++  /**
++   * Repo-local: present a content-sized sheet in one motion from hidden to its
++   * final height. Material3 presents the sheet as soon as it has an `Expanded`
++   * anchor, and that anchor needs a non-zero sheet height, so a hosted content
++   * that lays out after the sheet presented made it animate to a drag-handle
++   * peek and jump to full height in one frame. While this is true the sheet
++   * composes nothing that gives the surface a height of its own (no drag handle,
++   * no window insets) until the content's own height has settled, so Material3's
++   * `show()` runs once over the final height while the scrim fades in. Bounded,
++   * so a content that never reports a height still presents. Leave it false for
++   * a sheet with explicit detents, which must present at its detent.
++   * @platform android
++   */
++  deferUntilMeasured?: boolean;
    /**
     * Properties for the modal window behavior.
     */

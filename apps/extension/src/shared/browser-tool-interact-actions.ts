@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { buildWorkflowPageCode } from './agent-workflow-runner';
 import {
   ambiguousSelectorError,
+  dropPathsSchema,
+  dropTargetSchema,
   FRESH_SNAPSHOT_HINT,
   looksLikeBrowserRef,
   STALE_REF_ERROR,
@@ -1074,8 +1076,9 @@ const handleDrag = async (
 const dropArgsSchema = z.object({
   data: z.record(z.string(), z.string()).optional(),
   element: z.string().optional(),
-  paths: z.array(z.string()).optional(),
-  target: z.string().min(1),
+  /** An empty entry is refused here because it names no file. */
+  paths: dropPathsSchema.optional(),
+  target: dropTargetSchema,
 });
 
 /** Upstream rule, verbatim: neither a file list nor a MIME payload makes a drop. */

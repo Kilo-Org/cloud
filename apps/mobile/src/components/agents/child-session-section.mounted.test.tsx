@@ -610,3 +610,35 @@ describe.each(['de', 'km'] as const)('ChildSessionSection status copy in %s', ta
     }
   );
 });
+
+// At the display-depth cap the row is a status, not a permission: it paints the
+// catalog's own sentence about the depth that was reached.
+describe('ChildSessionMessage nesting-depth status', () => {
+  afterEach(async () => {
+    await i18n.changeLanguage('en');
+  });
+
+  it.each(['en', 'te'] as const)('paints the %s depth sentence at the cap', async tag => {
+    await i18n.changeLanguage(tag);
+    const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
+    act(() => {
+      ref.current = TestRenderer.create(
+        createElement(ChildSessionMessage, {
+          message: assistantMessage('deep'),
+          depth: 5,
+          getChildMessages: () => [],
+          renderPart: () => null,
+          onOpenChildSession: vi.fn<() => void>(),
+        })
+      );
+    });
+    const renderer = ref.current;
+    if (!renderer) {
+      throw new Error('renderer was not created');
+    }
+    expect(textValues(renderer.root)).toContain(i18n.t('agentChat.childSession.maxNestingDepth'));
+    act(() => {
+      renderer.unmount();
+    });
+  });
+});

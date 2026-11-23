@@ -212,9 +212,6 @@ export function stateTint(state: 'unknown' | 'platform' | 'repository' | 'idle' 
   if (state === 'unknown' || state === 'platform' || state === 'repository') {
     return PLACEHOLDER_TINT;
   }
-  // The two session states pin to distinct tokens so they stay separable by
-  // colour: idle takes the quiet neutral strip (it is the inactive state),
-  // live keeps the sky ramp entry it already rendered.
   return state === 'idle' ? IDLE_TINT : AGENT_RAMP[4];
 }
 

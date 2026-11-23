@@ -39,7 +39,12 @@ function lineWith(root: ReactTestInstance, copy: string): ReactTestInstance {
 }
 
 /** The props the mocked `QueryError` host element carries; the renderer keeps them untyped. */
-type RenderedQueryError = { variant?: string; title?: string; onRetry?: () => void };
+type RenderedQueryError = {
+  variant?: string;
+  title?: string;
+  placement?: string;
+  onRetry?: () => void;
+};
 
 const h = vi.hoisted(() => ({
   confirm: vi.fn(),
@@ -189,6 +194,10 @@ describe('ProfileSkillsScreen', () => {
     expect(queryError.variant).toBe('permission');
     expect(queryError.title).toBeUndefined();
     expect(queryError.onRetry).toBeUndefined();
+    // A read with nothing under it owns the surface, so it centres and no
+    // tab scroller holds it.
+    expect(queryError.placement).toBe('center');
+    expect(findAll(renderer.root, 'ScrollView')).toHaveLength(0);
 
     unmount();
   });

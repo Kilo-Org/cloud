@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- profile-editor instructions: section body, sheet and delete flow share one screen */
 import { type Href } from 'expo-router';
-import { Fragment, type ReactNode } from 'react';
+import { Fragment, type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { toast } from 'sonner-native';
@@ -10,6 +10,10 @@ import {
   InstructionFormSheet,
   type InstructionFormSubmission,
 } from '@/components/profiles/instruction-form-sheet';
+import {
+  type InstructionView,
+  InstructionViewSheet,
+} from '@/components/profiles/instruction-view-sheet';
 import { ProfileManageSlot } from '@/components/profiles/profile-manage-slot';
 import { ProfileSectionEmptyState } from '@/components/profiles/profile-section-empty-state';
 import { selectProfileReadErrorView } from '@/components/profiles/profile-read-error-view';
@@ -30,6 +34,7 @@ import { NEUTRAL_TINT } from '@/lib/agent-color';
 import { HIDDEN_LABEL_PROPS } from '@/lib/a11y/hidden-label';
 import { MAX_PROFILE_INSTRUCTIONS } from '@/lib/agent-profile-forms';
 import { isolateLtrBidiText } from '@/lib/bidi';
+import { useIsLargeFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import {
   type AgentProfileInstructionRow,
@@ -58,6 +63,8 @@ type InstructionRowProps = Readonly<{
   onToggle?: (enabled: boolean) => void;
   onEdit?: () => void;
   onDelete?: () => void;
+  /** Opens the read-only detail sheet. The row uses it only while it is read-only. */
+  onView?: () => void;
 }>;
 
 /**
@@ -74,20 +81,35 @@ function hasUsableMessage(error: unknown): boolean {
  * controls instead of three. The row paints the name only: the path repeats
  * `.kilocode/rules/` and the name's own extension on every row, so it rides the
  * row's spoken name instead of a second painted line — the content press while
- * the row opens the form, the static row's own label when it does not, because
- * a read-only row has no press to carry it.
+ * the row opens the form, the row's own press when it does not.
+ *
+ * The name is one line at the default font scale, cut in the middle: two files
+ * that share a long prefix are told apart by the end of their names, which a
+ * tail ellipsis hides. A press on either arm shows the whole name on a surface
+ * of its own, so the name never needs a second painted line to be readable: an
+ * editable row opens the form, which carries the name in a field, and a
+ * read-only row opens the detail sheet, which paints it in full.
+ *
+ * The read-only row keeps the switch it cannot flip, because whether a rule
+ * file is applied is what the member came to read, and it takes no disclosure
+ * mark: the title needs every point the trailing cell does not take. That
+ * state also rides the row's spoken value: the row's single accessible press
+ * hides the switch from a reader on iOS, so the value is what keeps an enabled
+ * file from reading the same as a disabled one. The editable row leaves the
+ * value unset, because there the switch stays its own stop with its own state.
  */
 function InstructionRow({
   instruction,
   onToggle,
   onEdit,
   onDelete,
+  onView,
 }: Readonly<InstructionRowProps>) {
   const { t } = useTranslation();
   const colors = useThemeColors();
   const contentIsPress = onEdit !== undefined;
-  // Only a row whose press names the file hides the painted name.
-  const nameLineA11y = contentIsPress ? HIDDEN_LABEL_PROPS : {};
+  // The row's title anatomy: one line here, two at a large font scale.
+  const nameLines = useIsLargeFontScale() ? 2 : 1;
   const rulesPath = `.kilocode/rules/${instruction.name}.md`;
   const contentAccessibilityLabel = contentIsPress
     ? [t('profiles.instructionEdit', { name: instruction.name }), rulesPath].join(', ')
@@ -95,6 +117,9 @@ function InstructionRow({
   const rowAccessibilityLabel = contentIsPress
     ? undefined
     : [instruction.name, rulesPath].join(', ');
+  // Both arms hide the painted name: the editable row's content press names the
+  // file, and the read-only row's own press names it too. The row keeps one
+  // accessible stop per row instead of a text node repeating the name.
   const trailing: ReactNode[] = [
     <Fragment key="enable">
       {renderRowTrailing({
@@ -123,17 +148,18 @@ function InstructionRow({
     <RowFrame
       leading={<IconTile icon={FileText} tint={NEUTRAL_TINT} />}
       pressTarget={contentIsPress ? 'content' : 'row'}
-      onPress={onEdit}
+      onPress={contentIsPress ? onEdit : onView}
       contentAccessibilityLabel={contentAccessibilityLabel}
+      accessibilityLabel={rowAccessibilityLabel}
+      accessibilityValue={
+        contentIsPress
+          ? undefined
+          : { text: instruction.enabled ? t('common.enabled') : t('common.disabled') }
+      }
       trailing={{ kind: 'nodes', nodes: trailing }}
     >
-      <Text
-        variant="mono"
-        numberOfLines={1}
-        accessibilityLabel={rowAccessibilityLabel}
-        {...nameLineA11y}
-      >
-        {instruction.name}
+      <Text variant="mono" numberOfLines={nameLines} ellipsizeMode="middle" {...HIDDEN_LABEL_PROPS}>
+        {contentIsPress ? instruction.name : isolateLtrBidiText(instruction.name)}
       </Text>
     </RowFrame>
   );
@@ -159,6 +185,10 @@ export function ProfileInstructionsScreen({
   const { confirm, dialog } = useConfirmDialog();
   const profileQuery = useAgentProfileInstructions(profileId, organizationId);
   const committedConnectivity = useCommittedConnectivityStatus();
+  // The row the read-only detail sheet shows the whole file name of. A row that
+  // can be edited opens the form instead, so this holds one only in the
+  // read-only arm.
+  const [preview, setPreview] = useState<InstructionView | null>(null);
   const readError = selectProfileReadErrorView({
     error: profileQuery.error,
     connectivity: committedConnectivity,
@@ -190,7 +220,9 @@ export function ProfileInstructionsScreen({
     form.close();
   };
 
-  useCloseEditorOnDeniedPermission(permission, handleClose);
+  // A denial is not a dismissal: nobody pressed anything, so the guard stays
+  // unarmed and the first row press after the screen settles still reaches it.
+  useCloseEditorOnDeniedPermission(permission, form.close);
 
   const setSaveFailure = (next: SaveFailure | null) => {
     form.setNotes({ saveFailure: next });
@@ -263,18 +295,7 @@ export function ProfileInstructionsScreen({
   };
 
   let content: ReactNode = null;
-  if (profileQuery.isError) {
-    content = (
-      <QueryError
-        variant={readError.variant}
-        placement="top"
-        title={readError.titleKey ? t(readError.titleKey) : undefined}
-        message={readError.descriptionKey ? t(readError.descriptionKey) : undefined}
-        onRetry={readError.showRetry ? () => void profileQuery.refetch() : undefined}
-        isRetrying={profileQuery.isRefetching}
-      />
-    );
-  } else if (profileQuery.isPending) {
+  if (profileQuery.isPending) {
     content = <InstructionsSkeleton />;
   } else if (instructions.length === 0) {
     content = (
@@ -332,6 +353,9 @@ export function ProfileInstructionsScreen({
                     })
                   : undefined
               }
+              onView={guardRowPress(() => {
+                setPreview(instruction);
+              })}
             />
           ))}
         </RowGroup>
@@ -359,15 +383,28 @@ export function ProfileInstructionsScreen({
         title={t('profiles.instructionsTitle')}
         backFallback={backFallback}
       />
-      <TabScreenScrollView
-        className="flex-1"
-        contentContainerClassName={SCREEN_BODY_CLASS}
-        keyboardShouldPersistTaps="handled"
-        automaticallyAdjustKeyboardInsets
-        showsVerticalScrollIndicator={false}
-      >
-        {content}
-      </TabScreenScrollView>
+      {profileQuery.isError ? (
+        // The read owns the surface, so it centres in the band the header and
+        // the bottom band leave instead of scrolling as a banner.
+        <QueryError
+          variant={readError.variant}
+          placement="center"
+          title={readError.titleKey ? t(readError.titleKey) : undefined}
+          message={readError.descriptionKey ? t(readError.descriptionKey) : undefined}
+          onRetry={readError.showRetry ? () => void profileQuery.refetch() : undefined}
+          isRetrying={profileQuery.isRefetching}
+        />
+      ) : (
+        <TabScreenScrollView
+          className="flex-1"
+          contentContainerClassName={SCREEN_BODY_CLASS}
+          keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets
+          showsVerticalScrollIndicator={false}
+        >
+          {content}
+        </TabScreenScrollView>
+      )}
 
       {form.isOpen && canManage ? (
         <InstructionFormSheet
@@ -380,6 +417,16 @@ export function ProfileInstructionsScreen({
           onSave={submission => saveInstruction(form.editing, submission)}
         />
       ) : null}
+
+      {/* The two sheets cannot be open together: a row offers the detail sheet
+          only while it has no edit press, and the form opens only through that
+          press, so a row that opens the form never opens the detail sheet. */}
+      <InstructionViewSheet
+        instruction={preview}
+        onClose={() => {
+          setPreview(null);
+        }}
+      />
 
       {dialog}
     </View>

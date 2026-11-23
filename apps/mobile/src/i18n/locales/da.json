@@ -91,6 +91,7 @@
     "draft": "Kladde",
     "enabled": "Aktiveret",
     "github": "GitHub",
+    "image": "Billede",
     "imageUnavailable": "Billedet er ikke tilgængeligt.",
     "loading": "Indlæser…",
     "loadMore": "Indlæs flere",
@@ -122,10 +123,10 @@
     "connectProvider": "Tilslut en udbyder",
     "contentTruncated": "Indhold afkortet",
     "copyLink": "Kopiér link",
+    "couldNotLoad": "Det lykkedes ikke at indlæse.",
+    "couldNotLoadMore": "Det lykkedes ikke at indlæse flere.",
     "couldNotLoadOrganizations": "Organisationerne kunne ikke indlæses.",
     "couldNotLoadSessions": "Sessionerne kunne ikke indlæses.",
-    "couldnTLoad": "Det lykkedes ikke at indlæse.",
-    "couldnTLoadMore": "Det lykkedes ikke at indlæse flere.",
     "deviceSessions": "Enhedssessioner",
     "disabled": "Deaktiveret",
     "email": "E-mail",
@@ -2661,6 +2662,7 @@
     "filePart": {
       "loadingImage": "Indlæser billede",
       "imageUnavailableRetry": "Billedet er ikke tilgængeligt. Prøv at indlæse det igen",
+      "imageUnavailableRetryWithAlt": "Billedet er ikke tilgængeligt. {{alt}}. Prøv at indlæse det igen",
       "imagePreviewUnavailableInSession": "Billedet kan ikke forhåndsvises i denne session.",
       "viewImage": "Vis billede",
       "viewImageWithAlt": "Vis billede {{alt}}",
@@ -3691,7 +3693,7 @@
       "noSeatsAvailable": "Alle pladser er i brug. Bed en organisationsejer om at tilføje pladser, før du inviterer flere medlemmer."
     },
     "invoices": {
-      "downloadA11y": "Download faktura {{number}}",
+      "downloadA11y": "Download faktura {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Fakturaer oprettes automatisk for hver faktureringsperiode og vises her, når din organisation bliver faktureret.",
       "emptyTitle": "Ingen fakturaer",
       "invoiceFallback": "Faktura",
@@ -3771,7 +3773,6 @@
       "usageDetails": "Forbrugsdetaljer",
       "providersAndModels": "Udbydere og modeller",
       "groups": "Grupper",
-      "guardrails": "Sikkerhedsgrænser",
       "byok": "Brug din egen nøgle",
       "ssoAndDomain": "SSO og domæne",
       "dataCollection": "Dataindsamling",
@@ -3891,7 +3892,7 @@
     "signupStepUpApple": "Brug '$t(login.signInWithApple)' for at færdiggøre oprettelsen af din konto.",
     "signupStepUpGoogle": "Brug '$t(login.signInWithGoogle)' for at færdiggøre oprettelsen af din konto.",
     "signupStepUpBack": "Gå tilbage og brug '$t(login.moreSignInOptions)' for at færdiggøre oprettelsen af din konto.",
-    "invalidCode": "Koden er forkert eller udløbet. Prøv igen eller brug '$t(login.resendCode)'.",
+    "invalidCode": "Koden er forkert eller udløbet. Brug '$t(login.resendCode)' eller '$t(login.moreSignInOptions)'.",
     "codeInProgress": "Din kode behandles. Vent et øjeblik, og prøv igen.",
     "tooManyAttempts": "For mange forsøg. Bed om en ny kode.",
     "invalidToken": "Det lykkedes ikke at logge ind. Prøv igen.",
@@ -4205,6 +4206,8 @@
       "discoveryNoModels": "Endepunktet angav ingen modeller. Tilføj modeller manuelt.",
       "connectionIncomplete": "Modellen svarede, men blev ikke færdig. Prøv igen, eller tjek model-ID'et og protokollen.",
       "invalidInput": "Indtast et servernavn, gyldige headere og mindst én model med et entydigt ID og navn. Tokengrænser skal være positive heltal.",
+      "invalidApiKey": "API-nøglen indeholder et tegn, som ikke kan sendes. Brug kun bogstaver, tal og standardtegn, uden linjeskift.",
+      "invalidHeaders": "En brugerdefineret header kan ikke sendes. Kontroller dens navn, og brug kun bogstaver, tal og standardtegn, uden linjeskift.",
       "invalidUrl": "Indtast en HTTP- eller HTTPS-API-rod uden loginoplysninger, forespørgselsparametre eller et fragment.",
       "publicHttp": "Offentlige HTTP-endepunkter er ikke tilladt. Brug HTTPS eller et privat lokalt endepunkt.",
       "httpApprovalRequired": "Godkend dette lokale HTTP-endepunkt, før du gemmer eller opretter forbindelse.",
@@ -4339,7 +4342,15 @@
       "download": "Download model til enheden",
       "downloading": "Downloader…",
       "downloadProgress": "Downloader… {{percent}}%",
-      "downloadFailed": "Downloaden blev ikke fuldført. Tjek din forbindelse og ledig lagerplads, og prøv igen."
+      "downloadFailed": "Downloaden blev ikke fuldført. Tjek din forbindelse og ledig lagerplads, og prøv igen.",
+      "cannotUse": "Kan ikke køre: {{items}}.",
+      "cannotUseOptions": "Kan ikke udfylde: nogle værktøjsvalgmuligheder.",
+      "limitations": "Begrænsninger",
+      "tools": {
+        "time": "Tid",
+        "settingsList": "Vis indstillinger",
+        "settingsSet": "Ændr indstillinger"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Denne model understøtter ræsonnementsniveau"
@@ -4518,6 +4529,7 @@
     "instructionSaveFailed": "Instruktionen kunne ikke gemmes",
     "instructionDeleteFailed": "Instruktionen kunne ikke slettes",
     "instructionToggleFailed": "Instruktionen kunne ikke opdateres",
+    "instructionViewTitle": "Instruktionsfil",
     "instructionLimitReached": "En profil kan have op til {{max}} instruktioner. Slet en for at tilføje en ny.",
     "mcp": {
       "title": "MCP-servere",
@@ -4688,10 +4700,20 @@
     "history": {
       "activityUnavailable": "Kunne ikke indlæse kreditaktivitet.",
       "appStoreReceipt": "Kvittering fra App Store",
+      "deduction": {
+        "adminCancel": "Saldo lukket af en administrator",
+        "adminDebit": "Kreditter fjernet af en administrator",
+        "codingPlan": "Kodeplan: {{plan}}",
+        "correction": "Saldokorrektion",
+        "dispute": "Betalingsstrid",
+        "refundAppStore": "Refusion af kreditpakke fra App Store",
+        "refundGooglePlay": "Refusion af kreditpakke fra Google Play"
+      },
       "deductionFallback": "Kreditfradrag",
       "emptyDescription": "Kreditkøb, kvitteringer og forbrug vises her.",
       "emptyTitle": "Ingen kredithistorik",
       "expiredGrant": "Udløbet: {{description}}",
+      "expiredStatus": "Udløbet",
       "googlePlayReceipt": "Kvittering fra Google Play",
       "kind": {
         "adjustment": "Justering",
@@ -4718,7 +4740,8 @@
       "receiptA11y": "Åbn kvitteringen for {{description}}, {{amount}}, fra {{date}}",
       "receiptUnavailable": "Der er ingen kvittering for dette køb.",
       "retentionLimit": "Viser den seneste kredithistorik.",
-      "voidedGrant": "Annulleret: {{description}}"
+      "voidedGrant": "Annulleret: {{description}}",
+      "voidedStatus": "Annulleret"
     },
     "title": "Køb kreditter",
     "description": "Kreditter er et engangskøb, der lægges til din Kilo-saldo til at køre AI-kodningssessioner i Kilo App. Butikken opkræver betaling på din konto, og kreditterne tilføjes, når butikken bekræfter betalingen.",

@@ -906,9 +906,6 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
   }
 
   function processCloudStatus(event: Extract<ServiceEvent, { type: 'cloud.status' }>): void {
-    // A user Stop retires a preparing route as a failed route whose reason is
-    // the cancellation code. The live event and a durable refresh carry the
-    // same status, so both must read as a stop rather than an error.
     if (isPreparationCancellationStatus(event.cloudStatus)) {
       settlePreparationCancellation();
     } else {

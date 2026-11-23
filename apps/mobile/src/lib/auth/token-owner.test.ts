@@ -236,7 +236,6 @@ describe('token-owner', () => {
       releaseRead?.();
 
       await expect(pending).resolves.toBe('newer-token');
-      // The stale read did not overwrite the newer owner or erase its expiry.
       expect(getActiveToken()).toEqual({ token: 'newer-token', expiresAtMs: 9999 });
     });
 

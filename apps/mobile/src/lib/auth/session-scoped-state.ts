@@ -199,10 +199,7 @@ export function clearSessionScopedState(): void {
   // The phone's search index is device-wide, not scoped to the signed-in
   // session, so without this the previous account's session, pull-request and
   // security titles stay searchable in Spotlight and Android app search after a
-  // sign-out or an account switch. Fire-and-forget via
-  // `clearSearchIndexBestEffort`: the native clear also wipes the fingerprint
-  // ledger the indexer diffs against, so the next sync re-indexes whatever the
-  // new account can see.
+  // sign-out or an account switch.
   runClear(clearSearchIndexBestEffort);
   // The App Intents session catalog is device-wide for the same reason, and it
   // is the same titles in another place: without this, Shortcuts and Siri would

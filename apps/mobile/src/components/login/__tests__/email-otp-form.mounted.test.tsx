@@ -315,13 +315,38 @@ describe('EmailOtpForm action labels', () => {
   });
 });
 
-describe('EmailOtpForm browser fallback', () => {
+describe('EmailOtpForm alternative sign-in', () => {
+  // The control renders from the refusal's data tag, not from a handler: a code
+  // that cannot succeed offers it, and nothing else does.
+  it('offers no other sign-in method without a recovery tag', () => {
+    const { mounted } = mount();
+    expect(
+      mounted.root.findAllByProps({ accessibilityLabel: i18n.t('login.moreSignInOptions') })
+    ).toHaveLength(0);
+  });
+
+  it('offers the other sign-in methods a refusal a code cannot clear names', () => {
+    const onAlternativeSignIn = vi.fn<() => void>();
+    const { mounted } = mount({ recovery: 'options', onAlternativeSignIn });
+
+    const alternatives = mounted.root.findByProps({
+      accessibilityLabel: i18n.t('login.moreSignInOptions'),
+    });
+    expect(alternatives.props.disabled).toBe(false);
+    expect(alternatives.props.loading).not.toBe(true);
+    act(() => {
+      (alternatives.props.onPress as () => void)();
+    });
+    expect(onAlternativeSignIn).toHaveBeenCalledOnce();
+  });
+
   // The mounted flow proves the control's presence and wiring; this pins the
   // busy edge it cannot see: the whole step locks while the browser opens.
-  it('disables the step and spins the action while the browser sign-in starts', () => {
+  it('disables the step and spins the action while the alternative sign-in starts', () => {
     const { mounted } = mount({
-      onBrowserSignIn: vi.fn<() => void>(),
-      browserSignInStarting: true,
+      recovery: 'options',
+      onAlternativeSignIn: vi.fn<() => void>(),
+      alternativeSignInStarting: true,
     });
     for (const button of mounted.root.findAllByType('Button')) {
       expect(button.props.disabled).toBe(true);

@@ -9,6 +9,8 @@ function loading(overrides: Partial<Parameters<typeof selectSessionListIsLoading
     isSearching: false,
     searchIsPending: false,
     storedIsPending: false,
+    searchIsPaused: false,
+    storedIsPaused: false,
     ...overrides,
   });
 }
@@ -43,6 +45,31 @@ describe('selectSessionListIsLoading', () => {
       );
     });
 
+    it('a paused search is unresolved, not loading', () => {
+      // Offline with no cached search page: the read will not settle until the
+      // network returns, so skeletons here would never land. The body shows the
+      // offline state with a retry instead.
+      expect(
+        loading({
+          isSearching: true,
+          searchIsPending: true,
+          searchIsPaused: true,
+          storedIsPending: false,
+        })
+      ).toBe(false);
+    });
+
+    it('a paused stored read is unresolved, not loading', () => {
+      expect(
+        loading({
+          isSearching: false,
+          storedIsPending: true,
+          storedIsPaused: true,
+          searchIsPending: false,
+        })
+      ).toBe(false);
+    });
+
     it('stops loading when a search settles with no matches', () => {
       expect(loading({ isSearching: true, searchIsPending: false, storedIsPending: false })).toBe(
         false
@@ -63,6 +90,7 @@ describe('selectSessionListIsLoading', () => {
   // what the screen actually renders, and it is where the flash came from.
   describe('cold-open body-surface decision', () => {
     const surfaceInput = {
+      isPaused: false,
       isError: false,
       isRetrying: false,
       hasAnySessions: false,
@@ -89,6 +117,31 @@ describe('selectSessionListIsLoading', () => {
       expect(selectSessionListContentSurface({ isLoading, ...surfaceInput })).toEqual({
         kind: 'history-empty',
       });
+    });
+
+    it('selects the offline surface, never skeletons, for a paused search', () => {
+      // Offline with no cached search page: the read is neither loading nor
+      // errored and will not settle on its own, so the surface carries the
+      // offline card with its own Retry.
+      const isLoading = loading({
+        isSearching: true,
+        searchIsPending: true,
+        searchIsPaused: true,
+      });
+      expect(
+        selectSessionListContentSurface({ isLoading, ...surfaceInput, isPaused: true })
+      ).toEqual({ kind: 'offline' });
+    });
+
+    it('selects the offline surface for a paused stored read', () => {
+      const isLoading = loading({
+        isSearching: false,
+        storedIsPending: true,
+        storedIsPaused: true,
+      });
+      expect(
+        selectSessionListContentSurface({ isLoading, ...surfaceInput, isPaused: true })
+      ).toEqual({ kind: 'offline' });
     });
   });
 });

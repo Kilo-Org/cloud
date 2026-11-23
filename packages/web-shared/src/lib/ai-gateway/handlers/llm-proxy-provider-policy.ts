@@ -14,6 +14,7 @@ import {
   paidUsageRejection,
   resolveOrganizationGatewaySettings,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-admission';
+import { resolveOpenRouterModelAlias } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { getIgnoredProviders } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
 import { isNonTrialEnterpriseOrganization } from '@kilocode/web-shared/lib/organizations/non-trial-enterprise';
 import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
@@ -375,7 +376,12 @@ export async function resolveProviderAndPolicy(
     }
   }
 
-  const dataCollectionRejected = await dataCollectionPolicyRejection(model, request.body.provider);
+  // The free class belongs to the model that is served and billed, which a `~` alias names by its target.
+  const dataCollectionModel = await resolveOpenRouterModelAlias(model);
+  const dataCollectionRejected = await dataCollectionPolicyRejection(
+    dataCollectionModel,
+    request.body.provider
+  );
   if (dataCollectionRejected) return reject(dataCollectionRejected);
 
   if (input.customLlm?.definition.public) {

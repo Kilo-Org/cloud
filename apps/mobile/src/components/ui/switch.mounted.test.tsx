@@ -151,8 +151,6 @@ describe('Switch', () => {
     expect(props.thumbColor).not.toBe(darkColors.primaryForeground);
   });
 
-  // Dark's accent is the brand yellow, which glares on the near-black page; the
-  // on pair takes the muted olive both schemes share instead.
   it('paints the dark on track with the muted olive, not the accent', () => {
     native.os = 'android';
     native.scheme = 'dark';

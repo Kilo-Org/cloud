@@ -80,6 +80,8 @@ function deduction(overrides: Partial<CreditDeduction> = {}): CreditDeduction {
     amount_mUsd: -10_000_000,
     kind: 'deduction',
     expiry: null,
+    reason: null,
+    planName: null,
     purchase: null,
     ...overrides,
   };
@@ -308,15 +310,18 @@ describe('LedgerHistoryRow', () => {
 
     const painted = texts(renderer).map(text => readable(text));
     // The ledger stores an English description; both lines read the catalog
-    // instead, so a grant the app knows never prints that stored sentence.
+    // instead, so a grant the app knows never prints that stored sentence. The
+    // grant's title sits directly above, so the line under it carries the
+    // status alone: the same name twice would read as two grants.
     expect(painted).toContain('Influencer credit');
-    expect(painted).toContain('Expired: Influencer credit');
+    expect(painted).toContain('Expired');
+    expect(painted).not.toContain('Expired: Influencer credit');
     expect(painted).not.toContain('influencer-bonus');
     expect(painted).not.toContain('Credit expired');
     renderer.unmount();
   });
 
-  it('reads the grant title and the expiry in Arabic', async () => {
+  it('reads the grant title and the expiry status in Arabic', async () => {
     try {
       await act(async () => {
         await i18n.changeLanguage('ar');
@@ -326,8 +331,16 @@ describe('LedgerHistoryRow', () => {
       );
 
       const painted = texts(renderer).map(text => readable(text));
+      // The status is the value this build resolves for the key, not a literal
+      // transcribed from the catalog beside it, and it must be the Arabic
+      // value rather than the English fallback an untranslated key paints.
+      const status = i18n.t('credits.history.expiredStatus');
+      expect(status).not.toBe(i18n.t('credits.history.expiredStatus', { lng: 'en' }));
       expect(painted).toContain('رصيد المؤثرين');
-      expect(painted).toContain('منتهي الصلاحية: رصيد المؤثرين');
+      expect(painted).toContain(status);
+      expect(painted).not.toContain(
+        i18n.t('credits.history.expiredGrant', { description: 'رصيد المؤثرين' })
+      );
       renderer.unmount();
     } finally {
       await act(async () => {
@@ -350,9 +363,11 @@ describe('LedgerHistoryRow', () => {
 
     const painted = texts(renderer).map(text => readable(text));
     // A paid grant's receipt records its own name, so the row keeps it rather
-    // than replacing it with a program title the reader never bought.
+    // than replacing it with a program title the reader never bought, and the
+    // line under it names only the status that closed it.
     expect(painted).toContain('Credit purchase');
-    expect(painted).toContain('Expired: Credit purchase');
+    expect(painted).toContain('Expired');
+    expect(painted).not.toContain('Expired: Credit purchase');
     renderer.unmount();
   });
 
@@ -390,8 +405,11 @@ describe('LedgerHistoryRow', () => {
     const painted = texts(renderer).map(text => readable(text));
     // The purchase row above already carries the grant, so this row paints the
     // expiry alone: the grant is titled from its reason, and the stored
-    // sentence must not gain a second prefix.
+    // sentence must not gain a second prefix. With the grant's name absent
+    // here, the full form stays the row's main title, and no second line
+    // repeats the status on its own.
     expect(painted).toContain('Expired: Promotional credits');
+    expect(painted).not.toContain('Expired');
     expect(painted).not.toContain('Expired: Expired: Promotional credits');
     expect(painted).not.toContain('promotional-bonus');
     renderer.unmount();
@@ -425,8 +443,11 @@ describe('LedgerHistoryRow', () => {
 
     const painted = texts(renderer).map(text => readable(text));
     // The server says the grant was cancelled, not that its term ran out, so
-    // the line must not claim an expiry.
-    expect(painted).toContain('Voided: OSS sponsorship credit');
+    // the line must not claim an expiry, and the status stands alone under the
+    // grant title the row above already paints.
+    expect(painted).toContain('OSS sponsorship credit');
+    expect(painted).toContain('Voided');
+    expect(painted).not.toContain('Voided: OSS sponsorship credit');
     expect(painted.some(text => text.startsWith('Expired: '))).toBe(false);
     renderer.unmount();
   });
@@ -446,10 +467,133 @@ describe('LedgerHistoryRow', () => {
 
     const painted = texts(renderer).map(text => readable(text));
     // The ledger stores a description the server does not guarantee is
-    // non-empty, and a blank title line reads as a broken row.
+    // non-empty, and a blank title line reads as a broken row. The grant line
+    // falls back to the purchase label, and the muted line carries the status
+    // alone rather than a label or a bare separator.
     expect(painted).toContain('Credit purchase');
-    expect(painted).toContain('Expired: Credit purchase');
-    expect(painted.some(text => text.trim() === 'Expired:')).toBe(false);
+    expect(painted).toContain('Expired');
+    expect(painted).not.toContain('Expired: Credit purchase');
+    expect(painted.some(text => text.trim().endsWith(':'))).toBe(false);
+    renderer.unmount();
+  });
+});
+
+describe('LedgerHistoryRow titles from the catalog', () => {
+  it('titles a usage charge from the catalog instead of the stored sentence', async () => {
+    const renderer = await renderLedgerRow(
+      deduction({ reason: 'usage', description: 'Usage charge', expiry: null, purchase: null })
+    );
+
+    const painted = texts(renderer).map(text => readable(text));
+    // The ledger stores an English sentence; a row whose category the server
+    // names reads the catalog instead, in whatever language the reader chose.
+    expect(painted).toContain(i18n.t('usage.title'));
+    expect(painted).not.toContain('Usage charge');
+    renderer.unmount();
+  });
+
+  it('titles a usage charge in Arabic', async () => {
+    try {
+      await act(async () => {
+        await i18n.changeLanguage('ar');
+      });
+      const renderer = await renderLedgerRow(
+        deduction({ reason: 'usage', description: 'Usage charge', expiry: null, purchase: null })
+      );
+
+      const painted = texts(renderer).map(text => readable(text));
+      expect(painted).toContain('الاستخدام');
+      expect(painted).not.toContain('Usage charge');
+      renderer.unmount();
+    } finally {
+      await act(async () => {
+        await i18n.changeLanguage('en');
+      });
+    }
+  });
+
+  it('names the coding plan a charge drew from, with the plan as a proper noun', async () => {
+    const renderer = await renderLedgerRow(
+      deduction({
+        reason: 'coding_plan',
+        planName: 'MiniMax Token Plan Plus',
+        description: 'Coding plan charge recorded for this period',
+        expiry: null,
+        purchase: null,
+      })
+    );
+
+    const painted = texts(renderer).map(text => readable(text));
+    // The stored sentence differs from the catalog template, so painting the
+    // template proves the row reads the catalog rather than echoing the ledger.
+    expect(painted).toContain(
+      readable(i18n.t('credits.history.deduction.codingPlan', { plan: 'MiniMax Token Plan Plus' }))
+    );
+    expect(painted).not.toContain('Coding plan charge recorded for this period');
+    renderer.unmount();
+  });
+
+  it('keeps the coding plan name intact inside the Arabic template', async () => {
+    try {
+      await act(async () => {
+        await i18n.changeLanguage('ar');
+      });
+      const renderer = await renderLedgerRow(
+        deduction({
+          reason: 'coding_plan',
+          planName: 'MiniMax Token Plan Plus',
+          description: 'Coding plan: MiniMax Token Plan Plus',
+          expiry: null,
+          purchase: null,
+        })
+      );
+
+      const painted = texts(renderer).map(text => readable(text));
+      const title = painted.find(text => text.includes('MiniMax Token Plan Plus'));
+      if (title === undefined) {
+        throw new Error('The row did not paint the coding plan name');
+      }
+      // The plan is a proper noun kept as data inside the Arabic frame, so the
+      // sentence cannot be the English one with a translated prefix.
+      expect(title).toBe(
+        readable(
+          i18n.t('credits.history.deduction.codingPlan', { plan: 'MiniMax Token Plan Plus' })
+        )
+      );
+      expect(title).not.toBe('Coding plan: MiniMax Token Plan Plus');
+      renderer.unmount();
+    } finally {
+      await act(async () => {
+        await i18n.changeLanguage('en');
+      });
+    }
+  });
+
+  it('keeps the ledger sentence on a row the server gave no reason', async () => {
+    const renderer = await renderLedgerRow(
+      deduction({ reason: null, description: 'Ledger sentence', expiry: null, purchase: null })
+    );
+
+    const painted = texts(renderer).map(text => readable(text));
+    expect(painted).toContain('Ledger sentence');
+    renderer.unmount();
+  });
+
+  it('keeps the ledger sentence on a coding plan charge whose plan is not named', async () => {
+    const renderer = await renderLedgerRow(
+      deduction({
+        reason: 'coding_plan',
+        planName: null,
+        description: 'Coding plan renewal',
+        expiry: null,
+        purchase: null,
+      })
+    );
+
+    const painted = texts(renderer).map(text => readable(text));
+    // A renewal charge names no plan, so a template with an empty placeholder
+    // would read as a broken row; the ledger's own sentence stays.
+    expect(painted).toContain('Coding plan renewal');
     renderer.unmount();
   });
 });

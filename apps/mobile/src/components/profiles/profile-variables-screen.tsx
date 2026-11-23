@@ -209,18 +209,7 @@ export function ProfileVariablesScreen({
   );
 
   let content: ReactNode = null;
-  if (varsQuery.isError) {
-    content = (
-      <QueryError
-        variant={readError.variant}
-        placement="top"
-        title={readError.titleKey ? t(readError.titleKey) : undefined}
-        message={readError.descriptionKey ? t(readError.descriptionKey) : undefined}
-        onRetry={readError.showRetry ? () => void varsQuery.refetch() : undefined}
-        isRetrying={varsQuery.isRefetching}
-      />
-    );
-  } else if (varsQuery.isPending) {
+  if (varsQuery.isPending) {
     content = <VariablesSkeleton />;
   } else if (rows.length === 0 && !isAdding) {
     content = (
@@ -303,15 +292,28 @@ export function ProfileVariablesScreen({
         title={t('profiles.variablesTitle')}
         backFallback={backFallback}
       />
-      <TabScreenScrollView
-        className="flex-1"
-        contentContainerClassName={SCREEN_BODY_CLASS}
-        keyboardShouldPersistTaps="handled"
-        automaticallyAdjustKeyboardInsets
-        showsVerticalScrollIndicator={false}
-      >
-        {content}
-      </TabScreenScrollView>
+      {varsQuery.isError ? (
+        // The read owns the surface, so it centres in the band the header and
+        // the bottom band leave instead of scrolling as a banner.
+        <QueryError
+          variant={readError.variant}
+          placement="center"
+          title={readError.titleKey ? t(readError.titleKey) : undefined}
+          message={readError.descriptionKey ? t(readError.descriptionKey) : undefined}
+          onRetry={readError.showRetry ? () => void varsQuery.refetch() : undefined}
+          isRetrying={varsQuery.isRefetching}
+        />
+      ) : (
+        <TabScreenScrollView
+          className="flex-1"
+          contentContainerClassName={SCREEN_BODY_CLASS}
+          keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets
+          showsVerticalScrollIndicator={false}
+        >
+          {content}
+        </TabScreenScrollView>
+      )}
 
       {dialog}
     </View>

@@ -39,9 +39,7 @@ export function useTrackingPermissionPrompt(enabled: boolean): void {
   useEffect(() => {
     let cancelled = false;
 
-    if (!enabled || !isTrackingPermissionSupported) {
-      // No-op cleanup so every branch returns the same type.
-    } else {
+    if (enabled && isTrackingPermissionSupported) {
       const checkAndPrompt = async () => {
         // The remembered choice loads asynchronously from SecureStore: wait for
         // that read before deciding, so a fast ATT check can never show the
@@ -135,8 +133,6 @@ export function useTrackingPermissionPrompt(enabled: boolean): void {
               },
             },
           ],
-          // Android back dismisses, which equals Not now: no request fires
-          // and the prompt stays governed by its own re-ask policy.
           { cancelable: true }
         );
       };

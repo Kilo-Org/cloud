@@ -9,7 +9,10 @@ export function resolveMarkdownImageSrc(uri: string): string {
   return uri;
 }
 
-/** The image viewer's header name: alt text, else the URL's file name, else "image". */
-export function markdownImageFilename(uri: string, alt: string): string {
-  return alt || (uri.startsWith('http') ? getFilename(uri.split('?')[0] ?? '') : '') || 'image';
+/**
+ * The image viewer's header name: alt text, else the URL's file name, else the
+ * catalog's localized "Image" fallback the caller passes in.
+ */
+export function markdownImageFilename(uri: string, alt: string, fallback: string): string {
+  return alt || (uri.startsWith('http') ? getFilename(uri.split('?')[0] ?? '') : '') || fallback;
 }

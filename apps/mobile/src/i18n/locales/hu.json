@@ -91,6 +91,7 @@
     "draft": "Piszkozat",
     "enabled": "Engedélyezve",
     "github": "GitHub",
+    "image": "Kép",
     "imageUnavailable": "A kép nem érhető el",
     "loading": "Betöltés…",
     "loadMore": "Továbbiak betöltése",
@@ -122,10 +123,10 @@
     "connectProvider": "Szolgáltató csatlakoztatása",
     "contentTruncated": "Tartalom csonkolva",
     "copyLink": "Hivatkozás másolása",
+    "couldNotLoad": "Nem sikerült betölteni.",
+    "couldNotLoadMore": "Nem sikerült betölteni a további elemeket.",
     "couldNotLoadOrganizations": "Nem sikerült betölteni a szervezeteket.",
     "couldNotLoadSessions": "Nem sikerült betölteni a munkameneteket.",
-    "couldnTLoad": "Nem sikerült betölteni.",
-    "couldnTLoadMore": "Nem sikerült betölteni a további elemeket.",
     "deviceSessions": "Eszközök munkamenetei",
     "disabled": "Letiltva",
     "email": "E-mail",
@@ -2661,6 +2662,7 @@
     "filePart": {
       "loadingImage": "Kép betöltése",
       "imageUnavailableRetry": "A kép nem érhető el, próbáld újra a betöltést",
+      "imageUnavailableRetryWithAlt": "A kép nem érhető el, {{alt}}, próbáld újra a betöltést",
       "imagePreviewUnavailableInSession": "A kép előnézete nem érhető el ebben a munkamenetben.",
       "viewImage": "Kép megtekintése",
       "viewImageWithAlt": "Kép megtekintése: {{alt}}",
@@ -3687,11 +3689,11 @@
       "pendingInvitation": "Erre az e-mail-címre már van egy függőben lévő meghívó.",
       "alreadyMember": "Ez a személy már tagja ennek a szervezetnek.",
       "seatsFull": "Az összes hely foglalt ({{used}}/{{total}}). Kérj meg egy szervezettulajdonost, hogy adjon hozzá helyeket, mielőtt további tagokat hívnál meg.",
-      "seatsFullCanInviteBilling": "Az összes hely foglalt ({{used}}/{{total}}). Számlázási kezelőket továbbra is meghívhatsz, mivel ők nem foglalnak helyet.",
+      "seatsFullCanInviteBilling": "Az összes hely foglalt ({{used}}/{{total}}). Számlázási felelősöket továbbra is meghívhatsz, mivel ők nem foglalnak helyet.",
       "noSeatsAvailable": "Az összes hely foglalt. Kérj meg egy szervezettulajdonost, hogy adjon hozzá helyeket, mielőtt további tagokat hívnál meg."
     },
     "invoices": {
-      "downloadA11y": "A(z) {{number}} számú számla letöltése",
+      "downloadA11y": "A(z) {{number}} számú számla letöltése, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "A számlák minden számlázási ciklusban automatikusan elkészülnek, és a szervezetednek kiállított számlák itt jelennek meg.",
       "emptyTitle": "Nincs számla",
       "invoiceFallback": "Számla",
@@ -3771,7 +3773,6 @@
       "usageDetails": "Használati részletek",
       "providersAndModels": "Szolgáltatók és modellek",
       "groups": "Csoportok",
-      "guardrails": "Védőkorlátok",
       "byok": "Saját kulcs használata",
       "ssoAndDomain": "SSO és domain",
       "dataCollection": "Adatgyűjtés",
@@ -3891,7 +3892,7 @@
     "signupStepUpApple": "A fiókod létrehozásának befejezéséhez válaszd ezt: „$t(login.signInWithApple)”.",
     "signupStepUpGoogle": "A fiókod létrehozásának befejezéséhez válaszd ezt: „$t(login.signInWithGoogle)”.",
     "signupStepUpBack": "A fiókod létrehozásának befejezéséhez lépj vissza, és válaszd ezt: „$t(login.moreSignInOptions)”.",
-    "invalidCode": "A kód helytelen vagy lejárt. Próbáld újra, vagy válaszd ezt: „$t(login.resendCode)”.",
+    "invalidCode": "A kód helytelen vagy lejárt. Használd ezt: „$t(login.resendCode)”, vagy ezt: „$t(login.moreSignInOptions)”.",
     "codeInProgress": "A kód feldolgozása folyamatban van. Várj egy pillanatot, majd próbáld újra.",
     "tooManyAttempts": "Túl sok próbálkozás történt. Kérj új kódot.",
     "invalidToken": "Nem sikerült bejelentkezni. Próbáld újra.",
@@ -4205,6 +4206,8 @@
       "discoveryNoModels": "A végpont nem sorolt fel modelleket. Add meg a modelleket kézzel.",
       "connectionIncomplete": "A modell válaszolt, de nem fejezte be. Próbáld újra, vagy ellenőrizd a modellazonosítót és a protokollt.",
       "invalidInput": "Adj meg egy háttérrendszernevet, érvényes fejléceket és legalább egy modellt egyedi azonosítóval és névvel. A tokenkorlátoknak pozitív egész számoknak kell lenniük.",
+      "invalidApiKey": "Az API-kulcs olyan karaktert tartalmaz, amelyet nem lehet elküldeni. Csak betűket, számjegyeket és szabványos szimbólumokat használj, sortörések nélkül.",
+      "invalidHeaders": "Egy egyéni fejlécet nem lehet elküldeni. Ellenőrizd a nevét, és csak betűket, számjegyeket és szabványos szimbólumokat használj, sortörések nélkül.",
       "invalidUrl": "Adj meg egy HTTP vagy HTTPS API alap-URL-címet hitelesítési adatok, lekérdezési paraméterek és töredékazonosító nélkül.",
       "publicHttp": "Nyilvános HTTP-végpontok nem engedélyezettek. Használj HTTPS-t vagy privát helyi végpontot.",
       "httpApprovalRequired": "Mentés vagy csatlakozás előtt hagyd jóvá ezt a helyi HTTP-végpontot.",
@@ -4339,7 +4342,15 @@
       "download": "Eszközön futó modell letöltése",
       "downloading": "Letöltés…",
       "downloadProgress": "Letöltés… {{percent}}%",
-      "downloadFailed": "A letöltés nem fejeződött be. Ellenőrizze a kapcsolatot és a szabad tárhelyet, majd próbálja újra."
+      "downloadFailed": "A letöltés nem fejeződött be. Ellenőrizze a kapcsolatot és a szabad tárhelyet, majd próbálja újra.",
+      "cannotUse": "Nem futtatható: {{items}}.",
+      "cannotUseOptions": "Nem tölthetők ki: bizonyos eszközbeállítások.",
+      "limitations": "Korlátozások",
+      "tools": {
+        "time": "Idő",
+        "settingsList": "Beállítások megjelenítése",
+        "settingsSet": "Beállítások módosítása"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Ez a modell támogatja a gondolkodás szintjét"
@@ -4518,6 +4529,7 @@
     "instructionSaveFailed": "Nem sikerült menteni az utasítást",
     "instructionDeleteFailed": "Nem sikerült törölni az utasítást",
     "instructionToggleFailed": "Nem sikerült frissíteni az utasítást",
+    "instructionViewTitle": "Utasításfájl",
     "instructionLimitReached": "Egy profil legfeljebb {{max}} utasítást tartalmazhat. Törölj egyet az új hozzáadásához.",
     "mcp": {
       "title": "MCP szerverek",
@@ -4688,10 +4700,20 @@
     "history": {
       "activityUnavailable": "Nem sikerült betölteni a kreditaktivitást.",
       "appStoreReceipt": "A nyugta az App Store-ban érhető el",
+      "deduction": {
+        "adminCancel": "Az egyenleget egy adminisztrátor zárta le",
+        "adminDebit": "Egy adminisztrátor eltávolította a krediteket",
+        "codingPlan": "Kódolási csomag: {{plan}}",
+        "correction": "Egyenlegkorrekció",
+        "dispute": "Fizetési vita",
+        "refundAppStore": "Kreditcsomag visszatérítése az App Store-ból",
+        "refundGooglePlay": "Kreditcsomag visszatérítése a Google Playről"
+      },
       "deductionFallback": "Kreditlevonás",
       "emptyDescription": "A kreditvásárlások, a nyugták és a felhasználás itt jelennek meg.",
       "emptyTitle": "Nincsenek kreditelőzmények",
       "expiredGrant": "Lejárt: {{description}}",
+      "expiredStatus": "Lejárt",
       "googlePlayReceipt": "A nyugta a Google Playen érhető el",
       "kind": {
         "adjustment": "Korrekció",
@@ -4718,7 +4740,8 @@
       "receiptA11y": "Nyugta megnyitása: {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Ehhez a vásárláshoz nem érhető el nyugta.",
       "retentionLimit": "A legutóbbi kreditelőzmények láthatók.",
-      "voidedGrant": "Érvénytelenítve: {{description}}"
+      "voidedGrant": "Érvénytelenítve: {{description}}",
+      "voidedStatus": "Érvénytelenítve"
     },
     "title": "Kreditek vásárlása",
     "description": "A kreditek egyszeri vásárlás, amely a Kilo egyenlegedhez adódik AI kódolási munkamenetek futtatásához a Kilo alkalmazásban. Az áruház terheli a fiókodat, és a kreditek az áruház fizetésigazolása után kerülnek jóváírásra.",
@@ -5135,7 +5158,7 @@
   },
   "organizationGuardrails": {
     "title": "AI-őrkorlátok",
-    "permissionDenied": "Csak a szervezet tulajdonosai és rendszergazdái kezelhetik az AI-őrkorlátokat. $t(organization.boundary.accessDeniedDescription)",
+    "permissionDenied": "Csak a szervezet tulajdonosai és adminisztrátorai kezelhetik az AI-őrkorlátokat. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Az AI-őrkorlátok nincsenek engedélyezve",
     "unavailable": "A Kilo kérésre engedélyezi az AI-őrkorlátokat a szervezet számára. Írj a {{supportEmail}} címre, és a Kilo csapata bekapcsolja őket a szervezeted számára.",
     "contactSupport": "Kapcsolatfelvétel az ügyfélszolgálattal",
@@ -5277,7 +5300,7 @@
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Vállalati funkció",
     "enterpriseOnly": "A szolgáltatók és modellek az Enterprise csomagban érhetők el.",
-    "readOnly": "Csak a szervezet tulajdonosai és rendszergazdái módosíthatják ezeket a beállításokat.",
+    "readOnly": "Csak a szervezet tulajdonosai és adminisztrátorai módosíthatják ezeket a beállításokat.",
     "loadError": "A szolgáltatókat és modelleket nem sikerült betölteni",
     "tabModels": "Modellek",
     "tabProviders": "Szolgáltatók",

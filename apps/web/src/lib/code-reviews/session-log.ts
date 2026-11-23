@@ -133,7 +133,7 @@ export function v2SnapshotToLogEntries(
     entries.push({
       timestamp: '',
       eventType: 'status',
-      message: `Transcript incomplete: ${omitted} ${omitted === 1 ? 'message' : 'messages'} could not be loaded.`,
+      message: `Transcript incomplete: ${omitted} ${omitted === 1 ? 'message has' : 'messages have'} missing content.`,
     });
   }
   return entries;

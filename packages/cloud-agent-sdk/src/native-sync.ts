@@ -92,6 +92,11 @@ export type NativeSessionState = {
   /** Canonical message identities awaiting a revision-pinned native snapshot. */
   pendingSnapshotMessageIDs?: string[] | undefined;
   assetURLs?: Readonly<Record<string, string>> | undefined;
+  /**
+   * Keys, in kilo2AssetKey form, that no authorization can bind. The snapshot reported them, so
+   * recovery must not chase them and the transcript stays readable.
+   */
+  unavailableAssetKeys?: string[] | undefined;
   messages: NativeSnapshotMessage[];
   pending: NativePendingRequests;
   events: NativeEvent[];
@@ -293,7 +298,12 @@ function snapshotCoversLiveGap(
   if (snapshot.revision <= requirement.revision || snapshot.position < requirement.position)
     return false;
   const item = snapshot.messages.find(item => item.message.id === requirement.messageID);
-  if (!item || item.incomplete || hasUnresolvedKilo2Assets(item.message, snapshot.assetURLs))
+  const unavailable = new Set<string>(snapshot.unavailableAssetKeys);
+  if (
+    !item ||
+    item.incomplete ||
+    hasUnresolvedKilo2Assets(item.message, snapshot.assetURLs, unavailable)
+  )
     return false;
   const files = readKilo2FileReferences(item.message);
   if (
@@ -390,7 +400,8 @@ function nativeGapMessages(
   previousByID: ReadonlyMap<string, NativeSnapshotMessage>,
   assetURLs: Readonly<Record<string, string>> | undefined,
   isPending: (messageID: string) => boolean,
-  recheckUnchanged: boolean
+  recheckUnchanged: boolean,
+  unavailable: ReadonlySet<string>
 ): NativeSnapshotMessage[] {
   const gaps: NativeSnapshotMessage[] = [];
   for (const item of messages) {
@@ -405,7 +416,7 @@ function nativeGapMessages(
     if (!recheckUnchanged && previous?.message === item.message) continue;
     if (
       !item.incomplete &&
-      hasUnresolvedKilo2Assets(item.message, assetURLs) &&
+      hasUnresolvedKilo2Assets(item.message, assetURLs, unavailable) &&
       !isPending(item.message.id)
     )
       gaps.push(item);
@@ -432,9 +443,10 @@ const EVENT_RING_LIMIT = 499;
 /** A transcript entry the client can certify: complete, and every private asset resolved. */
 function certifiedTranscriptEntry(
   item: NativeSnapshotMessage,
-  assetURLs: Readonly<Record<string, string>> | undefined
+  assetURLs: Readonly<Record<string, string>> | undefined,
+  unavailable: ReadonlySet<string>
 ): boolean {
-  return !item.incomplete && !hasUnresolvedKilo2Assets(item.message, assetURLs);
+  return !item.incomplete && !hasUnresolvedKilo2Assets(item.message, assetURLs, unavailable);
 }
 
 /**
@@ -445,12 +457,15 @@ function owedPendingSnapshotIDs(
   pendingIDs: readonly string[] | undefined,
   messages: NativeSnapshotMessage[],
   assetURLs: Readonly<Record<string, string>> | undefined,
-  liveRequirementIDs?: ReadonlySet<string>
+  liveRequirementIDs: ReadonlySet<string> | undefined,
+  unavailable: ReadonlySet<string>
 ): string[] | undefined {
   return pendingIDs?.filter(
     id =>
       liveRequirementIDs?.has(id) === true ||
-      !messages.some(item => item.message.id === id && certifiedTranscriptEntry(item, assetURLs))
+      !messages.some(
+        item => item.message.id === id && certifiedTranscriptEntry(item, assetURLs, unavailable)
+      )
   );
 }
 
@@ -460,6 +475,7 @@ type NativeTranscriptFacts = {
   assetURLs: Readonly<Record<string, string>> | undefined;
   pendingSnapshotMessageIDs: readonly string[] | undefined;
   quarantinedFrames: number;
+  unavailableAssetKeys: readonly string[] | undefined;
 };
 
 /**
@@ -477,7 +493,9 @@ type NativeTranscriptFacts = {
  */
 function transcriptHasGap(facts: NativeTranscriptFacts): boolean {
   if (facts.session === undefined || facts.quarantinedFrames > 0) return true;
-  if (facts.messages.some(item => !certifiedTranscriptEntry(item, facts.assetURLs))) return true;
+  const unavailable = new Set<string>(facts.unavailableAssetKeys);
+  if (facts.messages.some(item => !certifiedTranscriptEntry(item, facts.assetURLs, unavailable)))
+    return true;
   // Every listed identity renders as pending in the shared projection until a snapshot or its
   // live replay settles it, so the list itself is the gap signal; `owedPendingSnapshotIDs`
   // decides which entries may leave it.
@@ -1196,10 +1214,13 @@ export class NativeSyncClient {
         snapshot: { position: next.position, revision: next.revision },
         messages,
         assetURLs: next.assetURLs,
+        unavailableAssetKeys: next.unavailableAssetKeys,
         pendingSnapshotMessageIDs: owedPendingSnapshotIDs(
           state.pendingSnapshotMessageIDs,
           next.messages,
-          next.assetURLs
+          next.assetURLs,
+          undefined,
+          new Set<string>(next.unavailableAssetKeys)
         ),
       });
     };
@@ -1222,10 +1243,7 @@ export class NativeSyncClient {
         (error instanceof Error && error.name === 'AbortError')
       )
         return undefined;
-      snapshotFailures =
-        error instanceof Error && 'code' in error && error.code === 'native_asset_not_found'
-          ? SNAPSHOT_FAILURE_LIMIT
-          : snapshotFailures + 1;
+      snapshotFailures += 1;
       if (snapshotFailures < SNAPSHOT_FAILURE_LIMIT) return undefined;
       const cause = reason(error);
       const message = `Native transcript is unavailable: ${/[.!?]$/.test(cause) ? cause : `${cause}.`} Open the session again to retry.`;
@@ -1244,6 +1262,7 @@ export class NativeSyncClient {
       assetURLs: state.assetURLs,
       pendingSnapshotMessageIDs: state.pendingSnapshotMessageIDs,
       quarantinedFrames: quarantined.length,
+      unavailableAssetKeys: state.unavailableAssetKeys,
     });
     /**
      * A snapshot cycle is successful only when nothing it could not certify remains: a read
@@ -1365,11 +1384,13 @@ export class NativeSyncClient {
               snapshot: { position: next.position, revision: next.revision },
               messages: published,
               assetURLs,
+              unavailableAssetKeys: next.unavailableAssetKeys,
               pendingSnapshotMessageIDs: owedPendingSnapshotIDs(
                 state.pendingSnapshotMessageIDs,
                 next.messages,
                 next.assetURLs,
-                requiredMessageIDs
+                requiredMessageIDs,
+                new Set<string>(next.unavailableAssetKeys)
               ),
             });
           }
@@ -1437,7 +1458,6 @@ export class NativeSyncClient {
                 throw noteSnapshotFailure(error) ?? error;
               }
               if (!epoch.current()) return;
-              // A read that still leaves an uncertified gap has not settled the transcript.
               if (transcriptSettled()) settleSnapshotStreak();
               lastSeq = frame.seq;
             }
@@ -1497,6 +1517,7 @@ export class NativeSyncClient {
           const pending = reduceNativePendingRequests(state.pending, frame);
           const session = applyNativeSessionEvent(state.session, frame);
           const isPending = pendingLookup(state.pendingSnapshotMessageIDs);
+          const unavailable = new Set<string>(state.unavailableAssetKeys);
           // A frame that reports the entries it touched, none of them hidden by a local clear,
           // only needs those entries examined. An entry the frame did not touch keeps its
           // identity, so today's scan skips it too unless an asset key disappeared — which
@@ -1514,7 +1535,7 @@ export class NativeSyncClient {
           let newGaps: NativeSnapshotMessage[];
           if (fast) {
             assetURLs = changedAssets;
-            newGaps = nativeGapMessages(changed, known, assetURLs, isPending, false);
+            newGaps = nativeGapMessages(changed, known, assetURLs, isPending, false, unavailable);
           } else {
             const previousByID = indexNativeMessages(state.messages);
             assetURLs = nativeAssetURLsAfterMessages(previousByID, messages, state.assetURLs);
@@ -1523,7 +1544,8 @@ export class NativeSyncClient {
               previousByID,
               assetURLs,
               isPending,
-              assetURLs !== state.assetURLs
+              assetURLs !== state.assetURLs,
+              unavailable
             );
           }
           let pendingSnapshotMessageIDs = state.pendingSnapshotMessageIDs;
@@ -1725,10 +1747,13 @@ export class NativeSyncClient {
       requestRecovery: async () => {
         if (closed) return;
         // Already whole: nothing to fetch, so the retry resolves at once.
+        const unavailable = new Set<string>(state.unavailableAssetKeys);
         if (
           state.session &&
           !state.messages.some(
-            item => item.incomplete || hasUnresolvedKilo2Assets(item.message, state.assetURLs)
+            item =>
+              item.incomplete ||
+              hasUnresolvedKilo2Assets(item.message, state.assetURLs, unavailable)
           ) &&
           !state.pendingSnapshotMessageIDs?.length
         )
@@ -1773,6 +1798,7 @@ export class NativeSyncClient {
           snapshot: undefined,
           pendingSnapshotMessageIDs: undefined,
           assetURLs: undefined,
+          unavailableAssetKeys: undefined,
           messages: [],
           pending: {
             permissions: [],

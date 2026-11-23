@@ -92,6 +92,7 @@
     "draft": "Ciornă",
     "enabled": "Activat",
     "github": "GitHub",
+    "image": "Imagine",
     "imageUnavailable": "Imaginea nu este disponibilă.",
     "loading": "Se încarcă…",
     "loadMore": "Încarcă mai multe",
@@ -123,10 +124,10 @@
     "connectProvider": "Conectează un furnizor",
     "contentTruncated": "Conținut trunchiat",
     "copyLink": "Copiază linkul",
+    "couldNotLoad": "Nu s-a putut încărca.",
+    "couldNotLoadMore": "Nu s-au putut încărca mai multe elemente.",
     "couldNotLoadOrganizations": "Nu s-au putut încărca organizațiile.",
     "couldNotLoadSessions": "Nu s-au putut încărca sesiunile.",
-    "couldnTLoad": "Nu s-a putut încărca.",
-    "couldnTLoadMore": "Nu s-au putut încărca mai multe elemente.",
     "deviceSessions": "Sesiuni pe dispozitive",
     "disabled": "Dezactivat",
     "email": "E-mail",
@@ -2714,6 +2715,7 @@
     "filePart": {
       "loadingImage": "Se încarcă imaginea",
       "imageUnavailableRetry": "Imagine indisponibilă, reîncearcă încărcarea",
+      "imageUnavailableRetryWithAlt": "Imagine indisponibilă, {{alt}}, reîncearcă încărcarea",
       "imagePreviewUnavailableInSession": "Previzualizarea imaginii nu este disponibilă în această sesiune.",
       "viewImage": "Vezi imaginea",
       "viewImageWithAlt": "Vezi imaginea {{alt}}",
@@ -3755,11 +3757,11 @@
       "pendingInvitation": "Acest e-mail are deja o invitație în așteptare.",
       "alreadyMember": "Această persoană este deja membru al acestei organizații.",
       "seatsFull": "Toate locurile sunt ocupate ({{used}}/{{total}}). Cere unui proprietar al organizației să adauge locuri înainte de a invita mai mulți membri.",
-      "seatsFullCanInviteBilling": "Toate locurile sunt ocupate ({{used}}/{{total}}). Poți invita în continuare administratori de facturare, care nu ocupă un loc.",
+      "seatsFullCanInviteBilling": "Toate locurile sunt ocupate ({{used}}/{{total}}). Poți invita în continuare manageri de facturare, care nu ocupă un loc.",
       "noSeatsAvailable": "Toate locurile sunt ocupate. Cere unui proprietar al organizației să adauge locuri înainte de a invita mai mulți membri."
     },
     "invoices": {
-      "downloadA11y": "Descarcă factura {{number}}",
+      "downloadA11y": "Descarcă factura {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Facturile se generează automat la fiecare ciclu de facturare și vor apărea aici după emiterea lor pentru organizația ta.",
       "emptyTitle": "Nicio factură",
       "invoiceFallback": "Factură",
@@ -3839,7 +3841,6 @@
       "usageDetails": "Detalii de utilizare",
       "providersAndModels": "Furnizori și modele",
       "groups": "Grupuri",
-      "guardrails": "Măsuri de protecție",
       "byok": "Folosește propria cheie",
       "ssoAndDomain": "SSO și domeniu",
       "dataCollection": "Colectarea datelor",
@@ -3961,7 +3962,7 @@
     "signupStepUpApple": "Pentru a finaliza crearea contului, folosește „$t(login.signInWithApple)”.",
     "signupStepUpGoogle": "Pentru a finaliza crearea contului, folosește „$t(login.signInWithGoogle)”.",
     "signupStepUpBack": "Pentru a finaliza crearea contului, revino la ecranul anterior și folosește „$t(login.moreSignInOptions)”.",
-    "invalidCode": "Codul este incorect sau a expirat. Încearcă din nou sau folosește „$t(login.resendCode)”.",
+    "invalidCode": "Codul este incorect sau a expirat. Folosește „$t(login.resendCode)” sau „$t(login.moreSignInOptions)”.",
     "codeInProgress": "Codul tău este procesat. Așteaptă puțin și încearcă din nou.",
     "tooManyAttempts": "Prea multe încercări. Solicită un cod nou.",
     "invalidToken": "Autentificarea a eșuat. Încearcă din nou.",
@@ -4284,6 +4285,8 @@
       "discoveryNoModels": "Endpointul nu a listat niciun model. Introdu modelele manual.",
       "connectionIncomplete": "Modelul a răspuns, dar nu a terminat. Încearcă din nou sau verifică ID-ul modelului și protocolul.",
       "invalidInput": "Introdu un nume de backend, antete valide și cel puțin un model cu ID și nume unice. Limitele de tokenuri trebuie să fie numere întregi pozitive.",
+      "invalidApiKey": "Cheia API conține un caracter care nu poate fi trimis. Folosește doar litere, cifre și simboluri standard, fără întreruperi de linie.",
+      "invalidHeaders": "Un antet personalizat nu poate fi trimis. Verifică-i numele și folosește doar litere, cifre și simboluri standard, fără întreruperi de linie.",
       "invalidUrl": "Introdu o rădăcină API HTTP sau HTTPS fără credențiale, interogare sau fragment.",
       "publicHttp": "Endpointurile HTTP publice nu sunt permise. Folosește HTTPS sau un endpoint local privat.",
       "httpApprovalRequired": "Aprobă acest endpoint HTTP local înainte de a salva sau de a te conecta.",
@@ -4418,7 +4421,15 @@
       "download": "Descarcă modelul pe dispozitiv",
       "downloading": "Se descarcă…",
       "downloadProgress": "Se descarcă… {{percent}}%",
-      "downloadFailed": "Descărcarea nu s-a finalizat. Verifică-ți conexiunea și spațiul de stocare liber, apoi încearcă din nou."
+      "downloadFailed": "Descărcarea nu s-a finalizat. Verifică-ți conexiunea și spațiul de stocare liber, apoi încearcă din nou.",
+      "cannotUse": "Nu se poate rula: {{items}}.",
+      "cannotUseOptions": "Nu se pot completa: unele opțiuni ale instrumentului.",
+      "limitations": "Limitări",
+      "tools": {
+        "time": "Timp",
+        "settingsList": "Arată setările",
+        "settingsSet": "Modifică setările"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Acest model acceptă efort de raționament"
@@ -4602,6 +4613,7 @@
     "instructionSaveFailed": "Instrucțiunea nu a putut fi salvată",
     "instructionDeleteFailed": "Instrucțiunea nu a putut fi ștearsă",
     "instructionToggleFailed": "Instrucțiunea nu a putut fi actualizată",
+    "instructionViewTitle": "Fișier de instrucțiuni",
     "instructionLimitReached": "Un profil poate avea până la {{max}} instrucțiuni. Șterge una pentru a adăuga alta.",
     "mcp": {
       "title": "servere MCP",
@@ -4773,10 +4785,20 @@
     "history": {
       "activityUnavailable": "Nu am putut încărca activitatea de credite.",
       "appStoreReceipt": "Chitanță din App Store",
+      "deduction": {
+        "adminCancel": "Sold închis de un administrator",
+        "adminDebit": "Credite eliminate de un administrator",
+        "codingPlan": "Plan de coding: {{plan}}",
+        "correction": "Ajustare de sold",
+        "dispute": "Litigiu privind plata",
+        "refundAppStore": "Rambursare pentru pachetul de credite din App Store",
+        "refundGooglePlay": "Rambursare pentru pachetul de credite din Google Play"
+      },
       "deductionFallback": "Deducere de credite",
       "emptyDescription": "Achizițiile de credite, chitanțele și utilizarea vor apărea aici.",
       "emptyTitle": "Niciun istoric de credite",
       "expiredGrant": "Expirat: {{description}}",
+      "expiredStatus": "Expirat",
       "googlePlayReceipt": "Chitanță din Google Play",
       "kind": {
         "adjustment": "Ajustare",
@@ -4803,7 +4825,8 @@
       "receiptA11y": "Deschide chitanța pentru {{description}}, {{amount}}, din {{date}}",
       "receiptUnavailable": "Nu există o chitanță disponibilă pentru această achiziție.",
       "retentionLimit": "Se afișează cel mai recent istoric de credite.",
-      "voidedGrant": "Anulat: {{description}}"
+      "voidedGrant": "Anulat: {{description}}",
+      "voidedStatus": "Anulat"
     },
     "title": "Cumpără credite",
     "description": "Creditele sunt o achiziție unică adăugată la soldul tău Kilo pentru rularea sesiunilor de codare AI în Kilo App. Magazinul îți debitează contul, iar creditele sunt adăugate după ce magazinul confirmă plata.",

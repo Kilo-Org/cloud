@@ -93,6 +93,7 @@
     "draft": "Koncept",
     "enabled": "Zapnuto",
     "github": "GitHub",
+    "image": "Obrázek",
     "imageUnavailable": "Obrázek není k dispozici.",
     "loading": "Načítá se…",
     "loadMore": "Načíst více",
@@ -124,10 +125,10 @@
     "connectProvider": "Připojení poskytovatele",
     "contentTruncated": "Obsah zkrácen",
     "copyLink": "Kopírovat odkaz",
+    "couldNotLoad": "Načtení se nezdařilo.",
+    "couldNotLoadMore": "Další položky se nepodařilo načíst.",
     "couldNotLoadOrganizations": "Organizace se nepodařilo načíst.",
     "couldNotLoadSessions": "Relace se nepodařilo načíst.",
-    "couldnTLoad": "Načtení se nezdařilo.",
-    "couldnTLoadMore": "Další položky se nepodařilo načíst.",
     "deviceSessions": "Přihlášená zařízení",
     "disabled": "Vypnuto",
     "email": "E-mail",
@@ -402,7 +403,7 @@
       "title": "Klíče poskytovatelů",
       "rowSubtitle": "Používat vlastní fakturaci u poskytovatele",
       "orgDescription": "Tyto klíče jsou sdíleny se všemi v organizaci a účtují se na její účty u poskytovatelů.",
-      "viewOnly": "Klíče organizace může měnit pouze její vlastník, administrátor nebo správce fakturace.",
+      "viewOnly": "Klíče organizace může měnit pouze její vlastník, správce nebo správce fakturace.",
       "description": "Požadavky přes tyto klíče se účtují na váš účet u poskytovatele, ne z vašeho zůstatku v Kilo.",
       "managedByPlan": "Spravuje váš programovací tarif",
       "enableKey": "Povolit klíč pro {{provider}}",
@@ -2767,6 +2768,7 @@
     "filePart": {
       "loadingImage": "Načítání obrázku",
       "imageUnavailableRetry": "Obrázek není k dispozici, znovu načíst",
+      "imageUnavailableRetryWithAlt": "Obrázek není k dispozici, {{alt}}, znovu načíst",
       "imagePreviewUnavailableInSession": "Náhled obrázku není v této relaci k dispozici.",
       "viewImage": "Zobrazit obrázek",
       "viewImageWithAlt": "Zobrazit obrázek {{alt}}",
@@ -3545,7 +3547,7 @@
   "organization": {
     "auditLog": {
       "title": "Auditní protokol",
-      "permissionDenied": "Auditní protokol organizace s plánem Enterprise si může prohlížet jen její vlastník, administrátor nebo správce fakturace. $t(organization.boundary.accessDeniedDescription)",
+      "permissionDenied": "Auditní protokol organizace s plánem Enterprise si může prohlížet jen její vlastník, správce nebo správce fakturace. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Žádné události auditu",
       "emptyDescription": "Zde se zobrazí akce provedené v této organizaci.",
       "truncated": "Zobrazují se nejnovější události.",
@@ -3561,7 +3563,7 @@
         "promoCreditGranted": "Propagační kredity přiděleny",
         "memberRemove": "Odebrání člena",
         "memberChangeRole": "Změna role člena",
-        "memberAdminAdd": "Přidání administrátora",
+        "memberAdminAdd": "Přidání správce",
         "memberAutoJoin": "Automatické připojení člena",
         "ssoAutoProvision": "Zřízení uživatele přes SSO",
         "ssoSetDomain": "Přidání domény SSO",
@@ -3745,7 +3747,7 @@
     },
     "billing": {
       "title": "Fakturace",
-      "permissionDenied": "Fakturaci organizace může zobrazit pouze vlastník, administrátor nebo správce fakturace. $t(organization.boundary.accessDeniedDescription)",
+      "permissionDenied": "Fakturaci organizace může zobrazit pouze vlastník, správce nebo správce fakturace. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Předplatné",
       "state": "Stav",
       "stateNone": "Bez předplatného",
@@ -3827,7 +3829,7 @@
       "noSeatsAvailable": "Všechna místa jsou obsazena. Než pozvete další členy, požádejte vlastníka organizace o přidání míst."
     },
     "invoices": {
-      "downloadA11y": "Stáhnout fakturu {{number}}",
+      "downloadA11y": "Stáhnout fakturu {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Faktury se vystavují automaticky za každé fakturační období. Zobrazí se zde po vyúčtování vaší organizaci.",
       "emptyTitle": "Žádné faktury",
       "invoiceFallback": "Faktura",
@@ -3861,7 +3863,7 @@
       "limitLabel": "Limit (USD za den)",
       "memberNotFound": "Člen nebyl nalezen.",
       "noLimitPlaceholder": "Bez limitu",
-      "permissionDenied": "Limity útraty může spravovat pouze vlastník nebo administrátor organizace.",
+      "permissionDenied": "Limity útraty může spravovat pouze vlastník nebo správce organizace.",
       "removeLimit": "Zrušit limit",
       "title": "Denní limit útraty",
       "blankError": "Zadejte částku nebo níže klepněte na tlačítko Zrušit limit.",
@@ -3907,7 +3909,6 @@
       "usageDetails": "Podrobnosti o využití",
       "providersAndModels": "Poskytovatelé a modely",
       "groups": "Skupiny",
-      "guardrails": "Ochranná pravidla",
       "byok": "Vlastní klíč",
       "ssoAndDomain": "SSO a doména",
       "dataCollection": "Shromažďování dat",
@@ -3922,7 +3923,7 @@
       "emptyDescription": "Pomocí tlačítka „Starší hodina“ zobrazíte dřívější požadavky.",
       "emptyBoundDescription": "Záznamy požadavků dál do minulosti nesahají.",
       "loadError": "Protokoly požadavků se nepodařilo načíst.",
-      "permissionDenied": "Protokoly požadavků organizace si může prohlížet jen její vlastník, administrátor nebo správce fakturace. $t(organization.boundary.accessDeniedDescription)",
+      "permissionDenied": "Protokoly požadavků organizace si může prohlížet jen její vlastník, správce nebo správce fakturace. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} vstup · {{output}} výstup",
       "byok": "BYOK"
     },
@@ -4031,7 +4032,7 @@
     "signupStepUpApple": "Pro dokončení vytvoření účtu vyber „$t(login.signInWithApple)“.",
     "signupStepUpGoogle": "Pro dokončení vytvoření účtu vyber „$t(login.signInWithGoogle)“.",
     "signupStepUpBack": "Pro dokončení vytvoření účtu se vrať zpět a vyber „$t(login.moreSignInOptions)“.",
-    "invalidCode": "Tento kód je nesprávný nebo mu vypršela platnost. Zkus to znovu nebo vyber „$t(login.resendCode)“.",
+    "invalidCode": "Tento kód je nesprávný nebo mu vypršela platnost. Použij „$t(login.resendCode)“ nebo „$t(login.moreSignInOptions)“.",
     "codeInProgress": "Tvůj kód se zpracovává. Chvíli počkej a zkus to znovu.",
     "tooManyAttempts": "Proběhlo příliš mnoho pokusů. Vyžádej si nový kód.",
     "invalidToken": "Přihlášení se nezdařilo. Zkus to prosím znovu.",
@@ -4363,6 +4364,8 @@
       "discoveryNoModels": "Koncový bod neuvádí žádné modely. Zadejte modely ručně.",
       "connectionIncomplete": "Model odpověděl, ale nedokončil odpověď. Zkuste to znovu, nebo zkontrolujte ID modelu a protokol.",
       "invalidInput": "Zadejte název serveru, platné hlavičky a alespoň jeden model s jedinečným ID a názvem. Limity tokenů musí být kladná celá čísla.",
+      "invalidApiKey": "Klíč API obsahuje znak, který nelze odeslat. Používejte pouze písmena, číslice a standardní symboly, bez zlomů řádků.",
+      "invalidHeaders": "Vlastní hlavičku nelze odeslat. Zkontrolujte její název a používejte pouze písmena, číslice a standardní symboly, bez zlomů řádků.",
       "invalidUrl": "Zadejte základní URL API s HTTP nebo HTTPS bez přihlašovacích údajů, parametrů dotazu a fragmentu.",
       "publicHttp": "Veřejné koncové body HTTP nejsou povoleny. Použijte HTTPS nebo soukromý místní koncový bod.",
       "httpApprovalRequired": "Před uložením nebo připojením schvalte tento místní koncový bod HTTP.",
@@ -4497,7 +4500,15 @@
       "download": "Stáhnout model do zařízení",
       "downloading": "Stahování…",
       "downloadProgress": "Stahování… {{percent}} %",
-      "downloadFailed": "Stahování se nedokončilo. Zkontrolujte připojení a volné místo v úložišti a zkuste to znovu."
+      "downloadFailed": "Stahování se nedokončilo. Zkontrolujte připojení a volné místo v úložišti a zkuste to znovu.",
+      "cannotUse": "Nelze spustit: {{items}}.",
+      "cannotUseOptions": "Nelze vyplnit: některé možnosti nástroje.",
+      "limitations": "Omezení",
+      "tools": {
+        "time": "Čas",
+        "settingsList": "Zobrazit nastavení",
+        "settingsSet": "Změnit nastavení"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Tento model podporuje úroveň uvažování"
@@ -4686,6 +4697,7 @@
     "instructionSaveFailed": "Pokyn se nepodařilo uložit",
     "instructionDeleteFailed": "Pokyn se nepodařilo smazat",
     "instructionToggleFailed": "Pokyn se nepodařilo aktualizovat",
+    "instructionViewTitle": "Soubor pokynu",
     "instructionLimitReached": "Profil může obsahovat až {{max}} pokynů. Chcete-li přidat další, jeden smažte.",
     "mcp": {
       "title": "MCP servery",
@@ -4858,10 +4870,20 @@
     "history": {
       "activityUnavailable": "Aktivitu kreditů se nepodařilo načíst.",
       "appStoreReceipt": "Účtenka z App Store",
+      "deduction": {
+        "adminCancel": "Zůstatek uzavřen správcem",
+        "adminDebit": "Kredity odebrány správcem",
+        "codingPlan": "Plán programování: {{plan}}",
+        "correction": "Oprava zůstatku",
+        "dispute": "Spor o platbu",
+        "refundAppStore": "Vrácení balíčku kreditů z App Store",
+        "refundGooglePlay": "Vrácení balíčku kreditů z Google Play"
+      },
       "deductionFallback": "Odečtení kreditů",
       "emptyDescription": "Zde se zobrazí nákupy kreditů, účtenky a využití.",
       "emptyTitle": "Žádná historie kreditů",
       "expiredGrant": "Platnost vypršela: {{description}}",
+      "expiredStatus": "Platnost vypršela",
       "googlePlayReceipt": "Účtenka z Google Play",
       "kind": {
         "adjustment": "Úprava",
@@ -4888,7 +4910,8 @@
       "receiptA11y": "Otevřít účtenku pro {{description}}, {{amount}}, ze dne {{date}}",
       "receiptUnavailable": "Pro tento nákup není účtenka k dispozici.",
       "retentionLimit": "Zobrazuje se nejnovější historie kreditů.",
-      "voidedGrant": "Stornováno: {{description}}"
+      "voidedGrant": "Stornováno: {{description}}",
+      "voidedStatus": "Stornováno"
     },
     "title": "Koupit kredity",
     "description": "Kredity jsou jednorázový nákup přidaný do vašeho zůstatku Kilo pro spouštění AI programovacích relací v aplikaci Kilo. Obchod vám strhne platbu z účtu a kredity se přidají po potvrzení platby obchodem.",

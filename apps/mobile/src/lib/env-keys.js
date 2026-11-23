@@ -5,6 +5,13 @@
  *  and the `extra` spread bakes every entry, so an optional key must not be one
  *  of them. A URL key may be either kind, so the build-time URL contract reads
  *  both maps (see app.config.ts).
+ *  Plain .js, not TypeScript, because two build-time consumers read these
+ *  modules and neither can load workspace TS: the Expo config loader through
+ *  app.config.ts, and scripts/assert-expo-config.mjs, which runs under plain
+ *  Node. android-notification-channels.js and splash-branding.js, the other two
+ *  modules the assertion script imports, point here instead of repeating the
+ *  reason. Modules that the Expo config loader reads without that script state
+ *  their own case.
  *  Checked by the mobile typecheck through tsconfig include — keep the entry. */
 export const ENV_KEYS = {
   apiBaseUrl: 'API_BASE_URL',

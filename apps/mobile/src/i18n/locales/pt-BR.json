@@ -93,6 +93,7 @@
     "draft": "Rascunho",
     "enabled": "Ativado",
     "github": "GitHub",
+    "image": "Imagem",
     "imageUnavailable": "A imagem não está disponível.",
     "loading": "Carregando…",
     "loadMore": "Carregar mais",
@@ -124,10 +125,10 @@
     "connectProvider": "Conectar um provedor",
     "contentTruncated": "Conteúdo exibido parcialmente",
     "copyLink": "Copiar link",
+    "couldNotLoad": "Não foi possível carregar.",
+    "couldNotLoadMore": "Não foi possível carregar mais itens.",
     "couldNotLoadOrganizations": "Não foi possível carregar as organizações.",
     "couldNotLoadSessions": "Não foi possível carregar as sessões.",
-    "couldnTLoad": "Não foi possível carregar.",
-    "couldnTLoadMore": "Não foi possível carregar mais itens.",
     "deviceSessions": "Sessões nos dispositivos",
     "disabled": "Desativado",
     "email": "E-mail",
@@ -1003,7 +1004,7 @@
       "empty": "Nenhuma revisão com estatísticas ainda",
       "emptyDescription": "As estatísticas registram revisões concluídas enquanto estão ativadas para a organização.",
       "offTitle": "As estatísticas estão desativadas para {{platform}}",
-      "offDescription": "As funções de faturamento da organização (proprietários, administradores e gerentes de faturamento) podem ativar as estatísticas nas configurações da organização na web para registrar revisões concluídas.",
+      "offDescription": "As funções de faturamento da organização (proprietários, administradores e gerentes de cobrança) podem ativar as estatísticas nas configurações da organização na web para registrar revisões concluídas.",
       "couldNotLoad": "Não foi possível carregar as estatísticas",
       "trackedReviewsCaption": "Revisões concluídas neste período com as estatísticas ativadas. Revisões em andamento e com falha nunca são contadas.",
       "trackedReviewsUncounted": "Não contadas: {{displayCount}} das {{displayTotal}} revisões concluídas que a organização tem sem resultado capturado.",
@@ -2120,6 +2121,7 @@
     "filePart": {
       "loadingImage": "Carregando imagem",
       "imageUnavailableRetry": "Imagem indisponível, tentar carregar novamente",
+      "imageUnavailableRetryWithAlt": "Imagem indisponível, {{alt}}, tentar carregar novamente",
       "imagePreviewUnavailableInSession": "A prévia da imagem não está disponível nesta sessão.",
       "viewImage": "Ver imagem",
       "viewImageWithAlt": "Ver imagem {{alt}}",
@@ -3827,11 +3829,11 @@
       "pendingInvitation": "Este e-mail já tem um convite pendente.",
       "alreadyMember": "Esta pessoa já é membro desta organização.",
       "seatsFull": "Todos os assentos estão em uso ({{used}}/{{total}}). Peça a um proprietário da organização que adicione assentos antes de convidar mais membros.",
-      "seatsFullCanInviteBilling": "Todos os assentos estão em uso ({{used}}/{{total}}). Você ainda pode convidar gerentes de faturamento, que não ocupam um assento.",
+      "seatsFullCanInviteBilling": "Todos os assentos estão em uso ({{used}}/{{total}}). Você ainda pode convidar gerentes de cobrança, que não ocupam um assento.",
       "noSeatsAvailable": "Todos os assentos estão em uso. Peça a um proprietário da organização que adicione assentos antes de convidar mais membros."
     },
     "invoices": {
-      "downloadA11y": "Baixar fatura {{number}}",
+      "downloadA11y": "Baixar fatura {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "As faturas são geradas automaticamente a cada ciclo de cobrança e aparecerão aqui assim que sua organização for cobrada.",
       "emptyTitle": "Nenhuma fatura",
       "invoiceFallback": "Fatura",
@@ -3911,7 +3913,6 @@
       "usageDetails": "Detalhes de uso",
       "providersAndModels": "Provedores e modelos",
       "groups": "Grupos",
-      "guardrails": "Proteções",
       "byok": "Use sua própria chave",
       "ssoAndDomain": "SSO e domínio",
       "dataCollection": "Coleta de dados",
@@ -4031,7 +4032,7 @@
     "signupStepUpApple": "Para concluir a criação da sua conta, use '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Para concluir a criação da sua conta, use '$t(login.signInWithGoogle)'.",
     "signupStepUpBack": "Para concluir a criação da sua conta, volte e use '$t(login.moreSignInOptions)'.",
-    "invalidCode": "Esse código está incorreto ou expirou. Tente novamente ou use '$t(login.resendCode)'.",
+    "invalidCode": "Esse código está incorreto ou expirou. Use '$t(login.resendCode)' ou '$t(login.moreSignInOptions)'.",
     "codeInProgress": "Seu código está sendo processado. Aguarde um momento e tente novamente.",
     "tooManyAttempts": "Muitas tentativas. Solicite um novo código.",
     "invalidToken": "Não foi possível entrar. Tente novamente.",
@@ -4363,6 +4364,8 @@
       "discoveryNoModels": "O endereço de acesso não listou nenhum modelo. Insira modelos manualmente.",
       "connectionIncomplete": "O modelo respondeu, mas não concluiu. Tente novamente ou verifique o ID do modelo e o protocolo.",
       "invalidInput": "Insira um nome de servidor, cabeçalhos válidos e pelo menos um modelo com ID e nome exclusivos. Os limites de tokens devem ser números inteiros positivos.",
+      "invalidApiKey": "A chave de API contém um caractere que não pode ser enviado. Use apenas letras, dígitos e símbolos padrão, sem quebras de linha.",
+      "invalidHeaders": "Um cabeçalho personalizado não pode ser enviado. Verifique o nome dele e use apenas letras, dígitos e símbolos padrão, sem quebras de linha.",
       "invalidUrl": "Insira uma URL raiz de API HTTP ou HTTPS sem credenciais, parâmetros de consulta ou fragmento.",
       "publicHttp": "Endereços de acesso HTTP públicos não são permitidos. Use HTTPS ou um endereço de acesso local privado.",
       "httpApprovalRequired": "Autorize este endereço de acesso HTTP local antes de salvar ou conectar.",
@@ -4497,7 +4500,15 @@
       "download": "Baixar modelo no dispositivo",
       "downloading": "Baixando…",
       "downloadProgress": "Baixando… {{percent}}%",
-      "downloadFailed": "O download não foi concluído. Verifique sua conexão e o espaço livre e tente novamente."
+      "downloadFailed": "O download não foi concluído. Verifique sua conexão e o espaço livre e tente novamente.",
+      "cannotUse": "Não é possível executar: {{items}}.",
+      "cannotUseOptions": "Não é possível preencher: algumas opções de ferramenta.",
+      "limitations": "Limitações",
+      "tools": {
+        "time": "Hora",
+        "settingsList": "Mostrar configurações",
+        "settingsSet": "Alterar configurações"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Este modelo aceita esforço de raciocínio"
@@ -4686,6 +4697,7 @@
     "instructionSaveFailed": "Não foi possível salvar a instrução",
     "instructionDeleteFailed": "Não foi possível excluir a instrução",
     "instructionToggleFailed": "Não foi possível atualizar a instrução",
+    "instructionViewTitle": "Arquivo de instrução",
     "instructionLimitReached": "Um perfil pode ter até {{max}} instruções. Exclua uma para adicionar outra.",
     "mcp": {
       "title": "Servidores MCP",
@@ -4858,10 +4870,20 @@
     "history": {
       "activityUnavailable": "Não foi possível carregar a atividade de crédito.",
       "appStoreReceipt": "Recibo na App Store",
+      "deduction": {
+        "adminCancel": "Saldo encerrado por um administrador",
+        "adminDebit": "Créditos removidos por um administrador",
+        "codingPlan": "Plano de programação: {{plan}}",
+        "correction": "Ajuste de saldo",
+        "dispute": "Disputa de pagamento",
+        "refundAppStore": "Reembolso de pacote de créditos pela App Store",
+        "refundGooglePlay": "Reembolso de pacote de créditos pelo Google Play"
+      },
       "deductionFallback": "Dedução de créditos",
       "emptyDescription": "Compras de créditos, recibos e uso aparecerão aqui.",
       "emptyTitle": "Nenhum histórico de créditos",
       "expiredGrant": "Expirado: {{description}}",
+      "expiredStatus": "Expirado",
       "googlePlayReceipt": "Recibo no Google Play",
       "kind": {
         "adjustment": "Ajuste",
@@ -4888,7 +4910,8 @@
       "receiptA11y": "Abrir o recibo de {{description}}, {{amount}}, de {{date}}",
       "receiptUnavailable": "Não há recibo disponível para esta compra.",
       "retentionLimit": "Mostrando o histórico de créditos mais recente.",
-      "voidedGrant": "Cancelado: {{description}}"
+      "voidedGrant": "Cancelado: {{description}}",
+      "voidedStatus": "Cancelado"
     },
     "title": "Comprar créditos",
     "description": "Os créditos são uma compra única adicionada ao seu saldo Kilo para executar sessões de codificação com IA no Kilo App. A loja cobra na sua conta e os créditos são adicionados depois que a loja confirma o pagamento.",

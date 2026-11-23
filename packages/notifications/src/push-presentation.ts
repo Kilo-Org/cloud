@@ -41,10 +41,8 @@ export const LEGACY_AGENT_ANDROID_CHANNEL_ID = 'agent';
 
 /**
  * The channel every Android build before the agent-channel split addressed the
- * glanceable active-agents pushes with. It is not in
- * `ANDROID_NOTIFICATION_CHANNELS`: current builds only create the split
- * channels, and this id exists solely so a server push can still reach a token
- * registered by an older build (see `androidChannelIdForPushDataToAppVersion`).
+ * glanceable active-agents pushes with. Not in `ANDROID_NOTIFICATION_CHANNELS`
+ * for the reason given on `LEGACY_AGENT_ANDROID_CHANNEL_ID`.
  */
 export const LEGACY_ACTIVE_AGENTS_ANDROID_CHANNEL_ID = 'active-agents';
 
@@ -233,7 +231,6 @@ function agentKindForAgentPush(data: AgentPushData): AgentNotificationKind {
   }
 }
 
-/** The named kind of a push, or null when it is not an agent notification. */
 export function agentNotificationKindForPushData(data: PushData): AgentNotificationKind | null {
   return isAgentPushData(data) ? agentKindForAgentPush(data) : null;
 }
@@ -249,7 +246,6 @@ const AGENT_CHANNEL_KIND: ReadonlyMap<string, AgentNotificationKind> = new Map(
   AGENT_NOTIFICATION_KINDS.map(kind => [AGENT_KIND_CHANNEL[kind], kind] as const)
 );
 
-/** The Android channel that carries a kind. */
 export function androidChannelIdForAgentKind(
   kind: AgentNotificationKind
 ): AndroidNotificationChannelId {

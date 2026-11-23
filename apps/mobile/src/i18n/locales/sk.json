@@ -93,6 +93,7 @@
     "draft": "Koncept",
     "enabled": "Zapnuté",
     "github": "GitHub",
+    "image": "Obrázok",
     "imageUnavailable": "Obrázok nie je dostupný.",
     "loading": "Načítava sa…",
     "loadMore": "Načítať viac",
@@ -124,10 +125,10 @@
     "connectProvider": "Pripojte poskytovateľa",
     "contentTruncated": "Obsah skrátený",
     "copyLink": "Kopírovať odkaz",
+    "couldNotLoad": "Nepodarilo sa načítať.",
+    "couldNotLoadMore": "Nepodarilo sa načítať ďalšie položky.",
     "couldNotLoadOrganizations": "Nepodarilo sa načítať organizácie.",
     "couldNotLoadSessions": "Nepodarilo sa načítať relácie.",
-    "couldnTLoad": "Nepodarilo sa načítať.",
-    "couldnTLoadMore": "Nepodarilo sa načítať ďalšie položky.",
     "deviceSessions": "Relácie zariadení",
     "disabled": "Vypnuté",
     "email": "E-mail",
@@ -402,7 +403,7 @@
       "title": "Kľúče poskytovateľov",
       "rowSubtitle": "Používať vlastnú fakturáciu u poskytovateľa",
       "orgDescription": "Tieto kľúče zdieľajú všetci v organizácii a účtujú sa na jej účty u poskytovateľov.",
-      "viewOnly": "Kľúče organizácie môže meniť iba jej vlastník, administrátor alebo správca fakturácie.",
+      "viewOnly": "Kľúče organizácie môže meniť iba jej vlastník, správca alebo správca fakturácie.",
       "description": "Požiadavky cez tieto kľúče sa účtujú na tvoj účet u poskytovateľa namiesto tvojho zostatku v Kilo.",
       "managedByPlan": "Spravované tvojím plánom pre kódovanie",
       "enableKey": "Povoliť kľúč {{provider}}",
@@ -1650,7 +1651,7 @@
       "empty": "Zatiaľ žiadne kontroly s analytikou",
       "emptyDescription": "Analytika zaznamenáva dokončené kontroly, kým je pre organizáciu zapnutá.",
       "offTitle": "Analytika je pre {{platform}} vypnutá",
-      "offDescription": "Fakturačné roly organizácie – vlastníci, správcovia a manažéri fakturácie – môžu zapnúť analytiku v nastaveniach organizácie na webe, aby sa zaznamenávali dokončené kontroly.",
+      "offDescription": "Fakturačné roly organizácie – vlastníci, správcovia a správcovia fakturácie – môžu zapnúť analytiku v nastaveniach organizácie na webe, aby sa zaznamenávali dokončené kontroly.",
       "couldNotLoad": "Analytiku sa nepodarilo načítať",
       "trackedReviewsCaption": "Dokončené kontroly, ktoré sa skončili v tomto období so zapnutou analytikou. Prebiehajúce a neúspešné kontroly sa nikdy nezapočítavajú.",
       "trackedReviewsUncounted": "Nezapočítané: {{displayCount}} z {{displayTotal}} dokončených kontrol organizácie, ktorých výsledok nebol zachytený.",
@@ -2767,6 +2768,7 @@
     "filePart": {
       "loadingImage": "Načítava sa obrázok",
       "imageUnavailableRetry": "Obrázok nie je dostupný, skúsiť ho znova načítať",
+      "imageUnavailableRetryWithAlt": "Obrázok nie je dostupný, {{alt}}, skúsiť ho znova načítať",
       "imagePreviewUnavailableInSession": "Náhľad obrázka nie je v tejto relácii dostupný.",
       "viewImage": "Zobraziť obrázok",
       "viewImageWithAlt": "Zobraziť obrázok {{alt}}",
@@ -3545,7 +3547,7 @@
   "organization": {
     "auditLog": {
       "title": "Protokol auditu",
-      "permissionDenied": "Protokol auditu si môže prezerať iba vlastník, administrátor alebo správca fakturácie organizácie s plánom Enterprise. $t(organization.boundary.accessDeniedDescription)",
+      "permissionDenied": "Protokol auditu si môže prezerať iba vlastník, správca alebo správca fakturácie organizácie s plánom Enterprise. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Žiadne udalosti auditu",
       "emptyDescription": "Tu sa zobrazia akcie vykonané v tejto organizácii.",
       "truncated": "Zobrazujú sa najnovšie udalosti.",
@@ -3745,7 +3747,7 @@
     },
     "billing": {
       "title": "Fakturácia",
-      "permissionDenied": "Fakturáciu organizácie môže zobraziť iba jej vlastník, administrátor alebo správca fakturácie. $t(organization.boundary.accessDeniedDescription)",
+      "permissionDenied": "Fakturáciu organizácie môže zobraziť iba jej vlastník, správca alebo správca fakturácie. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Predplatné",
       "state": "Stav",
       "stateNone": "Bez predplatného",
@@ -3827,7 +3829,7 @@
       "noSeatsAvailable": "Všetky miesta sú obsadené. Pred pozvaním ďalších členov požiadaj vlastníka organizácie o pridanie miest."
     },
     "invoices": {
-      "downloadA11y": "Stiahnuť faktúru {{number}}",
+      "downloadA11y": "Stiahnuť faktúru {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Faktúry sa vytvárajú automaticky za každé fakturačné obdobie. Zobrazia sa tu po vyúčtovaní služieb tvojej organizácii.",
       "emptyTitle": "Žiadne faktúry",
       "invoiceFallback": "Faktúra",
@@ -3861,7 +3863,7 @@
       "limitLabel": "Limit (USD za deň)",
       "memberNotFound": "Člen sa nenašiel.",
       "noLimitPlaceholder": "Bez limitu",
-      "permissionDenied": "Limity spotreby môže spravovať iba vlastník alebo administrátor organizácie.",
+      "permissionDenied": "Limity spotreby môže spravovať iba vlastník alebo správca organizácie.",
       "removeLimit": "Odstrániť limit",
       "title": "Denný limit spotreby",
       "blankError": "Zadaj sumu alebo klepni na Odstrániť limit nižšie.",
@@ -3907,7 +3909,6 @@
       "usageDetails": "Podrobnosti o využití",
       "providersAndModels": "Poskytovatelia a modely",
       "groups": "Skupiny",
-      "guardrails": "Ochranné pravidlá",
       "byok": "Vlastný kľúč",
       "ssoAndDomain": "SSO a doména",
       "dataCollection": "Zber údajov",
@@ -3922,7 +3923,7 @@
       "emptyDescription": "Ak chcete zobraziť skoršie požiadavky, použite tlačidlo „Staršia hodina“.",
       "emptyBoundDescription": "Záznamy požiadaviek nesiahajú ďalej do minulosti.",
       "loadError": "Protokoly požiadaviek sa nepodarilo načítať.",
-      "permissionDenied": "Protokoly požiadaviek si môže prezerať iba vlastník, administrátor alebo správca fakturácie organizácie. $t(organization.boundary.accessDeniedDescription)",
+      "permissionDenied": "Protokoly požiadaviek si môže prezerať iba vlastník, správca alebo správca fakturácie organizácie. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} vstup · {{output}} výstup",
       "byok": "BYOK"
     },
@@ -4031,7 +4032,7 @@
     "signupStepUpApple": "Na dokončenie vytvorenia účtu použi „$t(login.signInWithApple)“.",
     "signupStepUpGoogle": "Na dokončenie vytvorenia účtu použi „$t(login.signInWithGoogle)“.",
     "signupStepUpBack": "Na dokončenie vytvorenia účtu sa vráť späť a použi „$t(login.moreSignInOptions)“.",
-    "invalidCode": "Tento kód je nesprávny alebo jeho platnosť vypršala. Skús to znova alebo použi „$t(login.resendCode)“.",
+    "invalidCode": "Tento kód je nesprávny alebo jeho platnosť vypršala. Použi „$t(login.resendCode)“ alebo „$t(login.moreSignInOptions)“.",
     "codeInProgress": "Tvoj kód sa spracúva. Chvíľu počkaj a skús to znova.",
     "tooManyAttempts": "Príliš veľa pokusov. Vyžiadaj si nový kód.",
     "invalidToken": "Prihlásenie zlyhalo. Skús to znova.",
@@ -4363,6 +4364,8 @@
       "discoveryNoModels": "Koncový bod neuviedol žiadne modely. Zadajte modely ručne.",
       "connectionIncomplete": "Model odpovedal, ale nedokončil odpoveď. Skúste to znova alebo skontrolujte ID modelu a protokol.",
       "invalidInput": "Zadajte názov servera, platné hlavičky a aspoň jeden model s jedinečným ID a názvom. Limity tokenov musia byť kladné celé čísla.",
+      "invalidApiKey": "API kľúč obsahuje znak, ktorý sa nedá odoslať. Používajte iba písmená, číslice a štandardné symboly, bez zalomení riadkov.",
+      "invalidHeaders": "Vlastnú hlavičku nie je možné odoslať. Skontrolujte jej názov a používajte iba písmená, číslice a štandardné symboly, bez zalomení riadkov.",
       "invalidUrl": "Zadajte základnú URL API s HTTP alebo HTTPS bez prihlasovacích údajov, parametrov dopytu alebo fragmentu.",
       "publicHttp": "Verejné koncové body HTTP nie sú povolené. Použite HTTPS alebo súkromný lokálny koncový bod.",
       "httpApprovalRequired": "Pred uložením alebo pripojením schváľte tento lokálny koncový bod HTTP.",
@@ -4497,7 +4500,15 @@
       "download": "Stiahnuť model do zariadenia",
       "downloading": "Sťahuje sa…",
       "downloadProgress": "Sťahuje sa… {{percent}} %",
-      "downloadFailed": "Sťahovanie sa nedokončilo. Skontrolujte pripojenie a voľné miesto v úložisku a skúste to znova."
+      "downloadFailed": "Sťahovanie sa nedokončilo. Skontrolujte pripojenie a voľné miesto v úložisku a skúste to znova.",
+      "cannotUse": "Nedá sa spustiť: {{items}}.",
+      "cannotUseOptions": "Nedá sa vyplniť: niektoré možnosti nástroja.",
+      "limitations": "Obmedzenia",
+      "tools": {
+        "time": "Čas",
+        "settingsList": "Zobraziť nastavenia",
+        "settingsSet": "Zmeniť nastavenia"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Tento model podporuje intenzitu uvažovania"
@@ -4686,6 +4697,7 @@
     "instructionSaveFailed": "Pokyn sa nepodarilo uložiť",
     "instructionDeleteFailed": "Pokyn sa nepodarilo odstrániť",
     "instructionToggleFailed": "Pokyn sa nepodarilo aktualizovať",
+    "instructionViewTitle": "Súbor pokynu",
     "instructionLimitReached": "Profil môže obsahovať najviac {{max}} pokynov. Ak chcete pridať ďalší, jeden odstráňte.",
     "mcp": {
       "title": "servery MCP",
@@ -4858,10 +4870,20 @@
     "history": {
       "activityUnavailable": "Aktivitu kreditov sa nepodarilo načítať.",
       "appStoreReceipt": "Doklad v obchode App Store",
+      "deduction": {
+        "adminCancel": "Zostatok uzavretý správcom",
+        "adminDebit": "Kredity odobral správca",
+        "codingPlan": "Plán programovania: {{plan}}",
+        "correction": "Úprava zostatku",
+        "dispute": "Spor o platbu",
+        "refundAppStore": "Vrátenie peňazí za balík kreditov v obchode App Store",
+        "refundGooglePlay": "Vrátenie peňazí za balík kreditov v obchode Google Play"
+      },
       "deductionFallback": "Odpočet kreditov",
       "emptyDescription": "Tu sa zobrazia nákupy kreditov, doklady a ich využitie.",
       "emptyTitle": "Žiadna história kreditov",
       "expiredGrant": "Platnosť vypršala: {{description}}",
+      "expiredStatus": "Platnosť vypršala",
       "googlePlayReceipt": "Doklad v obchode Google Play",
       "kind": {
         "adjustment": "Úprava",
@@ -4888,7 +4910,8 @@
       "receiptA11y": "Otvoriť doklad za {{description}}, {{amount}}, z {{date}}",
       "receiptUnavailable": "Pre tento nákup nie je k dispozícii doklad.",
       "retentionLimit": "Zobrazuje sa najnovšia história kreditov.",
-      "voidedGrant": "Stornované: {{description}}"
+      "voidedGrant": "Stornované: {{description}}",
+      "voidedStatus": "Stornované"
     },
     "title": "Kúpiť kredity",
     "description": "Kredity sú jednorazový nákup pridaný do vášho zostatku Kilo na spúšťanie AI programovacích relácií v aplikácii Kilo. Obchod vám strhne platbu z účtu a kredity sa pripíšu po potvrdení platby obchodom.",

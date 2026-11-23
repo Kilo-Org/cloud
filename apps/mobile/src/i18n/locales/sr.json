@@ -92,6 +92,7 @@
     "draft": "Nacrt",
     "enabled": "Uključeno",
     "github": "GitHub",
+    "image": "Slika",
     "imageUnavailable": "Slika nije dostupna.",
     "loading": "Učitavanje…",
     "loadMore": "Učitaj još",
@@ -123,10 +124,10 @@
     "connectProvider": "Poveži platformu",
     "contentTruncated": "Sadržaj je skraćen",
     "copyLink": "Kopiraj link",
+    "couldNotLoad": "Učitavanje nije uspelo.",
+    "couldNotLoadMore": "Učitavanje dodatnih stavki nije uspelo.",
     "couldNotLoadOrganizations": "Nije moguće učitati organizacije.",
     "couldNotLoadSessions": "Nije moguće učitati sesije.",
-    "couldnTLoad": "Učitavanje nije uspelo.",
-    "couldnTLoadMore": "Učitavanje dodatnih stavki nije uspelo.",
     "deviceSessions": "Sesije na uređajima",
     "disabled": "Isključeno",
     "email": "Imejl adresa",
@@ -1034,7 +1035,7 @@
       "reconnectAdminOnlyDescription": "Zamoli vlasnika organizacije, administratora ili menadžera za naplatu da ga ponovo poveže.",
       "bitbucketNotConnectedTitle": "Bitbucket nije povezan",
       "bitbucketAdminOnlyDescription": "Zamoli vlasnika organizacije, administratora ili menadžera za naplatu da ga poveže.",
-      "adminOnlyConnectDescription": "Samo vlasnici organizacije, administratori i menadžeri naplate mogu da ga povežu.",
+      "adminOnlyConnectDescription": "Samo vlasnici organizacije, administratori i menadžeri za naplatu mogu da ga povežu.",
       "contextLine": "Za {{organization}}",
       "contextLinePersonal": "Za lični nalog"
     },
@@ -1416,7 +1417,7 @@
       "off": "Memorija pregleda je isključena.",
       "on": "Memorija pregleda je uključena.",
       "offDescription": "Uključi je da Kilo uči iz odgovora osoba koje održavaju repozitorijum i predlaže smernice za REVIEW.md.",
-      "readOnlyDescription": "Samo vlasnici organizacije, administratori i menadžeri naplate mogu da promene memoriju pregleda.",
+      "readOnlyDescription": "Samo vlasnici organizacije, administratori i menadžeri za naplatu mogu da promene memoriju pregleda.",
       "enable": "Uključi memoriju pregleda",
       "loadingProposals": "Učitavanje predloga",
       "couldNotLoadProposals": "Nije moguće učitati predloge.",
@@ -1495,7 +1496,7 @@
     "bitbucketConnect": {
       "managedOnWeb": "Bitbucket vezom sa {{organization}} upravlja se na vebu, sa računara.",
       "deniedManagedByOwner": "Zamolite vlasnika organizacije {{organization}} da promeni vezu koju ne možete da promenite.",
-      "deniedConnectRole": "Samo vlasnici organizacije {{organization}}, administratori i menadžeri naplate mogu da ga povežu.",
+      "deniedConnectRole": "Samo vlasnici organizacije {{organization}}, administratori i menadžeri za naplatu mogu da ga povežu.",
       "deniedReconnectRole": "Zamoli vlasnika organizacije {{organization}}, administratora ili menadžera za naplatu da ga ponovo poveže.",
       "managedOnWebTitle": "Upravlja se na vebu",
       "managedOnWebShort": "Ova veza se upravlja na vebu, sa računara.",
@@ -1621,7 +1622,7 @@
       "empty": "Još nema pregleda sa analitikom",
       "emptyDescription": "Analitika beleži završene preglede dok je uključena za organizaciju.",
       "offTitle": "Analitika je isključena za {{platform}}",
-      "offDescription": "Vlasnici, administratori i menadžeri naplate mogu da uključe analitiku u podešavanjima organizacije na vebu kako bi beležila završene preglede.",
+      "offDescription": "Vlasnici, administratori i menadžeri za naplatu mogu da uključe analitiku u podešavanjima organizacije na vebu kako bi beležila završene preglede.",
       "couldNotLoad": "Nije moguće učitati analitiku",
       "trackedReviewsCaption": "Završeni pregledi koji su okončani u ovom periodu dok je analitika bila uključena. Pregledi u toku i neuspešni pregledi se nikada ne računaju.",
       "trackedReviewsUncounted": "Nije uračunato: {{displayCount}} od {{displayTotal}} završenih pregleda koje organizacija ima, njihov rezultat nije bio sačuvan.",
@@ -1861,7 +1862,7 @@
       "couldNotLoad": "Nije moguće učitati ovaj nalaz.",
       "couldNotCheckPermissions": "Nije moguće proveriti dozvole za odbacivanje.",
       "cannotDismissTitle": "Ovaj nalaz se ne može odbaciti",
-      "cannotDismissDescription": "Samo vlasnici organizacije, administratori i menadžeri naplate mogu da odbace nalaze.",
+      "cannotDismissDescription": "Samo vlasnici organizacije, administratori i menadžeri za naplatu mogu da odbace nalaze.",
       "alreadyResolvedDescription": "Ovaj nalaz je već rešen i više se ne može odbaciti."
     },
     "findingDetails": {
@@ -1898,7 +1899,7 @@
       "automationAllOff": "Sve isključeno",
       "automationCount": "Uključeno: {{displayCount}} od 3",
       "notificationsCount": "Uključeno: {{displayCount}} od 2",
-      "disabledNoManage": "Bezbednosni agent je isključen. Samo vlasnici organizacije, administratori i menadžeri naplate mogu da ga uključe.",
+      "disabledNoManage": "Bezbednosni agent je isključen. Samo vlasnici organizacije, administratori i menadžeri za naplatu mogu da ga uključe.",
       "disabledNoRepo": "Izaberi bar jedan repozitorijum pre uključivanja bezbednosnog agenta.",
       "disabledPrompt": "Uključi bezbednosnog agenta da sinhronizuješ Dependabot upozorenja, izabereš repozitorijume i podesiš automatizaciju.",
       "repositoriesCount_few": "{{displayCount}} repozitorijuma su izabrana"
@@ -1948,7 +1949,7 @@
       "invalidDayCount": "Broj dana mora biti ceo broj od 1 do 365.",
       "remediationDeadlineA11y": "Rok za otklanjanje u danima: {{label}}",
       "enterWholeNumber": "Unesi ceo broj između 1 i 365",
-      "permissionNote": "Samo vlasnici organizacije, administratori i menadžeri naplate mogu da promene ova podešavanja.",
+      "permissionNote": "Samo vlasnici organizacije, administratori i menadžeri za naplatu mogu da promene ova podešavanja.",
       "enableTracking": "Uključi praćenje rokova prema SLA",
       "enableTrackingSubtitle": "Postavi rokove za otklanjanje na osnovu ozbiljnosti nalaza.",
       "deadlinesHeading": "Rokovi za otklanjanje (u danima)"
@@ -2016,7 +2017,7 @@
       "summary": "Sažetak izveštaja",
       "title": "Izveštaj o reviziji",
       "unavailable": "Izveštaj o reviziji nije dostupan",
-      "unavailableDescription": "Samo vlasnici organizacije, administratori i menadžeri naplate mogu da pregledaju izveštaje o reviziji. Zamoli vlasnika, administratora ili menadžera naplate da ti dodeli pristup.",
+      "unavailableDescription": "Samo vlasnici organizacije, administratori i menadžeri za naplatu mogu da pregledaju izveštaje o reviziji. Zamoli vlasnika, administratora ili menadžera za naplatu da ti dodeli pristup.",
       "queryFailed": "Upit za izveštaj nije završen. Pokušaj ponovo.",
       "eventActions": {
         "findingAnalysisCompleted": "Analiza završena",
@@ -2093,7 +2094,7 @@
       "actionFailed": "Nije moguće dovršiti ovu radnju. Pokušaj ponovo.",
       "actionBlocked": "Nije moguće dovršiti ovu radnju. Problem mora biti rešen pre nego što pokušaš ponovo.",
       "syncNoRepositories": "Nijedan repozitorijum nije u opsegu sinhronizacije. Izaberite repozitorijume koje Bezbednosni agent nadgleda, pa ponovo sinhronizujte.",
-      "syncNoRepositoriesNoManage": "Nijedan repozitorijum nije u opsegu sinhronizacije. Vlasnik organizacije, administrator ili menadžer naplate mora da poveže repozitorijume pre nego što sinhronizacija može da se izvrši.",
+      "syncNoRepositoriesNoManage": "Nijedan repozitorijum nije u opsegu sinhronizacije. Vlasnik organizacije, administrator ili menadžer za naplatu mora da poveže repozitorijume pre nego što sinhronizacija može da se izvrši.",
       "syncIntegrationInactive": "GitHub veza za Bezbednosni agent nije aktivna. Ponovo povežite Kilo GitHub App, zatim ponovo sinhronizujte.",
       "syncMissingPermission": "Kilo GitHub aplikacija ne može da čita upozorenja o ranjivostima. Dodeli to ovlašćenje na GitHub-u, pa sinhronizuj ponovo.",
       "configConflict": "Podešavanja Bezbednosnog agenta promenjena su na drugom mestu. Pregledaj najnovija podešavanja i ponovo sačuvaj."
@@ -2714,6 +2715,7 @@
     "filePart": {
       "loadingImage": "Učitavanje slike",
       "imageUnavailableRetry": "Slika nije dostupna, pokušaj ponovo da je učitaš",
+      "imageUnavailableRetryWithAlt": "Slika nije dostupna, {{alt}}, pokušaj ponovo da je učitaš",
       "imagePreviewUnavailableInSession": "Pregled slike nije dostupan u ovoj sesiji.",
       "viewImage": "Prikaži sliku",
       "viewImageWithAlt": "Prikaži sliku {{alt}}",
@@ -3677,7 +3679,7 @@
     },
     "billing": {
       "title": "Naplata",
-      "permissionDenied": "Podatke o naplati mogu da vide samo vlasnik, administrator ili menadžer naplate organizacije. $t(organization.boundary.accessDeniedDescription)",
+      "permissionDenied": "Podatke o naplati mogu da vide samo vlasnik, administrator ili menadžer za naplatu organizacije. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Pretplata",
       "state": "Status",
       "stateNone": "Nema pretplate",
@@ -3759,7 +3761,7 @@
       "noSeatsAvailable": "Sva mesta su zauzeta. Zamoli vlasnika organizacije da doda mesta pre nego što pozoveš još članova."
     },
     "invoices": {
-      "downloadA11y": "Preuzmi fakturu {{number}}",
+      "downloadA11y": "Preuzmi fakturu {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Fakture se automatski izdaju za svaki obračunski period i prikazuju se ovde kada se tvojoj organizaciji naplati usluga.",
       "emptyTitle": "Nema faktura",
       "invoiceFallback": "Faktura",
@@ -3839,7 +3841,6 @@
       "usageDetails": "Detalji potrošnje",
       "providersAndModels": "Provajderi i modeli",
       "groups": "Grupe",
-      "guardrails": "Zaštitna ograničenja",
       "byok": "Sopstveni ključ",
       "ssoAndDomain": "SSO i domen",
       "dataCollection": "Prikupljanje podataka",
@@ -3961,7 +3962,7 @@
     "signupStepUpApple": "Za dovršavanje kreiranja naloga izaberi „$t(login.signInWithApple)“.",
     "signupStepUpGoogle": "Za dovršavanje kreiranja naloga izaberi „$t(login.signInWithGoogle)“.",
     "signupStepUpBack": "Za dovršavanje kreiranja naloga vrati se nazad i izaberi „$t(login.moreSignInOptions)“.",
-    "invalidCode": "Kod nije tačan ili je istekao. Pokušaj ponovo ili izaberi „$t(login.resendCode)“.",
+    "invalidCode": "Kod nije tačan ili je istekao. Koristi „$t(login.resendCode)“ ili „$t(login.moreSignInOptions)“.",
     "codeInProgress": "Tvoj kod se obrađuje. Sačekaj trenutak i pokušaj ponovo.",
     "tooManyAttempts": "Previše pokušaja. Zatraži novi kod.",
     "invalidToken": "Prijava nije uspela. Pokušaj ponovo.",
@@ -4284,6 +4285,8 @@
       "discoveryNoModels": "Krajnja tačka nije prikazala nijedan model. Unesi modele ručno.",
       "connectionIncomplete": "Model je odgovorio, ali nije završio. Pokušaj ponovo ili proveri ID modela i protokol.",
       "invalidInput": "Unesi ime pozadinskog servisa, važeća zaglavlja i bar jedan model sa jedinstvenim ID-jem i imenom. Ograničenja broja tokena moraju biti pozitivni celi brojevi.",
+      "invalidApiKey": "API ključ sadrži karakter koji ne može da se pošalje. Koristi samo slova, cifre i standardne simbole, bez preloma redova.",
+      "invalidHeaders": "Prilagođeno zaglavlje ne može da se pošalje. Proveri njegovo ime i koristi samo slova, cifre i standardne simbole, bez preloma redova.",
       "invalidUrl": "Unesi osnovni HTTP ili HTTPS URL API-ja bez podataka za prijavu, upita ili fragmenta.",
       "publicHttp": "Javne HTTP krajnje tačke nisu dozvoljene. Koristi HTTPS ili privatnu lokalnu krajnju tačku.",
       "httpApprovalRequired": "Odobri ovu lokalnu HTTP krajnju tačku pre čuvanja ili povezivanja.",
@@ -4418,7 +4421,15 @@
       "download": "Preuzmi model na uređaju",
       "downloading": "Preuzimanje…",
       "downloadProgress": "Preuzimanje… {{percent}}%",
-      "downloadFailed": "Preuzimanje nije završeno. Proverite vezu i slobodan prostor, pa pokušajte ponovo."
+      "downloadFailed": "Preuzimanje nije završeno. Proverite vezu i slobodan prostor, pa pokušajte ponovo.",
+      "cannotUse": "Nije moguće pokrenuti: {{items}}.",
+      "cannotUseOptions": "Nije moguće popuniti: neke opcije alata.",
+      "limitations": "Ograničenja",
+      "tools": {
+        "time": "Vreme",
+        "settingsList": "Prikaži podešavanja",
+        "settingsSet": "Promeni podešavanja"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Ovaj model podržava nivo razmišljanja"
@@ -4602,6 +4613,7 @@
     "instructionSaveFailed": "Čuvanje instrukcije nije uspelo",
     "instructionDeleteFailed": "Brisanje instrukcije nije uspelo",
     "instructionToggleFailed": "Ažuriranje instrukcije nije uspelo",
+    "instructionViewTitle": "Datoteka instrukcije",
     "instructionLimitReached": "Profil može da sadrži najviše {{max}} instrukcija. Obrišite jednu da biste dodali drugu.",
     "mcp": {
       "title": "MCP serveri",
@@ -4773,10 +4785,20 @@
     "history": {
       "activityUnavailable": "Aktivnost kredita nije moguće učitati.",
       "appStoreReceipt": "Račun iz prodavnice App Store",
+      "deduction": {
+        "adminCancel": "Saldo je zatvorio administrator",
+        "adminDebit": "Kredite je uklonio administrator",
+        "codingPlan": "Plan kodiranja: {{plan}}",
+        "correction": "Korekcija salda",
+        "dispute": "Spor o plaćanju",
+        "refundAppStore": "Povraćaj novca za paket kredita iz prodavnice App Store",
+        "refundGooglePlay": "Povraćaj novca za paket kredita iz prodavnice Google Play"
+      },
       "deductionFallback": "Odbitak kredita",
       "emptyDescription": "Kupovine kredita, računi i potrošnja prikazaće se ovde.",
       "emptyTitle": "Nema istorije kredita",
       "expiredGrant": "Isteklo: {{description}}",
+      "expiredStatus": "Isteklo",
       "googlePlayReceipt": "Račun iz prodavnice Google Play",
       "purchaseFallback": "Kupovina kredita",
       "receipt": "Račun",
@@ -4784,6 +4806,7 @@
       "receiptUnavailable": "Račun nije dostupan za ovu kupovinu.",
       "retentionLimit": "Prikazuje se najnovija istorija kredita.",
       "voidedGrant": "Stornirano: {{description}}",
+      "voidedStatus": "Stornirano",
       "kind": {
         "adjustment": "Korekcija",
         "balanceNeutral": "Bez uticaja na stanje",

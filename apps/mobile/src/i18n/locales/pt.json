@@ -93,6 +93,7 @@
     "draft": "Rascunho",
     "enabled": "Ativado",
     "github": "GitHub",
+    "image": "Imagem",
     "imageUnavailable": "A imagem não está disponível.",
     "loading": "A carregar…",
     "loadMore": "Carregar mais",
@@ -124,10 +125,10 @@
     "connectProvider": "Ligar um fornecedor",
     "contentTruncated": "Conteúdo truncado",
     "copyLink": "Copiar ligação",
+    "couldNotLoad": "Não foi possível carregar.",
+    "couldNotLoadMore": "Não foi possível carregar mais.",
     "couldNotLoadOrganizations": "Não foi possível carregar as organizações.",
     "couldNotLoadSessions": "Não foi possível carregar as sessões.",
-    "couldnTLoad": "Não foi possível carregar.",
-    "couldnTLoadMore": "Não foi possível carregar mais.",
     "deviceSessions": "Sessões nos dispositivos",
     "disabled": "Desativado",
     "email": "E-mail",
@@ -2767,6 +2768,7 @@
     "filePart": {
       "loadingImage": "A carregar a imagem",
       "imageUnavailableRetry": "Imagem indisponível, tentar carregar novamente",
+      "imageUnavailableRetryWithAlt": "Imagem indisponível, {{alt}}, tentar carregar novamente",
       "imagePreviewUnavailableInSession": "A pré-visualização da imagem não está disponível nesta sessão.",
       "viewImage": "Ver imagem",
       "viewImageWithAlt": "Ver imagem {{alt}}",
@@ -3827,7 +3829,7 @@
       "noSeatsAvailable": "Todos os lugares estão ocupados. Peça a um proprietário da organização que adicione lugares antes de convidar mais membros."
     },
     "invoices": {
-      "downloadA11y": "Transferir fatura {{number}}",
+      "downloadA11y": "Transferir fatura {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "As faturas são geradas automaticamente em cada ciclo de faturação e aparecem aqui após a faturação à sua organização.",
       "emptyTitle": "Sem faturas",
       "invoiceFallback": "Fatura",
@@ -3907,7 +3909,6 @@
       "usageDetails": "Detalhes de utilização",
       "providersAndModels": "Fornecedores e modelos",
       "groups": "Grupos",
-      "guardrails": "Salvaguardas",
       "byok": "Utilize a sua própria chave",
       "ssoAndDomain": "SSO e domínio",
       "dataCollection": "Recolha de dados",
@@ -4031,7 +4032,7 @@
     "signupStepUpApple": "Para concluir a criação da tua conta, usa '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Para concluir a criação da tua conta, usa '$t(login.signInWithGoogle)'.",
     "signupStepUpBack": "Para concluir a criação da tua conta, volta atrás e usa '$t(login.moreSignInOptions)'.",
-    "invalidCode": "Esse código está incorreto ou expirou. Tenta novamente ou usa '$t(login.resendCode)'.",
+    "invalidCode": "Esse código está incorreto ou expirou. Usa '$t(login.resendCode)' ou '$t(login.moreSignInOptions)'.",
     "codeInProgress": "O teu código está a ser processado. Aguarda um momento e tenta novamente.",
     "tooManyAttempts": "Demasiadas tentativas. Pede um novo código.",
     "invalidToken": "O início de sessão falhou. Tenta novamente.",
@@ -4363,6 +4364,8 @@
       "discoveryNoModels": "O ponto de acesso não listou nenhum modelo. Introduz os modelos manualmente.",
       "connectionIncomplete": "O modelo respondeu mas não terminou. Tenta novamente ou verifica o ID do modelo e o protocolo.",
       "invalidInput": "Introduz um nome de serviço, cabeçalhos válidos e pelo menos um modelo com ID e nome únicos. Os limites de tokens têm de ser números inteiros positivos.",
+      "invalidApiKey": "A chave da API contém um caractere que não pode ser enviado. Utiliza apenas letras, dígitos e símbolos padrão, sem quebras de linha.",
+      "invalidHeaders": "Um cabeçalho personalizado não pode ser enviado. Verifica o nome dele e utiliza apenas letras, dígitos e símbolos padrão, sem quebras de linha.",
       "invalidUrl": "Introduz um URL base da API com HTTP ou HTTPS, sem credenciais, parâmetros de consulta ou fragmentos.",
       "publicHttp": "Não são permitidos pontos de acesso HTTP públicos. Usa HTTPS ou um ponto de acesso local privado.",
       "httpApprovalRequired": "Autoriza este ponto de acesso HTTP local antes de guardar ou estabelecer ligação.",
@@ -4497,7 +4500,15 @@
       "download": "Descarregar modelo no dispositivo",
       "downloading": "A descarregar…",
       "downloadProgress": "A descarregar… {{percent}}%",
-      "downloadFailed": "A transferência não foi concluída. Verifique a ligação e o armazenamento livre e tente novamente."
+      "downloadFailed": "A transferência não foi concluída. Verifique a ligação e o armazenamento livre e tente novamente.",
+      "cannotUse": "Não é possível executar: {{items}}.",
+      "cannotUseOptions": "Não é possível preencher: algumas opções da ferramenta.",
+      "limitations": "Limitações",
+      "tools": {
+        "time": "Hora",
+        "settingsList": "Mostrar configurações",
+        "settingsSet": "Alterar configurações"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Este modelo suporta esforço de raciocínio"
@@ -4686,6 +4697,7 @@
     "instructionSaveFailed": "Não foi possível guardar a instrução",
     "instructionDeleteFailed": "Não foi possível eliminar a instrução",
     "instructionToggleFailed": "Não foi possível atualizar a instrução",
+    "instructionViewTitle": "Ficheiro de instrução",
     "instructionLimitReached": "Um perfil pode ter até {{max}} instruções. Elimine uma para adicionar outra.",
     "mcp": {
       "title": "Servidores MCP",
@@ -4858,10 +4870,20 @@
     "history": {
       "activityUnavailable": "Não foi possível carregar a atividade de créditos.",
       "appStoreReceipt": "Recibo da App Store",
+      "deduction": {
+        "adminCancel": "Saldo encerrado por um administrador",
+        "adminDebit": "Créditos removidos por um administrador",
+        "codingPlan": "Plano de programação: {{plan}}",
+        "correction": "Ajuste de saldo",
+        "dispute": "Contestação de pagamento",
+        "refundAppStore": "Reembolso de pacote de créditos da App Store",
+        "refundGooglePlay": "Reembolso de pacote de créditos do Google Play"
+      },
       "deductionFallback": "Dedução de créditos",
       "emptyDescription": "Compras, recibos e uso de créditos aparecerão aqui.",
       "emptyTitle": "Nenhum histórico de créditos",
       "expiredGrant": "Expirado: {{description}}",
+      "expiredStatus": "Expirado",
       "googlePlayReceipt": "Recibo do Google Play",
       "kind": {
         "adjustment": "Ajuste",
@@ -4888,7 +4910,8 @@
       "receiptA11y": "Abrir o recibo de {{description}}, {{amount}}, de {{date}}",
       "receiptUnavailable": "Não há recibo disponível para esta compra.",
       "retentionLimit": "A mostrar o histórico de créditos mais recente.",
-      "voidedGrant": "Anulado: {{description}}"
+      "voidedGrant": "Anulado: {{description}}",
+      "voidedStatus": "Anulado"
     },
     "title": "Comprar créditos",
     "description": "Os créditos são uma compra única adicionada ao seu saldo Kilo para executar sessões de programação com IA na aplicação Kilo. A loja cobra na sua conta e os créditos são adicionados depois de a loja confirmar o pagamento.",

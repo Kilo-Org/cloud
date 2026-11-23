@@ -32,18 +32,8 @@ import { hasVisibleComposerText } from '@/lib/composer-text';
  * for the life of the install; removing it makes one entry one event and every
  * later mount start from an absent key.
  *
- * A valid-JSON value that fails the caller's shape validator is not corrupt:
- * another build of the app can read it, so it may be that build's draft (a
- * downgrade, or a field this build has not learned yet) and removing it would
- * discard the user's text for good. It loads as null and stays stored, and its
- * report is claimed once per process per key, so the per-mount read does not
- * file an event each time. A write that replaces the value, an eviction, or an
- * explicit clear releases the claim, because the next mismatch is new
- * information.
- *
- * Every asynchronous write (debounced timer, flush, clear) is caught at this
- * boundary: a storage failure is reported to Sentry and swallowed, so the
- * fire-and-forget `void` call sites can never leak an unhandled rejection.
+ * A valid-JSON value that fails the caller's shape validator is not corrupt
+ * and stays stored, but loads as null; `draft-read-report.ts` owns its report.
  *
  * Serialization runs when the debounce fires, not on the keystroke that reset
  * it: a value that cannot be JSON-serialized (a circular reference, or a
@@ -259,10 +249,6 @@ type PendingSave = {
   value: unknown;
 };
 
-// One pending debounced write per full storage key. The timer, epoch, and
-// value are captured together under the full key, so a later save for a
-// different key (or a different account with the same entity key) can never
-// retarget it.
 const pendingSaves = new Map<string, PendingSave>();
 
 function fullKey(userId: string, entityKey: string): string {

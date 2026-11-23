@@ -91,6 +91,7 @@
     "draft": "Entwurf",
     "enabled": "Aktiviert",
     "github": "GitHub",
+    "image": "Bild",
     "imageUnavailable": "Das Bild ist nicht verfügbar.",
     "loading": "Wird geladen…",
     "loadMore": "Mehr laden",
@@ -122,10 +123,10 @@
     "connectProvider": "Anbieter verbinden",
     "contentTruncated": "Inhalt gekürzt",
     "copyLink": "Link kopieren",
+    "couldNotLoad": "Einträge konnten nicht geladen werden.",
+    "couldNotLoadMore": "Weitere Einträge konnten nicht geladen werden.",
     "couldNotLoadOrganizations": "Die Organisationen konnten nicht geladen werden.",
     "couldNotLoadSessions": "Die Sitzungen konnten nicht geladen werden.",
-    "couldnTLoad": "Einträge konnten nicht geladen werden.",
-    "couldnTLoadMore": "Weitere Einträge konnten nicht geladen werden.",
     "deviceSessions": "Gerätesitzungen",
     "disabled": "Deaktiviert",
     "email": "E-Mail",
@@ -1030,7 +1031,7 @@
       "empty": "Noch keine Reviews mit Analysen",
       "emptyDescription": "Analysen erfassen abgeschlossene Reviews, solange sie für die Organisation aktiviert sind.",
       "offTitle": "Analysen sind für {{platform}} deaktiviert",
-      "offDescription": "Personen mit Abrechnungsrollen der Organisation (Owner, Admins und Billing-Manager) können Analysen in den Organisationseinstellungen im Web aktivieren, um abgeschlossene Reviews zu erfassen.",
+      "offDescription": "Personen mit Abrechnungsrollen der Organisation (Inhaber, Admins und Abrechnungsmanager) können Analysen in den Organisationseinstellungen im Web aktivieren, um abgeschlossene Reviews zu erfassen.",
       "couldNotLoad": "Analysen konnten nicht geladen werden",
       "trackedReviewsCaption": "Reviews, die in diesem Zeitraum bei aktivierten Analysen abgeschlossen wurden. Laufende und fehlgeschlagene Reviews werden nie gezählt.",
       "trackedReviewsUncounted": "Nicht gezählt: {{displayCount}} von {{displayTotal}} abgeschlossenen Reviews der Organisation ohne erfasstes Ergebnis.",
@@ -1650,12 +1651,12 @@
       "couldNotOpenTitle": "GitHub konnte nicht geöffnet werden",
       "installedTitle": "GitHub-App installiert",
       "installedMessage": "Deine Repositories sind jetzt verbunden.",
-      "pendingTitle": "Genehmigung durch Administrator ausstehend",
-      "pendingMessage": "Ein Organisationsadministrator muss die Installationsanfrage genehmigen.",
+      "pendingTitle": "Genehmigung durch Admin ausstehend",
+      "pendingMessage": "Ein Admin der Organisation muss die Installationsanfrage genehmigen.",
       "accountMismatchTitle": "Konten stimmen nicht überein",
       "accountMismatchMessage": "Du hast diese Verbindung in der Kilo App mit einem anderen Konto gestartet. Melde dich im Browser mit demselben Konto an oder starte den Vorgang in der App erneut.",
       "cannotCompleteTitle": "Installation kann nicht abgeschlossen werden",
-      "notAdminMessage": "Nur ein GitHub-Administrator dieses Kontos kann es verbinden. Bitte einen Administrator deiner Organisation, Kilo zu installieren.",
+      "notAdminMessage": "Nur ein GitHub-Administrator dieses Kontos kann es verbinden. Bitte einen Admin deiner Organisation, Kilo zu installieren.",
       "alreadyClaimedMessage": "Diese GitHub-Installation ist bereits mit einem anderen Kilo-Konto verbunden. Trenne die Verbindung dort zuerst.",
       "installationUnavailableMessage": "Diese GitHub App-Installation ist ausgesetzt oder nicht mehr verfügbar. Stelle sie in GitHub wieder her oder installiere sie dort erneut, und starte dann erneut.",
       "multipleInstallationsMessage": "Diese Kilo-Organisation kann derzeit nur eine einzige GitHub-Organisation verbinden.",
@@ -2099,6 +2100,7 @@
     "filePart": {
       "loadingImage": "Bild wird geladen",
       "imageUnavailableRetry": "Bild nicht verfügbar, erneut laden",
+      "imageUnavailableRetryWithAlt": "Bild nicht verfügbar, {{alt}}, erneut laden",
       "imagePreviewUnavailableInSession": "In dieser Sitzung ist keine Bildvorschau verfügbar.",
       "viewImage": "Bild ansehen",
       "viewImageWithAlt": "Bild „{{alt}}“ ansehen",
@@ -3695,7 +3697,7 @@
       "noSeatsAvailable": "Alle Plätze sind belegt. Bitte einen Organisationsinhaber, Plätze hinzuzufügen, bevor du weitere Mitglieder einlädst."
     },
     "invoices": {
-      "downloadA11y": "Rechnung {{number}} herunterladen",
+      "downloadA11y": "Rechnung {{number}}, {{amount}}, {{date}}, {{status}} herunterladen",
       "emptyDescription": "Rechnungen werden für jeden Abrechnungszeitraum automatisch erstellt. Sie erscheinen hier, sobald deine Organisation eine Rechnung erhält.",
       "emptyTitle": "Keine Rechnungen",
       "invoiceFallback": "Rechnung",
@@ -3775,7 +3777,6 @@
       "usageDetails": "Nutzungsdetails",
       "providersAndModels": "Anbieter und Modelle",
       "groups": "Gruppen",
-      "guardrails": "Guardrails",
       "byok": "Eigenen Schlüssel verwenden",
       "ssoAndDomain": "SSO und Domain",
       "dataCollection": "Datenerfassung",
@@ -3852,7 +3853,7 @@
       "nameRequired": "Gruppennamen eingeben.",
       "nameTooLong": "Name auf höchstens 80 Zeichen beschränken.",
       "notFound": "Diese Gruppe existiert nicht mehr.",
-      "permissionDenied": "Nur ein Inhaber oder Administrator einer Organisation kann deren Gruppen ändern.",
+      "permissionDenied": "Nur ein Inhaber oder Admin einer Organisation kann deren Gruppen ändern.",
       "searchMembers": "Mitglieder suchen",
       "selectAllVisible": "Alle angezeigten auswählen"
     },
@@ -3891,7 +3892,7 @@
     "signupStepUpApple": "Wähle „$t(login.signInWithApple)“, um die Erstellung deines Kontos abzuschließen.",
     "signupStepUpGoogle": "Wähle „$t(login.signInWithGoogle)“, um die Erstellung deines Kontos abzuschließen.",
     "signupStepUpBack": "Um die Erstellung deines Kontos abzuschließen, geh zurück und wähle „$t(login.moreSignInOptions)“.",
-    "invalidCode": "Dieser Code ist falsch oder abgelaufen. Versuche es erneut oder wähle „$t(login.resendCode)“.",
+    "invalidCode": "Dieser Code ist falsch oder abgelaufen. Verwende „$t(login.resendCode)“ oder wähle „$t(login.moreSignInOptions)“.",
     "codeInProgress": "Dein Code wird verarbeitet. Warte einen Moment und versuche es erneut.",
     "tooManyAttempts": "Du hast zu viele Versuche unternommen. Bitte fordere einen neuen Code an.",
     "invalidToken": "Anmeldung fehlgeschlagen. Bitte versuche es erneut.",
@@ -4205,6 +4206,8 @@
       "discoveryNoModels": "Der Endpunkt hat keine Modelle aufgelistet. Gib Modelle manuell ein.",
       "connectionIncomplete": "Das Modell hat geantwortet, aber nicht abgeschlossen. Versuche es erneut oder prüfe die Modell-ID und das Protokoll.",
       "invalidInput": "Gib einen Backend-Namen, gültige Header und mindestens ein Modell mit eindeutiger ID und eindeutigem Namen ein. Token-Limits müssen positive ganze Zahlen sein.",
+      "invalidApiKey": "Der API-Schlüssel enthält ein Zeichen, das nicht gesendet werden kann. Verwende nur Buchstaben, Ziffern und Standardzeichen, ohne Zeilenumbrüche.",
+      "invalidHeaders": "Ein benutzerdefinierter Header kann nicht gesendet werden. Prüfe seinen Namen und verwende nur Buchstaben, Ziffern und Standardzeichen, ohne Zeilenumbrüche.",
       "invalidUrl": "Gib eine HTTP- oder HTTPS-API-Basis-URL ohne Zugangsdaten, Abfrageparameter oder Fragment ein.",
       "publicHttp": "Öffentliche HTTP-Endpunkte sind nicht erlaubt. Verwende HTTPS oder einen privaten lokalen Endpunkt.",
       "httpApprovalRequired": "Genehmige diesen lokalen HTTP-Endpunkt, bevor du speicherst oder eine Verbindung herstellst.",
@@ -4339,7 +4342,15 @@
       "download": "Modell auf dem Gerät herunterladen",
       "downloading": "Wird heruntergeladen…",
       "downloadProgress": "Wird heruntergeladen… {{percent}} %",
-      "downloadFailed": "Der Download wurde nicht abgeschlossen. Prüfe deine Verbindung und den freien Speicherplatz und versuche es dann erneut."
+      "downloadFailed": "Der Download wurde nicht abgeschlossen. Prüfe deine Verbindung und den freien Speicherplatz und versuche es dann erneut.",
+      "cannotUse": "Kann nicht ausgeführt werden: {{items}}.",
+      "cannotUseOptions": "Kann nicht ausgefüllt werden: einige Tool-Optionen.",
+      "limitations": "Einschränkungen",
+      "tools": {
+        "time": "Zeit",
+        "settingsList": "Einstellungen anzeigen",
+        "settingsSet": "Einstellungen ändern"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Dieses Modell unterstützt Denkaufwand"
@@ -4518,6 +4529,7 @@
     "instructionSaveFailed": "Anweisung konnte nicht gespeichert werden",
     "instructionDeleteFailed": "Anweisung konnte nicht gelöscht werden",
     "instructionToggleFailed": "Anweisung konnte nicht aktualisiert werden",
+    "instructionViewTitle": "Anweisungsdatei",
     "instructionLimitReached": "Ein Profil kann bis zu {{max}} Anweisungen enthalten. Lösche eine, um eine weitere hinzuzufügen.",
     "mcp": {
       "title": "MCP-Server",
@@ -4688,10 +4700,20 @@
     "history": {
       "activityUnavailable": "Credit-Aktivität konnte nicht geladen werden.",
       "appStoreReceipt": "Beleg im App Store",
+      "deduction": {
+        "adminCancel": "Saldo von einem Admin geschlossen",
+        "adminDebit": "Credits von einem Admin entfernt",
+        "codingPlan": "Coding-Plan: {{plan}}",
+        "correction": "Saldo-Korrektur",
+        "dispute": "Zahlungsstreit",
+        "refundAppStore": "Erstattung eines Credit-Pakets im App Store",
+        "refundGooglePlay": "Erstattung eines Credit-Pakets bei Google Play"
+      },
       "deductionFallback": "Credit-Abzug",
       "emptyDescription": "Credit-Käufe, Belege und Nutzung werden hier angezeigt.",
       "emptyTitle": "Kein Credit-Verlauf",
       "expiredGrant": "Abgelaufen: {{description}}",
+      "expiredStatus": "Abgelaufen",
       "googlePlayReceipt": "Beleg bei Google Play",
       "kind": {
         "adjustment": "Anpassung",
@@ -4718,7 +4740,8 @@
       "receiptA11y": "Beleg für {{description}}, {{amount}}, vom {{date}} öffnen",
       "receiptUnavailable": "Für diesen Kauf ist kein Beleg verfügbar.",
       "retentionLimit": "Es wird der neueste Credit-Verlauf angezeigt.",
-      "voidedGrant": "Storniert: {{description}}"
+      "voidedGrant": "Storniert: {{description}}",
+      "voidedStatus": "Storniert"
     },
     "title": "Guthaben kaufen",
     "description": "Guthaben ist ein einmaliger Kauf, der deinem Kilo-Guthaben für AI-Codierungssitzungen in der Kilo App hinzugefügt wird. Der Store belastet dein Konto, und das Guthaben wird gutgeschrieben, sobald der Store die Zahlung bestätigt.",
@@ -4904,7 +4927,7 @@
     "enable": "Kostenpflichtige Zusammenfassungen aktivieren",
     "allContexts": "Persönliche und Organisations-Briefings bleiben getrennt.",
     "emptyHistory": "Keine gespeicherten Briefings",
-    "estimatePermissionUnavailable": "Du hast keine Berechtigung, das Guthaben dieses Kontexts zu nutzen. Bitte eine Organisationsbesitzerin oder einen Organisationsbesitzer, dies zu aktivieren.",
+    "estimatePermissionUnavailable": "Du hast keine Berechtigung, das Guthaben dieses Kontexts zu nutzen. Bitte einen Inhaber der Organisation, dies zu aktivieren.",
     "saved": "Briefing-Einstellungen gespeichert",
     "selectedSessions": "Ausgewählte Sitzungen",
     "snapshotPullRequests": "PRs in ausgewählten Sitzungen",

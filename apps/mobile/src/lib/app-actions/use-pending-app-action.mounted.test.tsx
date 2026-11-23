@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one cohesive suite: the fake dispatcher, the parked-request gates and the refusal paths share the same harness */
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -16,6 +17,7 @@ import {
   takePendingAppAction,
 } from '@/lib/app-actions/pending-app-action';
 import { usePendingAppAction } from '@/lib/app-actions/use-pending-app-action';
+import { type SessionAttentionHydration } from '@/lib/session-attention';
 
 type DispatchAppAction = typeof AppActionDispatchModule.dispatchAppActionRequest;
 
@@ -84,6 +86,7 @@ function dispatchWithDefaults(request: AppActionRequest): Promise<AppActionResul
 }
 
 type HarnessProps = {
+  attentionHydration: SessionAttentionHydration;
   isError: boolean;
   isLoading: boolean;
   needsInputRows: NeedsInputSession[];
@@ -91,6 +94,7 @@ type HarnessProps = {
 };
 
 const SETTLED: HarnessProps = {
+  attentionHydration: 'ready',
   isError: false,
   isLoading: false,
   needsInputRows: [],
@@ -335,11 +339,18 @@ describe('usePendingAppAction', () => {
     renderer.unmount();
   });
 
-  it('holds OpenNeedsInput until the live list has settled', async () => {
-    const rows: NeedsInputSession[] = [{ id: 'ses_wait', status: 'question', isAcked: false }];
+  it.each([
+    { hold: { isLoading: true }, name: 'the live list has settled' },
+    { hold: { attentionHydration: 'loading' as const }, name: 'the ack store has hydrated' },
+  ])('holds OpenNeedsInput until $name', async ({ hold }) => {
+    // The second case pins the hold to the store's phase alone: behind an
+    // unhydrated store the request would open a session already answered.
+    const rows: NeedsInputSession[] = [
+      { id: 'ses_wait', status: 'question', hydration: 'ready', isAcked: false },
+    ];
     setPendingAppAction({ action: 'OpenNeedsInput' });
-    const renderer = mount({ ...SETTLED, isLoading: true, needsInputRows: rows });
-    // The list is still loading: the request stays parked, nothing acts.
+    const renderer = mount({ ...SETTLED, ...hold, needsInputRows: rows });
+    // Not settled: the request stays parked, nothing acts.
     expect(mocks.navigate).not.toHaveBeenCalled();
     expect(getPendingAppAction()).toEqual({ action: 'OpenNeedsInput' });
     // Settled: the single waiting session is the destination.

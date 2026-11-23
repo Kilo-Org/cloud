@@ -332,7 +332,7 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
 }));
 vi.mock('@/lib/hooks/use-reviewer-council', () => ({
   useCouncilGate: () => ({ allowed: false, pending: false }),
-  useCouncilUiEnabled: () => false,
+  useCouncilEntryAvailable: () => false,
 }));
 vi.mock('@/components/agents/model-selector', () => ({ openModelPicker: vi.fn() }));
 vi.mock('@/lib/hooks/use-available-models', () => ({

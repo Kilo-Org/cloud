@@ -189,6 +189,7 @@
     "draft": "Draft",
     "enabled": "Enabled",
     "github": "GitHub",
+    "image": "Image",
     "imageUnavailable": "Image unavailable",
     "loading": "Loading…",
     "loadMore": "Load more",
@@ -220,10 +221,10 @@
     "connectProvider": "Connect a provider",
     "contentTruncated": "Content truncated",
     "copyLink": "Copy link",
+    "couldNotLoad": "Couldn't load",
+    "couldNotLoadMore": "Couldn't load more",
     "couldNotLoadOrganizations": "Could not load organizations",
     "couldNotLoadSessions": "Could not load sessions",
-    "couldnTLoad": "Couldn't load",
-    "couldnTLoadMore": "Couldn't load more",
     "deviceSessions": "Device sessions",
     "disabled": "Disabled",
     "agent": "Agent",
@@ -2770,6 +2771,7 @@
     "filePart": {
       "loadingImage": "Loading image",
       "imageUnavailableRetry": "Image unavailable, retry loading",
+      "imageUnavailableRetryWithAlt": "Image unavailable, {{alt}}, retry loading",
       "imagePreviewUnavailableInSession": "Image preview unavailable in this session.",
       "viewImage": "View image",
       "viewImageWithAlt": "View image {{alt}}",
@@ -3801,7 +3803,7 @@
       "noSeatsAvailable": "All seats are in use. Ask an organization owner to add seats before inviting more members."
     },
     "invoices": {
-      "downloadA11y": "Download invoice {{number}}",
+      "downloadA11y": "Download invoice {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Invoices are generated automatically each billing cycle and will appear here once your organization is billed.",
       "emptyTitle": "No invoices",
       "invoiceFallback": "Invoice",
@@ -3881,7 +3883,6 @@
       "usageDetails": "Usage details",
       "providersAndModels": "Providers and models",
       "groups": "Groups",
-      "guardrails": "Guardrails",
       "byok": "Bring your own key",
       "ssoAndDomain": "SSO and domain",
       "dataCollection": "Data collection",
@@ -4001,7 +4002,7 @@
     "signupStepUpApple": "To finish creating your account, use '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "To finish creating your account, use '$t(login.signInWithGoogle)'.",
     "signupStepUpBack": "To finish creating your account, go back and use '$t(login.moreSignInOptions)'.",
-    "invalidCode": "That code is incorrect or expired. Try again or use '$t(login.resendCode)'.",
+    "invalidCode": "That code is incorrect or expired. Use '$t(login.resendCode)' or '$t(login.moreSignInOptions)'.",
     "codeInProgress": "Your code is being processed. Wait a moment and try again.",
     "tooManyAttempts": "Too many attempts. Please request a new code.",
     "invalidToken": "Sign-in failed. Please try again.",
@@ -4231,6 +4232,8 @@
       "discoveryNoModels": "The endpoint listed no models. Enter models manually.",
       "connectionIncomplete": "The model answered but did not finish. Try again, or check the model ID and protocol.",
       "invalidInput": "Enter a backend name, valid headers, and at least one model with a unique ID and name. Token limits must be positive whole numbers.",
+      "invalidApiKey": "The API key contains a character that cannot be sent. Use letters, digits, and standard symbols only, with no line breaks.",
+      "invalidHeaders": "A custom header cannot be sent. Check its name and use letters, digits, and standard symbols only, with no line breaks.",
       "invalidUrl": "Enter an HTTP or HTTPS API root without credentials, a query, or a fragment.",
       "publicHttp": "Public HTTP endpoints are not allowed. Use HTTPS, or a private local endpoint.",
       "httpApprovalRequired": "Approve this local HTTP endpoint before saving or connecting.",
@@ -4364,7 +4367,15 @@
       "download": "Download on-device model",
       "downloading": "Downloading…",
       "downloadProgress": "Downloading… {{percent}}%",
-      "downloadFailed": "The download didn't finish. Check your connection and free storage, then try again."
+      "downloadFailed": "The download didn't finish. Check your connection and free storage, then try again.",
+      "cannotUse": "Can't run: {{items}}.",
+      "cannotUseOptions": "Can't fill in: some tool options.",
+      "limitations": "Limitations",
+      "tools": {
+        "time": "Time",
+        "settingsList": "Show settings",
+        "settingsSet": "Change settings"
+      }
     },
     "webSearch": {
       "title": "Search the web",
@@ -4616,6 +4627,7 @@
     "instructionSaveFailed": "Couldn't save the instruction",
     "instructionDeleteFailed": "Couldn't delete the instruction",
     "instructionToggleFailed": "Couldn't update the instruction",
+    "instructionViewTitle": "Instruction file",
     "instructionLimitReached": "A profile can hold up to {{max}} instructions. Delete one to add another.",
     "mcp": {
       "title": "MCP servers",
@@ -4786,10 +4798,20 @@
     "history": {
       "activityUnavailable": "Couldn't load credit activity.",
       "appStoreReceipt": "Receipt from the App Store",
+      "deduction": {
+        "adminCancel": "Balance closed by an administrator",
+        "adminDebit": "Credits removed by an administrator",
+        "codingPlan": "Coding plan: {{plan}}",
+        "correction": "Balance correction",
+        "dispute": "Payment dispute",
+        "refundAppStore": "Credit pack refund from the App Store",
+        "refundGooglePlay": "Credit pack refund from Google Play"
+      },
       "deductionFallback": "Credit deduction",
       "emptyDescription": "Credit purchases, receipts, and usage will appear here.",
       "emptyTitle": "No credit history",
       "expiredGrant": "Expired: {{description}}",
+      "expiredStatus": "Expired",
       "googlePlayReceipt": "Receipt from Google Play",
       "kind": {
         "adjustment": "Adjustment",
@@ -4816,7 +4838,8 @@
       "receiptA11y": "Open the receipt for {{description}}, {{amount}}, from {{date}}",
       "receiptUnavailable": "A receipt is not available for this purchase.",
       "retentionLimit": "Showing the most recent credit history.",
-      "voidedGrant": "Voided: {{description}}"
+      "voidedGrant": "Voided: {{description}}",
+      "voidedStatus": "Voided"
     },
     "title": "Buy credits",
     "description": "Credits are a one-time purchase added to your Kilo balance for running AI coding sessions in Kilo App. The store charges your account and credits are added after the store confirms payment.",

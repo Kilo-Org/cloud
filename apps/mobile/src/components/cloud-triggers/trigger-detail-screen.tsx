@@ -18,6 +18,8 @@ import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { KvRow } from '@/components/ui/kv-row';
+import { RowGroup } from '@/components/ui/row-group';
+import { Section } from '@/components/ui/section';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { type CloudTriggerDetail } from '@/lib/cloud-triggers/trigger-draft';
@@ -61,7 +63,7 @@ function ReadOnlyTrigger({
     enabled: model !== '',
   });
   return (
-    <View>
+    <RowGroup>
       <KvRow label={t('common.repository')} value={detail.githubRepo ?? t('common.unknown')} />
       <KvRow
         label={t('cloudAgent.triggers.fieldActivation')}
@@ -84,7 +86,7 @@ function ReadOnlyTrigger({
         }
         valueFace="text"
       />
-    </View>
+    </RowGroup>
   );
 }
 
@@ -133,7 +135,9 @@ export function TriggerDetailScreen({
     body = (
       <View className="gap-4">
         {editableTarget ? null : (
-          <Text className="text-xs text-destructive">
+          // Nothing failed on this screen: the note explains why the values are
+          // read-only, so it reads as the muted intro body, not as an error.
+          <Text variant="muted">
             {query.data.canEditReason === 'creator_run'
               ? t('cloudAgent.triggers.cannotEditCreator')
               : t('cloudAgent.triggers.permissionDenied')}
@@ -149,12 +153,9 @@ export function TriggerDetailScreen({
           // where the trigger is managed instead of offering the wrong one.
           <Text variant="caption">{t('common.manageOnWeb')}</Text>
         ) : null}
-        <View className="gap-2">
-          <Text className="text-sm font-medium text-foreground">
-            {t('cloudAgent.triggers.deliveries')}
-          </Text>
+        <Section label={t('cloudAgent.triggers.deliveries')}>
           <TriggerDeliveries triggerId={query.data.triggerId} organizationId={organizationId} />
-        </View>
+        </Section>
       </View>
     );
   }

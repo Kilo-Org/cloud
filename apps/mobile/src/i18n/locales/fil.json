@@ -91,6 +91,7 @@
     "draft": "Burador",
     "enabled": "Naka-enable",
     "github": "GitHub",
+    "image": "Larawan",
     "imageUnavailable": "Hindi maipakita ang larawan.",
     "loading": "Naglo-load…",
     "loadMore": "Magpakita pa",
@@ -122,10 +123,10 @@
     "connectProvider": "Ikonekta ang isang provider",
     "contentTruncated": "Pinaikli ang nilalaman",
     "copyLink": "Kopyahin ang link",
+    "couldNotLoad": "Hindi ma-load.",
+    "couldNotLoadMore": "Hindi ma-load ang iba pa.",
     "couldNotLoadOrganizations": "Hindi ma-load ang mga organisasyon.",
     "couldNotLoadSessions": "Hindi ma-load ang mga sesyon.",
-    "couldnTLoad": "Hindi ma-load.",
-    "couldnTLoadMore": "Hindi ma-load ang iba pa.",
     "deviceSessions": "Mga sesyon sa aparato",
     "disabled": "Naka-disable",
     "email": "Adres ng email",
@@ -1592,7 +1593,7 @@
       "empty": "Wala pang pagsusuring may analitika",
       "emptyDescription": "Itinatala ng analitika ang mga natapos na pagsusuri habang pinagana ito para sa organisasyon.",
       "offTitle": "Naka-off ang analitika para sa {{platform}}",
-      "offDescription": "Maaaring paganahin ng mga role sa pagbabayad ng organisasyon ang analitika sa mga setting ng organisasyon sa web para itala ang mga natapos na pagsusuri.",
+      "offDescription": "Maaaring paganahin ng mga role sa pagsingil ng organisasyon ang analitika sa mga setting ng organisasyon sa web para itala ang mga natapos na pagsusuri.",
       "couldNotLoad": "Hindi ma-load ang analitika",
       "trackedReviewsCaption": "Mga natapos na pagsusuri sa panahong ito habang naka-on ang analitika. Hindi kailanman binibilang ang mga pagsusuring tumatakbo o nabigo.",
       "trackedReviewsUncounted": "Hindi binibilang: {{displayCount}} sa {{displayTotal}} natapos na pagsusuri ng organisasyon na walang naitalang resulta.",
@@ -2661,6 +2662,7 @@
     "filePart": {
       "loadingImage": "Naglo-load ng larawan",
       "imageUnavailableRetry": "Hindi maipakita ang larawan, subukang i-load muli",
+      "imageUnavailableRetryWithAlt": "Hindi maipakita ang larawan, {{alt}}, subukang i-load muli",
       "imagePreviewUnavailableInSession": "Hindi maipakita ang paunang tingin sa larawan sa sesyong ito.",
       "viewImage": "Tingnan ang larawan",
       "viewImageWithAlt": "Tingnan ang larawan: {{alt}}",
@@ -3687,11 +3689,11 @@
       "pendingInvitation": "May nakabinbing imbitasyon na ang email na ito.",
       "alreadyMember": "Miembro na ng organisasyong ito ang taong ito.",
       "seatsFull": "Ginagamit na ang lahat ng seat ({{used}}/{{total}}). Hilingin sa isang may-ari ng organisasyon na magdagdag ng mga seat bago mag-imbita ng mas maraming miyembro.",
-      "seatsFullCanInviteBilling": "Ginagamit na ang lahat ng seat ({{used}}/{{total}}). Maaari ka pa ring mag-imbita ng mga billing manager, na hindi gumagamit ng seat.",
+      "seatsFullCanInviteBilling": "Ginagamit na ang lahat ng seat ({{used}}/{{total}}). Maaari ka pa ring mag-imbita ng mga tagapamahala ng pagsingil, na hindi gumagamit ng seat.",
       "noSeatsAvailable": "Ginagamit na ang lahat ng seat. Hilingin sa isang may-ari ng organisasyon na magdagdag ng mga seat bago mag-imbita ng mas maraming miyembro."
     },
     "invoices": {
-      "downloadA11y": "I-download ang talaan ng singil {{number}}",
+      "downloadA11y": "I-download ang talaan ng singil {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Awtomatikong ginagawa ang mga talaan ng singil sa bawat siklo ng pagsingil. Lalabas ang mga ito rito kapag nasingil na ang iyong organisasyon.",
       "emptyTitle": "Walang talaan ng singil",
       "invoiceFallback": "Talaan ng singil",
@@ -3771,7 +3773,6 @@
       "usageDetails": "Mga detalye ng paggamit",
       "providersAndModels": "Mga provider at model",
       "groups": "Mga grupo",
-      "guardrails": "Mga guardrail",
       "byok": "Gamitin ang sarili mong key",
       "ssoAndDomain": "SSO at domain",
       "dataCollection": "Pangongolekta ng data",
@@ -3891,7 +3892,7 @@
     "signupStepUpApple": "Para matapos ang paggawa ng iyong account, gamitin ang '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Para matapos ang paggawa ng iyong account, gamitin ang '$t(login.signInWithGoogle)'.",
     "signupStepUpBack": "Para matapos ang paggawa ng iyong account, bumalik at gamitin ang '$t(login.moreSignInOptions)'.",
-    "invalidCode": "Mali o expired na ang code na iyon. Pakisubukan muli o gamitin ang '$t(login.resendCode)'.",
+    "invalidCode": "Mali o expired na ang code na iyon. Gamitin ang '$t(login.resendCode)' o ang '$t(login.moreSignInOptions)'.",
     "codeInProgress": "Pinoproseso ang iyong code. Maghintay ng sandali at subukan muli.",
     "tooManyAttempts": "Masyado nang maraming pagsubok. Humiling ng bagong code.",
     "invalidToken": "Hindi makapag-sign in. Pakisubukan muli.",
@@ -4205,6 +4206,8 @@
       "discoveryNoModels": "Walang nakalista na modelo ang endpoint. Maglagay ng mga modelo nang manu-mano.",
       "connectionIncomplete": "Sumagot ang modelo ngunit hindi natapos. Subukang muli, o suriin ang ID ng modelo at protocol.",
       "invalidInput": "Maglagay ng pangalan ng sistema, mga wastong header, at kahit isang modelo na may natatanging ID at pangalan. Ang mga limitasyon sa token ay dapat mga positibong buong bilang.",
+      "invalidApiKey": "Ang susi ng API ay naglalaman ng karakter na hindi maipapadala. Gumamit lamang ng mga titik, digit, at karaniwang simbolo, nang walang mga putol ng linya.",
+      "invalidHeaders": "Hindi maipadala ang isang pasadyang header. Suriin ang pangalan nito at gumamit lamang ng mga titik, digit, at karaniwang simbolo, nang walang mga putol ng linya.",
       "invalidUrl": "Maglagay ng pangunahing URL ng API na gumagamit ng HTTP o HTTPS at walang mga kredensyal, mga parameter ng query, o fragment.",
       "publicHttp": "Hindi pinapayagan ang mga pampublikong HTTP endpoint. Gumamit ng HTTPS o isang pribadong lokal na endpoint.",
       "httpApprovalRequired": "Aprubahan ang lokal na HTTP endpoint na ito bago mag-save o kumonekta.",
@@ -4339,7 +4342,15 @@
       "download": "I-download ang modelong nasa device",
       "downloading": "Nagda-download…",
       "downloadProgress": "Nagda-download… {{percent}}%",
-      "downloadFailed": "Hindi natapos ang pag-download. Tingnan ang iyong koneksyon at bakanteng storage, pagkatapos ay subukang muli."
+      "downloadFailed": "Hindi natapos ang pag-download. Tingnan ang iyong koneksyon at bakanteng storage, pagkatapos ay subukang muli.",
+      "cannotUse": "Hindi mapatakbo: {{items}}.",
+      "cannotUseOptions": "Hindi mapupunan: ilang opsyon ng tool.",
+      "limitations": "Mga limitasyon",
+      "tools": {
+        "time": "Oras",
+        "settingsList": "Ipakita ang mga setting",
+        "settingsSet": "Baguhin ang mga setting"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Sinusuportahan ng modelong ito ang antas ng pag-iisip"
@@ -4518,6 +4529,7 @@
     "instructionSaveFailed": "Hindi na-save ang tagubilin",
     "instructionDeleteFailed": "Hindi nabura ang tagubilin",
     "instructionToggleFailed": "Hindi na-update ang tagubilin",
+    "instructionViewTitle": "File ng tagubilin",
     "instructionLimitReached": "Hanggang {{max}} tagubilin lamang ang maaaring taglayin ng isang profile. Burahin ang isa para magdagdag ng panibago.",
     "mcp": {
       "title": "Mga MCP server",
@@ -4688,10 +4700,20 @@
     "history": {
       "activityUnavailable": "Hindi ma-load ang aktibidad ng credit.",
       "appStoreReceipt": "Resibo mula sa App Store",
+      "deduction": {
+        "adminCancel": "Isinara ng admin ang balanse",
+        "adminDebit": "Inalis ng admin ang mga credit",
+        "codingPlan": "Plano sa coding: {{plan}}",
+        "correction": "Pagwawasto ng balanse",
+        "dispute": "Pagtatalo sa pagbabayad",
+        "refundAppStore": "Refund ng credit pack mula sa App Store",
+        "refundGooglePlay": "Refund ng credit pack mula sa Google Play"
+      },
       "deductionFallback": "Bawas sa credit",
       "emptyDescription": "Lalabas dito ang mga pagbili, resibo, at paggamit ng credit.",
       "emptyTitle": "Walang kasaysayan ng credit",
       "expiredGrant": "Nag-expire: {{description}}",
+      "expiredStatus": "Nag-expire",
       "googlePlayReceipt": "Resibo mula sa Google Play",
       "kind": {
         "adjustment": "Adjustment",
@@ -4718,7 +4740,8 @@
       "receiptA11y": "Buksan ang resibo para sa {{description}}, {{amount}}, mula noong {{date}}",
       "receiptUnavailable": "Walang available na resibo para sa pagbiling ito.",
       "retentionLimit": "Ipinapakita ang pinakabagong kasaysayan ng credit.",
-      "voidedGrant": "Kinansela: {{description}}"
+      "voidedGrant": "Kinansela: {{description}}",
+      "voidedStatus": "Kinansela"
     },
     "title": "Bumili ng kredito",
     "description": "Ang kredito ay isang besesang pagbili na idinaragdag sa iyong Kilo balance para sa pagpapatakbo ng mga AI coding session sa Kilo App. Sinisingil ng store ang iyong account at idinaragdag ang kredito pagkatapos kumpirmahin ng store ang bayad.",
@@ -5135,7 +5158,7 @@
   },
   "organizationGuardrails": {
     "title": "Mga AI Guardrail",
-    "permissionDenied": "Ang mga owner at admin lang ng organisasyon ang puwedeng mamahala ng Mga AI Guardrail. $t(organization.boundary.accessDeniedDescription)",
+    "permissionDenied": "Ang mga may-ari at admin lang ng organisasyon ang puwedeng mamahala ng Mga AI Guardrail. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Hindi naka-enable ang Mga AI Guardrail",
     "unavailable": "Ini-enable ng Kilo ang Mga AI Guardrail para sa isang organisasyon kapag hiniling. Makipag-ugnayan sa {{supportEmail}}, at i-on ito ng Kilo team para sa iyong organisasyon.",
     "contactSupport": "Makipag-ugnayan sa suporta",
@@ -5277,7 +5300,7 @@
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Feature ng Enterprise",
     "enterpriseOnly": "Makukuha ang mga provider at modelo sa Enterprise plan.",
-    "readOnly": "Ang mga owner at admin lang ng organisasyon ang puwedeng magbago ng mga setting na ito.",
+    "readOnly": "Ang mga may-ari at admin lang ng organisasyon ang puwedeng magbago ng mga setting na ito.",
     "loadError": "Hindi ma-load ang mga provider at modelo",
     "tabModels": "Mga modelo",
     "tabProviders": "Mga provider",

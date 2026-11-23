@@ -2,7 +2,7 @@
 import { z } from 'zod';
 import { buildWorkflowPageCode } from './agent-workflow-runner';
 import { TAB_TAKEN_ERROR } from './browser-caller';
-import { STALE_REF_ERROR } from './browser-agent-checks';
+import { dropPathsSchema, dropTargetSchema, STALE_REF_ERROR } from './browser-agent-checks';
 import { runIsolatedAgentProbe } from './browser-agent-isolated-probe-script';
 import { MAIN_FRAME_ID, readIsolatedFrames } from './browser-agent-isolated-probe';
 import type { IsolatedAgentProbe, IsolatedFrameTree } from './browser-agent-isolated-probe';
@@ -1453,8 +1453,8 @@ const browserToolTypeArgsSchema = z.object({
 });
 const browserToolDropArgsSchema = z.object({
   data: z.record(z.string(), z.string()).optional(),
-  paths: z.array(z.string()).optional(),
-  target: z.string().min(1),
+  paths: dropPathsSchema.optional(),
+  target: dropTargetSchema,
 });
 const browserToolFillFormArgsSchema = z.object({
   fields: z.array(

@@ -23,7 +23,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, relative as relativePath, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { isTranslateCallee, propertyName, unwrap, walk } from '../lib/ast.mjs';
+import { isTranslateCallee, propertyName, stringLiteralValue, unwrap, walk } from '../lib/ast.mjs';
 import {
   catalogEntryNames,
   catalogTags,
@@ -32,6 +32,8 @@ import {
   missingPluralCategories,
   pluralFamilyBases,
   pluralParts,
+  selectablePluralCategories,
+  unselectablePluralCategories,
 } from '../lib/catalogs.mjs';
 import { runIfMain } from '../lib/entry-point.mjs';
 import { isTestArtifact, parseSourceEntry, parseSourceTree } from '../lib/source-files.mjs';
@@ -60,6 +62,9 @@ function catalogsOf(root) {
       dir: join(root, 'apps/mobile/src/i18n/locales'),
       sourceRoots: [join(root, 'apps/mobile/src')],
       baseKeyOf: pluralBaseKey,
+      // The app renders on Hermes, which has no `Intl.PluralRules`, so the
+      // FormatJS polyfill data the bundle ships decides the suffix.
+      selectableCategoriesOf: tag => selectablePluralCategories(root, tag),
       englishCopyRules: [
         checkEnglishCopies,
         checkMobileEnglishIdentical,
@@ -75,6 +80,10 @@ function catalogsOf(root) {
       localeRegistry: join(root, 'packages/notifications/src/i18n.ts'),
       sourceRoots: [join(root, 'packages/notifications/src'), join(root, 'services')],
       baseKeyOf: pushBaseKey,
+      // Push copy renders on a Worker, whose runtime brings its own
+      // `Intl.PluralRules` and ships no polyfill data.
+      selectableCategoriesOf: tag =>
+        new Set([...new Intl.PluralRules(tag).resolvedOptions().pluralCategories, 'zero']),
       englishCopyRules: [checkEnglishCopies, checkPushEnglishCopy],
       calledKeyOf: pushCalledKeyOf,
       keyPrefixOf: pushKeyPrefix,
@@ -119,6 +128,7 @@ const TWO_SENSE_COPY = new Map([
     'receipt',
     'the confirmation a moderation report produces, versus the proof of payment for a credit purchase',
   ],
+  ['expired', 'the state of a native-remote command delivery, versus the state of a credit grant'],
   ['block', 'the verb, block a discussion participant, versus the reviewer decision to block'],
   ['merge', 'the verb in the merge section header, versus the name of the merge method on a badge'],
   ['review', 'the noun, a review, versus the verb in the onboarding step'],
@@ -1192,6 +1202,72 @@ function checkBorrowedDanda(values, label) {
   return problems;
 }
 
+/** The mark an Urdu catalog declares as its sentence terminator. */
+const URDU_SENTENCE_TERMINATOR = '\u06D4';
+/** What continues a token after a dot rather than starting a sentence. */
+const LATIN_OR_NUMBER_AFTER_DOT = /[A-Za-z0-9/%-]/;
+
+/** Whether the character is a letter of the Arabic script, as Urdu words are. */
+function isArabicLetter(char) {
+  return char !== undefined && /\p{Script=Arabic}/u.test(char) && /\p{L}/u.test(char);
+}
+
+/**
+ * The Urdu full stop `۔` (U+06D4) closes a sentence written in the Arabic
+ * script, and a catalog that declares it in `common.sentenceJoiner` has stated
+ * that this mark ends its sentences. An ASCII `.` left at a boundary then puts
+ * two conventions on one screen. The rule reads that declared joiner instead of
+ * a tag list for the same reason `checkBorrowedDanda` does: the joiner is the
+ * catalog's own statement of which mark closes its sentences, so a catalog that
+ * declares another mark keeps its ASCII periods and none is named here. Only a
+ * mark that closes a sentence is read: an ellipsis, a host or file name and a
+ * decimal keep theirs. A period followed by whitespace and a word closes one
+ * sentence and opens the next whatever precedes it, so the sentence it joins is
+ * reported after a `{{token}}` or a closing bracket too; a value-final period
+ * is read only after an Urdu word, which leaves a Latin product name alone.
+ */
+function checkUrduSentenceTerminator(values, label) {
+  const problems = [];
+  const joiner = values.get('common.sentenceJoiner');
+  if (typeof joiner !== 'string' || !joiner.startsWith(URDU_SENTENCE_TERMINATOR)) {
+    return problems;
+  }
+  for (const [key, value] of values) {
+    for (let index = 0; index < value.length; index += 1) {
+      if (value[index] !== '.') {
+        continue;
+      }
+      // A run of dots is an ellipsis, a wait state rather than a sentence end.
+      if (value[index - 1] === '.' || value[index + 1] === '.') {
+        continue;
+      }
+      // A host, file name or decimal continues with its own characters.
+      if (LATIN_OR_NUMBER_AFTER_DOT.test(value[index + 1] ?? '')) {
+        continue;
+      }
+      // A word after the dot means a second sentence follows it, whatever the
+      // dot follows: `{{status}}. ہدف` joins two sentences as surely as a dot
+      // after an Urdu word does.
+      if (/^\s+\p{L}/u.test(value.slice(index + 1))) {
+        problems.push(`${label}: "${key}" joins two sentences with the ASCII "."; Urdu writes «۔»`);
+        continue;
+      }
+      // A dot that ends the value, or runs straight into the next word with no
+      // space, closes a sentence only after an Urdu word: `Sentry.` names a
+      // product and `{{status}}.` a value, not a sentence.
+      if (!isArabicLetter(value[index - 1])) {
+        continue;
+      }
+      if (/\p{L}/u.test(value.slice(index + 1))) {
+        problems.push(`${label}: "${key}" joins two sentences with the ASCII "."; Urdu writes «۔»`);
+        continue;
+      }
+      problems.push(`${label}: "${key}" ends a sentence with the ASCII "."; Urdu writes «۔»`);
+    }
+  }
+  return problems;
+}
+
 /** The `{{token}}` list of one string, in the order it writes them. */
 function placeholderTokens(value) {
   return [...value.matchAll(/\{\{\s*([^}\s]+)\s*\}\}/g)].map(match => match[1]);
@@ -1370,15 +1446,34 @@ function holdsLabel(values, run) {
 }
 
 /**
+ * The quoted runs of `value` that spell an English label: each names a control
+ * this reader must see as `$t(key)`, not as the English word.
+ *
+ * The one exemption is an explicit parameter, not a second scan: `ownValues`
+ * holds the locale's own values, and a run one of them holds is that locale's
+ * copy of a name it does not translate, so quoting it is right. English passes
+ * an empty set, because a label English spells is a label English can name.
+ */
+function quotedLabelRuns({ value, englishValues, ownValues }) {
+  const runs = [];
+  for (const run of quotedRuns(value)) {
+    if (englishValues.has(run) && !holdsLabel(ownValues, run)) {
+      runs.push(run);
+    }
+  }
+  return runs;
+}
+
+/**
  * The catalog key a node names as a plain string: unwrapped from its
  * TypeScript-only wrappers, a `Literal` string, and non-empty. Any other node,
- * including a template literal and an empty string, names no key here.
+ * including a template literal and an empty string, names no key here. The read
+ * itself is the shared one, so a key rule cannot see a literal shape the others
+ * do not; the non-empty requirement is this layer's own.
  */
 function staticStringKey(node) {
-  const value = unwrap(node);
-  return value.type === 'Literal' && typeof value.value === 'string' && value.value !== ''
-    ? value.value
-    : null;
+  const value = stringLiteralValue(node);
+  return value !== null && value !== '' ? value : null;
 }
 
 /** The catalog key a property's value translates, when it is `t('literal')`. */
@@ -1676,16 +1771,9 @@ function destructiveConfirmKeys(source, english) {
 
 /**
  * Reject a destructive button whose label reads as this catalog's Cancel word.
- *
- * An exact match is always a defect: the reader sees Cancel on the red button
- * too, so it is rejected for every key. The substring test applies only to a
- * key whose English copy is a bare destructive verb such as "Revoke": a red
- * button reading "Revoke link" when Cancel sits beneath it is ambiguous, while
- * "Cancel subscription" beside "Cancel" is deliberate English and its
- * translation may keep the locale's Cancel word. `rejectContainingCancel`
- * carries that per-key decision: a true flag rejects a label that CONTAINS this
- * catalog's Cancel word, so a key whose English names Cancel never reaches the
- * substring test.
+ * It folds both labels, rejects an exact match for every key, and rejects a
+ * match that only contains the Cancel word when `rejectContainingCancel` is
+ * true; `destructiveConfirmKeys` computes that flag.
  */
 function checkDestructiveConfirmLabel(label, key, value, cancelValue, rejectContainingCancel) {
   const problems = [];
@@ -2074,10 +2162,6 @@ function checkCatalogMembership({ catalogName, tags, present, dir }) {
 
 function checkEnglishCopies({ catalogName, english }) {
   const problems = [];
-  // One key per piece of copy. Two keys holding the same English string cannot
-  // be translated apart without the catalogs drifting, so the copy belongs to
-  // one key and every call site points at it.
-  //
   // Every plural key is exempt, not only the members of one family. So two
   // plural families holding the same copy pass here. That is deliberate: the
   // one-wording rule below groups plural keys too, so the catalogs still cannot
@@ -2094,8 +2178,6 @@ function checkEnglishCopies({ catalogName, english }) {
     }
     byCopy.get(value).push(key);
   }
-  // The per-line bucket phrases are registered once in PER_LINE_BUCKET_PHRASES,
-  // which checkSharedWordings also reads.
   for (const [value, keys] of byCopy) {
     if (keys.length < 2 || keys.every(key => PER_LINE_BUCKET_PHRASES.has(pluralBaseKey(key)))) {
       continue;
@@ -2154,6 +2236,8 @@ function checkSerializedJson(label, key, value) {
 /** The value rules English itself must pass. */
 function checkEnglishValues({ catalogName, english, englishValues }) {
   const problems = [];
+  // English exempts nothing: a label it spells is a label it can name.
+  const ownValues = new Set();
   for (const [key, value] of english) {
     if (value.trim() === '') {
       problems.push(`${catalogName}/en: "${key}" is empty`);
@@ -2168,12 +2252,10 @@ function checkEnglishValues({ catalogName, english, englishValues }) {
     }
     // English must not spell a label it can name, or every translator copies
     // the English word into a sentence they otherwise translated.
-    for (const run of quotedRuns(value)) {
-      if (englishValues.has(run)) {
-        problems.push(
-          `${catalogName}/en: "${key}" quotes the label "${run}"; name its key with $t()`
-        );
-      }
+    for (const run of quotedLabelRuns({ value, englishValues, ownValues })) {
+      problems.push(
+        `${catalogName}/en: "${key}" quotes the label "${run}"; name its key with $t()`
+      );
     }
   }
   return problems;
@@ -2193,6 +2275,8 @@ function checkEnglishCatalog({ catalogName, english, englishValues }) {
 /** The keys a locale owes English, then the keys English does not name. */
 function checkKeyParity({
   label,
+  tag,
+  selectableCategories,
   english,
   translated,
   englishFamilies,
@@ -2200,11 +2284,18 @@ function checkKeyParity({
   localeFamilies,
 }) {
   const problems = [];
+  const selectable = selectableCategories(tag);
   for (const key of english.keys()) {
     if (translated.has(key)) {
       continue;
     }
     const parts = pluralParts(key);
+    if (parts && !selectable.has(parts.category)) {
+      // The locale can never select this category, so it owes no such form:
+      // the key would be copy no reader of this language sees. A `_zero`
+      // member stays owed, because i18next looks that suffix up itself.
+      continue;
+    }
     if (
       parts &&
       englishFamilies.has(parts.base) &&
@@ -2231,14 +2322,63 @@ function checkKeyParity({
   return problems;
 }
 
-/** The categories a locale's plural families lack. */
-function checkPluralCategories({ label, tag, english, translated }) {
+/**
+ * The categories a locale's plural families lack, judged by the categories its
+ * catalog's runtime can both require and render.
+ *
+ * This rule demands a form and the unreachable-form rule rejects one, so the two
+ * must read one truth source or they can contradict each other: a category the
+ * host requires but the runtime cannot select would be demanded by one rule and
+ * rejected by the other, leaving the audit unsatisfiable. The required list is
+ * therefore the intersection of the host's categories and the catalog's own
+ * selectable set, and it keeps `zero` wherever the host list carries it: a
+ * language that selects that category itself (Arabic, Welsh, Latvian) still owes
+ * its `_zero` form.
+ *
+ * The demand therefore never includes a form the runtime cannot render. It also
+ * cannot demand a category only the shipped data selects, so a family a locale
+ * declares under a flat counted English key is not asked for that form; a
+ * family English declares is still covered by the key-parity rule.
+ */
+function checkPluralCategories({ label, tag, english, translated, selectableCategories }) {
   const problems = [];
-  // The families this locale must complete, and the categories it lacks,
-  // come from the rule both audits share.
-  for (const [family, absent] of missingPluralCategories(english, translated, tag)) {
+  const host = new Intl.PluralRules(tag).resolvedOptions().pluralCategories;
+  const selectable = selectableCategories(tag);
+  // The intersection, with no separate `zero` rule: `zero` is in the host list
+  // only for a language that really selects it (Arabic, Welsh, Latvian), so a
+  // family of one of those still owes its `_zero` form. For every other
+  // language the host list has no `zero` to carry through.
+  const required = host.filter(category => selectable.has(category));
+  for (const [family, absent] of missingPluralCategories(english, translated, tag, required)) {
     for (const category of absent) {
       problems.push(`${label}: plural family "${family}" lacks the ${category} category of ${tag}`);
+    }
+  }
+  return problems;
+}
+
+/**
+ * The plural forms no reader of this language can see: a form whose category
+ * the runtime never selects for this tag, and whose copy is identical to its
+ * family's `other` copy.
+ *
+ * Both conditions are needed before the rule names a line. The first says the
+ * runtime does not pick this form; the second says that even a runtime which
+ * does pick it renders exactly the same text, so the entry is a duplicate of
+ * copy its family already carries. A form with text of its own is left alone,
+ * because a runtime the audit does not measure may select it. `zero` is never
+ * reported: i18next consults it directly at a zero count.
+ */
+function checkUnselectablePluralCategories({ label, tag, translated, selectableCategories }) {
+  const problems = [];
+  for (const [family, categories] of unselectablePluralCategories(
+    translated,
+    selectableCategories(tag)
+  )) {
+    for (const category of categories) {
+      problems.push(
+        `${label}: plural family "${family}" declares a ${category} form that ${tag} never selects`
+      );
     }
   }
   return problems;
@@ -2363,8 +2503,6 @@ function checkTranslatedValue({
   mustTranslateKeys,
 }) {
   const problems = [];
-  // A catalog that writes no sentence mark may hold nothing but the space it
-  // separates sentences with; any other whitespace-only value is untranslated.
   const separatorOnly =
     key === 'common.sentenceJoiner' && MARKLESS_SENTENCE_TAGS.has(tag) && value !== '';
   if (value.trim() === '' && !separatorOnly) {
@@ -2375,8 +2513,6 @@ function checkTranslatedValue({
       ...checkDestructiveConfirmLabel(label, key, value, cancelValue, rejectContainingCancel)
     );
   }
-  // A catalog may not leave a listed key in English; MUST_TRANSLATE_KEYS
-  // records which keys, per catalog, and why.
   if (mustTranslateKeys.has(key) && value === englishValue) {
     problems.push(`${label}: "${key}" must be translated`);
   }
@@ -2388,8 +2524,6 @@ function checkTranslatedValue({
       key,
       value,
       englishValue,
-      // Only a reviewed (key, category, locale) entry may say its number as a
-      // word; every other form keeps its language's exact placeholder set.
       countsMayBeWorded: Boolean(
         parts && WORDED_COUNTS.has(`${parts.base}:${parts.category}:${tag}`)
       ),
@@ -2406,13 +2540,9 @@ function checkTranslatedValue({
  * the message points at a button this user never sees.
  */
 function checkQuotedLabels({ label, key, value, englishValues, ownValues }) {
-  const problems = [];
-  for (const run of quotedRuns(value)) {
-    if (englishValues.has(run) && !holdsLabel(ownValues, run)) {
-      problems.push(`${label}: "${key}" quotes the English label "${run}"; name its key with $t()`);
-    }
-  }
-  return problems;
+  return quotedLabelRuns({ value, englishValues, ownValues }).map(
+    run => `${label}: "${key}" quotes the English label "${run}"; name its key with $t()`
+  );
 }
 
 /**
@@ -2548,10 +2678,6 @@ function checkLoginSeparators({ label, tag, translated }) {
 /** The sentence separator of the composed review message. */
 function checkSentenceSeparator({ label, tag, translated }) {
   const problems = [];
-  // The composed message appends the stale clause to the fresh one verbatim,
-  // so the separator is one choice per catalog: every form of the family
-  // agrees on it, and only a catalog that writes no space after its
-  // terminator leaves the clause bare.
   const freshForms = [...translated].filter(
     ([key]) => pluralBaseKey(key) === SENTENCE_SEPARATED_FAMILY
   );
@@ -2656,6 +2782,7 @@ function checkSharedWordings({ label, tag, translated, sharedWordings, wordingEx
  */
 function checkCatalogLocales({
   catalog,
+  selectableCategories,
   present,
   supported,
   english,
@@ -2696,25 +2823,35 @@ function checkCatalogLocales({
     problems.push(...checkAgentEditorCopy(translated, english, label));
     problems.push(...checkPullRequestTerm(translated, label));
     problems.push(...checkArmenianSentenceTerminator(tag, translated, label));
+    problems.push(...checkUrduSentenceTerminator(translated, label));
     problems.push(...checkBorrowedDanda(translated, label));
     problems.push(...checkChangelogAreaLabels(tag, translated, label));
 
     // The families this locale declares itself, through a member key with a
-    // category suffix. The English `_one`/`_other` siblings of a family
-    // English declares stay mandatory in the missing-key rule below, except
-    // where the locale carries the flat base key instead.
+    // category suffix. The English siblings of a family English declares stay
+    // mandatory in the missing-key rule below, except where the locale carries
+    // the flat base key instead, and except a category this tag can never
+    // select: a Japanese catalog owes no `_one` form, because i18next never
+    // asks for one there.
     const localeFamilies = pluralFamilyBases(translated);
     problems.push(
       ...checkKeyParity({
         label,
+        tag,
         english,
         translated,
         englishFamilies,
         englishCountedBases,
         localeFamilies,
+        selectableCategories,
       })
     );
-    problems.push(...checkPluralCategories({ label, tag, english, translated }));
+    problems.push(
+      ...checkPluralCategories({ label, tag, english, translated, selectableCategories })
+    );
+    problems.push(
+      ...checkUnselectablePluralCategories({ label, tag, translated, selectableCategories })
+    );
     problems.push(
       ...checkTranslatedValues({
         label,
@@ -3045,6 +3182,7 @@ export function checkCatalogs(root = ROOT) {
 
     const locales = checkCatalogLocales({
       catalog,
+      selectableCategories: catalog.selectableCategoriesOf,
       present,
       supported,
       english,

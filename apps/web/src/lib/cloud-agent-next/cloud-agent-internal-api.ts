@@ -110,9 +110,9 @@ export type VercelSnapshotBuildStartInput = (
 };
 
 /**
- * Start an organization-scoped BYOC Vercel snapshot build through the
- * authenticated Cloud Agent internal API. This is intentionally not part of
- * the browser-facing tRPC client.
+ * Start a BYOC Vercel snapshot build through the authenticated Cloud Agent
+ * internal API. This is intentionally not part of the browser-facing tRPC
+ * client.
  */
 export async function startVercelSnapshotBuild(
   input: VercelSnapshotBuildStartInput

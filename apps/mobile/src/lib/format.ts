@@ -197,21 +197,36 @@ function durationFields(seconds: number) {
   };
 }
 
+/** The unit steps. The byte step is whole; every larger step shows two digits. */
+const FILE_SIZE_UNITS = ['byte', 'kilobyte', 'megabyte', 'gigabyte', 'terabyte'] as const;
+
 export function formatFileSize(bytes: number, locale: string): string {
-  const units = ['byte', 'kilobyte', 'megabyte', 'gigabyte'] as const;
   let value = bytes;
   let unit = 0;
-  while (value >= 1024 && unit < units.length - 1) {
-    value /= 1024;
+  let fractionDigits = 0;
+  // The step is 1000 because these are the ECMA-402 decimal unit identifiers.
+  // ECMA-402 sanctions no kibibyte, mebibyte or gibibyte identifier, so a 1024
+  // step could not keep the locale's own unit word and placement.
+  //
+  // The step is taken from the value as it will be displayed at that step, so
+  // "999,999" would print "1,000 kB" and instead takes the next unit's name: a
+  // reader never sees a figure the unit cannot hold. The last step is the top
+  // one, so a larger count keeps it.
+  while (unit < FILE_SIZE_UNITS.length - 1) {
+    if (Number(value.toFixed(fractionDigits)) < 1000) {
+      break;
+    }
+    value /= 1000;
     unit += 1;
+    fractionDigits = 2;
   }
   return formatNumber(value, locale, {
     style: 'unit',
-    unit: units[unit],
+    unit: FILE_SIZE_UNITS[unit] ?? 'terabyte',
     // CLDR has no plural for the abbreviated byte unit ("564 byte"), so a whole
     // byte count takes the long form: "1 byte", "564 bytes", "564 octets".
-    unitDisplay: unit === 0 ? 'long' : 'short',
-    maximumFractionDigits: unit === 0 ? 0 : 2,
+    unitDisplay: fractionDigits === 0 ? 'long' : 'short',
+    maximumFractionDigits: fractionDigits,
   });
 }
 

@@ -525,6 +525,43 @@ describe('ConsentCard', () => {
     expect(singleSwitch(renderer.root).props.value).toBe(true);
   });
 
+  it('gives the placeholder and the settled row one uncapped disclosure', async () => {
+    // The two branches paint the same copy, so the row cannot change height
+    // when the stored answer lands. No line count bounds that copy: a count
+    // that fits English clips the longer catalogs mid-sentence.
+    const deferred = Promise.withResolvers<{ mandatory: boolean; optional: boolean }>();
+    mockedReadConsent.mockReturnValue(deferred.promise);
+    const renderer = mountCard('review');
+    await act(async () => {
+      await Promise.resolve();
+    });
+    const placeholder = renderer.root.findAll(
+      n =>
+        typeof n.type === 'string' &&
+        (n.type as string) === 'ConfigureRow' &&
+        n.props.title === 'Help improve Kilo'
+    );
+    expect(placeholder).toHaveLength(1);
+    expect(placeholder[0]?.props.subtitleNumberOfLines).toBe('all');
+
+    await act(() => {
+      deferred.resolve({ mandatory: true, optional: true });
+    });
+    await act(flush);
+    // The settled row paints the same copy with no cap, so the two branches
+    // reserve the same height in every language.
+    const settled = renderer.root.findAll(
+      n =>
+        typeof n.type === 'string' &&
+        (n.type as string) === 'Text' &&
+        n.props.children === i18n.t('consent.helpImproveDescription')
+    );
+    expect(settled.length).toBeGreaterThan(0);
+    for (const node of settled) {
+      expect(node.props.numberOfLines).toBeUndefined();
+    }
+  });
+
   it('derives the pending phase from the account and the load phase together', () => {
     // `optionalIsPending` gates the switch placeholder: the b911 vr5 pre-load
     // state read as a completed revoke, so any render that has an account but
@@ -626,9 +663,6 @@ describe('ConsentCard', () => {
     await act(async () => {
       await Promise.resolve();
     });
-    // The dead-button finding: the pending card used to differ from a settled
-    // one by nothing a reader could see. The status line names the wait, so a
-    // disabled primary has its reason on screen.
     expect(texts(renderer.root)).toContain(i18n.t('consent.loadingConsentSettings'));
     expect(findButton(renderer.root, 'Accept and continue').props.disabled).toBe(true);
 
@@ -689,7 +723,7 @@ describe('ConsentCard', () => {
   it('holds the pending status while a stalled read keeps the card waiting', async () => {
     // The pre-bound state the finding reported: the read has not settled, so
     // the card names the wait and keeps the primary disabled until the bound
-    // or the read settles it (the bound itself is the timeout test above).
+    // or the read settles it (the bound itself is the timeout test below).
     const first = Promise.withResolvers<{ mandatory: boolean; optional: boolean }>();
     mockedReadConsent.mockReturnValueOnce(first.promise);
     const renderer = mountCard('onboarding');
@@ -828,7 +862,6 @@ describe('ConsentCard', () => {
   });
 
   it('clears error when optional toggle succeeds after a prior failure', async () => {
-    // First attempt: fail.
     mockedReadConsent.mockResolvedValue({ mandatory: true, optional: false });
     mockedSetOptionalConsent.mockRejectedValueOnce(new Error('write failed'));
     const renderer = mountCard('review');
@@ -841,7 +874,6 @@ describe('ConsentCard', () => {
     await act(flush);
     expect(texts(renderer.root)).toContain('Could not save your choice. Please try again.');
 
-    // Second attempt: succeed.
     mockedSetOptionalConsent.mockResolvedValueOnce(undefined);
     await act(async () => {
       await Promise.resolve();
@@ -979,9 +1011,6 @@ describe('ConsentCard', () => {
       if (!link) {
         throw new Error('privacy link not found');
       }
-      // A real 28dp box plus the vertical slop: the control-size audit reads
-      // the node's own rect, so the 14dp text line alone was reported as too
-      // small to tap, and the slop carries the 44pt region.
       // Test renderer props are untyped; name the two reads once.
       const props = link.props as {
         className?: string;

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import {
-  hasUndisplayableKilo2Assets,
   hasUnresolvedKilo2Assets,
+  hasIncompleteKilo2Assets,
   readKilo2Messages,
 } from './kilo2-source-messages';
 import type { NativeEvent, NativeSessionState } from './native-sync';
@@ -241,9 +241,6 @@ export function retryableGapCount(
   unresolvedMessageIDs: ReadonlySet<string>,
   projectionFailed: boolean
 ): number {
-  // The same identities the projector would have consumed: when the
-  // projection itself fails, none of them is a recoverable gap — recovery
-  // fills missing transports, not a broken projector.
   if (projectionFailed) {
     return new Set([
       ...messages.filter(item => item.incomplete).map(item => item.message.id),
@@ -260,37 +257,38 @@ export function retryableGapCount(
 /** Shared native display boundary. It never opens a socket or owns replay/recovery. */
 export function readNativeConversation(state: NativeSessionState): NativeConversation {
   const complete = state.messages.filter(item => !item.incomplete);
-  // No authorized bytes means no projection either way. A reference that a later
-  // snapshot may still authorize is a recovery gap and stays explicit; one that no
-  // snapshot can ever authorize is simply not displayed, as live and history do.
-  const undisplayable = complete.filter(item =>
-    hasUndisplayableKilo2Assets(item.message, state.assetURLs)
+  const unavailable = new Set(state.unavailableAssetKeys ?? []);
+  // A reference a later snapshot can still authorize withholds the message and is a
+  // recovery gap. A reference content storage was expected to provide only withholds its
+  // own file part: the message displays and its id stays reported, so the omission is
+  // never silent. An absolute `http(s)` reference is never fetched on purpose, so it is
+  // withheld from the display without being reported as missing content, unless the
+  // snapshot declared that key unavailable.
+  const blocked = complete.filter(item =>
+    hasUnresolvedKilo2Assets(item.message, state.assetURLs, unavailable)
   );
-  const unresolved = complete.filter(item =>
-    hasUnresolvedKilo2Assets(item.message, state.assetURLs)
+  const incompleteReferenced = complete.filter(item =>
+    hasIncompleteKilo2Assets(item.message, state.assetURLs, unavailable)
   );
   const incompleteMessageIDs = [
     ...new Set([
       ...state.messages.filter(item => item.incomplete).map(item => item.message.id),
       ...(state.pendingSnapshotMessageIDs ?? []),
-      ...unresolved.map(item => item.message.id),
+      ...blocked.map(item => item.message.id),
+      ...incompleteReferenced.map(item => item.message.id),
     ]),
   ];
   const session = state.session && withDisplayLocation(state.session);
   const last = state.messages.at(-1)?.message;
   let messages: SessionSnapshot['messages'] = [];
   let projectionError: string | undefined;
-  const unresolvedByProjection = new Set(unresolved.map(item => item.message.id));
+  const blockedIDs = new Set(blocked.map(item => item.message.id));
   if (session) {
     try {
       messages = readKilo2Messages(
         session,
-        complete
-          .filter(
-            item => !undisplayable.includes(item) && !unresolvedByProjection.has(item.message.id)
-          )
-          .map(item => item.message),
-        { assetURLs: state.assetURLs }
+        complete.filter(item => !blockedIDs.has(item.message.id)).map(item => item.message),
+        { assetURLs: state.assetURLs, unavailable }
       );
     } catch (error) {
       projectionError =
@@ -300,13 +298,10 @@ export function readNativeConversation(state: NativeSessionState): NativeConvers
           incompleteMessageIDs.push(item.message.id);
     }
   }
-  // Retryable gap count: parts the recovery snapshot can still fill. A
-  // projection failure is a real error below, not more gaps to charge the
-  // banner with.
   const recoveryGaps = retryableGapCount(
     state.messages,
     state.pendingSnapshotMessageIDs,
-    unresolvedByProjection,
+    blockedIDs,
     projectionError !== undefined
   );
   return {

@@ -91,6 +91,7 @@
     "draft": "Rasimu",
     "enabled": "Imewashwa",
     "github": "GitHub",
+    "image": "Picha",
     "imageUnavailable": "Picha haipatikani.",
     "loading": "Inapakia…",
     "loadMore": "Pakia zaidi",
@@ -122,10 +123,10 @@
     "connectProvider": "Unganisha mtoa huduma",
     "contentTruncated": "Maudhui yamepunguzwa",
     "copyLink": "Nakili kiungo",
+    "couldNotLoad": "Imeshindikana kupakia.",
+    "couldNotLoadMore": "Imeshindikana kupakia zaidi.",
     "couldNotLoadOrganizations": "Imeshindikana kupakia mashirika.",
     "couldNotLoadSessions": "Imeshindikana kupakia vikao.",
-    "couldnTLoad": "Imeshindikana kupakia.",
-    "couldnTLoadMore": "Imeshindikana kupakia zaidi.",
     "deviceSessions": "Vikao vya vifaa",
     "disabled": "Imezimwa",
     "email": "Barua pepe",
@@ -1592,7 +1593,7 @@
       "empty": "Hakuna ukaguzi wenye takwimu bado",
       "emptyDescription": "Takwimu hurekodi ukaguzi uliokamilika wakati imewashwa kwa shirika.",
       "offTitle": "Takwimu zimezimwa kwa {{platform}}",
-      "offDescription": "Majukumu ya bili ya shirika — wamiliki, wasimamizi na mameneja wa bili — yanaweza kuwasha takwimu katika mipangilio ya shirika kwenye wavuti ili kurekodi ukaguzi uliokamilika.",
+      "offDescription": "Majukumu ya bili ya shirika — wamiliki, wasimamizi na wasimamizi wa bili — yanaweza kuwasha takwimu katika mipangilio ya shirika kwenye wavuti ili kurekodi ukaguzi uliokamilika.",
       "couldNotLoad": "Imeshindwa kupakia takwimu",
       "trackedReviewsCaption": "Ukaguzi uliokamilika ulioisha katika kipindi hiki wakati takwimu zilikuwa zimewashwa. Ukaguzi unaoendelea na ulioshindikana hauhesabiwi kamwe.",
       "trackedReviewsUncounted": "Hauhesabiwi: {{displayCount}} kati ya ukaguzi {{displayTotal}} uliokamilika wa shirika, matokeo yake hayakurekodiwa.",
@@ -2661,6 +2662,7 @@
     "filePart": {
       "loadingImage": "Inapakia picha",
       "imageUnavailableRetry": "Picha haipatikani, jaribu tena kupakia",
+      "imageUnavailableRetryWithAlt": "Picha haipatikani, {{alt}}, jaribu tena kupakia",
       "imagePreviewUnavailableInSession": "Onyesho la awali la picha halipatikani kwenye kikao hiki.",
       "viewImage": "Tazama picha",
       "viewImageWithAlt": "Tazama picha {{alt}}",
@@ -3687,11 +3689,11 @@
       "pendingInvitation": "Barua pepe hii tayari ina mwaliko unaosubiri.",
       "alreadyMember": "Mtu huyu tayari ni mwanachama wa shirika hili.",
       "seatsFull": "Nafasi zote zinatumika ({{used}}/{{total}}). Muombe mmiliki wa shirika aongeze nafasi kabla ya kualika wanachama zaidi.",
-      "seatsFullCanInviteBilling": "Nafasi zote zinatumika ({{used}}/{{total}}). Bado unaweza kualika wasimamizi wa malipo, ambao hawatumii nafasi.",
+      "seatsFullCanInviteBilling": "Nafasi zote zinatumika ({{used}}/{{total}}). Bado unaweza kualika wasimamizi wa bili, ambao hawatumii nafasi.",
       "noSeatsAvailable": "Nafasi zote zinatumika. Muombe mmiliki wa shirika aongeze nafasi kabla ya kualika wanachama zaidi."
     },
     "invoices": {
-      "downloadA11y": "Pakua ankara {{number}}",
+      "downloadA11y": "Pakua ankara {{number}}, {{amount}}, {{date}}, {{status}}",
       "emptyDescription": "Ankara hutengenezwa kiotomatiki kila mzunguko wa bili na zitaonekana hapa shirika lako likishatozwa.",
       "emptyTitle": "Hakuna ankara",
       "invoiceFallback": "Ankara",
@@ -3771,7 +3773,6 @@
       "usageDetails": "Maelezo ya matumizi",
       "providersAndModels": "Watoa huduma na miundo",
       "groups": "Vikundi",
-      "guardrails": "Mipaka ya usalama",
       "byok": "Tumia ufunguo wako mwenyewe",
       "ssoAndDomain": "SSO na kikoa",
       "dataCollection": "Ukusanyaji wa data",
@@ -3891,7 +3892,7 @@
     "signupStepUpApple": "Ili kukamilisha kuunda akaunti yako, tumia '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Ili kukamilisha kuunda akaunti yako, tumia '$t(login.signInWithGoogle)'.",
     "signupStepUpBack": "Ili kukamilisha kuunda akaunti yako, rudi nyuma kisha utumie '$t(login.moreSignInOptions)'.",
-    "invalidCode": "Msimbo huo si sahihi au muda wake umeisha. Tafadhali jaribu tena au tumia '$t(login.resendCode)'.",
+    "invalidCode": "Msimbo huo si sahihi au muda wake umeisha. Tumia '$t(login.resendCode)' au '$t(login.moreSignInOptions)'.",
     "codeInProgress": "Msimbo wako unachakatwa. Subiri kidogo kisha ujaribu tena.",
     "tooManyAttempts": "Majaribio mengi mno. Tafadhali omba msimbo mpya.",
     "invalidToken": "Kuingia kumeshindikana. Tafadhali jaribu tena.",
@@ -4205,6 +4206,8 @@
       "discoveryNoModels": "Sehemu ya muunganisho haikuorodhesha modeli yoyote. Ingiza modeli mwenyewe.",
       "connectionIncomplete": "Modeli ilijibu lakini haikukamilisha. Jaribu tena, au angalia kitambulisho cha modeli na itifaki.",
       "invalidInput": "Weka jina la huduma, vichwa halali na angalau modeli moja yenye kitambulisho na jina la kipekee. Vikomo vya tokeni lazima viwe namba kamili kubwa kuliko sifuri.",
+      "invalidApiKey": "Ufunguo wa API una herufi ambayo haiwezi kutumwa. Tumia herufi, namba na alama za kawaida tu, bila mapumziko ya mstari.",
+      "invalidHeaders": "Kichwa maalumu hakiwezi kutumwa. Angalia jina lake na tumia herufi, namba na alama za kawaida tu, bila mapumziko ya mstari.",
       "invalidUrl": "Weka URL ya msingi ya API inayotumia HTTP au HTTPS bila taarifa za uthibitishaji, hoja ya utafutaji au kipande cha URL.",
       "publicHttp": "Sehemu za muunganisho za HTTP za umma haziruhusiwi. Tumia HTTPS au sehemu ya muunganisho ya ndani ya mtandao binafsi.",
       "httpApprovalRequired": "Idhinisha sehemu hii ya muunganisho ya HTTP ya ndani kabla ya kuhifadhi au kuunganisha.",
@@ -4339,7 +4342,15 @@
       "download": "Pakua modeli ya kwenye kifaa",
       "downloading": "Inapakua…",
       "downloadProgress": "Inapakua… {{percent}}%",
-      "downloadFailed": "Upakuaji haukukamilika. Angalia muunganisho wako na nafasi ya hifadhi, kisha ujaribu tena."
+      "downloadFailed": "Upakuaji haukukamilika. Angalia muunganisho wako na nafasi ya hifadhi, kisha ujaribu tena.",
+      "cannotUse": "Haiwezi kuendeshwa: {{items}}.",
+      "cannotUseOptions": "Haiwezi kujazwa: baadhi ya chaguo za kifaa.",
+      "limitations": "Vikwazo",
+      "tools": {
+        "time": "Muda",
+        "settingsList": "Onyesha mipangilio",
+        "settingsSet": "Badilisha mipangilio"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Modeli hii inaauni juhudi za kufikiri"
@@ -4518,6 +4529,7 @@
     "instructionSaveFailed": "Imeshindwa kuhifadhi elekezo",
     "instructionDeleteFailed": "Imeshindwa kufuta elekezo",
     "instructionToggleFailed": "Imeshindwa kusasisha elekezo",
+    "instructionViewTitle": "Faili ya elekezo",
     "instructionLimitReached": "Wasifu unaweza kubeba elekezo {{max}} kwa juu. Futa moja ili kuongeza nyingine.",
     "mcp": {
       "title": "seva za MCP",
@@ -4688,10 +4700,20 @@
     "history": {
       "activityUnavailable": "Imeshindwa kupakia shughuli za salio.",
       "appStoreReceipt": "Risiti kutoka App Store",
+      "deduction": {
+        "adminCancel": "Salio limefungwa na msimamizi",
+        "adminDebit": "Salio limeondolewa na msimamizi",
+        "codingPlan": "Mpango wa kuandika msimbo: {{plan}}",
+        "correction": "Marekebisho ya salio",
+        "dispute": "Mgogoro wa malipo",
+        "refundAppStore": "Marejesho ya fedha kwa pakiti ya salio kutoka App Store",
+        "refundGooglePlay": "Marejesho ya fedha kwa pakiti ya salio kutoka Google Play"
+      },
       "deductionFallback": "Makato ya salio",
       "emptyDescription": "Ununuzi wa salio, risiti na matumizi vitaonekana hapa.",
       "emptyTitle": "Hakuna historia ya salio",
       "expiredGrant": "Muda wake umeisha: {{description}}",
+      "expiredStatus": "Muda wake umeisha",
       "googlePlayReceipt": "Risiti kutoka Google Play",
       "kind": {
         "adjustment": "Marekebisho",
@@ -4718,7 +4740,8 @@
       "receiptA11y": "Fungua risiti ya {{description}}, {{amount}}, kutoka {{date}}",
       "receiptUnavailable": "Hakuna risiti ya ununuzi huu.",
       "retentionLimit": "Inaonyesha historia ya salio ya hivi karibuni.",
-      "voidedGrant": "Imebatilishwa: {{description}}"
+      "voidedGrant": "Imebatilishwa: {{description}}",
+      "voidedStatus": "Imebatilishwa"
     },
     "title": "Nunua salio",
     "description": "Salio ni ununuzi wa mara moja unaoongezwa kwenye usawa wako wa Kilo kwa kuendesha vikao vya kuandika msimbo kwa AI katika Kilo App. Duka hukutoza akaunti yako na salio huongezwa baada ya duka kuthibitisha malipo.",

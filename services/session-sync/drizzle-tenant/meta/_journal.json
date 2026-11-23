@@ -22,6 +22,13 @@
       "when": 1793881072261,
       "tag": "0002_creator_session_order",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1795437699492,
+      "tag": "0003_material_senator_kelly",
+      "breakpoints": true
     }
   ]
 }

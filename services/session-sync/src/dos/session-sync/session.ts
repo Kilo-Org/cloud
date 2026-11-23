@@ -1,14 +1,22 @@
-import { desc, eq } from 'drizzle-orm';
+import { asc, desc, eq, sql } from 'drizzle-orm';
 import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 
-import { receipts, session, sessionRoles, sessionStatus } from '../../db/sqlite-schema';
+import {
+  receipts,
+  session,
+  sessionRoles,
+  sessionSources,
+  sessionStatus,
+} from '../../db/sqlite-schema';
 import { sessionStatusSchema } from '../../protocol';
 import type {
   ErrorCode,
   Principal,
   Receipt,
+  SessionSource,
   SessionState,
   SessionStatus,
+  SourceClient,
   SyncError,
 } from '../../protocol';
 
@@ -100,6 +108,58 @@ export function toReceipt(sessionID: string, row: ReceiptRow): Receipt {
   };
 }
 
+/**
+ * Joined sources in join order. A session created before multi-source support
+ * may hold no row for its first source; that binding is synthesized from the
+ * immutable `session.source_id` so readers always see it.
+ */
+export function listSources(db: Db, meta: Meta): SessionSource[] {
+  const rows = db
+    .select()
+    .from(sessionSources)
+    .orderBy(
+      sql`${sessionSources.source_id} <> ${meta.source_id}`,
+      asc(sessionSources.joined_at),
+      asc(sessionSources.source_id)
+    )
+    .all();
+  const sources = rows.map(row => ({
+    sourceID: row.source_id,
+    client: row.client,
+    joinedAt: row.joined_at,
+  }));
+  if (!sources.some(source => source.sourceID === meta.source_id)) {
+    sources.unshift({ sourceID: meta.source_id, client: 'cli', joinedAt: meta.created_at });
+  }
+  return sources;
+}
+
+/** Whether `sourceID` may write to this session: the first source or a joined one. */
+export function isJoined(db: Db, meta: Meta, sourceID: string): boolean {
+  if (sourceID === meta.source_id) return true;
+  return (
+    db
+      .select({ source_id: sessionSources.source_id })
+      .from(sessionSources)
+      .where(eq(sessionSources.source_id, sourceID))
+      .get() !== undefined
+  );
+}
+
+/** Records a source once; re-joining keeps the original client and join time. */
+export function joinSource(db: Db, sourceID: string, client: SourceClient, now: number): void {
+  db.insert(sessionSources)
+    .values({ source_id: sourceID, client, joined_at: now })
+    .onConflictDoNothing()
+    .run();
+}
+
+/** Persists the first source of a session created before multi-source support. */
+export function seedFirstSource(db: Db): void {
+  const meta = load(db);
+  if (meta) joinSource(db, meta.source_id, 'cli', meta.created_at);
+}
+
 /** Reads the state a producer needs to recover; `lastReceipt` is the newest receipt. */
 export function toState(db: Db, meta: Meta): SessionState {
   const tenant =
@@ -123,6 +183,7 @@ export function toState(db: Db, meta: Meta): SessionState {
     deleted: false,
     creatorID: meta.creator_id,
     sourceID: meta.source_id,
+    sources: listSources(db, meta),
     position: meta.position,
     revision: meta.revision,
     batches: meta.batches,
@@ -139,15 +200,17 @@ export function toState(db: Db, meta: Meta): SessionState {
 }
 
 /**
- * Binds the session to its creator and source. A repeated registration by the
- * same creator and source is a no-op; it never replaces an existing binding.
+ * Binds the session to its creator and first source. A repeated registration
+ * by the same creator joins the source instead of replacing the binding; a
+ * tombstone is never revived.
  */
 export function register(
   db: Db,
   principal: Principal,
   sessionID: string,
   sourceID: string,
-  now: number
+  now: number,
+  client: SourceClient = 'cli'
 ): { created: boolean; state: SessionState } {
   const existing = load(db);
   if (existing) {
@@ -155,9 +218,8 @@ export function register(
     if (meta.deleted_at !== null) {
       raise('session_deleted', 'A deleted session cannot be registered again');
     }
-    if (meta.source_id !== sourceID) {
-      raise('source_conflict', 'The session is bound to another source');
-    }
+    joinSource(db, meta.source_id, 'cli', meta.created_at);
+    joinSource(db, sourceID, client, now);
     return { created: false, state: toState(db, meta) };
   }
   const row = {
@@ -181,6 +243,7 @@ export function register(
   };
   db.insert(session).values(row).run();
   db.insert(sessionRoles).values({ principal_id: principal.userID, role: 'owner' }).run();
+  joinSource(db, sourceID, client, now);
   return { created: true, state: toState(db, row) };
 }
 

@@ -21,7 +21,12 @@ function* pageChunks(
   for (let index = 0; index < rows.length; index++) {
     const row = rows[index];
     if (index > 0) yield ',';
-    const header = JSON.stringify({ kind: row.kind, id: row.id, revision: row.revision });
+    const header = JSON.stringify({
+      kind: row.kind,
+      id: row.id,
+      revision: row.revision,
+      sourceID: row.source_id,
+    });
     yield header.slice(0, -1);
     if (row.value !== null) {
       yield ',"value":';

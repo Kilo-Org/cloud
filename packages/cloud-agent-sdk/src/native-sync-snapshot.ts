@@ -74,7 +74,13 @@ const kindSchema = z.enum([
   'instruction-blob',
   'asset',
 ]);
-const entityHeader = { kind: kindSchema, id: idSchema, revision: positionSchema };
+const entityHeader = {
+  kind: kindSchema,
+  id: idSchema,
+  revision: positionSchema,
+  // Side tag of the row's last writer; absent from pages served before it existed.
+  sourceID: z.string().min(1).max(256).nullable().optional(),
+};
 const entitySchema = z.union([
   z.strictObject({ ...entityHeader, value: z.json() }),
   z.strictObject({

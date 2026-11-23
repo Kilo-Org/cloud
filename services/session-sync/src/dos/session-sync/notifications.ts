@@ -3,8 +3,23 @@ import { z } from 'zod';
 
 import { entities, sessionStatus } from '../../db/sqlite-schema';
 import type { SessionNotification } from '../../notifications/protocol';
-import type { statusRequestSchema, Principal, SessionStatus } from '../../protocol';
-import { KEY, load, raise, readStatus, update, writable, type Db, type Meta } from './session';
+import type {
+  statusRequestSchema,
+  Principal,
+  SessionListMetadata,
+  SessionStatus,
+} from '../../protocol';
+import {
+  KEY,
+  isJoined,
+  load,
+  raise,
+  readStatus,
+  update,
+  writable,
+  type Db,
+  type Meta,
+} from './session';
 
 export function setStatus(
   db: Db,
@@ -14,8 +29,8 @@ export function setStatus(
   now: number
 ): { status: SessionStatus; notification?: SessionNotification } {
   const meta = writable(db, principal, sessionID);
-  if (meta.source_id !== request.sourceID)
-    raise('source_conflict', 'The session source does not match');
+  if (!isJoined(db, meta, request.sourceID))
+    raise('source_conflict', 'The session source is not registered');
   const previous = readStatus(db);
   const version = previous?.version ?? 0;
   // A lost response can retry the same transition, but an older transition cannot replace a newer one.
@@ -51,7 +66,47 @@ export function setStatus(
   };
 }
 
+function cleanTitle(title: string): string {
+  return title.slice(0, 1024).replace(/[\uD800-\uDBFF]$/, '');
+}
+
 const titleSchema = z.object({ title: z.string().nullable().optional() });
+
+const listMetadataSchema = z.looseObject({
+  title: z.string().nullable().optional().catch(undefined),
+  origin: z
+    .looseObject({ directory: z.string().optional().catch(undefined) })
+    .optional()
+    .catch(undefined),
+  time: z
+    .looseObject({
+      updated: z.number().finite().nonnegative().optional().catch(undefined),
+      archived: z.unknown().optional(),
+    })
+    .optional()
+    .catch(undefined),
+});
+
+/**
+ * Extracts creator-index metadata from a `session` entity value. A field that
+ * does not parse is left out so the indexed value stays; `updatedAt` always
+ * resolves, to the batch commit time when `time.updated` is unusable.
+ */
+export function listMetadata(value: unknown, committedAt: number): SessionListMetadata {
+  const parsed = listMetadataSchema.safeParse(value);
+  if (!parsed.success) return { updatedAt: committedAt };
+  const { title, origin, time } = parsed.data;
+  return {
+    ...(title !== undefined ? { title: title === null ? null : cleanTitle(title) } : {}),
+    ...(origin?.directory !== undefined
+      ? { directory: origin.directory === '' ? null : origin.directory }
+      : {}),
+    updatedAt: time?.updated !== undefined ? Math.trunc(time.updated) : committedAt,
+    ...(time !== undefined
+      ? { archived: time.archived !== undefined && time.archived !== null }
+      : {}),
+  };
+}
 
 export function snapshot(
   db: Db,
@@ -69,8 +124,7 @@ export function snapshot(
   let title: string | null | undefined = meta.deleted_at === null ? undefined : null;
   if (entity?.value !== null && entity?.value !== undefined) {
     const parsed = titleSchema.safeParse(JSON.parse(entity.value));
-    if (parsed.success)
-      title = parsed.data.title?.slice(0, 1024).replace(/[\uD800-\uDBFF]$/, '') ?? null;
+    if (parsed.success) title = parsed.data.title == null ? null : cleanTitle(parsed.data.title);
   }
   return {
     version: 1,

@@ -1,5 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
-import { and, desc, eq, lt, or } from 'drizzle-orm';
+import { and, desc, eq, lt, or, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import { z } from 'zod';
@@ -12,6 +12,8 @@ import {
   fail,
   ok,
   sessionIDSchema,
+  sessionListMetadataSchema,
+  sourceClientSchema,
   tenantSchema,
   type Result,
   type Tenant,
@@ -45,6 +47,12 @@ export class SessionSyncTenantDO extends DurableObject<Env> {
     void ctx.blockConcurrencyWhile(async () => {
       await migrate(this.db, migrations);
       this.db.insert(usage).values({ id: 1, sessions: 0, bytes: 0 }).onConflictDoNothing().run();
+      // Rows created before list metadata sort by their creation time.
+      this.db
+        .update(createdSessions)
+        .set({ updated_at: sql`${createdSessions.created_at}` })
+        .where(eq(createdSessions.updated_at, 0))
+        .run();
       await erasure.schedule(this.db, ctx);
     });
   }
@@ -122,38 +130,73 @@ export class SessionSyncTenantDO extends DurableObject<Env> {
     return ok(null);
   }
 
+  async updateCreatedSession(input: unknown): Promise<Result<null>> {
+    const parsed = z
+      .strictObject({
+        tenant: tenantSchema,
+        sessionID: sessionIDSchema,
+        metadata: sessionListMetadataSchema,
+      })
+      .safeParse(input);
+    if (!parsed.success) return fail('invalid_request', 'Invalid session list metadata');
+    const { tenant, sessionID, metadata } = parsed.data;
+    this.db
+      .update(createdSessions)
+      .set({
+        ...(metadata.title !== undefined ? { title: metadata.title } : {}),
+        ...(metadata.directory !== undefined ? { directory: metadata.directory } : {}),
+        updated_at: metadata.updatedAt,
+        ...(metadata.archived !== undefined ? { archived: metadata.archived ? 1 : 0 } : {}),
+      })
+      .where(eq(createdSessions.target, JSON.stringify([tenant.type, tenant.id, sessionID])))
+      .run();
+    return ok(null);
+  }
+
   async listCreatedSessions(input: unknown) {
     const parsed = z
       .strictObject({
         limit: z.number().int().min(1).max(100),
         before: z
           .strictObject({
-            createdAt: z.number().int().nonnegative(),
+            updatedAt: z.number().int().nonnegative(),
             target: z.string().max(2048),
           })
           .optional(),
+        q: z.string().min(1).max(200).optional(),
+        client: sourceClientSchema.optional(),
+        directory: z.string().min(1).max(4096).optional(),
+        archived: z.boolean().optional(),
       })
       .safeParse(input);
     if (!parsed.success) return fail('invalid_request', 'Invalid session list page');
     if (this.db.select().from(userErasure).get()) {
       return ok({ items: [], next: null });
     }
-    const { before, limit } = parsed.data;
+    const { before, limit, q, client, directory, archived } = parsed.data;
+    const escaped = q?.toLowerCase().replace(/[\\%_]/g, character => `\\${character}`);
+    const conditions = [
+      before
+        ? or(
+            lt(createdSessions.updated_at, before.updatedAt),
+            and(
+              eq(createdSessions.updated_at, before.updatedAt),
+              lt(createdSessions.target, before.target)
+            )
+          )
+        : undefined,
+      escaped !== undefined
+        ? sql`lower(${createdSessions.title}) like ${`%${escaped}%`} escape '\\'`
+        : undefined,
+      client !== undefined ? eq(createdSessions.client, client) : undefined,
+      directory !== undefined ? eq(createdSessions.directory, directory) : undefined,
+      archived !== undefined ? eq(createdSessions.archived, archived ? 1 : 0) : undefined,
+    ].filter(condition => condition !== undefined);
     const rows = this.db
       .select()
       .from(createdSessions)
-      .where(
-        before
-          ? or(
-              lt(createdSessions.created_at, before.createdAt),
-              and(
-                eq(createdSessions.created_at, before.createdAt),
-                lt(createdSessions.target, before.target)
-              )
-            )
-          : undefined
-      )
-      .orderBy(desc(createdSessions.created_at), desc(createdSessions.target))
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(createdSessions.updated_at), desc(createdSessions.target))
       .limit(limit + 1)
       .all();
     const items = rows.slice(0, limit);
@@ -163,9 +206,14 @@ export class SessionSyncTenantDO extends DurableObject<Env> {
         sessionID: row.session_id,
         tenant: { type: row.tenant_type, id: row.tenant_id },
         createdAt: row.created_at,
+        updatedAt: row.updated_at,
+        title: row.title,
+        client: row.client,
+        directory: row.directory,
+        archived: row.archived === 1,
       })),
       next:
-        rows.length > limit && last ? { createdAt: last.created_at, target: last.target } : null,
+        rows.length > limit && last ? { updatedAt: last.updated_at, target: last.target } : null,
     });
   }
   async eraseUser(input: unknown): Promise<Result<null>> {

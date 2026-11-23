@@ -173,6 +173,7 @@ export class SessionSyncDO extends DurableObject<Env> {
   private async initialize(): Promise<void> {
     this.initialized ??= phase(this.env, 'syncInitialize', 'initialize', async () => {
       await migrate(this.db, migrations);
+      session.seedFirstSource(this.db);
       this.schemaReady = true;
       this.purgeRetryAt = (await this.ctx.storage.get<number>('purgeRetryAt')) ?? 0;
       this.relayUsed = (await this.ctx.storage.get<boolean>('relayUsed')) ?? false;
@@ -437,7 +438,14 @@ export class SessionSyncDO extends DurableObject<Env> {
       const existing = session.load(this.db);
       const prior = existing
         ? this.tx(() =>
-            session.register(this.db, principal, sessionID, request.sourceID, Date.now())
+            session.register(
+              this.db,
+              principal,
+              sessionID,
+              request.sourceID,
+              Date.now(),
+              request.client ?? 'cli'
+            )
           )
         : null;
       if (prior && !prior.ok) return prior;
@@ -451,6 +459,7 @@ export class SessionSyncDO extends DurableObject<Env> {
         getTenantStub(this.env, { type: 'user', id: principal.userID }).trackCreatedSession({
           principal,
           sessionID,
+          client: request.client ?? 'cli',
         })
       );
       if (!indexed.ok) return indexed;
@@ -489,7 +498,14 @@ export class SessionSyncDO extends DurableObject<Env> {
         return admitted;
       }
       const registered = this.tx(() =>
-        session.register(this.db, principal, sessionID, request.sourceID, Date.now())
+        session.register(
+          this.db,
+          principal,
+          sessionID,
+          request.sourceID,
+          Date.now(),
+          request.client ?? 'cli'
+        )
       );
       if (registered.ok) {
         if (registered.value.created)
@@ -644,8 +660,20 @@ export class SessionSyncDO extends DurableObject<Env> {
           Date.now(),
           work
         );
+        // The last session put in the batch holds the record the index shows.
+        let metadata;
+        if (meta) {
+          for (const change of batch.value.changes) {
+            if (change.op !== 'put' || change.kind !== 'session') continue;
+            metadata = notifications.listMetadata(
+              'value' in change ? change.value : undefined,
+              receipt.committedAt
+            );
+          }
+        }
         return {
           receipt,
+          metadata,
           notification: meta
             ? notifications.snapshot(this.db, 'session.updated', receipt.committedAt, meta)
             : undefined,
@@ -653,6 +681,20 @@ export class SessionSyncDO extends DurableObject<Env> {
       });
       if (!applied.ok) return applied;
       this.notify(principal.userID, applied.value.notification);
+      if (applied.value.metadata) {
+        // The batch is already committed; a failed index push leaves the list
+        // stale until the next session put, so it never fails this write.
+        const listed = await this.tenantCall(() =>
+          getTenantStub(this.env, { type: 'user', id: principal.userID }).updateCreatedSession({
+            tenant: principal.tenant,
+            sessionID,
+            metadata: applied.value.metadata,
+          })
+        );
+        if (!listed.ok) {
+          console.error('session-sync list metadata push failed', { code: listed.error.code });
+        }
+      }
       await phase(
         this.env,
         'applyBatch',

@@ -253,9 +253,13 @@ export const changeSchema = z
   );
 export type Change = z.infer<typeof changeSchema>;
 
+export const sourceClientSchema = z.enum(['cli', 'mobile', 'cloud-agent']);
+export type SourceClient = z.infer<typeof sourceClientSchema>;
+
 export const registerRequestSchema = z.strictObject({
   version: z.literal(1),
   sourceID: uuidSchema,
+  client: sourceClientSchema.optional(),
 });
 export type RegisterRequest = z.infer<typeof registerRequestSchema>;
 
@@ -354,6 +358,13 @@ export const receiptSchema = z.strictObject({
 });
 export type Receipt = z.infer<typeof receiptSchema>;
 
+export const sessionSourceSchema = z.strictObject({
+  sourceID: uuidSchema,
+  client: sourceClientSchema,
+  joinedAt: z.number().int(),
+});
+export type SessionSource = z.infer<typeof sessionSourceSchema>;
+
 export const liveStateSchema = z.strictObject({
   version: z.literal(1),
   sessionID: sessionIDSchema,
@@ -361,6 +372,7 @@ export const liveStateSchema = z.strictObject({
   deleted: z.literal(false),
   creatorID: z.string(),
   sourceID: uuidSchema,
+  sources: z.array(sessionSourceSchema),
   position: positionSchema,
   revision: revisionSchema,
   batches: z.number().int().min(0),
@@ -395,12 +407,14 @@ export const entitySchema = z.union([
     kind: kindSchema,
     id: entityIDSchema,
     revision: revisionSchema,
+    sourceID: uuidSchema.nullable(),
     value: jsonSchema,
   }),
   z.strictObject({
     kind: kindSchema,
     id: entityIDSchema,
     revision: revisionSchema,
+    sourceID: uuidSchema.nullable(),
     blob: blobRefSchema,
   }),
 ]);
@@ -415,6 +429,18 @@ export const pageSchema = z.strictObject({
   next: z.string().nullable(),
 });
 export type Page = z.infer<typeof pageSchema>;
+
+/**
+ * List-index metadata the session object pushes to the creator index after a
+ * batch puts the `session` entity. Absent fields keep their indexed values.
+ */
+export const sessionListMetadataSchema = z.strictObject({
+  title: z.string().nullable().optional(),
+  directory: z.string().nullable().optional(),
+  updatedAt: z.number().int().nonnegative(),
+  archived: z.boolean().optional(),
+});
+export type SessionListMetadata = z.infer<typeof sessionListMetadataSchema>;
 
 export const blobAckSchema = z.strictObject({
   version: z.literal(1),

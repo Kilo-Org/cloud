@@ -163,7 +163,7 @@ describe('claudeBillingRouter.sharePersonal', () => {
     });
   });
 
-  it('answers a lock-busy share with SERVICE_UNAVAILABLE', async () => {
+  it('answers a lock-busy share with TOO_MANY_REQUESTS', async () => {
     const user = await insertTestUser();
     const org = await createTestOrganization('Claude router busy share', user.id, 0);
     await seedConnectedPersonal(user.id);
@@ -173,7 +173,7 @@ describe('claudeBillingRouter.sharePersonal', () => {
       .mockRejectedValueOnce(new ClaudeBillingLockBusyError('claude_billing_grant:x'));
 
     await expect(caller.sharePersonal({ organizationId: org.id })).rejects.toMatchObject({
-      code: 'SERVICE_UNAVAILABLE',
+      code: 'TOO_MANY_REQUESTS',
       message: 'Claude billing is busy. Try again.',
     });
   });
@@ -371,14 +371,14 @@ describe('claudeBillingRouter.remove', () => {
     ).toMatchObject({ status: 'connected', user_profile_id: payer.user_profile_id });
   });
 
-  it('answers a lock-busy removal with SERVICE_UNAVAILABLE', async () => {
+  it('answers a lock-busy removal with TOO_MANY_REQUESTS', async () => {
     const { caller } = await connectedPersonalCaller();
     jest
       .mocked(unlinkAndRemoveClaudeBillingGrant)
       .mockRejectedValueOnce(new ClaudeBillingLockBusyError('claude_billing_grant:x'));
 
     await expect(caller.remove({})).rejects.toMatchObject({
-      code: 'SERVICE_UNAVAILABLE',
+      code: 'TOO_MANY_REQUESTS',
       message: 'Claude billing is busy. Try again.',
     });
   });

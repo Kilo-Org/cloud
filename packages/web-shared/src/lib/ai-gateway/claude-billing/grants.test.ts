@@ -903,8 +903,16 @@ describe('Claude billing grants', () => {
     // The key was collected by one restart; the next one cannot change the order.
     expect(attempts).toEqual([[], [repeatedKey]]);
     expect(warn.mock.calls).toEqual([
-      ['[claude-billing] lock retry cannot make progress: %s (after %d restarts)', repeatedKey, 1],
+      [
+        '[claude-billing] lock retry cannot make progress: %s namespace after %d restarts',
+        'grant',
+        1,
+      ],
     ]);
+    // The key carries a payer connection id, so the log reports the namespace only.
+    const logged = JSON.stringify(warn.mock.calls);
+    expect(logged).not.toContain('00000000-0000-4000-8000-0000000000ff');
+    expect(logged).not.toContain('claude_billing_');
     warn.mockRestore();
     expect(failure.lockKey).toBe(repeatedKey);
     expect(failure.message).toBe('Claude billing locks stayed busy; retry the request');

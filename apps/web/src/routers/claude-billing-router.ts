@@ -205,8 +205,10 @@ async function executeShare(
       });
     }
     if (error instanceof ClaudeBillingLockBusyError) {
+      // A distinct code from the unlink retry below, so the card's Anthropic
+      // unlink copy stays attached to that case only.
       throw new TRPCError({
-        code: 'SERVICE_UNAVAILABLE',
+        code: 'TOO_MANY_REQUESTS',
         message: 'Claude billing is busy. Try again.',
         cause: error,
       });
@@ -258,7 +260,7 @@ export const claudeBillingRouter = createTRPCRouter({
       const removal = await unlinkAndRemoveClaudeBillingGrant(owner).catch(error => {
         if (error instanceof ClaudeBillingLockBusyError) {
           throw new TRPCError({
-            code: 'SERVICE_UNAVAILABLE',
+            code: 'TOO_MANY_REQUESTS',
             message: 'Claude billing is busy. Try again.',
             cause: error,
           });

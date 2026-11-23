@@ -97,8 +97,6 @@ function outcomeMessage(outcome: string, scope: ClaudeBillingScope, connected: b
       return scope === 'organization'
         ? 'Only a Kilo organization owner or admin can link it.'
         : 'Claude linked billing is not available for this account.';
-    case 'busy':
-      return 'Claude is busy right now. Try again in a moment.';
     default:
       return 'We could not link your Claude organization. Try again.';
   }
@@ -417,7 +415,7 @@ function ClaudeBillingCardContent({
                       ? removeFailureCode === 'PRECONDITION_FAILED'
                         ? 'Kilo kept this Claude link. Unlink Kilo under Linked platforms in Claude Console, then remove it here again.'
                         : removeFailureCode === 'SERVICE_UNAVAILABLE'
-                          ? 'Kilo kept this Claude link. Try again.'
+                          ? 'Anthropic did not confirm the unlink, so Kilo kept this Claude link. Try again.'
                           : 'We could not remove your Claude link. Try again.'
                       : null
       }

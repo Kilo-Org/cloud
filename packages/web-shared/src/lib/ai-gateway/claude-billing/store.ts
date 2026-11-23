@@ -602,8 +602,8 @@ async function withClaudeBillingLockRetry<T>(
         extraLockKeys.size >= CLAUDE_BILLING_LOCK_ATTEMPT_CAP
       ) {
         console.warn(
-          '[claude-billing] lock retry cannot make progress: %s (after %d restarts)',
-          error.lockKey,
+          '[claude-billing] lock retry cannot make progress: %s namespace after %d restarts',
+          error.lockKey.startsWith('claude_billing_claim:') ? 'claim' : 'grant',
           extraLockKeys.size
         );
         throw new ClaudeBillingLockBusyError(error.lockKey);

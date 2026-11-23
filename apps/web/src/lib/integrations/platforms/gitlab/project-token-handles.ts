@@ -571,16 +571,34 @@ export async function removeStoredProjectAccessToken(
 /** Share one walk budget between the settlement and retirement walks. */
 export const PROJECT_TOKEN_WALK_BUDGET_MS = 20_000;
 
+/** What the mark statement did with one project the walk did not reach. */
+type UnreachedProjectOutcome =
+  /** Its row carried no marker and now does. */
+  | { projectId: string; outcome: 'marked' }
+  /** Its row already carried the marker, so it was left as it is. */
+  | { projectId: string; outcome: 'already-unusable' }
+  /** It holds only a metadata entry, so no row can carry a marker. */
+  | { projectId: string; outcome: 'no-credential' }
+  /** Its row belongs to the connected account, so it needs no marker. */
+  | { projectId: string; outcome: 'ignored' };
+
 /**
  * Marks the credentials the walk does not reach after the deadline, in one read
- * and one statement, so every project the walk lists is accounted for.
+ * and one statement, so every project the walk lists is accounted for. It
+ * reports what it did with each project, because the walk counts them as the
+ * loop would have: a project it marked or never could mark keeps a handle the
+ * walk did not settle, one already marked keeps a handle, and a project of the
+ * connected account is left alone.
  */
 async function markUnreachedProjectCredentialsUnusable(input: {
   integration: Pick<PlatformIntegration, 'id' | 'metadata'>;
   projectIds: readonly string[];
   currentAccountId: string;
-}): Promise<{ projectId: string; error: unknown }[]> {
-  if (input.projectIds.length === 0) return [];
+}): Promise<{
+  outcomes: UnreachedProjectOutcome[];
+  failures: { projectId: string; error: unknown }[];
+}> {
+  if (input.projectIds.length === 0) return { failures: [], outcomes: [] };
   const rows = await db
     .select({
       credentialId: platform_access_token_credentials.id,
@@ -597,6 +615,8 @@ async function markUnreachedProjectCredentialsUnusable(input: {
       )
     );
 
+  const rowsByProject = new Map(rows.map(row => [row.projectId ?? '', row]));
+  const outcomes: UnreachedProjectOutcome[] = [];
   const pending: {
     projectId: string;
     credentialId: string;
@@ -604,18 +624,26 @@ async function markUnreachedProjectCredentialsUnusable(input: {
     providerMetadata: Record<string, unknown>;
   }[] = [];
   const failures: { projectId: string; error: unknown }[] = [];
-  for (const row of rows) {
-    const projectId = row.projectId ?? '';
+  for (const projectId of input.projectIds) {
+    const row = rowsByProject.get(projectId);
+    if (row === undefined) {
+      outcomes.push({ projectId, outcome: 'no-credential' });
+      continue;
+    }
     const parsed = GitLabProjectAccessTokenMetadataSchema.safeParse(row.providerMetadata);
     if (!parsed.success) {
       failures.push({ projectId, error: parsed.error });
       continue;
     }
-    if (parsed.data.unusableReason !== undefined) continue;
+    if (parsed.data.unusableReason !== undefined) {
+      outcomes.push({ projectId, outcome: 'already-unusable' });
+      continue;
+    }
     if (
       parsed.data.authorizedAccountId === input.currentAccountId &&
       readLegacyProjectTokenId(input.integration.metadata, projectId) === null
     ) {
+      outcomes.push({ projectId, outcome: 'ignored' });
       continue;
     }
     pending.push({
@@ -625,7 +653,7 @@ async function markUnreachedProjectCredentialsUnusable(input: {
       providerMetadata: { ...parsed.data, unusableReason: 'account-changed' },
     });
   }
-  if (pending.length === 0) return failures;
+  if (pending.length === 0) return { failures, outcomes };
 
   const validatedAt = new Date().toISOString();
   const updated = await db.execute<{ id: string; credential_version: number }>(sql`
@@ -650,11 +678,13 @@ async function markUnreachedProjectCredentialsUnusable(input: {
   // credential was replaced between the read and this statement.
   const marked = new Set(updated.rows.map(row => `${row.id}:${row.credential_version}`));
   for (const entry of pending) {
-    if (!marked.has(`${entry.credentialId}:${entry.credentialVersion}`)) {
-      failures.push({ projectId: entry.projectId, error: new ProjectCredentialReplacedError() });
+    if (marked.has(`${entry.credentialId}:${entry.credentialVersion}`)) {
+      outcomes.push({ projectId: entry.projectId, outcome: 'marked' });
+      continue;
     }
+    failures.push({ projectId: entry.projectId, error: new ProjectCredentialReplacedError() });
   }
-  return failures;
+  return { failures, outcomes };
 }
 
 /**
@@ -752,20 +782,35 @@ export async function retireProjectCredentialsForReplacedAccount(input: {
   }
 
   if (unreachedProjectIds.length > 0) {
-    retained += unreachedProjectIds.length;
-    skipped += unreachedProjectIds.length;
-    const failures = await markUnreachedProjectCredentialsUnusable({
+    const marked = await markUnreachedProjectCredentialsUnusable({
       integration: input.integration,
       projectIds: unreachedProjectIds,
       currentAccountId: input.currentAccountId,
-    }).catch(error => unreachedProjectIds.map(projectId => ({ projectId, error })));
-    for (const failure of failures) {
+    }).catch(error => ({
+      failures: unreachedProjectIds.map(projectId => ({ projectId, error })),
+      outcomes: [] as UnreachedProjectOutcome[],
+    }));
+    for (const failure of marked.failures) {
       logExceptInTest('[retireProjectCredentialsForReplacedAccount] Unusable marker not stored', {
         integrationId: input.integration.id,
         projectId: failure.projectId,
         error: failure.error instanceof Error ? failure.error.message : String(failure.error),
       });
     }
+    // A project of the connected account needs no marker, so it is left out of
+    // both counts exactly as the loop leaves it out above. Every other project
+    // the walk did not settle keeps its handle, including one whose marker did
+    // not store.
+    const ignoredProjectIds = new Set(
+      marked.outcomes
+        .filter(outcome => outcome.outcome === 'ignored')
+        .map(outcome => outcome.projectId)
+    );
+    const countedProjectIds = unreachedProjectIds.filter(
+      projectId => !ignoredProjectIds.has(projectId)
+    );
+    retained += countedProjectIds.length;
+    skipped += countedProjectIds.length;
   }
 
   logExceptInTest('[retireProjectCredentialsForReplacedAccount] Retirement finished', {

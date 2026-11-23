@@ -1,8 +1,8 @@
 /* eslint-disable typescript-eslint/require-await, require-await, promise-function-async, promise/prefer-await-to-then -- a download is a pending promise the test settles by hand */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { CATALOG, finish, flush, harness, taskAt } from './gguf-downloads.test-helpers';
-import { ggufModelName, type GgufModelRecord, ggufPartialName } from './gguf-records';
+import { ggufModelName, type GgufModelRecord, ggufPartialName, RELEASE_WAIT_MS } from './gguf-records';
 
 describe('downloading a curated model', () => {
   it('reports progress, verifies the file, and lists what the file says', async () => {
@@ -338,5 +338,23 @@ describe('deleting a model', () => {
     const h = harness();
     await h.store.remove('missing');
     expect(h.released).toEqual([]);
+  });
+
+  it('deletes the files anyway when the release never settles', async () => {
+    const h = harness({ stallRelease: true });
+    h.store.start(CATALOG);
+    await finish(taskAt(h.tasks, 0), 1000);
+    // Installed only around the delete: the download above awaits a real timer.
+    vi.useFakeTimers();
+    try {
+      const removed = h.store.remove('small');
+      await vi.advanceTimersByTimeAsync(RELEASE_WAIT_MS);
+      await removed;
+      expect(h.released).toEqual(['small']);
+      expect(h.files.has(ggufModelName('small'))).toBe(false);
+      expect(h.store.snapshot().models).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

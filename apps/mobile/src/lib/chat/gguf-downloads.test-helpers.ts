@@ -51,6 +51,8 @@ export function harness(
     readonly sizeFails?: string;
     /** The transfer number whose open the device refuses; 1 is the first. */
     readonly createDownloadFailsAt?: number;
+    /** A release that never settles: the delete must not wait for it forever. */
+    readonly stallRelease?: boolean;
   } = {}
 ) {
   const freeBytes = options.freeBytes ?? 8_000_000_000;
@@ -179,6 +181,12 @@ export function harness(
     },
     release: async fileId => {
       released.push(fileId);
+      if (options.stallRelease !== true) {
+        return;
+      }
+      /* A native release that never answers: the delete must bound it, since
+         the person asked for the files to go and cannot reclaim them otherwise. */
+      await new Promise<void>(() => undefined);
     },
   });
   return { store, files, index, tasks, inspected, projectors, released, hashed };

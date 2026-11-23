@@ -1,4 +1,5 @@
 import {
+  awaitTeardown,
   type GgufDownloadProblem,
   type GgufDownloadSource,
   type GgufDownloadsSnapshot,
@@ -350,7 +351,13 @@ export function ggufDownloads({
       if (record === undefined) {
         return;
       }
-      await release(fileId);
+      /* The release is awaited so no context holds a file that is about to go,
+         but it is bounded the way a load bounds it: a native release that never
+         settles must not hold the delete open forever, because the person asked
+         for the files to go and has no other way to reclaim the space. A
+         stalled release stays pending on its own, which is what still keeps a
+         second context from opening beside it. */
+      await awaitTeardown(release(fileId));
       // A file already gone does not keep the list entry.
       for (const name of recordFileNames(record)) {
         removeQuietly(storage, name);

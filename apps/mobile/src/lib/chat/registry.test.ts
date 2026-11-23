@@ -1418,6 +1418,8 @@ describe('a question with images', () => {
       model: 'kilo/one',
       effort: null,
       images: [image],
+      // A chat's first question is anchored at the start of the conversation.
+      after: 0,
       failureKey: null,
     });
   });
@@ -2032,6 +2034,147 @@ describe('a question a later send took the slot from', () => {
     expect(held.displaced).toEqual([]);
     expect(asMessages(held).map(one => one.info.id)).toEqual(['trn_9', 'trn_10']);
     expect(await askedIn('answered')).toBeNull();
+  });
+
+  it('folds a plain question record whose answer is the newest stored question turn', async () => {
+    storedHistory = [];
+    await releaseChat(opened);
+    storedChat('first-answer', place);
+    /* A chat's first question is recorded with no kept copy to name, and its
+       answer is the newest question turn the conversation holds. A process that
+       stopped before the record was cleared leaves it behind to be folded. */
+    storedHistory = [
+      {
+        id: 'trn_20',
+        sessionId: 'first-answer',
+        role: 'user',
+        parts: [{ id: 'p1', kind: 'text', body: 'what is this' }],
+      },
+      {
+        id: 'trn_21',
+        sessionId: 'first-answer',
+        role: 'assistant',
+        parts: [{ id: 'p2', kind: 'text', body: 'the answer' }],
+      },
+    ];
+    storedQuestions.set(
+      'chat-asked-target:first-answer',
+      JSON.stringify({
+        text: 'what is this',
+        model: 'kilo/one',
+        effort: null,
+        images: [],
+        after: 0,
+      })
+    );
+
+    await enterChat(place, 'first-answer');
+    await settled();
+
+    const held = snapshotOf('first-answer');
+    // The answer is the transcript; no pending bubble stands beside it.
+    expect(held.asked).toBeNull();
+    expect(held.displaced).toEqual([]);
+    expect(asMessages(held).map(one => one.info.id)).toEqual(['trn_20', 'trn_21']);
+    expect(await askedIn('first-answer')).toBeNull();
+  });
+
+  it('does not fold a plain record whose newest question turn is a different one', async () => {
+    storedHistory = [];
+    await releaseChat(opened);
+    storedChat('other-newest', place);
+    /* The record's words are stored, but a different question was asked after
+       them and answered: the newest question turn is not this attempt's answer. */
+    storedHistory = [
+      {
+        id: 'trn_22',
+        sessionId: 'other-newest',
+        role: 'user',
+        parts: [{ id: 'p1', kind: 'text', body: 'what is this' }],
+      },
+      {
+        id: 'trn_23',
+        sessionId: 'other-newest',
+        role: 'assistant',
+        parts: [{ id: 'p2', kind: 'text', body: 'the first answer' }],
+      },
+      {
+        id: 'trn_24',
+        sessionId: 'other-newest',
+        role: 'user',
+        parts: [{ id: 'p3', kind: 'text', body: 'and this' }],
+      },
+      {
+        id: 'trn_25',
+        sessionId: 'other-newest',
+        role: 'assistant',
+        parts: [{ id: 'p4', kind: 'text', body: 'the second answer' }],
+      },
+    ];
+    storedQuestions.set(
+      'chat-asked-target:other-newest',
+      JSON.stringify({
+        text: 'what is this',
+        model: 'kilo/one',
+        effort: null,
+        images: [],
+        after: 0,
+      })
+    );
+
+    await enterChat(place, 'other-newest');
+    await settled();
+
+    // The attempt has no answer of its own, so its bubble and Retry are drawn.
+    const held = snapshotOf('other-newest');
+    expect(held.asked).toBe('what is this');
+    expect(held.displaced).toEqual([]);
+    expect(asMessages(held).map(one => one.info.id)).toEqual([
+      'trn_22',
+      'trn_23',
+      'trn_24',
+      'trn_25',
+      'other-newest:asked',
+    ]);
+    expect((await askedIn('other-newest'))?.text).toBe('what is this');
+  });
+
+  it('does not fold a plain record when the only stored question is a different one', async () => {
+    storedHistory = [];
+    await releaseChat(opened);
+    storedChat('plain-repeat', place);
+    /* The record is anchored at the start of the conversation, and the one
+       question the conversation holds is a different one, answered before this
+       attempt was asked: its answer is not this attempt's. */
+    storedHistory = [
+      {
+        id: 'trn_26',
+        sessionId: 'plain-repeat',
+        role: 'user',
+        parts: [{ id: 'p1', kind: 'text', body: 'the earlier question' }],
+      },
+      {
+        id: 'trn_27',
+        sessionId: 'plain-repeat',
+        role: 'assistant',
+        parts: [{ id: 'p2', kind: 'text', body: 'the earlier answer' }],
+      },
+    ];
+    storedQuestions.set(
+      'chat-asked-target:plain-repeat',
+      JSON.stringify({ text: 'hi', model: 'kilo/one', effort: null, images: [], after: 0 })
+    );
+
+    await enterChat(place, 'plain-repeat');
+    await settled();
+
+    const held = snapshotOf('plain-repeat');
+    expect(held.asked).toBe('hi');
+    expect(asMessages(held).map(one => one.info.id)).toEqual([
+      'trn_26',
+      'trn_27',
+      'plain-repeat:asked',
+    ]);
   });
 
   it('does not fold a later attempt that repeats an earlier answered question', async () => {
@@ -3432,6 +3575,8 @@ describe('custom backend question targets', () => {
       model: target,
       effort: null,
       images: [],
+      // The chat's first question is anchored at the start of the conversation.
+      after: 0,
       failureKey: 'common.somethingWentWrong',
     });
 
@@ -3538,6 +3683,8 @@ describe('custom backend question targets', () => {
       model: target,
       effort: null,
       images: [],
+      // The chat's first question is anchored at the start of the conversation.
+      after: 0,
       failureKey: 'common.somethingWentWrong',
     });
 
@@ -3569,6 +3716,8 @@ describe('custom backend question targets', () => {
       model: 'kilo/one',
       effort: null,
       images: [],
+      // Nothing was answered, so the new question is anchored at the start too.
+      after: 0,
       failureKey: null,
     });
     finish?.();

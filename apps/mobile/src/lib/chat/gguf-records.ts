@@ -157,6 +157,31 @@ export async function attempt<T>(call: () => Promise<T>): Promise<Settled<T>> {
  */
 export const STORAGE_HEADROOM_BYTES = 512 * 1024 * 1024;
 
+/**
+ * How long anything waits for a native teardown. A release that never settles
+ * would otherwise leave every later load spinning with no failure row, while
+ * the stalled teardown stays pending so no second context opens beside it. A
+ * deletion waits on the same release, so the budget is shared.
+ */
+export const RELEASE_WAIT_MS = 30_000;
+
+/**
+ * Waits for `teardown`, and reports whether `RELEASE_WAIT_MS` passed without
+ * it: the promise itself is left running, since a context may still be freeing.
+ */
+export async function awaitTeardown(teardown: Promise<void>): Promise<'settled' | 'stalled'> {
+  const stalled = Symbol('teardown stalled');
+  const { promise, resolve } = Promise.withResolvers<symbol>();
+  const timer = setTimeout(() => {
+    resolve(stalled);
+  }, RELEASE_WAIT_MS);
+  try {
+    return (await Promise.race([teardown, promise])) === stalled ? 'stalled' : 'settled';
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export const ggufModelName = (fileId: string) => `${fileId}.gguf`;
 
 /** A partial download is never resumed across launches, so its name is not a model's. */

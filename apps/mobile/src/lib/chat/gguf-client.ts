@@ -9,8 +9,11 @@ import { Cause, Effect, Queue, Stream } from 'effect';
 import { type ContextParams, type LlamaContext, type TokenData } from 'llama.rn';
 
 import { LocalModelError, type LocalModelProblem } from './local-model-error';
-import { attempt, type GgufModelFile, settled } from './gguf-records';
+import { attempt, awaitTeardown, type GgufModelFile, settled } from './gguf-records';
 import { answerOf, type CompletionResult, paramsOf, readCompletion, stopOf } from './gguf-template';
+
+/** The teardown budget lives with the other record helpers; re-exported so a client caller keeps one import. */
+export { RELEASE_WAIT_MS } from './gguf-records';
 
 /** The part of a llama.rn context this client drives. */
 export type GgufContext = Pick<
@@ -73,30 +76,6 @@ function failure(problem: LocalModelProblem, started: boolean): ModelError {
     reason: started ? 'stream' : 'unsupported',
     cause: new LocalModelError(problem),
   });
-}
-
-/**
- * How long a load waits for a teardown. A native release that never settles
- * would otherwise leave every later send spinning with no failure row, while
- * the stalled teardown stays pending so no second context opens beside it.
- */
-export const RELEASE_WAIT_MS = 30_000;
-
-/**
- * Waits for `teardown`, and reports whether `RELEASE_WAIT_MS` passed without
- * it: the promise itself is left running, since a context may still be freeing.
- */
-async function waitForTeardown(teardown: Promise<void>): Promise<'settled' | 'stalled'> {
-  const stalled = Symbol('teardown stalled');
-  const { promise, resolve } = Promise.withResolvers<symbol>();
-  const timer = setTimeout(() => {
-    resolve(stalled);
-  }, RELEASE_WAIT_MS);
-  try {
-    return (await Promise.race([teardown, promise])) === stalled ? 'stalled' : 'settled';
-  } finally {
-    clearTimeout(timer);
-  }
 }
 
 /**
@@ -269,7 +248,7 @@ export function ggufModelClient({
     // A teardown that never settles rejects this load rather than waiting
     // forever, which takes the caller's `unavailable` path; the teardown itself
     // stays pending, so it still keeps the next context from opening beside it.
-    if ((await waitForTeardown(teardown)) === 'stalled') {
+    if ((await awaitTeardown(teardown)) === 'stalled') {
       stalledGeneration = generation;
       throw new Error('teardown stalled');
     }

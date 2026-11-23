@@ -978,7 +978,10 @@ async function askInTurn(
       model,
       effort,
       images,
-      ...(before.turns.length === 0 ? {} : { after: before.turns.length }),
+      /* Stated for every question, a chat's first included: an open compares it
+         with the newest stored question turn, so a repeat of the same words
+         answered later is not read as this attempt's answer. */
+      after: before.turns.length,
       ...(from == null ? {} : { from }),
     });
     current = await ontoForUse(current, { model, effort }, held);
@@ -1274,27 +1277,31 @@ function withoutAnswered(
  * The kept questions and the slot record an open should draw, given what the
  * store actually holds.
  *
- * A question asked again leaves two records while its answer is on its way: the
- * slot's, and the kept one its bubble is drawn from. When the answer lands the
- * kept record goes first and the slot's second, so a write that was refused — or
- * a process that stopped between them — can leave either record behind. A stored
- * turn with that question's words is what says the answer landed, so both of its
- * records are stale and the open drops them rather than drawing a failed bubble
- * beside the answer.
+ * A question leaves its slot record while an answer to it is on its way, and it
+ * is cleared once that answer lands. A refused delete, or a process that
+ * stopped between the stored turn landing and that removal, leaves the record
+ * behind while the conversation already holds the answer. The same is true of a
+ * question asked again, which also leaves the kept record its bubble is drawn
+ * from: that one goes first and the slot's second, so either can be left over.
+ * A stored turn with that question's words is what says the answer landed, so
+ * the record is stale and the open drops it rather than drawing a pending copy
+ * of an answered question with a live Retry.
  *
  * The match is anchored where the question was asked: an answer is a question
  * turn after the turns the conversation already held, and it is the newest one,
- * because a retry is always the newest ask. That is what tells a repeat of the
- * same words from the attempt that was answered earlier — and it is why a turn
- * of tool results, which is stored as a user turn with no text, is not a
- * question.
+ * because asking again is always the newest ask. That is what tells a repeat of
+ * the same words from the attempt that was answered earlier — and it is why a
+ * turn of tool results, which is stored as a user turn with no text, is not a
+ * question. A record written before the anchor existed has none, and is read as
+ * asked at the start of the conversation, which is the strictest match it can
+ * support.
  */
 function settledRecords(turns: readonly Turn[], asked: Asked | null, kept: readonly Displaced[]) {
-  const from = asked?.from;
-  if (asked == null || from == null) {
+  if (asked == null) {
     return { asked, kept };
   }
-  const named = kept.find(one => one.id === from);
+  const from = asked.from ?? null;
+  const named = from === null ? undefined : kept.find(one => one.id === from);
   const anchor = Math.max(named?.afterTurns ?? 0, asked.after ?? 0);
   const newest = newestQuestionTurn(turns);
   const answered =
@@ -1388,7 +1395,14 @@ async function settle(
          drew. The next write of the list leaves one record behind. */
     }
   } else {
-    await forgetAsked(sessionId);
+    try {
+      await forgetAsked(sessionId);
+    } catch {
+      /* The answer landed, so the record is stale rather than needed: an open
+         folds it against the stored turn, and a refused delete costs nothing
+         here. The answer still settles below, so the chat leaves `working` and
+         the question waiting behind it is still asked. */
+    }
   }
   chat.answering = undefined;
   if (failure !== null) {

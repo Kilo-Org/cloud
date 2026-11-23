@@ -2544,7 +2544,126 @@ describe('GitLab encrypted credential persistence', () => {
     );
   });
 
-  it('stops retiring project credentials once the account-change deadline is spent', async () => {
+  it('retires a project credential of another account on account change', async () => {
+    const user = await insertTestUser();
+    const connected = await connectWithPAT(
+      { type: 'user', id: user.id },
+      'glpat-primary-token',
+      'https://gitlab.com',
+      user.id
+    );
+    const [integration] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integration.id));
+    await db.insert(platform_access_token_credentials).values({
+      platform_integration_id: integration.id,
+      token_encrypted: 'encrypted-project-42-token',
+      provider_credential_type: 'project_access_token',
+      provider_resource_id: '42',
+      provider_base_url: 'https://gitlab.com',
+      provider_metadata: {
+        providerCredentialId: '555',
+        expiresOn: '2027-07-13',
+        authorizedAccountId: '101',
+        unusableReason: 'account-changed',
+      },
+    });
+
+    await expect(getOrCreateProjectAccessToken(integration, 42, { userId: user.id })).resolves.toBe(
+      'glpat-created-project-token'
+    );
+
+    expect(mockRevokeProjectAccessToken).toHaveBeenCalledTimes(1);
+    expect(mockRevokeProjectAccessToken).toHaveBeenCalledWith(
+      'glpat-primary-token',
+      '42',
+      555,
+      'https://gitlab.com'
+    );
+    expect(mockCreateProjectAccessToken).toHaveBeenCalledTimes(1);
+    const credentials = await db
+      .select()
+      .from(platform_access_token_credentials)
+      .where(
+        and(
+          eq(platform_access_token_credentials.platform_integration_id, integration.id),
+          eq(platform_access_token_credentials.provider_credential_type, 'project_access_token')
+        )
+      );
+    expect(credentials).toEqual([
+      expect.objectContaining({
+        provider_resource_id: '42',
+        credential_version: 1,
+        provider_metadata: {
+          providerCredentialId: '777',
+          expiresOn: '2027-07-13',
+          authorizedAccountId: '123',
+        },
+      }),
+    ]);
+  });
+
+  it('retires the credential before writing a new row for the project', async () => {
+    const user = await insertTestUser();
+    const connected = await connectWithPAT(
+      { type: 'user', id: user.id },
+      'glpat-primary-token',
+      'https://gitlab.com',
+      user.id
+    );
+    const [integration] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integration.id));
+    await db.insert(platform_access_token_credentials).values({
+      platform_integration_id: integration.id,
+      token_encrypted: 'encrypted-project-42-token',
+      provider_credential_type: 'project_access_token',
+      provider_resource_id: '42',
+      provider_base_url: 'https://gitlab.com',
+      provider_metadata: {
+        providerCredentialId: '555',
+        expiresOn: '2027-07-13',
+        authorizedAccountId: '101',
+        unusableReason: 'account-changed',
+      },
+    });
+    mockRevokeProjectAccessToken.mockRejectedValueOnce(
+      new GitLabProjectAccessTokenPermissionError(
+        42,
+        403,
+        'Insufficient permissions to revoke Project Access Token for project 42.'
+      )
+    );
+
+    await expect(getOrCreateProjectAccessToken(integration, 42, { userId: user.id })).resolves.toBe(
+      'glpat-created-project-token'
+    );
+
+    expect(mockRevokeProjectAccessToken).toHaveBeenCalledTimes(1);
+    const credentials = await db
+      .select()
+      .from(platform_access_token_credentials)
+      .where(
+        and(
+          eq(platform_access_token_credentials.platform_integration_id, integration.id),
+          eq(platform_access_token_credentials.provider_credential_type, 'project_access_token')
+        )
+      );
+    expect(credentials).toEqual([
+      expect.objectContaining({
+        provider_resource_id: '42',
+        provider_metadata: {
+          providerCredentialId: '777',
+          expiresOn: '2027-07-13',
+          authorizedAccountId: '123',
+        },
+      }),
+    ]);
+  });
+
+  it('marks the remaining credentials after the account-change deadline', async () => {
     const user = await insertTestUser();
     const connected = await connectWithPAT(
       { type: 'user', id: user.id },
@@ -2590,6 +2709,18 @@ describe('GitLab encrypted credential persistence', () => {
           authorizedAccountId: '101',
         },
       },
+      {
+        platform_integration_id: integration.id,
+        token_encrypted: 'encrypted-project-44-token',
+        provider_credential_type: 'project_access_token',
+        provider_resource_id: '44',
+        provider_base_url: 'https://gitlab.com',
+        provider_metadata: {
+          providerCredentialId: '999',
+          expiresOn: '2027-07-13',
+          authorizedAccountId: '101',
+        },
+      },
     ]);
     const controller = new AbortController();
     mockRevokeProjectAccessToken.mockImplementation(async () => {
@@ -2606,7 +2737,7 @@ describe('GitLab encrypted credential persistence', () => {
         currentAccountId: '202',
         signal: controller.signal,
       })
-    ).resolves.toEqual({ retired: 1, retained: 1, skipped: 1 });
+    ).resolves.toEqual({ retired: 1, retained: 2, skipped: 2 });
 
     expect(mockRevokeProjectAccessToken).toHaveBeenCalledTimes(1);
     expect(mockRevokeProjectAccessToken).toHaveBeenCalledWith(
@@ -2625,13 +2756,19 @@ describe('GitLab encrypted credential persistence', () => {
           eq(platform_access_token_credentials.provider_credential_type, 'project_access_token')
         )
       );
-    expect(credentials.map(credential => credential.provider_resource_id)).toEqual(['43']);
-    expect(credentials[0].provider_metadata).toEqual({
-      providerCredentialId: '888',
-      expiresOn: '2027-07-13',
-      authorizedAccountId: '101',
-      unusableReason: 'account-changed',
-    });
+    expect(
+      credentials
+        .map(credential => credential.provider_resource_id)
+        .sort((left, right) => Number(left) - Number(right))
+    ).toEqual(['43', '44']);
+    for (const credential of credentials) {
+      expect(credential.provider_metadata).toEqual(
+        expect.objectContaining({
+          unusableReason: 'account-changed',
+          authorizedAccountId: '101',
+        })
+      );
+    }
   });
 
   it('leaves a project credential the provider already refused alone on a later account change', async () => {

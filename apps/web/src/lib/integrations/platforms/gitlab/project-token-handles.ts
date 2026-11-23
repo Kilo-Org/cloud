@@ -1,11 +1,14 @@
 import 'server-only';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { platform_access_token_credentials, type PlatformIntegration } from '@kilocode/db/schema';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
-import { GitLabProjectAccessTokenCredentialRowSchema } from '@kilocode/worker-utils/gitlab-credential';
+import {
+  GitLabProjectAccessTokenCredentialRowSchema,
+  GitLabProjectAccessTokenMetadataSchema,
+} from '@kilocode/worker-utils/gitlab-credential';
 import { revokeProjectAccessToken } from './adapter';
 import { normalizeGitLabInstanceUrl } from './instance-url';
 import {
@@ -565,12 +568,92 @@ export async function removeStoredProjectAccessToken(
   return { outcome: 'removed' };
 }
 
+/** Share one walk budget between the settlement and retirement walks. */
+export const PROJECT_TOKEN_WALK_BUDGET_MS = 20_000;
+
 /**
- * Time the account-change walk may spend revoking project tokens. The walk runs
- * inside the connect request that replaced the account, so it is bounded like
- * the settlement walk of the same request.
+ * Marks the credentials the walk does not reach after the deadline, in one read
+ * and one transaction, so every project the walk lists is accounted for.
  */
-const REPLACED_ACCOUNT_RETIREMENT_BUDGET_MS = 20_000;
+async function markUnreachedProjectCredentialsUnusable(input: {
+  integration: Pick<PlatformIntegration, 'id' | 'metadata'>;
+  projectIds: readonly string[];
+  currentAccountId: string;
+}): Promise<{ projectId: string; error: unknown }[]> {
+  if (input.projectIds.length === 0) return [];
+  const rows = await db
+    .select({
+      credentialId: platform_access_token_credentials.id,
+      credentialVersion: platform_access_token_credentials.credential_version,
+      projectId: platform_access_token_credentials.provider_resource_id,
+      providerMetadata: platform_access_token_credentials.provider_metadata,
+    })
+    .from(platform_access_token_credentials)
+    .where(
+      and(
+        eq(platform_access_token_credentials.platform_integration_id, input.integration.id),
+        eq(platform_access_token_credentials.provider_credential_type, 'project_access_token'),
+        inArray(platform_access_token_credentials.provider_resource_id, [...input.projectIds])
+      )
+    );
+
+  const pending: {
+    projectId: string;
+    credentialId: string;
+    credentialVersion: number;
+    providerMetadata: Record<string, unknown>;
+  }[] = [];
+  const failures: { projectId: string; error: unknown }[] = [];
+  for (const row of rows) {
+    const projectId = row.projectId ?? '';
+    const parsed = GitLabProjectAccessTokenMetadataSchema.safeParse(row.providerMetadata);
+    if (!parsed.success) {
+      failures.push({ projectId, error: parsed.error });
+      continue;
+    }
+    if (parsed.data.unusableReason !== undefined) continue;
+    if (
+      parsed.data.authorizedAccountId === input.currentAccountId &&
+      readLegacyProjectTokenId(input.integration.metadata, projectId) === null
+    ) {
+      continue;
+    }
+    pending.push({
+      projectId,
+      credentialId: row.credentialId,
+      credentialVersion: row.credentialVersion,
+      providerMetadata: { ...parsed.data, unusableReason: 'account-changed' },
+    });
+  }
+  if (pending.length === 0) return failures;
+
+  const validatedAt = new Date().toISOString();
+  await db.transaction(async tx => {
+    for (const entry of pending) {
+      try {
+        const updated = await tx
+          .update(platform_access_token_credentials)
+          .set({ provider_metadata: entry.providerMetadata, last_validated_at: validatedAt })
+          .where(
+            and(
+              eq(platform_access_token_credentials.id, entry.credentialId),
+              eq(platform_access_token_credentials.credential_version, entry.credentialVersion)
+            )
+          )
+          .returning({ id: platform_access_token_credentials.id });
+        if (updated.length !== 1) {
+          failures.push({
+            projectId: entry.projectId,
+            error: new ProjectCredentialReplacedError(),
+          });
+        }
+      } catch (error) {
+        failures.push({ projectId: entry.projectId, error });
+      }
+    }
+  });
+  return failures;
+}
 
 /**
  * Retires every project token the integration stores for an account other than
@@ -578,11 +661,9 @@ const REPLACED_ACCOUNT_RETIREMENT_BUDGET_MS = 20_000;
  *
  * A project keeps a handle that still belongs to the connected account, unless
  * its metadata entry names an older token id that only a revocation can settle.
- * The walk has one deadline for the whole walk: a project the deadline does not
- * reach keeps its handle and is marked unusable, so the connect that replaced
- * the account still completes. A credential the provider already refused is not
- * called again. A refusal keeps the handle and marks the credential unusable,
- * so the connect that replaced the account still succeeds.
+ * The walk marks a project it does not reach as unusable, together with every
+ * other project it left, so the connect that replaced the account still
+ * completes.
  */
 export async function retireProjectCredentialsForReplacedAccount(input: {
   integration: Pick<PlatformIntegration, 'id' | 'metadata'>;
@@ -590,13 +671,20 @@ export async function retireProjectCredentialsForReplacedAccount(input: {
   currentAccountId: string;
   signal?: AbortSignal;
 }): Promise<{ retired: number; retained: number; skipped: number }> {
-  const signal = input.signal ?? AbortSignal.timeout(REPLACED_ACCOUNT_RETIREMENT_BUDGET_MS);
+  const signal = input.signal ?? AbortSignal.timeout(PROJECT_TOKEN_WALK_BUDGET_MS);
   const projectIds = await listProjectIdsWithStoredTokens(input.integration);
 
   let retired = 0;
   let retained = 0;
   let skipped = 0;
-  for (const projectId of projectIds) {
+  let unreachedProjectIds: string[] = [];
+  for (const [index, projectId] of projectIds.entries()) {
+    // Check the deadline before each row read.
+    if (signal.aborted) {
+      unreachedProjectIds = projectIds.slice(index);
+      break;
+    }
+
     const storedCredential = await getStoredProjectCredential(
       input.integration.id,
       projectId
@@ -618,28 +706,6 @@ export async function retireProjectCredentialsForReplacedAccount(input: {
 
     if (storedCredential !== null && storedCredential.unusable) {
       retained += 1;
-      continue;
-    }
-
-    if (signal.aborted) {
-      retained += 1;
-      skipped += 1;
-      if (storedCredential !== null) {
-        await markStoredProjectCredentialUnusable({
-          integrationId: input.integration.id,
-          projectId,
-          credential: storedCredential,
-        }).catch(error => {
-          logExceptInTest(
-            '[retireProjectCredentialsForReplacedAccount] Unusable marker not stored',
-            {
-              integrationId: input.integration.id,
-              projectId,
-              error: error instanceof Error ? error.message : String(error),
-            }
-          );
-        });
-      }
       continue;
     }
 
@@ -678,6 +744,23 @@ export async function retireProjectCredentialsForReplacedAccount(input: {
           projectId,
           error: error instanceof Error ? error.message : String(error),
         });
+      });
+    }
+  }
+
+  if (unreachedProjectIds.length > 0) {
+    retained += unreachedProjectIds.length;
+    skipped += unreachedProjectIds.length;
+    const failures = await markUnreachedProjectCredentialsUnusable({
+      integration: input.integration,
+      projectIds: unreachedProjectIds,
+      currentAccountId: input.currentAccountId,
+    }).catch(error => unreachedProjectIds.map(projectId => ({ projectId, error })));
+    for (const failure of failures) {
+      logExceptInTest('[retireProjectCredentialsForReplacedAccount] Unusable marker not stored', {
+        integrationId: input.integration.id,
+        projectId: failure.projectId,
+        error: failure.error instanceof Error ? failure.error.message : String(failure.error),
       });
     }
   }

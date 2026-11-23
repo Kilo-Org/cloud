@@ -9,6 +9,7 @@ import {
   CHANGED_BY_DESIGN,
   EXIT,
   LEAN_MAX_SCOPED_ROWS,
+  LEAN_SUMMED_FIELDS,
   PARKED_REQUESTED_AT,
   SCHEMA_TABLES_EXPECTED,
   buildStatements,
@@ -1747,6 +1748,86 @@ test('a run too large to enumerate is refused before any read of its history', a
   }
 });
 
+test('a split enumerates models from every scoped table, not just case_results', async () => {
+  const f = fixture();
+  try {
+    seed(f.sqlite);
+    // One live run whose scoped rows sit almost entirely in `scheduler_executions`: production has
+    // a running run with 54,661 of them. Enumerating `case_results` alone would see one model and
+    // refuse (its 60,000 execution rows land in the `NOT IN` complement), or mis-split.
+    const insert = f.sqlite.prepare(
+      `INSERT INTO scheduler_executions (run_id, model, variant, rep, case_id, token)
+       VALUES ('run-live-b', ?, 'high', 0, ?, 'exec-token')`
+    );
+    f.sqlite.exec('BEGIN');
+    for (let i = 0; i < 60_000; i += 1) {
+      insert.run(i % 2 === 0 ? 'vendor/exec-a' : 'vendor/exec-b', `exec-case-${i}`);
+    }
+    f.sqlite.exec('COMMIT');
+    assert.equal(
+      f.sqlite.prepare("SELECT COUNT(*) n FROM case_results WHERE run_id = 'run-live-b'").get().n,
+      1,
+      'the fixture must keep graded results (and their models) out of the bulk'
+    );
+
+    const baseline = join(f.directory, 'baseline.json');
+    const applied = await leanRun(
+      f.path,
+      leanArgs('--apply', f.path, ['--baseline-out', baseline])
+    );
+    assert.equal(applied.code, EXIT.ok, JSON.stringify(applied.events));
+    const scope = applied.last('lean_scope');
+    const cancelled = scope.batches.filter(batch => batch.kind === 'cancelled');
+    assert.ok(cancelled.length > 1, 'the executions-heavy run must split into several batches');
+    for (const batch of cancelled) {
+      assert.ok(
+        batch.rows <= LEAN_MAX_SCOPED_ROWS,
+        `batch ${JSON.stringify(batch)} exceeds the cap`
+      );
+    }
+    // The execution rows are protected history: the apply must not remove any.
+    assert.equal(
+      f.sqlite
+        .prepare("SELECT COUNT(*) n FROM scheduler_executions WHERE run_id='run-live-b'")
+        .get().n,
+      60_000
+    );
+    // And verify accepts it: the same batches are re-sized and re-digested.
+    const verified = await leanRun(f.path, leanArgs('--verify', f.path, ['--baseline', baseline]));
+    assert.equal(verified.code, EXIT.ok, JSON.stringify(verified.events));
+  } finally {
+    f.close();
+  }
+});
+
+test('the model enumeration reads every scoped table through run_id', async () => {
+  const f = fixture();
+  try {
+    seed(f.sqlite);
+    const { createLocalExecutor, scopeRunModelsSql, assertLeanPlan } =
+      await import('./legacy-cancel.mjs');
+    const inner = createLocalExecutor(f.path);
+    const sql = scopeRunModelsSql('run-live-a');
+    for (const table of [
+      'case_results',
+      'model_summaries',
+      'scheduler_chunks',
+      'run_lane_failures',
+      'scheduler_executions',
+      'pending_decider_outputs',
+    ]) {
+      assert.match(sql, new RegExp(`FROM ${table} AS `), `${table} must be enumerated`);
+    }
+    const plan = await assertLeanPlan({ plan: s => inner.plan(s) }, sql);
+    // Every branch is a run_id seek; nothing reads a history table by another key.
+    const seeks = plan.filter(line => /^SEARCH /.test(line) && /run_id=\?/.test(line));
+    assert.equal(seeks.length, 6, `expected six keyed seeks, got ${JSON.stringify(plan)}`);
+    inner.close();
+  } finally {
+    f.close();
+  }
+});
+
 // ---- batched bounded path: a scope whose history exceeds the per-batch envelope ------------
 //
 // Production has two live runs owning ~94k case results, so one run alone is larger than
@@ -1866,52 +1947,146 @@ test('batched apply and verify reach the same end state as one exhaustive run', 
       normalizeClock(readAll(batched.sqlite)),
       normalizeClock(readAll(exhaustive.sqlite))
     );
-    // And every field both digests carry agrees, apart from what the operation moves by design.
-    // Float totals are summed per batch, so they are compared with a relative tolerance.
+    // Every field of the batched digest must equal an INDEPENDENTLY computed value: the summed
+    // fields from plain SQL over the final database, the scope-free counters from plain SQL, and
+    // the served artifact from the exhaustive digest of an identical fixture. Nothing is skipped,
+    // so a field the bounded digest fails to fill in (a dropped `LEAN_SUMMED_FIELDS` entry leaves
+    // the global batch's literal zero) fails here instead of passing a self-consistent compare.
     const batchedDigest = applied.last('after');
-    // The batched digest must equal what plain SQL says about the SAME final database: a
-    // self-consistent digest that silently dropped a batch would pass a before/after compare,
-    // so the expected values are computed independently here.
     const one = sql => ({ ...batched.sqlite.prepare(sql).get() });
-    const cancelledWhere = "run_id IN ('run-live-a','run-live-b') AND run_id <> 'run-done'";
-    const expected = {
-      served_case_results_n: one("SELECT COUNT(*) v FROM case_results WHERE run_id='run-done'").v,
-      served_case_results_score: one(
-        "SELECT COALESCE(TOTAL(score),0) v FROM case_results WHERE run_id='run-done'"
-      ).v,
-      served_summaries_n: one("SELECT COUNT(*) v FROM model_summaries WHERE run_id='run-done'").v,
-      served_candidates_n: one(
-        "SELECT COUNT(*) v FROM routing_table_candidates WHERE run_id='run-done'"
-      ).v,
-      served_routing_signature: one(
-        `SELECT COALESCE(GROUP_CONCAT(run_id || '@' || published_at || '@' || generated_at
-           || '@' || source, '|'), '') v FROM routing_tables WHERE run_id='run-done'`
-      ).v,
-      cancelled_case_results_n: one(`SELECT COUNT(*) v FROM case_results WHERE ${cancelledWhere}`)
-        .v,
-      cancelled_case_results_score: one(
+    const cancelledWhere = "run_id IN ('run-live-a','run-live-b')";
+    const sum = (field, sql) => ({ field, sql, value: one(sql).v });
+
+    // The additive set the module must know about, listed here by hand: deriving it from
+    // `LEAN_SUMMED_FIELDS` would make the check agree with any mutation.
+    const SUMMED_FIELDS = [
+      'cancelled_case_results_n',
+      'cancelled_case_results_score',
+      'cancelled_case_results_timeouts',
+      'cancelled_summaries_n',
+      'cancelled_chunks_n',
+      'cancelled_chunk_attempts',
+      'cancelled_lane_failures_n',
+      'cancelled_executions_n',
+      'cancelled_pending_outputs_n',
+    ];
+    assert.deepEqual(
+      [...LEAN_SUMMED_FIELDS].sort(),
+      [...SUMMED_FIELDS].sort(),
+      'LEAN_SUMMED_FIELDS must cover exactly the additive digest fields'
+    );
+
+    const summed = [
+      sum(
+        'cancelled_case_results_n',
+        `SELECT COUNT(*) v FROM case_results WHERE ${cancelledWhere}`
+      ),
+      sum(
+        'cancelled_case_results_score',
         `SELECT COALESCE(TOTAL(score),0) v FROM case_results WHERE ${cancelledWhere}`
-      ).v,
-      cancelled_executions_n: one(
-        `SELECT COUNT(*) v FROM scheduler_executions WHERE ${cancelledWhere}`
-      ).v,
-      cancelled_lane_failures_n: one(
+      ),
+      sum(
+        'cancelled_case_results_timeouts',
+        `SELECT COALESCE(SUM(COALESCE(timed_out,0)),0) v FROM case_results WHERE ${cancelledWhere}`
+      ),
+      sum(
+        'cancelled_summaries_n',
+        `SELECT COUNT(*) v FROM model_summaries WHERE ${cancelledWhere}`
+      ),
+      sum('cancelled_chunks_n', `SELECT COUNT(*) v FROM scheduler_chunks WHERE ${cancelledWhere}`),
+      sum(
+        'cancelled_chunk_attempts',
+        `SELECT COALESCE(TOTAL(attempts),0) v FROM scheduler_chunks WHERE ${cancelledWhere}`
+      ),
+      sum(
+        'cancelled_lane_failures_n',
         `SELECT COUNT(*) v FROM run_lane_failures WHERE ${cancelledWhere}`
-      ).v,
-      cancelled_pending_outputs_n: one(
+      ),
+      sum(
+        'cancelled_executions_n',
+        `SELECT COUNT(*) v FROM scheduler_executions WHERE ${cancelledWhere}`
+      ),
+      sum(
+        'cancelled_pending_outputs_n',
         `SELECT COUNT(*) v FROM pending_decider_outputs WHERE ${cancelledWhere}`
-      ).v,
-      cancelled_summaries_n: one(`SELECT COUNT(*) v FROM model_summaries WHERE ${cancelledWhere}`)
-        .v,
+      ),
+    ];
+    // The scope-free counters, compared literally: after the cancel none of the live-work ones
+    // may be non-zero, and every protected one is what the tables say.
+    const globals = [
+      sum('running_runs', `SELECT COUNT(*) v FROM benchmark_runs WHERE status='running'`),
+      sum(
+        'unfinished_chunks',
+        `SELECT COUNT(*) v FROM scheduler_chunks WHERE status IN ('pending','queued','active')`
+      ),
+      sum('pending_chunks', `SELECT COUNT(*) v FROM scheduler_chunks WHERE status='pending'`),
+      sum('queued_chunks', `SELECT COUNT(*) v FROM scheduler_chunks WHERE status='queued'`),
+      sum('active_chunks', `SELECT COUNT(*) v FROM scheduler_chunks WHERE status='active'`),
+      sum('running_profiles', `SELECT COUNT(*) v FROM benchmark_profiles WHERE status='running'`),
+      sum('pending_profiles', `SELECT COUNT(*) v FROM benchmark_profiles WHERE status='pending'`),
+      sum('ready_profiles', `SELECT COUNT(*) v FROM benchmark_profiles WHERE status='ready'`),
+      sum('failed_profiles', `SELECT COUNT(*) v FROM benchmark_profiles WHERE status='failed'`),
+      sum(
+        'platform_requested_sum',
+        `SELECT COALESCE(SUM(platform_requested),0) v FROM benchmark_profiles`
+      ),
+      sum('user_requested_sum', `SELECT COALESCE(SUM(user_requested),0) v FROM benchmark_profiles`),
+      sum('remeasures_n', `SELECT COUNT(*) v FROM profile_remeasures`),
+      sum(
+        'remeasure_claims_n',
+        `SELECT COUNT(*) v FROM profile_remeasures WHERE run_id IS NOT NULL`
+      ),
+      sum('subscriptions_n', `SELECT COUNT(*) v FROM benchmark_subscriptions`),
+      sum('probe_activations_n', `SELECT COUNT(*) v FROM probe_activations`),
+    ];
+    // The served artifact is per-run, so it is taken from the exhaustive digest of the identical
+    // fixture rather than re-derived (the field names differ between the two digests).
+    const referenceDigest = reference.last('after');
+    const SERVED_EQUIVALENT = {
+      served_case_results_n: 'case_results_n',
+      served_case_results_score: 'case_results_score',
+      served_case_results_cost: 'case_results_cost',
+      served_case_results_latency: 'case_results_latency',
+      served_case_results_timeouts: 'case_results_timeouts',
+      served_case_results_error_length: 'case_results_error_length',
+      served_case_results_key_length: 'case_results_key_length',
+      served_summaries_n: 'summaries_n',
+      served_summaries_accuracy: 'summaries_accuracy',
+      served_summaries_cases: 'summaries_cases',
+      served_routing_signature: 'routing_tables_signature',
+      served_candidates_n: 'candidates_n',
+      served_candidates_accuracy: 'candidates_accuracy',
+      served_candidates_cost: 'candidates_cost',
     };
-    for (const [field, value] of Object.entries(expected)) {
+    const served = Object.entries(SERVED_EQUIVALENT).map(([field, source]) => {
+      assert.ok(source in referenceDigest, `the exhaustive digest is missing ${source}`);
+      return { field, value: referenceDigest[source] };
+    });
+
+    const checked = new Set();
+    for (const { field, value } of [...summed, ...globals, ...served]) {
       assert.ok(field in batchedDigest, `the bounded digest is missing ${field}`);
-      if (field.endsWith('score')) {
-        assert.ok(Math.abs(Number(batchedDigest[field]) - Number(value)) < 1e-9, `${field}`);
-        continue;
+      checked.add(field);
+      const actual = batchedDigest[field];
+      if (typeof value === 'number' && !Number.isInteger(value)) {
+        assert.ok(
+          Math.abs(Number(actual) - Number(value)) < 1e-6,
+          `${field}: batched ${actual} != independent ${value}`
+        );
+      } else {
+        assert.equal(
+          String(actual),
+          String(value),
+          `${field}: batched ${actual} != independent ${value}`
+        );
       }
-      assert.equal(String(batchedDigest[field]), String(value), `${field}`);
     }
+    // No field may escape the check: an unlisted key means this test stopped covering the digest.
+    // `event` is the harness envelope key, not a digest field.
+    const unchecked = Object.keys(batchedDigest).filter(
+      field => field !== 'event' && !checked.has(field)
+    );
+    assert.deepEqual(unchecked, [], 'every bounded digest field must be compared');
     assert.ok(
       Number(batchedDigest.cancelled_case_results_n) >= LEAN_MAX_SCOPED_ROWS,
       'the equivalence fixture must really span more than one batch'

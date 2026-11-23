@@ -919,14 +919,35 @@ const CANCELLED_SIZE_FIELDS = [
 const SERVED_SIZE_FIELDS = ['served_case_results', 'served_summaries', 'served_candidates'];
 
 /**
- * The `model` groups of one run, largest first. The enumeration reads that run's `case_results`
- * rows once, and its size is capped by `LEAN_MAX_SPLIT_ROWS`: a run bigger than that is refused
- * before the enumeration, so this can never become a history-sized read.
+ * The `model` groups of one run, largest first, taken as the UNION of the models that appear in
+ * every table the batch probe counts. `case_results` alone is not enough: a run can hold its bulk
+ * in `scheduler_executions` (one row per executed case, and production has a run with 54,661 of
+ * them), in a chunk, or in a pending output that has no graded result yet. Enumerating only graded
+ * results would either refuse a splittable run ("no model groups") or push those rows into the
+ * `NOT IN` complement until it exceeded the cap.
+ *
+ * Each branch is a `run_id` seek with its own GROUP BY, so SQLite materializes them instead of
+ * flattening the compound and reading a table by something other than `run_id`. The size is
+ * bounded twice: the run is provably under `LEAN_MAX_SPLIT_ROWS` before this is reached, and the
+ * result is capped at `LEAN_MAX_MODEL_GROUPS + 1`.
  */
+export function scopeRunModelsSql(runId, cap = LEAN_MAX_MODEL_GROUPS) {
+  const key = sqlString(runId);
+  const branch = (from, alias) =>
+    `SELECT ${alias}.model AS model, COUNT(*) AS n FROM ${from} AS ${alias}
+      WHERE ${alias}.run_id = ${key} GROUP BY ${alias}.model`;
+  return `SELECT model, SUM(n) AS n FROM (
+    ${branch('case_results', 'row')}
+    UNION ALL ${branch('model_summaries', 'summary')}
+    UNION ALL ${branch('scheduler_chunks', 'chunk')}
+    UNION ALL ${branch('run_lane_failures', 'failure')}
+    UNION ALL ${branch('scheduler_executions', 'execution')}
+    UNION ALL ${branch('pending_decider_outputs', 'pending')}
+  ) GROUP BY model ORDER BY n DESC, model ASC LIMIT ${cap + 1}`;
+}
+
 async function runModelGroups(executor, runId) {
-  const sql = `SELECT model, COUNT(*) AS n FROM case_results AS row
-    WHERE row.run_id = ${sqlString(runId)}
-    GROUP BY row.model ORDER BY n DESC, row.model ASC LIMIT ${LEAN_MAX_MODEL_GROUPS + 1}`;
+  const sql = scopeRunModelsSql(runId);
   await assertLeanPlan(executor, sql);
   const rows = await executor.read(sql);
   if (rows.length > LEAN_MAX_MODEL_GROUPS) {

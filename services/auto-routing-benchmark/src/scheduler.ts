@@ -1397,23 +1397,17 @@ export function refundRetryAttemptStatement(
 }
 
 /**
- * Undo a retry that provably never reached the model: the attempt it spent and the ledger
- * start it moved. Both writes name this claim's own token, and the chunk is addressed by the
- * claim's id — a chunk id is the JSON of the block's position, never the run id. Best effort
- * by design: the block is already deferring, and a failed refund must not turn a wait into a
- * lane death.
+ * Undo a retry that provably never reached the model, after the retry's ledger start was moved
+ * and its attempt was spent: both are given back. Two separate calls exist because the two
+ * facts are independent — see {@link revertRetryLedgerStart}.
+ *
+ * Every write names this claim's own token, and the chunk is addressed by the claim's id: a
+ * chunk id is the JSON of the block's position, never the run id. Best effort by design — the
+ * block is already deferring, and a failed refund must not turn a wait into a lane death.
  */
-export async function refundRetryAttempt(
+export async function refundUnspentRetryAttempt(
   db: D1Database,
-  input: {
-    /** The claim the retry ran under. */
-    claim: { id: string; token: string };
-    /** The case whose ledger start the retry moved. */
-    execution: PaidExecutionKey & { attemptStartedAt: number };
-    /** The start the retry wrote; reverting restores `execution.attemptStartedAt`. */
-    startedAt: number;
-    onError?: (error: unknown) => void;
-  }
+  input: RetryRefundInput
 ): Promise<void> {
   await db
     .batch([
@@ -1426,6 +1420,37 @@ export async function refundRetryAttempt(
     ])
     .catch((error: unknown) => input.onError?.(error));
 }
+
+/**
+ * Undo only the ledger start a retry moved. The attempt is NOT given back here, because the
+ * caller knows it never spent one: a refused `consumeRetryAttemptStatement` (zero changes) is
+ * exactly that proof, and decrementing anyway would hand the block an attempt it never used —
+ * an extra automatic attempt, which would break the cap.
+ */
+export async function revertRetryLedgerStart(
+  db: D1Database,
+  input: RetryRefundInput
+): Promise<void> {
+  await db
+    .batch([
+      restartPaidCaseStatement(
+        db,
+        { ...input.execution, attemptStartedAt: input.startedAt },
+        input.execution.attemptStartedAt
+      ),
+    ])
+    .catch((error: unknown) => input.onError?.(error));
+}
+
+type RetryRefundInput = {
+  /** The claim the retry ran under. */
+  claim: { id: string; token: string };
+  /** The case whose ledger start the retry moved. */
+  execution: PaidExecutionKey & { attemptStartedAt: number };
+  /** The start the retry wrote; reverting restores `execution.attemptStartedAt`. */
+  startedAt: number;
+  onError?: (error: unknown) => void;
+};
 
 export async function restartPaidCase(
   db: D1Database,

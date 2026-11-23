@@ -33,8 +33,9 @@ import {
   SCHEDULER_MAX_PLATFORM_ATTEMPTS,
   SCHEDULER_MAX_USER_ATTEMPTS,
   SCHEDULER_MATERIALIZED_PAGE_SIZE,
-  refundRetryAttempt,
+  refundUnspentRetryAttempt,
   restartPaidCaseStatement,
+  revertRetryLedgerStart,
   SCHEDULER_MAX_USER_LEASE_RECLAIMS,
   SCHEDULER_QUEUE_LEASE_MS,
   SCHEDULER_PRUNE_CHUNKS_SQL,
@@ -1056,7 +1057,7 @@ describe('scheduler (production migrations and real SQLite)', () => {
       retriedAt
     ).run();
 
-    await refundRetryAttempt(db, {
+    await refundUnspentRetryAttempt(db, {
       claim: { id: claim.id, token: claim.token },
       // `execution` carries the attempt's ORIGINAL start; `startedAt` is what the retry
       // wrote. Reverting restores the original, which is what the WHERE clause matches.
@@ -1065,6 +1066,48 @@ describe('scheduler (production migrations and real SQLite)', () => {
     });
 
     expect(storedChunk(sqlite, claim.id).attempts).toBe(1);
+    expect(
+      sqlite.prepare('SELECT started_at FROM scheduler_executions WHERE case_id = ?').get('case')
+    ).toEqual({ started_at: NOW });
+  });
+
+  it('gives back only the ledger start when the consume statement refused the retry', async () => {
+    // A refused consume (zero changes) is proof the retry's attempt was never added. Undoing
+    // the ledger start alone is therefore the whole refund: decrementing `attempts` too would
+    // grant an attempt the block never used and break the cap.
+    insertRun(sqlite, 'refused');
+    await scheduleRunChunks(db, {
+      runId: 'refused',
+      entries: independentEntries(1),
+      repetitions: 1,
+      caseIds: ['case'],
+      chunkSize: 1,
+    });
+    const config = schedulerConfig('{"slots":1}');
+    const [claim] = await claimMany(db, config, 1, 'refused-claim', NOW);
+    if (!claim) throw new Error('Expected the claim');
+    expect(await startChunk(db, claim.id, claim.token, NOW)).toBe(true);
+    const ledgerKey = {
+      runId: 'refused',
+      model: claim.model,
+      variant: claim.variant,
+      rep: claim.rep,
+      caseId: 'case',
+      token: claim.token,
+    };
+    expect(await beginPaidCase(db, ledgerKey, NOW)).toBe(true);
+    // The block is on its second claim, and only the ledger start moved: `consume` refused.
+    sqlite.prepare('UPDATE scheduler_chunks SET attempts = 2 WHERE id = ?').run(claim.id);
+    const retriedAt = NOW + 1;
+    await restartPaidCaseStatement(db, { ...ledgerKey, attemptStartedAt: NOW }, retriedAt).run();
+
+    await revertRetryLedgerStart(db, {
+      claim: { id: claim.id, token: claim.token },
+      execution: { ...ledgerKey, attemptStartedAt: NOW },
+      startedAt: retriedAt,
+    });
+
+    expect(storedChunk(sqlite, claim.id).attempts).toBe(2);
     expect(
       sqlite.prepare('SELECT started_at FROM scheduler_executions WHERE case_id = ?').get('case')
     ).toEqual({ started_at: NOW });

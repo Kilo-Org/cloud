@@ -187,7 +187,8 @@ import {
   acquireInitializationLease,
   restartPaidCaseStatement,
   consumeRetryAttemptStatement,
-  refundRetryAttempt,
+  refundUnspentRetryAttempt,
+  revertRetryLedgerStart,
   claimScheduledChunks,
   clearUnbilledCase,
   getPaidCasePromptRevision,
@@ -3820,9 +3821,10 @@ async function processDeciderJob(
           Date.now()
         ).run();
         if ((consumed.meta.changes ?? 0) === 0) {
-          // The block already spent its automatic attempts: the ledger restart above is
-          // undone so the retry leaves no trace of a start that never happened.
-          await refundRetryAttempt(env.BENCH_DB, {
+          // The block already spent its automatic attempts — `consume` changed nothing, so no
+          // attempt was added either. Only the ledger restart above is undone: refunding an
+          // attempt here would hand the block one it never used and break the cap.
+          await revertRetryLedgerStart(env.BENCH_DB, {
             claim: { id: claim.id, token: claim.token },
             execution: { ...execution, attemptStartedAt },
             startedAt,
@@ -3924,10 +3926,11 @@ async function processDeciderJob(
             })
           );
           unstartedRetryAt = startedAt;
-          // The retry never reached the provider, so its spend is returned before anything
-          // else: a container-capacity refusal is a wait, and the block must not lose an
-          // attempt to it.
-          await refundRetryAttempt(env.BENCH_DB, {
+          // The retry never reached the provider, so both what it spent — the attempt the
+          // consume statement added and the ledger start it moved — are returned before
+          // anything else: a container-capacity refusal is a wait, and the block must not
+          // lose an attempt to it.
+          await refundUnspentRetryAttempt(env.BENCH_DB, {
             claim: { id: claim.id, token: claim.token },
             execution: { ...execution, attemptStartedAt },
             startedAt,

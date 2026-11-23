@@ -295,7 +295,6 @@ export function validateAuthorizationHeader(
     requestPathname?: string;
   }
 ) {
-  const traceability_logging_id = crypto.randomUUID();
   const authHeader = headers.get('authorization');
   if (!authHeader || !authHeader.toLowerCase().startsWith('bearer ')) {
     warnExceptInTest('Authorization header missing or invalid');
@@ -317,6 +316,7 @@ export function validateAuthorizationHeader(
   const payload = tryJwtVerify(token);
 
   if (!payload) {
+    const traceability_logging_id = crypto.randomUUID();
     warnExceptInTest(`Invalid token (${traceability_logging_id})`);
     return {
       error: `Invalid token (${traceability_logging_id})`,
@@ -330,6 +330,7 @@ export function validateAuthorizationHeader(
       mode: 'allow-legacy',
     })
   ) {
+    const traceability_logging_id = crypto.randomUUID();
     warnExceptInTest(`Invalid token (${traceability_logging_id})`);
     return {
       error: `Invalid token (${traceability_logging_id})`,
@@ -338,6 +339,7 @@ export function validateAuthorizationHeader(
   }
 
   if (payload.version !== KILO_TOKEN_VERSION) {
+    const traceability_logging_id = crypto.randomUUID();
     warnExceptInTest(`Token version outdated (${traceability_logging_id}):`, {
       version: payload.version,
       kiloUserId: payload.kiloUserId,
@@ -378,6 +380,7 @@ export function validateAuthorizationHeader(
       payload.runtimeAuthorization
     );
     if (!runtimeAuthorization.success || !options?.runtimeProxyAttestationVerified) {
+      const traceability_logging_id = crypto.randomUUID();
       warnExceptInTest(`Invalid token (${traceability_logging_id})`);
       return {
         error: `Invalid token (${traceability_logging_id})`,

@@ -46,4 +46,9 @@ export const AUTO_TOP_UP_ATTEMPT_LOCK_TIMEOUT_SECONDS = 60 * 60 * 2; // 2 hours
 // webhook must not mask a terminal no-credits state for hours.
 export const AUTO_TOP_UP_IN_FLIGHT_WINDOW_SECONDS = 15 * 60; // 15 minutes
 
+// An enforced verdict changes no balance, so every low-balance usage statement
+// would otherwise ask bouncer again; this caps that rate while auto top-up stays
+// enabled and the attempt lock is released.
+export const AUTO_TOP_UP_CHARGE_REFUSAL_COOLDOWN_SECONDS = 15 * 60;
+
 export const SYSTEM_AUTO_TOP_UP_USER_ID = 'system-auto-topup';

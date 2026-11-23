@@ -1349,6 +1349,7 @@ export const userRouter = createTRPCRouter({
             .set({
               disabled_reason: null,
               attempt_started_at: null,
+              charge_refused_at: null,
               ...(input.amountCents != null ? { amount_cents: input.amountCents } : {}),
             })
             .where(eq(auto_top_up_configs.owned_by_user_id, ctx.user.id));

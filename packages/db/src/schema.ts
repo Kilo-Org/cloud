@@ -2627,6 +2627,8 @@ export const auto_top_up_configs = pgTable(
     threshold_cents: integer(), // Org-only; null means the default org threshold
     last_auto_top_up_at: timestamp({ withTimezone: true, mode: 'string' }),
     attempt_started_at: timestamp({ withTimezone: true, mode: 'string' }),
+    // When bouncer last refused this payer's charge; the refusal window suppresses the next standing question.
+    charge_refused_at: timestamp({ withTimezone: true, mode: 'string' }),
     disabled_reason: text(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })

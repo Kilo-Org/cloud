@@ -7,7 +7,7 @@ import {
   organizations,
 } from '@kilocode/db/schema';
 import type { User, Organization } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   createOrganization,
@@ -38,6 +38,8 @@ import {
 import crypto from 'node:crypto';
 import Stripe from 'stripe';
 import { getPaidCreditTerms } from '@kilocode/web-shared/lib/paidCreditPolicy.server';
+import { chargeDecide } from '@kilocode/web-shared/lib/bouncer/client';
+import { captureMessage } from '@sentry/nextjs';
 
 // Convert dollars to microdollars
 const toMicrodollars = (dollars: number) => dollars * 1_000_000;
@@ -47,6 +49,25 @@ const ORG_AUTO_TOP_UP_THRESHOLD_DOLLARS = DEFAULT_ORG_AUTO_TOP_UP_THRESHOLD_CENT
 jest.mock('@kilocode/web-shared/lib/email', () => ({
   sendAutoTopUpFailedEmail: jest.fn().mockResolvedValue({ sent: true }),
 }));
+
+// A refusal stays a log line; the test asserts no Sentry event is captured.
+jest.mock('@sentry/nextjs', () => {
+  const actual = jest.requireActual('@sentry/nextjs');
+  return { __esModule: true, ...actual, captureException: jest.fn(), captureMessage: jest.fn() };
+});
+
+// The automatic top-up asks bouncer for a verdict. A test sets the answer it needs.
+jest.mock('@kilocode/web-shared/lib/bouncer/client', () => {
+  const actual = jest.requireActual('@kilocode/web-shared/lib/bouncer/client');
+  return { __esModule: true, ...actual, chargeDecide: jest.fn() };
+});
+
+const mockChargeDecide = jest.mocked(chargeDecide);
+
+beforeEach(() => {
+  mockChargeDecide.mockReset();
+  mockChargeDecide.mockResolvedValue(null);
+});
 
 jest.mock('@kilocode/web-shared/lib/stripe-client', () => {
   return {
@@ -1206,4 +1227,208 @@ describe('auto top-up invoice that does not reach paid', () => {
       });
     }
   );
+});
+
+describe('automatic top-up charge standing', () => {
+  beforeEach(async () => {
+    await cleanupDbForTest();
+    jest.clearAllMocks();
+  });
+
+  afterAll(async () => {
+    await cleanupDbForTest();
+  });
+
+  function stubPaidInvoice(invoiceId: string) {
+    (client.invoices.create as jest.Mock).mockResolvedValue({
+      id: invoiceId,
+      created: 1_700_000_000,
+    });
+    (client.invoices.update as jest.Mock).mockResolvedValue({
+      id: invoiceId,
+      created: 1_700_000_000,
+    });
+    (client.invoiceItems.create as jest.Mock).mockResolvedValue({
+      id: `ii_${crypto.randomUUID()}`,
+    });
+    (client.invoices.pay as jest.Mock).mockResolvedValue({ id: invoiceId, status: 'paid' });
+  }
+
+  async function insertPayerWithConfig() {
+    const user = await insertTestUser({
+      google_user_email: `at-gate-${crypto.randomUUID()}@example.com`,
+      auto_top_up_enabled: true,
+      stripe_customer_id: `cus_gate_${crypto.randomUUID()}`,
+      total_microdollars_acquired: 0,
+      microdollars_used: toMicrodollars(10),
+    });
+    const [config] = await db
+      .insert(auto_top_up_configs)
+      .values({
+        owned_by_user_id: user.id,
+        stripe_payment_method_id: 'pm_gate_user',
+        amount_cents: 5000,
+        disabled_reason: null,
+      })
+      .returning();
+    return { user, config };
+  }
+
+  test('a refusing verdict creates no invoice for a personal payer', async () => {
+    const { user, config } = await insertPayerWithConfig();
+    mockChargeDecide.mockResolvedValue({ enforced: true, flags: [] });
+
+    await maybePerformAutoTopUp(user);
+
+    expect(client.invoices.create).not.toHaveBeenCalled();
+    expect(client.invoices.pay).not.toHaveBeenCalled();
+    expect(await db.select().from(bouncer_credit_event_outbox)).toHaveLength(0);
+
+    const savedConfig = await db.query.auto_top_up_configs.findFirst({
+      where: eq(auto_top_up_configs.id, config.id),
+    });
+    expect(savedConfig?.attempt_started_at).toBeNull();
+    expect(savedConfig?.charge_refused_at).not.toBeNull();
+    expect(savedConfig?.disabled_reason).toBeNull();
+    const savedUser = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.id, user.id),
+    });
+    expect(savedUser?.auto_top_up_enabled).toBe(true);
+    expect(sendAutoTopUpFailedEmail).not.toHaveBeenCalled();
+    expect(captureMessage).not.toHaveBeenCalled();
+
+    expect(mockChargeDecide).toHaveBeenCalledTimes(1);
+    const request = mockChargeDecide.mock.calls[0]?.[0];
+    expect(request).toEqual(
+      expect.objectContaining({
+        requestId: expect.stringMatching(new RegExp(`^auto_topup:${config.id}:`)),
+        accountId: `user:${user.id}`,
+        userId: user.id,
+        stage: 'checkout',
+        flow: 'auto_topup',
+      })
+    );
+    expect(request?.ip).toBeUndefined();
+    expect(request?.ja4).toBeUndefined();
+  });
+
+  test('a recent refusal suppresses the next attempt for the same payer', async () => {
+    const { user, config } = await insertPayerWithConfig();
+    mockChargeDecide.mockResolvedValue({ enforced: true, flags: [] });
+
+    await maybePerformAutoTopUp(user);
+    await maybePerformAutoTopUp(user);
+
+    expect(mockChargeDecide).toHaveBeenCalledTimes(1);
+    expect(client.invoices.create).not.toHaveBeenCalled();
+    expect(client.invoices.pay).not.toHaveBeenCalled();
+
+    const savedConfig = await db.query.auto_top_up_configs.findFirst({
+      where: eq(auto_top_up_configs.id, config.id),
+    });
+    expect(savedConfig?.charge_refused_at).not.toBeNull();
+    expect(savedConfig?.attempt_started_at).toBeNull();
+  });
+
+  test('a refusal older than the cooldown asks bouncer again and charges', async () => {
+    const { user, config } = await insertPayerWithConfig();
+    mockChargeDecide.mockResolvedValueOnce({ enforced: true, flags: [] });
+
+    await maybePerformAutoTopUp(user);
+    expect(mockChargeDecide).toHaveBeenCalledTimes(1);
+    expect(client.invoices.create).not.toHaveBeenCalled();
+
+    await db
+      .update(auto_top_up_configs)
+      .set({ charge_refused_at: sql`NOW() - INTERVAL '20 minutes'` })
+      .where(eq(auto_top_up_configs.id, config.id));
+    stubPaidInvoice('inv_gate_after_cooldown');
+    mockChargeDecide.mockResolvedValueOnce({ enforced: false, flags: [] });
+
+    await maybePerformAutoTopUp(user);
+
+    expect(mockChargeDecide).toHaveBeenCalledTimes(2);
+    expect(client.invoices.create).toHaveBeenCalledTimes(1);
+    expect(client.invoices.pay).toHaveBeenCalledTimes(1);
+  });
+
+  test('a refusing verdict asks about the organization payer family root', async () => {
+    const actor = await insertTestUser({
+      google_user_email: `at-gate-org-${crypto.randomUUID()}@example.com`,
+    });
+    const organization = await createOrganization('Charge gate org', actor.id);
+    await db
+      .update(organizations)
+      .set({
+        auto_top_up_enabled: true,
+        stripe_customer_id: `cus_gate_org_${crypto.randomUUID()}`,
+        total_microdollars_acquired: 0,
+        microdollars_used: toMicrodollars(10),
+      })
+      .where(eq(organizations.id, organization.id));
+    const [config] = await db
+      .insert(auto_top_up_configs)
+      .values({
+        owned_by_organization_id: organization.id,
+        created_by_user_id: actor.id,
+        stripe_payment_method_id: 'pm_gate_org',
+        amount_cents: 10000,
+      })
+      .returning();
+    mockChargeDecide.mockResolvedValue({ enforced: true, flags: [] });
+
+    await maybePerformOrganizationAutoTopUp({
+      id: organization.id,
+      auto_top_up_enabled: true,
+      total_microdollars_acquired: 0,
+      microdollars_used: toMicrodollars(10),
+    });
+
+    expect(client.invoices.create).not.toHaveBeenCalled();
+    const savedConfig = await db.query.auto_top_up_configs.findFirst({
+      where: eq(auto_top_up_configs.id, config.id),
+    });
+    expect(savedConfig?.attempt_started_at).toBeNull();
+
+    expect(mockChargeDecide).toHaveBeenCalledTimes(1);
+    const request = mockChargeDecide.mock.calls[0]?.[0];
+    expect(request).toEqual(
+      expect.objectContaining({
+        requestId: expect.stringMatching(/^auto_topup:/),
+        accountId: `org:${organization.id}`,
+        userId: actor.id,
+        stage: 'checkout',
+        flow: 'auto_topup',
+      })
+    );
+  });
+
+  test('an unavailable answer charges as before', async () => {
+    const { user, config } = await insertPayerWithConfig();
+    stubPaidInvoice('inv_gate_unanswered');
+    mockChargeDecide.mockResolvedValue(null);
+
+    await maybePerformAutoTopUp(user);
+
+    expect(client.invoices.create).toHaveBeenCalledTimes(1);
+    expect(client.invoices.pay).toHaveBeenCalledTimes(1);
+    const events = await db.select().from(bouncer_credit_event_outbox);
+    expect(events).toHaveLength(1);
+    expect(events[0].event_type).toBe('charge.attempted');
+    const savedConfig = await db.query.auto_top_up_configs.findFirst({
+      where: eq(auto_top_up_configs.id, config.id),
+    });
+    expect(savedConfig?.attempt_started_at).not.toBeNull();
+  });
+
+  test('an allowing verdict charges', async () => {
+    const { user } = await insertPayerWithConfig();
+    stubPaidInvoice('inv_gate_allowed');
+    mockChargeDecide.mockResolvedValue({ enforced: false, flags: [] });
+
+    await maybePerformAutoTopUp(user);
+
+    expect(client.invoices.create).toHaveBeenCalledTimes(1);
+    expect(client.invoices.pay).toHaveBeenCalledTimes(1);
+  });
 });

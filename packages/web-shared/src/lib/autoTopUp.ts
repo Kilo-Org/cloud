@@ -21,6 +21,7 @@ import {
 } from '@kilocode/web-shared/lib/organizations/organizations';
 import { randomUUID } from 'crypto';
 import { reportChargeAttempted } from '@kilocode/web-shared/lib/bouncer/credit-events';
+import { decideCheckoutCharge } from '@kilocode/web-shared/lib/bouncer/charge-gate';
 import { sendAutoTopUpFailedEmail } from '@kilocode/web-shared/lib/email';
 import { getKiloPassStateForUser } from '@kilocode/web-shared/lib/kilo-pass/state';
 import { isStripeSubscriptionEnded } from '@kilocode/web-shared/lib/kilo-pass/stripe-subscription-status';
@@ -28,6 +29,7 @@ import { KiloPassIssuanceItemKind } from '@kilocode/web-shared/lib/kilo-pass/enu
 
 import {
   AUTO_TOP_UP_ATTEMPT_LOCK_TIMEOUT_SECONDS,
+  AUTO_TOP_UP_CHARGE_REFUSAL_COOLDOWN_SECONDS,
   AUTO_TOP_UP_THRESHOLD_DOLLARS,
   MAX_ORG_AUTO_TOP_UP_THRESHOLD_CENTS,
   parseOrgAutoTopUpThresholdCents,
@@ -147,6 +149,23 @@ async function readOrganizationAutoTopUpThresholdCents(
   return config?.threshold_cents;
 }
 
+/**
+ * Whether bouncer refused this payer's charge recently enough that the standing question is
+ * suppressed. The comparison runs in SQL so the stored text shape never becomes a JS date; a
+ * payer with no config row has never been refused.
+ */
+async function chargeRefusalIsFresh(entity: AutoTopUpEntity): Promise<boolean> {
+  const { ownerColumn, ownerId } = entityIdentity(entity);
+  const [config] = await db
+    .select({
+      refused: sql<boolean>`coalesce(${auto_top_up_configs.charge_refused_at} > NOW() - INTERVAL '${sql.raw(String(AUTO_TOP_UP_CHARGE_REFUSAL_COOLDOWN_SECONDS))} second', false)`,
+    })
+    .from(auto_top_up_configs)
+    .where(eq(ownerColumn, ownerId))
+    .limit(1);
+  return config?.refused ?? false;
+}
+
 async function shouldWaitForKiloPassBonusCredits(kiloUserId: string): Promise<boolean> {
   const subscription = await getKiloPassStateForUser(db, kiloUserId);
   if (!subscription) return false;
@@ -235,6 +254,15 @@ async function maybePerformAutoTopUpForEntity(entity: AutoTopUpEntity): Promise<
     }
   }
 
+  if (await chargeRefusalIsFresh(entity)) {
+    const { ownerId, label: entityLabel } = entityIdentity(entity);
+    logExceptInTest(`Auto-top-up skipped for ${entityLabel}: a standing refusal was recent`, {
+      entity_type: entity.type,
+      entity_id: ownerId,
+    });
+    return;
+  }
+
   const traceId = randomUUID();
 
   const { ownerId: entityId, label: entityLabel } = entityIdentity(entity);
@@ -253,6 +281,15 @@ async function maybePerformAutoTopUpForEntity(entity: AutoTopUpEntity): Promise<
   if (!result.success && result.error === 'concurrent_attempt_in_progress') {
     logExceptInTest(`Auto-top-up skipped for ${entityLabel}: concurrent attempt in progress`, {
       traceId,
+    });
+    return;
+  }
+
+  if (!result.success && result.error === 'charge_refused') {
+    logExceptInTest(`Auto-top-up charge refused for ${entityLabel}`, {
+      traceId,
+      entity_type: entity.type,
+      entity_id: entityId,
     });
     return;
   }
@@ -351,6 +388,20 @@ async function performAutoTopUpForEntity(
         ? entity.user.id
         : (config.created_by_user_id ?? SYSTEM_AUTO_TOP_UP_USER_ID);
     const bouncerOrgId = entity.type === 'organization' ? entity.organization.id : undefined;
+
+    const chargeVerdict = await decideCheckoutCharge({
+      userId: bouncerUserId,
+      organizationId: bouncerOrgId,
+      flow: 'auto_topup',
+      requestId: `auto_topup:${config.id}:${traceId}`,
+    });
+    if (chargeVerdict?.enforced) {
+      await db
+        .update(auto_top_up_configs)
+        .set({ charge_refused_at: sql`NOW()` })
+        .where(eq(auto_top_up_configs.id, config.id));
+      return failureResult('charge_refused');
+    }
 
     try {
       // Create a proper invoice (with PDF) and pay it off-session.

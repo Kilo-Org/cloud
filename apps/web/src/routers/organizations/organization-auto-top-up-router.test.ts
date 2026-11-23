@@ -208,6 +208,7 @@ describe('organization auto-top-up router', () => {
         stripe_payment_method_id: 'pm_test_enable',
         amount_cents: 5000,
         disabled_reason: 'card_declined', // Should be cleared
+        charge_refused_at: new Date().toISOString(), // Should be cleared
       });
 
       const caller = await createCallerForUser(ownerUser.id);
@@ -229,6 +230,7 @@ describe('organization auto-top-up router', () => {
         where: eq(auto_top_up_configs.owned_by_organization_id, testOrg.id),
       });
       expect(config?.disabled_reason).toBeNull();
+      expect(config?.charge_refused_at).toBeNull();
     });
 
     it('returns redirectUrl when no payment method exists', async () => {

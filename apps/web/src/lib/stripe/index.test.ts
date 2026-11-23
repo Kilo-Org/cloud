@@ -2980,6 +2980,7 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
         stripe_payment_method_id: `pm_${chargeId}`,
         amount_cents: principal,
         attempt_started_at: startedAt,
+        charge_refused_at: new Date().toISOString(),
       });
       await db.insert(credit_transactions).values({
         kilo_user_id: user.id,
@@ -3072,6 +3073,7 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
             : eq(auto_top_up_configs.owned_by_user_id, user.id),
         });
         expect(config?.attempt_started_at).toBeNull();
+        expect(config?.charge_refused_at).toBeNull();
         expect(config?.last_auto_top_up_at).not.toBeNull();
       } finally {
         invoicePayments.mockRestore();
@@ -3394,6 +3396,12 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
     expect(configAfterFirst?.amount_cents).toBe(2000);
     expect(configAfterFirst?.disabled_reason).toBeNull();
 
+    // A saved card replaces the reason for an earlier refusal.
+    await db
+      .update(auto_top_up_configs)
+      .set({ charge_refused_at: new Date().toISOString() })
+      .where(eq(auto_top_up_configs.owned_by_user_id, user.id));
+
     const userAfterFirst = await db.query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, user.id),
     });
@@ -3426,6 +3434,7 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
     expect(configAfterSecond?.stripe_payment_method_id).toBe(secondPaymentIntent.payment_method);
     expect(configAfterSecond?.amount_cents).toBe(5000);
     expect(configAfterSecond?.disabled_reason).toBeNull();
+    expect(configAfterSecond?.charge_refused_at).toBeNull();
   });
 
   test('org-auto-topup-setup: persists auto_top_up_configs via partial-unique-index upsert (requires targetWhere)', async () => {
@@ -3487,6 +3496,12 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
       expect(configAfterFirst?.threshold_cents).toBe(10000);
       expect(configAfterFirst?.disabled_reason).toBeNull();
 
+      // A saved card replaces the reason for an earlier refusal.
+      await db
+        .update(auto_top_up_configs)
+        .set({ charge_refused_at: new Date().toISOString() })
+        .where(eq(auto_top_up_configs.owned_by_organization_id, org.id));
+
       const orgAfterFirst = await db.query.organizations.findFirst({
         where: eq(organizations.id, org.id),
       });
@@ -3521,6 +3536,7 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
       expect(configAfterSecond?.amount_cents).toBe(5000);
       expect(configAfterSecond?.threshold_cents).toBe(5000);
       expect(configAfterSecond?.disabled_reason).toBeNull();
+      expect(configAfterSecond?.charge_refused_at).toBeNull();
     } finally {
       retrieveSpy.mockRestore();
     }
@@ -3593,6 +3609,7 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
       stripe_payment_method_id: `pm_lock_user_${Math.random()}`,
       amount_cents: 2000,
       attempt_started_at: new Date().toISOString(),
+      charge_refused_at: new Date().toISOString(),
     });
 
     const processTopUpMock = processTopUp as jest.MockedFunction<typeof processTopUp>;
@@ -3628,6 +3645,7 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
         where: eq(auto_top_up_configs.owned_by_user_id, user.id),
       });
       expect(userConfig?.attempt_started_at).toBeNull();
+      expect(userConfig?.charge_refused_at).toBeNull();
     } finally {
       processTopUpMock.mockRestore();
     }

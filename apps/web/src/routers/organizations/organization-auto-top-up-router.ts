@@ -128,6 +128,7 @@ export const organizationAutoTopUpRouter = createTRPCRouter({
             .set({
               disabled_reason: null,
               attempt_started_at: null,
+              charge_refused_at: null,
               ...(amountCents != null ? { amount_cents: amountCents } : {}),
               ...(thresholdCents != null ? { threshold_cents: thresholdCents } : {}),
             })

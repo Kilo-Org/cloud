@@ -4285,6 +4285,8 @@
       "discoveryNoModels": "L'indirizzo di accesso non ha elencato alcun modello. Inserisci i modelli manualmente.",
       "connectionIncomplete": "Il modello ha risposto ma non ha completato la richiesta. Riprova, oppure controlla l'ID del modello e il protocollo.",
       "invalidInput": "Inserisci un nome per il servizio, intestazioni valide e almeno un modello con ID e nome univoci. I limiti dei token devono essere numeri interi positivi.",
+      "invalidApiKey": "La chiave API contiene un carattere che non può essere inviato. Usa solo lettere, cifre e simboli standard, senza interruzioni di riga.",
+      "invalidHeaders": "Non è possibile inviare un'intestazione personalizzata. Controlla il suo nome e usa solo lettere, cifre e simboli standard, senza interruzioni di riga.",
       "invalidUrl": "Inserisci un URL di base dell'API HTTP o HTTPS senza credenziali, parametri di ricerca o un frammento.",
       "publicHttp": "Gli indirizzi di accesso HTTP pubblici non sono consentiti. Usa HTTPS o un indirizzo di accesso locale privato.",
       "httpApprovalRequired": "Approva questo indirizzo di accesso HTTP locale prima di salvare o connetterti.",

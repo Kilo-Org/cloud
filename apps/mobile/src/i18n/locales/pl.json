@@ -4364,6 +4364,8 @@
       "discoveryNoModels": "Punkt końcowy nie zwrócił żadnych modeli. Wprowadź modele ręcznie.",
       "connectionIncomplete": "Model odpowiedział, ale nie ukończył żądania. Spróbuj ponownie lub sprawdź ID modelu i protokół.",
       "invalidInput": "Wprowadź nazwę backendu, prawidłowe nagłówki i co najmniej jeden model z unikalnym ID i nazwą. Limity tokenów muszą być dodatnimi liczbami całkowitymi.",
+      "invalidApiKey": "Klucz API zawiera znak, którego nie można wysłać. Użyj wyłącznie liter, cyfr i standardowych symboli, bez podziałów wiersza.",
+      "invalidHeaders": "Nie można wysłać niestandardowego nagłówka. Sprawdź jego nazwę i używaj wyłącznie liter, cyfr i standardowych symboli, bez podziałów wiersza.",
       "invalidUrl": "Wprowadź główny adres API HTTP lub HTTPS bez danych uwierzytelniających, zapytania ani fragmentu.",
       "publicHttp": "Publiczne punkty końcowe HTTP są niedozwolone. Użyj HTTPS lub prywatnego lokalnego punktu końcowego.",
       "httpApprovalRequired": "Zatwierdź ten lokalny punkt końcowy HTTP przed zapisaniem lub połączeniem.",

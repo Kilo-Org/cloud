@@ -4285,6 +4285,8 @@
       "discoveryNoModels": "Le point de terminaison n'a listé aucun modèle. Saisissez les modèles manuellement.",
       "connectionIncomplete": "Le modèle a commencé à répondre, mais n'a pas terminé. Réessayez, ou vérifiez l'identifiant du modèle et le protocole.",
       "invalidInput": "Saisissez un nom de service, des en-têtes valides et au moins un modèle avec un identifiant unique et un nom. Les limites de jetons doivent être des nombres entiers strictement positifs.",
+      "invalidApiKey": "La clé API contient un caractère qui ne peut pas être envoyé. Utilisez uniquement des lettres, des chiffres et des symboles standard, sans saut de ligne.",
+      "invalidHeaders": "Un en-tête personnalisé ne peut pas être envoyé. Vérifiez son nom et utilisez uniquement des lettres, des chiffres et des symboles standard, sans saut de ligne.",
       "invalidUrl": "Saisissez une URL racine d'API HTTP ou HTTPS sans identifiants d'authentification, paramètres de requête ni fragment.",
       "publicHttp": "Les points de terminaison HTTP publics ne sont pas autorisés. Utilisez HTTPS ou un point de terminaison local privé.",
       "httpApprovalRequired": "Autorisez ce point de terminaison HTTP local avant d'enregistrer ou de vous connecter.",

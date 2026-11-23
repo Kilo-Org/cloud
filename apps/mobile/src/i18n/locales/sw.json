@@ -4206,6 +4206,8 @@
       "discoveryNoModels": "Sehemu ya muunganisho haikuorodhesha modeli yoyote. Ingiza modeli mwenyewe.",
       "connectionIncomplete": "Modeli ilijibu lakini haikukamilisha. Jaribu tena, au angalia kitambulisho cha modeli na itifaki.",
       "invalidInput": "Weka jina la huduma, vichwa halali na angalau modeli moja yenye kitambulisho na jina la kipekee. Vikomo vya tokeni lazima viwe namba kamili kubwa kuliko sifuri.",
+      "invalidApiKey": "Ufunguo wa API una herufi ambayo haiwezi kutumwa. Tumia herufi, namba na alama za kawaida tu, bila mapumziko ya mstari.",
+      "invalidHeaders": "Kichwa maalumu hakiwezi kutumwa. Angalia jina lake na tumia herufi, namba na alama za kawaida tu, bila mapumziko ya mstari.",
       "invalidUrl": "Weka URL ya msingi ya API inayotumia HTTP au HTTPS bila taarifa za uthibitishaji, hoja ya utafutaji au kipande cha URL.",
       "publicHttp": "Sehemu za muunganisho za HTTP za umma haziruhusiwi. Tumia HTTPS au sehemu ya muunganisho ya ndani ya mtandao binafsi.",
       "httpApprovalRequired": "Idhinisha sehemu hii ya muunganisho ya HTTP ya ndani kabla ya kuhifadhi au kuunganisha.",

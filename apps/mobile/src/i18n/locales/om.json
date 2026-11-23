@@ -4206,6 +4206,8 @@
       "discoveryNoModels": "Bakki walqunnamtii moodeela tokkoon iyyuu hin tarreessine. Moodeelota harkaan galchi.",
       "connectionIncomplete": "Moodeelli deebii kenneera garuu hin xumurre. Irra deebi'ii yaali, ykn ID moodeelaa fi pirootokoolii ilaali.",
       "invalidInput": "Maqaa sirna duubaa, matadureewwan sirrii fi yoo xiqqaate moodeela tokko ID fi maqaa adda ta'e qabu galchi. Daangaawwan tokanootaa lakkoofsota guutuu zeeroo caalan ta'uu qabu.",
+      "invalidApiKey": "Furtuu API keessatti mallattoo erguu hin dandeenye jira. Qubee, lakkoofsota fi mallattoowwan idilee qofa fayyadami, cituu sararaa malee.",
+      "invalidHeaders": "Mataduree dhuunfaa erguu hin danda'amu. Maqaa isaa mirkaneessi; qubee, lakkoofsota fi mallattoowwan idilee qofa fayyadami, cituu sararaa malee.",
       "invalidUrl": "Hundee API HTTP ykn HTTPS odeeffannoo mirkaneessa eenyummaa, gaaffii barbaachaa ykn kutaa URL hin qabne galchi.",
       "publicHttp": "Bakkeewwan walqunnamtii HTTP uummataaf banaa ta'an hin hayyamaman. HTTPS ykn bakka walqunnamtii naannoo dhuunfaa fayyadami.",
       "httpApprovalRequired": "Osoo hin kuusin ykn hin walqunnamsiisin dura bakka walqunnamtii HTTP naannoo kana hayyami.",

@@ -4285,6 +4285,8 @@
       "discoveryNoModels": "El punt de connexió no ha llistat cap model. Introdueix els models manualment.",
       "connectionIncomplete": "El model ha respost però no ha acabat. Torna-ho a provar o comprova l'ID del model i el protocol.",
       "invalidInput": "Introdueix un nom de servidor, capçaleres vàlides i almenys un model amb un ID i un nom únics. Els límits de tòkens han de ser nombres enters positius.",
+      "invalidApiKey": "La clau de l'API conté un caràcter que no es pot enviar. Utilitza només lletres, dígits i símbols estàndard, sense salts de línia.",
+      "invalidHeaders": "No es pot enviar una capçalera personalitzada. Comprova'n el nom i utilitza només lletres, dígits i símbols estàndard, sense salts de línia.",
       "invalidUrl": "Introdueix una arrel d'API HTTP o HTTPS sense credencials, consulta ni fragment.",
       "publicHttp": "No es permeten punts de connexió HTTP públics. Utilitza HTTPS o un punt de connexió local privat.",
       "httpApprovalRequired": "Autoritza aquest punt de connexió HTTP local abans de desar-lo o connectar-t'hi.",

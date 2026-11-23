@@ -4206,6 +4206,8 @@
       "discoveryNoModels": "Pika fundore nuk renditi asnjë model. Fut modelet manualisht.",
       "connectionIncomplete": "Modeli u përgjigj, por nuk përfundoi. Provo sërish, ose kontrollo ID-në e modelit dhe protokollin.",
       "invalidInput": "Fut një emër për shërbimin mbështetës, kryefusha të vlefshme dhe të paktën një model me ID dhe emër unik. Kufijtë e tokenëve duhet të jenë numra të plotë pozitivë.",
+      "invalidApiKey": "Çelësi API përmban një karakter që nuk mund të dërgohet. Përdor vetëm shkronja, shifra dhe simbole standarde, pa ndarje rreshtash.",
+      "invalidHeaders": "Një kryefushë e personalizuar nuk mund të dërgohet. Kontrollo emrin e saj dhe përdor vetëm shkronja, shifra dhe simbole standarde, pa ndarje rreshtash.",
       "invalidUrl": "Fut një URL bazë API me HTTP ose HTTPS, pa të dhëna hyrjeje, parametra kërkimi ose fragment.",
       "publicHttp": "Pikat fundore publike HTTP nuk lejohen. Përdor HTTPS ose një pikë fundore lokale private.",
       "httpApprovalRequired": "Mirato këtë pikë fundore lokale HTTP përpara se ta ruash ose të lidhesh me të.",

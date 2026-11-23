@@ -4206,6 +4206,8 @@
       "discoveryNoModels": "Amaiera-puntuak ez du modelorik zerrendatu. Sartu modeloak eskuz.",
       "connectionIncomplete": "Modeloak erantzun du, baina ez du amaitu. Saiatu berriro, edo egiaztatu modeloaren IDa eta protokoloa.",
       "invalidInput": "Sartu atzeko zerbitzuaren izena, baliozko goiburuak eta gutxienez ID eta izen bakarrak dituen modelo bat. Tokenen mugek zenbaki oso positiboak izan behar dute.",
+      "invalidApiKey": "API gakoak bidali ezin den karaktere bat dauka. Erabili letrak, digituak eta sinbolo estandarrak soilik, lerro-jauzirik gabe.",
+      "invalidHeaders": "Ezin da goiburu pertsonalizatu bat bidali. Egiaztatu bere izena eta erabili letrak, digituak eta sinbolo estandarrak soilik, lerro-jauzirik gabe.",
       "invalidUrl": "Sartu HTTP edo HTTPS APIaren erro bat, kredentzialik, kontsultarik edo zatirik gabe.",
       "publicHttp": "Ez dira onartzen HTTP amaierako puntu publikoak. Erabili HTTPS edo tokiko amaierako puntu pribatu bat.",
       "httpApprovalRequired": "Onartu tokiko HTTP amaierako puntu hau gorde edo konektatu aurretik.",

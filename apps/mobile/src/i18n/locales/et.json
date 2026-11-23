@@ -4206,6 +4206,8 @@
       "discoveryNoModels": "Lõpp-punkt ei loetlenud ühtki mudelit. Sisesta mudelid käsitsi.",
       "connectionIncomplete": "Mudel vastas, kuid ei lõpetanud. Proovi uuesti või kontrolli mudeli ID-d ja protokolli.",
       "invalidInput": "Sisesta taustsüsteemi nimi, kehtivad päised ja vähemalt üks kordumatu ID ja nimega mudel. Tokenite piirangud peavad olema positiivsed täisarvud.",
+      "invalidApiKey": "API võti sisaldab märki, mida ei saa saata. Kasuta ainult tähti, numbreid ja standardseid sümboleid, ilma reavahetusteta.",
+      "invalidHeaders": "Kohandatud päist ei saa saata. Kontrolli selle nime ja kasuta ainult tähti, numbreid ja standardseid sümboleid, ilma reavahetusteta.",
       "invalidUrl": "Sisesta HTTP või HTTPS API juur-URL ilma autentimisandmete, päringustringi ja fragmendita.",
       "publicHttp": "Avalikud HTTP lõpp-punktid pole lubatud. Kasuta HTTPS-i või privaatset kohalikku lõpp-punkti.",
       "httpApprovalRequired": "Enne salvestamist või ühenduse loomist kiida see kohalik HTTP lõpp-punkt heaks.",

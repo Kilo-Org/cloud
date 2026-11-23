@@ -4285,6 +4285,8 @@
       "discoveryNoModels": "Endpointul nu a listat niciun model. Introdu modelele manual.",
       "connectionIncomplete": "Modelul a răspuns, dar nu a terminat. Încearcă din nou sau verifică ID-ul modelului și protocolul.",
       "invalidInput": "Introdu un nume de backend, antete valide și cel puțin un model cu ID și nume unice. Limitele de tokenuri trebuie să fie numere întregi pozitive.",
+      "invalidApiKey": "Cheia API conține un caracter care nu poate fi trimis. Folosește doar litere, cifre și simboluri standard, fără întreruperi de linie.",
+      "invalidHeaders": "Un antet personalizat nu poate fi trimis. Verifică-i numele și folosește doar litere, cifre și simboluri standard, fără întreruperi de linie.",
       "invalidUrl": "Introdu o rădăcină API HTTP sau HTTPS fără credențiale, interogare sau fragment.",
       "publicHttp": "Endpointurile HTTP publice nu sunt permise. Folosește HTTPS sau un endpoint local privat.",
       "httpApprovalRequired": "Aprobă acest endpoint HTTP local înainte de a salva sau de a te conecta.",

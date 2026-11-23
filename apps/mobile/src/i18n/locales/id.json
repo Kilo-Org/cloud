@@ -4206,6 +4206,8 @@
       "discoveryNoModels": "Titik akhir tidak mencantumkan model apa pun. Masukkan model secara manual.",
       "connectionIncomplete": "Model menjawab tetapi tidak menyelesaikan permintaan. Coba lagi, atau periksa ID model dan protokol.",
       "invalidInput": "Masukkan nama layanan, tajuk yang valid, dan setidaknya satu model dengan ID dan nama yang unik. Batas token harus berupa bilangan bulat positif.",
+      "invalidApiKey": "Kunci API berisi karakter yang tidak dapat dikirim. Gunakan hanya huruf, angka, dan simbol standar, tanpa jeda baris.",
+      "invalidHeaders": "Tajuk kustom tidak dapat dikirim. Periksa namanya dan gunakan hanya huruf, angka, dan simbol standar, tanpa jeda baris.",
       "invalidUrl": "Masukkan URL dasar API HTTP atau HTTPS tanpa kredensial, kueri, atau fragmen.",
       "publicHttp": "Titik akhir HTTP publik tidak diizinkan. Gunakan HTTPS atau titik akhir lokal privat.",
       "httpApprovalRequired": "Setujui titik akhir HTTP lokal ini sebelum menyimpan atau menghubungkannya.",

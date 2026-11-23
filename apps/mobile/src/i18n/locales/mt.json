@@ -4443,6 +4443,8 @@
       "discoveryNoModels": "Il-punt ta' aċċess ma llista l-ebda mudell. Daħħal il-mudelli manwalment.",
       "connectionIncomplete": "Il-mudell wieġeb iżda ma lestiex. Erġa' pprova, jew iċċekkja l-ID tal-mudell u l-protokoll.",
       "invalidInput": "Daħħal isem għas-servizz, intestaturi validi u mill-inqas mudell wieħed b'ID u isem uniċi. Il-limiti tal-unitajiet tat-test iridu jkunu numri sħaħ pożittivi.",
+      "invalidApiKey": "Iċ-ċavetta tal-API fiha karattru li ma jistax jintbagħat. Uża biss ittri, ċifri u simboli standard, mingħajr ebda qlib tal-linja.",
+      "invalidHeaders": "Intestatura personalizzata ma tistax tintbagħat. Iċċekkja isimha u uża biss ittri, ċifri u simboli standard, mingħajr ebda qlib tal-linja.",
       "invalidUrl": "Daħħal URL bażi tal-API li juża HTTP jew HTTPS mingħajr kredenzjali, parametri ta' mistoqsija jew framment.",
       "publicHttp": "Punti ta' aċċess pubbliċi li jużaw HTTP mhumiex permessi. Uża HTTPS jew punt ta' aċċess lokali privat.",
       "httpApprovalRequired": "Approva dan il-punt ta' aċċess lokali li juża HTTP qabel issalva jew tikkonnettja.",

@@ -4522,6 +4522,8 @@
       "discoveryNoModels": "Ni restrir unrhyw fodelau gan y pwynt terfyn. Rhowch fodelau i mewn â llaw.",
       "connectionIncomplete": "Atebodd y model ond ni orffennodd. Rhowch gynnig arall arni, neu gwiriwch ID y model a'r protocol.",
       "invalidInput": "Rhowch enw ôl-ben, penawdau dilys ac o leiaf un model ag ID ac enw unigryw. Rhaid i derfynau tocynnau fod yn gyfanrifau positif.",
+      "invalidApiKey": "Mae'r allwedd API yn cynnwys cymeriad na ellir ei anfon. Defnyddiwch lythrennau, digidau a symbolau safonol yn unig, heb doriadau llinell.",
+      "invalidHeaders": "Ni ellir anfon pennawd personol. Gwiriwch ei enw a defnyddiwch lythrennau, digidau a symbolau safonol yn unig, heb doriadau llinell.",
       "invalidUrl": "Rhowch wraidd API HTTP neu HTTPS heb fanylion adnabod, ymholiad na darn.",
       "publicHttp": "Ni chaniateir pwyntiau terfyn HTTP cyhoeddus. Defnyddiwch HTTPS neu bwynt terfyn lleol preifat.",
       "httpApprovalRequired": "Cymeradwywch y pwynt terfyn HTTP lleol hwn cyn cadw neu gysylltu.",

@@ -4206,6 +4206,8 @@
       "discoveryNoModels": "Tsy nisy modely notanisain'ny adiresy fifandraisana. Ampidiro amin'ny tanana ny modely.",
       "connectionIncomplete": "Namaly ny modely fa tsy nahavita. Andramo indray, na hamarino ny famantarana ny modely sy ny fitsipika fifandraisana.",
       "invalidInput": "Ampidiro ny anaran'ny rafitra mpizara, ny sahan-doha manan-kery ary modely iray farafahakeliny manana famantarana sy anarana tsy miverina. Tsy maintsy isa manontolo miabo ny fetran'ny singa lahatsoratra.",
+      "invalidApiKey": "Misy marika tsy azo alefa ao amin'ny fanalahidy API. Ampiasao litera, isa ary marika mahazatra ihany, tsy misy fitoloana andalana.",
+      "invalidHeaders": "Tsy azo alefa ny sahan-doha namboarina manokana. Hamarino ny anarany ary ampiasao litera, isa ary marika mahazatra ihany, tsy misy fitoloana andalana.",
       "invalidUrl": "Ampidiro ny fototry ny API mampiasa HTTP na HTTPS, tsy misy mombamomba ny fidirana, masontsivana fikarohana na sombin'ny URL.",
       "publicHttp": "Tsy azo ampiasaina ny adiresy fifandraisana HTTP ho an'ny daholobe. Mampiasà HTTPS na adiresy fifandraisana eo an-toerana tsy azon'ny daholobe idirana.",
       "httpApprovalRequired": "Ankatoavy ity adiresy fifandraisana HTTP eo an-toerana ity alohan'ny hitahirizana na hifandraisana.",

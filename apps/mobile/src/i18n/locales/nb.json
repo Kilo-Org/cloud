@@ -4206,6 +4206,8 @@
       "discoveryNoModels": "Endepunktet listet ingen modeller. Legg inn modeller manuelt.",
       "connectionIncomplete": "Modellen svarte, men fullførte ikke. Prøv igjen, eller sjekk modell-ID-en og protokollen.",
       "invalidInput": "Skriv inn et navn på baksystemet, gyldige meldingshoder og minst én modell med unik ID og unikt navn. Tokengrensene må være positive heltall.",
+      "invalidApiKey": "API-nøkkelen inneholder et tegn som ikke kan sendes. Bruk bare bokstaver, tall og standardtegn, uten linjeskift.",
+      "invalidHeaders": "En egendefinert meldingshode kan ikke sendes. Kontroller navnet, og bruk bare bokstaver, tall og standardtegn, uten linjeskift.",
       "invalidUrl": "Skriv inn en HTTP- eller HTTPS-rotadresse for API-et uten påloggingsinformasjon, spørring eller fragment.",
       "publicHttp": "Offentlige HTTP-endepunkter er ikke tillatt. Bruk HTTPS eller et privat, lokalt endepunkt.",
       "httpApprovalRequired": "Godkjenn dette lokale HTTP-endepunktet før du lagrer eller kobler til.",

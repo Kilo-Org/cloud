@@ -4206,6 +4206,8 @@
       "discoveryNoModels": "Het eindpunt gaf geen modellen. Voer modellen handmatig in.",
       "connectionIncomplete": "Het model heeft geantwoord maar is niet klaar. Probeer het opnieuw of controleer de model-ID en het protocol.",
       "invalidInput": "Voer een naam voor de chatserver, geldige verzoekheaders en minstens één model met een unieke ID en naam in. Tokenlimieten moeten positieve gehele getallen zijn.",
+      "invalidApiKey": "De API-sleutel bevat een teken dat niet kan worden verzonden. Gebruik alleen letters, cijfers en standaardsymbolen, zonder regeleinden.",
+      "invalidHeaders": "Een aangepaste verzoekheader kan niet worden verzonden. Controleer de naam en gebruik alleen letters, cijfers en standaardsymbolen, zonder regeleinden.",
       "invalidUrl": "Voer een HTTP- of HTTPS-basis-URL voor de API in zonder aanmeldgegevens, query of fragment.",
       "publicHttp": "Openbare HTTP-eindpunten zijn niet toegestaan. Gebruik HTTPS of een privé-eindpunt op het lokale netwerk.",
       "httpApprovalRequired": "Geef toestemming voor dit lokale HTTP-eindpunt voordat je opslaat of verbinding maakt.",

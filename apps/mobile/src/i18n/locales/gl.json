@@ -4206,6 +4206,8 @@
       "discoveryNoModels": "O punto de acceso non listou ningún modelo. Introduce os modelos manualmente.",
       "connectionIncomplete": "O modelo respondeu pero non rematou. Téntao de novo ou comproba o ID do modelo e o protocolo.",
       "invalidInput": "Introduce un nome de servizo, cabeceiras válidas e polo menos un modelo cun ID único e un nome. Os límites de tókens deben ser números enteiros positivos.",
+      "invalidApiKey": "A clave da API contén un carácter que non se pode enviar. Usa só letras, díxitos e símbolos estándar, sen saltos de liña.",
+      "invalidHeaders": "Non se pode enviar unha cabeceira personalizada. Comproba o seu nome e usa só letras, díxitos e símbolos estándar, sen saltos de liña.",
       "invalidUrl": "Introduce un URL raíz da API con HTTP ou HTTPS, sen credenciais, parámetros de consulta nin un fragmento.",
       "publicHttp": "Non se permiten puntos de acceso HTTP públicos. Usa HTTPS ou un punto de acceso local privado.",
       "httpApprovalRequired": "Autoriza este punto de acceso HTTP local antes de gardar ou conectar.",

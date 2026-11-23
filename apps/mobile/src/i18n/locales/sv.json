@@ -4206,6 +4206,8 @@
       "discoveryNoModels": "Slutpunkten listade inga modeller. Ange modeller manuellt.",
       "connectionIncomplete": "Modellen svarade men slutförde inte. Försök igen eller kontrollera modell-ID:t och protokollet.",
       "invalidInput": "Ange ett backendnamn, giltiga headers och minst en modell med unikt ID och namn. Tokengränser måste vara positiva heltal.",
+      "invalidApiKey": "API-nyckeln innehåller ett tecken som inte kan skickas. Använd endast bokstäver, siffror och standardtecken, utan radbrytningar.",
+      "invalidHeaders": "En anpassad header kan inte skickas. Kontrollera dess namn och använd endast bokstäver, siffror och standardtecken, utan radbrytningar.",
       "invalidUrl": "Ange en HTTP- eller HTTPS-API-rot utan inloggningsuppgifter, frågesträng eller fragment.",
       "publicHttp": "Publika HTTP-slutpunkter är inte tillåtna. Använd HTTPS eller en privat lokal slutpunkt.",
       "httpApprovalRequired": "Godkänn den här lokala HTTP-slutpunkten innan du sparar eller ansluter.",

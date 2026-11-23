@@ -81,6 +81,37 @@ describe('ProfileOverviewScreen import gate', () => {
     unmount();
   });
 
+  it('terminal read then recovery: the sheet does not reopen without a tap', async () => {
+    h.query.data = testProfile();
+    h.query.isPending = false;
+
+    const { renderer, queryClient, unmount } = await mountScreen();
+    pressImportRow(renderer.root);
+    await waitFor(() => findAll(renderer.root, 'ProfileConfigImportSheet').length === 1);
+
+    // The refusal unmounts the sheet, and the same key then answers again: the
+    // open flag went with the refusal, so the recovered content comes back
+    // without a sheet nobody asked for.
+    Object.assign(h.query, { isError: true, error: { data: { code: 'FORBIDDEN' } } });
+    await act(async () => {
+      rerenderScreen(renderer, queryClient);
+      await Promise.resolve();
+    });
+    expect(findAll(renderer.root, 'ProfileConfigImportSheet')).toHaveLength(0);
+
+    Object.assign(h.query, { isError: false, error: undefined });
+    await act(async () => {
+      rerenderScreen(renderer, queryClient);
+      await Promise.resolve();
+    });
+    expect(findAll(renderer.root, 'ProfileConfigImportSheet')).toHaveLength(0);
+    expect(findAll(renderer.root, 'ConfigureRow').map(node => node.props.title)).toContain(
+      IMPORT_ROW
+    );
+
+    unmount();
+  });
+
   it('retryable read: a server failure keeps the open sheet and shows the banner', async () => {
     h.query.data = testProfile();
     h.query.isPending = false;

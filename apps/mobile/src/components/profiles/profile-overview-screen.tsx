@@ -150,6 +150,8 @@ export function ProfileOverviewScreen({
   // It renders only while the overview read has not been refused terminally,
   // and a `read-only` permission closes it from inside the sheet. The role does
   // not gate the mount: a role still resolving must not discard a pasted config.
+  // The flag itself closes with a terminal refusal below, so a read that later
+  // answers successfully does not reopen the sheet on its own.
   const [importOpen, setImportOpen] = useState(false);
 
   const profile = profileQuery.data;
@@ -175,6 +177,15 @@ export function ProfileOverviewScreen({
   // same way). A retryable failure keeps the cached profile usable under the
   // banner.
   const showContent = profile !== undefined && (errorView === null || errorView.showRetry);
+  // The config-import sheet lasts only as long as the read that offered it. A
+  // terminal refusal hides the content and unmounts the sheet, so its own open
+  // flag closes with it: leaving it set would reopen the sheet without a tap
+  // once the same key answered successfully again.
+  useEffect(() => {
+    if (!showContent) {
+      setImportOpen(false);
+    }
+  }, [showContent]);
   // With no profile to show, the error is the whole surface; a retryable
   // failure over a cached profile keeps it a banner above the content.
   const errorOwnsSurface = errorView !== null && !showContent;

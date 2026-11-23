@@ -1633,7 +1633,6 @@
     "council": {
       "title": "Revisió en consell",
       "subtitle": "Diversos especialistes revisen cada pull request i els seus vots es combinen en una sola decisió.",
-      "enable": "Activa el consell",
       "unavailablePersonallyTitle": "Necessita una organització Enterprise",
       "unavailablePersonally": "La revisió en consell no forma part d'un compte d'ús personal.",
       "unavailablePersonallyAction": "Crea una organització",

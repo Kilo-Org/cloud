@@ -1603,7 +1603,6 @@
     "council": {
       "title": "Tanácsellenőrzés",
       "subtitle": "Több szakértő ellenőrzi az egyes PR-eket, és szavazataik egyetlen döntéssé állnak össze.",
-      "enable": "Tanács engedélyezése",
       "unavailablePersonallyTitle": "Enterprise szervezet szükséges",
       "unavailablePersonally": "A tanácsellenőrzés nem része a személyes fióknak.",
       "unavailablePersonallyAction": "Szervezet létrehozása",

@@ -1037,7 +1037,6 @@
     "council": {
       "title": "Tinjauan dewan",
       "subtitle": "Beberapa spesialis meninjau setiap PR, dan suara mereka digabungkan menjadi satu keputusan.",
-      "enable": "Aktifkan dewan",
       "unavailablePersonallyTitle": "Memerlukan organisasi Enterprise",
       "unavailablePersonally": "Tinjauan dewan bukan bagian dari akun pribadi.",
       "unavailablePersonallyAction": "Buat organisasi",

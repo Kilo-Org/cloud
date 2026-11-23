@@ -1693,7 +1693,6 @@
     "council": {
       "title": "Athbhreithniú comhairle",
       "subtitle": "Déanann roinnt speisialtóirí athbhreithniú ar gach iarratas tarraingthe, agus cuirtear a vótaí le chéile in aon chinneadh amháin.",
-      "enable": "Cumasaigh an chomhairle",
       "unavailablePersonallyTitle": "Teastaíonn eagraíocht Enterprise",
       "unavailablePersonally": "Níl athbhreithniú comhairle mar chuid de chuntas pearsanta.",
       "unavailablePersonallyAction": "Cruthaigh eagraíocht",

@@ -1603,7 +1603,6 @@
     "council": {
       "title": "Pagsusuri ng konseho",
       "subtitle": "Sinusuri ng ilang espesyalista ang bawat pull request, at pinagsasama ang kanilang mga boto sa iisang desisyon.",
-      "enable": "Paganahin ang konseho",
       "unavailablePersonallyTitle": "Kailangan ng Enterprise na organisasyon",
       "unavailablePersonally": "Hindi bahagi ng personal na account ang pagsusuri ng konseho.",
       "unavailablePersonallyAction": "Gumawa ng organisasyon",

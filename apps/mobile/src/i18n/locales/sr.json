@@ -1633,7 +1633,6 @@
     "council": {
       "title": "Pregled veća",
       "subtitle": "Nekoliko stručnjaka pregleda svaki pull request, a njihovi glasovi se spajaju u jednu odluku.",
-      "enable": "Uključi pregled veća",
       "unavailablePersonallyTitle": "Potrebna je Enterprise organizacija",
       "unavailablePersonally": "Pregled veća nije deo ličnog naloga.",
       "unavailablePersonallyAction": "Napravi organizaciju",

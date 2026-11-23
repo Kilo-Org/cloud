@@ -1633,7 +1633,6 @@
     "council": {
       "title": "Revizuire în consiliu",
       "subtitle": "Mai mulți experți revizuiesc fiecare PR, iar voturile lor se combină într-o singură decizie.",
-      "enable": "Activează revizuirea în consiliu",
       "unavailablePersonallyTitle": "Necesită o organizație Enterprise",
       "unavailablePersonally": "Revizuirea în consiliu nu face parte dintr-un cont personal.",
       "unavailablePersonallyAction": "Creează organizația",

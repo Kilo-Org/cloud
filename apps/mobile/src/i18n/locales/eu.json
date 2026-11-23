@@ -1603,7 +1603,6 @@
     "council": {
       "title": "Kontseilu-berrikuspena",
       "subtitle": "Hainbat espezialistak berrikusten dute bateratze-eskaera bakoitza, eta haien botoak erabaki bakarrean batzen dira.",
-      "enable": "Gaitu kontseilua",
       "unavailablePersonallyTitle": "Enterprise erakundea behar du",
       "unavailablePersonally": "Kontseilu-berrikuspena ez da kontu pertsonal baten parte.",
       "unavailablePersonallyAction": "Sortu erakundea",

@@ -1577,7 +1577,6 @@
     "council": {
       "title": "Semakan panel",
       "subtitle": "Beberapa pakar menyemak setiap permintaan penarikan, dan undian mereka digabungkan menjadi satu keputusan.",
-      "enable": "Dayakan panel",
       "unavailablePersonallyTitle": "Memerlukan organisasi Enterprise",
       "unavailablePersonally": "Semakan panel bukan sebahagian daripada akaun peribadi.",
       "unavailablePersonallyAction": "Cipta organisasi",

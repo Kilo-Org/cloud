@@ -1603,7 +1603,6 @@
     "council": {
       "title": "Խորհրդի ստուգում",
       "subtitle": "Մի քանի մասնագետ ստուգում է յուրաքանչյուր PR, և նրանց ձայները միավորվում են մեկ որոշման մեջ։",
-      "enable": "Միացնել խորհուրդը",
       "unavailablePersonallyTitle": "Անհրաժեշտ է Enterprise կազմակերպություն",
       "unavailablePersonally": "Խորհրդի ստուգումը անձնական հաշվի մաս չէ։",
       "unavailablePersonallyAction": "Ստեղծել կազմակերպություն",

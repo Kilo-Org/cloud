@@ -1603,7 +1603,6 @@
     "council": {
       "title": "ਕੌਂਸਲ ਸਮੀਖਿਆ",
       "subtitle": "ਕਈ ਮਾਹਰ ਹਰ ਪੁੱਲ ਰਿਕਵੈਸਟ ਦੀ ਸਮੀਖਿਆ ਕਰਦੇ ਹਨ ਅਤੇ ਉਨ੍ਹਾਂ ਦੀਆਂ ਵੋਟਾਂ ਇੱਕ ਫੈਸਲੇ ਵਿੱਚ ਜੁੜ ਜਾਂਦੀਆਂ ਹਨ।",
-      "enable": "ਕੌਂਸਲ ਸਮੀਖਿਆ ਚਾਲੂ ਕਰੋ",
       "unavailablePersonallyTitle": "Enterprise ਸੰਗਠਨ ਦੀ ਲੋੜ ਹੈ",
       "unavailablePersonally": "ਕੌਂਸਲ ਸਮੀਖਿਆ ਨਿੱਜੀ ਖਾਤੇ ਦਾ ਹਿੱਸਾ ਨਹੀਂ ਹੈ।",
       "unavailablePersonallyAction": "ਸੰਸਥਾ ਬਣਾਓ",

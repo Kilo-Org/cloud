@@ -1633,7 +1633,6 @@
     "council": {
       "title": "Pregled vijeća",
       "subtitle": "Nekoliko stručnjaka pregledava svaki zahtjev za povlačenje, a njihovi se glasovi spajaju u jednu odluku.",
-      "enable": "Omogući vijeće",
       "unavailablePersonallyTitle": "Potrebna je Enterprise organizacija",
       "unavailablePersonally": "Pregled vijeća nije dio osobnog računa.",
       "unavailablePersonallyAction": "Stvori organizaciju",

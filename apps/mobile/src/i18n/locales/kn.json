@@ -1603,7 +1603,6 @@
     "council": {
       "title": "ಪರಿಶೀಲನಾ ಮಂಡಳಿ",
       "subtitle": "ಹಲವು ತಜ್ಞರು ಪ್ರತಿ ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಅನ್ನು ಪರಿಶೀಲಿಸುತ್ತಾರೆ ಮತ್ತು ಅವರ ಮತಗಳು ಒಂದೇ ನಿರ್ಧಾರವಾಗಿ ಸೇರುತ್ತವೆ.",
-      "enable": "ಮಂಡಳಿಯನ್ನು ಸಕ್ರಿಯಗೊಳಿಸಿ",
       "unavailablePersonallyTitle": "Enterprise ಸಂಸ್ಥೆ ಅಗತ್ಯವಿದೆ",
       "unavailablePersonally": "ಪರಿಶೀಲನಾ ಮಂಡಳಿಯು ವೈಯಕ್ತಿಕ ಖಾತೆಯ ಭಾಗವಲ್ಲ.",
       "unavailablePersonallyAction": "ಸಂಸ್ಥೆಯನ್ನು ರಚಿಸಿ",

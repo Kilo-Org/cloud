@@ -1603,7 +1603,6 @@
     "council": {
       "title": "Kengash koʻrib chiqishi",
       "subtitle": "Bir nechta mutaxassis har bir PRni koʻrib chiqadi va ularning ovozlari bitta qarorga birlashadi.",
-      "enable": "Kengash koʻrib chiqishini yoqish",
       "unavailablePersonallyTitle": "Enterprise tashkiloti talab qilinadi",
       "unavailablePersonally": "Kengash koʻrib chiqishi shaxsiy hisobning bir qismi emas.",
       "unavailablePersonallyAction": "Tashkilot yaratish",

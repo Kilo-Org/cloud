@@ -1603,7 +1603,6 @@
     "council": {
       "title": "Советен преглед",
       "subtitle": "Секој PR го прегледуваат неколку специјалисти, а нивните гласови се спојуваат во една одлука.",
-      "enable": "Овозможи совет",
       "unavailablePersonallyTitle": "Потребна е Enterprise организација",
       "unavailablePersonally": "Советниот преглед не е дел од лична сметка.",
       "unavailablePersonallyAction": "Креирај организација",

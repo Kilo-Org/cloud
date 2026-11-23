@@ -1603,7 +1603,6 @@
     "council": {
       "title": "Şura yoxlaması",
       "subtitle": "Hər pull request-i bir neçə mütəxəssis yoxlayır və onların səsləri vahid qərarda birləşir.",
-      "enable": "Şuranı aktivləşdir",
       "unavailablePersonallyTitle": "Enterprise təşkilatı tələb olunur",
       "unavailablePersonally": "Şura yoxlaması şəxsi hesabın bir hissəsi deyil.",
       "unavailablePersonallyAction": "Təşkilat yarat",

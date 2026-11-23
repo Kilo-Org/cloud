@@ -1011,7 +1011,6 @@
     "council": {
       "title": "Revisione del gruppo di revisori",
       "subtitle": "Diversi specialisti revisionano ogni pull request e i loro voti si combinano in un'unica decisione.",
-      "enable": "Attiva il gruppo di revisori",
       "unavailablePersonallyTitle": "Richiede un'organizzazione Enterprise",
       "unavailablePersonally": "La revisione del gruppo di revisori non fa parte di un account personale.",
       "unavailablePersonallyAction": "Crea organizzazione",

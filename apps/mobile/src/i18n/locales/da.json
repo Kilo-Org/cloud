@@ -1603,7 +1603,6 @@
     "council": {
       "title": "Rådsgennemgang",
       "subtitle": "Flere specialister gennemgår hver pull request, og deres stemmer samles til én beslutning.",
-      "enable": "Aktivér rådet",
       "unavailablePersonallyTitle": "Kræver en Enterprise-organisation",
       "unavailablePersonally": "Rådsgennemgang er ikke en del af en personlig konto.",
       "unavailablePersonallyAction": "Opret organisation",

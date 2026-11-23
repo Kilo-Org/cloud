@@ -1011,7 +1011,6 @@
     "council": {
       "title": "Revue en conseil",
       "subtitle": "Plusieurs spécialistes examinent chaque pull request, et leurs votes sont combinés en une seule décision.",
-      "enable": "Activer le conseil",
       "unavailablePersonallyTitle": "Nécessite une organisation Enterprise",
       "unavailablePersonally": "La revue en conseil ne fait pas partie d'un compte personnel.",
       "unavailablePersonallyAction": "Créer une organisation",

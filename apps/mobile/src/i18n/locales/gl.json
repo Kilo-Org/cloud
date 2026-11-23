@@ -1603,7 +1603,6 @@
     "council": {
       "title": "Revisión en consello",
       "subtitle": "Varios especialistas revisan cada pull request e os seus votos combínanse nunha única decisión.",
-      "enable": "Activar o consello",
       "unavailablePersonallyTitle": "Precisa unha organización Enterprise",
       "unavailablePersonally": "A revisión en consello non forma parte dunha conta persoal.",
       "unavailablePersonallyAction": "Crear unha organización",

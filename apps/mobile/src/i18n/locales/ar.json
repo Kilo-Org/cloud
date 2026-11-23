@@ -1057,7 +1057,6 @@
     "council": {
       "title": "مراجعة المجلس",
       "subtitle": "يراجع عدة متخصصين كل طلب دمج، وتُجمع أصواتهم في قرار واحد.",
-      "enable": "تفعيل المجلس",
       "unavailablePersonallyTitle": "يتطلب مؤسسة Enterprise",
       "unavailablePersonally": "مراجعة المجلس ليست جزءًا من الحساب الشخصي.",
       "unavailablePersonallyAction": "إنشاء مؤسسة",

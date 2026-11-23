@@ -273,7 +273,7 @@ const renderedTexts = (renderer: MountedRenderer) =>
 const specialistToggle = (title: string) =>
   state.toggleProps.findLast(props => props.title === title);
 
-const councilSwitch = () => state.toggleProps.findLast(props => props.title === 'Enable council');
+const councilSwitch = () => state.toggleProps.findLast(props => props.title === 'Council');
 
 type LabelFieldProps = {
   value: string;

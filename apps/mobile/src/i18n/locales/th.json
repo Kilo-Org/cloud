@@ -1576,7 +1576,6 @@
     "council": {
       "title": "การตรวจสอบโดยคณะ",
       "subtitle": "ผู้เชี่ยวชาญหลายคนตรวจสอบแต่ละ PR และคะแนนเสียงของพวกเขาจะรวมเป็นการตัดสินใจเดียว",
-      "enable": "เปิดการตรวจสอบโดยคณะ",
       "unavailablePersonallyTitle": "ต้องมีองค์กร Enterprise",
       "unavailablePersonally": "การตรวจสอบโดยคณะไม่รวมอยู่ในบัญชีส่วนตัว",
       "unavailablePersonallyAction": "สร้างองค์กร",

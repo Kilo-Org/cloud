@@ -1603,7 +1603,6 @@
     "council": {
       "title": "የጉባኤ ግምገማ",
       "subtitle": "በርካታ ባለሙያዎች እያንዳንዱን የመሳብ ጥያቄ ይገመግማሉ፤ ድምፆቻቸውም ወደ አንድ ውሳኔ ይጣመራሉ።",
-      "enable": "ጉባኤን ያንቁ",
       "unavailablePersonallyTitle": "Enterprise ድርጅት ያስፈልጋል",
       "unavailablePersonally": "የጉባኤ ግምገማ የግል መለያ አካል አይደለም።",
       "unavailablePersonallyAction": "ድርጅት ፍጠር",

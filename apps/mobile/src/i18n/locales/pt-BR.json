@@ -1015,7 +1015,6 @@
     "council": {
       "title": "Revisão do conselho",
       "subtitle": "Vários especialistas revisam cada PR e os votos deles se combinam em uma única decisão.",
-      "enable": "Ativar revisão do conselho",
       "unavailablePersonallyTitle": "Precisa de uma organização Enterprise",
       "unavailablePersonally": "A revisão do conselho não faz parte de uma conta pessoal.",
       "unavailablePersonallyAction": "Criar organização",

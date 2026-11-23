@@ -1603,7 +1603,6 @@
     "council": {
       "title": "Ráðsyfirferð",
       "subtitle": "Nokkrir sérfræðingar fara yfir hverja samrunabeiðni og atkvæði þeirra sameinast í eina ákvörðun.",
-      "enable": "Virkja ráðið",
       "unavailablePersonallyTitle": "Þarf Enterprise stofnun",
       "unavailablePersonally": "Ráðsyfirferð er ekki hluti af persónulegum reikningi.",
       "unavailablePersonallyAction": "Stofna félag",

@@ -1603,7 +1603,6 @@
     "council": {
       "title": "पुनरावलोकन मंडळ",
       "subtitle": "अनेक तज्ज्ञ प्रत्येक पुल रिक्वेस्टचे पुनरावलोकन करतात आणि त्यांची मते एका निर्णयात एकत्र येतात.",
-      "enable": "मंडळ चालू करा",
       "unavailablePersonallyTitle": "Enterprise संस्था आवश्यक आहे",
       "unavailablePersonally": "पुनरावलोकन मंडळ हे वैयक्तिक खात्याचा भाग नाही.",
       "unavailablePersonallyAction": "संस्था तयार करा",

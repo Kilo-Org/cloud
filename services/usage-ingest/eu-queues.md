@@ -91,8 +91,7 @@ existing source, and stops if the DLQ has any consumer, the source cannot be con
 to keep at least the default four-day retention, or its `delivery_paused` value is explicitly
 `true` or malformed. Preparation accepts an omitted `delivery_paused` response or explicit
 `false`; omission is API-shape compatibility, not proof of active delivery. Operator verification
-of attachment, staging processing and the production source stall alert still gates production
-cutover. Preparation changes none of these settings. After the other pairs it creates a missing
+of attachment and the production source stall alert still gates merging the switch-on change. Preparation changes none of these settings. After the other pairs it creates a missing
 DLQ (maximum retention) and
 then a missing source, each in EU and read back, raises the DLQ's retention like the
 others, and never detaches the tagged consumer. Any other tagged-pair shape fails the config

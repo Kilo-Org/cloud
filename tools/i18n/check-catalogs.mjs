@@ -1017,7 +1017,12 @@ function checkVisibilitySeparators(values, label) {
   return problems;
 }
 
-/** The agent editor's catalog rules, applied to English and to every locale. */
+/**
+ * The agent editor's catalog rules. The separator rule judges any catalog,
+ * English included. The verbatim rule reads a translated catalog against the
+ * English reference, so it does not run on the English pass, where the two maps
+ * would be the same.
+ */
 function checkAgentEditorCopy(values, english, label) {
   return [
     ...checkVisibilitySeparators(values, label),
@@ -2248,8 +2253,10 @@ function isSerializedJson(value) {
  * config placeholder shows the shape the stored value takes, so its braces and
  * quoted key are the content, not a storage slip. It is registered in
  * `VERBATIM_KEYS` too, because `checkVerbatimLabels` requires the English text.
- * Every other key, verbatim or not, still fails a serialized value — including
- * the English catalog, where `checkVerbatimLabels` cannot see a deviation.
+ * Every other key, verbatim or not, still fails a serialized value. The
+ * verbatim rule reads a locale against the English reference, so it cannot see
+ * a deviation in the English catalog itself, and the storage-slip rule is the
+ * only guard there.
  */
 const JSON_SAMPLE_KEY = 'profiles.mcp.jsonPlaceholder';
 
@@ -2299,7 +2306,7 @@ function checkEnglishCatalog({ catalogName, english, englishValues, structuredKe
   const label = `${catalogName}/en`;
   return [
     ...checkEnglishValues({ catalogName, english, englishValues, structuredKeys }),
-    ...checkAgentEditorCopy(english, english, label),
+    ...checkVisibilitySeparators(english, label),
     ...checkPullRequestTerm(english, label),
     ...checkChangelogAreaLabels('en', english, label),
   ];
@@ -2310,13 +2317,12 @@ function checkKeyParity({
   label,
   tag,
   selectableCategories,
-  english,
+  englishFacts,
   translated,
-  englishFamilies,
-  englishCountedBases,
   localeFamilies,
   structuredKeys,
 }) {
+  const { english, families: englishFamilies, countedBases: englishCountedBases } = englishFacts;
   const problems = [];
   const selectable = selectableCategories(tag);
   for (const key of english.keys()) {
@@ -2380,7 +2386,8 @@ function checkKeyParity({
  * declares under a flat counted English key is not asked for that form; a
  * family English declares is still covered by the key-parity rule.
  */
-function checkPluralCategories({ label, tag, english, translated, selectableCategories }) {
+function checkPluralCategories({ label, tag, englishFacts, translated, selectableCategories }) {
+  const { english } = englishFacts;
   const problems = [];
   const host = new Intl.PluralRules(tag).resolvedOptions().pluralCategories;
   const selectable = selectableCategories(tag);
@@ -2425,18 +2432,8 @@ function checkUnselectablePluralCategories({ label, tag, translated, selectableC
 }
 
 /** The value rules every translated key passes, in emission order. */
-function checkTranslatedValues({
-  label,
-  tag,
-  english,
-  translated,
-  englishFamilies,
-  englishCountedBases,
-  englishValues,
-  mustTranslateKeys,
-  destructiveChecks,
-  structuredKeys,
-}) {
+function checkTranslatedValues({ label, tag, englishFacts, translated, structuredKeys }) {
+  const { english, destructiveChecks } = englishFacts;
   const problems = [];
   const ownValues = new Set(translated.values());
   for (const [key, value] of translated) {
@@ -2452,12 +2449,9 @@ function checkTranslatedValues({
         ...checkAddedPluralForm({
           label,
           tag,
-          english,
+          englishFacts,
           key,
           value,
-          englishFamilies,
-          englishCountedBases,
-          englishValues,
           ownValues,
           structuredKeys,
         })
@@ -2469,15 +2463,13 @@ function checkTranslatedValues({
       ...checkTranslatedValue({
         label,
         tag,
-        english,
+        englishFacts,
         key,
         value,
         englishValue,
-        englishValues,
         ownValues,
         cancelValue: translated.get('common.cancel'),
         rejectContainingCancel: destructiveChecks.get(key),
-        mustTranslateKeys,
         structuredKeys,
       })
     );
@@ -2491,18 +2483,13 @@ function checkTranslatedValues({
  * reference for that category. A key that is not an admitted family member is
  * the extra-key rule's finding and passes nothing here.
  */
-function checkAddedPluralForm({
-  label,
-  tag,
-  english,
-  key,
-  value,
-  englishFamilies,
-  englishCountedBases,
-  englishValues,
-  ownValues,
-  structuredKeys,
-}) {
+function checkAddedPluralForm({ label, tag, englishFacts, key, value, ownValues, structuredKeys }) {
+  const {
+    english,
+    families: englishFamilies,
+    countedBases: englishCountedBases,
+    values: englishValues,
+  } = englishFacts;
   const problems = [];
   const parts = pluralParts(key);
   if (
@@ -2542,17 +2529,16 @@ function checkAddedPluralForm({
 function checkTranslatedValue({
   label,
   tag,
-  english,
+  englishFacts,
   key,
   value,
   englishValue,
-  englishValues,
   ownValues,
   cancelValue,
   rejectContainingCancel,
-  mustTranslateKeys,
   structuredKeys,
 }) {
+  const { english, values: englishValues, mustTranslateKeys } = englishFacts;
   const problems = [];
   // A structured key is the document rule's finding alone: its flattened value
   // is not prose, so no check below has anything to say about it.
@@ -2841,15 +2827,11 @@ function checkCatalogLocales({
   selectableCategories,
   present,
   supported,
-  english,
-  englishFamilies,
-  englishCountedBases,
-  englishValues,
-  mustTranslateKeys,
-  destructiveChecks,
+  englishFacts,
   sharedWordings,
   wordingExceptions,
 }) {
+  const { english } = englishFacts;
   const problems = [];
   const catalogName = catalog.name;
   const localeValues = new Map();
@@ -2895,17 +2877,15 @@ function checkCatalogLocales({
       ...checkKeyParity({
         label,
         tag,
-        english,
+        englishFacts,
         translated,
-        englishFamilies,
-        englishCountedBases,
         localeFamilies,
         selectableCategories,
         structuredKeys: catalog.structuredKeys,
       })
     );
     problems.push(
-      ...checkPluralCategories({ label, tag, english, translated, selectableCategories })
+      ...checkPluralCategories({ label, tag, englishFacts, translated, selectableCategories })
     );
     problems.push(
       ...checkUnselectablePluralCategories({ label, tag, translated, selectableCategories })
@@ -2914,13 +2894,8 @@ function checkCatalogLocales({
       ...checkTranslatedValues({
         label,
         tag,
-        english,
+        englishFacts,
         translated,
-        englishFamilies,
-        englishCountedBases,
-        englishValues,
-        mustTranslateKeys,
-        destructiveChecks,
         structuredKeys: catalog.structuredKeys,
       })
     );
@@ -3412,6 +3387,17 @@ export function checkCatalogs(root = ROOT) {
     }
     const sharedWordings = [...wordingGroups].filter(([, keys]) => keys.length > 1);
     const destructiveChecks = destructiveConfirmKeys(source, english);
+    // The English reference one catalog's rules read, built once and never
+    // mutated, so a new rule-specific fact is one field here rather than a
+    // parameter on every rule layer.
+    const englishFacts = Object.freeze({
+      english,
+      families: englishFamilies,
+      countedBases: englishCountedBases,
+      values: englishValues,
+      mustTranslateKeys,
+      destructiveChecks,
+    });
 
     problems.push(
       ...checkEnglishCatalog({
@@ -3428,12 +3414,7 @@ export function checkCatalogs(root = ROOT) {
       selectableCategories: catalog.selectableCategoriesOf,
       present,
       supported,
-      english,
-      englishFamilies,
-      englishCountedBases,
-      englishValues,
-      mustTranslateKeys,
-      destructiveChecks,
+      englishFacts,
       sharedWordings,
       wordingExceptions,
     });

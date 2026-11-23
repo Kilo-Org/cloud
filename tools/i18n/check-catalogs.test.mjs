@@ -1876,9 +1876,8 @@ test('rejects a catalog that translates the sampling parameter label', () => {
 });
 
 test('rejects a serialized JSON value in a verbatim English label', () => {
-  // `checkVerbatimLabels` compares English with itself, so it cannot catch a
-  // verbatim key whose English text is JSON: the storage-slip rule is the only
-  // guard there, and it must stay on for every key but the JSON sample.
+  // The verbatim rule reads a locale against the English reference, so it cannot
+  // catch JSON in the English catalog; only the storage-slip rule can.
   const topP = '{"value":"Top P"}';
   const found = run({
     english: {

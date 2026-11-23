@@ -145,6 +145,7 @@ describe('formatGitLabRepositoriesForPrompt budget', () => {
     const omitted = Number(/- Projects not listed here: (\d+)\./.exec(listLines[listed])?.[1]);
 
     expect(list.length).toBeLessThanOrEqual(REPOSITORY_PROMPT_MAX_CHARACTERS);
+    expect(listed).toBeGreaterThan(0);
     expect(listed).toBeLessThan(REPOSITORY_PROMPT_MAX_REPOSITORIES);
     expect(listed + omitted).toBe(repositories.length);
   });

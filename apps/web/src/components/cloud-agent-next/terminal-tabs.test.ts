@@ -40,6 +40,10 @@ import {
 
 Object.assign(globalThis, { React });
 
+jest.mock('@/hooks/useEnvironmentSetupRuns', () => ({
+  useEnvironmentSetupRunBySession: () => ({ data: null }),
+}));
+
 let mockSessionId: string | null = 'ses_recent';
 let mockAtParam: string | null = null;
 let mockWorktreeId: string | null = 'worktree_shared';

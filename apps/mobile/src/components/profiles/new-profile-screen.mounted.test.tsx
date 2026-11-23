@@ -36,8 +36,6 @@ function pressBack(): void {
   });
 }
 
-
-
 // ── Tests ──────────────────────────────────────────────────────────────────
 
 describe('NewProfileScreen', () => {

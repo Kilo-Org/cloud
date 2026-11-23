@@ -197,6 +197,47 @@ describe('BlockedImageChip link naming', () => {
     await unmount(renderer);
   });
 
+  it('does not repeat a link host written in mixed case', async () => {
+    const renderer = await mountImage({
+      uri: 'http://insecure.com/a.png',
+      alt: '',
+      accessibilityLabel: 'Insecure.com',
+      onPress: () => undefined,
+    });
+
+    expect(linkChipLabels(renderer.root)).toEqual([HTTP_CHIP_LINE_WITHOUT_ALT]);
+
+    await unmount(renderer);
+  });
+
+  it('does not repeat a link host written with the default port', async () => {
+    const renderer = await mountImage({
+      uri: 'http://insecure.com/a.png',
+      alt: '',
+      accessibilityLabel: 'insecure.com:80',
+      onPress: () => undefined,
+    });
+
+    expect(linkChipLabels(renderer.root)).toEqual([HTTP_CHIP_LINE_WITHOUT_ALT]);
+
+    await unmount(renderer);
+  });
+
+  it('merges a link name that only looks like the drawn host', async () => {
+    const renderer = await mountImage({
+      uri: 'http://insecure.com/a.png',
+      alt: '',
+      accessibilityLabel: 'other.example',
+      onPress: () => undefined,
+    });
+
+    expect(linkChipLabels(renderer.root)).toEqual([
+      `${HTTP_CHIP_LINE_WITHOUT_ALT} and other.example`,
+    ]);
+
+    await unmount(renderer);
+  });
+
   it('merges a link name that the chip does not draw', async () => {
     const renderer = await mountImage({
       uri: 'http://insecure.com/a.png',

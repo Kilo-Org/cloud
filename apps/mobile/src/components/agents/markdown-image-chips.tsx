@@ -50,10 +50,15 @@ export function BlockedImageChip({
   const line = chipLine([description, host, t('agentChat.markdownImage.httpsOnly')]);
   // Inside a link the chip is that link's control, so its name carries the
   // link's own name the way the loaded image's name does — but only when that
-  // name adds something: an untitled image link is named after its alt text
-  // (or, with no alt, after the href host), which the drawn line already says.
+  // name adds something. An untitled image link is named after its alt text, or
+  // with no alt after the href authority as written, while the drawn host is
+  // the lowercased key with a default port dropped; compare the link name in
+  // that same form, or a chip drawing the host reads it twice.
+  const writtenLinkHost = linkLabel?.toLowerCase();
+  const linkRepeatsHost =
+    host !== null && (writtenLinkHost === host || writtenLinkHost === `${host}:80`);
   const linkAddsName =
-    linkLabel !== undefined && linkLabel !== '' && linkLabel !== description && linkLabel !== host;
+    linkLabel !== undefined && linkLabel !== '' && linkLabel !== description && !linkRepeatsHost;
   const label = linkAddsName ? formatList([line, linkLabel], i18n.language) : line;
   const body = (
     <>

@@ -56,7 +56,7 @@ type Tab = 'models' | 'providers' | 'gateways';
  * the Cancel/Save pair above it cannot move at any system font scale. 1.4 is
  * the bounded-footer precedent (`CONSENT_DISCLOSURE_MAX_FONT_SCALE`).
  */
-export const STATUS_MAX_FONT_SCALE = 1.4;
+const STATUS_MAX_FONT_SCALE = 1.4;
 
 /**
  * One `text-sm` line box at scale 1, in dp: `text-sm` is 0.875rem with a

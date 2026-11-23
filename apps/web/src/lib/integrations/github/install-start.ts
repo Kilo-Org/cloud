@@ -9,8 +9,36 @@ import {
 } from '@/lib/integrations/platforms/github/app-selector';
 import { resolveAuthorizedOwner } from '@/lib/integrations/resolve-owner';
 import { canOrganizationUseMultipleGitHubInstallations } from '@/lib/integrations/github/multiple-installations';
-import { getPrimaryGitHubIntegrationForOrganization } from '@/lib/integrations/db/platform-integrations';
+import {
+  listOrganizationGitHubInstallationSlots,
+  type OrganizationGitHubInstallationSlot,
+} from '@/lib/integrations/db/platform-integrations';
+import { holdsGitHubInstallationSlot } from '@/lib/integrations/db/predicates';
+import { isPlatformIntegrationHealthy } from '@/lib/integrations/core/health';
 import { createInstallState } from '@/lib/integrations/github/install-state';
+
+/**
+ * Why the install page is refused for an organization that holds its single
+ * installation slot, or null when the slot is free.
+ *
+ * An organization may start an installation only when the completion gate
+ * would accept one: `connectVerifiedGitHubInstallation` refuses a second
+ * installation while any association that is not locally disconnected holds the
+ * slot, and refuses an installation whose canonical record is suspended. The
+ * start gate therefore reads the same associations, so a user is never sent to
+ * GitHub to create an installation that completion then rejects. The message
+ * names the recovery the organization already has: restore the connection on
+ * GitHub, or disconnect it in Kilo.
+ */
+export function describeGitHubInstallStartRefusal(
+  slots: readonly OrganizationGitHubInstallationSlot[]
+): string | null {
+  const occupied = slots.filter(holdsGitHubInstallationSlot);
+  if (occupied.length === 0) return null;
+  return occupied.every(isPlatformIntegrationHealthy)
+    ? 'This organization already has a GitHub installation. Disconnect it before installing another.'
+    : "This organization's GitHub connection is suspended or needs attention. Restore or disconnect it before installing again.";
+}
 
 /**
  * Mints the single-use install state that starts a GitHub App installation.
@@ -30,20 +58,11 @@ export async function beginGitHubAppInstall(
   );
 
   if (owner.type === 'org' && !canOrganizationUseMultipleGitHubInstallations(owner.id)) {
-    // The single-installation slot belongs to the organization's live
-    // workflow connection. Anything else still leaves the slot free to
-    // start an installation from: a pending request awaiting a GitHub
-    // organization admin's approval carries no installation id yet, and a
-    // suspended association is a connection GitHub will not serve until it
-    // is restored, so neither is a reason to refuse the install page. A
-    // locally disconnected row keeps relinquishing its slot, which the
-    // connection's health predicate already expresses.
-    const workflowConnection = await getPrimaryGitHubIntegrationForOrganization(owner.id);
-    if (workflowConnection) {
-      throw new TRPCError({
-        code: 'FORBIDDEN',
-        message: 'This organization already has a GitHub installation',
-      });
+    const refusal = describeGitHubInstallStartRefusal(
+      await listOrganizationGitHubInstallationSlots(owner.id)
+    );
+    if (refusal) {
+      throw new TRPCError({ code: 'FORBIDDEN', message: refusal });
     }
   }
 

@@ -26,6 +26,7 @@ import { lockProviderOAuthOwnerRow } from '@/lib/integrations/provider-oauth-att
 import { parsePlatformRepositoryCache } from '@/lib/integrations/core/schemas';
 import {
   effectiveAppTypeCondition,
+  liveGitHubInstallationSlotSql,
   occupiesAnotherGitHubInstallationSlot,
   ownerCondition,
 } from '@/lib/integrations/db/predicates';
@@ -228,15 +229,13 @@ export async function connectVerifiedGitHubInstallation(
           and(
             eq(platform_integrations.owned_by_organization_id, owner.id),
             eq(platform_integrations.platform, PLATFORM.GITHUB),
-            // A locally disconnected connection has relinquished its slot; it
-            // must not block attaching a different installation. This is
+            // A locally disconnected connection has relinquished its slot, so
+            // it must not block attaching a different installation. This is
             // deliberately narrower than the holder rule the connection role
-            // uses (`getGitHubInstallationHolderRejectionReason`): this check
-            // decides how many installations the organization holds, and a
-            // suspended association is restored to active by
-            // `observeGitHubInstallationLifecycle`, so it must keep occupying
-            // the slot.
-            isNull(platform_integrations.github_disconnected_at)
+            // uses (`getGitHubInstallationHolderRejectionReason`): a suspended
+            // association is restored to active by
+            // `observeGitHubInstallationLifecycle`, so it keeps its slot.
+            liveGitHubInstallationSlotSql()
           )
         );
       const hasAnotherInstallation = ownerIntegrations.some(integration =>

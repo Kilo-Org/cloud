@@ -4,7 +4,10 @@ import { TRPCError } from '@trpc/server';
 import type { PlatformIntegration, User } from '@kilocode/db/schema';
 import type { Owner } from '@/lib/integrations/core/types';
 import type { GitHubAppType } from '@/lib/integrations/platforms/github/app-selector';
-import type { UpsertPlatformIntegrationResult } from '@/lib/integrations/db/platform-integrations';
+import type {
+  OrganizationGitHubInstallationSlot,
+  UpsertPlatformIntegrationResult,
+} from '@/lib/integrations/db/platform-integrations';
 import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import {
   GITHUB_LISTING_BUDGET_MESSAGE,
@@ -68,8 +71,8 @@ const mockSeedUserGithubToken =
 const mockListIntegrations = jest.fn<(owner: Owner) => Promise<PlatformIntegration[]>>();
 const mockListNativelyUninstallableIds =
   jest.fn<(integrations: readonly PlatformIntegration[]) => Promise<Set<string>>>();
-const mockGetPrimaryGitHubIntegrationForOrganization =
-  jest.fn<(organizationId: string) => Promise<PlatformIntegration | null>>();
+const mockListOrganizationGitHubInstallationSlots =
+  jest.fn<(organizationId: string) => Promise<OrganizationGitHubInstallationSlot[]>>();
 const mockUninstallApp = jest.fn<() => Promise<{ success: boolean; message: string }>>();
 const mockCheckUserPendingInstallation =
   jest.fn<
@@ -145,8 +148,8 @@ jest.mock('@/lib/integrations/db/platform-integrations', () => ({
   ) => mockFindIntegrationByInstallationId(platform, installationId, appType),
   syncIntegrationInstallationDetails: (integrationId: string, details: Record<string, unknown>) =>
     mockSyncIntegrationInstallationDetails(integrationId, details),
-  getPrimaryGitHubIntegrationForOrganization: (organizationId: string) =>
-    mockGetPrimaryGitHubIntegrationForOrganization(organizationId),
+  listOrganizationGitHubInstallationSlots: (organizationId: string) =>
+    mockListOrganizationGitHubInstallationSlots(organizationId),
 }));
 jest.mock('@/lib/integrations/db/github-installations', () => ({
   canUninstallGitHubInstallation: jest.fn(
@@ -335,7 +338,7 @@ describe('githubAppsRouter organization install capability', () => {
     mockGetGitHubAppTypeForOrganization.mockResolvedValue('standard');
     mockCreateInstallState.mockResolvedValue('install-token');
     mockListIntegrations.mockResolvedValue([]);
-    mockGetPrimaryGitHubIntegrationForOrganization.mockResolvedValue(null);
+    mockListOrganizationGitHubInstallationSlots.mockResolvedValue([]);
     mockUninstallApp.mockResolvedValue({ success: true, message: 'GitHub App uninstalled' });
   });
 
@@ -538,32 +541,55 @@ describe('githubAppsRouter organization install capability', () => {
 
   it('refuses to mint another install state while the live workflow connection holds the slot', async () => {
     mockEnsureOrganizationAccess.mockResolvedValue('owner');
-    mockGetPrimaryGitHubIntegrationForOrganization.mockResolvedValue(organizationIntegration());
+    mockListOrganizationGitHubInstallationSlots.mockResolvedValue([
+      {
+        installationId: '123456',
+        integration_status: 'active',
+        suspended_at: null,
+        auth_invalid_at: null,
+      },
+    ]);
     const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
 
     await expect(caller.mintInstallState({ organizationId })).rejects.toMatchObject({
       code: 'FORBIDDEN',
     });
-    expect(mockGetPrimaryGitHubIntegrationForOrganization).toHaveBeenCalledWith(organizationId);
+    expect(mockListOrganizationGitHubInstallationSlots).toHaveBeenCalledWith(organizationId);
     expect(mockCreateInstallState).not.toHaveBeenCalled();
   });
 
   it('mints an install state when the organization has no live workflow connection', async () => {
-    // A locally disconnected association, a pending request awaiting a GitHub
-    // organization admin's approval and a suspended association all leave the
-    // slot free; the DB-level contract for those rows lives with the workflow
-    // connection predicate (`github-installations.test.ts`).
     mockEnsureOrganizationAccess.mockResolvedValue('owner');
-    mockGetPrimaryGitHubIntegrationForOrganization.mockResolvedValue(null);
+    mockListOrganizationGitHubInstallationSlots.mockResolvedValue([]);
     const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
 
     await expect(caller.mintInstallState({ organizationId })).resolves.toEqual({
       token: 'install-token',
     });
-    expect(mockGetPrimaryGitHubIntegrationForOrganization).toHaveBeenCalledWith(organizationId);
+    expect(mockListOrganizationGitHubInstallationSlots).toHaveBeenCalledWith(organizationId);
     expect(mockCreateInstallState).toHaveBeenCalledWith(
       expect.objectContaining({ ownerId: organizationId })
     );
+  });
+
+  it('refuses to mint an install state while a suspended association holds the slot', async () => {
+    mockEnsureOrganizationAccess.mockResolvedValue('owner');
+    mockListOrganizationGitHubInstallationSlots.mockResolvedValue([
+      {
+        installationId: '123456',
+        integration_status: 'suspended',
+        suspended_at: new Date().toISOString(),
+        auth_invalid_at: null,
+      },
+    ]);
+    const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
+
+    await expect(caller.mintInstallState({ organizationId })).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message:
+        "This organization's GitHub connection is suspended or needs attention. Restore or disconnect it before installing again.",
+    });
+    expect(mockCreateInstallState).not.toHaveBeenCalled();
   });
 
   it('mints another install state for an allowlisted organization', async () => {

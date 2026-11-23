@@ -1,5 +1,5 @@
 import { platform_integrations } from '@kilocode/db/schema';
-import { eq, sql } from 'drizzle-orm';
+import { eq, isNull, sql, type SQL } from 'drizzle-orm';
 import type { Owner } from '../core/types';
 import type { GitHubAppType } from '../platforms/github/app-selector';
 
@@ -36,6 +36,29 @@ export type GitHubInstallationSlot = {
 };
 
 /**
+ * SQL condition for a GitHub association that still occupies an installation
+ * slot for its owner.
+ *
+ * Only a local disconnect relinquishes the slot: a suspended or auth-invalid
+ * association keeps it, because `observeGitHubInstallationLifecycle` restores
+ * the association to active without touching its role. Every place that decides
+ * whether an owner still holds an installation reads this condition, so the
+ * single-installation rule has one definition.
+ */
+export function liveGitHubInstallationSlotSql(): SQL {
+  return isNull(platform_integrations.github_disconnected_at);
+}
+
+/**
+ * Whether a live association holds the installation slot its identity names. A
+ * row without an installation id — a request GitHub has not installed yet —
+ * holds none.
+ */
+export function holdsGitHubInstallationSlot(existing: { installationId: string | null }): boolean {
+  return existing.installationId !== null;
+}
+
+/**
  * Whether a live association of the owner occupies an installation slot that
  * the association being written must not share.
  *
@@ -52,7 +75,7 @@ export function occupiesAnotherGitHubInstallationSlot(
   existing: GitHubInstallationSlot,
   candidate: { installationId: string; appType: GitHubAppType }
 ): boolean {
-  if (existing.installationId === null) return false;
+  if (!holdsGitHubInstallationSlot(existing)) return false;
   return (
     existing.installationId !== candidate.installationId ||
     (existing.appType ?? 'standard') !== candidate.appType

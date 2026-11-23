@@ -21,6 +21,7 @@ import { canOrganizationUseMultipleGitHubInstallations } from '../github/multipl
 import { ownerFromIntegration } from '../core/owner';
 import {
   effectiveAppTypeCondition,
+  liveGitHubInstallationSlotSql,
   occupiesAnotherGitHubInstallationSlot,
   ownerCondition,
 } from './predicates';
@@ -282,6 +283,45 @@ export async function getPrimaryGitHubIntegrationForOrganization(organizationId:
     .limit(1);
 
   return integration ?? null;
+}
+
+/**
+ * One live GitHub association of an organization, reduced to the installation
+ * slot it holds and the health fields a refusal message reads.
+ */
+export type OrganizationGitHubInstallationSlot = {
+  installationId: string | null;
+  integration_status: string | null;
+  suspended_at: string | null;
+  auth_invalid_at: string | null;
+};
+
+/**
+ * The organization's live GitHub associations, reduced to the installation slot
+ * each holds.
+ *
+ * The install start gate reads this so it refuses an install that
+ * `connectVerifiedGitHubInstallation` would refuse after GitHub has already
+ * created the installation. Both read the same liveness condition.
+ */
+export async function listOrganizationGitHubInstallationSlots(
+  organizationId: string
+): Promise<OrganizationGitHubInstallationSlot[]> {
+  return db
+    .select({
+      installationId: platform_integrations.platform_installation_id,
+      integration_status: platform_integrations.integration_status,
+      suspended_at: platform_integrations.suspended_at,
+      auth_invalid_at: platform_integrations.auth_invalid_at,
+    })
+    .from(platform_integrations)
+    .where(
+      and(
+        eq(platform_integrations.owned_by_organization_id, organizationId),
+        eq(platform_integrations.platform, PLATFORM.GITHUB),
+        liveGitHubInstallationSlotSql()
+      )
+    );
 }
 
 export async function getAllIntegationsForOrganization(organizationId: string) {
@@ -1411,7 +1451,7 @@ export async function upsertPlatformIntegrationForOwner(
               eq(platform_integrations.platform, PLATFORM.GITHUB),
               // A locally disconnected connection has relinquished its slot;
               // it must not block attaching a different installation.
-              isNull(platform_integrations.github_disconnected_at)
+              liveGitHubInstallationSlotSql()
             )
           );
         if (

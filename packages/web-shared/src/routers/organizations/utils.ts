@@ -557,8 +557,7 @@ export function organizationAccessRole(
 
 /**
  * Returns a role for the caller, admitting a support grant only when the exact
- * procedure is on the allowlist. Use this instead of `ensureOrganizationAccess`
- * on allowlisted reads and writes.
+ * procedure is on the allowlist.
  */
 export async function ensureOrganizationAccess(
   ctx: TRPCContext,

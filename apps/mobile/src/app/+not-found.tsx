@@ -13,6 +13,12 @@ import { InvalidRouteState } from '@/components/invalid-route-state';
  * the hardware-back listener a cold deep link to a dead path leaves this route
  * as the only screen, and Android's back finishes the Activity — dropping the
  * user out of the app into whatever was last in front of it.
+ *
+ * This route renders directly under the root `Slot`, which is a plain router
+ * navigator: it emits no transition event, so a push-then-retire could never
+ * remove this route and Back from the app root would return to it. The in-app
+ * exit replaces at this stack position, which needs no retire; the hardware
+ * exit uses the plain router's one-commit replace. Both leave nothing beneath.
  */
 export default function NotFound() {
   const router = useRouter();

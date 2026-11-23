@@ -676,6 +676,7 @@
     "needsInputAction": {
       "approved": "请求已批准",
       "replied": "回复已发送",
+      "empty": "请先填写回答，再发送。",
       "failed": "无法回答。再次点按即可重试。",
       "unavailable": "该请求已不再等待。"
     }
@@ -817,6 +818,8 @@
     },
     "providerConnect": {
       "description": "连接 Kilo {{label}} 以自动审查拉取请求。",
+      "notConnectedTitle": "尚未连接 {{platform}}",
+      "githubAdminOnlyDescription": "只有组织所有者和管理员可以完成连接。",
       "githubApp": "GitHub 应用",
       "githubError": "无法打开 GitHub 配置页面。请重试。",
       "gitlabAccount": "GitLab 账户",
@@ -1689,6 +1692,7 @@
       "couldNotLoadThisSession": "无法加载此会话",
       "historyTooLarge": "此会话的对话记录过大，无法加载。",
       "historyUnavailable": "无法读取此会话的对话记录。",
+      "historyTemporarilyUnavailable": "此会话的对话记录暂时不可用。",
       "cloneFailedRetry": "无法克隆此会话。请重试。",
       "notEnoughCredits": "额度不足，无法处理此请求。请充值后重试。",
       "previousTaskFinishing": "上一个任务正在收尾，请稍等。",
@@ -2225,7 +2229,9 @@
       "skip": "跳过",
       "retrySkip": "再次尝试跳过",
       "submitting": "正在提交……",
-      "sendAnswers": "发送答案"
+      "sendAnswers": "发送答案",
+      "unreadableTitle": "无法显示此问题",
+      "unreadableBody": "Agent 正在等待一个此应用无法显示的问题。请在 CLI 中回答此问题以继续。"
     },
     "blockingCard": {
       "questionUnavailable": "此问题已失效。",
@@ -2252,6 +2258,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "无法加载子智能体会话",
+      "historyTooLarge": "此子智能体的历史记录过大，无法加载。",
+      "historyUnavailable": "此子智能体的历史记录不可用。",
+      "historyTemporarilyUnavailable": "此子智能体的历史记录暂时不可用。",
       "failed": "子智能体会话失败",
       "noMessages": "暂无子智能体消息",
       "noMessagesDescription": "此子智能体会话已完成，但未生成会话记录。",
@@ -2832,6 +2841,8 @@
     "why": "用途",
     "who": "接收方",
     "installAttributionPromptMessage": "Kilo 仅使用 Apple 的跟踪权限来了解你通过哪个渠道安装了应用，绝不会使用你的提示词和对话。",
+    "installAttributionRequestFailedTitle": "无法显示跟踪提示",
+    "installAttributionRequestFailedMessage": "Kilo 无法显示系统提示，因此安装归因保持关闭。",
     "installAttributionPromptTitle": "允许安装归因？"
   },
   "prReview": {
@@ -3399,7 +3410,7 @@
   "organization": {
     "auditLog": {
       "title": "审计日志",
-      "permissionDenied": "只有 Enterprise 套餐组织的所有者、管理员或账单管理员才能查看其审计日志。",
+      "permissionDenied": "只有 Enterprise 套餐组织的所有者、管理员或账单管理员才能查看其审计日志。 $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "暂无审计事件",
       "emptyDescription": "此组织中执行的操作会显示在这里。",
       "truncated": "仅显示最近的事件。",
@@ -3589,7 +3600,7 @@
     },
     "billing": {
       "title": "账单",
-      "permissionDenied": "只有组织所有者、管理员或账单管理员才能查看组织账单。",
+      "permissionDenied": "只有组织所有者、管理员或账单管理员才能查看组织账单。 $t(organization.boundary.accessDeniedDescription)",
       "subscription": "订阅",
       "state": "状态",
       "stateNone": "无订阅",
@@ -3778,7 +3789,7 @@
       "emptyDescription": "使用“上一小时”查看更早的请求。",
       "emptyBoundDescription": "请求日志最多只能追溯到此处。",
       "loadError": "无法加载请求日志。",
-      "permissionDenied": "只有组织的所有者、管理员或账单管理员才能查看其请求日志。",
+      "permissionDenied": "只有组织的所有者、管理员或账单管理员才能查看其请求日志。 $t(organization.boundary.accessDeniedDescription)",
       "tokens": "输入 {{input}} · 输出 {{output}}",
       "byok": "BYOK"
     },
@@ -4044,7 +4055,10 @@
     "list": {
       "loadFailed": "无法加载聊天历史。",
       "new": "新聊天",
-      "deleteTitle": "删除这个聊天？"
+      "deleteTitle": "删除这个聊天？",
+      "resetNoticeTitle": "本地聊天和草稿已清除",
+      "resetNoticeBody": "Kilo 无法打开保存在此设备上的聊天。你的云端会话不受影响。",
+      "resetNoticeDismiss": "忽略通知"
     },
     "rename": {
       "title": "重命名聊天",
@@ -4324,7 +4338,15 @@
       "download": "下载本机模型",
       "downloading": "正在下载…",
       "downloadProgress": "正在下载… {{percent}}%",
-      "downloadFailed": "下载未完成。请检查网络连接和可用存储空间，然后重试。"
+      "downloadFailed": "下载未完成。请检查网络连接和可用存储空间，然后重试。",
+      "cannotUse": "无法运行：{{items}}。",
+      "cannotUseOptions": "无法填写：部分工具选项。",
+      "limitations": "限制",
+      "tools": {
+        "time": "时间",
+        "settingsList": "显示设置",
+        "settingsSet": "更改设置"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "此模型支持思考强度"
@@ -4875,7 +4897,7 @@
     "defaultModel": "使用 Kilo 默认模型",
     "duration": "时间保护上限（分钟）",
     "spendLimit": "花费保护上限（USD）",
-    "invalidSafeguards": "请输入有限的正数时间和花费上限。",
+    "invalidSafeguards": "请输入允许范围内的正数。",
     "estimate": "预估 {{estimate}} · 最高 {{maximum}}",
     "estimateUnavailable": "这些设置下无法获取付费摘要。请更换模型或调整限制，或稍后重试。",
     "confirmPaid": "为 {{context}} 启用付费摘要？",
@@ -4945,7 +4967,8 @@
     "unavailableTitle": "用量不可用",
     "unavailableDescription": "此工作区尚未设置用量。如果认为此处应显示用量，请联系支持团队。",
     "orgSelfNotice": "你看到的是你自己在此组织中的用量。",
-    "viewDetails": "查看用量详情"
+    "viewDetails": "查看用量详情",
+    "orgSelfEntryTitle": "你的用量"
   },
   "integrations": {
     "title": "集成",
@@ -5041,6 +5064,8 @@
       "autoCommit": "运行结束时提交更改",
       "condenseOnComplete": "运行结束时压缩上下文",
       "activeTitle": "触发器已启用",
+      "activeSwitchA11y": "触发器已启用：{{name}}",
+      "copyLinkA11y": "复制链接：{{name}}",
       "activeDescription": "暂停的 Webhook 会返回 404。",
       "runAsCreator": "以我的身份运行",
       "runAsCreatorDescription": "每次运行都会使用你的账号，因此必须填写密钥请求头。",

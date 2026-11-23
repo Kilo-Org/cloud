@@ -38,8 +38,9 @@ function StatTile({ label, value }: Readonly<{ label: string; value: string | nu
 type OrgUsageStatsProps = {
   organizationId: string;
   /**
-   * Turns the section into the entry point for the full usage screen. Absent
-   * leaves the numbers informational.
+   * Turns the section into the entry point for the full usage screen, for a
+   * role that screen answers organization-wide. Absent leaves the numbers
+   * informational.
    */
   onPress?: () => void;
 };
@@ -49,8 +50,11 @@ type OrgUsageStatsProps = {
  * Visible to all org roles.
  *
  * The eyebrow names every member because the tiles are organization-wide
- * totals, while the usage screen the grid opens is self-scoped for a member
- * without a money role (`usage.orgSelfNotice`).
+ * totals. The grid is the entry point to the usage screen only for a role that
+ * screen answers organization-wide; every other role reaches its own usage
+ * through the hub's usage destination row, which names that scope
+ * (`usage.orgSelfEntryTitle`), so the grid stays informational there rather
+ * than opening a screen whose numbers would not match the tiles.
  *
  * The grid carries no entrance animation: it is the section's entire body, so a
  * fade that does not run leaves four cards unpainted while their frames and
@@ -59,6 +63,10 @@ type OrgUsageStatsProps = {
  * With `onPress` the whole grid opens the usage screen. The section cannot load
  * keeps its own retry row instead of the wrapper: a pressable around a retry
  * button leaves the reader guessing which control a tap reaches.
+ *
+ * The two token tiles print the same input and output totals the usage screen
+ * prints, so they use its compact notation and the two screens can be compared
+ * at a glance.
  */
 export function OrgUsageStats({ organizationId, onPress }: Readonly<OrgUsageStatsProps>) {
   const { t } = useTranslation();
@@ -97,11 +105,25 @@ export function OrgUsageStats({ organizationId, onPress }: Readonly<OrgUsageStat
         <View className="flex-row gap-3">
           <StatTile
             label={t('organization.usageStats.inputTokens')}
-            value={data ? formatNumber(data.totalInputTokens, i18n.language) : missingValue}
+            value={
+              data
+                ? formatNumber(data.totalInputTokens, i18n.language, {
+                    notation: 'compact',
+                    maximumFractionDigits: 1,
+                  })
+                : missingValue
+            }
           />
           <StatTile
             label={t('organization.usageStats.outputTokens')}
-            value={data ? formatNumber(data.totalOutputTokens, i18n.language) : missingValue}
+            value={
+              data
+                ? formatNumber(data.totalOutputTokens, i18n.language, {
+                    notation: 'compact',
+                    maximumFractionDigits: 1,
+                  })
+                : missingValue
+            }
           />
         </View>
       </View>

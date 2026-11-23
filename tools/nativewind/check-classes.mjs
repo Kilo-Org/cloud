@@ -18,9 +18,6 @@
  * `Sheet` without its `SheetHeader`, and a `ScreenHeader` `titleContent` in a
  * file that does not own one.
  *
- * Formatting built by hand instead of through `@/lib/intl-cache` skips the tag
- * normalisation every other surface shares, and pins or ignores the locale.
- *
  * Every rule reads the syntax tree oxc builds (tools/lib/ast.mjs): a JSX
  * attribute belongs to its own element, an import specifier is a specifier,
  * and a formatter is a call. Text that only looks like code — a comment, a
@@ -148,9 +145,6 @@ function stepOf(value) {
  *   holding that surface's chunks and names what it found.
  * - `detect` reads the whole file, for a rule whose ban is a shape rather than
  *   a class string, and names what it found.
- *
- * `checkLayout` calls the detector each entry carries, so the dispatch below
- * needs no rule-specific code and a rule's id exists only in the table.
  *
  * Exported for the structural test that keeps this promise: an entry without a
  * detector, a duplicated id, or a second detector on one entry fails there.

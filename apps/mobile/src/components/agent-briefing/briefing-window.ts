@@ -1,7 +1,14 @@
 import { formatDate } from '@/lib/format';
+import { deviceTimeZone } from '@/lib/intl-cache';
 import { parseTimestamp } from '@/lib/utils';
 
 const BRIEFING_DATE_TIME: Intl.DateTimeFormatOptions = { dateStyle: 'medium', timeStyle: 'short' };
+
+/** A briefing instant's text and the zone that text was written in. */
+type BriefingTimestamp = {
+  readonly text: string;
+  readonly timeZone: string;
+};
 
 /**
  * A briefing instant on the report's clock. The night window and every source
@@ -11,19 +18,26 @@ const BRIEFING_DATE_TIME: Intl.DateTimeFormatOptions = { dateStyle: 'medium', ti
  * the device zone, which is what the screen rendered before the zone was read.
  * A zone the runtime cannot resolve falls back the same way, so a report still
  * renders.
+ *
+ * The returned zone is the one the text was actually formatted in, so a caption
+ * beside the text names that zone instead of repeating the requested one: a
+ * zone the runtime refused would otherwise be printed over a device-zone clock.
  */
 export function formatBriefingTimestamp(
   value: string,
   locale: string,
   timeZone: string | undefined
-): string {
+): BriefingTimestamp {
   const date = parseTimestamp(value);
   if (timeZone) {
     try {
-      return formatDate(date, locale, { ...BRIEFING_DATE_TIME, timeZone });
+      return { text: formatDate(date, locale, { ...BRIEFING_DATE_TIME, timeZone }), timeZone };
     } catch {
       // `Intl` rejects a zone name it does not know; the device zone is the fallback.
     }
   }
-  return formatDate(date, locale, BRIEFING_DATE_TIME);
+  return {
+    text: formatDate(date, locale, BRIEFING_DATE_TIME),
+    timeZone: deviceTimeZone(),
+  };
 }

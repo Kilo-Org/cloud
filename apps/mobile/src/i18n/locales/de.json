@@ -399,7 +399,7 @@
       "title": "Anbieterschlüssel",
       "rowSubtitle": "Eigene Anbieterabrechnung nutzen",
       "orgDescription": "Diese Schlüssel werden mit allen in der Organisation geteilt und über deren Anbieterkonten abgerechnet.",
-      "viewOnly": "Nur Inhaber, Admins oder Abrechnungsverantwortliche der Organisation können ihre Schlüssel ändern.",
+      "viewOnly": "Nur Inhaber, Admins oder Abrechnungsmanager der Organisation können ihre Schlüssel ändern.",
       "description": "Anfragen über diese Schlüssel werden über dein Anbieterkonto statt über dein Kilo-Guthaben abgerechnet.",
       "managedByPlan": "Von deinem Coding-Plan verwaltet",
       "enableKey": "{{provider}}-Schlüssel aktivieren",
@@ -676,6 +676,7 @@
     "needsInputAction": {
       "approved": "Anfrage genehmigt",
       "replied": "Antwort gesendet",
+      "empty": "Antwort eingeben und dann senden.",
       "failed": "Konnte nicht antworten. Zum Wiederholen erneut antippen.",
       "unavailable": "Diese Anfrage wartet nicht mehr."
     }
@@ -817,6 +818,8 @@
     },
     "providerConnect": {
       "description": "Stelle die Verbindung über Kilo her ({{label}}), um Pull-Requests automatisch prüfen zu lassen.",
+      "notConnectedTitle": "{{platform}} ist nicht verbunden",
+      "githubAdminOnlyDescription": "Nur Organisationsinhaber und Admins können die Verbindung herstellen.",
       "githubApp": "GitHub-App",
       "githubError": "Die GitHub-Einrichtung konnte nicht geöffnet werden. Bitte versuche es erneut.",
       "gitlabAccount": "GitLab-Konto",
@@ -1026,7 +1029,7 @@
       "empty": "Noch keine Reviews mit Analysen",
       "emptyDescription": "Analysen erfassen abgeschlossene Reviews, solange sie für die Organisation aktiviert sind.",
       "offTitle": "Analysen sind für {{platform}} deaktiviert",
-      "offDescription": "Personen mit Abrechnungsrollen der Organisation (Owner, Admins und Billing-Manager) können Analysen in den Organisationseinstellungen im Web aktivieren, um abgeschlossene Reviews zu erfassen.",
+      "offDescription": "Personen mit Abrechnungsrollen der Organisation (Inhaber, Admins und Abrechnungsmanager) können Analysen in den Organisationseinstellungen im Web aktivieren, um abgeschlossene Reviews zu erfassen.",
       "couldNotLoad": "Analysen konnten nicht geladen werden",
       "trackedReviewsCaption": "Reviews, die in diesem Zeitraum bei aktivierten Analysen abgeschlossen wurden. Laufende und fehlgeschlagene Reviews werden nie gezählt.",
       "trackedReviewsUncounted": "Nicht gezählt: {{displayCount}} von {{displayTotal}} abgeschlossenen Reviews der Organisation ohne erfasstes Ergebnis.",
@@ -1646,12 +1649,12 @@
       "couldNotOpenTitle": "GitHub konnte nicht geöffnet werden",
       "installedTitle": "GitHub-App installiert",
       "installedMessage": "Deine Repositories sind jetzt verbunden.",
-      "pendingTitle": "Genehmigung durch Administrator ausstehend",
-      "pendingMessage": "Ein Organisationsadministrator muss die Installationsanfrage genehmigen.",
+      "pendingTitle": "Genehmigung durch Admin ausstehend",
+      "pendingMessage": "Ein Admin der Organisation muss die Installationsanfrage genehmigen.",
       "accountMismatchTitle": "Konten stimmen nicht überein",
       "accountMismatchMessage": "Du hast diese Verbindung in der Kilo App mit einem anderen Konto gestartet. Melde dich im Browser mit demselben Konto an oder starte den Vorgang in der App erneut.",
       "cannotCompleteTitle": "Installation kann nicht abgeschlossen werden",
-      "notAdminMessage": "Nur ein GitHub-Administrator dieses Kontos kann es verbinden. Bitte einen Administrator deiner Organisation, Kilo zu installieren.",
+      "notAdminMessage": "Nur ein GitHub-Administrator dieses Kontos kann es verbinden. Bitte einen Admin deiner Organisation, Kilo zu installieren.",
       "alreadyClaimedMessage": "Diese GitHub-Installation ist bereits mit einem anderen Kilo-Konto verbunden. Trenne die Verbindung dort zuerst.",
       "installationUnavailableMessage": "Diese GitHub App-Installation ist ausgesetzt oder nicht mehr verfügbar. Stelle sie in GitHub wieder her oder installiere sie dort erneut, und starte dann erneut.",
       "multipleInstallationsMessage": "Diese Kilo-Organisation kann derzeit nur eine einzige GitHub-Organisation verbinden.",
@@ -1689,6 +1692,7 @@
       "couldNotLoadThisSession": "Diese Sitzung konnte nicht geladen werden.",
       "historyTooLarge": "Das Protokoll dieser Sitzung ist zum Laden zu groß.",
       "historyUnavailable": "Das Protokoll dieser Sitzung kann nicht gelesen werden.",
+      "historyTemporarilyUnavailable": "Das Protokoll dieser Sitzung ist vorübergehend nicht verfügbar.",
       "cloneFailedRetry": "Diese Sitzung konnte nicht geklont werden. Versuche es erneut.",
       "notEnoughCredits": "Dein Guthaben reicht für diese Anfrage nicht aus. Lade Guthaben auf und versuche es erneut.",
       "previousTaskFinishing": "Die vorherige Aufgabe wird noch abgeschlossen. Bitte warte einen Moment.",
@@ -2225,7 +2229,9 @@
       "skip": "Überspringen",
       "retrySkip": "Erneut überspringen",
       "submitting": "Wird gesendet…",
-      "sendAnswers": "Antworten senden"
+      "sendAnswers": "Antworten senden",
+      "unreadableTitle": "Diese Frage konnte nicht angezeigt werden",
+      "unreadableBody": "Der Agent wartet auf eine Frage, die diese App nicht anzeigen kann. Beantworte die Frage in der CLI, um fortzufahren."
     },
     "blockingCard": {
       "questionUnavailable": "Diese Frage ist nicht mehr verfügbar.",
@@ -2252,6 +2258,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Die Sitzung des Unteragenten konnte nicht geladen werden.",
+      "historyTooLarge": "Der Verlauf dieses Unteragenten ist zum Laden zu groß.",
+      "historyUnavailable": "Der Verlauf dieses Unteragenten ist nicht verfügbar.",
+      "historyTemporarilyUnavailable": "Der Verlauf dieses Unteragenten ist vorübergehend nicht verfügbar.",
       "failed": "Die Sitzung des Unteragenten ist fehlgeschlagen.",
       "noMessages": "Keine Nachrichten vom Unteragenten",
       "noMessagesDescription": "Die Sitzung dieses Unteragenten wurde ohne Protokoll abgeschlossen.",
@@ -2832,6 +2841,8 @@
     "why": "Warum",
     "who": "Wer",
     "installAttributionPromptMessage": "Kilo nutzt Apples Tracking-Berechtigung nur, um zu erfahren, über welchen Kanal du zur App gefunden hast. Deine Prompts und Unterhaltungen werden dafür niemals verwendet.",
+    "installAttributionRequestFailedTitle": "Tracking-Abfrage konnte nicht angezeigt werden",
+    "installAttributionRequestFailedMessage": "Kilo konnte die Systemabfrage nicht anzeigen, deshalb bleibt die Installationszuordnung ausgeschaltet.",
     "installAttributionPromptTitle": "Installationszuordnung erlauben?"
   },
   "prReview": {
@@ -3399,7 +3410,7 @@
   "organization": {
     "auditLog": {
       "title": "Audit-Log",
-      "permissionDenied": "Nur Inhaber, Admins oder Abrechnungsverantwortliche einer Organisation mit Enterprise-Plan können deren Audit-Log einsehen.",
+      "permissionDenied": "Nur Inhaber, Admins oder Abrechnungsmanager einer Organisation mit Enterprise-Plan können deren Audit-Log einsehen. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Keine Audit-Ereignisse",
       "emptyDescription": "Hier erscheinen Aktionen, die in dieser Organisation ausgeführt werden.",
       "truncated": "Es werden die neuesten Ereignisse angezeigt.",
@@ -3589,7 +3600,7 @@
     },
     "billing": {
       "title": "Abrechnung",
-      "permissionDenied": "Nur Inhaber, Admins oder Abrechnungsverantwortliche einer Organisation können deren Abrechnung sehen.",
+      "permissionDenied": "Nur Inhaber, Admins oder Abrechnungsmanager einer Organisation können deren Abrechnung sehen. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Abonnement",
       "state": "Status",
       "stateNone": "Kein Abonnement",
@@ -3778,7 +3789,7 @@
       "emptyDescription": "Tippe auf „Frühere Stunde“, um frühere Anfragen anzuzeigen.",
       "emptyBoundDescription": "Weiter zurück reichen die Anfrageprotokolle nicht.",
       "loadError": "Anfrage-Logs konnten nicht geladen werden.",
-      "permissionDenied": "Nur Inhaber, Admins oder Abrechnungsverantwortliche einer Organisation können deren Anfrage-Logs einsehen.",
+      "permissionDenied": "Nur Inhaber, Admins oder Abrechnungsmanager einer Organisation können deren Anfrage-Logs einsehen. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} ein · {{output}} aus",
       "byok": "BYOK"
     },
@@ -3840,7 +3851,7 @@
       "nameRequired": "Gruppennamen eingeben.",
       "nameTooLong": "Name auf höchstens 80 Zeichen beschränken.",
       "notFound": "Diese Gruppe existiert nicht mehr.",
-      "permissionDenied": "Nur ein Inhaber oder Administrator einer Organisation kann deren Gruppen ändern.",
+      "permissionDenied": "Nur ein Inhaber oder Admin einer Organisation kann deren Gruppen ändern.",
       "searchMembers": "Mitglieder suchen",
       "selectAllVisible": "Alle angezeigten auswählen"
     },
@@ -4044,7 +4055,10 @@
     "list": {
       "loadFailed": "Chatverlauf konnte nicht geladen werden.",
       "new": "Neuer Chat",
-      "deleteTitle": "Diesen Chat löschen?"
+      "deleteTitle": "Diesen Chat löschen?",
+      "resetNoticeTitle": "Lokale Chats und Entwürfe gelöscht",
+      "resetNoticeBody": "Kilo konnte die lokal gespeicherten Chats nicht öffnen. Deine Cloud-Sitzungen sind nicht betroffen.",
+      "resetNoticeDismiss": "Hinweis ausblenden"
     },
     "rename": {
       "title": "Chat umbenennen",
@@ -4324,7 +4338,15 @@
       "download": "Modell auf dem Gerät herunterladen",
       "downloading": "Wird heruntergeladen…",
       "downloadProgress": "Wird heruntergeladen… {{percent}} %",
-      "downloadFailed": "Der Download wurde nicht abgeschlossen. Prüfe deine Verbindung und den freien Speicherplatz und versuche es dann erneut."
+      "downloadFailed": "Der Download wurde nicht abgeschlossen. Prüfe deine Verbindung und den freien Speicherplatz und versuche es dann erneut.",
+      "cannotUse": "Kann nicht ausgeführt werden: {{items}}.",
+      "cannotUseOptions": "Kann nicht ausgefüllt werden: einige Tool-Optionen.",
+      "limitations": "Einschränkungen",
+      "tools": {
+        "time": "Zeit",
+        "settingsList": "Einstellungen anzeigen",
+        "settingsSet": "Einstellungen ändern"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Dieses Modell unterstützt Denkaufwand"
@@ -4875,7 +4897,7 @@
     "defaultModel": "Standardmodell von Kilo verwenden",
     "duration": "Zeitlimit (Minuten)",
     "spendLimit": "Kostenlimit (USD)",
-    "invalidSafeguards": "Gib positive, endliche Zeit- und Kostenlimits ein.",
+    "invalidSafeguards": "Gib eine positive Zahl im zulässigen Bereich ein.",
     "estimate": "Schätzung {{estimate}} · maximal {{maximum}}",
     "estimateUnavailable": "Für diese Einstellungen ist keine kostenpflichtige Zusammenfassung verfügbar. Ändere das Modell oder die Grenzwerte, oder versuche es später erneut.",
     "estimatePricingUnavailable": "Für dieses Modell liegen keine Preisinformationen vor. Wähle ein anderes Modell.",
@@ -4889,7 +4911,7 @@
     "enable": "Kostenpflichtige Zusammenfassungen aktivieren",
     "allContexts": "Persönliche und Organisations-Briefings bleiben getrennt.",
     "emptyHistory": "Keine gespeicherten Briefings",
-    "estimatePermissionUnavailable": "Du hast keine Berechtigung, das Guthaben dieses Kontexts zu nutzen. Bitte eine Organisationsbesitzerin oder einen Organisationsbesitzer, dies zu aktivieren.",
+    "estimatePermissionUnavailable": "Du hast keine Berechtigung, das Guthaben dieses Kontexts zu nutzen. Bitte einen Inhaber der Organisation, dies zu aktivieren.",
     "saved": "Briefing-Einstellungen gespeichert",
     "selectedSessions": "Ausgewählte Sitzungen",
     "snapshotPullRequests": "PRs in ausgewählten Sitzungen",
@@ -4945,7 +4967,8 @@
     "unavailableTitle": "Nutzung nicht verfügbar",
     "unavailableDescription": "Die Nutzungserfassung ist für diesen Workspace nicht eingerichtet. Wende dich an den Kundendienst, wenn du hier Nutzungsdaten erwartest.",
     "orgSelfNotice": "Du siehst deine eigene Nutzung in dieser Organisation.",
-    "viewDetails": "Nutzungsdetails anzeigen"
+    "viewDetails": "Nutzungsdetails anzeigen",
+    "orgSelfEntryTitle": "Deine Nutzung"
   },
   "integrations": {
     "title": "Integrationen",
@@ -5041,6 +5064,8 @@
       "autoCommit": "Änderungen festschreiben, wenn der Lauf endet",
       "condenseOnComplete": "Kontext verdichten, wenn der Lauf endet",
       "activeTitle": "Auslöser aktiv",
+      "activeSwitchA11y": "Auslöser aktiv: {{name}}",
+      "copyLinkA11y": "Link für {{name}} kopieren",
       "activeDescription": "Pausierte Webhooks antworten mit 404.",
       "runAsCreator": "In meinem Namen ausführen",
       "runAsCreatorDescription": "Jeder Lauf verwendet dein Konto, daher ist der geheime Header erforderlich.",

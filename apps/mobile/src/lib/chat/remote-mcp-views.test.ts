@@ -217,8 +217,6 @@ describe('the document a view is drawn from', () => {
     const html = read.kind === 'ready' ? read.html : '';
     expect(html).toContain('Content-Security-Policy');
     expect(html).toContain('connect-src https://api.example');
-    // A read is not a call: it is bounded on its own and a row that cancels it
-    // must not publish the server as failed.
     expect(world.clients[0]?.deps.onCallFailure).toBeUndefined();
     expect(world.clients[0]?.deps.timeoutMs).toBe(15_000);
   });

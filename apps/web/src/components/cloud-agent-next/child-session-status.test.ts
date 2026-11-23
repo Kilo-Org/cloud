@@ -93,7 +93,7 @@ describe('getChildSessionTaskStatus', () => {
       getChildSessionTaskStatus({
         taskToolPart: task,
         childMessages: [],
-        hydrationState: { status: 'error', message: 'Synthetic history failure' },
+        hydrationState: { status: 'error', kind: null, message: 'Synthetic history failure' },
       })
     ).toBe('unavailable');
   });
@@ -113,14 +113,18 @@ describe('getChildSessionTaskStatus', () => {
           taskToolPart: task,
           childMessages: [],
           sessionStatus,
-          hydrationState: { status: 'error', message: 'Synthetic history failure' },
+          hydrationState: { status: 'error', kind: null, message: 'Synthetic history failure' },
         })
       ).toBe(expected);
     }
   );
 
   it('uses available child messages or execution errors despite a history failure', () => {
-    const hydrationState = { status: 'error', message: 'Synthetic history failure' } as const;
+    const hydrationState = {
+      status: 'error',
+      kind: null,
+      message: 'Synthetic history failure',
+    } as const;
     expect(
       getChildSessionTaskStatus({ taskToolPart: task, childMessages: [child], hydrationState })
     ).toBe('completed');

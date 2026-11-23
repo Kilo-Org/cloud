@@ -678,6 +678,7 @@
     "needsInputAction": {
       "approved": "Solicitud aprobada",
       "replied": "Respuesta enviada",
+      "empty": "Escribe una respuesta y luego envíala.",
       "failed": "No se pudo responder. Toca de nuevo para reintentarlo.",
       "unavailable": "Esta solicitud ya no está en espera."
     }
@@ -819,6 +820,8 @@
     },
     "providerConnect": {
       "description": "Conecta la {{label}} de Kilo para revisar PR automáticamente.",
+      "notConnectedTitle": "{{platform}} no está conectado",
+      "githubAdminOnlyDescription": "Solo los propietarios de la organización y los administradores pueden conectarlo.",
       "githubApp": "aplicación de GitHub",
       "githubError": "No se pudo abrir la configuración de GitHub. Inténtalo de nuevo.",
       "gitlabAccount": "cuenta de GitLab",
@@ -1712,6 +1715,7 @@
       "couldNotLoadThisSession": "No se pudo cargar esta sesión.",
       "historyTooLarge": "La transcripción de esta sesión es demasiado grande para cargarla.",
       "historyUnavailable": "No se puede leer la transcripción de esta sesión.",
+      "historyTemporarilyUnavailable": "La transcripción de esta sesión no está disponible temporalmente.",
       "cloneFailedRetry": "No se pudo clonar esta sesión. Inténtalo de nuevo.",
       "notEnoughCredits": "No hay suficientes créditos para esta solicitud. Añade créditos e inténtalo de nuevo.",
       "previousTaskFinishing": "La tarea anterior aún no ha terminado. Espera un momento.",
@@ -2252,7 +2256,9 @@
       "skip": "Omitir",
       "retrySkip": "Volver a intentar omitir",
       "submitting": "Enviando…",
-      "sendAnswers": "Enviar respuestas"
+      "sendAnswers": "Enviar respuestas",
+      "unreadableTitle": "No se pudo mostrar esta pregunta",
+      "unreadableBody": "El agente está esperando una pregunta que esta aplicación no puede mostrar. Responde a la pregunta en la CLI para continuar."
     },
     "blockingCard": {
       "questionUnavailable": "Esta pregunta ya no está disponible.",
@@ -2279,6 +2285,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "No se pudo cargar la sesión del subagente.",
+      "historyTooLarge": "El historial de este subagente es demasiado grande para cargarlo.",
+      "historyUnavailable": "El historial de este subagente no está disponible.",
+      "historyTemporarilyUnavailable": "El historial de este subagente no está disponible temporalmente.",
       "failed": "La sesión del subagente ha fallado.",
       "noMessages": "No hay mensajes del subagente",
       "noMessagesDescription": "Esta sesión del subagente terminó sin generar una transcripción.",
@@ -2869,6 +2878,8 @@
     "why": "Para qué",
     "who": "Con quién",
     "installAttributionPromptMessage": "Kilo usa el permiso de seguimiento de Apple solo para saber cómo has llegado a la aplicación. Nunca usa tus instrucciones ni tus conversaciones para este fin.",
+    "installAttributionRequestFailedTitle": "No se pudo mostrar la solicitud de seguimiento",
+    "installAttributionRequestFailedMessage": "Kilo no pudo mostrar la solicitud del sistema, así que la identificación del origen de la instalación sigue desactivada.",
     "installAttributionPromptTitle": "¿Permitir que se identifique el origen de la instalación?"
   },
   "prReview": {
@@ -3462,7 +3473,7 @@
   "organization": {
     "auditLog": {
       "title": "Registro de auditoría",
-      "permissionDenied": "Solo un propietario, administrador o responsable de facturación de una organización con el plan Enterprise puede ver su registro de auditoría.",
+      "permissionDenied": "Solo un propietario, administrador o gestor de facturación de una organización con el plan Enterprise puede ver su registro de auditoría. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "No hay eventos de auditoría",
       "emptyDescription": "Aquí aparecen las acciones realizadas en esta organización.",
       "truncated": "Se muestran los eventos más recientes.",
@@ -3657,7 +3668,7 @@
     },
     "billing": {
       "title": "Facturación",
-      "permissionDenied": "Solo el propietario, un administrador o un responsable de facturación de la organización puede ver su facturación.",
+      "permissionDenied": "Solo el propietario, un administrador o un gestor de facturación de la organización puede ver su facturación. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Suscripción",
       "state": "Estado",
       "stateNone": "Sin suscripción",
@@ -3846,7 +3857,7 @@
       "emptyDescription": "Usa Hora anterior para ver solicitudes anteriores.",
       "emptyBoundDescription": "Los registros de solicitudes no llegan más atrás.",
       "loadError": "No se pudieron cargar los registros de solicitudes.",
-      "permissionDenied": "Solo un propietario, administrador o responsable de facturación de la organización puede ver sus registros de solicitudes.",
+      "permissionDenied": "Solo un propietario, administrador o gestor de facturación de la organización puede ver sus registros de solicitudes. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} entrada · {{output}} salida",
       "byok": "BYOK"
     },
@@ -4122,7 +4133,10 @@
     "list": {
       "loadFailed": "No se pudo cargar el historial del chat.",
       "new": "Chat nuevo",
-      "deleteTitle": "¿Eliminar este chat?"
+      "deleteTitle": "¿Eliminar este chat?",
+      "resetNoticeTitle": "Chats locales y borradores eliminados",
+      "resetNoticeBody": "Kilo no pudo abrir los chats guardados en este dispositivo. Tus sesiones en la nube no se ven afectadas.",
+      "resetNoticeDismiss": "Descartar aviso"
     },
     "rename": {
       "title": "Cambiar nombre del chat",
@@ -4403,7 +4417,15 @@
       "download": "Descargar modelo en el dispositivo",
       "downloading": "Descargando…",
       "downloadProgress": "Descargando… {{percent}}%",
-      "downloadFailed": "La descarga no se completó. Revisa tu conexión y el espacio libre, y vuelve a intentarlo."
+      "downloadFailed": "La descarga no se completó. Revisa tu conexión y el espacio libre, y vuelve a intentarlo.",
+      "cannotUse": "No se puede ejecutar: {{items}}.",
+      "cannotUseOptions": "No se pueden rellenar: algunas opciones de herramienta.",
+      "limitations": "Limitaciones",
+      "tools": {
+        "time": "Hora",
+        "settingsList": "Mostrar ajustes",
+        "settingsSet": "Cambiar ajustes"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Este modelo admite esfuerzo de razonamiento"
@@ -4964,7 +4986,7 @@
     "defaultModel": "Usar el modelo predeterminado de Kilo",
     "duration": "Límite de tiempo (minutos)",
     "spendLimit": "Límite de gasto (USD)",
-    "invalidSafeguards": "Introduce límites de tiempo y gasto positivos y finitos.",
+    "invalidSafeguards": "Introduce un número positivo dentro del rango permitido.",
     "estimate": "Estimado {{estimate}} · máximo {{maximum}}",
     "estimateUnavailable": "No hay resumen de pago disponible con estos ajustes. Cambia el modelo o los límites, o inténtalo de nuevo más tarde.",
     "estimatePricingUnavailable": "No hay precios disponibles para este modelo. Elige otro modelo.",
@@ -5039,7 +5061,8 @@
     "unavailableTitle": "Uso no disponible",
     "unavailableDescription": "El uso no está configurado para este espacio de trabajo. Contacta con soporte si esperas ver el uso aquí.",
     "orgSelfNotice": "Estás viendo tu propio uso en esta organización.",
-    "viewDetails": "Ver detalles de uso"
+    "viewDetails": "Ver detalles de uso",
+    "orgSelfEntryTitle": "Tu uso"
   },
   "integrations": {
     "title": "Integraciones",
@@ -5135,6 +5158,8 @@
       "autoCommit": "Confirmar los cambios al finalizar la ejecución",
       "condenseOnComplete": "Condensar el contexto al finalizar la ejecución",
       "activeTitle": "Disparador activo",
+      "activeSwitchA11y": "Disparador activo: {{name}}",
+      "copyLinkA11y": "Copiar enlace de {{name}}",
       "activeDescription": "Los webhooks en pausa responden con 404.",
       "runAsCreator": "Ejecutar como yo",
       "runAsCreatorDescription": "Cada ejecución usa tu cuenta, así que la cabecera secreta es obligatoria.",

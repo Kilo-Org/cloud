@@ -1,14 +1,15 @@
-import { type SdkStatusMessageCode, type SessionStatusIndicator } from '@kilocode/cloud-agent-sdk';
+import {
+  type SdkStatusMessageCode,
+  type SessionSnapshotFailureKind,
+  type SessionStatusIndicator,
+} from '@kilocode/cloud-agent-sdk';
 
 import { i18n } from '@/i18n';
 import { type QueryErrorVariant } from '@/components/query-error';
 
 import { type MessageFailure } from './message-failure-state';
 import { isSafeFailureMessage } from './safe-failure-messages';
-import {
-  isTerminalSessionHistoryFailure,
-  sessionHistoryFailureCopyKey,
-} from './session-history-failures';
+import { sessionHistoryFailureCopy } from './session-history-failures';
 
 /**
  * Terminal error class for a session startup failure. The session manager's
@@ -401,7 +402,8 @@ export function describeSessionRuntimeFailure(message: string): SessionRuntimeFa
  *
  * Precedence: a populated transcript never shows a terminal error; a typed
  * transcript-read failure a retry cannot recover is terminal with its own
- * copy; any other `errorAtom` value is a retryable server failure; a lost
+ * copy, while the retryable kind states the temporary outage and keeps its
+ * Retry; any other `errorAtom` value is a retryable server failure; a lost
  * agent transport is a retryable connection failure; any other
  * `statusIndicator` of type `error` is classified by its message.
  *
@@ -427,7 +429,7 @@ export function resolveSessionTerminalError(input: {
    * The typed transcript-read failure the manager recorded with `error`, when
    * it carries one. The kind decides the branch; the string stays untyped.
    */
-  historyFailureKind?: 'retryable_failure' | 'too_large' | 'invalid_data' | null;
+  historyFailureKind?: SessionSnapshotFailureKind | null;
 }): SessionTerminalError | null {
   // A session with rows on screen is not a failed open. A failed preparation
   // group is the run's own statement of what went wrong, with the failed stage
@@ -438,16 +440,17 @@ export function resolveSessionTerminalError(input: {
   }
   if (input.error !== null) {
     // The atom carries the transport's own English text: an SDK fixed string,
-    // or a server failure the transport forwards. Show the reader translated
-    // copy and keep the original for the clipboard. The class decides the
-    // Retry for a transport failure; the typed transcript-read failure is
-    // decided by its kind instead, ahead of the classification.
-    if (isTerminalSessionHistoryFailure(input.historyFailureKind)) {
+    // or a server failure the transport forwards. The class decides the Retry
+    // for a transport failure; a typed transcript-read failure is decided by
+    // its kind instead, ahead of the classification.
+    if (input.historyFailureKind != null) {
+      const { copyKey, retryable } = sessionHistoryFailureCopy(input.historyFailureKind);
+      const title = i18n.t('agentChat.session.couldNotLoadThisSession');
       return {
         variant: 'server',
-        title: i18n.t('agentChat.session.couldNotLoadThisSession'),
-        message: i18n.t(sessionHistoryFailureCopyKey(input.historyFailureKind)),
-        retryable: false,
+        title,
+        message: i18n.t(copyKey),
+        retryable,
         retryWith: 'session',
         detail: input.error,
       };
@@ -502,19 +505,4 @@ export function resolveSessionTerminalError(input: {
     };
   }
   return null;
-}
-
-/**
- * Build the clipboard text for a terminal error: session id, then what the
- * reader saw, then the untranslated original that support needs.
- */
-export function buildTerminalErrorCopyText(input: {
-  sessionId: string;
-  title: string;
-  message: string;
-  /** The untranslated original. Omitted when the message already is it. */
-  detail?: string;
-}): string {
-  const { sessionId, title, message, detail } = input;
-  return [sessionId, title, message, detail === message ? '' : detail].filter(Boolean).join('\n');
 }

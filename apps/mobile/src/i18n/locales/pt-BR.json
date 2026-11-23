@@ -401,7 +401,7 @@
       "title": "Chaves de provedor",
       "rowSubtitle": "Use o faturamento do seu próprio provedor",
       "orgDescription": "Essas chaves são compartilhadas com todos na organização e cobradas nas contas de provedor da organização.",
-      "viewOnly": "Somente um proprietário, administrador ou gerente de faturamento da organização pode alterar as chaves dela.",
+      "viewOnly": "Somente um proprietário, administrador ou gerente de cobrança da organização pode alterar as chaves dela.",
       "description": "As solicitações feitas com essas chaves são cobradas na sua conta do provedor, e não no seu saldo Kilo.",
       "managedByPlan": "Gerenciada pelo seu plano de programação",
       "enableKey": "Ativar a chave do {{provider}}",
@@ -647,6 +647,7 @@
     "needsInputAction": {
       "approved": "Solicitação aprovada",
       "replied": "Resposta enviada",
+      "empty": "Escreva uma resposta e depois envie.",
       "failed": "Não foi possível responder. Toque novamente para tentar de novo.",
       "unavailable": "Esta solicitação não está mais aguardando."
     }
@@ -788,6 +789,8 @@
     },
     "providerConnect": {
       "description": "Conecte {{label}} ao Kilo para revisar PRs automaticamente.",
+      "notConnectedTitle": "O {{platform}} não está conectado",
+      "githubAdminOnlyDescription": "Somente proprietários e administradores da organização podem conectá-lo.",
       "githubApp": "o app do GitHub",
       "githubError": "Não foi possível abrir a configuração do GitHub. Tente novamente.",
       "gitlabAccount": "a conta do GitLab",
@@ -999,7 +1002,7 @@
       "empty": "Nenhuma revisão com estatísticas ainda",
       "emptyDescription": "As estatísticas registram revisões concluídas enquanto estão ativadas para a organização.",
       "offTitle": "As estatísticas estão desativadas para {{platform}}",
-      "offDescription": "As funções de faturamento da organização (proprietários, administradores e gerentes de faturamento) podem ativar as estatísticas nas configurações da organização na web para registrar revisões concluídas.",
+      "offDescription": "As funções de faturamento da organização (proprietários, administradores e gerentes de cobrança) podem ativar as estatísticas nas configurações da organização na web para registrar revisões concluídas.",
       "couldNotLoad": "Não foi possível carregar as estatísticas",
       "trackedReviewsCaption": "Revisões concluídas neste período com as estatísticas ativadas. Revisões em andamento e com falha nunca são contadas.",
       "trackedReviewsUncounted": "Não contadas: {{displayCount}} das {{displayTotal}} revisões concluídas que a organização tem sem resultado capturado.",
@@ -1702,6 +1705,7 @@
       "couldNotLoadThisSession": "Não foi possível carregar esta sessão.",
       "historyTooLarge": "A transcrição desta sessão é grande demais para carregar.",
       "historyUnavailable": "Não é possível ler a transcrição desta sessão.",
+      "historyTemporarilyUnavailable": "A transcrição desta sessão está temporariamente indisponível.",
       "cloneFailedRetry": "Não foi possível clonar esta sessão. Tente novamente.",
       "notEnoughCredits": "Créditos insuficientes para esta solicitação. Adicione créditos e tente novamente.",
       "previousTaskFinishing": "A tarefa anterior ainda está sendo concluída. Aguarde um momento.",
@@ -2246,7 +2250,9 @@
       "skip": "Pular",
       "retrySkip": "Tentar pular novamente",
       "submitting": "Enviando…",
-      "sendAnswers": "Enviar respostas"
+      "sendAnswers": "Enviar respostas",
+      "unreadableTitle": "Não foi possível exibir esta pergunta",
+      "unreadableBody": "O agente está aguardando uma pergunta que este app não consegue exibir. Responda à pergunta no CLI para continuar."
     },
     "blockingCard": {
       "questionUnavailable": "Esta pergunta não está mais disponível.",
@@ -2273,6 +2279,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Não foi possível carregar a sessão do subagente.",
+      "historyTooLarge": "O histórico deste subagente é grande demais para carregar.",
+      "historyUnavailable": "O histórico deste subagente não está disponível.",
+      "historyTemporarilyUnavailable": "O histórico deste subagente está temporariamente indisponível.",
       "failed": "A sessão do subagente falhou.",
       "noMessages": "Nenhuma mensagem do subagente",
       "noMessagesDescription": "Esta sessão do subagente foi concluída sem gerar uma transcrição.",
@@ -2906,6 +2915,8 @@
     "why": "Finalidade",
     "who": "Destinatários",
     "installAttributionPromptMessage": "O Kilo usa a permissão de rastreamento da Apple apenas para saber qual canal trouxe você até aqui. Seus prompts e conversas nunca são usados.",
+    "installAttributionRequestFailedTitle": "Não foi possível mostrar o prompt de rastreamento",
+    "installAttributionRequestFailedMessage": "O Kilo não conseguiu mostrar o prompt do sistema, então a atribuição de instalação continua desativada.",
     "installAttributionPromptTitle": "Permitir atribuição de instalação?"
   },
   "prReview": {
@@ -3525,7 +3536,7 @@
   "organization": {
     "auditLog": {
       "title": "Registro de auditoria",
-      "permissionDenied": "Somente proprietários, administradores ou gerentes de faturamento de uma organização no plano Enterprise podem ver o registro de auditoria dela.",
+      "permissionDenied": "Somente proprietários, administradores ou gerentes de cobrança de uma organização no plano Enterprise podem ver o registro de auditoria dela. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Nenhum evento de auditoria",
       "emptyDescription": "As ações realizadas nesta organização aparecem aqui.",
       "truncated": "Mostrando os eventos mais recentes.",
@@ -3725,7 +3736,7 @@
     },
     "billing": {
       "title": "Faturamento",
-      "permissionDenied": "Somente proprietários, administradores ou gerentes de faturamento da organização podem ver o faturamento.",
+      "permissionDenied": "Somente proprietários, administradores ou gerentes de cobrança da organização podem ver o faturamento. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Assinatura",
       "state": "Status",
       "stateNone": "Sem assinatura",
@@ -3815,7 +3826,7 @@
       "pendingInvitation": "Este e-mail já tem um convite pendente.",
       "alreadyMember": "Esta pessoa já é membro desta organização.",
       "seatsFull": "Todos os assentos estão em uso ({{used}}/{{total}}). Peça a um proprietário da organização que adicione assentos antes de convidar mais membros.",
-      "seatsFullCanInviteBilling": "Todos os assentos estão em uso ({{used}}/{{total}}). Você ainda pode convidar gerentes de faturamento, que não ocupam um assento.",
+      "seatsFullCanInviteBilling": "Todos os assentos estão em uso ({{used}}/{{total}}). Você ainda pode convidar gerentes de cobrança, que não ocupam um assento.",
       "noSeatsAvailable": "Todos os assentos estão em uso. Peça a um proprietário da organização que adicione assentos antes de convidar mais membros."
     },
     "invoices": {
@@ -3914,7 +3925,7 @@
       "emptyDescription": "Use Hora anterior para ver solicitações anteriores.",
       "emptyBoundDescription": "Os registros de solicitações não vão além deste ponto.",
       "loadError": "Não foi possível carregar os registros de solicitações.",
-      "permissionDenied": "Somente proprietários, administradores ou gerentes de faturamento de uma organização podem ver os registros de solicitações dela.",
+      "permissionDenied": "Somente proprietários, administradores ou gerentes de cobrança de uma organização podem ver os registros de solicitações dela. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} de entrada · {{output}} de saída",
       "byok": "BYOK"
     },
@@ -4200,7 +4211,10 @@
     "list": {
       "loadFailed": "Não foi possível carregar o histórico do chat.",
       "new": "Nova conversa",
-      "deleteTitle": "Excluir esta conversa?"
+      "deleteTitle": "Excluir esta conversa?",
+      "resetNoticeTitle": "Conversas locais e rascunhos foram excluídos",
+      "resetNoticeBody": "O Kilo não conseguiu abrir as conversas salvas neste dispositivo. Suas sessões na nuvem não foram afetadas.",
+      "resetNoticeDismiss": "Ignorar aviso"
     },
     "rename": {
       "title": "Renomear chat",
@@ -4482,7 +4496,15 @@
       "download": "Baixar modelo no dispositivo",
       "downloading": "Baixando…",
       "downloadProgress": "Baixando… {{percent}}%",
-      "downloadFailed": "O download não foi concluído. Verifique sua conexão e o espaço livre e tente novamente."
+      "downloadFailed": "O download não foi concluído. Verifique sua conexão e o espaço livre e tente novamente.",
+      "cannotUse": "Não é possível executar: {{items}}.",
+      "cannotUseOptions": "Não é possível preencher: algumas opções de ferramenta.",
+      "limitations": "Limitações",
+      "tools": {
+        "time": "Hora",
+        "settingsList": "Mostrar configurações",
+        "settingsSet": "Alterar configurações"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Este modelo aceita esforço de raciocínio"
@@ -5053,7 +5075,7 @@
     "defaultModel": "Usar o modelo padrão do Kilo",
     "duration": "Limite de tempo (minutos)",
     "spendLimit": "Limite de gasto (USD)",
-    "invalidSafeguards": "Insira limites de tempo e gasto positivos e finitos.",
+    "invalidSafeguards": "Insira um número positivo dentro do intervalo permitido.",
     "estimate": "Estimativa {{estimate}} · máximo de {{maximum}}",
     "estimateUnavailable": "Um resumo pago não está disponível para estas configurações. Altere o modelo ou os limites, ou tente novamente mais tarde.",
     "confirmPaid": "Ativar resumos pagos para {{context}}?",
@@ -5133,7 +5155,8 @@
     "unavailableTitle": "Uso indisponível",
     "unavailableDescription": "O uso não está configurado para este workspace. Entre em contato com o suporte se você espera ver o uso aqui.",
     "orgSelfNotice": "Você está vendo seu próprio uso nesta organização.",
-    "viewDetails": "Ver detalhes de uso"
+    "viewDetails": "Ver detalhes de uso",
+    "orgSelfEntryTitle": "Seu uso"
   },
   "integrations": {
     "title": "Integrações",
@@ -5229,6 +5252,8 @@
       "autoCommit": "Confirmar alterações ao final da execução",
       "condenseOnComplete": "Condensar o contexto quando a execução terminar",
       "activeTitle": "Gatilho ativo",
+      "activeSwitchA11y": "Gatilho ativo: {{name}}",
+      "copyLinkA11y": "Copiar link de {{name}}",
       "activeDescription": "Webhooks pausados respondem com 404.",
       "runAsCreator": "Executar como eu",
       "runAsCreatorDescription": "Toda execução usa sua conta, então o cabeçalho secreto é obrigatório.",

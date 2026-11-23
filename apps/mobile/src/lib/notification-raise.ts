@@ -28,13 +28,8 @@ function raiseStatusFor(action: 'approve' | 'reply'): string {
 }
 
 /**
- * True when the row waits on the raise the notification presents, or when the
- * payload named none. The identity is the raise instant plus a waiting row: a
- * different status time names a different raise, and a row outside the waiting
- * statuses holds none. The action's kind is deliberately absent — a push
- * without `attentionKind` offers both Approve and Reply for one raise, so
- * requiring the row's status to match the tapped action would refuse the
- * offered control of the other kind.
+ * True when the row waits on the raise the notification presents. A payload
+ * that named no raise compares nothing and returns true.
  */
 export function rowWaitsOnPresentedRaise(
   row: SessionRaiseRow,

@@ -538,7 +538,6 @@ export async function updateUserRoleInOrganization(
       return successResult({ updated: 'membership' as const });
     }
 
-    // If no membership was updated, check for pending invitations
     const [user] = await tx
       .select({
         email: kilocode_users.google_user_email,

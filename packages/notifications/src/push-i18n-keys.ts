@@ -25,9 +25,8 @@ const SECURITY_LIFECYCLE_BODY_KEY = `generic.body.${SECURITY_LIFECYCLE_BODY_LEAF
 type SecurityFindingNotificationKind = InternalDispatchSecurityFindingRequest['notificationKind'];
 
 /**
- * The catalog entry that carries each security-finding kind's title. The three
- * kinds differ only in that line, so they read one shared body entry
- * (`SECURITY_FINDING_PUSH_BODY_KEY`); a push names its title key in `i18nKey`.
+ * The catalog entry that carries each security-finding kind's title. A push
+ * names its title key in `i18nKey`.
  */
 export const SECURITY_FINDING_PUSH_TITLE_KEYS = {
   new_finding: 'internal.securityFindingNew',

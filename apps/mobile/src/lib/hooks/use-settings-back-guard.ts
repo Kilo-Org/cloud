@@ -1,9 +1,10 @@
 import { getSettingsBackGuardOptions } from '@kilocode/app-shared/security-agent';
-import { useFocusEffect, useNavigation, usePreventRemove, useRouter } from 'expo-router';
+import { useFocusEffect, useNavigation, usePreventRemove } from 'expo-router';
 import { type ReactNode, type RefObject, useCallback, useEffect, useRef, useState } from 'react';
 
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { i18n } from '@/i18n';
+import { useSettledReplace } from '@/lib/navigation/settled-replace';
 import { getSecurityAgentPath } from '@/lib/security-agent';
 
 const BUTTON_LABEL_KEY = {
@@ -32,7 +33,7 @@ export function useSecurityAgentSettingsRedirect(
     dirty = false,
   }: Readonly<{ skipRedirect?: boolean; dirty?: boolean }> = {}
 ) {
-  const router = useRouter();
+  const settledRouter = useSettledReplace();
   const settingsHref = getSecurityAgentPath(scope, 'settings');
   const bounce = isEnabled === false && !skipRedirect;
   // A focus effect, not an effect on the config alone: the config of a link
@@ -46,10 +47,13 @@ export function useSecurityAgentSettingsRedirect(
   useFocusEffect(
     useCallback(() => {
       if (bounce) {
-        router.replace(settingsHref);
+        // The bounce runs while that link's own navigation is still
+        // transitioning, and a swap inside that commit crashes Android Fabric
+        // with `addViewAt … already has a parent`.
+        settledRouter.replace(settingsHref);
       }
       // eslint-disable-next-line react-hooks/exhaustive-deps -- `dirty` re-asserts the bounce after an edit is undone, which the guard cancelled while the draft was dirty
-    }, [bounce, dirty, router, settingsHref])
+    }, [bounce, dirty, settledRouter, settingsHref])
   );
 }
 

@@ -401,7 +401,7 @@
       "title": "Klíče poskytovatelů",
       "rowSubtitle": "Používat vlastní fakturaci u poskytovatele",
       "orgDescription": "Tyto klíče jsou sdíleny se všemi v organizaci a účtují se na její účty u poskytovatelů.",
-      "viewOnly": "Klíče organizace může měnit pouze její vlastník, administrátor nebo správce fakturace.",
+      "viewOnly": "Klíče organizace může měnit pouze její vlastník, správce nebo správce fakturace.",
       "description": "Požadavky přes tyto klíče se účtují na váš účet u poskytovatele, ne z vašeho zůstatku v Kilo.",
       "managedByPlan": "Spravuje váš programovací tarif",
       "enableKey": "Povolit klíč pro {{provider}}",
@@ -1294,6 +1294,7 @@
     "needsInputAction": {
       "approved": "Žádost schválena",
       "replied": "Odpověď odeslána",
+      "empty": "Napište odpověď a poté ji odešlete.",
       "failed": "Odpovědět se nepodařilo. Klepnutím to zkuste znovu.",
       "unavailable": "Tato žádost už nečeká."
     }
@@ -1558,7 +1559,9 @@
       "githubError": "Nastavení GitHubu se nepodařilo otevřít. Zkuste to prosím znovu.",
       "gitlabAccount": "účet GitLab",
       "gitlabError": "Nastavení GitLabu se nepodařilo otevřít. Zkuste to prosím znovu.",
-      "description": "Nastavte propojení služby Kilo ({{label}}), aby se PR kontrolovaly automaticky."
+      "description": "Nastavte propojení služby Kilo ({{label}}), aby se PR kontrolovaly automaticky.",
+      "notConnectedTitle": "{{platform}} není připojen",
+      "githubAdminOnlyDescription": "Připojit ji mohou pouze vlastníci organizace a správci."
     },
     "overview": {
       "allAreas": "Všechny oblasti",
@@ -2349,6 +2352,7 @@
       "couldNotLoadThisSession": "Tuto relaci se nepodařilo načíst.",
       "historyTooLarge": "Přepis této relace je příliš velký k načtení.",
       "historyUnavailable": "Přepis této relace nelze přečíst.",
+      "historyTemporarilyUnavailable": "Přepis této relace je dočasně nedostupný.",
       "cloneFailedRetry": "Tuto relaci se nepodařilo klonovat. Zkuste to znovu.",
       "notEnoughCredits": "Nemáte dost kreditů pro tento požadavek. Dobijte si kredity a zkuste to znovu.",
       "previousTaskFinishing": "Předchozí úkol se ještě dokončuje. Chvíli prosím počkejte.",
@@ -2893,7 +2897,9 @@
       "skip": "Přeskočit",
       "retrySkip": "Opakovat přeskočení",
       "submitting": "Odesílání…",
-      "sendAnswers": "Odeslat odpovědi"
+      "sendAnswers": "Odeslat odpovědi",
+      "unreadableTitle": "Tuto otázku nelze zobrazit",
+      "unreadableBody": "Agent čeká na otázku, kterou tato aplikace nedokáže zobrazit. Odpovězte na otázku v CLI a pokračujte."
     },
     "blockingCard": {
       "questionUnavailable": "Tato otázka již není k dispozici.",
@@ -2920,6 +2926,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Relaci podřízeného agenta se nepodařilo načíst.",
+      "historyTooLarge": "Historie tohoto podřízeného agenta je příliš velká k načtení.",
+      "historyUnavailable": "Historie tohoto podřízeného agenta není dostupná.",
+      "historyTemporarilyUnavailable": "Historie tohoto podřízeného agenta je dočasně nedostupná.",
       "failed": "Relace podřízeného agenta selhala.",
       "noMessages": "Žádné zprávy podřízeného agenta",
       "noMessagesDescription": "Tato relace podřízeného agenta skončila bez vytvoření přepisu.",
@@ -3518,6 +3527,8 @@
     "voiceTranscriptionWho": "Tvoje zařízení, Kilo Gateway s tebou zvoleným modelem přepisu, nebo Apple či Google pro online rozpoznávání.",
     "installAttributionPromptTitle": "Povolit zjištění zdroje instalace?",
     "installAttributionPromptMessage": "Kilo používá oprávnění ke sledování od Apple pouze ke zjištění, odkud k nám přicházíte. Vaše zadání ani konverzace k tomu nikdy nepoužívá.",
+    "installAttributionRequestFailedTitle": "Výzvu ke sledování se nepodařilo zobrazit",
+    "installAttributionRequestFailedMessage": "Kilo nemohl zobrazit systémovou výzvu, proto zjištění zdroje instalace zůstává vypnuté.",
     "what": "Co",
     "why": "Proč",
     "who": "Kdo"
@@ -3533,7 +3544,7 @@
   "organization": {
     "auditLog": {
       "title": "Auditní protokol",
-      "permissionDenied": "Auditní protokol organizace s plánem Enterprise si může prohlížet jen její vlastník, administrátor nebo správce fakturace.",
+      "permissionDenied": "Auditní protokol organizace s plánem Enterprise si může prohlížet jen její vlastník, správce nebo správce fakturace. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Žádné události auditu",
       "emptyDescription": "Zde se zobrazí akce provedené v této organizaci.",
       "truncated": "Zobrazují se nejnovější události.",
@@ -3549,7 +3560,7 @@
         "promoCreditGranted": "Propagační kredity přiděleny",
         "memberRemove": "Odebrání člena",
         "memberChangeRole": "Změna role člena",
-        "memberAdminAdd": "Přidání administrátora",
+        "memberAdminAdd": "Přidání správce",
         "memberAutoJoin": "Automatické připojení člena",
         "ssoAutoProvision": "Zřízení uživatele přes SSO",
         "ssoSetDomain": "Přidání domény SSO",
@@ -3733,7 +3744,7 @@
     },
     "billing": {
       "title": "Fakturace",
-      "permissionDenied": "Fakturaci organizace může zobrazit pouze vlastník, administrátor nebo správce fakturace.",
+      "permissionDenied": "Fakturaci organizace může zobrazit pouze vlastník, správce nebo správce fakturace. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Předplatné",
       "state": "Stav",
       "stateNone": "Bez předplatného",
@@ -3849,7 +3860,7 @@
       "limitLabel": "Limit (USD za den)",
       "memberNotFound": "Člen nebyl nalezen.",
       "noLimitPlaceholder": "Bez limitu",
-      "permissionDenied": "Limity útraty může spravovat pouze vlastník nebo administrátor organizace.",
+      "permissionDenied": "Limity útraty může spravovat pouze vlastník nebo správce organizace.",
       "removeLimit": "Zrušit limit",
       "title": "Denní limit útraty",
       "blankError": "Zadejte částku nebo níže klepněte na tlačítko Zrušit limit.",
@@ -3910,7 +3921,7 @@
       "emptyDescription": "Pomocí tlačítka „Starší hodina“ zobrazíte dřívější požadavky.",
       "emptyBoundDescription": "Záznamy požadavků dál do minulosti nesahají.",
       "loadError": "Protokoly požadavků se nepodařilo načíst.",
-      "permissionDenied": "Protokoly požadavků organizace si může prohlížet jen její vlastník, administrátor nebo správce fakturace.",
+      "permissionDenied": "Protokoly požadavků organizace si může prohlížet jen její vlastník, správce nebo správce fakturace. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} vstup · {{output}} výstup",
       "byok": "BYOK"
     },
@@ -4200,7 +4211,10 @@
     "list": {
       "loadFailed": "Historie chatu se nepodařila načíst.",
       "new": "Nový chat",
-      "deleteTitle": "Smazat tento chat?"
+      "deleteTitle": "Smazat tento chat?",
+      "resetNoticeTitle": "Místní chaty a koncepty byly vymazány",
+      "resetNoticeBody": "Kilo nemohlo otevřít chaty uložené v tomto zařízení. Vaše relace v cloudu nejsou dotčeny.",
+      "resetNoticeDismiss": "Skrýt oznámení"
     },
     "rename": {
       "title": "Přejmenovat chat",
@@ -4482,7 +4496,15 @@
       "download": "Stáhnout model do zařízení",
       "downloading": "Stahování…",
       "downloadProgress": "Stahování… {{percent}} %",
-      "downloadFailed": "Stahování se nedokončilo. Zkontrolujte připojení a volné místo v úložišti a zkuste to znovu."
+      "downloadFailed": "Stahování se nedokončilo. Zkontrolujte připojení a volné místo v úložišti a zkuste to znovu.",
+      "cannotUse": "Nelze spustit: {{items}}.",
+      "cannotUseOptions": "Nelze vyplnit: některé možnosti nástroje.",
+      "limitations": "Omezení",
+      "tools": {
+        "time": "Čas",
+        "settingsList": "Zobrazit nastavení",
+        "settingsSet": "Změnit nastavení"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Tento model podporuje úroveň uvažování"
@@ -5053,7 +5075,7 @@
     "defaultModel": "Použít výchozí model Kilo",
     "duration": "Časový limit (minuty)",
     "spendLimit": "Limit útraty (USD)",
-    "invalidSafeguards": "Zadejte kladné konečné limity času a útraty.",
+    "invalidSafeguards": "Zadejte kladné číslo v povoleném rozsahu.",
     "estimate": "Odhad {{estimate}} · maximum {{maximum}}",
     "estimateUnavailable": "Placené shrnutí není pro tato nastavení dostupné. Změňte model nebo limity, případně to zkuste později.",
     "confirmPaid": "Povolit placená shrnutí pro {{context}}?",
@@ -5133,7 +5155,8 @@
     "unavailableTitle": "Využití není k dispozici",
     "unavailableDescription": "Využití pro tento pracovní prostor není nastaveno. Pokud zde očekáváte údaje o využití, kontaktujte podporu.",
     "orgSelfNotice": "Vidíte své vlastní využití v této organizaci.",
-    "viewDetails": "Zobrazit podrobnosti o využití"
+    "viewDetails": "Zobrazit podrobnosti o využití",
+    "orgSelfEntryTitle": "Vaše využití"
   },
   "integrations": {
     "title": "Integrace",
@@ -5229,6 +5252,8 @@
       "autoCommit": "Zapsat změny po dokončení spuštění",
       "condenseOnComplete": "Zhuštit kontext po dokončení spuštění",
       "activeTitle": "Spouštěč aktivní",
+      "activeSwitchA11y": "Spouštěč aktivní: {{name}}",
+      "copyLinkA11y": "Kopírovat odkaz: {{name}}",
       "activeDescription": "Pozastavené webhooky odpovídají 404.",
       "runAsCreator": "Spouštět jako já",
       "runAsCreatorDescription": "Každé spuštění používá váš účet, takže je vyžadována tajná hlavička.",

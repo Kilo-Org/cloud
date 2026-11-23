@@ -1,9 +1,10 @@
-import { type Href, useRouter } from 'expo-router';
+import { type Href } from 'expo-router';
 import { useEffect } from 'react';
 
 import { classifyPermission, type PermissionState } from '@/lib/code-reviewer-status';
 import { PERSONAL_SCOPE, type ReviewerPlatform } from '@/lib/code-reviewer-config';
 import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
+import { useSettledReplace } from '@/lib/navigation/settled-replace';
 
 function isPersonal(scope: string) {
   return scope === PERSONAL_SCOPE;
@@ -38,13 +39,16 @@ export function useReviewerPermission(scope: string): PermissionState {
  * still server-authorized).
  */
 export function useReviewerEditGuard(scope: string, platform: ReviewerPlatform) {
-  const router = useRouter();
+  const settledRouter = useSettledReplace();
   const permission = useReviewerPermission(scope);
   const readOnly = permission.status === 'ready' && !permission.canEdit;
 
   useEffect(() => {
     if (readOnly) {
-      router.replace(`/(app)/code-reviewer/${scope}/${platform}` as Href);
+      // The bounce can run while the link's own navigation is still
+      // transitioning, and a swap inside that commit crashes Android Fabric
+      // with `addViewAt … already has a parent`.
+      settledRouter.replace(`/(app)/code-reviewer/${scope}/${platform}` as Href);
     }
-  }, [readOnly, router, scope, platform]);
+  }, [readOnly, settledRouter, scope, platform]);
 }

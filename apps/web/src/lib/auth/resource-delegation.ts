@@ -203,10 +203,6 @@ function userAdmission(user: Pick<User, 'id' | 'api_token_pepper'>): RuntimeAdmi
   };
 }
 
-/**
- * Returns the lifetime a minted token may carry: the requested lifetime, bounded by the caller's cap
- * and by the parent authority's expiry. A non-positive result means the authority has expired.
- */
 function clampLifetimeSeconds(args: {
   requested?: number;
   cap: number;

@@ -112,10 +112,6 @@ function EmptyStateBody({
   compactTitleClassName,
 }: Readonly<EmptyStateProps>) {
   const colors = useThemeColors();
-  // The light disc is the card surface and the muted glyph reads on it. The
-  // dark disc is the filled neutral instead, where the muted glyph sits dimmer
-  // than its light counterpart, so dark takes the secondary ink and the mark
-  // stays as visible as it is in light. An explicit `iconColor` still wins.
   const stateIconInk = useColorScheme() === 'dark' ? colors.ink2 : colors.mutedForeground;
   // A centered state is handed the band between the page header and the fixed
   // bottom tab bar, and in a short landscape window that band is shorter than

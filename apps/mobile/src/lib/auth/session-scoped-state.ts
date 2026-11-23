@@ -56,12 +56,32 @@ function clearSearchIndexBestEffort(): void {
 /**
  * Re-runs the clears for a launch with no stored session, so the surfaces that
  * outlive a session start empty.
+ *
+ * The members here are the ones the account boundary clears that a signed-out
+ * launch can still observe: the OS search index, the App Intents catalog, the
+ * on-disk artifact mirror, the device-global PR recents and the OS launcher
+ * surfaces. The boundary's clear of any of them can be lost to a process killed
+ * during sign-out's awaited teardown, or to an OS call the platform refused, so
+ * a launch that positively restored no session repeats them. The rest of the
+ * boundary's in-process members start empty in a fresh process, and the durable
+ * preferences it clears are not re-run here.
  */
 export function clearSystemSearchIndexOnSignedOutLaunch(): void {
   clearSearchIndexBestEffort();
   clearSessionCatalogBestEffort();
   runClear(clearArtifactMirror);
   runClear(notifyArtifactsChanged);
+  // The launcher shortcuts, quick-settings tile and Quick Actions are
+  // device-wide and their labels come from the signed-in account's sessions, so
+  // a launch with no stored session must not keep offering the previous
+  // account's session. Recording the clear in the surface revision makes a
+  // publisher that mounts later write its own derivation instead of trusting
+  // the surface it wrote before.
+  runClear(() => {
+    clearLauncherSurfaces();
+    noteLauncherSurfacesCleared();
+  });
+  runClear(clearRecentPrsBestEffort);
 }
 
 /**
@@ -161,10 +181,6 @@ export function clearSessionScopedState(): void {
   runClear(() => {
     reapTempFiles({ all: true });
   });
-  // The stored PR recents are account-bound data the index folds in, and the
-  // key is device-global, so the account boundary must drop them as well as the
-  // index itself. Without this, an account switch re-indexes the previous
-  // account's pull requests from the recents the new account then inherits.
   runClear(clearRecentPrsBestEffort);
   // Cross-account separation for the retained PR discussion conversation: the
   // sign-in account switch and the sign-out clear it with the other
@@ -183,10 +199,7 @@ export function clearSessionScopedState(): void {
   // The phone's search index is device-wide, not scoped to the signed-in
   // session, so without this the previous account's session, pull-request and
   // security titles stay searchable in Spotlight and Android app search after a
-  // sign-out or an account switch. Fire-and-forget via
-  // `clearSearchIndexBestEffort`: the native clear also wipes the fingerprint
-  // ledger the indexer diffs against, so the next sync re-indexes whatever the
-  // new account can see.
+  // sign-out or an account switch.
   runClear(clearSearchIndexBestEffort);
   // The App Intents session catalog is device-wide for the same reason, and it
   // is the same titles in another place: without this, Shortcuts and Siri would

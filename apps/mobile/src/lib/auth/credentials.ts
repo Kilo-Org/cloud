@@ -164,13 +164,6 @@ async function clearStoredCredentialsAtEpoch(epoch: number): Promise<void> {
   });
 }
 
-/**
- * Persists a credential pair through the serialized credential write queue.
- * Returns whether the pair was published to the token owner. A newer sign-in
- * or sign-out that superseded the write while it waited or ran fences it:
- * any partial credential keys already committed are cleared and nothing is
- * published, so a stale sign-in can never surface.
- */
 type PersistCredentialsOptions = {
   expiresIn?: number;
   expectedEpoch?: number;
@@ -193,6 +186,13 @@ type PersistCredentialsOptions = {
   partialWrite?: 'clear' | 'preserve';
 };
 
+/**
+ * Persists a credential pair through the serialized credential write queue.
+ * Returns whether the pair was published to the token owner. A newer sign-in
+ * or sign-out that superseded the write while it waited or ran fences it:
+ * any partial credential keys already committed are cleared and nothing is
+ * published, so a stale sign-in can never surface.
+ */
 export async function persistSignInCredentialsAtEpoch(
   token: string,
   refreshToken: string | undefined,
@@ -434,9 +434,6 @@ async function doRefresh(): Promise<RefreshOutcome> {
       } catch {
         refusalBody = undefined;
       }
-      // Classify before deciding: a 401 is terminal (the stored pair is gone),
-      // a 429/5xx is retryable and carries the server's own back-off, and any
-      // other 4xx is terminal without a retry guidance to honour.
       const classified = classifyAuthResponse({
         path: REFRESH_PATH,
         status,

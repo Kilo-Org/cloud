@@ -1,3 +1,4 @@
+import { MAX_GIT_BRANCH_LENGTH } from '@kilocode/session-ingest-contracts';
 import { describe, it, expect } from 'vitest';
 import {
   CLIOutboundMessageSchema,
@@ -252,28 +253,51 @@ describe('CLIOutboundMessageSchema', () => {
   });
 
   it.each([
-    ['ASCII', 'a'.repeat(24), 'a'.repeat(25)],
-    ['escaped characters', '\\"'.repeat(12), '\\"'.repeat(12) + '\\'],
-    ['CJK', '界'.repeat(24), '界'.repeat(25)],
-    // zod 4.6 measures string bounds in Unicode code points, so a surrogate
-    // pair counts once: 24 astral characters fit even though they are 48
-    // UTF-16 units.
-    ['surrogate pairs', '\u{10400}'.repeat(24), '\u{10400}'.repeat(25)],
-  ])('bounds %s branches by Unicode code points, not JSON bytes', (_label, valid, invalid) => {
+    ['ASCII', 'a'.repeat(25)],
+    ['ASCII 40 characters', 'a'.repeat(40)],
+    ['ASCII at the limit', 'a'.repeat(MAX_GIT_BRANCH_LENGTH)],
+    ['escaped characters', '\\"'.repeat(20)],
+    ['CJK', '界'.repeat(25)],
+    ['surrogate pairs', '\u{10400}'.repeat(25)],
+  ])('keeps an instance branch of %s through unchanged', (_label, gitBranch) => {
     const heartbeat = {
       type: 'heartbeat',
       sessions: [],
-      instance: { name: 'host', projectName: 'project', gitBranch: valid },
+      instance: { name: 'host', projectName: 'project', gitBranch },
     };
     expect(CLIOutboundMessageSchema.parse(JSON.parse(JSON.stringify(heartbeat)))).toEqual(
       heartbeat
     );
-    expect(
-      CLIOutboundMessageSchema.safeParse({
-        ...heartbeat,
-        instance: { ...heartbeat.instance, gitBranch: invalid },
-      }).success
-    ).toBe(false);
+  });
+
+  it('shortens an over-long instance branch to the shared limit', () => {
+    for (const length of [300, MAX_GIT_BRANCH_LENGTH + 1]) {
+      const heartbeat = {
+        type: 'heartbeat',
+        sessions: [],
+        instance: { name: 'host', projectName: 'project', gitBranch: 'a'.repeat(length) },
+      };
+      const parsed = CLIOutboundMessageSchema.parse(heartbeat);
+      expect(parsed.type).toBe('heartbeat');
+      if (parsed.type === 'heartbeat') {
+        expect(parsed.instance?.gitBranch).toBe('a'.repeat(MAX_GIT_BRANCH_LENGTH));
+      }
+    }
+  });
+
+  it('shortens an instance branch without leaving a lone high surrogate', () => {
+    // The limit falls between the two halves of the first astral character.
+    const gitBranch = 'a'.repeat(MAX_GIT_BRANCH_LENGTH - 1) + '\u{10400}'.repeat(30);
+    const parsed = CLIOutboundMessageSchema.parse({
+      type: 'heartbeat',
+      sessions: [],
+      instance: { name: 'host', projectName: 'project', gitBranch },
+    });
+    expect(parsed.type).toBe('heartbeat');
+    if (parsed.type === 'heartbeat') {
+      expect(parsed.instance?.gitBranch).toBe('a'.repeat(MAX_GIT_BRANCH_LENGTH - 1));
+      expect(parsed.instance?.gitBranch).not.toMatch(/[\uD800-\uDBFF]$/);
+    }
   });
 
   it('rejects instance with empty name', () => {

@@ -5,6 +5,7 @@ import { selectSessionListContentSurface } from './session-list-content-surface'
 function surface(overrides: Partial<Parameters<typeof selectSessionListContentSurface>[0]> = {}) {
   return selectSessionListContentSurface({
     isLoading: false,
+    isPaused: false,
     isError: false,
     isRetrying: false,
     hasAnySessions: true,

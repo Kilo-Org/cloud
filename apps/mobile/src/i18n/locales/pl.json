@@ -401,7 +401,7 @@
       "title": "Klucze dostawców",
       "rowSubtitle": "Korzystaj z własnych rozliczeń u dostawcy",
       "orgDescription": "Te klucze są współdzielone ze wszystkimi członkami organizacji, a koszty są rozliczane na jej kontach u dostawców.",
-      "viewOnly": "Tylko właściciel, administrator lub menedżer rozliczeń organizacji może zmieniać jej klucze.",
+      "viewOnly": "Tylko właściciel, administrator lub osoba zarządzająca rozliczeniami organizacji może zmieniać jej klucze.",
       "description": "Żądania wysyłane z użyciem tych kluczy są rozliczane na twoim koncie u dostawcy zamiast z salda Kilo.",
       "managedByPlan": "Zarządzany przez twój plan kodowania",
       "enableKey": "Włącz klucz {{provider}}",
@@ -680,6 +680,7 @@
     "needsInputAction": {
       "approved": "Żądanie zatwierdzone",
       "replied": "Odpowiedź wysłana",
+      "empty": "Wpisz odpowiedź i ją wyślij.",
       "failed": "Nie udało się odpowiedzieć. Dotknij ponownie, aby spróbować.",
       "unavailable": "To żądanie już nie oczekuje."
     }
@@ -821,6 +822,8 @@
     },
     "providerConnect": {
       "description": "Skonfiguruj połączenie z Kilo ({{label}}), aby automatycznie przeglądać PR.",
+      "notConnectedTitle": "Brak połączenia z {{platform}}",
+      "githubAdminOnlyDescription": "Tylko właściciele organizacji i administratorzy mogą je skonfigurować.",
       "githubApp": "aplikacja GitHub",
       "githubError": "Nie udało się otworzyć konfiguracji GitHub. Spróbuj ponownie.",
       "gitlabAccount": "konto GitLab",
@@ -1032,7 +1035,7 @@
       "empty": "Brak przeglądów z analityką",
       "emptyDescription": "Analityka rejestruje ukończone przeglądy, dopóki jest włączona dla organizacji.",
       "offTitle": "Analityka jest wyłączona dla {{platform}}",
-      "offDescription": "Analitykę mogą włączyć w ustawieniach organizacji w wersji internetowej role związane z rozliczeniami — właściciele, administratorzy i menedżerowie rozliczeń — aby rejestrować ukończone przeglądy.",
+      "offDescription": "Analitykę mogą włączyć w ustawieniach organizacji w wersji internetowej role związane z rozliczeniami — właściciele, administratorzy i osoby zarządzające rozliczeniami — aby rejestrować ukończone przeglądy.",
       "couldNotLoad": "Nie udało się wczytać analityki",
       "trackedReviewsCaption": "Ukończone przeglądy, które zakończyły się w tym okresie przy włączonej analityce. Przeglądy w toku i zakończone niepowodzeniem nigdy nie są zliczane.",
       "trackedReviewsUncounted": "Nie zliczono: {{displayCount}} z {{displayTotal}} ukończonych przeglądów organizacji, których wynik nie został zapisany.",
@@ -1735,6 +1738,7 @@
       "couldNotLoadThisSession": "Nie udało się wczytać tej sesji.",
       "historyTooLarge": "Zapis tej sesji jest zbyt duży, żeby go wczytać.",
       "historyUnavailable": "Nie można odczytać zapisu tej sesji.",
+      "historyTemporarilyUnavailable": "Zapis tej sesji jest chwilowo niedostępny.",
       "cloneFailedRetry": "Nie udało się sklonować tej sesji. Spróbuj ponownie.",
       "notEnoughCredits": "Brakuje środków na to żądanie. Doładuj konto i spróbuj ponownie.",
       "previousTaskFinishing": "Trwa kończenie poprzedniego zadania. Poczekaj chwilę.",
@@ -2279,7 +2283,9 @@
       "skip": "Pomiń",
       "retrySkip": "Ponów pomijanie",
       "submitting": "Wysyłanie…",
-      "sendAnswers": "Wyślij odpowiedzi"
+      "sendAnswers": "Wyślij odpowiedzi",
+      "unreadableTitle": "Nie można wyświetlić tego pytania",
+      "unreadableBody": "Agent czeka na pytanie, którego ta aplikacja nie może pokazać. Odpowiedz na pytanie w CLI, aby kontynuować."
     },
     "blockingCard": {
       "questionUnavailable": "To pytanie nie jest już dostępne.",
@@ -2306,6 +2312,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Nie udało się wczytać sesji podagenta.",
+      "historyTooLarge": "Historia tego podagenta jest zbyt duża, żeby ją wczytać.",
+      "historyUnavailable": "Historia tego podagenta jest niedostępna.",
+      "historyTemporarilyUnavailable": "Historia tego podagenta jest chwilowo niedostępna.",
       "failed": "Sesja podagenta zakończyła się błędem.",
       "noMessages": "Brak wiadomości podagenta",
       "noMessagesDescription": "Ta sesja podagenta zakończyła się bez utworzenia zapisu rozmowy.",
@@ -2906,6 +2915,8 @@
     "why": "W jakim celu",
     "who": "Komu",
     "installAttributionPromptMessage": "Kilo korzysta ze zgody na śledzenie w systemie Apple wyłącznie do ustalenia źródła instalacji aplikacji. Nigdy nie wykorzystuje do tego twoich poleceń ani rozmów.",
+    "installAttributionRequestFailedTitle": "Nie udało się wyświetlić monitu o śledzenie",
+    "installAttributionRequestFailedMessage": "Kilo nie mogło wyświetlić monitu systemowego, więc ustalanie źródła instalacji pozostaje wyłączone.",
     "installAttributionPromptTitle": "Zezwolić na ustalenie źródła instalacji?"
   },
   "prReview": {
@@ -3525,7 +3536,7 @@
   "organization": {
     "auditLog": {
       "title": "Dziennik audytu",
-      "permissionDenied": "Dziennik audytu może przeglądać tylko właściciel, administrator lub menedżer rozliczeń organizacji w planie Enterprise.",
+      "permissionDenied": "Dziennik audytu może przeglądać tylko właściciel, administrator lub osoba zarządzająca rozliczeniami organizacji w planie Enterprise. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Brak zdarzeń audytu",
       "emptyDescription": "Tutaj pojawiają się działania podjęte w tej organizacji.",
       "truncated": "Wyświetlane są najnowsze zdarzenia.",
@@ -3725,7 +3736,7 @@
     },
     "billing": {
       "title": "Rozliczenia",
-      "permissionDenied": "Rozliczenia organizacji może zobaczyć tylko jej właściciel, administrator lub menedżer rozliczeń.",
+      "permissionDenied": "Rozliczenia organizacji może zobaczyć tylko jej właściciel, administrator lub osoba zarządzająca rozliczeniami. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Subskrypcja",
       "state": "Stan",
       "stateNone": "Brak subskrypcji",
@@ -3815,7 +3826,7 @@
       "pendingInvitation": "Ten adres e-mail ma już oczekujące zaproszenie.",
       "alreadyMember": "Ta osoba jest już członkiem tej organizacji.",
       "seatsFull": "Wszystkie miejsca są zajęte ({{used}}/{{total}}). Poproś właściciela organizacji o dodanie miejsc, zanim zaprosisz kolejnych członków.",
-      "seatsFullCanInviteBilling": "Wszystkie miejsca są zajęte ({{used}}/{{total}}). Nadal możesz zapraszać menedżerów rozliczeń, którzy nie zajmują miejsca.",
+      "seatsFullCanInviteBilling": "Wszystkie miejsca są zajęte ({{used}}/{{total}}). Nadal możesz zapraszać osoby zarządzające rozliczeniami, które nie zajmują miejsca.",
       "noSeatsAvailable": "Wszystkie miejsca są zajęte. Poproś właściciela organizacji o dodanie miejsc, zanim zaprosisz kolejnych członków."
     },
     "invoices": {
@@ -3914,7 +3925,7 @@
       "emptyDescription": "Użyj przycisku Wcześniejsza godzina, aby wyświetlić wcześniejsze żądania.",
       "emptyBoundDescription": "Dzienniki żądań nie sięgają dalej wstecz.",
       "loadError": "Nie udało się wczytać dzienników żądań.",
-      "permissionDenied": "Dzienniki żądań może przeglądać tylko właściciel, administrator lub menedżer rozliczeń organizacji.",
+      "permissionDenied": "Dzienniki żądań może przeglądać tylko właściciel, administrator lub osoba zarządzająca rozliczeniami organizacji. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} wej. · {{output}} wyj.",
       "byok": "BYOK"
     },
@@ -4200,7 +4211,10 @@
     "list": {
       "loadFailed": "Nie udało się wczytać historii czatu.",
       "new": "Nowy czat",
-      "deleteTitle": "Usunąć ten czat?"
+      "deleteTitle": "Usunąć ten czat?",
+      "resetNoticeTitle": "Wyczyszczono lokalne czaty i wersje robocze",
+      "resetNoticeBody": "Kilo nie mogło otworzyć czatów zapisanych na tym urządzeniu. Twoje sesje w chmurze pozostały nienaruszone.",
+      "resetNoticeDismiss": "Odrzuć powiadomienie"
     },
     "rename": {
       "title": "Zmień nazwę czatu",
@@ -4482,7 +4496,15 @@
       "download": "Pobierz model na urządzenie",
       "downloading": "Pobieranie…",
       "downloadProgress": "Pobieranie… {{percent}}%",
-      "downloadFailed": "Pobieranie nie zostało ukończone. Sprawdź połączenie i wolne miejsce w pamięci, a potem spróbuj ponownie."
+      "downloadFailed": "Pobieranie nie zostało ukończone. Sprawdź połączenie i wolne miejsce w pamięci, a potem spróbuj ponownie.",
+      "cannotUse": "Nie można uruchomić: {{items}}.",
+      "cannotUseOptions": "Nie można wypełnić: niektóre opcje narzędzia.",
+      "limitations": "Ograniczenia",
+      "tools": {
+        "time": "Czas",
+        "settingsList": "Pokaż ustawienia",
+        "settingsSet": "Zmień ustawienia"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Ten model obsługuje poziom rozumowania"
@@ -5053,7 +5075,7 @@
     "defaultModel": "Użyj domyślnego modelu Kilo",
     "duration": "Limit czasu (minuty)",
     "spendLimit": "Limit wydatków (USD)",
-    "invalidSafeguards": "Wpisz dodatnie, skończone limity czasu i wydatków.",
+    "invalidSafeguards": "Wpisz dodatnią liczbę w dozwolonym zakresie.",
     "estimate": "Szacunek {{estimate}} · maksymalnie {{maximum}}",
     "estimateUnavailable": "Płatne podsumowanie nie jest dostępne dla tych ustawień. Zmień model lub limity albo spróbuj ponownie później.",
     "confirmPaid": "Włączyć płatne podsumowania dla {{context}}?",
@@ -5133,7 +5155,8 @@
     "unavailableTitle": "Użycie niedostępne",
     "unavailableDescription": "Użycie nie jest skonfigurowane dla tej przestrzeni roboczej. Skontaktuj się z pomocą techniczną, jeśli spodziewasz się zobaczyć tutaj użycie.",
     "orgSelfNotice": "Widzisz własne użycie w tej organizacji.",
-    "viewDetails": "Wyświetl szczegóły użycia"
+    "viewDetails": "Wyświetl szczegóły użycia",
+    "orgSelfEntryTitle": "Twoje użycie"
   },
   "integrations": {
     "title": "Integracje",
@@ -5229,6 +5252,8 @@
       "autoCommit": "Zatwierdź zmiany po zakończeniu uruchomienia",
       "condenseOnComplete": "Skondensuj kontekst po zakończeniu uruchomienia",
       "activeTitle": "Wyzwalacz aktywny",
+      "activeSwitchA11y": "Wyzwalacz aktywny: {{name}}",
+      "copyLinkA11y": "Kopiuj link: {{name}}",
       "activeDescription": "Wstrzymane webhooki odpowiadają kodem 404.",
       "runAsCreator": "Uruchamiaj jako ja",
       "runAsCreatorDescription": "Każde uruchomienie używa Twojego konta, więc nagłówek z sekretem jest wymagany.",

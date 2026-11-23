@@ -419,14 +419,6 @@ describe('ScreenHeader mounted', () => {
   it('pulls the leading controls with a logical start margin the RTL swap cannot mirror', async () => {
     const renderer = renderHeader({ title: 'Sessions', headerRight: slotView() });
 
-    // The pull is on the START edge, so it must compile to the logical
-    // `marginInlineStart`. A hand-picked `-mr-4` under RTL compiles to
-    // `marginRight`, which Fabric rewrites to Yoga End for an RTL tree, landing
-    // the pull on the side that faces the title: the heading then started 12
-    // points under the 44-point back target and the title's box covered 0.27 of
-    // it — the "two controls cover each other" finding (the scan reports above
-    // 0.25). `-ms-4` keeps a real 4-point `gap-1` between the two controls in
-    // both writing directions. It rides on the frame, which is the row's child.
     const frame = findBackFrame(renderer.root);
     expect(frame.props.className).toContain('-ms-4');
     expect(await compiledMarginProperties(frame.props.className as string)).toEqual([
@@ -725,6 +717,13 @@ describe('ScreenHeader mounted', () => {
         });
       });
     };
+    /**
+     * The box around the visible title. The probe remounts it for the
+     * confirming pass, so its identity is how a test sees that a fresh
+     * `onLayout` — the second measurement a device delivers — is coming.
+     */
+    const titleBox = (renderer: TestRenderer.ReactTestRenderer) =>
+      renderer.root.findByProps({ accessibilityRole: 'header' }).parent as TestInstance;
     const measure = (
       renderer: TestRenderer.ReactTestRenderer,
       widths: { natural?: number; box?: number }
@@ -733,10 +732,7 @@ describe('ScreenHeader mounted', () => {
         layoutWidth(renderer.root.find(isNaturalCopy), widths.natural);
       }
       if (widths.box !== undefined) {
-        layoutWidth(
-          renderer.root.findByProps({ accessibilityRole: 'header' }).parent as TestInstance,
-          widths.box
-        );
+        layoutWidth(titleBox(renderer), widths.box);
       }
     };
     const update = (renderer: TestRenderer.ReactTestRenderer, props: ScreenHeaderProps) => {
@@ -751,6 +747,20 @@ describe('ScreenHeader mounted', () => {
       inlineActions: slotView(),
       allowInlineActionsStacking: false,
     };
+    /**
+     * Drives one decision the way a device does: the layout reports its
+     * widths, the probe remounts the copy and the box, and that same layout
+     * reports the box once more — the fresh title's `onLayout`, which is the
+     * report a re-keyed box produces on the device. A cut needs both; a row
+     * that fits is settled by the first.
+     */
+    const settle = (
+      renderer: TestRenderer.ReactTestRenderer,
+      widths: { natural?: number; box?: number }
+    ) => {
+      measure(renderer, widths);
+      measure(renderer, widths);
+    };
 
     it('moves the cluster under a title one pixel narrower than its natural width', () => {
       const renderer = renderHeader(german);
@@ -762,10 +772,28 @@ describe('ScreenHeader mounted', () => {
       expect(copy.parent?.props.pointerEvents).toBe('none');
       expect(copy.parent?.props.importantForAccessibility).toBe('no-hide-descendants');
 
+      // The first cut report only suspects: the cluster stays beside the title
+      // until this layout measures again, and the probe remounts the copy and
+      // the box the visible title fills — a fresh box reports its width again
+      // on a device, which is the confirmation the decision waits for.
+      const box = titleBox(renderer);
       measure(renderer, { natural: NATURAL, box: CUT_BOX });
+      expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(0);
+      expect(renderer.root.find(isNaturalCopy)).not.toBe(copy);
+      expect(titleBox(renderer)).not.toBe(box);
+
+      // The same row measures narrow again, so the cut is real.
+      measure(renderer, { box: CUT_BOX });
       const stacked = renderer.root.findAll(isStackedActionsRow);
       expect(stacked).toHaveLength(1);
       expect(stacked[0]?.children).toHaveLength(1);
+
+      // A decided layout does not remount again: another report of the same
+      // width keeps the box it already has, so the probe cannot loop.
+      const settled = titleBox(renderer);
+      measure(renderer, { box: CUT_BOX });
+      expect(titleBox(renderer)).toBe(settled);
+      expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(1);
 
       // The full width the title gets on its own row does not move the cluster
       // back beside it.
@@ -773,11 +801,35 @@ describe('ScreenHeader mounted', () => {
       expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(1);
     });
 
+    it('keeps the cluster inline when the row widens before the cut is confirmed', () => {
+      // The design gate measured a title box of 61.0dp beside a natural copy of
+      // 61.0dp with the picker still on its own row: one frame reported a box a
+      // fraction of a dp too narrow while the row settled, and the cut latched
+      // for the rest of the layout. The probe re-measures that layout instead.
+      const renderer = renderHeader(german);
+      measure(renderer, { natural: NATURAL, box: CUT_BOX });
+      expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(0);
+
+      // The confirm pass reads the settled box, which fits: no cut.
+      measure(renderer, { box: NATURAL });
+      expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(0);
+
+      // And the layout stays inline, without remounting again.
+      const settled = titleBox(renderer);
+      measure(renderer, { box: NATURAL });
+      expect(titleBox(renderer)).toBe(settled);
+      expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(0);
+    });
+
     it('decides on whichever width reports last', () => {
       const renderer = renderHeader(german);
       measure(renderer, { box: CUT_BOX });
       expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(0);
+      // The pair is complete and narrow, which only suspends the decision.
       measure(renderer, { natural: NATURAL });
+      expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(0);
+      // The probe's second pass reports the same narrow pair.
+      measure(renderer, { box: CUT_BOX });
       expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(1);
     });
 
@@ -792,7 +844,7 @@ describe('ScreenHeader mounted', () => {
 
     it('measures again after a language change and keeps a title that fits beside it', () => {
       const renderer = renderHeader(german);
-      measure(renderer, { natural: NATURAL, box: CUT_BOX });
+      settle(renderer, { natural: NATURAL, box: CUT_BOX });
       expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(1);
 
       // The new title holds no natural width yet, so the cluster returns to the
@@ -804,13 +856,50 @@ describe('ScreenHeader mounted', () => {
       expect(renderer.root.find(isNaturalCopy)).not.toBe(copyBefore);
       measure(renderer, { box: 160 / PIXEL_RATIO });
       expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(0);
-      measure(renderer, { natural: 160 / PIXEL_RATIO });
+      settle(renderer, { natural: 160 / PIXEL_RATIO });
       expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(0);
 
       // And back: the cut title moves the cluster again.
       update(renderer, german);
-      measure(renderer, { natural: NATURAL, box: CUT_BOX });
+      settle(renderer, { natural: NATURAL, box: CUT_BOX });
       expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(1);
+    });
+
+    it('never decides from a width the previous layout reported', () => {
+      // The visible title and the copy report in either order after a new
+      // layout, so for a moment the new layout holds one width and the record
+      // holds the other. Comparing the two would cut a title nothing measured
+      // as cut, so neither order decides: only this layout's own pair does.
+
+      // The visible title reports first, against the copy's old natural width.
+      const boxFirst = renderHeader(german);
+      settle(boxFirst, { natural: NATURAL, box: CUT_BOX });
+      expect(boxFirst.root.findAll(isStackedActionsRow)).toHaveLength(1);
+      update(boxFirst, { ...german, title: 'Chat' });
+      expect(boxFirst.root.findAll(isStackedActionsRow)).toHaveLength(0);
+      measure(boxFirst, { box: CUT_BOX });
+      expect(boxFirst.root.findAll(isStackedActionsRow)).toHaveLength(0);
+      measure(boxFirst, { box: CUT_BOX });
+      expect(boxFirst.root.findAll(isStackedActionsRow)).toHaveLength(0);
+
+      // The copy reports first, against the box the old layout reported.
+      const naturalFirst = renderHeader(german);
+      settle(naturalFirst, { natural: NATURAL, box: CUT_BOX });
+      expect(naturalFirst.root.findAll(isStackedActionsRow)).toHaveLength(1);
+      update(naturalFirst, { ...german, title: 'Chat' });
+      expect(naturalFirst.root.findAll(isStackedActionsRow)).toHaveLength(0);
+      measure(naturalFirst, { natural: NATURAL });
+      expect(naturalFirst.root.findAll(isStackedActionsRow)).toHaveLength(0);
+
+      // This layout's own pair decides it: the settled Chat row fits.
+      measure(naturalFirst, { natural: 160 / PIXEL_RATIO });
+      expect(naturalFirst.root.findAll(isStackedActionsRow)).toHaveLength(0);
+      measure(naturalFirst, { box: 160 / PIXEL_RATIO });
+      expect(naturalFirst.root.findAll(isStackedActionsRow)).toHaveLength(0);
+
+      // ...while a row of its own that is genuinely narrow still stacks.
+      settle(naturalFirst, { natural: NATURAL, box: CUT_BOX });
+      expect(naturalFirst.root.findAll(isStackedActionsRow)).toHaveLength(1);
     });
 
     it('does not measure a title the large font scale already moved the cluster under', () => {
@@ -889,10 +978,6 @@ describe('ScreenHeader mounted', () => {
   });
 
   it('keeps the title touch area out of the row gap beside it', () => {
-    // The heading's free side is the gap to the trailing slot, and a trailing
-    // control can carry a slop that reaches into that gap. A title slop there
-    // made the same strip two tap targets: measured on the session screen at
-    // 10.33 dp across, in every state and every gate cell.
     const renderer = renderHeader({ title: 'Sessions', onTitlePress: () => undefined });
 
     const title = findTitlePressable(renderer.root);
@@ -900,8 +985,6 @@ describe('ScreenHeader mounted', () => {
   });
 
   it('keeps the title touch area identical in both directions', () => {
-    // RN does not mirror hitSlop under RTL. With no side slop there is nothing
-    // to mirror, so Back and the trailing cluster keep their own taps alike.
     i18nManager.isRTL = true;
     const renderer = renderHeader({ title: 'Sessions', onTitlePress: () => undefined });
 
@@ -1201,10 +1284,6 @@ describe('ScreenHeader mounted', () => {
     renderer.unmount();
   });
 
-  // The reserve cannot know the arriving label, so it holds a no-ink no-break
-  // space: the eyebrow variant's line box is the same for every script
-  // (`EYEBROW_LINE_HEIGHT_DP`), so the space reserves exactly the height the
-  // label takes, in either interface direction.
   it.each([false, true])(
     'reserves a blank filler when the arriving label is unknown (RTL=%s)',
     isRTL => {
@@ -1964,9 +2043,8 @@ describe('centered title balance', () => {
   it('refines the filler from the measured slot width after mount', () => {
     // No declared width: the first frame balances on the 0 seed (no mirror),
     // then onLayout reports the slot's real 140dp — the same filler this test
-    // then reads back. The row's layout event lands the 358dp row width the
-    // seed already used, so the filler only moves when the slot
-    // reports.
+    // then reads back. The seed row is 390 - 44 = 346dp, so the 140dp slot
+    // report is what moves the filler.
     const renderer = renderHeader({
       title: 'Kilo Pass',
       modal: true,

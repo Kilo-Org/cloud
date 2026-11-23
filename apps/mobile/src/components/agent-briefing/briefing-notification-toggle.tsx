@@ -13,11 +13,13 @@ import { Text } from '@/components/ui/text';
 import { type BriefingPreferences, useBriefingPreferences } from '@/lib/agent-briefing';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
 import { useTRPC } from '@/lib/trpc';
+import { useBriefingLocale } from './briefing-locale';
 
 function useBriefingNotificationSwitch() {
   const trpc = useTRPC();
   const client = useQueryClient();
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
+  const locale = useBriefingLocale();
   const offline = useOfflineBannerState();
   const preferences = useBriefingPreferences();
   const update = useMutation(
@@ -63,7 +65,7 @@ function useBriefingNotificationSwitch() {
         nightStart: current.nightStart,
         morningStart: current.morningStart,
         morningEnd: current.morningEnd,
-        language: i18n.resolvedLanguage ?? i18n.language,
+        language: locale,
       });
     },
   };

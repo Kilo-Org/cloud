@@ -429,7 +429,6 @@ async function enrichCatalogModels(
 
 function sortByPreferredOrder(models: OpenRouterCatalogModel[]) {
   return models.sort((a, b) => {
-    // Sort by preferredIndex (undefined values last)
     if (a.preferredIndex !== undefined && b.preferredIndex === undefined) return -1;
     if (a.preferredIndex === undefined && b.preferredIndex !== undefined) return 1;
 

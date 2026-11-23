@@ -94,7 +94,6 @@ export function scheduleSend(sender: RepoSelectionSender): void {
   }
   sender.timer = setTimeout(() => {
     sender.timer = null;
-    // The fire submits only while the epoch that armed it is current.
     if (!isRepoSelectionEpochCurrent(sender.epoch)) {
       sender.pendingSelection = null;
       return;

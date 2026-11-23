@@ -1350,6 +1350,7 @@
     "needsInputAction": {
       "approved": "Cais wedi’i gymeradwyo",
       "replied": "Anfonwyd yr ymateb",
+      "empty": "Ysgrifennwch ateb ac yna ei anfon.",
       "failed": "Methwyd ag ateb. Tapwch eto i roi cynnig arall.",
       "unavailable": "Nid yw’r cais hwn yn aros mwyach."
     }
@@ -1614,7 +1615,9 @@
       "githubError": "Ni ellid agor y broses sefydlu GitHub. Ceisiwch eto.",
       "gitlabAccount": "y cyfrif GitLab",
       "gitlabError": "Ni ellid agor y broses sefydlu GitLab. Ceisiwch eto.",
-      "description": "Cysylltwch {{label}} â Kilo i adolygu ceisiadau tynnu'n awtomatig."
+      "description": "Cysylltwch {{label}} â Kilo i adolygu ceisiadau tynnu'n awtomatig.",
+      "notConnectedTitle": "Nid yw {{platform}} wedi'i gysylltu",
+      "githubAdminOnlyDescription": "Dim ond perchnogion a gweinyddwyr y sefydliad sy'n gallu ei gysylltu."
     },
     "overview": {
       "allAreas": "Pob maes",
@@ -2447,6 +2450,7 @@
       "couldNotLoadThisSession": "Methu llwytho'r sesiwn hon.",
       "historyTooLarge": "Mae trawsgrifiad y sesiwn hon yn rhy fawr i'w llwytho.",
       "historyUnavailable": "Ni ellir darllen trawsgrifiad y sesiwn hon.",
+      "historyTemporarilyUnavailable": "Nid yw trawsgrifiad y sesiwn hon ar gael dros dro.",
       "cloneFailedRetry": "Methu clonio'r sesiwn hon. Ceisiwch eto.",
       "notEnoughCredits": "Nid oes digon o gredydau ar gyfer y cais hwn. Ychwanegwch gredydau a cheisiwch eto.",
       "previousTaskFinishing": "Nid yw'r dasg flaenorol wedi gorffen eto. Arhoswch am eiliad.",
@@ -2999,7 +3003,9 @@
       "skip": "Hepgor",
       "retrySkip": "Ceisio hepgor eto",
       "submitting": "Yn cyflwyno…",
-      "sendAnswers": "Anfon atebion"
+      "sendAnswers": "Anfon atebion",
+      "unreadableTitle": "Methwyd dangos y cwestiwn hwn",
+      "unreadableBody": "Mae'r asiant yn aros am gwestiwn na all yr ap hwn ei ddangos. Atebwch y cwestiwn yn y CLI i barhau."
     },
     "blockingCard": {
       "questionUnavailable": "Nid yw'r cwestiwn hwn ar gael mwyach.",
@@ -3026,6 +3032,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Methu llwytho sesiwn yr is-asiant.",
+      "historyTooLarge": "Mae hanes yr is-asiant hwn yn rhy fawr i'w lwytho.",
+      "historyUnavailable": "Nid yw hanes yr is-asiant hwn ar gael.",
+      "historyTemporarilyUnavailable": "Nid yw hanes yr is-asiant hwn ar gael dros dro.",
       "failed": "Methodd sesiwn yr is-asiant.",
       "noMessages": "Dim negeseuon is-asiant",
       "noMessagesDescription": "Daeth sesiwn yr is-asiant hwn i ben heb gynhyrchu trawsgrifiad.",
@@ -3644,6 +3653,8 @@
     "voiceTranscriptionWho": "Eich dyfais, Kilo Gateway gyda'r model trawsgrifio a ddewiswch, neu Apple neu Google ar gyfer adnabyddiaeth ar-lein.",
     "installAttributionPromptTitle": "Caniatáu priodoli'r gosodiad?",
     "installAttributionPromptMessage": "Mae Kilo yn defnyddio caniatâd olrhain Apple dim ond i weld pa sianel ddaeth â chi yma. Ni ddefnyddir eich anogiadau na'ch sgyrsiau byth.",
+    "installAttributionRequestFailedTitle": "Methu dangos anogiad olrhain",
+    "installAttributionRequestFailedMessage": "Ni allai Kilo ddangos anogiad y system, felly mae priodoli'r gosodiad yn parhau wedi'i ddiffodd.",
     "what": "Beth",
     "why": "Pam",
     "who": "Pwy"
@@ -3659,7 +3670,7 @@
   "organization": {
     "auditLog": {
       "title": "Log archwilio",
-      "permissionDenied": "Dim ond perchennog, gweinyddwr neu reolwr bilio sefydliad ar y cynllun Enterprise all ddarllen ei log archwilio.",
+      "permissionDenied": "Dim ond perchennog, gweinyddwr neu reolwr bilio sefydliad ar y cynllun Enterprise all ddarllen ei log archwilio. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Dim digwyddiadau archwilio",
       "emptyDescription": "Mae camau a gymerir yn y sefydliad hwn yn ymddangos yma.",
       "truncated": "Yn dangos y digwyddiadau diweddaraf.",
@@ -3869,7 +3880,7 @@
     },
     "billing": {
       "title": "Bilio",
-      "permissionDenied": "Dim ond perchennog, gweinyddwr neu reolwr bilio'r sefydliad sy'n gallu gweld ei filio.",
+      "permissionDenied": "Dim ond perchennog, gweinyddwr neu reolwr bilio'r sefydliad sy'n gallu gweld ei filio. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Tanysgrifiad",
       "state": "Statws",
       "stateNone": "Dim tanysgrifiad",
@@ -4046,7 +4057,7 @@
       "emptyDescription": "Defnyddiwch Awr gynharach i weld ceisiadau cynharach.",
       "emptyBoundDescription": "Dyma mor bell yn ôl ag y mae logiau ceisiadau'n mynd.",
       "loadError": "Methu llwytho logiau ceisiadau.",
-      "permissionDenied": "Dim ond perchennog, gweinyddwr neu reolwr bilio sefydliad all ddarllen ei logiau ceisiadau.",
+      "permissionDenied": "Dim ond perchennog, gweinyddwr neu reolwr bilio sefydliad all ddarllen ei logiau ceisiadau. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} i mewn · {{output}} allan",
       "byok": "BYOK"
     },
@@ -4356,7 +4367,10 @@
     "list": {
       "loadFailed": "Ni ellid llwytho hanes y sgwrs.",
       "new": "Sgwrs newydd",
-      "deleteTitle": "Dileu'r sgwrs hon?"
+      "deleteTitle": "Dileu'r sgwrs hon?",
+      "resetNoticeTitle": "Cliriwyd y sgyrsiau a'r drafftiau lleol",
+      "resetNoticeBody": "Ni allai Kilo agor y sgyrsiau a gadwyd ar y ddyfais hon. Nid oes effaith ar eich sesiynau yn y cwmwl.",
+      "resetNoticeDismiss": "Diystyru'r hysbysiad"
     },
     "rename": {
       "title": "Ailenwi sgwrs",
@@ -4640,7 +4654,15 @@
       "download": "Llwytho'r model ar y ddyfais i lawr",
       "downloading": "Wrthi'n llwytho i lawr…",
       "downloadProgress": "Wrthi'n llwytho i lawr… {{percent}}%",
-      "downloadFailed": "Ni orffennodd y llwytho i lawr. Gwiriwch eich cysylltiad a'ch lle storio, yna rhowch gynnig arall arni."
+      "downloadFailed": "Ni orffennodd y llwytho i lawr. Gwiriwch eich cysylltiad a'ch lle storio, yna rhowch gynnig arall arni.",
+      "cannotUse": "Methu rhedeg: {{items}}.",
+      "cannotUseOptions": "Methu llenwi: rhai opsiynau offeryn.",
+      "limitations": "Cyfyngiadau",
+      "tools": {
+        "time": "Amser",
+        "settingsList": "Dangos gosodiadau",
+        "settingsSet": "Newid gosodiadau"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Mae'r model hwn yn cefnogi ymdrech feddwl"
@@ -5231,7 +5253,7 @@
     "defaultModel": "Defnyddio model diofyn Kilo",
     "duration": "Terfyn amser (munudau)",
     "spendLimit": "Terfyn gwariant (USD)",
-    "invalidSafeguards": "Rhowch derfynau amser a gwariant positif a meidraidd.",
+    "invalidSafeguards": "Rhowch rif positif o fewn yr ystod a ganiateir.",
     "estimate": "Amcangyfrif {{estimate}} · uchafswm {{maximum}}",
     "estimateUnavailable": "Nid oes crynodeb taledig ar gael ar gyfer y gosodiadau hyn. Newidiwch y model neu'r terfynau, neu ceisiwch eto yn ddiweddarach.",
     "estimatePricingUnavailable": "Nid yw prisio'r model hwn ar gael. Dewiswch fodel arall.",
@@ -5321,7 +5343,8 @@
     "unavailableTitle": "Nid yw defnydd ar gael",
     "unavailableDescription": "Nid yw defnydd wedi'i osod ar gyfer y weithfan hon. Cysylltwch â'r tîm cymorth os ydych yn disgwyl gweld defnydd yma.",
     "orgSelfNotice": "Rydych chi'n gweld eich defnydd eich hun yn y sefydliad hwn.",
-    "viewDetails": "Gweld manylion defnydd"
+    "viewDetails": "Gweld manylion defnydd",
+    "orgSelfEntryTitle": "Eich defnydd"
   },
   "integrations": {
     "title": "Integreiddiadau",
@@ -5417,6 +5440,8 @@
       "autoCommit": "Cyflwyno newidiadau pan fydd y rhediad yn gorffen",
       "condenseOnComplete": "Cywasgu’r cyd-destun pan fydd y rhediad yn gorffen",
       "activeTitle": "Sbardun yn weithredol",
+      "activeSwitchA11y": "Sbardun gweithredol: {{name}}",
+      "copyLinkA11y": "Copïo dolen ar gyfer {{name}}",
       "activeDescription": "Mae bachynnau gwe wedi’u seibio yn ateb â 404.",
       "runAsCreator": "Rhedeg fel fi",
       "runAsCreatorDescription": "Mae pob rhediad yn defnyddio’ch cyfrif, felly mae’r pennawd cyfrinachol yn ofynnol.",

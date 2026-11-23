@@ -102,7 +102,9 @@ export const EYEBROW_RTL_SCRIPT_DISPLAY = 'text-[13px]';
  * must not depend on it: one explicit height, and both sizes sit inside it.
  * Emitted unscaled: React Native multiplies an explicit `lineHeight` by the
  * system font scale itself, bounded by `maxFontSizeMultiplier`, so this is the
- * dp at scale 1 and the native pipeline carries it to the live scale once.
+ * dp at scale 1 and the native pipeline carries it to the live scale once
+ * (pre-scaling it as well would apply the system scale twice; see
+ * `use-text-height.tsx`, `scaledLineHeight`).
  */
 export const EYEBROW_LINE_HEIGHT_DP = 22;
 
@@ -121,9 +123,9 @@ function Text({
      * The paragraph's base direction. App copy omits it and names the
      * interface's. `auto` is for copy the app did not write — a server's
      * message, a finding's description, a user's own text — which names its
-     * own direction, so English content keeps its left edge and the
-     * punctuation that ends it inside a right-to-left interface
-     * (`contentTextDirection`).
+     * own direction, and the node's layout with it, so English content keeps
+     * its left edge and the punctuation that ends it inside a right-to-left
+     * interface (`contentTextDirection`).
      */
     direction?: 'auto';
   }) {
@@ -139,7 +141,8 @@ function Text({
   const { isRtlScript, joinedScript } = React.useMemo(
     () => ({
       // The font family is the script's, not the interface's: JetBrains Mono
-      // ships no Arabic or Hebrew glyphs, so the copy that uses either drops the
+      // draws the glyphs of neither the right-to-left blocks (`RTL_SCRIPT`) nor
+      // the joined scripts (`JOINED_SCRIPT`), so copy in either set drops the
       // family in both directions (`withoutMonoFamily`).
       isRtlScript: hasRtlScript(props.children),
       joinedScript: containsJoinedScript(props.children),
@@ -152,15 +155,6 @@ function Text({
   // take a spacing no Hebrew reader asked for — while Latin copy, in either
   // direction, keeps the tracking its class asks for (`NATURAL_LETTER_SPACING`).
   const resetsTracking = joinedScript || (isRTL && isRtlScript);
-  // One line box for the eyebrow in every script: the reserve in
-  // `screen-header.tsx` can never know the arriving label's script, so the box
-  // must not depend on it, and the 10px Latin size and the 13px RTL-script twin
-  // both sit inside `EYEBROW_LINE_HEIGHT_DP`. The value stays at font scale 1
-  // here: React Native scales an explicit `lineHeight` through the native text
-  // pipeline exactly as it scales the font size, bounded by the same
-  // `maxFontSizeMultiplier`, so pre-scaling it as well would apply the system
-  // scale twice (`use-text-height.tsx`, `scaledLineHeight`). A caller's own
-  // `lineHeight` still wins: the computed entry comes before `props.style`.
   const eyebrowLineHeight: TextStyle | undefined =
     variant === 'eyebrow' ? { lineHeight: EYEBROW_LINE_HEIGHT_DP } : undefined;
   const headingA11y = HEADING_A11Y.get(variant ?? 'default');
@@ -173,10 +167,6 @@ function Text({
     textClass,
     className
   );
-  // The paragraph's base direction: the interface's for app copy, and the
-  // copy's own first letter's for content (`direction="auto"`), named for the
-  // node's layout as well, which is what makes a Latin sentence keep its left
-  // edge and the punctuation that ends it inside a right-to-left interface.
   const interfaceDirection: TextStyle | undefined = isRTL ? RTL_WRITING_DIRECTION : undefined;
   const writingDirection =
     direction === 'auto'
@@ -218,9 +208,15 @@ function Text({
         props.style,
       ]
     : directionStyle;
+  // The mono family is dropped for both sets of copy it cannot draw: the
+  // right-to-left blocks (`isRtlScript`, `RTL_SCRIPT`) and the joined scripts
+  // (`joinedScript`, `JOINED_SCRIPT`). Either way a fallback would set the copy
+  // glyph by glyph and lose its joins or clusters, so the family goes in both
+  // interface directions and only the size, color and weight classes stay.
+  const dropsMonoFamily = isRtlScript || joinedScript;
   return (
     <Component
-      className={isRtlScript ? withoutMonoFamily(classes) : classes}
+      className={dropsMonoFamily ? withoutMonoFamily(classes) : classes}
       role={headingA11y?.role}
       aria-level={headingA11y?.level}
       {...props}

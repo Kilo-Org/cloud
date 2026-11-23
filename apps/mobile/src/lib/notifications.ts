@@ -71,6 +71,7 @@ import {
   isNeedsInputActionIdentifier,
   type NeedsInputActionDeps,
   pendingDeepLinkOptionsForData,
+  restoreReplyDraftFromData,
 } from './notification-actions';
 import { isAgentProgressAllowedInActiveFocus } from './notification-focus-filter';
 import { notificationPathForData } from './notification-path';
@@ -659,6 +660,11 @@ export function checkInitialNotification(): void {
   }
   const data = parseNotificationData(response.notification.request.content.data);
   if (data) {
+    // A tap on a failed reply's result carries the answer that reply could not
+    // deliver, exactly as the warm tap paths in `notification-actions.ts` do.
+    // This launcher path builds its own destination, so it has to hand the
+    // answer over here too, or the card it opens starts empty.
+    restoreReplyDraftFromData(data);
     const href = notificationPathForData(data);
     if (href !== null) {
       // Stash the session's destination the same way the warm tap paths do

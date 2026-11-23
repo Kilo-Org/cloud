@@ -1266,6 +1266,7 @@
     "needsInputAction": {
       "approved": "Zahtjev je odobren",
       "replied": "Odgovor je poslan",
+      "empty": "Napišite odgovor i zatim ga pošaljite.",
       "failed": "Nije uspjelo odgovoriti. Dodirnite ponovo da biste pokušali.",
       "unavailable": "Ovaj zahtjev više ne čeka."
     }
@@ -1530,7 +1531,9 @@
       "githubError": "Nije moguće otvoriti postavljanje za GitHub. Pokušaj ponovno.",
       "gitlabAccount": "račun na GitLabu",
       "gitlabError": "Nije moguće otvoriti postavljanje za GitLab. Pokušaj ponovno.",
-      "description": "Poveži {{label}} s uslugom Kilo za automatski pregled zahtjeva za spajanje."
+      "description": "Poveži {{label}} s uslugom Kilo za automatski pregled zahtjeva za spajanje.",
+      "notConnectedTitle": "{{platform}} nije povezan",
+      "githubAdminOnlyDescription": "Samo vlasnici organizacije i administratori mogu ga povezati."
     },
     "overview": {
       "allAreas": "Sva područja",
@@ -2300,6 +2303,7 @@
       "couldNotLoadThisSession": "Nije moguće učitati ovu sesiju.",
       "historyTooLarge": "Prijepis ove sesije je prevelik za učitavanje.",
       "historyUnavailable": "Prijepis ove sesije se ne može pročitati.",
+      "historyTemporarilyUnavailable": "Prijepis ove sesije privremeno nije dostupan.",
       "cloneFailedRetry": "Nije moguće klonirati ovu sesiju. Pokušaj ponovno.",
       "notEnoughCredits": "Nema dovoljno kredita za ovaj zahtjev. Dodaj kredite i pokušaj ponovno.",
       "previousTaskFinishing": "Prethodni se zadatak još dovršava. Pričekaj trenutak.",
@@ -2840,7 +2844,9 @@
       "skip": "Preskoči",
       "retrySkip": "Pokušaj ponovno preskočiti",
       "submitting": "Slanje…",
-      "sendAnswers": "Pošalji odgovore"
+      "sendAnswers": "Pošalji odgovore",
+      "unreadableTitle": "Ovo pitanje nije moguće prikazati",
+      "unreadableBody": "Agent čeka pitanje koje ova aplikacija ne može prikazati. Odgovorite na pitanje u CLI-ju kako biste nastavili."
     },
     "blockingCard": {
       "questionUnavailable": "Ovo pitanje više nije dostupno.",
@@ -2867,6 +2873,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Nije moguće učitati sesiju podagenta.",
+      "historyTooLarge": "Povijest ovog podagenta prevelika je za učitavanje.",
+      "historyUnavailable": "Povijest ovog podagenta nije dostupna.",
+      "historyTemporarilyUnavailable": "Povijest ovog podagenta privremeno nije dostupna.",
       "failed": "Sesija podagenta nije uspjela.",
       "noMessages": "Nema poruka podagenta",
       "noMessagesDescription": "Ova je sesija podagenta završila bez transkripta.",
@@ -3455,6 +3464,8 @@
     "voiceTranscriptionWho": "Tvoj uređaj, Kilo Gateway s odabranim modelom transkripcije ili Apple ili Google za prepoznavanje na mreži.",
     "installAttributionPromptTitle": "Dopustiti praćenje izvora instalacije?",
     "installAttributionPromptMessage": "Kilo koristi Appleovo dopuštenje za praćenje samo radi utvrđivanja kanala putem kojeg dolaziš. Tvoji se upiti i razgovori nikada ne koriste u tu svrhu.",
+    "installAttributionRequestFailedTitle": "Nije moguće prikazati upit za praćenje",
+    "installAttributionRequestFailedMessage": "Kilo nije mogao prikazati upit sustava pa je praćenje izvora instalacije i dalje isključeno.",
     "what": "Što",
     "why": "Zašto",
     "who": "Tko"
@@ -3470,7 +3481,7 @@
   "organization": {
     "auditLog": {
       "title": "Revizijski zapisnik",
-      "permissionDenied": "Revizijski zapisnik organizacije na planu Enterprise mogu čitati samo vlasnik, administrator ili upravitelj naplate.",
+      "permissionDenied": "Revizijski zapisnik organizacije na planu Enterprise mogu čitati samo vlasnik, administrator ili upravitelj naplate. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Nema revizijskih događaja",
       "emptyDescription": "Ovdje se prikazuju radnje poduzete u ovoj organizaciji.",
       "truncated": "Prikazuju se najnoviji događaji.",
@@ -3665,7 +3676,7 @@
     },
     "billing": {
       "title": "Naplata",
-      "permissionDenied": "Naplatu organizacije mogu vidjeti samo njezin vlasnik, administrator ili upravitelj naplate.",
+      "permissionDenied": "Naplatu organizacije mogu vidjeti samo njezin vlasnik, administrator ili upravitelj naplate. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Pretplata",
       "state": "Stanje",
       "stateNone": "Nema pretplate",
@@ -3743,7 +3754,7 @@
       "pendingInvitation": "Ova adresa e-pošte već ima pozivnicu na čekanju.",
       "alreadyMember": "Ova osoba je već član ove organizacije.",
       "seatsFull": "Sva su mjesta zauzeta ({{used}}/{{total}}). Zamoli vlasnika organizacije da doda mjesta prije nego što pozoveš još članova.",
-      "seatsFullCanInviteBilling": "Sva su mjesta zauzeta ({{used}}/{{total}}). I dalje možeš pozvati voditelje naplate jer oni ne zauzimaju mjesto.",
+      "seatsFullCanInviteBilling": "Sva su mjesta zauzeta ({{used}}/{{total}}). I dalje možeš pozvati upravitelje naplate jer oni ne zauzimaju mjesto.",
       "noSeatsAvailable": "Sva su mjesta zauzeta. Zamoli vlasnika organizacije da doda mjesta prije nego što pozoveš još članova."
     },
     "invoices": {
@@ -3842,7 +3853,7 @@
       "emptyDescription": "Pomoću gumba „Prethodni sat“ prikažite ranije zahtjeve.",
       "emptyBoundDescription": "Zapisnici zahtjeva ne sežu dalje u prošlost.",
       "loadError": "Učitavanje zapisnika zahtjeva nije uspjelo.",
-      "permissionDenied": "Zapisnike zahtjeva organizacije mogu čitati samo vlasnik, administrator ili upravitelj naplate.",
+      "permissionDenied": "Zapisnike zahtjeva organizacije mogu čitati samo vlasnik, administrator ili upravitelj naplate. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "ulaz: {{input}} · izlaz: {{output}}",
       "byok": "BYOK"
     },
@@ -4122,7 +4133,10 @@
     "list": {
       "loadFailed": "Nije moguće učitati povijest razgovora.",
       "new": "Novi razgovor",
-      "deleteTitle": "Izbrisati ovaj razgovor?"
+      "deleteTitle": "Izbrisati ovaj razgovor?",
+      "resetNoticeTitle": "Lokalni razgovori i nacrti su izbrisani",
+      "resetNoticeBody": "Kilo nije mogao otvoriti razgovore spremljene na ovom uređaju. Vaše sesije u oblaku nisu pogođene.",
+      "resetNoticeDismiss": "Odbaci obavijest"
     },
     "rename": {
       "title": "Preimenuj razgovor",
@@ -4403,7 +4417,15 @@
       "download": "Preuzmi model na uređaju",
       "downloading": "Preuzimanje…",
       "downloadProgress": "Preuzimanje… {{percent}} %",
-      "downloadFailed": "Preuzimanje nije dovršeno. Provjerite vezu i slobodnu pohranu pa pokušajte ponovno."
+      "downloadFailed": "Preuzimanje nije dovršeno. Provjerite vezu i slobodnu pohranu pa pokušajte ponovno.",
+      "cannotUse": "Nije moguće pokrenuti: {{items}}.",
+      "cannotUseOptions": "Nije moguće ispuniti: neke opcije alata.",
+      "limitations": "Ograničenja",
+      "tools": {
+        "time": "Vrijeme",
+        "settingsList": "Prikaži postavke",
+        "settingsSet": "Promijeni postavke"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Ovaj model podržava intenzitet razmišljanja"
@@ -4964,7 +4986,7 @@
     "defaultModel": "Koristi zadani model tvrtke Kilo",
     "duration": "Vremensko ograničenje (minute)",
     "spendLimit": "Ograničenje potrošnje (USD)",
-    "invalidSafeguards": "Unesite pozitivna, konačna ograničenja vremena i potrošnje.",
+    "invalidSafeguards": "Unesite pozitivan broj u dopuštenom rasponu.",
     "estimate": "Procjena {{estimate}} · najviše {{maximum}}",
     "estimateUnavailable": "Plaćeni sažetak nije dostupan za ove postavke. Promijenite model ili ograničenja, ili pokušajte ponovno kasnije.",
     "confirmPaid": "Omogućiti plaćene sažetke za {{context}}?",
@@ -5039,7 +5061,8 @@
     "unavailableTitle": "Potrošnja nije dostupna",
     "unavailableDescription": "Potrošnja nije postavljena za ovaj radni prostor. Obratite se podršci ako očekujete da ćete ovdje vidjeti potrošnju.",
     "orgSelfNotice": "Prikazuje se vaša vlastita potrošnja u ovoj organizaciji.",
-    "viewDetails": "Prikaži detalje potrošnje"
+    "viewDetails": "Prikaži detalje potrošnje",
+    "orgSelfEntryTitle": "Vaša potrošnja"
   },
   "integrations": {
     "title": "Integracije",
@@ -5135,6 +5158,8 @@
       "autoCommit": "Potvrdi promjene kad se pokretanje završi",
       "condenseOnComplete": "Sažmi kontekst kad se pokretanje završi",
       "activeTitle": "Okidač aktivan",
+      "activeSwitchA11y": "Okidač aktivan: {{name}}",
+      "copyLinkA11y": "Kopiraj poveznicu za {{name}}",
       "activeDescription": "Pauzirani webhookovi vraćaju 404.",
       "runAsCreator": "Pokreni kao ja",
       "runAsCreatorDescription": "Svako pokretanje upotrebljava vaš račun, pa je zaglavlje s tajnom obavezno.",

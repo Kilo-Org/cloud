@@ -41,7 +41,6 @@ describe('sortActiveSessionsByCreatedAt', () => {
     const oldEnriched = session({ id: 'old', createdAt: '2020-01-01T00:00:00.000Z' });
     const recent = session({ id: 'new', createdAt: '2026-07-01T12:00:00.000Z' });
     const result = sortActiveSessionsByCreatedAt([oldEnriched, unparseable, recent]);
-    // Unparseable in bucket 1 (first); then recent, then old.
     expect(ids(result)).toEqual(['u', 'new', 'old']);
   });
 
@@ -89,7 +88,6 @@ describe('sortActiveSessionsByCreatedAt', () => {
       session({ id: 'a', createdAt: '2026-07-01T10:00:00.000Z' }),
       session({ id: 'b', createdAt: '2026-07-01T12:00:00.000Z' }),
     ]);
-    // Documents the permitted one-time swap: a was first by id, then b leads by createdAt.
     expect(ids(after)).toEqual(['b', 'a']);
   });
 
@@ -106,7 +104,6 @@ describe('sortActiveSessionsByCreatedAt', () => {
       mid,
       session({ id: 'old', createdAt: '2026-01-01T00:00:00.000Z' }),
     ]);
-    // Documents the permitted one-time downward move once enrichment lands.
     expect(ids(settled)).toEqual(['recent', 'mid', 'old']);
   });
 });

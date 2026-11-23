@@ -9,6 +9,13 @@ import { createCallerForUser } from '@/routers/test-utils';
 
 let user: User;
 
+async function rejectionOf(call: () => Promise<unknown>): Promise<unknown> {
+  return call().then(
+    () => undefined,
+    (rejection: unknown) => rejection
+  );
+}
+
 describe('active-sessions-router without a Session Ingest URL', () => {
   beforeAll(async () => {
     user = await insertTestUser({
@@ -22,14 +29,11 @@ describe('active-sessions-router without a Session Ingest URL', () => {
     jest.restoreAllMocks();
   });
 
-  it('throws PRECONDITION_FAILED without calling the worker', async () => {
+  it('throws PRECONDITION_FAILED from createWebTicket without calling the worker', async () => {
     const fetchSpy = jest.spyOn(global, 'fetch');
     const caller = await createCallerForUser(user.id);
 
-    const error = await caller.activeSessions.createWebTicket().then(
-      () => undefined,
-      (rejection: unknown) => rejection
-    );
+    const error = await rejectionOf(() => caller.activeSessions.createWebTicket());
 
     expect(error).toBeInstanceOf(TRPCError);
     expect(error).toMatchObject({
@@ -37,5 +41,31 @@ describe('active-sessions-router without a Session Ingest URL', () => {
       message: 'Session ingest is not configured',
     });
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('throws PRECONDITION_FAILED from listInstances without calling the worker', async () => {
+    const fetchSpy = jest.spyOn(global, 'fetch');
+    const caller = await createCallerForUser(user.id);
+
+    const error = await rejectionOf(() => caller.activeSessions.listInstances());
+
+    expect(error).toBeInstanceOf(TRPCError);
+    expect(error).toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      message: 'Session ingest is not configured',
+    });
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('reports the same code for both procedures when the URL is missing', async () => {
+    const caller = await createCallerForUser(user.id);
+
+    const mintRejection = await rejectionOf(() => caller.activeSessions.createWebTicket());
+    const listRejection = await rejectionOf(() => caller.activeSessions.listInstances());
+
+    expect(mintRejection).toBeInstanceOf(TRPCError);
+    expect(listRejection).toBeInstanceOf(TRPCError);
+    if (!(mintRejection instanceof TRPCError) || !(listRejection instanceof TRPCError)) return;
+    expect(listRejection.code).toBe(mintRejection.code);
   });
 });

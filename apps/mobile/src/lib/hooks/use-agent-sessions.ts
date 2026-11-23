@@ -145,6 +145,11 @@ export function useAgentSessionSearch(options: UseAgentSessionSearchOptions) {
     dateGroups,
     timeZone,
     isPending: query.isPending,
+    // A paused search (offline, no cached page of its own) is neither loading
+    // nor errored: it has no rows and will not resolve until the network
+    // returns, so callers must offer a retry instead of a skeleton that never
+    // settles.
+    isPaused: query.isPaused,
     // Header-level fetch only — footer spinner has its own flag.
     isFetching: query.isFetching && !query.isFetchingNextPage,
     isError: query.isError,
@@ -387,10 +392,7 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
     // flag for the same reason.
     isFetchNextPageError: stored.isFetchNextPageError,
     fetchNextPage,
-    // Pull-to-refresh, retry and the Share Gate's refresh reconcile page one
-    // as well: after `maxPages` evicts page one, a plain stored `refetch()`
-    // would only refresh the pages still in cache (the departure trigger below
-    // reconciles for the same reason).
+    // Pull-to-refresh, retry and the Share Gate's refresh reconcile page one.
     refetch: async () => {
       await Promise.all([storedReconcile(), active.refetch()]);
     },
@@ -429,8 +431,8 @@ export function useLiveAgentSessions(options?: UseAgentSessionsOptions) {
   // empty: that emptiness came from a write no server answer confirmed (a
   // socket write, or the floor poll's own `setQueryData`), so it is not proof
   // that nothing runs. The surface keeps the rows this hook instance last
-  // rendered, and a fresh instance (a remount, such as the route reset this
-  // finding reports) paints its loading card until the confirmation answer
+  // rendered, and a fresh instance (a remount, such as a route reset back to
+  // the Agents tab) paints its loading card until the confirmation answer
   // lands. Only an accepted answer that lists no sessions resolves the zero
   // state.
   const confirmedRowsRef = useRef<{ scopeKey: string; rows: ActiveSession[] }>({

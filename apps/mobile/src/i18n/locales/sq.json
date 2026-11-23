@@ -1238,6 +1238,7 @@
     "needsInputAction": {
       "approved": "Kërkesa u miratua",
       "replied": "Përgjigja u dërgua",
+      "empty": "Shkruani një përgjigje dhe më pas dërgojeni.",
       "failed": "Nuk mundi të përgjigjej. Prekni përsëri për të provuar përsëri.",
       "unavailable": "Kjo kërkesë nuk pret më."
     }
@@ -1502,7 +1503,9 @@
       "githubError": "Nuk u hap konfigurimi i GitHub. Provo përsëri.",
       "gitlabAccount": "llogaria GitLab",
       "gitlabError": "Nuk u hap konfigurimi i GitLab. Provo përsëri.",
-      "description": "Lidh Kilo me {{label}} për të shqyrtuar automatikisht PR."
+      "description": "Lidh Kilo me {{label}} për të shqyrtuar automatikisht PR.",
+      "notConnectedTitle": "{{platform}} nuk është i lidhur",
+      "githubAdminOnlyDescription": "Vetëm pronarët e organizatës dhe administratorët mund ta lidhin."
     },
     "overview": {
       "allAreas": "Të gjitha fushat",
@@ -2251,6 +2254,7 @@
       "couldNotLoadThisSession": "Nuk u ngarkua kjo seancë.",
       "historyTooLarge": "Transkripti i kësaj seance është shumë i madh për t'u ngarkuar.",
       "historyUnavailable": "Transkripti i kësaj seance nuk mund të lexohet.",
+      "historyTemporarilyUnavailable": "Transkripti i kësaj seance është përkohësisht i padisponueshëm.",
       "cloneFailedRetry": "Nuk u klonua kjo seancë. Provo përsëri.",
       "notEnoughCredits": "Nuk ke mjaft kredite për këtë kërkesë. Shto kredite dhe provo përsëri.",
       "previousTaskFinishing": "Detyra e mëparshme nuk ka përfunduar ende. Prit pak.",
@@ -2787,7 +2791,9 @@
       "skip": "Anashkalo",
       "retrySkip": "Provo ta anashkalosh përsëri",
       "submitting": "Duke u dërguar…",
-      "sendAnswers": "Dërgo përgjigjet"
+      "sendAnswers": "Dërgo përgjigjet",
+      "unreadableTitle": "Kjo pyetje nuk mund të shfaqej",
+      "unreadableBody": "Agjenti po pret një pyetje që ky aplikacion nuk mund ta shfaqë. Përgjigju pyetjes në CLI për të vazhduar."
     },
     "blockingCard": {
       "questionUnavailable": "Kjo pyetje nuk është më e disponueshme.",
@@ -2814,6 +2820,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Nuk u ngarkua seanca e nënagjentit.",
+      "historyTooLarge": "Historiku i këtij nënagjenti është shumë i madh për t'u ngarkuar.",
+      "historyUnavailable": "Historiku i këtij nënagjenti nuk është i disponueshëm.",
+      "historyTemporarilyUnavailable": "Historiku i këtij nënagjenti është përkohësisht i padisponueshëm.",
       "failed": "Seanca e nënagjentit dështoi.",
       "noMessages": "Nuk ka mesazhe nga nënagjenti",
       "noMessagesDescription": "Kjo seancë e nënagjentit përfundoi pa krijuar një transkript.",
@@ -3392,6 +3401,8 @@
     "voiceTranscriptionWho": "Pajisja jote, Kilo Gateway me modelin e transkriptimit që zgjidhni, ose Apple ose Google për njohje në internet.",
     "installAttributionPromptTitle": "Të lejohet identifikimi i burimit të instalimit?",
     "installAttributionPromptMessage": "Kilo përdor lejen e gjurmimit të Apple vetëm për të mësuar se cili kanal të solli këtu. Kërkesat dhe bisedat e tua nuk përdoren kurrë.",
+    "installAttributionRequestFailedTitle": "Nuk u shfaq dot kërkesa e gjurmimit",
+    "installAttributionRequestFailedMessage": "Kilo nuk mundi të shfaqë kërkesën e sistemit, prandaj identifikimi i burimit të instalimit mbetet i fikur.",
     "what": "Çfarë",
     "why": "Pse",
     "who": "Kush"
@@ -3407,7 +3418,7 @@
   "organization": {
     "auditLog": {
       "title": "Regjistri i auditimit",
-      "permissionDenied": "Vetëm pronari, administratori ose menaxheri i faturimit i një organizate me planin Enterprise mund ta lexojë regjistrin e saj të auditimit.",
+      "permissionDenied": "Vetëm pronari, administratori ose menaxheri i faturimit i një organizate me planin Enterprise mund ta lexojë regjistrin e saj të auditimit. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Nuk ka ngjarje auditimi",
       "emptyDescription": "Veprimet e kryera në këtë organizatë shfaqen këtu.",
       "truncated": "Po shfaqen ngjarjet më të fundit.",
@@ -3597,7 +3608,7 @@
     },
     "billing": {
       "title": "Faturimi",
-      "permissionDenied": "Faturimin e organizatës mund ta shohë vetëm pronari, administratori ose menaxheri i faturimit.",
+      "permissionDenied": "Faturimin e organizatës mund ta shohë vetëm pronari, administratori ose menaxheri i faturimit. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Abonimi",
       "state": "Statusi",
       "stateNone": "Pa abonim",
@@ -3774,7 +3785,7 @@
       "emptyDescription": "Përdorni Ora e mëparshme për të parë kërkesat e mëparshme.",
       "emptyBoundDescription": "Regjistrat e kërkesave nuk shkojnë më mbrapa se kaq.",
       "loadError": "Regjistrat e kërkesave nuk u ngarkuan.",
-      "permissionDenied": "Vetëm pronari, administratori ose menaxheri i faturimit i një organizate mund t'i lexojë regjistrat e saj të kërkesave.",
+      "permissionDenied": "Vetëm pronari, administratori ose menaxheri i faturimit i një organizate mund t'i lexojë regjistrat e saj të kërkesave. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} hyrëse · {{output}} dalëse",
       "byok": "BYOK"
     },
@@ -4044,7 +4055,10 @@
     "list": {
       "loadFailed": "Nuk u arrit të ngarkohej historia e bisedës.",
       "new": "Bisedë e re",
-      "deleteTitle": "Ta fshini këtë bisedë?"
+      "deleteTitle": "Ta fshini këtë bisedë?",
+      "resetNoticeTitle": "Bisedat lokale dhe paraprakët u fshinë",
+      "resetNoticeBody": "Kilo nuk i hapi dot bisedat e ruajtura në këtë pajisje. Sesionet e tu në re nuk janë prekur.",
+      "resetNoticeDismiss": "Hidh poshtë njoftimin"
     },
     "rename": {
       "title": "Riemërto bisedën",
@@ -4324,7 +4338,15 @@
       "download": "Shkarko modelin në pajisje",
       "downloading": "Po shkarkohet…",
       "downloadProgress": "Po shkarkohet… {{percent}}%",
-      "downloadFailed": "Shkarkimi nuk përfundoi. Kontrollo lidhjen dhe hapësirën e lirë, pastaj provo përsëri."
+      "downloadFailed": "Shkarkimi nuk përfundoi. Kontrollo lidhjen dhe hapësirën e lirë, pastaj provo përsëri.",
+      "cannotUse": "Nuk mund të ekzekutohet: {{items}}.",
+      "cannotUseOptions": "Nuk mund të plotësohen: disa opsione mjeti.",
+      "limitations": "Kufizimet",
+      "tools": {
+        "time": "Koha",
+        "settingsList": "Shfaq cilësimet",
+        "settingsSet": "Ndrysho cilësimet"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Ky model mbështet nivelin e arsyetimit"
@@ -4875,7 +4897,7 @@
     "defaultModel": "Përdor modelin e parazgjedhur të Kilo",
     "duration": "Kufiri i kohës (minuta)",
     "spendLimit": "Kufiri i shpenzimit (USD)",
-    "invalidSafeguards": "Fut kufij kohe dhe shpenzimi pozitivë dhe të fundëm.",
+    "invalidSafeguards": "Fut një numër pozitiv brenda intervalit të lejuar.",
     "estimate": "Vlerësimi {{estimate}} · maksimumi {{maximum}}",
     "estimateUnavailable": "Një përmbledhje me pagesë nuk është e disponueshme për këto rregullime. Ndrysho modelin ose kufijtë, ose provo përsëri më vonë.",
     "confirmPaid": "Të aktivizohen përmbledhjet me pagesë për {{context}}?",
@@ -4945,7 +4967,8 @@
     "unavailableTitle": "Përdorimi nuk është i disponueshëm",
     "unavailableDescription": "Përdorimi nuk është konfiguruar për këtë hapësirë pune. Kontaktoni mbështetjen nëse prisni të shihni përdorim këtu.",
     "orgSelfNotice": "Po shihni përdorimin tuaj në këtë organizatë.",
-    "viewDetails": "Shiko detajet e përdorimit"
+    "viewDetails": "Shiko detajet e përdorimit",
+    "orgSelfEntryTitle": "Përdorimi juaj"
   },
   "integrations": {
     "title": "Integrimet",
@@ -5041,6 +5064,8 @@
       "autoCommit": "Regjistro ndryshimet kur përfundon ekzekutimi",
       "condenseOnComplete": "Përmblidh kontekstin kur përfundon ekzekutimi",
       "activeTitle": "Shkaktari aktiv",
+      "activeSwitchA11y": "Shkaktari aktiv: {{name}}",
+      "copyLinkA11y": "Kopjo lidhjen për {{name}}",
       "activeDescription": "Webhook-et e pezulluara përgjigjen me 404.",
       "runAsCreator": "Ekzekuto si unë",
       "runAsCreatorDescription": "Çdo ekzekutim përdor llogarinë tënde, prandaj kërkohet koka sekrete.",

@@ -399,7 +399,7 @@
       "title": "Lyklar þjónustuveitna",
       "rowSubtitle": "Nota eigin greiðslur hjá þjónustuveitu",
       "orgDescription": "Þessum lyklum er deilt með öllum í fyrirtækinu og þeir eru gjaldfærðir á reikninga þess hjá þjónustuveitum.",
-      "viewOnly": "Aðeins eigandi, stjórnandi eða greiðslustjóri fyrirtækisins getur breytt lyklum þess.",
+      "viewOnly": "Aðeins eigandi, stjórnandi eða innheimtustjóri fyrirtækisins getur breytt lyklum þess.",
       "description": "Beiðnir með þessum lyklum eru gjaldfærðar á reikninginn þinn hjá þjónustuveitunni í stað Kilo-inneignarinnar þinnar.",
       "managedByPlan": "Stýrt af forritunaráskriftinni þinni",
       "enableKey": "Virkja lykilinn fyrir {{provider}}",
@@ -1238,6 +1238,7 @@
     "needsInputAction": {
       "approved": "Beiðni samþykkt",
       "replied": "Svar sent",
+      "empty": "Skrifaðu svar og sendu það.",
       "failed": "Ekki tókst að svara. Ýttu aftur til að reyna aftur.",
       "unavailable": "Þessi beiðni bíður ekki lengur."
     }
@@ -1502,7 +1503,9 @@
       "githubError": "Ekki tókst að opna uppsetningu GitHub. Reyndu aftur.",
       "gitlabAccount": "GitLab-reikninginn",
       "gitlabError": "Ekki tókst að opna uppsetningu GitLab. Reyndu aftur.",
-      "description": "Tengdu Kilo við {{label}} til að yfirfara samrunabeiðnir sjálfkrafa."
+      "description": "Tengdu Kilo við {{label}} til að yfirfara samrunabeiðnir sjálfkrafa.",
+      "notConnectedTitle": "{{platform}} er ekki tengt",
+      "githubAdminOnlyDescription": "Aðeins eigendur fyrirtækisins og stjórnendur geta tengt það."
     },
     "overview": {
       "allAreas": "Allir þættir",
@@ -1588,7 +1591,7 @@
       "empty": "Engar yfirferðir með tölfræði ennþá",
       "emptyDescription": "Tölfræðin skráir yfirferðir sem klárast meðan hún er virk fyrir fyrirtækið.",
       "offTitle": "Tölfræðin er óvirk fyrir {{platform}}",
-      "offDescription": "Eigendur, stjórnendur og rekningastjórar fyrirtækisins geta kveikt á tölfræðinni í stillingum fyrirtækisins á vefnum til að skrá yfirferðir sem klárast.",
+      "offDescription": "Eigendur, stjórnendur og innheimtustjórar fyrirtækisins geta kveikt á tölfræðinni í stillingum fyrirtækisins á vefnum til að skrá yfirferðir sem klárast.",
       "couldNotLoad": "Tókst ekki að sækja tölfræðina",
       "trackedReviewsCaption": "Yfirferðir sem klárast á þessu tímabili, meðan tölfræðin er virk. Yfirferðir í gangi eða misheppnaðar teljast aldrei.",
       "trackedReviewsUncounted": "Ekki taldar: {{displayCount}} af {{displayTotal}} yfirferðum fyrirtækisins sem hafa klárast, niðurstöðan þeirra ekki skráð.",
@@ -2251,6 +2254,7 @@
       "couldNotLoadThisSession": "Ekki tókst að hlaða þessari lotu.",
       "historyTooLarge": "Spjallslóð þessarar lotu er of stór til að hlaða.",
       "historyUnavailable": "Ekki er hægt að lesa spjallslóð þessarar lotu.",
+      "historyTemporarilyUnavailable": "Spjallslóð þessarar lotu er tímabundið ekki tiltæk.",
       "cloneFailedRetry": "Ekki tókst að klóna þessa lotu. Reyndu aftur.",
       "notEnoughCredits": "Inneignin nægir ekki fyrir þessa beiðni. Bættu við inneign og reyndu aftur.",
       "previousTaskFinishing": "Fyrra verkefninu er ekki alveg lokið. Bíddu augnablik.",
@@ -2787,7 +2791,9 @@
       "skip": "Sleppa",
       "retrySkip": "Reyna að sleppa aftur",
       "submitting": "Sendir…",
-      "sendAnswers": "Senda svör"
+      "sendAnswers": "Senda svör",
+      "unreadableTitle": "Ekki tókst að birta þessa spurningu",
+      "unreadableBody": "Agentinn bíður eftir spurningu sem þetta forrit getur ekki sýnt. Svaraðu henni í CLI til að halda áfram."
     },
     "blockingCard": {
       "questionUnavailable": "Þessi spurning er ekki lengur tiltæk.",
@@ -2814,6 +2820,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Ekki tókst að hlaða lotu undirfulltrúans.",
+      "historyTooLarge": "Ferill þessa undirfulltrúa er of stór til að hlaða.",
+      "historyUnavailable": "Ferill þessa undirfulltrúa er ekki tiltækur.",
+      "historyTemporarilyUnavailable": "Ferill þessa undirfulltrúa er tímabundið ekki tiltækur.",
       "failed": "Lota undirfulltrúans mistókst.",
       "noMessages": "Engin skilaboð frá undirfulltrúa",
       "noMessagesDescription": "Þessari lotu undirfulltrúans lauk án þess að samtalsferill yrði til.",
@@ -3392,6 +3401,8 @@
     "voiceTranscriptionWho": "Tækið þitt, Kilo Gateway með umritunarlíkaninu sem þú velur, eða Apple eða Google fyrir auðkenningu á netinu.",
     "installAttributionPromptTitle": "Leyfa rakningu á uppruna uppsetningar?",
     "installAttributionPromptMessage": "Kilo notar rakningarheimild Apple aðeins til að sjá hvernig þú fannst forritið. Skilaboðin þín og samtöl eru aldrei notuð í þeim tilgangi.",
+    "installAttributionRequestFailedTitle": "Ekki tókst að sýna rakningarbeiðnina",
+    "installAttributionRequestFailedMessage": "Kilo gat ekki sýnt kerfisbeiðnina, svo rakning á uppruna uppsetningar helst óvirk.",
     "what": "Hvað",
     "why": "Hvers vegna",
     "who": "Hver"
@@ -3407,7 +3418,7 @@
   "organization": {
     "auditLog": {
       "title": "Endurskoðunarskrá",
-      "permissionDenied": "Aðeins eigandi, stjórnandi eða greiðslustjóri félags á Enterprise-áætlun getur lesið endurskoðunarskrá þess.",
+      "permissionDenied": "Aðeins eigandi, stjórnandi eða innheimtustjóri félags á Enterprise-áætlun getur lesið endurskoðunarskrá þess. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Engir skráðir atburðir",
       "emptyDescription": "Aðgerðir sem eru framkvæmdar í þessu félagi birtast hér.",
       "truncated": "Sýnir nýjustu atburðina.",
@@ -3597,7 +3608,7 @@
     },
     "billing": {
       "title": "Greiðslur",
-      "permissionDenied": "Aðeins eigandi, stjórnandi eða greiðslustjóri félagsins getur séð greiðsluupplýsingar þess.",
+      "permissionDenied": "Aðeins eigandi, stjórnandi eða innheimtustjóri félagsins getur séð greiðsluupplýsingar þess. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Áskrift",
       "state": "Staða",
       "stateNone": "Engin áskrift",
@@ -3675,7 +3686,7 @@
       "pendingInvitation": "Þetta tölvupóstfang er þegar með boð í bið.",
       "alreadyMember": "Þessi einstaklingur er þegar meðlimur í þessu fyrirtæki.",
       "seatsFull": "Öll sæti eru í notkun ({{used}}/{{total}}). Biddu eiganda fyrirtækisins að bæta við sætum áður en þú býður fleiri meðlimum.",
-      "seatsFullCanInviteBilling": "Öll sæti eru í notkun ({{used}}/{{total}}). Þú getur samt boðið greiðslustjórum, sem nota ekki sæti.",
+      "seatsFullCanInviteBilling": "Öll sæti eru í notkun ({{used}}/{{total}}). Þú getur samt boðið innheimtustjórum, sem nota ekki sæti.",
       "noSeatsAvailable": "Öll sæti eru í notkun. Biddu eiganda fyrirtækisins að bæta við sætum áður en þú býður fleiri meðlimum."
     },
     "invoices": {
@@ -3774,7 +3785,7 @@
       "emptyDescription": "Notaðu „Fyrri klukkustund“ til að sjá fyrri beiðnir.",
       "emptyBoundDescription": "Beiðnaskrár ná ekki lengra aftur.",
       "loadError": "Ekki tókst að sækja beiðnaskrár.",
-      "permissionDenied": "Aðeins eigandi, stjórnandi eða greiðslustjóri félags getur lesið beiðnaskrár þess.",
+      "permissionDenied": "Aðeins eigandi, stjórnandi eða innheimtustjóri félags getur lesið beiðnaskrár þess. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} inn · {{output}} út",
       "byok": "BYOK"
     },
@@ -4044,7 +4055,10 @@
     "list": {
       "loadFailed": "Ekki tókst að hlaða samtalsferilinn.",
       "new": "Nýtt spjall",
-      "deleteTitle": "Eyða þessu spjalli?"
+      "deleteTitle": "Eyða þessu spjalli?",
+      "resetNoticeTitle": "Staðbundin spjöll og drög hreinsuð",
+      "resetNoticeBody": "Kilo gat ekki opnað spjöllin sem vistuð eru í þessu tæki. Lotur þínar í skýinu eru ekki fyrir áhrifum.",
+      "resetNoticeDismiss": "Vísa tilkynningu frá"
     },
     "rename": {
       "title": "Endurnefna spjall",
@@ -4324,7 +4338,15 @@
       "download": "Sækja líkan í tækið",
       "downloading": "Sæki…",
       "downloadProgress": "Sæki… {{percent}}%",
-      "downloadFailed": "Niðurhalinu lauk ekki. Athugaðu nettenginguna og laust geymslupláss og reyndu svo aftur."
+      "downloadFailed": "Niðurhalinu lauk ekki. Athugaðu nettenginguna og laust geymslupláss og reyndu svo aftur.",
+      "cannotUse": "Ekki hægt að keyra: {{items}}.",
+      "cannotUseOptions": "Ekki hægt að fylla út: suma valkosti tóls.",
+      "limitations": "Takmarkanir",
+      "tools": {
+        "time": "Tími",
+        "settingsList": "Sýna stillingar",
+        "settingsSet": "Breyta stillingum"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Þetta líkan styður dýpt rökhugsunar"
@@ -4875,7 +4897,7 @@
     "defaultModel": "Nota sjálfgefið líkan Kilo",
     "duration": "Tímamörk (mínútur)",
     "spendLimit": "Kostnaðarmörk (USD)",
-    "invalidSafeguards": "Sláðu inn jákvæð, endanleg tíma- og kostnaðarmörk.",
+    "invalidSafeguards": "Sláðu inn jákvæða tölu innan leyfilegs bils.",
     "estimate": "Áætlun {{estimate}} · hámark {{maximum}}",
     "estimateUnavailable": "Greidd samantekt er ekki tiltæk fyrir þessar stillingar. Breyttu líkaninu eða hámarkinu, eða reyndu aftur síðar.",
     "confirmPaid": "Virkja greiddar samantektir fyrir {{context}}?",
@@ -4945,7 +4967,8 @@
     "unavailableTitle": "Notkun ekki tiltæk",
     "unavailableDescription": "Notkun hefur ekki verið sett upp fyrir þetta vinnusvæði. Hafðu samband við þjónustuver ef þú átt von á að sjá notkun hér.",
     "orgSelfNotice": "Þú sérð þína eigin notkun í þessu fyrirtæki.",
-    "viewDetails": "Skoða upplýsingar um notkun"
+    "viewDetails": "Skoða upplýsingar um notkun",
+    "orgSelfEntryTitle": "Notkun þín"
   },
   "integrations": {
     "title": "Samþættingar",
@@ -5041,6 +5064,8 @@
       "autoCommit": "Vista breytingar þegar keyrslu lýkur",
       "condenseOnComplete": "Þjappa samhenginu þegar keyrslu lýkur",
       "activeTitle": "Kveikja virk",
+      "activeSwitchA11y": "Virk kveikja: {{name}}",
+      "copyLinkA11y": "Afrita tengil: {{name}}",
       "activeDescription": "Vefkrókar sem eru í bið svara með 404.",
       "runAsCreator": "Keyra sem ég",
       "runAsCreatorDescription": "Sérhver keyrsla notar reikninginn þinn, svo leyndarhausinn er nauðsynlegur.",

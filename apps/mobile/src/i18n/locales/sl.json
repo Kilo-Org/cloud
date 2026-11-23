@@ -401,7 +401,7 @@
       "title": "Ključi ponudnikov",
       "rowSubtitle": "Uporabi lastno obračunavanje pri ponudniku",
       "orgDescription": "Ti ključi so v skupni rabi z vsemi v organizaciji, stroški pa se zaračunajo njenim računom pri ponudnikih.",
-      "viewOnly": "Ključe organizacije lahko spreminja samo njen lastnik, skrbnik ali upravitelj obračunavanja.",
+      "viewOnly": "Ključe organizacije lahko spreminja samo njen lastnik, skrbnik ali skrbnik obračunavanja.",
       "description": "Zahteve prek teh ključev se zaračunajo tvojemu računu pri ponudniku namesto stanju v Kilo.",
       "managedByPlan": "Upravlja ga tvoj paket za kodiranje",
       "enableKey": "Omogoči ključ za {{provider}}",
@@ -1294,6 +1294,7 @@
     "needsInputAction": {
       "approved": "Zahteva odobrena",
       "replied": "Odgovor poslan",
+      "empty": "Vnesite odgovor in ga nato pošljite.",
       "failed": "Odgovoriti ni uspelo. Znova se dotaknite, da poskusite znova.",
       "unavailable": "Ta zahteva ne čaka več."
     }
@@ -1558,7 +1559,9 @@
       "githubError": "Nastavitve povezave s platformo GitHub ni bilo mogoče odpreti. Poskusi znova.",
       "gitlabAccount": "račun GitLab",
       "gitlabError": "Nastavitve povezave s platformo GitLab ni bilo mogoče odpreti. Poskusi znova.",
-      "description": "Za samodejne preglede zahtev za združitev vzpostavi povezavo s Kilo prek možnosti {{label}}."
+      "description": "Za samodejne preglede zahtev za združitev vzpostavi povezavo s Kilo prek možnosti {{label}}.",
+      "notConnectedTitle": "{{platform}} ni povezan",
+      "githubAdminOnlyDescription": "Vzpostavijo jo lahko samo lastniki organizacije in skrbniki."
     },
     "overview": {
       "allAreas": "Vsa področja",
@@ -1646,7 +1649,7 @@
       "empty": "Še ni pregledov z analitiko",
       "emptyDescription": "Analitika beleži dokončane preglede, dokler je omogočena za organizacijo.",
       "offTitle": "Analitika je za {{platform}} izklopljena",
-      "offDescription": "Lastniki, skrbniki in upravitelji obračunavanja v organizaciji lahko vklopijo analitiko v nastavitvah organizacije na spletu, da se beležijo dokončani pregledi.",
+      "offDescription": "Lastniki, skrbniki in skrbniki obračunavanja v organizaciji lahko vklopijo analitiko v nastavitvah organizacije na spletu, da se beležijo dokončani pregledi.",
       "couldNotLoad": "Analitike ni bilo mogoče naložiti",
       "trackedReviewsCaption": "Dokončani pregledi, ki so se zaključili v tem obdobju z vklopljeno analitiko. Pregledi v teku in neuspešni pregledi se nikoli ne štejejo.",
       "trackedReviewsUncounted": "Ni preštetih: {{displayCount}} od {{displayTotal}} dokončanih pregledov organizacije, njihov rezultat ni bil zajet.",
@@ -2349,6 +2352,7 @@
       "couldNotLoadThisSession": "Te seje ni bilo mogoče naložiti.",
       "historyTooLarge": "Zapis te seje je prevelik za nalaganje.",
       "historyUnavailable": "Zapisa te seje ni mogoče prebrati.",
+      "historyTemporarilyUnavailable": "Zapis te seje začasno ni na voljo.",
       "cloneFailedRetry": "Te seje ni bilo mogoče klonirati. Poskusi znova.",
       "notEnoughCredits": "Za to zahtevo ni dovolj kreditov. Dodaj kredite in poskusi znova.",
       "previousTaskFinishing": "Prejšnja naloga se še zaključuje. Počakaj trenutek.",
@@ -2893,7 +2897,9 @@
       "skip": "Preskoči",
       "retrySkip": "Znova preskoči",
       "submitting": "Pošiljanje…",
-      "sendAnswers": "Pošlji odgovore"
+      "sendAnswers": "Pošlji odgovore",
+      "unreadableTitle": "Vprašanja ni bilo mogoče prikazati",
+      "unreadableBody": "Agent čaka na vprašanje, ki ga ta aplikacija ne more prikazati. Odgovorite na vprašanje v CLI, da nadaljujete."
     },
     "blockingCard": {
       "questionUnavailable": "To vprašanje ni več na voljo.",
@@ -2920,6 +2926,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Seje podagenta ni bilo mogoče naložiti.",
+      "historyTooLarge": "Zgodovina tega podagenta je prevelika za nalaganje.",
+      "historyUnavailable": "Zgodovina tega podagenta ni na voljo.",
+      "historyTemporarilyUnavailable": "Zgodovina tega podagenta začasno ni na voljo.",
       "failed": "Seja podagenta ni uspela.",
       "noMessages": "Ni sporočil podagenta",
       "noMessagesDescription": "Ta seja podagenta se je končala brez zapisa pogovora.",
@@ -3518,6 +3527,8 @@
     "voiceTranscriptionWho": "Tvoja naprava, Kilo Gateway z izbranim modelom prepisovanja ali Apple ali Google za prepoznavanje v spletu.",
     "installAttributionPromptTitle": "Želiš dovoliti ugotavljanje vira namestitve?",
     "installAttributionPromptMessage": "Kilo uporablja dovoljenje za sledenje podjetja Apple le za ugotavljanje, prek katerega kanala si prišel do aplikacije. Tvojih pozivov in pogovorov za to nikoli ne uporabimo.",
+    "installAttributionRequestFailedTitle": "Poziva za sledenje ni bilo mogoče prikazati",
+    "installAttributionRequestFailedMessage": "Kilo ni mogel prikazati sistemskega poziva, zato ugotavljanje vira namestitve ostaja izklopljeno.",
     "what": "Kaj",
     "why": "Zakaj",
     "who": "Kdo"
@@ -3533,7 +3544,7 @@
   "organization": {
     "auditLog": {
       "title": "Revizijski dnevnik",
-      "permissionDenied": "Revizijski dnevnik lahko bere samo lastnik, skrbnik ali upravitelj obračunavanja organizacije na načrtu Enterprise.",
+      "permissionDenied": "Revizijski dnevnik lahko bere samo lastnik, skrbnik ali skrbnik obračunavanja organizacije na načrtu Enterprise. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Ni revizijskih dogodkov",
       "emptyDescription": "Tukaj so prikazana dejanja, izvedena v tej organizaciji.",
       "truncated": "Prikazani so najnovejši dogodki.",
@@ -3733,7 +3744,7 @@
     },
     "billing": {
       "title": "Obračunavanje",
-      "permissionDenied": "Obračunavanje organizacije si lahko ogledajo samo lastnik, skrbnik ali upravitelj obračunavanja.",
+      "permissionDenied": "Obračunavanje organizacije si lahko ogledajo samo lastnik, skrbnik ali skrbnik obračunavanja. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Naročnina",
       "state": "Status",
       "stateNone": "Ni naročnine",
@@ -3811,7 +3822,7 @@
       "pendingInvitation": "Ta e-poštni naslov že ima čakajoče povabilo.",
       "alreadyMember": "Ta oseba je že član te organizacije.",
       "seatsFull": "Vsa mesta so zasedena ({{used}}/{{total}}). Prosi lastnika organizacije, naj doda mesta, preden povabiš več članov.",
-      "seatsFullCanInviteBilling": "Vsa mesta so zasedena ({{used}}/{{total}}). Še vedno lahko povabiš upravitelje obračunavanja, ki ne zasedajo mesta.",
+      "seatsFullCanInviteBilling": "Vsa mesta so zasedena ({{used}}/{{total}}). Še vedno lahko povabiš skrbnike obračunavanja, ki ne zasedajo mesta.",
       "noSeatsAvailable": "Vsa mesta so zasedena. Prosi lastnika organizacije, naj doda mesta, preden povabiš več članov."
     },
     "invoices": {
@@ -3910,7 +3921,7 @@
       "emptyDescription": "Uporabite Prejšnja ura za ogled prejšnjih zahtev.",
       "emptyBoundDescription": "Dnevniki zahtev ne segajo dlje v preteklost.",
       "loadError": "Dnevnikov zahtev ni bilo mogoče naložiti.",
-      "permissionDenied": "Dnevnike zahtev organizacije lahko bere samo njen lastnik, skrbnik ali upravitelj obračunavanja.",
+      "permissionDenied": "Dnevnike zahtev organizacije lahko bere samo njen lastnik, skrbnik ali skrbnik obračunavanja. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} vhod · {{output}} izhod",
       "byok": "BYOK"
     },
@@ -4200,7 +4211,10 @@
     "list": {
       "loadFailed": "Zgodovine klepeta ni bilo mogoče naložiti.",
       "new": "Nov klepet",
-      "deleteTitle": "Izbrišem ta klepet?"
+      "deleteTitle": "Izbrišem ta klepet?",
+      "resetNoticeTitle": "Lokalni klepeti in osnutki počiščeni",
+      "resetNoticeBody": "Kilo ni mogel odpreti klepetov, shranjenih na tej napravi. Vaše seje v oblaku niso prizadete.",
+      "resetNoticeDismiss": "Zavrzi obvestilo"
     },
     "rename": {
       "title": "Preimenuj klepet",
@@ -4482,7 +4496,15 @@
       "download": "Prenesi model v napravo",
       "downloading": "Prenašanje …",
       "downloadProgress": "Prenašanje … {{percent}} %",
-      "downloadFailed": "Prenos se ni dokončal. Preverite povezavo in prosti prostor za shranjevanje ter poskusite znova."
+      "downloadFailed": "Prenos se ni dokončal. Preverite povezavo in prosti prostor za shranjevanje ter poskusite znova.",
+      "cannotUse": "Ni mogoče zagnati: {{items}}.",
+      "cannotUseOptions": "Ni mogoče izpolniti: nekatere možnosti orodja.",
+      "limitations": "Omejitve",
+      "tools": {
+        "time": "Čas",
+        "settingsList": "Prikaži nastavitve",
+        "settingsSet": "Spremeni nastavitve"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Ta model podpira stopnjo razmišljanja"
@@ -5053,7 +5075,7 @@
     "defaultModel": "Uporabi privzeti model Kilo",
     "duration": "Časovna omejitev (minute)",
     "spendLimit": "Omejitev porabe (USD)",
-    "invalidSafeguards": "Vnesite pozitivni, končni omejitvi časa in porabe.",
+    "invalidSafeguards": "Vnesite pozitivno število v dovoljenem obsegu.",
     "estimate": "Ocena {{estimate}} · največ {{maximum}}",
     "estimateUnavailable": "Plačljiv povzetek za te nastavitve ni na voljo. Spremenite model ali omejitve, ali pa poskusite znova pozneje.",
     "confirmPaid": "Omogočiti plačljive povzetke za {{context}}?",
@@ -5133,7 +5155,8 @@
     "unavailableTitle": "Poraba ni na voljo",
     "unavailableDescription": "Poraba za ta delovni prostor ni nastavljena. Če pričakujete, da boste tukaj videli porabo, se obrnite na podporo.",
     "orgSelfNotice": "Prikazana je vaša lastna poraba v tej organizaciji.",
-    "viewDetails": "Ogled podrobnosti porabe"
+    "viewDetails": "Ogled podrobnosti porabe",
+    "orgSelfEntryTitle": "Vaša poraba"
   },
   "integrations": {
     "title": "Integracije",
@@ -5229,6 +5252,8 @@
       "autoCommit": "Potrdi spremembe, ko se izvajanje konča",
       "condenseOnComplete": "Zgošči kontekst, ko se izvajanje konča",
       "activeTitle": "Sprožilec je aktiven",
+      "activeSwitchA11y": "Aktiven sprožilec: {{name}}",
+      "copyLinkA11y": "Kopiraj povezavo: {{name}}",
       "activeDescription": "Zaustavljeni spletni kavlji odgovorijo s 404.",
       "runAsCreator": "Izvajaj kot jaz",
       "runAsCreatorDescription": "Vsako izvajanje uporabi vaš račun, zato je skrivno zaglavje obvezno.",

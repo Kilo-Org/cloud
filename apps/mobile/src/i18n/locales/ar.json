@@ -403,7 +403,7 @@
       "title": "مفاتيح المزوّدين",
       "rowSubtitle": "استخدم الفوترة الخاصة بمزوّدك",
       "orgDescription": "تتم مشاركة هذه المفاتيح مع جميع أعضاء المؤسسة، وتُحتسب تكلفتها على حسابات المؤسسة لدى المزوّدين.",
-      "viewOnly": "يمكن فقط لمالك المؤسسة أو مسؤول فيها أو مدير الفوترة تغيير مفاتيحها.",
+      "viewOnly": "يمكن فقط لمالك المؤسسة أو مشرف فيها أو مدير الفوترة تغيير مفاتيحها.",
       "description": "تُحتسب تكلفة الطلبات المُرسلة عبر هذه المفاتيح على حسابك لدى المزوّد بدلًا من رصيدك في Kilo.",
       "managedByPlan": "تتم إدارته عبر خطة البرمجة الخاصة بك",
       "enableKey": "تفعيل مفتاح {{provider}}",
@@ -684,6 +684,7 @@
     "needsInputAction": {
       "approved": "تمت الموافقة على الطلب",
       "replied": "تم إرسال الرد",
+      "empty": "اكتب ردًا ثم أرسله.",
       "failed": "تعذّرت الإجابة. انقر مجددًا لإعادة المحاولة.",
       "unavailable": "لم يعد هذا الطلب قيد الانتظار."
     }
@@ -825,6 +826,8 @@
     },
     "providerConnect": {
       "description": "اربط {{label}} الخاص بـ Kilo لمراجعة طلبات السحب تلقائيًا.",
+      "notConnectedTitle": "{{platform}} غير متصل",
+      "githubAdminOnlyDescription": "يمكن لمالكي المؤسسة والمشرفين فقط ربطه.",
       "githubApp": "تطبيق GitHub",
       "githubError": "تعذّر فتح صفحة إعداد GitHub. حاول مرة أخرى.",
       "gitlabAccount": "حساب GitLab",
@@ -1738,12 +1741,12 @@
       "couldNotOpenTitle": "تعذّر فتح GitHub",
       "installedTitle": "تم تثبيت تطبيق GitHub",
       "installedMessage": "تم الآن ربط مستودعاتك.",
-      "pendingTitle": "في انتظار موافقة المسؤول",
-      "pendingMessage": "يجب أن يوافق مسؤول المؤسسة على طلب التثبيت.",
+      "pendingTitle": "في انتظار موافقة المشرف",
+      "pendingMessage": "يجب أن يوافق مشرف المؤسسة على طلب التثبيت.",
       "accountMismatchTitle": "عدم تطابق الحساب",
       "accountMismatchMessage": "بدأ ربط الحساب من تطبيق Kilo أثناء تسجيل الدخول بحساب آخر. سجّل الدخول إلى الموقع بذلك الحساب، أو ابدأ من جديد من التطبيق.",
       "cannotCompleteTitle": "تعذّر إكمال التثبيت",
-      "notAdminMessage": "لا يمكن ربط ذلك الحساب إلا بواسطة أحد مسؤوليه على GitHub. اطلب من مسؤول المؤسسة تثبيت Kilo.",
+      "notAdminMessage": "لا يمكن ربط ذلك الحساب إلا بواسطة أحد مسؤوليه على GitHub. اطلب من مشرف المؤسسة تثبيت Kilo.",
       "alreadyClaimedMessage": "تثبيت تطبيق GitHub هذا مرتبط بالفعل بحساب Kilo آخر. ألغِ ربطه هناك أولًا.",
       "installationUnavailableMessage": "تثبيت GitHub App هذا موقوف أو لم يعد متاحًا. استعده أو أعد تثبيته في GitHub، ثم ابدأ من جديد.",
       "multipleInstallationsMessage": "يمكن لمؤسسة Kilo هذه حاليًا ربط مؤسسة GitHub واحدة فقط.",
@@ -1781,6 +1784,7 @@
       "couldNotLoadThisSession": "تعذّر تحميل هذه الجلسة.",
       "historyTooLarge": "بروكول هذه الجلسة كبير جدًا بحيث لا يمكن تحميله.",
       "historyUnavailable": "لا يمكن قراءة بروكول هذه الجلسة.",
+      "historyTemporarilyUnavailable": "بروكول هذه الجلسة غير متاح مؤقتًا.",
       "cloneFailedRetry": "تعذّر استنساخ هذه الجلسة. حاول مرة أخرى.",
       "notEnoughCredits": "رصيدك غير كافٍ لهذا الطلب. اشحن رصيدك وحاول مرة أخرى.",
       "previousTaskFinishing": "لم تنتهِ المهمة السابقة بعد. انتظر لحظة.",
@@ -2333,7 +2337,9 @@
       "skip": "تخطي",
       "retrySkip": "إعادة محاولة التخطي",
       "submitting": "جارٍ الإرسال…",
-      "sendAnswers": "إرسال الإجابات"
+      "sendAnswers": "إرسال الإجابات",
+      "unreadableTitle": "تعذّر عرض هذا السؤال",
+      "unreadableBody": "الوكيل في انتظار سؤال لا يستطيع هذا التطبيق عرضه. أجب عن السؤال في CLI للمتابعة."
     },
     "blockingCard": {
       "questionUnavailable": "لم يعد هذا السؤال متاحًا.",
@@ -2360,6 +2366,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "تعذّر تحميل جلسة الوكيل الفرعي.",
+      "historyTooLarge": "سجل هذا الوكيل الفرعي كبير جدًا بحيث لا يمكن تحميله.",
+      "historyUnavailable": "سجل هذا الوكيل الفرعي غير متاح.",
+      "historyTemporarilyUnavailable": "سجل هذا الوكيل الفرعي غير متاح مؤقتًا.",
       "failed": "فشلت جلسة الوكيل الفرعي.",
       "noMessages": "لا توجد رسائل من الوكيل الفرعي",
       "noMessagesDescription": "انتهت جلسة الوكيل الفرعي هذه دون إنشاء سجل للمحادثة.",
@@ -2980,6 +2989,8 @@
     "why": "الغرض",
     "who": "الجهة المستلمة",
     "installAttributionPromptMessage": "يستخدم Kilo إذن التتبع من Apple فقط لمعرفة القناة التي أتيت منها. ولا يستخدم تعليماتك أو محادثاتك لهذا الغرض أبدًا.",
+    "installAttributionRequestFailedTitle": "تعذّر عرض مطالبة التتبع",
+    "installAttributionRequestFailedMessage": "تعذّر على Kilo عرض مطالبة النظام، لذا يبقى تحديد مصدر التثبيت معطّلًا.",
     "installAttributionPromptTitle": "السماح بتحديد مصدر التثبيت؟"
   },
   "prReview": {
@@ -3651,7 +3662,7 @@
   "organization": {
     "auditLog": {
       "title": "سجل التدقيق",
-      "permissionDenied": "يمكن فقط لمالك المؤسسة أو مسؤولها أو مدير الفوترة فيها، ضمن خطة Enterprise، قراءة سجل التدقيق الخاص بها.",
+      "permissionDenied": "يمكن فقط لمالك المؤسسة أو مشرفها أو مدير الفوترة فيها، ضمن خطة Enterprise، قراءة سجل التدقيق الخاص بها. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "لا توجد أحداث تدقيق",
       "emptyDescription": "تظهر هنا الإجراءات المتخذة في هذه المؤسسة.",
       "truncated": "يتم عرض أحدث الأحداث.",
@@ -3667,7 +3678,7 @@
         "promoCreditGranted": "منح الرصيد الترويجي",
         "memberRemove": "تمت إزالة العضو",
         "memberChangeRole": "تم تغيير دور العضو",
-        "memberAdminAdd": "تمت إضافة مسؤول",
+        "memberAdminAdd": "تمت إضافة مشرف",
         "memberAutoJoin": "انضم العضو تلقائيًا",
         "ssoAutoProvision": "تمت تهيئة المستخدم عبر SSO",
         "ssoSetDomain": "تمت إضافة نطاق SSO",
@@ -3861,7 +3872,7 @@
     },
     "billing": {
       "title": "الفوترة",
-      "permissionDenied": "لا يمكن الاطلاع على فوترة المؤسسة إلا لمالكها أو مسؤولها أو مدير الفوترة فيها.",
+      "permissionDenied": "لا يمكن الاطلاع على فوترة المؤسسة إلا لمالكها أو مشرفها أو مدير الفوترة فيها. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "الاشتراك",
       "state": "الحالة",
       "stateNone": "لا يوجد اشتراك",
@@ -3989,7 +4000,7 @@
       "limitLabel": "الحد اليومي (USD)",
       "memberNotFound": "العضو غير موجود.",
       "noLimitPlaceholder": "بدون حد",
-      "permissionDenied": "لا يمكن إدارة حدود الاستخدام إلا لمالك المؤسسة أو مسؤولها.",
+      "permissionDenied": "لا يمكن إدارة حدود الاستخدام إلا لمالك المؤسسة أو مشرفها.",
       "removeLimit": "إزالة الحد",
       "title": "حد الاستخدام اليومي",
       "blankError": "أدخل مبلغًا، أو اضغط على «إزالة الحد» أدناه.",
@@ -4050,7 +4061,7 @@
       "emptyDescription": "استخدم «الساعة الأقدم» لعرض الطلبات السابقة.",
       "emptyBoundDescription": "هذا أقدم ما تصل إليه سجلات الطلبات.",
       "loadError": "تعذّر تحميل سجلات الطلبات.",
-      "permissionDenied": "يمكن فقط لمالك المؤسسة أو مسؤولها أو مدير الفوترة فيها قراءة سجلات الطلبات الخاصة بها.",
+      "permissionDenied": "يمكن فقط لمالك المؤسسة أو مشرفها أو مدير الفوترة فيها قراءة سجلات الطلبات الخاصة بها. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} إدخال · {{output}} إخراج",
       "byok": "BYOK"
     },
@@ -4356,7 +4367,10 @@
     "list": {
       "loadFailed": "تعذّر تحميل سجل المحادثة.",
       "new": "محادثة جديدة",
-      "deleteTitle": "حذف هذه المحادثة؟"
+      "deleteTitle": "حذف هذه المحادثة؟",
+      "resetNoticeTitle": "تم مسح المحادثات والمسودات المحلية",
+      "resetNoticeBody": "تعذّر على Kilo فتح المحادثات المحفوظة على هذا الجهاز. جلساتك في السحابة غير متأثرة.",
+      "resetNoticeDismiss": "استبعاد الإشعار"
     },
     "rename": {
       "title": "إعادة تسمية الدردشة",
@@ -4640,7 +4654,15 @@
       "download": "تنزيل النموذج على الجهاز",
       "downloading": "جارٍ التنزيل…",
       "downloadProgress": "جارٍ التنزيل… {{percent}}%",
-      "downloadFailed": "لم يكتمل التنزيل. تحقّق من اتصالك ومن توفر مساحة تخزين كافية، ثم حاول مرة أخرى."
+      "downloadFailed": "لم يكتمل التنزيل. تحقّق من اتصالك ومن توفر مساحة تخزين كافية، ثم حاول مرة أخرى.",
+      "cannotUse": "لا يمكن التشغيل: {{items}}.",
+      "cannotUseOptions": "لا يمكن تعبئة: بعض خيارات الأدوات.",
+      "limitations": "القيود",
+      "tools": {
+        "time": "الوقت",
+        "settingsList": "عرض الإعدادات",
+        "settingsSet": "تغيير الإعدادات"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "يدعم هذا النموذج جهد التفكير"
@@ -5231,7 +5253,7 @@
     "defaultModel": "استخدام نموذج Kilo الافتراضي",
     "duration": "حد الوقت (بالدقائق)",
     "spendLimit": "حد الإنفاق (USD)",
-    "invalidSafeguards": "أدخل حدودًا موجبة ومحددة للوقت والإنفاق.",
+    "invalidSafeguards": "أدخل رقمًا موجبًا ضمن النطاق المسموح.",
     "estimate": "التقدير {{estimate}} · الحد الأقصى {{maximum}}",
     "estimateUnavailable": "الملخص المدفوع غير متاح لهذه الإعدادات. غيّر النموذج أو الحدود، أو أعد المحاولة لاحقًا.",
     "confirmPaid": "تفعيل الملخصات المدفوعة لـ {{context}}؟",
@@ -5321,7 +5343,8 @@
     "unavailableTitle": "الاستخدام غير متاح",
     "unavailableDescription": "لم يتم إعداد الاستخدام لمساحة العمل هذه. تواصل مع الدعم إذا كنت تتوقع ظهور الاستخدام هنا.",
     "orgSelfNotice": "أنت تشاهد استخدامك الخاص في هذه المؤسسة.",
-    "viewDetails": "عرض تفاصيل الاستخدام"
+    "viewDetails": "عرض تفاصيل الاستخدام",
+    "orgSelfEntryTitle": "استخدامك"
   },
   "integrations": {
     "title": "التكاملات",
@@ -5417,6 +5440,8 @@
       "autoCommit": "تثبيت التغييرات عند انتهاء التشغيل",
       "condenseOnComplete": "تكثيف السياق عند انتهاء التشغيل",
       "activeTitle": "المشغل نشط",
+      "activeSwitchA11y": "المشغل نشط: {{name}}",
+      "copyLinkA11y": "نسخ الرابط للمشغل {{name}}",
       "activeDescription": "ترد الويب هوكات الموقوفة بالرمز 404.",
       "runAsCreator": "التشغيل باسمي",
       "runAsCreatorDescription": "يستخدم كل تشغيل حسابك، لذا تكون ترويسة السر مطلوبة.",
@@ -5493,7 +5518,7 @@
   },
   "organizationGuardrails": {
     "title": "ضوابط حماية الذكاء الاصطناعي",
-    "permissionDenied": "يمكن لمالكي المؤسسة ومسؤوليها فقط إدارة ضوابط حماية الذكاء الاصطناعي. $t(organization.boundary.accessDeniedDescription)",
+    "permissionDenied": "يمكن لمالكي المؤسسة ومشرفيها فقط إدارة ضوابط حماية الذكاء الاصطناعي. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "ضوابط حماية الذكاء الاصطناعي غير مفعّلة",
     "unavailable": "تُمكّن Kilo ضوابط حماية الذكاء الاصطناعي لمؤسسة عند الطلب. تواصل مع {{supportEmail}}، وفريق Kilo يفعّلها لمؤسستك.",
     "contactSupport": "التواصل مع الدعم",
@@ -5635,7 +5660,7 @@
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "ميزة خطة الشركات",
     "enterpriseOnly": "المزوّدون والنماذج متاحون في خطة Enterprise.",
-    "readOnly": "يمكن لمالكي المؤسسة ومسؤوليها فقط تغيير هذه الإعدادات.",
+    "readOnly": "يمكن لمالكي المؤسسة ومشرفيها فقط تغيير هذه الإعدادات.",
     "loadError": "تعذّر تحميل المزوّدين والنماذج",
     "tabModels": "النماذج",
     "tabProviders": "المزوّدون",

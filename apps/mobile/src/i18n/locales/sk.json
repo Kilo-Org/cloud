@@ -401,7 +401,7 @@
       "title": "Kľúče poskytovateľov",
       "rowSubtitle": "Používať vlastnú fakturáciu u poskytovateľa",
       "orgDescription": "Tieto kľúče zdieľajú všetci v organizácii a účtujú sa na jej účty u poskytovateľov.",
-      "viewOnly": "Kľúče organizácie môže meniť iba jej vlastník, správca alebo manažér fakturácie.",
+      "viewOnly": "Kľúče organizácie môže meniť iba jej vlastník, správca alebo správca fakturácie.",
       "description": "Požiadavky cez tieto kľúče sa účtujú na tvoj účet u poskytovateľa namiesto tvojho zostatku v Kilo.",
       "managedByPlan": "Spravované tvojím plánom pre kódovanie",
       "enableKey": "Povoliť kľúč {{provider}}",
@@ -1294,6 +1294,7 @@
     "needsInputAction": {
       "approved": "Žiadosť schválená",
       "replied": "Odpoveď odoslaná",
+      "empty": "Napíšte odpoveď a potom ju odošlite.",
       "failed": "Odpovedať sa nepodarilo. Ťuknutím to skúste znova.",
       "unavailable": "Táto žiadosť už nečaká."
     }
@@ -1558,7 +1559,9 @@
       "githubError": "Nastavenie pripojenia k platforme GitHub sa nepodarilo otvoriť. Skúste to znova.",
       "gitlabAccount": "účet GitLab",
       "gitlabError": "Nastavenie pripojenia k platforme GitLab sa nepodarilo otvoriť. Skúste to znova.",
-      "description": "Prepojte službu Kilo cez {{label}}, aby sa PR kontrolovali automaticky."
+      "description": "Prepojte službu Kilo cez {{label}}, aby sa PR kontrolovali automaticky.",
+      "notConnectedTitle": "{{platform}} nie je pripojený",
+      "githubAdminOnlyDescription": "Pripojiť ju môžu iba vlastníci organizácie a správcovia."
     },
     "overview": {
       "allAreas": "Všetky oblasti",
@@ -1646,7 +1649,7 @@
       "empty": "Zatiaľ žiadne kontroly s analytikou",
       "emptyDescription": "Analytika zaznamenáva dokončené kontroly, kým je pre organizáciu zapnutá.",
       "offTitle": "Analytika je pre {{platform}} vypnutá",
-      "offDescription": "Fakturačné roly organizácie – vlastníci, správcovia a manažéri fakturácie – môžu zapnúť analytiku v nastaveniach organizácie na webe, aby sa zaznamenávali dokončené kontroly.",
+      "offDescription": "Fakturačné roly organizácie – vlastníci, správcovia a správcovia fakturácie – môžu zapnúť analytiku v nastaveniach organizácie na webe, aby sa zaznamenávali dokončené kontroly.",
       "couldNotLoad": "Analytiku sa nepodarilo načítať",
       "trackedReviewsCaption": "Dokončené kontroly, ktoré sa skončili v tomto období so zapnutou analytikou. Prebiehajúce a neúspešné kontroly sa nikdy nezapočítavajú.",
       "trackedReviewsUncounted": "Nezapočítané: {{displayCount}} z {{displayTotal}} dokončených kontrol organizácie, ktorých výsledok nebol zachytený.",
@@ -2349,6 +2352,7 @@
       "couldNotLoadThisSession": "Túto reláciu sa nepodarilo načítať.",
       "historyTooLarge": "Pepis tejto relácie je na načítanie príliš veľký.",
       "historyUnavailable": "Pepis tejto relácie nie je možné prečítať.",
+      "historyTemporarilyUnavailable": "Prepis tejto relácie je dočasne nedostupný.",
       "cloneFailedRetry": "Túto reláciu sa nepodarilo naklonovať. Skús to znova.",
       "notEnoughCredits": "Na túto požiadavku nemáš dosť kreditov. Doplň kredity a skús to znova.",
       "previousTaskFinishing": "Predchádzajúca úloha sa ešte dokončuje. Chvíľu počkaj.",
@@ -2893,7 +2897,9 @@
       "skip": "Preskočiť",
       "retrySkip": "Skúsiť preskočiť znova",
       "submitting": "Odosiela sa…",
-      "sendAnswers": "Odoslať odpovede"
+      "sendAnswers": "Odoslať odpovede",
+      "unreadableTitle": "Túto otázku sa nepodarilo zobraziť",
+      "unreadableBody": "Agent čaká na otázku, ktorú táto aplikácia nedokáže zobraziť. Odpovedzte na otázku v CLI, aby ste mohli pokračovať."
     },
     "blockingCard": {
       "questionUnavailable": "Táto otázka už nie je dostupná.",
@@ -2920,6 +2926,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Reláciu pomocného agenta sa nepodarilo načítať.",
+      "historyTooLarge": "História tohto pomocného agenta je na načítanie príliš veľká.",
+      "historyUnavailable": "História tohto pomocného agenta nie je dostupná.",
+      "historyTemporarilyUnavailable": "História tohto pomocného agenta je dočasne nedostupná.",
       "failed": "Relácia pomocného agenta zlyhala.",
       "noMessages": "Žiadne správy pomocného agenta",
       "noMessagesDescription": "Táto relácia pomocného agenta sa skončila bez vytvorenia prepisu.",
@@ -3518,6 +3527,8 @@
     "voiceTranscriptionWho": "Tvoje zariadenie, Kilo Gateway s tebou zvoleným modelom prepisu alebo Apple či Google na rozpoznávanie online.",
     "installAttributionPromptTitle": "Povoliť zisťovanie zdroja inštalácie?",
     "installAttributionPromptMessage": "Kilo používa povolenie na sledovanie od spoločnosti Apple len na zistenie, odkiaľ si sa o aplikácii dozvedel. Tvoje zadania ani konverzácie na to nikdy nepoužívame.",
+    "installAttributionRequestFailedTitle": "Nepodarilo sa zobraziť výzvu na sledovanie",
+    "installAttributionRequestFailedMessage": "Kilo nemohlo zobraziť systémovú výzvu, preto zisťovanie zdroja inštalácie zostáva vypnuté.",
     "what": "Čo",
     "why": "Prečo",
     "who": "Kto"
@@ -3533,7 +3544,7 @@
   "organization": {
     "auditLog": {
       "title": "Protokol auditu",
-      "permissionDenied": "Protokol auditu si môže prezerať iba vlastník, administrátor alebo správca fakturácie organizácie s plánom Enterprise.",
+      "permissionDenied": "Protokol auditu si môže prezerať iba vlastník, správca alebo správca fakturácie organizácie s plánom Enterprise. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Žiadne udalosti auditu",
       "emptyDescription": "Tu sa zobrazia akcie vykonané v tejto organizácii.",
       "truncated": "Zobrazujú sa najnovšie udalosti.",
@@ -3733,7 +3744,7 @@
     },
     "billing": {
       "title": "Fakturácia",
-      "permissionDenied": "Fakturáciu organizácie môže zobraziť iba jej vlastník, administrátor alebo správca fakturácie.",
+      "permissionDenied": "Fakturáciu organizácie môže zobraziť iba jej vlastník, správca alebo správca fakturácie. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Predplatné",
       "state": "Stav",
       "stateNone": "Bez predplatného",
@@ -3849,7 +3860,7 @@
       "limitLabel": "Limit (USD za deň)",
       "memberNotFound": "Člen sa nenašiel.",
       "noLimitPlaceholder": "Bez limitu",
-      "permissionDenied": "Limity spotreby môže spravovať iba vlastník alebo administrátor organizácie.",
+      "permissionDenied": "Limity spotreby môže spravovať iba vlastník alebo správca organizácie.",
       "removeLimit": "Odstrániť limit",
       "title": "Denný limit spotreby",
       "blankError": "Zadaj sumu alebo klepni na Odstrániť limit nižšie.",
@@ -3910,7 +3921,7 @@
       "emptyDescription": "Ak chcete zobraziť skoršie požiadavky, použite tlačidlo „Staršia hodina“.",
       "emptyBoundDescription": "Záznamy požiadaviek nesiahajú ďalej do minulosti.",
       "loadError": "Protokoly požiadaviek sa nepodarilo načítať.",
-      "permissionDenied": "Protokoly požiadaviek si môže prezerať iba vlastník, administrátor alebo správca fakturácie organizácie.",
+      "permissionDenied": "Protokoly požiadaviek si môže prezerať iba vlastník, správca alebo správca fakturácie organizácie. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} vstup · {{output}} výstup",
       "byok": "BYOK"
     },
@@ -4200,7 +4211,10 @@
     "list": {
       "loadFailed": "Históriu chatu sa nepodarilo načítať.",
       "new": "Nový chat",
-      "deleteTitle": "Odstrániť tento chat?"
+      "deleteTitle": "Odstrániť tento chat?",
+      "resetNoticeTitle": "Lokálne chaty a koncepty boli vymazané",
+      "resetNoticeBody": "Kilo nedokázalo otvoriť chaty uložené v tomto zariadení. Vaše cloudové relácie nie sú ovplyvnené.",
+      "resetNoticeDismiss": "Ignorovať oznámenie"
     },
     "rename": {
       "title": "Premenovať chat",
@@ -4482,7 +4496,15 @@
       "download": "Stiahnuť model do zariadenia",
       "downloading": "Sťahuje sa…",
       "downloadProgress": "Sťahuje sa… {{percent}} %",
-      "downloadFailed": "Sťahovanie sa nedokončilo. Skontrolujte pripojenie a voľné miesto v úložisku a skúste to znova."
+      "downloadFailed": "Sťahovanie sa nedokončilo. Skontrolujte pripojenie a voľné miesto v úložisku a skúste to znova.",
+      "cannotUse": "Nedá sa spustiť: {{items}}.",
+      "cannotUseOptions": "Nedá sa vyplniť: niektoré možnosti nástroja.",
+      "limitations": "Obmedzenia",
+      "tools": {
+        "time": "Čas",
+        "settingsList": "Zobraziť nastavenia",
+        "settingsSet": "Zmeniť nastavenia"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Tento model podporuje intenzitu uvažovania"
@@ -5053,7 +5075,7 @@
     "defaultModel": "Použiť predvolený model Kilo",
     "duration": "Časový limit (minúty)",
     "spendLimit": "Limit výdavkov (USD)",
-    "invalidSafeguards": "Zadajte kladné, konečné limity času a výdavkov.",
+    "invalidSafeguards": "Zadajte kladné číslo v povolenom rozsahu.",
     "estimate": "Odhad {{estimate}} · maximálne {{maximum}}",
     "estimateUnavailable": "Platený súhrn nie je pre tieto nastavenia dostupný. Zmeňte model alebo limity, prípadne to skúste neskôr znova.",
     "confirmPaid": "Povoliť platené zhrnutia pre {{context}}?",
@@ -5133,7 +5155,8 @@
     "unavailableTitle": "Využitie nie je k dispozícii",
     "unavailableDescription": "Využitie nie je pre tento pracovný priestor nastavené. Ak očakávate, že sa tu využitie zobrazí, kontaktujte podporu.",
     "orgSelfNotice": "Vidíte svoje vlastné využitie v tejto organizácii.",
-    "viewDetails": "Zobraziť podrobnosti o využití"
+    "viewDetails": "Zobraziť podrobnosti o využití",
+    "orgSelfEntryTitle": "Vaše využitie"
   },
   "integrations": {
     "title": "Integrácie",
@@ -5229,6 +5252,8 @@
       "autoCommit": "Commitnúť zmeny po dokončení spustenia",
       "condenseOnComplete": "Zhustiť kontext po dokončení spustenia",
       "activeTitle": "Spúšťač je aktívny",
+      "activeSwitchA11y": "Aktívny spúšťač: {{name}}",
+      "copyLinkA11y": "Kopírovať odkaz pre {{name}}",
       "activeDescription": "Pozastavené webhooky odpovedajú 404.",
       "runAsCreator": "Spustiť ako ja",
       "runAsCreatorDescription": "Každé spustenie používa váš účet, preto je tajná hlavička povinná.",

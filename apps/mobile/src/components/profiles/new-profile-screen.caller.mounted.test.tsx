@@ -31,6 +31,14 @@ vi.mock('expo-router', () => ({
     canGoBack: () => routerCanGoBack.value,
   }),
 }));
+
+// The post-create hand-off goes through the push-then-retire hook that keeps
+// Android Fabric alive; its own mechanics have their own suite, so
+// here it stands in for the navigation call and the assertions stay about the
+// destination href.
+vi.mock('@/lib/navigation/stack-safe-replace', () => ({
+  useStackSafeReplace: () => ({ replace: routerReplace }),
+}));
 vi.mock('@/lib/hooks/use-organization-queries', () => ({
   useOrgBoundary: (organizationId?: string) => {
     boundaryArgs.value.push(organizationId);

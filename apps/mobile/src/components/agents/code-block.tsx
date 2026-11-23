@@ -202,7 +202,10 @@ function CodeBlockImpl({
   // Tool cards render on the app `card` surface, whose brightness tracks the
   // app scheme; the markdown renderer passes the scheme of its own code card.
   const effectiveTokenScheme = tokenScheme ?? (isDark ? 'onDark' : 'onLight');
-  const { displayText, isTruncated } = prepareMonoScrollContent(code, maxLength);
+  const { displayText, isTruncated } = useMemo(
+    () => prepareMonoScrollContent(code, maxLength),
+    [code, maxLength]
+  );
   // How much of the fence is mounted right now, remembered with the text it was
   // mounted for. The first paint mounts CODE_FIRST_PAINT_CHUNKS chunks — 128
   // lines, about a screen at this leading — so the sheet shows its header and

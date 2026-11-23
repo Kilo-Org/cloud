@@ -676,6 +676,7 @@
     "needsInputAction": {
       "approved": "Permintaan disetujui",
       "replied": "Balasan terkirim",
+      "empty": "Tulis balasan lalu kirim.",
       "failed": "Tidak dapat menjawab. Ketuk lagi untuk mencoba lagi.",
       "unavailable": "Permintaan ini tidak lagi menunggu."
     }
@@ -817,6 +818,8 @@
     },
     "providerConnect": {
       "description": "Hubungkan {{label}} Kilo untuk meninjau PR secara otomatis.",
+      "notConnectedTitle": "{{platform}} tidak terhubung",
+      "githubAdminOnlyDescription": "Hanya pemilik organisasi dan admin yang dapat menghubungkannya.",
       "githubApp": "aplikasi GitHub",
       "githubError": "Tidak dapat membuka penyiapan GitHub. Coba lagi.",
       "gitlabAccount": "akun GitLab",
@@ -1026,7 +1029,7 @@
       "empty": "Belum ada tinjauan dengan analitik",
       "emptyDescription": "Analitik mencatat tinjauan yang selesai selama fitur ini aktif untuk organisasi.",
       "offTitle": "Analitik nonaktif untuk {{platform}}",
-      "offDescription": "Peran penagihan organisasi (pemilik, admin, dan pengelola penagihan) dapat mengaktifkan analitik di pengaturan organisasi di web untuk mencatat tinjauan yang selesai.",
+      "offDescription": "Peran penagihan organisasi (pemilik, admin, dan manajer penagihan) dapat mengaktifkan analitik di pengaturan organisasi di web untuk mencatat tinjauan yang selesai.",
       "couldNotLoad": "Tidak dapat memuat analitik",
       "trackedReviewsCaption": "Tinjauan yang selesai selama periode ini dengan analitik aktif. Tinjauan yang sedang berjalan dan gagal tidak pernah dihitung.",
       "trackedReviewsUncounted": "Tidak dihitung: {{displayCount}} dari {{displayTotal}} tinjauan yang selesai milik organisasi, hasilnya tidak terekam.",
@@ -1689,6 +1692,7 @@
       "couldNotLoadThisSession": "Tidak dapat memuat sesi ini.",
       "historyTooLarge": "Transkrip sesi ini terlalu besar untuk dimuat.",
       "historyUnavailable": "Transkrip sesi ini tidak dapat dibaca.",
+      "historyTemporarilyUnavailable": "Transkrip sesi ini untuk sementara tidak tersedia.",
       "cloneFailedRetry": "Tidak dapat menyalin sesi ini. Coba lagi.",
       "notEnoughCredits": "Kredit tidak cukup untuk permintaan ini. Tambah kredit dan coba lagi.",
       "previousTaskFinishing": "Tugas sebelumnya belum selesai. Tunggu sebentar.",
@@ -2225,7 +2229,9 @@
       "skip": "Lewati",
       "retrySkip": "Coba lewati lagi",
       "submitting": "Mengirim…",
-      "sendAnswers": "Kirim jawaban"
+      "sendAnswers": "Kirim jawaban",
+      "unreadableTitle": "Pertanyaan ini tidak dapat ditampilkan",
+      "unreadableBody": "Agen sedang menunggu pertanyaan yang tidak dapat ditampilkan oleh aplikasi ini. Jawab pertanyaan itu di CLI untuk melanjutkan."
     },
     "blockingCard": {
       "questionUnavailable": "Pertanyaan ini tidak lagi tersedia.",
@@ -2252,6 +2258,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Tidak dapat memuat sesi subagen.",
+      "historyTooLarge": "Riwayat subagen ini terlalu besar untuk dimuat.",
+      "historyUnavailable": "Riwayat subagen ini tidak tersedia.",
+      "historyTemporarilyUnavailable": "Riwayat subagen ini untuk sementara tidak tersedia.",
       "failed": "Sesi subagen gagal.",
       "noMessages": "Tidak ada pesan subagen",
       "noMessagesDescription": "Sesi subagen ini selesai tanpa menghasilkan transkrip.",
@@ -2832,6 +2841,8 @@
     "why": "Tujuan",
     "who": "Penerima",
     "installAttributionPromptMessage": "Kilo menggunakan izin pelacakan Apple hanya untuk mengetahui saluran yang memperkenalkan Kilo kepadamu. Instruksi dan percakapanmu tidak pernah digunakan.",
+    "installAttributionRequestFailedTitle": "Tidak dapat menampilkan permintaan pelacakan",
+    "installAttributionRequestFailedMessage": "Kilo tidak dapat menampilkan permintaan sistem, jadi pelacakan sumber pemasangan tetap nonaktif.",
     "installAttributionPromptTitle": "Izinkan pelacakan sumber pemasangan?"
   },
   "prReview": {
@@ -3399,7 +3410,7 @@
   "organization": {
     "auditLog": {
       "title": "Log audit",
-      "permissionDenied": "Hanya pemilik, admin, atau pengelola penagihan organisasi dengan paket Enterprise yang dapat membaca log auditnya.",
+      "permissionDenied": "Hanya pemilik, admin, atau manajer penagihan organisasi dengan paket Enterprise yang dapat membaca log auditnya. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Tidak ada peristiwa audit",
       "emptyDescription": "Tindakan yang dilakukan di organisasi ini akan muncul di sini.",
       "truncated": "Menampilkan peristiwa terbaru.",
@@ -3415,7 +3426,7 @@
         "promoCreditGranted": "Kredit promosi diberikan",
         "memberRemove": "Anggota dihapus",
         "memberChangeRole": "Peran anggota diubah",
-        "memberAdminAdd": "Administrator ditambahkan",
+        "memberAdminAdd": "Admin ditambahkan",
         "memberAutoJoin": "Anggota bergabung otomatis",
         "ssoAutoProvision": "Pengguna disediakan oleh SSO",
         "ssoSetDomain": "Domain SSO ditambahkan",
@@ -3589,7 +3600,7 @@
     },
     "billing": {
       "title": "Penagihan",
-      "permissionDenied": "Hanya pemilik, admin, atau manajer penagihan organisasi yang dapat melihat penagihannya.",
+      "permissionDenied": "Hanya pemilik, admin, atau manajer penagihan organisasi yang dapat melihat penagihannya. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Langganan",
       "state": "Status",
       "stateNone": "Tidak ada langganan",
@@ -3679,7 +3690,7 @@
       "pendingInvitation": "Email ini sudah memiliki undangan yang tertunda.",
       "alreadyMember": "Orang ini sudah menjadi anggota organisasi ini.",
       "seatsFull": "Semua kursi sudah terpakai ({{used}}/{{total}}). Minta pemilik organisasi untuk menambah kursi sebelum mengundang lebih banyak anggota.",
-      "seatsFullCanInviteBilling": "Semua kursi sudah terpakai ({{used}}/{{total}}). Kamu masih dapat mengundang pengelola penagihan, yang tidak menggunakan kursi.",
+      "seatsFullCanInviteBilling": "Semua kursi sudah terpakai ({{used}}/{{total}}). Kamu masih dapat mengundang manajer penagihan, yang tidak menggunakan kursi.",
       "noSeatsAvailable": "Semua kursi sudah terpakai. Minta pemilik organisasi untuk menambah kursi sebelum mengundang lebih banyak anggota."
     },
     "invoices": {
@@ -3778,7 +3789,7 @@
       "emptyDescription": "Gunakan Jam sebelumnya untuk melihat permintaan yang lebih awal.",
       "emptyBoundDescription": "Log permintaan hanya tersedia sampai titik ini.",
       "loadError": "Tidak dapat memuat log permintaan.",
-      "permissionDenied": "Hanya pemilik, admin, atau pengelola penagihan organisasi yang dapat membaca log permintaannya.",
+      "permissionDenied": "Hanya pemilik, admin, atau manajer penagihan organisasi yang dapat membaca log permintaannya. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} masuk · {{output}} keluar",
       "byok": "BYOK"
     },
@@ -4044,7 +4055,10 @@
     "list": {
       "loadFailed": "Tidak dapat memuat riwayat obrolan.",
       "new": "Obrolan baru",
-      "deleteTitle": "Hapus obrolan ini?"
+      "deleteTitle": "Hapus obrolan ini?",
+      "resetNoticeTitle": "Obrolan dan draf di perangkat ini telah dihapus",
+      "resetNoticeBody": "Kilo tidak dapat membuka obrolan yang tersimpan di perangkat ini. Sesi cloud Anda tidak terpengaruh.",
+      "resetNoticeDismiss": "Abaikan pemberitahuan"
     },
     "rename": {
       "title": "Ganti nama obrolan",
@@ -4324,7 +4338,15 @@
       "download": "Unduh model di perangkat",
       "downloading": "Mengunduh…",
       "downloadProgress": "Mengunduh… {{percent}}%",
-      "downloadFailed": "Unduhan tidak selesai. Periksa koneksi dan ruang penyimpanan Anda, lalu coba lagi."
+      "downloadFailed": "Unduhan tidak selesai. Periksa koneksi dan ruang penyimpanan Anda, lalu coba lagi.",
+      "cannotUse": "Tidak dapat dijalankan: {{items}}.",
+      "cannotUseOptions": "Tidak dapat diisi: beberapa opsi alat.",
+      "limitations": "Batasan",
+      "tools": {
+        "time": "Waktu",
+        "settingsList": "Tampilkan pengaturan",
+        "settingsSet": "Ubah pengaturan"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Model ini mendukung tingkat penalaran"
@@ -4875,7 +4897,7 @@
     "defaultModel": "Gunakan model default Kilo",
     "duration": "Batas waktu (menit)",
     "spendLimit": "Batas biaya (USD)",
-    "invalidSafeguards": "Masukkan batas waktu dan biaya yang positif dan terbatas.",
+    "invalidSafeguards": "Masukkan angka positif dalam rentang yang diizinkan.",
     "estimate": "Estimasi {{estimate}} · maksimum {{maximum}}",
     "estimateUnavailable": "Ringkasan berbayar tidak tersedia untuk pengaturan ini. Ubah model atau batasnya, atau coba lagi nanti.",
     "confirmPaid": "Aktifkan ringkasan berbayar untuk {{context}}?",
@@ -4945,7 +4967,8 @@
     "unavailableTitle": "Penggunaan tidak tersedia",
     "unavailableDescription": "Penggunaan belum disiapkan untuk workspace ini. Hubungi dukungan jika Anda berharap melihat penggunaan di sini.",
     "orgSelfNotice": "Anda melihat penggunaan Anda sendiri di organisasi ini.",
-    "viewDetails": "Lihat detail penggunaan"
+    "viewDetails": "Lihat detail penggunaan",
+    "orgSelfEntryTitle": "Penggunaan Anda"
   },
   "integrations": {
     "title": "Integrasi",
@@ -5041,6 +5064,8 @@
       "autoCommit": "Komit perubahan saat eksekusi selesai",
       "condenseOnComplete": "Ringkas konteks saat eksekusi selesai",
       "activeTitle": "Pemicu aktif",
+      "activeSwitchA11y": "Pemicu aktif: {{name}}",
+      "copyLinkA11y": "Salin tautan untuk {{name}}",
       "activeDescription": "Webhook yang dijeda akan menjawab dengan 404.",
       "runAsCreator": "Jalankan sebagai saya",
       "runAsCreatorDescription": "Setiap eksekusi menggunakan akun Anda, sehingga header rahasia wajib diisi.",
@@ -5117,7 +5142,7 @@
   },
   "organizationGuardrails": {
     "title": "Pagar Pengaman Kecerdasan Artifisial",
-    "permissionDenied": "Hanya pemilik dan administrator organisasi yang dapat mengelola Pagar Pengaman Kecerdasan Artifisial. $t(organization.boundary.accessDeniedDescription)",
+    "permissionDenied": "Hanya pemilik dan admin organisasi yang dapat mengelola Pagar Pengaman Kecerdasan Artifisial. $t(organization.boundary.accessDeniedDescription)",
     "unavailableTitle": "Pagar Pengaman Kecerdasan Artifisial tidak diaktifkan",
     "unavailable": "Kilo mengaktifkan Pagar Pengaman Kecerdasan Artifisial untuk sebuah organisasi atas permintaan. Hubungi {{supportEmail}}, dan tim Kilo mengaktifkannya untuk organisasi Anda.",
     "contactSupport": "Hubungi tim dukungan",
@@ -5259,7 +5284,7 @@
   "organizationModelAccess": {
     "enterpriseOnlyTitle": "Fitur perusahaan",
     "enterpriseOnly": "Penyedia dan model tersedia di paket Enterprise.",
-    "readOnly": "Hanya pemilik dan administrator organisasi yang dapat mengubah pengaturan ini.",
+    "readOnly": "Hanya pemilik dan admin organisasi yang dapat mengubah pengaturan ini.",
     "loadError": "Penyedia dan model tidak dapat dimuat",
     "tabModels": "Model",
     "tabProviders": "Penyedia",

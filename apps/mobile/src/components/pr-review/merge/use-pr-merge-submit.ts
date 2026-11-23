@@ -6,6 +6,7 @@ import { type RefObject, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useConfirmDialog } from '@/components/ui/dialog';
+import { useLatestRef } from '@/components/agents/use-latest-ref';
 import { providerPrMergeTitles } from '@/components/pr-review/merge/pr-merge-titles';
 import { providerPrNounKey } from '@/components/pr-review/pr-review-provider-noun';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
@@ -73,6 +74,10 @@ export function usePrMergeSubmit({
   const [inlineErrorKind, setInlineErrorKind] = useState<
     'retryable' | 'non-retryable' | 'reconnect' | null
   >(null);
+  // The connection check settles after the render that started it, so clearing
+  // the latch reads the live kind through this ref rather than the closure the
+  // notice captured when it was pressed.
+  const inlineErrorKindRef = useLatestRef(inlineErrorKind);
   const ref = useMemo(() => ({ owner, repo: repoName, number }), [owner, repoName, number]);
   const mergeMutation = useMergePullRequestMutation(prRef ?? ref);
   const enableAutoMergeMutation = useEnableAutoMergeMutation(prRef ?? ref);
@@ -197,6 +202,17 @@ export function usePrMergeSubmit({
     }
   }
 
+  function clearReconnectError() {
+    // Only a connection check clears this latch, and only while it is still
+    // what the sheet is showing: a check that settles after a newer attempt
+    // failed for another reason must not wipe that newer failure.
+    if (inlineErrorKindRef.current !== 'reconnect') {
+      return;
+    }
+    setInlineError(null);
+    setInlineErrorKind(null);
+  }
+
   function handleConfirmPress() {
     if (isMutating || noMethodsAllowed) {
       return;
@@ -228,5 +244,12 @@ export function usePrMergeSubmit({
     });
   }
 
-  return { isMutating, inlineError, inlineErrorKind, handleConfirmPress, dialog };
+  return {
+    isMutating,
+    inlineError,
+    inlineErrorKind,
+    clearReconnectError,
+    handleConfirmPress,
+    dialog,
+  };
 }

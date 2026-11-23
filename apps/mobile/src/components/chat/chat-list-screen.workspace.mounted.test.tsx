@@ -174,6 +174,12 @@ vi.mock('@/components/ui/icons', () => ({
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/chat/chat-row', () => ({ ChatRow: 'ChatRow' }));
+// The list's notice reads the encrypted store, whose native modules this
+// account-row suite does not load; a store that was never reset is the state
+// under test here.
+vi.mock('@/lib/persist/use-local-reset-notice', () => ({
+  useLocalResetNotice: () => ({ notice: { kind: 'absent' }, dismiss: () => undefined }),
+}));
 vi.mock('@/components/chat/beta-pill', () => ({ BetaPill: 'BetaPill' }));
 vi.mock('@/lib/chat/backend-store', () => ({ useChatBackends: () => [] }));
 vi.mock('@/lib/chat/local-models', () => ({ useLocalModels: () => [] }));

@@ -399,7 +399,7 @@
       "title": "Funguo za watoa huduma",
       "rowSubtitle": "Tumia malipo ya mtoa huduma wako",
       "orgDescription": "Funguo hizi zinashirikiwa na kila mtu katika shirika na zinatozwa kwenye akaunti zake za watoa huduma.",
-      "viewOnly": "Ni mmiliki, msimamizi au meneja wa malipo wa shirika pekee anayeweza kubadilisha funguo zake.",
+      "viewOnly": "Ni mmiliki, msimamizi au msimamizi wa bili wa shirika pekee anayeweza kubadilisha funguo zake.",
       "description": "Maombi yanayopitia funguo hizi yanatozwa kwenye akaunti yako ya mtoa huduma badala ya salio lako la Kilo.",
       "managedByPlan": "Inasimamiwa na mpango wako wa uandishi wa msimbo",
       "enableKey": "Washa ufunguo wa {{provider}}",
@@ -1238,6 +1238,7 @@
     "needsInputAction": {
       "approved": "Ombi limeidhinishwa",
       "replied": "Jibu limetumwa",
+      "empty": "Andika jibu, kisha ulitume.",
       "failed": "Imeshindikana kujibu. Gusa tena kujaribu tena.",
       "unavailable": "Ombi hili halisubiri tena."
     }
@@ -1502,7 +1503,9 @@
       "githubError": "Imeshindikana kufungua usanidi wa GitHub. Tafadhali jaribu tena.",
       "gitlabAccount": "akaunti ya GitLab",
       "gitlabError": "Imeshindikana kufungua usanidi wa GitLab. Tafadhali jaribu tena.",
-      "description": "Unganisha {{label}} ya Kilo ili kukagua maombi ya kuunganisha kiotomatiki."
+      "description": "Unganisha {{label}} ya Kilo ili kukagua maombi ya kuunganisha kiotomatiki.",
+      "notConnectedTitle": "{{platform}} haijaunganishwa",
+      "githubAdminOnlyDescription": "Wamiliki na wasimamizi wa shirika pekee wanaweza kuiunganisha."
     },
     "overview": {
       "allAreas": "Maeneo yote",
@@ -1588,7 +1591,7 @@
       "empty": "Hakuna ukaguzi wenye takwimu bado",
       "emptyDescription": "Takwimu hurekodi ukaguzi uliokamilika wakati imewashwa kwa shirika.",
       "offTitle": "Takwimu zimezimwa kwa {{platform}}",
-      "offDescription": "Majukumu ya bili ya shirika — wamiliki, wasimamizi na mameneja wa bili — yanaweza kuwasha takwimu katika mipangilio ya shirika kwenye wavuti ili kurekodi ukaguzi uliokamilika.",
+      "offDescription": "Majukumu ya bili ya shirika — wamiliki, wasimamizi na wasimamizi wa bili — yanaweza kuwasha takwimu katika mipangilio ya shirika kwenye wavuti ili kurekodi ukaguzi uliokamilika.",
       "couldNotLoad": "Imeshindwa kupakia takwimu",
       "trackedReviewsCaption": "Ukaguzi uliokamilika ulioisha katika kipindi hiki wakati takwimu zilikuwa zimewashwa. Ukaguzi unaoendelea na ulioshindikana hauhesabiwi kamwe.",
       "trackedReviewsUncounted": "Hauhesabiwi: {{displayCount}} kati ya ukaguzi {{displayTotal}} uliokamilika wa shirika, matokeo yake hayakurekodiwa.",
@@ -2251,6 +2254,7 @@
       "couldNotLoadThisSession": "Imeshindikana kupakia kikao hiki.",
       "historyTooLarge": "Andiko la kikao hiki ni kikubwa mno kupakia.",
       "historyUnavailable": "Andiko la kikao hiki haliwezi kusomeka.",
+      "historyTemporarilyUnavailable": "Andiko la kikao hiki halipatikani kwa muda.",
       "cloneFailedRetry": "Imeshindikana kunakili kikao hiki. Jaribu tena.",
       "notEnoughCredits": "Salio halitoshi kwa ombi hili. Ongeza salio na ujaribu tena.",
       "previousTaskFinishing": "Kazi iliyotangulia bado inakamilika. Tafadhali subiri kidogo.",
@@ -2787,7 +2791,9 @@
       "skip": "Ruka",
       "retrySkip": "Jaribu tena kuruka",
       "submitting": "Inawasilisha…",
-      "sendAnswers": "Tuma majibu"
+      "sendAnswers": "Tuma majibu",
+      "unreadableTitle": "Swali hili halikuweza kuonyeshwa",
+      "unreadableBody": "Wakala anasubiri swali ambalo programu hii haiwezi kuonyesha. Jibu swali hilo kwenye CLI ili kuendelea."
     },
     "blockingCard": {
       "questionUnavailable": "Swali hili halipatikani tena.",
@@ -2814,6 +2820,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Imeshindikana kupakia kikao cha wakala msaidizi.",
+      "historyTooLarge": "Historia ya wakala msaidizi huyu ni kubwa mno kupakia.",
+      "historyUnavailable": "Historia ya wakala msaidizi huyu haipatikani.",
+      "historyTemporarilyUnavailable": "Historia ya wakala msaidizi huyu haipatikani kwa muda.",
       "failed": "Kikao cha wakala msaidizi kimeshindikana.",
       "noMessages": "Hakuna ujumbe wa wakala msaidizi",
       "noMessagesDescription": "Kikao hiki cha wakala msaidizi kilikamilika bila kutoa nakala ya mazungumzo.",
@@ -3392,6 +3401,8 @@
     "voiceTranscriptionWho": "Kifaa chako, Kilo Gateway na modeli ya unukuzi uliyochagua, au Apple au Google kwa utambuzi mtandaoni.",
     "installAttributionPromptTitle": "Ungependa kuruhusu utambuzi wa chanzo cha usakinishaji?",
     "installAttributionPromptMessage": "Kilo hutumia ruhusa ya ufuatiliaji ya Apple kujua tu njia iliyokuleta hapa. Maagizo na mazungumzo yako hayatumiwi kamwe kwa hili.",
+    "installAttributionRequestFailedTitle": "Imeshindwa kuonyesha ombi la ufuatiliaji",
+    "installAttributionRequestFailedMessage": "Kilo haikuweza kuonyesha ombi la mfumo, kwa hivyo utambuzi wa chanzo cha usakinishaji unabaki umezimwa.",
     "what": "Nini",
     "why": "Kwa nini",
     "who": "Nani"
@@ -3407,7 +3418,7 @@
   "organization": {
     "auditLog": {
       "title": "Kumbukumbu za ukaguzi",
-      "permissionDenied": "Ni mmiliki, msimamizi au meneja wa malipo wa shirika lililo kwenye mpango wa Enterprise pekee anayeweza kusoma kumbukumbu zake za ukaguzi.",
+      "permissionDenied": "Ni mmiliki, msimamizi au msimamizi wa bili wa shirika lililo kwenye mpango wa Enterprise pekee anayeweza kusoma kumbukumbu zake za ukaguzi. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Hakuna matukio ya ukaguzi",
       "emptyDescription": "Vitendo vinavyofanywa katika shirika hili huonekana hapa.",
       "truncated": "Inaonyesha matukio ya hivi karibuni zaidi.",
@@ -3597,7 +3608,7 @@
     },
     "billing": {
       "title": "Malipo",
-      "permissionDenied": "Ni mmiliki, msimamizi au meneja wa malipo wa shirika pekee anayeweza kuona malipo yake.",
+      "permissionDenied": "Ni mmiliki, msimamizi au msimamizi wa bili wa shirika pekee anayeweza kuona malipo yake. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Usajili",
       "state": "Hali",
       "stateNone": "Hakuna usajili",
@@ -3675,7 +3686,7 @@
       "pendingInvitation": "Barua pepe hii tayari ina mwaliko unaosubiri.",
       "alreadyMember": "Mtu huyu tayari ni mwanachama wa shirika hili.",
       "seatsFull": "Nafasi zote zinatumika ({{used}}/{{total}}). Muombe mmiliki wa shirika aongeze nafasi kabla ya kualika wanachama zaidi.",
-      "seatsFullCanInviteBilling": "Nafasi zote zinatumika ({{used}}/{{total}}). Bado unaweza kualika wasimamizi wa malipo, ambao hawatumii nafasi.",
+      "seatsFullCanInviteBilling": "Nafasi zote zinatumika ({{used}}/{{total}}). Bado unaweza kualika wasimamizi wa bili, ambao hawatumii nafasi.",
       "noSeatsAvailable": "Nafasi zote zinatumika. Muombe mmiliki wa shirika aongeze nafasi kabla ya kualika wanachama zaidi."
     },
     "invoices": {
@@ -3774,7 +3785,7 @@
       "emptyDescription": "Tumia Saa iliyotangulia ili kuona maombi ya awali.",
       "emptyBoundDescription": "Kumbukumbu za maombi haziendi nyuma zaidi ya hapa.",
       "loadError": "Imeshindwa kupakia kumbukumbu za maombi.",
-      "permissionDenied": "Ni mmiliki, msimamizi au meneja wa malipo wa shirika pekee anayeweza kusoma kumbukumbu zake za maombi.",
+      "permissionDenied": "Ni mmiliki, msimamizi au msimamizi wa bili wa shirika pekee anayeweza kusoma kumbukumbu zake za maombi. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} ndani · {{output}} nje",
       "byok": "BYOK"
     },
@@ -4044,7 +4055,10 @@
     "list": {
       "loadFailed": "Haikuweza kupakia historia ya mazungumzo.",
       "new": "Gumzo jipya",
-      "deleteTitle": "Futa gumzo hili?"
+      "deleteTitle": "Futa gumzo hili?",
+      "resetNoticeTitle": "Magumzo ya kifaa na rasimu yamefutwa",
+      "resetNoticeBody": "Kilo haikuweza kufungua magumzo yaliyohifadhiwa kwenye kifaa hiki. Vikao vyako vya wingu havijaathirika.",
+      "resetNoticeDismiss": "Puuza arifa"
     },
     "rename": {
       "title": "Badilisha jina la gumzo",
@@ -4324,7 +4338,15 @@
       "download": "Pakua modeli ya kwenye kifaa",
       "downloading": "Inapakua…",
       "downloadProgress": "Inapakua… {{percent}}%",
-      "downloadFailed": "Upakuaji haukukamilika. Angalia muunganisho wako na nafasi ya hifadhi, kisha ujaribu tena."
+      "downloadFailed": "Upakuaji haukukamilika. Angalia muunganisho wako na nafasi ya hifadhi, kisha ujaribu tena.",
+      "cannotUse": "Haiwezi kuendeshwa: {{items}}.",
+      "cannotUseOptions": "Haiwezi kujazwa: baadhi ya chaguo za kifaa.",
+      "limitations": "Vikwazo",
+      "tools": {
+        "time": "Muda",
+        "settingsList": "Onyesha mipangilio",
+        "settingsSet": "Badilisha mipangilio"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Modeli hii inaauni juhudi za kufikiri"
@@ -4875,7 +4897,7 @@
     "defaultModel": "Tumia modeli chaguomsingi ya Kilo",
     "duration": "Kikomo cha muda (dakika)",
     "spendLimit": "Kikomo cha matumizi (USD)",
-    "invalidSafeguards": "Weka vikomo vya muda na matumizi vyenye thamani chanya na zenye ukomo.",
+    "invalidSafeguards": "Weka nambari chanya ndani ya kiwango kinachoruhusiwa.",
     "estimate": "Makadirio {{estimate}} · kiwango cha juu {{maximum}}",
     "estimateUnavailable": "Muhtasari wenye malipo haupatikani kwa mipangilio hii. Badilisha modeli au mipaka, au ujaribu tena baadaye.",
     "confirmPaid": "Washa muhtasari wa kulipia kwa {{context}}?",
@@ -4945,7 +4967,8 @@
     "unavailableTitle": "Matumizi hayapatikani",
     "unavailableDescription": "Matumizi hayajawekwa kwa eneo hili la kazi. Wasiliana na timu ya usaidizi ikiwa unatarajia kuona matumizi hapa.",
     "orgSelfNotice": "Unaona matumizi yako mwenyewe katika shirika hili.",
-    "viewDetails": "Angalia maelezo ya matumizi"
+    "viewDetails": "Angalia maelezo ya matumizi",
+    "orgSelfEntryTitle": "Matumizi yako"
   },
   "integrations": {
     "title": "Miunganisho",
@@ -5041,6 +5064,8 @@
       "autoCommit": "Hifadhi mabadiliko utekelezaji unapokamilika",
       "condenseOnComplete": "Fupisha muktadha utekelezaji unapokamilika",
       "activeTitle": "Kichocheo hai",
+      "activeSwitchA11y": "Kichocheo hai: {{name}}",
+      "copyLinkA11y": "Nakili kiungo cha {{name}}",
       "activeDescription": "Ndoano za wavuti zilizosimamishwa hujibu kwa 404.",
       "runAsCreator": "Tekeleza kama mimi",
       "runAsCreatorDescription": "Kila utekelezaji hutumia akaunti yako, kwa hiyo kichwa cha siri kinahitajika.",

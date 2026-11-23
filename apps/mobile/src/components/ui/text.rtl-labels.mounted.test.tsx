@@ -24,6 +24,9 @@ const ARABIC_EXTENDED_B = '\u0870\u089F';
 // RTL locale the app ships and is not Arabic script, so an Arabic-only
 // predicate leaves it with the Latin tracking and mono family.
 const HEBREW = 'פעילים עכשיו';
+// The Hindi word for "now" (`hi.json`), a joined script that is not right to
+// left: only the mono family's missing glyphs reach it.
+const DEVANAGARI = 'अभी';
 const LATIN = 'Live now';
 
 beforeEach(() => {
@@ -93,6 +96,17 @@ describe('Text eyebrow in an RTL interface', () => {
 
     // Neither rule is the interface's: the script cannot take the tracking and
     // the mono family ships no glyph of it, in either direction.
+    expect(classes.some(token => token.startsWith('font-mono'))).toBe(false);
+    expect(label.props.style).toContainEqual({ letterSpacing: 0 });
+  });
+
+  it('drops the mono family from a Devanagari label in an LTR interface', () => {
+    i18nManager.isRTL = false;
+    const label = hostText(mountTextTree(createElement(Text, { variant: 'eyebrow' }, DEVANAGARI)));
+    const classes = (label.props.className as string).split(' ');
+
+    // A joined script is not right to left, but the mono family draws none of
+    // its clusters either, so the family goes in an LTR interface too.
     expect(classes.some(token => token.startsWith('font-mono'))).toBe(false);
     expect(label.props.style).toContainEqual({ letterSpacing: 0 });
   });

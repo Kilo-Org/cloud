@@ -202,9 +202,6 @@ describe('RowFrame interaction', () => {
     const content = pressableOf(root);
 
     expect(classesOf(frame)).toEqual(expect.arrayContaining(['min-h-[48px]', 'px-4', 'py-3']));
-    // One focus stop per row: the switch. A focusable `Pressable` keeps its
-    // native click listener, so Android exposed the label as a second,
-    // role-less clickable node, and iOS read the title and subtitle on their own.
     expect(content.props.accessible).toBe(false);
     expect(content.props.focusable).toBe(false);
     expect(content.props.importantForAccessibility).toBe('no-hide-descendants');

@@ -271,10 +271,8 @@ async function attempt(place: ChatPlace, timeoutMs: number): Promise<KiloMcpStat
 
 /**
  * Who is waiting for a discovery, which is the only thing that sets its
- * deadline. `automatic` is the four-second bound an open gets: a chat must not
- * wait on a server that has not answered by then. `retry` is the fifteen-second
- * bound a person's Retry gets, because they asked for it and the failure is what
- * is being given another chance.
+ * deadline. `automatic` is what a chat opening asks for; `retry` is what a
+ * person pressing Retry asks for.
  */
 export type KiloMcpRequest = 'automatic' | 'retry';
 

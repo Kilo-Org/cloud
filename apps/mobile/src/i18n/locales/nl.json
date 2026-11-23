@@ -399,7 +399,7 @@
       "title": "Providersleutels",
       "rowSubtitle": "Facturering via je eigen provider",
       "orgDescription": "Deze sleutels worden gedeeld met iedereen in de organisatie en gefactureerd aan de provideraccounts van de organisatie.",
-      "viewOnly": "Alleen een eigenaar, beheerder of factureringsbeheerder van de organisatie kan de sleutels wijzigen.",
+      "viewOnly": "Alleen een eigenaar, beheerder of factuurbeheerder van de organisatie kan de sleutels wijzigen.",
       "description": "Verzoeken via deze sleutels worden gefactureerd aan je provideraccount in plaats van afgeschreven van je Kilo-saldo.",
       "managedByPlan": "Beheerd door je codeerabonnement",
       "enableKey": "Sleutel van {{provider}} inschakelen",
@@ -676,6 +676,7 @@
     "needsInputAction": {
       "approved": "Verzoek goedgekeurd",
       "replied": "Antwoord verzonden",
+      "empty": "Typ een antwoord en verstuur het daarna.",
       "failed": "Kon niet antwoorden. Tik nogmaals om het opnieuw te proberen.",
       "unavailable": "Dit verzoek wacht niet langer."
     }
@@ -817,6 +818,8 @@
     },
     "providerConnect": {
       "description": "Koppel de Kilo {{label}} om PR's automatisch te laten beoordelen.",
+      "notConnectedTitle": "{{platform}} is niet gekoppeld",
+      "githubAdminOnlyDescription": "Alleen organisatie-eigenaren en beheerders kunnen de koppeling instellen.",
       "githubApp": "GitHub-app",
       "githubError": "Het instellen van GitHub kon niet worden geopend. Probeer het opnieuw.",
       "gitlabAccount": "GitLab-account",
@@ -1026,7 +1029,7 @@
       "empty": "Nog geen reviews met statistieken",
       "emptyDescription": "Statistieken leggen afgeronde reviews vast zolang ze voor de organisatie zijn ingeschakeld.",
       "offTitle": "Statistieken staan uit voor {{platform}}",
-      "offDescription": "De facturatierollen van de organisatie (eigenaren, beheerders en facturatiemanagers) kunnen statistieken inschakelen in de organisatie-instellingen op het web om afgeronde reviews vast te leggen.",
+      "offDescription": "De facturatierollen van de organisatie (eigenaren, beheerders en factuurbeheerders) kunnen statistieken inschakelen in de organisatie-instellingen op het web om afgeronde reviews vast te leggen.",
       "couldNotLoad": "Kan statistieken niet laden",
       "trackedReviewsCaption": "Reviews die in deze periode zijn afgerond terwijl statistieken waren ingeschakeld. Lopende en mislukte reviews worden nooit meegeteld.",
       "trackedReviewsUncounted": "Niet meegeteld: {{displayCount}} van de {{displayTotal}} afgeronde reviews van de organisatie, zonder vastgelegd resultaat.",
@@ -1689,6 +1692,7 @@
       "couldNotLoadThisSession": "Deze sessie kon niet worden geladen.",
       "historyTooLarge": "Het transcript van deze sessie is te groot om te laden.",
       "historyUnavailable": "Het transcript van deze sessie kan niet worden gelezen.",
+      "historyTemporarilyUnavailable": "Het transcript van deze sessie is tijdelijk niet beschikbaar.",
       "cloneFailedRetry": "Deze sessie kon niet worden gekloond. Probeer het opnieuw.",
       "notEnoughCredits": "Je hebt onvoldoende tegoed voor dit verzoek. Vul je tegoed aan en probeer het opnieuw.",
       "previousTaskFinishing": "De vorige taak wordt nog afgerond. Wacht even.",
@@ -2225,7 +2229,9 @@
       "skip": "Overslaan",
       "retrySkip": "Opnieuw overslaan",
       "submitting": "Verzenden…",
-      "sendAnswers": "Antwoorden verzenden"
+      "sendAnswers": "Antwoorden verzenden",
+      "unreadableTitle": "Deze vraag kon niet worden weergegeven",
+      "unreadableBody": "De agent wacht op een vraag die deze app niet kan tonen. Beantwoord hem in de CLI om door te gaan."
     },
     "blockingCard": {
       "questionUnavailable": "Deze vraag is niet meer beschikbaar.",
@@ -2252,6 +2258,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "De sessie van de hulpagent kon niet worden geladen.",
+      "historyTooLarge": "De geschiedenis van deze hulpagent is te groot om te laden.",
+      "historyUnavailable": "De geschiedenis van deze hulpagent is niet beschikbaar.",
+      "historyTemporarilyUnavailable": "De geschiedenis van deze hulpagent is tijdelijk niet beschikbaar.",
       "failed": "De sessie van de hulpagent is mislukt.",
       "noMessages": "Geen berichten van de hulpagent",
       "noMessagesDescription": "De sessie van deze hulpagent is voltooid zonder gespreksverloop vast te leggen.",
@@ -2832,6 +2841,8 @@
     "why": "Waarom",
     "who": "Wie",
     "installAttributionPromptMessage": "Kilo gebruikt de trackingtoestemming van Apple alleen om te bepalen via welk kanaal je de app hebt gevonden. Je prompts en gesprekken worden hiervoor nooit gebruikt.",
+    "installAttributionRequestFailedTitle": "Trackingprompt kon niet worden getoond",
+    "installAttributionRequestFailedMessage": "Kilo kon de systeemprompt niet tonen, dus installatiebron bijhouden blijft uit.",
     "installAttributionPromptTitle": "Bijhouden van de installatiebron toestaan?"
   },
   "prReview": {
@@ -3399,7 +3410,7 @@
   "organization": {
     "auditLog": {
       "title": "Auditlogboek",
-      "permissionDenied": "Alleen een eigenaar, beheerder of factureringsbeheerder van een organisatie met het Enterprise-plan kan het auditlogboek bekijken.",
+      "permissionDenied": "Alleen een eigenaar, beheerder of factuurbeheerder van een organisatie met het Enterprise-plan kan het auditlogboek bekijken. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Geen auditgebeurtenissen",
       "emptyDescription": "Acties die in deze organisatie worden uitgevoerd, verschijnen hier.",
       "truncated": "De meest recente gebeurtenissen worden weergegeven.",
@@ -3589,7 +3600,7 @@
     },
     "billing": {
       "title": "Facturering",
-      "permissionDenied": "Alleen een eigenaar, beheerder of factuurbeheerder van de organisatie kan de facturering bekijken.",
+      "permissionDenied": "Alleen een eigenaar, beheerder of factuurbeheerder van de organisatie kan de facturering bekijken. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Abonnement",
       "state": "Status",
       "stateNone": "Geen abonnement",
@@ -3778,7 +3789,7 @@
       "emptyDescription": "Gebruik Eerder uur om eerdere verzoeken te bekijken.",
       "emptyBoundDescription": "Verder terug gaan de verzoeklogboeken niet.",
       "loadError": "Kan verzoeklogboeken niet laden.",
-      "permissionDenied": "Alleen een eigenaar, beheerder of factureringsbeheerder van de organisatie kan de verzoeklogboeken bekijken.",
+      "permissionDenied": "Alleen een eigenaar, beheerder of factuurbeheerder van de organisatie kan de verzoeklogboeken bekijken. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} in · {{output}} uit",
       "byok": "BYOK"
     },
@@ -4044,7 +4055,10 @@
     "list": {
       "loadFailed": "Kon de chatgeschiedenis niet laden.",
       "new": "Nieuwe chat",
-      "deleteTitle": "Deze chat verwijderen?"
+      "deleteTitle": "Deze chat verwijderen?",
+      "resetNoticeTitle": "Lokale chats en concepten gewist",
+      "resetNoticeBody": "Kilo kon de chatgeschiedenis op dit apparaat niet laden. Je sessies in de cloud zijn niet aangetast.",
+      "resetNoticeDismiss": "Melding negeren"
     },
     "rename": {
       "title": "Chat hernoemen",
@@ -4324,7 +4338,15 @@
       "download": "Model op het apparaat downloaden",
       "downloading": "Downloaden…",
       "downloadProgress": "Downloaden… {{percent}}%",
-      "downloadFailed": "Het downloaden is niet voltooid. Controleer je verbinding en vrije opslagruimte en probeer het opnieuw."
+      "downloadFailed": "Het downloaden is niet voltooid. Controleer je verbinding en vrije opslagruimte en probeer het opnieuw.",
+      "cannotUse": "Kan niet worden uitgevoerd: {{items}}.",
+      "cannotUseOptions": "Kan niet worden ingevuld: sommige toolopties.",
+      "limitations": "Beperkingen",
+      "tools": {
+        "time": "Tijd",
+        "settingsList": "Toon instellingen",
+        "settingsSet": "Wijzig instellingen"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Dit model ondersteunt denkinspanning"
@@ -4875,7 +4897,7 @@
     "defaultModel": "Standaardmodel van Kilo gebruiken",
     "duration": "Tijdslimiet (minuten)",
     "spendLimit": "Uitgavenlimiet (USD)",
-    "invalidSafeguards": "Voer positieve, eindige tijd- en uitgavenlimieten in.",
+    "invalidSafeguards": "Voer een positief getal binnen het toegestane bereik in.",
     "estimate": "Schatting {{estimate}} · maximaal {{maximum}}",
     "estimateUnavailable": "Er is geen betaalde samenvatting beschikbaar voor deze instellingen. Pas het model of de limieten aan, of probeer het later opnieuw.",
     "confirmPaid": "Betaalde samenvattingen inschakelen voor {{context}}?",
@@ -4945,7 +4967,8 @@
     "unavailableTitle": "Gebruik niet beschikbaar",
     "unavailableDescription": "Gebruik is niet ingesteld voor deze workspace. Neem contact op met de ondersteuning als je hier gebruik verwacht te zien.",
     "orgSelfNotice": "Je ziet je eigen gebruik in deze organisatie.",
-    "viewDetails": "Gebruiksdetails bekijken"
+    "viewDetails": "Gebruiksdetails bekijken",
+    "orgSelfEntryTitle": "Jouw gebruik"
   },
   "integrations": {
     "title": "Integraties",
@@ -5041,6 +5064,8 @@
       "autoCommit": "Wijzigingen committen wanneer de uitvoering eindigt",
       "condenseOnComplete": "De context inkorten wanneer de uitvoering eindigt",
       "activeTitle": "Trigger actief",
+      "activeSwitchA11y": "Trigger actief: {{name}}",
+      "copyLinkA11y": "Link kopiëren voor {{name}}",
       "activeDescription": "Gepauzeerde webhooks reageren met 404.",
       "runAsCreator": "Uitvoeren als mij",
       "runAsCreatorDescription": "Elke uitvoering gebruikt je account, dus de geheime header is vereist.",

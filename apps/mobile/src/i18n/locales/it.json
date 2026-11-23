@@ -645,6 +645,7 @@
     "needsInputAction": {
       "approved": "Richiesta approvata",
       "replied": "Risposta inviata",
+      "empty": "Scrivi una risposta e poi inviala.",
       "failed": "Impossibile rispondere. Tocca di nuovo per riprovare.",
       "unavailable": "Questa richiesta non è più in attesa."
     }
@@ -786,6 +787,8 @@
     },
     "providerConnect": {
       "description": "Connetti {{label}} di Kilo per revisionare automaticamente le pull request.",
+      "notConnectedTitle": "{{platform}} non è connesso",
+      "githubAdminOnlyDescription": "Solo i proprietari dell'organizzazione e gli amministratori possono connetterlo.",
       "githubApp": "l'app GitHub",
       "githubError": "Impossibile aprire la configurazione di GitHub. Riprova.",
       "gitlabAccount": "l'account GitLab",
@@ -996,7 +999,7 @@
       "empty": "Nessuna revisione con statistiche",
       "emptyDescription": "Le statistiche registrano le revisioni completate mentre sono attive per l'organizzazione.",
       "offTitle": "Le statistiche sono disattivate per {{platform}}",
-      "offDescription": "I ruoli di fatturazione dell'organizzazione (proprietari, amministratori e gestori della fatturazione) possono attivare le statistiche nelle impostazioni dell'organizzazione sul web per registrare le revisioni completate.",
+      "offDescription": "I ruoli di fatturazione dell'organizzazione (proprietari, amministratori e responsabili della fatturazione) possono attivare le statistiche nelle impostazioni dell'organizzazione sul web per registrare le revisioni completate.",
       "couldNotLoad": "Impossibile caricare le statistiche",
       "trackedReviewsCaption": "Revisioni completate che si sono concluse in questo periodo con le statistiche attive. Le revisioni in corso e non riuscite non vengono mai conteggiate.",
       "trackedReviewsUncounted": "Senza conteggio: {{displayCount}} delle {{displayTotal}} revisioni terminate dell’organizzazione con risultato non registrato.",
@@ -1679,6 +1682,7 @@
       "couldNotLoadThisSession": "Impossibile caricare questa sessione.",
       "historyTooLarge": "La trascrizione di questa sessione è troppo grande da caricare.",
       "historyUnavailable": "Impossibile leggere la trascrizione di questa sessione.",
+      "historyTemporarilyUnavailable": "La trascrizione di questa sessione è temporaneamente non disponibile.",
       "cloneFailedRetry": "Impossibile clonare questa sessione. Riprova.",
       "notEnoughCredits": "Crediti insufficienti per questa richiesta. Aggiungi crediti e riprova.",
       "previousTaskFinishing": "L'attività precedente non è ancora terminata. Attendi un momento.",
@@ -2219,7 +2223,9 @@
       "skip": "Salta",
       "retrySkip": "Riprova a saltare",
       "submitting": "Invio in corso…",
-      "sendAnswers": "Invia le risposte"
+      "sendAnswers": "Invia le risposte",
+      "unreadableTitle": "Impossibile visualizzare la domanda",
+      "unreadableBody": "L'agente è in attesa di una domanda che questa app non può mostrare. Rispondi nella CLI per continuare."
     },
     "blockingCard": {
       "questionUnavailable": "Questa domanda non è più disponibile.",
@@ -2246,6 +2252,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Impossibile caricare la sessione del subagente.",
+      "historyTooLarge": "La cronologia di questo subagente è troppo grande da caricare.",
+      "historyUnavailable": "La cronologia di questo subagente non è disponibile.",
+      "historyTemporarilyUnavailable": "La cronologia di questo subagente è temporaneamente non disponibile.",
       "failed": "La sessione del subagente non è riuscita.",
       "noMessages": "Nessun messaggio del subagente",
       "noMessagesDescription": "Questa sessione del subagente è terminata senza produrre una trascrizione.",
@@ -2869,6 +2878,8 @@
     "why": "Perché",
     "who": "Chi",
     "installAttributionPromptMessage": "Kilo usa l'autorizzazione al tracciamento di Apple solo per capire quale canale ti ha portato qui. I tuoi prompt e le tue conversazioni non vengono mai usati.",
+    "installAttributionRequestFailedTitle": "Impossibile mostrare la richiesta di tracciamento",
+    "installAttributionRequestFailedMessage": "Kilo non è riuscito a mostrare la richiesta di sistema, quindi l'attribuzione dell'installazione resta disattivata.",
     "installAttributionPromptTitle": "Consentire l'attribuzione dell'installazione?"
   },
   "prReview": {
@@ -3462,7 +3473,7 @@
   "organization": {
     "auditLog": {
       "title": "Registro di controllo",
-      "permissionDenied": "Solo un proprietario, un amministratore o un responsabile della fatturazione dell'organizzazione con piano Enterprise può consultare il registro di controllo.",
+      "permissionDenied": "Solo un proprietario, un amministratore o un responsabile della fatturazione dell'organizzazione con piano Enterprise può consultare il registro di controllo. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Nessun evento di controllo",
       "emptyDescription": "Qui compaiono le azioni eseguite in questa organizzazione.",
       "truncated": "Vengono mostrati gli eventi più recenti.",
@@ -3657,7 +3668,7 @@
     },
     "billing": {
       "title": "Fatturazione",
-      "permissionDenied": "Solo il proprietario, un amministratore o un responsabile della fatturazione dell'organizzazione può visualizzarne la fatturazione.",
+      "permissionDenied": "Solo il proprietario, un amministratore o un responsabile della fatturazione dell'organizzazione può visualizzarne la fatturazione. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Abbonamento",
       "state": "Stato",
       "stateNone": "Nessun abbonamento",
@@ -3846,7 +3857,7 @@
       "emptyDescription": "Usa «Ora precedente» per visualizzare le richieste precedenti.",
       "emptyBoundDescription": "Lo storico delle richieste non va più indietro di così.",
       "loadError": "Impossibile caricare i registri delle richieste.",
-      "permissionDenied": "Solo un proprietario, un amministratore o un responsabile della fatturazione dell'organizzazione può consultare i registri delle richieste.",
+      "permissionDenied": "Solo un proprietario, un amministratore o un responsabile della fatturazione dell'organizzazione può consultare i registri delle richieste. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} input · {{output}} output",
       "byok": "BYOK"
     },
@@ -4122,7 +4133,10 @@
     "list": {
       "loadFailed": "Impossibile caricare la cronologia della chat.",
       "new": "Nuova chat",
-      "deleteTitle": "Eliminare questa chat?"
+      "deleteTitle": "Eliminare questa chat?",
+      "resetNoticeTitle": "Chat e bozze locali cancellate",
+      "resetNoticeBody": "Kilo non è riuscito ad aprire le chat salvate su questo dispositivo. Le sessioni nel cloud non sono interessate.",
+      "resetNoticeDismiss": "Ignora l'avviso"
     },
     "rename": {
       "title": "Rinomina la chat",
@@ -4403,7 +4417,15 @@
       "download": "Scarica il modello sul dispositivo",
       "downloading": "Download in corso…",
       "downloadProgress": "Download in corso… {{percent}}%",
-      "downloadFailed": "Il download non è stato completato. Controlla la connessione e lo spazio libero, poi riprova."
+      "downloadFailed": "Il download non è stato completato. Controlla la connessione e lo spazio libero, poi riprova.",
+      "cannotUse": "Impossibile eseguire: {{items}}.",
+      "cannotUseOptions": "Impossibile compilare: alcune opzioni dello strumento.",
+      "limitations": "Limitazioni",
+      "tools": {
+        "time": "Ora",
+        "settingsList": "Mostra impostazioni",
+        "settingsSet": "Modifica impostazioni"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Questo modello supporta il livello di ragionamento"
@@ -4964,7 +4986,7 @@
     "defaultModel": "Usa il modello predefinito di Kilo",
     "duration": "Limite di tempo (minuti)",
     "spendLimit": "Limite di spesa (USD)",
-    "invalidSafeguards": "Inserisci limiti di tempo e spesa positivi e finiti.",
+    "invalidSafeguards": "Inserisci un numero positivo nell'intervallo consentito.",
     "estimate": "Stima {{estimate}} · massimo {{maximum}}",
     "estimateUnavailable": "Nessun riepilogo a pagamento disponibile per queste impostazioni. Modifica il modello o i limiti, oppure riprova più tardi.",
     "confirmPaid": "Attivare i riepiloghi a pagamento per {{context}}?",
@@ -5039,7 +5061,8 @@
     "unavailableTitle": "Utilizzo non disponibile",
     "unavailableDescription": "L'utilizzo non è configurato per questo spazio di lavoro. Contatta l'assistenza se ti aspetti di vedere l'utilizzo qui.",
     "orgSelfNotice": "Stai visualizzando il tuo utilizzo in questa organizzazione.",
-    "viewDetails": "Visualizza dettagli utilizzo"
+    "viewDetails": "Visualizza dettagli utilizzo",
+    "orgSelfEntryTitle": "Il tuo utilizzo"
   },
   "integrations": {
     "title": "Integrazioni",
@@ -5135,6 +5158,8 @@
       "autoCommit": "Esegui il commit delle modifiche al termine dell'esecuzione",
       "condenseOnComplete": "Condensa il contesto al termine dell'esecuzione",
       "activeTitle": "Attivatore attivo",
+      "activeSwitchA11y": "Attivatore attivo: {{name}}",
+      "copyLinkA11y": "Copia link per {{name}}",
       "activeDescription": "I webhook in pausa rispondono con 404.",
       "runAsCreator": "Esegui come me",
       "runAsCreatorDescription": "Ogni esecuzione usa il tuo account, quindi l'intestazione segreta è obbligatoria.",

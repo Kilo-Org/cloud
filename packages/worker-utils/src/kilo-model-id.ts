@@ -1,6 +1,5 @@
 export const KILO_MODEL_PREFIX = 'kilo/';
 
-/** `undefined` unless the remainder after `kilo/` still contains a `/`. */
 export function unprefixKiloGatewayModelId(model: string): string | undefined {
   if (!model.startsWith(KILO_MODEL_PREFIX)) return undefined;
   const unprefixedModel = model.slice(KILO_MODEL_PREFIX.length);

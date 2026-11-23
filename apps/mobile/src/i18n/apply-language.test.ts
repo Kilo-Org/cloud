@@ -147,8 +147,6 @@ describe('applyLanguagePreference — needs-input category re-registration', () 
       kind: 'restart-skipped',
     });
 
-    // Without the record a relaunch that did not take the direction would
-    // repeat on every launch, so neither the direction nor the reload runs.
     expect(mocks.syncRtl).not.toHaveBeenCalled();
     expect(mocks.reloadAppAsync).not.toHaveBeenCalled();
   });
@@ -161,9 +159,6 @@ describe('applyLanguagePreference — needs-input category re-registration', () 
       kind: 'restart-guarded',
     });
 
-    // The record names the language the last launch relaunched for: forcing it
-    // again would loop through the retry screen while the platform keeps
-    // answering with the previous direction. No direction or reload runs.
     expect(mocks.writeDirectionAttemptAsync).not.toHaveBeenCalled();
     expect(mocks.syncRtl).not.toHaveBeenCalled();
     expect(mocks.reloadAppAsync).not.toHaveBeenCalled();
@@ -191,9 +186,6 @@ describe('applyLanguagePreference — needs-input category re-registration', () 
       kind: 'restarting-rtl',
     });
 
-    // The person asking again is exactly the input the automatic guard
-    // protects: the manual apply relaunches whatever the record names, and the
-    // record write is what keeps the cold start from looping.
     expect(mocks.writeDirectionAttemptAsync).toHaveBeenCalledWith('ar');
     expect(mocks.syncRtl).toHaveBeenCalledWith('ar');
     expect(mocks.reloadAppAsync).toHaveBeenCalled();
@@ -278,8 +270,6 @@ describe('restorePickedLanguage', () => {
   });
 
   it('restores nothing for a pick that changes the direction', async () => {
-    // An RTL pick persists and reloads by itself; swapping the catalog in place
-    // would paint it into the old LTR direction.
     mocks.i18nManager.isRTL = false;
     mocks.preference = 'ar';
     await i18n.changeLanguage('fr');

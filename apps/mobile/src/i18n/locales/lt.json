@@ -401,7 +401,7 @@
       "title": "Teikėjų raktai",
       "rowSubtitle": "Naudoti savo teikėjo atsiskaitymą",
       "orgDescription": "Šie raktai bendrinami su visais organizacijos nariais, o užklausos apmokestinamos jos teikėjų paskyrose.",
-      "viewOnly": "Organizacijos raktus gali keisti tik jos savininkas, administratorius arba atsiskaitymų vadovas.",
+      "viewOnly": "Organizacijos raktus gali keisti tik jos savininkas, administratorius arba atsiskaitymų administratorius.",
       "description": "Užklausos, atliekamos su šiais raktais, apmokestinamos jūsų teikėjo paskyroje, o ne iš jūsų Kilo likučio.",
       "managedByPlan": "Valdoma pagal jūsų programavimo planą",
       "enableKey": "Įjungti {{provider}} raktą",
@@ -1294,6 +1294,7 @@
     "needsInputAction": {
       "approved": "Užklausa patvirtinta",
       "replied": "Atsakymas išsiųstas",
+      "empty": "Įrašykite atsakymą, tada jį siųskite.",
       "failed": "Nepavyko atsakyti. Bakstelėkite dar kartą, kad pabandytumėte.",
       "unavailable": "Šios užklausos nebelaukiama."
     }
@@ -1558,7 +1559,9 @@
       "githubError": "Nepavyko atidaryti GitHub sąrankos. Bandyk dar kartą.",
       "gitlabAccount": "GitLab paskyra",
       "gitlabError": "Nepavyko atidaryti GitLab sąrankos. Bandyk dar kartą.",
-      "description": "Prijunk Kilo, kad {{label}} automatiškai peržiūrėtų PR."
+      "description": "Prijunk Kilo, kad {{label}} automatiškai peržiūrėtų PR.",
+      "notConnectedTitle": "{{platform}} neprijungtas",
+      "githubAdminOnlyDescription": "Ją prijungti gali tik organizacijos savininkai ir administratoriai."
     },
     "overview": {
       "allAreas": "Visos sritys",
@@ -1646,7 +1649,7 @@
       "empty": "Dar nėra peržiūrų su analitika",
       "emptyDescription": "Analitika fiksuoja užbaigtas peržiūras, kol ji įjungta organizacijai.",
       "offTitle": "Analitika išjungta platformai {{platform}}",
-      "offDescription": "Analitiką gali įjungti organizacijos atsiskaitymo vaidmenys – savininkai, administratoriai ir atsiskaitymo tvarkytojai – organizacijos nustatymuose žiniatinklyje, kad būtų fiksuojamos užbaigtos peržiūros.",
+      "offDescription": "Analitiką gali įjungti organizacijos atsiskaitymo vaidmenys – savininkai, administratoriai ir atsiskaitymų administratoriai – organizacijos nustatymuose žiniatinklyje, kad būtų fiksuojamos užbaigtos peržiūros.",
       "couldNotLoad": "Nepavyko įkelti analitikos",
       "trackedReviewsCaption": "Užbaigtos peržiūros, kurios baigėsi šiame laikotarpyje su įjungta analitika. Vykstančios ir nepavykusios peržiūros niekada neskaičiuojamos.",
       "trackedReviewsUncounted": "Neįskaičiuota: {{displayCount}} iš {{displayTotal}} organizacijos užbaigtų peržiūrų, kurių rezultatas nebuvo užfiksuotas.",
@@ -2349,6 +2352,7 @@
       "couldNotLoadThisSession": "Nepavyko įkelti šios sesijos",
       "historyTooLarge": "Šios sesijos nuorašas per didelis, kad jį būtų galima įkelti.",
       "historyUnavailable": "Šios sesijos nuorašo skaityti negalima.",
+      "historyTemporarilyUnavailable": "Šios sesijos nuorašas laikinai nepasiekiamas.",
       "cloneFailedRetry": "Nepavyko klonuoti šios sesijos. Bandykite dar kartą.",
       "notEnoughCredits": "Nepakanka kreditų šiai užklausai. Papildykite kreditus ir bandykite dar kartą.",
       "previousTaskFinishing": "Ankstesnė užduotis dar nebaigta. Šiek tiek palaukite.",
@@ -2893,7 +2897,9 @@
       "skip": "Praleisti",
       "retrySkip": "Bandyti praleisti iš naujo",
       "submitting": "Siunčiama…",
-      "sendAnswers": "Siųsti atsakymus"
+      "sendAnswers": "Siųsti atsakymus",
+      "unreadableTitle": "Nepavyko parodyti šio klausimo",
+      "unreadableBody": "Agentas laukia klausimo, kurio ši programa negali parodyti. Atsakykite į jį CLI, kad galėtumėte tęsti."
     },
     "blockingCard": {
       "questionUnavailable": "Šis klausimas nebepasiekiamas.",
@@ -2920,6 +2926,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Nepavyko įkelti subagento sesijos",
+      "historyTooLarge": "Šio subagento istorija per didelė, kad ją būtų galima įkelti.",
+      "historyUnavailable": "Šio subagento istorija nepasiekiama.",
+      "historyTemporarilyUnavailable": "Šio subagento istorija laikinai nepasiekiama.",
       "failed": "Subagento sesija baigėsi klaida",
       "noMessages": "Nėra subagento žinučių",
       "noMessagesDescription": "Ši subagento sesija baigėsi nesukūrusi pokalbio išrašo.",
@@ -3518,6 +3527,8 @@
     "voiceTranscriptionWho": "Jūsų įrenginys, Kilo Gateway su pasirinktu transkripcijos modeliu arba Apple ar Google atpažinimui internete.",
     "installAttributionPromptTitle": "Leisti nustatyti įdiegimo šaltinį?",
     "installAttributionPromptMessage": "Kilo naudoja Apple sekimo leidimą tik tam, kad sužinotų, per kurį kanalą radote programėlę. Jūsų užklausos ir pokalbiai tam niekada nenaudojami.",
+    "installAttributionRequestFailedTitle": "Nepavyko parodyti sekimo užklausos",
+    "installAttributionRequestFailedMessage": "Kilo nepavyko parodyti sistemos užklausos, todėl įdiegimo šaltinio nustatymas lieka išjungtas.",
     "what": "Kokie duomenys",
     "why": "Kam naudojami",
     "who": "Kas gauna"
@@ -3533,7 +3544,7 @@
   "organization": {
     "auditLog": {
       "title": "Audito žurnalas",
-      "permissionDenied": "Organizacijos audito žurnalą gali skaityti tik Enterprise plano organizacijos savininkas, administratorius arba atsiskaitymų valdytojas.",
+      "permissionDenied": "Organizacijos audito žurnalą gali skaityti tik Enterprise plano organizacijos savininkas, administratorius arba atsiskaitymų administratorius. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Audito įvykių nėra",
       "emptyDescription": "Čia rodomi šioje organizacijoje atlikti veiksmai.",
       "truncated": "Rodomi naujausi įvykiai.",
@@ -3733,7 +3744,7 @@
     },
     "billing": {
       "title": "Atsiskaitymai",
-      "permissionDenied": "Organizacijos atsiskaitymų informaciją gali matyti tik jos savininkas, administratorius arba atsiskaitymų tvarkytojas.",
+      "permissionDenied": "Organizacijos atsiskaitymų informaciją gali matyti tik jos savininkas, administratorius arba atsiskaitymų administratorius. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Prenumerata",
       "state": "Būsena",
       "stateNone": "Prenumeratos nėra",
@@ -3811,7 +3822,7 @@
       "pendingInvitation": "Šiam el. pašto adresui jau išsiųstas laukiantis kvietimas.",
       "alreadyMember": "Šis asmuo jau yra šios organizacijos narys.",
       "seatsFull": "Visos vietos užimtos ({{used}}/{{total}}). Paprašykite organizacijos savininko pridėti vietų, prieš kviesdami daugiau narių.",
-      "seatsFullCanInviteBilling": "Visos vietos užimtos ({{used}}/{{total}}). Vis tiek galite kviesti atsiskaitymų tvarkytojus, nes jie neužima vietos.",
+      "seatsFullCanInviteBilling": "Visos vietos užimtos ({{used}}/{{total}}). Vis tiek galite kviesti atsiskaitymų administratorius, nes jie neužima vietos.",
       "noSeatsAvailable": "Visos vietos užimtos. Paprašykite organizacijos savininko pridėti vietų, prieš kviesdami daugiau narių."
     },
     "invoices": {
@@ -3910,7 +3921,7 @@
       "emptyDescription": "Norėdami pamatyti ankstesnes užklausas, naudokite „Ankstesnė valanda“.",
       "emptyBoundDescription": "Užklausų žurnalai toliau į praeitį nesiekia.",
       "loadError": "Nepavyko įkelti užklausų žurnalų.",
-      "permissionDenied": "Organizacijos užklausų žurnalus gali skaityti tik jos savininkas, administratorius arba atsiskaitymų valdytojas.",
+      "permissionDenied": "Organizacijos užklausų žurnalus gali skaityti tik jos savininkas, administratorius arba atsiskaitymų administratorius. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "Įvestis {{input}} · išvestis {{output}}",
       "byok": "BYOK"
     },
@@ -4200,7 +4211,10 @@
     "list": {
       "loadFailed": "Nepavyko įkelti pokalbio istorijos.",
       "new": "Naujas pokalbis",
-      "deleteTitle": "Ištrinti šį pokalbį?"
+      "deleteTitle": "Ištrinti šį pokalbį?",
+      "resetNoticeTitle": "Vietiniai pokalbiai ir juodraščiai išvalyti",
+      "resetNoticeBody": "Kilo negalėjo atidaryti šiame įrenginyje išsaugotų pokalbių. Jūsų sesijos debesyje nebuvo paveiktos.",
+      "resetNoticeDismiss": "Atmesti pranešimą"
     },
     "rename": {
       "title": "Pervadinti pokalbį",
@@ -4482,7 +4496,15 @@
       "download": "Atsisiųsti įrenginio modelį",
       "downloading": "Atsisiunčiama…",
       "downloadProgress": "Atsisiunčiama… {{percent}}%",
-      "downloadFailed": "Atsisiuntimas nebaigtas. Patikrinkite ryšį ir laisvą vietą saugykloje, tada bandykite dar kartą."
+      "downloadFailed": "Atsisiuntimas nebaigtas. Patikrinkite ryšį ir laisvą vietą saugykloje, tada bandykite dar kartą.",
+      "cannotUse": "Nepavyksta paleisti: {{items}}.",
+      "cannotUseOptions": "Nepavyksta užpildyti: kai kurios įrankio parinktys.",
+      "limitations": "Apribojimai",
+      "tools": {
+        "time": "Laikas",
+        "settingsList": "Rodyti nustatymus",
+        "settingsSet": "Keisti nustatymus"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Šis modelis palaiko mąstymo intensyvumą"
@@ -5053,7 +5075,7 @@
     "defaultModel": "Naudoti numatytąjį Kilo modelį",
     "duration": "Laiko apribojimas (minutės)",
     "spendLimit": "Išlaidų apribojimas (USD)",
-    "invalidSafeguards": "Įveskite teigiamas, baigtines laiko ir išlaidų ribas.",
+    "invalidSafeguards": "Įveskite teigiamą skaičių leidžiamame intervale.",
     "estimate": "Apskaičiavimas {{estimate}} · daugiausia {{maximum}}",
     "estimateUnavailable": "Mokama santrauka šiems nustatymams neprieinama. Pakeiskite modelį arba ribas, arba pabandykite vėliau.",
     "confirmPaid": "{{context}}: įjungti mokamas santraukas?",
@@ -5133,7 +5155,8 @@
     "unavailableTitle": "Naudojimas nepasiekiamas",
     "unavailableDescription": "Šioje darbo srityje naudojimas nenustatytas. Jei tikitės čia matyti naudojimą, susisiekite su palaikymo komanda.",
     "orgSelfNotice": "Matote savo naudojimą šioje organizacijoje.",
-    "viewDetails": "Peržiūrėti naudojimo informaciją"
+    "viewDetails": "Peržiūrėti naudojimo informaciją",
+    "orgSelfEntryTitle": "Jūsų naudojimas"
   },
   "integrations": {
     "title": "Integracijos",
@@ -5229,6 +5252,8 @@
       "autoCommit": "Įtraukti pakeitimus pasibaigus paleidimui",
       "condenseOnComplete": "Sutrumpinti kontekstą pasibaigus paleidimui",
       "activeTitle": "Trigeris aktyvus",
+      "activeSwitchA11y": "Aktyvus trigeris: {{name}}",
+      "copyLinkA11y": "Kopijuoti nuorodą: {{name}}",
       "activeDescription": "Pristabdyti žiniatinklio kabliukai atsako 404.",
       "runAsCreator": "Paleisti kaip mane",
       "runAsCreatorDescription": "Kiekvienas paleidimas naudoja jūsų paskyrą, todėl slaptoji antraštė yra privaloma.",

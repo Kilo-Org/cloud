@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type PermissionState } from '@/lib/code-reviewer-status';
 import { PERSONAL_SCOPE } from '@/lib/code-reviewer-config';
-import { useReviewerPermission } from '@/lib/hooks/use-reviewer-permission';
+import { useReviewerEditGuard, useReviewerPermission } from '@/lib/hooks/use-reviewer-permission';
 import { trpcClient, TRPCProvider } from '@/lib/trpc';
 import { act } from '@/test/renderer';
 import { createTestQueryClient, renderWithProviders, waitFor } from '@/test/render-with-providers';
@@ -30,8 +30,14 @@ vi.mock('@/lib/trpc', async () => {
   };
 });
 vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => authState }));
-// The permission read reaches the edit guard's router, and expo-router is the
-// native runtime this node environment cannot load.
+// The permission read reaches the edit guard's bounce; expo-router is the native
+// runtime this node environment cannot load, and the guarded destination is
+// asserted on the settled-swap hook instead (its own suite covers the deferral).
+const guardReplace = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/navigation/settled-replace', () => {
+  const settled = { replace: guardReplace };
+  return { useSettledReplace: () => settled };
+});
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
 }));
@@ -81,6 +87,15 @@ function PersonalScopeProbe({ holder }: ProbeProps) {
   return null;
 }
 
+/**
+ * The edit guard's bounce, which a direct link into a nested reviewer route
+ * triggers for a non-editor.
+ */
+function EditGuardProbe() {
+  useReviewerEditGuard(SCOPE, 'github');
+  return null;
+}
+
 const queryClientRef: { current: QueryClient | null } = { current: null };
 
 function wrapper({ children }: { children: ReactNode }) {
@@ -121,6 +136,7 @@ describe('code reviewer permission read', () => {
     authState.token = undefined;
     membershipRole = 'owner';
     onlineManager.setOnline(true);
+    guardReplace.mockReset();
   });
 
   afterEach(() => {
@@ -262,6 +278,45 @@ describe('code reviewer permission read', () => {
 
     expect(callsTo('organizations.list')).toBe(0);
     expect(holder.state).toEqual({ status: 'ready', canEdit: true, canManage: true });
+    view.unmount();
+  });
+});
+
+describe('code reviewer edit guard', () => {
+  beforeEach(() => {
+    queryClientRef.current = null;
+    transport.mockReset();
+    authState.token = 'tok';
+    membershipRole = 'owner';
+    onlineManager.setOnline(true);
+    guardReplace.mockReset();
+  });
+
+  function mountEditGuard() {
+    const queryClient = createTestQueryClient();
+    queryClientRef.current = queryClient;
+    return renderWithProviders(<EditGuardProbe />, { queryClient, wrapper });
+  }
+
+  it('bounces a non-editor off a nested reviewer route to the overview', async () => {
+    // The nested routes are reachable by URL, so a plain member lands on one
+    // directly; the guard sends them to the overview at the same stack position.
+    membershipRole = 'member';
+    respondWithMembership();
+    const view = await mountEditGuard();
+    await waitFor(() => guardReplace.mock.calls.length > 0);
+
+    expect(guardReplace).toHaveBeenCalledExactlyOnceWith('/(app)/code-reviewer/org-1/github');
+    view.unmount();
+  });
+
+  it('leaves an editor on the nested reviewer route', async () => {
+    respondWithMembership();
+    const view = await mountEditGuard();
+    // Let the role resolve, then confirm the guard stayed quiet.
+    await flush();
+
+    expect(guardReplace).not.toHaveBeenCalled();
     view.unmount();
   });
 });

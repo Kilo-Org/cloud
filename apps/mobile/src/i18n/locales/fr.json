@@ -400,7 +400,7 @@
       "title": "Clés de fournisseur",
       "rowSubtitle": "Utiliser votre propre facturation fournisseur",
       "orgDescription": "Ces clés sont partagées avec tous les membres de l'organisation et facturées sur ses comptes fournisseur.",
-      "viewOnly": "Seul un propriétaire, un administrateur ou un gestionnaire de facturation de l'organisation peut modifier ses clés.",
+      "viewOnly": "Seul un propriétaire, un administrateur ou un responsable de la facturation de l'organisation peut modifier ses clés.",
       "description": "Les requêtes effectuées avec ces clés sont facturées sur votre compte fournisseur au lieu de votre solde Kilo.",
       "managedByPlan": "Gérée par votre forfait de code",
       "enableKey": "Activer la clé {{provider}}",
@@ -645,6 +645,7 @@
     "needsInputAction": {
       "approved": "Demande approuvée",
       "replied": "Réponse envoyée",
+      "empty": "Saisissez une réponse, puis envoyez-la.",
       "failed": "Impossible de répondre. Touchez à nouveau pour réessayer.",
       "unavailable": "Cette demande n’est plus en attente."
     }
@@ -786,6 +787,8 @@
     },
     "providerConnect": {
       "description": "Établissez la connexion entre Kilo et votre {{label}} pour examiner automatiquement les demandes de fusion.",
+      "notConnectedTitle": "{{platform}} n'est pas connecté",
+      "githubAdminOnlyDescription": "Seuls les propriétaires et les administrateurs de l'organisation peuvent établir la connexion.",
       "githubApp": "application GitHub",
       "githubError": "Impossible d'ouvrir la configuration de GitHub. Réessayez.",
       "gitlabAccount": "compte GitLab",
@@ -1607,6 +1610,7 @@
       "couldNotLoadThisSession": "Impossible de charger cette session",
       "historyTooLarge": "La transcription de cette session est trop volumineuse pour être chargée.",
       "historyUnavailable": "Impossible de lire la transcription de cette session.",
+      "historyTemporarilyUnavailable": "La transcription de cette session est temporairement indisponible.",
       "cloneFailedRetry": "Impossible de cloner cette session. Réessayez.",
       "notEnoughCredits": "Crédits insuffisants pour cette requête. Ajoutez des crédits et réessayez.",
       "previousTaskFinishing": "La tâche précédente se termine. Patientez un instant.",
@@ -2147,7 +2151,9 @@
       "skip": "Passer",
       "retrySkip": "Réessayer de passer",
       "submitting": "Envoi…",
-      "sendAnswers": "Envoyer les réponses"
+      "sendAnswers": "Envoyer les réponses",
+      "unreadableTitle": "Impossible d'afficher cette question",
+      "unreadableBody": "L'agent attend une question que cette application ne peut pas afficher. Répondez à la question dans le CLI pour continuer."
     },
     "blockingCard": {
       "questionUnavailable": "Cette question n'est plus disponible.",
@@ -2174,6 +2180,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Impossible de charger la session du sous-agent",
+      "historyTooLarge": "L'historique de ce sous-agent est trop volumineux pour être chargé.",
+      "historyUnavailable": "L'historique de ce sous-agent n'est pas disponible.",
+      "historyTemporarilyUnavailable": "L'historique de ce sous-agent est temporairement indisponible.",
       "failed": "La session du sous-agent a échoué",
       "noMessages": "Aucun message du sous-agent",
       "noMessagesDescription": "Cette session de sous-agent s'est terminée sans produire de transcription.",
@@ -2793,6 +2802,8 @@
     "revokeConsent": "Retirer le consentement",
     "revokeConsentTitle": "Retirer le consentement au partage des données ?",
     "installAttributionPromptMessage": "Kilo utilise l'autorisation de suivi d'Apple uniquement pour savoir comment vous avez découvert l'application. Vos consignes et conversations ne sont jamais utilisées.",
+    "installAttributionRequestFailedTitle": "Impossible d'afficher l'invite de suivi",
+    "installAttributionRequestFailedMessage": "Kilo n'a pas pu afficher l'invite système, donc le suivi de l'origine de l'installation reste désactivé.",
     "installAttributionPromptTitle": "Autoriser le suivi de l'origine de l'installation ?"
   },
   "agents": {
@@ -3462,7 +3473,7 @@
   "organization": {
     "auditLog": {
       "title": "Journal d'audit",
-      "permissionDenied": "Seuls un propriétaire, un administrateur ou un responsable de la facturation d'une organisation sous formule Enterprise peuvent consulter son journal d'audit.",
+      "permissionDenied": "Seuls un propriétaire, un administrateur ou un responsable de la facturation d'une organisation sous formule Enterprise peuvent consulter son journal d'audit. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Aucun événement d'audit",
       "emptyDescription": "Les actions effectuées dans cette organisation s'affichent ici.",
       "truncated": "Affichage des événements les plus récents.",
@@ -3657,7 +3668,7 @@
     },
     "billing": {
       "title": "Facturation",
-      "permissionDenied": "Seul un propriétaire, un administrateur ou un responsable de la facturation de l'organisation peut consulter sa facturation.",
+      "permissionDenied": "Seul un propriétaire, un administrateur ou un responsable de la facturation de l'organisation peut consulter sa facturation. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Abonnement",
       "state": "Statut",
       "stateNone": "Aucun abonnement",
@@ -3747,7 +3758,7 @@
       "pendingInvitation": "Cette adresse e-mail a déjà une invitation en attente.",
       "alreadyMember": "Cette personne est déjà membre de cette organisation.",
       "seatsFull": "Toutes les places sont occupées ({{used}}/{{total}}). Demandez à un propriétaire de l'organisation d'ajouter des places avant d'inviter d'autres membres.",
-      "seatsFullCanInviteBilling": "Toutes les places sont occupées ({{used}}/{{total}}). Vous pouvez toujours inviter des gestionnaires de facturation, qui n'occupent pas de place.",
+      "seatsFullCanInviteBilling": "Toutes les places sont occupées ({{used}}/{{total}}). Vous pouvez toujours inviter des responsables de la facturation, qui n'occupent pas de place.",
       "noSeatsAvailable": "Toutes les places sont occupées. Demandez à un propriétaire de l'organisation d'ajouter des places avant d'inviter d'autres membres."
     },
     "invoices": {
@@ -3846,7 +3857,7 @@
       "emptyDescription": "Utilisez Heure précédente pour voir les requêtes antérieures.",
       "emptyBoundDescription": "L'historique des requêtes ne remonte pas plus loin.",
       "loadError": "Impossible de charger les journaux des requêtes.",
-      "permissionDenied": "Seuls un propriétaire, un administrateur ou un responsable de la facturation d'une organisation peuvent consulter ses journaux des requêtes.",
+      "permissionDenied": "Seuls un propriétaire, un administrateur ou un responsable de la facturation d'une organisation peuvent consulter ses journaux des requêtes. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} en entrée · {{output}} en sortie",
       "byok": "BYOK"
     },
@@ -4122,7 +4133,10 @@
     "list": {
       "loadFailed": "Impossible de charger l'historique des discussions.",
       "new": "Nouvelle discussion",
-      "deleteTitle": "Supprimer cette discussion ?"
+      "deleteTitle": "Supprimer cette discussion ?",
+      "resetNoticeTitle": "Discussions et brouillons locaux effacés",
+      "resetNoticeBody": "Kilo n'a pas pu ouvrir les discussions enregistrées sur cet appareil. Vos sessions dans le nuage ne sont pas affectées.",
+      "resetNoticeDismiss": "Ignorer la notification"
     },
     "rename": {
       "title": "Renommer la discussion",
@@ -4403,7 +4417,15 @@
       "download": "Télécharger le modèle sur l'appareil",
       "downloading": "Téléchargement…",
       "downloadProgress": "Téléchargement… {{percent}} %",
-      "downloadFailed": "Le téléchargement n'a pas abouti. Vérifiez votre connexion et l'espace de stockage disponible, puis réessayez."
+      "downloadFailed": "Le téléchargement n'a pas abouti. Vérifiez votre connexion et l'espace de stockage disponible, puis réessayez.",
+      "cannotUse": "Impossible d'exécuter : {{items}}.",
+      "cannotUseOptions": "Impossible de renseigner : certaines options d'outil.",
+      "limitations": "Limitations",
+      "tools": {
+        "time": "Heure",
+        "settingsList": "Afficher les paramètres",
+        "settingsSet": "Modifier les paramètres"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Ce modèle prend en charge le niveau de réflexion"
@@ -4964,7 +4986,7 @@
     "defaultModel": "Utiliser le modèle par défaut de Kilo",
     "duration": "Limite de temps (minutes)",
     "spendLimit": "Limite de dépense (USD)",
-    "invalidSafeguards": "Saisissez des limites de temps et de dépense positives et finies.",
+    "invalidSafeguards": "Saisissez un nombre positif dans les limites autorisées.",
     "estimate": "Estimation {{estimate}} · maximum {{maximum}}",
     "estimateUnavailable": "Aucun résumé payant n’est disponible pour ces paramètres. Modifiez le modèle ou les limites, ou réessayez plus tard.",
     "estimatePricingUnavailable": "Tarification indisponible pour ce modèle. Choisissez un autre modèle.",
@@ -5039,7 +5061,8 @@
     "unavailableTitle": "Utilisation indisponible",
     "unavailableDescription": "Le suivi de l'utilisation n'est pas configuré pour cet espace de travail. Contactez l'assistance si vous vous attendez à voir l'utilisation ici.",
     "orgSelfNotice": "Vous voyez votre propre utilisation dans cette organisation.",
-    "viewDetails": "Voir les détails d'utilisation"
+    "viewDetails": "Voir les détails d'utilisation",
+    "orgSelfEntryTitle": "Votre utilisation"
   },
   "integrations": {
     "title": "Intégrations",
@@ -5135,6 +5158,8 @@
       "autoCommit": "Valider les modifications à la fin de l’exécution",
       "condenseOnComplete": "Condenser le contexte à la fin de l’exécution",
       "activeTitle": "Déclencheur actif",
+      "activeSwitchA11y": "Déclencheur actif : {{name}}",
+      "copyLinkA11y": "Copier le lien pour {{name}}",
       "activeDescription": "Les webhooks en pause répondent par 404.",
       "runAsCreator": "Exécuter en tant que moi",
       "runAsCreatorDescription": "Chaque exécution utilise votre compte, l’en-tête secret est donc requis.",

@@ -1238,6 +1238,7 @@
     "needsInputAction": {
       "approved": "Begäran godkänd",
       "replied": "Svar skickat",
+      "empty": "Skriv ett svar och skicka det sedan.",
       "failed": "Kunde inte svara. Tryck igen för att försöka igen.",
       "unavailable": "Denna begäran väntar inte längre."
     }
@@ -1502,7 +1503,9 @@
       "githubError": "Kunde inte öppna konfigurationen för GitHub. Försök igen.",
       "gitlabAccount": "GitLab-konto",
       "gitlabError": "Kunde inte öppna konfigurationen för GitLab. Försök igen.",
-      "description": "Anslut Kilos {{label}} för att granska pull-begäranden automatiskt."
+      "description": "Anslut Kilos {{label}} för att granska pull-begäranden automatiskt.",
+      "notConnectedTitle": "{{platform}} är inte anslutet",
+      "githubAdminOnlyDescription": "Endast organisationsägare och administratörer kan skapa anslutningen."
     },
     "overview": {
       "allAreas": "Alla områden",
@@ -1588,7 +1591,7 @@
       "empty": "Inga granskningar med statistik än",
       "emptyDescription": "Statistiken registrerar slutförda granskningar så länge den är aktiverad för organisationen.",
       "offTitle": "Statistiken är avstängd för {{platform}}",
-      "offDescription": "Organisationens faktureringsroller (ägare, administratörer och fakturahanterare) kan aktivera statistiken i organisationens inställningar på webben för att registrera slutförda granskningar.",
+      "offDescription": "Organisationens faktureringsroller (ägare, administratörer och faktureringsansvariga) kan aktivera statistiken i organisationens inställningar på webben för att registrera slutförda granskningar.",
       "couldNotLoad": "Det gick inte att läsa in statistiken",
       "trackedReviewsCaption": "Slutförda granskningar som avslutades under den här perioden medan statistiken var aktiverad. Pågående och misslyckade granskningar räknas aldrig.",
       "trackedReviewsUncounted": "Räknas inte: {{displayCount}} av organisationens {{displayTotal}} avslutade granskningar utan registrerat resultat.",
@@ -2251,6 +2254,7 @@
       "couldNotLoadThisSession": "Det gick inte att läsa in den här sessionen",
       "historyTooLarge": "Den här sessionens logg är för stor för att läsas in.",
       "historyUnavailable": "Den här sessionens logg kan inte läsas.",
+      "historyTemporarilyUnavailable": "Den här sessionens logg är tillfälligt otillgänglig.",
       "cloneFailedRetry": "Kunde inte klona den här sessionen. Försök igen.",
       "notEnoughCredits": "Du har inte tillräckligt med krediter för den här förfrågan. Fyll på krediter och försök igen.",
       "previousTaskFinishing": "Den föregående uppgiften håller på att avslutas. Vänta en stund.",
@@ -2787,7 +2791,9 @@
       "skip": "Hoppa över",
       "retrySkip": "Försök hoppa över igen",
       "submitting": "Skickar…",
-      "sendAnswers": "Skicka svar"
+      "sendAnswers": "Skicka svar",
+      "unreadableTitle": "Frågan kunde inte visas",
+      "unreadableBody": "Agenten väntar på en fråga som den här appen inte kan visa. Svara på frågan i CLI för att fortsätta."
     },
     "blockingCard": {
       "questionUnavailable": "Den här frågan är inte längre tillgänglig.",
@@ -2814,6 +2820,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Det gick inte att läsa in underagentens session",
+      "historyTooLarge": "Underagentens historik är för stor för att läsas in.",
+      "historyUnavailable": "Underagentens historik är inte tillgänglig.",
+      "historyTemporarilyUnavailable": "Underagentens historik är tillfälligt otillgänglig.",
       "failed": "Underagentens session misslyckades",
       "noMessages": "Inga meddelanden från underagenten",
       "noMessagesDescription": "Underagentens session avslutades utan någon meddelandehistorik.",
@@ -3392,6 +3401,8 @@
     "voiceTranscriptionWho": "Din enhet, Kilo Gateway med den transkriberingsmodell du väljer, eller Apple eller Google för identifiering online.",
     "installAttributionPromptTitle": "Tillåt spårning av installationskälla?",
     "installAttributionPromptMessage": "Kilo använder Apples spårningsbehörighet bara för att ta reda på vilken kanal du hittade appen genom. Dina prompter och konversationer används aldrig.",
+    "installAttributionRequestFailedTitle": "Det gick inte att visa förfrågan om spårning",
+    "installAttributionRequestFailedMessage": "Kilo kunde inte visa systemförfrågan, så spårningen av installationskälla förblir avstängd.",
     "what": "Vad",
     "why": "Varför",
     "who": "Vem"
@@ -3407,7 +3418,7 @@
   "organization": {
     "auditLog": {
       "title": "Granskningslogg",
-      "permissionDenied": "Endast en ägare, administratör eller faktureringsansvarig i en organisation med Enterprise-planen kan läsa organisationens granskningslogg.",
+      "permissionDenied": "Endast en ägare, administratör eller faktureringsansvarig i en organisation med Enterprise-planen kan läsa organisationens granskningslogg. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Inga granskningshändelser",
       "emptyDescription": "Åtgärder som utförs i den här organisationen visas här.",
       "truncated": "Visar de senaste händelserna.",
@@ -3597,7 +3608,7 @@
     },
     "billing": {
       "title": "Fakturering",
-      "permissionDenied": "Endast organisationens ägare, administratörer eller faktureringsansvariga kan se dess fakturering.",
+      "permissionDenied": "Endast organisationens ägare, administratörer eller faktureringsansvariga kan se dess fakturering. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Prenumeration",
       "state": "Status",
       "stateNone": "Ingen prenumeration",
@@ -3774,7 +3785,7 @@
       "emptyDescription": "Använd Tidigare timme för att se tidigare förfrågningar.",
       "emptyBoundDescription": "Förfrågningsloggarna sträcker sig inte längre tillbaka än så här.",
       "loadError": "Det gick inte att läsa in förfrågningsloggarna.",
-      "permissionDenied": "Endast en ägare, administratör eller faktureringsansvarig i organisationen kan läsa dess förfrågningsloggar.",
+      "permissionDenied": "Endast en ägare, administratör eller faktureringsansvarig i organisationen kan läsa dess förfrågningsloggar. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} in · {{output}} ut",
       "byok": "BYOK"
     },
@@ -4044,7 +4055,10 @@
     "list": {
       "loadFailed": "Det gick inte att läsa in chatthistoriken.",
       "new": "Ny chatt",
-      "deleteTitle": "Ta bort den här chatten?"
+      "deleteTitle": "Ta bort den här chatten?",
+      "resetNoticeTitle": "Lokala chattar och utkast rensades",
+      "resetNoticeBody": "Kilo kunde inte öppna chattarna som sparats på den här enheten. Dina sessioner i molnet påverkas inte.",
+      "resetNoticeDismiss": "Avskriv avisering"
     },
     "rename": {
       "title": "Byt namn på chatten",
@@ -4324,7 +4338,15 @@
       "download": "Ladda ned modell till enheten",
       "downloading": "Laddar ned…",
       "downloadProgress": "Laddar ned… {{percent}} %",
-      "downloadFailed": "Nedladdningen slutfördes inte. Kontrollera anslutningen och ledigt lagringsutrymme och försök sedan igen."
+      "downloadFailed": "Nedladdningen slutfördes inte. Kontrollera anslutningen och ledigt lagringsutrymme och försök sedan igen.",
+      "cannotUse": "Kan inte köra: {{items}}.",
+      "cannotUseOptions": "Kan inte fylla i: vissa verktygsalternativ.",
+      "limitations": "Begränsningar",
+      "tools": {
+        "time": "Tid",
+        "settingsList": "Visa inställningar",
+        "settingsSet": "Ändra inställningar"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Den här modellen stöder resonemangsnivå"
@@ -4875,7 +4897,7 @@
     "defaultModel": "Använd Kilos standardmodell",
     "duration": "Tidsgräns (minuter)",
     "spendLimit": "Kostnadsgräns (USD)",
-    "invalidSafeguards": "Ange positiva, ändliga tids- och kostnadsgränser.",
+    "invalidSafeguards": "Ange ett positivt tal inom det tillåtna intervallet.",
     "estimate": "Uppskattning {{estimate}} · maximalt {{maximum}}",
     "estimateUnavailable": "En betald sammanfattning är inte tillgänglig för dessa inställningar. Ändra modellen eller gränserna, eller försök igen senare.",
     "confirmPaid": "Aktivera betalda sammanfattningar för {{context}}?",
@@ -4945,7 +4967,8 @@
     "unavailableTitle": "Användning är inte tillgänglig",
     "unavailableDescription": "Användning är inte konfigurerad för den här arbetsytan. Kontakta supporten om du förväntar dig att se användning här.",
     "orgSelfNotice": "Du ser din egen användning i den här organisationen.",
-    "viewDetails": "Visa användningsdetaljer"
+    "viewDetails": "Visa användningsdetaljer",
+    "orgSelfEntryTitle": "Din användning"
   },
   "integrations": {
     "title": "Integrationer",
@@ -5041,6 +5064,8 @@
       "autoCommit": "Checka in ändringar när körningen är klar",
       "condenseOnComplete": "Komprimera kontexten när körningen är klar",
       "activeTitle": "Utlösare aktiv",
+      "activeSwitchA11y": "Utlösare aktiv: {{name}}",
+      "copyLinkA11y": "Kopiera länk för {{name}}",
       "activeDescription": "Pausade webhooks svarar med 404.",
       "runAsCreator": "Kör som jag",
       "runAsCreatorDescription": "Varje körning använder ditt konto, så det hemliga sidhuvudet krävs.",

@@ -149,8 +149,13 @@ export function OrgUsageStats({ organizationId, onPress }: Readonly<OrgUsageStat
     },
   ] as const;
   // Only the pressable grid needs this name: the informational grid's four
-  // tiles each name themselves.
-  const gridLabel = joinAccessibleName(tiles.flatMap(tile => [tile.label, tile.value]));
+  // tiles each name themselves. The section's own label leads, because the
+  // enclosing button used to speak it as its first child and it names the scope
+  // (every member, the last 30 days) the four totals are read against.
+  const gridLabel = joinAccessibleName([
+    t('organization.usageStats.orgLast30Days'),
+    ...tiles.flatMap(tile => [tile.label, tile.value]),
+  ]);
 
   const body = (
     <Section label={t('organization.usageStats.orgLast30Days')}>

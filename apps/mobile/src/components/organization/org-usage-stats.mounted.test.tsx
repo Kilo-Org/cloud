@@ -256,7 +256,8 @@ describe('Organization usage stats accessibility', () => {
     expect(button.props.accessibilityRole).toBe('button');
     expect(button.props.accessibilityHint).toBe(i18n.t('usage.viewDetails'));
     expect(button.props.accessibilityLabel).toBe(
-      'Cost, \u2066$2\u2069, Requests, 12, Input tokens, compact:34, Output tokens, compact:56'
+      `${i18n.t('organization.usageStats.orgLast30Days')}, Cost, \u2066$2\u2069, ` +
+        'Requests, 12, Input tokens, compact:34, Output tokens, compact:56'
     );
     // The enclosing button speaks the tiles, so no tile is an element itself.
     expect(

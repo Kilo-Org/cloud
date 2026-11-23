@@ -26,7 +26,7 @@ function namesOf(module: unknown): LanguageSearchNames {
 }
 
 // Metro includes each table in the bundle but evaluates only the active UI
-// language's.
+// language's table.
 const LANGUAGE_SEARCH_NAME_LOADERS = {
   af: () => namesOf(require('./language-search-name-tables/af.ts')),
   sq: () => namesOf(require('./language-search-name-tables/sq.ts')),

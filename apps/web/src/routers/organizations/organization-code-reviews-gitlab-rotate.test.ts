@@ -23,6 +23,7 @@ import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organ
 import { addUserToOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
+  agent_configs,
   kilocode_users,
   organization_audit_logs,
   organization_memberships,
@@ -107,6 +108,9 @@ describe('P1-D-32 GitLab webhook secret (rotation + status)', () => {
       await db
         .delete(platform_integrations)
         .where(eq(platform_integrations.owned_by_organization_id, organizationId));
+      await db
+        .delete(agent_configs)
+        .where(eq(agent_configs.owned_by_organization_id, organizationId));
       await db
         .delete(organization_memberships)
         .where(eq(organization_memberships.organization_id, organizationId));
@@ -566,6 +570,50 @@ describe('P1-D-32 GitLab webhook secret (rotation + status)', () => {
       expect(mockSyncWebhooksForRepositories).not.toHaveBeenCalled();
       // Secret still persisted for recovery.
       expect(await readWebhookSecret(organization.id)).toBe(result.webhookSecret);
+    });
+
+    it('re-signs only the repositories the stored configuration still selects', async () => {
+      const { owner, organization } = await makeOrgAndOwner();
+      // 202 is stored with a hook but is no longer selected: its hook must be
+      // treated as a removal, never re-signed with the new secret.
+      const configured = {
+        '101': { hook_id: 9001, created_at: '2026-01-01T00:00:00Z' },
+        '202': { hook_id: 9002, created_at: '2026-01-02T00:00:00Z' },
+      };
+      await seedGitLabIntegration(organization.id, {
+        gitlab_instance_url: 'https://gitlab.example.com',
+        configured_webhooks: configured,
+      });
+      await db.insert(agent_configs).values({
+        owned_by_organization_id: organization.id,
+        agent_type: 'code_review',
+        platform: 'gitlab',
+        config: {
+          focus_areas: [],
+          model_slug: 'kilo/fake-deterministic',
+          repository_selection_mode: 'selected',
+          review_style: 'balanced',
+          selected_repository_ids: [101],
+        },
+        created_by: owner.id,
+      });
+
+      const caller = await createCallerForUser(owner.id);
+      await caller.organizations.reviewAgent.rotateGitLabWebhookSecret({
+        organizationId: organization.id,
+      });
+
+      // The sync receives the stored selection, not the stored map's keys, so it
+      // re-signs 101 and falls into the removal path for 202.
+      expect(mockSyncWebhooksForRepositories).toHaveBeenCalledTimes(1);
+      expect(mockSyncWebhooksForRepositories).toHaveBeenCalledWith(
+        'gitlab-access-token',
+        expect.any(String),
+        [101],
+        [],
+        configured,
+        'https://gitlab.example.com'
+      );
     });
   });
 });

@@ -2814,7 +2814,7 @@
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
-      "maxNestingDepth": "ଗୋଟିଏ ସେସନ୍ ଭିତରେ ଆଉ ଏକ ସେସନ୍ ଖୋଲିବାର ସର୍ବାଧିକ ସ୍ତରରେ ପହଞ୍ଚିଛି।",
+      "maxNestingDepth": "ନେଷ୍ଟେଡ୍ ସେସନର ସର୍ବାଧିକ ଗଭୀରତାରେ ପହଞ୍ଚିଛି।",
       "modelAccessibility": "ମଡେଲ୍: {{modelLabel}}",
       "openHint": "ଉପଏଜେଣ୍ଟ ସେସନ୍ ଖୋଲନ୍ତୁ",
       "subagent": "ଉପଏଜେଣ୍ଟ",

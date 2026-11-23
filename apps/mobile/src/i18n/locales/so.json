@@ -2814,7 +2814,7 @@
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
-      "maxNestingDepth": "Waxaa la gaaray xadka kalfadhiyada la isku dhex abuuri karo.",
+      "maxNestingDepth": "Waxaa la gaaray xadka qotada kalfadhiyada gudaha ah.",
       "modelAccessibility": "Moodeelka: {{modelLabel}}",
       "openHint": "Fur kalfadhiga wakiilka hoose",
       "subagent": "Wakiil hoose",

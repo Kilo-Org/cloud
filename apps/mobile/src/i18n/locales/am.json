@@ -2814,7 +2814,7 @@
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}፣ {{taskName}}{{modelLabel}}፣ {{latestActivityLabel}}፣ {{status}}",
-      "maxNestingDepth": "ክፍለ ጊዜዎችን በሌሎች ክፍለ ጊዜዎች ውስጥ ለመፍጠር የሚፈቀደው ከፍተኛ ጥልቀት ተደርሷል።",
+      "maxNestingDepth": "የጎጆ ከፍተኛ ጥልቀት ተደርሷል።",
       "modelAccessibility": "ሞዴል፦ {{modelLabel}}",
       "openHint": "የንዑስ ወኪሉን ክፍለ ጊዜ ይክፈቱ",
       "subagent": "ንዑስ ወኪል",

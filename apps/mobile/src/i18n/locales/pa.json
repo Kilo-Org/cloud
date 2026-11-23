@@ -2814,7 +2814,7 @@
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
-      "maxNestingDepth": "ਇੱਕ ਦੇ ਅੰਦਰ ਦੂਜਾ ਸੈਸ਼ਨ ਬਣਾਉਣ ਦੀ ਵੱਧ ਤੋਂ ਵੱਧ ਹੱਦ ਪੂਰੀ ਹੋ ਗਈ ਹੈ।",
+      "maxNestingDepth": "ਨੈਸਟਿਡ ਸੈਸ਼ਨਾਂ ਦੀ ਵੱਧ ਤੋਂ ਵੱਧ ਡੂੰਘਾਈ ਪੂਰੀ ਹੋ ਗਈ ਹੈ।",
       "modelAccessibility": "ਮਾਡਲ: {{modelLabel}}",
       "openHint": "ਸਬਏਜੰਟ ਦਾ ਸੈਸ਼ਨ ਖੋਲ੍ਹੋ",
       "subagent": "ਸਬਏਜੰਟ",

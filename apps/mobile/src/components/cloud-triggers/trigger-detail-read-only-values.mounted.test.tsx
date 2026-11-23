@@ -94,6 +94,7 @@ vi.mock('@/components/screen-header', async () => {
 });
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
 vi.mock('@/components/ui/kv-row', () => ({ KvRow: 'KvRow' }));
+vi.mock('@/components/ui/row-group', () => ({ RowGroup: 'RowGroup' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('./trigger-edit-panel', () => ({ TriggerEditPanel: 'TriggerEditPanel' }));
@@ -210,5 +211,26 @@ describe('TriggerDetailScreen read-only values', () => {
 
     expect(rowValue(root, 'Agent')).toBe(i18n.t('common.unknown'));
     expect(rowValue(root, 'Model')).toBe(i18n.t('common.unknown'));
+  });
+
+  // The four saved values are one section, so they share one grouped card:
+  // every row sits inside that group and no row sits outside it.
+  it('renders the four read-only rows inside one group', async () => {
+    const root = await mount();
+
+    const groups = root.findAll(node => String(node.type) === 'RowGroup');
+    expect(groups).toHaveLength(1);
+
+    const rows = root.findAll(node => Object.is(node.type, KV_ROW));
+    expect(rows).toHaveLength(4);
+    expect(rows.map(row => row.props.label)).toEqual(
+      expect.arrayContaining([
+        i18n.t('common.repository'),
+        i18n.t('cloudAgent.triggers.fieldActivation'),
+        i18n.t('common.agent'),
+        i18n.t('common.model'),
+      ])
+    );
+    expect(groups[0]?.findAll(node => Object.is(node.type, KV_ROW))).toHaveLength(4);
   });
 });

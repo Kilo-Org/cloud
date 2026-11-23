@@ -2814,7 +2814,7 @@
     },
     "childSession": {
       "accessibilityLabel": "এজেন্ট: {{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
-      "maxNestingDepth": "সেশনের ভেতরে আরও সেশন তৈরির সর্বোচ্চ সীমায় পৌঁছেছে।",
+      "maxNestingDepth": "নেস্টেড সেশনের সর্বোচ্চ গভীরতায় পৌঁছেছে।",
       "modelAccessibility": "মডেল: {{modelLabel}}",
       "openHint": "সাবএজেন্টের সেশন খুলুন",
       "subagent": "সাবএজেন্ট",

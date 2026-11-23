@@ -2814,7 +2814,7 @@
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}, {{taskName}}{{modelLabel}}, {{latestActivityLabel}}, {{status}}",
-      "maxNestingDepth": "उपसत्रभित्र थप उपसत्र खोल्ने अधिकतम तह पुगेको छ।",
+      "maxNestingDepth": "नेस्टेड सत्रको अधिकतम गहिराइमा पुगेको छ।",
       "modelAccessibility": "मोडेल: {{modelLabel}}",
       "openHint": "उपएजेन्टको सत्र खोल्नुहोस्",
       "subagent": "उपएजेन्ट",

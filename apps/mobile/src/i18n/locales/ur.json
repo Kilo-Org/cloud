@@ -2814,7 +2814,7 @@
     },
     "childSession": {
       "accessibilityLabel": "{{agentName}}، {{taskName}}{{modelLabel}}، {{latestActivityLabel}}، {{status}}",
-      "maxNestingDepth": "ذیلی سیشنز بنانے کی زیادہ سے زیادہ سطح تک پہنچ گئے ہیں۔",
+      "maxNestingDepth": "نیسٹڈ سیشنز کی زیادہ سے زیادہ گہرائی تک پہنچ گئی ہے۔",
       "modelAccessibility": "ماڈل: {{modelLabel}}",
       "openHint": "ذیلی ایجنٹ کا سیشن کھولیں",
       "subagent": "ذیلی ایجنٹ",

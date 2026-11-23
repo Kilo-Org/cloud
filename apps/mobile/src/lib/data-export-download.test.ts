@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { getDataExportFailureMessage } from '@/lib/data-export-download';
+import type * as ShareRemoteFileModule from '@/lib/share-remote-file';
+
+import { getDataExportFailureMessage, shareDataExport } from '@/lib/data-export-download';
 import { ShareRemoteFileError } from '@/lib/share-remote-file';
 import { i18n } from '@/i18n';
 
@@ -17,6 +19,15 @@ vi.mock('expo-sharing', () => ({
   isAvailableAsync: vi.fn(),
   shareAsync: vi.fn(),
 }));
+
+const shareRemoteFile = vi.hoisted(() => vi.fn());
+
+// Only the transfer is faked: the failure reason, its class, and the failure
+// classification under test are the real ones.
+vi.mock('@/lib/share-remote-file', async importOriginal => {
+  const actual = await importOriginal<typeof ShareRemoteFileModule>();
+  return { ...actual, shareRemoteFile };
+});
 
 const downloadFailed = () => i18n.t('profile.dataExport.downloadFailed');
 const sharingUnavailable = () => i18n.t('organization.invoices.sharingUnavailable');
@@ -58,5 +69,29 @@ describe('getDataExportFailureMessage', () => {
 
   it('falls back to the download copy for an untyped error', () => {
     expect(getDataExportFailureMessage(new Error('boom'))).toBe(downloadFailed());
+  });
+});
+
+describe('shareDataExport', () => {
+  it('gives the export its own transfer budget, past the interactive share deadline', async () => {
+    shareRemoteFile.mockResolvedValue(undefined);
+
+    await shareDataExport({ downloadUrl: 'https://example.com/export', exportId: 'exp_1' });
+
+    expect(shareRemoteFile).toHaveBeenCalledTimes(1);
+    const [input] = shareRemoteFile.mock.calls[0] as [
+      { deadlineMs?: number; url: string; cacheKey: string; filename: string },
+    ];
+    // The export has no server-side size cap, so a slow but progressing
+    // transfer must outlast the 30 s interactive share budget (the module's
+    // own `SHARE_DOWNLOAD_DEADLINE_MS`).
+    expect(typeof input.deadlineMs).toBe('number');
+    expect(input.deadlineMs).toBeGreaterThan(30_000);
+    expect(input).toMatchObject({
+      url: 'https://example.com/export',
+      cacheDirectoryName: 'data-exports',
+      cacheKey: 'exp_1',
+      filename: 'kilo-data-export.jsonl.gz',
+    });
   });
 });

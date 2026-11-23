@@ -281,6 +281,38 @@ describe('downloadRemoteFile', () => {
     expect(fileSystem.recordFor('file:///cache/invoices/shared-a.pdf').exists).toBe(false);
   });
 
+  it('registers the attempt copy before the transfer and the destination after it', async () => {
+    // Snapshot the registry at the moment the request opens: the attempt's
+    // registration is only observable as already done from inside the fetch,
+    // not merely first in call order.
+    const registeredWhenFetchStarted: string[][] = [];
+    expoFetchMock.mockImplementation(() => {
+      registeredWhenFetchStarted.push(
+        tempFileRegistryMock.registerTempFile.mock.calls.map(([uri]) => uri as string)
+      );
+      return Promise.resolve(okResponse(new Uint8Array([1, 2, 3])));
+    });
+
+    const result = await downloadRemoteFile(downloadInput());
+
+    const attemptUris = [...fileSystem.records.keys()].filter(uri => uri.includes('.part-'));
+    expect(attemptUris).toHaveLength(1);
+    const [attemptUri] = attemptUris;
+    // A deadline reject while the writable stream still holds the attempt, or a
+    // filesystem error, is cleaned up by the reap, so the uri must be known
+    // before any of that can happen.
+    expect(registeredWhenFetchStarted).toEqual([[attemptUri]]);
+
+    await shareMaterializedRemoteFile(result, async () => {
+      await Promise.resolve();
+    });
+
+    // The completed copy was moved onto the destination name the share sheet is
+    // handed, so the reap follows that uri and not the attempt's.
+    expect(result.uri).toBe('file:///cache/invoices/shared-a.pdf');
+    expect(tempFileRegistryMock.registerTempFile).toHaveBeenCalledWith(result.uri);
+  });
+
   it('bounds the request with the deadline signal', async () => {
     expoFetchMock.mockResolvedValue(okResponse(new Uint8Array([1])));
 
@@ -469,6 +501,41 @@ describe('shareRemoteFile', () => {
     // Nothing of the failed attempt survives.
     expect(survivingAttempts()).toEqual([]);
     expect(survivingRecords().map(record => record.uri)).toEqual([firstUri]);
+  });
+
+  it('registers a distinct attempt and destination copy for each share of one key', async () => {
+    expoFetchMock.mockResolvedValueOnce(okResponse(new Uint8Array([1, 2, 3])));
+    await shareRemoteFile(shareInput());
+    expoFetchMock.mockResolvedValueOnce(okResponse(new Uint8Array([4, 5, 6])));
+    await shareRemoteFile(shareInput());
+
+    const registered = tempFileRegistryMock.registerTempFile.mock.calls.map(
+      ([uri]) => uri as string
+    );
+    const attemptUris = registered.filter(uri => uri.includes('.part-'));
+    const destinationUris = registered.filter(uri => !uri.includes('.part-'));
+
+    // The reap forgets a uri once it fires, so a shared attempt name would let
+    // the second share's reap drop the copy the first share already handed to a
+    // receiving app.
+    expect(attemptUris).toHaveLength(2);
+    expect(new Set(attemptUris).size).toBe(2);
+    // Each completed copy is registered under the uri the sheet was handed.
+    expect(destinationUris).toEqual(expoSharingMock.shareAsync.mock.calls.map(([uri]) => uri));
+    expect(new Set(destinationUris).size).toBe(2);
+  });
+
+  it('forwards a caller deadline to the transfer', async () => {
+    expoFetchMock.mockReturnValue(new Promise<never>(() => undefined));
+
+    const failure = await transferFailure(shareRemoteFile({ ...shareInput(), deadlineMs: 10 }));
+
+    // Only the caller's 10 ms can expire this fast: the module's own budget is
+    // 30 s, which would not settle inside the case.
+    expect(failure).toMatchObject({ reason: 'download-timeout' });
+    expect(expoSharingMock.shareAsync).not.toHaveBeenCalled();
+    expect(survivingAttempts()).toEqual([]);
+    expect(survivingRecords()).toEqual([]);
   });
 
   it('bounds the share filename and keeps the extension', async () => {

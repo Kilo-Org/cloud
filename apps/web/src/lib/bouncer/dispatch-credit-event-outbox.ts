@@ -54,6 +54,13 @@ function isOrganizationCreditEvent(row: BouncerCreditEventOutboxRow): boolean {
   return typeof orgId === 'string' && orgId.length > 0;
 }
 
+/**
+ * The wire fields that describe the attributed account's client (its address, its TLS/HTTP
+ * fingerprint, and the card it used), rather than the organization the event is reported against.
+ * An organization row reports the organization, so such a body carries organization-level fields.
+ */
+const CLIENT_DERIVED_FIELDS = ['ip', 'ipCountry', 'ja4', 'cardFingerprint', 'cardCountry'] as const;
+
 export type BouncerCreditEventOutboxDispatchSummary = {
   reclaimed: number;
   claimed: number;
@@ -155,22 +162,21 @@ async function dispatchCreditEvent(
     return 'failed';
   }
 
-  // A soft delete after enqueue must not send the deleted account's PII: recheck the owner here and
-  // drop the claim instead. This only prevents a send that has not happened; a delivery already
-  // made before the deletion cannot be undone. The delete is fenced on this claim, so it never
-  // removes a row a newer claim owns. An organization row is delivered: its subject is the payer
-  // organization, not the attributed account.
-  if (!isOrganizationCreditEvent(row)) {
-    const [owner] = await db
-      .select({ blockedReason: kilocode_users.blocked_reason })
-      .from(kilocode_users)
-      .where(eq(kilocode_users.id, row.user_id))
-      .limit(1);
-    if (owner && isGoneOrDeletingBlockedReason(owner.blockedReason)) {
-      logWarning('Dropping bouncer credit event for a soft-deleted user', outboxLogFields(row));
-      await deleteBouncerCreditEvent(db, { id: row.id, claimedAt });
-      return 'failed';
-    }
+  // A row whose subject is a personal account is delivered only while that account is active: the
+  // owner is rechecked here and a gone/deleting account's row is dropped. An organization row is
+  // delivered, because the organization is its subject, and its body carries organization-level
+  // fields only. The delete is fenced on this claim, so it never removes a row a newer claim owns.
+  const organizationEvent = isOrganizationCreditEvent(row);
+  const [owner] = await db
+    .select({ blockedReason: kilocode_users.blocked_reason })
+    .from(kilocode_users)
+    .where(eq(kilocode_users.id, row.user_id))
+    .limit(1);
+  const ownerGone = Boolean(owner && isGoneOrDeletingBlockedReason(owner.blockedReason));
+  if (ownerGone && !organizationEvent) {
+    logWarning('Dropping bouncer credit event for a soft-deleted user', outboxLogFields(row));
+    await deleteBouncerCreditEvent(db, { id: row.id, claimedAt });
+    return 'failed';
   }
 
   // Persisted JSON is untrusted at this boundary; fail a malformed row visibly, never silently.
@@ -183,6 +189,9 @@ async function dispatchCreditEvent(
       error: 'invalid_payload',
     });
     return failed ? 'failed' : 'retried';
+  }
+  if (organizationEvent && ownerGone) {
+    for (const field of CLIENT_DERIVED_FIELDS) delete body[field];
   }
 
   const result = await deliverCreditEventWireBody(body);

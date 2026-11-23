@@ -132,7 +132,7 @@ describe('dispatchQueuedBouncerCreditEvents', () => {
     expect(rows).toHaveLength(0);
   });
 
-  it('delivers an organization row whose attributed account became soft-deleted', async () => {
+  it('delivers an organization row with organization-level fields only', async () => {
     const user = await insertTestUser({ blocked_reason: createSoftDeletedBlockedReason() });
     const row = await insertPending({
       user_id: user.id,
@@ -144,6 +144,11 @@ describe('dispatchQueuedBouncerCreditEvents', () => {
         orgId: '2f1c0a3e-0000-4000-8000-000000000001',
         flow: 'auto_topup',
         amountCents: 5_000,
+        ip: '203.0.113.7',
+        ipCountry: 'DE',
+        ja4: 'ja4_digest_value',
+        cardFingerprint: 'card_fingerprint_value',
+        cardCountry: 'DE',
       },
     });
     mockDeliver.mockResolvedValue({ delivered: true, status: 200 });
@@ -152,17 +157,45 @@ describe('dispatchQueuedBouncerCreditEvents', () => {
 
     expect(summary.delivered).toBe(1);
     expect(mockDeliver).toHaveBeenCalledTimes(1);
-    expect(mockDeliver).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: 'charge.attempted',
-        orgId: '2f1c0a3e-0000-4000-8000-000000000001',
-      })
-    );
+    const delivered = mockDeliver.mock.calls[0]?.[0] ?? {};
+    expect(delivered.orgId).toBe('2f1c0a3e-0000-4000-8000-000000000001');
+    expect(delivered.userId).toBe(user.id);
+    expect(delivered.ip).toBeUndefined();
+    expect(delivered.ipCountry).toBeUndefined();
+    expect(delivered.ja4).toBeUndefined();
+    expect(delivered.cardFingerprint).toBeUndefined();
+    expect(delivered.cardCountry).toBeUndefined();
     const [after] = await db
       .select()
       .from(bouncer_credit_event_outbox)
       .where(eq(bouncer_credit_event_outbox.id, row.id));
     expect(after?.status).toBe('delivered');
+  });
+
+  it('keeps the client fields of an organization row for an active attributed account', async () => {
+    const user = await insertTestUser();
+    await insertPending({
+      user_id: user.id,
+      event_type: 'charge.attempted',
+      payload: {
+        type: 'charge.attempted',
+        eventId: 'evt-org-active-owner',
+        userId: user.id,
+        orgId: '2f1c0a3e-0000-4000-8000-000000000002',
+        flow: 'auto_topup',
+        amountCents: 5_000,
+        ip: '203.0.113.7',
+        ja4: 'ja4_digest_value',
+      },
+    });
+    mockDeliver.mockResolvedValue({ delivered: true, status: 200 });
+
+    const summary = await dispatchQueuedBouncerCreditEvents({ limit: 10 });
+
+    expect(summary.delivered).toBe(1);
+    expect(mockDeliver).toHaveBeenCalledWith(
+      expect.objectContaining({ ip: '203.0.113.7', ja4: 'ja4_digest_value' })
+    );
   });
 
   it('fails a row with an unvalidatable payload without calling the transport', async () => {

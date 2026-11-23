@@ -3890,7 +3890,7 @@
     "signupStepUpApple": "ਆਪਣਾ ਖਾਤਾ ਬਣਾਉਣਾ ਪੂਰਾ ਕਰਨ ਲਈ '$t(login.signInWithApple)' ਵਰਤੋ।",
     "signupStepUpGoogle": "ਆਪਣਾ ਖਾਤਾ ਬਣਾਉਣਾ ਪੂਰਾ ਕਰਨ ਲਈ '$t(login.signInWithGoogle)' ਵਰਤੋ।",
     "signupStepUpBack": "ਆਪਣਾ ਖਾਤਾ ਬਣਾਉਣਾ ਪੂਰਾ ਕਰਨ ਲਈ ਪਿੱਛੇ ਜਾਓ ਅਤੇ '$t(login.moreSignInOptions)' ਵਰਤੋ।",
-    "invalidCode": "ਇਹ ਕੋਡ ਗਲਤ ਹੈ ਜਾਂ ਇਸਦੀ ਮਿਆਦ ਪੁੱਗ ਗਈ ਹੈ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ ਜਾਂ '$t(login.resendCode)' ਵਰਤੋ।",
+    "invalidCode": "ਇਹ ਕੋਡ ਗਲਤ ਹੈ ਜਾਂ ਇਸਦੀ ਮਿਆਦ ਪੁੱਗ ਗਈ ਹੈ। '$t(login.resendCode)' ਜਾਂ '$t(login.moreSignInOptions)' ਵਰਤੋ।",
     "codeInProgress": "ਤੁਹਾਡੇ ਕੋਡ 'ਤੇ ਕਾਰਵਾਈ ਹੋ ਰਹੀ ਹੈ। ਥੋੜ੍ਹੀ ਦੇਰ ਉਡੀਕ ਕਰੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
     "tooManyAttempts": "ਬਹੁਤ ਜ਼ਿਆਦਾ ਕੋਸ਼ਿਸ਼ਾਂ ਹੋ ਚੁੱਕੀਆਂ ਹਨ। ਕਿਰਪਾ ਕਰਕੇ ਨਵਾਂ ਕੋਡ ਮੰਗੋ।",
     "invalidToken": "ਸਾਈਨ ਇਨ ਨਹੀਂ ਹੋ ਸਕਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",

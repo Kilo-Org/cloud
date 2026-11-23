@@ -3890,7 +3890,7 @@
     "signupStepUpApple": "ანგარიშის შექმნის დასასრულებლად გამოიყენე „$t(login.signInWithApple)“.",
     "signupStepUpGoogle": "ანგარიშის შექმნის დასასრულებლად გამოიყენე „$t(login.signInWithGoogle)“.",
     "signupStepUpBack": "ანგარიშის შექმნის დასასრულებლად დაბრუნდი უკან და გამოიყენე „$t(login.moreSignInOptions)“.",
-    "invalidCode": "ეს კოდი არასწორია ან ვადა გაუვიდა. ხელახლა სცადე ან გამოიყენე „$t(login.resendCode)“.",
+    "invalidCode": "ეს კოდი არასწორია ან ვადა გაუვიდა. გამოიყენე „$t(login.resendCode)“ ან „$t(login.moreSignInOptions)“.",
     "codeInProgress": "შენი კოდი მუშავდება. ცოტა მოიცადე და ხელახლა სცადე.",
     "tooManyAttempts": "მცდელობების რაოდენობა გადაჭარბებულია. მოითხოვე ახალი კოდი.",
     "invalidToken": "შესვლა ვერ მოხერხდა. ხელახლა სცადე.",

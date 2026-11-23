@@ -3960,7 +3960,7 @@
     "signupStepUpApple": "Para terminar de crear tu cuenta, usa «$t(login.signInWithApple)».",
     "signupStepUpGoogle": "Para terminar de crear tu cuenta, usa «$t(login.signInWithGoogle)».",
     "signupStepUpBack": "Para terminar de crear tu cuenta, vuelve atrás y usa «$t(login.moreSignInOptions)».",
-    "invalidCode": "Ese código es incorrecto o ha caducado. Inténtalo de nuevo o usa «$t(login.resendCode)».",
+    "invalidCode": "Ese código es incorrecto o ha caducado. Usa «$t(login.resendCode)» o «$t(login.moreSignInOptions)».",
     "codeInProgress": "Tu código se está procesando. Espera un momento e inténtalo de nuevo.",
     "tooManyAttempts": "Demasiados intentos. Solicita un código nuevo.",
     "invalidToken": "No se pudo iniciar sesión. Inténtalo de nuevo.",

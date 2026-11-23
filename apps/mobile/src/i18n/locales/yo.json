@@ -3890,7 +3890,7 @@
     "signupStepUpApple": "Láti parí ṣíṣẹ̀dá àkọọ́lẹ̀ rẹ, lo '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Láti parí ṣíṣẹ̀dá àkọọ́lẹ̀ rẹ, lo '$t(login.signInWithGoogle)'.",
     "signupStepUpBack": "Láti parí ṣíṣẹ̀dá àkọọ́lẹ̀ rẹ, padà sẹ́yìn kí o sì lo '$t(login.moreSignInOptions)'.",
-    "invalidCode": "Kóòdù yẹn kò tọ́ tàbí ó ti kọjá àkókò rẹ̀. Tún gbìyànjú tàbí lo '$t(login.resendCode)'.",
+    "invalidCode": "Kóòdù yẹn kò tọ́ tàbí ó ti kọjá àkókò rẹ̀. Lo '$t(login.resendCode)' tàbí lo '$t(login.moreSignInOptions)'.",
     "codeInProgress": "À ń ṣe àyẹ̀wò kóòdù rẹ. Dúró díẹ̀ kí o tún gbìyànjú.",
     "tooManyAttempts": "Àwọn ìgbìyànjú pọ̀ jù. Jọ̀wọ́ béèrè fún kóòdù tuntun.",
     "invalidToken": "Ìwọlé kùnà. Jọ̀wọ́ tún gbìyànjú.",

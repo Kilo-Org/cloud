@@ -4100,7 +4100,7 @@
     "signupStepUpApple": "Biex tlesti l-ħolqien tal-kont tiegħek, uża '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Biex tlesti l-ħolqien tal-kont tiegħek, uża '$t(login.signInWithGoogle)'.",
     "signupStepUpBack": "Biex tlesti l-ħolqien tal-kont tiegħek, mur lura u uża '$t(login.moreSignInOptions)'.",
-    "invalidCode": "Dak il-kodiċi huwa żbaljat jew skada. Erġa' pprova jew uża '$t(login.resendCode)'.",
+    "invalidCode": "Dak il-kodiċi huwa żbaljat jew skada. Uża '$t(login.resendCode)' jew '$t(login.moreSignInOptions)'.",
     "codeInProgress": "Il-kodiċi tiegħek qed jiġi pproċessat. Stenna mument u erġa' pprova.",
     "tooManyAttempts": "Wisq tentattivi. Jekk jogħġbok itlob kodiċi ġdid.",
     "invalidToken": "Ma stajtx tidħol. Erġa' pprova.",

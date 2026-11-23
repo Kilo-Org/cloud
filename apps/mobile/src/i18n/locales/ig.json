@@ -3890,7 +3890,7 @@
     "signupStepUpApple": "Iji mechaa imepụta akaụntụ gị, jiri '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Iji mechaa imepụta akaụntụ gị, jiri '$t(login.signInWithGoogle)'.",
     "signupStepUpBack": "Iji mechaa imepụta akaụntụ gị, laghachi azụ ma jiri '$t(login.moreSignInOptions)'.",
-    "invalidCode": "Koodu ahụ ezighi ezi ma ọ bụ na oge ya agafeela. Biko nwaa ọzọ ma ọ bụ jiri '$t(login.resendCode)'.",
+    "invalidCode": "Koodu ahụ ezighi ezi ma ọ bụ na oge ya agafeela. Jiri '$t(login.resendCode)' ma ọ bụ jiri '$t(login.moreSignInOptions)'.",
     "codeInProgress": "A na-ahazi koodu gị. Chere nwa oge wee nwaa ọzọ.",
     "tooManyAttempts": "Mgbalị karịrị akarị. Biko rịọ koodu ọhụrụ.",
     "invalidToken": "Nbanye emezughị. Biko nwaa ọzọ.",

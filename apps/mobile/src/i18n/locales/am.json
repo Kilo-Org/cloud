@@ -3890,7 +3890,7 @@
     "signupStepUpApple": "መለያህን መፍጠር ለመጨረስ '$t(login.signInWithApple)'ን ተጠቀም።",
     "signupStepUpGoogle": "መለያህን መፍጠር ለመጨረስ '$t(login.signInWithGoogle)'ን ተጠቀም።",
     "signupStepUpBack": "መለያህን መፍጠር ለመጨረስ ወደ ኋላ ተመለስና '$t(login.moreSignInOptions)'ን ተጠቀም።",
-    "invalidCode": "ያ ኮድ ትክክል አይደለም ወይም ጊዜው አልፎበታል። እንደገና ሞክር ወይም '$t(login.resendCode)'ን ተጠቀም።",
+    "invalidCode": "ያ ኮድ ትክክል አይደለም ወይም ጊዜው አልፎበታል። '$t(login.resendCode)'ን ወይም '$t(login.moreSignInOptions)'ን ተጠቀም።",
     "codeInProgress": "ኮድህ እየተሠራበት ነው። ትንሽ ጠብቅና እንደገና ሞክር።",
     "tooManyAttempts": "በጣም ብዙ ሙከራዎች ተደርገዋል። አዲስ ኮድ ጠይቅ።",
     "invalidToken": "መግባት አልተሳካም። እባክህ እንደገና ሞክር።",

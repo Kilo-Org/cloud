@@ -3960,7 +3960,7 @@
     "signupStepUpApple": "Lai pabeigtu konta izveidi, izvēlies “$t(login.signInWithApple)”.",
     "signupStepUpGoogle": "Lai pabeigtu konta izveidi, izvēlies “$t(login.signInWithGoogle)”.",
     "signupStepUpBack": "Lai pabeigtu konta izveidi, atgriezies iepriekšējā ekrānā un izvēlies “$t(login.moreSignInOptions)”.",
-    "invalidCode": "Kods ir nepareizs vai tam beidzies derīguma termiņš. Mēģini vēlreiz vai izvēlies “$t(login.resendCode)”.",
+    "invalidCode": "Kods ir nepareizs vai tam beidzies derīguma termiņš. Izmanto “$t(login.resendCode)” vai “$t(login.moreSignInOptions)”.",
     "codeInProgress": "Tavs kods tiek apstrādāts. Uzgaidi mirkli un mēģini vēlreiz.",
     "tooManyAttempts": "Pārāk daudz mēģinājumu. Pieprasi jaunu kodu.",
     "invalidToken": "Pierakstīšanās neizdevās. Lūdzu, mēģini vēlreiz.",

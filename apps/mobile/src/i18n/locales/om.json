@@ -3890,7 +3890,7 @@
     "signupStepUpApple": "Herrega kee uumuu xumuruuf '$t(login.signInWithApple)' fayyadami.",
     "signupStepUpGoogle": "Herrega kee uumuu xumuruuf '$t(login.signInWithGoogle)' fayyadami.",
     "signupStepUpBack": "Herrega kee uumuu xumuruuf duubatti deebi'ii '$t(login.moreSignInOptions)' fayyadami.",
-    "invalidCode": "Koodiin sun sirrii miti ykn yeroon isaa darbeera. Irra deebi'ii yaali ykn '$t(login.resendCode)' fayyadami.",
+    "invalidCode": "Koodiin sun sirrii miti ykn yeroon isaa darbeera. '$t(login.resendCode)' ykn '$t(login.moreSignInOptions)' fayyadami.",
     "codeInProgress": "Koodiin kee adeemsifamaa jira. Yeroo xiqqoo eegiitii irra deebi'ii yaali.",
     "tooManyAttempts": "Yaallii baay'ee godhame. Koodii haaraa gaafadhu.",
     "invalidToken": "Seenuun hin milkoofne. Irra deebi'ii yaali.",

@@ -4030,7 +4030,7 @@
     "signupStepUpApple": "Na dokončenie vytvorenia účtu použi „$t(login.signInWithApple)“.",
     "signupStepUpGoogle": "Na dokončenie vytvorenia účtu použi „$t(login.signInWithGoogle)“.",
     "signupStepUpBack": "Na dokončenie vytvorenia účtu sa vráť späť a použi „$t(login.moreSignInOptions)“.",
-    "invalidCode": "Tento kód je nesprávny alebo jeho platnosť vypršala. Skús to znova alebo použi „$t(login.resendCode)“.",
+    "invalidCode": "Tento kód je nesprávny alebo jeho platnosť vypršala. Použi „$t(login.resendCode)“ alebo „$t(login.moreSignInOptions)“.",
     "codeInProgress": "Tvoj kód sa spracúva. Chvíľu počkaj a skús to znova.",
     "tooManyAttempts": "Príliš veľa pokusov. Vyžiadaj si nový kód.",
     "invalidToken": "Prihlásenie zlyhalo. Skús to znova.",

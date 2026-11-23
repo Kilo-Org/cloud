@@ -3890,7 +3890,7 @@
     "signupStepUpApple": "Հաշվի ստեղծումն ավարտելու համար ընտրիր «$t(login.signInWithApple)»։",
     "signupStepUpGoogle": "Հաշվի ստեղծումն ավարտելու համար ընտրիր «$t(login.signInWithGoogle)»։",
     "signupStepUpBack": "Հաշվի ստեղծումն ավարտելու համար վերադարձիր նախորդ էկրան և ընտրիր «$t(login.moreSignInOptions)»։",
-    "invalidCode": "Կոդը սխալ է կամ ժամկետանց։ Կրկին փորձիր կամ ընտրիր «$t(login.resendCode)»։",
+    "invalidCode": "Կոդը սխալ է կամ ժամկետանց։ Օգտագործիր «$t(login.resendCode)» կամ «$t(login.moreSignInOptions)»։",
     "codeInProgress": "Կոդդ մշակվում է։ Մի քիչ սպասիր և կրկին փորձիր։",
     "tooManyAttempts": "Չափազանց շատ փորձեր են կատարվել։ Նոր կոդ խնդրիր։",
     "invalidToken": "Չհաջողվեց մուտք գործել։ Կրկին փորձիր։",

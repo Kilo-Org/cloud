@@ -3890,7 +3890,7 @@
     "signupStepUpApple": "За да завършиш създаването на акаунта си, използвай „$t(login.signInWithApple)“.",
     "signupStepUpGoogle": "За да завършиш създаването на акаунта си, използвай „$t(login.signInWithGoogle)“.",
     "signupStepUpBack": "За да завършиш създаването на акаунта си, върни се назад и използвай „$t(login.moreSignInOptions)“.",
-    "invalidCode": "Кодът е неправилен или е изтекъл. Опитай отново или използвай „$t(login.resendCode)“.",
+    "invalidCode": "Кодът е неправилен или е изтекъл. Използвай „$t(login.resendCode)“ или „$t(login.moreSignInOptions)“.",
     "codeInProgress": "Кодът ти се обработва. Изчакай малко и опитай отново.",
     "tooManyAttempts": "Твърде много опити. Поискай нов код.",
     "invalidToken": "Влизането беше неуспешно. Опитай отново.",

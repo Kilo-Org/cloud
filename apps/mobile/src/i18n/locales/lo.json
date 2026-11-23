@@ -3890,7 +3890,7 @@
     "signupStepUpApple": "ໃຊ້ '$t(login.signInWithApple)' ເພື່ອສ້າງບັນຊີຂອງທ່ານໃຫ້ສຳເລັດ.",
     "signupStepUpGoogle": "ໃຊ້ '$t(login.signInWithGoogle)' ເພື່ອສ້າງບັນຊີຂອງທ່ານໃຫ້ສຳເລັດ.",
     "signupStepUpBack": "ກັບຄືນໄປ ແລ້ວໃຊ້ '$t(login.moreSignInOptions)' ເພື່ອສ້າງບັນຊີຂອງທ່ານໃຫ້ສຳເລັດ.",
-    "invalidCode": "ລະຫັດນັ້ນບໍ່ຖືກຕ້ອງ ຫຼື ໝົດອາຍຸແລ້ວ. ກະລຸນາລອງອີກຄັ້ງ ຫຼື ໃຊ້ '$t(login.resendCode)'.",
+    "invalidCode": "ລະຫັດນັ້ນບໍ່ຖືກຕ້ອງ ຫຼື ໝົດອາຍຸແລ້ວ. ໃຊ້ '$t(login.resendCode)' ຫຼື ໃຊ້ '$t(login.moreSignInOptions)'.",
     "codeInProgress": "ກຳລັງປະມວນຜົນລະຫັດຂອງທ່ານ. ລໍຖ້າຈັກໜ້ອຍແລ້ວລອງອີກຄັ້ງ.",
     "tooManyAttempts": "ທ່ານລອງຫຼາຍຄັ້ງເກີນໄປແລ້ວ. ກະລຸນາຂໍລະຫັດໃໝ່.",
     "invalidToken": "ເຂົ້າສູ່ລະບົບບໍ່ສຳເລັດ. ກະລຸນາລອງໃໝ່.",

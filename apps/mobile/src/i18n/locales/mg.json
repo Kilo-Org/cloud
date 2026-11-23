@@ -3890,7 +3890,7 @@
     "signupStepUpApple": "Ampiasao ny '$t(login.signInWithApple)' hamitana ny famoronana ny kaontinao.",
     "signupStepUpGoogle": "Ampiasao ny '$t(login.signInWithGoogle)' hamitana ny famoronana ny kaontinao.",
     "signupStepUpBack": "Mba hamitana ny famoronana ny kaontinao, miverena any aoriana ary ampiasao ny '$t(login.moreSignInOptions)'.",
-    "invalidCode": "Diso na tapitra ny fe-potoanany io kaody io. Andramo indray na ampiasao ny '$t(login.resendCode)'.",
+    "invalidCode": "Diso na tapitra ny fe-potoanany io kaody io. Ampiasao ny '$t(login.resendCode)' na ny '$t(login.moreSignInOptions)'.",
     "codeInProgress": "Mbola karakaraina ny kaodinao. Miandrasa kely ary andramo indray.",
     "tooManyAttempts": "Betsaka loatra ny andrana. Mangataha kaody vaovao azafady.",
     "invalidToken": "Tsy nahomby ny fidirana. Andramo indray azafady.",

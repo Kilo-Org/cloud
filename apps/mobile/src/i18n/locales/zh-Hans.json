@@ -3890,7 +3890,7 @@
     "signupStepUpApple": "如需完成账户创建，请选择“$t(login.signInWithApple)”。",
     "signupStepUpGoogle": "如需完成账户创建，请选择“$t(login.signInWithGoogle)”。",
     "signupStepUpBack": "如需完成账户创建，请返回上一步并选择“$t(login.moreSignInOptions)”。",
-    "invalidCode": "验证码不正确或已过期。请重试，或选择“$t(login.resendCode)”。",
+    "invalidCode": "验证码不正确或已过期。请选择“$t(login.resendCode)”或“$t(login.moreSignInOptions)”。",
     "codeInProgress": "正在处理你的验证码。请稍后重试。",
     "tooManyAttempts": "尝试次数过多。请重新获取验证码。",
     "invalidToken": "登录失败。请重试。",

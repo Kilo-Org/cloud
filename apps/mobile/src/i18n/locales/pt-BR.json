@@ -4030,7 +4030,7 @@
     "signupStepUpApple": "Para concluir a criação da sua conta, use '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Para concluir a criação da sua conta, use '$t(login.signInWithGoogle)'.",
     "signupStepUpBack": "Para concluir a criação da sua conta, volte e use '$t(login.moreSignInOptions)'.",
-    "invalidCode": "Esse código está incorreto ou expirou. Tente novamente ou use '$t(login.resendCode)'.",
+    "invalidCode": "Esse código está incorreto ou expirou. Use '$t(login.resendCode)' ou '$t(login.moreSignInOptions)'.",
     "codeInProgress": "Seu código está sendo processado. Aguarde um momento e tente novamente.",
     "tooManyAttempts": "Muitas tentativas. Solicite um novo código.",
     "invalidToken": "Não foi possível entrar. Tente novamente.",

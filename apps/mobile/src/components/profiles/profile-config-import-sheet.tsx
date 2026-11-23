@@ -73,11 +73,15 @@ export function ProfileConfigImportSheet({
   const { previewConfigImport, applyConfigImport } = useConfigImportMutations(organizationId);
   const colors = useThemeColors();
   const permission = useOrganizationProfilePermission(organizationId);
-  // The sheet lasts only as long as the permission that allows it. A
-  // `read-only` verdict closes it, and the unmount drops the pasted text, the
-  // preview and the selection with it. `resolving` keeps the sheet: the role is
-  // not known yet, and the server may still accept the import.
+  // A `read-only` verdict closes the sheet, and the unmount drops the pasted
+  // text, the preview and the selection with it. `resolving` keeps the sheet:
+  // the role is not known yet, and the server may still accept the import.
   useCloseEditorOnDeniedPermission(permission, onClose);
+  // The permission a request settles under, not the one it started under: a
+  // denial closes the sheet mid-request, so its refusal needs a surface that
+  // outlives it.
+  const permissionRef = useRef(permission);
+  permissionRef.current = permission;
 
   const textRef = useRef('');
   const archiveRef = useRef<string | null>(null);
@@ -168,6 +172,12 @@ export function ProfileConfigImportSheet({
       toast.success(t('profiles.importConfigApplied'));
       onClose();
     } catch (error) {
+      // A denial closed the sheet, so this refusal has no inline note left: the
+      // toast carries it to the surface that remains.
+      if (permissionRef.current === 'read-only') {
+        toast.error(errorMessage(error) ?? t('profiles.importConfigApplyFailed'));
+        return;
+      }
       setFailure(errorMessage(error) ?? t('profiles.importConfigApplyFailed'));
     } finally {
       setStatus('idle');

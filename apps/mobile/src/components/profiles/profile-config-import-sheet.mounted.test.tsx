@@ -2,9 +2,11 @@
 // `resolving` keeps the pasted config on screen because the role is not known.
 import { type QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createElement } from 'react';
+import { toast as mockedToast } from 'sonner-native';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
+import { type ImportPreviewInput } from '@/components/profiles/config-import-preview-model';
 import { ProfileConfigImportSheet } from '@/components/profiles/profile-config-import-sheet';
 import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
@@ -16,6 +18,21 @@ const h = vi.hoisted(() => ({
 }));
 
 const onClose = vi.fn();
+
+/** A preview with one importable section, so the header's Done submits an apply. */
+const PREVIEW: ImportPreviewInput = {
+  agents: {
+    added: [{ id: 'reviewer', item: { slug: 'reviewer', name: 'Reviewer', config: {} } }],
+    changed: [],
+  },
+  commands: { added: [], changed: [] },
+  skills: { added: [], changed: [] },
+  instructions: { added: [], changed: [] },
+  issues: [],
+};
+
+/** The server's refusal, as the apply reports it. */
+const REFUSAL = 'Only organization owners and admins can change this profile';
 
 const SHEET_PROPS = {
   profileId: 'profile-1',
@@ -65,6 +82,15 @@ function findAll(root: ReactTestInstance, type: string): ReactTestInstance[] {
   return root.findAll(node => typeof node.type === 'string' && node.type === type);
 }
 
+/** The first host node of `type`, or a loud failure naming what the suite expected. */
+function propNode(root: ReactTestInstance, type: string, what: string): ReactTestInstance {
+  const node = findAll(root, type)[0];
+  if (node === undefined) {
+    throw new Error(`${what} was not rendered`);
+  }
+  return node;
+}
+
 function mountSheet() {
   return renderWithProviders(createElement(ProfileConfigImportSheet, SHEET_PROPS));
 }
@@ -79,6 +105,28 @@ async function rerenderSheet(renderer: ReactTestRenderer, queryClient: QueryClie
         createElement(ProfileConfigImportSheet, SHEET_PROPS)
       )
     );
+    await Promise.resolve();
+  });
+}
+
+/** The pasted-config field, whose text the sheet keeps in a ref. */
+function changePastedConfig(root: ReactTestInstance, value: string): void {
+  const handler = propNode(root, 'FormField', 'the pasted-config field').props as {
+    onChangeText?: (v: string) => void;
+  };
+  if (handler.onChangeText === undefined) {
+    throw new Error('the pasted-config field takes no text');
+  }
+  handler.onChangeText(value);
+}
+
+/** Press the sheet header's Done control, which previews or applies. */
+async function pressHeaderDone(root: ReactTestInstance): Promise<void> {
+  const handler = propNode(root, 'SheetHeader', 'the sheet header').props as {
+    onDone?: () => Promise<void> | void;
+  };
+  await act(async () => {
+    await handler.onDone?.();
     await Promise.resolve();
   });
 }
@@ -117,6 +165,33 @@ describe('ProfileConfigImportSheet permission gate', () => {
 
     expect(onClose).not.toHaveBeenCalled();
     expect(findAll(renderer.root, 'SessionPageSheet')).toHaveLength(1);
+
+    unmount();
+  });
+
+  it('read-only while an apply is refused: the refusal reaches the toast', async () => {
+    h.preview.mockResolvedValue(PREVIEW);
+    const apply = Promise.withResolvers<unknown>();
+    h.apply.mockReturnValue(apply.promise);
+
+    const { renderer, queryClient, unmount } = await mountSheet();
+    act(() => {
+      changePastedConfig(renderer.root, JSON.stringify({ agents: [] }));
+    });
+    // The header's Done previews first and applies once a preview is on screen.
+    await pressHeaderDone(renderer.root);
+    await pressHeaderDone(renderer.root);
+
+    // The permission turns read-only while the apply is in flight, so the sheet
+    // is closing when the server refuses: the note has to outlive it.
+    h.permission = 'read-only';
+    await rerenderSheet(renderer, queryClient);
+    await act(async () => {
+      apply.reject(new Error(REFUSAL));
+      await Promise.resolve();
+    });
+
+    expect(mockedToast.error).toHaveBeenCalledWith(REFUSAL);
 
     unmount();
   });

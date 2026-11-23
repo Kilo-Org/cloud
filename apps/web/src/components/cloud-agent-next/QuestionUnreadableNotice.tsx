@@ -19,8 +19,7 @@ export function QuestionUnreadableNotice() {
       <AlertTitle>Question could not be displayed</AlertTitle>
       <AlertDescription className="space-y-1">
         <p>
-          The agent is waiting on a question this app cannot show. Answer the question in the CLI to
-          continue.
+          The agent is waiting on a question this app cannot show. Answer it in the CLI to continue.
         </p>
       </AlertDescription>
     </Alert>

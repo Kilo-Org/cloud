@@ -10,8 +10,9 @@ describe('QuestionUnreadableNotice', () => {
 
     expect(html).toContain('role="alert"');
     expect(html).toContain('Question could not be displayed');
-    expect(html).toContain('The agent is waiting on a question this app cannot show.');
-    expect(html).toContain('Answer the question in the CLI to continue.');
+    expect(html).toContain(
+      'The agent is waiting on a question this app cannot show. Answer it in the CLI to continue.'
+    );
   });
 
   it('offers no answer action for a question that carried no readable options', () => {

@@ -34,19 +34,18 @@ function hashMagicLinkToken(plaintextToken: string): string {
 
 /**
  * The row identity of a redeemable sign-in code, shared by every path that
- * settles one: the address the code was delivered to, the hash of the code,
- * the sign-in-code purpose, an unconsumed row, and the challenge when the
- * caller has one.
+ * settles one. The predicates below are the whole identity.
  *
  * A path that needs more — a live reservation, an unexpired row, attempt
  * budget — appends its own clauses through `clauses`, so the row identity
  * itself is never restated and cannot drift between paths.
  *
- * When a challenge is supplied, this identity is narrower than the row it
- * belongs to: the address predicate stays, because a settlement must never
- * move from the delivered address to another address that shares a challenge.
- * `signInCodeRowWhere` is the hash-free row identity used by paths that
- * resolve a row before hashing the code.
+ * A supplied `challengeId` narrows the identity to that challenge, and every
+ * wrapper that accepts one is scoped the same way. The address predicate stays
+ * in that case, because a settlement must never move from the delivered
+ * address to another address that shares a challenge. `signInCodeRowWhere` is
+ * the hash-free row identity used by paths that resolve a row before hashing
+ * the code.
  */
 function signInCodeWhere({
   codeEmail,
@@ -70,12 +69,8 @@ function signInCodeWhere({
 }
 
 /**
- * The row identity of a sign-in code without its hash: the discriminator the
- * caller resolved the row by — the challenge when it has one, otherwise the
- * delivered address — plus the sign-in-code purpose and an unconsumed row.
- *
- * Paths that do not yet know the code hash resolve a row with this and append
- * what they need through `clauses`.
+ * The row identity of a sign-in code without its hash, for paths that resolve
+ * a row before hashing the code. They append what they need through `clauses`.
  */
 function signInCodeRowWhere({
   codeEmail,
@@ -122,11 +117,6 @@ export const MagicLinkTokenWithPlaintext = MagicLinkToken.extend({
   plaintext_token: z.string(),
 });
 
-/**
- * @param email - The email address to associate with the token
- * @param expiresInMinutes - Number of minutes until the token expires (default: 30)
- * @returns The created token record with the plaintext token (for sending in email)
- */
 export async function createMagicLinkToken(
   email: string,
   expiresInMinutes: number = 30
@@ -149,15 +139,8 @@ export async function createMagicLinkToken(
 
 /**
  * Verify and consume a magic link token atomically.
- * This function will only succeed if the token:
- * - Exists in the database
- * - Has not been consumed yet
- * - Has not expired
  *
  * If successful, the token is marked as consumed and cannot be used again.
- *
- * @param plaintextToken - The plaintext token from the magic link URL
- * @returns The token record if valid and consumed, null otherwise
  */
 export async function verifyAndConsumeMagicLinkToken(
   plaintextToken: string
@@ -200,9 +183,6 @@ export async function verifyAndConsumeMagicLinkToken(
  * address including any `+` suffix and Gmail dots. Only that address can redeem
  * it, so a delivery to an alias of another address authenticates the alias and
  * never the account that address belongs to.
- *
- * @param email - The address the code is sent to
- * @returns The plaintext 6-digit code and an opaque challenge identifier
  */
 export async function createSignInCode(
   email: string
@@ -232,13 +212,11 @@ export type ReserveSignInCodeResult = 'ok' | 'invalid' | 'too_many_attempts' | '
 
 /**
  * Reserve a sign-in code for settlement. Does not consume the code.
- * A live reservation blocks concurrent callers, who receive 'in_progress'.
  * A failed settlement must call releaseSignInCode so the code stays usable.
  *
  * Challenge verification counts in attempts; compatibility verification counts
  * in legacy_attempts. Wrong guesses draw on one allowance shared by both modes,
- * so alternating them cannot buy a second allowance. Lookups follow the
- * supplied challenge when present, otherwise the delivered address.
+ * so alternating them cannot buy a second allowance.
  *
  * Returns 'ok' when the code is reserved, 'invalid' for a wrong/expired/consumed
  * code, 'too_many_attempts' when the attempt budget is exhausted, and
@@ -374,8 +352,6 @@ async function settleSignInCode({
 /**
  * Commit a reserved sign-in code.
  * Must be called only after a successful settlement.
- *
- * When challengeId is supplied, the commit is scoped to the challenge.
  */
 export async function commitSignInCode(
   email: string,
@@ -388,8 +364,6 @@ export async function commitSignInCode(
 /**
  * Release a reserved sign-in code without consuming it or incrementing attempts.
  * A settlement failure is not a wrong guess — it must not cost the user an attempt.
- *
- * When challengeId is supplied, the release is scoped to the challenge.
  */
 export async function releaseSignInCode(
   email: string,
@@ -409,8 +383,6 @@ export async function releaseSignInCode(
  * Consume a sign-in code unconditionally, regardless of reservation status.
  * Used when the reservation lapsed between settlement and commit — the user
  * is legitimately settled and this prevents a second settlement with the same code.
- *
- * When challengeId is supplied, the consume is scoped to the challenge.
  */
 export async function consumeSignInCode(
   email: string,

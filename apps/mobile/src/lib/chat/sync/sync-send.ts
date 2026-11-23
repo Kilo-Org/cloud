@@ -1,4 +1,4 @@
-import type { ChatPlace } from '../scope';
+import { type ChatPlace } from '../scope';
 import { setBanner } from './sync-banners';
 import { depsFor } from './sync-deps';
 import { admitTurn } from './sync-pull';
@@ -26,7 +26,10 @@ export async function prepareSend(
   try {
     const { deps, client, db } = await depsFor(place);
     const record = syncRecordOf(db, sessionId);
-    if (record === null || record.serverSessionId === null || record.phase === 'local') {
+    if (record === null) {
+      return { kind: 'local' };
+    }
+    if (record.serverSessionId === null || record.phase === 'local') {
       return { kind: 'local' };
     }
     const live = await client.probeLive(record.serverSessionId);
@@ -72,4 +75,3 @@ export async function prepareSend(
     return { kind: 'blocked', reason: 'unavailable' };
   }
 }
-

@@ -1,4 +1,4 @@
-import  { type Turn } from '@kilocode/harness-sdk';
+import { type Turn } from '@kilocode/harness-sdk';
 
 import {
   applyPulled,
@@ -8,6 +8,7 @@ import {
   type TurnAdmission,
 } from './sync-engine';
 import { tailStateOf } from './sync-mapping';
+import { unreadyOutcome } from './sync-protocol';
 import { saveSyncRecord, syncRecordOf } from './sync-store';
 
 /**
@@ -27,45 +28,34 @@ export async function pullChat(
       await deps.forgetLocal(input.sessionId);
       return { kind: 'deleted' };
     }
-    return ready.kind === 'unknown-chat'
-      ? { kind: 'unknown-chat' }
-      : (ready.kind === 'pending'
-        ? { kind: 'pending' }
-        : { kind: 'failed', code: ready.code });
+    return unreadyOutcome(ready);
   }
   const pulled = await deps.transport.pull(ready.serverId);
-  switch (pulled.type) {
-    case 'deleted': {
-      saveSyncRecord(deps.db, input.sessionId, { phase: 'deleted', outbox: null });
-      await deps.forgetLocal(input.sessionId);
-      return { kind: 'deleted' };
-    }
-    case 'not_found': {
-      return { kind: 'not-found' };
-    }
-    case 'retryable': {
-      return { kind: 'pending' };
-    }
-    case 'failed': {
-      return { kind: 'failed', code: pulled.code };
-    }
-    default: {
-      if (
-        pulled.snapshot.position === ready.record.acknowledged &&
-        ready.record.phase === 'synced'
-      ) {
-        return { kind: 'current' };
-      }
-      const count = await applyPulled({
-        deps,
-        sessionId: input.sessionId,
-        serverId: ready.serverId,
-        snapshot: pulled.snapshot,
-        model: input.modelId,
-      });
-      return count === 0 ? { kind: 'current' } : { kind: 'imported', count };
-    }
+  if (pulled.type === 'deleted') {
+    saveSyncRecord(deps.db, input.sessionId, { phase: 'deleted', outbox: null });
+    await deps.forgetLocal(input.sessionId);
+    return { kind: 'deleted' };
   }
+  if (pulled.type === 'not_found') {
+    return { kind: 'not-found' };
+  }
+  if (pulled.type === 'retryable') {
+    return { kind: 'pending' };
+  }
+  if (pulled.type === 'failed') {
+    return { kind: 'failed', code: pulled.code };
+  }
+  if (pulled.snapshot.position === ready.record.acknowledged && ready.record.phase === 'synced') {
+    return { kind: 'current' };
+  }
+  const count = await applyPulled({
+    deps,
+    sessionId: input.sessionId,
+    serverId: ready.serverId,
+    snapshot: pulled.snapshot,
+    model: input.modelId,
+  });
+  return count === 0 ? { kind: 'current' } : { kind: 'imported', count };
 }
 
 /** H6 admission for a synced chat, from one fresh pull. Unsynced chats always run locally. */
@@ -79,7 +69,10 @@ export async function admitTurn(
   }
 ): Promise<TurnAdmission> {
   const record = syncRecordOf(deps.db, input.sessionId);
-  if (record === null || record.serverSessionId === null || record.phase === 'local') {
+  if (record === null) {
+    return { kind: 'local-turn' };
+  }
+  if (record.serverSessionId === null || record.phase === 'local') {
     return { kind: 'local-turn' };
   }
   if (record.phase === 'diverged') {

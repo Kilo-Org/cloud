@@ -2,18 +2,18 @@ import { randomUUID } from 'expo-crypto';
 import * as Crypto from 'expo-crypto';
 import { Effect, ManagedRuntime, Option } from 'effect';
 import { SessionStore } from '@kilocode/harness-sdk';
-import type { SQLiteDatabase } from 'expo-sqlite';
+import { type SQLiteDatabase } from 'expo-sqlite';
 
 import { encryptedDatabase } from '@/lib/persist/encrypted-kv';
 
 import { chatLayers, organizationIdOf } from '../layers';
 import { releaseChat, SYSTEM } from '../registry';
-import type { ChatPlace } from '../scope';
+import { type ChatPlace } from '../scope';
 import { type ChatDatabase, deleteChat } from '../store';
 import { announceDeleted, setBanner } from './sync-banners';
 import { type SyncClient, syncClientFor } from './sync-client';
-import type { SyncDeps } from './sync-protocol';
 import { mintServerSessionId } from './sync-ids';
+import { type SyncDeps } from './sync-protocol';
 import { readChatSyncSetting } from './sync-settings';
 
 /**
@@ -34,17 +34,24 @@ export function runtimeFor(place: ChatPlace, db: SQLiteDatabase) {
   return heldRuntime;
 }
 
-export /** The app's database, read through the sync engine's narrower contract. */
-function chatDbOf(database: SQLiteDatabase): ChatDatabase {
+/**
+ * The app's database, read through the sync engine's narrower contract. The
+ * write is wrapped so the engine sees no statement result it did not ask for.
+ */
+export function chatDbOf(database: SQLiteDatabase): ChatDatabase {
   return {
     getAllSync: database.getAllSync.bind(database),
-    runSync: database.runSync.bind(database),
+    runSync: (source, params) => {
+      database.runSync(source, params);
+    },
     withTransactionSync: database.withTransactionSync.bind(database),
     isInTransactionSync: database.isInTransactionSync.bind(database),
   };
 }
 
-export async function depsFor(place: ChatPlace): Promise<{ deps: SyncDeps; client: SyncClient; db: ChatDatabase }> {
+export async function depsFor(
+  place: ChatPlace
+): Promise<{ deps: SyncDeps; client: SyncClient; db: ChatDatabase }> {
   const database = await encryptedDatabase();
   const db = chatDbOf(database);
   const client = syncClientFor(organizationIdOf(place.org));
@@ -87,4 +94,3 @@ export async function depsFor(place: ChatPlace): Promise<{ deps: SyncDeps; clien
 export async function syncSettingOn(place: ChatPlace): Promise<boolean> {
   return (await readChatSyncSetting(place.chatScope)) === 'on';
 }
-

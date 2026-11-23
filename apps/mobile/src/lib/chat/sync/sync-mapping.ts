@@ -2,7 +2,13 @@ import { type PortableMessage, type PulledMessage } from '@kilocode/cloud-agent-
 import { type Turn } from '@kilocode/harness-sdk';
 import { z } from 'zod';
 
-import { idleMsgIdForTurn, importedPartId, importedTurnId, msgIdForTurn, ulidTimeMs } from './sync-ids';
+import {
+  idleMsgIdForTurn,
+  importedPartId,
+  importedTurnId,
+  msgIdForTurn,
+  ulidTimeMs,
+} from './sync-ids';
 
 /**
  * Harness turns to portable messages, and pulled messages back to harness
@@ -73,7 +79,7 @@ function toolResultsByCallId(turns: readonly Turn[]): ReadonlyMap<string, Part> 
 
 const toolInputSchema = z.record(z.string(), z.unknown());
 
-/** A tool call's arguments as the object the model wrote, else the raw text. */
+/** A tool call's arguments as the model wrote them, else the raw text. */
 function toolInput(body: string): Record<string, unknown> | string {
   try {
     const parsed = toolInputSchema.safeParse(JSON.parse(body));
@@ -81,6 +87,37 @@ function toolInput(body: string): Record<string, unknown> | string {
   } catch {
     return body;
   }
+}
+
+/**
+ * A pulled file that carries its bytes inline. The contract's other file
+ * variant names an authorized URI and carries no `data`, so it fails here.
+ */
+const inlineFileSchema = z.object({ data: z.string(), mime: z.string() }).passthrough();
+
+/** One pulled tool-result content item that speaks text. */
+const textContentSchema = z.object({ text: z.string() }).passthrough();
+
+/**
+ * A pulled tool call's recorded input: the raw string when the producer kept
+ * one, else the JSON text of whatever object it wrote.
+ */
+const pulledToolInputSchema = z.union([
+  z.string(),
+  z.unknown().transform(value => JSON.stringify(value ?? {})),
+]);
+
+/** One image an inline file carries, ready for a harness image part. */
+type InlineImage = { readonly body: string; readonly media: string };
+
+/** The image parts inline files give a pulled user message, in file order. */
+function inlineImagesOf(files: readonly { readonly mime: string }[]): readonly InlineImage[] {
+  return files.flatMap(file => {
+    const inline = inlineFileSchema.safeParse(file);
+    return inline.success && inline.data.mime.startsWith('image/')
+      ? [{ body: inline.data.data, media: inline.data.mime }]
+      : [];
+  });
 }
 
 /** One turn with the seq and message id the engine assigned it. */
@@ -120,42 +157,40 @@ export function turnsToPortable(
           const blob = options.blobs.get(part.id);
           return blob === undefined ? [] : [{ mime: part.media, blob }];
         });
-      if (text === '' && files.length === 0) {
-        continue;
+      if (text !== '' || files.length > 0) {
+        messages.push({ type: 'user', id: msgId, seq, text, files, time: { created } });
       }
-      messages.push({ type: 'user', id: msgId, seq, text, files, time: { created } });
-      continue;
-    }
-    const content: Extract<PortableMessage, { type: 'assistant' }>['content'] = [];
-    for (const part of turn.parts) {
-      if (part.kind === 'text' || part.kind === 'summary') {
-        content.push({ type: 'text', text: part.body });
-      } else if (part.kind === 'reasoning') {
-        content.push({ type: 'reasoning', text: part.body });
-      } else if (part.kind === 'toolCall') {
-        const result = results.get(part.callId);
-        content.push({
-          type: 'tool',
-          id: part.callId,
-          name: part.name,
-          state: {
-            status: result?.kind === 'toolResult' && result.failed ? 'error' : 'completed',
-            input: toolInput(part.body),
-            content:
-              result?.kind === 'toolResult' ? [{ type: 'text', text: result.body }] : [],
-          },
-        });
+    } else {
+      const content: Extract<PortableMessage, { type: 'assistant' }>['content'] = [];
+      for (const part of turn.parts) {
+        if (part.kind === 'text' || part.kind === 'summary') {
+          content.push({ type: 'text', text: part.body });
+        } else if (part.kind === 'reasoning') {
+          content.push({ type: 'reasoning', text: part.body });
+        } else if (part.kind === 'toolCall') {
+          const result = results.get(part.callId);
+          content.push({
+            type: 'tool',
+            id: part.callId,
+            name: part.name,
+            state: {
+              status: result?.kind === 'toolResult' && result.failed ? 'error' : 'completed',
+              input: toolInput(part.body),
+              content: result?.kind === 'toolResult' ? [{ type: 'text', text: result.body }] : [],
+            },
+          });
+        }
       }
+      messages.push({
+        type: 'assistant',
+        id: msgId,
+        seq,
+        agent: options.agent,
+        model: options.model,
+        content,
+        time: { created, completed: created },
+      });
     }
-    messages.push({
-      type: 'assistant',
-      id: msgId,
-      seq,
-      agent: options.agent,
-      model: options.model,
-      content,
-      time: { created, completed: created },
-    });
   }
   const last = sequenced.at(-1);
   if (options.idleSeq !== null && last?.turn.role === 'assistant') {
@@ -185,11 +220,9 @@ export function pulledToTurns(pulled: readonly PulledMessage[], sessionId: strin
         parts.push({ id: partId(ordinal), kind: 'text', body: message.text });
         ordinal += 1;
       }
-      for (const file of message.files ?? []) {
-        if ('data' in file && typeof file.data === 'string' && file.mime.startsWith('image/')) {
-          parts.push({ id: partId(ordinal), kind: 'image', body: file.data, media: file.mime });
-          ordinal += 1;
-        }
+      for (const image of inlineImagesOf(message.files ?? [])) {
+        parts.push({ id: partId(ordinal), kind: 'image', body: image.body, media: image.media });
+        ordinal += 1;
       }
       for (const block of message.content ?? []) {
         if (block.type === 'text' && block.text !== undefined && block.text !== '') {
@@ -200,54 +233,54 @@ export function pulledToTurns(pulled: readonly PulledMessage[], sessionId: strin
       if (parts.length > 0) {
         turns.push({ id: turnId, sessionId, role: 'user', parts });
       }
-      continue;
-    }
-    if (message.type !== 'assistant') {
-      continue;
-    }
-    const parts: Part[] = [];
-    const results: Part[] = [];
-    let ordinal = 0;
-    for (const block of message.content ?? []) {
-      if (block.type === 'text' && block.text !== undefined) {
-        parts.push({ id: partId(ordinal), kind: 'text', body: block.text });
-        ordinal += 1;
-      } else if (block.type === 'reasoning' && block.text !== undefined) {
-        parts.push({ id: partId(ordinal), kind: 'reasoning', body: block.text });
-        ordinal += 1;
-      } else if (block.type === 'tool' && block.id !== undefined && block.name !== undefined) {
-        const input = block.state?.input;
-        parts.push({
-          id: partId(ordinal),
-          kind: 'toolCall',
-          body: typeof input === 'string' ? input : JSON.stringify(input ?? {}),
-          callId: block.id,
-          name: block.name,
-        });
-        ordinal += 1;
-        const text = (block.state?.content ?? [])
-          .map(one => ('text' in one && typeof one.text === 'string' ? one.text : ''))
-          .join('');
-        results.push({
-          id: partId(ordinal),
-          kind: 'toolResult',
-          body: text,
-          callId: block.id,
-          failed: block.state?.status === 'error',
-        });
-        ordinal += 1;
+    } else if (message.type === 'assistant') {
+      const parts: Part[] = [];
+      const results: Part[] = [];
+      let ordinal = 0;
+      for (const block of message.content ?? []) {
+        if (block.type === 'text' && block.text !== undefined) {
+          parts.push({ id: partId(ordinal), kind: 'text', body: block.text });
+          ordinal += 1;
+        } else if (block.type === 'reasoning' && block.text !== undefined) {
+          parts.push({ id: partId(ordinal), kind: 'reasoning', body: block.text });
+          ordinal += 1;
+        } else if (block.type === 'tool' && block.id !== undefined && block.name !== undefined) {
+          const parsedInput = pulledToolInputSchema.safeParse(block.state?.input);
+          parts.push({
+            id: partId(ordinal),
+            kind: 'toolCall',
+            body: parsedInput.success ? parsedInput.data : '{}',
+            callId: block.id,
+            name: block.name,
+          });
+          ordinal += 1;
+          const text = (block.state?.content ?? [])
+            .map(one => {
+              const content = textContentSchema.safeParse(one);
+              return content.success ? content.data.text : '';
+            })
+            .join('');
+          results.push({
+            id: partId(ordinal),
+            kind: 'toolResult',
+            body: text,
+            callId: block.id,
+            failed: block.state?.status === 'error',
+          });
+          ordinal += 1;
+        }
       }
-    }
-    if (parts.length > 0) {
-      turns.push({ id: turnId, sessionId, role: 'assistant', parts });
-    }
-    if (results.length > 0) {
-      turns.push({
-        id: `${importedTurnId(created, seq)  }R`,
-        sessionId,
-        role: 'user',
-        parts: results,
-      });
+      if (parts.length > 0) {
+        turns.push({ id: turnId, sessionId, role: 'assistant', parts });
+      }
+      if (results.length > 0) {
+        turns.push({
+          id: `${importedTurnId(created, seq)}R`,
+          sessionId,
+          role: 'user',
+          parts: results,
+        });
+      }
     }
   }
   return turns;
@@ -277,9 +310,7 @@ export function tailStateOf(pulled: readonly PulledMessage[], now: number): Tail
     if (completed !== undefined) {
       return { kind: 'settled' };
     }
-    return now - last.message.time.created > STALE_TAIL_MS
-      ? { kind: 'settled' }
-      : { kind: 'busy' };
+    return now - last.message.time.created > STALE_TAIL_MS ? { kind: 'settled' } : { kind: 'busy' };
   }
   return { kind: 'settled' };
 }

@@ -12,13 +12,14 @@ import {
   freeze,
   sequenceNewTurns,
   sessionOf,
-  thaw,
   type SyncDeps,
+  thaw,
+  unreadyOutcome,
   type UploadChatInput,
-  type UploadOutcome,
   type UploadedBlob,
+  type UploadOutcome,
 } from './sync-protocol';
-import { saveSyncRecord, stampServerSessionId, syncRecordOf, type SyncRecord } from './sync-store';
+import { saveSyncRecord, stampServerSessionId, type SyncRecord, syncRecordOf } from './sync-store';
 
 /**
  * The sync engine: register a chat, then upload its settled turns as one
@@ -57,47 +58,36 @@ export async function ensureRegistered(
     return { kind: 'ready', record, serverId };
   }
   const registered = await deps.transport.register(serverId, sourceId);
-  switch (registered.type) {
-    case 'registered': {
-      saveSyncRecord(deps.db, sessionId, {
-        sourceId,
-        phase: record.outbox === null ? 'synced' : 'pending',
-        acknowledged: Math.max(record.acknowledged, registered.position),
-      });
-      return { kind: 'ready', record: syncRecordOf(deps.db, sessionId) ?? record, serverId };
-    }
-    case 'deleted': {
-      saveSyncRecord(deps.db, sessionId, { phase: 'deleted', outbox: null });
-      return { kind: 'deleted' };
-    }
-    case 'retryable': {
-      return { kind: 'pending' };
-    }
-    case 'failed': {
-      return { kind: 'failed', code: registered.code };
-    }
+  if (registered.type === 'registered') {
+    saveSyncRecord(deps.db, sessionId, {
+      sourceId,
+      phase: record.outbox === null ? 'synced' : 'pending',
+      acknowledged: Math.max(record.acknowledged, registered.position),
+    });
+    return { kind: 'ready', record: syncRecordOf(deps.db, sessionId) ?? record, serverId };
   }
+  if (registered.type === 'deleted') {
+    saveSyncRecord(deps.db, sessionId, { phase: 'deleted', outbox: null });
+    return { kind: 'deleted' };
+  }
+  if (registered.type === 'retryable') {
+    return { kind: 'pending' };
+  }
+  return { kind: 'failed', code: registered.code };
 }
 
 /**
  * Uploads every mapped-but-unacknowledged turn of one chat as one frozen
  * packet. A conflict pulls, imports, then fast-forwards or parks diverged.
  */
-export async function uploadChat(
-  deps: SyncDeps,
-  input: UploadChatInput
-): Promise<UploadOutcome> {
+export async function uploadChat(deps: SyncDeps, input: UploadChatInput): Promise<UploadOutcome> {
   const ready = await ensureRegistered(deps, input.sessionId, input.sourceId);
   if (ready.kind !== 'ready') {
     if (ready.kind === 'deleted') {
       await deps.forgetLocal(input.sessionId);
       return { kind: 'deleted' };
     }
-    return ready.kind === 'unknown-chat'
-      ? { kind: 'unknown-chat' }
-      : (ready.kind === 'pending'
-        ? { kind: 'pending' }
-        : { kind: 'failed', code: ready.code });
+    return unreadyOutcome(ready);
   }
   const { serverId } = ready;
   let record = ready.record;
@@ -118,11 +108,10 @@ export async function uploadChat(
         return outcome;
       }
       resentPosition = outcome.position;
-      record = syncRecordOf(deps.db, input.sessionId) ?? record;
     } else {
       saveSyncRecord(deps.db, input.sessionId, { outbox: null, phase: 'synced' });
-      record = syncRecordOf(deps.db, input.sessionId) ?? record;
     }
+    record = syncRecordOf(deps.db, input.sessionId) ?? record;
   }
 
   const { sequenced, map, maxSeq } = sequenceNewTurns(record, input.turns);
@@ -142,11 +131,7 @@ export async function uploadChat(
   const uploaded = await Promise.all(
     imagePartsOf(sequenced.map(one => one.turn)).map(async image => ({
       partId: image.partId,
-      blob: await deps.transport.putBlob(
-        serverId,
-        base64ToBytes(image.base64),
-        image.media
-      ),
+      blob: await deps.transport.putBlob(serverId, base64ToBytes(image.base64), image.media),
     }))
   );
   const blobs = new Map<string, UploadedBlob>(uploaded.map(one => [one.partId, one.blob]));
@@ -183,9 +168,14 @@ export async function uploadChat(
     messageMap: map,
     maxSeq: finalMaxSeq,
   });
-  return commitFrozen({ deps, input, serverId, frozen: { packet, maxSeq: finalMaxSeq }, mayRebatch: true });
+  return commitFrozen({
+    deps,
+    input,
+    serverId,
+    frozen: { packet, maxSeq: finalMaxSeq },
+    mayRebatch: true,
+  });
 }
-
 
 export { applyPulled } from './sync-import';
 export { base64ToBytes } from './sync-protocol';

@@ -1,8 +1,8 @@
-import type { PulledSnapshot } from '@kilocode/cloud-agent-sdk';
+import { type PulledSnapshot } from '@kilocode/cloud-agent-sdk';
 
 import { pulledToTurns } from './sync-mapping';
 import { importedTurnId } from './sync-ids';
-import type { SyncDeps } from './sync-protocol';
+import { type SyncDeps } from './sync-protocol';
 import { type MutableMessageMap, saveSyncRecord, syncRecordOf } from './sync-store';
 
 /**
@@ -56,4 +56,3 @@ export async function applyPulled(input: {
   });
   return turns.length;
 }
-

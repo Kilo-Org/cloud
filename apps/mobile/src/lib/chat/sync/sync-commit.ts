@@ -1,8 +1,13 @@
 import { classifyConflict, type NativeSyncPacket } from '@kilocode/cloud-agent-sdk';
 
 import { applyPulled } from './sync-import';
-import { freeze, type FrozenPacket } from './sync-protocol';
-import type { SyncDeps, UploadChatInput, UploadOutcome } from './sync-protocol';
+import {
+  freeze,
+  type FrozenPacket,
+  type SyncDeps,
+  type UploadChatInput,
+  type UploadOutcome,
+} from './sync-protocol';
 import { saveSyncRecord, syncRecordOf } from './sync-store';
 
 /**
@@ -19,37 +24,33 @@ export async function commitFrozen(args: {
 }): Promise<UploadOutcome> {
   const { deps, input, serverId, frozen, mayRebatch } = args;
   const result = await deps.transport.commit(serverId, frozen.packet);
-  switch (result.type) {
-    case 'committed': {
-      saveSyncRecord(deps.db, input.sessionId, {
-        phase: 'synced',
-        outbox: null,
-        acknowledged: result.receipt.through,
-        ackBatch: result.receipt.batchID,
-        ackDigest: result.receipt.digest,
-        ackedSeq: frozen.maxSeq,
-        maxSeq: frozen.maxSeq,
-      });
-      return { kind: 'synced', position: result.receipt.through };
-    }
-    case 'deleted': {
-      saveSyncRecord(deps.db, input.sessionId, { phase: 'deleted', outbox: null });
-      await deps.forgetLocal(input.sessionId);
-      return { kind: 'deleted' };
-    }
-    case 'retryable': {
-      saveSyncRecord(deps.db, input.sessionId, { phase: 'pending' });
-      return { kind: 'pending' };
-    }
-    case 'failed': {
-      saveSyncRecord(deps.db, input.sessionId, { phase: 'pending' });
-      return { kind: 'failed', code: result.code };
-    }
-    case 'superseded':
-    case 'conflict': {
-      return resolveConflict({ deps, input, serverId, frozen, mayRebatch });
-    }
+  if (result.type === 'committed') {
+    saveSyncRecord(deps.db, input.sessionId, {
+      phase: 'synced',
+      outbox: null,
+      acknowledged: result.receipt.through,
+      ackBatch: result.receipt.batchID,
+      ackDigest: result.receipt.digest,
+      ackedSeq: frozen.maxSeq,
+      maxSeq: frozen.maxSeq,
+    });
+    return { kind: 'synced', position: result.receipt.through };
   }
+  if (result.type === 'deleted') {
+    saveSyncRecord(deps.db, input.sessionId, { phase: 'deleted', outbox: null });
+    await deps.forgetLocal(input.sessionId);
+    return { kind: 'deleted' };
+  }
+  if (result.type === 'retryable') {
+    saveSyncRecord(deps.db, input.sessionId, { phase: 'pending' });
+    return { kind: 'pending' };
+  }
+  if (result.type === 'failed') {
+    saveSyncRecord(deps.db, input.sessionId, { phase: 'pending' });
+    return { kind: 'failed', code: result.code };
+  }
+  // The CAS was lost: superseded and conflict both resolve against a fresh pull.
+  return resolveConflict({ deps, input, serverId, frozen, mayRebatch });
 }
 
 /** H5: pull, import, then fast-forward above the pulled max seq or park diverged. */
@@ -62,22 +63,16 @@ async function resolveConflict(args: {
 }): Promise<UploadOutcome> {
   const { deps, input, serverId, frozen, mayRebatch } = args;
   const pulled = await deps.transport.pull(serverId);
-  switch (pulled.type) {
-    case 'deleted': {
-      saveSyncRecord(deps.db, input.sessionId, { phase: 'deleted', outbox: null });
-      await deps.forgetLocal(input.sessionId);
-      return { kind: 'deleted' };
-    }
-    case 'not_found':
-    case 'retryable': {
-      return { kind: 'pending' };
-    }
-    case 'failed': {
-      return { kind: 'failed', code: pulled.code };
-    }
-    case 'pulled': {
-      break;
-    }
+  if (pulled.type === 'deleted') {
+    saveSyncRecord(deps.db, input.sessionId, { phase: 'deleted', outbox: null });
+    await deps.forgetLocal(input.sessionId);
+    return { kind: 'deleted' };
+  }
+  if (pulled.type === 'not_found' || pulled.type === 'retryable') {
+    return { kind: 'pending' };
+  }
+  if (pulled.type === 'failed') {
+    return { kind: 'failed', code: pulled.code };
   }
   const snapshot = pulled.snapshot;
   const record = syncRecordOf(deps.db, input.sessionId);
@@ -122,4 +117,3 @@ async function resolveConflict(args: {
     mayRebatch: false,
   });
 }
-

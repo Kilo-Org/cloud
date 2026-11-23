@@ -51,4 +51,3 @@ export function announceDeleted(sessionId: string): void {
     listener(sessionId);
   }
 }
-

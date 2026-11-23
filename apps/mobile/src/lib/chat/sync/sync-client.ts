@@ -1,14 +1,10 @@
-import {
-  type ListedSession,
-  NativeSyncClient,
-  NativeSyncWriter,
-} from '@kilocode/cloud-agent-sdk';
+import { type ListedSession, NativeSyncClient, NativeSyncWriter } from '@kilocode/cloud-agent-sdk';
 
 import { SESSION_SYNC_URL } from '@/lib/config';
 import { getAuthenticatedOwner } from '@/lib/context-scope';
 import { nativeRemoteCredential } from '@/lib/native-remote-credential';
 
-import  { type SyncTransport } from './sync-engine';
+import { type SyncTransport } from './sync-engine';
 
 /**
  * The production transport: the SDK writer over the session-sync service,

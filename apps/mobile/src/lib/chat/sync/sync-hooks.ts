@@ -1,4 +1,4 @@
-import  { type Turn } from '@kilocode/harness-sdk';
+import { type Turn } from '@kilocode/harness-sdk';
 
 /**
  * The one seam between the chat registry and sync: the registry announces a

@@ -8,7 +8,7 @@ import { onChatSettled } from './sync-hooks';
 import { setBanner } from './sync-banners';
 import { syncClientFor } from './sync-client';
 import { depsFor } from './sync-deps';
-import { type UploadOutcome, uploadChat } from './sync-engine';
+import { uploadChat, type UploadOutcome } from './sync-engine';
 import { portableModelRef } from './sync-mapping';
 import { discardDiverged, pullChat } from './sync-pull';
 import { chatSyncSourceId, readChatSyncSetting } from './sync-settings';
@@ -119,7 +119,10 @@ export async function pullOpenedChat(place: ChatPlace, sessionId: string): Promi
   try {
     const { deps, db } = await depsFor(place);
     const record = syncRecordOf(db, sessionId);
-    if (record === null || record.serverSessionId === null) {
+    if (record === null) {
+      return;
+    }
+    if (record.serverSessionId === null) {
       return;
     }
     if (record.phase === 'diverged') {
@@ -144,10 +147,15 @@ export async function pullOpenedChat(place: ChatPlace, sessionId: string): Promi
 export async function deleteEverywhere(
   place: ChatPlace,
   sessionId: string
-): Promise<{ readonly kind: 'deleted' } | { readonly kind: 'local-only' } | { readonly kind: 'failed' }> {
+): Promise<
+  { readonly kind: 'deleted' } | { readonly kind: 'local-only' } | { readonly kind: 'failed' }
+> {
   const { deps, client, db } = await depsFor(place);
   const record = syncRecordOf(db, sessionId);
-  if (record === null || record.serverSessionId === null) {
+  if (record === null) {
+    return { kind: 'local-only' };
+  }
+  if (record.serverSessionId === null) {
     return { kind: 'local-only' };
   }
   const result = await client.deleteSession(record.serverSessionId);
@@ -202,7 +210,11 @@ export async function importServerSession(
   const sourceId = await chatSyncSourceId(place.chatScope);
   stampServerSessionId({ db, sessionId, serverSessionId, sourceId });
   const outcome = await pullChat(deps, { sessionId, sourceId, modelId });
-  if (outcome.kind === 'deleted' || outcome.kind === 'not-found' || outcome.kind === 'unknown-chat') {
+  if (
+    outcome.kind === 'deleted' ||
+    outcome.kind === 'not-found' ||
+    outcome.kind === 'unknown-chat'
+  ) {
     return null;
   }
   await enterChat(place, sessionId);
@@ -220,11 +232,9 @@ let uploaderOff: (() => void) | null = null;
 export function registerSyncUploader(place: ChatPlace): () => void {
   const count = (uploaderScopes.get(place.chatScope) ?? 0) + 1;
   uploaderScopes.set(place.chatScope, count);
-  if (uploaderOff === null) {
-    uploaderOff = onChatSettled((sessionId, turns) => {
-      void uploadSettledChat(place, sessionId, turns);
-    });
-  }
+  uploaderOff ??= onChatSettled((sessionId, turns) => {
+    void uploadSettledChat(place, sessionId, turns);
+  });
   return () => {
     const next = (uploaderScopes.get(place.chatScope) ?? 1) - 1;
     if (next <= 0) {
@@ -248,4 +258,3 @@ export async function deleteServerSession(
   const result = await client.deleteSession(serverSessionId);
   return result.type === 'deleted' || result.type === 'not_found';
 }
-

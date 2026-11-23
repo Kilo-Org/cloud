@@ -6,8 +6,8 @@ import { encryptedDatabase } from '@/lib/persist/encrypted-kv';
 import { type ChatSyncGate, selectChatSyncSettingState } from './sync-gate';
 
 import { organizationIdOf } from '../layers';
-import  { type ChatPlace } from '../scope';
-import  { type ChatSummary } from '../store';
+import { type ChatPlace } from '../scope';
+import { type ChatSummary } from '../store';
 import { syncClientFor } from './sync-client';
 import {
   type ChatListFilters,
@@ -31,7 +31,6 @@ import {
   readSyncNoticeSeen,
   writeChatSyncSetting,
 } from './sync-settings';
-export { selectChatSyncSettingState, type ChatSyncSettingState } from './sync-gate';
 import { syncedRecordsOfScope } from './sync-store';
 
 /**
@@ -40,6 +39,14 @@ import { syncedRecordsOfScope } from './sync-store';
  * Screens compose these; nothing here draws.
  */
 
+export { selectChatSyncSettingState, type ChatSyncSettingState } from './sync-gate';
+
+/** The one-time upgrade notice's state: whether to show it, and how to dismiss it. */
+export type ChatSyncNotice = {
+  readonly visible: boolean;
+  readonly dismiss: () => void;
+};
+
 export function useChatSyncGate(place: ChatPlace | null): ChatSyncGate {
   const client = useQueryClient();
   const scope = place?.chatScope ?? '';
@@ -47,8 +54,8 @@ export function useChatSyncGate(place: ChatPlace | null): ChatSyncGate {
     queryKey: ['chat-sync-setting', scope],
     enabled: place !== null,
     networkMode: 'always',
-    queryFn: async (): Promise<ChatSyncSetting> =>
-      place === null ? 'on' : readChatSyncSetting(place.chatScope),
+    queryFn: (): Promise<ChatSyncSetting> =>
+      place === null ? Promise.resolve('on') : readChatSyncSetting(place.chatScope),
   });
   const decide = useCallback(
     async (choice: 'on' | 'off') => {
@@ -77,7 +84,7 @@ export function useChatSyncGate(place: ChatPlace | null): ChatSyncGate {
 export function useChatSyncUploader(place: ChatPlace | null, enabled: boolean): void {
   useEffect(() => {
     if (place === null || !enabled) {
-      return;
+      return undefined;
     }
     return registerSyncUploader(place);
   }, [place, enabled]);
@@ -123,10 +130,8 @@ export function useMergedChatList(input: {
     enabled: place !== null && enabled,
     staleTime: 30_000,
     initialPageParam: null as string | null,
-    queryFn: async ({ pageParam }) => {
-      const client = syncClientFor(
-        place === null ? undefined : organizationIdOf(place.org)
-      );
+    queryFn: ({ pageParam }) => {
+      const client = syncClientFor(place === null ? undefined : organizationIdOf(place.org));
       return client.listSessions({
         ...serverListParams(filters),
         ...(pageParam === null ? {} : { cursor: pageParam }),
@@ -139,9 +144,7 @@ export function useMergedChatList(input: {
     enabled: place !== null && enabled,
     networkMode: 'always',
     queryFn: async () =>
-      place === null
-        ? []
-        : syncedRecordsOfScope(await encryptedDatabase(), place.chatScope),
+      place === null ? [] : syncedRecordsOfScope(await encryptedDatabase(), place.chatScope),
   });
   const listed = query.data?.pages.flatMap(page => page.items) ?? [];
   const rows = mergeChatRows({
@@ -172,17 +175,14 @@ export function useMergedChatList(input: {
 }
 
 /** The one-time upgrade notice: shown until this account dismisses it. */
-export function useChatSyncNotice(place: ChatPlace | null): {
-  readonly visible: boolean;
-  readonly dismiss: () => void;
-} {
+export function useChatSyncNotice(place: ChatPlace | null): ChatSyncNotice {
   const client = useQueryClient();
   const scope = place?.chatScope ?? '';
   const query = useQuery({
     queryKey: ['chat-sync-notice', scope],
     enabled: place !== null,
     networkMode: 'always',
-    queryFn: async () => (place === null ? true : readSyncNoticeSeen(place.chatScope)),
+    queryFn: () => (place === null ? Promise.resolve(true) : readSyncNoticeSeen(place.chatScope)),
   });
   const dismiss = useCallback(() => {
     if (place === null) {

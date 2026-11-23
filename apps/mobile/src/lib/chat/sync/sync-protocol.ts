@@ -4,10 +4,12 @@ import {
   type PortableSession,
   type PulledSnapshot,
 } from '@kilocode/cloud-agent-sdk';
-import type { Turn } from '@kilocode/harness-sdk';
+import { type Turn } from '@kilocode/harness-sdk';
+import { z } from 'zod';
 
+import { type ChatDatabase } from '../store';
 import { msgIdForTurn } from './sync-ids';
-import { type PortableModelRef, type SequencedTurn } from './sync-mapping';
+import { type PortableModelRef, type SequencedTurn, type UploadedBlob } from './sync-mapping';
 import { type MutableMessageMap, type SyncMessageMap, type SyncRecord } from './sync-store';
 
 /**
@@ -56,9 +58,6 @@ export type SyncTransport = {
   readonly pull: (sessionID: string) => Promise<SyncPullResult>;
 };
 
-import type { ChatDatabase } from '../store';
-import { type UploadedBlob } from './sync-mapping';
-
 export type SyncDeps = {
   readonly db: ChatDatabase;
   readonly transport: SyncTransport;
@@ -104,6 +103,27 @@ export type TurnAdmission =
   | { readonly kind: 'deleted' }
   | { readonly kind: 'unavailable' };
 
+/** What a register that did not answer `ready` means to its caller's outcome. */
+export type UnreadyOutcome =
+  | { readonly kind: 'pending' }
+  | { readonly kind: 'failed'; readonly code: string }
+  | { readonly kind: 'unknown-chat' };
+
+export function unreadyOutcome(
+  ready:
+    | { readonly kind: 'pending' }
+    | { readonly kind: 'failed'; readonly code: string }
+    | { readonly kind: 'unknown-chat' }
+): UnreadyOutcome {
+  if (ready.kind === 'unknown-chat') {
+    return { kind: 'unknown-chat' };
+  }
+  if (ready.kind === 'pending') {
+    return { kind: 'pending' };
+  }
+  return { kind: 'failed', code: ready.code };
+}
+
 const BASE64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
 /**
@@ -112,7 +132,7 @@ const BASE64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/
  * base 64, so plain arithmetic answers them.
  */
 export function base64ToBytes(base64: string): Uint8Array {
-  const clean = base64.replace(/[^A-Za-z0-9+/=]/g, '');
+  const clean = base64.replaceAll(/[^A-Za-z0-9+/=]/g, '');
   const bytes: number[] = [];
   for (let index = 0; index + 3 < clean.length; index += 4) {
     const a = BASE64.indexOf(clean[index] ?? '');
@@ -133,7 +153,55 @@ export function base64ToBytes(base64: string): Uint8Array {
   return Uint8Array.from(bytes);
 }
 
-export type FrozenPacket = { readonly packet: NativeSyncPacket; readonly maxSeq: number };
+const syncEntityKindSchema = z.enum([
+  'session',
+  'message',
+  'message-part',
+  'inbox',
+  'instruction-entry',
+  'instruction-state',
+  'instruction-blob',
+  'asset',
+]);
+
+/**
+ * A frozen change as the SDK writes it: a put carries either inline `value` or
+ * a `blob` reference, and a remove carries the cause it happened for. `blob`
+ * is tried first so a reference never decodes as an inline put with no value.
+ */
+const syncChangeSchema = z.union([
+  z.object({
+    op: z.literal('put'),
+    kind: syncEntityKindSchema,
+    id: z.string(),
+    blob: z.object({ hash: z.string(), bytes: z.number() }),
+  }),
+  z.object({
+    op: z.literal('put'),
+    kind: syncEntityKindSchema,
+    id: z.string(),
+    value: z.unknown(),
+  }),
+  z.object({
+    op: z.literal('remove'),
+    kind: syncEntityKindSchema,
+    id: z.string(),
+    cause: z.string(),
+  }),
+]);
+
+const frozenPacketSchema = z.object({
+  packet: z.object({
+    batchID: z.string(),
+    sourceID: z.string(),
+    after: z.number(),
+    through: z.number(),
+    changes: z.array(syncChangeSchema),
+  }),
+  maxSeq: z.number(),
+});
+
+export type FrozenPacket = z.infer<typeof frozenPacketSchema>;
 
 export function freeze(packet: NativeSyncPacket, maxSeq: number): string {
   return JSON.stringify({ packet, maxSeq } satisfies FrozenPacket);
@@ -141,10 +209,8 @@ export function freeze(packet: NativeSyncPacket, maxSeq: number): string {
 
 export function thaw(raw: string): FrozenPacket | null {
   try {
-    const parsed = JSON.parse(raw) as Partial<FrozenPacket>;
-    return parsed.packet !== undefined && typeof parsed.maxSeq === 'number'
-      ? { packet: parsed.packet, maxSeq: parsed.maxSeq }
-      : null;
+    const parsed = frozenPacketSchema.safeParse(JSON.parse(raw));
+    return parsed.success ? parsed.data : null;
   } catch {
     return null;
   }
@@ -205,7 +271,6 @@ export function sequenceNewTurns(record: SyncRecord, turns: readonly Turn[]): Se
   return { sequenced, map, maxSeq };
 }
 
-
 /** Everything one upload needs: the chat's turns and the record fields it writes. */
 export type UploadChatInput = {
   readonly sessionId: string;
@@ -219,4 +284,3 @@ export type UploadChatInput = {
   /** A rename with no new turns still writes the shared session entity (H3). */
   readonly metadataOnly?: boolean;
 };
-

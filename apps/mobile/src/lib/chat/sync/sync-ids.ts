@@ -18,12 +18,15 @@ export function isServerSessionId(value: string): boolean {
   return SERVER_SESSION_ID_PATTERN.test(value);
 }
 
+/** The largest 12-hex-digit value, so a descending id fills its field. */
+const DESCENDING_MAX = BigInt(2 ** 48) - 1n;
+
 /**
  * Mints a server session id at `now` (epoch ms). `random` answers one byte
  * per call; it is injected so tests can pin the suffix.
  */
 export function mintServerSessionId(now: number, random: () => number): string {
-  const descending = (0xFFFF_FFFF_FFFFn - BigInt(Math.max(0, Math.floor(now))))
+  const descending = (DESCENDING_MAX - BigInt(Math.max(0, Math.floor(now))))
     .toString(16)
     .padStart(12, '0')
     .slice(-12);

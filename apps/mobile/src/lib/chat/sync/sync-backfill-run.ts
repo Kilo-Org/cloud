@@ -3,10 +3,9 @@ import { SessionStore, type Turn } from '@kilocode/harness-sdk';
 
 import { encryptedDatabase } from '@/lib/persist/encrypted-kv';
 
-import type { ChatPlace } from '../scope';
-import type { ChatDatabase } from '../store';
+import { type ChatPlace } from '../scope';
 import { runBackfill } from './sync-backfill';
-import { runtimeFor } from './sync-deps';
+import { chatDbOf, runtimeFor } from './sync-deps';
 import { syncSettingOn, uploadNow } from './sync-service';
 import { unsyncedChatIdsOfScope } from './sync-store';
 
@@ -17,12 +16,6 @@ import { unsyncedChatIdsOfScope } from './sync-store';
 
 const backfills = new Set<string>();
 
-/**
- * Uploads the chats that existed before this device started syncing: in the
- * background, one at a time, re-reading the setting before every request so
- * turning sync off stops it. A second ask for the same scope joins the run
- * that is already going instead of starting a parallel one.
- */
 /** The turns a background upload would send for one chat. */
 async function loadTurns(place: ChatPlace, sessionId: string): Promise<readonly Turn[]> {
   try {
@@ -40,9 +33,16 @@ async function loadTurns(place: ChatPlace, sessionId: string): Promise<readonly 
   }
 }
 
+/** Resolves after `ms`, so a parked round waits without blocking its caller. */
+function delay(ms: number): Promise<void> {
+  return new Promise<void>(resolve => {
+    setTimeout(resolve, ms);
+  });
+}
+
 async function backfillRound(place: ChatPlace): Promise<void> {
   const database = await encryptedDatabase();
-  const db = database as unknown as ChatDatabase;
+  const db = chatDbOf(database);
   const pending = unsyncedChatIdsOfScope(db, place.chatScope);
   if (pending.length === 0) {
     return;
@@ -51,15 +51,21 @@ async function backfillRound(place: ChatPlace): Promise<void> {
     pending: () => pending,
     upload: async sessionId => uploadNow(place, sessionId, await loadTurns(place, sessionId)),
     stillOn: () => syncSettingOn(place),
-    wait: ms => new Promise<void>(resolve => setTimeout(resolve, ms)),
+    wait: delay,
   });
   if (outcome.kind !== 'parked') {
     return;
   }
-  await new Promise<void>(resolve => setTimeout(resolve, 60_000));
+  await delay(60_000);
   return backfillRound(place);
 }
 
+/**
+ * Uploads the chats that existed before this device started syncing: in the
+ * background, one at a time, re-reading the setting before every request so
+ * turning sync off stops it. A second ask for the same scope joins the run
+ * that is already going instead of starting a parallel one.
+ */
 export async function startBackfill(place: ChatPlace): Promise<void> {
   if (backfills.has(place.chatScope)) {
     return;

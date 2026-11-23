@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import  { type ChatDatabase } from '../store';
+import { type ChatDatabase } from '../store';
 
 /**
  * The sync record one chat carries, in the `chats` row beside the harness
@@ -22,7 +22,9 @@ const messageMapSchema = z.record(
 export type MutableMessageMap = Record<string, { msgId: string; seq: number }>;
 
 /** Turn id to the portable message it uploads (or was imported) as. */
-export type SyncMessageMap = Readonly<Record<string, { readonly msgId: string; readonly seq: number }>>;
+export type SyncMessageMap = Readonly<
+  Record<string, { readonly msgId: string; readonly seq: number }>
+>;
 
 export type SyncRecord = {
   readonly sessionId: string;
@@ -112,7 +114,7 @@ export function syncedRecordsOfScope(db: ChatDatabase, scope: string): SyncRecor
       `select ${COLUMNS} from chats where scope = ? and server_session_id is not null`,
       [scope]
     )
-    .map(recordOf);
+    .map(row => recordOf(row));
 }
 
 /**
@@ -160,17 +162,24 @@ export function saveSyncRecord(db: ChatDatabase, sessionId: string, patch: SyncR
   const sets: string[] = [];
   const values: (string | number)[] = [];
   for (const [key, column] of Object.entries(PATCH_COLUMNS) as [keyof SyncRecordPatch, string][]) {
-    const value = patch[key];
-    if (value === undefined) {
-      continue;
-    }
-    sets.push(`${column} = ?`);
-    values.push(key === 'messageMap' ? JSON.stringify(value) : (value as string | number));
-    if (values.at(-1) === null) {
-      // SQLite binds a JS null through the same parameter slot; the database
-      // shim only admits strings and numbers, so null writes ride as SQL.
-      values.pop();
-      sets[sets.length - 1] = `${column} = null`;
+    if (key === 'messageMap') {
+      const messageMap = patch.messageMap;
+      if (messageMap !== undefined) {
+        sets.push(`${column} = ?`);
+        values.push(JSON.stringify(messageMap));
+      }
+    } else {
+      const value = patch[key];
+      if (value !== undefined) {
+        if (value === null) {
+          // SQLite binds a JS null through the same parameter slot; the database
+          // shim only admits strings and numbers, so null writes ride as SQL.
+          sets.push(`${column} = null`);
+        } else {
+          sets.push(`${column} = ?`);
+          values.push(value);
+        }
+      }
     }
   }
   if (sets.length === 0) {

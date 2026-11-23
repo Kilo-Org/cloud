@@ -2746,6 +2746,160 @@ describe('agent browser calls', () => {
     expect(downloads.cancelled).toStrictEqual([92]);
   });
 
+  it('redeems a late download approval on the step it was issued for', async () => {
+    const downloads = createFakeDownloads();
+    const hold = createDownloadHold({
+      cancel: async itemId => downloads.api.cancel?.(itemId),
+      onReport: () => {},
+      search: async itemId => (await downloads.api.search?.({ id: itemId })) ?? [],
+    });
+    const { cdp, runtime } = await createHarness({
+      downloadHold: hold,
+      downloadsApi: downloads.api,
+    });
+    const dashboard = `${MAIN_ORIGIN}/dashboard`;
+    const url = `${MAIN_ORIGIN}/report.txt`;
+    /** The pay frame's field is sensitive; every node of the tab's own document is an ordinary one. */
+    const passwordProbe = { fields: [{ kind: 'password' }], paymentFormSubmit: false };
+    const plainProbe = { fields: [], paymentFormSubmit: false };
+    // The pay frame's tree gives node 31 an interactive role, so a snapshot surfaces it as the ref `e31`.
+    const payTree = {
+      nodes: [
+        { childIds: ['2'], nodeId: '1', role: { value: 'RootWebArea' } },
+        {
+          backendDOMNodeId: 31,
+          name: { value: 'Card number' },
+          nodeId: '2',
+          role: { value: 'textbox' },
+        },
+      ],
+    };
+    // One isolated world per frame, so the ownership probe can tell which document holds a node.
+    const worlds = new Map<number, string>();
+    let nextWorld = 3;
+    /** Set before the retry, so that one repeat starts the file its approval buys. */
+    let replay = false;
+
+    cdp.setHandlers({
+      'Accessibility.getFullAXTree': params => {
+        const { frameId } = params ?? {};
+
+        return frameId === 'f1' ? payTree : MAIN_TREE;
+      },
+      'DOM.resolveNode': params => {
+        const requested = params?.['backendNodeId'] ?? params?.['nodeId'];
+        const backendNodeId = typeof requested === 'number' ? String(requested) : 'none';
+        const contextId = params?.['executionContextId'];
+        const world = typeof contextId === 'number' ? (worlds.get(contextId) ?? 'main') : 'main';
+
+        return { object: { objectId: `obj-${backendNodeId}-${world}` } };
+      },
+      'Input.dispatchMouseEvent': params => {
+        // A drag is one press and one release: only the press can start the file, and only the retry's press does.
+        if (params?.['type'] === 'mousePressed' && replay) {
+          replay = false;
+          hold.handle({ id: 94, referrer: dashboard, url }, () => {});
+        }
+
+        return {};
+      },
+      'Page.createIsolatedWorld': params => {
+        const frameId = typeof params?.['frameId'] === 'string' ? params['frameId'] : 'main';
+        const executionContextId = nextWorld;
+
+        nextWorld += 1;
+        worlds.set(executionContextId, frameId);
+
+        return { executionContextId };
+      },
+      'Runtime.callFunctionOn': params => {
+        const declaration = params?.['functionDeclaration'];
+        const objectId = typeof params?.['objectId'] === 'string' ? params['objectId'] : '';
+        const [backendNodeId = 'none', world = 'main'] = objectId.split('-').slice(1);
+        // The gate's ownership probe: node 31 is the pay frame's field, every other node the tab's document.
+        const nodeFrame = backendNodeId === '31' ? 'f1' : 'main';
+
+        return {
+          result: {
+            value:
+              typeof declaration === 'string' && declaration.includes('ownerDocument')
+                ? nodeFrame === world
+                : JSON.stringify(backendNodeId === '31' ? passwordProbe : plainProbe),
+          },
+        };
+      },
+    });
+
+    const grants: readonly BrowserGrant[] = [
+      readGrant,
+      actGrant,
+      { class: 'read', origin: FRAME_ORIGIN },
+      { class: 'act', origin: FRAME_ORIGIN },
+    ];
+
+    const drag = (sensitive: readonly string[]) =>
+      runtime.runTool({
+        agent: { authorized: grants, sensitive: [...sensitive] },
+        arguments: { endTarget: 'e31', startTarget: 'e2' },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_drag',
+      });
+    const shot = () =>
+      runtime.runTool({
+        agent: { authorized: grants },
+        arguments: {},
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_snapshot',
+      });
+
+    // The refs the drag targets: `e2` in the tab's own document, `e31` in the pay frame.
+    const snapshot = await shot();
+
+    expect(snapshot.kind).toBe('result');
+
+    const refusedStep = await drag([]);
+
+    expect(refusedStep).toMatchObject({
+      items: [{ class: 'sensitive', origin: FRAME_ORIGIN, reason: SENSITIVE_REASON.password }],
+      kind: 'needs_permission',
+    });
+
+    // The step's approval runs the drag, and that run starts no file of its own.
+    const approvedStep = await drag([expectStepToken(refusedStep)]);
+
+    expect([approvedStep.kind, downloads.cancelled]).toStrictEqual(['result', []]);
+
+    // The file lands after the approved step answered, so the next call is the one that reports it.
+    hold.handle({ id: 92, referrer: dashboard, url }, () => {});
+
+    await vi.waitFor(() => {
+      expect(hold.tracked(92)?.kind).toBe('blocked');
+    });
+
+    const reported = await shot();
+    const downloadToken = expectStepToken(reported);
+
+    // The refusal names the origin of the call it answers; the approval it issues binds the origin the gate classified.
+    expect(reported).toMatchObject({
+      afterAction: true,
+      items: [{ class: 'sensitive', origin: MAIN_ORIGIN, reason: SENSITIVE_REASON.download }],
+      kind: 'needs_permission',
+    });
+
+    // The approval the refusal issued redeems on the repeat, which is what its binding buys.
+    replay = true;
+
+    const retried = await drag([downloadToken]);
+
+    expect(retried.kind).toBe('result');
+
+    // The late file was the hold's; the retry's own file is the one the reported approval kept.
+    expect(downloads.cancelled).toStrictEqual([92]);
+    expect(hold.needOf('session-1')).toMatchObject({ itemId: 94, kind: 'spent' });
+  });
+
   it('keeps the file an approved click starts after it answered, and guards the next identical call', async () => {
     const downloads = createFakeDownloads();
     const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });

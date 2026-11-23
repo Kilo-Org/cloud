@@ -47,6 +47,22 @@ function creditGrant(overrides: Partial<CreditGrant>): CreditGrant {
   };
 }
 
+/** The paid grant a listed purchase row paints, as a ledger row reports it. */
+function listedGrant(
+  overrides: Partial<NonNullable<CreditDeduction['purchase']>> = {}
+): NonNullable<CreditDeduction['purchase']> {
+  return {
+    id: 'p1',
+    date: '2026-01-01T00:00:00.000Z',
+    description: 'Top-up via stripe',
+    amount_mUsd: 20_000_000,
+    is_free: false,
+    credit_source: 'stripe',
+    kind: 'promotional',
+    ...overrides,
+  };
+}
+
 describe('creditPurchaseChannel', () => {
   it.each([
     ['apple', 'app_store'],
@@ -191,15 +207,8 @@ describe('buildCreditHistoryItems', () => {
           id: 'expiry',
           date: '2026-04-01T00:00:00.000Z',
           kind: 'adjustment',
-          purchase: {
-            id: 'p1',
-            date: '2026-01-01T00:00:00.000Z',
-            description: 'Top-up via stripe',
-            amount_mUsd: 20_000_000,
-            is_free: false,
-            credit_source: 'stripe',
-            kind: 'promotional',
-          },
+          expiry: 'expired',
+          purchase: listedGrant(),
         }),
       ],
       []
@@ -219,41 +228,52 @@ describe('buildCreditHistoryItems', () => {
           id: 'expiry',
           date: '2026-04-01T00:00:00.000Z',
           kind: 'adjustment',
-          purchase: {
-            id: 'p1',
-            date: '2026-01-01T00:00:00.000Z',
-            description: 'Top-up via stripe',
-            amount_mUsd: 20_000_000,
-            is_free: false,
-            credit_source: 'stripe',
-            kind: 'promotional',
-          },
+          expiry: 'expired',
+          purchase: listedGrant(),
         }),
         deduction({
           id: 'voided',
           date: '2026-05-01T00:00:00.000Z',
           kind: 'adjustment',
           expiry: 'voided',
-          purchase: {
-            id: 'p1',
-            date: '2026-01-01T00:00:00.000Z',
-            description: 'Top-up via stripe',
-            amount_mUsd: 20_000_000,
-            is_free: false,
-            credit_source: 'stripe',
-            kind: 'promotional',
-          },
+          purchase: listedGrant(),
         }),
       ],
       []
     );
 
     // One block can paint one status line, so the second row of the same grant
-    // stays a row of its own rather than disappearing from the history.
-    expect(items.map(item => item.key)).toEqual(['ledger:voided', 'purchase:p1']);
+    // stays a row of its own below the purchase rather than disappearing.
+    expect(items.map(item => item.key)).toEqual(['purchase:p1', 'ledger:voided']);
     expect(items.find(item => item.kind === 'purchase')).toMatchObject({
       status: { id: 'expiry' },
     });
+  });
+
+  it('keeps a charge against a listed grant as its own row', () => {
+    // A spend row names the grant it drew on but records no expiry: it is an
+    // event of its own, so folding it into the purchase block would paint it
+    // nowhere at all.
+    const items = buildCreditHistoryItems(
+      [purchase({ id: 'p1', date: '2026-01-01T00:00:00.000Z' })],
+      [
+        deduction({
+          id: 'spend',
+          date: '2026-04-01T00:00:00.000Z',
+          description: 'Deducting credits',
+          expiry: null,
+          purchase: listedGrant({ kind: 'adjustment' }),
+        }),
+      ],
+      []
+    );
+
+    // The charge keeps its own row, flagged so the row states the event alone
+    // instead of repeating the grant the purchase above already paints, and it
+    // follows that purchase at the instant the two share.
+    expect(items.map(item => item.key)).toEqual(['purchase:p1', 'ledger:spend']);
+    expect(items.find(item => item.kind === 'purchase')).toMatchObject({ status: null });
+    expect(items.find(item => item.kind === 'ledger')).toMatchObject({ grantListed: true });
   });
 
   it('keeps the grant line while its purchase page is not loaded', () => {
@@ -264,15 +284,7 @@ describe('buildCreditHistoryItems', () => {
           id: 'expiry',
           date: '2026-04-01T00:00:00.000Z',
           kind: 'adjustment',
-          purchase: {
-            id: 'p1',
-            date: '2026-01-01T00:00:00.000Z',
-            description: 'Top-up via stripe',
-            amount_mUsd: 20_000_000,
-            is_free: false,
-            credit_source: 'stripe',
-            kind: 'promotional',
-          },
+          purchase: listedGrant(),
         }),
       ],
       []

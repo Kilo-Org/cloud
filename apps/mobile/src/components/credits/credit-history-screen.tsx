@@ -107,7 +107,9 @@ export function PersonalCreditHistoryScreen() {
       if (item.kind === 'grant') {
         return <GrantHistoryRow grant={item.grant} last={last} />;
       }
-      return <LedgerHistoryRow deduction={item.deduction} last={last} />;
+      return (
+        <LedgerHistoryRow deduction={item.deduction} grantListed={item.grantListed} last={last} />
+      );
     },
     [openReceipt, openingReceiptId, items.length]
   );

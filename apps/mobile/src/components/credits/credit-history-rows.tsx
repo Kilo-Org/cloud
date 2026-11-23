@@ -337,35 +337,40 @@ function GrantStatusLine({ deduction }: Readonly<{ deduction: CreditDeduction }>
 }
 
 /**
- * One ledger event, in one of two shapes.
+ * One ledger event, in two shapes.
  *
  * A grant the screen does not list as a purchase is one row of its own: the
  * grant's title on the main line, and the muted status line under it when the
- * deduction names an expiry or a voidance. The status line a listed grant paints
- * now belongs to its purchase row, which keeps the start and the end of one
- * grant at the block's own gap.
+ * deduction names an expiry or a voidance.
  *
- * Every other ledger row — a usage charge, an adjustment, a balance-neutral
- * settlement, or an expiry whose grant is not loaded — is a plain row titled
- * from the catalog entry its reason names, falling back to the ledger's text.
+ * A grant that does list as a purchase already paints its own row above this
+ * one, so the row states the event it records alone — a charge that drew on that
+ * grant — instead of repeating the grant's name, amount and date. The status
+ * line of a grant's closure is not here either: it belongs to the purchase row,
+ * which keeps the start and the end of one grant at the block's own gap.
+ *
+ * Every other ledger row — a usage charge, an adjustment, or a balance-neutral
+ * settlement — is a plain row titled from the catalog entry its reason names,
+ * falling back to the ledger's text.
  */
 export const LedgerHistoryRow = memo(function LedgerHistoryRow({
   deduction,
+  grantListed,
   last,
-}: Readonly<{ deduction: CreditDeduction; last: boolean }>) {
+}: Readonly<{ deduction: CreditDeduction; grantListed: boolean; last: boolean }>) {
   const { t } = useTranslation();
   // The purchase row carries the grant, its receipt, and its expiry date, so a
   // grant printed again here would read as a second purchase.
-  const purchase = deduction.purchase;
+  const loadedGrant = deduction.purchase;
   // The grant's own name: a free grant is titled from the reason the server
   // recorded, so the row reads in the reader's language, while a paid grant
   // keeps the description its receipts record. An empty stored description
   // still names the row, the way the purchase list already falls back.
   let grantName: string | null = null;
-  if (purchase != null) {
-    grantName = purchase.is_free
-      ? grantTitle(t, purchase.kind)
-      : firstNonEmpty(purchase.description, t('credits.history.purchaseFallback'));
+  if (loadedGrant != null) {
+    grantName = loadedGrant.is_free
+      ? grantTitle(t, loadedGrant.kind)
+      : firstNonEmpty(loadedGrant.description, t('credits.history.purchaseFallback'));
   }
   const storedDescription = firstNonEmpty(
     deduction.description,
@@ -376,9 +381,14 @@ export const LedgerHistoryRow = memo(function LedgerHistoryRow({
   const expiryStatus = expiryStatusLabel(t, deduction);
   const rowClassName = cn('gap-2 px-4 py-3', !last && 'border-b-[0.5px] border-hair-soft');
 
-  // A grant this screen does not list as a purchase is the row's own subject,
-  // so its title stays on the main line and the muted line follows it.
-  const rowTitle = firstNonEmpty(grantName, deductionTitle(t, deduction), storedDescription);
+  // A grant the screen already paints above this row is not this row's subject,
+  // so the row carries the event it records and nothing about the grant.
+  const purchase = grantListed ? null : loadedGrant;
+  const rowTitle = firstNonEmpty(
+    purchase ? grantName : null,
+    deductionTitle(t, deduction),
+    storedDescription
+  );
 
   return (
     <View className={rowClassName}>

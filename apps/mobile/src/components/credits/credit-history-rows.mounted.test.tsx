@@ -104,8 +104,10 @@ function deductionGrant(overrides: Partial<DeductionGrant> = {}): DeductionGrant
   };
 }
 
-function renderLedgerRow(deductionRow: CreditDeduction) {
-  return render(createElement(LedgerHistoryRow, { deduction: deductionRow, last: false }));
+function renderLedgerRow(deductionRow: CreditDeduction, grantListed = false) {
+  return render(
+    createElement(LedgerHistoryRow, { deduction: deductionRow, grantListed, last: false })
+  );
 }
 
 /** Every string the row paints, so a line the row drops is visible to a test. */
@@ -457,6 +459,32 @@ describe('LedgerHistoryRow', () => {
     // ledger's sentence instead of claiming the grant ended.
     expect(painted).toContain('Usage charge against your grant');
     expect(painted.some(text => text.startsWith('Expired: '))).toBe(false);
+    renderer.unmount();
+  });
+
+  it('states a charge against a listed grant as its own event alone', async () => {
+    // The purchase row above already paints this grant's name, amount and date,
+    // so repeating them here would read as a second purchase. The charge keeps
+    // its own row, because the ledger records an event of its own.
+    const renderer = await renderLedgerRow(
+      deduction({
+        description: 'Deducting credits',
+        expiry: null,
+        amount_mUsd: -1_000_000,
+        purchase: deductionGrant({
+          is_free: false,
+          credit_source: 'stripe',
+          description: 'Top-up via stripe',
+        }),
+      }),
+      true
+    );
+
+    const painted = texts(renderer).map(text => readable(text));
+    expect(painted).not.toContain('Credit purchase');
+    expect(painted.some(text => text.includes('Top-up via stripe'))).toBe(false);
+    expect(painted).not.toContain('+$10.00');
+    expect(painted).toContain('-$1.00');
     renderer.unmount();
   });
 

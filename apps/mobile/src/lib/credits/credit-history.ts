@@ -111,6 +111,13 @@ export type CreditHistoryItem =
       readonly key: string;
       readonly deduction: CreditDeduction;
       readonly sortDate: string;
+      /**
+       * True when the grant this row names already paints above it as its own
+       * purchase row. The row then states the event it records alone — a charge
+       * that drew on that grant — instead of repeating the grant's name, amount
+       * and date a second time.
+       */
+      readonly grantListed: boolean;
     }
   | {
       readonly kind: 'grant';
@@ -162,16 +169,22 @@ export function buildCreditHistoryItems(
     deductions.flatMap(deduction => (deduction.purchase ? [deduction.purchase.id] : []))
   );
   // In the ledger's own order, the first row that closes a loaded grant is that
-  // purchase row's status line; every other row stays a row of its own, so a
-  // second close of the same grant is never dropped.
+  // purchase row's status line. Only a closure folds: a charge that merely drew
+  // on the grant records no expiry, and it is an event of its own, so folding it
+  // would paint it nowhere. Every row that does not fold stays a row of its own,
+  // so a second close of the same grant is never dropped either.
   const statusByGrantId = new Map<string, CreditDeduction>();
-  const ledgerRows: CreditDeduction[] = [];
+  const foldedIds = new Set<string>();
   for (const deduction of deductions) {
     const grantId = deduction.purchase?.id;
-    if (grantId != null && listedPurchaseIds.has(grantId) && !statusByGrantId.has(grantId)) {
+    if (
+      grantId != null &&
+      deduction.expiry != null &&
+      listedPurchaseIds.has(grantId) &&
+      !statusByGrantId.has(grantId)
+    ) {
       statusByGrantId.set(grantId, deduction);
-    } else {
-      ledgerRows.push(deduction);
+      foldedIds.add(deduction.id);
     }
   }
   const items: CreditHistoryItem[] = [
@@ -190,12 +203,18 @@ export function buildCreditHistoryItems(
         grant,
         sortDate: grant.date,
       })),
-    ...ledgerRows.map((deduction): CreditHistoryItem => ({
-      kind: 'ledger',
-      key: `ledger:${deduction.id}`,
-      deduction,
-      sortDate: deduction.purchase?.date ?? deduction.date,
-    })),
+    ...deductions
+      .filter(deduction => !foldedIds.has(deduction.id))
+      .map((deduction): CreditHistoryItem => {
+        const grant = deduction.purchase;
+        return {
+          kind: 'ledger',
+          key: `ledger:${deduction.id}`,
+          deduction,
+          sortDate: grant?.date ?? deduction.date,
+          grantListed: grant != null && listedPurchaseIds.has(grant.id),
+        };
+      }),
   ];
 
   return items.sort((a, b) => {
@@ -203,6 +222,15 @@ export function buildCreditHistoryItems(
     const atB = sortTimeOf(b.sortDate);
     if (atA !== atB) {
       return atB - atA;
+    }
+    // A row about a grant that already paints above it has to follow it: the
+    // two share the grant's instant, and the ledger's key would otherwise sort
+    // the event before the grant it drew on. Every other row keeps rank 0, so
+    // no other pair on one timestamp changes order.
+    const rankA = a.kind === 'ledger' && a.grantListed ? 1 : 0;
+    const rankB = b.kind === 'ledger' && b.grantListed ? 1 : 0;
+    if (rankA !== rankB) {
+      return rankA - rankB;
     }
     // A deterministic order for two rows that share a timestamp (or whose time
     // does not parse), so a refetch cannot reshuffle them under the reader.

@@ -4259,8 +4259,9 @@
       "downloading": "Download in corso…",
       "downloadProgress": "Download in corso… {{percent}}%",
       "downloadFailed": "Il download non è stato completato. Controlla la connessione e lo spazio libero, poi riprova.",
-      "cannotUse": "Questo modello non può usare: {{items}}.",
-      "cannotUseOptions": "Questo modello non può compilare alcune opzioni richieste da uno strumento.",
+      "cannotUse": "Impossibile eseguire: {{items}}.",
+      "cannotUseOptions": "Impossibile compilare: alcune opzioni dello strumento.",
+      "limitations": "Limitazioni",
       "tools": {
         "time": "Ora",
         "settingsList": "Mostra impostazioni",

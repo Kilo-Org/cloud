@@ -4185,8 +4185,9 @@
       "downloading": "Misintona…",
       "downloadProgress": "Misintona… {{percent}}%",
       "downloadFailed": "Tsy vita ny fisintonana. Hamarino ny fifandraisanao sy ny toerana malalaka amin'ny fitahirizana, dia andramo indray.",
-      "cannotUse": "Tsy azon'ity modely ity ampiasaina: {{items}}.",
-      "cannotUseOptions": "Tsy azon'ity modely ity fenoina ny safidy sasany angatahin'ny fitaovana.",
+      "cannotUse": "Tsy afaka mampandeha: {{items}}.",
+      "cannotUseOptions": "Tsy afaka mameno: safidy fitaovana sasany.",
+      "limitations": "Fetra",
       "tools": {
         "time": "Ora",
         "settingsList": "Asehoy ny fikirana",

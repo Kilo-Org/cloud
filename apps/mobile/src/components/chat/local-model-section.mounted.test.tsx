@@ -14,8 +14,9 @@ import { type LocalModelStatus } from '@/lib/chat/local-models';
  * that runs the loop says exactly what the schema converter leaves out: whole
  * tools the model never sees, and whether a tool it still receives is missing
  * an optional argument. The notes are non-blocking copy: the row keeps its
- * choice, its status and its download control, and adds its lines in one
- * caption group under a hairline divider.
+ * choice, its status and its download control, and adds a muted `Limitations`
+ * heading that owns the hairline divider, then its lines as the card's own
+ * children — no wrapper element between the heading and the lines.
  */
 
 vi.mock('react-native', () => ({
@@ -66,13 +67,59 @@ function mount(statuses: Parameters<typeof LocalModelSection>[0]['statuses']) {
 }
 
 const NOTE_LINE_TEST_ID = 'local-model-unusable-';
+const LIMITATIONS_TEST_ID = 'local-model-limitations-';
 
-/** The caption group each row draws its notes in, under the hairline divider. */
-function noteGroups(root: TestRenderer.ReactTestInstance) {
+/** The muted heading each row draws above its notes, under the hairline divider. */
+function limitationHeadings(root: TestRenderer.ReactTestInstance) {
   return root.findAll(
     node =>
-      Object.is(node.type, 'View') && String(node.props.className).includes('border-hair-soft')
+      Object.is(node.type, 'Text') &&
+      String(node.props.testID ?? '').startsWith(LIMITATIONS_TEST_ID)
   );
+}
+
+/** The heading of the one row that draws notes, which the divider belongs to. */
+function limitationHeading(root: TestRenderer.ReactTestInstance) {
+  const headings = limitationHeadings(root);
+  expect(headings).toHaveLength(1);
+  const heading = headings[0];
+  if (!heading) {
+    throw new Error('Missing limitations heading');
+  }
+  return heading;
+}
+
+/**
+ * The heading and its note lines as the card's own children, in render order.
+ *
+ * Nothing wraps them any more: the heading owns the hairline divider and each
+ * note line is the next child of the same parent, so the run is read from the
+ * heading forward and stops at the first child that is not part of it. A
+ * wrapper element between two notes would end the run early and the
+ * expectation below would miss the line it hides.
+ */
+function noteChildren(root: TestRenderer.ReactTestInstance) {
+  const heading = limitationHeading(root);
+  const parent = heading.parent;
+  if (!parent) {
+    throw new Error('Missing note parent');
+  }
+  const start = parent.children.indexOf(heading);
+  if (start === -1) {
+    throw new Error('The heading is not a child of its own parent');
+  }
+  const run: TestRenderer.ReactTestInstance[] = [];
+  for (const node of parent.children.slice(start)) {
+    if (typeof node === 'string') {
+      break;
+    }
+    const testID = String(node.props.testID ?? '');
+    if (![LIMITATIONS_TEST_ID, NOTE_LINE_TEST_ID].some(prefix => testID.startsWith(prefix))) {
+      break;
+    }
+    run.push(node);
+  }
+  return run;
 }
 
 /** The note lines in render order, each as its testID and its child. */
@@ -111,10 +158,33 @@ afterEach(() => {
 });
 
 describe('the on-device model row', () => {
-  it('draws the tools line and the options line in one caption group', () => {
+  it('draws the heading and the two note lines after it, with no wrapper between them', () => {
     const root = mount([appleStatus({ kind: 'some', tools: ['settings_set'], option: true })]);
-    const groups = noteGroups(root);
-    expect(groups).toHaveLength(1);
+    const heading = limitationHeading(root);
+    // The heading carries the catalog's own label and owns the hairline divider
+    // the notes used to sit inside.
+    expect(heading.props.children).toEqual('modelChat.localModels.limitations');
+    expect(heading.props.variant).toEqual('caption');
+    expect(String(heading.props.className)).toContain('border-hair-soft');
+    // The heading is a `Text`, not a group: the card holds three `Text`
+    // children, so nothing wraps the lines.
+    expect(Object.is(heading.type, 'Text')).toBe(true);
+    expect(
+      root.findAll(
+        node =>
+          Object.is(node.type, 'View') && String(node.props.className).includes('border-hair-soft')
+      )
+    ).toEqual([]);
+    expect(noteChildren(root).map(node => node.props.testID)).toEqual([
+      'local-model-limitations-apple',
+      'local-model-unusable-apple',
+      'local-model-unusable-options-apple',
+    ]);
+    expect(noteChildren(root).map(node => node.props.variant)).toEqual([
+      'caption',
+      'caption',
+      'caption',
+    ]);
     expect(noteLines(root)).toEqual([
       [
         'local-model-unusable-apple',
@@ -128,16 +198,6 @@ describe('the on-device model row', () => {
       // The options line carries no payload, so it is one string, not a list.
       ['local-model-unusable-options-apple', 'modelChat.localModels.cannotUseOptions'],
     ]);
-    // Both lines belong to the one group, so the divider cannot split them.
-    const lines = noteGroups(root)[0]?.findAll(
-      node =>
-        typeof node.props.testID === 'string' && node.props.testID.startsWith(NOTE_LINE_TEST_ID)
-    );
-    expect(lines?.map(node => node.props.testID)).toEqual([
-      'local-model-unusable-apple',
-      'local-model-unusable-options-apple',
-    ]);
-    expect(lines?.map(node => node.props.variant)).toEqual(['caption', 'caption']);
   });
 
   it('joins the tools with the catalog separator, never a literal comma', () => {
@@ -146,6 +206,11 @@ describe('the on-device model row', () => {
     // literal comma cannot produce.
     const root = mount([
       appleStatus({ kind: 'some', tools: ['time', 'settings_set'], option: true }),
+    ]);
+    expect(noteChildren(root).map(node => node.props.testID)).toEqual([
+      'local-model-limitations-apple',
+      'local-model-unusable-apple',
+      'local-model-unusable-options-apple',
     ]);
     expect(noteLines(root)).toEqual([
       [
@@ -162,9 +227,12 @@ describe('the on-device model row', () => {
     ]);
   });
 
-  it('draws only the tools line when the model can fill in every option', () => {
+  it('draws only the tools line under the heading when the model can fill in every option', () => {
     const root = mount([appleStatus({ kind: 'some', tools: ['settings_list'], option: false })]);
-    expect(noteGroups(root)).toHaveLength(1);
+    expect(noteChildren(root).map(node => node.props.testID)).toEqual([
+      'local-model-limitations-apple',
+      'local-model-unusable-apple',
+    ]);
     expect(noteLines(root)).toEqual([
       [
         'local-model-unusable-apple',
@@ -179,24 +247,27 @@ describe('the on-device model row', () => {
     ).toEqual([]);
   });
 
-  it('draws only the options line when every tool still reaches the model', () => {
+  it('draws only the options line under the heading when every tool still reaches the model', () => {
     const root = mount([appleStatus({ kind: 'some', tools: [], option: true })]);
-    expect(noteGroups(root)).toHaveLength(1);
+    expect(noteChildren(root).map(node => node.props.testID)).toEqual([
+      'local-model-limitations-apple',
+      'local-model-unusable-options-apple',
+    ]);
     expect(noteLines(root)).toEqual([
       ['local-model-unusable-options-apple', 'modelChat.localModels.cannotUseOptions'],
     ]);
     expect(root.findAll(node => node.props.testID === 'local-model-unusable-apple')).toEqual([]);
   });
 
-  it('draws no group when the model takes every offered tool', () => {
+  it('draws no heading when the model takes every offered tool', () => {
     const root = mount([appleStatus({ kind: 'none' })]);
-    expect(noteGroups(root)).toEqual([]);
+    expect(limitationHeadings(root)).toEqual([]);
     expect(noteLines(root)).toEqual([]);
   });
 
-  it('draws no group before the model has answered', () => {
+  it('draws no heading before the model has answered', () => {
     const root = mount([appleStatus({ kind: 'unknown' })]);
-    expect(noteGroups(root)).toEqual([]);
+    expect(limitationHeadings(root)).toEqual([]);
     expect(noteLines(root)).toEqual([]);
   });
 });

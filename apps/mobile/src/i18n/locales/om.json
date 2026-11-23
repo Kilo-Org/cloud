@@ -4185,8 +4185,9 @@
       "downloading": "Buufamaa jira…",
       "downloadProgress": "Buufamaa jira… {{percent}}%",
       "downloadFailed": "Buufachuun hin xumuramne. Walqunnamtii keessanii fi kuusaa duwwaa mirkaneessii irra deebi'ii yaali.",
-      "cannotUse": "Moodeela kun fayyadamuu hin danda'u: {{items}}.",
-      "cannotUseOptions": "Moodeelli kun filannoo muraasa meeshaan gaafatu guutuu hin danda'u.",
+      "cannotUse": "Hojjechuu hin danda'u: {{items}}.",
+      "cannotUseOptions": "Guutuu hin danda'u: filannoo meeshaa muraasa.",
+      "limitations": "Daangaa",
       "tools": {
         "time": "Yeroo",
         "settingsList": "Qindaa'ina agarsiisi",

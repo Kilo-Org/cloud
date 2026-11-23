@@ -237,11 +237,12 @@ describe('native tool schema', () => {
         required: ['query'],
       }),
     ]);
+    // The record names the argument; the failing item path is the diagnostic copy.
     expect(omitted).toEqual([
-      { kind: 'argument', tool: 'tool', argument: 'filters[]', reason: '$ref' },
+      { kind: 'argument', tool: 'tool', argument: 'filters', reason: 'filters[]: $ref' },
     ]);
     expect(warn.mock.calls).toEqual([
-      ['[native-model] optional argument left out: tool.filters[]: $ref'],
+      ['[native-model] optional argument left out: tool.filters: filters[]: $ref'],
     ]);
     warn.mockRestore();
   });

@@ -4407,8 +4407,9 @@
       "downloading": "Qed jitniżżel…",
       "downloadProgress": "Qed jitniżżel… {{percent}}%",
       "downloadFailed": "It-tniżżil ma tlestiex. Iċċekkja l-konnessjoni u l-ispazju ħieles, imbagħad erġa' pprova.",
-      "cannotUse": "Dan il-mudell ma jistax juża: {{items}}.",
-      "cannotUseOptions": "Dan il-mudell ma jistax jimla xi għażliet li titlob għodda.",
+      "cannotUse": "Ma jistax jiġi eżegwit: {{items}}.",
+      "cannotUseOptions": "Ma jistgħux jimtlew: xi għażliet tal-għodda.",
+      "limitations": "Limitazzjonijiet",
       "tools": {
         "time": "Ħin",
         "settingsList": "Uri l-impostazzjonijiet",

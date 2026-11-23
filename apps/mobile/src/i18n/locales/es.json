@@ -4259,8 +4259,9 @@
       "downloading": "Descargando…",
       "downloadProgress": "Descargando… {{percent}}%",
       "downloadFailed": "La descarga no se completó. Revisa tu conexión y el espacio libre, y vuelve a intentarlo.",
-      "cannotUse": "Este modelo no puede usar: {{items}}.",
-      "cannotUseOptions": "Este modelo no puede rellenar algunas opciones que solicita una herramienta.",
+      "cannotUse": "No se puede ejecutar: {{items}}.",
+      "cannotUseOptions": "No se pueden rellenar: algunas opciones de herramienta.",
+      "limitations": "Limitaciones",
       "tools": {
         "time": "Hora",
         "settingsList": "Mostrar ajustes",

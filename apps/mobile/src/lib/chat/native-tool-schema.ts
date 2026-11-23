@@ -44,7 +44,7 @@ function joinPath(path: string, name: string): string {
   return path === '' ? name : `${path}.${name}`;
 }
 
-/** A refusal's path and words as one line, for the diagnostic log only. */
+/** A refusal's path and words as one line, for the diagnostic copy. */
 function refusedAt(path: string, reason: string): string {
   return path === '' ? reason : `${path}: ${reason}`;
 }
@@ -178,14 +178,14 @@ function convertObject(node: SchemaNode, path: string): Converted {
       });
     } else if (required.has(name)) {
       return property;
-    } else if (property.path === argument || property.path.startsWith(`${argument}[`)) {
-      // The argument itself, or an item the model cannot express: name that path.
-      omitted.push({ argument: property.path, reason: property.reason });
     } else {
-      /* A required child of an optional argument failed, so the whole argument
-         is left out. The record names the argument and keeps the child's path
-         in the reason, which is the diagnostic copy. */
-      omitted.push({ argument, reason: refusedAt(property.path, property.reason) });
+      /* The argument itself, or a child the model cannot express: the record
+         names the argument, and the failing path stays in the diagnostic copy. */
+      omitted.push({
+        argument,
+        reason:
+          property.path === argument ? property.reason : refusedAt(property.path, property.reason),
+      });
     }
   }
   return {

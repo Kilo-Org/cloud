@@ -4214,8 +4214,9 @@
       "downloading": "Downloading…",
       "downloadProgress": "Downloading… {{percent}}%",
       "downloadFailed": "The download didn't finish. Check your connection and free storage, then try again.",
-      "cannotUse": "This model can't use: {{items}}.",
-      "cannotUseOptions": "This model can't fill in some options a tool asks for.",
+      "cannotUse": "Can't run: {{items}}.",
+      "cannotUseOptions": "Can't fill in: some tool options.",
+      "limitations": "Limitations",
       "tools": {
         "time": "Time",
         "settingsList": "Show settings",

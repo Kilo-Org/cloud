@@ -4185,8 +4185,9 @@
       "downloading": "Laster ned …",
       "downloadProgress": "Laster ned … {{percent}} %",
       "downloadFailed": "Nedlastingen ble ikke fullført. Sjekk tilkoblingen og ledig lagringsplass, og prøv igjen.",
-      "cannotUse": "Denne modellen kan ikke bruke: {{items}}.",
-      "cannotUseOptions": "Denne modellen kan ikke fylle ut enkelte alternativer som et verktøy ber om.",
+      "cannotUse": "Kan ikke kjøre: {{items}}.",
+      "cannotUseOptions": "Kan ikke fylle ut: enkelte verktøyalternativer.",
+      "limitations": "Begrensninger",
       "tools": {
         "time": "Tid",
         "settingsList": "Vis innstillinger",

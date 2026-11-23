@@ -4185,8 +4185,9 @@
       "downloading": "Ana saukewa…",
       "downloadProgress": "Ana saukewa… {{percent}}%",
       "downloadFailed": "Saukewar ba ta kammala ba. Duba haɗin intanet ɗinka da sararin ajiya, sannan ka sake gwadawa.",
-      "cannotUse": "Wannan samfurin ba zai iya amfani da: {{items}} ba.",
-      "cannotUseOptions": "Wannan samfurin ba zai iya cika wasu zaɓuɓɓukan da kayan aiki ke nema ba.",
+      "cannotUse": "Ba za a iya gudanar da {{items}} ba.",
+      "cannotUseOptions": "Ba za a iya cika wasu zaɓuɓɓukan kayan aiki ba.",
+      "limitations": "Iyaka",
       "tools": {
         "time": "Lokaci",
         "settingsList": "Nuna saituna",

@@ -80,20 +80,35 @@ function LocalModelRow({
         <Text className="text-sm text-muted-foreground">{t(reasonKey)}</Text>
       )}
       {toolUse.kind === 'some' && (toolUse.tools.length > 0 || toolUse.option) && (
-        <View className="mt-1 gap-1 border-t-[0.5px] border-hair-soft pt-3">
+        <>
+          <Text
+            testID={`local-model-limitations-${status.provider}`}
+            variant="caption"
+            className="mt-1 border-t-[0.5px] border-hair-soft pt-3"
+          >
+            {t('modelChat.localModels.limitations')}
+          </Text>
           {toolUse.tools.length > 0 && (
-            <Text testID={`local-model-unusable-${status.provider}`} variant="caption">
+            <Text
+              testID={`local-model-unusable-${status.provider}`}
+              variant="caption"
+              className="mt-1"
+            >
               {t('modelChat.localModels.cannotUse', {
                 items: toolUse.tools.map(toolDisplayName).join(t('common.listJoiner')),
               })}
             </Text>
           )}
           {toolUse.option && (
-            <Text testID={`local-model-unusable-options-${status.provider}`} variant="caption">
+            <Text
+              testID={`local-model-unusable-options-${status.provider}`}
+              variant="caption"
+              className="mt-1"
+            >
               {t('modelChat.localModels.cannotUseOptions')}
             </Text>
           )}
-        </View>
+        </>
       )}
       <ModelDownloadControl status={status} />
     </View>

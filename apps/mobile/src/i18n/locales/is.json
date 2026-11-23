@@ -4185,8 +4185,9 @@
       "downloading": "Sæki…",
       "downloadProgress": "Sæki… {{percent}}%",
       "downloadFailed": "Niðurhalinu lauk ekki. Athugaðu nettenginguna og laust geymslupláss og reyndu svo aftur.",
-      "cannotUse": "Þetta líkan getur ekki notað: {{items}}.",
-      "cannotUseOptions": "Þetta líkan getur ekki fyllt út sumar valkosti sem tól biður um.",
+      "cannotUse": "Ekki hægt að keyra: {{items}}.",
+      "cannotUseOptions": "Ekki hægt að fylla út: suma valkosti tóls.",
+      "limitations": "Takmarkanir",
       "tools": {
         "time": "Tími",
         "settingsList": "Sýna stillingar",

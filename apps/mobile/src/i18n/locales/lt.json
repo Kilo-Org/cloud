@@ -4333,8 +4333,9 @@
       "downloading": "Atsisiunčiama…",
       "downloadProgress": "Atsisiunčiama… {{percent}}%",
       "downloadFailed": "Atsisiuntimas nebaigtas. Patikrinkite ryšį ir laisvą vietą saugykloje, tada bandykite dar kartą.",
-      "cannotUse": "Šis modelis nepalaiko: {{items}}.",
-      "cannotUseOptions": "Šis modelis negali užpildyti kai kurių parinkčių, kurių prašo įrankis.",
+      "cannotUse": "Nepavyksta paleisti: {{items}}.",
+      "cannotUseOptions": "Nepavyksta užpildyti: kai kurios įrankio parinktys.",
+      "limitations": "Apribojimai",
       "tools": {
         "time": "Laikas",
         "settingsList": "Rodyti nustatymus",

@@ -4185,8 +4185,9 @@
       "downloading": "Downloader…",
       "downloadProgress": "Downloader… {{percent}}%",
       "downloadFailed": "Downloaden blev ikke fuldført. Tjek din forbindelse og ledig lagerplads, og prøv igen.",
-      "cannotUse": "Denne model kan ikke bruge: {{items}}.",
-      "cannotUseOptions": "Denne model kan ikke udfylde nogle af de valgmuligheder, som et værktøj beder om.",
+      "cannotUse": "Kan ikke køre: {{items}}.",
+      "cannotUseOptions": "Kan ikke udfylde: nogle værktøjsvalgmuligheder.",
+      "limitations": "Begrænsninger",
       "tools": {
         "time": "Tid",
         "settingsList": "Vis indstillinger",

@@ -4185,8 +4185,9 @@
       "downloading": "ダウンロード中…",
       "downloadProgress": "ダウンロード中… {{percent}}%",
       "downloadFailed": "ダウンロードが完了しませんでした。接続と空き容量を確認してから、もう一度お試しください。",
-      "cannotUse": "このモデルでは次の機能を利用できません：{{items}}。",
-      "cannotUseOptions": "このモデルでは、ツールが求める一部のオプションを入力できません。",
+      "cannotUse": "実行できません：{{items}}。",
+      "cannotUseOptions": "入力できません：一部のツールオプション。",
+      "limitations": "制限",
       "tools": {
         "time": "時刻",
         "settingsList": "設定を表示",

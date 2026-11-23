@@ -4185,8 +4185,9 @@
       "downloading": "Po shkarkohet…",
       "downloadProgress": "Po shkarkohet… {{percent}}%",
       "downloadFailed": "Shkarkimi nuk përfundoi. Kontrollo lidhjen dhe hapësirën e lirë, pastaj provo përsëri.",
-      "cannotUse": "Ky model nuk mund t'i përdorë: {{items}}.",
-      "cannotUseOptions": "Ky model nuk mund të plotësojë disa opsione që kërkon një mjet.",
+      "cannotUse": "Nuk mund të ekzekutohet: {{items}}.",
+      "cannotUseOptions": "Nuk mund të plotësohen: disa opsione mjeti.",
+      "limitations": "Kufizimet",
       "tools": {
         "time": "Koha",
         "settingsList": "Shfaq cilësimet",

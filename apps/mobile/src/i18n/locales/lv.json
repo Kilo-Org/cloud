@@ -4259,8 +4259,9 @@
       "downloading": "Notiek lejupielāde…",
       "downloadProgress": "Notiek lejupielāde… {{percent}}%",
       "downloadFailed": "Lejupielāde netika pabeigta. Pārbaudiet savienojumu un brīvo krātuvi, pēc tam mēģiniet vēlreiz.",
-      "cannotUse": "Šis modelis nevar izmantot: {{items}}.",
-      "cannotUseOptions": "Šis modelis nevar aizpildīt dažas opcijas, ko pieprasa rīks.",
+      "cannotUse": "Nevar palaist: {{items}}.",
+      "cannotUseOptions": "Nevar aizpildīt: dažas rīka opcijas.",
+      "limitations": "Ierobežojumi",
       "tools": {
         "time": "Laiks",
         "settingsList": "Rādīt iestatījumus",

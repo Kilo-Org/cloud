@@ -4185,8 +4185,9 @@
       "downloading": "Wird heruntergeladen…",
       "downloadProgress": "Wird heruntergeladen… {{percent}} %",
       "downloadFailed": "Der Download wurde nicht abgeschlossen. Prüfe deine Verbindung und den freien Speicherplatz und versuche es dann erneut.",
-      "cannotUse": "Dieses Modell kann Folgendes nicht nutzen: {{items}}.",
-      "cannotUseOptions": "Dieses Modell kann einige Optionen, die ein Tool verlangt, nicht ausfüllen.",
+      "cannotUse": "Kann nicht ausgeführt werden: {{items}}.",
+      "cannotUseOptions": "Kann nicht ausgefüllt werden: einige Tool-Optionen.",
+      "limitations": "Einschränkungen",
       "tools": {
         "time": "Zeit",
         "settingsList": "Einstellungen anzeigen",

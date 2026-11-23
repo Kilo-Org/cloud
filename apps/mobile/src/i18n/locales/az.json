@@ -4185,8 +4185,9 @@
       "downloading": "Endirilir…",
       "downloadProgress": "Endirilir… {{percent}}%",
       "downloadFailed": "Endirmə tamamlanmadı. İnternet bağlantınızı və boş yaddaşı yoxlayın, sonra yenidən cəhd edin.",
-      "cannotUse": "Bu model bunlardan istifadə edə bilməz: {{items}}",
-      "cannotUseOptions": "Bu model alətin tələb etdiyi bəzi seçimləri doldura bilməz.",
+      "cannotUse": "İcra edilə bilməz: {{items}}.",
+      "cannotUseOptions": "Doldurula bilməz: bəzi alət seçimləri.",
+      "limitations": "Məhdudiyyətlər",
       "tools": {
         "time": "Vaxt",
         "settingsList": "Tənzimləmələri göstər",

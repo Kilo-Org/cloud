@@ -4259,8 +4259,9 @@
       "downloading": "מתבצעת הורדה…",
       "downloadProgress": "מתבצעת הורדה… {{percent}}%",
       "downloadFailed": "ההורדה לא הושלמה. יש לבדוק את החיבור לאינטרנט ואת שטח האחסון הפנוי, ולנסות שוב.",
-      "cannotUse": "המודל הזה לא יכול להשתמש ב: {{items}}.",
-      "cannotUseOptions": "המודל הזה לא יכול למלא כמה אפשרויות שכלי מבקש.",
+      "cannotUse": "לא ניתן להריץ: {{items}}.",
+      "cannotUseOptions": "לא ניתן למלא: כמה אפשרויות של כלי.",
+      "limitations": "מגבלות",
       "tools": {
         "time": "שעה",
         "settingsList": "הצג הגדרות",

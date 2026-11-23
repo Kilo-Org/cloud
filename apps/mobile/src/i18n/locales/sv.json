@@ -4185,8 +4185,9 @@
       "downloading": "Laddar ned…",
       "downloadProgress": "Laddar ned… {{percent}} %",
       "downloadFailed": "Nedladdningen slutfördes inte. Kontrollera anslutningen och ledigt lagringsutrymme och försök sedan igen.",
-      "cannotUse": "Den här modellen kan inte använda: {{items}}.",
-      "cannotUseOptions": "Den här modellen kan inte fylla i vissa alternativ som ett verktyg begär.",
+      "cannotUse": "Kan inte köra: {{items}}.",
+      "cannotUseOptions": "Kan inte fylla i: vissa verktygsalternativ.",
+      "limitations": "Begränsningar",
       "tools": {
         "time": "Tid",
         "settingsList": "Visa inställningar",

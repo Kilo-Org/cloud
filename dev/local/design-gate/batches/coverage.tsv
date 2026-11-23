@@ -353,6 +353,8 @@ file	screen	source	platform	loading	empty	happy	retryable-error	non-retryable-er
 (auth)/language-picker.tsx	(auth)/language-picker	route	ios	n/a	n/a	none	n/a	n/a	n/a	n/a	none
 (auth)/legal/[document].tsx	(auth)/legal/[document]	route	android	none	n/a	T2-auth01b kiloapp:///(auth)/legal/privacy	none	note: none (legal-document-screen.tsx:100)	n/a	none	B:T2-auth01b
 (auth)/legal/[document].tsx	(auth)/legal/[document]	route	ios	none	n/a	T2-auth01b kiloapp:///(auth)/legal/privacy	none	note: none (legal-document-screen.tsx:100)	n/a	none	B:T2-auth01b
+(auth)/limit-copy-fixture.tsx	(auth)/limit-copy-fixture	dev-fixture	android	none	none	none	none	none	none	none	none
+(auth)/limit-copy-fixture.tsx	(auth)/limit-copy-fixture	dev-fixture	ios	none	none	none	none	none	none	none	none
 (auth)/login-fixture.tsx	(auth)/login-fixture	dev-fixture	android	none	none	none	none	none	none	none	none
 (auth)/login-fixture.tsx	(auth)/login-fixture	dev-fixture	ios	none	none	none	none	none	none	none	none
 (auth)/login.tsx	(auth)/login	route	android	none	n/a	T2-auth01b kiloapp:///(auth)/login	none	none	n/a	none	n/a
@@ -369,6 +371,8 @@ file	screen	source	platform	loading	empty	happy	retryable-error	non-retryable-er
 (auth)/session-row-fixture.tsx	(auth)/session-row-fixture	dev-fixture	ios	n/a	n/a	T2-auth01b kiloapp:///(auth)/session-row-fixture?lang=hi ; F:dev/session-row-fixture?lang=hi	n/a	n/a	n/a	n/a	B:T2-auth01b
 (auth)/settings-confirm-fixture.tsx	(auth)/settings-confirm-fixture	dev-fixture	android	n/a	n/a	F:dev/settings-confirm-fixture	n/a	n/a	n/a	n/a	n/a
 (auth)/settings-confirm-fixture.tsx	(auth)/settings-confirm-fixture	dev-fixture	ios	n/a	n/a	F:dev/settings-confirm-fixture	n/a	n/a	n/a	n/a	n/a
+(auth)/settings-count-fixture.tsx	(auth)/settings-count-fixture	dev-fixture	android	none	none	none	none	none	none	none	none
+(auth)/settings-count-fixture.tsx	(auth)/settings-count-fixture	dev-fixture	ios	none	none	none	none	none	none	none	none
 (auth)/transcript-style-fixture.tsx	(auth)/transcript-style-fixture	dev-fixture	android	n/a	n/a	T2-auth01a kiloapp:///(auth)/transcript-style-fixture	n/a	n/a	n/a	n/a	B:T2-auth01a
 (auth)/transcript-style-fixture.tsx	(auth)/transcript-style-fixture	dev-fixture	ios	n/a	n/a	T2-auth01a kiloapp:///(auth)/transcript-style-fixture	n/a	n/a	n/a	n/a	B:T2-auth01a
 button-label-fixture.tsx	button-label-fixture	dev-fixture	android	n/a	n/a	T2-G01 kiloapp:///button-label-fixture	n/a	n/a	n/a	n/a	none

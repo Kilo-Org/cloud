@@ -27,8 +27,6 @@ describe('resolveLanguageTag', () => {
   });
 
   it('resolves Portuguese tags to pt-BR unless they name a European-Portuguese region', () => {
-    // iOS reports a pt-BR device as the bare tag `pt` with the region in
-    // `regionCode`, not in `languageTag`.
     expect(resolveLanguageTag([{ languageTag: 'pt', regionCode: 'BR' } as const])).toBe('pt-BR');
     expect(resolveLanguageTag([{ languageTag: 'pt-PT' }])).toBe('pt');
     expect(resolveLanguageTag([{ languageTag: 'pt', regionCode: 'PT' } as const])).toBe('pt');
@@ -104,9 +102,7 @@ describe('resolveLanguageTag', () => {
     expect(resolveLanguageTag([{ languageTag: 'zh-CN', regionCode: 'TW' }])).toBe('zh-Hans');
   });
 
-  it('resolves the Android speech tag cmn-Hans-CN to zh-Hans', () => {
-    // Android's speech service names Mandarin with the ISO 639-3 code `cmn`;
-    // the app ships it as the zh scripts (p16, p4).
+  it('resolves the Android speech tag cmn-Hans-CN to zh-Hans (p16, p4)', () => {
     expect(resolveSupportedLanguageTag([{ languageTag: 'cmn-Hans-CN' }])).toBe('zh-Hans');
   });
 

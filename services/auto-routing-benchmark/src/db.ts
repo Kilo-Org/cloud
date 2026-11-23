@@ -1276,6 +1276,12 @@ export async function readOwnedCaseGeneration(
  * Move a running generation's canonical start to a further paid call its own run and
  * claim token make. The launch fence compares `started_at` to ISO(attemptStartedAt), so a
  * retry that moved only the run's ledger row would be refused as `not_live`.
+ *
+ * It carries the ledger restart's whole guard, not just its own row predicate: the retry
+ * batch must apply both starts or neither, or `benchmark_case_runs.started_at` and
+ * `scheduler_executions.started_at` disagree exactly where RunnerCancel compares them. The
+ * bind order matches {@link restartPaidCaseStatement}: ledger key, then `now` twice for the
+ * chunk lease and the run check.
  */
 export function restartPaidCaseRunStatement(
   db: D1Database,
@@ -1289,7 +1295,29 @@ export function restartPaidCaseRunStatement(
     .prepare(
       `UPDATE benchmark_case_runs SET started_at = ?, updated_at = ?
       WHERE engine_identity = ? AND model = ? AND variant = ? AND rep = ? AND case_id = ?
-        AND executor_run_id = ? AND executor_token = ? AND status = 'running'`
+        AND executor_run_id = ? AND executor_token = ? AND status = 'running'
+        AND EXISTS (
+          SELECT 1 FROM scheduler_executions AS ledger
+          WHERE ledger.run_id = benchmark_case_runs.executor_run_id
+            AND ledger.model = benchmark_case_runs.model
+            AND ledger.variant = benchmark_case_runs.variant
+            AND ledger.rep = benchmark_case_runs.rep
+            AND ledger.case_id = benchmark_case_runs.case_id
+            AND ledger.token = benchmark_case_runs.executor_token
+            AND EXISTS (
+              SELECT 1 FROM scheduler_chunks AS chunk
+              WHERE chunk.run_id = ledger.run_id AND chunk.model = ledger.model
+                AND chunk.variant = ledger.variant AND chunk.rep = ledger.rep
+                AND chunk.token = ledger.token
+                AND chunk.status = 'active' AND chunk.lease_until > ?
+            )
+            AND EXISTS (SELECT 1 FROM benchmark_runs WHERE id = ledger.run_id AND status = 'running')
+            AND NOT EXISTS (
+              SELECT 1 FROM run_lane_failures AS failure
+              WHERE failure.run_id = ledger.run_id AND failure.model = ledger.model
+                AND failure.variant = ledger.variant AND failure.rep = ledger.rep
+            )
+        )`
     )
     .bind(
       new Date(input.startedAt).toISOString(),
@@ -1300,7 +1328,8 @@ export function restartPaidCaseRunStatement(
       input.key.rep,
       input.key.caseId,
       input.executor.runId,
-      input.executor.token
+      input.executor.token,
+      input.startedAt
     );
 }
 

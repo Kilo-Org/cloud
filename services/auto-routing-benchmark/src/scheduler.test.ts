@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { DatabaseSync } from 'node:sqlite';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { applyBenchmarkMigrations, sqliteD1 } from '../test/sqlite-d1';
-import { markStaleRunsFailed } from './db';
+import { markStaleRunsFailed, restartPaidCaseRunStatement } from './db';
 import {
   acquireInitializationLease,
   beginPaidCase,
@@ -1071,6 +1071,38 @@ describe('scheduler (production migrations and real SQLite)', () => {
     ).toEqual({ started_at: NOW });
   });
 
+  /** Seeds the canonical case run the retry's fence moves, as the production claim does. */
+  function seedCanonicalCaseRun(runId: string, claim: SchedulerClaim, startedAt: number): void {
+    sqlite
+      .prepare(
+        `INSERT INTO benchmark_case_runs (
+          engine_identity, model, variant, rep, case_id, status, generation,
+          executor_run_id, executor_token, platform_covered, result_usable,
+          created_at, updated_at, started_at
+        ) VALUES (?, ?, ?, ?, 'case', 'running', 1, ?, ?, 1, 0, ?, ?, ?)`
+      )
+      .run(
+        'scheduler-storage-test',
+        claim.model,
+        claim.variant,
+        claim.rep,
+        runId,
+        claim.token,
+        new Date(startedAt).toISOString(),
+        new Date(startedAt).toISOString(),
+        new Date(startedAt).toISOString()
+      );
+  }
+
+  const retryStarts = () => ({
+    ledger: sqlite
+      .prepare('SELECT started_at FROM scheduler_executions WHERE case_id = ?')
+      .get('case'),
+    canonical: sqlite
+      .prepare('SELECT started_at FROM benchmark_case_runs WHERE case_id = ?')
+      .get('case'),
+  });
+
   it('leaves both starts untouched when the consume statement refuses the retry', async () => {
     // The retry spends its attempt before it moves either start, so a refused spend means the
     // ledger start and the canonical case-run start were never touched and still agree — which
@@ -1087,8 +1119,52 @@ describe('scheduler (production migrations and real SQLite)', () => {
     const [claim] = await claimMany(db, config, 1, 'refused-claim', NOW);
     if (!claim) throw new Error('Expected the claim');
     expect(await startChunk(db, claim.id, claim.token, NOW)).toBe(true);
+    expect(
+      await beginPaidCase(
+        db,
+        {
+          runId: 'refused',
+          model: claim.model,
+          variant: claim.variant,
+          rep: claim.rep,
+          caseId: 'case',
+          token: claim.token,
+        },
+        NOW
+      )
+    ).toBe(true);
+    seedCanonicalCaseRun('refused', claim, NOW);
+    sqlite.prepare('UPDATE scheduler_chunks SET attempts = 2 WHERE id = ?').run(claim.id);
+
+    const before = retryStarts();
+    // The canonical row really is seeded, so the assertion below is not undefined === undefined.
+    expect(before.canonical).toEqual({ started_at: new Date(NOW).toISOString() });
+
+    const consumed = await consumeRetryAttemptStatement(db, claim.id, claim.token, NOW + 1).run();
+    expect(consumed.meta.changes).toBe(0);
+
+    expect(retryStarts()).toEqual(before);
+    expect(storedChunk(sqlite, claim.id).attempts).toBe(2);
+  });
+
+  it('moves neither start when the run ends between the consume and the restart', async () => {
+    // The two restart statements carry the SAME guard, so a fence refusal cannot move only the
+    // canonical row: here the consume succeeds, then the run is paused, and the batch's guard
+    // refuses both. The retry's refund then restores the attempt and both starts still match.
+    insertRun(sqlite, 'paused');
+    await scheduleRunChunks(db, {
+      runId: 'paused',
+      entries: independentEntries(1),
+      repetitions: 1,
+      caseIds: ['case'],
+      chunkSize: 1,
+    });
+    const config = schedulerConfig('{"slots":1}');
+    const [claim] = await claimMany(db, config, 1, 'paused-claim', NOW);
+    if (!claim) throw new Error('Expected the claim');
+    expect(await startChunk(db, claim.id, claim.token, NOW)).toBe(true);
     const ledgerKey = {
-      runId: 'refused',
+      runId: 'paused',
       model: claim.model,
       variant: claim.variant,
       rep: claim.rep,
@@ -1096,27 +1172,39 @@ describe('scheduler (production migrations and real SQLite)', () => {
       token: claim.token,
     };
     expect(await beginPaidCase(db, ledgerKey, NOW)).toBe(true);
-    sqlite.prepare('UPDATE scheduler_chunks SET attempts = 2 WHERE id = ?').run(claim.id);
-    const before = {
-      ledger: sqlite
-        .prepare('SELECT started_at FROM scheduler_executions WHERE case_id = ?')
-        .get('case'),
-      canonical: sqlite
-        .prepare('SELECT started_at FROM benchmark_case_runs WHERE case_id = ?')
-        .get('case'),
-    };
+    seedCanonicalCaseRun('paused', claim, NOW);
+    const before = retryStarts();
+    expect(before.canonical).toBeDefined();
 
-    // The production order: consume first, and stop when it refuses.
     const consumed = await consumeRetryAttemptStatement(db, claim.id, claim.token, NOW + 1).run();
-    expect(consumed.meta.changes).toBe(0);
+    expect(consumed.meta.changes).toBe(1);
+    // The run stops being live between the spend and the fence restart.
+    sqlite.prepare("UPDATE benchmark_runs SET status = 'failed' WHERE id = 'paused'").run();
+    const restarted = await db.batch([
+      restartPaidCaseStatement(db, { ...ledgerKey, attemptStartedAt: NOW }, NOW + 1),
+      restartPaidCaseRunStatement(db, {
+        key: {
+          engineIdentity: 'scheduler-storage-test',
+          model: claim.model,
+          variant: claim.variant,
+          rep: claim.rep,
+          caseId: 'case',
+        },
+        executor: { runId: 'paused', token: claim.token },
+        startedAt: NOW + 1,
+      }),
+    ]);
+    expect(restarted.map(result => result.meta.changes)).toEqual([0, 0]);
+    expect(retryStarts()).toEqual(before);
 
-    expect(
-      sqlite.prepare('SELECT started_at FROM scheduler_executions WHERE case_id = ?').get('case')
-    ).toEqual(before.ledger);
-    expect(
-      sqlite.prepare('SELECT started_at FROM benchmark_case_runs WHERE case_id = ?').get('case')
-    ).toEqual(before.canonical);
-    expect(storedChunk(sqlite, claim.id).attempts).toBe(2);
+    // The refusal refunds the attempt it spent; both starts were never touched.
+    await refundUnspentRetryAttempt(db, {
+      claim: { id: claim.id, token: claim.token },
+      execution: { ...ledgerKey, attemptStartedAt: NOW },
+      startedAt: NOW + 1,
+    });
+    expect(storedChunk(sqlite, claim.id).attempts).toBe(1);
+    expect(retryStarts()).toEqual(before);
   });
 
   it('does not spend a platform attempt on a wait that never reached the model', async () => {

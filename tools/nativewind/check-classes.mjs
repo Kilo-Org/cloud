@@ -38,9 +38,11 @@
  * may never exceed its baseline count, and an entry the file is now below is
  * reported with the line to lower or delete, so the baseline only shrinks and
  * at the end of the migration it is empty. Regenerate it with
- * `--write-layout-baseline` only after the violations themselves are gone, and
- * the rewrite refuses a run that could not read the theme or could not read or
- * parse a walked file: those counts are short by what the run never saw.
+ * `--write-layout-baseline` only after the violations themselves are gone. The
+ * rewrite refuses a run that could not read or parse a walked file, because
+ * those counts are short by what the run never saw; a theme read failure does
+ * not withhold the rewrite, because the theme tokens feed only the `/opacity`
+ * ban rule, and an ordinary run reports it.
  *
  * Usage: node tools/nativewind/check-classes.mjs [--write-layout-baseline]
  */
@@ -1931,16 +1933,20 @@ function writeLayoutBaseline(findings) {
  * the baseline shrinking instead of outliving the migration.
  */
 function compareLayoutBaseline(findings, baseline) {
-  const exceeded = new Set();
-  const stale = [];
+  const reported = [];
+  const overCount = [];
   for (const [path, byRule] of findings) {
     for (const [id, problems] of byRule) {
       const admitted = baseline[path]?.[id] ?? 0;
       if (problems.length > admitted) {
-        exceeded.add(`${path} ${id}`);
+        reported.push(...problems.map(layoutFindingText));
+        overCount.push(
+          `${path}: ${id} now has ${problems.length} violation(s) and the baseline admits ${admitted}; remove the new one(s)`
+        );
       }
     }
   }
+  const stale = [];
   for (const [path, rules] of Object.entries(baseline)) {
     for (const [id, admitted] of Object.entries(rules)) {
       const actual = findings.get(path)?.get(id)?.length ?? 0;
@@ -1950,19 +1956,6 @@ function compareLayoutBaseline(findings, baseline) {
       if (actual < admitted) {
         stale.push(
           `${LAYOUT_BASELINE_PATH}: ${path} ${id} baseline is ${admitted} but the file now has ${actual}; ${actual === 0 ? 'delete the entry' : `lower it to ${actual}`}`
-        );
-      }
-    }
-  }
-
-  const reported = [];
-  const overCount = [];
-  for (const [path, byRule] of findings) {
-    for (const [id, problems] of byRule) {
-      if (exceeded.has(`${path} ${id}`)) {
-        reported.push(...problems.map(layoutFindingText));
-        overCount.push(
-          `${path}: ${id} now has ${problems.length} violation(s) and the baseline admits ${baseline[path]?.[id] ?? 0}; remove the new one(s)`
         );
       }
     }
@@ -2012,7 +2005,6 @@ function auditRun({
   // from the rules' findings: no rule can report what it never read, so a run
   // holding one of these has not audited the tree it walked.
   const unaudited = [];
-  const { failure: themeFailure } = themeTokens();
   for (const dir of SOURCE_DIRS) {
     for (const entry of parseSourceTree(dir, ROOT, isTestArtifact, read)) {
       unaudited.push(...entry.problems);
@@ -2024,19 +2016,17 @@ function auditRun({
   const findings = layoutFindings(layout);
 
   if (writeBaseline) {
-    // A run that could not read the theme, or a walked file it could not read
-    // or parse, has not audited the tree: rewriting the baseline from it would
-    // record counts short by every file the run never saw, and the migration's
-    // floor would rise instead of shrink.
-    if (themeFailure !== null || unaudited.length > 0) {
-      if (themeFailure !== null) {
-        console.error(themeFailure);
-      }
+    // Only a walked file the run could not read or parse leaves the tree
+    // unaudited and makes the counts short: rewriting the baseline from such a
+    // run would record every file it never saw as clean, and the migration's
+    // floor would rise instead of shrink. A theme read failure is an instrument
+    // problem of the ban rule and changes no layout count, so it neither aborts
+    // nor shortens the rewrite.
+    if (unaudited.length > 0) {
       for (const problem of unaudited) {
         console.error(problem);
       }
-      const count = unaudited.length + (themeFailure === null ? 0 : 1);
-      console.error(`\ncheck-classes: ${count} problem(s)`);
+      console.error(`\ncheck-classes: ${unaudited.length} problem(s)`);
       process.exitCode = 1;
       return;
     }
@@ -2047,6 +2037,9 @@ function auditRun({
   // The theme and baseline problems belong with the instrument problems: the
   // file problems print first, then what the audit could not check, then the
   // summary.
+  // The theme was already read during the walk, by the opacity rule, so this is
+  // the memo and not a second read.
+  const { failure: themeFailure } = themeTokens();
   const { baseline, failure: baselineFailure } = readBaseline();
   if (themeFailure !== null) {
     problems.push(themeFailure);

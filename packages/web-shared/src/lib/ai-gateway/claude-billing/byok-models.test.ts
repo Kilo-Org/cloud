@@ -10,7 +10,7 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => ({ readDb: {} }));
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import type { ClaudeBillingConnectionRow } from '@kilocode/db/schema';
 import { ClaudeBillingConnectionStatus } from '@kilocode/db/schema-types';
-import { getGrantedClaudeBillingConnection } from './store';
+import { getGrantedClaudeBillingConnection, type ClaudeBillingGrantedConnection } from './store';
 import { isClaudeOperatorConfigured } from './operator';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { tagClaudeBillingByokModels } from './byok-models';
@@ -26,13 +26,27 @@ function connection(status: ClaudeBillingConnectionStatus) {
   return { status } as ClaudeBillingConnectionRow;
 }
 
+/** A stored row whose grant gives it to the same scope, so both views agree. */
+function granted(row: ClaudeBillingConnectionRow | null): ClaudeBillingGrantedConnection | null {
+  return row
+    ? {
+        connection: row,
+        grant: {
+          kilo_user_id: row.kilo_user_id,
+          organization_id: row.organization_id,
+          created_by: row.created_by,
+        },
+      }
+    : null;
+}
+
 describe('tagClaudeBillingByokModels', () => {
   beforeEach(() => {
     jest.mocked(isClaudeOperatorConfigured).mockReset().mockReturnValue(true);
     jest
       .mocked(getGrantedClaudeBillingConnection)
       .mockReset()
-      .mockResolvedValue(connection(ClaudeBillingConnectionStatus.Connected));
+      .mockResolvedValue(granted(connection(ClaudeBillingConnectionStatus.Connected)));
   });
 
   it('tags only the Claude models a connected link serves, and never as free', async () => {
@@ -50,7 +64,7 @@ describe('tagClaudeBillingByokModels', () => {
     ClaudeBillingConnectionStatus.BillingUnavailable,
     ClaudeBillingConnectionStatus.Removed,
   ])('leaves the list unchanged for a %s link', async status => {
-    jest.mocked(getGrantedClaudeBillingConnection).mockResolvedValue(connection(status));
+    jest.mocked(getGrantedClaudeBillingConnection).mockResolvedValue(granted(connection(status)));
     await expect(tagClaudeBillingByokModels(owner, models)).resolves.toBe(models);
   });
 

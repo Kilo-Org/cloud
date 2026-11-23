@@ -4,14 +4,17 @@ on:
   workflow_dispatch:
     inputs:
       runtime_source_sha:
-        description: 'Main SHA whose published runtime to use (for a branch run); empty uses the run SHA'
+        # Only main publishes a runtime. A dispatch from a branch must name a
+        # main SHA, and an empty input falls back to the run SHA, which the
+        # resolution step then requires to be a main commit as well.
+        description: 'Main SHA whose published runtime to use; empty uses the run SHA, which must be a main commit'
         required: false
         type: string
         default: ''
   workflow_call:
     inputs:
       runtime_source_sha:
-        description: 'Main SHA whose published runtime to use; empty uses the run SHA'
+        description: 'Main SHA whose published runtime to use; empty uses the run SHA, which must be a main commit'
         required: false
         type: string
         default: ''

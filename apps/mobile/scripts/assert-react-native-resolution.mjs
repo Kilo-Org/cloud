@@ -170,12 +170,10 @@ const expoAsset = path.join(packageRoot('expo-asset'), 'build', 'Asset.js');
 const proxyPath = resolveFrom(expoAsset, 'react-native');
 const resolved = `${path.relative(appDir, expoAsset)} -> 'react-native' => ${proxyPath ?? '(unresolved)'}`;
 
-check(
-  proxyPath !== null && proxyPath.includes(STYLED_PROXY),
-  `a package resolves the styled \`react-native\` proxy\n    ${resolved}`
-);
+const usesStyledProxy = proxyPath !== null && proxyPath.includes(STYLED_PROXY);
+check(usesStyledProxy, `a package resolves the styled \`react-native\` proxy\n    ${resolved}`);
 
-if (proxyPath !== null && proxyPath.includes(STYLED_PROXY)) {
+if (usesStyledProxy) {
   const { exports: proxyExports, reactNative } = evaluateProxyExports(proxyPath);
   for (const name of Object.keys(FORWARDED_EXPORTS)) {
     check(

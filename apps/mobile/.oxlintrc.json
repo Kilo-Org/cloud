@@ -526,7 +526,11 @@
       }
     },
     {
-      "files": ["src/i18n/catalogs.ts", "src/lib/relative-time-locales.ts"],
+      "files": [
+        "src/i18n/catalogs.ts",
+        "src/lib/relative-time-locales.ts",
+        "src/lib/intl-cache.ts"
+      ],
       "rules": {
         "@typescript-eslint/no-require-imports": "off",
         "@typescript-eslint/no-var-requires": "off",
@@ -536,10 +540,7 @@
     {
       "files": ["src/lib/intl-cache.ts"],
       "rules": {
-        "@typescript-eslint/no-require-imports": "off",
-        "@typescript-eslint/no-var-requires": "off",
-        "no-restricted-globals": "off",
-        "unicorn/prefer-module": "off"
+        "no-restricted-globals": "off"
       }
     },
     {

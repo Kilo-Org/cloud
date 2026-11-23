@@ -823,26 +823,27 @@ export async function uninstallApp(owner: Owner, options: SlackUninstallOptions 
 }
 
 /**
- * Budget for the two Chat SDK removals of a retirement section. The section's
- * `statement_timeout` bounds only its SQL, so these external calls race this
- * budget instead: the second section runs one lookup at
- * `INSTALLATION_SERVER_LOCK_STATEMENT_TIMEOUT_MS`, so its worst case is
- * `1 statement x 1s + 3s removals = 4s < 5s wait`.
+ * Budget for the settlement of a retirement section: the token revoke and the
+ * two Chat SDK removals. The section's `statement_timeout` bounds only its SQL,
+ * so those external calls race this budget instead. The section runs one lookup
+ * at `INSTALLATION_SERVER_LOCK_STATEMENT_TIMEOUT_MS`, so its worst case is
+ * `1 statement x 1s + 3s settlement = 4s < 5s wait`.
  */
-export const SLACK_RETIREMENT_REMOVAL_TIMEOUT_MS = 3_000;
+export const SLACK_RETIREMENT_SETTLEMENT_TIMEOUT_MS = 3_000;
 
 /**
  * What the retirement settled on, for the report that follows it: `released`
- * when it removed the previous workspace's Chat SDK state, `recorded_by_another_row`
- * when a row records that workspace so the state stays, `removal_timed_out` when a
- * removal did not settle within its budget.
+ * when it revoked the previous workspace's token and removed its Chat SDK state,
+ * `recorded_by_another_row` when a row records that workspace so the token and
+ * state stay, `settlement_timed_out` when the settlement did not finish within
+ * its budget.
  */
-type SlackWorkspaceRetirement = 'released' | 'recorded_by_another_row' | 'removal_timed_out';
+type SlackWorkspaceRetirement = 'released' | 'recorded_by_another_row' | 'settlement_timed_out';
 
 /**
  * Whether any row records `teamId`, from any owner. A row that records the
- * workspace still serves it, so the retirement keeps that workspace's Chat SDK
- * state.
+ * workspace still serves it, so the retirement settles neither that workspace's
+ * token nor its Chat SDK state.
  */
 async function anyRowRecordsSlackWorkspace(
   tx: DrizzleTransaction,
@@ -869,7 +870,7 @@ function reportSlackRetirementOutcome(teamId: string, outcome: SlackWorkspaceRet
   const message =
     outcome === 'recorded_by_another_row'
       ? 'A replaced Slack workspace is recorded by another row and was kept'
-      : 'A replaced Slack workspace removal did not settle within its budget';
+      : 'A replaced Slack workspace settlement did not finish within its budget';
   captureException(new Error(message), {
     tags: { component: 'slack-service', op: 'retire-previous-workspace' },
     extra: { teamId, outcome },
@@ -877,25 +878,41 @@ function reportSlackRetirementOutcome(teamId: string, outcome: SlackWorkspaceRet
 }
 
 /**
- * Remove the previous workspace's Chat SDK installation and identity cache within
- * {@link SLACK_RETIREMENT_REMOVAL_TIMEOUT_MS}. Both are external calls, so a
- * section that holds the workspace lock leaves it when this budget is spent
- * rather than waiting for them. A removal still running at that point keeps the
- * handlers the race installed, so its later failure is not unhandled.
+ * Revoke the previous workspace's token and remove its Chat SDK installation and
+ * identity cache within {@link SLACK_RETIREMENT_SETTLEMENT_TIMEOUT_MS}. Every
+ * step is an external call, so the section that holds the workspace lock leaves
+ * it when this budget is spent rather than waiting for them. A settlement still
+ * running at that point keeps the handlers the race installed, so its later
+ * failure is not unhandled.
+ *
+ * The revoke is skipped when the previous workspace stored no token; a revoke
+ * Slack does not confirm is reported and the removals still run.
  */
-async function removeSlackWorkspaceState(
-  teamId: string,
+async function settleSlackWorkspace(
+  previous: PreviousSlackWorkspace,
   options: SlackUninstallOptions
-): Promise<'removed' | 'timed_out'> {
-  const removals = (async (): Promise<'removed'> => {
-    await options.deleteChatSdkInstallation?.(teamId);
-    await options.deleteChatSdkIdentityCache?.(teamId);
-    return 'removed';
+): Promise<'settled' | 'timed_out'> {
+  const settlement = (async (): Promise<'settled'> => {
+    if (previous.botToken) {
+      const revocation = await revokeSlackToken(previous.botToken);
+      if (revocation.status === 'temporary_failure') {
+        captureException(new Error('Slack token revocation did not settle a replaced workspace'), {
+          tags: { component: 'slack-service', op: 'retire-previous-workspace' },
+          extra: { teamId: previous.teamId, reason: revocation.reason },
+        });
+      }
+    }
+    await options.deleteChatSdkInstallation?.(previous.teamId);
+    await options.deleteChatSdkIdentityCache?.(previous.teamId);
+    return 'settled';
   })();
   const expired = Promise.withResolvers<'timed_out'>();
-  const timer = setTimeout(() => expired.resolve('timed_out'), SLACK_RETIREMENT_REMOVAL_TIMEOUT_MS);
+  const timer = setTimeout(
+    () => expired.resolve('timed_out'),
+    SLACK_RETIREMENT_SETTLEMENT_TIMEOUT_MS
+  );
   try {
-    return await Promise.race([removals, expired.promise]);
+    return await Promise.race([settlement, expired.promise]);
   } finally {
     clearTimeout(timer);
   }
@@ -906,46 +923,30 @@ async function removeSlackWorkspaceState(
  * caller's transaction has committed: the connection row already names the new
  * workspace, so the previous one's token and Chat SDK state are settled beside it.
  *
- * The token is revoked only for a workspace this call releases, so the function
- * takes the per-workspace lock twice. The first section answers whether any row
- * records the workspace. The revoke then runs outside any lock, because it is an
- * HTTP call that must not hold the workspace lock. The second section removes the
- * Chat SDK state only when no row records the workspace at that point. That lock
- * takes no owner key, so a retirement in flight never delays another connection
- * of this owner.
+ * One locked section decides and settles. Holding the workspace lock, it asks
+ * whether any row records the previous workspace; if one does, that workspace is
+ * still served, so nothing is revoked or removed. Otherwise it revokes the
+ * previous token and removes the Chat SDK installation and identity cache before
+ * the section ends. The claim question, the revoke and the removals are
+ * therefore one decision: a concurrent connection of the same workspace either
+ * commits before the section, and is then kept, or waits for the section and
+ * records the workspace again only after it has been settled. That lock takes no
+ * owner key, so a retirement in flight never delays another connection of this
+ * owner.
  *
- * The section's `statement_timeout` bounds its SQL only, so the removals race
- * their own budget and the section leaves the lock when that budget is spent.
+ * The section's `statement_timeout` bounds its SQL only, so the revoke and both
+ * removals race one settlement budget and the section leaves the lock when that
+ * budget is spent.
  *
  * A token Slack does not confirm as revoked, a workspace a row records, and a
- * removal past its budget are reported with the team id rather than thrown: the
- * new connection stands.
+ * settlement past its budget are reported with the team id rather than thrown:
+ * the new connection stands.
  */
 export async function retirePreviousSlackWorkspace(
   previous: PreviousSlackWorkspace,
   options: SlackUninstallOptions = {}
 ): Promise<void> {
   try {
-    const recordedBeforeRevoke = await withInstallationServerLock(
-      PLATFORM.SLACK,
-      previous.teamId,
-      tx => anyRowRecordsSlackWorkspace(tx, previous.teamId)
-    );
-    if (recordedBeforeRevoke) {
-      reportSlackRetirementOutcome(previous.teamId, 'recorded_by_another_row');
-      return;
-    }
-
-    if (previous.botToken) {
-      const revocation = await revokeSlackToken(previous.botToken);
-      if (revocation.status === 'temporary_failure') {
-        captureException(new Error('Slack token revocation did not settle a replaced workspace'), {
-          tags: { component: 'slack-service', op: 'retire-previous-workspace' },
-          extra: { teamId: previous.teamId, reason: revocation.reason },
-        });
-      }
-    }
-
     const retirement = await withInstallationServerLock(
       PLATFORM.SLACK,
       previous.teamId,
@@ -953,8 +954,8 @@ export async function retirePreviousSlackWorkspace(
         if (await anyRowRecordsSlackWorkspace(tx, previous.teamId)) {
           return 'recorded_by_another_row';
         }
-        const removal = await removeSlackWorkspaceState(previous.teamId, options);
-        return removal === 'removed' ? 'released' : 'removal_timed_out';
+        const settlement = await settleSlackWorkspace(previous, options);
+        return settlement === 'settled' ? 'released' : 'settlement_timed_out';
       }
     );
 

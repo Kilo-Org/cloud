@@ -3,6 +3,7 @@ import { Directory, File, Paths } from 'expo-file-system';
 import { fetch } from 'expo/fetch';
 import * as Sharing from 'expo-sharing';
 
+import { stripUnsafeFilenameCharacters } from './filename-safety';
 import { registerTempFile } from './temp-file-registry';
 import { isAbortError, isRequestDeadlineError } from './telemetry/abort-classification';
 import { truncateUtf8, utf8ByteLength } from './utf8-utils';
@@ -277,14 +278,16 @@ export async function shareRemoteFile({
 }
 
 export function getSafeCacheFilename({ id, filename }: { id: string; filename: string }): string {
-  const prefix = `${safePathSegment(id)}-`;
+  // The opaque id prefixes every name, so the result can never be a traversal
+  // token and never starts with a dot, whatever the name itself began with.
+  const prefix = `${safeOpaqueSegment(id)}-`;
   const filenameBudget = MAX_CACHE_FILENAME_BYTES - utf8ByteLength(prefix);
 
   if (filenameBudget <= 0) {
     return truncateUtf8(prefix, MAX_CACHE_FILENAME_BYTES);
   }
 
-  return `${prefix}${boundFilenameSegment(safePathSegment(filename), filenameBudget)}`;
+  return `${prefix}${boundFilenameSegment(safeFilenameSegment(filename), filenameBudget)}`;
 }
 
 /** One process-wide counter, so two attempts in the same millisecond differ. */
@@ -322,8 +325,23 @@ function deleteQuietly(file: File): void {
   }
 }
 
-function safePathSegment(value: string): string {
+/**
+ * A cache-name segment for an opaque id, not for a person's name: only
+ * `[a-zA-Z0-9._-]` survive, so an id that carries anything else stays one
+ * flat, unambiguous token beside the file's own name.
+ */
+function safeOpaqueSegment(value: string): string {
   const sanitized = value.trim().replaceAll(/[^a-zA-Z0-9._-]/g, '_');
+  return sanitized.length > 0 ? sanitized : 'attachment';
+}
+
+/**
+ * The human half of a cache name: the name the person was given, minus every
+ * character unsafe in a filename, so an accented or non-Latin name reaches the
+ * share sheet as itself.
+ */
+function safeFilenameSegment(value: string): string {
+  const sanitized = stripUnsafeFilenameCharacters(value).trim();
   return sanitized.length > 0 ? sanitized : 'attachment';
 }
 

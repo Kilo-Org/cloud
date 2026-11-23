@@ -36,6 +36,11 @@ export const usage = '<email> [--port <n>]';
  * - `STALL_PATH` accepts the request and never answers, so the share's deadline
  *   is what ends it.
  *
+ * Two more sessions reuse `OK_PATH` to cover the name a share carries: an
+ * accented filename (`Rechnung-März.pdf`) and a filename that arrived as a
+ * relative path (`../../Rechnung März.pdf`), of which only the basename may
+ * survive.
+ *
  * The device reaches this host through `adb reverse tcp:<port> tcp:<port>`:
  * the URL is `localhost` from the phone's own point of view, so no tunnel and
  * no non-loopback address are involved.
@@ -51,6 +56,10 @@ export const MISSING_SESSION_ID = 'ses_00000000022ShareRemoteGone';
 export const MISSING_SESSION_TITLE = 'Share fixture: missing.pdf';
 export const STALL_SESSION_ID = 'ses_00000000023ShareRemoteHang';
 export const STALL_SESSION_TITLE = 'Share fixture: stall.txt';
+export const NAME_SESSION_ID = 'ses_00000000024ShareRemoteName';
+export const NAME_SESSION_TITLE = 'Share fixture: Rechnung-März.pdf';
+export const PATH_SESSION_ID = 'ses_00000000025ShareRemotePath';
+export const PATH_SESSION_TITLE = 'Share fixture: ../Rechnung März.pdf';
 
 /** The paths the local fixture server answers, one per transfer outcome. */
 export const OK_PATH = '/ok';
@@ -111,6 +120,27 @@ const CASES = [
     path: STALL_PATH,
     createdAt: BASE_CREATED_AT + 1_000,
   },
+  {
+    // The name a person gets from an accountant: accents and a space must
+    // reach the share sheet unchanged.
+    sessionId: NAME_SESSION_ID,
+    title: NAME_SESSION_TITLE,
+    tag: 'Name',
+    mime: 'application/pdf',
+    filename: 'Rechnung-März.pdf',
+    path: OK_PATH,
+    createdAt: BASE_CREATED_AT + 500,
+  },
+  {
+    // A name that arrived as a relative path: only its basename may survive.
+    sessionId: PATH_SESSION_ID,
+    title: PATH_SESSION_TITLE,
+    tag: 'Path',
+    mime: 'application/pdf',
+    filename: '../../Rechnung März.pdf',
+    path: OK_PATH,
+    createdAt: BASE_CREATED_AT,
+  },
 ] satisfies readonly ShareFixtureCase[];
 
 function printUsage(): void {
@@ -118,9 +148,13 @@ function printUsage(): void {
   console.log('');
   console.log(`Usage: pnpm dev:seed app:share-remote-fixture ${usage}`);
   console.log('');
-  console.log('Three sessions, one attachment each. Every attachment URL is a');
+  console.log('Five sessions, one attachment each. Every attachment URL is a');
   console.log(`  http://localhost:${DEFAULT_FIXTURE_PORT}<path>`);
-  console.log('address: one answers 200, one answers 404, and one never answers.');
+  console.log('address: two answer 200, one answers 404, and one never answers.');
+  console.log('The two success cases cover the name a share carries: an accented');
+  console.log('filename (`Rechnung-März.pdf`) and a filename that arrived as a');
+  console.log('relative path (`../../Rechnung März.pdf`), which keeps only its');
+  console.log('basename.');
   console.log('Serve those paths on the VM and map the port onto the device first:');
   console.log(`  adb reverse tcp:${DEFAULT_FIXTURE_PORT} tcp:${DEFAULT_FIXTURE_PORT}`);
   console.log('');
@@ -397,10 +431,13 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   }
 
   console.log('');
-  console.log('This fixture represents: three sessions, one attachment each, every');
+  console.log('This fixture represents: five sessions, one attachment each, every');
   console.log(`attachment URL a http://localhost:${port} address on this VM.`);
-  console.log('One answers 200, one answers 404, and one never answers, so the app');
+  console.log('Two answer 200, one answers 404, and one never answers, so the app');
   console.log('runs the share download success path and both of its failure paths.');
+  console.log('The two success cases differ in the name they carry: an accented one');
+  console.log('(`Rechnung-März.pdf`) and one that arrived as a relative path');
+  console.log('(`../../Rechnung März.pdf`, which keeps only its basename).');
   console.log('');
   console.log(`Note: the device only reaches this host through adb reverse tcp:${port}.`);
   console.log('Suggested next step: foreground the app, open the session for the case');
@@ -413,11 +450,15 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     okSessionId: OK_SESSION_ID,
     missingSessionId: MISSING_SESSION_ID,
     stallSessionId: STALL_SESSION_ID,
+    nameSessionId: NAME_SESSION_ID,
+    pathSessionId: PATH_SESSION_ID,
     port,
     baseUrl: `http://localhost:${port}`,
     okMessageCount: counts.get(OK_SESSION_ID) ?? 0,
     missingMessageCount: counts.get(MISSING_SESSION_ID) ?? 0,
     stallMessageCount: counts.get(STALL_SESSION_ID) ?? 0,
+    nameMessageCount: counts.get(NAME_SESSION_ID) ?? 0,
+    pathMessageCount: counts.get(PATH_SESSION_ID) ?? 0,
     messageCount,
     sessionIngestUrl,
   };

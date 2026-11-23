@@ -470,10 +470,12 @@ describe('disabled switch pair contrast (non-text)', () => {
 });
 
 // The off control is what tells a reader a settings-row switch is off: the
-// light grip on the `mutedSoft` track it used to paint measured about 2.5:1 on
-// its own track, and about 1.1:1 where Android's wider thumb overhangs onto
-// the cream row, both under WCAG 1.4.11's 3:1 non-text floor. The pair is now
-// the mid neutral track under the scheme ink, the same in light and dark.
+// grip on the track it paints has to read as a knob there, and the track has to
+// read as a control on the page, card and row it sits on, so WCAG 1.4.11's 3:1
+// non-text floor holds for both. The pair is the mid neutral track under the
+// scheme ink, the same in light and dark. The pair it replaced, a white grip on
+// the `mutedSoft` track, measured about 2.5:1 there and about 1.1:1 where
+// Android's wider thumb overhangs onto the cream row, which is why it went.
 describe('enabled off switch pair contrast (non-text)', () => {
   it('every theme: the off grip reads on its own track and the row surfaces', () => {
     for (const [themeName, colors] of [
@@ -500,15 +502,6 @@ describe('enabled off switch pair contrast (non-text)', () => {
         ).toBeGreaterThanOrEqual(MIN_NON_TEXT_RATIO);
       }
     }
-  });
-
-  // Regression: the replaced light pair was the white `primaryForeground` grip
-  // on the `mutedSoft` track. It sat at about 2.5:1, so it never cleared the
-  // floor even against its own track.
-  it('light theme: the old white grip on the muted-soft track stays under the floor', () => {
-    expect(contrastRatio(lightColors.primaryForeground, lightColors.mutedSoft)).toBeLessThan(
-      MIN_NON_TEXT_RATIO
-    );
   });
 });
 

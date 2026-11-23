@@ -174,7 +174,6 @@ describe('createOfflineBannerStore', () => {
 
     source.emit(offlineState);
 
-    // The 5 s window is not evidence of a working transport, but it keeps painting online.
     expect(store.phase().kind).toBe('confirming-offline');
     expect(store.state()).toBe('online');
     expect(store.isOffline()).toBe(false);
@@ -204,7 +203,6 @@ describe('createOfflineBannerStore', () => {
 
     source.emit(offlineState);
 
-    // A repeated disconnect copies the state it found: the banner stays offline.
     expect(store.phase().kind).toBe('confirming-offline');
     expect(store.state()).toBe('offline');
     expect(store.isOffline()).toBe(true);
@@ -241,12 +239,6 @@ describe('createOfflineBannerStore', () => {
     expect(store.isOffline()).toBe(true);
     expect(changes).toEqual(['offline']);
   });
-
-  // The radio-back-without-reachability case (uxs3 spot check, e6-after-net:
-  // airplane mode → 3G while NetInfo's external probe never answers). The
-  // committed offline must not be preserved forever: the app's own probe is
-  // the decider, fired immediately without the five-second delay. The
-  // radioUpUnknownState fixture lives in the test helpers.
 
   it('probes immediately on unknown with the radio up while committed offline, and clears on a reachable probe', async () => {
     const { store, source, timer, probe, changes, settle } = createStore();

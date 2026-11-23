@@ -6,7 +6,7 @@ import { readDb } from '@kilocode/web-shared/lib/drizzle';
  * Longest an optional dashboard read may run on the replica. A slower scan is cancelled so the
  * card can degrade within seconds instead of holding a connection for the server-wide timeout.
  */
-export const BOUNDED_READ_STATEMENT_TIMEOUT_MS = 10_000;
+export const BOUNDED_READ_STATEMENT_TIMEOUT_MS = 30_000;
 
 /** Longest a bounded read waits for a lock; these reads never need one, so a wait means contention. */
 export const BOUNDED_READ_LOCK_TIMEOUT_MS = 2_000;

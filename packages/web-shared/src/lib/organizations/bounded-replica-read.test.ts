@@ -47,13 +47,15 @@ describe('withBoundedReplicaRead', () => {
       `SET LOCAL lock_timeout = ${BOUNDED_READ_LOCK_TIMEOUT_MS}`,
       'read',
     ]);
-    expect(result).toEqual({ statement_timeout: '10s', lock_timeout: '2s' });
+    expect(result).toEqual({ statement_timeout: '30s', lock_timeout: '2s' });
   });
 
   test('does not leak the bounds to the connection after the transaction', async () => {
+    const settings = sql`select current_setting('statement_timeout') as statement_timeout, current_setting('lock_timeout') as lock_timeout`;
+    const before = await readDb.execute(settings);
     await withBoundedReplicaRead(async () => undefined);
-    const rows = await readDb.execute(sql`select current_setting('statement_timeout') as value`);
-    expect(rows.rows[0]).not.toEqual({ value: '10s' });
+    const after = await readDb.execute(settings);
+    expect(after.rows).toEqual(before.rows);
   });
 
   test('recognizes a real statement timeout wrapped by Drizzle', async () => {

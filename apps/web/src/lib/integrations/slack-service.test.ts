@@ -1277,7 +1277,6 @@ describe('retirePreviousSlackWorkspace', () => {
     });
 
     await retirePreviousSlackWorkspace(
-      owner,
       { teamId: 'T_OLD', botToken: '$$SLACKTOKEN_OLDWORKSPACE:L$$' },
       { deleteChatSdkInstallation, deleteChatSdkIdentityCache }
     );
@@ -1291,7 +1290,7 @@ describe('retirePreviousSlackWorkspace', () => {
     mockAuthRevoke.mockResolvedValue({ ok: true });
 
     await expect(
-      retirePreviousSlackWorkspace(owner, { teamId: 'T_OLD', botToken: 'xoxb-old' })
+      retirePreviousSlackWorkspace({ teamId: 'T_OLD', botToken: 'xoxb-old' })
     ).resolves.toBeUndefined();
 
     expect(mockCaptureException).not.toHaveBeenCalled();
@@ -1304,7 +1303,7 @@ describe('retirePreviousSlackWorkspace', () => {
     });
 
     await expect(
-      retirePreviousSlackWorkspace(owner, { teamId: 'T_OLD', botToken: 'xoxb-old' })
+      retirePreviousSlackWorkspace({ teamId: 'T_OLD', botToken: 'xoxb-old' })
     ).resolves.toBeUndefined();
 
     expect(mockCaptureException).not.toHaveBeenCalled();
@@ -1317,7 +1316,6 @@ describe('retirePreviousSlackWorkspace', () => {
 
     await expect(
       retirePreviousSlackWorkspace(
-        owner,
         { teamId: 'T_OLD', botToken: 'xoxb-old' },
         { deleteChatSdkInstallation, deleteChatSdkIdentityCache }
       )
@@ -1349,7 +1347,6 @@ describe('retirePreviousSlackWorkspace', () => {
     const deleteChatSdkIdentityCache = jest.fn(async (_teamId: string): Promise<void> => {});
 
     await retirePreviousSlackWorkspace(
-      owner,
       { teamId: 'T_OLD', botToken: 'xoxb-old' },
       { deleteChatSdkInstallation, deleteChatSdkIdentityCache }
     );
@@ -1377,7 +1374,6 @@ describe('retirePreviousSlackWorkspace', () => {
     const deleteChatSdkIdentityCache = jest.fn(async (_teamId: string): Promise<void> => {});
 
     await retirePreviousSlackWorkspace(
-      owner,
       { teamId: 'T_OLD', botToken: 'xoxb-old' },
       { deleteChatSdkInstallation, deleteChatSdkIdentityCache }
     );
@@ -1405,7 +1401,6 @@ describe('retirePreviousSlackWorkspace', () => {
     const deleteChatSdkIdentityCache = jest.fn(async (_teamId: string): Promise<void> => {});
 
     await retirePreviousSlackWorkspace(
-      owner,
       { teamId: 'T_OLD', botToken: 'xoxb-old' },
       { deleteChatSdkInstallation, deleteChatSdkIdentityCache }
     );
@@ -1427,7 +1422,6 @@ describe('retirePreviousSlackWorkspace', () => {
     );
 
     const retirement = retirePreviousSlackWorkspace(
-      owner,
       { teamId: 'T_OLD', botToken: 'xoxb-old' },
       { deleteChatSdkInstallation }
     );
@@ -1451,7 +1445,6 @@ describe('retirePreviousSlackWorkspace', () => {
 
     await expect(
       retirePreviousSlackWorkspace(
-        owner,
         { teamId: 'T_OLD', botToken: 'xoxb-old' },
         { deleteChatSdkIdentityCache }
       )
@@ -1465,7 +1458,6 @@ describe('retirePreviousSlackWorkspace', () => {
     const deleteChatSdkInstallation = jest.fn(async (_teamId: string): Promise<void> => {});
 
     await retirePreviousSlackWorkspace(
-      owner,
       { teamId: 'T0PRIOR', botToken: null },
       {
         deleteChatSdkInstallation,

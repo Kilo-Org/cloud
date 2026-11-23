@@ -88,7 +88,10 @@ export function TriggerFormBehaviour({
         onBlur={() => {
           markTouched('prompt');
         }}
-        className="min-h-32"
+        // The box stops at this height and scrolls its own text: a box that
+        // grew with the prompt pushed every row below it down while the person
+        // typed, so a tap aimed at the run options landed on another row.
+        className="min-h-32 max-h-52 leading-[1.25rem]"
         textAlignVertical="top"
       />
 
@@ -109,7 +112,7 @@ export function TriggerFormBehaviour({
             autoCapitalize="none"
             autoCorrect={false}
             spellCheck={false}
-            className="min-h-32 font-mono text-xs"
+            className="min-h-32 max-h-52 font-mono text-xs leading-[1.25rem]"
             textAlignVertical="top"
           />
           <Text variant="caption">{t('cloudAgent.triggers.bodySchemaHelp')}</Text>

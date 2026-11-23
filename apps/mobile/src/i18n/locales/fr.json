@@ -92,6 +92,7 @@
     "draft": "Brouillon",
     "enabled": "Activé",
     "github": "GitHub",
+    "image": "Image",
     "imageUnavailable": "Cette image est indisponible",
     "loading": "Chargement…",
     "loadMore": "Afficher la suite",
@@ -2020,6 +2021,7 @@
     "filePart": {
       "loadingImage": "Chargement de l'image",
       "imageUnavailableRetry": "Image indisponible, réessayer le chargement",
+      "imageUnavailableRetryWithAlt": "Image indisponible, {{alt}}, réessayer le chargement",
       "imagePreviewUnavailableInSession": "Aperçu de l'image indisponible dans cette session.",
       "viewImage": "Voir l'image",
       "viewImageWithAlt": "Voir l'image {{alt}}",
@@ -3960,7 +3962,7 @@
     "signupStepUpApple": "Pour finaliser la création de votre compte, utilisez « $t(login.signInWithApple) ».",
     "signupStepUpGoogle": "Pour finaliser la création de votre compte, utilisez « $t(login.signInWithGoogle) ».",
     "signupStepUpBack": "Pour finaliser la création de votre compte, revenez en arrière et utilisez « $t(login.moreSignInOptions) ».",
-    "invalidCode": "Ce code est incorrect ou a expiré. Réessayez ou utilisez « $t(login.resendCode) ».",
+    "invalidCode": "Ce code est incorrect ou a expiré. Utilisez « $t(login.resendCode) » ou « $t(login.moreSignInOptions) ».",
     "codeInProgress": "Votre code est en cours de traitement. Attendez un instant et réessayez.",
     "tooManyAttempts": "Trop de tentatives. Veuillez demander un nouveau code.",
     "invalidToken": "Échec de la connexion. Réessayez.",
@@ -4417,7 +4419,15 @@
       "download": "Télécharger le modèle sur l'appareil",
       "downloading": "Téléchargement…",
       "downloadProgress": "Téléchargement… {{percent}} %",
-      "downloadFailed": "Le téléchargement n'a pas abouti. Vérifiez votre connexion et l'espace de stockage disponible, puis réessayez."
+      "downloadFailed": "Le téléchargement n'a pas abouti. Vérifiez votre connexion et l'espace de stockage disponible, puis réessayez.",
+      "cannotUse": "Impossible d'exécuter : {{items}}.",
+      "cannotUseOptions": "Impossible de renseigner : certaines options d'outil.",
+      "limitations": "Limitations",
+      "tools": {
+        "time": "Heure",
+        "settingsList": "Afficher les paramètres",
+        "settingsSet": "Modifier les paramètres"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Ce modèle prend en charge le niveau de réflexion"
@@ -4601,6 +4611,7 @@
     "instructionSaveFailed": "Impossible d'enregistrer l'instruction",
     "instructionDeleteFailed": "Impossible de supprimer l'instruction",
     "instructionToggleFailed": "Impossible de mettre à jour l'instruction",
+    "instructionViewTitle": "Fichier d'instruction",
     "instructionLimitReached": "Un profil peut contenir jusqu'à {{max}} instructions. Supprimez-en une pour en ajouter une autre.",
     "mcp": {
       "title": "Serveurs MCP",
@@ -4776,6 +4787,7 @@
       "emptyDescription": "Vos achats de crédits, reçus et consommations apparaîtront ici.",
       "emptyTitle": "Aucun historique de crédits",
       "expiredGrant": "Expiré : {{description}}",
+      "expiredStatus": "Expiré",
       "googlePlayReceipt": "Reçu disponible sur Google Play",
       "kind": {
         "adjustment": "Ajustement",
@@ -4802,7 +4814,8 @@
       "receiptA11y": "Ouvrir le reçu pour {{description}}, {{amount}}, du {{date}}",
       "receiptUnavailable": "Aucun reçu n'est disponible pour cet achat.",
       "retentionLimit": "Affichage de l'historique de crédits le plus récent.",
-      "voidedGrant": "Annulé : {{description}}"
+      "voidedGrant": "Annulé : {{description}}",
+      "voidedStatus": "Annulé"
     },
     "title": "Acheter des crédits",
     "description": "Les crédits sont un achat unique ajouté à votre solde Kilo pour lancer des sessions de codage IA dans Kilo App. La boutique débite votre compte et les crédits sont ajoutés après confirmation du paiement par la boutique.",

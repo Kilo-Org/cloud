@@ -91,6 +91,7 @@
     "draft": "Okusalungiswa",
     "enabled": "Kuvuliwe",
     "github": "GitHub",
+    "image": "Isithombe",
     "imageUnavailable": "Isithombe asitholakali.",
     "loading": "Kuyalayishwa…",
     "loadMore": "Layisha okwengeziwe",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Isithombe siyalayishwa",
       "imageUnavailableRetry": "Isithombe asitholakali, zama ukusilayisha futhi",
+      "imageUnavailableRetryWithAlt": "Isithombe asitholakali, {{alt}}, zama ukusilayisha futhi",
       "imagePreviewUnavailableInSession": "Ukubuka kuqala isithombe akutholakali kule seshini.",
       "viewImage": "Buka isithombe",
       "viewImageWithAlt": "Buka isithombe {{alt}}",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "Ukuze uqedele ukudala i-akhawunti yakho, sebenzisa '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Ukuze uqedele ukudala i-akhawunti yakho, sebenzisa '$t(login.signInWithGoogle)'.",
     "signupStepUpBack": "Ukuze uqedele ukudala i-akhawunti yakho, buyela emuva bese usebenzisa '$t(login.moreSignInOptions)'.",
-    "invalidCode": "Leyo khodi ayilungile noma isiphelelwe yisikhathi. Zama futhi noma usebenzise '$t(login.resendCode)'.",
+    "invalidCode": "Leyo khodi ayilungile noma isiphelelwe yisikhathi. Usebenzise '$t(login.resendCode)' noma '$t(login.moreSignInOptions)'.",
     "codeInProgress": "Ikhodi yakho iyacubungulwa. Linda isikhashana bese uzama futhi.",
     "tooManyAttempts": "Imizamo eminingi kakhulu. Sicela ucele ikhodi entsha.",
     "invalidToken": "Ukungena kwehlulekile. Sicela uzame futhi.",
@@ -4338,7 +4340,15 @@
       "download": "Dawuniloda imodeli esedivayisini",
       "downloading": "Iyadawuniloda…",
       "downloadProgress": "Iyadawuniloda… {{percent}}%",
-      "downloadFailed": "Ukudawuniloda akuqedanga. Hlola uxhumano lwakho nendawo yokugcina ekhululekile, bese uzama futhi."
+      "downloadFailed": "Ukudawuniloda akuqedanga. Hlola uxhumano lwakho nendawo yokugcina ekhululekile, bese uzama futhi.",
+      "cannotUse": "Akukwazeki ukuqalisa: {{items}}.",
+      "cannotUseOptions": "Akukwazeki ukugcwalisa ezinye izinketho zethuluzi.",
+      "limitations": "Imikhawulo",
+      "tools": {
+        "time": "Isikhathi",
+        "settingsList": "Bonisa izilungiselelo",
+        "settingsSet": "Shintsha izilungiselelo"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Le modeli isekela umzamo wokucabanga"
@@ -4517,6 +4527,7 @@
     "instructionSaveFailed": "Ayikwazekanga ukugcina umyalo",
     "instructionDeleteFailed": "Ayikwazekanga ukususa umyalo",
     "instructionToggleFailed": "Ayikwazekanga ukubuyekeza umyalo",
+    "instructionViewTitle": "Ifayela lomyalo",
     "instructionLimitReached": "Iphrofayela ingagcina imiyalelo efinyelela ku-{{max}}. Susa owodwa ukuze wengeze omunye.",
     "mcp": {
       "title": "Amaseva e-MCP",
@@ -4691,6 +4702,7 @@
       "emptyDescription": "Ukuthengwa kwamakhredithi, amarisidi, nokusetshenziswa kuzovela lapha.",
       "emptyTitle": "Awukho umlando wamakhredithi",
       "expiredGrant": "Kuphelelwe yisikhathi: {{description}}",
+      "expiredStatus": "Kuphelelwe yisikhathi",
       "googlePlayReceipt": "Irisidi evela ku-Google Play",
       "kind": {
         "adjustment": "Ulungiso",
@@ -4717,7 +4729,8 @@
       "receiptA11y": "Vula irisidi ye-{{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Ayikho irisidi etholakalayo yalokhu kuthenga.",
       "retentionLimit": "Kuboniswa umlando wamakhredithi wakamuva.",
-      "voidedGrant": "Ikhanseliwe: {{description}}"
+      "voidedGrant": "Ikhanseliwe: {{description}}",
+      "voidedStatus": "Ikhanseliwe"
     },
     "title": "Thenga amakhredithi",
     "description": "Amakhredithi ukuthenga kwesikhathi esisodwa okwengezwa kubhalansi yakho ye-Kilo ukuze usebenzise amaseshini okubhala ikhodi e-AI ku-Kilo App. Isitolo sikhokhisa i-akhawunti yakho futhi amakhredithi engezwa ngemva kokuba isitolo siqinisekise inkokhelo.",

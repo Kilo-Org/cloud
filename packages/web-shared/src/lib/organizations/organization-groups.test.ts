@@ -25,6 +25,7 @@ import {
 } from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies';
 import { MAX_ORGANIZATION_GROUP_MODEL_ID_LENGTH } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.schema';
 import {
+  createOrganizationGroup,
   deleteOrganizationGroup,
   listOrganizationGroupsForManager,
   normalizeOrganizationGroupPolicy,
@@ -68,6 +69,9 @@ describe('organization group policies', () => {
       OrganizationGroupInputSchema.safeParse({ name: ' Engineering ', policies: [] }).success
     ).toBe(true);
     expect(OrganizationGroupInputSchema.safeParse({ name: ' ', policies: [] }).success).toBe(false);
+    expect(
+      OrganizationGroupInputSchema.safeParse({ name: '\u200B\u200B', policies: [] }).success
+    ).toBe(false);
     expect(
       OrganizationGroupInputSchema.safeParse({ name: 'a'.repeat(81), policies: [] }).success
     ).toBe(false);
@@ -923,5 +927,70 @@ describe('organization group policy revision', () => {
           .where(eq(ai_gateway_config.id, 1));
       }
     }
+  });
+
+  // The table's `char_length(btrim(name))` check sees the zero-width spaces in
+  // `'\u200B\u200B'` as ordinary characters, and the canonical-name index keeps
+  // them too, so only the name schema refuses a row no reader can name.
+  it('refuses a create with a name of zero-width spaces and stores no row', async () => {
+    const organization = await createOrganization();
+
+    await expect(
+      createOrganizationGroup({
+        organizationId: organization.id,
+        actor,
+        name: '\u200B\u200B',
+        policies: [],
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+    const groups = await db
+      .select({ id: organization_groups.id })
+      .from(organization_groups)
+      .where(eq(organization_groups.organization_id, organization.id));
+    expect(groups).toEqual([]);
+  });
+
+  it('refuses a rename to a name of zero-width spaces and keeps the stored name', async () => {
+    const organization = await createOrganization();
+    const group = await createGroup(organization.id, 'India');
+
+    await expect(
+      updateOrganizationGroupMetadata({
+        organizationId: organization.id,
+        groupId: group.id,
+        actor,
+        name: '\u200B\u200B',
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+    expect(await readGroupName(group.id)).toBe('India');
+  });
+
+  it('refuses a details save with a name of zero-width spaces and changes neither name nor members', async () => {
+    const organization = await createOrganization();
+    const group = await createGroup(organization.id, 'Juliett');
+    const currentMember = await createMember(organization.id);
+    const otherMember = await createMember(organization.id);
+    await db.insert(organization_group_memberships).values({
+      organization_id: organization.id,
+      group_id: group.id,
+      kilo_user_id: currentMember.id,
+    });
+
+    await expect(
+      updateOrganizationGroupDetails({
+        organizationId: organization.id,
+        groupId: group.id,
+        actor,
+        name: '\u200B\u200B',
+        userIds: [otherMember.id],
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+    expect(await readGroupName(group.id)).toBe('Juliett');
+    expect((await readGroupMemberships(group.id)).map(row => row.kilo_user_id)).toEqual([
+      currentMember.id,
+    ]);
   });
 });

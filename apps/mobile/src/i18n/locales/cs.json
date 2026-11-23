@@ -93,6 +93,7 @@
     "draft": "Koncept",
     "enabled": "Zapnuto",
     "github": "GitHub",
+    "image": "Obrázek",
     "imageUnavailable": "Obrázek není k dispozici.",
     "loading": "Načítá se…",
     "loadMore": "Načíst více",
@@ -2766,6 +2767,7 @@
     "filePart": {
       "loadingImage": "Načítání obrázku",
       "imageUnavailableRetry": "Obrázek není k dispozici, znovu načíst",
+      "imageUnavailableRetryWithAlt": "Obrázek není k dispozici, {{alt}}, znovu načíst",
       "imagePreviewUnavailableInSession": "Náhled obrázku není v této relaci k dispozici.",
       "viewImage": "Zobrazit obrázek",
       "viewImageWithAlt": "Zobrazit obrázek {{alt}}",
@@ -4030,7 +4032,7 @@
     "signupStepUpApple": "Pro dokončení vytvoření účtu vyber „$t(login.signInWithApple)“.",
     "signupStepUpGoogle": "Pro dokončení vytvoření účtu vyber „$t(login.signInWithGoogle)“.",
     "signupStepUpBack": "Pro dokončení vytvoření účtu se vrať zpět a vyber „$t(login.moreSignInOptions)“.",
-    "invalidCode": "Tento kód je nesprávný nebo mu vypršela platnost. Zkus to znovu nebo vyber „$t(login.resendCode)“.",
+    "invalidCode": "Tento kód je nesprávný nebo mu vypršela platnost. Použij „$t(login.resendCode)“ nebo „$t(login.moreSignInOptions)“.",
     "codeInProgress": "Tvůj kód se zpracovává. Chvíli počkej a zkus to znovu.",
     "tooManyAttempts": "Proběhlo příliš mnoho pokusů. Vyžádej si nový kód.",
     "invalidToken": "Přihlášení se nezdařilo. Zkus to prosím znovu.",
@@ -4496,7 +4498,15 @@
       "download": "Stáhnout model do zařízení",
       "downloading": "Stahování…",
       "downloadProgress": "Stahování… {{percent}} %",
-      "downloadFailed": "Stahování se nedokončilo. Zkontrolujte připojení a volné místo v úložišti a zkuste to znovu."
+      "downloadFailed": "Stahování se nedokončilo. Zkontrolujte připojení a volné místo v úložišti a zkuste to znovu.",
+      "cannotUse": "Nelze spustit: {{items}}.",
+      "cannotUseOptions": "Nelze vyplnit: některé možnosti nástroje.",
+      "limitations": "Omezení",
+      "tools": {
+        "time": "Čas",
+        "settingsList": "Zobrazit nastavení",
+        "settingsSet": "Změnit nastavení"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Tento model podporuje úroveň uvažování"
@@ -4685,6 +4695,7 @@
     "instructionSaveFailed": "Pokyn se nepodařilo uložit",
     "instructionDeleteFailed": "Pokyn se nepodařilo smazat",
     "instructionToggleFailed": "Pokyn se nepodařilo aktualizovat",
+    "instructionViewTitle": "Soubor pokynu",
     "instructionLimitReached": "Profil může obsahovat až {{max}} pokynů. Chcete-li přidat další, jeden smažte.",
     "mcp": {
       "title": "MCP servery",
@@ -4861,6 +4872,7 @@
       "emptyDescription": "Zde se zobrazí nákupy kreditů, účtenky a využití.",
       "emptyTitle": "Žádná historie kreditů",
       "expiredGrant": "Platnost vypršela: {{description}}",
+      "expiredStatus": "Platnost vypršela",
       "googlePlayReceipt": "Účtenka z Google Play",
       "kind": {
         "adjustment": "Úprava",
@@ -4887,7 +4899,8 @@
       "receiptA11y": "Otevřít účtenku pro {{description}}, {{amount}}, ze dne {{date}}",
       "receiptUnavailable": "Pro tento nákup není účtenka k dispozici.",
       "retentionLimit": "Zobrazuje se nejnovější historie kreditů.",
-      "voidedGrant": "Stornováno: {{description}}"
+      "voidedGrant": "Stornováno: {{description}}",
+      "voidedStatus": "Stornováno"
     },
     "title": "Koupit kredity",
     "description": "Kredity jsou jednorázový nákup přidaný do vašeho zůstatku Kilo pro spouštění AI programovacích relací v aplikaci Kilo. Obchod vám strhne platbu z účtu a kredity se přidají po potvrzení platby obchodem.",

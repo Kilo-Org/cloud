@@ -119,6 +119,7 @@ const TWO_SENSE_COPY = new Map([
     'receipt',
     'the confirmation a moderation report produces, versus the proof of payment for a credit purchase',
   ],
+  ['expired', 'the state of a native-remote command delivery, versus the state of a credit grant'],
   ['block', 'the verb, block a discussion participant, versus the reviewer decision to block'],
   ['merge', 'the verb in the merge section header, versus the name of the merge method on a badge'],
   ['review', 'the noun, a review, versus the verb in the onboarding step'],
@@ -1676,16 +1677,9 @@ function destructiveConfirmKeys(source, english) {
 
 /**
  * Reject a destructive button whose label reads as this catalog's Cancel word.
- *
- * An exact match is always a defect: the reader sees Cancel on the red button
- * too, so it is rejected for every key. The substring test applies only to a
- * key whose English copy is a bare destructive verb such as "Revoke": a red
- * button reading "Revoke link" when Cancel sits beneath it is ambiguous, while
- * "Cancel subscription" beside "Cancel" is deliberate English and its
- * translation may keep the locale's Cancel word. `rejectContainingCancel`
- * carries that per-key decision: a true flag rejects a label that CONTAINS this
- * catalog's Cancel word, so a key whose English names Cancel never reaches the
- * substring test.
+ * It folds both labels, rejects an exact match for every key, and rejects a
+ * match that only contains the Cancel word when `rejectContainingCancel` is
+ * true; `destructiveConfirmKeys` computes that flag.
  */
 function checkDestructiveConfirmLabel(label, key, value, cancelValue, rejectContainingCancel) {
   const problems = [];
@@ -2074,10 +2068,6 @@ function checkCatalogMembership({ catalogName, tags, present, dir }) {
 
 function checkEnglishCopies({ catalogName, english }) {
   const problems = [];
-  // One key per piece of copy. Two keys holding the same English string cannot
-  // be translated apart without the catalogs drifting, so the copy belongs to
-  // one key and every call site points at it.
-  //
   // Every plural key is exempt, not only the members of one family. So two
   // plural families holding the same copy pass here. That is deliberate: the
   // one-wording rule below groups plural keys too, so the catalogs still cannot
@@ -2094,8 +2084,6 @@ function checkEnglishCopies({ catalogName, english }) {
     }
     byCopy.get(value).push(key);
   }
-  // The per-line bucket phrases are registered once in PER_LINE_BUCKET_PHRASES,
-  // which checkSharedWordings also reads.
   for (const [value, keys] of byCopy) {
     if (keys.length < 2 || keys.every(key => PER_LINE_BUCKET_PHRASES.has(pluralBaseKey(key)))) {
       continue;
@@ -2234,8 +2222,6 @@ function checkKeyParity({
 /** The categories a locale's plural families lack. */
 function checkPluralCategories({ label, tag, english, translated }) {
   const problems = [];
-  // The families this locale must complete, and the categories it lacks,
-  // come from the rule both audits share.
   for (const [family, absent] of missingPluralCategories(english, translated, tag)) {
     for (const category of absent) {
       problems.push(`${label}: plural family "${family}" lacks the ${category} category of ${tag}`);
@@ -2375,8 +2361,6 @@ function checkTranslatedValue({
       ...checkDestructiveConfirmLabel(label, key, value, cancelValue, rejectContainingCancel)
     );
   }
-  // A catalog may not leave a listed key in English; MUST_TRANSLATE_KEYS
-  // records which keys, per catalog, and why.
   if (mustTranslateKeys.has(key) && value === englishValue) {
     problems.push(`${label}: "${key}" must be translated`);
   }
@@ -2388,8 +2372,6 @@ function checkTranslatedValue({
       key,
       value,
       englishValue,
-      // Only a reviewed (key, category, locale) entry may say its number as a
-      // word; every other form keeps its language's exact placeholder set.
       countsMayBeWorded: Boolean(
         parts && WORDED_COUNTS.has(`${parts.base}:${parts.category}:${tag}`)
       ),
@@ -2548,10 +2530,6 @@ function checkLoginSeparators({ label, tag, translated }) {
 /** The sentence separator of the composed review message. */
 function checkSentenceSeparator({ label, tag, translated }) {
   const problems = [];
-  // The composed message appends the stale clause to the fresh one verbatim,
-  // so the separator is one choice per catalog: every form of the family
-  // agrees on it, and only a catalog that writes no space after its
-  // terminator leaves the clause bare.
   const freshForms = [...translated].filter(
     ([key]) => pluralBaseKey(key) === SENTENCE_SEPARATED_FAMILY
   );

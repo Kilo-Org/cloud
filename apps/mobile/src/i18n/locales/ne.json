@@ -91,6 +91,7 @@
     "draft": "मस्यौदा",
     "enabled": "चालु",
     "github": "GitHub",
+    "image": "तस्बिर",
     "imageUnavailable": "तस्बिर उपलब्ध छैन।",
     "loading": "लोड हुँदै…",
     "loadMore": "थप लोड गर्नुहोस्",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "तस्बिर लोड गर्दै",
       "imageUnavailableRetry": "तस्बिर उपलब्ध छैन, लोड गर्न पुनः प्रयास गर्नुहोस्",
+      "imageUnavailableRetryWithAlt": "तस्बिर उपलब्ध छैन, {{alt}}, लोड गर्न पुनः प्रयास गर्नुहोस्",
       "imagePreviewUnavailableInSession": "यो सत्रमा तस्बिरको पूर्वावलोकन उपलब्ध छैन।",
       "viewImage": "तस्बिर हेर्नुहोस्",
       "viewImageWithAlt": "{{alt}} तस्बिर हेर्नुहोस्",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "आफ्नो खाता सिर्जना पूरा गर्न '$t(login.signInWithApple)' प्रयोग गर्नुहोस्।",
     "signupStepUpGoogle": "आफ्नो खाता सिर्जना पूरा गर्न '$t(login.signInWithGoogle)' प्रयोग गर्नुहोस्।",
     "signupStepUpBack": "आफ्नो खाता सिर्जना पूरा गर्न पछाडि जानुहोस् र '$t(login.moreSignInOptions)' प्रयोग गर्नुहोस्।",
-    "invalidCode": "त्यो कोड गलत छ वा यसको म्याद सकिएको छ। कृपया फेरि प्रयास गर्नुहोस् वा '$t(login.resendCode)' प्रयोग गर्नुहोस्।",
+    "invalidCode": "त्यो कोड गलत छ वा यसको म्याद सकिएको छ। कृपया '$t(login.resendCode)' प्रयोग गर्नुहोस् वा '$t(login.moreSignInOptions)' प्रयोग गर्नुहोस्।",
     "codeInProgress": "तपाईंको कोड जाँचिँदै छ। केही क्षण पर्खेर फेरि प्रयास गर्नुहोस्।",
     "tooManyAttempts": "धेरै पटक प्रयास गरियो। कृपया नयाँ कोडको अनुरोध गर्नुहोस्।",
     "invalidToken": "साइन इन असफल भयो। कृपया फेरि प्रयास गर्नुहोस्।",
@@ -4338,7 +4340,15 @@
       "download": "यन्त्रमा चल्ने मोडेल डाउनलोड गर्नुहोस्",
       "downloading": "डाउनलोड हुँदैछ…",
       "downloadProgress": "डाउनलोड हुँदैछ… {{percent}}%",
-      "downloadFailed": "डाउनलोड पूरा भएन। आफ्नो इन्टरनेट जडान र खाली भण्डारण जाँच गरेर फेरि प्रयास गर्नुहोस्।"
+      "downloadFailed": "डाउनलोड पूरा भएन। आफ्नो इन्टरनेट जडान र खाली भण्डारण जाँच गरेर फेरि प्रयास गर्नुहोस्।",
+      "cannotUse": "चलाउन सकिँदैन: {{items}}।",
+      "cannotUseOptions": "भर्न सकिँदैन: केही टुल विकल्पहरू।",
+      "limitations": "सीमाहरू",
+      "tools": {
+        "time": "समय",
+        "settingsList": "सेटिङ देखाउनुहोस्",
+        "settingsSet": "सेटिङ बदल्नुहोस्"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "यो मोडेलले सोच्ने प्रयासको स्तर समर्थन गर्छ"
@@ -4517,6 +4527,7 @@
     "instructionSaveFailed": "निर्देशन सुरक्षित गर्न सकिएन",
     "instructionDeleteFailed": "निर्देशन मेट्न सकिएन",
     "instructionToggleFailed": "निर्देशन अद्यावधिक गर्न सकिएन",
+    "instructionViewTitle": "निर्देशन फाइल",
     "instructionLimitReached": "एउटा प्रोफाइलमा बढीमा {{max}} निर्देशन राख्न सकिन्छ। अर्को थप्न एउटा मेट्नुहोस्।",
     "mcp": {
       "title": "MCP सर्भरहरू",
@@ -4691,6 +4702,7 @@
       "emptyDescription": "क्रेडिट खरिद, रसिद र प्रयोग यहाँ देखिनेछन्।",
       "emptyTitle": "कुनै क्रेडिट इतिहास छैन",
       "expiredGrant": "म्याद सकियो: {{description}}",
+      "expiredStatus": "म्याद सकियो",
       "googlePlayReceipt": "Google Play बाट रसिद",
       "kind": {
         "adjustment": "समायोजन",
@@ -4717,7 +4729,8 @@
       "receiptA11y": "{{description}}, {{amount}}, {{date}} को रसिद खोल्नुहोस्",
       "receiptUnavailable": "यो खरिदको रसिद उपलब्ध छैन।",
       "retentionLimit": "सबैभन्दा पछिल्लो क्रेडिट इतिहास देखाइँदै छ।",
-      "voidedGrant": "रद्द गरिएको: {{description}}"
+      "voidedGrant": "रद्द गरिएको: {{description}}",
+      "voidedStatus": "रद्द गरिएको"
     },
     "title": "क्रेडिट किन्नुहोस्",
     "description": "क्रेडिट भनेको Kilo App मा AI कोडिङ सत्रहरू चलाउन तपाईंको Kilo ब्यालेन्समा थपिने एक-पटकको खरिद हो। स्टोरले तपाईंको खाताबाट शुल्क लिन्छ र स्टोरले भुक्तानी पुष्टि गरेपछि क्रेडिट थपिन्छ।",

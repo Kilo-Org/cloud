@@ -7,6 +7,7 @@ import { ackSessionAttention } from '@/lib/session-attention';
 import { trpcClient } from '@/lib/trpc';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 
+import { whenGlanceableAckHydrationSettled } from './ack-hydration';
 import { whenAskBindingSettled } from './ask-binding';
 import { NotApprovableError, resolveCloudAgentSessionId } from './cloud-agent-session';
 import { createGlanceablePublisher } from './create-publisher';
@@ -379,6 +380,10 @@ function hasWaitingAnsweredSession(
  * raw rows would republish the pre-action snapshot — the answered session still
  * counted as waiting — immediately after the user answered it. The poll below
  * still reads the raw row, because that is what proves the sync landed.
+ *
+ * The first derive also waits (bounded) for the ack store to hydrate: this
+ * refresh can run in a fresh headless process, where the store reads every
+ * raise answered in an earlier launch as unanswered until its KV read lands.
  */
 export async function refreshGlanceableSnapshot(
   input: {
@@ -421,6 +426,11 @@ export async function refreshGlanceableSnapshot(
   const pollMs = deps?.pollIntervalMs ?? GLANCEABLE_REFRESH_POLL_MS;
   const deadlineMs = deps?.deadlineMs ?? GLANCEABLE_REFRESH_DEADLINE_MS;
   const publisher = createPublisher();
+  // Armed once, before the loop: this refresh can run in a fresh headless
+  // process whose ack store has not read its KV yet, so the first derive holds
+  // for hydration to settle (bounded). A tick only awaits the one promise, so no
+  // poll tick accumulates the deadline.
+  const hydrationSettled = whenGlanceableAckHydrationSettled();
   let elapsedMs = 0;
   for (;;) {
     // eslint-disable-next-line no-await-in-loop -- one fetch per poll tick
@@ -429,6 +439,8 @@ export async function refreshGlanceableSnapshot(
       // The last published snapshot stays; nothing is fabricated.
       break;
     }
+    // eslint-disable-next-line no-await-in-loop -- armed once above; already racing the fetch
+    await hydrationSettled;
     publisher.handleSessions(resolveAnsweredRaises(rows), ctx);
     if (elapsedMs >= deadlineMs || !hasWaitingAnsweredSession(rows, input.answeredKiloSessionId)) {
       break;

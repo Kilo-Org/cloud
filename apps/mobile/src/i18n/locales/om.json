@@ -91,6 +91,7 @@
     "draft": "Wixinee",
     "enabled": "Hojii irra jira",
     "github": "GitHub",
+    "image": "Suuraa",
     "imageUnavailable": "Suuraan hin argamu.",
     "loading": "Fe'amaa jira…",
     "loadMore": "Dabalata fe'i",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Suuraa fe'aa jira",
       "imageUnavailableRetry": "Suuraan hin argamu, fe'uuf deebi'ii yaali",
+      "imageUnavailableRetryWithAlt": "Suuraan hin argamu, {{alt}}, fe'uuf deebi'ii yaali",
       "imagePreviewUnavailableInSession": "Turtii kana keessatti durargiin suuraa hin argamu.",
       "viewImage": "Suuraa ilaali",
       "viewImageWithAlt": "Suuraa {{alt}} ilaali",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "Herrega kee uumuu xumuruuf '$t(login.signInWithApple)' fayyadami.",
     "signupStepUpGoogle": "Herrega kee uumuu xumuruuf '$t(login.signInWithGoogle)' fayyadami.",
     "signupStepUpBack": "Herrega kee uumuu xumuruuf duubatti deebi'ii '$t(login.moreSignInOptions)' fayyadami.",
-    "invalidCode": "Koodiin sun sirrii miti ykn yeroon isaa darbeera. Irra deebi'ii yaali ykn '$t(login.resendCode)' fayyadami.",
+    "invalidCode": "Koodiin sun sirrii miti ykn yeroon isaa darbeera. '$t(login.resendCode)' ykn '$t(login.moreSignInOptions)' fayyadami.",
     "codeInProgress": "Koodiin kee adeemsifamaa jira. Yeroo xiqqoo eegiitii irra deebi'ii yaali.",
     "tooManyAttempts": "Yaallii baay'ee godhame. Koodii haaraa gaafadhu.",
     "invalidToken": "Seenuun hin milkoofne. Irra deebi'ii yaali.",
@@ -4338,7 +4340,15 @@
       "download": "Moodeela meeshaa irratti buufadhu",
       "downloading": "Buufamaa jira…",
       "downloadProgress": "Buufamaa jira… {{percent}}%",
-      "downloadFailed": "Buufachuun hin xumuramne. Walqunnamtii keessanii fi kuusaa duwwaa mirkaneessii irra deebi'ii yaali."
+      "downloadFailed": "Buufachuun hin xumuramne. Walqunnamtii keessanii fi kuusaa duwwaa mirkaneessii irra deebi'ii yaali.",
+      "cannotUse": "Hojjechuu hin danda'u: {{items}}.",
+      "cannotUseOptions": "Guutuu hin danda'u: filannoo meeshaa muraasa.",
+      "limitations": "Daangaa",
+      "tools": {
+        "time": "Yeroo",
+        "settingsList": "Qindaa'ina agarsiisi",
+        "settingsSet": "Qindaa'ina jijjiiri"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Moodeelli kun sadarkaa xiinxalaa ni deeggara"
@@ -4517,6 +4527,7 @@
     "instructionSaveFailed": "Qajeelfama olkaa'uu hin dandeenye",
     "instructionDeleteFailed": "Qajeelfama haquu hin dandeenye",
     "instructionToggleFailed": "Qajeelfama haaromsuu hin dandeenye",
+    "instructionViewTitle": "Faayilii qajeelfamaa",
     "instructionLimitReached": "Profaayiliin qajeelfama hamma {{max}} qofa qabata. Kan biraa dabaluuf tokko haqi.",
     "mcp": {
       "title": "Sarvaroota MCP",
@@ -4691,6 +4702,7 @@
       "emptyDescription": "Bittaan kireeditii, nagaheewwanii fi itti fayyadamni asitti mul'atu.",
       "emptyTitle": "Seenaan kireeditii hin jiru",
       "expiredGrant": "Yeroon isaa darbeera: {{description}}",
+      "expiredStatus": "Yeroon isaa darbeera",
       "googlePlayReceipt": "Nagahee Google Play irraa",
       "kind": {
         "adjustment": "Sirreeffama",
@@ -4717,7 +4729,8 @@
       "receiptA11y": "Nagahee {{description}}, {{amount}}, {{date}} bani",
       "receiptUnavailable": "Bittaa kanaaf nagaheen hin jiru.",
       "retentionLimit": "Seenaan kireeditii haaraan agarsiifamaa jira.",
-      "voidedGrant": "Haqameera: {{description}}"
+      "voidedGrant": "Haqameera: {{description}}",
+      "voidedStatus": "Haqameera"
     },
     "title": "Kireedita bituu",
     "description": "Kireeditiin bittaa yeroo tokkoo kan baalansii Kilo kee irratti dabalame ta'ee, shumarra code AI Kilo App keessatti hojjechuuf oola. Suuqii ammaataa kee irraa kaffaltii fudhata, suuqiin kaffaltii erga mirkaneesse booda kireeditiin dabalama.",

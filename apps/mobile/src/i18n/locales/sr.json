@@ -92,6 +92,7 @@
     "draft": "Nacrt",
     "enabled": "Uključeno",
     "github": "GitHub",
+    "image": "Slika",
     "imageUnavailable": "Slika nije dostupna.",
     "loading": "Učitavanje…",
     "loadMore": "Učitaj još",
@@ -2713,6 +2714,7 @@
     "filePart": {
       "loadingImage": "Učitavanje slike",
       "imageUnavailableRetry": "Slika nije dostupna, pokušaj ponovo da je učitaš",
+      "imageUnavailableRetryWithAlt": "Slika nije dostupna, {{alt}}, pokušaj ponovo da je učitaš",
       "imagePreviewUnavailableInSession": "Pregled slike nije dostupan u ovoj sesiji.",
       "viewImage": "Prikaži sliku",
       "viewImageWithAlt": "Prikaži sliku {{alt}}",
@@ -3960,7 +3962,7 @@
     "signupStepUpApple": "Za dovršavanje kreiranja naloga izaberi „$t(login.signInWithApple)“.",
     "signupStepUpGoogle": "Za dovršavanje kreiranja naloga izaberi „$t(login.signInWithGoogle)“.",
     "signupStepUpBack": "Za dovršavanje kreiranja naloga vrati se nazad i izaberi „$t(login.moreSignInOptions)“.",
-    "invalidCode": "Kod nije tačan ili je istekao. Pokušaj ponovo ili izaberi „$t(login.resendCode)“.",
+    "invalidCode": "Kod nije tačan ili je istekao. Koristi „$t(login.resendCode)“ ili „$t(login.moreSignInOptions)“.",
     "codeInProgress": "Tvoj kod se obrađuje. Sačekaj trenutak i pokušaj ponovo.",
     "tooManyAttempts": "Previše pokušaja. Zatraži novi kod.",
     "invalidToken": "Prijava nije uspela. Pokušaj ponovo.",
@@ -4417,7 +4419,15 @@
       "download": "Preuzmi model na uređaju",
       "downloading": "Preuzimanje…",
       "downloadProgress": "Preuzimanje… {{percent}}%",
-      "downloadFailed": "Preuzimanje nije završeno. Proverite vezu i slobodan prostor, pa pokušajte ponovo."
+      "downloadFailed": "Preuzimanje nije završeno. Proverite vezu i slobodan prostor, pa pokušajte ponovo.",
+      "cannotUse": "Nije moguće pokrenuti: {{items}}.",
+      "cannotUseOptions": "Nije moguće popuniti: neke opcije alata.",
+      "limitations": "Ograničenja",
+      "tools": {
+        "time": "Vreme",
+        "settingsList": "Prikaži podešavanja",
+        "settingsSet": "Promeni podešavanja"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Ovaj model podržava nivo razmišljanja"
@@ -4601,6 +4611,7 @@
     "instructionSaveFailed": "Čuvanje instrukcije nije uspelo",
     "instructionDeleteFailed": "Brisanje instrukcije nije uspelo",
     "instructionToggleFailed": "Ažuriranje instrukcije nije uspelo",
+    "instructionViewTitle": "Datoteka instrukcije",
     "instructionLimitReached": "Profil može da sadrži najviše {{max}} instrukcija. Obrišite jednu da biste dodali drugu.",
     "mcp": {
       "title": "MCP serveri",
@@ -4776,6 +4787,7 @@
       "emptyDescription": "Kupovine kredita, računi i potrošnja prikazaće se ovde.",
       "emptyTitle": "Nema istorije kredita",
       "expiredGrant": "Isteklo: {{description}}",
+      "expiredStatus": "Isteklo",
       "googlePlayReceipt": "Račun iz prodavnice Google Play",
       "purchaseFallback": "Kupovina kredita",
       "receipt": "Račun",
@@ -4783,6 +4795,7 @@
       "receiptUnavailable": "Račun nije dostupan za ovu kupovinu.",
       "retentionLimit": "Prikazuje se najnovija istorija kredita.",
       "voidedGrant": "Stornirano: {{description}}",
+      "voidedStatus": "Stornirano",
       "kind": {
         "adjustment": "Korekcija",
         "balanceNeutral": "Bez uticaja na stanje",

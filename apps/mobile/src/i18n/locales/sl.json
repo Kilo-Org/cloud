@@ -93,6 +93,7 @@
     "draft": "Osnutek",
     "enabled": "Omogočeno",
     "github": "GitHub",
+    "image": "Slika",
     "imageUnavailable": "Slika ni na voljo.",
     "loading": "Nalaganje…",
     "loadMore": "Naloži več",
@@ -2766,6 +2767,7 @@
     "filePart": {
       "loadingImage": "Nalaganje slike",
       "imageUnavailableRetry": "Slika ni na voljo, poskusi jo znova naložiti",
+      "imageUnavailableRetryWithAlt": "Slika ni na voljo, {{alt}}, poskusi jo znova naložiti",
       "imagePreviewUnavailableInSession": "Predogled slike v tej seji ni na voljo.",
       "viewImage": "Prikaži sliko",
       "viewImageWithAlt": "Prikaži sliko {{alt}}",
@@ -4030,7 +4032,7 @@
     "signupStepUpApple": "Za dokončanje ustvarjanja računa izberi »$t(login.signInWithApple)«.",
     "signupStepUpGoogle": "Za dokončanje ustvarjanja računa izberi »$t(login.signInWithGoogle)«.",
     "signupStepUpBack": "Za dokončanje ustvarjanja računa se vrni nazaj in izberi »$t(login.moreSignInOptions)«.",
-    "invalidCode": "Ta koda ni pravilna ali je potekla. Poskusi znova ali uporabi »$t(login.resendCode)«.",
+    "invalidCode": "Ta koda ni pravilna ali je potekla. Uporabi »$t(login.resendCode)« ali »$t(login.moreSignInOptions)«.",
     "codeInProgress": "Tvoja koda se obdeluje. Počakaj trenutek in poskusi znova.",
     "tooManyAttempts": "Preveč poskusov. Zahtevaj novo kodo.",
     "invalidToken": "Prijava ni uspela. Poskusi znova.",
@@ -4496,7 +4498,15 @@
       "download": "Prenesi model v napravo",
       "downloading": "Prenašanje …",
       "downloadProgress": "Prenašanje … {{percent}} %",
-      "downloadFailed": "Prenos se ni dokončal. Preverite povezavo in prosti prostor za shranjevanje ter poskusite znova."
+      "downloadFailed": "Prenos se ni dokončal. Preverite povezavo in prosti prostor za shranjevanje ter poskusite znova.",
+      "cannotUse": "Ni mogoče zagnati: {{items}}.",
+      "cannotUseOptions": "Ni mogoče izpolniti: nekatere možnosti orodja.",
+      "limitations": "Omejitve",
+      "tools": {
+        "time": "Čas",
+        "settingsList": "Prikaži nastavitve",
+        "settingsSet": "Spremeni nastavitve"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Ta model podpira stopnjo razmišljanja"
@@ -4685,6 +4695,7 @@
     "instructionSaveFailed": "Navodila ni bilo mogoče shraniti",
     "instructionDeleteFailed": "Navodila ni bilo mogoče izbrisati",
     "instructionToggleFailed": "Navodila ni bilo mogoče posodobiti",
+    "instructionViewTitle": "Datoteka z navodili",
     "instructionLimitReached": "Profil lahko vsebuje največ {{max}} navodil. Izbrišite eno, da dodate drugo.",
     "mcp": {
       "title": "MCP strežniki",
@@ -4861,6 +4872,7 @@
       "emptyDescription": "Tukaj bodo prikazani nakupi kreditov, potrdila in poraba.",
       "emptyTitle": "Ni zgodovine kreditov",
       "expiredGrant": "Poteklo: {{description}}",
+      "expiredStatus": "Poteklo",
       "googlePlayReceipt": "Potrdilo iz trgovine Google Play",
       "kind": {
         "adjustment": "Prilagoditev",
@@ -4887,7 +4899,8 @@
       "receiptA11y": "Odpri potrdilo za {{description}}, {{amount}}, z dne {{date}}",
       "receiptUnavailable": "Potrdilo za ta nakup ni na voljo.",
       "retentionLimit": "Prikazana je najnovejša zgodovina kreditov.",
-      "voidedGrant": "Razveljavljeno: {{description}}"
+      "voidedGrant": "Razveljavljeno: {{description}}",
+      "voidedStatus": "Razveljavljeno"
     },
     "title": "Kupi kredite",
     "description": "Krediti so enkraten nakup, ki se doda tvojemu Kilo stanju za izvajanje sej kodiranja z umetno inteligenco v aplikaciji Kilo. Trgovina obremeni tvoj račun in krediti se dodajo, ko trgovina potrdi plačilo.",

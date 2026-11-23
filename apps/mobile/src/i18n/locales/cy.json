@@ -95,6 +95,7 @@
     "draft": "Drafft",
     "enabled": "Wedi'i alluogi",
     "github": "GitHub",
+    "image": "Delwedd",
     "imageUnavailable": "Nid yw'r ddelwedd ar gael.",
     "loading": "Yn llwytho…",
     "loadMore": "Llwytho mwy",
@@ -2872,6 +2873,7 @@
     "filePart": {
       "loadingImage": "Yn llwytho delwedd",
       "imageUnavailableRetry": "Nid yw'r ddelwedd ar gael, ceisio ei llwytho eto",
+      "imageUnavailableRetryWithAlt": "Nid yw'r ddelwedd ar gael, {{alt}}, ceisio ei llwytho eto",
       "imagePreviewUnavailableInSession": "Nid yw rhagolwg y ddelwedd ar gael yn y sesiwn hon.",
       "viewImage": "Gweld delwedd",
       "viewImageWithAlt": "Gweld delwedd {{alt}}",
@@ -4170,7 +4172,7 @@
     "signupStepUpApple": "I orffen creu'ch cyfrif, defnyddiwch '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "I orffen creu'ch cyfrif, defnyddiwch '$t(login.signInWithGoogle)'.",
     "signupStepUpBack": "I orffen creu'ch cyfrif, ewch yn ôl a defnyddiwch '$t(login.moreSignInOptions)'.",
-    "invalidCode": "Mae'r cod hwnnw'n anghywir neu wedi dod i ben. Rhowch gynnig eto neu ddefnyddiwch '$t(login.resendCode)'.",
+    "invalidCode": "Mae'r cod hwnnw'n anghywir neu wedi dod i ben. Defnyddiwch '$t(login.resendCode)' neu ddefnyddiwch '$t(login.moreSignInOptions)'.",
     "codeInProgress": "Mae'ch cod yn cael ei brosesu. Arhoswch ychydig a rhowch gynnig eto.",
     "tooManyAttempts": "Rydych wedi rhoi cynnig gormod o weithiau. Gofynnwch am god newydd.",
     "invalidToken": "Methodd y mewngofnodi. Rho gynnig arall arni.",
@@ -4654,7 +4656,15 @@
       "download": "Llwytho'r model ar y ddyfais i lawr",
       "downloading": "Wrthi'n llwytho i lawr…",
       "downloadProgress": "Wrthi'n llwytho i lawr… {{percent}}%",
-      "downloadFailed": "Ni orffennodd y llwytho i lawr. Gwiriwch eich cysylltiad a'ch lle storio, yna rhowch gynnig arall arni."
+      "downloadFailed": "Ni orffennodd y llwytho i lawr. Gwiriwch eich cysylltiad a'ch lle storio, yna rhowch gynnig arall arni.",
+      "cannotUse": "Methu rhedeg: {{items}}.",
+      "cannotUseOptions": "Methu llenwi: rhai opsiynau offeryn.",
+      "limitations": "Cyfyngiadau",
+      "tools": {
+        "time": "Amser",
+        "settingsList": "Dangos gosodiadau",
+        "settingsSet": "Newid gosodiadau"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Mae'r model hwn yn cefnogi ymdrech feddwl"
@@ -4853,6 +4863,7 @@
     "instructionSaveFailed": "Methu cadw'r cyfarwyddyd",
     "instructionDeleteFailed": "Methu dileu'r cyfarwyddyd",
     "instructionToggleFailed": "Methu diweddaru'r cyfarwyddyd",
+    "instructionViewTitle": "Ffeil cyfarwyddyd",
     "instructionLimitReached": "Gall proffil gynnwys hyd at {{max}} cyfarwyddyd. Dilëwch un i ychwanegu un arall.",
     "mcp": {
       "title": "gweinyddwyr MCP",
@@ -5031,6 +5042,7 @@
       "emptyDescription": "Bydd pryniannau credyd, derbynebau a defnydd yn ymddangos yma.",
       "emptyTitle": "Dim hanes credydau",
       "expiredGrant": "Wedi dod i ben: {{description}}",
+      "expiredStatus": "Wedi dod i ben",
       "googlePlayReceipt": "Derbynneb gan Google Play",
       "kind": {
         "adjustment": "Addasiad",
@@ -5057,7 +5069,8 @@
       "receiptA11y": "Agor y dderbynneb ar gyfer {{description}}, {{amount}}, o {{date}}",
       "receiptUnavailable": "Nid oes derbynneb ar gael ar gyfer y pryniant hwn.",
       "retentionLimit": "Yn dangos yr hanes credydau diweddaraf.",
-      "voidedGrant": "Wedi'i ddirymu: {{description}}"
+      "voidedGrant": "Wedi'i ddirymu: {{description}}",
+      "voidedStatus": "Wedi'i ddirymu"
     },
     "title": "Prynu credydau",
     "description": "Mae credydau yn bryniant un-tro sy'n cael ei ychwanegu at eich balans Kilo ar gyfer rhedeg sesiynau codio AI yn Kilo App. Mae'r siop yn codi eich cyfrif ac mae credydau'n cael eu hychwanegu ar ôl i'r siop gadarnhau'r taliad.",

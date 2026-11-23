@@ -142,17 +142,6 @@ function toolRunningStartedAt(part: Part): number | undefined {
   return undefined;
 }
 
-/**
- * A tool part advances pending → running → terminal and never moves backwards.
- * A snapshot, history or DO replay can re-deliver an older part version over
- * newer live state, so a lower-ranked update is dropped (unless it reopens a
- * settled run — see `runningReopensTerminal`), and a terminal update is applied
- * only when it carries ordering evidence that it postdates the stored update
- * (the event's own time, or the tool state's `time.end` when a replay carries
- * no event time). A terminal with no evidence at all never replaces a live
- * running task.
- */
-
 /** Ordering evidence of a terminal update: its event time, else its settle time. */
 function terminalOrder(part: Part, eventTime: number | undefined): number | undefined {
   return eventTime ?? partSettledAt(part);
@@ -212,6 +201,16 @@ function runningReopensTerminal(stored: Part, incoming: Part): boolean {
   );
 }
 
+/**
+ * A tool part advances pending → running → terminal and never moves backwards.
+ * A snapshot, history or DO replay can re-deliver an older part version over
+ * newer live state, so a lower-ranked update is dropped (unless it reopens a
+ * settled run — see `runningReopensTerminal`), and a terminal update is applied
+ * only when it carries ordering evidence that it postdates the stored update
+ * (the event's own time, or the tool state's `time.end` when a replay carries
+ * no event time). A terminal with no evidence at all never replaces a live
+ * running task.
+ */
 function isStaleToolLifecycleUpdate(
   stored: Part,
   incoming: Part,

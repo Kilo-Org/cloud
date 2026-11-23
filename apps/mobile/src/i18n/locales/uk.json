@@ -93,6 +93,7 @@
     "draft": "Чернетка",
     "enabled": "Увімкнено",
     "github": "GitHub",
+    "image": "Зображення",
     "imageUnavailable": "Зображення недоступне.",
     "loading": "Завантаження…",
     "loadMore": "Завантажити ще",
@@ -2152,6 +2153,7 @@
     "filePart": {
       "loadingImage": "Завантаження зображення",
       "imageUnavailableRetry": "Зображення недоступне, повторіть завантаження",
+      "imageUnavailableRetryWithAlt": "Зображення недоступне, {{alt}}, повторіть завантаження",
       "imagePreviewUnavailableInSession": "Попередній перегляд зображення недоступний у цьому сеансі.",
       "viewImage": "Переглянути зображення",
       "viewImageWithAlt": "Переглянути зображення {{alt}}",
@@ -4030,7 +4032,7 @@
     "signupStepUpApple": "Щоб завершити створення облікового запису, виберіть «$t(login.signInWithApple)».",
     "signupStepUpGoogle": "Щоб завершити створення облікового запису, виберіть «$t(login.signInWithGoogle)».",
     "signupStepUpBack": "Щоб завершити створення облікового запису, поверніться назад і виберіть «$t(login.moreSignInOptions)».",
-    "invalidCode": "Код неправильний або термін його дії минув. Спробуйте ще раз або натисніть «$t(login.resendCode)».",
+    "invalidCode": "Код неправильний або термін його дії минув. Скористайтеся «$t(login.resendCode)» або «$t(login.moreSignInOptions)».",
     "codeInProgress": "Ваш код опрацьовується. Зачекайте трохи та спробуйте ще раз.",
     "tooManyAttempts": "Забагато спроб. Надішліть запит на новий код.",
     "invalidToken": "Не вдалося ввійти. Спробуй ще раз.",
@@ -4496,7 +4498,15 @@
       "download": "Завантажити модель на пристрій",
       "downloading": "Завантаження…",
       "downloadProgress": "Завантаження… {{percent}}%",
-      "downloadFailed": "Завантаження не завершилося. Перевірте з'єднання та вільне місце, потім спробуйте ще раз."
+      "downloadFailed": "Завантаження не завершилося. Перевірте з'єднання та вільне місце, потім спробуйте ще раз.",
+      "cannotUse": "Не вдається запустити: {{items}}.",
+      "cannotUseOptions": "Не вдається заповнити: деякі параметри інструмента.",
+      "limitations": "Обмеження",
+      "tools": {
+        "time": "Час",
+        "settingsList": "Показати налаштування",
+        "settingsSet": "Змінити налаштування"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Ця модель підтримує рівень міркування"
@@ -4685,6 +4695,7 @@
     "instructionSaveFailed": "Не вдалося зберегти інструкцію",
     "instructionDeleteFailed": "Не вдалося видалити інструкцію",
     "instructionToggleFailed": "Не вдалося оновити інструкцію",
+    "instructionViewTitle": "Файл інструкції",
     "instructionLimitReached": "Профіль може містити до {{max}} інструкцій. Видаліть одну, щоб додати іншу.",
     "mcp": {
       "title": "MCP сервери",
@@ -4861,6 +4872,7 @@
       "emptyDescription": "Тут з’являтимуться покупки кредитів, квитанції та використання.",
       "emptyTitle": "Історії кредитів немає",
       "expiredGrant": "Термін дії минув: {{description}}",
+      "expiredStatus": "Термін дії минув",
       "googlePlayReceipt": "Квитанція в Google Play",
       "kind": {
         "adjustment": "Коригування",
@@ -4887,7 +4899,8 @@
       "receiptA11y": "Відкрити квитанцію для {{description}}, {{amount}}, від {{date}}",
       "receiptUnavailable": "Квитанція для цієї покупки недоступна.",
       "retentionLimit": "Показано найновішу історію кредитів.",
-      "voidedGrant": "Анульовано: {{description}}"
+      "voidedGrant": "Анульовано: {{description}}",
+      "voidedStatus": "Анульовано"
     },
     "title": "Купити кредити",
     "description": "Кредити — це разова покупка, яка додається на ваш баланс Kilo для запуску AI-сесій кодування в Kilo App. Магазин списує кошти з вашого акаунта, і кредити нараховуються після підтвердження оплати магазином.",

@@ -93,6 +93,7 @@
     "draft": "Rascunho",
     "enabled": "Ativado",
     "github": "GitHub",
+    "image": "Imagem",
     "imageUnavailable": "A imagem não está disponível.",
     "loading": "Carregando…",
     "loadMore": "Carregar mais",
@@ -2119,6 +2120,7 @@
     "filePart": {
       "loadingImage": "Carregando imagem",
       "imageUnavailableRetry": "Imagem indisponível, tentar carregar novamente",
+      "imageUnavailableRetryWithAlt": "Imagem indisponível, {{alt}}, tentar carregar novamente",
       "imagePreviewUnavailableInSession": "A prévia da imagem não está disponível nesta sessão.",
       "viewImage": "Ver imagem",
       "viewImageWithAlt": "Ver imagem {{alt}}",
@@ -4030,7 +4032,7 @@
     "signupStepUpApple": "Para concluir a criação da sua conta, use '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Para concluir a criação da sua conta, use '$t(login.signInWithGoogle)'.",
     "signupStepUpBack": "Para concluir a criação da sua conta, volte e use '$t(login.moreSignInOptions)'.",
-    "invalidCode": "Esse código está incorreto ou expirou. Tente novamente ou use '$t(login.resendCode)'.",
+    "invalidCode": "Esse código está incorreto ou expirou. Use '$t(login.resendCode)' ou '$t(login.moreSignInOptions)'.",
     "codeInProgress": "Seu código está sendo processado. Aguarde um momento e tente novamente.",
     "tooManyAttempts": "Muitas tentativas. Solicite um novo código.",
     "invalidToken": "Não foi possível entrar. Tente novamente.",
@@ -4496,7 +4498,15 @@
       "download": "Baixar modelo no dispositivo",
       "downloading": "Baixando…",
       "downloadProgress": "Baixando… {{percent}}%",
-      "downloadFailed": "O download não foi concluído. Verifique sua conexão e o espaço livre e tente novamente."
+      "downloadFailed": "O download não foi concluído. Verifique sua conexão e o espaço livre e tente novamente.",
+      "cannotUse": "Não é possível executar: {{items}}.",
+      "cannotUseOptions": "Não é possível preencher: algumas opções de ferramenta.",
+      "limitations": "Limitações",
+      "tools": {
+        "time": "Hora",
+        "settingsList": "Mostrar configurações",
+        "settingsSet": "Alterar configurações"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Este modelo aceita esforço de raciocínio"
@@ -4685,6 +4695,7 @@
     "instructionSaveFailed": "Não foi possível salvar a instrução",
     "instructionDeleteFailed": "Não foi possível excluir a instrução",
     "instructionToggleFailed": "Não foi possível atualizar a instrução",
+    "instructionViewTitle": "Arquivo de instrução",
     "instructionLimitReached": "Um perfil pode ter até {{max}} instruções. Exclua uma para adicionar outra.",
     "mcp": {
       "title": "Servidores MCP",
@@ -4861,6 +4872,7 @@
       "emptyDescription": "Compras de créditos, recibos e uso aparecerão aqui.",
       "emptyTitle": "Nenhum histórico de créditos",
       "expiredGrant": "Expirado: {{description}}",
+      "expiredStatus": "Expirado",
       "googlePlayReceipt": "Recibo no Google Play",
       "kind": {
         "adjustment": "Ajuste",
@@ -4887,7 +4899,8 @@
       "receiptA11y": "Abrir o recibo de {{description}}, {{amount}}, de {{date}}",
       "receiptUnavailable": "Não há recibo disponível para esta compra.",
       "retentionLimit": "Mostrando o histórico de créditos mais recente.",
-      "voidedGrant": "Cancelado: {{description}}"
+      "voidedGrant": "Cancelado: {{description}}",
+      "voidedStatus": "Cancelado"
     },
     "title": "Comprar créditos",
     "description": "Os créditos são uma compra única adicionada ao seu saldo Kilo para executar sessões de codificação com IA no Kilo App. A loja cobra na sua conta e os créditos são adicionados depois que a loja confirma o pagamento.",

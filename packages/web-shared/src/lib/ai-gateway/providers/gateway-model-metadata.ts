@@ -27,7 +27,6 @@ export type GatewayModelMap = Record<string, GatewayModelWithEndpoints>;
 
 export const LATEST_ALIAS_PREFIX = '~';
 
-/** Whether a model id is a `~` latest alias rather than a concrete catalog id. */
 export function isLatestAliasId(modelId: string): boolean {
   return modelId.startsWith(LATEST_ALIAS_PREFIX);
 }

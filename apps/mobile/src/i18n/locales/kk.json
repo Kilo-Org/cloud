@@ -91,6 +91,7 @@
     "draft": "Нобай",
     "enabled": "Қосылған",
     "github": "GitHub",
+    "image": "Сурет",
     "imageUnavailable": "Сурет қолжетімсіз.",
     "loading": "Жүктелуде…",
     "loadMore": "Тағы жүктеу",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Сурет жүктелуде",
       "imageUnavailableRetry": "Сурет қолжетімсіз, жүктеуді қайталаңыз",
+      "imageUnavailableRetryWithAlt": "Сурет қолжетімсіз, {{alt}}, жүктеуді қайталаңыз",
       "imagePreviewUnavailableInSession": "Бұл сессияда суретті алдын ала қарау мүмкін емес.",
       "viewImage": "Суретті қарау",
       "viewImageWithAlt": "{{alt}} суретін қарау",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "Тіркелгіні жасауды аяқтау үшін «$t(login.signInWithApple)» тармағын таңдаңыз.",
     "signupStepUpGoogle": "Тіркелгіні жасауды аяқтау үшін «$t(login.signInWithGoogle)» тармағын таңдаңыз.",
     "signupStepUpBack": "Тіркелгіні жасауды аяқтау үшін артқа қайтып, «$t(login.moreSignInOptions)» тармағын таңдаңыз.",
-    "invalidCode": "Бұл код дұрыс емес немесе оның мерзімі өтіп кеткен. Қайталап көріңіз немесе «$t(login.resendCode)» түймесін басыңыз.",
+    "invalidCode": "Бұл код дұрыс емес немесе оның мерзімі өтіп кеткен. «$t(login.resendCode)» немесе «$t(login.moreSignInOptions)» түймесін пайдаланыңыз.",
     "codeInProgress": "Кодыңыз өңделуде. Сәл күтіп, қайталап көріңіз.",
     "tooManyAttempts": "Тым көп әрекет жасалды. Жаңа код сұраңыз.",
     "invalidToken": "Кіру мүмкін болмады. Қайталап көріңіз.",
@@ -4338,7 +4340,15 @@
       "download": "Құрылғыдағы модельді жүктеп алу",
       "downloading": "Жүктеп алынуда…",
       "downloadProgress": "Жүктеп алынуда… {{percent}}%",
-      "downloadFailed": "Жүктеп алу аяқталмады. Интернет байланысын және бос жадты тексеріп, қайталап көріңіз."
+      "downloadFailed": "Жүктеп алу аяқталмады. Интернет байланысын және бос жадты тексеріп, қайталап көріңіз.",
+      "cannotUse": "Іске қосу мүмкін емес: {{items}}.",
+      "cannotUseOptions": "Толтыру мүмкін емес: кейбір құрал опциялары.",
+      "limitations": "Шектеулер",
+      "tools": {
+        "time": "Уақыт",
+        "settingsList": "Параметрлерді көрсету",
+        "settingsSet": "Параметрлерді өзгерту"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Бұл модель ойлау деңгейін қолдайды"
@@ -4517,6 +4527,7 @@
     "instructionSaveFailed": "Нұсқаулықты сақтау мүмкін болмады",
     "instructionDeleteFailed": "Нұсқаулықты жою мүмкін болмады",
     "instructionToggleFailed": "Нұсқаулықты жаңарту мүмкін болмады",
+    "instructionViewTitle": "Нұсқаулық файлы",
     "instructionLimitReached": "Профильде {{max}} нұсқаулыққа дейін болуы мүмкін. Тағы қосу үшін біреуін жойыңыз.",
     "mcp": {
       "title": "MCP серверлері",
@@ -4691,6 +4702,7 @@
       "emptyDescription": "Кредит сатып алулары, түбіртектер және пайдалану осында көрсетіледі.",
       "emptyTitle": "Кредиттер тарихы жоқ",
       "expiredGrant": "Мерзімі өтті: {{description}}",
+      "expiredStatus": "Мерзімі өтті",
       "googlePlayReceipt": "Google Play түбіртегі",
       "kind": {
         "adjustment": "Түзету",
@@ -4717,7 +4729,8 @@
       "receiptA11y": "Түбіртекті ашу: {{description}}, {{amount}}, {{date}} күні",
       "receiptUnavailable": "Бұл сатып алу үшін түбіртек қолжетімді емес.",
       "retentionLimit": "Кредиттердің ең соңғы тарихы көрсетілуде.",
-      "voidedGrant": "Күші жойылды: {{description}}"
+      "voidedGrant": "Күші жойылды: {{description}}",
+      "voidedStatus": "Күші жойылды"
     },
     "title": "Кредит сатып алу",
     "description": "Кредиттер — Kilo App-те AI бағдарламалау сессияларын жүргізу үшін Kilo балансына қосылатын бір реттік сатып алу. Дүкен шотыңыздан ақша алады және дүкен төлемді растағаннан кейін кредиттер қосылады.",

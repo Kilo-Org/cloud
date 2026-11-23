@@ -92,6 +92,7 @@
     "draft": "Nacrt",
     "enabled": "Omogućeno",
     "github": "GitHub",
+    "image": "Slika",
     "imageUnavailable": "Slika nije dostupna.",
     "loading": "Učitavanje…",
     "loadMore": "Učitaj više",
@@ -2713,6 +2714,7 @@
     "filePart": {
       "loadingImage": "Učitavanje slike",
       "imageUnavailableRetry": "Slika nije dostupna, pokušaj je ponovo učitati",
+      "imageUnavailableRetryWithAlt": "Slika nije dostupna, {{alt}}, pokušaj je ponovo učitati",
       "imagePreviewUnavailableInSession": "Pregled slike nije dostupan u ovoj sesiji.",
       "viewImage": "Pogledaj sliku",
       "viewImageWithAlt": "Pogledaj sliku {{alt}}",
@@ -3960,7 +3962,7 @@
     "signupStepUpApple": "Za dovršetak kreiranja računa odaberi „$t(login.signInWithApple)“.",
     "signupStepUpGoogle": "Za dovršetak kreiranja računa odaberi „$t(login.signInWithGoogle)“.",
     "signupStepUpBack": "Za dovršetak kreiranja računa vrati se nazad i odaberi „$t(login.moreSignInOptions)“.",
-    "invalidCode": "Kod nije ispravan ili je istekao. Pokušaj ponovo ili odaberi „$t(login.resendCode)“.",
+    "invalidCode": "Kod nije ispravan ili je istekao. Koristi „$t(login.resendCode)“ ili „$t(login.moreSignInOptions)“.",
     "codeInProgress": "Tvoj kod se obrađuje. Sačekaj trenutak i pokušaj ponovo.",
     "tooManyAttempts": "Previše pokušaja. Zatraži novi kod.",
     "invalidToken": "Prijava nije uspjela. Pokušaj ponovo.",
@@ -4417,7 +4419,15 @@
       "download": "Preuzmi model na uređaju",
       "downloading": "Preuzimanje…",
       "downloadProgress": "Preuzimanje… {{percent}}%",
-      "downloadFailed": "Preuzimanje nije završeno. Provjerite vezu i slobodan prostor za pohranu, pa pokušajte ponovo."
+      "downloadFailed": "Preuzimanje nije završeno. Provjerite vezu i slobodan prostor za pohranu, pa pokušajte ponovo.",
+      "cannotUse": "Nije moguće pokrenuti: {{items}}.",
+      "cannotUseOptions": "Nije moguće popuniti: neke opcije alata.",
+      "limitations": "Ograničenja",
+      "tools": {
+        "time": "Vrijeme",
+        "settingsList": "Prikaži postavke",
+        "settingsSet": "Izmijeni postavke"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Ovaj model podržava intenzitet razmišljanja"
@@ -4601,6 +4611,7 @@
     "instructionSaveFailed": "Uputstvo nije moguće sačuvati",
     "instructionDeleteFailed": "Uputstvo nije moguće izbrisati",
     "instructionToggleFailed": "Uputstvo nije moguće ažurirati",
+    "instructionViewTitle": "Datoteka uputstva",
     "instructionLimitReached": "Profil može sadržavati najviše {{max}} uputstava. Izbrišite jedno da biste dodali novo.",
     "mcp": {
       "title": "MCP serveri",
@@ -4776,6 +4787,7 @@
       "emptyDescription": "Kupovine kredita, potvrde i potrošnja pojavit će se ovdje.",
       "emptyTitle": "Nema historije kredita",
       "expiredGrant": "Isteklo: {{description}}",
+      "expiredStatus": "Isteklo",
       "googlePlayReceipt": "Potvrda iz trgovine Google Play",
       "kind": {
         "adjustment": "Korekcija",
@@ -4802,7 +4814,8 @@
       "receiptA11y": "Otvori potvrdu za {{description}}, {{amount}}, od {{date}}",
       "receiptUnavailable": "Potvrda nije dostupna za ovu kupovinu.",
       "retentionLimit": "Prikazuje se najnovija historija kredita.",
-      "voidedGrant": "Poništeno: {{description}}"
+      "voidedGrant": "Poništeno: {{description}}",
+      "voidedStatus": "Poništeno"
     },
     "title": "Kupi kredite",
     "description": "Krediti su jednokratna kupovina koja se dodaje na tvoj Kilo saldo za pokretanje AI sesija kodiranja u Kilo App. Trgovina naplaćuje tvoj račun, a krediti se dodaju nakon što trgovina potvrdi plaćanje.",

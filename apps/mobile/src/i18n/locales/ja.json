@@ -91,6 +91,7 @@
     "draft": "下書き",
     "enabled": "有効",
     "github": "GitHub",
+    "image": "画像",
     "imageUnavailable": "画像を表示できません。",
     "loading": "読み込み中…",
     "loadMore": "さらに読み込む",
@@ -2098,6 +2099,7 @@
     "filePart": {
       "loadingImage": "画像を読み込み中",
       "imageUnavailableRetry": "画像を表示できません。読み込みを再試行",
+      "imageUnavailableRetryWithAlt": "画像を表示できません。{{alt}}。読み込みを再試行",
       "imagePreviewUnavailableInSession": "このセッションでは画像のプレビューを表示できません。",
       "viewImage": "画像を表示",
       "viewImageWithAlt": "画像「{{alt}}」を表示",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "アカウントの作成を完了するには、「$t(login.signInWithApple)」を選択してください。",
     "signupStepUpGoogle": "アカウントの作成を完了するには、「$t(login.signInWithGoogle)」を選択してください。",
     "signupStepUpBack": "アカウントの作成を完了するには、前の画面に戻って「$t(login.moreSignInOptions)」を選択してください。",
-    "invalidCode": "そのコードは正しくないか、有効期限が切れています。もう一度お試しいただくか、「$t(login.resendCode)」を選択してください。",
+    "invalidCode": "そのコードは正しくないか、有効期限が切れています。「$t(login.resendCode)」または「$t(login.moreSignInOptions)」を選択してください。",
     "codeInProgress": "コードを処理中です。しばらく待ってからもう一度お試しください。",
     "tooManyAttempts": "試行回数が多すぎます。新しいコードをリクエストしてください。",
     "invalidToken": "サインインに失敗しました。もう一度お試しください。",
@@ -4338,7 +4340,15 @@
       "download": "オンデバイスモデルをダウンロード",
       "downloading": "ダウンロード中…",
       "downloadProgress": "ダウンロード中… {{percent}}%",
-      "downloadFailed": "ダウンロードが完了しませんでした。接続と空き容量を確認してから、もう一度お試しください。"
+      "downloadFailed": "ダウンロードが完了しませんでした。接続と空き容量を確認してから、もう一度お試しください。",
+      "cannotUse": "実行できません：{{items}}。",
+      "cannotUseOptions": "入力できません：一部のツールオプション。",
+      "limitations": "制限",
+      "tools": {
+        "time": "時刻",
+        "settingsList": "設定を表示",
+        "settingsSet": "設定を変更"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "このモデルは思考量の指定に対応しています"
@@ -4517,6 +4527,7 @@
     "instructionSaveFailed": "指示を保存できませんでした",
     "instructionDeleteFailed": "指示を削除できませんでした",
     "instructionToggleFailed": "指示を更新できませんでした",
+    "instructionViewTitle": "指示ファイル",
     "instructionLimitReached": "プロファイルには最大{{max}}件の指示を保存できます。追加するには1件削除してください。",
     "mcp": {
       "title": "MCPサーバー",
@@ -4691,6 +4702,7 @@
       "emptyDescription": "クレジットの購入、領収書、使用状況がここに表示されます。",
       "emptyTitle": "クレジット履歴はありません",
       "expiredGrant": "期限切れ: {{description}}",
+      "expiredStatus": "期限切れ",
       "googlePlayReceipt": "領収書は Google Play にあります",
       "kind": {
         "adjustment": "調整",
@@ -4717,7 +4729,8 @@
       "receiptA11y": "{{description}}、{{amount}}、{{date}}の領収書を開く",
       "receiptUnavailable": "この購入の領収書はありません。",
       "retentionLimit": "最新のクレジット履歴を表示しています。",
-      "voidedGrant": "無効化済み: {{description}}"
+      "voidedGrant": "無効化済み: {{description}}",
+      "voidedStatus": "無効化済み"
     },
     "title": "クレジットを購入",
     "description": "クレジットは、Kilo AppでAIコーディングセッションを実行するためにKilo残高に追加される買い切りの購入です。ストアがアカウントに請求し、ストアが支払いを確認した後にクレジットが追加されます。",

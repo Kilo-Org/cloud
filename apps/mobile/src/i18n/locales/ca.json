@@ -92,6 +92,7 @@
     "draft": "Esborrany",
     "enabled": "Activat",
     "github": "GitHub",
+    "image": "Imatge",
     "imageUnavailable": "La imatge no està disponible.",
     "loading": "S'està carregant…",
     "loadMore": "Carrega'n més",
@@ -2713,6 +2714,7 @@
     "filePart": {
       "loadingImage": "Carregant la imatge",
       "imageUnavailableRetry": "La imatge no està disponible. Torna a provar de carregar-la",
+      "imageUnavailableRetryWithAlt": "La imatge no està disponible. {{alt}}. Torna a provar de carregar-la",
       "imagePreviewUnavailableInSession": "La previsualització de la imatge no està disponible en aquesta sessió.",
       "viewImage": "Mostra la imatge",
       "viewImageWithAlt": "Mostra la imatge {{alt}}",
@@ -3960,7 +3962,7 @@
     "signupStepUpApple": "Per acabar de crear el teu compte, utilitza «$t(login.signInWithApple)».",
     "signupStepUpGoogle": "Per acabar de crear el teu compte, utilitza «$t(login.signInWithGoogle)».",
     "signupStepUpBack": "Per acabar de crear el teu compte, torna enrere i utilitza «$t(login.moreSignInOptions)».",
-    "invalidCode": "Aquest codi és incorrecte o ha caducat. Torna-ho a provar o utilitza «$t(login.resendCode)».",
+    "invalidCode": "Aquest codi és incorrecte o ha caducat. Utilitza «$t(login.resendCode)» o «$t(login.moreSignInOptions)».",
     "codeInProgress": "S'està processant el teu codi. Espera un moment i torna-ho a provar.",
     "tooManyAttempts": "Has fet massa intents. Sol·licita un codi nou.",
     "invalidToken": "L'inici de sessió ha fallat. Torna-ho a provar.",
@@ -4417,7 +4419,15 @@
       "download": "Baixa el model al dispositiu",
       "downloading": "S'està baixant…",
       "downloadProgress": "S'està baixant… {{percent}}%",
-      "downloadFailed": "La baixada no s'ha completat. Comprova la connexió i l'espai lliure i torna-ho a provar."
+      "downloadFailed": "La baixada no s'ha completat. Comprova la connexió i l'espai lliure i torna-ho a provar.",
+      "cannotUse": "No es pot executar: {{items}}.",
+      "cannotUseOptions": "No es poden emplenar: algunes opcions d'eina.",
+      "limitations": "Limitacions",
+      "tools": {
+        "time": "Hora",
+        "settingsList": "Mostra la configuració",
+        "settingsSet": "Canvia la configuració"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Aquest model admet l'esforç de raonament"
@@ -4601,6 +4611,7 @@
     "instructionSaveFailed": "No s'ha pogut desar la instrucció",
     "instructionDeleteFailed": "No s'ha pogut eliminar la instrucció",
     "instructionToggleFailed": "No s'ha pogut actualitzar la instrucció",
+    "instructionViewTitle": "Fitxer d'instrucció",
     "instructionLimitReached": "Un perfil pot tenir fins a {{max}} instruccions. Elimina'n una per afegir-ne una altra.",
     "mcp": {
       "title": "Servidors MCP",
@@ -4776,6 +4787,7 @@
       "emptyDescription": "Les compres de crèdits, els rebuts i l'ús apareixeran aquí.",
       "emptyTitle": "No hi ha historial de crèdits",
       "expiredGrant": "Caducat: {{description}}",
+      "expiredStatus": "Caducat",
       "googlePlayReceipt": "Rebut de Google Play",
       "kind": {
         "adjustment": "Ajust",
@@ -4802,7 +4814,8 @@
       "receiptA11y": "Obre el rebut de {{description}}, {{amount}}, del {{date}}",
       "receiptUnavailable": "No hi ha cap rebut disponible per a aquesta compra.",
       "retentionLimit": "Es mostra l'historial de crèdits més recent.",
-      "voidedGrant": "Anul·lat: {{description}}"
+      "voidedGrant": "Anul·lat: {{description}}",
+      "voidedStatus": "Anul·lat"
     },
     "title": "Compra crèdits",
     "description": "Els crèdits són una compra única que s'afegeix al teu saldo de Kilo per executar sessions de programació amb IA a l'aplicació Kilo. La botiga cobra al teu compte i els crèdits s'afegeixen quan la botiga confirma el pagament.",

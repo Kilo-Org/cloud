@@ -91,6 +91,7 @@
     "draft": "مسودہ",
     "enabled": "فعال",
     "github": "GitHub",
+    "image": "تصویر",
     "imageUnavailable": "تصویر دستیاب نہیں ہے۔",
     "loading": "لوڈ ہو رہا ہے…",
     "loadMore": "مزید لوڈ کریں",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "تصویر لوڈ ہو رہی ہے",
       "imageUnavailableRetry": "تصویر دستیاب نہیں، دوبارہ لوڈ کرنے کی کوشش کریں",
+      "imageUnavailableRetryWithAlt": "تصویر دستیاب نہیں، {{alt}}، دوبارہ لوڈ کرنے کی کوشش کریں",
       "imagePreviewUnavailableInSession": "اس سیشن میں تصویر کا پیش نظارہ دستیاب نہیں۔",
       "viewImage": "تصویر دیکھیں",
       "viewImageWithAlt": "{{alt}} تصویر دیکھیں",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "اپنا اکاؤنٹ بنانا مکمل کرنے کے لیے '$t(login.signInWithApple)' استعمال کریں۔",
     "signupStepUpGoogle": "اپنا اکاؤنٹ بنانا مکمل کرنے کے لیے '$t(login.signInWithGoogle)' استعمال کریں۔",
     "signupStepUpBack": "اپنا اکاؤنٹ بنانا مکمل کرنے کے لیے واپس جائیں اور '$t(login.moreSignInOptions)' استعمال کریں۔",
-    "invalidCode": "یہ کوڈ غلط ہے یا اس کی میعاد ختم ہو چکی ہے۔ براہ کرم دوبارہ کوشش کریں یا '$t(login.resendCode)' استعمال کریں۔",
+    "invalidCode": "یہ کوڈ غلط ہے یا اس کی میعاد ختم ہو چکی ہے۔ '$t(login.resendCode)' استعمال کریں یا '$t(login.moreSignInOptions)' استعمال کریں۔",
     "codeInProgress": "آپ کے کوڈ پر کارروائی ہو رہی ہے۔ ذرا انتظار کریں اور دوبارہ کوشش کریں۔",
     "tooManyAttempts": "بہت زیادہ کوششیں ہو چکی ہیں۔ براہ کرم نئے کوڈ کی درخواست کریں۔",
     "invalidToken": "سائن ان ناکام رہا۔ براہ کرم دوبارہ کوشش کریں۔",
@@ -4338,7 +4340,15 @@
       "download": "ڈیوائس پر چلنے والا ماڈل ڈاؤن لوڈ کریں",
       "downloading": "ڈاؤن لوڈ ہو رہا ہے…",
       "downloadProgress": "ڈاؤن لوڈ ہو رہا ہے… {{percent}}%",
-      "downloadFailed": "ڈاؤن لوڈ مکمل نہیں ہوا۔ اپنا کنکشن اور خالی اسٹوریج چیک کریں، پھر دوبارہ کوشش کریں۔"
+      "downloadFailed": "ڈاؤن لوڈ مکمل نہیں ہوا۔ اپنا کنکشن اور خالی اسٹوریج چیک کریں، پھر دوبارہ کوشش کریں۔",
+      "cannotUse": "چلایا نہیں جا سکتا: {{items}}۔",
+      "cannotUseOptions": "بھرا نہیں جا سکتا: ٹول کے کچھ اختیارات۔",
+      "limitations": "پابندیاں",
+      "tools": {
+        "time": "وقت",
+        "settingsList": "ترتیبات دکھائیں",
+        "settingsSet": "ترتیبات تبدیل کریں"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "یہ ماڈل غور کی سطح کو سپورٹ کرتا ہے"
@@ -4517,6 +4527,7 @@
     "instructionSaveFailed": "ہدایت محفوظ نہیں ہو سکی",
     "instructionDeleteFailed": "ہدایت حذف نہیں ہو سکی",
     "instructionToggleFailed": "ہدایت اپ ڈیٹ نہیں ہو سکی",
+    "instructionViewTitle": "ہدایت کی فائل",
     "instructionLimitReached": "ایک پروفائل میں زیادہ سے زیادہ {{max}} ہدایات ہو سکتی ہیں۔ مزید شامل کرنے کے لیے ایک حذف کریں۔",
     "mcp": {
       "title": "MCP سرورز",
@@ -4691,6 +4702,7 @@
       "emptyDescription": "کریڈٹ کی خریداریاں، رسیدیں اور استعمال یہاں نظر آئیں گے۔",
       "emptyTitle": "کریڈٹ کی کوئی تاریخچہ نہیں",
       "expiredGrant": "میعاد ختم ہو گئی: {{description}}",
+      "expiredStatus": "میعاد ختم ہو گئی",
       "googlePlayReceipt": "Google Play کی رسید",
       "kind": {
         "adjustment": "ترمیم",
@@ -4717,7 +4729,8 @@
       "receiptA11y": "{{description}}، {{amount}}، {{date}} کی رسید کھولیں",
       "receiptUnavailable": "اس خریداری کی رسید دستیاب نہیں ہے۔",
       "retentionLimit": "کریڈٹ کی حالیہ ترین تاریخچہ دکھائی جا رہی ہے۔",
-      "voidedGrant": "منسوخ: {{description}}"
+      "voidedGrant": "منسوخ: {{description}}",
+      "voidedStatus": "منسوخ"
     },
     "title": "کریڈٹس خریدیں",
     "description": "کریڈٹس ایک بار کی خریداری ہیں جو Kilo App میں AI کوڈنگ سیشن چلانے کے لیے آپ کے Kilo بیلنس میں شامل کیے جاتے ہیں۔ اسٹور آپ کے اکاؤنٹ سے رقم وصول کرتا ہے اور اسٹور کے ادائیگی کی تصدیق کرنے کے بعد کریڈٹس شامل کیے جاتے ہیں۔",

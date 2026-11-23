@@ -42,6 +42,15 @@ const LEGAL_LINK_ACTIONS: readonly {
   { name: 'openPrivacy', labelKey: 'common.privacyPolicy', document: 'privacy' },
 ];
 
+/**
+ * Keeps the refusal that no further code can clear. The token route answers `INVALID_CODE` for an
+ * address the OTP route silently refused, so a resent code never arrives and typing another one
+ * cannot succeed; clearing the message on either step would leave the person with the dead end and
+ * no control naming the way out. The untagged (retryable) refusals still retire on that step.
+ */
+const survivesCodeStepRetry = (refusal: EmailCodeRefusal | undefined) =>
+  refusal?.recovery === 'options' ? refusal : undefined;
+
 export function IdleAuth({
   start,
   initialEmail = '',
@@ -119,7 +128,12 @@ export function IdleAuth({
     `${t('login.termsPrefix')}${t('login.termsInSentence')}${t('login.termsConnector')}` +
     `${t('common.privacyPolicy')}${t('login.termsSuffix')}`;
   const [view, setView] = useState<'main' | 'otp'>('main');
-  /** The code step's last verify refusal; edit, resend, and Back retire it whole. */
+  /**
+   * The code step's last verify refusal. A refusal without a tag is retryable, so typing or a
+   * resend retires it; one tagged `recovery: 'options'` outlives both, because the dead end it
+   * reports — a silently refused address, or the admission gate — is not something another code
+   * can clear. Only Back, entering the step afresh, or a pending link taking over ends it.
+   */
   const [verifyRefusal, setVerifyRefusal] = useState<EmailCodeRefusal | undefined>(undefined);
   // Bumps on every user step that retires a refusal (edit, resend, back), so a
   // slow refusal from an earlier attempt cannot re-appear after the user moved on.
@@ -296,11 +310,17 @@ export function IdleAuth({
         busy={busy}
         // A resend that fails has no field to sit under here, and the pending-link options are off
         // screen, so the code step shows that refusal in its own slot. Without a pending link the
-        // hook toasts it instead and this stays the verify message alone.
-        error={verifyRefusal?.message ?? pendingLinkFailure?.message}
-        // Only the terminal admission refusal offers the browser sign-in its copy names.
-        onBrowserSignIn={verifyRefusal?.browserSignIn ? () => void startBrowserAuth() : undefined}
-        browserSignInStarting={browserAuthStarting}
+        // hook toasts it instead and this stays the verify message alone. The newest refusal wins:
+        // a terminal verify refusal is kept on the step, so it must not mask a resend failure that
+        // lands after it, which would make the tap look like it did nothing.
+        error={pendingLinkFailure?.message ?? verifyRefusal?.message}
+        // The refusal's data tag decides, never the message: both refusals a code
+        // cannot clear — the admission gate and a silently refused address — show
+        // the other sign-in methods their copy names. The handler is always passed,
+        // so a missing tag only hides the control.
+        recovery={verifyRefusal?.recovery}
+        onAlternativeSignIn={() => void startBrowserAuth()}
+        alternativeSignInStarting={browserAuthStarting}
         onVerify={code => {
           const attempt = verifyAttemptRef.current;
           void (async () => {
@@ -309,20 +329,27 @@ export function IdleAuth({
             // code (clearing the message), requested a resend, or gone back.
             // Only the attempt this refusal belongs to may write its message.
             if (!outcome.ok && attempt === verifyAttemptRef.current) {
+              // The refusal is the newest word on the step, so an older resend
+              // failure must not stay in the slot ahead of it.
+              clearPendingLinkFailure();
               setVerifyRefusal(outcome);
             }
           })();
         }}
         onCodeChange={() => {
-          // Editing the code retires the refusal message above the field and
-          // disowns any verify attempt still in flight for the old code.
+          // Editing the code retires a retryable refusal and disowns any verify
+          // attempt still in flight for the old code; the tagged one stays, since
+          // this address gets no code that typing here could make right.
           verifyAttemptRef.current += 1;
-          setVerifyRefusal(undefined);
+          setVerifyRefusal(survivesCodeStepRetry);
           clearPendingLinkFailure();
         }}
         onResend={async () => {
+          // A resend is still only a code: it cannot clear the dead end it reports
+          // for an address the OTP route silently refused, so the refusal and its
+          // options control survive a failed resend and a successful one alike.
           verifyAttemptRef.current += 1;
-          setVerifyRefusal(undefined);
+          setVerifyRefusal(survivesCodeStepRetry);
           clearPendingLinkFailure();
           const ok = await requestEmailCode(otpEmail);
           if (ok) {

@@ -91,6 +91,7 @@
     "draft": "Bản nháp",
     "enabled": "Đã bật",
     "github": "GitHub",
+    "image": "Hình ảnh",
     "imageUnavailable": "Không thể hiển thị ảnh.",
     "loading": "Đang tải…",
     "loadMore": "Tải thêm",
@@ -2098,6 +2099,7 @@
     "filePart": {
       "loadingImage": "Đang tải hình ảnh",
       "imageUnavailableRetry": "Không thể tải hình ảnh, thử tải lại",
+      "imageUnavailableRetryWithAlt": "Không thể tải hình ảnh, {{alt}}, thử tải lại",
       "imagePreviewUnavailableInSession": "Không thể xem trước hình ảnh trong phiên này.",
       "viewImage": "Xem hình ảnh",
       "viewImageWithAlt": "Xem hình ảnh {{alt}}",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "Để hoàn tất việc tạo tài khoản, hãy dùng '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Để hoàn tất việc tạo tài khoản, hãy dùng '$t(login.signInWithGoogle)'.",
     "signupStepUpBack": "Để hoàn tất việc tạo tài khoản, hãy quay lại và dùng '$t(login.moreSignInOptions)'.",
-    "invalidCode": "Mã đó không đúng hoặc đã hết hạn. Vui lòng thử lại hoặc dùng '$t(login.resendCode)'.",
+    "invalidCode": "Mã đó không đúng hoặc đã hết hạn. Vui lòng dùng '$t(login.resendCode)' hoặc '$t(login.moreSignInOptions)'.",
     "codeInProgress": "Mã của bạn đang được xử lý. Chờ một chút rồi thử lại.",
     "tooManyAttempts": "Quá nhiều lần thử. Vui lòng yêu cầu mã mới.",
     "invalidToken": "Đăng nhập thất bại. Vui lòng thử lại.",
@@ -4338,7 +4340,15 @@
       "download": "Tải xuống mô hình trên thiết bị",
       "downloading": "Đang tải xuống…",
       "downloadProgress": "Đang tải xuống… {{percent}}%",
-      "downloadFailed": "Quá trình tải xuống chưa hoàn tất. Hãy kiểm tra kết nối và dung lượng trống, sau đó thử lại."
+      "downloadFailed": "Quá trình tải xuống chưa hoàn tất. Hãy kiểm tra kết nối và dung lượng trống, sau đó thử lại.",
+      "cannotUse": "Không thể chạy: {{items}}.",
+      "cannotUseOptions": "Không thể điền: một số tùy chọn công cụ.",
+      "limitations": "Hạn chế",
+      "tools": {
+        "time": "Thời gian",
+        "settingsList": "Hiển thị cài đặt",
+        "settingsSet": "Thay đổi cài đặt"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Mô hình này hỗ trợ mức độ suy luận"
@@ -4517,6 +4527,7 @@
     "instructionSaveFailed": "Không thể lưu hướng dẫn",
     "instructionDeleteFailed": "Không thể xóa hướng dẫn",
     "instructionToggleFailed": "Không thể cập nhật hướng dẫn",
+    "instructionViewTitle": "Tệp hướng dẫn",
     "instructionLimitReached": "Mỗi hồ sơ có tối đa {{max}} hướng dẫn. Xóa một hướng dẫn để thêm hướng dẫn khác.",
     "mcp": {
       "title": "máy chủ MCP",
@@ -4691,6 +4702,7 @@
       "emptyDescription": "Các giao dịch mua tín dụng, biên lai và mức sử dụng sẽ hiển thị tại đây.",
       "emptyTitle": "Chưa có lịch sử tín dụng",
       "expiredGrant": "Đã hết hạn: {{description}}",
+      "expiredStatus": "Đã hết hạn",
       "googlePlayReceipt": "Biên lai từ Google Play",
       "kind": {
         "adjustment": "Điều chỉnh",
@@ -4717,7 +4729,8 @@
       "receiptA11y": "Mở biên lai cho {{description}}, {{amount}}, từ {{date}}",
       "receiptUnavailable": "Không có biên lai cho giao dịch mua này.",
       "retentionLimit": "Đang hiển thị lịch sử tín dụng gần đây nhất.",
-      "voidedGrant": "Đã hủy: {{description}}"
+      "voidedGrant": "Đã hủy: {{description}}",
+      "voidedStatus": "Đã hủy"
     },
     "title": "Mua tín dụng",
     "description": "Tín dụng là giao dịch mua một lần được thêm vào số dư Kilo của bạn để chạy các phiên lập trình AI trong Kilo App. Cửa hàng tính phí vào tài khoản của bạn và tín dụng được thêm sau khi cửa hàng xác nhận thanh toán.",

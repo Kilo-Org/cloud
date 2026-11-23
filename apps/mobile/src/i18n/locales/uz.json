@@ -91,6 +91,7 @@
     "draft": "Qoralama",
     "enabled": "Yoqilgan",
     "github": "GitHub",
+    "image": "Rasm",
     "imageUnavailable": "Rasmni ko‘rsatib bo‘lmaydi.",
     "loading": "Yuklanmoqda…",
     "loadMore": "Yana yuklash",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Rasm yuklanmoqda",
       "imageUnavailableRetry": "Rasm yuklanmadi, qayta yuklash",
+      "imageUnavailableRetryWithAlt": "Rasm yuklanmadi, {{alt}}, qayta yuklash",
       "imagePreviewUnavailableInSession": "Bu sessiyada rasmni oldindan ko'rib bo'lmaydi.",
       "viewImage": "Rasmni ko'rish",
       "viewImageWithAlt": "{{alt}} rasmini ko'rish",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "Hisob yaratishni yakunlash uchun '$t(login.signInWithApple)' dan foydalaning.",
     "signupStepUpGoogle": "Hisob yaratishni yakunlash uchun '$t(login.signInWithGoogle)' dan foydalaning.",
     "signupStepUpBack": "Hisob yaratishni yakunlash uchun orqaga qayting va '$t(login.moreSignInOptions)' dan foydalaning.",
-    "invalidCode": "Bu kod noto‘g‘ri yoki muddati o‘tgan. Qayta urinib ko‘ring yoki '$t(login.resendCode)' dan foydalaning.",
+    "invalidCode": "Bu kod noto‘g‘ri yoki muddati o‘tgan. Yoki '$t(login.resendCode)' dan, yoki '$t(login.moreSignInOptions)' dan foydalaning.",
     "codeInProgress": "Kodingiz tekshirilmoqda. Biroz kuting va qayta urinib ko'ring.",
     "tooManyAttempts": "Juda ko'p urinish bo'ldi. Yangi kod so'rang.",
     "invalidToken": "Hisobga kirib bo‘lmadi. Qayta urinib ko‘ring.",
@@ -4338,7 +4340,15 @@
       "download": "Qurilmadagi modelni yuklab olish",
       "downloading": "Yuklab olinmoqda…",
       "downloadProgress": "Yuklab olinmoqda… {{percent}}%",
-      "downloadFailed": "Yuklab olish tugallanmadi. Internet aloqasi va bo‘sh xotirani tekshirib, qayta urining."
+      "downloadFailed": "Yuklab olish tugallanmadi. Internet aloqasi va bo‘sh xotirani tekshirib, qayta urining.",
+      "cannotUse": "Ishga tushirib bo'lmaydi: {{items}}.",
+      "cannotUseOptions": "To'ldirib bo'lmaydi: ba'zi vosita variantlari.",
+      "limitations": "Cheklovlar",
+      "tools": {
+        "time": "Vaqt",
+        "settingsList": "Sozlamalarni ko‘rsatish",
+        "settingsSet": "Sozlamalarni o‘zgartirish"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Bu model fikrlash darajasini qo‘llab-quvvatlaydi"
@@ -4517,6 +4527,7 @@
     "instructionSaveFailed": "Ko'rsatmani saqlab bo'lmadi",
     "instructionDeleteFailed": "Ko'rsatmani o'chirib bo'lmadi",
     "instructionToggleFailed": "Ko'rsatmani yangilab bo'lmadi",
+    "instructionViewTitle": "Ko'rsatma fayli",
     "instructionLimitReached": "Profilga {{max}} tagacha ko'rsatma sig'adi. Boshqasini qo'shish uchun bittasini o'chiring.",
     "mcp": {
       "title": "MCP serverlari",
@@ -4691,6 +4702,7 @@
       "emptyDescription": "Kredit xaridlari, cheklar va sarflar shu yerda ko‘rinadi.",
       "emptyTitle": "Kreditlar tarixi yo‘q",
       "expiredGrant": "Muddati tugagan: {{description}}",
+      "expiredStatus": "Muddati tugagan",
       "googlePlayReceipt": "Chek Google Play’da",
       "kind": {
         "adjustment": "Tuzatish",
@@ -4717,7 +4729,8 @@
       "receiptA11y": "{{description}}, {{amount}}, {{date}} chekini ochish",
       "receiptUnavailable": "Bu xarid uchun chek mavjud emas.",
       "retentionLimit": "Kreditlarning eng so'nggi tarixi ko'rsatilmoqda.",
-      "voidedGrant": "Bekor qilingan: {{description}}"
+      "voidedGrant": "Bekor qilingan: {{description}}",
+      "voidedStatus": "Bekor qilingan"
     },
     "title": "Kredit sotib olish",
     "description": "Kreditlar Kilo App'da AI kodlash sessiyalarini ishga tushirish uchun Kilo balansingizga qo'shiladigan bir martalik xariddir. Do'kon hisobingizdan to'lov oladi va do'kon to'lovni tasdiqlaganidan keyin kreditlar qo'shiladi.",

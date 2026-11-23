@@ -65,7 +65,6 @@ function removeCombinators(schema: unknown): CombinatorRemoval {
   if (present.length === 0) {
     return { constraints: undefined, combinators: [] };
   }
-  // A schema over the client walk budget is left unchanged rather than partially rewritten.
   if (!withinSchemaBudget(schema)) {
     return { constraints: undefined, combinators: [] };
   }

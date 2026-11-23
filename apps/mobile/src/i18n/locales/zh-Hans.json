@@ -91,6 +91,7 @@
     "draft": "草稿",
     "enabled": "已启用",
     "github": "GitHub",
+    "image": "图片",
     "imageUnavailable": "无法显示图片",
     "loading": "加载中…",
     "loadMore": "加载更多",
@@ -2098,6 +2099,7 @@
     "filePart": {
       "loadingImage": "正在加载图片",
       "imageUnavailableRetry": "无法加载图片，重新加载",
+      "imageUnavailableRetryWithAlt": "无法加载图片，{{alt}}，重新加载",
       "imagePreviewUnavailableInSession": "无法在此会话中预览图片。",
       "viewImage": "查看图片",
       "viewImageWithAlt": "查看图片 {{alt}}",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "如需完成账户创建，请选择“$t(login.signInWithApple)”。",
     "signupStepUpGoogle": "如需完成账户创建，请选择“$t(login.signInWithGoogle)”。",
     "signupStepUpBack": "如需完成账户创建，请返回上一步并选择“$t(login.moreSignInOptions)”。",
-    "invalidCode": "验证码不正确或已过期。请重试，或选择“$t(login.resendCode)”。",
+    "invalidCode": "验证码不正确或已过期。请选择“$t(login.resendCode)”或“$t(login.moreSignInOptions)”。",
     "codeInProgress": "正在处理你的验证码。请稍后重试。",
     "tooManyAttempts": "尝试次数过多。请重新获取验证码。",
     "invalidToken": "登录失败。请重试。",
@@ -4338,7 +4340,15 @@
       "download": "下载本机模型",
       "downloading": "正在下载…",
       "downloadProgress": "正在下载… {{percent}}%",
-      "downloadFailed": "下载未完成。请检查网络连接和可用存储空间，然后重试。"
+      "downloadFailed": "下载未完成。请检查网络连接和可用存储空间，然后重试。",
+      "cannotUse": "无法运行：{{items}}。",
+      "cannotUseOptions": "无法填写：部分工具选项。",
+      "limitations": "限制",
+      "tools": {
+        "time": "时间",
+        "settingsList": "显示设置",
+        "settingsSet": "更改设置"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "此模型支持思考强度"
@@ -4517,6 +4527,7 @@
     "instructionSaveFailed": "无法保存指令",
     "instructionDeleteFailed": "无法删除指令",
     "instructionToggleFailed": "无法更新指令",
+    "instructionViewTitle": "指令文件",
     "instructionLimitReached": "一个配置最多可包含 {{max}} 条指令。请删除一条以添加新的。",
     "mcp": {
       "title": "MCP 服务器",
@@ -4691,6 +4702,7 @@
       "emptyDescription": "积分购买、收据和使用情况将显示在这里。",
       "emptyTitle": "暂无积分记录",
       "expiredGrant": "已过期：{{description}}",
+      "expiredStatus": "已过期",
       "googlePlayReceipt": "收据位于 Google Play",
       "kind": {
         "adjustment": "调整",
@@ -4717,7 +4729,8 @@
       "receiptA11y": "打开 {{description}}，{{amount}}，{{date}} 的收据",
       "receiptUnavailable": "此购买暂无可用收据。",
       "retentionLimit": "仅显示最近的积分记录。",
-      "voidedGrant": "已作废：{{description}}"
+      "voidedGrant": "已作废：{{description}}",
+      "voidedStatus": "已作废"
     },
     "title": "购买额度",
     "description": "额度是一次性购买，会添加到你的 Kilo 余额中，用于在 Kilo App 中运行 AI 编程会话。商店会向你的账户收费，商店确认付款后额度才会到账。",

@@ -91,6 +91,7 @@
     "draft": "Qabyo",
     "enabled": "La shiday",
     "github": "GitHub",
+    "image": "Sawir",
     "imageUnavailable": "Sawirka lama heli karo.",
     "loading": "Soo raraya…",
     "loadMore": "Soo rar kuwo kale",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Sawirka waa la soo shubayaa",
       "imageUnavailableRetry": "Sawirka lama heli karo, mar kale isku day inaad soo shubto",
+      "imageUnavailableRetryWithAlt": "Sawirka lama heli karo, {{alt}}, mar kale isku day inaad soo shubto",
       "imagePreviewUnavailableInSession": "Horudhaca sawirka lagama heli karo kalfadhigan.",
       "viewImage": "Eeg sawirka",
       "viewImageWithAlt": "Eeg sawirka {{alt}}",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "Si aad u dhammaystirto abuurista akoonkaaga, isticmaal '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Si aad u dhammaystirto abuurista akoonkaaga, isticmaal '$t(login.signInWithGoogle)'.",
     "signupStepUpBack": "Si aad u dhammaystirto abuurista akoonkaaga, dib u noqo oo isticmaal '$t(login.moreSignInOptions)'.",
-    "invalidCode": "Koodhkaasi waa qalad ama wakhtigiisii wuu dhacay. Mar kale isku day ama isticmaal '$t(login.resendCode)'.",
+    "invalidCode": "Koodhkaasi waa qalad ama wakhtigiisii wuu dhacay. Isticmaal '$t(login.resendCode)' ama '$t(login.moreSignInOptions)'.",
     "codeInProgress": "Koodhkaaga waa la habaynayaa. Wax yar sug oo mar kale isku day.",
     "tooManyAttempts": "Isku dayo aad u badan. Fadlan codso koodh cusub.",
     "invalidToken": "Soo geliddu way fashilantay. Fadlan mar kale isku day.",
@@ -4338,7 +4340,15 @@
       "download": "Soo deji moodeelka aaladda gudaheeda",
       "downloading": "Waa la soo dejinayaa…",
       "downloadProgress": "Waa la soo dejinayaa… {{percent}}%",
-      "downloadFailed": "Soo dejintu ma dhammaan. Hubi xiriirkaaga iyo meesha bannaan ee kaydka, kadibna isku day mar kale."
+      "downloadFailed": "Soo dejintu ma dhammaan. Hubi xiriirkaaga iyo meesha bannaan ee kaydka, kadibna isku day mar kale.",
+      "cannotUse": "Lama socodsan karo: {{items}}.",
+      "cannotUseOptions": "Lama buuxin karo: xulashooyin qalab oo qaar ah.",
+      "limitations": "Xaddidaadyo",
+      "tools": {
+        "time": "Waqti",
+        "settingsList": "Muuji dejinta",
+        "settingsSet": "Beddel dejinta"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Moodeelkani wuxuu taageeraa heerka fikirka"
@@ -4517,6 +4527,7 @@
     "instructionSaveFailed": "Lama kaydin karin tilmaanta",
     "instructionDeleteFailed": "Lama tirtiri karin tilmaanta",
     "instructionToggleFailed": "Lama cusboonaysiin karin tilmaanta",
+    "instructionViewTitle": "Faylka tilmaanta",
     "instructionLimitReached": "Borofilku wuxuu qaadi karaa ilaa {{max}} tilmaamood. Tirtir mid si aad u darto mid kale.",
     "mcp": {
       "title": "Adeegayaasha MCP",
@@ -4691,6 +4702,7 @@
       "emptyDescription": "Iibsiyada kiredit-ka, rasiidhada, iyo isticmaalka halkan ayay ka muuqan doonaan.",
       "emptyTitle": "Ma jirto taariikh kiredit",
       "expiredGrant": "Waqtigiisu dhacay: {{description}}",
+      "expiredStatus": "Waqtigiisu dhacay",
       "googlePlayReceipt": "Rasiid ka yimid Google Play",
       "kind": {
         "adjustment": "Hagaajin",
@@ -4717,7 +4729,8 @@
       "receiptA11y": "Fur rasiidka {{description}}, {{amount}}, {{date}}",
       "receiptUnavailable": "Iibsashadan rasiid looma hayo.",
       "retentionLimit": "Waxaa la muujinayaa taariikhda kireditka ugu dambeysa.",
-      "voidedGrant": "La buriyay: {{description}}"
+      "voidedGrant": "La buriyay: {{description}}",
+      "voidedStatus": "La buriyay"
     },
     "title": "Iibso lacag adeeg",
     "description": "Lacagta adeeg waa iib hal mar ah oo lagu daraa dheelitirkaaga Kilo si loogu shaqeeyo kalfadhiyada codeynta AI ee app-ka Kilo. Dukaanku wuxuu ka qaadaa akoonkaaga, lacagta adeegna waxaa lagu daraa ka dib marka dukaanku xaqiijiyo lacag bixinta.",

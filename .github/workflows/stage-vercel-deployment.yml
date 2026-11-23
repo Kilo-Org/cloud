@@ -111,7 +111,7 @@ jobs:
           fi
 
           deployment_url=$(printf '%s\n' "$deployment_output" | tail -n 1)
-          if [[ ! "$deployment_url" =~ ^https:// ]]; then
+          if [[ ! "$deployment_url" =~ ^https://[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?/?$ ]]; then
             echo "Vercel deploy did not print a deployment URL" >&2
             exit 1
           fi

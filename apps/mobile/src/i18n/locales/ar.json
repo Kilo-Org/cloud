@@ -95,6 +95,7 @@
     "draft": "مسودة",
     "enabled": "مفعّل",
     "github": "GitHub",
+    "image": "صورة",
     "imageUnavailable": "الصورة غير متاحة.",
     "loading": "جارٍ التحميل…",
     "loadMore": "تحميل المزيد",
@@ -2206,6 +2207,7 @@
     "filePart": {
       "loadingImage": "جارٍ تحميل الصورة",
       "imageUnavailableRetry": "الصورة غير متاحة، أعد محاولة التحميل",
+      "imageUnavailableRetryWithAlt": "الصورة غير متاحة، {{alt}}، أعد محاولة التحميل",
       "imagePreviewUnavailableInSession": "معاينة الصورة غير متاحة في هذه الجلسة.",
       "viewImage": "عرض الصورة",
       "viewImageWithAlt": "عرض الصورة: {{alt}}",
@@ -4170,7 +4172,7 @@
     "signupStepUpApple": "لإكمال إنشاء حسابك، استخدم \"$t(login.signInWithApple)\".",
     "signupStepUpGoogle": "لإكمال إنشاء حسابك، استخدم \"$t(login.signInWithGoogle)\".",
     "signupStepUpBack": "لإكمال إنشاء حسابك، ارجع ثم استخدم \"$t(login.moreSignInOptions)\".",
-    "invalidCode": "هذا الرمز غير صحيح أو منتهي الصلاحية. حاول مرة أخرى أو استخدم \"$t(login.resendCode)\".",
+    "invalidCode": "هذا الرمز غير صحيح أو منتهي الصلاحية. استخدم \"$t(login.resendCode)\" أو \"$t(login.moreSignInOptions)\".",
     "codeInProgress": "جارٍ معالجة رمزك. انتظر قليلًا وحاول مرة أخرى.",
     "tooManyAttempts": "تجاوزت الحد المسموح للمحاولات. اطلب رمزًا جديدًا.",
     "invalidToken": "فشل تسجيل الدخول. حاول مرة أخرى.",
@@ -4654,7 +4656,15 @@
       "download": "تنزيل النموذج على الجهاز",
       "downloading": "جارٍ التنزيل…",
       "downloadProgress": "جارٍ التنزيل… {{percent}}%",
-      "downloadFailed": "لم يكتمل التنزيل. تحقّق من اتصالك ومن توفر مساحة تخزين كافية، ثم حاول مرة أخرى."
+      "downloadFailed": "لم يكتمل التنزيل. تحقّق من اتصالك ومن توفر مساحة تخزين كافية، ثم حاول مرة أخرى.",
+      "cannotUse": "لا يمكن التشغيل: {{items}}.",
+      "cannotUseOptions": "لا يمكن تعبئة: بعض خيارات الأدوات.",
+      "limitations": "القيود",
+      "tools": {
+        "time": "الوقت",
+        "settingsList": "عرض الإعدادات",
+        "settingsSet": "تغيير الإعدادات"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "يدعم هذا النموذج جهد التفكير"
@@ -4853,6 +4863,7 @@
     "instructionSaveFailed": "تعذّر حفظ التعليمات",
     "instructionDeleteFailed": "تعذّر حذف التعليمات",
     "instructionToggleFailed": "تعذّر تحديث التعليمات",
+    "instructionViewTitle": "ملف التعليمات",
     "instructionLimitReached": "يمكن أن يحتوي الملف الشخصي على {{max}} تعليمات كحد أقصى. احذف واحدة لإضافة أخرى.",
     "mcp": {
       "title": "خوادم MCP",
@@ -5031,6 +5042,7 @@
       "emptyDescription": "ستظهر هنا مشتريات الرصيد والإيصالات والاستخدام.",
       "emptyTitle": "لا يوجد سجل للرصيد",
       "expiredGrant": "منتهي الصلاحية: {{description}}",
+      "expiredStatus": "منتهي الصلاحية",
       "googlePlayReceipt": "الإيصال من Google Play",
       "kind": {
         "adjustment": "تعديل",
@@ -5057,7 +5069,8 @@
       "receiptA11y": "فتح إيصال {{description}}، {{amount}}، من {{date}}",
       "receiptUnavailable": "لا يتوفر إيصال لعملية الشراء هذه.",
       "retentionLimit": "يتم عرض أحدث حركات سجل الرصيد.",
-      "voidedGrant": "ملغى: {{description}}"
+      "voidedGrant": "ملغى: {{description}}",
+      "voidedStatus": "ملغى"
     },
     "title": "شراء الرصيد",
     "description": "الرصيد عملية شراء لمرة واحدة تُضاف إلى رصيدك في Kilo لتشغيل جلسات البرمجة بالذكاء الاصطناعي في تطبيق Kilo. يتقاضى المتجر المبلغ من حسابك وتُضاف الأرصدة بعد تأكيد المتجر للدفع.",

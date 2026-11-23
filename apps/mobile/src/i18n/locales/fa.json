@@ -91,6 +91,7 @@
     "draft": "پیش‌نویس",
     "enabled": "فعال",
     "github": "GitHub",
+    "image": "تصویر",
     "imageUnavailable": "تصویر در دسترس نیست.",
     "loading": "در حال بارگذاری…",
     "loadMore": "بارگذاری بیشتر",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "در حال بارگذاری تصویر",
       "imageUnavailableRetry": "تصویر در دسترس نیست؛ تلاش دوباره برای بارگذاری",
+      "imageUnavailableRetryWithAlt": "تصویر در دسترس نیست؛ {{alt}}؛ تلاش دوباره برای بارگذاری",
       "imagePreviewUnavailableInSession": "پیش‌نمایش تصویر در این نشست در دسترس نیست.",
       "viewImage": "مشاهده تصویر",
       "viewImageWithAlt": "مشاهده تصویر {{alt}}",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "برای تکمیل ساخت حساب خود، از «$t(login.signInWithApple)» استفاده کنید.",
     "signupStepUpGoogle": "برای تکمیل ساخت حساب خود، از «$t(login.signInWithGoogle)» استفاده کنید.",
     "signupStepUpBack": "برای تکمیل ساخت حساب خود، به صفحهٔ قبل برگردید و از «$t(login.moreSignInOptions)» استفاده کنید.",
-    "invalidCode": "کد واردشده نادرست است یا منقضی شده است. لطفاً دوباره تلاش کنید یا از «$t(login.resendCode)» استفاده کنید.",
+    "invalidCode": "کد واردشده نادرست است یا منقضی شده است. از «$t(login.resendCode)» یا «$t(login.moreSignInOptions)» استفاده کنید.",
     "codeInProgress": "کد شما در حال پردازش است. کمی صبر کنید و دوباره تلاش کنید.",
     "tooManyAttempts": "تعداد تلاش‌ها بیش از حد مجاز است. لطفاً کد جدیدی درخواست کنید.",
     "invalidToken": "ورود ناموفق بود. لطفاً دوباره تلاش کنید.",
@@ -4338,7 +4340,15 @@
       "download": "بارگیری مدل روی دستگاه",
       "downloading": "در حال بارگیری…",
       "downloadProgress": "در حال بارگیری… {{percent}}%",
-      "downloadFailed": "بارگیری کامل نشد. اتصال اینترنت و فضای خالی دستگاه را بررسی کنید و دوباره امتحان کنید."
+      "downloadFailed": "بارگیری کامل نشد. اتصال اینترنت و فضای خالی دستگاه را بررسی کنید و دوباره امتحان کنید.",
+      "cannotUse": "اجرا نمی‌شود: {{items}}.",
+      "cannotUseOptions": "پر نمی‌شود: برخی گزینه‌های ابزار.",
+      "limitations": "محدودیت‌ها",
+      "tools": {
+        "time": "زمان",
+        "settingsList": "نمایش تنظیمات",
+        "settingsSet": "تغییر تنظیمات"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "این مدل از میزان تفکر پشتیبانی می‌کند"
@@ -4517,6 +4527,7 @@
     "instructionSaveFailed": "دستورالعمل ذخیره نشد",
     "instructionDeleteFailed": "دستورالعمل حذف نشد",
     "instructionToggleFailed": "دستورالعمل به‌روزرسانی نشد",
+    "instructionViewTitle": "فایل دستورالعمل",
     "instructionLimitReached": "هر پروفایل حداکثر {{max}} دستورالعمل می‌تواند داشته باشد. برای افزودن یکی دیگر، یکی را حذف کنید.",
     "mcp": {
       "title": "سرورهای MCP",
@@ -4691,6 +4702,7 @@
       "emptyDescription": "خریدهای اعتبار، رسیدها و مصرف در اینجا نمایش داده می‌شوند.",
       "emptyTitle": "تاریخچهٔ اعتباری وجود ندارد",
       "expiredGrant": "منقضی شد: {{description}}",
+      "expiredStatus": "منقضی شد",
       "googlePlayReceipt": "رسید از Google Play",
       "kind": {
         "adjustment": "اصلاحیه",
@@ -4717,7 +4729,8 @@
       "receiptA11y": "باز کردن رسید {{description}}، {{amount}}، از {{date}}",
       "receiptUnavailable": "رسیدی برای این خرید موجود نیست.",
       "retentionLimit": "جدیدترین تاریخچهٔ اعتباری نمایش داده می‌شود.",
-      "voidedGrant": "باطل شد: {{description}}"
+      "voidedGrant": "باطل شد: {{description}}",
+      "voidedStatus": "باطل شد"
     },
     "title": "خرید اعتبار",
     "description": "اعتبار یک خرید یکباره است که برای اجرای جلسات کدنویسی هوش مصنوعی در Kilo App به موجودی Kilo شما اضافه می‌شود. فروشگاه مبلغ را از حساب شما دریافت می‌کند و اعتبار پس از تأیید پرداخت توسط فروشگاه اضافه می‌شود.",

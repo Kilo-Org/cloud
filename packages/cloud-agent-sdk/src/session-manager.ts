@@ -840,7 +840,10 @@ const DEFAULT_SPAWNED_RETRY_DELAY_MS = 1_000;
 const DEFAULT_SPAWNED_MAX_ATTEMPTS = 10;
 
 const GENERIC_ERROR = 'Something went wrong. Please retry in a moment.';
-/** Terminal message for a child session whose first page is a worker 404 (not-found). */
+/**
+ * Terminal not-available text for a session the backend answered 404, used by
+ * the child hydration path and by a denied root open.
+ */
 const CHILD_SESSION_NOT_FOUND_MESSAGE = 'This session is no longer available.';
 const SELECTED_MODEL_UNAVAILABLE_MESSAGE =
   'selected model is not available for this cloud agent session';
@@ -1331,10 +1334,6 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   const suggestionAtom = atom<SuggestionState | null>(null);
   const activeSuggestionAtom = atom<StandaloneSuggestion | null>(null);
   const pendingMessagesAtom = atom<ReadonlyMap<string, MessageDeliveryState>>(new Map());
-  // Client-side request-pending marker for optimistic rows whose transport send
-  // has not settled. Distinct from `pendingMessagesAtom`, which is server
-  // delivery state: this set is empty on a fresh load and never outlives the
-  // request, so it cannot present a restored or queued row as still sending.
   const sendingMessageIdsAtom = atom<ReadonlySet<string>>(new Set<string>());
   const failedPromptAtom = atom<string | null>(null);
   const billingFailureAtom = atom<CustomerBillingFailure | null>(null);
@@ -1742,8 +1741,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   // In-flight older-page load, used to dedupe concurrent calls and to let
   // late callers await the same result.
   let olderMessagesInFlight: Promise<void> | null = null;
-  // Once a non-retryable terminal failure lands, we permanently disable
-  // further older-page loads for the active session.
+  // Once a non-retryable terminal failure lands, further older-page loads for
+  // the active session stop until a trim rewind or a state clear resets this
+  // latch.
   let olderMessagesTerminal: boolean = false;
   /**
    * Stack of loaded older pages, newest first. Each entry records the cursor
@@ -2595,13 +2595,15 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     });
   }
 
-  // Replay a `SessionSnapshotPageOutcome` into the active storage. Returns the
-  // ids of the rows the replay stored, or `null` when the page was not applied
-  // (a stale caller, a non-success outcome, or a page that does not belong to
-  // this session), so the caller can also persist the cursor and atom updates
-  // and name the stored rows. Generation-aware: a stale caller's result is
-  // discarded silently. Used by both `switchSession` (initial page) and
-  // `loadOlderMessages` (subsequent pages).
+  // Replay a `SessionSnapshotPageOutcome` into the active storage. Writes the
+  // older-messages cursor, the `hasOlderMessagesAtom` / omitted-count atoms and
+  // clears `olderMessagesErrorAtom` itself. Returns the ids of the rows the
+  // replay stored, or `null` when the page was not applied (a stale caller, a
+  // non-success outcome, or a page that does not belong to this session). The
+  // caller uses the returned ids for its own bookkeeping: the retained-history
+  // stack, and an applied check for the initial page. Generation-aware: a stale
+  // caller's result is discarded silently. Used by both `switchSession` (initial
+  // page) and `loadOlderMessages` (subsequent pages).
   //
   // `initialPage` marks a replay of the first page. The cached first-page
   // replay and the live `onInitialPageLoaded` page are both the first page, so
@@ -2660,8 +2662,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   }
 
   async function loadOlderMessages(): Promise<void> {
-    // Terminal failures block any further backend hits until the next
-    // switchSession (which resets `olderMessagesTerminal`).
+    // Terminal failures block any further backend hits until a trim rewind or a
+    // state clear resets `olderMessagesTerminal`.
     if (olderMessagesTerminal) return;
     // `/clear` keeps the local view empty for this visit — do not page history back in.
     if (store.get(transcriptClearedAtom)) return;
@@ -3190,9 +3192,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     if (!data) return;
     store.set(fetchedSessionDataAtom, data);
 
-    // Populate session metadata and swap in the new storage eagerly.
-    // The storage starts empty; snapshot replay (inside session.connect)
-    // will populate it and the UI updates reactively.
+    // Populate session metadata eagerly. `startCleanSessionOpen` already created
+    // or reused this open's storage, and a cached page can land in it through
+    // `applyPage` before the live snapshot replay populates it further.
     store.set(sessionConfigAtom, sessionConfigFromFetchedSession(kiloSessionId, data));
     store.set(sessionIdAtom, data.cloudAgentSessionId);
 
@@ -3324,8 +3326,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     preserveTranscript: boolean,
     resolvedFailures: Set<string>
   ): SessionOpen {
-    // Clean slate immediately — the user asked to switch, so clear all
-    // previous session state and show a loading indicator.
+    // Clear session state immediately and show a loading indicator. A real
+    // switch clears everything; a retry reopen keeps the transcript and the
+    // composer settings through `preserveTranscript`.
     clearAllAtoms(preserveTranscript);
     remoteOptimisticIds.clear();
     // A prompt this session failed to deliver is this session's draft: restore
@@ -3503,10 +3506,6 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       }
       const surfaceFailure = () => {
         if (open.expectedGeneration !== switchGeneration) return;
-        // A never-answering transport (client deadline, no server response)
-        // is a stalled open, not a failed one: with nothing cached to paint,
-        // keep the skeleton up so the slow-load state offers its message +
-        // Retry at the threshold instead of a premature error screen.
         if (store.get(messagesListAtom).length === 0 && config.isStalledTransportError?.(err)) {
           return;
         }

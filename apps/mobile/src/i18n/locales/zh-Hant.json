@@ -91,6 +91,7 @@
     "draft": "草稿",
     "enabled": "已啟用",
     "github": "GitHub",
+    "image": "圖片",
     "imageUnavailable": "無法顯示圖片。",
     "loading": "載入中…",
     "loadMore": "載入更多",
@@ -2098,6 +2099,7 @@
     "filePart": {
       "loadingImage": "載入圖片中",
       "imageUnavailableRetry": "無法顯示圖片，重新載入",
+      "imageUnavailableRetryWithAlt": "無法顯示圖片，{{alt}}，重新載入",
       "imagePreviewUnavailableInSession": "此工作階段中無法預覽圖片。",
       "viewImage": "檢視圖片",
       "viewImageWithAlt": "檢視圖片：{{alt}}",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "如要完成帳戶建立，請選擇「$t(login.signInWithApple)」。",
     "signupStepUpGoogle": "如要完成帳戶建立，請選擇「$t(login.signInWithGoogle)」。",
     "signupStepUpBack": "如要完成帳戶建立，請返回上一步並選擇「$t(login.moreSignInOptions)」。",
-    "invalidCode": "該驗證碼不正確或已過期。請再試一次，或使用「$t(login.resendCode)」。",
+    "invalidCode": "該驗證碼不正確或已過期。使用「$t(login.resendCode)」或「$t(login.moreSignInOptions)」。",
     "codeInProgress": "正在處理你的驗證碼。請稍候再試一次。",
     "tooManyAttempts": "嘗試次數過多。請重新索取驗證碼。",
     "invalidToken": "登入失敗。請再試一次。",
@@ -4338,7 +4340,15 @@
       "download": "下載裝置端模型",
       "downloading": "下載中…",
       "downloadProgress": "下載中… {{percent}}%",
-      "downloadFailed": "下載未完成。請檢查網路連線和可用儲存空間，然後再試一次。"
+      "downloadFailed": "下載未完成。請檢查網路連線和可用儲存空間，然後再試一次。",
+      "cannotUse": "無法執行：{{items}}。",
+      "cannotUseOptions": "無法填寫：部分工具選項。",
+      "limitations": "限制",
+      "tools": {
+        "time": "時間",
+        "settingsList": "顯示設定",
+        "settingsSet": "變更設定"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "此模型支援思考程度"
@@ -4517,6 +4527,7 @@
     "instructionSaveFailed": "無法儲存指示",
     "instructionDeleteFailed": "無法刪除指示",
     "instructionToggleFailed": "無法更新指示",
+    "instructionViewTitle": "指示檔案",
     "instructionLimitReached": "每個設定檔最多可有 {{max}} 個指示。請刪除一個以新增其他指示。",
     "mcp": {
       "title": "MCP伺服器",
@@ -4691,6 +4702,7 @@
       "emptyDescription": "點數購買、收據與使用情況會顯示在這裡。",
       "emptyTitle": "尚無點數紀錄",
       "expiredGrant": "已過期：{{description}}",
+      "expiredStatus": "已過期",
       "googlePlayReceipt": "Google Play 收據",
       "kind": {
         "adjustment": "調整",
@@ -4717,7 +4729,8 @@
       "receiptA11y": "開啟「{{description}}」，{{amount}}，{{date}} 的收據",
       "receiptUnavailable": "此筆購買沒有可用的收據。",
       "retentionLimit": "顯示最近的點數紀錄。",
-      "voidedGrant": "已作廢：{{description}}"
+      "voidedGrant": "已作廢：{{description}}",
+      "voidedStatus": "已作廢"
     },
     "title": "購買點數",
     "description": "點數是一次性購買，會加入你的 Kilo 餘額，用於在 Kilo App 中執行 AI 程式設計工作階段。商店會向你的帳戶收費，商店確認付款後點數才會入帳。",

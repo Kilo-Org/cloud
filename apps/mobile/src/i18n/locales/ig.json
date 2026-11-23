@@ -91,6 +91,7 @@
     "draft": "Ihe odide mbido",
     "enabled": "Agbanyere",
     "github": "GitHub",
+    "image": "Onyonyo",
     "imageUnavailable": "Onyonyo adịghị",
     "loading": "Na-ebudata…",
     "loadMore": "Budata ọzọ",
@@ -2660,6 +2661,7 @@
     "filePart": {
       "loadingImage": "Na-ebudata onyonyo",
       "imageUnavailableRetry": "Onyonyo adịghị, nwaa ibudata ọzọ",
+      "imageUnavailableRetryWithAlt": "Onyonyo adịghị, {{alt}}, nwaa ibudata ọzọ",
       "imagePreviewUnavailableInSession": "Nlele onyonyo adịghị na nnọkọ a.",
       "viewImage": "Lee onyonyo",
       "viewImageWithAlt": "Lee onyonyo {{alt}}",
@@ -3890,7 +3892,7 @@
     "signupStepUpApple": "Iji mechaa imepụta akaụntụ gị, jiri '$t(login.signInWithApple)'.",
     "signupStepUpGoogle": "Iji mechaa imepụta akaụntụ gị, jiri '$t(login.signInWithGoogle)'.",
     "signupStepUpBack": "Iji mechaa imepụta akaụntụ gị, laghachi azụ ma jiri '$t(login.moreSignInOptions)'.",
-    "invalidCode": "Koodu ahụ ezighi ezi ma ọ bụ na oge ya agafeela. Biko nwaa ọzọ ma ọ bụ jiri '$t(login.resendCode)'.",
+    "invalidCode": "Koodu ahụ ezighi ezi ma ọ bụ na oge ya agafeela. Jiri '$t(login.resendCode)' ma ọ bụ jiri '$t(login.moreSignInOptions)'.",
     "codeInProgress": "A na-ahazi koodu gị. Chere nwa oge wee nwaa ọzọ.",
     "tooManyAttempts": "Mgbalị karịrị akarị. Biko rịọ koodu ọhụrụ.",
     "invalidToken": "Nbanye emezughị. Biko nwaa ọzọ.",
@@ -4338,7 +4340,15 @@
       "download": "Budata ihe nlereanya na ngwaọrụ",
       "downloading": "Na-ebudata…",
       "downloadProgress": "Na-ebudata… {{percent}}%",
-      "downloadFailed": "Nbudata ahụ emezughị. Lelee njikọ gị na ebe nchekwa tọgbọrọ chakoo, wee nwaa ọzọ."
+      "downloadFailed": "Nbudata ahụ emezughị. Lelee njikọ gị na ebe nchekwa tọgbọrọ chakoo, wee nwaa ọzọ.",
+      "cannotUse": "Enweghị ike ịrụ ọrụ: {{items}}.",
+      "cannotUseOptions": "Enweghị ike ịdejupụta: ụfọdụ nhọrọ ngwá ọrụ.",
+      "limitations": "Oke",
+      "tools": {
+        "time": "Oge",
+        "settingsList": "Gosi ntọala",
+        "settingsSet": "Gbanwee ntọala"
+      }
     },
     "reasoningEffort": {
       "modelFlag": "Ihe nlereanya a na-akwado mgbalị iche echiche"
@@ -4517,6 +4527,7 @@
     "instructionSaveFailed": "Enweghị ike ichekwa ntụziaka",
     "instructionDeleteFailed": "Enweghị ike ihichapụ ntụziaka",
     "instructionToggleFailed": "Enweghị ike imelite ntụziaka",
+    "instructionViewTitle": "Faịlụ ntụziaka",
     "instructionLimitReached": "Profaịlụ nwere ike ịnwe ihe ruru ntụziaka {{max}}. Hichapụ otu ka ịtinye ọzọ.",
     "mcp": {
       "title": "Ihe nkesa MCP",
@@ -4691,6 +4702,7 @@
       "emptyDescription": "Ịzụ kredit, rịsịt, na ojiji ga-apụta ebe a.",
       "emptyTitle": "Enweghị akụkọ kredit",
       "expiredGrant": "Oge agwụla: {{description}}",
+      "expiredStatus": "Oge agwụla",
       "googlePlayReceipt": "Rịsịt sitere na Google Play",
       "kind": {
         "adjustment": "Mmezi",
@@ -4717,7 +4729,8 @@
       "receiptA11y": "Mepee rịsịt maka {{description}}, {{amount}}, site na {{date}}",
       "receiptUnavailable": "Enweghị rịsịt maka ihe a zụrụ a.",
       "retentionLimit": "Na-egosi akụkọ kredit kachasị ọhụrụ.",
-      "voidedGrant": "E kagbuola: {{description}}"
+      "voidedGrant": "E kagbuola: {{description}}",
+      "voidedStatus": "E kagbuola"
     },
     "title": "Zụta ego ojiji",
     "description": "Ego ojiji bụ azụmahịa otu oge nke a na-agbakwunye na nguzozi Kilo gị maka ịgba nnọkọ ịde koodu AI na Kilo App. Ụlọ ahịa na-akwụ ụgwọ na akaụntụ gị, a na-agbakwunye ego ojiji mgbe ụlọ ahịa kwadoro ịkwụ ụgwọ ahụ.",

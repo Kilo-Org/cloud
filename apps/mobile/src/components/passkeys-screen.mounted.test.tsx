@@ -333,4 +333,18 @@ describe('PasskeysScreen', () => {
     expect(hasButtonLabel(view, 'Retry')).toBe(false);
     view.unmount();
   });
+
+  it('settles the passkey read offline instead of pausing it', async () => {
+    // This harness runs the real query client, so the options the screen passed
+    // are read back from the entry the read created.
+    const view = await mount();
+    await waitFor(() => texts(view).includes('MacBook'));
+
+    const entry = view.queryClient.getQueryCache().find({ queryKey: list.key, exact: true });
+    expect(entry?.options.networkMode).toBe('always');
+    // `refetchOnReconnect` is an observer option the query's defaulted options
+    // carry; the query's own `options` type does not declare it.
+    expect(entry?.options).toMatchObject({ refetchOnReconnect: true });
+    view.unmount();
+  });
 });

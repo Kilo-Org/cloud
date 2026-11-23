@@ -37,7 +37,11 @@ type ScreenState = {
   role: string | undefined;
   mutateAsync: Mock;
   dismissTo: Mock;
+  lastQueryOptions: ReadOptions | null;
 };
+
+/** The options object the screen hands `useQuery`, as this suite sees it. */
+type ReadOptions = { networkMode?: string; refetchOnReconnect?: boolean };
 
 const ORG_ID = '6f1c2f9a-0d3b-4a55-9c1e-2b8f7c4d5e60';
 const KEY_ID = '2b8f7c4d-5e60-4a55-9c1e-6f1c2f9a0d3b';
@@ -49,6 +53,7 @@ const state = vi.hoisted((): ScreenState => ({
   role: 'owner',
   mutateAsync: vi.fn(),
   dismissTo: vi.fn(),
+  lastQueryOptions: null,
 }));
 
 vi.mock('react-native', () => ({ View: 'View' }));
@@ -62,13 +67,16 @@ vi.mock('@tanstack/react-query', async importOriginal => {
   const actual = await importOriginal<typeof ReactQuery>();
   return {
     ...actual,
-    useQuery: () => ({
-      data: state.providers,
-      isPending: false,
-      isError: state.error,
-      isFetching: false,
-      refetch: vi.fn(),
-    }),
+    useQuery: (options: ReadOptions) => {
+      state.lastQueryOptions = options;
+      return {
+        data: state.providers,
+        isPending: false,
+        isError: state.error,
+        isFetching: false,
+        refetch: vi.fn(),
+      };
+    },
     useMutation: (options: MutationOptions) => ({
       mutateAsync: (input: unknown) => state.mutateAsync(options.kind, input),
       isPending: false,
@@ -197,6 +205,7 @@ beforeEach(() => {
   state.mutateAsync.mockReset();
   state.mutateAsync.mockResolvedValue(undefined);
   state.dismissTo.mockClear();
+  state.lastQueryOptions = null;
 });
 
 afterEach(() => {
@@ -688,5 +697,14 @@ describe('ProviderKeyNewScreen', () => {
 
     expect(root.findAll(node => Object.is(node.type, 'InvalidRouteState'))).toHaveLength(1);
     expect(root.findAll(node => Object.is(node.type, BUTTON))).toHaveLength(0);
+  });
+
+  it('settles the provider read offline instead of pausing it', async () => {
+    await mount();
+
+    expect(state.lastQueryOptions).toMatchObject({
+      networkMode: 'always',
+      refetchOnReconnect: true,
+    });
   });
 });

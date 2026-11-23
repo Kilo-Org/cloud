@@ -42,7 +42,11 @@ const state = vi.hoisted(() => ({
     setQueryData: vi.fn(),
     getQueryData: vi.fn(),
   },
+  lastQueryOptions: null as ReadOptions | null,
 }));
+
+/** The options object the screen hands `useQuery`, as this suite sees it. */
+type ReadOptions = { networkMode?: string; refetchOnReconnect?: boolean };
 
 vi.mock('react-native', () => ({ View: 'View', useColorScheme: () => 'light' }));
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: state.push }) }));
@@ -52,14 +56,17 @@ vi.mock('@tanstack/react-query', async importOriginal => {
   const actual = await importOriginal<typeof ReactQuery>();
   return {
     ...actual,
-    useQuery: () => ({
-      data: state.keys,
-      isPending: false,
-      isError: state.error,
-      error: state.errorCause,
-      isFetching: false,
-      refetch: vi.fn(),
-    }),
+    useQuery: (options: ReadOptions) => {
+      state.lastQueryOptions = options;
+      return {
+        data: state.keys,
+        isPending: false,
+        isError: state.error,
+        error: state.errorCause,
+        isFetching: false,
+        refetch: vi.fn(),
+      };
+    },
     useMutation: (options: MutationOptions) => {
       state.mutations.push(options);
       return { mutate: state.mutate, isPending: false, variables: undefined };
@@ -223,6 +230,7 @@ beforeEach(() => {
   state.push.mockClear();
   vi.mocked(announcingToast.success).mockClear();
   vi.mocked(announcingToast.error).mockClear();
+  state.lastQueryOptions = null;
 });
 
 afterEach(() => {
@@ -480,5 +488,14 @@ describe('ProviderKeysScreen', () => {
     }
     expect(queryError.props.variant).toBe('permission');
     expect(queryError.props.onRetry).toBeUndefined();
+  });
+
+  it('settles the key list offline instead of pausing it', async () => {
+    await mount();
+
+    expect(state.lastQueryOptions).toMatchObject({
+      networkMode: 'always',
+      refetchOnReconnect: true,
+    });
   });
 });

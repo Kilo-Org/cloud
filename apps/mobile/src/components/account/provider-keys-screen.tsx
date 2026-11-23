@@ -31,6 +31,7 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
+import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { isRetryableTrpcError, trpcErrorVariant } from '@/lib/trpc-error';
 import { useTRPC } from '@/lib/trpc';
 
@@ -73,7 +74,11 @@ export function ProviderKeysScreen({ organizationId }: Readonly<{ organizationId
   const scopeInput = providerKeyScopeInput(scope);
   const listKey = trpc.byok.list.queryKey(scopeInput);
 
-  const keys = useQuery(trpc.byok.list.queryOptions(scopeInput));
+  // A paused read leaves the key skeleton up with no request and no retry.
+  const keys = useQuery({
+    ...trpc.byok.list.queryOptions(scopeInput),
+    ...SETTLE_WHILE_OFFLINE,
+  });
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: listKey });
   };

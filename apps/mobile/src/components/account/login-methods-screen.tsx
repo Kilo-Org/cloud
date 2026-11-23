@@ -25,6 +25,7 @@ import { openAppShellHandoff } from '@/lib/app-shell-handoff';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
+import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { useTRPC } from '@/lib/trpc';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 
@@ -137,7 +138,11 @@ export function LoginMethodsScreen() {
   const [refusal, setRefusal] = useState<UnlinkRefusal | null>(null);
   useRouteForegroundRefresh([[['user']]]);
 
-  const providers = useQuery(trpc.user.getAuthProviders.queryOptions());
+  // A paused read leaves the method skeleton up with no request and no retry.
+  const providers = useQuery({
+    ...trpc.user.getAuthProviders.queryOptions(),
+    ...SETTLE_WHILE_OFFLINE,
+  });
   const methodCount = providers.data?.providers.length ?? 0;
   const statusMessage = refusalStatus(refusal, methodCount, t);
   const unlink = useMutation(

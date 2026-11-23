@@ -26,6 +26,7 @@ import { getDataExportFailureMessage, shareDataExport } from '@/lib/data-export-
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
+import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { useTRPC } from '@/lib/trpc';
 
 const SKELETON_ROWS = [0, 1];
@@ -83,10 +84,16 @@ export function DataExportScreen() {
   const [requestCodeError, setRequestCodeError] = useState<string | null>(null);
   const listKey = trpc.userExports.list.queryKey();
 
-  const access = useQuery(trpc.userExports.uiAccess.queryOptions());
+  // The list's gate comes from the access read, so a paused access read would
+  // hold the list off with no answer and no exit: both settle.
+  const access = useQuery({
+    ...trpc.userExports.uiAccess.queryOptions(),
+    ...SETTLE_WHILE_OFFLINE,
+  });
   const exportsQuery = useQuery({
     ...trpc.userExports.list.queryOptions(),
     enabled: access.data?.enabled === true,
+    ...SETTLE_WHILE_OFFLINE,
   });
   const invalidate = () => void queryClient.invalidateQueries({ queryKey: listKey });
 

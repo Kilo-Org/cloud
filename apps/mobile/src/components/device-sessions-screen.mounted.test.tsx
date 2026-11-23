@@ -17,6 +17,10 @@ const query = vi.hoisted(() => ({
   isFetching: false,
   refetch: vi.fn(),
 }));
+const reads = vi.hoisted(() => ({ options: null as ReadOptions | null }));
+
+/** The options object the screen hands `useQuery`, as this suite sees it. */
+type ReadOptions = { networkMode?: string; refetchOnReconnect?: boolean };
 const hosts = vi.hoisted(() => ({ trustedHosts: [] as string[], hasLoaded: true }));
 const imageHosts = vi.hoisted(() => ({ trustedImageHosts: [] as string[], hasLoaded: true }));
 const router = vi.hoisted(() => ({ back: vi.fn(), dismissTo: vi.fn() }));
@@ -25,7 +29,10 @@ const confirmations = vi.hoisted(() => ({
 }));
 vi.mock('@tanstack/react-query', async importOriginal => ({
   ...(await importOriginal<typeof ReactQuery>()),
-  useQuery: () => query,
+  useQuery: (options: ReadOptions) => {
+    reads.options = options;
+    return query;
+  },
   useMutation: () => ({ isPending: false, mutate: vi.fn() }),
 }));
 vi.mock('expo-router', () => ({ useRouter: () => router }));
@@ -159,6 +166,7 @@ beforeEach(() => {
   imageHosts.hasLoaded = true;
   imageHosts.trustedImageHosts = [];
   confirmations.requests = [];
+  reads.options = null;
 });
 
 describe('account surface states', () => {
@@ -426,5 +434,15 @@ describe('device session sign-out controls', () => {
       empty.renderer.root.findAll(node => String(node.type) === 'RefreshProgress')
     ).toHaveLength(0);
     empty.unmount();
+  });
+});
+
+describe('device sessions read policy', () => {
+  it('settles the read offline instead of pausing it', async () => {
+    // A paused read leaves the session skeleton up with no request and no retry.
+    const { unmount } = await renderWithProviders(createElement(DeviceSessionsScreen));
+
+    expect(reads.options).toMatchObject({ networkMode: 'always', refetchOnReconnect: true });
+    unmount();
   });
 });

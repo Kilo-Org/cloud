@@ -24,6 +24,7 @@ import { addFailureNoticeKey } from '@/lib/passkeys/add-failure-notice';
 import { type PasskeyRow } from '@/lib/passkeys/passkey-types';
 import { usePasskeyManagement } from '@/lib/passkeys/use-passkey-management';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
+import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { useTRPC } from '@/lib/trpc';
 
 /** Rows the skeleton reserves so loading→content does not resize the list. */
@@ -88,9 +89,11 @@ export function PasskeysScreen() {
   const { token } = useAuth();
   const { userId, email } = useCurrentUserId();
 
+  // A paused read leaves the passkey skeleton up with no request and no retry.
   const { data, isPending, isError, isFetching, refetch } = useQuery({
     ...trpc.user.getPasskeys.queryOptions(),
     enabled: token != null,
+    ...SETTLE_WHILE_OFFLINE,
   });
   const passkeys = data?.passkeys ?? [];
 

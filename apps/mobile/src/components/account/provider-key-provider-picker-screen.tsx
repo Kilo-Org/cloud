@@ -25,6 +25,7 @@ import {
 } from '@/lib/byok/provider-key-scope';
 import { providerKeyName } from '@/lib/byok/provider-key-name';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
+import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { useSideInsetStyle } from '@/lib/screen-insets';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
@@ -85,7 +86,11 @@ export function ProviderKeyProviderPickerScreen({
   const listRef = useRef<FlashListRef<ProviderOption>>(null);
   const [query, setQuery] = useState('');
   const scope = providerKeyScope(organizationId);
-  const providers = useQuery(trpc.byok.listProviders.queryOptions(providerKeyScopeInput(scope)));
+  // A paused read would leave the picker empty with no request and no retry.
+  const providers = useQuery({
+    ...trpc.byok.listProviders.queryOptions(providerKeyScopeInput(scope)),
+    ...SETTLE_WHILE_OFFLINE,
+  });
 
   const filtered = useMemo(() => {
     const rows = providers.data ?? [];

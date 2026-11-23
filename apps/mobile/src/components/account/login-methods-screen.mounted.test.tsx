@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one suite covers the linked-method list, the last-method rule and the unlink flow over one tRPC mock. */
 import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { type QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -23,7 +24,11 @@ const state = vi.hoisted(() => ({
   mutate: vi.fn(),
   openAppShellHandoff: vi.fn(),
   invalidateQueries: vi.fn(),
+  lastQueryOptions: null as ReadOptions | null,
 }));
+
+/** The options object the screen hands `useQuery`, as this suite sees it. */
+type ReadOptions = { networkMode?: string; refetchOnReconnect?: boolean };
 
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
@@ -38,13 +43,16 @@ vi.mock('@tanstack/react-query', async importOriginal => {
   const actual = await importOriginal<typeof ReactQuery>();
   return {
     ...actual,
-    useQuery: () => ({
-      data: { providers: state.providers },
-      isPending: false,
-      isError: state.error,
-      isFetching: false,
-      refetch: vi.fn(),
-    }),
+    useQuery: (options: ReadOptions) => {
+      state.lastQueryOptions = options;
+      return {
+        data: { providers: state.providers },
+        isPending: false,
+        isError: state.error,
+        isFetching: false,
+        refetch: vi.fn(),
+      };
+    },
     useMutation: (options: MutationOptions) => {
       state.mutations.push(options);
       return { mutate: state.mutate, isPending: false };
@@ -160,6 +168,7 @@ beforeEach(() => {
   state.confirm.mockClear();
   state.openAppShellHandoff.mockClear();
   state.invalidateQueries.mockClear();
+  state.lastQueryOptions = null;
 });
 
 afterEach(() => {
@@ -352,5 +361,14 @@ describe('LoginMethodsScreen', () => {
     const root = await mount();
 
     expect(root.findAll(node => Object.is(node.type, 'QueryError'))).toHaveLength(1);
+  });
+
+  it('settles the methods read offline instead of pausing it', async () => {
+    await mount();
+
+    expect(state.lastQueryOptions).toMatchObject({
+      networkMode: 'always',
+      refetchOnReconnect: true,
+    });
   });
 });

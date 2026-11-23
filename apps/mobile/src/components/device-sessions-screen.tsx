@@ -33,6 +33,7 @@ import { useManualRefresh } from '@/lib/hooks/use-manual-refresh';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
+import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { useTRPC } from '@/lib/trpc';
 import { parseTimestamp } from '@/lib/utils';
 
@@ -119,9 +120,11 @@ export function DeviceSessionsScreen() {
   const { t, i18n } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
 
+  // A paused read leaves the session skeleton up with no request and no retry.
   const { data, isPending, isError, isFetching, refetch } = useQuery({
     ...trpc.user.listDeviceSessions.queryOptions(),
     enabled: token != null,
+    ...SETTLE_WHILE_OFFLINE,
   });
 
   const state = classifyDeviceSessionsState({

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one suite covers the provider list, its search folding and the empty, error and choose flows over one mocked list. */
 import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -15,7 +16,11 @@ const state = vi.hoisted(() => ({
   error: false,
   push: vi.fn(),
   scrollToOffset: vi.fn(),
+  lastQueryOptions: null as ReadOptions | null,
 }));
+
+/** The options object the screen hands `useQuery`, as this suite sees it. */
+type ReadOptions = { networkMode?: string; refetchOnReconnect?: boolean };
 
 vi.mock('react-native', () => ({ View: 'View', Pressable: 'Pressable', TextInput: 'TextInput' }));
 vi.mock('@shopify/flash-list', async () => {
@@ -60,13 +65,16 @@ vi.mock('@tanstack/react-query', async importOriginal => {
   const actual = await importOriginal<typeof ReactQuery>();
   return {
     ...actual,
-    useQuery: () => ({
-      data: state.providers,
-      isPending: false,
-      isError: state.error,
-      isFetching: false,
-      refetch: vi.fn(),
-    }),
+    useQuery: (options: ReadOptions) => {
+      state.lastQueryOptions = options;
+      return {
+        data: state.providers,
+        isPending: false,
+        isError: state.error,
+        isFetching: false,
+        refetch: vi.fn(),
+      };
+    },
   };
 });
 vi.mock('@/lib/trpc', () => ({
@@ -160,6 +168,7 @@ beforeEach(() => {
   state.error = false;
   state.push.mockClear();
   state.scrollToOffset.mockClear();
+  state.lastQueryOptions = null;
 });
 
 afterEach(() => {
@@ -361,5 +370,14 @@ describe('ProviderKeyProviderPickerScreen', () => {
     const root = await mount();
 
     expect(root.findAll(node => Object.is(node.type, 'QueryError'))).toHaveLength(1);
+  });
+
+  it('settles the provider read offline instead of pausing it', async () => {
+    await mount();
+
+    expect(state.lastQueryOptions).toMatchObject({
+      networkMode: 'always',
+      refetchOnReconnect: true,
+    });
   });
 });

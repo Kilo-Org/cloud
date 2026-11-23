@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the one form carries the provider gate, both credential shapes, the organization boundary and the save failures */
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -43,6 +44,7 @@ import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { normalizeOrgQueryParam } from '@/lib/org-deep-link';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
+import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { useTRPC } from '@/lib/trpc';
 
 type ProviderOption = inferRouterOutputs<MobileRouter>['byok']['listProviders'][number];
@@ -85,7 +87,12 @@ export function ProviderKeyNewScreen() {
     scope.kind === 'organization' ? scope.organizationId : undefined
   );
   const permissions = providerKeyPermissions(scope, role);
-  const providers = useQuery(trpc.byok.listProviders.queryOptions(scopeInput));
+  // A paused read would leave the provider gate unanswered, so the form never
+  // offers a credential field and never shows why.
+  const providers = useQuery({
+    ...trpc.byok.listProviders.queryOptions(scopeInput),
+    ...SETTLE_WHILE_OFFLINE,
+  });
   // The credential is plaintext until it is stored: drop every copy on unmount.
   useEffect(
     () => () => {

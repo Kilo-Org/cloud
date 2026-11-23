@@ -26,7 +26,12 @@ type ScreenState = {
   calls: { name: string; input: unknown }[];
   pending: string;
   toastError: Mock;
+  accessOptions: ReadOptions | null;
+  listOptions: ReadOptions | null;
 };
+
+/** The options object the screen hands `useQuery`, as this suite sees it. */
+type ReadOptions = { kind: string; networkMode?: string; refetchOnReconnect?: boolean };
 
 const state = vi.hoisted((): ScreenState => ({
   access: { enabled: true },
@@ -38,6 +43,8 @@ const state = vi.hoisted((): ScreenState => ({
   calls: [],
   pending: '',
   toastError: vi.fn(),
+  accessOptions: null,
+  listOptions: null,
 }));
 
 /** Records the callbacks one mutation is created with, and names its mutate call. */
@@ -61,8 +68,9 @@ vi.mock('@tanstack/react-query', async importOriginal => {
   const actual = await importOriginal<typeof ReactQuery>();
   return {
     ...actual,
-    useQuery: (options: { kind: string }) => {
+    useQuery: (options: ReadOptions) => {
       if (options.kind === 'access') {
+        state.accessOptions = options;
         return {
           data: state.access,
           isPending: state.accessPending,
@@ -71,6 +79,7 @@ vi.mock('@tanstack/react-query', async importOriginal => {
           refetch: vi.fn(),
         };
       }
+      state.listOptions = options;
       return {
         data: { exports: state.exports },
         isPending: false,
@@ -186,6 +195,8 @@ beforeEach(() => {
   state.calls = [];
   state.pending = '';
   state.toastError.mockClear();
+  state.accessOptions = null;
+  state.listOptions = null;
 });
 
 afterEach(() => {
@@ -315,5 +326,14 @@ describe('DataExportScreen', () => {
     const root = await mount();
 
     expect(root.findAll(node => Object.is(node.type, 'QueryError'))).toHaveLength(1);
+  });
+
+  it('settles both reads offline instead of pausing them', async () => {
+    // The list is gated on the access read, so a paused access read would hold
+    // the list off for as long as the device reports itself offline.
+    await mount();
+
+    expect(state.accessOptions).toMatchObject({ networkMode: 'always', refetchOnReconnect: true });
+    expect(state.listOptions).toMatchObject({ networkMode: 'always', refetchOnReconnect: true });
   });
 });

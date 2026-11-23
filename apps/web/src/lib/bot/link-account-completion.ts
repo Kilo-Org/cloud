@@ -1,5 +1,11 @@
 import 'server-only';
-import { Message, ThreadImpl, type Message as ChatMessage, type Thread } from 'chat';
+import {
+  Message,
+  ThreadImpl,
+  type Message as ChatMessage,
+  type StateAdapter,
+  type Thread,
+} from 'chat';
 import { captureException } from '@sentry/nextjs';
 import type { User } from '@kilocode/db';
 import {
@@ -7,7 +13,7 @@ import {
   isLinkAccountContextConsumed,
   linkKiloUser,
   loadLinkAccountContext,
-  resolveKiloUserId,
+  releaseLinkAccountContextConsumption,
   type LinkAccountContext,
   type PlatformIdentity,
 } from '@/lib/bot-identity';
@@ -18,13 +24,6 @@ import { bot } from '@/lib/bot';
 
 export type CompleteLinkAccountOutcome =
   | { status: 'linked'; context: LinkAccountContext }
-  /**
-   * The identity mapping is this Kilo account's, but another submission of the
-   * same pending link holds the single-use claim and owns replaying the stored
-   * message. This outcome carries no context: the claim winner is the only
-   * caller that may replay it.
-   */
-  | { status: 'linked_elsewhere' }
   | { status: 'used' }
   | { status: 'conflict' }
   | { status: 'context_missing' };
@@ -35,27 +34,23 @@ export type CompleteLinkAccountOutcome =
  * message back to the agent.
  *
  * Order matters:
- *  1. load the pending context, so an expired link writes nothing;
+ *  1. read the pending context, so an expired link writes nothing;
  *  2. refuse a link that is already spent, without writing anything;
- *  3. claim the mapping compare-and-set, so an identity already held by a
- *     different Kilo account is refused while the pending link is still
- *     unspent, and so a transient state-store failure leaves the link usable;
- *  4. consume the pending link, so it completes at most once even under
- *     concurrent submissions.
+ *  3. take the single-use claim, which one submission of a pending link holds
+ *     and which therefore decides the single writer and the single replayer of
+ *     the stored message;
+ *  4. write the mapping compare-and-set, giving the claim back when the write is
+ *     refused or fails.
  *
- * The mapping write is committed before step 4, and it is idempotent per Kilo
- * account, so the link belongs to this account from that point on. Whoever
- * takes the single-use claim in step 4 — this submission or a concurrent one —
- * owns replaying the stored message; the others report `linked_elsewhere`
- * without a context, so exactly one caller hands the message back. A claim
- * write that fails without taking the marker leaves this submission the owner,
- * so it returns `linked` with its context and the message is still replayed.
- *
- * A `conflict` therefore leaves the pending link unspent until its TTL. That is
- * safe: the link is bound to the submitting Kilo account and to the chat
- * identity the sign-in proves, a retry for the same pair is refused again, and
- * the mapping compare-and-set never reassigns an identity, so the link cannot
+ * A held identity is refused without touching the mapping, and a pending link
+ * is given back whenever nothing was written, so it stays completable until its
+ * TTL. The mapping compare-and-set never reassigns an identity, so a link cannot
  * take over an account it does not belong to.
+ *
+ * A completion interrupted between the claim and the mapping write leaves the
+ * pending link spent with no mapping, so the user starts a new link from the
+ * chat. That trade keeps one message from being replayed twice: two runs and
+ * two replies cost more than asking for a new link.
  *
  * Callers must complete the platform's identity proof before calling this; the
  * `identity` argument is what the proof returned, not what a URL claimed.
@@ -79,30 +74,43 @@ export async function completeLinkAccount({
     return { status: 'used' };
   }
 
-  if ((await linkKiloUser(state, identity, user.id)) === 'conflict') {
-    return { status: 'conflict' };
+  // The claim decides who may write the mapping and replay the message, so it
+  // is taken first: one submission of a pending link owns both, and every other
+  // submission reports the link as used because it wrote nothing.
+  if (!(await consumeLinkAccountContext(state, contextKey))) {
+    return { status: 'used' };
   }
 
-  let claimed = false;
   try {
-    claimed = await consumeLinkAccountContext(state, contextKey);
+    if ((await linkKiloUser(state, identity, user.id)) === 'conflict') {
+      // The mapping was refused, so the pending link is given back and stays
+      // usable until its TTL.
+      await releaseClaim(state, contextKey);
+      return { status: 'conflict' };
+    }
   } catch (error) {
-    // The claim write did not land, so this submission is the only one that can
-    // own the replay: a later submission sees the marker only if the write did
-    // apply, and then reports the link as used without replaying.
-    captureException(error, { tags: { component: 'kilo-bot', op: 'link-account-claim' } });
-    return { status: 'linked', context };
+    // The mapping was not written, so the pending link is given back and the
+    // failure reaches the caller's own error page.
+    await releaseClaim(state, contextKey);
+    throw error;
   }
 
-  if (claimed) {
-    return { status: 'linked', context };
-  }
+  return { status: 'linked', context };
+}
 
-  // A concurrent submission of the same pending link holds the claim and owns
-  // the replay.
-  return (await resolveKiloUserId(state, identity)) === user.id
-    ? { status: 'linked_elsewhere' }
-    : { status: 'used' };
+/**
+ * Give a claim back after a mapping write that wrote nothing. The pending link
+ * then stays completable until its TTL; a release that fails is recorded and
+ * leaves the link reported as used.
+ */
+async function releaseClaim(state: StateAdapter, contextKey: string): Promise<void> {
+  try {
+    await releaseLinkAccountContextConsumption(state, contextKey);
+  } catch (error) {
+    captureException(error, {
+      tags: { component: 'kilo-bot', op: 'link-account-claim-release' },
+    });
+  }
 }
 
 /**

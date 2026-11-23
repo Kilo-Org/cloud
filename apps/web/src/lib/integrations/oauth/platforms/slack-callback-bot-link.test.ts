@@ -310,20 +310,15 @@ describe('handleSlackOAuthCallback Slack bot-link', () => {
     await expect(mappedKiloUser()).resolves.toBeNull();
   });
 
-  it('reports the account as linked when a concurrent submission holds the claim', async () => {
+  it('reports a link held by another submission as already used, without a replay', async () => {
     const contextKey = await seedPendingLink();
     await state.set(`identity:slack:${SLACK_TEAM_ID}:${SLACK_USER_ID}`, KILO_USER_ID);
-
-    const setIfNotExists = state.setIfNotExists;
-    state.setIfNotExists = async (key, value, ttl) => {
-      if (key.endsWith(':consumed')) return false;
-      return await setIfNotExists(key, value, ttl);
-    };
+    await state.set(`${contextKey}:consumed`, true);
 
     const response = await callCallback({ state: botLinkState(contextKey) });
 
-    expect(response.status).toBe(200);
-    await expect(response.text()).resolves.toContain('Account linked');
+    expect(response.status).toBe(400);
+    await expect(response.text()).resolves.toContain('Link Already Used');
     expect(mockAfter).not.toHaveBeenCalled();
     await expect(mappedKiloUser()).resolves.toBe(KILO_USER_ID);
   });

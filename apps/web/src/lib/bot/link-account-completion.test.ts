@@ -190,53 +190,51 @@ test('a link completes once and reports the stored context', async () => {
   await expect(resolveKiloUserId(state as never, identity)).resolves.toBe(KILO_USER_ID);
 });
 
-test('a lost claim reports the link as this account without a second replay', async () => {
-  await linkKiloUser(state as never, identity, KILO_USER_ID);
+test('a conflict gives the claim back', async () => {
+  await linkKiloUser(state as never, identity, OTHER_KILO_USER_ID);
   const contextKey = await seedPendingLink();
 
-  // A concurrent submission takes the single-use claim after this call passed
-  // the spent-link pre-check.
-  const setIfNotExists = state.setIfNotExists;
-  state.setIfNotExists = async (key, value, ttl) => {
-    if (key.endsWith(':consumed')) return false;
-    return await setIfNotExists(key, value, ttl);
-  };
+  await expect(complete(contextKey)).resolves.toEqual({ status: 'conflict' });
+  expect(state.values.has(`${contextKey}:consumed`)).toBe(false);
 
-  await expect(complete(contextKey)).resolves.toEqual({ status: 'linked_elsewhere' });
-  await expect(resolveKiloUserId(state as never, identity)).resolves.toBe(KILO_USER_ID);
+  await state.delete('identity:slack:T1:U1');
+  await expect(complete(contextKey)).resolves.toEqual({
+    status: 'linked',
+    context: { thread, message },
+  });
 });
 
-test('a failing claim still hands back the message to replay', async () => {
+test('a claim write that throws leaves the pending link completable', async () => {
   const contextKey = await seedPendingLink();
-
   const setIfNotExists = state.setIfNotExists;
+  let claimAttempts = 0;
   state.setIfNotExists = async (key, value, ttl) => {
-    if (key.endsWith(':consumed')) throw new Error('claim unavailable');
+    if (key.endsWith(':consumed')) {
+      claimAttempts += 1;
+      if (claimAttempts === 1) throw new Error('claim store unavailable');
+    }
     return await setIfNotExists(key, value, ttl);
   };
+
+  await expect(complete(contextKey)).rejects.toThrow('claim store unavailable');
+  expect(state.values.has(`${contextKey}:consumed`)).toBe(false);
+  await expect(resolveKiloUserId(state as never, identity)).resolves.toBeNull();
 
   await expect(complete(contextKey)).resolves.toEqual({
     status: 'linked',
     context: { thread, message },
   });
   await expect(resolveKiloUserId(state as never, identity)).resolves.toBe(KILO_USER_ID);
-  expect(state.values.has(`${contextKey}:consumed`)).toBe(false);
 });
 
-test('only the claim winner gets a context to replay', async () => {
+test('one submission owns the write and the replay', async () => {
   const contextKey = await seedPendingLink();
 
   const first = await complete(contextKey);
   expect(first).toEqual({ status: 'linked', context: { thread, message } });
 
-  // A concurrent submission read the spent-link pre-check before the first
-  // call took the claim, then lost the claim itself.
-  const get = state.get;
-  state.get = async key => (key.endsWith(':consumed') ? null : await get(key));
-
   const second = await complete(contextKey);
-  expect(second).toEqual({ status: 'linked_elsewhere' });
+  expect(second).toEqual({ status: 'used' });
   expect(second).not.toHaveProperty('context');
-  expect([first, second].filter(outcome => 'context' in outcome)).toHaveLength(1);
   await expect(resolveKiloUserId(state as never, identity)).resolves.toBe(KILO_USER_ID);
 });

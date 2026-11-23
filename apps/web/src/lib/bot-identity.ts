@@ -244,6 +244,17 @@ export async function consumeLinkAccountContext(
 }
 
 /**
+ * Give back a single-use claim taken by `consumeLinkAccountContext`, so a
+ * pending link whose write wrote nothing stays completable until its TTL.
+ */
+export async function releaseLinkAccountContextConsumption(
+  state: StateAdapter,
+  contextKey: string
+): Promise<void> {
+  await state.delete(`${contextKey}:consumed`);
+}
+
+/**
  * Report whether a pending link was already completed, without taking the
  * single-use claim. A caller uses this to refuse a spent link before it writes
  * anything, and only then takes the claim itself.

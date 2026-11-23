@@ -66,7 +66,7 @@ import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';
  *  3. the identity Slack reports must equal the identity the pending link
  *     names;
  *  4. the integration must still resolve and the user must still have access;
- *  5. only then is the single-use context consumed and the mapping written,
+ *  5. only then is the single-use claim taken and the mapping written,
  *     compare-and-set, so an existing mapping is never reassigned.
  */
 async function handleSlackBotLinkCallback({
@@ -199,12 +199,7 @@ async function handleSlackBotLinkCallback({
     );
   }
 
-  // `linked_elsewhere` means the mapping is this account's but another
-  // submission of the same link holds the single-use claim and owns the replay,
-  // so only a `linked` outcome replays the stored message.
-  if (outcome.status === 'linked') {
-    after(() => reprocessLinkedContext(provenIdentity, outcome.context, user));
-  }
+  after(() => reprocessLinkedContext(provenIdentity, outcome.context, user));
 
   return page(
     'Account linked',

@@ -22,6 +22,7 @@ const boundaryState = vi.hoisted(() => ({
   isResolving: false,
   isError: false,
   isFetching: false,
+  selectionSettled: true,
   orgs: [{ organizationId: 'org-1', role: 'owner' }] as
     | { organizationId: string; role: string }[]
     | undefined,
@@ -52,6 +53,9 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
     boundaryArgs.value.push(organizationId);
     return boundaryState;
   },
+}));
+vi.mock('@/lib/organization-context', () => ({
+  useOrganization: () => ({ isLoaded: boundaryState.selectionSettled }),
 }));
 vi.mock('react-native', () => ({ View: 'View', ScrollView: 'ScrollView' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
@@ -140,6 +144,7 @@ describe('NewProfileScreen caller request', () => {
     boundaryState.isResolving = false;
     boundaryState.isError = false;
     boundaryState.isFetching = false;
+    boundaryState.selectionSettled = true;
     boundaryState.orgs = [{ organizationId: 'org-1', role: 'owner' }];
     boundaryRefetch.mockReset();
   });

@@ -26,6 +26,7 @@ import { validateProfileDescription } from '@/lib/agent-profile-forms';
 import { useAgentProfileMutations } from '@/lib/hooks/use-agent-profiles';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { useProfileNameField } from '@/lib/hooks/use-profile-name-field';
+import { useOrganization } from '@/lib/organization-context';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 import {
@@ -103,6 +104,9 @@ export function NewProfileScreen({
     orgs,
     refetch,
   } = useOrgBoundary(organizationId);
+  // The stored selection publishes an organization only once it settles, so a
+  // Personal id before that is the absence of an answer rather than one.
+  const { isLoaded: selectionSettled } = useOrganization();
   // No organization context on the hook: the owner choice below decides which
   // `organizationId` each create carries, so a personal create is never
   // rewritten to the selected organization.
@@ -117,10 +121,13 @@ export function NewProfileScreen({
     owner: ProfileOwnerChoice;
   } | null>(null);
   // The membership answer decides the owner only for a create that can carry an
-  // organization: an active organization boundary, or a caller-requested
-  // organization owner waiting for an organization the boundary resolves to.
+  // organization: an active organization boundary, a caller-requested
+  // organization owner waiting for an organization the boundary resolves to, or
+  // a selection that has not settled and so may still name one.
   const roleDecidesOwner =
-    hasOrganizationContext(boundaryOrganizationId) || initialOwner === 'organization';
+    !selectionSettled ||
+    hasOrganizationContext(boundaryOrganizationId) ||
+    initialOwner === 'organization';
   // The owner follows the resolved role, so Create waits while that role is
   // unknown for a create the role decides. A failed background refetch keeps its
   // list, so only a missing list is unknown.

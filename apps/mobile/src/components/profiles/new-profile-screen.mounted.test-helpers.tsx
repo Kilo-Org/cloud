@@ -21,6 +21,7 @@ const boundaryState = vi.hoisted(() => {
     isResolving: boolean;
     isError: boolean;
     isFetching: boolean;
+    selectionSettled: boolean;
     orgs: BoundaryOrgRow[] | undefined;
     refetch: typeof boundaryRefetch;
   } = {
@@ -30,6 +31,7 @@ const boundaryState = vi.hoisted(() => {
     isResolving: false,
     isError: false,
     isFetching: false,
+    selectionSettled: true,
     orgs: [{ organizationId: 'org-1', role: 'owner' }],
     refetch: boundaryRefetch,
   };
@@ -61,6 +63,13 @@ vi.mock('@/lib/navigation/stack-safe-replace', () => ({
 
 vi.mock('@/lib/hooks/use-organization-queries', () => ({
   useOrgBoundary: () => boundaryState,
+}));
+
+// The stored selection settles through the provider; here its published
+// `isLoaded` stands in, so a test can mount the screen before the selection
+// names anything.
+vi.mock('@/lib/organization-context', () => ({
+  useOrganization: () => ({ isLoaded: boundaryState.selectionSettled }),
 }));
 
 vi.mock('@/lib/profile-agent-navigation', () => ({
@@ -180,6 +189,7 @@ export function resetNewProfileState(): void {
   boundaryState.isResolving = false;
   boundaryState.isError = false;
   boundaryState.isFetching = false;
+  boundaryState.selectionSettled = true;
   boundaryState.orgs = [{ organizationId: 'org-1', role: 'owner' }];
   mutationState.create.isPending = false;
 }

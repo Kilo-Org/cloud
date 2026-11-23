@@ -2999,6 +2999,12 @@ describe('GitHub installation persistence', () => {
       .set({ dispatch_reservation_id: crypto.randomUUID() })
       .where(eq(cloud_agent_code_reviews.id, reviewId));
 
+    // A leftover from an aborted earlier run must not reach this test.
+    await db.execute(sql`
+      DROP TRIGGER IF EXISTS fail_github_uninstall_once ON public.github_app_installations;
+      DROP FUNCTION IF EXISTS public.fail_github_uninstall_once();
+      DROP SEQUENCE IF EXISTS public.github_uninstall_fail_once;
+    `);
     // A sequence survives a transaction rollback, so exactly one canonical
     // write fails.
     await db.execute(sql`CREATE SEQUENCE public.github_uninstall_fail_once`);
@@ -3041,6 +3047,15 @@ describe('GitHub installation persistence', () => {
         )
       ).rows;
       expect(Number(fires?.last_value)).toBe(3);
+
+      const completionLogs = mockLogExceptInTest.mock.calls.filter(
+        ([message]) => message === '[uninstallExclusiveGitHubInstallation] completing local cleanup'
+      );
+      expect(completionLogs).toHaveLength(1);
+      // The injected trigger raises a plain exception, so no SQLSTATE is
+      // available; the field must still be present so the log shape stays
+      // uniform.
+      expect(completionLogs[0]?.[1]).toMatchObject({ integrationId: connected.integrationId });
 
       const [integrationRow] = await db
         .select({ id: platform_integrations.id })
@@ -3121,6 +3136,10 @@ describe('GitHub installation persistence', () => {
       .set({ dispatch_reservation_id: reservationId })
       .where(eq(cloud_agent_code_reviews.id, reviewId));
 
+    await db.execute(sql`
+      DROP TRIGGER IF EXISTS fail_github_uninstall_always ON public.github_app_installations;
+      DROP FUNCTION IF EXISTS public.fail_github_uninstall_always();
+    `);
     await db.execute(sql`
       CREATE FUNCTION public.fail_github_uninstall_always() RETURNS trigger
       LANGUAGE plpgsql AS $$

@@ -825,6 +825,13 @@ export async function uninstallExclusiveGitHubInstallation(input: {
     });
   } catch (error) {
     if (deletedUpstream === null) throw error;
+    // The local completion is a repair path, so record why it ran: this line is
+    // the only trace that the first transaction rolled back after the provider
+    // call returned.
+    logExceptInTest('[uninstallExclusiveGitHubInstallation] completing local cleanup', {
+      integrationId: input.integrationId,
+      sqlState: getPostgresErrorCode(error),
+    });
     cancelledReviews = await completeUninstallWithRetry({
       owner: input.owner,
       integrationId: input.integrationId,

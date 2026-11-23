@@ -1030,6 +1030,7 @@
       "deletePendingTitle": "წაიშალოს გასაგზავნი კომენტარი?",
       "deletePendingMessage": "ეს კომენტარი განხილვის რიგიდან წაიშლება.",
       "summaryOptional": "შეჯამება (არასავალდებულო)",
+      "footerHint": "გაგზავნისას დაემატება წარწერა „შემოწმებულია Kilo-ს მეშვეობით“.",
       "pendingComment_one": "გასაგზავნი კომენტარი",
       "pendingComment": "გაუგზავნელი კომენტარი",
       "pendingComment_other": "გაუგზავნელი კომენტარი",

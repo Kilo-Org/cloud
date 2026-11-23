@@ -1030,6 +1030,7 @@
       "deletePendingTitle": "प्रलंबित टिप्पणी हटवायची?",
       "deletePendingMessage": "ही टिप्पणी पुनरावलोकनाच्या रांगेतून काढली जाईल.",
       "summaryOptional": "सारांश (ऐच्छिक)",
+      "footerHint": "तुम्ही सादर करता तेव्हा Kilo द्वारे पुनरावलोकन केले असा उल्लेख जोडला जातो.",
       "pendingComment_one": "प्रलंबित टिप्पणी",
       "pendingComment": "प्रलंबित टिप्पण्या",
       "pendingComment_other": "प्रलंबित टिप्पण्या",

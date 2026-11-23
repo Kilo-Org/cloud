@@ -3325,6 +3325,7 @@
       "pendingComment_other": "nog niet verzonden opmerkingen",
       "pendingComment_one": "nog niet verzonden opmerking",
       "summaryOptional": "Samenvatting (optioneel)",
+      "footerHint": "Beoordeeld via Kilo wordt toegevoegd wanneer je de beoordeling indient.",
       "partialPostedFresh": "Geplaatste opmerkingen: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "Geplaatste opmerkingen: {{displayFreshCount}}. ",
       "partialPostedFresh_other": "Geplaatste opmerkingen: {{displayFreshCount}}. ",

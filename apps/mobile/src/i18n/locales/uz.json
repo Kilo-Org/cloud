@@ -1030,6 +1030,7 @@
       "deletePendingTitle": "Navbatdagi izoh o'chirilsinmi?",
       "deletePendingMessage": "Bu izoh ko'rib chiqish navbatidan o'chiriladi.",
       "summaryOptional": "Xulosa (ixtiyoriy)",
+      "footerHint": "Yuborganingizda oxiriga Kilo orqali tekshirilganini bildiruvchi yozuv qo'shiladi.",
       "pendingComment_one": "navbatdagi izoh",
       "pendingComment": "yuborilmagan izoh",
       "pendingComment_other": "yuborilmagan izoh",

@@ -1014,6 +1014,7 @@
       "deletePendingTitle": "Padam komen yang belum dihantar?",
       "deletePendingMessage": "Komen ini akan dialih keluar daripada senarai menunggu semakan.",
       "summaryOptional": "Ringkasan (pilihan)",
+      "footerHint": "Pengaki Disemak melalui Kilo ditambahkan apabila anda menghantar semakan.",
       "pendingComment": "komen belum dihantar",
       "pendingComment_other": "komen belum dihantar",
       "submitCountOfTotal": "Hantar {{displayFreshCount}} daripada {{displayTotalCount}} komen",

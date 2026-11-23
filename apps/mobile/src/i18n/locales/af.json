@@ -1030,6 +1030,7 @@
       "deletePendingTitle": "Skrap hangende kommentaar?",
       "deletePendingMessage": "Hierdie kommentaar sal uit die hersieningswaglys verwyder word.",
       "summaryOptional": "Opsomming (opsioneel)",
+      "footerHint": "Hersien via Kilo word bygevoeg wanneer jy indien.",
       "pendingComment_one": "hangende kommentaar",
       "pendingComment": "hangende kommentare",
       "pendingComment_other": "hangende kommentare",

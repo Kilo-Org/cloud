@@ -1030,6 +1030,7 @@
       "deletePendingTitle": "Bidaltzeko dagoen iruzkina ezabatu?",
       "deletePendingMessage": "Iruzkin hau berrikuspen-ilaratik kenduko da.",
       "summaryOptional": "Laburpena (aukerakoa)",
+      "footerHint": "Kilo-ren bidez berrikusia orri-oina automatikoki gehitzen da bidaltzen duzunean.",
       "pendingComment_one": "iruzkin bidaltzeko",
       "pendingComment": "iruzkin bidaltzeko zain",
       "pendingComment_other": "iruzkin bidaltzeko zain",

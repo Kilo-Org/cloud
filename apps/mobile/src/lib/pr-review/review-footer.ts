@@ -12,3 +12,11 @@ export function buildReviewFooter(os: 'ios' | 'android' | string): string {
   }
   return `\n\n---\nReviewed via the [Kilo Android app](${ANDROID_APP_URL})`;
 }
+
+// The footer is appended at submit, not seeded into the summary field: the
+// field starts empty, so a reader never edits around attribution they did not write.
+export function appendReviewFooter(summary: string, os: 'ios' | 'android' | string): string {
+  const typed = summary.trim();
+  const footer = buildReviewFooter(os).trim();
+  return typed.length > 0 ? `${typed}\n\n${footer}` : footer;
+}

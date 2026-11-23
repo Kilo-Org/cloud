@@ -1014,6 +1014,7 @@
       "deletePendingTitle": "Hichapụ okwu na-eche iziga?",
       "deletePendingMessage": "A ga-ewepụ okwu a na ndepụta okwu na-eche iziga na nyocha.",
       "summaryOptional": "Nchịkọta (ọ bụghị iwu)",
+      "footerHint": "A na-agbakwunye ahịrị E nyochara site na Kilo n'ala mgbe ị nyefere nyocha.",
       "pendingComment": "okwu a na-ezigabeghị",
       "pendingComment_other": "okwu a na-ezigabeghị",
       "submitCountOfTotal": "Ziga okwu {{displayFreshCount}} n'ime {{displayTotalCount}}",

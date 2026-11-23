@@ -2,7 +2,7 @@
 // location label, 2-line body excerpt, trash → confirm-delete, and a
 // pressable body that opens the comment composer in edit mode.
 
-import { type RefObject, useRef } from 'react';
+import { type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Trash2 } from '@/components/ui/icons';
 import { Pressable, TextInput, View } from 'react-native';
@@ -139,25 +139,18 @@ export function ReviewSummaryField({
   inputRef,
   isDisabled,
   onChange,
-  defaultValue = '',
 }: {
   bodyRef: RefObject<string>;
   inputRef: RefObject<TextInput | null>;
   isDisabled: boolean;
   onChange: () => void;
-  /** Initial summary content (e.g. the attribution footer). Empty by default. */
-  defaultValue?: string;
 }) {
   const colors = useThemeColors();
   const { t } = useTranslation();
   const keyboardVisible = useFormSheetKeyboardVisible();
-  // Place the caret at the start of a prefilled summary once, so the user
-  // begins editing at the top instead of after the footer.
-  const placedCaretRef = useRef(false);
   return (
     <TextInput
       ref={inputRef}
-      defaultValue={defaultValue}
       editable={!isDisabled}
       placeholder={t('prReview.pendingComment.summaryPlaceholder')}
       placeholderTextColor={colors.mutedForeground}
@@ -165,12 +158,6 @@ export function ReviewSummaryField({
       onChangeText={value => {
         bodyRef.current = value;
         onChange();
-      }}
-      onFocus={() => {
-        if (!placedCaretRef.current && defaultValue.length > 0) {
-          placedCaretRef.current = true;
-          inputRef.current?.setNativeProps({ selection: { start: 0, end: 0 } });
-        }
       }}
       multiline
       textAlignVertical="top"

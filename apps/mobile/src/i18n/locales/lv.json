@@ -1049,6 +1049,7 @@
       "deletePendingTitle": "Dzēst nepublicēto komentāru?",
       "deletePendingMessage": "Šis komentārs tiks noņemts no vērtējuma rindas.",
       "summaryOptional": "Kopsavilkums (neobligāts)",
+      "footerHint": "Norāde „Pārbaudīts, izmantojot Kilo” tiek pievienota, kad iesniedzat.",
       "pendingComment_one": "nepublicēts komentārs",
       "pendingComment": "neiesniegti komentāri",
       "pendingComment_other": "neiesniegti komentāri",

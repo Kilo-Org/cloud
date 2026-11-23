@@ -13,11 +13,11 @@ import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { PrReviewSubmit } from './pr-review-submit';
-import { buildReviewFooter } from '@/lib/pr-review/review-footer';
 
 type Event =
   | { kind: 'frame' }
-  | { kind: 'field'; defaultValue: string }
+  | { kind: 'field'; value: string }
+  | { kind: 'footer-hint' }
   | { kind: 'hint' }
   | { kind: 'block-reason'; message: string }
   | { kind: 'cta'; label: string };
@@ -135,8 +135,9 @@ vi.mock('@/components/pr-review/pr-review-pending-comment-row', () => ({
     return null;
   },
   PrReviewPendingCommentRow: 'PrReviewPendingCommentRow',
-  ReviewSummaryField: (props: { defaultValue?: string }): null => {
-    record.events.push({ kind: 'field', defaultValue: props.defaultValue ?? '' });
+  ReviewSummaryField: (props: { bodyRef: { current: string } }): null => {
+    // The real field paints no seeded content: what it shows is the body ref.
+    record.events.push({ kind: 'field', value: props.bodyRef.current });
     return null;
   },
 }));
@@ -161,7 +162,14 @@ vi.mock('@/components/pr-review/pr-form-sheet-chrome', () => ({
 vi.mock('@/components/pr-review/pr-review-reconnect-notice', () => ({
   PrReviewReconnectNotice: 'PrReviewReconnectNotice',
 }));
-vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/text', () => ({
+  Text: (props: { testID?: string }): null => {
+    if (props.testID === 'pr-review-submit-footer-hint') {
+      record.events.push({ kind: 'footer-hint' });
+    }
+    return null;
+  },
+}));
 vi.mock('@/components/ui/dialog', () => ({
   useConfirmDialog: () => ({ confirm: vi.fn(), dialog: null }),
 }));
@@ -196,6 +204,7 @@ vi.mock('react-native', () => ({
 
 type Frame = {
   field?: string;
+  footerHint?: boolean;
   hint?: boolean;
   blockReason?: string;
   ctas: string[];
@@ -212,7 +221,9 @@ function frames(): Frame[] {
         throw new Error(`body element rendered before its frame opened: ${event.kind}`);
       }
       if (event.kind === 'field') {
-        current.field = event.defaultValue;
+        current.field = event.value;
+      } else if (event.kind === 'footer-hint') {
+        current.footerHint = true;
       } else if (event.kind === 'hint') {
         current.hint = true;
       } else if (event.kind === 'block-reason') {
@@ -247,7 +258,16 @@ function mount(): TestRenderer.ReactTestRenderer {
   return renderer;
 }
 
-const FOOTER = buildReviewFooter('ios');
+const SETTLED_FRAME: Frame = {
+  // The summary starts empty; the attribution footer is appended at submit and
+  // the hint line under the field says so.
+  field: '',
+  footerHint: true,
+  // Nothing typed and nothing queued: a comment review paints the block
+  // reason, which the footer preference no longer hides.
+  blockReason: 'Add a summary or at least one comment to post a comment review.',
+  ctas: ['Submit review'],
+};
 
 beforeEach(() => {
   record.events = [];
@@ -299,10 +319,10 @@ describe('PrReviewSubmit first body frame', () => {
       pendingQueue.write({ hydrated: true });
     });
 
-    expect(frames()).toEqual([{ field: FOOTER, hint: true, ctas: ['Submit review'] }]);
+    expect(frames()).toEqual([SETTLED_FRAME]);
   });
 
-  it('never paints the block reason or a field-less body on the way to the settled frame', () => {
+  it('never paints a provisional frame on the way to the settled one', () => {
     mount();
 
     act(() => {
@@ -310,7 +330,10 @@ describe('PrReviewSubmit first body frame', () => {
       footerPreference.write({ hasLoaded: true });
     });
 
-    expect(frames()).toEqual([{ field: FOOTER, hint: true, ctas: ['Submit review'] }]);
-    expect(record.events.some(event => event.kind === 'block-reason')).toBe(false);
+    expect(frames()).toEqual([SETTLED_FRAME]);
+    // The block reason belongs to the settled frame only: no earlier body
+    // painted it (or the queue hint) before the footer preference landed.
+    expect(record.events.filter(event => event.kind === 'block-reason')).toHaveLength(1);
+    expect(record.events.some(event => event.kind === 'hint')).toBe(false);
   });
 });

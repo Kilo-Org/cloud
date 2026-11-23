@@ -1030,6 +1030,7 @@
       "deletePendingTitle": "Share tsokacin da ke jira?",
       "deletePendingMessage": "Za a cire wannan tsokaci daga jerin bita.",
       "summaryOptional": "Taƙaitawa (na zaɓi)",
+      "footerHint": "Ana ƙara \"An yi bita ta Kilo\" lokacin da ka aika.",
       "pendingComment_one": "tsokacin da ke jira",
       "pendingComment": "tsokace-tsokacen da ke jiran aikawa",
       "pendingComment_other": "tsokace-tsokacen da ke jiran aikawa",

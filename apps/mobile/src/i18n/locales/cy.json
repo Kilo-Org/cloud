@@ -1106,6 +1106,7 @@
       "deletePendingTitle": "Dileu'r sylw sydd heb ei gyflwyno?",
       "deletePendingMessage": "Bydd y sylw hwn yn cael ei dynnu o'r ciw adolygu.",
       "summaryOptional": "Crynodeb (dewisol)",
+      "footerHint": "Ychwanegir 'Adolygwyd drwy Kilo' pan fyddwch yn cyflwyno.",
       "pendingComment_one": "sylw heb ei gyflwyno",
       "pendingComment": "sylwadau heb eu cyflwyno",
       "pendingComment_other": "sylwadau heb eu cyflwyno",

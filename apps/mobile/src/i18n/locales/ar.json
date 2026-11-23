@@ -3553,6 +3553,7 @@
       "pendingComment_other": "تعليق معلّق",
       "pendingComment_one": "تعليق معلّق",
       "summaryOptional": "الملخص (اختياري)",
+      "footerHint": "تتم إضافة «تمت المراجعة عبر Kilo» عند الإرسال.",
       "partialPostedFresh": "عدد التعليقات المنشورة: {{displayFreshCount}}. ",
       "partialPostedFresh_zero": "عدد التعليقات المنشورة: {{displayFreshCount}}. ",
       "partialPostedFresh_one": "عدد التعليقات المنشورة: {{displayFreshCount}}. ",

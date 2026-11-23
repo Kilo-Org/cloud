@@ -1030,6 +1030,7 @@
       "deletePendingTitle": "Göndərilməmiş şərh silinsin?",
       "deletePendingMessage": "Bu şərh kod baxışı növbəsindən silinəcək.",
       "summaryOptional": "Xülasə (məcburi deyil)",
+      "footerHint": "Yoxlamanı göndərdiyiniz zaman «Kilo vasitəsilə yoxlanılıb» qeydi əlavə olunur.",
       "pendingComment_one": "göndərilməmiş şərh",
       "pendingComment": "göndərilməmiş şərh",
       "pendingComment_other": "göndərilməmiş şərh",

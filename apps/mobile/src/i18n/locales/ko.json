@@ -3270,6 +3270,7 @@
       "pendingComment": "제출 대기 중인 댓글",
       "pendingComment_other": "제출 대기 중인 댓글",
       "summaryOptional": "요약(선택 사항)",
+      "footerHint": "제출할 때 Kilo로 리뷰했다는 문구가 추가됩니다.",
       "partialPostedFresh": "댓글 {{displayFreshCount}}개를 게시했습니다. ",
       "partialPostedFresh_other": "댓글 {{displayFreshCount}}개를 게시했습니다. ",
       "partialPostedStale": "이전 커밋을 가리키는 댓글 {{displayStaleCount}}개는 대기열에 남았습니다.",

@@ -1030,6 +1030,7 @@
       "deletePendingTitle": "Илгээгээгүй сэтгэгдлийг устгах уу?",
       "deletePendingMessage": "Энэ сэтгэгдэл хяналтаар илгээх жагсаалтаас хасагдана.",
       "summaryOptional": "Хураангуй (заавал биш)",
+      "footerHint": "Илгээх үед «Kilo ашиглан хянасан» гэсэн тэмдэглэл нэмэгдэнэ.",
       "pendingComment_one": "илгээгээгүй сэтгэгдэл",
       "pendingComment": "илгээгээгүй сэтгэгдэл",
       "pendingComment_other": "илгээгээгүй сэтгэгдэл",

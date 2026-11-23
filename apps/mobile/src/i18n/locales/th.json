@@ -1013,6 +1013,7 @@
       "deletePendingTitle": "ลบความคิดเห็นที่รอส่งหรือไม่?",
       "deletePendingMessage": "ความคิดเห็นนี้จะถูกลบออกจากรายการที่รอส่งรีวิว",
       "summaryOptional": "สรุปรีวิว (ไม่บังคับ)",
+      "footerHint": "ข้อความท้ายการตรวจสอบว่าตรวจสอบผ่าน Kilo จะถูกเพิ่มเมื่อคุณส่งรีวิว",
       "pendingComment": "ความคิดเห็นที่รอส่ง",
       "pendingComment_other": "ความคิดเห็นที่รอส่ง",
       "submitCountOfTotal": "ส่งความคิดเห็น {{displayFreshCount}} จาก {{displayTotalCount}} รายการ",

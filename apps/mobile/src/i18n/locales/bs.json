@@ -1049,6 +1049,7 @@
       "deletePendingTitle": "Obrisati komentar na čekanju?",
       "deletePendingMessage": "Ovaj komentar će biti uklonjen iz pregleda koji čeka slanje.",
       "summaryOptional": "Sažetak (nije obavezno)",
+      "footerHint": "„Pregledano putem aplikacije Kilo“ dodaje se kada pošalješ pregled.",
       "pendingComment_one": "komentar na čekanju",
       "pendingComment": "komentara na čekanju",
       "pendingComment_other": "komentara na čekanju",

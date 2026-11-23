@@ -1030,6 +1030,7 @@
       "deletePendingTitle": "Të fshihet komenti në pritje?",
       "deletePendingMessage": "Ky koment do të hiqet nga radha e rishikimit.",
       "summaryOptional": "Përmbledhja (opsionale)",
+      "footerHint": "Shënimi «Rishikuar përmes Kilo» shtohet kur dërgon.",
       "pendingComment_one": "koment në pritje",
       "pendingComment": "komente në pritje",
       "pendingComment_other": "komente në pritje",

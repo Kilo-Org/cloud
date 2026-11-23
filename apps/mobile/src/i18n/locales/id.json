@@ -3274,6 +3274,7 @@
       "pendingComment": "komentar belum dikirim",
       "pendingComment_other": "komentar belum dikirim",
       "summaryOptional": "Ringkasan (opsional)",
+      "footerHint": "Keterangan Ditinjau melalui Kilo ditambahkan di bagian bawah saat kamu mengirim tinjauan.",
       "partialPostedFresh": "{{displayFreshCount}} komentar terkirim. ",
       "partialPostedFresh_other": "{{displayFreshCount}} komentar terkirim. ",
       "partialPostedStale": "{{displayStaleCount}} komentar merujuk ke commit lama dan tetap berada di antreanmu.",

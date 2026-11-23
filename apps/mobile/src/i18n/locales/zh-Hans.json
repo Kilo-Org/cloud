@@ -3270,6 +3270,7 @@
       "pendingComment": "条待提交评论",
       "pendingComment_other": "条待提交评论",
       "summaryOptional": "总结（可选）",
+      "footerHint": "提交时会在末尾添加“通过 Kilo 审查”。",
       "partialPostedFresh": "已发布 {{displayFreshCount}} 条评论。",
       "partialPostedFresh_other": "已发布 {{displayFreshCount}} 条评论。",
       "partialPostedStale": "另有 {{displayStaleCount}} 条评论针对旧提交，仍保留在你的队列中。",

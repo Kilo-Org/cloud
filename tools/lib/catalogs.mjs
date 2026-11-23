@@ -324,9 +324,18 @@ export function familiesOwedByEveryLocale(english) {
  * A complete family is absent from the Map, so an empty Map means the locale is
  * complete. Both audits ask this question, so the answer lives here and neither
  * audit carries the rule.
+ *
+ * `requiredCategories` is the category list the caller judges the catalog by.
+ * It defaults to the host's `Intl.PluralRules`, which is right for a catalog a
+ * Worker renders. A caller whose copy renders somewhere else — the mobile app
+ * bundles its own plural data — passes that runtime's list, so the categories
+ * it requires and the categories it forbids are the same set. Two rules reading
+ * two different plural sources can contradict each other: one demands a form
+ * the other rejects.
  */
-export function missingPluralCategories(english, locale, tag) {
-  const required = new Intl.PluralRules(tag).resolvedOptions().pluralCategories;
+export function missingPluralCategories(english, locale, tag, requiredCategories) {
+  const required =
+    requiredCategories ?? new Intl.PluralRules(tag).resolvedOptions().pluralCategories;
   const owed = familiesOwedByEveryLocale(english);
   const localeFamilies = pluralFamilyBases(locale);
   const missing = new Map();

@@ -407,7 +407,9 @@ function markdownProse(markdown: string): string {
   const prose: string[] = [];
   let state = startOfMessage();
   for (const line of markdown.split('\n')) {
-    const block = readBlockLine(state, line);
+    // The renderer the chat draws with keeps the line under a definition as
+    // that definition paragraph's text, so a definition is not a block end here.
+    const block = readBlockLine(state, line, { definitionEndsBlock: false });
     state = block.next;
     if (
       !block.inFence &&
@@ -1050,8 +1052,18 @@ function startOfMessage(): BlockState {
  * above it is code in both, and a fence closes on the same line in both.
  *
  * Nothing in `state` is modified: the walk hands `next` to the following line.
+ *
+ * `definitionEndsBlock` says whether a reference definition line counts as
+ * closing a block. The strip counts it, because a line under it is not a block
+ * start it may cut. The prose scan does not: the renderer the chat draws with
+ * keeps a definition's indented continuation as that definition paragraph's own
+ * text, so those letters are copy the message shows and they name its direction.
  */
-function readBlockLine(state: BlockState, line: string): BlockLine {
+function readBlockLine(
+  state: BlockState,
+  line: string,
+  options: { definitionEndsBlock?: boolean } = {}
+): BlockLine {
   const quoted = BLOCKQUOTE_START.exec(line)?.[0].length ?? 0;
   const quotedDepth = (line.slice(0, quoted).match(/>/g) ?? []).length;
   const body = line.slice(quoted);
@@ -1214,14 +1226,18 @@ function readBlockLine(state: BlockState, line: string): BlockLine {
   //
   // A definition only ends a block when the line carrying it starts one: it
   // cannot interrupt a paragraph, so inside one it is the paragraph's own
-  // text and the line under it continues that paragraph.
+  // text and the line under it continues that paragraph. A walk may also drop
+  // the definition from the set of block ends altogether, for a renderer that
+  // keeps the indented line under it as that paragraph's text.
   const endsBlock: boolean = htmlLine
     ? closesHtml
     : code ||
       heading !== null ||
       THEMATIC_BREAK_START.test(body) ||
       underlinesParagraph(state.previousParagraph, quotedDepth, body) ||
-      (startsBlock && REFERENCE_DEFINITION_START.test(body));
+      (options.definitionEndsBlock !== false &&
+        startsBlock &&
+        REFERENCE_DEFINITION_START.test(body));
   const openFence: Fence | undefined = fenceAfter(state.openFence, fence);
   // The list item this line opens, from its own marker and the padding after
   // it: a line reaching that content column or deeper is inside the item, and

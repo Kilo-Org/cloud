@@ -363,22 +363,31 @@ describe('markdownMessageDirection', () => {
   });
 
   // An indented block starts after a blank line or after a block that closed,
-  // and every kind CommonMark closes counts: an ATX heading, a thematic break,
-  // the setext underline under the paragraph above, an HTML block whose
-  // terminator arrived, and a reference definition that starts a block. Only a
-  // fence and an indented code line closed a block here before, so the Arabic
-  // line under each of these was read as prose and the message named a
-  // direction it has no prose letter for. The paragraph above the underline
-  // holds no letter, so the underline closes a block and nothing else.
+  // and the renderer the chat draws with closes a block on an ATX heading, a
+  // thematic break, the setext underline under the paragraph above, and an HTML
+  // block whose terminator arrived. Only a fence and an indented code line
+  // closed a block here before, so the Arabic line under each of these was read
+  // as prose and the message named a direction it has no prose letter for. The
+  // paragraph above the underline holds no letter, so the underline closes a
+  // block and nothing else.
   it.each([
     ['an ATX heading', '# 42\n    مرحبا'],
     ['a thematic break', '---\n    مرحبا'],
     ['a setext underline', '42\n===\n    مرحبا'],
     ['a comment closed on its line', '<!-- c -->\n    مرحبا'],
     ['a comment closed on a later line', '<!--\n-->\n    مرحبا'],
-    ['a reference definition', '[ref]: https://example.com\n    مرحبا'],
   ])('reads an indented line under %s as code', (_shape, message) => {
     expect(markdownMessageDirection(message)).toBeUndefined();
+  });
+
+  // A reference definition is the exception: the renderer keeps its indented
+  // continuation as that paragraph's own text, so those letters are copy the
+  // message shows and they name its direction. Marked's fallback path would
+  // draw an indented code block there instead, and the chat does not use it for
+  // a plain markdown run.
+  it('reads the line under a reference definition as that paragraph’s text', () => {
+    expect(markdownMessageDirection('[ref]: https://example.com\n    مرحبا')).toBe('rtl');
+    expect(markdownMessageDirection('[ref]: https://example.com\n    Latin text')).toBe('ltr');
   });
 
   // The same block ends leave the line under them opening a block, so a Latin

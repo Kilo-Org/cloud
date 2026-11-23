@@ -20,10 +20,11 @@ import { insideBurstWindow } from './burst-window';
  */
 
 /**
- * How long a screen ignores presses after it regains focus. It covers the
- * native dismiss or close animation plus the gap a double tap spans (Android's
- * double-tap timeout is 300 ms), and is short enough that a deliberate press
- * right after closing a screen is still accepted.
+ * How long a screen ignores presses after it is handed back to the reader —
+ * a sheet closed, or a pushed child screen closed itself. It covers the native
+ * dismiss animation plus the gap a double tap spans (Android's double-tap
+ * timeout is 300 ms), and is short enough that a deliberate press right after
+ * the hand-back is still accepted.
  */
 export const SHEET_ROW_TAP_GUARD_MS = 500;
 

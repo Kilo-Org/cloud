@@ -225,13 +225,22 @@ describe('useSettingsSearch with SettingsSearchField/Results', () => {
     const root = render();
     typeQuery(root, 'theme');
 
-    const themedRows = rows(root);
-    expect(themedRows).toHaveLength(1);
-    expect(themedRows[0]?.props.accessibilityLabel).toBe('Appearance');
+    expect(rows(root).map(row => row.props.accessibilityLabel)).toEqual(['Appearance']);
     const marked = root.findAll(
       node => Object.is(node.type, 'Text') && String(node.props.className).includes('font-semibold')
     );
     expect(marked).toEqual([]);
+  });
+
+  it('degrades an unexpected keyword shape to no synonyms', () => {
+    // `signOut` is absent from the mock's keyword map, so it resolves to its own
+    // key string, not a list; a throw would fail this case.
+    const source = { settings: [defineSetting('x', 'common.language', 'signOut')] };
+    const root = render(undefined, [source]);
+    typeQuery(root, 'logout');
+    expect(rows(root)).toEqual([]);
+    typeQuery(root, 'lang');
+    expect(rows(root).map(row => row.props.accessibilityLabel)).toEqual(['Language']);
   });
 
   it('finds one themed result and all three options by name in the real hub index', () => {
@@ -287,9 +296,7 @@ describe('useSettingsSearch with SettingsSearchField/Results', () => {
   it('announces one settled result count on iOS', () => {
     const root = render();
     typeQuery(root, 'appearance');
-    act(() => {
-      vi.advanceTimersByTime(500);
-    });
+    act(() => vi.advanceTimersByTime(500));
 
     expect(announce).toHaveBeenLastCalledWith('Settings found: 3');
     const live = root.findAll(
@@ -302,9 +309,7 @@ describe('useSettingsSearch with SettingsSearchField/Results', () => {
     platform.OS = 'android';
     const root = render();
     typeQuery(root, 'appearance');
-    act(() => {
-      vi.advanceTimersByTime(500);
-    });
+    act(() => vi.advanceTimersByTime(500));
 
     const live = root.findAll(
       node => Object.is(node.type, 'Text') && node.props.children === 'Settings found: 3'

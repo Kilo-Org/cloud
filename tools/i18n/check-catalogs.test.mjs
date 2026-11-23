@@ -3878,22 +3878,50 @@ test('accepts the keyword lists every mobile catalog ships', () => {
 test('rejects a keyword value stored as one "|"-joined string', () => {
   // The shape this section replaced: the matcher reads one unusable phrase.
   const found = runKeywords({ englishKeywords: withKeywordValue('signOut', 'logout|log off') });
-  assert.deepEqual(
-    found.filter(problem => problem.includes('settingsSearch.keywords')),
-    [
-      'mobile/en: "settingsSearch.keywords.signOut" is not a list of keyword strings: found a string',
-    ],
-    found.join('\n')
-  );
+  assert.deepEqual(found, [
+    'mobile/en: "settingsSearch.keywords.signOut" is not a list of keyword strings: found a string',
+  ]);
+});
+
+test('rejects a keyword section that is not one list per id', () => {
+  // The section as the `|`-joined string it replaced: the flattened catalog
+  // holds that string at the section key itself, and the keyword rule — not the
+  // prose value rules — names the defect once.
+  const found = runKeywords({ englishKeywords: 'logout|log off' });
+  assert.deepEqual(found, [
+    'mobile/en: "settingsSearch.keywords" is not a plain object holding one keyword list per id',
+  ]);
+});
+
+test('reports every violation of one keyword list, in index order', () => {
+  const found = runKeywords({ englishKeywords: withKeywordValue('signOut', ['  ', 'log|off']) });
+  assert.deepEqual(found, [
+    'mobile/en: "settingsSearch.keywords.signOut" has an empty keyword at index 0',
+    'mobile/en: "settingsSearch.keywords.signOut" keeps the removed "|" separator in the keyword at index 1',
+  ]);
+});
+
+test('reports a missing keyword id only through the keyword rule', () => {
+  const found = runKeywords({ englishKeywords: withoutKeyword('privacy') });
+  assert.deepEqual(found, ['mobile/en: "settingsSearch.keywords.privacy" is missing']);
+  const text = found.join('\n');
+  assert.doesNotMatch(text, /missing key/);
+  assert.doesNotMatch(text, /which en\.json does not define/);
+});
+
+test('reports an id outside the six only through the keyword rule', () => {
+  const found = runKeywords({
+    englishKeywords: { ...SETTINGS_KEYWORDS_ENGLISH, account: ['profile'] },
+  });
+  assert.deepEqual(found, [
+    'mobile/en: "settingsSearch.keywords.account" is not one of the six keyword ids',
+  ]);
+  const text = found.join('\n');
+  assert.doesNotMatch(text, /extra key/);
+  assert.doesNotMatch(text, /which no source file uses/);
 });
 
 for (const [name, keywords, reason] of [
-  ['a missing id', withoutKeyword('privacy'), '"settingsSearch.keywords.privacy" is missing'],
-  [
-    'an id outside the six',
-    { ...SETTINGS_KEYWORDS_ENGLISH, account: ['profile'] },
-    '"settingsSearch.keywords.account" is not one of the six keyword ids',
-  ],
   [
     'an empty list',
     withKeywordValue('signOut', []),
@@ -3928,13 +3956,10 @@ for (const [name, keywords, reason] of [
   test(`rejects ${name} in the keyword section`, () => {
     const found = runKeywords({ englishKeywords: keywords });
     const expected = `mobile/en: ${reason}`;
-    // One line per violation: the id and the reason name the defect once, so no
-    // second rule can report the same value under a different wording.
-    assert.deepEqual(
-      found.filter(problem => problem === expected),
-      [expected],
-      found.join('\n')
-    );
+    // One defect, one line: the keyword rule names the value defect, and no
+    // prose rule reads the flattened list as copy (an empty list flattens to
+    // "", a padded item to " logout", and so on), so nothing else is reported.
+    assert.deepEqual(found, [expected]);
   });
 }
 

@@ -50,7 +50,10 @@ const ROOT = fileURLToPath(new URL('../../', import.meta.url));
  * consumer appends its part to a key. `englishCopyRules` lists the checks the
  * catalog's English copy must pass. `documentRules` lists the checks the
  * catalog's parsed JSON must pass, in English and in every locale, for a shape
- * the flattened values cannot carry. `localeRegistry` names a hand-written
+ * the flattened values cannot carry. `structuredKeys` names the keys holding
+ * that structured data, which no value rule and no key-set rule reads: the
+ * document rule that owns the shape reports every defect of the section once.
+ * `localeRegistry` names a hand-written
  * module the push runtime reads its catalogs from. `calledKeyOf` reads the key
  * one translate call names, `keyPrefixOf` the static head of a key built as a
  * template literal (null when the catalog builds none), and
@@ -73,6 +76,7 @@ function catalogsOf(root) {
         checkMobileLocaleEnglishCopy,
       ],
       documentRules: [checkSettingsKeywordLists],
+      structuredKeys: isSettingsKeywordKey,
       calledKeyOf: mobileCalledKey,
       keyPrefixOf: null,
       collectsDestructiveKeys: true,
@@ -2239,11 +2243,15 @@ function checkSerializedJson(label, key, value) {
 }
 
 /** The value rules English itself must pass. */
-function checkEnglishValues({ catalogName, english, englishValues }) {
+function checkEnglishValues({ catalogName, english, englishValues, structuredKeys }) {
   const problems = [];
   // English exempts nothing: a label it spells is a label it can name.
   const ownValues = new Set();
   for (const [key, value] of english) {
+    // A structured key is the document rule's finding, not a value of prose.
+    if (holdsStructuredData(structuredKeys, key)) {
+      continue;
+    }
     if (value.trim() === '') {
       problems.push(`${catalogName}/en: "${key}" is empty`);
     }
@@ -2267,10 +2275,10 @@ function checkEnglishValues({ catalogName, english, englishValues }) {
 }
 
 /** The English side of one catalog, in emission order. */
-function checkEnglishCatalog({ catalogName, english, englishValues }) {
+function checkEnglishCatalog({ catalogName, english, englishValues, structuredKeys }) {
   const label = `${catalogName}/en`;
   return [
-    ...checkEnglishValues({ catalogName, english, englishValues }),
+    ...checkEnglishValues({ catalogName, english, englishValues, structuredKeys }),
     ...checkAgentEditorCopy(english, english, label),
     ...checkPullRequestTerm(english, label),
     ...checkChangelogAreaLabels('en', english, label),
@@ -2287,10 +2295,17 @@ function checkKeyParity({
   englishFamilies,
   englishCountedBases,
   localeFamilies,
+  structuredKeys,
 }) {
   const problems = [];
   const selectable = selectableCategories(tag);
   for (const key of english.keys()) {
+    // A structured key is not a translation unit: the section's document rule
+    // requires the same ids in every catalog, so its key-set line is the only
+    // report a missing id gets.
+    if (holdsStructuredData(structuredKeys, key)) {
+      continue;
+    }
     if (translated.has(key)) {
       continue;
     }
@@ -2315,7 +2330,7 @@ function checkKeyParity({
     problems.push(`${label}: missing key "${key}"`);
   }
   for (const key of translated.keys()) {
-    if (english.has(key)) {
+    if (english.has(key) || holdsStructuredData(structuredKeys, key)) {
       continue;
     }
     const parts = pluralParts(key);
@@ -2400,14 +2415,18 @@ function checkTranslatedValues({
   englishValues,
   mustTranslateKeys,
   destructiveChecks,
+  structuredKeys,
 }) {
   const problems = [];
   const ownValues = new Set(translated.values());
   for (const [key, value] of translated) {
     // The serialized-JSON rule needs no English reference: a locale's own
     // plural category (`agents.liveCount_few` of ar) never appears in en.json,
-    // but a JSON object stored in it is the same storage slip.
-    problems.push(...checkSerializedJson(label, key, value));
+    // but a JSON object stored in it is the same storage slip. A structured key
+    // is the document rule's finding instead; the value rules below skip it too.
+    if (!holdsStructuredData(structuredKeys, key)) {
+      problems.push(...checkSerializedJson(label, key, value));
+    }
     if (!english.has(key)) {
       problems.push(
         ...checkAddedPluralForm({
@@ -2420,6 +2439,7 @@ function checkTranslatedValues({
           englishCountedBases,
           englishValues,
           ownValues,
+          structuredKeys,
         })
       );
       continue;
@@ -2438,6 +2458,7 @@ function checkTranslatedValues({
         cancelValue: translated.get('common.cancel'),
         rejectContainingCancel: destructiveChecks.get(key),
         mustTranslateKeys,
+        structuredKeys,
       })
     );
   }
@@ -2460,10 +2481,14 @@ function checkAddedPluralForm({
   englishCountedBases,
   englishValues,
   ownValues,
+  structuredKeys,
 }) {
   const problems = [];
   const parts = pluralParts(key);
-  if (!isAdmittedPluralKey(parts, englishFamilies, englishCountedBases)) {
+  if (
+    !isAdmittedPluralKey(parts, englishFamilies, englishCountedBases) ||
+    holdsStructuredData(structuredKeys, key)
+  ) {
     return problems;
   }
   const englishRef =
@@ -2506,8 +2531,14 @@ function checkTranslatedValue({
   cancelValue,
   rejectContainingCancel,
   mustTranslateKeys,
+  structuredKeys,
 }) {
   const problems = [];
+  // A structured key is the document rule's finding alone: its flattened value
+  // is not prose, so no check below has anything to say about it.
+  if (holdsStructuredData(structuredKeys, key)) {
+    return problems;
+  }
   const separatorOnly =
     key === 'common.sentenceJoiner' && MARKLESS_SENTENCE_TAGS.has(tag) && value !== '';
   if (value.trim() === '' && !separatorOnly) {
@@ -2850,6 +2881,7 @@ function checkCatalogLocales({
         englishCountedBases,
         localeFamilies,
         selectableCategories,
+        structuredKeys: catalog.structuredKeys,
       })
     );
     problems.push(
@@ -2869,6 +2901,7 @@ function checkCatalogLocales({
         englishValues,
         mustTranslateKeys,
         destructiveChecks,
+        structuredKeys: catalog.structuredKeys,
       })
     );
     problems.push(...checkLoginSeparators({ label, tag, translated }));
@@ -2992,9 +3025,31 @@ const SETTINGS_KEYWORDS = [
   'privacy',
 ];
 
+/**
+ * The keys holding the structured `settingsSearch.keywords` section: the section
+ * itself and every id below it. That shape is `checkSettingsKeywordLists`'s
+ * finding, so every rule that reads a flattened value or a key set leaves these
+ * keys to it. Otherwise one defect prints twice, because `flattenCatalog` joins
+ * a list into one comma-joined string and the prose rules then read that string
+ * as copy.
+ */
+function isSettingsKeywordKey(key) {
+  return key === 'settingsSearch.keywords' || key.startsWith('settingsSearch.keywords.');
+}
+
 /** Whether a parsed value is a plain object: an array and `null` are not. */
 function isPlainObject(value) {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Whether `key` holds structured data, which only the `documentRules` check of
+ * its section reads. Such a key's flattened value is not copy — an array lands
+ * as one comma-joined string — so no value rule and no key-set rule may report
+ * it, or one defect would print twice under two wordings.
+ */
+function holdsStructuredData(structuredKeys, key) {
+  return structuredKeys !== undefined && structuredKeys(key);
 }
 
 /** What a parsed value is, named the way the keyword rule reports it. */
@@ -3092,14 +3147,27 @@ function checkSettingsKeywordLists(document, label) {
 }
 
 /** Every key the source names exists, and every English key is used. */
-function checkSourceUsage({ catalogName, english, source, baseKeyOf, englishFamilies }) {
+function checkSourceUsage({
+  catalogName,
+  english,
+  source,
+  baseKeyOf,
+  englishFamilies,
+  structuredKeys,
+}) {
   const problems = [];
   for (const key of source.called) {
+    if (holdsStructuredData(structuredKeys, key)) {
+      continue;
+    }
     if (!english.has(key) && !englishFamilies.has(key)) {
       problems.push(`${catalogName}: source uses "${key}", which en.json does not define`);
     }
   }
   for (const key of english.keys()) {
+    if (holdsStructuredData(structuredKeys, key)) {
+      continue;
+    }
     if (!source.referenced.has(key) && !source.referenced.has(baseKeyOf(key))) {
       problems.push(`${catalogName}: en.json defines "${key}", which no source file uses`);
     }
@@ -3299,7 +3367,14 @@ export function checkCatalogs(root = ROOT) {
     const sharedWordings = [...wordingGroups].filter(([, keys]) => keys.length > 1);
     const destructiveChecks = destructiveConfirmKeys(source, english);
 
-    problems.push(...checkEnglishCatalog({ catalogName, english, englishValues }));
+    problems.push(
+      ...checkEnglishCatalog({
+        catalogName,
+        english,
+        englishValues,
+        structuredKeys: catalog.structuredKeys,
+      })
+    );
     problems.push(...documentRuleProblems(catalog, `${catalogName}/en`, parsedEnglish.document));
 
     const locales = checkCatalogLocales({
@@ -3325,7 +3400,14 @@ export function checkCatalogs(root = ROOT) {
     }
 
     problems.push(
-      ...checkSourceUsage({ catalogName, english, source, baseKeyOf, englishFamilies })
+      ...checkSourceUsage({
+        catalogName,
+        english,
+        source,
+        baseKeyOf,
+        englishFamilies,
+        structuredKeys: catalog.structuredKeys,
+      })
     );
   }
 

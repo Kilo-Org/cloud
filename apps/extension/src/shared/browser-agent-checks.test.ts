@@ -307,9 +307,12 @@ describe('step tokens', () => {
     const store = createStepTokenStore({ now: () => 1000, random: () => 'token-miss' });
     const token = store.issue({ ...binding, reason: SENSITIVE_REASON.download });
 
-    expect(store.take(token, [{ ...binding, tabId: 8 }, { ...binding, element: 'e99' }])).toStrictEqual(
-      { ok: false }
-    );
+    expect(
+      store.take(token, [
+        { ...binding, tabId: 8 },
+        { ...binding, element: 'e99' },
+      ])
+    ).toStrictEqual({ ok: false });
     // Still burnt: a replay of the same token against the real binding answers nothing either.
     expect(store.take(token, [binding]).ok).toBe(false);
   });

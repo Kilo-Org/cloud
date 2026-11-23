@@ -3061,7 +3061,9 @@ export const createBrowserRuntime = ({
               tabId: step.tabId,
             },
             step,
-            file.url === undefined ? undefined : needOfUrl(file.tabId, file.url, context.scope ?? 'page')
+            file.url === undefined
+              ? undefined
+              : needOfUrl(file.tabId, file.url, context.scope ?? 'page')
           );
 
     // The tab this step opened, for the one repeat its token buys: sending `browser_tabs new` again would open

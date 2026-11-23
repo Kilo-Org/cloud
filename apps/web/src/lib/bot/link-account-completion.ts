@@ -10,7 +10,6 @@ import { captureException } from '@sentry/nextjs';
 import type { User } from '@kilocode/db';
 import {
   consumeLinkAccountContext,
-  isLinkAccountContextConsumed,
   linkKiloUser,
   loadLinkAccountContext,
   releaseLinkAccountContextConsumption,
@@ -35,11 +34,10 @@ export type CompleteLinkAccountOutcome =
  *
  * Order matters:
  *  1. read the pending context, so an expired link writes nothing;
- *  2. refuse a link that is already spent, without writing anything;
- *  3. take the single-use claim, which one submission of a pending link holds
+ *  2. take the single-use claim, which one submission of a pending link holds
  *     and which therefore decides the single writer and the single replayer of
- *     the stored message;
- *  4. write the mapping compare-and-set, giving the claim back when the write is
+ *     the stored message; a spent link stops here without writing anything;
+ *  3. write the mapping compare-and-set, giving the claim back when the write is
  *     refused or fails.
  *
  * A held identity is refused without touching the mapping, and a pending link
@@ -68,10 +66,6 @@ export async function completeLinkAccount({
   const context = await loadLinkAccountContext(state, contextKey);
   if (!context) {
     return { status: 'context_missing' };
-  }
-
-  if (await isLinkAccountContextConsumed(state, contextKey)) {
-    return { status: 'used' };
   }
 
   // The claim decides who may write the mapping and replay the message, so it

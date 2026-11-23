@@ -94,7 +94,13 @@ export async function linkKiloUser(
   // The identity is free again when nothing is stored for it, so the claim is
   // retried once. A value in the re-read belongs to another Kilo account.
   if (holder === null) {
-    return (await state.setIfNotExists(key, kiloUserId)) ? 'linked' : 'conflict';
+    if (await state.setIfNotExists(key, kiloUserId)) {
+      return 'linked';
+    }
+    // The retried claim can lose to a concurrent write, and an unlink can race
+    // a link and empty the key first, so the stored value is read again before
+    // reporting a conflict.
+    return (await state.get<string>(key)) === kiloUserId ? 'linked' : 'conflict';
   }
 
   return 'conflict';
@@ -252,18 +258,6 @@ export async function releaseLinkAccountContextConsumption(
   contextKey: string
 ): Promise<void> {
   await state.delete(`${contextKey}:consumed`);
-}
-
-/**
- * Report whether a pending link was already completed, without taking the
- * single-use claim. A caller uses this to refuse a spent link before it writes
- * anything, and only then takes the claim itself.
- */
-export async function isLinkAccountContextConsumed(
-  state: StateAdapter,
-  contextKey: string
-): Promise<boolean> {
-  return (await state.get(`${contextKey}:consumed`)) != null;
 }
 
 /**

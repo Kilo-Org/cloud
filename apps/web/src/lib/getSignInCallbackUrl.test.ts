@@ -49,6 +49,15 @@ describe('getSignInCallbackUrl', () => {
       );
     });
 
+    test('passes the chat link page through after-sign-in', () => {
+      const callbackPath = '/api/chat/link-account?token=abc.def';
+      const result = getSignInCallbackUrl({ callbackPath });
+
+      expect(result).toBe(
+        '/users/after-sign-in?callbackPath=%2Fapi%2Fchat%2Flink-account%3Ftoken%3Dabc.def'
+      );
+    });
+
     test('passes standard OAuth callback API paths through after-sign-in', () => {
       const callbackPath = '/api/integrations/slack/callback?code=abc&state=def';
       const result = getSignInCallbackUrl({ callbackPath });
@@ -110,10 +119,17 @@ describe('getSignInCallbackUrl', () => {
         ).toBe(true);
       });
 
+      test('accepts the chat link page carrying its signed token', () => {
+        expect(isValidCallbackPath('/api/chat/link-account?token=abc.def')).toBe(true);
+      });
+
       test('accepts the Slack callback API path resumed by the chat account link', () => {
         expect(isValidCallbackPath('/api/integrations/slack/callback?code=abc&state=def')).toBe(
           true
         );
+        expect(
+          isValidCallbackPath('/api/integrations/slack/callback?code=a&state=b&error=access_denied')
+        ).toBe(true);
         expect(isValidCallbackPath('/api/integrations/slack/callback')).toBe(true);
       });
 
@@ -181,6 +197,19 @@ describe('getSignInCallbackUrl', () => {
         expect(isValidCallbackPath('/api/integrations/gitlab/callback?code=abc')).toBe(false);
         expect(isValidCallbackPath('/api/integrations/linear/callback')).toBe(false);
         expect(isValidCallbackPath('/api/integrations/gitlab/callback')).toBe(false);
+      });
+
+      test('rejects a chat link page without exactly a token parameter', () => {
+        expect(isValidCallbackPath('/api/chat/link-account')).toBe(false);
+        expect(isValidCallbackPath('/api/chat/link-account?token=a&other=b')).toBe(false);
+        expect(isValidCallbackPath('/api/chat/link-account/extra?token=a')).toBe(false);
+        expect(isValidCallbackPath('/api/chat/link-account?token=a#x')).toBe(false);
+      });
+
+      test('rejects Slack callback query parameters the route does not read', () => {
+        expect(
+          isValidCallbackPath('/api/integrations/slack/callback?code=a&next=https://evil.example')
+        ).toBe(false);
       });
 
       test('rejects paths with spaces', () => {

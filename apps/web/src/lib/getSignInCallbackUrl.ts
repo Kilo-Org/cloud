@@ -19,6 +19,10 @@ export function isValidCallbackPath(path: string): boolean {
   if (path === '/api/auth/pending-link/complete') {
     return true;
   }
+  // The chat link page resumes after sign-in; its only parameter is the signed token.
+  if (isChatLinkAccountPath(path)) {
+    return true;
+  }
   if (
     path.startsWith('/users/accept-invite') ||
     path.startsWith('/get-started') ||
@@ -45,6 +49,26 @@ export function isValidCallbackPath(path: string): boolean {
     return true;
   }
   return CALLBACK_PATH_REGEX.test(path);
+}
+
+function isChatLinkAccountPath(path: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(path, PLACEHOLDER_ORIGIN);
+  } catch {
+    return false;
+  }
+
+  if (url.origin !== PLACEHOLDER_ORIGIN || url.hash) {
+    return false;
+  }
+
+  if (url.pathname !== '/api/chat/link-account') {
+    return false;
+  }
+
+  const keys = [...url.searchParams.keys()];
+  return keys.length > 0 && keys.every(key => key === 'token');
 }
 
 function isValidIntegrationOAuthPath(path: string): boolean {
@@ -79,7 +103,16 @@ function isValidIntegrationOAuthPath(path: string): boolean {
   // Every standard platform resumes at its `connect` route. Only the chat
   // account-link resume returns through a platform `callback` route today,
   // carrying the provider's `code`/`state`.
-  return action === 'connect' || (platform === PLATFORM.SLACK && action === 'callback');
+  if (action === 'connect') {
+    return true;
+  }
+  if (platform !== PLATFORM.SLACK || action !== 'callback') {
+    return false;
+  }
+  // The callback route reads only the provider's `code`, `state`, and `error`.
+  return [...url.searchParams.keys()].every(
+    key => key === 'code' || key === 'state' || key === 'error'
+  );
 }
 
 export default function getSignInCallbackUrl(searchParams?: NextAppSearchParams): string {

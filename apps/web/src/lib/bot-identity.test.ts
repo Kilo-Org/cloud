@@ -179,4 +179,53 @@ describe('linkKiloUser', () => {
     expect(setAttempts).toBe(2);
     await expect(resolveKiloUserId(state as never, slackIdentity)).resolves.toBe('kilo-1');
   });
+
+  test('a retried claim refused while the mapping becomes ours reports linked', async () => {
+    const base = createState();
+    // The first claim is refused and the re-read finds nothing stored; the
+    // retried claim is refused after another writer stored this Kilo user's
+    // mapping.
+    let setAttempts = 0;
+    let reads = 0;
+    const state = {
+      ...base,
+      setIfNotExists: async (key: string, value: unknown) => {
+        setAttempts += 1;
+        if (setAttempts === 1) return false;
+        await base.set(key, value);
+        return false;
+      },
+      get: async (key: string) => {
+        reads += 1;
+        return reads === 1 ? null : await base.get(key);
+      },
+    };
+
+    await expect(linkKiloUser(state as never, slackIdentity, 'kilo-1')).resolves.toBe('linked');
+    expect(setAttempts).toBe(2);
+    await expect(resolveKiloUserId(state as never, slackIdentity)).resolves.toBe('kilo-1');
+  });
+
+  test('a retried claim refused while another account holds the identity reports conflict', async () => {
+    const base = createState();
+    let setAttempts = 0;
+    let reads = 0;
+    const state = {
+      ...base,
+      setIfNotExists: async (key: string) => {
+        setAttempts += 1;
+        if (setAttempts === 1) return false;
+        await base.set(key, 'kilo-2');
+        return false;
+      },
+      get: async (key: string) => {
+        reads += 1;
+        return reads === 1 ? null : await base.get(key);
+      },
+    };
+
+    await expect(linkKiloUser(state as never, slackIdentity, 'kilo-1')).resolves.toBe('conflict');
+    expect(setAttempts).toBe(2);
+    await expect(resolveKiloUserId(state as never, slackIdentity)).resolves.toBe('kilo-2');
+  });
 });

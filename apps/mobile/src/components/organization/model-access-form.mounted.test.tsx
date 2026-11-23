@@ -472,6 +472,17 @@ describe('ModelAccessForm save', () => {
     expect(root.findAllByType('GatewaySettingsSection' as never)).toHaveLength(1);
     expect(root.findAllByType('ScreenFooter' as never)).toHaveLength(0);
   });
+
+  it('clamps the footer status to the slot so a long sentence cannot raise the actions', () => {
+    const root = render(undefined);
+    const footer = root.findByType('ScreenFooter' as never);
+
+    // The slot is one fixed height — two `text-sm` lines. A sentence that needs
+    // a third must truncate inside it rather than grow the bar and lift the
+    // actions above it, in any shipped locale.
+    const status = footer.findByType('AccessibleStatus' as never);
+    expect(status.props.numberOfLines).toBe(2);
+  });
 });
 
 describe('ModelAccessForm without the catalog', () => {

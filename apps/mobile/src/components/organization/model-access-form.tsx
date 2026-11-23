@@ -502,16 +502,20 @@ export function ModelAccessForm({
                   actions, as the consent footer's does, because a reserve above
                   them leaves a band of empty page under the list's last row, and
                   the row card then reads as clipped short of the bar.
-                  The reserve is two lines: the refusal sentences this form shows
-                  wrap at this width, and a one-line reserve would raise the pair
-                  when one appears instead of holding it still. `min-h-10` is
-                  exactly those two lines — 2.5 rem at the app's 14pt rem, twice
-                  the `text-sm` line height — so the reserve stays on the
-                  spacing scale. */}
+                  `min-h-10` is exactly two `text-sm` lines — 2.5 rem at the app's
+                  14pt rem — and the status is clamped to those same two lines, so
+                  the slot is one fixed height and the action row above it cannot
+                  move in any shipped locale: a longer localised sentence ends in
+                  the tail ellipsis instead of raising the pair. Nothing is lost to
+                  the clamp: the live region announces the whole sentence through
+                  `useStatusAnnouncement`, and the one sentence long enough to
+                  truncate (`organizationModelAccess.providersNeedCatalog`) is
+                  also rendered in full as the Providers tab's body caption. */}
               <View className="min-h-10 justify-center">
                 <AccessibleStatus
                   message={statusMessage}
                   tone={feedback.status === 'failed' ? 'error' : 'status'}
+                  numberOfLines={2}
                   className="text-sm"
                 />
               </View>

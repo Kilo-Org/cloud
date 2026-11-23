@@ -89,6 +89,10 @@ export async function issueRuntimeProxyAttestation(
     iat: issuedAt,
     exp: issuedAt + RUNTIME_PROXY_ATTESTATION_MAX_AGE_SECONDS,
   });
+  // The schema allows up to 120 seconds for verifiers, so issuance enforces its own lifetime.
+  if (claims.exp - claims.iat !== RUNTIME_PROXY_ATTESTATION_MAX_AGE_SECONDS) {
+    throw new Error('Invalid issued runtime proxy attestation lifetime');
+  }
   return new SignJWT(claims)
     .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
     .sign(signingKey(input.secret));

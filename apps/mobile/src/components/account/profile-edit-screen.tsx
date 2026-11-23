@@ -191,6 +191,30 @@ function ProfileLinkForm({ linkedinUrl, githubUrl, onDone }: FieldsProps) {
 }
 
 /**
+ * A placeholder line sized by the copy it stands in for. The hidden copy is the
+ * same text the loaded field paints, so the bar is exactly as tall as that line
+ * in every locale and at every text size; wrapping and font scaling therefore
+ * cannot make the loaded form taller than the placeholder.
+ */
+function PlaceholderLine({ text, barClassName }: Readonly<{ text: string; barClassName: string }>) {
+  return (
+    <View>
+      <View
+        className="flex-row opacity-0"
+        pointerEvents="none"
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+      >
+        <Text className="w-full shrink-0 text-sm">{text}</Text>
+      </View>
+      <View className="absolute inset-0">
+        <Skeleton className={cn('h-full', barClassName)} />
+      </View>
+    </View>
+  );
+}
+
+/**
  * The links on the account's public profile. Four states: the saved values load
  * behind skeletons sized to the two fields, a failed read keeps its retry, the
  * form is the happy path, and a refused save reports the server's own message.
@@ -227,22 +251,24 @@ export function ProfileEditScreen() {
     // Each block holds the loaded field's geometry: the label line, the field's
     // own 44pt box (`INPUT_BOX_SHAPE_CLASS`) and the reserved message line; the
     // Save slot holds the button's own 48pt action frame (`STATE_ACTION_CLASS`).
-    // A hand-sized bar would drift from those boxes and move the body on swap.
+    // A text bar is sized by the copy it stands in for, so a wrapped label or
+    // message keeps the block as tall as the loaded one; a hand-sized bar would
+    // drift from those boxes and move the body on swap.
     body = (
       <>
         <View className="gap-1.5">
           <View className="gap-1.5">
-            <Skeleton className="h-5 w-24" />
+            <PlaceholderLine text={t('profile.editProfile.linkedinLabel')} barClassName="w-24" />
             <Skeleton className={cn(INPUT_BOX_SHAPE_CLASS, 'w-full')} />
           </View>
-          <Skeleton className="h-5 w-40" />
+          <PlaceholderLine text={t('profile.editProfile.invalidUrl')} barClassName="w-40" />
         </View>
         <View className="gap-1.5">
           <View className="gap-1.5">
-            <Skeleton className="h-5 w-24" />
+            <PlaceholderLine text={t('profile.editProfile.githubLabel')} barClassName="w-24" />
             <Skeleton className={cn(INPUT_BOX_SHAPE_CLASS, 'w-full')} />
           </View>
-          <Skeleton className="h-5 w-40" />
+          <PlaceholderLine text={t('profile.editProfile.invalidUrl')} barClassName="w-40" />
         </View>
         <Skeleton className={cn(STATE_ACTION_CLASS, 'rounded-md')} />
       </>

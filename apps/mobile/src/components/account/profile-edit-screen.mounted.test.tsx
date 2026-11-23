@@ -467,6 +467,17 @@ describe('ProfileEditScreen', () => {
     expect(actionBars).toHaveLength(1);
     const handSized = allSkeletonClasses.filter(classes => classes.split(' ').includes('h-11'));
     expect(handSized).toHaveLength(0);
+
+    // The bar's height comes from this copy, so wrapping in a long locale cannot
+    // make the loaded form taller than the placeholder.
+    const placeholderCopy = root
+      .findAll(node => Object.is(node.type, TEXT))
+      .map(node => node.props.children);
+    expect(placeholderCopy.filter(copy => copy === 'LinkedIn URL')).toHaveLength(1);
+    expect(placeholderCopy.filter(copy => copy === 'GitHub URL')).toHaveLength(1);
+    expect(
+      placeholderCopy.filter(copy => copy === 'Enter a URL that starts with http:// or https://')
+    ).toHaveLength(2);
   });
 
   it('keeps the fields live and takes one save while a save is pending', async () => {

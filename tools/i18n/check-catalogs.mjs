@@ -2257,7 +2257,11 @@ function checkPluralCategories({ label, tag, english, translated, selectableCate
   const problems = [];
   const host = new Intl.PluralRules(tag).resolvedOptions().pluralCategories;
   const selectable = selectableCategories(tag);
-  const required = host.filter(category => category !== 'zero' && selectable.has(category));
+  // The intersection, with no separate `zero` rule: `zero` is in the host list
+  // only for a language that really selects it (Arabic, Welsh, Latvian), so a
+  // family of one of those still owes its `_zero` form. For every other
+  // language the host list has no `zero` to carry through.
+  const required = host.filter(category => selectable.has(category));
   for (const [family, absent] of missingPluralCategories(english, translated, tag, required)) {
     for (const category of absent) {
       problems.push(`${label}: plural family "${family}" lacks the ${category} category of ${tag}`);

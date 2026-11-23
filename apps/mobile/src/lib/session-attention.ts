@@ -36,10 +36,13 @@ import { SESSION_ATTENTION_KEY } from '@/lib/storage-keys';
  * consumers stop holding, and it answers exactly as `ready` does: an ack this
  * run recorded still hides its raise, and with no ack the badge derives from
  * the server status. Failing that way can add a badge the person dismissed,
- * but it can never suppress a genuine raise. A commit recorded after a failed
- * read is kept in memory only and never replaces the stored blob: the read
- * never merged it, so writing the map would drop the acks the blob still
- * holds. Those survive to the next launch, which hydrates them normally.
+ * but it can never suppress a genuine raise. When no read returned — no
+ * encrypted KV on this build, or the read rejected — a commit is kept in memory
+ * only and never replaces the stored blob: the read never merged it, so writing
+ * the map would drop the acks the blob still holds. Those survive to the next
+ * launch, which hydrates them normally. A blob that is absent or that does not
+ * parse may be replaced: the read returned, so the map already holds everything
+ * the blob does.
  *
  * No backend or tRPC imports: this is a mobile-local module so the web client
  * can keep its own copy. The one shared import is the pure timestamp reader,
@@ -151,9 +154,10 @@ type PersistedAttentionEntry = {
  * `ready` — the read completed: persisted entries applied, or genuinely empty.
  * `failed` — the KV is unavailable, the read rejected, or the blob does not
  * parse. Settled: never retried, so consumers must not wait on it; they fail
- * open instead. A commit recorded after a failed read stays in memory only and
- * does not replace the stored blob, so the acks this run never merged survive
- * and the next launch hydrates them.
+ * open instead. A commit after an unavailable KV or a rejected read stays in
+ * memory only and does not replace the stored blob, so the acks that read never
+ * merged survive and the next launch hydrates them. An absent or unparsable
+ * blob may be replaced, because that read returned.
  */
 export type SessionAttentionHydration = 'loading' | 'ready' | 'failed';
 

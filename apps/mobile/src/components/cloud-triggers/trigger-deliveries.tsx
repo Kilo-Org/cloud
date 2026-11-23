@@ -118,9 +118,13 @@ export function TriggerDeliveries({
   }
   if (query.data.length === 0) {
     return (
+      // The state is a block inside the section: it starts on the label's own
+      // edge and keeps the section's gap as the only air above it, so it reads
+      // as part of the section instead of a centred card under it.
       <EmptyState
+        align="start"
         placement="top"
-        compact
+        className="pt-0"
         icon={Workflow}
         title={t('cloudAgent.triggers.deliveriesEmptyTitle')}
         description={t('cloudAgent.triggers.deliveriesEmptyDescription')}

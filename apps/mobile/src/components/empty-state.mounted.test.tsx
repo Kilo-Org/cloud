@@ -276,6 +276,44 @@ describe('EmptyState presentation', () => {
     assertKeptContent(mounted);
     mounted.unmount();
   });
+
+  // A state inside a section (the trigger screen's Deliveries block) lines up
+  // with the section label and the start-aligned rows it belongs to, and its
+  // copy reads from that edge. The default stays centred for the state that is
+  // the whole surface.
+  it('aligns the stack and its copy to the start on request', async () => {
+    const state = (align?: 'start') =>
+      renderWithProviders(
+        <EmptyState
+          align={align}
+          icon={SearchX}
+          title="No sessions match"
+          description="Try a different search term."
+          action={createElement('Action')}
+        />
+      );
+    const stack = (mounted: Mounted) =>
+      mounted.renderer.root
+        .findAll(node => typeof node.type === 'string' && (node.type as string) === 'View')
+        .find(node => String(node.props.className).includes('gap-4'));
+    const title = (mounted: Mounted) =>
+      mounted.renderer.root
+        .findAllByType('Text')
+        .find(node => node.props.children === 'No sessions match');
+
+    const start = await state('start');
+    expect(String(stack(start)?.props.className)).toContain('items-start');
+    // No alignment class: the build drops `text-start`, so the paragraph takes
+    // the interface's start edge by default.
+    expect(title(start)?.props.className).not.toContain('text-center');
+    assertKeptContent(start);
+    start.unmount();
+
+    const centered = await state();
+    expect(String(stack(centered)?.props.className)).toContain('items-center');
+    expect(title(centered)?.props.className).toContain('text-center');
+    centered.unmount();
+  });
 });
 
 // A state action's busy state is the same action mid-flight: the label stays

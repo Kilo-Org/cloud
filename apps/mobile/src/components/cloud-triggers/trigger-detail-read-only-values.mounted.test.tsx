@@ -102,6 +102,7 @@ vi.mock('./trigger-url-card', () => ({ TriggerUrlCard: 'TriggerUrlCard' }));
 
 const EDIT_PANEL = 'TriggerEditPanel' as ElementType;
 const KV_ROW = 'KvRow' as ElementType;
+const TEXT = 'Text' as ElementType;
 
 let renderer: ReactTestRenderer | undefined = undefined;
 
@@ -136,6 +137,20 @@ describe('TriggerDetailScreen read-only values', () => {
     const root = await mount();
 
     expect(root.findAll(node => Object.is(node.type, EDIT_PANEL))).toHaveLength(0);
+  });
+
+  // Nothing failed on this screen: the note says why the values are read-only,
+  // so it carries the muted body intro and never the destructive error face.
+  it('explains the read-only state as muted body copy', async () => {
+    const root = await mount();
+
+    const notes = root.findAll(
+      node =>
+        Object.is(node.type, TEXT) &&
+        node.props.children === i18n.t('cloudAgent.triggers.permissionDenied')
+    );
+    expect(notes).toHaveLength(1);
+    expect(notes[0]?.props.variant).toBe('muted');
   });
 
   it('names the built-in agent mode and a model the catalogue lacks', async () => {

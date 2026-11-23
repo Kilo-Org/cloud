@@ -63,8 +63,6 @@ describe('voice network consent', () => {
     const unsubscribe = subscribeToVoiceNetworkConsent(listener);
     vi.mocked(SecureStore.setItemAsync).mockRejectedValueOnce(new Error('keychain locked'));
 
-    // Total: the settings row branches on `false`, and the voice flow's
-    // fire-and-forget callers stay rejection-free.
     await expect(writeVoiceNetworkConsent('user-1', 'granted')).resolves.toBe(false);
 
     // Nothing was stored, so no subscriber is told the choice was kept.

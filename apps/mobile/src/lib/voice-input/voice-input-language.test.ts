@@ -36,17 +36,17 @@ describe('pickSupportedVoiceInputLanguageTag', () => {
     expect(pickSupportedVoiceInputLanguageTag(['en_US'], ['en-US'])).toBe('en-US');
   });
 
-  it('region-shifted English lands on en-US via tie-break ii, not sorted-first en-AU', () => {
+  it('region-shifted English lands on en-US via the <lang>-US step, not sorted-first en-AU', () => {
     expect(
       pickSupportedVoiceInputLanguageTag(['en-DE'], ['de-DE', 'en-AU', 'en-GB', 'en-US'])
     ).toBe('en-US');
   });
 
-  it('eponymous-region tie-break i: de-AT → de-DE', () => {
+  it('eponymous-region fallback: de-AT → de-DE', () => {
     expect(pickSupportedVoiceInputLanguageTag(['de-AT'], ['de-DE', 'en-US'])).toBe('de-DE');
   });
 
-  it('last-resort order tie-break iii: ar-EG → ar-SA (no ar-AR, no ar-US)', () => {
+  it('last-resort order fallback: ar-EG → ar-SA (no ar-AR, no ar-US)', () => {
     expect(pickSupportedVoiceInputLanguageTag(['ar-EG'], ['ar-SA', 'en-US'])).toBe('ar-SA');
   });
 

@@ -389,9 +389,6 @@ async function hydrate(): Promise<void> {
   return hydrationPromise;
 }
 
-// Hydrate at module init, before the first read. The store reports `loading`
-// until this settles, so consumers hold their badge instead of drawing one
-// from a store that may still answer "not acked" for a restored ack.
 void hydrate();
 
 // ── Store ───────────────────────────────────────────────────────────────────
@@ -622,13 +619,9 @@ export function reconcileSessionAttention(
   }
 
   if (statusUpdatedAt == null && entry.status === status) {
-    // The observer has no timestamp for the acked status, so it cannot tell
-    // this raise from the answered one. Keeping the ack is what hides the
-    // badge the user already dismissed.
     return;
   }
 
-  // Different raise: replace the raise and clear the ack so the badge returns.
   store.entries.set(sessionId, { kind: 'cleared', raiseId, status: status ?? null });
   commit();
 }

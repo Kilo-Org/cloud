@@ -1,9 +1,10 @@
 import './pr-merge-sheet.test-mocks';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { type ProviderPrMergeState } from '@kilocode/app-shared/provider-review';
 import { type ProviderPrRef, providerPrRefKey } from '@/lib/pr-review/provider-pr-ref';
 import {
   baseProps,
+  button,
   draftKey,
   edit,
   hosts,
@@ -145,6 +146,61 @@ describe('PrMergeSheet provider behavior', () => {
     expect(storedDraft('u1', key)).toBeNull();
     expect(baseProps.onRefetch).toHaveBeenCalledOnce();
     expect(baseProps.onDismiss).toHaveBeenCalledOnce();
+  });
+
+  it('withholds the merge form when a provider arm carries no merge state', async () => {
+    const retry = vi.fn<() => void>();
+    const renderer = await mount({
+      prRef: gitlab,
+      mergeState: null,
+      mergeStateRetry: { retry, isRetrying: false },
+    });
+    expect(hosts(renderer, 'TextInput')).toHaveLength(0);
+    expect(hosts(renderer, 'Button').map(node => node.props.accessibilityLabel)).toEqual(['Retry']);
+    const text = visibleText(renderer);
+    expect(text).toContain("Couldn't determine mergeability.");
+    expect(hosts(renderer, 'AccessibleStatus').map(node => node.props.message)).toContain(
+      'Try refreshing the overview in a moment.'
+    );
+    await press(renderer, 'Retry');
+    expect(retry).toHaveBeenCalledOnce();
+    expect(state.merge.mutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('reports the merge-state read as busy on the retry control', async () => {
+    const renderer = await mount({
+      prRef: gitlab,
+      mergeState: null,
+      mergeStateRetry: { retry: vi.fn<() => void>(), isRetrying: true },
+    });
+    const retryButton = button(renderer, 'Retry');
+    expect(retryButton.props.accessibilityState).toEqual({ busy: true });
+    // `StateAction` disables a busy control and swaps its icon for the spinner,
+    // so the press cannot queue a second read.
+    expect(retryButton.props.disabled).toBe(true);
+    expect(hosts(renderer, 'ActivityIndicator')).toHaveLength(1);
+  });
+
+  it('renders no retry control for an allowed provider merge state', async () => {
+    const renderer = await mount({ prRef: gitlab, mergeState: allowed });
+    expect(input(renderer, 'Commit title')).toBeDefined();
+    expect(visibleText(renderer)).not.toContain("Couldn't determine mergeability.");
+    expect(
+      hosts(renderer, 'Button')
+        .map(node => node.props.accessibilityLabel)
+        .filter(label => label === 'Retry')
+    ).toHaveLength(0);
+  });
+
+  it('withholds the auto-merge action when a provider arm carries no merge state', async () => {
+    const renderer = await mount({
+      prRef: gitlab,
+      mode: 'enable-auto-merge',
+      autoMergeCapability: { supported: true, reason: '' },
+    });
+    expect(hosts(renderer, 'Button').map(node => node.props.accessibilityLabel)).toEqual(['Retry']);
+    expect(visibleText(renderer)).toContain("Couldn't determine mergeability.");
+    expect(state.autoMerge.mutateAsync).not.toHaveBeenCalled();
   });
 
   it('explains unsupported Bitbucket auto-merge without a submission action', async () => {

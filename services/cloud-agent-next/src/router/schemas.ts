@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { setupCommandsSchema } from '@kilocode/cloud-agent-profile/setup-script';
 import { egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
 import {
   getSandboxAllocation,
@@ -480,6 +481,8 @@ const PrepareSessionSharedFields = {
       'Allow resolving GitHub credentials with the session user’s own authorization when available'
     ),
   requestedEnvironment: requestedEnvironmentSchema.optional(),
+  environmentSetupRunId: z.uuid().optional(),
+  verificationOf: z.object({ runId: z.uuid() }).strict().optional(),
   requireEnvironmentChoice: z
     .literal(true)
     .optional()
@@ -548,9 +551,7 @@ const PrepareSessionSharedFields = {
   encryptedSecrets: EncryptedSecretsSchema.optional().describe(
     'Encrypted secret env vars (from agent environment profiles). These are stored encrypted in the DO and decrypted only at execution time.'
   ),
-  setupCommands: z
-    .array(z.string().max(Limits.MAX_SETUP_COMMAND_LENGTH))
-    .max(Limits.MAX_SETUP_COMMANDS)
+  setupCommands: setupCommandsSchema
     .optional()
     .describe('Setup commands to run during session initialization'),
   mcpServers: mcpServersRecordSchema(MCPServerConfigSchema)
@@ -945,10 +946,7 @@ export const ProfileInputSchema = z
       .object({
         envVars: envVarsSchema.optional(),
         encryptedSecrets: EncryptedSecretsSchema.optional(),
-        setupCommands: z
-          .array(z.string().max(Limits.MAX_SETUP_COMMAND_LENGTH))
-          .max(Limits.MAX_SETUP_COMMANDS)
-          .optional(),
+        setupCommands: setupCommandsSchema.optional(),
         mcpServers: mcpServersRecordSchema(MCPServerConfigSchema).optional(),
         runtimeSkills: RuntimeSkillsSchema.optional(),
         runtimeAgents: RuntimeAgentsSchema.optional(),
@@ -1116,6 +1114,11 @@ export const GetSessionInput = z.object({
 
 export const GetEgressAuditInput = GetEgressAuditInputSchema.extend({
   cloudAgentSessionId: sessionIdSchema,
+  organizationId: z
+    .string()
+    .min(1)
+    .optional()
+    .describe('Organization pinned by a scoped Cloud Agent parent authority'),
   limit: z.number().int().min(1).max(100).default(50),
 }).strict();
 
@@ -1133,6 +1136,7 @@ export const WorktreeFileInput = worktreeFileQuerySchema.extend({
 export const SyncWorktreeBranchInput = z
   .object({
     cloudAgentSessionId: sessionIdSchema,
+    organizationId: z.string().optional(),
     baseBranch: branchNameSchema.optional(),
     upstreamSha: commitShaSchema.optional(),
   })
@@ -1141,6 +1145,7 @@ export const SyncWorktreeBranchInput = z
 export const RestackWorktreeBranchInput = z
   .object({
     cloudAgentSessionId: sessionIdSchema,
+    organizationId: z.string().optional(),
     baseBranch: branchNameSchema.optional(),
     upstreamSha: commitShaSchema.optional(),
   })
@@ -1339,6 +1344,35 @@ export const GetSessionOutput = z.object({
     ),
 
   execution: ExecutionStatusSchema,
+
+  // Facts a setup authority reads back from the session it started: the
+  // admitted environment revision, the latest preparation outcome and the
+  // egress policy. They are optional because older sessions recorded none.
+  environment: z
+    .object({
+      environmentId: z.string(),
+      configurationRevision: z.number().int(),
+    })
+    .optional()
+    .describe('The admitted repository environment and the revision it resolved'),
+  latestPreparation: z
+    .object({
+      status: z.enum(['running', 'completed', 'failed']),
+      startedAt: z.number(),
+      completedAt: z.number().optional(),
+      setupDurationMs: z.number().int().nonnegative().optional(),
+      safeError: z.string().optional(),
+    })
+    .optional()
+    .describe('The most recent workspace preparation attempt'),
+  egress: z
+    .object({
+      mode: z.enum(['unrestricted', 'allowlist']),
+      allowlist: z.array(z.string()).optional(),
+      audit: z.boolean(),
+    })
+    .optional()
+    .describe('The admitted egress policy and whether auditing is on'),
 
   // Lifecycle timestamps (critical for idempotency)
   preparedAt: z.number().optional().describe('Timestamp when session was prepared'),

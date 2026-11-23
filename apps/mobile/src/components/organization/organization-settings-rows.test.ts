@@ -167,6 +167,16 @@ describe('visibleInAppSettingsRows', () => {
     });
   });
 
+  it('names the guardrails row with the destination screen title', () => {
+    // The row opens the app's own guardrails screen, so it reads that screen's
+    // title: one feature has one name instead of a second copy to keep in step.
+    const row = visibleInAppSettingsRows(
+      { role: 'owner', plan: 'enterprise', guardrailsEnabled: true },
+      'org_1'
+    ).find(entry => entry.area === 'guardrails');
+    expect(row?.title).toBe(i18n.t('organizationGuardrails.title'));
+  });
+
   it('names the usage row for the organization a billing role reads', () => {
     for (const role of ['owner', 'admin', 'billing_manager'] as const) {
       const row = visibleInAppSettingsRows(

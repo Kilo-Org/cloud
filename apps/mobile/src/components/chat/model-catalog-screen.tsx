@@ -110,7 +110,7 @@ export function ModelCatalogScreen() {
     footer = (
       <View className="items-center gap-2 px-4 py-4">
         <Text variant="muted" className="text-center text-xs">
-          {t('common.couldnTLoadMore')}
+          {t('common.couldNotLoadMore')}
         </Text>
         <Button
           size="sm"

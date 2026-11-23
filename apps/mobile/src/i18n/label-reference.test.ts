@@ -115,7 +115,7 @@ describe('catalog copy', () => {
     if (tag === 'ka') {
       return;
     }
-    for (const key of ['sessionRow.needsInput'] as const) {
+    for (const key of ['agents.sessionRow.needsInputBadge'] as const) {
       const value = i18n.t(key);
       expect(value, key).toBe(value.toLocaleUpperCase(tag));
     }

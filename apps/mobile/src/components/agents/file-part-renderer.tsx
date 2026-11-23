@@ -26,11 +26,11 @@ import { cn } from '@/lib/utils';
 import {
   downloadRemoteFile,
   getSafeCacheFilename,
-  getShareRemoteFileReason,
+  getShareFailureKind,
   shareLocalFile,
   shareRemoteFile,
-  ShareRemoteFileError,
 } from '@/lib/share-remote-file';
+import { assertSurfaceFailureHandled } from '@/lib/surface-feedback';
 
 import { ChatMarkdownText } from './chat-markdown-text';
 import { getFilePartAccessibilityLabel, getFilePartKind } from './file-part-preview';
@@ -164,12 +164,28 @@ export function FilePartRenderer({ part, onLongPress }: Readonly<FilePartRendere
     try {
       await shareFilePart(url, part);
     } catch (error: unknown) {
-      const reason = getShareRemoteFileReason(error);
+      const failureKind = getShareFailureKind(error);
       let message = t('agentChat.filePart.shareFailed');
-      if (reason === 'sharing-unavailable') {
-        message = t('agentChat.filePart.sharingUnavailable');
-      } else if (error instanceof ShareRemoteFileError) {
-        message = t('agentChat.filePart.shareFailedRetry');
+      switch (failureKind) {
+        case 'sharing-unavailable': {
+          message = t('agentChat.filePart.sharingUnavailable');
+          break;
+        }
+        case 'file-unavailable': {
+          message = t('common.fileUnavailable');
+          break;
+        }
+        case 'retry': {
+          message = t('agentChat.filePart.shareFailedRetry');
+          break;
+        }
+        case 'general': {
+          // The generic copy is already set: this failure judged nothing else.
+          break;
+        }
+        default: {
+          assertSurfaceFailureHandled(failureKind);
+        }
       }
       if (viewerVisibleRef.current || previewRef.current) {
         setShareError(message);

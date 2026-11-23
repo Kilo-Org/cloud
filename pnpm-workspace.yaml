@@ -400,6 +400,9 @@ patchedDependencies:
   # the sheet was measured, which used to move the sheet's whole content.
   # The version in the key must equal the `'@expo/ui'` override above.
   '@expo/ui@58.0.28': patches/@expo+ui@58.0.28.patch
+  # Android dev launcher: header and bottom-tab labels shrink to their laid-out
+  # width so each stays on one line; intrinsic SubcomposeLayout measurement
+  # crashes the launcher. Revisit when upstream sizes these labels itself.
   expo-dev-launcher@58.0.20: patches/expo-dev-launcher@58.0.20.patch
   # A zero badge count must not cancel every app notification: upstream called
   # cancelAll(), which removed the ongoing Active Agents card on Android.
@@ -488,6 +491,9 @@ patchedDependencies:
   llama.rn@0.12.9: patches/llama.rn@0.12.9.patch
   # The version in the key must equal the `stripe` catalog pin above.
   stripe@23.0.0: patches/stripe@23.0.0.patch
+  # Android action sheet: the enclosing cancel touchable is not its own
+  # accessibility element, so TalkBack reaches each option and Cancel separately
+  # (both published entry points corrected). Revisit when upstream does this.
   '@expo/react-native-action-sheet@4.1.1': patches/@expo+react-native-action-sheet@4.1.1.patch
   # Give the Apple @ExpoModule class scan 60 s instead of the hard-coded 5 s.
   # Slow macOS CI runners exceed 5 s; the configure phase then leaves modules

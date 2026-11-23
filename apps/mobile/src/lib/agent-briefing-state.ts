@@ -66,6 +66,31 @@ export function briefingSummaryStatusKey(status: string, error?: string | null):
   }
 }
 
+/**
+ * The body of the detail card's summary state. That card prints the
+ * `agentBriefing.summary` heading directly above this line, so the body never
+ * repeats the subject; the home card preview keeps
+ * {@link briefingSummaryStatusKey} because that surface has no heading. The
+ * card never renders this body for a `ready` summary.
+ */
+export function briefingSummaryBodyKey(status: string, error?: string | null): string {
+  if ((status === 'failed' || status === 'unavailable') && error === 'not_admitted') {
+    return 'agentBriefing.summaryNotAdmittedBody';
+  }
+  switch (status) {
+    case 'pending':
+    case 'running': {
+      return 'agentBriefing.summaryPendingBody';
+    }
+    case 'failed': {
+      return 'agentBriefing.snapshotSummaryFailedBody';
+    }
+    default: {
+      return 'agentBriefing.summaryUnavailableBody';
+    }
+  }
+}
+
 export function briefingEstimateUnavailableKey(reason: string | null | undefined): string {
   switch (reason) {
     case 'model_pricing_unavailable':

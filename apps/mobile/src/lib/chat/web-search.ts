@@ -10,6 +10,7 @@ import { API_BASE_URL } from '@/lib/config';
 
 import { chatFetch } from './fetch';
 import {
+  MAX_ATTEMPTS_PER_QUESTION,
   MAX_SEARCHES_PER_QUESTION,
   type QuestionSearches,
   questionSearches,
@@ -44,9 +45,30 @@ const TIMED_OUT = 'Web search took too long and was stopped. Tell the person it 
 const OVER_BUDGET =
   `This question already used ${String(MAX_SEARCHES_PER_QUESTION)} web searches, the limit. ` +
   'Do not search again: answer with what you have.';
+/**
+ * The stop for a call that arrives while this turn's earlier calls still hold
+ * the answered-search slots. Not every one of them has answered, so the text
+ * may not say five searches came back; it still forbids another search, because
+ * those slots are the question's whole allowance.
+ */
+const OVER_BUDGET_IN_FLIGHT =
+  `This turn already took the question's ${String(MAX_SEARCHES_PER_QUESTION)} web searches ` +
+  'and not all of them have answered. ' +
+  'Do not search again: answer with what you have.';
+/**
+ * The stop for a question that used its attempts. It says whether any search
+ * answered, because only then may the model's reply read as if the web was
+ * searched; with none answered it must say the search did not work.
+ */
+const overAttempts = (answered: boolean): string =>
+  `This question has used all ${String(MAX_ATTEMPTS_PER_QUESTION)} of its web search attempts. ` +
+  `Do not search again: answer with what you have${answered ? '.' : ', and say the search did not work.'}`;
 const ALLOWANCE_EXHAUSTED =
   "The account's free web searches for this month are used up and it has no credit balance. " +
   'Tell the person they can add credits in Kilo to search again.';
+const UNREADABLE_RESULTS =
+  'Kilo answered the web search, but its results could not be read. ' +
+  'Tell the person the search did not come back.';
 
 const argumentsSchema = z.object({ query: z.string().trim().min(1) });
 
@@ -63,11 +85,84 @@ const resultsSchema = z.object({
 
 const errorSchema = z.object({ error: z.string() });
 
-type SearchOutcome =
-  | { readonly ok: true; readonly body: string }
-  | { readonly ok: false; readonly reason: string };
+/**
+ * What one attempt took from the account. `admit` takes both slots before the
+ * attempt starts and `settle` gives back what the attempt did not use.
+ */
+type Charge =
+  /** Kilo answered, so the search drew on the account's allowance. */
+  | 'answered'
+  /** The proxy was reached but answered nothing usable, so the attempt is spent. */
+  | 'sent'
+  /** Nothing left the device, so neither slot is spent. */
+  | 'none';
 
-const failed = (reason: string): SearchOutcome => ({ ok: false, reason });
+/** What one search did, said in terms of what it costs the question. */
+type Attempt =
+  | { readonly ok: true; readonly body: string; readonly charge: 'answered' }
+  | { readonly ok: false; readonly reason: string; readonly charge: Charge };
+
+/** What the question's budget allowed this call to take. */
+type Admission =
+  | { readonly kind: 'none' }
+  | { readonly kind: 'refused'; readonly reason: string }
+  | { readonly kind: 'taken'; readonly spent: QuestionSearches };
+
+/**
+ * Checks the question's budget and reserves both slots in one step.
+ *
+ * A turn runs its calls at once, so a check that an await separates from its
+ * charge lets every call of the turn pass the check before any of them pays:
+ * the five-search cap turns into one search per call of the turn. Reserving
+ * here, before the first await, means each call of the turn sees what the calls
+ * before it took. `settle` gives the answered slot back whenever Kilo did not
+ * answer, so a search that never reached it costs nothing. A refused call reads
+ * the settled count: the answered-limit text is used only when the settled
+ * answers reached the cap, while a refusal during a turn that still holds
+ * reserved slots uses the in-flight text, because those slots may come back.
+ */
+function admit(spent: QuestionSearches | undefined): Admission {
+  if (spent === undefined) {
+    return { kind: 'none' };
+  }
+  if (spent.used >= MAX_SEARCHES_PER_QUESTION) {
+    return {
+      kind: 'refused',
+      reason: spent.answered >= MAX_SEARCHES_PER_QUESTION ? OVER_BUDGET : OVER_BUDGET_IN_FLIGHT,
+    };
+  }
+  if (spent.attempts >= MAX_ATTEMPTS_PER_QUESTION) {
+    return { kind: 'refused', reason: overAttempts(spent.answered > 0) };
+  }
+  spent.used += 1;
+  spent.attempts += 1;
+  return { kind: 'taken', spent };
+}
+
+/**
+ * Gives back the slots the attempt did not use, once per run, and hands its
+ * outcome to the model. A search Kilo answered keeps the answered slot and also
+ * counts as settled here, so a stop that reads `answered` cannot claim a search
+ * came back before its result did; one that never left the device keeps neither
+ * slot.
+ */
+function settle(
+  result: Attempt,
+  reserved: QuestionSearches | undefined
+): Effect.Effect<string, ToolFailure> {
+  if (reserved !== undefined && result.charge !== 'answered') {
+    reserved.used -= 1;
+  }
+  if (reserved !== undefined && result.charge === 'answered') {
+    reserved.answered += 1;
+  }
+  if (reserved !== undefined && result.charge === 'none') {
+    reserved.attempts -= 1;
+  }
+  return result.ok
+    ? Effect.succeed(result.body)
+    : Effect.fail(new ToolFailure({ cause: result.reason }));
+}
 
 function parsedBody<T>(text: string, schema: z.ZodType<T>): T | undefined {
   try {
@@ -78,10 +173,10 @@ function parsedBody<T>(text: string, schema: z.ZodType<T>): T | undefined {
   }
 }
 
-function resultsBody(text: string): SearchOutcome {
+function resultsBody(text: string): Attempt {
   const parsed = parsedBody(text, resultsSchema);
   if (parsed === undefined) {
-    return failed('Web search returned an invalid response.');
+    return { ok: false, charge: 'answered', reason: 'Web search returned an invalid response.' };
   }
   /* JSON.stringify leaves out an undefined field, so an absent title or date
      costs the model nothing. */
@@ -93,6 +188,7 @@ function resultsBody(text: string): SearchOutcome {
   }));
   return {
     ok: true,
+    charge: 'answered',
     body: JSON.stringify(
       results.length === 0
         ? { message: 'No results found. Try a different query.', results }
@@ -134,48 +230,73 @@ async function postSearch({
   }
 }
 
-type SearchContext = {
+/** The token for this attempt, without throwing on a keystore read that fails. */
+type TokenRead =
+  | { readonly kind: 'token'; readonly token: string }
+  | { readonly kind: 'signed-out' }
+  | { readonly kind: 'failed'; readonly error: unknown };
+
+/**
+ * The token for this attempt. A failing keystore read rethrows from
+ * `getAuthTokenForRequest` on Android, and a search that never leaves the
+ * device must spend neither slot, so the failure comes back as a value the
+ * attempt can answer with instead of escaping the tool.
+ */
+async function readToken(): Promise<TokenRead> {
+  try {
+    const token = await getAuthTokenForRequest();
+    return token === null ? { kind: 'signed-out' } : { kind: 'token', token };
+  } catch (error: unknown) {
+    return { kind: 'failed', error };
+  }
+}
+
+type AttemptContext = {
   readonly organizationId: string | undefined;
+  /** Aborted when the search times out, so a request nobody waits for is dropped. */
   readonly signal: AbortSignal;
-  /** The searches spent on the question being answered, when one is being answered. */
-  readonly spent: QuestionSearches | undefined;
 };
 
-async function search(argumentsText: string, context: SearchContext): Promise<SearchOutcome> {
-  const { organizationId, signal, spent } = context;
-  const args = parsedBody(argumentsText, argumentsSchema);
-  if (args === undefined) {
-    return failed('Give web_search a non-empty "query" string.');
+/**
+ * One search, reported as what it costs the question. It never touches the
+ * counters: the caller reserved their slots before the first await and settles
+ * them from the `Charge` this returns.
+ */
+async function attempt(query: string, context: AttemptContext): Promise<Attempt> {
+  const { organizationId, signal } = context;
+  const token = await readToken();
+  if (token.kind === 'signed-out') {
+    return { ok: false, charge: 'none', reason: SIGNED_OUT };
   }
-  if (spent !== undefined && spent.used >= MAX_SEARCHES_PER_QUESTION) {
-    return failed(OVER_BUDGET);
+  if (token.kind === 'failed') {
+    return { ok: false, charge: 'none', reason: `Web search failed: ${String(token.error)}` };
   }
-  if (!onlineManager.isOnline()) {
-    return failed(OFFLINE);
-  }
-  const token = await getAuthTokenForRequest();
-  if (token === null) {
-    return failed(SIGNED_OUT);
-  }
-  if (spent !== undefined) {
-    spent.used += 1;
-  }
-  const response = await postSearch({ query: args.query, token, organizationId, signal });
+  const response = await postSearch({ query, token: token.token, organizationId, signal });
   if (response === undefined) {
-    return failed(
-      'Web search could not reach Kilo. Tell the person, and answer from what you know.'
-    );
+    return {
+      ok: false,
+      charge: 'sent',
+      reason: 'Web search could not reach Kilo. Tell the person, and answer from what you know.',
+    };
   }
-  const text = await response.text();
   if (response.status === 402) {
     announcingToast.error(i18n.t('modelChat.webSearch.allowanceExhausted'));
-    return failed(ALLOWANCE_EXHAUSTED);
+    return { ok: false, charge: 'sent', reason: ALLOWANCE_EXHAUSTED };
   }
   if (!response.ok) {
-    const detail = parsedBody(text, errorSchema);
-    return failed(
-      `Web search failed with status ${String(response.status)}.${detail === undefined ? '' : ` ${detail.error}`}`
-    );
+    const detail = parsedBody(await response.text(), errorSchema);
+    return {
+      ok: false,
+      charge: 'sent',
+      reason: `Web search failed with status ${String(response.status)}.${detail === undefined ? '' : ` ${detail.error}`}`,
+    };
+  }
+  /* Kilo answered, so the search draws on the account's allowance even when it
+     found nothing or the body cannot be read: a body that fails mid-stream must
+     not hide a search Kilo billed. */
+  const text = await response.text().catch(() => undefined);
+  if (text === undefined) {
+    return { ok: false, charge: 'answered', reason: UNREADABLE_RESULTS };
   }
   return resultsBody(text);
 }
@@ -195,24 +316,44 @@ export function webSearchTool(organizationId?: string): Tool {
     },
     run: (call: ToolCall) =>
       questionSearches.pipe(
-        Effect.flatMap(spent =>
-          Effect.tryPromise({
-            try: async signal => {
-              const outcome = await search(call.arguments, { organizationId, signal, spent });
-              return outcome;
-            },
-            catch: cause => new ToolFailure({ cause: `Web search failed: ${String(cause)}` }),
-          })
-        ),
-        Effect.timeoutOrElse({
-          duration: SEARCH_TIMEOUT,
-          orElse: () => Effect.fail(new ToolFailure({ cause: TIMED_OUT })),
-        }),
-        Effect.flatMap(outcome =>
-          outcome.ok
-            ? Effect.succeed(outcome.body)
-            : Effect.fail(new ToolFailure({ cause: outcome.reason }))
-        )
+        Effect.flatMap(spent => {
+          /* Everything here runs before the first await, so the checks and the
+             reservation cannot be split by another call of the same turn. */
+          const args = parsedBody(call.arguments, argumentsSchema);
+          if (args === undefined) {
+            return Effect.fail(
+              new ToolFailure({ cause: 'Give web_search a non-empty "query" string.' })
+            );
+          }
+          if (!onlineManager.isOnline()) {
+            return Effect.fail(new ToolFailure({ cause: OFFLINE }));
+          }
+          const admission = admit(spent);
+          if (admission.kind === 'refused') {
+            return Effect.fail(new ToolFailure({ cause: admission.reason }));
+          }
+          const reserved = admission.kind === 'taken' ? admission.spent : undefined;
+          /* The promise never rejects: whatever escapes the attempt is a search
+             that reached Kilo, so only the attempt slot is spent. */
+          const attempted: Effect.Effect<Attempt> = Effect.promise(async signal => {
+            try {
+              return await attempt(args.query, { organizationId, signal });
+            } catch (error) {
+              return { ok: false, charge: 'sent', reason: `Web search failed: ${String(error)}` };
+            }
+          });
+          return attempted.pipe(
+            Effect.timeoutOrElse({
+              duration: SEARCH_TIMEOUT,
+              /* A timeout settles as 'sent': the attempt is spent, but the
+                 answered slot is not. See the note on the timeout in
+                 web-search-budget.ts. */
+              orElse: () =>
+                Effect.succeed<Attempt>({ ok: false, charge: 'sent', reason: TIMED_OUT }),
+            }),
+            Effect.flatMap(result => settle(result, reserved))
+          );
+        })
       ),
   };
 }

@@ -50,6 +50,7 @@ const queues = {
  */
 async function withRuntime(
   environment: 'production' | 'staging',
+  /** Overrides the committed `wrangler.jsonc` value; `undefined` keeps it. */
   dedicatedSwitch: string | undefined,
   handleWrite: RequestListener,
   run: (runtime: {
@@ -74,14 +75,13 @@ async function withRuntime(
           ...(environment === 'staging' ? { env: 'staging' } : {}),
           vars: {
             USAGE_WRITER_URL: `http://127.0.0.1:${address.port}${LLM_PATH}`,
-          },
-          // The cutover switch is a secret binding in the runbook, so it is supplied the same way.
-          secrets: {
-            USAGE_INGEST_PUBLISH_SECRET: publishSecret,
-            USAGE_WRITER_SECRET: writerSecret,
             ...(dedicatedSwitch === undefined
               ? {}
               : { USAGE_INGEST_DEDICATED_TAGGED_QUEUE_ENABLED: dedicatedSwitch }),
+          },
+          secrets: {
+            USAGE_INGEST_PUBLISH_SECRET: publishSecret,
+            USAGE_WRITER_SECRET: writerSecret,
           },
         },
       ],
@@ -90,6 +90,9 @@ async function withRuntime(
     const { url } = await server.listen();
     const env = () => server.getWorker<Env>().getEnv();
     expect((await env()).USAGE_INGEST_HEDGE_MODE).toBe('on');
+    expect((await env()).USAGE_INGEST_DEDICATED_TAGGED_QUEUE_ENABLED).toBe(
+      dedicatedSwitch ?? 'true'
+    );
     await run({
       publish: (path, body) =>
         fetch(new URL(path, url), {
@@ -177,11 +180,11 @@ function bodiesAt(calls: WriterCall[], path: string) {
 }
 
 describe.each(['production', 'staging'] as const)('%s queue routing', environment => {
-  it('with the switch on, publishes Enkrypt and Exa only to the tagged queue, never hedged, while LLM keeps the shared queue', async () => {
+  it('with the committed switch on, publishes Enkrypt and Exa only to the tagged queue, never hedged, while LLM keeps the shared queue', async () => {
     const calls: WriterCall[] = [];
     await withRuntime(
       environment,
-      'true',
+      undefined,
       recordingWriter(calls, dedupingReply()),
       async runtime => {
         const { publish, processing } = runtime;
@@ -244,7 +247,7 @@ it('keeps tagged writer overload out of the invocation that records LLM usage', 
     '1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c02',
     '1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c03',
   ];
-  await withRuntime('production', 'true', recordingWriter(calls, unavailable), async runtime => {
+  await withRuntime('production', undefined, recordingWriter(calls, unavailable), async runtime => {
     const { publish, processing } = runtime;
     const responses = await Promise.all([
       publish('/enkrypt-usage', { ...enkryptRecord, id: ids[0] }),
@@ -292,7 +295,7 @@ it('settles each tagged identity once across a legacy shared copy and tagged-que
   const calls: WriterCall[] = [];
   await withRuntime(
     'production',
-    'true',
+    undefined,
     recordingWriter(calls, dedupingReply()),
     async runtime => {
       const { publish, processing, env } = runtime;
@@ -351,7 +354,7 @@ it('settles each tagged identity once across a legacy shared copy and tagged-que
 }, 45_000);
 
 describe.each([
-  ['production', undefined],
+  ['production', 'false'],
   ['staging', 'false'],
   ['production', 'TRUE'],
 ] as const)('%s with the switch %s', (environment, dedicatedSwitch) => {

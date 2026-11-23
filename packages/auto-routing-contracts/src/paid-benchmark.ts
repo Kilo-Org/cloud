@@ -90,7 +90,28 @@ export const PaidBenchmarkProgressSchema = z.discriminatedUnion('status', [
 export type PaidBenchmarkProgress = z.infer<typeof PaidBenchmarkProgressSchema>;
 
 export const PaidBenchmarkStartResultSchema = z.discriminatedUnion('status', [
-  z.object({ status: z.literal('started'), request: PaidBenchmarkProgressSchema }),
+  z.object({
+    status: z.literal('started'),
+    request: PaidBenchmarkProgressSchema,
+    /**
+     * This pool already had a live request, so the click joined it instead of creating one:
+     * nothing new was priced, consumed or charged. It is a field on `started`, not a new
+     * status, so a web release that predates it still validates the body (the object schema
+     * strips unknown keys) and shows the same live progress.
+     *
+     * Deploy order is not relied on in either direction: `deploy-workers` and the Vercel
+     * stage-and-promote chain run side by side (`promote-app` does not need `deploy-workers`),
+     * so either side can be older. See the tolerated legacy alias below for the reverse window.
+     */
+    alreadyInProgress: z.boolean().optional(),
+  }),
+  /**
+   * Tolerated for one release: a worker that predates `alreadyInProgress` answers a second
+   * start with this status. A newer web must still show the live request instead of reporting
+   * the worker's answer as invalid while the worker rollout is in progress, so it parses to the
+   * same meaning. Remove once no deployed worker can answer it.
+   */
+  z.object({ status: z.literal('already_in_progress'), request: PaidBenchmarkProgressSchema }),
   z.object({
     status: z.literal('insufficient_balance'),
     requiredMicrodollars: BenchmarkMicrodollarsSchema.optional(),

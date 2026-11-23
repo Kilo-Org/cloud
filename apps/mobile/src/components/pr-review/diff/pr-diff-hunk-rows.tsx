@@ -200,7 +200,7 @@ export function PaginationRow({
     return (
       <View className="flex-row items-center justify-center gap-2 py-4">
         <Text variant="muted" className="text-xs">
-          {t('prReview.hunkRows.loadingMoreFiles')}
+          {t('prReview.fileNavigator.loadingMoreFiles')}
         </Text>
       </View>
     );
@@ -211,11 +211,11 @@ export function PaginationRow({
         onPress={onRetry}
         className="flex-row items-center justify-center gap-2 py-4 active:opacity-70"
         accessibilityRole="button"
-        accessibilityLabel={t('prReview.hunkRows.retryLoadingNextPage')}
+        accessibilityLabel={t('prReview.fileNavigator.retryLoadingNextPage')}
       >
         {/* eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic destructive color */}
         <Text className="text-sm" style={{ color: colors.destructive }}>
-          {t('prReview.hunkRows.failedToLoadMoreFiles')}
+          {t('prReview.fileNavigator.failedToLoadMoreFiles')}
         </Text>
       </Pressable>
     );
@@ -225,11 +225,11 @@ export function PaginationRow({
       <View className="flex-row items-center justify-center gap-2 py-4">
         <Text variant="muted" className="text-xs">
           {totalFiles
-            ? t('prReview.hunkRows.loadingAllFilesOf', {
+            ? t('prReview.fileNavigator.loadingAllFilesOf', {
                 loaded: formatNumber(loadedFiles, i18n.language),
                 total: formatNumber(totalFiles, i18n.language),
               })
-            : t('prReview.hunkRows.loadingAllFiles', {
+            : t('prReview.fileNavigator.loadingAllFiles', {
                 loaded: formatNumber(loadedFiles, i18n.language),
               })}
         </Text>
@@ -240,8 +240,8 @@ export function PaginationRow({
     return (
       <View className="flex-row items-center justify-center gap-3 py-4">
         <Text variant="muted" className="text-xs">
-          {/* i18n-dup-ok: 'prReview.hunkRows.loadedOfTotalFiles_one' and 'prReview.hunkRows.loadedOfTotalFiles_other' are this counted message's plural categories, not two keys for one string — the label reads the same at every count, but Zulu leads its noun before the numbers and inflects the one-form, so the family stays. */}
-          {t('prReview.hunkRows.loadedOfTotalFiles', {
+          {/* i18n-dup-ok: 'prReview.fileNavigator.loadedOfTotalFiles_one' and 'prReview.fileNavigator.loadedOfTotalFiles_other' are this counted message's plural categories, not two keys for one string — the label reads the same at every count, but Zulu leads its noun before the numbers and inflects the one-form, so the family stays. */}
+          {t('prReview.fileNavigator.loadedOfTotalFiles', {
             // The loaded count still selects the plural category, although the
             // copy leads the file noun so that no numeral governs it: the
             // total is the page set, and a catalog whose noun inflects on the
@@ -255,19 +255,19 @@ export function PaginationRow({
           variant="outline"
           size="sm"
           onPress={onFetchAll}
-          accessibilityLabel={t('prReview.hunkRows.loadAllFiles')}
+          accessibilityLabel={t('prReview.fileNavigator.loadAllFiles')}
         >
-          <Text>{t('prReview.hunkRows.loadAll')}</Text>
+          <Text>{t('prReview.fileNavigator.loadAll')}</Text>
         </Button>
       </View>
     );
   }
-  let loadedLabel = t('prReview.hunkRows.fileLoadedCount', {
+  let loadedLabel = t('prReview.fileNavigator.fileLoadedCount', {
     count: loadedFiles,
     displayCount: formatNumber(loadedFiles, i18n.language),
   });
   if (totalFiles) {
-    loadedLabel = t('prReview.hunkRows.fileLoadedOfTotalCount', {
+    loadedLabel = t('prReview.fileNavigator.fileLoadedOfTotalCount', {
       count: loadedFiles,
       displayCount: formatNumber(loadedFiles, i18n.language),
       total: formatNumber(totalFiles, i18n.language),
@@ -307,16 +307,16 @@ export function EmptyFilesView({
         <Text variant="muted" className="text-center">
           {changedFiles === 0
             ? (noChangesDescription ?? t('prReview.noFilesChangedDescription'))
-            : t('prReview.hunkRows.filesStillLoading')}
+            : t('prReview.fileNavigator.filesStillLoading')}
         </Text>
         {onRequestOverview ? (
           <Button
             variant="outline"
             size="sm"
             onPress={onRequestOverview}
-            accessibilityLabel={t('prReview.hunkRows.goToOverviewTab')}
+            accessibilityLabel={t('prReview.fileNavigator.goToOverviewTab')}
           >
-            <Text>{t('prReview.hunkRows.goToOverview')}</Text>
+            <Text>{t('prReview.fileNavigator.goToOverview')}</Text>
           </Button>
         ) : null}
       </View>

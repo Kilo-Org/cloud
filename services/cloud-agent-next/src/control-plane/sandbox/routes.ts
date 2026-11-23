@@ -605,13 +605,22 @@ export async function notifyReadyRoutes(ctx: RouteContext): Promise<void> {
   }
 }
 
-/** Stop the sandbox: every ready route loses its session and is removed. */
-export async function dropReadyRoutes(
+/** Settle routes when an allocation stops. Permanent launch failures also fail pending preparation. */
+export async function stopAllocationRoutes(
   ctx: RouteContext,
   reason: ControlPlaneFailureReason,
   billingFailure?: CustomerBillingFailure
 ): Promise<void> {
   for (const route of await listRoutes(ctx.db)) {
+    if (
+      route.state === 'preparing' &&
+      (reason === 'provider_identity_mismatch' ||
+        reason === 'provider_lifetime_exhausted' ||
+        reason === 'provider_cleanup_required')
+    ) {
+      await failCurrentAttempt(ctx, route.sessionId, route.attemptId, reason, 'provider_stop');
+      continue;
+    }
     if (route.state !== 'ready') continue;
     await deleteRoute(ctx.db, ctx.acceptedHandles, route.sessionId);
     await ctx.notify(route.sessionId, {

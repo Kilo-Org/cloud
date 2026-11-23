@@ -1534,6 +1534,10 @@ jobs:
           ln -s "$GITHUB_WORKSPACE/services/cloud-agent-next/node_modules/@sentry/cli" node_modules/@sentry/cli
           bun run build.ts --install-dir "$build_dir/bin"
 
+      - name: Test AWS runtime bundle and launch document
+        if: matrix.part == 'other'
+        run: pnpm --filter cloud-agent-next test:aws-runtime-bundle
+
       - name: Test cloud-agent-next checkers
         if: matrix.part == 'other'
         run: pnpm --filter cloud-agent-next test:checkers

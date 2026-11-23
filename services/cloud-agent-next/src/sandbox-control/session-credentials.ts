@@ -70,6 +70,7 @@ import {
 import {
   buildVercelCredentialNetworkPolicy,
   buildVercelTransformNetworkPolicy,
+  openVercelEgress,
 } from './vercel-network-policy.js';
 import {
   CAPABILITY_FAMILY_PATTERN_SOURCE,
@@ -1759,6 +1760,19 @@ export function buildControlNetworkPolicy(
   env: { WORKER_URL?: string } = {},
   originProof?: string
 ): VercelSandboxNetworkPolicy {
+  return addVercelScmForwarding(
+    openVercelEgress(buildControlCredentialPolicy(grants, acceptedHandlesByScopeId, originProof)),
+    grants,
+    env
+  );
+}
+
+/** The credential rules of the contained grants, with no egress default and no forwarding. */
+export function buildControlCredentialPolicy(
+  grants: readonly SessionCredentialGrant[],
+  acceptedHandlesByScopeId?: ReadonlyMap<string, readonly string[]>,
+  originProof?: string
+): VercelSandboxNetworkPolicy {
   const policies = grants.map(value => {
     const grant = validateGrant(value);
     if (
@@ -1784,17 +1798,9 @@ export function buildControlNetworkPolicy(
     ...(grant.scm ? [grant.scm.alias] : []),
   ]);
   if (new Set(aliases).size !== aliases.length) invalidCredentials();
-  const injectionRules = policies.flatMap(policy => policy.injectionRules);
-  return addVercelScmForwarding(
-    buildVercelTransformNetworkPolicy(
-      [
-        ...new Set(policies.flatMap(policy => policy.allowedDomains)),
-        ...(policies.length === 0 ? ['*'] : []),
-      ],
-      injectionRules
-    ),
-    grants,
-    env
+  return buildVercelTransformNetworkPolicy(
+    [...new Set(policies.flatMap(policy => policy.allowedDomains))],
+    policies.flatMap(policy => policy.injectionRules)
   );
 }
 

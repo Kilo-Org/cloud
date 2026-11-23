@@ -75,7 +75,11 @@ export function buildOverviewRows({
   modelsLoading: boolean;
   onOpenModelPicker: () => void;
   onOpenReviewMemory?: () => void;
-  /** Organizations only, and only when the council gate (entitlement + flag) passes. */
+  /**
+   * Wired whenever the build supports council for this scope (the rollout flag
+   * on an organization); the plan check is not the caller's question, because
+   * the council route paints the refusal that explains it.
+   */
   onOpenCouncil?: () => void;
 }): OverviewRow[] {
   return [
@@ -146,10 +150,11 @@ export function buildOverviewRows({
               displayCount: formatNumber(data.selectedRepositoryIds.length, i18n.language),
             }),
     },
-    // Council review is an organization entitlement behind a rollout flag; the
-    // caller only wires this row when both hold. It reports only whether any
-    // repository opted in, because that opt-in — not the specialist list — is
-    // what makes a run a council run.
+    // Council review is an organization entitlement behind a rollout flag. The
+    // row is wired on the build gate alone, so the entitlement refusal still
+    // has an entry that reaches it and explains the plan. It reports only
+    // whether any repository opted in, because that opt-in — not the specialist
+    // list — is what makes a run a council run.
     ...(onOpenCouncil
       ? [
           {

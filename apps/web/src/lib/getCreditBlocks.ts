@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { CreditTransactionForBlocks } from '@kilocode/web-shared/lib/creditExpiration';
 import { promoCreditCategoriesByKey } from '@kilocode/web-shared/lib/promoCreditCategories';
 import { CREDIT_CAMPAIGN_CATEGORY_PREFIX } from '@/lib/credit-campaigns-shared';
+import { getCodingPlanPrice } from '@/lib/coding-plans/pricing';
 import { computeExpiration, computeCreditLotAllocations } from '@kilocode/db/credit-expiration';
 import { toNonNullish } from '@/lib/utils';
 
@@ -11,11 +12,110 @@ type EntityForCreditBlocks = {
   total_microdollars_acquired: number;
 };
 
+/**
+ * The coding plan a negative row charged, as the plan catalog names it, or null
+ * when the category names no plan the catalog knows.
+ *
+ * A charge category names its plan directly (`coding-plan:<planId>:<key>`). A
+ * renewal category names the subscription it renewed instead
+ * (`coding-plan:renewal:<subscriptionId>:<creditRenewalAt>`), so the caller
+ * resolves that subscription to its plan and passes the names in; without an
+ * entry the row keeps its stored description rather than guess a plan.
+ */
+function codingPlanNameOf(
+  creditCategory: string | null,
+  codingPlanNamesBySubscription: ReadonlyMap<string, string>
+): string | null {
+  if (creditCategory === null) {
+    return null;
+  }
+  const codingPlanSegment = creditCategory.match(/^coding-plan:([^:]+):/)?.[1];
+  if (codingPlanSegment == null) {
+    return null;
+  }
+  const plan = getCodingPlanPrice(codingPlanSegment);
+  if (plan) {
+    return `${plan.providerName} ${plan.name}`;
+  }
+  // A renewal category names the subscription, and the subscription names the
+  // plan it bought. An extension row puts the literal `extension` first and its
+  // minutes are a zero-amount adjustment, so the lookup misses and it keeps its
+  // stored description.
+  const subscriptionId =
+    creditCategory.match(/^coding-plan:renewal:([^:]+):/)?.[1] ?? codingPlanSegment;
+  return codingPlanNamesBySubscription.get(subscriptionId) ?? null;
+}
+
+/**
+ * Why a negative row drew credit and, for a coding-plan charge, the plan it
+ * charged, read from the row's own category so a client titles the row in the
+ * reader's language instead of printing the stored English description. A
+ * reconciliation row is mapped whenever it carries one of the known
+ * categories, including the legacy billing system's names for them. The null
+ * reason covers expiry and void rows, which point at a grant the row already
+ * shows, categories with no user-facing meaning the app can name, and
+ * categories no writer has classified, which must keep their stored
+ * description rather than borrow another writer's wording.
+ */
+function deductionOf(
+  creditCategory: string | null,
+  codingPlanNamesBySubscription: ReadonlyMap<string, string>
+): { reason: CreditDeductionReason | null; planName: string | null } {
+  const planName = codingPlanNameOf(creditCategory, codingPlanNamesBySubscription);
+  if (planName != null) {
+    return { reason: 'coding_plan', planName };
+  }
+  // A negative row that records no category is the balance's own usage charge:
+  // the metering writer is the only one that leaves it empty, while every other
+  // writer records the category that identifies it.
+  if (creditCategory === null) {
+    return { reason: 'usage', planName: null };
+  }
+  if (creditCategory === 'stripe-dispute-enforcement') {
+    return { reason: 'dispute', planName: null };
+  }
+  if (creditCategory === 'manual_decrement') {
+    return { reason: 'admin_debit', planName: null };
+  }
+  // The legacy billing system recorded the same manual debit and accounting
+  // correction under its own category names.
+  if (creditCategory === 'orb_manual_decrement') {
+    return { reason: 'admin_debit', planName: null };
+  }
+  if (creditCategory === 'accounting_adjustment') {
+    return { reason: 'correction', planName: null };
+  }
+  if (creditCategory === 'orb_migration_accounting_adjustment') {
+    return { reason: 'correction', planName: null };
+  }
+  if (creditCategory.startsWith('admin-cancel-')) {
+    return { reason: 'admin_cancel', planName: null };
+  }
+  // A store refund names the store that refunded, so the client can say which
+  // one; a provider it does not know is not guessed at.
+  const refundProvider = creditCategory.match(/^store-credit-refund:([^:]+):/)?.[1];
+  if (refundProvider === 'app_store') {
+    return { reason: 'refund_app_store', planName: null };
+  }
+  if (refundProvider === 'google_play') {
+    return { reason: 'refund_google_play', planName: null };
+  }
+  // Expiries, voids, and categories no writer has classified all land here.
+  return { reason: null, planName: null };
+}
+
+/**
+ * `codingPlanNamesBySubscription` maps a coding-plan subscription id to the
+ * plan the catalog knows it bought, formatted as "<Provider> <Plan>". It is what
+ * lets a renewal row name its plan: the row's category carries only the
+ * subscription id.
+ */
 export function getCreditBlocks(
   transactions: CreditTransactionForBlocks[],
   now: Date,
   entity: EntityForCreditBlocks,
-  kilo_user_id: string
+  kilo_user_id: string,
+  codingPlanNamesBySubscription: ReadonlyMap<string, string> = new Map()
 ) {
   const paidTransactionsCount = transactions.filter(
     t =>
@@ -120,6 +220,9 @@ export function getCreditBlocks(
       // and admin credits are grants the user did not pay for directly. The
       // pair needs the grant's own free flag and recorded source to label it,
       // and its reason so the client can title the grant in its own language.
+      // The row's own category also says why it drew credit, and which coding
+      // plan it charged, so a client titles the row from its catalog.
+      const { reason, planName } = deductionOf(tx.credit_category, codingPlanNamesBySubscription);
       return {
         id: tx.id,
         date: tx.created_at,
@@ -127,6 +230,8 @@ export function getCreditBlocks(
         credit_category: tx.credit_category,
         amount_mUsd: tx.amount_microdollars, // negative
         expiry,
+        reason,
+        planName,
         purchase:
           source && source.amount_microdollars > 0
             ? {
@@ -167,6 +272,24 @@ export const CreditGrantReasonSchema = z.enum([
   'adjustment',
 ]);
 export type CreditGrantReason = z.infer<typeof CreditGrantReasonSchema>;
+
+/**
+ * Why a negative row drew credit. The client carries the wording for each
+ * reason in its own catalog, so the row title reads in the reader's language
+ * rather than echoing the stored English description. Null for a row whose
+ * category carries no reason the app can name.
+ */
+export const CreditDeductionReasonSchema = z.enum([
+  'usage',
+  'coding_plan',
+  'refund_app_store',
+  'refund_google_play',
+  'dispute',
+  'admin_cancel',
+  'admin_debit',
+  'correction',
+]);
+export type CreditDeductionReason = z.infer<typeof CreditDeductionReasonSchema>;
 
 /**
  * Ledger-cache reconciliation, the Orb migration, expirations and admin

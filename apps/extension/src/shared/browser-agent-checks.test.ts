@@ -13,6 +13,7 @@ import {
   maskSensitiveValues,
   MASKED_VALUE,
   originPatternMatches,
+  runsPageCode,
   SENSITIVE_REASON,
   sensitiveReasonForField,
   toBrowserOrigin,
@@ -128,6 +129,23 @@ describe('file handoff to the page', () => {
 
   it('leaves every other tool alone', () => {
     expect(isUploadCall('browser_click', { target: 'e1' })).toBe(false);
+  });
+});
+
+describe('page-code predicates', () => {
+  it('counts the tools that run model-authored code', () => {
+    expect(runsPageCode('browser_evaluate')).toBe(true);
+    expect(runsPageCode('browser_run_code_unsafe')).toBe(true);
+  });
+
+  it('counts the tool that runs code the page registered', () => {
+    expect(runsPageCode('browser_webmcp_call')).toBe(true);
+  });
+
+  it('leaves a page action or a read alone', () => {
+    expect(runsPageCode('browser_click')).toBe(false);
+    expect(runsPageCode('browser_webmcp_list')).toBe(false);
+    expect(runsPageCode('browser_snapshot')).toBe(false);
   });
 });
 

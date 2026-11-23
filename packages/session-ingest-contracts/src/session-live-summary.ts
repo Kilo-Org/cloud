@@ -56,7 +56,9 @@ export type SessionLiveTodoStatus = (typeof SESSION_LIVE_TODO_STATUSES)[number];
 
 /** The longest step target (a file basename or a short tool target). */
 export const SESSION_LIVE_TARGET_LIMIT = 40;
+/** The longest plan step text (`plan.current`). */
 export const SESSION_LIVE_PLAN_STEP_LIMIT = 40;
+/** The longest permission command the session card shows (`permissionCommand`), one line. */
 export const SESSION_LIVE_COMMAND_LIMIT = 60;
 
 export const sessionLiveStepSchema = z.object({
@@ -237,9 +239,16 @@ export function sessionLiveText(raw: unknown, limit: number): string | null {
 function basename(value: unknown): string | null {
   const text = sessionLiveText(value, Number.MAX_SAFE_INTEGER);
   if (text === null) return null;
-  const trimmed = text.replace(/[/\\]+$/, '');
-  const last = Math.max(trimmed.lastIndexOf('/'), trimmed.lastIndexOf('\\'));
-  const base = last === -1 ? trimmed : trimmed.slice(last + 1);
+  // Trailing separators name no segment, so the target ends before them.
+  let end = text.length;
+  while (end > 0) {
+    const code = text.charCodeAt(end - 1);
+    if (code !== 0x2f && code !== 0x5c) break;
+    end--;
+  }
+  const last =
+    end === 0 ? -1 : Math.max(text.lastIndexOf('/', end - 1), text.lastIndexOf('\\', end - 1));
+  const base = last === -1 ? text.slice(0, end) : text.slice(last + 1, end);
   return sessionLiveText(base, SESSION_LIVE_TARGET_LIMIT);
 }
 
@@ -301,7 +310,7 @@ export function sessionLiveToolStep(
         target: sessionLiveText(input['pattern'], SESSION_LIVE_TARGET_LIMIT),
       };
     case 'list':
-      return { verb: 'searching', target: basename(input['path']) };
+      return { verb: 'searching', target: basename(firstString(input, FILE_PATH_KEYS)) };
     case 'codesearch':
     case 'websearch':
     case 'web_search':

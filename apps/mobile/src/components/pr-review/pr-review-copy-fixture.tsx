@@ -62,7 +62,8 @@ import { TRPCProvider } from '@/lib/trpc';
 // The screen surfaces open the REAL nested routes instead of re-created bodies:
 // dev/pr-review-copy-fixture/screen-{file-navigator,merge,review-submit,
 // comment-composer,conversation-comment,comment-edit}, with `?shape=gitlab`
-// reaching the provider route shape and `?state=long` the long body.
+// reaching the provider route shape and `?state=long` the long body; the merge
+// surface takes `?mergeState=none` for the no-verdict arm.
 // Uses the app's selected language without changing its preference.
 // Real review consumers read owned fake DTOs across an asynchronous tRPC boundary.
 // Reads never invoke global fetch. The mutation cache rejects before any mutation
@@ -110,10 +111,11 @@ function ChecksSectionSurface() {
 }
 
 export function PrReviewCopyFixture() {
-  const { surface, side, selected } = useLocalSearchParams<{
+  const { surface, side, selected, mergeState } = useLocalSearchParams<{
     surface?: string;
     side?: string;
     selected?: string;
+    mergeState?: string;
   }>();
   // The composer surface defaults to the added-line state; `side=LEFT` reaches
   // the deleted-line state and `selected=1` seeds an added-line selection.
@@ -197,15 +199,29 @@ export function PrReviewCopyFixture() {
           initialMethod="merge"
           mode="merge"
           prRef={scope.ref}
-          mergeState={{
-            canMerge: true,
-            approvalsRequired: 0,
-            pipelineMustSucceed: false,
-            conflicts: false,
-            blockedReasons: [],
-          }}
+          // The no-verdict arm is unreachable from the real screen (it never
+          // mounts the sheet without a state), so the gate reaches it here:
+          // `mergeState=none` withholds the read and renders the sheet's
+          // unknown terminal. Every other value keeps the allowed state.
+          mergeState={
+            mergeState === 'none'
+              ? undefined
+              : {
+                  canMerge: true,
+                  approvalsRequired: 0,
+                  pipelineMustSucceed: false,
+                  conflicts: false,
+                  blockedReasons: [],
+                }
+          }
           sheetTitle={providerPrMergeTitles(t, scope.ref.platform).title}
           eyebrow="sample/review-copy!1"
+          mergeStateRetry={{
+            retry: () => {
+              void queryClient.invalidateQueries();
+            },
+            isRetrying: false,
+          }}
           onRefetch={async () => {
             await queryClient.invalidateQueries();
           }}

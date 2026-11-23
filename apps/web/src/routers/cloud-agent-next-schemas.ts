@@ -658,12 +658,17 @@ export const baseRestackWorktreeBranchNextOutputSchema = worktreeBranchOperation
 
 export const baseCreateWorktreeChatNextSchema = z
   .object({
-    sourceKiloSessionId: kiloSessionIdSchema,
+    sourceKiloSessionId: kiloSessionIdSchema.optional(),
+    cloudAgentSessionId: controlPlaneSessionIdSchema().optional(),
     operationKey: z.uuid(),
     /** Client-proposed id for the new chat, so the client can show it before this returns. */
     kiloSessionId: clientKiloSessionIdSchema.optional(),
   })
-  .strict();
+  .strict()
+  .refine(
+    input => input.sourceKiloSessionId !== undefined || input.cloudAgentSessionId !== undefined,
+    'A source session is required'
+  );
 
 export const baseCreateWorktreeChatNextOutputSchema = z
   .object({
@@ -1035,6 +1040,28 @@ export const baseGetSessionNextOutputSchema = z.object({
 
   // Execution status (grouped for cleaner API)
   execution: executionStatusNextSchema,
+
+  // Setup authority facts read back from a session. Mirrors
+  // cloud-agent-next/router/schemas.ts.
+  environment: z
+    .object({ environmentId: z.string(), configurationRevision: z.number().int() })
+    .optional(),
+  latestPreparation: z
+    .object({
+      status: z.enum(['running', 'completed', 'failed']),
+      startedAt: z.number(),
+      completedAt: z.number().optional(),
+      setupDurationMs: z.number().int().nonnegative().optional(),
+      safeError: z.string().optional(),
+    })
+    .optional(),
+  egress: z
+    .object({
+      mode: z.enum(['unrestricted', 'allowlist']),
+      allowlist: z.array(z.string()).optional(),
+      audit: z.boolean(),
+    })
+    .optional(),
 
   // Lifecycle timestamps
   preparedAt: z.number().optional(),

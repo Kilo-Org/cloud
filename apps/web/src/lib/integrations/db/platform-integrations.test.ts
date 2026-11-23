@@ -36,6 +36,7 @@ import {
 } from '@/lib/code-reviews/db/code-reviews';
 
 const INSTALLATION_ID = `test-github-install-${Date.now()}`;
+const GITLAB_INSTALLATION_ID = `test-gitlab-install-${Date.now()}`;
 
 describe('upsertPlatformIntegrationForOwner', () => {
   const userId = `test-upsert-user-${Date.now()}`;
@@ -101,6 +102,15 @@ describe('upsertPlatformIntegrationForOwner', () => {
     repositories: null,
     installedAt: new Date().toISOString(),
     githubAppType: 'standard' as const,
+  });
+
+  const gitlabData = (overrides: Partial<{ platformAccountLogin: string }> = {}) => ({
+    platform: 'gitlab',
+    integrationType: 'pat',
+    platformInstallationId: GITLAB_INSTALLATION_ID,
+    platformAccountId: '4242',
+    platformAccountLogin: overrides.platformAccountLogin ?? 'kilo-test',
+    repositoryAccess: 'all' as const,
   });
 
   test('inserts a new GitHub installation for a user owner', async () => {
@@ -1435,6 +1445,88 @@ describe('upsertPlatformIntegrationForOwner', () => {
       expect(matched?.integration_status).toBe('active');
       expect(sibling?.integration_status).toBe('suspended');
     });
+  });
+
+  test('a non-GitHub upsert inside a rolled-back caller transaction leaves no row', async () => {
+    await expect(
+      db.transaction(async tx => {
+        const result = await upsertPlatformIntegrationForOwner(
+          { type: 'user', id: userId },
+          gitlabData(),
+          tx
+        );
+        expect(result).toEqual({ ok: true });
+
+        const [inside] = await tx
+          .select()
+          .from(platform_integrations)
+          .where(
+            and(
+              eq(platform_integrations.owned_by_user_id, userId),
+              eq(platform_integrations.platform, 'gitlab')
+            )
+          );
+        expect(inside?.platform_installation_id).toBe(GITLAB_INSTALLATION_ID);
+
+        throw new Error('rollback');
+      })
+    ).rejects.toThrow('rollback');
+
+    const rows = await db
+      .select()
+      .from(platform_integrations)
+      .where(
+        and(
+          eq(platform_integrations.owned_by_user_id, userId),
+          eq(platform_integrations.platform, 'gitlab')
+        )
+      );
+    expect(rows).toHaveLength(0);
+  });
+
+  test('a non-GitHub upsert that refreshes an existing row joins the caller transaction', async () => {
+    const owner: Owner = { type: 'user', id: userId };
+    const first = await upsertPlatformIntegrationForOwner(
+      owner,
+      gitlabData({ platformAccountLogin: 'original' })
+    );
+    expect(first).toEqual({ ok: true });
+
+    await expect(
+      db.transaction(async tx => {
+        const result = await upsertPlatformIntegrationForOwner(
+          owner,
+          gitlabData({ platformAccountLogin: 'rolled-back' }),
+          tx
+        );
+        expect(result).toEqual({ ok: true });
+
+        const [inside] = await tx
+          .select()
+          .from(platform_integrations)
+          .where(
+            and(
+              eq(platform_integrations.owned_by_user_id, userId),
+              eq(platform_integrations.platform, 'gitlab')
+            )
+          );
+        expect(inside?.platform_account_login).toBe('rolled-back');
+
+        throw new Error('rollback');
+      })
+    ).rejects.toThrow('rollback');
+
+    const rows = await db
+      .select()
+      .from(platform_integrations)
+      .where(
+        and(
+          eq(platform_integrations.owned_by_user_id, userId),
+          eq(platform_integrations.platform, 'gitlab')
+        )
+      );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].platform_account_login).toBe('original');
   });
 });
 

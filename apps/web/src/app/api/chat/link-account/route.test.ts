@@ -256,6 +256,22 @@ describe('POST /api/chat/link-account', () => {
     expect(mockedBeginLinkAccountProof).toHaveBeenCalledTimes(1);
   });
 
+  test('accepts a same-origin form submission', async () => {
+    mockedVerifyLinkToken.mockResolvedValue(verifiedToken());
+
+    const response = await POST(
+      postRequest({ origin: null, secFetchSite: 'same-origin' }) as never
+    );
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get('location')).toBe(PROOF_URL);
+    expect(mockedBeginLinkAccountProof).toHaveBeenCalledWith({
+      identity: slackIdentity,
+      contextKey: 'context-key',
+      user: expect.objectContaining({ id: 'kilo-user-id' }),
+    });
+  });
+
   test('trusts Sec-Fetch-Site over a matching Origin', async () => {
     mockedVerifyLinkToken.mockResolvedValue(verifiedToken());
 

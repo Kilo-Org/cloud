@@ -179,4 +179,24 @@ describe('linkKiloUser', () => {
     expect(setAttempts).toBe(2);
     await expect(resolveKiloUserId(state as never, slackIdentity)).resolves.toBe('kilo-1');
   });
+
+  test('links when the state adapter reports an unset key as undefined', async () => {
+    const base = createState();
+    // Some adapters report an unset key as `undefined`; the retried claim
+    // accepts that value as an unlinked identity.
+    let setAttempts = 0;
+    const state = {
+      ...base,
+      setIfNotExists: async (key: string, value: unknown) => {
+        setAttempts += 1;
+        if (setAttempts === 1) return false;
+        return await base.setIfNotExists(key, value);
+      },
+      get: async (key: string) => (setAttempts === 1 ? undefined : await base.get(key)),
+    };
+
+    await expect(linkKiloUser(state as never, slackIdentity, 'kilo-1')).resolves.toBe('linked');
+    expect(setAttempts).toBe(2);
+    await expect(resolveKiloUserId(state as never, slackIdentity)).resolves.toBe('kilo-1');
+  });
 });

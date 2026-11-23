@@ -21,12 +21,18 @@ import { i18n } from '@/i18n';
 /**
  * The merge gate the sheet body renders from: `github` is the arm with no
  * provider merge read at all, `unknown` is a provider arm whose merge-state
- * read produced no value yet, and `state` is the provider's own verdict.
+ * read produced no value yet, and the two provider modes carry the verdict
+ * and — for auto-merge — the provider's capability answer.
  */
 export type PrMergeGate =
   | Readonly<{ kind: 'github' }>
   | Readonly<{ kind: 'unknown' }>
-  | Readonly<{ kind: 'state'; mergeState: ProviderPrMergeState }>;
+  | Readonly<{ kind: 'merge'; mergeState: ProviderPrMergeState }>
+  | Readonly<{
+      kind: 'auto-merge';
+      mergeState: ProviderPrMergeState;
+      capability?: ProviderReviewCapability;
+    }>;
 
 function providerBlockedReasonText(
   reason: ProviderPrMergeBlockedReason,
@@ -108,13 +114,13 @@ function MergeRestrictionsList({
 function ProviderAutoMergeBody({
   mergeState,
   term,
-}: Readonly<{ mergeState: ProviderPrMergeState | null; term: string }>) {
+}: Readonly<{ mergeState: ProviderPrMergeState; term: string }>) {
   const { t } = useTranslation();
   const sideInsetStyle = useSideInsetStyle();
   return (
     <View style={sideInsetStyle}>
       <View className={SCREEN_BODY_CLASS}>
-        {mergeState ? <MergeRestrictionsList mergeState={mergeState} term={term} /> : null}
+        <MergeRestrictionsList mergeState={mergeState} term={term} />
         <Text className="text-sm text-muted-foreground">
           {t('prReview.merge.enableAutoMergeDescriptionTerm', { term })}
         </Text>
@@ -134,8 +140,6 @@ function ProviderAutoMergeBody({
  * blocks, so the list is never the authorization.
  */
 export function PrMergeProviderBody({
-  providerAutoMerge,
-  autoMergeCapability,
   gate,
   term,
   isMutating,
@@ -143,8 +147,6 @@ export function PrMergeProviderBody({
   onCancel,
   children,
 }: Readonly<{
-  providerAutoMerge: boolean;
-  autoMergeCapability?: ProviderReviewCapability;
   gate: PrMergeGate;
   term: string;
   isMutating: boolean;
@@ -167,21 +169,6 @@ export function PrMergeProviderBody({
       </Button>
     );
   }
-  const mergeState = gate.kind === 'state' ? gate.mergeState : null;
-
-  if (providerAutoMerge && autoMergeCapability?.supported === false) {
-    return (
-      <>
-        <View style={sideInsetStyle}>
-          <View className="px-4 pt-3">
-            <PrReviewCapabilityBanner capability={autoMergeCapability} />
-          </View>
-        </View>
-        <View className="flex-1" />
-        <PrFormSheetFooter>{cancelButton()}</PrFormSheetFooter>
-      </>
-    );
-  }
   if (gate.kind === 'unknown') {
     return (
       <>
@@ -199,10 +186,23 @@ export function PrMergeProviderBody({
       </>
     );
   }
-  if (providerAutoMerge) {
+  if (gate.kind === 'auto-merge' && gate.capability?.supported === false) {
     return (
       <>
-        <ProviderAutoMergeBody mergeState={mergeState} term={term} />
+        <View style={sideInsetStyle}>
+          <View className="px-4 pt-3">
+            <PrReviewCapabilityBanner capability={gate.capability} />
+          </View>
+        </View>
+        <View className="flex-1" />
+        <PrFormSheetFooter>{cancelButton()}</PrFormSheetFooter>
+      </>
+    );
+  }
+  if (gate.kind === 'auto-merge') {
+    return (
+      <>
+        <ProviderAutoMergeBody mergeState={gate.mergeState} term={term} />
         <View className="flex-1" />
         <PrFormSheetFooter>
           <Button
@@ -218,12 +218,12 @@ export function PrMergeProviderBody({
       </>
     );
   }
-  if (mergeState && !mergeState.canMerge) {
+  if (gate.kind === 'merge' && !gate.mergeState.canMerge) {
     return (
       <>
         <View style={sideInsetStyle}>
           <View className={SCREEN_BODY_CLASS}>
-            <MergeRestrictionsList mergeState={mergeState} term={term} />
+            <MergeRestrictionsList mergeState={gate.mergeState} term={term} />
           </View>
         </View>
         <View className="flex-1" />
@@ -233,10 +233,10 @@ export function PrMergeProviderBody({
   }
   return (
     <>
-      {mergeState ? (
+      {gate.kind === 'merge' ? (
         <View style={sideInsetStyle}>
           <View className="px-4 pt-3">
-            <MergeRestrictionsList mergeState={mergeState} term={term} />
+            <MergeRestrictionsList mergeState={gate.mergeState} term={term} />
           </View>
         </View>
       ) : null}

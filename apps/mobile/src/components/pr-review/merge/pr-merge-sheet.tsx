@@ -41,17 +41,26 @@ import { type ProviderPrRef } from '@/lib/pr-review/provider-pr-ref';
 // tall, so a short arm's spacer can push its footer to the sheet's bottom.
 const SHEET_SCROLL_CONTENT_STYLE = { flexGrow: 1, paddingBottom: 4 };
 
-function mergeGateFor(
-  prRef: ProviderPrRef | undefined,
-  mergeState: ProviderPrMergeState | null | undefined
-): PrMergeGate {
+function mergeGateFor({
+  prRef,
+  mergeState,
+  mode,
+  autoMergeCapability,
+}: Readonly<{
+  prRef: ProviderPrRef | undefined;
+  mergeState: ProviderPrMergeState | null | undefined;
+  mode: 'merge' | 'enable-auto-merge';
+  autoMergeCapability: ProviderReviewCapability | undefined;
+}>): PrMergeGate {
   if (!prRef) {
     return { kind: 'github' };
   }
-  if (mergeState) {
-    return { kind: 'state', mergeState };
+  if (!mergeState) {
+    return { kind: 'unknown' };
   }
-  return { kind: 'unknown' };
+  return mode === 'enable-auto-merge'
+    ? { kind: 'auto-merge', mergeState, capability: autoMergeCapability }
+    : { kind: 'merge', mergeState };
 }
 
 type PrMergeSheetProps = Readonly<{
@@ -113,7 +122,7 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
       })
     : null;
   const methodOptions = providerMethodOptions ?? mergeMethodOptionsFor(repoSettings);
-  const gate = mergeGateFor(prRef, mergeState);
+  const gate = mergeGateFor({ prRef, mergeState, mode, autoMergeCapability });
   const fallbackMethod: AllowedMergeMethod =
     methodOptions.find(o => o.value === initialMethod)?.value ??
     (providerMethodOptions
@@ -209,8 +218,6 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
       >
         {settled ? (
           <PrMergeProviderBody
-            providerAutoMerge={Boolean(prRef) && mode === 'enable-auto-merge'}
-            autoMergeCapability={autoMergeCapability}
             gate={gate}
             term={prRef ? t(providerPrNounKey(prRef.platform)) : ''}
             isMutating={isMutating}

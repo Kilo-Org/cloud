@@ -198,6 +198,21 @@ function mount(
 }
 
 /**
+ * Re-render the mounted harness under another account: the tree stays mounted,
+ * so the harness keeps its own draft and selection and only the scope prop
+ * moves.
+ */
+function rerenderWithScope(
+  renderer: TestRenderer.ReactTestRenderer,
+  organizationId?: string,
+  onSelectProfile?: (id: string | null) => void
+) {
+  act(() => {
+    renderer.update(createElement(ControlledPanel, { organizationId, onSelectProfile }));
+  });
+}
+
+/**
  * A captured callback prop. Renderer props are untyped, so the value enters as
  * `unknown` and is narrowed once before the test calls through it.
  */
@@ -670,6 +685,67 @@ describe('AdvancedConfigPanel', () => {
     expect(texts(renderer)).not.toContain('API_KEY');
     expect(buttonByText(renderer, 'Save as profile')).toBeUndefined();
     expect(texts(renderer)).toContain('1 var · 1 setup cmd');
+  });
+
+  it('offers a saved profile only under the account that saved it', async () => {
+    const mocks = mutations();
+    const onSelectProfile = vi.fn<(id: string | null) => void>();
+    const renderer = mount({ mocks, organizationId: 'org-1', onSelectProfile });
+    fillManualConfig(renderer);
+    press(buttonByText(renderer, 'Save as profile'));
+    await submitSave(renderer, 'My Setup');
+
+    // The row shows in the account it was saved in, before the invalidated
+    // refetch lands, and the save picks it for this session.
+    expect(onSelectProfile).toHaveBeenCalledWith('new-1');
+    expect(texts(renderer)).toContain('1 var · 1 setup cmd');
+
+    // The panel stays mounted while the account moves to another organization,
+    // whose list holds no profile at all.
+    listMock.useAgentProfileList.mockImplementation((scope?: string) =>
+      listState(scope === 'org-1' ? {} : { personalProfiles: [] })
+    );
+    rerenderWithScope(renderer, 'org-2', onSelectProfile);
+
+    // Org-2 counts only its own rows.
+    expect(texts(renderer)).not.toContain('1 var · 1 setup cmd');
+  });
+
+  it('finishes a save only in the account it started in', async () => {
+    const mocks = mutations();
+    const write = Promise.withResolvers<{ id: string }>();
+    mocks.create.mutateAsync.mockReturnValue(write.promise);
+    const onSelectProfile = vi.fn<(id: string | null) => void>();
+    const renderer = mount({ mocks, organizationId: 'org-1', onSelectProfile });
+    fillManualConfig(renderer);
+    press(buttonByText(renderer, 'Save as profile'));
+    typeInto(renderer, 'Profile name', 'My Setup');
+    // Start the write without waiting for its answer.
+    act(() => {
+      (renderer.root.findByType('SheetHeader' as never).props.onDone as () => void)();
+    });
+
+    listMock.useAgentProfileList.mockImplementation(() => listState({ personalProfiles: [] }));
+    rerenderWithScope(renderer, 'org-2', onSelectProfile);
+    await act(async () => {
+      write.resolve({ id: 'new-1' });
+      await Promise.resolve();
+    });
+
+    // The profile belongs to org-1, so the account on screen neither offers nor
+    // picks it.
+    expect(onSelectProfile).not.toHaveBeenCalled();
+    // The form keeps the configuration it holds.
+    expect(texts(renderer)).toContain('API_KEY');
+    // The draft's counts and the saved row's counts are the same pair, so
+    // dropping the draft's command makes the two distinguishable: the account
+    // on screen counts only what its draft holds, while a row published into it
+    // would add its own var and its saved command on top.
+    typeInto(renderer, 'Command 1', '');
+    expect(texts(renderer)).toContain('1 var');
+    expect(texts(renderer)).not.toContain('2 vars');
+    // The save did complete, so the person still sees the confirmation.
+    expect(toast.success).toHaveBeenCalledTimes(1);
   });
 
   it('keeps the save sheet open and the typed name when the save fails', async () => {

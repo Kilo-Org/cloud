@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one panel contract: the disclosure, both manual editors, and the atomic save with its lost-save recovery and account scope must stay in step */
 import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
@@ -126,6 +127,26 @@ export function AdvancedConfigPanel({
   // it, because only the former appears as an id the panel did not know.
   const lostSaveAttemptRef = useRef<UnknownSaveAttempt | null>(null);
 
+  // The account this panel saves into. A saved row belongs to that account, so
+  // the panel offers and counts only the current account's rows. The latch
+  // lives in state beside the row, so a render React discards drops the latch
+  // and the row together and the next render applies the reset. `null` is
+  // Personal, so it never shares a key with an organization; `undefined` is the
+  // unset latch. The rows themselves are keyed by `useAgentProfileList`, which
+  // starts empty for a different account.
+  const scope = organizationId ?? null;
+  const [resolvedScope, setResolvedScope] = useState<string | null | undefined>(undefined);
+  if (resolvedScope !== scope) {
+    setResolvedScope(scope);
+    if (createdProfile !== null) {
+      setCreatedProfile(null);
+    }
+    lostSaveAttemptRef.current = null;
+  }
+  // Read after an `await`: a save publishes only into the account it started in.
+  const scopeRef = useRef(scope);
+  scopeRef.current = scope;
+
   const orgProfiles = useMemo(() => {
     const base = (list.orgProfiles as readonly ProfileListRow[]).map(profile =>
       toSelectorProfile(profile, 'organization')
@@ -178,19 +199,26 @@ export function AdvancedConfigPanel({
   );
 
   /**
-   * Complete a save for `profile`: record it for the selector, pick it, and
-   * clear the manual draft it now carries. The saved profile is the draft's new
-   * home, so the two must not disagree: the profile's setup commands are
-   * appended to the inline ones, and a draft left behind would run them twice.
+   * Complete a save for `profile`, whose account is `savedUnder`. The saved
+   * profile is the draft's new home, so the two must not disagree: the profile's
+   * setup commands are appended to the inline ones, and a draft left behind
+   * would run them twice.
    */
-  const finishSave = (profile: ProfileSelectorProfile) => {
+  const finishSave = (profile: ProfileSelectorProfile, savedUnder: string | null) => {
     lostSaveAttemptRef.current = null;
+    toast.success(t('agentChat.newSession.profileSaved', { name: profile.name }));
+    // A profile belongs to the account it was created in. A save that completes
+    // after the account moved publishes nothing here: the form keeps the
+    // configuration it holds, and the new account's picks come only from its own
+    // list.
+    if (savedUnder !== scopeRef.current) {
+      return;
+    }
     // Keep resource counts current before the invalidated list refetch lands.
     setCreatedProfile(profile);
     onSelectProfile(profile.id);
     onManualVarsChange([]);
     onManualCommandsChange([]);
-    toast.success(t('agentChat.newSession.profileSaved', { name: profile.name }));
   };
 
   /**
@@ -217,6 +245,9 @@ export function AdvancedConfigPanel({
   const handleSaveProfile = async (
     submission: SaveProfileSubmission
   ): Promise<SaveProfileOutcome> => {
+    // The account this save writes into, recorded so its result publishes only
+    // into that account.
+    const savedUnder = scope;
     // The server compares the trimmed name against the stored one, so every
     // reading here uses the trimmed form too.
     const name = submission.name.trim();
@@ -254,14 +285,17 @@ export function AdvancedConfigPanel({
       const { id: profileId } = await create.mutateAsync(
         profileSaveCreateInput({ vars: manualVars, commands: setupCommands, submission, name })
       );
-      finishSave({
-        id: profileId,
-        name,
-        varCount: manualVars.length,
-        commandCount: setupCommands.length,
-        isDefault: submission.setAsDefault,
-        ownerType: organizationId === undefined ? 'user' : 'organization',
-      });
+      finishSave(
+        {
+          id: profileId,
+          name,
+          varCount: manualVars.length,
+          commandCount: setupCommands.length,
+          isDefault: submission.setAsDefault,
+          ownerType: organizationId === undefined ? 'user' : 'organization',
+        },
+        savedUnder
+      );
       return { saved: true };
     } catch (error) {
       // The open sheet is this flow's only failure surface, so the hook's error
@@ -280,7 +314,7 @@ export function AdvancedConfigPanel({
       if (refusal === PROFILE_NAME_TAKEN_MESSAGE) {
         const recovered = await recoverLostSave(name, content);
         if (recovered !== null) {
-          finishSave(recovered);
+          finishSave(recovered, savedUnder);
           return { saved: true };
         }
       }

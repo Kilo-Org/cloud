@@ -5134,6 +5134,25 @@
       "openService": "Apri {{name}} sulla porta {{port}}",
       "portLabel": "localhost:{{port}}"
     },
+    "artifacts": {
+      "title": "Artefatti",
+      "loading": "Caricamento artefatti…",
+      "loadError": "Impossibile caricare gli artefatti.",
+      "empty": "Ancora nessun artefatto salvato. I documenti salvati in /artifacts compaiono qui dopo la sincronizzazione.",
+      "sandboxNotRunning": "La sandbox non è in esecuzione. I documenti salvati restano disponibili, ma le nuove modifiche non vengono sincronizzate.",
+      "deleteConfirmTitle": "Eliminare {{fileName}}?",
+      "deleteConfirmBody": "Questo rimuove il documento dai tuoi artefatti. Una copia potrebbe rimanere in una sandbox in esecuzione.",
+      "deleteConfirmAction": "Elimina artefatto",
+      "deleteChanged": "{{fileName}} è cambiato da quando è stato caricato questo elenco. L'elenco è stato aggiornato; controlla la nuova versione e riprova.",
+      "keptUntil": "Conservato fino all'eliminazione del workspace o della sessione.",
+      "deleteA11y": "Elimina {{fileName}}",
+      "downloadA11y": "Scarica {{fileName}}",
+      "downloadError": "Impossibile creare un link di download per {{fileName}}. Aggiorna e riprova.",
+      "downloadShareFailed": "Impossibile aprire {{fileName}} per la condivisione. Riprova.",
+      "fileCount_one": "{{count}} documento",
+      "fileCount_many": "{{count}} documenti",
+      "fileCount_other": "{{count}} documenti"
+    },
     "triggers": {
       "title": "Attivatori e webhook",
       "subtitle": "Automatizza le esecuzioni di Cloud Agent da una chiamata webhook o da una pianificazione.",

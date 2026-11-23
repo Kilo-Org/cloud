@@ -5040,6 +5040,24 @@
       "openService": "Ireki {{name}} {{port}} atakan",
       "portLabel": "localhost:{{port}}"
     },
+    "artifacts": {
+      "title": "Artefaktuak",
+      "loading": "Artefaktuak kargatzen…",
+      "loadError": "Ezin izan dira artefaktuak kargatu.",
+      "empty": "Oraindik ez dago gordetako artefakturik. /artifacts-en gordetako fitxategiak sinkronizatu ondoren agertzen dira hemen.",
+      "sandboxNotRunning": "Sandbox-a geldituta dago. Gordetako fitxategiak oraindik eskuragarri daude, baina aldaketa berriak ez dira sinkronizatzen ari.",
+      "deleteConfirmTitle": "Ezabatu {{fileName}}?",
+      "deleteConfirmBody": "Honek fitxategia zure artefaktuetatik kenduko du. Kopia bat martxan dagoen sandbox batean geratu liteke.",
+      "deleteConfirmAction": "Ezabatu artefaktua",
+      "deleteChanged": "{{fileName}} aldatu egin da zerrenda hau kargatu zenetik. Zerrenda freskatu da; berrikusi bertsio berria eta saiatu berriro.",
+      "keptUntil": "Lan-eremua edo saioa ezabatzen den arte gordeta egongo da.",
+      "deleteA11y": "Ezabatu {{fileName}}",
+      "downloadA11y": "Deskargatu {{fileName}}",
+      "downloadError": "Ezin izan da {{fileName}} deskargatzeko esteka sortu. Freskatu eta saiatu berriro.",
+      "downloadShareFailed": "Ezin izan da {{fileName}} ireki partekatzeko. Saiatu berriro.",
+      "fileCount_one": "{{count}} fitxategi",
+      "fileCount_other": "{{count}} fitxategi"
+    },
     "triggers": {
       "title": "Abiarazleak eta webhookak",
       "subtitle": "Automatizatu Cloud Agent exekuzioak webhook dei batetik edo ordutegi baten arabera.",

@@ -4953,6 +4953,23 @@
       "openService": "ポート{{port}}の{{name}}を開く",
       "portLabel": "localhost:{{port}}"
     },
+    "artifacts": {
+      "title": "アーティファクト",
+      "loading": "アーティファクトを読み込み中…",
+      "loadError": "アーティファクトを読み込めませんでした。",
+      "empty": "保存されたアーティファクトはまだありません。/artifacts に保存されたファイルは、同期後にここに表示されます。",
+      "sandboxNotRunning": "サンドボックスは停止しています。保存されたファイルは引き続き利用できますが、新しい変更は同期されません。",
+      "deleteConfirmTitle": "{{fileName}}を削除しますか？",
+      "deleteConfirmBody": "これにより、ファイルがアーティファクトから削除されます。実行中のサンドボックスにはコピーが残る場合があります。",
+      "deleteConfirmAction": "アーティファクトを削除",
+      "deleteChanged": "{{fileName}}は一覧の取得後に変更されました。一覧は更新されました。新しいバージョンを確認してから、再試行してください。",
+      "keptUntil": "ワークスペースまたはセッションが削除されるまで保持されます。",
+      "deleteA11y": "{{fileName}}を削除",
+      "downloadA11y": "{{fileName}}をダウンロード",
+      "downloadError": "{{fileName}}のダウンロードリンクを作成できませんでした。更新してから再試行してください。",
+      "downloadShareFailed": "共有するために{{fileName}}を開けませんでした。再試行してください。",
+      "fileCount_other": "{{count}}件のファイル"
+    },
     "triggers": {
       "title": "トリガーとウェブフック",
       "subtitle": "ウェブフック呼び出しまたはスケジュールからCloud Agentの実行を自動化します。",

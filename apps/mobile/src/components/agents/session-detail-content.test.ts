@@ -308,6 +308,7 @@ vi.mock('@/components/agents/session-follow-button', () => ({ SessionFollowButto
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 vi.mock('@/components/ui/icons', () => ({
   AlertCircle: 'AlertCircle',
+  Archive: 'Archive',
   ArrowLeft: 'ArrowLeft',
   Bot: 'Bot',
   ChevronDown: 'ChevronDown',

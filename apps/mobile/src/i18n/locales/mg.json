@@ -5040,6 +5040,24 @@
       "openService": "Sokafy {{name}} amin'ny port {{port}}",
       "portLabel": "localhost:{{port}}"
     },
+    "artifacts": {
+      "title": "Rakitra voatahiry",
+      "loading": "Mampiditra ny rakitra voatahiry…",
+      "loadError": "Tsy afaka nampiditra ny rakitra voatahiry.",
+      "empty": "Mbola tsy misy rakitra voatahiry. Ny rakitra voatahiry ao amin'ny /artifacts dia miseho eto aorian'ny fanarindahana.",
+      "sandboxNotRunning": "Tsy mandeha ny sandbox. Mbola azo alaina ny rakitra voatahiry, saingy tsy mifandrindra ny fiovana vaovao.",
+      "deleteConfirmTitle": "Hofafana ve ny {{fileName}}?",
+      "deleteConfirmBody": "Esorina amin'ny rakitra voatahiry ity rakitra ity. Mety hisy kopia tavela ao amin'ny sandbox mandeha.",
+      "deleteConfirmAction": "Fafao ny rakitra voatahiry",
+      "deleteChanged": "Niova ny {{fileName}} hatramin'ny nakana ity lisitra ity. Efa nohavaozina ny lisitra; jereo ny kinova vaovao ary andramo indray.",
+      "keptUntil": "Tazonina mandra-pahafafana ny toeram-piasana na ny fotoam-piasana.",
+      "deleteA11y": "Fafao ny {{fileName}}",
+      "downloadA11y": "Alaivo ny {{fileName}}",
+      "downloadError": "Tsy afaka namorona rohy fampidinana ho an'ny {{fileName}}. Havaozy ary andramo indray.",
+      "downloadShareFailed": "Tsy afaka nanokatra ny {{fileName}} mba hozaraina. Andramo indray.",
+      "fileCount_one": "{{count}} rakitra",
+      "fileCount_other": "{{count}} rakitra"
+    },
     "triggers": {
       "title": "Fanentanana sy fiantsoana",
       "subtitle": "Ataovy ho azy ny fanatanterahana Cloud Agent avy amin'ny fiantsoana na fandaharam-potoana.",

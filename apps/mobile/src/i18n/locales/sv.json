@@ -5040,6 +5040,24 @@
       "openService": "Öppna {{name}} på port {{port}}",
       "portLabel": "localhost:{{port}}"
     },
+    "artifacts": {
+      "title": "Artefakter",
+      "loading": "Läser in artefakter…",
+      "loadError": "Det gick inte att läsa in artefakterna.",
+      "empty": "Inga sparade artefakter än. Filer som sparas i /artifacts visas här efter synkronisering.",
+      "sandboxNotRunning": "Sandlådan är inte igång. Sparade filer finns fortfarande tillgängliga, men nya ändringar synkroniseras inte.",
+      "deleteConfirmTitle": "Ta bort {{fileName}}?",
+      "deleteConfirmBody": "Detta tar bort filen från dina artefakter. En kopia kan finnas kvar i en sandlåda som är igång.",
+      "deleteConfirmAction": "Ta bort artefakt",
+      "deleteChanged": "{{fileName}} har ändrats sedan listan hämtades. Listan har uppdaterats; granska den nya versionen och försök igen.",
+      "keptUntil": "Behålls tills arbetsytan eller sessionen tas bort.",
+      "deleteA11y": "Ta bort {{fileName}}",
+      "downloadA11y": "Ladda ned {{fileName}}",
+      "downloadError": "Det gick inte att skapa en nedladdningslänk för {{fileName}}. Uppdatera och försök igen.",
+      "downloadShareFailed": "Det gick inte att öppna {{fileName}} för delning. Försök igen.",
+      "fileCount_one": "{{count}} fil",
+      "fileCount_other": "{{count}} filer"
+    },
     "triggers": {
       "title": "Utlösare och webhooks",
       "subtitle": "Automatisera Cloud Agent-körningar från ett webhookanrop eller enligt ett schema.",

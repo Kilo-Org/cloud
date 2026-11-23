@@ -5040,6 +5040,24 @@
       "openService": "{{name}} megnyitása, port: {{port}}",
       "portLabel": "localhost:{{port}}"
     },
+    "artifacts": {
+      "title": "Artefaktok",
+      "loading": "Artefaktok betöltése…",
+      "loadError": "Nem sikerült betölteni az artefaktokat.",
+      "empty": "Még nincsenek mentett artefaktok. A /artifacts mappába mentett fájlok szinkronizálás után itt jelennek meg.",
+      "sandboxNotRunning": "A homokozó nem fut. A mentett fájlok továbbra is elérhetők, de az új változtatások nem szinkronizálódnak.",
+      "deleteConfirmTitle": "{{fileName}} törlése?",
+      "deleteConfirmBody": "Ezzel eltávolítod a fájlt az artefaktjaidból. Egy példány maradhat a futó homokozóban.",
+      "deleteConfirmAction": "Artefakt törlése",
+      "deleteChanged": "{{fileName}} megváltozott a lista betöltése óta. A lista frissült; nézd át az új verziót, és próbáld újra.",
+      "keptUntil": "A munkaterület vagy a munkamenet törléséig megmarad.",
+      "deleteA11y": "{{fileName}} törlése",
+      "downloadA11y": "{{fileName}} letöltése",
+      "downloadError": "Nem sikerült letöltési hivatkozást létrehozni a(z) {{fileName}} fájlhoz. Frissíts, és próbáld újra.",
+      "downloadShareFailed": "Nem sikerült megnyitni a(z) {{fileName}} fájlt a megosztáshoz. Próbáld újra.",
+      "fileCount_one": "{{count}} fájl",
+      "fileCount_other": "{{count}} fájl"
+    },
     "triggers": {
       "title": "Triggerek és webhookok",
       "subtitle": "Automatizálja a Cloud Agent futtatásait webhookhívásból vagy ütemezésből.",

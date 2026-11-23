@@ -5040,6 +5040,24 @@
       "openService": "Buɗe {{name}} a tashar {{port}}",
       "portLabel": "localhost:{{port}}"
     },
+    "artifacts": {
+      "title": "Fayilolin da aka adana",
+      "loading": "Ana loda fayilolin da aka adana…",
+      "loadError": "Ba a iya loda fayilolin da aka adana ba.",
+      "empty": "Babu fayilolin da aka adana tukuna. Fayilolin da aka adana a /artifacts suna bayyana a nan bayan daidaitawa.",
+      "sandboxNotRunning": "Sandbox ɗin ba ya aiki. Fayilolin da aka adana har yanzu suna samuwa, amma sabbin canje-canje ba sa daidaitawa.",
+      "deleteConfirmTitle": "Share {{fileName}}?",
+      "deleteConfirmBody": "Wannan yana cire fayil ɗin daga cikin fayilolinka da aka adana. Kwafi na iya kasancewa a cikin sandbox da ke aiki.",
+      "deleteConfirmAction": "Share fayil ɗin da aka adana",
+      "deleteChanged": "{{fileName}} ya canza tun lokacin da aka loda wannan jeri. An sabunta jerin; duba sabuwar sigar sannan ka sake gwadawa.",
+      "keptUntil": "Ana ajiye har sai an share wurin aiki ko zaman.",
+      "deleteA11y": "Share {{fileName}}",
+      "downloadA11y": "Sauke {{fileName}}",
+      "downloadError": "Ba a iya ƙirƙirar hanyar haɗin saukewa don {{fileName}} ba. Sabunta ka sake gwadawa.",
+      "downloadShareFailed": "Ba a iya buɗe {{fileName}} don rabawa ba. Sake gwadawa.",
+      "fileCount_one": "Fayil {{count}}",
+      "fileCount_other": "Fayiloli {{count}}"
+    },
     "triggers": {
       "title": "Masu jawowa da kiran yanar gizo",
       "subtitle": "Sarrafa ayyukan Cloud Agent ta atomatik daga kiran yanar gizo ko jadawali.",

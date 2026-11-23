@@ -4951,6 +4951,23 @@
       "openService": "포트 {{port}}에서 {{name}} 열기",
       "portLabel": "localhost:{{port}}"
     },
+    "artifacts": {
+      "title": "아티팩트",
+      "loading": "아티팩트 불러오는 중…",
+      "loadError": "아티팩트를 불러오지 못했습니다.",
+      "empty": "아직 저장된 아티팩트가 없습니다. /artifacts에 저장된 파일은 동기화 후 여기에 표시됩니다.",
+      "sandboxNotRunning": "샌드박스가 중지되었습니다. 저장된 파일은 계속 사용할 수 있지만 새 변경 사항은 동기화되지 않습니다.",
+      "deleteConfirmTitle": "{{fileName}} 파일을 삭제할까요?",
+      "deleteConfirmBody": "아티팩트에서 이 파일을 제거합니다. 실행 중인 샌드박스에 사본이 남아 있을 수 있습니다.",
+      "deleteConfirmAction": "아티팩트 삭제",
+      "deleteChanged": "{{fileName}} 파일이 이 목록을 불러온 후 변경되었습니다. 목록이 새로고침되었습니다. 새 버전을 확인한 후 다시 시도하세요.",
+      "keptUntil": "워크스페이스 또는 세션이 삭제될 때까지 보관됩니다.",
+      "deleteA11y": "{{fileName}} 파일 삭제",
+      "downloadA11y": "{{fileName}} 다운로드",
+      "downloadError": "{{fileName}} 파일의 다운로드 링크를 만들지 못했습니다. 새로고침한 후 다시 시도하세요.",
+      "downloadShareFailed": "{{fileName}} 파일을 열어 공유하지 못했습니다. 다시 시도하세요.",
+      "fileCount_other": "파일 {{count}}개"
+    },
     "triggers": {
       "title": "트리거 및 웹훅",
       "subtitle": "웹훅 호출 또는 일정으로 Cloud Agent 실행을 자동화하세요.",

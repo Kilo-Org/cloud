@@ -5040,6 +5040,24 @@
       "openService": "{{name}} xizmatini {{port}}-portda ochish",
       "portLabel": "localhost:{{port}}"
     },
+    "artifacts": {
+      "title": "Artefaktlar",
+      "loading": "Artefaktlar yuklanmoqda…",
+      "loadError": "Artefaktlarni yuklab bo‘lmadi.",
+      "empty": "Hozircha saqlangan artefaktlar yo‘q. /artifacts ichiga saqlangan fayllar sinxronlashdan so‘ng shu yerda paydo bo‘ladi.",
+      "sandboxNotRunning": "Sandbox ishlamayapti. Saqlangan fayllar mavjud bo‘lib qoladi, ammo yangi o‘zgarishlar sinxronlanmayapti.",
+      "deleteConfirmTitle": "{{fileName}} o‘chirilsinmi?",
+      "deleteConfirmBody": "Bu faylni artefaktlaringizdan olib tashlaydi. Nusxasi ishlab turgan sandboxda qolishi mumkin.",
+      "deleteConfirmAction": "Artefaktni o‘chirish",
+      "deleteChanged": "{{fileName}} ro‘yxat olingandan keyin o‘zgargan. Ro‘yxat yangilandi; yangi versiyani ko‘rib chiqing va qayta urinib ko‘ring.",
+      "keptUntil": "Ish maydoni yoki sessiya o‘chirilgunga qadar saqlanadi.",
+      "deleteA11y": "{{fileName}} faylini o‘chirish",
+      "downloadA11y": "{{fileName}} faylini yuklab olish",
+      "downloadError": "{{fileName}} uchun yuklab olish havolasini yaratib bo‘lmadi. Yangilang va qayta urinib ko‘ring.",
+      "downloadShareFailed": "{{fileName}} faylini ulashish uchun ochib bo‘lmadi. Qayta urinib ko‘ring.",
+      "fileCount_one": "{{count}} ta fayl",
+      "fileCount_other": "{{count}} ta fayl"
+    },
     "triggers": {
       "title": "Ishga tushirgichlar va vebhooklar",
       "subtitle": "Cloud Agent ishga tushirishlarini vebhook chaqiruvi yoki jadval boʻyicha avtomatlashtiring.",

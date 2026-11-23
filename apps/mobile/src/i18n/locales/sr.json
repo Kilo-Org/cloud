@@ -5134,6 +5134,25 @@
       "openService": "Otvori {{name}} na portu {{port}}",
       "portLabel": "localhost:{{port}}"
     },
+    "artifacts": {
+      "title": "Artefakti",
+      "loading": "Učitavanje artefakata…",
+      "loadError": "Nije moguće učitati artefakte.",
+      "empty": "Još nema sačuvanih artefakata. Datoteke sačuvane u /artifacts pojavljuju se ovde nakon sinhronizacije.",
+      "sandboxNotRunning": "Sandbox je zaustavljen. Sačuvane datoteke ostaju dostupne, ali nove izmene se ne sinhronizuju.",
+      "deleteConfirmTitle": "Obrisati {{fileName}}?",
+      "deleteConfirmBody": "Ovo uklanja datoteku iz tvojih artefakata. Kopija može ostati u sandboksu koji je pokrenut.",
+      "deleteConfirmAction": "Obriši artefakt",
+      "deleteChanged": "Datoteka {{fileName}} je izmenjena nakon što je ova lista učitana. Lista je osvežena; pregledaj novu verziju i pokušaj ponovo.",
+      "keptUntil": "Čuva se dok se radni prostor ili sesija ne obrišu.",
+      "deleteA11y": "Obriši {{fileName}}",
+      "downloadA11y": "Preuzmi {{fileName}}",
+      "downloadError": "Nije moguće kreirati vezu za preuzimanje datoteke {{fileName}}. Osveži i pokušaj ponovo.",
+      "downloadShareFailed": "Nije moguće otvoriti {{fileName}} za deljenje. Pokušaj ponovo.",
+      "fileCount_one": "{{count}} datoteka",
+      "fileCount_few": "{{count}} datoteke",
+      "fileCount_other": "{{count}} datoteka"
+    },
     "triggers": {
       "title": "Okidači i vebhukovi",
       "subtitle": "Automatizujte pokretanja Cloud Agent-a pomoću vebhuk poziva ili po rasporedu.",

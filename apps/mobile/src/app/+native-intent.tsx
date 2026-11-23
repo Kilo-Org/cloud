@@ -160,6 +160,16 @@ export function redirectSystemPath({
     if (/(?:^|\/)dev\/save-profile-sheet-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(app)/save-profile-sheet-fixture';
     }
+    // Dev-only session artifacts sheet, in the state the link's last segment
+    // names (`?state=` on the route; the fixture falls back to `loaded`).
+    const sessionArtifactsFixture =
+      /(?:^|\/)dev\/session-artifacts-fixture\/([a-z][a-z-]*)\/?$/.exec(path);
+    if (sessionArtifactsFixture) {
+      return `/(app)/session-artifacts-fixture?state=${sessionArtifactsFixture[1]}`;
+    }
+    if (/(?:^|\/)dev\/session-artifacts-fixture\/?(?:[?#].*)?$/.test(path)) {
+      return '/(app)/session-artifacts-fixture';
+    }
     if (/(?:^|\/)dev\/mcp-form-sheet-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(app)/mcp-form-sheet-fixture';
     }

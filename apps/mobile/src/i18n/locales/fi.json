@@ -5040,6 +5040,24 @@
       "openService": "Avaa {{name}} portissa {{port}}",
       "portLabel": "localhost:{{port}}"
     },
+    "artifacts": {
+      "title": "Tuotokset",
+      "loading": "Ladataan tuotoksia…",
+      "loadError": "Tuotoksia ei voitu ladata.",
+      "empty": "Tallennettuja tuotoksia ei ole vielä. Kansioon /artifacts tallennetut tiedostot näkyvät täällä synkronoinnin jälkeen.",
+      "sandboxNotRunning": "Hiekkalaatikko ei ole käynnissä. Tallennetut tiedostot ovat edelleen saatavilla, mutta uudet muutokset eivät synkronoidu.",
+      "deleteConfirmTitle": "Poistetaanko {{fileName}}?",
+      "deleteConfirmBody": "Tämä poistaa tiedoston tuotoksistasi. Kopio voi jäädä käynnissä olevaan hiekkalaatikkoon.",
+      "deleteConfirmAction": "Poista tuotos",
+      "deleteChanged": "{{fileName}} on muuttunut tämän luettelon lataamisen jälkeen. Luettelo on päivitetty; tarkista uusi versio ja yritä uudelleen.",
+      "keptUntil": "Säilyy, kunnes työtila tai istunto poistetaan.",
+      "deleteA11y": "Poista {{fileName}}",
+      "downloadA11y": "Lataa {{fileName}}",
+      "downloadError": "Tiedostolle {{fileName}} ei voitu luoda latauslinkkiä. Päivitä ja yritä uudelleen.",
+      "downloadShareFailed": "Tiedostoa {{fileName}} ei voitu avata jaettavaksi. Yritä uudelleen.",
+      "fileCount_one": "{{count}} tiedosto",
+      "fileCount_other": "{{count}} tiedostoa"
+    },
     "triggers": {
       "title": "Liipaisimet ja verkkokoukut",
       "subtitle": "Automatisoi Cloud Agent -ajot verkkokoukun kutsusta tai aikataulusta.",

@@ -5040,6 +5040,24 @@
       "openService": "{{name}} auf Port {{port}} öffnen",
       "portLabel": "localhost:{{port}}"
     },
+    "artifacts": {
+      "title": "Artefakte",
+      "loading": "Artefakte werden geladen…",
+      "loadError": "Artefakte konnten nicht geladen werden.",
+      "empty": "Noch keine gespeicherten Artefakte. In /artifacts gespeicherte Dateien erscheinen hier nach der Synchronisierung.",
+      "sandboxNotRunning": "Die Sandbox läuft nicht. Gespeicherte Dateien bleiben verfügbar, aber neue Änderungen werden nicht synchronisiert.",
+      "deleteConfirmTitle": "{{fileName}} löschen?",
+      "deleteConfirmBody": "Dadurch wird die Datei aus deinen Artefakten entfernt. Eine Kopie kann in einer laufenden Sandbox verbleiben.",
+      "deleteConfirmAction": "Artefakt löschen",
+      "deleteChanged": "{{fileName}} wurde seit dem Laden dieser Liste geändert. Die Liste wurde aktualisiert; prüfe die neue Version und versuche es erneut.",
+      "keptUntil": "Wird aufbewahrt, bis der Arbeitsbereich oder die Sitzung gelöscht wird.",
+      "deleteA11y": "{{fileName}} löschen",
+      "downloadA11y": "{{fileName}} herunterladen",
+      "downloadError": "Für {{fileName}} konnte kein Download-Link erstellt werden. Aktualisiere und versuche es erneut.",
+      "downloadShareFailed": "{{fileName}} konnte nicht zum Teilen geöffnet werden. Versuche es erneut.",
+      "fileCount_one": "{{count}} Datei",
+      "fileCount_other": "{{count}} Dateien"
+    },
     "triggers": {
       "title": "Auslöser & Webhooks",
       "subtitle": "Automatisiere Läufe von Cloud Agent per Webhook-Aufruf oder Zeitplan.",

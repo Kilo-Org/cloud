@@ -5134,6 +5134,25 @@
       "openService": "Ouvrir {{name}} sur le port {{port}}",
       "portLabel": "localhost:{{port}}"
     },
+    "artifacts": {
+      "title": "Artefacts",
+      "loading": "Chargement des artefacts…",
+      "loadError": "Impossible de charger les artefacts.",
+      "empty": "Aucun artefact enregistré pour l'instant. Les fichiers enregistrés dans /artifacts apparaissent ici après synchronisation.",
+      "sandboxNotRunning": "Le bac à sable n'est pas en cours d'exécution. Les fichiers enregistrés restent disponibles, mais les nouvelles modifications ne se synchronisent pas.",
+      "deleteConfirmTitle": "Supprimer {{fileName}} ?",
+      "deleteConfirmBody": "Cela retire le fichier de vos artefacts. Une copie peut subsister dans un bac à sable en cours d'exécution.",
+      "deleteConfirmAction": "Supprimer l'artefact",
+      "deleteChanged": "{{fileName}} a changé depuis le chargement de cette liste. La liste a été actualisée ; examinez la nouvelle version et réessayez.",
+      "keptUntil": "Conservé jusqu'à la suppression de l'espace de travail ou de la session.",
+      "deleteA11y": "Supprimer {{fileName}}",
+      "downloadA11y": "Télécharger {{fileName}}",
+      "downloadError": "Impossible de créer un lien de téléchargement pour {{fileName}}. Actualisez et réessayez.",
+      "downloadShareFailed": "Impossible d'ouvrir {{fileName}} pour le partager. Réessayez.",
+      "fileCount_one": "{{count}} fichier",
+      "fileCount_many": "{{count}} fichiers",
+      "fileCount_other": "{{count}} fichiers"
+    },
     "triggers": {
       "title": "Déclencheurs et webhooks",
       "subtitle": "Automatisez les exécutions de Cloud Agent à partir d’un appel webhook ou d’une planification.",

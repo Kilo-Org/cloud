@@ -5040,6 +5040,24 @@
       "openService": "Buksan ang {{name}} sa port {{port}}",
       "portLabel": "localhost:{{port}}"
     },
+    "artifacts": {
+      "title": "Mga naka-save na payl",
+      "loading": "Naglo-load ng mga naka-save na payl…",
+      "loadError": "Hindi ma-load ang mga naka-save na payl.",
+      "empty": "Wala pang naka-save na payl. Ang mga payl na naka-save sa /artifacts ay lalabas dito pagkatapos ng pag-synchronize.",
+      "sandboxNotRunning": "Hindi tumatakbo ang sandbox. Nananatiling available ang mga naka-save na payl, ngunit hindi nai-synchronize ang mga bagong pagbabago.",
+      "deleteConfirmTitle": "Burahin ang {{fileName}}?",
+      "deleteConfirmBody": "Aalisin nito ang payl mula sa iyong mga naka-save na payl. Maaaring may natitirang kopya sa isang tumatakbong sandbox.",
+      "deleteConfirmAction": "Burahin ang naka-save na payl",
+      "deleteChanged": "Nagbago ang {{fileName}} mula nang ma-load ang listahang ito. Na-refresh na ang listahan; suriin ang bagong bersyon at subukan muli.",
+      "keptUntil": "Itatago hanggang mabura ang workspace o sesyon.",
+      "deleteA11y": "Burahin ang {{fileName}}",
+      "downloadA11y": "I-download ang {{fileName}}",
+      "downloadError": "Hindi makagawa ng link para sa pag-download ng {{fileName}}. I-refresh at subukan muli.",
+      "downloadShareFailed": "Hindi mabuksan ang {{fileName}} para ibahagi. Subukan muli.",
+      "fileCount_one": "{{count}} payl",
+      "fileCount_other": "{{count}} payl"
+    },
     "triggers": {
       "title": "Mga pampapagana at webhook",
       "subtitle": "Gawing awtomatiko ang mga pagtakbo ng Cloud Agent mula sa tawag na webhook o iskedyul.",

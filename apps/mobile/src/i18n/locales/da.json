@@ -5040,6 +5040,24 @@
       "openService": "Åbn {{name}} på port {{port}}",
       "portLabel": "localhost:{{port}}"
     },
+    "artifacts": {
+      "title": "Artefakter",
+      "loading": "Indlæser artefakter…",
+      "loadError": "Kunne ikke indlæse artefakter.",
+      "empty": "Ingen gemte artefakter endnu. Filer, der gemmes i /artifacts, vises her efter synkronisering.",
+      "sandboxNotRunning": "Sandboxen kører ikke. Gemte filer er stadig tilgængelige, men nye ændringer synkroniseres ikke.",
+      "deleteConfirmTitle": "Slet {{fileName}}?",
+      "deleteConfirmBody": "Dette fjerner filen fra dine artefakter. Der kan stadig ligge en kopi i en kørende sandbox.",
+      "deleteConfirmAction": "Slet artefakt",
+      "deleteChanged": "{{fileName}} er blevet ændret, siden denne liste blev indlæst. Listen er blevet opdateret; gennemse den nye version, og prøv igen.",
+      "keptUntil": "Bevares, indtil arbejdsområdet eller sessionen slettes.",
+      "deleteA11y": "Slet {{fileName}}",
+      "downloadA11y": "Hent {{fileName}}",
+      "downloadError": "Kunne ikke oprette et downloadlink til {{fileName}}. Opdater, og prøv igen.",
+      "downloadShareFailed": "Kunne ikke åbne {{fileName}} for at dele. Prøv igen.",
+      "fileCount_one": "{{count}} fil",
+      "fileCount_other": "{{count}} filer"
+    },
     "triggers": {
       "title": "Udløsere og webhooks",
       "subtitle": "Automatiser Cloud Agent-kørsler fra et webhook-kald eller en tidsplan.",

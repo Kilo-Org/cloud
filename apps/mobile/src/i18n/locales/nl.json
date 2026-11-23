@@ -5040,6 +5040,24 @@
       "openService": "{{name}} openen op poort {{port}}",
       "portLabel": "localhost:{{port}}"
     },
+    "artifacts": {
+      "title": "Artefacten",
+      "loading": "Artefacten laden…",
+      "loadError": "Artefacten konden niet worden geladen.",
+      "empty": "Nog geen opgeslagen artefacten. Bestanden die in /artifacts worden opgeslagen, verschijnen hier na synchronisatie.",
+      "sandboxNotRunning": "De sandbox draait niet. Opgeslagen bestanden blijven beschikbaar, maar nieuwe wijzigingen worden niet gesynchroniseerd.",
+      "deleteConfirmTitle": "{{fileName}} verwijderen?",
+      "deleteConfirmBody": "Hiermee wordt het bestand uit je artefacten verwijderd. Een kopie kan in een draaiende sandbox achterblijven.",
+      "deleteConfirmAction": "Artefact verwijderen",
+      "deleteChanged": "{{fileName}} is gewijzigd sinds deze lijst is geladen. De lijst is vernieuwd; bekijk de nieuwe versie en probeer het opnieuw.",
+      "keptUntil": "Bewaard totdat de werkruimte of sessie wordt verwijderd.",
+      "deleteA11y": "{{fileName}} verwijderen",
+      "downloadA11y": "{{fileName}} downloaden",
+      "downloadError": "Kon geen downloadlink voor {{fileName}} maken. Vernieuw en probeer het opnieuw.",
+      "downloadShareFailed": "Kon {{fileName}} niet openen om te delen. Probeer het opnieuw.",
+      "fileCount_one": "{{count}} bestand",
+      "fileCount_other": "{{count}} bestanden"
+    },
     "triggers": {
       "title": "Triggers en webhooks",
       "subtitle": "Automatiseer Cloud Agent-uitvoeringen via een webhookaanroep of een planning.",

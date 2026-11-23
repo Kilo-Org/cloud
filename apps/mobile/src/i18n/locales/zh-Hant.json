@@ -4953,6 +4953,23 @@
       "openService": "開啟連接埠 {{port}} 上的 {{name}}",
       "portLabel": "localhost:{{port}}"
     },
+    "artifacts": {
+      "title": "成品",
+      "loading": "正在載入成品…",
+      "loadError": "無法載入成品。",
+      "empty": "尚無已儲存的成品。儲存在 /artifacts 的檔案會在同步後顯示於此。",
+      "sandboxNotRunning": "沙箱未在執行中。已儲存的檔案仍可使用，但新的變更不會同步。",
+      "deleteConfirmTitle": "要刪除 {{fileName}} 嗎？",
+      "deleteConfirmBody": "這會從你的成品中移除檔案。執行中的沙箱可能仍保留副本。",
+      "deleteConfirmAction": "刪除成品",
+      "deleteChanged": "{{fileName}} 在清單載入後已有變更。清單已重新整理；請檢閱新版本後再試一次。",
+      "keptUntil": "會保留到工作區或工作階段被刪除為止。",
+      "deleteA11y": "刪除 {{fileName}}",
+      "downloadA11y": "下載 {{fileName}}",
+      "downloadError": "無法為 {{fileName}} 建立下載連結。請重新整理後再試一次。",
+      "downloadShareFailed": "無法開啟 {{fileName}} 進行分享。請再試一次。",
+      "fileCount_other": "{{count}} 個檔案"
+    },
     "triggers": {
       "title": "觸發器與網路鉤子",
       "subtitle": "透過網路鉤子呼叫或排程自動執行 Cloud Agent。",

@@ -5134,6 +5134,25 @@
       "openService": "Atvērt {{name}} portā {{port}}",
       "portLabel": "localhost:{{port}}"
     },
+    "artifacts": {
+      "title": "Artefakti",
+      "loading": "Ielādē artefaktus…",
+      "loadError": "Neizdevās ielādēt artefaktus.",
+      "empty": "Vēl nav saglabātu artefaktu. Faili, kas saglabāti /artifacts, pēc sinhronizācijas parādīsies šeit.",
+      "sandboxNotRunning": "Smilškaste nedarbojas. Saglabātie faili joprojām ir pieejami, taču jaunās izmaiņas netiek sinhronizētas.",
+      "deleteConfirmTitle": "Dzēst {{fileName}}?",
+      "deleteConfirmBody": "Tas noņems failu no jūsu artefaktiem. Kopija var palikt darbojošā smilškastē.",
+      "deleteConfirmAction": "Dzēst artefaktu",
+      "deleteChanged": "{{fileName}} ir mainījies kopš šī saraksta ielādes. Saraksts ir atsvaidzināts; pārskatiet jauno versiju un mēģiniet vēlreiz.",
+      "keptUntil": "Saglabāts, līdz tiek dzēsta darbvieta vai sesija.",
+      "deleteA11y": "Dzēst {{fileName}}",
+      "downloadA11y": "Lejupielādēt {{fileName}}",
+      "downloadError": "Neizdevās izveidot lejupielādes saiti failam {{fileName}}. Atsvaidziniet un mēģiniet vēlreiz.",
+      "downloadShareFailed": "Neizdevās atvērt {{fileName}}, lai kopīgotu. Mēģiniet vēlreiz.",
+      "fileCount_zero": "{{count}} failu",
+      "fileCount_one": "{{count}} fails",
+      "fileCount_other": "{{count}} faili"
+    },
     "triggers": {
       "title": "Trigeri un tīmekļa āķi",
       "subtitle": "Automatizējiet Cloud Agent palaišanu ar tīmekļa āķa izsaukumu vai pēc grafika.",

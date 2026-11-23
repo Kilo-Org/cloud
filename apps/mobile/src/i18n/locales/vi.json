@@ -5040,6 +5040,24 @@
       "openService": "Mở {{name}} trên cổng {{port}}",
       "portLabel": "localhost:{{port}}"
     },
+    "artifacts": {
+      "title": "Tệp đã lưu",
+      "loading": "Đang tải tệp đã lưu…",
+      "loadError": "Không thể tải tệp đã lưu.",
+      "empty": "Chưa có tệp đã lưu nào. Các tệp được lưu trong /artifacts sẽ xuất hiện ở đây sau khi đồng bộ hóa.",
+      "sandboxNotRunning": "Sandbox không chạy. Các tệp đã lưu vẫn còn khả dụng, nhưng các thay đổi mới không được đồng bộ.",
+      "deleteConfirmTitle": "Xóa {{fileName}}?",
+      "deleteConfirmBody": "Thao tác này sẽ xóa tệp khỏi danh sách tệp đã lưu của bạn. Một bản sao có thể vẫn còn trong sandbox đang chạy.",
+      "deleteConfirmAction": "Xóa tệp đã lưu",
+      "deleteChanged": "{{fileName}} đã thay đổi kể từ khi danh sách này được tải. Danh sách đã được làm mới; hãy xem phiên bản mới và thử lại.",
+      "keptUntil": "Được giữ cho đến khi không gian làm việc hoặc phiên bị xóa.",
+      "deleteA11y": "Xóa {{fileName}}",
+      "downloadA11y": "Tải xuống {{fileName}}",
+      "downloadError": "Không thể tạo liên kết tải xuống cho {{fileName}}. Hãy làm mới và thử lại.",
+      "downloadShareFailed": "Không thể mở {{fileName}} để chia sẻ. Hãy thử lại.",
+      "fileCount_one": "{{count}} tệp",
+      "fileCount_other": "{{count}} tệp"
+    },
     "triggers": {
       "title": "Trình kích hoạt và webhook",
       "subtitle": "Tự động hóa các lần chạy Cloud Agent từ một lệnh gọi webhook hoặc theo lịch.",

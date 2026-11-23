@@ -5040,6 +5040,24 @@
       "openService": "Maak {{name}} op poort {{port}} oop",
       "portLabel": "localhost:{{port}}"
     },
+    "artifacts": {
+      "title": "Artefakte",
+      "loading": "Laai artefakte…",
+      "loadError": "Kon nie artefakte laai nie.",
+      "empty": "Nog geen gestoorde artefakte nie. Lêers wat in /artifacts gestoor word, verskyn hier ná sinchronisasie.",
+      "sandboxNotRunning": "Die sandbox loop nie. Gestoorde lêers bly beskikbaar, maar nuwe veranderinge sinchroniseer nie.",
+      "deleteConfirmTitle": "Skrap {{fileName}}?",
+      "deleteConfirmBody": "Dit verwyder die lêer uit jou artefakte. 'n Kopie kan in 'n sandbox wat loop agterbly.",
+      "deleteConfirmAction": "Skrap artefak",
+      "deleteChanged": "{{fileName}} het verander sedert hierdie lys gelaai is. Die lys is verfris; hersien die nuwe weergawe en probeer weer.",
+      "keptUntil": "Bewaar totdat die werkruimte of sessie geskrap word.",
+      "deleteA11y": "Skrap {{fileName}}",
+      "downloadA11y": "Laai {{fileName}} af",
+      "downloadError": "Kon nie 'n aflaaiskakel vir {{fileName}} skep nie. Verfris en probeer weer.",
+      "downloadShareFailed": "Kon nie {{fileName}} oopmaak om te deel nie. Probeer weer.",
+      "fileCount_one": "{{count}} lêer",
+      "fileCount_other": "{{count}} lêers"
+    },
     "triggers": {
       "title": "Snellers en webhake",
       "subtitle": "Automatiseer Cloud Agent-lopies vanaf ’n webhaakoproep of ’n skedule.",

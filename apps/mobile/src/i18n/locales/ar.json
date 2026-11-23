@@ -5416,6 +5416,28 @@
       "openService": "فتح {{name}} على المنفذ {{port}}",
       "portLabel": "localhost:{{port}}"
     },
+    "artifacts": {
+      "title": "المخرجات",
+      "loading": "جارٍ تحميل المخرجات…",
+      "loadError": "تعذّر تحميل المخرجات.",
+      "empty": "لا توجد مخرجات محفوظة بعد. تظهر الملفات المحفوظة في /artifacts هنا بعد المزامنة.",
+      "sandboxNotRunning": "الصندوق الرملي متوقف. تبقى الملفات المحفوظة متاحة، لكن التغييرات الجديدة لا تتم مزامنتها.",
+      "deleteConfirmTitle": "حذف {{fileName}}؟",
+      "deleteConfirmBody": "يؤدي هذا إلى إزالة الملف من مخرجاتك. قد تبقى نسخة في صندوق رملي قيد التشغيل.",
+      "deleteConfirmAction": "حذف المخرج",
+      "deleteChanged": "تغيّر {{fileName}} منذ تحميل هذه القائمة. تم تحديث القائمة؛ راجع النسخة الجديدة وأعد المحاولة.",
+      "keptUntil": "يُحتفظ به حتى حذف مساحة العمل أو الجلسة.",
+      "deleteA11y": "حذف {{fileName}}",
+      "downloadA11y": "تنزيل {{fileName}}",
+      "downloadError": "تعذّر إنشاء رابط تنزيل لـ {{fileName}}. حدّث وأعد المحاولة.",
+      "downloadShareFailed": "تعذّر فتح {{fileName}} لمشاركته. أعد المحاولة.",
+      "fileCount_zero": "لا ملفات ({{count}})",
+      "fileCount_one": "{{count}} ملف",
+      "fileCount_two": "{{count}} ملفان",
+      "fileCount_few": "{{count}} ملفات",
+      "fileCount_many": "{{count}} ملفًا",
+      "fileCount_other": "{{count}} ملف"
+    },
     "triggers": {
       "title": "المشغلات والويب هوك",
       "subtitle": "أتمت تشغيل Cloud Agent من استدعاء ويب هوك أو جدول زمني.",

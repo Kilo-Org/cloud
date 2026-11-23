@@ -5322,6 +5322,27 @@
       "openService": "Iftaħ {{name}} fuq il-port {{port}}",
       "portLabel": "localhost:{{port}}"
     },
+    "artifacts": {
+      "title": "Artefatti",
+      "loading": "Qed jgħabbi l-artefatti…",
+      "loadError": "L-artefatti ma setgħux jitgħabbew.",
+      "empty": "Għad m'hemmx artefatti issejvjati. Il-fajls issejvjati fi /artifacts jidhru hawn wara s-sinkronizzazzjoni.",
+      "sandboxNotRunning": "Is-sandbox mhux qed jaħdem. Il-fajls issejvjati jibqgħu disponibbli, iżda bidliet ġodda mhumiex qed jiġu sinkronizzati.",
+      "deleteConfirmTitle": "Tħassar {{fileName}}?",
+      "deleteConfirmBody": "Dan ineħħi l-fajl mill-artefatti tiegħek. Kopja tista' tibqa' f'sandbox li qed jaħdem.",
+      "deleteConfirmAction": "Ħassar l-artefatt",
+      "deleteChanged": "{{fileName}} inbidel minn meta nqabdet il-lista. Il-lista ġiet aġġornata; ara l-verżjoni l-ġdida u erġa' pprova.",
+      "keptUntil": "Jinżamm sakemm jitħassar l-ispazju tax-xogħol jew titħassar is-sessjoni.",
+      "deleteA11y": "Ħassar {{fileName}}",
+      "downloadA11y": "Niżżel {{fileName}}",
+      "downloadError": "Ma setax jinħoloq link għat-tniżżil ta' {{fileName}}. Aġġorna u erġa' pprova.",
+      "downloadShareFailed": "Ma setax jinfetaħ {{fileName}} għall-qsim. Erġa' pprova.",
+      "fileCount_one": "{{count}} fajl",
+      "fileCount_two": "{{count}} fajls",
+      "fileCount_few": "{{count}} fajls",
+      "fileCount_many": "{{count}}-il fajl",
+      "fileCount_other": "{{count}} fajl"
+    },
     "triggers": {
       "title": "Skattaturi u webhooks",
       "subtitle": "Awtomatizza l-eżekuzzjonijiet tal-Cloud Agent minn sejħa webhook jew skeda.",

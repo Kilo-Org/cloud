@@ -5228,6 +5228,26 @@
       "openService": "Atidaryti {{name}} prievade {{port}}",
       "portLabel": "localhost:{{port}}"
     },
+    "artifacts": {
+      "title": "Artefaktai",
+      "loading": "Įkeliami artefaktai…",
+      "loadError": "Nepavyko įkelti artefaktų.",
+      "empty": "Kol kas nėra išsaugotų artefaktų. Failai, išsaugoti /artifacts, atsiras čia po sinchronizavimo.",
+      "sandboxNotRunning": "Smėliadėžė neveikia. Išsaugoti failai lieka prieinami, bet nauji pakeitimai nesinchronizuojami.",
+      "deleteConfirmTitle": "Ištrinti {{fileName}}?",
+      "deleteConfirmBody": "Tai pašalins failą iš jūsų artefaktų. Kopija gali likti veikiančioje smėliadėžėje.",
+      "deleteConfirmAction": "Ištrinti artefaktą",
+      "deleteChanged": "{{fileName}} pasikeitė nuo tada, kai buvo įkeltas šis sąrašas. Sąrašas atnaujintas; peržiūrėkite naują versiją ir bandykite dar kartą.",
+      "keptUntil": "Saugoma, kol bus ištrinta darbo sritis arba sesija.",
+      "deleteA11y": "Ištrinti {{fileName}}",
+      "downloadA11y": "Atsisiųsti {{fileName}}",
+      "downloadError": "Nepavyko sukurti atsisiuntimo nuorodos failui {{fileName}}. Atnaujinkite ir bandykite dar kartą.",
+      "downloadShareFailed": "Nepavyko atidaryti {{fileName}}, kad būtų galima bendrinti. Bandykite dar kartą.",
+      "fileCount_one": "{{count}} failas",
+      "fileCount_few": "{{count}} failai",
+      "fileCount_many": "{{count}} failų",
+      "fileCount_other": "{{count}} failo"
+    },
     "triggers": {
       "title": "Trigeriai ir žiniatinklio kabliukai",
       "subtitle": "Automatizuokite Cloud Agent paleidimus pagal žiniatinklio kabliuko iškvietimą arba grafiką.",

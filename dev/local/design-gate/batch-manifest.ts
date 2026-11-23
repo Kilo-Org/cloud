@@ -446,6 +446,7 @@ const DEV_ROUTES: readonly (readonly [RegExp, string, 'self'?])[] = [
   [/^dev\/local-failure-copy-fixture\//, '(app)/local-failure-copy-fixture'],
   [/^dev\/gguf-retry-fixture/, '(app)/gguf-retry-fixture'],
   [/^dev\/header-balance-fixture/, '(app)/header-balance-fixture'],
+  [/^dev\/session-artifacts-fixture/, '(app)/session-artifacts-fixture'],
 ];
 
 export function linkSegments(link: string): string[] {

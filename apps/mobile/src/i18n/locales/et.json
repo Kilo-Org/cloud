@@ -5040,6 +5040,24 @@
       "openService": "Ava {{name}} pordil {{port}}",
       "portLabel": "localhost:{{port}}"
     },
+    "artifacts": {
+      "title": "Artefaktid",
+      "loading": "Artefaktide laadimine…",
+      "loadError": "Artefakte ei saanud laadida.",
+      "empty": "Salvestatud artefakte veel pole. Kausta /artifacts salvestatud failid ilmuvad pärast sünkroonimist siia.",
+      "sandboxNotRunning": "Liivakast ei tööta. Salvestatud failid on endiselt saadaval, kuid uusi muudatusi ei sünkroonita.",
+      "deleteConfirmTitle": "Kas kustutada {{fileName}}?",
+      "deleteConfirmBody": "See eemaldab faili sinu artefaktidest. Koopia võib jääda töötavasse liivakasti.",
+      "deleteConfirmAction": "Kustuta artefakt",
+      "deleteChanged": "{{fileName}} on muutunud pärast selle loendi laadimist. Loend on värskendatud; vaata uus versioon üle ja proovi uuesti.",
+      "keptUntil": "Säilitatakse, kuni tööruum või seanss kustutatakse.",
+      "deleteA11y": "Kustuta {{fileName}}",
+      "downloadA11y": "Laadi alla {{fileName}}",
+      "downloadError": "{{fileName}} jaoks ei saanud allalaadimislinki luua. Värskenda ja proovi uuesti.",
+      "downloadShareFailed": "{{fileName}} avamine jagamiseks ebaõnnestus. Proovi uuesti.",
+      "fileCount_one": "{{count}} fail",
+      "fileCount_other": "{{count}} faili"
+    },
     "triggers": {
       "title": "Päästikud ja veebihaagid",
       "subtitle": "Automatiseeri Cloud Agent käivitused veebihaagi kutse või ajakava kaudu.",

@@ -5040,6 +5040,24 @@
       "openService": "Open {{name}} on port {{port}}",
       "portLabel": "localhost:{{port}}"
     },
+    "artifacts": {
+      "title": "Artifacts",
+      "loading": "Loading artifacts…",
+      "loadError": "Could not load artifacts.",
+      "empty": "No saved artifacts yet. Files saved in /artifacts appear here after synchronization.",
+      "sandboxNotRunning": "The sandbox is not running. Saved files remain available, but new changes are not syncing.",
+      "deleteConfirmTitle": "Delete {{fileName}}?",
+      "deleteConfirmBody": "This removes the file from your artifacts. A copy may remain in a running sandbox.",
+      "deleteConfirmAction": "Delete artifact",
+      "deleteChanged": "{{fileName}} changed since this list loaded. The list has been refreshed; review the new version and try again.",
+      "downloadError": "Could not create a download link for {{fileName}}. Refresh and try again.",
+      "downloadShareFailed": "Could not open {{fileName}} to share. Try again.",
+      "keptUntil": "Kept until the workspace or session is deleted.",
+      "deleteA11y": "Delete {{fileName}}",
+      "downloadA11y": "Download {{fileName}}",
+      "fileCount_one": "{{count}} file",
+      "fileCount_other": "{{count}} files"
+    },
     "triggers": {
       "title": "Triggers & webhooks",
       "subtitle": "Automate Cloud Agent runs from a webhook call or a schedule.",

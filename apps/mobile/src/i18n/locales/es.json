@@ -819,6 +819,8 @@
     },
     "providerConnect": {
       "description": "Conecta la {{label}} de Kilo para revisar PR automáticamente.",
+      "notConnectedTitle": "{{platform}} no está conectado",
+      "githubAdminOnlyDescription": "Solo los propietarios de la organización y los administradores pueden conectarlo.",
       "githubApp": "aplicación de GitHub",
       "githubError": "No se pudo abrir la configuración de GitHub. Inténtalo de nuevo.",
       "gitlabAccount": "cuenta de GitLab",
@@ -3462,7 +3464,7 @@
   "organization": {
     "auditLog": {
       "title": "Registro de auditoría",
-      "permissionDenied": "Solo un propietario, administrador o responsable de facturación de una organización con el plan Enterprise puede ver su registro de auditoría.",
+      "permissionDenied": "Solo un propietario, administrador o gestor de facturación de una organización con el plan Enterprise puede ver su registro de auditoría. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "No hay eventos de auditoría",
       "emptyDescription": "Aquí aparecen las acciones realizadas en esta organización.",
       "truncated": "Se muestran los eventos más recientes.",
@@ -3657,7 +3659,7 @@
     },
     "billing": {
       "title": "Facturación",
-      "permissionDenied": "Solo el propietario, un administrador o un responsable de facturación de la organización puede ver su facturación.",
+      "permissionDenied": "Solo el propietario, un administrador o un gestor de facturación de la organización puede ver su facturación. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Suscripción",
       "state": "Estado",
       "stateNone": "Sin suscripción",
@@ -3846,7 +3848,7 @@
       "emptyDescription": "Usa Hora anterior para ver solicitudes anteriores.",
       "emptyBoundDescription": "Los registros de solicitudes no llegan más atrás.",
       "loadError": "No se pudieron cargar los registros de solicitudes.",
-      "permissionDenied": "Solo un propietario, administrador o responsable de facturación de la organización puede ver sus registros de solicitudes.",
+      "permissionDenied": "Solo un propietario, administrador o gestor de facturación de la organización puede ver sus registros de solicitudes. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} entrada · {{output}} salida",
       "byok": "BYOK"
     },
@@ -4964,7 +4966,7 @@
     "defaultModel": "Usar el modelo predeterminado de Kilo",
     "duration": "Límite de tiempo (minutos)",
     "spendLimit": "Límite de gasto (USD)",
-    "invalidSafeguards": "Introduce límites de tiempo y gasto positivos y finitos.",
+    "invalidSafeguards": "Introduce un número positivo dentro del rango permitido.",
     "estimate": "Estimado {{estimate}} · máximo {{maximum}}",
     "estimateUnavailable": "No hay resumen de pago disponible con estos ajustes. Cambia el modelo o los límites, o inténtalo de nuevo más tarde.",
     "estimatePricingUnavailable": "No hay precios disponibles para este modelo. Elige otro modelo.",
@@ -5135,6 +5137,8 @@
       "autoCommit": "Confirmar los cambios al finalizar la ejecución",
       "condenseOnComplete": "Condensar el contexto al finalizar la ejecución",
       "activeTitle": "Disparador activo",
+      "activeSwitchA11y": "Disparador activo: {{name}}",
+      "copyLinkA11y": "Copiar enlace de {{name}}",
       "activeDescription": "Los webhooks en pausa responden con 404.",
       "runAsCreator": "Ejecutar como yo",
       "runAsCreatorDescription": "Cada ejecución usa tu cuenta, así que la cabecera secreta es obligatoria.",

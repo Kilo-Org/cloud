@@ -817,6 +817,8 @@
     },
     "providerConnect": {
       "description": "プルリクエストを自動でレビューするには、Kiloの{{label}}を接続してください。",
+      "notConnectedTitle": "{{platform}}が接続されていません",
+      "githubAdminOnlyDescription": "接続できるのは組織のオーナーと管理者のみです。",
       "githubApp": "GitHub App",
       "githubError": "GitHubのセットアップを開けませんでした。もう一度お試しください。",
       "gitlabAccount": "GitLabアカウント",
@@ -3399,7 +3401,7 @@
   "organization": {
     "auditLog": {
       "title": "監査ログ",
-      "permissionDenied": "監査ログを閲覧できるのは、Enterpriseプランの組織のオーナー、管理者、または請求管理者のみです。",
+      "permissionDenied": "監査ログを閲覧できるのは、Enterpriseプランの組織のオーナー、管理者、または請求管理者のみです。 $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "監査イベントはありません",
       "emptyDescription": "この組織で行われた操作がここに表示されます。",
       "truncated": "最新のイベントを表示しています。",
@@ -3589,7 +3591,7 @@
     },
     "billing": {
       "title": "請求",
-      "permissionDenied": "請求情報を表示できるのは、組織のオーナー、管理者、請求管理者のみです。",
+      "permissionDenied": "請求情報を表示できるのは、組織のオーナー、管理者、請求管理者のみです。 $t(organization.boundary.accessDeniedDescription)",
       "subscription": "サブスクリプション",
       "state": "状態",
       "stateNone": "サブスクリプションなし",
@@ -3778,7 +3780,7 @@
       "emptyDescription": "「前の1時間」をタップすると、それより前のリクエストが表示されます。",
       "emptyBoundDescription": "リクエストログはここまでしかさかのぼれません。",
       "loadError": "リクエストログを読み込めませんでした。",
-      "permissionDenied": "リクエストログを閲覧できるのは、組織のオーナー、管理者、または請求管理者のみです。",
+      "permissionDenied": "リクエストログを閲覧できるのは、組織のオーナー、管理者、または請求管理者のみです。 $t(organization.boundary.accessDeniedDescription)",
       "tokens": "入力 {{input}} · 出力 {{output}}",
       "byok": "BYOK"
     },
@@ -4875,7 +4877,7 @@
     "defaultModel": "Kiloのデフォルトモデルを使用",
     "duration": "時間の上限(分)",
     "spendLimit": "支出の上限(USD)",
-    "invalidSafeguards": "正の有限な時間と支出の上限を入力してください。",
+    "invalidSafeguards": "許容範囲内の正の値を入力してください。",
     "estimate": "推定 {{estimate}} · 最大 {{maximum}}",
     "estimateUnavailable": "これらの設定では有料サマリーを利用できません。モデルや上限を変更するか、後でもう一度お試しください。",
     "confirmPaid": "{{context}}の有料要約を有効にしますか?",
@@ -5041,6 +5043,8 @@
       "autoCommit": "実行完了時に変更をコミットする",
       "condenseOnComplete": "実行完了時にコンテキストを圧縮する",
       "activeTitle": "トリガー有効",
+      "activeSwitchA11y": "トリガー有効：{{name}}",
+      "copyLinkA11y": "{{name}}のリンクをコピー",
       "activeDescription": "一時停止中のウェブフックは404を返します。",
       "runAsCreator": "自分として実行",
       "runAsCreatorDescription": "すべての実行があなたのアカウントを使用するため、シークレットヘッダーが必要です。",

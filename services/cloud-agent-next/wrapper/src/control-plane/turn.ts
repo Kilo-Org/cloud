@@ -1296,10 +1296,11 @@ export function createTurnManager(deps: TurnManagerDeps) {
       for (const pending of turn.prompts)
         if (pending.nativeClose) pending.nativeClose.completedExecution = undefined;
     }
-    const gateResult = event ? gateResultFromProperties(event.properties) : undefined;
-    if (gateResult !== undefined) turn.gateResult = gateResult;
     refreshActivity(route.runtimeKey);
     if (eventSessionId !== root) return;
+    // The staged gate is the root session's own result, not any child's.
+    const gateResult = event ? gateResultFromProperties(event.properties) : undefined;
+    if (gateResult !== undefined) turn.gateResult = gateResult;
     for (const pending of turn.prompts) {
       if (!pending.dispatched) continue;
       if (

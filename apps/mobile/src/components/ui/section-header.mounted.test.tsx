@@ -408,9 +408,6 @@ describe('SectionHeader mounted layout', () => {
   });
 
   it('announces the section label as a heading', () => {
-    // A section label is one of the few headings a long settings screen has; a
-    // reader navigates by jumping between them, so every one of them carries the
-    // role without the caller opting in.
     const root = mount(createElement(SectionHeader, { label: 'Explore' }));
     const label = root.find(
       node => Object.is(node.type, 'Text') && node.children.includes('Explore')

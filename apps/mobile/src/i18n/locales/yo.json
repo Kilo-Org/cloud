@@ -1502,7 +1502,9 @@
       "githubError": "A kò lè ṣí ìṣètò GitHub. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i.",
       "gitlabAccount": "àkọọ́lẹ̀ GitLab",
       "gitlabError": "A kò lè ṣí ìṣètò GitLab. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i.",
-      "description": "So {{label}} ti Kilo pọ̀ láti ṣàtúnyẹ̀wò àwọn ìbéèrè àkópọ̀ láìfọwọ́ṣe."
+      "description": "So {{label}} ti Kilo pọ̀ láti ṣàtúnyẹ̀wò àwọn ìbéèrè àkópọ̀ láìfọwọ́ṣe.",
+      "notConnectedTitle": "A kò tíì so {{platform}} pọ̀",
+      "githubAdminOnlyDescription": "Àwọn ẹni tó ni àjọ àti àwọn alákòóso nìkan ló lè so ó pọ̀."
     },
     "overview": {
       "allAreas": "Gbogbo apá",
@@ -3407,7 +3409,7 @@
   "organization": {
     "auditLog": {
       "title": "Àkọsílẹ̀ àyẹ̀wò",
-      "permissionDenied": "Olùní àjọ, alábòójútó tàbí olùṣàkóso ìsanwó nínú ètò Enterprise nìkan ló lè ka àkọsílẹ̀ àyẹ̀wò rẹ̀.",
+      "permissionDenied": "Olùní àjọ, alábòójútó tàbí olùṣàkóso ìsanwó nínú ètò Enterprise nìkan ló lè ka àkọsílẹ̀ àyẹ̀wò rẹ̀. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Kò sí ìṣẹ̀lẹ̀ àyẹ̀wò",
       "emptyDescription": "Àwọn ìgbésẹ̀ tí a gbé nínú àjọ yìí yóò hàn níbí.",
       "truncated": "À ń fi àwọn ìṣẹ̀lẹ̀ tuntun jùlọ hàn.",
@@ -3597,7 +3599,7 @@
     },
     "billing": {
       "title": "Ìsanwó",
-      "permissionDenied": "Ẹni tó ni àjọ, alábòójútó tàbí olùṣàkóso ìsanwó nìkan ló lè rí ìsanwó àjọ náà.",
+      "permissionDenied": "Ẹni tó ni àjọ, alábòójútó tàbí olùṣàkóso ìsanwó nìkan ló lè rí ìsanwó àjọ náà. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Ìforúkọsílẹ̀",
       "state": "Ipò",
       "stateNone": "Kò sí ìforúkọsílẹ̀",
@@ -3774,7 +3776,7 @@
       "emptyDescription": "Lo Wákàtí tó ṣáájú láti wo àwọn ìbéèrè tó ṣáájú.",
       "emptyBoundDescription": "Àkọsílẹ̀ àwọn ìbéèrè kò lọ sẹ́yìn ju ibí lọ.",
       "loadError": "A kò lè gbé àwọn àkọsílẹ̀ ìbéèrè wọlé.",
-      "permissionDenied": "Olùní àjọ, alábòójútó tàbí olùṣàkóso ìsanwó nìkan ló lè ka àkọsílẹ̀ ìbéèrè rẹ̀.",
+      "permissionDenied": "Olùní àjọ, alábòójútó tàbí olùṣàkóso ìsanwó nìkan ló lè ka àkọsílẹ̀ ìbéèrè rẹ̀. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} wọlé · {{output}} jáde",
       "byok": "BYOK"
     },
@@ -4875,7 +4877,7 @@
     "defaultModel": "Lo àwòṣe àìyípadà Kilo",
     "duration": "Ààbò àkókò (ìṣẹ́jú)",
     "spendLimit": "Ààbò ìnáwó (USD)",
-    "invalidSafeguards": "Tẹ òpin àkókò àti ìnáwó tó jẹ́ rere, tó sì ní òpin.",
+    "invalidSafeguards": "Tẹ nọ́mbà rere sínú ààlà tí a gbà.",
     "estimate": "Ìsirò {{estimate}} · ti ó pọ̀jù {{maximum}}",
     "estimateUnavailable": "Àkópọ̀ tí a sanwó fún kò sí fún àwọn ètò yìí. Yí àwòṣe dà tàbí àwọn ààlà dà, tàbí gbìyànjú mọ̀ ní àmọ̀jú.",
     "confirmPaid": "Mú àkópọ̀ olówó ṣiṣẹ́ fún {{context}}?",
@@ -5041,6 +5043,8 @@
       "autoCommit": "Ṣe àkójọ àwọn àyípadà nígbà tí ìṣiṣẹ́ bá parí",
       "condenseOnComplete": "Ṣe àkópọ̀ àyíká ọ̀rọ̀ nígbà tí ìṣiṣẹ́ bá parí",
       "activeTitle": "Ìmúṣiṣẹ́ ń ṣiṣẹ́",
+      "activeSwitchA11y": "Ìmúṣiṣẹ́ ń ṣiṣẹ́: {{name}}",
+      "copyLinkA11y": "Da ìjápọ̀ kọ fún {{name}}",
       "activeDescription": "Àwọn wẹ́ẹ̀bùhóòkù tí a dá dúró máa ń dáhùn pẹ̀lú 404.",
       "runAsCreator": "Ṣiṣẹ́ gẹ́gẹ́ bí èmi",
       "runAsCreatorDescription": "Ìṣiṣẹ́ kọ̀ọ̀kan máa ń lo àkọọ́lẹ̀ rẹ, nítorí náà àkọlé àṣírí pọn dandan.",

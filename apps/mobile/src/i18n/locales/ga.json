@@ -1586,7 +1586,9 @@
       "githubError": "Níorbh fhéidir socrú GitHub a oscailt. Bain triail as arís le do thoil.",
       "gitlabAccount": "an cuntas GitLab",
       "gitlabError": "Níorbh fhéidir socrú GitLab a oscailt. Bain triail as arís le do thoil.",
-      "description": "Ceangail {{label}} le Kilo chun iarratais tarraingthe a athbhreithniú go huathoibríoch."
+      "description": "Ceangail {{label}} le Kilo chun iarratais tarraingthe a athbhreithniú go huathoibríoch.",
+      "notConnectedTitle": "Níl {{platform}} nasctha",
+      "githubAdminOnlyDescription": "Ní féidir ach le húinéirí agus riarthóirí eagraíochta é a cheangal."
     },
     "overview": {
       "allAreas": "Gach réimse",
@@ -3596,7 +3598,7 @@
   "organization": {
     "auditLog": {
       "title": "Loga iniúchta",
-      "permissionDenied": "Ní féidir ach le húinéir, riarthóir nó bainisteoir billeála eagraíochta ar an bplean Enterprise a loga iniúchta a léamh.",
+      "permissionDenied": "Ní féidir ach le húinéir, riarthóir nó bainisteoir billeála eagraíochta ar an bplean Enterprise a loga iniúchta a léamh. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Níl aon imeachtaí iniúchta",
       "emptyDescription": "Taispeántar anseo na gníomhartha a dhéantar san eagraíocht seo.",
       "truncated": "Na himeachtaí is déanaí á dtaispeáint.",
@@ -3801,7 +3803,7 @@
     },
     "billing": {
       "title": "Billeáil",
-      "permissionDenied": "Ní féidir ach le húinéir, riarthóir nó bainisteoir billeála na heagraíochta an bhilleáil a fheiceáil.",
+      "permissionDenied": "Ní féidir ach le húinéir, riarthóir nó bainisteoir billeála na heagraíochta an bhilleáil a fheiceáil. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Síntiús",
       "state": "Staid",
       "stateNone": "Gan síntiús",
@@ -3978,7 +3980,7 @@
       "emptyDescription": "Bain úsáid as \"Uair níos luaithe\" chun iarratais níos luaithe a fheiceáil.",
       "emptyBoundDescription": "Ní théann logaí iarratas níos faide siar ná seo.",
       "loadError": "Níorbh fhéidir logaí iarratas a lódáil.",
-      "permissionDenied": "Ní féidir ach le húinéir, riarthóir nó bainisteoir billeála eagraíochta a logaí iarratas a léamh.",
+      "permissionDenied": "Ní féidir ach le húinéir, riarthóir nó bainisteoir billeála eagraíochta a logaí iarratas a léamh. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} isteach · {{output}} amach",
       "byok": "BYOK"
     },
@@ -5142,7 +5144,7 @@
     "defaultModel": "Úsáid múnla réamhshocraithe Kilo",
     "duration": "Cosaint ama (nóiméid)",
     "spendLimit": "Cosaint caiteachais (USD)",
-    "invalidSafeguards": "Cuir isteach teorainneacha ama agus caiteachais dearfacha, teoranta.",
+    "invalidSafeguards": "Cuir isteach uimhir dhearfach laistigh den raon ceadaithe.",
     "estimate": "Meastachán {{estimate}} · uasmhéid {{maximum}}",
     "estimateUnavailable": "Níl achoimre íoctha ar fáil le haghaidh na socruithe seo. Athraigh an tsamhail nó na teorainneacha, nó déan iarracht eile ar ball.",
     "confirmPaid": "Cumasaigh achoimrí íoctha do {{context}}?",
@@ -5323,6 +5325,8 @@
       "autoCommit": "Tiomantaigh athruithe nuair a chríochnaíonn an rith",
       "condenseOnComplete": "Dlúthaigh an comhthéacs nuair a chríochnaíonn an rith",
       "activeTitle": "Truicear gníomhach",
+      "activeSwitchA11y": "Truicear gníomhach: {{name}}",
+      "copyLinkA11y": "Cóipeáil an nasc: {{name}}",
       "activeDescription": "Freagraíonn crúcaí gréasáin atá ar sos le 404.",
       "runAsCreator": "Rith mar mise",
       "runAsCreatorDescription": "Úsáideann gach rith do chuntas, mar sin tá an ceanntásc rúnda riachtanach.",

@@ -1,9 +1,8 @@
 /* eslint-disable max-lines -- the presentation, dismissal and touch-gate contract with the native sheet stays one suite (same pattern as sheet-header.mounted.test.tsx) */
 // The app's one native bottom-sheet surface: it must stay unmounted while
-// closed, hand the native sheet the app's surface colour (or a forced dark
-// theme still shows a light sheet), and stay mounted through the dismiss
-// animation. Consumers assert their own content; this suite pins the wrapper's
-// contract with `@expo/ui/community/bottom-sheet`.
+// closed, hand the native sheet the app's surface colour, and stay mounted
+// through the dismiss animation. Consumers assert their own content; this suite
+// pins the wrapper's contract with `@expo/ui/community/bottom-sheet`.
 
 import { type QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
@@ -206,8 +205,6 @@ describe('Sheet', () => {
 
     expect(node.props.index).toBe(0);
     expect(node.props.snapPoints).toEqual(['50%', '90%']);
-    // Without the app's card colour the native sheet paints the platform
-    // surface, which contradicts a forced in-app dark theme.
     expect(node.props.backgroundStyle).toEqual({ backgroundColor: '#1F1F24' });
     // Android Back only dismisses when the sheet allows it.
     expect(node.props.enablePanDownToClose).toBe(true);
@@ -261,8 +258,6 @@ describe('Sheet', () => {
 
     await updateSheet(renderer, queryClient, { visible: false, onClose, onDismiss });
 
-    // Still mounted: `index` -1 starts the native dismiss, and the native
-    // `onDismiss` event ends it. Unmounting here would cut the animation off.
     const closing = sheet(renderer);
     if (!closing) {
       throw new Error('the sheet must stay mounted through the dismiss animation');
@@ -305,10 +300,6 @@ describe('Sheet', () => {
 
     await updateSheet(renderer, queryClient, { visible: false, onClose, onDismiss });
 
-    // Android reports from the host's own effect, so the sheet is already gone in
-    // this commit. The host flag has to be cleared with it, or the wrapper's
-    // `[visible]` effect (which runs after the host's) re-arms the deferral for a
-    // dismissal that already reported.
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(onDismiss).toHaveBeenCalledTimes(1);
     expect(sheet(renderer)).toBeUndefined();
@@ -334,9 +325,6 @@ describe('Sheet', () => {
     expect(sheet(renderer)?.props.index).toBe(-1);
     expect(sheet(renderer)?.props.presented).toBe(false);
 
-    // The reopen is deferred: handing the library `index` 0 while its dismissal
-    // is still in flight is the race that leaves the sheet gone for good, so the
-    // index stays -1 until the dismissal reports.
     await updateSheet(renderer, queryClient, { visible: true, onClose, onDismiss });
     expect(sheet(renderer)?.props.index).toBe(-1);
     expect(sheet(renderer)?.props.presented).toBe(false);
@@ -398,9 +386,6 @@ describe('Sheet', () => {
     expect(isSheetTouchHeld()).toBe(true);
   });
 
-  // The native sheet lets go of touch when its dismissal starts and reports the
-  // finished animation only after it: the second tap of a double press aimed at
-  // the sheet's Apply must reach the gate, not the row underneath the button.
   it('keeps the app window touch from the close request through the settle window', async () => {
     vi.useFakeTimers();
     const { renderer, queryClient } = await mount();
@@ -414,9 +399,6 @@ describe('Sheet', () => {
       nativeSheet.dismiss();
       await Promise.resolve();
     });
-    // The report ended the close-request lease AND armed the settle hold: the
-    // sheet's window is gone by now, so the frames right behind the report
-    // still belong to the gate.
     expect(isSheetTouchHeld()).toBe(true);
 
     await settleTimers(SHEET_TOUCH_SETTLE_MS + 1);
@@ -549,9 +531,6 @@ describe('Sheet', () => {
     expect(sheet(renderer)?.props.index).toBe(-1);
     const replaced = nativeSheet.handles.at(-1);
 
-    // The report never comes: the deadline ends the dismissal and replaces the
-    // instance that still holds it, because that adapter would not present again
-    // from an unchanged index.
     await settleTimers(DISMISS_REPORT_TIMEOUT_MS);
     expect(sheet(renderer)?.props.index).toBe(0);
     expect(sheet(renderer)?.props.presented).toBe(true);

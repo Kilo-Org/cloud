@@ -1502,7 +1502,9 @@
       "githubError": "Tidak dapat membuka persediaan GitHub. Sila cuba lagi.",
       "gitlabAccount": "akaun GitLab",
       "gitlabError": "Tidak dapat membuka persediaan GitLab. Sila cuba lagi.",
-      "description": "Sambungkan {{label}} Kilo untuk menyemak permintaan penarikan secara automatik."
+      "description": "Sambungkan {{label}} Kilo untuk menyemak permintaan penarikan secara automatik.",
+      "notConnectedTitle": "{{platform}} tidak disambungkan",
+      "githubAdminOnlyDescription": "Hanya pemilik organisasi dan pentadbir boleh menyambungkannya."
     },
     "overview": {
       "allAreas": "Semua bidang",
@@ -3407,7 +3409,7 @@
   "organization": {
     "auditLog": {
       "title": "Log audit",
-      "permissionDenied": "Hanya pemilik, pentadbir atau pengurus pengebilan organisasi pada pelan Enterprise boleh membaca log auditnya.",
+      "permissionDenied": "Hanya pemilik, pentadbir atau pengurus pengebilan organisasi pada pelan Enterprise boleh membaca log auditnya. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Tiada peristiwa audit",
       "emptyDescription": "Tindakan yang diambil dalam organisasi ini dipaparkan di sini.",
       "truncated": "Memaparkan peristiwa terkini.",
@@ -3597,7 +3599,7 @@
     },
     "billing": {
       "title": "Pengebilan",
-      "permissionDenied": "Hanya pemilik, pentadbir atau pengurus pengebilan organisasi boleh melihat pengebilannya.",
+      "permissionDenied": "Hanya pemilik, pentadbir atau pengurus pengebilan organisasi boleh melihat pengebilannya. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Langganan",
       "state": "Status",
       "stateNone": "Tiada langganan",
@@ -3774,7 +3776,7 @@
       "emptyDescription": "Gunakan Jam sebelumnya untuk melihat permintaan yang lebih awal",
       "emptyBoundDescription": "Log permintaan tidak tersedia lebih awal daripada ini",
       "loadError": "Tidak dapat memuatkan log permintaan.",
-      "permissionDenied": "Hanya pemilik, pentadbir atau pengurus pengebilan organisasi boleh membaca log permintaannya.",
+      "permissionDenied": "Hanya pemilik, pentadbir atau pengurus pengebilan organisasi boleh membaca log permintaannya. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} masuk · {{output}} keluar",
       "byok": "BYOK"
     },
@@ -4875,7 +4877,7 @@
     "defaultModel": "Guna model lalai Kilo",
     "duration": "Had masa (minit)",
     "spendLimit": "Had perbelanjaan (USD)",
-    "invalidSafeguards": "Masukkan had masa dan perbelanjaan yang positif dan terhingga.",
+    "invalidSafeguards": "Masukkan nombor positif dalam julat yang dibenarkan.",
     "estimate": "Anggaran {{estimate}} · maksimum {{maximum}}",
     "estimateUnavailable": "Ringkasan berbayar tidak tersedia untuk tetapan ini. Tukar model atau had, atau cuba lagi nanti.",
     "confirmPaid": "Dayakan ringkasan berbayar untuk {{context}}?",
@@ -5041,6 +5043,8 @@
       "autoCommit": "Komit perubahan apabila larian selesai",
       "condenseOnComplete": "Ringkaskan konteks apabila larian selesai",
       "activeTitle": "Pencetus aktif",
+      "activeSwitchA11y": "Pencetus aktif: {{name}}",
+      "copyLinkA11y": "Salin pautan untuk {{name}}",
       "activeDescription": "Webhook yang dijeda menjawab dengan 404.",
       "runAsCreator": "Jalankan sebagai saya",
       "runAsCreatorDescription": "Setiap larian menggunakan akaun anda, jadi pengepala rahsia diperlukan.",

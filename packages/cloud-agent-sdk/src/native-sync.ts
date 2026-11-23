@@ -5,7 +5,11 @@ import {
   type NativeSnapshotMessage,
   type NativeSnapshotSession,
 } from './native-sync-snapshot';
-import { applyNativeEvent, applyNativeSessionEvent } from './native-conversation-reducer';
+import {
+  applyNativeEvent,
+  applyNativeSessionEvent,
+  projectNativeEvent,
+} from './native-conversation-reducer';
 import { messageIDFromEventID } from './message-id';
 import {
   reduceNativePendingRequests,
@@ -395,7 +399,7 @@ function nativeGapMessages(
   messages: NativeSnapshotMessage[],
   previousByID: ReadonlyMap<string, NativeSnapshotMessage>,
   assetURLs: Readonly<Record<string, string>> | undefined,
-  pendingIDs: ReadonlySet<string>,
+  isPending: (messageID: string) => boolean,
   recheckUnchanged: boolean,
   unavailable: ReadonlySet<string>
 ): NativeSnapshotMessage[] {
@@ -413,12 +417,28 @@ function nativeGapMessages(
     if (
       !item.incomplete &&
       hasUnresolvedKilo2Assets(item.message, assetURLs, unavailable) &&
-      !pendingIDs.has(item.message.id)
+      !isPending(item.message.id)
     )
       gaps.push(item);
   }
   return gaps;
 }
+
+/** A set is built only once some candidate gap actually asks about pending identities. */
+function pendingLookup(pendingIDs: readonly string[] | undefined): (messageID: string) => boolean {
+  let known: Set<string> | undefined;
+  return messageID => {
+    if (!pendingIDs?.length) return false;
+    known ??= new Set(pendingIDs);
+    return known.has(messageID);
+  };
+}
+
+/**
+ * Live frames the published ring retains beside the current remote state: the frame being
+ * published plus the 498 before it, which is the window this transport has always published.
+ */
+const EVENT_RING_LIMIT = 499;
 
 /** A transcript entry the client can certify: complete, and every private asset resolved. */
 function certifiedTranscriptEntry(
@@ -1095,6 +1115,40 @@ export class NativeSyncClient {
     let quarantined: { seq: number; position: number }[] = [];
     let remoteState: NativeEvent | undefined;
     const clearedIDs = new Set<string>();
+    /**
+     * The published transcript's first entry per id: the previous-entry source for the entries
+     * one frame reports. It mirrors `state.messages` exactly, so a frame that reports nothing
+     * leaves it untouched.
+     */
+    let known = new Map<string, NativeSnapshotMessage>();
+    /** Chronological live frames once the ring is full, oldest-first from `ringStart`. */
+    const ring: NativeEvent[] = [];
+    let ringStart = 0;
+    const indexPublished = (messages: NativeSnapshotMessage[]) => {
+      known = indexNativeMessages(messages);
+      return messages;
+    };
+    /** The published ring: the current remote state, then the retained live frames. */
+    const publishedEvents = (): NativeEvent[] => {
+      const recent =
+        ring.length < EVENT_RING_LIMIT
+          ? ring.slice()
+          : [...ring.slice(ringStart), ...ring.slice(0, ringStart)];
+      return remoteState ? [remoteState, ...recent] : recent;
+    };
+    const recordEvent = (frame: NativeEvent) => {
+      if (frame.type === 'remote.state') {
+        ring.length = 0;
+        ringStart = 0;
+        remoteState = frame;
+        return;
+      }
+      if (ring.length < EVENT_RING_LIMIT) ring.push(frame);
+      else {
+        ring[ringStart] = frame;
+        ringStart = (ringStart + 1) % EVENT_RING_LIMIT;
+      }
+    };
     const publish = (patch: Partial<NativeSessionState>) => {
       if (closed) return;
       if ('error' in patch) failureError = patch.error;
@@ -1116,8 +1170,19 @@ export class NativeSyncClient {
       publish({ commands: { ...state.commands, [commandID]: status } });
       return status;
     };
-    const visible = (messages: NativeSnapshotMessage[]) =>
-      clearedIDs.size === 0 ? messages : messages.filter(item => !clearedIDs.has(item.message.id));
+    /**
+     * Published messages never carry a cleared id, so only a frame that reports a cleared entry
+     * can make the filter necessary; a frame that reports nothing keeps the full filter.
+     */
+    const visible = (
+      messages: NativeSnapshotMessage[],
+      changed: NativeSnapshotMessage[] | undefined
+    ) => {
+      if (clearedIDs.size === 0) return messages;
+      if (changed !== undefined && !changed.some(item => clearedIDs.has(item.message.id)))
+        return messages;
+      return messages.filter(item => !clearedIDs.has(item.message.id));
+    };
     const beyond = (frame: NativeEvent, position: number) => {
       const syncPosition = record(frame.body)['syncPosition'];
       const ephemeral = frame.type.endsWith('.delta') || frame.type === 'session.tool.progress';
@@ -1138,10 +1203,11 @@ export class NativeSyncClient {
         quarantined.length === 0 && integrityError === projectedFrameGap
           ? undefined
           : integrityError;
+      const messages = indexPublished(visible(next.messages, undefined));
       publish({
         session: next.session,
         snapshot: { position: next.position, revision: next.revision },
-        messages: visible(next.messages),
+        messages,
         assetURLs: next.assetURLs,
         unavailableAssetKeys: next.unavailableAssetKeys,
         pendingSnapshotMessageIDs: owedPendingSnapshotIDs(
@@ -1307,10 +1373,11 @@ export class NativeSyncClient {
             const requiredMessageIDs = new Set(
               [...current.requirements.values()].map(requirement => requirement.messageID)
             );
+            const published = indexPublished(visible(messages, undefined));
             publish({
               session,
               snapshot: { position: next.position, revision: next.revision },
-              messages: visible(messages),
+              messages: published,
               assetURLs,
               unavailableAssetKeys: next.unavailableAssetKeys,
               pendingSnapshotMessageIDs: owedPendingSnapshotIDs(
@@ -1438,22 +1505,45 @@ export class NativeSyncClient {
         // A frame this client cannot project is retained as an integrity-gap record
         // before its cursor advances; the transcript is repaired from a canonical snapshot.
         const projectEventsFrame = () => {
-          const messages = beyond(frame, snapshotPosition)
-            ? visible(applyNativeEvent(state.messages, frame, state.session))
-            : state.messages;
+          const projection = beyond(frame, snapshotPosition)
+            ? projectNativeEvent(state.messages, frame, state.session)
+            : undefined;
+          const changed = projection?.changed;
+          const messages = projection ? visible(projection.messages, changed) : state.messages;
           const pending = reduceNativePendingRequests(state.pending, frame);
           const session = applyNativeSessionEvent(state.session, frame);
-          const previousByID = indexNativeMessages(state.messages);
-          const assetURLs = nativeAssetURLsAfterMessages(previousByID, messages, state.assetURLs);
-          const pendingIDs = new Set(state.pendingSnapshotMessageIDs ?? []);
-          const newGaps = nativeGapMessages(
-            messages,
-            previousByID,
-            assetURLs,
-            pendingIDs,
-            assetURLs !== state.assetURLs,
-            new Set<string>(state.unavailableAssetKeys)
-          );
+          const isPending = pendingLookup(state.pendingSnapshotMessageIDs);
+          const unavailable = new Set<string>(state.unavailableAssetKeys);
+          // A frame that reports the entries it touched, none of them hidden by a local clear,
+          // only needs those entries examined. An entry the frame did not touch keeps its
+          // identity, so today's scan skips it too unless an asset key disappeared — which
+          // instead takes the whole-transcript path below. Anything else keeps that path, and
+          // it also refreshes the per-id bookkeeping.
+          const tracked =
+            changed !== undefined &&
+            known.size === state.messages.length &&
+            !changed.some(item => clearedIDs.has(item.message.id));
+          const changedAssets = tracked
+            ? nativeAssetURLsAfterMessages(known, changed, state.assetURLs)
+            : state.assetURLs;
+          const fast = tracked && changedAssets === state.assetURLs;
+          let assetURLs: Readonly<Record<string, string>> | undefined;
+          let newGaps: NativeSnapshotMessage[];
+          if (fast) {
+            assetURLs = changedAssets;
+            newGaps = nativeGapMessages(changed, known, assetURLs, isPending, false, unavailable);
+          } else {
+            const previousByID = indexNativeMessages(state.messages);
+            assetURLs = nativeAssetURLsAfterMessages(previousByID, messages, state.assetURLs);
+            newGaps = nativeGapMessages(
+              messages,
+              previousByID,
+              assetURLs,
+              isPending,
+              assetURLs !== state.assetURLs,
+              unavailable
+            );
+          }
           let pendingSnapshotMessageIDs = state.pendingSnapshotMessageIDs;
           if (newGaps.length)
             pendingSnapshotMessageIDs = [
@@ -1469,14 +1559,6 @@ export class NativeSyncClient {
                 ...new Set([...(pendingSnapshotMessageIDs ?? []), messageID]),
               ];
           }
-          const recent =
-            frame.type === 'remote.state'
-              ? []
-              : state.events.filter(event => event['type'] !== 'remote.state').slice(-498);
-          const events =
-            frame.type === 'remote.state'
-              ? [frame]
-              : [...(remoteState ? [remoteState] : []), ...recent, frame];
           return {
             messages,
             pending,
@@ -1484,7 +1566,8 @@ export class NativeSyncClient {
             assetURLs,
             newGaps,
             pendingSnapshotMessageIDs,
-            events,
+            changed,
+            fast,
           };
         };
         const projected = (() => {
@@ -1513,7 +1596,8 @@ export class NativeSyncClient {
           assetURLs,
           newGaps,
           pendingSnapshotMessageIDs,
-          events,
+          changed,
+          fast,
         } = projected;
         if (!recovery && (!session || newGaps.length || pendingSnapshotMessageIDs?.length))
           recoverIncomplete(epoch, true);
@@ -1538,12 +1622,15 @@ export class NativeSyncClient {
             incarnation: body['incarnation'],
             ...(typeof body['runID'] === 'string' ? { runID: body['runID'] } : {}),
           };
-        if (frame.type === 'remote.state') remoteState = frame;
+        if (fast && changed) {
+          for (const item of changed) known.set(item.message.id, item);
+        } else indexPublished(messages);
+        recordEvent(frame);
         // The frame is retained: acknowledge the cursor before notifying a consumer, so a
         // throwing listener cannot replay the same sequence for ever.
         lastSeq = frame.seq;
         publish({
-          events,
+          events: publishedEvents(),
           session,
           pending,
           messages,
@@ -1605,6 +1692,12 @@ export class NativeSyncClient {
         return Promise.reject<string>(new NativeSyncError('active_run_unknown'));
       return command(type, { ...body, ...identity }, { liveOnly: true });
     };
+    /** A local clear hides every published id, so the per-id bookkeeping goes with them. */
+    const clearTranscript = () => {
+      for (const item of state.messages) clearedIDs.add(item.message.id);
+      known.clear();
+      publish({ messages: [] });
+    };
     return {
       sendMessage: (text: string, options: { queueIfOffline?: boolean; ttlMs?: number } = {}) => {
         if (!text.trim()) return Promise.reject<string>(new NativeSyncError('empty_message'));
@@ -1626,8 +1719,7 @@ export class NativeSyncClient {
       sendCommand: (input: string, args?: string) => {
         const name = input.trim().replace(/^\//, '').split(/\s+/, 1)[0];
         if (name === 'clear') {
-          for (const item of state.messages) clearedIDs.add(item.message.id);
-          publish({ messages: [] });
+          clearTranscript();
           return Promise.resolve('local-clear');
         }
         if (!['compact', 'new', 'skill', 'models', 'agents'].includes(name ?? ''))
@@ -1669,8 +1761,7 @@ export class NativeSyncClient {
         await recovery?.done;
       },
       clear: () => {
-        for (const item of state.messages) clearedIDs.add(item.message.id);
-        publish({ messages: [] });
+        clearTranscript();
       },
       refresh: () => {
         if (closed) return;
@@ -1711,7 +1802,10 @@ export class NativeSyncClient {
           snapshotFailure: undefined,
         };
         clearedIDs.clear();
+        known.clear();
         remoteState = undefined;
+        ring.length = 0;
+        ringStart = 0;
         identity = undefined;
         liveEpoch = undefined;
       },

@@ -419,14 +419,6 @@ describe('ScreenHeader mounted', () => {
   it('pulls the leading controls with a logical start margin the RTL swap cannot mirror', async () => {
     const renderer = renderHeader({ title: 'Sessions', headerRight: slotView() });
 
-    // The pull is on the START edge, so it must compile to the logical
-    // `marginInlineStart`. A hand-picked `-mr-4` under RTL compiles to
-    // `marginRight`, which Fabric rewrites to Yoga End for an RTL tree, landing
-    // the pull on the side that faces the title: the heading then started 12
-    // points under the 44-point back target and the title's box covered 0.27 of
-    // it — the "two controls cover each other" finding (the scan reports above
-    // 0.25). `-ms-4` keeps a real 4-point `gap-1` between the two controls in
-    // both writing directions. It rides on the frame, which is the row's child.
     const frame = findBackFrame(renderer.root);
     expect(frame.props.className).toContain('-ms-4');
     expect(await compiledMarginProperties(frame.props.className as string)).toEqual([
@@ -889,10 +881,6 @@ describe('ScreenHeader mounted', () => {
   });
 
   it('keeps the title touch area out of the row gap beside it', () => {
-    // The heading's free side is the gap to the trailing slot, and a trailing
-    // control can carry a slop that reaches into that gap. A title slop there
-    // made the same strip two tap targets: measured on the session screen at
-    // 10.33 dp across, in every state and every gate cell.
     const renderer = renderHeader({ title: 'Sessions', onTitlePress: () => undefined });
 
     const title = findTitlePressable(renderer.root);
@@ -900,8 +888,6 @@ describe('ScreenHeader mounted', () => {
   });
 
   it('keeps the title touch area identical in both directions', () => {
-    // RN does not mirror hitSlop under RTL. With no side slop there is nothing
-    // to mirror, so Back and the trailing cluster keep their own taps alike.
     i18nManager.isRTL = true;
     const renderer = renderHeader({ title: 'Sessions', onTitlePress: () => undefined });
 
@@ -1201,10 +1187,6 @@ describe('ScreenHeader mounted', () => {
     renderer.unmount();
   });
 
-  // The reserve cannot know the arriving label, so it holds a no-ink no-break
-  // space: the eyebrow variant's line box is the same for every script
-  // (`EYEBROW_LINE_HEIGHT_DP`), so the space reserves exactly the height the
-  // label takes, in either interface direction.
   it.each([false, true])(
     'reserves a blank filler when the arriving label is unknown (RTL=%s)',
     isRTL => {
@@ -1964,9 +1946,8 @@ describe('centered title balance', () => {
   it('refines the filler from the measured slot width after mount', () => {
     // No declared width: the first frame balances on the 0 seed (no mirror),
     // then onLayout reports the slot's real 140dp — the same filler this test
-    // then reads back. The row's layout event lands the 358dp row width the
-    // seed already used, so the filler only moves when the slot
-    // reports.
+    // then reads back. The seed row is 390 - 44 = 346dp, so the 140dp slot
+    // report is what moves the filler.
     const renderer = renderHeader({
       title: 'Kilo Pass',
       modal: true,

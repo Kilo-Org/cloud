@@ -1502,7 +1502,9 @@
       "githubError": "Kunde inte öppna konfigurationen för GitHub. Försök igen.",
       "gitlabAccount": "GitLab-konto",
       "gitlabError": "Kunde inte öppna konfigurationen för GitLab. Försök igen.",
-      "description": "Anslut Kilos {{label}} för att granska pull-begäranden automatiskt."
+      "description": "Anslut Kilos {{label}} för att granska pull-begäranden automatiskt.",
+      "notConnectedTitle": "{{platform}} är inte anslutet",
+      "githubAdminOnlyDescription": "Endast organisationsägare och administratörer kan skapa anslutningen."
     },
     "overview": {
       "allAreas": "Alla områden",
@@ -3407,7 +3409,7 @@
   "organization": {
     "auditLog": {
       "title": "Granskningslogg",
-      "permissionDenied": "Endast en ägare, administratör eller faktureringsansvarig i en organisation med Enterprise-planen kan läsa organisationens granskningslogg.",
+      "permissionDenied": "Endast en ägare, administratör eller faktureringsansvarig i en organisation med Enterprise-planen kan läsa organisationens granskningslogg. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Inga granskningshändelser",
       "emptyDescription": "Åtgärder som utförs i den här organisationen visas här.",
       "truncated": "Visar de senaste händelserna.",
@@ -3597,7 +3599,7 @@
     },
     "billing": {
       "title": "Fakturering",
-      "permissionDenied": "Endast organisationens ägare, administratörer eller faktureringsansvariga kan se dess fakturering.",
+      "permissionDenied": "Endast organisationens ägare, administratörer eller faktureringsansvariga kan se dess fakturering. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Prenumeration",
       "state": "Status",
       "stateNone": "Ingen prenumeration",
@@ -3774,7 +3776,7 @@
       "emptyDescription": "Använd Tidigare timme för att se tidigare förfrågningar.",
       "emptyBoundDescription": "Förfrågningsloggarna sträcker sig inte längre tillbaka än så här.",
       "loadError": "Det gick inte att läsa in förfrågningsloggarna.",
-      "permissionDenied": "Endast en ägare, administratör eller faktureringsansvarig i organisationen kan läsa dess förfrågningsloggar.",
+      "permissionDenied": "Endast en ägare, administratör eller faktureringsansvarig i organisationen kan läsa dess förfrågningsloggar. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} in · {{output}} ut",
       "byok": "BYOK"
     },
@@ -4875,7 +4877,7 @@
     "defaultModel": "Använd Kilos standardmodell",
     "duration": "Tidsgräns (minuter)",
     "spendLimit": "Kostnadsgräns (USD)",
-    "invalidSafeguards": "Ange positiva, ändliga tids- och kostnadsgränser.",
+    "invalidSafeguards": "Ange ett positivt tal inom det tillåtna intervallet.",
     "estimate": "Uppskattning {{estimate}} · maximalt {{maximum}}",
     "estimateUnavailable": "En betald sammanfattning är inte tillgänglig för dessa inställningar. Ändra modellen eller gränserna, eller försök igen senare.",
     "confirmPaid": "Aktivera betalda sammanfattningar för {{context}}?",
@@ -5041,6 +5043,8 @@
       "autoCommit": "Checka in ändringar när körningen är klar",
       "condenseOnComplete": "Komprimera kontexten när körningen är klar",
       "activeTitle": "Utlösare aktiv",
+      "activeSwitchA11y": "Utlösare aktiv: {{name}}",
+      "copyLinkA11y": "Kopiera länk för {{name}}",
       "activeDescription": "Pausade webhooks svarar med 404.",
       "runAsCreator": "Kör som jag",
       "runAsCreatorDescription": "Varje körning använder ditt konto, så det hemliga sidhuvudet krävs.",

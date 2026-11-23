@@ -1614,7 +1614,9 @@
       "githubError": "Ni ellid agor y broses sefydlu GitHub. Ceisiwch eto.",
       "gitlabAccount": "y cyfrif GitLab",
       "gitlabError": "Ni ellid agor y broses sefydlu GitLab. Ceisiwch eto.",
-      "description": "Cysylltwch {{label}} â Kilo i adolygu ceisiadau tynnu'n awtomatig."
+      "description": "Cysylltwch {{label}} â Kilo i adolygu ceisiadau tynnu'n awtomatig.",
+      "notConnectedTitle": "Nid yw {{platform}} wedi'i gysylltu",
+      "githubAdminOnlyDescription": "Dim ond perchnogion a gweinyddwyr y sefydliad sy'n gallu ei gysylltu."
     },
     "overview": {
       "allAreas": "Pob maes",
@@ -3659,7 +3661,7 @@
   "organization": {
     "auditLog": {
       "title": "Log archwilio",
-      "permissionDenied": "Dim ond perchennog, gweinyddwr neu reolwr bilio sefydliad ar y cynllun Enterprise all ddarllen ei log archwilio.",
+      "permissionDenied": "Dim ond perchennog, gweinyddwr neu reolwr bilio sefydliad ar y cynllun Enterprise all ddarllen ei log archwilio. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Dim digwyddiadau archwilio",
       "emptyDescription": "Mae camau a gymerir yn y sefydliad hwn yn ymddangos yma.",
       "truncated": "Yn dangos y digwyddiadau diweddaraf.",
@@ -3869,7 +3871,7 @@
     },
     "billing": {
       "title": "Bilio",
-      "permissionDenied": "Dim ond perchennog, gweinyddwr neu reolwr bilio'r sefydliad sy'n gallu gweld ei filio.",
+      "permissionDenied": "Dim ond perchennog, gweinyddwr neu reolwr bilio'r sefydliad sy'n gallu gweld ei filio. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Tanysgrifiad",
       "state": "Statws",
       "stateNone": "Dim tanysgrifiad",
@@ -4046,7 +4048,7 @@
       "emptyDescription": "Defnyddiwch Awr gynharach i weld ceisiadau cynharach.",
       "emptyBoundDescription": "Dyma mor bell yn ôl ag y mae logiau ceisiadau'n mynd.",
       "loadError": "Methu llwytho logiau ceisiadau.",
-      "permissionDenied": "Dim ond perchennog, gweinyddwr neu reolwr bilio sefydliad all ddarllen ei logiau ceisiadau.",
+      "permissionDenied": "Dim ond perchennog, gweinyddwr neu reolwr bilio sefydliad all ddarllen ei logiau ceisiadau. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} i mewn · {{output}} allan",
       "byok": "BYOK"
     },
@@ -5231,7 +5233,7 @@
     "defaultModel": "Defnyddio model diofyn Kilo",
     "duration": "Terfyn amser (munudau)",
     "spendLimit": "Terfyn gwariant (USD)",
-    "invalidSafeguards": "Rhowch derfynau amser a gwariant positif a meidraidd.",
+    "invalidSafeguards": "Rhowch rif positif o fewn yr ystod a ganiateir.",
     "estimate": "Amcangyfrif {{estimate}} · uchafswm {{maximum}}",
     "estimateUnavailable": "Nid oes crynodeb taledig ar gael ar gyfer y gosodiadau hyn. Newidiwch y model neu'r terfynau, neu ceisiwch eto yn ddiweddarach.",
     "estimatePricingUnavailable": "Nid yw prisio'r model hwn ar gael. Dewiswch fodel arall.",
@@ -5417,6 +5419,8 @@
       "autoCommit": "Cyflwyno newidiadau pan fydd y rhediad yn gorffen",
       "condenseOnComplete": "Cywasgu’r cyd-destun pan fydd y rhediad yn gorffen",
       "activeTitle": "Sbardun yn weithredol",
+      "activeSwitchA11y": "Sbardun gweithredol: {{name}}",
+      "copyLinkA11y": "Copïo dolen ar gyfer {{name}}",
       "activeDescription": "Mae bachynnau gwe wedi’u seibio yn ateb â 404.",
       "runAsCreator": "Rhedeg fel fi",
       "runAsCreatorDescription": "Mae pob rhediad yn defnyddio’ch cyfrif, felly mae’r pennawd cyfrinachol yn ofynnol.",

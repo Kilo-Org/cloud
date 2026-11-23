@@ -1502,7 +1502,9 @@
       "githubError": "Kunne ikke åpne GitHub-oppsettet. Prøv igjen.",
       "gitlabAccount": "GitLab-kontoen",
       "gitlabError": "Kunne ikke åpne GitLab-oppsettet. Prøv igjen.",
-      "description": "Koble til Kilo via {{label}} for å gjennomgå PR-er automatisk."
+      "description": "Koble til Kilo via {{label}} for å gjennomgå PR-er automatisk.",
+      "notConnectedTitle": "{{platform}} er ikke tilkoblet",
+      "githubAdminOnlyDescription": "Bare organisasjonseiere og administratorer kan opprette tilkoblingen."
     },
     "overview": {
       "allAreas": "Alle områder",
@@ -3407,7 +3409,7 @@
   "organization": {
     "auditLog": {
       "title": "Revisjonslogg",
-      "permissionDenied": "Bare en eier, administrator eller faktureringsansvarlig i en organisasjon med Enterprise-planen kan lese revisjonsloggen.",
+      "permissionDenied": "Bare en eier, administrator eller faktureringsansvarlig i en organisasjon med Enterprise-planen kan lese revisjonsloggen. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Ingen revisjonshendelser",
       "emptyDescription": "Handlinger som utføres i denne organisasjonen, vises her.",
       "truncated": "Viser de nyeste hendelsene.",
@@ -3597,7 +3599,7 @@
     },
     "billing": {
       "title": "Fakturering",
-      "permissionDenied": "Bare en eier, administrator eller faktureringsansvarlig i organisasjonen kan se faktureringen.",
+      "permissionDenied": "Bare en eier, administrator eller faktureringsansvarlig i organisasjonen kan se faktureringen. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Abonnement",
       "state": "Status",
       "stateNone": "Ingen abonnement",
@@ -3774,7 +3776,7 @@
       "emptyDescription": "Bruk «Eldre time» for å se tidligere forespørsler.",
       "emptyBoundDescription": "Forespørselsloggene går ikke lenger tilbake enn dette.",
       "loadError": "Kunne ikke laste inn forespørselslogger.",
-      "permissionDenied": "Bare en eier, administrator eller faktureringsansvarlig i organisasjonen kan lese forespørselsloggene.",
+      "permissionDenied": "Bare en eier, administrator eller faktureringsansvarlig i organisasjonen kan lese forespørselsloggene. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} inn · {{output}} ut",
       "byok": "BYOK"
     },
@@ -4875,7 +4877,7 @@
     "defaultModel": "Bruk Kilos standardmodell",
     "duration": "Tidsgrense (minutter)",
     "spendLimit": "Forbruksgrense (USD)",
-    "invalidSafeguards": "Angi positive, endelige grenser for tid og forbruk.",
+    "invalidSafeguards": "Angi et positivt tall innenfor det tillatte området.",
     "estimate": "Estimat {{estimate}} · maksimum {{maximum}}",
     "estimateUnavailable": "En betalt oppsummering er ikke tilgjengelig for disse innstillingene. Endre modellen eller grensene, eller prøv igjen senere.",
     "confirmPaid": "Slå på betalte sammendrag for {{context}}?",
@@ -5041,6 +5043,8 @@
       "autoCommit": "Sjekk inn endringer når kjøringen er ferdig",
       "condenseOnComplete": "Komprimer konteksten når kjøringen er ferdig",
       "activeTitle": "Triggeren er aktiv",
+      "activeSwitchA11y": "Aktiv trigger: {{name}}",
+      "copyLinkA11y": "Kopier lenke for {{name}}",
       "activeDescription": "Pausede webhooker svarer med 404.",
       "runAsCreator": "Kjør som meg",
       "runAsCreatorDescription": "Hver kjøring bruker kontoen din, så hemmelighetsheaderen er påkrevd.",

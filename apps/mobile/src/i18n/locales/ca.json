@@ -1530,7 +1530,9 @@
       "githubError": "No s'ha pogut obrir la configuració de GitHub. Torna-ho a provar.",
       "gitlabAccount": "el compte de GitLab",
       "gitlabError": "No s'ha pogut obrir la configuració de GitLab. Torna-ho a provar.",
-      "description": "Connecta {{label}} a Kilo per revisar automàticament les sol·licituds d'integració."
+      "description": "Connecta {{label}} a Kilo per revisar automàticament les sol·licituds d'integració.",
+      "notConnectedTitle": "{{platform}} no està connectat",
+      "githubAdminOnlyDescription": "Només els propietaris i els administradors de l'organització poden connectar-lo."
     },
     "overview": {
       "allAreas": "Totes les àrees",
@@ -3470,7 +3472,7 @@
   "organization": {
     "auditLog": {
       "title": "Registre d'auditoria",
-      "permissionDenied": "Només un propietari, administrador o gestor de facturació d'una organització amb el pla Enterprise pot consultar-ne el registre d'auditoria.",
+      "permissionDenied": "Només un propietari, administrador o gestor de facturació d'una organització amb el pla Enterprise pot consultar-ne el registre d'auditoria. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "No hi ha esdeveniments d'auditoria",
       "emptyDescription": "Aquí apareixen les accions fetes en aquesta organització.",
       "truncated": "Es mostren els esdeveniments més recents.",
@@ -3665,7 +3667,7 @@
     },
     "billing": {
       "title": "Facturació",
-      "permissionDenied": "Només un propietari, administrador o gestor de facturació de l'organització en pot veure la facturació.",
+      "permissionDenied": "Només un propietari, administrador o gestor de facturació de l'organització en pot veure la facturació. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Subscripció",
       "state": "Estat",
       "stateNone": "Sense subscripció",
@@ -3842,7 +3844,7 @@
       "emptyDescription": "Utilitza «Hora anterior» per veure les sol·licituds anteriors.",
       "emptyBoundDescription": "Els registres de sol·licituds no arriben més enrere.",
       "loadError": "No s'han pogut carregar els registres de sol·licituds.",
-      "permissionDenied": "Només un propietari, administrador o gestor de facturació d'una organització pot consultar-ne els registres de sol·licituds.",
+      "permissionDenied": "Només un propietari, administrador o gestor de facturació d'una organització pot consultar-ne els registres de sol·licituds. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} d'entrada · {{output}} de sortida",
       "byok": "BYOK"
     },
@@ -4964,7 +4966,7 @@
     "defaultModel": "Usa el model per defecte de Kilo",
     "duration": "Límit de temps (minuts)",
     "spendLimit": "Límit de despesa (USD)",
-    "invalidSafeguards": "Introdueix límits de temps i despesa positius i finits.",
+    "invalidSafeguards": "Introdueix un nombre positiu dins del rang permès.",
     "estimate": "Estimació {{estimate}} · màxim {{maximum}}",
     "estimateUnavailable": "No hi ha cap resum de pagament disponible per a aquesta configuració. Canvia el model o els límits, o torna-ho a provar més tard.",
     "confirmPaid": "Vols activar els resums de pagament per a {{context}}?",
@@ -5135,6 +5137,8 @@
       "autoCommit": "Confirma els canvis quan acabi l'execució",
       "condenseOnComplete": "Condensa el context quan acabi l'execució",
       "activeTitle": "Disparador actiu",
+      "activeSwitchA11y": "Disparador actiu: {{name}}",
+      "copyLinkA11y": "Copia l'enllaç de {{name}}",
       "activeDescription": "Els ganxos web en pausa responen amb 404.",
       "runAsCreator": "Executa com a mi",
       "runAsCreatorDescription": "Cada execució utilitza el teu compte, així que la capçalera secreta és obligatòria.",

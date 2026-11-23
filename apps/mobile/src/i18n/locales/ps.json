@@ -399,7 +399,7 @@
       "title": "د چمتو کوونکي کیلي",
       "rowSubtitle": "د خپل چمتو کوونکي بیلینګ وکاروئ",
       "orgDescription": "دا کیلي د سازمان له ټولو غړو سره شریکې دي او لګښت یې د سازمان د چمتو کوونکو په حسابونو بیل کېږي.",
-      "viewOnly": "یوازې د سازمان مالک، اډمین یا د بیلینګ مدیر کولی شي د سازمان کیلي بدلې کړي.",
+      "viewOnly": "یوازې د سازمان مالک، اډمین یا د بلونو مدیر کولی شي د سازمان کیلي بدلې کړي.",
       "description": "د دې کیلیو له لارې د غوښتنو لګښت ستاسو د Kilo بیلانس پر ځای ستاسو د چمتو کوونکي په حساب بیل کېږي.",
       "managedByPlan": "ستاسو د کوډینګ پلان له لارې اداره کېږي",
       "enableKey": "د {{provider}} کیلي فعاله کړئ",
@@ -1502,7 +1502,9 @@
       "githubError": "د GitHub د تنظیم پاڼه پرانیستل نه شوه. مهرباني وکړئ بیا هڅه وکړئ.",
       "gitlabAccount": "د GitLab حساب",
       "gitlabError": "د GitLab د تنظیم پاڼه پرانیستل نه شوه. مهرباني وکړئ بیا هڅه وکړئ.",
-      "description": "د PR د اتوماتیکې بیاکتنې لپاره د Kilo {{label}} ونښلوئ."
+      "description": "د PR د اتوماتیکې بیاکتنې لپاره د Kilo {{label}} ونښلوئ.",
+      "notConnectedTitle": "{{platform}} نښلول شوی نه دی",
+      "githubAdminOnlyDescription": "یوازې د سازمان مالکان او مدیران کولی شي دا ونښلوي."
     },
     "overview": {
       "allAreas": "ټولې ساحې",
@@ -3407,7 +3409,7 @@
   "organization": {
     "auditLog": {
       "title": "د پلټنې لاګ",
-      "permissionDenied": "یوازې د Enterprise پلان لرونکي سازمان مالک، اډمین یا د بیلنګ مدیر کولی شي د هغه د پلټنې لاګ ولولي.",
+      "permissionDenied": "یوازې د Enterprise پلان لرونکي سازمان مالک، اډمین یا د بلونو مدیر کولی شي د هغه د پلټنې لاګ ولولي. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "د پلټنې پېښې نشته",
       "emptyDescription": "په دې سازمان کې ترسره شوې کړنې دلته ښکاري.",
       "truncated": "وروستۍ پېښې ښودل کېږي.",
@@ -3597,7 +3599,7 @@
     },
     "billing": {
       "title": "بیلینګ",
-      "permissionDenied": "یوازې د سازمان مالک، اډمین یا د بیلینګ مدیر کولی شي د سازمان بیلینګ وګوري.",
+      "permissionDenied": "یوازې د سازمان مالک، اډمین یا د بلونو مدیر کولی شي د سازمان بیلینګ وګوري. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "ګډون",
       "state": "حالت",
       "stateNone": "ګډون نشته",
@@ -3774,7 +3776,7 @@
       "emptyDescription": "د پخوانیو غوښتنو لیدو لپاره «پخوانی ساعت» وکاروئ.",
       "emptyBoundDescription": "د غوښتنو ثبت تر همدې وخته پورې شاته ځي.",
       "loadError": "د غوښتنو لاګونه بار نه شول.",
-      "permissionDenied": "یوازې د سازمان مالک، اډمین یا د بیلنګ مدیر کولی شي د هغه د غوښتنو لاګونه ولولي.",
+      "permissionDenied": "یوازې د سازمان مالک، اډمین یا د بلونو مدیر کولی شي د هغه د غوښتنو لاګونه ولولي. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} ننوتي · {{output}} وتلي",
       "byok": "BYOK"
     },
@@ -4875,7 +4877,7 @@
     "defaultModel": "د Kilo ډیفالټ ماډل وکاروئ",
     "duration": "د وخت ساتنه (دقیقې)",
     "spendLimit": "د لګښت ساتنه (USD)",
-    "invalidSafeguards": "مثبت، محدود د وخت او لګښت حدونه ولیکئ.",
+    "invalidSafeguards": "په اجازه ورکړل شوې حد کې مثبت عدد ولیکئ.",
     "estimate": "اټکل {{estimate}} · تر ټولو زیات {{maximum}}",
     "estimateUnavailable": "د دې ترتیباتو لپاره تادیه شوی لنډیز شتون نلري. موډل یا حدود بدل کړئ، یا وروسته بیا هڅه وکړئ.",
     "confirmPaid": "د {{context}} لپاره تادیه شوي لنډیزونه فعال کړئ؟",
@@ -5041,6 +5043,8 @@
       "autoCommit": "کله چې چل پای ته ورسیږي، بدلونونه ثبت کړئ.",
       "condenseOnComplete": "کله چې چل پای ته ورسیږي، زمینه لنډه کړئ.",
       "activeTitle": "ټرېګر فعال",
+      "activeSwitchA11y": "ټرېګر فعال: {{name}}",
+      "copyLinkA11y": "د {{name}} لپاره لینک کاپي کړئ",
       "activeDescription": "ځنډول شوي ویب‌هوکونه د 404 سره ځواب ورکوي.",
       "runAsCreator": "زما په توګه چل کړه",
       "runAsCreatorDescription": "هره چلېدنه ستاسو حساب کاروي، نو پټ سرلیک اړین دی.",

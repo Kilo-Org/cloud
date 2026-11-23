@@ -817,6 +817,8 @@
     },
     "providerConnect": {
       "description": "連結 Kilo {{label}}，即可自動審查 PR。",
+      "notConnectedTitle": "尚未連結 {{platform}}",
+      "githubAdminOnlyDescription": "只有組織擁有者和管理員可以設定連結。",
       "githubApp": "GitHub App",
       "githubError": "無法開啟 GitHub 設定。請再試一次。",
       "gitlabAccount": "GitLab 帳戶",
@@ -3399,7 +3401,7 @@
   "organization": {
     "auditLog": {
       "title": "稽核記錄",
-      "permissionDenied": "只有 Enterprise 套餐組織的擁有者、管理員或帳務管理員可以查看其稽核記錄。",
+      "permissionDenied": "只有 Enterprise 套餐組織的擁有者、管理員或帳單管理員可以查看其稽核記錄。 $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "沒有稽核事件",
       "emptyDescription": "在此組織中執行的操作會顯示在這裡。",
       "truncated": "僅顯示最近的事件。",
@@ -3589,7 +3591,7 @@
     },
     "billing": {
       "title": "帳單",
-      "permissionDenied": "只有組織擁有者、管理員或帳單管理員可以查看組織帳單。",
+      "permissionDenied": "只有組織擁有者、管理員或帳單管理員可以查看組織帳單。 $t(organization.boundary.accessDeniedDescription)",
       "subscription": "訂閱",
       "state": "狀態",
       "stateNone": "無訂閱",
@@ -3778,7 +3780,7 @@
       "emptyDescription": "使用「較早一小時」查看較早的請求。",
       "emptyBoundDescription": "請求記錄最早只到這裡。",
       "loadError": "無法載入請求記錄。",
-      "permissionDenied": "只有組織的擁有者、管理員或帳務管理員可以查看其請求記錄。",
+      "permissionDenied": "只有組織的擁有者、管理員或帳單管理員可以查看其請求記錄。 $t(organization.boundary.accessDeniedDescription)",
       "tokens": "輸入 {{input}} · 輸出 {{output}}",
       "byok": "BYOK"
     },
@@ -4875,7 +4877,7 @@
     "defaultModel": "使用 Kilo 的預設模型",
     "duration": "時間上限（分鐘）",
     "spendLimit": "花費上限（USD）",
-    "invalidSafeguards": "請輸入大於零的有限時間與花費上限。",
+    "invalidSafeguards": "請輸入允許範圍內的正數。",
     "estimate": "預估 {{estimate}} · 上限 {{maximum}}",
     "estimateUnavailable": "這些設定無法提供付費摘要。請變更模型或上限，或稍後再試。",
     "confirmPaid": "要為 {{context}} 啟用付費摘要嗎？",
@@ -5041,6 +5043,8 @@
       "autoCommit": "執行完成時提交變更",
       "condenseOnComplete": "執行完成時精簡內容脈絡",
       "activeTitle": "觸發器已啟用",
+      "activeSwitchA11y": "觸發器已啟用：{{name}}",
+      "copyLinkA11y": "複製 {{name}} 的連結",
       "activeDescription": "暫停的網路鉤子會回應 404。",
       "runAsCreator": "以我的身分執行",
       "runAsCreatorDescription": "每次執行都會使用你的帳戶，因此必須提供密鑰標頭。",

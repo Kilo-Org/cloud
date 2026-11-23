@@ -13,7 +13,7 @@ const state = vi.hoisted(() => ({
     | {
         refetchInterval: (query: { state: { data?: BriefingReport } }) => number | false;
       },
-  timestamp: vi.fn(() => 'formatted source time'),
+  timestamp: vi.fn(() => ({ text: 'formatted source time', timeZone: 'Europe/Berlin' })),
 }));
 const readMark = vi.hoisted(() => ({
   mutate: vi.fn(),

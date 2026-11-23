@@ -28,12 +28,6 @@ vi.mock('@/components/ui/icons', () => ({
 
 type DirectionalWrapper = typeof DirectionalArrowLeft;
 
-/**
- * Every wrapper the module exports, with the glyph it draws in each direction.
- * In RTL the native direction mirrors the chrome, so each pair swaps: the
- * parameterised cases below are the whole contract, and a wrapper whose emblem
- * or direction is inverted fails here.
- */
 const WRAPPERS = [
   {
     name: 'DirectionalChevronLeft',
@@ -152,11 +146,6 @@ function logOutIcon(renderer: TestRenderer.ReactTestRenderer): TestRenderer.Reac
   return icon;
 }
 
-/**
- * The sign-out arrow leaves the row toward the trailing edge in LTR, so an RTL
- * row needs the same glyph flipped to leave toward the start edge. Lucide ships
- * no mirrored log-out glyph, which is why this wrapper flips the glyph itself.
- */
 describe('DirectionalLogOut', () => {
   it('draws one log-out glyph, unflipped, in an LTR interface', () => {
     const renderer = renderLogOut();
@@ -208,11 +197,6 @@ function renderLogs(): TestRenderer.ReactTestRenderer {
   return renderer;
 }
 
-/**
- * A bulleted list keeps its bullets on the reading-start side, so an RTL screen
- * needs the glyph flipped: Lucide's `Logs` draws the ticks on the left in both
- * directions.
- */
 describe('DirectionalLogs', () => {
   it('draws the list glyph unflipped in an LTR interface', () => {
     const renderer = renderLogs();

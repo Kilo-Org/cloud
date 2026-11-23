@@ -1502,7 +1502,9 @@
       "githubError": "Die GitHub-opstelling kon nie oopgemaak word nie. Probeer asseblief weer.",
       "gitlabAccount": "GitLab-rekening",
       "gitlabError": "Die GitLab-opstelling kon nie oopgemaak word nie. Probeer asseblief weer.",
-      "description": "Koppel die Kilo {{label}} om trekversoeke outomaties te hersien."
+      "description": "Koppel die Kilo {{label}} om trekversoeke outomaties te hersien.",
+      "notConnectedTitle": "{{platform}} is nie gekoppel nie",
+      "githubAdminOnlyDescription": "Slegs organisasie-eienaars en administrateurs kan dit koppel."
     },
     "overview": {
       "allAreas": "Alle fokusareas",
@@ -3407,7 +3409,7 @@
   "organization": {
     "auditLog": {
       "title": "Ouditlog",
-      "permissionDenied": "Slegs 'n organisasie-eienaar, -administrateur of -faktuurbestuurder op die Enterprise-plan kan die organisasie se ouditlog lees.",
+      "permissionDenied": "Slegs 'n organisasie-eienaar, -administrateur of -faktureringsbestuurder op die Enterprise-plan kan die organisasie se ouditlog lees. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Geen ouditgebeure nie",
       "emptyDescription": "Aksies wat in hierdie organisasie geneem word, verskyn hier.",
       "truncated": "Die mees onlangse gebeure word gewys.",
@@ -3597,7 +3599,7 @@
     },
     "billing": {
       "title": "Fakturering",
-      "permissionDenied": "Slegs 'n eienaar, administrateur of faktureringsbestuurder van die organisasie kan die organisasie se fakturering sien.",
+      "permissionDenied": "Slegs 'n eienaar, administrateur of faktureringsbestuurder van die organisasie kan die organisasie se fakturering sien. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Intekening",
       "state": "Status",
       "stateNone": "Geen intekening",
@@ -3774,7 +3776,7 @@
       "emptyDescription": "Gebruik Vroeër uur om vroeëre versoeke te sien.",
       "emptyBoundDescription": "Versoeklogboeke strek nie verder terug nie.",
       "loadError": "Kon nie versoeklogs laai nie.",
-      "permissionDenied": "Slegs 'n organisasie-eienaar, -administrateur of -faktuurbestuurder kan die organisasie se versoeklogs lees.",
+      "permissionDenied": "Slegs 'n organisasie-eienaar, -administrateur of -faktureringsbestuurder kan die organisasie se versoeklogs lees. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} in · {{output}} uit",
       "byok": "BYOK"
     },
@@ -4875,7 +4877,7 @@
     "defaultModel": "Gebruik Kilo se verstekmodel",
     "duration": "Tydbeveiliging (minute)",
     "spendLimit": "Bestedingsbeveiliging (USD)",
-    "invalidSafeguards": "Voer positiewe, eindige tyd- en bestedingslimiete in.",
+    "invalidSafeguards": "Voer ’n positiewe getal binne die toegelate reeks in.",
     "estimate": "Skatting {{estimate}} · maksimum {{maximum}}",
     "estimateUnavailable": "’n Betaalde opsomming is nie beskikbaar vir hierdie instellings nie. Verander die model of die perke, of probeer later weer.",
     "confirmPaid": "Aktiveer betaalde opsommings vir {{context}}?",
@@ -5041,6 +5043,8 @@
       "autoCommit": "Pleeg veranderinge wanneer die lopie klaar is",
       "condenseOnComplete": "Verdig die konteks wanneer die lopie klaar is",
       "activeTitle": "Sneller aktief",
+      "activeSwitchA11y": "Sneller aktief: {{name}}",
+      "copyLinkA11y": "Kopieer skakel vir {{name}}",
       "activeDescription": "Gepauzeerde webhake antwoord met 404.",
       "runAsCreator": "Loop as ek",
       "runAsCreatorDescription": "Elke lopie gebruik jou rekening, so die geheime-opskrif is nodig.",

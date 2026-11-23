@@ -2598,7 +2598,10 @@ describe('GitLab encrypted credential persistence', () => {
 
     await expect(
       retireProjectCredentialsForReplacedAccount({
-        integration: { id: integration.id, metadata: { gitlab_instance_url: 'https://gitlab.com' } },
+        integration: {
+          id: integration.id,
+          metadata: { gitlab_instance_url: 'https://gitlab.com' },
+        },
         userToken: 'glpat-primary-token',
         currentAccountId: '202',
         signal: controller.signal,
@@ -2682,7 +2685,10 @@ describe('GitLab encrypted credential persistence', () => {
 
     await expect(
       retireProjectCredentialsForReplacedAccount({
-        integration: { id: integration.id, metadata: { gitlab_instance_url: 'https://gitlab.com' } },
+        integration: {
+          id: integration.id,
+          metadata: { gitlab_instance_url: 'https://gitlab.com' },
+        },
         userToken: 'glpat-primary-token',
         currentAccountId: '202',
         signal: new AbortController().signal,

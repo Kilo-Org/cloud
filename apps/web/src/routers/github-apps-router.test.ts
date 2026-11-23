@@ -539,7 +539,7 @@ describe('githubAppsRouter organization install capability', () => {
     });
   });
 
-  it('refuses to mint another install state while the live workflow connection holds the slot', async () => {
+  it('refuses to mint another install state while a healthy association holds the slot', async () => {
     mockEnsureOrganizationAccess.mockResolvedValue('owner');
     mockListOrganizationGitHubInstallationSlots.mockResolvedValue([
       {
@@ -558,7 +558,7 @@ describe('githubAppsRouter organization install capability', () => {
     expect(mockCreateInstallState).not.toHaveBeenCalled();
   });
 
-  it('mints an install state when the organization has no live workflow connection', async () => {
+  it('mints an install state when no association holds the slot', async () => {
     mockEnsureOrganizationAccess.mockResolvedValue('owner');
     mockListOrganizationGitHubInstallationSlots.mockResolvedValue([]);
     const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });

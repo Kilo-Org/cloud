@@ -21,16 +21,17 @@ import { createInstallState } from '@/lib/integrations/github/install-state';
  * Why the install page is refused for an organization that holds its single
  * installation slot, or null when the slot is free.
  *
- * An organization may start an installation only when the completion gate
- * would accept one: `connectVerifiedGitHubInstallation` refuses a second
- * installation while any association that is not locally disconnected holds the
- * slot, and refuses an installation whose canonical record is suspended. The
- * start gate therefore reads the same associations, so a user is never sent to
- * GitHub to create an installation that completion then rejects. The message
+ * The start gate reads the same association set as the completion gate:
+ * `connectVerifiedGitHubInstallation` refuses a second installation while any
+ * association that is not locally disconnected holds the slot, so an
+ * organization that holds one is refused here instead of at the end of
+ * GitHub's install flow. Completion keeps the checks this gate cannot make
+ * before an installation exists — the canonical installation record it later
+ * finds suspended or deleted, and the sharing and ownership rules. The message
  * names the recovery the organization already has: restore the connection on
  * GitHub, or disconnect it in Kilo.
  */
-export function describeGitHubInstallStartRefusal(
+function describeGitHubInstallStartRefusal(
   slots: readonly OrganizationGitHubInstallationSlot[]
 ): string | null {
   const occupied = slots.filter(holdsGitHubInstallationSlot);

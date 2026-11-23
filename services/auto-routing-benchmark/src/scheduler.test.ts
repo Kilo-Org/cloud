@@ -1819,6 +1819,7 @@ describe('scheduler (production migrations and real SQLite)', () => {
       .run();
     expect(await hasUnsettledChunks(db, 'dead-lane-settle')).toBe(false);
   });
+});
 
 /**
  * The automatic-attempt cap is keyed on the chunk row, so the proof that a platform block

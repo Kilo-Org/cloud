@@ -169,6 +169,29 @@ describe('ProfileConfigImportSheet permission gate', () => {
     unmount();
   });
 
+  it('an apply refused after the sheet unmounted: the refusal reaches the toast', async () => {
+    h.preview.mockResolvedValue(PREVIEW);
+    const apply = Promise.withResolvers<unknown>();
+    h.apply.mockReturnValue(apply.promise);
+
+    const { renderer, unmount } = await mountSheet();
+    act(() => {
+      changePastedConfig(renderer.root, JSON.stringify({ agents: [] }));
+    });
+    await pressHeaderDone(renderer.root);
+    await pressHeaderDone(renderer.root);
+
+    // Any close path unmounts the sheet, so the refusal has no inline note to
+    // land in even when the permission still allows the write.
+    unmount();
+    await act(async () => {
+      apply.reject(new Error(REFUSAL));
+      await Promise.resolve();
+    });
+
+    expect(mockedToast.error).toHaveBeenCalledWith(REFUSAL);
+  });
+
   it('read-only while an apply is refused: the refusal reaches the toast', async () => {
     h.preview.mockResolvedValue(PREVIEW);
     const apply = Promise.withResolvers<unknown>();

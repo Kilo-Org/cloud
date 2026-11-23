@@ -115,6 +115,14 @@ export function hasImportableItems(views: readonly ImportCategoryView[]): boolea
   return views.length > 0;
 }
 
+/** No section kept, the state before a preview answers. */
+export const NO_IMPORT_SELECTION = {
+  agents: false,
+  commands: false,
+  skills: false,
+  instructions: false,
+} satisfies ImportSelection;
+
 /** Every section with something to import starts selected, the way the web does. */
 export function defaultImportSelection(views: readonly ImportCategoryView[]) {
   const selection = { agents: false, commands: false, skills: false, instructions: false };

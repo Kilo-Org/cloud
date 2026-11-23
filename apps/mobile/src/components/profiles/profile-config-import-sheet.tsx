@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -14,6 +14,7 @@ import {
   importIssueViews,
   type ImportSelection,
   importSelectionRequest,
+  NO_IMPORT_SELECTION,
   selectedImportCount,
   selectedOverwriteCount,
 } from '@/components/profiles/config-import-preview-model';
@@ -82,18 +83,22 @@ export function ProfileConfigImportSheet({
   // outlives it.
   const permissionRef = useRef(permission);
   permissionRef.current = permission;
+  // Whether this sheet can still show a note. Every close path unmounts it, so
+  // a request that settles afterwards has only the toast left.
+  const mountedRef = useRef(true);
+  useEffect(
+    () => () => {
+      mountedRef.current = false;
+    },
+    []
+  );
 
   const textRef = useRef('');
   const archiveRef = useRef<string | null>(null);
   // Remount token for the pasted-config field, which is uncontrolled.
   const [pasteToken, setPasteToken] = useState(0);
   const [views, setViews] = useState<readonly ImportCategoryView[]>([]);
-  const [selection, setSelection] = useState<ImportSelection>({
-    agents: false,
-    commands: false,
-    skills: false,
-    instructions: false,
-  });
+  const [selection, setSelection] = useState<ImportSelection>(NO_IMPORT_SELECTION);
   const [issues, setIssues] = useState<readonly ImportIssueView[]>([]);
   const [hasPreview, setHasPreview] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
@@ -172,9 +177,9 @@ export function ProfileConfigImportSheet({
       toast.success(t('profiles.importConfigApplied'));
       onClose();
     } catch (error) {
-      // A denial closed the sheet, so this refusal has no inline note left: the
-      // toast carries it to the surface that remains.
-      if (permissionRef.current === 'read-only') {
+      // A closed sheet has no inline note left, so the toast carries the
+      // refusal to the surface that remains.
+      if (!mountedRef.current || permissionRef.current === 'read-only') {
         toast.error(errorMessage(error) ?? t('profiles.importConfigApplyFailed'));
         return;
       }

@@ -19,7 +19,9 @@ import type { BrowserToolContractEntry, BrowserToolInputSchema } from './browser
  *   and its `target` is a non-empty string (`dropTargetSchema`).
  * - `browser_webmcp_call` takes a tool name and its params (`webMcpCallArgumentsSchema`),
  *   so the vendored `frame` argument is no longer advertised; no handler reads
- *   it, and the session refuses it by name.
+ *   it, and the session refuses it by name. `frame` was the only property that
+ *   named the discovery tool, so the published `name` description names
+ *   `browser_webmcp_list` itself.
  * - `browser_webmcp_list` reads the tools the tab's top-level document
  *   registers, so its published description does not claim a cross-frame list.
  *
@@ -36,6 +38,13 @@ const DROP_PATHS_DESCRIPTION =
 
 /** The vendored wording claims a cross-frame list; discovery runs in the tab's top-level document. */
 const WEBMCP_LIST_DESCRIPTION = "List the WebMCP tools the page's top-level document registers";
+
+/**
+ * The vendored `frame` property was the only published text that named the discovery tool,
+ * so the pointer lives on `name`: the gateway path prefixes it and the local-agent path publishes bare names.
+ */
+const WEBMCP_CALL_NAME_DESCRIPTION =
+  'Name of the WebMCP tool to call, as reported by browser_webmcp_list';
 
 const jsonObjectSchema = z.record(z.string(), z.unknown());
 
@@ -110,7 +119,7 @@ const narrowWebMcpCallSchema = (schema: BrowserToolInputSchema): BrowserToolInpu
     properties: {
       name: {
         ...jsonObjectSchema.parse(publishedWebMcpCallProperties['name']),
-        description: name.data.description,
+        description: WEBMCP_CALL_NAME_DESCRIPTION,
       },
       params: {
         ...jsonObjectSchema.parse(publishedWebMcpCallProperties['params']),

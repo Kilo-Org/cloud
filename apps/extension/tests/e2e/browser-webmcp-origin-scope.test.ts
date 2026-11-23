@@ -354,6 +354,14 @@ test.describe('WebMCP descriptor origin scope', () => {
         'params',
       ]);
 
+      // The listing a model reads points at the discovery tool by its bare name, which is what this listing exposes.
+      const publishedName = z
+        .object({ description: z.string() })
+        .catchall(z.unknown())
+        .parse(published.inputSchema.properties['name']);
+
+      expect(publishedName.description).toContain('browser_webmcp_list');
+
       const refused = resultOf(
         await session.callTool(
           'browser_webmcp_call',

@@ -726,9 +726,6 @@ export function reportNetworkError(context: NetworkErrorContext): void {
     const normalizedPath = redactUrlText(normalizeUrlPath(context.url));
     const trpc = readTrpcErrorContext(context.error);
     const { procedure, messagePath } = failureIdentity(context, trpc, normalizedPath);
-    // The claim's key is the Sentry group key, so a repeat can never be filed
-    // under a different issue than the one it repeats. The expected-answer
-    // latch builds the same key ({@link contextNetworkErrorFingerprint}).
     const fingerprint = networkErrorFingerprint(context, trpc, {
       procedure,
       messagePath,
@@ -847,7 +844,8 @@ function isExpectedResponse(
  * for the first expected answer per fingerprint per process
  * ({@link claimExpectedAnswerBreadcrumb}); later expected answers record
  * nothing. A breadcrumb still shows in the trail that explains the next real
- * event. Same message and tags as a report; no query string.
+ * event. The breadcrumb carries the synthetic message and the network metadata,
+ * never tags or a query string.
  */
 function recordNetworkErrorBreadcrumb(context: NetworkErrorContext): void {
   try {
@@ -973,8 +971,6 @@ function recordFailedResponse(
       reportNetworkError(context);
       return;
     }
-    // An expected answer never spends the fingerprint's event, so a later real
-    // answer for the same endpoint still files its event.
     if (claimExpectedAnswerBreadcrumb(contextNetworkErrorFingerprint(context))) {
       recordNetworkErrorBreadcrumb(context);
     }

@@ -359,14 +359,6 @@ describe('Telugu link revoke copy', () => {
   });
 });
 
-describe('Telugu spoken loading cost', () => {
-  it('marks the figure as accumulated so far, like the canonical entry', () => {
-    expect(i18n.t('agentChat.contextUsage.loadingCostSpoken', { cost: '$0.04' })).toBe(
-      'ఇంతవరకు ఖర్చు $0.04.'
-    );
-  });
-});
-
 describe('Telugu to-do counts', () => {
   it('keeps the singular wording for one open item', () => {
     expect(i18n.t('todos.lists.openCount', { count: 1 })).toBe('1 తెరిచి ఉన్నది');

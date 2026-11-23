@@ -198,3 +198,11 @@ describe('Telugu one term per concept', () => {
     expect(i18n.t('codeReviewer.repos.repositoryAccess')).toContain('యాక్సెస్');
   });
 });
+
+describe('Telugu spoken loading cost', () => {
+  it('marks the figure as accumulated so far, like the canonical entry', () => {
+    expect(i18n.t('agentChat.contextUsage.loadingCostSpoken', { cost: '$0.04' })).toBe(
+      'ఇంతవరకు ఖర్చు $0.04.'
+    );
+  });
+});

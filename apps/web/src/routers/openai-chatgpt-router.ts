@@ -107,8 +107,8 @@ async function resolveOwner(
  * connector decision needs. The connector account lookup also takes the
  * primary, so the row and the account it names come from the same database and
  * the answer follows the row an owner just saved. Every other owner skips that
- * second stored-connection read. Every owner then reads the recorded plan limit
- * on the primary too, so a limit recorded moments ago is reported at once.
+ * second stored-connection read. A live connection then reads the recorded plan
+ * limit on the primary too, so a limit recorded moments ago is reported at once.
  */
 async function readStatus(owner: OpenAiChatGptOwner): Promise<OpenAiChatGptStatus> {
   const connection = await getOpenAiChatGptConnection(owner);

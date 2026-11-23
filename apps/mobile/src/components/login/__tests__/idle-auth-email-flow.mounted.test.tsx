@@ -9,6 +9,7 @@ import { type PostAuthFailure } from '@/lib/auth/auth-fetch';
 import type * as AuthFetchTypes from '@/lib/auth/auth-fetch';
 import { type PendingLinkOffer } from '@/lib/auth/native-auth-contract';
 
+import { type CodeStepNotice } from '@/components/login/email-otp-form';
 import { i18n } from '@/i18n';
 
 const authMock = vi.hoisted(() => ({ signIn: vi.fn() }));
@@ -131,6 +132,15 @@ type StartFn = (mode: 'signin' | 'sso', ssoEmail?: string) => Promise<void>;
 const INVALID_CODE_MESSAGE =
   "That code is incorrect or expired. Use 'Resend code' or 'More sign-in options'.";
 
+/** The admission gate's copy, which names the browser sign-in. */
+const ADMISSION_MESSAGE =
+  "Your device can't be verified. Use 'More sign-in options' to sign in on another device or through the web.";
+
+const RATE_LIMITED_MESSAGE = 'Too many sign-in attempts. Please wait and try again.';
+
+/** The neutral line a successful resend leaves where a terminal refusal stood. */
+const CONFIRMATION_MESSAGE = 'Code sent';
+
 function findAll(root: I, type: string): I[] {
   return root.findAll(n => typeof n.type === 'string' && (n.type as string) === type);
 }
@@ -162,13 +172,18 @@ async function mountIdleAuth(
   return renderer;
 }
 
-/** The code step's form, re-read after every update: its props carry the refusal. */
+/** The code step's form, re-read after every update: its props carry the notice list. */
 function codeStep(root: I): I {
   const form = findAll(root, 'EmailOtpForm')[0];
   if (!form) {
     throw new Error('EmailOtpForm not found');
   }
   return form;
+}
+
+/** The notices the code step renders, in reading order: the copy and its control come from here. */
+function codeStepNotices(root: I): readonly CodeStepNotice[] {
+  return (codeStep(root).props.notices as readonly CodeStepNotice[] | undefined) ?? [];
 }
 
 /** Mounts the idle screen and lands on the code step, with the OTP route accepting the request. */
@@ -449,7 +464,7 @@ describe('IdleAuth email sign-in flow (real useNativeAuth)', () => {
       await Promise.resolve();
     });
 
-    expect(findAll(renderer.root, 'EmailOtpForm')[0]?.props.error).toBeUndefined();
+    expect(codeStepNotices(renderer.root)).toEqual([]);
 
     act(() => {
       renderer.unmount();
@@ -458,7 +473,7 @@ describe('IdleAuth email sign-in flow (real useNativeAuth)', () => {
 
   it('keeps a wrong-code refusal and its options control while the person edits the code', async () => {
     const renderer = await mountCodeStep('wrong@example.com');
-    expect(codeStep(renderer.root).props.error).toBeUndefined();
+    expect(codeStepNotices(renderer.root)).toEqual([]);
 
     await refuseVerify(renderer, {
       ok: false,
@@ -466,18 +481,20 @@ describe('IdleAuth email sign-in flow (real useNativeAuth)', () => {
       ssoOrganizationId: undefined,
     });
 
-    expect(codeStep(renderer.root).props.error).toBe(INVALID_CODE_MESSAGE);
     // The server answers INVALID_CODE for an address it silently refused, so a
     // resent code never arrives either: the step offers the other methods.
-    expect(codeStep(renderer.root).props.recovery).toBe('options');
+    expect(codeStepNotices(renderer.root)).toEqual([
+      { kind: 'terminal', message: INVALID_CODE_MESSAGE },
+    ]);
 
     // Typing is not a way out of that dead end, so the message and the control
     // that names the real exit stay exactly where they are.
     act(() => {
       (codeStep(renderer.root).props.onCodeChange as () => void)();
     });
-    expect(codeStep(renderer.root).props.error).toBe(INVALID_CODE_MESSAGE);
-    expect(codeStep(renderer.root).props.recovery).toBe('options');
+    expect(codeStepNotices(renderer.root)).toEqual([
+      { kind: 'terminal', message: INVALID_CODE_MESSAGE },
+    ]);
 
     act(() => {
       renderer.unmount();
@@ -491,7 +508,9 @@ describe('IdleAuth email sign-in flow (real useNativeAuth)', () => {
       errorCode: 'INVALID_CODE',
       ssoOrganizationId: undefined,
     });
-    expect(codeStep(renderer.root).props.recovery).toBe('options');
+    expect(codeStepNotices(renderer.root)).toEqual([
+      { kind: 'terminal', message: INVALID_CODE_MESSAGE },
+    ]);
 
     // A refused resend delivers no code either, so clearing the refusal on the
     // tap would drop the only control that can finish a sign-in for this address.
@@ -507,8 +526,9 @@ describe('IdleAuth email sign-in flow (real useNativeAuth)', () => {
       await Promise.resolve();
     });
 
-    expect(codeStep(renderer.root).props.error).toBe(INVALID_CODE_MESSAGE);
-    expect(codeStep(renderer.root).props.recovery).toBe('options');
+    expect(codeStepNotices(renderer.root)).toEqual([
+      { kind: 'terminal', message: INVALID_CODE_MESSAGE },
+    ]);
     expect(codeStep(renderer.root).props.busy).toBeUndefined();
 
     act(() => {
@@ -523,11 +543,14 @@ describe('IdleAuth email sign-in flow (real useNativeAuth)', () => {
       errorCode: 'INVALID_CODE',
       ssoOrganizationId: undefined,
     });
-    expect(codeStep(renderer.root).props.recovery).toBe('options');
+    expect(codeStepNotices(renderer.root)).toEqual([
+      { kind: 'terminal', message: INVALID_CODE_MESSAGE },
+    ]);
 
-    // The resend the person tapped did deliver a challenge, but the field clears
-    // its code and the address stays one the code route cannot take: the refusal
-    // and its exit outlive the resend rather than vanishing with the field.
+    // The resend did deliver a new code, so the wrong-code sentence must not
+    // stay: it told the person to resend just after they did, and a fresh code
+    // can still work. The neutral line confirms the send, and the control that
+    // names the real exit stays.
     mockPostAuth.mockResolvedValue({
       ok: true,
       data: { success: true, challengeId: 'c0000000-0000-4000-8000-000000000002' },
@@ -539,8 +562,12 @@ describe('IdleAuth email sign-in flow (real useNativeAuth)', () => {
       await Promise.resolve();
     });
 
-    expect(codeStep(renderer.root).props.error).toBe(INVALID_CODE_MESSAGE);
-    expect(codeStep(renderer.root).props.recovery).toBe('options');
+    expect(codeStepNotices(renderer.root)).toEqual([
+      { kind: 'confirmation', message: CONFIRMATION_MESSAGE },
+    ]);
+    // The slot already says the code was sent, so this path raises no toast.
+    const { toast } = await import('sonner-native');
+    expect(toast.success).not.toHaveBeenCalled();
 
     act(() => {
       renderer.unmount();
@@ -555,17 +582,16 @@ describe('IdleAuth email sign-in flow (real useNativeAuth)', () => {
       ssoOrganizationId: undefined,
     });
 
-    expect(codeStep(renderer.root).props.error).toBe(
-      'Too many sign-in attempts. Please wait and try again.'
-    );
-    // A code can still clear this one, so the browser action stays off.
-    expect(codeStep(renderer.root).props.recovery).toBeUndefined();
+    // A code can still clear this one, so it stays a `refusal` and the browser
+    // action stays off.
+    expect(codeStepNotices(renderer.root)).toEqual([
+      { kind: 'refusal', message: RATE_LIMITED_MESSAGE },
+    ]);
 
     act(() => {
       (codeStep(renderer.root).props.onCodeChange as () => void)();
     });
-    expect(codeStep(renderer.root).props.error).toBeUndefined();
-    expect(codeStep(renderer.root).props.recovery).toBeUndefined();
+    expect(codeStepNotices(renderer.root)).toEqual([]);
 
     act(() => {
       renderer.unmount();
@@ -579,7 +605,9 @@ describe('IdleAuth email sign-in flow (real useNativeAuth)', () => {
       errorCode: 'INVALID_CODE',
       ssoOrganizationId: undefined,
     });
-    expect(codeStep(renderer.root).props.error).toBe(INVALID_CODE_MESSAGE);
+    expect(codeStepNotices(renderer.root)).toEqual([
+      { kind: 'terminal', message: INVALID_CODE_MESSAGE },
+    ]);
 
     act(() => {
       (codeStep(renderer.root).props.onBack as () => void)();
@@ -597,8 +625,7 @@ describe('IdleAuth email sign-in flow (real useNativeAuth)', () => {
       await Promise.resolve();
       await Promise.resolve();
     });
-    expect(codeStep(renderer.root).props.error).toBeUndefined();
-    expect(codeStep(renderer.root).props.recovery).toBeUndefined();
+    expect(codeStepNotices(renderer.root)).toEqual([]);
 
     act(() => {
       renderer.unmount();
@@ -656,10 +683,9 @@ describe('IdleAuth email sign-in flow (real useNativeAuth)', () => {
     if (!refused) {
       throw new Error('EmailOtpForm not found');
     }
-    expect(refused.props.error).toBe(
-      "That code is incorrect or expired. Use 'Resend code' or 'More sign-in options'."
-    );
-    expect(refused.props.recovery).toBe('options');
+    expect(codeStepNotices(renderer.root)).toEqual([
+      { kind: 'terminal', message: INVALID_CODE_MESSAGE },
+    ]);
     expect(authMock.signIn).not.toHaveBeenCalled();
 
     const onAlternativeSignIn = refused.props.onAlternativeSignIn as (() => void) | undefined;
@@ -716,7 +742,7 @@ describe('IdleAuth email sign-in flow (real useNativeAuth)', () => {
       await Promise.resolve();
     });
 
-    expect(findAll(renderer.root, 'EmailOtpForm')[0]?.props.error).toBeUndefined();
+    expect(codeStepNotices(renderer.root)).toEqual([]);
     expect(authMock.signIn).toHaveBeenCalledExactlyOnceWith('at', 'rt', 3600);
 
     act(() => {
@@ -751,9 +777,11 @@ describe('IdleAuth email sign-in flow (real useNativeAuth)', () => {
       (otpForm.props.onVerify as (code: string) => void)('123456');
     });
 
-    expect(findAll(renderer.root, 'EmailOtpForm')[0]?.props.error).toBe(
-      i18n.t('authErrors.retryableAdmission')
-    );
+    // The client could not build the device proof, so this is a retryable
+    // refusal: a code can still clear it, and the step offers no browser action.
+    expect(codeStepNotices(renderer.root)).toEqual([
+      { kind: 'refusal', message: i18n.t('authErrors.retryableAdmission') },
+    ]);
     expect(mockPostAuth).not.toHaveBeenCalled();
     expect(authMock.signIn).not.toHaveBeenCalled();
 
@@ -812,10 +840,9 @@ describe('IdleAuth email sign-in flow (real useNativeAuth)', () => {
     if (!refused) {
       throw new Error('EmailOtpForm not found');
     }
-    expect(refused.props.error).toBe(
-      "Your device can't be verified. Use 'More sign-in options' to sign in on another device or through the web."
-    );
-    expect(refused.props.recovery).toBe('options');
+    expect(codeStepNotices(renderer.root)).toEqual([
+      { kind: 'terminal', message: ADMISSION_MESSAGE },
+    ]);
     const onAlternativeSignIn = refused.props.onAlternativeSignIn as (() => void) | undefined;
     if (!onAlternativeSignIn) {
       throw new Error('alternative sign-in action not rendered');
@@ -893,18 +920,17 @@ describe('IdleAuth pending-link code step (real useNativeAuth)', () => {
       await Promise.resolve();
     });
 
-    const refused = findAll(renderer.root, 'EmailOtpForm')[0];
-    expect(refused?.props.error).toBe('Too many sign-in attempts. Please wait and try again.');
-    expect(refused?.props.busy).toBeUndefined();
-    // A retryable resend refusal never offers the terminal browser action.
-    expect(refused?.props.recovery).toBeUndefined();
+    expect(codeStepNotices(renderer.root)).toEqual([
+      { kind: 'refusal', message: RATE_LIMITED_MESSAGE },
+    ]);
+    expect(codeStep(renderer.root).props.busy).toBeUndefined();
 
     act(() => {
       renderer.unmount();
     });
   });
 
-  it('shows the newest refusal when a resend fails after a terminal verify refusal', async () => {
+  it('keeps the terminal refusal above the resend failure that follows it', async () => {
     mockPostAuth.mockResolvedValue({ ok: true, data: { success: true } });
     const renderer = await mountIdleAuth({
       pendingLink: offer,
@@ -941,11 +967,14 @@ describe('IdleAuth pending-link code step (real useNativeAuth)', () => {
       await Promise.resolve();
       await Promise.resolve();
     });
-    expect(findAll(renderer.root, 'EmailOtpForm')[0]?.props.recovery).toBe('options');
+    expect(codeStepNotices(renderer.root)).toEqual([
+      { kind: 'terminal', message: ADMISSION_MESSAGE },
+    ]);
 
-    // The resend then fails for its own, different reason. The slot must read
-    // the newest refusal: the sticky terminal message would hide the failure and
-    // the tap would look like it did nothing.
+    // The resend then fails for its own, different reason. Both sentences must
+    // read: the terminal one that names the control, and the newest failure, so
+    // the tap never looks like it did nothing and the control keeps the sentence
+    // that explains it.
     mockPostAuth.mockResolvedValue({
       ok: false,
       errorCode: 'RATE_LIMITED',
@@ -958,9 +987,11 @@ describe('IdleAuth pending-link code step (real useNativeAuth)', () => {
       await Promise.resolve();
     });
 
-    const afterResend = findAll(renderer.root, 'EmailOtpForm')[0];
-    expect(afterResend?.props.error).toBe('Too many sign-in attempts. Please wait and try again.');
-    expect(afterResend?.props.busy).toBeUndefined();
+    expect(codeStepNotices(renderer.root)).toEqual([
+      { kind: 'terminal', message: ADMISSION_MESSAGE },
+      { kind: 'refusal', message: RATE_LIMITED_MESSAGE },
+    ]);
+    expect(codeStep(renderer.root).props.busy).toBeUndefined();
 
     act(() => {
       renderer.unmount();
@@ -998,12 +1029,13 @@ describe('IdleAuth pending-link code step (real useNativeAuth)', () => {
       await Promise.resolve();
       await Promise.resolve();
     });
-    expect(codeStep(renderer.root).props.error).toBe(
-      'Too many sign-in attempts. Please wait and try again.'
-    );
+    expect(codeStepNotices(renderer.root)).toEqual([
+      { kind: 'refusal', message: RATE_LIMITED_MESSAGE },
+    ]);
 
-    // The code exchange then refuses for its own reason: its message is the
-    // newest one, so the older resend failure retires instead of shadowing it.
+    // The code exchange then refuses for its own reason: its notice is the
+    // newest word on the step, so the older resend failure retires instead of
+    // shadowing it.
     mockPostAuth.mockResolvedValue({
       ok: false,
       errorCode: 'ADMISSION_REQUIRED',
@@ -1017,11 +1049,9 @@ describe('IdleAuth pending-link code step (real useNativeAuth)', () => {
       await Promise.resolve();
     });
 
-    const afterVerify = findAll(renderer.root, 'EmailOtpForm')[0];
-    expect(afterVerify?.props.error).toBe(
-      "Your device can't be verified. Use 'More sign-in options' to sign in on another device or through the web."
-    );
-    expect(afterVerify?.props.recovery).toBe('options');
+    expect(codeStepNotices(renderer.root)).toEqual([
+      { kind: 'terminal', message: ADMISSION_MESSAGE },
+    ]);
 
     act(() => {
       renderer.unmount();
@@ -1071,10 +1101,9 @@ describe('IdleAuth pending-link code step (real useNativeAuth)', () => {
     if (!refused) {
       throw new Error('EmailOtpForm not found');
     }
-    expect(refused.props.error).toBe(
-      "Your device can't be verified. Use 'More sign-in options' to sign in on another device or through the web."
-    );
-    expect(refused.props.recovery).toBe('options');
+    expect(codeStepNotices(renderer.root)).toEqual([
+      { kind: 'terminal', message: ADMISSION_MESSAGE },
+    ]);
     const onAlternativeSignIn = refused.props.onAlternativeSignIn as (() => void) | undefined;
     if (!onAlternativeSignIn) {
       throw new Error('alternative sign-in action not rendered');

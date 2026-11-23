@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { Platform, Pressable, View } from 'react-native';
 import { toast } from 'sonner-native';
 
-import { EmailOtpForm } from '@/components/login/email-otp-form';
+import { type CodeStepNotice, EmailOtpForm } from '@/components/login/email-otp-form';
 import { PendingLinkAuth } from '@/components/login/pending-link-auth';
 import { ProviderButtons } from '@/components/login/provider-buttons';
 import { Button } from '@/components/ui/button';
@@ -21,7 +21,7 @@ import {
 } from '@/lib/a11y/tap-target';
 import { type PendingLinkOffer } from '@/lib/auth/native-auth-contract';
 import { pendingLinkOptions } from '@/lib/auth/pending-link';
-import { type EmailCodeRefusal, useNativeAuth } from '@/lib/auth/use-native-auth';
+import { useNativeAuth } from '@/lib/auth/use-native-auth';
 import { passkeysSupported } from '@/lib/auth/passkey-client';
 import {
   beginLoginEmail,
@@ -43,13 +43,14 @@ const LEGAL_LINK_ACTIONS: readonly {
 ];
 
 /**
- * Keeps the refusal that no further code can clear. The token route answers `INVALID_CODE` for an
- * address the OTP route silently refused, so a resent code never arrives and typing another one
- * cannot succeed; clearing the message on either step would leave the person with the dead end and
- * no control naming the way out. The untagged (retryable) refusals still retire on that step.
+ * Keeps the notice a code step retry cannot retire. A `refusal` is one a new code may still
+ * clear, so typing or a resend drops it. A `terminal` refusal — the admission gate, or an
+ * address the OTP route silently refused — and the `confirmation` a successful resend makes of
+ * it outlive both, because the dead end they report is not something another code can clear.
+ * Only Back, entering the step afresh, or a pending link taking over ends them.
  */
-const survivesCodeStepRetry = (refusal: EmailCodeRefusal | undefined) =>
-  refusal?.recovery === 'options' ? refusal : undefined;
+const survivesCodeStepRetry = (notice: CodeStepNotice | undefined) =>
+  notice?.kind === 'refusal' ? undefined : notice;
 
 export function IdleAuth({
   start,
@@ -129,12 +130,13 @@ export function IdleAuth({
     `${t('common.privacyPolicy')}${t('login.termsSuffix')}`;
   const [view, setView] = useState<'main' | 'otp'>('main');
   /**
-   * The code step's last verify refusal. A refusal without a tag is retryable, so typing or a
-   * resend retires it; one tagged `recovery: 'options'` outlives both, because the dead end it
-   * reports — a silently refused address, or the admission gate — is not something another code
-   * can clear. Only Back, entering the step afresh, or a pending link taking over ends it.
+   * The code step's held notice. A `refusal` is one a new code may still clear, so typing or a
+   * resend retires it; a `terminal` refusal outlives both, because the dead end it reports — a
+   * silently refused address, or the admission gate — is not something another code can clear,
+   * and a successful resend turns it into the neutral confirmation. Only Back, entering the step
+   * afresh, or a pending link taking over ends them.
    */
-  const [verifyRefusal, setVerifyRefusal] = useState<EmailCodeRefusal | undefined>(undefined);
+  const [codeStepNotice, setCodeStepNotice] = useState<CodeStepNotice | undefined>(undefined);
   // Bumps on every user step that retires a refusal (edit, resend, back), so a
   // slow refusal from an earlier attempt cannot re-appear after the user moved on.
   const verifyAttemptRef = useRef(0);
@@ -214,7 +216,7 @@ export function IdleAuth({
   useEffect(() => {
     if (pendingLinkToken) {
       verifyAttemptRef.current += 1;
-      setVerifyRefusal(undefined);
+      setCodeStepNotice(undefined);
       setView('main');
     }
   }, [pendingLinkToken]);
@@ -251,7 +253,7 @@ export function IdleAuth({
     const ok = await requestEmailCode(email);
     if (ok) {
       verifyAttemptRef.current += 1;
-      setVerifyRefusal(undefined);
+      setCodeStepNotice(undefined);
       setView('otp');
     }
   };
@@ -264,6 +266,17 @@ export function IdleAuth({
   const authBusy = busy !== undefined || browserAuthStarting;
   // The code step for a pending link goes to the existing account's address, not the typed one.
   const otpEmail = pendingLink ? pendingLink.email : emailRef.current;
+  // The held notice reads first, then the resend failure that landed after it.
+  // A resend that fails has no field to sit under here, and the pending-link
+  // options are off screen, so the code step shows that failure in its own slot;
+  // a `refusal` beside the held sentence never masks it. Without a pending link
+  // the hook toasts the failure instead and this stays the held notice alone.
+  const codeStepNotices: readonly CodeStepNotice[] = [
+    ...(codeStepNotice ? [codeStepNotice] : []),
+    ...(pendingLinkFailure
+      ? [{ kind: 'refusal' as const, message: pendingLinkFailure.message }]
+      : []),
+  ];
 
   // Report the form's busy state to the login shell so it can disable the
   // language Globe while the OTP form, the pending-link screen, or a busy auth
@@ -308,17 +321,14 @@ export function IdleAuth({
       <EmailOtpForm
         email={otpEmail.trim().toLowerCase()}
         busy={busy}
-        // A resend that fails has no field to sit under here, and the pending-link options are off
-        // screen, so the code step shows that refusal in its own slot. Without a pending link the
-        // hook toasts it instead and this stays the verify message alone. The newest refusal wins:
-        // a terminal verify refusal is kept on the step, so it must not mask a resend failure that
-        // lands after it, which would make the tap look like it did nothing.
-        error={pendingLinkFailure?.message ?? verifyRefusal?.message}
-        // The refusal's data tag decides, never the message: both refusals a code
-        // cannot clear — the admission gate and a silently refused address — show
-        // the other sign-in methods their copy names. The handler is always passed,
-        // so a missing tag only hides the control.
-        recovery={verifyRefusal?.recovery}
+        // The held notice and the pending-link resend failure, in that order:
+        // the sentence that names the way out stays above the newest failure, so
+        // neither can mask the other and the tap never looks like it did nothing.
+        notices={codeStepNotices}
+        // The notice kinds decide, never the message: a `terminal` or
+        // `confirmation` notice shows the other sign-in methods its copy names,
+        // while a `refusal` a code can still clear never does. The handler is
+        // always passed, so a missing one only disables the control.
         onAlternativeSignIn={() => void startBrowserAuth()}
         alternativeSignInStarting={browserAuthStarting}
         onVerify={code => {
@@ -326,41 +336,54 @@ export function IdleAuth({
           void (async () => {
             const outcome = await verifyEmailCode(otpEmail, code);
             // A refusal may settle after the user has moved on — edited the
-            // code (clearing the message), requested a resend, or gone back.
-            // Only the attempt this refusal belongs to may write its message.
+            // code (clearing the notice), requested a resend, or gone back.
+            // Only the attempt this refusal belongs to may write its notice.
             if (!outcome.ok && attempt === verifyAttemptRef.current) {
               // The refusal is the newest word on the step, so an older resend
               // failure must not stay in the slot ahead of it.
               clearPendingLinkFailure();
-              setVerifyRefusal(outcome);
+              setCodeStepNotice({
+                kind: outcome.recovery === 'options' ? 'terminal' : 'refusal',
+                message: outcome.message,
+              });
             }
           })();
         }}
         onCodeChange={() => {
           // Editing the code retires a retryable refusal and disowns any verify
-          // attempt still in flight for the old code; the tagged one stays, since
-          // this address gets no code that typing here could make right.
+          // attempt still in flight for the old code; a terminal one and its
+          // confirmation stay, since this address gets no code that typing here
+          // could make right.
           verifyAttemptRef.current += 1;
-          setVerifyRefusal(survivesCodeStepRetry);
+          setCodeStepNotice(survivesCodeStepRetry);
           clearPendingLinkFailure();
         }}
         onResend={async () => {
-          // A resend is still only a code: it cannot clear the dead end it reports
-          // for an address the OTP route silently refused, so the refusal and its
-          // options control survive a failed resend and a successful one alike.
+          // A resend is still only a code: it cannot clear the dead end a
+          // terminal notice reports, so that notice and its options control
+          // survive a failed resend and a successful one alike.
+          const survivor = survivesCodeStepRetry(codeStepNotice);
           verifyAttemptRef.current += 1;
-          setVerifyRefusal(survivesCodeStepRetry);
+          setCodeStepNotice(survivor);
           clearPendingLinkFailure();
           const ok = await requestEmailCode(otpEmail);
-          if (ok) {
+          if (!ok) {
+            // The code field empties only when a code was actually sent.
+            return false;
+          }
+          if (survivor) {
+            // The slot now says the code was sent, so the toast would say it
+            // twice; the terminal sentence it replaces comes back on the next
+            // verify if that code fails the same way.
+            setCodeStepNotice({ kind: 'confirmation', message: t('login.codeSent') });
+          } else {
             toast.success(t('login.codeSent'));
           }
-          // The code field empties only when a code was actually sent.
-          return ok;
+          return true;
         }}
         onBack={() => {
           verifyAttemptRef.current += 1;
-          setVerifyRefusal(undefined);
+          setCodeStepNotice(undefined);
           clearPendingLinkFailure();
           setView('main');
         }}

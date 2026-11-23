@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the layout, script-fold, and notice suites share one mock harness; splitting them would duplicate the react-native and theme-color setup */
 import { type ComponentProps, createElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -67,6 +68,16 @@ function actionLabel(root: TestRenderer.ReactTestInstance, accessibilityLabel: s
   return root
     .findByProps({ accessibilityLabel })
     .find(node => typeof node.type === 'string' && (node.type as string) === 'Text');
+}
+
+/** The notice lines in the measured block, in render order. */
+function noticeTexts(root: TestRenderer.ReactTestInstance) {
+  return root.findAll(
+    node =>
+      typeof node.type === 'string' &&
+      (node.type as string) === 'Text' &&
+      node.props.accessibilityLiveRegion === 'polite'
+  );
 }
 
 /**
@@ -315,19 +326,80 @@ describe('EmailOtpForm action labels', () => {
   });
 });
 
+describe('EmailOtpForm code-step notices', () => {
+  const TERMINAL_COPY =
+    "That code is incorrect or expired. Use 'Resend code' or 'More sign-in options'.";
+  const RATE_LIMITED_COPY = 'Too many sign-in attempts. Please wait and try again.';
+
+  it('renders every notice on its own line in list order', () => {
+    const { mounted } = mount({
+      notices: [
+        { kind: 'terminal', message: TERMINAL_COPY },
+        { kind: 'refusal', message: RATE_LIMITED_COPY },
+      ],
+    });
+
+    const rendered = noticeTexts(mounted.root);
+    expect(rendered.map(node => node.props.children)).toEqual([TERMINAL_COPY, RATE_LIMITED_COPY]);
+    for (const node of rendered) {
+      expect(node.props.accessibilityLiveRegion).toBe('polite');
+    }
+    // The sentence that names the control is not replaced by the newest
+    // failure, so the step never shows a failure beside a control it does not
+    // explain.
+    expect(
+      mounted.root.findByProps({ accessibilityLabel: i18n.t('login.moreSignInOptions') })
+    ).toBeTruthy();
+  });
+
+  it('paints the confirmation as the neutral line and a refusal destructive', () => {
+    const { mounted } = mount({
+      notices: [
+        { kind: 'refusal', message: RATE_LIMITED_COPY },
+        { kind: 'confirmation', message: 'Code sent' },
+      ],
+    });
+
+    const [refusal, confirmation] = noticeTexts(mounted.root);
+    expect(refusal?.props.className).toBe('text-center text-destructive');
+    expect(confirmation?.props.className).toBe('text-center');
+    expect(confirmation?.props.className).not.toContain('text-destructive');
+  });
+});
+
 describe('EmailOtpForm alternative sign-in', () => {
-  // The control renders from the refusal's data tag, not from a handler: a code
-  // that cannot succeed offers it, and nothing else does.
-  it('offers no other sign-in method without a recovery tag', () => {
+  // The control renders from the notice kinds, not from a handler: a notice a
+  // code cannot clear offers it, and a retryable refusal alone does not.
+  it('offers no other sign-in method without a notice', () => {
     const { mounted } = mount();
     expect(
       mounted.root.findAllByProps({ accessibilityLabel: i18n.t('login.moreSignInOptions') })
     ).toHaveLength(0);
   });
 
-  it('offers the other sign-in methods a refusal a code cannot clear names', () => {
+  it('offers no other sign-in method for a retryable refusal alone', () => {
+    const { mounted } = mount({
+      notices: [
+        { kind: 'refusal', message: 'Too many sign-in attempts. Please wait and try again.' },
+      ],
+    });
+    expect(
+      mounted.root.findAllByProps({ accessibilityLabel: i18n.t('login.moreSignInOptions') })
+    ).toHaveLength(0);
+  });
+
+  it('offers the other sign-in methods a notice a code cannot clear names', () => {
     const onAlternativeSignIn = vi.fn<() => void>();
-    const { mounted } = mount({ recovery: 'options', onAlternativeSignIn });
+    const { mounted } = mount({
+      notices: [
+        {
+          kind: 'terminal',
+          message:
+            "That code is incorrect or expired. Use 'Resend code' or 'More sign-in options'.",
+        },
+      ],
+      onAlternativeSignIn,
+    });
 
     const alternatives = mounted.root.findByProps({
       accessibilityLabel: i18n.t('login.moreSignInOptions'),
@@ -340,11 +412,23 @@ describe('EmailOtpForm alternative sign-in', () => {
     expect(onAlternativeSignIn).toHaveBeenCalledOnce();
   });
 
+  // A confirmation replaces the terminal sentence in the same slot, and the
+  // ways out exist exactly because the address stays one the code route cannot
+  // take: the control survives the swapping copy.
+  it('keeps the other sign-in methods for a confirmation', () => {
+    const { mounted } = mount({
+      notices: [{ kind: 'confirmation', message: 'Code sent' }],
+    });
+    expect(
+      mounted.root.findByProps({ accessibilityLabel: i18n.t('login.moreSignInOptions') })
+    ).toBeTruthy();
+  });
+
   // The mounted flow proves the control's presence and wiring; this pins the
   // busy edge it cannot see: the whole step locks while the browser opens.
   it('disables the step and spins the action while the alternative sign-in starts', () => {
     const { mounted } = mount({
-      recovery: 'options',
+      notices: [{ kind: 'terminal', message: 'Use more sign-in options.' }],
       onAlternativeSignIn: vi.fn<() => void>(),
       alternativeSignInStarting: true,
     });

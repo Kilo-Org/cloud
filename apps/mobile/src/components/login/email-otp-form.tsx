@@ -47,25 +47,56 @@ function formatCodeDestination(message: string, email: string): string {
   return `${lead}${destination}${trail}`;
 }
 
+/**
+ * One line in the code step's notice slot. The kind decides the paint and the
+ * controls beside it together, so the sentence and its way out cannot come from
+ * different refusals.
+ */
+export type CodeStepNotice =
+  | {
+      /** A code may still clear it; typing or a resend retires it. */
+      kind: 'refusal';
+      message: string;
+    }
+  | {
+      /**
+       * No code can clear it, and its copy names the other sign-in methods, so
+       * the step shows them.
+       */
+      kind: 'terminal';
+      message: string;
+    }
+  | {
+      /**
+       * A terminal refusal whose copy a successful resend replaced with the
+       * neutral confirmation. The step still shows the other sign-in methods.
+       */
+      kind: 'confirmation';
+      message: string;
+    };
+
 export function EmailOtpForm({
   email,
   busy,
-  error,
+  notices,
   onVerify,
   onCodeChange,
   onResend,
   onBack,
-  recovery,
   onAlternativeSignIn,
   alternativeSignInStarting = false,
   onBelowFieldHeightChange,
 }: Readonly<{
   email: string;
   busy: BusyAction;
-  /** A verify refusal in the active language, rendered above the verify button. */
-  error?: string;
+  /**
+   * The code step's notices in reading order, each on a line of its own inside
+   * the measured block. A notice whose kind is not `refusal` also shows the
+   * other sign-in methods its copy names.
+   */
+  notices?: readonly CodeStepNotice[];
   onVerify: (code: string) => void;
-  /** Fires on every code-input change so the caller can retire a stale refusal message. */
+  /** Fires on every code-input change so the caller can retire a stale refusal notice. */
   onCodeChange?: () => void;
   /**
    * Requests a new code and reports whether the server accepted the request, so
@@ -74,9 +105,7 @@ export function EmailOtpForm({
    */
   onResend: () => Promise<boolean>;
   onBack: () => void;
-  /** A refusal no further code can clear: the step offers the other sign-in methods its message names. */
-  recovery?: 'options';
-  /** Starts the other sign-in methods. The control renders from `recovery`, so a missing handler only disables its press. */
+  /** Starts the other sign-in methods. The control renders from the notice kinds, so a missing handler only disables its press. */
   onAlternativeSignIn?: () => void;
   /** An alternative sign-in already started, so every action stays disabled. */
   alternativeSignInStarting?: boolean;
@@ -99,6 +128,9 @@ export function EmailOtpForm({
    */
   const resendAttemptRef = useRef(0);
   const authBusy = busy !== undefined || alternativeSignInStarting;
+  // The notice kind decides the control, never a handler: a refusal a code can
+  // still clear keeps the step to the field and its two actions.
+  const showAlternatives = notices?.some(notice => notice.kind !== 'refusal') ?? false;
   const destination = formatCodeDestination(
     t('login.enterCodeSentTo', { email: ADDRESS_SLOT }),
     email
@@ -148,27 +180,34 @@ export function EmailOtpForm({
         accessibilityLabel={formFieldA11y({ label: t('login.signInCodeField'), required: true })}
       />
       {/* Everything the keyboard can cover below the field, as one measured
-          block in the order the user reads it: the refusal, the action it
-          belongs to, the resend that replaces the code, and — only while a
-          refusal a code cannot clear stands — the other sign-in methods its
-          copy names. A refusal wraps in some catalogs, so the shell reads this
-          block's measured height instead of assuming the actions sit one row
-          below the field. */}
+          block in the order the user reads it: the notices, the action the
+          newest one belongs to, the resend that replaces the code, and — only
+          while a notice a code cannot clear stands — the other sign-in methods
+          its copy names. A notice wraps in some catalogs, so the shell reads
+          this block's measured height instead of assuming the actions sit one
+          row below the field. */}
       <View
         className="gap-3"
         onLayout={event => {
           onBelowFieldHeightChange?.(event.nativeEvent.layout.height);
         }}
       >
-        {error ? (
+        {notices?.map(notice => (
+          // Every notice keeps its own line, in list order, so the held sentence
+          // that names the way out is still read above the newest failure. The
+          // confirmation is the neutral state: the same sentence slot without
+          // the destructive paint.
           <Text
+            key={`${notice.kind}:${notice.message}`}
             variant="muted"
-            className="text-center text-destructive"
+            className={
+              notice.kind === 'confirmation' ? 'text-center' : 'text-center text-destructive'
+            }
             accessibilityLiveRegion="polite"
           >
-            {error}
+            {notice.message}
           </Text>
-        ) : null}
+        ))}
         <Button
           size="lg"
           disabled={!hasCompleteCode || authBusy}
@@ -217,9 +256,10 @@ export function EmailOtpForm({
             {t('login.resendCode')}
           </Text>
         </Button>
-        {recovery === 'options' ? (
-          // The refusal's copy names this control, so it renders from the data
-          // tag beside the message: a full-size action, one line like the others.
+        {showAlternatives ? (
+          // A notice a code cannot clear names this control in its copy, so it
+          // renders from the notice kind beside the message: a full-size
+          // action, one line like the others.
           <Button
             variant="outline"
             size="lg"

@@ -3481,10 +3481,12 @@ describe('GitHub installation persistence', () => {
       repository_access: 'all',
     });
 
-    // The Security Agent's install slot is this connection: neither a request
-    // no installation backs yet nor an association GitHub will not serve is a
-    // connection the organization can act on, so both are exactly the states
-    // the install page resolves.
+    // The Security Agent's connection is this workflow association: neither a
+    // request no installation backs yet nor an association GitHub will not
+    // serve is a connection an operation may act on, so both leave it empty.
+    // The install start gate reads the wider slot set instead, with
+    // `liveGitHubInstallationSlotSql()`, because a suspended association is
+    // restored to active rather than replaced.
     await expect(
       getPrimaryGitHubIntegrationForOrganization(pendingOrganization.id)
     ).resolves.toBeNull();

@@ -145,6 +145,27 @@ describe('GitHub install start gate', () => {
     });
   });
 
+  test('refuses to start an install while a deduplicated association holds the slot', async () => {
+    // A migration-deduplication row is suspended and invisible to the workflow
+    // connection predicate, but it still carries an installation id and was
+    // never locally disconnected, so the completion gate counts it. The start
+    // gate must refuse it for the same reason.
+    const { organization } = await createOrgWithGitHub({
+      platform_installation_id: '778007',
+      integration_status: 'suspended',
+      suspended_at: new Date().toISOString(),
+      suspended_by: 'migration-0205-github-dedup',
+    });
+
+    await expect(
+      beginGitHubAppInstall(caller(), { organizationId: organization.id, returnTo: null })
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message:
+        "This organization's GitHub connection is suspended or needs attention. Restore or disconnect it before installing again.",
+    });
+  });
+
   test('starts an install for an organization approved for multiple installations', async () => {
     const { organization } = await createOrgWithGitHub({
       platform_installation_id: '778003',

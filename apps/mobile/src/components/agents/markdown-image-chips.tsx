@@ -103,7 +103,7 @@ export function UnconfirmedImageChip({
   onShowLinkActions?: () => void;
 }>) {
   const colors = useThemeColors();
-  const { t } = useTranslation();
+  const { i18n, t } = useTranslation();
   const host = formatTrustedImageHost(uri);
   const reason = host ?? t('agentChat.markdownImage.httpsOnly');
   const description = alt.trim();
@@ -117,14 +117,24 @@ export function UnconfirmedImageChip({
       accessible={false}
       className="h-full flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 dark:bg-neutral-900"
     >
-      <Text accessible className="min-w-0 flex-1 text-xs text-muted-foreground" numberOfLines={2}>
-        {label}
-      </Text>
+      {/* The Load control names the image, so the row's own copy stays out of
+          the accessibility tree; otherwise a reader hears the description twice. */}
+      <View
+        className="min-w-0 flex-1"
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+      >
+        <Text className="text-xs text-muted-foreground" numberOfLines={2}>
+          {label}
+        </Text>
+      </View>
       <Pressable
         onPress={onLoad}
         onLongPress={onShowLinkActions}
         accessibilityRole="button"
-        accessibilityLabel={loadLabel}
+        accessibilityLabel={
+          description ? formatList([description, loadLabel], i18n.language) : loadLabel
+        }
         accessibilityActions={onShowLinkActions ? getLinkAccessibilityActions(true) : undefined}
         onAccessibilityAction={event => {
           if (event.nativeEvent.actionName === 'showLinkActions') {

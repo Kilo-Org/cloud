@@ -74,20 +74,21 @@ function slotCount(root: TestRenderer.ReactTestInstance, aspectRatio: number): n
   ).length;
 }
 
-function loadLabel(uri: string): string {
-  return `Load ${new URL(uri).hostname.toLowerCase()}`;
+function loadLabel(uri: string, alt = ''): string {
+  const withHost = `Load ${new URL(uri).hostname.toLowerCase()}`;
+  return alt ? `${alt} and ${withHost}` : withHost;
 }
 
-/** The Load control, named for its action alone; the row above it names the image. */
 function findLoadButtons(
   root: TestRenderer.ReactTestInstance,
-  uri: string
+  uri: string,
+  alt = ''
 ): TestRenderer.ReactTestInstance[] {
   return root.findAll(
     node =>
       typeof node.type === 'string' &&
       (node.type as string) === 'Pressable' &&
-      node.props.accessibilityLabel === loadLabel(uri)
+      node.props.accessibilityLabel === loadLabel(uri, alt)
   );
 }
 
@@ -110,11 +111,11 @@ function chooseAlertAction(action: string): void {
 async function pressLoad(
   root: TestRenderer.ReactTestInstance,
   uri: string,
-  { action = 'Load once' }: { action?: string } = {}
+  { action = 'Load once', alt = '' }: { action?: string; alt?: string } = {}
 ): Promise<void> {
   await act(async () => {
     await Promise.resolve();
-    const loadButton = findLoadButtons(root, uri)[0];
+    const loadButton = findLoadButtons(root, uri, alt)[0];
     if (!loadButton) {
       throw new Error('load button not found');
     }
@@ -225,7 +226,7 @@ describe('MarkdownImage inert-until-load', () => {
       throw new Error('renderer was not created');
     }
 
-    await pressLoad(renderer.root, uri);
+    await pressLoad(renderer.root, uri, { alt: 'first' });
 
     expect(ofType(renderer.root, 'Image')).toHaveLength(2);
     await unmount(renderer);
@@ -316,7 +317,7 @@ describe('MarkdownImage inert-until-load', () => {
     let renderer = await mount(uri, 'shot');
 
     expect(slotCount(renderer.root, 4 / 3)).toBe(1);
-    await pressLoad(renderer.root, uri);
+    await pressLoad(renderer.root, uri, { alt: 'shot' });
     expect(slotCount(renderer.root, 4 / 3)).toBe(1);
     expect(ofType(renderer.root, 'Skeleton')).toHaveLength(1);
 
@@ -626,14 +627,14 @@ describe('MarkdownImage inert-until-load', () => {
   });
 
   it('Load control is at least 44pt and announces host plus action', async () => {
-    const renderer = await mount('https://example.com/a.png');
-    const load = findLoadButtons(renderer.root, 'https://example.com/a.png')[0];
+    const renderer = await mount('https://example.com/a.png', 'A chart');
+    const load = findLoadButtons(renderer.root, 'https://example.com/a.png', 'A chart')[0];
     if (!load) {
       throw new Error('load button not found');
     }
     expect(load.props.className).toContain('min-h-11');
     expect(load.props.className).toContain('min-w-11');
-    expect(load.props.accessibilityLabel).toBe('Load example.com');
+    expect(load.props.accessibilityLabel).toBe('A chart and Load example.com');
 
     await unmount(renderer);
   });
@@ -803,11 +804,11 @@ describe('MarkdownImage chip descriptions and long press', () => {
     const renderer = await mount(uri, 'A chart');
     expect(texts(renderer.root)).toContain('\u2068A chart\u2069 · \u2068example.com\u2069');
 
-    const load = findLoadButtons(renderer.root, uri)[0];
+    const load = findLoadButtons(renderer.root, uri, 'A chart')[0];
     if (!load) {
       throw new Error('load button not found');
     }
-    expect(load.props.accessibilityLabel).toBe('Load example.com');
+    expect(load.props.accessibilityLabel).toBe('A chart and Load example.com');
 
     await unmount(renderer);
   });

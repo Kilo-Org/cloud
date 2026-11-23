@@ -9,7 +9,6 @@ import {
   getPlatformIntegration,
 } from '@/lib/bot/platform-helpers';
 import { botPlatforms } from '@/lib/bot/platforms';
-import { verifySlackBotLinkState } from '@/lib/bot/slack-link-state';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { GET, POST } from './route';
@@ -35,15 +34,7 @@ jest.mock('@/lib/bot', () => ({
 }));
 jest.mock('@/lib/bot-identity', () => ({
   verifyLinkToken: jest.fn(),
-  loadLinkAccountContext: jest.fn(),
-  consumeLinkAccountContext: jest.fn(),
-  linkKiloUser: jest.fn(),
 }));
-jest.mock('@/lib/bot/link-account-completion', () => ({
-  completeLinkAccount: jest.fn(),
-  reprocessLinkedContext: jest.fn(async () => undefined),
-}));
-jest.mock('@/lib/bot/slack-link-state');
 jest.mock('@kilocode/web-shared/lib/user/server');
 jest.mock('@/lib/bot/platform-helpers');
 jest.mock('@/lib/bot/platforms', () => ({
@@ -57,7 +48,6 @@ jest.mock('@sentry/nextjs', () => ({
 
 const mockedBot = jest.mocked(bot);
 const mockedVerifyLinkToken = jest.mocked(verifyLinkToken);
-const mockedVerifySlackBotLinkState = jest.mocked(verifySlackBotLinkState);
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedGetPlatformIntegration = jest.mocked(getPlatformIntegration);
 const mockedCanKiloUserAccessPlatformIntegration = jest.mocked(
@@ -128,13 +118,6 @@ beforeEach(() => {
   jest.clearAllMocks();
 
   mockedBotPlatforms.require.mockReturnValue(widePlatformStub);
-
-  mockedVerifySlackBotLinkState.mockReturnValue({
-    userId: 'kilo-user-id',
-    slackTeamId: 'T123',
-    slackUserId: 'U123',
-    contextKey: 'context-key',
-  });
 
   mockedGetUserFromAuth.mockResolvedValue({
     user: { id: 'kilo-user-id', google_user_email: 'kilo@example.com' },

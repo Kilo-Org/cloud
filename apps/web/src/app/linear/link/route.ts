@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { createLinearBotLinkState } from '@/lib/bot/linear-link-state';
+import { errorPage } from '@/lib/bot/link-account-page';
 import { verifyLinearLinkToken } from '@/lib/bot/linear-link-token';
 import {
   canKiloUserAccessPlatformIntegration,
@@ -11,20 +12,6 @@ import {
 import { botPlatforms } from '@/lib/bot/platforms';
 import { getLinearUserOAuthUrl } from '@/lib/integrations/linear-service';
 import { PLATFORM } from '@/lib/integrations/core/constants';
-
-function errorPage(title: string, message: string, status: number): Response {
-  return new Response(
-    `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>${title}</title></head>
-<body style="font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
-<div style="text-align:center">
-  <h1>${title}</h1>
-  <p>${message}</p>
-</div>
-</body></html>`,
-    { status, headers: { 'content-type': 'text/html; charset=utf-8' } }
-  );
-}
 
 /**
  * Entry point for the Linear bot account-link flow.

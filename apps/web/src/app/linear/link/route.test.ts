@@ -93,6 +93,9 @@ describe('GET /linear/link', () => {
     const response = await GET(makeRequest('/linear/link?token=bogus'));
 
     expect(response.status).toBe(400);
+    expect(response.headers.get('content-security-policy')).toContain("default-src 'none'");
+    expect(response.headers.get('x-content-type-options')).toBe('nosniff');
+    expect(response.headers.get('referrer-policy')).toBe('no-referrer');
     await expect(response.text()).resolves.toContain('Link Expired');
   });
 

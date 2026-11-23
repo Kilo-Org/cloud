@@ -67,14 +67,4 @@ describe('immutable archive storage capabilities', () => {
       createAwsObjectStore({ ...config, fetch: async () => new Response(null) }).inspectArchive(key)
     ).rejects.toBeInstanceOf(AwsRequestError);
   });
-  it('keeps archive deletion separate from launch and proxy material', async () => {
-    const fetch = vi.fn(async (_request: Request) => new Response(null, { status: 204 }));
-    const store = createAwsObjectStore({ ...config, fetch });
-    await store.deleteArchive(key);
-    expect(fetch.mock.calls[0][0].method).toBe('DELETE');
-    await expect(store.deleteArchive('kilo/launch/other.json')).rejects.toThrow(
-      'Invalid AWS archive key'
-    );
-    expect(fetch).toHaveBeenCalledOnce();
-  });
 });

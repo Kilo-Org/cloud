@@ -110,7 +110,6 @@ export function awsProviderFixture(sandboxId = 'ses-abcdef') {
       throw new Error('Archive uploads unavailable in lifecycle fixture');
     },
     inspectArchive: async () => null,
-    deleteArchive: async () => {},
     async putLaunch(key, body) {
       if (putGate) await putGate;
       if (objects.has(key)) throw new AwsRequestError(412, 'PreconditionFailed');

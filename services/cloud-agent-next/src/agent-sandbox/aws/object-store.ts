@@ -16,7 +16,6 @@ export type AwsObjectStore = {
     expiresInSeconds: number
   ): Promise<{ url: string; headers: Record<string, string> }>;
   inspectArchive(key: string): Promise<{ size: number; sha256: string } | null>;
-  deleteArchive(key: string): Promise<void>;
 };
 
 /** Launch documents and prepared archives share transport, but never proxy-private prefixes. */
@@ -108,10 +107,6 @@ export function createAwsObjectStore(input: {
         if (error instanceof AwsRequestError && error.status === 404) return null;
         throw error;
       }
-    },
-    async deleteArchive(key) {
-      const response = await client.request(archiveTarget(key), { method: 'DELETE' });
-      await response.body?.cancel();
     },
   };
 }

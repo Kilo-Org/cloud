@@ -2302,6 +2302,7 @@
       "couldNotLoadThisSession": "No s'ha pogut carregar aquesta sessió.",
       "historyTooLarge": "La transcripció d'aquesta sessió és massa gran per carregar-la.",
       "historyUnavailable": "No es pot llegir la transcripció d'aquesta sessió.",
+      "historyTemporarilyUnavailable": "La transcripció d'aquesta sessió no està disponible temporalment.",
       "cloneFailedRetry": "No s'ha pogut clonar aquesta sessió. Torna-ho a provar.",
       "notEnoughCredits": "No tens prou crèdits per a aquesta sol·licitud. Afegeix crèdits i torna-ho a provar.",
       "previousTaskFinishing": "La tasca anterior encara no ha acabat. Espera un moment.",
@@ -2869,6 +2870,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "No s'ha pogut carregar la sessió de l'agent secundari.",
+      "historyTooLarge": "L'historial d'aquest agent secundari és massa gran per carregar-lo.",
+      "historyUnavailable": "L'historial d'aquest agent secundari no està disponible.",
+      "historyTemporarilyUnavailable": "L'historial d'aquest agent secundari no està disponible temporalment.",
       "failed": "La sessió de l'agent secundari ha fallat.",
       "noMessages": "No hi ha missatges de l'agent secundari",
       "noMessagesDescription": "La sessió de l'agent secundari ha acabat sense generar cap transcripció.",

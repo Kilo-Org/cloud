@@ -2351,6 +2351,7 @@
       "couldNotLoadThisSession": "Nepavyko įkelti šios sesijos",
       "historyTooLarge": "Šios sesijos nuorašas per didelis, kad jį būtų galima įkelti.",
       "historyUnavailable": "Šios sesijos nuorašo skaityti negalima.",
+      "historyTemporarilyUnavailable": "Šios sesijos nuorašas laikinai nepasiekiamas.",
       "cloneFailedRetry": "Nepavyko klonuoti šios sesijos. Bandykite dar kartą.",
       "notEnoughCredits": "Nepakanka kreditų šiai užklausai. Papildykite kreditus ir bandykite dar kartą.",
       "previousTaskFinishing": "Ankstesnė užduotis dar nebaigta. Šiek tiek palaukite.",
@@ -2922,6 +2923,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Nepavyko įkelti subagento sesijos",
+      "historyTooLarge": "Šio subagento istorija per didelė, kad ją būtų galima įkelti.",
+      "historyUnavailable": "Šio subagento istorija nepasiekiama.",
+      "historyTemporarilyUnavailable": "Šio subagento istorija laikinai nepasiekiama.",
       "failed": "Subagento sesija baigėsi klaida",
       "noMessages": "Nėra subagento žinučių",
       "noMessagesDescription": "Ši subagento sesija baigėsi nesukūrusi pokalbio išrašo.",

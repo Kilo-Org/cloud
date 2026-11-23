@@ -2302,6 +2302,7 @@
       "couldNotLoadThisSession": "Učitavanje ove sesije nije uspelo.",
       "historyTooLarge": "Pepis ove sesije je prevelik za učitavanje.",
       "historyUnavailable": "Pepis ove sesije se ne može pročitati.",
+      "historyTemporarilyUnavailable": "Pepis ove sesije je privremeno nedostupan.",
       "cloneFailedRetry": "Kloniranje ove sesije nije uspelo. Pokušaj ponovo.",
       "notEnoughCredits": "Nema dovoljno kredita za ovaj zahtev. Dodaj kredite i pokušaj ponovo.",
       "previousTaskFinishing": "Prethodni zadatak se privodi kraju. Sačekaj trenutak.",
@@ -2869,6 +2870,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Učitavanje sesije podagenta nije uspelo.",
+      "historyTooLarge": "Istorija ovog podagenta je prevelika za učitavanje.",
+      "historyUnavailable": "Istorija ovog podagenta nije dostupna.",
+      "historyTemporarilyUnavailable": "Istorija ovog podagenta je privremeno nedostupna.",
       "failed": "Sesija podagenta nije uspela.",
       "noMessages": "Nema poruka podagenta",
       "noMessagesDescription": "Ova sesija podagenta je završena bez transkripta.",

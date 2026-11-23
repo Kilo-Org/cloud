@@ -2253,6 +2253,7 @@
       "couldNotLoadThisSession": "Nou pa t ka chaje sesyon sa a.",
       "historyTooLarge": "Transksipsyon sesyon sa a twò gwo pou chaje.",
       "historyUnavailable": "Pa ka li transksipsyon sesyon sa a.",
+      "historyTemporarilyUnavailable": "Transksipsyon sesyon sa a pa disponib pou kounye a.",
       "cloneFailedRetry": "Nou pa t ka klone sesyon sa a. Eseye ankò.",
       "notEnoughCredits": "Pa gen ase kredi pou demann sa a. Ajoute kredi epi eseye ankò.",
       "previousTaskFinishing": "Travay anvan an poko fini. Tanpri tann yon ti moman.",
@@ -2816,6 +2817,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Nou pa t ka chaje sesyon sou-ajan an.",
+      "historyTooLarge": "Istorik sou-ajan sa a twò gwo pou chaje.",
+      "historyUnavailable": "Istorik sou-ajan sa a pa disponib.",
+      "historyTemporarilyUnavailable": "Istorik sou-ajan sa a pa disponib pou kounye a.",
       "failed": "Sesyon sou-ajan an echwe.",
       "noMessages": "Pa gen mesaj sou-ajan",
       "noMessagesDescription": "Sesyon sou-ajan sa a fini san li pa pwodui yon transkripsyon.",

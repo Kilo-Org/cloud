@@ -2253,6 +2253,7 @@
       "couldNotLoadThisSession": "A kò lè gbé ìgbà iṣẹ́ yìí wọlé.",
       "historyTooLarge": "Ìgbésílẹ̀ ìgbà iṣẹ́ yìí tóbí jù lọ láti lè gbé wọlé.",
       "historyUnavailable": "Kò sí lè ka ìgbésílẹ̀ ìgbà iṣẹ́ yìí.",
+      "historyTemporarilyUnavailable": "Ìgbésílẹ̀ ìgbà iṣẹ́ yìí kò sí fún ìgbà díẹ̀.",
       "cloneFailedRetry": "A kò lè ṣe àdàkọ ìgbà iṣẹ́ yìí. Gbìyànjú lẹ́ẹ̀kan sí i.",
       "notEnoughCredits": "Kirẹ́dítì kò tó fún ìbéèrè yìí. Fi kirẹ́dítì kún un kí o sì gbìyànjú lẹ́ẹ̀kan sí i.",
       "previousTaskFinishing": "Iṣẹ́ tó ṣáájú kò tíì parí. Jọ̀wọ́ dúró díẹ̀.",
@@ -2816,6 +2817,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "A kò lè gbé ìgbà iṣẹ́ aṣojú abẹ́ wọlé.",
+      "historyTooLarge": "Ìtàn aṣojú abẹ́ yìí tóbí jù lọ láti lè gbé wọlé.",
+      "historyUnavailable": "Ìtàn aṣojú abẹ́ yìí kò sí.",
+      "historyTemporarilyUnavailable": "Ìtàn aṣojú abẹ́ yìí kò sí fún ìgbà díẹ̀.",
       "failed": "Ìgbà iṣẹ́ aṣojú abẹ́ kùnà.",
       "noMessages": "Kò sí ìfiránṣẹ́ aṣojú abẹ́",
       "noMessagesDescription": "Ìgbà iṣẹ́ aṣojú abẹ́ yìí parí láìsí àkọsílẹ̀.",

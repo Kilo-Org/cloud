@@ -2253,6 +2253,7 @@
       "couldNotLoadThisSession": "An kasa loda wannan zaman.",
       "historyTooLarge": "Rubutun wannan zaman ya yi girma don a loda shi.",
       "historyUnavailable": "Ba a iya karantawa rubutun wannan zaman ba.",
+      "historyTemporarilyUnavailable": "Rubutun wannan zaman ba ya samuwa na ɗan lokaci.",
       "cloneFailedRetry": "An kasa yin kwafin wannan zaman. Sake gwadawa.",
       "notEnoughCredits": "Kuɗin amfani ba su isa don wannan buƙata ba. Ƙara kuɗin amfani ka sake gwadawa.",
       "previousTaskFinishing": "Ba a gama aikin da ya gabata ba tukuna. Jira ɗan lokaci.",
@@ -2816,6 +2817,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "An kasa loda zaman ƙaramin wakili.",
+      "historyTooLarge": "Tarihin wannan ƙaramin wakili ya yi girma don a loda shi.",
+      "historyUnavailable": "Tarihin wannan ƙaramin wakili ba ya samuwa.",
+      "historyTemporarilyUnavailable": "Tarihin wannan ƙaramin wakili ba ya samuwa na ɗan lokaci.",
       "failed": "Zaman ƙaramin wakili ya gaza.",
       "noMessages": "Babu saƙonnin ƙaramin wakili",
       "noMessagesDescription": "Wannan zaman ƙaramin wakili ya ƙare ba tare da samar da tarihin tattaunawa ba.",

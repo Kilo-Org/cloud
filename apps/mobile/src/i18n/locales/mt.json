@@ -2400,6 +2400,7 @@
       "couldNotLoadThisSession": "Ma setgħetx titgħabba din is-sessjoni.",
       "historyTooLarge": "It-transkrizzjoni ta' din is-sessjoni hija kbira wisq biex titgħabba.",
       "historyUnavailable": "It-transkrizzjoni ta' din is-sessjoni ma tistax tiġi maqruża.",
+      "historyTemporarilyUnavailable": "It-transkrizzjoni ta' din is-sessjoni mhix disponibbli temporanjament.",
       "cloneFailedRetry": "Ma setgħetx tiġi kklonjata din is-sessjoni. Erġa' pprova.",
       "notEnoughCredits": "M'għandekx biżżejjed krediti għal din it-talba. Żid krediti u erġa' pprova.",
       "previousTaskFinishing": "Il-kompitu ta' qabel għadu qed jitlesta. Stenna ftit.",
@@ -2975,6 +2976,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Ma setgħetx titgħabba s-sessjoni tas-subaġent.",
+      "historyTooLarge": "L-istorja ta' dan is-subaġent hija kbira wisq biex titgħabba.",
+      "historyUnavailable": "L-istorja ta' dan is-subaġent mhix disponibbli.",
+      "historyTemporarilyUnavailable": "L-istorja ta' dan is-subaġent mhix disponibbli temporanjament.",
       "failed": "Is-sessjoni tas-subaġent falliet.",
       "noMessages": "L-ebda messaġġ tas-subaġent",
       "noMessagesDescription": "Din is-sessjoni tas-subaġent tlestiet mingħajr ma pproduċiet traskrizzjoni.",

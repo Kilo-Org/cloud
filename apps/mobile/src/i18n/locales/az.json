@@ -2253,6 +2253,7 @@
       "couldNotLoadThisSession": "Bu sessiyanı yükləmək mümkün olmadı.",
       "historyTooLarge": "Bu sessiyanın transkripti yükləmək üçün çox böyükdür.",
       "historyUnavailable": "Bu sessiyanın transkripti oxuna bilmir.",
+      "historyTemporarilyUnavailable": "Bu sessiyanın transkripti müvəqqəti olaraq əlçatan deyil.",
       "cloneFailedRetry": "Bu sessiyanı klonlamaq mümkün olmadı. Yenidən cəhd et.",
       "notEnoughCredits": "Bu sorğu üçün kifayət qədər kredit yoxdur. Kredit əlavə et və yenidən cəhd et.",
       "previousTaskFinishing": "Əvvəlki tapşırıq hələ tamamlanmayıb. Bir az gözlə.",
@@ -2816,6 +2817,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Alt agentin sessiyasını yükləmək mümkün olmadı.",
+      "historyTooLarge": "Bu alt agentin tarixçəsi yükləmək üçün çox böyükdür.",
+      "historyUnavailable": "Bu alt agentin tarixçəsi əlçatan deyil.",
+      "historyTemporarilyUnavailable": "Bu alt agentin tarixçəsi müvəqqəti olaraq əlçatan deyil.",
       "failed": "Alt agentin sessiyası uğursuz oldu.",
       "noMessages": "Alt agentin mesajı yoxdur",
       "noMessagesDescription": "Alt agentin bu sessiyası yazışma tarixçəsi yaratmadan tamamlandı.",

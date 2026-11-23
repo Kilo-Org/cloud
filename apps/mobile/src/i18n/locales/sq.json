@@ -2253,6 +2253,7 @@
       "couldNotLoadThisSession": "Nuk u ngarkua kjo seancë.",
       "historyTooLarge": "Transkripti i kësaj seance është shumë i madh për t'u ngarkuar.",
       "historyUnavailable": "Transkripti i kësaj seance nuk mund të lexohet.",
+      "historyTemporarilyUnavailable": "Transkripti i kësaj seance është përkohësisht i padisponueshëm.",
       "cloneFailedRetry": "Nuk u klonua kjo seancë. Provo përsëri.",
       "notEnoughCredits": "Nuk ke mjaft kredite për këtë kërkesë. Shto kredite dhe provo përsëri.",
       "previousTaskFinishing": "Detyra e mëparshme nuk ka përfunduar ende. Prit pak.",
@@ -2816,6 +2817,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Nuk u ngarkua seanca e nënagjentit.",
+      "historyTooLarge": "Historiku i këtij nënagjenti është shumë i madh për t'u ngarkuar.",
+      "historyUnavailable": "Historiku i këtij nënagjenti nuk është i disponueshëm.",
+      "historyTemporarilyUnavailable": "Historiku i këtij nënagjenti është përkohësisht i padisponueshëm.",
       "failed": "Seanca e nënagjentit dështoi.",
       "noMessages": "Nuk ka mesazhe nga nënagjenti",
       "noMessagesDescription": "Kjo seancë e nënagjentit përfundoi pa krijuar një transkript.",

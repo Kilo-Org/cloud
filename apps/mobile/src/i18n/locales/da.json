@@ -2253,6 +2253,7 @@
       "couldNotLoadThisSession": "Kunne ikke indlæse denne session.",
       "historyTooLarge": "Denne sessions transskription er for stor at indlæse.",
       "historyUnavailable": "Denne sessions transskription kan ikke læses.",
+      "historyTemporarilyUnavailable": "Denne sessions transskription er midlertidigt utilgængelig.",
       "cloneFailedRetry": "Kunne ikke klone denne session. Prøv igen.",
       "notEnoughCredits": "Du har ikke nok kreditter til denne anmodning. Tilføj kreditter og prøv igen.",
       "previousTaskFinishing": "Den forrige opgave er ved at blive afsluttet. Vent et øjeblik.",
@@ -2816,6 +2817,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Kunne ikke indlæse underagentens session.",
+      "historyTooLarge": "Underagentens historik er for stor at indlæse.",
+      "historyUnavailable": "Underagentens historik er ikke tilgængelig.",
+      "historyTemporarilyUnavailable": "Underagentens historik er midlertidigt utilgængelig.",
       "failed": "Underagentens session mislykkedes.",
       "noMessages": "Ingen beskeder fra underagenten",
       "noMessagesDescription": "Underagentens session blev afsluttet uden en samtalehistorik.",

@@ -473,8 +473,10 @@ vi.mock('@/components/agents/session-keep-awake', () => ({
 vi.mock('@/components/agents/session-focus-refetch', () => ({
   shouldRefetchOnFocus: () => false,
 }));
-vi.mock('@/components/agents/session-terminal-error', () => ({
+vi.mock('@/components/agents/terminal-error-copy-text', () => ({
   buildTerminalErrorCopyText: () => '',
+}));
+vi.mock('@/components/agents/session-terminal-error', () => ({
   resolveSessionTerminalError: () => null,
 }));
 vi.mock('@/components/agents/child-session-card-state', () => ({

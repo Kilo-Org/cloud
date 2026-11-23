@@ -2253,6 +2253,7 @@
       "couldNotLoadThisSession": "Turtii kana fe'uu hin danda'amne.",
       "historyTooLarge": "Galcheen turtii kanaa fe'uu baay'ee guddaa dha.",
       "historyUnavailable": "Galchi turtii kanaa hin dubbifamu.",
+      "historyTemporarilyUnavailable": "Galchi turtii kanaa yeroodhaaf hin argamu.",
       "cloneFailedRetry": "Turtii kana kopii gochuu hin danda'amne. Deebi'ii yaali.",
       "notEnoughCredits": "Gaaffii kanaaf kiriiditii gahaa hin qabdu. Kiriiditii dabaliitii deebi'ii yaali.",
       "previousTaskFinishing": "Hojiin duraanii amma iyyuu xumuramaa jira. Yeroo muraasa eegi.",
@@ -2816,6 +2817,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Turtii ergamaa gargaaraa fe'uu hin danda'amne.",
+      "historyTooLarge": "Seenaan ergamaa gargaaraa kanaa fe'uu baay'ee guddaa dha.",
+      "historyUnavailable": "Seenaan ergamaa gargaaraa kanaa hin argamu.",
+      "historyTemporarilyUnavailable": "Seenaan ergamaa gargaaraa kanaa yeroodhaaf hin argamu.",
       "failed": "Turtiin ergamaa gargaaraa hin milkoofne.",
       "noMessages": "Ergaan ergamaa gargaaraa hin jiru",
       "noMessagesDescription": "Turtiin ergamaa gargaaraa kun galmee marii osoo hin uumin xumurameera.",

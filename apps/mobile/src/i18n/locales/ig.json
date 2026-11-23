@@ -2253,6 +2253,7 @@
       "couldNotLoadThisSession": "Enweghị ike ibudata nnọkọ a.",
       "historyTooLarge": "Ndebe nke okwu nnọkọ a buru ibu karịa ka a ga-ebugo ya.",
       "historyUnavailable": "Enweghị ike ịgụ ndebe nke okwu nnọkọ a.",
+      "historyTemporarilyUnavailable": "Ndebe nke okwu nnọkọ a adịghị nwa oge.",
       "cloneFailedRetry": "Enweghị ike ịmepụta oyiri nnọkọ a. Nwaa ọzọ.",
       "notEnoughCredits": "Ego ojiji ezughị maka arịrịọ a. Tinye ego ojiji ma nwaa ọzọ.",
       "previousTaskFinishing": "Ọrụ gara aga ka na-agwụcha. Biko chere obere oge.",
@@ -2816,6 +2817,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Enweghị ike ibudata nnọkọ onye nnọchi anya inyeaka.",
+      "historyTooLarge": "Ndekọ nke onye nnọchi anya inyeaka a buru ibu karịa ka a ga-ebugo ya.",
+      "historyUnavailable": "Ndekọ nke onye nnọchi anya inyeaka a adịghị.",
+      "historyTemporarilyUnavailable": "Ndekọ nke onye nnọchi anya inyeaka a adịghị nwa oge.",
       "failed": "Nnọkọ onye nnọchi anya inyeaka agaghị nke ọma.",
       "noMessages": "Enweghị ozi sitere n'aka onye nnọchi anya inyeaka",
       "noMessagesDescription": "Nnọkọ onye nnọchi anya inyeaka a agwụla n'enweghị ndekọ nnọkọ.",

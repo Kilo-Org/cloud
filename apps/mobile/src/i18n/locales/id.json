@@ -1691,6 +1691,7 @@
       "couldNotLoadThisSession": "Tidak dapat memuat sesi ini.",
       "historyTooLarge": "Transkrip sesi ini terlalu besar untuk dimuat.",
       "historyUnavailable": "Transkrip sesi ini tidak dapat dibaca.",
+      "historyTemporarilyUnavailable": "Transkrip sesi ini untuk sementara tidak tersedia.",
       "cloneFailedRetry": "Tidak dapat menyalin sesi ini. Coba lagi.",
       "notEnoughCredits": "Kredit tidak cukup untuk permintaan ini. Tambah kredit dan coba lagi.",
       "previousTaskFinishing": "Tugas sebelumnya belum selesai. Tunggu sebentar.",
@@ -2254,6 +2255,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Tidak dapat memuat sesi subagen.",
+      "historyTooLarge": "Riwayat subagen ini terlalu besar untuk dimuat.",
+      "historyUnavailable": "Riwayat subagen ini tidak tersedia.",
+      "historyTemporarilyUnavailable": "Riwayat subagen ini untuk sementara tidak tersedia.",
       "failed": "Sesi subagen gagal.",
       "noMessages": "Tidak ada pesan subagen",
       "noMessagesDescription": "Sesi subagen ini selesai tanpa menghasilkan transkrip.",

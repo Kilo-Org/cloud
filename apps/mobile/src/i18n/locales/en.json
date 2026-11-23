@@ -2351,6 +2351,7 @@
       "couldNotLoadThisSession": "Couldn't load this session",
       "historyTooLarge": "This session's transcript is too large to load.",
       "historyUnavailable": "This session's transcript can't be read.",
+      "historyTemporarilyUnavailable": "This session's transcript is temporarily unavailable.",
       "cloneFailedRetry": "Couldn't clone this session. Try again.",
       "notEnoughCredits": "Not enough credits for this request. Add credits and try again.",
       "previousTaskFinishing": "The previous task is still finishing. Please wait a moment.",
@@ -2933,6 +2934,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Could not load subagent session",
+      "historyTooLarge": "This sub-agent's history is too large to load.",
+      "historyUnavailable": "This sub-agent's history isn't available.",
+      "historyTemporarilyUnavailable": "This sub-agent's history is temporarily unavailable.",
       "failed": "Subagent session failed",
       "noMessages": "No subagent messages",
       "noMessagesDescription": "This subagent session completed without producing a transcript.",

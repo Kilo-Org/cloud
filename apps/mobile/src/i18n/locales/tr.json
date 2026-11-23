@@ -1691,6 +1691,7 @@
       "couldNotLoadThisSession": "Bu oturum yüklenemedi.",
       "historyTooLarge": "Bu oturumun dökümü yüklenemeyecek kadar büyük.",
       "historyUnavailable": "Bu oturumun dökümü okunamıyor.",
+      "historyTemporarilyUnavailable": "Bu oturumun dökümü geçici olarak kullanılamıyor.",
       "cloneFailedRetry": "Bu oturum kopyalanamadı. Tekrar dene.",
       "notEnoughCredits": "Bu istek için yeterli kredi yok. Kredi ekleyip tekrar dene.",
       "previousTaskFinishing": "Önceki görev henüz tamamlanmadı. Biraz bekle.",
@@ -2254,6 +2255,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Alt ajan oturumu yüklenemedi.",
+      "historyTooLarge": "Bu alt ajanın geçmişi yüklenemeyecek kadar büyük.",
+      "historyUnavailable": "Bu alt ajanın geçmişi kullanılamıyor.",
+      "historyTemporarilyUnavailable": "Bu alt ajanın geçmişi geçici olarak kullanılamıyor.",
       "failed": "Alt ajan oturumu başarısız oldu.",
       "noMessages": "Alt ajan mesajı yok",
       "noMessagesDescription": "Bu alt ajan oturumu, mesaj dökümü oluşturmadan tamamlandı.",

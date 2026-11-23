@@ -2400,6 +2400,7 @@
       "couldNotLoadThisSession": "Níorbh fhéidir an seisiún seo a lódáil.",
       "historyTooLarge": "Tá tras-scríbhinn an tseisiúin seo rómhór le lódáil.",
       "historyUnavailable": "Ní féidir tras-scríbhinn an tseisiúin seo a léamh.",
+      "historyTemporarilyUnavailable": "Níl tras-scríbhinn an tseisiúin seo ar fáil go sealadach.",
       "cloneFailedRetry": "Níorbh fhéidir an seisiún seo a chlónáil. Bain triail as arís.",
       "notEnoughCredits": "Níl go leor creidmheasanna agat don iarratas seo. Cuir creidmheasanna leis agus bain triail as arís.",
       "previousTaskFinishing": "Níl an tasc roimhe seo críochnaithe fós. Fan nóiméad, le do thoil.",
@@ -2975,6 +2976,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Níorbh fhéidir seisiún an fhoghníomhaire a lódáil.",
+      "historyTooLarge": "Tá stair an fhoghníomhaire seo rómhór le lódáil.",
+      "historyUnavailable": "Níl stair an fhoghníomhaire seo ar fáil.",
+      "historyTemporarilyUnavailable": "Níl stair an fhoghníomhaire seo ar fáil go sealadach.",
       "failed": "Theip ar sheisiún an fhoghníomhaire.",
       "noMessages": "Níl aon teachtaireacht ón bhfoghníomhaire ann",
       "noMessagesDescription": "Críochnaíodh seisiún an fhoghníomhaire seo gan athscríbhinn a chruthú.",

@@ -1691,6 +1691,7 @@
       "couldNotLoadThisSession": "このセッションを読み込めませんでした。",
       "historyTooLarge": "このセッションの履歴は大きすぎて読み込めません。",
       "historyUnavailable": "このセッションの履歴を読み取れません。",
+      "historyTemporarilyUnavailable": "このセッションの履歴は一時的に利用できません。",
       "cloneFailedRetry": "このセッションを複製できませんでした。もう一度お試しください。",
       "notEnoughCredits": "このリクエストに必要なクレジットが不足しています。クレジットを追加して、もう一度お試しください。",
       "previousTaskFinishing": "前のタスクの終了処理中です。少々お待ちください。",
@@ -2254,6 +2255,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "サブエージェントのセッションを読み込めませんでした。",
+      "historyTooLarge": "このサブエージェントの履歴は大きすぎて読み込めません。",
+      "historyUnavailable": "このサブエージェントの履歴は利用できません。",
+      "historyTemporarilyUnavailable": "このサブエージェントの履歴は一時的に利用できません。",
       "failed": "サブエージェントのセッションが失敗しました。",
       "noMessages": "サブエージェントのメッセージがありません",
       "noMessagesDescription": "このサブエージェントのセッションは、会話履歴を生成せずに完了しました。",

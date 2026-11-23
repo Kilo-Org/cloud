@@ -1691,6 +1691,7 @@
       "couldNotLoadThisSession": "Deze sessie kon niet worden geladen.",
       "historyTooLarge": "Het transcript van deze sessie is te groot om te laden.",
       "historyUnavailable": "Het transcript van deze sessie kan niet worden gelezen.",
+      "historyTemporarilyUnavailable": "Het transcript van deze sessie is tijdelijk niet beschikbaar.",
       "cloneFailedRetry": "Deze sessie kon niet worden gekloond. Probeer het opnieuw.",
       "notEnoughCredits": "Je hebt onvoldoende tegoed voor dit verzoek. Vul je tegoed aan en probeer het opnieuw.",
       "previousTaskFinishing": "De vorige taak wordt nog afgerond. Wacht even.",
@@ -2254,6 +2255,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "De sessie van de hulpagent kon niet worden geladen.",
+      "historyTooLarge": "De geschiedenis van deze hulpagent is te groot om te laden.",
+      "historyUnavailable": "De geschiedenis van deze hulpagent is niet beschikbaar.",
+      "historyTemporarilyUnavailable": "De geschiedenis van deze hulpagent is tijdelijk niet beschikbaar.",
       "failed": "De sessie van de hulpagent is mislukt.",
       "noMessages": "Geen berichten van de hulpagent",
       "noMessagesDescription": "De sessie van deze hulpagent is voltooid zonder gespreksverloop vast te leggen.",

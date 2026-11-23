@@ -1691,6 +1691,7 @@
       "couldNotLoadThisSession": "Diese Sitzung konnte nicht geladen werden.",
       "historyTooLarge": "Das Protokoll dieser Sitzung ist zum Laden zu groß.",
       "historyUnavailable": "Das Protokoll dieser Sitzung kann nicht gelesen werden.",
+      "historyTemporarilyUnavailable": "Das Protokoll dieser Sitzung ist vorübergehend nicht verfügbar.",
       "cloneFailedRetry": "Diese Sitzung konnte nicht geklont werden. Versuche es erneut.",
       "notEnoughCredits": "Dein Guthaben reicht für diese Anfrage nicht aus. Lade Guthaben auf und versuche es erneut.",
       "previousTaskFinishing": "Die vorherige Aufgabe wird noch abgeschlossen. Bitte warte einen Moment.",
@@ -2254,6 +2255,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Die Sitzung des Unteragenten konnte nicht geladen werden.",
+      "historyTooLarge": "Der Verlauf dieses Unteragenten ist zum Laden zu groß.",
+      "historyUnavailable": "Der Verlauf dieses Unteragenten ist nicht verfügbar.",
+      "historyTemporarilyUnavailable": "Der Verlauf dieses Unteragenten ist vorübergehend nicht verfügbar.",
       "failed": "Die Sitzung des Unteragenten ist fehlgeschlagen.",
       "noMessages": "Keine Nachrichten vom Unteragenten",
       "noMessagesDescription": "Die Sitzung dieses Unteragenten wurde ohne Protokoll abgeschlossen.",

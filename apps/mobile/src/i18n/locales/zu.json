@@ -2253,6 +2253,7 @@
       "couldNotLoadThisSession": "Asikwazanga ukulayisha le seshini.",
       "historyTooLarge": "Umyalezo wale seshini mude kakhulu ukuthi ulayishwe.",
       "historyUnavailable": "Iyalelephu wale seshini ayikwazi ukufundwa.",
+      "historyTemporarilyUnavailable": "Umyalezo wale seshini awutholakali okwesikhashana.",
       "cloneFailedRetry": "Asikwazanga ukwenza ikhophi yale seshini. Zama futhi.",
       "notEnoughCredits": "Awekho amakhredithi anele kulesi sicelo. Engeza amakhredithi bese uzama futhi.",
       "previousTaskFinishing": "Umsebenzi wangaphambilini usaphethwa. Sicela ulinde isikhashana.",
@@ -2816,6 +2817,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Asikwazanga ukulayisha iseshini yomenzeli ongaphansi.",
+      "historyTooLarge": "Umlando womenzeli ongaphansi ude kakhulu ukuthi ulayishwe.",
+      "historyUnavailable": "Umlando womenzeli ongaphansi awutholakali.",
+      "historyTemporarilyUnavailable": "Umlando womenzeli ongaphansi awutholakali okwesikhashana.",
       "failed": "Iseshini yomenzeli ongaphansi yehlulekile.",
       "noMessages": "Ayikho imilayezo yomenzeli ongaphansi",
       "noMessagesDescription": "Le seshini yomenzeli ongaphansi iphelile ngaphandle kokukhiqiza umbhalo.",

@@ -352,7 +352,7 @@ vi.mock('@/components/agents/mobile-session-manager', () => ({
   createMobileAgentSessionManager: createMobileManagerMock,
 }));
 
-vi.mock('@/components/agents/session-terminal-error', () => ({
+vi.mock('@/components/agents/terminal-error-copy-text', () => ({
   buildTerminalErrorCopyText: () => '',
 }));
 

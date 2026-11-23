@@ -1,0 +1,182 @@
+{
+  "type": "pulled",
+  "snapshot": {
+    "position": 51,
+    "revision": 2,
+    "lastReceipt": {
+      "version": 1,
+      "sessionID": "ses_df7025c6dffeICl18lhZYa7mH8",
+      "batchID": "e297463f-6a13-4357-8fc4-82ac53a65154",
+      "after": 32,
+      "through": 51,
+      "revision": 2,
+      "changes": 5,
+      "digest": "2820fd009dd06152d8ceb6a66543121f4b919f6790b39d1b88fa119a9d53372c",
+      "committedAt": 1795447303971
+    },
+    "sources": [
+      {
+        "sourceID": "a1d3e5d6-9796-438f-bfc2-7b619a7e4c26",
+        "client": "cli",
+        "joinedAt": 1795447170502
+      },
+      {
+        "sourceID": "8083045b-18fe-4d84-80ba-9d0acf161d31",
+        "client": "mobile",
+        "joinedAt": 1795447320098
+      }
+    ],
+    "session": {
+      "id": "ses_df7025c6dffeICl18lhZYa7mH8",
+      "title": "Fixture answer 1",
+      "time": {
+        "created": 1795447169943,
+        "updated": 1795447303700,
+        "idle": 1795447303707
+      },
+      "origin": {
+        "directory": "/home/igor/qc-proof-ws",
+        "subpath": "",
+        "projectID": "34a36e4bf7d42a90ef90e326804b24620d921896"
+      },
+      "outcome": "succeeded",
+      "cost": 0,
+      "tokens": {
+        "input": 30,
+        "output": 9,
+        "reasoning": 0,
+        "cache": {
+          "read": 0,
+          "write": 0
+        }
+      }
+    },
+    "messages": [
+      {
+        "message": {
+          "id": "msg_208fda3a8001prbIWJv9m8BmhR",
+          "type": "user",
+          "time": {
+            "created": 1795447170023
+          },
+          "text": "cli created session about postgres",
+          "files": []
+        },
+        "seq": 4,
+        "sourceID": "source-cli"
+      },
+      {
+        "message": {
+          "id": "msg_208fda407001JO6cRPP2WfcENl",
+          "type": "assistant",
+          "time": {
+            "created": 1795447170089,
+            "completed": 1795447170129,
+            "firstToken": 1795447170113,
+            "streamed": 1795447170126
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "Fixture answer 2"
+            }
+          ],
+          "agent": "code",
+          "model": {
+            "id": "echo",
+            "providerID": "local"
+          },
+          "cost": 0,
+          "tokens": {
+            "input": 10,
+            "output": 3,
+            "reasoning": 0,
+            "cache": {
+              "read": 0,
+              "write": 0
+            }
+          },
+          "finish": "stop",
+          "rawFinish": "stop"
+        },
+        "seq": 7,
+        "sourceID": "source-cli"
+      },
+      {
+        "message": {
+          "id": "msg_208fda4590013XcdSnX3LAo2Tz",
+          "type": "idle",
+          "time": {
+            "created": 1795447170137
+          },
+          "outcome": "succeeded"
+        },
+        "seq": 13,
+        "sourceID": "source-cli"
+      },
+      {
+        "message": {
+          "id": "msg_208ffadd1001Gw447uBPT1gsqd",
+          "type": "user",
+          "time": {
+            "created": 1795447303652
+          },
+          "text": "cli continues the cli-origin session",
+          "files": []
+        },
+        "seq": 16,
+        "sourceID": "source-cli"
+      },
+      {
+        "message": {
+          "id": "msg_208ffadee001Z6BF35wi2SXFsh",
+          "type": "assistant",
+          "time": {
+            "created": 1795447303671,
+            "completed": 1795447303700,
+            "firstToken": 1795447303686,
+            "streamed": 1795447303697
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "Fixture answer 3"
+            }
+          ],
+          "agent": "code",
+          "model": {
+            "id": "echo",
+            "providerID": "local"
+          },
+          "cost": 0,
+          "tokens": {
+            "input": 10,
+            "output": 3,
+            "reasoning": 0,
+            "cache": {
+              "read": 0,
+              "write": 0
+            }
+          },
+          "finish": "stop",
+          "rawFinish": "stop"
+        },
+        "seq": 17,
+        "sourceID": "source-cli"
+      },
+      {
+        "message": {
+          "id": "msg_208ffae1b001KsjvKz7EwSCuQz",
+          "type": "idle",
+          "time": {
+            "created": 1795447303707
+          },
+          "outcome": "succeeded"
+        },
+        "seq": 23,
+        "sourceID": "source-cli"
+      }
+    ],
+    "maxSeq": 23
+  }
+}

@@ -45,9 +45,11 @@ export async function pullChat(
   if (pulled.type === 'failed') {
     return { kind: 'failed', code: pulled.code };
   }
-  if (pulled.snapshot.position === ready.record.acknowledged && ready.record.phase === 'synced') {
-    return { kind: 'current' };
-  }
+  // Registering adopts the server's position as this device's acknowledgement,
+  // so position alone can never prove the turns are local: a first import of
+  // another device's session sits at the same position with nothing in the
+  // store. Applying the snapshot is what knows; it imports only the messages
+  // the map has never seen.
   const count = await applyPulled({
     deps,
     sessionId: input.sessionId,

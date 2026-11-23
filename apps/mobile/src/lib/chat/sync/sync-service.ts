@@ -1,6 +1,7 @@
 import { type Turn } from '@kilocode/harness-sdk';
 
 import { organizationIdOf } from '../layers';
+import { captureTelemetry } from '@/lib/telemetry/error-sink';
 import { enterChat, releaseChat } from '../registry';
 import { type ChatPlace } from '../scope';
 import { type ChatDatabase, modelOfSession, recordOfChat, rememberChat } from '../store';
@@ -138,8 +139,25 @@ export async function pullOpenedChat(place: ChatPlace, sessionId: string): Promi
       await releaseChat(sessionId);
       await enterChat(place, sessionId);
     }
-  } catch {
+    if (outcome.kind === 'pending' || outcome.kind === 'failed') {
+      // Quiet by design (the chat still shows its local copy), never silent:
+      // the outcome names the state so the next one is diagnosable.
+      captureTelemetry({
+        level: outcome.kind === 'pending' ? 'warning' : 'error',
+        message: `sync pull on open answered ${outcome.kind}`,
+        fingerprint: ['chat-sync-pull-open', outcome.kind],
+        tags: { outcome: outcome.kind },
+        extra: { code: outcome.kind === 'failed' ? outcome.code : undefined },
+      });
+    }
+  } catch (error) {
     // Offline opens read the local copy; the next turn's admission retries.
+    captureTelemetry({
+      level: 'warning',
+      error,
+      message: 'sync pull on open threw; the chat continues on its local copy',
+      fingerprint: ['chat-sync-pull-open'],
+    });
   }
 }
 
@@ -210,11 +228,17 @@ export async function importServerSession(
   const sourceId = await chatSyncSourceId(place.chatScope);
   stampServerSessionId({ db, sessionId, serverSessionId, sourceId });
   const outcome = await pullChat(deps, { sessionId, sourceId, modelId });
-  if (
-    outcome.kind === 'deleted' ||
-    outcome.kind === 'not-found' ||
-    outcome.kind === 'unknown-chat'
-  ) {
+  if (outcome.kind !== 'imported' && outcome.kind !== 'current') {
+    // Nothing was imported: leaving the row would name a harness session
+    // that was never written, so every later open lands on the Retry surface
+    // instead of importing again. Report the cause and forget the row.
+    captureTelemetry({
+      level: 'warning',
+      message: `sync import answered ${outcome.kind}; the listing is not opened`,
+      fingerprint: ['chat-sync-import'],
+      tags: { outcome: outcome.kind },
+    });
+    await deps.forgetLocal(sessionId);
     return null;
   }
   await enterChat(place, sessionId);

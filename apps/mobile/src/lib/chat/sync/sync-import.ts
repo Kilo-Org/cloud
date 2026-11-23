@@ -26,15 +26,16 @@ export async function applyPulled(input: {
   const known = new Set(Object.values(record.messageMap).map(entry => entry.msgId));
   const fresh = snapshot.messages.filter(one => !known.has(one.message.id));
   const turns = pulledToTurns(fresh, sessionId);
-  if (turns.length > 0) {
-    await deps.importTurns({
-      sessionId,
-      serverSessionId: serverId,
-      turns,
-      title: snapshot.session?.title ?? null,
-      model,
-    });
-  }
+  // Even an empty log materializes the harness session: the chat opens on the
+  // row this writes, and a listed chat with no session behind it can only
+  // fail with the retry surface.
+  await deps.importTurns({
+    sessionId,
+    serverSessionId: serverId,
+    turns,
+    title: snapshot.session?.title ?? null,
+    model,
+  });
   const map: MutableMessageMap = { ...record.messageMap };
   for (const one of fresh) {
     map[importedTurnId(one.message.time.created, one.seq)] = {

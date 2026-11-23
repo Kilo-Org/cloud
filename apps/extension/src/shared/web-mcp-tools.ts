@@ -71,13 +71,15 @@ export const webMcpDispatchHooks = (
 });
 
 /**
- * The WebMCP tools a caller may see. A descriptor that names no origin is
- * withheld from every caller — panel or agent — because every call path refuses
- * one, so showing it would offer a tool nothing can run. An agent caller
- * additionally sees only the descriptors whose origin it holds `read` for: the
- * list is page text, shown under the origin the page claims and withheld when
- * that origin cannot be read. Both list paths filter here, so a withheld tool is
- * never reported with its count.
+ * The WebMCP tools `browser_webmcp_list` shows. A descriptor that names no
+ * origin is withheld from every caller — panel or agent — because
+ * `browser_webmcp_call` refuses one, so listing it would offer a tool that call
+ * cannot run. An agent caller additionally sees only the descriptors whose
+ * origin it holds `read` for: the list is page text, shown under the origin the
+ * page claims and withheld when that origin cannot be read. Both browser-tool
+ * list paths filter here, so a withheld tool is never reported with its count.
+ * The panel's own gateway tools are built by `buildWebMcpToolDefinitions` and
+ * keep their own rules.
  */
 export const readableWebMcpTools = (
   tools: readonly WebMcpToolDescriptor[],

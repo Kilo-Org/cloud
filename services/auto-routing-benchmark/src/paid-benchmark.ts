@@ -88,11 +88,10 @@ import { variantFromStorage } from './reasoning-effort';
 /** How long a displayed quote stays confirmable. */
 export const PAID_QUOTE_TTL_MS = 30 * 60 * 1000;
 /**
- * Slots per staging batch: the store's per-batch case cap, which is itself derived from D1's
- * statement-size ceiling (see `STAGE_SLICE_MAX_SLOTS`). One slice is exactly one accepted
- * `batch()`, and the slice never grows a statement's binding count: the case and repetition
- * lists travel as one JSON array each, so the widest statement in a batch binds nine
- * parameters whatever the slice names.
+ * Slots per staging batch: the store's per-batch case cap (`STAGE_SLICE_MAX_SLOTS`), so one
+ * slice is exactly one accepted `batch()`. The slice is a transaction size, not a binding
+ * limit: the case and repetition lists travel as one JSON parameter each, so the batch's
+ * widest statement binds nine values whatever the slice names.
  */
 const STAGE_BATCH_SLOTS = STAGE_SLICE_MAX_SLOTS;
 /** Slots one request or one browser poll may stage, so a maximal pool is paged, not dumped. */
@@ -268,6 +267,10 @@ export async function stagePaidBenchmarkRequest(
   // plan's own pairs only and creates no measurement.
   const minimums = minimumCaseRevisions(plan.router, plan.revision);
   let budget = options.budgetSlots ?? STAGE_BUDGET_SLOTS;
+  // Kilo's ownership of a pair is a fact about the pair, not about the slice: a wide covered
+  // plan spans the same pairs batch after batch, so it is read once per pair per pass instead
+  // of once per slice (which would be one D1 query per batch on a fully covered pool).
+  const platformOwnership = new Map<string, boolean>();
   let counts = await readRequestCounts(db, request.id);
   if (counts.total === 0 && isPinOnlyPlan(plan) && !(await readServingPairsStillReady(db, plan)))
     return { status: 'aborted', reason: SERVING_EVIDENCE_GONE_REASON };
@@ -371,19 +374,25 @@ export async function stagePaidBenchmarkRequest(
       // it per covered slot cost one D1 query per slot (thousands in a wide covered pool), which
       // alone could exhaust an invocation's query budget. Only a slice that has a covered slot
       // without its latched platform run needs the answer at all.
-      const platformOwned = group.some(slot => {
+      const needsOwnership = group.some(slot => {
         if (!planSlotIsCovered(plan, slot.pairIndex, slot.caseIndex, slot.rep)) return false;
         const open = openBySlot.get(slot.caseIndex * plan.repetitions + slot.rep);
         return !open || open.platform_covered !== 1;
-      })
-        ? await readPlatformRequestedPairs(db, {
-            router: plan.router,
-            engineIdentity: plan.engineIdentity,
-            repetitions: plan.repetitions,
-            pairs: [resolvedPair],
-          })
-        : new Set<string>();
-      const pairIsPlatformOwned = platformOwned.size > 0;
+      });
+      const ownershipKey = `${resolvedPair.model}\u001f${resolvedPair.variant}`;
+      let pairIsPlatformOwned = platformOwnership.get(ownershipKey) ?? false;
+      if (needsOwnership && !platformOwnership.has(ownershipKey)) {
+        pairIsPlatformOwned =
+          (
+            await readPlatformRequestedPairs(db, {
+              router: plan.router,
+              engineIdentity: plan.engineIdentity,
+              repetitions: plan.repetitions,
+              pairs: [resolvedPair],
+            })
+          ).size > 0;
+        platformOwnership.set(ownershipKey, pairIsPlatformOwned);
+      }
       for (const slot of group) {
         const key = planSlotKey(plan, slot);
         const bit = slot.caseIndex * plan.repetitions + slot.rep;
@@ -1303,15 +1312,12 @@ export async function reconcilePaidBenchmarkRequests(
       ORDER BY updated_at, id LIMIT ${CRON_STAGE_MAX_REQUESTS_PER_TICK}`
     )
     .all<PaidBenchmarkRequestRow>();
-  // One tick's staging is hard-capped. The budget is divided over the requests this tick can
-  // actually serve — `min(preparing, scan cap)` — so the cap is spent, not stranded: dividing
-  // by every preparing request while only `CRON_STAGE_MAX_REQUESTS_PER_TICK` of them are
-  // scanned would leave part of the budget unused. The division itself keeps the total under
-  // the cap, and a request the tick cannot reach waits for the next one, which serves it first
-  // because the scan is stalest-first.
+  // One tick's staging is hard-capped, divided over the requests this tick serves: the scan
+  // above already returns at most `CRON_STAGE_MAX_REQUESTS_PER_TICK` rows, so its length *is*
+  // the served count. The division keeps the total under the cap, and a request the tick cannot
+  // reach waits for the next one, which serves it first because the scan is stalest-first.
   const preparing = preparingRows.results.length;
-  const served = Math.min(preparing, CRON_STAGE_MAX_REQUESTS_PER_TICK);
-  const fairShare = Math.floor(CRON_STAGE_BUDGET_SLOTS / Math.max(1, served));
+  const fairShare = Math.floor(CRON_STAGE_BUDGET_SLOTS / Math.max(1, preparing));
   const offered = Math.min(fairShare, CRON_STAGE_MAX_SLOTS_PER_REQUEST);
   let remainingStageBudget = CRON_STAGE_BUDGET_SLOTS;
   const live = [...preparingRows.results, ...activeRows.results];

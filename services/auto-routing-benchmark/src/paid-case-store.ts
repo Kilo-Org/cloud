@@ -362,8 +362,9 @@ function schedulerGuardParams(input: {
  * thousands of slots, so the controller chunks its plan into these batches. Approval is
  * never inferred from a partial plan: activation requires `staged_cases = plan_cases`.
  *
- * The bound is the staging slice itself (`STAGE_SLICE_MAX_SLOTS`), derived once from D1's
- * statement-size ceiling in `d1-limits.ts`, so a slice is always exactly one accepted batch.
+ * The bound is the staging slice itself (`STAGE_SLICE_MAX_SLOTS`, a documented transaction
+ * size in `d1-limits.ts`), so a slice is always exactly one accepted batch. Binding counts are
+ * flat — the case list is one JSON parameter — so nothing here is bounded by D1's 100.
  */
 export const PAID_CASE_BATCH_LIMIT = STAGE_SLICE_MAX_SLOTS;
 

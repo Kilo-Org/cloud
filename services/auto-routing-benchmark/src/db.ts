@@ -84,8 +84,7 @@ export type ConfigDeciderModelRow = Omit<typeof configDeciderModels.$inferSelect
 };
 type ModelSummaryRow = typeof modelSummaries.$inferSelect;
 
-// Every row-count constant below is bounded by this one number; the staging slice and the
-// case-row batch derive from it directly.
+// Every row-count constant below is bounded by this one number.
 export { D1_MAX_BOUND_PARAMETERS } from './d1-limits';
 
 // D1 rejects statements with too many bound variables. A model summary insert

@@ -105,13 +105,15 @@ function widestPlan(
 
 /**
  * One `preparing` request per router shape, plus an `active` one to reconcile. `platformCovered`
- * makes every slot Kilo-paid, so the tick runs the covered branch over a full slice.
+ * makes every slot Kilo-paid AND gives every pair a live platform registry row, so the covered
+ * branch stages a whole slice instead of aborting on its first slot.
  */
 function seedPaidRequests(sqlite: DatabaseSync, platformCovered = false): void {
   const insert = (status: 'preparing' | 'active', plan: PaidBenchmarkPlan) => {
     const requestId = crypto.randomUUID();
     const quoteId = crypto.randomUUID();
     const engine = plan.engineIdentity;
+    const planCases = plan.pairs.length * plan.caseIds.length * plan.repetitions;
     sqlite
       .prepare(
         `INSERT INTO paid_benchmark_quotes
@@ -126,7 +128,7 @@ function seedPaidRequests(sqlite: DatabaseSync, platformCovered = false): void {
         crypto.randomUUID(),
         engine,
         JSON.stringify(plan),
-        plan.counts.exclusive,
+        planCases,
         new Date(NOW + 30 * 60_000).toISOString(),
         requestId,
         AT,
@@ -142,17 +144,19 @@ function seedPaidRequests(sqlite: DatabaseSync, platformCovered = false): void {
         VALUES (?, 'user', 'user-1', NULL, ?, ?, 'pool-v1', ?, ?, ?, 0, 0, 0, ?, 0, NULL,
           'user-1', '{}', ?, ?)`
       )
-      .run(
-        requestId,
-        plan.router,
-        crypto.randomUUID(),
-        engine,
-        status,
-        quoteId,
-        plan.counts.exclusive,
-        AT,
-        AT
-      );
+      .run(requestId, plan.router, crypto.randomUUID(), engine, status, quoteId, planCases, AT, AT);
+    if (platformCovered)
+      // `readPlatformRequestedPairs` reads exactly this column: without it the covered branch
+      // aborts on its first slot and the fixture measures nothing.
+      for (const pair of plan.pairs)
+        sqlite
+          .prepare(
+            `INSERT OR IGNORE INTO benchmark_profiles
+              (router, model, variant, engine_identity, repetitions, status, requested_at,
+                updated_at, platform_requested, user_requested)
+            VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, 1, 0)`
+          )
+          .run(plan.router, pair.model, pair.variant, engine, plan.repetitions, AT, AT);
     return requestId;
   };
   // Both router shapes: an 88-slot efficient slice names about 30 distinct cases over 3
@@ -351,8 +355,22 @@ describe('scheduled tick D1 budget (production migrations, real handler)', () =>
     // Staging carries the 4,400-slot budget in 50 batches of 88, each with three slice reads
     // and a recount; both router shapes (efficient, 3 repetitions; frontier, 1) are preparing.
     expect(components.staging).toBeLessThanOrEqual(420);
-    // The covered branch reads the pair's platform membership once per slice, not per slot: a
-    // per-slot read would add thousands of queries on this fixture.
+    // The covered fixture stages a full covered slice for both router shapes (platform
+    // ownership is seeded, so the branch does not abort), and the pair's platform membership is
+    // read once per slice rather than per slot: a per-slot read would add ~88 queries per batch
+    // of this fixture, thousands per tick.
+    const coveredStaged = coveredSqlite
+      .prepare(
+        `SELECT COALESCE(SUM(staged_cases), 0) AS staged FROM paid_benchmark_requests
+        WHERE status IN ('preparing', 'active')`
+      )
+      .get() as { staged: number } | undefined;
+    expect(Number(coveredStaged?.staged ?? 0)).toBeGreaterThan(0);
+    expect(
+      coveredSqlite
+        .prepare("SELECT COUNT(*) AS failed FROM paid_benchmark_requests WHERE status = 'failed'")
+        .get()
+    ).toEqual({ failed: 0 });
     expect(components.coveredWorst).toBeLessThanOrEqual(700);
     // The whole tick keeps a wide margin under D1's hard limit of 1,000 queries per
     // invocation: about a third stays free for anything a future addition needs.

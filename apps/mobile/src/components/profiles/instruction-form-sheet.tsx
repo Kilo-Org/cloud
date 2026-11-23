@@ -56,27 +56,52 @@ type InstructionFormSheetProps = Readonly<{
   saveFailureTone?: 'error' | 'warn';
 }>;
 
-type InstructionNameHintLineProps = Readonly<{
-  slug: string;
+type InstructionNameHintRowProps = Readonly<{
+  hint: InstructionNameHint;
+  /** The rule the name must follow, painted while the fold leaves nothing to store. */
+  rule: string;
 }>;
 
 /**
- * The line under the name field: the slug a save will store, in one line. It is
- * mounted only while there is such a slug, so every state without one leaves
- * the section gap between the name field and the content label exactly as wide
- * as the form's own. The preview carries the only information on the line, so
- * it stays one line and its ellipsis sits in the middle, the app's treatment for
- * an identifier: both ends of the stored file name stay readable, including in
- * the catalogs that put the slug last. The rule a name must follow is the name
- * field's own error while the fold leaves nothing to store, so it is not stated
- * here.
+ * The helper row under the name field: the slug a save will store, or the rule
+ * a name must follow, in one reserved slot.
+ *
+ * The row is mounted in every state, and the rule sits in it twice: once as an
+ * invisible copy in native layout, which is what gives the row exactly the
+ * rule's wrapped height in every state, and once as the visible line in an
+ * absolute overlay that takes no space of its own. So the preview (one line,
+ * cut in the middle) and the rule (a sentence that wraps) paint in the same
+ * place, in the same caption size, and switching between them never moves the
+ * content field below. The preview carries the only new information, so it
+ * stays one line and its ellipsis sits in the middle, the app's treatment for an
+ * identifier: both ends of the stored file name stay readable, including in the
+ * catalogs that put the slug last. The rule is the same sentence the field's
+ * own error states on a refused save, painted here in the field's slot so the
+ * name `FormField` does not paint it a second time.
  */
-function InstructionNameHintLine({ slug }: InstructionNameHintLineProps) {
+function InstructionNameHintRow({ hint, rule }: InstructionNameHintRowProps) {
   const { t } = useTranslation();
   return (
-    <Text variant="muted" className="text-xs" numberOfLines={1} ellipsizeMode="middle">
-      {t('profiles.instructionNamePreview', { name: slug })}
-    </Text>
+    <View className="-mt-2">
+      {/* The reservation: in native layout, hidden from the a11y tree, so the
+          row is the rule's natural wrapped height in every state. */}
+      <Text
+        className="text-xs opacity-0"
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        pointerEvents="none"
+      >
+        {rule}
+      </Text>
+      <View className="absolute inset-x-0 top-0">
+        {hint.kind === 'preview' ? (
+          <Text variant="muted" className="text-xs" numberOfLines={1} ellipsizeMode="middle">
+            {t('profiles.instructionNamePreview', { name: hint.slug })}
+          </Text>
+        ) : null}
+        {hint.kind === 'rule' ? <AccessibleStatus message={rule} className="text-xs" /> : null}
+      </View>
+    </View>
   );
 }
 
@@ -85,15 +110,17 @@ function InstructionNameHintLine({ slug }: InstructionNameHintLineProps) {
  * only while open, so every open seeds the fields from the instruction it
  * edits. Fields are uncontrolled (refs), per the app's text-input rule.
  *
- * The name is reduced to the server's slug rule on save and the line under the
- * field says so first, so a typed `Release Notes` is never silently stored as
- * another file name. A name with nothing left in ASCII after the fold shows the
- * rule as the field's own error while it is typed, and Done dims with it,
+ * The name is reduced to the server's slug rule on save and the reserved helper
+ * row under the field says so first, so a typed `Release Notes` is never
+ * silently stored as another file name. A name with nothing left in ASCII after
+ * the fold paints the rule in that same row while it is typed — at the row's
+ * caption size and in the space the row always keeps — and Done dims with it,
  * because the fold would otherwise leave the field silent on exactly the input
- * the save refuses. Save validates the name as typed through
- * `validateInstructionInput`; a name with nothing left in ASCII after the fold
- * is refused as invalid, not as empty. A refused input shows the matching
- * `profiles.instruction*` message under the field at fault.
+ * the save refuses. The field's boundary and spoken name follow through
+ * `outsideError`, so the sentence is stated once. Save validates the name as
+ * typed through `validateInstructionInput`; a name with nothing left in ASCII
+ * after the fold is refused as invalid, not as empty. A refused input shows the
+ * matching `profiles.instruction*` message under the field at fault.
  */
 export function InstructionFormSheet({
   draftScope,
@@ -131,25 +158,27 @@ export function InstructionFormSheet({
   // outcome, so a refused save can be retried with Save.
   const { feedback, begin } = useSurfaceFeedback<never>();
 
+  // The rule sentence is the helper row's to paint while the fold leaves
+  // nothing to store. A refused save reports the same `bad-name`, so the field
+  // must not paint it a second time under the input; the row already states it,
+  // and the field keeps the boundary and the spoken name through `outsideError`.
   const nameError =
-    error !== null && instructionNameErrorShown(error)
+    error !== null && instructionNameErrorShown(error) && error !== 'bad-name'
       ? t(instructionErrorKey(error), { max: INSTRUCTION_NAME_MAX_LENGTH })
       : undefined;
-  // The rule the name must follow, shown as the field's own error while the
-  // fold leaves nothing to store: a disabled Done with no message would leave
-  // the person nothing to fix. A refused save's own message carries the same
-  // sentence or a more specific one, so it wins.
-  const ruleError = nameHint.kind === 'rule' ? t(instructionErrorKey('bad-name')) : undefined;
-  // Every message the name field can show, reserved as one slot at the field's
-  // first focus so an error never moves the form under the keyboard. The keys
-  // come from the same mapping the refused-save path reads, so a renamed
-  // catalog key cannot leave one path behind.
-  const nameErrorMessages = [
-    t(instructionErrorKey('empty')),
-    t(instructionErrorKey('bad-name')),
-    t(instructionErrorKey('reserved')),
-    t(instructionErrorKey('too-long'), { max: INSTRUCTION_NAME_MAX_LENGTH }),
-  ];
+  // The rule the name must follow. The helper row reserves this sentence's
+  // wrapped height in every state and paints it while the fold leaves nothing
+  // to store: a disabled Done with no message would leave the person nothing to
+  // fix. A refused save's own message carries the same sentence or a more
+  // specific one, so the field's painted error wins.
+  const rule = t(instructionErrorKey('bad-name'));
+  const ruleError = nameHint.kind === 'rule' ? rule : undefined;
+  // The two messages a refused instruction name can show, reserved as one slot
+  // under the field so a refusal never moves the form under the keyboard. A
+  // long name is cut to the stored slug rather than refused, so it has no
+  // message to reserve. The keys come from the same mapping the refused-save
+  // path reads, so a renamed catalog key cannot leave one path behind.
+  const nameErrorMessages = [t(instructionErrorKey('empty')), t(instructionErrorKey('reserved'))];
   const contentKey = instructionContentErrorKey(error);
   const contentError =
     contentKey === null ? undefined : t(contentKey, { max: INSTRUCTION_CONTENT_MAX_LENGTH });
@@ -229,7 +258,8 @@ export function InstructionFormSheet({
         <FormField
           label={t('profiles.instructionNameLabel')}
           defaultValue={nameRef.current}
-          error={nameError ?? ruleError}
+          error={nameError}
+          outsideError={ruleError}
           reserveErrorMessages={nameErrorMessages}
           disabled={isSaving}
           required
@@ -245,16 +275,11 @@ export function InstructionFormSheet({
             }
           }}
         />
-        {/* The preview line under the name field, mounted only while a save
-            would store another slug. A blank name, a name that saves as typed
-            and a name the fold cannot use all render nothing here, so the gap
-            between this field's own error and the content label is the form's
-            section gap in every state instead of a blank reserved line. */}
-        {nameHint.kind === 'preview' ? (
-          <View className="-mt-2">
-            <InstructionNameHintLine slug={nameHint.slug} />
-          </View>
-        ) : null}
+        {/* The reserved helper row: the preview while a save would store another
+            slug, the rule while the fold leaves nothing to store, and empty
+            below that. Its height is the rule's in every state, so switching
+            between the two never moves the content field. */}
+        <InstructionNameHintRow hint={nameHint} rule={rule} />
         <FormField
           label={t('profiles.instructionContentLabel')}
           defaultValue={contentRef.current}

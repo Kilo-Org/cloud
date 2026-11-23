@@ -1,13 +1,14 @@
 /**
- * What the row under the file-name field shows, and how the preview inside it is
- * cut. The row exists only while a save would store a different slug, so every
- * other state leaves the section gap between the name field and the content
- * label untouched; the preview carries the only new information on that row, so
+ * What the helper row under the file-name field shows, and how the preview
+ * inside it is cut. The row is always mounted and reserves the rule's wrapped
+ * height in native layout, so the name `FormField` — and everything under it —
+ * keeps one position whether the row shows the slug preview, the rule or
+ * nothing at all. The preview carries the only new information it can hold, so
  * it is cut in the middle rather than at its tail, which would hide the end of
  * the name a save writes. These cases pin one mounted preview line cut in the
- * middle and its absence in the other states, and the rule the name field states
- * as its own error while the fold leaves nothing to store, with Done dimmed for
- * it.
+ * middle, the reservation that keeps the row's height in every state, and the
+ * rule painted on that row (with the field's boundary following it and Done
+ * dimmed) while the fold leaves nothing to store.
  */
 import { createElement, type ReactNode, type Ref } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -51,7 +52,23 @@ vi.mock('@/components/agents/session-page-sheet', () => ({ SessionPageSheet: 'Se
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
-vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
+vi.mock('@/components/ui/accessible-status', async () => {
+  const { createElement: createMockElement } = await import('react');
+  return {
+    // The real status renders its message as a `Text`, so the row's painted
+    // copy lands in the same tree shape here.
+    AccessibleStatus: ({
+      message,
+      className,
+      tone = 'error',
+    }: {
+      message: string | null;
+      className?: string;
+      tone?: string;
+    }) =>
+      message === null ? null : createMockElement('Text', { className, tone, children: message }),
+  };
+});
 vi.mock('@/components/ui/dialog', () => ({
   useConfirmDialog: () => ({ confirm: vi.fn(), dialog: null }),
 }));
@@ -59,6 +76,30 @@ vi.mock('@/components/ui/dialog', () => ({
 /** The stubbed elements the sheet rendered under one element name. */
 function findAll(root: ReactTestInstance, type: string): ReactTestInstance[] {
   return root.findAll(node => typeof node.type === 'string' && node.type === type);
+}
+
+/** The helper row the sheet keeps under the name field, in every state. */
+function hintRow(root: ReactTestInstance): ReactTestInstance {
+  const row = findAll(root, 'View').find(node => node.props.className === '-mt-2');
+  if (!row) {
+    throw new Error('the helper row under the name field was not rendered');
+  }
+  return row;
+}
+
+/**
+ * The row's copies of `copy`, split into the ones the reservation holds (the
+ * zero-opacity copy in native layout) and the ones the caller can see.
+ */
+function rowCopies(
+  row: ReactTestInstance,
+  copy: string
+): { hidden: ReactTestInstance[]; visible: ReactTestInstance[] } {
+  const texts = findAll(row, 'Text').filter(node => node.props.children === copy);
+  return {
+    hidden: texts.filter(node => String(node.props.className).includes('opacity-0')),
+    visible: texts.filter(node => !String(node.props.className).includes('opacity-0')),
+  };
 }
 
 /** Types into the name field the way the field reports a keystroke. */
@@ -111,7 +152,18 @@ function doneDisabled(root: ReactTestInstance): boolean {
   return header.props.doneDisabled === true;
 }
 
-describe('InstructionFormSheet file-name line', () => {
+/** Presses the header's Done control the way the header reports the press. */
+function pressDone(root: ReactTestInstance): void {
+  const onDone: unknown = findAll(root, 'SheetHeader')[0]?.props.onDone;
+  if (typeof onDone !== 'function') {
+    throw new TypeError('the header has no done handler');
+  }
+  act(() => {
+    (onDone as () => void)();
+  });
+}
+
+describe('InstructionFormSheet file-name row', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     resetFormDraftsForTests();
@@ -137,12 +189,16 @@ describe('InstructionFormSheet file-name line', () => {
     unmount();
   });
 
-  it('mounts the preview row only for a name a save would rewrite', async () => {
+  it('keeps the row mounted in every state, reserving the rule while the preview comes and goes', async () => {
     const { renderer, unmount } = await mountSheet();
 
-    // Only a name a save would rewrite gets a row. Every other state renders no
-    // preview and no placeholder, so the gap between the name field's own error
-    // and the content label stays the form's section gap.
+    const rule = i18n.t('profiles.instructionNameInvalid');
+    // The row is mounted before a keystroke too: its reservation never arrives
+    // late, so the content label never sits where the row was about to appear.
+    expect(rowCopies(hintRow(renderer.root), rule).hidden).toHaveLength(1);
+
+    // Only a name a save would rewrite paints the preview; the reservation
+    // holds the row's height in every one of these states.
     const states: readonly (readonly [typed: string, slug: string | null])[] = [
       ['', null],
       ['release-notes', null],
@@ -152,40 +208,70 @@ describe('InstructionFormSheet file-name line', () => {
     for (const [typed, slug] of states) {
       typeName(renderer.root, typed);
 
-      // The preview row is the one single-line, middle-cut line under the
-      // field. A blank name, a name that saves as typed and an unusable name
-      // render none of it, so no blank line separates the field from the label
-      // below.
-      const rows = findAll(renderer.root, 'Text').filter(
-        node => node.props.ellipsizeMode === 'middle'
-      );
+      const row = hintRow(renderer.root);
+      // The reservation: the rule's own copy, in native layout, in every state.
+      const reserved = rowCopies(row, rule).hidden;
+      expect(reserved).toHaveLength(1);
+      expect(reserved[0]?.props.accessibilityElementsHidden).toBe(true);
+      expect(reserved[0]?.props.importantForAccessibility).toBe('no-hide-descendants');
+
+      // The visible line: the preview for a name a save would rewrite, and the
+      // rule only where the field states it too.
+      const previews = findAll(row, 'Text').filter(node => node.props.ellipsizeMode === 'middle');
       if (slug === null) {
-        expect(rows).toHaveLength(0);
+        // No preview line, so nothing is cut: the reservation is the row's only
+        // text in these states.
+        expect(previews).toHaveLength(0);
       } else {
-        expect(rows).toHaveLength(1);
-        expect(rows[0]?.props.numberOfLines).toBe(1);
-        expect(rows[0]?.props.children).toBe(
+        expect(previews).toHaveLength(1);
+        expect(previews[0]?.props.numberOfLines).toBe(1);
+        expect(previews[0]?.props.children).toBe(
           i18n.t('profiles.instructionNamePreview', { name: slug })
         );
       }
+      expect(rowCopies(row, rule).visible).toHaveLength(typed === 'पुणे कार्यालय नियम' ? 1 : 0);
     }
 
     unmount();
   });
 
-  it('states the rule as the field error and dims Done when the fold leaves no file name', async () => {
+  it('paints the rule on the row and dims Done when the fold leaves no file name', async () => {
     const { renderer, unmount } = await mountSheet();
 
     typeName(renderer.root, 'पुणे कार्यालय नियम');
 
     const rule = i18n.t('profiles.instructionNameInvalid');
-    expect(nameField(renderer.root).props.error).toBe(rule);
+    const row = hintRow(renderer.root);
+    // The rule is painted in the row's own slot, at the row's caption size, in
+    // the space the reservation keeps. The field contributes the boundary and
+    // the spoken name, never a second sentence under the row.
+    const painted = rowCopies(row, rule).visible;
+    expect(painted).toHaveLength(1);
+    expect(painted[0]?.props.className).toBe('text-xs');
+    expect(nameField(renderer.root).props.outsideError).toBe(rule);
+    expect(nameField(renderer.root).props.error).toBeUndefined();
     expect(doneDisabled(renderer.root)).toBe(true);
-    // The row no longer states the rule in its own line: the rule reaches the
-    // screen only through the field's error, so no text the sheet renders
-    // carries it. A Text that repeated the rule here would fail this check.
-    const texts = findAll(renderer.root, 'Text').map(node => node.props.children);
-    expect(texts).not.toContain(rule);
+
+    unmount();
+  });
+
+  it('states the rule once when a refused save reports it too', async () => {
+    const { renderer, unmount } = await mountSheet();
+
+    typeName(renderer.root, 'पुणे कार्यालय नियम');
+    // Done is dimmed for this input, but the header still reports a press, and
+    // the refused save reports `bad-name` — the row's own sentence.
+    pressDone(renderer.root);
+
+    const rule = i18n.t('profiles.instructionNameInvalid');
+    // One visible copy: the row's. The field paints nothing for `bad-name`,
+    // because the same sentence is already on the row.
+    const copies = rowCopies(renderer.root, rule);
+    expect(copies.visible).toHaveLength(1);
+    expect(copies.hidden).toHaveLength(1);
+    expect(nameField(renderer.root).props.error).toBeUndefined();
+    expect(nameField(renderer.root).props.outsideError).toBe(rule);
+    expect(doneDisabled(renderer.root)).toBe(true);
 
     unmount();
   });
@@ -196,6 +282,7 @@ describe('InstructionFormSheet file-name line', () => {
     typeName(renderer.root, 'release-notes');
 
     expect(nameField(renderer.root).props.error).toBeUndefined();
+    expect(nameField(renderer.root).props.outsideError).toBeUndefined();
     expect(doneDisabled(renderer.root)).toBe(false);
 
     unmount();

@@ -20,6 +20,10 @@ type FormFieldProps = Omit<TextInputProps, 'value'> &
      */
     labelRole?: 'field' | 'section';
     error?: string;
+    /** A message that makes the field invalid without painting under it: the caller
+     * shows it elsewhere (a helper row) and the field keeps the destructive
+     * boundary and the composed label. */
+    outsideError?: string;
     /**
      * The gap between the field's label row and its input. The default
      * `gap-1.5` keeps the ordinary compact block; a screen whose row controls
@@ -81,12 +85,17 @@ type FormFieldProps = Omit<TextInputProps, 'value'> &
  * writing to a ref (see CLAUDE.md). All other `TextInputProps` pass through
  * to the native input, including `autoComplete`/`textContentType` — set
  * them at call sites to expose system autofill metadata.
+ *
+ * The invalid state can come from a message the field does not paint
+ * (`outsideError`): a caller whose helper row states the rule passes it here so
+ * the boundary and the spoken name follow, and paints the sentence itself.
  */
 function FormField({
   label,
   labelRole = 'field',
   gapClassName = labelRole === 'section' ? 'gap-3' : 'gap-1.5',
   error,
+  outsideError,
   reserveErrorMessages,
   alwaysReserve,
   disabled,
@@ -113,6 +122,9 @@ function FormField({
   // error known from elsewhere (a rejected submit). Either one marks the field
   // invalid; the field's own rule wins while it has something to say.
   const displayedError = (validate ? validationError : null) ?? error;
+  // `outsideError` paints nothing and reserves nothing: its row lives with the
+  // caller. It still marks the field invalid, boundary and spoken name alike.
+  const shownError = displayedError ?? outsideError;
 
   // Write the default only on attach; later prop changes must not move the caret
   // while the person edits an uncontrolled field.
@@ -156,7 +168,7 @@ function FormField({
           // label in an RTL catalog. `Input` applies the alignment; the caller's
           // own style passes through untouched.
           style={style}
-          accessibilityLabel={formFieldA11y({ label, required, error: displayedError })}
+          accessibilityLabel={formFieldA11y({ label, required, error: shownError })}
           accessibilityState={{ disabled }}
           onChangeText={value => {
             valueRef.current = value;
@@ -189,7 +201,7 @@ function FormField({
             // 45 % ink `--input` border already carries the field.
             'dark:bg-[#FFFFFF0A]',
             'focus:border-ring',
-            displayedError && 'border-destructive',
+            shownError && 'border-destructive',
             disabled && 'opacity-50',
             className
           )}

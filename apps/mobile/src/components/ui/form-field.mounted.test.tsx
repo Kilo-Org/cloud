@@ -60,7 +60,7 @@ describe('FormField errors known from elsewhere', () => {
   const ownError = i18n.t('login.pleaseEnterEmail');
   const submittedError = i18n.t('authErrors.invalidEmail');
 
-  function mount(props: { error?: string }) {
+  function mount(props: { error?: string; outsideError?: string }) {
     act(() => {
       renderer = TestRenderer.create(
         createElement(FormField, {
@@ -111,6 +111,21 @@ describe('FormField errors known from elsewhere', () => {
       inputHandlers(mounted).onChangeText('dev@example.com');
     });
     expect(shownError(mounted)).toEqual([submittedError]);
+  });
+
+  it('marks the field invalid without painting a message its caller paints', () => {
+    // A caller whose helper row states the rule passes it here instead of as
+    // `error`: the field keeps the destructive boundary and the spoken state,
+    // and paints nothing under the input, so the sentence appears once.
+    const outsideError = i18n.t('profiles.instructionNameInvalid');
+    const mounted = mount({ outsideError });
+
+    expect(shownError(mounted)).toEqual([]);
+    const input = mounted.root.findByType('TextInput');
+    expect(input.props.className).toContain('border-destructive');
+    expect(input.props.accessibilityLabel).toBe(
+      [label, i18n.t('common.error', { error: outsideError })].join(', ')
+    );
   });
 });
 

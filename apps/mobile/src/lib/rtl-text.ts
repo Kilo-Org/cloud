@@ -468,14 +468,21 @@ const THEMATIC_BREAK_START = /^ {0,3}(?:(?:\*[ \t]*){3,}|(?:-[ \t]*){3,}|(?:_[ \
  * `underlinesParagraph`). */
 const SETEXT_UNDERLINE_START = /^ *(?:=+|-{1,2})[ \t]*$/;
 
-/** The quote depth and content indent of a block's own container: the number of
- * `>` markers in front of it, and how far its content starts past them — a list
- * item's content column, or the document's own zero. A setext underline in the
- * container sits from that indent up to three columns past it, and indented code
- * in it starts four columns past it.
+/** The quote depth and content column of a block's own container: the number of
+ * `>` markers in front of it, and where its content starts. A setext underline
+ * in the container sits at that column, up to three columns past it, and
+ * indented code in it starts four columns past it.
  *
- * The indicator reads from the end of the quote prefix: `> Title` and `>===` sit
- * in the same quote though their prefixes differ by a character. */
+ * The column is read from column zero of the line, so a list item's and an HTML
+ * block's containers are stated in one frame: a list item's content column does
+ * not move when a deeper quote opens inside it (`- item` puts its content at
+ * column 2, and `  > a` keeps that column though its own prefix reaches column
+ * 4), so the comparison that holds the item open stays correct there.
+ *
+ * `previousParagraph` is the one record in another frame: a setext underline is
+ * matched by the indentation it states past its quote prefix, because it reads
+ * `> Title` and `>===` as one quote though their prefixes differ by a character.
+ * That record is converted to the frame when it is written. */
 type Container = { depth: number; indent: number };
 
 /**
@@ -889,8 +896,10 @@ function stripLineMarks(
  * blockquote or a list item that closes under an HTML block carries the block
  * out with it, so the line that leaves the container is a new block whose mark
  * names its own edge (`> <div>` over a paragraph holds the paragraph's line,
- * and the paragraph under the quote does not). A block whose container
- * continues keeps its state exactly as it was.
+ * and the paragraph under the quote does not). A line that leaves a container
+ * and is itself a tag-kind block is that new block's opener, so the raw text
+ * under it is held by the container it opened in and keeps its marks. A block
+ * whose container continues keeps its state exactly as it was.
  *
  * Fenced and indented code keep every character they hold. An inline code span
  * is the one place where the two rules meet: a mark as a span's first character
@@ -930,43 +939,59 @@ export function withoutLeadingDirectionMarks(markdown: string): string {
   let openTagHtmlBlock: Container | undefined = undefined;
   // The list items still open, innermost last. A list item is a container in its
   // own right: the block inside it is held while the lines reach the item's
-  // content indent, and an indented code line in it starts four columns past
-  // that indent, not four columns past the line's own start.
+  // content column, and an indented code line in it starts four columns past
+  // that column, not four columns past the line's own start.
   const openLists: Container[] = [];
   for (const [index, line] of lines.entries()) {
     const quoted = BLOCKQUOTE_START.exec(line)?.[0].length ?? 0;
     const quotedDepth = (line.slice(0, quoted).match(/>/g) ?? []).length;
     const body = line.slice(quoted);
     const blank = body.trim().length === 0;
-    // The line's own indentation in columns, counted from the end of its quote
-    // prefix: where its first character stands inside its container.
-    const indent =
-      columnAt(line, quoted + (/^[ \t]*/.exec(body)?.[0].length ?? 0)) - columnAt(line, quoted);
-    // A line quoted more shallowly than a list item, or indented short of its
-    // content indent, ends that item; a blank line holds it as it is. Several
+    // The line's own first-content column, counted from column zero: where its
+    // first character stands, past its quote prefix and any indentation. Every
+    // container is stated in that same frame, so a list item's content column
+    // compares with it directly even when a deeper quote opens inside the item
+    // and pushes its own prefix out past that column.
+    const contentColumn = columnAt(line, quoted + (/^[ \t]*/.exec(body)?.[0].length ?? 0));
+    // A line quoted more shallowly than a list item, or reaching short of its
+    // content column, ends that item; a blank line holds it as it is. Several
     // items may close at once when the line returns to an outer container.
     while (openLists.length > 0) {
       const open = openLists.at(-1);
-      if (open === undefined || !(quotedDepth < open.depth || (!blank && indent < open.indent))) {
+      if (
+        open === undefined ||
+        !(quotedDepth < open.depth || (!blank && contentColumn < open.indent))
+      ) {
         break;
       }
       openLists.pop();
     }
     // The container holding this line: the innermost list item around it, or the
-    // quote it sits in, whose content starts at the quote prefix's end.
-    const container: Container = openLists.at(-1) ?? { depth: quotedDepth, indent: 0 };
+    // quote it sits in, whose content starts where its prefix ends.
+    const container: Container = openLists.at(-1) ?? {
+      depth: quotedDepth,
+      indent: columnAt(line, quoted),
+    };
+    // That container's column in the frame the line's body is read in, past its
+    // quote prefix: a container the prefix has already reached stands at the
+    // body's own start, and one it has not reached yet stands that far in. The
+    // container itself is stated from the line's start, so the conversion is
+    // made here once rather than in each reader.
+    const containerIndent = Math.max(0, container.indent - columnAt(line, quoted));
     // A line outside the container an HTML block opened in is not part of that
     // block: the container ended, so the block ended with it, and the line opens
     // a block of its own. A blank line carries no content, so only a shallower
     // quote moves it out; its own zero indentation says nothing about where it
-    // sits, and a terminator kind holds blank lines as its raw text. The walk's
-    // state feeds this predicate back into itself, so it names its own type.
+    // sits, and a terminator kind holds blank lines as its raw text. Both columns
+    // count from the line's start. The walk's state feeds this predicate back
+    // into itself, so it names its own type.
     const outsideContainer: boolean =
       openHtmlBlock !== undefined
         ? quotedDepth < openHtmlBlock.container.depth ||
-          (!blank && indent < openHtmlBlock.container.indent)
+          (!blank && contentColumn < openHtmlBlock.container.indent)
         : openTagHtmlBlock !== undefined &&
-          (quotedDepth < openTagHtmlBlock.depth || (!blank && indent < openTagHtmlBlock.indent));
+          (quotedDepth < openTagHtmlBlock.depth ||
+            (!blank && contentColumn < openTagHtmlBlock.indent));
     // A line inside an HTML block is that block's raw text: it keeps every mark
     // it holds and none of it is read as markdown. A line outside one — of the
     // block's container too — may open a block of either family, and then it is
@@ -984,7 +1009,7 @@ export function withoutLeadingDirectionMarks(markdown: string): string {
     const indentedCode: boolean =
       !rawHtml &&
       !inFence &&
-      indent >= container.indent + 4 &&
+      contentColumn >= container.indent + 4 &&
       !blank &&
       (previousBlank || previousEndsBlock || inIndentedCode);
     // Code is copy in its own right: a mark inside it is part of the code.
@@ -1083,8 +1108,7 @@ export function withoutLeadingDirectionMarks(markdown: string): string {
             // one — a paragraph starting inside a nested list item — begins at
             // its container's content column, counted in columns because a tab
             // reaches it in one character.
-            quoted +
-              (marker > 0 ? marker : offsetAtColumn(line, quoted, container.indent) - quoted),
+            quoted + (marker > 0 ? marker : offsetAtColumn(line, quoted, containerIndent) - quoted),
             {
               listItem: list !== null,
               inHeading: heading !== null,
@@ -1094,12 +1118,13 @@ export function withoutLeadingDirectionMarks(markdown: string): string {
       inFence = !inFence;
     }
     // The list item this line opens, from its own marker and the padding after
-    // it: a line at that content indent or deeper is inside the item, and its
-    // marker line also ends every item it is a sibling or an ancestor of. An
-    // item whose padding leaves an indented code block opens no container.
+    // it: a line reaching that content column or deeper is inside the item, and
+    // its marker line also ends every item it is a sibling or an ancestor of. An
+    // item whose padding leaves an indented code block opens no container. The
+    // column counts from the line's start, like every other container's.
     const itemIndent =
       list !== null && contentStart < body.length
-        ? columnAt(line, quoted + contentStart) - columnAt(line, quoted)
+        ? columnAt(line, quoted + contentStart)
         : undefined;
     if (itemIndent !== undefined) {
       let open = openLists.at(-1);
@@ -1110,8 +1135,11 @@ export function withoutLeadingDirectionMarks(markdown: string): string {
       openLists.push({ depth: quotedDepth, indent: itemIndent });
     }
     // The container this line's own blocks are held in: the innermost list item,
-    // or the quote the line sits in, whose content starts at its prefix's end.
-    const lineContainer: Container = openLists.at(-1) ?? { depth: quotedDepth, indent: 0 };
+    // or the quote the line sits in, whose content starts where its prefix ends.
+    const lineContainer: Container = openLists.at(-1) ?? {
+      depth: quotedDepth,
+      indent: columnAt(line, quoted),
+    };
     // The block's terminator closes it, and the line that held it, or the line
     // that left its container, leaves the line after it opening a block; a block
     // still open runs on.
@@ -1122,11 +1150,17 @@ export function withoutLeadingDirectionMarks(markdown: string): string {
       openHtmlBlock = { terminator: html.terminator, container: lineContainer };
     }
     // A tag-kind block has no terminator: it ends at the next blank line, which
-    // is not part of it, or where the container holding it ends.
-    openTagHtmlBlock =
-      blank || outsideContainer
-        ? undefined
-        : (openTagHtmlBlock ?? (opensTagHtmlBlock ? lineContainer : undefined));
+    // is not part of it, or where the container holding it ends. A line that
+    // leaves a block's container and opens a tag-kind block of its own is both
+    // cases at once: the block it left ends, while the one it opened is held by
+    // the container it just opened in, so its raw text below keeps its marks.
+    if (blank) {
+      openTagHtmlBlock = undefined;
+    } else if (opensTagHtmlBlock) {
+      openTagHtmlBlock = lineContainer;
+    } else if (outsideContainer) {
+      openTagHtmlBlock = undefined;
+    }
     previousBlank = blank;
     previousEndsBlock = endsBlock;
     inIndentedCode = indentedCode;
@@ -1140,18 +1174,18 @@ export function withoutLeadingDirectionMarks(markdown: string): string {
     if (blank || code || endsBlock || htmlLine) {
       previousParagraph = undefined;
     } else if (startsBlock) {
-      // The content column of this line's own container, counted from the end of
-      // its quote markers: a plain paragraph carries no container machinery, so
-      // its content starts at the indent's end, while a list item's content
-      // starts after its marker and padding. A setext underline in the same
-      // container sits at that same indent; one at column zero under a list item
-      // is outside the item and is a paragraph line of its own.
+      // The content column of this line's own container, counted past its quote
+      // markers: a plain paragraph carries no container machinery, so its content
+      // starts at the indent's end, while a list item's content starts after its
+      // marker and padding. A setext underline in the same container sits at that
+      // same indent; one at column zero under a list item is outside the item and
+      // is a paragraph line of its own.
       previousParagraph = {
         depth: quotedDepth,
         indent:
           contentStart > 0
             ? columnAt(line, quoted + contentStart) - columnAt(line, quoted)
-            : container.indent,
+            : containerIndent,
       };
     }
     if (stripped !== line) {

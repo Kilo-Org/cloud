@@ -567,6 +567,36 @@ describe('withoutLeadingDirectionMarks', () => {
     expect(withoutLeadingDirectionMarks('<div>\n\n\u200FLatin text')).toBe('<div>\n\nLatin text');
   });
 
+  // A line can leave the container of a tag-kind HTML block and open another one
+  // of its own: `<div>` at quote depth zero ends the quote that held the block
+  // above it and opens a new block at the top level. A tag-kind block runs to the
+  // next blank line, so the line under the new `<div>` is that block's raw text —
+  // a `#` in front of it is part of the copy, not a heading — and its mark stays
+  // with the copy. Only the paragraph under the blank line that ends the block
+  // starts a block of its own.
+  it('keeps a mark in the tag-kind block a line opens as it leaves a block’s container', () => {
+    const text = '> <div>\n> text\n<div>\n\u200FLatin\n\n\u200FLatin after';
+    expect(withoutLeadingDirectionMarks(text)).toBe(
+      '> <div>\n> text\n<div>\n\u200FLatin\n\nLatin after'
+    );
+    const heading = '> <div>\n> text\n<div>\n# \u200FLatin\n\n\u200FLatin after';
+    expect(withoutLeadingDirectionMarks(heading)).toBe(
+      '> <div>\n> text\n<div>\n# \u200FLatin\n\nLatin after'
+    );
+  });
+
+  // A quote opened at a list item's content column sits inside that item, and a
+  // list item's content column does not move when a deeper quote opens in it: in
+  // `  > quoted` under `- item` the `>` stands at the item's own column two and
+  // the quote's text starts at column four. The blank line closes the quote while
+  // the item stays open, so the marked line below is a paragraph at two columns
+  // past the item's content start — paragraph text, not an indented code block
+  // past column zero — and its mark names that paragraph's edge.
+  it('holds a list item open through a quote opened inside it', () => {
+    const value = '- item\n  > quoted\n\n    \u200FLatin';
+    expect(withoutLeadingDirectionMarks(value)).toBe('- item\n  > quoted\n\n    Latin');
+  });
+
   // Only a known block tag, or one complete tag alone on its line, opens a
   // tag-kind block: an inline tag line is the paragraph's own text, a complete
   // tag cannot interrupt a paragraph, and a raw-text element's name belongs to

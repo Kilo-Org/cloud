@@ -43,9 +43,10 @@ function GroupsSkeleton() {
  * group and opens one to change it, which the server allows an owner or admin; a
  * plain member sees the groups their own policies come from, read-only. Deleting
  * lives in the group's form, so the list carries no per-row actions. Once the
- * organization holds `MAX_ORGANIZATION_GROUPS` groups the list states the cap and
- * the header drops its create action, so the app never offers a create the server
- * would refuse.
+ * organization holds `MAX_ORGANIZATION_GROUPS` groups, a role that can create —
+ * an owner or admin — sees the cap stated and loses the header's create action,
+ * so the app never offers a create the server would refuse; a billing manager
+ * sees neither, since it can neither create nor delete a group.
  */
 export function OrganizationGroupsScreen() {
   const router = useRouter();
@@ -71,7 +72,8 @@ export function OrganizationGroupsScreen() {
   const managerGroups = data?.access === 'manager' ? data.groups : null;
   const memberGroups = data?.access === 'member' ? data.groups : null;
   // The cap is one derived fact from the manager list: no create action and a
-  // stated cap once the organization already holds its last group.
+  // stated cap, for the role that can create, once the organization already
+  // holds its last group.
   const atGroupLimit = managerGroups !== null && managerGroups.length >= MAX_ORGANIZATION_GROUPS;
   const errorView = groupsQuery.isError ? selectOrgListErrorView(groupsQuery.error) : null;
   // A plan gate, a failed read, or an empty list is the whole surface; a member
@@ -147,12 +149,13 @@ export function OrganizationGroupsScreen() {
   } else {
     // The list is the only surface that knows the count, so it states the cap
     // that its own create action would hit, above the rows at the body's
-    // section gap: the reader learns why the header lost its `+` here.
+    // section gap: the reader who can create learns why the header lost its `+`
+    // here, and a reader who cannot gets no notice it could not act on.
     body = (
       <View className="gap-3">
-        {atGroupLimit ? (
+        {atGroupLimit && canManage ? (
           <Text variant="muted" testID="org-groups-limit">
-            {t('organization.groups.limitReached')}
+            {t('organization.groups.limitReached', { max: MAX_ORGANIZATION_GROUPS })}
           </Text>
         ) : null}
         <RowGroup>

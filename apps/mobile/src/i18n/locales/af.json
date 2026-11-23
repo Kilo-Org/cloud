@@ -3837,7 +3837,7 @@
       "emptyDescription": "'n Groep versamel lede sodat een beleid op almal toegepas kan word.",
       "emptyTitle": "Nog geen groepe nie",
       "enterpriseOnly": "Groepe is op die Enterprise-plan beskikbaar.",
-      "limitReached": "Hierdie organisasie het sy limiet van 100 groepe bereik. Skrap 'n groep voordat jy nog een skep.",
+      "limitReached": "Hierdie organisasie het sy limiet van {{max}} groepe bereik. Skrap 'n groep voordat jy nog een skep.",
       "memberCount": "{{displayCount}} lede",
       "memberCount_one": "{{displayCount}} lid",
       "memberCount_other": "{{displayCount}} lede",

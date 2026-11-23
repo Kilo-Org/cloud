@@ -3837,7 +3837,7 @@
       "emptyDescription": "گروه اعضا را گرد هم می‌آورد تا یک سیاست برای همه آن‌ها اعمال شود.",
       "emptyTitle": "هنوز گروهی وجود ندارد",
       "enterpriseOnly": "گروه‌ها در طرح Enterprise در دسترس هستند.",
-      "limitReached": "این سازمان به سقف ۱۰۰ گروه خود رسیده است. پیش از ایجاد گروه دیگر، یک گروه را حذف کنید.",
+      "limitReached": "این سازمان به سقف {{max}} گروه خود رسیده است. پیش از ایجاد گروه دیگر، یک گروه را حذف کنید.",
       "memberCount": "{{displayCount}} عضو",
       "memberCount_one": "{{displayCount}} عضو",
       "memberCount_other": "{{displayCount}} عضو",

@@ -3837,7 +3837,7 @@
       "emptyDescription": "Grupp koondab liikmed, et üks poliitika kehtiks neile kõigile.",
       "emptyTitle": "Gruppe veel pole",
       "enterpriseOnly": "Grupid on saadaval Enterprise'i paketis.",
-      "limitReached": "See organisatsioon on jõudnud 100 grupi piirini. Kustuta grupp enne uue loomist.",
+      "limitReached": "See organisatsioon on jõudnud {{max}} grupi piirini. Kustuta grupp enne uue loomist.",
       "memberCount": "Liikmeid: {{displayCount}}",
       "memberCount_one": "{{displayCount}} liige",
       "memberCount_other": "{{displayCount}} liiget",

@@ -498,7 +498,9 @@ describe('GroupForm create at the group cap', () => {
     };
   }
 
-  const limitCopy = i18n.t('organization.groups.limitReached');
+  const limitCopy = i18n.t('organization.groups.limitReached', {
+    max: MAX_ORGANIZATION_GROUPS,
+  });
 
   it('disables Save and states the cap', async () => {
     groupsQuery.data = managerList(MAX_ORGANIZATION_GROUPS);

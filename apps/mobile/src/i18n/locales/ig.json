@@ -3780,7 +3780,7 @@
       "emptyDescription": "Ìgwè na-achịkọta ndị otu ka otu atụmatụ wee metụta ha niile.",
       "emptyTitle": "Enwebeghị ìgwè",
       "enterpriseOnly": "Ìgwè dị na atụmatụ Enterprise.",
-      "limitReached": "Òtù nzukọ a erutela oke nke ìgwè 100. Hichapụ ìgwè tupu ịmepụta nke ọzọ.",
+      "limitReached": "Òtù nzukọ a erutela oke nke ìgwè {{max}}. Hichapụ ìgwè tupu ịmepụta nke ọzọ.",
       "memberCount": "Ndị otu {{displayCount}}",
       "memberCount_other": "Ndị otu {{displayCount}}",
       "memberViewEmpty": "Ị nọghị n'ìgwè ọ bụla nke òtù nzukọ a.",

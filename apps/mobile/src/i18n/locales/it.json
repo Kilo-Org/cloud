@@ -3909,7 +3909,7 @@
       "emptyDescription": "Un gruppo raccoglie membri in modo che una policy si applichi a tutti.",
       "emptyTitle": "Nessun gruppo per ora",
       "enterpriseOnly": "I gruppi sono disponibili con il piano Enterprise.",
-      "limitReached": "Questa organizzazione ha raggiunto il limite di 100 gruppi. Elimina un gruppo prima di crearne un altro.",
+      "limitReached": "Questa organizzazione ha raggiunto il limite di {{max}} gruppi. Elimina un gruppo prima di crearne un altro.",
       "memberCount": "Membri: {{displayCount}}",
       "memberCount_many": "{{displayCount}} di membri",
       "memberCount_one": "{{displayCount}} membro",

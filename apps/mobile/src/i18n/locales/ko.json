@@ -3777,7 +3777,7 @@
       "emptyDescription": "그룹은 멤버를 모아 하나의 정책을 모든 멤버에게 적용할 수 있게 합니다.",
       "emptyTitle": "그룹이 아직 없습니다",
       "enterpriseOnly": "그룹은 엔터프라이즈 요금제에서 사용할 수 있습니다.",
-      "limitReached": "이 조직은 그룹 100개 한도에 도달했습니다. 새 그룹을 만들기 전에 기존 그룹을 삭제하세요.",
+      "limitReached": "이 조직은 그룹 {{max}}개 한도에 도달했습니다. 새 그룹을 만들기 전에 기존 그룹을 삭제하세요.",
       "memberCount": "멤버 {{displayCount}}명",
       "memberCount_other": "멤버 {{displayCount}}명",
       "memberViewEmpty": "이 조직의 어떤 그룹에도 속해 있지 않습니다.",

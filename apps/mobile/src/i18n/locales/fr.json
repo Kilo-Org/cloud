@@ -3909,7 +3909,7 @@
       "emptyDescription": "Un groupe rassemble des membres pour qu'une même politique s'applique à tous.",
       "emptyTitle": "Aucun groupe pour le moment",
       "enterpriseOnly": "Les groupes sont disponibles avec l'offre Enterprise.",
-      "limitReached": "Cette organisation a atteint sa limite de 100 groupes. Supprimez un groupe avant d'en créer un autre.",
+      "limitReached": "Cette organisation a atteint sa limite de {{max}} groupes. Supprimez un groupe avant d'en créer un autre.",
       "memberCount": "Membres : {{displayCount}}",
       "memberCount_many": "{{displayCount}} de membres",
       "memberCount_one": "{{displayCount}} membre",

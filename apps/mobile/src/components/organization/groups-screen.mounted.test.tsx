@@ -1,6 +1,7 @@
 // The Groups list is the surface that knows the count, so it is where the cap
 // has to show: at the organization's last group the header loses its `+` and
-// the list states the cap, and below it the action comes back.
+// the list states the cap, and below it the action comes back. A role that can
+// neither create nor delete — a billing manager — gets no cap notice at all.
 import { MAX_ORGANIZATION_GROUPS } from '@kilocode/app-shared/organizations';
 import { createElement, type ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -70,8 +71,9 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({ useOrgBoundary: () => h
 
 const mounted: RenderWithProvidersResult[] = [];
 
-/** Mount the screen over a manager list of `groupCount` groups. */
-async function renderScreen(groupCount: number) {
+/** Mount the screen over a manager list of `groupCount` groups, for `role`. */
+async function renderScreen(groupCount: number, role = 'owner') {
+  harness.boundary.role = role;
   harness.groupsQuery.data = {
     access: 'manager',
     groups: Array.from({ length: groupCount }, (_, index) => ({
@@ -107,7 +109,18 @@ describe('OrganizationGroupsScreen at the group cap', () => {
     const renderer = await renderScreen(MAX_ORGANIZATION_GROUPS);
 
     expect(renderer.root.findAllByType('IconButton')).toHaveLength(0);
-    expect(noticeText(renderer)).toBe(i18n.t('organization.groups.limitReached'));
+    expect(noticeText(renderer)).toBe(
+      i18n.t('organization.groups.limitReached', { max: MAX_ORGANIZATION_GROUPS })
+    );
+  });
+
+  // A billing manager can neither create nor delete a group, so the cap is not
+  // its problem to fix: the notice would name an action it cannot take.
+  it('shows no cap notice to a billing manager at the cap', async () => {
+    const renderer = await renderScreen(MAX_ORGANIZATION_GROUPS, 'billing_manager');
+
+    expect(renderer.root.findAllByType('IconButton')).toHaveLength(0);
+    expect(noticeText(renderer)).toBeUndefined();
   });
 
   it('keeps the create action and no notice below the cap', async () => {

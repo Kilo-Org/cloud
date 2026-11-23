@@ -3837,7 +3837,7 @@
       "emptyDescription": "Guruh a'zolarni jamlaydi, shunda bitta siyosat barchasiga qo‘llanadi.",
       "emptyTitle": "Hozircha guruhlar yo‘q",
       "enterpriseOnly": "Guruhlar Enterprise tarifida mavjud.",
-      "limitReached": "Bu tashkilot 100 ta guruh chegarasiga yetdi. Boshqa guruh yaratishdan oldin guruhni o‘chiring.",
+      "limitReached": "Bu tashkilot {{max}} ta guruh chegarasiga yetdi. Boshqa guruh yaratishdan oldin guruhni o‘chiring.",
       "memberCount": "{{displayCount}} a'zo",
       "memberCount_one": "{{displayCount}} a'zo",
       "memberCount_other": "{{displayCount}} a'zo",

@@ -3841,7 +3841,7 @@
       "emptyDescription": "Een groep verzamelt leden, zodat één beleid op allemaal van toepassing is.",
       "emptyTitle": "Nog geen groepen",
       "enterpriseOnly": "Groepen zijn beschikbaar in het Enterprise-abonnement.",
-      "limitReached": "Deze organisatie heeft de limiet van 100 groepen bereikt. Verwijder een groep voordat je een nieuwe aanmaakt.",
+      "limitReached": "Deze organisatie heeft de limiet van {{max}} groepen bereikt. Verwijder een groep voordat je een nieuwe aanmaakt.",
       "memberCount": "{{displayCount}} leden",
       "memberCount_one": "{{displayCount}} lid",
       "memberCount_other": "{{displayCount}} leden",

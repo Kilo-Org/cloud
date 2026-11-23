@@ -3905,7 +3905,7 @@
       "emptyDescription": "Grupa apvieno dalībniekus, lai viena politika attiektos uz visiem.",
       "emptyTitle": "Vēl nav grupu",
       "enterpriseOnly": "Grupas ir pieejamas Enterprise plānā.",
-      "limitReached": "Šī organizācija ir sasniegusi savu 100 grupu limitu. Dzēsiet grupu, pirms izveidojat citu.",
+      "limitReached": "Šī organizācija ir sasniegusi savu {{max}} grupu limitu. Dzēsiet grupu, pirms izveidojat citu.",
       "memberCount": "Dalībnieki: {{displayCount}}",
       "memberCount_one": "{{displayCount}} dalībnieks",
       "memberCount_other": "{{displayCount}} dalībnieki",

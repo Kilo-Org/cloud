@@ -490,7 +490,7 @@ function GroupFormBody({ organizationId, canManageBilling, group, draft }: Group
 
         {atGroupLimit ? (
           <Text variant="muted" testID="org-group-limit">
-            {t('organization.groups.limitReached')}
+            {t('organization.groups.limitReached', { max: MAX_ORGANIZATION_GROUPS })}
           </Text>
         ) : null}
         <OrgFormActions

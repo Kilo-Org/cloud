@@ -3837,7 +3837,7 @@
       "emptyDescription": "Qrup üzvləri bir araya gətirir ki, bir siyasət onların hamısına tətbiq edilsin.",
       "emptyTitle": "Hələ qrup yoxdur",
       "enterpriseOnly": "Qruplar Enterprise planında əlçatandır.",
-      "limitReached": "Bu təşkilat 100 qrup limitinə çatıb. Başqa bir qrup yaratmazdan əvvəl qrupu sil.",
+      "limitReached": "Bu təşkilat {{max}} qrup limitinə çatıb. Başqa bir qrup yaratmazdan əvvəl qrupu sil.",
       "memberCount": "{{displayCount}} üzv",
       "memberCount_one": "{{displayCount}} üzv",
       "memberCount_other": "{{displayCount}} üzv",

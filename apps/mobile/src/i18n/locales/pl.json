@@ -3977,7 +3977,7 @@
       "emptyDescription": "Grupa gromadzi członków, aby jedna zasada obejmowała ich wszystkich.",
       "emptyTitle": "Brak grup",
       "enterpriseOnly": "Grupy są dostępne w planie Enterprise.",
-      "limitReached": "Ta organizacja osiągnęła swój limit 100 grup. Usuń grupę przed utworzeniem kolejnej.",
+      "limitReached": "Ta organizacja osiągnęła swój limit {{max}} grup. Usuń grupę przed utworzeniem kolejnej.",
       "memberCount": "Członkowie: {{displayCount}}",
       "memberCount_few": "{{displayCount}} członków",
       "memberCount_many": "{{displayCount}} członków",

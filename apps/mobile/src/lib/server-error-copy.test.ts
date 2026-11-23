@@ -50,7 +50,9 @@ describe('knownServerErrorMessage', () => {
   it('explains a group create refused at the organization cap', () => {
     const atCap = makeError('BAD_REQUEST', ORGANIZATION_GROUP_LIMIT_MESSAGE);
     expect(knownServerErrorCopyKey(atCap)).toBe('organization.groups.limitReached');
-    expect(knownServerErrorMessage(atCap)).toBe(i18n.t('organization.groups.limitReached'));
+    expect(knownServerErrorMessage(atCap)).toBe(
+      i18n.t('organization.groups.limitReached', { max: MAX_ORGANIZATION_GROUPS })
+    );
   });
 
   // The client shows the cap beside the same sentence the server refuses with,
@@ -235,7 +237,7 @@ describe('organizationErrorMessage', () => {
   it('names the group cap for a refused group create', () => {
     expect(
       organizationErrorMessage(makeError('BAD_REQUEST', ORGANIZATION_GROUP_LIMIT_MESSAGE))
-    ).toBe(i18n.t('organization.groups.limitReached'));
+    ).toBe(i18n.t('organization.groups.limitReached', { max: MAX_ORGANIZATION_GROUPS }));
   });
 
   it('never shows an unexplained server sentence', () => {

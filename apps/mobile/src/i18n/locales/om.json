@@ -3837,7 +3837,7 @@
       "emptyDescription": "Gareen miseensota walitti qaba, imaammatni tokko hunda isaaniif hojiirra ooluu akka danda'uuf.",
       "emptyTitle": "Gareewwan amma hin jiran",
       "enterpriseOnly": "Gareewwan karoora Enterprise irratti ni argamu.",
-      "limitReached": "Dhaabbanni kun daangaa gareewwan 100 isaa gaheera. Garee haaraa uumuu dura garee balleessi.",
+      "limitReached": "Dhaabbanni kun daangaa gareewwan {{max}} isaa gaheera. Garee haaraa uumuu dura garee balleessi.",
       "memberCount": "Miseensoota {{displayCount}}",
       "memberCount_one": "Miseensa {{displayCount}}",
       "memberCount_other": "Miseensoota {{displayCount}}",

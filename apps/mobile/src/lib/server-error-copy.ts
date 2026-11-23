@@ -12,6 +12,7 @@ import {
   SLACK_DISCONNECT_UNCONFIRMED_MESSAGE,
 } from '@kilocode/app-shared/integrations-errors';
 import {
+  MAX_ORGANIZATION_GROUPS,
   ORGANIZATION_GROUP_LIMIT_MESSAGE,
   ORGANIZATION_INVITE_SEAT_LIMIT_REACHED,
 } from '@kilocode/app-shared/organizations';
@@ -179,6 +180,13 @@ function copyKeyFor(
   }
 }
 
+// The cap sentence interpolates the same number the server enforces.
+function copyValuesFor(key: string): Record<string, string> | undefined {
+  return key === 'organization.groups.limitReached'
+    ? { max: String(MAX_ORGANIZATION_GROUPS) }
+    : undefined;
+}
+
 /**
  * The catalog key for a server sentence the app explains, or `null` when it has
  * none. Surfaces that persist a failure (or re-translate it after a language
@@ -216,7 +224,7 @@ export function knownServerErrorMessage(
   billingStep: TrialRefusalBillingStep = 'offered'
 ): string | null {
   const key = knownServerErrorCopyKey(error, canManageBilling, billingStep);
-  return key == null ? null : i18n.t(key);
+  return key == null ? null : i18n.t(key, copyValuesFor(key));
 }
 
 /**

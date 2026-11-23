@@ -4041,7 +4041,7 @@
       "emptyDescription": "Cruinníonn grúpa baill ionas gur féidir beartas amháin a chur i bhfeidhm orthu go léir.",
       "emptyTitle": "Níl aon ghrúpa ann fós",
       "enterpriseOnly": "Tá grúpaí ar fáil ar an bplean Enterprise.",
-      "limitReached": "Tá a teorainn de 100 grúpa sroichte ag an eagraíocht seo. Scrios grúpa sula gcruthaíonn tú ceann eile.",
+      "limitReached": "Tá a teorainn de {{max}} grúpa sroichte ag an eagraíocht seo. Scrios grúpa sula gcruthaíonn tú ceann eile.",
       "memberCount": "{{displayCount}} ball",
       "memberCount_few": "{{displayCount}} bhall",
       "memberCount_many": "{{displayCount}} mball",

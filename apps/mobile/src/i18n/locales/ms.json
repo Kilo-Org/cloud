@@ -3776,7 +3776,7 @@
       "emptyDescription": "Kumpulan menghimpunkan ahli supaya satu dasar boleh digunakan kepada semua ahli.",
       "emptyTitle": "Belum ada kumpulan",
       "enterpriseOnly": "Kumpulan tersedia pada pelan Enterprise.",
-      "limitReached": "Organisasi ini telah mencapai had 100 kumpulan. Padam kumpulan sebelum mencipta kumpulan lain.",
+      "limitReached": "Organisasi ini telah mencapai had {{max}} kumpulan. Padam kumpulan sebelum mencipta kumpulan lain.",
       "memberCount": "{{displayCount}} ahli",
       "memberCount_other": "{{displayCount}} ahli",
       "memberViewEmpty": "Anda tidak berada dalam mana-mana kumpulan organisasi ini.",

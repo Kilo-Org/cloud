@@ -3837,7 +3837,7 @@
       "emptyDescription": "A csoport tagokat fog össze, hogy egy szabályzat vonatkozhasson mindannyiukra.",
       "emptyTitle": "Még nincsenek csoportok",
       "enterpriseOnly": "A csoportok az Enterprise csomagban érhetők el.",
-      "limitReached": "Ez a szervezet elérte a 100 csoportos korlátját. Töröljön egy csoportot, mielőtt újat hoz létre.",
+      "limitReached": "Ez a szervezet elérte a {{max}} csoportos korlátját. Töröljön egy csoportot, mielőtt újat hoz létre.",
       "memberCount": "{{displayCount}} tag",
       "memberCount_one": "{{displayCount}} tag",
       "memberCount_other": "{{displayCount}} tag",

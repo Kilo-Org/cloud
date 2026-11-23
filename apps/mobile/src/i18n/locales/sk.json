@@ -3973,7 +3973,7 @@
       "emptyDescription": "Skupina združuje členov, aby sa na všetkých vzťahovala jedna zásada.",
       "emptyTitle": "Zatiaľ žiadne skupiny",
       "enterpriseOnly": "Skupiny sú dostupné v pláne Enterprise.",
-      "limitReached": "Táto organizácia dosiahla svoj limit 100 skupín. Odstráňte skupinu pred vytvorením ďalšej.",
+      "limitReached": "Táto organizácia dosiahla svoj limit {{max}} skupín. Odstráňte skupinu pred vytvorením ďalšej.",
       "memberCount": "Počet členov: {{displayCount}}",
       "memberCount_few": "{{displayCount}} členovia",
       "memberCount_many": "{{displayCount}} člena",

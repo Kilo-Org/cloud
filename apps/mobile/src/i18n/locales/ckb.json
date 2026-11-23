@@ -3837,7 +3837,7 @@
       "emptyDescription": "گرووپ ئەندامەکان کۆدەکاتەوە تا یەک سیاسەت بۆ هەموویان جێبەجێ بکرێت.",
       "emptyTitle": "هێشتا هیچ گرووپ نییە",
       "enterpriseOnly": "گرووپەکان لە پلانی Enterprise بەردەستن.",
-      "limitReached": "ئەم ڕێکخراوە گەیشتووەتە سنووری 100 گرووپ. پێش دروستکردنی گرووپێکی تر، گرووپێک بسڕەوە.",
+      "limitReached": "ئەم ڕێکخراوە گەیشتووەتە سنووری {{max}} گرووپ. پێش دروستکردنی گرووپێکی تر، گرووپێک بسڕەوە.",
       "memberCount": "{{displayCount}} ئەندام",
       "memberCount_one": "{{displayCount}} ئەندام",
       "memberCount_other": "{{displayCount}} ئەندام",

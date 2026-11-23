@@ -3837,7 +3837,7 @@
       "emptyDescription": "Yon gwoup rasanble manm pou yon sèl politik ka aplike sou tout moun.",
       "emptyTitle": "Poko gen gwoup",
       "enterpriseOnly": "Gwoup disponib nan plan Enterprise la.",
-      "limitReached": "Òganizasyon sa a rive nan limit li ki se 100 gwoup. Efase gwoup anvan ou kreye yon lòt.",
+      "limitReached": "Òganizasyon sa a rive nan limit li ki se {{max}} gwoup. Efase gwoup anvan ou kreye yon lòt.",
       "memberCount": "{{displayCount}} manm",
       "memberCount_one": "{{displayCount}} manm",
       "memberCount_other": "{{displayCount}} manm",

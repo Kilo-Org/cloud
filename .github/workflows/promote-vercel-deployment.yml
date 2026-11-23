@@ -86,7 +86,10 @@ jobs:
           "$VERCEL_CLI_PREFIX/bin/vercel" --version
 
       - name: Promote Vercel deployment
-        run: vercel promote "${{ inputs.deployment_url }}" --scope=kilocode --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          DEPLOYMENT_URL: ${{ inputs.deployment_url }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: vercel promote "$DEPLOYMENT_URL" --scope=kilocode --token="$VERCEL_TOKEN"
 
       - name: Annotate production deployment in Axiom
         if: inputs.axiom_annotation_dataset != ''

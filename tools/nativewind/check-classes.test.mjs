@@ -4,6 +4,7 @@ import { createRequire } from 'node:module';
 import {
   chmodSync,
   copyFileSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -17,7 +18,15 @@ import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { pathToFileURL } from 'node:url';
 
-import { LAYOUT_RULES, checkParsedFile, layoutFindingText } from './check-classes.mjs';
+import {
+  LAYOUT_RULES,
+  RAW_TEXT_EXEMPT,
+  SHEET_ALLOWLIST,
+  TITLE_CONTENT_ALLOWLIST,
+  WIDGET_PROCESS_LAYOUTS,
+  checkParsedFile,
+  layoutFindingText,
+} from './check-classes.mjs';
 import { parseSourceEntry } from '../lib/source-files.mjs';
 
 // The rule cases read the repository's own files: the checker resolves the app's
@@ -2537,4 +2546,234 @@ test('run writes and reads the baseline through its injected seams', async conte
     () => readFileSync(join(root, 'tools/nativewind/layout-baseline.json'), 'utf8'),
     /ENOENT/
   );
+});
+
+test('derives every exemption set from the app base', () => {
+  // A set that spells its entries repo-relative stops matching the moment the
+  // app root moves, and the rule it guards goes silent instead of failing. Each
+  // entry is therefore relative to `APP_RELATIVE` and names a file that exists.
+  const sets = {
+    RAW_TEXT_EXEMPT,
+    WIDGET_PROCESS_LAYOUTS,
+    TITLE_CONTENT_ALLOWLIST,
+    SHEET_ALLOWLIST,
+  };
+  for (const [name, set] of Object.entries(sets)) {
+    assert.ok(set.size > 0, `${name} is empty`);
+    for (const entry of set) {
+      assert.ok(entry.startsWith('src/'), `${name} entry ${entry} is not relative to the app base`);
+      assert.ok(!entry.includes('apps/mobile'), `${name} entry ${entry} spells the repo path`);
+      assert.ok(existsSync(join(MOBILE_ROOT, entry)), `${name} entry ${entry} names no file`);
+    }
+  }
+  // The glanceable tree keeps one spelling across the layout trees and the Intl
+  // exemption set.
+  assert.ok(
+    [...WIDGET_PROCESS_LAYOUTS].some(entry => entry.startsWith('src/glanceable-ios/')),
+    'the widget set spells the glanceable tree the way the layout exemptions do'
+  );
+});
+
+test('does not accept a nested sheet header reached inside a local component', () => {
+  // The outer sheet's own body is a local component. The header that component
+  // draws belongs to the sheet it nests, so the outer sheet still has no header
+  // of its own; the nesting rule has to hold across the component boundary.
+  const found = layoutProblems(
+    SCREEN_FILE,
+    "import { Sheet } from '@/components/ui/sheet';\n" +
+      'function Body() {\n' +
+      '  return (\n' +
+      '    <Sheet visible={other} onClose={onClose}>\n' +
+      '      <SheetHeader title="Advanced" onDone={onClose} />\n' +
+      '    </Sheet>\n' +
+      '  );\n' +
+      '}\n' +
+      'export function Screen() {\n' +
+      '  return (\n' +
+      '    <Sheet visible onClose={onClose}>\n' +
+      '      <Body />\n' +
+      '    </Sheet>\n' +
+      '  );\n' +
+      '}'
+  );
+  assert.equal(found.length, 1);
+  assert.match(found[0], /screen\.tsx:11: \[L11\] "<Sheet>"/);
+  // The positive control: the same component drawing the header outside any
+  // nested sheet is the outer sheet's header.
+  assert.deepEqual(
+    layoutProblems(
+      SCREEN_FILE,
+      "import { Sheet } from '@/components/ui/sheet';\n" +
+        'function Body() {\n' +
+        '  return <SheetHeader title="Advanced" onDone={onClose} />;\n' +
+        '}\n' +
+        'export function Screen() {\n' +
+        '  return (\n' +
+        '    <Sheet visible onClose={onClose}>\n' +
+        '      <Body />\n' +
+        '    </Sheet>\n' +
+        '  );\n' +
+        '}'
+    ),
+    []
+  );
+});
+
+test('terminates on local components that render each other', () => {
+  // Two local components render each other, so following the sheet's body into
+  // them has no end: the header search has to terminate, and neither component
+  // draws a header, so the sheet is still reported as one without a header.
+  const found = layoutProblems(
+    SCREEN_FILE,
+    "import { Sheet } from '@/components/ui/sheet';\n" +
+      '// A and B render each other; neither draws a header.\n' +
+      'function A() {\n' +
+      '  return <B />;\n' +
+      '}\n' +
+      'function B() {\n' +
+      '  return <A />;\n' +
+      '}\n' +
+      'export function Screen() {\n' +
+      '  return (\n' +
+      '    <Sheet visible onClose={onClose}>\n' +
+      '      <A />\n' +
+      '    </Sheet>\n' +
+      '  );\n' +
+      '}'
+  );
+  assert.equal(found.length, 1);
+  assert.match(found[0], /screen\.tsx:11: \[L11\] "<Sheet>"/);
+  // The positive control: the same cycle, with one component drawing the header
+  // beside the cycle, is the sheet's own header.
+  assert.deepEqual(
+    layoutProblems(
+      SCREEN_FILE,
+      "import { Sheet } from '@/components/ui/sheet';\n" +
+        '// The cycle from A still reaches the header B draws.\n' +
+        'function A() {\n' +
+        '  return <B />;\n' +
+        '}\n' +
+        'function B() {\n' +
+        '  return (\n' +
+        '    <>\n' +
+        '      <A />\n' +
+        '      <SheetHeader title="Advanced" onDone={onClose} />\n' +
+        '    </>\n' +
+        '  );\n' +
+        '}\n' +
+        'export function Screen() {\n' +
+        '  return (\n' +
+        '    <Sheet visible onClose={onClose}>\n' +
+        '      <A />\n' +
+        '    </Sheet>\n' +
+        '  );\n' +
+        '}'
+    ),
+    []
+  );
+});
+
+test('does not reuse a header answer earned through a dropped cycle edge', () => {
+  // A reads B, then C, and C draws the header; B reads A, so the walk from B is
+  // cut at A. That cut made B's own walk stop short, and the second sheet reads
+  // B: a memo entry for B written from the cut walk would report that sheet as
+  // headerless, even though B reaches C's header through A.
+  assert.deepEqual(
+    layoutProblems(
+      SCREEN_FILE,
+      "import { Sheet } from '@/components/ui/sheet';\n" +
+        'function A() {\n' +
+        '  return (\n' +
+        '    <>\n' +
+        '      <B />\n' +
+        '      <C />\n' +
+        '    </>\n' +
+        '  );\n' +
+        '}\n' +
+        'function B() {\n' +
+        '  return <A />;\n' +
+        '}\n' +
+        'function C() {\n' +
+        '  return <SheetHeader title="Advanced" onDone={onClose} />;\n' +
+        '}\n' +
+        'export function Screen() {\n' +
+        '  return (\n' +
+        '    <>\n' +
+        '      <Sheet visible onClose={onClose}>\n' +
+        '        <A />\n' +
+        '      </Sheet>\n' +
+        '      <Sheet visible onClose={onClose}>\n' +
+        '        <B />\n' +
+        '      </Sheet>\n' +
+        '    </>\n' +
+        '  );\n' +
+        '}'
+    ),
+    []
+  );
+});
+
+test('reports a malformed theme seam instead of throwing', async context => {
+  // The seam has one shape. A reader that supplies neither the tokens nor a
+  // failure used to escape out of the first rule that read it, as a TypeError,
+  // instead of reaching the report; each malformed shape is now one instrument
+  // problem naming the seam.
+  const root = makeFixture(context, {
+    'apps/mobile/src/screen.tsx': screen('<View />'),
+  });
+  const { run } = await import(
+    pathToFileURL(join(root, 'tools/nativewind/check-classes.mjs')).href
+  );
+  // An array, not a plain object: `isPlainObject` rejects both, and an array is
+  // the shape whose diagnostic actually goes through `JSON.stringify`, which
+  // throws on the cycle.
+  const circular = [];
+  circular.push(circular);
+  const cases = [
+    [() => ({}), /theme read seam is malformed/],
+    [() => null, /theme read seam is malformed/],
+    // `JSON.stringify` throws on this pair, so the diagnostic names the type
+    // instead of escaping the run as a TypeError.
+    [() => 1n, /the theme read returned bigint/],
+    [() => circular, /the theme read returned object/],
+    [() => ({ tokens: [] }), /theme read seam is malformed/],
+    [() => ({ tokens: ['primary'], failure: 'boom' }), /boom/],
+  ];
+  const reports = [];
+  const originalError = console.error;
+  const originalLog = console.log;
+  const previousExitCode = process.exitCode;
+  let cleanExitCode;
+  try {
+    console.error = message => {
+      reports.push(String(message));
+    };
+    console.log = () => {};
+    for (const [readTheme, expected] of cases) {
+      reports.length = 0;
+      process.exitCode = undefined;
+      run({ readTheme, readBaseline: () => ({ baseline: {}, failure: null }) });
+      assert.equal(process.exitCode, 1);
+      const report = reports.join('\n');
+      assert.match(report, expected);
+      // A stack trace in the report means the seam escaped a rule rather than
+      // being reported as an instrument problem.
+      assert.doesNotMatch(report, /TypeError/);
+      assert.doesNotMatch(report, /\n\s+at /);
+    }
+    // The positive control: a well-formed read runs clean over the same tree.
+    reports.length = 0;
+    process.exitCode = undefined;
+    run({
+      readTheme: () => ({ tokens: ['primary'], failure: null }),
+      readBaseline: () => ({ baseline: {}, failure: null }),
+    });
+    cleanExitCode = process.exitCode;
+  } finally {
+    console.error = originalError;
+    console.log = originalLog;
+    process.exitCode = previousExitCode;
+  }
+  assert.notEqual(cleanExitCode, 1);
+  assert.deepEqual(reports, []);
 });

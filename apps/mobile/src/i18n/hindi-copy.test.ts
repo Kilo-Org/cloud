@@ -224,3 +224,51 @@ describe('Hindi PR-review retry, submit and organization copy', () => {
     expect(title).not.toMatch(/[.।]$/);
   });
 });
+
+describe('Hindi Code Reviewer detail, analytics and review memory copy', () => {
+  // findings: label rows keep the canonical colon label and no terminal mark,
+  // the ended label names the review with feminine agreement, the uncounted
+  // line must read correctly at 0 and 1, and the two review-memory sentences
+  // must name the reconnect remedy and Kilo's own analysis.
+  it('keeps the transcript rows as labels without a terminal danda', () => {
+    expect(i18n.t('codeReviewer.reviewDetail.errorWithMessage', { message: 'boom' })).toBe(
+      'त्रुटि: boom'
+    );
+    expect(i18n.t('codeReviewer.reviewDetail.sessionError', { error: 'boom' })).toBe(
+      'सत्र त्रुटि: boom'
+    );
+    expect(i18n.t('codeReviewer.reviewDetail.toolNameError', { name: 'grep' })).toBe(
+      'टूल: grep — त्रुटि'
+    );
+  });
+
+  it('names the review in the ended label', () => {
+    expect(i18n.t('codeReviewer.reviewDetail.reviewEnded')).toBe('समीक्षा समाप्त हुई');
+  });
+
+  it('keeps one label and clause shape for a zero, a one and a many count', () => {
+    for (const count of [0, 1, 2, 5]) {
+      const line = i18n.t('codeReviewer.analytics.trackedReviewsUncounted', {
+        count,
+        displayCount: String(count),
+        total: 9,
+        displayTotal: '9',
+      });
+      expect(line).toBe(
+        `गिनती में नहीं: संगठन की 9 पूरी हो चुकी समीक्षाओं में से ${count} में परिणाम कैप्चर नहीं हुआ था।`
+      );
+    }
+  });
+
+  it('tells the reader to reconnect GitHub with access, not a connection that has it', () => {
+    const line = i18n.t('codeReviewer.reviewMemory.changeRequestNoGitHubAccess');
+    expect(line).toContain('पहुंच के साथ GitHub को फिर से कनेक्ट करें');
+    expect(line).not.toContain('पहुंच वाले GitHub कनेक्शन');
+  });
+
+  it('makes Kilo the analyzer of maintainer replies', () => {
+    const line = i18n.t('codeReviewer.reviewMemory.noProposalsDescription');
+    expect(line).toContain('Kilo मेंटेनरों के जवाबों का विश्लेषण करता है');
+    expect(line).not.toContain('Kilo के मेंटेनर');
+  });
+});

@@ -116,8 +116,8 @@ export function assertNetworkSecretDestinations(
   );
   for (const [key, secret] of Object.entries(secrets)) {
     networkSecretKeySchema.parse(key);
-    networkSecretPolicySchema.parse(secret);
-    if (secret.allowedHosts.some(host => excluded.has(host))) {
+    const policy = networkSecretPolicySchema.parse(secret);
+    if (policy.allowedHosts.some(host => excluded.has(host))) {
       throw new NetworkSecretDestinationError();
     }
   }

@@ -3514,6 +3514,41 @@ describe('createSessionManager', () => {
       expect(clearPendingSendConfirmation).toHaveBeenCalledWith(kiloId('ses-1'), messageId);
     });
 
+    it('withdraws the restored text when the confirmed row arrived before the failure settled', async () => {
+      // The message reached the server while the answer was lost. By the time
+      // the rejection is classified the confirmed row is in storage, so the send
+      // counts as delivered, and the text the composer restored on its own
+      // rejection is that message: the delivery is published so it withdraws.
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSession.send.mockImplementationOnce(async input => {
+        if (input.messageId === undefined) throw new Error('send carries no id');
+        mockSession.storage?.upsertMessage(
+          stubUserMessage({
+            id: input.messageId,
+            sessionID: kiloId('ses-1'),
+            time: { created: 1 },
+            agent: 'test-agent',
+            model: { providerID: 'test-provider', modelID: 'test-model' },
+          })
+        );
+        throw new Error('ECONNRESET');
+      });
+
+      await expect(
+        mgr.send({ payload: { type: 'prompt', prompt: 'Delivered while the answer was lost' } })
+      ).resolves.toBe(true);
+
+      const sentId = mockSession.send.mock.calls[0][0].messageId;
+      if (sentId === undefined) throw new Error('send carries no id');
+      expect(atomValue(config.store, mgr.atoms.deliveredFailedPrompt)).toEqual({
+        messageId: sentId,
+        text: 'Delivered while the answer was lost',
+        sequence: 1,
+      });
+    });
+
     it('keeps a refused command draft across session switches without pending confirmation', async () => {
       const persistPendingSendConfirmation = jest.fn();
       const config = createMockConfig({ persistPendingSendConfirmation });

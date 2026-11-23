@@ -2459,6 +2459,7 @@
       "modelMissingToStart": "Vyberte model, aby ste mohli začať.",
       "staleRepositoryToStart": "Vybraný repozitár už nie je dostupný. Znova vyberte repozitár, aby ste mohli začať.",
       "modelNeedsCreditsToStart": "Tento model potrebuje kredity. Vyberte model zadarmo, aby ste mohli začať.",
+      "modelNeedsCreditsPinnedToStart": "Model tohto agenta potrebuje kredity. Doplňte kredity alebo vyberte iného agenta.",
       "eligibility": {
         "limitedTitle": "Dostupné modely zadarmo",
         "balance": "Tvoj zostatok je {{amount}}. Modely zadarmo sú stále dostupné.",

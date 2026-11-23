@@ -1799,6 +1799,7 @@
       "modelMissingToStart": "Wähle ein Modell aus, um zu starten.",
       "staleRepositoryToStart": "Das ausgewählte Repository ist nicht mehr verfügbar. Wähle erneut ein Repository aus, um zu starten.",
       "modelNeedsCreditsToStart": "Dieses Modell benötigt Guthaben. Wähle ein kostenloses Modell aus, um zu starten.",
+      "modelNeedsCreditsPinnedToStart": "Das Modell dieses Agenten benötigt Guthaben. Lade Guthaben auf oder wähle einen anderen Agenten aus.",
       "eligibility": {
         "limitedTitle": "Kostenlose Modelle verfügbar",
         "balance": "Dein Guthaben beträgt {{amount}}. Kostenlose Modelle sind weiterhin verfügbar.",

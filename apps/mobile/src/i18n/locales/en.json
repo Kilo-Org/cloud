@@ -2463,6 +2463,7 @@
       "modelMissingToStart": "Pick a model to start.",
       "staleRepositoryToStart": "The selected repository is no longer available. Pick a repository again to start.",
       "modelNeedsCreditsToStart": "This model needs credits. Pick a free model to start.",
+      "modelNeedsCreditsPinnedToStart": "This agent's model needs credits. Add credits or choose another agent.",
       "eligibility": {
         "limitedTitle": "Free models available",
         "balance": "Your balance is {{amount}}. Free models are still available.",

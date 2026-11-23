@@ -23,7 +23,6 @@ type CloudAgentEligibilityNoticeProps = {
   organizationId: string | undefined;
   /** Runs the eligibility read again, for the state where it failed. */
   onRetry: () => void;
-  isRetrying: boolean;
   /** Spacing owned by the caller; the notice keeps its own geometry. */
   className?: string;
 };
@@ -48,7 +47,6 @@ export function CloudAgentEligibilityNotice({
   state,
   organizationId,
   onRetry,
-  isRetrying,
   className,
 }: Readonly<CloudAgentEligibilityNoticeProps>) {
   const { t } = useTranslation();
@@ -61,7 +59,9 @@ export function CloudAgentEligibilityNotice({
 
   if (state.kind === 'failed') {
     // No tint: the read failed in the background and Start stays available, so
-    // this is a line about a check that did not run, not a refusal.
+    // this is a line about a check that did not run, not a refusal. The line
+    // stays up while its own retry runs, because the failure is what the person
+    // is answering.
     return (
       <View
         testID="cloud-agent-eligibility-notice"
@@ -72,10 +72,10 @@ export function CloudAgentEligibilityNotice({
         </Text>
         <Pressable
           onPress={onRetry}
-          disabled={isRetrying}
+          disabled={state.isRetrying}
           accessibilityRole="button"
           accessibilityLabel={t('common.retry')}
-          accessibilityState={{ disabled: isRetrying }}
+          accessibilityState={{ disabled: state.isRetrying }}
           // The row is only as tall as its text, and React Native clips hit slop
           // to the parent's bounds, so the control carries the app's 48 dp floor
           // itself — the shape the analysis capacity notice uses.

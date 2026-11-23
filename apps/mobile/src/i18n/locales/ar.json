@@ -1891,6 +1891,7 @@
       "modelMissingToStart": "اختر نموذجًا للبدء.",
       "staleRepositoryToStart": "المستودع المحدد لم يعد متاحًا. اختر مستودعًا مرة أخرى للبدء.",
       "modelNeedsCreditsToStart": "هذا النموذج يحتاج إلى رصيد. اختر نموذجًا مجانيًا للبدء.",
+      "modelNeedsCreditsPinnedToStart": "نموذج هذا الوكيل يحتاج إلى رصيد. اشحن الرصيد أو اختر وكيلًا آخر.",
       "eligibility": {
         "limitedTitle": "النماذج المجانية متاحة",
         "balance": "رصيدك هو {{amount}}. ما زالت النماذج المجانية متاحة.",

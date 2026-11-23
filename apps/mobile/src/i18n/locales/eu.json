@@ -2361,6 +2361,7 @@
       "modelMissingToStart": "Hautatu modelo bat hasteko.",
       "staleRepositoryToStart": "Hautatutako biltegia ez dago erabilgarri orain. Hautatu berriro biltegi bat hasteko.",
       "modelNeedsCreditsToStart": "Modelo honek kredituak behar ditu. Hautatu doako modelo bat hasteko.",
+      "modelNeedsCreditsPinnedToStart": "Agente honen modeloak kredituak behar ditu. Gehitu kredituak edo hautatu beste agente bat.",
       "eligibility": {
         "limitedTitle": "Doako modeloak eskuragarri",
         "balance": "Zure saldoa {{amount}} da. Doako modeloak oraindik ere eskuragarri daude.",

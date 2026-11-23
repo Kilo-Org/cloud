@@ -2459,6 +2459,7 @@
       "modelMissingToStart": "Norėdami pradėti, pasirinkite modelį.",
       "staleRepositoryToStart": "Pasirinktos saugyklos nebepasiekiama. Norėdami pradėti, dar kartą pasirinkite saugyklą.",
       "modelNeedsCreditsToStart": "Šiam modeliui reikia kreditų. Pasirinkite nemokamą modelį, kad pradėtumėte.",
+      "modelNeedsCreditsPinnedToStart": "Šio agento modeliui reikia kreditų. Papildykite kreditus arba pasirinkite kitą agentą.",
       "eligibility": {
         "limitedTitle": "Galimi nemokami modeliai",
         "balance": "Jūsų likutis yra {{amount}}. Nemokami modeliai vis dar galimi.",

@@ -2361,6 +2361,7 @@
       "modelMissingToStart": "ለመጀመር ሞዴል ይምረጡ።",
       "staleRepositoryToStart": "የተመረጠው ማከማቻ ከእንግዲህ አይገኝም። ለመጀመር እንደገና ማከማቻ ይምረጡ።",
       "modelNeedsCreditsToStart": "ይህ ሞዴል ክሬዲት ይፈልጋል። ለመጀመር ነፃ ሞዴል ይምረጡ።",
+      "modelNeedsCreditsPinnedToStart": "የዚህ ወኪል ሞዴል ክሬዲት ይፈልጋል። ክሬዲት ያክሉ ወይም ሌላ ወኪል ይምረጡ።",
       "eligibility": {
         "limitedTitle": "ነፃ ሞዴሎች ይገኛሉ",
         "balance": "ቀሪ ሂሳብዎ {{amount}} ነው። ነፃ ሞዴሎች አሁንም ይገኛሉ።",

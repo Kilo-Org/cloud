@@ -2317,6 +2317,7 @@
       "modelMissingToStart": "Pilih model untuk bermula.",
       "staleRepositoryToStart": "Repositori yang dipilih tidak lagi tersedia. Pilih repositori sekali lagi untuk bermula.",
       "modelNeedsCreditsToStart": "Model ini memerlukan kredit. Pilih model percuma untuk bermula.",
+      "modelNeedsCreditsPinnedToStart": "Model ejen ini memerlukan kredit. Tambah kredit atau pilih ejen lain.",
       "eligibility": {
         "limitedTitle": "Model percuma tersedia",
         "balance": "Baki anda ialah {{amount}}. Model percuma masih tersedia.",

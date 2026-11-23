@@ -2361,6 +2361,7 @@
       "modelMissingToStart": "Misafidiana modely hanombohana.",
       "staleRepositoryToStart": "Tsy azo ampiasaina intsony ny tahirin-kaody voafidy. Misafidiana tahirin-kaody indray hanombohana.",
       "modelNeedsCreditsToStart": "Mila kireditra ity modely ity. Misafidiana modely maimaimpoana hanombohana.",
+      "modelNeedsCreditsPinnedToStart": "Mila kireditra ny modely an'ity mpandraharaha ity. Ampio kireditra na misafidiana mpandraharaha hafa.",
       "eligibility": {
         "limitedTitle": "Misy modely maimaimpoana",
         "balance": "Ny ambim-bolinao dia {{amount}}. Mbola misy modely maimaimpoana.",

@@ -1799,6 +1799,7 @@
       "modelMissingToStart": "Başlamak için bir model seç.",
       "staleRepositoryToStart": "Seçilen depo artık kullanılamıyor. Başlamak için yeniden bir depo seç.",
       "modelNeedsCreditsToStart": "Bu model kredi gerektiriyor. Başlamak için ücretsiz bir model seç.",
+      "modelNeedsCreditsPinnedToStart": "Bu ajanın modeli kredi gerektiriyor. Kredi ekle veya başka bir ajan seç.",
       "eligibility": {
         "limitedTitle": "Ücretsiz modeller mevcut",
         "balance": "Bakiyen {{amount}}. Ücretsiz modeller hâlâ mevcut.",

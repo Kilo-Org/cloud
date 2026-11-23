@@ -1777,6 +1777,7 @@
       "modelMissingToStart": "시작하려면 모델을 선택하세요.",
       "staleRepositoryToStart": "선택한 저장소를 더 이상 사용할 수 없습니다. 시작하려면 저장소를 다시 선택하세요.",
       "modelNeedsCreditsToStart": "이 모델은 크레딧이 필요합니다. 시작하려면 무료 모델을 선택하세요.",
+      "modelNeedsCreditsPinnedToStart": "이 에이전트의 모델은 크레딧이 필요합니다. 크레딧을 충전하거나 다른 에이전트를 선택하세요.",
       "eligibility": {
         "limitedTitle": "무료 모델 사용 가능",
         "balance": "잔액은 {{amount}}입니다. 무료 모델은 여전히 사용할 수 있습니다.",

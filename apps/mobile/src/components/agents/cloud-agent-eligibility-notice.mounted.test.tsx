@@ -42,7 +42,6 @@ async function renderNotice(state: CloudAgentEligibilityState, organizationId?: 
         state,
         organizationId,
         onRetry: () => undefined,
-        isRetrying: false,
       })
     );
   });
@@ -96,7 +95,7 @@ describe('CloudAgentEligibilityNotice', () => {
   });
 
   it('states a failed read and offers its retry, without claiming a balance', async () => {
-    const renderer = await renderNotice({ kind: 'failed' });
+    const renderer = await renderNotice({ kind: 'failed', isRetrying: false });
 
     const text = textsOf(renderer);
     expect(text).toContain("Couldn't check your balance.");
@@ -111,6 +110,18 @@ describe('CloudAgentEligibilityNotice', () => {
     );
     expect(retry).toHaveLength(1);
     expect(retry[0]?.props.accessibilityLabel).toBe(i18n.t('common.retry'));
+  });
+
+  it('keeps the failed line up while its retry runs, with the control disabled', async () => {
+    const renderer = await renderNotice({ kind: 'failed', isRetrying: true });
+
+    expect(textsOf(renderer)).toContain("Couldn't check your balance.");
+    const retry = renderer.root.findAll(
+      node => (node.type as string) === 'Pressable' && node.props.accessibilityRole === 'button'
+    );
+    expect(retry).toHaveLength(1);
+    expect(retry[0]?.props.disabled).toBe(true);
+    expect(retry[0]?.props.accessibilityState).toEqual({ disabled: true });
   });
 
   it('announces the limited state as an alert, because it arrives after mount', async () => {

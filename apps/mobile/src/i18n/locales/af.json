@@ -2361,6 +2361,7 @@
       "modelMissingToStart": "Kies 'n model om te begin.",
       "staleRepositoryToStart": "Die gekose bewaarplek is nie meer beskikbaar nie. Kies weer 'n bewaarplek om te begin.",
       "modelNeedsCreditsToStart": "Hierdie model het krediete nodig. Kies 'n gratis model om te begin.",
+      "modelNeedsCreditsPinnedToStart": "Hierdie agent se model het krediete nodig. Voeg krediete by of kies 'n ander agent.",
       "eligibility": {
         "limitedTitle": "Gratis modelle beskikbaar",
         "balance": "Jou saldo is {{amount}}. Gratis modelle is steeds beskikbaar.",

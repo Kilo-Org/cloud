@@ -2557,6 +2557,7 @@
       "modelMissingToStart": "Dewiswch fodel i ddechrau.",
       "staleRepositoryToStart": "Nid yw'r ystorfa a ddewiswyd ar gael mwyach. Dewiswch ystorfa eto i ddechrau.",
       "modelNeedsCreditsToStart": "Mae angen credydau ar y model hwn. Dewiswch fodel am ddim i ddechrau.",
+      "modelNeedsCreditsPinnedToStart": "Mae angen credydau ar fodel yr asiant hwn. Ychwanegwch credydau neu ddewiswch asiant arall.",
       "eligibility": {
         "limitedTitle": "Modelau am ddim ar gael",
         "balance": "Eich balans yw {{amount}}. Mae modelau am ddim yn dal ar gael.",

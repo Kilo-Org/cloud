@@ -2361,6 +2361,7 @@
       "modelMissingToStart": "Zgjidh një model për të filluar.",
       "staleRepositoryToStart": "Depoja e zgjedhur nuk është më e disponueshme. Zgjidh përsëri një depo për të filluar.",
       "modelNeedsCreditsToStart": "Ky model kërkon kredite. Zgjidh një model falas për të filluar.",
+      "modelNeedsCreditsPinnedToStart": "Modeli i këtij agjenti kërkon kredite. Shto kredite ose zgjidh një agjent tjetër.",
       "eligibility": {
         "limitedTitle": "Modelet falas të disponueshme",
         "balance": "Gjendja jote është {{amount}}. Modelet falas janë ende të disponueshme.",

@@ -47,7 +47,7 @@ export function NewSessionEligibilityFixture({
   // the state a read that never answered draws.
   const eligibilityState: CloudAgentEligibilityState =
     state === 'unavailable'
-      ? { kind: 'failed' }
+      ? { kind: 'failed', isRetrying: false }
       : {
           kind: 'ready',
           eligibility: { balance: 0, minBalance: 1, accessLevel: 'limited', isEligible: false },
@@ -123,7 +123,6 @@ export function NewSessionEligibilityFixture({
             state={eligibilityState}
             organizationId={undefined}
             onRetry={noop}
-            isRetrying={false}
           />
         }
       />

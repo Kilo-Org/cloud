@@ -1811,6 +1811,7 @@
       "modelMissingToStart": "Selecione um modelo para começar.",
       "staleRepositoryToStart": "O repositório selecionado não está mais disponível. Selecione um repositório novamente para começar.",
       "modelNeedsCreditsToStart": "Este modelo precisa de créditos. Escolha um modelo grátis para começar.",
+      "modelNeedsCreditsPinnedToStart": "O modelo deste agente precisa de créditos. Adicione créditos ou escolha outro agente.",
       "eligibility": {
         "limitedTitle": "Modelos grátis disponíveis",
         "balance": "Seu saldo é de {{amount}}. Modelos grátis ainda estão disponíveis.",

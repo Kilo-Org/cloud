@@ -2361,6 +2361,7 @@
       "modelMissingToStart": "Vælg en model for at starte.",
       "staleRepositoryToStart": "Det valgte kodelager er ikke længere tilgængeligt. Vælg et kodelager igen for at starte.",
       "modelNeedsCreditsToStart": "Denne model kræver kreditter. Vælg en gratis model for at starte.",
+      "modelNeedsCreditsPinnedToStart": "Denne agents model kræver kreditter. Tilføj kreditter eller vælg en anden agent.",
       "eligibility": {
         "limitedTitle": "Gratis modeller tilgængelige",
         "balance": "Din saldo er {{amount}}. Gratis modeller er stadig tilgængelige.",

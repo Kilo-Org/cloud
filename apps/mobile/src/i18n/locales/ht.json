@@ -2361,6 +2361,7 @@
       "modelMissingToStart": "Chwazi yon modèl pou kòmanse.",
       "staleRepositoryToStart": "Depo ou chwazi a pa disponib ankò. Chwazi yon depo ankò pou kòmanse.",
       "modelNeedsCreditsToStart": "Modèl sa a bezwen kredi. Chwazi yon modèl gratis pou kòmanse.",
+      "modelNeedsCreditsPinnedToStart": "Modèl ajan sa a bezwen kredi. Ajoute kredi oswa chwazi yon lòt ajan.",
       "eligibility": {
         "limitedTitle": "Modèl gratis disponib",
         "balance": "Balans ou se {{amount}}. Modèl gratis yo toujou disponib.",

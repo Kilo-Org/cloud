@@ -2361,6 +2361,7 @@
       "modelMissingToStart": "Alustamiseks vali mudel.",
       "staleRepositoryToStart": "Valitud hoidla pole enam saadaval. Alustamiseks vali hoidla uuesti.",
       "modelNeedsCreditsToStart": "See mudel vajab krediiti. Alustamiseks vali tasuta mudel.",
+      "modelNeedsCreditsPinnedToStart": "Selle agendi mudel vajab krediiti. Lisa krediiti või vali teine agent.",
       "eligibility": {
         "limitedTitle": "Tasuta mudelid saadaval",
         "balance": "Sinu saldo on {{amount}}. Tasuta mudelid on endiselt saadaval.",

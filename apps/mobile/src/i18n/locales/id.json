@@ -1777,6 +1777,7 @@
       "modelMissingToStart": "Pilih model untuk memulai.",
       "staleRepositoryToStart": "Repositori yang dipilih tidak lagi tersedia. Pilih repositori lagi untuk memulai.",
       "modelNeedsCreditsToStart": "Model ini membutuhkan kredit. Pilih model gratis untuk memulai.",
+      "modelNeedsCreditsPinnedToStart": "Model agen ini membutuhkan kredit. Tambah kredit atau pilih agen lain.",
       "eligibility": {
         "limitedTitle": "Model gratis tersedia",
         "balance": "Saldomu adalah {{amount}}. Model gratis masih tersedia.",

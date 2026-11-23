@@ -2361,6 +2361,7 @@
       "modelMissingToStart": "Başlamaq üçün model seç.",
       "staleRepositoryToStart": "Seçilmiş repozitoriya artıq mövcud deyil. Başlamaq üçün yenidən repozitoriya seç.",
       "modelNeedsCreditsToStart": "Bu model üçün kredit lazımdır. Başlamaq üçün pulsuz model seç.",
+      "modelNeedsCreditsPinnedToStart": "Bu agentin modeli üçün kredit lazımdır. Kredit əlavə et və ya başqa agent seç.",
       "eligibility": {
         "limitedTitle": "Pulsuz modellər mövcuddur",
         "balance": "Balansınız: {{amount}}. Pulsuz modellər hələ də mövcuddur.",

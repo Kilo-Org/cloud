@@ -2410,6 +2410,7 @@
       "modelMissingToStart": "Odaberi model za početak.",
       "staleRepositoryToStart": "Odabrani repozitorij više nije dostupan. Ponovno odaberi repozitorij za početak.",
       "modelNeedsCreditsToStart": "Ovaj model treba kredite. Odaberi besplatan model za početak.",
+      "modelNeedsCreditsPinnedToStart": "Model ovog agenta treba kredite. Dodaj kredite ili odaberi drugog agenta.",
       "eligibility": {
         "limitedTitle": "Dostupni besplatni modeli",
         "balance": "Tvoj saldo je {{amount}}. Besplatni modeli su i dalje dostupni.",

@@ -18,7 +18,7 @@ const LIMITED: CloudAgentEligibilityState = {
   kind: 'ready',
   eligibility: { balance: 0.4, minBalance: 1, accessLevel: 'limited', isEligible: false },
 };
-const FAILED: CloudAgentEligibilityState = { kind: 'failed' };
+const FAILED: CloudAgentEligibilityState = { kind: 'failed', isRetrying: false };
 
 const MODELS = [
   { id: 'paid/model', isFree: false, hasUserByokAvailable: false },
@@ -31,7 +31,13 @@ const MODELS = [
 describe('resolveCloudAgentEligibilityState', () => {
   it('claims nothing while the read is pending', () => {
     expect(
-      resolveCloudAgentEligibilityState({ data: undefined, isPending: true, isError: false })
+      resolveCloudAgentEligibilityState({
+        data: undefined,
+        isPending: true,
+        isError: false,
+        isFetching: true,
+        failedBefore: false,
+      })
     ).toEqual(PENDING_ELIGIBILITY);
   });
 
@@ -40,14 +46,64 @@ describe('resolveCloudAgentEligibilityState', () => {
       data: LIMITED.eligibility,
       isPending: false,
       isError: false,
+      isFetching: false,
+      failedBefore: false,
     });
     expect(state).toEqual(LIMITED);
   });
 
   it('reports the failed read', () => {
     expect(
-      resolveCloudAgentEligibilityState({ data: undefined, isPending: false, isError: true })
+      resolveCloudAgentEligibilityState({
+        data: undefined,
+        isPending: false,
+        isError: true,
+        isFetching: false,
+        failedBefore: true,
+      })
     ).toEqual(FAILED);
+  });
+
+  it('keeps the failure visible while its own retry runs', () => {
+    // A refetch clears the query's error and turns its status back to pending
+    // (`fetchState` in @tanstack/query-core), so without the carried failure the
+    // line would vanish under the person who pressed Retry and the button's
+    // busy state could never paint.
+    expect(
+      resolveCloudAgentEligibilityState({
+        data: undefined,
+        isPending: true,
+        isError: false,
+        isFetching: true,
+        failedBefore: true,
+      })
+    ).toEqual({ kind: 'failed', isRetrying: true });
+  });
+
+  it('reports the retry as settled once it fails again', () => {
+    expect(
+      resolveCloudAgentEligibilityState({
+        data: undefined,
+        isPending: false,
+        isError: true,
+        isFetching: false,
+        failedBefore: true,
+      })
+    ).toEqual({ kind: 'failed', isRetrying: false });
+  });
+
+  it('claims nothing for a first load that has never failed', () => {
+    // The same pending, fetching shape as a retry, told apart only by the
+    // carried failure: a first read must not announce a failure it never had.
+    expect(
+      resolveCloudAgentEligibilityState({
+        data: undefined,
+        isPending: true,
+        isError: false,
+        isFetching: true,
+        failedBefore: false,
+      })
+    ).toEqual(PENDING_ELIGIBILITY);
   });
 
   it('keeps the last answer when a refetch fails over it', () => {
@@ -58,6 +114,8 @@ describe('resolveCloudAgentEligibilityState', () => {
         data: FULL.eligibility,
         isPending: false,
         isError: true,
+        isFetching: false,
+        failedBefore: true,
       })
     ).toEqual(FULL);
   });

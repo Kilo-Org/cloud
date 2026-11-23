@@ -2361,6 +2361,7 @@
       "modelMissingToStart": "Jalqabuuf moodela filadhu.",
       "staleRepositoryToStart": "Kuusaan koodii filatame amma hin argamu. Jalqabuuf irra deebi'ii kuusaa koodii filadhu.",
       "modelNeedsCreditsToStart": "Moodela kanaaf kiriiditii barbaachisa. Jalqabuuf moodela bilisa filadhu.",
+      "modelNeedsCreditsPinnedToStart": "Moodeela ergamaa kanaa kiriiditii barbaachisa. Kiriiditii dabali yookaan ergamaa biraa filadhu.",
       "eligibility": {
         "limitedTitle": "Moodeloonni bilisaa jiru",
         "balance": "Hafteen kee {{amount}} dha. Moodeloonni bilisaa ammallee jiru.",

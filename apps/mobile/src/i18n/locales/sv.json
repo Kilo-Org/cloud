@@ -2361,6 +2361,7 @@
       "modelMissingToStart": "Välj en modell för att starta.",
       "staleRepositoryToStart": "Det valda kodarkivet är inte längre tillgängligt. Välj ett kodarkiv igen för att starta.",
       "modelNeedsCreditsToStart": "Den här modellen kräver krediter. Välj en gratis modell för att starta.",
+      "modelNeedsCreditsPinnedToStart": "Den här agentens modell kräver krediter. Fyll på krediter eller välj en annan agent.",
       "eligibility": {
         "limitedTitle": "Gratis modeller tillgängliga",
         "balance": "Ditt saldo är {{amount}}. Gratis modeller är fortfarande tillgängliga.",

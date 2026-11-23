@@ -2361,6 +2361,7 @@
       "modelMissingToStart": "Boshlash uchun model tanlang.",
       "staleRepositoryToStart": "Tanlangan repozitoriya endi mavjud emas. Boshlash uchun repozitoriyani qaytadan tanlang.",
       "modelNeedsCreditsToStart": "Bu model uchun kreditlar kerak. Boshlash uchun bepul model tanlang.",
+      "modelNeedsCreditsPinnedToStart": "Bu agentning modeli uchun kreditlar kerak. Kreditlar qo'shing yoki boshqa agentni tanlang.",
       "eligibility": {
         "limitedTitle": "Bepul modellar mavjud",
         "balance": "Balansingiz {{amount}}. Bepul modellar hali ham mavjud.",

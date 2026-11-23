@@ -2361,6 +2361,7 @@
       "modelMissingToStart": "Khetha imodeli ukuze uqale.",
       "staleRepositoryToStart": "Inqolobane yekhodi ekhethiwe ayisatholakali. Khetha inqolobane yekhodi futhi ukuze uqale.",
       "modelNeedsCreditsToStart": "Le modeli idinga amakhredithi. Khetha imodeli yamahhala ukuze uqale.",
+      "modelNeedsCreditsPinnedToStart": "Imodeli yalomenzeli idinga amakhredithi. Engeza amakhredithi noma khetha omunye umenzeli.",
       "eligibility": {
         "limitedTitle": "Amamodeli amahhala ayatholakala",
         "balance": "Ibhalansi yakho ingu-{{amount}}. Amamodeli amahhala asatholakala.",

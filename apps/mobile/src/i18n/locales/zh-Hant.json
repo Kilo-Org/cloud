@@ -1778,6 +1778,7 @@
       "modelMissingToStart": "選取一個模型以開始。",
       "staleRepositoryToStart": "所選儲存庫已無法使用。請重新選取儲存庫以開始。",
       "modelNeedsCreditsToStart": "此模型需要點數。選取一個免費模型以開始。",
+      "modelNeedsCreditsPinnedToStart": "此代理的模型需要點數。加值點數或選取其他代理。",
       "eligibility": {
         "limitedTitle": "免費模型可用",
         "balance": "你的餘額為 {{amount}}。仍可使用免費模型。",

@@ -2322,6 +2322,7 @@
       "modelMissingToStart": "Yan awoṣe kan láti bẹ̀rẹ̀.",
       "staleRepositoryToStart": "Ibi ìpamọ́ kóòdù tí o yàn kò sí mọ́. Tun yan ibi ìpamọ́ kóòdù láti bẹ̀rẹ̀.",
       "modelNeedsCreditsToStart": "Awoṣe yìí nílò kirẹ́dítì. Yan awoṣe ọ̀fẹ́ kan láti bẹ̀rẹ̀.",
+      "modelNeedsCreditsPinnedToStart": "Awoṣe aṣoju yìí nílò kirẹ́dítì. Fi kirẹ́dítì kún un tàbí yan aṣoju mìíràn.",
       "eligibility": {
         "limitedTitle": "Àwọn awoṣe ọ̀fẹ́ wà",
         "balance": "Owó tó kù lọ́wọ́ rẹ jẹ́ {{amount}}. Àwọn awoṣe ọ̀fẹ́ ṣì wà.",

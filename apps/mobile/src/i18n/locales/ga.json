@@ -2508,6 +2508,7 @@
       "modelMissingToStart": "Roghnaigh samhail chun tosú.",
       "staleRepositoryToStart": "Níl an stór roghnaithe ar fáil a thuilleadh. Roghnaigh stór arís chun tosú.",
       "modelNeedsCreditsToStart": "Teastaíonn creidmheasanna ón tsamhail seo. Roghnaigh samhail shaor in aisce chun tosú.",
+      "modelNeedsCreditsPinnedToStart": "Teastaíonn creidmheasanna ó shamhail an ghníomhaire seo. Cuir creidmheasanna leis nó roghnaigh gníomhaire eile.",
       "eligibility": {
         "limitedTitle": "Samhlacha saora in aisce ar fáil",
         "balance": "Tá d'iarmhéid {{amount}}. Tá samhlacha saora in aisce ar fáil fós.",

@@ -2361,6 +2361,7 @@
       "modelMissingToStart": "Chagua modeli ili uanze.",
       "staleRepositoryToStart": "Hazina uliyochagua haipatikani tena. Chagua hazina tena ili uanze.",
       "modelNeedsCreditsToStart": "Modeli hii inahitaji salio. Chagua modeli ya bure ili uanze.",
+      "modelNeedsCreditsPinnedToStart": "Modeli ya wakala huyu inahitaji salio. Ongeza salio au chagua wakala mwingine.",
       "eligibility": {
         "limitedTitle": "Modeli za bure zinapatikana",
         "balance": "Salio lako ni {{amount}}. Modeli za bure bado zinapatikana.",

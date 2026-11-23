@@ -2,7 +2,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Keyboard, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { type Href, useLocalSearchParams, usePreventRemove, useRouter } from 'expo-router';
+import {
+  type Href,
+  useFocusEffect,
+  useLocalSearchParams,
+  usePreventRemove,
+  useRouter,
+} from 'expo-router';
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { type KiloSessionId, type RemoteModelOverride } from '@kilocode/cloud-agent-sdk';
@@ -536,12 +542,26 @@ export function NewSessionScreenBody() {
   const [environmentSheetOpen, setEnvironmentSheetOpen] = useState(false);
   const isCloudTarget = runOnInstance === null && !computerTargetSelected;
   // The Cloud Agent access answer for the account this session is created in.
-  // Only the ordinary Cloud Agent entry reads it: a computer target runs on the
-  // person's own machine and spends no Cloud Agent balance, and the clone entry
-  // has no composer or model picker to restrict.
+  // The computer target does not read it: it runs on the person's own machine
+  // and spends no Cloud Agent balance.
   const eligibility = useCloudAgentEligibility(organizationId);
   const eligibilityApplies = isCloudTarget && !isCloneEntry;
-  const handleEligibilityRetry = eligibility.retry;
+  const refetchEligibility = eligibility.refetch;
+  const handleEligibilityRetry = refetchEligibility;
+  // A return to this screen re-reads the balance: the credit purchase screen is
+  // another route, so buying credits and coming back is a route focus, not an
+  // app foreground, and the notice would otherwise describe the old balance.
+  // The first focus belongs to the mount's own read.
+  const eligibilityFocusedOnce = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      if (!eligibilityFocusedOnce.current) {
+        eligibilityFocusedOnce.current = true;
+        return;
+      }
+      refetchEligibility();
+    }, [refetchEligibility])
+  );
   const cloudEligibilityState = eligibilityApplies ? eligibility.state : PENDING_ELIGIBILITY;
   const allowedModelOptions = filterModelOptionsForLimitedAccess(
     modelView.options,
@@ -1397,9 +1417,14 @@ export function NewSessionScreenBody() {
     startBlockedReason = t('agentChat.newSession.modelMissingToStart');
   } else if (startBlockedReasonKey === 'model-needs-credits') {
     // The notice under the composer states the balance and offers the top-up;
-    // the footer names the one step that clears this gate without leaving the
-    // form, which is the pick of a free model.
-    startBlockedReason = t('agentChat.newSession.modelNeedsCreditsToStart');
+    // the footer names the step that clears this gate. A model pinned by the
+    // agent locks the picker, so asking for a free model pick there would name a
+    // control the person cannot use: the escape is another agent.
+    startBlockedReason = t(
+      !isRemoteTargetSelected && pinned.model
+        ? 'agentChat.newSession.modelNeedsCreditsPinnedToStart'
+        : 'agentChat.newSession.modelNeedsCreditsToStart'
+    );
   } else if (startBlockedReasonKey === 'stale-selection') {
     // The repository section already asked for a new pick; the footer says why
     // Start stayed disabled after a refresh dropped the selected row.
@@ -1609,7 +1634,6 @@ export function NewSessionScreenBody() {
               state={cloudEligibilityState}
               organizationId={organizationId}
               onRetry={handleEligibilityRetry}
-              isRetrying={eligibility.isRetrying}
             />
           ) : null
         }

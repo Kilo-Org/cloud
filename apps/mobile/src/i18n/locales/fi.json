@@ -2361,6 +2361,7 @@
       "modelMissingToStart": "Valitse malli aloittaaksesi.",
       "staleRepositoryToStart": "Valittu koodivarasto ei ole enää saatavilla. Valitse koodivarasto uudelleen aloittaaksesi.",
       "modelNeedsCreditsToStart": "Tämä malli tarvitsee krediittejä. Valitse ilmainen malli aloittaaksesi.",
+      "modelNeedsCreditsPinnedToStart": "Tämän agentin malli tarvitsee krediittejä. Lisää krediittejä tai valitse toinen agentti.",
       "eligibility": {
         "limitedTitle": "Ilmaiset mallit saatavilla",
         "balance": "Saldosi on {{amount}}. Ilmaisia malleja on edelleen saatavilla.",

@@ -1777,6 +1777,7 @@
       "modelMissingToStart": "開始するにはモデルを選択してください。",
       "staleRepositoryToStart": "選択したリポジトリは利用できなくなりました。開始するにはリポジトリをもう一度選択してください。",
       "modelNeedsCreditsToStart": "このモデルにはクレジットが必要です。開始するには無料のモデルを選択してください。",
+      "modelNeedsCreditsPinnedToStart": "このエージェントのモデルにはクレジットが必要です。クレジットを追加するか、別のエージェントを選択してください。",
       "eligibility": {
         "limitedTitle": "無料モデルが利用可能",
         "balance": "残高は{{amount}}です。無料モデルは引き続き利用できます。",

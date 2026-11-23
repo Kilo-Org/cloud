@@ -2361,6 +2361,7 @@
       "modelMissingToStart": "Veldu líkan til að byrja.",
       "staleRepositoryToStart": "Valið kóðasafn er ekki lengur tiltækt. Veldu kóðasafn aftur til að byrja.",
       "modelNeedsCreditsToStart": "Þetta líkan þarf inneign. Veldu ókeypis líkan til að byrja.",
+      "modelNeedsCreditsPinnedToStart": "Líkan þessa umboðsmanns þarf inneign. Bættu við inneign eða veldu annan umboðsmann.",
       "eligibility": {
         "limitedTitle": "Ókeypis líkön í boði",
         "balance": "Inneignin þín er {{amount}}. Ókeypis líkön eru enn í boði.",

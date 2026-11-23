@@ -2410,6 +2410,7 @@
       "modelMissingToStart": "Selecciona un model per començar.",
       "staleRepositoryToStart": "El repositori seleccionat ja no està disponible. Torna a seleccionar un repositori per començar.",
       "modelNeedsCreditsToStart": "Aquest model necessita crèdits. Selecciona un model gratuït per començar.",
+      "modelNeedsCreditsPinnedToStart": "El model d'aquest agent necessita crèdits. Afegeix crèdits o selecciona un altre agent.",
       "eligibility": {
         "limitedTitle": "Models gratuïts disponibles",
         "balance": "El teu saldo és {{amount}}. Els models gratuïts encara estan disponibles.",

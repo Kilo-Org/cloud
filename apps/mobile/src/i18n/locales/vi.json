@@ -1799,6 +1799,7 @@
       "modelMissingToStart": "Chọn một mô hình để bắt đầu.",
       "staleRepositoryToStart": "Kho mã đã chọn không còn khả dụng. Chọn lại một kho mã để bắt đầu.",
       "modelNeedsCreditsToStart": "Mô hình này cần số dư. Chọn một mô hình miễn phí để bắt đầu.",
+      "modelNeedsCreditsPinnedToStart": "Mô hình của tác nhân này cần số dư. Nạp tiền hoặc chọn tác nhân khác.",
       "eligibility": {
         "limitedTitle": "Mô hình miễn phí có sẵn",
         "balance": "Số dư của bạn là {{amount}}. Các mô hình miễn phí vẫn có sẵn.",

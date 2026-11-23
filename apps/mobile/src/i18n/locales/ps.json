@@ -2361,6 +2361,7 @@
       "modelMissingToStart": "د پیل لپاره یو ماډل وټاکئ.",
       "staleRepositoryToStart": "ټاکل شوی زېرمتون نور نشته. د پیل لپاره بیا یو زېرمتون وټاکئ.",
       "modelNeedsCreditsToStart": "دا ماډل کریډیټ ته اړتیا لري. د پیل لپاره یو وړیا ماډل وټاکئ.",
+      "modelNeedsCreditsPinnedToStart": "د دې اجنټ موډل کریډیټ ته اړتیا لري. کریډیټ زیات کړئ یا بل اجنټ وټاکئ.",
       "eligibility": {
         "limitedTitle": "وړیا ماډلونه شته",
         "balance": "ستاسو بیلانس {{amount}} دی. وړیا ماډلونه لا هم شته.",

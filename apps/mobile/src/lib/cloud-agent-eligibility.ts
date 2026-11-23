@@ -36,11 +36,17 @@ export type CloudAgentEligibility = {
  * The read's state as the composer renders it, one tag per phase. `pending`
  * claims nothing: no notice, the full model list, and Start unrestricted, so a
  * slow or failed read never invents a balance the server did not report.
+ *
+ * `failed` carries whether the retry is in flight, because the notice stays on
+ * screen and marks its own Retry busy instead of disappearing under the person
+ * who pressed it: a refetch clears the query's error and turns its status back
+ * to `pending` (`fetchState` in `@tanstack/query-core`), so without the carry
+ * the line would flash away and the button's busy state could never paint.
  */
 export type CloudAgentEligibilityState =
   | { readonly kind: 'pending' }
   | { readonly kind: 'ready'; readonly eligibility: CloudAgentEligibility }
-  | { readonly kind: 'failed' };
+  | { readonly kind: 'failed'; readonly isRetrying: boolean };
 
 /** The state that claims nothing: the form's state before an answer, and for a target that never asks. */
 export const PENDING_ELIGIBILITY: CloudAgentEligibilityState = { kind: 'pending' };
@@ -50,6 +56,12 @@ export type CloudAgentEligibilityQuery = {
   data: CloudAgentEligibility | undefined;
   isPending: boolean;
   isError: boolean;
+  isFetching: boolean;
+  /**
+   * True when this account scope's read failed before. The hook keeps it, so a
+   * retry that is running still reads as the failure it retries.
+   */
+  failedBefore: boolean;
 };
 
 /**
@@ -63,7 +75,13 @@ export function resolveCloudAgentEligibilityState(
   if (query.data !== undefined) {
     return { kind: 'ready', eligibility: query.data };
   }
-  return query.isError || !query.isPending ? { kind: 'failed' } : { kind: 'pending' };
+  if (query.isError) {
+    return { kind: 'failed', isRetrying: query.isFetching };
+  }
+  if (query.failedBefore && query.isFetching) {
+    return { kind: 'failed', isRetrying: true };
+  }
+  return query.isPending ? { kind: 'pending' } : { kind: 'failed', isRetrying: false };
 }
 
 /**

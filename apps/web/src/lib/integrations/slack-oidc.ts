@@ -59,6 +59,7 @@ const userInfoResponseSchema = z.object({
 const revokeResponseSchema = z.object({
   ok: z.boolean(),
   error: z.string().optional(),
+  revoked: z.boolean().optional(),
 });
 
 /**
@@ -202,7 +203,14 @@ export async function fetchSlackIdentity(accessToken: string): Promise<SlackIden
   return { teamId, userId };
 }
 
-/** Best-effort token revocation; the token is single-use proof and short-lived. */
+/**
+ * Best-effort token revocation; the token is single-use proof and short-lived.
+ *
+ * The token travels in the form body of the revoke request, which is where
+ * Slack reads it. Slack answers `ok: true` for a revocation it carried out and
+ * for one it declined, reporting the second as `revoked: false`, so the flag
+ * decides acceptance and a declined revocation is recorded.
+ */
 export async function revokeSlackOidcToken(accessToken: string): Promise<void> {
   try {
     const body = await slackRequest(
@@ -213,17 +221,26 @@ export async function revokeSlackOidcToken(accessToken: string): Promise<void> {
           authorization: `Bearer ${accessToken}`,
           'content-type': 'application/x-www-form-urlencoded',
         },
+        body: new URLSearchParams({ token: accessToken }).toString(),
       },
       'revoke'
     );
 
-    // Record Slack's answer when it is not an acceptance, so the revocation's
-    // own outcome is observable. The token is short-lived either way.
     const parsed = revokeResponseSchema.safeParse(body);
     if (!parsed.success || !parsed.data.ok) {
       captureException(new SlackOidcError('Slack declined the sign-in token revocation'), {
         tags: { component: 'kilo-bot', op: 'slack-oidc-revoke' },
         extra: { error: parsed.success ? parsed.data.error : 'unrecognised response' },
+      });
+      return;
+    }
+
+    // An absent `revoked` flag is not a failure: only Slack saying it kept the
+    // token is a decline to record.
+    if (parsed.data.revoked === false) {
+      captureException(new SlackOidcError('Slack declined the sign-in token revocation'), {
+        tags: { component: 'kilo-bot', op: 'slack-oidc-revoke' },
+        extra: { error: parsed.data.error ?? null, revoked: false },
       });
     }
   } catch (error) {

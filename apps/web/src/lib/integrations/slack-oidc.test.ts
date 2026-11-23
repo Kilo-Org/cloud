@@ -151,6 +151,40 @@ describe('revokeSlackOidcToken', () => {
     });
   });
 
+  test('sends the token in the body of a form-encoded POST', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ ok: true }));
+
+    await revokeSlackOidcToken('xoxp-oidc');
+
+    expect(mockFetch.mock.calls[0]?.[1]).toMatchObject({
+      method: 'POST',
+      headers: expect.objectContaining({ 'content-type': 'application/x-www-form-urlencoded' }),
+      body: 'token=xoxp-oidc',
+    });
+  });
+
+  test('records a declined revocation once without throwing', async () => {
+    const capture = jest.mocked(captureException);
+    mockFetch.mockResolvedValue(jsonResponse({ ok: true, revoked: false }));
+
+    await expect(revokeSlackOidcToken('xoxp-oidc')).resolves.toBeUndefined();
+
+    expect(capture).toHaveBeenCalledTimes(1);
+    expect(capture.mock.calls[0]?.[1]).toMatchObject({
+      tags: { component: 'kilo-bot', op: 'slack-oidc-revoke' },
+      extra: { error: null, revoked: false },
+    });
+  });
+
+  test('records nothing when Slack reports the token revoked', async () => {
+    const capture = jest.mocked(captureException);
+    mockFetch.mockResolvedValue(jsonResponse({ ok: true, revoked: true }));
+
+    await expect(revokeSlackOidcToken('xoxp-oidc')).resolves.toBeUndefined();
+
+    expect(capture).not.toHaveBeenCalled();
+  });
+
   test('records nothing for an accepted revocation', async () => {
     const capture = jest.mocked(captureException);
     mockFetch.mockResolvedValue(jsonResponse({ ok: true }));

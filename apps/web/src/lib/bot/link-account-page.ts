@@ -9,20 +9,14 @@ export const LINK_ACCOUNT_PATH = '/api/chat/link-account';
 const PAGE_HEADERS = {
   'content-type': 'text/html; charset=utf-8',
   'cache-control': 'no-store',
-  // The page's only action is a form posted back to this route, and the link
-  // token travels in the page URL, so the page declares the origins a form
-  // submission may reach and asks intermediaries not to store, embed, sniff,
-  // or forward it. `form-action` also governs the redirects of a form
-  // submission, and the identity proof continues to Slack from that POST, so
-  // Slack is the one additional origin the submission may reach.
-  //
-  // The apex and the wildcard are both required: a host source without a
-  // wildcard does not match subdomains, and `*.slack.com` does not match
-  // `slack.com` itself. The sign-in endpoint is on the apex today, but Slack
-  // routes some sign-in hops through a workspace or `app.` subdomain, and a
-  // blocked hop shows the user a CSP error instead of the sign-in page.
+  // The page runs no script (`default-src 'none'`) and escapes every
+  // interpolated value, so the form rule is a defence-in-depth bound on the
+  // destinations rather than the control that keeps the page safe. An
+  // SSO-enforced chat workspace sends the sign-in through an identity-provider
+  // host that cannot be listed in advance, so the rule admits any https origin
+  // and still refuses every non-https destination.
   'content-security-policy':
-    "default-src 'none'; style-src 'unsafe-inline'; form-action 'self' https://slack.com https://*.slack.com; frame-ancestors 'none'; base-uri 'none'",
+    "default-src 'none'; style-src 'unsafe-inline'; form-action 'self' https:; frame-ancestors 'none'; base-uri 'none'",
   'x-frame-options': 'DENY',
   'x-content-type-options': 'nosniff',
   'referrer-policy': 'no-referrer',

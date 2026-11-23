@@ -1800,28 +1800,44 @@ test('a split enumerates models from every scoped table, not just case_results',
   }
 });
 
-test('the model enumeration reads every scoped table through run_id', async () => {
+test('the model enumeration reads every scoped table through run_id within D1 limits', async () => {
   const f = fixture();
   try {
     seed(f.sqlite);
-    const { createLocalExecutor, scopeRunModelsSql, assertLeanPlan } =
-      await import('./legacy-cancel.mjs');
+    const {
+      createLocalExecutor,
+      scopeRunModelsSql,
+      assertLeanPlan,
+      compoundTermCount,
+      D1_MAX_COMPOUND_TERMS,
+    } = await import('./legacy-cancel.mjs');
     const inner = createLocalExecutor(f.path);
-    const sql = scopeRunModelsSql('run-live-a');
-    for (const table of [
+    const tables = [
       'case_results',
       'model_summaries',
       'scheduler_chunks',
       'run_lane_failures',
       'scheduler_executions',
       'pending_decider_outputs',
-    ]) {
-      assert.match(sql, new RegExp(`FROM ${table} AS `), `${table} must be enumerated`);
+    ];
+    const seen = new Set();
+    let seeks = 0;
+    for (const part of [0, 1]) {
+      const sql = scopeRunModelsSql('run-live-a', part);
+      // D1 caps a compound statement at five SELECT terms; six tables must not be one UNION.
+      assert.ok(
+        compoundTermCount(sql) <= D1_MAX_COMPOUND_TERMS,
+        `part ${part} has ${compoundTermCount(sql)} compound terms`
+      );
+      for (const table of tables) {
+        if (new RegExp(`FROM ${table} AS `).test(sql)) seen.add(table);
+      }
+      const plan = await assertLeanPlan({ plan: s => inner.plan(s) }, sql);
+      // Every branch is a run_id seek; nothing reads a history table by another key.
+      seeks += plan.filter(line => /^SEARCH /.test(line) && /run_id=\?/.test(line)).length;
     }
-    const plan = await assertLeanPlan({ plan: s => inner.plan(s) }, sql);
-    // Every branch is a run_id seek; nothing reads a history table by another key.
-    const seeks = plan.filter(line => /^SEARCH /.test(line) && /run_id=\?/.test(line));
-    assert.equal(seeks.length, 6, `expected six keyed seeks, got ${JSON.stringify(plan)}`);
+    assert.deepEqual([...seen].sort(), [...tables].sort(), 'every table must be enumerated');
+    assert.equal(seeks, 6, 'six keyed seeks across the two parts');
     inner.close();
   } finally {
     f.close();
@@ -2428,6 +2444,41 @@ function fakeWrangler(handler) {
   return { calls, spawnImpl };
 }
 
+/**
+ * Like `fakeWrangler`, but `handler` may return `{ exit, stdout, stderr }` to fail the way real
+ * wrangler does with `--json`: the error text goes to STDOUT and the process exits non-zero with
+ * an empty stderr.
+ */
+function fakeFailingWrangler(handler) {
+  const calls = [];
+  const spawnImpl = (binary, args) => {
+    const sql = args[args.indexOf('--command') + 1];
+    calls.push({ binary, args: [...args], sql });
+    const outcome = handler(sql, calls.length) ?? {};
+    const stdout = outcome.stdout ?? JSON.stringify([{ success: true, results: [] }]);
+    const stderr = outcome.stderr ?? '';
+    const code = outcome.exit ?? 0;
+    const listeners = { stdout: [], stderr: [], close: [], error: [] };
+    const child = {
+      stdout: { setEncoding() {}, on: (_e, fn) => listeners.stdout.push(fn) },
+      stderr: { setEncoding() {}, on: (_e, fn) => listeners.stderr.push(fn) },
+      on(event, fn) {
+        if (event === 'close') listeners.close.push(fn);
+        else if (event === 'error') listeners.error.push(fn);
+        return child;
+      },
+      kill() {},
+    };
+    queueMicrotask(() => {
+      if (stdout !== '') for (const fn of listeners.stdout) fn(stdout);
+      if (stderr !== '') for (const fn of listeners.stderr) fn(stderr);
+      for (const fn of listeners.close) fn(code);
+    });
+    return child;
+  };
+  return { calls, spawnImpl };
+}
+
 /** A real wrangler write envelope: `results: []`, count in `meta.changes`. */
 const writeEnvelope = changes => [{ success: true, results: [], meta: { changes } }];
 const rowsEnvelope = rows => [{ success: true, results: rows, meta: { changes: 0 } }];
@@ -2515,6 +2566,230 @@ test('the real remote transport reports per-statement write counts from meta.cha
       'the publication lookup must be plan-checked'
     );
     local.close();
+  } finally {
+    f.close();
+  }
+});
+
+test('a non-zero wrangler exit reports the error text written to stdout', async () => {
+  const f = fixture();
+  try {
+    seed(f.sqlite);
+    const { createRemoteExecutor } = await import('./legacy-cancel.mjs');
+    // Real shape: `--json` puts the failure on STDOUT, stderr is empty, exit 1. Before this fix
+    // the reported reason was a bare `wrangler exited 1: ` with no cause at all.
+    const { spawnImpl } = fakeFailingWrangler(() => ({
+      exit: 1,
+      stdout: JSON.stringify({
+        error: { text: 'D1_ERROR: too many terms in compound SELECT', code: 7500 },
+      }),
+      stderr: '',
+    }));
+    const remote = createRemoteExecutor({ spawnImpl });
+    await assert.rejects(
+      () => remote.read('SELECT 1'),
+      error => {
+        assert.match(error.message, /wrangler exited 1/);
+        assert.match(error.message, /too many terms in compound SELECT/);
+        assert.doesNotMatch(error.message, /SELECT 1/, 'the statement must not be echoed');
+        return true;
+      }
+    );
+  } finally {
+    f.close();
+  }
+});
+
+test('the stdout error is truncated to 300 characters and never echoes the statement', async () => {
+  const f = fixture();
+  try {
+    const { describeD1Failure } = await import('./legacy-cancel.mjs');
+    const long = 'X'.repeat(4000);
+    const message = describeD1Failure({
+      code: 1,
+      stdout: JSON.stringify([{ success: false, error: { message: long } }]),
+      stderr: '',
+    });
+    assert.match(message, /^wrangler exited 1: X+…$/);
+    assert.ok(message.length <= 'wrangler exited 1: '.length + 301, `too long: ${message.length}`);
+
+    // A non-JSON stdout still yields text rather than an empty tail, and stderr is the fallback.
+    assert.match(describeD1Failure({ code: 2, stdout: 'boom', stderr: '' }), /exited 2: boom/);
+    assert.match(
+      describeD1Failure({ code: 3, stdout: '', stderr: 'stderr text' }),
+      /exited 3: stderr text/
+    );
+    assert.match(
+      describeD1Failure({ code: 4, stdout: '', stderr: '' }),
+      /exited 4: no error text on stdout or stderr/
+    );
+  } finally {
+    f.close();
+  }
+});
+
+test('a statement over a D1 limit is refused before it is sent, naming the builder', async () => {
+  const f = fixture();
+  try {
+    seed(f.sqlite);
+    const {
+      createRemoteExecutor,
+      assertStatementFitsD1,
+      D1_MAX_STATEMENT_BYTES,
+      D1_MAX_COMPOUND_TERMS,
+      compoundTermCount,
+    } = await import('./legacy-cancel.mjs');
+    // The shape that broke production: six tables as one UNION ALL is six SELECT terms, and D1
+    // documents a maximum of five. Local SQLite accepts it, which is why the copy proof passed.
+    const sixTerms = ['a', 'b', 'c', 'd', 'e', 'f']
+      .map(name => `SELECT 1 AS x FROM t_${name}`)
+      .join(' UNION ALL ');
+    assert.equal(compoundTermCount(sixTerms), 6);
+    assert.throws(
+      () => assertStatementFitsD1(sixTerms, 'model enumeration'),
+      error =>
+        /model enumeration/.test(error.message) &&
+        /6 compound SELECT terms/.test(error.message) &&
+        new RegExp(String(D1_MAX_COMPOUND_TERMS)).test(error.message)
+    );
+    // Five is the documented maximum, so it must pass.
+    const fiveTerms = ['a', 'b', 'c', 'd', 'e']
+      .map(name => `SELECT 1 AS x FROM t_${name}`)
+      .join(' UNION ALL ');
+    assert.doesNotThrow(() => assertStatementFitsD1(fiveTerms, 'five'));
+
+    const long = `SELECT '${'y'.repeat(D1_MAX_STATEMENT_BYTES)}' AS v`;
+    assert.ok(Buffer.byteLength(long, 'utf8') > D1_MAX_STATEMENT_BYTES);
+    assert.throws(
+      () => assertStatementFitsD1(long, 'oversized read'),
+      error => /oversized read/.test(error.message) && /100000-byte limit/.test(error.message)
+    );
+
+    // And the live transport enforces it, so nothing invalid reaches wrangler.
+    const { calls, spawnImpl } = fakeFailingWrangler(() => ({
+      stdout: JSON.stringify([{ success: true, results: [] }]),
+    }));
+    const remote = createRemoteExecutor({ spawnImpl });
+    await assert.rejects(() => remote.read(sixTerms), /compound SELECT terms/);
+    await assert.rejects(() => remote.write([long]), /100000-byte limit/);
+    assert.equal(calls.length, 0, 'no refused statement may reach wrangler');
+  } finally {
+    f.close();
+  }
+});
+
+test('an apply whose whole scope stays inside the D1 statement limits', async () => {
+  const f = oversizedFixture();
+  try {
+    // Every statement the batched path builds — including the two-part model enumeration — must
+    // fit D1's documented limits. This is the regression the production dry-run hit.
+    const {
+      createRemoteExecutor,
+      D1_MAX_STATEMENT_BYTES,
+      D1_MAX_COMPOUND_TERMS,
+      compoundTermCount,
+    } = await import('./legacy-cancel.mjs');
+    const { createLocalExecutor } = await import('./legacy-cancel.mjs');
+    const local = createLocalExecutor(f.path);
+    const kinds = [];
+    const { spawnImpl } = fakeFailingWrangler(sql => {
+      const bytes = Buffer.byteLength(sql, 'utf8');
+      if (bytes > D1_MAX_STATEMENT_BYTES) {
+        return {
+          exit: 1,
+          stdout: JSON.stringify({ error: { text: `statement too long: ${bytes}` } }),
+        };
+      }
+      if (compoundTermCount(sql) > D1_MAX_COMPOUND_TERMS) {
+        return {
+          exit: 1,
+          stdout: JSON.stringify({
+            error: { text: `too many terms in compound SELECT (${compoundTermCount(sql)})` },
+          }),
+        };
+      }
+      const explain = /^\s*EXPLAIN QUERY PLAN\s+([\s\S]+)$/i.exec(sql);
+      if (explain) {
+        kinds.push('explain');
+        return {
+          stdout: JSON.stringify(rowsEnvelope(local.plan(explain[1]).map(detail => ({ detail })))),
+        };
+      }
+      if (/^\s*(SELECT|WITH)/i.test(sql)) {
+        kinds.push('read');
+        return { stdout: JSON.stringify(rowsEnvelope(local.read(sql))) };
+      }
+      kinds.push('write');
+      const changed = local.write([sql]);
+      return { stdout: JSON.stringify(writeEnvelope(changed[0])) };
+    });
+    const remote = createRemoteExecutor({ spawnImpl });
+    const lines = [];
+    const code = await runLegacyCancel({
+      argv: ['--apply', '--remote', '--expect-token', OPERATOR, '--min-remaining-ms', '600000'],
+      executor: remote,
+      log: line => lines.push(line),
+    });
+    assert.equal(code, EXIT.ok, lines.join('\n'));
+    // The enumeration really ran, in two parts, and reads happened after it.
+    assert.ok(kinds.filter(kind => kind === 'read').length > 4);
+    assert.ok(kinds.includes('write'));
+    local.close();
+  } finally {
+    f.close();
+  }
+});
+
+test('packing keeps every batch inside the D1 statement budget, not just the row cap', async () => {
+  const f = fixture();
+  try {
+    seed(f.sqlite);
+    const { leanBatchSizeSql, leanCancelledSql, LEAN_MAX_BATCH_BYTES, D1_MAX_STATEMENT_BYTES } =
+      await import('./legacy-cancel.mjs');
+    // Six small runs, each split into many model groups: the row cap alone would pack dozens of
+    // OR-chained segments into one statement, which can exceed D1's 100 KB limit.
+    const runIds = Array.from({ length: 6 }, (_, i) => `user-2026-11-21T06-53-54-446Z-${i}`);
+    const models = Array.from(
+      { length: 64 },
+      (_, i) => `vendor/some-long-model-name-${String(i).padStart(2, '0')}`
+    );
+    const probed = [];
+    for (const runId of runIds) {
+      for (const model of models)
+        probed.push({ candidate: { runIds: [runId], models: [model] }, rows: 1 });
+    }
+    // The unpacked worst case really is over the limit: this is what makes the budget necessary.
+    const all = probed.map(p => p.candidate);
+    assert.ok(
+      Math.max(
+        Buffer.byteLength(leanBatchSizeSql(all), 'utf8'),
+        Buffer.byteLength(leanCancelledSql(all), 'utf8')
+      ) > D1_MAX_STATEMENT_BYTES,
+      'the fixture must exceed 100 KB if packed by rows alone'
+    );
+
+    // packBatches is the real packer the scope uses.
+    const { packBatches } = await import('./legacy-cancel.mjs');
+    const packed = packBatches(probed);
+    assert.ok(packed.length > 1, 'the byte budget must split the scope');
+    for (const segments of packed) {
+      // Every probed candidate is one row, so the row cap is the segment count here.
+      assert.ok(segments.length <= LEAN_MAX_SCOPED_ROWS, 'a packed batch exceeded the row cap');
+      assert.ok(
+        Buffer.byteLength(leanBatchSizeSql(segments), 'utf8') <= LEAN_MAX_BATCH_BYTES,
+        'a packed batch exceeded the byte budget'
+      );
+      assert.ok(
+        Buffer.byteLength(leanCancelledSql(segments), 'utf8') <= LEAN_MAX_BATCH_BYTES,
+        'a packed batch exceeded the byte budget'
+      );
+    }
+    // Every segment lands in exactly one batch: the byte budget must not drop or duplicate one.
+    const keys = packed.flatMap(segments =>
+      segments.map(segment => `${segment.runIds[0]}|${segment.models[0]}`)
+    );
+    assert.equal(new Set(keys).size, probed.length);
+    assert.equal(keys.length, probed.length);
   } finally {
     f.close();
   }

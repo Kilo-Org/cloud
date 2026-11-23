@@ -122,6 +122,40 @@ const SQL_NOW_ISO = `strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`;
 
 const sqlString = value => `'${String(value).replaceAll("'", "''")}'`;
 
+/**
+ * D1's documented statement limits (https://developers.cloudflare.com/d1/platform/limits/):
+ * a statement may be at most 100,000 bytes, and a compound statement (`UNION`, `UNION ALL`,
+ * `INTERSECT`, `EXCEPT`) may carry at most five SELECT terms. SQLite accepts more of both, so a
+ * shape that passes the isolated copy can be refused by production; these are checked before a
+ * statement is sent so the refusal names the builder instead of arriving as an opaque
+ * `wrangler exited 1`.
+ */
+export const D1_MAX_STATEMENT_BYTES = 100_000;
+export const D1_MAX_COMPOUND_TERMS = 5;
+
+/** The compound-term count of a generated statement. Our literals never carry these keywords. */
+export function compoundTermCount(sql) {
+  return 1 + (sql.match(/\b(?:UNION(?:\s+ALL)?|EXCEPT|INTERSECT)\b/gi) ?? []).length;
+}
+
+/** Refuse a statement D1 is documented to reject, naming the builder that produced it. */
+export function assertStatementFitsD1(sql, kind = 'statement') {
+  const bytes = Buffer.byteLength(sql, 'utf8');
+  if (bytes > D1_MAX_STATEMENT_BYTES) {
+    throw new D1Error(
+      `the ${kind} statement is ${bytes} bytes, above D1's ${D1_MAX_STATEMENT_BYTES}-byte limit; ` +
+        'refusing to send it'
+    );
+  }
+  const terms = compoundTermCount(sql);
+  if (terms > D1_MAX_COMPOUND_TERMS) {
+    throw new D1Error(
+      `the ${kind} statement has ${terms} compound SELECT terms, above D1's ` +
+        `${D1_MAX_COMPOUND_TERMS}-term limit; refusing to send it`
+    );
+  }
+}
+
 class UsageError extends Error {}
 class GuardRefused extends Error {}
 class VerifyFailed extends Error {}
@@ -919,43 +953,65 @@ const CANCELLED_SIZE_FIELDS = [
 const SERVED_SIZE_FIELDS = ['served_case_results', 'served_summaries', 'served_candidates'];
 
 /**
- * The `model` groups of one run, largest first, taken as the UNION of the models that appear in
- * every table the batch probe counts. `case_results` alone is not enough: a run can hold its bulk
- * in `scheduler_executions` (one row per executed case, and production has a run with 54,661 of
+ * The `model` groups of one run, taken as the UNION of the models that appear in every table the
+ * batch probe counts. `case_results` alone is not enough: a run can hold its bulk in
+ * `scheduler_executions` (one row per executed case, and production has a run with 54,661 of
  * them), in a chunk, or in a pending output that has no graded result yet. Enumerating only graded
  * results would either refuse a splittable run ("no model groups") or push those rows into the
  * `NOT IN` complement until it exceeded the cap.
  *
- * Each branch is a `run_id` seek with its own GROUP BY, so SQLite materializes them instead of
- * flattening the compound and reading a table by something other than `run_id`. The size is
- * bounded twice: the run is provably under `LEAN_MAX_SPLIT_ROWS` before this is reached, and the
- * result is capped at `LEAN_MAX_MODEL_GROUPS + 1`.
+ * D1 allows at most FIVE SELECT terms in a compound statement, so six tables cannot be one
+ * `UNION ALL`: this is split into two statements of three branches each, run in order and merged.
+ * Every branch is its own `run_id` seek with its own GROUP BY, so SQLite materializes them instead
+ * of flattening the compound and reading a table by another key.
  */
-export function scopeRunModelsSql(runId, cap = LEAN_MAX_MODEL_GROUPS) {
+export function scopeRunModelsSql(runId, part = 0) {
   const key = sqlString(runId);
   const branch = (from, alias) =>
     `SELECT ${alias}.model AS model, COUNT(*) AS n FROM ${from} AS ${alias}
       WHERE ${alias}.run_id = ${key} GROUP BY ${alias}.model`;
-  return `SELECT model, SUM(n) AS n FROM (
-    ${branch('case_results', 'row')}
-    UNION ALL ${branch('model_summaries', 'summary')}
-    UNION ALL ${branch('scheduler_chunks', 'chunk')}
-    UNION ALL ${branch('run_lane_failures', 'failure')}
-    UNION ALL ${branch('scheduler_executions', 'execution')}
-    UNION ALL ${branch('pending_decider_outputs', 'pending')}
-  ) GROUP BY model ORDER BY n DESC, model ASC LIMIT ${cap + 1}`;
+  const tables = [
+    ['case_results', 'row'],
+    ['model_summaries', 'summary'],
+    ['scheduler_chunks', 'chunk'],
+    ['run_lane_failures', 'failure'],
+    ['scheduler_executions', 'execution'],
+    ['pending_decider_outputs', 'pending'],
+  ];
+  if (part < 0 || part > 1) throw new UsageError('the model enumeration has two parts');
+  const slice = tables.slice(part * 3, part * 3 + 3);
+  return slice.map(([from, alias]) => branch(from, alias)).join('\n    UNION ALL ');
+}
+
+/** Merge the two enumeration parts into `{ model, n }`, largest first. */
+function mergeModelGroups(parts) {
+  const totals = new Map();
+  for (const rows of parts) {
+    for (const row of rows) {
+      const model = String(row.model);
+      totals.set(model, (totals.get(model) ?? 0) + Number(row.n));
+    }
+  }
+  return [...totals.entries()]
+    .map(([model, n]) => ({ model, n }))
+    .sort((a, b) => b.n - a.n || (a.model < b.model ? -1 : a.model > b.model ? 1 : 0));
 }
 
 async function runModelGroups(executor, runId) {
-  const sql = scopeRunModelsSql(runId);
-  await assertLeanPlan(executor, sql);
-  const rows = await executor.read(sql);
+  const parts = [];
+  for (const part of [0, 1]) {
+    const sql = scopeRunModelsSql(runId, part);
+    assertStatementFitsD1(sql, 'model enumeration');
+    await assertLeanPlan(executor, sql);
+    parts.push(await executor.read(sql));
+  }
+  const rows = mergeModelGroups(parts);
   if (rows.length > LEAN_MAX_MODEL_GROUPS) {
     throw new VerifyFailed(
       `the run has more than ${LEAN_MAX_MODEL_GROUPS} model groups; refusing to split it further`
     );
   }
-  const models = rows.map(row => String(row.model));
+  const models = rows.map(row => row.model);
   if (models.length === 0) throw new VerifyFailed('a split run has no model groups');
   return models;
 }
@@ -1004,21 +1060,50 @@ async function splitRun(executor, runId) {
   return probed;
 }
 
-/** Pack probed candidates greedily so each batch's scoped rows stay inside the envelope. */
-function packBatches(probed) {
+/**
+ * A batch's generated statements must also fit D1's 100 KB statement limit. Packing is bounded by
+ * rows, but many small segments (six runs split into 64 model groups each) would otherwise combine
+ * into one very long `OR`-chained statement. This is the budget each batch's cancelled and size
+ * statements are kept under, leaving room for the `EXPLAIN QUERY PLAN ` prefix.
+ */
+export const LEAN_MAX_BATCH_BYTES = 60_000;
+
+/** The longest statement a batch of these segments produces. */
+function batchStatementBytes(segments) {
+  return Math.max(
+    Buffer.byteLength(leanBatchSizeSql(segments), 'utf8'),
+    Buffer.byteLength(leanCancelledSql(segments), 'utf8')
+  );
+}
+
+/**
+ * Pack probed candidates greedily so each batch's scoped rows stay inside the envelope AND its
+ * generated statements stay inside `LEAN_MAX_BATCH_BYTES`.
+ */
+export function packBatches(probed) {
   const batches = [];
   let current = null;
   let currentRows = 0;
+  const flush = () => {
+    if (current !== null) batches.push(current);
+  };
   for (const { candidate, rows } of probed) {
-    if (current !== null && currentRows + rows <= LEAN_MAX_SCOPED_ROWS) {
-      current.push(candidate);
-      currentRows += rows;
-      continue;
+    if (current !== null) {
+      const next = [...current, candidate];
+      const fits =
+        currentRows + rows <= LEAN_MAX_SCOPED_ROWS &&
+        batchStatementBytes(next) <= LEAN_MAX_BATCH_BYTES;
+      if (fits) {
+        current = next;
+        currentRows += rows;
+        continue;
+      }
     }
+    flush();
     current = [candidate];
     currentRows = rows;
-    batches.push(current);
   }
+  flush();
   return batches;
 }
 
@@ -1303,6 +1388,61 @@ function report(sink, event, fields = {}) {
 }
 
 /**
+ * The error text of a non-zero `wrangler d1 execute`. With `--json`, wrangler writes the failure
+ * to STDOUT (stderr is usually empty), so stderr alone produced a bare `wrangler exited 1: `.
+ * This parses the JSON envelope's error out of stdout, falls back to a raw stdout/stderr tail,
+ * and truncates to 300 characters. It never echoes the command's parameters or any row data: the
+ * builders inline literals only from the operator token and run ids, and only the message text is
+ * reported.
+ */
+export function describeD1Failure({ code, stdout = '', stderr = '' }) {
+  const MAX = 300;
+  const clip = text => {
+    const flat = String(text ?? '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    return flat.length > MAX ? `${flat.slice(0, MAX)}…` : flat;
+  };
+  // A JSON envelope may carry the message at the top level or inside an entry.
+  const jsonError = text => {
+    const trimmed = String(text ?? '').trim();
+    if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) return null;
+    let parsed;
+    try {
+      parsed = JSON.parse(trimmed);
+    } catch {
+      return null;
+    }
+    const entries = Array.isArray(parsed) ? parsed : [parsed];
+    for (const entry of entries) {
+      if (entry === null || typeof entry !== 'object') continue;
+      const error = entry.error ?? entry.errors;
+      if (typeof error === 'string' && error.trim() !== '') return error;
+      if (Array.isArray(error)) {
+        const messages = error
+          .map(item => (typeof item === 'string' ? item : item?.message))
+          .filter(message => typeof message === 'string' && message.trim() !== '');
+        if (messages.length > 0) return messages.join('; ');
+      }
+      if (error !== null && typeof error === 'object') {
+        const message = error.message ?? error.text ?? error.detail;
+        if (typeof message === 'string' && message.trim() !== '') return message;
+      }
+      if (entry.success === false && typeof entry.message === 'string') return entry.message;
+    }
+    return null;
+  };
+  const detail =
+    jsonError(stdout) ??
+    (stdout.trim() === '' ? null : stdout) ??
+    (stderr.trim() === '' ? null : stderr);
+  if (detail === null) {
+    return `wrangler exited ${code}: no error text on stdout or stderr`;
+  }
+  return `wrangler exited ${code}: ${clip(detail)}`;
+}
+
+/**
  * Parse and validate the real `wrangler d1 execute --json` envelope: rows in `results`, a
  * write's affected count in `meta.changes`. Malformed or unsuccessful is an error, never zero.
  */
@@ -1369,8 +1509,7 @@ export function createRemoteExecutor({ signal, spawnImpl = spawn } = {}) {
       child.on('error', error => reject(new D1Error(`wrangler could not start: ${error.message}`)));
       child.on('close', code => {
         if (code !== 0) {
-          const tail = stderr.trim().split('\n').slice(-5).join(' / ');
-          reject(new D1Error(`wrangler exited ${code}: ${tail}`));
+          reject(new D1Error(describeD1Failure({ code, stdout, stderr })));
           return;
         }
         try {
@@ -1384,10 +1523,18 @@ export function createRemoteExecutor({ signal, spawnImpl = spawn } = {}) {
   return {
     // The live path is the bounded one; `lean: true` is what selects it.
     lean: true,
-    read: sql => runEnvelope(sql).then(entries => entries.at(-1).results),
+    // Every statement is checked against D1's documented limits before it is sent, so an
+    // over-long or over-compounded shape refuses locally instead of as an opaque exit 1.
+    read: async sql => {
+      assertStatementFitsD1(sql, 'read');
+      return runEnvelope(sql).then(entries => entries.at(-1).results);
+    },
     /** `EXPLAIN QUERY PLAN` rows, as the real transport reports them. */
-    plan: sql =>
-      runEnvelope(`EXPLAIN QUERY PLAN ${sql}`).then(entries =>
+    plan: async sql => {
+      const explain = `EXPLAIN QUERY PLAN ${sql}`;
+      // The statement itself must fit; the prefixed text is what D1 actually receives.
+      assertStatementFitsD1(explain, 'EXPLAIN QUERY PLAN');
+      return runEnvelope(explain).then(entries =>
         entries
           .flatMap(entry => entry.results)
           .map(row => {
@@ -1396,10 +1543,12 @@ export function createRemoteExecutor({ signal, spawnImpl = spawn } = {}) {
             }
             return String(row.detail);
           })
-      ),
+      );
+    },
     write: async statements => {
       const changed = [];
       for (const statement of statements) {
+        assertStatementFitsD1(statement, 'write');
         // The affected count lives in `meta.changes`; `results` is normally empty.
         const entries = await runEnvelope(statement);
         const entry = entries.at(-1);

@@ -15,8 +15,11 @@ import {
   stepUpPolicyFor,
 } from '@kilocode/web-shared/lib/admin/step-up-policy';
 import {
+  normalizeStepUpMethod,
   stepUpBindingFromOperation,
+  stepUpOperationSchema,
   type StepUpOperation,
+  type StepUpOperationBinding,
   type StepUpSurface,
 } from '@kilocode/web-shared/lib/admin/step-up-binding';
 import { evaluateStepUp } from '@kilocode/web-shared/lib/admin/step-up-store';
@@ -56,6 +59,12 @@ export function stepUpErrorCodeForState(state: AdminStepUpState): StepUpErrorCod
  * The operation a guard call authorizes. An operation-class refusal carries
  * this value so the admin UI mints a proof for the same action instead of a
  * generic one.
+ *
+ * An operation-class request that cannot name its route and method is a wiring
+ * error, not a refusal: the refusal binding the admin UI echoes back is bounded
+ * by `stepUpOperationSchema` (non-empty route and method), so a value built from
+ * a missing one can never be submitted and no proof could ever match it. Throw
+ * before anything is measured, exactly as a missing operation itself does.
  */
 export function stepUpOperationFor(params: {
   actionClass: PrivilegedActionClass;
@@ -64,10 +73,15 @@ export function stepUpOperationFor(params: {
   surface: StepUpSurface;
   target: PrivilegedTarget;
 }): StepUpOperation {
+  const route = params.route ?? '';
+  const method = params.method ?? '';
+  if (isOperationStepUpClass(params.actionClass) && (route === '' || method.trim() === '')) {
+    throw new Error('An operation step-up request requires the route and method it authorizes');
+  }
   return {
     surface: params.surface,
-    route: params.route ?? '',
-    method: (params.method ?? '').toLowerCase(),
+    route,
+    method: normalizeStepUpMethod(method),
     target: params.target,
   };
 }
@@ -95,6 +109,26 @@ export function stepUpDecisionCovers(
   return decision.target.id === target.id;
 }
 
+/**
+ * The binding a refusal carries, which the admin UI echoes back to mint and
+ * verify the proof. The client parses it with `stepUpOperationSchema` before it
+ * sends it (and drops a malformed one), so build it through the same schema: a
+ * refusal whose descriptor the boundary rejects would prompt for an operation
+ * the caller cannot confirm.
+ */
+function refusalBinding(
+  actionClass: PrivilegedActionClass,
+  operation: StepUpOperation
+): StepUpOperationBinding {
+  const parsed = stepUpOperationSchema.safeParse(
+    stepUpBindingFromOperation(actionClass, operation)
+  );
+  if (!parsed.success) {
+    throw new Error('A step-up refusal requires a binding the client can submit');
+  }
+  return parsed.data;
+}
+
 function deny(params: {
   code: StepUpErrorCode;
   actionClass: PrivilegedActionClass;
@@ -111,7 +145,7 @@ function deny(params: {
       purpose: policy.purpose,
       maxAgeSeconds: Math.round(policy.maxAgeMs / 1000),
       binding: isOperationStepUpClass(params.actionClass)
-        ? stepUpBindingFromOperation(params.actionClass, params.operation)
+        ? refusalBinding(params.actionClass, params.operation)
         : null,
     }),
   });

@@ -12,6 +12,9 @@ import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   type ClaudeBillingShareError,
   claudeBillingEffectiveConnection,
+  claudeBillingOwnerLockKey,
+  claudeBillingPayerLockKey,
+  claudeBillingProfileLockKey,
   describeClaudeBillingSharing,
   getGrantedClaudeBillingConnection,
   insertClaudeBillingProfile,
@@ -46,18 +49,29 @@ async function holdPayerKey(payerConnectionId: string) {
   return await holdLockKey(`claude_billing_grant:${payerConnectionId}`);
 }
 
-/** Whether any backend in this database waits for a lock the holder holds. Bounded, no timers. */
-async function waitsForLockOf(holderPid: number): Promise<boolean> {
-  for (let attempt = 0; attempt < 2000; attempt += 1) {
+/**
+ * Waits until some backend in this database is blocked by the holder. The wait is
+ * bounded in database time, not by a wall-clock timer: each pass probes
+ * `pg_stat_activity`, then a short database sleep when nothing was found.
+ *
+ * A blocked backend cannot finish, so an operation that settles without any
+ * waiter proves the property false and fails here with the state named.
+ */
+async function waitForLockOf(holderPid: number, settled: () => boolean): Promise<void> {
+  const nothingWaited = (state: string) =>
+    new Error(`No backend waited for the lock held by pid ${holderPid}; the operation ${state}`);
+  for (let attempt = 0; attempt < 200; attempt += 1) {
     const waiting = await db.execute(sql`
       select 1
       from pg_stat_activity
       where datname = current_database()
         and wait_event_type = 'Lock'
         and ${holderPid} = any(pg_blocking_pids(pid))`);
-    if (waiting.rows.length > 0) return true;
+    if (waiting.rows.length > 0) return;
+    if (settled()) throw nothingWaited('settled without blocking');
+    await db.execute(sql`select pg_sleep(0.02)`);
   }
-  return false;
+  throw nothingWaited(`had not settled after ${200} probes`);
 }
 
 async function connectedPayer(kiloUserId: string | null, organizationId: string | null = null) {
@@ -597,16 +611,17 @@ describe('Claude billing grants', () => {
     };
 
     const held = await holdPayerKey(pendingTarget.id);
-    const share = shareClaudeBillingConnection(personal, organizationOwner, user.id);
-    let blocked = false;
+    let settled = false;
+    const share = shareClaudeBillingConnection(personal, organizationOwner, user.id).finally(() => {
+      settled = true;
+    });
     try {
-      blocked = await waitsForLockOf(held.holderPid);
+      await waitForLockOf(held.holderPid, () => settled);
     } finally {
       held.release();
       await held.holder;
     }
 
-    expect(blocked).toBe(true);
     await expect(share).resolves.toMatchObject({ id: payer.id });
     await expect(getGrantedClaudeBillingConnection(organizationOwner)).resolves.toMatchObject({
       connection: { id: payer.id },
@@ -634,16 +649,17 @@ describe('Claude billing grants', () => {
     const nextProfileId = `uprof_second_${crypto.randomUUID()}`;
 
     const held = await holdPayerKey(occupant.id);
-    const inserted = insertClaudeBillingProfile(personal, nextProfileId, user.id);
-    let blocked = false;
+    let settled = false;
+    const inserted = insertClaudeBillingProfile(personal, nextProfileId, user.id).finally(() => {
+      settled = true;
+    });
     try {
-      blocked = await waitsForLockOf(held.holderPid);
+      await waitForLockOf(held.holderPid, () => settled);
     } finally {
       held.release();
       await held.holder;
     }
 
-    expect(blocked).toBe(true);
     await expect(inserted).resolves.toMatchObject({ user_profile_id: nextProfileId });
     await expect(getGrantedClaudeBillingConnection(personal)).resolves.toMatchObject({
       connection: { user_profile_id: nextProfileId },
@@ -745,17 +761,18 @@ describe('Claude billing grants', () => {
       organizationId: organization.id,
     };
 
-    const held = await holdLockKey(`claude_billing_claim:org:${organization.id}`);
-    const share = shareClaudeBillingConnection(personal, organizationOwner, user.id);
-    let blocked = false;
+    const held = await holdLockKey(claudeBillingOwnerLockKey(organizationOwner));
+    let settled = false;
+    const share = shareClaudeBillingConnection(personal, organizationOwner, user.id).finally(() => {
+      settled = true;
+    });
     try {
-      blocked = await waitsForLockOf(held.holderPid);
+      await waitForLockOf(held.holderPid, () => settled);
     } finally {
       held.release();
       await held.holder;
     }
 
-    expect(blocked).toBe(true);
     await expect(share).resolves.toMatchObject({ id: payer.id });
     await expect(
       db
@@ -770,4 +787,21 @@ describe('Claude billing grants', () => {
         )
     ).resolves.toEqual([expect.objectContaining({ payer_connection_id: payer.id })]);
   }, 20000);
+
+  it('sorts the claim namespace below the payer namespace and the profile namespace above both', () => {
+    const owner: ClaudeBillingOwner = { kind: 'organization', organizationId: 'scope-order' };
+    const personal: ClaudeBillingOwner = { kind: 'personal', kiloUserId: 'scope-order' };
+    const payerId = 'scope-order';
+
+    for (const scope of [owner, personal]) {
+      const claimKey = claudeBillingOwnerLockKey(scope);
+      const payerKey = claudeBillingPayerLockKey(payerId);
+      const profileKey = claudeBillingProfileLockKey(scope);
+      expect(claimKey.startsWith('claude_billing_claim:')).toBe(true);
+      expect(payerKey.startsWith('claude_billing_grant:')).toBe(true);
+      expect(profileKey.startsWith('claude_billing_profile:')).toBe(true);
+      expect(claimKey < payerKey).toBe(true);
+      expect(payerKey < profileKey).toBe(true);
+    }
+  });
 });

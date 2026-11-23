@@ -138,6 +138,8 @@ export async function unlinkAndRemoveClaudeBillingGrant(
     // and its key set belong to the helper that owns this transaction: a payer
     // below a held key restarts the whole attempt, which repeats this unlink.
     // The unlink is idempotent, and the restart is bounded by the retry bound.
+    // `heldLockKeys` is that transaction's one set, and the removal adds the keys
+    // it takes to it.
     return {
       unlink,
       unreferencedPayer: await removeClaudeBillingGrantWithin(tx, owner, granted, heldLockKeys),

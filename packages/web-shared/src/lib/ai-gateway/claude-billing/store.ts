@@ -344,13 +344,14 @@ async function writePayerOwnerColumns(
  * grant, or is retired when no grant keeps it. The occupant's payer key is taken
  * before the read that decides, because the row and its grants change only
  * under that key. `heldLockKeys` names the keys the caller's transaction already
- * holds; a payer key at or below one of them would break the ascending rule, so
- * that transaction restarts instead.
+ * holds, and this function adds every key it takes to that same set, so a later
+ * owner-column change in the same transaction sees them. A payer key at or below
+ * a held one would break the ascending rule, so the transaction restarts.
  */
 async function freeClaudeBillingOwnerColumns(
   owner: ClaudeBillingOwner,
   exceptPayerId: string | null,
-  heldLockKeys: ReadonlySet<string>,
+  heldLockKeys: Set<string>,
   tx: DrizzleTransaction
 ): Promise<void> {
   const occupantWhere = and(
@@ -358,9 +359,8 @@ async function freeClaudeBillingOwnerColumns(
     ne(claude_billing_connections.status, ClaudeBillingConnectionStatus.Removed),
     ...(exceptPayerId ? [ne(claude_billing_connections.id, exceptPayerId)] : [])
   );
-  const held = new Set(heldLockKeys);
-  // Each pass adds one payer key to `held`, and a payer row changes only under its
-  // own key, so the loop ends at the first occupant already held.
+  // Each pass adds one payer key to the caller's set, and a payer row changes
+  // only under its own key, so the loop ends at the first occupant already held.
   for (;;) {
     const [occupant] = await tx
       .select()
@@ -370,12 +370,12 @@ async function freeClaudeBillingOwnerColumns(
     if (!occupant) return;
 
     const occupantLockKey = claudeBillingPayerLockKey(occupant.id);
-    if (!held.has(occupantLockKey)) {
-      if (!isAboveHeldLockKeys(occupantLockKey, held)) {
+    if (!heldLockKeys.has(occupantLockKey)) {
+      if (!isAboveHeldLockKeys(occupantLockKey, heldLockKeys)) {
         throw new ClaudeBillingLockRetry(occupantLockKey);
       }
       await lockClaudeBillingPayer(tx, occupant.id);
-      held.add(occupantLockKey);
+      heldLockKeys.add(occupantLockKey);
       // The probe ran unlocked, so the decision needs a read under the key.
       continue;
     }
@@ -469,7 +469,7 @@ class ClaudeBillingLockRetry extends Error {
 const CLAUDE_BILLING_LOCK_ATTEMPTS = 3;
 
 /** The lock key of a payer row: the grants and the owner columns of that row change under it. */
-function claudeBillingPayerLockKey(payerConnectionId: string): string {
+export function claudeBillingPayerLockKey(payerConnectionId: string): string {
   return `claude_billing_grant:${payerConnectionId}`;
 }
 
@@ -480,8 +480,19 @@ function claudeBillingPayerLockKey(payerConnectionId: string): string {
  * from different payers into one empty scope would each see no row and both
  * report success.
  */
-function claudeBillingOwnerLockKey(owner: ClaudeBillingOwner): string {
+export function claudeBillingOwnerLockKey(owner: ClaudeBillingOwner): string {
   return `claude_billing_claim:${claudeBillingOwnerKey(owner)}`;
+}
+
+/**
+ * The lock key that serialises first-time profile creation for a scope.
+ * `claude_billing_profile:` sorts above every claim and payer key. A transaction
+ * takes it before any key from this module and never after one, because
+ * first-time profile creation wraps an external provider call and must not hold a
+ * key that sharing waits on for that call.
+ */
+export function claudeBillingProfileLockKey(owner: ClaudeBillingOwner): string {
+  return `claude_billing_profile:${claudeBillingOwnerKey(owner)}`;
 }
 
 async function lockClaudeBillingPayer(tx: DrizzleTransaction, payerConnectionId: string) {
@@ -489,8 +500,10 @@ async function lockClaudeBillingPayer(tx: DrizzleTransaction, payerConnectionId:
 }
 
 /**
- * Locks every distinct key in ascending order. Keys come from two namespaces:
- * a payer key per row, and a claim key per scope that takes a payer.
+ * Locks every distinct key in ascending order. Keys come from three namespaces,
+ * in this sort order: `claude_billing_claim:` per scope that takes a payer,
+ * `claude_billing_grant:` per payer row, and `claude_billing_profile:` per scope
+ * that creates its first profile.
  *
  * A transaction that holds keys only ever waits for a key greater than every key
  * it holds. Two holders therefore cannot wait for each other, so no wait cycle
@@ -498,7 +511,8 @@ async function lockClaudeBillingPayer(tx: DrizzleTransaction, payerConnectionId:
  * holds aborts its transaction with `ClaudeBillingLockRetry` and retries from
  * scratch with that key added, which takes the wider set in order. The claim
  * namespace sorts before the payer namespace, so a claim key never has to be
- * taken after a discovered payer key.
+ * taken after a discovered payer key, and a profile key is taken first for the
+ * reason `claudeBillingProfileLockKey` states.
  */
 async function lockClaudeBillingKeys(
   tx: DrizzleTransaction,
@@ -664,7 +678,7 @@ async function reassignPayerOwnerColumns(
   tx: DrizzleTransaction,
   payerConnectionId: string,
   remaining: ClaudeBillingOwnerColumns,
-  heldLockKeys: ReadonlySet<string>
+  heldLockKeys: Set<string>
 ): Promise<void> {
   const nextOwner = ownerFromColumns(remaining);
   if (nextOwner) {
@@ -708,7 +722,7 @@ export async function withClaudeBillingPayerLock<T>(
   work: (
     tx: DrizzleTransaction,
     granted: ClaudeBillingGrantedConnection | null,
-    heldLockKeys: ReadonlySet<string>
+    heldLockKeys: Set<string>
   ) => Promise<T>,
   onDb: DrizzleConnection = db
 ): Promise<T> {
@@ -716,7 +730,9 @@ export async function withClaudeBillingPayerLock<T>(
     onDb.transaction(async tx => {
       const claimKey = claudeBillingOwnerLockKey(owner);
       await lockClaudeBillingKeys(tx, [...extraLockKeys, claimKey]);
-      let heldLockKeys = new Set([...extraLockKeys, claimKey]);
+      // One mutable set per transaction: a change `work` makes adds its keys here,
+      // so a later owner-column change in the same transaction sees them.
+      const heldLockKeys = new Set([...extraLockKeys, claimKey]);
       let granted = await getGrantedClaudeBillingConnection(owner, tx);
       if (!granted) return await work(tx, null, heldLockKeys);
       const payerLockKey = claudeBillingPayerLockKey(granted.connection.id);
@@ -725,7 +741,7 @@ export async function withClaudeBillingPayerLock<T>(
           throw new ClaudeBillingLockRetry(payerLockKey);
         }
         await lockClaudeBillingPayer(tx, granted.connection.id);
-        heldLockKeys = new Set([...heldLockKeys, payerLockKey]);
+        heldLockKeys.add(payerLockKey);
       }
       granted = await getGrantedClaudeBillingConnection(owner, tx);
       if (granted && !heldLockKeys.has(claudeBillingPayerLockKey(granted.connection.id))) {
@@ -751,21 +767,25 @@ export async function withClaudeBillingPayerLock<T>(
  * that resolves a payer outside the locked union restarts the transaction with the
  * wider union, bounded to `CLAUDE_BILLING_LOCK_ATTEMPTS`. `work` receives the
  * re-read grants in the order of `owners`; a scope without a row contributes
- * `null`.
+ * `null`. `work` also receives the one key set of this transaction, and every
+ * owner-column change it makes adds its keys to that same set.
  */
 export async function withClaudeBillingPayersLock<T>(
   owners: readonly ClaudeBillingOwner[],
   work: (
     tx: DrizzleTransaction,
-    grants: Array<ClaudeBillingGrantedConnection | null>
+    grants: Array<ClaudeBillingGrantedConnection | null>,
+    heldLockKeys: Set<string>
   ) => Promise<T>,
   onDb: DrizzleConnection = db
 ): Promise<T> {
   return await withClaudeBillingLockRetry(extraLockKeys =>
     onDb.transaction(async tx => {
-      const firstBatch = new Set(extraLockKeys);
-      for (const owner of owners) firstBatch.add(claudeBillingOwnerLockKey(owner));
-      await lockClaudeBillingKeys(tx, firstBatch);
+      // One mutable set per transaction: a change `work` makes adds its keys here,
+      // so a later owner-column change in the same transaction sees them.
+      const heldLockKeys = new Set(extraLockKeys);
+      for (const owner of owners) heldLockKeys.add(claudeBillingOwnerLockKey(owner));
+      await lockClaudeBillingKeys(tx, heldLockKeys);
 
       const probed: Array<ClaudeBillingGrantedConnection | null> = [];
       for (const owner of owners) {
@@ -776,7 +796,7 @@ export async function withClaudeBillingPayersLock<T>(
       for (const granted of probed) {
         if (!granted) continue;
         const payerLockKey = claudeBillingPayerLockKey(granted.connection.id);
-        if (!firstBatch.has(payerLockKey) && !isAboveHeldLockKeys(payerLockKey, firstBatch)) {
+        if (!heldLockKeys.has(payerLockKey) && !isAboveHeldLockKeys(payerLockKey, heldLockKeys)) {
           throw new ClaudeBillingLockRetry(payerLockKey);
         }
       }
@@ -785,7 +805,6 @@ export async function withClaudeBillingPayersLock<T>(
         if (granted) discovered.add(granted.connection.id);
       }
       await lockClaudeBillingPayers(tx, discovered);
-      const heldLockKeys = new Set(firstBatch);
       for (const payerId of discovered) heldLockKeys.add(claudeBillingPayerLockKey(payerId));
 
       const grants: Array<ClaudeBillingGrantedConnection | null> = [];
@@ -796,7 +815,7 @@ export async function withClaudeBillingPayersLock<T>(
         }
         grants.push(granted);
       }
-      return await work(tx, grants);
+      return await work(tx, grants, heldLockKeys);
     })
   );
 }
@@ -826,13 +845,14 @@ export async function findRetiringClaudeBillingPayer(
  * must free below a held key restarts the whole attempt and takes the merged key
  * set in one ascending batch.
  *
- * `heldLockKeys` names the keys the caller's transaction holds.
+ * `heldLockKeys` is the caller's key set; this function adds to it every key it
+ * takes, so a later owner-column change in the same transaction sees them.
  */
 export async function removeClaudeBillingGrantWithin(
   tx: DrizzleTransaction,
   owner: ClaudeBillingOwner,
   granted: ClaudeBillingGrantedConnection | null,
-  heldLockKeys: ReadonlySet<string>
+  heldLockKeys: Set<string>
 ): Promise<UnreferencedClaudeBillingPayer | null> {
   if (!granted) return null;
 
@@ -1151,10 +1171,12 @@ export async function describeClaudeBillingSharing(
  * report that connection as requiring a reconnect while its connector is gone.
  *
  * The transaction locks every payer the person appears on, in the one ascending
- * order the module uses for both key namespaces, so the deletes and the owner
- * reassignments below only wait for keys above the ones held. It takes no claim
- * key: it names payer rows, not a scope that is taking a payer. A reassignment
- * that meets another payer row below a held key restarts the whole attempt: the
+ * order the module uses for all three key namespaces, so the deletes and the
+ * owner reassignments below only wait for keys above the ones held. It takes no
+ * claim key: it names payer rows, not a scope that is taking a payer. One key set
+ * covers the whole loop, and every owner-column change adds the keys it takes to
+ * it, so a later reassignment sees what an earlier one holds. A reassignment that
+ * meets another payer row below a held key restarts the whole attempt: the
  * deletes and the reassignments are idempotent.
  *
  * The account-deletion transaction calls this with its own `tx`. A restart is
@@ -1189,6 +1211,8 @@ export async function removeUserClaudeBillingGrants(
         }
       }
       await lockClaudeBillingKeys(tx, discovered);
+      // One mutable set for the whole loop: each reassignment adds the keys it
+      // takes, so a later one sees them.
       const heldLockKeys = new Set([...extraLockKeys, ...discovered]);
 
       await tx

@@ -79,7 +79,7 @@ describe('resolveCatalogModelName', () => {
     );
   });
 
-  it('keeps an id with no path or alias marker', () => {
+  it('strips the alias marker from a bare alias id and spaces its hyphens', () => {
     expect(resolveCatalogModelName('~kilo-auto', [])).toBe('kilo auto');
   });
 });

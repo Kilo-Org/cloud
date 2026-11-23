@@ -391,12 +391,13 @@ function rules() {
       // length is resolved as a length.
       //
       // The same unitless multiplier can be written inside an arbitrary value:
-      // the compiler turns `leading-[9]` into the same deferred `em` multiplier
-      // the bare form produces, so both spellings are one rule. An explicit
-      // length (`leading-[1.25rem]`, `leading-[20px]`, `leading-[1.5em]`) is
-      // folded to a length and keeps passing, and `leading-[normal]` /
-      // `leading-[150%]` emit no line height at all, so they keep passing too.
-      pattern: /(?<![\w-])(?:leading-\d+(?:\.5)?(?![\w[.-])|leading-\[\d+(?:\.\d+)?\])/g,
+      // the compiler turns `leading-[9]` and `leading-[.5]` into the same
+      // deferred `em` multiplier the bare form produces, so every spelling is
+      // one rule. An explicit length (`leading-[1.25rem]`, `leading-[20px]`,
+      // `leading-[1.5em]`) is folded to a length and keeps passing, and
+      // `leading-[normal]` / `leading-[150%]` emit no line height at all, so
+      // they keep passing too.
+      pattern: /(?<![\w-])(?:leading-\d+(?:\.5)?(?![\w[.-])|leading-\[(?:\.\d+|\d+(?:\.\d+)?)\])/g,
       advice:
         'a numeric leading-N is multiplied by the font size at runtime; use an explicit length, e.g. leading-[1.25rem]',
     },

@@ -456,13 +456,14 @@ test('flags a bracketed opacity modifier on a theme token', () => {
 test('flags a bracketed unitless leading and keeps explicit lengths', () => {
   const found = check(
     'apps/mobile/src/bans.ts',
-    'export const a = "leading-[1.5] leading-[9] leading-9";\n' +
+    'export const a = "leading-[1.5] leading-[9] leading-[.5] leading-9";\n' +
       'export const b = "leading-[1.25rem] leading-[20px] leading-[1.5em] leading-[normal] leading-[150%]";\n'
   );
   const text = found.join('\n');
-  assert.equal(found.length, 3);
-  // `leading-[9]` compiles to the same deferred `em` multiplier as `leading-9`.
-  for (const spelling of ['leading-[1.5]', 'leading-[9]', 'leading-9']) {
+  assert.equal(found.length, 4);
+  // `leading-[9]` and `leading-[.5]` compile to the same deferred `em`
+  // multiplier as `leading-9`.
+  for (const spelling of ['leading-[1.5]', 'leading-[9]', 'leading-[.5]', 'leading-9']) {
     assert.ok(
       text.includes(`"${spelling}" a numeric leading-N`),
       `expected ${spelling} to be reported`

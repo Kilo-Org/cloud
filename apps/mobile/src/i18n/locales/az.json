@@ -4077,6 +4077,7 @@
       "divergedAction": "Sinxronlaşdırılmamış mesajları silin və ən son versiyanı yükləyin",
       "settingTitle": "Söhbətləri cihazlar arasında sinxronlaşdırın",
       "settingDescription": "Söhbətləri Kilo CLI daxil olmaqla bütün cihazlarınızda uyğun saxlayın.",
+      "settingUnreadable": "Bu parametri oxumaq mümkün olmadı. Yenidən cəhd etmək üçün toxunun.",
       "searchPlaceholder": "Söhbətlərdə axtarın",
       "originFilter": "Söhbətin mənbəyi",
       "originMobile": "Mobil",

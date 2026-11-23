@@ -4233,6 +4233,7 @@
       "divergedAction": "Zavrzi neusklajena sporočila in naloži najnovejše",
       "settingTitle": "Sinhroniziraj klepete med napravami",
       "settingDescription": "Klepeti ostanejo usklajeni v vseh vaših napravah, vključno s Kilo CLI.",
+      "settingUnreadable": "Te nastavitve ni bilo mogoče prebrati. Dotaknite se za ponovni poskus.",
       "searchPlaceholder": "Iskanje klepetov",
       "originFilter": "Izvor klepeta",
       "originMobile": "Mobilno",

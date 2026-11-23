@@ -4004,6 +4004,7 @@
       "divergedAction": "동기화되지 않은 메시지를 삭제하고 최신 버전 불러오기",
       "settingTitle": "기기 간 채팅 동기화",
       "settingDescription": "Kilo CLI를 포함한 모든 기기에서 채팅을 동기화합니다.",
+      "settingUnreadable": "이 설정을 읽을 수 없습니다. 다시 시도하려면 탭하세요.",
       "searchPlaceholder": "채팅 검색",
       "originFilter": "채팅 출처",
       "originMobile": "모바일",

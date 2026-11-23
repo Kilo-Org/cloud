@@ -4077,6 +4077,7 @@
       "divergedAction": "Forkast usynkroniserte meldinger og last inn den nyeste",
       "settingTitle": "Synkroniser chatter på tvers av enheter",
       "settingDescription": "Hold chattene i synk på alle enhetene dine, inkludert Kilo CLI.",
+      "settingUnreadable": "Kunne ikke lese denne innstillingen. Trykk for å prøve igjen.",
       "searchPlaceholder": "Søk i chatter",
       "originFilter": "Chattens opprinnelse",
       "originMobile": "Mobil",

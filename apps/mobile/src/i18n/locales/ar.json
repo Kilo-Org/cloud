@@ -4389,6 +4389,7 @@
       "divergedAction": "تجاهل الرسائل غير المتزامنة وتحميل أحدث نسخة",
       "settingTitle": "مزامنة الدردشات بين الأجهزة",
       "settingDescription": "أبقِ دردشاتك متزامنة على جميع أجهزتك، بما في ذلك Kilo CLI.",
+      "settingUnreadable": "تعذّر قراءة هذا الإعداد. اضغط للمحاولة مرة أخرى.",
       "searchPlaceholder": "ابحث في الدردشات",
       "originFilter": "مصدر الدردشة",
       "originMobile": "الهاتف",

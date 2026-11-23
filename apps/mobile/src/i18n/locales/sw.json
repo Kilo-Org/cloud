@@ -4077,6 +4077,7 @@
       "divergedAction": "Futa ujumbe ambao haujasawazishwa na upakie toleo jipya zaidi",
       "settingTitle": "Sawazisha gumzo kwenye vifaa vyote",
       "settingDescription": "Weka gumzo zikiendana kwenye vifaa vyako vyote, pamoja na Kilo CLI.",
+      "settingUnreadable": "Imeshindwa kusoma mpangilio huu. Gusa ili kujaribu tena.",
       "searchPlaceholder": "Tafuta gumzo",
       "originFilter": "Chanzo cha gumzo",
       "originMobile": "Simu",

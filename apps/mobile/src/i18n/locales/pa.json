@@ -4077,6 +4077,7 @@
       "divergedAction": "ਅਣ-ਸਿੰਕ ਕੀਤੇ ਸੁਨੇਹੇ ਰੱਦ ਕਰੋ ਅਤੇ ਨਵੀਨਤਮ ਲੋਡ ਕਰੋ",
       "settingTitle": "ਡਿਵਾਈਸਾਂ ਵਿਚਕਾਰ ਚੈਟਾਂ ਸਿੰਕ ਕਰੋ",
       "settingDescription": "Kilo CLI ਸਮੇਤ, ਆਪਣੀਆਂ ਸਾਰੀਆਂ ਡਿਵਾਈਸਾਂ 'ਤੇ ਚੈਟਾਂ ਨੂੰ ਮੇਲ ਵਿੱਚ ਰੱਖੋ।",
+      "settingUnreadable": "ਇਹ ਸੈਟਿੰਗ ਪੜ੍ਹੀ ਨਹੀਂ ਜਾ ਸਕੀ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰਨ ਲਈ ਟੈਪ ਕਰੋ।",
       "searchPlaceholder": "ਚੈਟਾਂ ਖੋਜੋ",
       "originFilter": "ਚੈਟ ਦਾ ਸਰੋਤ",
       "originMobile": "ਮੋਬਾਈਲ",

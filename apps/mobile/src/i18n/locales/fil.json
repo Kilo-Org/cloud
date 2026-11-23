@@ -4077,6 +4077,7 @@
       "divergedAction": "Itapon ang mga hindi na-sync na mensahe at i-load ang pinakabago",
       "settingTitle": "I-sync ang mga chat sa lahat ng device",
       "settingDescription": "Panatilihing naka-sync ang mga chat sa iyong mga device, kasama ang Kilo CLI.",
+      "settingUnreadable": "Hindi mabasa ang setting na ito. I-tap para subukan muli.",
       "searchPlaceholder": "Maghanap ng chat",
       "originFilter": "Pinagmulan ng chat",
       "originMobile": "Mobile",

@@ -4077,6 +4077,7 @@
       "divergedAction": "ያልተመሳሰሉ መልዕክቶችን አስወግድና የቅርብ ጊዜውን ጫን",
       "settingTitle": "ውይይቶችን በመሣሪያዎች መካከል አመሳስል",
       "settingDescription": "Kilo CLIን ጨምሮ በመሣሪያዎችዎ ሁሉ ውይይቶችን ተመሳስለው ያቆዩ።",
+      "settingUnreadable": "ይህን ቅንብር ማንበብ አልተቻለም። እንደገና ለመሞከር ይንኩ።",
       "searchPlaceholder": "ውይይቶችን ፈልግ",
       "originFilter": "የውይይት ምንጭ",
       "originMobile": "ሞባይል",

@@ -4077,6 +4077,7 @@
       "divergedAction": "Fleygja ósamstilltum skilaboðum og sækja nýjustu útgáfu",
       "settingTitle": "Samstilla spjöll milli tækja",
       "settingDescription": "Haltu spjöllum samstilltum milli tækjanna þinna, þar á meðal Kilo CLI.",
+      "settingUnreadable": "Ekki tókst að lesa þessa stillingu. Ýttu til að reyna aftur.",
       "searchPlaceholder": "Leita í spjöllum",
       "originFilter": "Uppruni spjalls",
       "originMobile": "Farsími",

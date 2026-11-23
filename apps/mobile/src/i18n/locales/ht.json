@@ -4077,6 +4077,7 @@
       "divergedAction": "Efase mesaj ki pa senkronize yo epi chaje dènye vèsyon an",
       "settingTitle": "Senkronize chat yo sou tout aparèy",
       "settingDescription": "Kenbe chat yo ajou sou tout aparèy ou yo, sa gen ladan Kilo CLI.",
+      "settingUnreadable": "Nou pa t ka li paramèt sa a. Tape pou eseye ankò.",
       "searchPlaceholder": "Chèche chat",
       "originFilter": "Orijin chat la",
       "originMobile": "Mobil",

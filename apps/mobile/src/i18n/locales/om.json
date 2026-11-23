@@ -4077,6 +4077,7 @@
       "divergedAction": "Ergaawwan hin walsimne gatii isa haaraa fe'i",
       "settingTitle": "Haasawwan meeshaalee hunda irratti walsimsiisi",
       "settingDescription": "Haasawwan meeshaalee kee hunda irratti, Kilo CLI dabalatee, walsimsiisi.",
+      "settingUnreadable": "Haasawwaan kun dubbisamuu hin danda'ane. Irra deebi'ii yaaluuf tuqi.",
       "searchPlaceholder": "Haasawwan barbaadi",
       "originFilter": "Madda haasaa",
       "originMobile": "Mobaayilii",

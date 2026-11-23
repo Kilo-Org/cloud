@@ -4233,6 +4233,7 @@
       "divergedAction": "Odrzuć niezsynchronizowane wiadomości i wczytaj najnowszą wersję",
       "settingTitle": "Synchronizuj czaty między urządzeniami",
       "settingDescription": "Utrzymuj czaty zsynchronizowane na wszystkich urządzeniach, w tym w Kilo CLI.",
+      "settingUnreadable": "Nie udało się odczytać tego ustawienia. Dotknij, aby spróbować ponownie.",
       "searchPlaceholder": "Szukaj czatów",
       "originFilter": "Źródło czatu",
       "originMobile": "Telefon",

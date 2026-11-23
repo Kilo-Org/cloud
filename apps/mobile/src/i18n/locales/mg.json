@@ -4077,6 +4077,7 @@
       "divergedAction": "Fafao ireo hafatra tsy voarindra ary ampidiro ny vaovao indrindra",
       "settingTitle": "Ampifanaraho ny resaka amin'ny fitaovana rehetra",
       "settingDescription": "Ataovy mitovy hatrany ny resaka amin'ny fitaovanao rehetra, anisan'izany ny Kilo CLI.",
+      "settingUnreadable": "Tsy voavaky ity fikirana ity. Tsindrio indray hanandramana.",
       "searchPlaceholder": "Hitady resaka",
       "originFilter": "Niavian'ny resaka",
       "originMobile": "Finday",

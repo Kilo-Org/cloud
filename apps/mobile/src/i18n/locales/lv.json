@@ -4155,6 +4155,7 @@
       "divergedAction": "Atmest nesinhronizētās ziņas un ielādēt jaunāko",
       "settingTitle": "Sinhronizēt tērzēšanas starp ierīcēm",
       "settingDescription": "Uzturiet tērzēšanas sinhronizētas visās savās ierīcēs, arī Kilo CLI.",
+      "settingUnreadable": "Neizdevās nolasīt šo iestatījumu. Pieskarieties, lai mēģinātu vēlreiz.",
       "searchPlaceholder": "Meklēt tērzēšanas",
       "originFilter": "Tērzēšanas izcelsme",
       "originMobile": "Mobilā ierīce",

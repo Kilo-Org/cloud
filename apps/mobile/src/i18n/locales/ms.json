@@ -4007,6 +4007,7 @@
       "divergedAction": "Buang mesej yang belum disegerakkan dan muatkan versi terkini",
       "settingTitle": "Segerakkan sembang merentas peranti",
       "settingDescription": "Pastikan sembang kekal selari merentas peranti anda, termasuk Kilo CLI.",
+      "settingUnreadable": "Tidak dapat membaca tetapan ini. Ketik untuk cuba lagi.",
       "searchPlaceholder": "Cari sembang",
       "originFilter": "Asal sembang",
       "originMobile": "Mudah alih",

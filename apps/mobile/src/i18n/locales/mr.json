@@ -4077,6 +4077,7 @@
       "divergedAction": "सिंक न झालेले मेसेज काढून टाका आणि नवीनतम लोड करा",
       "settingTitle": "सर्व डिव्हाइसवर चॅट सिंक करा",
       "settingDescription": "Kilo CLI सह तुमच्या सर्व डिव्हाइसवर चॅट सिंकमध्ये ठेवा.",
+      "settingUnreadable": "ही सेटिंग वाचता आली नाही. पुन्हा प्रयत्न करण्यासाठी टॅप करा.",
       "searchPlaceholder": "चॅट शोधा",
       "originFilter": "चॅटचा स्रोत",
       "originMobile": "मोबाइल",

@@ -4077,6 +4077,7 @@
       "divergedAction": "Eşitlenmemiş mesajları sil ve en son sürümü yükle",
       "settingTitle": "Sohbetleri cihazlar arasında eşitle",
       "settingDescription": "Kilo CLI dahil tüm cihazlarınızda sohbetleri eşit tutun.",
+      "settingUnreadable": "Bu ayar okunamadı. Tekrar denemek için dokunun.",
       "searchPlaceholder": "Sohbetlerde ara",
       "originFilter": "Sohbet kaynağı",
       "originMobile": "Mobil",

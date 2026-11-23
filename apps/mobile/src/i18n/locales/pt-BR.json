@@ -4233,6 +4233,7 @@
       "divergedAction": "Descartar mensagens não sincronizadas e carregar a versão mais recente",
       "settingTitle": "Sincronizar chats entre dispositivos",
       "settingDescription": "Mantenha os chats sincronizados entre seus dispositivos, incluindo o Kilo CLI.",
+      "settingUnreadable": "Não foi possível ler esta configuração. Toque para tentar novamente.",
       "searchPlaceholder": "Pesquisar chats",
       "originFilter": "Origem do chat",
       "originMobile": "Celular",

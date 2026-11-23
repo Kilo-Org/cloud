@@ -4155,6 +4155,7 @@
       "divergedAction": "Renunță la mesajele nesincronizate și încarcă cea mai recentă versiune",
       "settingTitle": "Sincronizează chaturile pe toate dispozitivele",
       "settingDescription": "Păstrează chaturile sincronizate pe toate dispozitivele tale, inclusiv în Kilo CLI.",
+      "settingUnreadable": "Nu s-a putut citi această setare. Atinge pentru a încerca din nou.",
       "searchPlaceholder": "Caută în chaturi",
       "originFilter": "Originea chatului",
       "originMobile": "Mobil",

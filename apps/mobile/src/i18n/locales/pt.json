@@ -4233,6 +4233,7 @@
       "divergedAction": "Descartar mensagens não sincronizadas e carregar a versão mais recente",
       "settingTitle": "Sincronizar conversas entre dispositivos",
       "settingDescription": "Mantenha as conversas sincronizadas em todos os seus dispositivos, incluindo o Kilo CLI.",
+      "settingUnreadable": "Não foi possível ler esta configuração. Toque para tentar novamente.",
       "searchPlaceholder": "Pesquisar conversas",
       "originFilter": "Origem da conversa",
       "originMobile": "Celular",

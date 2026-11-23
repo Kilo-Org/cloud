@@ -4077,6 +4077,7 @@
       "divergedAction": "Hidh mesazhet e pasinkronizuara dhe ngarko versionin më të fundit",
       "settingTitle": "Sinkronizo bisedat në të gjitha pajisjet",
       "settingDescription": "Mbaji bisedat të sinkronizuara në të gjitha pajisjet e tua, përfshirë Kilo CLI.",
+      "settingUnreadable": "Ky cilësim nuk u lexua dot. Trokit për të provuar përsëri.",
       "searchPlaceholder": "Kërko biseda",
       "originFilter": "Origjina e bisedës",
       "originMobile": "Celulari",

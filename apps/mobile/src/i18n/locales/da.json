@@ -4077,6 +4077,7 @@
       "divergedAction": "Kassér usynkroniserede beskeder, og indlæs den nyeste version",
       "settingTitle": "Synkroniser chats på tværs af enheder",
       "settingDescription": "Hold dine chats synkroniseret på tværs af dine enheder, også Kilo CLI.",
+      "settingUnreadable": "Kunne ikke læse denne indstilling. Tryk for at prøve igen.",
       "searchPlaceholder": "Søg i chats",
       "originFilter": "Chattens oprindelse",
       "originMobile": "Mobil",

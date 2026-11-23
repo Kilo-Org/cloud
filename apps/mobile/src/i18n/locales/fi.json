@@ -4077,6 +4077,7 @@
       "divergedAction": "Hylkää synkronoimattomat viestit ja lataa uusin",
       "settingTitle": "Synkronoi keskustelut laitteiden välillä",
       "settingDescription": "Pidä keskustelut ajan tasalla kaikilla laitteillasi, myös Kilo CLI:ssä.",
+      "settingUnreadable": "Tämän asetuksen lukeminen ei onnistunut. Napauta yrittääksesi uudelleen.",
       "searchPlaceholder": "Hae keskusteluja",
       "originFilter": "Keskustelun lähde",
       "originMobile": "Mobiili",

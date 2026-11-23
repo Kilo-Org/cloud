@@ -4010,6 +4010,7 @@
       "divergedAction": "ລຶບຂໍ້ຄວາມທີ່ຍັງບໍ່ໄດ້ຊິງຄ໌ ແລ້ວໂຫຼດອັນຫຼ້າສຸດ",
       "settingTitle": "ຊິງຄ໌ແຊັດຂ້າມອຸປະກອນ",
       "settingDescription": "ໃຫ້ແຊັດກົງກັນໃນທຸກອຸປະກອນຂອງທ່ານ, ລວມທັງ Kilo CLI.",
+      "settingUnreadable": "ບໍ່ສາມາດອ່ານການຕັ້ງຄ່ານີ້ໄດ້. ແຕະເພື່ອລອງອີກຄັ້ງ.",
       "searchPlaceholder": "ຊອກຫາແຊັດ",
       "originFilter": "ແຫຼ່ງທີ່ມາຂອງແຊັດ",
       "originMobile": "ມືຖື",

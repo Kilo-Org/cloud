@@ -4155,6 +4155,7 @@
       "divergedAction": "Descarta els missatges no sincronitzats i carrega la versió més recent",
       "settingTitle": "Sincronitza els xats entre dispositius",
       "settingDescription": "Mantén els xats sincronitzats entre els teus dispositius, inclòs el Kilo CLI.",
+      "settingUnreadable": "No s'ha pogut llegir aquest paràmetre. Toca per tornar-ho a provar.",
       "searchPlaceholder": "Cerca xats",
       "originFilter": "Origen del xat",
       "originMobile": "Mòbil",

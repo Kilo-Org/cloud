@@ -4077,6 +4077,7 @@
       "divergedAction": "Bỏ tin nhắn chưa đồng bộ và tải bản mới nhất",
       "settingTitle": "Đồng bộ cuộc trò chuyện giữa các thiết bị",
       "settingDescription": "Giữ các cuộc trò chuyện đồng bộ trên mọi thiết bị của bạn, kể cả Kilo CLI.",
+      "settingUnreadable": "Không thể đọc cài đặt này. Nhấn để thử lại.",
       "searchPlaceholder": "Tìm cuộc trò chuyện",
       "originFilter": "Nguồn cuộc trò chuyện",
       "originMobile": "Di động",

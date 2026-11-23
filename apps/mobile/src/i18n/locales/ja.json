@@ -4006,6 +4006,7 @@
       "divergedAction": "未同期のメッセージを破棄して最新の内容を読み込む",
       "settingTitle": "デバイス間でチャットを同期",
       "settingDescription": "Kilo CLIを含むすべてのデバイスでチャットを同期します。",
+      "settingUnreadable": "この設定を読み込めませんでした。タップして再試行してください。",
       "searchPlaceholder": "チャットを検索",
       "originFilter": "チャットの作成元",
       "originMobile": "モバイル",

@@ -4077,6 +4077,7 @@
       "divergedAction": "Sinxronlanmagan xabarlarni o‘chirib, eng so‘nggisini yuklash",
       "settingTitle": "Chatlarni qurilmalar o‘rtasida sinxronlash",
       "settingDescription": "Chatlarni barcha qurilmalaringizda, jumladan Kilo CLI’da ham bir xil holatda saqlang.",
+      "settingUnreadable": "Bu sozlamani o‘qib bo‘lmadi. Qayta urinish uchun bosing.",
       "searchPlaceholder": "Chatlarni qidirish",
       "originFilter": "Chat manbasi",
       "originMobile": "Mobil",

@@ -4009,6 +4009,7 @@
       "divergedAction": "Buang pesan yang belum disinkronkan dan muat versi terbaru",
       "settingTitle": "Sinkronkan chat di semua perangkat",
       "settingDescription": "Jaga chat tetap selaras di semua perangkat Anda, termasuk Kilo CLI.",
+      "settingUnreadable": "Tidak dapat membaca pengaturan ini. Ketuk untuk mencoba lagi.",
       "searchPlaceholder": "Cari chat",
       "originFilter": "Asal chat",
       "originMobile": "Seluler",

@@ -4155,6 +4155,7 @@
       "divergedAction": "מחיקת הודעות לא מסונכרנות וטעינת הגרסה העדכנית",
       "settingTitle": "סנכרון צ׳אטים בין מכשירים",
       "settingDescription": "שמירה על צ׳אטים מסונכרנים בכל המכשירים שלך, כולל Kilo CLI.",
+      "settingUnreadable": "לא ניתן לקרוא את ההגדרה הזו. יש להקיש כדי לנסות שוב.",
       "searchPlaceholder": "חיפוש צ׳אטים",
       "originFilter": "מקור הצ׳אט",
       "originMobile": "נייד",

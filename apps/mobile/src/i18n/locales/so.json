@@ -4077,6 +4077,7 @@
       "divergedAction": "Tirtir fariimaha aan la waafajin oo soo rar kii ugu dambeeyay",
       "settingTitle": "Ku waafaji wada-sheekeysiyada qalabyada oo dhan",
       "settingDescription": "Ka dhig wada-sheekeysiyadu kuwo isku jaan qaada qalabyadaada oo dhan, oo ay ku jirto Kilo CLI.",
+      "settingUnreadable": "Lama akhrin karin dejintan. Taabo si aad mar kale isku daydo.",
       "searchPlaceholder": "Raadi wada-sheekeysiyada",
       "originFilter": "Halka uu wada-sheekeysigu ka yimid",
       "originMobile": "Moobayl",

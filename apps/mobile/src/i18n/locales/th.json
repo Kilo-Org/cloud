@@ -4007,6 +4007,7 @@
       "divergedAction": "ทิ้งข้อความที่ยังไม่ซิงค์และโหลดเวอร์ชันล่าสุด",
       "settingTitle": "ซิงค์แชทระหว่างอุปกรณ์",
       "settingDescription": "ทำให้แชทตรงกันในทุกอุปกรณ์ของคุณ รวมถึง Kilo CLI",
+      "settingUnreadable": "ไม่สามารถอ่านการตั้งค่านี้ได้ แตะเพื่อลองอีกครั้ง",
       "searchPlaceholder": "ค้นหาแชท",
       "originFilter": "ต้นทางของแชท",
       "originMobile": "มือถือ",

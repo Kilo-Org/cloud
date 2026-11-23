@@ -4155,6 +4155,7 @@
       "divergedAction": "Supprimer les messages non synchronisés et charger la dernière version",
       "settingTitle": "Synchroniser les chats entre appareils",
       "settingDescription": "Gardez vos chats synchronisés sur tous vos appareils, y compris Kilo CLI.",
+      "settingUnreadable": "Impossible de lire ce paramètre. Appuyez pour réessayer.",
       "searchPlaceholder": "Rechercher des chats",
       "originFilter": "Origine du chat",
       "originMobile": "Mobile",

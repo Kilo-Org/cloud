@@ -4077,6 +4077,7 @@
       "divergedAction": "Loobu sünkroonimata sõnumitest ja laadi uusim",
       "settingTitle": "Sünkrooni vestlused seadmete vahel",
       "settingDescription": "Hoia vestlused kõigis oma seadmetes, sh Kilo CLI-s, sünkroonis.",
+      "settingUnreadable": "Seda seadet ei õnnestunud lugeda. Puuduta uuesti proovimiseks.",
       "searchPlaceholder": "Otsi vestlusi",
       "originFilter": "Vestluse päritolu",
       "originMobile": "Mobiil",

@@ -4077,6 +4077,7 @@
       "divergedAction": "Watsar da saƙonnin da ba a daidaita ba kuma a loda sabon sigar",
       "settingTitle": "Daidaita hirarraki a duk na'urori",
       "settingDescription": "Ka riƙe hirarraki daidai a duk na'urorinka, har da Kilo CLI.",
+      "settingUnreadable": "Ba a iya karanta wannan saitin ba. Taɓa don sake gwadawa.",
       "searchPlaceholder": "Nemi hirarraki",
       "originFilter": "Asalin hira",
       "originMobile": "Wayar hannu",

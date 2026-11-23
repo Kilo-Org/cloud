@@ -4077,6 +4077,7 @@
       "divergedAction": "Niet-gesynchroniseerde berichten verwijderen en nieuwste versie laden",
       "settingTitle": "Chats synchroniseren tussen apparaten",
       "settingDescription": "Houd chats gelijk op al je apparaten, inclusief Kilo CLI.",
+      "settingUnreadable": "Kan deze instelling niet lezen. Tik om het opnieuw te proberen.",
       "searchPlaceholder": "Chats zoeken",
       "originFilter": "Herkomst van chat",
       "originMobile": "Mobiel",

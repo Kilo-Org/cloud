@@ -4233,6 +4233,7 @@
       "divergedAction": "Atmesti nesinchronizuotas žinutes ir įkelti naujausią versiją",
       "settingTitle": "Sinchronizuoti pokalbius tarp įrenginių",
       "settingDescription": "Pokalbiai bus sinchronizuojami visuose jūsų įrenginiuose, įskaitant Kilo CLI.",
+      "settingUnreadable": "Nepavyko perskaityti šio nustatymo. Palieskite, kad bandytumėte dar kartą.",
       "searchPlaceholder": "Ieškoti pokalbių",
       "originFilter": "Pokalbio šaltinis",
       "originMobile": "Mobilusis",

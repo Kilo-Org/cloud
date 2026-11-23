@@ -4077,6 +4077,7 @@
       "divergedAction": "Nem szinkronizált üzenetek elvetése és a legújabb betöltése",
       "settingTitle": "Csevegések szinkronizálása az eszközök között",
       "settingDescription": "Tartsd szinkronban a csevegéseidet az összes eszközödön, a Kilo CLI-t is beleértve.",
+      "settingUnreadable": "Nem sikerült beolvasni ezt a beállítást. Koppints az újrapróbálkozáshoz.",
       "searchPlaceholder": "Csevegések keresése",
       "originFilter": "Csevegés forrása",
       "originMobile": "Mobil",

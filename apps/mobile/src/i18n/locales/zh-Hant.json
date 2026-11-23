@@ -4006,6 +4006,7 @@
       "divergedAction": "捨棄未同步的訊息並載入最新版本",
       "settingTitle": "跨裝置同步聊天",
       "settingDescription": "讓你所有裝置（包括 Kilo CLI）上的聊天保持同步。",
+      "settingUnreadable": "無法讀取此設定。點按即可重試。",
       "searchPlaceholder": "搜尋聊天",
       "originFilter": "聊天來源",
       "originMobile": "行動裝置",

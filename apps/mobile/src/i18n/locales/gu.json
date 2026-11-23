@@ -4077,6 +4077,7 @@
       "divergedAction": "સિંક ન થયેલા સંદેશા કાઢી નાખો અને નવીનતમ લોડ કરો",
       "settingTitle": "ડિવાઇસ વચ્ચે ચેટ સિંક કરો",
       "settingDescription": "Kilo CLI સહિત તમારા બધા ડિવાઇસ પર ચેટને સુમેળમાં રાખો.",
+      "settingUnreadable": "આ સેટિંગ વાંચી શકાઈ નથી. ફરી પ્રયાસ કરવા માટે ટેપ કરો.",
       "searchPlaceholder": "ચેટ શોધો",
       "originFilter": "ચેટનો સ્રોત",
       "originMobile": "મોબાઇલ",

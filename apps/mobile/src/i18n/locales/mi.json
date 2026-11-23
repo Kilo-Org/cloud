@@ -4077,6 +4077,7 @@
       "divergedAction": "Whakakorea ngā karere kāore anō kia tukutahia, ka uta i te mea hou",
       "settingTitle": "Tukutahia ngā kōrerorero puta noa i ngā pūrere",
       "settingDescription": "Kia ōrite tonu ngā kōrerorero puta noa i ō pūrere, tae atu ki te Kilo CLI.",
+      "settingUnreadable": "Kāore i taea te pānui i tēnei tautuhinga. Pāwhiritia kia whakamātau anō.",
       "searchPlaceholder": "Rapu kōrerorero",
       "originFilter": "Pūtake o te kōrerorero",
       "originMobile": "Waea pūkoro",

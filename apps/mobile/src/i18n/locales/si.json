@@ -4077,6 +4077,7 @@
       "divergedAction": "සමමුහුර්ත නොකළ පණිවිඩ ඉවත දමා නවතම අනුවාදය පූරණය කරන්න",
       "settingTitle": "උපාංග අතර චැට් සමමුහුර්ත කරන්න",
       "settingDescription": "Kilo CLI ඇතුළුව ඔබේ සියලු උපාංග අතර චැට් සමමුහුර්තව තබා ගන්න.",
+      "settingUnreadable": "මෙම සැකසුම කියවීමට නොහැකි විය. නැවත උත්සාහ කිරීමට ටැප් කරන්න.",
       "searchPlaceholder": "චැට් සොයන්න",
       "originFilter": "චැට් ආරම්භය",
       "originMobile": "ජංගම",

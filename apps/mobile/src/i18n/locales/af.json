@@ -4077,6 +4077,7 @@
       "divergedAction": "Gooi ongesinchroniseerde boodskappe weg en laai die nuutste",
       "settingTitle": "Sinchroniseer kletse oor toestelle heen",
       "settingDescription": "Hou kletse gesinchroniseer oor al jou toestelle, insluitend Kilo CLI.",
+      "settingUnreadable": "Kon nie hierdie instelling lees nie. Tik om weer te probeer.",
       "searchPlaceholder": "Soek kletse",
       "originFilter": "Oorsprong van klets",
       "originMobile": "Selfoon",

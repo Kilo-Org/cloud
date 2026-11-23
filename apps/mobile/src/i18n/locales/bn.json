@@ -4077,6 +4077,7 @@
       "divergedAction": "সিঙ্ক না হওয়া মেসেজ বাদ দিয়ে সর্বশেষটি লোড করুন",
       "settingTitle": "সব ডিভাইসে চ্যাট সিঙ্ক করুন",
       "settingDescription": "Kilo CLI সহ আপনার সব ডিভাইসে চ্যাটগুলো সিঙ্কে রাখুন।",
+      "settingUnreadable": "এই সেটিংটি পড়া যায়নি। আবার চেষ্টা করতে ট্যাপ করুন।",
       "searchPlaceholder": "চ্যাট খুঁজুন",
       "originFilter": "চ্যাটের উৎস",
       "originMobile": "মোবাইল",

@@ -4077,6 +4077,7 @@
       "divergedAction": "ناهمغږي پیغامونه لرې کړئ او وروستۍ بڼه پورته کړئ",
       "settingTitle": "چټونه په ټولو وسیلو کې همغږي کړئ",
       "settingDescription": "خپل چټونه په ټولو وسیلو کې، د Kilo CLI په ګډون، همغږي وساتئ.",
+      "settingUnreadable": "دا چټنه ونه لوستل شوه. د بیا هڅه کولو لپاره ټک وکړئ.",
       "searchPlaceholder": "چټونه ولټوئ",
       "originFilter": "د چټ سرچینه",
       "originMobile": "موبایل",

@@ -4077,6 +4077,7 @@
       "divergedAction": "सिंक न हुए मैसेज हटाएं और नया वर्शन लोड करें",
       "settingTitle": "सभी डिवाइस पर चैट सिंक करें",
       "settingDescription": "Kilo CLI समेत अपने सभी डिवाइस पर चैट सिंक में रखें।",
+      "settingUnreadable": "यह सेटिंग पढ़ी नहीं जा सकी। पुनः प्रयास करने के लिए टैप करें।",
       "searchPlaceholder": "चैट खोजें",
       "originFilter": "चैट का स्रोत",
       "originMobile": "मोबाइल",

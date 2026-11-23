@@ -4389,6 +4389,7 @@
       "divergedAction": "Gwaredu negeseuon heb eu cysoni a llwytho'r diweddaraf",
       "settingTitle": "Cysoni sgyrsiau ar draws dyfeisiau",
       "settingDescription": "Cadwch sgyrsiau'n gyson ar draws eich dyfeisiau, gan gynnwys Kilo CLI.",
+      "settingUnreadable": "Methu darllen y gosodiad hwn. Tapiwch i roi cynnig arall.",
       "searchPlaceholder": "Chwilio sgyrsiau",
       "originFilter": "Tarddiad y sgwrs",
       "originMobile": "Symudol",

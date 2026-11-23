@@ -4077,6 +4077,7 @@
       "divergedAction": "Nicht synchronisierte Nachrichten verwerfen und neuesten Stand laden",
       "settingTitle": "Chats geräteübergreifend synchronisieren",
       "settingDescription": "Halte deine Chats auf allen Geräten synchron, auch in der Kilo CLI.",
+      "settingUnreadable": "Diese Einstellung konnte nicht gelesen werden. Tippe, um es erneut zu versuchen.",
       "searchPlaceholder": "Chats durchsuchen",
       "originFilter": "Chat-Herkunft",
       "originMobile": "Mobil",

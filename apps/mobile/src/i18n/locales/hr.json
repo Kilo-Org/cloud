@@ -4155,6 +4155,7 @@
       "divergedAction": "Odbaci nesinkronizirane poruke i učitaj najnovije",
       "settingTitle": "Sinkroniziraj chatove na svim uređajima",
       "settingDescription": "Drži chatove usklađenima na svim svojim uređajima, uključujući Kilo CLI.",
+      "settingUnreadable": "Nije moguće pročitati ovu postavku. Dodirnite za ponovni pokušaj.",
       "searchPlaceholder": "Pretraži chatove",
       "originFilter": "Izvor chata",
       "originMobile": "Mobitel",

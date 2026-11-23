@@ -4233,6 +4233,7 @@
       "divergedAction": "Zahodiť nesynchronizované správy a načítať najnovšie",
       "settingTitle": "Synchronizovať chaty medzi zariadeniami",
       "settingDescription": "Udržujte chaty zosúladené na všetkých zariadeniach vrátane Kilo CLI.",
+      "settingUnreadable": "Toto nastavenie sa nepodarilo načítať. Ťuknutím to skúste znova.",
       "searchPlaceholder": "Hľadať chaty",
       "originFilter": "Pôvod chatu",
       "originMobile": "Mobil",

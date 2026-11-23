@@ -4311,6 +4311,7 @@
       "divergedAction": "Armi l-messaġġi mhux sinkronizzati u tella' l-aħħar verżjoni",
       "settingTitle": "Issinkronizza ċ-chats bejn l-apparati",
       "settingDescription": "Żomm iċ-chats sinkronizzati bejn l-apparati tiegħek, inkluż Kilo CLI.",
+      "settingUnreadable": "Ma setax jinqara dan l-issettjar. Tektek biex terġa' tipprova.",
       "searchPlaceholder": "Fittex fiċ-chats",
       "originFilter": "Oriġini taċ-chat",
       "originMobile": "Mowbajl",

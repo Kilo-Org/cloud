@@ -4077,6 +4077,7 @@
       "divergedAction": "Ta bort osynkade meddelanden och läs in den senaste versionen",
       "settingTitle": "Synka chattar mellan enheter",
       "settingDescription": "Håll chattar synkade mellan dina enheter, inklusive Kilo CLI.",
+      "settingUnreadable": "Det gick inte att läsa in den här inställningen. Tryck för att försöka igen.",
       "searchPlaceholder": "Sök chattar",
       "originFilter": "Chattens ursprung",
       "originMobile": "Mobil",

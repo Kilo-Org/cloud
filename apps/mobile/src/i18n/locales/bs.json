@@ -4155,6 +4155,7 @@
       "divergedAction": "Odbaci nesinhronizovane poruke i učitaj najnovije",
       "settingTitle": "Sinhronizuj razgovore na svim uređajima",
       "settingDescription": "Neka razgovori budu usklađeni na svim vašim uređajima, uključujući Kilo CLI.",
+      "settingUnreadable": "Nije moguće pročitati ovu postavku. Dodirnite da pokušate ponovo.",
       "searchPlaceholder": "Pretraži razgovore",
       "originFilter": "Porijeklo razgovora",
       "originMobile": "Mobilni",

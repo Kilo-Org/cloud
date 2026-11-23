@@ -4077,6 +4077,7 @@
       "divergedAction": "Baztertu sinkronizatu gabeko mezuak eta kargatu azken bertsioa",
       "settingTitle": "Sinkronizatu txatak gailuen artean",
       "settingDescription": "Mantendu txatak sinkronizatuta zure gailu guztietan, Kilo CLI barne.",
+      "settingUnreadable": "Ezin izan da ezarpen hau irakurri. Sakatu berriro saiatzeko.",
       "searchPlaceholder": "Bilatu txatak",
       "originFilter": "Txataren jatorria",
       "originMobile": "Mugikorra",

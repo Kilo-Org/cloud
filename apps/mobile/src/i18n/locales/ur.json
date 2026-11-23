@@ -4077,6 +4077,7 @@
       "divergedAction": "غیر مطابقت شدہ پیغامات حذف کریں اور تازہ ترین لوڈ کریں",
       "settingTitle": "تمام آلات پر چیٹس کی مطابقت پذیری کریں",
       "settingDescription": "Kilo CLI سمیت اپنے تمام آلات پر چیٹس کو ہم آہنگ رکھیں۔",
+      "settingUnreadable": "یہ سیٹنگ پڑھی نہیں جا سکی۔ دوبارہ کوشش کرنے کے لیے ٹیپ کریں۔",
       "searchPlaceholder": "چیٹس تلاش کریں",
       "originFilter": "چیٹ کا ماخذ",
       "originMobile": "موبائل",

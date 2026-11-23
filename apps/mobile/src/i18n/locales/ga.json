@@ -4311,6 +4311,7 @@
       "divergedAction": "Scrios na teachtaireachtaí nach bhfuil sioncronaithe agus luchtaigh an leagan is déanaí",
       "settingTitle": "Sioncronaigh comhráite idir gléasanna",
       "settingDescription": "Coinnigh comhráite i gcomhréir ar do ghléasanna go léir, Kilo CLI san áireamh.",
+      "settingUnreadable": "Níorbh fhéidir an socrú seo a léamh. Tapáil chun iarracht eile a dhéanamh.",
       "searchPlaceholder": "Cuardaigh comhráite",
       "originFilter": "Bunús an chomhrá",
       "originMobile": "Soghluaiste",

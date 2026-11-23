@@ -260,13 +260,6 @@ export async function runNeedsInputInteraction({
         pollIntervalMs,
       });
       if (requestId === null) {
-        // No raise of this kind reached the atoms inside the budget and
-        // nothing was sent. The budget alone is not proof the raise is gone:
-        // with the app closed, a cold headless start (ticket mint, connect,
-        // snapshot replay) can exceed it while the raise is still live. Only a
-        // proven live snapshot (see `liveSnapshotLanded`) makes the empty
-        // atoms authoritative — then the raise's outcome is decided by the
-        // session's own raise state (see `resolveMissingRequestId`).
         const resolution = await resolveMissingRequestId({
           store,
           manager,
@@ -294,9 +287,6 @@ export async function runNeedsInputInteraction({
           return 'retryable';
         }
       }
-      // The wait can span a raise: re-read the row immediately before sending,
-      // so the request is answered only while the session waits on the raise
-      // the notification presents.
       const gate = await presentedRaiseGate({ getSession, kiloSessionId, action, raiseId, ack });
       if (gate !== 'answer') {
         return gate;
@@ -492,7 +482,7 @@ async function resolveMissingRequestId(args: {
   return { kind: 'ended', outcome: 'unavailable' };
 }
 
-/* eslint-disable @typescript-eslint/promise-function-async, require-await -- thin trpc / stored-value / timer passthroughs */
+/* eslint-disable require-await -- thin trpc / stored-value / timer passthroughs */
 async function defaultGetSession(kiloSessionId: string): Promise<SessionRow> {
   return trpcClient.cliSessionsV2.get.query({ session_id: kiloSessionId });
 }
@@ -514,7 +504,7 @@ async function defaultSleep(ms: number): Promise<void> {
     setTimeout(resolve, ms);
   });
 }
-/* eslint-enable @typescript-eslint/promise-function-async, require-await */
+/* eslint-enable require-await */
 
 /**
  * The real manager: the same construction `session-provider.tsx` performs,

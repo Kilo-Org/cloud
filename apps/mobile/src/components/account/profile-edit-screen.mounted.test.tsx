@@ -20,6 +20,7 @@ type MutationOptions = {
 type ScreenState = {
   invalidate: Mock;
   links: Links;
+  linksPending: boolean;
   error: boolean;
   mutations: MutationOptions[];
   mutate: Mock;
@@ -33,6 +34,7 @@ type ScreenState = {
 
 const state = vi.hoisted((): ScreenState => ({
   links: { linkedinUrl: null, githubUrl: null },
+  linksPending: false,
   error: false,
   mutations: [] as MutationOptions[],
   mutate: vi.fn(),
@@ -82,7 +84,7 @@ vi.mock('@tanstack/react-query', async importOriginal => {
     ...actual,
     useQuery: () => ({
       data: state.links,
-      isPending: false,
+      isPending: state.linksPending,
       isError: state.error,
       isFetching: false,
       refetch: vi.fn(),
@@ -187,6 +189,7 @@ beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   resetLeaveSettle();
   state.links = { linkedinUrl: null, githubUrl: null };
+  state.linksPending = false;
   state.error = false;
   state.mutations = [];
   state.pending = false;
@@ -406,6 +409,23 @@ describe('ProfileEditScreen', () => {
     const root = await mount();
 
     expect(root.findAll(node => Object.is(node.type, 'QueryError'))).toHaveLength(1);
+  });
+
+  it('reserves the message line in each field of the loading placeholder', async () => {
+    state.linksPending = true;
+    const root = await mount();
+
+    // A loaded field holds its label line, its input box and the message line it
+    // reserves from the first render. The placeholder must hold the same three,
+    // or the swap to real content grows the body and moves the Save button.
+    const fieldBlocks = root.findAll(
+      node =>
+        Object.is(node.type, 'View') &&
+        typeof node.props.className === 'string' &&
+        node.props.className === 'gap-1.5' &&
+        node.findAll(child => Object.is(child.type, 'Skeleton')).length === 3
+    );
+    expect(fieldBlocks).toHaveLength(2);
   });
 
   it('keeps the fields live and takes one save while a save is pending', async () => {

@@ -222,15 +222,25 @@ export function ProfileEditScreen() {
 
   let body: ReactNode = null;
   if (links.isPending) {
+    // Each block holds the loaded field's geometry: the label line, the 44pt
+    // input box, and the message line the form now reserves from its first
+    // render. A placeholder without that line would let the swap to real
+    // content move the Save button, which is the shift this screen removes.
     body = (
       <>
-        <View className="gap-1">
-          <Skeleton className="h-3 w-24" />
-          <Skeleton className="h-12 rounded-md" />
+        <View className="gap-1.5">
+          <View className="gap-1.5">
+            <Skeleton className="h-5 w-24" />
+            <Skeleton className="h-11 rounded-md" />
+          </View>
+          <Skeleton className="h-5 w-40" />
         </View>
-        <View className="gap-1">
-          <Skeleton className="h-3 w-24" />
-          <Skeleton className="h-12 rounded-md" />
+        <View className="gap-1.5">
+          <View className="gap-1.5">
+            <Skeleton className="h-5 w-24" />
+            <Skeleton className="h-11 rounded-md" />
+          </View>
+          <Skeleton className="h-5 w-40" />
         </View>
         <Skeleton className="h-11 rounded-md" />
       </>

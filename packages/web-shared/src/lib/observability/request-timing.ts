@@ -139,7 +139,10 @@ export function buildTimingLine(input: TimingLineInput): TimingLine {
     surface,
     durationMs,
     ok,
-    ...dimensions,
+    client: dimensions.client,
+    platform: dimensions.platform,
+    version: dimensions.version,
+    requestId: dimensions.requestId,
   };
   if (path !== undefined) line.path = path;
   if (route !== undefined) line.route = route;

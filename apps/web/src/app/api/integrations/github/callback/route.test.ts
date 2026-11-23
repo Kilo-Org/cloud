@@ -375,7 +375,11 @@ describe('GET /api/integrations/github/callback bot link flow', () => {
     );
 
     expect(response.status).toBe(409);
-    await expect(response.text()).resolves.toContain('already linked to a different Kilo account');
+    const body = await response.text();
+    expect(body).toContain('already linked to a different Kilo account');
+    expect(body).toContain(
+      'an organization owner can uninstall the Kilo GitHub App from this installation and install it again'
+    );
     expect(mockedExchangeGitHubOAuthCode).toHaveBeenCalledWith('abc', 'standard');
   });
 

@@ -193,7 +193,10 @@ async function handleSlackBotLinkCallback({
   }
 
   if (outcome.status === 'conflict') {
-    return linkConflictPage(PLATFORM.SLACK);
+    return linkConflictPage(
+      PLATFORM.SLACK,
+      'If you cannot sign in to that account, a workspace owner or admin can disconnect the slack integration and connect it again, which clears the links held for that workspace.'
+    );
   }
 
   after(() => reprocessLinkedContext(provenIdentity, outcome.context, user));

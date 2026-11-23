@@ -23,6 +23,7 @@ import {
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { bot } from '@/lib/bot';
 import { linkKiloUser, unlinkTeamKiloUsers } from '@/lib/bot-identity';
+import { linkConflictPage } from '@/lib/bot/link-account-page';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import {
   type VerifiedLinearBotLinkState,
@@ -176,11 +177,9 @@ async function handleLinearBotLinkCallback(
     );
 
     if (linkResult === 'conflict') {
-      return htmlPage(
-        'Already linked',
-        'This Linear account is already linked to a different Kilo account. No changes were made.<br>' +
-          'Sign in to the Kilo account that already holds it, then mention Kilo again.',
-        409
+      return linkConflictPage(
+        'Linear',
+        'If you cannot sign in to that account, a workspace owner or admin can disconnect the Linear integration and connect it again, which clears the links held for that workspace.'
       );
     }
 

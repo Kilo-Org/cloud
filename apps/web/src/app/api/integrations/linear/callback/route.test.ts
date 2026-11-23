@@ -913,7 +913,11 @@ describe('GET /api/integrations/linear/callback bot-link flow', () => {
     );
 
     expect(response.status).toBe(409);
-    await expect(response.text()).resolves.toContain('already linked to a different Kilo account');
+    const body = await response.text();
+    expect(body).toContain('already linked to a different Kilo account');
+    expect(body).toContain(
+      'a workspace owner or admin can disconnect the Linear integration and connect it again'
+    );
     // The proof tokens are still dropped.
     expect(mockedRevokeLinearToken).toHaveBeenCalledWith('lin_user_tok', 'access_token');
   });

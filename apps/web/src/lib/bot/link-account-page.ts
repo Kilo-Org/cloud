@@ -55,13 +55,12 @@ export function errorPage(title: string, message: string, status: number): Respo
   return page(title, `  <p>${escapeHtml(message)}</p>`, status);
 }
 
-export function linkConflictPage(platform: string): Response {
+export function linkConflictPage(platform: string, clearLinksHint: string): Response {
   return errorPage(
     'Already linked',
     `This ${platform} account is already linked to a different Kilo account. No changes were made. ` +
       `Sign in to the Kilo account that already holds it, then request a new link from your chat. ` +
-      `If you cannot sign in to that account, a workspace owner or admin can disconnect the ` +
-      `${platform} integration and connect it again, which clears the links held for that workspace.`,
+      clearLinksHint,
     409
   );
 }

@@ -518,6 +518,29 @@ describe('BitbucketConnectForm primary-action reveal', () => {
     expect(form.scrollToEnd).not.toHaveBeenCalled();
   });
 
+  it('leaves the same failure alone when the motion policy flips under it', async () => {
+    mutations.connect.mockRejectedValue({
+      data: {
+        code: 'BAD_REQUEST',
+        message: 'The Bitbucket Workspace Access Token format is invalid',
+      },
+    });
+    const form = await mount(null);
+    await submit(form.root, 'workspace-token');
+    await runFrames();
+    form.scrollToEnd.mockClear();
+
+    // Reduce Motion turning on, or the battery dropping, recomputes the policy
+    // while this failure stays on screen. That is not a second failure, so the
+    // sheet must not scroll again and pull the token field out from under the
+    // person correcting it.
+    motion.scrollAnimated = false;
+    await form.rerender();
+    await runFrames();
+
+    expect(form.scrollToEnd).not.toHaveBeenCalled();
+  });
+
   it('jumps instead of animating for a person who asked for less motion', async () => {
     mutations.connect.mockRejectedValue({
       data: {

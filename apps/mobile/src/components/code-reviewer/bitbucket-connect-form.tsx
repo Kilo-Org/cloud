@@ -119,11 +119,17 @@ export function BitbucketConnectForm({
 
   const failure = feedback.status === 'failed' ? feedback.failure : null;
   const { scrollAnimated } = useMotionPolicy();
+  // The policy can flip while one failure stays on screen: Reduce Motion turns
+  // on, or the battery drops. The reveal reads it at the moment it runs, so that
+  // a flip re-renders the form without re-running the effect below and scrolling
+  // a second time.
+  const scrollAnimatedRef = useRef(scrollAnimated);
+  scrollAnimatedRef.current = scrollAnimated;
   const revealPrimaryAction = useCallback(() => {
     // The shared policy turns the reveal into a jump for a person who asked the
     // system for fewer animations (apps/mobile/AGENTS.md).
-    scrollRef.current?.scrollToEnd({ animated: scrollAnimated });
-  }, [scrollAnimated, scrollRef]);
+    scrollRef.current?.scrollToEnd({ animated: scrollAnimatedRef.current });
+  }, [scrollRef]);
   // A refused token's sentence grows this body's scroll content while the sheet
   // keeps its detent, so the primary action — the form's last child — can fall
   // below the viewport. Reveal it in the frame the sentence is laid out in. Once

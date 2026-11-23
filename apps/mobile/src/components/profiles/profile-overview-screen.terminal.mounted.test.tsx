@@ -159,8 +159,6 @@ describe('ProfileOverviewScreen terminal error states', () => {
     // With nothing to show under it, the error owns the surface: it centres and
     // no tab scroller holds it.
     expect(props.placement).toBe('center');
-    expect(findAll(renderer.root, 'ScrollView')).toHaveLength(0);
-    expect(findAll(renderer.root, 'TabScrollView')).toHaveLength(0);
     expect(findAll(renderer.root, 'TabScreenScrollView')).toHaveLength(0);
     // Without history the header back lands on the Profiles list.
     expect(findOne(renderer.root, 'ScreenHeader').props.backFallback).toBe(

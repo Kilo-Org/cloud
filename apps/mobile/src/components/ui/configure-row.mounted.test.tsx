@@ -54,7 +54,7 @@ function renderRow(
     title?: string;
     /** The line under the title; `null` renders the row without one. */
     subtitle?: string | null;
-    subtitleNumberOfLines?: number;
+    subtitleNumberOfLines?: number | 'all';
     tone?: 'good' | 'warn' | 'danger';
     disabled?: boolean;
     testID?: string;
@@ -203,6 +203,12 @@ describe('ConfigureRow subtitle line cap', () => {
     const node = subtitleNodeOf(renderRow({ subtitleNumberOfLines: 2 }), 'Transcribe');
 
     expect(node.props.numberOfLines).toBe(2);
+  });
+
+  it('leaves the subtitle uncapped when the caller asks for every line', () => {
+    const node = subtitleNodeOf(renderRow({ subtitleNumberOfLines: 'all' }), 'Transcribe');
+
+    expect(node.props.numberOfLines).toBeUndefined();
   });
 
   it('renders no subtitle line at all when the row has no subtitle', () => {

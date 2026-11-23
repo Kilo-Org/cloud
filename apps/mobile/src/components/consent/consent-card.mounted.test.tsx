@@ -549,7 +549,9 @@ describe('ConsentCard', () => {
         n.props.children === i18n.t('consent.helpImproveDescription')
     );
     expect(settled.length).toBeGreaterThan(0);
-    for (const node of settled) expect(node.props.numberOfLines).toBeUndefined();
+    for (const node of settled) {
+      expect(node.props.numberOfLines).toBeUndefined();
+    }
   });
 
   it('derives the pending phase from the account and the load phase together', () => {

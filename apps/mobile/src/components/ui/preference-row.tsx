@@ -150,11 +150,7 @@ export function PreferenceRow({
             accessibilityElementsHidden
             importantForAccessibility="no-hide-descendants"
           >
-            <Text
-              variant="muted"
-              className="w-full shrink-0 text-xs"
-              numberOfLines={subtitleLines}
-            >
+            <Text variant="muted" className="w-full shrink-0 text-xs" numberOfLines={subtitleLines}>
               {subtitle}
             </Text>
             <Text

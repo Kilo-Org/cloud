@@ -129,7 +129,9 @@ function InstructionNameHintRow({ hint, rule }: InstructionNameHintRowProps) {
  * `outsideError`, so the sentence is stated once. Save validates the name as
  * typed through `validateInstructionInput`; a name with nothing left in ASCII
  * after the fold is refused as invalid, not as empty. A refused input shows the
- * matching `profiles.instruction*` message under the field at fault.
+ * matching `profiles.instruction*` message under the field at fault, except
+ * `bad-name`: that one is the row's own sentence, already on screen, so the
+ * field adds only its boundary and its spoken name and paints it once.
  */
 export function InstructionFormSheet({
   draftScope,
@@ -178,8 +180,8 @@ export function InstructionFormSheet({
   // The rule the name must follow. The helper row reserves this sentence's
   // wrapped height in every state and paints it while the fold leaves nothing
   // to store: a disabled Done with no message would leave the person nothing to
-  // fix. A refused save's own message carries the same sentence or a more
-  // specific one, so the field's painted error wins.
+  // fix. The row owns that sentence, so the field contributes only the
+  // boundary and the spoken name through `outsideError` below.
   const rule = t(instructionErrorKey('bad-name'));
   const ruleError = nameHint.kind === 'rule' ? rule : undefined;
   // The two messages a refused instruction name can show, reserved as one slot

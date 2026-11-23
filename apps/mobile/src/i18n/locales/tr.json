@@ -4946,8 +4946,7 @@
     "unavailableDescription": "Bu çalışma alanı için kullanım ayarlanmamış. Burada kullanım görmeyi bekliyorsanız destek ekibiyle iletişime geçin.",
     "orgSelfNotice": "Bu organizasyondaki kendi kullanımınızı görüyorsunuz.",
     "viewDetails": "Kullanım ayrıntılarını görüntüle",
-    "orgSelfEntryTitle": "Sizin kullanımınız",
-    "orgSelfEntrySubtitle": "Bu organizasyondaki kendi kullanımınız"
+    "orgSelfEntryTitle": "Sizin kullanımınız"
   },
   "integrations": {
     "title": "Entegrasyonlar",

@@ -4946,8 +4946,7 @@
     "unavailableDescription": "Die Nutzungserfassung ist für diesen Workspace nicht eingerichtet. Wende dich an den Kundendienst, wenn du hier Nutzungsdaten erwartest.",
     "orgSelfNotice": "Du siehst deine eigene Nutzung in dieser Organisation.",
     "viewDetails": "Nutzungsdetails anzeigen",
-    "orgSelfEntryTitle": "Deine Nutzung",
-    "orgSelfEntrySubtitle": "Deine eigene Nutzung in dieser Organisation"
+    "orgSelfEntryTitle": "Deine Nutzung"
   },
   "integrations": {
     "title": "Integrationen",

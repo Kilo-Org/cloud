@@ -492,7 +492,9 @@ describe('Organization hub usage entry', () => {
     if (row === undefined) {
       throw new Error('the hub shows the self-scoped usage row');
     }
-    expect(row.props.subtitle).toBe(i18n.t('usage.orgSelfEntrySubtitle'));
+    // The title alone names the scope, so the row keeps the one-line height its
+    // siblings have instead of growing a subtitle that repeats it.
+    expect(row.props.subtitle).toBeUndefined();
     expect(
       rows.some(node => node.props.title === i18n.t('organization.settingsOnWeb.usageDetails'))
     ).toBe(false);

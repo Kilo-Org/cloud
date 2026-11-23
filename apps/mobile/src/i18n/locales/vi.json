@@ -4946,8 +4946,7 @@
     "unavailableDescription": "Mức sử dụng chưa được thiết lập cho vùng làm việc này. Hãy liên hệ bộ phận hỗ trợ nếu bạn nghĩ mức sử dụng lẽ ra phải hiển thị ở đây.",
     "orgSelfNotice": "Bạn đang xem mức sử dụng của chính mình trong tổ chức này.",
     "viewDetails": "Xem chi tiết mức sử dụng",
-    "orgSelfEntryTitle": "Mức sử dụng của bạn",
-    "orgSelfEntrySubtitle": "Mức sử dụng của chính mình trong tổ chức này"
+    "orgSelfEntryTitle": "Mức sử dụng của bạn"
   },
   "integrations": {
     "title": "Tích hợp",

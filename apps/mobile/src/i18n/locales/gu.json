@@ -4946,8 +4946,7 @@
     "unavailableDescription": "આ વર્કસ્પેસ માટે વપરાશ ગોઠવાયેલ નથી. જો તમે અહીં વપરાશ જોવાની અપેક્ષા રાખતા હો, તો સપોર્ટનો સંપર્ક કરો.",
     "orgSelfNotice": "તમે આ સંસ્થામાં તમારો પોતાનો વપરાશ જોઈ રહ્યા છો.",
     "viewDetails": "વપરાશની વિગતો જુઓ",
-    "orgSelfEntryTitle": "તમારો વપરાશ",
-    "orgSelfEntrySubtitle": "આ સંસ્થામાં તમારો પોતાનો વપરાશ"
+    "orgSelfEntryTitle": "તમારો વપરાશ"
   },
   "integrations": {
     "title": "ઇન્ટિગ્રેશન્સ",

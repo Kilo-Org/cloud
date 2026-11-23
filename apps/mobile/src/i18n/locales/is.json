@@ -4946,8 +4946,7 @@
     "unavailableDescription": "Notkun hefur ekki verið sett upp fyrir þetta vinnusvæði. Hafðu samband við þjónustuver ef þú átt von á að sjá notkun hér.",
     "orgSelfNotice": "Þú sérð þína eigin notkun í þessu fyrirtæki.",
     "viewDetails": "Skoða upplýsingar um notkun",
-    "orgSelfEntryTitle": "Notkun þín",
-    "orgSelfEntrySubtitle": "Þín eigin notkun í þessu fyrirtæki"
+    "orgSelfEntryTitle": "Notkun þín"
   },
   "integrations": {
     "title": "Samþættingar",

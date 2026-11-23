@@ -524,7 +524,6 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
               key={row.area}
               icon={row.icon}
               title={row.title}
-              subtitle={row.subtitle}
               onPress={() => {
                 router.push(row.href);
               }}

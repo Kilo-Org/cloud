@@ -5228,8 +5228,7 @@
     "unavailableDescription": "L-użu mhuwiex konfigurat għal dan il-workspace. Ikkuntattja l-appoġġ jekk tistenna li tara l-użu hawnhekk.",
     "orgSelfNotice": "Qed tara l-użu tiegħek stess f'din l-organizzazzjoni.",
     "viewDetails": "Ara d-dettalji tal-użu",
-    "orgSelfEntryTitle": "L-użu tiegħek",
-    "orgSelfEntrySubtitle": "L-użu tiegħek stess f'din l-organizzazzjoni"
+    "orgSelfEntryTitle": "L-użu tiegħek"
   },
   "integrations": {
     "title": "Integrazzjonijiet",

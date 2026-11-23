@@ -4946,8 +4946,7 @@
     "unavailableDescription": "此工作區尚未設定用量。若預期此處應顯示用量，請聯絡支援團隊。",
     "orgSelfNotice": "你看到的是你自己在此組織中的用量。",
     "viewDetails": "查看用量詳情",
-    "orgSelfEntryTitle": "你的用量",
-    "orgSelfEntrySubtitle": "你自己在此組織中的用量"
+    "orgSelfEntryTitle": "你的用量"
   },
   "integrations": {
     "title": "整合",

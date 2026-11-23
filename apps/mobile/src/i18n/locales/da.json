@@ -4946,8 +4946,7 @@
     "unavailableDescription": "Forbrug er ikke sat op for dette arbejdsområde. Kontakt support, hvis du forventer at se forbrug her.",
     "orgSelfNotice": "Du ser dit eget forbrug i denne organisation.",
     "viewDetails": "Se forbrugsdetaljer",
-    "orgSelfEntryTitle": "Dit forbrug",
-    "orgSelfEntrySubtitle": "Dit eget forbrug i denne organisation"
+    "orgSelfEntryTitle": "Dit forbrug"
   },
   "integrations": {
     "title": "Integrationer",

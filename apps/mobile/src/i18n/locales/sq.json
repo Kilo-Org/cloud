@@ -4946,8 +4946,7 @@
     "unavailableDescription": "Përdorimi nuk është konfiguruar për këtë hapësirë pune. Kontaktoni mbështetjen nëse prisni të shihni përdorim këtu.",
     "orgSelfNotice": "Po shihni përdorimin tuaj në këtë organizatë.",
     "viewDetails": "Shiko detajet e përdorimit",
-    "orgSelfEntryTitle": "Përdorimi juaj",
-    "orgSelfEntrySubtitle": "Përdorimi juaj vetjak në këtë organizatë"
+    "orgSelfEntryTitle": "Përdorimi juaj"
   },
   "integrations": {
     "title": "Integrimet",

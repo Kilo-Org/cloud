@@ -5134,8 +5134,7 @@
     "unavailableDescription": "Poraba za ta delovni prostor ni nastavljena. Če pričakujete, da boste tukaj videli porabo, se obrnite na podporo.",
     "orgSelfNotice": "Prikazana je vaša lastna poraba v tej organizaciji.",
     "viewDetails": "Ogled podrobnosti porabe",
-    "orgSelfEntryTitle": "Vaša poraba",
-    "orgSelfEntrySubtitle": "Vaša lastna poraba v tej organizaciji"
+    "orgSelfEntryTitle": "Vaša poraba"
   },
   "integrations": {
     "title": "Integracije",

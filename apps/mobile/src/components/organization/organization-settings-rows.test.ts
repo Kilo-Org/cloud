@@ -174,7 +174,7 @@ describe('visibleInAppSettingsRows', () => {
         'org_1'
       ).find(entry => entry.area === 'usageDetails');
       expect(row?.title).toBe(i18n.t('organization.settingsOnWeb.usageDetails'));
-      expect(row?.subtitle).toBeUndefined();
+      expect(row).not.toHaveProperty('subtitle');
       expect(row?.href).toBe('/(app)/(tabs)/(3_profile)/organization/usage');
     }
   });
@@ -186,7 +186,7 @@ describe('visibleInAppSettingsRows', () => {
         'org_1'
       ).find(entry => entry.area === 'usageDetails');
       expect(row?.title).toBe(i18n.t('usage.orgSelfEntryTitle'));
-      expect(row?.subtitle).toBe(i18n.t('usage.orgSelfEntrySubtitle'));
+      expect(row).not.toHaveProperty('subtitle');
       expect(row?.href).toBe('/(app)/(tabs)/(3_profile)/organization/usage');
     }
   });

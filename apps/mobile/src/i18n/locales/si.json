@@ -4946,8 +4946,7 @@
     "unavailableDescription": "මෙම වර්ක්ස්පේස් සඳහා භාවිතය සකසා නැත. මෙහි භාවිතය දැකීමට ඔබ අපේක්ෂා කරන්නේ නම් සහාය අමතන්න.",
     "orgSelfNotice": "ඔබ දකින්නේ මෙම සංවිධානයේ ඔබගේම භාවිතයයි.",
     "viewDetails": "භාවිත විස්තර බලන්න",
-    "orgSelfEntryTitle": "ඔබගේ භාවිතය",
-    "orgSelfEntrySubtitle": "මෙම සංවිධානයේ ඔබගේම භාවිතය"
+    "orgSelfEntryTitle": "ඔබගේ භාවිතය"
   },
   "integrations": {
     "title": "ඒකාබද්ධ කිරීම්",

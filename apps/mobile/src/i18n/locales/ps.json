@@ -4946,8 +4946,7 @@
     "unavailableDescription": "د دې کار ځای لپاره کارونه نه ده تنظیم شوې. که تمه لرئ چې دلته کارونه ووینئ، له ملاتړ سره اړیکه ونیسئ.",
     "orgSelfNotice": "تاسو په دې سازمان کې خپله کارونه وینئ.",
     "viewDetails": "د کارونې جزئیات وګورئ",
-    "orgSelfEntryTitle": "ستاسو کارونه",
-    "orgSelfEntrySubtitle": "په دې سازمان کې ستاسو خپله کارونه"
+    "orgSelfEntryTitle": "ستاسو کارونه"
   },
   "integrations": {
     "title": "ادغامونه",

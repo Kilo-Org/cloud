@@ -4946,8 +4946,7 @@
     "unavailableDescription": "Erabilera ez dago konfiguratuta lan-eremu honetan. Hemen erabilera ikusi beharko zenukeela uste baduzu, jarri harremanetan laguntza-zerbitzuarekin.",
     "orgSelfNotice": "Erakunde honetan zure erabilera ikusten ari zara.",
     "viewDetails": "Ikusi erabileraren xehetasunak",
-    "orgSelfEntryTitle": "Zure erabilera",
-    "orgSelfEntrySubtitle": "Zure erabilera propioa erakunde honetan"
+    "orgSelfEntryTitle": "Zure erabilera"
   },
   "integrations": {
     "title": "Integrazioak",

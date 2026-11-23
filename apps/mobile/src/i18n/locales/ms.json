@@ -4946,8 +4946,7 @@
     "unavailableDescription": "Penggunaan belum disediakan untuk ruang kerja ini. Hubungi sokongan jika anda menjangkakan penggunaan dipaparkan di sini.",
     "orgSelfNotice": "Anda sedang melihat penggunaan anda sendiri dalam organisasi ini.",
     "viewDetails": "Lihat butiran penggunaan",
-    "orgSelfEntryTitle": "Penggunaan anda",
-    "orgSelfEntrySubtitle": "Penggunaan anda sendiri dalam organisasi ini"
+    "orgSelfEntryTitle": "Penggunaan anda"
   },
   "integrations": {
     "title": "Integrasi",

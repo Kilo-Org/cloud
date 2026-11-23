@@ -5134,8 +5134,7 @@
     "unavailableDescription": "Využitie nie je pre tento pracovný priestor nastavené. Ak očakávate, že sa tu využitie zobrazí, kontaktujte podporu.",
     "orgSelfNotice": "Vidíte svoje vlastné využitie v tejto organizácii.",
     "viewDetails": "Zobraziť podrobnosti o využití",
-    "orgSelfEntryTitle": "Vaše využitie",
-    "orgSelfEntrySubtitle": "Vaše vlastné využitie v tejto organizácii"
+    "orgSelfEntryTitle": "Vaše využitie"
   },
   "integrations": {
     "title": "Integrácie",

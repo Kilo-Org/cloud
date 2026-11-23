@@ -5040,8 +5040,7 @@
     "unavailableDescription": "השימוש אינו מוגדר עבור סביבת העבודה הזו. פנו לתמיכה אם אתם מצפים לראות כאן נתוני שימוש.",
     "orgSelfNotice": "מוצג השימוש שלך בארגון זה.",
     "viewDetails": "הצגת פרטי השימוש",
-    "orgSelfEntryTitle": "השימוש שלך",
-    "orgSelfEntrySubtitle": "השימוש שלך בארגון זה"
+    "orgSelfEntryTitle": "השימוש שלך"
   },
   "integrations": {
     "title": "אינטגרציות",

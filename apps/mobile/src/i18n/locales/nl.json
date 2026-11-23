@@ -4946,8 +4946,7 @@
     "unavailableDescription": "Gebruik is niet ingesteld voor deze workspace. Neem contact op met de ondersteuning als je hier gebruik verwacht te zien.",
     "orgSelfNotice": "Je ziet je eigen gebruik in deze organisatie.",
     "viewDetails": "Gebruiksdetails bekijken",
-    "orgSelfEntryTitle": "Jouw gebruik",
-    "orgSelfEntrySubtitle": "Je eigen gebruik in deze organisatie"
+    "orgSelfEntryTitle": "Jouw gebruik"
   },
   "integrations": {
     "title": "Integraties",

@@ -4946,8 +4946,7 @@
     "unavailableDescription": "Selle tööruumi jaoks pole kasutust seadistatud. Kui eeldad siin kasutust näha, võta ühendust toega.",
     "orgSelfNotice": "Näed oma kasutust selles organisatsioonis.",
     "viewDetails": "Vaata kasutuse üksikasju",
-    "orgSelfEntryTitle": "Sinu kasutus",
-    "orgSelfEntrySubtitle": "Sinu oma kasutus selles organisatsioonis"
+    "orgSelfEntryTitle": "Sinu kasutus"
   },
   "integrations": {
     "title": "Integratsioonid",

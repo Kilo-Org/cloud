@@ -4946,8 +4946,7 @@
     "unavailableDescription": "Bu Workspace uchun foydalanish sozlanmagan. Agar bu yerda foydalanish ma'lumotlarini ko'rishni kutsangiz, qo'llab-quvvatlash xizmatiga murojaat qiling.",
     "orgSelfNotice": "Siz ushbu tashkilotdagi o'z foydalanishingizni ko'ryapsiz.",
     "viewDetails": "Foydalanish tafsilotlarini ko'rish",
-    "orgSelfEntryTitle": "Sizning foydalanishingiz",
-    "orgSelfEntrySubtitle": "Ushbu tashkilotdagi o'z foydalanishingiz"
+    "orgSelfEntryTitle": "Sizning foydalanishingiz"
   },
   "integrations": {
     "title": "Integratsiyalar",

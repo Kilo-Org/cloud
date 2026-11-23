@@ -5134,8 +5134,7 @@
     "unavailableDescription": "Šioje darbo srityje naudojimas nenustatytas. Jei tikitės čia matyti naudojimą, susisiekite su palaikymo komanda.",
     "orgSelfNotice": "Matote savo naudojimą šioje organizacijoje.",
     "viewDetails": "Peržiūrėti naudojimo informaciją",
-    "orgSelfEntryTitle": "Jūsų naudojimas",
-    "orgSelfEntrySubtitle": "Jūsų naudojimas šioje organizacijoje"
+    "orgSelfEntryTitle": "Jūsų naudojimas"
   },
   "integrations": {
     "title": "Integracijos",

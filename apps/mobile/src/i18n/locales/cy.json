@@ -5322,8 +5322,7 @@
     "unavailableDescription": "Nid yw defnydd wedi'i osod ar gyfer y weithfan hon. Cysylltwch â'r tîm cymorth os ydych yn disgwyl gweld defnydd yma.",
     "orgSelfNotice": "Rydych chi'n gweld eich defnydd eich hun yn y sefydliad hwn.",
     "viewDetails": "Gweld manylion defnydd",
-    "orgSelfEntryTitle": "Eich defnydd",
-    "orgSelfEntrySubtitle": "Eich defnydd eich hun yn y sefydliad hwn"
+    "orgSelfEntryTitle": "Eich defnydd"
   },
   "integrations": {
     "title": "Integreiddiadau",

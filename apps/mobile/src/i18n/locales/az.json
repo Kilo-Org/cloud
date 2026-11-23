@@ -4946,8 +4946,7 @@
     "unavailableDescription": "Bu iş sahəsi üçün istifadə qurulmayıb. Burada istifadəni görməyi gözləyirsinizsə, dəstək xidməti ilə əlaqə saxlayın.",
     "orgSelfNotice": "Bu təşkilatda öz istifadənizi görürsünüz.",
     "viewDetails": "İstifadə təfərrüatlarına baxın",
-    "orgSelfEntryTitle": "Sizin istifadəniz",
-    "orgSelfEntrySubtitle": "Bu təşkilatda öz istifadəniz"
+    "orgSelfEntryTitle": "Sizin istifadəniz"
   },
   "integrations": {
     "title": "İnteqrasiyalar",

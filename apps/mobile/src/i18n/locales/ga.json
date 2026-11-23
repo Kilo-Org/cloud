@@ -5228,8 +5228,7 @@
     "unavailableDescription": "Níl úsáid socraithe don spás oibre seo. Déan teagmháil leis an tacaíocht má tá súil agat úsáid a fheiceáil anseo.",
     "orgSelfNotice": "Tá d'úsáid féin san eagraíocht seo á feiceáil agat.",
     "viewDetails": "Féach ar shonraí úsáide",
-    "orgSelfEntryTitle": "D'úsáid féin",
-    "orgSelfEntrySubtitle": "D'úsáid féin san eagraíocht seo"
+    "orgSelfEntryTitle": "D'úsáid féin"
   },
   "integrations": {
     "title": "Comhtháthuithe",

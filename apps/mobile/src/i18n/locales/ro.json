@@ -5040,8 +5040,7 @@
     "unavailableDescription": "Utilizarea nu este configurată pentru acest spațiu de lucru. Contactați asistența dacă vă așteptați să vedeți utilizarea aici.",
     "orgSelfNotice": "Vezi propria utilizare în această organizație.",
     "viewDetails": "Vezi detaliile utilizării",
-    "orgSelfEntryTitle": "Utilizarea ta",
-    "orgSelfEntrySubtitle": "Propria utilizare în această organizație"
+    "orgSelfEntryTitle": "Utilizarea ta"
   },
   "integrations": {
     "title": "Integrări",

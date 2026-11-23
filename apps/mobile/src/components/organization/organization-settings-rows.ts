@@ -98,8 +98,6 @@ type OrgInAppSettingsArea =
 export type OrgInAppSettingsRow = Readonly<{
   area: OrgInAppSettingsArea;
   title: string;
-  /** Names the scope the destination reads, where the role changes it. */
-  subtitle?: string;
   icon: LucideIcon;
   /** The in-app screen that shows the area. */
   href: Href;
@@ -271,20 +269,14 @@ const IN_APP_TITLE_KEYS = {
 
 /**
  * The usage screen reads the whole organization for a billing role and only the
- * viewer's own usage for every other role, so the row that opens it is named for
- * the scope that role reads. Every other area has one name for every role.
+ * viewer's own usage for every other role, so the one row that opens it is named
+ * for the scope that role reads. Every other area has one name for every role.
  */
-function titleForArea(
-  area: OrgInAppSettingsArea,
-  gate: OrgInAppSettingsGate
-): Pick<OrgInAppSettingsRow, 'title' | 'subtitle'> {
+function titleForArea(area: OrgInAppSettingsArea, gate: OrgInAppSettingsGate): string {
   if (area === 'usageDetails' && !canManageOrganizationBilling(gate.role)) {
-    return {
-      title: i18n.t('usage.orgSelfEntryTitle'),
-      subtitle: i18n.t('usage.orgSelfEntrySubtitle'),
-    };
+    return i18n.t('usage.orgSelfEntryTitle');
   }
-  return { title: i18n.t(IN_APP_TITLE_KEYS[area]) };
+  return i18n.t(IN_APP_TITLE_KEYS[area]);
 }
 
 /**
@@ -321,14 +313,10 @@ export function visibleInAppSettingsRows(
   gate: OrgInAppSettingsGate,
   organizationId: string
 ): readonly OrgInAppSettingsRow[] {
-  return IN_APP_ROW_SPECS.filter(spec => spec.visible(gate)).map(spec => {
-    const { title, subtitle } = titleForArea(spec.area, gate);
-    return {
-      area: spec.area,
-      title,
-      subtitle,
-      icon: spec.icon,
-      href: spec.href(organizationId),
-    };
-  });
+  return IN_APP_ROW_SPECS.filter(spec => spec.visible(gate)).map(spec => ({
+    area: spec.area,
+    title: titleForArea(spec.area, gate),
+    icon: spec.icon,
+    href: spec.href(organizationId),
+  }));
 }

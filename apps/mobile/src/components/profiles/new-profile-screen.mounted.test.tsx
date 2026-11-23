@@ -235,6 +235,7 @@ describe('NewProfileScreen', () => {
 
   it('a failed boundary read disables Create and the retry row reads the boundary again', async () => {
     boundaryState.isError = true;
+    boundaryState.orgs = undefined;
     const { renderer, unmount } = await mount();
 
     expect(findCreateButton(renderer.root).props.disabled).toBe(true);
@@ -257,6 +258,22 @@ describe('NewProfileScreen', () => {
       (retryRow.props as { onRetry: () => void }).onRetry();
     });
     expect(boundaryRefetch).toHaveBeenCalledOnce();
+
+    unmount();
+  });
+
+  it('a failed refetch that still holds the list keeps Create enabled', async () => {
+    boundaryState.isError = true;
+    const { renderer, unmount } = await mount();
+
+    expect(findCreateButton(renderer.root).props.disabled).toBe(false);
+    expect(findRetryRow(renderer.root)).toBeUndefined();
+
+    typeName(renderer.root, 'Backend debugging');
+    await pressCreate(renderer.root);
+
+    await waitFor(() => createMutate.mock.calls.length > 0);
+    expect(createMutate.mock.calls[0]?.[0]).toEqual({ name: 'Backend debugging' });
 
     unmount();
   });

@@ -22,6 +22,9 @@ const boundaryState = vi.hoisted(() => ({
   isResolving: false,
   isError: false,
   isFetching: false,
+  orgs: [{ organizationId: 'org-1', role: 'owner' }] as
+    | { organizationId: string; role: string }[]
+    | undefined,
   refetch: boundaryRefetch,
 }));
 
@@ -137,6 +140,7 @@ describe('NewProfileScreen caller request', () => {
     boundaryState.isResolving = false;
     boundaryState.isError = false;
     boundaryState.isFetching = false;
+    boundaryState.orgs = [{ organizationId: 'org-1', role: 'owner' }];
     boundaryRefetch.mockReset();
   });
 

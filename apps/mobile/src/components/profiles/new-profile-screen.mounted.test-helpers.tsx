@@ -12,15 +12,29 @@ const toastSuccess = vi.hoisted(() => vi.fn());
 const toastError = vi.hoisted(() => vi.fn());
 const routerReplace = vi.hoisted(() => vi.fn());
 const boundaryRefetch = vi.hoisted(() => vi.fn());
-const boundaryState = vi.hoisted(() => ({
-  organizationId: 'org-1' as string | null,
-  org: { organizationName: 'First test organization' },
-  role: 'owner' as string | undefined,
-  isResolving: false,
-  isError: false,
-  isFetching: false,
-  refetch: boundaryRefetch,
-}));
+type BoundaryOrgRow = { organizationId: string; role: string };
+const boundaryState = vi.hoisted(() => {
+  const state: {
+    organizationId: string | null;
+    org: { organizationName: string } | undefined;
+    role: string | undefined;
+    isResolving: boolean;
+    isError: boolean;
+    isFetching: boolean;
+    orgs: BoundaryOrgRow[] | undefined;
+    refetch: typeof boundaryRefetch;
+  } = {
+    organizationId: 'org-1',
+    org: { organizationName: 'First test organization' },
+    role: 'owner',
+    isResolving: false,
+    isError: false,
+    isFetching: false,
+    orgs: [{ organizationId: 'org-1', role: 'owner' }],
+    refetch: boundaryRefetch,
+  };
+  return state;
+});
 const mutationState = vi.hoisted(() => ({
   create: { mutateAsync: createMutate, isPending: false },
 }));
@@ -166,5 +180,6 @@ export function resetNewProfileState(): void {
   boundaryState.isResolving = false;
   boundaryState.isError = false;
   boundaryState.isFetching = false;
+  boundaryState.orgs = [{ organizationId: 'org-1', role: 'owner' }];
   mutationState.create.isPending = false;
 }

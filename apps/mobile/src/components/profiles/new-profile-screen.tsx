@@ -100,6 +100,7 @@ export function NewProfileScreen({
     isResolving,
     isError,
     isFetching,
+    orgs,
     refetch,
   } = useOrgBoundary(organizationId);
   // No organization context on the hook: the owner choice below decides which
@@ -115,9 +116,10 @@ export function NewProfileScreen({
     organizationId: string | null;
     owner: ProfileOwnerChoice;
   } | null>(null);
-  // The owner stays a placeholder until the boundary answers. A submit before
-  // then would carry the wrong owner, so Create waits for the answer.
-  const roleUnknown = isResolving || isError;
+  // The owner follows the resolved role. Before the list answers there is no
+  // role to read, so Create waits and the screen sends no owner meanwhile. A
+  // failed background refetch keeps its list, so only a missing list is unknown.
+  const roleUnknown = isResolving || orgs === undefined;
   const canOwnOrganization =
     !roleUnknown && hasOrganizationContext(boundaryOrganizationId) && canManageOrganization(role);
   const pickedOwner =
@@ -125,6 +127,8 @@ export function NewProfileScreen({
   const owner: ProfileOwnerChoice = canOwnOrganization
     ? (pickedOwner ?? initialOwner ?? 'personal')
     : 'personal';
+  // Only a first read that failed leaves no answer and no retry of its own.
+  const boundaryUnread = isError && orgs === undefined;
   const selectOwner = (next: ProfileOwnerChoice) => {
     setOwnerSelection({ organizationId: boundaryOrganizationId ?? null, owner: next });
   };
@@ -190,7 +194,7 @@ export function NewProfileScreen({
           }}
         />
 
-        {isError ? (
+        {boundaryUnread ? (
           <QueryError
             placement="top"
             inset="none"

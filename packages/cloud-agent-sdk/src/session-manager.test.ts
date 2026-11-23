@@ -5,6 +5,7 @@ import {
   formatError,
   INTERRUPT_ABORT_SUPPRESSION_MS,
   type SessionManagerConfig,
+  type DurableDeliveryRecord,
   type StoredMessage,
   type SnapshotHistoryFailure,
 } from './session-manager';
@@ -30,6 +31,7 @@ import { createChatProcessor } from './chat-processor';
 import { sessionSnapshotFailureMessage, type SessionSnapshotFailure } from './snapshot-page';
 import { readKilo2Messages } from './kilo2-source-messages';
 import { createServiceState } from './service-state';
+import type { ServiceState } from './service-state';
 import type {
   AssistantMessage,
   UserMessage,
@@ -8906,7 +8908,9 @@ describe('createSessionManager', () => {
     it('seeds the resolved ids from the durable reader and persists a retry', async () => {
       const persistResolvedDeliveryFailure = jest.fn();
       const config = createMockConfig({
-        readResolvedDeliveryFailures: jest.fn().mockResolvedValue(['m-original']),
+        readResolvedDeliveryFailures: jest
+          .fn()
+          .mockResolvedValue({ items: ['m-original'], complete: true }),
         persistResolvedDeliveryFailure,
       });
       const mgr = createSessionManager(config);
@@ -8928,7 +8932,7 @@ describe('createSessionManager', () => {
     it('persists a retry under the session that owns the row, not the switched-to one', async () => {
       const persistResolvedDeliveryFailure = jest.fn();
       const config = createMockConfig({
-        readResolvedDeliveryFailures: jest.fn().mockResolvedValue([]),
+        readResolvedDeliveryFailures: jest.fn().mockResolvedValue({ items: [], complete: true }),
         persistResolvedDeliveryFailure,
       });
       const mgr = createSessionManager(config);
@@ -8950,7 +8954,7 @@ describe('createSessionManager', () => {
       // The durable store never sees the retry: the fire-and-forget write has
       // not landed yet, so both reads return the pre-write list.
       const config = createMockConfig({
-        readResolvedDeliveryFailures: jest.fn().mockResolvedValue([]),
+        readResolvedDeliveryFailures: jest.fn().mockResolvedValue({ items: [], complete: true }),
         persistResolvedDeliveryFailure: jest.fn(),
       });
       const mgr = createSessionManager(config);
@@ -8970,7 +8974,7 @@ describe('createSessionManager', () => {
     });
 
     it('undoes the terminal error a failure pruned by the durable read had set', async () => {
-      const read = deferred<readonly string[]>();
+      const read = deferred<DurableDeliveryRecord<string>>();
       const config = createMockConfig({
         readResolvedDeliveryFailures: jest.fn(() => read.promise),
       });
@@ -8991,7 +8995,7 @@ describe('createSessionManager', () => {
       );
 
       mockSession.state.clearFailedMessage.mockReturnValueOnce(true);
-      read.resolve(['m-original']);
+      read.resolve({ items: ['m-original'], complete: true });
       await read.promise;
       await Promise.resolve();
 
@@ -9002,7 +9006,9 @@ describe('createSessionManager', () => {
     });
 
     it('reads the durable memory for the session being opened', async () => {
-      const readResolvedDeliveryFailures = jest.fn().mockResolvedValue([]);
+      const readResolvedDeliveryFailures = jest
+        .fn()
+        .mockResolvedValue({ items: [], complete: true });
       const config = createMockConfig({ readResolvedDeliveryFailures });
       const mgr = createSessionManager(config);
 
@@ -9012,7 +9018,7 @@ describe('createSessionManager', () => {
     });
 
     it('prunes a replayed failure that landed before the durable read resolved', async () => {
-      const read = deferred<readonly string[]>();
+      const read = deferred<DurableDeliveryRecord<string>>();
       const config = createMockConfig({
         readResolvedDeliveryFailures: jest.fn(() => read.promise),
       });
@@ -9024,7 +9030,7 @@ describe('createSessionManager', () => {
       // The DO's stored-event replay delivered the failure first.
       expect(sessionConfig?.isDeliveryFailureResolved?.('m-original')).toBe(false);
 
-      read.resolve(['m-original']);
+      read.resolve({ items: ['m-original'], complete: true });
       await read.promise;
       await Promise.resolve();
 
@@ -9033,11 +9039,11 @@ describe('createSessionManager', () => {
     });
 
     it('ignores a durable read that resolves after the session switched', async () => {
-      const read = deferred<readonly string[]>();
+      const read = deferred<DurableDeliveryRecord<string>>();
       const readResolvedDeliveryFailures = jest
         .fn()
         .mockReturnValueOnce(read.promise)
-        .mockResolvedValue([]);
+        .mockResolvedValue({ items: [], complete: true });
       const config = createMockConfig({ readResolvedDeliveryFailures });
       const mgr = createSessionManager(config);
 
@@ -9045,7 +9051,7 @@ describe('createSessionManager', () => {
       await mgr.switchSession(kiloId('ses-2'));
       const secondConfig = lastSessionConfig();
 
-      read.resolve(['m-original']);
+      read.resolve({ items: ['m-original'], complete: true });
       await read.promise;
       await Promise.resolve();
 
@@ -9053,11 +9059,380 @@ describe('createSessionManager', () => {
       expect(mockSession.state.clearFailedMessage).not.toHaveBeenCalledWith('m-original');
     });
 
+    it('hides a replayed failure for a session whose durable record is incomplete', async () => {
+      // The record could not be read (or its caps dropped ids), so an empty
+      // list does not mean "nothing was resolved". Treating it as empty would
+      // let the DO's replay restore a footer the person already resolved.
+      let complete = false;
+      const config = createMockConfig({
+        readResolvedDeliveryFailures: jest.fn(async () => ({ items: [], complete })),
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      await Promise.resolve();
+
+      expect(lastSessionConfig()?.isDeliveryFailureResolved?.('m-original')).toBe(true);
+
+      // An id this process minted for a send cannot be a stored-event replay,
+      // so the incomplete record must not hide its failure.
+      const sentIds: string[] = [];
+      mockSession.send.mockResolvedValue(undefined);
+      await mgr.send({
+        payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
+        onOptimisticSend: messageId => sentIds.push(messageId),
+      });
+      expect(sentIds).toHaveLength(1);
+      expect(lastSessionConfig()?.isDeliveryFailureResolved?.(sentIds[0]!)).toBe(false);
+
+      // A later read that can vouch for the record restores the normal
+      // behaviour for that session.
+      complete = true;
+      await mgr.switchSession(kiloId('ses-2'));
+      await mgr.switchSession(kiloId('ses-1'));
+      await Promise.resolve();
+
+      expect(lastSessionConfig()?.isDeliveryFailureResolved?.('m-original')).toBe(false);
+    });
+
+    it('applies a failure for a send this process made in an unverifiable session', async () => {
+      const config = createMockConfig({
+        readResolvedDeliveryFailures: jest.fn(async () => ({ items: [], complete: false })),
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      await Promise.resolve();
+
+      const sentIds: string[] = [];
+      mockSession.send.mockResolvedValue(undefined);
+      await mgr.send({
+        payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
+        onOptimisticSend: messageId => sentIds.push(messageId),
+      });
+      const sentId = sentIds[0]!;
+
+      // The service state applies the failure footer only when the predicate
+      // allows it, so this call mirrors an applied `cloud.message.failed`.
+      expect(lastSessionConfig()?.isDeliveryFailureResolved?.(sentId)).toBe(false);
+      mockSessionCallbacks.onMessageFailed?.(sentId, {
+        status: 'failed',
+        error: 'The message could not be delivered',
+        reason: 'exhausted',
+      });
+
+      expect(
+        atomValue<{ message?: string; code?: string } | null>(
+          config.store,
+          mgr.atoms.statusIndicator
+        )
+      ).toMatchObject({ message: 'Message failed to deliver', code: 'message-delivery-failed' });
+    });
+
+    it('keeps a failure this process sent when the unverifiable read discards applied ones', async () => {
+      const read = deferred<DurableDeliveryRecord<string>>();
+      const config = createMockConfig({
+        readResolvedDeliveryFailures: jest.fn(() => read.promise),
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+
+      const sentIds: string[] = [];
+      mockSession.send.mockResolvedValue(undefined);
+      await mgr.send({
+        payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
+        onOptimisticSend: messageId => sentIds.push(messageId),
+      });
+      const sentId = sentIds[0]!;
+      // The replay applied a stored failure, and this process's own send then
+      // failed, both before the unverifiable read landed.
+      mockSession.state.getPendingMessages.mockReturnValue(
+        new Map([
+          [sentId, { status: 'failed', error: 'x', reason: 'exhausted' }],
+          ['m-replay', { status: 'failed', error: 'y', reason: 'execution' }],
+        ])
+      );
+      mockSession.state.clearFailedMessage.mockReturnValue(true);
+      mockSession.state.clearFailedMessage.mockClear();
+
+      read.resolve({ items: [], complete: false });
+      await read.promise;
+      await Promise.resolve();
+
+      expect(mockSession.state.clearFailedMessage).toHaveBeenCalledWith('m-replay');
+      expect(mockSession.state.clearFailedMessage).not.toHaveBeenCalledWith(sentId);
+    });
+
+    it('keeps a resolved send id suppressed after its session record is evicted', async () => {
+      // The record cannot be vouched for, so the predicate falls back to
+      // hiding replayed failures. An id this process sent is not a replay, so
+      // it is exempt — until the person resolves it: a resolved id must never
+      // be exempt again, even once the bounded per-session record forgets it.
+      const config = createMockConfig({
+        readResolvedDeliveryFailures: jest.fn(async () => ({ items: [], complete: false })),
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      await Promise.resolve();
+
+      const sentIds: string[] = [];
+      mockSession.send.mockResolvedValue(undefined);
+      await mgr.send({
+        payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
+        onOptimisticSend: messageId => sentIds.push(messageId),
+      });
+      const sentId = sentIds[0]!;
+      expect(lastSessionConfig()?.isDeliveryFailureResolved?.(sentId)).toBe(false);
+
+      // The re-send was accepted, so the id is resolved and suppressed.
+      mgr.clearFailedMessage(sentId);
+      expect(lastSessionConfig()?.isDeliveryFailureResolved?.(sentId)).toBe(true);
+
+      // The bounded per-session record holds 20 sessions; enough switches evict
+      // `ses-1`'s entry while this process still remembers minting the id.
+      for (let index = 0; index < 20; index += 1) {
+        await mgr.switchSession(kiloId(`ses-other-${index}`));
+      }
+      await mgr.switchSession(kiloId('ses-1'));
+      await Promise.resolve();
+
+      // The record is gone and the read still cannot vouch for the session, so
+      // only the resolution itself can suppress the replayed failure.
+      expect(lastSessionConfig()?.isDeliveryFailureResolved?.(sentId)).toBe(true);
+    });
+
+    it('drops a failure the replay applied before the unverifiable read landed', async () => {
+      // The DO's stored-event replay normally applies the footer before the
+      // durable read resolves, so hiding later failures is not enough: an
+      // unverifiable record must also drop what the replay already applied.
+      const read = deferred<DurableDeliveryRecord<string>>();
+      const config = createMockConfig({
+        readResolvedDeliveryFailures: jest.fn(() => read.promise),
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSession.state.getPendingMessages.mockReturnValue(
+        new Map([['m-resolved', { status: 'failed', error: 'x', reason: 'execution' }]])
+      );
+      mockSession.state.clearFailedMessage.mockReturnValueOnce(true);
+
+      read.resolve({ items: [], complete: false });
+      await read.promise;
+      await Promise.resolve();
+
+      expect(mockSession.state.clearFailedMessage).toHaveBeenCalledWith('m-resolved');
+      expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBeNull();
+    });
+
+    it('deletes the client-materialised row of a failure the replay applied', async () => {
+      // The dropped failure leaves no footer, so the row its replayed
+      // `cloud.message.queued` materialised must go too: left behind it reads
+      // as an ordinary sent bubble for a prompt that was never delivered.
+      const read = deferred<DurableDeliveryRecord<string>>();
+      const config = createMockConfig({
+        readResolvedDeliveryFailures: jest.fn(() => read.promise),
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      const storage = mockSession.storage;
+      if (!storage) throw new Error('expected session storage');
+      jest
+        .spyOn(storage, 'getMessageInfo')
+        .mockReturnValue(
+          stubUserMessage({ id: 'm-resolved', sessionID: 'ses-1', synthetic: true })
+        );
+      const deleteMessage = jest.spyOn(storage, 'deleteMessage').mockImplementation(() => {});
+      mockSession.state.getPendingMessages.mockReturnValue(
+        new Map([['m-resolved', { status: 'failed', error: 'x', reason: 'execution' }]])
+      );
+      mockSession.state.clearFailedMessage.mockReturnValueOnce(true);
+
+      read.resolve({ items: [], complete: false });
+      await read.promise;
+      await Promise.resolve();
+
+      expect(mockSession.state.clearFailedMessage).toHaveBeenCalledWith('m-resolved');
+      expect(deleteMessage).toHaveBeenCalledWith('m-resolved');
+    });
+
+    it('keeps a server-confirmed row of a failure the replay applied', async () => {
+      // A confirmed row is server history: only the client ghost the replay
+      // created is this path's to delete.
+      const read = deferred<DurableDeliveryRecord<string>>();
+      const config = createMockConfig({
+        readResolvedDeliveryFailures: jest.fn(() => read.promise),
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      const storage = mockSession.storage;
+      if (!storage) throw new Error('expected session storage');
+      jest
+        .spyOn(storage, 'getMessageInfo')
+        .mockReturnValue(stubUserMessage({ id: 'm-resolved', sessionID: 'ses-1' }));
+      const deleteMessage = jest.spyOn(storage, 'deleteMessage').mockImplementation(() => {});
+      mockSession.state.getPendingMessages.mockReturnValue(
+        new Map([['m-resolved', { status: 'failed', error: 'x', reason: 'execution' }]])
+      );
+      mockSession.state.clearFailedMessage.mockReturnValueOnce(true);
+
+      read.resolve({ items: [], complete: false });
+      await read.promise;
+      await Promise.resolve();
+
+      expect(mockSession.state.clearFailedMessage).toHaveBeenCalledWith('m-resolved');
+      expect(deleteMessage).not.toHaveBeenCalled();
+    });
+
+    /**
+     * A prompt that was never delivered replays as `cloud.message.queued` then
+     * `cloud.message.failed` with `delivery: 'queued'` and `accepted: false`.
+     * `processMessageFailed` does not treat that as the active turn, so it
+     * records no terminal error and `clearFailedMessage` answers `false` for
+     * exactly the ghosts `discardAppliedDeliveryFailures` exists to drop. The
+     * two cases above mock `clearFailedMessage` to return `true`, so they never
+     * cover it: these drive the real service state instead.
+     */
+    function replayUnacceptedQueuedFailure(): ServiceState {
+      const state = createServiceState({ rootSessionId: 'ses-1' });
+      state.process({ type: 'cloud.message.queued', messageId: 'm-ghost' });
+      state.process({
+        type: 'cloud.message.failed',
+        messageId: 'm-ghost',
+        delivery: 'queued',
+        accepted: false,
+        error: 'Message delivery failed',
+        reason: 'execution',
+      });
+      return state;
+    }
+
+    it('deletes the ghost row of a queued failure that never owned the terminal error', async () => {
+      const realState = replayUnacceptedQueuedFailure();
+
+      // The precondition that makes this a bug rather than a formality: the
+      // ghost sits in `pendingMessages` as a failure, yet it never set the
+      // terminal error, so clearing it cannot report that it undid one. Probed
+      // on a second state so this assertion does not consume the entry the
+      // manager is about to prune.
+      const probe = replayUnacceptedQueuedFailure();
+      expect(probe.getStatus()).toEqual({ type: 'idle' });
+      expect(probe.clearFailedMessage('m-ghost')).toBe(false);
+      expect(realState.getPendingMessages().get('m-ghost')?.status).toBe('failed');
+
+      const read = deferred<DurableDeliveryRecord<string>>();
+      const config = createMockConfig({
+        readResolvedDeliveryFailures: jest.fn(() => read.promise),
+      });
+      const mgr = createSessionManager(config);
+      const originalState = mockSession.state;
+      // The real object, not the jest mock: `getPendingMessages` and
+      // `clearFailedMessage` must decide the outcome on their own semantics.
+      mockSession.state = realState as unknown as MockSession['state'];
+      try {
+        await mgr.switchSession(kiloId('ses-1'));
+        const storage = mockSession.storage;
+        if (!storage) throw new Error('expected session storage');
+        // The row the replayed `queued` materialised: a client ghost, marked
+        // synthetic, that no server confirmation ever replaced.
+        storage.upsertMessage(
+          stubUserMessage({ id: 'm-ghost', sessionID: 'ses-1', synthetic: true })
+        );
+        // Calls through, so the row's removal is observed on the real storage.
+        const deleteMessage = jest.spyOn(storage, 'deleteMessage');
+
+        read.resolve({ items: [], complete: false });
+        await read.promise;
+        await Promise.resolve();
+
+        expect(deleteMessage).toHaveBeenCalledWith('m-ghost');
+        expect(realState.getPendingMessages().has('m-ghost')).toBe(false);
+        expect(storage.getMessageInfo('m-ghost')).toBeUndefined();
+      } finally {
+        mockSession.state = originalState;
+      }
+    });
+
+    it('keeps a server-confirmed row of a queued failure that never owned the terminal error', async () => {
+      const realState = replayUnacceptedQueuedFailure();
+
+      const read = deferred<DurableDeliveryRecord<string>>();
+      const config = createMockConfig({
+        readResolvedDeliveryFailures: jest.fn(() => read.promise),
+      });
+      const mgr = createSessionManager(config);
+      const originalState = mockSession.state;
+      mockSession.state = realState as unknown as MockSession['state'];
+      try {
+        await mgr.switchSession(kiloId('ses-1'));
+        const storage = mockSession.storage;
+        if (!storage) throw new Error('expected session storage');
+        storage.upsertMessage(stubUserMessage({ id: 'm-ghost', sessionID: 'ses-1' }));
+        const deleteMessage = jest.spyOn(storage, 'deleteMessage');
+
+        read.resolve({ items: [], complete: false });
+        await read.promise;
+        await Promise.resolve();
+
+        // The failure still goes; the row is server history and stays.
+        expect(deleteMessage).not.toHaveBeenCalled();
+        expect(realState.getPendingMessages().has('m-ghost')).toBe(false);
+        expect(storage.getMessageInfo('m-ghost')?.role).toBe('user');
+      } finally {
+        mockSession.state = originalState;
+      }
+    });
+
+    it('deletes the ghost row a complete record prunes after the replay applied it', async () => {
+      // The other order of the same race: a COMPLETE record whose read lands
+      // after the replay already applied the failure. The predicate answered
+      // false for an id the read had not seeded yet, so the failure and its
+      // row are on screen; the prune then drops the footer, and the row must
+      // not survive it as an ordinary sent bubble.
+      const realState = replayUnacceptedQueuedFailure();
+      expect(realState.getPendingMessages().get('m-ghost')?.status).toBe('failed');
+
+      const read = deferred<DurableDeliveryRecord<string>>();
+      const config = createMockConfig({
+        readResolvedDeliveryFailures: jest.fn(() => read.promise),
+      });
+      const mgr = createSessionManager(config);
+      const originalState = mockSession.state;
+      mockSession.state = realState as unknown as MockSession['state'];
+      try {
+        await mgr.switchSession(kiloId('ses-1'));
+        const storage = mockSession.storage;
+        if (!storage) throw new Error('expected session storage');
+        storage.upsertMessage(
+          stubUserMessage({ id: 'm-ghost', sessionID: 'ses-1', synthetic: true })
+        );
+        const deleteMessage = jest.spyOn(storage, 'deleteMessage');
+
+        // Complete, and it names the id: the resolved-set path, not the
+        // uncertain one that `discardAppliedDeliveryFailures` serves.
+        read.resolve({ items: ['m-ghost'], complete: true });
+        await read.promise;
+        await Promise.resolve();
+
+        expect(deleteMessage).toHaveBeenCalledWith('m-ghost');
+        expect(realState.getPendingMessages().has('m-ghost')).toBe(false);
+        expect(storage.getMessageInfo('m-ghost')).toBeUndefined();
+      } finally {
+        mockSession.state = originalState;
+      }
+    });
+
     it('projects the seeded durable ids on the resolvedDeliveryFailures atom', async () => {
       // A relaunch: the row a retry superseded is server history and comes back
       // with the snapshot, so the transcript filter needs the durable record.
       const config = createMockConfig({
-        readResolvedDeliveryFailures: jest.fn().mockResolvedValue(['m-confirmed']),
+        readResolvedDeliveryFailures: jest
+          .fn()
+          .mockResolvedValue({ items: ['m-confirmed'], complete: true }),
       });
       const mgr = createSessionManager(config);
 
@@ -9086,9 +9461,10 @@ describe('createSessionManager', () => {
 
     it('projects per session and drops the previous session on a switch', async () => {
       const config = createMockConfig({
-        readResolvedDeliveryFailures: jest.fn().mockImplementation(async id => {
-          return id === kiloId('ses-1') ? ['m-one'] : ['m-two'];
-        }),
+        readResolvedDeliveryFailures: jest.fn().mockImplementation(async id => ({
+          items: id === kiloId('ses-1') ? ['m-one'] : ['m-two'],
+          complete: true,
+        })),
       });
       const mgr = createSessionManager(config);
 

@@ -6,6 +6,7 @@ import * as Haptics from 'expo-haptics';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { clearDraft } from '@/lib/persist/drafts';
 import { ChatComposer, type ChatComposerControl } from './chat-composer';
 
 // Pins the session send contract at the component level: ONE send press sends
@@ -451,6 +452,10 @@ describe('ChatComposer send — one tap sends exactly once', () => {
 });
 
 describe('ChatComposer withdraws a restored send the server delivered', () => {
+  beforeEach(() => {
+    vi.mocked(clearDraft).mockClear();
+  });
+
   it('clears the restored draft, and keeps a draft the reader edited', async () => {
     const controlRef = createRef<ChatComposerControl>();
     // The real host clears the draft through `onOptimisticSend` and only then
@@ -459,8 +464,8 @@ describe('ChatComposer withdraws a restored send the server delivered', () => {
       throw new Error('Failed to send message');
     });
     const sendThatClearsDraft = vi.fn(
-      async (_text: string, options?: { onOptimisticSend?: () => void }) => {
-        options?.onOptimisticSend?.();
+      async (_text: string, options?: { onOptimisticSend?: (messageId: string) => void }) => {
+        options?.onOptimisticSend?.('msg-1');
         await onSend();
       }
     );
@@ -474,11 +479,13 @@ describe('ChatComposer withdraws a restored send the server delivered', () => {
     // The send failed, so the text came back into the composer.
     expect(controlRef.current?.hasContent()).toBe(true);
 
-    // The confirmed message then reached the transcript: the restore is a
-    // duplicate, so it leaves the input.
+    // The confirmed message then reached the transcript under this restore's
+    // own id: the restore is a duplicate, so it leaves the input.
+    let withdrawn: boolean | undefined = undefined;
     await act(async () => {
-      controlRef.current?.withdrawRestoredSend('Delivered late');
+      withdrawn = controlRef.current?.withdrawRestoredSend('Delivered late', 'msg-1');
     });
+    expect(withdrawn).toBe(true);
     expect(controlRef.current?.hasContent()).toBe(false);
 
     // A draft typed over a restore is the next message and stays.
@@ -487,11 +494,448 @@ describe('ChatComposer withdraws a restored send the server delivered', () => {
       sendControl(renderer.root).press();
       await flushSubmitChain();
     });
+    // The edit made the text the reader's own, so its own send failure cannot
+    // have armed it.
     await typeIntoComposer(renderer, 'Next message');
+    let editedWithdrawn: boolean | undefined = undefined;
     await act(async () => {
-      controlRef.current?.withdrawRestoredSend('Restored prompt');
+      editedWithdrawn = controlRef.current?.withdrawRestoredSend('Restored prompt', 'msg-1');
+    });
+    expect(editedWithdrawn).toBe(false);
+    expect(controlRef.current?.hasContent()).toBe(true);
+
+    renderer.unmount();
+  });
+
+  it('keeps a restore armed for message id A when the host settles id B with the same text', async () => {
+    const controlRef = createRef<ChatComposerControl>();
+    const onSend = vi.fn(
+      async (_text: string, options?: { onOptimisticSend?: (messageId: string) => void }) => {
+        options?.onOptimisticSend?.('msg-a');
+        throw new Error('Failed to send message');
+      }
+    );
+    const renderer = await mountComposer(
+      baseProps({ controlRef, draftKey: 'agent-composer:sess-1', onSend })
+    );
+
+    await typeIntoComposer(renderer, 'Delivered late');
+    await act(async () => {
+      sendControl(renderer.root).press();
+      await flushSubmitChain();
     });
     expect(controlRef.current?.hasContent()).toBe(true);
+    // The send's optimistic clear already cleared the stored draft. Only what
+    // the withdrawal does from here matters.
+    vi.mocked(clearDraft).mockClear();
+
+    // A different send carries the same words: its confirmation says nothing
+    // about the restore armed under `msg-a`.
+    let withdrawn: boolean | undefined = undefined;
+    await act(async () => {
+      withdrawn = controlRef.current?.withdrawRestoredSend('Delivered late', 'msg-b');
+    });
+    expect(withdrawn).toBe(false);
+    expect(controlRef.current?.hasContent()).toBe(true);
+    // The stored draft of the restore is untouched.
+    expect(vi.mocked(clearDraft)).not.toHaveBeenCalled();
+
+    renderer.unmount();
+  });
+
+  it('does not withdraw a stored draft the record does not name', async () => {
+    const controlRef = createRef<ChatComposerControl>();
+    const renderer = await mountComposer(
+      baseProps({
+        controlRef,
+        draftKey: 'agent-composer:sess-1',
+        initialDraft: 'Delivered late',
+        // The host read the record and it names no send for this draft, so no
+        // message id can identify it.
+        restoredSend: null,
+        restoredSendSettled: true,
+      })
+    );
+    vi.mocked(clearDraft).mockClear();
+
+    expect(controlRef.current?.hasContent()).toBe(true);
+    let withdrawn: boolean | undefined = undefined;
+    await act(async () => {
+      withdrawn = controlRef.current?.withdrawRestoredSend('Delivered late', 'msg-1');
+    });
+    expect(withdrawn).toBe(false);
+    expect(controlRef.current?.hasContent()).toBe(true);
+    expect(vi.mocked(clearDraft)).not.toHaveBeenCalled();
+
+    renderer.unmount();
+  });
+
+  it('consumes a settled draft load when a withdrawal matches nothing', async () => {
+    const controlRef = createRef<ChatComposerControl>();
+    const onDeliveredDraftConsumed = vi.fn<() => void>();
+    const renderer = await mountComposer(
+      baseProps({
+        controlRef,
+        draftKey: 'agent-composer:sess-1',
+        initialDraft: 'Restored draft text',
+        restoredSend: null,
+        restoredSendSettled: true,
+        onDeliveredDraftConsumed,
+      })
+    );
+    expect(controlRef.current?.hasContent()).toBe(true);
+
+    // The load already settled and its attribution names no send, so nothing is
+    // left for the suppression to guard: the record must not keep it for a
+    // later draft.
+    let withdrawn: boolean | undefined = undefined;
+    await act(async () => {
+      withdrawn = controlRef.current?.withdrawRestoredSend('Another prompt', 'msg-1');
+    });
+    expect(withdrawn).toBe(false);
+    expect(onDeliveredDraftConsumed).toHaveBeenCalledTimes(1);
+    expect(controlRef.current?.hasContent()).toBe(true);
+
+    renderer.unmount();
+  });
+
+  it('releases a withdrawal when the host reports no attribution at all', async () => {
+    const controlRef = createRef<ChatComposerControl>();
+    const onDeliveredDraftConsumed = vi.fn<() => void>();
+    const renderer = await mountComposer(
+      baseProps({
+        controlRef,
+        draftKey: 'agent-composer:sess-1',
+        initialDraft: 'Restored draft text',
+        deliveredDraft: null,
+        onDeliveredDraftConsumed,
+      })
+    );
+    expect(controlRef.current?.hasContent()).toBe(true);
+
+    // A host that reports no attribution has no answer pending. Holding the
+    // request would strand it, and the record it guards would never be spent.
+    let withdrawn: boolean | undefined = undefined;
+    await act(async () => {
+      withdrawn = controlRef.current?.withdrawRestoredSend('Another prompt', 'msg-1');
+    });
+    expect(withdrawn).toBe(false);
+    expect(onDeliveredDraftConsumed).toHaveBeenCalledTimes(1);
+    expect(controlRef.current?.hasContent()).toBe(true);
+
+    renderer.unmount();
+  });
+
+  it('keeps a pending draft load when a withdrawal matches nothing', async () => {
+    const controlRef = createRef<ChatComposerControl>();
+    const onDeliveredDraftConsumed = vi.fn<() => void>();
+    const renderer = await mountComposer(
+      baseProps({
+        controlRef,
+        draftKey: 'agent-composer:sess-1',
+        initialDraft: undefined,
+        restoredSend: null,
+        restoredSendSettled: false,
+        onDeliveredDraftConsumed,
+      })
+    );
+
+    // The load has not settled, so the suppression stays for the one load it
+    // was published for. The request is held until the host answers.
+    let withdrawn: boolean | undefined = undefined;
+    await act(async () => {
+      withdrawn = controlRef.current?.withdrawRestoredSend('Another prompt', 'msg-1');
+    });
+    expect(withdrawn).toBe(false);
+    expect(onDeliveredDraftConsumed).not.toHaveBeenCalled();
+
+    renderer.unmount();
+  });
+});
+
+describe('ChatComposer withdraws a stored draft the host attributes to a recorded send', () => {
+  beforeEach(() => {
+    vi.mocked(clearDraft).mockClear();
+  });
+
+  it('clears the loaded draft when the withdrawal names the attributed send', async () => {
+    const controlRef = createRef<ChatComposerControl>();
+    const renderer = await mountComposer(
+      baseProps({
+        controlRef,
+        draftKey: 'agent-composer:sess-1',
+        initialDraft: 'Delivered late',
+        restoredSend: { text: 'Delivered late', messageId: 'msg-1' },
+        restoredSendSettled: true,
+      })
+    );
+    expect(controlRef.current?.hasContent()).toBe(true);
+
+    let withdrawn: boolean | undefined = undefined;
+    await act(async () => {
+      withdrawn = controlRef.current?.withdrawRestoredSend('Delivered late', 'msg-1');
+    });
+    expect(withdrawn).toBe(true);
+    expect(controlRef.current?.hasContent()).toBe(false);
+    expect(vi.mocked(clearDraft)).toHaveBeenCalledTimes(1);
+
+    renderer.unmount();
+  });
+
+  it('holds a withdrawal that arrives before the attribution, then applies it', async () => {
+    const controlRef = createRef<ChatComposerControl>();
+    const onDeliveredDraftConsumed = vi.fn<() => void>();
+    const loadedProps = {
+      controlRef,
+      draftKey: 'agent-composer:sess-1',
+      initialDraft: 'Delivered late',
+      onDeliveredDraftConsumed,
+    };
+    const renderer = await mountComposer(
+      baseProps({ ...loadedProps, restoredSend: null, restoredSendSettled: false })
+    );
+    vi.mocked(clearDraft).mockClear();
+    expect(controlRef.current?.hasContent()).toBe(true);
+
+    // The host has not read the record yet, so the request waits instead of
+    // spending the load's suppression on a guess.
+    let withdrawn: boolean | undefined = undefined;
+    await act(async () => {
+      withdrawn = controlRef.current?.withdrawRestoredSend('Delivered late', 'msg-1');
+    });
+    expect(withdrawn).toBe(false);
+    expect(onDeliveredDraftConsumed).not.toHaveBeenCalled();
+    expect(controlRef.current?.hasContent()).toBe(true);
+
+    // The answer names the send this draft came from: the held request applies.
+    await act(async () => {
+      renderer.update(
+        createElement(
+          ChatComposer,
+          baseProps({
+            ...loadedProps,
+            restoredSend: { text: 'Delivered late', messageId: 'msg-1' },
+            restoredSendSettled: true,
+          })
+        )
+      );
+    });
+    expect(controlRef.current?.hasContent()).toBe(false);
+    expect(vi.mocked(clearDraft)).toHaveBeenCalledTimes(1);
+
+    renderer.unmount();
+  });
+
+  it('releases the held withdrawal when the attribution names another send', async () => {
+    const controlRef = createRef<ChatComposerControl>();
+    const onDeliveredDraftConsumed = vi.fn<() => void>();
+    const loadedProps = {
+      controlRef,
+      draftKey: 'agent-composer:sess-1',
+      initialDraft: 'Delivered late',
+      onDeliveredDraftConsumed,
+    };
+    const renderer = await mountComposer(
+      baseProps({ ...loadedProps, restoredSend: null, restoredSendSettled: false })
+    );
+
+    let withdrawn: boolean | undefined = undefined;
+    await act(async () => {
+      withdrawn = controlRef.current?.withdrawRestoredSend('Delivered late', 'msg-1');
+    });
+    expect(withdrawn).toBe(false);
+
+    await act(async () => {
+      renderer.update(
+        createElement(
+          ChatComposer,
+          baseProps({
+            ...loadedProps,
+            restoredSend: { text: 'Delivered late', messageId: 'msg-other' },
+            restoredSendSettled: true,
+          })
+        )
+      );
+    });
+    // The draft is the reader's next message, not the delivered one. The
+    // suppression is spent so it cannot outlive the load it was published for.
+    expect(controlRef.current?.hasContent()).toBe(true);
+    expect(onDeliveredDraftConsumed).toHaveBeenCalledTimes(1);
+
+    renderer.unmount();
+  });
+
+  it('releases the held withdrawal when the attribution finds no send', async () => {
+    const controlRef = createRef<ChatComposerControl>();
+    const onDeliveredDraftConsumed = vi.fn<() => void>();
+    const loadedProps = {
+      controlRef,
+      draftKey: 'agent-composer:sess-1',
+      initialDraft: 'Delivered late',
+      onDeliveredDraftConsumed,
+    };
+    const renderer = await mountComposer(
+      baseProps({ ...loadedProps, restoredSend: null, restoredSendSettled: false })
+    );
+
+    let withdrawn: boolean | undefined = undefined;
+    await act(async () => {
+      withdrawn = controlRef.current?.withdrawRestoredSend('Delivered late', 'msg-1');
+    });
+    expect(withdrawn).toBe(false);
+
+    await act(async () => {
+      renderer.update(
+        createElement(
+          ChatComposer,
+          baseProps({ ...loadedProps, restoredSend: null, restoredSendSettled: true })
+        )
+      );
+    });
+    expect(controlRef.current?.hasContent()).toBe(true);
+    expect(onDeliveredDraftConsumed).toHaveBeenCalledTimes(1);
+
+    renderer.unmount();
+  });
+
+  it('does not arm an attribution whose text the input no longer holds', async () => {
+    const controlRef = createRef<ChatComposerControl>();
+    const onDeliveredDraftConsumed = vi.fn<() => void>();
+    const renderer = await mountComposer(
+      baseProps({
+        controlRef,
+        draftKey: 'agent-composer:sess-1',
+        initialDraft: 'Delivered late',
+        // The record names different words, so this draft is not that send.
+        restoredSend: { text: 'Another prompt', messageId: 'msg-1' },
+        restoredSendSettled: true,
+        onDeliveredDraftConsumed,
+      })
+    );
+    expect(controlRef.current?.hasContent()).toBe(true);
+
+    // The withdrawal names the attributed id, but the attribution does not
+    // describe the text in the input, so the draft stays.
+    let withdrawn: boolean | undefined = undefined;
+    await act(async () => {
+      withdrawn = controlRef.current?.withdrawRestoredSend('Delivered late', 'msg-1');
+    });
+    expect(withdrawn).toBe(false);
+    expect(controlRef.current?.hasContent()).toBe(true);
+    expect(onDeliveredDraftConsumed).toHaveBeenCalledTimes(1);
+
+    renderer.unmount();
+  });
+
+  it('does not arm text the reader typed while the draft was loading', async () => {
+    const controlRef = createRef<ChatComposerControl>();
+    const onDeliveredDraftConsumed = vi.fn<() => void>();
+    const loadedProps = {
+      controlRef,
+      draftKey: 'agent-composer:sess-1',
+      onDeliveredDraftConsumed,
+    };
+    const renderer = await mountComposer(
+      baseProps({
+        ...loadedProps,
+        initialDraft: undefined,
+        restoredSend: null,
+        restoredSendSettled: false,
+      })
+    );
+    await typeIntoComposer(renderer, 'Delivered late');
+
+    // The load lands after the typing, so nothing is applied and the words stay
+    // the reader's own — even though they equal the recorded send.
+    await act(async () => {
+      renderer.update(
+        createElement(
+          ChatComposer,
+          baseProps({
+            ...loadedProps,
+            initialDraft: 'Delivered late',
+            restoredSend: { text: 'Delivered late', messageId: 'msg-1' },
+            restoredSendSettled: true,
+          })
+        )
+      );
+    });
+
+    let withdrawn: boolean | undefined = undefined;
+    await act(async () => {
+      withdrawn = controlRef.current?.withdrawRestoredSend('Delivered late', 'msg-1');
+    });
+    expect(withdrawn).toBe(false);
+    expect(controlRef.current?.hasContent()).toBe(true);
+    expect(onDeliveredDraftConsumed).toHaveBeenCalledTimes(1);
+
+    renderer.unmount();
+  });
+});
+
+describe('ChatComposer gates the delivered-send check on the failing send’s own id', () => {
+  it('restores the prompt when the delivered record belongs to a different id', async () => {
+    // The host holds a confirmed record for `msg-2`. This send carries `msg-3`,
+    // so that earlier message with the same words must not stand in for it.
+    const isPromptDelivered = vi.fn(
+      (text: string, id: string) => text === 'Delivered prompt' && id === 'msg-2'
+    );
+    const controlRef = createRef<ChatComposerControl>();
+    const onSend = vi.fn(
+      async (_text: string, options?: { onOptimisticSend?: (messageId: string) => void }) => {
+        options?.onOptimisticSend?.('msg-3');
+        throw new Error('Failed to send message');
+      }
+    );
+    const renderer = await mountComposer(
+      baseProps({
+        controlRef,
+        onSend,
+        isPromptDelivered,
+      })
+    );
+
+    await typeIntoComposer(renderer, 'Delivered prompt');
+    await act(async () => {
+      sendControl(renderer.root).press();
+      await flushSubmitChain();
+    });
+
+    expect(isPromptDelivered).toHaveBeenCalledWith('Delivered prompt', 'msg-3');
+    expect(controlRef.current?.hasContent()).toBe(true);
+
+    renderer.unmount();
+  });
+
+  it('keeps the prompt out of the composer when the record is this send’s own id', async () => {
+    // This send carried `msg-2`, the id the host confirmed, so restoring the
+    // text beside its own delivered message would offer a duplicate.
+    const isPromptDelivered = vi.fn(
+      (text: string, id: string) => text === 'Delivered prompt' && id === 'msg-2'
+    );
+    const controlRef = createRef<ChatComposerControl>();
+    const onSend = vi.fn(
+      async (_text: string, options?: { onOptimisticSend?: (messageId: string) => void }) => {
+        options?.onOptimisticSend?.('msg-2');
+        throw new Error('Failed to send message');
+      }
+    );
+    const renderer = await mountComposer(
+      baseProps({
+        controlRef,
+        onSend,
+        isPromptDelivered,
+      })
+    );
+
+    await typeIntoComposer(renderer, 'Delivered prompt');
+    await act(async () => {
+      sendControl(renderer.root).press();
+      await flushSubmitChain();
+    });
+
+    expect(isPromptDelivered).toHaveBeenCalledWith('Delivered prompt', 'msg-2');
+    expect(controlRef.current?.hasContent()).toBe(false);
 
     renderer.unmount();
   });

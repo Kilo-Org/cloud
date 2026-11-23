@@ -216,7 +216,12 @@ import { useUserWebConnectionHealth } from '@/lib/hooks/use-user-web-connection-
 import { useCliAgents } from '@/lib/hooks/use-cli-agents';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
+import { composerPromptText } from '@/lib/composer-text';
 import { agentComposerDraftKey } from '@/lib/persist/drafts';
+import {
+  pendingSendMessageIdForText,
+  readPendingSendConfirmations,
+} from '@/lib/persist/pending-send-confirmations';
 import { useFencedDraftLoad } from '@/lib/persist/use-draft-load';
 import { useKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-preference';
 import { useKeepAwake } from '@/lib/keep-awake';
@@ -648,6 +653,61 @@ export function SessionDetailContent({
     isIdentityLoading,
     entityKey: sessionComposerDraftKey,
   });
+
+  // The send the loaded draft came from. A restored draft is the text of a send
+  // whose outcome was unknown, and the durable pending-send record is the only
+  // trace of that send's message id. Naming it lets the composer withdraw the
+  // draft once the server confirms that send, instead of leaving the delivered
+  // text beside its own row. `settled` tells the composer "not read yet" apart
+  // from "read, nothing found", so a withdrawal that arrives first is held.
+  const [restoredDraftSend, setRestoredDraftSend] = useState<{
+    text: string;
+    messageId: string;
+  } | null>(null);
+  const [restoredDraftSendSettled, setRestoredDraftSendSettled] = useState(false);
+  // The session the screen shows right now. The route keeps one mounted screen
+  // across a session switch, so a read that resolves late compares against this
+  // before it attributes anything.
+  const liveSessionIdRef = useRef(sessionId);
+  liveSessionIdRef.current = sessionId;
+  // Bumped by every attribution run, so only the newest read may publish.
+  const restoredDraftReadGenerationRef = useRef(0);
+  const composerDraftSettled = composerDraft.settled;
+  const composerDraftValue = composerDraft.value;
+  useEffect(() => {
+    if (!composerDraftSettled) {
+      return;
+    }
+    restoredDraftReadGenerationRef.current += 1;
+    const generation = restoredDraftReadGenerationRef.current;
+    const draft = composerDraftValue ?? '';
+    setRestoredDraftSendSettled(false);
+    setRestoredDraftSend(null);
+    // Nothing to attribute: no draft, no account, or no session. Reporting the
+    // answer as settled releases a held withdrawal instead of keeping it.
+    const attributable =
+      composerPromptText(draft) !== '' && userId !== undefined && sessionId !== '';
+    if (!attributable) {
+      setRestoredDraftSendSettled(true);
+      return;
+    }
+    // Fence the read on the session it was started for: a late answer for
+    // another session must never attribute a draft in this one.
+    const readFor = { userId, sessionId };
+    const attributeDraft = async (): Promise<void> => {
+      const record = await readPendingSendConfirmations(readFor.userId, readFor.sessionId);
+      if (
+        restoredDraftReadGenerationRef.current !== generation ||
+        liveSessionIdRef.current !== readFor.sessionId
+      ) {
+        return;
+      }
+      const messageId = pendingSendMessageIdForText(record, draft);
+      setRestoredDraftSend(messageId === null ? null : { text: draft, messageId });
+      setRestoredDraftSendSettled(true);
+    };
+    void attributeDraft();
+  }, [composerDraftSettled, composerDraftValue, userId, sessionId]);
 
   // Composer remount identity. An account CHANGE must remount the composer, so
   // one account's typed text never surfaces under another. Identity RESOLVING
@@ -1469,6 +1529,13 @@ export function SessionDetailContent({
     cancelQueuedUpgradeRequiredRef.current = null;
     setExitFailure(null);
     setIsRetryingExit(false);
+    // The attribution names a send in the session being left, and its read has
+    // not run for the new one. The composer remounts on this render, so it must
+    // see "nothing to attribute, not read yet" rather than the previous
+    // session's answer: a stale id would arm the new draft and refuse the id
+    // that arrives for it.
+    setRestoredDraftSend(null);
+    setRestoredDraftSendSettled(false);
   } else {
     const next = nextHeldQueuedIds(heldQueuedIds, pendingMessages, isStreaming);
     if (next !== heldQueuedIds) {
@@ -1596,7 +1663,10 @@ export function SessionDetailContent({
       return;
     }
     appliedDeliveredFailedPromptSequence.current = deliveredFailedPrompt.sequence;
-    composerControlRef.current?.withdrawRestoredSend(deliveredFailedPrompt.text);
+    composerControlRef.current?.withdrawRestoredSend(
+      deliveredFailedPrompt.text,
+      deliveredFailedPrompt.messageId
+    );
   }, [deliveredFailedPrompt, setConsumedDeliveredSequence]);
   const consumableDeliveredDraft =
     deliveredFailedPrompt !== null && deliveredFailedPrompt.sequence > consumedDeliveredSequence
@@ -1607,6 +1677,28 @@ export function SessionDetailContent({
       setConsumedDeliveredSequence(deliveredFailedPrompt.sequence);
     }
   }, [deliveredFailedPrompt]);
+  // The record names the message id the failed send carried, so the composer
+  // can ask whether the send that just failed is itself confirmed instead of
+  // matching on words: an earlier delivery with the same text has a different
+  // id and must never suppress the restore.
+  const deliveredFailedPromptRef = useRef(deliveredFailedPrompt);
+  deliveredFailedPromptRef.current = deliveredFailedPrompt;
+  const isPromptDelivered = useCallback((text: string, messageId: string) => {
+    const record = deliveredFailedPromptRef.current;
+    if (record === null) {
+      return false;
+    }
+    return (
+      record.messageId === messageId && composerPromptText(record.text) === composerPromptText(text)
+    );
+  }, []);
+
+  // The record of unknown-outcome sends is the only thing that retires a
+  // restored draft when its confirmation lands: it names the message id the
+  // send carried. Matching the draft's text against a confirmed row cannot do
+  // that — the row's time is the server's clock while the draft's write is the
+  // device's, and a re-typed prompt is indistinguishable from a delivered one.
+  // So an unreadable or truncated record withdraws nothing; the draft stays.
 
   // Where the account settles a turn its balance refused. The action reads no
   // session state, so it stays wired for a read-only transcript too. It reads
@@ -3486,6 +3578,9 @@ export function SessionDetailContent({
                 draftKey={userId ? sessionComposerDraftKey : undefined}
                 initialDraft={composerDraft.settled ? (composerDraft.value ?? '') : undefined}
                 deliveredDraft={consumableDeliveredDraft}
+                restoredSend={restoredDraftSend}
+                restoredSendSettled={restoredDraftSendSettled}
+                isPromptDelivered={isPromptDelivered}
                 onDeliveredDraftConsumed={consumeDeliveredDraft}
                 sessionId={sessionId}
                 suggestion={activeSuggestion}

@@ -56,6 +56,7 @@ export type {
   StoredMessage,
   DeliveredFailedPrompt,
   PendingSendConfirmation,
+  DurableDeliveryRecord,
   PrepareInput,
 } from './session-manager';
 

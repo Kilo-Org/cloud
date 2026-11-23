@@ -237,6 +237,9 @@ const TRANSCRIPT_CLEARED_INDICATOR = 'View cleared — earlier messages are stil
  */
 const RESOLVED_DELIVERY_MEMORY_MAX_SESSIONS = 20;
 
+/** Maximum number of locally minted send ids remembered as this process's own. */
+const LOCAL_SEND_MEMORY_MAX_IDS = 200;
+
 /**
  * Maximum number of sessions with an in-memory record of a prompt a failed send
  * could not deliver. Bounded like the delivery-failure record: a long-lived
@@ -370,6 +373,18 @@ type PrepareInput = {
   initialMessageId?: string;
 };
 
+/**
+ * One durable per-session delivery record as read back by a
+ * `SessionManagerConfig` reader. `items` may be partial, so `complete` is what
+ * separates "nothing was recorded" from "the record could not be vouched for".
+ */
+export type DurableDeliveryRecord<T> = {
+  /** What the record still holds; may be partial. */
+  readonly items: readonly T[];
+  /** False when the record could not be read, or when ids it should hold were dropped. */
+  readonly complete: boolean;
+};
+
 type SessionManagerConfig = {
   store: JotaiStore;
   resolveSession: (kiloSessionId: KiloSessionId) => Promise<ResolvedSession>;
@@ -478,8 +493,17 @@ type SessionManagerConfig = {
    * and the failed response row it re-sent — so the transcript keeps hiding
    * them after a relaunch. Callers without a reader (web, tests) keep the
    * in-memory-only behaviour.
+   *
+   * `complete: false` means the caller cannot vouch for the whole record: it
+   * could not be read, or its caps dropped ids it should hold. The manager
+   * then suppresses replayed failures for that session rather than trusting an
+   * empty list, because an absent id would let the DO's replay restore a footer
+   * the person already resolved. A failure this process sent itself is not a
+   * replay, so it keeps its footer.
    */
-  readResolvedDeliveryFailures?: (kiloSessionId: KiloSessionId) => Promise<readonly string[]>;
+  readResolvedDeliveryFailures?: (
+    kiloSessionId: KiloSessionId
+  ) => Promise<DurableDeliveryRecord<string>>;
   /**
    * Optional sink for a message id the user resolved by retrying, so the next
    * open can drop its replayed `cloud.message.failed` and keep a replaced row
@@ -767,9 +791,11 @@ type SessionManager = {
     /**
      * Fired synchronously after the optimistic user row is inserted, before the
      * transport round-trip. The composer uses it to clear the draft and unlock
-     * so the prompt never renders in both the transcript and the input.
+     * so the prompt never renders in both the transcript and the input. The
+     * argument is the message id the transport carried, so a caller can tie its
+     * own failure handling to this send.
      */
-    onOptimisticSend?: () => void;
+    onOptimisticSend?: (messageId: string) => void;
   }): Promise<boolean>;
   setRemoteModelOverride(override: RemoteModelOverride | null): void;
   setCloudAgentModelOverride(override: CloudAgentModelOverride | null): void;
@@ -1613,6 +1639,29 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    * only way to reach any set.
    */
   const resolvedDeliveryFailuresBySession = new Map<KiloSessionId, Set<string>>();
+  /**
+   * Sessions whose durable resolution record could not be vouched for. An
+   * unverifiable record must not read as "nothing was resolved": the manager
+   * then knows only that it cannot answer, and the session predicate hides
+   * failures instead of letting the DO's replay restore a footer the person
+   * already resolved. The flag suppresses only failures this process did not
+   * send itself. A send here minted its message id, so its failure cannot be a
+   * stored-event replay. A capped or tombstoned record never becomes complete,
+   * so the flag stays for the session's lifetime. That is why the suppression
+   * is scoped rather than permanent. Bounded like the sibling per-session
+   * records, with the active session protected: an entry is dropped by a later
+   * read for that session that comes back complete, and the cap only has to
+   * hold sessions opened in this process — a fresh manager reads every record
+   * again on open, so a dropped entry is re-established before its predicate is
+   * consulted.
+   */
+  const resolvedFailuresUncertain = new Set<KiloSessionId>();
+  /**
+   * Ids this manager minted for a send in this process, bounded like the
+   * sibling memories. A failure for one of them is never mistaken for a
+   * stored-event replay.
+   */
+  const locallySentMessageIds = new Set<string>();
   /**
    * Failed rows a re-send superseded while it is still in flight, keyed by the
    * session that owns the row. The transcript filter needs the row hidden
@@ -3255,6 +3304,11 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    * awaited: if it lands after the DO's replay already applied a resolved
    * failure, the prune below removes the whole failure; if it lands first,
    * the predicate suppresses it.
+   *
+   * A record the reader cannot vouch for marks the session uncertain instead
+   * of seeding an empty list, because an empty list would let the replay
+   * restore a footer the person already resolved. An unreadable or capped
+   * record then suppresses replayed failures only.
    */
   function seedResolvedDeliveryFailures(
     kiloSessionId: KiloSessionId,
@@ -3264,8 +3318,20 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     if (!config.readResolvedDeliveryFailures) return resolvedFailures;
     void config
       .readResolvedDeliveryFailures(kiloSessionId)
-      .then(ids => {
+      .then(record => {
         if (expectedGeneration !== switchGeneration) return;
+        if (record.complete) {
+          resolvedFailuresUncertain.delete(kiloSessionId);
+        } else {
+          addBoundedKeeping(
+            resolvedFailuresUncertain,
+            kiloSessionId,
+            RESOLVED_DELIVERY_MEMORY_MAX_SESSIONS,
+            activeSessionId
+          );
+          discardAppliedDeliveryFailures();
+        }
+        const ids = record.items;
         for (const id of ids) {
           resolvedFailures.add(id);
         }
@@ -3276,6 +3342,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           );
         }
         for (const id of ids) {
+          // A failure the replay applied before this read landed still has its
+          // client-materialised row, so it goes whole here too.
+          dropMaterialisedRow(id);
           // `clearFailedMessage` reports when the pruned entry was also the
           // failure that set the terminal error and has undone it. That
           // error reached `errorAtom` through `config.onError`, which the
@@ -3288,9 +3357,62 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         }
       })
       .catch(() => {
-        // An unreadable memory is a miss, never a failed open.
+        // A rejected read is a record that could not be read: never a miss.
+        // The open still succeeds, but the session's failures stay hidden
+        // rather than allowing one the person already resolved to return.
+        if (expectedGeneration !== switchGeneration) return;
+        addBoundedKeeping(
+          resolvedFailuresUncertain,
+          kiloSessionId,
+          RESOLVED_DELIVERY_MEMORY_MAX_SESSIONS,
+          activeSessionId
+        );
+        discardAppliedDeliveryFailures();
       });
     return resolvedFailures;
+  }
+
+  /**
+   * A failure this client hid goes whole: the replayed `cloud.message.queued`
+   * materialised its user row locally, and without the footer that row renders
+   * as an ordinary sent bubble for a prompt that was never delivered. A
+   * confirmed row (`synthetic` undefined) is server history and stays.
+   *
+   * The delete is deliberately not gated on `clearFailedMessage`, which returns
+   * true only for the entry that owned the terminal error, and a prompt that
+   * was never delivered replays as queued and unaccepted, which never owns one.
+   */
+  function dropMaterialisedRow(messageId: string): void {
+    const info = currentSession?.storage.getMessageInfo(messageId);
+    if (info?.role === 'user' && info.synthetic === true) {
+      currentSession?.storage.deleteMessage(messageId);
+    }
+  }
+
+  /**
+   * A record the reader cannot vouch for may name a failure the user already
+   * resolved. The DO's stored-event replay usually applies those footers before
+   * the durable read lands, so hiding later failures is not enough: the ones
+   * already applied for this session are dropped here. A dropped failure goes
+   * whole — pending entry, terminal error, and the client-materialised row —
+   * while a confirmed user row is server history and stays. A failure whose id
+   * this process minted for its own send is kept. It cannot be a stored-event
+   * replay, so its footer and terminal error stay. A failure another client of
+   * this session made is dropped like a replay, because the unreadable record
+   * cannot tell the two apart; see `isDeliveryFailureResolved`.
+   */
+  function discardAppliedDeliveryFailures(): void {
+    const state = currentSession?.state;
+    if (state === undefined) return;
+    for (const [messageId, delivery] of state.getPendingMessages()) {
+      if (delivery.status !== 'failed') continue;
+      if (locallySentMessageIds.has(messageId)) continue;
+      dropMaterialisedRow(messageId);
+      if (state.clearFailedMessage(messageId)) {
+        store.set(errorAtom, null);
+        store.set(failedHistoryKindAtom, null);
+      }
+    }
   }
 
   function seedPendingSendConfirmations(
@@ -4088,7 +4210,22 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       storage,
       onToolAttachment: config.onToolAttachment,
       onFilePart: config.onFilePart,
-      isDeliveryFailureResolved: messageId => resolvedFailures.has(messageId),
+      // An unverifiable durable record hides a failure only when this process
+      // did not send it. A failure for an id this manager minted is genuine,
+      // not a stored-event replay. It keeps its footer.
+      //
+      // A live failure for a send made by another client of this session (a
+      // second device, or the CLI) is therefore hidden too while the record
+      // cannot be read. The client has no way to tell that failure apart from
+      // a stored-event replay: both carry an id this process never minted, and
+      // the record that could separate them is exactly the one that is
+      // unreadable. Hiding it keeps this record's one promise — a footer the
+      // person already resolved never returns — and the cost is that such a
+      // failure shows no footer and no Retry for as long as the record stays
+      // incomplete.
+      isDeliveryFailureResolved: messageId =>
+        resolvedFailures.has(messageId) ||
+        (resolvedFailuresUncertain.has(kiloSessionId) && !locallySentMessageIds.has(messageId)),
       ...callbacks,
     });
     return session;
@@ -4118,7 +4255,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     payload: SessionManagerSendPayload;
     attachments?: CloudAgentAttachments;
     attachmentParts?: RemoteAttachmentPart[];
-    onOptimisticSend?: () => void;
+    /** Receives the message id this send carries, so a caller can tie its own failure handling to it. */
+    onOptimisticSend?: (messageId: string) => void;
   }): Promise<boolean> {
     store.set(errorAtom, null);
     store.set(failedHistoryKindAtom, null);
@@ -4147,6 +4285,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     }
 
     const messageId = generateMessageId();
+    addBoundedKeeping(locallySentMessageIds, messageId, LOCAL_SEND_MEMORY_MAX_IDS, null);
     const messageText =
       input.payload.type === 'command'
         ? `/${input.payload.command}${input.payload.arguments ? ` ${input.payload.arguments}` : ''}`
@@ -4199,7 +4338,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         }
         markSending(messageId, true);
         // Signal the composer exactly once, after the row is in the transcript.
-        input.onOptimisticSend?.();
+        input.onOptimisticSend?.(messageId);
       }
 
       if (!sessionAtSend) throw new Error('No active session');
@@ -4566,6 +4705,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     // durable write below lands; that write is what keeps the clear across a
     // relaunch.
     resolvedFailuresForSession(owner).add(messageId);
+    // A resolved id must never be exempt again: the exemption exists for a
+    // failure this process has not seen resolved, and the bounded per-session
+    // set can lose the resolution while this process keeps the id.
+    locallySentMessageIds.delete(messageId);
     // The accepted resolution replaces the in-flight mark: one record per id,
     // and the resolved record is the one that survives a relaunch.
     unmarkMessageSuperseded(messageId, owner);
@@ -4711,6 +4854,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     clearAllAtoms();
     remoteOptimisticIds.clear();
     resolvedDeliveryFailuresBySession.clear();
+    resolvedFailuresUncertain.clear();
+    locallySentMessageIds.clear();
     supersededInFlightBySession.clear();
     failedPromptBySession.clear();
     pendingConfirmationBySession.clear();

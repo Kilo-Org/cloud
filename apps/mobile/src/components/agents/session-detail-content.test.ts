@@ -80,6 +80,7 @@ import { PULL_FEEDBACK_MIN_BEAT_MS } from '@/components/agents/use-pull-refresh'
 import { SESSION_SLOW_LOAD_MS } from '@/components/agents/session-slow-load';
 import { SessionMessageList } from '@/components/agents/session-message-list';
 import type * as SessionTranscript from '@/components/agents/session-transcript';
+import type * as PendingSendConfirmationsModule from '@/lib/persist/pending-send-confirmations';
 import { type SessionTranscriptItem } from '@/components/agents/session-transcript';
 import type * as UseEffectiveAgentProfileModule from '@/components/agents/use-effective-agent-profile';
 import type * as UseEffectiveProfileCustomModesModule from '@/components/agents/use-effective-profile-custom-modes';
@@ -113,6 +114,10 @@ import {
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 
 const managerSlot = vi.hoisted(() => ({ current: null as SessionManager | null }));
+// The durable composer draft the screen loads. `null` is the ordinary
+// no-draft session; a case that needs a restored draft sets it here.
+const draftLoadState = vi.hoisted(() => ({ settled: true, value: null as string | null }));
+
 // The open gate's verdict the list mock publishes. `true` is the settled open
 // these cases describe; a test that needs the still-measuring window sets it to
 // `false`, and `null` models a list that never reports.
@@ -200,6 +205,13 @@ vi.mock('react-native', () => ({
   // The header reads the window to decide whether its actions share the title
   // row; this phone is wide enough for them to.
   useWindowDimensions: () => ({ width: 390, fontScale: 1, height: 844 }),
+  // Read only by the real composer one case mounts (see `composerProbe`): the
+  // app-state and focus subscriptions answer a foregrounded device and drop
+  // themselves, and the input is a host the composer clears through its ref.
+  AccessibilityInfo: { addEventListener: () => ({ remove: () => undefined }) },
+  AppState: { addEventListener: () => ({ remove: () => undefined }) },
+  Keyboard: { dismiss: () => undefined },
+  TextInput: 'TextInput',
 }));
 vi.mock('react-native-reanimated', () => ({
   default: { View: 'AnimatedView' },
@@ -391,7 +403,19 @@ vi.mock('@/components/agents/message-error-boundary', () => ({
 vi.mock('@/components/agents/message-details-sheet', () => ({
   MessageDetailsSheet: 'MessageDetailsSheet',
 }));
-vi.mock('@/components/agents/chat-composer', () => ({ ChatComposer: 'ChatComposer' }));
+// The composer is a host stub for every case but the session-switch attribution
+// one, which mounts the real component so the withdrawal it drives is the
+// composer's own arming, not a re-implementation of it. The real module is
+// imported by that case only: its graph needs the native stubs below.
+const composerProbe = vi.hoisted(() => ({ real: null as unknown, useReal: false }));
+vi.mock('@/components/agents/chat-composer', () => ({
+  // A getter, not a wrapper component: the screen's JSX reads the export per
+  // render, and a wrapper would add a fiber between the composer and the
+  // wrapper `composerWrapper` walks to.
+  get ChatComposer() {
+    return composerProbe.useReal ? composerProbe.real : 'ChatComposer';
+  },
+}));
 vi.mock('@/components/agents/model-selector', () => ({
   ModelPickerSelectionScopeProvider: 'ModelPickerSelectionScopeProvider',
 }));
@@ -428,6 +452,100 @@ vi.mock('@/components/agents/session-tasks-indicator', () => ({
 }));
 vi.mock('@/components/agents/session-status-indicator', () => ({
   SessionStatusIndicator: 'SessionStatusIndicator',
+}));
+
+// ── the real composer's module graph ─────────────────────────────────────────
+// The session-switch attribution case mounts `ChatComposer` itself, so the
+// native and presentation modules on its path are stubs here. Nothing else in
+// this file imports them: the stub composer never reaches these paths.
+vi.mock('react-native-gesture-handler', () => ({
+  Gesture: {
+    Pan: () => {
+      const builder = {
+        activeOffsetY: () => builder,
+        enabled: () => builder,
+        failOffsetX: () => builder,
+        onStart: () => builder,
+        runOnJS: () => builder,
+      };
+      return builder;
+    },
+  },
+  GestureDetector: ({ children }: { children: ReactNode }) => children,
+}));
+vi.mock('@/components/agents/attachment-preview-strip', () => ({
+  AttachmentPreviewStrip: 'AttachmentPreviewStrip',
+}));
+vi.mock('@/components/agents/chat-toolbar', () => ({ ChatToolbar: 'ChatToolbar' }));
+vi.mock('@/components/agents/slash-command-suggestions', () => ({
+  SlashCommandSuggestions: 'SlashCommandSuggestions',
+}));
+vi.mock('@/components/agents/suggestion-card', () => ({ SuggestionCard: 'SuggestionCard' }));
+vi.mock('@/components/agents/attachment-picker', () => ({
+  pickAgentAttachments: vi.fn(),
+  pickAgentImages: vi.fn(),
+}));
+vi.mock('@/components/agents/remote-session-exit-alert', () => ({
+  useRemoteSessionExitConfirmation: () => ({ confirmExit: vi.fn(), exitDialog: null }),
+}));
+// The row owns the platform input; the draft the composer holds is read back
+// through its own `textRef`, which the withdrawal clears.
+vi.mock('@/components/agents/chat-composer-input-row', () => ({
+  ChatComposerInputRow: 'ChatComposerInputRow',
+}));
+// Mock factories are hoisted above the file's imports, so a top-level
+// `createElement` is still in its temporal dead zone here: this one module
+// boundary must resolve React at call time.
+vi.mock('@/components/agents/chat-composer-measure', async () => {
+  const react = await import('react');
+  return {
+    ChatComposerMeasure: react.forwardRef((_props: unknown, ref) => {
+      react.useImperativeHandle(ref, () => ({ reset: vi.fn(), setText: vi.fn() }));
+      return react.createElement('ChatComposerMeasure');
+    }),
+  };
+});
+vi.mock('@/lib/agent-attachments/use-agent-attachment-upload', () => ({
+  useAgentAttachmentUpload: () => ({
+    addCandidates: vi.fn(),
+    attachments: [],
+    clearOptimistic: vi.fn(),
+    commitSent: vi.fn(),
+    hasUnclaimedAttachments: false,
+    isUploading: false,
+    releaseUnclaimedUploads: vi.fn(),
+    removeAttachment: vi.fn(),
+    restoreChips: vi.fn(),
+    restoreFileParts: vi.fn(),
+    uploadPending: vi.fn(),
+  }),
+}));
+vi.mock('@/lib/agent-attachments/use-android-pending-picker-recovery', () => ({
+  useAndroidPendingPickerRecovery: vi.fn(),
+}));
+vi.mock('@/lib/agent-attachments/use-clipboard-paste', () => ({
+  clipboardPasteFailureMessage: () => '',
+  useClipboardPaste: () => ({ paste: vi.fn() }),
+}));
+vi.mock('@/lib/voice-input/use-voice-input', () => ({
+  useVoiceInput: () => ({
+    abort: vi.fn(),
+    available: false,
+    isActive: false,
+    settleBeforeSubmit: vi.fn(() => Promise.resolve(true)),
+    status: 'idle',
+    toggle: vi.fn(),
+  }),
+}));
+vi.mock('@/lib/share-prefill', () => ({
+  useSharePrefill: () => ({ dismiss: vi.fn(), failed: false, retry: vi.fn() }),
+}));
+vi.mock('@/lib/persist/use-draft-flush', () => ({ useDraftFlushOnBackground: vi.fn() }));
+vi.mock('@/lib/hooks/use-return-sends-message-preference', () => ({
+  useReturnSendsMessagePreference: () => ({ hasLoaded: true, returnSendsMessage: false }),
+}));
+vi.mock('@/components/ui/remaining-characters-counter', () => ({
+  RemainingCharactersCounter: 'RemainingCharactersCounter',
 }));
 vi.mock('@/components/agents/session-detail-skeleton', () => ({
   SessionSkeletonMessages: 'SessionSkeletonMessages',
@@ -735,9 +853,52 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useMutedDisabledInk: () => '#fff',
   useThemeColors: () => ({}),
 }));
-vi.mock('@/lib/persist/drafts', () => ({ agentComposerDraftKey: (id: string) => id }));
+vi.mock('@/lib/persist/drafts', () => ({
+  agentComposerDraftKey: (id: string) => id,
+  // The real composer clears and writes the durable draft through these.
+  clearDraft: vi.fn(),
+  flushDraft: vi.fn(),
+  saveDraft: vi.fn(),
+}));
+// The pending-send record lives in the encrypted SQLCipher store, which cannot
+// open in this node suite. Only its read is stubbed; the attribution helper the
+// screen applies to the answer stays the real one. The store module is stubbed
+// too, so loading the helper never pulls the native SQLCipher chain.
+type PendingSendRecord = { items: { messageId: string; text: string }[]; complete: boolean };
+const pendingSendRead = vi.hoisted(() => ({
+  calls: [] as { userId: string; sessionId: string }[],
+  record: { items: [] as { messageId: string; text: string }[], complete: true as boolean },
+  // A case that needs an answer to land after a session switch holds the read
+  // here and resolves it, for the session it names, in its own order.
+  hold: false,
+  held: [] as { sessionId: string; resolve: (record: PendingSendRecord) => void }[],
+}));
+vi.mock('@/lib/persist/encrypted-kv', () => ({
+  getItem: vi.fn(() => Promise.resolve(null)),
+  setItem: vi.fn(() => Promise.resolve(undefined)),
+  removeItem: vi.fn(() => Promise.resolve(undefined)),
+  listEntryValues: vi.fn(() => Promise.resolve([])),
+}));
+vi.mock('@/lib/persist/pending-send-confirmations', async importOriginal => {
+  const actual = await importOriginal<typeof PendingSendConfirmationsModule>();
+  return {
+    ...actual,
+    readPendingSendConfirmations: (userId: string, sessionId: string) => {
+      pendingSendRead.calls.push({ userId, sessionId });
+      if (!pendingSendRead.hold) {
+        return Promise.resolve(pendingSendRead.record);
+      }
+      return new Promise<PendingSendRecord>(resolve => {
+        pendingSendRead.held.push({ resolve, sessionId });
+      });
+    },
+  };
+});
 vi.mock('@/lib/persist/use-draft-load', () => ({
-  useFencedDraftLoad: () => ({ settled: true, value: null }),
+  useFencedDraftLoad: () => ({
+    settled: draftLoadState.settled,
+    value: draftLoadState.value,
+  }),
 }));
 const organizations = vi.hoisted(() => [
   { organizationId: 'org-a', organizationName: 'Session organization' },
@@ -1046,6 +1207,15 @@ beforeEach(() => {
   rootPageNextCursor = null;
   sessionTitleOverride = null;
   pendingSend = null;
+  draftLoadState.settled = true;
+  draftLoadState.value = null;
+  pendingSendRead.calls.length = 0;
+  pendingSendRead.record.items = [];
+  pendingSendRead.record.complete = true;
+  pendingSendRead.hold = false;
+  pendingSendRead.held.length = 0;
+  composerProbe.real = null;
+  composerProbe.useReal = false;
   condensePreference.value = false;
   currentUserId.value = 'test-user';
   sessionConfigSync.currentModel = '';
@@ -5055,7 +5225,10 @@ describe('session detail composer after a failed turn', () => {
         }
       );
     });
-    expect(control.withdrawRestoredSend).toHaveBeenCalledExactlyOnceWith('Delivered late');
+    expect(control.withdrawRestoredSend).toHaveBeenCalledExactlyOnceWith(
+      'Delivered late',
+      'msg-delivered'
+    );
 
     // A re-render of the same record changes nothing: one delivery, one
     // withdrawal.
@@ -5070,6 +5243,137 @@ describe('session detail composer after a failed turn', () => {
       );
     });
     expect(control.withdrawRestoredSend).toHaveBeenCalledTimes(1);
+  });
+
+  it('answers the delivered check only for the record’s own message id', async () => {
+    goalMountOptions = { resolvedType: 'remote' };
+    const view = await mountDetails([]);
+    const composer = view.renderer.root.find(candidate =>
+      Object.is(candidate.type, 'ChatComposer')
+    );
+    const ask = composer.props.isPromptDelivered as (text: string, messageId: string) => boolean;
+
+    // Nothing is confirmed yet, so no send can be withdrawn for delivery.
+    expect(ask('Delivered late', 'msg-delivered')).toBe(false);
+
+    act(() => {
+      view.store.set<DeliveredFailedPrompt | null, [DeliveredFailedPrompt | null], unknown>(
+        view.manager.atoms.deliveredFailedPrompt,
+        {
+          messageId: 'msg-delivered',
+          text: 'Delivered late',
+          sequence: 1,
+        }
+      );
+    });
+    // The callback reads the published record live, so the same handle answers
+    // for the record that arrived after the render.
+    expect(ask('Delivered late', 'msg-delivered')).toBe(true);
+    // Same words, different id: an earlier delivery that must not stand in for
+    // the send being restored.
+    expect(ask('Delivered late', 'msg-other')).toBe(false);
+    expect(ask('Another prompt', 'msg-delivered')).toBe(false);
+  });
+
+  it('keeps a restored draft the confirmed transcript already carries', async () => {
+    goalMountOptions = { resolvedType: 'remote' };
+    const text = 'Already delivered';
+    // The durable record of unknown-outcome sends is the only thing that can
+    // retire a restored draft: it names the message id the send carried. The
+    // confirmed row only carries words, which cannot separate a delivered send
+    // from text the reader typed again, so the draft stays and the reader can
+    // clear it.
+    draftLoadState.value = text;
+    const message = userMessage('msg-confirmed-prompt');
+    const confirmed: StoredMessage = {
+      info: { ...message.info, sessionID: ROOT_ID },
+      parts: [
+        stubTextPart({
+          id: 'text-confirmed-prompt',
+          sessionID: ROOT_ID,
+          messageID: message.info.id,
+          text,
+        }),
+      ],
+    };
+    const view = await mountDetails([confirmed]);
+    const composer = view.renderer.root.find(candidate =>
+      Object.is(candidate.type, 'ChatComposer')
+    );
+    const control = {
+      setText: vi.fn(),
+      hasContent: vi.fn(() => true),
+      restoreAttachments: vi.fn(),
+      withdrawRestoredSend: vi.fn(),
+    };
+    act(() => {
+      (composer.props.controlRef as { current: typeof control | null }).current = control;
+    });
+    // Let the seeded row land before the assertions.
+    await waitFor(() => view.store.get(view.manager.atoms.messagesList).length > 0);
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(control.withdrawRestoredSend).not.toHaveBeenCalled();
+    const settledComposer = view.renderer.root.find(candidate =>
+      Object.is(candidate.type, 'ChatComposer')
+    );
+    expect(settledComposer.props.initialDraft).toBe(text);
+    // The record of unknown-outcome sends names no send for this draft, and the
+    // composer is told the answer is final so it can release a held withdrawal.
+    expect(settledComposer.props.restoredSend).toBeNull();
+    expect(settledComposer.props.restoredSendSettled).toBe(true);
+  });
+
+  it('attributes the loaded draft to the recorded send', async () => {
+    goalMountOptions = { resolvedType: 'remote' };
+    draftLoadState.value = 'Delivered late';
+    // The durable record of unknown-outcome sends names the id the send
+    // carried; that is the only identity a restored draft can take.
+    pendingSendRead.record.items = [
+      { messageId: 'msg-older', text: 'Another prompt' },
+      { messageId: 'msg-delivered', text: 'Delivered late' },
+    ];
+    const view = await mountDetails([]);
+    const composer = view.renderer.root.find(candidate =>
+      Object.is(candidate.type, 'ChatComposer')
+    );
+    expect(composer.props.initialDraft).toBe('Delivered late');
+
+    await waitFor(() => {
+      const settled = view.renderer.root.find(candidate =>
+        Object.is(candidate.type, 'ChatComposer')
+      );
+      return settled.props.restoredSend !== null;
+    });
+    const attributed = view.renderer.root.find(candidate =>
+      Object.is(candidate.type, 'ChatComposer')
+    );
+    expect(attributed.props.restoredSend).toEqual({
+      text: 'Delivered late',
+      messageId: 'msg-delivered',
+    });
+    expect(attributed.props.restoredSendSettled).toBe(true);
+    expect(pendingSendRead.calls).toEqual([{ userId: 'test-user', sessionId: ROOT_ID }]);
+  });
+
+  it('does not attribute a draft from an incomplete record', async () => {
+    goalMountOptions = { resolvedType: 'remote' };
+    draftLoadState.value = 'Delivered late';
+    // A cut record may have lost the entry, so its silence is not evidence.
+    pendingSendRead.record.items = [{ messageId: 'msg-delivered', text: 'Delivered late' }];
+    pendingSendRead.record.complete = false;
+    const view = await mountDetails([]);
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const composer = view.renderer.root.find(candidate =>
+      Object.is(candidate.type, 'ChatComposer')
+    );
+    expect(composer.props.restoredSend).toBeNull();
+    expect(composer.props.restoredSendSettled).toBe(true);
   });
 
   it('keeps the composer sendable after a non-retryable turn failure', async () => {
@@ -5099,6 +5403,181 @@ describe('session detail composer after a failed turn', () => {
     const node = view.renderer.root.find(candidate => Object.is(candidate.type, 'ChatComposer'));
     expect(node.props.disabled).toBe(false);
     expect(node.props.sendDisabled).toBe(false);
+  });
+});
+
+/** The read the screen made for `sessionId`, waited for, so a case can order it. */
+async function heldReadFor(sessionId: KiloSessionId) {
+  await waitFor(() => pendingSendRead.held.some(entry => entry.sessionId === sessionId));
+  const entry = pendingSendRead.held.find(candidate => candidate.sessionId === sessionId);
+  if (!entry) {
+    throw new Error(`the read for ${sessionId} was expected to be held`);
+  }
+  return entry;
+}
+
+/** The attribution the screen publishes to the mounted composer, if any. */
+function publishedRestoredSend(
+  view: { renderer: ReactTestRenderer },
+  realComposer: { ChatComposer: ElementType }
+): { messageId: string; text: string } | null | undefined {
+  return view.renderer.root.findAll(node => Object.is(node.type, realComposer.ChatComposer))[0]
+    ?.props.restoredSend as { messageId: string; text: string } | null | undefined;
+}
+
+describe('session detail composer attribution across a session switch', () => {
+  it('withdraws the next session draft with the send its own record names', async () => {
+    // The route keeps one mounted screen across a switch, so its composer
+    // remounts with the attribution the previous session published. The real
+    // composer is mounted here: the arm that decides the outcome is its own.
+    const realComposer = await vi.importActual<{ ChatComposer: ElementType }>(
+      '@/components/agents/chat-composer'
+    );
+    composerProbe.real = realComposer.ChatComposer;
+    composerProbe.useReal = true;
+
+    goalMountOptions = { resolvedType: 'remote' };
+    draftLoadState.value = 'Delivered late';
+    // Both sessions restored the same words and each durable record names its
+    // own send. Only the answer for the session on screen may be attributed.
+    pendingSendRead.hold = true;
+    // The default root page populates the transcript, so the switch keeps the
+    // composer mounted instead of holding it behind the loading chrome.
+    const view = await mountDetails(undefined, { keepInstanceOnSwitch: true });
+    const rootAnswer = await heldReadFor(ROOT_ID);
+    await act(async () => {
+      rootAnswer.resolve({
+        items: [{ messageId: 'msg-old', text: 'Delivered late' }],
+        complete: true,
+      });
+      await Promise.resolve();
+    });
+    // The previous session's attribution is settled before the switch, so its
+    // answer is what the composer remounts with.
+    await waitFor(() => publishedRestoredSend(view, realComposer)?.messageId === 'msg-old');
+
+    // The manager's open for the next session is still in flight, so the rows on
+    // screen are still the previous session's and the screen keeps its composer
+    // mounted through the switch. That render is the one that hands the new
+    // session the previous session's attribution.
+    vi.spyOn(view.manager, 'switchSession').mockImplementation(
+      () =>
+        new Promise<void>(() => {
+          // Never settles: the switch stays in flight for this case.
+        })
+    );
+    await view.switchRoot(NEXT_ROOT_ID);
+    expect(
+      view.renderer.root.findAll(node => Object.is(node.type, realComposer.ChatComposer))
+    ).toHaveLength(1);
+
+    // Only now does the next session's record answer, naming its own send.
+    const nextAnswer = await heldReadFor(NEXT_ROOT_ID);
+    await act(async () => {
+      nextAnswer.resolve({
+        items: [{ messageId: 'msg-next', text: 'Delivered late' }],
+        complete: true,
+      });
+      await Promise.resolve();
+    });
+    // The screen's own attribution for the session on screen, published before
+    // the withdrawal asks the composer to act on it.
+    await waitFor(() => publishedRestoredSend(view, realComposer)?.messageId === 'msg-next');
+    const composer = view.renderer.root.find(node =>
+      Object.is(node.type, realComposer.ChatComposer)
+    );
+    const control = composer.props.controlRef as {
+      current: {
+        hasContent: () => boolean;
+        withdrawRestoredSend: (text: string, messageId: string) => boolean;
+      } | null;
+    };
+    const handle = control.current;
+    if (!handle) {
+      throw new Error('the real composer did not publish its control');
+    }
+    expect(handle.hasContent()).toBe(true);
+
+    // The next session's send is confirmed: its draft is that send, so it leaves
+    // the input. A stale attribution from the previous session would arm the
+    // wrong id, and the composer would refuse this one and keep the text.
+    let withdrawn: boolean | undefined = undefined;
+    act(() => {
+      withdrawn = handle.withdrawRestoredSend('Delivered late', 'msg-next');
+    });
+    expect(withdrawn).toBe(true);
+    expect(handle.hasContent()).toBe(false);
+  });
+
+  it('does not publish the previous session answer that arrives after the switch', async () => {
+    // A late answer must not publish over the newer state, and the session it
+    // was read for is the other half of that: both fences are required here,
+    // because the read for the session being left resolves after the screen
+    // already reads for the one on screen.
+    const realComposer = await vi.importActual<{ ChatComposer: ElementType }>(
+      '@/components/agents/chat-composer'
+    );
+    composerProbe.real = realComposer.ChatComposer;
+    composerProbe.useReal = true;
+
+    goalMountOptions = { resolvedType: 'remote' };
+    draftLoadState.value = 'Delivered late';
+    // Both sessions restore the same words, so the old answer would attribute a
+    // send in the new session if either fence let it through.
+    pendingSendRead.hold = true;
+    const view = await mountDetails(undefined, { keepInstanceOnSwitch: true });
+    const rootAnswer = await heldReadFor(ROOT_ID);
+
+    // The manager's open for the next session stays in flight, so the screen
+    // keeps its composer mounted through the switch and starts the next read.
+    vi.spyOn(view.manager, 'switchSession').mockImplementation(
+      () =>
+        new Promise<void>(() => {
+          // Never settles: the switch stays in flight for this case.
+        })
+    );
+    await view.switchRoot(NEXT_ROOT_ID);
+    const nextAnswer = await heldReadFor(NEXT_ROOT_ID);
+
+    // The previous session's record answers only now, after the screen left it.
+    await act(async () => {
+      rootAnswer.resolve({
+        items: [{ messageId: 'msg-old', text: 'Delivered late' }],
+        complete: true,
+      });
+      await Promise.resolve();
+    });
+    // Nothing is attributed: the answer belongs to the session being left, so
+    // the composer stays unarmed and the withdrawal is still held.
+    const afterRoot = view.renderer.root.find(node =>
+      Object.is(node.type, realComposer.ChatComposer)
+    );
+    expect(afterRoot.props.restoredSend).toBeNull();
+    expect(afterRoot.props.restoredSendSettled).toBe(false);
+
+    // Only the session on screen may publish, and it publishes its own send.
+    await act(async () => {
+      nextAnswer.resolve({
+        items: [{ messageId: 'msg-next', text: 'Delivered late' }],
+        complete: true,
+      });
+      await Promise.resolve();
+    });
+    await waitFor(() => publishedRestoredSend(view, realComposer)?.messageId === 'msg-next');
+    const composer = view.renderer.root.find(node =>
+      Object.is(node.type, realComposer.ChatComposer)
+    );
+    expect(composer.props.restoredSend).toEqual({ text: 'Delivered late', messageId: 'msg-next' });
+    const control = composer.props.controlRef as {
+      current: {
+        withdrawRestoredSend: (text: string, messageId: string) => boolean;
+      } | null;
+    };
+    const handle = control.current;
+    if (!handle) {
+      throw new Error('the real composer did not publish its control');
+    }
+    expect(handle.withdrawRestoredSend('Delivered late', 'msg-next')).toBe(true);
   });
 });
 

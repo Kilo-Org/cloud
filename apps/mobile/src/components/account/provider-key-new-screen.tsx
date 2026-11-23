@@ -23,10 +23,9 @@ import {
   type CredentialDraft,
   type CredentialFieldId,
   credentialForm,
-  type CredentialRead,
   fieldLabelKey,
   type ModelMapping,
-  readStructuredCredential,
+  readCredential,
   replacesBedrockKey,
   withoutUnshownValues,
 } from '@/lib/byok/credential-fields';
@@ -45,6 +44,7 @@ import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { normalizeOrgQueryParam } from '@/lib/org-deep-link';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { useTRPC } from '@/lib/trpc';
+import { readTrpcErrorField } from '@/lib/trpc-error';
 
 /**
  * The empty field-error state. One shared object, not a fresh `{}`, so an edit
@@ -130,6 +130,11 @@ export function ProviderKeyNewScreen() {
     );
   }
 
+  // The key this form replaces is gone, so there is nothing left to replace.
+  if (asksStoredMethod && readTrpcErrorField(credentialMethod.error, 'code') === 'NOT_FOUND') {
+    return <InvalidRouteState backTo={backHref} />;
+  }
+
   // A stored method still being read may be the other one, so the body waits
   // rather than show fields the reader may have to abandon.
   const waiting = asksStoredMethod && (credentialMethod.isPending || credentialMethod.isError);
@@ -184,30 +189,20 @@ export function ProviderKeyNewScreen() {
     setChosenMode(mode);
   };
 
-  /** The credential the server stores: the JSON its fields add up to. */
-  const readCredential = (): CredentialRead => {
-    if (!form) {
-      const apiKey = keyRef.current.trim();
-      return apiKey === ''
-        ? { tag: 'missing', fields: ['apiKey'] }
-        : { tag: 'ready', credential: apiKey };
-    }
-    return readStructuredCredential({
-      providerId: provider.id,
-      mode: authMode,
-      form,
-      values: valuesRef.current,
-      rows: [...mappingsRef.current.values()],
-    });
-  };
-
   const submit = async () => {
     const attempt = save.begin();
     if (!attempt) {
       return;
     }
     setFieldErrors(NO_FIELD_ERRORS);
-    const credential = readCredential();
+    const credential = readCredential({
+      providerId: provider.id,
+      form,
+      mode: authMode,
+      apiKey: keyRef.current,
+      values: valuesRef.current,
+      rows: [...mappingsRef.current.values()],
+    });
     if (credential.tag === 'missing') {
       if (form) {
         // Every empty field gets its own message under its own input: the

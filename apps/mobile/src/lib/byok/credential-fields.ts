@@ -364,6 +364,33 @@ export function readStructuredCredential(input: {
 }
 
 /**
+ * The credential a screen's form holds: one value for a provider whose key is a
+ * single secret, or the JSON the structured form's fields add up to.
+ */
+export function readCredential(input: {
+  providerId: string;
+  form: CredentialForm | null;
+  mode: BedrockAuthMode;
+  apiKey: string;
+  values: CredentialValues;
+  rows: readonly Partial<ModelMapping>[];
+}): CredentialRead {
+  if (input.form) {
+    return readStructuredCredential({
+      providerId: input.providerId,
+      mode: input.mode,
+      form: input.form,
+      values: input.values,
+      rows: input.rows,
+    });
+  }
+  const apiKey = input.apiKey.trim();
+  return apiKey === ''
+    ? { tag: 'missing', fields: ['apiKey'] }
+    : { tag: 'ready', credential: apiKey };
+}
+
+/**
  * The draft with only the values this form renders. Bedrock's two methods share
  * the draft, and a field the next method does not show comes back empty, so
  * keeping its value would send what the reader cannot see.

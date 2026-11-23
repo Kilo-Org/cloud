@@ -41,6 +41,8 @@ type ScreenState = {
   credentialMethod: { method: 'apiKey' | 'accessKeys' | null };
   credentialMethodPending: boolean;
   credentialMethodError: boolean;
+  /** The code the failed read carries; `NOT_FOUND` is the terminal one. */
+  credentialMethodErrorCode: string;
   mutateAsync: Mock;
   dismissTo: Mock;
 };
@@ -56,6 +58,7 @@ const state = vi.hoisted((): ScreenState => ({
   credentialMethod: { method: null },
   credentialMethodPending: false,
   credentialMethodError: false,
+  credentialMethodErrorCode: 'INTERNAL_SERVER_ERROR',
   mutateAsync: vi.fn(),
   dismissTo: vi.fn(),
 }));
@@ -79,6 +82,12 @@ vi.mock('@tanstack/react-query', async importOriginal => {
             data: state.credentialMethod,
             isPending: state.credentialMethodPending,
             isError: state.credentialMethodError,
+            error: state.credentialMethodError
+              ? serverRefusal(
+                  state.credentialMethodErrorCode,
+                  'The stored method could not be read'
+                )
+              : null,
             isFetching: false,
             refetch: vi.fn(),
           }
@@ -221,6 +230,7 @@ beforeEach(() => {
   state.credentialMethod = { method: null };
   state.credentialMethodPending = false;
   state.credentialMethodError = false;
+  state.credentialMethodErrorCode = 'INTERNAL_SERVER_ERROR';
   state.mutateAsync.mockReset();
   state.mutateAsync.mockResolvedValue(undefined);
   state.dismissTo.mockClear();
@@ -684,6 +694,18 @@ describe('ProviderKeyNewScreen', () => {
     expect(root.findAll(node => Object.is(node.type, CREDENTIAL_FORM))).toHaveLength(0);
     const [queryError] = root.findAll(node => Object.is(node.type, 'QueryError'));
     expect(typeof queryError?.props.onRetry).toBe('function');
+  });
+
+  it('does not trap the reader when the replaced key is gone', async () => {
+    state.params = { provider: 'bedrock', id: KEY_ID };
+    state.providers = [{ id: 'bedrock', name: 'Amazon Bedrock' }];
+    state.credentialMethodError = true;
+    state.credentialMethodErrorCode = 'NOT_FOUND';
+    const root = await mount();
+
+    // The key cannot come back, so a retry would loop on the same refusal.
+    expect(root.findAll(node => Object.is(node.type, 'InvalidRouteState'))).toHaveLength(1);
+    expect(root.findAll(node => Object.is(node.type, 'QueryError'))).toHaveLength(0);
   });
 
   it('names every empty field of an access-key form, not only the first', async () => {

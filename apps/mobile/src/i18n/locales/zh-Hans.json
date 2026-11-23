@@ -3776,7 +3776,6 @@
       "usageDetails": "用量详情",
       "providersAndModels": "提供商和模型",
       "groups": "群组",
-      "guardrails": "防护规则",
       "byok": "自带密钥",
       "ssoAndDomain": "SSO 和域名",
       "dataCollection": "数据收集",

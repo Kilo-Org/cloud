@@ -1107,7 +1107,7 @@
       "analyzed": "विश्लेषण पूरा",
       "capacityFull": "एक साथ चल सकने वाले विश्लेषणों की सीमा पूरी हो गई है। किसी चल रहे विश्लेषण के पूरा होने का इंतज़ार करें।",
       "couldNotCheckCapacity": "विश्लेषण के लिए उपलब्ध क्षमता की जाँच नहीं हो सकी।",
-      "couldNotLoad": "विश्लेषण लोड नहीं हो सका।",
+      "couldNotLoad": "विश्लेषण लोड नहीं हो सका",
       "exploitabilityReasoning": "हमले की संभावना का तर्क",
       "exploitable": "दुरुपयोग संभव",
       "fullReport": "तैयार की गई पूरी रिपोर्ट",
@@ -1139,7 +1139,7 @@
     },
     "analysisSettings": {
       "analysisModel": "विश्लेषण का मॉडल",
-      "couldNotLoad": "विश्लेषण की सेटिंग्स लोड नहीं हो सकीं।",
+      "couldNotLoad": "विश्लेषण की सेटिंग्स लोड नहीं हो सकीं",
       "depth": "विश्लेषण की गहराई",
       "remediationModel": "सुधार का मॉडल",
       "title": "मॉडल और विश्लेषण",
@@ -1149,7 +1149,7 @@
       "actorMaskedKiloAdmin": "Kilo एडमिन",
       "actorMaskedUser": "छिपा हुआ उपयोगकर्ता",
       "actorSystem": "Kilo सिस्टम",
-      "couldNotLoad": "ऑडिट रिपोर्ट लोड नहीं हो सकी।",
+      "couldNotLoad": "ऑडिट रिपोर्ट लोड नहीं हो सकी",
       "events": "घटनाएँ",
       "eventConfidence": "विश्वास: {{confidence}}",
       "eventReason": "कारण: {{reason}}",
@@ -1157,7 +1157,7 @@
       "eventStatusChange": "$t(common.status): {{previous}} → {{next}}",
       "eventsCount_one": "{{displayCount}} घटना",
       "eventsCount_other": "{{displayCount}} घटनाएँ",
-      "generated": "रिपोर्ट तैयार हुई: {{generatedAt}}।",
+      "generated": "रिपोर्ट तैयार हुई {{generatedAt}}",
       "noActivity": "कोई गतिविधि दर्ज नहीं",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "queryFailed": "रिपोर्ट क्वेरी पूरी नहीं हुई। फिर से कोशिश करें।",
@@ -1199,7 +1199,7 @@
       "confidenceHighOnly": "केवल उच्च विश्वसनीयता",
       "confidenceMediumOrHigher": "मध्यम या अधिक",
       "confidenceThreshold": "विश्वसनीयता का न्यूनतम स्तर",
-      "couldNotLoad": "स्वचालन की सेटिंग्स लोड नहीं हो सकीं।",
+      "couldNotLoad": "स्वचालन की सेटिंग्स लोड नहीं हो सकीं",
       "enable": "चालू करें",
       "autoAnalysisDescription": "समस्याएँ सिंक होने पर।",
       "analyzeNewFindings": "नई समस्याओं का विश्लेषण करें",
@@ -1230,7 +1230,7 @@
       "analysisNotComplete": "विश्लेषण अधूरा",
       "codebaseRisk": "कोडबेस का जोखिम",
       "confirmedExploitable": "दुरुपयोग संभव होने की पुष्टि",
-      "couldNotLoad": "डैशबोर्ड का डेटा लोड नहीं हो सका।",
+      "couldNotLoad": "डैशबोर्ड का डेटा लोड नहीं हो सका",
       "daysOverdue": "समय सीमा से {{displayCount}} दिन की देरी",
       "deadlineToday": "अंतिम तारीख आज है",
       "filterByRepository": "रिपॉज़िटरी के आधार पर फ़िल्टर करें",
@@ -1262,8 +1262,8 @@
       "settings": "सेटिंग",
       "syncing": "सिंक हो रहा है…",
       "syncNow": "अभी सिंक करें",
-      "syncQueued": "सिंक का अनुरोध कतार में जोड़ा गया।",
-      "syncStatusUnavailable": "सिंक की स्थिति उपलब्ध नहीं है।",
+      "syncQueued": "सिंक का अनुरोध कतार में जोड़ा गया",
+      "syncStatusUnavailable": "सिंक की स्थिति उपलब्ध नहीं है",
       "daysOverdue_one": "समय सीमा से {{displayCount}} दिन की देरी",
       "daysOverdue_other": "समय सीमा से {{displayCount}} दिन की देरी",
       "findingsCount_one": "{{displayCount}} समस्या",
@@ -1344,8 +1344,8 @@
       "reasonAfterReview": "समीक्षा के बाद"
     },
     "findingList": {
-      "couldNotLoad": "समस्याएँ लोड नहीं हो सकीं।",
-      "couldNotLoadMore": "और समस्याएँ लोड नहीं हो सकीं।",
+      "couldNotLoad": "समस्याएँ लोड नहीं हो सकीं",
+      "couldNotLoadMore": "और समस्याएँ लोड नहीं हो सकीं",
       "emptyDescription": "अभी किसी अनसुलझी समस्या पर ध्यान देने की ज़रूरत नहीं है।",
       "emptyTitle": "कोई खुली समस्या नहीं",
       "noMatchesDescription": "चुने हुए फ़िल्टर बदलकर या हटाकर देखें।",
@@ -1467,12 +1467,12 @@
     "initialSyncAdmissionFailed": "सुरक्षा एजेंट चालू हो गया, लेकिन पहले सिंक का अनुरोध कतार में नहीं जुड़ सका। फिर से सिंक करें।",
     "queuedActionUntracked": "कतार में लगी कार्रवाई अब ट्रैक नहीं की जा सकती। नवीनतम स्थिति देखने के लिए रीफ़्रेश करें।",
     "commands": {
-      "findingAlreadyDismissed": "समस्या पहले ही खारिज की जा चुकी है।",
-      "findingDismissed": "समस्या खारिज की गई।",
-      "noRemediationsQueued": "कोई मौजूदा समस्या कतार में नहीं जोड़ी गई।",
-      "remediationsQueued": "मौजूदा सुधार कतार में जोड़े गए।",
-      "analysisComplete": "विश्लेषण पूरा हुआ।",
-      "syncComplete": "सिंक पूरा हुआ।"
+      "findingAlreadyDismissed": "समस्या पहले ही खारिज की जा चुकी है",
+      "findingDismissed": "समस्या खारिज की गई",
+      "noRemediationsQueued": "कोई मौजूदा समस्या कतार में नहीं जोड़ी गई",
+      "remediationsQueued": "मौजूदा सुधार कतार में जोड़े गए",
+      "analysisComplete": "विश्लेषण पूरा हुआ",
+      "syncComplete": "सिंक पूरा हुआ"
     },
     "mutations": {
       "serviceNotConfiguredResubmit": "सुरक्षा सेवा का सेटअप नहीं हुआ है। इसे ठीक करने तक अनुरोध दोबारा भेजने से भी काम नहीं होगा।",
@@ -2612,11 +2612,11 @@
   },
   "queryError": {
     "neutralDescription": "कृपया फिर से कोशिश करें।",
-    "offlineTitle": "डेटा लोड नहीं हो सका।",
+    "offlineTitle": "डेटा लोड नहीं हो सका",
     "offlineDescription": "सर्वर से संपर्क नहीं हो सका।",
     "permissionDescription": "आपको इसे देखने की अनुमति नहीं है।",
     "notFoundDescription": "हो सकता है कि यह आइटम हटा दिया गया हो या अब उपलब्ध न हो।",
-    "serverTitle": "डेटा लोड नहीं हो सका।",
+    "serverTitle": "डेटा लोड नहीं हो सका",
     "serverDescription": "हमारी ओर से कुछ गड़बड़ हो गई। कृपया फिर से कोशिश करें।",
     "timeoutTitle": "सर्वर को बहुत ज़्यादा समय लग रहा है",
     "timeoutDescription": "अनुरोध पूरा होने से पहले ही समय समाप्त हो गया। कृपया फिर से कोशिश करें।"
@@ -3071,7 +3071,7 @@
       "failedToLoadAllFiles": "सभी फ़ाइलें लोड नहीं हो सकीं।",
       "filterPlaceholder": "फ़ाइल का पाथ",
       "loadingFiles": "फ़ाइलें लोड हो रही हैं — {{total}} में से {{loaded}}…",
-      "noMatches": "\"{{query}}\" से कोई फ़ाइल मेल नहीं खाती।",
+      "noMatches": "\"{{query}}\" से कोई फ़ाइल मेल नहीं खाती",
       "openFile": "{{path}} खोलें",
       "openFileViewed": "{{path}} खोलें (देखी गई)",
       "retryLoadingAllFiles": "सभी फ़ाइलें फिर से लोड करें",
@@ -3087,7 +3087,7 @@
     },
     "fileRows": {
       "collapseFile": "फ़ाइल समेटें",
-      "diffTooLarge": "डिफ़ इतना बड़ा है कि उसे दिखाया नहीं जा सकता।",
+      "diffTooLarge": "डिफ़ इतना बड़ा है कि उसे दिखाया नहीं जा सकता",
       "noPreview": "इस फ़ाइल का पूर्वावलोकन उपलब्ध नहीं है",
       "expandFile": "फ़ाइल फैलाएँ",
       "markViewed": "{{path}} को देखी गई फ़ाइल के रूप में चिह्नित करें",
@@ -3105,7 +3105,7 @@
     },
     "headLine": "{{counts}} · हेड {{sha}}",
     "hunkRows": {
-      "contextUnavailable": "इस रेफ़रेंस पर संदर्भ उपलब्ध नहीं है।",
+      "contextUnavailable": "इस रेफ़रेंस पर संदर्भ उपलब्ध नहीं है",
       "expandAll": "सभी दिखाएँ",
       "expandAllLines": "सभी {{displayCount}} पंक्तियाँ दिखाएँ",
       "expandContext": "संदर्भ दिखाएँ",
@@ -3147,7 +3147,7 @@
       "loadedOfTotalFiles_other": "{{loaded}}/{{total}} फ़ाइलें लोड हुईं"
     },
     "inbox": {
-      "couldNotLoad": "इनबॉक्स लोड नहीं हो सका।",
+      "couldNotLoad": "इनबॉक्स लोड नहीं हो सका",
       "accessLostTitle": "इस संगठन की पहुँच नहीं है",
       "accessLostDescription": "आप अब इस संगठन के मेंबर नहीं हैं, इसलिए इसके समीक्षा अनुरोध लोड नहीं हो सकते। समीक्षा जारी रखने के लिए अपने व्यक्तिगत खाते में जारी रखें।",
       "organizationUnavailableTitle": "यह संगठन अब मौजूद नहीं है",
@@ -3204,9 +3204,9 @@
       },
       "partialSuccessBanner": {
         "accessibility": "मर्ज हो गया। ब्रांच नहीं हटाई जा सकी: {{reason}}",
-        "body": "ब्रांच नहीं हटाई जा सकी: {{reason}}।"
+        "body": "ब्रांच नहीं हटाई जा सकी: {{reason}}"
       },
-      "loadFailedTitle": "मर्ज के विकल्प लोड नहीं हो सके।",
+      "loadFailedTitle": "मर्ज के विकल्प लोड नहीं हो सके",
       "blocked": {
         "unknownStateTitle": "GitHub ने अभी तक मर्ज की अनुमति वाली स्थिति नहीं बताई है",
         "unknownStateDetail": "थोड़ी देर बाद अवलोकन रीफ़्रेश करने की कोशिश करें।",
@@ -3295,10 +3295,10 @@
     "pullRequestUnavailableDescription": "यह PR नहीं खोला जा सकता। हो सकता है कि इसे हटा दिया गया हो, रिपॉज़िटरी निजी हो या उसमें Kilo GitHub ऐप इंस्टॉल न हो।",
     "pullRequestDiscussionUnavailableMessage": "हो सकता है कि कनेक्शन विफल हो गया हो, या यह पुल रिक्वेस्ट हटा दी गई हो।",
     "reconnectNotice": {
-      "title": "GitHub कनेक्शन की अवधि समाप्त हो गई।",
+      "title": "GitHub कनेक्शन की अवधि समाप्त हो गई",
       "message": "अपना कनेक्शन फिर से जाँचें — ज़रूरत होने पर आपको फिर से कनेक्ट करने के लिए कहा जाएगा।",
-      "gitlabTitle": "GitLab कनेक्शन की अवधि समाप्त हो गई।",
-      "bitbucketTitle": "Bitbucket कनेक्शन की अवधि समाप्त हो गई।"
+      "gitlabTitle": "GitLab कनेक्शन की अवधि समाप्त हो गई",
+      "bitbucketTitle": "Bitbucket कनेक्शन की अवधि समाप्त हो गई"
     },
     "review": "समीक्षा",
     "reviewPullRequest": "पुल रिक्वेस्ट की समीक्षा करें",
@@ -3310,7 +3310,7 @@
       "emptyDiffColumn": "खाली डिफ़ कॉलम",
       "emptyDiffRow": "खाली डिफ़ पंक्ति",
       "newOnly": "केवल नया: {{text}}",
-      "noNewlineAtEndOfFile": "⚠️ फ़ाइल के अंत में नई पंक्ति नहीं है।",
+      "noNewlineAtEndOfFile": "⚠️ फ़ाइल के अंत में नई पंक्ति नहीं है",
       "oldNew": "पुराना: {{old}} | नया: {{new}}",
       "oldOnly": "केवल पुराना: {{text}}"
     },
@@ -3360,7 +3360,7 @@
       "truncationBanner_one": "बदली गई {{total}} फ़ाइलों में से पहली {{limit}} फ़ाइलें दिखाई जा रही हैं — GitHub API की सीमा के कारण।",
       "truncationBanner_other": "बदली गई {{total}} फ़ाइलों में से पहली {{limit}} फ़ाइलें दिखाई जा रही हैं — GitHub API की सीमा के कारण।"
     },
-    "linkPasteClipboardEmpty": "क्लिपबोर्ड खाली है।",
+    "linkPasteClipboardEmpty": "क्लिपबोर्ड खाली है",
     "linkPasteDenied": "पेस्ट करने की अनुमति अस्वीकार कर दी गई। पेस्ट करने की अनुमति दें और फिर से कोशिश करें।",
     "linkPasteNotAPullRequest": "यह पुल रिक्वेस्ट या मर्ज रिक्वेस्ट का लिंक नहीं है",
     "announce": {
@@ -3402,7 +3402,7 @@
       "mergeRequestUnavailable": "मर्ज रिक्वेस्ट अनुपलब्ध",
       "unavailableDescription": "हो सकता है कि कनेक्शन विफल हो गया हो, या यह आइटम हटा दिया गया हो या उस तक पहुँच न हो।",
       "accessDeniedMergeRequest": "आपको इस मर्ज रिक्वेस्ट को देखने की अनुमति नहीं है।",
-      "couldNotLoadMergeRequest": "मर्ज रिक्वेस्ट लोड नहीं हो सकी।",
+      "couldNotLoadMergeRequest": "मर्ज रिक्वेस्ट लोड नहीं हो सकी",
       "discussionAccessDenied": "आपको इस मर्ज रिक्वेस्ट की चर्चा देखने की अनुमति नहीं है।",
       "discussionUnavailableMessage": "हो सकता है कि कनेक्शन विफल हो गया हो, या यह मर्ज रिक्वेस्ट हटा दी गई हो।",
       "noDiscussionDescription": "इस मर्ज रिक्वेस्ट पर अभी समीक्षा का कोई थ्रेड नहीं है और बातचीत में भी कोई टिप्पणी नहीं है।",

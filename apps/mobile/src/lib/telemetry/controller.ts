@@ -47,8 +47,9 @@ export function subscribeToTelemetryGeneration(listener: TelemetryGenerationList
   };
 }
 
-/** Write a decision for the given account. Increments `generation` only on
- *  an account change. Always increments `epoch`. */
+/** Write a decision for the given account. `generation` moves only between two
+ *  defined accounts, so the first decision after `undefined` is not an account
+ *  change. */
 export function setTelemetryDecision(accountId: string, optional: boolean): void {
   const accountChanged = decision !== undefined && decision.accountId !== accountId;
   if (accountChanged) {
@@ -61,7 +62,6 @@ export function setTelemetryDecision(accountId: string, optional: boolean): void
   }
 }
 
-/** Clear the decision. Increments `generation` and `epoch`, then closes every gate. */
 export function clearTelemetryDecision(): void {
   generation += 1;
   epoch += 1;

@@ -321,11 +321,6 @@ export function normalizeUrlPath(url: string): string {
   }
 }
 
-/**
- * Extract `<procs>` from a `/api/trpc/<procs>` URL, query string removed. The
- * rule and the strip step live in `request-target.ts`, so the latency sampler
- * reports the same text for the same request.
- */
 export function trpcProcedureFromUrl(url: string): string | undefined {
   return trpcProcedureText(url);
 }

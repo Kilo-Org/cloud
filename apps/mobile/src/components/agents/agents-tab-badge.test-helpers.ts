@@ -17,6 +17,9 @@ const organization = vi.hoisted(() => ({
 const fetchSessions = vi.hoisted(() => vi.fn<() => Promise<{ sessions: ActiveSession[] }>>());
 const attentionKv = vi.hoisted(() => ({
   getItem: vi.fn<() => Promise<string | null>>().mockResolvedValue(null),
+  getItemWithUpdatedAt: vi
+    .fn<() => Promise<{ v: string; updatedAt: number } | null>>()
+    .mockResolvedValue(null),
   setItem: vi.fn().mockResolvedValue(undefined),
 }));
 const routerReplace = vi.hoisted(() => vi.fn());

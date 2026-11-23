@@ -50,6 +50,7 @@ vi.mock('@/lib/auth/token-owner', () => ({
 // node suite.
 vi.mock('@/lib/persist/encrypted-kv', () => ({
   getItem: vi.fn(),
+  getItemWithUpdatedAt: vi.fn(),
   setItem: vi.fn(),
   removeItem: vi.fn(),
   clearScope: vi.fn(),

@@ -59,6 +59,9 @@ vi.mock('expo-file-system', () => ({
 // evaluate the native encrypted-kv / sentry chain.
 const kvMock = vi.hoisted(() => ({
   getItem: vi.fn(async (_scope: string, _k: string): Promise<string | null> => null),
+  getItemWithUpdatedAt: vi.fn(
+    async (_scope: string, _k: string): Promise<{ v: string; updatedAt: number } | null> => null
+  ),
   setItem: vi.fn(async (_scope: string, _k: string, _v: string): Promise<void> => undefined),
   removeItem: vi.fn(async (_scope: string, _k: string): Promise<void> => undefined),
   listEntries: vi.fn(async (_scope: string): Promise<{ k: string; updatedAt: number }[]> => []),

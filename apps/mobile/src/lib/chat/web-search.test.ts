@@ -54,6 +54,13 @@ vi.mock('@/lib/persist/encrypted-kv', () => ({
     await Promise.resolve();
     return world.settings.get(`${scope}:${key}`) ?? null;
   },
+  // The fake models stored values, not write times: the read keeps the same
+  // value `getItem` answers and stamps it with one fixed time.
+  getItemWithUpdatedAt: async (scope: string, key: string) => {
+    await Promise.resolve();
+    const v = world.settings.get(`${scope}:${key}`) ?? null;
+    return v === null ? null : { v, updatedAt: 0 };
+  },
   setItem: async (scope: string, key: string, value: string) => {
     await Promise.resolve();
     world.settings.set(`${scope}:${key}`, value);

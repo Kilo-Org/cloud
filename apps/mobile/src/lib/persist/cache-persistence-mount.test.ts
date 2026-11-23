@@ -48,6 +48,7 @@ const unsubscribeMock = vi.hoisted(() => vi.fn<() => void>());
 
 const kvMock = vi.hoisted(() => ({
   getItem: vi.fn(async (): Promise<string | null> => null),
+  getItemWithUpdatedAt: vi.fn(async (): Promise<{ v: string; updatedAt: number } | null> => null),
   setItem: vi.fn(async (): Promise<void> => undefined),
   removeItem: vi.fn(async (): Promise<void> => undefined),
   clearScope: vi.fn(async (): Promise<void> => undefined),
@@ -97,6 +98,7 @@ vi.mock('@/lib/auth/auth-context', () => ({
 
 vi.mock('@/lib/persist/encrypted-kv', () => ({
   getItem: kvMock.getItem,
+  getItemWithUpdatedAt: kvMock.getItemWithUpdatedAt,
   setItem: kvMock.setItem,
   removeItem: kvMock.removeItem,
   clearScope: kvMock.clearScope,
@@ -116,6 +118,7 @@ beforeEach(() => {
   identityMock.value = { userId: undefined, isLoading: true, isError: false };
   authMock.value = { authEpoch: 0, isSigningOut: false };
   kvMock.getItem.mockResolvedValue(null);
+  kvMock.getItemWithUpdatedAt.mockResolvedValue(null);
   kvMock.setItem.mockResolvedValue(undefined);
   kvMock.removeItem.mockResolvedValue(undefined);
   kvMock.clearScope.mockResolvedValue(undefined);

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one suite owns the asked-question record: its ids, its migration, and the encrypted-store fake behind it */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -17,6 +18,12 @@ import { DERIVED_CHAT_TEXT_MAX_LENGTH } from './title';
 const stored = vi.hoisted(() => new Map<string, string>());
 vi.mock('@/lib/persist/encrypted-kv', () => ({
   getItem: (scope: string, key: string) => Promise.resolve(stored.get(`${scope}:${key}`) ?? null),
+  // The fake stores values only, so the timestamped read answers the same value
+  // under one fixed time.
+  getItemWithUpdatedAt: (scope: string, key: string) => {
+    const v = stored.get(`${scope}:${key}`) ?? null;
+    return Promise.resolve(v === null ? null : { v, updatedAt: 0 });
+  },
   setItem: async (scope: string, key: string, value: string) => {
     await Promise.resolve();
     stored.set(`${scope}:${key}`, value);

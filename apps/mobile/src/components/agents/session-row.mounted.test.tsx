@@ -60,6 +60,7 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 }));
 vi.mock('@/lib/persist/encrypted-kv', () => ({
   getItem: vi.fn().mockResolvedValue(null),
+  getItemWithUpdatedAt: vi.fn().mockResolvedValue(null),
   setItem: vi.fn().mockResolvedValue(undefined),
   clearScope: vi.fn().mockResolvedValue(undefined),
 }));

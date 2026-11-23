@@ -73,6 +73,12 @@ vi.mock('@/lib/persist/encrypted-kv', () => ({
       },
     }),
   getItem: (scope: string, key: string) => Promise.resolve(kv.get(`${scope}:${key}`) ?? null),
+  // The fake stores values only, so the timestamped read answers the same value
+  // under one fixed time.
+  getItemWithUpdatedAt: (scope: string, key: string) => {
+    const v = kv.get(`${scope}:${key}`) ?? null;
+    return Promise.resolve(v === null ? null : { v, updatedAt: 0 });
+  },
   setItem: (scope: string, key: string, value: string) => {
     if (refuse.scope === scope) {
       refuse.scope = null;

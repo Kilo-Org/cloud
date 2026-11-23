@@ -469,6 +469,13 @@ vi.mock('@/lib/persist/encrypted-kv', () => {
       }
       return stored;
     },
+    // The fake stores values only, so the timestamped read answers the same
+    // value under one fixed time.
+    getItemWithUpdatedAt: async (scope: string, key: string) => {
+      await Promise.resolve();
+      const v = storedQuestions.get(`${scope}:${key}`) ?? null;
+      return v === null ? null : { v, updatedAt: 0 };
+    },
     setItem,
     setItemWithSignal: setItem,
     removeItem: async (scope: string, key: string, signal?: AbortSignal) => {

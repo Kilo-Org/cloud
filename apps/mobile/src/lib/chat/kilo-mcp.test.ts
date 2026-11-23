@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one suite owns the Kilo MCP connection: its caching, its churn across accounts, and the per-chat preference it stores */
 import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -45,6 +46,13 @@ vi.mock('@/lib/persist/encrypted-kv', () => ({
   getItem: async (scope: string, k: string) => {
     await Promise.resolve();
     return world.settings.get(`${scope}\u0000${k}`) ?? null;
+  },
+  // The fake models stored values, not write times: the read keeps the same
+  // value `getItem` answers and stamps it with one fixed time.
+  getItemWithUpdatedAt: async (scope: string, k: string) => {
+    await Promise.resolve();
+    const v = world.settings.get(`${scope}\u0000${k}`) ?? null;
+    return v === null ? null : { v, updatedAt: 0 };
   },
   removeItem: async (scope: string, k: string) => {
     await Promise.resolve();

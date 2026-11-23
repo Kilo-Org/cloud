@@ -209,8 +209,6 @@ function ignoreRejection(attempt: Promise<unknown> | null): void {
 type OfflineWrite = Readonly<{
   /** Requests the transport saw for this procedure while offline. */
   attempted: number;
-  /** Whether the mutation left its pending state, as a Save button reads it. */
-  settled: boolean;
   /** The hook's `isPending` after the flush: what a Save button renders. */
   stillPending: boolean;
 }>;
@@ -249,7 +247,6 @@ async function runOfflineWrite(Probe: ProbeComponent, procedure: string): Promis
   await flushQueryUpdates();
   const write: OfflineWrite = {
     attempted: callsTo(procedure),
-    settled: !holder.pending,
     stillPending: holder.pending,
   };
   view.unmount();
@@ -275,8 +272,7 @@ describe('record writes while the device reports itself offline', () => {
     // The attempt is the fix: a paused mutation sends nothing and never settles,
     // which leaves the form's Save busy with no failure copy.
     expect(write.attempted).toBe(1);
-    // Save is usable again: a paused mutation leaves both of these stuck.
-    expect(write.settled).toBe(true);
+    // Save is usable again: a paused mutation leaves this true forever.
     expect(write.stillPending).toBe(false);
     expect(announceError).toHaveBeenCalledTimes(1);
   });
@@ -286,8 +282,7 @@ describe('record writes while the device reports itself offline', () => {
     const write = await runOfflineWrite(RecordModeUpdateProbe, 'organizations.modes.update');
 
     expect(write.attempted).toBe(1);
-    // Save is usable again: a paused mutation leaves both of these stuck.
-    expect(write.settled).toBe(true);
+    // Save is usable again: a paused mutation leaves this true forever.
     expect(write.stillPending).toBe(false);
     expect(announceError).toHaveBeenCalledTimes(1);
   });
@@ -297,8 +292,7 @@ describe('record writes while the device reports itself offline', () => {
     const write = await runOfflineWrite(RecordGroupCreateProbe, 'organizations.groups.create');
 
     expect(write.attempted).toBe(1);
-    // Save is usable again: a paused mutation leaves both of these stuck.
-    expect(write.settled).toBe(true);
+    // Save is usable again: a paused mutation leaves this true forever.
     expect(write.stillPending).toBe(false);
     expect(announceError).toHaveBeenCalledTimes(1);
   });
@@ -308,8 +302,7 @@ describe('record writes while the device reports itself offline', () => {
     const write = await runOfflineWrite(RecordInviteProbe, 'organizations.members.invite');
 
     expect(write.attempted).toBe(1);
-    // Save is usable again: a paused mutation leaves both of these stuck.
-    expect(write.settled).toBe(true);
+    // Save is usable again: a paused mutation leaves this true forever.
     expect(write.stillPending).toBe(false);
   });
 
@@ -318,8 +311,7 @@ describe('record writes while the device reports itself offline', () => {
     const write = await runOfflineWrite(RecordTodoCreateProbe, 'todos.lists.create');
 
     expect(write.attempted).toBe(1);
-    // Save is usable again: a paused mutation leaves both of these stuck.
-    expect(write.settled).toBe(true);
+    // Save is usable again: a paused mutation leaves this true forever.
     expect(write.stillPending).toBe(false);
   });
 
@@ -328,8 +320,7 @@ describe('record writes while the device reports itself offline', () => {
     const write = await runOfflineWrite(RecordBitbucketProbe, 'organizations.bitbucket.connect');
 
     expect(write.attempted).toBe(1);
-    // Save is usable again: a paused mutation leaves both of these stuck.
-    expect(write.settled).toBe(true);
+    // Save is usable again: a paused mutation leaves this true forever.
     expect(write.stillPending).toBe(false);
   });
 
@@ -338,8 +329,7 @@ describe('record writes while the device reports itself offline', () => {
     const write = await runOfflineWrite(RecordDisconnectProbe, 'githubApps.uninstallApp');
 
     expect(write.attempted).toBe(1);
-    // Save is usable again: a paused mutation leaves both of these stuck.
-    expect(write.settled).toBe(true);
+    // Save is usable again: a paused mutation leaves this true forever.
     expect(write.stillPending).toBe(false);
     expect(announceError).toHaveBeenCalledTimes(1);
   });

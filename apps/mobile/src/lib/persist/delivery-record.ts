@@ -250,19 +250,15 @@ export async function tombstoneOldSessions({
   }
 
   // One read for the whole family, so both passes classify a value exactly
-  // once: the eviction path must not cost one SQLCipher read per entry.
+  // once: the eviction path must not cost one SQLCipher read per entry. The
+  // single statement also means the count and the classification come from the
+  // same snapshot, so the surplus can never be measured against records that
+  // have since left.
   const present = family.map(entry => ({
     k: entry.k,
     tombstone: isTombstone(entry.v),
     keep: entry.k === keepKey,
   }));
-  // The surplus is measured on what this pass actually read. A key that left
-  // the family between the listing and the write cannot make it negative: a
-  // negative surplus would make pass one delete tombstones that are still
-  // inside the window, and a deleted tombstone reads as "nothing recorded".
-  if (present.length <= max) {
-    return;
-  }
 
   // Pass one: delete the tombstones among the oldest records. Each deletion
   // shrinks the family, so the surplus it covers needs no retirement at all.

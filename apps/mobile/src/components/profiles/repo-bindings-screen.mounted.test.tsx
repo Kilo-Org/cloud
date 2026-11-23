@@ -245,7 +245,7 @@ describe('RepoBindingsScreen', () => {
     expect(queryError.message).toBe('Ask an organization owner or admin to grant you access.');
     expect(queryError.onRetry).toBeUndefined();
     // A terminal read hides the manage slot, so the error owns the surface: it
-    // centres and no scroller wraps it.
+    // centres and no tab scroller holds it.
     expect(queryError.placement).toBe('center');
     expect(findAll(renderer.root, 'ScrollView')).toHaveLength(0);
     expect(findAll(renderer.root, 'TabScrollView')).toHaveLength(0);

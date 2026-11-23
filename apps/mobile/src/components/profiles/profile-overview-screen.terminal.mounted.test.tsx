@@ -157,7 +157,7 @@ describe('ProfileOverviewScreen terminal error states', () => {
     expect(findAll(renderer.root, 'FormField')).toHaveLength(0);
     expect(findAll(renderer.root, 'Button')).toHaveLength(0);
     // With nothing to show under it, the error owns the surface: it centres and
-    // no scroller wraps it.
+    // no tab scroller holds it.
     expect(props.placement).toBe('center');
     expect(findAll(renderer.root, 'ScrollView')).toHaveLength(0);
     expect(findAll(renderer.root, 'TabScrollView')).toHaveLength(0);

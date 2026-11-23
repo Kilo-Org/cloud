@@ -196,7 +196,7 @@ describe('ProfileCommandsScreen', () => {
     expect(queryError.message).toBe('Ask an organization owner or admin to grant you access.');
     expect(queryError.onRetry).toBeUndefined();
     // A read with nothing under it owns the surface, so it centres and no
-    // scroller wraps it.
+    // tab scroller holds it.
     expect(queryError.placement).toBe('center');
     expect(findAll(renderer.root, 'ScrollView')).toHaveLength(0);
     expect(findAll(renderer.root, 'TabScrollView')).toHaveLength(0);

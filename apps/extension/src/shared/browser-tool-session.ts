@@ -3860,7 +3860,7 @@ export const createBrowserToolSession = ({
           return { error: 'WebMCP execution API is unavailable.', ok: false };
         }
 
-        // This handler refuses a descriptor that names no origin, the last door under the preflight; whether a named origin is the one the call may run in is the preflight's decision, not this handler's.
+        // Discovery and execution both happen in the tab's top-level document, so this handler requires a descriptor that names an origin and requires it to be the tab's own readable origin; the preflight makes the same decision for a CLI agent, and this check is what holds for a caller that has none.
         const tools = await discoverWebMcpTools();
         const discovery = webMcpDiscovery;
 

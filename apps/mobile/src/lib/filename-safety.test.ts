@@ -20,6 +20,13 @@ describe('stripUnsafeFilenameCharacters', () => {
     expect(stripUnsafeFilenameCharacters('a/b/')).toBe('');
   });
 
+  it('takes the basename after removing the characters, not before', () => {
+    // `.` in the basename pattern crosses no line terminator, so a terminator
+    // in front of the last separator would hide the directory part.
+    expect(stripUnsafeFilenameCharacters('a\n/b')).toBe('b');
+    expect(stripUnsafeFilenameCharacters('../../etc\n/passwd')).toBe('passwd');
+  });
+
   it('removes control characters, C0, DEL and C1', () => {
     expect(stripUnsafeFilenameCharacters('test\u0000file.txt')).toBe('testfile.txt');
     expect(stripUnsafeFilenameCharacters('a\u001Fb\u001Fc.bin')).toBe('abc.bin');

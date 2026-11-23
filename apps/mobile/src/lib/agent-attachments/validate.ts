@@ -153,7 +153,12 @@ export function classifyAttachment(candidate: AttachmentCandidate): ClassifiedAt
   if (candidate.size <= 0) {
     return { ok: false, reason: 'empty' };
   }
-  const extension = normalizeAttachmentExtension(candidate.name);
+  // The deny list judges the name that would be stored, not the raw picker
+  // name: sanitization removes characters (a bidi override, a control) that
+  // can hide the real extension, so `evil.e\u202Exe` sanitizes to `evil.exe`
+  // and must be refused here rather than stored with an extension this list
+  // never saw.
+  const extension = normalizeAttachmentExtension(stripUnsafeFilenameCharacters(candidate.name));
   if (AGENT_ATTACHMENT_DENIED_EXTENSIONS.has(extension)) {
     return { ok: false, reason: 'denied' };
   }

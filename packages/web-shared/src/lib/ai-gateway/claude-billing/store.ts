@@ -430,15 +430,17 @@ export async function shareClaudeBillingConnection(
       if (!source || source.connection.status !== ClaudeBillingConnectionStatus.Connected) {
         throw new ClaudeBillingShareError('source_unavailable');
       }
-      // The lock proves the payer existed when it was taken. A hard delete of the
-      // account that owns it cascades past that lock, so ask again before granting
-      // this payer to another scope: a grant naming a deleted payer would fail on
-      // the foreign key instead of answering as an unavailable source.
+      // The advisory lock is not taken by a cascade delete, so ask again that the
+      // payer still exists and hold it: a key-share lock blocks a parent delete of
+      // the account that owns it until this transaction commits. Without one, a
+      // grant naming a deleted payer would fail on the foreign key instead of
+      // answering as an unavailable source.
       const [livePayer] = await tx
         .select({ id: claude_billing_connections.id })
         .from(claude_billing_connections)
         .where(eq(claude_billing_connections.id, source.connection.id))
-        .limit(1);
+        .limit(1)
+        .for('key share');
       if (!livePayer) {
         throw new ClaudeBillingShareError('source_unavailable');
       }

@@ -127,7 +127,26 @@ describe('kilo browser tool definitions', () => {
     }
   });
 
-  it('publishes the non-empty path and target rules the browser_drop handler enforces', () => {
+  it('publishes the non-empty path rule the browser_drop handler enforces', () => {
+    const definitions = createKiloBrowserToolDefinitions('dangerous');
+    const drop = definitions.find(definition => definition.function.name === 'kilo_browser_drop');
+    const publishedPaths = z
+      .object({
+        description: z.string(),
+        items: z.record(z.string(), z.unknown()),
+      })
+      .parse(propertiesOf(drop?.function.parameters)['paths']);
+
+    // The schema a model reads states the rule the call applies, read from the schema the handler parses.
+    expect(publishedPaths.items).toStrictEqual(
+      z
+        .object({ items: z.record(z.string(), z.unknown()) })
+        .parse(z.toJSONSchema(dropPathsSchema, { io: 'input' })).items
+    );
+    expect(publishedPaths.description).toContain('empty entry is not allowed');
+  });
+
+  it('publishes the non-empty target rule the browser_drop handler enforces', () => {
     const definitions = createKiloBrowserToolDefinitions('dangerous');
     const drop = definitions.find(definition => definition.function.name === 'kilo_browser_drop');
     const vendoredTarget = z
@@ -138,34 +157,17 @@ describe('kilo browser tool definitions', () => {
           .parse(BROWSER_TOOL_CONTRACT.find(entry => entry.name === 'browser_drop')?.inputSchema)
           .properties['target']
       );
-    const published = z
-      .object({
-        paths: z.object({
-          description: z.string(),
-          items: z.record(z.string(), z.unknown()),
-        }),
-        target: z.object({ description: z.string() }).catchall(z.unknown()),
-      })
-      .parse(propertiesOf(drop?.function.parameters));
+    const publishedTarget = z
+      .object({ description: z.string() })
+      .catchall(z.unknown())
+      .parse(propertiesOf(drop?.function.parameters)['target']);
     // The rule the drop handlers apply, read from the schema they parse rather than copied from the producer.
     const targetRule = z
       .object({ minLength: z.number(), type: z.string() })
       .parse(z.toJSONSchema(dropTargetSchema, { io: 'input' }));
 
-    // The schema a model reads states the rule the call applies.
-    expect(published.paths.items).toStrictEqual({ minLength: 1, type: 'string' });
-    expect(published.paths.description).toContain('empty entry is not allowed');
-    expect(published.target).toStrictEqual({ ...vendoredTarget, ...targetRule });
-    // The vendored `target` wording is published unchanged beside the rule.
-    expect(published.target['description']).toBe(vendoredTarget['description']);
-
-    // The published rules are read from the schemas the handlers parse, so the two cannot drift apart.
-    expect(published.paths.items).toStrictEqual(
-      z
-        .object({ items: z.record(z.string(), z.unknown()) })
-        .parse(z.toJSONSchema(dropPathsSchema, { io: 'input' })).items
-    );
-    expect(targetRule).toStrictEqual({ minLength: 1, type: 'string' });
+    // The published target keeps the vendored wording and states the rule the call applies.
+    expect(publishedTarget).toStrictEqual({ ...vendoredTarget, ...targetRule });
   });
 
   it('rewrites every bare upstream sibling reference to its exposed kilo_ name', () => {

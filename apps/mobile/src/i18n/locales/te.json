@@ -1664,7 +1664,7 @@
     },
     "automation": {
       "title": "ఆటోమేషన్",
-      "couldNotLoad": "స్వయంచాలక చర్యల సెట్టింగ్‌లను లోడ్ చేయలేకపోయాము.",
+      "couldNotLoad": "స్వయంచాలక చర్యల సెట్టింగ్‌లను లోడ్ చేయలేకపోయాము",
       "autoAnalysis": "స్వయంచాలక విశ్లేషణ",
       "autoRemediation": "స్వయంచాలక పరిష్కారం",
       "autoDismiss": "స్వయంచాలక తీసివేత",
@@ -1696,9 +1696,9 @@
       "confidenceAny": "ఏ నమ్మక స్థాయి అయినా"
     },
     "analysis": {
-      "couldNotLoad": "విశ్లేషణను లోడ్ చేయలేకపోయాము.",
+      "couldNotLoad": "విశ్లేషణను లోడ్ చేయలేకపోయాము",
       "noAnalysisYet": "ఇంకా విశ్లేషణ జరగలేదు",
-      "noAnalysisYetDescription": "వివరాల ట్యాబ్ నుంచి విశ్లేషణను ప్రారంభించండి.",
+      "noAnalysisYetDescription": "వివరాల ట్యాబ్ నుంచి విశ్లేషణను ప్రారంభించండి",
       "restartTitle": "ఈ విశ్లేషణను పునఃప్రారంభించాలా?",
       "restartMessage": "భద్రతా ఏజెంట్ ప్రస్తుత విశ్లేషణ కోసం వేచి ఉండటం ఆపి, కొత్త విశ్లేషణను క్యూలో చేర్చుతుంది. ప్రస్తుత విశ్లేషణ నుంచి వచ్చే ఫలితాలను విస్మరిస్తుంది.",
       "keepWaiting": "ఇంకా వేచి ఉండండి",
@@ -1759,7 +1759,7 @@
       "repoSummaryHigh": "{{displayCount}} అధిక తీవ్రత",
       "repoSummaryHigh_one": "{{displayCount}} అధిక తీవ్రత",
       "repoSummaryHigh_other": "{{displayCount}} అధిక తీవ్రత",
-      "couldNotLoad": "డాష్‌బోర్డ్ డేటాను లోడ్ చేయలేకపోయాము.",
+      "couldNotLoad": "డాష్‌బోర్డ్ డేటాను లోడ్ చేయలేకపోయాము",
       "filterByRepository": "రిపోజిటరీ ఆధారంగా ఫిల్టర్ చేయండి",
       "lastSynced": "చివరిసారి సింక్ చేసిన సమయం: {{time}}",
       "manageRepositories": "రిపోజిటరీలను నిర్వహించండి",
@@ -1770,7 +1770,7 @@
       "syncing": "సింక్ అవుతోంది…",
       "syncNow": "ఇప్పుడే సింక్ చేయండి",
       "syncQueued": "సింక్‌ను క్యూలో చేర్చాము",
-      "syncStatusUnavailable": "సింక్ స్థితి అందుబాటులో లేదు.",
+      "syncStatusUnavailable": "సింక్ స్థితి అందుబాటులో లేదు",
       "daysOverdue_one": "గడువు దాటి {{displayCount}} రోజు",
       "daysOverdue_other": "గడువు దాటి {{displayCount}} రోజులు",
       "findingsCount_one": "{{displayCount}} సమస్య",
@@ -1863,7 +1863,7 @@
     "remediation": {
       "cancellationRequested": "రద్దు చేయమని కోరారు",
       "cancelled": "పరిష్కారం రద్దు చేయబడింది",
-      "couldNotLoad": "పరిష్కార స్థితిని లోడ్ చేయలేకపోయాము.",
+      "couldNotLoad": "పరిష్కార స్థితిని లోడ్ చేయలేకపోయాము",
       "start": "పరిష్కారాన్ని ప్రారంభించండి",
       "retry": "పరిష్కరించడానికి మళ్లీ ప్రయత్నించండి",
       "cancelTitle": "ఈ పరిష్కారాన్ని రద్దు చేయాలా?",
@@ -1886,7 +1886,7 @@
     },
     "analysisSettings": {
       "title": "మోడళ్లు, విశ్లేషణ",
-      "couldNotLoad": "విశ్లేషణ సెట్టింగ్‌లను లోడ్ చేయలేకపోయాము.",
+      "couldNotLoad": "విశ్లేషణ సెట్టింగ్‌లను లోడ్ చేయలేకపోయాము",
       "depth": "విశ్లేషణ లోతు",
       "triageModel": "ప్రాథమిక అంచనా మోడల్",
       "analysisModel": "విశ్లేషణ మోడల్",
@@ -1916,8 +1916,8 @@
       "tabRemediation": "పరిష్కారం"
     },
     "findingList": {
-      "couldNotLoad": "సమస్యలను లోడ్ చేయలేకపోయాము.",
-      "couldNotLoadMore": "మరిన్ని సమస్యలను లోడ్ చేయలేకపోయాము.",
+      "couldNotLoad": "సమస్యలను లోడ్ చేయలేకపోయాము",
+      "couldNotLoadMore": "మరిన్ని సమస్యలను లోడ్ చేయలేకపోయాము",
       "noMatchesTitle": "ఫిల్టర్‌లకు సరిపోలే సమస్యలు లేవు",
       "noMatchesDescription": "ఎంచుకున్న ఫిల్టర్‌లను మార్చి లేదా తీసివేసి చూడండి.",
       "emptyTitle": "ఓపెన్ సమస్యలు లేవు",
@@ -1952,7 +1952,7 @@
       "actorMaskedKiloAdmin": "Kilo అడ్మిన్",
       "actorMaskedUser": "దాగిన వినియోగదారు",
       "actorSystem": "Kilo సిస్టమ్",
-      "couldNotLoad": "ఆడిట్ నివేదికను లోడ్ చేయలేకపోయాము.",
+      "couldNotLoad": "ఆడిట్ నివేదికను లోడ్ చేయలేకపోయాము",
       "events": "సంఘటనలు",
       "eventConfidence": "విశ్వాసం: {{confidence}}",
       "eventReason": "కారణం: {{reason}}",
@@ -1992,7 +1992,7 @@
       }
     },
     "notifications": {
-      "couldNotLoad": "నోటిఫికేషన్ సెట్టింగ్‌లను లోడ్ చేయలేకపోయాము.",
+      "couldNotLoad": "నోటిఫికేషన్ సెట్టింగ్‌లను లోడ్ చేయలేకపోయాము",
       "emailOwners": "సంస్థ యజమానులకు ఇమెయిల్ చేయండి",
       "newFindingPersonalTitle": "కొత్త సమస్యల గురించి నాకు ఇమెయిల్ చేయండి",
       "newFindingSection": "కొత్త సమస్య నోటిఫికేషన్",

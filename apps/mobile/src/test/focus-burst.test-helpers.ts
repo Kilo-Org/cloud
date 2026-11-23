@@ -14,7 +14,7 @@ export type FocusEffects = {
 };
 
 /** Run every focus effect the router registered so far. */
-export async function runFocusEffects(focus: FocusEffects): Promise<void> {
+async function runFocusEffects(focus: FocusEffects): Promise<void> {
   await act(async () => {
     for (const effect of focus.effects) {
       effect();

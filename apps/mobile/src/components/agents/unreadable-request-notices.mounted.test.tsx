@@ -90,14 +90,14 @@ describe('UnreadableRequestNotices mounted', () => {
 
     expect(announceForA11y).toHaveBeenCalledTimes(1);
 
-    await act(async () => {
+    act(() => {
       renderer.update(
         createElement(UnreadableRequestNotices, { hasQuestions: true, hasPermissions: false })
       );
     });
     expect(announceForA11y).toHaveBeenCalledTimes(1);
 
-    await act(async () => {
+    act(() => {
       renderer.update(
         createElement(UnreadableRequestNotices, { hasQuestions: false, hasPermissions: false })
       );

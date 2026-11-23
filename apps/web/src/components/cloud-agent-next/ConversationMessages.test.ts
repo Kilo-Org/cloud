@@ -960,7 +960,13 @@ describe('ConversationMessages', () => {
           set(atoms.activeSuggestion, value);
         }
       ),
-      unreadableQuestions: atom<readonly UnreadableQuestionState[]>([]),
+      unreadableQuestions: atom<
+        readonly UnreadableQuestionState[],
+        [readonly UnreadableQuestionState[]],
+        void
+      >([], (_get, set, value) => {
+        set(atoms.unreadableQuestions, value);
+      }),
     };
     jest.mocked(useOptionalManager).mockReturnValue({ atoms } as SessionManager);
     const childSessionId = `ses_${'a'.repeat(26)}`;

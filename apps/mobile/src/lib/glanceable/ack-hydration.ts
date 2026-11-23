@@ -11,7 +11,7 @@ import { whenSessionAttentionHydrationSettled } from '@/lib/session-attention';
  * derives — an unhydrated read is the same answer every surface had before
  * this wait existed.
  */
-export const ACK_HYDRATION_SETTLE_MS = 2000;
+const ACK_HYDRATION_SETTLE_MS = 2000;
 
 /**
  * Wait (bounded) for the ack store's hydration read. Every glanceable path

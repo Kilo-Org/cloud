@@ -1756,6 +1756,105 @@ test('leaves another locale’s ASCII sentence terminator alone', () => {
   assert.deepEqual(found, []);
 });
 
+const URDU_TERMINATORS_ENGLISH = {
+  common: { sentenceJoiner: '. ', listJoiner: ', ' },
+  work: {
+    empty: 'Nothing to do.',
+    waiting: 'Waiting...',
+    retry: 'Try again',
+    host: 'Open kilo.ai',
+    note: 'Contact support',
+    file: 'Read this file',
+  },
+};
+const URDU_TERMINATORS_SOURCE =
+  "t('common.sentenceJoiner');\nt('common.listJoiner');\nt('work.empty');\nt('work.waiting');\nt('work.retry');\nt('work.host');\nt('work.note');\nt('work.file');";
+const URDU_TERMINATOR_WORK = {
+  empty: 'کوئی کام نہیں۔',
+  waiting: 'انتظار...',
+  retry: 'دوبارہ کوشش کریں',
+  host: 'kilo.ai کھولیں۔',
+  note: 'رپورٹنگ Sentry.',
+  file: 'فائل.png کھولیں۔',
+};
+
+/** The Urdu catalog fixture: it declares the Urdu full stop as its joiner. */
+function urduTerminators(work = URDU_TERMINATOR_WORK) {
+  return { common: { sentenceJoiner: '۔ ', listJoiner: '، ' }, work };
+}
+
+test('accepts Urdu copy that closes its sentences with «۔»', () => {
+  const found = run({
+    language: 'ur',
+    english: URDU_TERMINATORS_ENGLISH,
+    translated: urduTerminators(),
+    source: URDU_TERMINATORS_SOURCE,
+  });
+  assert.deepEqual(found, []);
+});
+
+test('rejects Urdu copy with a terminal ASCII period', () => {
+  const found = run({
+    language: 'ur',
+    english: URDU_TERMINATORS_ENGLISH,
+    translated: urduTerminators({ ...URDU_TERMINATOR_WORK, empty: 'کوئی کام نہیں.' }),
+    source: URDU_TERMINATORS_SOURCE,
+  });
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(
+    found.join('\n'),
+    /mobile\/ur: "work\.empty" ends a sentence with the ASCII "\."; Urdu writes «۔»/
+  );
+});
+
+test('rejects Urdu copy with a period that joins two sentences', () => {
+  const found = run({
+    language: 'ur',
+    english: URDU_TERMINATORS_ENGLISH,
+    translated: urduTerminators({
+      ...URDU_TERMINATOR_WORK,
+      empty: 'پہلے یہ کریں. پھر دوبارہ کوشش کریں',
+    }),
+    source: URDU_TERMINATORS_SOURCE,
+  });
+  assert.ok(found.length > 0, 'expected a problem');
+  assert.match(
+    found.join('\n'),
+    /mobile\/ur: "work\.empty" joins two sentences with the ASCII "\."; Urdu writes «۔»/
+  );
+});
+
+test('leaves an Urdu URL, product name and ellipsis alone', () => {
+  const found = run({
+    language: 'ur',
+    english: URDU_TERMINATORS_ENGLISH,
+    translated: urduTerminators({
+      ...URDU_TERMINATOR_WORK,
+      // A host and a file name continue after their dot, and a product name
+      // ends on a Latin letter rather than on an Urdu word.
+      host: 'یہ لنک کھولیں: kilo.ai',
+      note: 'رپورٹنگ Sentry.',
+      file: 'فائل.png',
+      waiting: 'انتظار...',
+    }),
+    source: URDU_TERMINATORS_SOURCE,
+  });
+  assert.deepEqual(found, []);
+});
+
+test('holds only the catalog that declares «۔» as its sentence joiner', () => {
+  const found = run({
+    language: 'ar',
+    english: URDU_TERMINATORS_ENGLISH,
+    translated: {
+      common: { sentenceJoiner: '.', listJoiner: '، ' },
+      work: { ...URDU_TERMINATOR_WORK, empty: 'لا يوجد شيء للقيام به.' },
+    },
+    source: URDU_TERMINATORS_SOURCE,
+  });
+  assert.deepEqual(found, []);
+});
+
 test('rejects a notification catalog the push locale registry omits', () => {
   const found = run({
     extraFiles: {

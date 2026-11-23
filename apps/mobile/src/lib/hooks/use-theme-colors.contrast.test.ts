@@ -235,7 +235,9 @@ describe('disabled primary action fill contrast (WCAG AA text)', () => {
   //
   // The light face's fill equals `--muted` and `--secondary`, so it is the
   // preexisting light fill and out of this change's scope; the perceived-step
-  // guard below is dark-only for that reason.
+  // guard below is dark-only for that reason. 1.6 is this file's perception
+  // floor for a control's own surface, the same value the idle composer circle
+  // and the ring track are held to below.
   const MIN_VISIBLE_SURFACE_RATIO = 1.6;
 
   it('light theme: mutedForeground vs secondaryFill >= 4.5:1', () => {

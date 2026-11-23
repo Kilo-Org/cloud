@@ -177,8 +177,9 @@ const buttonLabelClasses = Object.fromEntries(
  * palette's own step for a filled neutral control. A brand or taupe fill reads
  * as a second colour rather than as an inactive control, so the face takes the
  * neutral step instead. That token is a distinct step off both the card surface
- * and the page in dark (1.70:1 and 1.99:1, above the app's 1.6:1
- * visible-surface floor), and it equals `--muted` in light, so the light face
+ * and the page in dark (1.70:1 and 1.99:1, above the 1.6:1 perception floor
+ * this guard sets for a control fill, the same threshold the idle send circle
+ * and the ring track use), and it equals `--muted` in light, so the light face
  * does not change.
  *
  * The plate draws no border, so an enabled-to-disabled transition changes no

@@ -30,11 +30,17 @@ const PEM_KEY = typeof exportedKey === 'string' ? exportedKey : exportedKey.toSt
 
 type MutationOptions = { kind?: 'create' | 'update' };
 
+type QueryOptions = { kind?: 'listProviders' | 'credentialMethod' };
+
 type ScreenState = {
   params: Record<string, string>;
   providers: { id: string; name: string }[];
   error: boolean;
   role: string | undefined;
+  /** The method the stored key used, as `byok.credentialMethod` answers it. */
+  credentialMethod: { method: 'apiKey' | 'accessKeys' | null };
+  credentialMethodPending: boolean;
+  credentialMethodError: boolean;
   mutateAsync: Mock;
   dismissTo: Mock;
 };
@@ -47,6 +53,9 @@ const state = vi.hoisted((): ScreenState => ({
   providers: [],
   error: false,
   role: 'owner',
+  credentialMethod: { method: null },
+  credentialMethodPending: false,
+  credentialMethodError: false,
   mutateAsync: vi.fn(),
   dismissTo: vi.fn(),
 }));
@@ -62,13 +71,24 @@ vi.mock('@tanstack/react-query', async importOriginal => {
   const actual = await importOriginal<typeof ReactQuery>();
   return {
     ...actual,
-    useQuery: () => ({
-      data: state.providers,
-      isPending: false,
-      isError: state.error,
-      isFetching: false,
-      refetch: vi.fn(),
-    }),
+    // Two queries answer this screen, so the mock answers by the options each
+    // call hands it: the provider list, or the method the stored key used.
+    useQuery: (options: QueryOptions) =>
+      options.kind === 'credentialMethod'
+        ? {
+            data: state.credentialMethod,
+            isPending: state.credentialMethodPending,
+            isError: state.credentialMethodError,
+            isFetching: false,
+            refetch: vi.fn(),
+          }
+        : {
+            data: state.providers,
+            isPending: false,
+            isError: state.error,
+            isFetching: false,
+            refetch: vi.fn(),
+          },
     useMutation: (options: MutationOptions) => ({
       mutateAsync: (input: unknown) => state.mutateAsync(options.kind, input),
       isPending: false,
@@ -91,7 +111,10 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
     byok: {
-      listProviders: { queryOptions: () => ({}), queryKey: () => [] },
+      listProviders: { queryOptions: () => ({ kind: 'listProviders' }), queryKey: () => [] },
+      credentialMethod: {
+        queryOptions: () => ({ kind: 'credentialMethod' }),
+      },
       list: { queryKey: () => [] },
       create: { mutationOptions: (options: MutationOptions) => ({ ...options, kind: 'create' }) },
       update: { mutationOptions: (options: MutationOptions) => ({ ...options, kind: 'update' }) },
@@ -152,7 +175,8 @@ function credentialForm(root: ReactTestRenderer['root']) {
   }
   return {
     values: form.props.values as { current: Record<string, string> },
-    form: form.props.form as { kind: string },
+    form: form.props.form as { kind: string; fields: readonly { id: string }[] },
+    mode: form.props.mode as string,
     mappings: form.props.mappings as { current: Map<number, Partial<ModelMapping>> },
     onModeChange: form.props.onModeChange as (mode: string) => void,
     onEdit: form.props.onEdit as () => void,
@@ -194,6 +218,9 @@ beforeEach(() => {
   state.providers = [{ id: 'anthropic', name: 'Anthropic' }];
   state.error = false;
   state.role = 'owner';
+  state.credentialMethod = { method: null };
+  state.credentialMethodPending = false;
+  state.credentialMethodError = false;
   state.mutateAsync.mockReset();
   state.mutateAsync.mockResolvedValue(undefined);
   state.dismissTo.mockClear();
@@ -612,6 +639,70 @@ describe('ProviderKeyNewScreen', () => {
     // The API key field is gone from the form, so its value must be gone from
     // the draft as well: Save cannot send what the reader cannot see.
     expect(credentialForm(root).values.current).toEqual({ region: 'us-east-1' });
+  });
+
+  it('opens a saved Bedrock key on the method it used', async () => {
+    state.params = { provider: 'bedrock', id: KEY_ID };
+    state.providers = [{ id: 'bedrock', name: 'Amazon Bedrock' }];
+    state.credentialMethod = { method: 'accessKeys' };
+    const root = await mount();
+
+    expect(credentialForm(root).mode).toBe('accessKeys');
+    expect(credentialForm(root).form.fields.map(field => field.id)).toEqual([
+      'accessKeyId',
+      'secretAccessKey',
+      'region',
+    ]);
+  });
+
+  it('opens a saved Bedrock key on the API-key method when the stored one cannot be read', async () => {
+    state.params = { provider: 'bedrock', id: KEY_ID };
+    state.providers = [{ id: 'bedrock', name: 'Amazon Bedrock' }];
+    state.credentialMethod = { method: null };
+    const root = await mount();
+
+    expect(credentialForm(root).mode).toBe('apiKey');
+    expect(credentialForm(root).form.fields.map(field => field.id)).toEqual(['apiKey', 'region']);
+  });
+
+  it('waits for the stored method instead of showing the other one', async () => {
+    state.params = { provider: 'bedrock', id: KEY_ID };
+    state.providers = [{ id: 'bedrock', name: 'Amazon Bedrock' }];
+    state.credentialMethodPending = true;
+    const root = await mount();
+
+    expect(root.findAll(node => Object.is(node.type, CREDENTIAL_FORM))).toHaveLength(0);
+    expect(root.findAll(node => Object.is(node.type, 'Skeleton')).length).toBeGreaterThan(0);
+  });
+
+  it('offers a retry when the stored method could not be read', async () => {
+    state.params = { provider: 'bedrock', id: KEY_ID };
+    state.providers = [{ id: 'bedrock', name: 'Amazon Bedrock' }];
+    state.credentialMethodError = true;
+    const root = await mount();
+
+    expect(root.findAll(node => Object.is(node.type, CREDENTIAL_FORM))).toHaveLength(0);
+    const [queryError] = root.findAll(node => Object.is(node.type, 'QueryError'));
+    expect(typeof queryError?.props.onRetry).toBe('function');
+  });
+
+  it('names every empty field of an access-key form, not only the first', async () => {
+    state.params = { provider: 'bedrock', id: KEY_ID };
+    state.providers = [{ id: 'bedrock', name: 'Amazon Bedrock' }];
+    state.credentialMethod = { method: 'accessKeys' };
+    const root = await mount();
+
+    await act(() => {
+      (addButton(root).props.onPress as () => void)();
+    });
+
+    expect(state.mutateAsync).not.toHaveBeenCalled();
+    expect(credentialForm(root).errors).toEqual({
+      accessKeyId: 'Access key ID is required.',
+      secretAccessKey: 'Secret access key is required.',
+      region: 'AWS region is required.',
+    });
+    expect(statusMessages(root)).toEqual(['The key is missing a required value.']);
   });
 
   it('names the half-filled mapping instead of refusing the whole credential', async () => {

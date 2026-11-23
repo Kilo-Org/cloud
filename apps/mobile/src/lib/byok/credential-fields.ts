@@ -163,20 +163,38 @@ export function credentialForm(providerId: string, mode: BedrockAuthMode): Crede
 }
 
 /**
- * The first field this form still needs. Every field it renders is required:
- * the shapes have no optional field the reader may leave out, and Azure's
- * mappings are the one optional part, which is a list rather than a field.
+ * The copy key that names one field on this form. A field the form does not
+ * show falls back to the API-key label, the same field the one-value form has.
  */
-export function firstMissingField(
-  form: CredentialForm,
-  values: CredentialValues
-): CredentialFieldId | null {
-  for (const field of form.fields) {
-    if ((values[field.id] ?? '').trim() === '') {
-      return field.id;
-    }
-  }
-  return null;
+export function fieldLabelKey(form: CredentialForm, id: CredentialFieldId): string {
+  return form.fields.find(field => field.id === id)?.labelKey ?? 'profile.providerKeys.apiKeyLabel';
+}
+
+/**
+ * Whether replacing this key reads the method its saved credential used: only
+ * the edit route of a Bedrock key has one. A new key has none yet, and a
+ * one-value provider has no method at all.
+ */
+export function replacesBedrockKey(
+  providerId: string | undefined,
+  keyId: string | undefined
+): boolean {
+  return (
+    keyId !== undefined &&
+    providerId !== undefined &&
+    credentialForm(providerId, 'apiKey')?.kind === 'bedrock'
+  );
+}
+
+/**
+ * Every field this form still needs, in the order the form shows them, so each
+ * empty field gets its own message rather than only the first one. Every field
+ * it renders is required: the shapes have no optional field the reader may
+ * leave out, and Azure's mappings are the one optional part, which is a list
+ * rather than a field.
+ */
+export function missingFields(form: CredentialForm, values: CredentialValues): CredentialFieldId[] {
+  return form.fields.filter(field => (values[field.id] ?? '').trim() === '').map(field => field.id);
 }
 
 /** The Vertex credential one form's fields add up to, with its key in canonical form. */
@@ -272,13 +290,14 @@ export function credentialProblem(input: {
 }
 
 /**
- * What one form's fields add up to: the credential to send, the field still
+ * What one form's fields add up to: the credential to send, the fields still
  * empty, one mapping row still half filled, or a shape the server's own check
  * refuses.
  */
 export type CredentialRead =
   | { readonly tag: 'ready'; readonly credential: string }
-  | { readonly tag: 'missing'; readonly field: CredentialFieldId }
+  /** Every field still empty, in the order the form shows them. */
+  | { readonly tag: 'missing'; readonly fields: readonly CredentialFieldId[] }
   /**
    * One mapping row has one side filled. `mapping` is its 1-based position
    * among the rows the form shows, so the refusal can name the row.
@@ -310,9 +329,9 @@ export function readStructuredCredential(input: {
   values: CredentialValues;
   rows: readonly Partial<ModelMapping>[];
 }): CredentialRead {
-  const missing = firstMissingField(input.form, input.values);
-  if (missing) {
-    return { tag: 'missing', field: missing };
+  const missing = missingFields(input.form, input.values);
+  if (missing.length > 0) {
+    return { tag: 'missing', fields: missing };
   }
   const modelMappings: ModelMapping[] = [];
   for (const [index, row] of input.rows.entries()) {

@@ -1,4 +1,3 @@
-import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
@@ -25,8 +24,10 @@ import {
   type CredentialFieldId,
   credentialForm,
   type CredentialRead,
+  fieldLabelKey,
   type ModelMapping,
   readStructuredCredential,
+  replacesBedrockKey,
   withoutUnshownValues,
 } from '@/lib/byok/credential-fields';
 import { type KeySaveFailure, refusedKeyMessage } from '@/lib/byok/key-refusal';
@@ -44,8 +45,6 @@ import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { normalizeOrgQueryParam } from '@/lib/org-deep-link';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
 import { useTRPC } from '@/lib/trpc';
-
-type ProviderOption = inferRouterOutputs<MobileRouter>['byok']['listProviders'][number];
 
 /**
  * The empty field-error state. One shared object, not a fresh `{}`, so an edit
@@ -74,18 +73,27 @@ export function ProviderKeyNewScreen() {
   const keyRef = useRef('');
   const valuesRef = useRef<CredentialDraft>({});
   const mappingsRef = useRef(new Map<number, Partial<ModelMapping>>());
-  const [authMode, setAuthMode] = useState<BedrockAuthMode>('apiKey');
+  // The method the reader chose, or null while the stored one decides it. An
+  // edit opens on the method its saved key used, so replacing a Bedrock key
+  // does not start on the other one and drop the fields the reader expects.
+  const [chosenMode, setChosenMode] = useState<BedrockAuthMode | null>(null);
   const [fieldErrors, setFieldErrors] =
     useState<Partial<Record<CredentialFieldId, string>>>(NO_FIELD_ERRORS);
   const save = useSurfaceFeedback<KeySaveFailure>();
   const scope = providerKeyScope(parsedParam.success ? parsedParam.data.org : undefined);
   const scopeInput = providerKeyScopeInput(scope);
   const keyId = parsedParam.success ? parsedParam.data.id : undefined;
+  const providerId = parsedParam.success ? parsedParam.data.provider : undefined;
   const { role, org, isResolving } = useOrgBoundary(
     scope.kind === 'organization' ? scope.organizationId : undefined
   );
   const permissions = providerKeyPermissions(scope, role);
   const providers = useQuery(trpc.byok.listProviders.queryOptions(scopeInput));
+  // Replacing a Bedrock key opens on the method its saved credential used.
+  const asksStoredMethod = replacesBedrockKey(providerId, keyId);
+  const methodInput = trpc.byok.credentialMethod.queryOptions({ ...scopeInput, id: keyId ?? '' });
+  const credentialMethod = useQuery({ ...methodInput, enabled: asksStoredMethod });
+  const authMode: BedrockAuthMode = chosenMode ?? credentialMethod.data?.method ?? 'apiKey';
   // The credential is plaintext until it is stored: drop every copy on unmount.
   useEffect(
     () => () => {
@@ -122,7 +130,11 @@ export function ProviderKeyNewScreen() {
     );
   }
 
-  if (providers.isPending || providers.isError) {
+  // A stored method still being read may be the other one, so the body waits
+  // rather than show fields the reader may have to abandon.
+  const waiting = asksStoredMethod && (credentialMethod.isPending || credentialMethod.isError);
+  if (providers.isPending || providers.isError || waiting) {
+    const stalled = providers.isError ? providers : credentialMethod;
     return (
       <View className="flex-1 bg-background">
         {/* The loaded header names the provider on its subtitle line, so the
@@ -133,8 +145,8 @@ export function ProviderKeyNewScreen() {
           reserveSubtitle={providers.isPending}
           backFallback={PROFILE_TAB_HREF}
         />
-        {providers.isError ? (
-          <QueryError onRetry={() => void providers.refetch()} isRetrying={providers.isFetching} />
+        {stalled.isError ? (
+          <QueryError onRetry={() => void stalled.refetch()} isRetrying={stalled.isFetching} />
         ) : (
           <View className={SCREEN_BODY_CLASS}>
             <View className="gap-1">
@@ -148,18 +160,12 @@ export function ProviderKeyNewScreen() {
     );
   }
 
-  const provider: ProviderOption | undefined = parsedParam.success
-    ? providers.data.find(row => row.id === parsedParam.data.provider)
-    : undefined;
+  const provider = providers.data.find(row => row.id === providerId);
   if (!provider) {
     return <InvalidRouteState backTo={backHref} />;
   }
 
   const form = credentialForm(provider.id, authMode);
-  const fieldLabel = (id: CredentialFieldId) => {
-    const field = form?.fields.find(candidate => candidate.id === id);
-    return field ? t(field.labelKey) : t('profile.providerKeys.apiKeyLabel');
-  };
 
   /**
    * The credential changed: a refusal shown beside the old value is about a
@@ -175,7 +181,7 @@ export function ProviderKeyNewScreen() {
   const changeAuthMode = (mode: BedrockAuthMode) => {
     valuesRef.current = withoutUnshownValues(credentialForm(provider.id, mode), valuesRef.current);
     clearFailureOnEdit();
-    setAuthMode(mode);
+    setChosenMode(mode);
   };
 
   /** The credential the server stores: the JSON its fields add up to. */
@@ -183,7 +189,7 @@ export function ProviderKeyNewScreen() {
     if (!form) {
       const apiKey = keyRef.current.trim();
       return apiKey === ''
-        ? { tag: 'missing', field: 'apiKey' }
+        ? { tag: 'missing', fields: ['apiKey'] }
         : { tag: 'ready', credential: apiKey };
     }
     return readStructuredCredential({
@@ -204,11 +210,16 @@ export function ProviderKeyNewScreen() {
     const credential = readCredential();
     if (credential.tag === 'missing') {
       if (form) {
-        setFieldErrors({
-          [credential.field]: t('profile.providerKeys.fieldRequired', {
-            field: fieldLabel(credential.field),
-          }),
-        });
+        // Every empty field gets its own message under its own input: the
+        // summary says the key is incomplete, but a reader who left the region
+        // empty needs to see which field that is.
+        const missingErrors: Partial<Record<CredentialFieldId, string>> = {};
+        for (const id of credential.fields) {
+          missingErrors[id] = t('profile.providerKeys.fieldRequired', {
+            field: t(fieldLabelKey(form, id)),
+          });
+        }
+        setFieldErrors(missingErrors);
       }
       attempt.fail({
         kind: 'refused',
@@ -281,14 +292,6 @@ export function ProviderKeyNewScreen() {
     router.dismissTo(backHref);
   };
 
-  const saveFailure = (
-    <ProviderKeySaveFailure
-      failure={save.failure}
-      onRetry={() => void submit()}
-      retryLabel={t('common.retry')}
-    />
-  );
-
   const pending = save.feedback.status === 'pending';
 
   return (
@@ -343,7 +346,11 @@ export function ProviderKeyNewScreen() {
             }}
           />
         )}
-        {saveFailure}
+        <ProviderKeySaveFailure
+          failure={save.failure}
+          onRetry={() => void submit()}
+          retryLabel={t('common.retry')}
+        />
         <Button
           className={STATE_ACTION_CLASS}
           loading={pending}

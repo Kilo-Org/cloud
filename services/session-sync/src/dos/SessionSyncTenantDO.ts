@@ -48,11 +48,20 @@ export class SessionSyncTenantDO extends DurableObject<Env> {
       await migrate(this.db, migrations);
       this.db.insert(usage).values({ id: 1, sessions: 0, bytes: 0 }).onConflictDoNothing().run();
       // Rows created before list metadata sort by their creation time.
-      this.db
-        .update(createdSessions)
-        .set({ updated_at: sql`${createdSessions.created_at}` })
-        .where(eq(createdSessions.updated_at, 0))
-        .run();
+      if (
+        this.db
+          .select({ target: createdSessions.target })
+          .from(createdSessions)
+          .where(eq(createdSessions.updated_at, 0))
+          .limit(1)
+          .get()
+      ) {
+        this.db
+          .update(createdSessions)
+          .set({ updated_at: sql`${createdSessions.created_at}` })
+          .where(eq(createdSessions.updated_at, 0))
+          .run();
+      }
       await erasure.schedule(this.db, ctx);
     });
   }

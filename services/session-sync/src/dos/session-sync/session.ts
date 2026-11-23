@@ -154,12 +154,6 @@ export function joinSource(db: Db, sourceID: string, client: SourceClient, now: 
     .run();
 }
 
-/** Persists the first source of a session created before multi-source support. */
-export function seedFirstSource(db: Db): void {
-  const meta = load(db);
-  if (meta) joinSource(db, meta.source_id, 'cli', meta.created_at);
-}
-
 /** Reads the state a producer needs to recover; `lastReceipt` is the newest receipt. */
 export function toState(db: Db, meta: Meta): SessionState {
   const tenant =

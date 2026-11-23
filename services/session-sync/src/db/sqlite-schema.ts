@@ -71,6 +71,14 @@ export const entities = sqliteTable(
   ]
 );
 
+/** List metadata owed to the creator index; at most one row (`key` = 1). */
+export const pendingListMetadata = sqliteTable('pending_list_metadata', {
+  key: integer('key').primaryKey(),
+  /** Serialized `SessionListMetadata` awaiting a retry. */
+  value: text('value').notNull(),
+  retry_at: integer('retry_at').notNull(),
+});
+
 /** Bounded tail of durable batch receipts, keyed by the producer batch ID. */
 export const receipts = sqliteTable(
   'receipts',

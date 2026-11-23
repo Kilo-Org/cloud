@@ -1,7 +1,43 @@
+import { runDurableObjectAlarm, runInDurableObject } from 'cloudflare:test';
 import { bytesToBase64url } from '@kilocode/worker-utils/base64url';
+import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { describe, expect, it } from 'vitest';
 
-import { batch, client, member, newSessionID, personal, type Client } from '../helpers';
+import { pendingListMetadata } from '../../src/db/sqlite-schema';
+import { getSessionSyncDOStub, type SessionSyncDO } from '../../src/dos/SessionSyncDO';
+import { getTenantStub } from '../../src/dos/SessionSyncTenantDO';
+import type { Env } from '../../src/env';
+import { batch, client, member, newSessionID, personal, testEnv, type Client } from '../helpers';
+
+/** Makes the next `updateCreatedSession` call fail without reaching the tenant. */
+async function loseNextIndexPush(stub: DurableObjectStub<SessionSyncDO>, userID: string) {
+  await runInDurableObject(stub, instance => {
+    const exposed = instance as unknown as { env: Env };
+    const namespace = exposed.env.SESSION_SYNC_TENANT_DO;
+    const realTenant = getTenantStub(testEnv, { type: 'user', id: userID });
+    let lost = false;
+    exposed.env = {
+      ...exposed.env,
+      SESSION_SYNC_TENANT_DO: {
+        idFromName: namespace.idFromName.bind(namespace),
+        get: () =>
+          new Proxy(realTenant, {
+            get(target, property: string) {
+              if (property !== 'updateCreatedSession')
+                return (...args: unknown[]) => target[property](...args);
+              return async (input: unknown) => {
+                if (!lost) {
+                  lost = true;
+                  throw new Error('Synthetic refused tenant call');
+                }
+                return await target.updateCreatedSession(input);
+              };
+            },
+          }),
+      } as unknown as Env['SESSION_SYNC_TENANT_DO'],
+    };
+  });
+}
 
 type Item = {
   sessionID: string;
@@ -213,5 +249,70 @@ describe('creator session list', () => {
   ])('rejects invalid pagination %s', async query => {
     const api = client(personal(`usr-${crypto.randomUUID()}`));
     expect((await api.send('GET', `/v1/sessions${query}`)).status).toBe(400);
+  });
+});
+
+describe('creator index retries', () => {
+  it('keeps an owed index push durable and completes it from the alarm', async () => {
+    const userID = `usr-${crypto.randomUUID()}`;
+    const api = client(personal(userID));
+    const id = newSessionID();
+    const sourceID = crypto.randomUUID();
+    expect((await api.register(id, sourceID, 'mobile')).status).toBe(201);
+    const stub = getSessionSyncDOStub(testEnv, {
+      tenant: { type: 'user', id: userID },
+      sessionID: id,
+    });
+    await loseNextIndexPush(stub, userID);
+    expect(
+      (
+        await api.apply(
+          id,
+          batch(sourceID, 0, 1, [
+            {
+              op: 'put',
+              kind: 'session',
+              id,
+              value: {
+                id,
+                title: 'Retried title',
+                origin: { directory: '/repo/retry', client: 'mobile' },
+                time: { created: 1000, updated: 2000, archived: 1500 },
+              },
+            },
+          ])
+        )
+      ).status
+    ).toBe(200);
+
+    // The refused push is owed, so the list still shows the unindexed session.
+    expect((await listing(api)).items[0]).toMatchObject({
+      sessionID: id,
+      title: null,
+      directory: null,
+      archived: false,
+    });
+    expect((await listing(api, '?q=retried')).items).toEqual([]);
+
+    await runInDurableObject(stub, (_instance, state) => {
+      expect(drizzle(state.storage).select().from(pendingListMetadata).get()).toMatchObject({
+        retry_at: expect.any(Number),
+      });
+      drizzle(state.storage).update(pendingListMetadata).set({ retry_at: 0 }).run();
+    });
+    expect(await runDurableObjectAlarm(stub)).toBe(true);
+
+    const listed = (await listing(api, '?q=retried')).items;
+    expect(listed).toHaveLength(1);
+    expect(listed[0]).toMatchObject({
+      sessionID: id,
+      title: 'Retried title',
+      client: 'mobile',
+      directory: '/repo/retry',
+      archived: true,
+    });
+    await runInDurableObject(stub, (_instance, state) => {
+      expect(drizzle(state.storage).select().from(pendingListMetadata).get()).toBeUndefined();
+    });
   });
 });

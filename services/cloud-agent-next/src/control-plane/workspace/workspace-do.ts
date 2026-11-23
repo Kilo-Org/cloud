@@ -9,7 +9,10 @@ import {
   unsealRuntimeAuthorization,
 } from '@kilocode/worker-utils/runtime-authorization';
 import type { RuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization-contract';
-import type { CloudAgentAuthority } from '@kilocode/worker-utils/cloud-agent-authority';
+import {
+  CLOUD_AGENT_STACK_TARGET_DENIED,
+  type CloudAgentAuthority,
+} from '@kilocode/worker-utils/cloud-agent-authority';
 import type { SessionMetadata } from '../../persistence/session-metadata.js';
 import { resolveSecret } from '../../auth.js';
 import {
@@ -177,13 +180,21 @@ export class CloudAgentWorkspaceDO extends DurableObject<Env> {
     const childSessionId = serverAllocatedSessionId(input.childSessionId);
     const record = (await this.liveAuthority(input.authority)).record;
     if (input.stackOnWorktreeId !== undefined) {
-      await this.assertStackTarget(input.authority, input.stackOnWorktreeId);
+      await this.checkStackTarget(input.authority, input.stackOnWorktreeId, record);
     }
     return this.delegate(record, childSessionId, input.authority);
   }
 
   async assertStackTarget(authority: CloudAgentAuthority, worktreeId: string): Promise<void> {
     const { record } = await this.liveAuthority(authority);
+    await this.checkStackTarget(authority, worktreeId, record);
+  }
+
+  private async checkStackTarget(
+    authority: CloudAgentAuthority,
+    worktreeId: string,
+    record: WorkspaceAuthorityRecord
+  ): Promise<void> {
     if (record.worktreeId === worktreeId) return;
     const registry = await this.ctx.storage.list<WorkspaceChildEntry>({ prefix: CHILD_PREFIX });
     const anchorId = workspaceSessionIdForScope(worktreeId, '');
@@ -203,7 +214,7 @@ export class CloudAgentWorkspaceDO extends DurableObject<Env> {
       }
     }
     if (readFailure) throw readFailure.error;
-    throw new Error('Stack target must be this workspace or a direct child workspace');
+    throw new Error(CLOUD_AGENT_STACK_TARGET_DENIED);
   }
 
   private async readChildMetadata(authority: CloudAgentAuthority, childSessionId: string) {

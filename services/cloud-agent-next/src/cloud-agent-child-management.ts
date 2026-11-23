@@ -2,6 +2,7 @@ import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import type { CloudAgentWorktreeId } from '@kilocode/session-ingest-contracts';
 import {
+  CLOUD_AGENT_STACK_TARGET_DENIED,
   cloudAgentAuthorityProcedureKind,
   cloudAgentAuthorityProcedures,
   validateCloudAgentAuthorityRequest,
@@ -217,8 +218,8 @@ export async function assertCloudAgentManagementRequest(input: {
         'assertStackTarget'
       ).catch(error => {
         throw forbidden(
-          error instanceof Error && error.message.includes('Stack target must be')
-            ? 'Stack target must be this workspace or a direct child workspace'
+          error instanceof Error && error.message === CLOUD_AGENT_STACK_TARGET_DENIED
+            ? CLOUD_AGENT_STACK_TARGET_DENIED
             : CLOUD_AGENT_PARENT_AUTHORITY_DENIED
         );
       });

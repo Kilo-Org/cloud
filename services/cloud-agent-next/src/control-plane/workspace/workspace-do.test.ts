@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import jwt from 'jsonwebtoken';
+import {
+  CLOUD_AGENT_STACK_TARGET_DENIED,
+  CloudAgentAuthoritySchema,
+} from '@kilocode/worker-utils/cloud-agent-authority';
 import { signModernKiloToken } from '@kilocode/worker-utils/kilo-token-policy';
 import type { RuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization-contract';
 import type * as RuntimeAuthorizationModule from '@kilocode/worker-utils/runtime-authorization';
@@ -38,6 +42,8 @@ const workspaceSessionId = 'workspace_12345678-1234-4234-8234-123456789abc';
 const siblingSessionId = 'workspace_12345678-1234-4234-8234-123456789abd';
 const childSessionId = 'workspace_22345678-1234-4234-8234-123456789abc';
 const worktreeId = 'worktree_12345678-1234-4234-8234-123456789abc';
+const childWorktreeId = 'worktree_22345678-1234-4234-8234-123456789abc';
+const childChatSessionId = 'workspace_32345678-1234-4234-8234-123456789abc';
 const authorizationId = '12345678-1234-4234-8234-123456789abc';
 const binding = { workspaceSessionId, worktreeId, ownerId, organizationId: null };
 
@@ -106,6 +112,7 @@ type Fixture = {
   storage: MemoryStorage;
   seed: { current: WorkspaceAuthoritySeed | null };
   exportSeed: ReturnType<typeof vi.fn>;
+  getMetadata: ReturnType<typeof vi.fn<(sessionId: string) => Promise<SessionMetadata | null>>>;
 };
 
 function fixture(options: { name?: string } = {}): Fixture {
@@ -118,19 +125,35 @@ function fixture(options: { name?: string } = {}): Fixture {
     },
   };
   const exportSeed = vi.fn(async () => structuredClone(seed.current));
+  const getMetadata = vi.fn<(sessionId: string) => Promise<SessionMetadata | null>>(
+    async () => null
+  );
   const env = {
     NEXTAUTH_SECRET: secret,
     HYPERDRIVE: { connectionString: 'postgres://fixture' },
     SANDBOX_SESSION: {
       idFromName: (name: string) => name,
-      get: () => ({ exportWorkspaceAuthoritySeed: exportSeed }),
+      get: (name: string) => ({
+        exportWorkspaceAuthoritySeed: exportSeed,
+        getMetadata: () => getMetadata(name.slice(name.lastIndexOf(':') + 1)),
+      }),
     },
   } as unknown as Env;
   const ctx = {
     id: { name: options.name ?? `${ownerId}:${workspaceSessionId}` },
     storage,
   } as unknown as DurableObjectState;
-  return { workspace: new CloudAgentWorkspaceDO(ctx, env), storage, seed, exportSeed };
+  return { workspace: new CloudAgentWorkspaceDO(ctx, env), storage, seed, exportSeed, getMetadata };
+}
+
+function childMetadata(sessionId: string, parentId = workspaceSessionId): SessionMetadata {
+  const metadata = anchorMetadata();
+  return {
+    ...metadata,
+    identity: { ...metadata.identity, sessionId },
+    workspace: { worktreeId: childWorktreeId },
+    parentCloudAgentSessionId: parentId,
+  };
 }
 
 function scopeOf(token: string | undefined) {
@@ -379,6 +402,100 @@ describe('workspace authority revocation', () => {
 });
 
 describe('workspace delegation and child registry', () => {
+  it('delegates an own-worktree stack without a registry scan or duplicate binding check', async () => {
+    const { workspace, storage, getMetadata } = fixture();
+    const issued = await workspace.issueMcpGrant(binding);
+    const authority = CloudAgentAuthoritySchema.parse(scopeOf(issued?.token));
+    const list = vi.spyOn(storage, 'list');
+    renew.mockClear();
+
+    await expect(
+      workspace.authorizeChild({
+        authority,
+        childSessionId,
+        stackOnWorktreeId: worktreeId,
+      })
+    ).resolves.toHaveProperty('seal');
+    expect(list).not.toHaveBeenCalled();
+    expect(getMetadata).not.toHaveBeenCalled();
+    expect(renew).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(['registry', 'anchor'] as const)(
+    'accepts a direct child worktree via the %s',
+    async source => {
+      const { workspace, getMetadata } = fixture();
+      const issued = await workspace.issueMcpGrant(binding);
+      const authority = CloudAgentAuthoritySchema.parse(scopeOf(issued?.token));
+      const sessionId = source === 'registry' ? childChatSessionId : childSessionId;
+      await workspace.forgetChild(childSessionId);
+      if (source === 'registry') {
+        await workspace.recordChild({
+          cloudAgentSessionId: sessionId,
+          worktreeId: childWorktreeId,
+        });
+      }
+      getMetadata.mockImplementation(async id => (id === sessionId ? childMetadata(id) : null));
+
+      await expect(
+        workspace.assertStackTarget(authority, childWorktreeId)
+      ).resolves.toBeUndefined();
+      expect(getMetadata).toHaveBeenCalledExactlyOnceWith(sessionId);
+    }
+  );
+
+  it.each([false, true])(
+    'denies an unrelated worktree (stale registry hint: %s)',
+    async hasRegistryHint => {
+      const { workspace, getMetadata } = fixture();
+      const issued = await workspace.issueMcpGrant(binding);
+      const authority = CloudAgentAuthoritySchema.parse(scopeOf(issued?.token));
+      if (hasRegistryHint) {
+        await workspace.recordChild({
+          cloudAgentSessionId: childChatSessionId,
+          worktreeId: childWorktreeId,
+        });
+        getMetadata.mockImplementation(async id =>
+          id === childChatSessionId ? childMetadata(id, siblingSessionId) : null
+        );
+      }
+
+      await expect(workspace.assertStackTarget(authority, childWorktreeId)).rejects.toMatchObject({
+        message: CLOUD_AGENT_STACK_TARGET_DENIED,
+      });
+    }
+  );
+
+  it('checks the anchor after a failed registry read and preserves the error if no child matches', async () => {
+    const { workspace, getMetadata } = fixture();
+    const issued = await workspace.issueMcpGrant(binding);
+    const authority = CloudAgentAuthoritySchema.parse(scopeOf(issued?.token));
+    await workspace.recordChild({
+      cloudAgentSessionId: childChatSessionId,
+      worktreeId: childWorktreeId,
+    });
+    const error = new Error('Metadata unavailable');
+    getMetadata.mockRejectedValueOnce(error).mockResolvedValueOnce(childMetadata(childSessionId));
+
+    await expect(workspace.assertStackTarget(authority, childWorktreeId)).resolves.toBeUndefined();
+    getMetadata.mockRejectedValueOnce(error);
+    await expect(workspace.assertStackTarget(authority, childWorktreeId)).rejects.toBe(error);
+  });
+
+  it('delegates a chat only for a verified direct child worktree', async () => {
+    const { workspace, getMetadata } = fixture();
+    const issued = await workspace.issueMcpGrant(binding);
+    const authority = CloudAgentAuthoritySchema.parse(scopeOf(issued?.token));
+    const input = { authority, childSessionId, chatSessionId: childChatSessionId };
+    getMetadata.mockResolvedValueOnce(childMetadata(childSessionId));
+    await expect(workspace.authorizeChildChat(input)).resolves.toHaveProperty('seal');
+
+    getMetadata.mockResolvedValueOnce(childMetadata(childSessionId, siblingSessionId));
+    await expect(workspace.authorizeChildChat(input)).rejects.toThrow(
+      'Cloud Agent parent authority denied'
+    );
+  });
+
   it('delegates to a direct child within the workspace delegation', async () => {
     const { workspace } = fixture();
     const issued = await workspace.issueMcpGrant(binding);

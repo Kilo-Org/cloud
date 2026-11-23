@@ -241,7 +241,7 @@ describe('createWorktreeChat', () => {
     { cloudAgentSessionId: SOURCE_WORKSPACE_ID, worktreeId: null },
     { cloudAgentSessionId: SOURCE_WORKSPACE_ID, worktreeId: 'worktree_invalid' },
   ])('rejects an ineligible source %j before contacting the Worker', async source => {
-    mockLimit.mockResolvedValueOnce([source]);
+    mockLimit.mockResolvedValueOnce([{ kiloSessionId: SOURCE_KILO_SESSION_ID, ...source }]);
 
     await expect(
       createWorktreeChat({

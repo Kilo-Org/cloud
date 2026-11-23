@@ -56,7 +56,10 @@ import {
 } from '@kilocode/session-ingest-contracts';
 import { normalizeGitUrl } from '@kilocode/worker-utils';
 import { generateBranchSlugFromSeed } from '@kilocode/worker-utils/deployment-slug';
-import type { CloudAgentAuthority } from '@kilocode/worker-utils/cloud-agent-authority';
+import {
+  CLOUD_AGENT_STACK_TARGET_DENIED,
+  type CloudAgentAuthority,
+} from '@kilocode/worker-utils/cloud-agent-authority';
 import {
   createRuntimeAuthorization,
   RuntimeAuthorizationRevokedError,
@@ -932,8 +935,8 @@ async function issueSessionRuntimeAuthorization(
       throw new TRPCError({
         code: 'FORBIDDEN',
         message:
-          error instanceof Error && error.message.includes('Stack target must be')
-            ? 'Stack target must be this workspace or a direct child workspace'
+          error instanceof Error && error.message === CLOUD_AGENT_STACK_TARGET_DENIED
+            ? CLOUD_AGENT_STACK_TARGET_DENIED
             : 'Cloud Agent parent authorization unavailable',
       });
     });

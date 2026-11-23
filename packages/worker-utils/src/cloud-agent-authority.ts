@@ -11,6 +11,8 @@ import { CLOUD_AGENT_NEXT_AUDIENCE, KILO_API_AUDIENCE } from './internal-service
 
 export const PARENT_WORKSPACE_CALLBACK_URL = 'workspace:new-chat';
 export const WORKSPACE_SESSION_CALLBACK_PREFIX = 'workspace:';
+export const CLOUD_AGENT_STACK_TARGET_DENIED =
+  'Stack target must be this workspace or a direct child workspace';
 const WORKSPACE_SESSION_CALLBACK_URL_PATTERN =
   /^workspace:workspace_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 export const ParentWorkspaceCallbackTargetSchema = z

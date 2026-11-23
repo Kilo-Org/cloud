@@ -286,8 +286,10 @@ describe('Button native target contract', () => {
     expect(classes).not.toContain('bg-primary');
     expect(classes).not.toContain('bg-primary-disabled');
     expect(classes).not.toContain('opacity-50');
-    // The dark muted fill equals the dark card surface, so the plate needs the
-    // palette's control edge to be visible on a dark card at all.
+    // The dark muted fill equals the dark card surface, so the dark face
+    // recesses to the page step and takes the palette's control edge to be
+    // visible on a dark card at all.
+    expect(classes).toContain('dark:bg-background');
     expect(classes).toContain('dark:border');
     expect(classes).toContain('dark:border-input');
     const labelClasses = (button.findByType(NativeText).props.className as string).split(' ');
@@ -297,6 +299,7 @@ describe('Button native target contract', () => {
     const busy = renderButton({ disabled: true, loading: true });
     const busyClasses = (busy.props.className as string).split(' ');
     expect(busyClasses).not.toContain('bg-muted');
+    expect(busyClasses).not.toContain('dark:bg-background');
     expect(busyClasses).not.toContain('dark:border');
     expect(busyClasses).not.toContain('dark:border-input');
     expect((busy.findByType(NativeText).props.className as string).split(' ')).not.toContain(
@@ -311,12 +314,14 @@ describe('Button native target contract', () => {
     const enabled = renderButton({}).props.className as string;
     expect(enabled.split(' ')).not.toContain('dark:border');
     expect(enabled.split(' ')).not.toContain('dark:border-input');
+    expect(enabled.split(' ')).not.toContain('dark:bg-background');
 
     const disabledOutline = renderButton({ variant: 'outline', disabled: true });
     const outlineClasses = (disabledOutline.props.className as string).split(' ');
     expect(outlineClasses).toContain('border-input');
     expect(outlineClasses).not.toContain('dark:border');
     expect(outlineClasses).not.toContain('dark:border-input');
+    expect(outlineClasses).not.toContain('dark:bg-background');
   });
 
   it('keeps a busy primary on its brand fill so it still reads as working', () => {

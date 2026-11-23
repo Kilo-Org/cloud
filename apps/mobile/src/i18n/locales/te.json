@@ -2473,7 +2473,7 @@
       "sandboxStarting": "సాండ్‌బాక్స్ ప్రారంభమవుతోంది",
       "sandboxStopping": "సాండ్‌బాక్స్ ఆగుతోంది",
       "sandboxError": "సాండ్‌బాక్స్ లోపం",
-      "sandboxUnreachable": "సాండ్‌బాక్స్‌ను చేరుకోలేకపోతున్నాం",
+      "sandboxUnreachable": "సాండ్‌బాక్స్ అందుబాటులో లేదు",
       "sandboxStatusUnknown": "సాండ్‌బాక్స్ స్థితి తెలియదు",
       "sandboxChecked": "{{when}} తనిఖీ చేయబడింది",
       "sandboxDetailStopped": "దీన్ని కొనసాగించడానికి ఒక సందేశం పంపండి.",

@@ -434,7 +434,9 @@ describe('withoutLeadingDirectionMarks', () => {
   // A mark can stand where a block marker would otherwise be: the line is a
   // paragraph only because the mark interrupts it, so removing that mark would
   // turn the paragraph into a heading, a list item, a quote or a fence. The
-  // strip keeps the document's blocks, so such a mark stays.
+  // strip keeps the document's blocks, so such a mark stays. The last four are
+  // the markers that also open a block: a thematic break, an HTML block, a
+  // reference definition, and an indented code line.
   it.each([
     ['  \u200F# Latin', 'an indented heading'],
     ['\u200F# Latin', 'a heading at the content start'],
@@ -443,8 +445,19 @@ describe('withoutLeadingDirectionMarks', () => {
     ['  \u200F+ Latin', 'an indented plus bullet'],
     ['  \u200F> Latin', 'an indented quote'],
     ['  \u200F```js', 'an indented fence'],
+    ['  \u200F---', 'an indented thematic break'],
+    ['  \u200F***', 'an indented starred thematic break'],
+    ['\u200F<div>x</div>', 'an HTML block'],
+    ['\u200F[ref]: /url', 'a reference definition'],
   ])('keeps a mark in front of %s (%s)', (value, _shape) => {
     expect(withoutLeadingDirectionMarks(value)).toBe(value);
+  });
+
+  // Inside a heading's own text no marker can open another block, so the mark
+  // there is only an edge and goes: keeping it would leave the heading on the
+  // wrong one, which is the defect this strip exists for.
+  it('strips a mark inside a heading that would not open a block there', () => {
+    expect(withoutLeadingDirectionMarks('# \u200F# Latin')).toBe('# # Latin');
   });
 
   it('returns the same string when there is no mark to strip', () => {

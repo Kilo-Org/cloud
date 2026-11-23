@@ -450,6 +450,17 @@ const FENCE_START = /^ {0,3}(?:```|~~~)/;
 /** A line indented enough to be an indented code block after a blank line. */
 const INDENTED_CODE = /^(?: {4}|\t)/;
 
+/** A thematic break: three or more of one marker, spaced or not. */
+const THEMATIC_BREAK_START = /^ {0,3}(?:(?:\*[ \t]*){3,}|(?:-[ \t]*){3,}|(?:_[ \t]*){3,})$/;
+
+/** An HTML block's opening line: a tag, a comment, a processing instruction or
+ * a declaration at the line's start. Inline content after a mark is not that,
+ * because the raw line does not begin with the tag. */
+const HTML_BLOCK_START = /^ {0,3}(?:<!--|<\?|<![A-Za-z]|<\/?[A-Za-z][A-Za-z0-9-]*(?:[ \t/>]|$))/;
+
+/** A link reference definition: a label, a colon, and a destination. */
+const REFERENCE_DEFINITION_START = /^ {0,3}\[[^\]\n]+\]:/;
+
 /** Up to three spaces: an indentation a block's own content may still carry
  * after its marker, and the most a line may be indented and stay a paragraph. */
 const CONTENT_INDENT = / {0,3}/y;
@@ -537,7 +548,11 @@ function opensBlockAt(line: string, at: number): boolean {
     HEADING_START.test(rest) ||
     LIST_START.test(rest) ||
     BLOCKQUOTE_START.test(rest) ||
-    FENCE_START.test(rest)
+    FENCE_START.test(rest) ||
+    THEMATIC_BREAK_START.test(rest) ||
+    HTML_BLOCK_START.test(rest) ||
+    REFERENCE_DEFINITION_START.test(rest) ||
+    INDENTED_CODE.test(rest)
   );
 }
 
@@ -558,12 +573,20 @@ function opensBlockAt(line: string, at: number): boolean {
  * whose mark survives (`pastLinkOpener`).
  */
 
-function stripLineMarks(line: string, at: number, listItem: boolean): string {
+function stripLineMarks(
+  line: string,
+  at: number,
+  block: { listItem: boolean; inHeading: boolean }
+): string {
   const runs: [number, number][] = [];
   /** Records the mark run at `from` only when cutting it keeps the same blocks. */
   const cut = (from: number): number => {
     const after = pastMatch(DIRECTION_MARK_RUN, line, from);
-    if (after === from || opensBlockAt(line, after)) {
+    // Inside a heading's own text no marker can start a block, so the mark there
+    // is only an edge and always goes. Anywhere else a cut that would reparse
+    // the line as a different block is refused, and the walk ends: only the
+    // block's first character was the walk's business.
+    if (after === from || (!block.inHeading && opensBlockAt(line, after))) {
       return from;
     }
     runs.push([from, after]);
@@ -574,7 +597,7 @@ function stripLineMarks(line: string, at: number, listItem: boolean): string {
   cursor = cut(pastMatch(CONTENT_INDENT, line, cursor));
   // A checkbox belongs to a list item's structure; without a list marker the
   // brackets and space are the paragraph's own text.
-  const checkbox = listItem ? pastMatch(TASK_CHECKBOX, line, cursor) : cursor;
+  const checkbox = block.listItem ? pastMatch(TASK_CHECKBOX, line, cursor) : cursor;
   if (checkbox > cursor) {
     cursor = cut(checkbox);
   }
@@ -648,7 +671,10 @@ export function withoutLeadingDirectionMarks(markdown: string): string {
     const stripped =
       opensFence || code || blank || !startsBlock
         ? line
-        : stripLineMarks(line, quoted + marker, list !== null);
+        : stripLineMarks(line, quoted + marker, {
+            listItem: list !== null,
+            inHeading: heading !== null,
+          });
     if (opensFence) {
       inFence = !inFence;
     }

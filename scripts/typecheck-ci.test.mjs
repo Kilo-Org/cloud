@@ -2086,8 +2086,8 @@ test('the kilo-app CI consumers install the app closure', () => {
   );
   assert.equal(
     catalogInstall?.run,
-    'pnpm --filter kilocode-monorepo install --frozen-lockfile --ignore-scripts',
-    'the catalog job installs the root project only: the audit reads JSON catalogs and the oxc parser, no app dependency'
+    'pnpm --filter kilocode-monorepo --filter kilo-app install --frozen-lockfile --ignore-scripts',
+    'the catalog job installs the app too: the audit reads the plural data the app bundle ships to decide which plural forms a language can select'
   );
 });
 

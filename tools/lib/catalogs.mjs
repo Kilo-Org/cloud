@@ -161,20 +161,26 @@ function loaderMapOf(root) {
   if (loaderMaps.has(root)) {
     return loaderMaps.get(root);
   }
-  let map = null;
+  let source;
   try {
-    const block = /const PLURAL_RULES_LOCALE_LOADERS = \{([\s\S]*?)\n\} satisfies/.exec(
-      readFileSync(join(root, LOADER_MAP_SOURCE), 'utf8')
-    );
-    if (block !== null) {
-      map = new Map();
-      for (const match of block[1].matchAll(LOADER_MAP_ENTRY)) {
-        map.set(match[1] ?? match[2], match[3]);
-      }
-    }
+    source = readFileSync(join(root, LOADER_MAP_SOURCE), 'utf8');
   } catch {
-    // A tree without the app (a checker test fixture) has no polyfill data.
-    map = null;
+    // A tree without the app at all (a checker test fixture) has no polyfill
+    // data to read, so the caller falls back to the host's rules.
+    loaderMaps.set(root, null);
+    return null;
+  }
+  const block = /const PLURAL_RULES_LOCALE_LOADERS = \{([\s\S]*?)\n\} satisfies/.exec(source);
+  if (block === null) {
+    // The app is here but its loader map is not, so the language-to-data-file
+    // mapping this rule depends on is gone. Falling back to the host's rules
+    // would audit the catalogs against data the app does not run, which is the
+    // silent wrong answer this rule exists to prevent.
+    throw new Error(`${LOADER_MAP_SOURCE} declares no PLURAL_RULES_LOCALE_LOADERS map`);
+  }
+  const map = new Map();
+  for (const match of block[1].matchAll(LOADER_MAP_ENTRY)) {
+    map.set(match[1] ?? match[2], match[3]);
   }
   loaderMaps.set(root, map);
   return map;
@@ -191,7 +197,15 @@ function loaderMapOf(root) {
 function readPluralDataFile(file) {
   const sandbox = { Intl: { PluralRules: undefined } };
   vm.createContext(sandbox);
-  vm.runInContext(readFileSync(file, 'utf8'), sandbox, { timeout: 2000 });
+  let source;
+  try {
+    source = readFileSync(file, 'utf8');
+  } catch {
+    throw new Error(
+      `${file} is missing: this audit reads the plural data the app bundle ships, so install the app's dependencies before running it`
+    );
+  }
+  vm.runInContext(source, sandbox, { timeout: 2000 });
   const data = sandbox.__FORMATJS_PLURALRULES_DATA__;
   if (!Array.isArray(data) || data.length === 0) {
     throw new Error(`no plural data in ${file}`);

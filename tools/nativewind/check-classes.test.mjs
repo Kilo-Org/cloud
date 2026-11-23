@@ -2724,15 +2724,18 @@ test('reports a malformed theme seam instead of throwing', async context => {
   const { run } = await import(
     pathToFileURL(join(root, 'tools/nativewind/check-classes.mjs')).href
   );
-  const circular = {};
-  circular.self = circular;
+  // An array, not a plain object: `isPlainObject` rejects both, and an array is
+  // the shape whose diagnostic actually goes through `JSON.stringify`, which
+  // throws on the cycle.
+  const circular = [];
+  circular.push(circular);
   const cases = [
     [() => ({}), /theme read seam is malformed/],
     [() => null, /theme read seam is malformed/],
     // `JSON.stringify` throws on this pair, so the diagnostic names the type
     // instead of escaping the run as a TypeError.
-    [() => 1n, /theme read seam is malformed/],
-    [() => circular, /theme read seam is malformed/],
+    [() => 1n, /the theme read returned bigint/],
+    [() => circular, /the theme read returned object/],
     [() => ({ tokens: [] }), /theme read seam is malformed/],
     [() => ({ tokens: ['primary'], failure: 'boom' }), /boom/],
   ];

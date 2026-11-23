@@ -522,4 +522,3 @@ describe('getShareFailureKind', () => {
     expect(getShareFailureKind(new Error('boom'))).toBe('general');
   });
 });
-

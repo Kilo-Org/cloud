@@ -1,5 +1,6 @@
 import { type ReactNode } from 'react';
 import { View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { Card } from '@/components/ui/card';
 import { type LucideIcon } from '@/components/ui/icons';
@@ -8,8 +9,11 @@ import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { SectionHeaderSkeleton } from '@/components/ui/section-header-skeleton';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
 import { PLATFORM_CAPABILITIES } from '@/lib/code-reviewer-config';
+import { formatNumber } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { cn } from '@/lib/utils';
 
 /**
  * The day window the dashboard covers. The label is the day count and its unit
@@ -49,17 +53,44 @@ export function MetricCard({
 }
 
 /**
- * The lines each caption below the cards wraps to at the width the dashboard
- * opens in, so their band is reserved at the height the loaded copy takes.
+ * The two caption lines under the cards. The skeleton paints the same two nodes
+ * at zero opacity, so the band is reserved at the height this copy actually
+ * wraps to: a line count written here would hold for one locale and one width
+ * and under-reserve every longer translation.
  */
-const CAPTION_LINES = [2, 1] as const;
-
-/**
- * The bar stands in for one `text-xs` line, so it holds that line's own height
- * (14 dp, the box `RowSkeleton` uses for the same variant) rather than the
- * 16 dp a hand-picked size would add to the band under the cards.
- */
-const CAPTION_LINE_CLASS = 'h-3.5 w-full rounded bg-muted-soft';
+export function AnalyticsCaptions({
+  uncapturedReviews,
+  enrolledCompletedReviews,
+  hidden = false,
+}: Readonly<{
+  uncapturedReviews: number;
+  enrolledCompletedReviews: number;
+  hidden?: boolean;
+}>): ReactNode {
+  const { t } = useTranslation();
+  const number = (value: number) => formatNumber(value, i18n.language);
+  // A reserved caption is invisible and inert: it holds the band, and neither
+  // the eye nor a screen reader meets copy that is not on screen yet.
+  const className = cn('text-xs', hidden && 'opacity-0');
+  const hiddenProps = hidden
+    ? { accessibilityElementsHidden: true, importantForAccessibility: 'no' as const }
+    : {};
+  return (
+    <>
+      <Text variant="muted" className={className} {...hiddenProps}>
+        {t('codeReviewer.analytics.trackedReviewsCaption')}
+      </Text>
+      <Text variant="muted" className={className} {...hiddenProps}>
+        {t('codeReviewer.analytics.trackedReviewsUncounted', {
+          count: uncapturedReviews,
+          displayCount: number(uncapturedReviews),
+          total: enrolledCompletedReviews,
+          displayTotal: number(enrolledCompletedReviews),
+        })}
+      </Text>
+    </>
+  );
+}
 
 /**
  * The dashboard's first paint: the body alone. The platform and period controls
@@ -91,13 +122,9 @@ export function AnalyticsSkeleton(): ReactNode {
             <Skeleton className="h-7 w-16 max-w-full rounded bg-muted-soft" />
           </Card>
         </View>
-        {CAPTION_LINES.map((lines, index) => (
-          <View key={index}>
-            {Array.from({ length: lines }, (_, line) => (
-              <Skeleton key={line} className={CAPTION_LINE_CLASS} />
-            ))}
-          </View>
-        ))}
+        {/* The loaded captions paint the same copy here at zero opacity, so the
+            band under the cards is exact for every locale and width. */}
+        <AnalyticsCaptions uncapturedReviews={0} enrolledCompletedReviews={0} hidden />
       </View>
       <View className="gap-3">
         <SectionHeaderSkeleton />

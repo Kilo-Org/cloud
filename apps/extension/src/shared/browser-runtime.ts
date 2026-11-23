@@ -24,6 +24,7 @@ import type {
   BrowserOriginChanged,
   BrowserPermissionItem,
   DownloadTier,
+  StepTokenBinding,
   StepTokenNeed,
   StepTokenStore,
 } from './browser-agent-checks';
@@ -1876,6 +1877,110 @@ export const createBrowserRuntime = ({
     return tabId;
   };
 
+  /**
+   * The binding each download approval was issued under, keyed by the step it belongs to. A refusal's retry is not
+   * re-classified as sensitive — post-action, the gate sees a file it never asked about — so the retry has no
+   * sensitive element of its own: the token still has to match the call it was issued for.
+   */
+  const approvedStepBindings = new Map<
+    string,
+    {
+      readonly binding: {
+        readonly element?: string | undefined;
+        readonly origin: string;
+        readonly tabId: number;
+      };
+      readonly since: number;
+    }
+  >();
+
+  /** Remembers the binding a download token was issued under, for the one repeat its token buys. */
+  const rememberApprovedBinding = (
+    step: {
+      readonly argumentHash: string;
+      readonly session: string;
+      readonly toolName: string;
+    },
+    binding: {
+      readonly element?: string | undefined;
+      readonly origin: string;
+      readonly tabId: number;
+    }
+  ): void => {
+    const at = Date.now();
+
+    for (const [key, entry] of approvedStepBindings) {
+      if (entry.since + STEP_TAB_TTL_MS < at) {
+        approvedStepBindings.delete(key);
+      }
+    }
+
+    approvedStepBindings.set(stepTabKey(step), { binding, since: at });
+
+    // Bounded the same way the step tabs are: only a token that is about to be redeemed can still read one.
+    while (approvedStepBindings.size > STEP_TAB_LIMIT) {
+      const oldest = approvedStepBindings.keys().next().value;
+
+      if (oldest === undefined) {
+        break;
+      }
+
+      approvedStepBindings.delete(oldest);
+    }
+  };
+
+  /** The binding a download approval for this step was issued under, while its entry is live. */
+  const peekApprovedBinding = (step: {
+    readonly argumentHash: string;
+    readonly session: string;
+    readonly toolName: string;
+  }):
+    | {
+        readonly element?: string | undefined;
+        readonly origin: string;
+        readonly tabId: number;
+      }
+    | undefined => {
+    const entry = approvedStepBindings.get(stepTabKey(step));
+
+    return entry === undefined || entry.since + STEP_TAB_TTL_MS < Date.now()
+      ? undefined
+      : entry.binding;
+  };
+
+  /**
+   * Issues the token a download refusal buys, and remembers the binding under it in the same step: the retry
+   * presents this token against a call the gate may no longer classify as sensitive, so the record is what it has.
+   */
+  const issueDownloadToken = (
+    binding: {
+      readonly element?: string | undefined;
+      readonly origin: string;
+      readonly tabId: number;
+    },
+    step: {
+      readonly argumentHash: string;
+      readonly session: string;
+      readonly toolName: string;
+    },
+    need?: StepTokenNeed
+  ): string => {
+    const token = tokens.issue({
+      argumentHash: step.argumentHash,
+      element: binding.element,
+      ...(need === undefined ? {} : { need }),
+      origin: binding.origin,
+      reason: SENSITIVE_REASON.download,
+      session: step.session,
+      tabId: binding.tabId,
+      toolName: step.toolName,
+    });
+
+    rememberApprovedBinding(step, binding);
+
+    return token;
+  };
+
   /** A session that ends owes no approval, and its stopped files stay unreported: there is no model left to tell. */
   const closeSessionRecords = (session: string): void => {
     downloadRecords.delete(session);
@@ -1887,6 +1992,13 @@ export const createBrowserRuntime = ({
     for (const key of stepTabs.keys()) {
       if (key.startsWith(`${session}|`)) {
         stepTabs.delete(key);
+      }
+    }
+
+    // Nor may it redeem an approval for one of them: the token is burnt with the session that would present it.
+    for (const key of approvedStepBindings.keys()) {
+      if (key.startsWith(`${session}|`)) {
+        approvedStepBindings.delete(key);
       }
     }
 
@@ -2537,6 +2649,12 @@ export const createBrowserRuntime = ({
         stepTabs.delete(key);
       }
     }
+    // A download approval issued for a step on this tab has no call left to redeem it on.
+    for (const [key, entry] of approvedStepBindings) {
+      if (entry.binding.tabId === tabId) {
+        approvedStepBindings.delete(key);
+      }
+    }
     inFlight.delete(tabId);
     // A closed tab has no next call, so its linger is over and nothing will report what it left: both go with it.
     takeOverDownloads(tabId);
@@ -2934,20 +3052,17 @@ export const createBrowserRuntime = ({
     const stepToken =
       step === undefined
         ? undefined
-        : tokens.issue({
-            argumentHash: step.argumentHash,
-            // The step's own element, when the gate classified one: the token binds the step that started this file,
-            // So the retry is the same approval the gate already answered.
-            element: step.element,
-            ...(file.url === undefined
-              ? {}
-              : { need: needOfUrl(file.tabId, file.url, context.scope ?? 'page') }),
-            origin: step.boundOrigin ?? step.origin,
-            reason,
-            session: step.session,
-            tabId: step.tabId,
-            toolName: step.toolName,
-          });
+        : issueDownloadToken(
+            {
+              // The step's own element, when the gate classified one: the token binds the step that started this
+              // File, so the retry is the same approval the gate already answered.
+              element: step.element,
+              origin: step.boundOrigin ?? step.origin,
+              tabId: step.tabId,
+            },
+            step,
+            file.url === undefined ? undefined : needOfUrl(file.tabId, file.url, context.scope ?? 'page')
+          );
 
     // The tab this step opened, for the one repeat its token buys: sending `browser_tabs new` again would open
     // A second tab and download the file twice instead of receiving the one the human approved.
@@ -2999,18 +3114,17 @@ export const createBrowserRuntime = ({
     const stepToken =
       step === undefined
         ? undefined
-        : tokens.issue({
-            argumentHash: step.argumentHash,
-            // The step's own element, when the gate classified one: the retry carries the same binding, so the
-            // Approval it holds buys the file this report names.
-            element: step.element,
-            ...(need === undefined ? {} : { need }),
-            origin: step.boundOrigin ?? step.origin,
-            reason: SENSITIVE_REASON.download,
-            session: step.session,
-            tabId: step.tabId,
-            toolName: step.toolName,
-          });
+        : issueDownloadToken(
+            {
+              // The step's own element, when the gate classified one: the retry carries the same binding, so the
+              // Approval it holds buys the file this report names.
+              element: step.element,
+              origin: step.boundOrigin ?? step.origin,
+              tabId: step.tabId,
+            },
+            step,
+            need
+          );
 
     return needsPermissionOutcome(
       [{ class: 'sensitive', origin, reason: SENSITIVE_REASON.download }],
@@ -3202,17 +3316,11 @@ export const createBrowserRuntime = ({
         const issueSensitiveToken = (
           sensitive: BrowserSensitiveStep,
           /** The tab the step ran on: a `browser_tabs new` step runs on the tab it opened. */
-          tokenTabId: number = tabId,
-          /**
-           * The one download this approval is for, when the step was refused for a file. A download approval on a
-           * sensitive step also binds the element the gate classified, so its retry matches that same binding.
-           */
-          need?: StepTokenNeed
+          tokenTabId: number = tabId
         ): string =>
           tokens.issue({
             argumentHash: stepHash,
             element: sensitive.element,
-            ...(need === undefined ? {} : { need }),
             origin: sensitive.origin,
             reason: sensitive.reason,
             session: sessionKey,
@@ -3243,13 +3351,9 @@ export const createBrowserRuntime = ({
           const element = preflight?.ok === true ? preflight.sensitiveToken?.element : undefined;
           const boundOrigin =
             preflight?.ok === true ? (preflight.sensitiveToken?.origin ?? origin) : origin;
-          const token = issueSensitiveToken(
-            {
-              element,
-              origin: boundOrigin,
-              reason: SENSITIVE_REASON.download,
-            },
-            tokenTabId,
+          const token = issueDownloadToken(
+            { element, origin: boundOrigin, tabId: tokenTabId },
+            { argumentHash: stepHash, session: sessionKey, toolName: stepToolName },
             need
           );
 
@@ -3299,7 +3403,7 @@ export const createBrowserRuntime = ({
             : await preflightAgentCall({
                 args: argsRecord,
                 authorized: agentContext.authorized,
-                consumeStepToken: (token, binding) => tokens.take(token, binding),
+                consumeStepToken: (token, binding) => tokens.take(token, [binding]),
                 // The page cannot report its frames while a dialog blocks it, so the answer is judged against the frame that opened the dialog: its handler resumes there.
                 ...(openDialog === undefined
                   ? {}
@@ -3410,21 +3514,53 @@ export const createBrowserRuntime = ({
         let redeemed: RedeemedApproval = redeemedFromGate();
 
         // The tokens the gate redeemed are burnt, so their take fails here without spending anything else: this loop
-        // Redeems the file approval a call carries besides its step approval; a take that names a file wins.
+        // Redeems the file approval a call carries besides its step approval; a take that names a file wins. The
+        // Candidates are the binding the gate recomputed for this call and the one the approval was issued under: a
+        // Retry the gate no longer classifies as sensitive carries no element of its own, so only the record matches.
         if (agentContext !== undefined && preflight !== undefined && preflight.ok) {
-          for (const token of presentedTokens) {
-            const take = tokens.take(token, {
+          const gateBinding: StepTokenBinding = {
+            argumentHash: stepHash,
+            // The element the gate classified this call on, when it did.
+            ...(preflight.sensitiveToken?.element === undefined
+              ? {}
+              : { element: preflight.sensitiveToken.element }),
+            // The origin the gate bound this call's approval under, which is its sensitive element's own frame.
+            origin: preflight.sensitiveToken?.origin ?? preflight.origin,
+            session: sessionKey,
+            tabId: stepTab ?? tabId,
+            toolName: stepToolName,
+          };
+          const candidates: StepTokenBinding[] = [gateBinding];
+          const rememberedBinding = peekApprovedBinding({
+            argumentHash: stepHash,
+            session: sessionKey,
+            toolName: stepToolName,
+          });
+
+          if (rememberedBinding !== undefined) {
+            const issued: StepTokenBinding = {
               argumentHash: stepHash,
-              // The element the gate classified this call on, when it did.
-              ...(preflight.sensitiveToken?.element === undefined
+              ...(rememberedBinding.element === undefined
                 ? {}
-                : { element: preflight.sensitiveToken.element }),
-              // The origin the gate bound this call's approval under, which is its sensitive element's own frame.
-              origin: preflight.sensitiveToken?.origin ?? preflight.origin,
+                : { element: rememberedBinding.element }),
+              origin: rememberedBinding.origin,
               session: sessionKey,
-              tabId: stepTab ?? tabId,
+              tabId: rememberedBinding.tabId,
               toolName: stepToolName,
-            });
+            };
+
+            // Identical bindings appear once: the two differ only in what the approval was issued with.
+            if (
+              issued.tabId !== gateBinding.tabId ||
+              issued.origin !== gateBinding.origin ||
+              (issued.element ?? '') !== (gateBinding.element ?? '')
+            ) {
+              candidates.push(issued);
+            }
+          }
+
+          for (const token of presentedTokens) {
+            const take = tokens.take(token, candidates);
 
             // A take that names a file wins. One that names none buys the step alone unless its refusal was a
             // Download's, which is the approval that exempts the one file its step starts.
@@ -4272,15 +4408,15 @@ export const createBrowserRuntime = ({
           const own = ownDownloadOf(settlement.stoppedItems ?? [], stepDocuments);
           const refusedFile = own?.file;
           const stepToken = preflight?.ok
-            ? issueSensitiveToken(
+            ? issueDownloadToken(
                 {
                   // The gate classified this call on an element, and its binding carries that element: a download
                   // Approval on the same call must match it on the retry instead of asking for the step again.
                   element: preflight.sensitiveToken?.element,
                   origin: boundOrigin,
-                  reason,
+                  tabId: runTabId,
                 },
-                runTabId,
+                { argumentHash: stepHash, session: sessionKey, toolName: stepToolName },
                 refusedFile?.url === undefined
                   ? undefined
                   : needOfUrl(refusedFile.tabId ?? runTabId, refusedFile.url, own?.scope ?? 'page')

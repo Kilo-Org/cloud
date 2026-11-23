@@ -282,15 +282,42 @@ describe('step tokens', () => {
     const store = createStepTokenStore({ now: () => 1000, random: () => 'token-1' });
     const token = store.issue({ ...binding, reason: SENSITIVE_REASON.password });
 
-    expect(store.take(token, binding).ok).toBe(true);
-    expect(store.take(token, binding).ok).toBe(false);
+    expect(store.take(token, [binding]).ok).toBe(true);
+    expect(store.take(token, [binding]).ok).toBe(false);
   });
 
   it('rejects a token bound to another tab, tool, element or argument set', () => {
     const store = createStepTokenStore({ now: () => 1000, random: () => 'token-2' });
     const token = store.issue({ ...binding, reason: SENSITIVE_REASON.password });
 
-    expect(store.take(token, { ...binding, tabId: 8 }).ok).toBe(false);
+    expect(store.take(token, [{ ...binding, tabId: 8 }]).ok).toBe(false);
+  });
+
+  it('matches a token against the second of the bindings a call names', () => {
+    const store = createStepTokenStore({ now: () => 1000, random: () => 'token-any' });
+    const other = { ...binding, element: 'e99', origin: 'https://pay.example.com', tabId: 8 };
+    const token = store.issue({ ...other, reason: SENSITIVE_REASON.download });
+
+    expect(store.take(token, [binding, other]).ok).toBe(true);
+  });
+
+  it('burns the token when none of the named bindings match', () => {
+    const store = createStepTokenStore({ now: () => 1000, random: () => 'token-miss' });
+    const token = store.issue({ ...binding, reason: SENSITIVE_REASON.download });
+
+    expect(store.take(token, [{ ...binding, tabId: 8 }, { ...binding, element: 'e99' }])).toStrictEqual(
+      { ok: false }
+    );
+    // Still burnt: a replay of the same token against the real binding answers nothing either.
+    expect(store.take(token, [binding]).ok).toBe(false);
+  });
+
+  it('burns the token when a call names no binding at all', () => {
+    const store = createStepTokenStore({ now: () => 1000, random: () => 'token-empty' });
+    const token = store.issue({ ...binding, reason: SENSITIVE_REASON.download });
+
+    expect(store.take(token, [])).toStrictEqual({ ok: false });
+    expect(store.size()).toBe(0);
   });
 
   it('keeps the file an approval is for, for the whole life of the token', () => {
@@ -302,13 +329,13 @@ describe('step tokens', () => {
     // A human takes half a minute: no download record survives that long, and the token still names the file.
     clock += 30_000;
 
-    expect(store.take(token, binding)).toStrictEqual({
+    expect(store.take(token, [binding])).toStrictEqual({
       need,
       ok: true,
       reason: SENSITIVE_REASON.download,
     });
     // The token is spent whether or not the next call matches: a replay cannot probe for a valid binding.
-    expect(store.take(token, binding)).toStrictEqual({ ok: false });
+    expect(store.take(token, [binding])).toStrictEqual({ ok: false });
   });
 
   it('expires after 60 s', () => {
@@ -317,11 +344,11 @@ describe('step tokens', () => {
     const token = store.issue({ ...binding, reason: SENSITIVE_REASON.password });
 
     clock += 59_999;
-    expect(store.take(token, binding).ok).toBe(true);
+    expect(store.take(token, [binding]).ok).toBe(true);
 
     const second = store.issue({ ...binding, reason: SENSITIVE_REASON.password });
     clock += 60_000;
-    expect(store.take(second, binding).ok).toBe(false);
+    expect(store.take(second, [binding]).ok).toBe(false);
     expect(store.size()).toBe(0);
   });
 });

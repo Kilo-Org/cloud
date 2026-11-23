@@ -323,7 +323,7 @@ const run = (
   preflightAgentCall({
     args: input.args ?? {},
     authorized: input.authorized ?? grants,
-    consumeStepToken: (token, binding) => tokens.take(token, binding),
+    consumeStepToken: (token, binding) => tokens.take(token, [binding]),
     ...(input.readFrames === undefined ? {} : { readFrames: input.readFrames }),
     session:
       input.session ?? createSession(input.probe === undefined ? {} : { probe: input.probe }),

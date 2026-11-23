@@ -920,6 +920,77 @@ describe('agent browser calls', () => {
     expect(suggested).toStrictEqual([51, 52]);
   });
 
+  it('redeems a file approval when the retried step is no longer sensitive', async () => {
+    const downloads = createFakeDownloads();
+    const hold = createDownloadHold({
+      cancel: async itemId => downloads.api.cancel?.(itemId),
+      onReport: () => {},
+      search: async itemId => (await downloads.api.search?.({ id: itemId })) ?? [],
+    });
+    const { cdp, runtime } = await createHarness({
+      downloadHold: hold,
+      downloadsApi: downloads.api,
+    });
+    const dashboard = `${MAIN_ORIGIN}/dashboard`;
+    const first = { filename: 'report.txt', id: 51, url: `${MAIN_ORIGIN}/report.txt` };
+    const second = { filename: 'report.txt', id: 52, url: `${MAIN_ORIGIN}/report.txt` };
+    const suggested: number[] = [];
+
+    // The submit inside a form that holds a payment field is a sensitive step: the gate refuses the first call.
+    cdp.setProbe({ fields: [], paymentFormSubmit: true });
+    cdp.setHandlers({
+      'Input.dispatchMouseEvent': params => {
+        // A click is a press and a release; the press is the event that starts the file.
+        if (params?.['type'] === 'mousePressed') {
+          const file = suggested.length === 0 ? first : second;
+
+          hold.handle({ id: file.id, referrer: dashboard, url: file.url }, () => {
+            suggested.push(file.id);
+          });
+        }
+
+        return {};
+      },
+    });
+
+    const click = (sensitive: readonly string[]) =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant], sensitive: [...sensitive] },
+        arguments: { target: '#pay' },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_click',
+      });
+
+    const sensitiveRefusal = await click([]);
+
+    expect(sensitiveRefusal).toMatchObject({
+      items: [{ class: 'sensitive', origin: MAIN_ORIGIN, reason: SENSITIVE_REASON.cardFormSubmit }],
+      kind: 'needs_permission',
+    });
+
+    // The step's approval lets the submit run; the file it starts is stopped and gets an approval of its own.
+    const refused = await click([expectStepToken(sensitiveRefusal)]);
+
+    expect(refused).toMatchObject({
+      afterAction: true,
+      items: [{ class: 'sensitive', origin: MAIN_ORIGIN, reason: SENSITIVE_REASON.download }],
+      kind: 'needs_permission',
+    });
+    expect(suggested).toStrictEqual([51]);
+
+    // The page now answers as an ordinary submit, so the gate classifies no step for the retry: the file's approval
+    // Is still the one that was issued for this call, and it buys the file it named.
+    cdp.setProbe({ fields: [], paymentFormSubmit: false });
+
+    const approved = await click([expectStepToken(refused)]);
+
+    expect(approved.kind).toBe('result');
+    // The retried file was kept, not cancelled again, and the human was not asked a second time.
+    expect(downloads.cancelled).toStrictEqual([51]);
+    expect(suggested).toStrictEqual([51, 52]);
+  });
+
   it('gives the file a step-approved submit starts its own approval', async () => {
     // A granted `downloads` permission and no hold is the legacy tier.
     const downloads = createFakeDownloads();

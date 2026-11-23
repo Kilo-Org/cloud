@@ -588,9 +588,11 @@ export interface StepTokenStore {
   readonly issue: (input: StepTokenIssue) => string;
   /**
    * Consumes a token and answers what it carried. The need lives exactly as long as the token — a human may take
-   * Minutes to approve — so it is never tied to a download record the browser's own pruning removes.
+   * Minutes to approve — so it is never tied to a download record the browser's own pruning removes. The bindings are
+   * the finite set of calls this token may legitimately name, so a caller can offer the one it recomputed beside the
+   * one the token was issued under.
    */
-  readonly take: (token: string, binding: StepTokenBinding) => StepTokenTake;
+  readonly take: (token: string, bindings: readonly StepTokenBinding[]) => StepTokenTake;
   readonly size: () => number;
 }
 
@@ -703,7 +705,7 @@ export const createStepTokenStore = ({
     }
   };
 
-  const take: StepTokenStore['take'] = (token, binding) => {
+  const take: StepTokenStore['take'] = (token, bindings) => {
     prune();
 
     const stored = tokens.get(token);
@@ -712,10 +714,11 @@ export const createStepTokenStore = ({
       return { ok: false };
     }
 
-    // A token is single use: even a mismatch burns it, so a replay cannot probe for a valid binding.
+    // A token is single use: unless one of the named bindings matches, it is burnt and gone. A replay presenting it
+    // Again can therefore never probe for a valid binding.
     tokens.delete(token);
 
-    if (!stepTokenBindingMatches(stored, binding)) {
+    if (!bindings.some(binding => stepTokenBindingMatches(stored, binding))) {
       return { ok: false };
     }
 

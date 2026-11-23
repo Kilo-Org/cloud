@@ -55,7 +55,7 @@ export function BlockedImageChip({
     <>
       <AlertCircle size={14} color={colors.mutedForeground} />
       <Text className="min-w-0 flex-1 text-xs text-muted-foreground" numberOfLines={2}>
-        {label}
+        {line}
       </Text>
     </>
   );

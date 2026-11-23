@@ -777,6 +777,27 @@ describe('MarkdownImage chip descriptions and long press', () => {
     await unmount(renderer);
   });
 
+  it('names a linked blocked chip for the link while drawing only the description', async () => {
+    const renderer = await mount('http://insecure.com/a.png', 'A chart', {
+      accessibilityLabel: 'Example',
+      onPress: () => undefined,
+    });
+    const chip = ofType(renderer.root, 'Pressable')[0];
+    if (!chip) {
+      throw new Error('blocked chip not found');
+    }
+    // The link's name reaches the reader...
+    expect(chip.props.accessibilityLabel).toBe(
+      '\u2068A chart\u2069 · \u2068insecure.com\u2069 · \u2068HTTPS images only\u2069 and Example'
+    );
+    // ...and never lands in the drawn line.
+    expect(texts(renderer.root)).toContain(
+      '\u2068A chart\u2069 · \u2068insecure.com\u2069 · \u2068HTTPS images only\u2069'
+    );
+
+    await unmount(renderer);
+  });
+
   it('names the unconfirmed chip row and its Load button with the alt text', async () => {
     const uri = 'https://example.com/a.png';
     const renderer = await mount(uri, 'A chart');

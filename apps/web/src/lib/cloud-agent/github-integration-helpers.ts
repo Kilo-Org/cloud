@@ -428,28 +428,6 @@ export async function fetchGitHubRepositoriesForUser(
   }
 }
 
-export async function validateGitHubRepoAccessForUser(
-  userId: string,
-  githubRepo: string
-): Promise<boolean> {
-  try {
-    const result = await fetchGitHubRepositoriesForUser(userId, false);
-
-    if (!result.integrationInstalled || !result.repositories.length) {
-      return false;
-    }
-
-    return result.repositories.some(
-      repo => repo.fullName.toLowerCase() === githubRepo.toLowerCase()
-    );
-  } catch (_error) {
-    throw new TRPCError({
-      code: 'INTERNAL_SERVER_ERROR',
-      message: 'Failed to validate repository access',
-    });
-  }
-}
-
 export async function checkDemoRepositoryFork(
   userId: string
 ): Promise<{ exists: boolean; forkedRepo: string | null; githubUsername: string | null }> {

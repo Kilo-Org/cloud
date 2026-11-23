@@ -1,30 +1,22 @@
-import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
+import { getEnvVariable, requireEnv } from '@kilocode/web-shared/lib/dotenvx';
 import { createR2Client } from '@kilocode/web-shared/lib/r2/create-client';
 
-// R2 configuration from environment variables
-const R2_ACCOUNT_ID = getEnvVariable('R2_ACCOUNT_ID');
-const R2_ACCESS_KEY_ID = getEnvVariable('R2_ACCESS_KEY_ID');
-const R2_SECRET_ACCESS_KEY = getEnvVariable('R2_SECRET_ACCESS_KEY');
-const R2_CLI_SESSIONS_BUCKET_NAME = getEnvVariable('R2_CLI_SESSIONS_BUCKET_NAME');
-const CLOUD_AGENT_R2_ATTACHMENTS_BUCKET_NAME = getEnvVariable(
-  'CLOUD_AGENT_R2_ATTACHMENTS_BUCKET_NAME'
+// R2 is required at startup, so every exported bucket name is non-empty by construction.
+// `createR2Client` reads the account id itself, so this call only enforces the startup check.
+requireEnv('R2_ACCOUNT_ID', getEnvVariable('R2_ACCOUNT_ID'));
+const R2_ACCESS_KEY_ID = requireEnv('R2_ACCESS_KEY_ID', getEnvVariable('R2_ACCESS_KEY_ID'));
+const R2_SECRET_ACCESS_KEY = requireEnv(
+  'R2_SECRET_ACCESS_KEY',
+  getEnvVariable('R2_SECRET_ACCESS_KEY')
 );
-
-if (!R2_ACCOUNT_ID) {
-  throw new Error('R2_ACCOUNT_ID environment variable is required');
-}
-
-if (!R2_ACCESS_KEY_ID) {
-  throw new Error('R2_ACCESS_KEY_ID environment variable is required');
-}
-
-if (!R2_SECRET_ACCESS_KEY) {
-  throw new Error('R2_SECRET_ACCESS_KEY environment variable is required');
-}
-
-if (!R2_CLI_SESSIONS_BUCKET_NAME) {
-  throw new Error('R2_CLI_SESSIONS_BUCKET_NAME environment variable is required');
-}
+const R2_CLI_SESSIONS_BUCKET_NAME = requireEnv(
+  'R2_CLI_SESSIONS_BUCKET_NAME',
+  getEnvVariable('R2_CLI_SESSIONS_BUCKET_NAME')
+);
+const CLOUD_AGENT_R2_ATTACHMENTS_BUCKET_NAME = requireEnv(
+  'CLOUD_AGENT_R2_ATTACHMENTS_BUCKET_NAME',
+  getEnvVariable('CLOUD_AGENT_R2_ATTACHMENTS_BUCKET_NAME')
+);
 
 /** Singleton R2 client using the shared `R2_ACCESS_KEY_ID` credentials. */
 export const r2Client = createR2Client({

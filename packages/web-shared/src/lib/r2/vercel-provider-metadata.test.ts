@@ -210,3 +210,53 @@ test('captures a terminal error envelope before freezing and ignores all subsequ
   await collector.completed;
   expect(collector.snapshot()).toEqual({ error: { unknown: 'retained' } });
 });
+
+test('sniffs a Messages stream without an api kind and completes on message_stop', async () => {
+  const collector = createVercelProviderMetadataCollector();
+  collector.capture({
+    type: 'message_start',
+    message: { provider_metadata: { nested: true } },
+    provider_metadata: { root: true },
+  });
+  expect(collector.snapshot()).toEqual({ root: true });
+  collector.capture({ type: 'message_stop' });
+  await collector.completed;
+  expect(collector.snapshot()).toEqual({ root: true });
+});
+
+test('sniffs a Responses stream without an api kind and completes on response.completed', async () => {
+  const collector = createVercelProviderMetadataCollector();
+  collector.capture({
+    type: 'response.created',
+    response: { provider_metadata: { first: true } },
+  });
+  expect(collector.snapshot()).toEqual({ first: true });
+  collector.capture({
+    type: 'response.completed',
+    response: { provider_metadata: { done: true } },
+  });
+  await collector.completed;
+  expect(collector.snapshot()).toEqual({ done: true });
+});
+
+test('does not treat chat-shaped frames without an api kind as metadata completion', async () => {
+  const collector = createVercelProviderMetadataCollector();
+  const completed = jest.fn();
+  void collector.completed.then(completed);
+  collector.capture({ choices: [{ finish_reason: 'stop' }] });
+  collector.capture({ type: 'error' });
+  await Promise.resolve();
+  expect(completed).not.toHaveBeenCalled();
+
+  collector.capture('[DONE]');
+  await collector.completed;
+  expect(completed).toHaveBeenCalledTimes(1);
+});
+
+test('completes a sniffed chat stream on an error frame, before [DONE] arrives', async () => {
+  const collector = createVercelProviderMetadataCollector();
+  collector.capture({ choices: [{ delta: { provider_metadata: { kept: true } } }] });
+  collector.capture({ error: { message: 'upstream failed' } });
+  await collector.completed;
+  expect(collector.snapshot()).toEqual({ kept: true });
+});

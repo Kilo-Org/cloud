@@ -13,6 +13,7 @@ import { renderWithProviders } from '@/test/render-with-providers';
 
 const h = vi.hoisted(() => ({
   permission: 'allowed' as 'resolving' | 'allowed' | 'read-only',
+  confirm: vi.fn(),
   preview: vi.fn(),
   apply: vi.fn(),
 }));
@@ -51,7 +52,7 @@ vi.mock('@/lib/hooks/use-config-import-mutations', () => ({
 }));
 vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('@/components/ui/dialog', () => ({
-  useConfirmDialog: () => ({ confirm: vi.fn(), dialog: null }),
+  useConfirmDialog: () => ({ confirm: h.confirm, dialog: null }),
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ foreground: '#111111' }),
@@ -165,6 +166,23 @@ describe('ProfileConfigImportSheet permission gate', () => {
 
     expect(onClose).not.toHaveBeenCalled();
     expect(findAll(renderer.root, 'SessionPageSheet')).toHaveLength(1);
+
+    unmount();
+  });
+
+  it('read-only with a pasted draft: closes without asking', async () => {
+    const { renderer, queryClient, unmount } = await mountSheet();
+    act(() => {
+      changePastedConfig(renderer.root, JSON.stringify({ agents: [] }));
+    });
+
+    // The sheet lasts only as long as the permission that offers it: a draft
+    // that was never previewed is dropped with it, not rung through the guard.
+    h.permission = 'read-only';
+    await rerenderSheet(renderer, queryClient);
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(h.confirm).not.toHaveBeenCalled();
 
     unmount();
   });

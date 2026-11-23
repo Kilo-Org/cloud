@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -75,15 +75,22 @@ export function ProfileConfigImportSheet({
   const { previewConfigImport, applyConfigImport } = useConfigImportMutations(organizationId);
   const colors = useThemeColors();
   const permission = useOrganizationProfilePermission(organizationId);
-  // A `read-only` verdict closes the sheet, and the unmount drops the pasted
-  // text, the preview and the selection with it. `resolving` keeps the sheet:
-  // the role is not known yet, and the server may still accept the import.
+  // A `read-only` verdict closes the sheet and drops the pasted text with it,
+  // as the sibling editors do: the sheet lasts only as long as the permission
+  // that offers it. That text is a scratch draft of this sheet alone, not the
+  // persisted form draft those editors keep, so dropping it is intended, and a
+  // request that settles after the close reports through the toast. Routing
+  // this close through the dismiss guard would leave the sheet mounted under a
+  // permission that denies the write. `resolving` keeps the sheet: the role is
+  // not known yet, and the server may still accept the import.
   useCloseEditorOnDeniedPermission(permission, onClose);
   // The permission a request settles under, not the one it started under: a
   // denial closes the sheet mid-request, so its refusal needs a surface that
   // outlives it.
   const permissionRef = useRef(permission);
-  permissionRef.current = permission;
+  useEffect(() => {
+    permissionRef.current = permission;
+  }, [permission]);
   // Whether this sheet can still show a note. Every close path unmounts it, so
   // a request that settles afterwards has only the toast left.
   const mountedRef = useIsMounted();

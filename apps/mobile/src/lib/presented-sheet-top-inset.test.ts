@@ -97,9 +97,6 @@ describe('presentsAboveWindowInset', () => {
   });
 
   it('is false for every mode whose answer the header cannot use', () => {
-    // `never` promises the surface cannot reach the window top, `ios-page-sheet`
-    // presents below the inset and pads its own content, and `always` already
-    // reserves the inset — sampling an origin for any of them is wasted work.
     expect(can('never')).toBe(false);
     expect(can('ios-page-sheet')).toBe(false);
     expect(can('always')).toBe(false);

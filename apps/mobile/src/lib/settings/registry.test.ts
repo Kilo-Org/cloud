@@ -242,7 +242,7 @@ describe('settingsService one source of truth', () => {
     expect(Result.isFailure(badBoolean)).toBe(true);
   });
 
-  it('reads and rejects a non-list write for the trusted hosts', () => {
+  it('rejects a non-list write for the trusted hosts', () => {
     const bad = Effect.runSync(
       Effect.result(settingsService().write('trustedHosts', 'github.com'))
     );

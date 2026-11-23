@@ -167,9 +167,13 @@ export function OrganizationBillingScreen({
         });
 
   // The usage read answers `null` both for an organization with no Kilo Pass and
-  // for one whose agreement has issued no window yet, so only the summary's
-  // agreement says whether the section belongs on the screen at all.
-  const kiloPassUsageAgreement = kiloPassSummary.data?.agreement != null;
+  // for one whose agreement has issued no window yet, so only the summary says
+  // whether the section belongs on the screen at all. An ended agreement answers
+  // `null` too, and it has no current period to describe: the web card renders
+  // nothing there, so this section stays off instead of claiming Credits are
+  // still to come.
+  const kiloPassUsageOpen =
+    kiloPassSummary.data?.agreement != null && kiloPassSummary.data.state !== 'ended';
 
   const renderSubscriptionState = (): ReactNode => {
     if (subscription.isPending) {
@@ -328,7 +332,7 @@ export function OrganizationBillingScreen({
         <OrgKiloPassUsage
           organizationId={organizationId}
           hasBillingRole={hasBillingRole}
-          hasAgreement={kiloPassUsageAgreement}
+          agreementOpen={kiloPassUsageOpen}
         />
 
         <BillingWebSettings

@@ -62,6 +62,8 @@ const boundary = vi.hoisted(() => ({
 const reads = vi.hoisted(() => ({
   subscription: undefined as string | undefined,
   seats: undefined as string | undefined,
+  /** The usage read's gate, so a screen test can prove it stayed off. */
+  usageEnabled: undefined as boolean | undefined,
 }));
 
 /** Whether the storefront rule lets this surface link to the web page. */
@@ -95,7 +97,10 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
   },
   useOrgParentLink: () => ({ parentLink: null }),
   useOrgKiloPassSummary: () => queries.kiloPass,
-  useOrgKiloPassUsage: () => queries.kiloPassUsage,
+  useOrgKiloPassUsage: (_organizationId: string | null, enabled: boolean) => {
+    reads.usageEnabled = enabled;
+    return queries.kiloPassUsage;
+  },
 }));
 
 vi.mock('@/lib/hooks/use-org-billing-queries', () => ({
@@ -274,6 +279,7 @@ export function resetBillingQueries() {
   boundary.trialEndsAt = null;
   reads.subscription = undefined;
   reads.seats = undefined;
+  reads.usageEnabled = undefined;
   platform.linkAllowed = true;
   queries.seats.data = { usedSeats: 3, totalSeats: 3 };
   queries.autoTopUp.data = { enabled: true, amountCents: 5000, thresholdCents: 1000 };

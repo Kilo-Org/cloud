@@ -91,12 +91,12 @@ function usage(allocations: Record<string, unknown>[]) {
   };
 }
 
-function mount(props?: { hasBillingRole?: boolean; hasAgreement?: boolean }) {
+function mount(props?: { hasBillingRole?: boolean; agreementOpen?: boolean }) {
   return renderWithProviders(
     createElement(OrgKiloPassUsage, {
       organizationId: 'org-1',
       hasBillingRole: props?.hasBillingRole ?? true,
-      hasAgreement: props?.hasAgreement ?? true,
+      agreementOpen: props?.agreementOpen ?? true,
     })
   );
 }
@@ -255,13 +255,13 @@ describe('OrgKiloPassUsage states', () => {
     unmount();
   });
 
-  it('renders nothing without a billing role or without an agreement', async () => {
+  it('renders nothing without a billing role or without a live agreement', async () => {
     query.data = usage([allocation()]);
     const withoutRole = await mount({ hasBillingRole: false });
     expect(withoutRole.renderer.toJSON()).toBeNull();
     withoutRole.unmount();
 
-    const withoutAgreement = await mount({ hasAgreement: false });
+    const withoutAgreement = await mount({ agreementOpen: false });
     expect(withoutAgreement.renderer.toJSON()).toBeNull();
     withoutAgreement.unmount();
   });

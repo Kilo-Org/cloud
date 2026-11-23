@@ -13,10 +13,12 @@ export type OrgKiloPassUsageAllocation = OrgKiloPassUsageOutput['currentAllocati
 /**
  * The section's phase, as one union rather than a set of flags beside it.
  *
- * `hidden` covers both "this reader may not see it" and "this organization has
- * no Kilo Pass at all": the usage read answers `null` for an organization with
- * no agreement and for one whose agreement has issued no window yet, so only
- * the summary's `agreement` separates them.
+ * `hidden` covers "this reader may not see it", "this organization has no Kilo
+ * Pass at all" and "its agreement has ended". The usage read answers `null` for
+ * all three, so the summary separates them: it knows whether an agreement exists
+ * and whether that agreement still has a current period to describe. An ended
+ * agreement has none, and the web card renders nothing for it, so neither does
+ * this section.
  */
 export type OrgKiloPassUsageState =
   | { kind: 'hidden' }
@@ -44,14 +46,14 @@ const TERMINAL_USAGE_CODES = new Set(['FORBIDDEN', 'UNAUTHORIZED', 'NOT_FOUND'])
  * both mean "no window issued yet".
  */
 export function getOrgKiloPassUsageState(input: {
-  hasAgreement: boolean;
+  agreementOpen: boolean;
   hasBillingRole: boolean;
   isPending: boolean;
   isError: boolean;
   error: unknown;
   data: OrgKiloPassUsageOutput | null | undefined;
 }): OrgKiloPassUsageState {
-  if (!input.hasBillingRole || !input.hasAgreement) {
+  if (!input.hasBillingRole || !input.agreementOpen) {
     return { kind: 'hidden' };
   }
   if (input.isPending) {

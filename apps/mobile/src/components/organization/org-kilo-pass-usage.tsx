@@ -139,8 +139,12 @@ type OrgKiloPassUsageProps = Readonly<{
   organizationId: string;
   /** The billing role reaches the whole pass; every other role sees nothing. */
   hasBillingRole: boolean;
-  /** Whether the summary holds an agreement, which the read alone cannot tell. */
-  hasAgreement: boolean;
+  /**
+   * Whether the organization holds a Kilo Pass whose current period is still
+   * running. The read alone cannot tell: it answers `null` for no agreement, for
+   * an ended one, and for one that has issued no window yet.
+   */
+  agreementOpen: boolean;
 }>;
 
 /**
@@ -155,15 +159,15 @@ type OrgKiloPassUsageProps = Readonly<{
 export function OrgKiloPassUsage({
   organizationId,
   hasBillingRole,
-  hasAgreement,
+  agreementOpen,
 }: OrgKiloPassUsageProps) {
   const { t } = useTranslation();
   const { data, isPending, isError, error, isFetching, refetch } = useOrgKiloPassUsage(
     organizationId,
-    hasBillingRole && hasAgreement
+    hasBillingRole && agreementOpen
   );
   const state = getOrgKiloPassUsageState({
-    hasAgreement,
+    agreementOpen,
     hasBillingRole,
     isPending,
     isError,

@@ -45,7 +45,7 @@ function usage(overrides?: Partial<OrgKiloPassUsageOutput>): OrgKiloPassUsageOut
 
 /** Both gates open, with a settled successful read. */
 const OPEN = {
-  hasAgreement: true,
+  agreementOpen: true,
   hasBillingRole: true,
   isPending: false,
   isError: false,
@@ -59,8 +59,8 @@ describe('getOrgKiloPassUsageState gates', () => {
     });
   });
 
-  it('hides the section without an agreement, even once data arrives', () => {
-    expect(getOrgKiloPassUsageState({ ...OPEN, hasAgreement: false, data: usage() })).toEqual({
+  it('hides the section with no live agreement, even once data arrives', () => {
+    expect(getOrgKiloPassUsageState({ ...OPEN, agreementOpen: false, data: usage() })).toEqual({
       kind: 'hidden',
     });
   });

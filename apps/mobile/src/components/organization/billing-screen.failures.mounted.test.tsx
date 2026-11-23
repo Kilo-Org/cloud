@@ -8,6 +8,7 @@ import {
   mount,
   onlyButton,
   queries,
+  reads,
   resetBillingQueries,
   subscriptionReadout,
   texts,
@@ -85,6 +86,24 @@ describe('OrganizationBillingScreen failure states', () => {
     expect(queries.subscription.refetch).not.toHaveBeenCalled();
     expect(queries.autoTopUp.refetch).not.toHaveBeenCalled();
     expect(queries.kiloPass.refetch).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it('keeps the Kilo Pass usage section off an agreement that has ended', async () => {
+    queries.subscription.data = subscriptionReadout();
+    // An ended agreement still answers a summary with an `agreement`, and the
+    // usage read answers `null`. The section must stay off: there is no current
+    // period to describe, and the web card renders nothing for it either.
+    queries.kiloPass.data = {
+      state: 'ended',
+      commercialState: 'ended',
+      processingCondition: 'ready',
+      agreement: { tier: 'tier_49', paidSeatCount: 2, planVersion: 1, paidThrough: null },
+    };
+    const { renderer, unmount } = await mount();
+
+    expect(reads.usageEnabled).toBe(false);
+    expect(texts(renderer)).not.toContain('No monthly Credits have been issued yet.');
     unmount();
   });
 });

@@ -38,6 +38,10 @@ catalog:
   '@trpc/client': 11.19.0
   '@trpc/server': 11.19.0
   '@trpc/tanstack-react-query': 11.19.0
+  # The vitest transform `@ttsc/unplugin` peers the `ttsc` compiler at its own
+  # release line: the lock records `ttsc: ^0.36.4`, so both entries move
+  # together in one change.
+  '@ttsc/unplugin': 0.36.4
   '@types/jsonwebtoken': 9.0.10
   '@types/node': 24.12.4
   '@typescript/native-preview': 7.0.0-dev.20260707.2
@@ -71,6 +75,8 @@ catalog:
   postcss: 8.5.30
   stripe: 23.0.0
   tsx: 4.23.15
+  # The compiler `@ttsc/unplugin` above peers; it moves with that entry.
+  ttsc: 0.36.4
   # TypeScript 7 is the native compiler and ships no compiler JS API. The
   # workspace typechecks with the @typescript/native-preview `tsgo` binary, so
   # this entry is what `tsc`, `next build` and the bundlers load. The one tool

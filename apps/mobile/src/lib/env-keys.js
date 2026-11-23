@@ -8,8 +8,10 @@
  *  Plain .js, not TypeScript, because two build-time consumers read these
  *  modules and neither can load workspace TS: the Expo config loader through
  *  app.config.ts, and scripts/assert-expo-config.mjs, which runs under plain
- *  Node. The sibling plain-.js modules beside this one cite this note instead
- *  of repeating it, so the constraint is described once here.
+ *  Node. android-notification-channels.js and splash-branding.js, the other two
+ *  modules the assertion script imports, point here instead of repeating the
+ *  reason. Modules that the Expo config loader reads without that script state
+ *  their own case.
  *  Checked by the mobile typecheck through tsconfig include — keep the entry. */
 export const ENV_KEYS = {
   apiBaseUrl: 'API_BASE_URL',

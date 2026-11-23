@@ -46,6 +46,16 @@ const OVER_BUDGET =
   `This question already used ${String(MAX_SEARCHES_PER_QUESTION)} web searches, the limit. ` +
   'Do not search again: answer with what you have.';
 /**
+ * The stop for a call that arrives while this turn's earlier calls still hold
+ * the answered-search slots. Not every one of them has answered, so the text
+ * may not say five searches came back; it still forbids another search, because
+ * those slots are the question's whole allowance.
+ */
+const OVER_BUDGET_IN_FLIGHT =
+  `This turn already took the question's ${String(MAX_SEARCHES_PER_QUESTION)} web searches ` +
+  'and not all of them have answered. ' +
+  'Do not search again: answer with what you have.';
+/**
  * The stop for a question that used its attempts. It says whether any search
  * answered, because only then may the model's reply read as if the web was
  * searched; with none answered it must say the search did not work.
@@ -106,14 +116,20 @@ type Admission =
  * the five-search cap turns into one search per call of the turn. Reserving
  * here, before the first await, means each call of the turn sees what the calls
  * before it took. `settle` gives the answered slot back whenever Kilo did not
- * answer, so a search that never reached it costs nothing.
+ * answer, so a search that never reached it costs nothing. A refused call reads
+ * the settled count: the answered-limit text is used only when the settled
+ * answers reached the cap, while a refusal during a turn that still holds
+ * reserved slots uses the in-flight text, because those slots may come back.
  */
 function admit(spent: QuestionSearches | undefined): Admission {
   if (spent === undefined) {
     return { kind: 'none' };
   }
   if (spent.used >= MAX_SEARCHES_PER_QUESTION) {
-    return { kind: 'refused', reason: OVER_BUDGET };
+    return {
+      kind: 'refused',
+      reason: spent.answered >= MAX_SEARCHES_PER_QUESTION ? OVER_BUDGET : OVER_BUDGET_IN_FLIGHT,
+    };
   }
   if (spent.attempts >= MAX_ATTEMPTS_PER_QUESTION) {
     return { kind: 'refused', reason: overAttempts(spent.answered > 0) };

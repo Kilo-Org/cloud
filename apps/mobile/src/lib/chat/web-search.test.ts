@@ -399,7 +399,10 @@ describe('a web search', () => {
     // stricter than the fifteen attempts a failing loop is allowed one at a time.
     expect(world.requests).toHaveLength(5);
     expect(outcome.slice(0, 5).every(answer => Result.isFailure(answer))).toBe(true);
-    expect(reasonOf(outcome[5])).toContain('5 web searches, the limit');
+    // Nothing has settled yet, so the refusal may not claim five searches came back.
+    expect(reasonOf(outcome[5])).toContain('not all of them have answered');
+    expect(reasonOf(outcome[5])).toContain('Do not search again');
+    expect(reasonOf(outcome[5])).not.toContain('5 web searches, the limit');
     expect(spent.used).toBe(0);
     expect(spent.answered).toBe(0);
     expect(spent.attempts).toBe(5);
@@ -421,7 +424,9 @@ describe('a web search', () => {
     }
     // A refusal reaches the model as a failed tool result, not as a body.
     expect(refused.failure).toBeInstanceOf(ToolFailure);
-    expect(reasonOf(outcome[5])).toContain('5 web searches, the limit');
+    expect(reasonOf(outcome[5])).toContain('not all of them have answered');
+    expect(reasonOf(outcome[5])).toContain('Do not search again');
+    expect(reasonOf(outcome[5])).not.toContain('5 web searches, the limit');
     expect(spent.used).toBe(5);
     expect(spent.answered).toBe(5);
     expect(spent.attempts).toBe(5);
@@ -464,6 +469,7 @@ describe('a web search', () => {
       false,
     ]);
     // The five-search limit stops the sixth, so attempts never reach fifteen.
+    // Each earlier search answered, so the settled case keeps the answered-limit text.
     expect(reasonOf(outcome[5])).toContain('5 web searches, the limit');
     expect(world.requests).toHaveLength(5);
     expect(spent.used).toBe(5);

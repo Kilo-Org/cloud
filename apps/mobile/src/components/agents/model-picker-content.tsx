@@ -18,7 +18,6 @@ import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { useModelPickerPick } from '@/lib/hooks/use-model-picker-pick';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { CONTROL_TO_STATE_GAP_CLASS } from '@/lib/layout';
 import {
   buildModelPickerRows,
   favoriteToggleAction,
@@ -29,7 +28,6 @@ import { dismissSearchPickerKeyboard, SEARCHABLE_PICKER_LIST_PROPS } from '@/lib
 import { parseParam } from '@/lib/route-params';
 import { modelPickerSlot, UNFENCED_ROUTE_KEY, useRouteRegistry } from '@/lib/route-registry';
 import { useSideInsetMarginStyle } from '@/lib/screen-insets';
-import { cn } from '@/lib/utils';
 
 // The picker sheet renders its own scroll container (`scrollable={false}`), so
 // the list fills the sheet's body.
@@ -356,9 +354,10 @@ export function ModelPickerContent() {
           ListHeaderComponent={
             allOptionsUnavailable ? (
               <EmptyState
-                // The state keeps one section gap on each side of itself:
-                // below the search field and above the first section header.
-                className={cn(CONTROL_TO_STATE_GAP_CLASS, 'mb-6')}
+                // The sheet's sections sit 21pt apart, and the state keeps
+                // one section gap on each side of itself: below the search
+                // field and above the first section header.
+                className="mt-3 mb-6"
                 icon={Info}
                 placement="top"
                 inset="gutter"

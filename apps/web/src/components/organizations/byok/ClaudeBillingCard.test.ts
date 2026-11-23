@@ -79,6 +79,15 @@ describe('ClaudeBillingCardView', () => {
     expect(render({ status: { ...status('not_connected'), linkingAvailable: false } })).toBe('');
   });
 
+  it('asks the person to retry a lock conflict instead of reporting a failure', () => {
+    expect(render({ status: status('not_connected'), outcome: 'busy' })).toContain(
+      'Claude is busy right now.'
+    );
+    expect(render({ status: status('not_connected'), outcome: 'failed' })).not.toContain(
+      'Claude is busy right now.'
+    );
+  });
+
   it('hides the connect action when linking is unavailable', () => {
     expect(
       buttons({

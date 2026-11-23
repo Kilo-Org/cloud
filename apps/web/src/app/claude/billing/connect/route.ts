@@ -4,7 +4,10 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
-import type { ClaudeBillingOwner } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
+import {
+  ClaudeBillingLockBusyError,
+  type ClaudeBillingOwner,
+} from '@kilocode/web-shared/lib/ai-gateway/claude-billing/store';
 import { ensureClaudeBillingProfile } from '@/lib/claude-billing/profile';
 import { saveClaudeBillingPending } from '@/lib/claude-billing/pending';
 import { validateReturnPath } from '@/lib/integrations/validate-return-path';
@@ -97,6 +100,12 @@ export async function GET(request: NextRequest) {
     });
     return NextResponse.redirect(authorizeUrl);
   } catch (error) {
+    // A lock conflict is transient and clears by retrying the request, so it is
+    // reported apart from a real connect failure. The store has already logged
+    // why its retry loop stopped.
+    if (error instanceof ClaudeBillingLockBusyError) {
+      return outcomeRedirect(returnPath, owner, 'busy');
+    }
     // Only the name and HTTP status: provider errors can carry request metadata.
     console.error('[claude-billing] connect failed', {
       error: error instanceof Error ? error.name : 'unknown',

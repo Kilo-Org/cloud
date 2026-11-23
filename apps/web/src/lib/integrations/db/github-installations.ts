@@ -650,6 +650,7 @@ type ExclusiveUninstallIdentity = { installationId: string; appType: 'standard' 
  * Commits the local half of an exclusive uninstall in its own transaction.
  * It performs no provider call, so a repeat is safe. The installation identity
  * lock serializes it against every other writer for the same installation.
+ * The row is re-read under its lock because the two transactions are separate.
  */
 async function completeUninstallAfterUpstreamDelete(input: {
   owner: Owner;
@@ -658,10 +659,33 @@ async function completeUninstallAfterUpstreamDelete(input: {
 }): Promise<CancelledReviewRow[]> {
   return db.transaction(async tx => {
     await lockGitHubInstallationIdentity(tx, input.identity.appType, input.identity.installationId);
-    const cancelled = await cancelActiveCodeReviewsForIntegration(
-      { owner: input.owner, platform: PLATFORM.GITHUB, integrationId: input.integrationId },
-      tx
-    );
+    // The completion has its own transaction, so it re-reads the association under
+    // a row lock and acts on it only while it still holds the same installation.
+    const [target] = await tx
+      .select({
+        id: platform_integrations.id,
+        installationId: platform_integrations.platform_installation_id,
+        appType: platform_integrations.github_app_type,
+      })
+      .from(platform_integrations)
+      .where(
+        and(
+          eq(platform_integrations.id, input.integrationId),
+          eq(platform_integrations.platform, PLATFORM.GITHUB),
+          ownerCondition(input.owner)
+        )
+      )
+      .for('update');
+    const stillTarget =
+      target !== undefined &&
+      target.installationId === input.identity.installationId &&
+      (target.appType ?? 'standard') === input.identity.appType;
+    const cancelled = stillTarget
+      ? await cancelActiveCodeReviewsForIntegration(
+          { owner: input.owner, platform: PLATFORM.GITHUB, integrationId: input.integrationId },
+          tx
+        )
+      : [];
     await observeGitHubInstallationLifecycle(
       {
         installationId: input.identity.installationId,
@@ -670,7 +694,11 @@ async function completeUninstallAfterUpstreamDelete(input: {
       },
       tx
     );
-    await tx.delete(platform_integrations).where(eq(platform_integrations.id, input.integrationId));
+    if (stillTarget) {
+      await tx
+        .delete(platform_integrations)
+        .where(eq(platform_integrations.id, input.integrationId));
+    }
     return cancelled;
   });
 }

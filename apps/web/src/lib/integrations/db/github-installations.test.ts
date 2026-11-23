@@ -3031,6 +3031,17 @@ describe('GitHub installation persistence', () => {
       ).resolves.toBeUndefined();
       expect(deleteUpstreamCalls).toBe(1);
 
+      // Value 1 belongs to the aborted canonical write. Values 2 and 3 belong
+      // to the completion's single upsert, because the trigger fires once for
+      // its insert attempt and once for its update attempt. Without this line,
+      // the test also passes when the trigger never fires.
+      const [fires] = (
+        await db.execute<{ last_value: string }>(
+          sql`SELECT last_value FROM public.github_uninstall_fail_once`
+        )
+      ).rows;
+      expect(Number(fires?.last_value)).toBe(3);
+
       const [integrationRow] = await db
         .select({ id: platform_integrations.id })
         .from(platform_integrations)

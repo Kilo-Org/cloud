@@ -7,6 +7,9 @@ const mockRetirePreviousSlackWorkspace = jest.fn();
 const mockExchangeSlackOAuthCode = jest.fn();
 const mockCaptureException = jest.fn();
 const mockCaptureMessage = jest.fn();
+const mockGetSlackInstallation = jest.fn<Promise<unknown>, [string]>(async () => null);
+const mockSetSlackInstallation = jest.fn<Promise<void>, [string, unknown]>(async () => undefined);
+const mockDeleteSlackInstallation = jest.fn<Promise<void>, [string]>(async () => undefined);
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   NEXTAUTH_SECRET: 'test-nextauth-secret',
@@ -24,9 +27,9 @@ jest.mock('@/lib/bot', () => ({
     initialize: jest.fn(async () => {}),
     getState: () => ({}),
     getAdapter: () => ({
-      getInstallation: jest.fn(async () => null),
-      setInstallation: jest.fn(async () => {}),
-      deleteInstallation: jest.fn(async () => {}),
+      getInstallation: (...args: [string]) => mockGetSlackInstallation(...args),
+      setInstallation: (...args: [string, unknown]) => mockSetSlackInstallation(...args),
+      deleteInstallation: (...args: [string]) => mockDeleteSlackInstallation(...args),
     }),
   },
 }));
@@ -280,6 +283,8 @@ describe('handleSlackOAuthCallback replaced workspace settlement', () => {
     mockEnsureOrganizationAccess.mockResolvedValue('owner');
     mockConsumeProviderOAuthAttempt.mockResolvedValue(true);
     mockExchangeSlackOAuthCode.mockResolvedValue({ installationId: 'T123', installation });
+    // The Chat SDK holds no installation unless a test scripts one.
+    mockGetSlackInstallation.mockResolvedValue(null);
   });
 
   it('retires the workspace a rebind replaced after the install commits', async () => {
@@ -293,6 +298,7 @@ describe('handleSlackOAuthCallback replaced workspace settlement', () => {
 
     expect(mockRetirePreviousSlackWorkspace).toHaveBeenCalledTimes(1);
     expect(mockRetirePreviousSlackWorkspace).toHaveBeenCalledWith(
+      { type: 'user', id: USER_ID },
       previousWorkspace,
       expect.objectContaining({
         deleteChatSdkInstallation: expect.any(Function),
@@ -328,5 +334,24 @@ describe('handleSlackOAuthCallback replaced workspace settlement', () => {
       'previous_workspace_unreadable'
     );
     expect(mockRetirePreviousSlackWorkspace).not.toHaveBeenCalled();
+  });
+
+  it('restores the installation when the rebind stops', async () => {
+    const previousInstallation = {
+      botToken: 'xoxb-previous',
+      botUserId: 'U_PREVIOUS_BOT',
+      teamName: 'Previous Team',
+    };
+    mockGetSlackInstallation.mockResolvedValue(previousInstallation);
+    mockUpsertSlackInstallation.mockRejectedValue(
+      new SlackWorkspaceRebindUnsettledError('credential_unreadable')
+    );
+
+    const { response } = await callCallback(`user_${USER_ID}`);
+
+    expect(mockSetSlackInstallation).toHaveBeenLastCalledWith('T123', previousInstallation);
+    expect(new URL(response.headers.get('location') ?? '').searchParams.get('error')).toBe(
+      'previous_workspace_unreadable'
+    );
   });
 });

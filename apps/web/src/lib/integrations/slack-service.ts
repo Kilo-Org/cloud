@@ -7,6 +7,7 @@ import { TRPCError } from '@trpc/server';
 import type { Owner } from '@/lib/integrations/core/types';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import { getPlatformOAuthCallbackUrl } from '@/lib/integrations/oauth/urls';
+import { withInstallationServerLock } from '@/lib/integrations/oauth/workspace-installation-lock';
 import { SLACK_CLIENT_ID, SLACK_CLIENT_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { WebClient } from '@slack/web-api';
 import type { SlackInstallation } from '@chat-adapter/slack';
@@ -531,10 +532,22 @@ export type PreviousSlackWorkspace = {
 };
 
 /**
+ * The token an item may keep in `metadata` from before the credential store.
+ * `metadata` is untyped, so only a non-empty string counts as a token.
+ */
+function readMetadataSlackToken(integration: PlatformIntegration): string | null {
+  const metadata = integration.metadata;
+  if (typeof metadata !== 'object' || metadata === null || !('access_token' in metadata)) {
+    return null;
+  }
+  const token = metadata.access_token;
+  return typeof token === 'string' && token.length > 0 ? token : null;
+}
+
+/**
  * Read the bot token of the workspace a rebind replaces, before the write that
- * overwrites its only record. A read that yields no token refuses the rebind,
- * because after the write this code could never revoke it: `read_failed` is
- * worth a retry, and an unreadable credential needs the operator path.
+ * records the new workspace. An `unavailable` read stops the install with the
+ * read's reason; an `absent` read falls back to the item's metadata.
  */
 async function readReplacedSlackWorkspace(
   existing: PlatformIntegration,
@@ -546,7 +559,10 @@ async function readReplacedSlackWorkspace(
       read.reason === 'read_failed' ? 'read_failed' : 'credential_unreadable'
     );
   }
-  return { teamId, botToken: read.status === 'available' ? read.token : null };
+  if (read.status === 'available') return { teamId, botToken: read.token };
+  // The install write drops `metadata.access_token`, so this read hands a token
+  // that predates the credential store to the revocation step.
+  return { teamId, botToken: readMetadataSlackToken(existing) };
 }
 
 export type UpsertSlackInstallationResult = {
@@ -803,29 +819,70 @@ export async function uninstallApp(owner: Owner, options: SlackUninstallOptions 
 }
 
 /**
+ * What one locked retirement section settled on: `released` when the section
+ * removed the previous workspace's Chat SDK state, `recorded_by_another_owner`
+ * when it left that state in place.
+ */
+type SlackWorkspaceRetirement = 'released' | 'recorded_by_another_owner';
+
+/**
  * Retire the workspace a successful install replaced. Call this only after the
  * caller's transaction has committed: the connection row already names the new
  * workspace, so the previous one's token and Chat SDK state are settled beside it.
  *
- * A token Slack does not confirm as revoked is reported with its team id, the
- * only place that still names it, rather than thrown: the new connection stands.
+ * The Chat SDK installation and identity cache are removed only when no other
+ * row records that workspace, which the per-workspace lock makes one decision
+ * with the removals. That lock takes no owner key, so a retirement in flight
+ * never delays another connection of this owner. The section runs at most two
+ * lookups and the two removals, the budget the server lock's statement timeout
+ * covers, and the replaced token is revoked before it.
+ *
+ * A token Slack does not confirm as revoked, and a workspace a row still
+ * records, are reported with the team id rather than thrown: the new connection
+ * stands.
  */
 export async function retirePreviousSlackWorkspace(
+  owner: Owner,
   previous: PreviousSlackWorkspace,
   options: SlackUninstallOptions = {}
 ): Promise<void> {
-  try {
-    if (previous.botToken) {
-      const revocation = await revokeSlackToken(previous.botToken);
-      if (revocation.status === 'temporary_failure') {
-        captureException(new Error('Slack token revocation did not settle a replaced workspace'), {
-          tags: { component: 'slack-service', op: 'retire-previous-workspace' },
-          extra: { teamId: previous.teamId, reason: revocation.reason },
-        });
-      }
+  if (previous.botToken) {
+    const revocation = await revokeSlackToken(previous.botToken);
+    if (revocation.status === 'temporary_failure') {
+      captureException(new Error('Slack token revocation did not settle a replaced workspace'), {
+        tags: { component: 'slack-service', op: 'retire-previous-workspace' },
+        extra: { teamId: previous.teamId, reason: revocation.reason },
+      });
     }
-    await options.deleteChatSdkInstallation?.(previous.teamId);
-    await options.deleteChatSdkIdentityCache?.(previous.teamId);
+  }
+
+  try {
+    const retirement = await withInstallationServerLock(
+      PLATFORM.SLACK,
+      previous.teamId,
+      async (tx): Promise<SlackWorkspaceRetirement> => {
+        const recordedByAnotherOwner = await getConflictingSlackInstallation(
+          owner,
+          previous.teamId,
+          tx
+        );
+        if (recordedByAnotherOwner) return 'recorded_by_another_owner';
+
+        await options.deleteChatSdkInstallation?.(previous.teamId);
+        await options.deleteChatSdkIdentityCache?.(previous.teamId);
+        return 'released';
+      }
+    );
+
+    if (retirement === 'recorded_by_another_owner') {
+      captureException(
+        new Error('A replaced Slack workspace is recorded by another owner and was kept'),
+        {
+          tags: { component: 'slack-service', op: 'retire-previous-workspace' },
+          extra: { teamId: previous.teamId, outcome: 'recorded_by_another_owner' },
+        }
+      );
+    }
   } catch (error) {
     // The new connection is already committed; this cleanup runs beside it.
     captureException(error, {

@@ -23,7 +23,7 @@ import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { getPlatformOAuthConnectPath } from '@/lib/integrations/oauth/paths';
 import { useConfirm } from '@/components/ui/confirm';
-import { resolveConnectionErrorMessage } from '@/components/integrations/connection-error-message';
+import { getSlackConnectionErrorMessage } from '@/components/integrations/slack-connection-errors';
 
 type SlackIntegrationDetailsProps = {
   organizationId?: string;
@@ -35,27 +35,10 @@ type SlackIntegrationDetailsProps = {
   connectPath?: string;
 };
 
-const slackConnectionErrorMessages: Record<string, string> = {
-  workspace_already_connected:
-    'This Slack workspace is already connected to another Kilo account or organization. Disconnect it there before connecting it here.',
-  previous_workspace_unconfirmed:
-    'Slack could not confirm the move away from the previous workspace, so the connection was not changed. Try again.',
-  previous_workspace_unreadable:
-    'Kilo could not read the Slack access saved for the previous workspace, so the connection was not changed. Contact support to finish disconnecting it.',
-  permission_required:
-    'Only organization owners and admins can connect or change the organization Slack integration.',
-  organization_access_required:
-    'You no longer have access to this organization. Ask an organization owner or admin for access.',
-};
-
 const duplicateSlackWorkspaceMigration = 'duplicate_slack_workspace_migration';
 
-function getSlackConnectionErrorMessage(error: string): string {
-  return resolveConnectionErrorMessage(
-    slackConnectionErrorMessages,
-    error,
-    `Connection failed: ${error}`
-  );
+function getSlackCardErrorMessage(error: string): string {
+  return getSlackConnectionErrorMessage(error, `Connection failed: ${error}`);
 }
 
 function getSuspendedSlackIntegrationMessage(suspendedBy: string | null): string {
@@ -173,7 +156,7 @@ export function SlackIntegrationDetails({
       toast.success('Slack connected successfully!');
     }
     if (error) {
-      toast.error(getSlackConnectionErrorMessage(error));
+      toast.error(getSlackCardErrorMessage(error));
     }
   }, [success, error]);
 
@@ -297,7 +280,7 @@ export function SlackIntegrationDetails({
         <Alert variant="destructive">
           <XCircle className="h-4 w-4" />
           <AlertTitle>Could not connect Slack</AlertTitle>
-          <AlertDescription>{getSlackConnectionErrorMessage(error)}</AlertDescription>
+          <AlertDescription>{getSlackCardErrorMessage(error)}</AlertDescription>
         </Alert>
       )}
 

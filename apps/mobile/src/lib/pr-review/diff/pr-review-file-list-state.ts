@@ -24,7 +24,10 @@ import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'r
 import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { classifyPrReviewQueryState } from '@/lib/pr-review/classify-pr-review-query-state';
 import { flattenFilePages } from '@/lib/pr-review/diff/dedupe-file-pages';
-import { PR_REVIEW_MAX_PAGES } from '@/lib/pr-review/diff/pr-review-file-types';
+import {
+  normalizePrReviewFile,
+  PR_REVIEW_MAX_PAGES,
+} from '@/lib/pr-review/diff/pr-review-file-types';
 import {
   applyViewedFilesToggle,
   getViewedFilesSnapshot,
@@ -98,7 +101,10 @@ export function usePrReviewFileListQuery(args: {
   const firstPageErrorState = hasLoadedPages ? null : errorState;
   const laterPageError = Boolean(query.error) && hasLoadedPages;
 
-  const files = useMemo(() => flattenFilePages(query.data?.pages), [query.data]);
+  const files = useMemo(
+    () => flattenFilePages(query.data?.pages).map(file => normalizePrReviewFile(file)),
+    [query.data]
+  );
 
   return {
     query,

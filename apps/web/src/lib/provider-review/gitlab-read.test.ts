@@ -490,6 +490,9 @@ describe('listChangedFiles', () => {
     expect(page.files[0]).toMatchObject({
       path: 'assets/pixel.bin',
       status: 'added',
+      // The placeholder is not carried as a patch: a file with a cause has no
+      // renderable hunks, which is the contract's own invariant.
+      patch: null,
       patchMissingCause: 'binary',
     });
   });

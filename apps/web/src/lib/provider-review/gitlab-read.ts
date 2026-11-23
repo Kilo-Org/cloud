@@ -209,7 +209,9 @@ function mapDiffToFile(diff: GitLabDiff): ProviderPrFile {
     status,
     additions,
     deletions,
-    patch: diff.diff || null,
+    // The contract's invariant: a file with a cause has no renderable patch, so
+    // GitLab's binary placeholder is not carried as hunks the rows cannot use.
+    patch: patchMissingCause === null ? patch : null,
     patchMissingCause,
     // The pre-cause field a client bundle without the cause still reads.
     patchMissing: patchMissingCause !== null,

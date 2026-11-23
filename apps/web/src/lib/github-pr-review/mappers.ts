@@ -397,7 +397,9 @@ export function buildFilesPage(args: {
       status,
       additions: f.additions,
       deletions: f.deletions,
-      patch: f.patch ?? null,
+      // A file with a cause has no renderable patch, so an empty one is not
+      // carried as hunks the rows cannot use.
+      patch: patchMissingCause === null ? (f.patch ?? null) : null,
       patchMissingCause,
       // The pre-cause field, kept for a client bundle that has not taken an
       // update; it is the cause's own truth, never an independent signal.

@@ -48,11 +48,9 @@ afterAll(async () => {
 });
 
 describe('nesting-depth status copy', () => {
-  it('states the depth alone in every reworded catalog', async () => {
-    for (const [tag, expected] of Object.entries(EXPECTED)) {
-      await i18n.changeLanguage(tag);
-      expect(i18n.t(KEY), tag).toBe(expected);
-    }
+  it.each(Object.entries(EXPECTED))('states the depth alone in %s', async (tag, expected) => {
+    await i18n.changeLanguage(tag);
+    expect(i18n.t(KEY)).toBe(expected);
   });
 
   it('keeps the canonical English sentence', async () => {

@@ -718,10 +718,10 @@ describe('OrganizationRequestLogsScreen pull to refresh', () => {
 
   it('draws one static band above each pull surface, carrying its control', async () => {
     // The band is the pull's visible half under reduced motion, where the
-    // platform control is forced back to rest. It stands beside the body rather
-    // than inside it, so its reserve never moves the first row at rest and never
-    // scrolls away with the rows. The list and the state scroller are handed the
-    // same control element, so one band paints whichever pull is in flight.
+    // platform control is forced back to rest. It paints over the body rather
+    // than sitting in flow, so it moves no row at rest and never scrolls away
+    // with the rows. The list and the state scroller are handed the same control
+    // element, so one band paints whichever pull is in flight.
     logsQuery.data = entries(2);
     const list = await mount();
     expect(list.renderer.root.findAllByType('RefreshProgress')).toHaveLength(1);

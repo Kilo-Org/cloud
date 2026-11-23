@@ -258,9 +258,11 @@ export function OrganizationRequestLogsScreen() {
   // The pull's visible half under reduced motion, where the platform control is
   // forced back to rest. It belongs to the three bodies that own a pull — the
   // list, the empty hour and the failure — and never to the skeleton: no read
-  // has settled, so `useManualRefresh` hands it no gesture to paint. It sits
-  // beside the body rather than inside it, so its reserve neither moves the
-  // first row at rest nor scrolls away with the rows.
+  // has settled, so `useManualRefresh` hands it no gesture to paint. It paints
+  // over the body rather than in flow: in flow its `h-9` reserve opened a gap
+  // between the window header's buttons and the first row three times the row
+  // separator, so the header block read as detached from the list; out of flow
+  // it never moves content and still paints the pull's only visible feedback.
   const showsRefreshBand = body.kind === 'list' || bodyPulls;
   const bodyContent = renderBody(body);
 
@@ -345,25 +347,31 @@ export function OrganizationRequestLogsScreen() {
           </View>
         </View>
       </View>
-      {showsRefreshBand ? <RefreshProgress refreshControl={refreshControl} /> : null}
-      {bodyPulls ? (
-        // `flex-grow` lets short content still pull: a content box only as tall
-        // as the state cannot be dragged far enough to trigger the gesture. The
-        // state draws its own gutter through `inset="gutter"`, so this body
-        // adds none.
-        <TabScreenScrollView
-          className="flex-1"
-          contentContainerClassName="flex-grow"
-          showsVerticalScrollIndicator={false}
-          refreshControl={refreshControl}
-        >
-          {bodyContent}
-        </TabScreenScrollView>
-      ) : (
-        <View className="flex-1" style={sideInsetStyle}>
-          {bodyContent}
-        </View>
-      )}
+      <View className="flex-1">
+        {bodyPulls ? (
+          // `flex-grow` lets short content still pull: a content box only as tall
+          // as the state cannot be dragged far enough to trigger the gesture. The
+          // state draws its own gutter through `inset="gutter"`, so this body
+          // adds none.
+          <TabScreenScrollView
+            className="flex-1"
+            contentContainerClassName="flex-grow"
+            showsVerticalScrollIndicator={false}
+            refreshControl={refreshControl}
+          >
+            {bodyContent}
+          </TabScreenScrollView>
+        ) : (
+          <View className="flex-1" style={sideInsetStyle}>
+            {bodyContent}
+          </View>
+        )}
+        {showsRefreshBand ? (
+          <View className="absolute inset-x-0 top-0" pointerEvents="none">
+            <RefreshProgress refreshControl={refreshControl} />
+          </View>
+        ) : null}
+      </View>
     </View>
   );
 }

@@ -3519,7 +3519,7 @@
   "organization": {
     "auditLog": {
       "title": "Audit log",
-      "permissionDenied": "Only an organization owner, admin or billing manager on the Enterprise plan can read its audit log.",
+      "permissionDenied": "Only an organization owner, admin or billing manager on the Enterprise plan can read its audit log. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "No audit events",
       "emptyDescription": "Actions taken in this organization appear here.",
       "truncated": "Showing the most recent events.",
@@ -3709,7 +3709,7 @@
     },
     "billing": {
       "title": "Billing",
-      "permissionDenied": "Only an organization owner, admin or billing manager can see its billing.",
+      "permissionDenied": "Only an organization owner, admin or billing manager can see its billing. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Subscription",
       "state": "State",
       "stateNone": "No subscription",
@@ -3886,7 +3886,7 @@
       "emptyDescription": "Use Older hour to see earlier requests.",
       "emptyBoundDescription": "This is as far back as request logs go.",
       "loadError": "Couldn't load request logs.",
-      "permissionDenied": "Only an organization owner, admin or billing manager can read its request logs.",
+      "permissionDenied": "Only an organization owner, admin or billing manager can read its request logs. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} in · {{output}} out",
       "byok": "BYOK"
     },

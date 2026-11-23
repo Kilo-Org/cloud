@@ -400,7 +400,7 @@
       "title": "Clés de fournisseur",
       "rowSubtitle": "Utiliser votre propre facturation fournisseur",
       "orgDescription": "Ces clés sont partagées avec tous les membres de l'organisation et facturées sur ses comptes fournisseur.",
-      "viewOnly": "Seul un propriétaire, un administrateur ou un gestionnaire de facturation de l'organisation peut modifier ses clés.",
+      "viewOnly": "Seul un propriétaire, un administrateur ou un responsable de la facturation de l'organisation peut modifier ses clés.",
       "description": "Les requêtes effectuées avec ces clés sont facturées sur votre compte fournisseur au lieu de votre solde Kilo.",
       "managedByPlan": "Gérée par votre forfait de code",
       "enableKey": "Activer la clé {{provider}}",
@@ -3464,7 +3464,7 @@
   "organization": {
     "auditLog": {
       "title": "Journal d'audit",
-      "permissionDenied": "Seuls un propriétaire, un administrateur ou un responsable de la facturation d'une organisation sous formule Enterprise peuvent consulter son journal d'audit.",
+      "permissionDenied": "Seuls un propriétaire, un administrateur ou un responsable de la facturation d'une organisation sous formule Enterprise peuvent consulter son journal d'audit. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Aucun événement d'audit",
       "emptyDescription": "Les actions effectuées dans cette organisation s'affichent ici.",
       "truncated": "Affichage des événements les plus récents.",
@@ -3659,7 +3659,7 @@
     },
     "billing": {
       "title": "Facturation",
-      "permissionDenied": "Seul un propriétaire, un administrateur ou un responsable de la facturation de l'organisation peut consulter sa facturation.",
+      "permissionDenied": "Seul un propriétaire, un administrateur ou un responsable de la facturation de l'organisation peut consulter sa facturation. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Abonnement",
       "state": "Statut",
       "stateNone": "Aucun abonnement",
@@ -3848,7 +3848,7 @@
       "emptyDescription": "Utilisez Heure précédente pour voir les requêtes antérieures.",
       "emptyBoundDescription": "L'historique des requêtes ne remonte pas plus loin.",
       "loadError": "Impossible de charger les journaux des requêtes.",
-      "permissionDenied": "Seuls un propriétaire, un administrateur ou un responsable de la facturation d'une organisation peuvent consulter ses journaux des requêtes.",
+      "permissionDenied": "Seuls un propriétaire, un administrateur ou un responsable de la facturation d'une organisation peuvent consulter ses journaux des requêtes. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} en entrée · {{output}} en sortie",
       "byok": "BYOK"
     },

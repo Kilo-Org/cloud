@@ -3472,7 +3472,7 @@
   "organization": {
     "auditLog": {
       "title": "Jurnal de audit",
-      "permissionDenied": "Jurnalul de audit poate fi citit doar de proprietarul, un administrator sau un manager de facturare al organizației, pe planul Enterprise.",
+      "permissionDenied": "Jurnalul de audit poate fi citit doar de proprietarul, un administrator sau un manager de facturare al organizației, pe planul Enterprise. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Niciun eveniment de audit",
       "emptyDescription": "Acțiunile efectuate în această organizație apar aici.",
       "truncated": "Se afișează cele mai recente evenimente.",
@@ -3667,7 +3667,7 @@
     },
     "billing": {
       "title": "Facturare",
-      "permissionDenied": "Doar proprietarii, administratorii sau managerii de facturare ai organizației pot vedea facturarea acesteia.",
+      "permissionDenied": "Doar proprietarii, administratorii sau managerii de facturare ai organizației pot vedea facturarea acesteia. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Abonament",
       "state": "Stare",
       "stateNone": "Fără abonament",
@@ -3844,7 +3844,7 @@
       "emptyDescription": "Apăsați „Ora anterioară” pentru a vedea cererile anterioare.",
       "emptyBoundDescription": "Jurnalele de cereri nu sunt disponibile mai în urmă de atât.",
       "loadError": "Jurnalele de cereri nu au putut fi încărcate.",
-      "permissionDenied": "Jurnalele de cereri pot fi citite doar de proprietarul, un administrator sau un manager de facturare al organizației.",
+      "permissionDenied": "Jurnalele de cereri pot fi citite doar de proprietarul, un administrator sau un manager de facturare al organizației. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} intrare · {{output}} ieșire",
       "byok": "BYOK"
     },

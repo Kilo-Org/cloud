@@ -399,7 +399,7 @@
       "title": "Palveluntarjoajien avaimet",
       "rowSubtitle": "Käytä palveluntarjoajasi omaa laskutusta",
       "orgDescription": "Nämä avaimet jaetaan kaikille organisaation jäsenille, ja käyttö laskutetaan organisaation palveluntarjoajatileiltä.",
-      "viewOnly": "Vain organisaation omistaja, ylläpitäjä tai laskutuksen hallinnoija voi muuttaa sen avaimia.",
+      "viewOnly": "Vain organisaation omistaja, ylläpitäjä tai laskutusvastaava voi muuttaa sen avaimia.",
       "description": "Näiden avainten kautta tehdyt pyynnöt laskutetaan palveluntarjoajasi tililtä Kilo-saldon sijaan.",
       "managedByPlan": "Hallitaan koodaustilauksesi kautta",
       "enableKey": "Ota palvelun {{provider}} avain käyttöön",
@@ -3409,7 +3409,7 @@
   "organization": {
     "auditLog": {
       "title": "Tarkastusloki",
-      "permissionDenied": "Vain Enterprise-paketin organisaation omistaja, ylläpitäjä tai laskutusvastaava voi lukea organisaation tarkastuslokia.",
+      "permissionDenied": "Vain Enterprise-paketin organisaation omistaja, ylläpitäjä tai laskutusvastaava voi lukea organisaation tarkastuslokia. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Ei tarkastustapahtumia",
       "emptyDescription": "Tässä organisaatiossa tehdyt toiminnot näkyvät täällä.",
       "truncated": "Näytetään viimeisimmät tapahtumat.",
@@ -3599,7 +3599,7 @@
     },
     "billing": {
       "title": "Laskutus",
-      "permissionDenied": "Vain organisaation omistaja, ylläpitäjä tai laskutusvastaava voi nähdä organisaation laskutuksen.",
+      "permissionDenied": "Vain organisaation omistaja, ylläpitäjä tai laskutusvastaava voi nähdä organisaation laskutuksen. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Tilaus",
       "state": "Tila",
       "stateNone": "Ei tilausta",
@@ -3776,7 +3776,7 @@
       "emptyDescription": "Näytä aiemmat pyynnöt painamalla Edellinen tunti.",
       "emptyBoundDescription": "Pyyntölokit eivät ulotu tätä pidemmälle taaksepäin.",
       "loadError": "Pyyntölokien lataaminen epäonnistui.",
-      "permissionDenied": "Vain organisaation omistaja, ylläpitäjä tai laskutusvastaava voi lukea organisaation pyyntölokeja.",
+      "permissionDenied": "Vain organisaation omistaja, ylläpitäjä tai laskutusvastaava voi lukea organisaation pyyntölokeja. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} sisään · {{output}} ulos",
       "byok": "BYOK"
     },

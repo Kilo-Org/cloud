@@ -3409,7 +3409,7 @@
   "organization": {
     "auditLog": {
       "title": "Ikuskaritza-erregistroa",
-      "permissionDenied": "Enterprise planeko erakunde baten jabeak, administratzaileak edo fakturazio-kudeatzaileak soilik irakur dezake haren ikuskaritza-erregistroa.",
+      "permissionDenied": "Enterprise planeko erakunde baten jabeak, administratzaileak edo fakturazio-kudeatzaileak soilik irakur dezake haren ikuskaritza-erregistroa. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Ez dago ikuskaritza-gertaerarik",
       "emptyDescription": "Erakunde honetan egindako ekintzak hemen agertzen dira.",
       "truncated": "Gertaera berrienak erakusten dira.",
@@ -3599,7 +3599,7 @@
     },
     "billing": {
       "title": "Fakturazioa",
-      "permissionDenied": "Erakundearen jabeak, administratzaileak edo fakturazio-kudeatzaileak soilik ikus dezake haren fakturazioa.",
+      "permissionDenied": "Erakundearen jabeak, administratzaileak edo fakturazio-kudeatzaileak soilik ikus dezake haren fakturazioa. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Harpidetza",
       "state": "Egoera",
       "stateNone": "Harpidetzarik ez",
@@ -3776,7 +3776,7 @@
       "emptyDescription": "Erabili «Aurreko ordua» aurreko eskaerak ikusteko.",
       "emptyBoundDescription": "Hemendik atzera ez dago eskaera-erregistrorik.",
       "loadError": "Ezin izan dira eskaeren erregistroak kargatu.",
-      "permissionDenied": "Erakunde baten jabeak, administratzaileak edo fakturazio-kudeatzaileak soilik irakur ditzake haren eskaeren erregistroak.",
+      "permissionDenied": "Erakunde baten jabeak, administratzaileak edo fakturazio-kudeatzaileak soilik irakur ditzake haren eskaeren erregistroak. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} sarrera · {{output}} irteera",
       "byok": "BYOK"
     },

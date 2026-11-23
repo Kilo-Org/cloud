@@ -3653,7 +3653,7 @@
   "organization": {
     "auditLog": {
       "title": "سجل التدقيق",
-      "permissionDenied": "يمكن فقط لمالك المؤسسة أو مسؤولها أو مدير الفوترة فيها، ضمن خطة Enterprise، قراءة سجل التدقيق الخاص بها.",
+      "permissionDenied": "يمكن فقط لمالك المؤسسة أو مسؤولها أو مدير الفوترة فيها، ضمن خطة Enterprise، قراءة سجل التدقيق الخاص بها. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "لا توجد أحداث تدقيق",
       "emptyDescription": "تظهر هنا الإجراءات المتخذة في هذه المؤسسة.",
       "truncated": "يتم عرض أحدث الأحداث.",
@@ -3863,7 +3863,7 @@
     },
     "billing": {
       "title": "الفوترة",
-      "permissionDenied": "لا يمكن الاطلاع على فوترة المؤسسة إلا لمالكها أو مسؤولها أو مدير الفوترة فيها.",
+      "permissionDenied": "لا يمكن الاطلاع على فوترة المؤسسة إلا لمالكها أو مسؤولها أو مدير الفوترة فيها. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "الاشتراك",
       "state": "الحالة",
       "stateNone": "لا يوجد اشتراك",
@@ -4052,7 +4052,7 @@
       "emptyDescription": "استخدم «الساعة الأقدم» لعرض الطلبات السابقة.",
       "emptyBoundDescription": "هذا أقدم ما تصل إليه سجلات الطلبات.",
       "loadError": "تعذّر تحميل سجلات الطلبات.",
-      "permissionDenied": "يمكن فقط لمالك المؤسسة أو مسؤولها أو مدير الفوترة فيها قراءة سجلات الطلبات الخاصة بها.",
+      "permissionDenied": "يمكن فقط لمالك المؤسسة أو مسؤولها أو مدير الفوترة فيها قراءة سجلات الطلبات الخاصة بها. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} إدخال · {{output}} إخراج",
       "byok": "BYOK"
     },

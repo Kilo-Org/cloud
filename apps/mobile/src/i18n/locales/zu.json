@@ -3409,7 +3409,7 @@
   "organization": {
     "auditLog": {
       "title": "Irekhodi lokucwaninga",
-      "permissionDenied": "Ngumnikazi wenhlangano, umlawuli noma umphathi wokukhokha ohlelweni lwe-Enterprise kuphela ongafunda irekhodi layo lokucwaninga.",
+      "permissionDenied": "Ngumnikazi wenhlangano, umlawuli noma umphathi wokukhokha ohlelweni lwe-Enterprise kuphela ongafunda irekhodi layo lokucwaninga. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Azikho izehlakalo zokucwaninga",
       "emptyDescription": "Izenzo ezenziwa kule nhlangano zivela lapha.",
       "truncated": "Kuboniswa izehlakalo zakamuva kakhulu.",
@@ -3599,7 +3599,7 @@
     },
     "billing": {
       "title": "Ukukhokha",
-      "permissionDenied": "Ngumnikazi wenhlangano, umlawuli noma umphathi wokukhokha kuphela ongabona ukukhokha kwayo.",
+      "permissionDenied": "Ngumnikazi wenhlangano, umlawuli noma umphathi wokukhokha kuphela ongabona ukukhokha kwayo. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Ukubhalisela",
       "state": "Isimo",
       "stateNone": "Akukho ukubhalisela",
@@ -3776,7 +3776,7 @@
       "emptyDescription": "Sebenzisa i-Ihora elidlule ukubona izicelo ezangaphambili.",
       "emptyBoundDescription": "Amarekhodi ezicelo awahambi emuva ukwedlula lapha.",
       "loadError": "Akukwazekanga ukulayisha amarekhodi ezicelo.",
-      "permissionDenied": "Ngumnikazi wenhlangano, umlawuli noma umphathi wokukhokha kuphela ongafunda amarekhodi ayo ezicelo.",
+      "permissionDenied": "Ngumnikazi wenhlangano, umlawuli noma umphathi wokukhokha kuphela ongafunda amarekhodi ayo ezicelo. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} okungenayo · {{output}} okuphumayo",
       "byok": "BYOK"
     },

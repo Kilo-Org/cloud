@@ -3409,7 +3409,7 @@
   "organization": {
     "auditLog": {
       "title": "විගණන ලොගය",
-      "permissionDenied": "Enterprise සැලැස්මේ ඇති සංවිධානයක විගණන ලොගය කියවිය හැක්කේ එහි හිමිකරුට, පරිපාලකට හෝ බිල්පත් කළමනාකරුට පමණි.",
+      "permissionDenied": "Enterprise සැලැස්මේ ඇති සංවිධානයක විගණන ලොගය කියවිය හැක්කේ එහි හිමිකරුට, පරිපාලකට හෝ බිල්පත් කළමනාකරුට පමණි. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "විගණන සිදුවීම් නැත",
       "emptyDescription": "මෙම සංවිධානයේ සිදු කළ ක්‍රියා මෙහි දිස් වේ.",
       "truncated": "නවතම සිදුවීම් පෙන්වයි.",
@@ -3599,7 +3599,7 @@
     },
     "billing": {
       "title": "බිල්පත්",
-      "permissionDenied": "සංවිධානයේ බිල්පත් තොරතුරු බැලිය හැක්කේ හිමිකරුට, පරිපාලකට හෝ බිල්පත් කළමනාකරුට පමණි.",
+      "permissionDenied": "සංවිධානයේ බිල්පත් තොරතුරු බැලිය හැක්කේ හිමිකරුට, පරිපාලකට හෝ බිල්පත් කළමනාකරුට පමණි. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "දායකත්වය",
       "state": "තත්ත්වය",
       "stateNone": "දායකත්වයක් නැත",
@@ -3776,7 +3776,7 @@
       "emptyDescription": "පෙර ඉල්ලීම් බැලීමට පෙර පැය භාවිතා කරන්න.",
       "emptyBoundDescription": "ඉල්ලීම් ලොග් ලබා ගත හැක්කේ මෙතැන් දක්වා පමණි.",
       "loadError": "ඉල්ලීම් ලොග පූරණය කළ නොහැකි විය.",
-      "permissionDenied": "සංවිධානයක ඉල්ලීම් ලොග කියවිය හැක්කේ එහි හිමිකරුට, පරිපාලකට හෝ බිල්පත් කළමනාකරුට පමණි.",
+      "permissionDenied": "සංවිධානයක ඉල්ලීම් ලොග කියවිය හැක්කේ එහි හිමිකරුට, පරිපාලකට හෝ බිල්පත් කළමනාකරුට පමණි. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "ආදාන {{input}} · ප්‍රතිදාන {{output}}",
       "byok": "BYOK"
     },

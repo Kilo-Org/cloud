@@ -3409,7 +3409,7 @@
   "organization": {
     "auditLog": {
       "title": "Regjistri i auditimit",
-      "permissionDenied": "Vetëm pronari, administratori ose menaxheri i faturimit i një organizate me planin Enterprise mund ta lexojë regjistrin e saj të auditimit.",
+      "permissionDenied": "Vetëm pronari, administratori ose menaxheri i faturimit i një organizate me planin Enterprise mund ta lexojë regjistrin e saj të auditimit. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Nuk ka ngjarje auditimi",
       "emptyDescription": "Veprimet e kryera në këtë organizatë shfaqen këtu.",
       "truncated": "Po shfaqen ngjarjet më të fundit.",
@@ -3599,7 +3599,7 @@
     },
     "billing": {
       "title": "Faturimi",
-      "permissionDenied": "Faturimin e organizatës mund ta shohë vetëm pronari, administratori ose menaxheri i faturimit.",
+      "permissionDenied": "Faturimin e organizatës mund ta shohë vetëm pronari, administratori ose menaxheri i faturimit. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Abonimi",
       "state": "Statusi",
       "stateNone": "Pa abonim",
@@ -3776,7 +3776,7 @@
       "emptyDescription": "Përdorni Ora e mëparshme për të parë kërkesat e mëparshme.",
       "emptyBoundDescription": "Regjistrat e kërkesave nuk shkojnë më mbrapa se kaq.",
       "loadError": "Regjistrat e kërkesave nuk u ngarkuan.",
-      "permissionDenied": "Vetëm pronari, administratori ose menaxheri i faturimit i një organizate mund t'i lexojë regjistrat e saj të kërkesave.",
+      "permissionDenied": "Vetëm pronari, administratori ose menaxheri i faturimit i një organizate mund t'i lexojë regjistrat e saj të kërkesave. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} hyrëse · {{output}} dalëse",
       "byok": "BYOK"
     },

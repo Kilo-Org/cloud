@@ -3661,7 +3661,7 @@
   "organization": {
     "auditLog": {
       "title": "Log archwilio",
-      "permissionDenied": "Dim ond perchennog, gweinyddwr neu reolwr bilio sefydliad ar y cynllun Enterprise all ddarllen ei log archwilio.",
+      "permissionDenied": "Dim ond perchennog, gweinyddwr neu reolwr bilio sefydliad ar y cynllun Enterprise all ddarllen ei log archwilio. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Dim digwyddiadau archwilio",
       "emptyDescription": "Mae camau a gymerir yn y sefydliad hwn yn ymddangos yma.",
       "truncated": "Yn dangos y digwyddiadau diweddaraf.",
@@ -3871,7 +3871,7 @@
     },
     "billing": {
       "title": "Bilio",
-      "permissionDenied": "Dim ond perchennog, gweinyddwr neu reolwr bilio'r sefydliad sy'n gallu gweld ei filio.",
+      "permissionDenied": "Dim ond perchennog, gweinyddwr neu reolwr bilio'r sefydliad sy'n gallu gweld ei filio. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Tanysgrifiad",
       "state": "Statws",
       "stateNone": "Dim tanysgrifiad",
@@ -4048,7 +4048,7 @@
       "emptyDescription": "Defnyddiwch Awr gynharach i weld ceisiadau cynharach.",
       "emptyBoundDescription": "Dyma mor bell yn ôl ag y mae logiau ceisiadau'n mynd.",
       "loadError": "Methu llwytho logiau ceisiadau.",
-      "permissionDenied": "Dim ond perchennog, gweinyddwr neu reolwr bilio sefydliad all ddarllen ei logiau ceisiadau.",
+      "permissionDenied": "Dim ond perchennog, gweinyddwr neu reolwr bilio sefydliad all ddarllen ei logiau ceisiadau. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} i mewn · {{output}} allan",
       "byok": "BYOK"
     },

@@ -3409,7 +3409,7 @@
   "organization": {
     "auditLog": {
       "title": "Àkọsílẹ̀ àyẹ̀wò",
-      "permissionDenied": "Olùní àjọ, alábòójútó tàbí olùṣàkóso ìsanwó nínú ètò Enterprise nìkan ló lè ka àkọsílẹ̀ àyẹ̀wò rẹ̀.",
+      "permissionDenied": "Olùní àjọ, alábòójútó tàbí olùṣàkóso ìsanwó nínú ètò Enterprise nìkan ló lè ka àkọsílẹ̀ àyẹ̀wò rẹ̀. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Kò sí ìṣẹ̀lẹ̀ àyẹ̀wò",
       "emptyDescription": "Àwọn ìgbésẹ̀ tí a gbé nínú àjọ yìí yóò hàn níbí.",
       "truncated": "À ń fi àwọn ìṣẹ̀lẹ̀ tuntun jùlọ hàn.",
@@ -3599,7 +3599,7 @@
     },
     "billing": {
       "title": "Ìsanwó",
-      "permissionDenied": "Ẹni tó ni àjọ, alábòójútó tàbí olùṣàkóso ìsanwó nìkan ló lè rí ìsanwó àjọ náà.",
+      "permissionDenied": "Ẹni tó ni àjọ, alábòójútó tàbí olùṣàkóso ìsanwó nìkan ló lè rí ìsanwó àjọ náà. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Ìforúkọsílẹ̀",
       "state": "Ipò",
       "stateNone": "Kò sí ìforúkọsílẹ̀",
@@ -3776,7 +3776,7 @@
       "emptyDescription": "Lo Wákàtí tó ṣáájú láti wo àwọn ìbéèrè tó ṣáájú.",
       "emptyBoundDescription": "Àkọsílẹ̀ àwọn ìbéèrè kò lọ sẹ́yìn ju ibí lọ.",
       "loadError": "A kò lè gbé àwọn àkọsílẹ̀ ìbéèrè wọlé.",
-      "permissionDenied": "Olùní àjọ, alábòójútó tàbí olùṣàkóso ìsanwó nìkan ló lè ka àkọsílẹ̀ ìbéèrè rẹ̀.",
+      "permissionDenied": "Olùní àjọ, alábòójútó tàbí olùṣàkóso ìsanwó nìkan ló lè ka àkọsílẹ̀ ìbéèrè rẹ̀. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} wọlé · {{output}} jáde",
       "byok": "BYOK"
     },

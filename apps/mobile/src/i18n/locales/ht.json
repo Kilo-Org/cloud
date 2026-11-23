@@ -399,7 +399,7 @@
       "title": "Kle founisè",
       "rowSubtitle": "Sèvi ak pwòp faktirasyon founisè w",
       "orgDescription": "Kle sa yo pataje ak tout moun nan òganizasyon an, epi yo faktire sou kont founisè òganizasyon an.",
-      "viewOnly": "Se sèlman yon pwopriyetè, yon administratè oswa yon jesyonè faktirasyon òganizasyon an ki ka chanje kle li yo.",
+      "viewOnly": "Se sèlman yon pwopriyetè, yon administratè oswa yon responsab faktirasyon òganizasyon an ki ka chanje kle li yo.",
       "description": "Demann ki pase nan kle sa yo ap faktire sou kont founisè w la olye de balans Kilo w la.",
       "managedByPlan": "Plan kodaj ou a jere l",
       "enableKey": "Aktive kle {{provider}} an",
@@ -3409,7 +3409,7 @@
   "organization": {
     "auditLog": {
       "title": "Jounal odit",
-      "permissionDenied": "Se sèlman yon pwopriyetè, yon administratè oswa yon jesyonè faktirasyon nan yon òganizasyon ki sou plan Enterprise la ki ka li jounal odit li.",
+      "permissionDenied": "Se sèlman yon pwopriyetè, yon administratè oswa yon responsab faktirasyon nan yon òganizasyon ki sou plan Enterprise la ki ka li jounal odit li. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Pa gen evènman odit",
       "emptyDescription": "Aksyon yo fè nan òganizasyon sa a ap parèt la a.",
       "truncated": "N ap montre evènman ki pi resan yo.",
@@ -3599,7 +3599,7 @@
     },
     "billing": {
       "title": "Faktirasyon",
-      "permissionDenied": "Se sèlman yon pwopriyetè, yon administratè oswa yon jesyonè faktirasyon òganizasyon an ki ka wè faktirasyon li.",
+      "permissionDenied": "Se sèlman yon pwopriyetè, yon administratè oswa yon responsab faktirasyon òganizasyon an ki ka wè faktirasyon li. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Abònman",
       "state": "Eta",
       "stateNone": "Pa gen abònman",
@@ -3776,7 +3776,7 @@
       "emptyDescription": "Sèvi ak Èdtan anvan pou wè demann anvan yo.",
       "emptyBoundDescription": "Jounal demann yo pa ale pi lwen pase sa a.",
       "loadError": "Nou pa t ka chaje jounal demann yo.",
-      "permissionDenied": "Se sèlman yon pwopriyetè, yon administratè oswa yon jesyonè faktirasyon nan òganizasyon an ki ka li jounal demann li.",
+      "permissionDenied": "Se sèlman yon pwopriyetè, yon administratè oswa yon responsab faktirasyon nan òganizasyon an ki ka li jounal demann li. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} antre · {{output}} soti",
       "byok": "BYOK"
     },

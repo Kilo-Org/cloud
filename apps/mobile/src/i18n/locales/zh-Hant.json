@@ -3401,7 +3401,7 @@
   "organization": {
     "auditLog": {
       "title": "稽核記錄",
-      "permissionDenied": "只有 Enterprise 套餐組織的擁有者、管理員或帳務管理員可以查看其稽核記錄。",
+      "permissionDenied": "只有 Enterprise 套餐組織的擁有者、管理員或帳單管理員可以查看其稽核記錄。 $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "沒有稽核事件",
       "emptyDescription": "在此組織中執行的操作會顯示在這裡。",
       "truncated": "僅顯示最近的事件。",
@@ -3591,7 +3591,7 @@
     },
     "billing": {
       "title": "帳單",
-      "permissionDenied": "只有組織擁有者、管理員或帳單管理員可以查看組織帳單。",
+      "permissionDenied": "只有組織擁有者、管理員或帳單管理員可以查看組織帳單。 $t(organization.boundary.accessDeniedDescription)",
       "subscription": "訂閱",
       "state": "狀態",
       "stateNone": "無訂閱",
@@ -3780,7 +3780,7 @@
       "emptyDescription": "使用「較早一小時」查看較早的請求。",
       "emptyBoundDescription": "請求記錄最早只到這裡。",
       "loadError": "無法載入請求記錄。",
-      "permissionDenied": "只有組織的擁有者、管理員或帳務管理員可以查看其請求記錄。",
+      "permissionDenied": "只有組織的擁有者、管理員或帳單管理員可以查看其請求記錄。 $t(organization.boundary.accessDeniedDescription)",
       "tokens": "輸入 {{input}} · 輸出 {{output}}",
       "byok": "BYOK"
     },

@@ -3472,7 +3472,7 @@
   "organization": {
     "auditLog": {
       "title": "Registre d'auditoria",
-      "permissionDenied": "Només un propietari, administrador o gestor de facturació d'una organització amb el pla Enterprise pot consultar-ne el registre d'auditoria.",
+      "permissionDenied": "Només un propietari, administrador o gestor de facturació d'una organització amb el pla Enterprise pot consultar-ne el registre d'auditoria. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "No hi ha esdeveniments d'auditoria",
       "emptyDescription": "Aquí apareixen les accions fetes en aquesta organització.",
       "truncated": "Es mostren els esdeveniments més recents.",
@@ -3667,7 +3667,7 @@
     },
     "billing": {
       "title": "Facturació",
-      "permissionDenied": "Només un propietari, administrador o gestor de facturació de l'organització en pot veure la facturació.",
+      "permissionDenied": "Només un propietari, administrador o gestor de facturació de l'organització en pot veure la facturació. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Subscripció",
       "state": "Estat",
       "stateNone": "Sense subscripció",
@@ -3844,7 +3844,7 @@
       "emptyDescription": "Utilitza «Hora anterior» per veure les sol·licituds anteriors.",
       "emptyBoundDescription": "Els registres de sol·licituds no arriben més enrere.",
       "loadError": "No s'han pogut carregar els registres de sol·licituds.",
-      "permissionDenied": "Només un propietari, administrador o gestor de facturació d'una organització pot consultar-ne els registres de sol·licituds.",
+      "permissionDenied": "Només un propietari, administrador o gestor de facturació d'una organització pot consultar-ne els registres de sol·licituds. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} d'entrada · {{output}} de sortida",
       "byok": "BYOK"
     },

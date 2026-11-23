@@ -3409,7 +3409,7 @@
   "organization": {
     "auditLog": {
       "title": "অডিট লগ",
-      "permissionDenied": "শুধুমাত্র Enterprise প্ল্যানে থাকা সংস্থার মালিক, অ্যাডমিন বা বিলিং ম্যানেজার এর অডিট লগ দেখতে পারেন।",
+      "permissionDenied": "শুধুমাত্র Enterprise প্ল্যানে থাকা সংস্থার মালিক, অ্যাডমিন বা বিলিং ম্যানেজার এর অডিট লগ দেখতে পারেন। $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "কোনো অডিট ইভেন্ট নেই",
       "emptyDescription": "এই সংস্থায় নেওয়া পদক্ষেপগুলো এখানে দেখা যাবে।",
       "truncated": "সাম্প্রতিকতম ইভেন্টগুলো দেখানো হচ্ছে।",
@@ -3599,7 +3599,7 @@
     },
     "billing": {
       "title": "বিলিং",
-      "permissionDenied": "শুধুমাত্র সংস্থার মালিক, অ্যাডমিন বা বিলিং ম্যানেজার এর বিলিং দেখতে পারেন।",
+      "permissionDenied": "শুধুমাত্র সংস্থার মালিক, অ্যাডমিন বা বিলিং ম্যানেজার এর বিলিং দেখতে পারেন। $t(organization.boundary.accessDeniedDescription)",
       "subscription": "সাবস্ক্রিপশন",
       "state": "অবস্থা",
       "stateNone": "কোনো সাবস্ক্রিপশন নেই",
@@ -3776,7 +3776,7 @@
       "emptyDescription": "পূর্ববর্তী রিকোয়েস্ট দেখতে আগের ঘণ্টা ব্যবহার করুন।",
       "emptyBoundDescription": "এর আগের কোনো রিকোয়েস্ট লগ উপলব্ধ নেই।",
       "loadError": "রিকোয়েস্ট লগ লোড করা যায়নি।",
-      "permissionDenied": "শুধুমাত্র সংস্থার মালিক, অ্যাডমিন বা বিলিং ম্যানেজার এর রিকোয়েস্ট লগ দেখতে পারেন।",
+      "permissionDenied": "শুধুমাত্র সংস্থার মালিক, অ্যাডমিন বা বিলিং ম্যানেজার এর রিকোয়েস্ট লগ দেখতে পারেন। $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} ইনপুট · {{output}} আউটপুট",
       "byok": "BYOK"
     },

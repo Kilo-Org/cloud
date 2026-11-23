@@ -3409,7 +3409,7 @@
   "organization": {
     "auditLog": {
       "title": "Ouditlog",
-      "permissionDenied": "Slegs 'n organisasie-eienaar, -administrateur of -faktuurbestuurder op die Enterprise-plan kan die organisasie se ouditlog lees.",
+      "permissionDenied": "Slegs 'n organisasie-eienaar, -administrateur of -faktureringsbestuurder op die Enterprise-plan kan die organisasie se ouditlog lees. $t(organization.boundary.accessDeniedDescription)",
       "emptyTitle": "Geen ouditgebeure nie",
       "emptyDescription": "Aksies wat in hierdie organisasie geneem word, verskyn hier.",
       "truncated": "Die mees onlangse gebeure word gewys.",
@@ -3599,7 +3599,7 @@
     },
     "billing": {
       "title": "Fakturering",
-      "permissionDenied": "Slegs 'n eienaar, administrateur of faktureringsbestuurder van die organisasie kan die organisasie se fakturering sien.",
+      "permissionDenied": "Slegs 'n eienaar, administrateur of faktureringsbestuurder van die organisasie kan die organisasie se fakturering sien. $t(organization.boundary.accessDeniedDescription)",
       "subscription": "Intekening",
       "state": "Status",
       "stateNone": "Geen intekening",
@@ -3776,7 +3776,7 @@
       "emptyDescription": "Gebruik Vroeër uur om vroeëre versoeke te sien.",
       "emptyBoundDescription": "Versoeklogboeke strek nie verder terug nie.",
       "loadError": "Kon nie versoeklogs laai nie.",
-      "permissionDenied": "Slegs 'n organisasie-eienaar, -administrateur of -faktuurbestuurder kan die organisasie se versoeklogs lees.",
+      "permissionDenied": "Slegs 'n organisasie-eienaar, -administrateur of -faktureringsbestuurder kan die organisasie se versoeklogs lees. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} in · {{output}} uit",
       "byok": "BYOK"
     },

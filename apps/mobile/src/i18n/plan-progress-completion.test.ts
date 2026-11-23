@@ -11,10 +11,11 @@ import { formatNumber } from '@/lib/format';
  * numeral one.
  *
  * Each catalog below moved its completed clause to a form with no number
- * agreement — the catalog's invariant completion word, or a verbless nominal
- * phrase — so the row reads correctly at every done count. The test pins the
- * whole value at each state a reader meets inside a three-step plan (no step,
- * one, two and all three finished) and on a single-step plan.
+ * agreement — the catalog's invariant completion word, a verbless nominal phrase,
+ * or counts followed by one fixed plural phrase — so the row reads correctly at
+ * every done count. The test pins the whole value at each state a reader meets
+ * inside a three-step plan (no step, one, two and all three finished) and on a
+ * single-step plan.
  */
 
 type LocaleCase = {
@@ -49,8 +50,8 @@ const locales: readonly LocaleCase[] = [
   },
   {
     tag: 'om',
-    render: (done, total) => `Karoora: tarkaanfiiwwan ${total} keessaa ${done} xumuraman`,
-    renderOne: (done, total) => `Karoora: tarkaanfii ${total} keessaa ${done} xumurame`,
+    render: (done, total) => `Karoora: ${done}/${total} tarkaanfiiwwan xumuraman`,
+    renderOne: (done, total) => `Karoora: ${done}/${total} tarkaanfii xumurame`,
   },
   { tag: 'sw', render: (done, total) => `Mpango: hatua zilizokamilika ${done} kati ya ${total}` },
   { tag: 'cy', render: (done, total) => `Cynllun: ${done} o ${total} cam wedi cwblhau` },

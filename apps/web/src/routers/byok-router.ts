@@ -31,12 +31,16 @@ import {
   ListBYOKKeysInputSchema,
   ReorderBYOKKeysInputSchema,
   TestBYOKKeyInputSchema,
+  CredentialMethodInputSchema,
+  CredentialMethodResponseSchema,
   PreviewBYOKRoutingInputSchema,
   BYOKApiKeyResponseSchema,
   BYOKKeyTestResultSchema,
   type BYOKApiKeyResponse,
   type BYOKKeyTestResult,
+  type CredentialMethodResponse,
 } from '@/lib/byok/types';
+import { storedBedrockMethod } from '@/lib/byok/credential-method';
 import { isUniqueViolation } from '@/lib/db-errors';
 import { sanitizeErrorForTelemetry } from '@/lib/sanitize-error-for-telemetry';
 import {
@@ -470,6 +474,60 @@ export const byokRouter = createTRPCRouter({
       return Promise.all(
         inRouteOrder(keys).map(key => toBYOKApiKeyResponse(key, organizationRole))
       );
+    }),
+
+  /**
+   * The authentication method one stored credential was saved with, so a
+   * replace form can ask for the same shape. Never returns any part of the
+   * credential.
+   */
+  credentialMethod: baseProcedure
+    .input(CredentialMethodInputSchema)
+    .output(CredentialMethodResponseSchema)
+    .query(async ({ input, ctx }): Promise<CredentialMethodResponse> => {
+      const { organizationId, id } = input;
+
+      if (organizationId) {
+        await ensureOrganizationAccess(ctx, organizationId);
+      }
+
+      const [existingKey] = await db
+        .select({
+          id: byok_api_keys.id,
+          organization_id: byok_api_keys.organization_id,
+          kilo_user_id: byok_api_keys.kilo_user_id,
+          provider_id: byok_api_keys.provider_id,
+          encrypted_api_key_envelope: byok_api_keys.encrypted_api_key_envelope,
+        })
+        .from(byok_api_keys)
+        .where(eq(byok_api_keys.id, id));
+
+      if (!existingKey) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'BYOK key not found' });
+      }
+
+      if (organizationId) {
+        if (existingKey.organization_id !== organizationId) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'BYOK key not found' });
+        }
+      } else {
+        if (existingKey.kilo_user_id !== ctx.user.id) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'BYOK key not found' });
+        }
+      }
+
+      try {
+        const decryptedKey = await decryptByokRow(existingKey);
+        return {
+          method: storedBedrockMethod(existingKey.provider_id, decryptedKey.decryptedAPIKey),
+        };
+      } catch (e) {
+        logByokWarning('BYOK key method read could not decrypt the stored key', {
+          providerId: existingKey.provider_id,
+          message: e instanceof Error ? e.message : undefined,
+        });
+        return { method: null };
+      }
     }),
 
   /**

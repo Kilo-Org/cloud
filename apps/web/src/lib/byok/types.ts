@@ -74,6 +74,18 @@ export const TestBYOKKeyInputSchema = OptionalOrganizationIdSchema.extend({
   id: BYOKKeyIdSchema,
 });
 
+/** Reads back the authentication method one stored credential was saved with. */
+export const CredentialMethodInputSchema = OptionalOrganizationIdSchema.extend({
+  id: BYOKKeyIdSchema,
+});
+
+/** The method a stored credential uses, or null when it is unreadable or single-key. */
+export const CredentialMethodResponseSchema = z.object({
+  method: z.enum(['apiKey', 'accessKeys']).nullable(),
+});
+
+export type CredentialMethodResponse = z.infer<typeof CredentialMethodResponseSchema>;
+
 /**
  * The outcome of testing a stored key. `outcome` is what both current clients
  * render, so a test failure is a value rather than a message the server words

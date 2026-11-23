@@ -1419,6 +1419,143 @@ describe('BYOK Router', () => {
     });
   });
 
+  describe('credentialMethod', () => {
+    async function insertKey(values: {
+      provider_id: string;
+      envelope: BYOKApiKeyEnvelope | null;
+      kilo_user_id?: string;
+      organization_id?: string;
+    }): Promise<string> {
+      const [row] = await db
+        .insert(byok_api_keys)
+        .values({
+          provider_id: values.provider_id,
+          encrypted_api_key_envelope: values.envelope,
+          kilo_user_id: values.kilo_user_id ?? null,
+          organization_id: values.organization_id ?? null,
+          created_by: values.kilo_user_id ?? ownerUser.id,
+        })
+        .returning({ id: byok_api_keys.id });
+      return row.id;
+    }
+
+    test('answers access keys for a stored IAM key pair', async () => {
+      const id = await insertKey({
+        provider_id: 'bedrock',
+        envelope: testByokEnvelope(JSON.stringify(BEDROCK_IAM_CREDENTIALS)),
+        kilo_user_id: ownerUser.id,
+      });
+      const caller = await createCallerForUser(ownerUser.id);
+
+      await expect(caller.byok.credentialMethod({ id })).resolves.toEqual({
+        method: 'accessKeys',
+      });
+    });
+
+    test('answers API key for a stored single API key credential', async () => {
+      const id = await insertKey({
+        provider_id: 'bedrock',
+        envelope: testByokEnvelope(JSON.stringify(BEDROCK_API_KEY_CREDENTIALS)),
+        kilo_user_id: ownerUser.id,
+      });
+      const caller = await createCallerForUser(ownerUser.id);
+
+      await expect(caller.byok.credentialMethod({ id })).resolves.toEqual({ method: 'apiKey' });
+    });
+
+    test('answers null for a provider without a structured credential', async () => {
+      const id = await insertKey({
+        provider_id: 'anthropic',
+        envelope: testByokEnvelope('stored-api-key'),
+        kilo_user_id: ownerUser.id,
+      });
+      const caller = await createCallerForUser(ownerUser.id);
+
+      await expect(caller.byok.credentialMethod({ id })).resolves.toEqual({ method: null });
+    });
+
+    test('answers null without throwing when the stored credential is missing or unreadable', async () => {
+      const missing = await insertKey({
+        provider_id: 'openrouter',
+        envelope: null,
+        kilo_user_id: ownerUser.id,
+      });
+      const stored = testByokEnvelope(JSON.stringify(BEDROCK_IAM_CREDENTIALS));
+      const corrupt = await insertKey({
+        provider_id: 'bedrock',
+        envelope: {
+          ...stored,
+          encrypted_data: { ...stored.encrypted_data, iv: Buffer.alloc(12, 9).toString('base64') },
+        },
+        kilo_user_id: ownerUser.id,
+      });
+      const caller = await createCallerForUser(ownerUser.id);
+
+      await expect(caller.byok.credentialMethod({ id: missing })).resolves.toEqual({
+        method: null,
+      });
+      await expect(caller.byok.credentialMethod({ id: corrupt })).resolves.toEqual({
+        method: null,
+      });
+    });
+
+    test('answers null for a stored Bedrock credential that is not a JSON object', async () => {
+      const id = await insertKey({
+        provider_id: 'bedrock',
+        envelope: testByokEnvelope('not json'),
+        kilo_user_id: ownerUser.id,
+      });
+      const caller = await createCallerForUser(ownerUser.id);
+
+      await expect(caller.byok.credentialMethod({ id })).resolves.toEqual({ method: null });
+    });
+
+    test('does not answer for another user key', async () => {
+      const id = await insertKey({
+        provider_id: 'anthropic',
+        envelope: testByokEnvelope('member-api-key'),
+        kilo_user_id: memberUser.id,
+      });
+
+      try {
+        const caller = await createCallerForUser(ownerUser.id);
+
+        await expect(caller.byok.credentialMethod({ id })).rejects.toMatchObject({
+          code: 'NOT_FOUND',
+          message: 'BYOK key not found',
+        });
+      } finally {
+        await db.delete(byok_api_keys).where(eq(byok_api_keys.id, id));
+      }
+    });
+
+    test('answers an organization key that a plain member reads', async () => {
+      const id = await insertKey({
+        provider_id: 'bedrock',
+        envelope: testByokEnvelope(JSON.stringify(BEDROCK_IAM_CREDENTIALS)),
+        organization_id: organizationA.id,
+      });
+      const caller = await createCallerForUser(memberUser.id);
+
+      await expect(
+        caller.byok.credentialMethod({ organizationId: organizationA.id, id })
+      ).resolves.toEqual({ method: 'accessKeys' });
+    });
+
+    test('does not answer for a key of another organization', async () => {
+      const id = await insertKey({
+        provider_id: 'bedrock',
+        envelope: testByokEnvelope(JSON.stringify(BEDROCK_IAM_CREDENTIALS)),
+        organization_id: organizationA.id,
+      });
+      const caller = await createCallerForUser(otherOrgOwner.id);
+
+      await expect(
+        caller.byok.credentialMethod({ organizationId: organizationB.id, id })
+      ).rejects.toMatchObject({ code: 'NOT_FOUND', message: 'BYOK key not found' });
+    });
+  });
+
   describe('Bedrock credentials', () => {
     test.each(['user', 'organization'] as const)(
       'encrypts a %s API key credential and returns only metadata from create and list',

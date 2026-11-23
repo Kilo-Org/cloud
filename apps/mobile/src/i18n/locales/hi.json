@@ -1387,7 +1387,7 @@
       "cancelTitle": "यह सुधार रद्द करें?",
       "cancellationRequested": "रद्द करने का अनुरोध भेजा गया",
       "cancelled": "सुधार रद्द किया गया",
-      "couldNotLoad": "सुधार की स्थिति लोड नहीं हो सकी।",
+      "couldNotLoad": "सुधार की स्थिति लोड नहीं हो सकी",
       "openDraftPullRequest": "ड्राफ़्ट पुल रिक्वेस्ट{{number}} खोलें",
       "openPullRequest": "पुल रिक्वेस्ट{{number}} खोलें",
       "progress": "प्रगति",
@@ -1404,7 +1404,7 @@
       "unavailable": "इस समस्या को ठीक करने की सुविधा उपलब्ध नहीं है।"
     },
     "repositories": {
-      "couldNotLoad": "रिपॉज़िटरी की सेटिंग्स लोड नहीं हो सकीं।",
+      "couldNotLoad": "रिपॉज़िटरी की सेटिंग्स लोड नहीं हो सकीं",
       "githubAppSettings": "GitHub ऐप की सेटिंग",
       "manageAccess": "GitHub ऐप की पहुँच प्रबंधित करें",
       "noRepositories": "कोई रिपॉज़िटरी नहीं",
@@ -1415,7 +1415,7 @@
       "connectDescription": "Dependabot अलर्ट अपने आप सिंक करने और अपनी रिपॉज़िटरी में सुरक्षा समस्याएँ प्रबंधित करने के लिए Kilo GitHub ऐप इंस्टॉल करें।",
       "connectOwnerOnly": "किसी संगठन के मालिक या एडमिन से {{platform}} कनेक्ट करने के लिए कहें।",
       "connectTitle": "शुरू करने के लिए GitHub कनेक्ट करें",
-      "couldNotLoad": "सुरक्षा एजेंट लोड नहीं हो सका।",
+      "couldNotLoad": "सुरक्षा एजेंट लोड नहीं हो सका",
       "installApp": "GitHub ऐप इंस्टॉल करें",
       "reauthorizeButton": "GitHub ऐप को फिर से अधिकृत करें",
       "reauthorizeDescription": "Dependabot अलर्ट पढ़ने के लिए सुरक्षा एजेंट को अनुमति चाहिए। यह अनुमति देने के लिए GitHub ऐप को फिर से अधिकृत करें।",
@@ -1427,8 +1427,8 @@
       "analysisModeSubtitle": "{{mode}} विश्लेषण",
       "automationAllOff": "सभी बंद",
       "automationCount": "3 में से {{displayCount}} चालू",
-      "couldNotLoadPermissions": "अनुमतियाँ लोड नहीं हो सकीं।",
-      "couldNotLoadSettings": "सुरक्षा एजेंट की सेटिंग्स लोड नहीं हो सकीं।",
+      "couldNotLoadPermissions": "अनुमतियाँ लोड नहीं हो सकीं",
+      "couldNotLoadSettings": "सुरक्षा एजेंट की सेटिंग्स लोड नहीं हो सकीं",
       "disabledNoManage": "सुरक्षा एजेंट बंद है। केवल संगठन के मालिक, एडमिन और बिलिंग प्रबंधक ही इसे चालू कर सकते हैं।",
       "disabledNoRepo": "सुरक्षा एजेंट चालू करने से पहले कम से कम एक रिपॉज़िटरी चुनें।",
       "disabledPrompt": "Dependabot अलर्ट सिंक करने, रिपॉज़िटरी चुनने और स्वचालन की सेटिंग तय करने के लिए सुरक्षा एजेंट चालू करें।",
@@ -1449,7 +1449,7 @@
       "couldNotOpenGithub": "GitHub नहीं खुल सका। कृपया फिर से कोशिश करें।"
     },
     "sla": {
-      "couldNotLoad": "SLA की सेटिंग्स लोड नहीं हो सकीं।",
+      "couldNotLoad": "SLA की सेटिंग्स लोड नहीं हो सकीं",
       "criticalDescription": "बिना प्रमाणीकरण के दूर से हमला संभव।",
       "deadlinesHeading": "सुधार की समय सीमाएँ (दिन)",
       "enableTracking": "SLA की निगरानी चालू करें",
@@ -2689,7 +2689,7 @@
     "cliCantReceiveFilesTitle": "यह सत्र फ़ाइलें प्राप्त नहीं कर सकता",
     "cliCantReceiveFilesMessage": "इस सत्र को चलाने वाला Kilo CLI फ़ाइलें प्राप्त नहीं कर सकता। उस मशीन पर CLI अपडेट करें या किसी नए सत्र में साझा करें।",
     "contentlessMessage": "साझा करने के लिए कुछ नहीं है — कोई टेक्स्ट या फ़ाइल शामिल नहीं थी।",
-    "couldNotReadContent": "साझा की गई सामग्री पढ़ी नहीं जा सकी।",
+    "couldNotReadContent": "साझा की गई सामग्री पढ़ी नहीं जा सकी",
     "onlyFirstFilesAttached_one": "केवल पहली {{displayCount}} फ़ाइल संलग्न की जाएगी।",
     "onlyFirstFilesAttached_other": "केवल पहली {{displayCount}} फ़ाइलें संलग्न की जाएँगी।"
   },

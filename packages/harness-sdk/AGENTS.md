@@ -323,11 +323,12 @@ repository root fixed it.
 
 The transform needs the toolchain the root project installs, so install
 `--filter '@kilocode/harness-sdk...' --filter kilocode-monorepo`. That closure
-runs every `ttsx` step of `check:ci` — `check:migrations`, `check:package` and
-`check:platform` included — and the whole chain passed on 2026-11-11. CI uses
-the same command, in `kilo-app-ci.yml`, `mobile-native-build.yml` and the
-`harness-sdk` job of `ci.yml`. A bare `--filter @kilocode/harness-sdk` has
-failed this way, so never install the package alone.
+runs every `ttsx` step of `check:ci` — `check:boundaries`, `check:migrations`,
+`check:package` and `check:platform` — and the whole chain passed on
+2026-11-11. CI uses the same command, in `kilo-app-ci.yml`,
+`mobile-native-build.yml` and the `harness-sdk` job of `ci.yml`. A bare
+`--filter @kilocode/harness-sdk` has failed this way, so never install the
+package alone.
 
 ## Rules
 
@@ -1942,7 +1943,8 @@ knows a model's own limit, so `ask.ts` reads
 
 `core/` holds the contracts and the pure domain. `plugins/` holds the
 implementations, including the ones this package owns. **A file in `core/` must
-never import from `plugins/`.** `pnpm check:boundaries` fails when one does.
+never import from `plugins/`.** `pnpm check:boundaries` fails when one does,
+and when `src/core` cannot be read, so a scan that did not run is not a pass.
 It exempts `*.test.ts`: a core test needs a plugin to run against.
 
 | Path | Purpose |

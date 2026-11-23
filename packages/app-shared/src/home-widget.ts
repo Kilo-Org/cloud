@@ -38,12 +38,13 @@ const kindSchema = z.enum(GLANCEABLE_STATUS_KINDS);
 export const homeWidgetDetailsSchema = z.object({
   approvalKey: approvalKeySchema.default(null),
   /**
-   * The kind whose row produced `primaryTitle`, so the title always describes
-   * the kind drawn beside it. Optional on input: a payload stored or pushed
-   * before this field existed omits it, which reads as an unknown kind and
-   * keeps the title, so an older payload renders as it did.
+   * The kind whose row produced `primaryTitle`. Thus the title always describes
+   * the kind drawn beside it. A payload that was stored or pushed before this
+   * field existed omits it. The schema normalizes an omitted value to `null`,
+   * which is an unknown kind. The title is kept, so an older payload renders as
+   * it did.
    */
-  primaryKind: kindSchema.nullable().optional(),
+  primaryKind: kindSchema.nullable().default(null),
   primaryTitle: titleSchema.nullable(),
   waitingAgents: z
     .array(
@@ -369,7 +370,6 @@ export function buildHomeWidgetPresentation(
 ): HomeWidgetPresentation {
   const { snapshot, details } = data;
   const { terminal, primaryKind, checkedAt, staleAt } = staleness(data);
-  const titleKind = details.primaryKind ?? null;
   const wake = scheduledWake(snapshot, terminal);
   const status = presentationStatus(terminal, snapshot, primaryKind);
   // One approval availability: the same value decides the key the native action
@@ -400,7 +400,9 @@ export function buildHomeWidgetPresentation(
     // The card never advertises an update past the retry deadline.
     awaitingUpdate: wake.at !== null && now >= wake.at && now < wake.retryAt,
     primaryTitle:
-      terminal !== null || primaryKind === null || (titleKind !== null && titleKind !== primaryKind)
+      terminal !== null ||
+      primaryKind === null ||
+      (details.primaryKind !== null && details.primaryKind !== primaryKind)
         ? null
         : details.primaryTitle,
     waitingAgents: terminal !== null || snapshot.needsInput === 0 ? [] : details.waitingAgents,

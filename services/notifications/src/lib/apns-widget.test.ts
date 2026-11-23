@@ -60,6 +60,7 @@ describe('WidgetKit reload hints', () => {
       type: 'active_agents_glanceable',
       homeWidgetDetails: {
         approvalKey: 'a'.repeat(64),
+        primaryKind: null,
         primaryTitle: 'Private Home title',
         waitingAgents: [{ title: 'Private waiting title', kind: 'permission' }],
         scheduledAgents: [],

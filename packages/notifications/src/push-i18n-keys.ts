@@ -35,9 +35,20 @@ export const SESSION_READY_I18N_KEY = 'sessionReady';
 /** The leaf of the generic body the security-lifecycle notice reads. */
 export const SECURITY_LIFECYCLE_BODY_LEAF = 'securityUpdate';
 
+/**
+ * The catalog key of one generic body leaf, for a producer that names the leaf
+ * alone.
+ */
+export function genericBodyCatalogKey<Leaf extends keyof typeof en.generic.body>(
+  leaf: Leaf
+): `generic.body.${Leaf}` {
+  return `generic.body.${leaf}`;
+}
+
 /** The one catalog entry the security-lifecycle push reads its body from. */
-const SECURITY_LIFECYCLE_BODY_KEY =
-  `generic.body.${SECURITY_LIFECYCLE_BODY_LEAF}` satisfies PushCatalogKey;
+const SECURITY_LIFECYCLE_BODY_KEY = genericBodyCatalogKey(
+  SECURITY_LIFECYCLE_BODY_LEAF
+) satisfies PushCatalogKey;
 
 /** The security-finding kinds the internal dispatch producer can send. */
 type SecurityFindingNotificationKind = InternalDispatchSecurityFindingRequest['notificationKind'];

@@ -68,6 +68,22 @@ export function hashStepUpBinding(
   return createHash('sha256').update(stepUpBindingValue(actionClass, operation)).digest('hex');
 }
 
+/** The stored fields a refusal explanation reads. */
+type StoredProofRefusal = {
+  verified_at: string;
+  revoked_at: string | null;
+};
+
+/**
+ * How a stored proof that did not authorize this request explains itself when
+ * it was revoked or has aged out. Both action classes share one projection, so
+ * the two refusal explanations cannot drift apart.
+ */
+function storedProofRefusalState(proof: StoredProofRefusal): AdminStepUpState {
+  const verifiedAt = new Date(proof.verified_at).toISOString();
+  return proof.revoked_at ? { status: 'revoked', verifiedAt } : { status: 'expired', verifiedAt };
+}
+
 async function countPasskeys(userId: string, fromDb: DrizzleConnection): Promise<number> {
   const [row] = await fromDb
     .select({ count: sql<number>`count(*)::int` })
@@ -190,33 +206,20 @@ export async function evaluateStepUp(
     .orderBy(desc(session_step_up_proofs.verified_at))
     .limit(1);
 
-  if (latestProof && operationClass) {
+  if (latestProof) {
     // A spent proof, a fresh proof bound to a different operation, and a
     // missing binding all read as "verify for this operation now". Only an
-    // expired one keeps the expiry explanation.
-    const spent = latestProof.consumed_at !== null;
+    // operation-class proof gets that explanation, because only it is bound to
+    // one operation; a session proof is refused for its own age. A revoked or
+    // expired proof explains itself the same way for both classes.
+    const verifyForOperation =
+      operationClass &&
+      latestProof.revoked_at === null &&
+      (latestProof.consumed_at !== null || !latestProof.stale);
     return {
-      state: latestProof.revoked_at
-        ? { status: 'revoked', verifiedAt: new Date(latestProof.verified_at).toISOString() }
-        : spent || !latestProof.stale
-          ? { status: passkeyCount === 0 ? 'not_enrolled' : 'required' }
-          : { status: 'expired', verifiedAt: new Date(latestProof.verified_at).toISOString() },
-      proof: null,
-      passkeyCount,
-    };
-  }
-
-  if (latestProof) {
-    return {
-      state: latestProof.revoked_at
-        ? {
-            status: 'revoked',
-            verifiedAt: new Date(latestProof.verified_at).toISOString(),
-          }
-        : {
-            status: 'expired',
-            verifiedAt: new Date(latestProof.verified_at).toISOString(),
-          },
+      state: verifyForOperation
+        ? { status: passkeyCount === 0 ? 'not_enrolled' : 'required' }
+        : storedProofRefusalState(latestProof),
       proof: null,
       passkeyCount,
     };

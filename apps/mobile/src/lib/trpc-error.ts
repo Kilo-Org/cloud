@@ -105,12 +105,6 @@ type AuthoredRefusalCode = (typeof AUTHORED_REFUSAL_CODES)[number];
  * Whether this envelope carries a refusal the application wrote, so its
  * sentence may be shown to a person.
  *
- * Wire shape of a mobile call: the client rejects with a `TRPCClientError`
- * whose `message` is the server's message, and whose `data` holds the code,
- * status, path and stack. Only an allowlisted application code speaks for the
- * person, and only when the envelope is not one of the two shapes that carry
- * no authored sentence:
- *
  * - An authored refusal, such as a duplicate name (`CONFLICT`), carries a
  *   sentence written for the person, so the caller shows it.
  * - `INTERNAL_SERVER_ERROR`, and every other code outside the allowlist,

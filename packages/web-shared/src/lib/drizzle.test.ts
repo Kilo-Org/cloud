@@ -63,9 +63,15 @@ describe('drizzle', () => {
       expect(shouldExitOnPoolError('replica', 'production')).toBe(false);
     });
 
+    it('does not exit on a tagged-writer pool error outside test mode', () => {
+      // A tagged-pool idle-client error must not terminate an instance whose primary is healthy.
+      expect(shouldExitOnPoolError('tagged-writer', 'production')).toBe(false);
+    });
+
     it('never exits in test mode, so pool.end() cleanup cannot kill the runner', () => {
       expect(shouldExitOnPoolError('primary', 'test')).toBe(false);
       expect(shouldExitOnPoolError('replica', 'test')).toBe(false);
+      expect(shouldExitOnPoolError('tagged-writer', 'test')).toBe(false);
     });
   });
 

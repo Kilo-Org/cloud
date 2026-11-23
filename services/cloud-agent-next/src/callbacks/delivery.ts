@@ -1,6 +1,10 @@
 import { TRPCError } from '@trpc/server';
 import { CLOUD_AGENT_PARENT_AUTHORITY_DENIED } from '../cloud-agent-authority.js';
-import type { CallbackTarget, ExecutionCallbackPayload } from './types.js';
+import type {
+  CallbackDeliveryIdentity,
+  CallbackTarget,
+  ExecutionCallbackPayload,
+} from './types.js';
 import { logger } from '../logger.js';
 
 /** Initial callback delivery plus configured Queue redeliveries. Keep wrangler consumer max_retries in sync. */
@@ -22,7 +26,7 @@ export type DeliveryResult =
 /** Access and input errors cannot recover through redelivery. */
 export function classifyCallbackError(
   error: unknown,
-  payload: ExecutionCallbackPayload,
+  payload: CallbackDeliveryIdentity,
   attempts: number,
   message: string,
   forcePermanent = false
@@ -97,7 +101,7 @@ export async function deliverCallbackJob(
 
 export function classifyCallbackDelivery(
   result: { ok: boolean; status?: number; error?: string },
-  payload: ExecutionCallbackPayload,
+  payload: CallbackDeliveryIdentity,
   attempts: number
 ): DeliveryResult {
   if (result.ok) {

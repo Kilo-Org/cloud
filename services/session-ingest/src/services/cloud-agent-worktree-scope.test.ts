@@ -11,6 +11,7 @@ vi.mock('@kilocode/worker-utils', async importOriginal => ({
 
 import type { CloudAgentSessionScopeV2 } from '@kilocode/session-ingest-contracts';
 import {
+  cloudAgentOrganizationIdSchema,
   encodeCloudAgentSessionScopeV2Headers,
   parseCloudAgentSessionScopeV2Headers,
   tryEncodeCloudAgentSessionScopeV2Headers,
@@ -24,7 +25,7 @@ import {
 
 const userId = 'usr_test';
 const worktreeId = 'worktree_11111111-1111-4111-8111-111111111111';
-const organizationId = '33333333-3333-4333-8333-333333333333';
+const organizationId = cloudAgentOrganizationIdSchema.parse('33333333-3333-4333-8333-333333333333');
 const memberRootId = 'ses_11111111111111111111111111';
 const otherRootId = 'ses_22222222222222222222222222';
 const childId = 'ses_33333333333333333333333333';
@@ -373,6 +374,20 @@ describe('Cloud Agent session scope v2 header codec', () => {
     expect(parseCloudAgentSessionScopeV2Headers(headers)).toEqual({ kind: 'ok', scope: input });
   });
 
+  it('parses a repeated member root the encoder writes back to the distinct list', () => {
+    const input: CloudAgentSessionScopeV2 = {
+      worktreeId,
+      organizationId,
+      memberRootKiloSessionIds: [memberRootId, memberRootId],
+    };
+    const headers = encodeCloudAgentSessionScopeV2Headers(input);
+    expect(headers.memberRootKiloSessionIds).toBe(`${memberRootId},${memberRootId}`);
+    expect(parseCloudAgentSessionScopeV2Headers(headers)).toEqual({
+      kind: 'ok',
+      scope: { ...input, memberRootKiloSessionIds: [memberRootId] },
+    });
+  });
+
   it.each([
     ['a worktree id that is not a UUID', 'worktree_test'],
     ['a scope id without the worktree prefix', 'workspace_11111111-1111-4111-8111-111111111111'],
@@ -388,7 +403,10 @@ describe('Cloud Agent session scope v2 header codec', () => {
   });
 
   it.each([
-    ['a non-uuid organization', { organizationId: 'org-a' }],
+    [
+      'a non-uuid organization',
+      { organizationId: 'org-a' as CloudAgentSessionScopeV2['organizationId'] },
+    ],
     ['an empty member-root list', { memberRootKiloSessionIds: [] }],
     [
       'more member roots than the contract allows',

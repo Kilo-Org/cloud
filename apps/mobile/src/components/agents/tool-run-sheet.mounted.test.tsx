@@ -50,6 +50,9 @@ vi.mock('react-native-safe-area-context', () => ({
 }));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'StateSurface' }));
+// The vanished body is its own component with its own suite; here it is a
+// sentinel so the sheet's branch is what the assertions read.
+vi.mock('./vanished-part-state', () => ({ VanishedPartState: 'VanishedPartState' }));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
@@ -226,16 +229,15 @@ describe('ToolRunSheet mounted', () => {
     });
   });
 
-  it('shows the unavailable copy and no rows when the run is empty', async () => {
+  it('shows the shared vanished-part state and no rows when the run is empty', async () => {
     const renderer = await mountSheet([]);
 
     expect(renderer.root.findAllByType(FixedPartRow)).toHaveLength(0);
     expect(
       renderer.root.findAll(
-        node => typeof node.type === 'string' && (node.type as string) === 'CenteredState'
+        node => typeof node.type === 'string' && (node.type as string) === 'VanishedPartState'
       )
     ).toHaveLength(1);
-    expect(textsOf(renderer.root)).toContain('Details unavailable');
 
     await act(async () => {
       await Promise.resolve();

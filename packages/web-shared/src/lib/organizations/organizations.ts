@@ -455,6 +455,13 @@ export async function addSsoUserToOrganization(
     if (removal) return false;
 
     if (options?.invitationToken) {
+      // An invitation records the SSO source it was created under: the
+      // organization itself for a direct authority, its parent for a child
+      // organization that inherits SSO. The guard therefore compares against
+      // that same value, as acceptance does.
+      const policy = await resolveEffectiveOrganizationSsoPolicy(organizationId, tx);
+      const invitationSourceOrganizationId =
+        policy.status === 'required' ? policy.sourceOrganizationId : organizationId;
       const [invitation] = await tx
         .select({
           email: organization_invitations.email,
@@ -468,7 +475,7 @@ export async function addSsoUserToOrganization(
             liveInvitationCondition(organizationId),
             eq(organization_invitations.token, options.invitationToken),
             eq(organization_invitations.authentication_requirement, 'workos'),
-            eq(organization_invitations.sso_source_organization_id, organizationId)
+            eq(organization_invitations.sso_source_organization_id, invitationSourceOrganizationId)
           )
         )
         .limit(1);

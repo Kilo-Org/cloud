@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from '@jest/globals';
 import type Anthropic from '@anthropic-ai/sdk';
 import {
-  preserveCacheControl,
+  createCacheControlCarrier,
   removeWhitespaceOnlyMessages,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-whitespace-only-messages';
 import type { GatewayMessagesRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
@@ -209,6 +209,38 @@ describe('removeWhitespaceOnlyMessages', () => {
     ]);
   });
 
+  it('keeps one carried breakpoint across many removals after a long reasoning tail', () => {
+    jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const messages: Anthropic.MessageParam[] = [
+      { role: 'assistant', content: [toolUse, ...Array.from({ length: 64 }, () => thinking)] },
+      ...Array.from({ length: 64 }, (): Anthropic.MessageParam => ({
+        role: 'assistant',
+        content: [{ type: 'text', text: '\n', cache_control: { type: 'ephemeral' } }],
+      })),
+      { role: 'user', content: 'Continue.' },
+    ];
+    const before = structuredClone(messages);
+    const body = makeBody(messages);
+
+    removeWhitespaceOnlyMessages(body);
+
+    expect(body.messages).toEqual([
+      {
+        role: 'assistant',
+        content: [
+          { ...toolUse, cache_control: { type: 'ephemeral' } },
+          ...Array.from({ length: 64 }, () => thinking),
+        ],
+      },
+      { role: 'user', content: 'Continue.' },
+    ]);
+    expect(body.messages[0]).not.toBe(messages[0]);
+    const carriedContent = body.messages[0].content;
+    const carriedBlocks = Array.isArray(carriedContent) ? carriedContent : [];
+    expect(carriedBlocks.filter(block => 'cache_control' in block)).toHaveLength(1);
+    expect(messages).toEqual(before);
+  });
+
   it('moves the cache breakpoint of a removed message to the last cacheable block before it', () => {
     jest.spyOn(console, 'warn').mockImplementation(() => undefined);
     const body = makeBody([
@@ -360,15 +392,17 @@ describe('removeWhitespaceOnlyMessages', () => {
   });
 });
 
-describe('preserveCacheControl', () => {
+describe('createCacheControlCarrier', () => {
   it('moves a breakpoint from a removed message onto the last cacheable block', () => {
     const previousMessage: Anthropic.MessageParam = { role: 'assistant', content: [toolUse] };
     const removedMessage: Anthropic.MessageParam = {
       role: 'user',
       content: [{ type: 'text', text: 'x', cache_control: ephemeral }, image],
     };
+    const carrier = createCacheControlCarrier();
+    carrier.keep(previousMessage);
 
-    const result = preserveCacheControl(previousMessage, removedMessage);
+    const result = carrier.drop(removedMessage) ?? previousMessage;
 
     expect(result).toEqual({
       role: 'assistant',
@@ -384,8 +418,10 @@ describe('preserveCacheControl', () => {
       role: 'user',
       content: [{ ...toolResult, cache_control: ephemeral }, image],
     };
+    const carrier = createCacheControlCarrier();
+    carrier.keep(previousMessage);
 
-    const result = preserveCacheControl(previousMessage, removedMessage);
+    const result = carrier.drop(removedMessage) ?? previousMessage;
 
     expect(result).toEqual({
       role: 'assistant',
@@ -402,13 +438,50 @@ describe('preserveCacheControl', () => {
       role: 'user',
       content: [{ ...toolResult, cache_control: ephemeral }],
     };
+    const carrier = createCacheControlCarrier();
+    carrier.keep(previousMessage);
 
-    const result = preserveCacheControl(previousMessage, removedMessage);
+    const result = carrier.drop(removedMessage) ?? previousMessage;
 
     expect(result).toBe(previousMessage);
     expect(result).toEqual({
       role: 'assistant',
       content: [{ type: 'text', text: 'Hi', cache_control: { type: 'ephemeral', ttl: '1h' } }],
+    });
+  });
+
+  it('returns the carried message unchanged while the tail stays settled, then targets a new tail', () => {
+    const previousMessage: Anthropic.MessageParam = { role: 'assistant', content: [toolUse] };
+    const removedMessage: Anthropic.MessageParam = {
+      role: 'user',
+      content: [{ type: 'text', text: 'x', cache_control: ephemeral }],
+    };
+    const carriedTail: Anthropic.MessageParam = {
+      role: 'assistant',
+      content: [
+        { ...toolUse, cache_control: ephemeral },
+        { type: 'text', text: 'Answer' },
+      ],
+    };
+    const carrier = createCacheControlCarrier();
+    carrier.keep(previousMessage);
+
+    const carried = carrier.drop(removedMessage);
+    expect(carried).toEqual({
+      role: 'assistant',
+      content: [{ ...toolUse, cache_control: ephemeral }],
+    });
+    expect(carrier.drop(removedMessage)).toBe(carried);
+    expect(carrier.drop(removedMessage)).toBe(carried);
+
+    carrier.keep(carriedTail);
+
+    expect(carrier.drop(removedMessage)).toEqual({
+      role: 'assistant',
+      content: [
+        { ...toolUse, cache_control: ephemeral },
+        { type: 'text', text: 'Answer', cache_control: ephemeral },
+      ],
     });
   });
 });

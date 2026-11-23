@@ -2,9 +2,8 @@ import { eq } from 'drizzle-orm';
 import { organizations } from '@kilocode/db/schema';
 import type { User } from '@kilocode/db/schema';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
-import { CLAUDE_BILLING_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/provider-id';
-import { OPENAI_CHATGPT_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/provider-id';
 import { isClaudeModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/claude-model';
+import { isDelegatedBillingProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/provider-type-predicates';
 import type { ProviderRoute } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
 import {
   decideAnthropicUserProfile,
@@ -27,11 +26,7 @@ export type GatewayAnthropicUserProfile = {
  * subscriptions are the customer's own accounts and never carry Kilo's profile.
  */
 export function isAnthropicUserProfileRoute(route: Pick<ProviderRoute, 'provider' | 'userByok'>) {
-  return (
-    route.userByok === null &&
-    route.provider.type !== CLAUDE_BILLING_PROVIDER_ID &&
-    route.provider.type !== OPENAI_CHATGPT_PROVIDER_ID
-  );
+  return route.userByok === null && !isDelegatedBillingProvider(route.provider.type);
 }
 
 /** Reads the request's profile settings and stored profile, through the replica. */

@@ -307,6 +307,9 @@ public stream has no reconnecting status today, so `reconnecting` changes no cli
   carries no text, so the interaction stays answerable by a different reply.
 - Each terminal message produces one report. The batch callback fires when no `queued` or
   `accepted` message remains (current callback semantics).
+- A new pending question in a child with a workspace callback target produces an interaction
+  callback. Its outbox entry is keyed by question ID independently of terminal reports.
+  The parent receives the question and options and can use `answer_question` or `reject_question`.
 - The per-user facade serves native `/event` and `/global/event`. `/event` first opens the same
   session `/stream?replay=false` log the client stream uses and buffers its live frames, then pages
   the `nativeSnapshot`, writes the fence, and delivers the buffered and later frames above it. The
@@ -995,6 +998,7 @@ keep environment snapshots and existing history/worktree recovery.
   always restore on demand, so history-only warmup cannot suppress their saved file patches.
   Cancelling a caller stops its wait immediately, but its import lock remains until the underlying
   harness open settles. A queued requested open keeps its own inputs and cancellation deadline.
+
 - **Diagnostics and retention.** Existing diagnostics report workspace, requesting session,
   allocation, capture time, selected source and skip/fallback reason. They never log handles,
   credentials or file contents. Replacing a descriptor makes the previous artifact unselectable;
@@ -1811,7 +1815,7 @@ remain decisive. No inspected validator enforces task-branch names or parses rec
 | GitLab | Identity, GraphQL, unrelated projects, origin/base-path escape, traversal, and non-enumerated web/Git paths cannot redeem managed credentials. |
 | Bitbucket | Other repositories, origin changes, traversal, and encoded path slashes cannot redeem managed credentials. |
 | Retry exclusions | Push/discovery for receive-pack, LFS, API requests, 403 responses, and responses without an observable reset never enter the GitHub retry loop. |
-| Current Vercel limits | Contained Vercel uses the same capability path as native providers. Live GitHub clone, fetch, push dry-run, and credential-denial checks passed. GitLab and Bitbucket parity checks remain synthetic. Explicit repository tokens are rejected, as on native providers. Restricted egress remains native-only. |
+| Current Vercel limits | Contained Vercel uses the same capability path as native providers. Live GitHub clone, fetch, push dry-run, and credential-denial checks passed. GitLab and Bitbucket parity checks remain synthetic. Explicit repository tokens are rejected, as on native providers. Restricted egress uses the shared [sandbox egress proxy](#sandbox-egress-proxy). |
 
 **Changed**
 
@@ -1931,6 +1935,105 @@ Cloudflare's public Worker ingress limit depends on the account plan: 100 MB, 20
 Workers HTTP duration has no fixed limit while connected, but Vercel forwarding duration remains
 unverified beyond the tested 8 MiB transfers and Git operations. Before production rollout,
 confirm ingress and duration compatibility and resolve any confirmed reduction. See [Workers limits](https://developers.cloudflare.com/workers/platform/limits/).
+
+### Sandbox egress proxy
+
+An egress allowlist and an egress audit are product logic in one shared core,
+`proxySandboxEgress` (`src/egress/sandbox-egress.ts`). A provider supplies two primitives in the
+capability table (`packages/worker-utils/src/sandbox-provider-capabilities.ts`):
+
+| Feature | Meaning | Containers | Vercel | Cloudflare (retired) |
+|---|---|---|---|---|
+| `egressProxy` | Sandbox egress reaches the Worker proxy with a verified sandbox identity. | yes | yes | no |
+| `egressProxySeesAll` | The proxy sees all HTTP(S) egress, not only the listed hosts. | yes | no | no |
+
+One rule, `egressRequestSupported`, reads them: an allowlist needs `egressProxy`; an audit without
+an allowlist needs `egressProxySeesAll`; a session without an egress request is always supported.
+Registration, the sandbox selection and metadata schemas, the Sandbox DO pin checks, the
+saved-allocation skip and the web guidance use this rule. The pin checks and the schemas also
+require an isolated sandbox. The audit read requires `egressProxy`.
+
+**Core.** For each request: a strict URL check against the allowlist (`https` or `http`, the
+default port, no userinfo, an exact host); then one audit row when the policy has audit; then a 403
+`Egress destination disallowed`, or a fetch with `Host` from the URL and `redirect: 'manual'`.
+A failed audit write gives 502 `Egress audit unavailable` and sends nothing. Containers runs the
+core from its outbound handler. The audit store is one `EgressAuditStore` for each logical sandbox,
+reached only through `egressAuditStore` (`SANDBOX_CONTAINERS` by the logical sandbox id). Its use
+is provider-neutral: for a Vercel sandbox the object starts no container, sets no alarm and writes
+no billing record. Retention is the same on both providers: at most 256 chunks of 64 rows. When
+the store is full, a write deletes the oldest chunk if its last write is at least 60 seconds old;
+otherwise the write fails, and the request gets 502. Rows have no time-based expiry.
+
+**Vercel request path.** A restricted Vercel policy (`restrictVercelEgress`) has the effective
+allowlist as its keys and never `'*'`. The Worker host keeps its credential rules and a Host-pin
+transform; every other listed host keeps its credential rules and ends with a forward to
+`/scm/vercel/<sandboxId>`. An unlisted name does not resolve in the sandbox. A policy that cannot
+be built creates no sandbox and sends no update. The route then:
+
+1. reads the target from the `vercel-forwarded-*` headers;
+2. admits the request: the pin policy, then the live allocation (owner, allocation id, provider
+   ref, not stopping or stopped), then the Vercel OIDC token (issuer, audience, team, project,
+   sandbox name, `exp`). An unavailable allocation gives 403 `allocation_unavailable` before the
+   token check. A bad or expired token, or a token of another sandbox, gives 401;
+3. strips every `vercel-*`, `x-vercel-*` and `x-forwarded-*` header, the token and hop-by-hop
+   headers. It keeps `upgrade` only on a WebSocket upgrade;
+4. runs the core with the pin allowlist minus the Worker host, so the Worker host, another port,
+   userinfo, `http` and an IP literal give 403. The core writes a `denied` row only when the pin
+   has audit;
+5. sends an unmanaged request with `fetch`, and a managed SCM credential through the SCM admission.
+
+A Vercel sandbox without an allowlist keeps the SCM forward path unchanged. The route never
+proxies to a host outside the allowlist or the managed SCM targets.
+
+The runtime proxy facade middleware leaves `/scm/vercel/` paths alone, so a forwarded request with
+a runtime proxy handle in `Authorization` also reaches the route.
+
+**Admission caches.** The Sandbox DO caches a verified identity for each token hash and allocation
+(at most 64 entries, until the token `exp`); the live allocation check runs on every request. Each
+Worker isolate caches an admitted result by sandbox id and token hash: at most 256 entries, for at
+most 30 seconds and never past the token `exp`. A denial is not cached. So an isolate can admit a
+request for up to 30 seconds after the allocation stops or changes. In that window the request
+still passes the URL check against the admitted allowlist, and its audit row is still written.
+
+**Differences on Vercel.**
+
+| # | Case | Containers | Vercel |
+|---|---|---|---|
+| D1 | `http://` to a listed host | allowed | fails (connection reset); use `https://` |
+| D3 | unlisted host | 403, audited `denied` | does not resolve; not audited |
+| D13 | audit | any network mode | allowlist mode only |
+| D15 | Worker host; a request that a credential rule matches | through the proxy, audited | direct, not audited |
+| D16 | upload size | no edge limit | the request body limit of the Cloudflare plan |
+| D17 | HTTP/2-only client, gRPC | not checked | fails on forwarded hosts |
+
+**Failure.** Egress stays restricted in each case: a refused update leaves the old policy in
+force, and that policy has no `'*'`.
+
+| Path | Result of a policy that cannot be built or applied |
+|---|---|
+| Create | No sandbox. The routes fail with `network_policy_failed`. |
+| Release (`applyVercelNetworkPolicyOrStop`), workspace Stop (`cancelWorkspace`) | The sandbox stops: `network_policy_failed` on a restricted sandbox, `sandbox_lost` on an unrestricted one (`refusedPolicyStopReason`). |
+| Route grant at prepare (2 attempts) | That route fails with `workspace_setup_failed`, stage `credential_policy_unavailable`. The sandbox keeps running. |
+| A preparing route when the wrapper connects (`onWrapperConnected`) | That route fails with `workspace_setup_failed`. The sandbox keeps running. |
+| `bindRuntimeCredentialProxyHandle`, `updateNetworkPolicy` | The call fails. The sandbox keeps running. |
+
+**Rollback.**
+
+- No migration and no new Durable Object class.
+- Deploy the Worker before the web app: the web guidance reads the same capability table.
+- Revert of the Vercel `egressProxy = true` commit fails closed. Registration refuses a restricted
+  Vercel request, and a live restricted pin makes `readProviderPin` throw. The stored metadata and
+  registration of a restricted Vercel session fail validation, so the Session DO loads that session
+  as absent until the commit is deployed again. Audit rows stay in the store, but the audit read
+  refuses them. Nothing is deleted.
+- After that revert, a live restricted Vercel sandbox runs until the Vercel sandbox timeout.
+  `readProviderPin` runs in `initializeStorage`, so the Sandbox DO fails to initialize and cannot
+  stop the BYOC sandbox in the customer account. Egress stays closed: the Vercel policy stays in
+  force, and each forward gets 503 `forwarding_unavailable` because the admission cannot load the
+  pin. To prevent this, stop live restricted Vercel sandboxes before the rollback.
+- Revert the two `network_policy_failed` commits together (the reason, and the workspace Stop that
+  uses it), and only when no stored route row holds that reason: the failure reason schema is
+  strict, and a stored row with an unknown reason fails to parse.
 
 ### Compatibility and rollout
 
@@ -2052,14 +2155,21 @@ names the workspace for its whole life, including after the chat with the same U
 Credentials keep the `CloudAgentAuthority` v1 claim: `parentSessionId` is the canonical workspace ID
 and `authorizationId` is the workspace's current authorization.
 
-The workspace record binds the canonical workspace ID, worktree, owner and organization, and stores
-its own runtime delegation (at most 24 hours), revocation state, origin and network policy. It is
-adopted once from the chat that created the workspace, only when that chat may launch children and
-does not use a legacy shared sandbox. Adoption copies the stored authorization as it is, including
-an expired or revoked state, and imports that chat's legacy child registry. A sibling chat is never
-an adoption source. Deleting the creating chat first completes adoption, so the authority and the
-registry survive; deleting a session without a worktree, or starting worktree deletion, permanently
-ends the workspace authority with a tombstone that adoption cannot overwrite.
+The workspace record binds the canonical workspace ID, worktree, owner and organization. It stores
+the workspace's runtime delegation (at most 24 hours), revocation state, origin and network policy.
+The creating chat supplies these values once, if it has policy-bearing runtime authorization and
+does not use a legacy shared sandbox. Origin and child depth do not limit new registrations.
+Legacy tokens without runtime authorization do not provide MCP.
+
+New workspace records also retain the creating chat's resolved profile and environment for child
+launches. An explicit environment selection overrides this default. Inheritance applies only when
+the launch repository belongs to the inherited environment, if one is present. The Worker rechecks
+repository access before registration.
+
+Adoption copies the stored authorization, including expired or revoked state, and imports the
+creating chat's legacy child registry. A sibling chat cannot supply this data. Deleting the creating
+chat first completes adoption so the authority and registry survive. Deleting a standalone session
+or starting worktree deletion ends the workspace authority with a tombstone adoption cannot overwrite.
 
 Every issuance, launch, management call and delegation checks the stored record and then renews it,
 which rechecks the owner, organization membership, credential pepper and admitting device session in
@@ -2083,19 +2193,20 @@ chat in the launching workspace (`workspace:new-chat`) or notifies one existing 
 persisted callback message ID and delegates the workspace authority to the new chat, so it needs an
 active authority. The session form needs a workspace that is not deleted or revoked; an expired
 authority can still notify an existing chat, which runs on that chat's own authorization. The target
-must be a chat of the same worktree, owner and organization without spawn lineage, and still
-accessible. A deleted target fails the callback; it is never redirected to another chat. The
+must be an accessible chat of the same worktree, owner and organization. A standalone parent
+can use `workspace:<session-id>` to receive the callback in its own chat. A deleted target fails
+the callback; it is never redirected to another chat. The
 invoking chat learns its own session id from the `cloud-agent-context` line in its turns.
 
-The scoped connection can create children, list direct children, inspect a child, read an exact
-message result, interrupt a child, and send a prompt follow-up. The personal and organization
-procedures are `prepareSession`, `listChildSessions`, `getSession`, `getMessageResult`,
-`interruptSession`, and `sendMessage`. Folder assignment and stacking on a child reach the same
-management checks through `getSession` and `listChildSessions`. Management revalidates the workspace
+The scoped connection uses dedicated tools, not API `search` or `call`. It can discover repositories,
+branches, environments and models; launch children; attach files; read child history, message results
+and artifacts; answer or reject questions; send or cancel queued messages; and stop a child. It can
+file child workspaces, sync or restack child branches, and create chats in a direct child's workspace.
+Stacking is permitted on the caller's own workspace or a direct child. Management revalidates the workspace
 authority and the target's persisted spawn lineage (`parentCloudAgentSessionId` equals the canonical
 workspace ID), owner and organization; the workspace itself, its chats and unrelated sessions are not
-valid targets, so a child cannot be managed from another workspace or organization. A child cannot
-launch children, so there are no grandchildren. Follow-ups require a
+valid management targets, so a child cannot be managed from another workspace or organization. Each
+child can launch and manage its own children. Follow-ups require a
 stable message ID and cannot change callbacks, runtime configuration or delegation lifetime.
 Interrupt stops work; it does not delete the child workspace. Launch idempotency stays in the
 operation ledger by `operationKey`.
@@ -2353,6 +2464,7 @@ Request and response bodies stream; there is no body-size cap.
   change: it shows the preview button once the Worker reports preview as enabled. The `kilo serve`
   password is in the wrapper, so ship a sandbox image with it before you enable preview; an older
   image leaves `kilo serve` open to a preview of its port.
+
 #### Preview tunnel (`wrapper-tunnel`)
 
 A provider without a private network path to its sandbox (today Vercel) reaches the dev server
@@ -2780,6 +2892,7 @@ A new preparation after stop creates a contained allocation. Sessions retain the
 Earlier branch work recorded live Vercel identity and GitHub checks.
 The shared admission refactor has local tests only; those earlier checks do not verify this change.
 Maximum payload and duration compatibility still require verification before production rollout.
+
 ## Customer billing schema maintenance
 
 The customer billing schema owner is `packages/session-ingest-contracts/src/cloud-agent-billing.ts`.
@@ -2816,3 +2929,15 @@ Readers treat a value that is not exactly one proof, such as a joined duplicate,
 as absent. Keep the releases separate;
 deploying both PRs together removes the compatibility boundary. For a rollback after
 enforcement, use the compatibility release as the Cloud Agent rollback target.
+
+### Containers allowlist and runtime facade
+
+New Containers allowlist allocations include the Worker runtime facade, Session Sync, and required repository hosts.
+Model, backend, and ingest upstreams remain behind the Worker facade. The wrapper receives a bound proxy handle before preparation.
+A legacy grant fails with `credential_upgrade_required`. A failed handle mint fails a per-session prepare and sends no prepare frame. An adopted worktree scope keeps serving its usable canonical handle.
+
+An active allocation keeps its exact persisted allowlist. `matchesActiveEgressPolicy` recognizes the previous direct-upstream baseline
+only when the requested destinations and audit setting are unchanged. It never broadens or rewrites the active pin.
+The next allocation uses the facade baseline after the previous allocation stops.
+Remove this compatibility comparison only after every pre-facade allocation is confirmed stopped, including hibernated Durable Objects.
+A release age or a successful new allocation does not prove that condition.

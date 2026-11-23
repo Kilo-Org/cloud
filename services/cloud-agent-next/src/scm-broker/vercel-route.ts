@@ -1,12 +1,14 @@
-import type { Hono } from 'hono';
 import { logger } from '../logger.js';
-import type { HonoContext } from '../hono-context.js';
+import type {
+  ControlPlaneScmForwardAdmission,
+  ControlPlaneScmForwardAdmissionResult,
+} from '../shared/control-plane-protocol.js';
 import type { Env } from '../types.js';
 import { isSafeSandboxId } from '../shared/control-plane-credential.js';
 import { admitVercelScmForwardAtLocator } from './vercel-admission.js';
 import { forwardResolvedScmCapability } from './managed-forwarding.js';
 
-function originalTarget(headers: Headers): URL | null {
+export function originalTarget(headers: Headers): URL | null {
   const host = headers.get('vercel-forwarded-host');
   const scheme = headers.get('vercel-forwarded-scheme');
   const port = headers.get('vercel-forwarded-port');
@@ -34,7 +36,7 @@ function originalTarget(headers: Headers): URL | null {
   }
 }
 
-function upstreamRequest(request: Request, target: URL): Request {
+export function upstreamRequest(request: Request, target: URL): Request {
   const headers = new Headers(request.headers);
   const connectionHeaders = (headers.get('connection') ?? '').split(',').map(value => value.trim());
   for (const name of [...headers.keys()]) {
@@ -61,6 +63,47 @@ function upstreamRequest(request: Request, target: URL): Request {
   return new Request(target, new Request(request, { headers, redirect: 'manual' }));
 }
 
+/** The SCM credentials a forwarded request presents, as the SCM admission reads them. */
+export function scmAuthorization(
+  headers: Headers
+): ControlPlaneScmForwardAdmission['authorization'] {
+  return {
+    ...(headers.has('authorization') ? { authorization: headers.get('authorization') ?? '' } : {}),
+    ...(headers.has('private-token') ? { privateToken: headers.get('private-token') ?? '' } : {}),
+  };
+}
+
+/** The response for a refused admission. The log has the sandbox id, code and status only. */
+export function forwardAdmissionDenied(
+  sandboxId: string,
+  admission: { status: number; code: string; retryAfter?: number },
+  message: string
+): Response {
+  logger.withFields({ sandboxId, code: admission.code, status: admission.status }).warn(message);
+  return Response.json(
+    { code: admission.code },
+    {
+      status: admission.status,
+      ...(admission.retryAfter ? { headers: { 'Retry-After': String(admission.retryAfter) } } : {}),
+    }
+  );
+}
+
+/** Sends an upstream request with the authority that the SCM admission granted. */
+export async function forwardAdmittedScm(
+  upstream: Request,
+  env: Pick<Env, 'GIT_TOKEN_SERVICE'>,
+  authority: Extract<ControlPlaneScmForwardAdmissionResult, { ok: true }>['authority']
+): Promise<Response> {
+  if (authority.type === 'unmanaged') return await fetch(upstream);
+  return await forwardResolvedScmCapability(
+    upstream,
+    env.GIT_TOKEN_SERVICE,
+    { provider: authority.provider, capability: authority.capability },
+    authority.outboundContainerId
+  );
+}
+
 export async function handleVercelScmForward(
   request: Request,
   env: Env,
@@ -75,46 +118,16 @@ export async function handleVercelScmForward(
     const admission = await admit(env, sandboxId, {
       oidcToken,
       target: { url: target.href, method: request.method },
-      authorization: {
-        ...(request.headers.has('authorization')
-          ? { authorization: request.headers.get('authorization') ?? '' }
-          : {}),
-        ...(request.headers.has('private-token')
-          ? { privateToken: request.headers.get('private-token') ?? '' }
-          : {}),
-      },
+      authorization: scmAuthorization(request.headers),
     });
-    if (!admission.ok) {
-      logger
-        .withFields({ sandboxId, code: admission.code, status: admission.status })
-        .warn('Vercel SCM forwarding admission rejected');
-      return Response.json(
-        { code: admission.code },
-        {
-          status: admission.status,
-          ...(admission.retryAfter
-            ? { headers: { 'Retry-After': String(admission.retryAfter) } }
-            : {}),
-        }
+    if (!admission.ok)
+      return forwardAdmissionDenied(
+        sandboxId,
+        admission,
+        'Vercel SCM forwarding admission rejected'
       );
-    }
-    const upstream = upstreamRequest(request, target);
-    if (admission.authority.type === 'unmanaged') return await fetch(upstream);
-    return await forwardResolvedScmCapability(
-      upstream,
-      env.GIT_TOKEN_SERVICE,
-      { provider: admission.authority.provider, capability: admission.authority.capability },
-      admission.authority.outboundContainerId
-    );
+    return await forwardAdmittedScm(upstreamRequest(request, target), env, admission.authority);
   } catch {
     return Response.json({ code: 'forwarding_unavailable' }, { status: 503 });
-  }
-}
-
-export function registerVercelScmBrokerRoute(app: Hono<HonoContext>): void {
-  for (const path of ['/scm/vercel/:sandboxId', '/scm/vercel/:sandboxId/*']) {
-    app.all(path, context =>
-      handleVercelScmForward(context.req.raw, context.env, context.req.param('sandboxId') ?? '')
-    );
   }
 }

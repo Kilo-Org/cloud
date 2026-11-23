@@ -184,20 +184,10 @@ export function generateOrganizationApiToken(
 ) {
   const expiresAt = new Date(Date.now() + FIFTEEN_MINUTES_IN_SECONDS * 1000);
 
-  const token = jwt.sign(
-    {
-      env: process.env.NODE_ENV,
-      kiloUserId: user.id,
-      apiTokenPepper: user.api_token_pepper,
-      version: KILO_TOKEN_VERSION,
-      organizationId,
-      organizationRole,
-    },
-    NEXTAUTH_SECRET,
-    {
-      algorithm: jwtSigningAlgorithm,
-      expiresIn: FIFTEEN_MINUTES_IN_SECONDS,
-    }
+  const token = generateApiToken(
+    user,
+    { organizationId, organizationRole },
+    { expiresIn: FIFTEEN_MINUTES_IN_SECONDS }
   );
 
   return {

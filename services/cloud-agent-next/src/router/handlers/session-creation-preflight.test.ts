@@ -262,10 +262,13 @@ describe('session creation preflight', () => {
     }
   );
 
-  it('rejects a non-interactive parent origin before billing or profile resolution', async () => {
+  it('inherits resolved configuration from a non-interactive parent and rechecks access', async () => {
+    const environment = environmentLoad({}, 'c78fbb23-49b8-4d57-8cdf-d93863ed26a1').reference;
+    const profile = { envVars: { PROFILE_MARKER: 'inherited' } };
     parentSpawnContextMock.mockResolvedValue({
       token: 'trusted-parent-model-token',
-      createdOnPlatform: 'slack',
+      createdOnPlatform: 'code-review',
+      configuration: { environment, profile },
     });
     const authority = {
       version: 1 as const,
@@ -282,11 +285,18 @@ describe('session creation preflight', () => {
         { ...context, cloudAgentAuthority: authority },
         'prepareSession'
       )
-    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    ).resolves.toMatchObject({
+      options: { createdOnPlatform: 'code-review' },
+      profile: { resolved: profile },
+      environment,
+    });
 
-    expect(balanceMock).not.toHaveBeenCalled();
+    expect(balanceMock).toHaveBeenCalledWith('trusted-parent-model-token', undefined, context.env);
+    expect(assertRepositoryAccessMock).toHaveBeenCalled();
+    expect(assertEnvironmentRepositoriesAccessMock).toHaveBeenCalledWith(
+      expect.objectContaining({ environment })
+    );
     expect(mergeProfileConfigurationMock).not.toHaveBeenCalled();
-    expect(assertRepositoryAccessMock).not.toHaveBeenCalled();
   });
 
   it('does not bypass existing billing or accept mismatched lineage', async () => {

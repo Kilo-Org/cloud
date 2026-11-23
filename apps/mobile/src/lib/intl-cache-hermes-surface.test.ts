@@ -56,8 +56,11 @@ describe('Hermes Intl surface', () => {
       const { i18n } = await import('@/i18n');
       prewarmIntl('ru');
       await i18n.changeLanguage('ru');
-      const few = i18n.t('prReview.hunkRows.fileLoadedCount', { count: 2, displayCount: '2' });
-      const many = i18n.t('prReview.hunkRows.fileLoadedCount', { count: 5, displayCount: '5' });
+      const few = i18n.t('prReview.fileNavigator.fileLoadedCount', { count: 2, displayCount: '2' });
+      const many = i18n.t('prReview.fileNavigator.fileLoadedCount', {
+        count: 5,
+        displayCount: '5',
+      });
       expect(few).not.toBe(many);
     },
     allLanguagesTimeoutMs

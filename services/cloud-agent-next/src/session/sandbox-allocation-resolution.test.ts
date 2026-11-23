@@ -621,9 +621,19 @@ describe('withSavedSandboxAllocation', () => {
 
   describe('egress policy', () => {
     const vercelArgs = { ...args, env: { ...env, BYOC_VERCEL_IDS: owner.orgId } as Env };
+    // A Vercel sandbox enforces an allowlist, but cannot audit without one.
     const restricted: [string, SessionRuntimeIntent][] = [
-      ['an allowlist', { egressMode: 'allowlist', egressAllowlist: ['example.com'] }],
       ['an egress audit', { egressAudit: true }],
+      ['an unrestricted egress audit', { egressMode: 'unrestricted', egressAudit: true }],
+    ];
+    const supported: [string, SessionRuntimeIntent | undefined][] = [
+      ['no policy', undefined],
+      ['an unrestricted policy', { egressMode: 'unrestricted', egressAudit: false }],
+      ['an allowlist', { egressMode: 'allowlist', egressAllowlist: ['example.com'] }],
+      [
+        'an audited allowlist',
+        { egressMode: 'allowlist', egressAllowlist: ['example.com'], egressAudit: true },
+      ],
     ];
     const environments = [
       ['V1', v1],
@@ -666,15 +676,7 @@ describe('withSavedSandboxAllocation', () => {
 
     it.each(
       environments.flatMap(([version, environment]) =>
-        [undefined, { egressMode: 'unrestricted', egressAudit: false } as const].map(
-          runtime =>
-            [
-              version,
-              runtime === undefined ? 'no policy' : 'an unrestricted policy',
-              environment,
-              runtime,
-            ] as const
-        )
+        supported.map(([policy, runtime]) => [version, policy, environment, runtime] as const)
       )
     )(
       'keeps a Vercel owner default for a %s environment with %s',

@@ -1,3 +1,4 @@
+import { QueryClientProvider } from '@tanstack/react-query';
 import { createElement } from 'react';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -13,11 +14,20 @@ const routerReplace = vi.hoisted(() => vi.fn());
 const routerBack = vi.hoisted(() => vi.fn());
 const routerCanGoBack = vi.hoisted(() => ({ value: true }));
 const boundaryArgs = vi.hoisted((): { value: (string | undefined)[] } => ({ value: [] }));
+const boundaryRefetch = vi.hoisted(() => vi.fn());
 const boundaryState = vi.hoisted(() => ({
   organizationId: 'org-1' as string | null,
   org: { organizationName: 'First test organization' },
   role: 'owner' as string | undefined,
   isResolving: false,
+  isError: false,
+  isFetching: false,
+  selectionSettled: true,
+  selectionError: null as 'restore' | 'save' | null,
+  orgs: [{ organizationId: 'org-1', role: 'owner' }] as
+    | { organizationId: string; role: string }[]
+    | undefined,
+  refetch: boundaryRefetch,
 }));
 
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
@@ -45,6 +55,13 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
     return boundaryState;
   },
 }));
+vi.mock('@/lib/organization-context', () => ({
+  useOrganization: () => ({
+    isLoaded: boundaryState.selectionSettled,
+    error: boundaryState.selectionError,
+    retry: vi.fn(),
+  }),
+}));
 vi.mock('react-native', () => ({ View: 'View', ScrollView: 'ScrollView' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
@@ -55,6 +72,10 @@ vi.mock('@/components/ui/accessible-status', () => ({
 }));
 vi.mock('@/components/ui/segmented-control', () => ({ SegmentedControl: 'SegmentedControl' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/query-error', () => ({
+  QueryError: (props: { isRetrying?: boolean; onRetry?: () => void }) =>
+    createElement('QueryError', props),
+}));
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -78,6 +99,28 @@ function mount(props: {
   organizationId?: string;
 }) {
   return renderWithProviders(createElement(NewProfileScreen, { stack: 'app', ...props }));
+}
+
+/** Re-render the mounted screen at its caller props, so a test can resolve the boundary. */
+function mountWithRerender(props: {
+  initialOwner?: 'personal' | 'organization';
+  returnToCaller?: boolean;
+  organizationId?: string;
+}) {
+  return mount(props).then(result => ({
+    ...result,
+    rerender: () => {
+      act(() => {
+        result.renderer.update(
+          createElement(
+            QueryClientProvider,
+            { client: result.queryClient },
+            createElement(NewProfileScreen, { stack: 'app', ...props })
+          )
+        );
+      });
+    },
+  }));
 }
 
 async function pressCreate(root: ReactTestInstance): Promise<void> {
@@ -104,6 +147,12 @@ describe('NewProfileScreen caller request', () => {
     boundaryState.role = 'owner';
     boundaryState.org = { organizationName: 'First test organization' };
     boundaryState.isResolving = false;
+    boundaryState.isError = false;
+    boundaryState.isFetching = false;
+    boundaryState.selectionSettled = true;
+    boundaryState.selectionError = null;
+    boundaryState.orgs = [{ organizationId: 'org-1', role: 'owner' }];
+    boundaryRefetch.mockReset();
   });
 
   it('starts on the owner its caller asked for and hands the form back on save', async () => {
@@ -171,6 +220,69 @@ describe('NewProfileScreen caller request', () => {
     });
 
     expect(boundaryArgs.value).toContain('org-2');
+
+    unmount();
+  });
+
+  it('holds the caller-requested organization create until the boundary resolves', async () => {
+    boundaryState.isResolving = true;
+    const { renderer, rerender, unmount } = await mountWithRerender({
+      initialOwner: 'organization',
+      returnToCaller: true,
+    });
+
+    expect(findAll(renderer.root, 'Button')[0]?.props.disabled).toBe(true);
+
+    typeName(renderer.root, 'Org profile');
+    await pressCreate(renderer.root);
+    expect(createMutate).not.toHaveBeenCalled();
+
+    boundaryState.isResolving = false;
+    boundaryState.role = 'owner';
+    rerender();
+
+    expect(findAll(renderer.root, 'Button')[0]?.props.disabled).toBe(false);
+    await pressCreate(renderer.root);
+
+    await waitFor(() => createMutate.mock.calls.length > 0);
+    expect(createMutate.mock.calls[0]?.[0]).toEqual({
+      name: 'Org profile',
+      organizationId: 'org-1',
+    });
+
+    unmount();
+  });
+
+  it('waits for the organization its caller asked for before the boundary has one', async () => {
+    boundaryState.organizationId = null;
+    boundaryState.role = undefined;
+    boundaryState.orgs = undefined;
+    boundaryState.isResolving = true;
+    const { renderer, rerender, unmount } = await mountWithRerender({
+      initialOwner: 'organization',
+      returnToCaller: true,
+    });
+
+    expect(findAll(renderer.root, 'Button')[0]?.props.disabled).toBe(true);
+
+    typeName(renderer.root, 'Org profile');
+    await pressCreate(renderer.root);
+    expect(createMutate).not.toHaveBeenCalled();
+
+    boundaryState.organizationId = 'org-1';
+    boundaryState.role = 'owner';
+    boundaryState.orgs = [{ organizationId: 'org-1', role: 'owner' }];
+    boundaryState.isResolving = false;
+    rerender();
+
+    expect(findAll(renderer.root, 'Button')[0]?.props.disabled).toBe(false);
+    await pressCreate(renderer.root);
+
+    await waitFor(() => createMutate.mock.calls.length > 0);
+    expect(createMutate.mock.calls[0]?.[0]).toEqual({
+      name: 'Org profile',
+      organizationId: 'org-1',
+    });
 
     unmount();
   });

@@ -11,12 +11,35 @@ const createMutate = vi.hoisted(() => vi.fn());
 const toastSuccess = vi.hoisted(() => vi.fn());
 const toastError = vi.hoisted(() => vi.fn());
 const routerReplace = vi.hoisted(() => vi.fn());
-const boundaryState = vi.hoisted(() => ({
-  organizationId: 'org-1' as string | null,
-  org: { organizationName: 'First test organization' },
-  role: 'owner' as string | undefined,
-  isResolving: false,
-}));
+const boundaryRefetch = vi.hoisted(() => vi.fn());
+const selectionRetry = vi.hoisted(() => vi.fn());
+type BoundaryOrgRow = { organizationId: string; role: string };
+const boundaryState = vi.hoisted(() => {
+  const state: {
+    organizationId: string | null;
+    org: { organizationName: string } | undefined;
+    role: string | undefined;
+    isResolving: boolean;
+    isError: boolean;
+    isFetching: boolean;
+    selectionSettled: boolean;
+    selectionError: 'restore' | 'save' | null;
+    orgs: BoundaryOrgRow[] | undefined;
+    refetch: typeof boundaryRefetch;
+  } = {
+    organizationId: 'org-1',
+    org: { organizationName: 'First test organization' },
+    role: 'owner',
+    isResolving: false,
+    isError: false,
+    isFetching: false,
+    selectionSettled: true,
+    selectionError: null,
+    orgs: [{ organizationId: 'org-1', role: 'owner' }],
+    refetch: boundaryRefetch,
+  };
+  return state;
+});
 const mutationState = vi.hoisted(() => ({
   create: { mutateAsync: createMutate, isPending: false },
 }));
@@ -45,6 +68,17 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
   useOrgBoundary: () => boundaryState,
 }));
 
+// The stored selection settles through the provider; here its published
+// `isLoaded` stands in, so a test can mount the screen before the selection
+// names anything.
+vi.mock('@/lib/organization-context', () => ({
+  useOrganization: () => ({
+    isLoaded: boundaryState.selectionSettled,
+    error: boundaryState.selectionError,
+    retry: selectionRetry,
+  }),
+}));
+
 vi.mock('@/lib/profile-agent-navigation', () => ({
   getProfileOverviewPath: (profileId: string, options: { organizationId?: string } = {}) =>
     options.organizationId
@@ -61,10 +95,29 @@ vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
 vi.mock('@/components/ui/segmented-control', () => ({ SegmentedControl: 'SegmentedControl' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+// The shared retry row has its own suite; here it passes its props through so a
+// test can read the retry callback the screen handed it and press it.
+vi.mock('@/components/query-error', () => ({
+  QueryError: (props: {
+    placement?: string;
+    inset?: string;
+    compact?: boolean;
+    isRetrying?: boolean;
+    onRetry?: () => void;
+  }) => createElement('QueryError', props),
+}));
 
 // `vi.hoisted` results cannot be exported at their declaration (vitest hoists
 // them above the export), so they are exported after the declaration instead.
-export { boundaryState, createMutate, routerReplace, toastError, toastSuccess };
+export {
+  boundaryRefetch,
+  boundaryState,
+  createMutate,
+  routerReplace,
+  selectionRetry,
+  toastError,
+  toastSuccess,
+};
 
 export function findAll(root: ReactTestInstance, type: string): ReactTestInstance[] {
   return root.findAll(node => typeof node.type === 'string' && node.type === type);
@@ -123,16 +176,37 @@ export async function pressCreate(root: ReactTestInstance): Promise<void> {
   });
 }
 
+/** The one Create button, so a test can read whether the screen disabled it. */
+export function findCreateButton(root: ReactTestInstance): ReactTestInstance {
+  const button = findAll(root, 'Button')[0];
+  if (!button) {
+    throw new Error('create button was not rendered');
+  }
+  return button;
+}
+
+/** The boundary read's retry row, or `undefined` while the read has not failed. */
+export function findRetryRow(root: ReactTestInstance): ReactTestInstance | undefined {
+  return findAll(root, 'QueryError')[0];
+}
+
 /** Put the boundary, the mocks and the create result back to the suite's baseline. */
 export function resetNewProfileState(): void {
   createMutate.mockReset();
   toastSuccess.mockReset();
   toastError.mockReset();
   routerReplace.mockReset();
+  boundaryRefetch.mockReset();
+  selectionRetry.mockReset();
   createMutate.mockResolvedValue({ id: 'profile-1' });
   boundaryState.organizationId = 'org-1';
   boundaryState.role = 'owner';
   boundaryState.org = { organizationName: 'First test organization' };
   boundaryState.isResolving = false;
+  boundaryState.isError = false;
+  boundaryState.isFetching = false;
+  boundaryState.selectionSettled = true;
+  boundaryState.selectionError = null;
+  boundaryState.orgs = [{ organizationId: 'org-1', role: 'owner' }];
   mutationState.create.isPending = false;
 }

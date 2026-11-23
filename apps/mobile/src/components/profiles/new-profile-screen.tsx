@@ -15,6 +15,7 @@ import {
   ownerChoices,
   type ProfileOwnerChoice,
 } from '@/components/profiles/profile-owner-model';
+import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
@@ -25,6 +26,7 @@ import { validateProfileDescription } from '@/lib/agent-profile-forms';
 import { useAgentProfileMutations } from '@/lib/hooks/use-agent-profiles';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { useProfileNameField } from '@/lib/hooks/use-profile-name-field';
+import { useOrganization } from '@/lib/organization-context';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 import {
@@ -97,7 +99,20 @@ export function NewProfileScreen({
     role,
     org,
     isResolving,
+    isError,
+    isFetching,
+    orgs,
+    refetch,
   } = useOrgBoundary(organizationId);
+  // The stored selection publishes an organization only once it settles, so a
+  // Personal id before that is the absence of an answer rather than one. Its
+  // own read can fail, and it then stays unsettled, so the failure and its
+  // retry reach the row this screen already renders for a failed read.
+  const {
+    isLoaded: selectionSettled,
+    error: selectionError,
+    retry: retrySelection,
+  } = useOrganization();
   // No organization context on the hook: the owner choice below decides which
   // `organizationId` each create carries, so a personal create is never
   // rewritten to the selected organization.
@@ -111,19 +126,40 @@ export function NewProfileScreen({
     organizationId: string | null;
     owner: ProfileOwnerChoice;
   } | null>(null);
+  // The membership answer decides the owner only for a create that can carry an
+  // organization: an active organization boundary, a caller-requested
+  // organization owner waiting for an organization the boundary resolves to, or
+  // a selection that has not settled and so may still name one.
+  const roleDecidesOwner =
+    !selectionSettled ||
+    hasOrganizationContext(boundaryOrganizationId) ||
+    initialOwner === 'organization';
+  // The owner follows the resolved role, so Create waits while that role is
+  // unknown for a create the role decides. A failed background refetch keeps its
+  // list, so only a missing list is unknown.
+  const roleUnknown = roleDecidesOwner && (isResolving || orgs === undefined);
   const canOwnOrganization =
-    !isResolving && hasOrganizationContext(boundaryOrganizationId) && canManageOrganization(role);
+    !roleUnknown && hasOrganizationContext(boundaryOrganizationId) && canManageOrganization(role);
   const pickedOwner =
     ownerSelection?.organizationId === boundaryOrganizationId ? ownerSelection.owner : null;
   const owner: ProfileOwnerChoice = canOwnOrganization
     ? (pickedOwner ?? initialOwner ?? 'personal')
     : 'personal';
+  // Only a read that failed leaves no answer and no retry of its own, and the
+  // row is for the reads a create depends on: the membership list, or the
+  // stored selection it is resolved against.
+  const selectionUnread = selectionError === 'restore';
+  const boundaryUnread = roleDecidesOwner && (selectionUnread || (isError && orgs === undefined));
+  const retryBoundary = selectionUnread ? retrySelection : refetch;
   const selectOwner = (next: ProfileOwnerChoice) => {
     setOwnerSelection({ organizationId: boundaryOrganizationId ?? null, owner: next });
   };
   const [descriptionError, setDescriptionError] = useState<string | null>(null);
 
   const submit = async () => {
+    if (roleUnknown) {
+      return;
+    }
     const name = nameField.commit();
     if (name === null) {
       return;
@@ -180,6 +216,16 @@ export function NewProfileScreen({
           }}
         />
 
+        {boundaryUnread ? (
+          <QueryError
+            placement="top"
+            inset="none"
+            compact
+            onRetry={() => void retryBoundary()}
+            isRetrying={isFetching}
+          />
+        ) : null}
+
         {canOwnOrganization ? (
           <View className="gap-1.5">
             <FormFieldLabel
@@ -206,7 +252,7 @@ export function NewProfileScreen({
 
         <Button
           loading={create.isPending}
-          disabled={create.isPending}
+          disabled={roleUnknown || create.isPending}
           onPress={() => void submit()}
         >
           <Text>{t('profiles.createAction')}</Text>

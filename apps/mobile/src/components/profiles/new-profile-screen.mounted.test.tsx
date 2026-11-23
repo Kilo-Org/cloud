@@ -1,11 +1,14 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import {
+  boundaryRefetch,
   boundaryState,
   createMutate,
   findAll,
+  findCreateButton,
   findField,
   findOwnerControl,
+  findRetryRow,
   mount,
   pressCreate,
   resetNewProfileState,
@@ -148,6 +151,33 @@ describe('NewProfileScreen', () => {
     unmount();
   });
 
+  it.each([
+    { read: 'resolving', isResolving: true, isError: false },
+    { read: 'failed', isResolving: false, isError: true },
+  ])(
+    'personal context: a $read membership read neither blocks the create nor asks for a retry',
+    async ({ isResolving, isError }) => {
+      boundaryState.organizationId = null;
+      boundaryState.role = undefined;
+      boundaryState.orgs = undefined;
+      boundaryState.isResolving = isResolving;
+      boundaryState.isError = isError;
+      const { renderer, unmount } = await mount();
+
+      expect(findCreateButton(renderer.root).props.disabled).toBe(false);
+      expect(findRetryRow(renderer.root)).toBeUndefined();
+
+      typeName(renderer.root, 'Backend debugging');
+      await pressCreate(renderer.root);
+
+      await waitFor(() => createMutate.mock.calls.length > 0);
+      expect(createMutate.mock.calls[0]?.[0]).toEqual({ name: 'Backend debugging' });
+      expect(routerReplace).toHaveBeenCalledWith('/profiles/profile-1');
+
+      unmount();
+    }
+  );
+
   it.each(['member', 'billing_manager'])(
     'does not offer organization ownership to a %s and still creates personal profiles',
     async role => {
@@ -168,28 +198,112 @@ describe('NewProfileScreen', () => {
   );
 
   it.each([
-    { name: 'unresolved membership', isResolving: true, role: undefined },
-    { name: 'unresolved membership with a cached role', isResolving: true, role: 'owner' },
-    { name: 'missing membership', isResolving: false, role: undefined },
-  ])(
-    'does not offer organization ownership for $name and still creates personal profiles',
-    async ({ isResolving, role }) => {
-      boundaryState.isResolving = isResolving;
-      boundaryState.role = role;
-      const { renderer, unmount } = await mount();
+    { name: 'unresolved membership', role: undefined },
+    { name: 'unresolved membership with a cached role', role: 'owner' },
+  ])('blocks Create while the organization boundary for $name is unresolved', async ({ role }) => {
+    boundaryState.isResolving = true;
+    boundaryState.role = role;
+    const { renderer, unmount } = await mount();
 
-      expect(findAll(renderer.root, 'SegmentedControl')).toHaveLength(0);
+    expect(findAll(renderer.root, 'SegmentedControl')).toHaveLength(0);
+    expect(findCreateButton(renderer.root).props.disabled).toBe(true);
 
-      typeName(renderer.root, 'Backend debugging');
-      await pressCreate(renderer.root);
+    typeName(renderer.root, 'Backend debugging');
+    await pressCreate(renderer.root);
+    expect(createMutate).not.toHaveBeenCalled();
 
-      await waitFor(() => createMutate.mock.calls.length > 0);
-      expect(createMutate.mock.calls[0]?.[0]).toEqual({ name: 'Backend debugging' });
-      expect(routerReplace).toHaveBeenCalledWith('/profiles/profile-1');
+    unmount();
+  });
 
-      unmount();
+  it('does not offer organization ownership for missing membership and still creates personal profiles', async () => {
+    boundaryState.role = undefined;
+    const { renderer, unmount } = await mount();
+
+    expect(findAll(renderer.root, 'SegmentedControl')).toHaveLength(0);
+    expect(findCreateButton(renderer.root).props.disabled).toBe(false);
+
+    typeName(renderer.root, 'Backend debugging');
+    await pressCreate(renderer.root);
+
+    await waitFor(() => createMutate.mock.calls.length > 0);
+    expect(createMutate.mock.calls[0]?.[0]).toEqual({ name: 'Backend debugging' });
+    expect(routerReplace).toHaveBeenCalledWith('/profiles/profile-1');
+
+    unmount();
+  });
+
+  it('holds Create until the boundary resolves, then carries the organization id', async () => {
+    boundaryState.isResolving = true;
+    const { renderer, rerender, unmount } = await mount();
+
+    expect(findCreateButton(renderer.root).props.disabled).toBe(true);
+
+    boundaryState.isResolving = false;
+    boundaryState.role = 'owner';
+    rerender();
+
+    expect(findCreateButton(renderer.root).props.disabled).toBe(false);
+    act(() => {
+      (findOwnerControl(renderer.root).props as { onChange: (v: string) => void }).onChange(
+        'organization'
+      );
+    });
+    typeName(renderer.root, 'Org profile');
+    await pressCreate(renderer.root);
+
+    await waitFor(() => createMutate.mock.calls.length > 0);
+    expect(createMutate.mock.calls[0]?.[0]).toEqual({
+      name: 'Org profile',
+      organizationId: 'org-1',
+    });
+
+    unmount();
+  });
+
+  it('a failed boundary read disables Create and the retry row reads the boundary again', async () => {
+    boundaryState.isError = true;
+    boundaryState.orgs = undefined;
+    const { renderer, unmount } = await mount();
+
+    expect(findCreateButton(renderer.root).props.disabled).toBe(true);
+    expect(findAll(renderer.root, 'SegmentedControl')).toHaveLength(0);
+
+    typeName(renderer.root, 'Backend debugging');
+    await pressCreate(renderer.root);
+    expect(createMutate).not.toHaveBeenCalled();
+
+    const retryRow = findRetryRow(renderer.root);
+    if (!retryRow) {
+      throw new Error('boundary retry row was not rendered');
     }
-  );
+    expect(retryRow.props.placement).toBe('top');
+    expect(retryRow.props.inset).toBe('none');
+    expect(retryRow.props.compact).toBe(true);
+    expect(retryRow.props.isRetrying).toBe(false);
+
+    act(() => {
+      (retryRow.props as { onRetry: () => void }).onRetry();
+    });
+    expect(boundaryRefetch).toHaveBeenCalledOnce();
+
+    unmount();
+  });
+
+  it('a failed refetch that still holds the list keeps Create enabled', async () => {
+    boundaryState.isError = true;
+    const { renderer, unmount } = await mount();
+
+    expect(findCreateButton(renderer.root).props.disabled).toBe(false);
+    expect(findRetryRow(renderer.root)).toBeUndefined();
+
+    typeName(renderer.root, 'Backend debugging');
+    await pressCreate(renderer.root);
+
+    await waitFor(() => createMutate.mock.calls.length > 0);
+    expect(createMutate.mock.calls[0]?.[0]).toEqual({ name: 'Backend debugging' });
+
+    unmount();
+  });
 
   it('stale role: a selected organization cannot submit after the role drops', async () => {
     const { renderer, rerender, unmount } = await mount();

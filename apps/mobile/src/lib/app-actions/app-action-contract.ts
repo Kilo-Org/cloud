@@ -304,7 +304,6 @@ export function parseActionRepository(raw: string): ParsedActionRepository | nul
   return { kind: 'github', fullName: bare };
 }
 
-/** A target split into its path and its query, fragment dropped. */
 type ActionTarget = {
   path: string;
   search: string;

@@ -1673,15 +1673,15 @@
       "backToSessions": "सत्रों पर वापस जाएँ",
       "follow": "सत्र फ़ॉलो करें",
       "unfollow": "सत्र फ़ॉलो करना बंद करें",
-      "couldNotLoad": "सत्र लोड नहीं हो सका।",
-      "failedToLoadDetails": "सत्र का विवरण लोड नहीं हो सका।",
+      "couldNotLoad": "सत्र लोड नहीं हो सका",
+      "failedToLoadDetails": "सत्र का विवरण लोड नहीं हो सका",
       "emptyDescription": "शुरू करने के लिए नीचे एक संदेश भेजें।",
-      "failedToStopExecution": "चल रहा काम रोका नहीं जा सका।",
+      "failedToStopExecution": "चल रहा काम रोका नहीं जा सका",
       "stopped": "सत्र रोक दिया गया",
       "committing": "कमिट किया जा रहा है…",
       "committed": "कमिट हो गया",
       "commitFailed": "कमिट विफल रहा",
-      "readOnly": "इस सत्र को केवल पढ़ा जा सकता है।",
+      "readOnly": "इस सत्र को केवल पढ़ा जा सकता है",
       "continueInNewSession": "नए सत्र में जारी रखें",
       "renamePlaceholder": "सत्र का नाम",
       "renameSession": "सत्र का नाम बदलें",
@@ -1690,7 +1690,7 @@
       "emptyTitle": "अभी कोई संदेश नहीं",
       "emptyReadOnlyTitle": "इस सत्र में कोई संदेश नहीं",
       "cloningSession": "सत्र क्लोन किया जा रहा है",
-      "couldNotLoadThisSession": "यह सत्र लोड नहीं हो सका।",
+      "couldNotLoadThisSession": "यह सत्र लोड नहीं हो सका",
       "historyTooLarge": "इस सत्र का ट्रांसक्रिप्ट लोड करने के लिए बहुत बड़ा है।",
       "historyUnavailable": "इस सत्र का ट्रांसक्रिप्ट नहीं पढ़ा जा सकता।",
       "historyTemporarilyUnavailable": "इस सत्र का ट्रांसक्रिप्ट अस्थायी रूप से उपलब्ध नहीं है।",
@@ -1743,8 +1743,8 @@
       "exitTitle": "सत्र से बाहर निकलें?",
       "keepSessionRunning": "सत्र चालू रखें",
       "restartExitFailed": "नया सत्र शुरू हुआ। पिछला सत्र अभी भी खुला है।",
-      "exitNotSupported": "इस सत्र में रिमोट से बाहर निकलने की सुविधा नहीं है।",
-      "exitUnavailable": "इस सत्र के लिए रिमोट सत्र से बाहर निकलना उपलब्ध नहीं है।",
+      "exitNotSupported": "इस सत्र में रिमोट से बाहर निकलने की सुविधा नहीं है",
+      "exitUnavailable": "इस सत्र के लिए रिमोट सत्र से बाहर निकलना उपलब्ध नहीं है",
       "exitNeedsNewerCli": "रिमोट स्लैश आदेश के लिए Kilo CLI का नया संस्करण चाहिए। Kilo CLI अपडेट करें और फिर से कनेक्ट करें।"
     },
     "newSession": {
@@ -1770,7 +1770,7 @@
       "branchDefault": "डिफ़ॉल्ट",
       "branchAccessibility": "ब्रांच: {{label}}",
       "branchLoading": "ब्रांच लोड हो रही हैं",
-      "branchInactive": "इसकी ब्रांच लोड करने के लिए रिपॉज़िटरी चुनें।",
+      "branchInactive": "इसकी ब्रांच लोड करने के लिए रिपॉज़िटरी चुनें",
       "branchLoadError": "ब्रांच लोड नहीं हो सकीं",
       "branchUnavailable": "इस रिपॉज़िटरी के लिए ब्रांच उपलब्ध नहीं हैं। प्रदाता के साथ अपनी पहुँच जाँचें, फिर कोई दूसरी रिपॉज़िटरी चुनें।",
       "branchEmpty": "कोई ब्रांच उपलब्ध नहीं",
@@ -1927,9 +1927,9 @@
       "snapshotCaptured": "वर्कस्पेस स्नैपशॉट {{when}} कैप्चर किया गया"
     },
     "partRenderer": {
-      "updatedFileCount_one": "{{displayCount}} फ़ाइल अपडेट की गई।",
-      "updatedFileCount": "{{displayCount}} फ़ाइलें अपडेट की गईं।",
-      "updatedFileCount_other": "{{displayCount}} फ़ाइलें अपडेट की गईं।"
+      "updatedFileCount_one": "{{displayCount}} फ़ाइल अपडेट की गई",
+      "updatedFileCount": "{{displayCount}} फ़ाइलें अपडेट की गईं",
+      "updatedFileCount_other": "{{displayCount}} फ़ाइलें अपडेट की गईं"
     },
     "readToolMarkdown": {
       "linesTruncated": "पंक्तियाँ {{start}}–{{end}} (कुछ हिस्सा हटाया गया है)",
@@ -2011,7 +2011,7 @@
       "reportAiResponseFailedTerminal": "इस उत्तर की रिपोर्ट नहीं की जा सकती।"
     },
     "partDetail": {
-      "detailsUnavailable": "विवरण उपलब्ध नहीं है।",
+      "detailsUnavailable": "विवरण उपलब्ध नहीं है",
       "textDisplay": "दिखाया गया टेक्स्ट",
       "thinking": "सोच रहा है",
       "thought": "विचार",
@@ -2034,10 +2034,10 @@
       }
     },
     "messageErrorBoundary": {
-      "failedToRender": "सामग्री दिखाई नहीं जा सकी।"
+      "failedToRender": "सामग्री दिखाई नहीं जा सकी"
     },
     "messageFailure": {
-      "deliveryTitle": "संदेश पहुँचाया नहीं जा सका।",
+      "deliveryTitle": "संदेश पहुँचाया नहीं जा सका",
       "deliveryInterrupted": "आपने यह संदेश रोक दिया।",
       "deliveryExhausted": "कई कोशिशों के बाद भी हम यह संदेश नहीं पहुँचा सके।",
       "deliveryExecution": "एजेंट इस संदेश पर काम नहीं कर सका।",
@@ -2066,8 +2066,8 @@
       "couldNotLoadFileRetry": "यह फ़ाइल लोड नहीं हो सकी। फिर से कोशिश करें।",
       "retryLoadingFile": "फ़ाइल फिर से लोड करें",
       "fileEmpty": "यह फ़ाइल खाली है।",
-      "previewUnavailable": "पूर्वावलोकन उपलब्ध नहीं है।",
-      "shareFailed": "साझा नहीं किया जा सका।",
+      "previewUnavailable": "पूर्वावलोकन उपलब्ध नहीं है",
+      "shareFailed": "साझा नहीं किया जा सका",
       "sharingUnavailable": "इस डिवाइस पर फ़ाइल साझा करने की सुविधा नहीं है।",
       "shareFailedRetry": "फ़ाइल साझा नहीं हो सकी। कृपया फिर से कोशिश करें।",
       "openAsText": "टेक्स्ट के रूप में खोलें",
@@ -2077,7 +2077,7 @@
     },
     "preparation": {
       "exitCode": "एग्ज़िट कोड: {{code}}",
-      "earlierOutputOmitted": "पहले का आउटपुट नहीं दिखाया गया है।",
+      "earlierOutputOmitted": "पहले का आउटपुट नहीं दिखाया गया है",
       "preparingEnvironment": "एनवायरनमेंट तैयार हो रहा है",
       "preparationComplete": "तैयारी पूरी हुई",
       "preparationFailed": "तैयारी विफल रही",
@@ -2179,7 +2179,7 @@
       "skipQuestionsTitle": "प्रश्न छोड़ें?",
       "skipQuestionsMessage": "एजेंट यह चरण छोड़ देगा।",
       "answerProgress": "उत्तर दिए गए: {{answered}}/{{total}}",
-      "selectAllThatApply": "लागू होने वाले सभी विकल्प चुनें।",
+      "selectAllThatApply": "लागू होने वाले सभी विकल्प चुनें",
       "option": "{{label}}",
       "optionSelected": "{{label}}, चयनित",
       "typeYourOwnAnswer": "अपना उत्तर टाइप करें",
@@ -2215,7 +2215,7 @@
       "waitingForActivity": "गतिविधि की प्रतीक्षा"
     },
     "childSessionSheet": {
-      "couldNotLoad": "सबएजेंट का सत्र लोड नहीं हो सका।",
+      "couldNotLoad": "सबएजेंट का सत्र लोड नहीं हो सका",
       "historyTooLarge": "इस सबएजेंट का इतिहास लोड करने के लिए बहुत बड़ा है।",
       "historyUnavailable": "इस सबएजेंट का इतिहास उपलब्ध नहीं है।",
       "historyTemporarilyUnavailable": "इस सबएजेंट का इतिहास अस्थायी रूप से उपलब्ध नहीं है।",
@@ -2311,7 +2311,7 @@
       "waitForUploads": "अटैचमेंट का अपलोड पूरा होने तक इंतज़ार करें।",
       "pasteFromClipboard": "क्लिपबोर्ड से पेस्ट करें",
       "stopGenerating": "उत्तर बनाना रोकें",
-      "selectModelBeforeSending": "भेजने से पहले एक मॉडल चुनें।",
+      "selectModelBeforeSending": "भेजने से पहले एक मॉडल चुनें",
       "preparingPlaceholder": "एनवायरनमेंट तैयार हो रहा है…",
       "finalizingPlaceholder": "काम पूरा किया जा रहा है…",
       "sessionLoadFailed": "सत्र लोड नहीं हो सका। पहले फिर से प्रयास करें।",
@@ -2335,8 +2335,8 @@
       "share": "साझा करें",
       "prLinkActions": "PR लिंक के विकल्प",
       "linkActions": "लिंक के विकल्प",
-      "couldNotCopyLink": "लिंक कॉपी नहीं हो सका।",
-      "couldNotShareLink": "लिंक साझा नहीं हो सका।",
+      "couldNotCopyLink": "लिंक कॉपी नहीं हो सका",
+      "couldNotShareLink": "लिंक साझा नहीं हो सका",
       "showLinkActions": "लिंक के विकल्प दिखाएँ"
     },
     "compaction": {
@@ -2525,7 +2525,7 @@
       "fieldLabel": "फ़ोल्डर",
       "retryableDescription": "अपना कनेक्शन जाँचें और फिर से कोशिश करें। आप फिर भी ‘हो गया’ पर टैप करके यह फ़ोल्डर चुन सकते हैं।",
       "retryableTitle": "फ़ोल्डर की सूची नहीं मिल सकी",
-      "tapToListHint": "किसी फ़ोल्डर की सामग्री देखने के लिए उस पर टैप करें।",
+      "tapToListHint": "किसी फ़ोल्डर की सामग्री देखने के लिए उस पर टैप करें",
       "unsupportedDescription": "यह CLI फ़ोल्डर की सूची नहीं दिखा सकता। ‘हो गया’ पर टैप करने से शुरुआती फ़ोल्डर चुना रहेगा। ‘सत्र शुरू करें’ पर टैप करने से सत्र वहीं शुरू होगा।",
       "unsupportedTitle": "फ़ोल्डर की सूची नहीं दिखाई जा सकती"
     },

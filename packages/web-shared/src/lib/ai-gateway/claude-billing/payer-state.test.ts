@@ -2,7 +2,10 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   ...jest.requireActual('@kilocode/web-shared/lib/drizzle'),
   isUSRegion: () => true,
 }));
-jest.mock('./store', () => ({ getGrantedClaudeBillingConnection: jest.fn() }));
+jest.mock('./store', () => ({
+  ...jest.requireActual('./store'),
+  getGrantedClaudeBillingConnection: jest.fn(),
+}));
 
 import { afterEach, describe, expect, it } from '@jest/globals';
 import { getGrantedClaudeBillingConnection } from './store';

@@ -63,8 +63,31 @@ describe('intl-cache', () => {
     );
   });
 
-  it('reports the device zone through the same probe that drops the cache', () => {
-    expect(deviceTimeZone()).toBe(new Intl.DateTimeFormat().resolvedOptions().timeZone);
+  it('reports the stubbed device zone, and re-reads it only after the check interval', () => {
+    let zone = 'UTC';
+    stubDeviceZone(() => zone);
+    // A spy on `Date.now` moves the one-second check interval. `vi.useFakeTimers()`
+    // is not usable here: the fake clock builds its `Intl` mirror once and
+    // reinstalls that same mirror on every later call, so this case would read a
+    // mirror built elsewhere and the zone cases below would receive it.
+    let now = Date.now();
+    const clock = vi.spyOn(Date, 'now').mockImplementation(() => now);
+    try {
+      // Past the interval, so the probe reads the zone the stub reports.
+      now += 2000;
+      expect(deviceTimeZone()).toBe('UTC');
+
+      // The device moved, but inside the interval the cached answer stands.
+      zone = 'Pacific/Auckland';
+      now += 200;
+      expect(deviceTimeZone()).toBe('UTC');
+
+      // Past the interval, the probe reads the zone the device now reports.
+      now += 1800;
+      expect(deviceTimeZone()).toBe('Pacific/Auckland');
+    } finally {
+      clock.mockRestore();
+    }
   });
 
   it('formats in the locale it was asked for', () => {
@@ -140,12 +163,24 @@ describe('intl-cache', () => {
     expect(Intl.Locale).toBeTypeOf('function');
   });
 
-  it('prewarmIntl does not throw when a formatter constructor fails', () => {
-    vi.stubGlobal('Intl', { ...Intl, DurationFormat: failingFormat });
+  it('prewarms the duration formatter once and swallows its failure', () => {
+    let durationFormatAttempts = 0;
+    // Inherit `Intl` so every other formatter stays native, and define only the
+    // one the prewarm reaches. It must be a function, not an arrow: the prewarm
+    // constructs it, and an arrow has no construct trap to run.
+    const stub: typeof Intl = Object.create(Intl);
+    Object.defineProperty(stub, 'DurationFormat', {
+      value: function DurationFormat(): never {
+        durationFormatAttempts += 1;
+        return failingFormat();
+      },
+    });
+    vi.stubGlobal('Intl', stub);
 
-    // A locale no other test warms, so the caches cannot hide the failure.
+    // A locale no other case warms, so the caches cannot hide the attempt.
     expect(() => {
       prewarmIntl('sv');
     }).not.toThrow();
+    expect(durationFormatAttempts).toBe(1);
   });
 });

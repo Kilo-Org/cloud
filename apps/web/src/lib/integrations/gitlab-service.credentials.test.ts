@@ -2981,6 +2981,85 @@ describe('GitLab encrypted credential persistence', () => {
     }
   });
 
+  it('completes the walk when the marker statement fails', async () => {
+    const user = await insertTestUser();
+    const connected = await connectWithPAT(
+      { type: 'user', id: user.id },
+      'glpat-primary-token',
+      'https://gitlab.com',
+      user.id
+    );
+    const [integration] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integration.id));
+    await db.insert(platform_access_token_credentials).values([
+      {
+        platform_integration_id: integration.id,
+        token_encrypted: 'encrypted-project-42-token',
+        provider_credential_type: 'project_access_token' as const,
+        provider_resource_id: '42',
+        provider_base_url: 'https://gitlab.com',
+        provider_metadata: {
+          providerCredentialId: '777',
+          expiresOn: '2027-07-13',
+          authorizedAccountId: '101',
+        },
+      },
+      {
+        platform_integration_id: integration.id,
+        token_encrypted: 'encrypted-project-43-token',
+        provider_credential_type: 'project_access_token' as const,
+        provider_resource_id: '43',
+        provider_base_url: 'https://gitlab.com',
+        provider_metadata: {
+          providerCredentialId: '888',
+          expiresOn: '2027-07-13',
+          authorizedAccountId: '202',
+        },
+      },
+    ]);
+    const controller = new AbortController();
+    controller.abort();
+    const execute = jest
+      .spyOn(db, 'execute')
+      .mockRejectedValueOnce(new Error('canceling statement due to statement timeout'));
+
+    try {
+      await expect(
+        retireProjectCredentialsForReplacedAccount({
+          integration: {
+            id: integration.id,
+            metadata: { gitlab_instance_url: 'https://gitlab.com' },
+          },
+          userToken: 'glpat-primary-token',
+          currentAccountId: '202',
+          signal: controller.signal,
+        })
+      ).resolves.toEqual({ retired: 0, retained: 1, skippedWithinRetained: 1 });
+      expect(execute).toHaveBeenCalledTimes(1);
+    } finally {
+      execute.mockRestore();
+    }
+
+    expect(mockRevokeProjectAccessToken).not.toHaveBeenCalled();
+    const credentials = await db
+      .select({ providerMetadata: platform_access_token_credentials.provider_metadata })
+      .from(platform_access_token_credentials)
+      .where(
+        and(
+          eq(platform_access_token_credentials.platform_integration_id, integration.id),
+          eq(platform_access_token_credentials.provider_credential_type, 'project_access_token')
+        )
+      );
+    // The write failed, so nothing was marked; the row of the connected account is
+    // still left out of the counts.
+    expect(credentials.map(credential => credential.providerMetadata)).toEqual([
+      { authorizedAccountId: '101', expiresOn: '2027-07-13', providerCredentialId: '777' },
+      { authorizedAccountId: '202', expiresOn: '2027-07-13', providerCredentialId: '888' },
+    ]);
+  });
+
   it('leaves a project credential the provider already refused alone on a later account change', async () => {
     const user = await insertTestUser();
     const connected = await connectWithPAT(

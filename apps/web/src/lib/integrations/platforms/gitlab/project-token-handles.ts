@@ -733,7 +733,10 @@ async function markProjectCredentialRows(input: {
   if (pending.length === 0) return { failures, outcomes };
 
   const validatedAt = new Date().toISOString();
-  const updated = await db.execute<{ id: string; credential_version: number }>(sql`
+  // The account change is already committed, so a failed statement must report the
+  // batch instead of rejecting the connect that carries it.
+  const updated = await db
+    .execute<{ id: string; credential_version: number }>(sql`
     UPDATE ${platform_access_token_credentials}
     SET provider_metadata = marks.provider_metadata,
         last_validated_at = ${validatedAt},
@@ -749,7 +752,14 @@ async function markProjectCredentialRows(input: {
       AND ${platform_access_token_credentials.credential_version} = marks.credential_version
     RETURNING ${platform_access_token_credentials.id} AS id,
       ${platform_access_token_credentials.credential_version} AS credential_version
-  `);
+  `)
+    .catch((error: unknown) => {
+      for (const entry of pending) {
+        failures.push({ projectId: entry.projectId, error });
+      }
+      return null;
+    });
+  if (updated === null) return { failures, outcomes };
 
   // A pending entry whose row did not come back lost a version race: its
   // credential was replaced between the read and this statement.

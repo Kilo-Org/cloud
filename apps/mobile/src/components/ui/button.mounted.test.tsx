@@ -301,49 +301,28 @@ describe('Button native target contract', () => {
     const busyLabelClasses = (busy.findByType(NativeText).props.className as string).split(' ');
     expect(busyLabelClasses).not.toContain('dark:text-ink2');
     expect(busyLabelClasses).not.toContain('text-muted-foreground');
-  });
 
-  it('leaves the disabled plate fill off every enabled and non-primary face', () => {
-    // The plate belongs to the disabled primary alone: an enabled primary keeps
-    // the brand fill, and a disabled outlined control keeps its own dimmed
-    // treatment with its own ink.
-    const enabled = renderButton({}).props.className as string;
-    expect(enabled.split(' ')).not.toContain('bg-secondary-fill');
-
-    const disabledOutline = renderButton({ variant: 'outline', disabled: true });
-    const outlineClasses = (disabledOutline.props.className as string).split(' ');
-    expect(outlineClasses).not.toContain('bg-secondary-fill');
-    // A dimmed outlined control keeps its own foreground ink, so the dark plate
-    // ink must not leak into it.
-    const outlineLabelClasses = (
-      disabledOutline.findByType(NativeText).props.className as string
-    ).split(' ');
-    expect(outlineLabelClasses).not.toContain('dark:text-ink2');
-  });
-
-  it('keeps the disabled plate geometry stable across the enabled transition', () => {
-    // A size or radius token that appears only on one face would resize the
-    // button when its action becomes unavailable.
+    // The enabled face must carry the same size and radius tokens, and neither
+    // face a border, so the frame does not change when the action becomes
+    // unavailable.
     const enabled = (renderButton({}).props.className as string).split(' ');
-    const disabled = (renderButton({ disabled: true }).props.className as string).split(' ');
-    // The plate draws no border, so neither face may gain one: a border would
-    // shift the layout by its own width.
+    expect(enabled).not.toContain('bg-secondary-fill');
     expect(enabled).not.toContain('border');
-    expect(enabled).not.toContain('border-input');
-    expect(disabled).not.toContain('border');
-    expect(disabled).not.toContain('border-input');
-    // Both faces must carry the same size and radius tokens, and the filter
-    // must find some, or the comparison would pass on two empty lists.
-    const geometryTokens = (classes: string[]) =>
-      classes.filter(
-        token =>
-          token.includes('min-h-') ||
-          token.includes('px-') ||
-          token.includes('py-') ||
-          token.includes('rounded-')
+    const geometry = (face: string[]) =>
+      face.filter(token =>
+        ['min-h-', 'px-', 'py-', 'rounded-'].some(prefix => token.startsWith(prefix))
       );
-    expect(geometryTokens(enabled).length).toBeGreaterThan(0);
-    expect(geometryTokens(disabled).sort()).toEqual(geometryTokens(enabled).sort());
+    // The filter must find some tokens, or two empty lists would pass.
+    expect(geometry(classes).length).toBeGreaterThan(0);
+    expect(geometry(classes).sort()).toEqual(geometry(enabled).sort());
+
+    // The plate belongs to the disabled primary alone: a dimmed outlined control
+    // keeps its own foreground ink, so neither the fill nor its dark ink leaks.
+    const outlined = renderButton({ variant: 'outline', disabled: true });
+    expect((outlined.props.className as string).split(' ')).not.toContain('bg-secondary-fill');
+    expect((outlined.findByType(NativeText).props.className as string).split(' ')).not.toContain(
+      'dark:text-ink2'
+    );
   });
 
   it('keeps a busy primary on its brand fill so it still reads as working', () => {

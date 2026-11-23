@@ -1,5 +1,5 @@
 import { describe, expect, it } from '@jest/globals';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import {
   byok_api_keys,
   claude_billing_connection_grants,
@@ -21,6 +21,41 @@ import {
   type ClaudeBillingOwner,
 } from './store';
 import { claudeBillingOwnerMatches } from './owner';
+
+/**
+ * Holds one payer key in its own transaction and reports the backend pid that
+ * holds it, so a concurrent operation can be observed queueing behind the key.
+ * The caller releases `release` and then awaits the returned promise.
+ */
+async function holdPayerKey(payerConnectionId: string) {
+  const lockHeld = Promise.withResolvers<number>();
+  const release = Promise.withResolvers<void>();
+  const holder = db.transaction(async tx => {
+    await tx.execute(
+      sql`select pg_advisory_xact_lock(hashtext(${`claude_billing_grant:${payerConnectionId}`}))`
+    );
+    const backend = await tx.execute<{ pid: number }>(sql`select pg_backend_pid()::int as pid`);
+    const pid = backend.rows[0]?.pid;
+    if (pid === undefined) throw new Error('PostgreSQL backend pid unavailable');
+    lockHeld.resolve(pid);
+    await release.promise;
+  });
+  return { holderPid: await lockHeld.promise, release: () => release.resolve(), holder };
+}
+
+/** Whether any backend in this database waits for a lock the holder holds. Bounded, no timers. */
+async function waitsForLockOf(holderPid: number): Promise<boolean> {
+  for (let attempt = 0; attempt < 2000; attempt += 1) {
+    const waiting = await db.execute(sql`
+      select 1
+      from pg_stat_activity
+      where datname = current_database()
+        and wait_event_type = 'Lock'
+        and ${holderPid} = any(pg_blocking_pids(pid))`);
+    if (waiting.rows.length > 0) return true;
+  }
+  return false;
+}
 
 async function connectedPayer(kiloUserId: string | null, organizationId: string | null = null) {
   const [row] = await db
@@ -530,4 +565,168 @@ describe('Claude billing grants', () => {
       created_by: bob.id,
     });
   });
+
+  it('waits for the pending target payer lock before it retires the pending row', async () => {
+    const user = await insertTestUser();
+    const organization = await createTestOrganization('Claude share lock', user.id, 0);
+    const payer = await connectedPayer(user.id);
+    const [pendingTarget] = await db
+      .insert(claude_billing_connections)
+      .values({
+        kilo_user_id: null,
+        organization_id: organization.id,
+        user_profile_id: `uprof_pending_${crypto.randomUUID()}`,
+        // Synthetic: a Pending row that carries the retirement columns, so the
+        // retirement write must clear them and not only flip the status.
+        connection_id: `ocon_${crypto.randomUUID()}`,
+        connected_at: new Date().toISOString(),
+        last_refusal_code: 'linked_organization_spend_limit_reached',
+        last_refusal_at: new Date().toISOString(),
+        status: 'pending',
+        created_by: user.id,
+      })
+      .returning();
+    if (!pendingTarget) throw new Error('Missing pending target fixture');
+    const personal: ClaudeBillingOwner = { kind: 'personal', kiloUserId: user.id };
+    const organizationOwner: ClaudeBillingOwner = {
+      kind: 'organization',
+      organizationId: organization.id,
+    };
+
+    const held = await holdPayerKey(pendingTarget.id);
+    const share = shareClaudeBillingConnection(personal, organizationOwner, user.id);
+    let blocked = false;
+    try {
+      blocked = await waitsForLockOf(held.holderPid);
+    } finally {
+      held.release();
+      await held.holder;
+    }
+
+    expect(blocked).toBe(true);
+    await expect(share).resolves.toMatchObject({ id: payer.id });
+    await expect(getGrantedClaudeBillingConnection(organizationOwner)).resolves.toMatchObject({
+      connection: { id: payer.id },
+    });
+    await expect(
+      db
+        .select()
+        .from(claude_billing_connections)
+        .where(eq(claude_billing_connections.id, pendingTarget.id))
+    ).resolves.toEqual([
+      expect.objectContaining({
+        status: 'removed',
+        connection_id: null,
+        connected_at: null,
+        last_refusal_code: null,
+        last_refusal_at: null,
+      }),
+    ]);
+  }, 20000);
+
+  it('waits for the occupant payer lock before it frees the owner columns', async () => {
+    const user = await insertTestUser();
+    const occupant = await connectedPayer(user.id);
+    const personal: ClaudeBillingOwner = { kind: 'personal', kiloUserId: user.id };
+    const nextProfileId = `uprof_second_${crypto.randomUUID()}`;
+
+    const held = await holdPayerKey(occupant.id);
+    const inserted = insertClaudeBillingProfile(personal, nextProfileId, user.id);
+    let blocked = false;
+    try {
+      blocked = await waitsForLockOf(held.holderPid);
+    } finally {
+      held.release();
+      await held.holder;
+    }
+
+    expect(blocked).toBe(true);
+    await expect(inserted).resolves.toMatchObject({ user_profile_id: nextProfileId });
+    await expect(getGrantedClaudeBillingConnection(personal)).resolves.toMatchObject({
+      connection: { user_profile_id: nextProfileId },
+    });
+    await expect(
+      db
+        .select()
+        .from(claude_billing_connections)
+        .where(eq(claude_billing_connections.id, occupant.id))
+    ).resolves.toEqual([expect.objectContaining({ status: 'removed', connection_id: null })]);
+  }, 20000);
+
+  it('frees an occupant payer below the removed payer through the public removal path', async () => {
+    const owner = await insertTestUser();
+    const organization = await createTestOrganization('Claude lower occupant', owner.id, 0);
+    // The organization keeps a row from the release before grant persistence, so
+    // its row records the owner but no grant points at it. These two ids make the
+    // occupant sort below the shared payer, which is the ordering under test.
+    const [occupantPayer] = await db
+      .insert(claude_billing_connections)
+      .values({
+        id: '11111111-1111-4111-8111-111111111111',
+        kilo_user_id: null,
+        organization_id: organization.id,
+        user_profile_id: `uprof_occupant_${crypto.randomUUID()}`,
+        connection_id: `ocon_${crypto.randomUUID()}`,
+        status: 'connected',
+        connected_at: new Date().toISOString(),
+        created_by: owner.id,
+      })
+      .returning();
+    if (!occupantPayer) throw new Error('Missing occupant payer fixture');
+    const [sharedPayer] = await db
+      .insert(claude_billing_connections)
+      .values({
+        id: 'ffffffff-ffff-4fff-bfff-fffffffffff1',
+        kilo_user_id: owner.id,
+        organization_id: null,
+        user_profile_id: `uprof_shared_${crypto.randomUUID()}`,
+        connection_id: `ocon_${crypto.randomUUID()}`,
+        status: 'connected',
+        connected_at: new Date().toISOString(),
+        created_by: owner.id,
+      })
+      .returning();
+    if (!sharedPayer) throw new Error('Missing shared payer fixture');
+    await db.insert(claude_billing_connection_grants).values([
+      {
+        payer_connection_id: sharedPayer.id,
+        kilo_user_id: owner.id,
+        organization_id: null,
+        created_by: owner.id,
+      },
+      {
+        payer_connection_id: sharedPayer.id,
+        kilo_user_id: null,
+        organization_id: organization.id,
+        created_by: owner.id,
+      },
+    ]);
+    const personal: ClaudeBillingOwner = { kind: 'personal', kiloUserId: owner.id };
+
+    // The removal hands the shared payer to the organization, which has to retire
+    // its own occupant first. The occupant key sorts below the held payer key, so
+    // the retry must restart and take both keys in ascending order instead of
+    // deadlocking.
+    await expect(removeClaudeBillingGrant(personal)).resolves.toBeNull();
+
+    await expect(
+      db
+        .select()
+        .from(claude_billing_connections)
+        .where(eq(claude_billing_connections.id, sharedPayer.id))
+    ).resolves.toEqual([
+      expect.objectContaining({
+        kilo_user_id: null,
+        organization_id: organization.id,
+        status: 'connected',
+      }),
+    ]);
+    await expect(
+      db
+        .select()
+        .from(claude_billing_connections)
+        .where(eq(claude_billing_connections.id, occupantPayer.id))
+    ).resolves.toEqual([expect.objectContaining({ status: 'removed', connection_id: null })]);
+    await expect(activeGrants(occupantPayer.id)).resolves.toEqual([]);
+  }, 20000);
 });

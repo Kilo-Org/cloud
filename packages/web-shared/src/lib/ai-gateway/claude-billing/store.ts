@@ -13,6 +13,7 @@ import {
 import { ClaudeBillingConnectionStatus } from '@kilocode/db/schema-types';
 import {
   db,
+  readDb,
   type DrizzleConnection,
   type DrizzleTransaction,
 } from '@kilocode/web-shared/lib/drizzle';
@@ -338,72 +339,107 @@ async function writePayerOwnerColumns(
     .where(eq(claude_billing_connections.id, connectionId));
 }
 
+/**
+ * Clears the row that holds an owner's columns: the row goes to the next live
+ * grant, or is retired when no grant keeps it. The occupant's payer key is taken
+ * before the read that decides, because the row and its grants change only
+ * under that key. `heldPayers` names the keys the caller's transaction already
+ * holds; a key at or below one of them would break the ascending rule, so that
+ * transaction restarts instead.
+ */
 async function freeClaudeBillingOwnerColumns(
   owner: ClaudeBillingOwner,
   exceptPayerId: string | null,
-  onDb: DrizzleConnection
+  heldPayers: ReadonlySet<string>,
+  tx: DrizzleTransaction
 ): Promise<void> {
-  const [occupant] = await onDb
-    .select()
-    .from(claude_billing_connections)
-    .where(
-      and(
-        claudeBillingOwnerWhere(owner),
-        ne(claude_billing_connections.status, ClaudeBillingConnectionStatus.Removed),
-        ...(exceptPayerId ? [ne(claude_billing_connections.id, exceptPayerId)] : [])
-      )
-    )
-    .limit(1);
-  if (!occupant) return;
+  const occupantWhere = and(
+    claudeBillingOwnerWhere(owner),
+    ne(claude_billing_connections.status, ClaudeBillingConnectionStatus.Removed),
+    ...(exceptPayerId ? [ne(claude_billing_connections.id, exceptPayerId)] : [])
+  );
+  const held = new Set(heldPayers);
+  // Each pass adds one payer key to `held`, and a payer row changes only under its
+  // own key, so the loop ends at the first occupant already held.
+  for (;;) {
+    const [occupant] = await tx
+      .select()
+      .from(claude_billing_connections)
+      .where(occupantWhere)
+      .limit(1);
+    if (!occupant) return;
 
-  const otherGrant = await selectNextActiveGrant(onDb, occupant.id, owner);
+    if (!held.has(occupant.id)) {
+      if (!isAboveHeldPayers(occupant.id, held)) throw new ClaudeBillingLockRetry(occupant.id);
+      await lockClaudeBillingPayer(tx, occupant.id);
+      held.add(occupant.id);
+      // The probe ran unlocked, so the decision needs a read under the key.
+      continue;
+    }
 
-  if (otherGrant) {
-    await writePayerOwnerColumns(onDb, occupant.id, otherGrant);
+    const otherGrant = await selectNextActiveGrant(tx, occupant.id, owner);
+
+    if (otherGrant) {
+      await writePayerOwnerColumns(tx, occupant.id, otherGrant);
+      return;
+    }
+
+    await retireClaudeBillingConnection(tx, occupant.id);
     return;
   }
-
-  await retireClaudeBillingConnection(onDb, occupant.id);
 }
 
+/**
+ * Stores a fresh profile for a scope and makes it the scope's grant. The clear
+ * of an existing occupant and the insert run in one transaction, because the
+ * occupant's payer lock must span both statements. The transaction starts with
+ * the keys an earlier attempt could not take in order, so those are locked
+ * before anything it discovers. A restart repeats nothing, because the clear and
+ * the insert are idempotent.
+ */
 export async function insertClaudeBillingProfile(
   owner: ClaudeBillingOwner,
   userProfileId: string,
   createdBy: string,
   onDb: DrizzleConnection = db
 ): Promise<ClaudeBillingConnectionRow> {
-  await freeClaudeBillingOwnerColumns(owner, null, onDb);
-  await onDb
-    .insert(claude_billing_connections)
-    .values({
-      ...ownerColumns(owner),
-      user_profile_id: userProfileId,
-      created_by: createdBy,
+  return await withClaudeBillingLockRetry(extraPayerIds =>
+    onDb.transaction(async tx => {
+      await lockClaudeBillingPayers(tx, extraPayerIds);
+      await freeClaudeBillingOwnerColumns(owner, null, extraPayerIds, tx);
+      await tx
+        .insert(claude_billing_connections)
+        .values({
+          ...ownerColumns(owner),
+          user_profile_id: userProfileId,
+          created_by: createdBy,
+        })
+        .onConflictDoNothing();
+      const [row] = await tx
+        .select()
+        .from(claude_billing_connections)
+        .where(eq(claude_billing_connections.user_profile_id, userProfileId))
+        .limit(1);
+      if (!row) throw new Error('Claude billing connection row is missing after insert');
+      if (!claudeBillingOwnerMatches(row, owner)) {
+        const [existingGrant] = await tx
+          .select({ id: claude_billing_connection_grants.id })
+          .from(claude_billing_connection_grants)
+          .where(
+            and(
+              claudeBillingGrantOwnerWhere(owner),
+              eq(claude_billing_connection_grants.payer_connection_id, row.id)
+            )
+          )
+          .limit(1);
+        if (!existingGrant) {
+          throw new Error('Claude user profile belongs to another scope');
+        }
+      }
+      await activateClaudeBillingGrant(owner, row.id, createdBy, tx);
+      return row;
     })
-    .onConflictDoNothing();
-  const [row] = await onDb
-    .select()
-    .from(claude_billing_connections)
-    .where(eq(claude_billing_connections.user_profile_id, userProfileId))
-    .limit(1);
-  if (!row) throw new Error('Claude billing connection row is missing after insert');
-  if (!claudeBillingOwnerMatches(row, owner)) {
-    const [existingGrant] = await onDb
-      .select({ id: claude_billing_connection_grants.id })
-      .from(claude_billing_connection_grants)
-      .where(
-        and(
-          claudeBillingGrantOwnerWhere(owner),
-          eq(claude_billing_connection_grants.payer_connection_id, row.id)
-        )
-      )
-      .limit(1);
-    if (!existingGrant) {
-      throw new Error('Claude user profile belongs to another scope');
-    }
-  }
-  await activateClaudeBillingGrant(owner, row.id, createdBy, onDb);
-  return row;
+  );
 }
 
 export class ClaudeBillingShareError extends Error {
@@ -412,10 +448,78 @@ export class ClaudeBillingShareError extends Error {
   }
 }
 
+/**
+ * Signals that the transaction would have to wait for a payer key at or below a
+ * key it already holds. The transaction aborts, and the caller restarts the
+ * operation with that key added to its lock set. `payerConnectionId` is the key
+ * the next attempt must take as well.
+ */
+class ClaudeBillingLockRetry extends Error {
+  constructor(readonly payerConnectionId: string) {
+    super('Claude billing payer locks must be retaken in ascending key order');
+  }
+}
+
+/** How often a transaction restarts after a key left it on the wrong side of the ascending rule. */
+const CLAUDE_BILLING_LOCK_ATTEMPTS = 3;
+
 async function lockClaudeBillingPayer(tx: DrizzleTransaction, payerConnectionId: string) {
   await tx.execute(
     sql`select pg_advisory_xact_lock(hashtext(${`claude_billing_grant:${payerConnectionId}`}))`
   );
+}
+
+/**
+ * Locks every distinct payer key in ascending order.
+ *
+ * A transaction that holds payer keys only ever waits for a key greater than
+ * every key it holds. Two holders therefore cannot wait for each other, so no
+ * wait cycle can form. A caller that would have to wait for a key at or below a
+ * key it holds aborts its transaction with `ClaudeBillingLockRetry` and retries
+ * from scratch with that key added, which takes the wider set in order.
+ */
+async function lockClaudeBillingPayers(
+  tx: DrizzleTransaction,
+  payerConnectionIds: Iterable<string | null | undefined>
+): Promise<void> {
+  const payerIds = new Set<string>();
+  for (const payerId of payerConnectionIds) {
+    if (payerId != null) payerIds.add(payerId);
+  }
+  for (const payerId of [...payerIds].sort()) {
+    await lockClaudeBillingPayer(tx, payerId);
+  }
+}
+
+/** Whether a key sorts above every key the transaction holds, so waiting for it cannot close a cycle. */
+function isAboveHeldPayers(payerConnectionId: string, heldPayers: ReadonlySet<string>): boolean {
+  for (const held of heldPayers) {
+    if (payerConnectionId <= held) return false;
+  }
+  return true;
+}
+
+/**
+ * Runs `attempt` again, up to the attempt bound, when a transaction asks to
+ * retake its payer keys, and passes the keys every attempt must take as well.
+ */
+async function withClaudeBillingLockRetry<T>(
+  attempt: (extraPayerIds: ReadonlySet<string>) => Promise<T>
+): Promise<T> {
+  const extraPayerIds = new Set<string>();
+  for (let attemptNumber = 1; ; attemptNumber += 1) {
+    try {
+      return await attempt(extraPayerIds);
+    } catch (error) {
+      if (
+        !(error instanceof ClaudeBillingLockRetry) ||
+        attemptNumber >= CLAUDE_BILLING_LOCK_ATTEMPTS
+      ) {
+        throw error;
+      }
+      extraPayerIds.add(error.payerConnectionId);
+    }
+  }
 }
 
 export async function shareClaudeBillingConnection(
@@ -424,9 +528,9 @@ export async function shareClaudeBillingConnection(
   createdBy: string,
   onDb: DrizzleConnection = db
 ): Promise<ClaudeBillingConnectionRow> {
-  return await withClaudeBillingPayerLock(
-    sourceOwner,
-    async (tx, source) => {
+  return await withClaudeBillingPayersLock(
+    [sourceOwner, targetOwner],
+    async (tx, [source, target]) => {
       if (!source || source.connection.status !== ClaudeBillingConnectionStatus.Connected) {
         throw new ClaudeBillingShareError('source_unavailable');
       }
@@ -469,7 +573,6 @@ export async function shareClaudeBillingConnection(
         tx
       );
 
-      const target = await getGrantedClaudeBillingConnection(targetOwner, tx);
       if (target && !claudeBillingTargetAcceptsShare(target.connection.status)) {
         // The one share a scope that already holds a payer can take again: its own
         // connected row, so a repeated share is idempotent instead of a conflict.
@@ -529,11 +632,12 @@ async function deletePersonalAnthropicByokKey(
 async function reassignPayerOwnerColumns(
   tx: DrizzleTransaction,
   payerConnectionId: string,
-  remaining: ClaudeBillingOwnerColumns
+  remaining: ClaudeBillingOwnerColumns,
+  heldPayers: ReadonlySet<string>
 ): Promise<void> {
   const nextOwner = ownerFromColumns(remaining);
   if (nextOwner) {
-    await freeClaudeBillingOwnerColumns(nextOwner, payerConnectionId, tx);
+    await freeClaudeBillingOwnerColumns(nextOwner, payerConnectionId, heldPayers, tx);
   }
   await writePayerOwnerColumns(tx, payerConnectionId, remaining);
 }
@@ -541,23 +645,111 @@ async function reassignPayerOwnerColumns(
 /**
  * Runs `work` while holding the payer lock that sharing and removal take, so no
  * grant on the payer changes between a read and the write that follows it. The
- * helper reads the scope's granted connection, locks the payer, re-reads the
- * grant under that lock, and passes the re-read grant, or null when the scope
- * has no row, to `work`. Because the grant and its payer row arrive together, a
- * caller can read either view without a second query.
+ * helper reads the scope's granted connection, locks its payer key, and re-reads
+ * the grant under that key.
+ *
+ * Every payer whose row or grant `work` changes must be locked before the reads
+ * that decide: the helper locks the payer the scope holds now, and a helper that
+ * meets another payer row calls `freeClaudeBillingOwnerColumns`, which takes that
+ * payer's key before it decides anything. Keys are taken in ascending order, so a
+ * transaction only ever waits for a key above every key it holds and no two
+ * holders can wait for each other. A re-read that resolves another payer restarts
+ * the transaction with the wider key set, bounded to `CLAUDE_BILLING_LOCK_ATTEMPTS`.
+ *
+ * `work` also receives the payer keys this transaction holds, which it must pass
+ * to any owner-column change so the ascending rule keeps holding.
+ *
+ * Because the grant and its payer row arrive together, a caller can read either
+ * view without a second query.
  */
 export async function withClaudeBillingPayerLock<T>(
   owner: ClaudeBillingOwner,
-  work: (tx: DrizzleTransaction, granted: ClaudeBillingGrantedConnection | null) => Promise<T>,
+  work: (
+    tx: DrizzleTransaction,
+    granted: ClaudeBillingGrantedConnection | null,
+    heldPayers: ReadonlySet<string>
+  ) => Promise<T>,
   onDb: DrizzleConnection = db
 ): Promise<T> {
-  return await onDb.transaction(async tx => {
-    let granted = await getGrantedClaudeBillingConnection(owner, tx);
-    if (!granted) return await work(tx, null);
-    await lockClaudeBillingPayer(tx, granted.connection.id);
-    granted = await getGrantedClaudeBillingConnection(owner, tx);
-    return await work(tx, granted);
-  });
+  return await withClaudeBillingLockRetry(extraPayerIds =>
+    onDb.transaction(async tx => {
+      await lockClaudeBillingPayers(tx, extraPayerIds);
+      let granted = await getGrantedClaudeBillingConnection(owner, tx);
+      if (!granted) return await work(tx, null, extraPayerIds);
+      if (
+        !extraPayerIds.has(granted.connection.id) &&
+        !isAboveHeldPayers(granted.connection.id, extraPayerIds)
+      ) {
+        throw new ClaudeBillingLockRetry(granted.connection.id);
+      }
+      await lockClaudeBillingPayers(tx, [granted.connection.id]);
+      const heldPayers = new Set([...extraPayerIds, granted.connection.id]);
+      granted = await getGrantedClaudeBillingConnection(owner, tx);
+      if (granted && !heldPayers.has(granted.connection.id)) {
+        throw new ClaudeBillingLockRetry(granted.connection.id);
+      }
+      return await work(tx, granted, heldPayers);
+    })
+  );
+}
+
+/**
+ * Runs `work` while holding the payer lock of every named scope, which is what
+ * sharing needs: it validates the source, activates the target grant and decides
+ * whether the target's earlier row still has an owner, and each of those reads
+ * must see a payer no other holder can change.
+ *
+ * The helper reads each scope's granted connection, locks the union of those
+ * payer keys in ascending order, and re-reads every scope under the locks. A
+ * re-read that resolves a payer outside the locked union restarts the
+ * transaction with the wider union, bounded to `CLAUDE_BILLING_LOCK_ATTEMPTS`.
+ * `work` receives the re-read grants in the order of `owners`; a scope without a
+ * row contributes `null`.
+ */
+export async function withClaudeBillingPayersLock<T>(
+  owners: readonly ClaudeBillingOwner[],
+  work: (
+    tx: DrizzleTransaction,
+    grants: Array<ClaudeBillingGrantedConnection | null>
+  ) => Promise<T>,
+  onDb: DrizzleConnection = db
+): Promise<T> {
+  return await withClaudeBillingLockRetry(extraPayerIds =>
+    onDb.transaction(async tx => {
+      await lockClaudeBillingPayers(tx, extraPayerIds);
+      const probed: Array<ClaudeBillingGrantedConnection | null> = [];
+      for (const owner of owners) {
+        probed.push(await getGrantedClaudeBillingConnection(owner, tx));
+      }
+      // A key below a held extra would have to wait for a lower key, so the
+      // attempt aborts and the next one takes the merged set in one batch.
+      for (const granted of probed) {
+        if (
+          granted &&
+          !extraPayerIds.has(granted.connection.id) &&
+          !isAboveHeldPayers(granted.connection.id, extraPayerIds)
+        ) {
+          throw new ClaudeBillingLockRetry(granted.connection.id);
+        }
+      }
+      const discovered = new Set<string>();
+      for (const granted of probed) {
+        if (granted) discovered.add(granted.connection.id);
+      }
+      await lockClaudeBillingPayers(tx, discovered);
+      const heldPayers = new Set([...extraPayerIds, ...discovered]);
+
+      const grants: Array<ClaudeBillingGrantedConnection | null> = [];
+      for (const owner of owners) {
+        const granted = await getGrantedClaudeBillingConnection(owner, tx);
+        if (granted && !heldPayers.has(granted.connection.id)) {
+          throw new ClaudeBillingLockRetry(granted.connection.id);
+        }
+        grants.push(granted);
+      }
+      return await work(tx, grants);
+    })
+  );
 }
 
 /**
@@ -578,46 +770,66 @@ export async function findRetiringClaudeBillingPayer(
     : { id: connection.connection.id, userProfileId: connection.connection.user_profile_id };
 }
 
+/**
+ * Removes a scope's grant inside the caller's transaction, using the granted
+ * connection the enclosing helper already resolved. This variant installs no
+ * retry of its own: the transaction's owner owns the retry, so a payer row it
+ * must free below a held key restarts the whole attempt and takes the merged key
+ * set in one ascending batch.
+ *
+ * `heldPayers` names the keys the caller's transaction holds.
+ */
+export async function removeClaudeBillingGrantWithin(
+  tx: DrizzleTransaction,
+  owner: ClaudeBillingOwner,
+  granted: ClaudeBillingGrantedConnection | null,
+  heldPayers: ReadonlySet<string>
+): Promise<UnreferencedClaudeBillingPayer | null> {
+  if (!granted) return null;
+
+  await activateClaudeBillingGrant(owner, granted.connection.id, granted.grant.created_by, tx);
+  await tx
+    .update(claude_billing_connection_grants)
+    .set({ removed_at: new Date().toISOString() })
+    .where(claudeBillingGrantOwnerWhere(owner));
+  const remaining = await selectNextActiveGrant(tx, granted.connection.id);
+
+  if (!remaining) {
+    await retireClaudeBillingConnection(tx, granted.connection.id);
+    return {
+      id: granted.connection.id,
+      userProfileId: granted.connection.user_profile_id,
+    };
+  }
+
+  if (claudeBillingOwnerMatches(granted.connection, owner)) {
+    await reassignPayerOwnerColumns(tx, granted.connection.id, remaining, heldPayers);
+    return null;
+  }
+
+  await tx
+    .update(claude_billing_connections)
+    .set({ updated_at: sql`clock_timestamp()` })
+    .where(eq(claude_billing_connections.id, granted.connection.id));
+  return null;
+}
+
+/**
+ * Removes a scope's grant in its own transaction, under the payer lock that
+ * sharing takes. This entry point owns the retry, because it owns the
+ * transaction: a payer row it must free below a held key restarts the whole
+ * attempt with the merged key set. A caller that already holds a transaction
+ * calls `removeClaudeBillingGrantWithin` instead, so the enclosing retry owns
+ * both key sets.
+ */
 export async function removeClaudeBillingGrant(
   owner: ClaudeBillingOwner,
   onDb: DrizzleConnection = db
 ): Promise<UnreferencedClaudeBillingPayer | null> {
   return await withClaudeBillingPayerLock(
     owner,
-    async (tx, connection) => {
-      if (!connection) return null;
-
-      await activateClaudeBillingGrant(
-        owner,
-        connection.connection.id,
-        connection.grant.created_by,
-        tx
-      );
-      await tx
-        .update(claude_billing_connection_grants)
-        .set({ removed_at: new Date().toISOString() })
-        .where(claudeBillingGrantOwnerWhere(owner));
-      const remaining = await selectNextActiveGrant(tx, connection.connection.id);
-
-      if (!remaining) {
-        await retireClaudeBillingConnection(tx, connection.connection.id);
-        return {
-          id: connection.connection.id,
-          userProfileId: connection.connection.user_profile_id,
-        };
-      }
-
-      if (claudeBillingOwnerMatches(connection.connection, owner)) {
-        await reassignPayerOwnerColumns(tx, connection.connection.id, remaining);
-        return null;
-      }
-
-      await tx
-        .update(claude_billing_connections)
-        .set({ updated_at: sql`clock_timestamp()` })
-        .where(eq(claude_billing_connections.id, connection.connection.id));
-      return null;
-    },
+    async (tx, granted, heldPayers) =>
+      await removeClaudeBillingGrantWithin(tx, owner, granted, heldPayers),
     onDb
   );
 }
@@ -888,48 +1100,68 @@ export async function describeClaudeBillingSharing(
  * organization, and the row keeps `created_by` as the record of who linked it
  * until an organization owner reconnects it. Routing and the billing card
  * report that connection as requiring a reconnect while its connector is gone.
+ *
+ * The transaction locks every payer the person appears on in ascending order, so
+ * the deletes and the owner reassignments below only wait for keys above the ones
+ * held. A reassignment that meets another payer row below a held key restarts the
+ * whole attempt: the deletes and the reassignments are idempotent.
+ *
+ * The account-deletion transaction calls this with its own `tx`. A restart is
+ * then a savepoint restart: PostgreSQL releases the keys a savepoint took when it
+ * rolls back to it, and that enclosing transaction holds no other Claude payer
+ * key, so the restart keeps the ascending rule with keys nobody else holds.
  */
 export async function removeUserClaudeBillingGrants(
   userId: string,
   onDb: DrizzleConnection
 ): Promise<void> {
-  await onDb.transaction(async tx => {
-    const grantPayers = await tx
-      .select({ payerId: claude_billing_connection_grants.payer_connection_id })
-      .from(claude_billing_connection_grants)
-      .where(eq(claude_billing_connection_grants.kilo_user_id, userId));
-    const directPayers = await tx
-      .select({ payerId: claude_billing_connections.id })
-      .from(claude_billing_connections)
-      .where(eq(claude_billing_connections.kilo_user_id, userId));
-    const payerIds = [...new Set([...grantPayers, ...directPayers].map(row => row.payerId))].sort();
-    for (const payerId of payerIds) {
-      await lockClaudeBillingPayer(tx, payerId);
-    }
-
-    await tx
-      .delete(claude_billing_connection_grants)
-      .where(eq(claude_billing_connection_grants.kilo_user_id, userId));
-
-    for (const payerId of payerIds) {
-      const remaining = await selectNextActiveGrant(tx, payerId);
-
-      if (!remaining) {
-        await tx
-          .delete(claude_billing_connections)
-          .where(eq(claude_billing_connections.id, payerId));
-      } else {
-        const [payerRow] = await tx
-          .select()
-          .from(claude_billing_connections)
-          .where(eq(claude_billing_connections.id, payerId))
-          .limit(1);
-        if (payerRow?.kilo_user_id === userId) {
-          await reassignPayerOwnerColumns(tx, payerId, remaining);
+  await withClaudeBillingLockRetry(extraPayerIds =>
+    onDb.transaction(async tx => {
+      await lockClaudeBillingPayers(tx, extraPayerIds);
+      const grantPayers = await tx
+        .select({ payerId: claude_billing_connection_grants.payer_connection_id })
+        .from(claude_billing_connection_grants)
+        .where(eq(claude_billing_connection_grants.kilo_user_id, userId));
+      const directPayers = await tx
+        .select({ payerId: claude_billing_connections.id })
+        .from(claude_billing_connections)
+        .where(eq(claude_billing_connections.kilo_user_id, userId));
+      const discovered = new Set<string>();
+      for (const row of [...grantPayers, ...directPayers]) discovered.add(row.payerId);
+      // A key below a held extra would have to wait for a lower key, so the
+      // attempt aborts and the next one takes the merged set in one batch.
+      for (const payerId of discovered) {
+        if (!extraPayerIds.has(payerId) && !isAboveHeldPayers(payerId, extraPayerIds)) {
+          throw new ClaudeBillingLockRetry(payerId);
         }
       }
-    }
-  });
+      const heldPayers = new Set([...extraPayerIds, ...discovered]);
+      await lockClaudeBillingPayers(tx, discovered);
+
+      await tx
+        .delete(claude_billing_connection_grants)
+        .where(eq(claude_billing_connection_grants.kilo_user_id, userId));
+
+      for (const payerId of [...heldPayers].sort()) {
+        const remaining = await selectNextActiveGrant(tx, payerId);
+
+        if (!remaining) {
+          await tx
+            .delete(claude_billing_connections)
+            .where(eq(claude_billing_connections.id, payerId));
+        } else {
+          const [payerRow] = await tx
+            .select()
+            .from(claude_billing_connections)
+            .where(eq(claude_billing_connections.id, payerId))
+            .limit(1);
+          if (payerRow?.kilo_user_id === userId) {
+            await reassignPayerOwnerColumns(tx, payerId, remaining, heldPayers);
+          }
+        }
+      }
+    })
+  );
 }
 
 /**
@@ -1015,12 +1247,46 @@ export async function recordClaudeBillingRefusal(
   );
 }
 
-/** A request the customer paid for succeeded, so an earlier refusal no longer applies. */
+/**
+ * A request the customer paid for succeeded, so an earlier refusal no longer
+ * applies.
+ *
+ * Almost every success finds nothing to clear, so the common case must not write:
+ * the row keeps its version and no update touches it. An unlocked read of the
+ * replica answers whether a refusal is recorded. A replica that misses a refusal
+ * recorded moments ago skips this clear, and the next success clears it. A replica
+ * that still shows a cleared refusal only falls through to the guarded primary
+ * update, which changes nothing. A failed replica read falls back to that update
+ * as well. The update matches only the same profile with the same `connected_at`
+ * on a connected row, so neither path can undo a removal or a newer reconnect.
+ */
 export async function clearClaudeBillingRefusal(
   userProfileId: string,
   connectedAt: string,
   onDb: DrizzleConnection = db
 ): Promise<void> {
+  try {
+    const [recorded] = await readDb
+      .select({ last_refusal_code: claude_billing_connections.last_refusal_code })
+      .from(claude_billing_connections)
+      .where(
+        and(
+          eq(claude_billing_connections.user_profile_id, userProfileId),
+          eq(claude_billing_connections.connected_at, connectedAt),
+          eq(claude_billing_connections.status, ClaudeBillingConnectionStatus.Connected)
+        )
+      )
+      .limit(1);
+    if (!recorded?.last_refusal_code) return;
+  } catch (error) {
+    // An unavailable replica must not stop the clear: the guarded update below
+    // re-checks on the primary, exactly as before the pre-check existed.
+    console.debug(
+      '[claude-billing] refusal pre-check failed, falling back to the primary: %s',
+      error instanceof Error ? error.name : 'UnknownError'
+    );
+  }
+
   await updateConnectedClaudeBillingConnection(
     userProfileId,
     connectedAt,

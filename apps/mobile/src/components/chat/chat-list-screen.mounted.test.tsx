@@ -63,6 +63,39 @@ vi.mock('@/lib/chat/use-chat', () => ({
   }),
 }));
 vi.mock('@/lib/chat/layers', () => ({ rememberModelFacts: () => undefined }));
+vi.mock('@/lib/chat/sync/use-chat-sync', () => ({
+  useChatSyncGate: () => ({
+    flagOn: false,
+    setting: { kind: 'off' },
+    enabled: false,
+    decide: async () => undefined,
+  }),
+  useChatSyncUploader: () => undefined,
+  useSyncBanner: () => ({ kind: 'none' }),
+  useDeletedElsewhere: () => undefined,
+  useMergedChatList: () => ({
+    surface: { kind: 'off' },
+    rows: [],
+    hasNextPage: false,
+    fetchNextPage: () => undefined,
+    refetch: () => undefined,
+    nextPageFailed: false,
+  }),
+}));
+vi.mock('@/lib/chat/sync/sync-service', () => ({
+  prepareSend: async () => ({ kind: 'local' }),
+  pullOpenedChat: async () => undefined,
+  discardAndReload: async () => '',
+  registerSyncUploader: () => () => undefined,
+  bannerOf: () => ({ kind: 'none' }),
+  watchBanners: () => () => undefined,
+  onDeletedElsewhere: () => () => undefined,
+  uploadSettledChat: async () => undefined,
+  uploadRenamedChat: async () => undefined,
+  deleteEverywhere: async () => ({ kind: 'local-only' }),
+  deleteServerSession: async () => true,
+  importServerSession: async () => null,
+}));
 vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => ({ authEpoch: 0 }) }));
 vi.mock('@/lib/organization-context', () => ({
   useOrganization: () => ({ organizationId: null }),

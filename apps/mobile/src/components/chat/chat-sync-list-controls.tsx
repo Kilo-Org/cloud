@@ -50,9 +50,9 @@ export function ChatSyncListControls({
           onChange({ ...filters, origin });
         }}
         options={[
-          { value: 'all', label: t('modelChat.sync.filterAll') },
+          { value: 'all', label: t('common.all') },
           { value: 'mobile', label: t('modelChat.sync.originMobile') },
-          { value: 'cli', label: t('modelChat.sync.originCli') },
+          { value: 'cli', label: t('agentChat.sessionFilter.platformCli') },
         ]}
       />
       <View className="flex-row items-center justify-between gap-3">

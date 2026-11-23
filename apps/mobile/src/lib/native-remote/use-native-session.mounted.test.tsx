@@ -43,6 +43,11 @@ const session: NativeSessionSummary = {
   tenant: { type: 'organization', id: 'old-organization' },
   createdAt: 1,
   live: true,
+  updatedAt: 1,
+  title: null,
+  client: 'cli',
+  directory: null,
+  archived: false,
 };
 const connected: NativeSessionState = {
   connection: 'connected',

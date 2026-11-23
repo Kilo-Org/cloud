@@ -35,44 +35,42 @@ import {
  * whole state machine runs against fakes in tests.
  */
 
+/** What a register answers: joined, tombstoned, or one of the two failures. */
+export type SyncRegisterResult =
+  | { readonly type: 'registered'; readonly position: number }
+  | { readonly type: 'deleted' }
+  | { readonly type: 'retryable' }
+  | { readonly type: 'failed'; readonly code: string };
+
+/** The receipt a commit answers with, reduced to what the record keeps. */
+export type SyncReceipt = {
+  readonly through: number;
+  readonly batchID: string;
+  readonly digest: string;
+};
+
+/** What a commit answers: the new position, a lost CAS, a tombstone, or a failure. */
+export type SyncCommitResult =
+  | { readonly type: 'committed'; readonly receipt: SyncReceipt }
+  | { readonly type: 'superseded'; readonly position: number }
+  | { readonly type: 'conflict'; readonly position: number }
+  | { readonly type: 'deleted' }
+  | { readonly type: 'retryable' }
+  | { readonly type: 'failed'; readonly code: string };
+
+/** What a pull answers: the log and its position, a tombstone, or a failure. */
+export type SyncPullResult =
+  | { readonly type: 'pulled'; readonly snapshot: PulledSnapshot }
+  | { readonly type: 'deleted' }
+  | { readonly type: 'not_found' }
+  | { readonly type: 'retryable' }
+  | { readonly type: 'failed'; readonly code: string };
+
 export type SyncTransport = {
-  readonly register: (
-    sessionID: string,
-    sourceID: string
-  ) => Promise<
-    | { readonly type: 'registered'; readonly position: number }
-    | { readonly type: 'deleted' }
-    | { readonly type: 'retryable' }
-    | { readonly type: 'failed'; readonly code: string }
-  >;
-  readonly putBlob: (
-    sessionID: string,
-    bytes: Uint8Array,
-    mime: string
-  ) => Promise<UploadedBlob>;
-  readonly commit: (
-    sessionID: string,
-    packet: NativeSyncPacket
-  ) => Promise<
-    | {
-        readonly type: 'committed';
-        readonly receipt: { readonly through: number; readonly batchID: string; readonly digest: string };
-      }
-    | { readonly type: 'superseded'; readonly position: number }
-    | { readonly type: 'conflict'; readonly position: number }
-    | { readonly type: 'deleted' }
-    | { readonly type: 'retryable' }
-    | { readonly type: 'failed'; readonly code: string }
-  >;
-  readonly pull: (
-    sessionID: string
-  ) => Promise<
-    | { readonly type: 'pulled'; readonly snapshot: PulledSnapshot }
-    | { readonly type: 'deleted' }
-    | { readonly type: 'not_found' }
-    | { readonly type: 'retryable' }
-    | { readonly type: 'failed'; readonly code: string }
-  >;
+  readonly register: (sessionID: string, sourceID: string) => Promise<SyncRegisterResult>;
+  readonly putBlob: (sessionID: string, bytes: Uint8Array, mime: string) => Promise<UploadedBlob>;
+  readonly commit: (sessionID: string, packet: NativeSyncPacket) => Promise<SyncCommitResult>;
+  readonly pull: (sessionID: string) => Promise<SyncPullResult>;
 };
 
 export type SyncDeps = {
@@ -299,24 +297,27 @@ export async function applyPulled(
   return turns.length;
 }
 
+/** Everything one upload needs: the chat's turns and the record fields it writes. */
+export type UploadChatInput = {
+  readonly sessionId: string;
+  readonly sourceId: string;
+  readonly turns: readonly Turn[];
+  readonly title: string | null;
+  readonly model: PortableModelRef;
+  readonly modelId: string;
+  readonly agent: string;
+  readonly createdAt: number;
+  /** A rename with no new turns still writes the shared session entity (H3). */
+  readonly metadataOnly?: boolean;
+};
+
 /**
  * Uploads every mapped-but-unacknowledged turn of one chat as one frozen
  * packet. A conflict pulls, imports, then fast-forwards or parks diverged.
  */
 export async function uploadChat(
   deps: SyncDeps,
-  input: {
-    readonly sessionId: string;
-    readonly sourceId: string;
-    readonly turns: readonly Turn[];
-    readonly title: string | null;
-    readonly model: PortableModelRef;
-    readonly modelId: string;
-    readonly agent: string;
-    readonly createdAt: number;
-    /** A rename with no new turns still writes the shared session entity (H3). */
-    readonly metadataOnly?: boolean;
-  }
+  input: UploadChatInput
 ): Promise<UploadOutcome> {
   const ready = await ensureRegistered(deps, input.sessionId, input.sourceId);
   if (ready.kind !== 'ready') {
@@ -376,18 +377,18 @@ export async function uploadChat(
     idleSeq,
     now,
   });
-  const messageChanges = encodeMessageChanges(messages, 0);
-  const changes = [encodeSessionEntity(session), ...messageChanges];
-  const through = record.acknowledged + changes.length;
-  // Parts carry the packet's `through`, so messages encode once it is known:
-  // the change count does not depend on it, so re-encode with the real value.
-  const finalChanges = [encodeSessionEntity(session), ...encodeMessageChanges(messages, through)];
+  // Parts carry the packet's `through` as their position, so encoding happens
+  // once the count of changes is known. The count does not depend on the
+  // value, so one throwaway encode answers it.
+  const changeCount = 1 + encodeMessageChanges(messages, 0).length;
+  const through = record.acknowledged + changeCount;
+  const changes = [encodeSessionEntity(session), ...encodeMessageChanges(messages, through)];
   const packet: NativeSyncPacket = {
     batchID: deps.newBatchId(),
     sourceID: input.sourceId,
     after: record.acknowledged,
-    through: record.acknowledged + finalChanges.length,
-    changes: finalChanges,
+    through,
+    changes,
   };
   saveSyncRecord(deps.db, input.sessionId, {
     phase: 'pending',
@@ -400,7 +401,7 @@ export async function uploadChat(
 
 async function commitFrozen(
   deps: SyncDeps,
-  input: Parameters<typeof uploadChat>[1],
+  input: UploadChatInput,
   serverId: string,
   frozen: FrozenPacket,
   mayRebatch: boolean
@@ -437,7 +438,7 @@ async function commitFrozen(
 /** H5: pull, import, then fast-forward above the pulled max seq or park diverged. */
 async function resolveConflict(
   deps: SyncDeps,
-  input: Parameters<typeof uploadChat>[1],
+  input: UploadChatInput,
   serverId: string,
   frozen: FrozenPacket,
   mayRebatch: boolean

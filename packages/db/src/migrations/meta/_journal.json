@@ -2647,6 +2647,13 @@
       "when": 1795428129892,
       "tag": "0377_environment_setup_runs",
       "breakpoints": true
+    },
+    {
+      "idx": 378,
+      "version": "7",
+      "when": 1795471444945,
+      "tag": "0378_sign_in_method_change_code_purpose",
+      "breakpoints": true
     }
   ]
 }

@@ -158,6 +158,7 @@ import { revokeOpenSupportGrants } from '@/lib/admin/support-access-revocation';
 import { runAfterResponse } from '@/lib/after-response';
 import { isEmailSignupDisabled } from '@/lib/auth/email-signup-switch';
 import { recordSignInMethodChange } from '@/lib/auth/sign-in-method-change';
+import { currentSignInMethodChangeRequestDetails } from '@/lib/auth/sign-in-method-change-request';
 import { strict as assert } from 'node:assert';
 import type { OptionalError, Result } from '@kilocode/web-shared/lib/maybe-result';
 import { failureResult, successResult, trpcFailure } from '@kilocode/web-shared/lib/maybe-result';
@@ -1044,6 +1045,8 @@ export async function linkAccountToExistingUser(
   }
 
   if (!isNoOpRelink && authProviderData.provider !== 'fake-login') {
+    // Read while the request is still in scope; the email goes after the response.
+    const details = await currentSignInMethodChangeRequestDetails();
     // Sent after the response: the notice must never delay or fail the sign-in.
     await runAfterResponse(async () => {
       try {
@@ -1053,17 +1056,21 @@ export async function linkAccountToExistingUser(
           {
             email: authProviderData.google_user_email,
             displayName: authProviderData.display_name ?? null,
-          }
+          },
+          details
         );
         if (!notice.sent) {
-          console.warn('[auth] New sign-in method notice was not sent', {
-            provider: authProviderData.provider,
-            reason: notice.reason,
+          captureException(new Error('New sign-in method notice was not sent'), {
+            tags: {
+              operation: 'sign_in_method_change_notice',
+              provider: authProviderData.provider,
+            },
+            extra: { reason: notice.reason },
           });
         }
-      } catch {
-        console.warn('[auth] New sign-in method notice failed', {
-          provider: authProviderData.provider,
+      } catch (error) {
+        captureException(error, {
+          tags: { operation: 'sign_in_method_change_notice', provider: authProviderData.provider },
         });
       }
     });

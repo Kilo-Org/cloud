@@ -13,10 +13,8 @@ import { openAiChatGptByokPath, startOpenAiChatGptConnect } from '@/lib/auth/ope
 import type { OpenAiChatGptStatus } from '@/lib/openai-chatgpt/status';
 import { ChatGptUsageLinkView } from '@/components/chatgpt/ChatGptUsageLinkView';
 import { ChatGptUsageLimitDialog } from '@/components/chatgpt/ChatGptUsageLimitDialog';
-import {
-  SIGN_IN_METHOD_CHANGE_ERROR_MESSAGES,
-  signInMethodChangeError,
-} from '@/lib/auth/sign-in-method-change-codes';
+import { SIGN_IN_METHOD_CHANGE_ERROR_MESSAGES } from '@/lib/auth/sign-in-method-change-codes';
+import { SignInMethodCodeDialog } from '@/components/profile/SignInMethodCodeDialog';
 
 /**
  * The BYOK entry for a delegated "Sign in with ChatGPT" connection. It is not a
@@ -66,13 +64,6 @@ const FALLBACK_ERROR_MESSAGE = 'Your ChatGPT connection is not available. Reconn
 const FALLBACK_IDENTITY_LABEL = 'your ChatGPT account';
 const LOAD_ERROR_MESSAGE = "We couldn't load your ChatGPT connection. Try again.";
 const DISCONNECT_ERROR_MESSAGE = "We couldn't disconnect ChatGPT. Try again.";
-
-/**
- * Client-side code for a linking session that never started the OAuth
- * round-trip. It is fed through `authErrorCode`, so the card renders the same
- * generic connect-failure copy and try-again action as a returned OAuth error.
- */
-const CONNECT_FAILED_CODE = 'connect_failed';
 
 /**
  * Shared by every state so the card keeps one padding and one reserved height:
@@ -442,24 +433,34 @@ function OpenAiChatGptCardConnected({ organizationId }: { organizationId?: strin
   );
 
   const linkMutation = useMutation(trpc.user.linkAuthProvider.mutationOptions());
+  const [isCodeDialogOpen, setIsCodeDialogOpen] = useState(false);
 
   const handleConnect = () => {
     // A retry starts from a clean state so the failure copy never overlaps the
     // new attempt.
     setAuthErrorCode(null);
+    // The code step below asks for the emailed code before it starts the link.
+    setIsCodeDialogOpen(true);
+  };
+
+  const handleCodeVerified = async (code: string, challengeId: string) => {
     setIsConnecting(true);
-    void startOpenAiChatGptConnect(
-      () =>
-        linkMutation.mutateAsync(
-          organizationId ? { provider: 'openai', organizationId } : { provider: 'openai' }
-        ),
-      organizationId
-    ).catch((error: unknown) => {
+    try {
+      await startOpenAiChatGptConnect(
+        () =>
+          linkMutation.mutateAsync(
+            organizationId
+              ? { provider: 'openai', organizationId, code, challengeId }
+              : { provider: 'openai', code, challengeId }
+          ),
+        organizationId
+      );
+    } catch (error) {
       // Only a failed attempt releases the busy state; a successful one
       // navigates away with the label still pending.
       setIsConnecting(false);
-      setAuthErrorCode(signInMethodChangeError(error) ?? CONNECT_FAILED_CODE);
-    });
+      throw error;
+    }
   };
 
   const handleDisconnect = () => {
@@ -472,24 +473,34 @@ function OpenAiChatGptCardConnected({ organizationId }: { organizationId?: strin
   };
 
   return (
-    <OpenAiChatGptCardView
-      status={statusQuery.data}
-      authErrorCode={authErrorCode}
-      hasLoadError={statusQuery.isError}
-      hasDisconnectError={hasDisconnectError}
-      onConnect={handleConnect}
-      onDisconnect={handleDisconnect}
-      onRetry={handleRetryLoad}
-      isConnecting={isConnecting}
-      isDisconnecting={disconnectMutation.isPending}
-      isOrganization={Boolean(organizationId)}
-      isUsageLimitDismissed={
-        statusQuery.data?.usageLimit?.reachedAt === dismissedUsageLimitReachedAt
-      }
-      onDismissUsageLimit={() => {
-        setDismissedUsageLimitReachedAt(statusQuery.data?.usageLimit?.reachedAt ?? null);
-      }}
-    />
+    <>
+      <OpenAiChatGptCardView
+        status={statusQuery.data}
+        authErrorCode={authErrorCode}
+        hasLoadError={statusQuery.isError}
+        hasDisconnectError={hasDisconnectError}
+        onConnect={handleConnect}
+        onDisconnect={handleDisconnect}
+        onRetry={handleRetryLoad}
+        isConnecting={isConnecting}
+        isDisconnecting={disconnectMutation.isPending}
+        isOrganization={Boolean(organizationId)}
+        isUsageLimitDismissed={
+          statusQuery.data?.usageLimit?.reachedAt === dismissedUsageLimitReachedAt
+        }
+        onDismissUsageLimit={() => {
+          setDismissedUsageLimitReachedAt(statusQuery.data?.usageLimit?.reachedAt ?? null);
+        }}
+      />
+      <SignInMethodCodeDialog
+        open={isCodeDialogOpen}
+        change="link"
+        provider="openai"
+        onOpenChange={setIsCodeDialogOpen}
+        onError={error => setAuthErrorCode(error)}
+        onVerified={handleCodeVerified}
+      />
+    </>
   );
 }
 

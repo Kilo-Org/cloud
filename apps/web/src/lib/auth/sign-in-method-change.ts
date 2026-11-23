@@ -20,20 +20,11 @@ import type { SignInMethodChangeRefusal } from '@/lib/auth/sign-in-method-change
 
 export type SignInMethodChange = 'link' | 'unlink';
 
-/** The browser session claims that prove when and how the session signed in. */
-export type SignInMethodChangeSession = {
-  webSessionId?: string;
-  /** Unix seconds when this browser session signed in. */
-  authenticatedAt?: number;
-  /** The WorkOS organization the session signed in through, when it used SSO. */
-  ssoSourceOrganizationId?: string;
-};
-
 /**
  * Whether this browser session proved its holder recently: a primary sign-in
  * in the last ten minutes, or a live step-up proof for this session. Passkey
- * enrollment and sign-in method changes use the same rule. A failed step-up
- * read throws, so the caller fails closed.
+ * enrollment uses this rule. A failed step-up read throws, so the caller fails
+ * closed.
  */
 export async function isRecentlyProvenSession(params: {
   userId: string;
@@ -88,22 +79,15 @@ export async function isSignInMethodLinkAllowed(
 }
 
 /**
- * Decides whether a browser session may link or unlink a sign-in method. A
- * sign-in method is a way into the account, so the change needs a recent
- * proof of the person, not only a live session:
- *
- * - a link for an account whose domain requires SSO needs the organization
- *   to allow other methods;
- * - for a domain that requires SSO, the session must have signed in through
- *   that SSO in the last ten minutes, or hold a live step-up proof;
- * - for every other account, a primary sign-in in the last ten minutes, or a
- *   live step-up proof.
+ * Decides whether the SSO policy allows a sign-in method change. A link for
+ * an account whose domain requires SSO needs the organization to allow other
+ * methods. A domain whose SSO authority is misconfigured refuses every change.
+ * The proof of the person is the emailed code, which the caller checks.
  *
  * Returns the refusal, or null when the change may go ahead.
  */
 export async function authorizeSignInMethodChange(params: {
-  user: Pick<User, 'id' | 'google_user_email'>;
-  session: SignInMethodChangeSession;
+  user: Pick<User, 'google_user_email'>;
   change: SignInMethodChange;
 }): Promise<SignInMethodChangeRefusal | null> {
   const authority = await ssoAuthorityForUser(params.user);
@@ -111,17 +95,7 @@ export async function authorizeSignInMethodChange(params: {
   if (params.change === 'link' && !(await linkAllowedBySsoPolicy(authority))) {
     return 'ssoLinkNotAllowed';
   }
-
-  const ssoRequired = authority?.status === 'required';
-  const signedInThroughRequiredSso =
-    !ssoRequired || params.session.ssoSourceOrganizationId === authority.sourceOrganizationId;
-  const proven = await isRecentlyProvenSession({
-    userId: params.user.id,
-    webSessionId: params.session.webSessionId,
-    // A recent sign-in counts for an SSO domain only when it used that SSO.
-    authenticatedAt: signedInThroughRequiredSso ? params.session.authenticatedAt : undefined,
-  });
-  return proven ? null : 'reauthRequired';
+  return null;
 }
 
 /**

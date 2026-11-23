@@ -16,7 +16,21 @@ import {
   sendAccountDeletionConfirmationEmail,
   sendAccountDeletionSupportNotification,
   sendSignInCodeEmail,
+  sendSignInMethodChangeCodeEmail,
+  sendSignInMethodRemovedEmail,
 } from '@kilocode/web-shared/lib/email';
+import { AUTH_PROVIDER_DISPLAY_NAMES } from '@kilocode/web-shared/lib/auth/constants';
+import type { AuthProviderId } from '@kilocode/db/schema-types';
+import type { User } from '@kilocode/db/schema';
+import {
+  consumeSignInMethodChangeCode,
+  createSignInMethodChangeCode,
+  deleteSignInMethodChangeCode,
+  SIGN_IN_METHOD_CHANGE_CODE_EXPIRY_MINUTES,
+  SIGN_IN_METHOD_CHANGE_CODE_LOCKOUT_MINUTES,
+  type SignInMethodChangeCodeBinding,
+} from '@/lib/auth/sign-in-method-change-email-code';
+import { currentSignInMethodChangeRequestDetails } from '@/lib/auth/sign-in-method-change-request';
 import {
   consumeSignInCode,
   createSignInCode,
@@ -213,14 +227,30 @@ const AutocompleteMetricsOutputSchema = z.object({
   tokens: z.number(),
 });
 
+/**
+ * The emailed code that authorizes one link or unlink. Optional in the schema
+ * only so that clients which can not send it get the refusal that says why.
+ */
+const SignInMethodChangeCodeInput = {
+  code: z.string().trim().max(32).optional(),
+  challengeId: z.uuid().optional(),
+};
+
 const LinkAuthProviderInputSchema = z.object({
   provider: AuthProviderIdSchema,
   organizationId: z.uuid().optional(),
   /** Set when the person connects the organization's shared-services account. */
   chatGptScope: z.literal('shared_services').optional(),
+  ...SignInMethodChangeCodeInput,
 });
 
 const UnlinkAuthProviderInputSchema = z.object({
+  provider: AuthProviderIdSchema,
+  ...SignInMethodChangeCodeInput,
+});
+
+const RequestSignInMethodChangeCodeInputSchema = z.object({
+  change: z.enum(['link', 'unlink']),
   provider: AuthProviderIdSchema,
 });
 
@@ -726,47 +756,102 @@ async function computeNotificationCapabilities(userId: string): Promise<Notifica
 const SIGN_IN_METHOD_CHANGE_REFUSAL_MESSAGES: Record<SignInMethodChangeRefusal, string> = {
   browserSessionRequired:
     'Sign-in methods can only be changed from a browser signed in to app.kilo.ai.',
-  reauthRequired:
-    'Sign in again on app.kilo.ai, then change your sign-in methods within 10 minutes.',
   ssoLinkNotAllowed:
     'Your organization requires single sign-on, so other sign-in methods can not be linked.',
+  codeInvalid: 'The code is not correct or it expired. Try again, or send a new code.',
+  codeLocked: `Too many incorrect codes. Wait ${SIGN_IN_METHOD_CHANGE_CODE_LOCKOUT_MINUTES} minutes, then send a new code.`,
+  codeCooldown: 'A code was sent a short time ago. Wait one minute before you send a new code.',
+  codeSendFailed: 'We could not send the code email. Try again in a few minutes.',
+};
+
+const SIGN_IN_METHOD_CHANGE_REFUSAL_STATUS: Record<SignInMethodChangeRefusal, TRPCError['code']> = {
+  browserSessionRequired: 'FORBIDDEN',
+  ssoLinkNotAllowed: 'FORBIDDEN',
+  codeInvalid: 'BAD_REQUEST',
+  codeLocked: 'TOO_MANY_REQUESTS',
+  codeCooldown: 'TOO_MANY_REQUESTS',
+  codeSendFailed: 'INTERNAL_SERVER_ERROR',
 };
 
 function signInMethodChangeRefused(refusal: SignInMethodChangeRefusal): TRPCError {
   return new TRPCError({
-    code: 'FORBIDDEN',
+    code: SIGN_IN_METHOD_CHANGE_REFUSAL_STATUS[refusal],
     message: SIGN_IN_METHOD_CHANGE_REFUSAL_MESSAGES[refusal],
     cause: new UpstreamApiError(SIGN_IN_METHOD_CHANGE_REFUSAL_CODES[refusal]),
   });
 }
 
 // A sign-in method is a way into the account, so adding or removing one needs
-// the browser session of a person who proved who they are just now. A bearer
-// credential (API key, CLI or app session) or an app-shell session is refused,
-// and so is a browser session that did not sign in recently: a copied session
-// cookie alone can not change how the account signs in.
-async function assertSignInMethodChangeAllowed(
+// the browser session of the account and a code sent to the account's primary
+// email address. A bearer credential (API key, CLI or app session) or an
+// app-shell session is refused. A copied session cookie alone can not change
+// how the account signs in, because the code proves control of the mailbox.
+async function signInMethodChangeBinding(
   ctx: TRPCContext,
-  change: SignInMethodChange
-): Promise<void> {
+  change: SignInMethodChange,
+  provider: AuthProviderId
+): Promise<SignInMethodChangeCodeBinding> {
   if (ctx.credential !== 'session') {
     throw signInMethodChangeRefused('browserSessionRequired');
   }
   const session = await getUserFromSessionForCredentialIssuance();
-  if (!session.user || session.user.id !== ctx.user.id) {
+  if (!session.user || session.user.id !== ctx.user.id || !session.webSessionId) {
     throw signInMethodChangeRefused('browserSessionRequired');
   }
-  const refusal = await authorizeSignInMethodChange({
-    user: session.user,
-    session: {
-      webSessionId: session.webSessionId,
-      authenticatedAt: session.authenticatedAt,
-      ssoSourceOrganizationId: session.ssoSourceOrganizationId,
-    },
-    change,
-  });
+  const refusal = await authorizeSignInMethodChange({ user: session.user, change });
   if (refusal) {
     throw signInMethodChangeRefused(refusal);
+  }
+  return {
+    userId: session.user.id,
+    email: session.user.google_user_email,
+    change,
+    provider,
+    webSessionId: session.webSessionId,
+  };
+}
+
+async function assertSignInMethodChangeAllowed(
+  ctx: TRPCContext,
+  params: {
+    change: SignInMethodChange;
+    provider: AuthProviderId;
+    code: string | undefined;
+    challengeId: string | undefined;
+  }
+): Promise<void> {
+  const binding = await signInMethodChangeBinding(ctx, params.change, params.provider);
+  if (!params.code || !params.challengeId) {
+    throw signInMethodChangeRefused('codeInvalid');
+  }
+  const result = await consumeSignInMethodChangeCode(binding, params.code, params.challengeId);
+  if (result === 'invalid') throw signInMethodChangeRefused('codeInvalid');
+  if (result === 'locked') throw signInMethodChangeRefused('codeLocked');
+}
+
+/**
+ * Tells the account owner about an unlink after it happened. A failed email
+ * does not undo the unlink; it is reported.
+ */
+async function sendSignInMethodRemovedNotice(
+  user: Pick<User, 'google_user_email'>,
+  provider: AuthProviderId
+): Promise<void> {
+  const details = await currentSignInMethodChangeRequestDetails();
+  try {
+    const notice = await sendSignInMethodRemovedEmail(
+      user.google_user_email,
+      AUTH_PROVIDER_DISPLAY_NAMES[provider],
+      details
+    );
+    if (!notice.sent) {
+      captureException(new Error('Sign-in method removed notice was not sent'), {
+        tags: { operation: 'sign_in_method_change_notice', provider },
+        extra: { reason: notice.reason },
+      });
+    }
+  } catch (error) {
+    captureException(error, { tags: { operation: 'sign_in_method_change_notice', provider } });
   }
 }
 
@@ -1000,7 +1085,12 @@ export const userRouter = createTRPCRouter({
         });
       }
 
-      await assertSignInMethodChangeAllowed(ctx, 'link');
+      await assertSignInMethodChangeAllowed(ctx, {
+        change: 'link',
+        provider: input.provider,
+        code: input.code,
+        challengeId: input.challengeId,
+      });
 
       try {
         // Create a secure linking session
@@ -1024,7 +1114,12 @@ export const userRouter = createTRPCRouter({
   unlinkAuthProvider: baseProcedure
     .input(UnlinkAuthProviderInputSchema)
     .mutation(async ({ ctx, input }) => {
-      await assertSignInMethodChangeAllowed(ctx, 'unlink');
+      await assertSignInMethodChangeAllowed(ctx, {
+        change: 'unlink',
+        provider: input.provider,
+        code: input.code,
+        challengeId: input.challengeId,
+      });
       const result = assertNoTrpcError(
         await unlinkAuthProviderFromUser(ctx.user.id, input.provider)
       );
@@ -1034,7 +1129,52 @@ export const userRouter = createTRPCRouter({
         provider: input.provider,
         request: { ip: ctx.ip, route: ctx.trpcPath },
       });
+      await sendSignInMethodRemovedNotice(ctx.user, input.provider);
       return result;
+    }),
+
+  // Emails a one-time code that authorizes one link or unlink from this
+  // browser session. The code goes to the account's primary email address.
+  requestSignInMethodChangeCode: baseProcedure
+    .input(RequestSignInMethodChangeCodeInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      if (input.change === 'link' && !isAccountLinkingProvider(input.provider)) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'This sign-in method cannot be added to an account.',
+        });
+      }
+      const binding = await signInMethodChangeBinding(ctx, input.change, input.provider);
+      const created = await createSignInMethodChangeCode(binding);
+      if (created.status === 'locked') throw signInMethodChangeRefused('codeLocked');
+      if (created.status === 'cooldown') throw signInMethodChangeRefused('codeCooldown');
+
+      let delivered = false;
+      try {
+        const sent = await sendSignInMethodChangeCodeEmail(binding.email, {
+          code: created.code,
+          change: input.change,
+          providerName: AUTH_PROVIDER_DISPLAY_NAMES[input.provider],
+          expiresInMinutes: SIGN_IN_METHOD_CHANGE_CODE_EXPIRY_MINUTES,
+        });
+        delivered = sent.sent;
+      } catch (error) {
+        captureException(error, { tags: { operation: 'sign_in_method_change_code' } });
+      }
+      if (!delivered) {
+        // A code that never reached the mailbox would only block the next
+        // request with the resend cooldown.
+        try {
+          await deleteSignInMethodChangeCode(created.challengeId);
+        } catch (error) {
+          captureException(error, { tags: { operation: 'sign_in_method_change_code' } });
+        }
+        throw signInMethodChangeRefused('codeSendFailed');
+      }
+      return {
+        challengeId: created.challengeId,
+        expiresInMinutes: SIGN_IN_METHOD_CHANGE_CODE_EXPIRY_MINUTES,
+      };
     }),
 
   resetAPIKey: baseProcedure.mutation(async ({ ctx }) => {

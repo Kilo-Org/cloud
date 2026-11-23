@@ -10,9 +10,9 @@ import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import type { AuthProvider } from './LoginMethodsCard';
 import { UnlinkAccountDialog } from './UnlinkAccountDialog';
+import { SignInMethodCodeDialog } from './SignInMethodCodeDialog';
 import type { AuthProviderId } from '@kilocode/db/schema-types';
 import { getProviderById } from '@/lib/auth/provider-metadata';
-import { signInMethodChangeError } from '@/lib/auth/sign-in-method-change-codes';
 
 type ConnectedAccountsCardProps = {
   providers: AuthProvider[];
@@ -30,23 +30,18 @@ export function ConnectedAccountsCard({
 }: ConnectedAccountsCardProps) {
   const [unlinkingProvider, setUnlinkingProvider] = useState<AuthProviderId | null>(null);
   const [showConfirmUnlink, setShowConfirmUnlink] = useState<AuthProviderId | null>(null);
+  const [codeProvider, setCodeProvider] = useState<AuthProviderId | null>(null);
   const trpc = useTRPC();
 
   const unlinkMutation = useMutation(
     trpc.user.unlinkAuthProvider.mutationOptions({
-      onSuccess: async () => {
-        const providerName = showConfirmUnlink
-          ? getProviderById(showConfirmUnlink).name
-          : 'Connected';
+      onSuccess: async (_data, variables) => {
+        const providerName = getProviderById(variables.provider).name;
         toast.success(`${providerName} account unlinked successfully`);
         await onRefetch();
         setUnlinkingProvider(null);
         setShowConfirmUnlink(null);
-      },
-      onError: error => {
-        onError(signInMethodChangeError(error) ?? 'LINKING-FAILED');
-        setUnlinkingProvider(null);
-        setShowConfirmUnlink(null);
+        setCodeProvider(null);
       },
     })
   );
@@ -56,15 +51,35 @@ export function ConnectedAccountsCard({
       <UnlinkAccountDialog
         open={!!showConfirmUnlink}
         providerName={showConfirmUnlink ? getProviderById(showConfirmUnlink).name : ''}
-        isUnlinking={unlinkingProvider === showConfirmUnlink}
         onConfirm={() => {
-          if (showConfirmUnlink) {
-            setUnlinkingProvider(showConfirmUnlink);
-            unlinkMutation.mutate({ provider: showConfirmUnlink });
-          }
+          if (!showConfirmUnlink) return;
+          // The code step confirms the unlink, so the confirmation closes now.
+          setCodeProvider(showConfirmUnlink);
+          setShowConfirmUnlink(null);
         }}
         onCancel={() => setShowConfirmUnlink(null)}
       />
+
+      {codeProvider !== null && (
+        <SignInMethodCodeDialog
+          open
+          change="unlink"
+          provider={codeProvider}
+          onOpenChange={open => {
+            if (!open) setCodeProvider(null);
+          }}
+          onError={onError}
+          onVerified={async (code, challengeId) => {
+            if (codeProvider === null) return;
+            setUnlinkingProvider(codeProvider);
+            try {
+              await unlinkMutation.mutateAsync({ provider: codeProvider, code, challengeId });
+            } finally {
+              setUnlinkingProvider(null);
+            }
+          }}
+        />
+      )}
 
       <Card className="h-full w-full rounded-xl shadow-sm">
         <CardContent className="space-y-6 pt-6">

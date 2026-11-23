@@ -1,11 +1,18 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import { randomUUID } from 'node:crypto';
 
-// The link and unlink procedures read the browser session from the request
-// cookies, so the suite serves `next/headers` from a cookie jar it controls.
+// The procedures read the browser session from the request cookies and the
+// request details from the headers, so the suite serves `next/headers` itself.
 const cookieStore = new Map<string, { name: string; value: string }>();
+const REQUEST_HEADERS = {
+  'x-forwarded-for': '203.0.113.7',
+  'user-agent':
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+  'x-vercel-ip-city': 'San%20Francisco',
+  'x-vercel-ip-country': 'US',
+};
 jest.mock('next/headers', () => ({
-  headers: async () => new Headers({ 'x-forwarded-for': '203.0.113.7' }),
+  headers: async () => new Headers(REQUEST_HEADERS),
   cookies: async () => ({
     get: (name: string) => cookieStore.get(name),
     set: (name: string, value: string) => cookieStore.set(name, { name, value }),
@@ -24,6 +31,8 @@ jest.mock('@/lib/account-linking-session', () => ({
 jest.mock('@kilocode/web-shared/lib/email', () => ({
   ...jest.requireActual('@kilocode/web-shared/lib/email'),
   sendNewSignInMethodEmail: jest.fn(async () => ({ sent: true })),
+  sendSignInMethodRemovedEmail: jest.fn(async () => ({ sent: true })),
+  sendSignInMethodChangeCodeEmail: jest.fn(async () => ({ sent: true })),
 }));
 
 import { encode, type JWT } from 'next-auth/jwt';
@@ -31,16 +40,20 @@ import { and, eq } from 'drizzle-orm';
 import {
   admin_action_audit_logs,
   device_sessions,
+  magic_link_tokens,
   organization_audit_logs,
   organizations,
-  passkey_credentials,
-  session_step_up_proofs,
   user_auth_provider,
   type User,
 } from '@kilocode/db/schema';
+import type { AuthProviderId } from '@kilocode/db/schema-types';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
-import { hashWebSessionId } from '@kilocode/web-shared/lib/admin/step-up-store';
+import {
+  sendNewSignInMethodEmail,
+  sendSignInMethodChangeCodeEmail,
+  sendSignInMethodRemovedEmail,
+} from '@kilocode/web-shared/lib/email';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import {
@@ -54,10 +67,18 @@ import { linkAccountToExistingUser } from '@/lib/user';
 import { SIGN_IN_METHOD_CHANGE_REFUSAL_CODES } from '@/lib/auth/sign-in-method-change-codes';
 
 const mockCreateLinkingSession = jest.mocked(createAccountLinkingSession);
+const mockSendCode = jest.mocked(sendSignInMethodChangeCodeEmail);
+const mockSendRemoved = jest.mocked(sendSignInMethodRemovedEmail);
+const mockSendAdded = jest.mocked(sendNewSignInMethodEmail);
 
-const nowSeconds = () => Math.floor(Date.now() / 1000);
-/** A session that signed in long ago, such as a copied session cookie. */
-const STALE_SIGN_IN = () => nowSeconds() - 20 * 24 * 60 * 60;
+const EXPECTED_DETAILS = {
+  changedAt: expect.any(Date),
+  ip: '203.0.113.7',
+  location: 'San Francisco, US',
+  device: 'Chrome on macOS',
+};
+
+type SessionCaller = Awaited<ReturnType<typeof createSessionCallerForUser>>;
 
 /** Puts a real NextAuth session cookie for `user` on the request. */
 async function setSessionCookie(user: User, claims: Partial<JWT> = {}) {
@@ -70,6 +91,7 @@ async function setSessionCookie(user: User, claims: Partial<JWT> = {}) {
         sub: randomUUID(),
         webSessionPepper: user.web_session_pepper,
         webSessionId: `web-session-${randomUUID()}`,
+        authenticatedAt: Math.floor(Date.now() / 1000),
         ...claims,
       },
     }),
@@ -123,20 +145,94 @@ async function providersOf(userId: string) {
 
 function refusedWith(code: string) {
   return expect.objectContaining({
-    code: 'FORBIDDEN',
     cause: expect.objectContaining({ upstreamCode: code }),
   });
+}
+
+/** Requests a code and returns the code that the email would carry. */
+async function requestCode(
+  caller: SessionCaller,
+  change: 'link' | 'unlink',
+  provider: AuthProviderId
+) {
+  mockSendCode.mockClear();
+  const { challengeId } = await caller.user.requestSignInMethodChangeCode({ change, provider });
+  const [[, props]] = mockSendCode.mock.calls;
+  return { code: props.code, challengeId };
+}
+
+function wrongCode(code: string) {
+  return code === '000000' ? '000001' : '000000';
 }
 
 beforeEach(() => {
   cookieStore.clear();
   mockCreateLinkingSession.mockReset();
+  mockSendCode.mockReset();
+  mockSendCode.mockResolvedValue({ sent: true });
+  mockSendRemoved.mockReset();
+  mockSendRemoved.mockResolvedValue({ sent: true });
+  mockSendAdded.mockReset();
+  mockSendAdded.mockResolvedValue({ sent: true });
+});
+
+describe('user.requestSignInMethodChangeCode', () => {
+  it('refuses an API token, even when the request also carries a browser session', async () => {
+    const user = await insertUser();
+    await setSessionCookie(user);
+    const caller = await createCallerForUser(user.id);
+
+    await expect(
+      caller.user.requestSignInMethodChangeCode({ change: 'link', provider: 'github' })
+    ).rejects.toEqual(refusedWith(SIGN_IN_METHOD_CHANGE_REFUSAL_CODES.browserSessionRequired));
+    expect(mockSendCode).not.toHaveBeenCalled();
+  });
+
+  it('sends the code to the primary email address and enforces the resend cooldown', async () => {
+    const user = await insertUser();
+    await setSessionCookie(user);
+    const caller = await createSessionCallerForUser(user.id);
+
+    const { challengeId } = await caller.user.requestSignInMethodChangeCode({
+      change: 'link',
+      provider: 'github',
+    });
+    expect(challengeId).toEqual(expect.any(String));
+    expect(mockSendCode).toHaveBeenCalledWith(
+      user.google_user_email,
+      expect.objectContaining({ change: 'link', providerName: 'GitHub', expiresInMinutes: 10 })
+    );
+
+    await expect(
+      caller.user.requestSignInMethodChangeCode({ change: 'link', provider: 'github' })
+    ).rejects.toEqual(refusedWith(SIGN_IN_METHOD_CHANGE_REFUSAL_CODES.codeCooldown));
+  });
+
+  it('reports a send failure and lets the person try again at once', async () => {
+    const user = await insertUser();
+    await setSessionCookie(user);
+    const caller = await createSessionCallerForUser(user.id);
+
+    mockSendCode.mockResolvedValueOnce({ sent: false, reason: 'provider_not_configured' });
+    await expect(
+      caller.user.requestSignInMethodChangeCode({ change: 'link', provider: 'github' })
+    ).rejects.toEqual(refusedWith(SIGN_IN_METHOD_CHANGE_REFUSAL_CODES.codeSendFailed));
+
+    mockSendCode.mockRejectedValueOnce(new Error('mail API down'));
+    await expect(
+      caller.user.requestSignInMethodChangeCode({ change: 'link', provider: 'github' })
+    ).rejects.toEqual(refusedWith(SIGN_IN_METHOD_CHANGE_REFUSAL_CODES.codeSendFailed));
+
+    await expect(
+      caller.user.requestSignInMethodChangeCode({ change: 'link', provider: 'github' })
+    ).resolves.toEqual(expect.objectContaining({ expiresInMinutes: 10 }));
+  });
 });
 
 describe('user.linkAuthProvider', () => {
-  it('refuses an API token, even when the request also carries a fresh browser session', async () => {
+  it('refuses an API token', async () => {
     const user = await insertUser();
-    await setSessionCookie(user, { authenticatedAt: nowSeconds() });
+    await setSessionCookie(user);
     const caller = await createCallerForUser(user.id);
 
     await expect(caller.user.linkAuthProvider({ provider: 'openai' })).rejects.toEqual(
@@ -159,21 +255,10 @@ describe('user.linkAuthProvider', () => {
     expect(mockCreateLinkingSession).not.toHaveBeenCalled();
   });
 
-  it('refuses a browser session that signed in long ago', async () => {
-    const user = await insertUser();
-    await setSessionCookie(user, { authenticatedAt: STALE_SIGN_IN() });
-    const caller = await createSessionCallerForUser(user.id);
-
-    await expect(caller.user.linkAuthProvider({ provider: 'openai' })).rejects.toEqual(
-      refusedWith(SIGN_IN_METHOD_CHANGE_REFUSAL_CODES.reauthRequired)
-    );
-    expect(mockCreateLinkingSession).not.toHaveBeenCalled();
-  });
-
   it('refuses a browser session whose cookie names another account', async () => {
     const user = await insertUser();
     const other = await insertUser();
-    await setSessionCookie(other, { authenticatedAt: nowSeconds() });
+    await setSessionCookie(other);
     const caller = await createSessionCallerForUser(user.id);
 
     await expect(caller.user.linkAuthProvider({ provider: 'openai' })).rejects.toEqual(
@@ -181,89 +266,168 @@ describe('user.linkAuthProvider', () => {
     );
   });
 
-  it('starts a link for every offered provider from a recent browser sign-in', async () => {
+  it('refuses a fresh browser session that sends no code', async () => {
     const user = await insertUser();
-    await setSessionCookie(user, { authenticatedAt: nowSeconds() });
+    await setSessionCookie(user);
+    const caller = await createSessionCallerForUser(user.id);
+
+    await expect(caller.user.linkAuthProvider({ provider: 'github' })).rejects.toEqual(
+      refusedWith(SIGN_IN_METHOD_CHANGE_REFUSAL_CODES.codeInvalid)
+    );
+    expect(mockCreateLinkingSession).not.toHaveBeenCalled();
+  });
+
+  it('refuses a wrong code, then accepts the right code once only', async () => {
+    const user = await insertUser();
+    await setSessionCookie(user);
+    const caller = await createSessionCallerForUser(user.id);
+    const { code, challengeId } = await requestCode(caller, 'link', 'github');
+
+    await expect(
+      caller.user.linkAuthProvider({ provider: 'github', code: wrongCode(code), challengeId })
+    ).rejects.toEqual(refusedWith(SIGN_IN_METHOD_CHANGE_REFUSAL_CODES.codeInvalid));
+    expect(mockCreateLinkingSession).not.toHaveBeenCalled();
+
+    await expect(
+      caller.user.linkAuthProvider({ provider: 'github', code, challengeId })
+    ).resolves.toEqual({ success: true });
+    expect(mockCreateLinkingSession).toHaveBeenCalledTimes(1);
+
+    await expect(
+      caller.user.linkAuthProvider({ provider: 'github', code, challengeId })
+    ).rejects.toEqual(refusedWith(SIGN_IN_METHOD_CHANGE_REFUSAL_CODES.codeInvalid));
+    expect(mockCreateLinkingSession).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses an expired code', async () => {
+    const user = await insertUser();
+    await setSessionCookie(user);
+    const caller = await createSessionCallerForUser(user.id);
+    const { code, challengeId } = await requestCode(caller, 'link', 'github');
+    await db
+      .update(magic_link_tokens)
+      .set({
+        created_at: new Date(Date.now() - 60 * 60_000).toISOString(),
+        expires_at: new Date(Date.now() - 60_000).toISOString(),
+      })
+      .where(eq(magic_link_tokens.challenge_id, challengeId));
+
+    await expect(
+      caller.user.linkAuthProvider({ provider: 'github', code, challengeId })
+    ).rejects.toEqual(refusedWith(SIGN_IN_METHOD_CHANGE_REFUSAL_CODES.codeInvalid));
+    expect(mockCreateLinkingSession).not.toHaveBeenCalled();
+  });
+
+  it('refuses a code made for another change, provider, browser session or user', async () => {
+    const user = await insertUser();
+    await setSessionCookie(user);
+    const caller = await createSessionCallerForUser(user.id);
+
+    const unlinkCode = await requestCode(caller, 'unlink', 'github');
+    await expect(
+      caller.user.linkAuthProvider({ provider: 'github', ...unlinkCode })
+    ).rejects.toEqual(refusedWith(SIGN_IN_METHOD_CHANGE_REFUSAL_CODES.codeInvalid));
+
+    await db.delete(magic_link_tokens).where(eq(magic_link_tokens.email, user.google_user_email));
+    const gitlabCode = await requestCode(caller, 'link', 'gitlab');
+    await expect(
+      caller.user.linkAuthProvider({ provider: 'github', ...gitlabCode })
+    ).rejects.toEqual(refusedWith(SIGN_IN_METHOD_CHANGE_REFUSAL_CODES.codeInvalid));
+
+    await db.delete(magic_link_tokens).where(eq(magic_link_tokens.email, user.google_user_email));
+    const sessionCode = await requestCode(caller, 'link', 'github');
+    // The same account signs in again in another browser session.
+    await setSessionCookie(user);
+    await expect(
+      caller.user.linkAuthProvider({ provider: 'github', ...sessionCode })
+    ).rejects.toEqual(refusedWith(SIGN_IN_METHOD_CHANGE_REFUSAL_CODES.codeInvalid));
+
+    const other = await insertUser();
+    await setSessionCookie(other);
+    const otherCaller = await createSessionCallerForUser(other.id);
+    const otherCode = await requestCode(otherCaller, 'link', 'github');
+    await setSessionCookie(user);
+    await expect(
+      caller.user.linkAuthProvider({ provider: 'github', ...otherCode })
+    ).rejects.toEqual(refusedWith(SIGN_IN_METHOD_CHANGE_REFUSAL_CODES.codeInvalid));
+
+    expect(mockCreateLinkingSession).not.toHaveBeenCalled();
+  });
+
+  it('locks the code after too many wrong codes and sends no new code', async () => {
+    const user = await insertUser();
+    await setSessionCookie(user);
+    const caller = await createSessionCallerForUser(user.id);
+    const { code, challengeId } = await requestCode(caller, 'link', 'github');
+
+    for (let attempt = 1; attempt < 5; attempt++) {
+      await expect(
+        caller.user.linkAuthProvider({ provider: 'github', code: wrongCode(code), challengeId })
+      ).rejects.toEqual(refusedWith(SIGN_IN_METHOD_CHANGE_REFUSAL_CODES.codeInvalid));
+    }
+    await expect(
+      caller.user.linkAuthProvider({ provider: 'github', code: wrongCode(code), challengeId })
+    ).rejects.toEqual(refusedWith(SIGN_IN_METHOD_CHANGE_REFUSAL_CODES.codeLocked));
+    // The right code does not work after the lock.
+    await expect(
+      caller.user.linkAuthProvider({ provider: 'github', code, challengeId })
+    ).rejects.toEqual(refusedWith(SIGN_IN_METHOD_CHANGE_REFUSAL_CODES.codeLocked));
+
+    mockSendCode.mockClear();
+    await expect(
+      caller.user.requestSignInMethodChangeCode({ change: 'link', provider: 'github' })
+    ).rejects.toEqual(refusedWith(SIGN_IN_METHOD_CHANGE_REFUSAL_CODES.codeLocked));
+    expect(mockSendCode).not.toHaveBeenCalled();
+    expect(mockCreateLinkingSession).not.toHaveBeenCalled();
+  });
+
+  it('starts a link for every offered provider with its code', async () => {
+    const user = await insertUser();
+    await setSessionCookie(user);
     const caller = await createSessionCallerForUser(user.id);
 
     for (const { id } of AccountLinkingProviders) {
       mockCreateLinkingSession.mockClear();
-      await expect(caller.user.linkAuthProvider({ provider: id })).resolves.toEqual({
-        success: true,
-      });
+      const { code, challengeId } = await requestCode(caller, 'link', id);
+      await expect(
+        caller.user.linkAuthProvider({ provider: id, code, challengeId })
+      ).resolves.toEqual({ success: true });
       expect(mockCreateLinkingSession).toHaveBeenCalledWith(user.id, id, undefined, undefined);
     }
 
-    // A method the card does not offer must not open a linking session.
-    mockCreateLinkingSession.mockClear();
-    await expect(caller.user.linkAuthProvider({ provider: 'workos' })).rejects.toMatchObject({
-      code: 'BAD_REQUEST',
-    });
-    expect(mockCreateLinkingSession).not.toHaveBeenCalled();
-  });
-
-  it('accepts an older browser sign-in that holds a live step-up proof', async () => {
-    const user = await insertUser();
-    const webSessionId = `web-session-${randomUUID()}`;
-    const [passkey] = await db
-      .insert(passkey_credentials)
-      .values({
-        kilo_user_id: user.id,
-        credential_id: `credential-${randomUUID()}`,
-        public_key: 'cose-public-key-bytes',
-      })
-      .returning();
-    await db.insert(session_step_up_proofs).values({
-      kilo_user_id: user.id,
-      session_id_hash: hashWebSessionId(webSessionId),
-      method: 'webauthn_uv',
-      passkey_credential_id: passkey.id,
-      purpose: 'session',
-      verified_at: new Date().toISOString(),
-      expires_at: new Date(Date.now() + 15 * 60_000).toISOString(),
-    });
-    await setSessionCookie(user, { authenticatedAt: STALE_SIGN_IN(), webSessionId });
-    const caller = await createSessionCallerForUser(user.id);
-
-    await expect(caller.user.linkAuthProvider({ provider: 'github' })).resolves.toEqual({
-      success: true,
-    });
+    // A method the card does not offer must not get a code or a linking session.
+    await expect(
+      caller.user.requestSignInMethodChangeCode({ change: 'link', provider: 'workos' })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
   });
 
   it('refuses a link for an SSO domain whose organization does not allow other methods', async () => {
     const { member, organization } = await insertSsoMember();
     await setSessionCookie(member, {
-      authenticatedAt: nowSeconds(),
       authProvider: 'workos',
       ssoSourceOrganizationId: organization.id,
     });
     const caller = await createSessionCallerForUser(member.id);
 
-    await expect(caller.user.linkAuthProvider({ provider: 'openai' })).rejects.toEqual(
-      refusedWith(SIGN_IN_METHOD_CHANGE_REFUSAL_CODES.ssoLinkNotAllowed)
-    );
-    expect(mockCreateLinkingSession).not.toHaveBeenCalled();
+    await expect(
+      caller.user.requestSignInMethodChangeCode({ change: 'link', provider: 'openai' })
+    ).rejects.toEqual(refusedWith(SIGN_IN_METHOD_CHANGE_REFUSAL_CODES.ssoLinkNotAllowed));
+    expect(mockSendCode).not.toHaveBeenCalled();
   });
 
-  it('allows the link for an SSO domain once the organization allows it, from a fresh SSO sign-in only', async () => {
+  it('allows the link for an SSO domain once the organization allows it', async () => {
     const { member, organization } = await insertSsoMember();
     await allowNonSsoSignInMethods(organization.id);
-    const caller = await createSessionCallerForUser(member.id);
-
-    // A recent sign-in that did not go through the domain's SSO is not enough.
-    await setSessionCookie(member, { authenticatedAt: nowSeconds(), authProvider: 'passkey' });
-    await expect(caller.user.linkAuthProvider({ provider: 'openai' })).rejects.toEqual(
-      refusedWith(SIGN_IN_METHOD_CHANGE_REFUSAL_CODES.reauthRequired)
-    );
-
     await setSessionCookie(member, {
-      authenticatedAt: nowSeconds(),
       authProvider: 'workos',
       ssoSourceOrganizationId: organization.id,
     });
-    await expect(caller.user.linkAuthProvider({ provider: 'openai' })).resolves.toEqual({
-      success: true,
-    });
+    const caller = await createSessionCallerForUser(member.id);
+    const { code, challengeId } = await requestCode(caller, 'link', 'openai');
+
+    await expect(
+      caller.user.linkAuthProvider({ provider: 'openai', code, challengeId })
+    ).resolves.toEqual({ success: true });
   });
 });
 
@@ -280,29 +444,31 @@ describe('user.unlinkAuthProvider', () => {
     expect(await providersOf(user.id)).toEqual(['github', 'google']);
   });
 
-  it('refuses a browser session that signed in long ago and keeps the method', async () => {
+  it('refuses a fresh browser session without a code and keeps the method', async () => {
     const user = await insertUser();
     await addProvider(user.id, 'google');
     await addProvider(user.id, 'github');
-    await setSessionCookie(user, { authenticatedAt: STALE_SIGN_IN() });
+    await setSessionCookie(user);
     const caller = await createSessionCallerForUser(user.id);
 
     await expect(caller.user.unlinkAuthProvider({ provider: 'github' })).rejects.toEqual(
-      refusedWith(SIGN_IN_METHOD_CHANGE_REFUSAL_CODES.reauthRequired)
+      refusedWith(SIGN_IN_METHOD_CHANGE_REFUSAL_CODES.codeInvalid)
     );
     expect(await providersOf(user.id)).toEqual(['github', 'google']);
+    expect(mockSendRemoved).not.toHaveBeenCalled();
   });
 
-  it('unlinks from a recent sign-in and writes the admin audit row for an admin', async () => {
+  it('unlinks with the code, writes the admin audit row and sends the notice', async () => {
     const admin = await insertUser({ is_admin: true });
     await addProvider(admin.id, 'google');
     await addProvider(admin.id, 'github');
-    await setSessionCookie(admin, { authenticatedAt: nowSeconds() });
+    await setSessionCookie(admin);
     const caller = await createSessionCallerForUser(admin.id);
+    const { code, challengeId } = await requestCode(caller, 'unlink', 'github');
 
-    await expect(caller.user.unlinkAuthProvider({ provider: 'github' })).resolves.toEqual({
-      success: true,
-    });
+    await expect(
+      caller.user.unlinkAuthProvider({ provider: 'github', code, challengeId })
+    ).resolves.toEqual({ success: true });
 
     expect(await providersOf(admin.id)).toEqual(['google']);
     const rows = await db
@@ -321,6 +487,26 @@ describe('user.unlinkAuthProvider', () => {
         metadata: { provider: 'github' },
       }),
     ]);
+    expect(mockSendRemoved).toHaveBeenCalledWith(
+      admin.google_user_email,
+      'GitHub',
+      EXPECTED_DETAILS
+    );
+  });
+
+  it('keeps the unlink when the notice email fails', async () => {
+    const user = await insertUser();
+    await addProvider(user.id, 'google');
+    await addProvider(user.id, 'github');
+    await setSessionCookie(user);
+    const caller = await createSessionCallerForUser(user.id);
+    const { code, challengeId } = await requestCode(caller, 'unlink', 'github');
+    mockSendRemoved.mockRejectedValueOnce(new Error('mail API down'));
+
+    await expect(
+      caller.user.unlinkAuthProvider({ provider: 'github', code, challengeId })
+    ).resolves.toEqual({ success: true });
+    expect(await providersOf(user.id)).toEqual(['google']);
   });
 
   it('writes the organization audit row for an SSO member', async () => {
@@ -328,13 +514,13 @@ describe('user.unlinkAuthProvider', () => {
     await addProvider(member.id, 'google');
     await addProvider(member.id, 'github');
     await setSessionCookie(member, {
-      authenticatedAt: nowSeconds(),
       authProvider: 'workos',
       ssoSourceOrganizationId: organization.id,
     });
     const caller = await createSessionCallerForUser(member.id);
+    const { code, challengeId } = await requestCode(caller, 'unlink', 'github');
 
-    await caller.user.unlinkAuthProvider({ provider: 'github' });
+    await caller.user.unlinkAuthProvider({ provider: 'github', code, challengeId });
 
     const rows = await db
       .select()
@@ -354,7 +540,7 @@ describe('user.unlinkAuthProvider', () => {
   });
 });
 
-describe('linkAccountToExistingUser audit', () => {
+describe('linkAccountToExistingUser', () => {
   const identity = (email: string) => ({
     google_user_email: email,
     google_user_name: 'Linked',
@@ -401,5 +587,28 @@ describe('linkAccountToExistingUser audit', () => {
         message: 'User linked a GitHub sign-in method',
       }),
     ]);
+  });
+
+  it('sends the notice with the request IP address, location and browser', async () => {
+    const user = await insertUser();
+
+    await linkAccountToExistingUser(user.id, identity('notice@example.net'));
+
+    expect(mockSendAdded).toHaveBeenCalledWith(
+      user.google_user_email,
+      'GitHub',
+      { email: 'notice@example.net', displayName: null },
+      EXPECTED_DETAILS
+    );
+  });
+
+  it('keeps the link when the notice email fails', async () => {
+    const user = await insertUser();
+    mockSendAdded.mockRejectedValueOnce(new Error('mail API down'));
+
+    const result = await linkAccountToExistingUser(user.id, identity('fails@example.net'));
+
+    expect(result.success).toBe(true);
+    expect(await providersOf(user.id)).toContain('github');
   });
 });

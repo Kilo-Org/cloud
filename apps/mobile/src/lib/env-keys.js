@@ -30,8 +30,8 @@ export const ENV_KEYS = {
  *  Each entry still sets its own build-time and runtime result: most disable the
  *  feature that reads them, or fall back to a committed default.
  *  playIntegrityProjectNumber is required by a separate production-only build
- *  gate (app.config.ts), and a build whose extra lacks it refuses native signup
- *  at runtime. */
+ *  gate (app.config.ts), and a build whose extra lacks it refuses native sign-in
+ *  on Android at runtime. */
 export const OPTIONAL_ENV_KEYS = {
   // The Kilo MCP server the chat reaches with the signed-in session's own
   // token. An override: a production build resolves the public server in

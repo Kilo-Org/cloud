@@ -203,11 +203,12 @@ export const adminCustomLlmRouter = createTRPCRouter({
         message: `Custom LLM with public_id "${input.source_public_id}" not found`,
       });
     }
-    if (source.definition.partner) {
-      badRequest('A partner custom LLM cannot be copied');
-    }
     assertPricingMatchesPublicId(input.public_id, source.definition);
-    await assertPublicIdIsClaimable(input.public_id);
+    if (source.definition.partner) {
+      await assertPartnerPublicIdIsCatalogModel(input.public_id);
+    } else {
+      await assertPublicIdIsClaimable(input.public_id);
+    }
 
     const [inserted] = await db
       .insert(custom_llm2)

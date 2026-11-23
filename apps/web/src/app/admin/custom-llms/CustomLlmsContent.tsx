@@ -146,6 +146,7 @@ type CopyState = {
   sourcePublicId: string;
   sourceIsPublic: boolean;
   sourceIsPriced: boolean;
+  sourceIsPartner: boolean;
   publicId: string;
   displayName: string;
   internalId: string;
@@ -245,6 +246,7 @@ export function CustomLlmsContent() {
       sourcePublicId,
       sourceIsPublic: source.public !== undefined,
       sourceIsPriced: source.pricing !== undefined,
+      sourceIsPartner: source.partner !== undefined,
       publicId: sourcePublicId,
       displayName: source.display_name,
       internalId: source.internal_id ?? '',
@@ -541,17 +543,15 @@ export function CustomLlmsContent() {
                     >
                       <Pencil className="h-3 w-3" />
                     </Button>
-                    {!item.definition.partner && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => openCopy(item.public_id, item.definition)}
-                        aria-label={`Copy ${item.public_id}`}
-                        title="Copy custom LLM"
-                      >
-                        <CopyIcon className="h-3 w-3" />
-                      </Button>
-                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openCopy(item.public_id, item.definition)}
+                      aria-label={`Copy ${item.public_id}`}
+                      title="Copy custom LLM"
+                    >
+                      <CopyIcon className="h-3 w-3" />
+                    </Button>
                     <InlineDeleteConfirmation
                       onDelete={() => handleDelete(item.public_id)}
                       isLoading={deleteMutation.isPending}
@@ -832,6 +832,8 @@ export function CustomLlmsContent() {
               Copy the definition and encrypted credentials from{' '}
               <code className="font-mono">{copy?.sourcePublicId}</code>. Enter a new public ID and
               adjust the display name and internal ID for the copy.
+              {copy?.sourceIsPartner &&
+                ' The copy stays a partner, so its public ID must be the catalog model ID it serves.'}
             </DialogDescription>
           </DialogHeader>
 

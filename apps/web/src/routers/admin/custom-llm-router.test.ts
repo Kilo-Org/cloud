@@ -1072,7 +1072,36 @@ describe('adminCustomLlmRouter', () => {
       expect(row?.definition.partner).toBeUndefined();
     });
 
-    it('rejects copying a partner', async () => {
+    it('copies a partner to another model in the OpenRouter model list', async () => {
+      jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({
+        [catalogPublicId]: {} as GatewayModelWithEndpoints,
+        'openai/gpt-4o-mini': {} as GatewayModelWithEndpoints,
+      });
+      const caller = await createCallerForUser(admin.id);
+      await caller.admin.customLlm.upsert({
+        public_id: catalogPublicId,
+        definition: partnerDefinition,
+        credentials,
+      });
+
+      const result = await caller.admin.customLlm.copy({
+        source_public_id: catalogPublicId,
+        public_id: 'openai/gpt-4o-mini',
+        display_name: 'Partner GPT-4o mini',
+        internal_id: 'partner-gpt-4o-mini',
+      });
+
+      expect(result.definition).toEqual({
+        ...partnerDefinition,
+        display_name: 'Partner GPT-4o mini',
+        internal_id: 'partner-gpt-4o-mini',
+      });
+      const rows = await db.select().from(custom_llm2).orderBy(custom_llm2.public_id);
+      expect(rows.map(row => row.public_id)).toEqual([catalogPublicId, 'openai/gpt-4o-mini']);
+      expect(rows[1]?.encrypted_api_key).toEqual(rows[0]?.encrypted_api_key);
+    });
+
+    it('rejects copying a partner to an id that is not in the OpenRouter model list', async () => {
       const caller = await createCallerForUser(admin.id);
       await caller.admin.customLlm.upsert({
         public_id: catalogPublicId,
@@ -1088,7 +1117,7 @@ describe('adminCustomLlmRouter', () => {
         })
       ).rejects.toMatchObject({
         code: 'BAD_REQUEST',
-        message: 'A partner custom LLM cannot be copied',
+        message: expect.stringContaining('must exist in the OpenRouter model list'),
       });
 
       const [copiedRow] = await db

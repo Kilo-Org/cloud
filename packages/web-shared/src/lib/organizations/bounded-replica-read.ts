@@ -3,8 +3,9 @@ import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 
 /**
- * Longest an optional dashboard read may run on the replica. A slower scan is cancelled so the
- * card can degrade within seconds instead of holding a connection for the server-wide timeout.
+ * Per-statement limit for optional dashboard reads on the replica. This cancels slow scans before
+ * the server-wide timeout, but does not cap the whole dashboard request: the member lookup runs
+ * before the parallel usage queries, and each database statement has its own limit.
  */
 export const BOUNDED_READ_STATEMENT_TIMEOUT_MS = 30_000;
 

@@ -2659,10 +2659,10 @@
     "transcribing": "टेक्स्ट में बदला जा रहा है…",
     "gatewayUnreachable": "Kilo Gateway से संपर्क नहीं हो सका। अपना कनेक्शन जाँचें और फिर से कोशिश करें।",
     "gatewayTimeout": "आवाज़ को टेक्स्ट में बदलने में बहुत समय लगा। फिर से कोशिश करें।",
-    "gatewayModelUnavailable": "आवाज़ को टेक्स्ट में बदलने का यह मॉडल उपलब्ध नहीं है। पसंद में दूसरा चुनें।",
+    "gatewayModelUnavailable": "आवाज़ को टेक्स्ट में बदलने का यह मॉडल उपलब्ध नहीं है। प्राथमिकताओं में दूसरा चुनें।",
     "gatewayModelUnavailableNotice": "यह मॉडल अब पेश नहीं किया जाता। दूसरा चुनने के लिए $t(transcriptionModel.title) पर टैप करें।",
     "gatewaySignInRequired": "Kilo Gateway से आवाज़ को टेक्स्ट में बदलने के लिए साइन इन करें।",
-    "gatewayNoModel": "पहले पसंद में आवाज़ को टेक्स्ट में बदलने का मॉडल चुनें।",
+    "gatewayNoModel": "पहले प्राथमिकताओं में आवाज़ को टेक्स्ट में बदलने का मॉडल चुनें।",
     "testTitle": "वॉइस इनपुट का परीक्षण करें",
     "testPlaceholder": "माइक्रोफ़ोन पर टैप करें और बोलना शुरू करें।",
     "testClear": "टेक्स्ट साफ़ करें"
@@ -5337,16 +5337,16 @@
     }
   },
   "settingsSearch": {
-    "placeholder": "पसंद में खोजें",
-    "noMatches": "मेल खाती कोई पसंद नहीं मिली",
-    "emptyDescription": "पसंद का कोई दूसरा नाम या कीवर्ड आज़माएँ।",
-    "resultsStatus": "पसंद मिलीं: {{resultCount}}",
+    "placeholder": "सेटिंग्स में खोजें",
+    "noMatches": "मेल खाती कोई सेटिंग नहीं मिली",
+    "emptyDescription": "कोई दूसरा सेटिंग नाम या कीवर्ड आज़माएँ।",
+    "resultsStatus": "सेटिंग्स के परिणाम: {{resultCount}}",
     "keywords": {
       "signOut": "साइन आउट|लॉग आउट|बाहर निकलें",
       "appearance": "थीम|रंग|डार्क मोड",
       "appUnlock": "बायोमेट्रिक्स|चेहरा|फिंगरप्रिंट",
       "language": "भाषा|अनुवाद",
-      "notifications": "सूचनाएँ|अलर्ट",
+      "notifications": "सूचनाएँ|अलर्ट|पुश सूचनाएँ",
       "privacy": "विश्लेषण|ट्रैकिंग"
     }
   }

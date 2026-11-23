@@ -49,6 +49,7 @@ import {
   organizationAccessDenialErrorCode,
 } from '@/lib/integrations/oauth/common';
 import { consumeProviderOAuthAttempt } from '@/lib/integrations/provider-oauth-attempts';
+import { APP_SHELL_FLOW_COOKIE } from '@/lib/integrations/oauth/app-shell-flow';
 import { withWorkspaceInstallationLock } from '@/lib/integrations/oauth/workspace-installation-lock';
 import { restoreProviderInstallation } from '@/lib/integrations/oauth/provider-installation-restore';
 import { getDefaultAllowedModel } from '@/lib/slack-bot/model-allow-list';
@@ -194,7 +195,7 @@ async function handleSlackBotLinkCallback({
 
   if (outcome.status === 'conflict') {
     return linkConflictPage(
-      PLATFORM.SLACK,
+      'Slack',
       'If you cannot sign in to that account, a workspace owner or admin can disconnect the slack integration and connect it again, which clears the links held for that workspace.'
     );
   }
@@ -225,7 +226,23 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
     // plus the flow cookie its connect route set for this exact attempt.
     const verified = verifyOAuthState(state);
     const actor = await resolveOAuthCallbackActor({ request, rawState: state, verified });
+    // Classify the state for the error routing below and for the sign-in
+    // resume here. The payload decode grants no authority; the signed checks
+    // stay with `verifySlackBotLinkState`.
+    const isBotLinkState = isSlackBotLinkState(state);
     if (actor.status === 'unauthenticated') {
+      // A chat-link callback continues after sign-in by carrying its own path
+      // and query as `callbackPath`. A browser with the app shell's flow cookie
+      // keeps `oauthCallbackRedirectPath`'s terminal page, because the shell
+      // resumes its own flow.
+      if (isBotLinkState && !request.cookies.has(APP_SHELL_FLOW_COOKIE)) {
+        const signInUrl = new URL('/users/sign_in', APP_URL);
+        signInUrl.searchParams.set(
+          'callbackPath',
+          request.nextUrl.pathname + request.nextUrl.search
+        );
+        return NextResponse.redirect(signInUrl, 302);
+      }
       return NextResponse.redirect(
         new URL(oauthCallbackRedirectPath(request, '/users/sign_in'), APP_URL)
       );
@@ -246,7 +263,7 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
     // below would send the user to an unrelated integrations page. The
     // response must not distinguish expired from tampered, so this branch
     // answers both the same way.
-    if (isSlackBotLinkState(state)) {
+    if (isBotLinkState) {
       return errorPage(
         'Link Expired',
         'Invalid or expired link. Please go back to your chat and try again.',

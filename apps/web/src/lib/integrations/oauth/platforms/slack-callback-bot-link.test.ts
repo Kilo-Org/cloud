@@ -77,6 +77,7 @@ import {
   canKiloUserAccessPlatformIntegration,
   getPlatformIntegration,
 } from '@/lib/bot/platform-helpers';
+import { APP_SHELL_FLOW_COOKIE } from '@/lib/integrations/oauth/app-shell-flow';
 import { handleSlackOAuthCallback } from './slack-callback';
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
@@ -164,6 +165,7 @@ async function callCallback(params: {
   state: string;
   code?: string | null;
   error?: string | null;
+  appShellFlowCookie?: boolean;
 }) {
   const query = new URLSearchParams();
   if (params.code !== null) query.set('code', params.code ?? 'oidc-code');
@@ -171,7 +173,9 @@ async function callCallback(params: {
   query.set('state', params.state);
 
   return await handleSlackOAuthCallback(
-    new NextRequest(`http://localhost:3000/api/integrations/slack/callback?${query.toString()}`)
+    new NextRequest(`http://localhost:3000/api/integrations/slack/callback?${query.toString()}`, {
+      headers: params.appShellFlowCookie ? { cookie: `${APP_SHELL_FLOW_COOKIE}=stub` } : undefined,
+    })
   );
 }
 
@@ -294,9 +298,47 @@ describe('handleSlackOAuthCallback Slack bot-link', () => {
 
     expect(response.status).toBe(409);
     expect(body).toContain('already linked to a different Kilo account');
+    expect(body).toContain('This Slack account is already linked');
     expect(body).toContain('disconnect the slack integration');
     await expect(mappedKiloUser()).resolves.toBe(OTHER_KILO_USER_ID);
     expect(mockAfter).not.toHaveBeenCalled();
+  });
+
+  it('resumes a chat-link callback at sign-in with its callback path', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: null,
+      authFailedResponse: { status: 401 },
+    } as never);
+
+    const response = await callCallback({ state: botLinkState(CONTEXT_KEY) });
+
+    expect(response.status).toBe(302);
+    const location = response.headers.get('location');
+    expect(location).not.toBeNull();
+    const signInUrl = new URL(location as string);
+    expect(signInUrl.pathname).toBe('/users/sign_in');
+    const callbackPath = signInUrl.searchParams.get('callbackPath');
+    expect(callbackPath).not.toBeNull();
+    expect(callbackPath?.startsWith('/api/integrations/slack/callback')).toBe(true);
+    expect(callbackPath).toContain('code=oidc-code');
+    expect(callbackPath).toContain('state=');
+  });
+
+  it('keeps the app-shell redirect when the flow cookie is present', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: null,
+      authFailedResponse: { status: 401 },
+    } as never);
+
+    const response = await callCallback({
+      state: botLinkState(CONTEXT_KEY),
+      appShellFlowCookie: true,
+    });
+
+    expect(response.status).toBe(307);
+    const location = response.headers.get('location');
+    expect(location).not.toBeNull();
+    expect(new URL(location as string).pathname).toBe('/app-shell/expired');
   });
 
   it('completes a link at most once', async () => {

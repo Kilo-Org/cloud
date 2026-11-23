@@ -49,6 +49,7 @@ export function errorPage(title: string, message: string, status: number): Respo
   return page(title, `  <p>${escapeHtml(message)}</p>`, status);
 }
 
+/** `platform` is the display name the page shows, such as "Slack" or "GitHub". */
 export function linkConflictPage(platform: string, clearLinksHint: string): Response {
   return errorPage(
     'Already linked',

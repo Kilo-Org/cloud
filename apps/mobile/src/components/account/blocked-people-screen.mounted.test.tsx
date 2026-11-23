@@ -119,23 +119,70 @@ describe('BlockedPeopleScreen', () => {
     expect(notices[0]?.props.onRetry).toBeTypeOf('function');
   });
 
-  it('names the refreshed notice after the failure kind', async () => {
+  it('settles the hidden-people read while the app reports offline', async () => {
+    // The default `networkMode: 'online'` would pause in `pending` while the
+    // online manager reports offline: no rows, no error, no retry.
+    await mount();
+
+    expect(state.lastQueryOptions).toMatchObject({
+      networkMode: 'always',
+      refetchOnReconnect: true,
+    });
+  });
+
+  it('names the connection when a cached empty list fails to refresh offline', async () => {
+    // The read settles (`networkMode: 'always'`), so a failure the server never
+    // answered lands as an error over the cache; the notice names the
+    // connection and the empty state stays visible beneath it.
+    state.blockedLogins = [];
+    state.mutedLogins = [];
     state.error = true;
     state.connectivity = 'offline';
-    const offline = await mount();
-    expect(offline.find(node => Object.is(node.type, 'QueryError')).props.variant).toBe('offline');
+    const root = await mount();
 
-    state.connectivity = 'online';
+    const notice = root.find(node => Object.is(node.type, 'QueryError'));
+    expect(notice.props.variant).toBe('offline');
+    expect(notice.props.onRetry).toBeTypeOf('function');
+    expect(root.findAll(node => Object.is(node.type, 'EmptyState'))).toHaveLength(1);
+    expect(root.findAll(node => Object.is(node.type, 'Skeleton'))).toHaveLength(0);
+  });
+
+  it('names the connection for a failure that never reached the server', async () => {
+    // Connectivity is still unsettled, but a transport error carries no
+    // server answer, so the failure is the connection's all the same.
+    state.error = true;
+    state.connectivity = 'unknown';
+    const root = await mount();
+
+    const notice = root.find(node => Object.is(node.type, 'QueryError'));
+    expect(notice.props.variant).toBe('offline');
+    expect(notice.props.onRetry).toBeTypeOf('function');
+  });
+
+  it('reports a coded refresh failure as the server failure it is', async () => {
+    state.error = true;
     state.errorCode = 'INTERNAL_SERVER_ERROR';
-    const failed = await mount();
-    expect(failed.find(node => Object.is(node.type, 'QueryError')).props.variant).toBe('server');
+    const root = await mount();
+
+    const notice = root.find(node => Object.is(node.type, 'QueryError'));
+    expect(notice.props.variant).toBe('server');
+    expect(notice.props.onRetry).toBeTypeOf('function');
+  });
+
+  it('reports a refused refresh without an offer to retry', async () => {
+    state.error = true;
+    state.errorCode = 'FORBIDDEN';
+    const root = await mount();
+
+    const notice = root.find(node => Object.is(node.type, 'QueryError'));
+    expect(notice.props.variant).toBe('permission');
+    expect(notice.props.onRetry).toBeUndefined();
   });
 
   it('keeps the stale notice mounted while its retry runs', async () => {
     // A notice gated on `!isFetching` would unmount on the tap that starts the
     // retry, so the reader saw the notice vanish instead of its spinner.
-    state.fetchStatus = 'paused';
-    state.connectivity = 'offline';
+    state.error = true;
     const idle = await mount();
     expect(idle.find(node => Object.is(node.type, 'QueryError')).props.isRetrying).toBe(false);
 
@@ -146,18 +193,9 @@ describe('BlockedPeopleScreen', () => {
     expect(notice.props.onRetry).toBeTypeOf('function');
   });
 
-  it('keeps the generic pause copy while connectivity is unsettled', async () => {
-    state.fetchStatus = 'paused';
-    state.connectivity = 'unknown';
-    const root = await mount();
-
-    const notice = root.find(node => Object.is(node.type, 'QueryError'));
-    expect(notice.props.variant).toBe('neutral');
-  });
-
-  it('names the offline pause of a cold first read instead of the skeleton', async () => {
+  it('names the offline failure of a first load instead of the skeleton', async () => {
     state.hasData = false;
-    state.fetchStatus = 'paused';
+    state.error = true;
     state.connectivity = 'offline';
     const root = await mount();
 
@@ -168,10 +206,8 @@ describe('BlockedPeopleScreen', () => {
     expect(root.findAll(node => Object.is(node.type, 'Skeleton'))).toHaveLength(0);
   });
 
-  it('keeps the skeleton for a cold first read while connectivity is unsettled', async () => {
+  it('keeps the skeleton for a first load still in flight', async () => {
     state.hasData = false;
-    state.fetchStatus = 'paused';
-    state.connectivity = 'unknown';
     const root = await mount();
 
     expect(root.findAll(node => Object.is(node.type, 'QueryError'))).toHaveLength(0);

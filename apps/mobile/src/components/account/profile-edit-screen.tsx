@@ -14,9 +14,16 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { usePopOnce } from '@/lib/navigation/pop-once';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
+import {
+  classifyReadFailureKind,
+  readFailureKindIsRetryable,
+  readFailureKindVariant,
+} from '@/lib/query/read-failure-variant';
+import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { useTRPC } from '@/lib/trpc';
 
 type ProfileUrlError = (value: string) => string | null;
@@ -210,7 +217,15 @@ export function ProfileEditScreen() {
     router.dismissTo(PROFILE_TAB_HREF);
   }, [popOnce, router]);
   const trpc = useTRPC();
-  const links = useQuery(trpc.user.getProfileLinks.queryOptions());
+  const links = useQuery({
+    ...trpc.user.getProfileLinks.queryOptions(),
+    // A paused first read leaves the skeleton on screen with no retry: the
+    // read neither answers nor fails while the online manager holds the device
+    // offline. It settles instead, and the reconnect refetch comes with it.
+    ...SETTLE_WHILE_OFFLINE,
+  });
+  // Reactive: a connectivity commit re-picks the failure's variant.
+  const committedConnectivity = useCommittedConnectivityStatus();
 
   let body: ReactNode = null;
   if (links.isPending) {
@@ -228,7 +243,21 @@ export function ProfileEditScreen() {
       </>
     );
   } else if (links.isError) {
-    body = <QueryError onRetry={() => void links.refetch()} isRetrying={links.isFetching} />;
+    // The read settles offline (`SETTLE_WHILE_OFFLINE`), so a failure the
+    // server never answered names the connection, and only a failure that can
+    // pass on a second attempt offers the retry.
+    const kind = classifyReadFailureKind({
+      errors: [links.error],
+      isPaused: links.fetchStatus === 'paused',
+      connectivity: committedConnectivity,
+    });
+    body = (
+      <QueryError
+        variant={readFailureKindVariant(kind)}
+        onRetry={readFailureKindIsRetryable(kind) ? () => void links.refetch() : undefined}
+        isRetrying={links.isFetching}
+      />
+    );
   } else {
     body = (
       <ProfileLinkForm

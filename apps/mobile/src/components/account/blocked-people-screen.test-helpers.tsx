@@ -25,7 +25,6 @@ type ScreenState = {
   mutedLogins: string[];
   error: boolean;
   hasData: boolean;
-  fetchStatus: 'fetching' | 'paused' | 'idle';
   isFetching: boolean;
   isRefetching: boolean;
   connectivity: 'online' | 'offline' | 'unknown';
@@ -36,6 +35,7 @@ type ScreenState = {
   calls: { name: string; input: unknown }[];
   toastError: Mock;
   lastRefreshControl: { props: { refreshing: boolean; onRefresh: unknown } } | null;
+  lastQueryOptions: Record<string, unknown> | null;
 };
 
 const state = vi.hoisted((): ScreenState => ({
@@ -43,7 +43,6 @@ const state = vi.hoisted((): ScreenState => ({
   mutedLogins: [],
   error: false,
   hasData: true,
-  fetchStatus: 'idle' as 'fetching' | 'paused' | 'idle',
   isFetching: false,
   isRefetching: false,
   connectivity: 'online' as 'online' | 'offline' | 'unknown',
@@ -54,6 +53,7 @@ const state = vi.hoisted((): ScreenState => ({
   calls: [],
   toastError: vi.fn(),
   lastRefreshControl: null as { props: { refreshing: boolean; onRefresh: unknown } } | null,
+  lastQueryOptions: null as Record<string, unknown> | null,
 }));
 
 export const screenState = state;
@@ -70,20 +70,27 @@ vi.mock('@tanstack/react-query', async importOriginal => {
   const actual = await importOriginal<typeof ReactQuery>();
   return {
     ...actual,
-    useQuery: () => ({
-      data: state.hasData
-        ? { blockedLogins: state.blockedLogins, mutedLogins: state.mutedLogins }
-        : null,
-      isPending: !state.hasData && !state.error,
-      isError: state.error,
-      isFetching: state.isFetching,
-      isRefetching: state.isRefetching,
-      fetchStatus: state.fetchStatus,
-      error: state.error
-        ? Object.assign(new Error('refetch failed'), { data: { code: state.errorCode } })
-        : null,
-      refetch: vi.fn(),
-    }),
+    useQuery: (options: Record<string, unknown>) => {
+      state.lastQueryOptions = options;
+      return {
+        data: state.hasData
+          ? { blockedLogins: state.blockedLogins, mutedLogins: state.mutedLogins }
+          : null,
+        isPending: !state.hasData && !state.error,
+        isError: state.error,
+        isFetching: state.isFetching,
+        isRefetching: state.isRefetching,
+        fetchStatus: 'idle',
+        // A coded failure is a tRPC envelope the server answered; without a
+        // code the error is the transport's, carrying no server answer.
+        error: state.error
+          ? state.errorCode === undefined
+            ? new TypeError('Network request failed')
+            : Object.assign(new Error('refetch failed'), { data: { code: state.errorCode } })
+          : null,
+        refetch: vi.fn(),
+      };
+    },
     useMutation: (options: { kind: string } & MutationOptions) => {
       state.mutations[options.kind] = options;
       const pending = state.pending === options.kind;
@@ -181,7 +188,6 @@ export function resetState() {
   state.mutedLogins = ['loudmouth'];
   state.error = false;
   state.hasData = true;
-  state.fetchStatus = 'idle';
   state.isRefetching = false;
   state.isFetching = false;
   state.connectivity = 'online';
@@ -192,6 +198,7 @@ export function resetState() {
   state.pendingVariables = null;
   state.toastError.mockClear();
   state.lastRefreshControl = null;
+  state.lastQueryOptions = null;
 }
 
 export function unmountBlockedPeople() {

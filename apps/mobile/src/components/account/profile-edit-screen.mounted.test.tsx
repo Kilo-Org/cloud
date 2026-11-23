@@ -21,6 +21,10 @@ type ScreenState = {
   invalidate: Mock;
   links: Links;
   error: boolean;
+  errorCode: string | undefined;
+  connectivity: 'online' | 'offline' | 'unknown';
+  refetch: Mock;
+  lastQueryOptions: Record<string, unknown> | null;
   mutations: MutationOptions[];
   mutate: Mock;
   pending: boolean;
@@ -34,6 +38,10 @@ type ScreenState = {
 const state = vi.hoisted((): ScreenState => ({
   links: { linkedinUrl: null, githubUrl: null },
   error: false,
+  errorCode: undefined as string | undefined,
+  connectivity: 'online' as 'online' | 'offline' | 'unknown',
+  refetch: vi.fn(),
+  lastQueryOptions: null as Record<string, unknown> | null,
   mutations: [] as MutationOptions[],
   mutate: vi.fn(),
   pending: false,
@@ -80,13 +88,24 @@ vi.mock('@tanstack/react-query', async importOriginal => {
   const actual = await importOriginal<typeof ReactQuery>();
   return {
     ...actual,
-    useQuery: () => ({
-      data: state.links,
-      isPending: false,
-      isError: state.error,
-      isFetching: false,
-      refetch: vi.fn(),
-    }),
+    useQuery: (options: Record<string, unknown>) => {
+      state.lastQueryOptions = options;
+      return {
+        data: state.error ? null : state.links,
+        isPending: false,
+        isError: state.error,
+        isFetching: false,
+        fetchStatus: 'idle',
+        // A coded failure is a tRPC envelope the server answered; without a
+        // code the error is the transport's, carrying no server answer.
+        error: state.error
+          ? state.errorCode === undefined
+            ? new TypeError('Network request failed')
+            : Object.assign(new Error('read failed'), { data: { code: state.errorCode } })
+          : null,
+        refetch: state.refetch,
+      };
+    },
     useQueryClient: () => ({ invalidateQueries: state.invalidate }),
     useMutation: (options: MutationOptions) => {
       state.mutations.push(options);
@@ -105,6 +124,9 @@ vi.mock('@/lib/trpc', () => ({
       updateProfile: { mutationOptions: (options: MutationOptions) => options },
     },
   }),
+}));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => state.connectivity,
 }));
 vi.mock('@/components/screen-header', () => ({
   // The real header runs its `onBack` for a Back press; keep that callback so a
@@ -187,6 +209,9 @@ beforeEach(() => {
   resetLeaveSettle();
   state.links = { linkedinUrl: null, githubUrl: null };
   state.error = false;
+  state.errorCode = undefined;
+  state.connectivity = 'online';
+  state.lastQueryOptions = null;
   state.mutations = [];
   state.pending = false;
   state.focused = true;
@@ -373,11 +398,40 @@ describe('ProfileEditScreen', () => {
     expect(state.back).not.toHaveBeenCalled();
   });
 
-  it('offers a retry when the saved links cannot be read', async () => {
+  it('settles the links read while the app reports offline', async () => {
+    // The default `networkMode: 'online'` would pause in `pending` while the
+    // online manager reports offline: the field skeletons stay with no retry.
+    await mount();
+
+    expect(state.lastQueryOptions).toMatchObject({
+      networkMode: 'always',
+      refetchOnReconnect: true,
+    });
+  });
+
+  it('names the connection when the saved links cannot be read', async () => {
+    // The read settles (`networkMode: 'always'`), so a failure that reached no
+    // server lands as an error: the copy names the connection, and the retry
+    // runs the read again instead of leaving the skeletons.
     state.error = true;
     const root = await mount();
 
-    expect(root.findAll(node => Object.is(node.type, 'QueryError'))).toHaveLength(1);
+    const errors = root.findAll(node => Object.is(node.type, 'QueryError'));
+    expect(errors).toHaveLength(1);
+    expect(errors[0]?.props.variant).toBe('offline');
+    expect(errors[0]?.props.onRetry).toBeTypeOf('function');
+    expect(root.findAll(node => Object.is(node.type, 'Skeleton'))).toHaveLength(0);
+  });
+
+  it('reports a refused read of the saved links without an offer to retry', async () => {
+    state.error = true;
+    state.errorCode = 'FORBIDDEN';
+    const root = await mount();
+
+    const errors = root.findAll(node => Object.is(node.type, 'QueryError'));
+    expect(errors).toHaveLength(1);
+    expect(errors[0]?.props.variant).toBe('permission');
+    expect(errors[0]?.props.onRetry).toBeUndefined();
   });
 
   it('keeps the fields live and takes one save while a save is pending', async () => {

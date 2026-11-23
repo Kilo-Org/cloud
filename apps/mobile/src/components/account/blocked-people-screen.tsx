@@ -21,7 +21,12 @@ import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { PROFILE_TAB_HREF } from '@/lib/profile-navigation';
-import { isRetryableTrpcError, trpcErrorVariant, type TrpcErrorVariant } from '@/lib/trpc-error';
+import {
+  classifyReadFailureKind,
+  readFailureKindIsRetryable,
+  readFailureKindVariant,
+} from '@/lib/query/read-failure-variant';
+import { SETTLE_WHILE_OFFLINE } from '@/lib/query/settle-while-offline';
 import { useTRPC } from '@/lib/trpc';
 
 const SKELETON_ROWS = [0, 1];
@@ -125,8 +130,14 @@ export function BlockedPeopleScreen() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const listKey = trpc.moderation.listHiddenUsers.queryKey();
-  const hidden = useQuery(trpc.moderation.listHiddenUsers.queryOptions());
-  // Reactive: a connectivity commit re-picks the failure notice's variant.
+  const hidden = useQuery({
+    ...trpc.moderation.listHiddenUsers.queryOptions(),
+    // A paused first read leaves the skeleton on screen with no retry: the
+    // read neither answers nor fails while the online manager holds the device
+    // offline. It settles instead, and the reconnect refetch comes with it.
+    ...SETTLE_WHILE_OFFLINE,
+  });
+  // Reactive: a connectivity commit re-picks the failure's variant.
   const committedConnectivity = useCommittedConnectivityStatus();
 
   const refresh = () => void queryClient.invalidateQueries({ queryKey: listKey });
@@ -154,64 +165,44 @@ export function BlockedPeopleScreen() {
   const hasHiddenPeople =
     hidden.data != null &&
     (hidden.data.blockedLogins.length > 0 || hidden.data.mutedLogins.length > 0);
+  // The read settles offline (`SETTLE_WHILE_OFFLINE`), so a failure carries its
+  // own cause: one the server never answered names the connection, and a coded
+  // refusal keeps its own copy. Classified once, so the notice above a cached
+  // list and the first-load face cannot disagree, and only a kind that can pass
+  // on a second attempt offers the retry.
+  const failureKind = hidden.isError
+    ? classifyReadFailureKind({
+        errors: [hidden.error],
+        isPaused: hidden.fetchStatus === 'paused',
+        connectivity: committedConnectivity,
+      })
+    : null;
   // A re-read the reader started that settled badly while rows are shown must
   // not silently confirm them as current. The old branch replaced the rows
   // with the error state on any failure; the profiles-list pattern keeps the
-  // rows and paints the notice above them instead (finding). A confirmed
-  // offline connectivity names the pause or the failure offline, like the
-  // profiles list does; any other failure reports its tRPC code, and a pause
-  // while connectivity is still unsettled keeps the generic copy. The notice
-  // is not gated on `!isFetching`, so it stays mounted while its own Retry
-  // runs and `isRetrying` reports that read.
-  const stale = hidden.data != null && (hidden.isError || hidden.fetchStatus === 'paused');
-  let staleVariant: 'offline' | 'neutral' | TrpcErrorVariant = 'neutral';
-  if (committedConnectivity === 'offline') {
-    staleVariant = 'offline';
-  } else if (hidden.isError) {
-    staleVariant = trpcErrorVariant(hidden.error);
-  }
-  const staleNotice = stale ? (
-    <QueryError
-      variant={staleVariant}
-      placement="top"
-      className="pt-0"
-      onRetry={
-        hidden.isError && !isRetryableTrpcError(hidden.error)
-          ? undefined
-          : () => void hidden.refetch()
-      }
-      isRetrying={hidden.isFetching}
-    />
-  ) : null;
+  // rows and paints the notice above them instead (finding). The notice is not
+  // gated on `!isFetching`, so it stays mounted while its own Retry runs and
+  // `isRetrying` reports that read.
+  const staleNotice =
+    hidden.data != null && failureKind != null ? (
+      <QueryError
+        variant={readFailureKindVariant(failureKind)}
+        placement="top"
+        className="pt-0"
+        onRetry={readFailureKindIsRetryable(failureKind) ? () => void hidden.refetch() : undefined}
+        isRetrying={hidden.isFetching}
+      />
+    ) : null;
+  const stale = staleNotice != null;
 
-  const coldPauseWithoutCache =
-    hidden.fetchStatus === 'paused' &&
-    hidden.data == null &&
-    hidden.isPending &&
-    committedConnectivity === 'offline';
   const isEmpty = hidden.data != null && !hasHiddenPeople;
   // An empty or failed list is the whole surface: its own state says everything
   // the intro would, so the intro is hidden there instead of repeating it. A
-  // cached empty list whose refresh is paused or failed is the exception: the
-  // stale notice has to sit above it, in the body.
-  const wholeSurface = isEmpty
-    ? !stale
-    : hidden.data == null && (hidden.isError || coldPauseWithoutCache);
+  // cached empty list whose refresh failed is the exception: the stale notice
+  // has to sit above it, in the body.
+  const wholeSurface = isEmpty ? !stale : hidden.data == null && hidden.isError;
   let body: ReactNode = null;
-  if (coldPauseWithoutCache) {
-    // An offline cold start pauses the first read with no cache: pending
-    // never settles, so the skeleton would sit forever. A pause while the
-    // probe is unsettled keeps the skeleton, the same way the reviewer
-    // screens classify.
-    body = (
-      <QueryError
-        variant="offline"
-        title={t('queryError.offlineTitle')}
-        onRetry={() => void hidden.refetch()}
-        isRetrying={hidden.isFetching}
-      />
-    );
-  } else if (hidden.isPending) {
+  if (hidden.isPending) {
     body = (
       <RowGroup>
         {SKELETON_ROWS.map(row => (
@@ -221,8 +212,14 @@ export function BlockedPeopleScreen() {
         ))}
       </RowGroup>
     );
-  } else if (hidden.isError && hidden.data == null) {
-    body = <QueryError onRetry={() => void hidden.refetch()} isRetrying={hidden.isFetching} />;
+  } else if (hidden.data == null && failureKind != null) {
+    body = (
+      <QueryError
+        variant={readFailureKindVariant(failureKind)}
+        onRetry={readFailureKindIsRetryable(failureKind) ? () => void hidden.refetch() : undefined}
+        isRetrying={hidden.isFetching}
+      />
+    );
   } else if (!hasHiddenPeople) {
     body = (
       <EmptyState

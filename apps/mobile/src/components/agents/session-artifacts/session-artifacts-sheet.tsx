@@ -105,7 +105,7 @@ export function SessionArtifactsSheet({
   // One action per row at a time. The key names the action as well as the file,
   // so a row's spinner and its failure line can never be read as the other
   // action's, and the row's own frame carries the busy spinner.
-  const { snapshot, begin, clearWhere } = useKeyedSurfaceFeedback<string, ArtifactFailure>();
+  const { snapshot, begin } = useKeyedSurfaceFeedback<string, ArtifactFailure>();
 
   const removeArtifact = useMutation({
     mutationFn: (entry: WorkspaceArtifactEntry) => {
@@ -196,7 +196,6 @@ export function SessionArtifactsSheet({
     if (attempt === null) {
       return;
     }
-    clearWhere(key, () => true);
     const fileName = workspaceArtifactFileName(entry);
     let url = '';
     try {
@@ -247,7 +246,6 @@ export function SessionArtifactsSheet({
     if (attempt === null) {
       return;
     }
-    clearWhere(key, () => true);
     const fileName = workspaceArtifactFileName(entry);
     let status: 'deleted' | 'absent' | 'hash_mismatch' = 'absent';
     try {

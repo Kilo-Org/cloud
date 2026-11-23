@@ -1,5 +1,6 @@
 import { lazy, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { View } from 'react-native';
 
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { Archive } from '@/components/ui/icons';
@@ -38,8 +39,11 @@ export function SessionArtifactsRow({
     return null;
   }
   const label = t('cloudAgent.artifacts.title');
+  // The row and its sheet are one child of the group that holds them: the group
+  // flattens fragments and draws a divider after every child, so a bare
+  // fragment would add a second divider once the sheet mounts.
   return (
-    <>
+    <View>
       <ConfigureRow
         testID="session-context-sheet-artifacts"
         icon={Archive}
@@ -63,6 +67,6 @@ export function SessionArtifactsRow({
           />
         </Suspense>
       ) : null}
-    </>
+    </View>
   );
 }

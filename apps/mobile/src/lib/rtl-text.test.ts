@@ -443,6 +443,11 @@ describe('withoutLeadingDirectionMarks', () => {
     ['a one-dash underline under paragraph text', 'Title\n-\n\u200FLatin text'],
     ['a two-dash underline under paragraph text', 'Title\n--\n\u200FLatin text'],
     ['an equals underline inside the same quote', '> Title\n>===\n\u200FLatin text'],
+    // An underline under a list item's paragraph closes that paragraph and the
+    // line after it is an item paragraph of its own, at the item's content
+    // indent or at column zero alike.
+    ['an underline under a list item’s paragraph', '- Title\n===\n\u200FLatin text'],
+    ['an indented underline under a list item’s paragraph', '- Title\n  ===\n\u200FLatin text'],
     ['a fence that closed', '```js\nconst a = 1;\n```\n\u200FLatin text'],
     ['a reference definition', '[ref]: https://example.com\n\u200FLatin text'],
     ['an indented code line', '    code\n\u200FLatin text'],
@@ -510,14 +515,6 @@ describe('withoutLeadingDirectionMarks', () => {
       'a pre element across a blank line',
       '<pre>\n\n\u200FLatin text\n</pre>',
       '<pre>\n\n\u200FLatin text\n</pre>',
-    ],
-    // The underline belongs to the item’s own container, so a run at column
-    // zero does not close the item’s paragraph: the line under it continues
-    // that paragraph.
-    [
-      'the paragraph after an underline below a list item',
-      '- Title\n===\n\u200FLatin text',
-      '- Title\n===\n\u200FLatin text',
     ],
   ])('keeps a mark in %s', (_shape, value, expected) => {
     expect(withoutLeadingDirectionMarks(value)).toBe(expected);

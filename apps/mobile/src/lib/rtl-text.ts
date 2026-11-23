@@ -877,11 +877,14 @@ export function withoutLeadingDirectionMarks(markdown: string): string {
     previousEndsBlock = endsBlock;
     inIndentedCode = indentedCode;
     // Only paragraph text in this line's own container can be closed by the next
-    // line's setext underline: a list item's text sits inside its item, so a
-    // markerless line under it is that item's lazy continuation, not an underline.
-    // An HTML line is raw, not paragraph text, so it says nothing to the next.
-    previousParagraphDepth =
-      blank || code || endsBlock || list !== null || htmlLine ? undefined : quotedDepth;
+    // line's setext underline, and a list item's opening text is such paragraph
+    // text: the underline closes it and the line under the underline is an item
+    // paragraph of its own. Without the underline that line is the item's lazy
+    // continuation instead, which the depth comparison alone cannot tell apart —
+    // so a markerless line under an item keeps its mark through the setext rule,
+    // not through this one. An HTML line is raw, not paragraph text, so it says
+    // nothing to the next.
+    previousParagraphDepth = blank || code || endsBlock || htmlLine ? undefined : quotedDepth;
     if (stripped !== line) {
       lines[index] = stripped;
       changed = true;

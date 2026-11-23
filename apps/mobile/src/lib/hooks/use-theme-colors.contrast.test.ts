@@ -226,58 +226,63 @@ describe('disabled toolbar badge label contrast (WCAG AA text)', () => {
 });
 
 describe('disabled primary action fill contrast (WCAG AA text)', () => {
-  // A disabled default-variant Button paints its label on the palette's muted
-  // ink: on `--muted` in light and on the recessed page step in dark. Both
-  // scheme fills clear 4.5:1 and each stays clearly below the enabled brand
-  // fill, so an inactive Start never reads as a second action colour.
+  // A disabled default-variant Button paints its label on the palette's
+  // `--secondary-fill` plate. In light that label keeps `--muted-foreground`; in
+  // dark it takes `--ink2`, because `--muted-foreground` measures under the text
+  // floor on the dark plate. Both pairs clear 4.5:1, and each plate stays
+  // clearly below the enabled brand fill so an inactive Start never reads as a
+  // second action colour.
   //
-  // The light face is unchanged and deliberately not asserted beyond its text
-  // pair: it keeps its preexisting `--muted` fill and its variant border, so
-  // the recess and the hairline guards below are dark-only.
-  it('light theme: mutedForeground vs muted >= 4.5:1', () => {
-    const ratio = contrastRatio(lightColors.mutedForeground, lightColors.muted);
+  // The light face's fill equals `--muted` and `--secondary`, so it is the
+  // preexisting light fill and out of this change's scope; the perceived-step
+  // guard below is dark-only for that reason.
+  const MIN_VISIBLE_SURFACE_RATIO = 1.6;
+
+  it('light theme: mutedForeground vs secondaryFill >= 4.5:1', () => {
+    // A light label that fell below the floor would make the disabled action's
+    // text unreadable on its own plate.
+    const ratio = contrastRatio(lightColors.mutedForeground, lightColors.secondaryFill);
     expect(ratio).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
   });
 
-  it('dark theme: mutedForeground vs background >= 4.5:1', () => {
-    const ratio = contrastRatio(darkColors.mutedForeground, darkColors.background);
+  it('dark theme: ink2 vs secondaryFill >= 4.5:1', () => {
+    // The dark label's only ink is `--ink2`; a regression to the muted ink is
+    // caught by the next test, and a palette change to this token is caught
+    // here.
+    const ratio = contrastRatio(darkColors.ink2, darkColors.secondaryFill);
     expect(ratio).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
   });
 
-  it('dark theme: the disabled fill stays distinguishable from the enabled brand fill', () => {
+  it('dark theme: mutedForeground would not clear the text floor on the dark plate', () => {
+    // This is why the dark label takes `--ink2`: if the muted ink ever cleared
+    // the floor here, the dark label override would be dead weight and the
+    // comment in `button.tsx` would be wrong.
+    expect(contrastRatio(darkColors.mutedForeground, darkColors.secondaryFill)).toBeLessThan(
+      MIN_TEXT_RATIO
+    );
+  });
+
+  it('dark theme: the disabled plate reads as a visible step off every surface it sits on', () => {
+    // A plate that matched its surface would leave a disabled primary with no
+    // shape at all, as the old `--muted` fill did on a card.
+    for (const surface of ['secondary', 'card', 'background'] as const) {
+      expect(
+        contrastRatio(darkColors.secondaryFill, darkColors[surface]),
+        `secondaryFill vs ${surface} (dark)`
+      ).toBeGreaterThanOrEqual(MIN_VISIBLE_SURFACE_RATIO);
+    }
+    // The light plate keeps its preexisting fill, which equals both `--muted`
+    // and `--secondary`, so the light step guard is out of scope: a change to
+    // either light token would separate them and fail here.
+    expect(lightColors.secondaryFill).toBe(lightColors.muted);
+    expect(lightColors.secondaryFill).toBe(lightColors.secondary);
+  });
+
+  it('dark theme: the disabled plate stays distinguishable from the enabled brand fill', () => {
     // The plate must read as a superseded control next to the enabled brand
     // fill, not as a second brand colour, or a disabled Start would look
     // tappable and an enabled one would lose its emphasis.
-    const separation = contrastRatio(darkColors.primary, darkColors.background);
-    expect(separation).toBeGreaterThanOrEqual(1.5);
-  });
-
-  it('dark theme: the input edge separates the disabled fill on every dark surface', () => {
-    // `--muted` equals `--secondary` in both themes, so a disabled primary
-    // painted on a card would paint no plate at all. The dark face recesses to
-    // the page step and the `--input` hairline makes the control visible; all
-    // three surfaces are checked because such a control sits on a card, on the
-    // plain secondary fill and on the page alike.
-    for (const surface of [darkColors.card, darkColors.secondary, darkColors.background]) {
-      const edge = compositeToken(darkColors.input, surface);
-      expect(contrastRatio(edge, surface), `input edge vs ${surface}`).toBeGreaterThanOrEqual(
-        MIN_NON_TEXT_RATIO
-      );
-    }
-  });
-
-  // A recessed-step perception floor, not the WCAG bar: the fill only has to
-  // read as a different step from the surface beneath it. The edge, not the
-  // fill, carries the 3:1 non-text floor asserted above.
-  const RECESSED_STEP_PERCEPTION_FLOOR = 1.15;
-
-  it('dark theme: the disabled fill recesses off the surface and off the outlined fill', () => {
-    // The enabled `outline` control paints `secondary` in dark, so the surface
-    // the disabled plate sits on and the fill of the control beside it are one
-    // colour: one ratio pins both.
-    expect(contrastRatio(darkColors.background, darkColors.secondary)).toBeGreaterThanOrEqual(
-      RECESSED_STEP_PERCEPTION_FLOOR
-    );
+    expect(contrastRatio(darkColors.primary, darkColors.secondaryFill)).toBeGreaterThanOrEqual(1.5);
   });
 });
 

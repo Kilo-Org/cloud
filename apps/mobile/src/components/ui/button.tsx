@@ -173,26 +173,26 @@ const buttonLabelClasses = Object.fromEntries(
 ) as Record<ButtonVariant, string>;
 
 /**
- * The pair a disabled (not busy) primary action paints: the palette's muted
- * surface and the muted ink that reads on it (4.6:1 light, 4.5:1 dark). A
- * brand or taupe fill reads as a second colour rather than as an inactive
- * control; the muted step is the one every disabled row in the app already
- * uses. The label takes the complete class set rather than overriding the
+ * The face a disabled (not busy) primary action paints: `--secondary-fill`, the
+ * palette's own step for a filled neutral control. A brand or taupe fill reads
+ * as a second colour rather than as an inactive control, so the face takes the
+ * neutral step instead. That token is a distinct step off both the card surface
+ * and the page in dark (1.70:1 and 1.99:1, above the app's 1.6:1
+ * visible-surface floor), and it equals `--muted` in light, so the light face
+ * does not change.
+ *
+ * The plate draws no border, so an enabled-to-disabled transition changes no
+ * geometry. The label takes `--muted-foreground` in light (4.62:1) and `--ink2`
+ * in dark (5.37:1), because `--muted-foreground` measures 2.67:1 on the dark
+ * plate. The label takes the complete class set rather than overriding the
  * variant's ink, so no two colour utilities compete. A caller that paints its
  * own mark on this fill takes `useMutedDisabledInk` from
- * `@/lib/hooks/use-theme-colors`.
- *
- * The muted fill equals the card surface (`--secondary`) in both themes, so a
- * disabled primary painted on a card merges with it. The dark face recesses to
- * the page step and takes the dark-only `--input` hairline, so it reads as an
- * inactive control on a card and stays outlined on the page. The light face
- * keeps its existing fill and border on purpose: its counterpart is preexisting
- * and out of this change's scope. The enabled brand fill, the busy face and the
- * muted label ink are unchanged.
+ * `@/lib/hooks/use-theme-colors`. The enabled brand fill and the busy face do
+ * not change.
  */
-const MUTED_DISABLED_FILL_CLASS = 'bg-muted dark:bg-background';
-const MUTED_DISABLED_EDGE_CLASS = 'dark:border dark:border-input';
-const MUTED_DISABLED_LABEL_CLASS = 'text-center text-sm font-semibold text-muted-foreground';
+const MUTED_DISABLED_FILL_CLASS = 'bg-secondary-fill';
+const MUTED_DISABLED_LABEL_CLASS =
+  'text-center text-sm font-semibold text-muted-foreground dark:text-ink2';
 
 const buttonTextVariants = cva('text-foreground text-center text-sm font-semibold', {
   variants: {
@@ -333,7 +333,6 @@ function Button({
           buttonVariants({ variant, size }),
           buttonGapVariants({ size }),
           isMutedDisabled && MUTED_DISABLED_FILL_CLASS,
-          isMutedDisabled && MUTED_DISABLED_EDGE_CLASS,
           className
         )}
         role="button"

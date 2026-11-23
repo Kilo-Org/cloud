@@ -31,7 +31,6 @@ export const TOKEN_KEYS = [
   ['destructiveSolid', '--destructive-solid'],
   ['destructiveSolidForeground', '--destructive-solid-foreground'],
   ['border', '--border'],
-  ['input', '--input'],
   ['card', '--card'],
   ['selection', '--selection'],
   ['selectionForeground', '--selection-foreground'],

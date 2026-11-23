@@ -30,9 +30,11 @@ import { useTRPC } from '@/lib/trpc';
 
 const SKELETON_ROWS = [0, 1];
 
-/** The stack the release answer paints: the notice's disc, title line and two
- *  description lines, so neither answer resizes the body. A short band drops
- *  the disc, as the notice it reserves does. */
+/** The stack the unavailable answer paints — the notice's disc, title line and
+ *  two description lines — so that answer lands where the reserve painted. The
+ *  read error keeps the same band but carries its retry action below the copy,
+ *  which this reserve does not hold. A short band drops the disc, as the notice
+ *  it reserves does. */
 function ReleaseCheckSkeleton() {
   const shortBand = useShortCenteredBand();
   return (

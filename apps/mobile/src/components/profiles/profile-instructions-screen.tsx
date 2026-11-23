@@ -78,12 +78,16 @@ function hasUsableMessage(error: unknown): boolean {
  * row's spoken name instead of a second painted line — the content press while
  * the row opens the form, the row's own press when it does not.
  *
- * The name is one line at the default font scale, with a tail ellipsis that
- * still tells two files apart by their leading run. A press on either arm shows
- * the whole name on a surface of its own, so the name never needs a second
- * painted line to be readable: an editable row opens the form, which carries
- * the name in a field, and a read-only row opens the detail sheet, which paints
- * it in full.
+ * The name is one line at the default font scale, cut in the middle: two files
+ * that share a long prefix are told apart by the end of their names, which a
+ * tail ellipsis hides. A press on either arm shows the whole name on a surface
+ * of its own, so the name never needs a second painted line to be readable: an
+ * editable row opens the form, which carries the name in a field, and a
+ * read-only row opens the detail sheet, which paints it in full.
+ *
+ * The read-only row keeps the switch it cannot flip, because whether a rule
+ * file is applied is what the member came to read, and it takes no disclosure
+ * mark: the title needs every point the trailing cell does not take.
  */
 function InstructionRow({
   instruction,
@@ -130,10 +134,6 @@ function InstructionRow({
         <Trash2 size={18} color={colors.mutedForeground} />
       </RowIconAction>
     );
-  } else {
-    // A read-only row is a way into the detail sheet, so it carries the row
-    // anatomy's own disclosure cue beside the switch it cannot flip.
-    trailing.push(<Fragment key="chevron">{renderRowTrailing({ kind: 'chevron' })}</Fragment>);
   }
   return (
     <RowFrame
@@ -144,7 +144,12 @@ function InstructionRow({
       accessibilityLabel={rowAccessibilityLabel}
       trailing={{ kind: 'nodes', nodes: trailing }}
     >
-      <Text variant="mono" numberOfLines={nameLines} ellipsizeMode="tail" {...HIDDEN_LABEL_PROPS}>
+      <Text
+        variant="mono"
+        numberOfLines={nameLines}
+        ellipsizeMode="middle"
+        {...HIDDEN_LABEL_PROPS}
+      >
         {contentIsPress ? instruction.name : isolateLtrBidiText(instruction.name)}
       </Text>
     </RowFrame>

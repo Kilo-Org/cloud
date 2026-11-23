@@ -416,12 +416,13 @@ describe('ProfileInstructionsScreen row controls', () => {
     ).toBe(false);
 
     // The press opens the form that shows the whole name, so this row clamps
-    // the name to the title's one line at the default font scale and paints it
-    // bare: no isolate marks, and the row's spoken name is the content press.
+    // the name to the title's one line at the default font scale and cuts it in
+    // the middle, where two names that share a long prefix still differ.
     const nameLine = findAll(renderer.root, 'Text').find(
       node => node.props.children === INSTRUCTION_NAME
     );
     expect(nameLine?.props.numberOfLines).toBe(1);
+    expect(nameLine?.props.ellipsizeMode).toBe('middle');
     expect(nameLine?.props.children).toBe(INSTRUCTION_NAME);
 
     unmount();
@@ -455,8 +456,24 @@ describe('ProfileInstructionsScreen read-only row', () => {
     expect(nameLine?.props.accessible).toBe(false);
     expect(nameLine?.props.importantForAccessibility).toBe('no');
     expect(nameLine?.props.numberOfLines).toBe(1);
+    // The cut sits in the middle of the name, so two files that share a long
+    // prefix still read differently on the row itself.
+    expect(nameLine?.props.ellipsizeMode).toBe('middle');
     expect(nameLine?.props.children).toBe(isolateLtrBidiText(INSTRUCTION_NAME));
     expect(findAll(renderer.root, 'Switch')[0]?.props.accessibilityLabel).toBe(INSTRUCTION_NAME);
+
+    unmount();
+  });
+
+  // A disclosure mark beside the switch used to take the width the title
+  // needed, and the whole row is already one press: nothing else trails it.
+  it('leaves the trailing cell to the switch its state belongs to', async () => {
+    const { renderer, unmount } = await mountScreen();
+
+    const frames = renderer.root.findAll(node => node.props?.trailing?.kind === 'nodes');
+    expect(frames).toHaveLength(1);
+    expect(frames[0]?.props.trailing.nodes).toHaveLength(1);
+    expect(findAll(renderer.root, 'Switch')).toHaveLength(1);
 
     unmount();
   });
@@ -488,12 +505,15 @@ describe('ProfileInstructionsScreen read-only row', () => {
     expect(LONG_INSTRUCTION_NAME).toHaveLength(100);
 
     // The row's own spoken name finds the press on either arm; the row no
-    // longer wraps, so the clamp and the untouched sheet value are what differ.
+    // longer wraps, so the cut and the untouched sheet value are what differ.
     const nameLine = findAll(renderer.root, 'Text').find(
       node => node.props.children === isolateLtrBidiText(LONG_INSTRUCTION_NAME)
     );
     expect(nameLine).toBeDefined();
     expect(nameLine?.props.numberOfLines).toBe(1);
+    // A 100-character name that shares its prefix with a sibling stays
+    // distinguishable on the row: the middle cut keeps its own ending.
+    expect(nameLine?.props.ellipsizeMode).toBe('middle');
 
     pressRowControl(
       renderer.root,

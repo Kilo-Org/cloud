@@ -3789,7 +3789,8 @@
       "loadError": "ඉල්ලීම් ලොග පූරණය කළ නොහැකි විය.",
       "permissionDenied": "සංවිධානයක ඉල්ලීම් ලොග කියවිය හැක්කේ එහි හිමිකරුට, පරිපාලකට හෝ බිල්පත් කළමනාකරුට පමණි. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "ආදාන {{input}} · ප්‍රතිදාන {{output}}",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "මෙම වේලාවන් ඔබේ උපාංගයේ වේලා කලාපය අනුගමනය කරයි ({{zone}})."
     },
     "usageStats": {
       "inputTokens": "ආදාන ටෝකන",

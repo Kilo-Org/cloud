@@ -3789,7 +3789,8 @@
       "loadError": "রিকোয়েস্ট লগ লোড করা যায়নি।",
       "permissionDenied": "শুধুমাত্র সংস্থার মালিক, অ্যাডমিন বা বিলিং ম্যানেজার এর রিকোয়েস্ট লগ দেখতে পারেন। $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} ইনপুট · {{output}} আউটপুট",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "এই সময়গুলো আপনার ডিভাইসের টাইম জোন অনুসরণ করে ({{zone}})।"
     },
     "usageStats": {
       "inputTokens": "ইনপুট টোকেন",

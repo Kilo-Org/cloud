@@ -3793,7 +3793,8 @@
       "loadError": "रिक्वेस्ट लॉग लोड नहीं हो सके।",
       "permissionDenied": "सिर्फ़ संगठन के मालिक, एडमिन या बिलिंग प्रबंधक ही इसके रिक्वेस्ट लॉग देख सकते हैं। $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} इनपुट · {{output}} आउटपुट",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "ये समय आपके डिवाइस के समय क्षेत्र ({{zone}}) का पालन करते हैं।"
     },
     "usageStats": {
       "inputTokens": "इनपुट टोकन",

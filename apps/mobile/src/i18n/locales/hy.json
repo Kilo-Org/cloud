@@ -3789,7 +3789,8 @@
       "loadError": "Չհաջողվեց բեռնել հարցումների մատյանները։",
       "permissionDenied": "Կազմակերպության հարցումների մատյանները կարող են դիտել միայն նրա սեփականատերը, ադմինիստրատորը կամ վճարումների կառավարիչը։ $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} մուտք · {{output}} ելք",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "Այս ժամերը համապատասխանում են ձեր սարքի ժամային գոտուն ({{zone}})։"
     },
     "usageStats": {
       "inputTokens": "Մուտքային տոկեններ",

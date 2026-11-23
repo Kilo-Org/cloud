@@ -3789,7 +3789,8 @@
       "loadError": "بارگذاری گزارش‌های درخواست ناموفق بود.",
       "permissionDenied": "فقط مالک، مدیر یا مدیر صورتحساب سازمان می‌تواند گزارش‌های درخواست آن را ببیند. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} ورودی · {{output}} خروجی",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "این زمان‌ها از منطقه زمانی دستگاه شما ({{zone}}) پیروی می‌کنند."
     },
     "usageStats": {
       "inputTokens": "توکن‌های ورودی",

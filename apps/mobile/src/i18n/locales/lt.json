@@ -3925,7 +3925,8 @@
       "loadError": "Nepavyko įkelti užklausų žurnalų.",
       "permissionDenied": "Organizacijos užklausų žurnalus gali skaityti tik jos savininkas, administratorius arba atsiskaitymų administratorius. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "Įvestis {{input}} · išvestis {{output}}",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "Šie laikai rodomi pagal jūsų įrenginio laiko juostą ({{zone}})."
     },
     "usageStats": {
       "inputTokens": "Įvesties žetonai",

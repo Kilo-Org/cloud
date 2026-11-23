@@ -3861,7 +3861,8 @@
       "loadError": "Impossible de charger les journaux des requêtes.",
       "permissionDenied": "Seuls un propriétaire, un administrateur ou un responsable de la facturation d'une organisation peuvent consulter ses journaux des requêtes. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} en entrée · {{output}} en sortie",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "Ces heures suivent le fuseau horaire de votre appareil ({{zone}})."
     },
     "usageStats": {
       "inputTokens": "Jetons d'entrée",

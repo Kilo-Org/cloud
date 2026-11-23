@@ -3789,7 +3789,8 @@
       "loadError": "Δεν ήταν δυνατή η φόρτωση των αρχείων αιτημάτων.",
       "permissionDenied": "Μόνο ο κάτοχος, ένας διαχειριστής ή ένας διαχειριστής χρέωσης ενός οργανισμού μπορεί να δει τα αρχεία αιτημάτων του. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} εισόδου · {{output}} εξόδου",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "Αυτές οι ώρες ακολουθούν τη ζώνη ώρας της συσκευής σας ({{zone}})."
     },
     "usageStats": {
       "inputTokens": "Διακριτικά εισόδου",

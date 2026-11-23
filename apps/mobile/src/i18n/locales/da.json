@@ -3789,7 +3789,8 @@
       "loadError": "Anmodningslogs kunne ikke indlæses.",
       "permissionDenied": "Kun en ejer, administrator eller faktureringsansvarlig i organisationen kan se dens anmodningslogs. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} ind · {{output}} ud",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "Disse tidspunkter følger enhedens tidszone ({{zone}})."
     },
     "usageStats": {
       "inputTokens": "Tokens i inddata",

@@ -3789,7 +3789,8 @@
       "loadError": "Ekki tókst að sækja beiðnaskrár.",
       "permissionDenied": "Aðeins eigandi, stjórnandi eða innheimtustjóri félags getur lesið beiðnaskrár þess. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} inn · {{output}} út",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "Þessir tímar fylgja tímabelti tækisins þíns ({{zone}})."
     },
     "usageStats": {
       "inputTokens": "Inntakstókar",

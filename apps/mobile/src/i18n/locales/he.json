@@ -3861,7 +3861,8 @@
       "loadError": "לא ניתן לטעון את יומני הבקשות.",
       "permissionDenied": "רק בעלים, מנהל או מנהל חיובים של הארגון יכולים לצפות ביומני הבקשות שלו. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "קלט {{input}} · פלט {{output}}",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "השעות האלה עוקבות אחר אזור הזמן של המכשיר שלכם ({{zone}})."
     },
     "usageStats": {
       "inputTokens": "טוקני קלט",

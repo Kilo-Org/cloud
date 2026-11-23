@@ -3793,7 +3793,8 @@
       "loadError": "요청 로그를 불러오지 못했습니다.",
       "permissionDenied": "조직의 소유자, 관리자 또는 결제 관리자만 요청 로그를 볼 수 있습니다. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "입력 {{input}} · 출력 {{output}}",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "이 시간은 사용 중인 기기의 시간대({{zone}})를 따릅니다."
     },
     "usageStats": {
       "inputTokens": "입력 토큰",

@@ -3789,7 +3789,8 @@
       "loadError": "ವಿನಂತಿ ಲಾಗ್‌ಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "permissionDenied": "ಸಂಸ್ಥೆಯ ಮಾಲೀಕರು, ನಿರ್ವಾಹಕರು ಅಥವಾ ಬಿಲ್ಲಿಂಗ್ ವ್ಯವಸ್ಥಾಪಕರು ಮಾತ್ರ ಅದರ ವಿನಂತಿ ಲಾಗ್‌ಗಳನ್ನು ಓದಬಹುದು. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} ಇನ್‌ಪುಟ್ · {{output}} ಔಟ್‌ಪುಟ್",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "ಈ ಸಮಯಗಳು ನಿಮ್ಮ ಸಾಧನದ ಸಮಯ ವಲಯವನ್ನು ({{zone}}) ಅನುಸರಿಸುತ್ತವೆ."
     },
     "usageStats": {
       "inputTokens": "ಇನ್‌ಪುಟ್ ಟೋಕನ್‌ಗಳು",

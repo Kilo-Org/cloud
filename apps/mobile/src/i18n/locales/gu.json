@@ -3789,7 +3789,8 @@
       "loadError": "રિક્વેસ્ટ લૉગ લોડ કરી શકાયા નહીં.",
       "permissionDenied": "સંસ્થાના રિક્વેસ્ટ લૉગ ફક્ત તેના માલિક, એડમિન અથવા બિલિંગ મેનેજર જ જોઈ શકે છે. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} ઇનપુટ · {{output}} આઉટપુટ",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "આ સમયો તમારા ઉપકરણના સમય ઝોનને અનુસરે છે ({{zone}})."
     },
     "usageStats": {
       "inputTokens": "ઇનપુટ ટોકન",

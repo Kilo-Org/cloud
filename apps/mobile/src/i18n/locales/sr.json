@@ -3857,7 +3857,8 @@
       "loadError": "Učitavanje dnevnika zahteva nije uspelo.",
       "permissionDenied": "Dnevnike zahteva organizacije mogu da čitaju samo njen vlasnik, administrator ili menadžer za naplatu. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} ulaz · {{output}} izlaz",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "Ova vremena prate vremensku zonu vašeg uređaja ({{zone}})."
     },
     "usageStats": {
       "inputTokens": "Ulazni tokeni",

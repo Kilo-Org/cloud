@@ -3857,7 +3857,8 @@
       "loadError": "No s'han pogut carregar els registres de sol·licituds.",
       "permissionDenied": "Només un propietari, administrador o gestor de facturació d'una organització pot consultar-ne els registres de sol·licituds. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} d'entrada · {{output}} de sortida",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "Aquestes hores segueixen la zona horària del dispositiu ({{zone}})."
     },
     "usageStats": {
       "inputTokens": "Tòkens d'entrada",

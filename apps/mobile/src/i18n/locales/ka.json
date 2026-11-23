@@ -3789,7 +3789,8 @@
       "loadError": "მოთხოვნების ჟურნალების ჩატვირთვა ვერ მოხერხდა.",
       "permissionDenied": "მოთხოვნების ჟურნალების ნახვა შეუძლიათ მხოლოდ ორგანიზაციის მფლობელს, ადმინისტრატორს ან ანგარიშსწორების მენეჯერს. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} შემავალი · {{output}} გამავალი",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "ეს დროები მიჰყვება თქვენი მოწყობილობის სასაათო სარტყელს ({{zone}})."
     },
     "usageStats": {
       "inputTokens": "შემავალი ტოკენები",

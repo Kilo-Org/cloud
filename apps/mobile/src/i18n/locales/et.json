@@ -3789,7 +3789,8 @@
       "loadError": "Päringulogide laadimine ebaõnnestus.",
       "permissionDenied": "Päringulogisid saavad lugeda ainult organisatsiooni omanik, administraator või arveldushaldur. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} sisse · {{output}} välja",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "Need ajad järgivad teie seadme ajavööndit ({{zone}})."
     },
     "usageStats": {
       "inputTokens": "Sisendtokenid",

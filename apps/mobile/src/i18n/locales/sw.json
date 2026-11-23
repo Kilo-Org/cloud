@@ -3789,7 +3789,8 @@
       "loadError": "Imeshindwa kupakia kumbukumbu za maombi.",
       "permissionDenied": "Ni mmiliki, msimamizi au msimamizi wa bili wa shirika pekee anayeweza kusoma kumbukumbu zake za maombi. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} ndani · {{output}} nje",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "Saa hizi zinafuata saa za eneo za kifaa chako ({{zone}})."
     },
     "usageStats": {
       "inputTokens": "Tokeni za ingizo",

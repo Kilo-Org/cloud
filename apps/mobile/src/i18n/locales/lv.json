@@ -3857,7 +3857,8 @@
       "loadError": "Neizdevās ielādēt pieprasījumu žurnālus.",
       "permissionDenied": "Organizācijas pieprasījumu žurnālus var skatīt tikai tās īpašnieks, administrators vai norēķinu pārvaldnieks. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} ievade · {{output}} izvade",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "Šie laiki atbilst jūsu ierīces laika joslai ({{zone}})."
     },
     "usageStats": {
       "inputTokens": "Ievades tokeni",

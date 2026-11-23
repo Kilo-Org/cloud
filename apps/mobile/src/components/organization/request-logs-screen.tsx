@@ -20,6 +20,7 @@ import {
   DirectionalLogs,
 } from '@/components/ui/directional-icons';
 import { RefreshControl } from '@/components/ui/refresh-control';
+import { RefreshProgress } from '@/components/ui/refresh-progress';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { isolateBidiText } from '@/lib/bidi';
@@ -28,6 +29,7 @@ import { useManualRefresh } from '@/lib/hooks/use-manual-refresh';
 import { type OrgRequestLogEntry, useOrgRequestLogs } from '@/lib/hooks/use-org-billing-queries';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { useMutedDisabledInk, useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { deviceTimeZone } from '@/lib/intl-cache';
 import { ORGANIZATION_HUB_PATH } from '@/lib/organization-navigation';
 import {
   classifyReadFailureKind,
@@ -245,6 +247,13 @@ export function OrganizationRequestLogsScreen() {
   // applies the side insets itself, so those two bodies are not wrapped in the
   // padded view the list and the skeleton need.
   const bodyPulls = body.kind === 'empty' || body.kind === 'failure';
+  // The pull's visible half under reduced motion, where the platform control is
+  // forced back to rest. It belongs to the three bodies that own a pull — the
+  // list, the empty hour and the failure — and never to the skeleton: no read
+  // has settled, so `useManualRefresh` hands it no gesture to paint. It sits
+  // beside the body rather than inside it, so its reserve neither moves the
+  // first row at rest nor scrolls away with the rows.
+  const showsRefreshBand = body.kind === 'list' || bodyPulls;
   const bodyContent = renderBody(body);
 
   return (
@@ -272,6 +281,16 @@ export function OrganizationRequestLogsScreen() {
               {t('common.timeRange', {
                 start: isolateBidiText(formatClockTime(windowStart, i18n.language)),
                 end: isolateBidiText(formatClockTime(windowEnd, i18n.language)),
+              })}
+            </Text>
+            {/* The clocks above are the server's instants, so the header says
+                which clock they were read on. The zone id is pinned
+                left-to-right: an IANA id is Latin by design and a right-to-left
+                reader must not have its segments reordered. The caption wraps
+                instead of clipping, so a long id stays whole. */}
+            <Text variant="caption">
+              {t('organization.requestLogs.timeZoneNote', {
+                zone: isolateBidiText(deviceTimeZone()),
               })}
             </Text>
           </View>
@@ -318,6 +337,7 @@ export function OrganizationRequestLogsScreen() {
           </View>
         </View>
       </View>
+      {showsRefreshBand ? <RefreshProgress refreshControl={refreshControl} /> : null}
       {bodyPulls ? (
         // `flex-grow` lets short content still pull: a content box only as tall
         // as the state cannot be dragged far enough to trigger the gesture. The

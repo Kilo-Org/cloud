@@ -3789,7 +3789,8 @@
       "loadError": "Hindi ma-load ang mga request log.",
       "permissionDenied": "Ang may-ari, admin o tagapamahala ng pagsingil lang ng organisasyon ang puwedeng magbasa ng mga request log nito. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} input · {{output}} output",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "Ang mga oras na ito ay sumusunod sa time zone ng iyong aparato ({{zone}})."
     },
     "usageStats": {
       "inputTokens": "Mga papasok na token",

@@ -3789,7 +3789,8 @@
       "loadError": "Не може да се вчитаат дневниците на барања.",
       "permissionDenied": "Само сопственик, администратор или одговорен за наплата на организацијата може да ги чита нејзините дневници на барања. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} влез · {{output}} излез",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "Овие времиња ја следат временската зона на вашиот уред ({{zone}})."
     },
     "usageStats": {
       "inputTokens": "Влезни токени",

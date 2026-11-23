@@ -3793,7 +3793,8 @@
       "loadError": "Anfrage-Logs konnten nicht geladen werden.",
       "permissionDenied": "Nur Inhaber, Admins oder Abrechnungsmanager einer Organisation können deren Anfrage-Logs einsehen. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} ein · {{output}} aus",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "Diese Zeiten folgen der Zeitzone deines Geräts ({{zone}})."
     },
     "usageStats": {
       "inputTokens": "Eingabe-Tokens",

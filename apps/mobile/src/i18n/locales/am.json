@@ -3789,7 +3789,8 @@
       "loadError": "የጥያቄ መዝገቦችን መጫን አልተቻለም።",
       "permissionDenied": "የጥያቄ መዝገቦቹን ማንበብ የሚችሉት የድርጅቱ ባለቤት፣ አስተዳዳሪ ወይም የክፍያ አስተዳዳሪ ብቻ ናቸው። $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} ግብዓት · {{output}} ውጤት",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "እነዚህ ሰዓቶች የመሣሪያዎን የሰዓት ሰቅ ({{zone}}) ይከተላሉ።"
     },
     "usageStats": {
       "inputTokens": "የግብዓት ቶከኖች",

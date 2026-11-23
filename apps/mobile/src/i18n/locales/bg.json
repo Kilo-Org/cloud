@@ -3789,7 +3789,8 @@
       "loadError": "Журналите на заявките не можаха да се заредят.",
       "permissionDenied": "Само собственик, администратор или отговорник за плащанията на организацията може да преглежда журналите на заявките ѝ. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} вх. · {{output}} изх.",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "Тези часове следват часовата зона на вашето устройство ({{zone}})."
     },
     "usageStats": {
       "inputTokens": "Входни токени",

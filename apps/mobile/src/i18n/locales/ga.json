@@ -3993,7 +3993,8 @@
       "loadError": "Níorbh fhéidir logaí iarratas a lódáil.",
       "permissionDenied": "Ní féidir ach le húinéir, riarthóir nó bainisteoir billeála eagraíochta a logaí iarratas a léamh. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} isteach · {{output}} amach",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "Leanann na hamanna seo crios ama do ghléis ({{zone}})."
     },
     "usageStats": {
       "inputTokens": "Comharthaí ionchuir",

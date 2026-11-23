@@ -3789,7 +3789,8 @@
       "loadError": "โหลดบันทึกคำขอไม่สำเร็จ",
       "permissionDenied": "เฉพาะเจ้าของ ผู้ดูแลระบบ หรือผู้ดูแลการเรียกเก็บเงินขององค์กรเท่านั้นที่ดูบันทึกคำขอได้ $t(organization.boundary.accessDeniedDescription)",
       "tokens": "อินพุต {{input}} · เอาต์พุต {{output}}",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "เวลาเหล่านี้ใช้เขตเวลาของอุปกรณ์ของคุณ ({{zone}})."
     },
     "usageStats": {
       "inputTokens": "โทเคนขาเข้า",

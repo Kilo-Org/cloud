@@ -3789,7 +3789,8 @@
       "loadError": "A kò lè gbé àwọn àkọsílẹ̀ ìbéèrè wọlé.",
       "permissionDenied": "Ẹni tó ni àjọ, alákòóso tàbí olùṣàkóso ìsanwó nìkan ló lè ka àkọsílẹ̀ ìbéèrè rẹ̀. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} wọlé · {{output}} jáde",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "Àwọn wákàtí wọ̀nyí ń tẹ̀lé àgbègbè àkókò ẹ̀rọ rẹ ({{zone}})."
     },
     "usageStats": {
       "inputTokens": "Àwọn ìpín ọ̀rọ̀ ìgbéwọlé",

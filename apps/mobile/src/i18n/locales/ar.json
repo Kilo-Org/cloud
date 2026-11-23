@@ -4065,7 +4065,8 @@
       "loadError": "تعذّر تحميل سجلات الطلبات.",
       "permissionDenied": "يمكن فقط لمالك المؤسسة أو مشرفها أو مدير الفوترة فيها قراءة سجلات الطلبات الخاصة بها. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} إدخال · {{output}} إخراج",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "تتبع هذه الأوقات المنطقة الزمنية لجهازك ({{zone}})."
     },
     "usageStats": {
       "inputTokens": "رموز الإدخال",

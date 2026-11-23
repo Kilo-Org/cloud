@@ -3929,7 +3929,8 @@
       "loadError": "Nie udało się wczytać dzienników żądań.",
       "permissionDenied": "Dzienniki żądań może przeglądać tylko właściciel, administrator lub osoba zarządzająca rozliczeniami organizacji. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} wej. · {{output}} wyj.",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "Te godziny są zgodne ze strefą czasową Twojego urządzenia ({{zone}})."
     },
     "usageStats": {
       "inputTokens": "Tokeny wejściowe",

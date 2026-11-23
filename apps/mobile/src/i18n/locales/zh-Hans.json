@@ -3793,7 +3793,8 @@
       "loadError": "无法加载请求日志。",
       "permissionDenied": "只有组织的所有者、管理员或账单管理员才能查看其请求日志。 $t(organization.boundary.accessDeniedDescription)",
       "tokens": "输入 {{input}} · 输出 {{output}}",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "这些时间以你设备的时区为准（{{zone}}）。"
     },
     "usageStats": {
       "inputTokens": "输入词元",

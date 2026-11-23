@@ -3789,7 +3789,8 @@
       "loadError": "ଅନୁରୋଧ ଲଗ୍ ଲୋଡ୍ କରିହେଲା ନାହିଁ।",
       "permissionDenied": "କେବଳ ସଂଗଠନର ମାଲିକ, ପ୍ରଶାସକ କିମ୍ବା ବିଲିଂ ପରିଚାଳକ ଏହାର ଅନୁରୋଧ ଲଗ୍ ପଢ଼ିପାରିବେ। $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} ଇନପୁଟ୍ · {{output}} ଆଉଟପୁଟ୍",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "ଏହି ସମୟଗୁଡ଼ିକ ଆପଣଙ୍କ ଉପକରଣର ସମୟ ଅଞ୍ଚଳ ({{zone}}) ଅନୁସରଣ କରେ।"
     },
     "usageStats": {
       "inputTokens": "ଇନପୁଟ୍ ଟୋକନ୍",

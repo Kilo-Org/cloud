@@ -3789,7 +3789,8 @@
       "loadError": "Ezin izan dira eskaeren erregistroak kargatu.",
       "permissionDenied": "Erakunde baten jabeak, administratzaileak edo fakturazio-kudeatzaileak soilik irakur ditzake haren eskaeren erregistroak. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} sarrera · {{output}} irteera",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "Ordu hauek zure gailuaren ordu-zona jarraitzen dute ({{zone}})."
     },
     "usageStats": {
       "inputTokens": "Sarrerako tokenak",

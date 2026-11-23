@@ -3861,7 +3861,8 @@
       "loadError": "Impossibile caricare i registri delle richieste.",
       "permissionDenied": "Solo un proprietario, un amministratore o un responsabile della fatturazione dell'organizzazione può consultare i registri delle richieste. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} input · {{output}} output",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "Questi orari seguono il fuso orario del tuo dispositivo ({{zone}})."
     },
     "usageStats": {
       "inputTokens": "Token in ingresso",

@@ -3789,7 +3789,8 @@
       "loadError": "Kon nie versoeklogs laai nie.",
       "permissionDenied": "Slegs 'n organisasie-eienaar, -administrateur of -faktureringsbestuurder kan die organisasie se versoeklogs lees. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} in · {{output}} uit",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "Hierdie tye volg jou toestel se tydsone ({{zone}})."
     },
     "usageStats": {
       "inputTokens": "Invoertekens",

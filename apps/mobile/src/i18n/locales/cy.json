@@ -4061,7 +4061,8 @@
       "loadError": "Methu llwytho logiau ceisiadau.",
       "permissionDenied": "Dim ond perchennog, gweinyddwr neu reolwr bilio sefydliad all ddarllen ei logiau ceisiadau. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} i mewn · {{output}} allan",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "Mae'r amseroedd hyn yn dilyn cylchfa amser eich dyfais ({{zone}})."
     },
     "usageStats": {
       "inputTokens": "Tocynnau mewnbwn",

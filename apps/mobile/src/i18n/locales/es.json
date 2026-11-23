@@ -3861,7 +3861,8 @@
       "loadError": "No se pudieron cargar los registros de solicitudes.",
       "permissionDenied": "Solo un propietario, administrador o gestor de facturación de la organización puede ver sus registros de solicitudes. $t(organization.boundary.accessDeniedDescription)",
       "tokens": "{{input}} entrada · {{output}} salida",
-      "byok": "BYOK"
+      "byok": "BYOK",
+      "timeZoneNote": "Estas horas siguen la zona horaria de tu dispositivo ({{zone}})."
     },
     "usageStats": {
       "inputTokens": "Tokens de entrada",

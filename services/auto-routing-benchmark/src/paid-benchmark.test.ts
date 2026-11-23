@@ -24,7 +24,10 @@ import {
   reconcilePaidUsageReceipts,
   registerPaidBenchmarkRoutes,
 } from './paid-benchmark';
-import { selectPaidModelRequestPayerStatements } from './paid-case-store';
+import {
+  enqueuePaidCaseBatchStatements,
+  selectPaidModelRequestPayerStatements,
+} from './paid-case-store';
 import { SERVING_EVIDENCE_GONE_REASON } from './paid-benchmark-plan';
 import { computeEngineIdentity } from './run';
 
@@ -2062,5 +2065,279 @@ describe('terminal unusable measurement', () => {
     if (completed.status !== 'completed') return;
     expect(completed.counts.done).toBe(SLOTS);
     expect(completed.counts.failed).toBe(0);
+  });
+});
+
+describe('paid request staging liveness', () => {
+  /** Two extra catalog models, so a test can quote a pool of three or four concrete pairs. */
+  const WIDE_CATALOG = {
+    data: [
+      ...CATALOG.data,
+      { id: 'vendor/third', pricing: { prompt: 1e-6, completion: 2e-6 } },
+      { id: 'vendor/fourth', pricing: { prompt: 1e-6, completion: 2e-6 } },
+    ],
+  };
+  const MINUTE_MS = 60 * 1000;
+  const ABANDON_REASON = 'Benchmark request was never activated.';
+  /** The old cron staged `STAGE_BATCH_SLOTS * 2` (80) a minute: one hour of it is 4,800. */
+  const ONE_HOUR_OF_OLD_CRON_SLOTS = 4_800;
+
+  type PoolContext = typeof CONTEXT;
+
+  function poolContext(models: readonly string[]): PoolContext {
+    return {
+      ...CONTEXT,
+      entries: models.map(model => ({ kind: 'gateway' as const, model })),
+    };
+  }
+
+  async function quoteFor(context: PoolContext): Promise<PaidBenchmarkQuote> {
+    const response = await post({
+      action: 'quote',
+      ownerType: 'user',
+      ownerId: 'user-1',
+      routerId: ROUTER_ID,
+      poolVersion: 'pool-v1',
+      poolSlug: 'pool-one',
+      context,
+    });
+    expect(response.status).toBe(200);
+    return parseBody(response, PaidBenchmarkQuoteSchema);
+  }
+
+  /** A started request for `models`; throws unless the worker accepted the click. */
+  async function startFor(models: readonly string[]): Promise<{
+    requestId: string;
+    planCases: number;
+    context: PoolContext;
+  }> {
+    catalog = WIDE_CATALOG;
+    const context = poolContext(models);
+    const quoted = await quoteFor(context);
+    if (quoted.status !== 'ready') throw new Error(`quote not ready: ${quoted.status}`);
+    expect(quoted.cases.exclusive).toBe(models.length * SLOTS);
+    const started = await startResult(await post(startRequest(quoted.id, { context })));
+    if (started.status !== 'started' || started.request.status === 'empty')
+      throw new Error(`start refused: ${started.status}`);
+    return {
+      requestId: startedRequestId(started.request),
+      planCases: quoted.cases.exclusive,
+      context,
+    };
+  }
+
+  function requestState(requestId: string): {
+    status: string;
+    staged_cases: number;
+    plan_cases: number;
+    last_staged_at: string | null;
+    updated_at: string;
+    failure_reason: string | null;
+    failure_retryable: number;
+  } {
+    const row = sqlite
+      .prepare(
+        `SELECT status, staged_cases, plan_cases, last_staged_at, updated_at, failure_reason,
+          failure_retryable
+        FROM paid_benchmark_requests WHERE id = ?`
+      )
+      .get(requestId);
+    if (!row) throw new Error('request row missing');
+    return row as never;
+  }
+
+  function liveRequestCount(): number {
+    return countRows(
+      "SELECT COUNT(*) AS count FROM paid_benchmark_requests WHERE status IN ('preparing', 'active')"
+    );
+  }
+
+  it('keeps a two-hour-old request preparing while its staging is still progressing', async () => {
+    const { requestId, planCases } = await startFor([
+      'vendor/alpha',
+      'vendor/cheap',
+      'vendor/third',
+      'vendor/fourth',
+    ]);
+    const now = Date.now();
+    // Created two hours ago, which the old creation-age guard abandons outright, but a slot
+    // was staged a minute ago: the request is alive and must keep staging.
+    sqlite
+      .prepare(
+        `UPDATE paid_benchmark_requests
+        SET created_at = ?, last_staged_at = ?, updated_at = ? WHERE id = ?`
+      )
+      .run(
+        new Date(now - 120 * MINUTE_MS).toISOString(),
+        new Date(now - MINUTE_MS).toISOString(),
+        new Date(now - MINUTE_MS).toISOString(),
+        requestId
+      );
+
+    const summary = await reconcilePaidBenchmarkRequests(paidBindings(db), { now });
+    expect(summary.closed).toEqual([]);
+    const state = requestState(requestId);
+    expect(state.status).toBe('preparing');
+    // One cron pass stages the whole shared budget and the plan is wider than that, so it is
+    // still staging rather than terminal or active.
+    expect(state.staged_cases).toBeGreaterThan(0);
+    expect(state.staged_cases).toBeLessThan(planCases);
+    expect(state.failure_reason).toBeNull();
+  });
+
+  it('fails a request whose staging has made no progress for over an hour', async () => {
+    const { requestId } = await startFor([
+      'vendor/alpha',
+      'vendor/cheap',
+      'vendor/third',
+      'vendor/fourth',
+    ]);
+    const now = Date.now();
+    sqlite
+      .prepare(
+        `UPDATE paid_benchmark_requests
+        SET created_at = ?, last_staged_at = ?, updated_at = ? WHERE id = ?`
+      )
+      .run(
+        new Date(now - 180 * MINUTE_MS).toISOString(),
+        new Date(now - 61 * MINUTE_MS).toISOString(),
+        new Date(now - 61 * MINUTE_MS).toISOString(),
+        requestId
+      );
+
+    const summary = await reconcilePaidBenchmarkRequests(paidBindings(db), { now });
+    expect(summary.closed).toEqual([requestId]);
+    expect(requestState(requestId)).toMatchObject({
+      status: 'failed',
+      failure_reason: ABANDON_REASON,
+      failure_retryable: 1,
+    });
+    // The pool's only live-request slot is free again.
+    expect(liveRequestCount()).toBe(0);
+  });
+
+  it('never treats a staging pass that inserts nothing as progress', async () => {
+    const { requestId } = await startFor([
+      'vendor/alpha',
+      'vendor/cheap',
+      'vendor/third',
+      'vendor/fourth',
+    ]);
+    const base = Date.parse(requestState(requestId).last_staged_at ?? '');
+    expect(Number.isFinite(base)).toBe(true);
+    const stagedBefore = requestState(requestId).staged_cases;
+    expect(stagedBefore).toBeGreaterThan(0);
+    const row = sqlite
+      .prepare(
+        'SELECT engine_identity, model, variant, rep, case_id FROM benchmark_case_runs LIMIT 1'
+      )
+      .get() as {
+      engine_identity: string;
+      model: string;
+      variant: string;
+      rep: number;
+      case_id: string;
+    };
+    const key = {
+      engineIdentity: row.engine_identity,
+      model: row.model,
+      variant: row.variant,
+      rep: row.rep,
+      caseId: row.case_id,
+    };
+
+    // The cron keeps running staging passes that insert nothing. Each one rewrites the row
+    // (`updated_at` moves, which is exactly what made a stuck request look alive), so the
+    // liveness stamp must stay on the last slot that was actually written.
+    for (let minute = 1; minute <= 61; minute += 1) {
+      await db.batch(
+        enqueuePaidCaseBatchStatements(db, {
+          requestId,
+          cases: [{ ...key, coveredByKilo: false }],
+          now: base + minute * MINUTE_MS,
+        })
+      );
+      const state = requestState(requestId);
+      expect(state.staged_cases).toBe(stagedBefore);
+      expect(state.last_staged_at).toBe(new Date(base).toISOString());
+      expect(state.updated_at).toBe(new Date(base + minute * MINUTE_MS).toISOString());
+    }
+
+    const now = base + 62 * MINUTE_MS;
+    const summary = await reconcilePaidBenchmarkRequests(paidBindings(db), { now });
+    expect(summary.closed).toEqual([requestId]);
+    expect(requestState(requestId)).toMatchObject({
+      status: 'failed',
+      failure_reason: ABANDON_REASON,
+      failure_retryable: 1,
+    });
+    expect(liveRequestCount()).toBe(0);
+  });
+
+  it('stages a plan bigger than an hour of the old cron budget to active through cron alone', async () => {
+    // Three pairs are 3 × SLOTS slots, more than one hour of the old 80-slots-a-minute cron,
+    // and the browser never polls: every advance below is a scheduled reconcile pass.
+    const { requestId, planCases } = await startFor([
+      'vendor/alpha',
+      'vendor/cheap',
+      'vendor/third',
+    ]);
+    expect(planCases).toBeGreaterThan(ONE_HOUR_OF_OLD_CRON_SLOTS);
+    expect(requestState(requestId).status).toBe('preparing');
+
+    const now = Date.now();
+    let passes = 0;
+    let stagedBefore = requestState(requestId).staged_cases;
+    while (requestState(requestId).status === 'preparing' && passes < 5) {
+      passes += 1;
+      const summary = await reconcilePaidBenchmarkRequests(paidBindings(db), {
+        now: now + passes * MINUTE_MS,
+      });
+      expect(summary.closed).toEqual([]);
+      const stagedAfter = requestState(requestId).staged_cases;
+      // Each pass carries the raised budget, not the retired 80-slot slice.
+      expect(stagedAfter - stagedBefore).toBeLessThanOrEqual(ONE_HOUR_OF_OLD_CRON_SLOTS);
+      stagedBefore = stagedAfter;
+    }
+    expect(passes).toBe(1);
+    expect(requestState(requestId)).toMatchObject({ status: 'active', staged_cases: planCases });
+  });
+
+  it('lets the same owner and router start again after an abandon, and the retry activates', async () => {
+    const { requestId } = await startFor([
+      'vendor/alpha',
+      'vendor/cheap',
+      'vendor/third',
+      'vendor/fourth',
+    ]);
+    const now = Date.now();
+    sqlite
+      .prepare(`UPDATE paid_benchmark_requests SET last_staged_at = ?, updated_at = ? WHERE id = ?`)
+      .run(
+        new Date(now - 61 * MINUTE_MS).toISOString(),
+        new Date(now - 61 * MINUTE_MS).toISOString(),
+        requestId
+      );
+    const abandoned = await reconcilePaidBenchmarkRequests(paidBindings(db), { now });
+    expect(abandoned.closed).toEqual([requestId]);
+    expect(liveRequestCount()).toBe(0);
+
+    // The "Get a fresh estimate" retry: a new quote and click on the same router and owner.
+    // A failed row is outside the live-per-router unique index, so this creates a fresh
+    // request instead of colliding with the abandoned one.
+    const retried = await startFor(['vendor/alpha', 'vendor/cheap', 'vendor/third']);
+    expect(retried.requestId).not.toBe(requestId);
+    expect(requestState(retried.requestId).status).toBe('preparing');
+    expect(requestState(requestId).status).toBe('failed');
+
+    // Cron-only continuation reaches active with no browser polling.
+    let passes = 0;
+    while (requestState(retried.requestId).status === 'preparing' && passes < 5) {
+      passes += 1;
+      await reconcilePaidBenchmarkRequests(paidBindings(db), { now: now + passes * MINUTE_MS });
+    }
+    expect(requestState(retried.requestId).status).toBe('active');
+    // The abandoned request stays failed and was never relaunched.
+    expect(requestState(requestId).status).toBe('failed');
   });
 });

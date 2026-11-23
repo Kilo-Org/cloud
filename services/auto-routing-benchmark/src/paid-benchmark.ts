@@ -88,9 +88,29 @@ import { variantFromStorage } from './reasoning-effort';
 export const PAID_QUOTE_TTL_MS = 30 * 60 * 1000;
 /** Slots per staging batch: the store's own batch cap, well under D1's binding limit. */
 const STAGE_BATCH_SLOTS = 40;
-/** Slots one request or one cron pass may stage, so a maximal pool is paged, not dumped. */
+/** Slots one request or one browser poll may stage, so a maximal pool is paged, not dumped. */
 const STAGE_BUDGET_SLOTS = 400;
-/** A request that is not fully staged for this long is closed, never left dangling. */
+/**
+ * Slots the one-minute tick stages across all of its live `preparing` requests.
+ *
+ * Sized from the widest real pool rather than from one request: a saved pool holds up to 20
+ * entries and each expands into one concrete pair per catalog reasoning variant, so a large
+ * efficient pool plans tens of pairs. At the measured 597 cases × 3 repetitions that is well
+ * over 100,000 slots, and the old 80 slots a minute needed hours, so a large pool could only
+ * activate while the browser kept polling. 120 batches of {@link STAGE_BATCH_SLOTS} stage the
+ * widest observed plan in about 25 minutes — under half of {@link STAGE_ABANDON_MS} — and stay
+ * inside D1 limits: a `batch()` counts as one of the 1,000 queries a Worker invocation may
+ * send, and a staging batch reads at most ~5 more (three slice reads, its own batch, one
+ * recount), so 120 × 6 = 720 queries.
+ */
+const CRON_STAGE_BUDGET_SLOTS = STAGE_BATCH_SLOTS * 120;
+/** What a tick still gives each live request when several stage at once (shares the budget). */
+const CRON_STAGE_MIN_SLOTS_PER_REQUEST = STAGE_BATCH_SLOTS * 2;
+/**
+ * A request whose staging makes no progress for this long is closed, never left dangling.
+ * Measured from the last slot actually staged (`last_staged_at`, else creation), not from
+ * activity that writes nothing, so it cannot be kept alive without measuring anything.
+ */
 const STAGE_ABANDON_MS = 60 * 60 * 1000;
 /** A deferred native usage row lags its response by a moment; poll briefly, then disclose. */
 const RECEIPT_POLL_DELAYS_MS = [250, 500, 1_000];
@@ -1195,11 +1215,23 @@ export async function reconcilePaidBenchmarkRequests(
       ORDER BY updated_at LIMIT 50`
     )
     .all<PaidBenchmarkRequestRow>();
+  // The tick's staging budget is shared, so several concurrent requests cannot multiply the
+  // D1 write load or the queries one invocation sends.
+  const preparing = live.results.filter(request => request.status === 'preparing').length;
+  const stageBudget = Math.max(
+    CRON_STAGE_MIN_SLOTS_PER_REQUEST,
+    Math.floor(CRON_STAGE_BUDGET_SLOTS / Math.max(1, preparing))
+  );
   for (const request of live.results) {
     const quote = await readPaidBenchmarkQuote(db, request.quote_id);
     const plan = quote ? decodePlan(quote.plan) : null;
     if (!plan) continue;
-    if (request.status === 'preparing' && now - Date.parse(request.created_at) > STAGE_ABANDON_MS) {
+    // Liveness is staging progress, not row age or mere activity: a pool of thousands of
+    // slots legitimately takes many passes, while a request that stages nothing must not hold
+    // its pool's only live-request slot forever. `last_staged_at` moves only when a slot is
+    // actually written, so a pass that inserts nothing cannot keep it alive.
+    const lastProgress = Date.parse(request.last_staged_at ?? request.created_at);
+    if (request.status === 'preparing' && now - lastProgress > STAGE_ABANDON_MS) {
       await db.batch(
         failPaidBenchmarkRequestStatements(db, {
           requestId: request.id,
@@ -1242,7 +1274,7 @@ export async function reconcilePaidBenchmarkRequests(
     }
     if (current.status === 'preparing') {
       const staged = await stagePaidBenchmarkRequest(env, current, plan, {
-        budgetSlots: STAGE_BATCH_SLOTS * 2,
+        budgetSlots: stageBudget,
         now,
       });
       if (staged.status === 'aborted') {

@@ -150,6 +150,8 @@ export type PaidBenchmarkRequestRow = {
   charged_microdollars: number;
   plan_cases: number;
   staged_cases: number;
+  /** When staging last added a slot; null until the first staged slot. */
+  last_staged_at: string | null;
   pause_reason: 'no_funds' | 'owner' | null;
   actor_user_id: string;
   context: string;
@@ -361,6 +363,36 @@ function schedulerGuardParams(input: {
  */
 export const PAID_CASE_BATCH_LIMIT = 50;
 
+/**
+ * Recount one request's staged slots and stamp the moment staging last added a slot.
+ *
+ * `staged_cases` only ever grows (staging inserts rows and nothing removes them), so
+ * `last_staged_at` advances exactly when a batch materialised new work. It is deliberately
+ * not `updated_at`: every staging pass rewrites `updated_at` even when its batch inserts
+ * nothing, and abandonment is decided on real progress, so a request stuck at one count must
+ * not look alive.
+ */
+function recountStagedSlotsStatement(
+  db: D1Database,
+  input: { requestId: string; now?: number }
+): D1PreparedStatement {
+  const at = iso(input.now ?? Date.now());
+  return db
+    .prepare(
+      `UPDATE paid_benchmark_requests
+      SET last_staged_at = CASE
+          WHEN (SELECT COUNT(*) FROM paid_benchmark_request_cases WHERE request_id = ?)
+            > staged_cases
+          THEN ? ELSE last_staged_at END,
+        staged_cases = (
+          SELECT COUNT(*) FROM paid_benchmark_request_cases WHERE request_id = ?
+        ),
+        updated_at = ?
+      WHERE id = ? AND status = 'preparing'`
+    )
+    .bind(input.requestId, at, input.requestId, at, input.requestId);
+}
+
 export function enqueuePaidCaseBatchStatements(
   db: D1Database,
   input: {
@@ -545,15 +577,7 @@ export function enqueuePaidCaseBatchStatements(
           AND excluded.status IN ('queued', 'running', 'reused')`
       )
       .bind(input.requestId, minimumRevisions, input.eligibility?.router ?? '', at, plan),
-    db
-      .prepare(
-        `UPDATE paid_benchmark_requests
-        SET staged_cases = (
-            SELECT COUNT(*) FROM paid_benchmark_request_cases WHERE request_id = ?
-          ), updated_at = ?
-        WHERE id = ? AND status = 'preparing'`
-      )
-      .bind(input.requestId, at, input.requestId),
+    recountStagedSlotsStatement(db, { requestId: input.requestId, now: input.now }),
   ];
 }
 
@@ -594,15 +618,7 @@ export function markPaidCaseReusedStatements(
         at,
         input.requestId
       ),
-    db
-      .prepare(
-        `UPDATE paid_benchmark_requests
-        SET staged_cases = (
-            SELECT COUNT(*) FROM paid_benchmark_request_cases WHERE request_id = ?
-          ), updated_at = ?
-        WHERE id = ? AND status = 'preparing'`
-      )
-      .bind(input.requestId, at, input.requestId),
+    recountStagedSlotsStatement(db, { requestId: input.requestId, now: input.now }),
   ];
 }
 
@@ -665,15 +681,7 @@ export function markServingPairReusedStatements(
         input.engineIdentity,
         input.repetitions
       ),
-    db
-      .prepare(
-        `UPDATE paid_benchmark_requests
-        SET staged_cases = (
-            SELECT COUNT(*) FROM paid_benchmark_request_cases WHERE request_id = ?
-          ), updated_at = ?
-        WHERE id = ? AND status = 'preparing'`
-      )
-      .bind(input.requestId, at, input.requestId),
+    recountStagedSlotsStatement(db, { requestId: input.requestId, now: input.now }),
   ];
 }
 

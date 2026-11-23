@@ -1197,10 +1197,19 @@ pool, then forwards its immutable context to `POST /admin/custom-router-benchmar
 | `progress` | Continues staging, activates a fully staged request, settles a finished one, and returns one page of cases with a cursor. Never creates a request. |
 | `pause` | Detaches this request's payers, cancels only the case runs it was alone paying, and makes dispatch stop now. |
 
+Staging is paged, and the browser is not required to finish it: while a request is `preparing`,
+the one-minute tick stages a shared budget of 4,800 slots (120 batches of 40) across its live
+requests, which activates the widest observed pool in about 25 minutes with the tab closed, and a
+`progress` read stages 400 more. A request stays alive while its staging keeps adding slots
+(`last_staged_at`) and is closed as "Benchmark request was never activated." — retryably, freeing
+its pool's only live-request slot — once no slot has been staged for an hour. Row age and passes
+that write nothing never extend that window.
+
 The web exposes the same four actions through the pool-owner authorization: an organization needs
 the existing billing authority to start or pause, and any member with pool access may read the
 quote, progress and table. A save, an alias scan, a subscription sync, an admin retry, or a deploy
-cannot start a request.
+cannot start a request. A failed request can simply be restarted: it is outside the one-live-
+request-per-pool unique index, so the retry quotes and starts a fresh request.
 
 Admission of registry rows still uses `POST /admin/profiles/register`: stale history admits free,
 a never-seen model consumes the 20-per-base-router-per-24-hours window, and the batch records its

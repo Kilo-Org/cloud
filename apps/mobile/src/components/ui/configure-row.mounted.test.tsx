@@ -116,10 +116,6 @@ afterEach(() => {
 });
 
 describe('ConfigureRow mounted layout', () => {
-  // A 160 dp window leaves the text block between the icon tile and the
-  // chevron too little room for one word, and Android broke it mid-word
-  // ("Gene ral" / "Trans cribe", e1-settings, 2026-09-21). Stacking hands the
-  // title and subtitle the row's full width.
   it('stacks the icon above the title in a narrow window', () => {
     windowDims.width = 160;
     const classes = rowClasses(renderRow());
@@ -182,11 +178,6 @@ function textOf(root: TestRenderer.ReactTestInstance, content: string): string[]
 }
 
 describe('ConfigureRow disabled cue', () => {
-  // Regression: a disabled row halved the entire row with `opacity-50` on top
-  // of its already-muted subtitle, which lands that line at 2.15:1 on the dark
-  // `bg-secondary` card and 1.95:1 on the light one — under the 3:1 floor, so a
-  // row the user cannot open stopped being readable. The cue is the muted ink,
-  // applied once; no row carries a second dim.
   it('dims a disabled row by token, never by row opacity', () => {
     expect(rowClasses(renderRow({ disabled: true }))).not.toContain('opacity-50');
     expect(rowClasses(renderRow())).not.toContain('opacity-50');

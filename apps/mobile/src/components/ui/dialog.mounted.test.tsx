@@ -5,13 +5,9 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import { DialogCard } from './dialog';
 import { isModalSurfacePresented } from '@/lib/modal-surface-veil';
 
-// The card is a `@rn-primitives/portal` overlay: it renders into the app-root
-// `PortalHost`, inside the app's own window, so the screen it covers stays in
-// the same accessibility tree. Android ignores the card's
-// `accessibilityViewIsModal`, so the root hides the covered screen only for as
-// long as the card holds the modal veil. If the card ever stops holding it, an
-// open rename dialog silently leaves the hub rows and the tab bar focusable
-// again — the state this suite rejects.
+// If the card ever stops holding the modal veil, an open rename dialog silently
+// leaves the hub rows and the tab bar focusable again — the state this suite
+// rejects.
 
 vi.mock('@rn-primitives/dialog', () => ({
   Root: 'DialogRoot',

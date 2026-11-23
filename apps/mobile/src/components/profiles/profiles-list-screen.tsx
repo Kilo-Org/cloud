@@ -220,6 +220,7 @@ export function ProfilesListScreen({
                           ) : undefined
                         }
                         subtitle={subtitle || undefined}
+                        subtitleNumberOfLines={2}
                         accessibilityLabel={accessibilityLabel}
                         onPress={() => {
                           openProfile(profile);

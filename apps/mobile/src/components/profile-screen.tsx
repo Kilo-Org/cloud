@@ -600,6 +600,7 @@ export function ProfileScreen({ settingsTarget: routeTarget }: SettingsTargetPro
                     icon={Workflow}
                     title={t(PROFILE_SETTINGS.triggers.label)}
                     subtitle={t('cloudAgent.triggers.subtitle')}
+                    subtitleNumberOfLines={2}
                     hue="honey"
                     onPress={() => {
                       router.push(triggersListHref(organizationId ?? undefined));
@@ -676,6 +677,7 @@ export function ProfileScreen({ settingsTarget: routeTarget }: SettingsTargetPro
                     icon={SlidersHorizontal}
                     title={t(PROFILE_SETTINGS.preferences.label)}
                     subtitle={t('profile.preferencesSubtitle')}
+                    subtitleNumberOfLines={2}
                     hue="sage"
                     onPress={() => {
                       router.push('/(app)/(tabs)/(3_profile)/preferences' as Href);
@@ -687,6 +689,7 @@ export function ProfileScreen({ settingsTarget: routeTarget }: SettingsTargetPro
                     icon={BookOpenCheck}
                     title={t(PROFILE_SETTINGS.agentBriefing.label)}
                     subtitle={t('agentBriefing.historyHint')}
+                    subtitleNumberOfLines={2}
                     hue="sage"
                     onPress={() => {
                       router.push('/(app)/agent-briefing' as Href);

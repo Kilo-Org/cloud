@@ -353,9 +353,9 @@ describe('row palette contrast (WCAG 1.4.11 non-text)', () => {
 
 describe('idle composer control and ring track contrast (non-text)', () => {
   // The composer's send circle while there is nothing to send needed its own
-  // step (dark only — the light theme keeps its neutral). The floors below are
-  // perception floors, not a WCAG bar: the fill must read as an object on its
-  // surface.
+  // step (dark only — the light theme keeps its neutral). Its 1.6 floor is a
+  // perception floor, not a WCAG bar: the fill must read as an object on its
+  // surface, while the arrow keeps the 3:1 non-text floor.
   const MIN_VISIBLE_SURFACE_RATIO = 1.6;
   const themes = [
     ['light', lightColors],

@@ -67,12 +67,12 @@ const LOCALES_DIR = join(ROOT, 'apps/mobile/src/i18n/locales');
 const COUNTED_OPTIONS = ['count', 'displayCount', 'itemCount'];
 
 /**
- * Reviewed one by one: before
- * adding an entry, read the English copy and confirm every word reads the same
- * at 1 and at 5. If a word does change, declare the family instead. The list is
- * checked in both directions: a counted key that is neither a family nor here is
- * a problem, and so is an entry here whose counted call the source no longer
- * has, so a removed call site cannot leave a stale exemption behind.
+ * Reviewed one by one: before adding an entry, read the English copy and
+ * confirm every word reads the same at 1 and at 5. If a word does change,
+ * declare the family instead. The list is checked in both directions: a counted
+ * key that is neither a family nor here is a problem, and so is an entry here
+ * whose counted call the source no longer has, so a removed call site cannot
+ * leave a stale exemption behind.
  */
 export const NO_AGREEMENT = new Map([
   [

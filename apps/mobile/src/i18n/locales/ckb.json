@@ -2657,6 +2657,7 @@
     "filePart": {
       "loadingImage": "بارکردنی وێنە",
       "imageUnavailableRetry": "وێنەکە بەردەست نییە، دووبارە هەوڵ بدەرەوە بۆ بارکردنی",
+      "imageUnavailableRetryWithAlt": "وێنەکە بەردەست نییە، {{alt}}، دووبارە هەوڵ بدەرەوە بۆ بارکردنی",
       "imagePreviewUnavailableInSession": "پێشاندانی پێشەکیی وێنە لەم سێشنەدا بەردەست نییە.",
       "viewImage": "بینینی وێنە",
       "viewImageWithAlt": "بینینی وێنەی {{alt}}",

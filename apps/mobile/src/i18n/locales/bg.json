@@ -2657,6 +2657,7 @@
     "filePart": {
       "loadingImage": "Зареждане на изображението",
       "imageUnavailableRetry": "Изображението е недостъпно. Опитай да го заредиш отново",
+      "imageUnavailableRetryWithAlt": "Изображението е недостъпно. {{alt}}. Опитай да го заредиш отново",
       "imagePreviewUnavailableInSession": "Прегледът на изображението е недостъпен в тази сесия.",
       "viewImage": "Прегледай изображението",
       "viewImageWithAlt": "Прегледай изображението {{alt}}",

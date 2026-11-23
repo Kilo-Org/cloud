@@ -2116,6 +2116,7 @@
     "filePart": {
       "loadingImage": "Carregando imagem",
       "imageUnavailableRetry": "Imagem indisponível, tentar carregar novamente",
+      "imageUnavailableRetryWithAlt": "Imagem indisponível, {{alt}}, tentar carregar novamente",
       "imagePreviewUnavailableInSession": "A prévia da imagem não está disponível nesta sessão.",
       "viewImage": "Ver imagem",
       "viewImageWithAlt": "Ver imagem {{alt}}",

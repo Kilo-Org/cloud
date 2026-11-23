@@ -2710,6 +2710,7 @@
     "filePart": {
       "loadingImage": "Ielādē attēlu",
       "imageUnavailableRetry": "Attēls nav pieejams, mēģināt ielādēt vēlreiz",
+      "imageUnavailableRetryWithAlt": "Attēls nav pieejams, {{alt}}, mēģināt ielādēt vēlreiz",
       "imagePreviewUnavailableInSession": "Attēla priekšskatījums šajā sesijā nav pieejams.",
       "viewImage": "Skatīt attēlu",
       "viewImageWithAlt": "Skatīt attēlu {{alt}}",

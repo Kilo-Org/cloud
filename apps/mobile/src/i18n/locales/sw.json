@@ -2657,6 +2657,7 @@
     "filePart": {
       "loadingImage": "Inapakia picha",
       "imageUnavailableRetry": "Picha haipatikani, jaribu tena kupakia",
+      "imageUnavailableRetryWithAlt": "Picha haipatikani, {{alt}}, jaribu tena kupakia",
       "imagePreviewUnavailableInSession": "Onyesho la awali la picha halipatikani kwenye kikao hiki.",
       "viewImage": "Tazama picha",
       "viewImageWithAlt": "Tazama picha {{alt}}",

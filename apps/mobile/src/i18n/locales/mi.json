@@ -2657,6 +2657,7 @@
     "filePart": {
       "loadingImage": "Kei te uta i te atahanga",
       "imageUnavailableRetry": "Kāore e wātea ana te atahanga, whakamātau anō ki te uta",
+      "imageUnavailableRetryWithAlt": "Kāore e wātea ana te atahanga, {{alt}}, whakamātau anō ki te uta",
       "imagePreviewUnavailableInSession": "Kāore e wātea ana te arokite o te atahanga i tēnei wātū.",
       "viewImage": "Tirohia te atahanga",
       "viewImageWithAlt": "Tirohia te atahanga {{alt}}",

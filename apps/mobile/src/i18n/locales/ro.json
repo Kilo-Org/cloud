@@ -2710,6 +2710,7 @@
     "filePart": {
       "loadingImage": "Se încarcă imaginea",
       "imageUnavailableRetry": "Imagine indisponibilă, reîncearcă încărcarea",
+      "imageUnavailableRetryWithAlt": "Imagine indisponibilă, {{alt}}, reîncearcă încărcarea",
       "imagePreviewUnavailableInSession": "Previzualizarea imaginii nu este disponibilă în această sesiune.",
       "viewImage": "Vezi imaginea",
       "viewImageWithAlt": "Vezi imaginea {{alt}}",

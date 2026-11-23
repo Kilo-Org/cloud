@@ -2657,6 +2657,7 @@
     "filePart": {
       "loadingImage": "ກຳລັງໂຫຼດຮູບພາບ",
       "imageUnavailableRetry": "ສະແດງຮູບພາບບໍ່ໄດ້, ລອງໂຫຼດໃໝ່",
+      "imageUnavailableRetryWithAlt": "ສະແດງຮູບພາບບໍ່ໄດ້, {{alt}}, ລອງໂຫຼດໃໝ່",
       "imagePreviewUnavailableInSession": "ບໍ່ສາມາດເບິ່ງຕົວຢ່າງຮູບພາບໃນເຊດຊັນນີ້ໄດ້.",
       "viewImage": "ເບິ່ງຮູບພາບ",
       "viewImageWithAlt": "ເບິ່ງຮູບພາບ {{alt}}",

@@ -2763,6 +2763,7 @@
     "filePart": {
       "loadingImage": "A carregar a imagem",
       "imageUnavailableRetry": "Imagem indisponível, tentar carregar novamente",
+      "imageUnavailableRetryWithAlt": "Imagem indisponível, {{alt}}, tentar carregar novamente",
       "imagePreviewUnavailableInSession": "A pré-visualização da imagem não está disponível nesta sessão.",
       "viewImage": "Ver imagem",
       "viewImageWithAlt": "Ver imagem {{alt}}",

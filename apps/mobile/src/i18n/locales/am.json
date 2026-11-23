@@ -2657,6 +2657,7 @@
     "filePart": {
       "loadingImage": "ምስሉን በመጫን ላይ",
       "imageUnavailableRetry": "ምስሉ አይገኝም፣ ለመጫን እንደገና ይሞክሩ",
+      "imageUnavailableRetryWithAlt": "ምስሉ አይገኝም፣ ለመጫን እንደገና ይሞክሩ {{alt}}",
       "imagePreviewUnavailableInSession": "በዚህ ክፍለ ጊዜ ውስጥ የምስል ቅድመ እይታ አይገኝም።",
       "viewImage": "ምስሉን ይመልከቱ",
       "viewImageWithAlt": "{{alt}} የሚለውን ምስል ይመልከቱ",

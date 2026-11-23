@@ -2657,6 +2657,7 @@
     "filePart": {
       "loadingImage": "Isithombe siyalayishwa",
       "imageUnavailableRetry": "Isithombe asitholakali, zama ukusilayisha futhi",
+      "imageUnavailableRetryWithAlt": "Isithombe asitholakali, {{alt}}, zama ukusilayisha futhi",
       "imagePreviewUnavailableInSession": "Ukubuka kuqala isithombe akutholakali kule seshini.",
       "viewImage": "Buka isithombe",
       "viewImageWithAlt": "Buka isithombe {{alt}}",

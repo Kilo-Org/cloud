@@ -2657,6 +2657,7 @@
     "filePart": {
       "loadingImage": "Duke u ngarkuar imazhi",
       "imageUnavailableRetry": "Imazhi nuk është i disponueshëm, provo ta ngarkosh përsëri",
+      "imageUnavailableRetryWithAlt": "Imazhi nuk është i disponueshëm, {{alt}}, provo ta ngarkosh përsëri",
       "imagePreviewUnavailableInSession": "Parapamja e imazhit nuk është e disponueshme në këtë seancë.",
       "viewImage": "Shiko imazhin",
       "viewImageWithAlt": "Shiko imazhin {{alt}}",

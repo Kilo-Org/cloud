@@ -2657,6 +2657,7 @@
     "filePart": {
       "loadingImage": "Sawirka waa la soo shubayaa",
       "imageUnavailableRetry": "Sawirka lama heli karo, mar kale isku day inaad soo shubto",
+      "imageUnavailableRetryWithAlt": "Sawirka lama heli karo, {{alt}}, mar kale isku day inaad soo shubto",
       "imagePreviewUnavailableInSession": "Horudhaca sawirka lagama heli karo kalfadhigan.",
       "viewImage": "Eeg sawirka",
       "viewImageWithAlt": "Eeg sawirka {{alt}}",

@@ -2710,6 +2710,7 @@
     "filePart": {
       "loadingImage": "Učitavanje slike",
       "imageUnavailableRetry": "Slika nije dostupna, pokušaj ponovo da je učitaš",
+      "imageUnavailableRetryWithAlt": "Slika nije dostupna, {{alt}}, pokušaj ponovo da je učitaš",
       "imagePreviewUnavailableInSession": "Pregled slike nije dostupan u ovoj sesiji.",
       "viewImage": "Prikaži sliku",
       "viewImageWithAlt": "Prikaži sliku {{alt}}",

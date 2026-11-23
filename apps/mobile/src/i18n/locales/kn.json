@@ -2657,6 +2657,7 @@
     "filePart": {
       "loadingImage": "ಚಿತ್ರ ಲೋಡ್ ಆಗುತ್ತಿದೆ",
       "imageUnavailableRetry": "ಚಿತ್ರ ಲಭ್ಯವಿಲ್ಲ, ಲೋಡ್ ಮಾಡಲು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ",
+      "imageUnavailableRetryWithAlt": "ಚಿತ್ರ ಲಭ್ಯವಿಲ್ಲ, {{alt}}, ಲೋಡ್ ಮಾಡಲು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ",
       "imagePreviewUnavailableInSession": "ಈ ಸೆಶನ್‌ನಲ್ಲಿ ಚಿತ್ರದ ಮುನ್ನೋಟ ಲಭ್ಯವಿಲ್ಲ.",
       "viewImage": "ಚಿತ್ರ ನೋಡಿ",
       "viewImageWithAlt": "{{alt}} ಚಿತ್ರ ನೋಡಿ",

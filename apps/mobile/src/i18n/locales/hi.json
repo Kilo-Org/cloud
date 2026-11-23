@@ -2051,6 +2051,7 @@
     "filePart": {
       "loadingImage": "छवि लोड हो रही है",
       "imageUnavailableRetry": "छवि उपलब्ध नहीं, फिर से लोड करें",
+      "imageUnavailableRetryWithAlt": "छवि उपलब्ध नहीं, {{alt}}, फिर से लोड करें",
       "viewImage": "छवि देखें",
       "viewImageWithAlt": "छवि देखें: {{alt}}",
       "imageOutput": "आउटपुट की छवि",

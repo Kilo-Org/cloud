@@ -2657,6 +2657,7 @@
     "filePart": {
       "loadingImage": "படம் ஏற்றப்படுகிறது",
       "imageUnavailableRetry": "படம் கிடைக்கவில்லை. மீண்டும் ஏற்ற முயற்சிக்கவும்",
+      "imageUnavailableRetryWithAlt": "படம் கிடைக்கவில்லை. {{alt}}. மீண்டும் ஏற்ற முயற்சிக்கவும்",
       "imagePreviewUnavailableInSession": "இந்த அமர்வில் பட முன்னோட்டம் கிடைக்கவில்லை.",
       "viewImage": "படத்தைப் பார்க்கவும்",
       "viewImageWithAlt": "{{alt}} படத்தைப் பார்க்கவும்",

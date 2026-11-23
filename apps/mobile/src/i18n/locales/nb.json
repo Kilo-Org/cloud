@@ -2657,6 +2657,7 @@
     "filePart": {
       "loadingImage": "Laster inn bilde",
       "imageUnavailableRetry": "Bildet er ikke tilgjengelig. Prøv å laste det inn på nytt",
+      "imageUnavailableRetryWithAlt": "Bildet er ikke tilgjengelig. {{alt}}. Prøv å laste det inn på nytt",
       "imagePreviewUnavailableInSession": "Bildet kan ikke forhåndsvises i denne økten.",
       "viewImage": "Vis bilde",
       "viewImageWithAlt": "Vis bilde: {{alt}}",

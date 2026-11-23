@@ -2018,6 +2018,7 @@
     "filePart": {
       "loadingImage": "Chargement de l'image",
       "imageUnavailableRetry": "Image indisponible, réessayer le chargement",
+      "imageUnavailableRetryWithAlt": "Image indisponible, {{alt}}, réessayer le chargement",
       "imagePreviewUnavailableInSession": "Aperçu de l'image indisponible dans cette session.",
       "viewImage": "Voir l'image",
       "viewImageWithAlt": "Voir l'image {{alt}}",

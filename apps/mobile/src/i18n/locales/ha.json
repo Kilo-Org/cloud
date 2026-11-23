@@ -2657,6 +2657,7 @@
     "filePart": {
       "loadingImage": "Ana loda hoto",
       "imageUnavailableRetry": "Ba a samun hoton, sake gwada loda shi",
+      "imageUnavailableRetryWithAlt": "Ba a samun hoton, {{alt}}, sake gwada loda shi",
       "imagePreviewUnavailableInSession": "Ba a iya ganin hoton a wannan zaman.",
       "viewImage": "Duba hoto",
       "viewImageWithAlt": "Duba hoton {{alt}}",

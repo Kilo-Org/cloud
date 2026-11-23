@@ -2657,6 +2657,7 @@
     "filePart": {
       "loadingImage": "රූපය පූරණය වෙමින්",
       "imageUnavailableRetry": "රූපය ලබා ගත නොහැක. එය පූරණය කිරීමට නැවත උත්සාහ කරන්න",
+      "imageUnavailableRetryWithAlt": "රූපය ලබා ගත නොහැක. {{alt}}. එය පූරණය කිරීමට නැවත උත්සාහ කරන්න",
       "imagePreviewUnavailableInSession": "මෙම සැසියේදී රූප පෙරදසුන ලබාගත නොහැක.",
       "viewImage": "රූපය බලන්න",
       "viewImageWithAlt": "{{alt}} රූපය බලන්න",

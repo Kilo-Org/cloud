@@ -2657,6 +2657,7 @@
     "filePart": {
       "loadingImage": "Φόρτωση εικόνας",
       "imageUnavailableRetry": "Η εικόνα δεν είναι διαθέσιμη. Νέα προσπάθεια φόρτωσης",
+      "imageUnavailableRetryWithAlt": "Η εικόνα δεν είναι διαθέσιμη. {{alt}}. Νέα προσπάθεια φόρτωσης",
       "imagePreviewUnavailableInSession": "Η προεπισκόπηση εικόνας δεν είναι διαθέσιμη σε αυτή τη συνεδρία.",
       "viewImage": "Προβολή εικόνας",
       "viewImageWithAlt": "Προβολή εικόνας {{alt}}",

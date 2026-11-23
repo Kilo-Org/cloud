@@ -2657,6 +2657,7 @@
     "filePart": {
       "loadingImage": "Вчитување слика",
       "imageUnavailableRetry": "Сликата не е достапна. Вчитај ја повторно",
+      "imageUnavailableRetryWithAlt": "Сликата не е достапна. {{alt}}. Вчитај ја повторно",
       "imagePreviewUnavailableInSession": "Прегледот на сликата е недостапен во оваа сесија.",
       "viewImage": "Погледни ја сликата",
       "viewImageWithAlt": "Погледни ја сликата {{alt}}",

@@ -2657,6 +2657,7 @@
     "filePart": {
       "loadingImage": "Ladataan kuvaa",
       "imageUnavailableRetry": "Kuva ei ole käytettävissä. Yritä ladata se uudelleen",
+      "imageUnavailableRetryWithAlt": "Kuva ei ole käytettävissä. {{alt}}. Yritä ladata se uudelleen",
       "imagePreviewUnavailableInSession": "Kuvan esikatselu ei ole käytettävissä tässä istunnossa.",
       "viewImage": "Näytä kuva",
       "viewImageWithAlt": "Näytä kuva {{alt}}",

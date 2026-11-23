@@ -2657,6 +2657,7 @@
     "filePart": {
       "loadingImage": "Ń gbé àwòrán wọlé",
       "imageUnavailableRetry": "Àwòrán kò sí, gbìyànjú láti tún un gbé wọlé",
+      "imageUnavailableRetryWithAlt": "Àwòrán kò sí, {{alt}}, gbìyànjú láti tún un gbé wọlé",
       "imagePreviewUnavailableInSession": "A kò lè fi àwòrán hàn ṣáájú nínú ìgbà iṣẹ́ yìí.",
       "viewImage": "Wo àwòrán",
       "viewImageWithAlt": "Wo àwòrán {{alt}}",

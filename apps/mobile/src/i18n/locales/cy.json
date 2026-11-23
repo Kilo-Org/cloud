@@ -2869,6 +2869,7 @@
     "filePart": {
       "loadingImage": "Yn llwytho delwedd",
       "imageUnavailableRetry": "Nid yw'r ddelwedd ar gael, ceisio ei llwytho eto",
+      "imageUnavailableRetryWithAlt": "Nid yw'r ddelwedd ar gael, {{alt}}, ceisio ei llwytho eto",
       "imagePreviewUnavailableInSession": "Nid yw rhagolwg y ddelwedd ar gael yn y sesiwn hon.",
       "viewImage": "Gweld delwedd",
       "viewImageWithAlt": "Gweld delwedd {{alt}}",

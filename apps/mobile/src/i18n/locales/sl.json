@@ -2763,6 +2763,7 @@
     "filePart": {
       "loadingImage": "Nalaganje slike",
       "imageUnavailableRetry": "Slika ni na voljo, poskusi jo znova naložiti",
+      "imageUnavailableRetryWithAlt": "Slika ni na voljo, {{alt}}, poskusi jo znova naložiti",
       "imagePreviewUnavailableInSession": "Predogled slike v tej seji ni na voljo.",
       "viewImage": "Prikaži sliko",
       "viewImageWithAlt": "Prikaži sliko {{alt}}",

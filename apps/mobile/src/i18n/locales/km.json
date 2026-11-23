@@ -2657,6 +2657,7 @@
     "filePart": {
       "loadingImage": "កំពុងផ្ទុករូបភាព",
       "imageUnavailableRetry": "មិនអាចបង្ហាញរូបភាពបានទេ សូមព្យាយាមផ្ទុកម្តងទៀត",
+      "imageUnavailableRetryWithAlt": "មិនអាចបង្ហាញរូបភាពបានទេ សូមព្យាយាមផ្ទុកម្តងទៀត {{alt}}",
       "imagePreviewUnavailableInSession": "មិនអាចមើលរូបភាពជាមុនក្នុងវគ្គនេះបានទេ។",
       "viewImage": "មើលរូបភាព",
       "viewImageWithAlt": "មើលរូបភាព {{alt}}",

@@ -2657,6 +2657,7 @@
     "filePart": {
       "loadingImage": "Şəkil yüklənir",
       "imageUnavailableRetry": "Şəkil əlçatan deyil, yenidən yüklə",
+      "imageUnavailableRetryWithAlt": "Şəkil əlçatan deyil, {{alt}}, yenidən yüklə",
       "imagePreviewUnavailableInSession": "Bu sessiyada şəklə önbaxış mümkün deyil.",
       "viewImage": "Şəkilə bax",
       "viewImageWithAlt": "Şəkilə bax: {{alt}}",

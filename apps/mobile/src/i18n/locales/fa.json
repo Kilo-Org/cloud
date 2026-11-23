@@ -2657,6 +2657,7 @@
     "filePart": {
       "loadingImage": "در حال بارگذاری تصویر",
       "imageUnavailableRetry": "تصویر در دسترس نیست؛ تلاش دوباره برای بارگذاری",
+      "imageUnavailableRetryWithAlt": "تصویر در دسترس نیست؛ {{alt}}؛ تلاش دوباره برای بارگذاری",
       "imagePreviewUnavailableInSession": "پیش‌نمایش تصویر در این نشست در دسترس نیست.",
       "viewImage": "مشاهده تصویر",
       "viewImageWithAlt": "مشاهده تصویر {{alt}}",

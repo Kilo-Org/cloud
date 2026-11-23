@@ -2657,6 +2657,7 @@
     "filePart": {
       "loadingImage": "Сурет жүктелуде",
       "imageUnavailableRetry": "Сурет қолжетімсіз, жүктеуді қайталаңыз",
+      "imageUnavailableRetryWithAlt": "Сурет қолжетімсіз, {{alt}}, жүктеуді қайталаңыз",
       "imagePreviewUnavailableInSession": "Бұл сессияда суретті алдын ала қарау мүмкін емес.",
       "viewImage": "Суретті қарау",
       "viewImageWithAlt": "{{alt}} суретін қарау",

@@ -2657,6 +2657,7 @@
     "filePart": {
       "loadingImage": "Memuatkan imej",
       "imageUnavailableRetry": "Imej tidak tersedia, cuba muatkan semula",
+      "imageUnavailableRetryWithAlt": "Imej tidak tersedia, {{alt}}, cuba muatkan semula",
       "imagePreviewUnavailableInSession": "Pratonton imej tidak tersedia dalam sesi ini.",
       "viewImage": "Lihat imej",
       "viewImageWithAlt": "Lihat imej {{alt}}",

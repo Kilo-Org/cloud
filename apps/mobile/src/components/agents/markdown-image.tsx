@@ -108,6 +108,7 @@ export function MarkdownImage({
         kind={kind}
         uri={uri}
         alt={alt}
+        linkLabel={accessibilityLabel}
         onPress={onPress}
         onShowLinkActions={onShowLinkActions}
       />
@@ -137,8 +138,11 @@ export function MarkdownImage({
 
   if (failed) {
     const retryAlt = alt.trim();
+    // One catalog sentence carries the description, so the translators own the
+    // punctuation and the word order. `common.imageUnavailable` cannot be joined
+    // into a list: several catalogs end it with a period.
     const retryLabel = retryAlt
-      ? formatList([t('common.imageUnavailable'), retryAlt, t('common.retry')], i18n.language)
+      ? t('agentChat.filePart.imageUnavailableRetryWithAlt', { alt: retryAlt })
       : t('agentChat.filePart.imageUnavailableRetry');
     return (
       <FixedImageSlot aspectRatio={aspectRatio ?? measuredAspectRatio}>

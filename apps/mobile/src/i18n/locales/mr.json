@@ -2657,6 +2657,7 @@
     "filePart": {
       "loadingImage": "प्रतिमा लोड होत आहे",
       "imageUnavailableRetry": "प्रतिमा उपलब्ध नाही, ती लोड करण्याचा पुन्हा प्रयत्न करा",
+      "imageUnavailableRetryWithAlt": "प्रतिमा उपलब्ध नाही, {{alt}}, ती लोड करण्याचा पुन्हा प्रयत्न करा",
       "imagePreviewUnavailableInSession": "या सत्रात प्रतिमेचे पूर्वावलोकन उपलब्ध नाही.",
       "viewImage": "प्रतिमा पहा",
       "viewImageWithAlt": "{{alt}} ही प्रतिमा पहा",

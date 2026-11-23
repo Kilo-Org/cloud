@@ -2659,6 +2659,7 @@
     "filePart": {
       "loadingImage": "చిత్రాన్ని లోడ్ చేస్తోంది",
       "imageUnavailableRetry": "చిత్రం అందుబాటులో లేదు. లోడ్ చేయడానికి మళ్లీ ప్రయత్నించండి",
+      "imageUnavailableRetryWithAlt": "చిత్రం అందుబాటులో లేదు. {{alt}}. లోడ్ చేయడానికి మళ్లీ ప్రయత్నించండి",
       "imagePreviewUnavailableInSession": "ఈ సెషన్‌లో చిత్రం ప్రివ్యూ అందుబాటులో లేదు.",
       "viewImage": "చిత్రాన్ని చూడండి",
       "viewImageWithAlt": "{{alt}} చిత్రాన్ని చూడండి",

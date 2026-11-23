@@ -2816,6 +2816,7 @@
     "filePart": {
       "loadingImage": "Ag lódáil na híomhá",
       "imageUnavailableRetry": "Níl an íomhá ar fáil, bain triail eile as í a lódáil",
+      "imageUnavailableRetryWithAlt": "Níl an íomhá ar fáil, {{alt}}, bain triail eile as í a lódáil",
       "imagePreviewUnavailableInSession": "Níl réamhamharc na híomhá ar fáil sa seisiún seo.",
       "viewImage": "Féach ar an íomhá",
       "viewImageWithAlt": "Féach ar an íomhá {{alt}}",

@@ -2657,6 +2657,7 @@
     "filePart": {
       "loadingImage": "ছবি লোড হচ্ছে",
       "imageUnavailableRetry": "ছবি পাওয়া যাচ্ছে না, লোড করার জন্য আবার চেষ্টা করুন",
+      "imageUnavailableRetryWithAlt": "ছবি পাওয়া যাচ্ছে না, {{alt}}, লোড করার জন্য আবার চেষ্টা করুন",
       "imagePreviewUnavailableInSession": "এই সেশনে ছবির প্রিভিউ দেখা যায় না।",
       "viewImage": "ছবি দেখুন",
       "viewImageWithAlt": "{{alt}} ছবিটি দেখুন",

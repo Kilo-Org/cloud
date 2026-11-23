@@ -32,20 +32,25 @@ export function BlockedImageChip({
   kind,
   uri,
   alt,
+  linkLabel,
   onPress,
   onShowLinkActions,
 }: Readonly<{
   kind: 'http' | 'data';
   uri: string;
   alt: string;
+  linkLabel?: string;
   onPress?: () => void;
   onShowLinkActions?: () => void;
 }>) {
   const colors = useThemeColors();
-  const { t } = useTranslation();
+  const { i18n, t } = useTranslation();
   const host = kind === 'http' ? formatTrustedImageHost(uri) : null;
   const description = alt.trim();
-  const label = chipLine([description, host, t('agentChat.markdownImage.httpsOnly')]);
+  const line = chipLine([description, host, t('agentChat.markdownImage.httpsOnly')]);
+  // Inside a link the chip is that link's control, so its name carries the
+  // link's own name the way the loaded image's name does.
+  const label = linkLabel ? formatList([line, linkLabel], i18n.language) : line;
   const body = (
     <>
       <AlertCircle size={14} color={colors.mutedForeground} />
@@ -98,7 +103,7 @@ export function UnconfirmedImageChip({
   onShowLinkActions?: () => void;
 }>) {
   const colors = useThemeColors();
-  const { i18n, t } = useTranslation();
+  const { t } = useTranslation();
   const host = formatTrustedImageHost(uri);
   const reason = host ?? t('agentChat.markdownImage.httpsOnly');
   const description = alt.trim();
@@ -112,16 +117,14 @@ export function UnconfirmedImageChip({
       accessible={false}
       className="h-full flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 dark:bg-neutral-900"
     >
-      <Text className="min-w-0 flex-1 text-xs text-muted-foreground" numberOfLines={2}>
+      <Text accessible className="min-w-0 flex-1 text-xs text-muted-foreground" numberOfLines={2}>
         {label}
       </Text>
       <Pressable
         onPress={onLoad}
         onLongPress={onShowLinkActions}
         accessibilityRole="button"
-        accessibilityLabel={
-          description ? formatList([description, loadLabel], i18n.language) : loadLabel
-        }
+        accessibilityLabel={loadLabel}
         accessibilityActions={onShowLinkActions ? getLinkAccessibilityActions(true) : undefined}
         onAccessibilityAction={event => {
           if (event.nativeEvent.actionName === 'showLinkActions') {

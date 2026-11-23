@@ -2657,6 +2657,7 @@
     "filePart": {
       "loadingImage": "Läser in bild",
       "imageUnavailableRetry": "Bilden är inte tillgänglig. Försök läsa in den igen",
+      "imageUnavailableRetryWithAlt": "Bilden är inte tillgänglig. {{alt}}. Försök läsa in den igen",
       "imagePreviewUnavailableInSession": "Bilden kan inte förhandsvisas i den här sessionen.",
       "viewImage": "Visa bild",
       "viewImageWithAlt": "Visa bild {{alt}}",

@@ -2763,6 +2763,7 @@
     "filePart": {
       "loadingImage": "Загрузка выявы",
       "imageUnavailableRetry": "Выява недаступная. Паўтарыць загрузку",
+      "imageUnavailableRetryWithAlt": "Выява недаступная. {{alt}}. Паўтарыць загрузку",
       "imagePreviewUnavailableInSession": "Папярэдні прагляд выявы недаступны ў гэтым сеансе.",
       "viewImage": "Праглядзець выяву",
       "viewImageWithAlt": "Праглядзець выяву «{{alt}}»",

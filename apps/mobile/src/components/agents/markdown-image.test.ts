@@ -74,21 +74,20 @@ function slotCount(root: TestRenderer.ReactTestInstance, aspectRatio: number): n
   ).length;
 }
 
-function loadLabel(uri: string, alt = ''): string {
-  const withHost = `Load ${new URL(uri).hostname.toLowerCase()}`;
-  return alt ? `${alt} and ${withHost}` : withHost;
+function loadLabel(uri: string): string {
+  return `Load ${new URL(uri).hostname.toLowerCase()}`;
 }
 
+/** The Load control, named for its action alone; the row above it names the image. */
 function findLoadButtons(
   root: TestRenderer.ReactTestInstance,
-  uri: string,
-  alt = ''
+  uri: string
 ): TestRenderer.ReactTestInstance[] {
   return root.findAll(
     node =>
       typeof node.type === 'string' &&
       (node.type as string) === 'Pressable' &&
-      node.props.accessibilityLabel === loadLabel(uri, alt)
+      node.props.accessibilityLabel === loadLabel(uri)
   );
 }
 
@@ -111,11 +110,11 @@ function chooseAlertAction(action: string): void {
 async function pressLoad(
   root: TestRenderer.ReactTestInstance,
   uri: string,
-  { action = 'Load once', alt = '' }: { action?: string; alt?: string } = {}
+  { action = 'Load once' }: { action?: string } = {}
 ): Promise<void> {
   await act(async () => {
     await Promise.resolve();
-    const loadButton = findLoadButtons(root, uri, alt)[0];
+    const loadButton = findLoadButtons(root, uri)[0];
     if (!loadButton) {
       throw new Error('load button not found');
     }
@@ -226,7 +225,7 @@ describe('MarkdownImage inert-until-load', () => {
       throw new Error('renderer was not created');
     }
 
-    await pressLoad(renderer.root, uri, { alt: 'first' });
+    await pressLoad(renderer.root, uri);
 
     expect(ofType(renderer.root, 'Image')).toHaveLength(2);
     await unmount(renderer);
@@ -272,7 +271,7 @@ describe('MarkdownImage inert-until-load', () => {
       node =>
         typeof node.type === 'string' &&
         (node.type as string) === 'Pressable' &&
-        node.props.accessibilityLabel === 'Image unavailable, shot, and Retry'
+        node.props.accessibilityLabel === 'Image unavailable, shot, retry loading'
     );
     expect(retryButtons).toHaveLength(1);
     const retryButton = retryButtons[0];
@@ -317,7 +316,7 @@ describe('MarkdownImage inert-until-load', () => {
     let renderer = await mount(uri, 'shot');
 
     expect(slotCount(renderer.root, 4 / 3)).toBe(1);
-    await pressLoad(renderer.root, uri, { alt: 'shot' });
+    await pressLoad(renderer.root, uri);
     expect(slotCount(renderer.root, 4 / 3)).toBe(1);
     expect(ofType(renderer.root, 'Skeleton')).toHaveLength(1);
 
@@ -340,7 +339,7 @@ describe('MarkdownImage inert-until-load', () => {
     expect(slotCount(renderer.root, 0.75)).toBe(1);
 
     const retry = renderer.root.find(
-      node => node.props.accessibilityLabel === 'Image unavailable, shot, and Retry'
+      node => node.props.accessibilityLabel === 'Image unavailable, shot, retry loading'
     );
     await act(async () => {
       await Promise.resolve();
@@ -555,7 +554,7 @@ describe('MarkdownImage inert-until-load', () => {
       node =>
         typeof node.type === 'string' &&
         (node.type as string) === 'Pressable' &&
-        node.props.accessibilityLabel === 'Image unavailable, shot, and Retry'
+        node.props.accessibilityLabel === 'Image unavailable, shot, retry loading'
     );
     expect(retryButtons).toHaveLength(1);
     const retryButton = retryButtons[0];
@@ -783,11 +782,11 @@ describe('MarkdownImage chip descriptions and long press', () => {
     const renderer = await mount(uri, 'A chart');
     expect(texts(renderer.root)).toContain('\u2068A chart\u2069 · \u2068example.com\u2069');
 
-    const load = findLoadButtons(renderer.root, uri, 'A chart')[0];
+    const load = findLoadButtons(renderer.root, uri)[0];
     if (!load) {
       throw new Error('load button not found');
     }
-    expect(load.props.accessibilityLabel).toBe('A chart and Load example.com');
+    expect(load.props.accessibilityLabel).toBe('Load example.com');
 
     await unmount(renderer);
   });
@@ -873,7 +872,7 @@ describe('MarkdownImage chip descriptions and long press', () => {
       (image.props.onError as () => void)();
     });
     expect(ofType(renderer.root, 'Pressable')[0]?.props.accessibilityLabel).toBe(
-      'Image unavailable, shot, and Retry'
+      'Image unavailable, shot, retry loading'
     );
     await unmount(renderer);
 

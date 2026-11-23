@@ -2657,6 +2657,7 @@
     "filePart": {
       "loadingImage": "Rasm yuklanmoqda",
       "imageUnavailableRetry": "Rasm yuklanmadi, qayta yuklash",
+      "imageUnavailableRetryWithAlt": "Rasm yuklanmadi, {{alt}}, qayta yuklash",
       "imagePreviewUnavailableInSession": "Bu sessiyada rasmni oldindan ko'rib bo'lmaydi.",
       "viewImage": "Rasmni ko'rish",
       "viewImageWithAlt": "{{alt}} rasmini ko'rish",

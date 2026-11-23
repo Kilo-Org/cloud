@@ -2657,6 +2657,7 @@
     "filePart": {
       "loadingImage": "ပုံ ဖွင့်နေသည်",
       "imageUnavailableRetry": "ပုံကို ဖွင့်၍မရပါ၊ ထပ်ဖွင့်ကြည့်ပါ",
+      "imageUnavailableRetryWithAlt": "ပုံကို ဖွင့်၍မရပါ၊ ထပ်ဖွင့်ကြည့်ပါ {{alt}}",
       "imagePreviewUnavailableInSession": "ဤစက်ရှင်တွင် ပုံကို အစမ်းကြည့်၍မရပါ။",
       "viewImage": "ပုံ ကြည့်ရှုပါ",
       "viewImageWithAlt": "{{alt}} ပုံကို ကြည့်ရှုပါ",

@@ -2095,6 +2095,7 @@
     "filePart": {
       "loadingImage": "載入圖片中",
       "imageUnavailableRetry": "無法顯示圖片，重新載入",
+      "imageUnavailableRetryWithAlt": "無法顯示圖片，{{alt}}，重新載入",
       "imagePreviewUnavailableInSession": "此工作階段中無法預覽圖片。",
       "viewImage": "檢視圖片",
       "viewImageWithAlt": "檢視圖片：{{alt}}",

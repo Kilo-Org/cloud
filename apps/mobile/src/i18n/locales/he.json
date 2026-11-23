@@ -2122,6 +2122,7 @@
     "filePart": {
       "loadingImage": "טוען תמונה",
       "imageUnavailableRetry": "התמונה אינה זמינה, ניסיון טעינה נוסף",
+      "imageUnavailableRetryWithAlt": "התמונה אינה זמינה, {{alt}}, ניסיון טעינה נוסף",
       "imagePreviewUnavailableInSession": "תצוגה מקדימה של תמונות אינה זמינה בסשן הזה.",
       "viewImage": "הצגת התמונה",
       "viewImageWithAlt": "הצגת התמונה: {{alt}}",

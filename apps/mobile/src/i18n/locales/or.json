@@ -2657,6 +2657,7 @@
     "filePart": {
       "loadingImage": "ଛବି ଲୋଡ୍ ହେଉଛି",
       "imageUnavailableRetry": "ଛବି ଉପଲବ୍ଧ ନାହିଁ, ପୁଣି ଲୋଡ୍ କରନ୍ତୁ",
+      "imageUnavailableRetryWithAlt": "ଛବି ଉପଲବ୍ଧ ନାହିଁ, {{alt}}, ପୁଣି ଲୋଡ୍ କରନ୍ତୁ",
       "imagePreviewUnavailableInSession": "ଏହି ସେସନରେ ଛବିର ପୂର୍ବଦର୍ଶନ ଉପଲବ୍ଧ ନାହିଁ।",
       "viewImage": "ଛବି ଦେଖନ୍ତୁ",
       "viewImageWithAlt": "{{alt}} ଛବି ଦେଖନ୍ତୁ",

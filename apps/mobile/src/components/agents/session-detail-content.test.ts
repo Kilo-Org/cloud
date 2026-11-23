@@ -5169,6 +5169,44 @@ describe('session detail composer after a failed turn', () => {
     expect(control.withdrawRestoredSend).not.toHaveBeenCalled();
   });
 
+  it('keeps a restored draft when the confirmed row that carries it has an answer', async () => {
+    goalMountOptions = { resolvedType: 'remote' };
+    const text = 'continue';
+    // A repeated short prompt: the confirmed row with these words is an earlier
+    // turn the agent already answered, so the restored draft is unsent text the
+    // reader is about to send, not that delivery.
+    draftLoadState.value = text;
+    const prompt = confirmedUserRow(text);
+    const base = assistantMessage('msg-answered').info as Extract<
+      StoredMessage['info'],
+      { role: 'assistant' }
+    >;
+    const answered: StoredMessage = {
+      info: {
+        ...base,
+        sessionID: ROOT_ID,
+        parentID: prompt.info.id,
+        // The answer's own turn anchors on a later server time, as the worker's
+        // history read orders it.
+        time: { created: prompt.info.time.created + 1_000 },
+      },
+      parts: [
+        stubTextPart({
+          id: 'text-msg-answered',
+          sessionID: ROOT_ID,
+          messageID: 'msg-answered',
+          text: 'Answered the earlier turn',
+        }),
+      ],
+    };
+    const { view, resolveRecord } = await mountWithHeldPendingSendRead([prompt, answered]);
+    const control = composerControlStub(view);
+
+    await resolveRecord(false);
+
+    expect(control.withdrawRestoredSend).not.toHaveBeenCalled();
+  });
+
   it('leaves the restored draft alone when the pending-send record is complete', async () => {
     goalMountOptions = { resolvedType: 'remote' };
     const text = 'Already delivered';

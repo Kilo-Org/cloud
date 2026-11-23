@@ -119,7 +119,7 @@ import {
 } from '@/components/agents/session-working-state';
 import {
   countInFlightMessages,
-  hasConfirmedSentPrompt,
+  isNewestMessageConfirmedPrompt,
   lastVisibleMessageFailure,
   resolveRetryPrompt,
   resolveRetryTarget,
@@ -1621,17 +1621,20 @@ export function SessionDetailContent({
 
   // The record of unknown-outcome sends is the only thing that retires a
   // restored draft when its confirmation lands. When that record is truncated
-  // or unreadable, the newest confirmed user row stands in: if it carries this
-  // draft's prompt, the server took that send, so the draft is withdrawn
-  // instead of offered for a second send. The composer ignores a withdrawal of
-  // text that is not the unedited restored draft, so a repeated run costs
-  // nothing and a draft the reader typed or edited is never taken.
+  // or unreadable, the transcript stands in: a newest confirmed user row that
+  // carries this draft's prompt AND ends the transcript is that delivery, so
+  // the draft is withdrawn instead of offered for a second send. A row with an
+  // answer below it is an earlier turn the reader is repeating ("continue",
+  // "yes"), and withdrawing its draft would silently erase text nobody sent.
+  // The composer ignores a withdrawal of text that is not the unedited restored
+  // draft, so a repeated run costs nothing and a draft the reader typed or
+  // edited is never taken.
   const restoredDraftValue = composerDraft.value;
   useEffect(() => {
     if (!pendingSendGuardIncomplete || !composerDraft.settled || !restoredDraftValue) {
       return;
     }
-    if (!hasConfirmedSentPrompt(messages, restoredDraftValue)) {
+    if (!isNewestMessageConfirmedPrompt(messages, restoredDraftValue)) {
       return;
     }
     // The comparison uses the prompt the send carries, so the withdrawal gets

@@ -695,9 +695,19 @@ test('a spend in a worker that got no answer keeps the spent approval with the r
     );
 
     // 3. That generation refused the record's read itself, so it restored nothing and stores nothing until the
-    // Spend asks for the record it is about to change.
+    // Spend asks for the record it is about to change. `refused` counts only after the patched read's own two
+    // `chrome.storage.local` round trips, so it is polled rather than read once from the restart snapshot.
     expect(second.state.patched).toBe(true);
-    expect(second.state.refused).toBeGreaterThanOrEqual(1);
+    await expect
+      .poll(
+        async () => {
+          const live = await probeState(second.worker).catch(() => null);
+
+          return live === null ? 0 : (live.refused ?? 0);
+        },
+        { timeout: 20_000 }
+      )
+      .toBeGreaterThanOrEqual(1);
 
     // 4. The session the spend belongs to. The record is keyed by the session handle, so the armed approval stored
     // Below is the same key the approved file spends.

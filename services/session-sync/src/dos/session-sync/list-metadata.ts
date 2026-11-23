@@ -23,9 +23,17 @@ function parse(text: string | null): SessionListMetadata | undefined {
   }
 }
 
-function put(db: Db, values: { owed: string | null; pushed?: string | null; retry_at: number }): void {
+function put(
+  db: Db,
+  values: { owed: string | null; pushed?: string | null; retry_at: number }
+): void {
   db.insert(listMetadata)
-    .values({ key: KEY, owed: values.owed, pushed: values.pushed ?? null, retry_at: values.retry_at })
+    .values({
+      key: KEY,
+      owed: values.owed,
+      pushed: values.pushed ?? null,
+      retry_at: values.retry_at,
+    })
     .onConflictDoUpdate({ target: listMetadata.key, set: values })
     .run();
 }
@@ -46,7 +54,9 @@ export function stage(db: Db, metadata: SessionListMetadata, now: number): void 
   put(db, { owed: value, retry_at: now });
 }
 
-export function owed(db: Db): { value: string; metadata: SessionListMetadata; retryAt: number } | undefined {
+export function owed(
+  db: Db
+): { value: string; metadata: SessionListMetadata; retryAt: number } | undefined {
   const row = read(db);
   if (!row?.owed) return undefined;
   const metadata = parse(row.owed);

@@ -8,17 +8,16 @@ import m0005 from './0005_session_status.sql';
 import m0006 from './0006_stiff_micromax.sql';
 import m0007 from './0007_nappy_doorman.sql';
 
-  export default {
-    journal,
-    migrations: {
-      m0000,
-m0001,
-m0002,
-m0003,
-m0004,
-m0005,
-m0006,
-m0007
-    }
-  }
-  
+export default {
+  journal,
+  migrations: {
+    m0000,
+    m0001,
+    m0002,
+    m0003,
+    m0004,
+    m0005,
+    m0006,
+    m0007,
+  },
+};

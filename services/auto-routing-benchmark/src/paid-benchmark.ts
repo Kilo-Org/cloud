@@ -373,9 +373,7 @@ export async function stagePaidBenchmarkRequest(
       // without its latched platform run needs the answer at all.
       const platformOwned = group.some(slot => {
         if (!planSlotIsCovered(plan, slot.pairIndex, slot.caseIndex, slot.rep)) return false;
-        const open = openBySlot.get(
-          slot.caseIndex * plan.repetitions + slot.rep
-        );
+        const open = openBySlot.get(slot.caseIndex * plan.repetitions + slot.rep);
         return !open || open.platform_covered !== 1;
       })
         ? await readPlatformRequestedPairs(db, {

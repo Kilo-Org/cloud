@@ -306,7 +306,8 @@ export function PoolBenchmarkDialog({ router, organizationId, onClose }: Props) 
             ) : null}
             {showProgress && activeProgress !== undefined ? (
               <>
-                {startNoticeFor !== null && startNoticeFor.requestId === activeProgress.id &&
+                {startNoticeFor !== null &&
+                startNoticeFor.requestId === activeProgress.id &&
                 (activeProgress.status === 'preparing' || activeProgress.status === 'active') ? (
                   // Neutral, not an error: the pool's own request is simply already in flight.
                   <Alert variant="notice">

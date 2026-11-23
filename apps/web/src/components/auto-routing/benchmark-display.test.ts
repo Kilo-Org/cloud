@@ -216,13 +216,18 @@ describe('start failure copy', () => {
     // A settled or replaced request, or a broken query, ends it.
     expect(keepStartNotice(REQUEST_ID, progress('completed', {}), false)).toBe(false);
     expect(keepStartNotice(REQUEST_ID, progress('paused', {}), false)).toBe(false);
-    expect(keepStartNotice('00000000-0000-4000-8000-000000000003', progress('preparing', {}), false)).toBe(false);
+    expect(
+      keepStartNotice('00000000-0000-4000-8000-000000000003', progress('preparing', {}), false)
+    ).toBe(false);
     expect(keepStartNotice(REQUEST_ID, { status: 'empty' }, false)).toBe(false);
     expect(keepStartNotice(REQUEST_ID, undefined, true)).toBe(false);
   });
 
   it('treats a pre-flag worker status as the same join notice', () => {
-    const copy = startFailureCopy({ status: 'already_in_progress', request: progress('active', {}) });
+    const copy = startFailureCopy({
+      status: 'already_in_progress',
+      request: progress('active', {}),
+    });
     expect(copy?.title).toBe('A benchmark is already running for this pool');
     expect(copy?.retryable).toBe(false);
   });

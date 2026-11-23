@@ -2479,7 +2479,17 @@ describe('paid request staging liveness', () => {
           VALUES (?, 'user', ?, NULL, 'efficient', ?, 'pool-v1', ?, '{}', ?, 0, 0, ?,
             '2027-01-01T00:00:00.000Z', ?, ?, ?)`
         )
-        .run(quoteId, `user-${index}`, crypto.randomUUID(), ENGINE, JSON.stringify(plan), SLOTS, requestId, createdAt, createdAt);
+        .run(
+          quoteId,
+          `user-${index}`,
+          crypto.randomUUID(),
+          ENGINE,
+          JSON.stringify(plan),
+          SLOTS,
+          requestId,
+          createdAt,
+          createdAt
+        );
       sqlite
         .prepare(
           `INSERT INTO paid_benchmark_requests

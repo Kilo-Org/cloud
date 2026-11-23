@@ -1326,8 +1326,9 @@ provide — a stored `media:`/workspace reference, or one the snapshot reported 
 unmapped — is reported by the snapshot projection and the live reader in
 `incompleteMessageIDs`, so those surfaces show an incomplete transcript. An absolute
 `http(s)` reference is never fetched on purpose, so only its own file part is withheld
-and the transcript is not reported incomplete. The paged history reader keeps only
-its existing omitted-item count.
+and the transcript is not reported incomplete, unless the snapshot declared that
+reference unavailable. The paged history reader keeps only its existing omitted-item
+count.
 
 Snapshot fetching, relay cursors, replay and recovery remain native-owned.
 `session.moved` requires an authoritative canonical snapshot because its event does

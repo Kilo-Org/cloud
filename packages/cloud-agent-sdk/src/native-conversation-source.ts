@@ -216,7 +216,8 @@ export function readNativeConversation(state: NativeSessionState): NativeConvers
   // recovery gap. A reference content storage was expected to provide only withholds its
   // own file part: the message displays and its id stays reported, so the omission is
   // never silent. An absolute `http(s)` reference is never fetched on purpose, so it is
-  // withheld from the display without ever being reported as missing content.
+  // withheld from the display without being reported as missing content, unless the
+  // snapshot declared that key unavailable.
   const blocked = complete.filter(item =>
     hasUnresolvedKilo2Assets(item.message, state.assetURLs, unavailable)
   );

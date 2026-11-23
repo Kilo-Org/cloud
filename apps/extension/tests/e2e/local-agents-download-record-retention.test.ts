@@ -96,6 +96,52 @@ const WRAPPER_SERVICE_WORKER = `/* kilo e2e: a download-hold record that stays a
 })();
 `;
 
+/**
+ * The wrapper worker with a budget: like the one above, but the record's own read is refused only as many times as
+ * `chrome.storage.local` says. The budget is read and decremented before the refusal, so the boot read of a
+ * generation spends one refusal and the spend's own retry read is answered. `refused` counts the refusals this
+ * generation made, which is how the spec proves its boot ran against an area that did not answer.
+ */
+const WRAPPER_SERVICE_WORKER_BUDGETED = `/* kilo e2e: a download-hold record whose read is refused a limited number of times */
+(() => {
+  const probe = (globalThis.__kiloRecordRetention = { bootedAt: Date.now(), patched: false, refused: 0 });
+  const key = ${JSON.stringify(HOLD_STATE_STORAGE_KEY)};
+  const budgetKey = 'kiloE2eRefusalBudget';
+  const original = chrome.storage.session.get.bind(chrome.storage.session);
+  const namesOf = keys => {
+    if (typeof keys === 'string') {
+      return [keys];
+    }
+    if (Array.isArray(keys)) {
+      return keys.map(String);
+    }
+    return keys === null || keys === undefined ? [] : Object.keys(keys);
+  };
+
+  // The refusal is scoped to the record's own key, and the budget read is awaited before the refusal: a decrement
+  // That never landed would refuse every later read too, and the spend's own retry could never be answered.
+  const refused = async function get(keys) {
+    if (namesOf(keys).some(name => name === key || name.endsWith(':' + key))) {
+      const stored = await chrome.storage.local.get(budgetKey);
+      const budget = stored[budgetKey];
+
+      if (typeof budget === 'number' && budget > 0) {
+        await chrome.storage.local.set({ [budgetKey]: budget - 1 });
+        probe.refused += 1;
+        throw new Error('kilo e2e: the record read is refused');
+      }
+    }
+
+    return original(...arguments);
+  };
+
+  chrome.storage.session.get = refused;
+  probe.patched = chrome.storage.session.get === refused;
+
+  importScripts('./background.js');
+})();
+`;
+
 const manifestSchema = z.looseObject({
   optional_permissions: z.array(z.string()).optional(),
   permissions: z.array(z.string()).optional(),
@@ -106,7 +152,9 @@ const manifestSchema = z.looseObject({
  * than through the launch, which only rewrites its own copy of the build: without the permission the
  * hold's listener never exists, and a download would prove nothing about it.
  */
-const writeRecordRetentionExtension = async (): Promise<string> => {
+const writeRecordRetentionExtension = async (
+  wrapper: string = WRAPPER_SERVICE_WORKER
+): Promise<string> => {
   const directory = await mkdtemp(join(tmpdir(), 'kilo-record-retention-'));
 
   await cp(extensionPath, directory, { recursive: true });
@@ -125,12 +173,17 @@ const writeRecordRetentionExtension = async (): Promise<string> => {
       permissions: [...new Set([...(manifest.permissions ?? []), 'downloads'])],
     })
   );
-  await writeFile(join(directory, 'sw.js'), WRAPPER_SERVICE_WORKER);
+  await writeFile(join(directory, 'sw.js'), wrapper);
 
   return directory;
 };
 
-const probeSchema = z.object({ bootedAt: z.number(), patched: z.boolean().optional() });
+const probeSchema = z.object({
+  bootedAt: z.number(),
+  patched: z.boolean().optional(),
+  /** The refusals this generation's patched read made; only the budgeted wrapper starts one. */
+  refused: z.number().optional(),
+});
 
 type ProbeState = z.infer<typeof probeSchema>;
 
@@ -252,6 +305,41 @@ const recordOnPage = async (page: Page): Promise<unknown> => {
   return raw === null ? null : recordSchema.parse(raw);
 };
 
+/**
+ * The record a page reads while it may hold a spent approval: `recordEntrySchema` names the armed need the existing
+ * test writes, and a spent need carries the file it bought instead of an expiry, so this read keeps the fields the
+ * spend assertions compare and tolerates the rest.
+ */
+const liveNeedSchema = z.looseObject({
+  filename: z.string().optional(),
+  itemId: z.number().optional(),
+  kind: z.string(),
+});
+
+const liveRecordSchema = z.record(z.string(), z.looseObject({ need: liveNeedSchema.optional() }));
+
+/** The record's raw value: the strict schema rejects a spent need, and an annotation keeps exactly what was stored. */
+const rawRecordOnPage = (page: Page): Promise<unknown> =>
+  page.evaluate(
+    `chrome.storage.session.get(${JSON.stringify(HOLD_STATE_STORAGE_KEY)})
+      .then(items => items[${JSON.stringify(HOLD_STATE_STORAGE_KEY)}] ?? null)`
+  );
+
+/** Each session's need as an extension page reads it: the value a spend is asserted on. */
+const needsOnPage = async (page: Page): Promise<Record<string, z.infer<typeof liveNeedSchema>>> => {
+  const raw = await rawRecordOnPage(page);
+
+  if (raw === null) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(liveRecordSchema.parse(raw)).flatMap(([session, entry]) =>
+      entry.need === undefined ? [] : [[session, entry.need]]
+    )
+  );
+};
+
 /** The record once it has settled: two reads a poll apart that agree are a value every write has landed. */
 const settledRecord = async (page: Page): Promise<unknown> => {
   const read = async (): Promise<string> => JSON.stringify(await recordOnPage(page));
@@ -332,17 +420,17 @@ interface CdpTargetInfo {
 }
 
 /** A record with one session, one tab and one armed approval: exactly what `stateSchema` accepts. */
-const seedRecordFor = (url: string, tabId: number) => ({
-  'session-1': {
+const seedRecordFor = (url: string, tabId: number, session = 'session-1') => ({
+  [session]: {
     need: {
       expiresAt: Date.now() + 600_000,
       kind: 'armed',
-      session: 'session-1',
+      session,
       tabId,
       target: { kind: 'url', url: `${url}${DOWNLOAD_PATH}` },
     },
     owed: [],
-    tabs: [{ page: `${url}/page`, session: 'session-1', tabId }],
+    tabs: [{ page: `${url}/page`, session, tabId }],
   },
 });
 
@@ -516,6 +604,193 @@ test('the download-hold record stays as written across a worker restart that get
     expect(item?.state).toBe('complete');
     expect(await tempDownloadFiles(downloadsPath)).toStrictEqual([]);
     expect(folder).toStrictEqual([DOWNLOAD_FILENAME]);
+  } finally {
+    await launch.close();
+    await hub.close();
+    await fixture.close();
+    await rm(extensionDirectory, { force: true, maxRetries: 5, recursive: true, retryDelay: 100 });
+  }
+});
+
+/*
+ * The record keeps the approval a file spent as `spent`, and a worker whose own read got no answer stores nothing —
+ * so a spend makes one read of its own, and the approval it spent is kept with the record it belongs to. This spec
+ * drives that on the real build.
+ *
+ * The wrapper refuses the record's read only as often as `chrome.storage.local` says, so the new generation's boot
+ * read is refused and the spend's own read is answered. The stored record is an armed approval for the session that
+ * spends it — keyed by the session handle, which is the key every write of the record uses — and the spec asserts
+ * that the same key reads back `spent`, which is the value a later worker reads for that session.
+ */
+test('a spend in a worker that got no answer keeps the spent approval with the record', async () => {
+  test.setTimeout(300_000);
+  const fixture = await startDownloadFixture();
+  const hub = await startFakeHub();
+  const extensionDirectory = await writeRecordRetentionExtension(WRAPPER_SERVICE_WORKER_BUDGETED);
+  const launch = await launchRealDownloadBrowser({ extensionPath: extensionDirectory });
+  const { context, downloadsPath, extensionId } = launch;
+
+  await mockKiloApi(context, {});
+  await context.addInitScript({
+    content:
+      "Object.defineProperty(chrome.permissions, 'request', { value: () => Promise.resolve(true) });",
+  });
+
+  try {
+    const sidePanel = await context.newPage();
+    const agentPage = await context.newPage();
+
+    await sidePanel.goto(`chrome-extension://${extensionId}/sidepanel.html`);
+    await agentPage.goto(`${fixture.url}/page`);
+
+    const first = await waitForGeneration(context, extensionId, () => true);
+
+    // 1. The next generation's boot read is the one refusal this budget pays for. Nothing else in this spec asks
+    // The record's key of `storage.session`, and `readInWorker` is never called here: it would spend the budget.
+    await sidePanel.evaluate('chrome.storage.local.set({ kiloE2eRefusalBudget: 1 })');
+
+    // 2. The worker is restarted with no page reload: its own target is closed over CDP and the extension is woken
+    // From the panel, so the next generation boots against a read the budget refuses once.
+    const browserCdp = await launch.browser.newBrowserCDPSession();
+
+    await browserCdp.send('Target.setAutoAttach', {
+      autoAttach: true,
+      flatten: true,
+      waitForDebuggerOnStart: true,
+    });
+
+    const targets = (await browserCdp.send('Target.getTargets')) as {
+      targetInfos: CdpTargetInfo[];
+    };
+    const workerTarget = targets.targetInfos.find(
+      target => target.type === 'service_worker' && target.url.includes(extensionId)
+    );
+
+    if (workerTarget === undefined) {
+      throw new Error('the browser reported no service worker for the extension under test');
+    }
+
+    const closed = await browserCdp.send('Target.closeTarget', { targetId: workerTarget.targetId });
+
+    // The auto-attach above would hold every new page target for the debugger; nothing else needs it.
+    await browserCdp
+      .send('Target.setAutoAttach', {
+        autoAttach: false,
+        flatten: true,
+        waitForDebuggerOnStart: false,
+      })
+      .catch(() => null);
+    await browserCdp.detach().catch(() => null);
+
+    // The panel's own message is what starts the next generation; nothing answers it, which is fine.
+    const wake: unknown = await sidePanel.evaluate(
+      `chrome.runtime.sendMessage({ probe: 'wake' })
+        .then(() => ({ kind: 'answered' }), error => ({ error: String(error), kind: 'rejected' }))`
+    );
+
+    const second = await waitForGeneration(
+      context,
+      extensionId,
+      state => state.bootedAt !== first.state.bootedAt
+    );
+
+    // 3. That generation refused the record's read itself, so it restored nothing and stores nothing until the
+    // Spend asks for the record it is about to change.
+    expect(second.state.patched).toBe(true);
+    expect(second.state.refused).toBeGreaterThanOrEqual(1);
+
+    // 4. The session the spend belongs to. The record is keyed by the session handle, so the armed approval stored
+    // Below is the same key the approved file spends.
+    const session = await openPairedAgentSession({
+      beforeShare: async () => {
+        await activateTab(sidePanel, `${fixture.url}/page`);
+      },
+      context,
+      extensionId,
+      hub,
+      sidePanel,
+      title: 'Spend retention session',
+    });
+    const grants = [
+      { class: 'act', origin: fixture.url },
+      { class: 'navigate', origin: fixture.url },
+      { class: 'read', origin: fixture.url },
+    ];
+
+    const guarded = await session.callTool(
+      'browser_navigate',
+      { url: `${fixture.url}${DOWNLOAD_PATH}` },
+      grants
+    );
+
+    expect(guarded).toMatchObject({
+      afterAction: true,
+      code: LOCAL_AGENT_ERROR_CODES.needsPermission,
+      kind: 'error',
+    });
+    expect(guarded.kind === 'error' ? guarded.stepToken : undefined).toEqual(expect.any(String));
+    // The call's own request reached the fixture, and the hold stopped the item it would have written.
+    expect(fixture.hits()).toBeGreaterThan(0);
+    await expectNothingSaved(downloadsPath);
+
+    // 5. The stored record still says `armed` for this session, which is what a worker that stored nothing leaves
+    // Behind. The approved file spends that approval, and the spend's own read is the only thing that can store it.
+    const armed = seedRecordFor(fixture.url, session.tabId, session.sessionHandle);
+
+    await writeFromPage(sidePanel, armed);
+
+    const beforeSpend = await settledRecord(sidePanel);
+
+    expect(recordSchema.parse(beforeSpend)).toStrictEqual(armed);
+
+    const approved = await session.callTool(
+      'browser_navigate',
+      { url: `${fixture.url}${DOWNLOAD_PATH}` },
+      grants,
+      [guarded.kind === 'error' ? (guarded.stepToken ?? '') : '']
+    );
+
+    expect(approved).toMatchObject({ isError: false, kind: 'result' });
+
+    // 6. The spend's read answered, so the worker merged the record under its own mirror — where the approval is
+    // Spent — and stored it: the key reads back `spent`, which is the value a later worker reads for that session.
+    await expect
+      .poll(
+        async () => {
+          const needs = await needsOnPage(sidePanel);
+
+          return needs[session.sessionHandle]?.kind ?? 'absent';
+        },
+        { timeout: 30_000 }
+      )
+      .toBe('spent');
+
+    const needs = await needsOnPage(sidePanel);
+    const afterSpend = await rawRecordOnPage(sidePanel);
+    const items = await downloadItems(sidePanel);
+    const folder = await downloadFiles(downloadsPath);
+    const temp = await tempDownloadFiles(downloadsPath);
+
+    test
+      .info()
+      .annotations.push(
+        { description: JSON.stringify(armed), type: 'seeded-armed-record' },
+        { description: JSON.stringify(first.state), type: 'first-generation' },
+        { description: JSON.stringify(second.state), type: 'second-generation' },
+        { description: JSON.stringify(closed), type: 'worker-close' },
+        { description: JSON.stringify(wake), type: 'wake' },
+        { description: JSON.stringify({ hits: fixture.hits() }), type: 'guarded-navigate' },
+        { description: JSON.stringify(beforeSpend), type: 'record-before-spend' },
+        { description: JSON.stringify(approved), type: 'approved-download' },
+        { description: JSON.stringify(afterSpend), type: 'record-after-spend' },
+        { description: JSON.stringify(items), type: 'download-items' },
+        { description: JSON.stringify(folder), type: 'folder-after-spend' }
+      );
+
+    expect(needs[session.sessionHandle]?.kind).toBe('spent');
+    // The approval bought its one file, and nothing is left growing behind it.
+    expect(folder).toContain(DOWNLOAD_FILENAME);
+    expect(temp).toStrictEqual([]);
   } finally {
     await launch.close();
     await hub.close();

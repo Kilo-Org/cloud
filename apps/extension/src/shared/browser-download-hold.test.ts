@@ -184,6 +184,7 @@ const makeDownloads = (): FakeDownloads => {
 
 /** The `storage.session` fake: one value per key, plus a switch that holds its read open and one that refuses it. */
 interface FakeStorage {
+  readonly allowReads: () => void;
   readonly getItem: (key: string) => Promise<unknown>;
   readonly keys: string[];
   /** The session names the last written record holds: what a restart would restore. */
@@ -212,6 +213,9 @@ const makeStorage = ({
   }
 
   return {
+    allowReads: (): void => {
+      reading = false;
+    },
     getItem: async (key: string): Promise<unknown> => {
       keys.push(key);
 
@@ -1308,6 +1312,122 @@ describe('the recorded state', () => {
     expect(
       secondHold.drain('session-1').map(report => `${String(report.kept)}:${report.filename}`)
     ).toEqual(['false:q4.pdf']);
+  });
+
+  /**
+   * The behaviour this covers: a spend reads the record once and merges it under the worker's mirror, so the stored
+   * value carries the approval the file spent, even when this worker's startup read got no answer.
+   */
+  it('stores a spent approval when the spend’s own read answers, so it reads back as spent', async () => {
+    const attachment = 'https://app.example/reports/q4.pdf';
+    // Generation A stores an armed approval and the tab it belongs to.
+    const storage = makeStorage({});
+    const first = makeDownloads();
+    const firstHold = startChrome(first, storage);
+
+    firstHold.tab(agentTab());
+    firstHold.arm(armedNeed({ url: attachment }));
+    await vi.advanceTimersByTimeAsync(0);
+
+    // Generation W gets no answer on its boot read, so it restores nothing and stores nothing.
+    storage.refuseReads();
+    const middle = makeDownloads();
+    const middleHold = startChrome(middle, storage);
+
+    middleHold.tab(agentTab());
+    middleHold.arm(armedNeed({ url: attachment }));
+    await vi.advanceTimersByTimeAsync(0);
+
+    // The area answers again before a human's approval is spent: the spend's own read is the one that lands.
+    storage.allowReads();
+    middleHold.handle({ id: 1, referrer: page, url: attachment }, () => {
+      middle.order.push('suggest');
+    });
+    await vi.advanceTimersByTimeAsync(0);
+
+    // The next boot reads the spent approval, so the file that approval already bought is refused with a report.
+    const last = makeDownloads();
+    const lastHold = startChrome(last, storage);
+
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(lastHold.needOf('session-1')?.kind).toBe('spent');
+    expect(
+      lastHold.handle({ id: 2, referrer: page, url: attachment }, () => {
+        last.order.push('suggest');
+      })
+    ).toBe(true);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(last.order).toContain('cancel');
+    expect(
+      lastHold.drain('session-1').map(report => `${String(report.kept)}:${report.filename}`)
+    ).toEqual(['false:q4.pdf']);
+  });
+
+  it('does not re-register a tab forgotten before the boot read when the spend’s own read lands', async () => {
+    const attachment = 'https://app.example/reports/q4.pdf';
+    const record = {
+      'session-1': {
+        need: armedNeed({ tabId: 9, url: attachment }),
+        owed: [],
+        tabs: [{ page, session: 'session-1', step, tabId: 9 }],
+      },
+    };
+    const storage = makeStorage({ initial: record });
+    storage.refuseReads();
+    const downloads = makeDownloads();
+    const hold = startChrome(downloads, storage);
+
+    // This worker forgets the tab before its boot read answers.
+    hold.tab({ detach: 9 });
+    await vi.advanceTimersByTimeAsync(0);
+
+    // The spend's own read lands afterwards, and the record still lists tab 9.
+    storage.allowReads();
+    hold.tab(agentTab());
+    hold.arm(armedNeed({ url: attachment }));
+    hold.handle({ id: 1, referrer: page, url: attachment }, () => {
+      downloads.order.push('suggest');
+    });
+    await vi.advanceTimersByTimeAsync(0);
+
+    // The spent approval is stored, and the forgotten tab is not put back by that merge.
+    const written = z
+      .object({})
+      .catchall(z.object({ tabs: z.array(z.object({ tabId: z.number() })) }))
+      .parse(storage.store());
+    const stored = z
+      .object({ tabs: z.array(z.object({ tabId: z.number() })) })
+      .parse(written['session-1']);
+
+    expect(stored.tabs.map(tab => tab.tabId)).not.toContain(9);
+  });
+
+  it('keeps the stored record untouched when the spend’s own read also fails', async () => {
+    const attachment = 'https://app.example/reports/q4.pdf';
+    const record = {
+      'session-1': {
+        need: armedNeed({ url: attachment }),
+        owed: [],
+        tabs: [{ page, session: 'session-1', step, tabId: 9 }],
+      },
+    };
+    const storage = makeStorage({ initial: record });
+    storage.refuseReads();
+    const downloads = makeDownloads();
+    const hold = startChrome(downloads, storage);
+
+    hold.tab(agentTab());
+    hold.arm(armedNeed({ url: attachment }));
+    await vi.advanceTimersByTimeAsync(0);
+    hold.handle({ id: 1, referrer: page, url: attachment }, () => {
+      downloads.order.push('suggest');
+    });
+    await vi.advanceTimersByTimeAsync(0);
+
+    // A retry that also fails still stores nothing: a write needs a record on this path too.
+    expect(storage.store()).toStrictEqual(record);
   });
 
   /**

@@ -197,3 +197,30 @@ describe('Hindi trusted-host and voice copy', () => {
     );
   });
 });
+
+describe('Hindi PR-review retry, submit and organization copy', () => {
+  it('labels the shared retry button with one load verb in both pagination states', () => {
+    expect(i18n.t('prReview.fileNavigator.retryLoadingMoreFiles')).toBe('और फ़ाइलें फिर से लोड करें');
+    expect(i18n.t('prReview.fileNavigator.retryLoadingAllFiles')).toBe('सभी फ़ाइलें फिर से लोड करें');
+  });
+
+  it('states the deleted-organization purpose without repeating the instruction verb', () => {
+    expect(i18n.t('prReview.inbox.organizationUnavailableDescription')).toBe(
+      'यह संगठन हटा दिया गया है, इसलिए इसके समीक्षा अनुरोध लोड नहीं हो सकते। समीक्षा करते रहने के लिए अपने व्यक्तिगत खाते में जारी रखें।'
+    );
+  });
+
+  it('uses the family submit verb for the provider-substituted failure', () => {
+    const message = i18n.t('prReview.mutationError.reviewNotSubmittedTerm', { term: 'पुल रिक्वेस्ट' });
+    expect(message).toBe(
+      'यह समीक्षा जैसी है वैसी भेजी नहीं जा सकती। हो सकता है पुल रिक्वेस्ट बदल गई हो, या आप अपनी खुद की पुल रिक्वेस्ट की समीक्षा नहीं कर सकते।'
+    );
+    expect(message).not.toMatch(/सबमिट/);
+  });
+
+  it('names the review submission in the load-failure title and stays a label', () => {
+    const title = i18n.t('prReview.submit.loadFailedTitle');
+    expect(title).toBe('समीक्षा सबमिशन लोड नहीं हो सका');
+    expect(title).not.toMatch(/[.।]$/);
+  });
+});

@@ -323,6 +323,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Discord အဖွဲ့ဝင်ဖြစ်မှု",
+      "linkPrompt": "အဖွဲ့ဝင်ဖြစ်ကြောင်း အတည်ပြုရန် သင့် Discord အကောင့်ကို ချိတ်ဆက်ပါ",
+      "memberTitle": "Kilo Discord အဖွဲ့ဝင်",
+      "memberSubtitle": "{{date}} တွင် အတည်ပြုပြီး",
+      "notMemberTitle": "Discord အဖွဲ့ဝင် မဟုတ်ပါ",
+      "loadFailed": "Discord အဖွဲ့ဝင်အချက်အလက်ကို ဖွင့်၍ မရပါ။",
+      "verify": "အတည်ပြုမည်",
+      "reverify": "ပြန်လည်အတည်ပြုမည်",
+      "verifyFailed": "အဖွဲ့ဝင်ဖြစ်ကြောင်း အတည်ပြု၍ မရပါ။ ထပ်မံကြိုးစားပါ။"
+    },
     "providerTestAccount": "စမ်းသပ်အကောင့်",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

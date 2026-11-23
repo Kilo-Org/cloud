@@ -324,6 +324,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Discord അംഗത്വം",
+      "linkPrompt": "അംഗത്വം സ്ഥിരീകരിക്കാൻ നിങ്ങളുടെ Discord അക്കൗണ്ട് ലിങ്ക് ചെയ്യുക",
+      "memberTitle": "Kilo Discord അംഗം",
+      "memberSubtitle": "{{date}} സ്ഥിരീകരിച്ചു",
+      "notMemberTitle": "Discord അംഗമല്ല",
+      "loadFailed": "Discord അംഗത്വം ലോഡ് ചെയ്യാനായില്ല",
+      "verify": "സ്ഥിരീകരിക്കുക",
+      "reverify": "വീണ്ടും സ്ഥിരീകരിക്കുക",
+      "verifyFailed": "അംഗത്വം സ്ഥിരീകരിക്കാനായില്ല. വീണ്ടും ശ്രമിക്കുക."
+    },
     "providerTestAccount": "ടെസ്റ്റ് അക്കൗണ്ട്",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

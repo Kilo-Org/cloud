@@ -326,6 +326,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Членство в Discord",
+      "linkPrompt": "Привяжите аккаунт Discord, чтобы подтвердить членство",
+      "memberTitle": "Участник Kilo Discord",
+      "memberSubtitle": "Подтверждено {{date}}",
+      "notMemberTitle": "Не участник Discord",
+      "loadFailed": "Не удалось загрузить данные о членстве в Discord.",
+      "verify": "Проверить",
+      "reverify": "Проверить снова",
+      "verifyFailed": "Не удалось подтвердить членство. Попробуйте ещё раз."
+    },
     "providerTestAccount": "Тестовый аккаунт",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

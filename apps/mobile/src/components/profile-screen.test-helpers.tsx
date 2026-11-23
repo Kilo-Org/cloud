@@ -11,11 +11,14 @@ import { act, type ReactTestInstance } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 const providersQueryFn = vi.hoisted(() => vi.fn());
+const guildStatusQueryFn = vi.hoisted(() => vi.fn());
+const verifyDiscordMembershipFn = vi.hoisted(() => vi.fn());
 const organizationsQueryFn = vi.hoisted(() => vi.fn());
 const signOutFn = vi.hoisted(() => vi.fn());
 const routerPush = vi.hoisted(() => vi.fn());
 const keys = vi.hoisted(() => ({
   providers: ['user', 'getAuthProviders'],
+  guildStatus: ['user', 'getDiscordGuildStatus'],
   organizations: ['organizations', 'list'],
 }));
 const authState = vi.hoisted(() => ({ token: 'token-1' as string | null }));
@@ -99,6 +102,13 @@ vi.mock('@/lib/trpc', () => ({
     user: {
       getAuthProviders: {
         queryOptions: () => ({ queryKey: keys.providers, queryFn: providersQueryFn }),
+      },
+      getDiscordGuildStatus: {
+        queryOptions: () => ({ queryKey: keys.guildStatus, queryFn: guildStatusQueryFn }),
+        queryKey: () => keys.guildStatus,
+      },
+      verifyDiscordGuildMembership: {
+        mutationOptions: () => ({ mutationFn: verifyDiscordMembershipFn }),
       },
     },
     organizations: {
@@ -214,6 +224,7 @@ vi.mock('@/components/ui/icons', () => ({
   MessageSquare: 'MessageSquare',
   Plus: 'Plus',
   Plug: 'Plug',
+  Shield: 'Shield',
   ShieldCheck: 'ShieldCheck',
   SlidersHorizontal: 'SlidersHorizontal',
   Smartphone: 'Smartphone',

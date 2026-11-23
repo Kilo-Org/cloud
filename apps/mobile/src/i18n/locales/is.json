@@ -324,6 +324,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Discord aðild",
+      "linkPrompt": "Tengdu Discord-reikninginn þinn til að staðfesta aðild",
+      "memberTitle": "Meðlimur í Kilo Discord",
+      "memberSubtitle": "Staðfest {{date}}",
+      "notMemberTitle": "Ekki meðlimur í Discord",
+      "loadFailed": "Gat ekki hlaðið Discord-aðild",
+      "verify": "Staðfesta",
+      "reverify": "Staðfesta aftur",
+      "verifyFailed": "Gat ekki staðfest aðild. Reyndu aftur."
+    },
     "providerTestAccount": "Prófunarreikningur",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

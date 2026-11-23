@@ -324,6 +324,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Membresía de Discord",
+      "linkPrompt": "Vincula a túa conta de Discord para verificar a membresía",
+      "memberTitle": "Membro de Kilo Discord",
+      "memberSubtitle": "Verificado o {{date}}",
+      "notMemberTitle": "Non é membro de Discord",
+      "loadFailed": "Non se puido cargar a membresía de Discord",
+      "verify": "Verificar",
+      "reverify": "Verificar de novo",
+      "verifyFailed": "Non se puido verificar a membresía. Téntao de novo."
+    },
     "providerTestAccount": "Conta de proba",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

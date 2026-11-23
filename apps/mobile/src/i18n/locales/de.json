@@ -324,6 +324,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Discord-Mitgliedschaft",
+      "linkPrompt": "Verknüpfe deinen Discord-Account, um die Mitgliedschaft zu überprüfen",
+      "memberTitle": "Kilo-Discord-Mitglied",
+      "memberSubtitle": "Verifiziert am {{date}}",
+      "notMemberTitle": "Kein Discord-Mitglied",
+      "loadFailed": "Die Discord-Mitgliedschaft konnte nicht geladen werden.",
+      "verify": "Überprüfen",
+      "reverify": "Erneut überprüfen",
+      "verifyFailed": "Die Mitgliedschaft konnte nicht überprüft werden. Versuche es erneut."
+    },
     "providerTestAccount": "Testkonto",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

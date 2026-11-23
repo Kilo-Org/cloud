@@ -323,6 +323,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "សមាជិកភាព Discord",
+      "linkPrompt": "ភ្ជាប់គណនី Discord របស់អ្នក ដើម្បីផ្ទៀងផ្ទាត់សមាជិកភាព",
+      "memberTitle": "សមាជិក Kilo Discord",
+      "memberSubtitle": "បានផ្ទៀងផ្ទាត់ {{date}}",
+      "notMemberTitle": "មិនមែនជាសមាជិក Discord",
+      "loadFailed": "មិនអាចផ្ទុកសមាជិកភាព Discord បានទេ",
+      "verify": "ផ្ទៀងផ្ទាត់",
+      "reverify": "ផ្ទៀងផ្ទាត់ឡើងវិញ",
+      "verifyFailed": "មិនអាចផ្ទៀងផ្ទាត់សមាជិកភាពបានទេ។ សូមព្យាយាមម្តងទៀត។"
+    },
     "providerTestAccount": "គណនីសាកល្បង",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

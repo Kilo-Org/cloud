@@ -327,6 +327,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Ballraíocht Discord",
+      "linkPrompt": "Nasc do chuntas Discord chun ballraíocht a fhíorú",
+      "memberTitle": "Ball de Kilo Discord",
+      "memberSubtitle": "Fíoraithe {{date}}",
+      "notMemberTitle": "Ní ball de Discord",
+      "loadFailed": "Níorbh fhéidir ballraíocht Discord a lódáil.",
+      "verify": "Fíoraigh",
+      "reverify": "Athfhíoraigh",
+      "verifyFailed": "Níorbh fhéidir ballraíocht a fhíorú. Bain triail eile as."
+    },
     "providerTestAccount": "Cuntas tástála",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

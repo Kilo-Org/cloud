@@ -324,6 +324,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Discord உறுப்பினர் நிலை",
+      "linkPrompt": "உங்கள் Discord கணக்கை இணைத்து உறுப்பினர் நிலையைச் சரிபார்க்கவும்",
+      "memberTitle": "Kilo Discord உறுப்பினர்",
+      "memberSubtitle": "{{date}} அன்று சரிபார்க்கப்பட்டது",
+      "notMemberTitle": "Discord உறுப்பினர் அல்ல",
+      "loadFailed": "Discord உறுப்பினர் நிலையை ஏற்ற முடியவில்லை",
+      "verify": "சரிபார்",
+      "reverify": "மீண்டும் சரிபார்",
+      "verifyFailed": "உறுப்பினர் நிலையைச் சரிபார்க்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்."
+    },
     "providerTestAccount": "சோதனைக் கணக்கு",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

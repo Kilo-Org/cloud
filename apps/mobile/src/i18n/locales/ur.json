@@ -324,6 +324,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Discord رکنیت",
+      "linkPrompt": "ممبرشپ کی تصدیق کے لیے اپنا Discord اکاؤنٹ لنک کریں",
+      "memberTitle": "Kilo Discord ممبر",
+      "memberSubtitle": "{{date}} کو تصدیق شدہ",
+      "notMemberTitle": "Discord ممبر نہیں",
+      "loadFailed": "Discord ممبرشپ لوڈ نہیں ہو سکی",
+      "verify": "تصدیق کریں",
+      "reverify": "دوبارہ تصدیق کریں",
+      "verifyFailed": "ممبرشپ کی تصدیق نہیں ہو سکی۔ دوبارہ کوشش کریں۔"
+    },
     "providerTestAccount": "آزمائشی اکاؤنٹ",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

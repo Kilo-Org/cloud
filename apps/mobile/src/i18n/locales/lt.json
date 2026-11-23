@@ -326,6 +326,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Discord narystė",
+      "linkPrompt": "Susiekite savo Discord paskyrą, kad patvirtintumėte narystę",
+      "memberTitle": "Kilo Discord narys",
+      "memberSubtitle": "Patvirtinta {{date}}",
+      "notMemberTitle": "Ne Discord narys",
+      "loadFailed": "Nepavyko įkelti Discord narystės.",
+      "verify": "Patvirtinti",
+      "reverify": "Patvirtinti dar kartą",
+      "verifyFailed": "Nepavyko patvirtinti narystės. Bandykite dar kartą."
+    },
     "providerTestAccount": "Bandomoji paskyra",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

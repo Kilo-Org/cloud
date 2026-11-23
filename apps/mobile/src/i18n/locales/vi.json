@@ -324,6 +324,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Tư cách thành viên Discord",
+      "linkPrompt": "Liên kết tài khoản Discord của bạn để xác minh tư cách thành viên",
+      "memberTitle": "Thành viên Kilo Discord",
+      "memberSubtitle": "Đã xác minh {{date}}",
+      "notMemberTitle": "Không phải thành viên Discord",
+      "loadFailed": "Không thể tải tư cách thành viên Discord",
+      "verify": "Xác minh",
+      "reverify": "Xác minh lại",
+      "verifyFailed": "Không thể xác minh tư cách thành viên. Vui lòng thử lại."
+    },
     "providerTestAccount": "Tài khoản thử nghiệm",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

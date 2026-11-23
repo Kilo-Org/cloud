@@ -324,6 +324,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Discord ସଦସ୍ୟତା",
+      "linkPrompt": "ସଦସ୍ୟତା ଯାଞ୍ଚ କରିବା ପାଇଁ ଆପଣଙ୍କର Discord ଖାତା ଲିଙ୍କ କରନ୍ତୁ",
+      "memberTitle": "Kilo Discord ସଦସ୍ୟ",
+      "memberSubtitle": "ଯାଞ୍ଚିତ {{date}}",
+      "notMemberTitle": "Discord ସଦସ୍ୟ ନୁହନ୍ତି",
+      "loadFailed": "Discord ସଦସ୍ୟତା ଲୋଡ୍ କରିପାରିଲା ନାହିଁ।",
+      "verify": "ଯାଞ୍ଚ କରନ୍ତୁ",
+      "reverify": "ପୁନଃ ଯାଞ୍ଚ କରନ୍ତୁ",
+      "verifyFailed": "ସଦସ୍ୟତା ଯାଞ୍ଚ କରିପାରିଲା ନାହିଁ। ପୁନର୍ବାର ଚେଷ୍ଟା କରନ୍ତୁ।"
+    },
     "providerTestAccount": "ପରୀକ୍ଷଣ ଆକାଉଣ୍ଟ",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

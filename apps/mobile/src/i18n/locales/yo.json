@@ -323,6 +323,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Ìjẹ́ọmọ Discord",
+      "linkPrompt": "So àkọsílẹ̀ Discord rẹ pọ̀ láti ṣàyẹ̀wò ẹ̀tọ́ ẹgbẹ́",
+      "memberTitle": "Ọmọ ẹgbẹ́ Kilo Discord",
+      "memberSubtitle": "A ṣàyẹ̀wò ní {{date}}",
+      "notMemberTitle": "Kì í ṣe ọmọ ẹgbẹ́ Discord",
+      "loadFailed": "Kò lè gbé ẹ̀tọ́ ẹgbẹ́ Discord wá.",
+      "verify": "Ṣàyẹ̀wò",
+      "reverify": "Ṣàyẹ̀wò lẹ́ẹ̀kan sí",
+      "verifyFailed": "Kò lè ṣàyẹ̀wò ẹ̀tọ́ ẹgbẹ́. Gbìyànjú lẹ́ẹ̀kan sí."
+    },
     "providerTestAccount": "Àkọọ́lẹ̀ àdánwò",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

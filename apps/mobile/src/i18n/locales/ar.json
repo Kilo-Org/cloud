@@ -328,6 +328,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "عضوية Discord",
+      "linkPrompt": "اربط حسابك على Discord للتحقق من العضوية",
+      "memberTitle": "عضو في Kilo Discord",
+      "memberSubtitle": "تم التحقق في {{date}}",
+      "notMemberTitle": "لست عضوًا في Discord",
+      "loadFailed": "تعذّر تحميل عضوية Discord.",
+      "verify": "تحقق",
+      "reverify": "تحقق مجددًا",
+      "verifyFailed": "تعذّر التحقق من العضوية. حاول مرة أخرى."
+    },
     "providerTestAccount": "حساب تجريبي",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

@@ -324,6 +324,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Ubulungu be-Discord",
+      "linkPrompt": "Xhumanisa i-akhawunti yakho ye-Discord ukuze uqinisekise ubulungu",
+      "memberTitle": "Ilungu le-Kilo Discord",
+      "memberSubtitle": "Kuqinisekiswe {{date}}",
+      "notMemberTitle": "Akuyena ilungu le-Discord",
+      "loadFailed": "Akukwazekanga ukulayisha ubulungu be-Discord.",
+      "verify": "Qinisekisa",
+      "reverify": "Qinisekisa futhi",
+      "verifyFailed": "Akukwazekanga ukuqinisekisa ubulungu. Zama futhi."
+    },
     "providerTestAccount": "I-akhawunti yokuhlola",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

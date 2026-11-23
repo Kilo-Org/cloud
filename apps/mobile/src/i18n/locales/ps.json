@@ -324,6 +324,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "د Discord غړیتوب",
+      "linkPrompt": "خپل Discord حساب وصل کړئ ترڅو غړیتوب تایید کړئ",
+      "memberTitle": "د Kilo Discord غړی",
+      "memberSubtitle": "تایید شوی {{date}}",
+      "notMemberTitle": "د Discord غړی نه دی",
+      "loadFailed": "د Discord غړیتوب بارول ممکن نه وو.",
+      "verify": "تایید",
+      "reverify": "بیا تایید",
+      "verifyFailed": "غړیتوب تایید نه شو. بیا هڅه وکړئ."
+    },
     "providerTestAccount": "د ازموینې حساب",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

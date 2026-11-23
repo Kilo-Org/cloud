@@ -88,6 +88,8 @@ type RowSkeletonProps = {
    * other caller keeps main's geometry.
    */
   rowFrame?: boolean;
+  /** Test handle for native E2E scripts, on the placeholder's own row view. */
+  testID?: string;
   className?: string;
 };
 
@@ -113,6 +115,7 @@ export function RowSkeleton({
   variant = 'row',
   last = false,
   rowFrame = false,
+  testID,
   className,
 }: Readonly<RowSkeletonProps>) {
   const lineCount = lines ?? (subtitle ? 2 : 1);
@@ -121,6 +124,7 @@ export function RowSkeleton({
   if (variant === 'session') {
     return (
       <View
+        testID={testID}
         className={cn(
           'flex-row items-center gap-3 px-4 py-3',
           !last && 'border-b-[0.5px] border-hair-soft',
@@ -140,7 +144,7 @@ export function RowSkeleton({
 
   if (stack) {
     return (
-      <View className={cn(ROW_FRAME_STACK_CLASS, className)}>
+      <View testID={testID} className={cn(ROW_FRAME_STACK_CLASS, className)}>
         <View className="w-full flex-row items-center justify-between gap-3">
           {tile ? (
             <Skeleton className={cn(ROW_TILE_CLASS, 'bg-muted-soft')} />
@@ -162,7 +166,7 @@ export function RowSkeleton({
   }
 
   return (
-    <View className={cn(ROW_FRAME_CLASS, className)}>
+    <View testID={testID} className={cn(ROW_FRAME_CLASS, className)}>
       {tile ? <Skeleton className={cn(ROW_TILE_CLASS, 'bg-muted-soft')} /> : null}
       <View className={cn('min-w-0 flex-1', lineGapClass)}>
         <Skeleton className={TITLE_BAR_CLASS} />

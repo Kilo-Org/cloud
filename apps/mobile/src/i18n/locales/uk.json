@@ -326,6 +326,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Членство в Discord",
+      "linkPrompt": "Прив'яжіть обліковий запис Discord, щоб підтвердити участь",
+      "memberTitle": "Учасник Kilo Discord",
+      "memberSubtitle": "Підтверджено {{date}}",
+      "notMemberTitle": "Не учасник Discord",
+      "loadFailed": "Не вдалося завантажити дані про участь у Discord",
+      "verify": "Перевірити",
+      "reverify": "Перевірити ще раз",
+      "verifyFailed": "Не вдалося підтвердити участь. Спробуйте ще раз."
+    },
     "providerTestAccount": "Тестовий обліковий запис",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

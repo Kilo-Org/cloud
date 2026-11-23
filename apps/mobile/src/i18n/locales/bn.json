@@ -324,6 +324,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Discord সদস্যপদ",
+      "linkPrompt": "সদস্যপদ যাচাই করতে আপনার Discord অ্যাকাউন্ট লিঙ্ক করুন",
+      "memberTitle": "Kilo Discord সদস্য",
+      "memberSubtitle": "যাচাই করা হয়েছে {{date}}",
+      "notMemberTitle": "Discord সদস্য নন",
+      "loadFailed": "Discord সদস্যপদ লোড করা যায়নি",
+      "verify": "যাচাই করুন",
+      "reverify": "আবার যাচাই করুন",
+      "verifyFailed": "সদস্যপদ যাচাই করা যায়নি। আবার চেষ্টা করুন।"
+    },
     "providerTestAccount": "পরীক্ষার অ্যাকাউন্ট",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

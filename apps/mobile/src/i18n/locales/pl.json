@@ -326,6 +326,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Członkostwo w Discordzie",
+      "linkPrompt": "Powiąż swoje konto Discord, aby zweryfikować członkostwo",
+      "memberTitle": "Członek Kilo Discord",
+      "memberSubtitle": "Zweryfikowano {{date}}",
+      "notMemberTitle": "Nie jest członkiem Discord",
+      "loadFailed": "Nie udało się wczytać członkostwa Discord",
+      "verify": "Zweryfikuj",
+      "reverify": "Zweryfikuj ponownie",
+      "verifyFailed": "Nie udało się zweryfikować członkostwa. Spróbuj ponownie."
+    },
     "providerTestAccount": "Konto testowe",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

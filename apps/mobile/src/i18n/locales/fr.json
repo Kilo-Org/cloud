@@ -325,6 +325,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Adhésion à Discord",
+      "linkPrompt": "Liez votre compte Discord pour vérifier votre appartenance",
+      "memberTitle": "Membre de Kilo Discord",
+      "memberSubtitle": "Vérifié le {{date}}",
+      "notMemberTitle": "Pas membre de Discord",
+      "loadFailed": "Impossible de charger l'appartenance Discord",
+      "verify": "Vérifier",
+      "reverify": "Revérifier",
+      "verifyFailed": "Impossible de vérifier l'appartenance. Réessayez."
+    },
     "providerTestAccount": "Compte de test",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

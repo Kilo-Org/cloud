@@ -323,6 +323,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Onye otu Discord",
+      "linkPrompt": "Jikọọ akaụntụ Discord gị iji nyochaa ịbụ onye otu",
+      "memberTitle": "Onye otu Kilo Discord",
+      "memberSubtitle": "Enyochara na {{date}}",
+      "notMemberTitle": "Ọ bụghị onye otu Discord",
+      "loadFailed": "Enweghị ike ibudata ịbụ onye otu Discord",
+      "verify": "Nyochaa",
+      "reverify": "Nyochaa ọzọ",
+      "verifyFailed": "Enweghị ike ịnyochaa ịbụ onye otu. Nwaa ọzọ."
+    },
     "providerTestAccount": "Akaụntụ nnwale",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

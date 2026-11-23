@@ -324,6 +324,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Discord мүшелігі",
+      "linkPrompt": "Мүшелікті растау үшін Discord аккаунтыңызды байланыстырыңыз",
+      "memberTitle": "Kilo Discord мүшесі",
+      "memberSubtitle": "{{date}} расталды",
+      "notMemberTitle": "Discord мүшесі емес",
+      "loadFailed": "Discord мүшелігін жүктеу мүмкін болмады.",
+      "verify": "Растау",
+      "reverify": "Қайта растау",
+      "verifyFailed": "Мүшелікті растау мүмкін болмады. Қайталап көріңіз."
+    },
     "providerTestAccount": "Сынақ тіркелгісі",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

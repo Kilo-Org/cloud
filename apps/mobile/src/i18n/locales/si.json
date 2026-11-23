@@ -324,6 +324,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Discord සාමාජිකත්වය",
+      "linkPrompt": "සාමාජිකත්වය තහවුරු කිරීමට ඔබේ Discord ගිණුම සම්බන්ධ කරන්න",
+      "memberTitle": "Kilo Discord සාමාජික",
+      "memberSubtitle": "{{date}} තහවුරු කරන ලදී",
+      "notMemberTitle": "Discord සාමාජිකයෙක් නොවේ",
+      "loadFailed": "Discord සාමාජිකත්වය පූරණය කළ නොහැකි විය",
+      "verify": "තහවුරු කරන්න",
+      "reverify": "නැවත තහවුරු කරන්න",
+      "verifyFailed": "සාමාජිකත්වය තහවුරු කළ නොහැකි විය. නැවත උත්සාහ කරන්න."
+    },
     "providerTestAccount": "පරීක්ෂණ ගිණුම",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

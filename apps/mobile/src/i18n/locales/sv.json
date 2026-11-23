@@ -324,6 +324,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Discord-medlemskap",
+      "linkPrompt": "Länka ditt Discord-konto för att verifiera medlemskap",
+      "memberTitle": "Kilo Discord-medlem",
+      "memberSubtitle": "Verifierad {{date}}",
+      "notMemberTitle": "Inte Discord-medlem",
+      "loadFailed": "Det gick inte att läsa in Discord-medlemskapet",
+      "verify": "Verifiera",
+      "reverify": "Verifiera igen",
+      "verifyFailed": "Det gick inte att verifiera medlemskapet. Försök igen."
+    },
     "providerTestAccount": "Testkonto",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

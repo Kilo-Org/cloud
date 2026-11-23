@@ -324,6 +324,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Discord kidetza",
+      "linkPrompt": "Lotu zure Discord kontua kidetza egiaztatzeko",
+      "memberTitle": "Kilo Discordeko kidea",
+      "memberSubtitle": "Egiaztatuta {{date}}",
+      "notMemberTitle": "Ez da Discordeko kidea",
+      "loadFailed": "Ezin izan da Discord kidetza kargatu.",
+      "verify": "Egiaztatu",
+      "reverify": "Berregiaztatu",
+      "verifyFailed": "Ezin izan da kidetza egiaztatu. Saiatu berriro."
+    },
     "providerTestAccount": "Probako kontua",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

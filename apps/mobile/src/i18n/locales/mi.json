@@ -324,6 +324,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Mematanga Discord",
+      "linkPrompt": "Honoa tō pūkete Discord ki te manatoko i tō mematanga",
+      "memberTitle": "Mema o Kilo Discord",
+      "memberSubtitle": "Kua manatoko i te {{date}}",
+      "notMemberTitle": "Ehara i te mema o Discord",
+      "loadFailed": "Kāore i taea te uta i te mematanga o Discord.",
+      "verify": "Manatoko",
+      "reverify": "Manatoko anō",
+      "verifyFailed": "Kāore i taea te manatoko i te mematanga. Whakamātau anō."
+    },
     "providerTestAccount": "Pūkete whakamātau",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

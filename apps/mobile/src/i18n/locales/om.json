@@ -324,6 +324,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Miseensummaa Discord",
+      "linkPrompt": "Miseensummaa mirkaneessuuf akkaawuntii Discord kee walitti hidhi",
+      "memberTitle": "Miseensa Kilo Discord",
+      "memberSubtitle": "Mirkanaa'e {{date}}",
+      "notMemberTitle": "Miseensa Discord miti",
+      "loadFailed": "Miseensummaa Discord fe'uu hin dandeenye.",
+      "verify": "Mirkaneessi",
+      "reverify": "Irra deebi'ii mirkaneessi",
+      "verifyFailed": "Miseensummaa mirkaneessuu hin dandeenye. Irra deebi'ii yaali."
+    },
     "providerTestAccount": "Herrega yaalii",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

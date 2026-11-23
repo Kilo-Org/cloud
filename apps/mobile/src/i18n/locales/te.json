@@ -324,6 +324,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Discord సభ్యత్వం",
+      "linkPrompt": "సభ్యత్వాన్ని ధృవీకరించడానికి మీ Discord ఖాతాను లింక్ చేయండి",
+      "memberTitle": "Kilo Discord సభ్యుడు",
+      "memberSubtitle": "{{date}}న ధృవీకరించబడింది",
+      "notMemberTitle": "Discord సభ్యుడు కాదు",
+      "loadFailed": "Discord సభ్యత్వాన్ని లోడ్ చేయలేకపోయాం",
+      "verify": "ధృవీకరించండి",
+      "reverify": "మళ్లీ ధృవీకరించండి",
+      "verifyFailed": "సభ్యత్వాన్ని ధృవీకరించలేకపోయాం. మళ్లీ ప్రయత్నించండి."
+    },
     "providerTestAccount": "పరీక్ష ఖాతా",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

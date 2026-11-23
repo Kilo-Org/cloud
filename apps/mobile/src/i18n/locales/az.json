@@ -324,6 +324,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Discord üzvlüyü",
+      "linkPrompt": "Üzvlüyü təsdiqləmək üçün Discord hesabınızı qoşun",
+      "memberTitle": "Kilo Discord üzvü",
+      "memberSubtitle": "{{date}} tarixində təsdiqlənib",
+      "notMemberTitle": "Discord üzvü deyil",
+      "loadFailed": "Discord üzvlüyünü yükləmək mümkün olmadı.",
+      "verify": "Təsdiqlə",
+      "reverify": "Yenidən təsdiqlə",
+      "verifyFailed": "Üzvlüyü təsdiqləmək mümkün olmadı. Yenidən cəhd edin."
+    },
     "providerTestAccount": "Sınaq hesabı",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

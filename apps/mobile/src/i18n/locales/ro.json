@@ -325,6 +325,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Apartenență Discord",
+      "linkPrompt": "Conectează-ți contul Discord pentru a verifica apartenența",
+      "memberTitle": "Membru Kilo Discord",
+      "memberSubtitle": "Verificat {{date}}",
+      "notMemberTitle": "Nu ești membru Discord",
+      "loadFailed": "Nu s-a putut încărca apartenența Discord",
+      "verify": "Verifică",
+      "reverify": "Reverifică",
+      "verifyFailed": "Nu s-a putut verifica apartenența. Încearcă din nou."
+    },
     "providerTestAccount": "Cont de test",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

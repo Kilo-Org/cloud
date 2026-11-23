@@ -324,6 +324,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Discord सदस्यता",
+      "linkPrompt": "सदस्यता सत्यापित करने के लिए अपना Discord खाता लिंक करें",
+      "memberTitle": "Kilo Discord सदस्य",
+      "memberSubtitle": "{{date}} को सत्यापित",
+      "notMemberTitle": "Discord सदस्य नहीं",
+      "loadFailed": "Discord सदस्यता लोड नहीं हो सकी",
+      "verify": "सत्यापित करें",
+      "reverify": "फिर से सत्यापित करें",
+      "verifyFailed": "सदस्यता सत्यापित नहीं हो सकी। फिर से प्रयास करें।"
+    },
     "providerTestAccount": "परीक्षण खाता",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

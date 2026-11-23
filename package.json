@@ -48,6 +48,7 @@
     "dev:mock-github": "tsx dev/mock-github/server.ts",
     "dev:mock-anthropic": "tsx dev/mock-anthropic/server.ts",
     "dev:mock-snowflake": "tsx dev/mock-snowflake/server.ts",
+    "dev:mock-discord": "tsx dev/mock-discord/server.ts",
     "dev:byok-kms": "tsx dev/byok-kms/server.ts",
     "dev:mobile:android": "tsx dev/local/mobile-android.ts",
     "dev:mobile:ios": "tsx dev/local/mobile-ios-build.ts",

@@ -324,6 +324,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Membancin Discord",
+      "linkPrompt": "Haɗa asusun Discord ɗinka don tabbatar da zama memba",
+      "memberTitle": "Memban Kilo Discord",
+      "memberSubtitle": "An tabbatar {{date}}",
+      "notMemberTitle": "Ba memban Discord ba",
+      "loadFailed": "An kasa loda membancin Discord",
+      "verify": "Tabbatar",
+      "reverify": "Sake tabbatar",
+      "verifyFailed": "An kasa tabbatar da zama memba. Sake ƙoƙari."
+    },
     "providerTestAccount": "Asusun gwaji",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

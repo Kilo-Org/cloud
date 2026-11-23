@@ -324,6 +324,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Discord-jäsenyys",
+      "linkPrompt": "Yhdistä Discord-tilisi jäsenyyden vahvistamiseksi",
+      "memberTitle": "Kilo Discord -jäsen",
+      "memberSubtitle": "Vahvistettu {{date}}",
+      "notMemberTitle": "Ei Discord-jäsen",
+      "loadFailed": "Discord-jäsenyyden lataaminen epäonnistui.",
+      "verify": "Vahvista",
+      "reverify": "Vahvista uudelleen",
+      "verifyFailed": "Jäsenyyden vahvistaminen epäonnistui. Yritä uudelleen."
+    },
     "providerTestAccount": "Testitili",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

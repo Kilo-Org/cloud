@@ -324,6 +324,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Discord አባልነት",
+      "linkPrompt": "አባልነትዎን ለማረጋገጥ የDiscord መለያዎን ያገናኙ",
+      "memberTitle": "የKilo Discord አባል",
+      "memberSubtitle": "የተረጋገጠበት {{date}}",
+      "notMemberTitle": "የDiscord አባል አይደለም",
+      "loadFailed": "የDiscord አባልነትን መጫን አልተቻለም።",
+      "verify": "ያረጋግጡ",
+      "reverify": "እንደገና ያረጋግጡ",
+      "verifyFailed": "አባልነትን ማረጋገጥ አልተቻለም። እንደገና ይሞክሩ።"
+    },
     "providerTestAccount": "የሙከራ መለያ",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

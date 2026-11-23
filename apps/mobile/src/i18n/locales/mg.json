@@ -324,6 +324,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Maha-mpikambana ao amin'ny Discord",
+      "linkPrompt": "Ampifanaraho ny kaontinao Discord mba hanamarina ny maha-mpikambana",
+      "memberTitle": "Mpikambana ao amin'ny Kilo Discord",
+      "memberSubtitle": "Voamarina {{date}}",
+      "notMemberTitle": "Tsy mpikambana ao amin'ny Discord",
+      "loadFailed": "Tsy afaka nampiditra ny maha-mpikambana ao amin'ny Discord.",
+      "verify": "Hamarinio",
+      "reverify": "Hamarinio indray",
+      "verifyFailed": "Tsy afaka nanamarina ny maha-mpikambana. Andramo indray."
+    },
     "providerTestAccount": "Kaonty fitsapana",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

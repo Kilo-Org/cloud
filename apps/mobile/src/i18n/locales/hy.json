@@ -324,6 +324,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Discord-ի անդամակցություն",
+      "linkPrompt": "Միացրեք ձեր Discord հաշիվը՝ անդամակցությունը ստուգելու համար",
+      "memberTitle": "Kilo Discord-ի անդամ",
+      "memberSubtitle": "Հաստատված է {{date}}",
+      "notMemberTitle": "Դուք Discord-ի անդամ չեք",
+      "loadFailed": "Չհաջողվեց բեռնել Discord-ի անդամակցությունը",
+      "verify": "Ստուգել",
+      "reverify": "Կրկին ստուգել",
+      "verifyFailed": "Չհաջողվեց ստուգել անդամակցությունը։ Փորձեք կրկին։"
+    },
     "providerTestAccount": "Թեստային հաշիվ",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

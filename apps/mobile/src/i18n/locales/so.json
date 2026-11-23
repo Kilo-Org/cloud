@@ -324,6 +324,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Xubinnimada Discord",
+      "linkPrompt": "Ku xidh akoonkaaga Discord si aad u xaqiijiso xubinimada",
+      "memberTitle": "Xubin Kilo Discord",
+      "memberSubtitle": "La xaqiijiyay {{date}}",
+      "notMemberTitle": "Ma aha xubin Discord",
+      "loadFailed": "Lama soo dejin karin xubinimada Discord",
+      "verify": "Xaqiiji",
+      "reverify": "Dib u xaqiiji",
+      "verifyFailed": "Lama xaqiijin karin xubinimada. Isku day mar kale."
+    },
     "providerTestAccount": "Akoon tijaabo ah",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

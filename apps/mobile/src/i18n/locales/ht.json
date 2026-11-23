@@ -324,6 +324,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Manm Discord",
+      "linkPrompt": "Konekte kont Discord ou pou verifye manm ou",
+      "memberTitle": "Manm Kilo Discord",
+      "memberSubtitle": "Verifye {{date}}",
+      "notMemberTitle": "Ou pa yon manm Discord",
+      "loadFailed": "Nou pa t ka chaje manm Discord la.",
+      "verify": "Verifye",
+      "reverify": "Verifye ankò",
+      "verifyFailed": "Nou pa t ka verifye manm ou. Eseye ankò."
+    },
     "providerTestAccount": "Kont tès",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

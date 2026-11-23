@@ -326,6 +326,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Členstvo v Discorde",
+      "linkPrompt": "Prepojte svoj účet Discord na overenie členstva",
+      "memberTitle": "Člen Kilo Discord",
+      "memberSubtitle": "Overené {{date}}",
+      "notMemberTitle": "Nie je členom Discord",
+      "loadFailed": "Nepodarilo sa načítať členstvo v Discord",
+      "verify": "Overiť",
+      "reverify": "Znova overiť",
+      "verifyFailed": "Členstvo sa nepodarilo overiť. Skúste to znova."
+    },
     "providerTestAccount": "Testovací účet",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

@@ -324,6 +324,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Ιδιότητα μέλους Discord",
+      "linkPrompt": "Συνδέστε τον λογαριασμό σας στο Discord για να επαληθεύσετε την ιδιότητα μέλους",
+      "memberTitle": "Μέλος του Kilo Discord",
+      "memberSubtitle": "Επαληθεύτηκε {{date}}",
+      "notMemberTitle": "Δεν είστε μέλος του Discord",
+      "loadFailed": "Δεν ήταν δυνατή η φόρτωση της ιδιότητας μέλους στο Discord.",
+      "verify": "Επαλήθευση",
+      "reverify": "Επανεπαλήθευση",
+      "verifyFailed": "Δεν ήταν δυνατή η επαλήθευση της ιδιότητας μέλους. Δοκιμάστε ξανά."
+    },
     "providerTestAccount": "Δοκιμαστικός λογαριασμός",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

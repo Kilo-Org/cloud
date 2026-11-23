@@ -324,6 +324,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Discord ಸದಸ್ಯತ್ವ",
+      "linkPrompt": "ಸದಸ್ಯತ್ವವನ್ನು ಪರಿಶೀಲಿಸಲು ನಿಮ್ಮ Discord ಖಾತೆಯನ್ನು ಲಿಂಕ್ ಮಾಡಿ",
+      "memberTitle": "Kilo Discord ಸದಸ್ಯ",
+      "memberSubtitle": "{{date}} ರಂದು ಪರಿಶೀಲಿಸಲಾಗಿದೆ",
+      "notMemberTitle": "Discord ಸದಸ್ಯರಲ್ಲ",
+      "loadFailed": "Discord ಸದಸ್ಯತ್ವವನ್ನು ಲೋಡ್ ಮಾಡಲಾಗಲಿಲ್ಲ",
+      "verify": "ಪರಿಶೀಲಿಸಿ",
+      "reverify": "ಮತ್ತೆ ಪರಿಶೀಲಿಸಿ",
+      "verifyFailed": "ಸದಸ್ಯತ್ವವನ್ನು ಪರಿಶೀಲಿಸಲಾಗಲಿಲ್ಲ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
+    },
     "providerTestAccount": "ಪರೀಕ್ಷಾ ಖಾತೆ",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

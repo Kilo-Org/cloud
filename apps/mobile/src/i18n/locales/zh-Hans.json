@@ -323,6 +323,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Discord 成员身份",
+      "linkPrompt": "关联你的 Discord 账号以验证成员身份",
+      "memberTitle": "Kilo Discord 成员",
+      "memberSubtitle": "已验证 {{date}}",
+      "notMemberTitle": "非 Discord 成员",
+      "loadFailed": "无法加载 Discord 成员身份",
+      "verify": "验证",
+      "reverify": "重新验证",
+      "verifyFailed": "无法验证成员身份，请重试。"
+    },
     "providerTestAccount": "测试账户",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

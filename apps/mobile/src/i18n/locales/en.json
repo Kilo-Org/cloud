@@ -426,6 +426,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Kilo Discord",
+      "linkPrompt": "Link your Discord account to verify membership",
+      "memberTitle": "Kilo Discord member",
+      "memberSubtitle": "Verified {{date}}",
+      "notMemberTitle": "Not a Discord member",
+      "loadFailed": "Couldn't load Discord membership",
+      "verify": "Verify",
+      "reverify": "Re-verify",
+      "verifyFailed": "Couldn't verify membership. Try again."
+    },
     "providerTestAccount": "Test Account",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

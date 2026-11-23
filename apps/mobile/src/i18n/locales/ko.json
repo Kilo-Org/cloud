@@ -323,6 +323,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Discord 멤버십",
+      "linkPrompt": "멤버십을 확인하려면 Discord 계정을 연결하세요",
+      "memberTitle": "Kilo Discord 멤버",
+      "memberSubtitle": "{{date}}에 확인됨",
+      "notMemberTitle": "Discord 멤버 아님",
+      "loadFailed": "Discord 멤버십을 불러오지 못했습니다.",
+      "verify": "확인",
+      "reverify": "다시 확인",
+      "verifyFailed": "멤버십을 확인하지 못했습니다. 다시 시도해 주세요."
+    },
     "providerTestAccount": "테스트 계정",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

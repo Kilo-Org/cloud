@@ -324,6 +324,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Discord સભ્યપદ",
+      "linkPrompt": "સભ્યપદ ચકાસવા માટે તમારું Discord એકાઉન્ટ લિંક કરો",
+      "memberTitle": "Kilo Discord સભ્ય",
+      "memberSubtitle": "{{date}} ના રોજ ચકાસાયેલ",
+      "notMemberTitle": "Discord સભ્ય નથી",
+      "loadFailed": "Discord સભ્યપદ લોડ કરી શકાયું નહીં.",
+      "verify": "ચકાસો",
+      "reverify": "ફરી ચકાસો",
+      "verifyFailed": "સભ્યપદ ચકાસી શકાયું નહીં. ફરી પ્રયાસ કરો."
+    },
     "providerTestAccount": "પરીક્ષણ એકાઉન્ટ",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

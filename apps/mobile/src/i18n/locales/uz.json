@@ -324,6 +324,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Discord a'zoligi",
+      "linkPrompt": "A'zolikni tasdiqlash uchun Discord hisobingizni bog'lang",
+      "memberTitle": "Kilo Discord a'zosi",
+      "memberSubtitle": "{{date}} da tasdiqlangan",
+      "notMemberTitle": "Discord a'zosi emas",
+      "loadFailed": "Discord a'zoligini yuklab bo'lmadi",
+      "verify": "Tasdiqlash",
+      "reverify": "Qayta tasdiqlash",
+      "verifyFailed": "A'zolikni tasdiqlab bo'lmadi. Qayta urinib ko'ring."
+    },
     "providerTestAccount": "Sinov hisobi",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

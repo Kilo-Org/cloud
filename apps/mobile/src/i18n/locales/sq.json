@@ -324,6 +324,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Anëtarësimi në Discord",
+      "linkPrompt": "Lidh llogarinë tënde të Discord për të verifikuar anëtarësimin",
+      "memberTitle": "Anëtar i Kilo Discord",
+      "memberSubtitle": "Verifikuar më {{date}}",
+      "notMemberTitle": "Jo anëtar i Discord",
+      "loadFailed": "Nuk u ngarkua dot anëtarësimi në Discord.",
+      "verify": "Verifiko",
+      "reverify": "Riverifiko",
+      "verifyFailed": "Nuk u verifikua dot anëtarësimi. Provo përsëri."
+    },
     "providerTestAccount": "Llogari testimi",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

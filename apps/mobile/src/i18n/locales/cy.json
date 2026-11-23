@@ -328,6 +328,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Aelodaeth Discord",
+      "linkPrompt": "Cysylltwch eich cyfrif Discord i ddilysu aelodaeth",
+      "memberTitle": "Aelod o Kilo Discord",
+      "memberSubtitle": "Wedi'i ddilysu {{date}}",
+      "notMemberTitle": "Nid aelod o Discord",
+      "loadFailed": "Methu llwytho aelodaeth Discord",
+      "verify": "Dilysu",
+      "reverify": "Ail-ddilysu",
+      "verifyFailed": "Methu dilysu aelodaeth. Rhowch gynnig arall arni."
+    },
     "providerTestAccount": "Cyfrif prawf",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

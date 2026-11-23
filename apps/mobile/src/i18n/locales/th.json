@@ -323,6 +323,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "สมาชิกภาพ Discord",
+      "linkPrompt": "เชื่อมต่อบัญชี Discord ของคุณเพื่อยืนยันการเป็นสมาชิก",
+      "memberTitle": "สมาชิก Kilo Discord",
+      "memberSubtitle": "ยืนยันเมื่อ {{date}}",
+      "notMemberTitle": "ไม่ใช่สมาชิก Discord",
+      "loadFailed": "ไม่สามารถโหลดสถานะสมาชิก Discord",
+      "verify": "ยืนยัน",
+      "reverify": "ยืนยันอีกครั้ง",
+      "verifyFailed": "ไม่สามารถยืนยันการเป็นสมาชิกได้ โปรดลองอีกครั้ง"
+    },
     "providerTestAccount": "บัญชีทดสอบ",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

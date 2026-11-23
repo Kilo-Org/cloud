@@ -324,6 +324,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Членство во Discord",
+      "linkPrompt": "Поврзи ја својата Discord сметка за да го потврдиш членството",
+      "memberTitle": "Член на Kilo Discord",
+      "memberSubtitle": "Потврдено на {{date}}",
+      "notMemberTitle": "Не е член на Discord",
+      "loadFailed": "Не можеше да се вчита членството во Discord.",
+      "verify": "Потврди",
+      "reverify": "Потврди повторно",
+      "verifyFailed": "Не можеше да се потврди членството. Обиди се повторно."
+    },
     "providerTestAccount": "Тестна сметка",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

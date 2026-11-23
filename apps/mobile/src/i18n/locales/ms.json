@@ -323,6 +323,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Keahlian Discord",
+      "linkPrompt": "Pautkan akaun Discord anda untuk mengesahkan keahlian",
+      "memberTitle": "Ahli Kilo Discord",
+      "memberSubtitle": "Disahkan {{date}}",
+      "notMemberTitle": "Bukan ahli Discord",
+      "loadFailed": "Tidak dapat memuatkan keahlian Discord.",
+      "verify": "Sahkan",
+      "reverify": "Sahkan semula",
+      "verifyFailed": "Tidak dapat mengesahkan keahlian. Cuba lagi."
+    },
     "providerTestAccount": "Akaun ujian",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

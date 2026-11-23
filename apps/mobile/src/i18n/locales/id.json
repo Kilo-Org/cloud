@@ -323,6 +323,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Keanggotaan Discord",
+      "linkPrompt": "Tautkan akun Discord Anda untuk memverifikasi keanggotaan",
+      "memberTitle": "Anggota Kilo Discord",
+      "memberSubtitle": "Terverifikasi {{date}}",
+      "notMemberTitle": "Bukan anggota Discord",
+      "loadFailed": "Tidak dapat memuat keanggotaan Discord.",
+      "verify": "Verifikasi",
+      "reverify": "Verifikasi ulang",
+      "verifyFailed": "Tidak dapat memverifikasi keanggotaan. Coba lagi."
+    },
     "providerTestAccount": "Akun uji",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

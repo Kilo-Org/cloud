@@ -325,6 +325,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Discord dalība",
+      "linkPrompt": "Saistīt savu Discord kontu, lai pārbaudītu dalību",
+      "memberTitle": "Kilo Discord dalībnieks",
+      "memberSubtitle": "Pārbaudīts {{date}}",
+      "notMemberTitle": "Nav Discord dalībnieks",
+      "loadFailed": "Nevarēja ielādēt Discord dalību.",
+      "verify": "Pārbaudīt",
+      "reverify": "Pārbaudīt vēlreiz",
+      "verifyFailed": "Nevarēja pārbaudīt dalību. Mēģiniet vēlreiz."
+    },
     "providerTestAccount": "Testa konts",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

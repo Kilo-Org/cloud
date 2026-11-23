@@ -326,6 +326,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Associação ao Discord",
+      "linkPrompt": "Vincule sua conta do Discord para verificar seu status de membro",
+      "memberTitle": "Membro do Kilo Discord",
+      "memberSubtitle": "Verificado em {{date}}",
+      "notMemberTitle": "Não é membro do Discord",
+      "loadFailed": "Não foi possível carregar seu status de membro do Discord.",
+      "verify": "Verificar",
+      "reverify": "Verificar novamente",
+      "verifyFailed": "Não foi possível verificar seu status de membro. Tente novamente."
+    },
     "providerTestAccount": "Conta de teste",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

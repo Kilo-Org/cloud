@@ -324,6 +324,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Discord-medlemskap",
+      "linkPrompt": "Koble til Discord-kontoen din for å bekrefte medlemskap",
+      "memberTitle": "Kilo Discord-medlem",
+      "memberSubtitle": "Verifisert {{date}}",
+      "notMemberTitle": "Ikke Discord-medlem",
+      "loadFailed": "Kunne ikke laste inn Discord-medlemskap",
+      "verify": "Bekreft",
+      "reverify": "Bekreft på nytt",
+      "verifyFailed": "Kunne ikke bekrefte medlemskapet. Prøv igjen."
+    },
     "providerTestAccount": "Testkonto",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

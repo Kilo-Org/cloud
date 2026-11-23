@@ -34,6 +34,7 @@ import {
 } from '@/components/context-control';
 import { DeleteAccountCodeCard } from '@/components/delete-account-code-card';
 import { CreditsCard, type CreditsCardOrgList } from '@/components/profile-credits-card';
+import { DiscordMembershipRow } from '@/components/profile-discord-membership';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import {
@@ -767,6 +768,16 @@ export function ProfileScreen({ settingsTarget: routeTarget }: SettingsTargetPro
                         hue="moss"
                       />
                     ))}
+                    {/* The Discord server membership is a fact about a linked
+                    account, so its row closes this group: no link reads as the
+                    way to add one, and the membership read stays disabled. */}
+                    <DiscordMembershipRow
+                      isAuthenticated={isAuthenticated}
+                      afterIdle={afterIdle}
+                      hasDiscordLinked={
+                        data?.providers.some(p => p.provider === 'discord') ?? false
+                      }
+                    />
                   </RowGroup>
                 )}
 

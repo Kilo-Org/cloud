@@ -326,6 +326,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Членства ў Discord",
+      "linkPrompt": "Спалучыце свой уліковы запіс Discord, каб пацвердзіць членства",
+      "memberTitle": "Член Kilo Discord",
+      "memberSubtitle": "Пацверджана {{date}}",
+      "notMemberTitle": "Не член Discord",
+      "loadFailed": "Не ўдалося загрузіць членства ў Discord.",
+      "verify": "Пацвердзіць",
+      "reverify": "Пацвердзіць зноў",
+      "verifyFailed": "Не ўдалося пацвердзіць членства. Паспрабуйце яшчэ раз."
+    },
     "providerTestAccount": "Тэставы ўліковы запіс",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

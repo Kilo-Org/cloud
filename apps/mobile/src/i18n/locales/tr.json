@@ -324,6 +324,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Discord üyeliği",
+      "linkPrompt": "Üyeliği doğrulamak için Discord hesabınızı bağlayın",
+      "memberTitle": "Kilo Discord üyesi",
+      "memberSubtitle": "{{date}} tarihinde doğrulandı",
+      "notMemberTitle": "Discord üyesi değil",
+      "loadFailed": "Discord üyeliği yüklenemedi.",
+      "verify": "Doğrula",
+      "reverify": "Yeniden doğrula",
+      "verifyFailed": "Üyelik doğrulanamadı. Tekrar deneyin."
+    },
     "providerTestAccount": "Test hesabı",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

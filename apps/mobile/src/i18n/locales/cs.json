@@ -326,6 +326,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Členství v Discordu",
+      "linkPrompt": "Propoj svůj účet Discord pro ověření členství",
+      "memberTitle": "Člen Kilo Discord",
+      "memberSubtitle": "Ověřeno {{date}}",
+      "notMemberTitle": "Není členem Discordu",
+      "loadFailed": "Členství v Discordu se nepodařilo načíst.",
+      "verify": "Ověřit",
+      "reverify": "Ověřit znovu",
+      "verifyFailed": "Členství se nepodařilo ověřit. Zkus to znovu."
+    },
     "providerTestAccount": "Testovací účet",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

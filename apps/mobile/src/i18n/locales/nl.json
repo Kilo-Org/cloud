@@ -324,6 +324,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Discord-lidmaatschap",
+      "linkPrompt": "Koppel je Discord-account om je lidmaatschap te verifiëren",
+      "memberTitle": "Kilo Discord-lid",
+      "memberSubtitle": "Geverifieerd op {{date}}",
+      "notMemberTitle": "Geen Discord-lid",
+      "loadFailed": "Kan Discord-lidmaatschap niet laden",
+      "verify": "Verifiëren",
+      "reverify": "Opnieuw verifiëren",
+      "verifyFailed": "Kan lidmaatschap niet verifiëren. Probeer het opnieuw."
+    },
     "providerTestAccount": "Testaccount",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

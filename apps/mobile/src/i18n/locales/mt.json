@@ -327,6 +327,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Sħubija f'Discord",
+      "linkPrompt": "Ikkollega l-kont Discord tiegħek biex tivverifika s-sħubija",
+      "memberTitle": "Membru ta' Kilo Discord",
+      "memberSubtitle": "Ivverifikat {{date}}",
+      "notMemberTitle": "Mhux membru ta' Discord",
+      "loadFailed": "Is-sħubija ta' Discord ma tistax tiġi mgħobbija.",
+      "verify": "Ivverifika",
+      "reverify": "Erġa' vverifika",
+      "verifyFailed": "Is-sħubija ma tistax tiġi vverifikata. Erġa' pprova."
+    },
     "providerTestAccount": "Kont tat-test",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

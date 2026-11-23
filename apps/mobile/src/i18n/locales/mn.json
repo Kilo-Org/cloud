@@ -324,6 +324,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Discord гишүүнчлэл",
+      "linkPrompt": "Гишүүнчлэлээ баталгаажуулахын тулд Discord бүртгэлээ холбоно уу",
+      "memberTitle": "Kilo Discord гишүүн",
+      "memberSubtitle": "{{date}}-нд баталгаажсан",
+      "notMemberTitle": "Discord гишүүн биш",
+      "loadFailed": "Discord гишүүнчлэлийг ачаалж чадсангүй",
+      "verify": "Баталгаажуулах",
+      "reverify": "Дахин баталгаажуулах",
+      "verifyFailed": "Гишүүнчлэлийг баталгаажуулж чадсангүй. Дахин оролдоно уу."
+    },
     "providerTestAccount": "Туршилтын бүртгэл",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

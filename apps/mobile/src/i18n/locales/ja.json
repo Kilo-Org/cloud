@@ -323,6 +323,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Discordメンバーシップ",
+      "linkPrompt": "メンバーシップを確認するためにDiscordアカウントを連携してください",
+      "memberTitle": "Kilo Discordのメンバー",
+      "memberSubtitle": "{{date}}に確認済み",
+      "notMemberTitle": "Discordのメンバーではありません",
+      "loadFailed": "Discordのメンバーシップを読み込めませんでした",
+      "verify": "確認",
+      "reverify": "再確認",
+      "verifyFailed": "メンバーシップを確認できませんでした。もう一度お試しください。"
+    },
     "providerTestAccount": "テストアカウント",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

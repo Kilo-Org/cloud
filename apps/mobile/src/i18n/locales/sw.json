@@ -324,6 +324,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Uanachama wa Discord",
+      "linkPrompt": "Unganisha akaunti yako ya Discord ili kuthibitisha uanachama",
+      "memberTitle": "Mwanachama wa Kilo Discord",
+      "memberSubtitle": "Imethibitishwa {{date}}",
+      "notMemberTitle": "Si mwanachama wa Discord",
+      "loadFailed": "Imeshindwa kupakia uanachama wa Discord",
+      "verify": "Thibitisha",
+      "reverify": "Thibitisha tena",
+      "verifyFailed": "Imeshindwa kuthibitisha uanachama. Jaribu tena."
+    },
     "providerTestAccount": "Akaunti ya majaribio",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

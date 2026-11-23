@@ -324,6 +324,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "عضویت در Discord",
+      "linkPrompt": "برای تأیید عضویت، حساب Discord خود را متصل کنید",
+      "memberTitle": "عضو Kilo Discord",
+      "memberSubtitle": "تأییدشده در {{date}}",
+      "notMemberTitle": "عضو Discord نیستید",
+      "loadFailed": "بارگذاری عضویت Discord ممکن نشد.",
+      "verify": "تأیید",
+      "reverify": "تأیید دوباره",
+      "verifyFailed": "تأیید عضویت ممکن نشد. دوباره تلاش کنید."
+    },
     "providerTestAccount": "حساب آزمایشی",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

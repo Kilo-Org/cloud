@@ -324,6 +324,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Discord-medlemskab",
+      "linkPrompt": "Tilknyt din Discord-konto for at bekræfte medlemskab",
+      "memberTitle": "Medlem af Kilo Discord",
+      "memberSubtitle": "Bekræftet {{date}}",
+      "notMemberTitle": "Ikke medlem af Discord",
+      "loadFailed": "Kunne ikke indlæse Discord-medlemskabet.",
+      "verify": "Bekræft",
+      "reverify": "Bekræft igen",
+      "verifyFailed": "Kunne ikke bekræfte medlemskabet. Prøv igen."
+    },
     "providerTestAccount": "Testkonto",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

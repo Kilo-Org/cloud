@@ -324,6 +324,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Discord ਮੈਂਬਰਸ਼ਿਪ",
+      "linkPrompt": "ਮੈਂਬਰਸ਼ਿਪ ਦੀ ਪੁਸ਼ਟੀ ਕਰਨ ਲਈ ਆਪਣਾ Discord ਖਾਤਾ ਲਿੰਕ ਕਰੋ",
+      "memberTitle": "Kilo Discord ਮੈਂਬਰ",
+      "memberSubtitle": "{{date}} ਨੂੰ ਪੁਸ਼ਟੀ ਕੀਤੀ ਗਈ",
+      "notMemberTitle": "Discord ਮੈਂਬਰ ਨਹੀਂ",
+      "loadFailed": "Discord ਮੈਂਬਰਸ਼ਿਪ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੀ",
+      "verify": "ਪੁਸ਼ਟੀ ਕਰੋ",
+      "reverify": "ਦੁਬਾਰਾ ਪੁਸ਼ਟੀ ਕਰੋ",
+      "verifyFailed": "ਮੈਂਬਰਸ਼ਿਪ ਦੀ ਪੁਸ਼ਟੀ ਨਹੀਂ ਹੋ ਸਕੀ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
+    },
     "providerTestAccount": "ਟੈਸਟ ਖਾਤਾ",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

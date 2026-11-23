@@ -325,6 +325,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Članstvo u Discordu",
+      "linkPrompt": "Povežite svoj Discord račun za provjeru članstva",
+      "memberTitle": "Član Kilo Discorda",
+      "memberSubtitle": "Provjereno {{date}}",
+      "notMemberTitle": "Nije član Discorda",
+      "loadFailed": "Nije moguće učitati Discord članstvo.",
+      "verify": "Provjerite",
+      "reverify": "Ponovno provjerite",
+      "verifyFailed": "Nije moguće provjeriti članstvo. Pokušajte ponovno."
+    },
     "providerTestAccount": "Testni račun",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

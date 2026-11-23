@@ -325,6 +325,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "חברות ב-Discord",
+      "linkPrompt": "קשרו את חשבון ה-Discord שלכם כדי לאמת חברות",
+      "memberTitle": "חבר בקהילת Kilo Discord",
+      "memberSubtitle": "אומת ב-{{date}}",
+      "notMemberTitle": "לא חבר בקהילת Discord",
+      "loadFailed": "לא ניתן לטעון את חברות ה-Discord",
+      "verify": "אימות",
+      "reverify": "אימות מחדש",
+      "verifyFailed": "לא ניתן לאמת את החברות. נסו שוב."
+    },
     "providerTestAccount": "חשבון בדיקה",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

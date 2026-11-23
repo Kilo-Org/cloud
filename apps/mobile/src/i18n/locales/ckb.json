@@ -324,6 +324,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "ئەندامێتی Discord",
+      "linkPrompt": "پەیوەندیکردنی هەژماری Discordت بۆ دڵنیابوونەوە لە ئەندامێتی",
+      "memberTitle": "ئەندامی Kilo Discord",
+      "memberSubtitle": "پشتڕاستکرایەوە لە {{date}}",
+      "notMemberTitle": "ئەندامی Discord نییە",
+      "loadFailed": "نەتوانرا ئەندامێتی Discord باربکرێت.",
+      "verify": "پشتڕاستکردنەوە",
+      "reverify": "دووبارە پشتڕاستکردنەوە",
+      "verifyFailed": "نەتوانرا ئەندامێتی پشتڕاست بکرێتەوە. دووبارە هەوڵ بدەوە."
+    },
     "providerTestAccount": "هەژماری تاقیکردنەوە",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

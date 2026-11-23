@@ -324,6 +324,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Pagiging miyembro sa Discord",
+      "linkPrompt": "I-link ang iyong Discord account para ma-verify ang membership",
+      "memberTitle": "Miyembro ng Kilo Discord",
+      "memberSubtitle": "Na-verify noong {{date}}",
+      "notMemberTitle": "Hindi miyembro ng Discord",
+      "loadFailed": "Hindi ma-load ang membership sa Discord.",
+      "verify": "I-verify",
+      "reverify": "I-verify muli",
+      "verifyFailed": "Hindi ma-verify ang membership. Subukan muli."
+    },
     "providerTestAccount": "Akawnt sa pagsubok",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

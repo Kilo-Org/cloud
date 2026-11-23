@@ -324,6 +324,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Discordi liikmesus",
+      "linkPrompt": "Lingi oma Discordi konto liikmelisuse kontrollimiseks",
+      "memberTitle": "Kilo Discordi liige",
+      "memberSubtitle": "Kinnitatud {{date}}",
+      "notMemberTitle": "Pole Discordi liige",
+      "loadFailed": "Discordi liikmelisust ei õnnestunud laadida.",
+      "verify": "Kontrolli",
+      "reverify": "Kontrolli uuesti",
+      "verifyFailed": "Liikmelisust ei õnnestunud kontrollida. Proovi uuesti."
+    },
     "providerTestAccount": "Testikonto",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

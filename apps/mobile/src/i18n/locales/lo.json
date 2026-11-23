@@ -323,6 +323,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "ສະມາຊິກ Discord",
+      "linkPrompt": "ເຊື່ອມຕໍ່ບັນຊີ Discord ຂອງທ່ານເພື່ອຢືນຢັນສະຖານະສະມາຊິກ",
+      "memberTitle": "ສະມາຊິກ Kilo Discord",
+      "memberSubtitle": "ຢືນຢັນແລ້ວ {{date}}",
+      "notMemberTitle": "ບໍ່ແມ່ນສະມາຊິກ Discord",
+      "loadFailed": "ບໍ່ສາມາດໂຫຼດສະຖານະສະມາຊິກ Discord ໄດ້",
+      "verify": "ຢືນຢັນ",
+      "reverify": "ຢືນຢັນຄືນໃໝ່",
+      "verifyFailed": "ບໍ່ສາມາດຢືນຢັນສະຖານະສະມາຊິກໄດ້. ກະລຸນາລອງອີກຄັ້ງ."
+    },
     "providerTestAccount": "ບັນຊີທົດສອບ",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

@@ -324,6 +324,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Discord-ის წევრობა",
+      "linkPrompt": "დააკავშირეთ თქვენი Discord-ის ანგარიში წევრობის გადასამოწმებლად",
+      "memberTitle": "Kilo Discord-ის წევრი",
+      "memberSubtitle": "გადამოწმებულია {{date}}",
+      "notMemberTitle": "Discord-ის წევრი არ ხართ",
+      "loadFailed": "Discord-ის წევრობის ჩატვირთვა ვერ მოხერხდა.",
+      "verify": "გადამოწმება",
+      "reverify": "ხელახლა გადამოწმება",
+      "verifyFailed": "წევრობის გადამოწმება ვერ მოხერხდა. სცადეთ ხელახლა."
+    },
     "providerTestAccount": "სატესტო ანგარიში",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

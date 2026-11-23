@@ -324,6 +324,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Discord tagság",
+      "linkPrompt": "Kapcsold össze a Discord-fiókodat a tagság ellenőrzéséhez",
+      "memberTitle": "Kilo Discord-tag",
+      "memberSubtitle": "Ellenőrizve: {{date}}",
+      "notMemberTitle": "Nem Discord-tag",
+      "loadFailed": "Nem sikerült betölteni a Discord-tagságot.",
+      "verify": "Ellenőrzés",
+      "reverify": "Újraellenőrzés",
+      "verifyFailed": "Nem sikerült ellenőrizni a tagságot. Próbáld újra."
+    },
     "providerTestAccount": "Tesztfiók",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

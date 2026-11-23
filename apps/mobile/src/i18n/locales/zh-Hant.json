@@ -323,6 +323,17 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
+    "discord": {
+      "title": "Discord 會員資格",
+      "linkPrompt": "連結你的 Discord 帳號以驗證會員身分",
+      "memberTitle": "Kilo Discord 會員",
+      "memberSubtitle": "已於 {{date}} 驗證",
+      "notMemberTitle": "非 Discord 會員",
+      "loadFailed": "無法載入 Discord 會員資料",
+      "verify": "驗證",
+      "reverify": "重新驗證",
+      "verifyFailed": "無法驗證會員身分，請再試一次。"
+    },
     "providerTestAccount": "測試帳戶",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",

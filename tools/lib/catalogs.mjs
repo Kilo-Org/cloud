@@ -7,9 +7,10 @@
  * `_other` is complete enough to be owed by every locale. Those are facts about
  * the catalogs, not rules of either gate, so they live here. So is which
  * families a locale must complete before its copy can count: both audits ask
- * that question, so the answer lives here too. Each audit keeps its own
- * allowlists, wording and exit behavior, including what it does with a key that
- * is not a plural category.
+ * that question, so the answer lives here too. So is which plural forms a
+ * language can ever render at all. Each audit keeps its own allowlists,
+ * wording and exit behavior, including what it does with a key that is not a
+ * plural category.
  */
 import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -134,6 +135,49 @@ export function pluralFamilyBases(messages) {
  */
 export function declaresPluralFamily(messages, base) {
   return messages.has(`${base}_one`) && messages.has(`${base}_other`);
+}
+
+/**
+ * The plural categories a catalog of `tag` can ever render: every category
+ * `Intl.PluralRules` selects, plus `zero`, which i18next looks up on its own at
+ * count 0 before it asks the plural rule (i18next's `resolve()` pushes
+ * `<key>_zero` into the lookup candidates when `count === 0`), so a `_zero`
+ * form renders in every language.
+ *
+ * Any other category is unreachable: i18next picks its suffix from
+ * `rule.select(count)` alone, so a form outside this set is copy no user of
+ * that language can see.
+ */
+export function selectablePluralCategories(tag) {
+  return new Set([...new Intl.PluralRules(tag).resolvedOptions().pluralCategories, 'zero']);
+}
+
+/**
+ * The plural forms a locale declares whose category it can never select, by
+ * family base, in catalog order: a Map from the family base to the categories,
+ * in key order, that `tag` cannot reach.
+ *
+ * The walk is over the locale's own keys, so a family is judged by the member
+ * forms the catalog actually ships rather than by what English declares. A
+ * family whose every member is selectable is absent from the Map, so an empty
+ * Map means every plural form of this locale renders somewhere.
+ */
+export function unselectablePluralCategories(locale, tag) {
+  const selectable = selectablePluralCategories(tag);
+  const unselectable = new Map();
+  for (const key of locale.keys()) {
+    const parts = pluralParts(key);
+    if (parts === null || selectable.has(parts.category)) {
+      continue;
+    }
+    const declared = unselectable.get(parts.base);
+    if (declared === undefined) {
+      unselectable.set(parts.base, [parts.category]);
+    } else {
+      declared.push(parts.category);
+    }
+  }
+  return unselectable;
 }
 
 /**

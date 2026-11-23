@@ -32,6 +32,8 @@ import {
   missingPluralCategories,
   pluralFamilyBases,
   pluralParts,
+  selectablePluralCategories,
+  unselectablePluralCategories,
 } from '../lib/catalogs.mjs';
 import { runIfMain } from '../lib/entry-point.mjs';
 import { isTestArtifact, parseSourceEntry, parseSourceTree } from '../lib/source-files.mjs';
@@ -2180,6 +2182,7 @@ function checkEnglishCatalog({ catalogName, english, englishValues }) {
 /** The keys a locale owes English, then the keys English does not name. */
 function checkKeyParity({
   label,
+  tag,
   english,
   translated,
   englishFamilies,
@@ -2187,11 +2190,18 @@ function checkKeyParity({
   localeFamilies,
 }) {
   const problems = [];
+  const selectable = selectablePluralCategories(tag);
   for (const key of english.keys()) {
     if (translated.has(key)) {
       continue;
     }
     const parts = pluralParts(key);
+    if (parts && !selectable.has(parts.category)) {
+      // The locale can never select this category, so it owes no such form:
+      // the key would be copy no reader of this language sees. A `_zero`
+      // member stays owed, because i18next looks that suffix up itself.
+      continue;
+    }
     if (
       parts &&
       englishFamilies.has(parts.base) &&
@@ -2224,6 +2234,24 @@ function checkPluralCategories({ label, tag, english, translated }) {
   for (const [family, absent] of missingPluralCategories(english, translated, tag)) {
     for (const category of absent) {
       problems.push(`${label}: plural family "${family}" lacks the ${category} category of ${tag}`);
+    }
+  }
+  return problems;
+}
+
+/**
+ * The plural forms a locale declares but its language never renders: a form
+ * whose category `Intl.PluralRules` does not select for this tag, i18next's own
+ * zero lookup aside. Such a form is unreachable text — a translator's work that
+ * ships to nobody — so the rule names one line per family and category.
+ */
+function checkUnselectablePluralCategories({ label, tag, translated }) {
+  const problems = [];
+  for (const [family, categories] of unselectablePluralCategories(translated, tag)) {
+    for (const category of categories) {
+      problems.push(
+        `${label}: plural family "${family}" declares a ${category} form that ${tag} never selects`
+      );
     }
   }
   return problems;
@@ -2677,13 +2705,16 @@ function checkCatalogLocales({
     problems.push(...checkChangelogAreaLabels(tag, translated, label));
 
     // The families this locale declares itself, through a member key with a
-    // category suffix. The English `_one`/`_other` siblings of a family
-    // English declares stay mandatory in the missing-key rule below, except
-    // where the locale carries the flat base key instead.
+    // category suffix. The English siblings of a family English declares stay
+    // mandatory in the missing-key rule below, except where the locale carries
+    // the flat base key instead, and except a category this tag can never
+    // select: a Japanese catalog owes no `_one` form, because i18next never
+    // asks for one there.
     const localeFamilies = pluralFamilyBases(translated);
     problems.push(
       ...checkKeyParity({
         label,
+        tag,
         english,
         translated,
         englishFamilies,
@@ -2692,6 +2723,7 @@ function checkCatalogLocales({
       })
     );
     problems.push(...checkPluralCategories({ label, tag, english, translated }));
+    problems.push(...checkUnselectablePluralCategories({ label, tag, translated }));
     problems.push(
       ...checkTranslatedValues({
         label,

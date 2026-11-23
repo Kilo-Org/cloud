@@ -53,6 +53,25 @@ const TRANSLATED = {
 };
 const SOURCE = "t('agents.title');\nt('agents.liveCount', { count: 2 });";
 
+// Hindi selects only `one` and `other`, so a fixture catalog for it declares
+// those two forms and nothing else: a form Hindi cannot select is now a
+// reported problem of its own.
+const HINDI_TRANSLATED = {
+  agents: {
+    title: 'स्थानीयकृत एजेंट',
+    liveCount_one: '{{count}} स्थानीयकृत सत्र',
+    liveCount_other: '{{count}} स्थानीयकृत सत्र',
+  },
+};
+
+// Thai selects only `other`, so its fixture catalog carries that one form.
+const THAI_TRANSLATED = {
+  agents: {
+    title: 'เอเจนต์ที่แปลแล้ว',
+    liveCount_other: '{{count}} เซสชันที่แปลแล้ว',
+  },
+};
+
 // One parent directory for the whole file: each case writes its files into a
 // directory of its own, so a case never sees another case's catalogs.
 const FIXTURES = mkdtempSync(join(tmpdir(), 'check-catalogs-'));
@@ -238,6 +257,41 @@ test('rejects a missing required locale plural category', () => {
     found.join('\n'),
     /mobile\/ru: plural family "agents\.liveCount" lacks the few category of ru/
   );
+});
+
+test('rejects a plural category the locale can never select', () => {
+  // Japanese selects only `other`, so i18next never asks it for `_one`: the
+  // form is copy that ships to nobody.
+  const found = run({
+    language: 'ja',
+    translated: {
+      agents: {
+        title: 'エージェント',
+        liveCount_one: '{{count}}件のセッション',
+        liveCount_other: '{{count}}件のセッション',
+      },
+    },
+  });
+  assert.match(
+    found.join('\n'),
+    /mobile\/ja: plural family "agents\.liveCount" declares a one form that ja never selects/
+  );
+});
+
+test('admits a zero form the plural rule cannot select', () => {
+  // i18next looks `_zero` up by itself at count 0, so Japanese may carry one
+  // even though its plural rule never selects that category.
+  const found = run({
+    language: 'ja',
+    translated: {
+      agents: {
+        title: 'エージェント',
+        liveCount_zero: '{{count}}件のセッション',
+        liveCount_other: '{{count}}件のセッション',
+      },
+    },
+  });
+  assert.deepEqual(found, []);
 });
 
 test('rejects an unused English exact key', () => {
@@ -547,6 +601,7 @@ test('rejects a borrowed Devanagari danda in a catalog that writes no sentence m
   // sentence mark at all and a danda there belongs to no script of its own.
   const found = run({
     language: 'hi',
+    translated: { agents: HINDI_TRANSLATED.agents },
     pushEnglish: {
       generic: { title: 'Kilo', body: { chatMessage: 'You have a new message' } },
     },
@@ -627,7 +682,7 @@ test('accepts a bare-space sentence joiner in the markless Thai catalog', () => 
   const found = run({
     language: 'th',
     english: { common: { sentenceJoiner: '. ' }, agents: ENGLISH.agents },
-    translated: { common: { sentenceJoiner: ' ' }, agents: TRANSLATED.agents },
+    translated: { common: { sentenceJoiner: ' ' }, agents: THAI_TRANSLATED.agents },
     source: `${SOURCE}\nt('common.sentenceJoiner');`,
   });
   assert.deepEqual(found, []);

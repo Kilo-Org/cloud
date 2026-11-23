@@ -1313,11 +1313,19 @@ export async function getPaidCaseStartedAt(
   return row?.started_at ?? null;
 }
 
-/** Moves a ledgered case's start to a further paid call its own token makes. */
+/**
+ * Moves a ledgered case's start to a further paid call its own token makes.
+ *
+ * `now` is the start the row moves to. `leaseClock` is the instant the chunk's lease is checked
+ * against, defaulting to `now`; a caller that also moves a second row in the same batch passes
+ * the SAME instant to both, because two different clocks would let a lease expire between them
+ * and apply one statement while the other refuses.
+ */
 export function restartPaidCaseStatement(
   db: D1Database,
   key: PaidExecutionKey,
-  now: number
+  now: number,
+  leaseClock: number = now
 ): D1PreparedStatement {
   return db
     .prepare(`UPDATE scheduler_executions SET started_at = ?
@@ -1348,7 +1356,7 @@ export function restartPaidCaseStatement(
       key.token,
       key.attemptStartedAt ?? null,
       key.attemptStartedAt ?? null,
-      now
+      leaseClock
     );
 }
 
@@ -1422,19 +1430,21 @@ export async function refundUnspentRetryAttempt(
   db: D1Database,
   input: RetryRefundInput
 ): Promise<void> {
+  // Both reverts check the lease against ONE instant. The ledger statement's `now` is the
+  // start it writes, so its lease clock is passed separately: with the revert target as the
+  // clock, a lease expiring between the first start and the retry start would satisfy the
+  // ledger revert and refuse the canonical one, leaving the two starts disagreeing.
+  const leaseClock = Date.now();
   await db
     .batch([
       refundRetryAttemptStatement(db, input.claim.id, input.claim.token),
-      // Both starts go back to the first attempt's start, in one batch and under the guard
-      // each one already carries: a retry that never reached the model must leave the ledger
-      // start and the canonical `benchmark_case_runs.started_at` equal, because RunnerCancel's
-      // live check compares them.
       restartPaidCaseStatement(
         db,
         { ...input.execution, attemptStartedAt: input.startedAt },
-        input.execution.attemptStartedAt
+        input.execution.attemptStartedAt,
+        leaseClock
       ),
-      revertRetryCanonicalStartStatement(db, input),
+      revertRetryCanonicalStartStatement(db, input, leaseClock),
     ])
     .catch((error: unknown) => input.onError?.(error));
 }
@@ -1451,11 +1461,13 @@ export async function refundUnspentRetryAttempt(
  * is exactly what RunnerCancel's live check compares.
  *
  * Bind order: the revert's timestamp twice, the case key's five columns, the executor run id
- * and token, then the lease clock (`input.startedAt`, the instant the retry wrote).
+ * and token, then the lease clock — the same instant the ledger revert in this batch checks,
+ * so the two statements apply together or refuse together.
  */
 export function revertRetryCanonicalStartStatement(
   db: D1Database,
-  input: RetryRefundInput
+  input: RetryRefundInput,
+  leaseClock: number
 ): D1PreparedStatement {
   const startedAt = new Date(input.execution.attemptStartedAt).toISOString();
   return db
@@ -1496,7 +1508,7 @@ export function revertRetryCanonicalStartStatement(
       input.execution.caseId,
       input.execution.runId,
       input.claim.token,
-      input.startedAt
+      leaseClock
     );
 }
 

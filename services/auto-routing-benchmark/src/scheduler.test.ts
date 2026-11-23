@@ -1334,6 +1334,73 @@ describe('scheduler (production migrations and real SQLite)', () => {
     expect(storedChunk(sqlite, claim.id).attempts).toBe(1);
   });
 
+  it('checks both reverts against one lease clock, so a lease inside the retry window cannot split them', async () => {
+    // The ledger and canonical reverts must use the SAME lease clock. With the ledger clocked
+    // at the first start and the canonical at the retry start, a lease expiring between them
+    // satisfies one statement and refuses the other, and the two starts end up disagreeing.
+    insertRun(sqlite, 'windows');
+    await scheduleRunChunks(db, {
+      runId: 'windows',
+      entries: independentEntries(1),
+      repetitions: 1,
+      caseIds: ['case'],
+      chunkSize: 1,
+    });
+    const config = schedulerConfig('{"slots":1}');
+    const [claim] = await claimMany(db, config, 1, 'windows-claim', NOW);
+    if (!claim) throw new Error('Expected the claim');
+    expect(await startChunk(db, claim.id, claim.token, NOW)).toBe(true);
+    const ledgerKey = {
+      runId: 'windows',
+      model: claim.model,
+      variant: claim.variant,
+      rep: claim.rep,
+      caseId: 'case',
+      token: claim.token,
+    };
+    expect(await beginPaidCase(db, ledgerKey, NOW)).toBe(true);
+    seedCanonicalCaseRun('windows', claim, NOW);
+    expect(
+      (await consumeRetryAttemptStatement(db, claim.id, claim.token, NOW + 1).run()).meta.changes
+    ).toBe(1);
+
+    // The retry starts well after the first attempt, and the lease expires strictly between the
+    // two — the window the two different clocks used to straddle.
+    const retriedAt = NOW + 5_000;
+    const restarted = await db.batch([
+      restartPaidCaseStatement(db, { ...ledgerKey, attemptStartedAt: NOW }, retriedAt),
+      restartPaidCaseRunStatement(db, {
+        key: {
+          engineIdentity: 'scheduler-storage-test',
+          model: claim.model,
+          variant: claim.variant,
+          rep: claim.rep,
+          caseId: 'case',
+        },
+        executor: { runId: 'windows', token: claim.token },
+        startedAt: retriedAt,
+      }),
+    ]);
+    expect(restarted.map(result => result.meta.changes)).toEqual([1, 1]);
+    sqlite
+      .prepare('UPDATE scheduler_chunks SET lease_until = ? WHERE id = ?')
+      .run(NOW + 2_500, claim.id);
+
+    await refundUnspentRetryAttempt(db, {
+      claim: { id: claim.id, token: claim.token },
+      engineIdentity: 'scheduler-storage-test',
+      execution: { ...ledgerKey, attemptStartedAt: NOW },
+      startedAt: retriedAt,
+    });
+
+    // Both fits the shared clock (the suite pins the system time to NOW), so both applied: the
+    // two starts are equal again, at the first attempt's start.
+    const after = retryStarts();
+    expect(after.ledger).toEqual({ started_at: NOW });
+    expect(after.canonical).toEqual({ started_at: new Date(NOW).toISOString() });
+    expect(storedChunk(sqlite, claim.id).attempts).toBe(1);
+  });
+
   it('moves neither start when the run ends between the consume and the restart', async () => {
     // The two restart statements carry the SAME guard, so a fence refusal cannot move only the
     // canonical row: here the consume succeeds, then the run is paused, and the batch's guard

@@ -2415,8 +2415,6 @@ function checkTranslatedValue({
   mustTranslateKeys,
 }) {
   const problems = [];
-  // A catalog that writes no sentence mark may hold nothing but the space it
-  // separates sentences with; any other whitespace-only value is untranslated.
   const separatorOnly =
     key === 'common.sentenceJoiner' && MARKLESS_SENTENCE_TAGS.has(tag) && value !== '';
   if (value.trim() === '' && !separatorOnly) {

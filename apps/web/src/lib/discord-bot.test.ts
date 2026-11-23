@@ -403,66 +403,63 @@ describe('processDiscordBotMessage session start authorization', () => {
     expect(result.cloudAgentSessionId).toBe('cloud-session-1');
   });
 
-  it(
-    'credentials an organization session from the association that grants the repository',
-    async () => {
-      const organization = await createTestOrganization(
-        'Discord association workspace',
-        installationOwner.id,
-        0
+  it('credentials an organization session from the association that grants the repository', async () => {
+    const organization = await createTestOrganization(
+      'Discord association workspace',
+      installationOwner.id,
+      0
+    );
+    await db
+      .update(platform_integrations)
+      .set({ owned_by_user_id: null, owned_by_organization_id: organization.id })
+      .where(
+        and(
+          eq(platform_integrations.owned_by_user_id, installationOwner.id),
+          eq(platform_integrations.platform, 'discord')
+        )
       );
-      await db
-        .update(platform_integrations)
-        .set({ owned_by_user_id: null, owned_by_organization_id: organization.id })
-        .where(
-          and(
-            eq(platform_integrations.owned_by_user_id, installationOwner.id),
-            eq(platform_integrations.platform, 'discord')
-          )
-        );
-      const primaryAssociationId = await connectOrganizationGitHubRepository(organization.id, {
-        accountLogin: 'kilo-test-primary',
-        repositories: [
-          {
-            id: 515151,
-            name: 'other-repo',
-            full_name: 'kilo-test-primary/other-repo',
-            private: true,
-          },
-        ],
-        createdAt: '2026-01-01T00:00:00.000Z',
-      });
-      const grantingAssociationId = await connectOrganizationGitHubRepository(organization.id, {
-        accountLogin: 'kilo-test',
-        repositories: [
-          {
-            id: 626262,
-            name: 'connected-repo',
-            full_name: CONNECTED_REPOSITORY,
-            private: true,
-          },
-        ],
-        createdAt: '2026-02-01T00:00:00.000Z',
-      });
-      const discordUserId = nextSnowflake();
-      await linkDiscordAccount(installationOwner.id, discordUserId);
+    const primaryAssociationId = await connectOrganizationGitHubRepository(organization.id, {
+      accountLogin: 'kilo-test-primary',
+      repositories: [
+        {
+          id: 515151,
+          name: 'other-repo',
+          full_name: 'kilo-test-primary/other-repo',
+          private: true,
+        },
+      ],
+      createdAt: '2026-01-01T00:00:00.000Z',
+    });
+    const grantingAssociationId = await connectOrganizationGitHubRepository(organization.id, {
+      accountLogin: 'kilo-test',
+      repositories: [
+        {
+          id: 626262,
+          name: 'connected-repo',
+          full_name: CONNECTED_REPOSITORY,
+          private: true,
+        },
+      ],
+      createdAt: '2026-02-01T00:00:00.000Z',
+    });
+    const discordUserId = nextSnowflake();
+    await linkDiscordAccount(installationOwner.id, discordUserId);
 
-      const result = await processDiscordBotMessage(
-        `Inspect ${CONNECTED_REPOSITORY}`,
-        guildId,
-        eventContext(discordUserId)
-      );
+    const result = await processDiscordBotMessage(
+      `Inspect ${CONNECTED_REPOSITORY}`,
+      guildId,
+      eventContext(discordUserId)
+    );
 
-      expect(result.response).toBe('The session finished.');
-      expect(mockRunSessionToCompletion).toHaveBeenCalledTimes(1);
-      const [sessionInput] = mockRunSessionToCompletion.mock.calls[0];
-      expect(sessionInput.prepareInput.githubIntegrationId).toBe(grantingAssociationId);
-      expect(sessionInput.prepareInput.githubIntegrationId).not.toBe(primaryAssociationId);
-      expect(sessionInput.prepareInput.githubAccessPurpose).toBe('workflow');
-      expect(sessionInput.prepareInput.kilocodeOrganizationId).toBe(organization.id);
-      expect(sessionInput.prepareInput).not.toHaveProperty('githubToken');
-    }
-  );
+    expect(result.response).toBe('The session finished.');
+    expect(mockRunSessionToCompletion).toHaveBeenCalledTimes(1);
+    const [sessionInput] = mockRunSessionToCompletion.mock.calls[0];
+    expect(sessionInput.prepareInput.githubIntegrationId).toBe(grantingAssociationId);
+    expect(sessionInput.prepareInput.githubIntegrationId).not.toBe(primaryAssociationId);
+    expect(sessionInput.prepareInput.githubAccessPurpose).toBe('workflow');
+    expect(sessionInput.prepareInput.kilocodeOrganizationId).toBe(organization.id);
+    expect(sessionInput.prepareInput).not.toHaveProperty('githubToken');
+  });
 
   it.each(['user', 'org'] as const)(
     'authenticates %s session operations with bounded workflow authority',

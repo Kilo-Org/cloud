@@ -6,8 +6,9 @@ import { toast } from 'sonner-native';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import '@/i18n';
 import {
+  FLOOR_BOX_MEASURED_DP,
   INLINE_LINK_BOX_CLASS,
-  MIN_TAP_TARGET_DP,
+  INLINE_LINK_NEIGHBOUR_RESERVE_CLASS,
   tapTargetReachDp,
   TOUCH_TARGET_DP,
 } from '@/lib/a11y/tap-target';
@@ -352,7 +353,11 @@ describe('ConsentDetails copy', () => {
     // Test renderer props are untyped (`any` from the JSON tree); name them once.
     const props = link.props as { className?: string; hitSlop?: { top?: number; bottom?: number } };
     expect(String(props.className)).toContain(INLINE_LINK_BOX_CLASS);
-    expect(tapTargetReachDp(MIN_TAP_TARGET_DP, props.hitSlop?.top ?? 0)).toBeGreaterThanOrEqual(
+    // The sentence row carries the reserve that keeps a control below it out of
+    // the link's downward band.
+    expect(String(link.parent?.props.className)).toContain(INLINE_LINK_NEIGHBOUR_RESERVE_CLASS);
+    // Measured from the box's Android height, not the declared 28dp floor.
+    expect(tapTargetReachDp(FLOOR_BOX_MEASURED_DP, props.hitSlop?.top ?? 0)).toBeGreaterThanOrEqual(
       TOUCH_TARGET_DP
     );
     expect(props.hitSlop?.bottom).toBe(props.hitSlop?.top);

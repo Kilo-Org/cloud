@@ -3,8 +3,9 @@ import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import {
+  FLOOR_BOX_MEASURED_DP,
   INLINE_LINK_BOX_CLASS,
-  MIN_TAP_TARGET_DP,
+  INLINE_LINK_NEIGHBOUR_RESERVE_CLASS,
   tapTargetReachDp,
   TOUCH_TARGET_DP,
 } from '@/lib/a11y/tap-target';
@@ -1017,9 +1018,13 @@ describe('ConsentCard', () => {
         hitSlop?: { top?: number; bottom?: number };
       };
       expect(String(props.className)).toContain(INLINE_LINK_BOX_CLASS);
-      expect(tapTargetReachDp(MIN_TAP_TARGET_DP, props.hitSlop?.top ?? 0)).toBeGreaterThanOrEqual(
-        TOUCH_TARGET_DP
-      );
+      // The sentence row under the link reserves the box's own overflow, so the
+      // action button below the footer's `gap-3` cannot take the downward band.
+      expect(String(link.parent?.props.className)).toContain(INLINE_LINK_NEIGHBOUR_RESERVE_CLASS);
+      // Measured from the box's Android height, not the declared 28dp floor.
+      expect(
+        tapTargetReachDp(FLOOR_BOX_MEASURED_DP, props.hitSlop?.top ?? 0)
+      ).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
       return link;
     });
 

@@ -219,8 +219,8 @@ describe('Hindi Code Reviewer detail, analytics and review memory copy', () => {
     expect(i18n.t('codeReviewer.reviewDetail.reviewEnded')).toBe('समीक्षा समाप्त हुई');
   });
 
-  it('reads correctly at a zero and a one count, which share the one category', () => {
-    for (const count of [0, 1]) {
+  it('keeps one label and clause shape for a zero, a one and a many count', () => {
+    for (const count of [0, 1, 2, 5]) {
       const line = i18n.t('codeReviewer.analytics.trackedReviewsUncounted', {
         count,
         displayCount: String(count),

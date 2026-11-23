@@ -237,9 +237,16 @@ export function sessionLiveText(raw: unknown, limit: number): string | null {
 function basename(value: unknown): string | null {
   const text = sessionLiveText(value, Number.MAX_SAFE_INTEGER);
   if (text === null) return null;
-  const trimmed = text.replace(/[/\\]+$/, '');
-  const last = Math.max(trimmed.lastIndexOf('/'), trimmed.lastIndexOf('\\'));
-  const base = last === -1 ? trimmed : trimmed.slice(last + 1);
+  // Trailing separators name no segment, so the target ends before them.
+  let end = text.length;
+  while (end > 0) {
+    const code = text.charCodeAt(end - 1);
+    if (code !== 0x2f && code !== 0x5c) break;
+    end--;
+  }
+  const last =
+    end === 0 ? -1 : Math.max(text.lastIndexOf('/', end - 1), text.lastIndexOf('\\', end - 1));
+  const base = last === -1 ? text.slice(0, end) : text.slice(last + 1, end);
   return sessionLiveText(base, SESSION_LIVE_TARGET_LIMIT);
 }
 

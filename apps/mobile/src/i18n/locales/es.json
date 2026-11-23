@@ -1712,6 +1712,7 @@
       "couldNotLoadThisSession": "No se pudo cargar esta sesión.",
       "historyTooLarge": "La transcripción de esta sesión es demasiado grande para cargarla.",
       "historyUnavailable": "No se puede leer la transcripción de esta sesión.",
+      "historyTemporarilyUnavailable": "La transcripción de esta sesión no está disponible temporalmente.",
       "cloneFailedRetry": "No se pudo clonar esta sesión. Inténtalo de nuevo.",
       "notEnoughCredits": "No hay suficientes créditos para esta solicitud. Añade créditos e inténtalo de nuevo.",
       "previousTaskFinishing": "La tarea anterior aún no ha terminado. Espera un momento.",
@@ -2279,6 +2280,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "No se pudo cargar la sesión del subagente.",
+      "historyTooLarge": "El historial de este subagente es demasiado grande para cargarlo.",
+      "historyUnavailable": "El historial de este subagente no está disponible.",
+      "historyTemporarilyUnavailable": "El historial de este subagente no está disponible temporalmente.",
       "failed": "La sesión del subagente ha fallado.",
       "noMessages": "No hay mensajes del subagente",
       "noMessagesDescription": "Esta sesión del subagente terminó sin generar una transcripción.",

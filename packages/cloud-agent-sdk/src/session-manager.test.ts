@@ -6357,9 +6357,12 @@ describe('createSessionManager', () => {
       const childHydrationState = atomValue<
         (childSessionId: string) => { status: string; message?: string }
       >(config.store, mgr.atoms.childSessionHydrationState);
-      expect(childHydrationState('child-retry')).toEqual(
-        expect.objectContaining({ status: 'error' })
-      );
+      // A thrown read carries no typed history kind: the state names no kind.
+      expect(childHydrationState('child-retry')).toEqual({
+        status: 'error',
+        kind: null,
+        message: 'Connection lost. Please retry in a moment.',
+      });
 
       await mgr.hydrateChildSession(kiloId('child-retry'));
 
@@ -6442,6 +6445,7 @@ describe('createSessionManager', () => {
       );
       expect(state('child-null')).toEqual({
         status: 'error',
+        kind: null,
         message: 'This session is no longer available.',
       });
     });
@@ -6460,11 +6464,12 @@ describe('createSessionManager', () => {
         config.store,
         mgr.atoms.childSessionHydrationState
       );
-      // A retryable read keeps the retry copy every app already classifies as
-      // transient, so its Retry stays.
+      // The machine kind decides the Retry, and the canonical history copy
+      // replaces the generic one for the same read.
       expect(state('child-fail')).toEqual({
         status: 'error',
-        message: 'Something went wrong. Please retry in a moment.',
+        kind: 'retryable_failure',
+        message: 'Session history temporarily unavailable',
       });
     });
 
@@ -6484,6 +6489,7 @@ describe('createSessionManager', () => {
         );
         expect(state(`child-${kind}`)).toEqual({
           status: 'error',
+          kind,
           message: sessionSnapshotFailureMessage(kind).message,
         });
       }

@@ -2251,6 +2251,7 @@
       "couldNotLoadThisSession": "ይህን ክፍለ ጊዜ መጫን አልተቻለም።",
       "historyTooLarge": "የዚህ ክፍለ ጊዜ ጽሑፍ ለመጫን በጣም ትልቅ ነው።",
       "historyUnavailable": "የዚህ ክፍለ ጊዜ ጽሑፍ ሊነበብ አይችልም።",
+      "historyTemporarilyUnavailable": "የዚህ ክፍለ ጊዜ ጽሑፍ ለጊዜው አይገኝም።",
       "cloneFailedRetry": "የዚህን ክፍለ ጊዜ ቅጂ መፍጠር አልተቻለም። እንደገና ይሞክሩ።",
       "notEnoughCredits": "ለዚህ ጥያቄ በቂ ክሬዲት የለዎትም። ክሬዲት ጨምረው እንደገና ይሞክሩ።",
       "previousTaskFinishing": "ያለፈው ተግባር ገና አልተጠናቀቀም። እባክዎ ትንሽ ይጠብቁ።",
@@ -2814,6 +2815,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "የንዑስ ወኪሉን ክፍለ ጊዜ መጫን አልተቻለም።",
+      "historyTooLarge": "የዚህ ንዑስ ወኪል ታሪክ ለመጫን በጣም ትልቅ ነው።",
+      "historyUnavailable": "የዚህ ንዑስ ወኪል ታሪክ አይገኝም።",
+      "historyTemporarilyUnavailable": "የዚህ ንዑስ ወኪል ታሪክ ለጊዜው አይገኝም።",
       "failed": "የንዑስ ወኪሉ ክፍለ ጊዜ አልተሳካም።",
       "noMessages": "የንዑስ ወኪል መልእክቶች የሉም",
       "noMessagesDescription": "ይህ የንዑስ ወኪል ክፍለ ጊዜ የውይይት ግልባጭ ሳያወጣ ተጠናቋል።",

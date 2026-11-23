@@ -2447,6 +2447,7 @@
       "couldNotLoadThisSession": "Methu llwytho'r sesiwn hon.",
       "historyTooLarge": "Mae trawsgrifiad y sesiwn hon yn rhy fawr i'w llwytho.",
       "historyUnavailable": "Ni ellir darllen trawsgrifiad y sesiwn hon.",
+      "historyTemporarilyUnavailable": "Nid yw trawsgrifiad y sesiwn hon ar gael dros dro.",
       "cloneFailedRetry": "Methu clonio'r sesiwn hon. Ceisiwch eto.",
       "notEnoughCredits": "Nid oes digon o gredydau ar gyfer y cais hwn. Ychwanegwch gredydau a cheisiwch eto.",
       "previousTaskFinishing": "Nid yw'r dasg flaenorol wedi gorffen eto. Arhoswch am eiliad.",
@@ -3026,6 +3027,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Methu llwytho sesiwn yr is-asiant.",
+      "historyTooLarge": "Mae hanes yr is-asiant hwn yn rhy fawr i'w lwytho.",
+      "historyUnavailable": "Nid yw hanes yr is-asiant hwn ar gael.",
+      "historyTemporarilyUnavailable": "Nid yw hanes yr is-asiant hwn ar gael dros dro.",
       "failed": "Methodd sesiwn yr is-asiant.",
       "noMessages": "Dim negeseuon is-asiant",
       "noMessagesDescription": "Daeth sesiwn yr is-asiant hwn i ben heb gynhyrchu trawsgrifiad.",

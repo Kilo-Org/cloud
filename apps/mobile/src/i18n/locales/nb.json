@@ -2251,6 +2251,7 @@
       "couldNotLoadThisSession": "Kunne ikke laste inn denne økten.",
       "historyTooLarge": "Øktens logg er for stor til å laste inn.",
       "historyUnavailable": "Øktens logg kan ikke leses.",
+      "historyTemporarilyUnavailable": "Øktens logg er midlertidig utilgjengelig.",
       "cloneFailedRetry": "Kunne ikke klone denne økten. Prøv igjen.",
       "notEnoughCredits": "Du har ikke nok kreditter til denne forespørselen. Fyll på kreditter og prøv igjen.",
       "previousTaskFinishing": "Den forrige oppgaven er ikke helt avsluttet ennå. Vent et øyeblikk.",
@@ -2814,6 +2815,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Kunne ikke laste inn underagentøkten.",
+      "historyTooLarge": "Underagentens historikk er for stor til å laste inn.",
+      "historyUnavailable": "Underagentens historikk er ikke tilgjengelig.",
+      "historyTemporarilyUnavailable": "Underagentens historikk er midlertidig utilgjengelig.",
       "failed": "Underagentøkten mislyktes.",
       "noMessages": "Ingen meldinger fra underagenten",
       "noMessagesDescription": "Denne underagentøkten ble fullført uten en samtalelogg.",

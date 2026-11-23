@@ -1735,6 +1735,7 @@
       "couldNotLoadThisSession": "Nie udało się wczytać tej sesji.",
       "historyTooLarge": "Zapis tej sesji jest zbyt duży, żeby go wczytać.",
       "historyUnavailable": "Nie można odczytać zapisu tej sesji.",
+      "historyTemporarilyUnavailable": "Zapis tej sesji jest chwilowo niedostępny.",
       "cloneFailedRetry": "Nie udało się sklonować tej sesji. Spróbuj ponownie.",
       "notEnoughCredits": "Brakuje środków na to żądanie. Doładuj konto i spróbuj ponownie.",
       "previousTaskFinishing": "Trwa kończenie poprzedniego zadania. Poczekaj chwilę.",
@@ -2306,6 +2307,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Nie udało się wczytać sesji podagenta.",
+      "historyTooLarge": "Historia tego podagenta jest zbyt duża, żeby ją wczytać.",
+      "historyUnavailable": "Historia tego podagenta jest niedostępna.",
+      "historyTemporarilyUnavailable": "Historia tego podagenta jest chwilowo niedostępna.",
       "failed": "Sesja podagenta zakończyła się błędem.",
       "noMessages": "Brak wiadomości podagenta",
       "noMessagesDescription": "Ta sesja podagenta zakończyła się bez utworzenia zapisu rozmowy.",

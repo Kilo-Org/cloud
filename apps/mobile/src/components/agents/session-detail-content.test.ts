@@ -3324,7 +3324,11 @@ describe('session detail terminal load failure retry', () => {
         await Promise.resolve();
       });
       expect(errorCard(view).isRetrying).toBe(false);
-      expect(errorCard(view).message).toBe(i18n.t('agentChat.session.failedToLoadDetails'));
+      // The reopen answered with the typed retryable history failure, so the
+      // card names the temporary outage instead of the generic page-load line.
+      expect(errorCard(view).message).toBe(
+        i18n.t('agentChat.session.historyTemporarilyUnavailable')
+      );
       expect(cardRetryAction(view.renderer)).toBeDefined();
     } finally {
       vi.useRealTimers();

@@ -2300,6 +2300,7 @@
       "couldNotLoadThisSession": "Nu s-a putut încărca această sesiune.",
       "historyTooLarge": "Transcrierea acestei sesiuni este prea mare pentru a fi încărcată.",
       "historyUnavailable": "Transcrierea acestei sesiuni nu poate fi citită.",
+      "historyTemporarilyUnavailable": "Transcrierea acestei sesiuni este temporar indisponibilă.",
       "cloneFailedRetry": "Nu s-a putut clona această sesiune. Încearcă din nou.",
       "notEnoughCredits": "Nu ai suficiente credite pentru această solicitare. Adaugă credite și încearcă din nou.",
       "previousTaskFinishing": "Sarcina anterioară este în curs de finalizare. Așteaptă puțin.",
@@ -2867,6 +2868,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Nu s-a putut încărca sesiunea agentului secundar.",
+      "historyTooLarge": "Istoricul acestui agent secundar este prea mare pentru a fi încărcat.",
+      "historyUnavailable": "Istoricul acestui agent secundar nu este disponibil.",
+      "historyTemporarilyUnavailable": "Istoricul acestui agent secundar este temporar indisponibil.",
       "failed": "Sesiunea agentului secundar a eșuat.",
       "noMessages": "Niciun mesaj de la agentul secundar",
       "noMessagesDescription": "Această sesiune a agentului secundar s-a încheiat fără a genera o transcriere.",

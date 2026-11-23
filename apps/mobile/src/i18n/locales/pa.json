@@ -2251,6 +2251,7 @@
       "couldNotLoadThisSession": "ਇਹ ਸੈਸ਼ਨ ਲੋਡ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ।",
       "historyTooLarge": "ਇਸ ਸੈਸ਼ਨ ਦੀ ਲਿਖਤ ਲੋਡ ਕਰਨ ਲਈ ਬਹੁਤ ਵੱਡੀ ਹੈ।",
       "historyUnavailable": "ਇਸ ਸੈਸ਼ਨ ਦੀ ਲਿਖਤ ਨਹੀਂ ਪੜ੍ਹੀ ਜਾ ਸਕਦੀ।",
+      "historyTemporarilyUnavailable": "ਇਸ ਸੈਸ਼ਨ ਦੀ ਲਿਖਤ ਅਸਥਾਈ ਤੌਰ 'ਤੇ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।",
       "cloneFailedRetry": "ਇਹ ਸੈਸ਼ਨ ਕਲੋਨ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "notEnoughCredits": "ਇਸ ਬੇਨਤੀ ਲਈ ਕਾਫ਼ੀ ਕ੍ਰੈਡਿਟ ਨਹੀਂ ਹਨ। ਕ੍ਰੈਡਿਟ ਜੋੜੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "previousTaskFinishing": "ਪਿਛਲਾ ਕੰਮ ਅਜੇ ਪੂਰਾ ਹੋ ਰਿਹਾ ਹੈ। ਕਿਰਪਾ ਕਰਕੇ ਥੋੜ੍ਹੀ ਦੇਰ ਉਡੀਕੋ।",
@@ -2814,6 +2815,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "ਸਬਏਜੰਟ ਦਾ ਸੈਸ਼ਨ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕਿਆ।",
+      "historyTooLarge": "ਇਸ ਸਬਏਜੰਟ ਦਾ ਇਤਿਹਾਸ ਲੋਡ ਕਰਨ ਲਈ ਬਹੁਤ ਵੱਡਾ ਹੈ।",
+      "historyUnavailable": "ਇਸ ਸਬਏਜੰਟ ਦਾ ਇਤਿਹਾਸ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।",
+      "historyTemporarilyUnavailable": "ਇਸ ਸਬਏਜੰਟ ਦਾ ਇਤਿਹਾਸ ਅਸਥਾਈ ਤੌਰ 'ਤੇ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।",
       "failed": "ਸਬਏਜੰਟ ਦਾ ਸੈਸ਼ਨ ਅਸਫਲ ਹੋ ਗਿਆ।",
       "noMessages": "ਸਬਏਜੰਟ ਦਾ ਕੋਈ ਸੁਨੇਹਾ ਨਹੀਂ",
       "noMessagesDescription": "ਸਬਏਜੰਟ ਦਾ ਇਹ ਸੈਸ਼ਨ ਲਿਖਤ ਤਿਆਰ ਕੀਤੇ ਬਿਨਾਂ ਹੀ ਪੂਰਾ ਹੋ ਗਿਆ।",

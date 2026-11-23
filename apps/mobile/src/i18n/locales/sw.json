@@ -2251,6 +2251,7 @@
       "couldNotLoadThisSession": "Imeshindikana kupakia kikao hiki.",
       "historyTooLarge": "Andiko la kikao hiki ni kikubwa mno kupakia.",
       "historyUnavailable": "Andiko la kikao hiki haliwezi kusomeka.",
+      "historyTemporarilyUnavailable": "Andiko la kikao hiki halipatikani kwa muda.",
       "cloneFailedRetry": "Imeshindikana kunakili kikao hiki. Jaribu tena.",
       "notEnoughCredits": "Salio halitoshi kwa ombi hili. Ongeza salio na ujaribu tena.",
       "previousTaskFinishing": "Kazi iliyotangulia bado inakamilika. Tafadhali subiri kidogo.",
@@ -2814,6 +2815,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Imeshindikana kupakia kikao cha wakala msaidizi.",
+      "historyTooLarge": "Historia ya wakala msaidizi huyu ni kubwa mno kupakia.",
+      "historyUnavailable": "Historia ya wakala msaidizi huyu haipatikani.",
+      "historyTemporarilyUnavailable": "Historia ya wakala msaidizi huyu haipatikani kwa muda.",
       "failed": "Kikao cha wakala msaidizi kimeshindikana.",
       "noMessages": "Hakuna ujumbe wa wakala msaidizi",
       "noMessagesDescription": "Kikao hiki cha wakala msaidizi kilikamilika bila kutoa nakala ya mazungumzo.",

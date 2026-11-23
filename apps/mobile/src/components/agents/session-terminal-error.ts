@@ -1,4 +1,8 @@
-import { type SdkStatusMessageCode, type SessionStatusIndicator } from '@kilocode/cloud-agent-sdk';
+import {
+  type SdkStatusMessageCode,
+  type SessionSnapshotFailureKind,
+  type SessionStatusIndicator,
+} from '@kilocode/cloud-agent-sdk';
 
 import { i18n } from '@/i18n';
 import { type QueryErrorVariant } from '@/components/query-error';
@@ -353,6 +357,53 @@ export function describeTerminalFailure(message: string): SessionTerminalError {
 }
 
 /**
+ * The reader's copy and retryability for a child session's failed first-page
+ * load. The typed history kind decides both: a retryable failure names the
+ * outage and keeps its Retry, while a terminal kind — an oversize or unreadable
+ * stored page — states its own reason and never offers one, because the same
+ * read answers the same way every time. A null kind is a failure the read never
+ * typed (a dropped transport, or a worker 404 for a gone child), so it
+ * classifies from its sentence like any other error. The untranslated original
+ * stays in `detail` for Copy.
+ *
+ * The copy names the child as a sub-agent, matching the child sheet's own
+ * surface, instead of borrowing the root transcript's session wording. The
+ * title still comes from the session keys: the sheet is a session that failed
+ * to open, whatever the reader calls the thing they tapped.
+ */
+export function describeChildHistoryFailure(state: {
+  kind: SessionSnapshotFailureKind | null;
+  message: string;
+}): SessionTerminalError {
+  const { kind, message } = state;
+  if (kind === null) {
+    return describeTerminalFailure(message);
+  }
+  if (kind === 'retryable_failure') {
+    return {
+      variant: 'server',
+      title: i18n.t('agentChat.session.couldNotLoadThisSession'),
+      message: i18n.t('agentChat.childSessionSheet.historyTemporarilyUnavailable'),
+      retryable: true,
+      retryWith: 'session',
+      detail: message,
+    };
+  }
+  return {
+    variant: 'server',
+    title: i18n.t('agentChat.session.couldNotLoadThisSession'),
+    message: i18n.t(
+      kind === 'too_large'
+        ? 'agentChat.childSessionSheet.historyTooLarge'
+        : 'agentChat.childSessionSheet.historyUnavailable'
+    ),
+    retryable: false,
+    retryWith: 'session',
+    detail: message,
+  };
+}
+
+/**
  * Whether a terminal failure can recover by retrying. A coded failure names
  * its class directly; an uncoded one is classified from its message. The
  * composer's reason line uses this so a non-retryable failure on an empty
@@ -401,7 +452,8 @@ export function describeSessionRuntimeFailure(message: string): SessionRuntimeFa
  *
  * Precedence: a populated transcript never shows a terminal error; a typed
  * transcript-read failure a retry cannot recover is terminal with its own
- * copy; any other `errorAtom` value is a retryable server failure; a lost
+ * copy, while the retryable kind states the temporary outage and keeps its
+ * Retry; any other `errorAtom` value is a retryable server failure; a lost
  * agent transport is a retryable connection failure; any other
  * `statusIndicator` of type `error` is classified by its message.
  *
@@ -427,7 +479,7 @@ export function resolveSessionTerminalError(input: {
    * The typed transcript-read failure the manager recorded with `error`, when
    * it carries one. The kind decides the branch; the string stays untyped.
    */
-  historyFailureKind?: 'retryable_failure' | 'too_large' | 'invalid_data' | null;
+  historyFailureKind?: SessionSnapshotFailureKind | null;
 }): SessionTerminalError | null {
   // A session with rows on screen is not a failed open. A failed preparation
   // group is the run's own statement of what went wrong, with the failed stage
@@ -440,8 +492,20 @@ export function resolveSessionTerminalError(input: {
     // The atom carries the transport's own English text: an SDK fixed string,
     // or a server failure the transport forwards. Show the reader translated
     // copy and keep the original for the clipboard. The class decides the
-    // Retry for a transport failure; the typed transcript-read failure is
-    // decided by its kind instead, ahead of the classification.
+    // Retry for a transport failure; a typed transcript-read failure is decided
+    // by its kind instead, ahead of the classification: the retryable kind is
+    // this app's own temporary outage, while a terminal kind names a stored
+    // page a retry re-reads unchanged.
+    if (input.historyFailureKind === 'retryable_failure') {
+      return {
+        variant: 'server',
+        title: i18n.t('agentChat.session.couldNotLoadThisSession'),
+        message: i18n.t('agentChat.session.historyTemporarilyUnavailable'),
+        retryable: true,
+        retryWith: 'session',
+        detail: input.error,
+      };
+    }
     if (isTerminalSessionHistoryFailure(input.historyFailureKind)) {
       return {
         variant: 'server',

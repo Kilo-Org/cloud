@@ -2251,6 +2251,7 @@
       "couldNotLoadThisSession": "Ekki tókst að hlaða þessari lotu.",
       "historyTooLarge": "Spjallslóð þessarar lotu er of stór til að hlaða.",
       "historyUnavailable": "Ekki er hægt að lesa spjallslóð þessarar lotu.",
+      "historyTemporarilyUnavailable": "Spjallslóð þessarar lotu er tímabundið ekki tiltæk.",
       "cloneFailedRetry": "Ekki tókst að klóna þessa lotu. Reyndu aftur.",
       "notEnoughCredits": "Inneignin nægir ekki fyrir þessa beiðni. Bættu við inneign og reyndu aftur.",
       "previousTaskFinishing": "Fyrra verkefninu er ekki alveg lokið. Bíddu augnablik.",
@@ -2814,6 +2815,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Ekki tókst að hlaða lotu undirfulltrúans.",
+      "historyTooLarge": "Ferill þessa undirfulltrúa er of stór til að hlaða.",
+      "historyUnavailable": "Ferill þessa undirfulltrúa er ekki tiltækur.",
+      "historyTemporarilyUnavailable": "Ferill þessa undirfulltrúa er tímabundið ekki tiltækur.",
       "failed": "Lota undirfulltrúans mistókst.",
       "noMessages": "Engin skilaboð frá undirfulltrúa",
       "noMessagesDescription": "Þessari lotu undirfulltrúans lauk án þess að samtalsferill yrði til.",

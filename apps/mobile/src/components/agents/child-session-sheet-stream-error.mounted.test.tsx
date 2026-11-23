@@ -8,8 +8,10 @@ import {
   makeAssistantMessage,
   renderSheet,
   retryButton,
+  retryableState,
   type SheetProps,
   textValues,
+  tooLargeState,
   updateSheet,
 } from './child-session-sheet-test-helpers';
 import {
@@ -168,7 +170,11 @@ describe('ChildSessionSheet streamed session load error', () => {
     const renderer = await renderSheet(
       buildProps({
         getChildMessages: () => [],
-        hydrationState: { status: 'error', message: 'This session is no longer available.' },
+        hydrationState: {
+          status: 'error',
+          kind: null,
+          message: 'This session is no longer available.',
+        },
       })
     );
 
@@ -234,5 +240,92 @@ describe('ChildSessionSheet streamed session load error', () => {
     expect(textValues(sheet.renderer.root)).not.toContain(
       i18n.t('agentChat.childSessionSheet.loading')
     );
+  });
+
+  it('shows a terminal history failure while streaming and never re-issues it', async () => {
+    const props = {
+      ...buildProps({ getChildMessages: () => [], hydrationState: tooLargeState }),
+      isStreaming: true,
+    };
+    const renderer = await renderSheet(props);
+
+    // The stored page is oversize, so a retry re-reads it unchanged: the card
+    // states the reason while the child streams instead of holding a spinner.
+    expect(textValues(renderer.root)).toContain(i18n.t('agentChat.childSessionSheet.couldNotLoad'));
+    expect(textValues(renderer.root)).toContain(
+      i18n.t('agentChat.childSessionSheet.historyTooLarge')
+    );
+    expect(textValues(renderer.root)).not.toContain(i18n.t('agentChat.childSessionSheet.loading'));
+    expect(renderer.root.findAllByType(QueryError)).toHaveLength(1);
+    expect(
+      renderer.root.findAll(
+        node => (node.type as string) === 'Pressable' && node.props.accessibilityLabel === 'Retry'
+      )
+    ).toHaveLength(0);
+
+    // No hold, so the cadence that re-issues a recoverable failure never fires.
+    await act(async () => {
+      vi.advanceTimersByTime(HELD_CHILD_LOAD_RETRY_MS);
+      await Promise.resolve();
+    });
+    expect(props.onRetry).not.toHaveBeenCalled();
+    expect(textValues(renderer.root)).toContain(
+      i18n.t('agentChat.childSessionSheet.historyTooLarge')
+    );
+  });
+
+  it('holds a retryable history failure while streaming and re-issues it', async () => {
+    const props = {
+      ...buildProps({ getChildMessages: () => [], hydrationState: retryableState }),
+      isStreaming: true,
+    };
+    const renderer = await renderSheet(props);
+
+    // The typed retryable failure names the outage and, because the child is
+    // live, the sheet holds its loading state rather than the error card.
+    expect(textValues(renderer.root)).toContain(i18n.t('agentChat.childSessionSheet.loading'));
+    expect(textValues(renderer.root)).not.toContain(
+      i18n.t('agentChat.childSessionSheet.historyTemporarilyUnavailable')
+    );
+    expect(renderer.root.findAllByType(QueryError)).toHaveLength(0);
+    expect(props.onRetry).not.toHaveBeenCalled();
+
+    // The held load re-issues on its cadence, so the rows land when the
+    // outage clears.
+    await act(async () => {
+      vi.advanceTimersByTime(HELD_CHILD_LOAD_RETRY_MS);
+      await Promise.resolve();
+    });
+    expect(props.onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the retryable copy and Retry unchanged across a retry in flight', async () => {
+    const props = buildProps({
+      getChildMessages: () => [makeAssistantMessage()],
+      hydrationState: retryableState,
+    });
+    const renderer = await renderSheet(props);
+
+    expect(textValues(renderer.root)).toContain(
+      i18n.t('agentChat.childSessionSheet.historyTemporarilyUnavailable')
+    );
+    expect(retryButton(renderer.root).props.accessibilityState).toEqual({
+      disabled: false,
+      busy: false,
+    });
+
+    // Hydration drops its error while the retry runs: the retained kind keeps
+    // the copy and the retrying state on screen instead of the classifier's
+    // fallback for the blank message.
+    await updateSheet(renderer, { ...props, hydrationState: { status: 'loading' } });
+
+    expect(textValues(renderer.root)).toContain('child text');
+    expect(textValues(renderer.root)).toContain(
+      i18n.t('agentChat.childSessionSheet.historyTemporarilyUnavailable')
+    );
+    expect(retryButton(renderer.root).props.accessibilityState).toEqual({
+      disabled: true,
+      busy: true,
+    });
   });
 });

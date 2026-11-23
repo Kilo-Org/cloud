@@ -1607,6 +1607,7 @@
       "couldNotLoadThisSession": "Impossible de charger cette session",
       "historyTooLarge": "La transcription de cette session est trop volumineuse pour être chargée.",
       "historyUnavailable": "Impossible de lire la transcription de cette session.",
+      "historyTemporarilyUnavailable": "La transcription de cette session est temporairement indisponible.",
       "cloneFailedRetry": "Impossible de cloner cette session. Réessayez.",
       "notEnoughCredits": "Crédits insuffisants pour cette requête. Ajoutez des crédits et réessayez.",
       "previousTaskFinishing": "La tâche précédente se termine. Patientez un instant.",
@@ -2174,6 +2175,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Impossible de charger la session du sous-agent",
+      "historyTooLarge": "L'historique de ce sous-agent est trop volumineux pour être chargé.",
+      "historyUnavailable": "L'historique de ce sous-agent n'est pas disponible.",
+      "historyTemporarilyUnavailable": "L'historique de ce sous-agent est temporairement indisponible.",
       "failed": "La session du sous-agent a échoué",
       "noMessages": "Aucun message du sous-agent",
       "noMessagesDescription": "Cette session de sous-agent s'est terminée sans produire de transcription.",

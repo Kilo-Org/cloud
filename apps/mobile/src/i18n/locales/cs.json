@@ -2349,6 +2349,7 @@
       "couldNotLoadThisSession": "Tuto relaci se nepodařilo načíst.",
       "historyTooLarge": "Přepis této relace je příliš velký k načtení.",
       "historyUnavailable": "Přepis této relace nelze přečíst.",
+      "historyTemporarilyUnavailable": "Přepis této relace je dočasně nedostupný.",
       "cloneFailedRetry": "Tuto relaci se nepodařilo klonovat. Zkuste to znovu.",
       "notEnoughCredits": "Nemáte dost kreditů pro tento požadavek. Dobijte si kredity a zkuste to znovu.",
       "previousTaskFinishing": "Předchozí úkol se ještě dokončuje. Chvíli prosím počkejte.",
@@ -2920,6 +2921,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Relaci podřízeného agenta se nepodařilo načíst.",
+      "historyTooLarge": "Historie tohoto podřízeného agenta je příliš velká k načtení.",
+      "historyUnavailable": "Historie tohoto podřízeného agenta není dostupná.",
+      "historyTemporarilyUnavailable": "Historie tohoto podřízeného agenta je dočasně nedostupná.",
       "failed": "Relace podřízeného agenta selhala.",
       "noMessages": "Žádné zprávy podřízeného agenta",
       "noMessagesDescription": "Tato relace podřízeného agenta skončila bez vytvoření přepisu.",

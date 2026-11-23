@@ -11,6 +11,11 @@ import {
   type SessionSnapshotPageOutcome,
 } from '@kilocode/cloud-agent-sdk';
 import { cloudSessionMessagesPageWireSchema } from '@kilocode/cloud-agent-sdk/schemas';
+import {
+  isSessionSnapshotFailure,
+  sessionSnapshotFailureMessage,
+  type SessionSnapshotFailure,
+} from '@kilocode/cloud-agent-sdk/snapshot-page';
 import { z } from 'zod';
 
 type SessionReadOptions = { context: { skipBatch: boolean } };
@@ -118,11 +123,14 @@ export type CloudSessionPageTrpcClient = {
   };
 };
 
+/** One Cloud Agent history read: an accepted page (or its empty reading) or a typed failure. */
+export type CloudSessionPageRead = CloudSessionMessagesWirePage | SessionSnapshotFailure;
+
 export async function fetchWebCloudSessionSnapshotPage(
   trpcClient: CloudSessionPageTrpcClient,
   sessionId: CloudAgentSessionId,
   options: { organizationId?: string; kiloSessionId?: string; cursor?: string; limit?: number }
-): Promise<CloudSessionMessagesWirePage> {
+): Promise<CloudSessionPageRead> {
   const { organizationId, limit, ...pageOptions } = options;
   const pageLimit = limit ?? (pageOptions.cursor ? undefined : INITIAL_WEB_HISTORY_PAGE_SIZE);
   // Completed tool bodies arrive as bounded previews; expanded cards read the complete call.
@@ -132,7 +140,9 @@ export async function fetchWebCloudSessionSnapshotPage(
     toolDisplay: 'preview' as const,
     ...(pageLimit === undefined ? {} : { limit: pageLimit }),
   };
-  const read = async (pageInput: CloudSessionPageInput) => {
+  // A persisted page a retry reads again cannot recover, so its schema failure
+  // is a terminal outcome. The validation text is not a user-facing message.
+  const read = async (pageInput: CloudSessionPageInput): Promise<CloudSessionPageRead> => {
     const result = organizationId
       ? await trpcClient.organizations.cloudAgentNext.getSessionMessagesPage.query(
           { ...pageInput, organizationId },
@@ -142,18 +152,20 @@ export async function fetchWebCloudSessionSnapshotPage(
           pageInput,
           SESSION_READ_OPTIONS
         );
-    return cloudSessionMessagesPageWireSchema.parse(result);
+    const parsed = cloudSessionMessagesPageWireSchema.safeParse(result);
+    return parsed.success ? parsed.data : sessionSnapshotFailureMessage('invalid_data');
   };
   const first = await read(input);
-  if (!first || options.cursor || limit !== undefined) return first;
-  const page = await loadRecentUserTurns(first, async cursor => {
+  if (first === null || isSessionSnapshotFailure(first)) return first;
+  if (options.cursor || limit !== undefined) return first;
+  return loadRecentUserTurns(first, async cursor => {
     const older = await read({ ...input, cursor, limit: undefined });
-    if (older?.info.id !== first.info.id || older.source?.version !== first.source?.version) {
+    if (older === null || isSessionSnapshotFailure(older)) return null;
+    if (older.info.id !== first.info.id || older.source?.version !== first.source?.version) {
       return null;
     }
     return older;
   });
-  return cloudSessionMessagesPageWireSchema.parse(page);
 }
 
 function isHistoryPage(history: KiloSdkMessageHistory): history is KiloSdkMessageHistoryPage {

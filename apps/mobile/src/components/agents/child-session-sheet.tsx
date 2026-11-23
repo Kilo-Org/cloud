@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import {
   type ChildSessionHydrationState,
   type OlderMessagesError,
+  type SessionSnapshotFailureKind,
   type StoredMessage,
 } from '@kilocode/cloud-agent-sdk';
 
@@ -33,8 +34,8 @@ import { SessionPageSheet } from './session-page-sheet';
 import { SessionStatusIndicator } from './session-status-indicator';
 import {
   buildTerminalErrorCopyText,
+  describeChildHistoryFailure,
   describeSessionRuntimeFailure,
-  describeTerminalFailure,
 } from './session-terminal-error';
 import { performCopy } from './use-message-copy';
 import { WorkingIndicator } from './working-indicator';
@@ -105,13 +106,58 @@ export function ChildSessionSheet({
   // row. Drop it from the list so its padded wrapper cannot leave an empty row.
   const rowMessages = messages.filter(message => message.parts.some(partRendersContent));
   const sheetState = getChildSessionSheetState(hydrationState, messages.length, sessionError);
+  const { t } = useTranslation();
+  // Hydration drops its error while retrying. Retain this child's failure —
+  // its message and its typed kind — so the copy and the recovery controls do
+  // not change character until the request settles.
+  const [lastHydrationError, setLastHydrationError] = useState<{
+    sessionId: string;
+    kind: SessionSnapshotFailureKind | null;
+    message: string | null;
+  }>({ sessionId, kind: null, message: null });
+  let retainedHydrationError: { kind: SessionSnapshotFailureKind | null; message: string } | null =
+    null;
+  if (hydrationState.status === 'error') {
+    retainedHydrationError = { kind: hydrationState.kind, message: hydrationState.message };
+  } else if (
+    hydrationState.status === 'loading' &&
+    lastHydrationError.sessionId === sessionId &&
+    lastHydrationError.message !== null
+  ) {
+    retainedHydrationError = { kind: lastHydrationError.kind, message: lastHydrationError.message };
+  }
+  const hydrationError = retainedHydrationError?.message ?? null;
+  if (
+    lastHydrationError.sessionId !== sessionId ||
+    lastHydrationError.message !== hydrationError ||
+    lastHydrationError.kind !== (retainedHydrationError?.kind ?? null)
+  ) {
+    setLastHydrationError({
+      sessionId,
+      kind: retainedHydrationError?.kind ?? null,
+      message: hydrationError,
+    });
+  }
+  // The hydration error is a raw SDK string with a typed failure kind. Describe
+  // it so the reader sees catalog copy, and offer Retry only where one can
+  // help. A blank message stays undefined so `QueryError` falls back to its
+  // variant copy.
+  const describedHydrationError =
+    retainedHydrationError === null || retainedHydrationError.message === ''
+      ? null
+      : describeChildHistoryFailure(retainedHydrationError);
   // A streaming child is proof the session is live: its first rows are in
-  // flight, so the stored first-page failure must not render — not as the
-  // banner above rows (guarded below) and not full-screen before the first row
-  // lands. Hold the loading state and re-issue the load below, so the rows land
-  // when the fetch recovers.
+  // flight, so a first-page failure a retry can recover must not render — not
+  // as the banner above rows (guarded below) and not full-screen before the
+  // first row lands. Hold the loading state and re-issue the load below, so the
+  // rows land when the fetch recovers. A terminal kind (an oversize or
+  // unreadable stored page) is not held: the same read answers the same way
+  // every time, so its card states the reason while the child streams.
   const state =
-    sheetState === 'error' && isStreaming && hydrationState.status === 'error'
+    sheetState === 'error' &&
+    isStreaming &&
+    hydrationState.status === 'error' &&
+    describedHydrationError?.retryable === true
       ? 'loading'
       : sheetState;
   // The held loading state only resolves when the first page lands. A stream
@@ -119,48 +165,28 @@ export function ChildSessionSheet({
   // while the child keeps running, so the sheet must re-issue the load itself.
   // Retry on a cadence while the sheet is visible; the effect stops the moment
   // the state leaves the held loading state (the load succeeds, a row lands,
-  // or the child stops streaming).
-  const heldFailedLoad = state === 'loading' && hydrationState.status === 'error' && visible;
+  // or the child stops streaming). Only a recoverable failure is re-issued.
+  const heldFailedLoad =
+    state === 'loading' &&
+    hydrationState.status === 'error' &&
+    describedHydrationError?.retryable === true &&
+    visible;
   const onRetryRef = useRef(onRetry);
   useEffect(() => {
     onRetryRef.current = onRetry;
   }, [onRetry]);
   useEffect(() => {
-    const timer = heldFailedLoad
-      ? setTimeout(() => {
-          onRetryRef.current();
-        }, HELD_CHILD_LOAD_RETRY_MS)
-      : null;
+    if (!heldFailedLoad) {
+      return;
+    }
+    const timer = setTimeout(() => {
+      onRetryRef.current();
+    }, HELD_CHILD_LOAD_RETRY_MS);
     return () => {
-      if (timer !== null) {
-        clearTimeout(timer);
-      }
+      clearTimeout(timer);
     };
   }, [heldFailedLoad]);
   const modelLabel = getChildSessionModelLabel(messages, modelOptions ?? []);
-  const { t } = useTranslation();
-  // Hydration drops its error while retrying. Retain this child's copy so
-  // the recovery controls stay mounted until the request settles.
-  const [lastHydrationError, setLastHydrationError] = useState<{
-    sessionId: string;
-    message: string | null;
-  }>({ sessionId, message: null });
-  let hydrationError: string | null = null;
-  if (hydrationState.status === 'error') {
-    hydrationError = hydrationState.message;
-  } else if (hydrationState.status === 'loading' && lastHydrationError.sessionId === sessionId) {
-    hydrationError = lastHydrationError.message;
-  }
-  if (lastHydrationError.sessionId !== sessionId || lastHydrationError.message !== hydrationError) {
-    setLastHydrationError({ sessionId, message: hydrationError });
-  }
-  // The hydration and runtime errors are raw SDK strings. Describe each one so
-  // the reader sees catalog copy, and offer Retry only where one can help. A
-  // blank message stays undefined so `QueryError` falls back to its variant copy.
-  const describedHydrationError =
-    hydrationError === null || hydrationError === ''
-      ? null
-      : describeTerminalFailure(hydrationError);
   // The runtime error is a failed agent run, not a failed first-page load, so
   // it resolves through the same copy the transcript's error banner shows
   // rather than the hydration classifier's page-load fallback.

@@ -41,7 +41,12 @@ import {
 import type { CloudAgentSession, CloudAgentSessionConfig } from './session';
 import { createChatProcessor } from './chat-processor';
 import { removePendingRequest, upsertByRequestId } from './pending-requests';
-import { replayStoredMessages, sessionSnapshotFailureMessage } from './snapshot-page';
+import {
+  isSessionSnapshotFailure,
+  replayStoredMessages,
+  sessionSnapshotFailureMessage,
+} from './snapshot-page';
+import type { SessionSnapshotFailure, SessionSnapshotFailureKind } from './snapshot-page';
 import { createJotaiStorage } from './storage/jotai';
 import type { JotaiSessionStorage, JotaiStore } from './storage/jotai';
 import type { SessionStorage } from './storage/types';
@@ -192,7 +197,16 @@ type ChildSessionHydrationState =
       /** Total items omitted across every page loaded for this child so far. */
       omittedItemCount: number;
     }
-  | { status: 'error'; message: string };
+  | {
+      status: 'error';
+      /**
+       * Machine kind of the failed history read, or null when the failure
+       * carried none (a thrown read or a worker 404). The kind decides whether
+       * a surface offers a Retry.
+       */
+      kind: SessionSnapshotFailureKind | null;
+      message: string;
+    };
 
 const IDLE_CHILD_SESSION_HYDRATION_STATE = {
   status: 'idle',
@@ -1925,7 +1939,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   function storeChildHydrationFailure(
     storage: JotaiSessionStorage,
     childSessionId: KiloSessionId,
-    message: string
+    failure: { kind: SessionSnapshotFailureKind | null; message: string }
   ): void {
     if (childHasStoredMessages(storage, childSessionId)) {
       const next = new Map(store.get(childSessionHydrationStatesAtom));
@@ -1933,7 +1947,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       store.set(childSessionHydrationStatesAtom, next);
       return;
     }
-    setChildSessionHydrationState(childSessionId, { status: 'error', message });
+    setChildSessionHydrationState(childSessionId, { status: 'error', ...failure });
   }
 
   function isCurrentChildSessionHydration(
@@ -2006,7 +2020,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     childSessionId: KiloSessionId;
     cloudSessionId: CloudAgentSessionId | null;
     cursor?: string;
-  }): Promise<SessionSnapshotPageOutcome | null> {
+  }): Promise<SessionSnapshotPageOutcome | SessionSnapshotFailure | null> {
     const { childSessionId, cloudSessionId, cursor } = args;
     if (cloudSessionId) {
       if (!config.fetchCloudSnapshotPage) {
@@ -2018,6 +2032,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           ? { kiloSessionId: childSessionId }
           : { kiloSessionId: childSessionId, cursor }
       );
+      // A hook can report the typed failure itself instead of a page. Keep that
+      // machine kind, so the caller classifies it from the kind and not from a
+      // shape failure.
+      if (isSessionSnapshotFailure(cloudPage)) return cloudPage;
       // A page the transcript contract cannot describe is terminal for this
       // child, matching the root transcript's older-page read: retrying
       // re-reads the same persisted page. The schema's transform can also
@@ -2061,7 +2079,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     const request = (async () => {
       try {
         if (activeCloudSessionId || config.fetchSnapshotPage) {
-          let page: SessionSnapshotPageOutcome | null;
+          let page: SessionSnapshotPageOutcome | SessionSnapshotFailure | null;
           if (activeCloudSessionId) {
             page = await fetchChildPage({
               childSessionId,
@@ -2078,23 +2096,21 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           // A null page (worker 404) or any typed failure on the first page is
           // a terminal hydration error for this child.
           if (page === null) {
-            storeChildHydrationFailure(storage, childSessionId, CHILD_SESSION_NOT_FOUND_MESSAGE);
+            storeChildHydrationFailure(storage, childSessionId, {
+              kind: null,
+              message: CHILD_SESSION_NOT_FOUND_MESSAGE,
+            });
             return;
           }
           if (page.kind !== 'success') {
-            // A retryable read keeps the generic retry copy the apps already
-            // classify as transient. The terminal kinds store the history copy
-            // instead of a connection error, so a surface that classifies the
-            // message (the mobile child sheet) neither offers nor claims a
-            // retry; a surface that always draws a retry still shows honest
-            // copy for a page a retry re-reads unchanged.
-            storeChildHydrationFailure(
-              storage,
-              childSessionId,
-              page.kind === 'retryable_failure'
-                ? formatError(page)
-                : sessionSnapshotFailureMessage(page.kind).message
-            );
+            // The machine kind is the truth: it decides whether a surface
+            // offers a Retry. The message is the canonical history copy for
+            // every kind, so a retryable read no longer claims a generic
+            // connection error.
+            storeChildHydrationFailure(storage, childSessionId, {
+              kind: page.kind,
+              message: sessionSnapshotFailureMessage(page.kind).message,
+            });
             return;
           }
 
@@ -2125,7 +2141,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         });
       } catch (err) {
         if (!isCurrentChildSessionHydration(generation, rootSessionId, storage)) return;
-        storeChildHydrationFailure(storage, childSessionId, formatError(err));
+        storeChildHydrationFailure(storage, childSessionId, {
+          kind: null,
+          message: formatError(err),
+        });
       }
     })();
 
@@ -2161,7 +2180,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
     setChildSessionHydrationState(childSessionId, { ...state, isLoadingOlder: true });
 
-    let outcome: SessionSnapshotPageOutcome | null;
+    let outcome: SessionSnapshotPageOutcome | SessionSnapshotFailure | null;
     try {
       outcome = await fetchChildPage({
         childSessionId,

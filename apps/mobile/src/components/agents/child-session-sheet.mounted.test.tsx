@@ -6,14 +6,17 @@ import {
   errorState,
   findByTestID,
   host,
+  invalidDataState,
   makeAssistantMessage,
   reactNativeMock,
   readyState,
   renderSheet,
   retryButton,
+  retryableState,
   safeAreaMock,
   sheet,
   textValues,
+  tooLargeState,
   updateSheet,
 } from './child-session-sheet-test-helpers';
 import { QueryError } from '@/components/query-error';
@@ -66,6 +69,35 @@ describe('ChildSessionSheet title layout', () => {
       sessionError: null,
       expectedText: i18n.t('agentChat.session.connectionTrouble'),
       retryCount: 1,
+    },
+    // A typed retryable read failure names the outage in the sheet's own
+    // sub-agent wording, not the sentence the transport forwarded, and keeps
+    // its Retry.
+    {
+      state: 'retryable history failure',
+      hydrationState: retryableState,
+      messages: [],
+      sessionError: null,
+      expectedText: i18n.t('agentChat.childSessionSheet.historyTemporarilyUnavailable'),
+      retryCount: 1,
+    },
+    // A terminal kind names what cannot be read and offers no Retry: the same
+    // read answers the same way every time.
+    {
+      state: 'too large history failure',
+      hydrationState: tooLargeState,
+      messages: [],
+      sessionError: null,
+      expectedText: i18n.t('agentChat.childSessionSheet.historyTooLarge'),
+      retryCount: 0,
+    },
+    {
+      state: 'invalid history failure',
+      hydrationState: invalidDataState,
+      messages: [],
+      sessionError: null,
+      expectedText: i18n.t('agentChat.childSessionSheet.historyUnavailable'),
+      retryCount: 0,
     },
     {
       state: 'terminal error',

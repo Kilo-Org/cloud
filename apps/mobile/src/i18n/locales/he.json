@@ -1712,6 +1712,7 @@
       "couldNotLoadThisSession": "לא ניתן היה לטעון את הסשן הזה.",
       "historyTooLarge": "ההתעתק של הסשן הזה גדול מדי מכדי לטעון.",
       "historyUnavailable": "לא ניתן לקרוא את ההתעתק של הסשן הזה.",
+      "historyTemporarilyUnavailable": "ההתעתק של הסשן הזה אינו זמין באופן זמני.",
       "cloneFailedRetry": "לא ניתן היה לשכפל את הסשן הזה. נסה שוב.",
       "notEnoughCredits": "אין מספיק קרדיטים לבקשה הזו. הוסף קרדיטים ונסה שוב.",
       "previousTaskFinishing": "המשימה הקודמת עדיין לא הסתיימה. המתן רגע.",
@@ -2279,6 +2280,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "לא ניתן היה לטעון את הסשן של תת-הסוכן.",
+      "historyTooLarge": "ההיסטוריה של תת-הסוכן הזה גדולה מדי מכדי לטעון.",
+      "historyUnavailable": "ההיסטוריה של תת-הסוכן הזה אינה זמינה.",
+      "historyTemporarilyUnavailable": "ההיסטוריה של תת-הסוכן הזה אינה זמינה באופן זמני.",
       "failed": "הסשן של תת-הסוכן נכשל.",
       "noMessages": "אין הודעות מתת-הסוכן",
       "noMessagesDescription": "הסשן של תת-הסוכן הסתיים ללא תמליל.",

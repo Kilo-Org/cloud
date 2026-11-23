@@ -7,7 +7,11 @@ import {
   type CloudAgentSessionId,
 } from '@kilocode/cloud-agent-sdk';
 import type * as SessionPageAdapter from './session-page-adapter';
-import type { CloudSessionPageTrpcClient, SessionPageTrpcClient } from './session-page-adapter';
+import type {
+  CloudSessionPageRead,
+  CloudSessionPageTrpcClient,
+  SessionPageTrpcClient,
+} from './session-page-adapter';
 
 const mockCaptureException = jest.fn();
 jest.mock('@sentry/nextjs', () => ({ captureException: mockCaptureException }));
@@ -21,6 +25,12 @@ beforeAll(async () => {
 });
 
 const unbatched = { context: { skipBatch: true } };
+
+/** Narrow a Cloud Agent read to an accepted page, so the assertions read its fields. */
+function successPage(read: CloudSessionPageRead) {
+  if (read === null || read.kind !== 'success') throw new Error('Expected a session history page');
+  return read;
+}
 
 function kiloSessionId(id: string): KiloSessionId {
   return id as KiloSessionId;
@@ -268,14 +278,41 @@ describe('fetchWebCloudSessionSnapshotPage', () => {
     }
   );
 
-  it('validates mutation cursors and does not fall back on null or invalid DO results', async () => {
+  it('keeps a null page and answers an invalid page with a typed failure', async () => {
     const fixture = client();
     fixture.personal
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce({ ...page, updateCursor: 'wrong' });
     await expect(fetchWebCloudSessionSnapshotPage(fixture.trpc, sessionId, {})).resolves.toBeNull();
-    await expect(fetchWebCloudSessionSnapshotPage(fixture.trpc, sessionId, {})).rejects.toThrow();
+    await expect(fetchWebCloudSessionSnapshotPage(fixture.trpc, sessionId, {})).resolves.toEqual({
+      kind: 'invalid_data',
+      message: 'Session history is unavailable',
+    });
     expect(fixture.ingest).not.toHaveBeenCalled();
+  });
+
+  it('answers a page the wire schema rejects with a typed failure instead of a rejection', async () => {
+    const fixture = client();
+    fixture.organization.mockResolvedValue({ ...page, messages: 'not-an-array' });
+    await expect(
+      fetchWebCloudSessionSnapshotPage(fixture.trpc, sessionId, { organizationId: 'org-1' })
+    ).resolves.toEqual({ kind: 'invalid_data', message: 'Session history is unavailable' });
+    expect(fixture.organization).toHaveBeenCalledTimes(1);
+    expect(fixture.personal).not.toHaveBeenCalled();
+  });
+
+  it('keeps the initial page when an older page fails the wire schema', async () => {
+    const fixture = client();
+    mockCaptureException.mockClear();
+    const first = { ...page, nextCursor: 'older' };
+    fixture.personal
+      .mockResolvedValueOnce(first)
+      .mockResolvedValueOnce({ ...page, updateCursor: 'wrong' });
+    await expect(fetchWebCloudSessionSnapshotPage(fixture.trpc, sessionId, {})).resolves.toEqual(
+      first
+    );
+    expect(fixture.personal).toHaveBeenCalledTimes(2);
+    expect(mockCaptureException).not.toHaveBeenCalled();
   });
 
   it.each(['v1', 'v2'] as const)(
@@ -384,7 +421,7 @@ describe('fetchWebCloudSessionSnapshotPage', () => {
     }));
     const result = await fetchWebCloudSessionSnapshotPage(fixture.trpc, sessionId, {});
     expect(fixture.personal).toHaveBeenCalledTimes(5);
-    expect(result?.nextCursor).toBe('start-older-older-older-older-older');
+    expect(successPage(result).nextCursor).toBe('start-older-older-older-older-older');
   });
 
   it('keeps a usable partial page and retry cursor when an additional read fails', async () => {
@@ -414,9 +451,9 @@ describe('fetchWebCloudSessionSnapshotPage', () => {
       .mockResolvedValueOnce(first)
       .mockResolvedValueOnce(second)
       .mockResolvedValueOnce({ ...page, messages: messages('older', 11), nextCursor: 'three' });
-    const result = await fetchWebCloudSessionSnapshotPage(fixture.trpc, sessionId, {});
-    expect(result?.messages).toHaveLength(190);
-    expect(result?.nextCursor).toBe('two');
+    const result = successPage(await fetchWebCloudSessionSnapshotPage(fixture.trpc, sessionId, {}));
+    expect(result.messages).toHaveLength(190);
+    expect(result.nextCursor).toBe('two');
     expect(fixture.personal).toHaveBeenCalledTimes(3);
   });
 
@@ -446,8 +483,8 @@ describe('fetchWebCloudSessionSnapshotPage', () => {
         messages: [message('msg_user', 'user')],
         nextCursor: 'two',
       });
-    const result = await fetchWebCloudSessionSnapshotPage(fixture.trpc, sessionId, {});
-    expect(result?.nextCursor).toBe('two');
+    const result = successPage(await fetchWebCloudSessionSnapshotPage(fixture.trpc, sessionId, {}));
+    expect(result.nextCursor).toBe('two');
     expect(fixture.personal).toHaveBeenCalledTimes(2);
   });
 

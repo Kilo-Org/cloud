@@ -2251,6 +2251,7 @@
       "couldNotLoadThisSession": "Kalfadhigan lama soo shubi karin.",
       "historyTooLarge": "Qoralka kalfadhigan waa aad u weyn yahay si la soo shubo.",
       "historyUnavailable": "Qoralka kalfadhigan lama akhriyi karo.",
+      "historyTemporarilyUnavailable": "Qoralka kalfadhigan si ku meel gaar ah looma heli karo.",
       "cloneFailedRetry": "Kalfadhigan nuqul lagama samayn karin. Mar kale isku day.",
       "notEnoughCredits": "Lacagta isticmaalka kuma filna codsigan. Lacag ku dar oo mar kale isku day.",
       "previousTaskFinishing": "Hawshii hore weli waa la dhammaystirayaa. Fadlan wax yar sug.",
@@ -2814,6 +2815,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Kalfadhiga wakiilka hoose lama soo shubi karin.",
+      "historyTooLarge": "Taariikhda wakiilkan hoose aad bay u weyn tahay si la soo shubo.",
+      "historyUnavailable": "Taariikhda wakiilkan hoose lama heli karo.",
+      "historyTemporarilyUnavailable": "Taariikhda wakiilkan hoose si ku meel gaar ah looma heli karo.",
       "failed": "Kalfadhiga wakiilka hoose wuu fashilmay.",
       "noMessages": "Ma jiraan farriimo ka yimid wakiilka hoose",
       "noMessagesDescription": "Kalfadhigan wakiilka hoose wuu dhammaaday isaga oo aan soo saarin qoraal.",

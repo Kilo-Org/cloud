@@ -2349,6 +2349,7 @@
       "couldNotLoadThisSession": "Te seje ni bilo mogoče naložiti.",
       "historyTooLarge": "Zapis te seje je prevelik za nalaganje.",
       "historyUnavailable": "Zapisa te seje ni mogoče prebrati.",
+      "historyTemporarilyUnavailable": "Zapis te seje začasno ni na voljo.",
       "cloneFailedRetry": "Te seje ni bilo mogoče klonirati. Poskusi znova.",
       "notEnoughCredits": "Za to zahtevo ni dovolj kreditov. Dodaj kredite in poskusi znova.",
       "previousTaskFinishing": "Prejšnja naloga se še zaključuje. Počakaj trenutek.",
@@ -2920,6 +2921,9 @@
     },
     "childSessionSheet": {
       "couldNotLoad": "Seje podagenta ni bilo mogoče naložiti.",
+      "historyTooLarge": "Zgodovina tega podagenta je prevelika za nalaganje.",
+      "historyUnavailable": "Zgodovina tega podagenta ni na voljo.",
+      "historyTemporarilyUnavailable": "Zgodovina tega podagenta začasno ni na voljo.",
       "failed": "Seja podagenta ni uspela.",
       "noMessages": "Ni sporočil podagenta",
       "noMessagesDescription": "Ta seja podagenta se je končala brez zapisa pogovora.",

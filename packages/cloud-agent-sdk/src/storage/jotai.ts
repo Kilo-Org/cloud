@@ -257,10 +257,6 @@ function createJotaiStorage(
     },
 
     getParts(messageId) {
-      // Buffered stream chunks are not published until the frame flush, but a
-      // direct reader (the chat processor's empty-text guard) must still see
-      // the deltas that already arrived. Consume them into the parts map
-      // without bumping the revision or notifying subscribers.
       applyPendingTextDeltas(messageId);
       return readPartsSnapshot(messageId, partsMap.get(messageId), partsSnapshot, partViews);
     },
@@ -275,8 +271,6 @@ function createJotaiStorage(
       return part ? createReadonlyPartView(part) : undefined;
     },
 
-    // Consuming pending deltas first matches `getPart`/`getParts`: a direct
-    // reader must see the chunks that already arrived.
     getPartIds(messageId) {
       applyPendingTextDeltas(messageId);
       return (partsMap.get(messageId) ?? []).map(p => p.id);
